@@ -1316,6 +1316,73 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         r"\1",
     ),
+    # ── Ronda 20 — Bug GG: placeholder "procedimiento facturado según
+    # historia clínica" EN MEDIO del argumento ──
+    # Caso real 30-jun (SALUD TOTAL TMS): "el servicio de hospitalización
+    # psiquiátrica con tms, el procedimiento facturado según historia
+    # clínica, por valor objetado". El placeholder está concatenado entre
+    # texto real y una coma. Bug DD (ronda 19) solo lo limpiaba al FINAL
+    # del campo servicio; aquí lo quitamos también cuando aparece en medio
+    # del cuerpo del argumento, precedido de coma y seguido de coma.
+    (
+        re.compile(
+            r",\s*(?:el|la)\s+(?:procedimiento|medicamento|servicio)\s+"
+            r"facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\s*,",
+            re.IGNORECASE,
+        ),
+        ",",
+    ),
+    # Variante seguida de "por valor"/"por concepto" sin coma intermedia.
+    (
+        re.compile(
+            r",\s*(?:el|la)\s+(?:procedimiento|medicamento|servicio)\s+"
+            r"facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\s+"
+            r"(?=por\s+(?:valor|concepto)|respecto)",
+            re.IGNORECASE,
+        ),
+        ", ",
+    ),
+    # Variante al final de un campo: "..., el procedimiento facturado según
+    # historia clínica</div>" o "...clínica" + fin. Caso del campo
+    # "Servicio objetado" cuando el dictamen vino del Quality Gate (que no
+    # popula servicio_ia → Bug DD de ronda 19 no lo limpió).
+    (
+        re.compile(
+            r",\s*(?:el|la)\s+(?:procedimiento|medicamento|servicio)\s+"
+            r"facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\s*(?=<|$)",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        "",
+    ),
+    # ── Ronda 20 — Bug HH: "[EPS] la entidad pagadora" duplicado ──
+    # Caso real 30-jun: "la sanción del 10% aplicada por salud total la
+    # entidad pagadora el servicio". El nombre de la EPS quedó seguido de
+    # "la entidad pagadora" (residuo de placeholder elidido) + un sustantivo
+    # sin preposición. Reparamos los dos defectos.
+    # Caso específico: "[EPS] la entidad pagadora el/la [sustantivo]" →
+    # "[EPS] respecto del/de la [sustantivo]" (repara nombre + preposición).
+    (
+        re.compile(
+            r"\b(SALUD\s+TOTAL|SURA|COMPENSAR|FAMISANAR|SANITAS|COOSALUD|"
+            r"NUEVA\s+EPS|ECOOPSOS|EMSSANAR|MUTUAL\s+SER|CAPITAL\s+SALUD|"
+            r"MEDIM[ÁA]S|ASMET\s+SALUD)\s+la\s+entidad\s+pagadora\s+"
+            r"(?:el|la)\s+(servicio|procedimiento|medicamento|valor|"
+            r"tratamiento|insumo)\b",
+            re.IGNORECASE,
+        ),
+        r"\1, respecto del \2",
+    ),
+    # Caso general: "[EPS] la entidad pagadora" (sin sustantivo después) →
+    # "[EPS]" (quita el residuo duplicado).
+    (
+        re.compile(
+            r"\b(SALUD\s+TOTAL|SURA|COMPENSAR|FAMISANAR|SANITAS|COOSALUD|"
+            r"NUEVA\s+EPS|ECOOPSOS|EMSSANAR|MUTUAL\s+SER|CAPITAL\s+SALUD|"
+            r"MEDIM[ÁA]S|ASMET\s+SALUD)\s+la\s+entidad\s+pagadora\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
 )
 
 
@@ -1891,24 +1958,45 @@ def _limpiar_placeholder_servicio(servicio: str) -> str:
 # variantes "contrato vigente CTR", "contrato CTR-", "según contrato N°"),
 # el dictamen NO puede afirmar "sin contrato pactado". Sustituimos por
 # referencia genérica al contrato vigente.
+# Ronda 20 (Bug FF, 30-jun-2026): el regex captura el CÓDIGO del contrato
+# en el grupo 1 (sin la palabra "contrato"). Antes capturaba "contrato
+# CTR-2024" (con la palabra Y truncado a 4 dígitos) → el reemplazo daba
+# "según el contrato contrato CTR-2024". El primer patrón prioriza el
+# formato completo CTR-AÑO-NOMBRE-HUS para no truncar.
 _RE_CONTRATO_CITADO_GLOSA = re.compile(
-    r"\bCTR\-\d{4}\-[A-Z0-9]+\-HUS\b|"
-    r"\bCONTRATO\s+(?:VIGENTE\s+)?CTR\-\d{2,4}|"
-    r"\bSEG[ÚU]N\s+CONTRATO\s+N[°º\.]?\s*\d{2,6}|"
-    r"\bCONTRATO\s+(?:N[°º\.]?\s*|N[ÚU]MERO\s+)?\d{4,6}|"
-    r"\bCONFORME\s+AL\s+CONTRATO\s+\d{3,}",
+    r"\b("
+    r"CTR\-\d{4}\-[A-Z0-9]+\-HUS"  # CTR-2024-SALUDTOTAL-HUS (completo)
+    r"|CTR\-\d{2,6}(?:\-[A-Z0-9]+)*"  # CTR-2024 / CTR-2024-XXX (parcial)
+    r"|\d{3,4}\-[A-Z]+/[A-Z]+\-\d{4}"  # 440-DIGSA/DMBUG-2025 (militar)
+    r"|CONTRATO\s+(?:VIGENTE\s+)?N[°º\.]?\s*\d{4,6}"  # CONTRATO N° 12345
+    r"|CONTRATO\s+N[ÚU]MERO\s+\d{4,6}"  # CONTRATO NÚMERO 12345
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Limpia el prefijo "CONTRATO"/"N°" si quedó dentro de la captura, para
+# que el reemplazo no duplique la palabra "contrato".
+_RE_LIMPIAR_PREFIJO_CONTRATO = re.compile(
+    r"^(?:CONTRATO\s+)?(?:VIGENTE\s+)?(?:N[°º\.]?\s*|N[ÚU]MERO\s+)?",
     re.IGNORECASE,
 )
 
 
 def _detectar_contrato_citado_en_glosa(texto_glosa: str) -> str | None:
-    """Devuelve el código de contrato si la glosa lo cita textualmente.
-    Útil para validar que el dictamen no niegue su existencia.
+    """Devuelve el CÓDIGO de contrato (sin la palabra "contrato") si la
+    glosa lo cita textualmente. Útil para validar que el dictamen no
+    niegue su existencia.
+
+    "del contrato CTR-2024-SALUDTOTAL-HUS" → "CTR-2024-SALUDTOTAL-HUS"
+    "según contrato N° 12345"              → "12345"
     """
     if not texto_glosa:
         return None
     m = _RE_CONTRATO_CITADO_GLOSA.search(texto_glosa)
-    return m.group(0) if m else None
+    if not m:
+        return None
+    codigo = _RE_LIMPIAR_PREFIJO_CONTRATO.sub("", m.group(1).strip()).strip()
+    return codigo or None
 
 
 def _reescribir_negacion_contrato(
@@ -5512,21 +5600,13 @@ class GlosaService:
                 tarifa=tarifa_ia if tarifa_ia else None,
             )
 
-        # ── Ronda 19 (Bug BB): banner de alerta cuando se corrigió la EPS ──
-        # Si el dropdown contradecía el texto y el motor priorizó la EPS del
-        # texto, mostramos un banner amarillo visible al inicio del dictamen
-        # para que el gestor sepa qué pasó y pueda corregir el dropdown si
-        # el motor se equivocó.
-        _eps_alerta = getattr(self, "_eps_alerta_actual", "")
-        if _eps_alerta and modo_resp != "auditoria_previa":
-            _banner_eps = (
-                '<div style="margin-bottom:12px;padding:10px 14px;'
-                "background:#fef9c3;border:2px solid #eab308;border-radius:8px;"
-                'font-size:12px;color:#854d0e;">'
-                f"⚠️ <b>EPS corregida automáticamente:</b> {_eps_alerta}"
-                "</div>"
-            )
-            dictamen = _banner_eps + dictamen
+        # ── Ronda 19 (Bug BB) + Ronda 20 (Bug EE): el banner de alerta de
+        # EPS corregida se inyecta AL FINAL del flujo (más abajo, justo
+        # antes de construir GlosaResult), DESPUÉS de todos los sanitizers
+        # del dictamen. Antes (ronda 19) se inyectaba aquí y el sanitizer
+        # _sustituir_eps_inventada confundía "EPS corregida" con un nombre
+        # de EPS inventado → lo reemplazaba por "la entidad pagadora",
+        # rompiendo el banner ("⚠️ la entidad pagadora automáticamente").
 
         # ═══════════════════════════════════════════════════════════
         #  Multi-código: un dictamen por código (jun-2026).
@@ -5993,6 +6073,21 @@ class GlosaService:
         # inflada era la más visible. Ahora el gauge responde a la evidencia:
         # cada cita inválida descuenta, y nunca supera confianza_real + 10.
         score = _ajustar_score_por_evidencia(score, verif_citas, confianza)
+
+        # ── Ronda 20 (Bug EE): banner de EPS corregida — inyectado AL FINAL,
+        # después de TODOS los sanitizers del dictamen, para que ninguno lo
+        # modifique. La palabra "EPS" del banner ya no es tocada por
+        # _sustituir_eps_inventada (que corrió mucho antes sobre el cuerpo).
+        _eps_alerta = getattr(self, "_eps_alerta_actual", "")
+        if _eps_alerta and modo_resp != "auditoria_previa":
+            _banner_eps = (
+                '<div style="margin-bottom:12px;padding:10px 14px;'
+                "background:#fef9c3;border:2px solid #eab308;border-radius:8px;"
+                'font-size:12px;color:#854d0e;">'
+                f"⚠️ <b>Entidad pagadora corregida:</b> {_eps_alerta}"
+                "</div>"
+            )
+            dictamen = _banner_eps + dictamen
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
