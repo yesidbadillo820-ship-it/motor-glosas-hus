@@ -291,22 +291,26 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     send_keys(_escapar(factura_larga) + "{ENTER}")
     logger.info(f"  factura {factura_larga} escrita; esperando autocargue…")
 
-    # 3) Esperar el autocargue: la señal fiable es que la GRILLA reciba la fila
-    #    de concepto (Tercero y demás ctrl* del encabezado están virtualizados).
+    # 3) Esperar el autocargue. Es ASÍNCRONO (DevExpress.Data.Async): para una
+    #    factura de régimen especial puede tardar ~20-30s. La señal fiable es que
+    #    la GRILLA reciba la fila de concepto (Tercero y demás ctrl* están
+    #    virtualizados). Damos hasta 45s.
+    grid = _buscar(editor, auto_id="gcConceptosObjecion", timeout=12)
+    if grid is None:
+        logger.error("  no hallé la grilla de conceptos (gcConceptosObjecion).")
+        if dump_al_fallar:
+            _dump("sin_grilla")
+        return "ERROR_GRILLA"
     datos = None
-    fin = time.time() + 20
+    fin = time.time() + 45
     while time.time() < fin:
-        grid = _buscar(editor, auto_id="gcConceptosObjecion", timeout=1)
-        if grid is not None:
-            d = _buscar(grid, auto_id="dataPresenter", timeout=1)
-            if d is not None and _buscar(d, control_type="DataItem", timeout=1) is not None:
-                datos = d
-                break
-        time.sleep(0.6)
+        d = _buscar(grid, auto_id="dataPresenter", timeout=1)
+        if d is not None and _buscar(d, control_type="DataItem", timeout=1) is not None:
+            datos = d
+            break
+        time.sleep(0.8)
     if datos is None:
-        logger.error(
-            "  la factura no autocargó (grilla sin filas). ¿Número correcto / ya tramitada?"
-        )
+        logger.error("  la factura no autocargó en 45s (grilla sin filas). ¿Ya tramitada?")
         if dump_al_fallar:
             _dump("sin_autocargue")
         return "NO_AUTOCARGA"
