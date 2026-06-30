@@ -226,10 +226,25 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         except Exception:
             pass
 
+    # Acotar al ÁRBOL del Editor activo: buscar controles profundos en el árbol
+    # completo de DG (con todas las pestañas) es lento y no siempre resuelve.
+    # Con una sola pestaña Editor abierta, esto es único y rápido.
+    editor = _buscar(win, name_re="Editor de Tr.mite", control_type="Window", timeout=8) or win
+
     # 2) Escribir la Factura → DG autocarga los datos de la objeción.
-    factura_ctl = _buscar(win, auto_id="ctrlFactura", timeout=10)
+    factura_ctl = _buscar(editor, auto_id="ctrlFactura", timeout=8)
     if factura_ctl is None:
-        logger.error("  no hallé el campo Factura (ctrlFactura).")
+        # Fallback: el LayoutItem 'Factura' → su editor interno (estado en blanco).
+        fac_pane = _buscar(editor, auto_id="Factura", control_type="Pane", timeout=4)
+        if fac_pane is not None:
+            factura_ctl = _buscar(
+                fac_pane, auto_id="PART_Editor", control_type="Edit", timeout=3
+            ) or _buscar(fac_pane, control_type="Edit", timeout=3)
+    if factura_ctl is None:
+        logger.error(
+            "  no hallé el campo Factura. Si tenés varias pestañas 'Editor de Trámite' abiertas, "
+            "cerralas (dejá sólo el Listado) y reintentá."
+        )
         if dump_al_fallar:
             _dump("sin_factura")
         return "ERROR_FACTURA"
@@ -241,7 +256,7 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     cargado = False
     fin = time.time() + 20
     while time.time() < fin:
-        tercero = _buscar(win, auto_id="ctrlTercero", timeout=1)
+        tercero = _buscar(editor, auto_id="ctrlTercero", timeout=1)
         try:
             if tercero is not None and (tercero.window_text() or "").strip():
                 cargado = True
@@ -257,7 +272,7 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     logger.info("  ✓ datos de la factura autocargados.")
 
     # 4) Llenar la grilla de conceptos (gcConceptosObjecion), fila por fila.
-    grid = _buscar(win, auto_id="gcConceptosObjecion", timeout=10)
+    grid = _buscar(editor, auto_id="gcConceptosObjecion", timeout=10)
     if grid is None:
         logger.error("  no hallé la grilla de conceptos (gcConceptosObjecion).")
         if dump_al_fallar:
@@ -329,7 +344,9 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         return "PILOTO_OK"
 
     # 5) GRABAR + diálogo 'Registro grabado' (Confirmar=Sí, Imprimir=Sí).
-    grabar_btn = _buscar(win, name="GRABAR", control_type="Button", timeout=5)
+    grabar_btn = _buscar(
+        editor, auto_id="BarButtonItemLink0", control_type="Button", timeout=4
+    ) or _buscar(editor, name="GRABAR", control_type="Button", timeout=4)
     if grabar_btn is None:
         logger.error("  no hallé el botón GRABAR.")
         if dump_al_fallar:
