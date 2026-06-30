@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import re
 import sys
 import unicodedata
 from collections import Counter, defaultdict
@@ -233,10 +232,10 @@ def procesar_recepcion(
     # fila como una glosa a evaluar).
     try:
         idx = _idx(headers, COLS_RECEPCION)
-        logger.info(f"  formato detectado: RECEPCION (export del Listado de Recepción)")
+        logger.info("  formato detectado: RECEPCION (export del Listado de Recepción)")
     except ValueError:
         idx = _idx(headers, COLS_RECEPCION_DESDE_TRAMITE)
-        logger.info(f"  formato detectado: TRAMITE (export del Listado de Trámite)")
+        logger.info("  formato detectado: TRAMITE (export del Listado de Trámite)")
 
     fil_eps = _norm(filtro_eps or "")
     fil_fac = (filtro_factura or "").strip().upper()
@@ -280,7 +279,6 @@ def procesar_recepcion(
         cod_obj = str(r[idx["cod_obj"]] or "").strip()
         if not cod_obj:
             continue
-        v_obj = r[idx["val_obj"]] or 0
         propuesta = patrones.proponer(eps, cod_obj)
         v_ace = propuesta["valor_aceptado"]
         if v_ace == -1:

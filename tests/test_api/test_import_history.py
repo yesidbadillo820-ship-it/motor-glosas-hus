@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -98,9 +96,15 @@ class TestImportHistory:
         assert d["items"][0]["glosas_creadas"] == 12
 
     def test_orden_clusters_desc(self, client, db_session):
-        ts1 = datetime(2026, 4, 10, 10, 0, tzinfo=timezone.utc)
-        ts2 = datetime(2026, 4, 12, 14, 0, tzinfo=timezone.utc)
-        # 20 glosas en ts1
+        from datetime import timedelta
+
+        # Fechas RELATIVAS a "ahora" y dentro de la ventana de 60 días. Con fechas
+        # fijas el test caducaba: una vez pasados 60 días de esas fechas quedaban
+        # fuera de la ventana, la lista venía vacía y el test fallaba con
+        # IndexError en items[0].
+        ts1 = ahora_utc() - timedelta(days=20)
+        ts2 = ahora_utc() - timedelta(days=10)
+        # 20 glosas en ts1 (cluster más grande)
         for _ in range(20):
             _seed(db_session, ts1)
         # 11 glosas en ts2

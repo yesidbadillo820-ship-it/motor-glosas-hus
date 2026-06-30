@@ -386,7 +386,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--exe", type=Path, default=DEFAULT_EXE,
-        help=f"Ruta a DG.WinDG.exe (default desde LOCALAPPDATA)."
+        help="Ruta a DG.WinDG.exe (default desde LOCALAPPDATA)."
     )
     parser.add_argument(
         "--area", default=os.environ.get("DG_AREA", "Hospitalización"),
