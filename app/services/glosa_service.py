@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import hashlib
 import asyncio
 import time
@@ -2324,6 +2325,285 @@ _RE_HTML_ESTRUCTURAL = re.compile(
 # Ej: S-13-1-03-1-04958, F-2024-001, T-553/2024, RES-456, AU-301.
 # Pattern: 1-3 mayúsculas iniciales + hífen/slash + alfanumérico (≥4 chars).
 _RE_CODIGO_HIFENADO = re.compile(r"\b[A-Z]{1,4}(?:[\-/][A-Z0-9]+){2,}\b")
+
+
+# ════════════════════════════════════════════════════════════════════
+# MEJORA #3 — Salida estructurada incremental (jun-2026)
+#
+# El LLM emite, DESPUÉS de </argumento> y como último bloque, un objeto
+# JSON delimitado por <CAMPOS_ESTRUCTURADOS>{...}</CAMPOS_ESTRUCTURADOS>
+# con los 6 campos críticos. El motor:
+#   1. lo PARSEA tolerante (_parsear_campos_estructurados),
+#   2. lo CRUZA contra los valores deterministas (_validar_campos_estructurados),
+#   3. cuando coinciden, marca que se pueden SALTAR los sanitizers frágiles
+#      de ese campo (defensa en profundidad: el cuerpo narrativo siempre
+#      se sanea).
+# Si el bloque falta o está roto → degradación elegante (None → pipeline
+# de texto+sanitizers intacto). El bloque se ELIMINA del texto antes de
+# extraer <argumento> para que jamás contamine el dictamen radicable.
+# Todo detrás del flag settings.glosa_campos_estructurados (default OFF).
+# ════════════════════════════════════════════════════════════════════
+
+# Tag específico y largo para no colisionar con el contrato XML ni con
+# texto del dictamen. Captura con o sin tag de cierre (truncamiento).
+_RE_CAMPOS_ESTRUCTURADOS = re.compile(
+    r"<CAMPOS_ESTRUCTURADOS>\s*(\{.*?\})\s*</CAMPOS_ESTRUCTURADOS>",
+    re.DOTALL | re.IGNORECASE,
+)
+# Fallback: tag de apertura sin cierre (max_tokens cortó la respuesta),
+# toma hasta la última llave de cierre del objeto.
+_RE_CAMPOS_ESTRUCTURADOS_SIN_CIERRE = re.compile(
+    r"<CAMPOS_ESTRUCTURADOS>\s*(\{.*\})",
+    re.DOTALL | re.IGNORECASE,
+)
+# Para borrar el bloque del texto (con o sin cierre) antes del wrap HTML.
+_RE_CAMPOS_ESTRUCTURADOS_BORRAR = re.compile(
+    r"<CAMPOS_ESTRUCTURADOS>.*?(?:</CAMPOS_ESTRUCTURADOS>|$)",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Las 6 claves del contrato estructurado.
+_CLAVES_CAMPOS_ESTRUCTURADOS = (
+    "eps_efectiva",
+    "servicio_objetado",
+    "contrato_citado",
+    "clausulas_respondidas",
+    "sancion_rechazada",
+    "subconceptos_refutados",
+)
+
+
+def _limpiar_bloque_campos_estructurados(texto: str) -> str:
+    """Elimina el bloque <CAMPOS_ESTRUCTURADOS>{...} del texto.
+
+    Se llama SIEMPRE (flag ON u OFF) antes de extraer <argumento> y de
+    cualquier wrap HTML, para garantizar que el bloque jamás aparezca en
+    el dictamen radicable. Si el bloque no existe → no-op.
+    """
+    if not texto or "CAMPOS_ESTRUCTURADOS" not in texto.upper():
+        return texto
+    return _RE_CAMPOS_ESTRUCTURADOS_BORRAR.sub("", texto).strip()
+
+
+def _cast_bool_tolerante(v) -> bool | None:
+    """Castea a bool tolerando 'true'/'si'/'1' y variantes. None si no se puede."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("true", "si", "sí", "1", "verdadero", "yes"):
+            return True
+        if s in ("false", "no", "0", "falso"):
+            return False
+    return None
+
+
+def _cast_lista_ints_tolerante(v) -> list[int] | None:
+    """Castea a lista de enteros tolerando strings ('24'), floats y mezcla.
+    None si el tipo es completamente inesperado (no lista)."""
+    if not isinstance(v, list):
+        return None
+    out: list[int] = []
+    for item in v:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            out.append(item)
+        elif isinstance(item, float):
+            out.append(int(item))
+        elif isinstance(item, str):
+            m = re.search(r"\d+", item)
+            if m:
+                out.append(int(m.group()))
+    return out
+
+
+def _cast_lista_strs_tolerante(v) -> list[str] | None:
+    """Castea a lista de strings no vacíos. None si no es lista."""
+    if not isinstance(v, list):
+        return None
+    out: list[str] = []
+    for item in v:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            out.append(str(item))
+    return out
+
+
+def _parsear_campos_estructurados(res_ia: str) -> dict | None:
+    """Extrae y parsea el bloque <CAMPOS_ESTRUCTURADOS>{...} del texto crudo.
+
+    Devuelve un dict normalizado campo-por-campo (cast tolerante de tipos)
+    o None si no hay bloque o el JSON es irreparable (degradación elegante).
+    NUNCA un campo malformado invalida el dict completo: el campo que no
+    valide se pone en None individualmente.
+    """
+    if not res_ia or "CAMPOS_ESTRUCTURADOS" not in res_ia.upper():
+        return None
+
+    m = _RE_CAMPOS_ESTRUCTURADOS.search(res_ia)
+    if not m:
+        # Fallback: tag sin cierre por truncamiento.
+        m = _RE_CAMPOS_ESTRUCTURADOS_SIN_CIERRE.search(res_ia)
+    if not m:
+        return None
+
+    bloque = m.group(1).strip()
+
+    datos = None
+    try:
+        datos = json.loads(bloque)
+    except (json.JSONDecodeError, ValueError):
+        # Segundo intento: reparar comillas tipográficas y comas colgantes.
+        reparado = bloque.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+        reparado = re.sub(r",\s*([}\]])", r"\1", reparado)
+        try:
+            datos = json.loads(reparado)
+        except (json.JSONDecodeError, ValueError):
+            return None
+
+    if not isinstance(datos, dict):
+        return None
+
+    # Normalización tolerante campo-por-campo. Cada campo inválido → None.
+    out: dict = {}
+
+    eps = datos.get("eps_efectiva")
+    out["eps_efectiva"] = eps.strip() if isinstance(eps, str) and eps.strip() else None
+
+    serv = datos.get("servicio_objetado")
+    out["servicio_objetado"] = serv.strip() if isinstance(serv, str) and serv.strip() else None
+
+    contrato = datos.get("contrato_citado")
+    out["contrato_citado"] = (
+        contrato.strip() if isinstance(contrato, str) and contrato.strip() else None
+    )
+
+    out["clausulas_respondidas"] = _cast_lista_ints_tolerante(datos.get("clausulas_respondidas"))
+    out["sancion_rechazada"] = _cast_bool_tolerante(datos.get("sancion_rechazada"))
+    out["subconceptos_refutados"] = _cast_lista_strs_tolerante(datos.get("subconceptos_refutados"))
+
+    return out
+
+
+def _normalizar_eps_para_match(eps: str) -> str:
+    """Normaliza un nombre de EPS para comparación: sin tildes, mayúsculas,
+    sin sufijos genéricos (EPS, EPS-S, S.A.S, etc.), sin espacios extra."""
+    if not eps:
+        return ""
+    s = eps.upper().strip()
+    # Quitar tildes
+    for a, b in (("Á", "A"), ("É", "E"), ("Í", "I"), ("Ó", "O"), ("Ú", "U"), ("Ñ", "N")):
+        s = s.replace(a, b)
+    # Quitar sufijos/ruido institucional
+    s = re.sub(r"\b(EPS-?S?|EPSS|S\.?A\.?S?\.?|SA|LTDA|CCF|EAPB)\b", " ", s)
+    s = re.sub(r"[^A-Z0-9 ]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+# EPS genéricas de dropdown que NO sirven como ancla determinista.
+_EPS_GENERICAS_NO_ANCLA = {
+    "",
+    "OTRA",
+    "OTRA SIN DEFINIR",
+    "SIN DEFINIR",
+    "NO DEFINIDA",
+    "DISPENSARIO MEDICO",
+}
+
+
+def _validar_campos_estructurados(
+    campos_llm: dict | None,
+    deterministas: dict,
+    *,
+    multi_codigo: bool = False,
+) -> dict:
+    """Cruza el JSON del LLM contra los valores DETERMINISTAS y decide qué
+    sanitizers se pueden saltar.
+
+    Args:
+        campos_llm: salida de _parsear_campos_estructurados (o None).
+        deterministas: dict con las claves disponibles calculadas pre/post-LLM:
+            'eps_efectiva' (str, resuelta por resolver_eps_efectiva),
+            'contrato_citado' (str|None, del catálogo/glosa),
+            'subconceptos' (list[str]),
+            'sancion_detectada' (bool),
+            'servicio_valido' (bool — si servicio_objetado del LLM no es placeholder).
+        multi_codigo: si True, NUNCA se saltan sanitizers (un único bloque no
+            representa N secciones).
+
+    Returns:
+        {
+          'campos_finales': dict — valores finales (determinista como verdad),
+          'saltar': set[str] — campos cuyos sanitizers se pueden omitir,
+          'divergencias': list[str] — telemetría LLM-vs-determinista.
+        }
+    """
+    saltar: set[str] = set()
+    divergencias: list[str] = []
+    campos_finales: dict = dict(campos_llm) if campos_llm else {}
+
+    if not campos_llm:
+        return {"campos_finales": campos_finales, "saltar": saltar, "divergencias": divergencias}
+
+    det_eps = (deterministas.get("eps_efectiva") or "").strip()
+    det_eps_norm = _normalizar_eps_para_match(det_eps)
+    eps_es_ancla = det_eps_norm and det_eps.upper().strip() not in _EPS_GENERICAS_NO_ANCLA
+
+    # ── EPS ──────────────────────────────────────────────────────────
+    eps_llm = campos_llm.get("eps_efectiva")
+    if eps_llm and eps_es_ancla:
+        if _normalizar_eps_para_match(eps_llm) == det_eps_norm:
+            # El LLM confirmó la EPS determinista → no inventó nada.
+            if not multi_codigo:
+                saltar.add("eps")
+        else:
+            divergencias.append(f"eps: llm={eps_llm!r} != det={det_eps!r}")
+    # La verdad SIEMPRE es la determinista.
+    if eps_es_ancla:
+        campos_finales["eps_efectiva"] = det_eps
+
+    # ── Contrato ─────────────────────────────────────────────────────
+    contrato_llm = campos_llm.get("contrato_citado")
+    det_contrato = (deterministas.get("contrato_citado") or "").strip()
+    if det_contrato:
+        if contrato_llm and contrato_llm.strip().upper() == det_contrato.upper():
+            if not multi_codigo:
+                saltar.add("contrato")
+        elif contrato_llm and contrato_llm.strip().upper() != det_contrato.upper():
+            divergencias.append(f"contrato: llm={contrato_llm!r} != det={det_contrato!r}")
+        campos_finales["contrato_citado"] = det_contrato
+
+    # ── Servicio ─────────────────────────────────────────────────────
+    # Sin fuente determinista canónica fuerte: se usa el del LLM SOLO si
+    # pasa validación de forma (no-placeholder), si no, sanitizer.
+    if deterministas.get("servicio_valido") and campos_llm.get("servicio_objetado"):
+        if not multi_codigo:
+            saltar.add("servicio")
+
+    # ── Sanción ──────────────────────────────────────────────────────
+    # NO se salta nunca el sanitizer (es generación de contenido legal).
+    # Solo telemetría de divergencia.
+    sancion_llm = campos_llm.get("sancion_rechazada")
+    sancion_det = bool(deterministas.get("sancion_detectada"))
+    if sancion_det and sancion_llm is False:
+        divergencias.append("sancion: detectada pero llm dice no-rechazada")
+
+    # ── Sub-conceptos ────────────────────────────────────────────────
+    det_subs = deterministas.get("subconceptos") or []
+    subs_llm = campos_llm.get("subconceptos_refutados") or []
+    if det_subs and len(subs_llm) < len(det_subs):
+        divergencias.append(f"subconceptos: llm refutó {len(subs_llm)}/{len(det_subs)}")
+
+    return {
+        "campos_finales": campos_finales,
+        "saltar": saltar,
+        "divergencias": divergencias,
+    }
 
 
 def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:

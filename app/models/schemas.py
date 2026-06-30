@@ -178,6 +178,14 @@ class GlosaResult(BaseModel):
     # propone AUTO_ENVIABLE. El gestor decide si activa el envío
     # automático global. Por defecto, cada caso requiere revisión.
     auto_pilot: Optional[dict] = None
+    # Mejora #3 (jun-2026): salida estructurada incremental. Bloque de los
+    # 6 campos críticos que el LLM confirmó (eps_efectiva, servicio_objetado,
+    # contrato_citado, clausulas_respondidas, sancion_rechazada,
+    # subconceptos_refutados) ya cruzados contra los valores deterministas,
+    # más telemetría de divergencias. None cuando el flag está OFF o el LLM
+    # no emitió el bloque (degradación elegante). Opcional para no romper
+    # consumidores que no lo esperan.
+    campos_estructurados: Optional[dict] = None
 
 
 class GlosaHistorialItem(BaseModel):

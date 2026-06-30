@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.5.0"
     banner_capacitacion: str = ""
+    # Mejora #3 (jun-2026): salida estructurada incremental. Cuando está
+    # ON, el LLM emite — además del envelope XML — un bloque
+    # <CAMPOS_ESTRUCTURADOS>{...} con los 6 campos críticos ya validados
+    # (eps, servicio, contrato, cláusulas, sanción, sub-conceptos). El
+    # motor cruza ese JSON contra los valores DETERMINISTAS y, cuando
+    # coinciden, se salta los sanitizers frágiles de ese campo. Default
+    # OFF: con el flag apagado el pipeline es byte-idéntico al actual
+    # (degradación elegante total). Override por env:
+    # GLOSA_CAMPOS_ESTRUCTURADOS=true.
+    glosa_campos_estructurados: bool = False
 
     model_config = {
         "env_file": ".env",
