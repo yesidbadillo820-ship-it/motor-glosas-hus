@@ -202,6 +202,30 @@ def _dump(etiqueta: str) -> None:
         logger.warning(f"  no pude volcar {etiqueta}: {e}")
 
 
+def _diag_grids(win):
+    """Loguea cuántas grillas gcConceptosObjecion hay y si cada una tiene fila.
+    Sirve para diagnosticar 'no autocargó' sin pedir un dump."""
+    n = 0
+    for i in range(40):
+        try:
+            grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
+            if not grid.exists():
+                break
+        except Exception:
+            break
+        n += 1
+        tiene_dp = tiene_fila = False
+        try:
+            datos = grid.child_window(auto_id="dataPresenter")
+            tiene_dp = datos.exists()
+            if tiene_dp:
+                tiene_fila = datos.child_window(control_type="DataItem").exists()
+        except Exception:
+            pass
+        logger.info(f"    diag grid #{i}: dataPresenter={tiene_dp} fila={tiene_fila}")
+    logger.info(f"    diag: {n} grilla(s) gcConceptosObjecion visibles en el árbol de DG")
+
+
 def _grid_con_fila(win):
     """(grid_spec, datos_spec) de la PRIMERA grilla 'gcConceptosObjecion' cuyo
     panel de datos tiene una fila (DataItem), sin importar en qué pestaña Editor
@@ -330,6 +354,7 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         time.sleep(0.8)
     if datos is None:
         logger.error("  la factura no autocargó (ninguna grilla con fila en 60s). ¿Ya tramitada?")
+        _diag_grids(win)
         if dump_al_fallar:
             _dump("sin_autocargue")
         return "NO_AUTOCARGA"
