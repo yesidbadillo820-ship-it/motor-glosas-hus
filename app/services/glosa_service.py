@@ -1848,6 +1848,40 @@ def _rechazar_sancion_eps_ilegal(
     return nuevo
 
 
+# ── Ronda 19 (Bug DD, 30-jun-2026): placeholder pegado al servicio ──
+# Caso real SALUD TOTAL TMS: el campo "Servicio objetado" salió como
+# "HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS, el procedimiento facturado según
+# historia clínica". La frase neutra "el procedimiento/medicamento
+# facturado según historia clínica" es para REEMPLAZAR un CUPS inventado,
+# NO para concatenarla al servicio que ya tiene descripción real.
+_RE_PLACEHOLDER_SERVICIO_SUFIJO = re.compile(
+    r"[\s,;]+(?:el|la)\s+(?:procedimiento|medicamento|servicio)\s+facturado\s+"
+    r"seg[úu]n\s+historia\s+cl[íi]nica\s*\.?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _limpiar_placeholder_servicio(servicio: str) -> str:
+    """Bug DD (ronda 19): si el nombre del servicio objetado tiene texto
+    real ANTES del placeholder neutro "el procedimiento facturado según
+    historia clínica", quita ese placeholder. Si el servicio es SOLO el
+    placeholder (sin descripción real), lo deja (no hay nada que perder).
+    """
+    if not servicio:
+        return servicio
+    s = servicio.strip()
+    nuevo = _RE_PLACEHOLDER_SERVICIO_SUFIJO.sub("", s).strip(" ,;.")
+    # Solo aplicar si quedó texto real (≥ 4 chars) — si el placeholder era
+    # todo el contenido, conservamos el original.
+    if nuevo and len(nuevo) >= 4 and nuevo.lower() != s.lower():
+        logger.info(
+            f"[PLACEHOLDER-SERVICIO] sufijo neutro removido del servicio "
+            f"objetado: '{s[:60]}...' → '{nuevo[:60]}...'"
+        )
+        return nuevo
+    return servicio
+
+
 # ── Ronda 18 (Bug Y, 26-jun-2026): niega contrato citado por EPS ──
 # Caso real MEDIMÁS 26-jun: la glosa de entrada decía textualmente
 # "contrato vigente CTR-2024-MEDIMAS-HUS define para prostatectomía
@@ -3721,6 +3755,31 @@ class GlosaService:
             few_shots = list(few_shots) + [hint_gestor]
         texto_base = str(data.tabla_excel).strip().upper()
 
+        # ── Ronda 19 (Bug BB, 30-jun-2026): resolver EPS efectiva ──
+        # Si el dropdown de EPS contradice la EPS nombrada en el texto de la
+        # glosa (caso real: dropdown="DISPENSARIO MEDICO" militar pero la
+        # glosa dice "SALUD TOTAL:"), priorizamos el texto y alertamos.
+        # Decisión del usuario 30-jun: el texto es la fuente de verdad; el
+        # dropdown es propenso a quedar de una sesión anterior. ESTO DEBE
+        # CORRER ANTES de get_contrato/get_system_prompt/build_user_prompt
+        # para que el contrato y el régimen especial se carguen correctos.
+        self._eps_alerta_actual = ""
+        try:
+            from app.services.glosa_ia_prompts import resolver_eps_efectiva
+
+            _eps_efectiva, _hubo_correccion, _eps_alerta = resolver_eps_efectiva(
+                str(getattr(data, "eps", "") or ""), texto_base
+            )
+            if _hubo_correccion and _eps_efectiva:
+                logger.warning(
+                    f"[EPS-CORREGIDA] dropdown='{data.eps}' → "
+                    f"texto='{_eps_efectiva}'. {_eps_alerta}"
+                )
+                data.eps = _eps_efectiva
+                self._eps_alerta_actual = _eps_alerta
+        except Exception as _e_eps:
+            logger.debug(f"[EPS-CORREGIDA] no aplicada: {_e_eps}")
+
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
         if len(codigos_detectados) > 1:
@@ -4959,6 +5018,15 @@ class GlosaService:
 
             pac_ia = self._xml("paciente", res_ia, "NO IDENTIFICADO")
             servicio_ia = self._xml("servicio", res_ia, "")
+            # Ronda 19 (Bug DD, 30-jun-2026): limpiar el placeholder neutro
+            # "el procedimiento/medicamento facturado según historia clínica"
+            # cuando la IA lo CONCATENA al nombre real del servicio. Caso
+            # real 30-jun: "HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS, el
+            # procedimiento facturado según historia clínica". Esa frase es
+            # para REEMPLAZAR un CUPS inventado, no para pegarla al servicio
+            # que ya está descrito. Si el servicio tiene texto real ANTES del
+            # placeholder, quitamos el placeholder.
+            servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
             contrato_ia = self._xml("contrato", res_ia, "")
             tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
@@ -5443,6 +5511,22 @@ class GlosaService:
                 contrato=contrato_ia if contrato_ia else None,
                 tarifa=tarifa_ia if tarifa_ia else None,
             )
+
+        # ── Ronda 19 (Bug BB): banner de alerta cuando se corrigió la EPS ──
+        # Si el dropdown contradecía el texto y el motor priorizó la EPS del
+        # texto, mostramos un banner amarillo visible al inicio del dictamen
+        # para que el gestor sepa qué pasó y pueda corregir el dropdown si
+        # el motor se equivocó.
+        _eps_alerta = getattr(self, "_eps_alerta_actual", "")
+        if _eps_alerta and modo_resp != "auditoria_previa":
+            _banner_eps = (
+                '<div style="margin-bottom:12px;padding:10px 14px;'
+                "background:#fef9c3;border:2px solid #eab308;border-radius:8px;"
+                'font-size:12px;color:#854d0e;">'
+                f"⚠️ <b>EPS corregida automáticamente:</b> {_eps_alerta}"
+                "</div>"
+            )
+            dictamen = _banner_eps + dictamen
 
         # ═══════════════════════════════════════════════════════════
         #  Multi-código: un dictamen por código (jun-2026).
