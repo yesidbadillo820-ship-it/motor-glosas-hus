@@ -180,7 +180,7 @@ _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
 # todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
 # etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
 # porque la clave SHA256 no incluía señal de versión.
-_PROMPT_CACHE_VERSION = "r11-20260618"
+_PROMPT_CACHE_VERSION = "r18-20260626"
 
 FERIADOS_CO = [
     # 2025
@@ -1526,14 +1526,33 @@ _RE_URGENCIA_LEGITIMA = re.compile(
 )
 
 # Marcadores de servicio CRÓNICO/ELECTIVO/AMBULATORIO (negación de urgencia)
+# Ronda 18 (Bug X, 26-jun-2026): agregados los marcadores que detectaron los
+# 3 casos super difíciles del 26-jun (auditoría Yesid): implante coclear,
+# da Vinci, prostatectomía radical, Norwood/Glenn/Fontan (electivas), TMS,
+# Cart-T (programada). En todos ellos la IA invocaba "atención inicial de
+# urgencias" como muletilla y el dictamen perdía credibilidad ante la EPS.
 _RE_NO_ES_URGENCIA = re.compile(
     r"\bELECTIV|\bAMBULATORI|\bPROGRAMAD|"
     r"\bABA\b|TEA\b|TRASTORNO\s+ESPECTRO\s+AUTISTA|"
     r"TERAPIA\s+ENZIM[ÁA]TIC|TRASPLANT|HEMODI[ÁA]LISIS\s+CR[ÓO]NIC|"
     r"\bDOPPLER\b|\bECOGRAF[ÍI]A\b|"
-    r"\bRADIOCIRUG[ÍI]A\b|CRANEOTOMÍA\s+TUMORAL|"
+    r"\bRADIOCIRUG[ÍI]A\b|CRANEOT?OM[ÍI]A\s+TUMORAL|"
     r"REHABILITACI[ÓO]N|REINTERVENCI[ÓO]N|"
-    r"\d+\s*d[ií]as\s+UCI|HOSPITALIZACI[ÓO]N\s+DE\s+\d+",
+    r"\d+\s*d[ií]as\s+UCI|HOSPITALIZACI[ÓO]N\s+DE\s+\d+|"
+    # Ronda 18 (Bug X): cirugías programadas de alto costo
+    r"IMPLANTE\s+COCLEAR|DA\s+VINCI|CIRUG[ÍI]A\s+ROB[ÓO]TIC|"
+    r"PROSTATECTOM[ÍI]A\s+RADICAL|PROSTATECTOM[ÍI]A|"
+    r"NORWOOD|FONTAN|GLENN|HLHS|"
+    # Terapias programadas en sala (no urgencia vital)
+    r"CART[\-\s]?T|TISAGENLECLEUCEL|AXICABTAGENE|"
+    r"\bTMS\b|ESTIMULACI[ÓO]N\s+MAGN[ÉE]TICA|"
+    r"\bEPICEL\b|QUERATINOCITOS\s+CULTIV|"
+    # Salud mental refractaria (no urgencia inicial)
+    r"PSIQUI[ÁA]TRIC\s+REFRACTAR|ESQUIZOFRENIA\s+REFRACTARIA|"
+    # Oncología programada
+    r"QUIMIOTERAPIA\s+PROGRAMAD|RADIOTERAPIA\s+PROGRAMAD|"
+    # Pediátrico programado
+    r"NEONATAL\s+PROGRAMAD|VENTANA\s+CR[ÍI]TICA",
     re.IGNORECASE,
 )
 
@@ -1829,6 +1848,125 @@ def _rechazar_sancion_eps_ilegal(
     return nuevo
 
 
+# ── Ronda 18 (Bug Y, 26-jun-2026): niega contrato citado por EPS ──
+# Caso real MEDIMÁS 26-jun: la glosa de entrada decía textualmente
+# "contrato vigente CTR-2024-MEDIMAS-HUS define para prostatectomía
+# CUPS 60.1.2.01 una tarifa de SOAT × 0.85". La IA respondió con
+# "Contrato: SIN CONTRATO PACTADO" — error administrativo fatal.
+# Detector: si texto_glosa menciona un patrón CTR-XXXX-XXX-HUS (o
+# variantes "contrato vigente CTR", "contrato CTR-", "según contrato N°"),
+# el dictamen NO puede afirmar "sin contrato pactado". Sustituimos por
+# referencia genérica al contrato vigente.
+_RE_CONTRATO_CITADO_GLOSA = re.compile(
+    r"\bCTR\-\d{4}\-[A-Z0-9]+\-HUS\b|"
+    r"\bCONTRATO\s+(?:VIGENTE\s+)?CTR\-\d{2,4}|"
+    r"\bSEG[ÚU]N\s+CONTRATO\s+N[°º\.]?\s*\d{2,6}|"
+    r"\bCONTRATO\s+(?:N[°º\.]?\s*|N[ÚU]MERO\s+)?\d{4,6}|"
+    r"\bCONFORME\s+AL\s+CONTRATO\s+\d{3,}",
+    re.IGNORECASE,
+)
+
+
+def _detectar_contrato_citado_en_glosa(texto_glosa: str) -> str | None:
+    """Devuelve el código de contrato si la glosa lo cita textualmente.
+    Útil para validar que el dictamen no niegue su existencia.
+    """
+    if not texto_glosa:
+        return None
+    m = _RE_CONTRATO_CITADO_GLOSA.search(texto_glosa)
+    return m.group(0) if m else None
+
+
+def _reescribir_negacion_contrato(
+    dictamen: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Bug Y (ronda 18): si la glosa de entrada cita un contrato (CTR-...)
+    y el dictamen dice "SIN CONTRATO PACTADO" o similar, reescribe la
+    afirmación por una referencia al contrato vigente citado.
+    """
+    if not dictamen or not texto_glosa:
+        return dictamen
+    contrato_citado = _detectar_contrato_citado_en_glosa(texto_glosa)
+    if not contrato_citado:
+        return dictamen
+
+    contrato_clean = contrato_citado.strip()
+    # Patrones del dictamen que niegan el contrato
+    patrones_negacion = (
+        (
+            re.compile(
+                r"SIN\s+CONTRATO\s+PACTADO|"
+                r"NO\s+EXISTE\s+CONTRATO\s+PACTADO|"
+                r"AUSENCIA\s+DE\s+CONTRATO|"
+                r"EN\s+AUSENCIA\s+DE\s+CONTRATO\s+PACTADO",
+                re.IGNORECASE,
+            ),
+            f"según el contrato {contrato_clean}",
+        ),
+    )
+    nuevo = dictamen
+    n = 0
+    for pat, reemplazo in patrones_negacion:
+        nuevo, k = pat.subn(reemplazo, nuevo)
+        n += k
+    if n:
+        logger.warning(
+            f"[CONTRATO-NEGADO] {n} negación(es) de contrato reescrita(s) — "
+            f"la glosa cita textualmente {contrato_clean!r} pero el "
+            "dictamen afirmaba 'sin contrato pactado'."
+        )
+    return nuevo
+
+
+# ── Ronda 18 (Bug Z, 26-jun-2026): evade cláusula citada por EPS ──
+# Caso real ECOOPSOS 26-jun: la EPS citó "Cláusula 24 del Contrato
+# CTR-2025-ECOOPSOS-HUS exige cotización comparativa de al menos 3
+# proveedores". La IA respondió con "la historia clínica institucional...
+# constituye único instrumento válido para la auditoría" — evadió la
+# cláusula con muletilla. La defensa correcta es responder por nombre:
+# justificar exclusividad MED-EL, distribuidor único, anexo tarifario, etc.
+# Detector: si la glosa cita "Cláusula N" pero el dictamen no menciona
+# esa cláusula → warning. (No modifica el texto — el caller decide).
+_RE_CLAUSULA_CITADA_GLOSA = re.compile(
+    r"\bCL[ÁA]USULA\s+(\d{1,3})\s+(?:DEL\s+)?(?:CONTRATO|ACUERDO)",
+    re.IGNORECASE,
+)
+
+
+def _auditar_clausulas_citadas_en_glosa(
+    dictamen: str,
+    texto_glosa: str | None,
+) -> tuple[bool, list[int]]:
+    """Bug Z (ronda 18): verifica que las cláusulas citadas por la EPS
+    en su texto de glosa aparezcan referenciadas en el dictamen.
+
+    Devuelve (todas_referenciadas, lista_evadidas).
+    """
+    if not dictamen or not texto_glosa:
+        return True, []
+    citadas = {int(m.group(1)) for m in _RE_CLAUSULA_CITADA_GLOSA.finditer(texto_glosa)}
+    if not citadas:
+        return True, []
+    dictamen_up = dictamen.upper()
+    evadidas = []
+    for n in citadas:
+        # Acepta "Cláusula N", "Cl. N", "cláusula número N"
+        pat = re.compile(
+            rf"CL[ÁA]USULA(?:\s+N[°º\.]?\s*|\s+N[ÚU]MERO\s+|\s+)?{n}\b",
+            re.IGNORECASE,
+        )
+        if not pat.search(dictamen_up):
+            evadidas.append(n)
+    if evadidas:
+        logger.warning(
+            f"[CLAUSULAS-EVADIDAS] La glosa cita {len(evadidas)} cláusula(s) "
+            f"({evadidas}) que el dictamen no respondió por nombre. "
+            "Defensa débil — el auditor EPS lee silencio como concesión."
+        )
+    return len(evadidas) == 0, evadidas
+
+
 # ── Ronda 16 (Bug O v3): post-validador de instrucciones del gestor ──
 # Casos 26-jun: el usuario pidió en user_instructions "INCLUIR LA SENTENCIA
 # T-553/2024" pero la IA no la incluyó. Bug O v2 (ronda 15) ya implementaba
@@ -2037,19 +2175,48 @@ def _es_sigla_o_codigo(palabra: str) -> bool:
     return p in _SIGLAS_CONSERVAR_UPPER or _RE_SIGLA_O_CODIGO.match(p) is not None
 
 
+# Detector simple de HTML estructural — si el texto está envuelto en
+# <table>/<div>/<span> con atributos de estilo, NO normalizar el texto.
+# El generador de HTML del dictamen ya controla el case de tags, headers
+# de tabla, etiquetas y nombres de contrato (Bug detectado en ronda 17:
+# el sanitizer convertía S-13-1-03-1-04958 → s-13-1-03-1-04958 y
+# <TH>CÓDIGO GLOSA</TH> → <th>código glosa</th>, rompiendo el render).
+_RE_HTML_ESTRUCTURAL = re.compile(
+    r"<table\b|<div\s+style=|<span\s+style=|<th\s+style=|<td\s+style=",
+    re.IGNORECASE,
+)
+
+# Códigos hifenados de contrato/normativa que el sanitizer NO debe lowercase.
+# Ej: S-13-1-03-1-04958, F-2024-001, T-553/2024, RES-456, AU-301.
+# Pattern: 1-3 mayúsculas iniciales + hífen/slash + alfanumérico (≥4 chars).
+_RE_CODIGO_HIFENADO = re.compile(r"\b[A-Z]{1,4}(?:[\-/][A-Z0-9]+){2,}\b")
+
+
 def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:
     """Convierte texto en MAYÚSCULAS sostenidas a sentence case institucional.
 
     Estrategia:
-      1. Si el dictamen completo tiene < umbral_pct de letras en uppercase,
-         no se toca (probablemente ya está bien formateado).
-      2. Si supera el umbral, se divide en oraciones (por . ! ?) y cada
+      1. Si el texto contiene HTML estructural (tags <table>, <div style=>,
+         etc.), no se toca — el HTML ya viene del generador del dictamen
+         con el case correcto en headers, atributos y nombres de contrato.
+         Bug ronda 17 (26-jun-2026): el sanitizer lowercase HTML y
+         convertía códigos como "S-13-1-03-1-04958" a "s-13-..." rompiendo
+         test_optimizaciones_tokens y test_multi_codigo. La normalización
+         de mayúsculas correcta es sobre el ARGUMENTO antes de envolverlo
+         en HTML, no sobre el HTML ensamblado.
+      2. Si el texto plano completo tiene < umbral_pct de letras en
+         uppercase, no se toca (probablemente ya está bien formateado).
+      3. Si supera el umbral, se divide en oraciones (por . ! ?) y cada
          oración se normaliza: primer carácter alfabético en uppercase,
          resto en lowercase EXCEPTO siglas conocidas y códigos.
-      3. Después de la conversión, se restauran las siglas a uppercase
-         exacto si quedaron en lowercase.
+      4. Después de la conversión, se restauran las siglas y códigos
+         hifenados a uppercase exacto si quedaron en lowercase.
     """
     if not texto:
+        return texto
+    # Skip: si tiene HTML estructural, no es texto plano. El sanitizer no
+    # aplica acá — el HTML ya viene con el case correcto del generador.
+    if _RE_HTML_ESTRUCTURAL.search(texto):
         return texto
     # Calcular porcentaje de uppercase en letras alfabéticas
     letras_alfa = [c for c in texto if c.isalpha()]
@@ -2059,8 +2226,19 @@ def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> s
     if pct_upper < umbral_pct:
         return texto
 
+    # ── Preserve códigos hifenados antes del lowercase global ──
+    # Reemplazamos cada match por un placeholder único y restauramos al
+    # final. Esto evita que "S-13-1-03-1-04958" pase a lowercase.
+    codigos_preservados: list[str] = []
+
+    def _reserve(m: re.Match[str]) -> str:
+        codigos_preservados.append(m.group(0))
+        return f"\x00CODHIF{len(codigos_preservados) - 1}\x00"
+
+    nuevo = _RE_CODIGO_HIFENADO.sub(_reserve, texto)
+
     # 1) Lowercase global
-    nuevo = texto.lower()
+    nuevo = nuevo.lower()
     # 2) Capitalizar tras inicio de oración (., !, ?, salto de línea, " " al inicio)
     nuevo = re.sub(
         r"(^|[\.!?\n]\s*)([a-záéíóúñü])",
@@ -2085,9 +2263,16 @@ def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> s
     )
     # 5) "Ley", "Decreto", "Resolución" + número se conservan tal cual:
     # la regla 2 ya capitalizó la inicial; nada extra.
+
+    # 6) Restaurar códigos hifenados originales (S-13-..., T-553/2024, etc.)
+    for i, codigo in enumerate(codigos_preservados):
+        nuevo = nuevo.replace(f"\x00codhif{i}\x00", codigo)
+        nuevo = nuevo.replace(f"\x00CODHIF{i}\x00", codigo)
+
     logger.info(
         f"[MAYUSCULAS-NORMALIZADAS] dictamen normalizado a sentence case "
-        f"(antes: {pct_upper:.0%} mayúsculas)"
+        f"(antes: {pct_upper:.0%} mayúsculas, códigos preservados: "
+        f"{len(codigos_preservados)})"
     )
     return nuevo
 
@@ -4303,9 +4488,17 @@ class GlosaService:
             #  críticas tipo Cart-T/Norwood/trasplante/hemofilia/
             #  Epicel/recobro/tutela), FORZAMOS Anthropic — Llama 4
             #  Scout aluciona masivamente en estos casos (evidencia:
-            #  3 dictamens 26-jun con Bug T/U/Q/B/N detectados). Como
-            #  modelo_override siempre va a Anthropic (línea 7096),
-            #  basta con setearlo para sobrepasar el primary_ai=groq.
+            #  3 dictamens 26-jun con Bug T/U/Q/B/N detectados). El
+            #  override se rutea a Anthropic en _llamar_ia (línea 7427)
+            #  bypasseando primary_ai=groq.
+            #
+            #  RONDA 17 (26-jun-2026): el detector de complejidad fue
+            #  EXTRAÍDO a app.services.routing_complejidad para ser
+            #  reusable por (a) el router del Quality Gate, (b) las
+            #  secciones adicionales de multi-código, (c) refinar_dictamen
+            #  desde chat_glosa, y (d) la auto-crítica de R-CEREBRO #1.
+            #  Antes solo R-CEREBRO #5 lo aplicaba — los otros caminos
+            #  perdían la señal y los casos complejos caían en Llama.
             _modelo_override = None
             _es_complejo_forzar_claude = False
             try:
@@ -4314,6 +4507,9 @@ class GlosaService:
                 # Bug detectado 12-may-2026: Sonnet se activaba para casos de
                 # $7.700 porque el parser interpretaba mal los puntos de miles.
                 from app.services.auto_pilot_decision import _parse_valor as _pval_route
+                from app.services.routing_complejidad import (
+                    detectar_complejidad_critica as _detectar,
+                )
 
                 _valor_num_route = int(_pval_route(valor_raw)) if valor_raw else 0
                 _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
@@ -4321,57 +4517,14 @@ class GlosaService:
                 _len_pdf_route = len(str(contexto_pdf or ""))
                 _num_codigos_route = len(codigos_detectados or [])
 
-                # ── Detector de COMPLEJIDAD (ronda 16, 26-jun-2026) ──
-                # Si CUALQUIERA de estas condiciones se cumple, el caso es
-                # "alta complejidad jurídica" y debe ir a Claude aunque el
-                # usuario haya elegido Groq por defecto:
-                #   1. Valor ≥ $50M (impacto financiero alto)
-                #   2. Multi-PDF (2+ documentos soporte → análisis cruzado)
-                #   3. Multi-código (≥ 3 códigos de glosa → defensa multinorma)
-                #   4. Texto largo (> 4000 chars → dictamen muy detallado)
-                #   5. Palabras-clave críticas que históricamente le revientan
-                #      el dictamen a Llama (oncología cara, neonatal grave,
-                #      enfermedades raras, recobros, tutelas, evento adverso).
-                _palabras_clave_complejas = (
-                    "CART-T",
-                    "CAR-T",
-                    "TISAGENLECLEUCEL",
-                    "AXICABTAGENE",
-                    "NORWOOD",
-                    "TRASPLANT",
-                    "HEMOFILIA",
-                    "EPICEL",
-                    "ELIZARIA",
-                    "ATALUREN",
-                    "NUSINERSEN",
-                    "ZOLGENSMA",
-                    "TUTELA",
-                    "RECOBRO",
-                    "EVENTO ADVERSO",
-                    "PREVENIBLE",
-                    "MUERTE MATERNA",
-                    "DAÑO IATROG",
-                    "ENFERMEDAD HUÉRFANA",
-                    "ENFERMEDAD HUERFANA",
-                    "CARTAGENA-T",
-                    "GAUCHER",
-                    "POMPE",
-                    "CEREZYME",
-                    "VPH-RECOMB",
-                    "DUCHENNE",
+                _resultado_complej = _detectar(
+                    valor=_valor_num_route,
+                    num_pdfs=_num_pdfs_route,
+                    num_codigos=_num_codigos_route,
+                    texto_glosa=texto_base or "",
+                    contexto_pdf=contexto_pdf or "",
                 )
-                _texto_upper_route = (f"{texto_base or ''} {contexto_pdf or ''}"[:50000]).upper()
-                _hit_palabra_clave = any(
-                    kw in _texto_upper_route for kw in _palabras_clave_complejas
-                )
-
-                _es_complejo_forzar_claude = (
-                    _valor_num_route >= 50_000_000
-                    or (_num_pdfs_route >= 2 and _valor_num_route >= 5_000_000)
-                    or _num_codigos_route >= 3
-                    or _len_glosa_route > 4_000
-                    or _hit_palabra_clave
-                )
+                _es_complejo_forzar_claude = _resultado_complej.es_complejo
 
                 _saltar_routing = self.primary_ai == "groq" and not _es_complejo_forzar_claude
 
@@ -4394,21 +4547,11 @@ class GlosaService:
                     # a Llama 4 Scout (rondas 14-15-16: Cart-T, Norwood, VIH).
                     elif _es_complejo_forzar_claude and self.primary_ai == "groq":
                         _modelo_override = self.anthropic_model or "claude-sonnet-4-6"
-                        _motivos = []
-                        if _valor_num_route >= 50_000_000:
-                            _motivos.append(f"valor=${_valor_num_route:,}")
-                        if _num_pdfs_route >= 2 and _valor_num_route >= 5_000_000:
-                            _motivos.append(f"pdfs={_num_pdfs_route}+5M")
-                        if _num_codigos_route >= 3:
-                            _motivos.append(f"codigos={_num_codigos_route}")
-                        if _len_glosa_route > 4_000:
-                            _motivos.append(f"texto={_len_glosa_route}c")
-                        if _hit_palabra_clave:
-                            _motivos.append("palabra-clave-critica")
                         logger.warning(
                             "[ROUTING-IA] FORZANDO ANTHROPIC — primary_ai=groq pero "
-                            f"caso complejo ({', '.join(_motivos)}). Llama 4 Scout "
-                            f"aluciona en estos casos; escalamos a {_modelo_override}."
+                            f"caso complejo ({', '.join(_resultado_complej.motivos)}). "
+                            f"Llama 4 Scout aluciona en estos casos; escalamos a "
+                            f"{_modelo_override}."
                         )
                     # HAIKU: caso liviano. Reduce ~75% el costo y conserva
                     # calidad porque el cerebro pre-IA ya hizo el trabajo
@@ -4625,6 +4768,16 @@ class GlosaService:
                                 user_prompt=user_prompt,
                                 glosa_id=None,
                                 proveedores_disponibles=_proveedores,
+                                # Ronda 17 (26-jun-2026): propagar la señal
+                                # de R-CEREBRO #5 al QG. Antes el QG decidía
+                                # su propio modelo via su router interno y
+                                # ignoraba la complejidad detectada acá —
+                                # casos Cart-T/Norwood/$50M+ con
+                                # QUALITY_GATE_ENABLED=1 seguían cayendo en
+                                # Llama 4 Scout. Ahora el override forza
+                                # Anthropic al primer intento del QG.
+                                modelo_override_forzado=_modelo_override,
+                                contexto_pdf=contexto_pdf or "",
                             )
                             registrar_estadistica_qg(_qg_resultado)
                     except Exception as _qg_err:
@@ -5174,11 +5327,18 @@ class GlosaService:
                             # proveedor es Anthropic; los demás usan su default (0.2).
                             # bypass_cache=True para no servir el mismo dictamen defectuoso
                             # ya cacheado — necesitamos fuerza nueva generación.
+                            #
+                            # Ronda 17 (26-jun-2026): reusar el _modelo_override que
+                            # R-CEREBRO #5 calculó arriba. Si el caso era suficientemente
+                            # complejo para escalar la generación original a Claude,
+                            # también lo es para escalar la auto-crítica — si Llama
+                            # produjo dictamen malo, refinarlo con Llama no lo arregla.
                             _res_refinado, _modelo_refinado = await self._llamar_ia(
                                 system=_sys_refine,
                                 user=_refine_prompt,
                                 eps=str(data.eps or ""),
                                 codigo=codigo_det,
+                                modelo_override=_modelo_override,
                                 temperature_override=0.05,
                                 bypass_cache=True,
                                 # Fix #9: refinamiento = tarea corta → gpt-oss
@@ -5219,7 +5379,15 @@ class GlosaService:
                     logger.debug(f"[AUTO-CRITICA] validación falló: {_e_val}")
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
+            # Ronda 17 (26-jun-2026): aplicar normalización de MAYÚSCULAS
+            # sostenidas AQUÍ, sobre el ARGUMENTO en texto plano, antes
+            # del wrap en HTML estructural. Después del wrap, llamar al
+            # mismo sanitizer sobre el HTML completo lo hacía lowercase
+            # también las tags y nombres de contrato como S-13-1-03-1-04958
+            # (regresión detectada en CI tras ronda 16 con umbral 0.45).
+            arg_limpio = _normalizar_mayusculas_sostenidas(arg_limpio)
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
+            arg_ia = _normalizar_mayusculas_sostenidas(arg_ia)
 
         score = self._calcular_score(
             tipo_glosa,
@@ -5556,10 +5724,19 @@ class GlosaService:
                 # tácita cuando la glosa de entrada habla de "sanción del
                 # N%", "multa del N%", etc.
                 _dict_u = _rechazar_sancion_eps_ilegal(_dict_g, texto_glosa=_texto_glosa_input_md)
-                if _dict_u != dictamen:
-                    dictamen = _dict_u
+                # Ronda 18 (Bug Y): si la glosa cita CTR-XXXX-XXX-HUS y el
+                # dictamen dice "SIN CONTRATO PACTADO", reescribirlo.
+                _dict_y = _reescribir_negacion_contrato(_dict_u, texto_glosa=_texto_glosa_input_md)
+                # Ronda 18 (Bug Z): audita cláusulas evadidas (no modifica;
+                # registra warning para que el gestor revise).
+                try:
+                    _auditar_clausulas_citadas_en_glosa(_dict_y, texto_glosa=_texto_glosa_input_md)
+                except Exception as _e_z:
+                    logger.debug(f"[CLAUSULAS-EVADIDAS] no auditadas: {_e_z}")
+                if _dict_y != dictamen:
+                    dictamen = _dict_y
             except Exception as _e_mu:
-                logger.debug(f"[MULETILLAS-RONDA13-16] red final no aplicada: {_e_mu}")
+                logger.debug(f"[MULETILLAS-RONDA13-16-18] red final no aplicada: {_e_mu}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 14 (25-jun-2026) — Bug I v2: EPS detectada del texto
@@ -6692,8 +6869,39 @@ class GlosaService:
         # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic).
         # Fix #9: refinamiento por instrucción del auditor = tarea corta →
         # gpt-oss con reasoning_effort 'low'.
+        #
+        # Ronda 17 (26-jun-2026): detectar complejidad sobre (argumento
+        # actual + instrucción del auditor). Si hay palabras-clave
+        # críticas (Cart-T, Norwood, tutela, recobro, etc.), forzar
+        # Anthropic. Antes el refinamiento siempre iba a Llama 4 Scout
+        # incluso si el dictamen original era de un caso complejo —
+        # inconsistente porque el dictamen radicado era Claude pero la
+        # modificación pedida por chat era Llama.
+        from app.services.routing_complejidad import detectar_complejidad_critica as _det
+
+        _complej_refinar = _det(
+            valor=None,
+            num_pdfs=0,
+            num_codigos=0,
+            texto_glosa=mensaje_usuario or "",
+            contexto_pdf=txt or "",
+        )
+        _modelo_override_refinar = None
+        if _complej_refinar.es_complejo and self.anthropic_key:
+            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-6"
+            logger.warning(
+                f"[REFINAR-DICTAMEN] FORZANDO ANTHROPIC "
+                f"({', '.join(_complej_refinar.motivos)}) — "
+                f"modelo={_modelo_override_refinar}"
+            )
+
         content, _modelo = await self._llamar_ia(
-            system, user, eps=eps, codigo=codigo, llamada_corta=True
+            system,
+            user,
+            eps=eps,
+            codigo=codigo,
+            modelo_override=_modelo_override_refinar,
+            llamada_corta=True,
         )
         out = content.strip()
         # Eliminar cierres XML si la IA los metió por hábito
@@ -7066,6 +7274,15 @@ class GlosaService:
         _t_inicio = _time.monotonic()
 
         ultimo_error = None
+        # Ronda 18 (Bug V, 26-jun-2026): retry-por-truncamiento. Si
+        # stop_reason="max_tokens" o el content termina mid-oración (sin
+        # punto final), reintentamos UNA vez con max_tokens duplicado.
+        # Antes solo Groq tenía esta protección; Anthropic Sonnet sí se
+        # trunca en dictámenes multi-norma o argumentación detallada
+        # (caso real MEDIMÁS 26-jun: "Por lo expuesto y con base en"
+        # truncado sin cierre).
+        max_tokens_anthropic = 3000
+        retry_length_usado_anthropic = False
         for intento in range(3):
             try:
                 async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
@@ -7082,9 +7299,7 @@ class GlosaService:
                         headers=_headers,
                         json={
                             "model": _modelo_efectivo,
-                            # Ronda 49: 3000 tokens es suficiente para dictamen
-                            # de 800-1200 palabras; reduce latencia vs 4000.
-                            "max_tokens": 3000,
+                            "max_tokens": max_tokens_anthropic,
                             "temperature": _temp_efectiva,
                             "system": system_payload,
                             "messages": [{"role": "user", "content": user}],
@@ -7092,6 +7307,25 @@ class GlosaService:
                     )
                     data = resp.json()
                     if "content" in data and data["content"]:
+                        content_text = data["content"][0].get("text", "")
+                        stop_reason = data.get("stop_reason", "")
+                        # Bug V: retry-por-truncamiento si stop_reason=max_tokens
+                        # o el texto no cierra con signo terminal.
+                        if (
+                            content_text
+                            and not retry_length_usado_anthropic
+                            and (stop_reason == "max_tokens" or not _termina_completo(content_text))
+                        ):
+                            retry_length_usado_anthropic = True
+                            nuevo_max = max_tokens_anthropic * 2
+                            logger.warning(
+                                f"[ANTHROPIC-RETRY-LENGTH-TRUNC] model={_modelo_efectivo} "
+                                f"max_tokens={max_tokens_anthropic}→{nuevo_max} "
+                                f"stop={stop_reason!r} (content truncado: "
+                                f"'...{content_text[-60:]!r}')"
+                            )
+                            max_tokens_anthropic = nuevo_max
+                            continue
                         usage = data.get("usage", {})
                         latencia_ms = int((_time.monotonic() - _t_inicio) * 1000)
                         _log_metricas_anthropic(
@@ -7099,7 +7333,7 @@ class GlosaService:
                             _modelo_efectivo,
                             latencia_ms,
                         )
-                        return data["content"][0]["text"], f"anthropic/{_modelo_efectivo}"
+                        return content_text, f"anthropic/{_modelo_efectivo}"
                     err = data.get("error", {}).get("message", str(data)[:300])
                     # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     status = resp.status_code
@@ -7368,10 +7602,21 @@ class GlosaService:
         # caso 8 vino del caché DB con etiqueta qwen3 vieja aunque ya
         # tuviéramos los fixes desplegados.
         modelo_para_clave = modelo_override or self.anthropic_model
+        # Ronda 18 (Bug W, 26-jun-2026): el hash de cache se compone también
+        # de un fingerprint del `user` prompt completo. Esto es necesario
+        # porque el user prompt incluye numero_factura + numero_radicado +
+        # texto_glosa (todos llegan via build_user_prompt). Sin embargo, un
+        # bug en la BD de cache permitió que el caso MEDIMÁS (factura
+        # HUS0000602103) recibiera el dictamen cacheado del caso ECOOPSOS
+        # (factura HUS0000601892) — dos glosas distintas pero hash colisionando.
+        # Hipótesis: la columna `clave_cache` en SQLite tenía algún truncado
+        # silencioso. Bumpear _PROMPT_CACHE_VERSION invalida todos los
+        # registros viejos y este hash incluye explícitamente la longitud
+        # del user (defensa adicional contra truncados).
         clave_cache = hashlib.sha256(
             (
                 f"{_PROMPT_CACHE_VERSION}|{self.primary_ai}|{modelo_para_clave}|"
-                f"{eps}|{codigo}|{system}|{user}"
+                f"{eps}|{codigo}|len={len(system)}+{len(user)}|{system}|{user}"
             ).encode()
         ).hexdigest()
 
