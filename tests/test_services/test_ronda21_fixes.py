@@ -203,3 +203,76 @@ class TestBug9VocabularioCobertura:
         ok, omitidos = auditar_subconceptos_respondidos(dictamen, subs)
         assert not ok
         assert any("liquidaci" in o.lower() or "saldos" in o.lower() for o in omitidos)
+
+
+# ── Bugs #11 y #12: postprocesador (coda + Art. 177 pelado) ──
+
+
+class TestBug11CodaConjuncion:
+    def test_coda_unida_por_conjuncion_se_recorta(self):
+        from app.services.dictamen_postprocesor import truncar_despues_de_levantamiento
+
+        d = (
+            "El HUS prestó el servicio. Se solicita el levantamiento de la glosa "
+            "y, de persistir discrepancias técnicas, se invita a mesa de "
+            "conciliación de auditoría conforme a la resolución 3047/2008."
+        )
+        out = truncar_despues_de_levantamiento(d)
+        assert "conciliación" not in out.lower()
+        assert "de persistir" not in out.lower()
+        assert out.rstrip().endswith("de la glosa.")
+
+    def test_continuacion_legitima_se_preserva(self):
+        from app.services.dictamen_postprocesor import truncar_despues_de_levantamiento
+
+        d = (
+            "Se solicita el levantamiento de la glosa y el reconocimiento "
+            "íntegro del valor pactado en el anexo 1 del contrato."
+        )
+        out = truncar_despues_de_levantamiento(d)
+        assert "reconocimiento íntegro" in out.lower()
+
+
+class TestBug12Art177Pelado:
+    def test_art177_pelado_en_tarifa_se_reemplaza(self):
+        from app.services.glosa_service import _neutralizar_art_177_relleno
+
+        d = "Rige el manual tarifario SOAT 2026 conforme al art. 177 de la ley 100/1993."
+        out = _neutralizar_art_177_relleno(
+            d, texto_glosa="TARIFA: diferencia de SOAT pleno vs pactado", codigo_glosa="TA0201"
+        )
+        assert "177" not in out
+        assert "Pacta Sunt Servanda" in out
+
+    def test_art177_cobertura_se_conserva(self):
+        """En debate de COBERTURA (CO), Art. 177 es legítimo y NO se toca."""
+        from app.services.glosa_service import _neutralizar_art_177_relleno
+
+        d = "Conforme al art. 177 de la ley 100/1993, la EPS debe movilizar recursos al POS."
+        out = _neutralizar_art_177_relleno(
+            d, texto_glosa="COBERTURA: servicio incluido en PBS", codigo_glosa="CO0101"
+        )
+        assert "177" in out
+
+
+# ── Bug #8: cláusula citada por la EPS y evadida → detectable ──
+
+
+class TestBug8ClausulaEvadida:
+    def test_clausula_citada_no_respondida_se_detecta(self):
+        from app.services.glosa_service import _auditar_clausulas_citadas_en_glosa
+
+        glosa = "SOPORTES: la cotización comparativa requerida por la cláusula 31 del contrato no fue aportada."
+        dictamen = "El HUS prestó el servicio conforme a la historia clínica institucional."
+        ok, evadidas = _auditar_clausulas_citadas_en_glosa(dictamen, texto_glosa=glosa)
+        assert not ok
+        assert 31 in evadidas
+
+    def test_clausula_respondida_no_se_marca(self):
+        from app.services.glosa_service import _auditar_clausulas_citadas_en_glosa
+
+        glosa = "la cláusula 31 del contrato exige cotización comparativa."
+        dictamen = "Respecto de la cláusula 31, el HUS aporta la justificación de proveedor único."
+        ok, evadidas = _auditar_clausulas_citadas_en_glosa(dictamen, texto_glosa=glosa)
+        assert ok
+        assert not evadidas

@@ -1753,6 +1753,24 @@ def _neutralizar_art_177_relleno(
         re.IGNORECASE | re.DOTALL,
     )
     nuevo, n = pat_art177.subn("", dictamen)
+    # Ronda 21 (caso MEDIMÁS): cita "pelada" de Art. 177 Ley 100 SIN sufijo
+    # POS, usada como fundamento tarifario ("rige el manual ... conforme al
+    # art. 177 de la ley 100/1993"). El Art. 177 regula el deber de las EPS
+    # de movilizar recursos al POS — no es fundamento de una tarifa. En
+    # debate no-financiero se REEMPLAZA (no se borra, para no dejar la
+    # oración sin base) por el fundamento contractual correcto.
+    pat_art177_bare = re.compile(
+        r"(?:CONFORME\s+(?:AL?\s+)?|EL\s+|AL\s+)?"
+        r"(?:ART[ÍI]?CULO?S?|ARTS?\.?)\s*177"
+        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
+        re.IGNORECASE,
+    )
+    nuevo, n_bare = pat_art177_bare.subn(
+        "el régimen tarifario y contractual aplicable (Pacta Sunt Servanda — "
+        "Art. 1602 C.C. y Art. 871 C.Co.)",
+        nuevo,
+    )
+    n += n_bare
     # Limpieza: "Asimismo,  Conforme..." → "Conforme..." después de borrar
     nuevo = re.sub(
         r"\b(ASIMISMO|AS[ÍI]\s+MISMO)[,\s]+(CONFORME|EL\s+ART)", r"\2", nuevo, flags=re.IGNORECASE
@@ -6697,6 +6715,39 @@ class GlosaService:
                     score = max(0, score - 8 * len(_omitidos))
         except Exception as _e_scval:
             logger.debug(f"[SUBCONCEPTOS-OMITIDOS] no auditados: {_e_scval}")
+
+        # ── Ronda 21 (Bug Z v2): cláusula citada por la EPS sin responder ──
+        # El auditor de cláusulas (Bug Z) solo registraba warning y se
+        # descartaba el retorno. Ahora, si la glosa cita "Cláusula N" y el
+        # dictamen no la responde, se antepone banner rojo + penaliza score,
+        # igual que con los sub-conceptos (caso MEDIMÁS: cláusula 31 evadida).
+        try:
+            if modo_resp != "auditoria_previa":
+                _ok_cl, _evadidas = _auditar_clausulas_citadas_en_glosa(
+                    dictamen, texto_glosa=texto_base
+                )
+                if _evadidas:
+                    logger.warning(
+                        f"[CLAUSULAS-EVADIDAS] el dictamen no respondió "
+                        f"la(s) cláusula(s) citada(s): {sorted(_evadidas)}"
+                    )
+                    _items_cl = "".join(
+                        f"<li>Cláusula {n} citada por la EPS — sin responder</li>"
+                        for n in sorted(_evadidas)
+                    )
+                    _banner_cl = (
+                        '<div style="margin-bottom:12px;padding:10px 14px;'
+                        "background:#fef2f2;border:2px solid #dc2626;"
+                        'border-radius:8px;font-size:12px;color:#991b1b;">'
+                        "⚠️ <b>Cláusulas del contrato SIN responder</b> "
+                        "(el silencio equivale a concesión tácita — refiná con "
+                        f"IA antes de radicar):<ul style='margin:6px 0 0 18px;'>{_items_cl}</ul>"
+                        "</div>"
+                    )
+                    dictamen = _banner_cl + dictamen
+                    score = max(0, score - 8 * len(_evadidas))
+        except Exception as _e_clval:
+            logger.debug(f"[CLAUSULAS-EVADIDAS] no auditadas (post): {_e_clval}")
 
         # ── Defensa clínica: checklist de literatura nivel 1A ──
         # Si el caso era de tecnología cara y el dictamen NO citó literatura
