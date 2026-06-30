@@ -303,6 +303,60 @@ def _dump_modal(etiqueta: str) -> None:
     logger.info(f"  volcado del modal (multi-estrategia): {out.resolve()}")
 
 
+_CT_NOMBRES = {
+    50000: "Button",
+    50002: "CheckBox",
+    50003: "ComboBox",
+    50004: "Edit",
+    50005: "RadioButton",
+    50008: "DataItem",
+    50011: "List",
+    50020: "Text",
+    50026: "Group",
+    50032: "Window",
+    50033: "Pane",
+}
+
+
+def _diag_foco_modal(hwnd, pasos: int = 28) -> None:
+    """Con el modal abierto, enfoca su ventana y TABULA campo por campo, logueando
+    el control con foco REAL en cada parada (GetFocusedElement funciona aunque el
+    árbol WPF del modal no se pueda caminar por UIA). Revela el orden de tabulado
+    y la identidad (control_type / auto_id / name) de cada campo, que es lo que se
+    necesita para cablear el llenado por teclado.
+
+    Sólo navega (TAB); no manda ENTER/SPACE, así no dispara botones ni cambia
+    datos."""
+    from pywinauto import Application
+    from pywinauto.keyboard import send_keys
+    from pywinauto.uia_defines import IUIA
+
+    try:
+        app = Application(backend="uia").connect(handle=hwnd, timeout=5)
+        app.window(handle=hwnd).set_focus()
+        time.sleep(0.5)
+    except Exception as e:
+        logger.warning(f"  no pude enfocar el modal para el diag de foco: {e}")
+    logger.info("  ── secuencia de foco del modal (TAB por TAB) ──")
+    for i in range(pasos):
+        aid = nm = ""
+        ct = 0
+        try:
+            el = IUIA().iuia.GetFocusedElement()
+            aid = el.CurrentAutomationId or ""
+            nm = el.CurrentName or ""
+            ct = el.CurrentControlType
+        except Exception:
+            pass
+        ctn = _CT_NOMBRES.get(ct, str(ct))
+        logger.info(f"    foco modal #{i:02d}: [{ctn}] auto_id={aid!r} name={nm!r}")
+        try:
+            send_keys("{TAB}")
+        except Exception:
+            pass
+        time.sleep(0.35)
+
+
 def _diag_grids(win):
     """Loguea cuántas grillas gcConceptosObjecion hay y si cada una tiene fila.
     Sirve para diagnosticar 'no autocargó' sin pedir un dump."""
@@ -525,18 +579,22 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     except Exception as e:
         logger.warning(f"  fallo doble-click en la fila: {e}")
     time.sleep(2.0)
-    logger.info("  doble-click en la fila; capturando el INTERIOR del modal de respuesta…")
-    # Volcamos rooteando en el HWND del modal (ver _modal_conceptos): los volcados
-    # anteriores sólo capturaban el TitleBar porque el árbol del proceso se corta
-    # en el borde WinForms→WPF. Con este árbol salen los auto_id reales del modal
-    # (Concepto / Observaciones / Aplicar campos / GRABAR) para automatizar el
-    # llenado en v2.
-    _dump_modal("modal_abierto")
+    logger.info("  doble-click en la fila; modal de respuesta abierto.")
+    # El interior del modal es WPF y NO se puede caminar por UIA ni win32 (lo
+    # confirmé: rooteando en su HWND, las 3 vías sólo dan el TitleBar). PERO el
+    # control con FOCO sí se lee (GetFocusedElement). Así que en vez de volcar el
+    # árbol, tabulamos por el modal y logueamos el foco en cada parada: eso revela
+    # el orden y la identidad de los campos para cablear el llenado por teclado.
+    hwnds = _hwnds_modal()
+    if hwnds:
+        _diag_foco_modal(hwnds[0])
+    else:
+        logger.warning("  no encontré el HWND del modal para el diag de foco.")
     logger.warning(
-        "  ⚠ v1: abrí el modal de respuesta (doble-click) y volqué su INTERIOR. "
-        "Mandame el 'dump_dgh_modal_abierto_*.txt' (ahora sí trae los campos) y con "
-        "eso cableo: seleccionar la fila → Concepto RE9901 → Observaciones → Aplicar "
-        "campos → GRABAR."
+        "  ⚠ El interior del modal es WPF: NO se camina por UIA (las 3 vías sólo dieron "
+        "el TitleBar). Pero el FOCO sí se lee. Pasame la secuencia 'foco modal #NN' de "
+        "arriba y con eso cableo el llenado por teclado (fila → RE9901 → Observaciones → "
+        "Aplicar campos → GRABAR)."
     )
     return "MODAL_ABIERTO"
     # ── (v2: aquí va el llenado del modal una vez tengamos sus auto_id) ──
