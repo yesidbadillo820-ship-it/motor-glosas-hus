@@ -480,19 +480,30 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     send_keys(_escapar(factura_larga) + "{ENTER}")
     logger.info(f"  factura {factura_larga} escrita; esperando autocargue…")
 
-    # 3) Autocargue ASÍNCRONO (DevExpress.Data.Async). Poll hasta que ALGUNA
-    #    grilla gcConceptosObjecion tenga su fila de concepto. No dependemos de
-    #    aislar el Editor ni de timings fijos: buscamos directamente la grilla
-    #    con fila (robusto a timing y a editores duplicados). Hasta 60s.
+    # 3) Autocargue ASÍNCRONO (DevExpress.Data.Async). La factura resuelve el
+    #    encabezado enseguida, pero la grilla de conceptos llega después por carga
+    #    asíncrona; en sesiones de DG "cansadas" (varias corridas) puede tardar
+    #    bastante (se vio ~70s). Poll hasta que ALGUNA grilla gcConceptosObjecion
+    #    tenga su fila, hasta 120s, con aviso de progreso + diag cada 15s.
     grid = datos = None
-    fin = time.time() + 60
+    espera_max = 120
+    fin = time.time() + espera_max
+    prox_aviso = time.time() + 15
     while time.time() < fin:
         grid, datos = _grid_con_fila(win)
         if datos is not None:
             break
+        if time.time() >= prox_aviso:
+            logger.info(f"  … aún esperando autocargue ({int(fin - time.time())}s restantes)")
+            _diag_grids(win)
+            prox_aviso = time.time() + 15
         time.sleep(0.8)
     if datos is None:
-        logger.error("  la factura no autocargó (ninguna grilla con fila en 60s). ¿Ya tramitada?")
+        logger.error(
+            f"  la factura no autocargó (ninguna grilla con fila en {espera_max}s). "
+            "Si la pantalla SÍ muestra la grilla cargada, la sesión de DG está muy "
+            "lenta: reiniciá DG fresco (con DG fresco autocarga en ~4s)."
+        )
         _diag_grids(win)
         if dump_al_fallar:
             _dump("sin_autocargue")
