@@ -202,6 +202,28 @@ def _dump(etiqueta: str) -> None:
         logger.warning(f"  no pude volcar {etiqueta}: {e}")
 
 
+def _grid_con_fila(win):
+    """(grid_spec, datos_spec) de la PRIMERA grilla 'gcConceptosObjecion' cuyo
+    panel de datos tiene una fila (DataItem), sin importar en qué pestaña Editor
+    esté. Robusto a editores duplicados y a la carga asíncrona: una grilla vacía
+    (Record 0 of 0) tiene dataPresenter pero NO DataItem, así distinguimos la
+    autocargada."""
+    for i in range(6):
+        try:
+            grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
+            if not grid.exists():
+                break
+        except Exception:
+            break
+        try:
+            datos = grid.child_window(auto_id="dataPresenter")
+            if datos.exists() and datos.child_window(control_type="DataItem").exists():
+                return grid, grid.child_window(auto_id="dataPresenter", found_index=0)
+        except Exception:
+            continue
+    return None, None
+
+
 # ─── Flujo por factura ───────────────────────────────────────────────────────
 
 
@@ -240,37 +262,15 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         except Exception:
             pass
 
-    # Acotar al ÁRBOL del Editor activo: buscar controles profundos en el árbol
-    # completo de DG (con todas las pestañas) es lento y no siempre resuelve.
-    editor = _buscar(win, name_re="Editor de Tr.mite", control_type="Window", timeout=8)
-    if editor is None:
-        logger.warning("  no aislé la ventana del Editor; uso el árbol completo (más lento).")
-        editor = win
-    else:
-        logger.info("  ✓ Editor activo localizado.")
-
-    # 2) Escribir la Factura. Truco confirmado por el usuario: al abrir el
-    #    Editor el foco arranca en Consecutivo (cuyo editor SÍ está instanciado);
-    #    los demás campos están virtualizados hasta enfocarse. Entonces:
-    #    foco en Consecutivo → TAB hasta que aparezca ctrlFactura (= Factura
-    #    enfocado, su editor recién ahí se instancia) → tipear.
+    # 2) Ir al campo Factura operando por FOCO (NO por aislar la ventana del
+    #    Editor, que con pestañas duplicadas es ambiguo y fue la causa de fondo
+    #    de los falsos negativos). Tras AGREGAR el Editor nuevo está activo y el
+    #    foco arranca en Consecutivo; TAB hasta que el control con foco real se
+    #    llame 'Factura' (orden Consecutivo→Fecha→[Estado]→Factura).
     from pywinauto.keyboard import send_keys
 
-    cons = _buscar(editor, auto_id="ctrlConsecutivo", timeout=6)
-    if cons is None:
-        logger.error("  no hallé el campo Consecutivo (ctrlConsecutivo). Mandame el dump.")
-        if dump_al_fallar:
-            _dump("sin_consecutivo")
-        return "ERROR_FACTURA"
-    try:
-        cons.click_input()
-    except Exception:
-        pass
-    time.sleep(0.3)
-    # TAB hasta que el control con FOCO real se llame 'Factura'. Detectar por el
-    # foco (no por "existe en el árbol") evita escribir en Fecha por error.
     en_factura = False
-    for intento in range(12):
+    for intento in range(20):
         aid, nm = _foco_actual()
         if nm == "Factura" or aid == "ctrlFactura":
             logger.info(f"  Factura enfocada tras {intento} TAB(s).")
@@ -281,7 +281,7 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     if not en_factura:
         aid, nm = _foco_actual()
         logger.error(
-            f"  no llegué a Factura tabulando (último foco: name={nm!r} auto_id={aid!r}). Mandame el dump."
+            f"  no llegué a Factura (último foco: name={nm!r} auto_id={aid!r}). Mandame el dump."
         )
         if dump_al_fallar:
             _dump("sin_factura")
@@ -291,26 +291,19 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     send_keys(_escapar(factura_larga) + "{ENTER}")
     logger.info(f"  factura {factura_larga} escrita; esperando autocargue…")
 
-    # 3) Esperar el autocargue. Es ASÍNCRONO (DevExpress.Data.Async): para una
-    #    factura de régimen especial puede tardar ~20-30s. La señal fiable es que
-    #    la GRILLA reciba la fila de concepto (Tercero y demás ctrl* están
-    #    virtualizados). Damos hasta 45s.
-    grid = _buscar(editor, auto_id="gcConceptosObjecion", timeout=12)
-    if grid is None:
-        logger.error("  no hallé la grilla de conceptos (gcConceptosObjecion).")
-        if dump_al_fallar:
-            _dump("sin_grilla")
-        return "ERROR_GRILLA"
-    datos = None
-    fin = time.time() + 45
+    # 3) Autocargue ASÍNCRONO (DevExpress.Data.Async). Poll hasta que ALGUNA
+    #    grilla gcConceptosObjecion tenga su fila de concepto. No dependemos de
+    #    aislar el Editor ni de timings fijos: buscamos directamente la grilla
+    #    con fila (robusto a timing y a editores duplicados). Hasta 60s.
+    grid = datos = None
+    fin = time.time() + 60
     while time.time() < fin:
-        d = _buscar(grid, auto_id="dataPresenter", timeout=1)
-        if d is not None and _buscar(d, control_type="DataItem", timeout=1) is not None:
-            datos = d
+        grid, datos = _grid_con_fila(win)
+        if datos is not None:
             break
         time.sleep(0.8)
     if datos is None:
-        logger.error("  la factura no autocargó en 45s (grilla sin filas). ¿Ya tramitada?")
+        logger.error("  la factura no autocargó (ninguna grilla con fila en 60s). ¿Ya tramitada?")
         if dump_al_fallar:
             _dump("sin_autocargue")
         return "NO_AUTOCARGA"
@@ -381,8 +374,8 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
 
     # 5) GRABAR + diálogo 'Registro grabado' (Confirmar=Sí, Imprimir=Sí).
     grabar_btn = _buscar(
-        editor, auto_id="BarButtonItemLink0", control_type="Button", timeout=4
-    ) or _buscar(editor, name="GRABAR", control_type="Button", timeout=4)
+        win, auto_id="BarButtonItemLink0", control_type="Button", timeout=4
+    ) or _buscar(win, name="GRABAR", control_type="Button", timeout=4)
     if grabar_btn is None:
         logger.error("  no hallé el botón GRABAR.")
         if dump_al_fallar:
