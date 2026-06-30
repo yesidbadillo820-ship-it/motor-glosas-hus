@@ -208,7 +208,7 @@ def _grid_con_fila(win):
     esté. Robusto a editores duplicados y a la carga asíncrona: una grilla vacía
     (Record 0 of 0) tiene dataPresenter pero NO DataItem, así distinguimos la
     autocargada."""
-    for i in range(6):
+    for i in range(40):
         try:
             grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
             if not grid.exists():
