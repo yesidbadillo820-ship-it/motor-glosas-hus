@@ -82,3 +82,4 @@ radicacion_reporte.csv
 scratchpad/
 tests/benchmark/salidas/
 tests/benchmark/historial_live.jsonl
+tests/benchmark/historial.jsonl
