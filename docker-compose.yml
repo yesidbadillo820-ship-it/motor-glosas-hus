@@ -46,6 +46,10 @@ services:
       SOPORTES_ROOT: /data/soportes
       SOPORTES_LOCAL_ROOT: /data/soportes
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      # Mejora #3 (jun-2026): salida estructurada incremental. OFF por
+      # defecto. Para activarla, poner GLOSA_CAMPOS_ESTRUCTURADOS=true en
+      # el .env y `docker compose up -d --build`. Reversible: volver a 0.
+      GLOSA_CAMPOS_ESTRUCTURADOS: ${GLOSA_CAMPOS_ESTRUCTURADOS:-0}
       # Secretos — DEBEN venir del .env (no hardcodear)
       JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY: ${SECRET_KEY}
