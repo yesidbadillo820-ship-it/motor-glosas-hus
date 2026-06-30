@@ -145,8 +145,10 @@ def normalizar_factura(s: str) -> str:
     return m.group(1) if m else s.lstrip("0") or s
 
 
-def leer_excel_respuestas(ruta: Path) -> list[dict]:
-    """Devuelve una lista de dicts {factura, factura_corta, num, aceptado, detalle}.
+def leer_excel_respuestas(ruta: Path) -> dict[str, list[dict]]:
+    """Devuelve {factura_corta: [{factura, factura_corta, num, aceptado, detalle}, ...]},
+    agrupado por factura y ordenado por # de objeción (así lo consumen tanto el
+    bot de SIMED como el de DGH, que iteran `.items()`).
 
     Acepta cabeceras con variantes (tolerante mayúsculas/acentos/espacios).
     """
