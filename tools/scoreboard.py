@@ -77,9 +77,19 @@ def main() -> int:
     ap.add_argument("--caso", help="id de caso a puntuar con un dictamen externo")
     ap.add_argument("--archivo", help="archivo .txt con el dictamen a puntuar")
     ap.add_argument("--no-guardar", action="store_true", help="no anexar al historial")
+    ap.add_argument(
+        "--rescore-live",
+        action="store_true",
+        help="re-puntúa los últimos dictámenes generados por el benchmark en vivo (sin LLM)",
+    )
     args = ap.parse_args()
 
     casos = {c["id"]: c for c in _cargar_casos()}
+
+    # Modo: re-puntuar los dictámenes ya generados (carpeta salidas/ más
+    # reciente). Útil tras afinar el scorer — sin volver a llamar al LLM.
+    if args.rescore_live:
+        return _rescore_live(casos)
 
     # Modo: puntuar un dictamen externo para un caso puntual
     if args.caso and args.archivo:
@@ -164,6 +174,47 @@ def main() -> int:
             )
 
     return 0 if aprobados == len(resultados) else 1
+
+
+def _rescore_live(casos: dict) -> int:
+    """Re-puntúa los .txt de la carpeta salidas/ más reciente (sin LLM)."""
+    salidas = os.path.join(_RAIZ, "tests", "benchmark", "salidas")
+    if not os.path.isdir(salidas):
+        print("No hay dictámenes generados todavía (corré tools/scoreboard_live.py primero).")
+        return 2
+    subdirs = sorted(d for d in os.listdir(salidas) if os.path.isdir(os.path.join(salidas, d)))
+    if not subdirs:
+        print("La carpeta salidas/ está vacía.")
+        return 2
+    ultima = os.path.join(salidas, subdirs[-1])
+    print("\n" + "═" * 64)
+    print(f"  RE-PUNTUACIÓN (sin LLM) de: {subdirs[-1]}")
+    print("═" * 64)
+    resultados = []
+    for cid, caso in casos.items():
+        txt = os.path.join(ultima, f"{cid}.txt")
+        if not os.path.exists(txt):
+            print(f"\n⚠️  {caso['titulo']}: sin dictamen generado (se omite)")
+            continue
+        with open(txt, encoding="utf-8") as f:
+            dictamen = f.read()
+        r = puntuar_dictamen(dictamen, caso)
+        resultados.append(r)
+        print(f"\n{_emoji(r['score'])}  {caso['titulo']} → {r['score']}/10")
+        for df in r["defectos"]:
+            print(
+                f"       − {df['gravedad']:8} −{df['peso']}  {df['criterio']}: {df['evidencia'][:60]}"
+            )
+        if not r["defectos"]:
+            print("       (sin defectos detectados) ✨")
+    if resultados:
+        aprobados = sum(1 for r in resultados if r["aprobado"])
+        promedio = round(sum(r["score"] for r in resultados) / len(resultados), 2)
+        print("\n" + "═" * 64)
+        print(f"  RESUMEN: {aprobados}/{len(resultados)} casos >= 7  ·  promedio {promedio}/10")
+        print("═" * 64 + "\n")
+        return 0 if aprobados == len(resultados) else 1
+    return 2
 
 
 def _imprimir_caso(r: dict) -> None:
