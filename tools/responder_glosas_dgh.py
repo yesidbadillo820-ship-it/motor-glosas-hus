@@ -236,80 +236,65 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     else:
         logger.info("  ✓ Editor activo localizado.")
 
-    # 2) Escribir la Factura. Los editores DevExpress en BLANCO virtualizan su
-    #    parte editable (no exponen el control interno hasta enfocarse). Por eso
-    #    CLICKEAMOS el campo para enfocarlo y tipeamos al control enfocado.
+    # 2) Escribir la Factura. Truco confirmado por el usuario: al abrir el
+    #    Editor el foco arranca en Consecutivo (cuyo editor SÍ está instanciado);
+    #    los demás campos están virtualizados hasta enfocarse. Entonces:
+    #    foco en Consecutivo → TAB hasta que aparezca ctrlFactura (= Factura
+    #    enfocado, su editor recién ahí se instancia) → tipear.
     from pywinauto.keyboard import send_keys
 
-    fac = _buscar(editor, auto_id="ctrlFactura", timeout=5) or _buscar(
-        editor, auto_id="Factura", control_type="Pane", timeout=5
-    )
-    enfocado = False
-    if fac is not None:
-        try:
-            r = fac.rectangle()
-            # Click en el ~75% del ancho (zona del editor, no de la etiqueta).
-            fac.click_input(coords=(int(r.width() * 0.75), int(r.height() * 0.5)))
-            enfocado = True
-        except Exception as e:
-            logger.warning(f"  no pude clickear el campo Factura: {e}")
-    if not enfocado:
-        # Fallback (pista del usuario): enfocar Consecutivo y TAB hasta Factura.
-        cons = _buscar(editor, auto_id="ctrlConsecutivo", timeout=4) or _buscar(
-            editor, auto_id="Consecutivo", control_type="Pane", timeout=4
-        )
-        if cons is None:
-            logger.error("  no pude enfocar ni Factura ni Consecutivo. Mandame el dump.")
-            if dump_al_fallar:
-                _dump("sin_factura")
-            return "ERROR_FACTURA"
-        try:
-            cons.click_input()
-            time.sleep(0.3)
-            # Consecutivo → (Fecha) → Factura. Estado es de sólo lectura y se
-            # suele saltear; probamos 2 TABs.
-            send_keys("{TAB}{TAB}")
-            enfocado = True
-        except Exception as e:
-            logger.error(f"  fallback Consecutivo+TAB falló: {e}")
-            if dump_al_fallar:
-                _dump("sin_factura")
-            return "ERROR_FACTURA"
-    time.sleep(0.5)
+    cons = _buscar(editor, auto_id="ctrlConsecutivo", timeout=6)
+    if cons is None:
+        logger.error("  no hallé el campo Consecutivo (ctrlConsecutivo). Mandame el dump.")
+        if dump_al_fallar:
+            _dump("sin_consecutivo")
+        return "ERROR_FACTURA"
+    try:
+        cons.click_input()
+    except Exception:
+        pass
+    time.sleep(0.3)
+    fac_edit = None
+    for intento in range(8):
+        send_keys("{TAB}")
+        time.sleep(0.35)
+        fac_edit = _buscar(editor, auto_id="ctrlFactura", timeout=1)
+        if fac_edit is not None:
+            logger.info(f"  Factura enfocada tras {intento + 1} TAB(s).")
+            break
+    if fac_edit is None:
+        logger.error("  no llegué a Factura tabulando desde Consecutivo. Mandame el dump.")
+        if dump_al_fallar:
+            _dump("sin_factura")
+        return "ERROR_FACTURA"
+    time.sleep(0.3)
     send_keys("^a{DEL}")
     send_keys(_escapar(factura_larga) + "{ENTER}")
     logger.info(f"  factura {factura_larga} escrita; esperando autocargue…")
 
-    # 3) Esperar a que cargue (el Tercero deja de estar vacío).
-    cargado = False
+    # 3) Esperar el autocargue: la señal fiable es que la GRILLA reciba la fila
+    #    de concepto (Tercero y demás ctrl* del encabezado están virtualizados).
+    datos = None
     fin = time.time() + 20
     while time.time() < fin:
-        tercero = _buscar(editor, auto_id="ctrlTercero", timeout=1)
-        try:
-            if tercero is not None and (tercero.window_text() or "").strip():
-                cargado = True
+        grid = _buscar(editor, auto_id="gcConceptosObjecion", timeout=1)
+        if grid is not None:
+            d = _buscar(grid, auto_id="dataPresenter", timeout=1)
+            if d is not None and _buscar(d, control_type="DataItem", timeout=1) is not None:
+                datos = d
                 break
-        except Exception:
-            pass
-        time.sleep(0.5)
-    if not cargado:
-        logger.error("  la factura no autocargó (Tercero vacío). ¿Número correcto / ya tramitada?")
+        time.sleep(0.6)
+    if datos is None:
+        logger.error(
+            "  la factura no autocargó (grilla sin filas). ¿Número correcto / ya tramitada?"
+        )
         if dump_al_fallar:
             _dump("sin_autocargue")
         return "NO_AUTOCARGA"
-    logger.info("  ✓ datos de la factura autocargados.")
+    logger.info("  ✓ datos autocargados (grilla con fila).")
 
-    # 4) Llenar la grilla de conceptos (gcConceptosObjecion), fila por fila.
-    grid = _buscar(editor, auto_id="gcConceptosObjecion", timeout=10)
-    if grid is None:
-        logger.error("  no hallé la grilla de conceptos (gcConceptosObjecion).")
-        if dump_al_fallar:
-            _dump("sin_grilla")
-        return "ERROR_GRILLA"
-    # Las celdas de DATOS comparten auto_id con la fila de filtros y el footer;
-    # hay que buscarlas DENTRO del panel de datos (dataPresenter) para no agarrar
-    # la celda equivocada.
-    datos = _buscar(grid, auto_id="dataPresenter", timeout=5) or grid
+    # 4) Llenar la grilla. Las celdas de DATOS comparten auto_id con la fila de
+    #    filtros y el footer; por eso las buscamos DENTRO del panel de datos.
 
     # Las celdas de respuesta editables exponen auto_id = binding:
     #   ConceptoObjecion.Codigo  → código de respuesta (RE9901)
