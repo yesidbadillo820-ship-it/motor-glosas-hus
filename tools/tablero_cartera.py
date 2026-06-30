@@ -492,6 +492,8 @@ def agregar(facturas: list[FacturaCartera], corte: date) -> dict:
         m["pagado"] += f.valor_pagado
         m["n"] += 1
     meses = [m for k, m in sorted(por_mes.items()) if k != "Sin fecha"]
+    for m in meses:
+        m["pct_recaudo"] = round(100.0 * m["pagado"] / m["radicado"], 1) if m["radicado"] else 0.0
 
     # Aging (mora por tramos, solo saldo > 0)
     aging = {nombre: 0.0 for nombre, _, _ in TRAMOS_MORA}
@@ -535,6 +537,8 @@ def agregar(facturas: list[FacturaCartera], corte: date) -> dict:
             "n_pagadas": sum(1 for f in facturas if f.estado_cartera == "PAGADA"),
             "n_glosadas": sum(1 for f in facturas if f.objetado > 0),
             "n_listas": sum(1 for f in facturas if f.estado_radicacion == "LISTA"),
+            "riesgo_90": round(aging["+90"], 2),
+            "n_riesgo": sum(1 for f in facturas if (f.dias_mora(corte) or 0) > 90),
         },
         "entidades": entidades,
         "meses": meses,

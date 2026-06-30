@@ -83,6 +83,31 @@ _PLANTILLA = r"""<!DOCTYPE html>
   .foot{text-align:center;color:var(--muted);font-size:12px;padding:24px 0 8px}
   .pill{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px}
   .empty{color:var(--muted);text-align:center;padding:30px;font-style:italic}
+  .btn{padding:8px 14px;border:1px solid var(--blue);background:var(--blue);color:#fff;border-radius:9px;
+    font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{filter:brightness(1.06)}
+  .btn.ghost{background:#fff;color:var(--blue)}
+  .alert-row{display:grid;grid-template-columns:120px 1fr 130px 90px;gap:10px;align-items:center;
+    padding:9px 8px;border-bottom:1px solid var(--border);font-size:13px;cursor:pointer}
+  .alert-row:hover{background:var(--rose-bg)}
+  .alert-row .d{color:var(--rose);font-weight:800;text-align:right}
+  .alert-row .s{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .cmp{width:100%;border-collapse:collapse;font-size:13px}
+  .cmp th,.cmp td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:right}
+  .cmp th:first-child,.cmp td:first-child{text-align:left}
+  .up{color:var(--green);font-weight:700}.down{color:var(--rose);font-weight:700}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;place-items:center;z-index:50}
+  .modal-bg.on{display:grid}
+  .modal{background:#fff;border-radius:16px;max-width:540px;width:92%;max-height:86vh;overflow:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .modal .mh{background:linear-gradient(120deg,var(--navy),var(--blue));color:#fff;padding:16px 20px;
+    border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0}
+  .modal .mh h3{margin:0;font-size:17px}
+  .modal .x{cursor:pointer;font-size:24px;line-height:1;background:none;border:none;color:#fff;opacity:.9}
+  .modal .mb{padding:8px 20px 18px}
+  .drow{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .drow .k{color:var(--muted)}.drow .v{font-weight:600;text-align:right}
+  tr.clickable{cursor:pointer}
 </style>
 </head>
 <body>
@@ -110,6 +135,11 @@ _PLANTILLA = r"""<!DOCTYPE html>
       </div>
     </div>
 
+    <div class="panel full" id="panel-alertas">
+      <h2>🔴 Alertas de mora — cartera +90 días <span class="tag" id="tag-alertas"></span></h2>
+      <div id="alertas"></div>
+    </div>
+
     <div class="panel">
       <h2>Estado de cartera</h2>
       <div id="donut-cartera"></div>
@@ -134,11 +164,17 @@ _PLANTILLA = r"""<!DOCTYPE html>
     </div>
 
     <div class="panel full">
+      <h2>Comparativo mensual <span class="tag">recaudo y glosa por periodo</span></h2>
+      <div id="comparativo"></div>
+    </div>
+
+    <div class="panel full">
       <h2>Detalle por factura <span class="tag" id="tag-tabla"></span></h2>
       <div class="toolbar">
         <input id="q" placeholder="Buscar factura, entidad, motivo…">
         <select id="f-ent"><option value="">Todas las entidades</option></select>
         <select id="f-car"><option value="">Todos los estados de cartera</option></select>
+        <button class="btn ghost" id="btn-export">⬇ Exportar Excel</button>
       </div>
       <div class="tablewrap">
         <table id="tabla">
@@ -150,6 +186,13 @@ _PLANTILLA = r"""<!DOCTYPE html>
   </div>
 
   <div class="foot">Generado por el Tablero de Radicación y Cartera · ESE Hospital Universitario de Santander · __FECHA__</div>
+</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="mh"><h3 id="m-title">Factura</h3><button class="x" id="m-close" title="Cerrar">&times;</button></div>
+    <div class="mb" id="m-body"></div>
+  </div>
 </div>
 
 <script>
@@ -192,6 +235,7 @@ function renderKPIs(){
     {lbl:"Pagado", val:fmtShort(k.pagado), hint:pct(k.pct_recaudo)+" de recaudo", acc:"var(--green)"},
     {lbl:"Glosado / Devuelto", val:fmtShort(k.glosado+k.devuelto), hint:pct(k.pct_glosa)+" del radicado", acc:"var(--rose)"},
     {lbl:"Saldo (debiendo)", val:fmtShort(k.saldo), hint:k.n_glosadas+" con glosa", acc:"var(--amber)"},
+    {lbl:"Cartera +90 días", val:fmtShort(k.riesgo_90), hint:(k.n_riesgo||0)+" factura(s) en riesgo", acc:"#be123c"},
   ];
   document.getElementById("kpis").innerHTML = cards.map(c=>
     `<div class="kpi" style="--accent:${c.acc}">
@@ -295,7 +339,7 @@ const COLS=[
   {k:"estado_cartera",t:"Cartera"},{k:"estado_radicacion",t:"Radicación"},
   {k:"motivo_glosa",t:"Motivo"}
 ];
-let sortK="saldo",sortDir=-1;
+let sortK="saldo",sortDir=-1,vista=[];
 function pintaTabla(){
   const q=document.getElementById("q").value.toLowerCase();
   const fe=document.getElementById("f-ent").value, fc=document.getElementById("f-car").value;
@@ -306,10 +350,11 @@ function pintaTabla(){
     return true;
   });
   rows.sort((a,b)=>{let x=a[sortK],y=b[sortK];if(typeof x==="string"){x=x||"";y=y||"";return sortDir*x.localeCompare(y);}return sortDir*((x||0)-(y||0));});
+  vista=rows;
   document.getElementById("thead").innerHTML=COLS.map(c=>`<th class="${c.n?'num':''}" data-k="${c.k}">${c.t}${sortK===c.k?(sortDir<0?" ▾":" ▴"):""}</th>`).join("");
   document.getElementById("tbody").innerHTML = rows.length? rows.map(f=>{
     const td=(v,n)=>`<td class="${n?'num':''}">${v}</td>`;
-    return `<tr>
+    return `<tr class="clickable" data-fac="${f.factura}">
       ${td(f.factura)}${td(f.entidad)}
       ${td(fmtShort(f.radicado),1)}${td(f.glosado+f.devuelto?fmtShort(f.glosado+f.devuelto):"—",1)}
       ${td(f.pagado?fmtShort(f.pagado):"—",1)}${td(fmtShort(f.saldo),1)}
@@ -322,10 +367,75 @@ function pintaTabla(){
   document.getElementById("tag-tabla").textContent=rows.length+" / "+DATA.facturas.length+" facturas";
 }
 
+/* ── alertas de mora +90 días ── */
+function renderAlertas(){
+  const cr=DATA.facturas.filter(f=>f.dias_mora!=null&&f.dias_mora>90&&f.saldo>0).sort((a,b)=>b.saldo-a.saldo);
+  const el=document.getElementById("alertas");
+  document.getElementById("tag-alertas").textContent=cr.length+" facturas · "+fmtShort(DATA.kpis.riesgo_90||0);
+  if(!cr.length){el.innerHTML='<div class="empty">Sin facturas en mora +90 días. 👍</div>';return;}
+  el.innerHTML=cr.slice(0,15).map(f=>
+    `<div class="alert-row" data-fac="${f.factura}">
+       <div><b>${f.factura}</b></div>
+       <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.entidad}</div>
+       <div class="s">${fmtShort(f.saldo)}</div><div class="d">${f.dias_mora} d</div>
+     </div>`).join("")
+    +(cr.length>15?`<div class="muted" style="padding:9px 4px;font-size:12px">…y ${cr.length-15} más (ver tabla).</div>`:"");
+}
+
+/* ── comparativo mensual (variación de recaudo) ── */
+function renderComparativo(){
+  const ms=DATA.meses, el=document.getElementById("comparativo");
+  if(!ms.length){el.innerHTML='<div class="empty">Sin fechas de radicación cargadas en el seguimiento.</div>';return;}
+  let prev=null;
+  const filas=ms.map(m=>{
+    const v=prev!=null?m.pct_recaudo-prev:null; prev=m.pct_recaudo;
+    const tag=v==null?"—":(v>=0?`<span class="up">▲ ${v.toFixed(1)}</span>`:`<span class="down">▼ ${Math.abs(v).toFixed(1)}</span>`);
+    return `<tr><td>${m.mes}</td><td>${fmtShort(m.radicado)}</td><td>${fmtShort(m.pagado)}</td><td>${pct(m.pct_recaudo)}</td><td>${tag}</td><td>${m.n}</td></tr>`;
+  }).join("");
+  el.innerHTML=`<table class="cmp"><thead><tr><th>Mes</th><th>Radicado</th><th>Pagado</th><th>% Recaudo</th><th>Δ recaudo</th><th>Facturas</th></tr></thead><tbody>${filas}</tbody></table>`;
+}
+
+/* ── exportar la vista filtrada a CSV (lo abre Excel) ── */
+function exportCSV(){
+  const cols=["factura","entidad","canal","radicado","glosado","devuelto","pagado","saldo","pct_recaudo","dias_mora","estado_cartera","estado_radicacion","fecha_radicacion","fecha_pago","motivo_glosa","nota_credito","observaciones"];
+  const linea=f=>cols.map(c=>{let v=f[c];if(v==null)v="";return '"'+String(v).replace(/"/g,'""')+'"';}).join(";");
+  const csv="﻿"+cols.join(";")+"\n"+vista.map(linea).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"}));
+  a.download="cartera_"+DATA.generado+".csv"; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ── drill-down: detalle completo de una factura ── */
+function abrirFactura(fac){
+  const f=DATA.facturas.find(x=>x.factura===fac); if(!f)return;
+  const row=(k,v)=>`<div class="drow"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+  const bc=colCartera(f.estado_cartera);
+  document.getElementById("m-title").textContent=f.factura+" · "+f.entidad;
+  document.getElementById("m-body").innerHTML=
+    row("Estado de cartera",`<span class="badge" style="background:${bc}22;color:${bc}">${lblCartera(f.estado_cartera)}</span>`)
+    +row("Estado de radicación",f.estado_radicacion||"—")
+    +row("Canal",f.canal||"—")
+    +row("Valor radicado",fmtCOP(f.radicado))
+    +row("Glosado",f.glosado?fmtCOP(f.glosado):"—")
+    +row("Devuelto",f.devuelto?fmtCOP(f.devuelto):"—")
+    +row("Pagado",f.pagado?fmtCOP(f.pagado):"—")
+    +row("Saldo (debiendo)",`<b>${fmtCOP(f.saldo)}</b>`)
+    +row("% Recaudo",pct(f.pct_recaudo))
+    +row("Días de mora",f.dias_mora==null?"—":f.dias_mora+" días")
+    +row("Fecha radicación",f.fecha_radicacion||"—")
+    +row("Fecha pago",f.fecha_pago||"—")
+    +row("Motivo de glosa",f.motivo_glosa||"—")
+    +row("Nota crédito",f.nota_credito||"—")
+    +row("Observaciones",f.observaciones||"—");
+  document.getElementById("modal").classList.add("on");
+}
+const cerrarModal=()=>document.getElementById("modal").classList.remove("on");
+
 /* ── init ── */
 function init(){
   document.getElementById("fcorte").textContent=DATA.generado;
   renderKPIs(); renderEntidades(); renderAging(); renderTendencia(); renderMotivos();
+  renderAlertas(); renderComparativo();
   donut("donut-cartera", Object.entries(DATA.estados_cartera).map(([k,v])=>({label:lblCartera(k),value:v,color:colCartera(k)})));
   donut("donut-radicacion", Object.entries(DATA.estados_radicacion).map(([k,v])=>({label:k,value:v,color:colRad(k)})));
   const fe=document.getElementById("f-ent");
@@ -337,6 +447,12 @@ function init(){
   document.getElementById("thead").addEventListener("click",e=>{
     const k=e.target.dataset.k; if(!k)return; if(sortK===k)sortDir*=-1;else{sortK=k;sortDir=-1;} pintaTabla();
   });
+  document.getElementById("btn-export").addEventListener("click",exportCSV);
+  document.getElementById("m-close").addEventListener("click",cerrarModal);
+  document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")cerrarModal();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")cerrarModal();});
+  document.getElementById("tbody").addEventListener("click",e=>{const tr=e.target.closest("tr[data-fac]");if(tr)abrirFactura(tr.dataset.fac);});
+  document.getElementById("alertas").addEventListener("click",e=>{const r=e.target.closest("[data-fac]");if(r)abrirFactura(r.dataset.fac);});
   pintaTabla();
 }
 init();

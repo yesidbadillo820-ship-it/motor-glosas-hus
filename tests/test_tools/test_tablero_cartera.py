@@ -162,6 +162,24 @@ class TestCargaYAgregacion:
         # Aging: HUS200 con saldo y radicada 2026-04-01 → 90 días al corte
         assert datos["aging"]["61-90"] == 2_000_000.0
 
+    def test_riesgo_mora_mayor_90(self, tmp_path):
+        r = tmp_path / "rad.csv"
+        _csv(
+            r,
+            [
+                ["factura", "entidad", "valor_total", "estado"],
+                ["HUS500", "NUEVA EPS", "1000000", "LISTA"],
+            ],
+        )
+        inv = tab.cargar_radicacion([r])
+        s = tmp_path / "seg.csv"
+        _csv(s, [["FACTURA", "FECHA_RADICACION", "VALOR_PAGADO"], ["HUS500", "2026-01-01", "0"]])
+        facturas = tab.fusionar(inv, tab.cargar_seguimiento(s))
+        datos = tab.agregar(facturas, date(2026, 6, 30))  # ~180 días → +90
+        assert datos["kpis"]["riesgo_90"] == 1_000_000.0
+        assert datos["kpis"]["n_riesgo"] == 1
+        assert datos["meses"][0]["pct_recaudo"] == 0.0
+
     def test_seguimiento_de_factura_inexistente_se_ignora(self, tmp_path):
         inv = tab.cargar_radicacion([self._radicacion(tmp_path)])
         s = tmp_path / "seg.csv"
