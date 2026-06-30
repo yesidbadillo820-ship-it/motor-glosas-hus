@@ -202,6 +202,91 @@ def _dump(etiqueta: str) -> None:
         logger.warning(f"  no pude volcar {etiqueta}: {e}")
 
 
+def _modal_conceptos(timeout: float = 12.0):
+    """Devuelve un WindowSpecification del modal 'Conceptos del trámite de
+    objeción', o None.
+
+    CLAVE: el modal es una ventana WPF hosteada dentro de la app WinForms. Su
+    INTERIOR (Concepto / Observaciones / Aplicar campos / la grilla de conceptos
+    / GRABAR) NO es alcanzable caminando el árbol desde DGFRMPrincipal: el
+    recorrido se corta en el borde WinForms→WPF y sólo expone el TitleBar del
+    modal (por eso los volcados anteriores nunca mostraron sus campos). Hay que
+    tomar el modal como ventana TOP-LEVEL del escritorio, rooteando la búsqueda
+    UIA en su propio HWND; recién ahí el proveedor WPF expone los controles
+    internos."""
+    try:
+        from pywinauto import Desktop
+    except Exception:
+        return None
+    fin = time.time() + timeout
+    while time.time() < fin:
+        try:
+            m = Desktop(backend="uia").window(
+                title_re="Conceptos del tr.mite de objeci.n", control_type="Window"
+            )
+            if m.exists():
+                return m
+        except Exception:
+            pass
+        time.sleep(0.4)
+    return None
+
+
+def _dump_modal(etiqueta: str) -> None:
+    """Vuelca el INTERIOR del modal de conceptos. Camina CADA ventana top-level
+    del escritorio que pertenece al proceso de DG (cada una rooteada en su propio
+    HWND). El modal es una ventana propia: así su fragmento WPF queda visible. El
+    `_dump` por proceso sólo capturaba el TitleBar del modal."""
+    from contextlib import redirect_stdout
+    from io import StringIO
+
+    try:
+        from dump_dg import _walk
+        from pywinauto import Desktop
+    except Exception as e:
+        logger.warning(
+            f"  no pude preparar el volcado del modal ({e}); vuelco el proceso completo."
+        )
+        _dump(etiqueta)
+        return
+    pid = _pid_dg()
+    claves = (
+        "dinámica",
+        "dinamica",
+        "conceptos del tr",
+        "trámite de objec",
+        "tramite de objec",
+        "registro grabado",
+    )
+    out = Path(f"dump_dgh_{etiqueta}_{time.strftime('%H%M%S')}.txt")
+    buf = StringIO()
+    n = 0
+    try:
+        with redirect_stdout(buf):
+            for w in Desktop(backend="uia").windows():
+                try:
+                    titulo = w.window_text() or ""
+                except Exception:
+                    titulo = ""
+                # Filtramos a DG: por PID si se puede, y si no por título conocido,
+                # para no volcar todo el escritorio.
+                de_dg = False
+                try:
+                    de_dg = pid is not None and w.element_info.process_id == pid
+                except Exception:
+                    de_dg = False
+                if not de_dg and not any(k in titulo.lower() for k in claves):
+                    continue
+                print(f"========== TOP-LEVEL {titulo!r} (root = su HWND) ==========")
+                _walk(w, 0, 16)
+                n += 1
+        out.write_text(buf.getvalue() or "(vacío)", encoding="utf-8")
+        logger.info(f"  volcado del modal: {out.resolve()} ({n} ventana(s) top-level del proceso)")
+    except Exception as e:
+        logger.warning(f"  no pude volcar el modal ({e}); vuelco el proceso completo.")
+        _dump(etiqueta)
+
+
 def _diag_grids(win):
     """Loguea cuántas grillas gcConceptosObjecion hay y si cada una tiene fila.
     Sirve para diagnosticar 'no autocargó' sin pedir un dump."""
@@ -375,14 +460,18 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     except Exception as e:
         logger.warning(f"  fallo doble-click en la fila: {e}")
     time.sleep(2.0)
-    logger.info("  doble-click en la fila; capturando el modal de respuesta…")
-    # Volcamos AHORA que el modal está abierto (nunca pudimos capturarlo a mano,
-    # siempre se volcaba el Editor). Con esos selectores se automatiza el llenado.
-    _dump("modal_abierto")
+    logger.info("  doble-click en la fila; capturando el INTERIOR del modal de respuesta…")
+    # Volcamos rooteando en el HWND del modal (ver _modal_conceptos): los volcados
+    # anteriores sólo capturaban el TitleBar porque el árbol del proceso se corta
+    # en el borde WinForms→WPF. Con este árbol salen los auto_id reales del modal
+    # (Concepto / Observaciones / Aplicar campos / GRABAR) para automatizar el
+    # llenado en v2.
+    _dump_modal("modal_abierto")
     logger.warning(
-        "  ⚠ v1: abrí el modal de respuesta (doble-click) y lo volqué. Falta automatizar "
-        "su llenado (RE9901 / valor / observaciones / Aceptar / Grabar). Mandame el "
-        "dump 'dump_dgh_modal_abierto_*.txt' y con eso escribo esos selectores."
+        "  ⚠ v1: abrí el modal de respuesta (doble-click) y volqué su INTERIOR. "
+        "Mandame el 'dump_dgh_modal_abierto_*.txt' (ahora sí trae los campos) y con "
+        "eso cableo: seleccionar la fila → Concepto RE9901 → Observaciones → Aplicar "
+        "campos → GRABAR."
     )
     return "MODAL_ABIERTO"
     # ── (v2: aquí va el llenado del modal una vez tengamos sus auto_id) ──
