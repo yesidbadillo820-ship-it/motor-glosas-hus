@@ -151,6 +151,19 @@ def _set_editor(ctl, texto: str) -> bool:
         return False
 
 
+def _foco_actual() -> tuple[str, str]:
+    """(auto_id, name) del control que tiene el foco AHORA (vía UIA). Sirve para
+    saber en qué campo estamos al tabular (los editores DevExpress comparten
+    estructura y 'aparecer en el árbol' no implica tener el foco)."""
+    try:
+        from pywinauto.uia_defines import IUIA
+
+        el = IUIA().iuia.GetFocusedElement()
+        return (el.CurrentAutomationId or "", el.CurrentName or "")
+    except Exception:
+        return ("", "")
+
+
 def _escapar(t: str) -> str:
     """Escapa caracteres especiales de type_keys ({}()+^%~)."""
     for ch in "{}":
@@ -254,16 +267,22 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     except Exception:
         pass
     time.sleep(0.3)
-    fac_edit = None
-    for intento in range(8):
-        send_keys("{TAB}")
-        time.sleep(0.35)
-        fac_edit = _buscar(editor, auto_id="ctrlFactura", timeout=1)
-        if fac_edit is not None:
-            logger.info(f"  Factura enfocada tras {intento + 1} TAB(s).")
+    # TAB hasta que el control con FOCO real se llame 'Factura'. Detectar por el
+    # foco (no por "existe en el árbol") evita escribir en Fecha por error.
+    en_factura = False
+    for intento in range(12):
+        aid, nm = _foco_actual()
+        if nm == "Factura" or aid == "ctrlFactura":
+            logger.info(f"  Factura enfocada tras {intento} TAB(s).")
+            en_factura = True
             break
-    if fac_edit is None:
-        logger.error("  no llegué a Factura tabulando desde Consecutivo. Mandame el dump.")
+        send_keys("{TAB}")
+        time.sleep(0.4)
+    if not en_factura:
+        aid, nm = _foco_actual()
+        logger.error(
+            f"  no llegué a Factura tabulando (último foco: name={nm!r} auto_id={aid!r}). Mandame el dump."
+        )
         if dump_al_fallar:
             _dump("sin_factura")
         return "ERROR_FACTURA"
