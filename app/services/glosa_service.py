@@ -2032,7 +2032,14 @@ def _reescribir_negacion_contrato(
         (
             re.compile(
                 r"SIN\s+CONTRATO\s+PACTADO|"
-                r"NO\s+EXISTE\s+CONTRATO\s+PACTADO|"
+                # Bug ronda 21 (30-jun-2026, caso MEDIMÁS da Vinci): el cuerpo
+                # decía DOS veces "al no existir contrato pactado" — forma
+                # verbal (infinitivo/conjugada) que el regex anterior (solo
+                # "NO EXISTE CONTRATO PACTADO") no capturaba, dejando una
+                # auto-contradicción: el campo Contrato corregido pero el
+                # cuerpo negando el contrato citado por la EPS. Se cubre
+                # existe/existen/existir/existía/existiendo + prefijo al/de.
+                r"(?:AL\s+|DE\s+)?NO\s+EXIST(?:E|EN|IR|[ÍI]A|IENDO)\s+(?:UN\s+)?CONTRATO(?:\s+PACTADO)?|"
                 r"AUSENCIA\s+DE\s+CONTRATO|"
                 r"EN\s+AUSENCIA\s+DE\s+CONTRATO\s+PACTADO",
                 re.IGNORECASE,
