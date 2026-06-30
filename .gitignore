@@ -69,6 +69,12 @@ data/
 !data/plantillas_hus_base.json
 !data/perfiles_radicacion.json
 
+# app/data/ contiene catálogos versionados que el motor lee en runtime
+# (se hornean en la imagen Docker vía COPY app/). NO confundir con la
+# carpeta data/ raíz (runtime).
+!app/data/
+!app/data/cups_soat_homologacion.json.gz
+
 # Reporte por defecto del radicador de facturación (artefacto generado)
 radicacion_reporte.csv
 

@@ -4509,6 +4509,30 @@ class GlosaService:
                 )
                 user_prompt = user_prompt + bloque_tarifa
 
+            # ── Homologador CUPS → SOAT (jun-2026) ──
+            # En glosas de TARIFA (TA) con un CUPS detectado, inyectamos la
+            # homologación OFICIAL CUPS→SOAT (Manual Único Res. 2775 → Manual
+            # Tarifario SOAT, 10.024 CUPS). Le da a la IA el/los código(s)
+            # SOAT que corresponden al CUPS facturado, para que la defensa
+            # tarifaria cite el dato oficial y NO uno inventado. Si la EPS
+            # asignó un SOAT distinto, es modificación tarifaria unilateral.
+            try:
+                _es_ta = (codigo_det or "").upper().startswith("TA") or es_tarifa
+                if _es_ta and cups_verificado:
+                    from app.services.cups_soat_service import (
+                        bloque_homologacion_para_prompt,
+                    )
+
+                    _bloque_homolog = bloque_homologacion_para_prompt(cups_verificado)
+                    if _bloque_homolog:
+                        user_prompt = user_prompt + _bloque_homolog
+                        logger.info(
+                            f"[CUPS-SOAT] homologación oficial inyectada para "
+                            f"CUPS {cups_verificado} (glosa de tarifa)."
+                        )
+            except Exception as _e_homolog:
+                logger.debug(f"[CUPS-SOAT] homologación no inyectada: {_e_homolog}")
+
             # Ronda 6: agregar bloque multi-agente (Jurídico + Clínico +
             # Tarifario + Conciliador) al user_prompt. Les da a la IA
             # inputs curados por cada especialidad antes de redactar.

@@ -243,9 +243,19 @@ def detalle_cups(
     except Exception:
         pass
 
+    # Homologación CUPS → SOAT (Manual Único Res. 2775 → Manual Tarifario).
+    homo_soat = []
+    try:
+        from app.services.cups_soat_service import homologar_cups_a_soat
+
+        homo_soat = homologar_cups_a_soat(codigo_clean)
+    except Exception:
+        pass
+
     return {
         "codigo_consultado": codigo_clean,
         "homologacion_2641": homo,
+        "homologacion_soat": homo_soat,
         "contratos_que_lo_incluyen": [
             {
                 "eps": f.eps,
@@ -260,4 +270,34 @@ def detalle_cups(
             for f in filas
         ],
         "total_contratos": len(filas),
+    }
+
+
+@router.get("/{codigo}/soat")
+def homologacion_soat(
+    codigo: str,
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Homologación oficial CUPS → SOAT (Manual Único Res. 2775).
+
+    Devuelve el/los código(s) SOAT que corresponden al CUPS, con sus
+    descripciones. Un CUPS puede mapear a varios SOAT (multi-mapeo ~11.7%).
+    """
+    from app.services.cups_soat_service import (
+        homologar_cups_a_soat,
+        resumen_homologacion,
+    )
+
+    codigo_clean = re.sub(r"\s+", "", str(codigo or "")).upper()
+    if not codigo_clean:
+        raise HTTPException(status_code=400, detail="Código CUPS vacío.")
+
+    mapeos = homologar_cups_a_soat(codigo_clean)
+    return {
+        "cups": codigo_clean,
+        "encontrado": bool(mapeos),
+        "codigos_soat": mapeos,
+        "total_soat": len(mapeos),
+        "multi_mapeo": len(mapeos) > 1,
+        "fuente": resumen_homologacion().get("fuente", ""),
     }
