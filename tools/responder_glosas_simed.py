@@ -1300,10 +1300,17 @@ def enviar_finalizar(
         return "OK_SIN_DIALOGO"
 
     up = texto_msg.upper()
-    es_ok = any(k in up for k in ("RESPUESTA CARGADA", "COMPLETAD", "EXITOS"))
+    # Éxito = "Registro completado/completo", "respuesta cargada", "exitoso",
+    # "guardado". Aceptamos la raíz COMPLET* (cubre completo/completado/
+    # completada) pero excluimos INCOMPLET* para no clasificar un error de
+    # "datos incompletos" como OK. Así la evidencia se dispara con cualquier
+    # variante de la redacción de éxito del portal.
+    es_ok = "INCOMPLET" not in up and any(
+        k in up for k in ("CARGAD", "COMPLET", "EXITOS", "GUARDAD", "REGISTRO COMPLET")
+    )
 
     # Pantallazo de evidencia ANTES de cerrar el diálogo: así el mensaje del
-    # portal queda capturado en la imagen.
+    # portal ("Registro completado") queda capturado dentro de la imagen.
     if es_ok:
         _screenshot_evidencia(page, factura_corta, evidencias_dir)
 
