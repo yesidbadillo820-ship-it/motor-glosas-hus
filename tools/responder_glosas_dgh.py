@@ -355,17 +355,40 @@ def _grid_con_fila(win):
 def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump_al_fallar):
     logger.info(f"[{factura_larga}] {len(objeciones)} objeción(es)")
 
-    # 1) Activar la pestaña 'Listado de Tramite de Objeción' y darle AGREGAR.
-    #    Con varias pestañas MDI abiertas, sólo la ACTIVA es clickeable por
-    #    coordenadas; por eso primero la traemos al frente.
+    # 1) Activar 'Listado de Tramite de Objeción' y darle AGREGAR para abrir un
+    #    Editor nuevo. CLAVE (causa raíz de "no abrió el Editor"): hay que traer DG
+    #    al FRENTE primero (win.set_focus). Si DG no está en foreground, el primer
+    #    click se consume como click de ACTIVACIÓN y el botón no dispara — se ve el
+    #    tooltip "AGREGAR (Ctrl+N)" pero el Editor no abre. Por eso, además del
+    #    click, usamos el atajo Ctrl+N (que el propio tooltip revela) y verificamos
+    #    que el Editor realmente aparezca.
+    from pywinauto.keyboard import send_keys
+
+    try:
+        win.set_focus()
+        time.sleep(0.4)
+    except Exception:
+        pass
     tab_listado = _buscar(win, name_re="Listado de Tr.mite", control_type="TabItem", timeout=5)
     if tab_listado is not None:
         try:
             tab_listado.click_input()
-            time.sleep(0.8)
+            time.sleep(0.6)
+            win.set_focus()  # re-asegurar foreground tras activar la pestaña
+            time.sleep(0.3)
         except Exception:
             pass
-    # AGREGAR del Listado (auto_id único). Fallback: cualquier AGREGAR visible.
+
+    def _esperar_editor(segundos):
+        fin_ = time.time() + segundos
+        while time.time() < fin_:
+            te = _buscar(win, name_re="Editor de Tr.mite", control_type="TabItem", timeout=1)
+            if te is not None:
+                return te
+            time.sleep(0.4)
+        return None
+
+    # AGREGAR: 1º por click (auto_id único; fallback por nombre).
     agregar = _buscar(win, auto_id="BarButtonItemLinkbbiAgregar", control_type="Button", timeout=8)
     if agregar is None:
         agregar = _buscar(win, name="AGREGAR", control_type="Button", timeout=4)
@@ -376,25 +399,40 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         if dump_al_fallar:
             _dump("sin_agregar")
         return "ERROR_NAV"
-    agregar.click_input()
-    time.sleep(1.8)
-    # Tras AGREGAR se abre/activa el Editor; activamos su pestaña por las dudas.
-    tab_editor = _buscar(win, name_re="Editor de Tr.mite", control_type="TabItem", timeout=5)
-    if tab_editor is not None:
+    try:
+        agregar.click_input()
+    except Exception:
+        pass
+    tab_editor = _esperar_editor(6)
+    # Si el click no disparó (DG no estaba al frente / WPF ocupado), atajo Ctrl+N.
+    if tab_editor is None:
+        logger.info("  AGREGAR por click no abrió el Editor; pruebo el atajo Ctrl+N…")
         try:
-            tab_editor.click_input()
-            time.sleep(0.6)
+            win.set_focus()
+            time.sleep(0.3)
+            send_keys("^n")
         except Exception:
             pass
+        tab_editor = _esperar_editor(8)
+    if tab_editor is None:
+        logger.error(
+            "  AGREGAR no abrió el Editor (ni por click ni por Ctrl+N). ¿Estaba el "
+            "'Listado de Tramite de Objeción' al frente y DG visible al correr?"
+        )
+        if dump_al_fallar:
+            _dump("sin_editor")
+        return "ERROR_NAV"
+    # Activar la pestaña Editor recién abierta.
+    try:
+        tab_editor.click_input()
+        time.sleep(0.6)
+    except Exception:
+        pass
 
-    # 2) Ir al campo Factura operando por FOCO. Pero primero hay que ANCLAR el
-    #    foco en el Editor: al correr desde la terminal el foco queda en
-    #    PowerShell y los TAB irían a la terminal. Traemos DG al frente
-    #    (set_focus) y clickeamos Consecutivo (primer campo) para enfocarlo; de
-    #    ahí TAB hasta que el control con foco real se llame 'Factura' (orden
+    # 2) Ir al campo Factura operando por FOCO. Anclamos el foco en el Editor
+    #    (DG ya está al frente) clickeando Consecutivo (primer campo); de ahí TAB
+    #    hasta que el control con foco real se llame 'Factura' (orden
     #    Consecutivo→Fecha→[Estado]→Factura).
-    from pywinauto.keyboard import send_keys
-
     try:
         win.set_focus()
         time.sleep(0.5)
