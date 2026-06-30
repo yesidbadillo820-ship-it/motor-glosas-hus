@@ -232,59 +232,75 @@ def _modal_conceptos(timeout: float = 12.0):
     return None
 
 
+def _hwnds_modal() -> list[int]:
+    """HWNDs de la(s) ventana(s) cuyo título es el del modal de conceptos.
+    win32 EnumWindows ve ventanas top-level (incluidas las propias/owned) que la
+    enumeración UIA Desktop().windows() no lista."""
+    try:
+        from pywinauto import findwindows
+
+        return list(findwindows.find_windows(title_re="Conceptos del tr.mite de objeci.n"))
+    except Exception:
+        return []
+
+
 def _dump_modal(etiqueta: str) -> None:
-    """Vuelca el INTERIOR del modal de conceptos. Camina CADA ventana top-level
-    del escritorio que pertenece al proceso de DG (cada una rooteada en su propio
-    HWND). El modal es una ventana propia: así su fragmento WPF queda visible. El
-    `_dump` por proceso sólo capturaba el TitleBar del modal."""
+    """Vuelca el INTERIOR del modal de conceptos probando VARIAS estrategias en
+    UNA sola corrida. El modal es una ventana WPF *owned*: su interior no se
+    alcanza caminando desde DGFRMPrincipal (sólo sale el TitleBar) y Desktop UIA
+    no la lista como top-level. La forma robusta es localizar su HWND con win32 y
+    rootear una conexión UIA fresca en ese HWND. Se escriben todas las secciones;
+    la que tenga 'Aplicar campos' es la buena y de ahí salen los selectores."""
     from contextlib import redirect_stdout
     from io import StringIO
 
     try:
         from dump_dg import _walk
-        from pywinauto import Desktop
+        from pywinauto import Application
     except Exception as e:
-        logger.warning(
-            f"  no pude preparar el volcado del modal ({e}); vuelco el proceso completo."
-        )
+        logger.warning(f"  no pude importar dependencias del volcado ({e}); vuelco el proceso.")
         _dump(etiqueta)
         return
-    pid = _pid_dg()
-    claves = (
-        "dinámica",
-        "dinamica",
-        "conceptos del tr",
-        "trámite de objec",
-        "tramite de objec",
-        "registro grabado",
-    )
+
     out = Path(f"dump_dgh_{etiqueta}_{time.strftime('%H%M%S')}.txt")
     buf = StringIO()
-    n = 0
-    try:
-        with redirect_stdout(buf):
-            for w in Desktop(backend="uia").windows():
-                try:
-                    titulo = w.window_text() or ""
-                except Exception:
-                    titulo = ""
-                # Filtramos a DG: por PID si se puede, y si no por título conocido,
-                # para no volcar todo el escritorio.
-                de_dg = False
-                try:
-                    de_dg = pid is not None and w.element_info.process_id == pid
-                except Exception:
-                    de_dg = False
-                if not de_dg and not any(k in titulo.lower() for k in claves):
-                    continue
-                print(f"========== TOP-LEVEL {titulo!r} (root = su HWND) ==========")
-                _walk(w, 0, 16)
-                n += 1
-        out.write_text(buf.getvalue() or "(vacío)", encoding="utf-8")
-        logger.info(f"  volcado del modal: {out.resolve()} ({n} ventana(s) top-level del proceso)")
-    except Exception as e:
-        logger.warning(f"  no pude volcar el modal ({e}); vuelco el proceso completo.")
-        _dump(etiqueta)
+    with redirect_stdout(buf):
+        hwnds = _hwnds_modal()
+        print(f"HWNDs del modal (win32): {hwnds}\n")
+
+        # [A] Conexión UIA fresca rooteada en el HWND del modal (lo más probable).
+        print("========== [A] UIA connect(handle=HWND del modal) ==========")
+        if not hwnds:
+            print("(sin HWND del modal)")
+        for h in hwnds:
+            try:
+                app = Application(backend="uia").connect(handle=h, timeout=5)
+                _walk(app.window(handle=h).wrapper_object(), 0, 18)
+            except Exception as e:
+                print(f"(error HWND {h}: {e})")
+
+        # [B] Finder UIA del escritorio por título.
+        print("\n========== [B] Desktop().window(title=...) ==========")
+        try:
+            m = _modal_conceptos(timeout=4)
+            if m is not None:
+                _walk(m.wrapper_object(), 0, 18)
+            else:
+                print("(no encontrado por finder)")
+        except Exception as e:
+            print(f"(error: {e})")
+
+        # [C] win32: por si el modal expone controles nativos hijos.
+        print("\n========== [C] win32 connect(handle=HWND del modal) ==========")
+        for h in hwnds:
+            try:
+                appw = Application(backend="win32").connect(handle=h, timeout=5)
+                _walk(appw.window(handle=h).wrapper_object(), 0, 18)
+            except Exception as e:
+                print(f"(error win32 HWND {h}: {e})")
+
+    out.write_text(buf.getvalue() or "(vacío)", encoding="utf-8")
+    logger.info(f"  volcado del modal (multi-estrategia): {out.resolve()}")
 
 
 def _diag_grids(win):
