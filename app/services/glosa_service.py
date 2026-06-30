@@ -1383,6 +1383,18 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         r"\1",
     ),
+    # ── Verbo elidido: "[entidad] DE facultad sancionatoria" ──
+    # Caso real 30-jun (SALUD TOTAL): "la entidad pagadora de facultad
+    # sancionatoria sobre el prestador" — la IA elidió el verbo "CARECE".
+    # Debe ser "la entidad pagadora CARECE DE facultad sancionatoria".
+    (
+        re.compile(
+            r"\b(la\s+entidad\s+pagadora|la\s+EPS)\s+de\s+facultad\s+"
+            r"(sancionatoria|punitiva)\b",
+            re.IGNORECASE,
+        ),
+        r"\1 carece de facultad \2",
+    ),
 )
 
 
@@ -4318,6 +4330,34 @@ class GlosaService:
                 clausulas_contrato=_clausulas_contrato,
             )
 
+            # ── Concepto×concepto (jun-2026) ──
+            # Si la glosa objeta VARIOS conceptos bajo UN solo código (caso
+            # SALUD TOTAL: TMS no-PBS + 22 días + autorización + sanción +
+            # acompañamiento), inyectamos una instrucción que fuerza refutar
+            # CADA uno por separado. En auditoría, callar sobre un concepto
+            # equivale a aceptarlo → la EPS descuenta lo no refutado. Los
+            # sub-conceptos detectados se guardan para post-validar al final.
+            self._subconceptos_actuales = []
+            try:
+                from app.services.subconceptos_glosa import (
+                    bloque_subconceptos_para_prompt,
+                    detectar_subconceptos,
+                )
+
+                _subconceptos = detectar_subconceptos(texto_base)
+                if len(_subconceptos) >= 2:
+                    self._subconceptos_actuales = _subconceptos
+                    _bloque_sc = bloque_subconceptos_para_prompt(_subconceptos)
+                    if _bloque_sc:
+                        user_prompt = user_prompt + _bloque_sc
+                        logger.info(
+                            f"[SUBCONCEPTOS] {len(_subconceptos)} conceptos en la "
+                            f"glosa (1 código) → instrucción de refutación por "
+                            f"cada uno inyectada."
+                        )
+            except Exception as _e_sc:
+                logger.debug(f"[SUBCONCEPTOS] no inyectados: {_e_sc}")
+
             # ═══════════════════════════════════════════════════════════
             #  Extemporaneidad de la RATIFICACIÓN (12-jun-2026, ronda 2 —
             #  fix #5). Evidencia: "Fecha radicación: 2026-03-01. Fecha
@@ -6112,6 +6152,40 @@ class GlosaService:
                 "</div>"
             )
             dictamen = _banner_eps + dictamen
+
+        # ── Concepto×concepto: post-validador ──
+        # Si la glosa tenía varios conceptos y el dictamen omitió alguno,
+        # avisamos al gestor con un banner rojo (el concepto omitido se da
+        # por aceptado ante la EPS). No regeneramos automáticamente para no
+        # gastar tokens; el gestor decide si refina con IA.
+        try:
+            _subs = getattr(self, "_subconceptos_actuales", []) or []
+            if _subs and modo_resp != "auditoria_previa":
+                from app.services.subconceptos_glosa import (
+                    auditar_subconceptos_respondidos,
+                )
+
+                _ok_sc, _omitidos = auditar_subconceptos_respondidos(dictamen, _subs)
+                if _omitidos:
+                    logger.warning(
+                        f"[SUBCONCEPTOS-OMITIDOS] el dictamen no abordó "
+                        f"{len(_omitidos)}/{len(_subs)} concepto(s): {_omitidos}"
+                    )
+                    _items = "".join(f"<li>{o}</li>" for o in _omitidos)
+                    _banner_sc = (
+                        '<div style="margin-bottom:12px;padding:10px 14px;'
+                        "background:#fef2f2;border:2px solid #dc2626;"
+                        'border-radius:8px;font-size:12px;color:#991b1b;">'
+                        "⚠️ <b>Conceptos de la glosa SIN responder</b> "
+                        "(la EPS los daría por aceptados — revisá y refiná con IA "
+                        f"antes de radicar):<ul style='margin:6px 0 0 18px;'>{_items}</ul>"
+                        "</div>"
+                    )
+                    dictamen = _banner_sc + dictamen
+                    # Penalizar el score: hay conceptos sin defender.
+                    score = max(0, score - 8 * len(_omitidos))
+        except Exception as _e_scval:
+            logger.debug(f"[SUBCONCEPTOS-OMITIDOS] no auditados: {_e_scval}")
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
