@@ -60,6 +60,16 @@ PALABRAS_CLAVE_COMPLEJIDAD_CRITICA: tuple[str, ...] = (
     "AUTOTRASPLANT",
     # Hematología y enfermedades raras
     "HEMOFILIA",
+    # Agentes de baña / bypassing (hemofilia con inhibidores) — la glosa a
+    # veces no dice "hemofilia" sino el principio activo (caso real NUEVA EPS
+    # 30-jun: "factor VII activado recombinante / eptacog alfa"). Sin estas
+    # claves el caso —clínicamente complejo y de alto costo— se quedaba en
+    # Groq en vez de escalar a Claude.
+    "FACTOR VII",
+    "EPTACOG",
+    "INHIBIDOR",
+    "FEIBA",
+    "APCC",
     "GAUCHER",
     "POMPE",
     "CEREZYME",

@@ -8,65 +8,217 @@
     {
       "id": "medimas_davinci",
       "titulo": "MEDIMÁS da Vinci $273M",
-      "glosa": "OBSERVACIONES MEDIMÁS EPS-S (LIQUIDACIÓN): (I) PERTINENCIA: la prostatectomía radical ABIERTA es alternativa válida con resultados oncológicos equivalentes según la GPC Cáncer de Próstata MinSalud 2023; el uso de plataforma robótica da Vinci Xi NO se justifica y representa un sobrecosto del 340%. (II) EVENTO ADVERSO PREVENIBLE: la fístula urinaria post-operatoria es complicación EVITABLE atribuible a falla en la técnica quirúrgica; conforme al Decreto 4747/2007 Art. 20 + Res. 0112/2012, el costo lo asume el prestador. (III) TARIFA: el contrato vigente CTR-2024-MEDIMAS-HUS define para CUPS 60.1.2.01 una tarifa de SOAT × 0.85; la facturación aplicó SOAT pleno + adicional 35% por plataforma robótica, modificación unilateral. (IV) SOPORTES: no se aporta el consentimiento informado específico para plataforma robótica ni la cotización comparativa requerida por la cláusula 31 del contrato. (V) Dado el proceso de liquidación, el reconocimiento queda condicionado a la verificación de saldos por la agente liquidadora.",
+      "glosa": "OBSERVACIONES MEDIMÁS EPS-S (LIQUIDACIÓN): (I) PERTINENCIA: la prostatectomía radical ABIERTA es alternativa válida con resultados oncológicos equivalentes según la GPC Cáncer de Próstata MinSalud 2023; el uso de plataforma robótica da Vinci Xi NO se justifica y representa un sobrecosto del 340%. (II) EVENTO ADVERSO PREVENIBLE: la fístula urinaria post-operatoria es complicación EVITABLE atribuible a falla en la técnica quirúrgica; conforme al Decreto 4747/2007 Art. 20 + Res. 0112/2012, el costo lo asume el prestador. (III) TARIFA: el contrato vigente CTR-2024-MEDIMAS-HUS define para CUPS 60.1.2.01 una tarifa de SOAT × 0.85; la facturación aplicó SOAT pleno + adicional 35% por plataforma robótica, modificación unilateral. (IV) SOPORTES: no se aporta el consentimiento informado específico para plataforma robótica ni la cotización comparativa requerida por la cláusula 31 del contrato. (V) Dado el proceso de liquidación, el reconocimiento queda condicionado a la verificación de saldos por la agente liquidadora. Valor objetado: $273.180.000.",
       "eps_dropdown": "OTRA / SIN DEFINIR",
       "contrato": "CTR-2024-MEDIMAS-HUS",
       "tiene_sancion": false,
       "es_tecnologia_cara": true,
       "conceptos": [
-        {"id": "pertinencia", "keywords": ["pertinencia", "robótica", "robotica", "da vinci", "eau"]},
-        {"id": "evento_adverso", "keywords": ["fístula", "fistula", "evento adverso", "nexo causal"]},
-        {"id": "tarifa", "keywords": ["tarifa", "soat", "0.85", "35%"]},
-        {"id": "soportes_clausula31", "keywords": ["consentimiento", "cotización", "cotizacion", "cláusula 31", "clausula 31"]},
-        {"id": "liquidacion", "keywords": ["liquidación", "liquidacion", "agente liquidadora", "saldos", "prelación", "prelacion"]}
+        {
+          "id": "pertinencia",
+          "keywords": [
+            "pertinencia",
+            "robótica",
+            "robotica",
+            "da vinci",
+            "eau"
+          ]
+        },
+        {
+          "id": "evento_adverso",
+          "keywords": [
+            "fístula",
+            "fistula",
+            "evento adverso",
+            "nexo causal"
+          ]
+        },
+        {
+          "id": "tarifa",
+          "keywords": [
+            "tarifa",
+            "soat",
+            "0.85",
+            "35%"
+          ]
+        },
+        {
+          "id": "soportes_clausula31",
+          "keywords": [
+            "consentimiento",
+            "cotización",
+            "cotizacion",
+            "cláusula 31",
+            "clausula 31"
+          ]
+        },
+        {
+          "id": "liquidacion",
+          "keywords": [
+            "liquidación",
+            "liquidacion",
+            "agente liquidadora",
+            "saldos",
+            "prelación",
+            "prelacion"
+          ]
+        }
       ],
       "dictamen_produccion": "ESE HUS NO ACEPTA LA GLOSA MULTI-CONCEPTO APLICADA POR MEDIMÁS EPS-S SOBRE EL PROCEDIMIENTO DE PROSTATECTOMÍA RADICAL ROBÓTICA DA VINCI XI. EN PRIMER LUGAR, EN RELACIÓN CON LA PERTINENCIA CLÍNICA: La objeción desconoce que la prostatectomía radical robótica constituye indicación nivel 1A conforme a EAU Guidelines 2023, con mejor preservación de continencia urinaria y función eréctil frente a vía abierta. Conforme al artículo 17 de la Ley 1751 de 2015 y la Sentencia T-478 de 1995. EN SEGUNDO LUGAR, EN RELACIÓN CON EL EVENTO ADVERSO: La fístula urinaria post-operatoria es complicación conocida con incidencia del 0.3% al 15.4% según Journal of Urology 2018. El Decreto 4747 de 2007 artículo 20 exige demostración probatoria de nexo causal, carga que corresponde a la entidad objetante. EN TERCER LUGAR, EN RELACIÓN CON LA TARIFA: Al no existir contrato pactado entre ESE HUS y MEDIMÁS EPS-S, resulta aplicable el artículo 177 de la Ley 100 de 1993 conforme al Decreto 2423 de 1996 que consagra el Manual SOAT como referente obligatorio en ausencia de pacto específico. POR LO EXPUESTO, SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO INTEGRAL DE LA GLOSA Y EL RECONOCIMIENTO DEL VALOR FACTURADO CONFORME A TARIFA SOAT PLENA. Contrato: según el contrato CTR-2024-MEDIMAS-HUS. Tarifa pactada: SOAT PLENO."
     },
     {
       "id": "ecoopsos_coclear",
       "titulo": "ECOOPSOS implante coclear $389M",
-      "glosa": "OBSERVACIONES ECOOPSOS: La paciente cuenta con 14 meses de edad. (I) el implante coclear bilateral es PREMATURO; (II) se objeta la BILATERALIDAD por costo del segundo dispositivo Med-El; (III) el procesador SONNET 2 es de gama PREMIUM no justificada. La cláusula 24 del Contrato CTR-2025-ECOOPSOS-HUS exige cotización comparativa de al menos 3 proveedores, NO aportada.",
+      "glosa": "OBSERVACIONES ECOOPSOS: La paciente cuenta con 14 meses de edad. (I) el implante coclear bilateral es PREMATURO; (II) se objeta la BILATERALIDAD por costo del segundo dispositivo Med-El; (III) el procesador SONNET 2 es de gama PREMIUM no justificada. La cláusula 24 del Contrato CTR-2025-ECOOPSOS-HUS exige cotización comparativa de al menos 3 proveedores, NO aportada. Valor objetado: $389.700.000.",
       "eps_dropdown": "OTRA / SIN DEFINIR",
       "contrato": "CTR-2025-ECOOPSOS-HUS",
       "tiene_sancion": false,
       "es_tecnologia_cara": true,
       "conceptos": [
-        {"id": "edad", "keywords": ["14 meses", "edad", "ventana", "plasticidad", "óptima", "optima"]},
-        {"id": "bilateralidad", "keywords": ["bilateralidad", "bilateral", "localización", "localizacion"]},
-        {"id": "procesador_premium", "keywords": ["sonnet", "procesador", "micrófono", "microfono", "opus"]},
-        {"id": "clausula24", "keywords": ["cláusula 24", "clausula 24", "proveedor único", "proveedor unico", "exclusivo", "1082"]}
+        {
+          "id": "edad",
+          "keywords": [
+            "14 meses",
+            "edad",
+            "ventana",
+            "plasticidad",
+            "óptima",
+            "optima"
+          ]
+        },
+        {
+          "id": "bilateralidad",
+          "keywords": [
+            "bilateralidad",
+            "bilateral",
+            "localización",
+            "localizacion"
+          ]
+        },
+        {
+          "id": "procesador_premium",
+          "keywords": [
+            "sonnet",
+            "procesador",
+            "micrófono",
+            "microfono",
+            "opus"
+          ]
+        },
+        {
+          "id": "clausula24",
+          "keywords": [
+            "cláusula 24",
+            "clausula 24",
+            "proveedor único",
+            "proveedor unico",
+            "exclusivo",
+            "1082"
+          ]
+        }
       ],
       "dictamen_produccion": "ESE HUS no acepta la glosa aplicada por ECOOPSOS sobre el implante coclear bilateral con procesador sonnet 2 (med-el) en paciente de 14 meses. Primero, la edad de 14 meses no es prematura sino óptima conforme a la evidencia internacional nivel 1a (fda aprobación desde los 9-12 meses; cochrane 2022) que establece la ventana crítica de plasticidad auditiva. Segundo, la bilateralidad es indicación 1a para localización espacial del sonido. Tercero, respecto de la cláusula 24 citada por la entidad pagadora, el dispositivo med-el tiene distribuidor único en colombia, lo que exime la cotización comparativa conforme al artículo 2.2.1.2.1.5.7 del decreto 1082/2015. De conformidad con la ley 1751/2015 artículo 17, la ley 1388/2010 que garantiza la atención integral a población con discapacidad auditiva, y la sentencia T-027/2020, la historia clínica institucional con el valor probatorio que le confiere la resolución 1995 de 1999 constituye único instrumento válido para la auditoría. Se solicita respetuosamente el levantamiento de la glosa dentro de los 10 días hábiles siguientes conforme al artículo 57 de la ley 1438/2011, entendiéndose el silencio como aceptación tácita. Contrato: según el contrato CTR-2025-ECOOPSOS-HUS. Tarifa pactada: SOAT PLENO."
     },
     {
       "id": "hemofilia_sancion",
       "titulo": "Hemofilia con inhibidores + sanción 10% (NUEVA EPS)",
-      "glosa": "NUEVA EPS objeta: (1) el uso de factor VII activado recombinante (eptacog alfa) NO está justificado, debe usarse factor VIII estándar; (2) el esquema de dosis excede lo recomendado. SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO por facturación improcedente.",
+      "glosa": "NUEVA EPS objeta: (1) el uso de factor VII activado recombinante (eptacog alfa) NO está justificado, debe usarse factor VIII estándar; (2) el esquema de dosis excede lo recomendado. SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO por facturación improcedente. Valor objetado: $156.000.000.",
       "eps_dropdown": "NUEVA EPS",
       "contrato": null,
       "tiene_sancion": true,
       "es_tecnologia_cara": true,
       "conceptos": [
-        {"id": "factor_vii", "keywords": ["factor vii", "inhibidor", "bypass", "feiba", "wfh"]},
-        {"id": "dosis", "keywords": ["dosis", "mcg/kg", "peso", "vida media", "esquema"]},
-        {"id": "sancion", "keywords": ["sanción", "sancion", "vicio de competencia", "facultad sancionatoria"]}
+        {
+          "id": "factor_vii",
+          "keywords": [
+            "factor vii",
+            "inhibidor",
+            "bypass",
+            "feiba",
+            "wfh"
+          ]
+        },
+        {
+          "id": "dosis",
+          "keywords": [
+            "dosis",
+            "mcg/kg",
+            "peso",
+            "vida media",
+            "esquema"
+          ]
+        },
+        {
+          "id": "sancion",
+          "keywords": [
+            "sanción",
+            "sancion",
+            "vicio de competencia",
+            "facultad sancionatoria"
+          ]
+        }
       ],
       "dictamen_produccion": "ESE HUS no acepta la glosa aplicada por concepto de facturación improcedente, interpuesta por nueva EPS, respecto del procedimiento facturado conforme al CUPS de la factura electrónica por $x,xxx.Xx, correspondiente a la atención de un paciente con hemofilia. La afirmacion de la auditoria de que el uso de factor vii activado recombinante no está justificado no se ajusta a las guías clínicas. En primer lugar, según las wfh guidelines 2020, nivel 1a, el factor vii activado recombinante es indicación en sangrado mayor refractario con inhibidores ≥ 5 bu. En segundo lugar, la resolución 1652/2021 establece que los medicamentos para hemofilia con inhibidores deben ser formulados según el PBS. Adicionalmente, se cita textualmente la cláusula 5 del contrato entre el ESE HUS y nueva EPS, que establece: en los términos de los servicios de salud serán evaluados y pagados conforme a las normas técnicas y administrativas vigentes. También se fundamenta en la ley 1438/2011, art. 57, que establece: en los términos de las entidades deberán dar respuesta dentro de los 10 días hábiles. Se solicita respetuosamente el levantamiento de la glosa y el reconocimiento íntegro del valor facturado. Contrato: ACTA DE NEGOCIACIÓN No. 1388 DE 2024. Tarifa pactada: SOAT -20%."
     },
     {
       "id": "saludtotal_tms",
       "titulo": "SALUD TOTAL TMS $98M (multi-concepto + sanción)",
-      "glosa": "SALUD TOTAL: Se objeta integralmente la atención: (1) la terapia de Estimulación Magnética Transcraneal (TMS) NO está en el PBS conforme a la Resolución 2292 de 2021; (2) la hospitalización psiquiátrica de 22 días excede los lineamientos de pertinencia (máximo 14 días); (3) la atención NO fue tramitada vía autorización previa (AU0301). SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO, conforme a la cláusula 18 del contrato CTR-2024-SALUDTOTAL-HUS. Adicionalmente, se objeta el acompañamiento familiar protocolizado por no estar en el PBS.",
+      "glosa": "SALUD TOTAL: Se objeta integralmente la atención: (1) la terapia de Estimulación Magnética Transcraneal (TMS) NO está en el PBS conforme a la Resolución 2292 de 2021; (2) la hospitalización psiquiátrica de 22 días excede los lineamientos de pertinencia (máximo 14 días); (3) la atención NO fue tramitada vía autorización previa (AU0301). SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO, conforme a la cláusula 18 del contrato CTR-2024-SALUDTOTAL-HUS. Adicionalmente, se objeta el acompañamiento familiar protocolizado por no estar en el PBS. Valor objetado: $98.000.000.",
       "eps_dropdown": "NUEVA EPS",
       "contrato": "CTR-2024-SALUDTOTAL-HUS",
       "tiene_sancion": true,
       "es_tecnologia_cara": true,
       "conceptos": [
-        {"id": "tms_pbs", "keywords": ["tms", "estimulación magnética", "estimulacion magnetica", "fda", "nice"]},
-        {"id": "estancia", "keywords": ["22 días", "22 dias", "remisión", "remision", "hospitalización", "hospitalizacion"]},
-        {"id": "autorizacion", "keywords": ["autorización", "autorizacion", "previa", "urgencias", "anexo 3"]},
-        {"id": "sancion", "keywords": ["sanción", "sancion", "vicio de competencia", "ineficaz", "abusiva"]},
-        {"id": "acompanamiento", "keywords": ["acompañamiento", "acompanamiento", "familiar", "4886"]}
+        {
+          "id": "tms_pbs",
+          "keywords": [
+            "tms",
+            "estimulación magnética",
+            "estimulacion magnetica",
+            "fda",
+            "nice"
+          ]
+        },
+        {
+          "id": "estancia",
+          "keywords": [
+            "22 días",
+            "22 dias",
+            "remisión",
+            "remision",
+            "hospitalización",
+            "hospitalizacion"
+          ]
+        },
+        {
+          "id": "autorizacion",
+          "keywords": [
+            "autorización",
+            "autorizacion",
+            "previa",
+            "urgencias",
+            "anexo 3"
+          ]
+        },
+        {
+          "id": "sancion",
+          "keywords": [
+            "sanción",
+            "sancion",
+            "vicio de competencia",
+            "ineficaz",
+            "abusiva"
+          ]
+        },
+        {
+          "id": "acompanamiento",
+          "keywords": [
+            "acompañamiento",
+            "acompanamiento",
+            "familiar",
+            "4886"
+          ]
+        }
       ],
       "dictamen_produccion": "ESE HUS no acepta la glosa por concepto de autorización aplicada por salud total. El servicio prestado corresponde a estimulación magnética transcraneal (tms) más hospitalización psiquiátrica, facturado conforme a la tarifa SOAT pleno vigente. En primer lugar, respecto de la tms, constituye procedimiento establecido con aprobación fda 2008 para depresión refractaria y evidencia nivel 1a (nice TA300, apa guidelines 2020), amparado por la ley 1616 de 2013. En segundo lugar, la hospitalización de 22 días se justifica por la remisión de síntomas agudos documentados en historia clínica. En tercer lugar, la autorización previa no es exigible cuando la atención obedece a criterio médico especializado conforme al artículo 17 de la ley 1751 de 2015. En cuarto lugar, la sanción del 10% constituye modificación unilateral prohibida, vulnerando el principio pacta sunt servanda. En quinto lugar, el acompañamiento familiar protocolizado es componente terapéutico integral en psiquiatría conforme a la resolución 4886 de 2018. La historia clínica constituye único instrumento válido para la auditoría. Se advierte que cualquier intento de rebatir este dictamen mediante argumentos administrativos o financieros constituirá violación directa al derecho fundamental a la salud, generando responsabilidad institucional conforme al artículo 44 de la misma ley. Por lo expuesto se solicita el levantamiento inmediato de la glosa. Contrato: según el contrato CTR-2024-SALUDTOTAL-HUS. Tarifa pactada: SOAT PLENO."
     }
