@@ -711,6 +711,46 @@ class TestCLI:
         )
         assert rc == 1
 
+    def test_main_soportes_varias_carpetas(self, tmp_path):
+        # En el HUS los soportes clínicos están repartidos en varias carpetas
+        # (por mes). --soportes acepta VARIAS y las fusiona: el HEV de la factura
+        # está en la SEGUNDA carpeta, no en la primera, y aun así queda LISTA.
+        origen = tmp_path / "lote"
+        _factura_folder(origen / "COOSALUD", "HUS487523", servicios=_SERV_PROC)
+        carpeta_a = _share_clinico(tmp_path / "MAYO", "HUS999999", ["HEV"])  # otra factura
+        carpeta_b = _share_clinico(tmp_path / "JUNIO", "HUS487523", ["HEV"])  # la nuestra
+        reporte = tmp_path / "rep.csv"
+        rc = rad.main(
+            [
+                "--origen",
+                str(origen),
+                "--reporte",
+                str(reporte),
+                "--soportes",
+                str(carpeta_a),
+                str(carpeta_b),
+            ]
+        )
+        assert rc == 0, reporte.read_text(encoding="utf-8-sig")
+        contenido = reporte.read_text(encoding="utf-8-sig")
+        assert "LISTA" in contenido
+        assert "REVISAR_TIPIFICACION" not in contenido
+
+    def test_main_soportes_carpeta_inexistente(self, tmp_path):
+        origen = tmp_path / "lote"
+        _factura_folder(origen / "COOSALUD", "HUS487523")
+        rc = rad.main(
+            [
+                "--origen",
+                str(origen),
+                "--reporte",
+                str(tmp_path / "r.csv"),
+                "--soportes",
+                str(tmp_path / "no_existe"),
+            ]
+        )
+        assert rc == 1
+
     def test_main_share_real_queda_lista(self, tmp_path):
         # Reproduce el share real: RIPS+CUV en …/RIPS/ENV/<fac> y FEV en el
         # árbol hermano …/SOPORTES/ENV/<fac>. La fusión + el RIPS desnudo deben

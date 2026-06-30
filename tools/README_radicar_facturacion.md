@@ -65,10 +65,11 @@ py radicar_facturacion.py --origen "\\Prime\radicacion_2026\...\ESCANEO" --layou
 REM 5) Mapear factura -> entidad con un Excel de facturación
 py radicar_facturacion.py --origen "D:\LOTE" --manifiesto "D:\facturacion.xlsx"
 
-REM 6) Cruzar el share de soportes CLÍNICOS (epicrisis, evolución, órdenes…)
-REM     para completar las facturas con procedimientos/hospitalización/urgencias
+REM 6) Cruzar el/los share(s) de soportes CLÍNICOS (epicrisis, evolución…) para
+REM     completar las facturas con procedimientos/hospitalización/urgencias.
+REM     Los soportes del HUS están repartidos por mes: pasá TODAS las carpetas.
 py radicar_facturacion.py --origen "\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_SALUD" ^
-    --soportes "\\Prime\soportes_radicacion\2026\06 JUNIO - SOPORTES RADICACION" ^
+    --soportes "Y:\6. JUNIO 2026 - SOPORTES RADICACION" "Y:\Radicacion Digital - Carpeta 2" ^
     --reporte "%USERPROFILE%\Desktop\radicacion_fe.csv" --xlsx "%USERPROFILE%\Desktop\radicacion_fe.xlsx"
 ```
 
@@ -133,11 +134,11 @@ en **otro share** (el de escaneo de soportes). Por eso, sin cruzar nada, toda
 factura con `procedimientos`/`urgencias`/`hospitalización`/`medicamentos` queda
 en `REVISAR_TIPIFICACION` (solo las de **consulta** llegan a `LISTA`).
 
-Con `--soportes <raíz>` el radicador **indexa ese share por número de factura**
-y rellena los huecos de cada factura (anexando `HEV`, `OPF`, `PDE`, `PDX`, `CRC`…
-al paquete cuando se arma). Mismo criterio de cruce que el indexador de la app
-(`HUS\d{4,12}` + normalización quitando ceros), así que **no requiere
-configuración extra**.
+Con `--soportes <raíz> [<raíz2> …]` el radicador **indexa ese/esos share(s) por
+número de factura** y rellena los huecos de cada factura (anexando `HEV`, `OPF`,
+`PDE`, `PDX`, `CRC`… al paquete cuando se arma). Mismo criterio de cruce que el
+indexador de la app (`HUS\d{4,12}` + normalización quitando ceros), así que **no
+requiere configuración extra**. Recorre cada raíz **recursivamente**.
 
 ```
 <raíz>\…\ESCANEO\<EPS>\ENV-<lote>\
@@ -146,8 +147,14 @@ configuración extra**.
   PDX_900006037_HUS487523.pdf   ← resultado de apoyo diagnóstico
 ```
 
+- **Varias carpetas** (importante en el HUS): los soportes están repartidos por
+  mes (`Y:\6. JUNIO 2026 - SOPORTES RADICACION`, `Y:\Radicacion Digital - Carpeta 2`,
+  …). Pasá **todas** las que apliquen separadas por espacio — se indexan y
+  fusionan en un solo índice. Una factura encuentra su soporte sin importar en
+  cuál carpeta esté escaneado. (También podés apuntar a la raíz `Y:\`, pero
+  recorrer todo el disco es más lento.)
 - Si se omite `--soportes`, se usa la variable de entorno **`SOPORTES_ROOT`**
-  cuando está definida (la misma que ya usa el motor de glosas).
+  (la misma que usa el motor de glosas); admite **varias rutas separadas por `;`**.
 - Los soportes clínicos **siempre se copian** (nunca se mueven, aun con
   `--mover`): el share clínico es fuente y lo comparten otras facturas.
 - Solo rellena **huecos**: no duplica `FEV`/`RIP`/`CUV` que el share de FE ya

@@ -1520,11 +1520,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--soportes",
         type=Path,
+        nargs="+",
         default=None,
-        help="Carpeta raíz del share de soportes CLÍNICOS (epicrisis, evolución, "
-        "órdenes…). Se cruza por número de factura para completar las que tienen "
-        "procedimientos/urgencias/hospitalización y sacarlas de REVISAR_TIPIFICACION. "
-        "Si se omite, usa $SOPORTES_ROOT cuando está definida.",
+        metavar="CARPETA",
+        help="Una o VARIAS carpetas raíz del share de soportes CLÍNICOS (epicrisis, "
+        "evolución, órdenes…). Se recorren recursivamente y se cruzan por número de "
+        "factura para completar las que tienen procedimientos/urgencias/hospitalización "
+        "y sacarlas de REVISAR_TIPIFICACION. Pasá todas las que apliquen (p.ej. cada "
+        "carpeta mensual de Y:\\) o la raíz del disco. Si se omite, usa $SOPORTES_ROOT "
+        "(que puede traer varias rutas separadas por ';').",
     )
     p.add_argument(
         "--layout",
@@ -1600,18 +1604,36 @@ def main(argv: list[str] | None = None) -> int:
         manifiesto = cargar_manifiesto(args.manifiesto)
         logger.info(f"Manifiesto: {len(manifiesto)} facturas mapeadas a entidad.")
 
-    # Share de soportes clínicos: --soportes o, si no, $SOPORTES_ROOT (el mismo
-    # que usa el indexador de la app). Se cruza por número de factura.
+    # Share(s) de soportes clínicos: --soportes (una o varias carpetas) o, si no,
+    # $SOPORTES_ROOT (la misma que usa la app; admite varias rutas separadas por
+    # os.pathsep). En el HUS los soportes están repartidos en carpetas por mes
+    # (Y:\6. JUNIO…, Y:\Radicacion Digital - Carpeta 2, …): se indexan todas y se
+    # fusionan en un solo índice por número de factura.
     soportes_idx: dict[str, list[Path]] | None = None
-    ruta_soportes = args.soportes or (
-        Path(os.environ["SOPORTES_ROOT"]) if os.environ.get("SOPORTES_ROOT") else None
-    )
-    if ruta_soportes is not None:
-        if not ruta_soportes.is_dir():
-            logger.error(f"--soportes no existe o no es carpeta: {ruta_soportes}")
+    rutas_soportes: list[Path] = list(args.soportes) if args.soportes else []
+    if not rutas_soportes and os.environ.get("SOPORTES_ROOT"):
+        rutas_soportes = [
+            Path(p) for p in os.environ["SOPORTES_ROOT"].split(os.pathsep) if p.strip()
+        ]
+    if rutas_soportes:
+        invalidas = [r for r in rutas_soportes if not r.is_dir()]
+        if invalidas:
+            logger.error(
+                "--soportes: no existe(n) o no es/son carpeta(s): "
+                + ", ".join(str(x) for x in invalidas)
+            )
             return 1
-        logger.info(f"Indexando soportes clínicos desde {ruta_soportes} …")
-        soportes_idx = indexar_soportes_clinicos(ruta_soportes, cfg.patron_factura)
+        fusion: dict[str, list[Path]] = defaultdict(list)
+        for raiz in rutas_soportes:
+            logger.info(f"Indexando soportes clínicos desde {raiz} …")
+            for fac, rutas in indexar_soportes_clinicos(raiz, cfg.patron_factura).items():
+                fusion[fac].extend(rutas)
+        soportes_idx = dict(fusion)
+        if len(rutas_soportes) > 1:
+            logger.info(
+                f"Soportes clínicos: {len(soportes_idx)} factura(s) cubiertas por "
+                f"{len(rutas_soportes)} carpeta(s)."
+            )
 
     if args.layout == "lote":
         items = descubrir_lote(args.origen, manifiesto, cfg, cfg.patron_factura)
