@@ -96,8 +96,12 @@ def convertir(ruta_tramite: Path, ruta_salida: Path) -> tuple[int, int]:
             sh.cell(row=fila_dest, column=2, value=n)
             sh.cell(row=fila_dest, column=3, value=str(r[IDX_CODIGO] or "")[:10])
             sh.cell(row=fila_dest, column=4, value=str(r[IDX_SERVICIO] or "")[:200])
-            sh.cell(row=fila_dest, column=5, value=_num(r[IDX_VALOR_OBJETADO])).number_format = "#,##0"
-            sh.cell(row=fila_dest, column=6, value=_num(r[IDX_VALOR_ACEPTADO])).number_format = "#,##0"
+            sh.cell(
+                row=fila_dest, column=5, value=_num(r[IDX_VALOR_OBJETADO])
+            ).number_format = "#,##0"
+            sh.cell(
+                row=fila_dest, column=6, value=_num(r[IDX_VALOR_ACEPTADO])
+            ).number_format = "#,##0"
             det = sh.cell(row=fila_dest, column=7, value=str(r[IDX_OBS] or ""))
             det.alignment = Alignment(wrap_text=True, vertical="top")
             fila_dest += 1
@@ -109,9 +113,15 @@ def convertir(ruta_tramite: Path, ruta_salida: Path) -> tuple[int, int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tramite", type=Path, required=True, help="Excel del CRRP (TRAMITE DE OBJECIONES MASIVO).")
-    parser.add_argument("--salida", type=Path, required=True, help="Excel destino con formato del responder.")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--tramite", type=Path, required=True, help="Excel del CRRP (TRAMITE DE OBJECIONES MASIVO)."
+    )
+    parser.add_argument(
+        "--salida", type=Path, required=True, help="Excel destino con formato del responder."
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -124,7 +134,9 @@ def main() -> int:
     logger.info(f"  Facturas: {n_fac:,}")
     logger.info(f"  Objeciones: {n_obj:,}")
     logger.info("\nPróximo paso:")
-    logger.info("  py tools\\responder_glosas_simed.py --excel \"<este.xlsx>\" --todas --sin-soportes ...")
+    logger.info(
+        '  py tools\\responder_glosas_simed.py --excel "<este.xlsx>" --todas --sin-soportes ...'
+    )
     return 0
 
 

@@ -74,10 +74,7 @@ def extraer_texto_pdf(ruta: Path) -> str:
     try:
         import pdfplumber
     except ImportError:
-        sys.stderr.write(
-            "ERROR: falta pdfplumber.\n"
-            "Instalalo con:  py -m pip install pdfplumber\n"
-        )
+        sys.stderr.write("ERROR: falta pdfplumber.\nInstalalo con:  py -m pip install pdfplumber\n")
         sys.exit(2)
     with pdfplumber.open(str(ruta)) as pdf:
         return "\n".join((p.extract_text() or "") for p in pdf.pages)
@@ -202,7 +199,9 @@ def main() -> int:
             continue
         fac = obj[0]["factura"]
         total_obj = sum(o["valor_objetado"] for o in obj)
-        logger.info(f"{p.name} → factura {fac}: {len(obj)} objeciones, total objetado ${total_obj:,}")
+        logger.info(
+            f"{p.name} → factura {fac}: {len(obj)} objeciones, total objetado ${total_obj:,}"
+        )
         todas.extend(obj)
 
     if not todas:
@@ -215,7 +214,9 @@ def main() -> int:
     logger.info(f"  Facturas: {len({o['factura'] for o in todas})}")
     logger.info(f"  Objeciones: {len(todas)}")
     logger.info("\nProximo paso:")
-    logger.info("  1) Abrí el Excel, revisá 'Detalle Respuesta' (extraído del PDF) y 'Valor Aceptado'.")
+    logger.info(
+        "  1) Abrí el Excel, revisá 'Detalle Respuesta' (extraído del PDF) y 'Valor Aceptado'."
+    )
     logger.info("  2) Corré responder_glosas_simed.py con --excel <ese.xlsx>.")
     return 0
 

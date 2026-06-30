@@ -83,10 +83,14 @@ def _png_dims_px(path: Path) -> tuple[int, int] | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     fuente = parser.add_mutually_exclusive_group(required=True)
     fuente.add_argument("--carpeta", type=Path, help="Carpeta con los PNG de evidencia.")
-    fuente.add_argument("--lista", type=Path, help="TXT con 1 ruta de PNG por linea (preserva el orden del TXT).")
+    fuente.add_argument(
+        "--lista", type=Path, help="TXT con 1 ruta de PNG por linea (preserva el orden del TXT)."
+    )
     parser.add_argument("--salida", type=Path, required=True, help="Archivo .docx de salida.")
     parser.add_argument(
         "--patron",
@@ -193,7 +197,7 @@ def main() -> int:
         # Salto de página (menos en la última).
         if i < len(imagenes) - 1:
             doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-        logger.info(f"  [{i+1}/{len(imagenes)}] {factura} ← {img.name}")
+        logger.info(f"  [{i + 1}/{len(imagenes)}] {factura} ← {img.name}")
 
     args.salida.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(args.salida))

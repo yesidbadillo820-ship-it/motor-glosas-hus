@@ -81,6 +81,7 @@ def _exigir_playwright() -> None:
         )
         sys.exit(2)
 
+
 PORTAL_LOGIN = "https://auditool25.tool.com.co/gamexamplelogin.aspx"
 PORTAL_GLOSAS = "https://auditool25.tool.com.co/glosasfacturaww.aspx"
 
@@ -306,7 +307,9 @@ def buscar_soportes(
         if carpeta_soportes is None:
             avisos.append(f"No hallé HUS{factura_corta} en el indice (sin soportes del share).")
     else:
-        avisos.append("Sin --indice ni --carpeta-share: subo sólo el PDF de Trámite (no los HC/HEV/HAM).")
+        avisos.append(
+            "Sin --indice ni --carpeta-share: subo sólo el PDF de Trámite (no los HC/HEV/HAM)."
+        )
 
     if carpeta_soportes is not None:
         if not carpeta_soportes.is_dir():
@@ -373,8 +376,12 @@ def login(page: Page, user: str, password: str) -> None:
     p = page.locator("input[type='password']:visible").first
     # fill() atómico: el portal acepta fill en usuario/password (sólo el campo
     # Fecha del modal exige tipeo). Ahorra ~2s vs type(delay=30) char a char.
-    u.click(); u.fill(user); u.press("Tab")
-    p.click(); p.fill(password); p.press("Enter")
+    u.click()
+    u.fill(user)
+    u.press("Tab")
+    p.click()
+    p.fill(password)
+    p.press("Enter")
     try:
         page.wait_for_url(lambda url: "gamexamplelogin" not in url, timeout=3000)
     except PlaywrightTimeout:
@@ -385,7 +392,8 @@ def login(page: Page, user: str, password: str) -> None:
             "input[type='submit']:not([disabled])"
         ).first
         try:
-            boton.wait_for(state="visible", timeout=5000); boton.click(timeout=10000)
+            boton.wait_for(state="visible", timeout=5000)
+            boton.click(timeout=10000)
         except PlaywrightTimeout:
             page.evaluate("document.forms[0] && document.forms[0].submit()")
     try:
@@ -468,8 +476,8 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
 
     input_buscar.fill(factura_corta)
     page.wait_for_timeout(500)  # debounce del DDO (200ms era demasiado agresivo
-                                # — causaba falsos negativos por race con el AJAX
-                                # que repinta la grilla tras aplicar el filtro)
+    # — causaba falsos negativos por race con el AJAX
+    # que repinta la grilla tras aplicar el filtro)
     try:
         page.locator(
             "img[src*='ApplyFilter']:visible, img[title*='Apply' i]:visible, "
@@ -532,9 +540,11 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
         "a[href*='glosasfactura.aspx']"
     ).first
     try:
-        boton_editar.wait_for(state="visible", timeout=5000); boton_editar.click()
+        boton_editar.wait_for(state="visible", timeout=5000)
+        boton_editar.click()
     except PlaywrightTimeout:
-        _screenshot_debug(page, f"editar_no_encontrado_{factura_corta}"); raise
+        _screenshot_debug(page, f"editar_no_encontrado_{factura_corta}")
+        raise
     page.wait_for_url("**/glosasfactura.aspx*", timeout=15000)
     page.wait_for_selector("text=Información General", timeout=10000)
 
@@ -586,9 +596,7 @@ def _fila_contestada(fila) -> bool:
         badge = fila.locator("span[id*='vGRIDBADGE']").first
         if badge.count() > 0:
             title = (
-                badge.get_attribute("data-original-title")
-                or badge.get_attribute("title")
-                or ""
+                badge.get_attribute("data-original-title") or badge.get_attribute("title") or ""
             ).lower()
             if "contest" in title or "content" in title:
                 return True
@@ -626,16 +634,18 @@ def _link_paginacion_deshabilitado(link) -> bool:
     la grilla ya está en el borde (página 1 para 'Ant', última para 'Sig').
     """
     try:
-        return bool(link.evaluate(
-            """el => {
+        return bool(
+            link.evaluate(
+                """el => {
                 const cls = (el.className || '') + ' ' +
                             (el.closest('li') ? el.closest('li').className : '');
                 return /disabled|inactive/i.test(cls)
                     || el.getAttribute('aria-disabled') === 'true'
                     || el.hasAttribute('disabled');
             }""",
-            timeout=1000,
-        ))
+                timeout=1000,
+            )
+        )
     except Exception:
         return False
 
@@ -874,8 +884,7 @@ def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
     # para no pagar latencia extra por intento fallido).
     estrategias = [
         # 1) Botón exacto del DOM: img id W0104vBTNRESPUESTA_NNNN ("Dar Respuesta").
-        ("btn_respuesta_id",
-         "img[id*='vBTNRESPUESTA'], a:has(img[id*='vBTNRESPUESTA'])"),
+        ("btn_respuesta_id", "img[id*='vBTNRESPUESTA'], a:has(img[id*='vBTNRESPUESTA'])"),
         # 2) Último recurso: cualquier <img> clickable en las primeras 2 celdas.
         ("img_inicio", "xpath=.//td[position()<=2]//img"),
     ]
@@ -988,9 +997,7 @@ def llenar_informacion_glosa(ctx, page: Page, aceptado: int, detalle: str) -> No
     _clic_tab(ctx, page, "Información Glosa", marcador="textarea")
 
     # Campo Aceptado.
-    aceptado_input = _primer_visible(
-        ctx, "input[name*='ACEPTADO' i], input[id*='ACEPTADO' i]"
-    )
+    aceptado_input = _primer_visible(ctx, "input[name*='ACEPTADO' i], input[id*='ACEPTADO' i]")
     if aceptado_input is None:
         aceptado_input = ctx.locator(
             "xpath=//label[contains(., 'Aceptado')]/following::input[1]"
@@ -1004,9 +1011,7 @@ def llenar_informacion_glosa(ctx, page: Page, aceptado: int, detalle: str) -> No
         logger.warning(f"  No pude escribir 'Aceptado' ({e}); sigo.")
 
     # Campo Nota Credito: dejar vacío (ya no van NCs).
-    nc_input = ctx.locator(
-        "xpath=//label[contains(., 'Nota Credito')]/following::input[1]"
-    ).first
+    nc_input = ctx.locator("xpath=//label[contains(., 'Nota Credito')]/following::input[1]").first
     try:
         if nc_input.count() > 0:
             nc_input.fill("")
@@ -1057,8 +1062,11 @@ def _cerrar_popup_forzado(page: Page) -> None:
     """Cierra a la fuerza el popup de respuesta si quedó colgado abierto
     (con la X del popup o Escape), para no bloquear la objeción siguiente."""
     for sel in (
-        "#gxp0_b .close", "#gxp0_b .gx-popup-close", "div.gx-popup .close",
-        "div.gx-popup img[onclick*='close' i]", "[id^='gxp'] .close",
+        "#gxp0_b .close",
+        "#gxp0_b .gx-popup-close",
+        "div.gx-popup .close",
+        "div.gx-popup img[onclick*='close' i]",
+        "[id^='gxp'] .close",
     ):
         try:
             b = page.locator(sel).first
@@ -1130,9 +1138,7 @@ def subir_soportes_modal(ctx, page: Page, archivos: list[Path]) -> None:
         page.wait_for_timeout(500)
 
     # 'Agregar' (rojo) — texto EXACTO para no agarrar 'Agregar archivos...'.
-    btn_agregar = _buscar_en_frames(
-        page, ctx, "button:text-is('Agregar'), input[value='Agregar']"
-    )
+    btn_agregar = _buscar_en_frames(page, ctx, "button:text-is('Agregar'), input[value='Agregar']")
     if btn_agregar is not None:
         try:
             btn_agregar.click(timeout=5000)
@@ -1176,7 +1182,9 @@ def _dump_botones(page: Page, etiqueta: str) -> None:
                 try:
                     if not e.is_visible():
                         continue
-                    txt = (e.inner_text(timeout=400) or "").strip() or (e.get_attribute("value") or "")
+                    txt = (e.inner_text(timeout=400) or "").strip() or (
+                        e.get_attribute("value") or ""
+                    )
                     eid = e.get_attribute("id") or ""
                     lineas.append(f"[{(fr.url or '')[-45:]}] '{txt[:40]}' id={eid}")
                 except Exception:
@@ -1207,9 +1215,9 @@ def confirmar_modal(ctx, page: Page) -> None:
     # (Si ya estamos en ese tab — siempre en --sin-soportes — es instantáneo.)
     _clic_tab(ctx, page, "Información Glosa", marcador="textarea")
     btn = _buscar_en_frames(
-        page, ctx,
-        "input#BTNTRN_ENTER, input[type='button'][value='Confirmar'], "
-        "button:text-is('Confirmar')",
+        page,
+        ctx,
+        "input#BTNTRN_ENTER, input[type='button'][value='Confirmar'], button:text-is('Confirmar')",
     )
     if btn is None:
         _screenshot_debug(page, "modal_sin_confirmar")
@@ -1371,11 +1379,15 @@ def procesar_factura(
                     res = abrir_modal_objecion(page, ob["num"], rehacer)
                     if res == "YA_CONTESTADA":
                         omitidas += 1
-                        logger.info(f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)")
+                        logger.info(
+                            f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)"
+                        )
                         ok = True
                         break
                     sufijo = "" if intento == 0 else f" (reintento {intento})"
-                    logger.info(f"  → objecion #{ob['num']}{sufijo} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
+                    logger.info(
+                        f"  → objecion #{ob['num']}{sufijo} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)"
+                    )
                     ctx = res
                     llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
                     if subir_soportes:
@@ -1392,7 +1404,9 @@ def procesar_factura(
                     no_en_portal = True
                     break
                 except Exception as e:
-                    logger.warning(f"  intento {intento + 1} de objecion #{ob['num']} falló: {type(e).__name__}: {e}")
+                    logger.warning(
+                        f"  intento {intento + 1} de objecion #{ob['num']} falló: {type(e).__name__}: {e}"
+                    )
                     _cerrar_popup_forzado(page)
                     page.wait_for_timeout(800)
             if not ok and not no_en_portal:
@@ -1404,20 +1418,20 @@ def procesar_factura(
 
         if respondidas == 0:
             reg["estado"] = "SIN_PENDIENTES" if not fallidas else "ERROR"
-            reg["detalle"] = (
-                f"{omitidas} ya contestadas"
-                + (f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else "")
+            reg["detalle"] = f"{omitidas} ya contestadas" + (
+                f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else ""
             )
-            logger.info(f"  {factura_larga}: respondidas=0, omitidas={omitidas}, fallidas={len(fallidas)}.")
+            logger.info(
+                f"  {factura_larga}: respondidas=0, omitidas={omitidas}, fallidas={len(fallidas)}."
+            )
             return reg
 
         # En piloto parcial (--max-obj) no finalizamos: faltarían objeciones y
         # el botón verde sólo avisaría 'glosas pendientes'.
         if max_obj and max_obj > 0:
             reg["estado"] = "PILOTO_PARCIAL"
-            reg["detalle"] = (
-                f"{respondidas} respondidas de {max_obj} (sin finalizar)"
-                + (f", {len(fallidas)} fallaron: {fallidas}" if fallidas else "")
+            reg["detalle"] = f"{respondidas} respondidas de {max_obj} (sin finalizar)" + (
+                f", {len(fallidas)} fallaron: {fallidas}" if fallidas else ""
             )
             logger.info(f"  ✓ piloto parcial: {respondidas} respondidas, {len(fallidas)} fallaron.")
             return reg
@@ -1429,9 +1443,8 @@ def procesar_factura(
             logger.warning(f"  (Confirmar del form principal no aplicó: {e})")
         estado = enviar_finalizar(page, factura_corta, evidencias_dir=evidencias_dir)
         reg["estado"] = estado
-        reg["detalle"] = (
-            f"{respondidas} respondidas, {omitidas} omitidas"
-            + (f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else "")
+        reg["detalle"] = f"{respondidas} respondidas, {omitidas} omitidas" + (
+            f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else ""
         )
     except FacturaNoPendiente as e:
         reg["estado"] = "NO_PENDIENTE"
@@ -1450,8 +1463,18 @@ def main() -> int:
         description="Carga masiva de respuestas a glosas en SIMED (item por item).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--excel", type=Path, required=True, help="Excel con respuestas (de extraer_respuestas_glosa.py).")
-    parser.add_argument("--soportes-glosa", type=Path, default=None, help="Carpeta con HUS<factura>.pdf (Trámite/Respuesta). No requerida con --sin-soportes.")
+    parser.add_argument(
+        "--excel",
+        type=Path,
+        required=True,
+        help="Excel con respuestas (de extraer_respuestas_glosa.py).",
+    )
+    parser.add_argument(
+        "--soportes-glosa",
+        type=Path,
+        default=None,
+        help="Carpeta con HUS<factura>.pdf (Trámite/Respuesta). No requerida con --sin-soportes.",
+    )
     parser.add_argument(
         "--indice",
         type=Path,
@@ -1466,16 +1489,32 @@ def main() -> int:
         "Útil para piloto sin tener el indice TXT armado.",
     )
     grupo = parser.add_mutually_exclusive_group(required=True)
-    grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS... o número corto).")
-    grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas del Excel.")
-    parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser (no headless).")
-    parser.add_argument("--rehacer", action="store_true",
-                        help="Rehacer objeciones YA contestadas (por defecto se omiten para no re-subir soportes).")
-    parser.add_argument("--max-obj", type=int, default=0,
-                        help="Procesar como mucho N objeciones por factura (0 = todas). Útil para pilotos rápidos.")
-    parser.add_argument("--sin-soportes", action="store_true",
-                        help="NO subir soportes: sólo carga la respuesta (texto + fecha) y confirma. "
-                        "Mucho más rápido y evita que la subida trabe el cierre del modal.")
+    grupo.add_argument(
+        "--solo", type=str, help="Procesar solo esta factura (HUS... o número corto)."
+    )
+    grupo.add_argument(
+        "--todas", action="store_true", help="Procesar todas las facturas del Excel."
+    )
+    parser.add_argument(
+        "--con-cabeza", action="store_true", help="Mostrar el browser (no headless)."
+    )
+    parser.add_argument(
+        "--rehacer",
+        action="store_true",
+        help="Rehacer objeciones YA contestadas (por defecto se omiten para no re-subir soportes).",
+    )
+    parser.add_argument(
+        "--max-obj",
+        type=int,
+        default=0,
+        help="Procesar como mucho N objeciones por factura (0 = todas). Útil para pilotos rápidos.",
+    )
+    parser.add_argument(
+        "--sin-soportes",
+        action="store_true",
+        help="NO subir soportes: sólo carga la respuesta (texto + fecha) y confirma. "
+        "Mucho más rápido y evita que la subida trabe el cierre del modal.",
+    )
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_glosa.csv"))
     parser.add_argument("--log", type=Path, default=None)
@@ -1496,7 +1535,9 @@ def main() -> int:
     setup_logging(args.log)
 
     if not args.sin_soportes and args.soportes_glosa is None:
-        parser.error("--soportes-glosa es obligatorio (o usá --sin-soportes para no subir soportes).")
+        parser.error(
+            "--soportes-glosa es obligatorio (o usá --sin-soportes para no subir soportes)."
+        )
 
     _exigir_playwright()
     user, password = cargar_credenciales()
@@ -1520,9 +1561,13 @@ def main() -> int:
             return 1
         logger.info(f"Carpeta share fija: {args.carpeta_share}")
     else:
-        logger.warning("Sin --indice ni --carpeta-share: subiré sólo el PDF de Trámite por objeción.")
+        logger.warning(
+            "Sin --indice ni --carpeta-share: subiré sólo el PDF de Trámite por objeción."
+        )
     if args.carpeta_share is not None and args.todas:
-        logger.error("--carpeta-share sólo tiene sentido con --solo (1 factura). Para masivo usá --indice.")
+        logger.error(
+            "--carpeta-share sólo tiene sentido con --solo (1 factura). Para masivo usá --indice."
+        )
         return 1
     logger.info(f"Facturas a procesar: {len(facturas)}")
 
@@ -1545,6 +1590,7 @@ def main() -> int:
             f_rep.flush()
 
     t0 = time.time()
+
     def _sesion_muerta(exc: Exception) -> bool:
         """True si el error indica que el browser/page/context ya no es usable."""
         msg = str(exc).lower()
@@ -1576,17 +1622,30 @@ def main() -> int:
                     archivos, avisos = [], []
                 else:
                     archivos, avisos = buscar_soportes(
-                        factura_corta, factura_larga, args.soportes_glosa, indice,
+                        factura_corta,
+                        factura_larga,
+                        args.soportes_glosa,
+                        indice,
                         carpeta_share_override=args.carpeta_share,
                     )
                     for a in avisos:
                         logger.warning(f"  ⚠ {a}")
-                extra = " (sin soportes)" if args.sin_soportes else f", {len(archivos)} archivos soporte"
-                logger.info(f"[{i}/{len(facturas)}] {factura_larga} — {len(objeciones)} objeciones{extra}")
+                extra = (
+                    " (sin soportes)"
+                    if args.sin_soportes
+                    else f", {len(archivos)} archivos soporte"
+                )
+                logger.info(
+                    f"[{i}/{len(facturas)}] {factura_larga} — {len(objeciones)} objeciones{extra}"
+                )
                 if not args.sin_soportes and not archivos:
                     registrar(
-                        {"factura": factura_larga, "objeciones": len(objeciones),
-                         "estado": "SIN_SOPORTES", "detalle": "; ".join(avisos)}
+                        {
+                            "factura": factura_larga,
+                            "objeciones": len(objeciones),
+                            "estado": "SIN_SOPORTES",
+                            "detalle": "; ".join(avisos),
+                        }
                     )
                     continue
 
@@ -1595,8 +1654,13 @@ def main() -> int:
                 # MISMA factura una vez antes de pasar a la siguiente.
                 for sesion_intento in range(2):
                     reg = procesar_factura(
-                        page, factura_corta, factura_larga, objeciones, archivos,
-                        rehacer=args.rehacer, max_obj=args.max_obj,
+                        page,
+                        factura_corta,
+                        factura_larga,
+                        objeciones,
+                        archivos,
+                        rehacer=args.rehacer,
+                        max_obj=args.max_obj,
                         subir_soportes=not args.sin_soportes,
                         evidencias_dir=None if args.sin_evidencias else args.evidencias_dir,
                     )
@@ -1634,6 +1698,7 @@ def main() -> int:
     logger.info(f"\nReporte: {args.reporte}")
     logger.info(f"Facturas procesadas: {len(resultados)} en {dur:.1f} min")
     from collections import Counter
+
     c = Counter(r["estado"] for r in resultados)
     for estado, n in c.items():
         logger.info(f"  {estado}: {n}")

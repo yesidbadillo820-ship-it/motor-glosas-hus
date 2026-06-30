@@ -97,7 +97,9 @@ def buscar_json_origen(carpeta: Path) -> Path | None:
     return None
 
 
-def procesar_carpeta(carpeta: Path, base: Path, borrar: bool, dry_run: bool, aceptar_sin_json: bool = False) -> dict:
+def procesar_carpeta(
+    carpeta: Path, base: Path, borrar: bool, dry_run: bool, aceptar_sin_json: bool = False
+) -> dict:
     registro = {
         "carpeta": carpeta.name,
         "nota_electronica": "",
@@ -331,10 +333,15 @@ def main() -> int:
     resultados = []
     for i, c in enumerate(carpetas, 1):
         logger.info(f"[{i}/{len(carpetas)}] {c.name}")
-        resultados.append(procesar_carpeta(
-            c, args.destino, args.borrar, args.dry_run,
-            aceptar_sin_json=args.aceptar_sin_json,
-        ))
+        resultados.append(
+            procesar_carpeta(
+                c,
+                args.destino,
+                args.borrar,
+                args.dry_run,
+                aceptar_sin_json=args.aceptar_sin_json,
+            )
+        )
 
     escribir_reporte(resultados, args.reporte)
 

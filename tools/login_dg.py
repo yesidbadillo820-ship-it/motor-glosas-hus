@@ -53,8 +53,7 @@ logger = logging.getLogger("login_dg")
 
 
 DEFAULT_EXE = (
-    Path(os.environ.get("LOCALAPPDATA", ""))
-    / r"SYAC\Dinamica Gerencial .NET\1.0.0.0\DG.WinDG.exe"
+    Path(os.environ.get("LOCALAPPDATA", "")) / r"SYAC\Dinamica Gerencial .NET\1.0.0.0\DG.WinDG.exe"
 )
 
 
@@ -110,6 +109,7 @@ def _listar_ventanas_visibles() -> None:
     """Imprime las ventanas top-level visibles para diagnóstico."""
     try:
         from pywinauto import Desktop
+
         logger.info("  Ventanas top-level visibles ahora:")
         for w in Desktop(backend="uia").windows():
             try:
@@ -127,10 +127,13 @@ def _proceso_dg_existente(nombre_exe: str = "DG.WinDG.exe") -> int | None:
     """Devuelve el PID del primer DG.WinDG.exe corriendo, o None."""
     try:
         import subprocess
+
         # tasklist es nativo de Windows, no agrega dependencias.
         out = subprocess.run(
             ["tasklist", "/FI", f"IMAGENAME eq {nombre_exe}", "/FO", "CSV", "/NH"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         ).stdout
         for linea in out.splitlines():
             if nombre_exe.lower() in linea.lower():
@@ -147,6 +150,7 @@ def _ventana_login_por_pid(pid: int):
     """Devuelve la ventana 'Inicio de sesión' del proceso pid, o None."""
     try:
         from pywinauto import Application
+
         app = Application(backend="uia").connect(process=pid, timeout=2)
         for w in app.windows():
             try:
@@ -163,11 +167,17 @@ def _ventana_login_por_pid(pid: int):
 def _ventana_dashboard_por_pid(pid: int):
     try:
         from pywinauto import Application
+
         app = Application(backend="uia").connect(process=pid, timeout=2)
         for w in app.windows():
             try:
                 t = (w.window_text() or "").lower()
-                if "dashboard" in t and "dinámica" in t.lower() or "dashboard" in t and "dinamica" in t:
+                if (
+                    "dashboard" in t
+                    and "dinámica" in t.lower()
+                    or "dashboard" in t
+                    and "dinamica" in t
+                ):
                     return w
             except Exception:
                 continue
@@ -190,10 +200,7 @@ def login(
         from pywinauto import Application
         from pywinauto.timings import Timings
     except ImportError:
-        sys.stderr.write(
-            "ERROR: falta pywinauto.\n"
-            "    py -m pip install pywinauto\n"
-        )
+        sys.stderr.write("ERROR: falta pywinauto.\n    py -m pip install pywinauto\n")
         sys.exit(2)
 
     # Hacer pywinauto un poco más paciente con el WPF de DG.
@@ -251,7 +258,9 @@ def login(
         except Exception:
             continue
     if intento_input_usr is None:
-        logger.error("No encontré el campo USUARIO. Volvé a correr con --con-ventanas y mandame el árbol.")
+        logger.error(
+            "No encontré el campo USUARIO. Volvé a correr con --con-ventanas y mandame el árbol."
+        )
         _print_controles(dlg_login)
         sys.exit(1)
     intento_input_usr.click_input()
@@ -308,7 +317,9 @@ def login(
         etiqueta="segunda ventana de login",
     )
     if dlg_area is None:
-        logger.error("No apareció la pantalla de Área de Servicios. ¿Usuario o contraseña incorrectos?")
+        logger.error(
+            "No apareció la pantalla de Área de Servicios. ¿Usuario o contraseña incorrectos?"
+        )
         _listar_ventanas_visibles()
         sys.exit(1)
     # Damos tiempo a que renderice los radios
@@ -385,28 +396,36 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--exe", type=Path, default=DEFAULT_EXE,
-        help="Ruta a DG.WinDG.exe (default desde LOCALAPPDATA)."
+        "--exe",
+        type=Path,
+        default=DEFAULT_EXE,
+        help="Ruta a DG.WinDG.exe (default desde LOCALAPPDATA).",
     )
     parser.add_argument(
-        "--area", default=os.environ.get("DG_AREA", "Hospitalización"),
-        help="Área de servicios a seleccionar (default Hospitalización)."
+        "--area",
+        default=os.environ.get("DG_AREA", "Hospitalización"),
+        help="Área de servicios a seleccionar (default Hospitalización).",
     )
     parser.add_argument(
-        "--centro", default=os.environ.get("DG_CENTRO", "01"),
-        help="Código de centro de atención (default 01)."
+        "--centro",
+        default=os.environ.get("DG_CENTRO", "01"),
+        help="Código de centro de atención (default 01).",
     )
     parser.add_argument(
-        "--timeout-inicial", type=int, default=120,
-        help="Segundos máx esperando la ventana de login (default 120 — DG es lento de arrancar)."
+        "--timeout-inicial",
+        type=int,
+        default=120,
+        help="Segundos máx esperando la ventana de login (default 120 — DG es lento de arrancar).",
     )
     parser.add_argument(
-        "--solo-listar", action="store_true",
-        help="Solo lista ventanas visibles y termina (diagnóstico)."
+        "--solo-listar",
+        action="store_true",
+        help="Solo lista ventanas visibles y termina (diagnóstico).",
     )
     parser.add_argument(
-        "--con-ventanas", action="store_true",
-        help="Imprime el árbol de controles UIA de cada ventana (debug)."
+        "--con-ventanas",
+        action="store_true",
+        help="Imprime el árbol de controles UIA de cada ventana (debug).",
     )
     args = parser.parse_args()
     setup_logging(args.con_ventanas)

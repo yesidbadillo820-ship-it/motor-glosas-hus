@@ -44,8 +44,7 @@ def _norm(s: str) -> str:
 ALIAS = {
     "acta": ["ACTA", "NUMERO ACTA", "ACTA CONCILIACION", "N ACTA"],
     "factura": ["FACTURA HUS", "FACTURA", "NUMERO FACTURA", "NUM FACTURA"],
-    "nota": ["NOTA ELECTRONICA", "NE", "NOTA CREDITO", "NOTAS CREDITO",
-             "NOTA ELECTRONICA NUMERO"],
+    "nota": ["NOTA ELECTRONICA", "NE", "NOTA CREDITO", "NOTAS CREDITO", "NOTA ELECTRONICA NUMERO"],
 }
 
 
@@ -59,17 +58,30 @@ def _idx_columnas(headers: list[str]) -> dict[str, int]:
                 break
         if clave not in idx and clave != "acta":
             raise ValueError(
-                f"No encontré la columna '{clave}'. Acepté {opciones}. "
-                f"Headers: {headers}"
+                f"No encontré la columna '{clave}'. Acepté {opciones}. Headers: {headers}"
             )
     return idx
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--excel", type=Path, required=True, help="Excel de notas (ACTA, FACTURA, NOTA ELECTRONICA).")
-    parser.add_argument("--salida", type=Path, required=True, help="Carpeta donde escribir los CSV.")
-    parser.add_argument("--acta-correo", type=str, default="AC000456", help="ACTA cuyas notas van por correo (default AC000456).")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--excel",
+        type=Path,
+        required=True,
+        help="Excel de notas (ACTA, FACTURA, NOTA ELECTRONICA).",
+    )
+    parser.add_argument(
+        "--salida", type=Path, required=True, help="Carpeta donde escribir los CSV."
+    )
+    parser.add_argument(
+        "--acta-correo",
+        type=str,
+        default="AC000456",
+        help="ACTA cuyas notas van por correo (default AC000456).",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -93,7 +105,7 @@ def main() -> int:
     idx_acta = idx.get("acta")  # puede no existir; las sin ACTA van a SIMED
 
     acta_correo = _norm(args.acta_correo)
-    correo: list[tuple[str, str]] = []   # (nota, factura)
+    correo: list[tuple[str, str]] = []  # (nota, factura)
     simed: list[tuple[str, str, str]] = []  # (acta, nota, factura)
     sin_nota: list[str] = []  # facturas sin NOTA ELECTRONICA (no procesables)
     por_acta: dict[str, int] = defaultdict(int)
@@ -148,7 +160,9 @@ def main() -> int:
     logger.info(f"\n📧 CORREO (ACTA {args.acta_correo}): {len(correo)} notas → {ruta_correo}")
     logger.info(f"🖥️  SIMED (blanco + otras actas): {len(simed)} notas → {ruta_simed}")
     if sin_nota:
-        logger.warning(f"\n⚠ {len(sin_nota)} factura(s) SIN nota electrónica (no procesables hasta tener la NE):")
+        logger.warning(
+            f"\n⚠ {len(sin_nota)} factura(s) SIN nota electrónica (no procesables hasta tener la NE):"
+        )
         for fac in sin_nota:
             logger.warning(f"     {fac}")
         logger.warning(f"   Listado en: {ruta_sin_ne}")
