@@ -111,11 +111,23 @@ async def _run(primary: str | None) -> int:
     print("═" * 64)
 
     resultados = []
-    for caso in casos:
+    total = len(casos)
+    for i, caso in enumerate(casos, 1):
+        print(
+            f"\n⏳ Generando {i}/{total}: {caso['titulo']} "
+            "(llama a Claude — puede tardar 1-2 min, NO presiones Ctrl+C)...",
+            flush=True,
+        )
         try:
-            dictamen = await _generar(service, caso)
+            # Timeout amplio por caso para que uno lento no cuelgue todo,
+            # pero sin cortar generaciones legítimas (con reintentos).
+            dictamen = await asyncio.wait_for(_generar(service, caso), timeout=420)
+        except asyncio.TimeoutError:
+            print(f"🔴  {caso['titulo']}: TIMEOUT (>7 min) — se omite", flush=True)
+            resultados.append({"caso": caso["id"], "score": 0.0, "aprobado": False, "defectos": []})
+            continue
         except Exception as e:
-            print(f"\n🔴  {caso['titulo']}: ERROR generando — {e}")
+            print(f"🔴  {caso['titulo']}: ERROR generando — {e}", flush=True)
             resultados.append({"caso": caso["id"], "score": 0.0, "aprobado": False, "defectos": []})
             continue
         # guardar el dictamen para inspección humana
@@ -123,14 +135,14 @@ async def _run(primary: str | None) -> int:
             f.write(dictamen)
         r = puntuar_dictamen(dictamen, caso)
         resultados.append(r)
-        print(f"\n{_emoji(r['score'])}  {caso['titulo']}")
-        print(f"     score: {r['score']}/10")
+        print(f"{_emoji(r['score'])}  {caso['titulo']} → score: {r['score']}/10", flush=True)
         for df in r["defectos"]:
             print(
-                f"       − {df['gravedad']:8} −{df['peso']}  {df['criterio']}: {df['evidencia'][:60]}"
+                f"       − {df['gravedad']:8} −{df['peso']}  {df['criterio']}: {df['evidencia'][:60]}",
+                flush=True,
             )
         if not r["defectos"]:
-            print("       (sin defectos detectados) ✨")
+            print("       (sin defectos detectados) ✨", flush=True)
 
     aprobados = sum(1 for r in resultados if r["aprobado"])
     promedio = round(sum(r["score"] for r in resultados) / len(resultados), 2)
