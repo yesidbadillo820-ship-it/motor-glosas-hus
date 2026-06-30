@@ -156,10 +156,38 @@ def _buscar_clave_norma(tipo: str, numero: str, anio: str, normas: dict) -> Opti
         )
     if tipo_l in ("t", "c", "su"):
         candidatos.append(f"sentencia_{n.lower()}_{anio}")
+        # Ronda 19 (Bug CC, 30-jun-2026): el corpus actual usa el formato
+        # upper-words "SENTENCIA T-121 DE 2015", "SENTENCIA SU-1023 DE 2001".
+        # Antes solo se generaba snake_case → T-121/2015 (que SÍ está en el
+        # corpus) se marcaba NORMA_INEXISTENTE y bajaba la confianza del
+        # dictamen. Generamos también el formato upper-words del corpus.
+        sala_up = tipo_l.upper()
+        candidatos.extend(
+            [
+                f"SENTENCIA {sala_up}-{n} DE {anio}",
+                f"SENTENCIA {sala_up}-{numero} DE {anio}",
+                f"SENTENCIA {sala_up}{n} DE {anio}",
+            ]
+        )
 
     for c in candidatos:
         if c and c in normas:
             return c
+
+    # Ronda 19 (Bug CC): coincidencia tolerante para sentencias. Cubre
+    # variantes en la clave del corpus (con/sin guión entre sala y número).
+    if tipo_l in ("t", "c", "su"):
+        sala_up = tipo_l.upper()
+        for k in normas.keys():
+            if not k.startswith(f"SENTENCIA {sala_up}"):
+                continue
+            if f" DE {anio}" not in k:
+                continue
+            # Extraer el número entre "SENTENCIA {SALA}" y " DE "
+            resto = k[len(f"SENTENCIA {sala_up}") :].lstrip("-").strip()
+            cand_num = resto.split(" DE ")[0].strip().lstrip("0") or "0"
+            if cand_num == n:
+                return k
 
     # Coincidencia tolerante: clave que empieza por el prefijo, contiene
     # el número como token entre espacios, y termina/contiene " DE YYYY".

@@ -1397,6 +1397,77 @@ def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     return ""
 
 
+def _normalizar_eps_para_comparar(eps: str | None) -> str:
+    """Normaliza un nombre de EPS para comparación robusta: upper, colapsa
+    espacios y quita sufijos comunes (EPS, EPS-S, EPS-C, E.P.S.).
+
+    "SALUD TOTAL EPS" / "Salud Total" / "SALUD TOTAL EPS-S" → "SALUD TOTAL".
+    """
+    if not eps:
+        return ""
+    e = re.sub(r"\s+", " ", eps.upper().strip())
+    e = re.sub(r"\s+(?:EPS-S|EPS-C|EPS|E\.?P\.?S\.?)\b", "", e)
+    return e.strip()
+
+
+# EPS / regímenes que el dropdown puede traer como valor "genérico" — para
+# estos el texto de la glosa siempre manda (ronda 13-14, adelantado a ronda 19).
+_EPS_DROPDOWN_GENERICO = frozenset({"", "OTRA", "OTRA / SIN DEFINIR", "SIN DEFINIR", "N/A"})
+
+
+def resolver_eps_efectiva(
+    eps_dropdown: str | None,
+    texto_glosa: str | None,
+) -> tuple[str, bool, str]:
+    """Bug BB (ronda 19, 30-jun-2026): resuelve la EPS efectiva cuando el
+    dropdown contradice la EPS nombrada en el texto de la glosa.
+
+    Caso real 30-jun: el usuario seleccionó "DISPENSARIO MEDICO" (régimen
+    militar) en el dropdown pero la glosa empezaba con "SALUD TOTAL:". El
+    motor cargó el contrato militar 440-DIGSA/DMBUG y normas de FF.MM. para
+    una glosa de EPS contributiva → alucinación total.
+
+    Decisión del usuario (30-jun): PRIORIZAR EL TEXTO + ALERTAR. El texto de
+    la glosa es un documento oficial de la EPS y es la fuente de verdad; el
+    dropdown es propenso a error humano (queda de sesión anterior, default).
+
+    Returns:
+        (eps_efectiva, hubo_correccion, mensaje_alerta)
+        - eps_efectiva: la EPS a usar para contrato/régimen/prompts.
+        - hubo_correccion: True si se cambió respecto del dropdown.
+        - mensaje_alerta: texto para mostrar al gestor (vacío si no hay).
+    """
+    eps_dropdown = (eps_dropdown or "").strip()
+    eps_texto = _detectar_pagador_en_texto(texto_glosa)
+    if not eps_texto:
+        # No se detectó ninguna EPS conocida en el texto → respetar dropdown.
+        return eps_dropdown, False, ""
+
+    dropdown_norm = _normalizar_eps_para_comparar(eps_dropdown)
+    texto_norm = _normalizar_eps_para_comparar(eps_texto)
+
+    # 1) Dropdown genérico → usar la del texto (silencioso, comportamiento
+    #    histórico de rondas 13-14 ahora adelantado al inicio del flujo).
+    if eps_dropdown.upper() in _EPS_DROPDOWN_GENERICO:
+        return eps_texto, True, ""
+
+    # 2) Coinciden (exacto o uno contiene al otro) → respetar dropdown.
+    if (
+        dropdown_norm == texto_norm
+        or (len(dropdown_norm) >= 4 and dropdown_norm in texto_norm)
+        or (len(texto_norm) >= 4 and texto_norm in dropdown_norm)
+    ):
+        return eps_dropdown, False, ""
+
+    # 3) CONTRADICCIÓN: dropdown específico ≠ EPS del texto → priorizar texto.
+    mensaje = (
+        f"Seleccionaste «{eps_dropdown}» pero la glosa menciona «{eps_texto}». "
+        f"El motor usó «{eps_texto}» (la del texto de la glosa). Si el dropdown "
+        f"era correcto, corregilo y reanalizá."
+    )
+    return eps_texto, True, mensaje
+
+
 def _es_pagador_arl(eps: str | None, texto_glosa: str | None) -> bool:
     """Bug H (ronda 13): determina si el régimen aplicable es ARL/Riesgos
     Laborales — por el nombre de la entidad o por marcadores en el texto.
