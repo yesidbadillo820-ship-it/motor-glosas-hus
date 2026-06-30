@@ -444,6 +444,28 @@
       "formato_paquete": "ZIP_FACTURA",
       "bot": "",
       "observaciones": "Regional de Aseguramiento en Salud N° 5 (aparece con la grafía 'ASEGURAMENTO'). Entidad propia — REVISAR canal/portal/NIT reales de radicación."
+    },
+    {
+      "id": "UT_MAISFEN",
+      "nombre": "UNION TEMPORAL SALUD INTEGRAL MAISFEN",
+      "alias": [
+        "UNION TEMPORAL SALUD INTEGRAL MAISFEN",
+        "SALUD INTEGRAL MAISFEN",
+        "UT SALUD INTEGRAL MAISFEN",
+        "MAISFEN",
+        "MAISFE"
+      ],
+      "nit": "901702024",
+      "eps_codigo": "MAISFE",
+      "regimen": "SUBSIDIADO",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Unión Temporal operadora de régimen subsidiado (cód. EPS MAISFE, NIT 901702024), leída del adquiriente de la FEV. Confirmar canal/portal de radicación y soportes_extra con el contrato."
     }
   ]
 }
