@@ -276,3 +276,23 @@ class TestBug8ClausulaEvadida:
         ok, evadidas = _auditar_clausulas_citadas_en_glosa(dictamen, texto_glosa=glosa)
         assert ok
         assert not evadidas
+
+
+# ── Ronda 22: norma citada para el tema equivocado (red de seguridad) ──
+
+
+class TestRonda22NormaMalAplicada:
+    def test_ley_1388_en_auditivo_se_corrige(self):
+        from app.services.glosa_service import _corregir_norma_mal_aplicada
+
+        d = "la ley 1388/2010 que garantiza la atención a población con discapacidad auditiva"
+        out = _corregir_norma_mal_aplicada(d)
+        assert "1388" not in out
+        assert "Ley 1618 de 2013" in out
+
+    def test_ley_1388_en_oncologia_no_se_toca(self):
+        from app.services.glosa_service import _corregir_norma_mal_aplicada
+
+        d = "la ley 1388/2010 garantiza la atención del menor con cáncer y leucemia"
+        out = _corregir_norma_mal_aplicada(d)
+        assert out == d

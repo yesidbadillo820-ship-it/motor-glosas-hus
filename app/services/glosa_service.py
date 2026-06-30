@@ -3097,6 +3097,42 @@ def _neutralizar_cups_falsos(texto: str) -> str:
     return resultado
 
 
+# ── Ronda 22: normas citadas para el TEMA EQUIVOCADO (alucinación grave) ──
+# Yesid 30-jun (caso ECOOPSOS): el dictamen citó "Ley 1388/2010 que garantiza
+# la atención integral a población con discapacidad auditiva" — pero la Ley
+# 1388/2010 es de CÁNCER INFANTIL. Una norma citada para el tema equivocado
+# anula la seriedad del dictamen ante el auditor. La regla 8.terdecies del
+# prompt lo previene; esta red es la defensa en profundidad: si aun así
+# aparece, se reemplaza por la norma correcta o se neutraliza.
+#
+# Formato: (regex_norma, regex_contexto_equivocado, reemplazo_de_la_norma).
+_NORMAS_TEMA_EQUIVOCADO = (
+    (
+        re.compile(r"\bley\s+1388\s*(?:de\s*|/)\s*2010\b", re.IGNORECASE),
+        re.compile(r"audit|coclear|hipoacusia|discapacidad\s+auditiva|sordera", re.IGNORECASE),
+        "Ley 1618 de 2013",
+    ),
+)
+
+
+def _corregir_norma_mal_aplicada(dictamen: str) -> str:
+    """Reemplaza normas citadas para un tema que no les corresponde por la
+    norma correcta. Conservador: solo dispara si AMBOS (la norma equivocada y
+    el contexto temático) están presentes en el dictamen."""
+    if not dictamen:
+        return dictamen
+    nuevo = dictamen
+    for re_norma, re_ctx, reemplazo in _NORMAS_TEMA_EQUIVOCADO:
+        if re_norma.search(nuevo) and re_ctx.search(nuevo):
+            nuevo, n = re_norma.subn(reemplazo, nuevo)
+            if n:
+                logger.warning(
+                    f"[NORMA-TEMA-EQUIVOCADO] {n} cita(s) corregida(s) → {reemplazo} "
+                    "(la norma original no corresponde al tema del dictamen)."
+                )
+    return nuevo
+
+
 # ── Sanitizer "descomillar citas ALTA" (12-jun-2026, ronda 2 — fix #2) ──
 # Evidencia: caso osteosíntesis ENTREGADO con «El pagador reconocerá la
 # factura dentro de los veintidós (22) días hábiles...» marcada
@@ -6363,6 +6399,16 @@ class GlosaService:
                     dictamen = _dictamen_sin_cups_falso
             except Exception as _e_cf:
                 logger.debug(f"[CUPS-FALSO] red final no aplicada: {_e_cf}")
+
+            # Ronda 22 — RED FINAL: norma citada para el tema equivocado
+            # (caso ECOOPSOS: Ley 1388/2010 —cáncer— citada para discapacidad
+            # auditiva). Defensa en profundidad de la regla 8.terdecies.
+            try:
+                _dictamen_norma_ok = _corregir_norma_mal_aplicada(dictamen)
+                if _dictamen_norma_ok != dictamen:
+                    dictamen = _dictamen_norma_ok
+            except Exception as _e_nm:
+                logger.debug(f"[NORMA-TEMA-EQUIVOCADO] red final no aplicada: {_e_nm}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 5 (16-jun-2026) — RED FINAL EPS inventada.
