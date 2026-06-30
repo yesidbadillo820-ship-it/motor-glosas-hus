@@ -18,7 +18,8 @@
         "contrato_citado": "CTR-2024-SALUDTOTAL-HUS",
         "clausulas_citadas": [18],
         "es_complejo": true,
-        "complejidad_motivo_contiene": "TMS"
+        "complejidad_motivo_contiene": "TMS",
+        "defensa_clinica_titulo_contiene": "TMS"
       }
     },
     {
@@ -33,7 +34,8 @@
         "contrato_citado": "CTR-2025-ECOOPSOS-HUS",
         "clausulas_citadas": [24],
         "es_complejo": true,
-        "complejidad_motivo_contiene": "IMPLANTE COCLEAR"
+        "complejidad_motivo_contiene": "IMPLANTE COCLEAR",
+        "defensa_clinica_titulo_contiene": "coclear"
       }
     },
     {
@@ -48,7 +50,8 @@
         "contrato_citado": "CTR-2024-MEDIMAS-HUS",
         "clausulas_citadas": [31],
         "es_complejo": true,
-        "complejidad_motivo_contiene": "EVENTO ADVERSO"
+        "complejidad_motivo_contiene": "EVENTO ADVERSO",
+        "defensa_clinica_titulo_contiene": "robótica"
       }
     },
     {
@@ -60,7 +63,8 @@
       "criterios": {
         "eps_efectiva_contiene": "SURA",
         "es_complejo": true,
-        "complejidad_motivo_contiene": "EPICEL"
+        "complejidad_motivo_contiene": "EPICEL",
+        "defensa_clinica_titulo_contiene": "Epicel"
       }
     },
     {
@@ -72,7 +76,8 @@
       "criterios": {
         "eps_efectiva_contiene": "NUEVA EPS",
         "es_complejo": true,
-        "complejidad_motivo_contiene": "NORWOOD"
+        "complejidad_motivo_contiene": "NORWOOD",
+        "defensa_clinica_titulo_contiene": "Norwood"
       }
     },
     {
