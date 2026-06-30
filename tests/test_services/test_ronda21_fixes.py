@@ -14,6 +14,8 @@ PACTADO"). El infinitivo/conjugado se escapaba.
 
 from __future__ import annotations
 
+import pytest
+
 from app.services.glosa_service import _reescribir_negacion_contrato
 
 _GLOSA_MEDIMAS = (
@@ -78,3 +80,126 @@ class TestBug1NegacionContratoInfinitivo:
         out = _reescribir_negacion_contrato(d, texto_glosa=_GLOSA_MEDIMAS)
         assert "SIN CONTRATO PACTADO" not in out
         assert "CTR-2024-MEDIMAS-HUS" in out
+
+
+# ── Bug #2: hint SOAT-pleno no debe inyectarse si la glosa cita contrato ──
+
+
+def _capturar_system_prompt(monkeypatch):
+    """Stub de _llamar_ia que captura el system prompt enviado a la IA."""
+    from app.services.glosa_service import GlosaService
+
+    capturado = {}
+
+    async def fake(self, system, user, *a, **k):
+        capturado["system"] = system
+        return (
+            "<paciente>X</paciente><argumento>LA ESE HUS NO ACEPTA LA GLOSA. "
+            "LOS SERVICIOS FUERON PRESTADOS Y SOPORTADOS. SE SOLICITA EL "
+            "LEVANTAMIENTO Y EL PAGO INTEGRO.</argumento>",
+            "stub-test",
+        )
+
+    monkeypatch.setattr(GlosaService, "_llamar_ia", fake)
+    return capturado
+
+
+def _prep_min(monkeypatch):
+    monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
+    monkeypatch.delenv("TOOL_USE_HABILITADO", raising=False)
+    monkeypatch.delenv("MULTI_AGENT_HABILITADO", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    import app.services.dictamen_directo as dd
+    import app.services.validador_dictamen as vd
+
+    monkeypatch.setattr(vd, "detectar_defectos_criticos", lambda *a, **k: [])
+    monkeypatch.setattr(dd, "puede_emitir_directo", lambda *a, **k: False)
+
+
+def _svc():
+    from app.services.glosa_service import GlosaService
+
+    return GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
+
+
+def _data(texto, eps="OTRA / SIN DEFINIR"):
+    from app.models.schemas import GlosaInput
+
+    return GlosaInput(eps=eps, etapa="RESPUESTA A GLOSA", tabla_excel=texto, valor_aceptado="0")
+
+
+class TestBug2SoatConContrato:
+    @pytest.mark.asyncio
+    async def test_glosa_con_contrato_no_inyecta_hint_sin_contrato(self, monkeypatch):
+        """Glosa que cita CTR + SOAT × 0.85 → NO debe pedir 'SOAT pleno / sin
+        contrato'; debe pedir defensa intra-contrato."""
+        _prep_min(monkeypatch)
+        cap = _capturar_system_prompt(monkeypatch)
+        glosa = (
+            "TARIFA: el contrato vigente CTR-2024-MEDIMAS-HUS define para "
+            "prostatectomía una tarifa de SOAT × 0.85; la facturación aplicó "
+            "SOAT pleno + adicional 35%."
+        )
+        await _svc().analizar(_data(glosa))
+        sysp = cap["system"]
+        assert "NO HAY CONTRATO PACTADO, por lo que rige" not in sysp
+        assert "TARIFA CON CONTRATO PACTADO" in sysp
+        assert "CTR-2024-MEDIMAS-HUS" in sysp
+
+    @pytest.mark.asyncio
+    async def test_glosa_soat_puro_si_inyecta_hint_sin_contrato(self, monkeypatch):
+        """Aseguradora SOAT pura (sin contrato citado) → SÍ mantiene el hint
+        clásico de 'sin contrato → SOAT pleno' (no romper el caso legítimo)."""
+        _prep_min(monkeypatch)
+        cap = _capturar_system_prompt(monkeypatch)
+        glosa = (
+            "U220154 - COMPAÑIA MUNDIAL DE SEGUROS S.A. SOAT UVB. Diferencia "
+            "tarifaria en atención inicial de urgencias por accidente de tránsito."
+        )
+        await _svc().analizar(_data(glosa))
+        sysp = cap["system"]
+        assert "ASEGURADORA SOAT" in sysp
+        assert "TARIFA CON CONTRATO PACTADO" not in sysp
+
+
+# ── Bug #9: vocabulario de cobertura (evento adverso / liquidación) ──
+
+
+class TestBug9VocabularioCobertura:
+    def test_evento_adverso_se_detecta_como_clave(self):
+        """Un sub-concepto de evento adverso ahora tiene 'claves' → puede
+        marcarse como omitido si el dictamen no lo aborda."""
+        from app.services.subconceptos_glosa import (
+            auditar_subconceptos_respondidos,
+            detectar_subconceptos,
+        )
+
+        glosa = (
+            "Se objeta: (1) la fístula urinaria es un EVENTO ADVERSO PREVENIBLE "
+            "atribuible a falla en la técnica quirúrgica; (2) la TARIFA aplicada "
+            "excede lo pactado."
+        )
+        subs = detectar_subconceptos(glosa)
+        assert len(subs) >= 2
+        # Dictamen que solo habla de tarifa, NO del evento adverso
+        dictamen = "Sobre la tarifa, se aplicó el manual vigente conforme a lo pactado."
+        ok, omitidos = auditar_subconceptos_respondidos(dictamen, subs)
+        assert not ok
+        assert any("evento adverso" in o.lower() or "fístula" in o.lower() for o in omitidos)
+
+    def test_liquidacion_se_detecta_como_clave(self):
+        from app.services.subconceptos_glosa import (
+            auditar_subconceptos_respondidos,
+            detectar_subconceptos,
+        )
+
+        glosa = (
+            "(1) PERTINENCIA: el procedimiento no se justifica. (2) Dado el "
+            "proceso de LIQUIDACIÓN de la EPS, el reconocimiento queda "
+            "condicionado a la verificación de saldos por la AGENTE LIQUIDADORA."
+        )
+        subs = detectar_subconceptos(glosa)
+        dictamen = "Sobre la pertinencia, la decisión corresponde al médico tratante."
+        ok, omitidos = auditar_subconceptos_respondidos(dictamen, subs)
+        assert not ok
+        assert any("liquidaci" in o.lower() or "saldos" in o.lower() for o in omitidos)

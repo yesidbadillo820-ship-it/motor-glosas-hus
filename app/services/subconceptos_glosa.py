@@ -63,11 +63,20 @@ _MARCADORES_CONCEPTO_SUELTO = (
 )
 
 # Verbos que abren una objeción concreta (para resumir el sub-concepto).
+# Bug ronda 21 (caso MEDIMÁS da Vinci): faltaban tokens de dominios
+# enteros (evento adverso, liquidación), por lo que auditar_subconceptos_
+# respondidos no detectaba esos conceptos como "claves" y daba falsos
+# "respondido". Se añade vocabulario de evento adverso y liquidación.
 _RE_PALABRAS_RESUMEN = re.compile(
     r"\b(TMS|ESTIMULACI[ÓO]N\s+MAGN[ÉE]TICA|HOSPITALIZACI[ÓO]N|"
     r"AUTORIZACI[ÓO]N\s+PREVIA|PBS|SANCI[ÓO]N|MULTA|COBERTURA|"
     r"ACOMPA[ÑN]AMIENTO|REMISI[ÓO]N|PERTINENCIA|TARIFA|D[ÍI]AS|"
-    r"CONSENTIMIENTO|COTIZACI[ÓO]N|MIPRES)\b",
+    r"CONSENTIMIENTO|COTIZACI[ÓO]N|MIPRES|"
+    # Evento adverso / complicaciones
+    r"EVENTO\s+ADVERSO|PREVENIBLE|F[ÍI]STULA|SEPSIS|UCI|"
+    r"REINTERVENCI[ÓO]N|COMPLICACI[ÓO]N|FALLA|T[ÉE]CNICA\s+QUIR[ÚU]RGICA|"
+    # Liquidación / cartera de entidad intervenida
+    r"LIQUIDACI[ÓO]N|AGENTE\s+LIQUIDADORA|SALDOS|SUPERSALUD|INTERVENIDA)\b",
     re.IGNORECASE,
 )
 

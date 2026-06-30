@@ -4550,7 +4550,38 @@ class GlosaService:
             es_asegura_soat = _es_aseguradora_soat(str(data.eps)) or _es_aseguradora_soat(
                 texto_base
             )
-            if es_asegura_soat:
+            # Bug ronda 21 (caso MEDIMÁS da Vinci): _es_aseguradora_soat da
+            # True por el keyword " SOAT" presente en "tarifa de SOAT × 0.85",
+            # disparando el hint "NO HAY CONTRATO PACTADO → SOAT pleno" aunque
+            # la glosa CITE un contrato con factor pactado. Eso indujo el
+            # dictamen a negar el contrato y a defender SOAT pleno. Si la glosa
+            # cita un CTR-XXXX, NO se inyecta el hint de "sin contrato": en su
+            # lugar se instruye defender DENTRO del contrato (respetar el
+            # factor pactado y discutir solo el adicional objetado).
+            _contrato_en_glosa = _detectar_contrato_citado_en_glosa(texto_base)
+            if es_asegura_soat and _contrato_en_glosa:
+                hint_contrato_soat = (
+                    "\n\n═══════════════════════════════════════════════════════\n"
+                    "⚠ TARIFA CON CONTRATO PACTADO (NO afirmar 'sin contrato')\n"
+                    f"La glosa cita el contrato {_contrato_en_glosa}. POR TANTO:\n"
+                    "1. NO afirmes que 'no existe contrato pactado' ni que rige\n"
+                    "   'SOAT pleno en su integridad' — sería negar el contrato\n"
+                    "   que la propia EPS invoca (confesión de parte).\n"
+                    "2. Reconoce el factor tarifario pactado y defiende SOLO el\n"
+                    "   componente objetado (p.ej. el adicional por la tecnología)\n"
+                    "   dentro del marco del contrato y su anexo tarifario.\n"
+                    "3. Si el adicional está soportado clínicamente, susténtalo\n"
+                    "   como prestación necesaria; no como modificación unilateral.\n"
+                    "4. Pacta Sunt Servanda (Art. 1602 C.C. / Art. 871 C.Co.):\n"
+                    "   ninguna parte modifica la tarifa unilateralmente.\n"
+                    "═══════════════════════════════════════════════════════"
+                )
+                system_prompt = system_prompt + hint_contrato_soat
+                logger.info(
+                    f"[SOAT-CON-CONTRATO] glosa cita {_contrato_en_glosa} — hint de "
+                    "defensa intra-contrato (no 'sin contrato')."
+                )
+            elif es_asegura_soat:
                 nombre_real = _extraer_nombre_entidad_real(texto_base) or str(data.eps)
                 hint_aseguradora = (
                     "\n\n═══════════════════════════════════════════════════════\n"
