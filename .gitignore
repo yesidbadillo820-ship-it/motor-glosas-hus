@@ -80,3 +80,5 @@ radicacion_reporte.csv
 
 # Scratchpad temporal (datos sensibles del usuario, no commitear)
 scratchpad/
+tests/benchmark/salidas/
+tests/benchmark/historial_live.jsonl

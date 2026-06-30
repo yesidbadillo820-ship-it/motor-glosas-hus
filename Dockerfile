@@ -40,6 +40,11 @@ COPY static/ /app/static/
 # el lifespan lee al arranque para auto-seed. SIN ESTO el seed falla
 # silenciosamente con "archivo no existe" y la BD queda sin plantillas.
 COPY data/ /app/data/
+# Tablero de calidad: el scorer + casos + el runner en vivo viajan con la
+# imagen para poder medir el motor desde el contenedor:
+#   docker compose exec motor python tools/scoreboard_live.py
+COPY tools/ /app/tools/
+COPY tests/benchmark/ /app/tests/benchmark/
 
 # Carpeta de soportes — montada como volumen persistente Fly al
 # correr (ver fly.toml). Si no se monta volumen, queda en disco

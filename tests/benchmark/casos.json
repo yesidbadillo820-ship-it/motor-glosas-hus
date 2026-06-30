@@ -8,6 +8,7 @@
     {
       "id": "medimas_davinci",
       "titulo": "MEDIMÁS da Vinci $273M",
+      "glosa": "OBSERVACIONES MEDIMÁS EPS-S (LIQUIDACIÓN): (I) PERTINENCIA: la prostatectomía radical ABIERTA es alternativa válida con resultados oncológicos equivalentes según la GPC Cáncer de Próstata MinSalud 2023; el uso de plataforma robótica da Vinci Xi NO se justifica y representa un sobrecosto del 340%. (II) EVENTO ADVERSO PREVENIBLE: la fístula urinaria post-operatoria es complicación EVITABLE atribuible a falla en la técnica quirúrgica; conforme al Decreto 4747/2007 Art. 20 + Res. 0112/2012, el costo lo asume el prestador. (III) TARIFA: el contrato vigente CTR-2024-MEDIMAS-HUS define para CUPS 60.1.2.01 una tarifa de SOAT × 0.85; la facturación aplicó SOAT pleno + adicional 35% por plataforma robótica, modificación unilateral. (IV) SOPORTES: no se aporta el consentimiento informado específico para plataforma robótica ni la cotización comparativa requerida por la cláusula 31 del contrato. (V) Dado el proceso de liquidación, el reconocimiento queda condicionado a la verificación de saldos por la agente liquidadora.",
       "eps_dropdown": "OTRA / SIN DEFINIR",
       "contrato": "CTR-2024-MEDIMAS-HUS",
       "tiene_sancion": false,
@@ -24,6 +25,7 @@
     {
       "id": "ecoopsos_coclear",
       "titulo": "ECOOPSOS implante coclear $389M",
+      "glosa": "OBSERVACIONES ECOOPSOS: La paciente cuenta con 14 meses de edad. (I) el implante coclear bilateral es PREMATURO; (II) se objeta la BILATERALIDAD por costo del segundo dispositivo Med-El; (III) el procesador SONNET 2 es de gama PREMIUM no justificada. La cláusula 24 del Contrato CTR-2025-ECOOPSOS-HUS exige cotización comparativa de al menos 3 proveedores, NO aportada.",
       "eps_dropdown": "OTRA / SIN DEFINIR",
       "contrato": "CTR-2025-ECOOPSOS-HUS",
       "tiene_sancion": false,
@@ -39,6 +41,7 @@
     {
       "id": "hemofilia_sancion",
       "titulo": "Hemofilia con inhibidores + sanción 10% (NUEVA EPS)",
+      "glosa": "NUEVA EPS objeta: (1) el uso de factor VII activado recombinante (eptacog alfa) NO está justificado, debe usarse factor VIII estándar; (2) el esquema de dosis excede lo recomendado. SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO por facturación improcedente.",
       "eps_dropdown": "NUEVA EPS",
       "contrato": null,
       "tiene_sancion": true,
@@ -53,6 +56,7 @@
     {
       "id": "saludtotal_tms",
       "titulo": "SALUD TOTAL TMS $98M (multi-concepto + sanción)",
+      "glosa": "SALUD TOTAL: Se objeta integralmente la atención: (1) la terapia de Estimulación Magnética Transcraneal (TMS) NO está en el PBS conforme a la Resolución 2292 de 2021; (2) la hospitalización psiquiátrica de 22 días excede los lineamientos de pertinencia (máximo 14 días); (3) la atención NO fue tramitada vía autorización previa (AU0301). SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO, conforme a la cláusula 18 del contrato CTR-2024-SALUDTOTAL-HUS. Adicionalmente, se objeta el acompañamiento familiar protocolizado por no estar en el PBS.",
       "eps_dropdown": "NUEVA EPS",
       "contrato": "CTR-2024-SALUDTOTAL-HUS",
       "tiene_sancion": true,
