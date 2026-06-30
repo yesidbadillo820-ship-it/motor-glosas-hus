@@ -13,6 +13,8 @@ si se cablean al flujo de analizar().
 
 from __future__ import annotations
 
+import pytest
+
 from app.services.glosa_service import (
     _cast_bool_tolerante,
     _cast_lista_ints_tolerante,
@@ -278,3 +280,182 @@ def test_validar_campos_llm_none_degrada():
     assert r["saltar"] == set()
     assert r["divergencias"] == []
     assert r["campos_finales"] == {}
+
+
+# ── Constructores de prompt ──────────────────────────────────────────
+
+
+def test_instruccion_campos_estructurados():
+    from app.services.glosa_service import _instruccion_campos_estructurados
+
+    txt = _instruccion_campos_estructurados()
+    assert "<CAMPOS_ESTRUCTURADOS>" in txt
+    assert "eps_efectiva" in txt and "contrato_citado" in txt
+    assert "PROHIBIDO inventar" in txt
+    # Debe dejar claro que va DESPUÉS de </argumento>
+    assert "</argumento>" in txt
+
+
+def test_bloque_campos_a_confirmar():
+    from app.services.glosa_service import _bloque_campos_a_confirmar
+
+    txt = _bloque_campos_a_confirmar(
+        "SALUD TOTAL",
+        "CTR-2024-SALUDTOTAL-HUS",
+        [{"id": "sancion"}, {"id": "no-pbs"}],
+    )
+    assert "SALUD TOTAL" in txt
+    assert "CTR-2024-SALUDTOTAL-HUS" in txt
+    assert "sancion" in txt and "no-pbs" in txt
+
+
+def test_bloque_campos_a_confirmar_sin_datos():
+    """Sin contrato ni subconceptos, solo lista la EPS."""
+    from app.services.glosa_service import _bloque_campos_a_confirmar
+
+    txt = _bloque_campos_a_confirmar("SURA", None, [])
+    assert "SURA" in txt
+    assert "contrato_citado" not in txt
+
+
+# ── Integración end-to-end (analizar con flag ON/OFF) ────────────────
+#
+# Patrón de stub de _llamar_ia tomado de test_multi_codigo.py: se
+# reemplaza la llamada al LLM por un envelope sintético que incluye el
+# bloque <CAMPOS_ESTRUCTURADOS>, y se fuerza el flag vía get_settings.
+
+_GLOSA_TMS = (
+    "SALUD TOTAL: Se objeta integralmente la atención: (1) la terapia TMS "
+    "NO está en el PBS; (2) la hospitalización de 22 días excede lo "
+    "pertinente; (3) no hubo autorización previa. SE APLICA SANCIÓN DEL 10% "
+    "AL VALOR FACTURADO conforme a la Cláusula 18 del contrato "
+    "CTR-2024-SALUDTOTAL-HUS."
+)
+
+_ENVELOPE_CON_BLOQUE = (
+    "<paciente>JUAN PEREZ</paciente>"
+    "<servicio>HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS</servicio>"
+    "<contrato>CTR-2024-SALUDTOTAL-HUS</contrato>"
+    "<argumento>LA ESE HUS NO ACEPTA LA GLOSA. LOS SERVICIOS FUERON "
+    "PRESTADOS, SOPORTADOS Y FACTURADOS CONFORME A LO PACTADO. LA TERAPIA "
+    "DE ESTIMULACIÓN MAGNÉTICA TRANSCRANEAL CUENTA CON RESPALDO CLÍNICO. "
+    "EN CONSECUENCIA, SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO "
+    "INTEGRO DEL VALOR FACTURADO.</argumento>"
+    "\n<CAMPOS_ESTRUCTURADOS>\n"
+    '{"eps_efectiva":"SALUD TOTAL","servicio_objetado":"HOSPITALIZACIÓN '
+    'PSIQUIÁTRICA CON TMS","contrato_citado":"CTR-2024-SALUDTOTAL-HUS",'
+    '"clausulas_respondidas":[18],"sancion_rechazada":true,'
+    '"subconceptos_refutados":["sancion","no-pbs","autorizacion"]}\n'
+    "</CAMPOS_ESTRUCTURADOS>"
+)
+
+
+def _preparar_entorno_ce(monkeypatch):
+    monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
+    monkeypatch.delenv("QUALITY_GATE_ROLLOUT_PCT", raising=False)
+    monkeypatch.delenv("TOOL_USE_HABILITADO", raising=False)
+    monkeypatch.delenv("MULTI_AGENT_HABILITADO", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("MULTI_CODIGO_DICTAMENES", raising=False)
+
+    import app.services.dictamen_directo as dd
+    import app.services.validador_dictamen as vd
+
+    monkeypatch.setattr(vd, "detectar_defectos_criticos", lambda *a, **k: [])
+    monkeypatch.setattr(dd, "puede_emitir_directo", lambda *a, **k: False)
+
+
+def _set_flag(monkeypatch, valor: bool):
+    """Fuerza settings.glosa_campos_estructurados sin tocar el resto."""
+    from app.core import config
+
+    real = config.get_settings()
+    nuevo = real.model_copy(update={"glosa_campos_estructurados": valor})
+    monkeypatch.setattr(config, "get_settings", lambda: nuevo)
+
+
+def _stub_ia(monkeypatch, envelope: str):
+    from app.services.glosa_service import GlosaService
+
+    async def fake_llamar_ia(self, system, user, *a, **k):
+        return (envelope, "stub-test")
+
+    monkeypatch.setattr(GlosaService, "_llamar_ia", fake_llamar_ia)
+
+
+def _servicio_ce():
+    from app.services.glosa_service import GlosaService
+
+    return GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
+
+
+def _data_ce():
+    from app.models.schemas import GlosaInput
+
+    return GlosaInput(
+        eps="SALUD TOTAL",
+        etapa="RESPUESTA A GLOSA",
+        tabla_excel=_GLOSA_TMS,
+        valor_aceptado="0",
+    )
+
+
+@pytest.mark.asyncio
+async def test_e2e_flag_on_bloque_no_contamina_dictamen(monkeypatch):
+    """Flag ON: el dictamen radicable NUNCA contiene 'CAMPOS_ESTRUCTURADOS'."""
+    _preparar_entorno_ce(monkeypatch)
+    _set_flag(monkeypatch, True)
+    _stub_ia(monkeypatch, _ENVELOPE_CON_BLOQUE)
+
+    resultado = await _servicio_ce().analizar(_data_ce())
+    assert "CAMPOS_ESTRUCTURADOS" not in resultado.dictamen.upper()
+
+
+@pytest.mark.asyncio
+async def test_e2e_flag_on_campos_poblados(monkeypatch):
+    """Flag ON: GlosaResult.campos_estructurados queda poblado y la verdad
+    de EPS/contrato es la determinista."""
+    _preparar_entorno_ce(monkeypatch)
+    _set_flag(monkeypatch, True)
+    _stub_ia(monkeypatch, _ENVELOPE_CON_BLOQUE)
+
+    resultado = await _servicio_ce().analizar(_data_ce())
+    ce = resultado.campos_estructurados
+    assert ce is not None
+    assert "SALUD TOTAL" in (ce.get("eps_efectiva") or "")
+    assert ce.get("contrato_citado") == "CTR-2024-SALUDTOTAL-HUS"
+    # servicio aislado válido → skip aplicado
+    assert "servicio" in ce.get("_saltar", [])
+
+
+@pytest.mark.asyncio
+async def test_e2e_flag_off_campos_none(monkeypatch):
+    """Flag OFF: campos_estructurados es None y el bloque (si llegara) se
+    borra igual del dictamen (degradación elegante)."""
+    _preparar_entorno_ce(monkeypatch)
+    _set_flag(monkeypatch, False)
+    _stub_ia(monkeypatch, _ENVELOPE_CON_BLOQUE)
+
+    resultado = await _servicio_ce().analizar(_data_ce())
+    assert resultado.campos_estructurados is None
+    # El borrado del bloque es incondicional (seguridad del documento).
+    assert "CAMPOS_ESTRUCTURADOS" not in resultado.dictamen.upper()
+
+
+@pytest.mark.asyncio
+async def test_e2e_flag_on_sin_bloque_degrada(monkeypatch):
+    """Flag ON pero la IA no emitió bloque → campos None, dictamen intacto."""
+    _preparar_entorno_ce(monkeypatch)
+    _set_flag(monkeypatch, True)
+    envelope_sin = (
+        "<paciente>JUAN PEREZ</paciente>"
+        "<servicio>HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS</servicio>"
+        "<argumento>LA ESE HUS NO ACEPTA LA GLOSA. LOS SERVICIOS FUERON "
+        "PRESTADOS Y SOPORTADOS. SE SOLICITA EL LEVANTAMIENTO Y EL PAGO "
+        "INTEGRO DEL VALOR FACTURADO.</argumento>"
+    )
+    _stub_ia(monkeypatch, envelope_sin)
+
+    resultado = await _servicio_ce().analizar(_data_ce())
+    assert resultado.campos_estructurados is None
+    assert resultado.dictamen  # se produjo dictamen normal

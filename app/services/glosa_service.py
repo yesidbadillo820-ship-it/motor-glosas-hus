@@ -2606,6 +2606,55 @@ def _validar_campos_estructurados(
     }
 
 
+def _instruccion_campos_estructurados() -> str:
+    """Instrucción (nivel system) para que la IA emita el bloque estructurado
+    al FINAL de su respuesta, ADEMÁS del envelope XML. Mejora #3.
+
+    Solo se concatena al system prompt cuando el flag está ON — no se hornea
+    en la constante SYSTEM_BASE para no alterar el prompt en modo OFF.
+    """
+    return (
+        "\n\n═══ BLOQUE DE CONFIRMACIÓN ESTRUCTURADA (OBLIGATORIO) ═══\n"
+        "DESPUÉS de cerrar </argumento>, y como ÚLTIMO elemento de tu "
+        "respuesta, emite EXACTAMENTE este bloque con los datos REALES del "
+        "caso (NO lo metas dentro de <argumento>):\n"
+        "<CAMPOS_ESTRUCTURADOS>\n"
+        "{\n"
+        '  "eps_efectiva": "<nombre real de la EPS pagadora>",\n'
+        '  "servicio_objetado": "<servicio/procedimiento real, sin placeholders>",\n'
+        '  "contrato_citado": "<código CTR-... completo, o SIN CONTRATO PACTADO>",\n'
+        '  "clausulas_respondidas": [<números de cláusula que refutaste>],\n'
+        '  "sancion_rechazada": <true si la glosa aplica sanción y la rechazaste; si no, false>,\n'
+        '  "subconceptos_refutados": ["<id corto de cada sub-concepto atendido>"]\n'
+        "}\n"
+        "</CAMPOS_ESTRUCTURADOS>\n"
+        "Este bloque es ADICIONAL al XML y al <argumento>; NO los reemplaza. "
+        "Usa SOLO datos reales del caso; está PROHIBIDO inventar EPS, "
+        "contratos o CUPS. Si un dato no existe, deja el campo vacío "
+        '("" o []), nunca lo inventes.\n'
+    )
+
+
+def _bloque_campos_a_confirmar(eps: str, contrato: str | None, subconceptos: list) -> str:
+    """Bloque (nivel user) con los valores DETERMINISTAS que la IA debe
+    copiar/confirmar en el JSON estructurado. Mejora #3.
+
+    Le da a la IA los valores ya resueltos por el motor (EPS efectiva,
+    contrato del catálogo, sub-conceptos detectados) para que los CONFIRME
+    en vez de re-derivarlos (y arriesgarse a alucinar).
+    """
+    partes = ["\n\n═══ CAMPOS A CONFIRMAR EN EL BLOQUE ESTRUCTURADO ═══"]
+    if eps and eps.strip():
+        partes.append(f"- eps_efectiva DEBE ser exactamente: {eps.strip()}")
+    if contrato:
+        partes.append(f"- contrato_citado DEBE ser exactamente: {contrato}")
+    if subconceptos:
+        ids = ", ".join(str(s.get("id", s) if isinstance(s, dict) else s) for s in subconceptos)
+        partes.append(f"- subconceptos_refutados DEBE cubrir cada uno de: {ids}")
+    partes.append("Copia estos valores exactos en el JSON estructurado; no los cambies.")
+    return "\n".join(partes) + "\n"
+
+
 def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:
     """Convierte texto en MAYÚSCULAS sostenidas a sentence case institucional.
 
@@ -4160,6 +4209,17 @@ class GlosaService:
         except Exception as _e_eps:
             logger.debug(f"[EPS-CORREGIDA] no aplicada: {_e_eps}")
 
+        # Mejora #3: flag de salida estructurada, leído una vez. Gobierna
+        # tanto la inyección al prompt (abajo) como el parseo/validación
+        # post-LLM. OFF (default) → todo el camino estructurado es inerte.
+        _flag_campos = False
+        try:
+            from app.core.config import get_settings as _get_settings_ce
+
+            _flag_campos = bool(_get_settings_ce().glosa_campos_estructurados)
+        except Exception:
+            _flag_campos = False
+
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
         if len(codigos_detectados) > 1:
@@ -4593,6 +4653,12 @@ class GlosaService:
             except Exception as _e_cc:
                 logger.debug(f"[CLAUSULAS-CONTRATO] no disponibles: {_e_cc}")
 
+            # Mejora #3: si el flag está ON, pedirle a la IA el bloque
+            # <CAMPOS_ESTRUCTURADOS> al final (instrucción a nivel system).
+            # Concatenación condicional — el SYSTEM_BASE no cambia en OFF.
+            if _flag_campos:
+                system_prompt = system_prompt + _instruccion_campos_estructurados()
+
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
                 contexto_pdf=contexto_pdf,
@@ -4637,6 +4703,23 @@ class GlosaService:
                         )
             except Exception as _e_sc:
                 logger.debug(f"[SUBCONCEPTOS] no inyectados: {_e_sc}")
+
+            # Mejora #3: si el flag está ON, inyectar al user prompt los
+            # valores DETERMINISTAS (EPS efectiva, contrato del catálogo,
+            # sub-conceptos) para que la IA los CONFIRME en el JSON en vez de
+            # re-derivarlos y arriesgarse a alucinar.
+            if _flag_campos:
+                try:
+                    _contrato_det_cf = _detectar_contrato_citado_en_glosa(texto_base)
+                    _bloque_cf = _bloque_campos_a_confirmar(
+                        str(data.eps or ""),
+                        _contrato_det_cf,
+                        getattr(self, "_subconceptos_actuales", []) or [],
+                    )
+                    if _bloque_cf:
+                        user_prompt = user_prompt + _bloque_cf
+                except Exception as _e_cf:
+                    logger.debug(f"[CAMPOS-EST] bloque a confirmar no inyectado: {_e_cf}")
 
             # ═══════════════════════════════════════════════════════════
             #  Extemporaneidad de la RATIFICACIÓN (12-jun-2026, ronda 2 —
@@ -5444,6 +5527,33 @@ class GlosaService:
                 except Exception as _e:
                     logger.debug(f"Validación post-gen no aplicada: {_e}")
 
+            # ═══════════════════════════════════════════════════════════
+            #  Mejora #3 (jun-2026) — Salida estructurada incremental.
+            #  Si el flag está ON, parsear el bloque <CAMPOS_ESTRUCTURADOS>
+            #  ANTES de extraer <argumento>. SIEMPRE borrar el bloque de
+            #  res_ia (no-op si no existe) para que jamás contamine el
+            #  dictamen radicable. Flag OFF (default) → _campos_llm=None y el
+            #  pipeline queda idéntico al actual (degradación elegante).
+            # ═══════════════════════════════════════════════════════════
+            _campos_llm = None
+            _campos_saltar: set[str] = set()
+            _campos_finales: dict | None = None
+            if _flag_campos:
+                try:
+                    _campos_llm = _parsear_campos_estructurados(res_ia)
+                    if _campos_llm:
+                        logger.info(
+                            "[CAMPOS-EST] bloque parseado: "
+                            f"eps={_campos_llm.get('eps_efectiva')!r} "
+                            f"contrato={_campos_llm.get('contrato_citado')!r} "
+                            f"clausulas={_campos_llm.get('clausulas_respondidas')} "
+                            f"sancion={_campos_llm.get('sancion_rechazada')}"
+                        )
+                except Exception as _e_ce:
+                    logger.debug(f"[CAMPOS-EST] parseo falló: {_e_ce}")
+                    _campos_llm = None
+            res_ia = _limpiar_bloque_campos_estructurados(res_ia)
+
             razonamiento = self._xml("razonamiento", res_ia, "")
             if razonamiento:
                 logger.info(f"IA razonamiento: {razonamiento[:200]}")
@@ -5458,11 +5568,67 @@ class GlosaService:
             # para REEMPLAZAR un CUPS inventado, no para pegarla al servicio
             # que ya está descrito. Si el servicio tiene texto real ANTES del
             # placeholder, quitamos el placeholder.
-            servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
+            #
+            # Mejora #3: si el flag está ON y la IA entregó un servicio_objetado
+            # estructurado y LIMPIO (sin el placeholder), lo usamos directo —
+            # es la respuesta deliberada y confirmada de la IA — y saltamos el
+            # limpiador. Si no, pipeline actual sobre el <servicio> crudo. Solo
+            # se aplica a este campo AISLADO; los sanitizers del cuerpo
+            # narrativo siguen corriendo siempre (defensa en profundidad).
+            _serv_est = (_campos_llm or {}).get("servicio_objetado") if _flag_campos else None
+            if (
+                _serv_est
+                and "según historia clínica" not in _serv_est.lower()
+                and len(_serv_est.strip()) >= 4
+            ):
+                servicio_ia = _serv_est.strip()
+                _campos_saltar.add("servicio")
+            else:
+                servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
             contrato_ia = self._xml("contrato", res_ia, "")
             tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
             normas_clave = self._xml("normas_clave", res_ia, "")
+
+            # ── Mejora #3: cruzar campos estructurados vs deterministas ──
+            #  Telemetría de divergencia LLM-vs-determinista + construcción
+            #  de _campos_finales (verdad = determinista). NO se saltan
+            #  sanitizers del cuerpo narrativo: solo se registra. El único
+            #  skip aplicado es el de servicio (campo aislado, arriba).
+            if _flag_campos and _campos_llm is not None:
+                try:
+                    _det_contrato_ce = _detectar_contrato_citado_en_glosa(texto_base)
+                    _det_sancion_ce = bool(_RE_SANCION_EPS_MENCIONADA.search(texto_base))
+                    _det_ce = {
+                        "eps_efectiva": str(getattr(data, "eps", "") or ""),
+                        "contrato_citado": _det_contrato_ce,
+                        "subconceptos": getattr(self, "_subconceptos_actuales", []) or [],
+                        "sancion_detectada": _det_sancion_ce,
+                        # servicio ya se resolvió arriba; no re-skipear aquí.
+                        "servicio_valido": False,
+                    }
+                    _multi_ce = len(codigos_detectados) > 1
+                    _val_ce = _validar_campos_estructurados(
+                        _campos_llm, _det_ce, multi_codigo=_multi_ce
+                    )
+                    # 'eps'/'contrato' del validador NO gatean sanitizers en
+                    # esta versión (defensa en profundidad); se conservan en
+                    # _campos_saltar solo como telemetría junto a 'servicio'.
+                    _campos_saltar |= _val_ce["saltar"]
+                    _campos_finales = {
+                        **_val_ce["campos_finales"],
+                        "_divergencias": _val_ce["divergencias"],
+                        "_saltar": sorted(_campos_saltar),
+                    }
+                    if _val_ce["divergencias"]:
+                        logger.warning(
+                            f"[CAMPOS-EST] divergencias LLM-vs-determinista: "
+                            f"{_val_ce['divergencias']}"
+                        )
+                except Exception as _e_val_ce:
+                    logger.debug(f"[CAMPOS-EST] validación falló: {_e_val_ce}")
+                    _campos_finales = None
+
             # Decisión autónoma de la IA (R-cerebro #8)
             accion_ia = (self._xml("accion", res_ia, "") or "").strip().upper()
             try:
@@ -6486,6 +6652,10 @@ class GlosaService:
             verificacion_citas=verif_citas,
             confianza=confianza,
             auto_pilot=auto_pilot,
+            # Mejora #3: campos estructurados confirmados (None si flag OFF o
+            # la IA no emitió el bloque). locals().get evita NameError si el
+            # flujo no pasó por el bloque de extracción (p.ej. early-return).
+            campos_estructurados=locals().get("_campos_finales"),
         )
         # Memoria (Render Free 512 MB): el análisis dejó en memoria PDFs
         # decodificados, prompts grandes, y caché de respuestas IA. Si no
