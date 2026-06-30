@@ -123,7 +123,15 @@ def _check_placeholders(dictamen: str, caso: dict) -> list[dict]:
     out = []
     patrones = [
         (r"\$x[,\.]?x{2,}", "valor placeholder $x,xxx"),
-        (r"en\s+los\s+t[ée]rminos\s+de\s+(?:los|las|el|la)\s", "muletilla 'en los términos de'"),
+        # OJO: "en los términos de la Ley/Resolución X" es LEGÍTIMO — es la
+        # paráfrasis neutra que el motor usa al descomillar una cita riesgosa
+        # (glosa_service _descomillar_citas). Solo se penaliza la versión ROTA:
+        # la cláusula INVENTADA con verbo futuro ("...de los servicios de salud
+        # SERÁN evaluados..."), señal de plantilla-leak, no de cita real.
+        (
+            r"en\s+los\s+t[ée]rminos\s+de\s+(?:los|las)\s+[\w\s]{0,40}?(?:ser[áa]n|deber[áa]n|tendr[áa]n|estar[áa]n)\b",
+            "muletilla de cláusula inventada ('en los términos de los X serán...')",
+        ),
         (r"\bN/A\b.*\bADICIONALMENTE\b.*RECHAZA", "texto inyectado en campo equivocado"),
         (r"\[(?:nombre|valor|fecha|eps|cups)\b", "placeholder [campo]"),
     ]
