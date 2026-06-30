@@ -309,68 +309,32 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         return "NO_AUTOCARGA"
     logger.info("  ✓ datos autocargados (grilla con fila).")
 
-    # 4) Llenar la grilla. Las celdas de DATOS comparten auto_id con la fila de
-    #    filtros y el footer; por eso las buscamos DENTRO del panel de datos.
-
-    # Las celdas de respuesta editables exponen auto_id = binding:
-    #   ConceptoObjecion.Codigo  → código de respuesta (RE9901)
-    #   ValorAceptado            → valor aceptado
-    #   Observaciones            → detalle
-    respondidas = 0
-    for i, ob in enumerate(objeciones, start=1):
-        detalle = sanitizar(ob["detalle"]) if sanitizar else ob["detalle"]
-        logger.info(
-            f"  → objeción #{ob['num']}: {cod_respuesta}, aceptado={ob['aceptado']}, {len(detalle)} chars"
-        )
-        cel_cod = _buscar(datos, auto_id="ConceptoObjecion.Codigo", timeout=4)
-        cel_val = _buscar(datos, auto_id="ValorAceptado", timeout=2)
-        cel_obs = _buscar(datos, auto_id="Observaciones", timeout=2)
-        if not all([cel_cod, cel_val, cel_obs]):
-            logger.error(
-                "  no hallé las celdas de respuesta en la grilla (inline). Vuelco para revisar."
-            )
-            if dump_al_fallar:
-                _dump("sin_celdas")
-            return "ERROR_CELDAS"
-        # Código de respuesta: doble-click para entrar en edición, tipear, Enter.
-        try:
-            cel_cod.double_click_input()
-            time.sleep(0.2)
-            cel_cod.type_keys(cod_respuesta + "{ENTER}", with_spaces=True, pause=0.03)
-        except Exception as e:
-            logger.warning(f"  fallo set código respuesta: {e}")
-        # Valor aceptado.
-        try:
-            cel_val.double_click_input()
-            time.sleep(0.15)
-            cel_val.type_keys("^a{DEL}" + str(ob["aceptado"]) + "{ENTER}", pause=0.03)
-        except Exception as e:
-            logger.warning(f"  fallo set valor aceptado: {e}")
-        # Observaciones (MemoEdit).
-        try:
-            cel_obs.double_click_input()
-            time.sleep(0.15)
-            cel_obs.type_keys("^a{DEL}", pause=0.03)
-            cel_obs.type_keys(_escapar(detalle), with_spaces=True, pause=0.005)
-            cel_obs.type_keys("{ENTER}")
-        except Exception as e:
-            logger.warning(f"  fallo set observaciones: {e}")
-        respondidas += 1
-        # NOTA v1: si hay >1 objeción, mover el foco de fila requiere lógica
-        # adicional (la grilla DevExpress edita la fila activa). Por ahora
-        # avisamos y procesamos sólo la fila activa de forma confiable.
-        if len(objeciones) > 1 and i == 1:
-            logger.warning(
-                "  ⚠ v1: esta factura tiene varias objeciones; el bot llenó la fila activa. "
-                "Verificá las demás filas manualmente o esperá v2 (navegación de filas)."
-            )
-            break
-
-    logger.info(f"  ✓ {respondidas} fila(s) llenada(s).")
-
-    if not grabar:
-        logger.info("  (PILOTO: no grabo. Revisá en pantalla. Usá --grabar para confirmar.)")
-        return "PILOTO_OK"
+    # 4) Abrir el MODAL de respuesta. La respuesta NO se edita inline en esta
+    #    grilla: hay que dar DOBLE-CLICK en la fila de concepto, lo que abre el
+    #    modal "Conceptos del trámite de objeción" donde se carga la respuesta
+    #    (Concepto RE9901 / Valor aceptado / Observaciones / Aceptar / Grabar).
+    fila = _buscar(datos, control_type="DataItem", timeout=5)
+    if fila is None:
+        logger.error("  no hallé la fila de concepto para doble-click.")
+        if dump_al_fallar:
+            _dump("sin_fila")
+        return "ERROR_FILA"
+    try:
+        fila.double_click_input()
+    except Exception as e:
+        logger.warning(f"  fallo doble-click en la fila: {e}")
+    time.sleep(2.0)
+    logger.info("  doble-click en la fila; capturando el modal de respuesta…")
+    # Volcamos AHORA que el modal está abierto (nunca pudimos capturarlo a mano,
+    # siempre se volcaba el Editor). Con esos selectores se automatiza el llenado.
+    _dump("modal_abierto")
+    logger.warning(
+        "  ⚠ v1: abrí el modal de respuesta (doble-click) y lo volqué. Falta automatizar "
+        "su llenado (RE9901 / valor / observaciones / Aceptar / Grabar). Mandame el "
+        "dump 'dump_dgh_modal_abierto_*.txt' y con eso escribo esos selectores."
+    )
+    return "MODAL_ABIERTO"
+    # ── (v2: aquí va el llenado del modal una vez tengamos sus auto_id) ──
 
     # 5) GRABAR + diálogo 'Registro grabado' (Confirmar=Sí, Imprimir=Sí).
     grabar_btn = _buscar(
