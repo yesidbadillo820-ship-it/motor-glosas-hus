@@ -20,10 +20,23 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
+import re
 import sys
 from pathlib import Path
 
 logger = logging.getLogger("explorador_radicacion")
+
+# El radicador escribe en el detalle de ENTIDAD_NO_RESUELTA: "…(pista: 'XXX')…".
+# De ahí sacamos el nombre del pagador que no está en el catálogo.
+_RE_PISTA = re.compile(r"pista:\s*'([^']*)'")
+
+
+def _pagador_no_resuelto(detalle: str) -> str:
+    """Nombre del pagador leído del FEV que no resolvió contra el catálogo."""
+    m = _RE_PISTA.search(detalle or "")
+    nombre = m.group(1).strip() if m else ""
+    return "" if nombre in ("", "—") else nombre
+
 
 # Estado del radicador → (etiqueta legible, color). Orden = prioridad de gestión.
 ESTADOS_INFO: dict[str, tuple[str, str]] = {
@@ -109,7 +122,12 @@ def _falta(estado: str, r: dict) -> str:
             return "Faltan soportes clínicos: " + r["soportes_esperados_faltantes"]
         return "Revisar tipificación"
     if estado == "ENTIDAD_NO_RESUELTA":
-        return "No se identificó la EPS pagadora"
+        pag = _pagador_no_resuelto(r.get("detalle", ""))
+        return (
+            f"Pagador sin perfil en el catálogo: {pag}"
+            if pag
+            else "No se identificó la EPS pagadora"
+        )
     if estado == "PARTICULAR":
         return "Paciente particular (no es EPS)"
     if estado == "FACTURA_INCONSISTENTE":
@@ -142,10 +160,17 @@ def cargar_reporte(ruta: Path) -> list[dict]:
             continue
         r = {campo: cel(fila, campo) for campo in idx}
         estado = r.get("estado", "") or "—"
+        entidad = r.get("entidad", "") or "—"
+        # Para las no resueltas, mostrar el PAGADOR detectado (no "SIN_PERFIL"):
+        # así se ve qué entidad falta agregar al catálogo y se puede exportar.
+        if estado == "ENTIDAD_NO_RESUELTA":
+            pag = _pagador_no_resuelto(r.get("detalle", ""))
+            if pag:
+                entidad = pag
         registros.append(
             {
                 "factura": r.get("factura", ""),
-                "entidad": r.get("entidad", "") or "—",
+                "entidad": entidad,
                 "canal": r.get("canal", ""),
                 "valor": _parse_valor(r.get("valor", 0)),
                 "servicios": r.get("servicios", ""),

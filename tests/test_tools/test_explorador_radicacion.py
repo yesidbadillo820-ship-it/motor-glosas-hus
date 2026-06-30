@@ -62,6 +62,48 @@ class TestFalta:
     def test_lista_sin_falta(self):
         assert exp._falta("LISTA", {}) == ""
 
+    def test_entidad_no_resuelta_muestra_pagador(self):
+        det = "No se pudo resolver la entidad (pista: 'UT SALUD INTEGRAL MAISFEN')."
+        assert "MAISFEN" in exp._falta("ENTIDAD_NO_RESUELTA", {"detalle": det})
+
+
+class TestPagadorNoResuelto:
+    def test_extrae_pista(self):
+        assert exp._pagador_no_resuelto("algo (pista: 'ABC EPS'). más") == "ABC EPS"
+
+    def test_pista_guion_es_vacia(self):
+        assert exp._pagador_no_resuelto("pista: '—'") == ""
+
+    def test_sin_pista(self):
+        assert exp._pagador_no_resuelto("texto sin pista") == ""
+
+    def test_cargar_pone_pagador_en_entidad(self, tmp_path):
+        r = tmp_path / "rep.csv"
+        _csv(
+            r,
+            [
+                HEADERS,
+                [
+                    "HUS900",
+                    "SIN_PERFIL",
+                    "",
+                    "",
+                    "850000",
+                    "procedimientos:1",
+                    "FEV RIP CUV",
+                    "",
+                    "",
+                    "",
+                    "ENTIDAD_NO_RESUELTA",
+                    "No se pudo resolver la entidad (pista: 'UNION TEMPORAL MAISFEN').",
+                    "",
+                    "Y:\\HUS900",
+                ],
+            ],
+        )
+        regs = exp.cargar_reporte(r)
+        assert regs[0]["entidad"] == "UNION TEMPORAL MAISFEN"  # no "SIN_PERFIL"
+
 
 class TestCargaYAgregacion:
     def _reporte(self, tmp_path: Path) -> Path:
