@@ -179,6 +179,7 @@ def cargar_reporte(ruta: Path) -> list[dict]:
                 "soportes_presentes": r.get("soportes_presentes", ""),
                 "soportes_faltantes": r.get("soportes_faltantes", ""),
                 "soportes_esperados_faltantes": r.get("soportes_esperados_faltantes", ""),
+                "soportes_clinicos": r.get("soportes_clinicos", ""),
                 "archivos_sin_clasificar": r.get("archivos_sin_clasificar", ""),
                 "detalle": r.get("detalle", ""),
                 "carpeta": r.get("carpeta", ""),

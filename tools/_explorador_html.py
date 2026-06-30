@@ -42,7 +42,7 @@ _PLANTILLA = r"""<!DOCTYPE html>
   .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
   .toolbar input,.toolbar select{padding:9px 12px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:#fff;color:var(--text)}
   .toolbar input{flex:1;min-width:220px}
-  .btn{padding:9px 14px;border:1px solid var(--blue);background:#fff;color:var(--blue);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn{padding:9px 14px;border:1px solid var(--blue);background:#fff;color:var(--blue);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
   .btn:hover{background:var(--blue-bg)}
   .count{margin-left:auto;color:var(--muted);font-size:13px;font-weight:600}
   .tablewrap{max-height:64vh;overflow:auto;border:1px solid var(--border);border-radius:11px}
@@ -168,20 +168,43 @@ function pinta(){
   document.getElementById("count").textContent = rows.length.toLocaleString("es-CO")+" de "+DATA.total.toLocaleString("es-CO")+tope;
 }
 
+const OBLIG=["FEV","RIP","CUV"];
+const CLIN=["EPI","HEV","HAU","OPF","PDE","PDX","CRC","HAM","DQX","RAN"];
+const DESC={FEV:"Factura electrónica (XML)",RIP:"RIPS",CUV:"Validación RIPS (CUV)",EPI:"Epicrisis",
+  HEV:"Historia clínica / evolución",HAU:"Atención de urgencias",OPF:"Orden / prescripción",
+  PDE:"Resultado de procedimientos",PDX:"Apoyo diagnóstico",CRC:"Comprobante recibido",
+  HAM:"Adm. de medicamentos",DQX:"Descripción quirúrgica",RAN:"Registro de anestesia"};
+
+/* ── ficha de verificación de una factura (checklist ✓/✗ + veredicto) ── */
 function abrir(i){
   const f=DATA.facturas[i]; if(!f)return;
   const row=(k,v)=>v?`<div class="drow"><span class="k">${k}</span><span class="v">${v}</span></div>`:"";
-  const c=colEstado(f.estado);
+  const pres=new Set((f.soportes_presentes||"").split(/\s+/).filter(Boolean));
+  const faltClin=new Set((f.soportes_esperados_faltantes||"").split(/\s+/).filter(Boolean));
+  const tk=ok=>ok?'<span style="color:#16a34a;font-weight:800">✓</span>':'<span style="color:#e11d48;font-weight:800">✗</span>';
+  const chip=(cod,ok)=>`<div style="display:flex;gap:9px;align-items:center;padding:3px 0">
+    <span style="width:14px">${tk(ok)}</span><b style="width:40px">${cod}</b>
+    <span class="muted" style="font-size:12px">${DESC[cod]||""}</span></div>`;
+  const oblig=OBLIG.map(c=>chip(c,pres.has(c))).join("");
+  const clinCods=[...new Set([...CLIN.filter(c=>pres.has(c)),...faltClin])];
+  const clin=clinCods.length?clinCods.map(c=>chip(c,pres.has(c))).join("")
+    :'<div class="muted" style="font-size:12px;padding:3px 0">— No requiere (solo consulta).</div>';
+  const lista=f.estado==="LISTA";
+  const vcol=lista?"#16a34a":"#e11d48";
+  const verd=lista?"✅ COMPLETA — lista para radicar":"❌ "+f.estado+(f.falta?" · "+f.falta:"");
+  const cruz=f.soportes_clinicos
+    ? row("Soportes cruzados (Y:/X:/Z:)", f.soportes_clinicos)
+    : (faltClin.size?'<div class="drow"><span class="k">Soportes cruzados</span><span class="v falta">ninguno — no se halló en el índice/share</span></div>':"");
   document.getElementById("m-title").textContent=f.factura+" · "+f.entidad;
   document.getElementById("m-body").innerHTML=
-    row("Estado",`<span class="badge" style="background:${c}1f;color:${c}">${f.estado}</span>`)
-    +(f.falta?`<div class="drow"><span class="k">¿Qué le falta?</span><span class="v falta">${f.falta}</span></div>`:"")
-    +row("Canal",f.canal)+row("Servicios",f.servicios)+row("Valor",f.valor?fmt(f.valor):"—")
-    +row("Soportes presentes",f.soportes_presentes)
-    +row("Soportes faltantes",f.soportes_faltantes)
-    +row("Soportes clínicos esperados",f.soportes_esperados_faltantes)
-    +row("Archivos sin tipificar",f.archivos_sin_clasificar)
-    +row("Detalle",f.detalle)
+    `<div style="background:${vcol}1a;border:1px solid ${vcol};color:${vcol};border-radius:11px;padding:12px 14px;font-weight:800;margin:4px 0 12px">${verd}</div>`
+    +`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-bottom:6px">
+        <div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">Obligatorios</div>${oblig}</div>
+        <div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">Clínicos (por servicio)</div>${clin}</div>
+      </div>`
+    +row("Servicios",f.servicios)+row("Canal",f.canal)+row("Valor",f.valor?fmt(f.valor):"—")
+    +cruz
+    +(f.archivos_sin_clasificar?row("Archivos sin tipificar",f.archivos_sin_clasificar):"")
     +(f.carpeta?`<div style="margin-top:12px"><div class="k" style="color:var(--muted);font-size:12px">📁 Carpeta (dónde está):</div>
        <div class="pathbox"><span>${f.carpeta}</span><button class="btn" data-copy="${encodeURIComponent(f.carpeta)}">Copiar</button></div></div>`:"")
     +(f.ruta_paquete?`<div style="margin-top:10px"><div class="k" style="color:var(--muted);font-size:12px">📦 Paquete armado:</div>
