@@ -48,10 +48,9 @@ try:
     from responder_glosas_simed import (
         leer_excel_respuestas,
         normalizar_factura,
-        sanitizar,
     )
 except Exception:  # pragma: no cover - sólo si se mueve el archivo
-    leer_excel_respuestas = normalizar_factura = sanitizar = None  # type: ignore
+    leer_excel_respuestas = normalizar_factura = None  # type: ignore
 
 logger = logging.getLogger("responder_glosas_dgh")
 
@@ -132,25 +131,6 @@ def _buscar(parent, *, auto_id=None, control_type=None, name=None, name_re=None,
     return None
 
 
-def _set_editor(ctl, texto: str) -> bool:
-    """Escribe en un editor DevExpress (PART_Editor TextBox dentro del control).
-    Click → seleccionar todo → tipear."""
-    try:
-        editor = ctl.child_window(auto_id="PART_Editor", control_type="Edit")
-        target = editor.wrapper_object() if editor.exists() else ctl
-    except Exception:
-        target = ctl
-    try:
-        target.click_input()
-        time.sleep(0.2)
-        target.type_keys("^a{DEL}", pause=0.03)
-        target.type_keys(_escapar(texto), with_spaces=True, pause=0.01)
-        return True
-    except Exception as e:
-        logger.warning(f"  no pude escribir {texto!r}: {e}")
-        return False
-
-
 def _foco_actual() -> tuple[str, str]:
     """(auto_id, name) del control que tiene el foco AHORA (vía UIA). Sirve para
     saber en qué campo estamos al tabular (los editores DevExpress comparten
@@ -202,36 +182,6 @@ def _dump(etiqueta: str) -> None:
         logger.warning(f"  no pude volcar {etiqueta}: {e}")
 
 
-def _modal_conceptos(timeout: float = 12.0):
-    """Devuelve un WindowSpecification del modal 'Conceptos del trámite de
-    objeción', o None.
-
-    CLAVE: el modal es una ventana WPF hosteada dentro de la app WinForms. Su
-    INTERIOR (Concepto / Observaciones / Aplicar campos / la grilla de conceptos
-    / GRABAR) NO es alcanzable caminando el árbol desde DGFRMPrincipal: el
-    recorrido se corta en el borde WinForms→WPF y sólo expone el TitleBar del
-    modal (por eso los volcados anteriores nunca mostraron sus campos). Hay que
-    tomar el modal como ventana TOP-LEVEL del escritorio, rooteando la búsqueda
-    UIA en su propio HWND; recién ahí el proveedor WPF expone los controles
-    internos."""
-    try:
-        from pywinauto import Desktop
-    except Exception:
-        return None
-    fin = time.time() + timeout
-    while time.time() < fin:
-        try:
-            m = Desktop(backend="uia").window(
-                title_re="Conceptos del tr.mite de objeci.n", control_type="Window"
-            )
-            if m.exists():
-                return m
-        except Exception:
-            pass
-        time.sleep(0.4)
-    return None
-
-
 def _hwnds_modal() -> list[int]:
     """HWNDs de la(s) ventana(s) cuyo título es el del modal de conceptos.
     win32 EnumWindows ve ventanas top-level (incluidas las propias/owned) que la
@@ -242,65 +192,6 @@ def _hwnds_modal() -> list[int]:
         return list(findwindows.find_windows(title_re="Conceptos del tr.mite de objeci.n"))
     except Exception:
         return []
-
-
-def _dump_modal(etiqueta: str) -> None:
-    """Vuelca el INTERIOR del modal de conceptos probando VARIAS estrategias en
-    UNA sola corrida. El modal es una ventana WPF *owned*: su interior no se
-    alcanza caminando desde DGFRMPrincipal (sólo sale el TitleBar) y Desktop UIA
-    no la lista como top-level. La forma robusta es localizar su HWND con win32 y
-    rootear una conexión UIA fresca en ese HWND. Se escriben todas las secciones;
-    la que tenga 'Aplicar campos' es la buena y de ahí salen los selectores."""
-    from contextlib import redirect_stdout
-    from io import StringIO
-
-    try:
-        from dump_dg import _walk
-        from pywinauto import Application
-    except Exception as e:
-        logger.warning(f"  no pude importar dependencias del volcado ({e}); vuelco el proceso.")
-        _dump(etiqueta)
-        return
-
-    out = Path(f"dump_dgh_{etiqueta}_{time.strftime('%H%M%S')}.txt")
-    buf = StringIO()
-    with redirect_stdout(buf):
-        hwnds = _hwnds_modal()
-        print(f"HWNDs del modal (win32): {hwnds}\n")
-
-        # [A] Conexión UIA fresca rooteada en el HWND del modal (lo más probable).
-        print("========== [A] UIA connect(handle=HWND del modal) ==========")
-        if not hwnds:
-            print("(sin HWND del modal)")
-        for h in hwnds:
-            try:
-                app = Application(backend="uia").connect(handle=h, timeout=5)
-                _walk(app.window(handle=h).wrapper_object(), 0, 18)
-            except Exception as e:
-                print(f"(error HWND {h}: {e})")
-
-        # [B] Finder UIA del escritorio por título.
-        print("\n========== [B] Desktop().window(title=...) ==========")
-        try:
-            m = _modal_conceptos(timeout=4)
-            if m is not None:
-                _walk(m.wrapper_object(), 0, 18)
-            else:
-                print("(no encontrado por finder)")
-        except Exception as e:
-            print(f"(error: {e})")
-
-        # [C] win32: por si el modal expone controles nativos hijos.
-        print("\n========== [C] win32 connect(handle=HWND del modal) ==========")
-        for h in hwnds:
-            try:
-                appw = Application(backend="win32").connect(handle=h, timeout=5)
-                _walk(appw.window(handle=h).wrapper_object(), 0, 18)
-            except Exception as e:
-                print(f"(error win32 HWND {h}: {e})")
-
-    out.write_text(buf.getvalue() or "(vacío)", encoding="utf-8")
-    logger.info(f"  volcado del modal (multi-estrategia): {out.resolve()}")
 
 
 _CT_NOMBRES = {
@@ -382,11 +273,11 @@ def _diag_grids(win):
 
 
 def _grid_con_fila(win):
-    """(grid_spec, datos_spec) de la PRIMERA grilla 'gcConceptosObjecion' cuyo
-    panel de datos tiene una fila (DataItem), sin importar en qué pestaña Editor
-    esté. Robusto a editores duplicados y a la carga asíncrona: una grilla vacía
+    """dataPresenter (spec) de la PRIMERA grilla 'gcConceptosObjecion' cuyo panel
+    de datos tiene una fila (DataItem), sin importar en qué pestaña Editor esté.
+    Robusto a editores duplicados y a la carga asíncrona: una grilla vacía
     (Record 0 of 0) tiene dataPresenter pero NO DataItem, así distinguimos la
-    autocargada."""
+    autocargada. Devuelve None si ninguna grilla tiene fila."""
     for i in range(40):
         try:
             grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
@@ -397,10 +288,10 @@ def _grid_con_fila(win):
         try:
             datos = grid.child_window(auto_id="dataPresenter")
             if datos.exists() and datos.child_window(control_type="DataItem").exists():
-                return grid, grid.child_window(auto_id="dataPresenter", found_index=0)
+                return grid.child_window(auto_id="dataPresenter", found_index=0)
         except Exception:
             continue
-    return None, None
+    return None
 
 
 # ─── Flujo por factura ───────────────────────────────────────────────────────
@@ -505,7 +396,7 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         time.sleep(0.4)
     except Exception as e:
         logger.warning(f"  no pude clickear Consecutivo para anclar el foco: {e}")
-    aid0, nm0 = _foco_actual()
+    _, nm0 = _foco_actual()
     if nm0 not in ("Consecutivo", "Factura") and "Consecutivo" not in nm0:
         logger.warning(
             f"  ⚠ tras anclar, el foco está en {nm0!r} (no en el Editor). NO toques el "
@@ -539,12 +430,12 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
     #    asíncrona; en sesiones de DG "cansadas" (varias corridas) puede tardar
     #    bastante (se vio ~70s). Poll hasta que ALGUNA grilla gcConceptosObjecion
     #    tenga su fila, hasta 120s, con aviso de progreso + diag cada 15s.
-    grid = datos = None
+    datos = None
     espera_max = 120
     fin = time.time() + espera_max
     prox_aviso = time.time() + 15
     while time.time() < fin:
-        grid, datos = _grid_con_fila(win)
+        datos = _grid_con_fila(win)
         if datos is not None:
             break
         if time.time() >= prox_aviso:
@@ -597,29 +488,6 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         "Aplicar campos → GRABAR)."
     )
     return "MODAL_ABIERTO"
-    # ── (v2: aquí va el llenado del modal una vez tengamos sus auto_id) ──
-
-    # 5) GRABAR + diálogo 'Registro grabado' (Confirmar=Sí, Imprimir=Sí).
-    grabar_btn = _buscar(
-        win, auto_id="BarButtonItemLink0", control_type="Button", timeout=4
-    ) or _buscar(win, name="GRABAR", control_type="Button", timeout=4)
-    if grabar_btn is None:
-        logger.error("  no hallé el botón GRABAR.")
-        if dump_al_fallar:
-            _dump("sin_grabar")
-        return "ERROR_GRABAR"
-    grabar_btn.click_input()
-    time.sleep(2.0)
-    # El diálogo 'Registro grabado' (Confirmar/Imprimir) aún no lo capturamos;
-    # con --dump-al-fallar lo volcamos JUSTO ahora que está en pantalla, para v2.
-    if dump_al_fallar:
-        _dump("dialogo_grabado")
-    logger.warning(
-        "  ⚠ v1: el diálogo 'Registro grabado' (Confirmar/Imprimir) aún no está "
-        "automatizado. Confirmá/Imprimí a mano esta vez. Si corriste con "
-        "--dump-al-fallar, ya quedó capturado para automatizarlo en v2."
-    )
-    return "GRABADO_SIN_DIALOGO"
 
 
 def main() -> int:
