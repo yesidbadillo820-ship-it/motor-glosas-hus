@@ -4358,6 +4358,33 @@ class GlosaService:
             except Exception as _e_sc:
                 logger.debug(f"[SUBCONCEPTOS] no inyectados: {_e_sc}")
 
+            # ── Defensa clínica reforzada (jun-2026) ──
+            # Si el caso involucra tecnología de alto costo (Cart-T, da Vinci,
+            # implante coclear, TMS, Epicel, Norwood, hemofilia, IRIS/VIH),
+            # inyectamos la defensa clínica de referencia con literatura
+            # nivel 1A concreta (FDA/NICE/Cochrane/AHA) + el argumento de
+            # fondo + normativa. Evita que la IA se quede en "autonomía
+            # médica" genérica, que la EPS desestima.
+            self._defensa_clinica_actual = None
+            try:
+                from app.services.defensa_clinica import (
+                    bloque_defensa_clinica_para_prompt,
+                    detectar_defensa_clinica,
+                )
+
+                _def_clin = detectar_defensa_clinica(texto_base)
+                if _def_clin:
+                    self._defensa_clinica_actual = _def_clin
+                    _bloque_dc = bloque_defensa_clinica_para_prompt(texto_base)
+                    if _bloque_dc:
+                        user_prompt = user_prompt + _bloque_dc
+                        logger.info(
+                            f"[DEFENSA-CLINICA] '{_def_clin['titulo']}' detectada → "
+                            f"evidencia nivel 1A inyectada al prompt."
+                        )
+            except Exception as _e_dc:
+                logger.debug(f"[DEFENSA-CLINICA] no inyectada: {_e_dc}")
+
             # ═══════════════════════════════════════════════════════════
             #  Extemporaneidad de la RATIFICACIÓN (12-jun-2026, ronda 2 —
             #  fix #5). Evidencia: "Fecha radicación: 2026-03-01. Fecha
@@ -6186,6 +6213,35 @@ class GlosaService:
                     score = max(0, score - 8 * len(_omitidos))
         except Exception as _e_scval:
             logger.debug(f"[SUBCONCEPTOS-OMITIDOS] no auditados: {_e_scval}")
+
+        # ── Defensa clínica: checklist de literatura nivel 1A ──
+        # Si el caso era de tecnología cara y el dictamen NO citó literatura
+        # clínica (FDA/NICE/Cochrane/AHA), avisamos al gestor — una defensa
+        # de tecnología cara basada solo en "autonomía médica" la desestima
+        # la EPS.
+        try:
+            if getattr(self, "_defensa_clinica_actual", None) and modo_resp != "auditoria_previa":
+                from app.services.defensa_clinica import auditar_literatura_citada
+
+                _ok_lit, _msg_lit = auditar_literatura_citada(
+                    dictamen, str(getattr(data, "tabla_excel", "") or "")
+                )
+                if not _ok_lit:
+                    logger.warning(f"[DEFENSA-CLINICA-DEBIL] {_msg_lit}")
+                    _banner_dc = (
+                        '<div style="margin-bottom:12px;padding:10px 14px;'
+                        "background:#fff7ed;border:2px solid #f97316;"
+                        'border-radius:8px;font-size:12px;color:#9a3412;">'
+                        "⚠️ <b>Defensa clínica débil:</b> el dictamen defiende una "
+                        "tecnología de alto costo sin citar literatura nivel 1A "
+                        "(FDA/NICE/Cochrane/AHA). La EPS suele desestimar la sola "
+                        "'autonomía médica'. Considerá refinar con IA para reforzar "
+                        "la evidencia clínica.</div>"
+                    )
+                    dictamen = _banner_dc + dictamen
+                    score = max(0, score - 6)
+        except Exception as _e_lit:
+            logger.debug(f"[DEFENSA-CLINICA-DEBIL] no auditada: {_e_lit}")
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",

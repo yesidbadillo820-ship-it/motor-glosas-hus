@@ -138,6 +138,18 @@ def _evaluar_caso_glosa(caso: dict) -> list[dict]:
                 f"esperado≈{crit['complejidad_motivo_contiene']} motivos={comp.motivos}",
             )
 
+    # Defensa clínica (tecnología cara → literatura nivel 1A)
+    if "defensa_clinica_titulo_contiene" in crit:
+        from app.services.defensa_clinica import detectar_defensa_clinica
+
+        d = detectar_defensa_clinica(glosa)
+        titulo = d["titulo"] if d else ""
+        _check(
+            "defensa_clinica_titulo_contiene",
+            crit["defensa_clinica_titulo_contiene"].lower() in titulo.lower(),
+            f"esperado≈{crit['defensa_clinica_titulo_contiene']} obtenido={titulo}",
+        )
+
     return res
 
 
