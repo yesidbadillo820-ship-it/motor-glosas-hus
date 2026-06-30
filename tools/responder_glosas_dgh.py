@@ -102,11 +102,16 @@ def _conectar(pid: int):
 
 
 def _buscar(parent, *, auto_id=None, control_type=None, name=None, name_re=None, timeout=10):
-    """Devuelve el primer descendiente que matchee, o None tras `timeout` s.
+    """Devuelve un WindowSpecification del primer descendiente que matchee, o
+    None tras `timeout` s.
 
-    Maneja coincidencias AMBIGUAS (p.ej. dos botones 'AGREGAR' con varias
-    pestañas abiertas): si wrapper_object() falla por ambigüedad, toma la
-    primera (found_index=0)."""
+    CLAVE: devuelve un *spec* (no un wrapper). Un WindowSpecification soporta
+    tanto `.child_window()` (para anidar búsquedas) como los métodos de acción
+    (`.click_input()`, `.type_keys()`, `.rectangle()`, …) por proxy al wrapper.
+    Si devolviéramos `wrapper_object()`, las búsquedas anidadas fallarían: los
+    wrappers de pywinauto NO tienen `.child_window()`.
+
+    `found_index=0` fija la primera coincidencia → el spec nunca es ambiguo."""
     fin = time.time() + timeout
     crit = {}
     if auto_id:
@@ -119,12 +124,8 @@ def _buscar(parent, *, auto_id=None, control_type=None, name=None, name_re=None,
         crit["title_re"] = name_re
     while time.time() < fin:
         try:
-            ctl = parent.child_window(**crit)
-            if ctl.exists():
-                try:
-                    return ctl.wrapper_object()
-                except Exception:
-                    return parent.child_window(**crit, found_index=0).wrapper_object()
+            if parent.child_window(**crit).exists():
+                return parent.child_window(**crit, found_index=0)
         except Exception:
             pass
         time.sleep(0.4)
