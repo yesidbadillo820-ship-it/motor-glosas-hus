@@ -101,8 +101,12 @@ def _conectar(pid: int):
 # ─── Helpers de UIA ──────────────────────────────────────────────────────────
 
 
-def _buscar(parent, *, auto_id=None, control_type=None, name=None, timeout=10):
-    """Devuelve el primer descendiente que matchee, o None tras `timeout` s."""
+def _buscar(parent, *, auto_id=None, control_type=None, name=None, name_re=None, timeout=10):
+    """Devuelve el primer descendiente que matchee, o None tras `timeout` s.
+
+    Maneja coincidencias AMBIGUAS (p.ej. dos botones 'AGREGAR' con varias
+    pestañas abiertas): si wrapper_object() falla por ambigüedad, toma la
+    primera (found_index=0)."""
     fin = time.time() + timeout
     crit = {}
     if auto_id:
@@ -111,11 +115,16 @@ def _buscar(parent, *, auto_id=None, control_type=None, name=None, timeout=10):
         crit["control_type"] = control_type
     if name:
         crit["title"] = name
+    if name_re:
+        crit["title_re"] = name_re
     while time.time() < fin:
         try:
             ctl = parent.child_window(**crit)
             if ctl.exists():
-                return ctl.wrapper_object()
+                try:
+                    return ctl.wrapper_object()
+                except Exception:
+                    return parent.child_window(**crit, found_index=0).wrapper_object()
         except Exception:
             pass
         time.sleep(0.4)
@@ -185,17 +194,37 @@ def _dump(etiqueta: str) -> None:
 def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump_al_fallar):
     logger.info(f"[{factura_larga}] {len(objeciones)} objeción(es)")
 
-    # 1) AGREGAR (toolbar del Listado o del Editor) → abre Editor en blanco.
-    agregar = _buscar(win, name="AGREGAR", control_type="Button", timeout=10)
+    # 1) Activar la pestaña 'Listado de Tramite de Objeción' y darle AGREGAR.
+    #    Con varias pestañas MDI abiertas, sólo la ACTIVA es clickeable por
+    #    coordenadas; por eso primero la traemos al frente.
+    tab_listado = _buscar(win, name_re="Listado de Tr.mite", control_type="TabItem", timeout=5)
+    if tab_listado is not None:
+        try:
+            tab_listado.click_input()
+            time.sleep(0.8)
+        except Exception:
+            pass
+    # AGREGAR del Listado (auto_id único). Fallback: cualquier AGREGAR visible.
+    agregar = _buscar(win, auto_id="BarButtonItemLinkbbiAgregar", control_type="Button", timeout=8)
+    if agregar is None:
+        agregar = _buscar(win, name="AGREGAR", control_type="Button", timeout=4)
     if agregar is None:
         logger.error(
-            "  no hallé el botón AGREGAR. ¿Está abierta la pantalla 'Listado de Tramite de Objeción'?"
+            "  no hallé AGREGAR. Abrí 'Listado de Tramite de Objeción' (Cartera→Procesos→Tramite de Objeción)."
         )
         if dump_al_fallar:
             _dump("sin_agregar")
         return "ERROR_NAV"
     agregar.click_input()
-    time.sleep(1.5)
+    time.sleep(1.8)
+    # Tras AGREGAR se abre/activa el Editor; activamos su pestaña por las dudas.
+    tab_editor = _buscar(win, name_re="Editor de Tr.mite", control_type="TabItem", timeout=5)
+    if tab_editor is not None:
+        try:
+            tab_editor.click_input()
+            time.sleep(0.6)
+        except Exception:
+            pass
 
     # 2) Escribir la Factura → DG autocarga los datos de la objeción.
     factura_ctl = _buscar(win, auto_id="ctrlFactura", timeout=10)
