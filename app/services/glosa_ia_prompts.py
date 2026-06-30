@@ -1381,6 +1381,28 @@ _TOKENS_PAGADOR_EN_TEXTO: tuple[tuple[str, str], ...] = (
 )
 
 
+# EPS canónicas que las glosas reales nombran SOLAS (sin "EPS" delante),
+# típicamente al inicio o tras "OBSERVACIONES" + ":". Se buscan como
+# PALABRA COMPLETA (\b) para no dar falsos positivos (ej. "SURA" dentro de
+# "usura"/"clausura" NO matchea \bSURA\b). Golden set 30-jun: el formato
+# "SURA: Se objeta..." no se detectaba porque el token era "EPS SURA".
+_RE_EPS_SOLA = (
+    (re.compile(r"\bSALUD\s+TOTAL\b"), "SALUD TOTAL EPS"),
+    (re.compile(r"\bNUEVA\s+EPS\b"), "NUEVA EPS"),
+    (re.compile(r"\bCOMPENSAR\b"), "COMPENSAR"),
+    (re.compile(r"\bFAMISANAR\b"), "FAMISANAR"),
+    (re.compile(r"\bSANITAS\b"), "SANITAS EPS"),
+    (re.compile(r"\bCOOSALUD\b"), "COOSALUD"),
+    (re.compile(r"\bECOOPSOS\b"), "ECOOPSOS"),
+    (re.compile(r"\bEMSSANAR\b"), "EMSSANAR"),
+    (re.compile(r"\bMUTUAL\s+SER\b"), "MUTUAL SER EPS"),
+    (re.compile(r"\bCAPITAL\s+SALUD\b"), "CAPITAL SALUD EPS"),
+    (re.compile(r"\bASMET\s+SALUD\b"), "ASMET SALUD"),
+    (re.compile(r"\bMEDIM[ÁA]S\b"), "MEDIMÁS"),
+    (re.compile(r"\bSURA\b"), "SURA EPS"),
+)
+
+
 def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     """Bug I (ronda 13): detecta el nombre canónico de la EPS / ARL que
     aparece literalmente en el texto de la glosa. Útil cuando el usuario
@@ -1391,8 +1413,14 @@ def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     if not texto_glosa:
         return ""
     txt_up = re.sub(r"\s+", " ", str(texto_glosa).upper())
+    # 1) Tokens explícitos ("EPS SURA", "ARL SURA", etc.) — más específicos.
     for token, canonico in _TOKENS_PAGADOR_EN_TEXTO:
         if token in txt_up:
+            return canonico
+    # 2) EPS nombrada sola como palabra completa (formato "SURA: ...",
+    #    "OBSERVACIONES ECOOPSOS: ...").
+    for pat, canonico in _RE_EPS_SOLA:
+        if pat.search(txt_up):
             return canonico
     return ""
 
