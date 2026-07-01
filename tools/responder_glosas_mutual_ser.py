@@ -524,12 +524,13 @@ def _set_observacion(page: Page, texto: str) -> None:
     # Botón de la celda OBSERVACIONES DE SUBSANACIÓN (col 21) de la fila ACTIVA -> modal.
     fila = _fila_activa(page).first
     fila.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
-    dialog = page.locator("[role=dialog]").last
-    dialog.wait_for(timeout=15000)
-    ta = dialog.locator("textarea").first
+    # El modal ("Observaciones de subsanación") NO expone role=dialog de forma fiable;
+    # lo operamos por su textarea (con contador de caracteres) + el botón ACEPTAR.
+    ta = page.locator("textarea").last
+    ta.wait_for(state="visible", timeout=15000)
     ta.fill(texto)
-    dialog.get_by_role("button", name="ACEPTAR", exact=True).click()
-    dialog.wait_for(state="hidden", timeout=15000)
+    page.get_by_role("button", name="ACEPTAR", exact=True).click()
+    ta.wait_for(state="hidden", timeout=15000)
 
 
 def subsanar_items(
