@@ -37,6 +37,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="HUSxxxx",
         help="Factura a verificar en el índice (se puede repetir). Def.: HUS521788.",
     )
+    p.add_argument(
+        "--origen",
+        type=Path,
+        default=None,
+        help="Share de FE del lote (opcional): cruza el lote real contra el índice "
+        "y hace deep-dive de la(s) factura(s) para ver si el cruce le pega.",
+    )
     args = p.parse_args(argv)
     facturas = args.factura or ["HUS521788"]
 
@@ -78,7 +85,60 @@ def main(argv: list[str] | None = None) -> int:
         for ruta in rutas[:15]:
             cod, _desc, _ok = rad.clasificar_soporte(Path(ruta).name)
             print(f"    [{cod}] {ruta}")
+
+    if args.origen is not None:
+        _cruzar_con_lote(args.origen, indice_total, facturas)
     return 0
+
+
+def _cruzar_con_lote(origen: Path, indice_total: dict[str, list], facturas: list[str]) -> None:
+    """Cruza el lote real (share de FE) contra el índice de soportes y hace un
+    deep-dive de cada factura pedida: qué factura_norm calcula el lote, si el
+    cruce le pega y en qué estado queda. Aísla el bug de "numeración que no
+    coincide" del de "el share no tiene el soporte"."""
+    print("=" * 70)
+    print(f"LOTE (origen): {origen}")
+    if not origen.is_dir():
+        print("  ⚠ Python NO ve el origen. Revisá la ruta / permisos.")
+        return
+    cfg = rad.cargar_perfiles(None)
+    items = rad.descubrir_auto(origen, {}, cfg, rad.PATRON_FACTURA_DEFAULT)
+    # Clave barata por el nombre/hint de carpeta (sin leer el RIPS todavía).
+    por_clave: dict[str, tuple] = {}
+    for fh, arch, carp, ent in items:
+        por_clave.setdefault(rad.normalizar_factura(fh), (fh, arch, carp, ent))
+    en_indice = sum(1 for k in por_clave if k in indice_total)
+    total = len(por_clave)
+    pct = 100 * en_indice / max(1, total)
+    print(f"  Facturas en el lote: {total:,}")
+    print(f"  De ellas, con carpeta de soporte en el índice: {en_indice:,} ({pct:.0f}%)")
+    solo_indice = len(indice_total) - en_indice
+    print(f"  Facturas del índice que NO están en el lote: {max(0, solo_indice):,}")
+
+    for f in facturas:
+        clave = rad.normalizar_factura(f)
+        print(f"\n  ── deep-dive {f} (clave por carpeta: {clave}) ──")
+        item = por_clave.get(clave)
+        if item is None:
+            print(f"    NO aparece en el lote {origen} con esa clave.")
+            continue
+        fh, arch, carp, ent = item
+        # SIN cruce y CON cruce, para ver el efecto real del índice.
+        base = rad.procesar_factura(fh, arch, carp, ent, cfg)
+        cruz = rad.procesar_factura(fh, arch, carp, ent, cfg, indice_total)
+        print(f"    factura_norm que calcula el lote : {cruz.factura_norm}")
+        print(
+            f"    ¿esa clave está en el índice?     {'SÍ' if cruz.factura_norm in indice_total else 'NO'}"
+        )
+        print(
+            f"    estado SIN cruce  : {base.estado}  (faltan: {base.soportes_esperados_faltantes})"
+        )
+        print(
+            f"    estado CON cruce  : {cruz.estado}  (faltan: {cruz.soportes_esperados_faltantes})"
+        )
+        print(f"    soportes anexados por el cruce   : {len(cruz.soportes_clinicos)}")
+        for ruta in cruz.soportes_clinicos[:12]:
+            print(f"        + {ruta}")
 
 
 if __name__ == "__main__":
