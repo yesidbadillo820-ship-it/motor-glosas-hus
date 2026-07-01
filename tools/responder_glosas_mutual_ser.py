@@ -509,38 +509,29 @@ def _dump_modal(page: Page, evidencias: Path, nombre: str = "dbg_modal.html") ->
         logger.warning(f"    [diag] no pude volcar el modal: {e}")
 
 
-def _plus_items(page: Page):
-    """Botones "+" de expandir, uno por ítem: viven en la celda TECNOLOGÍA (la 3ª,
-    nth-child(3)) de cada fila de ítem. La sub-fila de detalle que se inserta al
-    expandir NO tiene botón en esa celda, así que este selector siempre devuelve
-    exactamente los N ítems, en orden."""
-    return page.locator("table tbody tr td:nth-child(3) button")
+def _item_rows(page: Page):
+    """Filas de ítem: las que tienen el botón "+" en la celda TECNOLOGÍA (3ª). La
+    sub-fila de detalle que se inserta al expandir NO tiene botón ahí, así que esto
+    devuelve exactamente los N ítems, en orden y estable aunque haya varias
+    expandidas (el portal NO es acordeón: permite varias abiertas a la vez)."""
+    return page.locator("table tbody tr:has(td:nth-child(3) button)")
 
 
-def _fila_activa(page: Page):
-    """La sub-fila de detalle activa: la única que tiene el input de valor (adorno)."""
-    return page.locator("table tbody tr").filter(
-        has=page.locator("input.MuiInputBase-inputAdornedEnd")
-    )
-
-
-def _set_valor(page: Page, valor: int, timeout: int = 12000) -> None:
-    # El input de VALOR RATIFICADO ACEPTADO IPS es el único con adorno al final
-    # (clase MUI estable, no hasheada). Al expandir un ítem sólo hay uno visible.
-    inp = page.locator("table input.MuiInputBase-inputAdornedEnd").first
+def _set_valor(detail, valor: int, timeout: int = 12000) -> None:
+    # Input de VALOR RATIFICADO ACEPTADO IPS dentro de la sub-fila de detalle del ítem
+    # (clase MUI estable). Se resuelve DENTRO de `detail` para no pisar otra fila.
+    inp = detail.locator("input.MuiInputBase-inputAdornedEnd").first
     inp.wait_for(state="visible", timeout=timeout)
     inp.click()
     inp.fill(str(valor))
     inp.press("Tab")  # dispara la validación (check verde)
 
 
-def _set_observacion(page: Page, texto: str) -> None:
-    # Botón de la celda OBSERVACIONES DE SUBSANACIÓN (col 21) de la fila ACTIVA -> modal.
-    fila = _fila_activa(page).first
-    fila.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
-    # El modal ("Observaciones de subsanación") NO expone role=dialog de forma fiable
-    # y la página tiene decenas de textareas OCULTAS (una por fila) — hay que tomar la
-    # ÚNICA textarea VISIBLE (la del modal) + el botón ACEPTAR.
+def _set_observacion(page: Page, detail, texto: str) -> None:
+    # Botón de OBSERVACIONES DE SUBSANACIÓN (col 21) de ESTA sub-fila -> modal.
+    detail.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
+    # El modal NO expone role=dialog fiable y hay decenas de textareas OCULTAS (una por
+    # fila) -> tomar la ÚNICA textarea VISIBLE (la del modal) + el botón ACEPTAR.
     ta = page.locator("textarea:visible").last
     ta.wait_for(state="visible", timeout=15000)
     ta.fill(texto)
@@ -561,20 +552,22 @@ def subsanar_items(
     page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
     page.wait_for_timeout(1500)
     _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
-    total = _plus_items(page).count()
+    total = _item_rows(page).count()
     n = min(total, max_items) if max_items else total
     logger.info(f"  Modo subsanar activo. Ítems: {total} — a llenar: {n}")
     hechos = 0
     for i in range(n):
-        # Expandir el ítem i (acordeón: colapsa el que estaba abierto). Re-queryeamos
-        # por si el DOM se re-renderizó al insertar/quitar la sub-fila de detalle.
-        _plus_items(page).nth(i).click()
+        # Fila del ítem i y su botón "+" (re-query por el re-render al expandir).
+        item_row = _item_rows(page).nth(i)
+        item_row.locator("td:nth-child(3) button").first.click()  # expandir ítem i
         page.wait_for_timeout(700)
+        # La sub-fila de detalle es la <tr> inmediatamente siguiente a la del ítem.
+        detail = item_row.locator("xpath=following-sibling::tr[1]")
         if i == 0:
             _dump_tabla(page, evidencias, "dbg_expandido.html")
         try:
-            _set_valor(page, valor)
-            _set_observacion(page, texto)
+            _set_valor(detail, valor)
+            _set_observacion(page, detail, texto)
         except Exception as e:  # noqa: BLE001
             _dump_tabla(page, evidencias, f"dbg_error_item{i + 1}.html")
             _dump_modal(page, evidencias, f"dbg_modal_item{i + 1}.html")
