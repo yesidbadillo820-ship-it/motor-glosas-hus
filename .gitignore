@@ -68,6 +68,7 @@ deploy/cloudflared/*.json
 data/
 !data/plantillas_hus_base.json
 !data/perfiles_radicacion.json
+!data/clausulas_contrato_base.json
 
 # app/data/ contiene catálogos versionados que el motor lee en runtime
 # (se hornean en la imagen Docker vía COPY app/). NO confundir con la
