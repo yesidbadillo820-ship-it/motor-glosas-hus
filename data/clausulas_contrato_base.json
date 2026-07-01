@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "descripcion": "Cláusulas LITERALES de los contratos por EPS, para que la IA las cite textualmente al refutar una glosa (en vez de decir 'SIN CONTRATO PACTADO' o evadir la cláusula citada). Se cargan a la tabla clausulas_contrato con: python scripts/seed_clausulas_contrato.py",
+    "como_llenar": "Copia el texto EXACTO de cada cláusula relevante del contrato firmado con cada EPS. NO inventes ni parafrasees — la IA la cita entre comillas, así que debe ser el texto real. Prioriza las cláusulas que más usas para defender: tarifa, soportes, autorización, cobertura, sanciones.",
+    "ejemplo_formato": {
+      "eps": "COMPENSAR",
+      "numero_clausula": "9",
+      "tema": "CO",
+      "titulo": "Junta médica para prótesis de alto costo",
+      "texto_literal": "[AQUÍ va el texto EXACTO de la cláusula 9 tal como aparece en el contrato firmado]",
+      "pagina": 12
+    },
+    "temas_validos": {
+      "TA": "tarifas / valor",
+      "SO": "soportes / documentos",
+      "AU": "autorizaciones",
+      "CO": "cobertura / pertinencia / PBS",
+      "FA": "facturación",
+      "NN": "general / comodín (aplica a cualquier tema)"
+    },
+    "nota": "La EPS debe escribirse en MAYÚSCULAS y coincidir con la que detecta el motor (ej. 'COMPENSAR', 'SANITAS', 'NUEVA EPS'). El campo 'tema' se empareja con el prefijo del código de glosa (TA0201 → TA)."
+  },
+  "clausulas": []
+}
