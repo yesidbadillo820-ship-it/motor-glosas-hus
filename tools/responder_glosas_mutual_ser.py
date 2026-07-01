@@ -659,49 +659,94 @@ def _seleccionar_codigo(page: Page, codigo: str, evidencias: Path) -> None:
     TOTAL'). Puede haber otros combobox en la pantalla (p. ej. el paginador), así que
     probamos cada uno y elegimos el que ofrezca ese código."""
     rx = re.compile(re.escape(codigo), re.I)
+    page.wait_for_timeout(900)  # dejar asentar el selector tras el llenado
+
+    def _buscar_opcion():
+        """La opción del menú puede ser role=option, role=menuitem o un <li> con el
+        texto. Devuelve el primer locator VISIBLE que matchee el código, o None."""
+        for cand in (
+            page.get_by_role("option", name=rx),
+            page.get_by_role("menuitem", name=rx),
+            page.locator("li", has_text=rx),
+        ):
+            with contextlib.suppress(Exception):
+                el = cand.first
+                if el.count() and el.is_visible():
+                    return el
+        return None
+
+    def _elegir(combo) -> bool:
+        """Abre `combo`, espera hasta ~4s a que aparezca la opción del código, la
+        clickea y verifica el valor mostrado. Devuelve True si quedó seleccionado."""
+        try:
+            combo.scroll_into_view_if_needed()
+            combo.click()
+        except Exception:  # noqa: BLE001
+            return False
+        el = None
+        t0 = time.time()
+        while time.time() - t0 < 4:  # el menú puede tardar en renderizar (página grande)
+            el = _buscar_opcion()
+            if el is not None:
+                break
+            page.wait_for_timeout(250)
+        if el is None:
+            with contextlib.suppress(Exception):  # menú equivocado/vacío: cerrar
+                page.keyboard.press("Escape")
+            return False
+        etiqueta = ""
+        with contextlib.suppress(Exception):
+            etiqueta = (el.inner_text() or "").strip()
+        el.click()
+        page.wait_for_timeout(700)
+        # VERIFICACIÓN: leer qué quedó mostrando el selector. Si muestra OTRO código
+        # RE#### distinto, abortar ANTES de enviar (no mandar el equivocado).
+        mostrado = ""
+        with contextlib.suppress(Exception):
+            mostrado = (combo.inner_text() or "").strip()
+        if mostrado and re.search(r"RE\d{3,4}", mostrado) and not rx.search(mostrado):
+            _dump_modal(page, evidencias, "dbg_codigo.html")
+            raise RuntimeError(
+                f"¡El selector quedó en '{mostrado}', NO en '{codigo}'! Aborto ANTES de "
+                "enviar para no mandar un código equivocado."
+            )
+        logger.info(
+            f"  Código de subsanación seleccionado: {codigo} "
+            f"(opción='{etiqueta or '?'}' · selector muestra='{mostrado or '?'}')"
+        )
+        return True
+
+    # 1) Combobox por rol (puede haber varios: paginador, filtros de columna…).
     combos = page.get_by_role("combobox")
     try:
         n = combos.count()
     except Exception:  # noqa: BLE001
         n = 0
     for j in range(n):
-        c = combos.nth(j)
-        try:
-            c.scroll_into_view_if_needed()
-            c.click()
-        except Exception:  # noqa: BLE001
-            continue
-        page.wait_for_timeout(350)
-        opcion = page.get_by_role("option", name=rx).first
-        if opcion.count() and opcion.is_visible():
-            etiqueta = ""
-            with contextlib.suppress(Exception):
-                etiqueta = (opcion.inner_text() or "").strip()
-            opcion.click()
-            page.wait_for_timeout(700)
-            # VERIFICACIÓN CRÍTICA: leer qué quedó mostrando el selector. Si NO es el
-            # código pedido, abortar ANTES de enviar (no mandar el código equivocado).
-            mostrado = ""
-            with contextlib.suppress(Exception):
-                mostrado = (c.inner_text() or "").strip()
-            if mostrado and not rx.search(mostrado):
-                _dump_modal(page, evidencias, "dbg_codigo.html")
-                raise RuntimeError(
-                    f"¡El selector quedó en '{mostrado}', NO en '{codigo}'! Aborto ANTES "
-                    "de enviar para no mandar un código equivocado."
-                )
-            logger.info(
-                f"  Código de subsanación seleccionado: {codigo} "
-                f"(opción='{etiqueta or '?'}' · selector muestra='{mostrado or '?'}')"
-            )
+        if _elegir(combos.nth(j)):
             return
-        with contextlib.suppress(Exception):  # menú equivocado (p. ej. paginador): cerrar
-            page.keyboard.press("Escape")
         page.wait_for_timeout(150)
+
+    # 2) Fallback: abrir el selector por su placeholder ("…seleccione una opción").
+    with contextlib.suppress(Exception):
+        ph = page.get_by_text(re.compile(r"seleccione una opci", re.I)).last
+        if ph.count() and _elegir(ph):
+            return
+
+    # 3) Fallback: cualquier div[role=combobox] o .MuiSelect-select del pie.
+    for sel in ("div[role=combobox]", ".MuiSelect-select", "[aria-haspopup=listbox]"):
+        loc = page.locator(sel)
+        with contextlib.suppress(Exception):
+            for j in range(loc.count()):
+                if _elegir(loc.nth(j)):
+                    return
+
     _dump_modal(page, evidencias, "dbg_codigo.html")
+    with contextlib.suppress(Exception):
+        (evidencias / "dbg_codigo_page.html").write_text(page.content()[:250000], encoding="utf-8")
     raise RuntimeError(
         f"no pude seleccionar el CÓDIGO SUBSANACIÓN '{codigo}' (no apareció la opción). "
-        f"Volqué el DOM en {evidencias / 'dbg_codigo.html'} para calibrar el selector."
+        f"Volqué {evidencias / 'dbg_codigo.html'} y dbg_codigo_page.html para calibrar."
     )
 
 
@@ -782,6 +827,7 @@ def procesar_factura(
     lento: bool = False,
     soportes_dir: Path | None = None,
     codigo: str = "RE9901",
+    solo_finalizar: bool = False,
 ) -> dict:
     grupos = datos["grupos"]
     items = [it for g in grupos for it in g["items"]]
@@ -798,6 +844,16 @@ def procesar_factura(
     }
     try:
         _abrir_factura(page, factura)
+        if solo_finalizar:
+            # La factura YA fue llenada en una corrida previa (el draft persiste). Sólo
+            # entramos a modo subsanar (para que aparezca el selector de código) y
+            # cerramos: elegir CÓDIGO + ENVIAR. Evita re-llenar y re-subir soportes.
+            page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
+            page.wait_for_timeout(2500)
+            det = finalizar_factura(page, factura, evidencias, codigo=codigo)
+            reg["estado"] = "OK"
+            reg["detalle"] = f"solo-finalizar; {det}"
+            return reg
         hechos = subsanar_items(
             page, valor, texto, evidencias, max_items=max_items, lento=lento, soporte=soporte
         )
@@ -919,6 +975,15 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--solo-finalizar",
+        action="store_true",
+        help=(
+            "NO llena nada: asume que la factura YA está llena (draft) y sólo elige el "
+            "CÓDIGO SUBSANACIÓN y ENVÍA. Útil si un intento anterior llenó todo pero "
+            "falló en el paso del código (evita re-llenar y re-subir soportes)."
+        ),
+    )
+    parser.add_argument(
         "--reporte", type=Path, default=Path("reporte_mutualser.csv"), help="CSV de salida."
     )
     parser.add_argument("--log", type=Path, default=None, help="Archivo de log adicional.")
@@ -976,6 +1041,7 @@ def main() -> int:
                     lento=args.lento,
                     soportes_dir=args.soportes,
                     codigo=args.codigo,
+                    solo_finalizar=args.solo_finalizar,
                 )
                 resultados.append(reg)
                 w_rep.writerow(reg)
