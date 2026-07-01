@@ -77,6 +77,7 @@ import argparse
 import csv
 import logging
 import os
+import re
 import sys
 import time
 import unicodedata
@@ -777,12 +778,46 @@ def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 45) -> bool:
 # ─── Formulario de RESPUESTA (RTA2) ─────────────────────────────────────────
 
 
+def _nucleo_factura(s: str) -> str:
+    """Parte numérica sin ceros a la izquierda: 'HUS0000505761' → '505761',
+    'HUS512134' → '512134'. Sirve para matchear formas con distinto padding."""
+    m = re.search(r"(\d+)\s*$", (s or "").strip())
+    if not m:
+        return (s or "").strip().upper()
+    return m.group(1).lstrip("0") or "0"
+
+
+def _formas_factura(factura: str) -> list[str]:
+    """Formas a probar en la grilla, de más probable a menos: HUS+núcleo (como
+    aparece en Horus: 'HUS512134'), la forma dada ('HUS0000512134'), y el núcleo
+    suelto ('512134')."""
+    f = (factura or "").strip().upper()
+    formas: list[str] = []
+    m = re.match(r"^([A-Z]+)0*(\d+)$", f)
+    if m:
+        formas.append(f"{m.group(1)}{m.group(2)}")  # HUS505761
+    if f not in formas:
+        formas.append(f)                            # HUS0000505761 (o lo dado)
+    core = _nucleo_factura(f)
+    if core and core not in formas:
+        formas.append(core)                         # 505761
+    return formas
+
+
 def abrir_respuesta(page: Page, factura: str) -> bool:
-    """Filtra la factura y clickea su botón 'RESPUESTA'. True si abrió el form."""
-    if not filtrar_por_factura(page, factura):
+    """Filtra la factura (probando formas con/sin ceros) y clickea 'RESPUESTA'.
+    True si abrió el formulario."""
+    forma_ok = None
+    for forma in _formas_factura(factura):
+        if filtrar_por_factura(page, forma):
+            forma_ok = forma
+            break
+    if forma_ok is None:
         logger.warning(f"  {factura}: no aparece en la grilla tras filtrar.")
         return False
-    btn = _boton_respuesta_de_fila(page, factura)
+    if forma_ok != factura.strip().upper():
+        logger.info(f"  {factura}: en la grilla figura como '{forma_ok}'.")
+    btn = _boton_respuesta_de_fila(page, forma_ok)
     if btn is None:
         _screenshot_debug(page, f"sin_boton_respuesta_{factura}")
         logger.warning(f"  {factura}: no encontré el botón RESPUESTA.")
@@ -1123,17 +1158,26 @@ def _guardar_fila(page: Page, fila, idx_guardar: int) -> bool:
 
 
 def _buscar_pdf_factura(pdf_dir: Path | None, factura: str) -> Path | None:
-    """Busca <factura>.pdf en pdf_dir (case-insensitive, .pdf/.PDF)."""
+    """Busca el PDF de la factura en pdf_dir. Matchea por nombre exacto y, si no,
+    por el núcleo numérico (así 'HUS512134' encuentra 'HUS0000512134.pdf' y
+    viceversa — los soportes vienen con ceros a la izquierda)."""
     if pdf_dir is None or not pdf_dir.is_dir():
         return None
-    objetivo = factura.strip().upper()
+    dado = factura.strip().upper()
+    core = _nucleo_factura(factura)
+    por_core = None
     try:
         for p in pdf_dir.iterdir():
-            if p.is_file() and p.suffix.lower() == ".pdf" and p.stem.strip().upper() == objetivo:
+            if not (p.is_file() and p.suffix.lower() == ".pdf"):
+                continue
+            stem = p.stem.strip().upper()
+            if stem == dado:
                 return p
+            if por_core is None and _nucleo_factura(stem) == core:
+                por_core = p
     except OSError:
         return None
-    return None
+    return por_core
 
 
 def _esperar_adjunto(page: Page, timeout_s: int = 25) -> bool:
