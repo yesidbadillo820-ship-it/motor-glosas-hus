@@ -190,6 +190,34 @@ de cada uno (clave para facturas de 185 ítems). **Prioridad de calibración.**
 código `RE9901` podría ir en **`CÓDIGO SUBSANACIÓN`** o ser fijo del sistema — a
 confirmar.
 
+### Selectores del portal (hallazgos del volcado `--explorar`, 2026-07-01)
+
+- **Framework: React + Material-UI (MUI).** Las clases CSS son **hasheadas/inestables**
+  (`jss48`, `css-mfslm7`) y los ids son **auto-generados** (`:r4g:`) → **NO usar como
+  selectores**. Usar **texto/rol** (`get_by_role("button", name=...)`) y estructura de
+  tabla.
+- **Módulo:** el link `CONSULTAR CUENTAS MÉDICAS GLOSADAS` apunta a
+  `/dashboard/applications/auditoria-de-cuentas-medicas/GESTION-RESPUESTAS-GLOSAS`
+  (ya es `PORTAL_MODULO`).
+- **Botones estables por texto** (MUI, `<button>` con label visible):
+  `SUBSANAR GLOSA`, `ENVIAR SUBSANACIÓN`, `ACEPTAR TOTAL RATIFICADO`,
+  `CÓDIGO SUBSANACIÓN`, `VOLVER`. `ENVIAR SUBSANACIÓN` y `ACEPTAR TOTAL RATIFICADO`
+  arrancan **`Mui-disabled`** y se habilitan al diligenciar.
+- **Tabla:** un solo `<table>` **ancho** (scroll horizontal) con 23 columnas
+  (`ÍTEM … SOPORTE DE SUBSANACIÓN`). Se opera por **fila** (`tbody tr`) mapeando por
+  el índice de la columna (headers `th` conocidos).
+- **Los campos por ítem son lo difícil:** el valor aceptado es un `<input>` MUI y la
+  observación/soporte se abren con **botones-ícono `MuiIconButton` con SVG adentro y
+  SIN texto ni aria-label** → hay que localizarlos por posición dentro de la fila
+  (columna) o por el modal que abren. La paginación sí tiene aria-label
+  (`Ir a la página anterior/siguiente`).
+- **Pendiente crítico:** el volcado de la **grilla** (lista de facturas) salió de
+  `/dashboard` (Inicio), no de la grilla → falta el selector del **link de la
+  factura**. Y falta ver **`CÓDIGO SUBSANACIÓN`** (si es carga masiva, evita el
+  clic-por-ícono de cada uno de los 185 ítems y hace el bot MUCHO más robusto).
+- Nota: el volcado se ve con "mojibake" (`ÃTEM`) en la consola de PowerShell, pero el
+  archivo está en **UTF-8** correcto — es solo cómo lo muestra `Get-Content`.
+
 ### Mapa de campos: Excel del extractor → portal
 
 | Campo del portal (subsanación) | De dónde sale |
