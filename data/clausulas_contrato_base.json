@@ -84,6 +84,14 @@
       "titulo": "Tarifa pactada COMPENSAR (SOAT − 10% / tarifas institucionales)",
       "texto_literal": "Conforme al Acuerdo Tarifario E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER – COMPENSAR EPS vigencia 2025 (notificado el 13 de enero de 2025), los servicios se liquidan a la tarifa SOAT menos diez por ciento (SOAT − 10%) para los CUPS homologados al Manual SOAT, y a las TARIFAS INSTITUCIONALES propias de la E.S.E. HUS para los procedimientos con código propio. El anexo tarifario forma parte integral del contrato suscrito con COMPENSAR EPS.",
       "pagina": 1
+    },
+    {
+      "eps": "COOSALUD",
+      "numero_clausula": "Tarifario de Servicios 2025",
+      "tema": "TA",
+      "titulo": "Tarifa pactada COOSALUD (SOAT − 15% / tarifas institucionales)",
+      "texto_literal": "Conforme al Tarifario de Servicios E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER vigencia 2025, notificado a COOSALUD EPS el 13 de enero de 2025 en desarrollo de los contratos No. 68001C00060340-24 y 68001S00060339-24, los servicios se liquidan a la tarifa SOAT menos quince por ciento (SOAT − 15%) para los CUPS homologados al Manual Tarifario SOAT, y a las TARIFAS INSTITUCIONALES propias de la E.S.E. HUS para los procedimientos con código propio. El anexo tarifario forma parte integral del acuerdo de servicios y tarifas suscrito con COOSALUD EPS.",
+      "pagina": 1
     }
   ]
 }
