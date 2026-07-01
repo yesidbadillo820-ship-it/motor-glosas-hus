@@ -12,10 +12,11 @@ siguiendo el mismo patrón que responder_glosas_coosalud.py / _simed.py.
     de PILOTO. El portal es React/MUI; los selectores usan texto/rol + posición de
     celda (las clases/ids son inestables). Flujo de SUBSANACIÓN implementado:
     abrir factura → SUBSANAR GLOSA → por cada ítem: expandir "+" (col. TECNOLOGÍA),
-    poner VALOR RATIFICADO ACEPTADO IPS = 0, escribir OBSERVACIÓN (modal ≤1000) →
-    ACEPTAR TOTAL RATIFICADO. El soporte PDF es opcional y v1 lo omite.
-    SEGURIDAD: sin --finalizar el bot SOLO llena (no envía); --max-items N limita a
-    N ítems para pilotear. Modo --explorar sigue disponible para re-calibrar.
+    poner VALOR RATIFICADO ACEPTADO IPS = 0, escribir OBSERVACIÓN (modal ≤1000) y —si
+    se pasa --soportes— subir el PDF de soporte → ENVIAR SUBSANACIÓN (arriba a la
+    derecha; sólo se habilita al completar todos los campos y, normalmente, los
+    soportes). SEGURIDAD: sin --finalizar el bot SOLO llena (no envía); --max-items N
+    limita a N ítems para pilotear. Modo --explorar sigue disponible para re-calibrar.
 
 CREDENCIALES (variables de entorno, NO en el código):
     setx MUTUALSER_USER  gerencia@hus.gov.co
@@ -47,13 +48,15 @@ USO:
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
         --solo HUS0000510639 --cdp http://127.0.0.1:9222 --max-items 1
 
-    REM 3) Factura completa, llena todo y ENVÍA (ACEPTAR TOTAL RATIFICADO):
+    REM 3) Factura completa, llena todo, sube soportes y ENVÍA (ENVIAR SUBSANACIÓN):
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
-        --solo HUS0000510639 --cdp http://127.0.0.1:9222 --finalizar
+        --solo HUS0000510639 --cdp http://127.0.0.1:9222 ^
+        --soportes C:\\temp-notas\\pdfs_mutualser --finalizar
 
-    REM 4) Masivo (todas), enviando:
+    REM 4) Masivo (todas), con soportes, enviando:
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx --todas ^
-        --cdp http://127.0.0.1:9222 --finalizar --reporte reporte_mutualser.csv
+        --cdp http://127.0.0.1:9222 --soportes C:\\temp-notas\\pdfs_mutualser ^
+        --finalizar --reporte reporte_mutualser.csv
 """
 
 from __future__ import annotations
@@ -539,6 +542,42 @@ def _set_observacion(page: Page, detail, texto: str) -> None:
     ta.wait_for(state="hidden", timeout=15000)
 
 
+def _subir_soporte(page: Page, detail, pdf: Path, evidencias: Path) -> None:
+    """Sube `pdf` como SOPORTE DE SUBSANACIÓN de ESTA sub-fila de detalle.
+
+    La celda SOPORTE (col 22) tiene 3 botones en <span aria-label=…>: "Ver
+    documentos", el de subir (nube; su aria-label cambia según el estado) y "Limpiar
+    soporte". Clic en el de subir -> modal "SOPORTE - Cargar archivos" -> input file
+    + GUARDAR -> toast "Carga de archivo exitosa"."""
+    cell = detail.locator("td").nth(COL_SOPORTE)
+    botones = cell.get_by_role("button")
+    botones.first.wait_for(state="visible", timeout=8000)
+    # El de subir es el del medio (2º de 3); si hubiera menos, tomo el primero.
+    idx = 1 if botones.count() >= 3 else 0
+    botones.nth(idx).click()
+    page.wait_for_timeout(800)
+    try:
+        finp = page.locator('input[type="file"]').last
+        finp.wait_for(state="attached", timeout=8000)
+        finp.set_input_files(str(pdf))
+    except Exception as e:  # noqa: BLE001
+        _dump_modal(page, evidencias, "dbg_modal_soporte.html")
+        raise RuntimeError(
+            f"no encontré el input de archivo del soporte ({str(e)[:100]}). Volqué el "
+            f"modal en {evidencias / 'dbg_modal_soporte.html'} para calibrar."
+        ) from e
+    page.wait_for_timeout(500)
+    # Confirmar/guardar dentro del modal (si el modal tiene su propio GUARDAR).
+    with contextlib.suppress(Exception):
+        guardar = page.get_by_role("button", name=re.compile(r"^guardar$", re.I))
+        if guardar.count() and guardar.last.is_visible():
+            guardar.last.click()
+    # Esperar el toast de carga exitosa (si aparece); si no, seguir igual.
+    with contextlib.suppress(Exception):
+        page.get_by_text(re.compile(r"exitos", re.I)).first.wait_for(timeout=12000)
+    page.wait_for_timeout(400)
+
+
 def subsanar_items(
     page: Page,
     valor: int,
@@ -546,15 +585,20 @@ def subsanar_items(
     evidencias: Path,
     max_items: int = 0,
     lento: bool = False,
+    soporte: Path | None = None,
 ) -> int:
-    """Activa el modo SUBSANAR y llena cada ítem con (valor, texto). Devuelve cuántos
-    se llenaron. NOTA: procesa la página actual (>1 página aún es un TODO)."""
+    """Activa el modo SUBSANAR y llena cada ítem con (valor, texto) y —si se pasó
+    `soporte`— sube ese PDF en cada ítem. Devuelve cuántos se llenaron. NOTA: procesa
+    la página actual (>1 página aún es un TODO)."""
     page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
     page.wait_for_timeout(1500)
     _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
     total = _item_rows(page).count()
     n = min(total, max_items) if max_items else total
-    logger.info(f"  Modo subsanar activo. Ítems: {total} — a llenar: {n}")
+    logger.info(
+        f"  Modo subsanar activo. Ítems: {total} — a llenar: {n}"
+        + ("  (con soporte PDF)" if soporte else "")
+    )
     hechos = 0
     for i in range(n):
         # Fila del ítem i y su botón "+" (re-query por el re-render al expandir).
@@ -568,6 +612,8 @@ def subsanar_items(
         try:
             _set_valor(detail, valor)
             _set_observacion(page, detail, texto)
+            if soporte is not None:
+                _subir_soporte(page, detail, soporte, evidencias)
         except Exception as e:  # noqa: BLE001
             _dump_tabla(page, evidencias, f"dbg_error_item{i + 1}.html")
             _dump_modal(page, evidencias, f"dbg_modal_item{i + 1}.html")
@@ -583,16 +629,63 @@ def subsanar_items(
 
 
 def finalizar_factura(page: Page, factura: str, evidencias: Path) -> str:
-    """Cierra la subsanación con ACEPTAR TOTAL RATIFICADO y captura evidencia."""
-    btn = page.get_by_role("button", name="ACEPTAR TOTAL RATIFICADO", exact=True)
-    btn.wait_for(timeout=15000)
-    btn.click()
-    page.wait_for_timeout(2500)
+    """Envía la subsanación con el botón ENVIAR SUBSANACIÓN (arriba a la derecha) y
+    captura evidencia. Ese botón SÓLO se habilita cuando TODOS los ítems tienen su
+    valor + observación y —si el portal lo exige— el soporte PDF cargado; por eso
+    esperamos a que quede habilitado antes de hacer clic."""
+    btn = page.get_by_role("button", name=re.compile(r"enviar\s+subsanaci", re.I))
+    btn.first.wait_for(timeout=20000)
+    # Esperar hasta ~40s a que se habilite (se activa al completar todos los campos).
+    t0 = time.time()
+    while time.time() - t0 < 40:
+        with contextlib.suppress(Exception):
+            if btn.first.is_enabled():
+                break
+        page.wait_for_timeout(1000)
+    else:
+        with contextlib.suppress(Exception):
+            page.screenshot(path=str(evidencias / f"{factura}_no_habilita.png"), full_page=True)
+        raise RuntimeError(
+            "El botón ENVIAR SUBSANACIÓN siguió DESHABILITADO. Suele faltar el soporte "
+            "PDF en cada ítem: re-corré agregando --soportes <carpeta con "
+            f"{factura}.pdf> (o revisá que todos los ítems tengan valor y observación)."
+        )
+    btn.first.click()
+    page.wait_for_timeout(1500)
+    # Posible modal de confirmación ("¿Está seguro?" -> ACEPTAR / CONFIRMAR / SÍ / ENVIAR).
+    with contextlib.suppress(Exception):
+        conf = page.get_by_role(
+            "button", name=re.compile(r"^(aceptar|confirmar|s[ií]|enviar)$", re.I)
+        )
+        if conf.count() and conf.last.is_visible():
+            conf.last.click()
+            page.wait_for_timeout(1500)
+    page.wait_for_timeout(2000)
     evidencias.mkdir(parents=True, exist_ok=True)
     shot = evidencias / f"{factura}_ok.png"
     with contextlib.suppress(Exception):
         page.screenshot(path=str(shot), full_page=True)
-    return f"finalizada; evidencia {shot.name}"
+    return f"enviada; evidencia {shot.name}"
+
+
+def _resolver_soporte(soportes_dir: Path | None, factura: str) -> Path | None:
+    """Ubica el PDF de soporte de la factura dentro de `soportes_dir`. Acepta
+    '<factura>.pdf' (ej. HUS0000510639.pdf) o 'HUS<numero>.pdf'."""
+    if soportes_dir is None:
+        return None
+    candidatos = [
+        soportes_dir / f"{factura}.pdf",
+        soportes_dir / f"{factura.upper()}.pdf",
+        soportes_dir / f"HUS{normalizar_factura(factura)}.pdf",
+    ]
+    for c in candidatos:
+        if c.is_file():
+            return c
+    logger.warning(
+        f"  No hallé el PDF de soporte de {factura} en {soportes_dir} "
+        f"(busqué {', '.join(c.name for c in candidatos)}). Sigo SIN soporte."
+    )
+    return None
 
 
 def procesar_factura(
@@ -603,12 +696,14 @@ def procesar_factura(
     max_items: int = 0,
     finalizar: bool = False,
     lento: bool = False,
+    soportes_dir: Path | None = None,
 ) -> dict:
     grupos = datos["grupos"]
     items = [it for g in grupos for it in g["items"]]
     # Respuesta uniforme (glosa ratificada): 1 grupo -> mismo (aceptado, detalle) para todos.
     valor = grupos[0]["items"][0]["aceptado"] if grupos and grupos[0]["items"] else 0
     texto = grupos[0]["detalle"] if grupos else ""
+    soporte = _resolver_soporte(soportes_dir, factura)
     reg = {
         "factura": factura,
         "grupos": len(grupos),
@@ -618,7 +713,9 @@ def procesar_factura(
     }
     try:
         _abrir_factura(page, factura)
-        hechos = subsanar_items(page, valor, texto, evidencias, max_items=max_items, lento=lento)
+        hechos = subsanar_items(
+            page, valor, texto, evidencias, max_items=max_items, lento=lento, soporte=soporte
+        )
         if finalizar:
             det = finalizar_factura(page, factura, evidencias)
             reg["estado"] = "OK"
@@ -709,11 +806,21 @@ def main() -> int:
         help="Llenar como mucho N ítems por factura (piloto). 0 = todos.",
     )
     parser.add_argument(
+        "--soportes",
+        type=Path,
+        default=None,
+        help=(
+            "Carpeta con los PDF de soporte por factura (ej. HUS0000510639.pdf). Si se "
+            "pasa, el bot sube ese PDF en el SOPORTE de cada ítem (suele ser obligatorio "
+            "para que se habilite ENVIAR SUBSANACIÓN)."
+        ),
+    )
+    parser.add_argument(
         "--finalizar",
         action="store_true",
         help=(
-            "Hacer click en ACEPTAR TOTAL RATIFICADO al terminar (envía). SIN este "
-            "flag el bot SOLO llena los campos y NO envía (revisás y re-corrés)."
+            "Hacer click en ENVIAR SUBSANACIÓN al terminar (envía). SIN este flag el "
+            "bot SOLO llena los campos y NO envía (revisás y re-corrés)."
         ),
     )
     parser.add_argument(
@@ -772,6 +879,7 @@ def main() -> int:
                     max_items=args.max_items,
                     finalizar=args.finalizar,
                     lento=args.lento,
+                    soportes_dir=args.soportes,
                 )
                 resultados.append(reg)
                 w_rep.writerow(reg)

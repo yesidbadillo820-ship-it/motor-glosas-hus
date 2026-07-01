@@ -200,17 +200,23 @@ confirmar.
   `/dashboard/applications/auditoria-de-cuentas-medicas/GESTION-RESPUESTAS-GLOSAS`
   (ya es `PORTAL_MODULO`).
 - **Botones estables por texto** (MUI, `<button>` con label visible):
-  `SUBSANAR GLOSA`, `ENVIAR SUBSANACIÓN`, `ACEPTAR TOTAL RATIFICADO`,
-  `CÓDIGO SUBSANACIÓN`, `VOLVER`. `ENVIAR SUBSANACIÓN` y `ACEPTAR TOTAL RATIFICADO`
-  arrancan **`Mui-disabled`** y se habilitan al diligenciar.
-- **Tabla:** un solo `<table>` **ancho** (scroll horizontal) con 23 columnas
+  `SUBSANAR GLOSA`, `ENVIAR SUBSANACIÓN`, `CÓDIGO SUBSANACIÓN`, `VOLVER`. El botón que
+  **envía** la subsanación es **`ENVIAR SUBSANACIÓN`** (arriba a la derecha); arranca
+  **`Mui-disabled`** y sólo se habilita cuando **todos** los ítems tienen valor +
+  observación y (normalmente) su **soporte PDF** cargado. `ACEPTAR TOTAL RATIFICADO`
+  **NO** es el botón de envío de esta pantalla.
+- **Tabla:** un solo `<table>` **ancho** (scroll horizontal) con ~24 columnas
   (`ÍTEM … SOPORTE DE SUBSANACIÓN`). Se opera por **fila** (`tbody tr`) mapeando por
-  el índice de la columna (headers `th` conocidos).
-- **Los campos por ítem son lo difícil:** el valor aceptado es un `<input>` MUI y la
-  observación/soporte se abren con **botones-ícono `MuiIconButton` con SVG adentro y
-  SIN texto ni aria-label** → hay que localizarlos por posición dentro de la fila
-  (columna) o por el modal que abren. La paginación sí tiene aria-label
-  (`Ir a la página anterior/siguiente`).
+  el índice de la columna (headers `th` conocidos). Índices usados:
+  `COL_TECNOLOGIA=2` (botón `+`), `COL_VALOR_ACEPTADO=19`, `COL_OBSERVACION=21`,
+  `COL_SOPORTE=22`. **No es acordeón:** el `+` inserta una sub-fila de detalle
+  (`following-sibling::tr[1]`) y pueden quedar varias abiertas a la vez.
+- **Campos por ítem:** el valor aceptado es un `<input class="MuiInputBase-inputAdornedEnd">`;
+  la observación abre un **modal** (única `textarea:visible`) que se confirma con
+  `ACEPTAR`. La celda **SOPORTE** tiene 3 `MuiIconButton` dentro de
+  `<span aria-label=…>`: `Ver documentos`, el de **subir** (nube; su aria-label cambia
+  con el estado, ej. `Soporte cargado`) y `Limpiar soporte` → el de subir es el **2º**.
+  La paginación sí tiene aria-label (`Ir a la página anterior/siguiente`).
 - **Pendiente crítico:** el volcado de la **grilla** (lista de facturas) salió de
   `/dashboard` (Inicio), no de la grilla → falta el selector del **link de la
   factura**. Y falta ver **`CÓDIGO SUBSANACIÓN`** (si es carga masiva, evita el
@@ -224,7 +230,7 @@ confirmar.
 |---|---|
 | `VALOR RATIFICADO ACEPTADO IPS` | `Valor Aceptado` del Excel (**$0** en rechazo total) |
 | `OBSERVACIONES DE SUBSANACIÓN` (modal, ≤1000 chars) | `Detalle Respuesta` del Excel (832 chars, entra) |
-| `SOPORTE DE SUBSANACIÓN` (PDF ≤300 MB) | PDF de soporte por concepto (a definir cuál) |
+| `SOPORTE DE SUBSANACIÓN` (PDF) | El mismo **Trámite de Objeción** PDF de la factura (`--soportes <carpeta>/<factura>.pdf`), subido en cada ítem |
 | — | `Código Respuesta` (RE9901) y `Código Glosa`: referencia, no se tipean en esta pantalla |
 
 ## 7) Riesgos / decisiones abiertas
@@ -233,11 +239,13 @@ confirmar.
    login asistido a mano la primera vez. No se usan servicios de resolución de
    captcha de terceros.
 2. **Formulario de respuesta:** ✅ RESUELTO (ver §6) — es una **subsanación** que se
-   llena **ítem por ítem** (valor aceptado + observación en modal ≤1000 chars +
-   soporte PDF) y se cierra con `ACEPTAR TOTAL RATIFICADO`. No hay dropdown de código
-   de respuesta en esa pantalla. Pendiente: (a) confirmar si `CÓDIGO SUBSANACIÓN`
-   permite carga **masiva** (vital para 185 ítems); (b) qué **PDF de soporte** va y
-   si es obligatorio; (c) relación `ACEPTAR TOTAL RATIFICADO` vs `ENVIAR SUBSANACIÓN`.
+   llena **ítem por ítem** (valor aceptado `$0` + observación en modal ≤1000 chars +
+   soporte PDF) y se **envía** con **`ENVIAR SUBSANACIÓN`** (arriba a la derecha), que
+   sólo se habilita al completar todo. El bot sube el mismo Trámite PDF por ítem con
+   `--soportes`. No hay dropdown de código de respuesta en esa pantalla. Pendiente:
+   (a) confirmar en piloto si `ENVIAR SUBSANACIÓN` se habilita **sin** soporte o si es
+   obligatorio; (b) si `CÓDIGO SUBSANACIÓN` permite carga **masiva** (evitaría el
+   clic-por-ícono en los 185 ítems).
 3. **Selectores del DOM:** los botones de ícono (`+` expandir, libro/chat de
    observación, nube de soporte, check de valor) no tienen texto → hace falta el
    volcado de `--explorar` (o iterar en un piloto) para fijar sus selectores.
