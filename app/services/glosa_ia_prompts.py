@@ -1894,9 +1894,27 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
 
         db = SessionLocal()
         try:
+            # Ronda 23: emparejamiento FLEXIBLE de EPS (como get_contrato). La
+            # glosa puede traer "AURORA" o "COMPENSAR" y las cláusulas estar
+            # guardadas como "SEGUROS DE VIDA AURORA S.A." o "COMPENSAR EPS".
+            # El match exacto (== eps.upper()) las perdía.
+            eps_q = eps.upper().strip()
+            eps_match = eps_q
+            try:
+                almacenadas = [
+                    r[0] for r in db.query(ClausulaContrato.eps).distinct().all() if r[0]
+                ]
+                if eps_q not in {a.upper() for a in almacenadas}:
+                    for stored in almacenadas:
+                        su = stored.upper()
+                        if su in eps_q or (len(eps_q) >= 4 and eps_q in su):
+                            eps_match = stored
+                            break
+            except Exception:
+                pass
             q = (
                 db.query(ClausulaContrato)
-                .filter(ClausulaContrato.eps == eps.upper())
+                .filter(ClausulaContrato.eps == eps_match)
                 .filter(ClausulaContrato.tema.in_(temas_relevantes))
                 .order_by(ClausulaContrato.tema, ClausulaContrato.id)
                 .limit(max_clausulas)

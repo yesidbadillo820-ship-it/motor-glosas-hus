@@ -109,3 +109,28 @@ def test_clausulas_reales_se_inyectan_para_citar(db_en_memoria):
 
     cls = get_clausulas_para_glosa("PRUEBA EPS BD", "TA0201")
     assert any("SOAT menos diez" in c["texto_literal"] for c in cls)
+
+
+def test_eps_corta_empareja_con_razon_social_completa(db_en_memoria):
+    """La glosa trae 'AURORA' pero la cláusula está bajo la razón social
+    completa 'SEGUROS DE VIDA AURORA S.A.'. El match flexible debe hallarla
+    (antes el == exacto la perdía y la IA no citaba nada)."""
+    s = db_en_memoria()
+    s.add(
+        ClausulaContrato(
+            eps="SEGUROS DE VIDA AURORA S.A.",
+            numero_clausula="Primera, Parágrafo Cuarto",
+            tema="TA",
+            titulo="Tarifa pactada",
+            texto_literal="Los servicios se facturarán a SOAT – 3% en SMLMV.",
+        )
+    )
+    s.commit()
+    s.close()
+
+    from app.services.glosa_ia_prompts import get_clausulas_para_glosa
+
+    cls = get_clausulas_para_glosa("AURORA", "TA0101")
+    assert any("SOAT – 3%" in c["texto_literal"] for c in cls), (
+        "El match flexible no encontró la cláusula bajo la razón social completa"
+    )

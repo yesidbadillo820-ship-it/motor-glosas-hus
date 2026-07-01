@@ -1,24 +1,89 @@
 {
   "_meta": {
-    "descripcion": "Cláusulas LITERALES de los contratos por EPS, para que la IA las cite textualmente al refutar una glosa (en vez de decir 'SIN CONTRATO PACTADO' o evadir la cláusula citada). Se cargan a la tabla clausulas_contrato con: python scripts/seed_clausulas_contrato.py",
-    "como_llenar": "Copia el texto EXACTO de cada cláusula relevante del contrato firmado con cada EPS. NO inventes ni parafrasees — la IA la cita entre comillas, así que debe ser el texto real. Prioriza las cláusulas que más usas para defender: tarifa, soportes, autorización, cobertura, sanciones.",
-    "ejemplo_formato": {
-      "eps": "COMPENSAR",
-      "numero_clausula": "9",
-      "tema": "CO",
-      "titulo": "Junta médica para prótesis de alto costo",
-      "texto_literal": "[AQUÍ va el texto EXACTO de la cláusula 9 tal como aparece en el contrato firmado]",
-      "pagina": 12
-    },
+    "descripcion": "Cláusulas LITERALES de los contratos por EPS/aseguradora, para que la IA las cite textualmente al refutar una glosa (en vez de decir 'SIN CONTRATO PACTADO' o evadir la cláusula citada). Se cargan a la tabla clausulas_contrato con: python scripts/seed_clausulas_contrato.py",
+    "como_llenar": "Copia el texto EXACTO de cada cláusula relevante del contrato firmado. NO inventes ni parafrasees — la IA la cita entre comillas.",
     "temas_validos": {
       "TA": "tarifas / valor",
       "SO": "soportes / documentos",
       "AU": "autorizaciones",
-      "CO": "cobertura / pertinencia / PBS",
-      "FA": "facturación",
-      "NN": "general / comodín (aplica a cualquier tema)"
+      "CO": "cobertura / pertinencia / exclusiones",
+      "FA": "facturación / pago",
+      "NN": "general / comodín"
     },
-    "nota": "La EPS debe escribirse en MAYÚSCULAS y coincidir con la que detecta el motor (ej. 'COMPENSAR', 'SANITAS', 'NUEVA EPS'). El campo 'tema' se empareja con el prefijo del código de glosa (TA0201 → TA)."
+    "nota": "La EPS se empareja de forma flexible (ej. 'AURORA' encuentra 'SEGUROS DE VIDA AURORA S.A.')."
   },
-  "clausulas": []
+  "clausulas": [
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Primera, Parágrafo Cuarto",
+      "tema": "TA",
+      "titulo": "Tarifa pactada (SOAT – 3% / tarifas propias)",
+      "texto_literal": "Los servicios prestados con cargo a este contrato se facturarán conforme a las siguientes tarifas: TARIFAS PROPIAS emanadas a través de actos administrativos y SOAT – 3% expresadas en SMLMV, en los casos que la E.S.E., no cuente con una tarifa Institucional para el servicio de acuerdo con la propuesta de LA E.S.E y el acuerdo entre las partes.",
+      "pagina": 1
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Séptima, Parágrafo",
+      "tema": "TA",
+      "titulo": "Modalidad por evento y actualización anual de tarifas",
+      "texto_literal": "Los servicios prestados con cargo a este contrato se facturarán conforme las TARIFAS PROPIAS, emanadas a través de actos administrativos y SOAT – 3% expresados en SMLMV, en los casos que la E.S.E., no cuente con una tarifa Institucional para el servicio; la modalidad del contrato es por evento; los valores pactados se actualizarán el 1 de enero de cada año conforme los incrementos que determine el Gobierno Nacional de acuerdo a las tarifas pactadas y los anexos, previo acuerdo entre las partes, los cuales forman parte del presente convenio.",
+      "pagina": 6
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Octava, numeral 3",
+      "tema": "FA",
+      "titulo": "El incumplimiento de plazos no exonera de pagar los servicios prestados",
+      "texto_literal": "El no cumplimiento de los plazos estipulados en la presente cláusula no exonera a AURORA S.A. de cancelar los servicios efectivamente prestados de acuerdo con los criterios de racionalidad y pertinencia para su pago.",
+      "pagina": 7
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Octava, Parágrafo Tercero (MAOS)",
+      "tema": "TA",
+      "titulo": "Suministro de MAOS (material de osteosíntesis) — cotización y entrega",
+      "texto_literal": "SUMINISTRO DE MAOS (MATERIAL DE OSTEOSÍNTESIS): Para todos los casos que requieran material de osteosíntesis LA E.S.E debe generar cotización del costo total del procedimiento incluyendo el valor total del MAOS conforme se establece en la Resolución del CONTRATISTA... En caso de que el CONTRATANTE NO acepte la cotización, el paciente debe ser puesto en referencia, garantizando su traslado en un término no mayor a 12 horas, de no realizarse el traslado, LA E.S.E quedará habilitado para la entrega del MAOS al valor establecido en sus actos administrativos para la fecha de prestación del servicio, esto garantizando la atención oportuna del usuario y evitando estancias prolongadas.",
+      "pagina": 8
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Primera, Parágrafo Tercero",
+      "tema": "AU",
+      "titulo": "Autorización previa de servicios programados",
+      "texto_literal": "Los servicios de asistencia médica/quirúrgica/terapéutica/diagnostica programada, ambulatoria u hospitalaria, requeridas para el manejo integral del asegurado y/o sus beneficiarios que sean atendidos por LA E.S.E, deberán ser autorizados en forma previa por AURORA S.A. quien generará un numero de autorización y definirá los procedimientos y/o tiempos de hospitalización y/o pruebas diagnósticas; esta autorización deberá acompañar la factura con los soportes de reclamación para cada paciente.",
+      "pagina": 2
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Octava, Parágrafo Primero",
+      "tema": "SO",
+      "titulo": "Soportes mínimos de la factura",
+      "texto_literal": "Los soportes mínimos son: Factura electrónica de acuerdo con las disposiciones de la DIAN y RIPS / CUV. Según anexo técnico 5 de la resolución 3047 del 2008 y Resolución 558 del 2024 y demás normas que las modifiquen y sustituyan. Según sea el caso, el listado de soportes que deben acompañar la factura de cobro si aplica son: a) Factura de venta en salud. b) Registro de la atención de salud. c) Resumen de atención. d) Epicrisis. Resultados de los procedimientos de apoyo. e) Diagnóstico. f) Descripción quirúrgica. g) Registro de anestesia. h) Comprobante de recibido de usuario. i) Soporte de traslado de transporte. j) Hoja de traslado asistencial de pacientes. k) Soporte de transporte no asistencial. l) Orden o prescripción facultativa. m) Hoja de atención de urgencias. n) Hoja de atención odontológica. o) Hoja de administración de medicamentos. p) Evidencia de envío del trámite de autorización del servicio.",
+      "pagina": 7
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Segunda",
+      "tema": "CO",
+      "titulo": "Exclusiones del contrato",
+      "texto_literal": "Se encuentran excluidos del objeto del presente contrato los servicios de salud derivados de todas aquellas actividades, procedimientos, intervenciones y guías de atención integral que se deriven o sean ocasionados por un accidente o enfermedad laboral, accidente de tránsito, enfermedad preexistente, pandemia, epidemia. De igual manera, todas las acciones terapéuticas que no hayan sido autorizadas por AURORA S.A., todos los eventos que no hagan parte de la cobertura de la póliza, así como todos los servicios que no se encuentren debidamente habilitados.",
+      "pagina": 2
+    },
+    {
+      "eps": "SEGUROS DE VIDA AURORA S.A.",
+      "numero_clausula": "Vigésima Octava (Cláusula Penal)",
+      "tema": "NN",
+      "titulo": "Cláusula penal — 10% del valor del contrato por INCUMPLIMIENTO",
+      "texto_literal": "Para el referido contrato se aplicará la normatividad contenida en el artículo 1592 del Código Civil en caso de configurarse cualquier incumplimiento contractual, AURORA S.A. hará efectiva la cláusula penal, pecuniario equivalente al 10% del valor del contrato, amparando todos y cada uno de los daños y perjuicios que se generen con el incumplimiento del contrato ya sea por acción u omisión.",
+      "pagina": 12
+    },
+    {
+      "eps": "COMPENSAR EPS",
+      "numero_clausula": "Acuerdo Tarifario 2025",
+      "tema": "TA",
+      "titulo": "Tarifa pactada COMPENSAR (SOAT − 10% / tarifas institucionales)",
+      "texto_literal": "Conforme al Acuerdo Tarifario E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER – COMPENSAR EPS vigencia 2025 (notificado el 13 de enero de 2025), los servicios se liquidan a la tarifa SOAT menos diez por ciento (SOAT − 10%) para los CUPS homologados al Manual SOAT, y a las TARIFAS INSTITUCIONALES propias de la E.S.E. HUS para los procedimientos con código propio. El anexo tarifario forma parte integral del contrato suscrito con COMPENSAR EPS.",
+      "pagina": 1
+    }
+  ]
 }
