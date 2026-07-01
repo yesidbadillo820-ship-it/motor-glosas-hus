@@ -36,17 +36,30 @@ INSTALACIÓN (una vez):
     py -m pip install playwright openpyxl
     py -m playwright install chromium
 
+reCAPTCHA — IMPORTANTE:
+    El login tiene reCAPTCHA y NO valida en un navegador automatizado (Playwright).
+    Solución recomendada: abrí TU Chrome con puerto de depuración, logueate a mano
+    (ahí el captcha sí pasa) y el bot se CONECTA a ese Chrome con --cdp:
+
+    REM (1 vez) cerrá Chrome y abrilo con depuración + perfil dedicado:
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^
+        --remote-debugging-port=9222 --user-data-dir="C:\\temp-notas\\zonaser-chrome"
+    REM en ese Chrome: entrá a https://portalzonaser.mutualser.com, logueate, abrí el módulo.
+
 USO:
-    REM 1) Explorar/calibrar el portal (browser visible, resolver captcha a mano):
+    REM 1) Explorar/calibrar conectándose a tu Chrome (recomendado):
+    py responder_glosas_mutual_ser.py --explorar --cdp http://localhost:9222
+
+    REM 1b) Explorar lanzando el browser (si el captcha te deja):
     py responder_glosas_mutual_ser.py --explorar --con-cabeza
 
-    REM 2) Piloto de una factura (con cabeza), reutilizando la sesión guardada:
+    REM 2) Piloto de una factura conectándose a tu Chrome:
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
-        --solo HUS0000492542 --con-cabeza
+        --solo HUS0000492542 --cdp http://localhost:9222
 
     REM 3) Masivo:
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx --todas ^
-        --reporte reporte_mutualser.csv
+        --cdp http://localhost:9222 --reporte reporte_mutualser.csv
 """
 
 from __future__ import annotations
@@ -295,10 +308,52 @@ def login_interactivo(page: Page, user: str, password: str, timeout_captcha_s: i
 
 
 def abrir_sesion(p, args, user: str, password: str):
-    """Abre browser + contexto. Si existe --storage-state válido, lo reutiliza
-    (evita el captcha). Si no, hace login interactivo y lo guarda."""
+    """Abre/conecta el browser. Devuelve (browser, ctx, page, es_cdp).
+
+    MODO --cdp URL (recomendado por el reCAPTCHA): se CONECTA a un Chrome real que
+    el usuario abrió con --remote-debugging-port y donde YA inició sesión a mano. El
+    captcha lo resuelve el usuario en su Chrome normal, así reCAPTCHA nunca ve un
+    navegador automatizado (que es lo que lo hace fallar). El bot sólo maneja la
+    pestaña ya autenticada. NO cierra ese Chrome al terminar.
+
+    MODO default: lanza Chromium/Chrome controlado por Playwright y reutiliza
+    --storage-state si existe; si no, login interactivo. OJO: en este modo el
+    reCAPTCHA suele NEGARSE a validar (navegador detectado como automatizado) — usá
+    --cdp si el captcha no pasa.
+    """
+    if args.cdp:
+        logger.info(f"Conectando a tu Chrome vía CDP: {args.cdp}")
+        try:
+            browser = p.chromium.connect_over_cdp(args.cdp)
+        except Exception as e:
+            raise RuntimeError(
+                f"No pude conectarme a Chrome en {args.cdp}. Abrí Chrome con "
+                '--remote-debugging-port=9222 y --user-data-dir="C:\\temp-notas\\'
+                f'zonaser-chrome", logueate al portal, y reintentá. Detalle: {e}"'
+            ) from e
+        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.set_default_navigation_timeout(120000)
+        page.set_default_timeout(30000)
+        if not _login_ok(page):
+            logger.warning(
+                "No detecto sesión activa en ese Chrome. En esa ventana: iniciá "
+                "sesión en el portal (resolvé el captcha) y abrí el módulo / la "
+                "factura ANTES de seguir. Igual continúo con la pestaña actual."
+            )
+        return browser, ctx, page, True
+
     storage = Path(args.storage_state)
-    browser = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
+    launch_kwargs = {
+        "headless": not args.con_cabeza,
+        "slow_mo": 300 if args.lento else 0,
+        # Reduce la huella de automatización (ayuda algo, pero el reCAPTCHA igual
+        # puede fallar — para eso está --cdp).
+        "args": ["--disable-blink-features=AutomationControlled"],
+    }
+    if args.canal:
+        launch_kwargs["channel"] = args.canal
+    browser = p.chromium.launch(**launch_kwargs)
     ctx_kwargs = {"accept_downloads": True}
     if storage.is_file():
         logger.info(f"Reutilizando sesión guardada: {storage}")
@@ -315,13 +370,13 @@ def abrir_sesion(p, args, user: str, password: str):
         if not args.con_cabeza:
             raise RuntimeError(
                 "Sesión inválida/expirada y estás headless. Corré una vez con "
-                "--con-cabeza para resolver el captcha y regenerar la sesión."
+                "--con-cabeza (o mejor --cdp) para autenticarte y regenerar la sesión."
             )
         login_interactivo(page, user, password)
         ctx.storage_state(path=str(storage))
         logger.info(f"Sesión guardada en {storage} (reutilizable sin captcha).")
         page.goto(PORTAL_MODULO, wait_until="domcontentloaded")
-    return browser, ctx, page
+    return browser, ctx, page, False
 
 
 # ─── Exploración/calibración del DOM (equivalente web de dump_dg.py) ──────────
@@ -343,28 +398,35 @@ def explorar(page: Page, salida_dir: Path) -> None:
     dump = page.evaluate(
         """() => {
         const txt = el => (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().slice(0,80);
+        const html = el => (el.outerHTML || '').replace(/\\s+/g,' ').slice(0,160);
         const desc = el => {
             const a = [];
-            for (const at of ['id','name','type','placeholder','role','class']) {
-                const v = el.getAttribute(at); if (v) a.push(at+'='+v.slice(0,60));
+            for (const at of ['id','name','type','placeholder','role','aria-label','class']) {
+                const v = el.getAttribute(at); if (v) a.push(at+'='+v.slice(0,50));
             }
             return el.tagName.toLowerCase()+' {'+a.join(' ')+'} '+txt(el);
         };
-        const pick = sel => Array.from(document.querySelectorAll(sel)).slice(0,60).map(desc);
+        const pick = (sel,n=80) => Array.from(document.querySelectorAll(sel)).slice(0,n).map(desc);
+        // Botones (incluye icon-buttons) con un trozo de outerHTML para ver el mat-icon interno.
+        const botones = Array.from(document.querySelectorAll(
+            'button, [role=button], input[type=button], input[type=submit], a.btn, [class*=btn]'
+        )).slice(0,120).map(el => desc(el)+' || '+html(el));
         return {
             url: location.href,
-            botones: pick('button, [role=button], input[type=button], input[type=submit], a.btn'),
+            botones,
             inputs: pick('input, textarea'),
             selects: pick('select, [role=combobox], mat-select'),
-            th: Array.from(document.querySelectorAll('th, [role=columnheader]')).slice(0,40).map(e=>txt(e)),
-            links: Array.from(document.querySelectorAll('a')).slice(0,60).map(a=>({t:txt(a), href:a.getAttribute('href')})),
+            iconos: Array.from(document.querySelectorAll('mat-icon, i[class*=icon], svg[class*=icon]'))
+                .slice(0,120).map(e => (txt(e)||'')+' | '+html(e)),
+            th: Array.from(document.querySelectorAll('th, [role=columnheader]')).slice(0,50).map(e=>txt(e)),
+            links: Array.from(document.querySelectorAll('a')).slice(0,80).map(a=>({t:txt(a), href:a.getAttribute('href')})),
         };
     }"""
     )
     out = salida_dir / f"explorar_{ts}.txt"
     with out.open("w", encoding="utf-8") as f:
         f.write(f"URL: {dump.get('url')}\n\n")
-        for seccion in ("th", "botones", "selects", "inputs", "links"):
+        for seccion in ("th", "botones", "iconos", "selects", "inputs", "links"):
             f.write(f"===== {seccion.upper()} =====\n")
             for row in dump.get(seccion, []):
                 f.write(f"  {row}\n")
@@ -507,6 +569,21 @@ def main() -> int:
         action="store_true",
         help="Browser visible (necesario para resolver el captcha).",
     )
+    parser.add_argument(
+        "--cdp",
+        type=str,
+        default=None,
+        help=(
+            "Conectar a un Chrome REAL ya abierto (ej. http://localhost:9222) donde "
+            "vos iniciaste sesión a mano. Evita que el reCAPTCHA detecte automatización."
+        ),
+    )
+    parser.add_argument(
+        "--canal",
+        type=str,
+        default=None,
+        help="Canal del browser en modo lanzado (ej. 'chrome' o 'msedge').",
+    )
     parser.add_argument("--lento", action="store_true", help="slow_mo 300ms (debug visual).")
     parser.add_argument(
         "--reporte", type=Path, default=Path("reporte_mutualser.csv"), help="CSV de salida."
@@ -516,7 +593,8 @@ def main() -> int:
 
     setup_logging(args.log)
     _exigir_playwright()
-    user, password = cargar_credenciales()
+    # En modo --cdp el login lo hace el usuario en su Chrome: no hacen falta credenciales.
+    user, password = ("", "") if args.cdp else cargar_credenciales()
 
     if not args.explorar and not args.excel:
         parser.error("indicá --excel (o usá --explorar para calibrar el portal).")
@@ -524,9 +602,14 @@ def main() -> int:
         parser.error("elegí qué facturas procesar: --solo / --facturas / --lista / --todas.")
 
     with sync_playwright() as p:
-        browser, ctx, page = abrir_sesion(p, args, user, password)
+        browser, ctx, page, es_cdp = abrir_sesion(p, args, user, password)
         try:
             if args.explorar:
+                if es_cdp:
+                    logger.info(
+                        "Modo CDP: vuelco la pestaña ACTUAL de tu Chrome "
+                        "(abrí la factura en modo subsanación para capturar esos botones)."
+                    )
                 explorar(page, args.evidencias)
                 return 0
 
@@ -570,6 +653,8 @@ def main() -> int:
                     "los  # TODO(portal)  de responder_glosas_mutual_ser.py."
                 )
         finally:
+            # browser.close() sobre una conexión CDP sólo DESCONECTA (no mata el
+            # Chrome del usuario); sobre un browser lanzado, lo cierra.
             with contextlib.suppress(Exception):
                 browser.close()
     return 0
