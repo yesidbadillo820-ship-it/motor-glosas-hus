@@ -124,6 +124,102 @@
       "titulo": "Tarifa pactada FAMISANAR 2026 (UVB − 5% / tarifas propias)",
       "texto_literal": "Conforme al anexo tarifario del contrato FAMISANAR (Propuesta Base Final vigencia 2026), los servicios se liquidan de la siguiente manera: los CUPS homologados a la UVB se pagan a la UVB vigente menos cinco por ciento (UVB − 5%); los procedimientos y paquetes con código propio se pagan a las TARIFAS PROPIAS de la E.S.E. HUS; los exámenes ambulatorios conforme a la Resolución 2706 de 2025; y las órtesis y prótesis a la tarifa institucional 2026. El anexo tarifario forma parte integral del contrato No. S-13-1-03-1-04958 suscrito con FAMISANAR.",
       "pagina": 1
+    },
+    {
+      "eps": "SUMIMEDICAL",
+      "numero_clausula": "Tarifario de Servicios 2025",
+      "tema": "TA",
+      "titulo": "Tarifa pactada SUMIMEDICAL (SOAT − 15% / institucionales)",
+      "texto_literal": "Conforme al Tarifario de Servicios E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER vigencia 2025, notificado a SUMIMEDICAL el 13 de enero de 2025, los servicios se liquidan a la tarifa SOAT menos quince por ciento (SOAT − 15%) para los CUPS homologados al Manual Tarifario SOAT, y a las TARIFAS INSTITUCIONALES propias de la E.S.E. HUS para los procedimientos con código propio. El anexo tarifario forma parte integral de la relación contractual con SUMIMEDICAL.",
+      "pagina": 1
+    },
+    {
+      "eps": "SALUD MIA",
+      "numero_clausula": "Octava (Valor y Tarifas)",
+      "tema": "TA",
+      "titulo": "Tarifa pactada SALUD MÍA (SOAT VIGENTE − 15%)",
+      "texto_literal": "CLÁUSULA OCTAVA - VALOR DEL CONTRATO Y TARIFAS: Los servicios prestados con cargo a este contrato se facturarán a tarifa SOAT VIGENTE −15 % (Decreto 2423 de 1996 compilado en el Decreto 780 de 2016 del Ministerio de Salud y Protección Social, Título 3, Capítulo 6, Anexo técnico 1), excepto los servicios sin homólogo en el manual SOAT, que se liquidan a las tarifas institucionales/propias de la E.S.E. HUS (Cláusula Octava, Parágrafo Primero).",
+      "pagina": 4
+    },
+    {
+      "eps": "SALUD MIA",
+      "numero_clausula": "Novena, Parágrafo Cuarto",
+      "tema": "AU",
+      "titulo": "La autorización inoportuna no exonera del pago",
+      "texto_literal": "PARÁGRAFO CUARTO: El no cumplimiento de los plazos estipulados en la presente cláusula incluyendo la solicitud inoportuna o parcial de las respectivas autorizaciones, no exonera a la EPS de cancelar los servicios efectivamente prestados con racionalidad y pertinencia.",
+      "pagina": 6
+    },
+    {
+      "eps": "SALUD MIA",
+      "numero_clausula": "Novena, Parágrafo Sexto",
+      "tema": "SO",
+      "titulo": "Soportes (Res. 3047/2008) — más soportes no es causal de devolución",
+      "texto_literal": "PARÁGRAFO SEXTO: Se presentará: 1. Copia de la Factura de venta con todos los soportes enunciados en el anexo 5 de la Resolución 3047 de 2008 expedido por el Ministerio de la Protección Social. 2. En caso de que la EPS requiera más soportes de la historia clínica, EL PRESTADOR los facilitará a efectos de que la EPS pueda reproducirlos total o parcialmente y a su costa, siguiendo los lineamientos de la resolución 1995 de 1999 y la Resolución 3047 de 2008. En ningún caso este será causal de devolución de la factura y/o dilación para el pago de la factura.",
+      "pagina": 6
+    },
+    {
+      "eps": "POSITIVA",
+      "numero_clausula": "Objeto (Otrosí 03 al Contrato 0525/2017)",
+      "tema": "CO",
+      "titulo": "Ramos ARL cubiertos y exclusiones",
+      "texto_literal": "El objeto del contrato 0525 de 2017 comprende los ramos: Administración de Riesgos Laborales (ARL —por causa exclusiva de un accidente de trabajo, una enfermedad profesional), Accidentes Personales (AP Educativo Generación Positiva, AP Colectivos, AP Corto Plazo, AP Individual), Vida Individual, Vida Grupo, encontrándose excluidos del presente contrato los servicios y todas aquellas actividades, procedimientos e intervenciones que no tengan por objeto contribuir al diagnóstico, tratamiento o rehabilitación de la patología derivada del evento calificado como profesional, los servicios considerados como experimentales, cosméticos, suntuarios o los amparados por las demás pólizas de la Compañía.",
+      "pagina": 2
+    },
+    {
+      "eps": "POSITIVA",
+      "numero_clausula": "Contrato 0525/2017 + Otrosí 03 (tarifa/vigencia)",
+      "tema": "TA",
+      "titulo": "Tarifa SOAT − 15% y vigencia hasta 19-ene-2027",
+      "texto_literal": "Conforme al contrato de prestación de servicios No. 0525 de 2017 y su Otrosí No. 03 (suscrito el 11 de diciembre de 2025, que prorroga la duración hasta el 19 de enero de 2027 inclusive), los servicios homologados al Manual SOAT se liquidan a la tarifa SOAT menos quince por ciento (SOAT − 15%), y los servicios sin homólogo SOAT a las TARIFAS PROPIAS/institucionales de la E.S.E. HUS; los traslados se liquidan conforme a la Resolución 159 de 2018.",
+      "pagina": 1
+    },
+    {
+      "eps": "PPL",
+      "numero_clausula": "Contrato IPS-001B-2022 + Otrosí 26 (tarifa)",
+      "tema": "TA",
+      "titulo": "Tarifa PPL (SOAT SMLV − 15% / propias bajo resolución)",
+      "texto_literal": "Conforme al contrato No. IPS-001B-2022 (Patrimonio Autónomo Fondo de Atención en Salud PPL, administrado por Fiduprevisora S.A.) y su Otrosí No. 26, la modalidad tarifaria es SOAT 'SMLV' menos quince por ciento (SOAT SMLV − 15%) para los CUPS homologados al Manual SOAT (homologación CUPS-SOAT HUS 2022), y tarifas PROPIAS/institucionales bajo resolución (sin descuento) para los CUPS no homologados a SOAT.",
+      "pagina": 1
+    },
+    {
+      "eps": "PPL",
+      "numero_clausula": "Otrosí 26, Cláusula 1 (Prórroga)",
+      "tema": "NN",
+      "titulo": "Vigencia prorrogada al 31-jul-2026",
+      "texto_literal": "CLÁUSULA 1. PRORROGAR: PRORROGAR el plazo de ejecución del Contrato n.° IPS-001B-2022 suscrito entre el PATRIMONIO AUTÓNOMO FIDEICOMISO FONDO NACIONAL DE SALUD PPL y la EMPRESA SOCIAL DEL ESTADO HOSPITAL UNIVERSITARIO DE SANTANDER, por siete (7) meses contados a partir del primero (1) de enero de dos mil veintiséis (2026) y hasta el treinta (31) de julio de dos mil veintiséis (2026).",
+      "pagina": 1
+    },
+    {
+      "eps": "POLICIA NACIONAL",
+      "numero_clausula": "Anexo 2 (Tarifario Ofertado)",
+      "tema": "TA",
+      "titulo": "Tarifario oncología (UVB vigente − 8% + institucionales)",
+      "texto_literal": "ANEXO 2 TARIFARIO OFERTADO: Atención intrahospitalaria y tarifa base de atención ambulatoria a UVB VIGENTE − 8%, más TARIFAS INSTITUCIONALES según las tablas del 'Anexo Excel Tarifas HUS Oncología 2026 – UVB -8% PONAL' y las resoluciones de la E.S.E. HUS. Medicamentos, nutriciones, material de osteosíntesis, dispositivos médicos e insumos: tarifa según Resoluciones de la E.S.E. HUS No. 288 de 2025, 183 de 2025, 194 de 2025 y 054 de 2026.",
+      "pagina": 1
+    },
+    {
+      "eps": "POLICIA NACIONAL",
+      "numero_clausula": "Quinta (Forma de Pago) — Trámite de Glosas",
+      "tema": "FA",
+      "titulo": "Trámite de glosas — 20 días hábiles, sin glosas nuevas (Decreto 441/2022)",
+      "texto_literal": "TRÁMITE DE GLOSAS: Las entidades responsables del pago de servicios de salud dentro de los veinte (20) días hábiles siguientes a la presentación de la factura con todos sus soportes, formularán y comunicarán a los prestadores de servicios de salud las glosas a cada factura, con base en la codificación y alcance definidos en la normatividad vigente. Una vez formuladas las glosas a una factura no se podrán formular nuevas glosas a la misma factura, salvo las que surjan de hechos nuevos detectados en la respuesta dada a la glosa inicial.",
+      "pagina": 1
+    },
+    {
+      "eps": "FOMAG",
+      "numero_clausula": "Circular Externa 004 de 2025",
+      "tema": "AU",
+      "titulo": "FOMAG NO exige autorización previa a los docentes (Circular 004/2025)",
+      "texto_literal": "FONDO NACIONAL DE PRESTACIONES SOCIALES DEL MAGISTERIO FOMAG — CIRCULAR EXTERNA 004 del 27 de marzo de 2025. ASUNTO: No exigir a los docentes autorización para citas médicas o procedimientos en salud. Conforme a lo establecido en el Acuerdo 03 del 1 de abril de 2024, el vicepresidente de Fiduprevisora/FOMAG informa a los prestadores que no es necesaria una autorización previa por parte de un funcionario de Fiduprevisora/FOMAG. En consecuencia se reafirma que: (1) No se requiere autorización expedida por funcionarios de Fiduprevisora/FOMAG para que el maestro y/o su beneficiario reciba atención en una entidad de la red o en una interconsulta especializada; (2) La orden emitida por el médico tratante es suficiente y no necesita autorización adicional.",
+      "pagina": 1
+    },
+    {
+      "eps": "FOMAG",
+      "numero_clausula": "Acta de Negociación Tarifaria No. 012",
+      "tema": "TA",
+      "titulo": "Tarifa pactada FOMAG (SOAT SMDLV − 20% / propias, sujeta a techos)",
+      "texto_literal": "Conforme al Acta de Negociación Tarifaria No. 012 entre la E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER y el FOMAG (Fiduprevisora S.A.), la modalidad de contratación es por tarifas SOAT 'SMDLV' menos veinte por ciento (SOAT SMDLV − 20%) para los CUPS homologados de la Resolución 2641, y tarifas propias/institucionales para los servicios sin homólogo SOAT, sujetas a los techos (topes) definidos por el FOMAG por SMDLV. En el anexo tarifario aceptado por el FOMAG los servicios objeto de este contrato figuran con la observación 'SE ACEPTA TARIFA PROPUESTA'; los servicios cuya tarifa supera el techo FOMAG quedaron excluidos del anexo.",
+      "pagina": 1
     }
   ]
 }

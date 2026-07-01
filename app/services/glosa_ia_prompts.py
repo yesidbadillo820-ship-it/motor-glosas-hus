@@ -193,13 +193,24 @@ CONTRATOS_HUS: dict[str, dict] = {
     },
     "POLICIA NACIONAL ONCOLOGIA": {
         "numero": "CONTRATO No. 068-5-200006-26 — ONCOLOGÍA",
-        "tarifa": "TARIFAS INSTITUCIONALES HUS",
-        "factor": 1.00,
-        "tipo": "POLICÍA NACIONAL — ONCOLOGÍA",
+        "tarifa": "UVB VIGENTE − 8% (servicios SOAT/UVB) + TARIFAS INSTITUCIONALES HUS (medicamentos, nutriciones, osteosíntesis, dispositivos e insumos — Res. 288/2025, 183/2025, 194/2025, 054/2026)",
+        "factor": 0.92,
+        "tipo": "POLICÍA NACIONAL — ONCOLOGÍA / HEMATOLOGÍA",
         "nit": "804.012.688-5",
-        "vigencia": "2026",
+        "vigencia": "Hasta 31/07/2026 (plazo) + 4 meses (Cláusula Octava), o hasta agotar presupuesto",
         "contacto": "MAYOR LEONARDO VEGA CALA — Jefe Regional Aseguramiento en Salud N° 5 | Delegación Res. 00011/2025 + Resolución 364/12-02-2025",
-        "nota": "Contrato interadministrativo exclusivo oncología. Minuta firmada marzo 2026. Inicio de ejecución certificado.",
+        "nota": (
+            "Contrato interadministrativo exclusivo oncología/hematología "
+            "(adultos y pediátricos), valor $1.440.000.000 vigencia 2026. Base "
+            "tarifaria HÍBRIDA verificada contra el Anexo 2 de la minuta y la "
+            "Propuesta 2026 PONAL: UVB vigente − 8% (UVB × 0.92) para servicios "
+            "SOAT/UVB, y tarifas institucionales HUS (resoluciones) para "
+            "medicamentos, insumos y procedimientos propios. Trámite de glosas: "
+            "20 días hábiles y no se formulan nuevas glosas a la misma factura "
+            "salvo hechos nuevos (Decreto 441 de 2022). Cubre además lo ordenado "
+            "por jueces vía tutela y lo autorizado por el Comité Técnico "
+            "Científico. Reporte mensual a la Cuenta de Alto Costo."
+        ),
     },
     "SUMIMEDICAL": {
         "numero": "TARIFARIO ESE HUS 2025 — SUMIMEDICAL",
