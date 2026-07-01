@@ -487,15 +487,30 @@ def _filas(page: Page):
     return page.locator("table tbody tr")
 
 
-def _set_valor(row, valor: int) -> None:
-    inp = row.locator("td").nth(COL_VALOR_ACEPTADO).locator("input")
+def _dump_tabla(page: Page, evidencias: Path, nombre: str) -> None:
+    """Diagnóstico: vuelca el outerHTML de la 1ª tabla a un archivo para inspeccionar
+    la estructura real (clases MUI estables) cuando un selector falla."""
+    try:
+        evidencias.mkdir(parents=True, exist_ok=True)
+        html = page.locator("table").first.evaluate("e => e.outerHTML")
+        (evidencias / nombre).write_text(html, encoding="utf-8")
+        logger.info(f"    [diag] tabla volcada: {evidencias / nombre}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"    [diag] no pude volcar la tabla: {e}")
+
+
+def _set_valor(page: Page, valor: int, timeout: int = 12000) -> None:
+    # El input de VALOR RATIFICADO ACEPTADO IPS es el único con adorno al final
+    # (clase MUI estable, no hasheada). Al expandir un ítem, sólo hay uno visible.
+    inp = page.locator("table input.MuiInputBase-inputAdornedEnd").first
+    inp.wait_for(state="visible", timeout=timeout)
     inp.click()
     inp.fill(str(valor))
     inp.press("Tab")  # dispara la validación (check verde)
 
 
 def _set_observacion(page: Page, row, texto: str) -> None:
-    # El botón de la celda de observación abre el modal "Observaciones de subsanación".
+    # El botón de la celda OBSERVACIONES DE SUBSANACIÓN abre el modal.
     row.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
     dialog = page.locator("[role=dialog]").last
     dialog.wait_for(timeout=15000)
@@ -506,13 +521,19 @@ def _set_observacion(page: Page, row, texto: str) -> None:
 
 
 def subsanar_items(
-    page: Page, valor: int, texto: str, max_items: int = 0, lento: bool = False
+    page: Page,
+    valor: int,
+    texto: str,
+    evidencias: Path,
+    max_items: int = 0,
+    lento: bool = False,
 ) -> int:
     """Activa el modo SUBSANAR y llena cada ítem visible con (valor, texto). Devuelve
     la cantidad de ítems llenados. NOTA: procesa los ítems de la página actual (aún no
     pagina — las facturas grandes con >1 página son un TODO)."""
     page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
     page.wait_for_timeout(1500)
+    _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
     total = _filas(page).count()
     n = min(total, max_items) if max_items else total
     logger.info(f"  Modo subsanar activo. Ítems en la página: {total} — a llenar: {n}")
@@ -523,9 +544,18 @@ def subsanar_items(
         exp = row.locator("td").nth(COL_TECNOLOGIA).locator("button")
         if exp.count() > 0:
             exp.first.click()
-            page.wait_for_timeout(400)
-        _set_valor(row, valor)
-        _set_observacion(page, row, texto)
+            page.wait_for_timeout(600)
+        if i == 0:
+            _dump_tabla(page, evidencias, "dbg_expandido.html")
+        try:
+            _set_valor(page, valor)
+            _set_observacion(page, row, texto)
+        except Exception as e:  # noqa: BLE001
+            _dump_tabla(page, evidencias, f"dbg_error_item{i + 1}.html")
+            raise RuntimeError(
+                f"Falló el llenado del ítem {i + 1}: {str(e)[:150]}. Se volcó el HTML de "
+                f"la tabla en {evidencias} (dbg_*.html) para calibrar el selector."
+            ) from e
         hechos += 1
         logger.info(f"    ítem {i + 1}/{n} ✓")
         if lento:
@@ -569,7 +599,7 @@ def procesar_factura(
     }
     try:
         _abrir_factura(page, factura)
-        hechos = subsanar_items(page, valor, texto, max_items=max_items, lento=lento)
+        hechos = subsanar_items(page, valor, texto, evidencias, max_items=max_items, lento=lento)
         if finalizar:
             det = finalizar_factura(page, factura, evidencias)
             reg["estado"] = "OK"
