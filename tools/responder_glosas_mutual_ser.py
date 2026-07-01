@@ -483,10 +483,6 @@ def _abrir_factura(page: Page, factura: str) -> None:
     logger.info(f"  Detalle de {corto} abierto.")
 
 
-def _filas(page: Page):
-    return page.locator("table tbody tr")
-
-
 def _dump_tabla(page: Page, evidencias: Path, nombre: str) -> None:
     """Diagnóstico: vuelca el outerHTML de la 1ª tabla a un archivo para inspeccionar
     la estructura real (clases MUI estables) cuando un selector falla."""
@@ -499,9 +495,24 @@ def _dump_tabla(page: Page, evidencias: Path, nombre: str) -> None:
         logger.warning(f"    [diag] no pude volcar la tabla: {e}")
 
 
+def _plus_items(page: Page):
+    """Botones "+" de expandir, uno por ítem: viven en la celda TECNOLOGÍA (la 3ª,
+    nth-child(3)) de cada fila de ítem. La sub-fila de detalle que se inserta al
+    expandir NO tiene botón en esa celda, así que este selector siempre devuelve
+    exactamente los N ítems, en orden."""
+    return page.locator("table tbody tr td:nth-child(3) button")
+
+
+def _fila_activa(page: Page):
+    """La sub-fila de detalle activa: la única que tiene el input de valor (adorno)."""
+    return page.locator("table tbody tr").filter(
+        has=page.locator("input.MuiInputBase-inputAdornedEnd")
+    )
+
+
 def _set_valor(page: Page, valor: int, timeout: int = 12000) -> None:
     # El input de VALOR RATIFICADO ACEPTADO IPS es el único con adorno al final
-    # (clase MUI estable, no hasheada). Al expandir un ítem, sólo hay uno visible.
+    # (clase MUI estable, no hasheada). Al expandir un ítem sólo hay uno visible.
     inp = page.locator("table input.MuiInputBase-inputAdornedEnd").first
     inp.wait_for(state="visible", timeout=timeout)
     inp.click()
@@ -509,9 +520,10 @@ def _set_valor(page: Page, valor: int, timeout: int = 12000) -> None:
     inp.press("Tab")  # dispara la validación (check verde)
 
 
-def _set_observacion(page: Page, row, texto: str) -> None:
-    # El botón de la celda OBSERVACIONES DE SUBSANACIÓN abre el modal.
-    row.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
+def _set_observacion(page: Page, texto: str) -> None:
+    # Botón de la celda OBSERVACIONES DE SUBSANACIÓN (col 21) de la fila ACTIVA -> modal.
+    fila = _fila_activa(page).first
+    fila.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
     dialog = page.locator("[role=dialog]").last
     dialog.wait_for(timeout=15000)
     ta = dialog.locator("textarea").first
@@ -528,28 +540,25 @@ def subsanar_items(
     max_items: int = 0,
     lento: bool = False,
 ) -> int:
-    """Activa el modo SUBSANAR y llena cada ítem visible con (valor, texto). Devuelve
-    la cantidad de ítems llenados. NOTA: procesa los ítems de la página actual (aún no
-    pagina — las facturas grandes con >1 página son un TODO)."""
+    """Activa el modo SUBSANAR y llena cada ítem con (valor, texto). Devuelve cuántos
+    se llenaron. NOTA: procesa la página actual (>1 página aún es un TODO)."""
     page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
     page.wait_for_timeout(1500)
     _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
-    total = _filas(page).count()
+    total = _plus_items(page).count()
     n = min(total, max_items) if max_items else total
-    logger.info(f"  Modo subsanar activo. Ítems en la página: {total} — a llenar: {n}")
+    logger.info(f"  Modo subsanar activo. Ítems: {total} — a llenar: {n}")
     hechos = 0
     for i in range(n):
-        row = _filas(page).nth(i)
-        # Activar la fila (botón "+" en TECNOLOGÍA) si aún no está activa.
-        exp = row.locator("td").nth(COL_TECNOLOGIA).locator("button")
-        if exp.count() > 0:
-            exp.first.click()
-            page.wait_for_timeout(600)
+        # Expandir el ítem i (acordeón: colapsa el que estaba abierto). Re-queryeamos
+        # por si el DOM se re-renderizó al insertar/quitar la sub-fila de detalle.
+        _plus_items(page).nth(i).click()
+        page.wait_for_timeout(700)
         if i == 0:
             _dump_tabla(page, evidencias, "dbg_expandido.html")
         try:
             _set_valor(page, valor)
-            _set_observacion(page, row, texto)
+            _set_observacion(page, texto)
         except Exception as e:  # noqa: BLE001
             _dump_tabla(page, evidencias, f"dbg_error_item{i + 1}.html")
             raise RuntimeError(
