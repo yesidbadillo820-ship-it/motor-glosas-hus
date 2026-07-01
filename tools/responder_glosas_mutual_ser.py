@@ -674,9 +674,26 @@ def _seleccionar_codigo(page: Page, codigo: str, evidencias: Path) -> None:
         page.wait_for_timeout(350)
         opcion = page.get_by_role("option", name=rx).first
         if opcion.count() and opcion.is_visible():
+            etiqueta = ""
+            with contextlib.suppress(Exception):
+                etiqueta = (opcion.inner_text() or "").strip()
             opcion.click()
-            page.wait_for_timeout(600)
-            logger.info(f"  Código de subsanación seleccionado: {codigo}")
+            page.wait_for_timeout(700)
+            # VERIFICACIÓN CRÍTICA: leer qué quedó mostrando el selector. Si NO es el
+            # código pedido, abortar ANTES de enviar (no mandar el código equivocado).
+            mostrado = ""
+            with contextlib.suppress(Exception):
+                mostrado = (c.inner_text() or "").strip()
+            if mostrado and not rx.search(mostrado):
+                _dump_modal(page, evidencias, "dbg_codigo.html")
+                raise RuntimeError(
+                    f"¡El selector quedó en '{mostrado}', NO en '{codigo}'! Aborto ANTES "
+                    "de enviar para no mandar un código equivocado."
+                )
+            logger.info(
+                f"  Código de subsanación seleccionado: {codigo} "
+                f"(opción='{etiqueta or '?'}' · selector muestra='{mostrado or '?'}')"
+            )
             return
         with contextlib.suppress(Exception):  # menú equivocado (p. ej. paginador): cerrar
             page.keyboard.press("Escape")
@@ -712,6 +729,12 @@ def finalizar_factura(page: Page, factura: str, evidencias: Path, codigo: str = 
             f"(re-corré con --soportes <carpeta con {factura}.pdf>) y que el CÓDIGO "
             "SUBSANACIÓN haya quedado seleccionado."
         )
+    # Evidencia ANTES de enviar: muestra el CÓDIGO elegido + el botón verde. Es la
+    # prueba real de qué se envió, porque AL ENVIAR el dropdown se resetea a su 1er
+    # valor por defecto (RE9602) y una foto post-envío puede confundir.
+    evidencias.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(Exception):
+        page.screenshot(path=str(evidencias / f"{factura}_pre_envio.png"), full_page=True)
     btn.first.click()
     page.wait_for_timeout(1500)
     # Posible modal de confirmación ("¿Está seguro?" -> ACEPTAR / CONFIRMAR / SÍ / ENVIAR).
@@ -723,11 +746,10 @@ def finalizar_factura(page: Page, factura: str, evidencias: Path, codigo: str = 
             conf.last.click()
             page.wait_for_timeout(1500)
     page.wait_for_timeout(2000)
-    evidencias.mkdir(parents=True, exist_ok=True)
     shot = evidencias / f"{factura}_ok.png"
     with contextlib.suppress(Exception):
         page.screenshot(path=str(shot), full_page=True)
-    return f"enviada; evidencia {shot.name}"
+    return f"enviada; código {codigo}; evidencia {shot.name} (+ {factura}_pre_envio.png)"
 
 
 def _resolver_soporte(soportes_dir: Path | None, factura: str) -> Path | None:
