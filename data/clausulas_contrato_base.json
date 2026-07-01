@@ -92,6 +92,38 @@
       "titulo": "Tarifa pactada COOSALUD (SOAT − 15% / tarifas institucionales)",
       "texto_literal": "Conforme al Tarifario de Servicios E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER vigencia 2025, notificado a COOSALUD EPS el 13 de enero de 2025 en desarrollo de los contratos No. 68001C00060340-24 y 68001S00060339-24, los servicios se liquidan a la tarifa SOAT menos quince por ciento (SOAT − 15%) para los CUPS homologados al Manual Tarifario SOAT, y a las TARIFAS INSTITUCIONALES propias de la E.S.E. HUS para los procedimientos con código propio. El anexo tarifario forma parte integral del acuerdo de servicios y tarifas suscrito con COOSALUD EPS.",
       "pagina": 1
+    },
+    {
+      "eps": "DISPENSARIO MEDICO",
+      "numero_clausula": "Segunda (Valor)",
+      "tema": "TA",
+      "titulo": "Tarifa pactada Dispensario Médico (SOAT − 20% / tarifas propias)",
+      "texto_literal": "Se deja expresa claridad que algunas tarifas corresponden a la tarifa SOAT menos veinte por ciento (SOAT - 20%) y otras a tarifas propias de la ESE. Asimismo, se tendrán en cuenta los documentos anexos denominados 'Tarifario Final de Medicamentos e Insumos', correspondiente a medicamentos e insumos, así como todas las resoluciones expedidas por la ESE y vigentes durante la ejecución del contrato. Los documentos anteriormente mencionados se consideran referentes económicos obligatorios para efectos de la facturación de los servicios objeto del presente contrato. PARÁGRAFO 3: Las tarifas aplicables al presente contrato interadministrativo corresponderán a las tarifas SOAT vigentes para la anualidad 2025, de conformidad con el Decreto 2423 de 1996 y sus actualizaciones.",
+      "pagina": 2
+    },
+    {
+      "eps": "DISPENSARIO MEDICO",
+      "numero_clausula": "Tercera (Soportes/Radicación)",
+      "tema": "SO",
+      "titulo": "Radicación (22 días hábiles) y soportes de la factura",
+      "texto_literal": "El CONTRATISTA, dentro de los sesenta (60) días calendario siguientes a la emisión de la factura, tendrá 22 días hábiles para la radicación en la plataforma de la FIRMA AUDITORA designada por la DIRECCIÓN DE SANIDAD EJÉRCITO, adjuntando los siguientes documentos soporte: Factura(s) en original y dos (2) copias con la firma del representante legal, con los soportes requeridos, donde se relaciona uno a uno los servicios prestados; Autorización de servicios expedida por la oficina de referencia y contrarreferencia del DMBUG, con las respectivas firmas y sellos; Copia de identificación del usuario.",
+      "pagina": 3
+    },
+    {
+      "eps": "DISPENSARIO MEDICO",
+      "numero_clausula": "Tercera, Parágrafo 8",
+      "tema": "FA",
+      "titulo": "Objeciones y glosas — plazo de 20 días calendario",
+      "texto_literal": "PARÁGRAFO 8: OBJECIONES Y GLOSAS: En caso de presentarse objeciones transitorias, estas deberán resolverse dentro de los veinte (20) días calendario y lo contenido en la lista de chequeo, prevista en el Decreto 4747 de 2007, Resolución 3047 de 2008 y Ley 1438 de 2011 (art. 57), contados a partir de la fecha de notificación al CONTRATISTA por parte del Área responsable; si el CONTRATISTA no cumple con la obligación de aclarar las objeciones notificadas se entenderá que acepta la reclamación y en consecuencia se convierte en glosa definitiva.",
+      "pagina": 5
+    },
+    {
+      "eps": "FAMISANAR",
+      "numero_clausula": "Anexo Tarifario 2026",
+      "tema": "TA",
+      "titulo": "Tarifa pactada FAMISANAR 2026 (UVB − 5% / tarifas propias)",
+      "texto_literal": "Conforme al anexo tarifario del contrato FAMISANAR (Propuesta Base Final vigencia 2026), los servicios se liquidan de la siguiente manera: los CUPS homologados a la UVB se pagan a la UVB vigente menos cinco por ciento (UVB − 5%); los procedimientos y paquetes con código propio se pagan a las TARIFAS PROPIAS de la E.S.E. HUS; los exámenes ambulatorios conforme a la Resolución 2706 de 2025; y las órtesis y prótesis a la tarifa institucional 2026. El anexo tarifario forma parte integral del contrato No. S-13-1-03-1-04958 suscrito con FAMISANAR.",
+      "pagina": 1
     }
   ]
 }
