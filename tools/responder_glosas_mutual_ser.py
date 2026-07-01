@@ -323,14 +323,29 @@ def abrir_sesion(p, args, user: str, password: str):
     """
     if args.cdp:
         logger.info(f"Conectando a tu Chrome vía CDP: {args.cdp}")
-        try:
-            browser = p.chromium.connect_over_cdp(args.cdp)
-        except Exception as e:
+        # En Windows 'localhost' suele resolver a IPv6 (::1) y Chrome escucha en IPv4
+        # (127.0.0.1) -> ECONNREFUSED. Probar variantes IPv4 automáticamente.
+        candidatos = [args.cdp]
+        for alias in ("localhost", "::1", "0.0.0.0"):
+            if alias in args.cdp:
+                candidatos.append(args.cdp.replace(alias, "127.0.0.1"))
+        browser = None
+        ultimo_error: Exception | None = None
+        for url in dict.fromkeys(candidatos):  # dedup preservando orden
+            try:
+                browser = p.chromium.connect_over_cdp(url)
+                if url != args.cdp:
+                    logger.info(f"Conectado usando {url} (fallback IPv4).")
+                break
+            except Exception as e:  # noqa: BLE001
+                ultimo_error = e
+        if browser is None:
             raise RuntimeError(
-                f"No pude conectarme a Chrome en {args.cdp}. Abrí Chrome con "
-                '--remote-debugging-port=9222 y --user-data-dir="C:\\temp-notas\\'
-                f'zonaser-chrome", logueate al portal, y reintentá. Detalle: {e}"'
-            ) from e
+                f"No pude conectarme a Chrome en {args.cdp} (ni por 127.0.0.1). Abrí "
+                "Chrome con --remote-debugging-port=9222 y "
+                '--user-data-dir="C:\\temp-notas\\zonaser-chrome", verificá '
+                f"http://127.0.0.1:9222/json/version, y reintentá. Detalle: {ultimo_error}"
+            ) from ultimo_error
         ctx = browser.contexts[0] if browser.contexts else browser.new_context()
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.set_default_navigation_timeout(120000)
