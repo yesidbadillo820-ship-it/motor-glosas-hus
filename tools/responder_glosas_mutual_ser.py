@@ -8,24 +8,14 @@ Bot Playwright que carga las respuestas a glosas del HUS (una fila por objeción
 generadas por `extraer_respuestas_glosa_mutualser.py`) sin intervención humana,
 siguiendo el mismo patrón que responder_glosas_coosalud.py / _simed.py.
 
-⚠ ESTADO: v0 — ANDAMIAJE + CALIBRACIÓN.
-    Lo que YA funciona (probado con la infraestructura del repo):
-      - Login con manejo de reCAPTCHA vía sesión persistida (storage_state):
-        el humano resuelve el captcha UNA vez con --con-cabeza y el bot reusa la
-        cookie en las corridas siguientes.
-      - Lectura del Excel de respuestas (columnas del extractor de MUTUAL SER).
-      - Agrupación por (código respuesta + texto) — en glosa ratificada TODOS los
-        ítems comparten RE9901 + el mismo texto, así que es UN solo grupo.
-      - Modo --explorar: navega al módulo y VUELCA el DOM (inputs, botones, selects,
-        cabeceras de la grilla) + screenshot, para calibrar los selectores reales
-        (equivalente web del dump_dg.py de DGH).
-      - Reporte CSV incremental, logging, screenshots de diagnóstico.
-
-    Lo que FALTA calibrar contra el portal real (marcado con  # TODO(portal)  ):
-      - Selectores de la grilla, apertura de factura, formulario de respuesta por
-        glosa (código + valor aceptado + texto), y el botón de finalizar.
-      Corré primero:  py responder_glosas_mutual_ser.py --explorar --con-cabeza
-      y con el volcado se completan los  # TODO(portal).
+⚠ ESTADO: v1 — IMPLEMENTADO (selectores calibrados con el volcado real), PENDIENTE
+    de PILOTO. El portal es React/MUI; los selectores usan texto/rol + posición de
+    celda (las clases/ids son inestables). Flujo de SUBSANACIÓN implementado:
+    abrir factura → SUBSANAR GLOSA → por cada ítem: expandir "+" (col. TECNOLOGÍA),
+    poner VALOR RATIFICADO ACEPTADO IPS = 0, escribir OBSERVACIÓN (modal ≤1000) →
+    ACEPTAR TOTAL RATIFICADO. El soporte PDF es opcional y v1 lo omite.
+    SEGURIDAD: sin --finalizar el bot SOLO llena (no envía); --max-items N limita a
+    N ítems para pilotear. Modo --explorar sigue disponible para re-calibrar.
 
 CREDENCIALES (variables de entorno, NO en el código):
     setx MUTUALSER_USER  gerencia@hus.gov.co
@@ -53,13 +43,17 @@ USO:
     REM 1b) Explorar lanzando el browser (si el captcha te deja):
     py responder_glosas_mutual_ser.py --explorar --con-cabeza
 
-    REM 2) Piloto de una factura conectándose a tu Chrome:
+    REM 2) PILOTO SEGURO: llena SOLO 1 ítem y NO envía (para revisar en pantalla):
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
-        --solo HUS0000492542 --cdp http://localhost:9222
+        --solo HUS0000510639 --cdp http://127.0.0.1:9222 --max-items 1
 
-    REM 3) Masivo:
+    REM 3) Factura completa, llena todo y ENVÍA (ACEPTAR TOTAL RATIFICADO):
+    py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
+        --solo HUS0000510639 --cdp http://127.0.0.1:9222 --finalizar
+
+    REM 4) Masivo (todas), enviando:
     py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx --todas ^
-        --cdp http://localhost:9222 --reporte reporte_mutualser.csv
+        --cdp http://127.0.0.1:9222 --finalizar --reporte reporte_mutualser.csv
 """
 
 from __future__ import annotations
@@ -467,74 +461,122 @@ def explorar(page: Page, salida_dir: Path) -> None:
 # ─── Procesamiento por factura (TODO: calibrar contra el portal) ─────────────
 
 
-class CalibracionPendiente(NotImplementedError):
-    """El flujo del portal aún no está calibrado (faltan los  # TODO(portal))."""
+# Índices de columna (0-based) de la tabla "Detalle de respuesta de glosa"
+# (24 columnas, confirmados con el volcado --explorar 2026-07-01):
+COL_TECNOLOGIA = 2  # celda con el botón "+" que expande/activa la fila
+COL_VALOR_ACEPTADO = 19  # VALOR RATIFICADO ACEPTADO IPS (input al activar la fila)
+COL_OBSERVACION = 21  # OBSERVACIONES DE SUBSANACIÓN (input + botón libro -> modal)
+COL_SOPORTE = 22  # SOPORTE DE SUBSANACIÓN (íconos: ver / subir / cancelar)
 
 
-def buscar_factura_en_grilla(page: Page, factura: str) -> bool:
-    """Abre la factura desde CONSULTAR CUENTAS MÉDICAS GLOSADAS (link azul de la
-    columna FACTURA). Devuelve "YA" si ya tiene FECHA RESPUESTA SUBSANACIÓN."""
-    # TODO(portal): con los selectores del volcado de --explorar:
-    #   1) filtrar/buscar la factura en la grilla (o paginar hasta encontrarla).
-    #   2) idempotencia: si FECHA RESPUESTA SUBSANACIÓN != vacío -> return "YA".
-    #   3) click en el link azul de la factura -> abre "Detalle de respuesta de glosa".
-    raise CalibracionPendiente(
-        "buscar_factura_en_grilla: falta calibrar selectores (corré --explorar)."
-    )
+def _abrir_factura(page: Page, factura: str) -> None:
+    """Va a la grilla y abre la factura por su número corto (ej. 'HUS510639').
+    Deja la pantalla en 'Detalle de respuesta de glosa'."""
+    page.goto(PORTAL_MODULO, wait_until="domcontentloaded")
+    corto = "HUS" + normalizar_factura(factura)  # 'HUS0000510639' -> 'HUS510639'
+    logger.info(f"  Buscando {corto} en la grilla…")
+    objetivo = page.get_by_text(corto, exact=True)
+    objetivo.first.wait_for(timeout=90000)
+    objetivo.first.click()
+    # Señal de que abrió el detalle: el botón SUBSANAR GLOSA.
+    page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).wait_for(timeout=60000)
+    logger.info(f"  Detalle de {corto} abierto.")
 
 
-def subsanar_items(page: Page, items: list[dict], evidencias: Path) -> None:
-    """Flujo de SUBSANACIÓN ítem por ítem (ver docs/CONTEXTO_MUTUAL_SER.md §6):
-    click SUBSANAR GLOSA (modo edición) y, por cada ítem, llenar valor aceptado +
-    observación (modal ≤1000 chars) + soporte PDF."""
-    # TODO(portal): con los selectores del volcado de --explorar:
-    #   1) click en el botón "SUBSANAR GLOSA" (habilita edición).
-    #   2) por cada fila de ítem del portal (el portal CONSOLIDA por CUPS, así que
-    #      la respuesta uniforme se aplica a TODOS los ítems que muestre):
-    #      a) expandir con el botón "+" azul de la columna TECNOLOGÍA;
-    #      b) VALOR RATIFICADO ACEPTADO IPS = item['aceptado'] (0 en rechazo) -> check verde;
-    #      c) click en el ícono azul de libro/chat -> modal "Observaciones de
-    #         subsanación" -> escribir item['detalle'] (≤1000; ya viene en 832) -> ACEPTAR;
-    #      d) (si aplica) ícono de nube -> modal "SOPORTE" -> set_input_files(pdf) ->
-    #         GUARDAR -> esperar toast "Carga de archivo exitosa" + check verde.
-    #   3) verificar que ACEPTAR TOTAL RATIFICADO quedó habilitado (azul).
-    # OJO: si "CÓDIGO SUBSANACIÓN" permite carga masiva, preferirlo para facturas
-    # con cientos de ítems (evita abrir el "+" de cada uno).
-    raise CalibracionPendiente(
-        "subsanar_items: falta calibrar el formulario de subsanación (corré --explorar)."
-    )
+def _filas(page: Page):
+    return page.locator("table tbody tr")
+
+
+def _set_valor(row, valor: int) -> None:
+    inp = row.locator("td").nth(COL_VALOR_ACEPTADO).locator("input")
+    inp.click()
+    inp.fill(str(valor))
+    inp.press("Tab")  # dispara la validación (check verde)
+
+
+def _set_observacion(page: Page, row, texto: str) -> None:
+    # El botón de la celda de observación abre el modal "Observaciones de subsanación".
+    row.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
+    dialog = page.locator("[role=dialog]").last
+    dialog.wait_for(timeout=15000)
+    ta = dialog.locator("textarea").first
+    ta.fill(texto)
+    dialog.get_by_role("button", name="ACEPTAR", exact=True).click()
+    dialog.wait_for(state="hidden", timeout=15000)
+
+
+def subsanar_items(
+    page: Page, valor: int, texto: str, max_items: int = 0, lento: bool = False
+) -> int:
+    """Activa el modo SUBSANAR y llena cada ítem visible con (valor, texto). Devuelve
+    la cantidad de ítems llenados. NOTA: procesa los ítems de la página actual (aún no
+    pagina — las facturas grandes con >1 página son un TODO)."""
+    page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
+    page.wait_for_timeout(1500)
+    total = _filas(page).count()
+    n = min(total, max_items) if max_items else total
+    logger.info(f"  Modo subsanar activo. Ítems en la página: {total} — a llenar: {n}")
+    hechos = 0
+    for i in range(n):
+        row = _filas(page).nth(i)
+        # Activar la fila (botón "+" en TECNOLOGÍA) si aún no está activa.
+        exp = row.locator("td").nth(COL_TECNOLOGIA).locator("button")
+        if exp.count() > 0:
+            exp.first.click()
+            page.wait_for_timeout(400)
+        _set_valor(row, valor)
+        _set_observacion(page, row, texto)
+        hechos += 1
+        logger.info(f"    ítem {i + 1}/{n} ✓")
+        if lento:
+            page.wait_for_timeout(300)
+    return hechos
 
 
 def finalizar_factura(page: Page, factura: str, evidencias: Path) -> str:
-    """Cierra la subsanación (ACEPTAR TOTAL RATIFICADO) y captura evidencia."""
-    # TODO(portal): click en "ACEPTAR TOTAL RATIFICADO" (azul cuando está todo
-    #   diligenciado) -> esperar confirmación -> screenshot evidencias/f"{factura}_ok.png".
-    #   (Confirmar relación con "ENVIAR SUBSANACIÓN".)
-    raise CalibracionPendiente("finalizar_factura: falta calibrar el cierre (corré --explorar).")
+    """Cierra la subsanación con ACEPTAR TOTAL RATIFICADO y captura evidencia."""
+    btn = page.get_by_role("button", name="ACEPTAR TOTAL RATIFICADO", exact=True)
+    btn.wait_for(timeout=15000)
+    btn.click()
+    page.wait_for_timeout(2500)
+    evidencias.mkdir(parents=True, exist_ok=True)
+    shot = evidencias / f"{factura}_ok.png"
+    with contextlib.suppress(Exception):
+        page.screenshot(path=str(shot), full_page=True)
+    return f"finalizada; evidencia {shot.name}"
 
 
-def procesar_factura(page: Page, factura: str, datos: dict, evidencias: Path) -> dict:
-    items = [it for g in datos["grupos"] for it in g["items"]]
+def procesar_factura(
+    page: Page,
+    factura: str,
+    datos: dict,
+    evidencias: Path,
+    max_items: int = 0,
+    finalizar: bool = False,
+    lento: bool = False,
+) -> dict:
+    grupos = datos["grupos"]
+    items = [it for g in grupos for it in g["items"]]
+    # Respuesta uniforme (glosa ratificada): 1 grupo -> mismo (aceptado, detalle) para todos.
+    valor = grupos[0]["items"][0]["aceptado"] if grupos and grupos[0]["items"] else 0
+    texto = grupos[0]["detalle"] if grupos else ""
     reg = {
         "factura": factura,
-        "grupos": len(datos["grupos"]),
+        "grupos": len(grupos),
         "items": len(items),
         "estado": "",
         "detalle": "",
     }
     try:
-        estado = buscar_factura_en_grilla(page, factura)
-        if estado == "YA":
-            reg["estado"] = "YA_RESPONDIDA"
-            reg["detalle"] = "FECHA RESPUESTA SUBSANACIÓN ya registrada"
-            return reg
-        subsanar_items(page, items, evidencias)
-        estado_fin = finalizar_factura(page, factura, evidencias)
-        reg["estado"] = "OK"
-        reg["detalle"] = estado_fin or f"{len(items)} ítems subsanados"
-    except CalibracionPendiente as e:
-        reg["estado"] = "CALIBRACION_PENDIENTE"
-        reg["detalle"] = str(e)
+        _abrir_factura(page, factura)
+        hechos = subsanar_items(page, valor, texto, max_items=max_items, lento=lento)
+        if finalizar:
+            det = finalizar_factura(page, factura, evidencias)
+            reg["estado"] = "OK"
+            reg["detalle"] = f"{hechos} ítems; {det}"
+        else:
+            reg["estado"] = "LLENADO_SIN_ENVIAR"
+            reg["detalle"] = f"{hechos} ítems llenados; revisá y re-corré con --finalizar"
     except Exception as e:
         reg["estado"] = "ERROR"
         reg["detalle"] = str(e)[:300]
@@ -612,6 +654,20 @@ def main() -> int:
     )
     parser.add_argument("--lento", action="store_true", help="slow_mo 300ms (debug visual).")
     parser.add_argument(
+        "--max-items",
+        type=int,
+        default=0,
+        help="Llenar como mucho N ítems por factura (piloto). 0 = todos.",
+    )
+    parser.add_argument(
+        "--finalizar",
+        action="store_true",
+        help=(
+            "Hacer click en ACEPTAR TOTAL RATIFICADO al terminar (envía). SIN este "
+            "flag el bot SOLO llena los campos y NO envía (revisás y re-corrés)."
+        ),
+    )
+    parser.add_argument(
         "--reporte", type=Path, default=Path("reporte_mutualser.csv"), help="CSV de salida."
     )
     parser.add_argument("--log", type=Path, default=None, help="Archivo de log adicional.")
@@ -659,7 +715,15 @@ def main() -> int:
                 logger.info(
                     f"[{i}/{len(seleccion)}] {factura} — {len(datos['grupos'])} grupo(s), {n_items} ítems"
                 )
-                reg = procesar_factura(page, factura, datos, args.evidencias)
+                reg = procesar_factura(
+                    page,
+                    factura,
+                    datos,
+                    args.evidencias,
+                    max_items=args.max_items,
+                    finalizar=args.finalizar,
+                    lento=args.lento,
+                )
                 resultados.append(reg)
                 w_rep.writerow(reg)
                 if i % 5 == 0:
@@ -673,10 +737,10 @@ def main() -> int:
             logger.info(f"\nReporte: {args.reporte} | {len(resultados)} facturas en {dur:.1f} min")
             for estado, n in Counter(r["estado"] for r in resultados).items():
                 logger.info(f"  {estado}: {n}")
-            if any(r["estado"] == "CALIBRACION_PENDIENTE" for r in resultados):
+            if any(r["estado"] == "LLENADO_SIN_ENVIAR" for r in resultados):
                 logger.warning(
-                    "Hay pasos sin calibrar. Corré  --explorar --con-cabeza  y completá "
-                    "los  # TODO(portal)  de responder_glosas_mutual_ser.py."
+                    "Se LLENARON los campos pero NO se envió (sin --finalizar). Revisá en "
+                    "el browser y, si está OK, re-corré agregando  --finalizar."
                 )
         finally:
             # browser.close() sobre una conexión CDP sólo DESCONECTA (no mata el
