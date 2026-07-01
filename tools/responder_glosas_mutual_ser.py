@@ -413,26 +413,26 @@ def explorar(page: Page, salida_dir: Path) -> None:
     dump = page.evaluate(
         """() => {
         const txt = el => (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().slice(0,80);
-        const html = el => (el.outerHTML || '').replace(/\\s+/g,' ').slice(0,160);
+        // data-testid del/los SVG interno(s) (MUI: AddIcon, CloudUploadIcon, etc.) —
+        // el selector ROBUSTO para los botones-ícono sin texto.
+        const svgtd = el => Array.from(el.querySelectorAll('svg[data-testid]'))
+            .map(s => s.getAttribute('data-testid')).join(',');
         const desc = el => {
             const a = [];
-            for (const at of ['id','name','type','placeholder','role','aria-label','class']) {
+            for (const at of ['id','name','type','placeholder','role','aria-label','data-testid','title']) {
                 const v = el.getAttribute(at); if (v) a.push(at+'='+v.slice(0,50));
             }
-            return el.tagName.toLowerCase()+' {'+a.join(' ')+'} '+txt(el);
+            const svg = svgtd(el);
+            return el.tagName.toLowerCase()+' {'+a.join(' ')+'}'+(svg?' svg=['+svg+']':'')+' '+txt(el);
         };
         const pick = (sel,n=80) => Array.from(document.querySelectorAll(sel)).slice(0,n).map(desc);
-        // Botones (incluye icon-buttons) con un trozo de outerHTML para ver el mat-icon interno.
-        const botones = Array.from(document.querySelectorAll(
-            'button, [role=button], input[type=button], input[type=submit], a.btn, [class*=btn]'
-        )).slice(0,120).map(el => desc(el)+' || '+html(el));
         return {
             url: location.href,
-            botones,
+            botones: pick('button, [role=button], input[type=button], input[type=submit], a[href]', 140),
             inputs: pick('input, textarea'),
             selects: pick('select, [role=combobox], mat-select'),
-            iconos: Array.from(document.querySelectorAll('mat-icon, i[class*=icon], svg[class*=icon]'))
-                .slice(0,120).map(e => (txt(e)||'')+' | '+html(e)),
+            iconos: Array.from(document.querySelectorAll('svg[data-testid]'))
+                .slice(0,150).map(s => s.getAttribute('data-testid')),
             th: Array.from(document.querySelectorAll('th, [role=columnheader]')).slice(0,50).map(e=>txt(e)),
             links: Array.from(document.querySelectorAll('a')).slice(0,80).map(a=>({t:txt(a), href:a.getAttribute('href')})),
         };
