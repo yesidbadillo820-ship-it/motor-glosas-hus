@@ -297,6 +297,63 @@ def _contrato_sin_pacto() -> dict:
     }
 
 
+def _contrato_desde_bd(eps_upper: str) -> dict | None:
+    """Ronda 23 (jul-2026): si la EPS tiene contrato o cláusulas cargadas en
+    la BD, devuelve una ficha REAL; si no hay nada en BD, None.
+
+    Corrige la causa raíz de "SIN CONTRATO PACTADO": get_contrato solo leía
+    el catálogo estático CONTRATOS_HUS (~15 EPS). Una EPS con contrato
+    cargado en la BD (ContratoRecord / ClausulaContrato) pero fuera del
+    catálogo caía al fallback "SIN CONTRATO PACTADO" — negando un contrato
+    que sí existe. La presencia de cláusulas PRUEBA que hay contrato: en ese
+    caso jamás se declara "sin contrato".
+
+    Degrada a None silenciosamente si la BD no está disponible.
+    """
+    if not eps_upper:
+        return None
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato, ContratoRecord
+
+        db = SessionLocal()
+        try:
+            rec = db.query(ContratoRecord).filter(ContratoRecord.eps == eps_upper).first()
+            n_clausulas = (
+                db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_upper).count()
+            )
+            if rec is None and n_clausulas == 0:
+                return None  # nada en BD → que decida el fallback
+            numero = ((rec.numero_contrato if rec else "") or "").strip()
+            if not numero:
+                # Hay relación contractual documentada pero sin número →
+                # referencia NEUTRA, nunca "SIN CONTRATO PACTADO".
+                numero = "el contrato vigente entre las partes"
+            ficha = _contrato_sin_pacto()
+            ficha["numero"] = numero
+            ficha["tipo"] = "CONTRATO VIGENTE"
+            if rec is not None:
+                ficha["nit"] = (getattr(rec, "nit_eps", None) or ficha["nit"]).strip() or ficha[
+                    "nit"
+                ]
+                if getattr(rec, "fecha_inicio", None) or getattr(rec, "fecha_fin", None):
+                    ficha["vigencia"] = (
+                        f"{getattr(rec, 'fecha_inicio', '') or '?'} — "
+                        f"{getattr(rec, 'fecha_fin', '') or '?'}"
+                    )
+            ficha["nota"] = (
+                f"Contrato cargado en el sistema con {n_clausulas} cláusula(s) "
+                "literal(es) disponibles para citar."
+                if n_clausulas
+                else "Contrato registrado en el sistema; citar por el número real."
+            )
+            return ficha
+        finally:
+            db.close()
+    except Exception:
+        return None
+
+
 def get_contrato(eps: str) -> dict:
     """Retorna los datos del contrato para una EPS dada (búsqueda flexible).
 
@@ -306,6 +363,11 @@ def get_contrato(eps: str) -> dict:
       • eps genérica ("OTRA / SIN DEFINIR" y variantes) → SIN CONTRATO.
       • El match inverso (eps contenida en la clave) exige ≥4 caracteres:
         "EPS" matcheaba "NUEVA EPS" y "SA" matcheaba "FAMISANAR".
+
+    Ronda 23: antes de declarar "SIN CONTRATO PACTADO" se consulta la BD
+    (ContratoRecord / ClausulaContrato). El catálogo estático sigue teniendo
+    prioridad (curado), pero una EPS fuera de él con contrato cargado ya no
+    cae al falso "sin contrato".
     """
     eps_upper = (eps or "").upper().strip()
     if not eps_upper or eps_upper in _EPS_SIN_CONTRATO:
@@ -313,6 +375,9 @@ def get_contrato(eps: str) -> dict:
     for key, val in CONTRATOS_HUS.items():
         if key in eps_upper or (len(eps_upper) >= 4 and eps_upper in key):
             return val
+    desde_bd = _contrato_desde_bd(eps_upper)
+    if desde_bd is not None:
+        return desde_bd
     return _contrato_sin_pacto()
 
 
