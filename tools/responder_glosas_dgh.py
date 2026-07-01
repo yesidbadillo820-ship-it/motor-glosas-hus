@@ -18,14 +18,22 @@ PRE-REQUISITOS
 
 USO
 ---
-    REM Piloto seguro (NO graba; sólo llena para que verifiques):
+    REM 0) CALIBRAR (recomendado la 1a vez): mueve el mouse a cada control del
+    REM    modal SIN clickear, para verificar las coordenadas. Riesgo cero.
+    py tools\\responder_glosas_dgh.py --excel "D:\\...\\respuestas.xlsx" --solo HUS0000516474 --calibrar
+
+    REM 1) Piloto: llena el modal (fila → RE9901 → Observaciones → Aplicar campos)
+    REM    pero NO graba, para que verifiques que quedó bien.
     py tools\\responder_glosas_dgh.py --excel "D:\\...\\respuestas.xlsx" --solo HUS0000516474
 
-    REM Cuando confíes, que grabe + confirme + imprima el PDF de evidencia:
+    REM 2) Cuando confíes, que grabe:
     py tools\\responder_glosas_dgh.py --excel "D:\\...\\respuestas.xlsx" --solo HUS0000516474 --grabar
 
-    REM Volcar el modal/diálogo si hace falta afinar selectores:
+    REM Volcar el árbol/diálogo si algo no se encuentra:
     py tools\\responder_glosas_dgh.py --excel ... --solo HUS... --dump-al-fallar
+
+NOTA: el interior del modal WPF es opaco a UIA; se maneja por COORDENADAS sobre el
+rect real del modal. Si algún click cae corrido, se ajustan los _MODAL_OFFSETS.
 
 DEPENDENCIAS
 ------------
@@ -194,58 +202,140 @@ def _hwnds_modal() -> list[int]:
         return []
 
 
-_CT_NOMBRES = {
-    50000: "Button",
-    50002: "CheckBox",
-    50003: "ComboBox",
-    50004: "Edit",
-    50005: "RadioButton",
-    50008: "DataItem",
-    50011: "List",
-    50020: "Text",
-    50026: "Group",
-    50032: "Window",
-    50033: "Pane",
+# ─── Modal de conceptos: llenado por COORDENADAS ─────────────────────────────
+# El interior del modal es WPF y es OPACO a UIA/win32 por todas las vías probadas
+# (árbol desde DGFRMPrincipal, conexión al HWND propio, win32, y GetFocusedElement
+# tabulando: siempre devuelve la Window, nunca el campo). PERO el input real de
+# mouse/teclado SÍ llega (el usuario lo llena a mano). Por eso lo manejamos por
+# COORDENADAS de pantalla, calculadas desde el rect REAL del modal en runtime.
+#
+# Offsets (x, y) de cada control medidos desde la esquina sup-izq del modal en las
+# capturas del usuario (modal en 360,166 @ 1920x1080). Son relativos al rect real,
+# así siguen andando si el modal abre en otra posición. Si algún target cae
+# corrido, se ajustan estos números — usar --calibrar (mueve el mouse SIN clickear
+# para verificar dónde caería cada click).
+_MODAL_REF_TL = (360, 166)
+_MODAL_OFFSETS = {
+    "grabar": (50, 51),  # botón GRABAR (toolbar del modal)
+    "concepto": (150, 83),  # combo Concepto (fila superior, izq)
+    "observaciones": (130, 109),  # campo Observaciones (fila debajo de Concepto)
+    "aplicar": (1029, 135),  # botón "Aplicar campos"
+    "check_fila": (47, 296),  # checkbox de la fila del concepto en la grilla
 }
 
 
-def _diag_foco_modal(hwnd, pasos: int = 28) -> None:
-    """Con el modal abierto, enfoca su ventana y TABULA campo por campo, logueando
-    el control con foco REAL en cada parada (GetFocusedElement funciona aunque el
-    árbol WPF del modal no se pueda caminar por UIA). Revela el orden de tabulado
-    y la identidad (control_type / auto_id / name) de cada campo, que es lo que se
-    necesita para cablear el llenado por teclado.
-
-    Sólo navega (TAB); no manda ENTER/SPACE, así no dispara botones ni cambia
-    datos."""
-    from pywinauto import Application
-    from pywinauto.keyboard import send_keys
-    from pywinauto.uia_defines import IUIA
-
+def _rect_modal(hwnd):
+    """(L, T, R, B) del modal en pantalla, o None."""
     try:
-        app = Application(backend="uia").connect(handle=hwnd, timeout=5)
-        app.window(handle=hwnd).set_focus()
-        time.sleep(0.5)
+        from pywinauto import Application
+
+        w = Application(backend="uia").connect(handle=hwnd, timeout=5).window(handle=hwnd)
+        r = w.rectangle()
+        return (r.left, r.top, r.right, r.bottom)
     except Exception as e:
-        logger.warning(f"  no pude enfocar el modal para el diag de foco: {e}")
-    logger.info("  ── secuencia de foco del modal (TAB por TAB) ──")
-    for i in range(pasos):
-        aid = nm = ""
-        ct = 0
+        logger.warning(f"  no pude leer el rect del modal: {e}")
+        return None
+
+
+def _targets_modal(hwnd):
+    """{nombre: (x, y)} absolutos de cada control, desde el rect real del modal."""
+    rect = _rect_modal(hwnd)
+    if rect is None:
+        return None
+    left, top = rect[0], rect[1]
+    return {k: (left + ox, top + oy) for k, (ox, oy) in _MODAL_OFFSETS.items()}
+
+
+def _click_abs(x: int, y: int, doble: bool = False) -> None:
+    from pywinauto import mouse
+
+    if doble:
+        mouse.double_click(button="left", coords=(int(x), int(y)))
+    else:
+        mouse.click(button="left", coords=(int(x), int(y)))
+
+
+def _calibrar_modal(hwnd) -> None:
+    """Mueve el mouse a cada target SIN clickear (2s de pausa + log), para verificar
+    que las coordenadas caen sobre los controles. Riesgo cero."""
+    from pywinauto import mouse
+
+    tg = _targets_modal(hwnd)
+    if tg is None:
+        logger.error("  no pude leer el rect del modal para calibrar.")
+        return
+    logger.info(f"  rect del modal: {_rect_modal(hwnd)}")
+    logger.info("  ── calibración: mirá dónde queda el cursor en cada paso ──")
+    for nombre, (x, y) in tg.items():
+        logger.info(f"    → {nombre}: mouse a ({x},{y})")
         try:
-            el = IUIA().iuia.GetFocusedElement()
-            aid = el.CurrentAutomationId or ""
-            nm = el.CurrentName or ""
-            ct = el.CurrentControlType
-        except Exception:
-            pass
-        ctn = _CT_NOMBRES.get(ct, str(ct))
-        logger.info(f"    foco modal #{i:02d}: [{ctn}] auto_id={aid!r} name={nm!r}")
-        try:
-            send_keys("{TAB}")
-        except Exception:
-            pass
-        time.sleep(0.35)
+            mouse.move(coords=(int(x), int(y)))
+        except Exception as e:
+            logger.warning(f"      no pude mover el mouse: {e}")
+        time.sleep(2.0)
+    logger.info("  calibración lista. Decime qué targets caen corridos y ajusto los offsets.")
+
+
+def _responder_modal(hwnd, cod_respuesta: str, detalle: str, grabar: bool, dump_al_fallar: bool):
+    """Llena el modal por coordenadas: selecciona la fila → Concepto=RE9901 →
+    Observaciones → 'Aplicar campos' → (si --grabar) GRABAR."""
+    from pywinauto.keyboard import send_keys
+
+    tg = _targets_modal(hwnd)
+    if tg is None:
+        logger.error("  no pude leer el rect del modal para responder.")
+        return "ERROR_MODAL"
+
+    # 1) Seleccionar la fila del concepto (checkbox). El usuario recalcó que la
+    #    factura/fila SIEMPRE debe estar tildada para 'Aplicar campos' + GRABAR.
+    logger.info(f"  1) tildo la fila (checkbox) en {tg['check_fila']}")
+    _click_abs(*tg["check_fila"])
+    time.sleep(0.5)
+
+    # 2) Concepto = RE9901 (click en el combo → borrar → tipear → ENTER para que
+    #    el lookup fije el código y autocomplete el nombre).
+    logger.info(f"  2) Concepto={cod_respuesta} en {tg['concepto']}")
+    _click_abs(*tg["concepto"])
+    time.sleep(0.4)
+    send_keys("^a{DEL}")
+    send_keys(_escapar(cod_respuesta), pause=0.04)
+    time.sleep(0.4)
+    send_keys("{ENTER}")
+    time.sleep(0.5)
+
+    # 3) Observaciones = detalle de respuesta del Excel.
+    logger.info(f"  3) Observaciones en {tg['observaciones']} ({len(detalle)} chars)")
+    _click_abs(*tg["observaciones"])
+    time.sleep(0.4)
+    send_keys("^a{DEL}")
+    if detalle:
+        send_keys(_escapar(detalle), with_spaces=True, pause=0.005)
+    time.sleep(0.4)
+
+    # 4) Aplicar campos (copia Concepto+Observaciones a la fila tildada).
+    logger.info(f"  4) 'Aplicar campos' en {tg['aplicar']}")
+    _click_abs(*tg["aplicar"])
+    time.sleep(1.0)
+
+    if not grabar:
+        logger.warning(
+            "  ✓ modal LLENADO (SIN grabar). Revisá que Concepto/Observaciones/valor "
+            "quedaron en la fila y que está tildada. Si está OK, corré con --grabar."
+        )
+        return "MODAL_LLENADO"
+
+    # 5) GRABAR.
+    logger.info(f"  5) GRABAR en {tg['grabar']}")
+    _click_abs(*tg["grabar"])
+    time.sleep(2.0)
+    if dump_al_fallar:
+        _dump("dialogo_grabado")  # el diálogo 'Registro grabado' SÍ es ventana normal
+    logger.warning(
+        "  ⚠ GRABAR clickeado. El diálogo 'Registro grabado' (Confirmar/Imprimir) "
+        "aún no está automatizado: confirmá/imprimí a mano. Con --dump-al-fallar lo "
+        "capturé para automatizarlo."
+    )
+    return "GRABADO_SIN_DIALOGO"
 
 
 def _diag_grids(win):
@@ -297,7 +387,9 @@ def _grid_con_fila(win):
 # ─── Flujo por factura ───────────────────────────────────────────────────────
 
 
-def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump_al_fallar):
+def procesar_factura(
+    win, factura_larga, objeciones, cod_respuesta, grabar, dump_al_fallar, calibrar
+):
     logger.info(f"[{factura_larga}] {len(objeciones)} objeción(es)")
 
     # 1) Activar 'Listado de Tramite de Objeción' y darle AGREGAR para abrir un
@@ -471,23 +563,22 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         logger.warning(f"  fallo doble-click en la fila: {e}")
     time.sleep(2.0)
     logger.info("  doble-click en la fila; modal de respuesta abierto.")
-    # El interior del modal es WPF y NO se puede caminar por UIA ni win32 (lo
-    # confirmé: rooteando en su HWND, las 3 vías sólo dan el TitleBar). PERO el
-    # control con FOCO sí se lee (GetFocusedElement). Así que en vez de volcar el
-    # árbol, tabulamos por el modal y logueamos el foco en cada parada: eso revela
-    # el orden y la identidad de los campos para cablear el llenado por teclado.
+    # El interior del modal es WPF y es OPACO a UIA/win32 (probado por 4 vías: árbol
+    # desde DGFRMPrincipal, conexión a su HWND, win32, y GetFocusedElement tabulando
+    # —siempre devolvió la Window—). Se maneja por COORDENADAS sobre el rect real
+    # del modal (ver _responder_modal / _calibrar_modal).
     hwnds = _hwnds_modal()
-    if hwnds:
-        _diag_foco_modal(hwnds[0])
-    else:
-        logger.warning("  no encontré el HWND del modal para el diag de foco.")
-    logger.warning(
-        "  ⚠ El interior del modal es WPF: NO se camina por UIA (las 3 vías sólo dieron "
-        "el TitleBar). Pero el FOCO sí se lee. Pasame la secuencia 'foco modal #NN' de "
-        "arriba y con eso cableo el llenado por teclado (fila → RE9901 → Observaciones → "
-        "Aplicar campos → GRABAR)."
-    )
-    return "MODAL_ABIERTO"
+    if not hwnds:
+        logger.error("  no encontré el HWND del modal para responder.")
+        if dump_al_fallar:
+            _dump("sin_modal")
+        return "ERROR_MODAL"
+    hwnd = hwnds[0]
+    if calibrar:
+        _calibrar_modal(hwnd)
+        return "CALIBRACION"
+    detalle = objeciones[0].get("detalle", "") if objeciones else ""
+    return _responder_modal(hwnd, cod_respuesta, detalle, grabar, dump_al_fallar)
 
 
 def main() -> int:
@@ -510,6 +601,12 @@ def main() -> int:
     )
     parser.add_argument(
         "--grabar", action="store_true", help="Grabar de verdad (por defecto NO graba: piloto)."
+    )
+    parser.add_argument(
+        "--calibrar",
+        action="store_true",
+        help="Sólo mueve el mouse a cada control del modal (SIN clickear) para verificar "
+        "coordenadas. Riesgo cero; no llena ni graba.",
     )
     parser.add_argument(
         "--dump-al-fallar",
@@ -558,7 +655,13 @@ def main() -> int:
         factura_larga = objeciones[0]["factura"]
         try:
             estado = procesar_factura(
-                win, factura_larga, objeciones, args.cod_respuesta, args.grabar, args.dump_al_fallar
+                win,
+                factura_larga,
+                objeciones,
+                args.cod_respuesta,
+                args.grabar,
+                args.dump_al_fallar,
+                args.calibrar,
             )
         except Exception as e:
             logger.error(f"  ✗ {factura_larga}: {type(e).__name__}: {e}")
