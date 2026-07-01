@@ -1089,30 +1089,42 @@ def descubrir_auto(
 # ─── Índice del share de soportes clínicos ───────────────────────────────────
 
 
+def _clave_factura_en(texto: str, rx: re.Pattern) -> str | None:
+    """Número de factura normalizado de la ÚLTIMA coincidencia de `rx` en `texto`.
+
+    En una ruta las coincidencias van de la raíz a la hoja, así que la última es
+    la más profunda = la más específica (…\\HUS521788\\… → 521788). Devuelve None
+    si no hay coincidencia o si normaliza a '0'."""
+    ms = rx.findall(texto)
+    if not ms:
+        return None
+    clave = normalizar_factura(ms[-1])
+    return None if clave == "0" else clave
+
+
 def indexar_soportes_clinicos(raiz: Path, patron: str) -> dict[str, list[Path]]:
     """Recorre el share de soportes CLÍNICOS (epicrisis, evolución, urgencias,
     órdenes, resultados de apoyo diagnóstico…) y devuelve {factura_norm: [rutas]}.
 
-    La llave es el número de factura embebido en el nombre del archivo
-    (HEV_900006037_HUS487523.pdf → HUS487523), normalizado igual que el resto del
-    motor (quita 'HUS' y ceros de relleno). Mismo criterio que el indexador de la
-    app (app/services/soportes_autodiscovery_service.py), por eso cruza con las
-    facturas del share de factura electrónica sin configuración extra.
+    La llave es el número de factura. Se toma primero del NOMBRE del archivo
+    (HEV_900006037_HUS487523.pdf → HUS487523); si el archivo no lo lleva —el HUS
+    escanea muchos clínicos con nombres genéricos: EPICRISIS.pdf, 1.pdf— se toma
+    de la CARPETA contenedora, que en el share va nombrada por factura
+    (…\\SOPORTES\\HUS521788\\EPICRISIS.pdf → 521788). Se normaliza igual que el
+    resto del motor (quita 'HUS' y ceros de relleno).
 
-    Sólo se indexan archivos cuyo nombre lleva la factura; los documentos de lote
-    sin factura en el nombre (FURIPS/ACUSE compartidos) no se reparten para no
-    contaminar paquetes ajenos —esos ya viven en el share de FE—."""
+    Los documentos de lote sin factura en el nombre NI en una carpeta de factura
+    (FURIPS/ACUSE que cuelgan de carpetas de entidad) no se reparten: sin clave,
+    se saltan y no contaminan paquetes ajenos."""
     rx = re.compile(patron, re.IGNORECASE)
     indice: dict[str, list[Path]] = defaultdict(list)
     n = 0
     for dirpath, _dirnames, filenames in os.walk(raiz):
         d = Path(dirpath)
+        clave_carpeta = _clave_factura_en(dirpath, rx)  # factura embebida en la ruta
         for fn in filenames:
-            m = rx.search(fn)
-            if not m:
-                continue
-            clave = normalizar_factura(m.group(0))
-            if clave == "0":
+            clave = _clave_factura_en(fn, rx) or clave_carpeta
+            if clave is None:
                 continue
             indice[clave].append(d / fn)
             n += 1
@@ -1140,15 +1152,17 @@ def indexar_soportes_desde_indice(ruta_indice: Path, patron: str) -> dict[str, l
             linea = raw.strip().strip('"')
             if not linea:
                 continue
-            base = linea.replace("/", "\\").rsplit("\\", 1)[-1]
-            m = rx.search(base)
-            if m is None:
+            ruta = linea.replace("/", "\\")
+            base = ruta.rsplit("\\", 1)[-1]
+            carpeta = ruta.rsplit("\\", 1)[0] if "\\" in ruta else ""
+            if "." not in base:  # es una CARPETA, no un archivo
+                if rx.search(base):
+                    n_carpetas += 1
                 continue
-            if "." not in base:  # carpeta HUS<factura>, no un archivo
-                n_carpetas += 1
-                continue
-            clave = normalizar_factura(m.group(0))
-            if clave == "0":
+            # Clave por el NOMBRE del archivo; si no la lleva (EPICRISIS.pdf),
+            # por la CARPETA contenedora (…\HUS521788\EPICRISIS.pdf → 521788).
+            clave = _clave_factura_en(base, rx) or _clave_factura_en(carpeta, rx)
+            if clave is None:
                 continue
             _cod, _desc, reconocido = clasificar_soporte(base)
             if reconocido:
@@ -1519,6 +1533,26 @@ def imprimir_resumen(resultados: list[ResultadoFactura]) -> None:
         if n:
             pct = 100 * n / max(1, total)
             logger.info(f"    {estado:<22} {n:>4} ({pct:.0f}%)")
+    # Desglose de REVISAR_TIPIFICACION: distingue lo que el cruce --soportes puede
+    # resolver (faltan soportes clínicos) de lo que necesita renombrar (archivos
+    # sin tipificar). Así se ve dónde está el lever para bajar ese estado.
+    revisar = [r for r in resultados if r.estado == "REVISAR_TIPIFICACION"]
+    if revisar:
+        faltan_clin = [r for r in revisar if r.soportes_esperados_faltantes]
+        solo_sin_clasif = [
+            r for r in revisar if r.archivos_sin_clasificar and not r.soportes_esperados_faltantes
+        ]
+        cod_faltantes = Counter(c for r in faltan_clin for c in r.soportes_esperados_faltantes)
+        logger.info("  REVISAR_TIPIFICACION — por qué:")
+        logger.info(
+            f"    faltan soportes clínicos   : {len(faltan_clin):>4}  (cruzables con --soportes)"
+        )
+        logger.info(
+            f"    solo archivos sin tipificar: {len(solo_sin_clasif):>4}  (renombrar/aliasar)"
+        )
+        if cod_faltantes:
+            top = ", ".join(f"{c}×{n}" for c, n in cod_faltantes.most_common(8))
+            logger.info(f"    códigos clínicos más faltantes: {top}")
     logger.info("  Por entidad:")
     for ent, d in _resumen_por_entidad(resultados).items():
         logger.info(

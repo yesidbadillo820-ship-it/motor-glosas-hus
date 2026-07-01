@@ -481,6 +481,40 @@ class TestSoportesClinicos:
         assert "487523" in idx  # HUS0000487523 → 487523
         assert len(idx["487523"]) == 2
 
+    def test_indexa_clinico_por_carpeta_cuando_archivo_es_generico(self, tmp_path, cfg):
+        # El HUS escanea clínicos con nombres genéricos (EPICRISIS.pdf, HEV.pdf)
+        # DENTRO de una carpeta nombrada por factura (…\HUS487523\). El indexador
+        # toma la factura de la CARPETA aunque el archivo no la lleve en el nombre.
+        carpeta = tmp_path / "clin" / "NUEVA EPS" / "ENV-1" / "HUS487523"
+        carpeta.mkdir(parents=True)
+        (carpeta / "HEV.pdf").write_text("x", encoding="utf-8")
+        (carpeta / "EPICRISIS.pdf").write_text("x", encoding="utf-8")
+        idx = rad.indexar_soportes_clinicos(tmp_path / "clin", cfg.patron_factura)
+        assert "487523" in idx
+        assert len(idx["487523"]) == 2
+
+    def test_clinico_por_carpeta_completa_la_factura(self, tmp_path, cfg):
+        # End-to-end: la factura de procedimientos exige HEV; el HEV vive como
+        # archivo genérico dentro de …\HUS487523\ → queda LISTA por el fallback.
+        d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
+        carpeta = tmp_path / "clin" / "NUEVA EPS" / "ENV-1" / "HUS487523"
+        carpeta.mkdir(parents=True)
+        (carpeta / "HEV.pdf").write_text("x", encoding="utf-8")
+        idx = rad.indexar_soportes_clinicos(tmp_path / "clin", cfg.patron_factura)
+        res = rad.procesar_factura("HUS487523", rad._archivos_de(d), d, "NUEVA EPS", cfg, idx)
+        assert res.estado == "LISTA", res.detalle
+        assert "HEV" in res.soportes_presentes
+        assert any("HEV.pdf" in x for x in res.soportes_clinicos)
+
+    def test_archivo_generico_sin_carpeta_de_factura_no_se_reparte(self, tmp_path, cfg):
+        # Un genérico que NO cuelga de una carpeta de factura (FURIPS de lote en la
+        # carpeta de la entidad) no tiene clave → no contamina ningún paquete.
+        carpeta = tmp_path / "clin" / "NUEVA EPS" / "LOTE"
+        carpeta.mkdir(parents=True)
+        (carpeta / "FURIPS_general.pdf").write_text("x", encoding="utf-8")
+        idx = rad.indexar_soportes_clinicos(tmp_path / "clin", cfg.patron_factura)
+        assert idx == {}
+
     def test_no_duplica_codigos_del_share_fe(self, tmp_path, cfg):
         # Si el share clínico también trae FEV/RIP (ya presentes en el de FE),
         # NO se anexan: el cruce sólo rellena huecos.
@@ -536,6 +570,18 @@ class TestSoportesIndice:
         f = tmp_path / "indice.txt"
         f.write_text("X:\\RAD\\HUS520760\nY:\\RAD\\HUS520761\n", encoding="utf-8")
         assert rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT) == {}
+
+    def test_toma_factura_de_la_carpeta_cuando_el_archivo_es_generico(self, tmp_path):
+        # El archivo no lleva el número pero su CARPETA sí (…\HUS520760\EPICRISIS.pdf).
+        f = tmp_path / "indice.txt"
+        f.write_text(
+            "Y:\\6. JUNIO 2026 - SOPORTES RADICACION\\NUEVA EPS\\ENV-1\\HUS520760\\EPICRISIS.pdf\n"
+            "Y:\\6. JUNIO 2026 - SOPORTES RADICACION\\NUEVA EPS\\ENV-1\\HUS520760\\HEV.pdf\n",
+            encoding="utf-8",
+        )
+        idx = rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT)
+        assert set(idx) == {"520760"}
+        assert len(idx["520760"]) == 2
 
 
 class TestDescubrimiento:
