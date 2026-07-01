@@ -513,11 +513,19 @@ def _dump_modal(page: Page, evidencias: Path, nombre: str = "dbg_modal.html") ->
 
 
 def _item_rows(page: Page):
-    """Filas de ítem: las que tienen el botón "+" en la celda TECNOLOGÍA (3ª). La
-    sub-fila de detalle que se inserta al expandir NO tiene botón ahí, así que esto
-    devuelve exactamente los N ítems, en orden y estable aunque haya varias
-    expandidas (el portal NO es acordeón: permite varias abiertas a la vez)."""
+    """Filas de ÍTEM padre: las que tienen el botón "+" en la celda TECNOLOGÍA (3ª).
+    Al expandir un ítem se insertan 1..N sub-filas de glosa (que NO tienen ese botón),
+    así que esto devuelve exactamente los ítems padre, en orden y estable aunque haya
+    varias expandidas (el portal NO es acordeón: permite varias abiertas a la vez)."""
     return page.locator("table tbody tr:has(td:nth-child(3) button)")
+
+
+def _detail_rows(page: Page):
+    """Sub-filas de DETALLE (una por glosa): las únicas con el input editable de
+    VALOR RATIFICADO ACEPTADO IPS. OJO: un ítem puede tener VARIAS glosas (p. ej. las
+    tecnologías 799/dispositivos traen TA0201 + TA0601), y cada una es una sub-fila
+    propia que hay que responder. Los ítems padre no tienen ese input."""
+    return page.locator("table tbody tr:has(input.MuiInputBase-inputAdornedEnd)")
 
 
 def _set_valor(detail, valor: int, timeout: int = 12000) -> None:
@@ -587,42 +595,57 @@ def subsanar_items(
     lento: bool = False,
     soporte: Path | None = None,
 ) -> int:
-    """Activa el modo SUBSANAR y llena cada ítem con (valor, texto) y —si se pasó
-    `soporte`— sube ese PDF en cada ítem. Devuelve cuántos se llenaron. NOTA: procesa
-    la página actual (>1 página aún es un TODO)."""
+    """Activa el modo SUBSANAR, EXPANDE todos los ítems y llena CADA sub-fila de glosa
+    con (valor, texto) y —si se pasó `soporte`— sube ese PDF. Un ítem puede tener
+    varias glosas (cada una es su propia sub-fila) y hay que responderlas TODAS, o el
+    botón ENVIAR SUBSANACIÓN no se habilita. Devuelve cuántas glosas se llenaron.
+    NOTA: procesa la página actual (>1 página aún es un TODO)."""
     page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
     page.wait_for_timeout(1500)
     _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
-    total = _item_rows(page).count()
+
+    # 1) Expandir TODOS los ítems padre: cada "+" revela 1..N sub-filas de glosa.
+    n_items = _item_rows(page).count()
+    logger.info(f"  Modo subsanar activo. Ítems padre: {n_items}. Expandiendo todos…")
+    for i in range(n_items):
+        parent = _item_rows(page).nth(i)
+        with contextlib.suppress(Exception):
+            parent.locator("td:nth-child(3) button").first.scroll_into_view_if_needed()
+            parent.locator("td:nth-child(3) button").first.click()
+        page.wait_for_timeout(250)
+    page.wait_for_timeout(700)
+    _dump_tabla(page, evidencias, "dbg_expandido.html")
+
+    # 2) Llenar TODAS las sub-filas de detalle (una por glosa). Los ítems 799 traen 2.
+    total = _detail_rows(page).count()
     n = min(total, max_items) if max_items else total
     logger.info(
-        f"  Modo subsanar activo. Ítems: {total} — a llenar: {n}"
-        + ("  (con soporte PDF)" if soporte else "")
+        f"  Glosas a subsanar: {total} — a llenar: {n}" + ("  (con soporte PDF)" if soporte else "")
     )
+    if total < n_items:
+        logger.warning(
+            f"  ⚠ Se detectaron {total} glosas pero {n_items} ítems: puede que algún "
+            "ítem no se expandiera. Revisá dbg_expandido.html."
+        )
     hechos = 0
     for i in range(n):
-        # Fila del ítem i y su botón "+" (re-query por el re-render al expandir).
-        item_row = _item_rows(page).nth(i)
-        item_row.locator("td:nth-child(3) button").first.click()  # expandir ítem i
-        page.wait_for_timeout(700)
-        # La sub-fila de detalle es la <tr> inmediatamente siguiente a la del ítem.
-        detail = item_row.locator("xpath=following-sibling::tr[1]")
-        if i == 0:
-            _dump_tabla(page, evidencias, "dbg_expandido.html")
+        detail = _detail_rows(page).nth(i)  # re-query por el re-render de cada llenado
+        with contextlib.suppress(Exception):
+            detail.scroll_into_view_if_needed()
         try:
             _set_valor(detail, valor)
             _set_observacion(page, detail, texto)
             if soporte is not None:
                 _subir_soporte(page, detail, soporte, evidencias)
         except Exception as e:  # noqa: BLE001
-            _dump_tabla(page, evidencias, f"dbg_error_item{i + 1}.html")
-            _dump_modal(page, evidencias, f"dbg_modal_item{i + 1}.html")
+            _dump_tabla(page, evidencias, f"dbg_error_glosa{i + 1}.html")
+            _dump_modal(page, evidencias, f"dbg_modal_glosa{i + 1}.html")
             raise RuntimeError(
-                f"Falló el llenado del ítem {i + 1}: {str(e)[:150]}. Se volcó el HTML de "
-                f"la tabla en {evidencias} (dbg_*.html) para calibrar el selector."
+                f"Falló el llenado de la glosa {i + 1}: {str(e)[:150]}. Se volcó el HTML "
+                f"de la tabla en {evidencias} (dbg_*.html) para calibrar el selector."
             ) from e
         hechos += 1
-        logger.info(f"    ítem {i + 1}/{n} ✓")
+        logger.info(f"    glosa {i + 1}/{n} ✓")
         if lento:
             page.wait_for_timeout(300)
     return hechos
@@ -719,10 +742,10 @@ def procesar_factura(
         if finalizar:
             det = finalizar_factura(page, factura, evidencias)
             reg["estado"] = "OK"
-            reg["detalle"] = f"{hechos} ítems; {det}"
+            reg["detalle"] = f"{hechos} glosas; {det}"
         else:
             reg["estado"] = "LLENADO_SIN_ENVIAR"
-            reg["detalle"] = f"{hechos} ítems llenados; revisá y re-corré con --finalizar"
+            reg["detalle"] = f"{hechos} glosas llenadas; revisá y re-corré con --finalizar"
     except Exception as e:
         reg["estado"] = "ERROR"
         reg["detalle"] = str(e)[:300]
