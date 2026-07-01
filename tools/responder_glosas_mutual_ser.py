@@ -413,28 +413,35 @@ def explorar(page: Page, salida_dir: Path) -> None:
     dump = page.evaluate(
         """() => {
         const txt = el => (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().slice(0,80);
-        // data-testid del/los SVG interno(s) (MUI: AddIcon, CloudUploadIcon, etc.) —
-        // el selector ROBUSTO para los botones-ícono sin texto.
-        const svgtd = el => Array.from(el.querySelectorAll('svg[data-testid]'))
-            .map(s => s.getAttribute('data-testid')).join(',');
+        // data-testid o class del/los SVG interno(s) (MUI: AddIcon, CloudUploadIcon...).
+        const svgInfo = el => Array.from(el.querySelectorAll('svg'))
+            .map(s => s.getAttribute('data-testid') || (s.getAttribute('class')||'').slice(0,45))
+            .filter(Boolean).join(' , ');
         const desc = el => {
             const a = [];
-            for (const at of ['id','name','type','placeholder','role','aria-label','data-testid','title']) {
-                const v = el.getAttribute(at); if (v) a.push(at+'='+v.slice(0,50));
+            for (const at of ['id','name','type','placeholder','role','aria-label','data-testid','title','class']) {
+                const v = el.getAttribute(at); if (v) a.push(at+'='+v.slice(0,55));
             }
-            const svg = svgtd(el);
-            return el.tagName.toLowerCase()+' {'+a.join(' ')+'}'+(svg?' svg=['+svg+']':'')+' '+txt(el);
+            const svg = svgInfo(el);
+            return el.tagName.toLowerCase()+' {'+a.join(' ')+'}'+(svg?' [svg: '+svg+']':'')+' '+txt(el);
         };
-        const pick = (sel,n=80) => Array.from(document.querySelectorAll(sel)).slice(0,n).map(desc);
+        const pick = (sel,n=100) => Array.from(document.querySelectorAll(sel)).slice(0,n).map(desc);
+        const clean = h => (h||'').replace(/\\s+/g,' ');
+        // HTML crudo de la 1ª tabla y de cualquier modal/dialog abierto — la fuente de
+        // verdad para ver cómo se anidan input de valor y botón de observación.
+        const tabla = document.querySelector('table');
+        const dialog = document.querySelector('[role=dialog], .MuiDialog-root, .MuiModal-root');
         return {
             url: location.href,
-            botones: pick('button, [role=button], input[type=button], input[type=submit], a[href]', 140),
+            botones: pick('button, [role=button], input[type=button], input[type=submit], a[href]', 160),
             inputs: pick('input, textarea'),
             selects: pick('select, [role=combobox], mat-select'),
             iconos: Array.from(document.querySelectorAll('svg[data-testid]'))
-                .slice(0,150).map(s => s.getAttribute('data-testid')),
-            th: Array.from(document.querySelectorAll('th, [role=columnheader]')).slice(0,50).map(e=>txt(e)),
+                .slice(0,200).map(s => s.getAttribute('data-testid')),
+            th: Array.from(document.querySelectorAll('th, [role=columnheader]')).slice(0,60).map(e=>txt(e)),
             links: Array.from(document.querySelectorAll('a')).slice(0,80).map(a=>({t:txt(a), href:a.getAttribute('href')})),
+            tabla_html: clean(tabla ? tabla.outerHTML : '').slice(0, 40000),
+            dialog_html: clean(dialog ? dialog.outerHTML : '').slice(0, 8000),
         };
     }"""
     )
@@ -446,6 +453,10 @@ def explorar(page: Page, salida_dir: Path) -> None:
             for row in dump.get(seccion, []):
                 f.write(f"  {row}\n")
             f.write("\n")
+        for seccion in ("dialog_html", "tabla_html"):
+            html = dump.get(seccion) or ""
+            f.write(f"===== {seccion.upper()} ({len(html)} chars) =====\n")
+            f.write(html + "\n\n")
     logger.info(f"Volcado del DOM: {out}")
     logger.info(
         "Usá este volcado para completar los  # TODO(portal)  de este script "
