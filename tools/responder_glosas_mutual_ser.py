@@ -384,57 +384,66 @@ class CalibracionPendiente(NotImplementedError):
 
 
 def buscar_factura_en_grilla(page: Page, factura: str) -> bool:
-    """Filtra la factura en CONSULTAR CUENTAS MÉDICAS GLOSADAS y la abre.
-    Devuelve True si quedó abierta. Idempotencia: si FECHA RESPUESTA IPS ya
-    tiene valor, la factura está respondida → el llamador la salta."""
-    # TODO(portal): implementar con los selectores reales del volcado de --explorar.
-    #   1) localizar la caja de búsqueda / filtro por columna FACTURA.
-    #   2) tipear `factura` (o su forma corta normalizar_factura(factura)).
-    #   3) leer la fila: si FECHA RESPUESTA IPS != vacío -> ya respondida (return "YA").
-    #   4) abrir la factura (click en la fila / botón de acción).
+    """Abre la factura desde CONSULTAR CUENTAS MÉDICAS GLOSADAS (link azul de la
+    columna FACTURA). Devuelve "YA" si ya tiene FECHA RESPUESTA SUBSANACIÓN."""
+    # TODO(portal): con los selectores del volcado de --explorar:
+    #   1) filtrar/buscar la factura en la grilla (o paginar hasta encontrarla).
+    #   2) idempotencia: si FECHA RESPUESTA SUBSANACIÓN != vacío -> return "YA".
+    #   3) click en el link azul de la factura -> abre "Detalle de respuesta de glosa".
     raise CalibracionPendiente(
         "buscar_factura_en_grilla: falta calibrar selectores (corré --explorar)."
     )
 
 
-def responder_grupo(page: Page, grupo: dict) -> None:
-    """Carga la respuesta de un grupo (cod_rta + detalle) sobre sus ítems.
-    En glosa ratificada hay UN grupo: RE9901 + texto de conciliación, aceptado 0."""
-    # TODO(portal): implementar según el formulario real:
-    #   - seleccionar código de respuesta (grupo['cod_rta'], p.ej. RE9901),
-    #   - escribir el detalle (grupo['detalle']; usar sanitizar() SOLO si el portal
-    #     rechaza caracteres especiales),
-    #   - poner Valor Aceptado = item['aceptado'] (0 en rechazo),
-    #   - confirmar el ítem/grupo.
+def subsanar_items(page: Page, items: list[dict], evidencias: Path) -> None:
+    """Flujo de SUBSANACIÓN ítem por ítem (ver docs/CONTEXTO_MUTUAL_SER.md §6):
+    click SUBSANAR GLOSA (modo edición) y, por cada ítem, llenar valor aceptado +
+    observación (modal ≤1000 chars) + soporte PDF."""
+    # TODO(portal): con los selectores del volcado de --explorar:
+    #   1) click en el botón "SUBSANAR GLOSA" (habilita edición).
+    #   2) por cada fila de ítem del portal (el portal CONSOLIDA por CUPS, así que
+    #      la respuesta uniforme se aplica a TODOS los ítems que muestre):
+    #      a) expandir con el botón "+" azul de la columna TECNOLOGÍA;
+    #      b) VALOR RATIFICADO ACEPTADO IPS = item['aceptado'] (0 en rechazo) -> check verde;
+    #      c) click en el ícono azul de libro/chat -> modal "Observaciones de
+    #         subsanación" -> escribir item['detalle'] (≤1000; ya viene en 832) -> ACEPTAR;
+    #      d) (si aplica) ícono de nube -> modal "SOPORTE" -> set_input_files(pdf) ->
+    #         GUARDAR -> esperar toast "Carga de archivo exitosa" + check verde.
+    #   3) verificar que ACEPTAR TOTAL RATIFICADO quedó habilitado (azul).
+    # OJO: si "CÓDIGO SUBSANACIÓN" permite carga masiva, preferirlo para facturas
+    # con cientos de ítems (evita abrir el "+" de cada uno).
     raise CalibracionPendiente(
-        "responder_grupo: falta calibrar el formulario de respuesta (corré --explorar)."
+        "subsanar_items: falta calibrar el formulario de subsanación (corré --explorar)."
     )
 
 
 def finalizar_factura(page: Page, factura: str, evidencias: Path) -> str:
-    """Confirma/finaliza la respuesta de la factura y captura evidencia."""
-    # TODO(portal): botón de finalizar + espera del mensaje de éxito + screenshot
-    #   evidencias / f"{factura}_ok.png".
-    raise CalibracionPendiente(
-        "finalizar_factura: falta calibrar el botón de finalizar (corré --explorar)."
-    )
+    """Cierra la subsanación (ACEPTAR TOTAL RATIFICADO) y captura evidencia."""
+    # TODO(portal): click en "ACEPTAR TOTAL RATIFICADO" (azul cuando está todo
+    #   diligenciado) -> esperar confirmación -> screenshot evidencias/f"{factura}_ok.png".
+    #   (Confirmar relación con "ENVIAR SUBSANACIÓN".)
+    raise CalibracionPendiente("finalizar_factura: falta calibrar el cierre (corré --explorar).")
 
 
 def procesar_factura(page: Page, factura: str, datos: dict, evidencias: Path) -> dict:
-    grupos = datos["grupos"]
-    n_items = sum(len(g["items"]) for g in grupos)
-    reg = {"factura": factura, "grupos": len(grupos), "items": n_items, "estado": "", "detalle": ""}
+    items = [it for g in datos["grupos"] for it in g["items"]]
+    reg = {
+        "factura": factura,
+        "grupos": len(datos["grupos"]),
+        "items": len(items),
+        "estado": "",
+        "detalle": "",
+    }
     try:
         estado = buscar_factura_en_grilla(page, factura)
         if estado == "YA":
             reg["estado"] = "YA_RESPONDIDA"
-            reg["detalle"] = "FECHA RESPUESTA IPS ya registrada"
+            reg["detalle"] = "FECHA RESPUESTA SUBSANACIÓN ya registrada"
             return reg
-        for g in grupos:
-            responder_grupo(page, g)
+        subsanar_items(page, items, evidencias)
         estado_fin = finalizar_factura(page, factura, evidencias)
         reg["estado"] = "OK"
-        reg["detalle"] = estado_fin or f"{len(grupos)} grupo(s), {n_items} ítems"
+        reg["detalle"] = estado_fin or f"{len(items)} ítems subsanados"
     except CalibracionPendiente as e:
         reg["estado"] = "CALIBRACION_PENDIENTE"
         reg["detalle"] = str(e)

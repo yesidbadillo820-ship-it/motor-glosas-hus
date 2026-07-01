@@ -142,22 +142,84 @@ py tools\responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx --toda
 
 (✅ = la suma de ítems coincide exactamente con el TOTAL del PDF.)
 
-## 6) Riesgos / decisiones abiertas
+## 6) Flujo del portal — cómo se responde (observado en pantalla, 2026-07-01)
+
+El módulo es una SPA (Angular). El flujo real de respuesta es una **SUBSANACIÓN**
+(la glosa fue ratificada por la EPS y la IPS responde la ratificación):
+
+1. **Grilla** *CONSULTAR CUENTAS MÉDICAS GLOSADAS* → click en el **link azul de la
+   factura** (columna `FACTURA`).
+2. Abre **"Detalle de respuesta de glosa — Factura HUSxxxxx"** con tarjetas de
+   totales (`VALOR TOTAL FACTURADO`, `VALOR TOTAL GLOSADO`, `VALOR GLOSA ACTUAL`,
+   `VALOR RATIFICADO EPS`, `VALOR TOTAL ACEPTADO IPS`, `VALOR TOTAL LEVANTADO EPS`) y
+   una **tabla de ítems** (el portal **consolida** por tecnología/CUPS: HUS510639
+   muestra 15–16 ítems aunque el PDF traía 18 objeciones — no importa porque la
+   respuesta es uniforme).
+3. **Botón `SUBSANAR GLOSA`** (arriba der.) → entra en **modo edición** (habilita
+   los campos por ítem). ⚠ Hay que darle ANTES de poder escribir nada.
+4. Por cada ítem (fila), columnas editables de subsanación:
+   - **`VALOR RATIFICADO ACEPTADO IPS`**: input → el valor que la IPS acepta.
+     En rechazo total = **`0`** (para todos). Al confirmarlo aparece un **check
+     verde**; `VALOR RATIFICADO NO ACEPTADO` se calcula solo (= glosa − aceptado).
+   - **`OBSERVACIONES DE SUBSANACIÓN`**: click en el **ícono azul de libro/chat**
+     de la celda → abre modal **"Observaciones de subsanación"** con un **textarea
+     (límite 1000 caracteres)** → pegar el texto de conciliación (**832 chars,
+     entra**) → **`ACEPTAR`**. Es **campo obligatorio** ("Campo obligatorio, por
+     favor diligenciar").
+   - **`SOPORTE DE SUBSANACIÓN`** (ícono de **nube**): abre modal **"SOPORTE —
+     Cargar archivos"** → arrastrar/seleccionar **UN PDF** → **`GUARDAR`**. Reglas:
+     **solo PDF**, **máx 300 MB**, **un archivo por concepto de glosa**. Al subir
+     aparece un toast verde **"Carga de archivo exitosa"** y el ítem queda con un
+     **check verde** en la columna `SOPORTE DE SUBSANACIÓN` (fila completa). Los
+     íconos de la fila (👁 ver, ☁ subir, ✕) se ponen **azules** al completarse.
+     (Pendiente confirmar QUÉ PDF va y si es obligatorio — ver §7.)
+5. Repetir para todos los ítems hasta que todos tengan valor + observación
+   (+ soporte).
+6. **Finalizar:** cuando están todos diligenciados, el botón **`ACEPTAR TOTAL
+   RATIFICADO`** (abajo der.) se pone **azul/habilitado** → click → **tomar el
+   screenshot de evidencia**. (Arriba también está **`ENVIAR SUBSANACIÓN`**;
+   confirmar la relación/orden entre ambos — el operador usa `ACEPTAR TOTAL
+   RATIFICADO` como cierre y evidencia.)
+
+**Atajo masivo — `CÓDIGO SUBSANACIÓN`** (abajo der.): a confirmar si permite setear
+valor/observación/soporte para TODOS los ítems de una, lo que evitaría abrir el `+`
+de cada uno (clave para facturas de 185 ítems). **Prioridad de calibración.**
+
+**Nota sobre `RE9901`:** en la pantalla de subsanación NO hay un campo editable de
+"código de respuesta"; los campos son valor aceptado + observación + soporte. El
+código `RE9901` podría ir en **`CÓDIGO SUBSANACIÓN`** o ser fijo del sistema — a
+confirmar.
+
+### Mapa de campos: Excel del extractor → portal
+
+| Campo del portal (subsanación) | De dónde sale |
+|---|---|
+| `VALOR RATIFICADO ACEPTADO IPS` | `Valor Aceptado` del Excel (**$0** en rechazo total) |
+| `OBSERVACIONES DE SUBSANACIÓN` (modal, ≤1000 chars) | `Detalle Respuesta` del Excel (832 chars, entra) |
+| `SOPORTE DE SUBSANACIÓN` (PDF ≤300 MB) | PDF de soporte por concepto (a definir cuál) |
+| — | `Código Respuesta` (RE9901) y `Código Glosa`: referencia, no se tipean en esta pantalla |
+
+## 7) Riesgos / decisiones abiertas
 
 1. **reCAPTCHA en el login** (riesgo #1): se maneja con **sesión persistida** +
    login asistido a mano la primera vez. No se usan servicios de resolución de
    captcha de terceros.
-2. **Formulario de respuesta:** falta confirmar en el portal si la respuesta se
-   carga **glosa por glosa** o **masiva por factura**, qué **códigos de respuesta**
-   ofrece el dropdown (¿acepta `RE9901`?), si valida caracteres (tildes/ñ — hay
-   `sanitizar()` listo por si acaso) y si permite/exige **adjuntar soportes**.
-3. **Doble ronda (respuesta / subsanación):** `FECHA RESPUESTA SUBSANACIÓN` sugiere
-   un segundo flujo; confirmar cómo se accede a las facturas en subsanación.
-4. **Idempotencia:** leer el estado real de la grilla (`FECHA RESPUESTA IPS`), nunca
-   un flag propio; `--saltar-csv`/estados terminales como en COOSALUD (pendiente de
-   sumar cuando se calibre el flujo).
+2. **Formulario de respuesta:** ✅ RESUELTO (ver §6) — es una **subsanación** que se
+   llena **ítem por ítem** (valor aceptado + observación en modal ≤1000 chars +
+   soporte PDF) y se cierra con `ACEPTAR TOTAL RATIFICADO`. No hay dropdown de código
+   de respuesta en esa pantalla. Pendiente: (a) confirmar si `CÓDIGO SUBSANACIÓN`
+   permite carga **masiva** (vital para 185 ítems); (b) qué **PDF de soporte** va y
+   si es obligatorio; (c) relación `ACEPTAR TOTAL RATIFICADO` vs `ENVIAR SUBSANACIÓN`.
+3. **Selectores del DOM:** los botones de ícono (`+` expandir, libro/chat de
+   observación, nube de soporte, check de valor) no tienen texto → hace falta el
+   volcado de `--explorar` (o iterar en un piloto) para fijar sus selectores.
+4. **Doble ronda (respuesta / subsanación):** confirmado — el flujo actual es la
+   **subsanación** (2ª ronda tras la ratificación de la EPS).
+5. **Idempotencia:** leer el estado real de la grilla (`FECHA DE RESPUESTA IPS` /
+   `FECHA RESPUESTA SUBSANACIÓN`), nunca un flag propio; `--saltar-csv`/estados
+   terminales como en COOSALUD (pendiente de sumar cuando se calibre el flujo).
 
-## 7) Reglas que el asistente NO debe romper
+## 8) Reglas que el asistente NO debe romper
 
 1. **Nunca confundir MUTUAL SER con COOSALUD / SIMED / DGH.** Plataformas distintas.
 2. **Nunca commitear passwords ni usuarios.** Solo en variables de entorno.
