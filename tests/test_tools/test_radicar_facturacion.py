@@ -584,6 +584,49 @@ class TestSoportesIndice:
         assert len(idx["520760"]) == 2
 
 
+class TestResumenCruce:
+    """El resumen reporta —al final— qué hizo realmente el cruce --soportes."""
+
+    @staticmethod
+    def _res(estado, *, clinicos=(), esperados_faltan=()):
+        r = rad.ResultadoFactura()
+        r.factura = "521788"
+        r.estado = estado
+        r.entidad_nombre = "NUEVA EPS"
+        r.soportes_clinicos = list(clinicos)
+        r.soportes_esperados_faltantes = list(esperados_faltan)
+        return r
+
+    def test_reporta_facturas_que_recibieron_soportes(self, caplog):
+        con = self._res("LISTA", clinicos=["Y:\\x\\HEV.pdf", "Y:\\x\\OPF.pdf"])
+        sin = self._res("REVISAR_TIPIFICACION", esperados_faltan=["HEV"])
+        with caplog.at_level("INFO"):
+            rad.imprimir_resumen([con, sin], n_indice=3)
+        assert "Cruce de soportes clínicos" in caplog.text
+        assert "facturas indexadas en el/los share(s):" in caplog.text
+        assert "recibieron soportes:     1" in caplog.text  # 1 factura, 2 archivos
+        assert "(2 archivo(s) anexados)" in caplog.text
+
+    def test_diagnostica_share_vacio(self, caplog):
+        r = self._res("REVISAR_TIPIFICACION", esperados_faltan=["HEV"])
+        with caplog.at_level("INFO"):
+            rad.imprimir_resumen([r], n_indice=0)
+        assert "el share no devolvió NINGÚN soporte" in caplog.text
+
+    def test_diagnostica_numeracion_que_no_cruza(self, caplog):
+        # Índice con soportes, pero ninguna factura del lote recibió nada.
+        r = self._res("REVISAR_TIPIFICACION", esperados_faltan=["HEV"])
+        with caplog.at_level("INFO"):
+            rad.imprimir_resumen([r], n_indice=8000)
+        assert "NINGUNO cruzó con el lote" in caplog.text
+
+    def test_sin_cruce_no_imprime_bloque(self, caplog):
+        r = self._res("LISTA")
+        with caplog.at_level("INFO"):
+            rad.imprimir_resumen([r], n_indice=None)
+        assert "Cruce de soportes clínicos" not in caplog.text
+
+
 class TestDescubrimiento:
     def test_carpeta_factura_con_eps_padre(self, tmp_path, cfg):
         _factura_folder(tmp_path / "COOSALUD", "HUS1")

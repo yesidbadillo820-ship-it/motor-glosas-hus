@@ -1518,7 +1518,7 @@ def _resumen_por_entidad(resultados: list[ResultadoFactura]) -> dict[str, dict]:
     return dict(sorted(agg.items(), key=lambda kv: -kv[1]["total"]))
 
 
-def imprimir_resumen(resultados: list[ResultadoFactura]) -> None:
+def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = None) -> None:
     por_estado = Counter(r.estado for r in resultados)
     total = len(resultados)
     valor_total = sum(r.valor_total for r in resultados)
@@ -1553,6 +1553,29 @@ def imprimir_resumen(resultados: list[ResultadoFactura]) -> None:
         if cod_faltantes:
             top = ", ".join(f"{c}×{n}" for c, n in cod_faltantes.most_common(8))
             logger.info(f"    códigos clínicos más faltantes: {top}")
+    # Qué hizo REALMENTE el cruce --soportes: cuántas facturas del lote recibieron
+    # soportes del share. Se imprime aquí (final del resumen) para que el dato
+    # quede a la vista aunque no se scrollee al inicio del log. Auto-diagnostica
+    # los dos modos de falla: share vacío vs. numeración que no cruza.
+    if n_indice is not None:
+        con_cruce = sum(1 for r in resultados if r.soportes_clinicos)
+        n_files = sum(len(r.soportes_clinicos) for r in resultados)
+        logger.info("  Cruce de soportes clínicos (--soportes):")
+        logger.info(f"    facturas indexadas en el/los share(s):     {n_indice:>5,}")
+        logger.info(
+            f"    facturas del lote que recibieron soportes: {con_cruce:>5,}  "
+            f"({n_files:,} archivo(s) anexados)"
+        )
+        if n_indice == 0:
+            logger.info(
+                "    ⚠ el share no devolvió NINGÚN soporte: revisá la(s) ruta(s) de --soportes "
+                "(¿carpeta correcta? ¿permiso de lectura? ¿el disco se ve desde Python?)."
+            )
+        elif con_cruce == 0:
+            logger.info(
+                "    ⚠ hay soportes indexados pero NINGUNO cruzó con el lote: la numeración "
+                "del share no coincide con la del lote (revisar rango/normalización)."
+            )
     logger.info("  Por entidad:")
     for ent, d in _resumen_por_entidad(resultados).items():
         logger.info(
@@ -1734,6 +1757,10 @@ def main(argv: list[str] | None = None) -> int:
     if fusion:
         soportes_idx = dict(fusion)
         logger.info(f"Soportes clínicos: {len(soportes_idx)} factura(s) con soporte para cruzar.")
+    # Se pidió cruce (--soportes/--soportes-indice/$SOPORTES_ROOT) → reportá cuántas
+    # facturas quedaron indexadas (0 incluido, para diagnosticar share vacío).
+    cruce_pedido = bool(rutas_soportes) or args.soportes_indice is not None
+    n_indice_soportes = len(fusion) if cruce_pedido else None
 
     if args.layout == "lote":
         items = descubrir_lote(args.origen, manifiesto, cfg, cfg.patron_factura)
@@ -1791,7 +1818,7 @@ def main(argv: list[str] | None = None) -> int:
     escribir_reporte_csv(resultados, args.reporte)
     if args.xlsx is not None:
         escribir_reporte_xlsx(resultados, args.xlsx)
-    imprimir_resumen(resultados)
+    imprimir_resumen(resultados, n_indice_soportes)
 
     listas = sum(1 for r in resultados if r.estado in ESTADOS_OK)
     logger.info(
