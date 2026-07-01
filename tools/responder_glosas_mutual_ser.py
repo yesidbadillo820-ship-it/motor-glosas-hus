@@ -495,6 +495,20 @@ def _dump_tabla(page: Page, evidencias: Path, nombre: str) -> None:
         logger.warning(f"    [diag] no pude volcar la tabla: {e}")
 
 
+def _dump_modal(page: Page, evidencias: Path, nombre: str = "dbg_modal.html") -> None:
+    """Diagnóstico: vuelca el HTML del overlay/modal MUI visible, si hay alguno."""
+    try:
+        loc = page.locator(".MuiModal-root, .MuiDialog-root, [role=presentation]")
+        if loc.count() == 0:
+            return
+        evidencias.mkdir(parents=True, exist_ok=True)
+        html = loc.last.evaluate("e => e.outerHTML")
+        (evidencias / nombre).write_text(html, encoding="utf-8")
+        logger.info(f"    [diag] modal volcado: {evidencias / nombre}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"    [diag] no pude volcar el modal: {e}")
+
+
 def _plus_items(page: Page):
     """Botones "+" de expandir, uno por ítem: viven en la celda TECNOLOGÍA (la 3ª,
     nth-child(3)) de cada fila de ítem. La sub-fila de detalle que se inserta al
@@ -524,9 +538,10 @@ def _set_observacion(page: Page, texto: str) -> None:
     # Botón de la celda OBSERVACIONES DE SUBSANACIÓN (col 21) de la fila ACTIVA -> modal.
     fila = _fila_activa(page).first
     fila.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
-    # El modal ("Observaciones de subsanación") NO expone role=dialog de forma fiable;
-    # lo operamos por su textarea (con contador de caracteres) + el botón ACEPTAR.
-    ta = page.locator("textarea").last
+    # El modal ("Observaciones de subsanación") NO expone role=dialog de forma fiable
+    # y la página tiene decenas de textareas OCULTAS (una por fila) — hay que tomar la
+    # ÚNICA textarea VISIBLE (la del modal) + el botón ACEPTAR.
+    ta = page.locator("textarea:visible").last
     ta.wait_for(state="visible", timeout=15000)
     ta.fill(texto)
     page.get_by_role("button", name="ACEPTAR", exact=True).click()
@@ -562,6 +577,7 @@ def subsanar_items(
             _set_observacion(page, texto)
         except Exception as e:  # noqa: BLE001
             _dump_tabla(page, evidencias, f"dbg_error_item{i + 1}.html")
+            _dump_modal(page, evidencias, f"dbg_modal_item{i + 1}.html")
             raise RuntimeError(
                 f"Falló el llenado del ítem {i + 1}: {str(e)[:150]}. Se volcó el HTML de "
                 f"la tabla en {evidencias} (dbg_*.html) para calibrar el selector."
