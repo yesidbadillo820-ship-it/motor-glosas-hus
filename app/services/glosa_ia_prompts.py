@@ -13,13 +13,12 @@ COOSALUD                   68001C00060340-24           SOAT – 15 %
 COMPENSAR                  Acuerdo Tarifario 2025      SOAT – 10 %
 POSITIVA                   0525 de 2017 + Otrosí 03   SOAT – 15 %
 PPL (Fiduprevisora)        IPS-001B-2022 / Otrosí 26  SOAT – 15 %
-FOMAG (Fiduprevisora)      12076-359-2025              SOAT – 15 %
+FOMAG (Fiduprevisora)      12076-359-2025 / Acta 012  SOAT/SMDLV – 20 %
 POLICÍA NAL. (Med/Alta)    068-5-200004-26 (SFI 004)  UVB – 8 %
-POLICÍA NAL. (Oncología)   068-5-200006-26             Inst. HUS
+POLICÍA NAL. (Oncología)   068-5-200006-26             UVB – 8 % + Inst. HUS
 SUMIMEDICAL                Tarifario 2025              SOAT – 15 %
 DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT/SMLV – 20 %
 SALUD MIA                  CSA2025EVE3A005             SOAT – 15 %
-PRECIMED                   Contrato 319 de 2024        SOAT – 15 %
 AURORA (ARL/Vida)          Minuta ARL firmada 2024     SOAT pleno
 SIN CONTRATO               —                           SOAT pleno
 """
@@ -161,9 +160,9 @@ CONTRATOS_HUS: dict[str, dict] = {
         ),
     },
     "FOMAG": {
-        "numero": "CONTRATO No. 12076-359-2025",
-        "tarifa": "SOAT -15 %",
-        "factor": 0.85,
+        "numero": "CONTRATO No. 12076-359-2025 (Fiduprevisora — Acta de Negociación Tarifaria No. 012)",
+        "tarifa": "SOAT SMDLV -20 % (Acta 012, con techos FOMAG) / tarifas propias sin homólogo",
+        "factor": 0.80,
         "tipo": "MAGISTERIO — DOCENTES OFICIALES",
         "nit": "830.053.105-3",
         "vigencia": "2025",
@@ -261,16 +260,6 @@ CONTRATOS_HUS: dict[str, dict] = {
         "vigencia": "Desde 01/06/2025 con renovación automática",
         "contacto": "Correo contratación HUS",
         "nota": "Dos documentos firmados: CSA2025EVE3A005 (Contributivo) y SSA2025EVE3A005 (Subsidiado). Cláusula décima séptima #10/#11 y vigésima cuarta (parágrafo eventos adversos) son defensivas clave.",
-    },
-    "PRECIMED": {
-        "numero": "CONTRATO No. 319 DE 2024",
-        "tarifa": "SOAT -15 %",
-        "factor": 0.85,
-        "tipo": "EMPRESA DE MEDICINA PREPAGADA",
-        "nit": "N/D",
-        "vigencia": "2024-2025",
-        "contacto": "Correo contratación HUS",
-        "nota": "Contrato de prestación de servicios de salud.",
     },
 }
 
