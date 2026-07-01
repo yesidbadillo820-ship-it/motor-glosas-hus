@@ -11,12 +11,13 @@ siguiendo el mismo patrón que responder_glosas_coosalud.py / _simed.py.
 ⚠ ESTADO: v1 — IMPLEMENTADO (selectores calibrados con el volcado real), PENDIENTE
     de PILOTO. El portal es React/MUI; los selectores usan texto/rol + posición de
     celda (las clases/ids son inestables). Flujo de SUBSANACIÓN implementado:
-    abrir factura → SUBSANAR GLOSA → por cada ítem: expandir "+" (col. TECNOLOGÍA),
-    poner VALOR RATIFICADO ACEPTADO IPS = 0, escribir OBSERVACIÓN (modal ≤1000) y —si
-    se pasa --soportes— subir el PDF de soporte → ENVIAR SUBSANACIÓN (arriba a la
-    derecha; sólo se habilita al completar todos los campos y, normalmente, los
-    soportes). SEGURIDAD: sin --finalizar el bot SOLO llena (no envía); --max-items N
-    limita a N ítems para pilotear. Modo --explorar sigue disponible para re-calibrar.
+    abrir factura → SUBSANAR GLOSA → expandir TODOS los ítems (cada "+" revela 1..N
+    sub-filas de glosa; un ítem puede traer varias) → por cada glosa: VALOR RATIFICADO
+    ACEPTADO IPS = 0, OBSERVACIÓN (modal ≤1000) y —si se pasa --soportes— subir el PDF
+    → elegir CÓDIGO SUBSANACIÓN (RE9901 SUBSANADA TOTAL) → ENVIAR SUBSANACIÓN (arriba a
+    la derecha; sólo se pone verde tras completar todo y elegir el código). SEGURIDAD:
+    sin --finalizar el bot SOLO llena (no envía); --max-items N limita a N glosas para
+    pilotear. Modo --explorar sigue disponible para re-calibrar.
 
 CREDENCIALES (variables de entorno, NO en el código):
     setx MUTUALSER_USER  gerencia@hus.gov.co
@@ -651,11 +652,48 @@ def subsanar_items(
     return hechos
 
 
-def finalizar_factura(page: Page, factura: str, evidencias: Path) -> str:
-    """Envía la subsanación con el botón ENVIAR SUBSANACIÓN (arriba a la derecha) y
-    captura evidencia. Ese botón SÓLO se habilita cuando TODOS los ítems tienen su
-    valor + observación y —si el portal lo exige— el soporte PDF cargado; por eso
-    esperamos a que quede habilitado antes de hacer clic."""
+def _seleccionar_codigo(page: Page, codigo: str, evidencias: Path) -> None:
+    """Selecciona el CÓDIGO SUBSANACIÓN (dropdown abajo, junto a ACEPTAR TOTAL
+    RATIFICADO) que HABILITA (pone verde) el botón ENVIAR SUBSANACIÓN. En glosa
+    ratificada total el código es `RE9901` (la opción real dice 'RE9901 SUBSANADA
+    TOTAL'). Puede haber otros combobox en la pantalla (p. ej. el paginador), así que
+    probamos cada uno y elegimos el que ofrezca ese código."""
+    rx = re.compile(re.escape(codigo), re.I)
+    combos = page.get_by_role("combobox")
+    try:
+        n = combos.count()
+    except Exception:  # noqa: BLE001
+        n = 0
+    for j in range(n):
+        c = combos.nth(j)
+        try:
+            c.scroll_into_view_if_needed()
+            c.click()
+        except Exception:  # noqa: BLE001
+            continue
+        page.wait_for_timeout(350)
+        opcion = page.get_by_role("option", name=rx).first
+        if opcion.count() and opcion.is_visible():
+            opcion.click()
+            page.wait_for_timeout(600)
+            logger.info(f"  Código de subsanación seleccionado: {codigo}")
+            return
+        with contextlib.suppress(Exception):  # menú equivocado (p. ej. paginador): cerrar
+            page.keyboard.press("Escape")
+        page.wait_for_timeout(150)
+    _dump_modal(page, evidencias, "dbg_codigo.html")
+    raise RuntimeError(
+        f"no pude seleccionar el CÓDIGO SUBSANACIÓN '{codigo}' (no apareció la opción). "
+        f"Volqué el DOM en {evidencias / 'dbg_codigo.html'} para calibrar el selector."
+    )
+
+
+def finalizar_factura(page: Page, factura: str, evidencias: Path, codigo: str = "RE9901") -> str:
+    """Cierra la subsanación: (1) elige el CÓDIGO SUBSANACIÓN (habilita el envío) y
+    (2) hace clic en ENVIAR SUBSANACIÓN (arriba a la derecha); captura evidencia. El
+    botón sólo se habilita cuando TODOS los ítems tienen valor + observación + soporte
+    y se seleccionó el código; por eso lo elegimos primero y esperamos el enable."""
+    _seleccionar_codigo(page, codigo, evidencias)
     btn = page.get_by_role("button", name=re.compile(r"enviar\s+subsanaci", re.I))
     btn.first.wait_for(timeout=20000)
     # Esperar hasta ~40s a que se habilite (se activa al completar todos los campos).
@@ -669,9 +707,10 @@ def finalizar_factura(page: Page, factura: str, evidencias: Path) -> str:
         with contextlib.suppress(Exception):
             page.screenshot(path=str(evidencias / f"{factura}_no_habilita.png"), full_page=True)
         raise RuntimeError(
-            "El botón ENVIAR SUBSANACIÓN siguió DESHABILITADO. Suele faltar el soporte "
-            "PDF en cada ítem: re-corré agregando --soportes <carpeta con "
-            f"{factura}.pdf> (o revisá que todos los ítems tengan valor y observación)."
+            "El botón ENVIAR SUBSANACIÓN siguió DESHABILITADO tras elegir el código. "
+            "Revisá que TODAS las glosas tengan valor + observación + soporte PDF "
+            f"(re-corré con --soportes <carpeta con {factura}.pdf>) y que el CÓDIGO "
+            "SUBSANACIÓN haya quedado seleccionado."
         )
     btn.first.click()
     page.wait_for_timeout(1500)
@@ -720,6 +759,7 @@ def procesar_factura(
     finalizar: bool = False,
     lento: bool = False,
     soportes_dir: Path | None = None,
+    codigo: str = "RE9901",
 ) -> dict:
     grupos = datos["grupos"]
     items = [it for g in grupos for it in g["items"]]
@@ -740,7 +780,7 @@ def procesar_factura(
             page, valor, texto, evidencias, max_items=max_items, lento=lento, soporte=soporte
         )
         if finalizar:
-            det = finalizar_factura(page, factura, evidencias)
+            det = finalizar_factura(page, factura, evidencias, codigo=codigo)
             reg["estado"] = "OK"
             reg["detalle"] = f"{hechos} glosas; {det}"
         else:
@@ -839,11 +879,21 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--codigo",
+        type=str,
+        default="RE9901",
+        help=(
+            "CÓDIGO SUBSANACIÓN a elegir antes de enviar (habilita ENVIAR SUBSANACIÓN). "
+            "Por defecto 'RE9901' (opción 'RE9901 SUBSANADA TOTAL' = glosa ratificada "
+            "rechazada). Se busca por coincidencia del texto de la opción."
+        ),
+    )
+    parser.add_argument(
         "--finalizar",
         action="store_true",
         help=(
-            "Hacer click en ENVIAR SUBSANACIÓN al terminar (envía). SIN este flag el "
-            "bot SOLO llena los campos y NO envía (revisás y re-corrés)."
+            "Elegir el CÓDIGO SUBSANACIÓN y hacer click en ENVIAR SUBSANACIÓN al "
+            "terminar (envía). SIN este flag el bot SOLO llena los campos y NO envía."
         ),
     )
     parser.add_argument(
@@ -903,6 +953,7 @@ def main() -> int:
                     finalizar=args.finalizar,
                     lento=args.lento,
                     soportes_dir=args.soportes,
+                    codigo=args.codigo,
                 )
                 resultados.append(reg)
                 w_rep.writerow(reg)

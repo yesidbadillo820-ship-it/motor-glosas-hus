@@ -238,14 +238,17 @@ confirmar.
 1. **reCAPTCHA en el login** (riesgo #1): se maneja con **sesión persistida** +
    login asistido a mano la primera vez. No se usan servicios de resolución de
    captcha de terceros.
-2. **Formulario de respuesta:** ✅ RESUELTO (ver §6) — es una **subsanación** que se
-   llena **ítem por ítem** (valor aceptado `$0` + observación en modal ≤1000 chars +
-   soporte PDF) y se **envía** con **`ENVIAR SUBSANACIÓN`** (arriba a la derecha), que
-   sólo se habilita al completar todo. El bot sube el mismo Trámite PDF por ítem con
-   `--soportes`. No hay dropdown de código de respuesta en esa pantalla. Pendiente:
-   (a) confirmar en piloto si `ENVIAR SUBSANACIÓN` se habilita **sin** soporte o si es
-   obligatorio; (b) si `CÓDIGO SUBSANACIÓN` permite carga **masiva** (evitaría el
-   clic-por-ícono en los 185 ítems).
+2. **Formulario de respuesta:** ✅ RESUELTO y PROBADO (ver §6) — es una **subsanación**
+   que se llena **por glosa**, no por ítem: cada ÍTEM padre tiene el botón `+` que al
+   expandir revela **1..N sub-filas de glosa** (las tecnologías 799/dispositivos traen
+   2: `TA0201` + `TA0601`). Hay que responder **TODAS** las sub-filas (valor `$0` +
+   observación en modal + soporte PDF por glosa) o el envío no se habilita. En
+   `HUS0000510639`: 15 ítems → **21 glosas** → 36 filas ("1–36 de 36"). Cierre en 2
+   pasos: (a) elegir el **`CÓDIGO SUBSANACIÓN`** en el dropdown de abajo (opciones
+   `RE9602 INJUSTIFICADA` / **`RE9901 SUBSANADA TOTAL`**; para glosa ratificada total
+   se elige **RE9901**), lo que pone **verde** el botón; (b) **`ENVIAR SUBSANACIÓN`**
+   (arriba a la derecha). El bot hace todo esto: sube el mismo Trámite PDF por glosa
+   con `--soportes` y elige el código con `--codigo RE9901` (default).
 3. **Selectores del DOM:** los botones de ícono (`+` expandir, libro/chat de
    observación, nube de soporte, check de valor) no tienen texto → hace falta el
    volcado de `--explorar` (o iterar en un piloto) para fijar sus selectores.
