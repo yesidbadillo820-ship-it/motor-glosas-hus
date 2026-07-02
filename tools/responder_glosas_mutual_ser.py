@@ -244,6 +244,7 @@ def leer_excel_respuestas(ruta: Path) -> dict[str, dict]:
             )
             g["items"].append(it)
         datos["grupos"] = list(grupos.values())
+    wb.close()  # read_only=True mantiene abierto el handle del zip hasta cerrarlo.
     return por_factura
 
 
@@ -345,9 +346,14 @@ def abrir_sesion(p, args, user: str, password: str):
                 f"http://127.0.0.1:9222/json/version, y reintentá. Detalle: {ultimo_error}"
             ) from ultimo_error
         ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        # Preferir la pestaña que YA está en el portal (el usuario puede tener otras).
+        page = next(
+            (pg for pg in ctx.pages if PORTAL_BASE in pg.url),
+            ctx.pages[0] if ctx.pages else ctx.new_page(),
+        )
         page.set_default_navigation_timeout(120000)
         page.set_default_timeout(30000)
+        page.on("dialog", lambda d: d.accept())
         if not _login_ok(page):
             logger.warning(
                 "No detecto sesión activa en ese Chrome. En esa ventana: iniciá "
@@ -564,7 +570,10 @@ def _subir_soporte(page: Page, detail, pdf: Path, evidencias: Path) -> None:
     # El de subir es el del medio (2º de 3); si hubiera menos, tomo el primero.
     idx = 1 if botones.count() >= 3 else 0
     botones.nth(idx).click()
-    page.wait_for_timeout(800)
+    # Esperar el título del modal ("SOPORTE - Cargar archivos") en vez de 800ms fijos;
+    # si el título no matchea, el cap de 2s deja el comportamiento como antes.
+    with contextlib.suppress(Exception):
+        page.get_by_text(re.compile(r"cargar archivos", re.I)).last.wait_for(timeout=2000)
     try:
         finp = page.locator('input[type="file"]').last
         finp.wait_for(state="attached", timeout=8000)
@@ -575,16 +584,17 @@ def _subir_soporte(page: Page, detail, pdf: Path, evidencias: Path) -> None:
             f"no encontré el input de archivo del soporte ({str(e)[:100]}). Volqué el "
             f"modal en {evidencias / 'dbg_modal_soporte.html'} para calibrar."
         ) from e
-    page.wait_for_timeout(500)
     # Confirmar/guardar dentro del modal (si el modal tiene su propio GUARDAR).
+    guardar = page.get_by_role("button", name=re.compile(r"^guardar$", re.I))
     with contextlib.suppress(Exception):
-        guardar = page.get_by_role("button", name=re.compile(r"^guardar$", re.I))
-        if guardar.count() and guardar.last.is_visible():
-            guardar.last.click()
+        guardar.last.wait_for(state="visible", timeout=5000)
+        guardar.last.click()
     # Esperar el toast de carga exitosa (si aparece); si no, seguir igual.
     with contextlib.suppress(Exception):
         page.get_by_text(re.compile(r"exitos", re.I)).first.wait_for(timeout=12000)
-    page.wait_for_timeout(400)
+    # Esperar a que el modal se cierre (GUARDAR desaparece) en vez de 400ms fijos.
+    with contextlib.suppress(Exception):
+        guardar.last.wait_for(state="hidden", timeout=8000)
 
 
 def subsanar_items(
@@ -602,7 +612,16 @@ def subsanar_items(
     botón ENVIAR SUBSANACIÓN no se habilita. Devuelve cuántas glosas se llenaron.
     NOTA: procesa la página actual (>1 página aún es un TODO)."""
     page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
-    page.wait_for_timeout(1500)
+    # Esperar a que la tabla del modo subsanar termine de renderizar: el conteo de
+    # ítems padre debe ser >0 y estable en dos lecturas seguidas (antes: 1500ms fijos).
+    prev = -1
+    t0 = time.time()
+    while time.time() - t0 < 10:
+        cur = _item_rows(page).count()
+        if cur and cur == prev:
+            break
+        prev = cur
+        page.wait_for_timeout(300)
     _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
 
     # 1) Expandir TODOS los ítems padre: cada "+" revela 1..N sub-filas de glosa.
@@ -610,11 +629,17 @@ def subsanar_items(
     logger.info(f"  Modo subsanar activo. Ítems padre: {n_items}. Expandiendo todos…")
     for i in range(n_items):
         parent = _item_rows(page).nth(i)
+        antes = _detail_rows(page).count()
         with contextlib.suppress(Exception):
             parent.locator("td:nth-child(3) button").first.scroll_into_view_if_needed()
             parent.locator("td:nth-child(3) button").first.click()
-        page.wait_for_timeout(250)
-    page.wait_for_timeout(700)
+        # Esperar a que aparezcan las sub-filas de ESTE ítem (antes: 250ms fijos). El
+        # cap de 2s sólo se agota si el click no expandió nada (antes pasaba en
+        # silencio y la glosa quedaba sin llenar).
+        t1 = time.time()
+        while _detail_rows(page).count() <= antes and time.time() - t1 < 2:
+            page.wait_for_timeout(50)
+    page.wait_for_timeout(300)
     _dump_tabla(page, evidencias, "dbg_expandido.html")
 
     # 2) Llenar TODAS las sub-filas de detalle (una por glosa). Los ítems 799 traen 2.
@@ -689,6 +714,12 @@ def _seleccionar_codigo(page: Page, codigo: str, evidencias: Path) -> None:
             el = _buscar_opcion()
             if el is not None:
                 break
+            # Si el menú YA desplegó opciones visibles y ninguna matchea, es el combo
+            # equivocado (p. ej. el paginador): salir ya en vez de agotar los 4s.
+            if time.time() - t0 > 0.8:
+                with contextlib.suppress(Exception):
+                    if page.locator("[role=option]:visible").count() > 0:
+                        break
             page.wait_for_timeout(250)
         if el is None:
             with contextlib.suppress(Exception):  # menú equivocado/vacío: cerrar
@@ -698,12 +729,17 @@ def _seleccionar_codigo(page: Page, codigo: str, evidencias: Path) -> None:
         with contextlib.suppress(Exception):
             etiqueta = (el.inner_text() or "").strip()
         el.click()
-        page.wait_for_timeout(700)
-        # VERIFICACIÓN: leer qué quedó mostrando el selector. Si muestra OTRO código
-        # RE#### distinto, abortar ANTES de enviar (no mandar el equivocado).
+        # VERIFICACIÓN: esperar (hasta 3s) a que el selector muestre el código elegido.
+        # Si muestra OTRO código RE#### distinto, abortar ANTES de enviar (no mandar el
+        # equivocado). Antes: 700ms fijos + una sola lectura.
         mostrado = ""
-        with contextlib.suppress(Exception):
-            mostrado = (combo.inner_text() or "").strip()
+        t1 = time.time()
+        while time.time() - t1 < 3:
+            with contextlib.suppress(Exception):
+                mostrado = (combo.inner_text() or "").strip()
+            if mostrado and rx.search(mostrado):
+                break
+            page.wait_for_timeout(150)
         if mostrado and re.search(r"RE\d{3,4}", mostrado) and not rx.search(mostrado):
             _dump_modal(page, evidencias, "dbg_codigo.html")
             raise RuntimeError(
@@ -842,6 +878,23 @@ def procesar_factura(
         "estado": "",
         "detalle": "",
     }
+    # GUARDA: el flujo llena TODAS las glosas del portal con el MISMO (valor, texto).
+    # Si el Excel trae respuestas distintas por ítem, NO hay mapeo fila↔ítem: abortar
+    # esta factura (no enviar datos equivocados) y seguir con la siguiente.
+    if not solo_finalizar and (len(grupos) > 1 or any(it["aceptado"] != valor for it in items)):
+        reg["estado"] = "ERROR"
+        reg["detalle"] = (
+            f"{len(grupos)} grupos de respuesta / valores aceptados no uniformes: el "
+            "flujo actual sólo soporta respuesta uniforme; se omite para no enviar "
+            "datos equivocados."
+        )
+        return reg
+    if len(texto) > 1000:
+        logger.warning(
+            f"  ⚠ Observación de {factura}: {len(texto)} caracteres (>1000, el máximo "
+            "del modal). Se trunca a 1000."
+        )
+        texto = texto[:1000]
     try:
         _abrir_factura(page, factura)
         if solo_finalizar:
@@ -867,6 +920,10 @@ def procesar_factura(
     except Exception as e:
         reg["estado"] = "ERROR"
         reg["detalle"] = str(e)[:300]
+        # Evidencia del estado en que quedó la pantalla (clave en corridas masivas).
+        with contextlib.suppress(Exception):
+            evidencias.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(evidencias / f"{factura}_error.png"), full_page=True)
     return reg
 
 
@@ -998,6 +1055,11 @@ def main() -> int:
         parser.error("indicá --excel (o usá --explorar para calibrar el portal).")
     if not args.explorar and not (args.solo or args.facturas or args.lista or args.todas):
         parser.error("elegí qué facturas procesar: --solo / --facturas / --lista / --todas.")
+    if args.finalizar and args.max_items:
+        logger.warning(
+            "--finalizar con --max-items: si quedan glosas sin llenar, ENVIAR "
+            "SUBSANACIÓN no se habilita y la factura terminará en ERROR (tras ~40s)."
+        )
 
     with sync_playwright() as p:
         browser, ctx, page, es_cdp = abrir_sesion(p, args, user, password)
@@ -1026,29 +1088,36 @@ def main() -> int:
             w_rep.writeheader()
             resultados: list[dict] = []
             t0 = time.time()
-            for i, (factura, datos) in enumerate(seleccion.items(), start=1):
-                n_items = sum(len(g["items"]) for g in datos["grupos"])
-                logger.info(
-                    f"[{i}/{len(seleccion)}] {factura} — {len(datos['grupos'])} grupo(s), {n_items} ítems"
-                )
-                reg = procesar_factura(
-                    page,
-                    factura,
-                    datos,
-                    args.evidencias,
-                    max_items=args.max_items,
-                    finalizar=args.finalizar,
-                    lento=args.lento,
-                    soportes_dir=args.soportes,
-                    codigo=args.codigo,
-                    solo_finalizar=args.solo_finalizar,
-                )
-                resultados.append(reg)
-                w_rep.writerow(reg)
-                if i % 5 == 0:
-                    f_rep.flush()
-                logger.info(f"    → {reg['estado']}: {reg['detalle']}")
-            f_rep.close()
+            try:
+                for i, (factura, datos) in enumerate(seleccion.items(), start=1):
+                    n_items = sum(len(g["items"]) for g in datos["grupos"])
+                    logger.info(
+                        f"[{i}/{len(seleccion)}] {factura} — {len(datos['grupos'])} grupo(s), {n_items} ítems"
+                    )
+                    reg = procesar_factura(
+                        page,
+                        factura,
+                        datos,
+                        args.evidencias,
+                        max_items=args.max_items,
+                        finalizar=args.finalizar,
+                        lento=args.lento,
+                        soportes_dir=args.soportes,
+                        codigo=args.codigo,
+                        solo_finalizar=args.solo_finalizar,
+                    )
+                    resultados.append(reg)
+                    w_rep.writerow(reg)
+                    f_rep.flush()  # filas chicas: no perder la auditoría si algo corta
+                    logger.info(f"    → {reg['estado']}: {reg['detalle']}")
+                    if page.is_closed():
+                        logger.error(
+                            "La pestaña/Chrome se cerró: corto el lote acá (lo hecho "
+                            "hasta ahora quedó en el reporte)."
+                        )
+                        break
+            finally:
+                f_rep.close()
 
             from collections import Counter
 
@@ -1066,7 +1135,8 @@ def main() -> int:
             # Chrome del usuario); sobre un browser lanzado, lo cierra.
             with contextlib.suppress(Exception):
                 browser.close()
-    return 0
+    # Código de salida ≠0 si alguna factura terminó en ERROR (para scripts/wrappers).
+    return 1 if any(r["estado"] == "ERROR" for r in resultados) else 0
 
 
 if __name__ == "__main__":
