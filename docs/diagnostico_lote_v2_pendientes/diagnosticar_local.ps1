@@ -40,8 +40,10 @@ $facturas = @(
   [PSCustomObject]@{ Factura="HUS0000440328"; HUS="HUS440328"; NE_V2="";       NE_TSV="302111"; OrigenAlt=$null; Motivo="Sin NE V2 - confirmar con facturacion (TSV historico: 302111)" }
 )
 
-function Inspeccionar-Carpeta($path) {
-  $info = [ordered]@{
+# Esqueleto unico del resultado de inspeccion: lo usan tanto Inspeccionar-Carpeta
+# como el fallback para facturas sin NE, asi nunca divergen las columnas del CSV.
+function New-InfoCarpeta {
+  [ordered]@{
     Existe       = $false
     TienePDF     = $false
     TieneXML     = $false
@@ -56,10 +58,14 @@ function Inspeccionar-Carpeta($path) {
     CUV_FechaValidacion = ""
     Archivos     = @()
   }
+}
+
+function Inspeccionar-Carpeta($path) {
+  $info = New-InfoCarpeta
   if (-not (Test-Path $path)) { return [PSCustomObject]$info }
   $info.Existe = $true
   $archivos = Get-ChildItem -Path $path -File -ErrorAction SilentlyContinue
-  $info.Archivos = $archivos.Name
+  $info.Archivos = @($archivos.Name)
   foreach ($a in $archivos) {
     if ($a.Name -match "^NC_.*\.pdf$")  { $info.TienePDF = $true;  $info.NombrePDF = $a.Name }
     if ($a.Name -match "^XML_.*\.xml$") { $info.TieneXML = $true;  $info.NombreXML = $a.Name }
@@ -71,7 +77,7 @@ function Inspeccionar-Carpeta($path) {
       # Caso 1: el archivo no es JSON sino texto plano con el error del
       # servicio interno del HUS (dockerrips.hus.gov.co:9443 caido). Asi salen
       # los "CUV" de las notas cuyo RIPS nunca llego a validarse contra
-      # MinSalud — el archivo se guarda con el mensaje de excepcion del API.
+      # MinSalud - el archivo se guarda con el mensaje de excepcion del API.
       if ($raw -match "Se ha generado un error en el consumo" -or `
           $raw -match "dockerrips\.hus\.gov\.co" -or `
           $raw -match "No connection could be made" -or `
@@ -86,7 +92,10 @@ function Inspeccionar-Carpeta($path) {
         } else {
           $info.CUV_Observacion = ($raw.Substring(0, [Math]::Min(200, $raw.Length))).Replace("`r"," ").Replace("`n"," ")
         }
-        return [PSCustomObject]$info
+        # OJO: seguir con el resto de archivos (NC_/XML_), no cortar aca.
+        # CUV_ ordena alfabeticamente ANTES que NC_ y XML_, asi que un return
+        # dejaria TienePDF/TieneXML en false y el estado saldria FALTAN_PDF+XML.
+        continue
       }
       try {
         $j = $raw | ConvertFrom-Json
@@ -138,7 +147,7 @@ $resultados = @()
 foreach ($f in $facturas) {
   $rutaV2 = if ($f.NE_V2) { Join-Path $baseV2 $f.NE_V2 } else { "" }
 
-  $infoV2 = if ($rutaV2) { Inspeccionar-Carpeta $rutaV2 } else { [PSCustomObject]@{ Existe=$false; TienePDF=$false; TieneXML=$false; TieneCUV=$false; NombrePDF=""; NombreXML=""; NombreCUV=""; CUV_State=""; CUV_CodigoError=""; Archivos=@() } }
+  $infoV2 = if ($rutaV2) { Inspeccionar-Carpeta $rutaV2 } else { [PSCustomObject](New-InfoCarpeta) }
 
   $infoOrigen = if ($f.OrigenAlt) { Inspeccionar-Carpeta $f.OrigenAlt } else { $null }
 
@@ -150,7 +159,8 @@ foreach ($f in $facturas) {
     if ($infoV2.CUV_State -eq "True") {
       $estadoCalculado = "COMPLETA_CUV_OK"
     } elseif ($infoV2.CUV_State -eq "False") {
-      $estadoCalculado = "COMPLETA_CUV_RECHAZADO_$($infoV2.CUV_CodigoError)"
+      $cod = if ($infoV2.CUV_CodigoError) { $infoV2.CUV_CodigoError } else { "SIN_CODIGO" }
+      $estadoCalculado = "COMPLETA_CUV_RECHAZADO_$cod"
     } elseif ($infoV2.CUV_State -eq "INVALIDO_RIPS_DOWN") {
       $estadoCalculado = "COMPLETA_CUV_INVALIDO_DOCKERRIPS"
     } elseif ($infoV2.CUV_State -eq "JSON_ILEGIBLE") {

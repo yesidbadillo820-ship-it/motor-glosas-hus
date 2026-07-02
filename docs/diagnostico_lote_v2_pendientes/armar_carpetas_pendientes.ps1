@@ -14,7 +14,7 @@
 #   SIN_PDF_HUS<n>_NE<ne>\
 #   SIN_NE_HUS<n>\
 #
-# El script NO toca V2\NOTAS\ original — solo copia hacia PENDIENTES_12\.
+# El script NO toca V2\NOTAS\ original - solo copia hacia PENDIENTES_12\.
 # Es idempotente: si la subcarpeta existe, sobreescribe el _ESTADO.txt y
 # vuelve a copiar los archivos con -Force.
 #
@@ -158,14 +158,19 @@ $facturas = @(
 
 # --- Funciones auxiliares ---
 
-function Copiar-Archivos-NC($origen, $destino) {
+function Copiar-Archivos-NC($origen, $destino, [switch]$SoloFaltantes) {
+  # Con -SoloFaltantes NO pisa archivos que ya esten en $destino: se usa para
+  # el origen alterno (lote anterior), que solo debe rellenar huecos. El V2
+  # es la fuente vigente y siempre gana.
   if (-not (Test-Path $origen)) { return @() }
   $copiados = @()
   $patrones = @("NC_*.pdf", "XML_*.xml", "CUV_*.json")
   foreach ($pat in $patrones) {
     $items = Get-ChildItem -Path $origen -Filter $pat -File -ErrorAction SilentlyContinue
     foreach ($it in $items) {
-      Copy-Item -Path $it.FullName -Destination (Join-Path $destino $it.Name) -Force
+      $destArchivo = Join-Path $destino $it.Name
+      if ($SoloFaltantes -and (Test-Path $destArchivo)) { continue }
+      Copy-Item -Path $it.FullName -Destination $destArchivo -Force
       $copiados += $it.Name
     }
   }
@@ -246,11 +251,11 @@ foreach ($f in $facturas) {
   $archivos = @()
   $origenes = @()
 
-  # 1) Si existe la carpeta NE en V2, copiar de ahi.
+  # 1) Si existe la carpeta NE en V2, copiar de ahi (fuente vigente, gana siempre).
   if ($f.NE) {
     $rutaV2 = Join-Path $baseV2 $f.NE
     if (Test-Path $rutaV2) {
-      $copiados = Copiar-Archivos-NC $rutaV2 $destCarpeta
+      $copiados = @(Copiar-Archivos-NC $rutaV2 $destCarpeta)
       if ($copiados.Count -gt 0) {
         $archivos += $copiados
         $origenes += "$rutaV2  (V2\NOTAS)"
@@ -258,18 +263,18 @@ foreach ($f in $facturas) {
     }
   }
 
-  # 2) Si tiene origen alterno (DISP_9 / DISP_10), copiar lo que no haya quedado.
+  # 2) Origen alterno (DISP_9 / DISP_10): SOLO rellena lo que falte, sin pisar
+  #    lo que ya vino del V2.
   if ($f.OrigenAlt -and (Test-Path $f.OrigenAlt)) {
-    $copiados = Copiar-Archivos-NC $f.OrigenAlt $destCarpeta
+    $copiados = @(Copiar-Archivos-NC $f.OrigenAlt $destCarpeta -SoloFaltantes)
     if ($copiados.Count -gt 0) {
-      foreach ($c in $copiados) { if ($archivos -notcontains $c) { $archivos += $c } }
+      $archivos += $copiados
       $origenes += "$($f.OrigenAlt)  (lote anterior)"
     }
   }
 
   Generar-EstadoTxt $f $destCarpeta $archivos $origenes
 
-  $estadoTxtPath = (Join-Path $destCarpeta "_ESTADO.txt")
   $color = switch ($f.Causa) {
     "RVC086"     { "Red" }
     "DOCKERRIPS" { "Magenta" }
