@@ -20,6 +20,7 @@ Filosofía:
 from __future__ import annotations
 
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ def obtener_ejemplos_gold(
     eps: str,
     codigo: str,
     max_ejemplos: int = _MAX_EJEMPLOS,
+    texto_glosa: str = "",
 ) -> list[dict]:
     """Devuelve hasta N dictámenes ganadores del par (eps, codigo).
 
@@ -197,6 +199,58 @@ def obtener_ejemplos_gold(
     except Exception as e:
         logger.debug(f"few_shot_gold: error consultando GlosaRecord: {e}")
 
+    # 4) Fase 3 (jul-2026): completar por SIMILITUD BM25 al TEXTO de la glosa.
+    #    El match exacto (eps+código) de los pasos 1-3 tiene recall bajo:
+    #    si no hay histórico del par exacto, no hay ejemplo relevante. El
+    #    RAGService rankea por BM25 sobre precedentes GANADOS (LEVANTADA) de
+    #    CUALQUIER eps/código, con boost por eps/prefijo — trae el ejemplo más
+    #    parecido a ESTA glosa, no el más popular por código. Apagable:
+    #    GLOSA_FEWSHOT_BM25=0.
+    if (
+        texto_glosa
+        and len(ejemplos) < max_ejemplos
+        # No mezclar con las plantillas BANCO_HUS (modo "copiar verbatim"):
+        # meter un precedente "para estilo" al lado confunde la instrucción.
+        and not any(e.get("fuente") == "BANCO_HUS" for e in ejemplos)
+        and os.getenv("GLOSA_FEWSHOT_BM25", "1").strip().lower() not in ("0", "false", "no")
+    ):
+        try:
+            from app.services.rag_service import RAGService
+
+            _ya = {e["argumento"][:200] for e in ejemplos}
+            precedentes = RAGService().buscar_casos_similares(
+                texto_glosa=texto_glosa,
+                eps=eps_norm,
+                codigo_glosa=cod_norm,
+                db=db,
+                top_k=max_ejemplos * 3,
+                solo_exitosos=True,
+            )
+            for p in precedentes:
+                arg = (p.get("extracto_dictamen") or "").strip()
+                if len(arg) < 200 or arg[:200] in _ya:
+                    continue
+                # Los precedentes BM25 vienen de OTRAS EPS/códigos: si citan un
+                # contrato ajeno, la IA lo arrastraría — no inyectar.
+                if _contiene_contrato_ajeno(arg, eps_norm):
+                    logger.warning(
+                        f"[FEW-SHOT-GOLD] precedente BM25 #{p.get('id')} omitido: "
+                        f"cita contrato de otra EPS (glosa de {eps_norm})"
+                    )
+                    continue
+                ejemplos.append(
+                    {
+                        "argumento": arg[:_MAX_CHARS_EJEMPLO],
+                        "fuente": "SIMILAR_BM25",
+                        "id": p.get("id"),
+                    }
+                )
+                _ya.add(arg[:200])
+                if len(ejemplos) >= max_ejemplos:
+                    break
+        except Exception as e:
+            logger.debug(f"few_shot_gold: BM25 similar no disponible: {e}")
+
     return ejemplos
 
 
@@ -312,8 +366,12 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
         partes.append("--- FIN EJEMPLO ---")
         partes.append("")
     partes.append(
-        "⚠ El dictamen final debe usar los DATOS DEL BLOQUE 1 (CUPS, valor, "
-        "EPS exactos del caso actual), no los del ejemplo."
+        "⚠ Los ejemplos son de OTROS expedientes (elegidos por similitud). "
+        "Toma SOLO el ESTILO y la ESTRUCTURA jurídica. El dictamen final debe "
+        "usar los DATOS DEL BLOQUE 1 del caso actual (CUPS, valor, EPS). "
+        "PROHIBIDO copiar del ejemplo: folios, fechas, nombres de paciente, "
+        "números de contrato, cláusulas o valores — pertenecen a otro caso y "
+        "citarlos aquí sería un error verificable por la EPS."
     )
     partes.append("═══════════════════════════════════════════════════════════════════")
     partes.append("")
@@ -325,10 +383,11 @@ def construir_bloque_gold(
     eps: str,
     codigo: str,
     max_ejemplos: int = _MAX_EJEMPLOS,
+    texto_glosa: str = "",
 ) -> str:
     """Helper de un solo paso: busca y formatea."""
     try:
-        ejemplos = obtener_ejemplos_gold(db, eps, codigo, max_ejemplos)
+        ejemplos = obtener_ejemplos_gold(db, eps, codigo, max_ejemplos, texto_glosa=texto_glosa)
         if ejemplos:
             logger.info(
                 f"[FEW-SHOT-GOLD] {len(ejemplos)} ejemplo(s) inyectado(s) "

@@ -5113,6 +5113,7 @@ class GlosaService:
                         _db_fs,
                         str(data.eps),
                         codigo_det,
+                        texto_glosa=texto_base,
                     )
                 finally:
                     _db_fs.close()
