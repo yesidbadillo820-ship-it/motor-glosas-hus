@@ -9,6 +9,7 @@ armado del paquete con renombrado ADRES + ZIP, y el CLI end-to-end.
 from __future__ import annotations
 
 import json
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -527,6 +528,17 @@ class TestSoportesClinicos:
         anexados = {Path(x).name.split("_")[0] for x in res.soportes_clinicos}
         assert anexados == {"HEV"}
 
+    def test_cruce_no_duplica_la_misma_ruta(self, tmp_path, cfg):
+        # El mismo archivo puede llegar dos veces al índice (--soportes-indice y
+        # --soportes sobre el mismo share): no se anexa duplicado.
+        d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
+        idx = rad.indexar_soportes_clinicos(
+            _share_clinico(tmp_path / "clin", "HUS487523", ["HEV"]), cfg.patron_factura
+        )
+        idx["487523"] = idx["487523"] * 2  # misma ruta repetida
+        res = rad.procesar_factura("HUS487523", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        assert len(res.soportes_clinicos) == 1
+
     def test_armar_copia_clinico_sin_mover_el_original(self, tmp_path, cfg):
         d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
         clin = _share_clinico(tmp_path / "clin", "HUS487523", ["HEV"])
@@ -582,6 +594,25 @@ class TestSoportesIndice:
         idx = rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT)
         assert set(idx) == {"520760"}
         assert not str(idx["520760"][0]).startswith("\ufeff")
+
+    def test_tolera_utf16_de_cmd(self, tmp_path):
+        # 'dir /s /b > f.txt' (cmd) escribe UTF-16 con BOM; le\u00eddo como utf-8 el
+        # \u00edndice quedaba en 0 sin aviso. Debe detectarse y leerse igual.
+        f = tmp_path / "indice.txt"
+        f.write_text(
+            "X:\\RAD\\HUS520760\\HEV_900006037_HUS520760.pdf\n",
+            encoding="utf-16",
+        )
+        idx = rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT)
+        assert set(idx) == {"520760"}
+        assert any("HEV" in p.name for p in idx["520760"])
+
+    def test_clave_salta_coincidencias_que_normalizan_a_cero(self):
+        # La coincidencia m\u00e1s profunda (HUS0000 \u2192 '0') no identifica; cae a la
+        # anterior v\u00e1lida en vez de descartar el archivo.
+        rx = re.compile(rad.PATRON_FACTURA_DEFAULT, re.IGNORECASE)
+        assert rad._clave_factura_en("X\\HUS521788\\HUS0000", rx) == "521788"
+        assert rad._clave_factura_en("X\\HUS0000", rx) is None
 
     def test_toma_factura_de_la_carpeta_cuando_el_archivo_es_generico(self, tmp_path):
         # El archivo no lleva el número pero su CARPETA sí (…\HUS520760\EPICRISIS.pdf).

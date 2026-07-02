@@ -117,6 +117,7 @@ import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path, PureWindowsPath
 
 logger = logging.getLogger("radicar")
@@ -195,6 +196,10 @@ _ALIAS_TOKEN: dict[str, str] = {
     "FACOSTE": "FAT",
 }
 
+# Tabla única token → código (códigos ADRES + alias) para resolver cada token
+# con UNA búsqueda de dict. Los alias no colisionan con los códigos.
+_TOKEN_A_CODIGO: dict[str, str] = {**{k: k for k in CODIGOS_SOPORTE}, **_ALIAS_TOKEN}
+
 # Soportes esperados por tipo de servicio del RIPS (Res. 2284/2023). Defaults;
 # el JSON de perfiles los puede sobrescribir.
 SOPORTES_BASE_DEFAULT = ["FEV", "RIP", "CUV"]
@@ -264,9 +269,11 @@ def factura_corta(fac: str) -> str:
 
 def normalizar_factura(fac: str) -> str:
     """Clave canónica para comparar facturas: HUS0000487523, HUS487523 y
-    487523 colapsan a 487523 (mismo criterio que soportes_autodiscovery)."""
+    487523 colapsan a 487523 (mismo criterio que soportes_autodiscovery).
+    Sin regex: se llama cientos de miles de veces al indexar los shares."""
     f = (fac or "").strip().upper()
-    f = re.sub(r"^HUS", "", f)
+    if f.startswith("HUS"):
+        f = f[3:]
     f = f.lstrip("0")
     return f or "0"
 
@@ -303,6 +310,9 @@ _RE_FACTURA_DESNUDA = re.compile(r"^(?:HUS)?\d{4,12}$", re.IGNORECASE)
 #   ar… = ApplicationResponse (acuse de la DIAN)
 _RE_DIAN = re.compile(r"^(fv|ad|ar)\d{6,}", re.IGNORECASE)
 
+# Separadores de tokens en los nombres de archivo (FEV_900006037_HUS487523).
+_RE_SEP_TOKEN = re.compile(r"[ _\-.]+")
+
 
 def clasificar_soporte(nombre: str) -> tuple[str, str, bool]:
     """Devuelve (codigo_adres, descripcion, reconocido) según el TOKEN del
@@ -311,22 +321,19 @@ def clasificar_soporte(nombre: str) -> tuple[str, str, bool]:
     separado, intenta por prefijo (FURIPS168...txt → FUR), por nombre DIAN
     (fv…/ad…/ar…) y, en último lugar, reconoce el RIPS desnudo (HUS469401.json)
     o el paquete FE comprimido (HUS520769.zip)."""
-    base = nombre.rsplit(".", 1)[0]
-    ext = nombre.lower().rsplit(".", 1)[-1] if "." in nombre else ""
-    tokens = re.split(r"[ _\-.]+", base)
-    for t in reversed(tokens):
-        tu = t.upper()
-        if tu in CODIGOS_SOPORTE:
-            return tu, CODIGOS_SOPORTE[tu], True
-        if tu in _ALIAS_TOKEN:
-            cod = _ALIAS_TOKEN[tu]
+    raiz, punto, ext = nombre.rpartition(".")
+    base = raiz if punto else nombre
+    ext = ext.lower() if punto else ""
+    for t in reversed(_RE_SEP_TOKEN.split(base)):
+        cod = _TOKEN_A_CODIGO.get(t.upper())
+        if cod is not None:
             return cod, CODIGOS_SOPORTE[cod], True
     base_up = base.upper()
     for pref, cod in _PREFIJOS_SOPORTE:
         if base_up.startswith(pref):
             return cod, CODIGOS_SOPORTE[cod], True
     # Factura electrónica DIAN nombrada por CUFE (fv…/ad…/ar… + dígitos).
-    m = _RE_DIAN.match(base.lower())
+    m = _RE_DIAN.match(base)  # el patrón ya es IGNORECASE
     if m:
         pref = m.group(1).lower()
         if pref == "fv":
@@ -379,6 +386,10 @@ class ConfigRadicacion:
         default_factory=lambda: {k: list(v) for k, v in EQUIVALENCIAS_SOPORTE_DEFAULT.items()}
     )
     entidades: list[PerfilEntidad] = field(default_factory=list)
+    # Cache interno de resolver_entidad {pista: perfil|None}: en un lote las
+    # mismas pistas (carpeta de EPS, razón social del FEV) se repiten miles de
+    # veces y cada resolución escanea todo el catálogo normalizando alias.
+    _cache_resolver: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 def cargar_perfiles(ruta: Path | None) -> ConfigRadicacion:
@@ -442,12 +453,24 @@ def cargar_perfiles(ruta: Path | None) -> ConfigRadicacion:
 
 def resolver_entidad(hint: str | None, cfg: ConfigRadicacion) -> PerfilEntidad | None:
     """Resuelve un nombre/código de entidad contra el catálogo. Tolera código
-    EPS embebido ('U220311 - DISPENSARIO ...'), tildes y truncamientos."""
+    EPS embebido ('U220311 - DISPENSARIO ...'), tildes y truncamientos.
+    Cachea por pista: en un lote las mismas pistas se repiten miles de veces."""
     if not hint:
         return None
+    cache = cfg._cache_resolver
+    if hint not in cache:
+        cache[hint] = _resolver_entidad(hint, cfg)
+    return cache[hint]
+
+
+# Prefijo de código EPS estilo DGH: "U220311 - NOMBRE".
+_RE_COD_EPS = re.compile(r"^\s*([A-Za-z]\d{5,})\s*[-–:·]\s*(.+)$")
+
+
+def _resolver_entidad(hint: str, cfg: ConfigRadicacion) -> PerfilEntidad | None:
     h = hint.strip()
     # Quitar prefijo de código EPS estilo DGH: "U220311 - NOMBRE".
-    m = re.match(r"^\s*([A-Za-z]\d{5,})\s*[-–:·]\s*(.+)$", h)
+    m = _RE_COD_EPS.match(h)
     cod = m.group(1).upper() if m else ""
     if m:
         h = m.group(2)
@@ -479,13 +502,20 @@ def resolver_entidad(hint: str | None, cfg: ConfigRadicacion) -> PerfilEntidad |
 _RE_CBC_ID = re.compile(r"<cbc:ID>([^<]+)</cbc:ID>")
 
 
-def peek_num_factura_fev(ruta: Path) -> str:
-    """Número de factura del FEV XML (best-effort, tolera el wrapping DIAN)."""
+@lru_cache(maxsize=8)
+def _texto_fev(ruta: Path) -> str:
+    """Texto del XML de la factura ('' si no se puede leer). Con caché chico:
+    peek_num_factura_fev y peek_adquiriente_fev suelen leer el MISMO archivo en
+    la misma factura, y así el segundo viaje a la red no se paga."""
     try:
-        texto = ruta.read_text(encoding="utf-8", errors="ignore")
+        return ruta.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return ""
-    m = _RE_CBC_ID.search(texto)
+
+
+def peek_num_factura_fev(ruta: Path) -> str:
+    """Número de factura del FEV XML (best-effort, tolera el wrapping DIAN)."""
+    m = _RE_CBC_ID.search(_texto_fev(ruta))
     return m.group(1).strip() if m else ""
 
 
@@ -577,9 +607,8 @@ def _es_persona_natural(texto: str, nombre: str) -> bool:
 def peek_adquiriente_fev(ruta: Path) -> tuple[str, bool]:
     """(nombre del adquiriente, es_persona_natural) de la factura electrónica.
     Funciona con el Invoice directo y con el embebido (CDATA/escapado) de un AD."""
-    try:
-        texto = ruta.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
+    texto = _texto_fev(ruta)
+    if not texto:
         return "", False
     m = _RE_CLIENTE_REG.search(texto) or _RE_CLIENTE_NOM.search(texto)
     if (not m or "AdditionalAccountID" not in texto) and "&lt;" in texto:
@@ -631,7 +660,19 @@ class ResultadoFactura:
 
 
 def _archivos_de(carpeta: Path) -> list[Path]:
-    return sorted(p for p in carpeta.iterdir() if p.is_file()) if carpeta.is_dir() else []
+    """Archivos directos de la carpeta. os.scandir evita un stat por entrada
+    (en un share de red el listado ya trae el tipo de cada entrada)."""
+    if not carpeta.is_dir():
+        return []
+    archivos: list[Path] = []
+    with os.scandir(carpeta) as it:
+        for e in it:
+            try:
+                if e.is_file():
+                    archivos.append(carpeta / e.name)
+            except OSError:  # entrada ilegible: mismo criterio que Path.is_file()
+                continue
+    return sorted(archivos)
 
 
 def procesar_factura(
@@ -759,13 +800,21 @@ def procesar_factura(
     # la factura. No duplica FEV/RIP/CUV que el share de FE ya trae.
     if soportes_idx is not None:
         codigos_fe = set(presentes)
+        vistos: set[str] = set()
         for sp in soportes_idx.get(res.factura_norm, []):
+            ruta_sp = str(sp)
+            # El mismo archivo puede venir dos veces (--soportes-indice y
+            # --soportes sobre el mismo share, o listados concatenados): no se
+            # anexa —ni luego se copia— duplicado.
+            if ruta_sp in vistos:
+                continue
+            vistos.add(ruta_sp)
             cod, _desc, reconocido = clasificar_soporte(sp.name)
             if not reconocido or cod in codigos_fe:
                 continue
             presentes.add(cod)
             por_codigo[cod].append(sp)
-            res.soportes_clinicos.append(str(sp))
+            res.soportes_clinicos.append(ruta_sp)
         res.soportes_presentes = sorted(presentes)
 
     # ── Completitud ─────────────────────────────────────────────────────────
@@ -910,6 +959,13 @@ def _debe_armar(estado: str, forzar: bool) -> bool:
 # ─── Descubrimiento del lote ─────────────────────────────────────────────────
 
 
+# Carpetas contenedoras del share que NO son entidades: ENV-…, ESCANEO, RIPS,
+# SOPORTES, FE/FACTURA…, y prefijos numéricos tipo "1. DD FACTURACION".
+_RE_CARPETA_CONTENEDORA = re.compile(
+    r"(?i)^(env[-_].*|escaneo|soportes.*|rips|fe|factura.*|xml|pdf|\d+\..*)$"
+)
+
+
 def _entidad_desde_ruta(carpeta: Path, origen: Path, cfg: ConfigRadicacion) -> str | None:
     """Busca, de la carpeta hacia arriba hasta origen, un componente de ruta
     que resuelva a una entidad conocida (la carpeta EPS del share)."""
@@ -918,12 +974,7 @@ def _entidad_desde_ruta(carpeta: Path, origen: Path, cfg: ConfigRadicacion) -> s
     except ValueError:
         rel = Path(carpeta.name)
     for parte in reversed(rel.parts):
-        # Saltar carpetas contenedoras del share (no son entidades): ENV-…,
-        # ESCANEO, RIPS, SOPORTES, FE/FACTURA…, y prefijos numéricos
-        # tipo "1. DD FACTURACION".
-        if re.match(
-            r"(?i)^(env[-_].*|escaneo|soportes.*|rips|fe|factura.*|xml|pdf|\d+\..*)$", parte
-        ):
+        if _RE_CARPETA_CONTENEDORA.match(parte):
             continue
         if resolver_entidad(parte, cfg) is not None:
             return parte
@@ -941,18 +992,19 @@ def descubrir_carpeta_factura(
     el FEV y los PDFs): dos carpetas con el MISMO nombre de factura. Se FUSIONAN
     por número de factura para no reportar la misma dos veces ni dejarla
     incompleta."""
-    carpetas: list[Path] = []
+    # Un solo listado por carpeta (los shares de red cobran cada round-trip).
+    carpetas: list[tuple[Path, list[Path]]] = []
     raiz_archivos = _archivos_de(origen)
     if raiz_archivos:
-        carpetas.append(origen)
+        carpetas.append((origen, raiz_archivos))
     for d in sorted(p for p in origen.rglob("*") if p.is_dir()):
-        if _archivos_de(d):
-            carpetas.append(d)
+        archivos_d = _archivos_de(d)
+        if archivos_d:
+            carpetas.append((d, archivos_d))
 
     fusion: dict[str, list] = {}
     orden: list[str] = []
-    for c in carpetas:
-        archivos = _archivos_de(c)
+    for c, archivos in carpetas:
         fac_hint = c.name
         ent = manifiesto.get(normalizar_factura(fac_hint)) or _entidad_desde_ruta(c, origen, cfg)
         # Fusionar solo cuando el nombre de la carpeta ES una factura
@@ -986,7 +1038,15 @@ def descubrir_lote(
     compartidos_por_dir: dict[Path, list[Path]] = defaultdict(list)
     facturas_por_dir: dict[Path, set[str]] = defaultdict(set)
 
-    for p in sorted(x for x in origen.rglob("*") if x.is_file()):
+    # os.walk en vez de rglob + is_file: no hace un stat por entrada (caro en
+    # shares de red enormes); el listado ya separa carpetas de archivos.
+    todos: list[Path] = []
+    for dirpath, _dirnames, filenames in os.walk(origen):
+        d = Path(dirpath)
+        todos.extend(d / fn for fn in filenames)
+    todos.sort()
+
+    for p in todos:
         m = rx.search(p.name)
         if m:
             clave = normalizar_factura(m.group(0))
@@ -1030,28 +1090,29 @@ def descubrir_auto(
     rx = re.compile(patron, re.IGNORECASE)
     # Un solo recorrido del árbol con os.walk (no hace stat por entrada → mucho
     # más rápido en shares de red con miles de facturas que rglob + is_dir).
-    anclas: set[Path] = set()
-    archivos: list[Path] = []
+    # os.walk es top-down (el padre se visita antes que sus hijas), así que el
+    # ancla de cada carpeta —la carpeta-factura más cercana hacia arriba— se
+    # hereda en el mismo recorrido, sin re-caminar los parents de cada archivo.
+    ancla_de_dir: dict[Path, Path | None] = {}
+    archivos: list[tuple[Path, Path | None]] = []
     for dirpath, _dirnames, filenames in os.walk(origen):
         d = Path(dirpath)
-        if d != origen and _RE_FACTURA_DESNUDA.match(d.name):
-            anclas.add(d)
-        archivos.extend(d / fn for fn in filenames)
-    archivos.sort()
+        if d == origen:
+            ancla = None
+        elif _RE_FACTURA_DESNUDA.match(d.name):
+            ancla = d  # la propia carpeta es una factura (la más cercana)
+        else:
+            ancla = ancla_de_dir.get(d.parent)  # hereda el ancla del padre
+        ancla_de_dir[d] = ancla
+        archivos.extend((d / fn, ancla) for fn in filenames)
+    archivos.sort(key=lambda t: t[0])
 
     grupos: dict[str, list[Path]] = defaultdict(list)
     carpeta_de: dict[str, Path] = {}
     fac_raw_de: dict[str, str] = {}
     sueltos: list[Path] = []
 
-    for p in archivos:
-        ancla: Path | None = None
-        for parent in p.parents:
-            if parent in anclas:
-                ancla = parent
-                break
-            if parent == origen:
-                break
+    for p, ancla in archivos:
         if ancla is not None:
             clave = normalizar_factura(ancla.name)
             grupos[clave].append(p)
@@ -1090,16 +1151,27 @@ def descubrir_auto(
 
 
 def _clave_factura_en(texto: str, rx: re.Pattern) -> str | None:
-    """Número de factura normalizado de la ÚLTIMA coincidencia de `rx` en `texto`.
+    """Número de factura normalizado de la ÚLTIMA coincidencia VÁLIDA de `rx`
+    en `texto`.
 
-    En una ruta las coincidencias van de la raíz a la hoja, así que la última es
-    la más profunda = la más específica (…\\HUS521788\\… → 521788). Devuelve None
-    si no hay coincidencia o si normaliza a '0'."""
-    ms = rx.findall(texto)
-    if not ms:
-        return None
-    clave = normalizar_factura(ms[-1])
-    return None if clave == "0" else clave
+    En una ruta las coincidencias van de la raíz a la hoja, así que se prueba
+    de la última (la más profunda = la más específica: …\\HUS521788\\… → 521788)
+    hacia atrás, saltando las que normalizan a '0' (HUS0000 no identifica nada).
+    Devuelve None si ninguna coincidencia da clave.
+
+    findall solo devuelve la coincidencia completa si el patrón NO tiene grupos
+    de captura; si el perfil trae un patrón con grupos, se cae a finditer +
+    group(0) (más lento, pero correcto). Con el patrón por defecto va por la
+    vía rápida: esto corre una vez por línea del índice (250k+)."""
+    if rx.groups:
+        ms = [m.group(0) for m in rx.finditer(texto)]
+    else:
+        ms = rx.findall(texto)
+    for candidato in reversed(ms):
+        clave = normalizar_factura(candidato)
+        if clave != "0":
+            return clave
+    return None
 
 
 def indexar_soportes_clinicos(raiz: Path, patron: str) -> dict[str, list[Path]]:
@@ -1120,6 +1192,8 @@ def indexar_soportes_clinicos(raiz: Path, patron: str) -> dict[str, list[Path]]:
     indice: dict[str, list[Path]] = defaultdict(list)
     n = 0
     for dirpath, _dirnames, filenames in os.walk(raiz):
+        if not filenames:  # nada que indexar: ahorra el escaneo de la ruta
+            continue
         d = Path(dirpath)
         clave_carpeta = _clave_factura_en(dirpath, rx)  # factura embebida en la ruta
         for fn in filenames:
@@ -1147,23 +1221,35 @@ def indexar_soportes_desde_indice(ruta_indice: Path, patron: str) -> dict[str, l
     rx = re.compile(patron, re.IGNORECASE)
     indice: dict[str, list[Path]] = defaultdict(list)
     n_arch = n_carpetas = 0
-    # utf-8-sig: PowerShell (Set-Content -Encoding UTF8, 'dir /s /b > f') suele
-    # anteponer un BOM; utf-8-sig lo descarta y no ensucia la primera ruta.
-    with ruta_indice.open(encoding="utf-8-sig", errors="replace") as fh:
+    # Codificación: la redirección de PowerShell ('dir > f.txt', Out-File) escribe
+    # UTF-16 con BOM — leído como utf-8 el listado sale en garabatos y el índice
+    # queda en 0 sin aviso. Se detecta el BOM UTF-16 y, si no, utf-8-sig (descarta
+    # el BOM de 'Set-Content -Encoding UTF8' y no ensucia la primera ruta).
+    with ruta_indice.open("rb") as fb:
+        bom = fb.read(2)
+    encoding = "utf-16" if bom in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
+    # Las líneas de un 'dir /s /b' vienen agrupadas por carpeta: se cachea la
+    # clave de la carpeta para no re-escanear la misma ruta por cada archivo.
+    carpeta_prev: str | None = None
+    clave_carpeta: str | None = None
+    with ruta_indice.open(encoding=encoding, errors="replace") as fh:
         for raw in fh:
             linea = raw.strip().strip('"')
             if not linea:
                 continue
-            ruta = linea.replace("/", "\\")
-            base = ruta.rsplit("\\", 1)[-1]
-            carpeta = ruta.rsplit("\\", 1)[0] if "\\" in ruta else ""
+            carpeta, _sep, base = linea.replace("/", "\\").rpartition("\\")
             if "." not in base:  # es una CARPETA, no un archivo
                 if rx.search(base):
                     n_carpetas += 1
                 continue
             # Clave por el NOMBRE del archivo; si no la lleva (EPICRISIS.pdf),
             # por la CARPETA contenedora (…\HUS521788\EPICRISIS.pdf → 521788).
-            clave = _clave_factura_en(base, rx) or _clave_factura_en(carpeta, rx)
+            clave = _clave_factura_en(base, rx)
+            if clave is None:
+                if carpeta != carpeta_prev:
+                    carpeta_prev = carpeta
+                    clave_carpeta = _clave_factura_en(carpeta, rx)
+                clave = clave_carpeta
             if clave is None:
                 continue
             _cod, _desc, reconocido = clasificar_soporte(base)
@@ -1417,7 +1503,9 @@ def _fila_reporte(res: ResultadoFactura) -> dict:
         "soportes_faltantes": " ".join(res.soportes_faltantes),
         "soportes_esperados_faltantes": " ".join(res.soportes_esperados_faltantes),
         "archivos_sin_clasificar": "; ".join(res.archivos_sin_clasificar),
-        "soportes_clinicos": "; ".join(Path(x).name for x in res.soportes_clinicos),
+        # PureWindowsPath: las rutas del cruce pueden ser de Windows (X:\…) y el
+        # basename debe salir bien aunque el reporte se genere en otro SO.
+        "soportes_clinicos": "; ".join(PureWindowsPath(x).name for x in res.soportes_clinicos),
         "estado": res.estado,
         "detalle": " ".join(res.detalle),
         "ruta_paquete": res.ruta_paquete,
@@ -1521,9 +1609,20 @@ def _resumen_por_entidad(resultados: list[ResultadoFactura]) -> dict[str, dict]:
 
 
 def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = None) -> None:
-    por_estado = Counter(r.estado for r in resultados)
+    # Una sola pasada sobre resultados para todos los agregados del resumen.
+    por_estado: Counter[str] = Counter()
+    valor_total = 0.0
+    revisar: list[ResultadoFactura] = []
+    con_cruce = n_files = 0
+    for r in resultados:
+        por_estado[r.estado] += 1
+        valor_total += r.valor_total
+        if r.estado == "REVISAR_TIPIFICACION":
+            revisar.append(r)
+        if r.soportes_clinicos:
+            con_cruce += 1
+            n_files += len(r.soportes_clinicos)
     total = len(resultados)
-    valor_total = sum(r.valor_total for r in resultados)
     logger.info("=" * 64)
     logger.info("RESUMEN DE RADICACIÓN")
     logger.info(f"  Facturas procesadas: {total:,}")
@@ -1538,7 +1637,6 @@ def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = 
     # Desglose de REVISAR_TIPIFICACION: distingue lo que el cruce --soportes puede
     # resolver (faltan soportes clínicos) de lo que necesita renombrar (archivos
     # sin tipificar). Así se ve dónde está el lever para bajar ese estado.
-    revisar = [r for r in resultados if r.estado == "REVISAR_TIPIFICACION"]
     if revisar:
         faltan_clin = [r for r in revisar if r.soportes_esperados_faltantes]
         solo_sin_clasif = [
@@ -1560,8 +1658,6 @@ def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = 
     # quede a la vista aunque no se scrollee al inicio del log. Auto-diagnostica
     # los dos modos de falla: share vacío vs. numeración que no cruza.
     if n_indice is not None:
-        con_cruce = sum(1 for r in resultados if r.soportes_clinicos)
-        n_files = sum(len(r.soportes_clinicos) for r in resultados)
         logger.info("  Cruce de soportes clínicos (--soportes):")
         logger.info(f"    facturas indexadas en el/los share(s):     {n_indice:>5,}")
         logger.info(

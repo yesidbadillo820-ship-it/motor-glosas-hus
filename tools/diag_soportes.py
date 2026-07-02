@@ -47,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     facturas = args.factura or ["HUS521788"]
 
+    # El mismo perfil (y patrón de factura) que usa el radicador: si el JSON de
+    # perfiles cambia el patrón, el diagnóstico debe diagnosticar ESE cruce.
+    cfg = rad.cargar_perfiles(None)
+
     indice_total: dict[str, list] = {}
     for raiz in args.raices:
         print("=" * 70)
@@ -68,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    - {name}")
         if len(top) > 15:
             print(f"    … (+{len(top) - 15} más)")
-        idx = rad.indexar_soportes_clinicos(raiz, rad.PATRON_FACTURA_DEFAULT)
+        idx = rad.indexar_soportes_clinicos(raiz, cfg.patron_factura)
         print(f"  -> indexadas {len(idx)} factura(s) con soporte en esta raíz.")
         ejemplos = list(idx)[:10]
         if ejemplos:
@@ -87,11 +91,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    [{cod}] {ruta}")
 
     if args.origen is not None:
-        _cruzar_con_lote(args.origen, indice_total, facturas)
+        _cruzar_con_lote(args.origen, indice_total, facturas, cfg)
     return 0
 
 
-def _cruzar_con_lote(origen: Path, indice_total: dict[str, list], facturas: list[str]) -> None:
+def _cruzar_con_lote(
+    origen: Path,
+    indice_total: dict[str, list],
+    facturas: list[str],
+    cfg: rad.ConfigRadicacion,
+) -> None:
     """Cruza el lote real (share de FE) contra el índice de soportes y hace un
     deep-dive de cada factura pedida: qué factura_norm calcula el lote, si el
     cruce le pega y en qué estado queda. Aísla el bug de "numeración que no
@@ -101,8 +110,7 @@ def _cruzar_con_lote(origen: Path, indice_total: dict[str, list], facturas: list
     if not origen.is_dir():
         print("  ⚠ Python NO ve el origen. Revisá la ruta / permisos.")
         return
-    cfg = rad.cargar_perfiles(None)
-    items = rad.descubrir_auto(origen, {}, cfg, rad.PATRON_FACTURA_DEFAULT)
+    items = rad.descubrir_auto(origen, {}, cfg, cfg.patron_factura)
     # Clave barata por el nombre/hint de carpeta (sin leer el RIPS todavía).
     por_clave: dict[str, tuple] = {}
     for fh, arch, carp, ent in items:
