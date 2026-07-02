@@ -43,7 +43,14 @@ _MARCADORES_CONCEPTO_SUELTO = (
     ),
     (re.compile(r"\bSE\s+APLICA\s+(?:UNA\s+)?MULTA\b", re.IGNORECASE), "multa aplicada por la EPS"),
     (
-        re.compile(r"\bADICIONALMENTE,?\s+SE\s+OBJETA\b", re.IGNORECASE),
+        # Ronda 26 (2-jul-2026): "ADICIONALMENTE SE GLOSA LA PRÓTESIS..."
+        # no partía el caso — solo se reconocía "SE OBJETA". La prótesis
+        # de $3.9M quedó SIN respuesta en el dictamen de producción.
+        re.compile(
+            r"\b(?:ADICIONALMENTE|AS[ÍI]\s+MISMO|DE\s+IGUAL\s+(?:FORMA|MANERA)|"
+            r"POR\s+OTRA\s+PARTE|TAMBI[ÉE]N),?\s+SE\s+(?:OBJETA|GLOSA)\b",
+            re.IGNORECASE,
+        ),
         "concepto adicional objetado",
     ),
     (
@@ -133,6 +140,17 @@ def detectar_subconceptos(texto_glosa: str | None) -> list[dict]:
             if hay_numeracion and m.start() <= pos_ultima_num:
                 continue
             marcas.append((m.start(), m.start(), etiqueta))
+
+    # Ronda 26 (2-jul-2026): glosa en PROSA con un solo marcador suelto
+    # ("...SE GLOSA LA DIFERENCIA. ADICIONALMENTE SE GLOSA LA PRÓTESIS...")
+    # — el concepto principal vive ANTES del marcador y no tenía marca, así
+    # que len(marcas)==1 y el caso NO se partía: la prótesis de $3.9M quedó
+    # sin respuesta en producción. Se agrega una marca implícita al inicio
+    # cuando hay texto sustancial antes del primer marcador.
+    if not hay_numeracion and marcas:
+        primera_pos = min(m[0] for m in marcas)
+        if primera_pos >= _MIN_CONCEPTO_CHARS:
+            marcas.append((0, 0, "concepto principal"))
 
     if len(marcas) < 2:
         return []

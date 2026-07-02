@@ -476,6 +476,7 @@ def detectar_defectos_criticos(
     es_ratificacion: bool = False,
     es_extemporanea: bool = False,
     codigo_respuesta: str = "",
+    texto_glosa: str = "",
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -572,6 +573,31 @@ def detectar_defectos_criticos(
                     ),
                 }
             )
+
+    # 4-ter. CUPS fantasma (Ronda 26, 2-jul-2026): el modelo etiquetó como
+    # "código CUPS 27535" un número que no existe en la glosa ni en ningún
+    # dato del caso (alucinación verificable por la EPS en segundos). Solo
+    # se validan números explícitamente rotulados "CUPS" — los SOAT
+    # homólogos, valores y CUM no se tocan.
+    if texto_glosa:
+        _digitos_glosa = set(re.findall(r"\d{4,7}", texto_glosa))
+        for _m_cups in re.finditer(r"CUPS\s*[:#]?\s*(\d{4,7})\b", arg_up):
+            _num = _m_cups.group(1)
+            if _num not in _digitos_glosa:
+                defectos.append(
+                    {
+                        "regla": "cups_fantasma",
+                        "mensaje": (
+                            f'El dictamen cita "CUPS {_num}", código que NO aparece '
+                            "en la glosa ni en los datos del caso."
+                        ),
+                        "sugerencia": (
+                            "Usa ÚNICAMENTE el CUPS del BLOQUE 1. Si te refieres al "
+                            "homólogo SOAT, rotúlalo 'código SOAT', nunca 'CUPS'."
+                        ),
+                    }
+                )
+                break
 
     # 4-bis. Fuga del andamiaje del prompt de soportes (Fase 2, jul-2026)
     for frase in _FRASES_FUGA_PROMPT_SOPORTES:

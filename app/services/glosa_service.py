@@ -3221,6 +3221,12 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
         contenido = m.group(1)
         if _es_falsa(contenido):
             n_reemplazos += 1
+            # Ronda 26: si la cita ya arranca con un conector propio
+            # ("Conforme a...", "Según...", "De acuerdo..."), anteponer
+            # "en los términos de" produce "en los términos de conforme
+            # al..." (visto en producción 2-jul, dictamen COMPENSAR).
+            if re.match(r"\s*(conforme|seg[úu]n|de acuerdo)\b", contenido, re.IGNORECASE):
+                return contenido
             return _conector_por_contexto(texto, m.start()) + contenido
         return m.group(0)
 
@@ -5563,6 +5569,7 @@ class GlosaService:
                         es_ratificacion=es_ratificacion,
                         es_extemporanea=es_extemporanea,
                         codigo_respuesta=cod_res,
+                        texto_glosa=texto_base,
                     )
                     # Mejora #7: chequear si el dictamen es copia textual
                     # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -7203,10 +7210,14 @@ class GlosaService:
                 return f"$ {int(round(valor_num)):,}".replace(",", ".")
 
         patrones = [
+            # Ronda 26: el VALOR OBJETADO etiquetado tiene prioridad. En
+            # textos multi-valor ("FACTURADO: $20.2M ... OBJETADO: $6.4M")
+            # el patrón genérico '$' agarraba el PRIMERO (el facturado):
+            # tabla del dictamen con valor errado y routing sobre-escalado.
+            r"\b(?:valor|total)\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})",
             r"\$\s*([\d][\d\.,]{2,})",
             r"%\s*([\d][\d\.,]{2,})",
             r"\bvalor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
-            r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})",
             r"\bpor\s+valor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
             r"\b([\d][\d\.,]{4,})\s*(?:pesos|cop|cop\.|col\$)\b",
         ]
@@ -8271,8 +8282,25 @@ class GlosaService:
                         )
                         return content_text, f"anthropic/{_modelo_efectivo}"
                     err = data.get("error", {}).get("message", str(data)[:300])
-                    # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     status = resp.status_code
+                    # Ronda 26 (2-jul-2026, visto en producción): si el modelo
+                    # ESCALADO no existe para esta API key (Opus → 404
+                    # not_found), degradar a self.anthropic_model (Sonnet) en
+                    # vez de reventar la cadena — el caso de $20.2M + 2 PDFs
+                    # terminaba en Groq/Llama: el caso más grande en el modelo
+                    # más débil.
+                    if (
+                        modelo_override
+                        and modelo_override != self.anthropic_model
+                        and (status == 404 or "not_found" in err.lower())
+                    ):
+                        logger.warning(
+                            f"[ANTHROPIC] modelo escalado '{modelo_override}' no disponible "
+                            f"(HTTP {status}: {err[:120]}); degradando a {self.anthropic_model}."
+                        )
+                        modelo_override = None
+                        continue
+                    # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     if status in (429, 529, 500, 502, 503, 504):
                         ultimo_error = RuntimeError(f"Anthropic HTTP {status}: {err[:200]}")
                         import asyncio as _aio
@@ -8490,6 +8518,22 @@ class GlosaService:
             raise RuntimeError(f"Multimodal falló por red: {e}")
 
         if resp.status_code != 200:
+            # Ronda 26: modelo escalado inexistente para esta key (Opus 404)
+            # → reintentar UNA vez con el modelo base, conservando los PDFs
+            # nativos (antes se perdía el multimodal completo).
+            if (
+                modelo_override
+                and modelo_override != self.anthropic_model
+                and (resp.status_code == 404 or "not_found" in resp.text[:300].lower())
+            ):
+                logger.warning(
+                    f"[MULTIMODAL] modelo escalado '{modelo_override}' no disponible "
+                    f"(HTTP {resp.status_code}); degradando a {self.anthropic_model} "
+                    "con los mismos PDFs."
+                )
+                return await self._llamar_anthropic_multimodal(
+                    system, user, pdfs_raw, modelo_override=None
+                )
             logger.error(f"[MULTIMODAL] HTTP {resp.status_code}: {resp.text[:500]}")
             raise RuntimeError(f"Multimodal HTTP {resp.status_code}")
 
@@ -8505,7 +8549,7 @@ class GlosaService:
             f"[MULTIMODAL] OK con {len(pdfs_efectivos)} PDFs | "
             f"input_tokens={data.get('usage', {}).get('input_tokens', '?')}"
         )
-        return texto_final, f"anthropic/{self.anthropic_model}/multimodal"
+        return texto_final, f"anthropic/{modelo_override or self.anthropic_model}/multimodal"
 
     async def _llamar_ia(
         self,

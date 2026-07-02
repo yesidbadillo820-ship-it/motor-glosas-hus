@@ -112,14 +112,18 @@ def main() -> int:
     creadas = actualizadas = 0
     try:
         for c in limpias:
+            # Ronda 26: la clave de idempotencia es (eps, numero_clausula) —
+            # SIN el tema. Si una cláusula se re-clasifica (ej. FA -> NN para
+            # que se inyecte en cualquier glosa), se ACTUALIZA el tema en vez
+            # de crear una fila duplicada con el texto repetido.
             existente = (
                 db.query(ClausulaContrato)
                 .filter(ClausulaContrato.eps == c["eps"])
                 .filter(ClausulaContrato.numero_clausula == c["numero_clausula"])
-                .filter(ClausulaContrato.tema == c["tema"])
                 .first()
             )
             if existente:
+                existente.tema = c["tema"]
                 existente.titulo = c["titulo"]
                 existente.texto_literal = c["texto_literal"]
                 existente.pagina = c["pagina"]

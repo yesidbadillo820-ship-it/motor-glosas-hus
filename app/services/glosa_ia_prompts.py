@@ -236,7 +236,7 @@ CONTRATOS_HUS: dict[str, dict] = {
         "factor": 1.00,
         "tipo": "ARL — COMPAÑÍA DE SEGUROS DE VIDA AURORA",
         "nit": "860.022.137-5",
-        "vigencia": "2024 (vigente)",
+        "vigencia": "Vigente desde 2024 — sin acta de terminación acreditada; aplica a la fecha de prestación",
         "contacto": "MARIO ALBERTO DIAZ ARIAS — Representante Legal Aurora",
         "nota": (
             "Compañía de Seguros de Vida Aurora S.A. — IPS Persona Jurídica "
