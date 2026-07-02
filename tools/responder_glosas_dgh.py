@@ -97,12 +97,14 @@ def _pid_dg(nombre_exe: str = "DG.WinDG.exe") -> int | None:
 
 
 def _conectar(pid: int):
+    """Spec de la ventana principal de DG (mantiene viva la Application: el spec
+    guarda la referencia 'app' en sus criterios)."""
     from pywinauto import Application
 
     app = Application(backend="uia").connect(process=pid, timeout=10)
     win = app.window(auto_id="DGFRMPrincipal", control_type="Window")
     win.wait("visible", timeout=15)
-    return app, win
+    return win
 
 
 # ─── Helpers de UIA ──────────────────────────────────────────────────────────
@@ -118,9 +120,14 @@ def _buscar(parent, *, auto_id=None, control_type=None, name=None, name_re=None,
     Si devolviéramos `wrapper_object()`, las búsquedas anidadas fallarían: los
     wrappers de pywinauto NO tienen `.child_window()`.
 
-    `found_index=0` fija la primera coincidencia → el spec nunca es ambiguo."""
+    `found_index=0` fija la primera coincidencia TAMBIÉN en el sondeo con
+    `.exists()`: sin él, 2+ coincidencias (p.ej. varias filas DataItem en una
+    grilla) hacen que pywinauto lance ElementAmbiguousError —que `.exists()` NO
+    atrapa— y el elemento se daría por inexistente. El spec que se devuelve se
+    construye FRESCO porque `.exists()` muta in place los criterios del spec
+    sondeado (les relaja visible/enabled)."""
     fin = time.time() + timeout
-    crit = {}
+    crit = {"found_index": 0}
     if auto_id:
         crit["auto_id"] = auto_id
     if control_type:
@@ -132,7 +139,7 @@ def _buscar(parent, *, auto_id=None, control_type=None, name=None, name_re=None,
     while time.time() < fin:
         try:
             if parent.child_window(**crit).exists():
-                return parent.child_window(**crit, found_index=0)
+                return parent.child_window(**crit)
         except Exception:
             pass
         time.sleep(0.4)
@@ -153,12 +160,10 @@ def _foco_actual() -> tuple[str, str]:
 
 
 def _escapar(t: str) -> str:
-    """Escapa caracteres especiales de type_keys ({}()+^%~)."""
-    for ch in "{}":
-        t = t.replace(ch, "{" + ch + "}")
-    for ch in "+^%~()":
-        t = t.replace(ch, "{" + ch + "}")
-    return t
+    """Escapa los caracteres especiales de type_keys ({}()+^%~) en UNA sola
+    pasada. (Encadenar str.replace re-escapaba las llaves recién insertadas:
+    '{' terminaba como '{{{}}', que type_keys rechaza como código inválido.)"""
+    return "".join("{" + ch + "}" if ch in "{}+^%~()" else ch for ch in t)
 
 
 def _dump(etiqueta: str) -> None:
@@ -210,11 +215,10 @@ def _hwnds_modal() -> list[int]:
 # COORDENADAS de pantalla, calculadas desde el rect REAL del modal en runtime.
 #
 # Offsets (x, y) de cada control medidos desde la esquina sup-izq del modal en las
-# capturas del usuario (modal en 360,166 @ 1920x1080). Son relativos al rect real,
-# así siguen andando si el modal abre en otra posición. Si algún target cae
-# corrido, se ajustan estos números — usar --calibrar (mueve el mouse SIN clickear
-# para verificar dónde caería cada click).
-_MODAL_REF_TL = (360, 166)
+# capturas del usuario (referencia: modal en 360,166 @ 1920x1080). Son relativos
+# al rect real, así siguen andando si el modal abre en otra posición. Si algún
+# target cae corrido, se ajustan estos números — usar --calibrar (mueve el mouse
+# SIN clickear para verificar dónde caería cada click).
 _MODAL_OFFSETS = {
     "grabar": (50, 51),  # botón GRABAR (toolbar del modal)
     "concepto": (150, 83),  # combo Concepto (fila superior, izq)
@@ -237,22 +241,18 @@ def _rect_modal(hwnd):
         return None
 
 
-def _targets_modal(hwnd):
-    """{nombre: (x, y)} absolutos de cada control, desde el rect real del modal."""
-    rect = _rect_modal(hwnd)
-    if rect is None:
-        return None
+def _targets_modal(rect) -> dict[str, tuple[int, int]]:
+    """{nombre: (x, y)} absolutos de cada control: _MODAL_OFFSETS trasladados a la
+    esquina sup-izq del rect real del modal (leído UNA vez por el llamador, para
+    que todos los targets salgan del mismo rect aunque el modal se mueva)."""
     left, top = rect[0], rect[1]
     return {k: (left + ox, top + oy) for k, (ox, oy) in _MODAL_OFFSETS.items()}
 
 
-def _click_abs(x: int, y: int, doble: bool = False) -> None:
+def _click_abs(x: int, y: int) -> None:
     from pywinauto import mouse
 
-    if doble:
-        mouse.double_click(button="left", coords=(int(x), int(y)))
-    else:
-        mouse.click(button="left", coords=(int(x), int(y)))
+    mouse.click(button="left", coords=(int(x), int(y)))
 
 
 def _calibrar_modal(hwnd) -> None:
@@ -260,11 +260,12 @@ def _calibrar_modal(hwnd) -> None:
     que las coordenadas caen sobre los controles. Riesgo cero."""
     from pywinauto import mouse
 
-    tg = _targets_modal(hwnd)
-    if tg is None:
+    rect = _rect_modal(hwnd)
+    if rect is None:
         logger.error("  no pude leer el rect del modal para calibrar.")
         return
-    logger.info(f"  rect del modal: {_rect_modal(hwnd)}")
+    logger.info(f"  rect del modal: {rect}")
+    tg = _targets_modal(rect)
     logger.info("  ── calibración: mirá dónde queda el cursor en cada paso ──")
     for nombre, (x, y) in tg.items():
         logger.info(f"    → {nombre}: mouse a ({x},{y})")
@@ -281,10 +282,11 @@ def _responder_modal(hwnd, cod_respuesta: str, detalle: str, grabar: bool, dump_
     Observaciones → 'Aplicar campos' → (si --grabar) GRABAR."""
     from pywinauto.keyboard import send_keys
 
-    tg = _targets_modal(hwnd)
-    if tg is None:
+    rect = _rect_modal(hwnd)
+    if rect is None:
         logger.error("  no pude leer el rect del modal para responder.")
         return "ERROR_MODAL"
+    tg = _targets_modal(rect)
 
     # 1) Seleccionar la fila del concepto (checkbox). El usuario recalcó que la
     #    factura/fila SIEMPRE debe estar tildada para 'Aplicar campos' + GRABAR.
@@ -338,24 +340,36 @@ def _responder_modal(hwnd, cod_respuesta: str, detalle: str, grabar: bool, dump_
     return "GRABADO_SIN_DIALOGO"
 
 
-def _diag_grids(win):
-    """Loguea cuántas grillas gcConceptosObjecion hay y si cada una tiene fila.
-    Sirve para diagnosticar 'no autocargó' sin pedir un dump."""
-    n = 0
+def _iter_grids(win):
+    """Genera (i, spec) por cada grilla 'gcConceptosObjecion' presente en el árbol
+    (los editores DevExpress pueden quedar duplicados). Se sondea con
+    exists(timeout=0) = UN intento por sondeo: los llamadores ya re-intentan a su
+    propio ritmo (el poll de autocargue cada 0.8s), así no se paga además el
+    retry interno de pywinauto (0.5s) por cada índice ausente."""
     for i in range(40):
+        grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
         try:
-            grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
-            if not grid.exists():
+            if not grid.exists(timeout=0):
                 break
         except Exception:
             break
+        yield i, grid
+
+
+def _diag_grids(win) -> None:
+    """Loguea cuántas grillas gcConceptosObjecion hay y si cada una tiene fila.
+    Sirve para diagnosticar 'no autocargó' sin pedir un dump."""
+    n = 0
+    for i, grid in _iter_grids(win):
         n += 1
         tiene_dp = tiene_fila = False
         try:
-            datos = grid.child_window(auto_id="dataPresenter")
-            tiene_dp = datos.exists()
+            datos = grid.child_window(auto_id="dataPresenter", found_index=0)
+            tiene_dp = datos.exists(timeout=0)
             if tiene_dp:
-                tiene_fila = datos.child_window(control_type="DataItem").exists()
+                tiene_fila = datos.child_window(control_type="DataItem", found_index=0).exists(
+                    timeout=0
+                )
         except Exception:
             pass
         logger.info(f"    diag grid #{i}: dataPresenter={tiene_dp} fila={tiene_fila}")
@@ -364,20 +378,19 @@ def _diag_grids(win):
 
 def _grid_con_fila(win):
     """dataPresenter (spec) de la PRIMERA grilla 'gcConceptosObjecion' cuyo panel
-    de datos tiene una fila (DataItem), sin importar en qué pestaña Editor esté.
+    de datos tiene fila(s) (DataItem), sin importar en qué pestaña Editor esté.
     Robusto a editores duplicados y a la carga asíncrona: una grilla vacía
     (Record 0 of 0) tiene dataPresenter pero NO DataItem, así distinguimos la
-    autocargada. Devuelve None si ninguna grilla tiene fila."""
-    for i in range(40):
+    autocargada. found_index=0 en cada sondeo evita el ElementAmbiguousError que
+    .exists() no atrapa cuando la grilla ya tiene 2+ filas (ver _buscar).
+    Devuelve None si ninguna grilla tiene fila."""
+    for _i, grid in _iter_grids(win):
         try:
-            grid = win.child_window(auto_id="gcConceptosObjecion", found_index=i)
-            if not grid.exists():
-                break
-        except Exception:
-            break
-        try:
-            datos = grid.child_window(auto_id="dataPresenter")
-            if datos.exists() and datos.child_window(control_type="DataItem").exists():
+            datos = grid.child_window(auto_id="dataPresenter", found_index=0)
+            if datos.exists(timeout=0) and datos.child_window(
+                control_type="DataItem", found_index=0
+            ).exists(timeout=0):
+                # Spec FRESCO: .exists() mutó los criterios de `datos` (ver _buscar).
                 return grid.child_window(auto_id="dataPresenter", found_index=0)
         except Exception:
             continue
@@ -387,18 +400,16 @@ def _grid_con_fila(win):
 # ─── Flujo por factura ───────────────────────────────────────────────────────
 
 
-def procesar_factura(
-    win, factura_larga, objeciones, cod_respuesta, grabar, dump_al_fallar, calibrar
-):
-    logger.info(f"[{factura_larga}] {len(objeciones)} objeción(es)")
+def _abrir_editor(win, dump_al_fallar: bool) -> str | None:
+    """Paso 1: activar 'Listado de Tramite de Objeción' y darle AGREGAR para abrir
+    un Editor nuevo. Devuelve None si el Editor quedó abierto y activo, o el
+    código de error a reportar.
 
-    # 1) Activar 'Listado de Tramite de Objeción' y darle AGREGAR para abrir un
-    #    Editor nuevo. CLAVE (causa raíz de "no abrió el Editor"): hay que traer DG
-    #    al FRENTE primero (win.set_focus). Si DG no está en foreground, el primer
-    #    click se consume como click de ACTIVACIÓN y el botón no dispara — se ve el
-    #    tooltip "AGREGAR (Ctrl+N)" pero el Editor no abre. Por eso, además del
-    #    click, usamos el atajo Ctrl+N (que el propio tooltip revela) y verificamos
-    #    que el Editor realmente aparezca.
+    CLAVE (causa raíz de "no abrió el Editor"): hay que traer DG al FRENTE primero
+    (win.set_focus). Si DG no está en foreground, el primer click se consume como
+    click de ACTIVACIÓN y el botón no dispara — se ve el tooltip "AGREGAR (Ctrl+N)"
+    pero el Editor no abre. Por eso, además del click, usamos el atajo Ctrl+N (que
+    el propio tooltip revela) y verificamos que el Editor realmente aparezca."""
     from pywinauto.keyboard import send_keys
 
     try:
@@ -416,15 +427,6 @@ def procesar_factura(
         except Exception:
             pass
 
-    def _esperar_editor(segundos):
-        fin_ = time.time() + segundos
-        while time.time() < fin_:
-            te = _buscar(win, name_re="Editor de Tr.mite", control_type="TabItem", timeout=1)
-            if te is not None:
-                return te
-            time.sleep(0.4)
-        return None
-
     # AGREGAR: 1º por click (auto_id único; fallback por nombre).
     agregar = _buscar(win, auto_id="BarButtonItemLinkbbiAgregar", control_type="Button", timeout=8)
     if agregar is None:
@@ -440,7 +442,7 @@ def procesar_factura(
         agregar.click_input()
     except Exception:
         pass
-    tab_editor = _esperar_editor(6)
+    tab_editor = _buscar(win, name_re="Editor de Tr.mite", control_type="TabItem", timeout=6)
     # Si el click no disparó (DG no estaba al frente / WPF ocupado), atajo Ctrl+N.
     if tab_editor is None:
         logger.info("  AGREGAR por click no abrió el Editor; pruebo el atajo Ctrl+N…")
@@ -450,7 +452,7 @@ def procesar_factura(
             send_keys("^n")
         except Exception:
             pass
-        tab_editor = _esperar_editor(8)
+        tab_editor = _buscar(win, name_re="Editor de Tr.mite", control_type="TabItem", timeout=8)
     if tab_editor is None:
         logger.error(
             "  AGREGAR no abrió el Editor (ni por click ni por Ctrl+N). ¿Estaba el "
@@ -465,11 +467,20 @@ def procesar_factura(
         time.sleep(0.6)
     except Exception:
         pass
+    return None
 
-    # 2) Ir al campo Factura operando por FOCO. Anclamos el foco en el Editor
-    #    (DG ya está al frente) clickeando Consecutivo (primer campo); de ahí TAB
-    #    hasta que el control con foco real se llame 'Factura' (orden
-    #    Consecutivo→Fecha→[Estado]→Factura).
+
+def _cargar_factura(win, factura_larga: str, dump_al_fallar: bool) -> str | None:
+    """Paso 2: ir al campo Factura operando por FOCO y tipear la factura + ENTER.
+    Devuelve None si quedó escrita, o el código de error a reportar.
+
+    Anclamos el foco en el Editor (DG ya está al frente) clickeando Consecutivo
+    (primer campo); de ahí TAB hasta que el control con foco REAL (_foco_actual,
+    GetFocusedElement) se llame 'Factura' (orden Consecutivo→Fecha→[Estado]→
+    Factura). Los editores DevExpress virtualizan sus partes editables: 'estar en
+    el árbol' NO implica tener el foco."""
+    from pywinauto.keyboard import send_keys
+
     try:
         win.set_focus()
         time.sleep(0.5)
@@ -495,15 +506,18 @@ def procesar_factura(
             "mouse/teclado mientras corre el bot."
         )
 
+    max_tabs = 20
     en_factura = False
-    for intento in range(20):
+    # range(max_tabs + 1): así el foco se chequea también DESPUÉS del último TAB.
+    for intento in range(max_tabs + 1):
         aid, nm = _foco_actual()
         if nm == "Factura" or aid == "ctrlFactura":
             logger.info(f"  Factura enfocada tras {intento} TAB(s).")
             en_factura = True
             break
-        send_keys("{TAB}")
-        time.sleep(0.4)
+        if intento < max_tabs:
+            send_keys("{TAB}")
+            time.sleep(0.4)
     if not en_factura:
         aid, nm = _foco_actual()
         logger.error(
@@ -516,25 +530,53 @@ def procesar_factura(
     send_keys("^a{DEL}")
     send_keys(_escapar(factura_larga) + "{ENTER}")
     logger.info(f"  factura {factura_larga} escrita; esperando autocargue…")
+    return None
 
-    # 3) Autocargue ASÍNCRONO (DevExpress.Data.Async). La factura resuelve el
-    #    encabezado enseguida, pero la grilla de conceptos llega después por carga
-    #    asíncrona; en sesiones de DG "cansadas" (varias corridas) puede tardar
-    #    bastante (se vio ~70s). Poll hasta que ALGUNA grilla gcConceptosObjecion
-    #    tenga su fila, hasta 120s, con aviso de progreso + diag cada 15s.
-    datos = None
-    espera_max = 120
+
+def _esperar_autocargue(win, espera_max: int):
+    """Paso 3: autocargue ASÍNCRONO (DevExpress.Data.Async). La factura resuelve
+    el encabezado enseguida, pero la grilla de conceptos llega después por carga
+    asíncrona; en sesiones de DG "cansadas" (varias corridas) puede tardar
+    bastante (se vio ~70s). Poll hasta que ALGUNA grilla gcConceptosObjecion
+    tenga su fila, hasta `espera_max` s, con aviso de progreso + diag cada 15s.
+    Devuelve el spec del dataPresenter con fila, o None si no autocargó."""
     fin = time.time() + espera_max
     prox_aviso = time.time() + 15
     while time.time() < fin:
         datos = _grid_con_fila(win)
         if datos is not None:
-            break
+            return datos
         if time.time() >= prox_aviso:
             logger.info(f"  … aún esperando autocargue ({int(fin - time.time())}s restantes)")
             _diag_grids(win)
             prox_aviso = time.time() + 15
         time.sleep(0.8)
+    return None
+
+
+def procesar_factura(
+    win, factura_larga, objeciones, cod_respuesta, grabar, dump_al_fallar, calibrar
+):
+    logger.info(f"[{factura_larga}] {len(objeciones)} objeción(es)")
+    if len(objeciones) > 1:
+        logger.warning(
+            f"  ⚠ v1: el modal se llena UNA sola vez (primera fila / primer detalle); "
+            f"las otras {len(objeciones) - 1} objeción(es) de esta factura quedan sin responder."
+        )
+
+    # 1) Abrir un Editor nuevo (AGREGAR con DG al frente; fallback Ctrl+N).
+    err = _abrir_editor(win, dump_al_fallar)
+    if err is not None:
+        return err
+
+    # 2) Escribir la factura en su campo (navegando por foco real).
+    err = _cargar_factura(win, factura_larga, dump_al_fallar)
+    if err is not None:
+        return err
+
+    # 3) Esperar el autocargue asíncrono de la grilla de conceptos.
+    espera_max = 120
+    datos = _esperar_autocargue(win, espera_max)
     if datos is None:
         logger.error(
             f"  la factura no autocargó (ninguna grilla con fila en {espera_max}s). "
@@ -562,17 +604,21 @@ def procesar_factura(
     except Exception as e:
         logger.warning(f"  fallo doble-click en la fila: {e}")
     time.sleep(2.0)
-    logger.info("  doble-click en la fila; modal de respuesta abierto.")
     # El interior del modal es WPF y es OPACO a UIA/win32 (probado por 4 vías: árbol
     # desde DGFRMPrincipal, conexión a su HWND, win32, y GetFocusedElement tabulando
     # —siempre devolvió la Window—). Se maneja por COORDENADAS sobre el rect real
     # del modal (ver _responder_modal / _calibrar_modal).
     hwnds = _hwnds_modal()
+    fin_modal = time.time() + 8  # margen extra por si el modal tarda en pintar
+    while not hwnds and time.time() < fin_modal:
+        time.sleep(0.5)
+        hwnds = _hwnds_modal()
     if not hwnds:
         logger.error("  no encontré el HWND del modal para responder.")
         if dump_al_fallar:
             _dump("sin_modal")
         return "ERROR_MODAL"
+    logger.info("  doble-click en la fila; modal de respuesta abierto.")
     hwnd = hwnds[0]
     if calibrar:
         _calibrar_modal(hwnd)
@@ -632,13 +678,23 @@ def main() -> int:
         logger.error("Falta pywinauto:  py -m pip install pywinauto")
         return 2
 
-    facturas = leer_excel_respuestas(args.excel)
+    try:
+        facturas = leer_excel_respuestas(args.excel)
+    except FileNotFoundError:
+        logger.error(f"No existe el Excel: {args.excel}")
+        return 2
+    except ValueError as e:
+        logger.error(f"Excel de respuestas inválido: {e}")
+        return 2
     if args.solo:
         objetivo = normalizar_factura(args.solo)
         facturas = {k: v for k, v in facturas.items() if k == objetivo}
         if not facturas:
             logger.error(f"No hallé la factura {args.solo} en el Excel.")
             return 1
+    if not facturas:
+        logger.error("El Excel no tiene filas de respuesta válidas.")
+        return 1
     logger.info(f"Facturas a procesar: {len(facturas)}")
 
     pid = _pid_dg()
@@ -647,11 +703,17 @@ def main() -> int:
             "DG.WinDG.exe no está corriendo. Abrí y logueá DG (o corré tools\\login_dg.py)."
         )
         return 1
+    try:
+        win = _conectar(pid)
+    except Exception as e:
+        logger.error(
+            f"No pude conectar a la ventana principal de DG (PID {pid}): {type(e).__name__}: {e}"
+        )
+        return 1
     logger.info(f"Conectado a DG (PID {pid}).")
-    _app, win = _conectar(pid)
 
     resultados = []
-    for factura_corta, objeciones in facturas.items():
+    for objeciones in facturas.values():
         factura_larga = objeciones[0]["factura"]
         try:
             estado = procesar_factura(
@@ -673,6 +735,10 @@ def main() -> int:
     logger.info("\nResumen:")
     for f, e in resultados:
         logger.info(f"  {f}: {e}")
+    fallidas = [f for f, e in resultados if e.startswith("ERROR") or e == "NO_AUTOCARGA"]
+    if fallidas:
+        logger.error(f"{len(fallidas)} factura(s) con error; revisá el resumen (exit code 1).")
+        return 1
     return 0
 
 
