@@ -78,8 +78,9 @@ def test_tope_simple_tunable_por_env(monkeypatch):
 
 
 def test_fallback_sin_soportes_es_defensivo(monkeypatch):
-    """TA de valor bajo sin PDFs → fallback nuevo (prohíbe inventar),
-    jamás el viejo 'EL REGISTRO CLÍNICO RESPALDA LA ATENCIÓN'."""
+    """TA de valor bajo sin PDFs → fallback nuevo (anti-invención con
+    lenguaje SIEMPRE-verdadero), jamás el viejo 'EL REGISTRO CLÍNICO
+    RESPALDA LA ATENCIÓN'."""
     _limpiar_env(monkeypatch)
     from app.services.glosa_ia_prompts import build_user_prompt
 
@@ -90,8 +91,24 @@ def test_fallback_sin_soportes_es_defensivo(monkeypatch):
         "COMPENSAR",
         valor_objetado="$150.000",
     )
-    assert "PROHIBIDO citar folios" in prompt
+    assert "NO inventes folios" in prompt
     assert "RESPALDA LA ATENCIÓN PRESTADA" not in prompt
+
+
+def test_fallback_no_afirma_ausencia_de_documentos(monkeypatch):
+    """Fix del review (ALTA-2): el fallback NO debe afirmar 'no hay
+    documentos' ni 'PROHIBIDO citar folios' de forma absoluta — mentiría
+    cuando los PDFs van adjuntos por multimodal en la misma llamada."""
+    _limpiar_env(monkeypatch)
+    from app.services.glosa_ia_prompts import build_user_prompt
+
+    prompt = build_user_prompt(
+        TEXTO_GLOSA_BASE, "", "TA0201", "COMPENSAR", valor_objetado="$150.000"
+    )
+    assert "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS" not in prompt
+    assert "PROHIBIDO citar folios" not in prompt
+    # Sí conserva la regla condicional siempre-verdadera:
+    assert "APAREZCAN literalmente" in prompt
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -112,7 +129,7 @@ def test_codigo_soportes_sin_pdfs_inyecta_alerta(monkeypatch):
         "COMPENSAR",
         valor_objetado="$150.000",
     )
-    assert "ALERTA DE EXPEDIENTE INCOMPLETO" in prompt
+    assert "AVISO DE EXPEDIENTE" in prompt
     assert "Historia clínica institucional del paciente" in prompt
 
 
@@ -127,7 +144,7 @@ def test_pertinencia_sin_contexto_clinico_inyecta_alerta(monkeypatch):
         "COMPENSAR",
         valor_objetado="$150.000",
     )
-    assert "ALERTA DE EXPEDIENTE INCOMPLETO" in prompt
+    assert "AVISO DE EXPEDIENTE" in prompt
 
 
 def test_alta_cuantia_sin_expediente_inyecta_alerta(monkeypatch):
@@ -142,7 +159,7 @@ def test_alta_cuantia_sin_expediente_inyecta_alerta(monkeypatch):
         "COMPENSAR",
         valor_objetado="$5.000.000",
     )
-    assert "ALERTA DE EXPEDIENTE INCOMPLETO" in prompt
+    assert "AVISO DE EXPEDIENTE" in prompt
 
 
 def test_con_soportes_suficientes_no_hay_alerta(monkeypatch):
@@ -162,7 +179,7 @@ def test_con_soportes_suficientes_no_hay_alerta(monkeypatch):
         "COMPENSAR",
         valor_objetado="$150.000",
     )
-    assert "ALERTA DE EXPEDIENTE INCOMPLETO" not in prompt
+    assert "AVISO DE EXPEDIENTE" not in prompt
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -187,3 +204,77 @@ def test_multimodal_auto_apagable_por_env(monkeypatch):
     from app.services.routing_complejidad import multimodal_auto_activado
 
     assert multimodal_auto_activado(True, "claude-opus-4-7") is False
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 5. Fixes del review adversarial (jul-2026)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_gate_no_apila_fallback_y_alerta(monkeypatch):
+    """Dedup (BAJA-5): con contexto vacío + SO*, la ALERTA reemplaza al
+    FALLBACK — no aparecen los dos (el FALLBACK 'SIN TEXTO OCR' se va)."""
+    _limpiar_env(monkeypatch)
+    from app.services.glosa_ia_prompts import build_user_prompt
+
+    prompt = build_user_prompt(
+        TEXTO_GLOSA_BASE, "", "SO3401", "COMPENSAR", valor_objetado="$150.000"
+    )
+    assert "AVISO DE EXPEDIENTE" in prompt
+    assert "SIN TEXTO OCR" not in prompt  # el FALLBACK no se apila
+
+
+def test_gate_con_ocr_flaco_preserva_el_ocr(monkeypatch):
+    """Con OCR real pero flaco (<800) + SO*, la ALERTA se antepone SIN
+    pisar el texto OCR real."""
+    _limpiar_env(monkeypatch)
+    from app.services.glosa_ia_prompts import build_user_prompt
+
+    prompt = build_user_prompt(
+        TEXTO_GLOSA_BASE,
+        "FOLIO_REAL_MARCA presente en el expediente.",
+        "SO3401",
+        "COMPENSAR",
+        valor_objetado="$150.000",
+    )
+    assert "AVISO DE EXPEDIENTE" in prompt
+    assert "FOLIO_REAL_MARCA" in prompt  # el OCR real se conserva
+
+
+def test_multimodal_acepta_modelo_override():
+    """Fix ALTA-1: la firma de _llamar_anthropic_multimodal acepta
+    modelo_override (para no degradar Opus→Sonnet)."""
+    import inspect
+
+    from app.services.glosa_service import GlosaService
+
+    sig = inspect.signature(GlosaService._llamar_anthropic_multimodal)
+    assert "modelo_override" in sig.parameters
+
+
+def test_backstop_caza_fuga_de_andamiaje_del_prompt():
+    """Fix BAJA-6: si el modelo eco-ea el andamiaje del prompt al
+    <argumento>, detectar_defectos_criticos lo marca (fuerza retry)."""
+    from app.services.validador_dictamen import detectar_defectos_criticos
+
+    xml = (
+        "<paciente>X</paciente><servicio>Y</servicio>"
+        "<argumento>ESE HUS NO ACEPTA LA GLOSA. AVISO DE EXPEDIENTE: "
+        "NO INVENTES FOLIOS. Se solicita reconocimiento.</argumento>"
+    )
+    defectos = detectar_defectos_criticos(xml, codigo_glosa="SO3401")
+    assert any(d["regla"] == "fuga_prompt_soportes" for d in defectos)
+
+
+def test_backstop_no_marca_dictamen_limpio():
+    """Un dictamen normal (sin andamiaje) NO dispara el backstop."""
+    from app.services.validador_dictamen import detectar_defectos_criticos
+
+    xml = (
+        "<paciente>Juan</paciente><servicio>Artroplastia</servicio>"
+        "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE TARIFA "
+        "SOBRE EL CÓDIGO FACTURADO, DADO QUE LA TARIFA PACTADA CORRESPONDE "
+        "AL SOAT MENOS DIEZ POR CIENTO CONFORME AL CONTRATO VIGENTE.</argumento>"
+    )
+    defectos = detectar_defectos_criticos(xml, codigo_glosa="TA0201")
+    assert not any(d["regla"] == "fuga_prompt_soportes" for d in defectos)

@@ -1834,21 +1834,23 @@ def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
 
 
 # Fase 2 Soportes (jul-2026): el fallback viejo afirmaba "EL REGISTRO
-# CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN" — un empujón directo a que
-# la IA asegurara respaldo clínico que nunca vio. Ahora es DEFENSIVO:
-# prohíbe inventar evidencia y redirige la defensa a contrato + norma.
+# CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN" — empujaba a la IA a asegurar
+# respaldo clínico que nunca vio. La v1 de Fase 2 lo pasó al extremo opuesto
+# ("PROHIBIDO citar folios — NO están a la vista"), que MIENTE cuando los
+# PDFs sí van adjuntos por vía multimodal en la misma llamada. Esta versión
+# es CONDICIONAL y siempre verdadera: cita solo lo que REALMENTE aparezca,
+# no inventes; sirva o no haya PDFs adjuntos.
 FALLBACK_SIN_SOPORTES = (
-    "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS EN ESTA RADICACIÓN.\n"
-    "⚠ REGLAS PARA DICTAMINAR SIN SOPORTES A LA VISTA:\n"
-    "1. PROHIBIDO citar folios, fechas de atención, hallazgos clínicos, "
-    "resultados o médicos específicos — no los tienes a la vista; "
-    "inventarlos viciaría el dictamen.\n"
-    "2. Fundamenta la defensa en las cláusulas del contrato, la normativa "
-    "y la carga de la EPS de especificar y probar su objeción "
+    "SIN TEXTO OCR DE SOPORTES EN ESTE BLOQUE.\n"
+    "⚠ REGLA ANTI-INVENCIÓN (aplica SIEMPRE):\n"
+    "1. Si hay PDFs de soportes adjuntos, léelos y cita ÚNICAMENTE folios, "
+    "fechas, hallazgos o médicos que APAREZCAN literalmente en ellos.\n"
+    "2. Si no hay evidencia clínica a la vista, NO inventes folios ni "
+    "hallazgos: fundamenta en las cláusulas del contrato, la normativa y la "
+    "carga de la EPS de especificar y probar su objeción "
     "(Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
-    "3. Puedes dejar constancia de que la historia clínica (Res. 1995/1999) "
-    "y los RIPS (Res. 866/2021) reposan en el archivo institucional a "
-    "disposición de la entidad — sin transcribir contenido clínico."
+    "3. La historia clínica (Res. 1995/1999) y los RIPS (Res. 866/2021) "
+    "reposan en el archivo institucional a disposición de la entidad."
 )
 
 
@@ -2600,9 +2602,12 @@ def build_user_prompt(
     # ─── Fase 2 Soportes (jul-2026): gate interactivo de expediente ───
     # El mismo detector determinista del auto-responder avisa DENTRO del
     # prompt cuando el código exige soportes y el expediente está flaco,
-    # para que la IA NO invente evidencia clínica (folios, fechas,
-    # hallazgos) y pivotee a defensa contractual/normativa. Antes esto solo
-    # gateaba el lote batch; el flujo interactivo generaba en silencio.
+    # para que la IA cite SOLO evidencia real y pivotee a defensa
+    # contractual/normativa si no la hay. Antes esto solo gateaba el lote
+    # batch; el flujo interactivo generaba en silencio.
+    # NOTA (fix jul-2026): el aviso usa lenguaje SIEMPRE-verdadero ("cita
+    # solo lo que aparezca") — no afirma "no hay documentos", porque los
+    # PDFs pueden ir adjuntos por multimodal en la misma llamada.
     if len((contexto_pdf or "").strip()) < 800:
         try:
             from app.services.detector_requiere_soportes import (
@@ -2619,22 +2624,29 @@ def build_user_prompt(
                 _sugeridos = "".join(
                     f"\n    • {s}" for s in _eval_res.get("soportes_sugeridos", [])
                 )
-                pdf_texto = (
-                    "⚠ ALERTA DE EXPEDIENTE INCOMPLETO (detector determinista del motor):\n"
+                _alerta = (
+                    "⚠ AVISO DE EXPEDIENTE (detector determinista del motor):\n"
                     f"  {_eval_res.get('motivo', '')}\n"
-                    f"  Soportes que el gestor debería aportar:{_sugeridos}\n"
-                    "  REGLAS OBLIGATORIAS PARA ESTE DICTAMEN:\n"
-                    "  1. PROHIBIDO citar folios, fechas de atención, hallazgos clínicos,\n"
-                    "     resultados o médicos específicos — NO están a la vista; inventarlos\n"
-                    "     viciaría el dictamen.\n"
-                    "  2. Fundamenta EXCLUSIVAMENTE en las cláusulas contractuales del caso,\n"
-                    "     la normativa aplicable y la carga de la EPS de especificar y probar\n"
-                    "     su objeción (Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
-                    "  3. Deja constancia de que la historia clínica reposa en el archivo\n"
-                    "     institucional (Res. 1995/1999) a disposición de la entidad.\n"
+                    f"  Soportes que respaldarían el caso:{_sugeridos}\n"
+                    "  REGLAS PARA ESTE DICTAMEN:\n"
+                    "  1. Cita ÚNICAMENTE folios, fechas, hallazgos o médicos que APAREZCAN\n"
+                    "     literalmente en los soportes a la vista (texto OCR o PDF adjunto).\n"
+                    "     NO inventes evidencia clínica que no puedas verificar.\n"
+                    "  2. Si no hay evidencia clínica a la vista, fundamenta en las cláusulas\n"
+                    "     del contrato, la normativa y la carga de la EPS de especificar y\n"
+                    "     probar su objeción (Res. 3047/2008 anexo técnico 5; Ley 1438 art. 57).\n"
+                    "  3. La historia clínica (Res. 1995/1999) reposa en el archivo\n"
+                    "     institucional a disposición de la entidad.\n"
                     "  4. Exige a la EPS precisar el folio/documento echado de menos, sin\n"
-                    "     aceptar la glosa.\n\n" + pdf_texto
+                    "     aceptar la glosa."
                 )
+                # Dedup (fix jul-2026): si el bloque venía vacío, pdf_texto ya
+                # es el FALLBACK — reemplazar, no apilar. Si trae OCR real
+                # (flaco pero presente), anteponer para preservarlo.
+                if contexto_pdf and contexto_pdf.strip():
+                    pdf_texto = _alerta + "\n\n" + pdf_texto
+                else:
+                    pdf_texto = _alerta
         except Exception:
             pass
 

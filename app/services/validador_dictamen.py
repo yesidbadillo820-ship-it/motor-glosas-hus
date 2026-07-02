@@ -417,6 +417,26 @@ _FRASES_PROHIBIDAS_CRITICAS = [
     "NO FUE RESPETADA",
 ]
 
+# Fase 2 Soportes (jul-2026): andamiaje del prompt (aviso de expediente,
+# reglas anti-invención, fallback sin-OCR) que NUNCA debe salir como texto
+# radicable si el modelo lo eco-ea. El repo ya tuvo fugas de prompt (bugs
+# EE/GG); este backstop las caza y fuerza reintento.
+_FRASES_FUGA_PROMPT_SOPORTES = [
+    "AVISO DE EXPEDIENTE",
+    "ALERTA DE EXPEDIENTE",
+    "DETECTOR DETERMINISTA",
+    "SOPORTES QUE RESPALDARÍAN",
+    "SOPORTES QUE RESPALDARIAN",
+    "SOPORTES QUE EL GESTOR",
+    "SIN TEXTO OCR",
+    "REGLA ANTI-INVENCIÓN",
+    "REGLA ANTI-INVENCION",
+    "REGLAS PARA ESTE DICTAMEN",
+    "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS",
+    "PROHIBIDO CITAR FOLIOS",
+    "NO INVENTES FOLIOS",
+]
+
 # Errores típicos de citación legal (incorrecto → correcto)
 _CITAS_INCORRECTAS = [
     ("ART. 1601 ", "ART. 1602 "),
@@ -550,6 +570,26 @@ def detectar_defectos_criticos(
                     ),
                 }
             )
+
+    # 4-bis. Fuga del andamiaje del prompt de soportes (Fase 2, jul-2026)
+    for frase in _FRASES_FUGA_PROMPT_SOPORTES:
+        if frase in arg_up:
+            defectos.append(
+                {
+                    "regla": "fuga_prompt_soportes",
+                    "mensaje": (
+                        f'Se filtró andamiaje del prompt al dictamen: "{frase}". '
+                        "Es una instrucción interna, no texto radicable."
+                    ),
+                    "sugerencia": (
+                        "Redacta el argumento SIN mencionar avisos de expediente, "
+                        "reglas anti-invención ni la ausencia de OCR: si no hay "
+                        "evidencia clínica a la vista, defiende con contrato y norma "
+                        "de forma natural."
+                    ),
+                }
+            )
+            break
 
     # 5. Citas legales con sintaxis incorrecta
     for incorrecto, correcto in _CITAS_INCORRECTAS:

@@ -5414,6 +5414,7 @@ class GlosaService:
                             system_prompt,
                             user_prompt,
                             pdfs_raw_para_multimodal,
+                            modelo_override=_modelo_override,
                         )
                         _intento_ok = True
                     except Exception as _e_mm:
@@ -8409,6 +8410,7 @@ class GlosaService:
         system: str,
         user: str,
         pdfs_raw: list[tuple[str, bytes]],
+        modelo_override: str | None = None,
     ) -> tuple[str, str]:
         """Llama a Claude pasándole el user prompt + los PDFs de soportes
         como `document` content blocks (formato nativo Anthropic).
@@ -8471,7 +8473,11 @@ class GlosaService:
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json={
-                        "model": self.anthropic_model,
+                        # Fase 2 fix (jul-2026): respetar la escalación del
+                        # router. Antes usaba siempre self.anthropic_model
+                        # (Sonnet) — un caso Opus (≥$10M+2PDFs) auto-enviado
+                        # a multimodal se degradaba en silencio a Sonnet.
+                        "model": modelo_override or self.anthropic_model,
                         "max_tokens": 3000,
                         "temperature": 0.10,
                         "system": system,

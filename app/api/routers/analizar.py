@@ -741,18 +741,43 @@ async def analizar(
         raise HTTPException(status_code=400, detail=_msg)
 
     try:
-        # Fase 2 Soportes (jul-2026): capturar los bytes raw también cuando
-        # el AUTO-multimodal está habilitado (el servicio decide después si
-        # el caso escala a Claude; sin bytes capturados no habría qué mandar).
+        # Fase 2 Soportes (jul-2026): capturar los bytes raw cuando el
+        # checkbox está ON o cuando el AUTO-multimodal probablemente dispare
+        # (caso que ya escala a Claude por complejidad). Se predice con el
+        # mismo detector determinista del router de modelo — así el capture
+        # se alinea con el uso y NO se retienen hasta 150MB por request (10
+        # PDFs × 15MB) en la VM de 1GB para casos simples que jamás usarán
+        # multimodal (fix del review adversarial, jul-2026).
         _mm_auto_env = os.getenv("GLOSA_MULTIMODAL_AUTO", "1").strip().lower() not in (
             "0",
             "false",
             "no",
         )
+        _capturar_raw = bool(usar_pdf_nativo_soportes)
+        if not _capturar_raw and _mm_auto_env and archivos:
+            try:
+                from app.services.auto_pilot_decision import _parse_valor as _pv_mm
+                from app.services.routing_complejidad import (
+                    detectar_complejidad_critica as _det_mm,
+                )
+
+                _vals_mm = [_pv_mm(m) for m in re.findall(r"\$[\d.,]+", tabla_excel or "")]
+                _valor_mm = int(max(_vals_mm)) if _vals_mm else 0
+                _capturar_raw = bool(
+                    _det_mm(
+                        valor=_valor_mm,
+                        num_pdfs=len(archivos),
+                        num_codigos=0,
+                        texto_glosa=tabla_excel or "",
+                        contexto_pdf="",
+                    ).es_complejo
+                )
+            except Exception:
+                _capturar_raw = False
         contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
             archivos,
             req_id,
-            capturar_raw=bool(usar_pdf_nativo_soportes) or _mm_auto_env,
+            capturar_raw=_capturar_raw,
         )
         _publicar_progreso(
             _tid,
