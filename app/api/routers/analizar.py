@@ -9,6 +9,7 @@ Extraído de app/main.py (era ~365 LOC). Maneja:
   - Persistencia (GlosaRecord) + snapshot de versión inicial
 """
 
+import os
 import re
 from typing import Optional
 
@@ -740,10 +741,18 @@ async def analizar(
         raise HTTPException(status_code=400, detail=_msg)
 
     try:
+        # Fase 2 Soportes (jul-2026): capturar los bytes raw también cuando
+        # el AUTO-multimodal está habilitado (el servicio decide después si
+        # el caso escala a Claude; sin bytes capturados no habría qué mandar).
+        _mm_auto_env = os.getenv("GLOSA_MULTIMODAL_AUTO", "1").strip().lower() not in (
+            "0",
+            "false",
+            "no",
+        )
         contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
             archivos,
             req_id,
-            capturar_raw=bool(usar_pdf_nativo_soportes),
+            capturar_raw=bool(usar_pdf_nativo_soportes) or _mm_auto_env,
         )
         _publicar_progreso(
             _tid,

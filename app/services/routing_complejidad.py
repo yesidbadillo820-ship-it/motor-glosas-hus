@@ -214,3 +214,21 @@ def detectar_complejidad_critica(
         motivos.append(f"palabra-clave-critica:{palabra_encontrada}")
 
     return ResultadoComplejidad(es_complejo=bool(motivos), motivos=motivos)
+
+
+def multimodal_auto_activado(es_complejo: bool, modelo_override: str | None) -> bool:
+    """Fase 2 Soportes (jul-2026): ¿auto-activar la lectura PDF nativa?
+
+    Envía los PDFs binarios a Claude SOLO cuando el caso YA se enruta a un
+    Claude "grande" (complejidad crítica u Opus por valor+multi-PDF). Los
+    casos simples que van a Groq/Haiku siguen con el texto OCR — así el
+    multimodal queda "ON por defecto" donde importa, sin convertir cada
+    glosa con PDF en una llamada cara (la trampa que el usuario vetó).
+
+    Apagable sin redeploy: GLOSA_MULTIMODAL_AUTO=0.
+    """
+    import os
+
+    if os.getenv("GLOSA_MULTIMODAL_AUTO", "1").strip().lower() in ("0", "false", "no"):
+        return False
+    return bool(es_complejo or (modelo_override or "").startswith("claude-opus"))

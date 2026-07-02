@@ -23,8 +23,17 @@ AURORA (ARL/Vida)          Minuta ARL firmada 2024     SOAT pleno
 SIN CONTRATO               —                           SOAT pleno
 """
 
+import os
 import re
 from typing import Optional
+
+
+def _env_int(nombre: str, default: int) -> int:
+    """Lee un entero de una env var; ante ausencia o basura, el default."""
+    try:
+        return int(os.getenv(nombre, "") or default)
+    except (TypeError, ValueError):
+        return default
 
 
 def _parsear_valor_cop(s: str) -> float:
@@ -1824,10 +1833,22 @@ def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
     )
 
 
+# Fase 2 Soportes (jul-2026): el fallback viejo afirmaba "EL REGISTRO
+# CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN" — un empujón directo a que
+# la IA asegurara respaldo clínico que nunca vio. Ahora es DEFENSIVO:
+# prohíbe inventar evidencia y redirige la defensa a contrato + norma.
 FALLBACK_SIN_SOPORTES = (
-    "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS EN ESTA RADICACIÓN. "
-    "EL REGISTRO CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN PRESTADA. "
-    "LA HISTORIA CLÍNICA (RES. 1995/1999) Y LOS RIPS (RES. 866/2021) DAN CUENTA DE LA PRESTACIÓN."
+    "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS EN ESTA RADICACIÓN.\n"
+    "⚠ REGLAS PARA DICTAMINAR SIN SOPORTES A LA VISTA:\n"
+    "1. PROHIBIDO citar folios, fechas de atención, hallazgos clínicos, "
+    "resultados o médicos específicos — no los tienes a la vista; "
+    "inventarlos viciaría el dictamen.\n"
+    "2. Fundamenta la defensa en las cláusulas del contrato, la normativa "
+    "y la carga de la EPS de especificar y probar su objeción "
+    "(Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
+    "3. Puedes dejar constancia de que la historia clínica (Res. 1995/1999) "
+    "y los RIPS (Res. 866/2021) reposan en el archivo institucional a "
+    "disposición de la entidad — sin transcribir contenido clínico."
 )
 
 
@@ -2566,13 +2587,56 @@ def build_user_prompt(
     es_complejo = _puntos_complejidad >= 4
 
     # PDF: para casos COMPLEJOS enviamos hasta 40K chars (Claude Sonnet 4.6
-    # maneja 200K contexto sin problema). Para SIMPLES limitamos a 2000 para
-    # mantener respuestas concisas.
+    # maneja 200K contexto sin problema). Para SIMPLES el tope histórico era
+    # 2000 chars — tan poco que la IA argumentaba a ciegas aunque la HC
+    # estuviera adjunta (Fase 2 Soportes, jul-2026). Ahora 12K por defecto,
+    # tunable por env var sin redeploy.
     if es_complejo:
-        _max_pdf_chars = 40000
+        _max_pdf_chars = _env_int("GLOSA_SOPORTES_MAX_CHARS_COMPLEJO", 40000)
     else:
-        _max_pdf_chars = 2000
+        _max_pdf_chars = _env_int("GLOSA_SOPORTES_MAX_CHARS_SIMPLE", 12000)
     pdf_texto = contexto_pdf[:_max_pdf_chars].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES
+
+    # ─── Fase 2 Soportes (jul-2026): gate interactivo de expediente ───
+    # El mismo detector determinista del auto-responder avisa DENTRO del
+    # prompt cuando el código exige soportes y el expediente está flaco,
+    # para que la IA NO invente evidencia clínica (folios, fechas,
+    # hallazgos) y pivotee a defensa contractual/normativa. Antes esto solo
+    # gateaba el lote batch; el flujo interactivo generaba en silencio.
+    if len((contexto_pdf or "").strip()) < 800:
+        try:
+            from app.services.detector_requiere_soportes import (
+                evaluar as _eval_soportes,
+            )
+
+            _eval_res = _eval_soportes(
+                codigo_glosa=codigo,
+                texto_glosa=texto_glosa,
+                contexto_pdf=contexto_pdf or "",
+                valor_objetado=float(_valor_numerico or 0),
+            )
+            if _eval_res.get("requiere"):
+                _sugeridos = "".join(
+                    f"\n    • {s}" for s in _eval_res.get("soportes_sugeridos", [])
+                )
+                pdf_texto = (
+                    "⚠ ALERTA DE EXPEDIENTE INCOMPLETO (detector determinista del motor):\n"
+                    f"  {_eval_res.get('motivo', '')}\n"
+                    f"  Soportes que el gestor debería aportar:{_sugeridos}\n"
+                    "  REGLAS OBLIGATORIAS PARA ESTE DICTAMEN:\n"
+                    "  1. PROHIBIDO citar folios, fechas de atención, hallazgos clínicos,\n"
+                    "     resultados o médicos específicos — NO están a la vista; inventarlos\n"
+                    "     viciaría el dictamen.\n"
+                    "  2. Fundamenta EXCLUSIVAMENTE en las cláusulas contractuales del caso,\n"
+                    "     la normativa aplicable y la carga de la EPS de especificar y probar\n"
+                    "     su objeción (Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
+                    "  3. Deja constancia de que la historia clínica reposa en el archivo\n"
+                    "     institucional (Res. 1995/1999) a disposición de la entidad.\n"
+                    "  4. Exige a la EPS precisar el folio/documento echado de menos, sin\n"
+                    "     aceptar la glosa.\n\n" + pdf_texto
+                )
+        except Exception:
+            pass
 
     # Instrucción adaptativa de longitud
     if es_complejo:

@@ -50,6 +50,12 @@ services:
       # defecto. Para activarla, poner GLOSA_CAMPOS_ESTRUCTURADOS=true en
       # el .env y `docker compose up -d --build`. Reversible: volver a 0.
       GLOSA_CAMPOS_ESTRUCTURADOS: ${GLOSA_CAMPOS_ESTRUCTURADOS:-0}
+      # Fase 2 Soportes (jul-2026): cuánto texto OCR de los soportes llega
+      # a la IA (antes: 2000 chars el caso simple — argumentaba a ciegas) y
+      # auto-activación de lectura PDF nativa cuando el caso escala a Claude.
+      GLOSA_SOPORTES_MAX_CHARS_SIMPLE: ${GLOSA_SOPORTES_MAX_CHARS_SIMPLE:-12000}
+      GLOSA_SOPORTES_MAX_CHARS_COMPLEJO: ${GLOSA_SOPORTES_MAX_CHARS_COMPLEJO:-40000}
+      GLOSA_MULTIMODAL_AUTO: ${GLOSA_MULTIMODAL_AUTO:-1}
       # Secretos — DEBEN venir del .env (no hardcodear)
       JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY: ${SECRET_KEY}

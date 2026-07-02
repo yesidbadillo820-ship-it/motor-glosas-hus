@@ -5388,10 +5388,26 @@ class GlosaService:
                 # hacía la misma cadena y se reintentaba Gemini dos veces).
                 # Si la cadena completa falla, caemos a los paths de texto
                 # (Tool Use / clásico) con el contexto OCR ya extraído.
-                _quiere_multimodal = (
-                    bool(getattr(data, "usar_pdf_nativo_soportes", False))
-                    and pdfs_raw_para_multimodal
+                # Fase 2 Soportes (jul-2026): además del checkbox manual,
+                # AUTO-activar PDF nativo cuando el caso ya se enruta a un
+                # Claude grande (complejidad crítica / Opus). Los casos
+                # simples de Groq/Haiku siguen con texto OCR (ahora 12K).
+                try:
+                    from app.services.routing_complejidad import (
+                        multimodal_auto_activado as _mm_auto_fn,
+                    )
+
+                    _mm_auto = _mm_auto_fn(_es_complejo_forzar_claude, _modelo_override)
+                except Exception:
+                    _mm_auto = False
+                _quiere_multimodal = bool(pdfs_raw_para_multimodal) and (
+                    bool(getattr(data, "usar_pdf_nativo_soportes", False)) or _mm_auto
                 )
+                if _quiere_multimodal and _mm_auto:
+                    logger.info(
+                        "[MULTIMODAL] AUTO-activado — caso escalado a Claude "
+                        f"(override={_modelo_override}, complejo={_es_complejo_forzar_claude})."
+                    )
                 if _quiere_multimodal:
                     try:
                         res_ia, modelo_usado = await self._llamar_anthropic_multimodal(
