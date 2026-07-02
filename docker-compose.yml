@@ -20,8 +20,6 @@
 # Cómo actualizar a la última versión del código:
 #   docker compose pull && docker compose up -d --build
 
-version: "3.9"
-
 services:
   # ─── Motor Glosas IA (FastAPI + SQLite) ────────────────────────────
   motor:
