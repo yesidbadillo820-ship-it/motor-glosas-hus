@@ -207,10 +207,15 @@ def _primer_visible(loc):
     return None
 
 
-def _screenshot_debug(page: Page, etiqueta: str) -> Path | None:
+def _dir_debug() -> Path:
+    """Carpeta para volcados de diagnóstico (screenshots / HTML)."""
     out = Path("debug_screenshots")
     out.mkdir(exist_ok=True)
-    ruta = out / f"{time.strftime('%H%M%S')}_{etiqueta}.png"
+    return out
+
+
+def _screenshot_debug(page: Page, etiqueta: str) -> Path | None:
+    ruta = _dir_debug() / f"{time.strftime('%H%M%S')}_{etiqueta}.png"
     try:
         page.screenshot(path=str(ruta), full_page=True)
         logger.info(f"  📸 Screenshot de diagnóstico: {ruta}")
@@ -218,6 +223,25 @@ def _screenshot_debug(page: Page, etiqueta: str) -> Path | None:
     except Exception as e:
         logger.warning(f"  No pude tomar screenshot: {e}")
         return None
+
+
+def _disparar_eventos(campo, *eventos: str) -> None:
+    """Dispara eventos DOM (input/change/blur) sobre el campo para que el form
+    de Angular registre el valor cargado por script."""
+    campo.evaluate(
+        "(el, evs) => { for (const t of evs) "
+        "el.dispatchEvent(new Event(t, {bubbles:true})); }",
+        list(eventos),
+    )
+
+
+def _goto_tolerante(page: Page, url: str) -> None:
+    """goto esperando domcontentloaded; si el portal (lento) no lo emite a
+    tiempo, alcanza con el commit de la navegación."""
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=90000)
+    except PlaywrightTimeout:
+        page.goto(url, wait_until="commit", timeout=90000)
 
 
 # ─── Login (perfil persistente + reCAPTCHA manual) ──────────────────────────
@@ -265,10 +289,7 @@ def login(page: Page, user: str, password: str, timeout_login_s: int = 240) -> N
     no hace nada. Si no, completa email + contraseña y ESPERA a que el humano
     resuelva el reCAPTCHA y la página entre (el captcha no se automatiza)."""
     logger.info("Abriendo el portal FOMAG (Horus)…")
-    try:
-        page.goto(PORTAL_LOGIN, wait_until="domcontentloaded", timeout=90000)
-    except PlaywrightTimeout:
-        page.goto(PORTAL_LOGIN, wait_until="commit", timeout=90000)
+    _goto_tolerante(page, PORTAL_LOGIN)
     page.wait_for_timeout(2500)
 
     if _logueado(page):
@@ -290,11 +311,7 @@ def login(page: Page, user: str, password: str, timeout_login_s: int = 240) -> N
             # los valores y habilite INGRESAR.
             for campo in (email, pwd):
                 try:
-                    campo.evaluate(
-                        "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
-                        " el.dispatchEvent(new Event('change', {bubbles:true}));"
-                        " el.dispatchEvent(new Event('blur', {bubbles:true})); }"
-                    )
+                    _disparar_eventos(campo, "input", "change", "blur")
                 except Exception:
                     pass
             logger.info("  Email y contraseña cargados.")
@@ -463,10 +480,7 @@ def _navegar_por_menu(page: Page) -> None:
 def _ir_a_auditoria(page: Page) -> None:
     """Carga la vista de Auditoría de facturas: prueba el goto directo y, si la
     vista no aparece, navega por el menú lateral. Lanza si ninguna funciona."""
-    try:
-        page.goto(PORTAL_AUDITORIA, wait_until="domcontentloaded", timeout=90000)
-    except PlaywrightTimeout:
-        page.goto(PORTAL_AUDITORIA, wait_until="commit", timeout=90000)
+    _goto_tolerante(page, PORTAL_AUDITORIA)
     if _esperar_auditoria(page, timeout_s=25):
         return
     logger.info("  la vista de Auditoría no apareció con la URL directa; pruebo el menú lateral…")
@@ -678,19 +692,15 @@ def leer_grilla_completa(page: Page, max_paginas: int = 200) -> list[dict]:
     return todas
 
 
-def _grilla_dice_sin_datos(page: Page) -> bool:
-    try:
-        return page.locator("text=/sin datos|no hay datos|sin registros|no data/i").count() > 0
-    except Exception:
-        return False
+# Botón verde "RESPUESTA" de la grilla (a veces renderiza como <a>).
+_SEL_BOTON_RESPUESTA = "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"
 
 
 def _fila_cargo(page: Page, factura: str) -> bool:
     """True si la grilla cargó la fila de la factura. Estructura-agnóstico: NO
     depende de que la grilla sea un <table> (la de Horus no siempre lo es).
     Señal: hay un botón RESPUESTA visible Y la factura está en pantalla."""
-    if _primer_visible(page.locator(
-            "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')")) is None:
+    if _primer_visible(page.locator(_SEL_BOTON_RESPUESTA)) is None:
         return False
     try:
         return _primer_visible(page.get_by_text(factura, exact=False)) is not None
@@ -705,12 +715,10 @@ def _boton_respuesta_de_fila(page: Page, factura: str):
                 f"li:has-text('{factura}')"):
         fila = _primer_visible(page.locator(sel))
         if fila is not None:
-            b = _primer_visible(fila.locator(
-                "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"))
+            b = _primer_visible(fila.locator(_SEL_BOTON_RESPUESTA))
             if b is not None:
                 return b
-    return _primer_visible(page.locator(
-        "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"))
+    return _primer_visible(page.locator(_SEL_BOTON_RESPUESTA))
 
 
 def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 45) -> bool:
@@ -726,10 +734,7 @@ def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 45) -> bool:
         caja.fill("")
         caja.type(factura, delay=30)
         # Eventos para que el form de Angular registre el valor antes de FILTRAR.
-        caja.evaluate(
-            "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
-            " el.dispatchEvent(new Event('change', {bubbles:true})); }"
-        )
+        _disparar_eventos(caja, "input", "change")
     except Exception:
         pass
     # Log del valor que quedó en la caja (diagnóstico siempre).
@@ -843,21 +848,22 @@ def _tabla_formulario(page: Page):
     Cod Rta2 / Detalle Rta 2 / Concepto Aud), distinguiéndola de las otras
     tablas ocultas del DOM. Prueba <table> y, si no, <mat-table>."""
     for sel in ("table", "mat-table"):
+        loc = page.locator(sel)
         try:
-            n = page.locator(sel).count()
+            n = loc.count()
         except Exception:
             n = 0
         mejor, mejor_hits = -1, 1
         for i in range(n):
             try:
-                txt = (page.locator(sel).nth(i).inner_text() or "").lower()
+                txt = (loc.nth(i).inner_text() or "").lower()
             except Exception:
                 continue
             hits = sum(1 for k in _CLAVES_TABLA_FORM if k in txt)
             if hits > mejor_hits:
                 mejor, mejor_hits = i, hits
         if mejor >= 0:
-            return page.locator(sel).nth(mejor)
+            return loc.nth(mejor)
     return None
 
 
@@ -1040,9 +1046,7 @@ def _elegir_codigo_en_celda(page: Page, celda, codigo: str) -> bool:
     # Falló: volcar el HTML de la celda para ver el control real del dropdown.
     try:
         html = celda.evaluate("el => el.outerHTML")
-        out = Path("debug_screenshots")
-        out.mkdir(exist_ok=True)
-        (out / "celda_cod_rta2.html").write_text(html, encoding="utf-8")
+        (_dir_debug() / "celda_cod_rta2.html").write_text(html, encoding="utf-8")
         logger.info("    [diag] celda Cod Rta2 RAT → debug_screenshots/celda_cod_rta2.html")
         logger.info(f"    [diag] HTML (recorte): {' '.join(html.split())[:400]}")
     except Exception:
@@ -1096,11 +1100,7 @@ def _cargar_detalle_en_celda(page: Page, celda, texto: str) -> bool:
             # contenteditable no soporta fill(): tipear.
             campo.click()
             campo.type(texto, delay=2)
-        campo.evaluate(
-            "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
-            " el.dispatchEvent(new Event('change', {bubbles:true}));"
-            " el.dispatchEvent(new Event('blur', {bubbles:true})); }"
-        )
+        _disparar_eventos(campo, "input", "change", "blur")
     except Exception as e:
         logger.warning(f"  No pude escribir el detalle: {e}")
         return False
@@ -1230,11 +1230,6 @@ def _subir_pdf_en_celda(page: Page, celda, pdf_path: Path) -> bool:
         return False
 
 
-def _set_rows_per_page_form(page: Page) -> None:
-    """En el form, subir 'Rows per page' a su máximo para ver todas las filas."""
-    _set_page_size_max(page)
-
-
 def responder_glosa(
     page: Page,
     factura: str,
@@ -1255,7 +1250,8 @@ def responder_glosa(
                           "(¿ya respondida, o no es de esta pestaña?)")
         return reg
 
-    _set_rows_per_page_form(page)
+    # En el form, subir 'Rows per page' a su máximo para ver todas las filas.
+    _set_page_size_max(page)
     tabla = _tabla_formulario(page)
     if tabla is None:
         _screenshot_debug(page, f"form_sin_tabla_{factura}")
@@ -1297,9 +1293,10 @@ def responder_glosa(
     logger.info(f"  {factura}: {len(filas)} fila(s) de servicio; cod={codigo}"
                 + (f"; pdf={pdf.name}" if pdf else ""))
     for n, fila in enumerate(filas, start=1):
-        ok_cod = _elegir_codigo_en_celda(page, _celda(fila, i_cod), codigo)
+        celda_cod = _celda(fila, i_cod)
+        ok_cod = _elegir_codigo_en_celda(page, celda_cod, codigo)
         try:
-            cel = _celda(fila, i_cod).evaluate(
+            cel = celda_cod.evaluate(
                 """el => {
                     let t = (el.innerText||'').trim();
                     for (const i of el.querySelectorAll('input,select')) {
@@ -1379,8 +1376,6 @@ def diagnosticar_respuesta(page: Page, factura: str) -> None:
     if not abrir_respuesta(page, factura):
         logger.error(f"  No pude abrir RESPUESTA para {factura}.")
         return
-    out = Path("debug_screenshots")
-    out.mkdir(exist_ok=True)
     _screenshot_debug(page, f"respuesta_form_{factura}")
     tabla = _tabla_formulario(page)
     headers = _headers_formulario(tabla)
@@ -1389,7 +1384,7 @@ def diagnosticar_respuesta(page: Page, factura: str) -> None:
     logger.info(f"    idx Detalle Rta 2     = {_idx_columna(headers, 'DETALLERTA2PRESTADOR', 'DETALLERTA2')}")
     logger.info(f"    idx Guardar           = {_idx_columna(headers, 'GUARDAR')}")
     try:
-        dump = out / f"respuesta_form_{factura}.html"
+        dump = _dir_debug() / f"respuesta_form_{factura}.html"
         dump.write_text(page.content(), encoding="utf-8")
         logger.info(f"  HTML del formulario: {dump}")
     except Exception as e:
@@ -1506,42 +1501,42 @@ def main() -> int:
                 logger.info(f"\n✅ Inventario de {tab_label}: {len(filas)} facturas → {args.reporte}")
 
             elif args.diagnostico:
-                for fac in objetivos:
+                for i, fac in enumerate(objetivos, start=1):
                     diagnosticar_respuesta(page, fac)
-                    # Volver a la grilla para la siguiente.
-                    ir_a_pestana(page, tab_label)
+                    # Volver a la grilla para la siguiente (no en la última).
+                    if i < len(objetivos):
+                        ir_a_pestana(page, tab_label)
 
             elif args.responder:
                 logger.info(f"Respondiendo {len(objetivos)} factura(s) de {tab_label} "
                             f"con código {args.cod}"
                             + (" [SIN GUARDAR]" if args.sin_guardar else "") + ".")
                 args.reporte.parent.mkdir(parents=True, exist_ok=True)
-                f_rep = args.reporte.open("w", newline="", encoding="utf-8-sig")
-                w_rep = csv.DictWriter(f_rep, fieldnames=["factura", "filas", "ok", "estado", "detalle"])
-                w_rep.writeheader()
-                for i, fac in enumerate(objetivos, start=1):
-                    logger.info(f"[{i}/{len(objetivos)}] {fac}")
-                    try:
-                        reg = responder_glosa(
-                            page, fac, args.cod, texto, args.evidencias,
-                            max_filas=args.max_filas, guardar=not args.sin_guardar,
-                            pdf_dir=args.pdf_dir,
-                        )
-                    except Exception as e:
-                        _screenshot_debug(page, f"error_{fac}")
-                        reg = {"factura": fac, "filas": 0, "ok": 0,
-                               "estado": "ERROR", "detalle": str(e)[:300]}
-                        logger.error(f"  ERROR en {fac}: {e}")
-                    resultados.append(reg)
-                    w_rep.writerow(reg)
-                    f_rep.flush()
-                    # Volver a la grilla para la siguiente (no en la última).
-                    if i < len(objetivos):
+                with args.reporte.open("w", newline="", encoding="utf-8-sig") as f_rep:
+                    w_rep = csv.DictWriter(f_rep, fieldnames=["factura", "filas", "ok", "estado", "detalle"])
+                    w_rep.writeheader()
+                    for i, fac in enumerate(objetivos, start=1):
+                        logger.info(f"[{i}/{len(objetivos)}] {fac}")
                         try:
-                            ir_a_pestana(page, tab_label)
-                        except Exception:
-                            pass
-                f_rep.close()
+                            reg = responder_glosa(
+                                page, fac, args.cod, texto, args.evidencias,
+                                max_filas=args.max_filas, guardar=not args.sin_guardar,
+                                pdf_dir=args.pdf_dir,
+                            )
+                        except Exception as e:
+                            _screenshot_debug(page, f"error_{fac}")
+                            reg = {"factura": fac, "filas": 0, "ok": 0,
+                                   "estado": "ERROR", "detalle": str(e)[:300]}
+                            logger.error(f"  ERROR en {fac}: {e}")
+                        resultados.append(reg)
+                        w_rep.writerow(reg)
+                        f_rep.flush()
+                        # Volver a la grilla para la siguiente (no en la última).
+                        if i < len(objetivos):
+                            try:
+                                ir_a_pestana(page, tab_label)
+                            except Exception:
+                                pass
                 # Piloto visible: pausar para inspeccionar el formulario lleno
                 # antes de cerrar (no se guardó nada).
                 if args.sin_guardar and args.con_cabeza:
