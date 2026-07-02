@@ -56,6 +56,11 @@ services:
       GLOSA_SOPORTES_MAX_CHARS_SIMPLE: ${GLOSA_SOPORTES_MAX_CHARS_SIMPLE:-12000}
       GLOSA_SOPORTES_MAX_CHARS_COMPLEJO: ${GLOSA_SOPORTES_MAX_CHARS_COMPLEJO:-40000}
       GLOSA_MULTIMODAL_AUTO: ${GLOSA_MULTIMODAL_AUTO:-1}
+      # Fase 2b (jul-2026): pre-pass del Auditor Forense — lee los PDFs y
+      # antepone un mapa de folios al contexto para citar folios reales.
+      # Llamada Claude EXTRA (cacheada 14 días) → OFF por defecto. Poner a 1
+      # solo si querés máxima precisión de folios y aceptás el costo/latencia.
+      GLOSA_AUDITOR_FORENSE_PREPASS: ${GLOSA_AUDITOR_FORENSE_PREPASS:-0}
       # Secretos — DEBEN venir del .env (no hardcodear)
       JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY: ${SECRET_KEY}

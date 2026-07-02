@@ -806,6 +806,44 @@ async def analizar(
             # que hay soportes disponibles y referencie en el dictamen.
             archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
 
+        # Fase 2b Soportes (jul-2026): PRE-PASS del Auditor Forense (OPT-IN).
+        # Lee los PDFs nativos y antepone al contexto un MAPA DE FOLIOS
+        # (folios + fechas + hallazgos) para que el dictamen cite folios
+        # REALES en vez de argumentar a ciegas. Es una llamada Claude extra
+        # (cacheada 14 días) → default OFF; corre solo en casos que ya
+        # escalan a Claude (mismo criterio que capturar_raw), para no
+        # convertir cada glosa en doble costo.
+        if (
+            os.getenv("GLOSA_AUDITOR_FORENSE_PREPASS", "0").strip().lower()
+            not in ("0", "false", "no")
+            and pdfs_raw
+            and _capturar_raw
+        ):
+            try:
+                from app.services.auditor_forense import evidencia_para_dictamen
+
+                _ev = await evidencia_para_dictamen(
+                    factura=numero_factura or "s/n",
+                    texto_glosa=tabla_excel or "",
+                    pdfs_raw=pdfs_raw,
+                    contexto_pdf_texto=contexto_pdf or "",
+                )
+                if _ev.get("evidencia"):
+                    contexto_pdf = (
+                        "═══ EVIDENCIA FORENSE (folios auditados de los soportes) ═══\n"
+                        f"{_ev['evidencia']}\n"
+                        "═══ FIN EVIDENCIA FORENSE ═══\n\n" + (contexto_pdf or "")
+                    )
+                    _publicar_progreso(
+                        _tid, "auditor_forense", {"cache_hit": _ev.get("cache_hit", False)}
+                    )
+                    logger.info(
+                        f"[{req_id}] Auditor forense pre-pass OK "
+                        f"(cache_hit={_ev.get('cache_hit')}, {len(_ev['evidencia'])} chars)"
+                    )
+            except Exception as _e_af:
+                logger.warning(f"[{req_id}] Auditor forense pre-pass falló: {_e_af}")
+
         contrato_repo = ContratoRepository(db)
         contratos = contrato_repo.como_dict()
 

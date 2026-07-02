@@ -36,6 +36,7 @@ Funciona via:
 
 from __future__ import annotations
 import os
+import re
 import base64
 import logging
 from typing import Optional
@@ -405,4 +406,81 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
             f"Gemini-PDF: {gemini_pdf_error or 'no intentado'}. "
             f"Sin GEMINI_API_KEY o sin PDFs para convertir a imagenes."
         ),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Fase 2b Soportes (jul-2026): Auditor Forense como PRE-PASS del dictamen
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _evidencia_texto_desde_html(html: str) -> str:
+    """Aplana la sección 2 (EVIDENCIA CLÍNICA Y DOCUMENTAL) del reporte
+    forense HTML a texto plano citable (folios + fechas + hallazgos). Si no
+    encuentra esa sección, aplana el reporte entero. Nunca devuelve HTML.
+    """
+    if not html:
+        return ""
+    m = re.search(
+        r"EVIDENCIA CL[IÍ]NICA Y DOCUMENTAL\s*</h3>(.*?)(?:<h3|</div>|$)",
+        html,
+        re.IGNORECASE | re.DOTALL,
+    )
+    frag = m.group(1) if m else html
+    frag = re.sub(r"<li>", "\n• ", frag, flags=re.IGNORECASE)
+    frag = re.sub(r"<[^>]+>", " ", frag)
+    frag = frag.replace("&laquo;", "«").replace("&raquo;", "»")
+    frag = re.sub(r"[ \t]+", " ", frag)
+    frag = re.sub(r"\n\s*\n+", "\n", frag)
+    return frag.strip()
+
+
+async def evidencia_para_dictamen(
+    factura: str,
+    texto_glosa: str,
+    pdfs_raw: Optional[list[tuple[str, bytes]]] = None,
+    contexto_pdf_texto: str = "",
+    api_key: str = None,
+    modelo: str = None,
+) -> dict:
+    """Corre el Auditor Forense como PRE-PASS y devuelve un MAPA DE FOLIOS
+    (folios + fechas + hallazgos) en TEXTO PLANO para inyectar al prompt del
+    dictamen. NO produce el dictamen — solo la evidencia verificable, para
+    que el dictamen cite folios REALES en vez de argumentar a ciegas.
+
+    Reutiliza la caché de 14 días de `auditar_forense` (misma factura +
+    mismos PDFs → sin costo). Ante cualquier fallo devuelve evidencia="".
+    """
+    pregunta = (
+        f"Para defender la factura {factura} frente a esta objeción de la EPS:\n"
+        f"«{(texto_glosa or '').strip()[:800]}»\n\n"
+        "Extrae un MAPA DE FOLIOS de los soportes: por cada documento "
+        "relevante indica NOMBRE DEL SOPORTE, FOLIO, FECHA y qué acredita, "
+        "citando SOLO lo que aparezca literalmente. Al final enumera los "
+        "documentos esperables que NO se encuentran (folios faltantes)."
+    )
+    try:
+        res = await auditar_forense(
+            factura=factura or "s/n",
+            pregunta_gestor=pregunta,
+            pdfs_raw=pdfs_raw,
+            contexto_pdf_texto=contexto_pdf_texto,
+            api_key=api_key,
+            modelo=modelo,
+        )
+    except Exception as e:  # pragma: no cover - defensivo
+        logger.warning(f"[AUDITOR-FORENSE] pre-pass excepción: {e}")
+        return {"evidencia": "", "error": str(e), "cache_hit": False}
+
+    if res.get("error") or not res.get("html"):
+        return {
+            "evidencia": "",
+            "error": res.get("error"),
+            "cache_hit": res.get("cache_hit", False),
+        }
+    return {
+        "evidencia": _evidencia_texto_desde_html(res["html"]),
+        "error": None,
+        "cache_hit": res.get("cache_hit", False),
+        "modelo": res.get("modelo"),
     }

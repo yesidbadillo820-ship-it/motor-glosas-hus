@@ -278,3 +278,62 @@ def test_backstop_no_marca_dictamen_limpio():
     )
     defectos = detectar_defectos_criticos(xml, codigo_glosa="TA0201")
     assert not any(d["regla"] == "fuga_prompt_soportes" for d in defectos)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 6. Fase 2b — Auditor Forense como pre-pass del dictamen
+# ─────────────────────────────────────────────────────────────────────
+
+_HTML_FORENSE = (
+    '<div class="auditor-forense"><h3>1. CONTEXTO DE LA GLOSA</h3>'
+    "<p>La EPS objeta soportes.</p>"
+    "<h3>2. EVIDENCIA CLÍNICA Y DOCUMENTAL</h3><ul>"
+    "<li><b>HISTORIA CLÍNICA FOLIO 25 (28/02/2026)</b>: baciloscopia "
+    "positiva documentada.</li>"
+    "<li><b>Descripción quirúrgica FOLIO 31</b>: procedimiento realizado.</li>"
+    "</ul><h3>3. FUNDAMENTO TÉCNICO Y JURÍDICO</h3><p>Procedente.</p>"
+    "<h3>4. CONCLUSIÓN Y EXIGENCIA DE PAGO</h3><p>Se exige el pago.</p></div>"
+)
+
+
+def test_evidencia_texto_extrae_solo_seccion_2():
+    """La extracción aplana SOLO la sección 2 (evidencia/folios), no el
+    fundamento ni la conclusión ('se exige el pago')."""
+    from app.services.auditor_forense import _evidencia_texto_desde_html
+
+    txt = _evidencia_texto_desde_html(_HTML_FORENSE)
+    assert "FOLIO 25" in txt and "FOLIO 31" in txt
+    assert "<" not in txt  # sin HTML
+    assert "Se exige el pago" not in txt  # no arrastra la sección 4
+
+
+async def test_prepass_devuelve_evidencia(monkeypatch):
+    """El pre-pass llama al forense y devuelve el mapa de folios en texto."""
+    import app.services.auditor_forense as af
+
+    async def _fake_auditar(**kwargs):
+        return {"html": _HTML_FORENSE, "error": None, "cache_hit": False}
+
+    monkeypatch.setattr(af, "auditar_forense", _fake_auditar)
+    res = await af.evidencia_para_dictamen(
+        factura="F-1",
+        texto_glosa="SO: faltan soportes",
+        pdfs_raw=[("hc.pdf", b"x" * 2048)],
+    )
+    assert res["error"] is None
+    assert "FOLIO 25" in res["evidencia"]
+
+
+async def test_prepass_degrada_a_vacio_en_error(monkeypatch):
+    """Si el forense falla, el pre-pass devuelve evidencia='' (no rompe el
+    dictamen)."""
+    import app.services.auditor_forense as af
+
+    async def _fake_auditar(**kwargs):
+        return {"html": "", "error": "sin proveedores"}
+
+    monkeypatch.setattr(af, "auditar_forense", _fake_auditar)
+    res = await af.evidencia_para_dictamen(
+        factura="F-1", texto_glosa="x", pdfs_raw=[("a.pdf", b"y" * 2048)]
+    )
+    assert res["evidencia"] == ""
