@@ -1,5 +1,60 @@
 # Registro de cambios
 
+## Sesión 1–2-jul-2026 — El expediente: contratos + soportes + precedentes
+
+Diagnóstico que disparó la sesión (del usuario): *"la IA se rehúsa a
+refutar... es como pegar el concepto en una IA normal"*. Causa raíz
+confirmada: el motor argumentaba **a ciegas** — tres conexiones de datos
+existían como código pero estaban desenchufadas de la generación del
+dictamen. Esta sesión las enchufó (rondas 23–25).
+
+### Fase 1 — Contratos (ronda 23)
+- `get_contrato` ahora lee la BD (`ContratoRecord` + `ClausulaContrato`),
+  no solo el catálogo estático: fin del falso "SIN CONTRATO PACTADO"
+  cuando sí hay contrato cargado.
+- Emparejamiento flexible de EPS ("AURORA" encuentra "SEGUROS DE VIDA
+  AURORA S.A.").
+- **26 cláusulas LITERALES de 11 pagadores reales** cargables con
+  `scripts/seed_clausulas_contrato.py` (idempotente): AURORA (8),
+  COMPENSAR, COOSALUD, SUMIMEDICAL, SALUD MÍA (3), POSITIVA (2), PPL (2),
+  FAMISANAR 2026, DISPENSARIO MÉDICO/DMBUG (3), POLICÍA oncología (2),
+  FOMAG (2 — incl. Circular 004/2025: sin autorización previa a docentes).
+  Tarifas verificadas contra los Excel (SOAT−3/10/15/20%, UVB−5/8%,
+  SMDLV−20%).
+- Correcciones de catálogo: FOMAG a SOAT SMDLV −20% (Acta 012), POLICÍA
+  oncología a UVB−8% + institucionales (Anexo 2 de la minuta), PRECIMED
+  eliminado (era contrato de suministro con PRECIMEC SAS, no un pagador).
+
+### Fase 2 — Soportes (ronda 24)
+- **Tope de OCR 2000 → 12000 chars** en el caso simple (la IA por fin ve
+  la HC adjunta); tunable por env (`GLOSA_SOPORTES_MAX_CHARS_*`).
+- **Multimodal automático** (`GLOSA_MULTIMODAL_AUTO=1`): los casos que ya
+  escalan a Claude mandan los PDFs nativos completos; los simples siguen
+  en Groq con texto (no es "siempre Claude").
+- **Gate interactivo de expediente**: el detector determinista avisa en el
+  prompt qué soportes faltan y prohíbe inventar evidencia; fallback
+  sin-soportes reescrito de "el registro clínico respalda la atención"
+  (invitación a alucinar) a reglas anti-invención siempre-verdaderas.
+- **Auditor Forense conectado al dictamen** (opt-in,
+  `GLOSA_AUDITOR_FORENSE_PREPASS=1`): pre-pass que lee los PDFs y antepone
+  un mapa de folios (folio + fecha + hallazgo + faltantes) al contexto.
+- Review adversarial del propio diff cazó y corrigió 6 bugs antes de
+  mergear (el peor: Opus degradándose a Sonnet en casos ≥$10M por la vía
+  multimodal; backstop nuevo en el validador contra fuga del andamiaje
+  del prompt al dictamen).
+
+### Fase 3 — RAG/banco (ronda 25)
+- **Few-shots por SIMILITUD BM25** (`GLOSA_FEWSHOT_BM25=1`): cuando el
+  match exacto (eps+código) no llena los ejemplos, se completa con el
+  precedente GANADO más parecido al texto de la glosa (RAGService, antes
+  desconectado de la generación). Sin tokens extra.
+- Filtro de contrato ajeno sobre los precedentes + instrucción anti-copia
+  reforzada (estilo sí, datos del otro expediente no).
+
+Suite: **4069 tests verdes**. Todo reversible por env var sin redeploy.
+
+---
+
 ## Sesión 30-jun-2026 — De "a ciegas" a "medido"
 
 Resultado medible de la sesión, con el **tablero de calidad** (0–10) sobre
