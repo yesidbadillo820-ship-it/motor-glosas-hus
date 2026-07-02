@@ -571,6 +571,18 @@ class TestSoportesIndice:
         f.write_text("X:\\RAD\\HUS520760\nY:\\RAD\\HUS520761\n", encoding="utf-8")
         assert rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT) == {}
 
+    def test_tolera_bom_de_powershell(self, tmp_path):
+        # PowerShell (Set-Content -Encoding UTF8) antepone un BOM; el lector debe
+        # descartarlo y NO ensuciar la primera ruta del listado.
+        f = tmp_path / "indice.txt"
+        f.write_text(
+            "X:\\RAD\\HUS520760\\HEV_900006037_HUS520760.pdf\n",
+            encoding="utf-8-sig",
+        )
+        idx = rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT)
+        assert set(idx) == {"520760"}
+        assert not str(idx["520760"][0]).startswith("\ufeff")
+
     def test_toma_factura_de_la_carpeta_cuando_el_archivo_es_generico(self, tmp_path):
         # El archivo no lleva el número pero su CARPETA sí (…\HUS520760\EPICRISIS.pdf).
         f = tmp_path / "indice.txt"

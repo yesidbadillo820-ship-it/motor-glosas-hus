@@ -1147,7 +1147,9 @@ def indexar_soportes_desde_indice(ruta_indice: Path, patron: str) -> dict[str, l
     rx = re.compile(patron, re.IGNORECASE)
     indice: dict[str, list[Path]] = defaultdict(list)
     n_arch = n_carpetas = 0
-    with ruta_indice.open(encoding="utf-8", errors="replace") as fh:
+    # utf-8-sig: PowerShell (Set-Content -Encoding UTF8, 'dir /s /b > f') suele
+    # anteponer un BOM; utf-8-sig lo descarta y no ensucia la primera ruta.
+    with ruta_indice.open(encoding="utf-8-sig", errors="replace") as fh:
         for raw in fh:
             linea = raw.strip().strip('"')
             if not linea:
