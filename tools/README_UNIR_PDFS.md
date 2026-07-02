@@ -1,8 +1,10 @@
-# UNIR_PDFS — bot de doble clic para unir PDF por carpeta
+# UNIR_PDFS — bot de doble clic para unir PDF por carpeta (y dejarlos como .cmd)
 
-Une (combina) **todos los PDF de cada carpeta en un solo PDF consolidado**.
-Pensado para armar el soporte único por factura / NE cuando cada carpeta tiene
-varios PDF sueltos (factura, epicrisis, notas, autorizaciones…).
+Une (combina) **todos los PDF de cada carpeta en un solo PDF consolidado** y
+deja además **una copia idéntica con extensión `.cmd`**, lista para subirla
+donde pidan ese formato. Pensado para armar el soporte único por factura / NE
+cuando cada carpeta tiene varios PDF sueltos (factura, epicrisis, notas,
+autorizaciones…).
 
 Son dos archivos, pero para el día a día **solo necesitas el `.cmd`**:
 
@@ -32,17 +34,28 @@ Son dos archivos, pero para el día a día **solo necesitas el `.cmd`**:
 
 2. **Doble clic** en `UNIR_PDFS.cmd`.
 
-3. En cada carpeta aparece el PDF consolidado con el nombre `_UNIDO_<carpeta>.pdf`:
+3. En cada carpeta aparecen **dos archivos** con el mismo contenido:
 
    ```
    SOPORTES\
    ├── 311131\
    │   ├── _UNIDO_311131.pdf   <-- factura + epicrisis + autorizacion, en un solo PDF
+   │   ├── _UNIDO_311131.cmd   <-- copia identica en formato .cmd (para subir)
    │   └── ...
    └── 311136\
        ├── _UNIDO_311136.pdf   <-- factura + soporte
+       ├── _UNIDO_311136.cmd
        └── ...
    ```
+
+   - El **`.pdf`** es para abrirlo y revisarlo.
+   - El **`.cmd`** es el mismo PDF con la extensión cambiada, para subirlo donde
+     exigen archivos `.cmd`.
+
+> ⚠️ **Importante:** los `_UNIDO_*.cmd` generados **no son programas** — son el
+> PDF con otra extensión. **No les des doble clic** (Windows intentaría
+> ejecutarlos como script y mostraría errores sin sentido). Si necesitas ver uno
+> como documento, renómbralo de vuelta a `.pdf`.
 
 El bot recorre la carpeta donde lo pusiste **y todas sus subcarpetas**, así que
 puedes ponerlo en la carpeta madre y procesa todos los NE de una sola pasada.
@@ -83,3 +96,8 @@ py tools\unir_pdfs_carpetas.py .  --sin-recursion # solo la carpeta raíz, sin s
 | `--minimo N` | Mínimo de PDF por carpeta para unirla (por defecto 2). |
 | `--prefijo TEXTO` | Cambia el prefijo del resultado (por defecto `_UNIDO_`). |
 | `--sin-recursion` | No baja a las subcarpetas; solo procesa la carpeta indicada. |
+| `--tambien-cmd` | Deja además la copia `.cmd` del consolidado. El bot `UNIR_PDFS.cmd` ya lo pasa solo. |
+
+Nota: si una carpeta ya tiene su copia `_UNIDO_*.cmd` de una corrida anterior, el
+motor la refresca **siempre** al regenerar el consolidado, aunque no le pases
+`--tambien-cmd` — así el `.cmd` nunca queda desactualizado respecto al `.pdf`.

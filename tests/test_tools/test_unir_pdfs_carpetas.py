@@ -101,3 +101,96 @@ def test_simulacro_no_escribe(tmp_path):
     mod = _cargar_modulo()
     assert mod.main([str(tmp_path), "--simulacro"]) == 0
     assert not (tmp_path / "c" / "_UNIDO_c.pdf").exists()
+
+
+def test_tambien_cmd_crea_copia_identica(tmp_path):
+    _hacer_pdf(tmp_path / "c" / "a.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c" / "b.pdf", paginas=2)
+    mod = _cargar_modulo()
+
+    assert mod.main([str(tmp_path), "--tambien-cmd"]) == 0
+    pdf = tmp_path / "c" / "_UNIDO_c.pdf"
+    cmd = tmp_path / "c" / "_UNIDO_c.cmd"
+    assert pdf.exists() and cmd.exists()
+    # La copia .cmd es byte a byte el mismo PDF (solo cambia la extensión).
+    assert cmd.read_bytes() == pdf.read_bytes()
+    assert cmd.read_bytes().startswith(b"%PDF")
+
+    # Re-corrida: la copia .cmd no se traga como entrada ni duplica páginas.
+    assert mod.main([str(tmp_path), "--tambien-cmd"]) == 0
+    assert _num_paginas(pdf) == 3
+    assert cmd.read_bytes() == pdf.read_bytes()
+
+
+def test_tambien_cmd_en_simulacro_no_escribe(tmp_path):
+    _hacer_pdf(tmp_path / "c" / "a.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c" / "b.pdf", paginas=1)
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path), "--tambien-cmd", "--simulacro"]) == 0
+    assert not (tmp_path / "c" / "_UNIDO_c.pdf").exists()
+    assert not (tmp_path / "c" / "_UNIDO_c.cmd").exists()
+
+
+def test_sin_tambien_cmd_no_deja_copia(tmp_path):
+    _hacer_pdf(tmp_path / "c" / "a.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c" / "b.pdf", paginas=1)
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+    assert (tmp_path / "c" / "_UNIDO_c.pdf").exists()
+    assert not (tmp_path / "c" / "_UNIDO_c.cmd").exists()
+
+
+def test_cmd_existente_se_refresca_aunque_falte_la_bandera(tmp_path):
+    """Si hay copia .cmd previa, re-correr SIN --tambien-cmd no la deja obsoleta."""
+    _hacer_pdf(tmp_path / "c" / "a.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c" / "b.pdf", paginas=1)
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path), "--tambien-cmd"]) == 0
+    pdf = tmp_path / "c" / "_UNIDO_c.pdf"
+    cmd = tmp_path / "c" / "_UNIDO_c.cmd"
+    assert cmd.read_bytes() == pdf.read_bytes()
+
+    # Cambia el contenido de la carpeta y re-corre sin la bandera (flujo manual
+    # del README): el .cmd debe refrescarse junto con el .pdf, no divergir.
+    _hacer_pdf(tmp_path / "c" / "z_nuevo.pdf", paginas=5)
+    assert mod.main([str(tmp_path)]) == 0
+    assert _num_paginas(pdf) == 7
+    assert cmd.read_bytes() == pdf.read_bytes()
+
+
+def test_fallo_al_copiar_cmd_no_aborta_la_corrida(tmp_path):
+    """Un obstáculo en el destino .cmd de una carpeta no debe tumbar el resto."""
+    _hacer_pdf(tmp_path / "c1" / "a.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c1" / "b.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c2" / "a.pdf", paginas=1)
+    _hacer_pdf(tmp_path / "c2" / "b.pdf", paginas=1)
+    # Obstáculo: un DIRECTORIO ocupa el nombre del .cmd destino en c1.
+    (tmp_path / "c1" / "_UNIDO_c1.cmd").mkdir()
+
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path), "--tambien-cmd"]) == 0
+    # c1: el PDF consolidado sí se generó aunque su copia .cmd falló.
+    assert (tmp_path / "c1" / "_UNIDO_c1.pdf").exists()
+    # c2 se procesó completo a pesar del fallo en c1.
+    assert (tmp_path / "c2" / "_UNIDO_c2.pdf").exists()
+    assert (tmp_path / "c2" / "_UNIDO_c2.cmd").exists()
+    # No quedan .tmp huérfanos.
+    assert not list(tmp_path.rglob("*.tmp"))
+
+
+def test_motor_embebido_en_cmd_identico_al_py():
+    """La copia embebida tras #PYSTART# en UNIR_PDFS.cmd debe ser el .py exacto.
+
+    Es el código que ejecuta la mayoría de usuarios (copian SOLO el .cmd): si
+    alguien edita el .py y olvida regenerar el .cmd, este test lo detecta.
+    """
+    cmd_path = _RAIZ / "tools" / "UNIR_PDFS.cmd"
+    lineas = cmd_path.read_text(encoding="utf-8").splitlines()
+    marcador = "#PY" + "START#"  # partido para no autodetectarse
+    idx = next(i for i, ln in enumerate(lineas) if marcador in ln)
+    embebido = "\n".join(lineas[idx + 1 :]).strip("\n")
+    fuente = _MOTOR.read_text(encoding="utf-8").replace("\r\n", "\n").strip("\n")
+    assert embebido == fuente, (
+        "La copia embebida en tools/UNIR_PDFS.cmd difiere de tools/unir_pdfs_carpetas.py. "
+        "Regenera el .cmd (encabezado batch + contenido del .py en CRLF)."
+    )
