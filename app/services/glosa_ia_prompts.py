@@ -2419,6 +2419,9 @@ def build_user_prompt(
                 "IMPORTANTE: estas cláusulas son TEXTO LITERAL del contrato firmado. "
                 "Cuando defiendas, CITA UNA O DOS entre comillas usando su número de cláusula "
                 "para que la EPS no pueda rebatir (firmó el documento que se cita).\n"
+                "⚠ Usa el identificador EXACTO que se muestra (ej. «Acuerdo Tarifario 2025», "
+                "«Octava, numeral 3») — NO inventes numeraciones ('cláusula tercera') que no "
+                "estén en esta lista: la EPS verifica el número en segundos.\n"
                 + "\n".join(lineas_cc)
                 + "\n"
             )

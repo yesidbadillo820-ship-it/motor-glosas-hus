@@ -599,6 +599,84 @@ def detectar_defectos_criticos(
                 )
                 break
 
+    # 4-quater. Sub-concepto sin refutar (Ronda 27, 2-jul-2026): la glosa
+    # trae 2+ conceptos y el argumento ignora alguno — la prótesis de $3.9M
+    # quedó MUDA en producción. Anclas = palabras DISTINTIVAS del fragmento
+    # (las que no aparecen en los otros conceptos) + sus montos; si ninguna
+    # aparece en el argumento, el concepto no fue respondido.
+    if texto_glosa:
+        try:
+            from app.services.subconceptos_glosa import detectar_subconceptos
+
+            _subs = detectar_subconceptos(texto_glosa)
+            if len(_subs) >= 2:
+                _palabras_por_sub = [
+                    set(re.findall(r"[A-ZÁÉÍÓÚÑ]{6,}", (s.get("texto") or "").upper()))
+                    for s in _subs
+                ]
+                # Solo los conceptos ADICIONALES (2º en adelante): el primero
+                # siempre se responde (aunque parafraseado); el bug real de
+                # producción fue el ADICIONAL mudo. Orden determinista.
+                for _i, _sc in list(enumerate(_subs))[1:]:
+                    _otras = set().union(*(p for _j, p in enumerate(_palabras_por_sub) if _j != _i))
+                    _distintivas = sorted(
+                        _palabras_por_sub[_i] - _otras, key=lambda w: (-len(w), w)
+                    )[:8]
+                    _montos = re.findall(r"\$\s*[\d\.,]{5,}", (_sc.get("texto") or ""))
+                    _anclas = _distintivas + [m.replace(" ", "") for m in _montos]
+                    if not _anclas:
+                        continue
+                    _arg_compacto = arg_up.replace(" ", "")
+                    if not any(
+                        (a in arg_up) or (a.replace(" ", "") in _arg_compacto) for a in _anclas
+                    ):
+                        defectos.append(
+                            {
+                                "regla": "subconcepto_sin_respuesta",
+                                "mensaje": (
+                                    f"La glosa trae {len(_subs)} conceptos y el argumento "
+                                    f"NO responde el concepto '{_sc.get('id', '?')}' "
+                                    f"(esperaba mención de: {', '.join(_anclas[:4])})."
+                                ),
+                                "sugerencia": (
+                                    "Refuta CADA concepto de la glosa por separado. El "
+                                    f"concepto omitido dice: «{(_sc.get('texto') or '')[:180]}»"
+                                ),
+                            }
+                        )
+                        break
+        except Exception:
+            pass
+
+    # 4-quinquies. Placeholder dentro de una fórmula (Ronda 27): Groq produjo
+    # "(el valor objetado consignado en el expediente - 10% = el valor
+    # objetado consignado en el expediente)" — la frase neutra anti-invención
+    # usada como operando de una ecuación sin sentido.
+    _FRASES_NEUTRAS_FORMULA = (
+        "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE",
+        "EL VALOR INDICADO EN EL EXPEDIENTE",
+        "EL CUPS DE LA FACTURA",
+    )
+    for _fn in _FRASES_NEUTRAS_FORMULA:
+        if re.search(re.escape(_fn) + r"\s*[-−+*/=]", arg_up) or re.search(
+            r"[-−+*/=%]\s*" + re.escape(_fn), arg_up
+        ):
+            defectos.append(
+                {
+                    "regla": "placeholder_en_formula",
+                    "mensaje": (
+                        f'La frase neutra "{_fn.title()}" aparece como operando de una '
+                        "fórmula/ecuación — texto sin sentido para la EPS."
+                    ),
+                    "sugerencia": (
+                        "Si no tienes las cifras exactas, describe la operación en prosa "
+                        "('aplicando el descuento pactado del 10% sobre la tarifa SOAT') "
+                        "sin ecuaciones con frases genéricas."
+                    ),
+                }
+            )
+            break
+
     # 4-bis. Fuga del andamiaje del prompt de soportes (Fase 2, jul-2026)
     for frase in _FRASES_FUGA_PROMPT_SOPORTES:
         if frase in arg_up:

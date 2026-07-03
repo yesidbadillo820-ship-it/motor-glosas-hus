@@ -33,6 +33,7 @@ Cualquier condición que se cumpla → escalación a Claude. Caso simple
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 # Palabras-clave que históricamente le revientan el dictamen a Llama 4
@@ -207,7 +208,14 @@ def detectar_complejidad_critica(
     texto_upper = (f"{texto_glosa or ''} {contexto_pdf or ''}"[:longitud_max_busqueda]).upper()
     palabra_encontrada: str | None = None
     for kw in PALABRAS_CLAVE_COMPLEJIDAD_CRITICA:
-        if kw in texto_upper:
+        # Ronda 27 (2-jul-2026): las keywords CORTAS exigen frontera de
+        # palabra — "AME" (atrofia muscular espinal) matcheaba dentro de
+        # "PREVIAMENTE"/"ADECUADAMENTE" y escalaba falsos positivos.
+        if len(kw) <= 4:
+            if re.search(rf"(?<![A-ZÁÉÍÓÚÑ0-9]){re.escape(kw)}(?![A-ZÁÉÍÓÚÑ0-9])", texto_upper):
+                palabra_encontrada = kw
+                break
+        elif kw in texto_upper:
             palabra_encontrada = kw
             break
     if palabra_encontrada:

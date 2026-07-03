@@ -8676,6 +8676,7 @@ class GlosaService:
                 intentos.append(("anthropic", self._llamar_anthropic))
 
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
+        _causa_anthropic = ""
         for nombre, fn in intentos:
             try:
                 # Solo Anthropic acepta modelo/temperature override
@@ -8690,12 +8691,23 @@ class GlosaService:
                     # Groq: propagar la marca de llamada corta para que
                     # gpt-oss use reasoning_effort 'low' (fix #9).
                     content, modelo = await fn(system, user, llamada_corta=llamada_corta)
+                # Ronda 27 (2-jul-2026): si el caso venía ESCALADO a Anthropic
+                # (modelo_override) y terminó respondiendo OTRO proveedor, la
+                # etiqueta lleva la causa — viaja a la UI/BD y permite
+                # diagnosticar sin acceso a logs. Visto en producción: caso de
+                # $6.4M + 2 PDFs cayó a Groq en silencio DOS veces y nadie
+                # supo por qué.
+                if nombre != "anthropic" and modelo_override and _causa_anthropic:
+                    modelo = f"{modelo} [degradado de {modelo_override}: {_causa_anthropic[:80]}]"
+                    logger.warning(f"[MODELO-DEGRADADO] {modelo}")
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
+                if nombre == "anthropic":
+                    _causa_anthropic = str(e)[:200]
                 logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
                 continue
 
