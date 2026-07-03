@@ -225,6 +225,63 @@ def test_comprimir_nunca_infla_un_pdf_ya_optimo(tmp_path):
     assert not list((tmp_path / "con").rglob("*.tmp"))
 
 
+def test_origen_con_referencias_rotas_no_asusta_ni_dana(tmp_path, capsys):
+    """PDFs de origen con referencias rotas (caso real: 'cannot find Pattern
+    resource'): la corrida termina bien, el resultado renderiza igual y el
+    ruido de MuPDF se convierte en un contador amable, no en errores rojos."""
+    fitz = pytest.importorskip("fitz")
+    import os as _os
+
+    carpeta = tmp_path / "c"
+    carpeta.mkdir()
+    # PDF 1: escaneo color pesado (garantiza que la compresión gane espacio).
+    w, h = 2400, 3400
+    pix = fitz.Pixmap(fitz.csRGB, w, h, _os.urandom(w * h * 3), False)
+    d1 = fitz.open()
+    d1.new_page(width=595, height=842).insert_image(
+        fitz.Rect(0, 0, 595, 842), stream=pix.tobytes("jpeg", jpg_quality=95)
+    )
+    d1.save(str(carpeta / "a_escaneo.pdf"))
+    d1.close()
+    # PDF 2: contenido que referencia un patrón INEXISTENTE (como los PDF del
+    # sistema del hospital). fitz lo normaliza para que tenga xref válida.
+    roto = (
+        b"%PDF-1.4\n"
+        b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
+        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n"
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200]\n"
+        b"  /Resources << >> /Contents 5 0 R >> endobj\n"
+        b"5 0 obj << /Length 62 >>\nstream\n"
+        b"1 0 0 rg 0 0 200 20 re f /Pattern cs /P99 scn 20 20 160 160 re f\n"
+        b"endstream\nendobj\n"
+        b"trailer << /Size 6 /Root 1 0 R >>\n%%EOF"
+    )
+    crudo = tmp_path / "crudo.pdf"
+    crudo.write_bytes(roto)
+    d2 = fitz.open(str(crudo))
+    d2.save(str(carpeta / "b_roto.pdf"))
+    d2.close()
+
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path), "--tambien-cmd", "--comprimir"]) == 0
+    salida = capsys.readouterr().out
+    pdf = carpeta / "_UNIDO_c.pdf"
+    assert _num_paginas(pdf) == 2
+    assert (carpeta / "_UNIDO_c.cmd").read_bytes() == pdf.read_bytes()
+    # El aviso aparece como contador explicado, no como error suelto.
+    assert "aviso(s) técnicos en los PDF de ORIGEN" in salida
+    # La franja roja de la página rota sigue renderizando igual en el unido.
+    doc = fitz.open(str(pdf))
+    px = doc[1].get_pixmap()
+    rojos = sum(
+        1
+        for i in range(0, len(px.samples), px.n)
+        if px.samples[i] > 150 and px.samples[i + 1] < 100
+    )
+    doc.close()
+    assert rojos > 1000
+
+
 def test_motor_embebido_en_cmd_identico_al_py():
     """La copia embebida tras #PYSTART# en UNIR_PDFS.cmd debe ser el .py exacto.
 

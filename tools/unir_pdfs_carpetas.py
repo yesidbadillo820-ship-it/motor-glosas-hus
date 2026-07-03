@@ -147,7 +147,7 @@ def _mb(n: int) -> str:
     return f"{n / 1_048_576:.1f} MB"
 
 
-def comprimir_pdf(destino: Path, dpi: int = 150, calidad: int = 80) -> tuple[int, int] | None:
+def comprimir_pdf(destino: Path, dpi: int = 150, calidad: int = 80) -> tuple[int, int, int] | None:
     """Reduce el peso del PDF consolidado sin perder páginas ni legibilidad.
 
     Recomprime los escaneos: las imágenes con resolución mayor al umbral se
@@ -157,13 +157,23 @@ def comprimir_pdf(destino: Path, dpi: int = 150, calidad: int = 80) -> tuple[int
 
     Red de seguridad: el archivo SOLO se reemplaza si el resultado abre bien,
     conserva el mismo número de páginas y pesa menos. Ante cualquier duda se
-    conserva el original intacto. Devuelve (bytes_antes, bytes_despues) si
-    comprimió, o None si no hubo ganancia / falta pymupdf / algo falló.
+    conserva el original intacto. Devuelve (bytes_antes, bytes_despues,
+    n_avisos) si comprimió, o None si no hubo ganancia / falta pymupdf / algo
+    falló.
+
+    Sobre `n_avisos`: los PDF que generan algunos sistemas traen referencias
+    rotas (p. ej. "cannot find Pattern resource") que MuPDF reporta al leerlos.
+    Vienen así DESDE EL ORIGEN — esos elementos tampoco se ven al abrir el
+    original en cualquier visor — y no afectan la unión. Se capturan para
+    mostrarlos como un contador amable en vez de ruido rojo en la consola.
     """
     try:
         import fitz  # pymupdf
     except ImportError:
         return None
+    with contextlib.suppress(Exception):
+        fitz.TOOLS.mupdf_display_errors(False)  # sin ruido en stderr
+        fitz.TOOLS.mupdf_warnings(reset=True)
     antes = destino.stat().st_size
     tmp = destino.with_suffix(destino.suffix + ".tmp")
     try:
@@ -180,12 +190,16 @@ def comprimir_pdf(destino: Path, dpi: int = 150, calidad: int = 80) -> tuple[int
         with fitz.open(str(tmp)) as chk:  # el comprimido debe abrir y estar completo
             if chk.page_count != paginas:
                 raise ValueError("el comprimido no conserva las páginas")
+        avisos = 0
+        with contextlib.suppress(Exception):
+            texto = fitz.TOOLS.mupdf_warnings(reset=True) or ""
+            avisos = sum(1 for ln in texto.splitlines() if "cannot find" in ln)
         despues = tmp.stat().st_size
         if despues >= antes:
             tmp.unlink()
             return None
         os.replace(tmp, destino)
-        return antes, despues
+        return antes, despues, avisos
     except Exception:
         with contextlib.suppress(OSError):
             tmp.unlink()
@@ -220,6 +234,7 @@ def procesar(
     saltadas = 0
     copias_cmd = 0
     ahorrado = 0
+    avisos_origen = 0
     con_error: list[str] = []
 
     print("=" * 64)
@@ -268,8 +283,9 @@ def procesar(
         if comprimir:
             resultado = comprimir_pdf(destino)
             if resultado:
-                antes, despues = resultado
+                antes, despues, avisos = resultado
                 ahorrado += antes - despues
+                avisos_origen += avisos
                 detalle += f"  comprimido {_mb(antes)} → {_mb(despues)}"
         if escribir_cmd:
             try:
@@ -292,6 +308,11 @@ def procesar(
     )
     if ahorrado:
         print(f"           Compresión: se ahorraron {_mb(ahorrado)} en total sin perder páginas.")
+    if avisos_origen:
+        print(
+            f"           {avisos_origen} aviso(s) técnicos en los PDF de ORIGEN (referencias rotas"
+        )
+        print("           que ya venían del sistema que los generó; NO afectan el resultado).")
     if copias_cmd:
         print(
             f"           {copias_cmd} consolidado(s) quedaron también como .cmd (mismo PDF, otra extensión)."
