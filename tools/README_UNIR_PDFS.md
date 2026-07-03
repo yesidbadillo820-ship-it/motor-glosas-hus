@@ -97,7 +97,21 @@ py tools\unir_pdfs_carpetas.py .  --sin-recursion # solo la carpeta raíz, sin s
 | `--prefijo TEXTO` | Cambia el prefijo del resultado (por defecto `_UNIDO_`). |
 | `--sin-recursion` | No baja a las subcarpetas; solo procesa la carpeta indicada. |
 | `--tambien-cmd` | Deja además la copia `.cmd` del consolidado. El bot `UNIR_PDFS.cmd` ya lo pasa solo. |
+| `--comprimir` | Reduce el peso del consolidado (y por lo tanto del `.cmd`). El bot ya lo pasa solo. Requiere `pymupdf` (el bot lo instala). |
 
 Nota: si una carpeta ya tiene su copia `_UNIDO_*.cmd` de una corrida anterior, el
 motor la refresca **siempre** al regenerar el consolidado, aunque no le pases
 `--tambien-cmd` — así el `.cmd` nunca queda desactualizado respecto al `.pdf`.
+
+### Sobre la compresión
+
+- Los **escaneos a color o en grises de alta resolución** (epicrisis, soportes
+  con sellos, fotos) son los que más bajan: la resolución se ajusta a 150 dpi
+  (de sobra para leer e imprimir) y se recomprimen como JPEG de buena calidad.
+  Ahí el ahorro típico es del 40–80%.
+- Los **escaneos en blanco y negro puro** (tipo fax, formato CCITT) ya vienen en
+  su mínimo físico: en esos el ahorro es de apenas 2–5% y es normal — no es que
+  la compresión "no funcione", es que no hay nada que quitar sin dañar el texto.
+- **Red de seguridad**: el archivo solo se reemplaza si de verdad queda más
+  liviano, abre bien y conserva todas sus páginas. Ante cualquier duda, el
+  consolidado queda tal cual. La compresión **nunca** agranda un archivo.

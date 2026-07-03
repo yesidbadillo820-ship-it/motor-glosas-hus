@@ -17,6 +17,12 @@ refresca SIEMPRE al regenerar el consolidado, aunque no se pase
 `--tambien-cmd`: el .cmd es lo que se sube al portal y no puede quedar
 divergente del .pdf.
 
+Con `--comprimir` (requiere pymupdf) el consolidado se recomprime antes de
+sacar la copia .cmd: los escaneos con resolución alta se bajan a 150 dpi
+(de sobra para leer e imprimir) y se re-encoda como JPEG calidad 80. Solo se
+reemplaza si de verdad queda más liviano y conserva todas las páginas; ante
+cualquier fallo se mantiene el original tal cual.
+
 Es idempotente: en cada corrida vuelve a generar los `_UNIDO_*.pdf` y NUNCA los
 toma como entrada (se excluyen por el prefijo), así que puedes correrlo las veces
 que quieras sin que se aniden.
@@ -32,6 +38,7 @@ USO:
     py tools\\unir_pdfs_carpetas.py . --minimo 1           # unir aunque haya 1 solo PDF
     py tools\\unir_pdfs_carpetas.py . --sin-recursion      # solo la carpeta raíz
     py tools\\unir_pdfs_carpetas.py . --tambien-cmd        # dejar copia .cmd del consolidado
+    py tools\\unir_pdfs_carpetas.py . --comprimir          # reducir el peso del consolidado
 
 Normalmente NO se ejecuta a mano: el archivo `UNIR_PDFS.cmd` lo lanza con doble
 clic sobre la carpeta donde esté ubicado.
@@ -136,10 +143,74 @@ def copiar_como(origen: Path, destino: Path) -> None:
         raise
 
 
+def _mb(n: int) -> str:
+    return f"{n / 1_048_576:.1f} MB"
+
+
+def comprimir_pdf(destino: Path, dpi: int = 150, calidad: int = 80) -> tuple[int, int] | None:
+    """Reduce el peso del PDF consolidado sin perder páginas ni legibilidad.
+
+    Recomprime los escaneos: las imágenes con resolución mayor al umbral se
+    bajan a `dpi` (150 es de sobra para leer e imprimir un contrato) y todo se
+    re-encoda como JPEG calidad `calidad`. Además limpia objetos basura y
+    duplicados que quedan al unir varios PDF.
+
+    Red de seguridad: el archivo SOLO se reemplaza si el resultado abre bien,
+    conserva el mismo número de páginas y pesa menos. Ante cualquier duda se
+    conserva el original intacto. Devuelve (bytes_antes, bytes_despues) si
+    comprimió, o None si no hubo ganancia / falta pymupdf / algo falló.
+    """
+    try:
+        import fitz  # pymupdf
+    except ImportError:
+        return None
+    antes = destino.stat().st_size
+    tmp = destino.with_suffix(destino.suffix + ".tmp")
+    try:
+        with fitz.open(str(destino)) as doc:
+            paginas = doc.page_count
+            if hasattr(doc, "rewrite_images"):  # pymupdf >= 1.24.10
+                doc.rewrite_images(
+                    dpi_threshold=int(dpi * 4 / 3),
+                    dpi_target=dpi,
+                    quality=calidad,
+                    set_to_gray=False,
+                )
+            doc.save(str(tmp), garbage=4, deflate=True, clean=True)
+        with fitz.open(str(tmp)) as chk:  # el comprimido debe abrir y estar completo
+            if chk.page_count != paginas:
+                raise ValueError("el comprimido no conserva las páginas")
+        despues = tmp.stat().st_size
+        if despues >= antes:
+            tmp.unlink()
+            return None
+        os.replace(tmp, destino)
+        return antes, despues
+    except Exception:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        return None
+
+
 def procesar(
-    raiz: Path, prefijo: str, minimo: int, recursivo: bool, simulacro: bool, tambien_cmd: bool
+    raiz: Path,
+    prefijo: str,
+    minimo: int,
+    recursivo: bool,
+    simulacro: bool,
+    tambien_cmd: bool,
+    comprimir: bool,
 ) -> int:
     PdfReader, PdfWriter = _cargar_lector_escritor()
+
+    if comprimir and not simulacro:
+        try:
+            import fitz  # noqa: F401  (pymupdf)
+        except ImportError:
+            comprimir = False
+            print("AVISO: compresión no disponible (falta pymupdf).")
+            print("       Instálala con:  py -m pip install pymupdf")
+            print("       Se continúa sin comprimir; los archivos salen igual de válidos.")
 
     carpetas = [Path(dp) for dp, _dn, _fn in os.walk(raiz)] if recursivo else [raiz]
     carpetas.sort(key=lambda p: clave_natural(str(p)))
@@ -148,6 +219,7 @@ def procesar(
     total_paginas = 0
     saltadas = 0
     copias_cmd = 0
+    ahorrado = 0
     con_error: list[str] = []
 
     print("=" * 64)
@@ -193,6 +265,12 @@ def procesar(
         generados += 1
         total_paginas += paginas
         detalle = f"({len(pdfs)} PDF, {paginas} págs.)"
+        if comprimir:
+            resultado = comprimir_pdf(destino)
+            if resultado:
+                antes, despues = resultado
+                ahorrado += antes - despues
+                detalle += f"  comprimido {_mb(antes)} → {_mb(despues)}"
         if escribir_cmd:
             try:
                 copiar_como(destino, destino_cmd)
@@ -212,6 +290,8 @@ def procesar(
         f"  Resumen: {generados} PDF consolidados {verbo}"
         f"{'' if simulacro else f', {total_paginas} páginas en total'}."
     )
+    if ahorrado:
+        print(f"           Compresión: se ahorraron {_mb(ahorrado)} en total sin perder páginas.")
     if copias_cmd:
         print(
             f"           {copias_cmd} consolidado(s) quedaron también como .cmd (mismo PDF, otra extensión)."
@@ -257,6 +337,14 @@ def main(argv: list[str] | None = None) -> int:
         "(mismo contenido PDF, solo cambia la extensión).",
     )
     parser.add_argument(
+        "--comprimir",
+        action="store_true",
+        help="Reducir el peso del consolidado recomprimiendo los escaneos (150 dpi, "
+        "JPEG 80): sigue perfectamente legible e imprimible. Requiere pymupdf; "
+        "si falta, se continúa sin comprimir. Solo se aplica si de verdad reduce "
+        "el tamaño y nunca pierde páginas.",
+    )
+    parser.add_argument(
         "--simulacro",
         "--dry-run",
         action="store_true",
@@ -279,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
         recursivo=not args.sin_recursion,
         simulacro=args.simulacro,
         tambien_cmd=args.tambien_cmd,
+        comprimir=args.comprimir,
     )
 
 

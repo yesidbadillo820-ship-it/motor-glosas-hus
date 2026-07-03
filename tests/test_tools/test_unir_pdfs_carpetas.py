@@ -178,6 +178,53 @@ def test_fallo_al_copiar_cmd_no_aborta_la_corrida(tmp_path):
     assert not list(tmp_path.rglob("*.tmp"))
 
 
+def test_comprimir_reduce_escaneos_color(tmp_path):
+    """--comprimir baja el peso de escaneos color de alta resolución sin perder páginas."""
+    fitz = pytest.importorskip("fitz")
+    import os as _os
+
+    # "Escaneo" a color ~300 dpi: JPEG ruidoso de alta calidad (pesado a propósito).
+    w, h = 2400, 3400
+    pix = fitz.Pixmap(fitz.csRGB, w, h, _os.urandom(w * h * 3), False)
+    jpeg = pix.tobytes("jpeg", jpg_quality=95)
+    origen = fitz.open()
+    page = origen.new_page(width=595, height=842)
+    page.insert_image(page.rect, stream=jpeg)
+    carpeta = tmp_path / "c"
+    carpeta.mkdir()
+    origen.save(str(carpeta / "a.pdf"))
+    origen.save(str(carpeta / "b.pdf"))
+    origen.close()
+    peso_fuentes = sum(p.stat().st_size for p in carpeta.glob("*.pdf"))
+
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path), "--tambien-cmd", "--comprimir"]) == 0
+    pdf = carpeta / "_UNIDO_c.pdf"
+    cmd = carpeta / "_UNIDO_c.cmd"
+    assert _num_paginas(pdf) == 2
+    # Reducción real (300→150 dpi baja 4x los píxeles): exigimos al menos 30%.
+    assert pdf.stat().st_size < peso_fuentes * 0.7
+    # La copia .cmd sale de la versión YA comprimida.
+    assert cmd.read_bytes() == pdf.read_bytes()
+
+
+def test_comprimir_nunca_infla_un_pdf_ya_optimo(tmp_path):
+    """En PDFs sin nada que ganar, --comprimir no daña ni agranda el resultado."""
+    pytest.importorskip("fitz")
+    for sub in ("con", "sin"):
+        _hacer_pdf(tmp_path / sub / "a.pdf", paginas=2)
+        _hacer_pdf(tmp_path / sub / "b.pdf", paginas=1)
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path / "con"), "--comprimir"]) == 0
+    assert mod.main([str(tmp_path / "sin")]) == 0
+    con = tmp_path / "con" / "_UNIDO_con.pdf"
+    sin = tmp_path / "sin" / "_UNIDO_sin.pdf"
+    assert _num_paginas(con) == 3 == _num_paginas(sin)
+    # La red de seguridad garantiza que comprimir jamás agranda el archivo.
+    assert con.stat().st_size <= sin.stat().st_size
+    assert not list((tmp_path / "con").rglob("*.tmp"))
+
+
 def test_motor_embebido_en_cmd_identico_al_py():
     """La copia embebida tras #PYSTART# en UNIR_PDFS.cmd debe ser el .py exacto.
 
