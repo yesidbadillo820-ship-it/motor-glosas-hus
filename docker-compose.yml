@@ -64,8 +64,24 @@ services:
       # rankeados por BM25 al texto de la glosa (RAGService). Sin costo de
       # tokens extra (BM25 local). ON por defecto; apagable con 0.
       GLOSA_FEWSHOT_BM25: ${GLOSA_FEWSHOT_BM25:-1}
+      # Auditoría jul-2026: knobs que el código lee pero NO llegaban al
+      # contenedor (quedaban en su default silenciosamente).
+      PRIMARY_AI: ${PRIMARY_AI:-groq}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      ANTHROPIC_MODEL_OPUS: ${ANTHROPIC_MODEL_OPUS:-claude-opus-4-7}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # Alertas por correo (opcionales)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ALERTAS_EMAIL: ${ALERTAS_EMAIL:-}
+      # Claves Fernet de cifrado — si se usan, DEBEN ser estables entre
+      # reinicios (sin ellas los campos cifrados no se pueden descifrar)
+      GLOSAS_ENCRYPTION_KEY: ${GLOSAS_ENCRYPTION_KEY:-}
+      CRED_VAULT_KEY: ${CRED_VAULT_KEY:-}
       # Secretos — DEBEN venir del .env (no hardcodear)
-      JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       FORCE_RESET_ADMIN_PASSWORD: ${FORCE_RESET_ADMIN_PASSWORD:-0}

@@ -4184,7 +4184,7 @@ class GlosaService:
         groq_api_key: str = None,
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
-        anthropic_model: str = "claude-sonnet-4-6",
+        anthropic_model: str = "claude-sonnet-4-5",
         groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
@@ -4209,7 +4209,7 @@ class GlosaService:
                 "(proveedor retirado jun-2026). Normalizando a 'groq'."
             )
             self.primary_ai = "groq"
-        self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
+        self.anthropic_model = anthropic_model or "claude-sonnet-4-5"
         # Cadena de modelos DENTRO de Groq (decision 16-jun-2026 ronda 8,
         # ver app/core/config.py): llama-4-maverick → gpt-oss-120b →
         # qwen3-32b → llama-3.3-70b. Si el primario falla (429/transitorio/
@@ -5237,7 +5237,7 @@ class GlosaService:
                 else:
                     # OPUS: valor alto + multi-PDF (caso ricamente documentado).
                     if _valor_num_route >= 10_000_000 and _num_pdfs_route >= 2:
-                        _modelo_override = "claude-opus-4-7"
+                        _modelo_override = os.getenv("ANTHROPIC_MODEL_OPUS", "claude-opus-4-7")
                         logger.info(
                             "[ROUTING-IA] OPUS — "
                             f"valor=${_valor_num_route:,} pdfs={_num_pdfs_route}"
@@ -5246,7 +5246,7 @@ class GlosaService:
                     # Las palabras-clave críticas o valores ≥ $50M reventaban
                     # a Llama 4 Scout (rondas 14-15-16: Cart-T, Norwood, VIH).
                     elif _es_complejo_forzar_claude and self.primary_ai == "groq":
-                        _modelo_override = self.anthropic_model or "claude-sonnet-4-6"
+                        _modelo_override = self.anthropic_model or "claude-sonnet-4-5"
                         logger.warning(
                             "[ROUTING-IA] FORZANDO ANTHROPIC — primary_ai=groq pero "
                             f"caso complejo ({', '.join(_resultado_complej.motivos)}). "
@@ -5257,7 +5257,10 @@ class GlosaService:
                     # calidad porque el cerebro pre-IA ya hizo el trabajo
                     # duro (auditoría + bloque excedente + checklist).
                     elif (
-                        _valor_num_route < 500_000
+                        # Auditoría jul-2026: un caso con keyword crítica y
+                        # valor bajo caía en Haiku cuando primary_ai=anthropic.
+                        not _es_complejo_forzar_claude
+                        and _valor_num_route < 500_000
                         and _num_pdfs_route <= 1
                         and _len_pdf_route < 5_000
                         and _len_glosa_route < 800
@@ -7835,7 +7838,7 @@ class GlosaService:
         )
         _modelo_override_refinar = None
         if _complej_refinar.es_complejo and self.anthropic_key:
-            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-6"
+            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-5"
             logger.warning(
                 f"[REFINAR-DICTAMEN] FORZANDO ANTHROPIC "
                 f"({', '.join(_complej_refinar.motivos)}) — "

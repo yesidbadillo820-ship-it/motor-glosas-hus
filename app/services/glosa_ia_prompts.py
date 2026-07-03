@@ -19,7 +19,7 @@ POLICÍA NAL. (Oncología)   068-5-200006-26             UVB – 8 % + Inst. HUS
 SUMIMEDICAL                Tarifario 2025              SOAT – 15 %
 DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT/SMLV – 20 %
 SALUD MIA                  CSA2025EVE3A005             SOAT – 15 %
-AURORA (ARL/Vida)          Minuta ARL firmada 2024     SOAT pleno
+AURORA (ARL/Vida)          GID-ARL-0090 (2024)        PROPIAS + SOAT – 3 %
 SIN CONTRATO               —                           SOAT pleno
 """
 
@@ -232,8 +232,8 @@ CONTRATOS_HUS: dict[str, dict] = {
     },
     "AURORA": {
         "numero": "CONTRATO No. GID-ARL-0090 — ARL + VIDA AP",
-        "tarifa": "Manual Tarifario ARL (SOAT homologado)",
-        "factor": 1.00,
+        "tarifa": "TARIFAS PROPIAS HUS (actos administrativos); subsidiariamente SOAT −3% en SMLMV cuando no exista tarifa institucional (Cláusulas Primera Par. Cuarto y Séptima, Contrato GID-ARL-0090)",
+        "factor": 0.97,
         "tipo": "ARL — COMPAÑÍA DE SEGUROS DE VIDA AURORA",
         "nit": "860.022.137-5",
         "vigencia": "Vigente desde 2024 — sin acta de terminación acreditada; aplica a la fecha de prestación",
@@ -247,7 +247,10 @@ CONTRATOS_HUS: dict[str, dict] = {
             "de 2022 en Capítulo 4 Título 3 Parte 5 Libro 2), Ley 1122 de 2007, "
             "Decreto 4747 de 2007, Decreto-Ley 1295 de 1994. Las prestaciones "
             "se otorgan a usuarios del CONTRATANTE en calidad de asegurados. "
-            "Aurora NO cubre eventos sin nexo causal laboral identificable."
+            "Aurora NO cubre eventos sin nexo causal laboral identificable. "
+            "OJO TARIFA: el factor 0.97 (SOAT −3%) aplica SOLO cuando el "
+            "servicio no tiene tarifa institucional HUS; si existe tarifa "
+            "propia, prima la propia (Cláusula Primera, Parágrafo Cuarto)."
         ),
     },
     "DISPENSARIO MEDICO": {
@@ -381,9 +384,34 @@ def get_contrato(eps: str) -> dict:
     eps_upper = (eps or "").upper().strip()
     if not eps_upper or eps_upper in _EPS_SIN_CONTRATO:
         return _contrato_sin_pacto()
-    for key, val in CONTRATOS_HUS.items():
-        if key in eps_upper or (len(eps_upper) >= 4 and eps_upper in key):
-            return val
+    # Auditoría jul-2026: match EXACTO primero y luego el candidato MÁS
+    # ESPECÍFICO — "POLICIA NACIONAL" (orden de inserción) eclipsaba a
+    # "POLICIA NACIONAL ONCOLOGIA" y el contrato 068-5-200006-26 era
+    # inalcanzable. Candidatos: subcadena directa/inversa o TODOS los
+    # tokens de la clave presentes como palabra (cubre "DIRECCION DE
+    # SANIDAD POLICIA NACIONAL - SERVICIO ONCOLOGIA").
+    if eps_upper in CONTRATOS_HUS:
+        return CONTRATOS_HUS[eps_upper]
+
+    def _tokens_como_palabras(clave: str) -> bool:
+        return all(
+            re.search(rf"(?<![A-ZÁÉÍÓÚÑ]){re.escape(t)}(?![A-ZÁÉÍÓÚÑ])", eps_upper)
+            for t in clave.split()
+        )
+
+    candidatos = [
+        k
+        for k in CONTRATOS_HUS
+        if k in eps_upper
+        or (len(eps_upper) >= 4 and eps_upper in k)
+        or (" " in k and _tokens_como_palabras(k))
+    ]
+    if candidatos:
+        candidatos.sort(
+            key=lambda k: (sum(1 for t in set(k.split()) if t in eps_upper), len(k)),
+            reverse=True,
+        )
+        return CONTRATOS_HUS[candidatos[0]]
     desde_bd = _contrato_desde_bd(eps_upper)
     if desde_bd is not None:
         return desde_bd
@@ -926,7 +954,7 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <valor_defender>valor objetado completo</valor_defender>
 <argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según BLOQUE COMPLEJIDAD del user prompt:
   • COMPLEJIDAD BAJA (glosa simple, sin PDF, valor <500k): 2 PÁRRAFOS, 130-180 palabras. NO enumerar (I)/(II). Ve directo.
-  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso, casos con vicios identificables): 5-8 PUNTOS enumerados en NÚMEROS ROMANOS (I), (II), (III)... + petición final. 280-450 palabras.
+  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso, casos con vicios identificables): 4 PÁRRAFOS (o 4-6 puntos romanos si hay varios vicios), 230-310 palabras. La cifra EXACTA la fija el BLOQUE COMPLEJIDAD del user prompt — ese bloque SIEMPRE manda.
 Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL. Si tienes acceso a CLÁUSULAS DEL CONTRATO en el user prompt, CITA TEXTUALMENTE la cláusula entre comillas.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
@@ -1044,7 +1072,7 @@ Verifica MENTALMENTE antes de cerrar el <argumento>:
 ☐ ¿Invoca al menos 3 normas con número y artículo exacto?
 ☐ ¿Nombra al menos 1 principio doctrinal (Pacta Sunt Servanda / Lex Artis / etc.)?
 ☐ ¿Identifica vicios procedimentales si los hay?
-☐ ¿Cierra con petición de levantamiento + escalera procesal + contacto institucional?
+☐ ¿Cierra con petición de levantamiento (+ escalera procesal y contacto, SALVO que una PLANTILLA BASE del banco HUS ordene otro cierre — la plantilla manda)?
 ☐ ¿NO inventa datos? ¿NO usa placeholders con corchetes?
 
 ═══════════════ PROHIBIDO ═══════════════
@@ -1849,7 +1877,7 @@ FALLBACK_SIN_SOPORTES = (
     "hallazgos: fundamenta en las cláusulas del contrato, la normativa y la "
     "carga de la EPS de especificar y probar su objeción "
     "(Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
-    "3. La historia clínica (Res. 1995/1999) y los RIPS (Res. 866/2021) "
+    "3. La historia clínica (Res. 1995/1999) y los RIPS "
     "reposan en el archivo institucional a disposición de la entidad."
 )
 
@@ -2660,7 +2688,11 @@ def build_user_prompt(
             f"  • {_num_docs_pdf} documento(s) PDF adjunto(s), {_pdf_len:,} caracteres totales.\n"
             f"  • Texto de glosa: {_texto_glosa_len} caracteres.\n"
             f"  LONGITUD DE RESPUESTA: 4 PÁRRAFOS, 230-310 palabras total.\n"
-            f"  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos, médicos específicos.\n"
+            + (
+                "  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos y médicos que APAREZCAN en los soportes.\n"
+                if _pdf_len > 0
+                else "  Sin PDFs adjuntos: fundamenta en contrato y normativa; NO cites folios ni hallazgos clínicos.\n"
+            )
         )
     else:
         bloque_complejidad_str = (

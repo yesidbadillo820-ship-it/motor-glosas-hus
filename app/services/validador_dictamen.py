@@ -149,6 +149,10 @@ def check_enumeracion(texto: str) -> dict:
     peso = 10
     t = texto.upper()
     tiene = "EN PRIMER LUGAR" in t and "EN SEGUNDO LUGAR" in t
+    # Auditoría jul-2026: el caso SIMPLE (2 párrafos) tiene PROHIBIDA la
+    # enumeración por el propio prompt — exento del check.
+    if not tiene and _contar_palabras(texto) <= 210:
+        tiene = True
     msg = "Enumeración presente" if tiene else "Falta enumeración técnica en P2"
     return {
         "id": "enumeracion",
@@ -189,8 +193,10 @@ def check_extension(texto: str) -> dict:
     nombre = "Extensión 230-310 palabras"
     peso = 8
     palabras = _contar_palabras(texto)
-    aprobado = 230 <= palabras <= 320 or (palabras < 230 and palabras >= 180)  # margen
-    if palabras < 180:
+    # Auditoría jul-2026: el prompt EXIGE 2 párrafos de 130-180 palabras
+    # en casos simples — el check castigaba al dictamen por obedecer.
+    aprobado = 130 <= palabras <= 320
+    if palabras < 130:
         msg = f"Demasiado corto ({palabras} palabras)"
     elif palabras > 320:
         msg = f"Demasiado largo ({palabras} palabras)"

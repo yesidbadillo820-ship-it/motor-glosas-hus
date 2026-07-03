@@ -69,7 +69,6 @@ _EPS_CONOCIDAS_NORMALIZADAS = {
     "DISPENSARIO MÉDICO",
     "DMBUG",
     "DIGSA",
-    "PRECIMED",
     "SUMIMEDICAL",
     "AURORA",
     # Genérico para banco HUS

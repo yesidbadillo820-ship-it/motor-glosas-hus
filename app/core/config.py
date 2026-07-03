@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     groq_model_fallback_1: str = "openai/gpt-oss-120b"
     groq_model_fallback_2: str = "qwen/qwen3-32b"
     groq_model_fallback_3: str = "llama-3.3-70b-versatile"
-    anthropic_model: str = "claude-sonnet-4-6"
+    anthropic_model: str = "claude-sonnet-4-5"
     # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
     # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
     # 2.0-flash paso a GA.
