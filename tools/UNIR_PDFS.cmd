@@ -19,8 +19,11 @@ REM
 REM  USO:  copia este archivo a la carpeta que tiene tus PDF y dale
 REM        doble clic.  Nada mas.
 REM
-REM  Es autocontenido: lleva el motor Python adentro. Solo necesita que
-REM  Python este instalado en el equipo (https://www.python.org/downloads/).
+REM  Es autocontenido: lleva el motor Python adentro. Si el equipo no
+REM  tiene Python, el bot lo INSTALA SOLO (via winget o descargando el
+REM  instalador oficial de python.org, sin pedir administrador). Solo
+REM  necesita internet la primera vez. Si las politicas del equipo lo
+REM  impiden, muestra las instrucciones para instalarlo a mano.
 REM ====================================================================
 chcp 65001 >nul 2>&1
 setlocal EnableExtensions DisableDelayedExpansion
@@ -47,8 +50,9 @@ set "PYEXE="
 py -3 -c "import sys" >nul 2>&1 && set "PYEXE=py -3"
 if not defined PYEXE ( python -c "import sys" >nul 2>&1 && set "PYEXE=python" )
 if not defined PYEXE ( python3 -c "import sys" >nul 2>&1 && set "PYEXE=python3" )
-if not defined PYEXE goto sinpython
+if not defined PYEXE goto instalarpython
 
+:deps
 REM --- 2) Asegurar el componente PDF (PyPDF2 / pypdf) -----------------
 %PYEXE% -c "import PyPDF2" >nul 2>&1 && goto haspdf
 %PYEXE% -c "import pypdf"  >nul 2>&1 && goto haspdf
@@ -92,15 +96,71 @@ echo.
 pause
 exit /b %RC%
 
-:sinpython
-echo [ERROR] No se encontro Python en este equipo.
+REM ==== Instalacion automatica de Python ==============================
+REM  Se intenta primero winget (viene con Windows 10/11) y si no,
+REM  descargando el instalador oficial de python.org. Instalacion
+REM  por-usuario: NO pide permisos de administrador.
+:instalarpython
+echo [i] No se encontro Python en este equipo.
+echo [i] Instalando Python automaticamente - es gratis y no pide permisos
+echo     de administrador. Puede tardar unos minutos, NO cierres esta
+echo     ventana...
 echo.
-echo   Este bot necesita Python (gratis) para poder unir los PDF:
+
+where winget >nul 2>&1 || goto py_descarga
+echo [i] Instalando Python con winget...
+winget install -e --id Python.Python.3.12 --silent --disable-interactivity --accept-package-agreements --accept-source-agreements >nul 2>&1
+call :redetectar
+if defined PYEXE goto pyok
+
+:py_descarga
+set "PYINST=%TEMP%\python_instalador_hus.exe"
+set "PYURL=https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe"
+del "%PYINST%" >nul 2>&1
+echo [i] Descargando Python desde python.org - 25 MB aprox., espera...
+curl.exe -L -s -o "%PYINST%" "%PYURL%" 2>nul
+if exist "%PYINST%" goto py_instalar
+powershell -NoProfile -Command "Invoke-WebRequest -Uri $env:PYURL -OutFile $env:PYINST" >nul 2>&1
+if not exist "%PYINST%" goto sinpython
+
+:py_instalar
+echo [i] Instalando Python - solo para tu usuario, sin administrador...
+"%PYINST%" /quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_test=0
+del "%PYINST%" >nul 2>&1
+call :redetectar
+if defined PYEXE goto pyok
+goto sinpython
+
+:pyok
+echo [OK] Python quedo instalado en este equipo. Continuando...
+echo.
+goto deps
+
+REM  Vuelve a buscar Python despues de instalarlo. Se revisa tambien la
+REM  carpeta tipica de la instalacion por-usuario, porque el PATH de la
+REM  ventana actual no se refresca solo.
+:redetectar
+set "PYEXE="
+py -3 -c "import sys" >nul 2>&1 && set "PYEXE=py -3"
+if defined PYEXE goto :eof
+python -c "import sys" >nul 2>&1 && set "PYEXE=python"
+if defined PYEXE goto :eof
+for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do if exist "%%D\python.exe" set PYEXE="%%D\python.exe"
+if defined PYEXE %PYEXE% -c "import sys" >nul 2>&1 || set "PYEXE="
+goto :eof
+
+:sinpython
+echo [ERROR] No se pudo instalar Python automaticamente en este equipo.
+echo         Suele pasar cuando no hay internet o las politicas del
+echo         equipo bloquean instalaciones.
+echo.
+echo   Para instalarlo a mano (gratis, 2 minutos):
 echo     1^) Descargalo de:  https://www.python.org/downloads/
 echo     2^) En el instalador MARCA la casilla "Add python.exe to PATH".
 echo     3^) Vuelve a dar doble clic a este archivo.
 echo.
-echo   (Tambien sirve instalar "Python" desde la Microsoft Store.)
+echo   (Tambien sirve instalar "Python" desde la Microsoft Store, o
+echo    pedirselo al area de SISTEMAS.)
 echo.
 pause
 exit /b 1

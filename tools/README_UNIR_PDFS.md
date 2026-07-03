@@ -72,10 +72,12 @@ puedes ponerlo en la carpeta madre y procesa todos los NE de una sola pasada.
 - **Carpetas con un solo PDF** se omiten (no hay nada que unir). Si igual quieres
   generarlas, ver "Opciones avanzadas".
 - **PDF dañados** se saltan con un aviso y el resto se une igual (no se cae).
-- **Requisito:** Python instalado en el equipo. Si no lo tienes, el bot te muestra
-  el enlace de descarga (https://www.python.org/downloads/); en el instalador marca
-  la casilla **"Add python.exe to PATH"**. El componente de PDF (PyPDF2) lo instala
-  el bot solo la primera vez.
+- **Requisitos: ninguno que instalar a mano.** Si el equipo no tiene Python, el
+  bot **lo instala solo** la primera vez (usa `winget` o descarga el instalador
+  oficial de python.org; no pide permisos de administrador, solo internet y unos
+  minutos). Los componentes de PDF (PyPDF2) y de compresión (pymupdf) también los
+  instala él solo. Únicamente si las políticas del equipo bloquean instalaciones,
+  muestra las instrucciones para hacerlo a mano o pedirlo a SISTEMAS.
 
 ---
 
