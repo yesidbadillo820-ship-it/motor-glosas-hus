@@ -69,18 +69,13 @@ services:
       PRIMARY_AI: ${PRIMARY_AI:-groq}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
       ANTHROPIC_MODEL_OPUS: ${ANTHROPIC_MODEL_OPUS:-claude-opus-4-7}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
-      # Alertas por correo (opcionales)
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      ALERTAS_EMAIL: ${ALERTAS_EMAIL:-}
-      # Claves Fernet de cifrado — si se usan, DEBEN ser estables entre
-      # reinicios (sin ellas los campos cifrados no se pueden descifrar)
-      GLOSAS_ENCRYPTION_KEY: ${GLOSAS_ENCRYPTION_KEY:-}
-      CRED_VAULT_KEY: ${CRED_VAULT_KEY:-}
+      # NOTA (incidente 3-jul-2026): NO agregar aquí variables con default
+      # VACÍO (VAR: ${VAR:-}) — compose inyecta string vacío "" y los campos
+      # tipados de Settings (ej. smtp_port: int) revientan el arranque.
+      # Los knobs opcionales (SMTP_*, ALERTAS_EMAIL, ALLOWED_ORIGINS,
+      # GLOSAS_ENCRYPTION_KEY, CRED_VAULT_KEY) se declaran SOLO en el .env
+      # cuando se necesiten — docker compose los toma de ahí vía env_file
+      # implícito de ${...} en este archivo, o agregalos aquí CON VALOR.
       # Secretos — DEBEN venir del .env (no hardcodear)
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}

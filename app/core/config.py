@@ -1,5 +1,6 @@
 import logging
 import warnings
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -72,6 +73,17 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
+
+    @field_validator("smtp_port", mode="before")
+    @classmethod
+    def _smtp_port_vacio_usa_default(cls, v):
+        """Incidente 3-jul-2026: docker-compose inyectó SMTP_PORT="" (string
+        vacío) y Pydantic no parsea "" como int → la app moría al importar
+        (crash-loop + 502 en producción). Un env vacío = no configurado."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 587
+        return v
+
     smtp_user: str = ""
     smtp_password: str = ""
     alertas_email: str = ""
