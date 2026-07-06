@@ -403,11 +403,14 @@ def test_nombre_archivo_seguro_conserva_extension_y_reservados():
 
 
 def test_nombre_disponible_recorta_rutas_muy_largas(tmp_path):
-    carpeta = tmp_path / ("SUB" * 60)  # carpeta de ~180 chars
+    carpeta = tmp_path / "ENTIDAD OK"
     carpeta.mkdir()
-    destino = org.nombre_disponible(carpeta, "B" * 200 + ".pdf")
+    # nombre de 400+ chars: debe recortarse para que la ruta completa quepa
+    # en MAX_PATH (el largo de tmp_path varía entre máquinas; el del nombre no)
+    destino = org.nombre_disponible(carpeta, "B" * 400 + ".pdf")
     assert len(str(destino)) <= org.MAX_RUTA_WINDOWS
     assert destino.suffix == ".pdf"
+    assert len(destino.stem) >= 8  # nunca degenerar el nombre a la nada
 
 
 def test_fecha_correo_absurda_usa_hoy():
