@@ -5,53 +5,91 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>IA GLOSAS SINAC SC — ESE HUS</title>
 <link rel="manifest" href="/manifest.webmanifest"/>
-<meta name="theme-color" content="#0b5d8a"/>
+<meta name="theme-color" content="#0B3D91"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="HUS Glosas"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  /* Paleta premium — inspirada en Linear, Stripe, Supabase */
-  --navy:#0b1220; --navy2:#152033; --navy3:#1e293b;
-  --teal:#0284c7; --teal2:#0ea5e9; --teal-light:#e0f2fe;
-  --c-navy:#0b1220; --c-navy2:#152033; --c-navy3:#1e293b;
-  --c-teal:#0369a1; --c-teal2:#0284c7; --c-teal-light:#e0f2fe;
-  --c-blue:#1d4ed8; --c-blue-light:#eff6ff;
-  --c-red:#dc2626; --c-red-light:#fef2f2;
-  --c-amber:#d97706; --c-amber-light:#fffbeb;
-  --c-green:#059669; --c-green-light:#ecfdf5;
-  --c-gold:#b8860b; --c-gold2:#d4a017; --c-gold-light:#fef9e7;
-  --c-indigo:#4f46e5; --c-indigo-light:#eef2ff;
-  --c-gray:#334155; --c-gray2:#64748b; --c-gray3:#94a3b8;
-  --bg:#fbfbfd; --bg-card:#ffffff; --bg-subtle:#f5f7fa;
-  --border:#e5e7eb; --border2:#cbd5e1; --border-focus:#0ea5e9;
-  --text:#0b1220; --text2:#334155; --text3:#64748b; --text4:#94a3b8;
+  /* ═══ PALETA SINAC ═══ (rebrand 10-jun-2026)
+     Identidad corporativa: AZUL + VERDE + BLANCO. Estética
+     profesional / sector salud / institucional. Los nombres viejos
+     (--navy, --teal, --c-blue, etc.) se conservan apuntando a la
+     nueva paleta para no romper componentes existentes. */
+
+  /* SINAC AZUL — institucional, fiabilidad, sanidad
+     - sinac-blue-900: azul profundo (header/marca, navy de fondo)
+     - sinac-blue-700: azul corporativo principal (botones, hover)
+     - sinac-blue-500: azul medio (acentos)
+     - sinac-blue-100: azul suave (cards activas, badges info) */
+  --sinac-blue-900:#0B3D91; --sinac-blue-800:#0D47A1; --sinac-blue-700:#1565C0;
+  --sinac-blue-600:#1976D2; --sinac-blue-500:#1E88E5; --sinac-blue-400:#42A5F5;
+  --sinac-blue-200:#BBDEFB; --sinac-blue-100:#E3F2FD; --sinac-blue-50:#F5FAFF;
+
+  /* SINAC VERDE — éxito, salud, conformidad
+     - sinac-green-700: verde corporativo (CTAs positivos, score alto)
+     - sinac-green-500: verde medio (badges aprobado)
+     - sinac-green-100: verde suave (fondos info) */
+  --sinac-green-800:#1B5E20; --sinac-green-700:#2E7D32; --sinac-green-600:#388E3C;
+  --sinac-green-500:#43A047; --sinac-green-400:#66BB6A;
+  --sinac-green-200:#C8E6C9; --sinac-green-100:#E8F5E9; --sinac-green-50:#F1F8F4;
+
+  /* GRISES NEUTROS — texto y bordes profesionales */
+  --sinac-gray-900:#212B36; --sinac-gray-800:#37474F; --sinac-gray-700:#455A64;
+  --sinac-gray-500:#607D8B; --sinac-gray-400:#90A4AE; --sinac-gray-300:#B0BEC5;
+  --sinac-gray-200:#CFD8DC; --sinac-gray-100:#ECEFF1; --sinac-gray-50:#F5F7FA;
+
+  /* BLANCOS Y FONDOS */
+  --sinac-white:#FFFFFF; --sinac-off-white:#F8FAFC;
+
+  /* Acentos secundarios (alertas y estados — paleta acotada) */
+  --c-red:#C62828; --c-red-light:#FFEBEE;
+  --c-amber:#E65100; --c-amber-light:#FFF3E0;
+  --c-gold:#B8860B; --c-gold2:#C9970F; --c-gold-light:#FEF6DA;
+  --c-indigo:#283593; --c-indigo-light:#E8EAF6;
+
+  /* ═══ Compatibilidad con código existente (apuntan a SINAC) ═══ */
+  --navy:var(--sinac-blue-900); --navy2:var(--sinac-blue-800); --navy3:var(--sinac-gray-800);
+  --teal:var(--sinac-blue-700); --teal2:var(--sinac-blue-500); --teal-light:var(--sinac-blue-100);
+  --c-navy:var(--sinac-blue-900); --c-navy2:var(--sinac-blue-800); --c-navy3:var(--sinac-gray-800);
+  --c-teal:var(--sinac-blue-700); --c-teal2:var(--sinac-blue-600); --c-teal-light:var(--sinac-blue-100);
+  --c-blue:var(--sinac-blue-700); --c-blue-light:var(--sinac-blue-50);
+  --c-green:var(--sinac-green-700); --c-green-light:var(--sinac-green-100);
+  --c-gray:var(--sinac-gray-700); --c-gray2:var(--sinac-gray-500); --c-gray3:var(--sinac-gray-300);
+
+  --bg:var(--sinac-off-white); --bg-card:var(--sinac-white); --bg-subtle:var(--sinac-gray-50);
+  --border:var(--sinac-gray-100); --border2:var(--sinac-gray-200); --border-focus:var(--sinac-blue-500);
+  --text:var(--sinac-gray-900); --text2:var(--sinac-gray-700); --text3:var(--sinac-gray-500); --text4:var(--sinac-gray-400);
   --r:8px; --r-lg:12px; --r-xl:16px; --r-2xl:20px;
-  /* Sombras premium con profundidad */
-  --sh:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.06);
-  --sh-md:0 4px 8px -2px rgba(15,23,42,.06),0 2px 4px -2px rgba(15,23,42,.08);
-  --sh-lg:0 12px 24px -8px rgba(15,23,42,.12),0 8px 16px -4px rgba(15,23,42,.08);
-  --sh-xl:0 24px 48px -12px rgba(15,23,42,.18),0 12px 24px -8px rgba(15,23,42,.10);
-  --sh-premium:0 1px 2px rgba(15,23,42,.04),0 4px 8px rgba(15,23,42,.04),0 16px 32px -8px rgba(15,23,42,.10);
-  /* Gradientes premium */
-  --grad-navy:linear-gradient(135deg,#0b1220 0%,#152033 50%,#1e293b 100%);
-  --grad-teal:linear-gradient(135deg,#0369a1 0%,#0284c7 50%,#0ea5e9 100%);
-  --grad-gold:linear-gradient(135deg,#b8860b 0%,#d4a017 100%);
-  --grad-card:linear-gradient(180deg,#ffffff 0%,#fafbfc 100%);
+  /* Sombras institucionales — más sutiles que la versión anterior */
+  --sh:0 1px 2px rgba(11,61,145,.04),0 1px 3px rgba(11,61,145,.05);
+  --sh-md:0 4px 8px -2px rgba(11,61,145,.05),0 2px 4px -2px rgba(11,61,145,.06);
+  --sh-lg:0 12px 24px -8px rgba(11,61,145,.10),0 8px 16px -4px rgba(11,61,145,.06);
+  --sh-xl:0 24px 48px -12px rgba(11,61,145,.14),0 12px 24px -8px rgba(11,61,145,.08);
+  --sh-premium:0 1px 2px rgba(11,61,145,.04),0 4px 8px rgba(11,61,145,.04),0 16px 32px -8px rgba(11,61,145,.08);
+  /* Gradientes SINAC: azul corporativo + verde acento + blanco */
+  --grad-navy:linear-gradient(135deg,var(--sinac-blue-900) 0%,var(--sinac-blue-800) 50%,var(--sinac-blue-700) 100%);
+  --grad-teal:linear-gradient(135deg,var(--sinac-blue-700) 0%,var(--sinac-blue-600) 50%,var(--sinac-blue-500) 100%);
+  --grad-success:linear-gradient(135deg,var(--sinac-green-700) 0%,var(--sinac-green-500) 100%);
+  --grad-sinac:linear-gradient(135deg,var(--sinac-blue-700) 0%,var(--sinac-green-600) 100%);
+  --grad-gold:linear-gradient(135deg,#B8860B 0%,#C9970F 100%);
+  --grad-card:linear-gradient(180deg,var(--sinac-white) 0%,var(--sinac-off-white) 100%);
+  --grad-header:linear-gradient(135deg,var(--sinac-blue-900) 0%,var(--sinac-blue-700) 100%);
   --font:'Inter',system-ui,-apple-system,sans-serif;
   --font-mono:'JetBrains Mono',ui-monospace,monospace;
-  --font-display:'Inter',system-ui,sans-serif;
+  --font-display:'Manrope','Inter',system-ui,sans-serif;
   --ease:cubic-bezier(.4,0,.2,1);
   --ease-out:cubic-bezier(.16,1,.3,1);
   --ease-spring:cubic-bezier(.34,1.56,.64,1);
 }
 body.dark{
-  --bg:#0a0f1c; --bg-card:#0f172a; --bg-subtle:#131c2f;
-  --border:#1e293b; --border2:#334155;
-  --text:#f1f5f9; --text2:#cbd5e1; --text3:#94a3b8; --text4:#64748b;
+  /* Modo oscuro SINAC — preserva azul + verde con fondos profundos */
+  --bg:#0A1929; --bg-card:#0F2438; --bg-subtle:#132B45;
+  --border:#1F3A5F; --border2:#2D4F73;
+  --text:#E3F2FD; --text2:#B0BEC5; --text3:#90A4AE; --text4:#607D8B;
   --sh:0 1px 2px rgba(0,0,0,.3),0 1px 3px rgba(0,0,0,.4);
   --sh-md:0 2px 4px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5);
 }
@@ -358,46 +396,116 @@ h4{font-size:.95rem;font-weight:600}
 .i-lg{width:20px;height:20px}
 .i-xl{width:24px;height:24px}
 
-/* ─── LOGIN ─────────────────────────────── */
+/* ─── LOGIN SPLIT-SCREEN (Confianza Institucional Digital) ──────── */
 #login-screen{
   position:fixed;inset:0;
-  background:var(--grad-navy);
-  display:flex;align-items:center;justify-content:center;z-index:9999;
+  background:var(--sinac-off-white);
+  display:flex;align-items:stretch;justify-content:flex-start;z-index:9999;
   overflow:hidden;
-}
-#login-screen::before{
-  content:"";position:absolute;inset:0;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(14,165,233,.15), transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(212,160,23,.08), transparent 40%);
-  pointer-events:none;
-}
-#login-screen::after{
-  content:"";position:absolute;inset:0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
-  background-size:48px 48px;
-  pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 30%, transparent 70%);
 }
 #login-screen.hidden{display:none}
 
+/* Pane izquierdo: hero de marca con gradiente azul→verde */
+.login-hero{
+  flex:0 0 58%;max-width:58%;
+  background:var(--grad-sinac);
+  color:#fff;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:4rem 4.5rem;
+}
+.login-hero::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 18% 25%, rgba(255,255,255,.10), transparent 42%),
+    radial-gradient(circle at 85% 80%, rgba(11,61,145,.30), transparent 50%);
+  pointer-events:none;
+}
+.login-hero::after{
+  content:"";position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size:48px 48px;
+  pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 25%, transparent 75%);
+}
+.login-hero > *{position:relative;z-index:1}
+.login-hero-wordmark{
+  display:flex;align-items:baseline;gap:.45rem;margin-bottom:2.4rem;
+}
+.login-hero-wordmark .wm{
+  font-family:var(--font-display);font-weight:800;font-size:1.5rem;
+  letter-spacing:.14em;color:#fff;line-height:1;
+}
+.login-hero-wordmark .wm-dot{
+  width:9px;height:9px;border-radius:2px;background:var(--sinac-green-400);
+  display:inline-block;flex-shrink:0;transform:translateY(-1px);
+}
+.login-hero-wordmark .wm-sub{
+  font-size:.72rem;font-weight:600;color:rgba(255,255,255,.78);
+  letter-spacing:.08em;text-transform:uppercase;
+}
+.login-hero-claim{
+  font-family:var(--font-display);font-weight:800;
+  font-size:clamp(2rem,3.4vw,3rem);line-height:1.12;letter-spacing:-.02em;
+  color:#fff;margin-bottom:1rem;max-width:560px;
+}
+.login-hero-subclaim{
+  font-size:.95rem;color:rgba(255,255,255,.85);line-height:1.55;
+  margin-bottom:2.4rem;max-width:520px;font-weight:500;
+}
+.login-hero-bullets{list-style:none;display:flex;flex-direction:column;gap:1rem;max-width:520px}
+.login-hero-bullets li{
+  display:flex;align-items:flex-start;gap:.8rem;
+  font-size:.9rem;color:rgba(255,255,255,.92);line-height:1.45;font-weight:500;
+}
+.login-hero-bullets .lhb-ico{
+  flex-shrink:0;width:26px;height:26px;border-radius:8px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:.8rem;font-weight:800;margin-top:-1px;
+}
+.login-hero-foot{
+  margin-top:3rem;font-size:.7rem;color:rgba(255,255,255,.6);
+  letter-spacing:.05em;
+}
+
+/* Pane derecho: card del formulario */
+.login-form-pane{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  padding:2rem;position:relative;
+  background:var(--sinac-off-white);
+}
 .login-box{
-  background:#fff;border-radius:var(--r-xl);padding:2.5rem;width:420px;
-  box-shadow:0 24px 60px -12px rgba(0,0,0,.45),0 0 0 1px rgba(14,165,233,.08),inset 0 1px 0 rgba(255,255,255,1);
+  background:var(--sinac-white);border-radius:var(--r-xl);padding:2.5rem;width:420px;max-width:100%;
+  box-shadow:var(--sh-premium),0 0 0 1px var(--sinac-gray-100);
   position:relative;z-index:1;
   animation:fadeInUp .5s var(--ease-out);
 }
 .login-box::before{
   content:"";position:absolute;top:0;left:2.5rem;right:2.5rem;height:3px;
-  background:linear-gradient(90deg,var(--c-teal2),var(--c-gold2),var(--c-teal2));
+  background:var(--grad-sinac);
   border-radius:0 0 3px 3px;
+}
+
+/* Móvil: columna única, hero compacto arriba */
+@media(max-width:860px){
+  #login-screen{flex-direction:column;overflow-y:auto}
+  .login-hero{
+    flex:0 0 auto;max-width:100%;width:100%;
+    padding:1.6rem 1.4rem 1.5rem;justify-content:flex-start;
+  }
+  .login-hero-claim{font-size:1.45rem;margin-bottom:.5rem}
+  .login-hero-subclaim{margin-bottom:0;font-size:.8rem}
+  .login-hero-bullets,.login-hero-foot{display:none}
+  .login-hero-wordmark{margin-bottom:1rem}
+  .login-form-pane{padding:1.4rem 1rem 2.5rem;align-items:flex-start}
+  .login-box{padding:1.8rem 1.5rem}
 }
 .login-logo{display:flex;align-items:center;gap:.9rem;margin-bottom:2rem}
 .login-badge{
   width:56px;height:56px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;overflow:hidden;
-  box-shadow:0 4px 12px rgba(15,23,42,.08),0 0 0 3px rgba(212,160,23,.08);
+  box-shadow:0 4px 12px rgba(11,61,145,.08),0 0 0 3px rgba(56,142,60,.08);
 }
 .login-badge img{width:100%;height:100%;object-fit:contain}
 .login-title{font-size:1.05rem;font-weight:700;color:var(--c-navy);letter-spacing:-.015em;line-height:1.25}
@@ -459,31 +567,47 @@ h4{font-size:.95rem;font-weight:600}
 #app{display:none;flex-direction:column;height:100vh;overflow:hidden}
 #app.show{display:flex}
 
-/* ─── HEADER PREMIUM ─────────────────────────────── */
+/* ─── HEADER IDENTIDAD DUAL SINAC + HUS ─────────────────────────── */
 header{
-  background:var(--grad-navy);
+  background:var(--grad-header);
   height:62px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:0 1.75rem;z-index:200;position:relative;
-  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 4px 24px rgba(11,18,32,.2);
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 4px 24px rgba(11,61,145,.18);
 }
 header::after{
   content:"";position:absolute;bottom:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent 0%,var(--c-teal2) 20%,var(--c-gold2) 50%,var(--c-teal2) 80%,transparent 100%);
-  opacity:.6;
+  background:linear-gradient(90deg,transparent 0%,var(--sinac-blue-400) 25%,var(--sinac-green-500) 55%,var(--sinac-green-600) 80%,transparent 100%);
+  opacity:.75;
 }
-.hdr-left{display:flex;align-items:center;gap:.9rem}
+.hdr-left{display:flex;align-items:center;gap:.9rem;min-width:0}
+/* Wordmark tipográfico SINAC (sin archivo de imagen) */
+.hdr-wordmark{
+  display:flex;align-items:baseline;gap:.3rem;flex-shrink:0;
+  font-family:var(--font-display);font-weight:800;font-size:1.18rem;
+  letter-spacing:.14em;color:#fff;line-height:1;user-select:none;
+}
+.hdr-wordmark .wm-dot{
+  width:7px;height:7px;border-radius:2px;background:var(--sinac-green-400);
+  display:inline-block;flex-shrink:0;
+  box-shadow:0 0 8px rgba(102,187,106,.55);
+}
+.hdr-brand-sep{
+  width:1px;height:30px;background:rgba(255,255,255,.22);flex-shrink:0;
+  margin:0 .15rem;
+}
+.hdr-brand-txt{min-width:0}
 .hdr-badge{
   width:44px;height:44px;background:#fff;border:1px solid rgba(255,255,255,.15);border-radius:10px;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:5px;overflow:hidden;
-  box-shadow:0 2px 8px rgba(0,0,0,.25),0 0 0 1px rgba(212,160,23,.12);
+  box-shadow:0 2px 8px rgba(0,0,0,.25),0 0 0 1px rgba(102,187,106,.18);
   transition:transform .3s var(--ease-spring);
 }
 .hdr-badge:hover{transform:scale(1.05)}
 .hdr-badge img{width:100%;height:100%;object-fit:contain;display:block}
 /* Animación sutil del logo al cargar la primera vez: entrada con bounce + brillo dorado */
 @keyframes logoEntrada {
-  0%   { transform: scale(.4) rotate(-90deg); opacity: 0; filter: brightness(1.8) drop-shadow(0 0 12px rgba(212,160,23,.8)); }
-  60%  { transform: scale(1.12) rotate(6deg);  opacity: 1; filter: brightness(1.3) drop-shadow(0 0 8px rgba(212,160,23,.5)); }
+  0%   { transform: scale(.4) rotate(-90deg); opacity: 0; filter: brightness(1.8) drop-shadow(0 0 12px rgba(102,187,106,.8)); }
+  60%  { transform: scale(1.12) rotate(6deg);  opacity: 1; filter: brightness(1.3) drop-shadow(0 0 8px rgba(102,187,106,.5)); }
   100% { transform: scale(1) rotate(0);       opacity: 1; filter: brightness(1) drop-shadow(0 0 0 transparent); }
 }
 .hdr-badge.anim-entrada { animation: logoEntrada 1s var(--ease-spring, cubic-bezier(.175,.885,.32,1.275)) 1; }
@@ -532,8 +656,9 @@ header::after{
   .confetti-particle{display:none}
   .empty-state .es-emoji{animation:none}
 }
-.hdr-title{font-size:.95rem;font-weight:700;color:#fff;letter-spacing:-.015em;line-height:1.2}
-.hdr-sub{font-size:.68rem;color:rgba(255,255,255,.55);margin-top:3px;font-weight:500;letter-spacing:.02em}
+.hdr-title{font-size:.92rem;font-weight:700;color:#fff;letter-spacing:-.01em;line-height:1.2;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-sub{font-size:.66rem;color:rgba(255,255,255,.62);margin-top:3px;font-weight:500;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-sub .hdr-powered{color:var(--sinac-green-200);font-weight:600}
 .hdr-right{display:flex;align-items:center;gap:.75rem}
 .status-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.7)}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
@@ -582,22 +707,22 @@ header::after{
   transition:background .2s var(--ease-out),color .2s var(--ease-out),transform .15s var(--ease-out);
   position:relative;border-radius:0;
 }
-.sn-item:hover{background:var(--bg-subtle);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(14,165,233,.08)}
-.sn-item:hover svg{color:var(--c-teal2)}
+.sn-item:hover{background:var(--sinac-gray-50);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(11,61,145,.06)}
+.sn-item:hover svg{color:var(--sinac-blue-700)}
 .sn-item.active{
-  background:linear-gradient(90deg,rgba(14,165,233,.10) 0%,rgba(14,165,233,.04) 100%);
-  color:var(--c-teal2);font-weight:600;
+  background:var(--sinac-blue-50);
+  color:var(--sinac-blue-700);font-weight:600;
 }
 .sn-item.active::before{
   content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
-  background:linear-gradient(180deg,var(--c-teal2),var(--c-teal));
+  background:var(--sinac-green-600);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 8px rgba(14,165,233,.4);
+  box-shadow:0 0 8px rgba(56,142,60,.35);
   animation:snActivePulse 2.4s ease-in-out infinite;
 }
 @keyframes snActivePulse{
-  0%,100%{box-shadow:0 0 8px rgba(14,165,233,.4)}
-  50%{box-shadow:0 0 14px rgba(14,165,233,.65)}
+  0%,100%{box-shadow:0 0 8px rgba(56,142,60,.30)}
+  50%{box-shadow:0 0 13px rgba(56,142,60,.55)}
 }
 /* Cascade slide-in al cargar el sidebar */
 .sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
@@ -616,9 +741,11 @@ header::after{
   .sn-group .sn-item{opacity:1;animation:none}
   .sn-item.active::before{animation:none}
 }
-body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
+body.dark .sn-item.active{background:rgba(30,136,229,.16);color:#7dd3fc}
+body.dark .sn-item:hover{background:rgba(255,255,255,.05)}
 .sn-item svg{flex-shrink:0;color:var(--text3)}
-.sn-item.active svg{color:var(--c-teal2)}
+.sn-item.active svg{color:var(--sinac-blue-700)}
+body.dark .sn-item.active svg{color:#7dd3fc}
 .sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-nav.collapsed .sn-item-label{display:none}
 .sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
@@ -916,6 +1043,11 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 
 /* ─── DASHBOARD (sobrio, mono-color con jerarquía) ──────────────────────────── */
 .dash-area{flex:1;overflow-y:auto;padding:1.75rem;display:flex;flex-direction:column;gap:1.25rem}
+/* Tab-bar consolidada de Reportes (Mando·Dashboard·Cartera·Mes) */
+.rep-tabbar{display:flex;gap:.3rem;flex-wrap:wrap;border-bottom:2px solid var(--border);margin-bottom:.35rem;padding-bottom:0}
+.rep-tab{background:transparent;border:0;border-bottom:3px solid transparent;padding:.55rem .95rem;font-size:.82rem;font-weight:600;color:var(--text3);cursor:pointer;border-radius:8px 8px 0 0;transition:color .12s,background .12s,border-color .12s;margin-bottom:-2px;white-space:nowrap}
+.rep-tab:hover{color:var(--text);background:var(--bg)}
+.rep-tab.active{color:var(--c-teal2,#0d9488);border-bottom-color:var(--c-teal2,#0d9488);background:var(--bg)}
 .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:.85rem}
 .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.35rem;transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
 .kpi:hover{border-color:var(--border2);box-shadow:var(--sh)}
@@ -1056,7 +1188,7 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .field-inline input,.field-inline select{padding:.35rem .55rem;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);min-width:110px}
 .hist-toolbar input,.hist-toolbar select{width:auto;padding:.45rem .7rem;font-size:.78rem}
 .hist-toolbar input{width:180px}
-.tbl-wrap{flex:1;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.tbl-wrap{flex:1;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg)}
 table{width:100%;border-collapse:collapse;font-size:.78rem}
 thead th{background:var(--c-navy);color:rgba(255,255,255,.9);padding:.7rem 1rem;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
 tbody td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -1092,6 +1224,41 @@ tbody tr:hover{background:var(--bg)}
 .contrato-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;border-top:3px solid var(--c-teal2)}
 .contrato-eps{font-weight:700;color:var(--text);font-size:.9rem;margin-bottom:.4rem}
 .contrato-det{font-size:.75rem;color:var(--text3);line-height:1.6}
+
+/* ─── CONTRATOS · Editor de metadatos enriquecidos ───────────────────
+   Llena las 12 columnas del PR #106 que consume el inyector
+   contexto_contractual_enriquecido.py — sin estos datos el dictamen IA
+   no citaba contrato/NIT/SECOP (auditoría 10-jun-2026). */
+.ctr-meta-card{margin-bottom:1.5rem}
+.ctr-meta-head{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1.15rem 1.25rem .4rem}
+.ctr-meta-title{font-family:var(--font-display);font-size:1.02rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+.ctr-meta-title .badge-ia{background:var(--grad-sinac);color:#fff;font-size:.6rem;font-weight:800;letter-spacing:.06em;padding:.2rem .5rem;border-radius:5px}
+.ctr-meta-head .field{margin:0;min-width:240px;flex:0 1 320px}
+.ctr-meta-banner{display:flex;gap:.55rem;align-items:flex-start;margin:.7rem 1.25rem .95rem;padding:.65rem .85rem;background:var(--sinac-blue-50);border:1px solid var(--sinac-blue-100);border-left:3px solid var(--sinac-blue-700);border-radius:8px;font-size:.78rem;color:var(--sinac-blue-900);line-height:1.5}
+.ctr-meta-banner .ico{font-size:.95rem;line-height:1.2;font-weight:800;color:var(--sinac-blue-700)}
+.ctr-meta-estado{margin:0 1.25rem .9rem;padding:.6rem .85rem;border-radius:8px;font-size:.8rem;line-height:1.45}
+.ctr-meta-estado.nuevo{background:var(--sinac-green-50);border:1px solid var(--sinac-green-200);border-left:3px solid var(--sinac-green-700);color:var(--sinac-green-800)}
+.ctr-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem 1rem;padding:0 1.25rem}
+.ctr-meta-grid .span-2{grid-column:1/-1}
+.ctr-meta-grid .field{margin-bottom:0}
+.ctr-meta-fechas{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem 1rem}
+.ctr-meta-mono{font-family:var(--font-mono);font-feature-settings:'tnum','zero'}
+.ctr-meta-hint{font-size:.68rem;color:var(--text4);margin-top:.25rem}
+.ctr-meta-chips{display:flex;flex-wrap:wrap;gap:.4rem;padding:.45rem .55rem;border:1.5px solid var(--border);border-radius:var(--r);background:var(--bg-card);min-height:44px;align-items:center;cursor:text}
+.ctr-meta-chip{display:inline-flex;align-items:center;gap:.3rem;background:var(--sinac-blue-100);border:1px solid var(--sinac-blue-200);color:var(--sinac-blue-800);font-family:var(--font-mono);font-size:.7rem;font-weight:700;padding:.22rem .3rem .22rem .55rem;border-radius:14px;white-space:nowrap}
+.ctr-meta-chip button{border:none;background:transparent;color:var(--sinac-blue-800);font-size:.85rem;line-height:1;cursor:pointer;padding:0 .25rem;width:auto}
+.ctr-meta-chip button:hover{color:var(--c-red)}
+.ctr-meta-chips input{width:auto;flex:1;min-width:150px;border:none;background:transparent;font-size:.78rem;padding:.2rem;box-shadow:none}
+.ctr-meta-chips input:focus,.ctr-meta-chips input:hover{border:none;box-shadow:none}
+.ctr-anexo-row{display:grid;grid-template-columns:minmax(130px,210px) 1fr 36px;gap:.5rem;margin-bottom:.45rem;align-items:center}
+.cm-anexo-del{border:1px solid var(--border2);background:var(--bg-subtle);color:var(--text3);border-radius:8px;height:36px;cursor:pointer;font-size:.8rem;width:36px;padding:0}
+.cm-anexo-del:hover{background:var(--c-red-light);color:var(--c-red);border-color:var(--c-red)}
+.ctr-meta-footer{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem 1.25rem 1.25rem;margin-top:1.1rem;border-top:1px solid var(--border)}
+.ctr-meta-pdfinfo{font-size:.72rem;color:var(--text3);font-family:var(--font-mono)}
+.btn-guardar-meta{display:inline-flex;align-items:center;gap:.45rem;background:var(--sinac-green-700);color:#fff;border:none;border-radius:10px;padding:.65rem 1.3rem;font-size:.85rem;font-weight:700;cursor:pointer;width:auto;box-shadow:0 4px 12px rgba(46,125,50,.25);transition:all .18s var(--ease)}
+.btn-guardar-meta:hover{background:var(--sinac-green-800);transform:translateY(-1px)}
+.btn-guardar-meta:disabled{opacity:.55;cursor:not-allowed;transform:none}
+@media(max-width:760px){.ctr-meta-grid{grid-template-columns:1fr}.ctr-meta-fechas{grid-template-columns:1fr}}
 
 /* ─── LOADING ─────────────────────────────── */
 #loading{position:fixed;inset:0;background:rgba(14,31,61,.88);display:none;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:1rem}
@@ -1357,11 +1524,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   animation:fadeIn .15s var(--ease-out);
 }
 
-/* Hdr title premium — acento dorado sutil */
-.hdr-title{
-  background:linear-gradient(135deg,#fff 0%,#fff 60%,#fef3c7 100%);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-}
+/* Hdr title — blanco sólido (contraste AA sobre azul SINAC) */
+.hdr-title{color:#fff}
 
 /* ─── PRINT CSS GLOBAL (para cualquier pantalla) ───────────── */
 @media print{
@@ -1671,11 +1835,30 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 .search-trigger:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
 .search-trigger .kbd{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.8)}
 </style>
+<!-- SINAC Design System 2.0 — Plan de Transformación, Ola 3 -->
+<link rel="stylesheet" href="/static/sinac-ds.css">
+<!-- SINAC Analizar PRO — gauge, dictamen héroe, loading premium, chips con identidad -->
+<link rel="stylesheet" href="/static/sinac-analizar-pro.css">
 </head>
 <body>
 
 <!-- ─── LOGIN ──────────────────── -->
 <div id="login-screen">
+  <div class="login-hero">
+    <div class="login-hero-wordmark">
+      <span class="wm">SINAC</span><span class="wm-dot"></span>
+      <span class="wm-sub">SC SAS</span>
+    </div>
+    <h1 class="login-hero-claim">Motor de Glosas IA</h1>
+    <div class="login-hero-subclaim">ESE Hospital Universitario de Santander · Powered by SINAC SC SAS</div>
+    <ul class="login-hero-bullets">
+      <li><span class="lhb-ico">✓</span><span>Dictámenes con Quality Gate anti-alucinación</span></li>
+      <li><span class="lhb-ico">✓</span><span>Citas normativas verificadas contra corpus</span></li>
+      <li><span class="lhb-ico">✓</span><span>Radicación con evidencia auditable</span></li>
+    </ul>
+    <div class="login-hero-foot">SINAC SC SAS · Soluciones de inteligencia artificial para el sector salud</div>
+  </div>
+  <div class="login-form-pane">
   <div class="login-box">
     <div class="login-logo">
       <div class="login-badge"><img src="/static/logo.png" alt="HUS"/></div>
@@ -1706,6 +1889,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       <span>v6.0 · IA GLOSAS SINAC SC</span>
     </div>
   </div>
+  </div>
 </div>
 
 <!-- ─── APP ────────────────────── -->
@@ -1715,10 +1899,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       <button class="btn-menu-mobile" onclick="toggleSidebar()" aria-label="Menú">
         <svg class="i i-lg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
+      <div class="hdr-wordmark" title="SINAC SC SAS">SINAC<span class="wm-dot"></span></div>
+      <div class="hdr-brand-sep"></div>
       <div class="hdr-badge"><img src="/static/logo.png" alt="HUS"/></div>
-      <div>
-        <div class="hdr-title">IA GLOSAS SINAC SC</div>
-        <div class="hdr-sub">ESE Hospital Universitario de Santander · Área de Cartera</div>
+      <div class="hdr-brand-txt">
+        <div class="hdr-title">HUS · Motor de Glosas IA</div>
+        <div class="hdr-sub">ESE Hospital Universitario de Santander · <span class="hdr-powered">Powered by SINAC SC SAS</span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -2010,7 +2196,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                   Limpiar
                 </button>
               </div>
-              <textarea id="f-glosa" rows="6" placeholder="Pegá el texto de la glosa tal como aparece en el formato de la EPS. Incluí código, descripción, valores y justificación." required oninput="paPreviewLiveDebounced()"></textarea>
+              <textarea id="f-glosa" rows="6" placeholder="Pegá el texto de la glosa tal como aparece en el formato de la EPS. Incluí código, descripción, valores y justificación." required oninput="paPreviewLiveDebounced(); detectarEpsEnGlosa();" onpaste="setTimeout(detectarEpsEnGlosa, 50);"></textarea>
+              <div id="eps-detectada-badge" style="display:none;margin-top:.4rem;padding:.3rem .6rem;background:#dcfce7;color:#166534;border-radius:6px;font-size:.78rem;font-weight:600;">✓ EPS detectada automáticamente: <span id="eps-detectada-nombre"></span></div>
             </div>
             <div class="field pa-field-tight" style="margin-top:.5rem;">
               <label class="pa-lbl-tiny">CUPS (buscar por descripción)</label>
@@ -2189,6 +2376,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- DASHBOARD -->
     <div class="panel" id="p-dashboard">
       <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="dashboard"></div>
         <div class="kpi-grid" id="kpi-grid">
           <div class="kpi"><div class="kpi-lbl">Total glosas</div><div class="kpi-num" id="k-total">—</div><div class="kpi-sub">procesadas en el mes</div></div>
           <div class="kpi"><div class="kpi-lbl">Valor objetado</div><div class="kpi-num" id="k-obj">—</div><div class="kpi-sub">acumulado del mes</div></div>
@@ -2248,6 +2436,29 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
           <div id="mia-contenido" style="font-size:.85rem;color:var(--text3);text-align:center;padding:1rem;">
             Cargando métricas…
+          </div>
+        </div>
+
+        <!-- Win-rate por EPS + código (feature #7) -->
+        <div class="analitica-block" id="win-rate-block" style="margin-top:1rem">
+          <div class="analitica-hdr">
+            <div>
+              <div class="analitica-title">🏆 Win-rate por EPS + código</div>
+              <div class="analitica-sub">Tasa de levantamiento por combinación, con tendencia vs el periodo anterior. Ventana <span id="wr-ventana-lbl">90</span> días.</div>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <select id="wr-ventana" onchange="cargarWinRateDetalle()" class="ap-select">
+                <option value="30">Últimos 30 días</option>
+                <option value="60">Últimos 60 días</option>
+                <option value="90" selected>Últimos 90 días</option>
+                <option value="180">Últimos 180 días</option>
+                <option value="365">Último año</option>
+              </select>
+              <button class="btn btn-ghost" onclick="cargarWinRateDetalle()" style="font-size:.78rem;padding:.3rem .7rem">Actualizar</button>
+            </div>
+          </div>
+          <div id="win-rate-body" style="padding:.6rem 0;font-size:.78rem;color:var(--text2)">
+            Cargando…
           </div>
         </div>
 
@@ -2597,6 +2808,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- R300: Dashboard Cobranza Live -->
     <div class="panel" id="p-cobranza-live">
       <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="cobranza-live"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
           <div>
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Cobranza Live</div>
@@ -2629,6 +2841,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- R350: Resumen mensual ejecutivo -->
     <div class="panel" id="p-resumen-mes">
       <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="resumen-mes"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
           <div>
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Resumen del mes <span id="rm-mes" style="color:var(--c-teal2);font-weight:600"></span></div>
@@ -2660,6 +2873,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- B.1: Mando ejecutivo single-pane-of-glass (coord/admin) -->
     <div class="panel" id="p-mando">
       <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div class="rep-tabbar-host" data-activo="mando"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
           <div>
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">⚡ Mando ejecutivo</div>
@@ -2873,6 +3087,100 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- CONTRATOS -->
     <div class="panel" id="p-contratos">
       <div class="contratos-area">
+
+        <!-- ── Editor de metadatos enriquecidos (PR #106 fase 2) ──
+             Las 12 columnas que consume contexto_contractual_enriquecido.py
+             para el bloque [CONTRATO VIGENTE — DATOS AUDITABLES] del prompt.
+             Sin editor quedaban NULL y el dictamen IA salía genérico
+             (auditoría 10-jun-2026). -->
+        <div class="card-doc ctr-meta-card">
+          <div class="ctr-meta-head">
+            <div class="ctr-meta-title">📋 Metadatos del contrato <span class="badge-ia">PARA DICTÁMENES IA</span></div>
+            <div class="field">
+              <label>EPS / Entidad pagadora</label>
+              <select id="ctr-meta-eps" onchange="ctrMetaCargar()">
+                <option value="">— Seleccione EPS —</option>
+              </select>
+            </div>
+          </div>
+          <div class="ctr-meta-banner">
+            <span class="ico">ℹ</span>
+            <span>Estos datos se inyectan al prompt de la IA cuando analiza glosas de esta EPS —
+            el dictamen citará número de contrato, NITs y proceso SECOP automáticamente.</span>
+          </div>
+          <div class="ctr-meta-estado nuevo" id="ctr-meta-estado" style="display:none"></div>
+          <div id="ctr-meta-form" style="display:none">
+            <div class="ctr-meta-grid">
+              <div class="field">
+                <label>Número del contrato</label>
+                <input id="cm-numero-contrato" class="ctr-meta-mono" maxlength="120" placeholder="Ej: 440-DIGSA/DMBUG-2025"/>
+              </div>
+              <div class="field">
+                <label>Nº proceso SECOP</label>
+                <input id="cm-proceso-secop" class="ctr-meta-mono" maxlength="120" placeholder="Ej: CD477"/>
+              </div>
+              <div class="field">
+                <label>Razón social EPS / pagador</label>
+                <input id="cm-razon-eps" maxlength="300" placeholder="Ej: DIRECCIÓN GENERAL DE SANIDAD MILITAR"/>
+              </div>
+              <div class="field">
+                <label>NIT EPS</label>
+                <input id="cm-nit-eps" class="ctr-meta-mono" maxlength="40" placeholder="Ej: 901.541.137-1"/>
+              </div>
+              <div class="field">
+                <label>Razón social IPS / prestador</label>
+                <input id="cm-razon-ips" maxlength="300" value="ESE HOSPITAL UNIVERSITARIO DE SANTANDER"/>
+              </div>
+              <div class="field">
+                <label>NIT IPS</label>
+                <input id="cm-nit-ips" class="ctr-meta-mono" maxlength="40" value="900.006.037-4"/>
+              </div>
+              <div class="field span-2">
+                <label>URL del proceso en SECOP II</label>
+                <input id="cm-secop-url" class="ctr-meta-mono" maxlength="500" placeholder="https://community.secop.gov.co/Public/Tendering/..."/>
+              </div>
+              <div class="span-2 ctr-meta-fechas">
+                <div class="field">
+                  <label>Fecha de suscripción</label>
+                  <input type="date" id="cm-fecha-suscripcion" class="ctr-meta-mono"/>
+                </div>
+                <div class="field">
+                  <label>Inicio de ejecución</label>
+                  <input type="date" id="cm-fecha-inicio" class="ctr-meta-mono"/>
+                </div>
+                <div class="field">
+                  <label>Fin de ejecución (plazo)</label>
+                  <input type="date" id="cm-fecha-fin" class="ctr-meta-mono"/>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label>Objeto contractual</label>
+                <textarea id="cm-objeto" rows="4" maxlength="5000" placeholder="Ej: Prestación de servicios integrales de salud a los usuarios del Subsistema de Salud de las Fuerzas Militares adscritos al DMBUG..."></textarea>
+                <div class="ctr-meta-hint">Máx 5000 caracteres — la IA cita los primeros 400 en el dictamen.</div>
+              </div>
+              <div class="field span-2">
+                <label>Modalidades tarifarias pactadas</label>
+                <div class="ctr-meta-chips" id="cm-modalidades" onclick="document.getElementById('cm-modalidad-input').focus()">
+                  <input id="cm-modalidad-input" onkeydown="ctrMetaChipKey(event)" placeholder="Escribe y presiona Enter (ej: TARIFA PROPIA ESE, SOAT UVB)"/>
+                </div>
+                <div class="ctr-meta-hint">Enter o coma agrega · × quita · Backspace borra la última.</div>
+              </div>
+              <div class="field span-2">
+                <label>Anexos integrales del contrato</label>
+                <div id="cm-anexos"></div>
+                <div style="display:flex;gap:.5rem;margin-top:.45rem;flex-wrap:wrap">
+                  <button type="button" class="btn-sm ghost" onclick="ctrMetaAgregarAnexo('','')">+ Agregar anexo</button>
+                  <button type="button" class="btn-sm ghost" onclick="ctrMetaCargarSugeridos()">⤓ Cargar anexos comunes</button>
+                </div>
+              </div>
+            </div>
+            <div class="ctr-meta-footer">
+              <span class="ctr-meta-pdfinfo" id="cm-pdf-info"></span>
+              <button type="button" class="btn-guardar-meta" id="cm-btn-guardar" onclick="ctrMetaGuardar()">💾 Guardar metadatos</button>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title">Contratos vigentes <span id="n-contratos">0</span></div>
         <div class="contratos-grid" id="contratos-grid"></div>
       </div>
@@ -3103,6 +3411,24 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <button class="btn btn-primary" onclick="crearUsuario()">Crear Usuario</button>
           </div>
 
+          <div id="admin-token-card" class="form-card" style="display:none;border:1px solid #bae6fd;background:#f0f9ff">
+            <h3 style="color:#0369a1">🔑 Token de integración <span style="color:#0284c7">Jump-box soportes</span></h3>
+            <p style="font-size:.76rem;color:#0c4a6e;line-height:1.55;margin-bottom:.7rem">
+              Genera un token de <b>larga duración</b> (hasta 2 años) para una cuenta de
+              servicio con rol <b>AUDITOR o superior</b>. Se pega en la variable
+              <code>MOTOR_TOKEN</code> del jump-box (<code>tools/jumpbox_sync.py</code>)
+              para que sincronice los soportes 24/7 sin que el token expire cada 8 horas.
+            </p>
+            <div class="field"><label>Email cuenta de servicio</label><input type="email" id="tok-email" placeholder="jumpbox.hus@sinacsc.com"/></div>
+            <div class="field"><label>Días de validez (máx 730)</label><input type="number" id="tok-dias" value="365" min="1" max="730"/></div>
+            <button class="btn btn-primary" style="background:#0284c7" onclick="generarTokenIntegracion()">Generar token</button>
+            <div id="tok-resultado" style="margin-top:.8rem;display:none">
+              <label style="font-size:.72rem;color:#0c4a6e;font-weight:600;display:block;margin-bottom:.25rem">Token (cópialo, se muestra una sola vez):</label>
+              <textarea id="tok-valor" readonly rows="4" style="width:100%;font-family:monospace;font-size:.68rem;border:1px solid #7dd3fc;border-radius:6px;padding:.5rem;background:#fff;color:#0c4a6e;resize:vertical"></textarea>
+              <button class="btn-sm" style="background:#0284c7;margin-top:.4rem" onclick="copiarTokenIntegracion()">📋 Copiar token</button>
+            </div>
+          </div>
+
           <div id="admin-reset-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #fecaca;background:#fff5f5">
             <h3 style="color:#991b1b">Zona peligrosa <span style="color:#dc2626">Solo SUPER_ADMIN</span></h3>
             <p style="font-size:.78rem;color:#7f1d1d;line-height:1.55;margin-bottom:.85rem">
@@ -3142,15 +3468,40 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- CONCILIACIÓN -->
     <div class="panel" id="p-conciliacion">
       <div class="concil-area">
+        <!-- Acordeón de instrucciones (siempre visible al entrar) -->
+        <div style="background:linear-gradient(135deg,#ecfeff,#f0f9ff);border:1px solid #0891b2;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem">
+          <div style="display:flex;gap:.8rem;align-items:start">
+            <div style="font-size:1.6rem">📋</div>
+            <div style="flex:1">
+              <div style="font-weight:700;color:#0e7490;font-size:.95rem;margin-bottom:.4rem">¿Cómo funciona Conciliación?</div>
+              <div style="font-size:.82rem;color:#0c4a6e;line-height:1.55">
+                <b>1.</b> Programa una audiencia individual (formulario abajo) o genera un <b>acta SINAC multi-glosa</b> con el botón verde.<br/>
+                <b>2.</b> Tras la audiencia: registra la postura de la EPS, la postura HUS y el resultado (Acuerdo Total / Parcial / Sin Acuerdo).<br/>
+                <b>3.</b> Descarga el <b>acta firmable</b> en formato SINAC (PDF) y carga el acta firmada de regreso al sistema.<br/>
+                <b>4.</b> Si hay acuerdo parcial/total: registra la <b>nota crédito</b> de la EPS y se cierra el caso.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="stat-row" id="concil-stats">
           <div class="stat-mini"><div class="stat-mini-num" id="cs-total">—</div><div class="stat-mini-lbl">Total</div></div>
           <div class="stat-mini"><div class="stat-mini-num" style="color:var(--c-green)" id="cs-acuerdo">—</div><div class="stat-mini-lbl">Acuerdo Total</div></div>
           <div class="stat-mini"><div class="stat-mini-num" style="color:var(--c-amber)" id="cs-parcial">—</div><div class="stat-mini-lbl">Parcial</div></div>
           <div class="stat-mini"><div class="stat-mini-num" style="color:var(--c-red)" id="cs-sin">—</div><div class="stat-mini-lbl">Sin Acuerdo</div></div>
         </div>
+
+        <!-- Botón principal: generar acta SINAC multi-glosa -->
+        <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
+          <button class="btn" style="background:#059669;color:white;border:0;font-weight:700;padding:.7rem 1.2rem;font-size:.85rem;border-radius:8px;cursor:pointer" onclick="abrirActaSinac()">
+            📄 Generar Acta SINAC (multi-glosa)
+          </button>
+          <span style="font-size:.75rem;color:var(--text3);align-self:center">Formato oficial idéntico al ACTA_SINAC_N_XXX. Acepta N facturas en una sola acta.</span>
+        </div>
+
         <div class="concil-grid">
           <div class="form-card" style="height:fit-content">
-            <h3>Nueva Conciliación <span>Programar</span></h3>
+            <h3>Nueva Conciliación <span>(1 glosa)</span></h3>
             <div class="field"><label>ID, factura o consecutivo</label><input type="text" id="c-glosa-id" placeholder="42 | HUS0000491176 | DGH-12345"/><small style="font-size:.68rem;color:var(--text3);margin-top:2px;display:block">Acepta ID interno (ej: 42), número de factura (HUS000...) o consecutivo DGH</small></div>
             <div class="field"><label>Fecha y hora</label><input type="datetime-local" id="c-fecha"/></div>
             <div class="field"><label>Lugar</label><input type="text" id="c-lugar"/></div>
@@ -3165,6 +3516,73 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
               <thead><tr><th>ID</th><th>Glosa</th><th>Fecha</th><th>Lugar</th><th>Resultado</th><th>Valor</th><th>Acciones</th></tr></thead>
               <tbody id="concil-body"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Generador de acta SINAC multi-glosa -->
+      <div id="acta-sinac-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:9999;align-items:flex-start;justify-content:center;padding:2rem;overflow-y:auto">
+        <div style="background:var(--bg-card);border-radius:12px;padding:1.6rem;max-width:1100px;width:100%;color:var(--text)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h2 style="margin:0;color:var(--c-navy)">📄 Generar Acta SINAC</h2>
+            <button onclick="cerrarActaSinac()" style="background:none;border:0;font-size:1.5rem;cursor:pointer;color:var(--text3)">×</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin-bottom:1rem">
+            <div class="field"><label>N° Acta SINAC*</label><input type="text" id="as-acta" placeholder="806"/></div>
+            <div class="field"><label>Fecha del acta</label><input type="date" id="as-fecha"/></div>
+            <div class="field"><label>Período</label><input type="text" id="as-periodo" placeholder="JUNIO 2026"/></div>
+            <div class="field"><label>NIT EPS*</label><input type="text" id="as-nit" placeholder="901541302"/></div>
+            <div class="field" style="grid-column:span 2"><label>Razón Social EPS*</label><input type="text" id="as-razon" placeholder="DISPENSARIO MEDICO NIVEL II BOGOTA - SANIDAD NAVAL"/></div>
+          </div>
+
+          <div style="margin-bottom:.8rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+            <b style="font-size:.85rem">Glosas incluidas:</b>
+            <input type="text" id="as-busqueda-glosa" placeholder="Pega N° factura (HUS000…) y Enter" style="flex:1;min-width:220px;padding:.4rem .6rem;font-size:.8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter'){as_buscarFactura()}"/>
+            <button class="btn btn-ghost" onclick="as_buscarFactura()" style="font-size:.78rem">Agregar factura</button>
+            <button class="btn btn-ghost" onclick="as_agregarManual()" style="font-size:.78rem">+ Fila manual</button>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:300px">
+            <table style="width:100%;font-size:.75rem;border-collapse:collapse">
+              <thead>
+                <tr style="background:var(--c-navy);color:white">
+                  <th style="padding:.4rem">#</th>
+                  <th style="padding:.4rem">Factura</th>
+                  <th style="padding:.4rem">Fecha</th>
+                  <th style="padding:.4rem">Tipo</th>
+                  <th style="padding:.4rem">Tipif.</th>
+                  <th style="padding:.4rem">Cód.</th>
+                  <th style="padding:.4rem">Descripción</th>
+                  <th style="padding:.4rem">Factura $</th>
+                  <th style="padding:.4rem">Glosa inicial $</th>
+                  <th style="padding:.4rem">Pendiente $</th>
+                  <th style="padding:.4rem">Acepta IPS $</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="as-filas-body"><tr><td colspan="12" style="text-align:center;padding:1.5rem;color:var(--text3)">Sin filas. Pega una factura arriba o agrega fila manual.</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="field" style="margin-top:1rem"><label>Observaciones del acta</label><textarea id="as-obs" rows="3"></textarea></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem">
+            <div style="border:1px solid var(--border);padding:.8rem;border-radius:8px;background:var(--bg)">
+              <b style="font-size:.82rem;color:var(--c-navy)">Firmante por la EPS</b>
+              <div class="field" style="margin-top:.4rem"><label>Nombre</label><input type="text" id="as-eps-nombre"/></div>
+              <div class="field"><label>Cargo</label><input type="text" id="as-eps-cargo"/></div>
+              <div class="field"><label>Correo</label><input type="text" id="as-eps-correo"/></div>
+            </div>
+            <div style="border:1px solid var(--border);padding:.8rem;border-radius:8px;background:var(--bg)">
+              <b style="font-size:.82rem;color:var(--c-navy)">Firmante por HUS</b>
+              <div class="field" style="margin-top:.4rem"><label>Nombre</label><input type="text" id="as-hus-nombre"/></div>
+              <div class="field"><label>Cargo</label><input type="text" id="as-hus-cargo" value="TECNICO DE GLOSAS Y DEVOLUCIONES"/></div>
+              <div class="field"><label>Correo</label><input type="text" id="as-hus-correo"/></div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:.6rem;margin-top:1.2rem;justify-content:flex-end">
+            <button class="btn btn-ghost" onclick="cerrarActaSinac()">Cancelar</button>
+            <button class="btn btn-primary" style="background:#059669;color:white;border:0;padding:.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer" onclick="as_generarPdf()">📄 Generar PDF imprimible</button>
           </div>
         </div>
       </div>
@@ -4086,33 +4504,98 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
   .pa-prev-badge.warn{background:rgba(245,158,11,.12); color:#f59e0b; border-color:rgba(245,158,11,.28)}
   .pa-prev-badge.err{background:rgba(239,68,68,.12); color:#ef4444; border-color:rgba(239,68,68,.28)}
 
-  /* Pipeline multi-agente */
-  .pa-agent-list{display:flex; flex-direction:column; gap:.45rem}
+  /* ═══ Pipeline multi-agente — TIMELINE QUIRÚRGICO horizontal ═══
+     (rediseño SINAC 11-jun-2026). El JS (paShowPipeline / paSetAgentState)
+     genera el mismo markup .pa-agent-row > .pa-agent-dot + .pa-agent-name +
+     .pa-agent-detail con estados running/done/fail — aquí solo cambia el CSS.
+     En móvil (≤720px) degrada a la lista vertical original. */
+  .pa-agent-list{
+    display:flex; flex-direction:row; align-items:flex-start; gap:0;
+    position:relative; padding:.6rem 0 2.3rem;
+  }
+  /* Línea conectora detrás de los nodos */
+  .pa-agent-list::before{
+    content:""; position:absolute; top:calc(.6rem + 17px);
+    left:calc(100% / 14); right:calc(100% / 14); height:2px;
+    background:var(--sinac-gray-200); border-radius:2px; z-index:0;
+  }
+  body.dark .pa-agent-list::before{background:var(--border2)}
   .pa-agent-row{
-    display:flex; align-items:center; gap:.65rem;
-    padding:.55rem .75rem; border-radius:10px;
-    background:var(--bg-subtle);
-    border:1px solid var(--border);
+    flex:1 1 0; min-width:0; position:static;
+    display:flex; flex-direction:column; align-items:center; gap:.45rem;
+    padding:0; border-radius:0; background:transparent; border:none;
     transition:all .25s cubic-bezier(.4,0,.2,1);
   }
-  .pa-agent-row.done{background:#f0fdf4; border-color:#bbf7d0}
-  .pa-agent-row.running{background:#eef2ff; border-color:#c7d2fe}
-  .pa-agent-row.fail{background:#fef2f2; border-color:#fecaca}
   .pa-agent-dot{
-    width:18px; height:18px; border-radius:50%; flex-shrink:0;
-    background:var(--bg-card); border:1px solid var(--border);
+    width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    background:var(--bg-card); border:3px solid var(--sinac-gray-300);
     display:flex; align-items:center; justify-content:center;
-    font-size:.65rem; color:var(--text3); font-weight:700;
+    font-size:.85rem; color:var(--text4); font-weight:700;
+    position:relative; z-index:1;
+    transition:border-color .25s, background .25s, color .25s, box-shadow .25s;
   }
-  .pa-agent-row.done .pa-agent-dot{background:#10b981; color:#fff; border-color:#10b981}
-  .pa-agent-row.running .pa-agent-dot{background:#6366f1; color:#fff; border-color:#6366f1; animation:pa-spin 1s linear infinite}
+  body.dark .pa-agent-dot{border-color:var(--border2)}
+  .pa-agent-row.running .pa-agent-dot{
+    background:var(--bg-card); color:var(--sinac-blue-700);
+    border-color:var(--sinac-blue-600);
+    animation:pa-node-pulse 1.6s ease-in-out infinite;
+  }
+  .pa-agent-row.done .pa-agent-dot{background:var(--sinac-green-600); color:#fff; border-color:var(--sinac-green-600)}
   .pa-agent-row.fail .pa-agent-dot{background:#ef4444; color:#fff; border-color:#ef4444}
   @keyframes pa-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .pa-agent-row.running .pa-agent-dot::before{content:"↻"}
+  @keyframes pa-node-pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(21,101,192,.30)}
+    50%{box-shadow:0 0 0 7px rgba(21,101,192,0)}
+  }
+  .pa-agent-row.running .pa-agent-dot::before{content:"↻"; display:inline-block; animation:pa-spin 1.1s linear infinite}
   .pa-agent-row.done .pa-agent-dot::before{content:"✓"}
-  .pa-agent-row.fail .pa-agent-dot::before{content:"!"}
-  .pa-agent-name{flex:1; font-size:.83rem; color:var(--text); font-weight:500}
-  .pa-agent-detail{font-size:.7rem; color:var(--text3); font-feature-settings:"tnum"}
+  .pa-agent-row.fail .pa-agent-dot::before{content:"✕"}
+  .pa-agent-name{
+    flex:none; font-size:.6rem; color:var(--text3); font-weight:600;
+    text-transform:uppercase; letter-spacing:.04em; text-align:center;
+    line-height:1.25; max-width:96px; padding:0 .2rem;
+  }
+  .pa-agent-row.running .pa-agent-name{color:var(--sinac-blue-700); font-weight:700}
+  .pa-agent-row.done .pa-agent-name{color:var(--sinac-green-700)}
+  .pa-agent-row.fail .pa-agent-name{color:#dc2626; font-weight:700}
+  body.dark .pa-agent-row.running .pa-agent-name{color:#7dd3fc}
+  body.dark .pa-agent-row.done .pa-agent-name{color:#86efac}
+  /* Detalle de la fase: oculto por nodo; el de la fase activa (running/fail)
+     se proyecta como línea única bajo el timeline (absolute vs .pa-agent-list) */
+  .pa-agent-detail{display:none; font-size:.72rem; color:var(--text3); font-feature-settings:"tnum"}
+  .pa-agent-row.running .pa-agent-detail,
+  .pa-agent-row.fail .pa-agent-detail{
+    display:block; position:absolute; left:0; right:0; bottom:.15rem;
+    text-align:center; color:var(--text2); font-weight:500;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pa-agent-row.fail .pa-agent-detail{color:#dc2626; z-index:2; background:var(--bg-card)}
+  /* Móvil: degradar a la lista vertical original */
+  @media (max-width:720px){
+    .pa-agent-list{flex-direction:column; gap:.45rem; padding:0}
+    .pa-agent-list::before{display:none}
+    .pa-agent-row{
+      flex:none; width:100%; flex-direction:row; align-items:center; gap:.65rem;
+      padding:.55rem .75rem; border-radius:10px;
+      background:var(--bg-subtle); border:1px solid var(--border);
+    }
+    .pa-agent-row.done{background:var(--sinac-green-50); border-color:var(--sinac-green-200)}
+    .pa-agent-row.running{background:var(--sinac-blue-50); border-color:var(--sinac-blue-200)}
+    .pa-agent-row.fail{background:#fef2f2; border-color:#fecaca}
+    body.dark .pa-agent-row{background:var(--bg-subtle); border-color:var(--border)}
+    .pa-agent-dot{width:20px; height:20px; border-width:2px; font-size:.65rem}
+    .pa-agent-name{
+      flex:1; font-size:.83rem; text-transform:none; letter-spacing:0;
+      text-align:left; max-width:none; font-weight:500; color:var(--text);
+    }
+    .pa-agent-detail{display:block; position:static; font-size:.7rem; white-space:normal}
+    .pa-agent-row.running .pa-agent-detail,
+    .pa-agent-row.fail .pa-agent-detail{position:static; text-align:right; white-space:normal}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pa-agent-row.running .pa-agent-dot{animation:none}
+    .pa-agent-row.running .pa-agent-dot::before{animation:none}
+  }
 
   /* Score breakdown bars */
   .pa-score-row{
@@ -4343,8 +4826,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     color:var(--text) !important;
   }
   #p-analizar .res-dictamen-hdr{
-    color:var(--text2) !important;
+    /* Bug 11-jun-2026: este override legacy ponía --text2 (gris oscuro)
+       sobre la franja navy — "DICTAMEN JURÍDICO" quedaba invisible.
+       La franja es navy SIEMPRE (claro y oscuro): texto blanco. */
+    color:#fff !important;
   }
+  #p-analizar .res-dictamen-hdr span{color:#fff !important}
   #p-analizar .res-dictamen-body{
     color:var(--text) !important;
   }
@@ -5085,6 +5572,387 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
   @keyframes pa-btn-shimmer{
     0%{transform:translateX(-100%)}
     100%{transform:translateX(100%)}
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     RONDA 51 (21 mayo 2026 — Yesid): ajustes estéticos panel Analizar.
+     Reportado: "todo muy junto, muy pegado, mucho espacio desperdiciado".
+     Mejoras puntuales sin rewrite — overrides al final del CSS.
+  ═══════════════════════════════════════════════════════════════════ */
+
+  /* 1. Dictamen body: línea más respirable pero no excesiva (era 2 → muy
+        gaseoso; ahora 1.65 con tamaño levemente mayor para mejor lectura). */
+  #p-analizar .res-dictamen-body{
+    line-height:1.65 !important;
+    font-size:.84rem !important;
+    padding:1.1rem 1.4rem !important;
+  }
+
+  /* 2. Result area: ancho máximo legible para no estirar líneas a 1400px
+        en monitores grandes. Pero NUNCA más estrecho que el espacio
+        disponible (evita que el dictamen se "esconda" detrás del sidebar
+        cuando el usuario hace zoom in y el viewport útil se achica). */
+  #p-analizar .result-area{
+    max-width:980px;
+    width:100%;
+    margin:0 auto;
+    padding:1.25rem 1.5rem !important;
+    gap:1.1rem !important;
+    box-sizing:border-box;
+  }
+  /* En pantallas chicas (laptop estándar 1366px con sidebar ~280px), el
+     dictamen necesita el ancho COMPLETO sin restricción de 980px. */
+  @media (max-width: 1400px){
+    #p-analizar .result-area{
+      max-width:100% !important;
+      margin:0 !important;
+    }
+  }
+
+  /* 3. Separador visual entre preview (detección automática) y dictamen
+        final — evita que metadata y resultado se fusionen. */
+  #p-analizar .pa-prev-card{
+    margin-bottom:.25rem;
+    border-bottom:2px solid var(--border, #e2e8f0);
+    padding-bottom:.85rem;
+  }
+  /* Spacer pequeño antes del dictamen para jerarquía visual */
+  #p-analizar .res-dictamen{
+    margin-top:.4rem;
+  }
+
+  /* 4. Cards de análisis avanzado (confianza, validador citas, auto-pilot,
+        auditor forense): padding compacto + bordes sutiles para distinguir. */
+  #p-analizar .result-area > div[style*="padding"]{
+    padding:.85rem 1.1rem !important;
+    border-radius:.6rem !important;
+    border:1px solid var(--border, #e2e8f0) !important;
+  }
+
+  /* 5. Toolbar de acciones (.res-actions): gap mínimo + wrap permitido +
+        botones consistentes. Antes los 7 botones saltaban a 2 líneas feo. */
+  #p-analizar .res-actions{
+    gap:.4rem !important;
+    flex-wrap:wrap !important;
+    justify-content:flex-start !important;
+    padding:.6rem .25rem !important;
+  }
+  #p-analizar .res-actions button{
+    padding:.45rem .85rem !important;
+    font-size:.78rem !important;
+  }
+
+  /* 6. Labels del formulario izquierdo: más legibles. Antes .65rem gris
+        claro era casi invisible. */
+  #p-analizar .sidebar .pa-lbl-tiny,
+  #p-analizar .sidebar label{
+    font-size:.72rem !important;
+    font-weight:600 !important;
+    letter-spacing:.02em !important;
+    color:var(--text2, #475569) !important;
+  }
+
+  /* 7. Fundamento normativo: lista de 3 normas más prominente que el
+        running text — son las que el gestor consulta primero. */
+  #p-analizar .res-dictamen-body ul li,
+  #p-analizar .res-dictamen-body ol li{
+    padding:.15rem 0 !important;
+    line-height:1.45 !important;
+  }
+
+  /* 8. Textarea del auditor forense: más bajita por defecto, expande on
+        focus. Ahorra 25-30 px de altura visible. */
+  #p-analizar textarea[placeholder*="BACILOSCOPIA"],
+  #p-analizar textarea[placeholder*="folios"]{
+    min-height:64px !important;
+    max-height:120px !important;
+    transition:max-height .18s ease;
+  }
+  #p-analizar textarea[placeholder*="BACILOSCOPIA"]:focus,
+  #p-analizar textarea[placeholder*="folios"]:focus{
+    max-height:200px !important;
+  }
+
+  /* 9. Header del dictamen ("Dictamen Jurídico — ESE HUS / 21 de mayo"):
+        más contraste y separación del body. */
+  #p-analizar .res-dictamen-hdr{
+    padding:.85rem 1.4rem !important;
+    font-size:.85rem !important;
+    border-bottom:2px solid rgba(255,255,255,.08) !important;
+  }
+
+  /* 10. Score / confianza chip: pegado al dictamen para que se lea como
+         una unidad, no como elemento separado huérfano. */
+  #p-analizar .result-area > div:has(> .pa-glass){
+    margin-top:-.5rem !important;
+  }
+
+  /* ═══ REDISEÑO SINAC 11-jun-2026 — "Confianza Institucional Digital" ═══
+     Overrides de componentes sobre la paleta SINAC (PR #106).
+     Secciones: tipografía dual · card-doc · sello QG · medalla doble ·
+     documento radicable · dashboard hero · micro-interacciones · dark. */
+
+  /* ── 2. Tipografía dual: Manrope para display, JetBrains Mono para datos ── */
+  .section-title, .chart-hdr, .panel-hero-title, .land-saludo-title,
+  .login-title, .res-title, .pa-prev-title{
+    font-family:var(--font-display);
+  }
+  /* Mono: códigos, factura/radicado, valores COP en KPIs chicos y tablas */
+  .pill-code, .mono-num, #hdr-kpis span[data-num],
+  #f-factura, #f-radicado, #f-cups,
+  .pill.sds-valor-big, .ap-tbl td:not(:first-child){
+    font-family:var(--font-mono);
+    font-feature-settings:'tnum','zero';
+  }
+
+  /* ── 3. CARD-DOC "Documento Institucional" ───────────────────────── */
+  .card-doc{
+    position:relative;
+    background:var(--sinac-white);
+    border:1px solid var(--border);
+    border-radius:var(--r-lg);
+    box-shadow:var(--sh-md);
+    overflow:hidden;
+  }
+  .card-doc::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:var(--sinac-blue-700);z-index:2;
+  }
+  body.dark .card-doc{background:var(--bg-card)}
+  /* Sello Quality Gate: visible solo cuando la card lleva .qg-ok
+     (renderResult la pone si verificacion_citas no trae severidad ALTA;
+     el JS puede togglearla con classList si la verificación cambia). */
+  .qg-seal{
+    display:none;
+    position:absolute;top:10px;right:12px;z-index:3;
+    padding:.28rem .6rem;border-radius:6px;
+    background:var(--sinac-green-700);color:#fff;
+    font-size:.6rem;font-weight:800;letter-spacing:.07em;
+    font-family:var(--font-display);
+    box-shadow:0 2px 8px rgba(46,125,50,.35);
+    pointer-events:none;
+  }
+  .card-doc.qg-ok .qg-seal{display:inline-block}
+  /* En el dictamen el sello vive SOBRE la franja navy del hdr; se reserva
+     espacio a la derecha para no tapar la fecha (el ID pesa más, por eso
+     la regla va con #p-analizar). */
+  .res-dictamen.card-doc .qg-seal{top:11px;border:1px solid rgba(255,255,255,.35)}
+  #p-analizar .res-dictamen.qg-ok .res-dictamen-hdr{padding-right:200px !important}
+  /* Login en modo oscuro: pane derecho no debe quedar blanco brillante */
+  body.dark .login-form-pane{background:var(--bg)}
+  body.dark .login-hero{box-shadow:inset 0 0 0 100vmax rgba(0,0,0,.12)}
+
+  /* ── 8. MEDALLA DOBLE: EVIDENCIA + CONFIANZA ─────────────────────── */
+  /* min-height + overflow defensivos: reporte del 11-jun-2026 — en
+     algunas condiciones de viewport la card colapsaba y los aros
+     quedaban recortados en el borde superior. */
+  .medallas-wrap{padding:1.1rem 1.25rem 1rem;min-height:128px;overflow:visible}
+  .medallas-row{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:1rem;align-items:stretch;overflow:visible;
+  }
+  .medalla{min-height:88px}
+  .medallas-wrap.card-doc{overflow:visible}
+  .medallas-wrap.card-doc::before{border-radius:var(--r-lg) var(--r-lg) 0 0}
+  .medalla{
+    display:flex;align-items:center;gap:.9rem;
+    padding:.75rem .9rem;border-radius:var(--r-lg);
+    border:1px solid var(--border);background:var(--bg-card);
+  }
+  .medalla-aro{
+    width:62px;height:62px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    border:4px solid var(--sinac-gray-300);
+    background:var(--bg-card);
+  }
+  .medalla-valor{
+    font-family:var(--font-display);font-weight:800;font-size:1.45rem;
+    line-height:1;color:var(--text);letter-spacing:-.02em;
+  }
+  .medalla-valor small{font-size:.7rem;font-weight:700;margin-left:1px}
+  .medalla-info{min-width:0}
+  .medalla-lbl{
+    font-size:.62rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--text3);
+  }
+  .medalla-tag{
+    display:inline-block;margin-top:.2rem;padding:.14rem .5rem;border-radius:5px;
+    font-size:.66rem;font-weight:800;letter-spacing:.05em;
+    font-family:var(--font-display);
+  }
+  .medalla-det{font-size:.7rem;color:var(--text3);margin-top:.3rem;line-height:1.35}
+  .medalla.med-a{border-color:var(--sinac-green-200);background:linear-gradient(180deg,var(--sinac-white),var(--sinac-green-50))}
+  .medalla.med-a .medalla-aro{border-color:var(--sinac-green-600)}
+  .medalla.med-a .medalla-valor{color:var(--sinac-green-700)}
+  .medalla.med-a .medalla-tag{background:var(--sinac-green-100);color:var(--sinac-green-800)}
+  .medalla.med-b{border-color:#fde68a;background:linear-gradient(180deg,var(--sinac-white),#fffbeb)}
+  .medalla.med-b .medalla-aro{border-color:#d97706}
+  .medalla.med-b .medalla-valor{color:#b45309}
+  .medalla.med-b .medalla-tag{background:#fef3c7;color:#92400e}
+  .medalla.med-c{border-color:#fecaca;background:linear-gradient(180deg,var(--sinac-white),#fff5f5)}
+  .medalla.med-c .medalla-aro{border-color:#dc2626}
+  .medalla.med-c .medalla-valor{color:#b91c1c}
+  .medalla.med-c .medalla-tag{background:#fee2e2;color:#991b1b}
+  .medalla.med-nd .medalla-tag{background:var(--sinac-gray-100);color:var(--sinac-gray-700)}
+  body.dark .medalla.med-a,body.dark .medalla.med-b,body.dark .medalla.med-c{
+    background:var(--bg-subtle);
+  }
+  body.dark .medalla{background:var(--bg-subtle)}
+  body.dark .medalla .medalla-aro{background:var(--bg-card)}
+  body.dark .medalla.med-a .medalla-valor{color:#86efac}
+  body.dark .medalla.med-b .medalla-valor{color:#fcd34d}
+  body.dark .medalla.med-c .medalla-valor{color:#fca5a5}
+  body.dark .medalla.med-a .medalla-tag{background:rgba(134,239,172,.14);color:#86efac}
+  body.dark .medalla.med-b .medalla-tag{background:rgba(252,211,77,.14);color:#fcd34d}
+  body.dark .medalla.med-c .medalla-tag{background:rgba(252,165,165,.14);color:#fca5a5}
+  /* Prob. de éxito histórica — degradada a dato secundario bajo las medallas */
+  .exito-mini{
+    display:flex;align-items:center;gap:.6rem;margin-top:.8rem;
+    padding-top:.7rem;border-top:1px dashed var(--border);
+  }
+  .exito-mini-lbl{
+    font-size:.64rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--text3);flex-shrink:0;
+  }
+  .exito-mini-bar{
+    flex:1;height:5px;border-radius:3px;background:var(--bg-subtle);
+    overflow:hidden;display:block;
+  }
+  .exito-mini-bar > span{display:block;height:100%;border-radius:3px;transition:width .6s var(--ease-out)}
+  .exito-mini-val{
+    font-family:var(--font-mono);font-size:.74rem;font-weight:700;flex-shrink:0;
+  }
+
+  /* ── 7. DICTAMEN "DOCUMENTO RADICABLE" ───────────────────────────── */
+  .doc-membrete{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;
+    flex-wrap:wrap;
+    padding:1.1rem 1.4rem .85rem;
+    border-bottom:2px solid var(--sinac-blue-900);
+    background:var(--sinac-off-white);
+  }
+  .doc-membrete-nombre{
+    font-family:var(--font-display);font-weight:800;font-size:.92rem;
+    color:var(--sinac-blue-900);letter-spacing:.06em;text-transform:uppercase;
+    line-height:1.3;
+  }
+  .doc-membrete-ciudad{
+    font-size:.7rem;color:var(--text3);margin-top:2px;letter-spacing:.04em;
+  }
+  .doc-membrete-meta{
+    display:flex;flex-direction:column;gap:2px;align-items:flex-end;
+    font-size:.68rem;color:var(--text3);text-align:right;
+  }
+  .doc-membrete-meta b{font-weight:600;color:var(--text2)}
+  body.dark .doc-membrete{background:var(--bg-subtle);border-bottom-color:var(--sinac-blue-400)}
+  body.dark .doc-membrete-nombre{color:var(--sinac-blue-200)}
+  /* Cuerpo: hoja formal — justificado, aireado */
+  #p-analizar .res-dictamen .res-dictamen-body{
+    text-align:justify;
+    line-height:1.7 !important;
+    padding:1.4rem 1.6rem !important;
+    font-size:.84rem !important;
+  }
+  .doc-footer{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;
+    flex-wrap:wrap;
+    padding:1.4rem 1.6rem 1.2rem;
+    border-top:1px solid var(--border);
+    background:var(--sinac-off-white);
+  }
+  body.dark .doc-footer{background:var(--bg-subtle)}
+  .doc-firma{flex:1;min-width:220px;max-width:340px}
+  .doc-firma-linea{border-bottom:1.5px solid var(--text2);height:2.4rem}
+  .doc-firma-cargo{
+    font-size:.66rem;color:var(--text3);margin-top:.35rem;
+    letter-spacing:.04em;text-transform:uppercase;font-weight:600;
+  }
+  .doc-sello{
+    display:flex;align-items:center;gap:.6rem;flex-shrink:0;
+    color:var(--sinac-green-700);
+  }
+  body.dark .doc-sello{color:#86efac}
+  .doc-sello svg{flex-shrink:0;transform:rotate(-8deg)}
+  .doc-sello-txt{
+    font-size:.62rem;font-weight:700;letter-spacing:.06em;line-height:1.5;
+    text-transform:uppercase;font-family:var(--font-display);
+  }
+  /* Botón PDF radicable prominente en verde institucional */
+  .btn-pdf-radicable{
+    background:var(--grad-success) !important;
+    box-shadow:0 1px 2px rgba(46,125,50,.25),0 4px 12px -2px rgba(46,125,50,.3),inset 0 1px 0 rgba(255,255,255,.2) !important;
+  }
+  .btn-pdf-radicable:hover{
+    box-shadow:0 2px 4px rgba(46,125,50,.3),0 8px 20px -4px rgba(46,125,50,.4) !important;
+  }
+
+  /* ── 4. DASHBOARD HERO — KPIs estilo Stripe ──────────────────────── */
+  #p-dashboard #kpi-grid .kpi{
+    padding:1.35rem 1.4rem;border-radius:var(--r-xl);
+    border:1px solid var(--border);position:relative;overflow:hidden;
+    transition:transform .2s var(--ease-out),box-shadow .2s var(--ease-out),border-color .2s var(--ease-out);
+  }
+  #p-dashboard #kpi-grid .kpi:hover{
+    transform:translateY(-2px);box-shadow:var(--sh-lg);
+    border-color:var(--sinac-blue-200);
+  }
+  #p-dashboard #kpi-grid .kpi-num{
+    font-family:var(--font-display);font-weight:800;font-size:2.05rem;
+    letter-spacing:-.03em;
+  }
+  #p-dashboard #kpi-grid .kpi-lbl{
+    font-size:.64rem;letter-spacing:.08em;color:var(--text3);font-weight:700;
+  }
+  /* Gradientes MUY sutiles: azules para volumen/dinero, verdes para éxito */
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(1),
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(2){
+    background:linear-gradient(180deg,var(--sinac-white) 30%,var(--sinac-blue-50) 100%);
+  }
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(3),
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(4){
+    background:linear-gradient(180deg,var(--sinac-white) 30%,var(--sinac-green-50) 100%);
+  }
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(3) .kpi-num,
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(4) .kpi-num{
+    color:var(--sinac-green-700);
+  }
+  @media(max-width:1100px){
+    #p-dashboard #kpi-grid .kpi-num{font-size:1.7rem}
+  }
+
+  /* ── 1. Header: responsive del wordmark ──────────────────────────── */
+  @media(max-width:980px){
+    .hdr-wordmark,.hdr-brand-sep{display:none}
+  }
+  @media(max-width:760px){
+    .hdr-sub{display:none}
+  }
+
+  /* ── 10. Micro-interacciones institucionales ─────────────────────── */
+  .btn-primary:hover{
+    transform:translateY(-1px);
+    box-shadow:0 2px 4px rgba(11,61,145,.14),0 8px 20px -4px rgba(11,61,145,.18),inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .btn-login:hover{
+    box-shadow:0 8px 20px -4px rgba(11,61,145,.30),inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  /* Toasts: acento de barra por tipo alineado a paleta SINAC */
+  .toast.success{border-left-color:var(--sinac-green-600);color:var(--sinac-green-600)}
+  .toast.info{border-left-color:var(--sinac-blue-600);color:var(--sinac-blue-600)}
+  /* Confetti descartado para el look institucional (decisión 11-jun-2026) */
+  .confetti-particle{display:none !important}
+
+  /* ── Impresión: el documento radicable imprime limpio ────────────── */
+  @media print{
+    .medallas-wrap,.exito-mini{display:none !important}
+    .res-dictamen.card-doc{border:1px solid #999 !important;box-shadow:none !important}
+    .card-doc::before{display:none}
+    .qg-seal{display:none}
+    .card-doc.qg-ok .qg-seal{position:static;display:inline-block;float:right;background:#fff;
+      color:#2E7D32;border:1.5px solid #2E7D32;box-shadow:none}
+    .doc-membrete,.doc-footer{background:#fff !important}
+    .doc-sello{color:#2E7D32 !important}
+    #p-analizar .res-dictamen .res-dictamen-body{font-size:10pt !important;line-height:1.65 !important}
   }
 </style>
 <div class="fab-stack">
@@ -6149,12 +7017,28 @@ function _h(s){
 }
 
 
+// ─── Detección de sesión expirada (10-jun-2026) ─────────────────────────
+// El JWT vence y el panel quedaba "zombie": visible como logueado pero
+// todos los fetch devolvían 401 en silencio (badge/alertas/analytics
+// cada 60s en los logs de Fly). El gestor solo se enteraba al intentar
+// una acción. Ahora el primer 401 de un poll de fondo fuerza el login.
+window._sesion401Detectada = false;
+function manejarSesionExpirada(){
+  if(window._sesion401Detectada) return;       // una sola vez
+  if(!localStorage.getItem('hus_token')) return; // ya deslogueado
+  window._sesion401Detectada = true;
+  try{ toast('Sesión expirada','Tu sesión venció — vuelve a iniciar sesión. Lo que escribiste en el formulario se conserva.','warning'); }catch(_){}
+  logout();
+  window._sesion401Detectada = false; // permitir detección en el próximo login
+}
+
 // ─── Notificaciones personales (Ronda 26) ───────────────────────────────
 // Pollea /notificaciones/badge cada 60s. Solo pide el conteo total para
 // minimizar carga en BD. El drawer completo se carga on-demand al click.
 async function refrescarBadgeNotif(){
   try{
     var r = await fetch('/notificaciones/badge', {headers: authH()});
+    if(r.status === 401){ manejarSesionExpirada(); return; }
     if(!r.ok) return;
     var d = await r.json();
     var badge = document.getElementById('hdr-notif-badge');
@@ -6264,6 +7148,69 @@ document.addEventListener('DOMContentLoaded', function(){
     if(c){ c.checked = localStorage.getItem('sonidos_off') !== '1'; }
   }, 1100);
 });
+
+// ── Auto-detección de EPS en el texto pegado de la glosa (17-jun-2026) ──
+// Si el texto trae "COOSALUD EPS" o "GLOSA INICIAL — NUEVA EPS" en el
+// encabezado, autoselecciona la EPS en el dropdown SIN que el usuario
+// tenga que ir a buscarla. Solo dispara la primera vez (cuando la EPS
+// está en "OTRA / SIN DEFINIR" o vacía) — no pisa una selección manual.
+function _normalizarParaMatch(s){
+  return (s || '').toString().toUpperCase()
+    .replace(/[ÁÄÀÂ]/g,'A').replace(/[ÉËÈÊ]/g,'E').replace(/[ÍÏÌÎ]/g,'I')
+    .replace(/[ÓÖÒÔ]/g,'O').replace(/[ÚÜÙÛ]/g,'U').replace(/[Ñ]/g,'N')
+    .replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function detectarEpsEnGlosa(){
+  try{
+    var ta = document.getElementById('f-glosa');
+    var sel = document.getElementById('eps-sel');
+    var badge = document.getElementById('eps-detectada-badge');
+    var nombreEl = document.getElementById('eps-detectada-nombre');
+    if(!ta || !sel) return;
+    var texto = (ta.value || '').slice(0, 800);
+    if(texto.length < 12) { if(badge) badge.style.display = 'none'; return; }
+    // Si el usuario ya eligió manualmente una EPS distinta a "OTRA",
+    // respetar su elección — no sobrescribir.
+    // Ronda 9 (17-jun-2026): además ocultar el badge para que no quede
+    // residuo del análisis anterior (caso 18 ronda 8: el badge mostraba
+    // "COMPENSAR" cuando ya se había cambiado el texto a otro caso).
+    var actual = (sel.value || '').toUpperCase().trim();
+    if(actual && actual !== 'OTRA' && actual !== 'OTRA / SIN DEFINIR' && actual !== 'OTRA/SIN DEFINIR') {
+      if(badge) badge.style.display = 'none';
+      return;
+    }
+    var textoNorm = _normalizarParaMatch(texto);
+    // Recorrer todas las EPS del dropdown buscando match en el texto.
+    // Prioriza el match más LARGO (NUEVA EPS sobre EPS, DISPENSARIO MEDICO
+    // sobre DISPENSARIO) para evitar falsos positivos.
+    var candidatos = [];
+    for(var i = 0; i < sel.options.length; i++){
+      var opt = sel.options[i];
+      var v = (opt.value || '').trim();
+      if(!v) continue;
+      var vu = v.toUpperCase();
+      if(vu === 'OTRA' || vu === 'OTRA / SIN DEFINIR' || vu === 'OTRA/SIN DEFINIR') continue;
+      var vn = _normalizarParaMatch(v);
+      // Match: nombre completo en el texto normalizado
+      if(vn && vn.length >= 4 && textoNorm.indexOf(vn) >= 0){
+        candidatos.push({ valor: v, longitud: vn.length });
+      }
+    }
+    if(!candidatos.length){ if(badge) badge.style.display = 'none'; return; }
+    // Elegir el match más largo (más específico)
+    candidatos.sort(function(a, b){ return b.longitud - a.longitud; });
+    var match = candidatos[0].valor;
+    if(sel.value !== match){
+      sel.value = match;
+      // Disparar evento change por si hay listeners que dependen del valor
+      try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch(_){}
+    }
+    if(badge && nombreEl){
+      nombreEl.textContent = match;
+      badge.style.display = 'block';
+    }
+  }catch(_){ /* silencioso */ }
+}
 
 function cargarCasoEjemplo(){
   var ej = {
@@ -6425,6 +7372,7 @@ function tab(btn,id){
   if(id==='mi-desempeno') cargarMiDesempeno();
   if(id==='usuarios') cargar2FAEstado();
   if(id==='papelera') cargarPapelera();
+  if(id==='contratos') ctrMetaInit();
   if(id==='tarifas'){ cargarTarifas(); poblarSelectEpsContratos(); }
   if(id==='soportes') cargarSoportesEstado();
   if(id==='importacion-masiva') initImportacionMasiva();
@@ -8775,69 +9723,92 @@ function _tercerDomingoMes(anio, mes0){
   d.setDate(d.getDate() + 14);
   return d;
 }
+function _diasEntre(a, b){
+  // Diferencia en días calendario (b - a), redondeada.
+  return Math.round((b - a) / 86400000);
+}
 function getTemaFestivoHoy(){
   // Busca coincidencia de la fecha actual con las festividades del catálogo.
   // Los textos/colores están en TEMAS_FESTIVOS; acá solo la lógica de fecha.
-  var hoy = new Date();
+  // VENTANA: cada festividad se activa desde N días antes hasta el día del
+  // evento (inclusive). Así el equipo ve el tema toda la semana previa, no
+  // solo el día exacto (feedback Yesid 17-jun: "pasó el día del padre y
+  // nunca cambió" — porque el detector exigía el día exacto y un domingo
+  // nadie entra al sistema).
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
   var anio = hoy.getFullYear();
   var mes = hoy.getMonth();     // 0-11
   var dia = hoy.getDate();
 
-  // Día de la Madre Colombia: 2º domingo de mayo (móvil)
-  var madre = _segundoDomingoMes(anio, 4);
-  if(mes === 4 && dia === madre.getDate()) return TEMAS_FESTIVOS.madre;
-  // Día del Padre Colombia: 3er domingo de junio (móvil)
-  var padre = _tercerDomingoMes(anio, 5);
-  if(mes === 5 && dia === padre.getDate()) return TEMAS_FESTIVOS.padre;
-  // Navidad: 24 y 25 diciembre
-  if(mes === 11 && (dia === 24 || dia === 25)) return TEMAS_FESTIVOS.navidad;
-  // Año Nuevo: 31 diciembre / 1 enero
-  if((mes === 11 && dia === 31) || (mes === 0 && dia === 1)) return TEMAS_FESTIVOS.anio_nuevo;
-  // San Valentín internacional (14 feb) — Colombia tiene su propio día de amor
-  // y amistad en septiembre, pero muchos equipos usan el 14 feb.
-  if(mes === 1 && dia === 14) return TEMAS_FESTIVOS.valentin;
-  // Día del Trabajador: 1 mayo
-  if(mes === 4 && dia === 1) return TEMAS_FESTIVOS.trabajador;
-  // Independencia Colombia: 20 julio
-  if(mes === 6 && dia === 20) return TEMAS_FESTIVOS.independencia;
+  // Helper: ¿hoy está en la ventana [evento - antesDias, evento]?
+  function enVentana(fechaEvento, antesDias){
+    fechaEvento.setHours(0,0,0,0);
+    var d = _diasEntre(hoy, fechaEvento);  // >0 si el evento es futuro
+    return d >= 0 && d <= antesDias;
+  }
+
+  // Día de la Madre Colombia: 2º domingo de mayo (móvil) — ventana 6 días
+  if(mes === 4 && enVentana(_segundoDomingoMes(anio, 4), 6)) return TEMAS_FESTIVOS.madre;
+  // Día del Padre Colombia: 3er domingo de junio (móvil) — ventana 6 días
+  if(mes === 5 && enVentana(_tercerDomingoMes(anio, 5), 6)) return TEMAS_FESTIVOS.padre;
+  // Navidad: 18→25 diciembre
+  if(mes === 11 && dia >= 18 && dia <= 25) return TEMAS_FESTIVOS.navidad;
+  // Año Nuevo: 26 dic → 2 enero
+  if((mes === 11 && dia >= 26) || (mes === 0 && dia <= 2)) return TEMAS_FESTIVOS.anio_nuevo;
+  // San Valentín: 10→14 feb
+  if(mes === 1 && dia >= 10 && dia <= 14) return TEMAS_FESTIVOS.valentin;
+  // Día del Trabajador: 28 abr → 1 mayo
+  if((mes === 3 && dia >= 28) || (mes === 4 && dia === 1)) return TEMAS_FESTIVOS.trabajador;
+  // Independencia Colombia: 15→20 julio
+  if(mes === 6 && dia >= 15 && dia <= 20) return TEMAS_FESTIVOS.independencia;
   // Batalla de Boyacá: 7 agosto
-  if(mes === 7 && dia === 7) return TEMAS_FESTIVOS.boyaca;
-  // Día de los Niños / Halloween: 31 octubre
-  if(mes === 9 && dia === 31) return TEMAS_FESTIVOS.halloween;
+  if(mes === 7 && (dia === 6 || dia === 7)) return TEMAS_FESTIVOS.boyaca;
+  // Día de los Niños / Halloween: 25→31 octubre
+  if(mes === 9 && dia >= 25 && dia <= 31) return TEMAS_FESTIVOS.halloween;
   return null;
 }
 // Catálogo de temas festivos — permite preview y fácil mantenimiento.
 // Claves usadas también en el query ?festivo=<clave> para probar.
 var TEMAS_FESTIVOS = {
   madre:        {emoji:'💐', icono:'💐', color:'#ec4899', bg:'#fdf2f8',
+                 particulas:['💐','🌷','🌸','💖','🌹'],
                  titulo:'¡Feliz Día de la Madre!',
                  mensaje:'💐 SINAC SC desea un feliz Día de la Madre a todas las mamás del equipo HUS. Gracias por todo lo que hacen.'},
   padre:        {emoji:'👔', icono:'👔', color:'#0369a1', bg:'#eff6ff',
+                 particulas:['👔','👨‍👧','⚽','🎣','🏆'],
                  titulo:'¡Feliz Día del Padre!',
                  mensaje:'👔 SINAC SC desea un feliz Día del Padre a todos los papás del equipo HUS.'},
   navidad:      {emoji:'🎄', icono:'🎄', color:'#dc2626', bg:'#fef2f2',
+                 particulas:['🎄','❄️','🎁','⭐','🔔'],
                  titulo:'¡Feliz Navidad!',
                  mensaje:'🎄 SINAC SC les desea una Navidad llena de paz y unión familiar.'},
   anio_nuevo:   {emoji:'🎆', icono:'🎆', color:'#7c3aed', bg:'#f5f3ff',
+                 particulas:['🎆','🎇','🥂','✨','🎉'],
                  titulo:'¡Feliz Año Nuevo!',
                  mensaje:'🎆 SINAC SC les desea un año lleno de éxitos y recuperaciones exitosas.'},
   valentin:     {emoji:'❤️', icono:'❤️', color:'#e11d48', bg:'#fff1f2',
+                 particulas:['❤️','💕','💘','🌹','💝'],
                  titulo:'¡Feliz Día del Amor y la Amistad!',
                  mensaje:'❤️ SINAC SC les desea un día lleno de amor y amistad.'},
   trabajador:   {emoji:'🛠️', icono:'🛠️', color:'#ea580c', bg:'#fff7ed',
+                 particulas:['🛠️','⚙️','👷','💪','🔧'],
                  titulo:'¡Feliz Día del Trabajador!',
                  mensaje:'🛠️ SINAC SC reconoce el trabajo y compromiso del equipo HUS.'},
   independencia:{emoji:'🇨🇴', icono:'🇨🇴', color:'#eab308', bg:'#fefce8',
+                 particulas:['🇨🇴','🎺','⭐','🟡','🔵'],
                  titulo:'¡Feliz 20 de Julio!',
                  mensaje:'🇨🇴 SINAC SC celebra con ustedes el Día de la Independencia.'},
   boyaca:       {emoji:'🎖️', icono:'🎖️', color:'#1d4ed8', bg:'#eff6ff',
+                 particulas:['🎖️','⚔️','🇨🇴','🐎','🏅'],
                  titulo:'Batalla de Boyacá',
                  mensaje:'🎖️ En memoria de la gesta libertaria de 1819.'},
   halloween:    {emoji:'🎃', icono:'🎃', color:'#ea580c', bg:'#fff7ed',
+                 particulas:['🎃','👻','🍬','🦇','🕷️'],
                  titulo:'¡Feliz Día de los Niños!',
                  mensaje:'🎃 SINAC SC les desea un día mágico a los peques del equipo.'},
   // Tema demo neutro para mostrar siempre en capacitación o demos
   lanzamiento:  {emoji:'🚀', icono:'🚀', color:'#0ea5e9', bg:'#f0f9ff',
+                 particulas:['🚀','⭐','✨','💡','🛰️'],
                  titulo:'¡Bienvenido a IA GLOSAS SINAC SC!',
                  mensaje:'🚀 Sistema inteligente de defensa de glosas · Powered by SINAC SC SAS'},
 };
@@ -8929,6 +9900,66 @@ function _quitarColoresTema(){
   if(existing) existing.remove();
 }
 
+// ─── Lluvia de partículas decorativas del tema ──────────────────────────
+// Feedback Yesid 17-jun: "los temas cambian solo el color, no se nota que
+// es un tema nuevo". Esto agrega emojis cayendo suavemente de fondo
+// (pointer-events:none → no interfiere con clics). Se autodetiene tras
+// `duracionMs` para no consumir CPU indefinidamente; se relanza si el
+// usuario cambia de tema. Respeta prefers-reduced-motion.
+var _festivoParticulasTimer = null;
+function _lanzarParticulasFestivas(tema, duracionMs){
+  try{
+    if(!tema || !tema.particulas || !tema.particulas.length) return;
+    // Respetar accesibilidad: si el usuario pidió menos movimiento, no animar.
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    _detenerParticulasFestivas();
+    duracionMs = duracionMs || 9000;
+
+    // Inyectar keyframes una sola vez
+    if(!document.getElementById('festivo-particulas-kf')){
+      var kf = document.createElement('style');
+      kf.id = 'festivo-particulas-kf';
+      kf.textContent =
+        '@keyframes festCaer{0%{transform:translateY(-8vh) rotate(0deg);opacity:0}' +
+        '8%{opacity:.9}92%{opacity:.9}100%{transform:translateY(108vh) rotate(360deg);opacity:0}}' +
+        '.fest-particula{position:fixed;top:0;z-index:9997;pointer-events:none;' +
+        'user-select:none;will-change:transform;font-size:1.6rem;animation:festCaer linear forwards}';
+      document.head.appendChild(kf);
+    }
+
+    var layer = document.createElement('div');
+    layer.id = 'festivo-particulas-layer';
+    layer.style.cssText = 'position:fixed;inset:0;z-index:9997;pointer-events:none;overflow:hidden';
+    document.body.appendChild(layer);
+
+    var N = 26;  // cantidad de partículas
+    for(var i = 0; i < N; i++){
+      (function(idx){
+        var s = document.createElement('span');
+        s.className = 'fest-particula';
+        s.textContent = tema.particulas[idx % tema.particulas.length];
+        var dur = 5 + Math.random() * 5;          // 5-10s de caída
+        var delay = Math.random() * 4;            // escalonadas
+        var size = 1.1 + Math.random() * 1.4;     // tamaños variados
+        s.style.left = (Math.random() * 98) + 'vw';
+        s.style.fontSize = size + 'rem';
+        s.style.animationDuration = dur + 's';
+        s.style.animationDelay = delay + 's';
+        s.style.opacity = (0.55 + Math.random() * 0.4).toFixed(2);
+        layer.appendChild(s);
+      })(i);
+    }
+
+    // Autodetener: la lluvia es un saludo, no un fondo permanente.
+    _festivoParticulasTimer = setTimeout(_detenerParticulasFestivas, duracionMs);
+  }catch(e){ console.warn('partículas festivas:', e); }
+}
+function _detenerParticulasFestivas(){
+  if(_festivoParticulasTimer){ clearTimeout(_festivoParticulasTimer); _festivoParticulasTimer = null; }
+  var l = document.getElementById('festivo-particulas-layer');
+  if(l) l.remove();
+}
+
 // Cambia el tema festivo desde el selector del panel Usuarios.
 // Persiste en localStorage y refresca la UI sin recargar la página.
 function cambiarTemaFestivo(clave){
@@ -8936,10 +9967,11 @@ function cambiarTemaFestivo(clave){
     clave = (clave || '').toLowerCase().trim();
     if(!clave || clave === 'off'){
       localStorage.removeItem('_festivo_override');
-      // Quitar banner global + colores inyectados
+      // Quitar banner global + colores inyectados + partículas
       var b = document.getElementById('banner-festivo-global');
       if(b){ b.remove(); document.body.style.paddingTop=''; }
       _quitarColoresTema();
+      _detenerParticulasFestivas();
       // Restaurar landing
       var msg = document.getElementById('landing-festivo-msg');
       var icon = document.getElementById('landing-icon');
@@ -9010,10 +10042,17 @@ function _mostrarBannerFestivoGlobal(tema){
   b.style.background = tema.bg;
   b.style.color = tema.color;
   b.style.borderBottom = '2px solid ' + tema.color;
-  // Contenido: emoji + título + mensaje corto
+  // Contenido: emoji + título + mensaje corto + botón "celebrar"
   var textSpan = b.querySelector('span:not(:first-child)') || b.appendChild(document.createElement('span'));
   textSpan.innerHTML = tema.emoji + ' <b>' + tema.titulo + '</b> · ' +
-    tema.mensaje.replace(/^[^\s]+\s/, ''); // quitar emoji duplicado al inicio
+    tema.mensaje.replace(/^[^\s]+\s/, '') + // quitar emoji duplicado al inicio
+    ' <span onclick="_lanzarParticulasFestivas(window._temaFestivoActual,9000)" ' +
+    'style="cursor:pointer;text-decoration:underline;margin-left:8px;font-weight:600;opacity:.85" ' +
+    'title="Lanzar la animación de nuevo">🎉 celebrar</span>';
+
+  // 3) Lluvia de partículas decorativas (una vez al activar el tema).
+  window._temaFestivoActual = tema;
+  _lanzarParticulasFestivas(tema, 9000);
 }
 // Aplicar al cargar
 document.addEventListener('DOMContentLoaded', function(){
@@ -9371,7 +10410,13 @@ function limpiarSoportesPDF(){
 function validarPDFs(input){
   var info = document.getElementById('pdf-info');
   var files = input.files || [];
-  if(!files.length){ info.textContent = ''; info.style.color=''; return; }
+  if(!files.length){
+    info.textContent = '';
+    info.style.color='';
+    var prefill = document.getElementById('soportes-prefill');
+    if(prefill) prefill.style.display = 'none';
+    return;
+  }
   var totalMB = 0;
   for(var i=0;i<files.length;i++){ totalMB += files[i].size/(1024*1024); }
   totalMB = Math.round(totalMB * 10) / 10;
@@ -9379,10 +10424,107 @@ function validarPDFs(input){
   if(n > 10){
     info.innerHTML = '⚠ <b style="color:#dc2626">Máximo 10 archivos</b> — tienes '+n+'. Elimina '+(n-10)+'.';
     info.style.color = '#dc2626';
-  } else {
-    var complejidad = (n >= 2 ? 'ALTA (respuesta 4 párrafos)' : 'ESTÁNDAR');
-    info.innerHTML = '✓ '+n+' archivo(s) · '+totalMB+' MB total · Complejidad: <b>'+complejidad+'</b>';
-    info.style.color = 'var(--c-green)';
+    return;
+  }
+  var complejidad = (n >= 2 ? 'ALTA (respuesta 4 párrafos)' : 'ESTÁNDAR');
+  info.innerHTML = '✓ '+n+' archivo(s) · '+totalMB+' MB total · Complejidad: <b>'+complejidad+'</b>';
+  info.style.color = 'var(--c-green)';
+  // Auto-extraer metadata del PDF en segundo plano para sugerir prefill.
+  extraerMetadataSoportes(files);
+}
+
+// ─── AUTO-EXTRACT desde PDFs de soporte (feature #5) ───────────────
+// Llama a POST /analizar/extraer-soportes apenas el gestor adjunta PDFs
+// y le ofrece chips para confirmar paciente/factura/CUPS/valor/eps.
+// No sobrescribe campos ya escritos por el gestor — solo SUGIERE.
+async function extraerMetadataSoportes(files){
+  var panel = document.getElementById('soportes-prefill');
+  if(!panel){
+    // Crear el panel debajo de #pdf-info la primera vez
+    var info = document.getElementById('pdf-info');
+    if(!info || !info.parentNode) return;
+    panel = document.createElement('div');
+    panel.id = 'soportes-prefill';
+    panel.style.cssText = 'margin-top:.5rem;padding:.6rem .8rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;font-size:.75rem;line-height:1.6;display:none;';
+    info.parentNode.insertBefore(panel, info.nextSibling);
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = '<span style="color:var(--text3)">🔍 Extrayendo metadata de los PDFs…</span>';
+  try{
+    var fd = new FormData();
+    for(var i = 0; i < files.length; i++) fd.append('archivos', files[i]);
+    var r = await fetch('/analizar/extraer-soportes', {method:'POST', body:fd, headers: authH()});
+    if(!r.ok){ panel.style.display = 'none'; return; }
+    var d = await r.json();
+    if(!d.archivos_procesados || d.confianza_global === 0){
+      panel.innerHTML = '<span style="color:var(--text3)">ℹ Los PDFs no tienen texto plano (puede que requieran OCR — se hará al analizar).</span>';
+      return;
+    }
+    panel.innerHTML = renderPrefillSoportes(d);
+  }catch(e){
+    // Silencioso: el auto-extract es UX-mejora, no debe bloquear el flujo
+    panel.style.display = 'none';
+  }
+}
+
+function renderPrefillSoportes(d){
+  var chips = [];
+  var conf = Math.round((d.confianza_global || 0) * 100);
+  var confColor = conf >= 70 ? 'var(--c-green)' : conf >= 40 ? '#d97706' : '#94a3b8';
+  function chip(label, value, campo, targetId){
+    if(!value) return '';
+    var safe = String(value).replace(/'/g, "\\'").replace(/"/g,'&quot;');
+    return '<button type="button" class="pa-chip" style="margin:.15rem;padding:.18rem .55rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:14px;cursor:pointer;font-size:.7rem;font-weight:600" '
+      + 'onclick="confirmarPrefillSoporte(\''+targetId+'\',\''+safe+'\',\''+campo+'\',this)" title="Clic para usar este valor en el formulario">'
+      + label + ': ' + (String(value).length > 28 ? String(value).slice(0,28)+'…' : value) + '</button>';
+  }
+  chips.push(chip('Factura',  d.factura,           'factura',  'f-factura'));
+  chips.push(chip('Radicado', d.radicado,          'radicado', 'f-radicado'));
+  chips.push(chip('EPS',      d.eps,               'eps',      'eps-sel'));
+  chips.push(chip('CUPS',     d.cups,              'cups',     'f-cups'));
+  chips.push(chip('Paciente', d.paciente,          'paciente', null));
+  if(d.valor_objetado){
+    chips.push(chip('Valor objetado','$ '+(d.valor_objetado).toLocaleString('es-CO'),'valor_objetado','f-valacp'));
+  }
+  if(d.fecha_radicacion){
+    chips.push(chip('F. Radicación', d.fecha_radicacion, 'fecha_rad', 'f-rad'));
+  }
+  if(d.fecha_recepcion){
+    chips.push(chip('F. Recepción', d.fecha_recepcion, 'fecha_rec', 'f-rec'));
+  }
+  var chipsHtml = chips.filter(function(c){ return !!c; }).join('');
+  if(!chipsHtml){
+    return '<span style="color:var(--text3)">Soportes leídos pero sin metadata reconocible.</span>';
+  }
+  return '<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem">'
+    + '<span style="font-weight:600">⚡ Auto-detectado en los PDFs ('+d.archivos_procesados+' archivo(s)):</span>'
+    + '<span style="color:'+confColor+';font-size:.7rem">confianza '+conf+'%</span>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;align-items:center">' + chipsHtml + '</div>'
+    + '<div style="margin-top:.3rem;color:var(--text3);font-size:.68rem">Clic en un chip para usar ese valor. No sobrescribe lo que ya tipeaste.</div>';
+}
+
+function confirmarPrefillSoporte(targetId, value, campo, btn){
+  if(targetId){
+    var el = document.getElementById(targetId);
+    if(el){
+      var prev = (el.value || '').trim();
+      if(prev && prev !== value){
+        if(!confirm('Ya escribiste "'+prev+'" en este campo. ¿Reemplazar por "'+value+'"?')) return;
+      }
+      el.value = value;
+      // Disparar eventos para que listeners (preview, etc.) se enteren
+      el.dispatchEvent(new Event('input', {bubbles:true}));
+      el.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+  // Marcar el chip como confirmado
+  if(btn){
+    btn.style.background = '#dcfce7';
+    btn.style.color = '#15803d';
+    btn.style.borderColor = '#86efac';
+    btn.innerHTML = '✓ ' + btn.textContent;
+    btn.disabled = true;
   }
 }
 
@@ -10948,6 +12090,38 @@ function sidebarTab(el, id){
   if(window.innerWidth <= 900) toggleSidebar(false);
 }
 
+// ─── Tab-bar consolidada de Reportes ───────────────────────────────────────
+// Consolida Mando · Dashboard · Cartera (Cobranza Live) · Resumen del mes en
+// una sola barra de pestañas que aparece arriba de los 4 paneles. Feedback
+// Yesid: "4 botones que sacan la misma info → consolidar en uno". El menú
+// lateral sigue teniendo los accesos, pero ahora dentro de cualquiera de los
+// 4 se navega entre ellos sin volver al sidebar.
+function navReporte(id){
+  // Marca el .sn-item correcto del sidebar y navega (sidebarTab gestiona todo)
+  var target = null;
+  document.querySelectorAll('.sn-item').forEach(function(b){
+    var oc = b.getAttribute('onclick') || '';
+    if(oc.indexOf("'" + id + "'") >= 0) target = b;
+  });
+  sidebarTab(target, id);
+}
+function pintarRepTabbars(){
+  var rol = (window.USER_ROL || '').toUpperCase();
+  var verMando = (rol === 'SUPER_ADMIN' || rol === 'COORDINADOR');
+  var tabs = [];
+  if(verMando) tabs.push(['mando', '⚡ Mando']);
+  tabs.push(['dashboard', '📊 Dashboard']);
+  tabs.push(['cobranza-live', '💰 Cartera & Aging']);
+  tabs.push(['resumen-mes', '📅 Resumen del mes']);
+  document.querySelectorAll('.rep-tabbar-host').forEach(function(host){
+    var activo = host.getAttribute('data-activo');
+    host.innerHTML = '<div class="rep-tabbar">' + tabs.map(function(t){
+      var cls = (t[0] === activo) ? 'rep-tab active' : 'rep-tab';
+      return '<button class="' + cls + '" onclick="navReporte(\'' + t[0] + '\')">' + t[1] + '</button>';
+    }).join('') + '</div>';
+  });
+}
+
 // Toggle colapsable del sidebar (persiste en localStorage)
 function toggleSidebarCollapse(){
   var sb = document.getElementById('sidebar-nav');
@@ -11822,6 +12996,11 @@ function _renderMisGlosas(dataRaw){
       var primario = '';
       var menuItems = [];
 
+      // PDF radicable (documento formal para subir al portal de la EPS)
+      if(g.dictamen_generado || yaRespondida){
+        menuItems.push({icon:'📄', label:'PDF respuesta (radicable)', onclick:'descargarPdfRespuesta(' + g.id + ')'});
+      }
+
       if(yaRespondida){
         // Respondida: primario = "Ver" (abre la glosa con el dictamen).
         primario = '<button class="btn-sm btn-primary" onclick="responderGlosa(' + g.id + ')" title="Abrir glosa y ver el dictamen">Ver</button>';
@@ -11856,7 +13035,7 @@ function _renderMisGlosas(dataRaw){
           menuItems.push({icon:'✓', label:'Aprobar', onclick:'cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')'});
           menuItems.push({icon:'←', label:'Devolver a borrador', onclick:'cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')'});
         } else if(wfEstado === 'APROBADA' && puedeAprobar){
-          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')'});
+          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'marcarRadicadaUI(' + g.id + ')'});
         }
       }
 
@@ -12472,6 +13651,52 @@ function mostrarConfettiBurst(){
   }catch(_){ /* nunca romper UI por una animación */ }
 }
 
+// PDF radicable: documento formal de la respuesta para subir al portal de la EPS.
+async function descargarPdfRespuesta(id){
+  try{
+    var r = await fetch('/glosas/' + id + '/dictamen.pdf', {headers: authH()});
+    if(!r.ok){
+      var d = {}; try{ d = await r.json(); }catch(_){}
+      toast('Error', d.detail || 'No se pudo generar el PDF ('+r.status+')', 'error');
+      return;
+    }
+    var blob = await r.blob();
+    var cd = r.headers.get('content-disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (m && m[1]) || ('respuesta_glosa_' + id + '.pdf');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    toast('PDF listo', 'Respuesta radicable descargada', 'success');
+  }catch(e){ toast('Error', 'Conexión: ' + e.message, 'error'); }
+}
+
+// Marcar radicada CON evidencia: pide el N° de radicado que asignó la
+// entidad y una observación opcional. Queda en el audit log de la glosa.
+async function marcarRadicadaUI(id){
+  var numero = prompt('N° de radicado asignado por la entidad (obligatorio):');
+  if(numero === null) return; // cancelado
+  numero = (numero || '').trim();
+  if(!numero){ toast('Falta el radicado','Ingresa el número de radicado para dejar evidencia','error'); return; }
+  var obs = prompt('Observación opcional (canal, archivo de confirmación, etc.):') || '';
+  try{
+    var r = await fetch('/glosas/' + id + '/marcar-radicada', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({numero_radicado: numero, observacion: obs.trim() || null})
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('Radicación registrada', 'N° ' + (d.numero_radicado || numero) + ' ✓', 'success');
+      mostrarConfettiBurst();
+      if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    } else {
+      toast('Error', d.detail || 'No se pudo registrar la radicación', 'error');
+    }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
 async function cambiarWorkflow(id, nuevoEstado, etiqueta){
   var comentario = prompt('Comentario opcional para esta transición a ' + etiqueta + ':') || '';
   try{
@@ -13076,6 +14301,255 @@ async function loadContratos(){
   }catch(e){console.error(e);}
 }
 
+// ─── CONTRATOS · Metadatos enriquecidos (editor admin) ───────────────────
+// Llena las 12 columnas del PR #106 que consume el inyector
+// contexto_contractual_enriquecido.py — sin estos datos el bloque
+// [CONTRATO VIGENTE — DATOS AUDITABLES] del prompt quedaba vacío y el
+// dictamen no citaba contrato/NIT/SECOP (auditoría 10-jun-2026).
+var CTR_META_IPS_DEFAULT = {razon:'ESE HOSPITAL UNIVERSITARIO DE SANTANDER', nit:'900.006.037-4'};
+var CTR_META_CAMPOS = [
+  ['cm-numero-contrato','numero_contrato'],
+  ['cm-proceso-secop','numero_proceso_secop'],
+  ['cm-razon-eps','razon_social_eps'],
+  ['cm-nit-eps','nit_eps'],
+  ['cm-razon-ips','razon_social_ips'],
+  ['cm-nit-ips','nit_ips'],
+  ['cm-secop-url','secop_url'],
+  ['cm-fecha-suscripcion','fecha_suscripcion'],
+  ['cm-fecha-inicio','fecha_inicio'],
+  ['cm-fecha-fin','fecha_fin'],
+  ['cm-objeto','objeto_contractual'],
+];
+
+function ctrMetaVal(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+function ctrMetaSet(id, v){ var el=document.getElementById(id); if(el) el.value = (v==null ? '' : v); }
+
+// Pobla el selector con las EPS que ya tienen ContratoRecord + las que
+// tienen glosas pero AÚN no tienen contrato (el PUT crea la fila — flujo
+// "Contrato nuevo" del 404).
+async function ctrMetaInit(){
+  var sel = document.getElementById('ctr-meta-eps');
+  if(!sel) return;
+  var seleccionada = sel.value;
+  var conContrato = [], sinContrato = [];
+  try{
+    var r = await fetch('/contratos/', {headers: authH()});
+    if(r.ok){ conContrato = (await r.json()).map(function(c){ return c.eps; }); }
+  }catch(e){}
+  try{
+    var r2 = await fetch('/contratos/eps-sin-contrato', {headers: authH()});
+    if(r2.ok){ sinContrato = ((await r2.json()).items || []).map(function(x){ return x.eps; }); }
+  }catch(e){}
+  var opt = function(eps){ return '<option value="'+escHtml(eps)+'">'+escHtml(eps)+'</option>'; };
+  var html = '<option value="">— Seleccione EPS —</option>';
+  if(conContrato.length) html += '<optgroup label="Con contrato registrado">'+conContrato.map(opt).join('')+'</optgroup>';
+  if(sinContrato.length) html += '<optgroup label="Con glosas, sin contrato (se creará al guardar)">'+sinContrato.map(opt).join('')+'</optgroup>';
+  sel.innerHTML = html;
+  if(seleccionada){ sel.value = seleccionada; }
+}
+
+function ctrMetaLimpiarForm(prefillIps){
+  CTR_META_CAMPOS.forEach(function(par){ ctrMetaSet(par[0], ''); });
+  if(prefillIps){
+    ctrMetaSet('cm-razon-ips', CTR_META_IPS_DEFAULT.razon);
+    ctrMetaSet('cm-nit-ips', CTR_META_IPS_DEFAULT.nit);
+  }
+  ctrMetaRenderChips([]);
+  ctrMetaRenderAnexos([]);
+  var info = document.getElementById('cm-pdf-info');
+  if(info) info.textContent = '';
+}
+
+async function ctrMetaCargar(){
+  var eps = ctrMetaVal('ctr-meta-eps');
+  var form = document.getElementById('ctr-meta-form');
+  var estado = document.getElementById('ctr-meta-estado');
+  if(!form || !estado) return;
+  if(!eps){ form.style.display = 'none'; estado.style.display = 'none'; return; }
+  form.style.display = 'block';
+  estado.style.display = 'none';
+  try{
+    var r = await fetch('/contratos/'+encodeURIComponent(eps)+'/metadatos', {headers: authH()});
+    if(r.status === 404){
+      // EPS sin ContratoRecord: formulario vacío, el PUT creará la fila.
+      ctrMetaLimpiarForm(true);
+      estado.style.display = 'block';
+      estado.innerHTML = '🆕 <b>Contrato nuevo</b> — completa los datos y guarda.';
+      return;
+    }
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return {}; });
+      toast('Error cargando metadatos', err.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    var d = await r.json();
+    CTR_META_CAMPOS.forEach(function(par){ ctrMetaSet(par[0], d[par[1]]); });
+    // Defaults institucionales si el contrato aún no los tiene
+    if(!d.razon_social_ips) ctrMetaSet('cm-razon-ips', CTR_META_IPS_DEFAULT.razon);
+    if(!d.nit_ips) ctrMetaSet('cm-nit-ips', CTR_META_IPS_DEFAULT.nit);
+    ctrMetaRenderChips(d.modalidades_tarifarias || []);
+    ctrMetaRenderAnexos(d.anexos_descripcion || []);
+    var info = document.getElementById('cm-pdf-info');
+    if(info){
+      info.textContent = d.pdf_subido_en
+        ? ('PDF del contrato subido: '+new Date(d.pdf_subido_en).toLocaleDateString('es-CO'))
+        : 'Sin PDF del contrato (se sube en la pestaña Tarifas)';
+    }
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+// ── Chips de modalidades tarifarias ──
+function ctrMetaRenderChips(lista){
+  var cont = document.getElementById('cm-modalidades');
+  if(!cont) return;
+  cont.querySelectorAll('.ctr-meta-chip').forEach(function(c){ c.remove(); });
+  (lista || []).forEach(function(m){ ctrMetaInsertarChip(m); });
+}
+
+function ctrMetaInsertarChip(valor){
+  valor = String(valor == null ? '' : valor).trim();
+  if(!valor) return;
+  var cont = document.getElementById('cm-modalidades');
+  var input = document.getElementById('cm-modalidad-input');
+  if(!cont || !input) return;
+  var repetida = ctrMetaModalidades().some(function(v){ return v.toUpperCase() === valor.toUpperCase(); });
+  if(repetida) return;
+  var chip = document.createElement('span');
+  chip.className = 'ctr-meta-chip';
+  chip.dataset.valor = valor;
+  chip.innerHTML = escHtml(valor) + '<button type="button" title="Quitar modalidad">×</button>';
+  chip.querySelector('button').addEventListener('click', function(){ chip.remove(); });
+  cont.insertBefore(chip, input);
+}
+
+function ctrMetaModalidades(){
+  return Array.prototype.map.call(
+    document.querySelectorAll('#cm-modalidades .ctr-meta-chip'),
+    function(c){ return c.dataset.valor || ''; }
+  ).filter(Boolean);
+}
+
+function ctrMetaChipKey(ev){
+  var input = ev.target;
+  if(ev.key === 'Enter' || ev.key === ','){
+    ev.preventDefault();
+    ctrMetaInsertarChip(input.value.replace(/,/g, ' ').trim());
+    input.value = '';
+  } else if(ev.key === 'Backspace' && !input.value){
+    var chips = document.querySelectorAll('#cm-modalidades .ctr-meta-chip');
+    if(chips.length) chips[chips.length-1].remove();
+  }
+}
+
+// ── Repeater de anexos {nombre, descripcion} ──
+function ctrMetaRenderAnexos(lista){
+  var cont = document.getElementById('cm-anexos');
+  if(!cont) return;
+  cont.innerHTML = '';
+  (lista || []).forEach(function(a){ ctrMetaAgregarAnexo(a.nombre || '', a.descripcion || ''); });
+}
+
+function ctrMetaAgregarAnexo(nombre, descripcion){
+  var cont = document.getElementById('cm-anexos');
+  if(!cont) return;
+  var row = document.createElement('div');
+  row.className = 'ctr-anexo-row';
+  row.innerHTML =
+    '<input class="cm-anexo-nombre ctr-meta-mono" maxlength="120" placeholder="Anexo 1" value="'+escHtml(nombre || '')+'"/>' +
+    '<input class="cm-anexo-desc" maxlength="400" placeholder="Descripción (ej: Tarifas y servicios pactados)" value="'+escHtml(descripcion || '')+'"/>' +
+    '<button type="button" class="cm-anexo-del" title="Quitar anexo">🗑</button>';
+  row.querySelector('.cm-anexo-del').addEventListener('click', function(){ row.remove(); });
+  cont.appendChild(row);
+}
+
+async function ctrMetaCargarSugeridos(){
+  var eps = ctrMetaVal('ctr-meta-eps') || 'HUS';
+  try{
+    var r = await fetch('/contratos/'+encodeURIComponent(eps)+'/anexos/sugeridos', {headers: authH()});
+    if(!r.ok){ toast('Error', 'No se pudieron cargar las sugerencias (HTTP '+r.status+')', 'error'); return; }
+    var d = await r.json();
+    var existentes = Array.prototype.map.call(
+      document.querySelectorAll('#cm-anexos .cm-anexo-nombre'),
+      function(i){ return i.value.trim().toUpperCase(); }
+    );
+    var agregados = 0;
+    (d.sugeridos || []).forEach(function(a){
+      if(existentes.indexOf((a.nombre || '').toUpperCase()) === -1){
+        ctrMetaAgregarAnexo(a.nombre, a.descripcion);
+        agregados++;
+      }
+    });
+    toast('Anexos comunes', agregados + ' sugerencias añadidas — edita o quita las que no apliquen', 'info');
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+function ctrMetaAnexos(){
+  var anexos = [];
+  document.querySelectorAll('#cm-anexos .ctr-anexo-row').forEach(function(row){
+    var n = (row.querySelector('.cm-anexo-nombre').value || '').trim();
+    var de = (row.querySelector('.cm-anexo-desc').value || '').trim();
+    if(n || de) anexos.push({nombre: n, descripcion: de});
+  });
+  return anexos;
+}
+
+async function ctrMetaGuardar(){
+  var eps = ctrMetaVal('ctr-meta-eps');
+  if(!eps){ toast('Sin EPS', 'Seleccioná la EPS primero', 'warning'); return; }
+  // Validación rápida client-side (el backend revalida todo)
+  var fi = ctrMetaVal('cm-fecha-inicio'), ff = ctrMetaVal('cm-fecha-fin');
+  if(fi && ff && fi > ff){
+    toast('Fechas inválidas', 'La fecha de inicio no puede ser posterior a la fecha fin', 'warning');
+    return;
+  }
+  var url = ctrMetaVal('cm-secop-url');
+  if(url && url.toLowerCase().indexOf('https://') !== 0){
+    toast('URL inválida', 'La URL de SECOP debe empezar con https://', 'warning');
+    return;
+  }
+  // Chip a medio escribir: agregarla para no perder lo tipeado
+  var pendiente = ctrMetaVal('cm-modalidad-input');
+  if(pendiente){ ctrMetaInsertarChip(pendiente); ctrMetaSet('cm-modalidad-input', ''); }
+
+  var body = {anexos_descripcion: ctrMetaAnexos(), modalidades_tarifarias: ctrMetaModalidades()};
+  CTR_META_CAMPOS.forEach(function(par){ body[par[1]] = ctrMetaVal(par[0]) || null; });
+
+  var btn = document.getElementById('cm-btn-guardar');
+  if(btn) btn.disabled = true;
+  try{
+    var r = await fetch('/contratos/'+encodeURIComponent(eps)+'/metadatos', {
+      method: 'PUT',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(body),
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      var msg = d.detail || ('HTTP '+r.status);
+      if(r.status === 403) msg = 'Solo COORDINADOR o SUPER_ADMIN pueden editar metadatos';
+      toast('No se pudo guardar', msg, 'error');
+      return;
+    }
+    toast('Metadatos guardados', 'La IA citará estos datos al analizar glosas de '+eps, 'success');
+    var estado = document.getElementById('ctr-meta-estado');
+    if(estado) estado.style.display = 'none';
+    // Repintar con lo normalizado por el backend (NITs sin espacios, etc.)
+    CTR_META_CAMPOS.forEach(function(par){ ctrMetaSet(par[0], d[par[1]]); });
+    ctrMetaRenderChips(d.modalidades_tarifarias || []);
+    ctrMetaRenderAnexos(d.anexos_descripcion || []);
+    // La EPS pudo pasar de "sin contrato" a "con contrato" → refrescar listas
+    ctrMetaInit();
+    loadContratos();
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
 // ─── ANALIZAR ─────────────────────────────────────────────────────────────
 // Pre-auditoría gratis (sin tokens) — corre el auditor determinístico
 // del backend y muestra los hallazgos en un panel inline. Útil para
@@ -13298,16 +14772,25 @@ async function analizar(modoOverride){
     if(!r.ok){
       var er=await r.json().catch(function(){return{detail:'Error desconocido'}});
       toast('Error en el análisis',er.detail||'Verifique los datos','error');
+      // Bug 10-jun-2026: el simulador del pipeline seguía marcando verde
+      // aunque el backend ya falló (pre-validación) — el usuario veía
+      // "EN CURSO + todo verde" sin dictamen. Marcar fallo + ocultar.
+      if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
       hideLoading();_rehab();return;
     }
     var d=await r.json();
     lastResult=d;
+    // Parar el simulador antes de pintar el dictamen para evitar que un
+    // timer rezagado machaque el estado final.
+    if(typeof _paCancelarSimulador === 'function') _paCancelarSimulador();
+    if(typeof paHidePipeline === 'function') paHidePipeline();
     renderResult(d);
     toast('Análisis completado','Defensa jurídica generada','success');
     // Limpiar draft tras submit exitoso
     if(typeof _draftClear === 'function'){ _draftClear(); _draftClear('nueva'); }
   } catch(e){
     toast('Error de conexión','No se pudo conectar con el servidor','error');
+    if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
   }
   hideLoading();
   _rehab();
@@ -13425,7 +14908,7 @@ function renderConfianzaPanel(c){
     +'<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;">'
     +'<span style="font-size:1.4rem;">'+icono+'</span>'
     +'<div style="flex:1;min-width:200px;">'
-    +'<div style="font-weight:700;color:'+color+';font-size:.95rem;">Confianza del dictamen: '+pct+'% — '+(c.recomendacion||'')+'</div>'
+    +'<div style="font-weight:600;color:var(--text2);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">Desglose de confianza <span style="color:'+color+';font-weight:700;">'+pct+'%</span></div>'
     +'<div style="height:8px;background:#e5e7eb;border-radius:4px;margin-top:.35rem;overflow:hidden;">'
       +'<div style="width:'+pct+'%;height:100%;background:'+color+';transition:width .5s;"></div>'
     +'</div>'
@@ -14184,7 +15667,17 @@ async function cargarDiagnostico(){
       var col = s.estado === 'ok' ? '#16a34a' : (s.estado === 'warning' ? '#d97706' : '#dc2626');
       var ico = s.estado === 'ok' ? '✅' : (s.estado === 'warning' ? '⚠️' : '🚨');
       var bg = s.estado === 'ok' ? '#f0fdf4' : (s.estado === 'warning' ? '#fefce8' : '#fef2f2');
-      var nombre = k.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+      // Overrides de label: la key del JSON puede ser histórica (ej.
+      // "volumen_fly" del periodo Fly.io) pero el panel ya está corriendo
+      // en self-hosted Google Cloud. Mostramos el nombre actual.
+      var LABEL_OVERRIDES = {
+        'volumen_fly': 'Volumen de Datos',
+        'base_de_datos': 'Base de Datos',
+        'soportes_indexer': 'Soportes Indexer',
+        'lotes_importacion': 'Lotes Importación',
+        'clausulas_contratos': 'Cláusulas Contratos',
+      };
+      var nombre = LABEL_OVERRIDES[k] || k.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
       html += '<div style="background:'+bg+';border:1.5px solid '+col+';border-radius:10px;padding:.85rem 1rem;font-size:.83rem;">'
         + '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">'
         +   '<span style="font-size:1.2rem;">'+ico+'</span>'
@@ -14233,6 +15726,94 @@ async function diagReindexarSoportes(){
     setTimeout(cargarDiagnostico, 800);
   }catch(e){
     toast('Error de red', String(e), 'error');
+  }
+}
+
+// ─── GANADORES HISTÓRICOS (feature #3) ─────────────────────────────
+// Side-by-side: muestra hasta 3 dictámenes LEVANTADOS del mismo
+// (EPS, código_glosa) para que el gestor pueda ver "el que ya ganó"
+// y copiar frases que probaron funcionar. Render lazy — el HTML del
+// placeholder dispara la carga en background y rellena el body cuando
+// llega la respuesta del endpoint /glosas/stats/historicos-ganadores.
+function renderGanadoresHistoricosPlaceholder(eps, codigo){
+  if(!eps || !codigo) return '';
+  var epsSafe   = String(eps).replace(/"/g, '&quot;');
+  var codSafe   = String(codigo).replace(/"/g, '&quot;');
+  // Disparamos la carga después del render (microtask), una sola vez.
+  setTimeout(function(){ cargarGanadoresHistoricos(eps, codigo); }, 0);
+  return '<div class="form-card" id="ganadores-historicos" '
+    + 'data-eps="' + epsSafe + '" data-codigo="' + codSafe + '" '
+    + 'style="margin-bottom:1rem;border-left:4px solid #16a34a;background:#f0fdf4">'
+    + '<div style="font-weight:700;color:#15803d;font-size:.95rem;margin-bottom:.3rem">'
+    + '🏆 Ganadores históricos para esta EPS + código'
+    + '</div>'
+    + '<div id="ganadores-historicos-body" style="font-size:.78rem;color:var(--text2)">'
+    + '<span style="color:var(--text3)">Buscando dictámenes que ya ganaron…</span>'
+    + '</div></div>';
+}
+
+async function cargarGanadoresHistoricos(eps, codigo){
+  var body = document.getElementById('ganadores-historicos-body');
+  if(!body) return;
+  try{
+    var qs = '?eps=' + encodeURIComponent(eps) + '&codigo=' + encodeURIComponent(codigo) + '&limit=3';
+    var r = await fetch('/glosas/stats/historicos-ganadores' + qs, {headers: authH()});
+    if(!r.ok){ body.innerHTML = '<span style="color:var(--text3)">No fue posible cargar ganadores históricos.</span>'; return; }
+    var d = await r.json();
+    if(!d.total){
+      // Esconder el panel completo cuando no hay datos para no agregar ruido visual
+      var card = document.getElementById('ganadores-historicos');
+      if(card) card.style.display = 'none';
+      return;
+    }
+    var fmtCop = function(n){ return '$ ' + Math.round(Number(n)||0).toLocaleString('es-CO'); };
+    var fmtFecha = function(iso){
+      if(!iso) return '—';
+      try{ return new Date(iso).toLocaleDateString('es-CO', {year:'numeric', month:'short', day:'numeric'}); }
+      catch(e){ return iso; }
+    };
+    var totalRec = fmtCop(d.valor_recuperado_total);
+    var html = '<div style="margin-bottom:.4rem;font-size:.72rem;color:var(--text3)">'
+             + d.total + ' caso(s) previo(s) — total recuperado: <b style="color:#15803d">' + totalRec + '</b>'
+             + '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:.5rem">';
+    for(var i = 0; i < d.items.length; i++){
+      var it = d.items[i];
+      var dictSafe = String(it.dictamen || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var preview = dictSafe.length > 380 ? dictSafe.slice(0, 380) + '…' : dictSafe;
+      html += '<div style="padding:.5rem .65rem;background:white;border:1px solid var(--border);border-radius:6px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;font-size:.72rem">'
+            + '<span><b>Glosa #' + it.glosa_id + '</b> · ' + fmtFecha(it.fecha_decision_eps) + '</span>'
+            + '<span style="color:#15803d;font-weight:700">' + fmtCop(it.valor_recuperado) + ' recuperado</span>'
+            + '</div>'
+            + '<div style="font-size:.7rem;color:var(--text3);line-height:1.5;white-space:pre-wrap;word-break:break-word">' + preview + '</div>'
+            + '<div style="margin-top:.35rem">'
+            + '<button class="btn btn-ghost" style="padding:.2rem .55rem;font-size:.68rem" '
+            + 'onclick="copiarGanadorHistorico(' + it.glosa_id + ')">📋 Copiar dictamen</button>'
+            + '</div></div>';
+    }
+    html += '</div>';
+    body.innerHTML = html;
+    // Guardar los dictámenes en el cache local para el botón "copiar"
+    window._ganadoresHistoricos = (window._ganadoresHistoricos || {});
+    for(var j = 0; j < d.items.length; j++){
+      window._ganadoresHistoricos[d.items[j].glosa_id] = d.items[j].dictamen || '';
+    }
+  }catch(e){
+    body.innerHTML = '<span style="color:var(--text3)">Error cargando ganadores.</span>';
+  }
+}
+
+function copiarGanadorHistorico(glosaId){
+  var t = (window._ganadoresHistoricos || {})[glosaId];
+  if(!t){ alert('No tengo cacheado el dictamen #' + glosaId); return; }
+  try{
+    navigator.clipboard.writeText(t).then(function(){
+      if(typeof toast === 'function') toast('Copiado','Dictamen #'+glosaId+' al portapapeles','success');
+    });
+  }catch(e){
+    // Fallback no-clipboard: prompt
+    window.prompt('Copia con Ctrl+C el dictamen:', t);
   }
 }
 
@@ -14391,6 +15972,61 @@ function renderRiesgoRatificacion(r){
   );
 }
 
+// ── Medalla doble EVIDENCIA + CONFIANZA (rediseño SINAC 11-jun-2026) ──
+// Reemplaza el gauge "% éxito" como héroe (contradecía a la Confianza).
+// EVIDENCIA: grade A/B/C derivado de verificacion_citas.issues[].severidad
+//   A = 0 issues · B = solo MEDIA · C = alguna ALTA.
+// CONFIANZA: % real de confianza.score*100 + recomendación del backend.
+// La prob. de éxito histórica queda como dato secundario (.exito-mini).
+function renderMedallasDictamen(d, scoreColor){
+  var v = d.verificacion_citas;
+  var issues = (v && v.issues) || [];
+  var altas = issues.filter(function(i){ return i.severidad === 'ALTA'; }).length;
+  var grade, gradeCls, gradeTag, gradeDet;
+  if(!v){
+    grade='—'; gradeCls='nd'; gradeTag='SIN DATOS'; gradeDet='Sin verificación de citas disponible';
+  } else if(issues.length === 0){
+    grade='A'; gradeCls='a'; gradeTag='CITAS VERIFICADAS';
+    gradeDet=(v.total_citas || 0)+' citas contra corpus · 0 hallazgos';
+  } else if(altas === 0){
+    grade='B'; gradeCls='b'; gradeTag='HALLAZGOS LEVES';
+    gradeDet=issues.length+' hallazgo(s) leve(s) (sin severidad ALTA) en '+(v.total_citas || issues.length)+' citas';
+  } else {
+    grade='C'; gradeCls='c'; gradeTag='HALLAZGOS GRAVES';
+    gradeDet=altas+' cita(s) con severidad ALTA — corregir antes de radicar';
+  }
+  var medEvid =
+    '<div class="medalla med-'+gradeCls+'">'
+    +'<div class="medalla-aro"><span class="medalla-valor">'+grade+'</span></div>'
+    +'<div class="medalla-info"><div class="medalla-lbl">Evidencia</div>'
+    +'<div class="medalla-tag">'+gradeTag+'</div>'
+    +'<div class="medalla-det">'+escHtml(gradeDet)+'</div></div>'
+    +'</div>';
+  var medConf = '';
+  var c = d.confianza;
+  if(c && typeof c.score === 'number'){
+    var pctC = Math.round(c.score * 100);
+    var nivelCls = c.nivel === 'alto' ? 'a' : (c.nivel === 'medio' ? 'b' : 'c');
+    medConf =
+      '<div class="medalla med-'+nivelCls+'">'
+      +'<div class="medalla-aro"><span class="medalla-valor">'+pctC+'<small>%</small></span></div>'
+      +'<div class="medalla-info"><div class="medalla-lbl">Confianza</div>'
+      +'<div class="medalla-tag">'+escHtml(c.recomendacion || '')+'</div>'
+      +'<div class="medalla-det">'+escHtml(c.nivel ? 'Solidez del dictamen: nivel '+c.nivel : '')+'</div></div>'
+      +'</div>';
+  }
+  var mini =
+    '<div class="exito-mini" title="Probabilidad histórica de levantamiento — dato estadístico de referencia, no mide la calidad de este dictamen">'
+    +'<span class="exito-mini-lbl">Prob. éxito histórica</span>'
+    +'<span class="exito-mini-bar"><span style="width:'+d.score+'%;background:'+scoreColor+'"></span></span>'
+    +'<span class="exito-mini-val" style="color:'+scoreColor+'">'+d.score+'%</span>'
+    +'</div>';
+  return '<div class="medallas-wrap card-doc">'
+    +'<div class="medallas-row">'+medEvid+medConf+'</div>'
+    +mini
+    +'</div>';
+}
+
 function renderResult(d){
   var isOk=!d.mensaje_tiempo.includes('EXTEMPOR');
   var scoreColor=d.score>=85?'#15803d':d.score>=65?'#b45309':'#b91c1c';
@@ -14398,6 +16034,15 @@ function renderResult(d){
   CURRENT_GLOSA_ID = d.glosa_id || null;
   // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
   window._paVerificacionCitas = d.verificacion_citas || null;
+
+  // Quality Gate OK = trae verificación de citas y ninguna con severidad ALTA.
+  // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
+  // el JS puede togglearla después si la verificación cambia.
+  var _qgIssues = (d.verificacion_citas && d.verificacion_citas.issues) || [];
+  var qgOk = !!(d.verificacion_citas && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
+
+  var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  var consecDoc = d.glosa_id ? ('GL-'+d.glosa_id) : (d.codigo_glosa || '—');
 
   var html='<div class="res-header">'
     +'<div class="res-title">'+d.resumen+'</div>'
@@ -14408,28 +16053,50 @@ function renderResult(d){
     +'<span class="pill pill-teal">'+d.modelo_ia+'</span>'
     +'</div></div>'
 
-    +'<div class="res-score">'
-    +'<div class="score-row"><span class="score-label">Probabilidad de éxito de la defensa</span>'
-    +'<span class="score-val" style="color:'+scoreColor+'">'+d.score+'%</span></div>'
-    +'<div class="score-bar-bg"><div class="score-bar" style="width:'+d.score+'%;background:'+scoreColor+'"></div></div>'
-    +'</div>'
+    + renderMedallasDictamen(d, scoreColor)
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
     + (d.accion_ia ? renderAccionIA(d) : '')
 
-    +'<div class="res-dictamen">'
+    +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
+    +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
-    +'<span style="opacity:.6;font-weight:400">'+new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})+'</span>'
+    +'<span style="opacity:.85;font-weight:500;white-space:nowrap">'+fechaLarga+'</span>'
+    +'</div>'
+    +'<div class="doc-membrete">'
+    +'<div class="doc-membrete-ent">'
+    +'<div class="doc-membrete-nombre">ESE Hospital Universitario de Santander</div>'
+    +'<div class="doc-membrete-ciudad">Bucaramanga, Santander · NIT 900.006.037-4</div>'
+    +'</div>'
+    +'<div class="doc-membrete-meta">'
+    +'<span>Fecha: <b class="mono-num">'+fechaLarga+'</b></span>'
+    +'<span>Consecutivo: <b class="mono-num">'+escHtml(String(consecDoc))+'</b></span>'
+    +'</div>'
     +'</div>'
     +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
+    +'<div class="doc-footer">'
+    +'<div class="doc-firma">'
+    +'<div class="doc-firma-linea"></div>'
+    +'<div class="doc-firma-cargo">Área de Cartera · Glosas y Devoluciones — ESE HUS</div>'
+    +'</div>'
+    +'<div class="doc-sello">'
+    +'<svg viewBox="0 0 48 48" width="42" height="42" aria-hidden="true">'
+    +'<circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2"/>'
+    +'<circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2.5 3"/>'
+    +'<path d="M16 24.5l5.5 5.5L32 19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    +'</svg>'
+    +'<div class="doc-sello-txt">Generado por IA con Quality Gate<br/>SINAC SC SAS</div>'
+    +'</div>'
+    +'</div>'
     +'</div>'
 
     + (d.confianza ? renderConfianzaPanel(d.confianza) : '')
     + (d.verificacion_citas ? renderVerificacionCitas(d.verificacion_citas) : '')
     + (d.auto_pilot ? renderAutoPilotPanel(d.auto_pilot) : '')
+    + renderGanadoresHistoricosPlaceholder(d.eps, d.codigo_glosa)
     + renderAuditorForensePanel(d)
 
     +'<div class="res-actions">'
-    +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
+    +'<button class="btn btn-primary btn-pdf-radicable" onclick="imprimirDictamen()">🖨 Imprimir / PDF radicable</button>'
     +'<button class="btn btn-ghost" onclick="copiarDictamen(event)">Copiar texto</button>'
     +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
@@ -14969,7 +16636,15 @@ async function cargarIAStatus(){
         '<div style="font-size:.74rem;color:var(--text2);margin-bottom:.3rem"><b>Rol:</b> '+escHtml(p.rol)+'</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem;font-size:.7rem;color:var(--text3);margin-top:.4rem">'+
           '<div><b>API key:</b> '+(p.api_key_configurada ? '<code>'+escHtml(p.api_key_prefix)+'…</code>' : '<span style="color:#dc2626">no configurada</span>')+'</div>'+
-          '<div><b>Modelo:</b> <code>'+escHtml(p.modelo_actual||'?')+'</code></div>'+
+          // Groq trae modelos_cadena (12-jun-2026): primario + fallbacks
+          // internos que se agotan antes de saltar a Anthropic.
+          '<div style="grid-column:1/-1"><b>Modelo:</b> '+(
+            (p.modelos_cadena && p.modelos_cadena.length > 1)
+              ? p.modelos_cadena.map(function(m,i){
+                  return (i===0 ? 'Primario: ' : 'Fallback '+i+': ')+'<code>'+escHtml(m)+'</code>';
+                }).join(' · ')
+              : '<code>'+escHtml(p.modelo_actual||'?')+'</code>'
+          )+'</div>'+
           '<div style="grid-column:1/-1"><b>Rate limit:</b> '+escHtml(p.rate_limit)+'</div>'+
         '</div>'+
         '<div style="margin-top:.5rem;text-align:right">'+
@@ -16307,7 +17982,66 @@ async function loadDash(){
     // Sprint #7: dashboard plata recuperada
     cargarPlataRecuperada();
 
+    // Win-rate por EPS+código (feature #7)
+    cargarWinRateDetalle();
+
   } catch(e){console.error('Dashboard error',e);}
+}
+
+// ─── WIN-RATE DETALLADO POR (EPS, CÓDIGO) ──────────────────────────
+async function cargarWinRateDetalle(){
+  var body = document.getElementById('win-rate-body');
+  if(!body) return;
+  var dias = parseInt((document.getElementById('wr-ventana') || {}).value || '90', 10);
+  document.getElementById('wr-ventana-lbl').textContent = dias;
+  body.innerHTML = '<span style="color:var(--text3)">Cargando…</span>';
+  try{
+    var r = await fetch('/analytics/win-rate-detalle?dias=' + dias, {headers: authH()});
+    if(!r.ok){ body.innerHTML = '<span style="color:#dc2626">Error ' + r.status + '</span>'; return; }
+    var d = await r.json();
+    if(!d.total_combinaciones){
+      body.innerHTML = '<span style="color:var(--text3)">Sin glosas decididas en esta ventana.</span>';
+      return;
+    }
+    var fmtCop = function(n){ return '$ ' + Math.round(Number(n)||0).toLocaleString('es-CO'); };
+    var fmtTasa = function(t){
+      var color = t >= 75 ? '#15803d' : t >= 50 ? '#d97706' : '#b91c1c';
+      return '<b style="color:' + color + '">' + t.toFixed(1) + '%</b>';
+    };
+    var fmtTend = function(t){
+      if(t === null || t === undefined) return '<span style="color:var(--text3)">—</span>';
+      if(t > 0) return '<span style="color:#15803d">▲ +' + t.toFixed(1) + 'p</span>';
+      if(t < 0) return '<span style="color:#b91c1c">▼ ' + t.toFixed(1) + 'p</span>';
+      return '<span style="color:var(--text3)">— sin cambio</span>';
+    };
+    var rows = d.items.slice(0, 30).map(function(it){
+      return '<tr>'
+        + '<td style="padding:.35rem .5rem"><b>' + it.eps + '</b></td>'
+        + '<td style="padding:.35rem .5rem"><code>' + it.codigo + '</code></td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + it.n_total + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + it.n_levantadas + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + fmtTasa(it.tasa_levantamiento_pct) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + fmtTend(it.tendencia_3m_pct) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right;color:#15803d;font-weight:600">' + fmtCop(it.valor_recuperado_total) + '</td>'
+        + '</tr>';
+    }).join('');
+    body.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;font-size:.74rem;border-collapse:collapse">'
+      + '<thead><tr style="background:var(--bg-card);text-align:left;border-bottom:1px solid var(--border)">'
+      + '<th style="padding:.4rem .5rem">EPS</th>'
+      + '<th style="padding:.4rem .5rem">Código</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">N total</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Levantadas</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Tasa</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Tendencia</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Recuperado</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div style="margin-top:.4rem;color:var(--text3);font-size:.7rem">'
+      + 'Mostrando top ' + Math.min(d.items.length, 30) + ' de ' + d.total_combinaciones + ' combinaciones, ordenadas por valor recuperado. '
+      + 'Tendencia = diferencia (en puntos) vs la ventana anterior del mismo tamaño.'
+      + '</div>';
+  }catch(e){
+    body.innerHTML = '<span style="color:#dc2626">Error: ' + e.message + '</span>';
+  }
 }
 
 // ─── Sprint #7 — Dashboard plata recuperada ────────────────────────
@@ -17195,6 +18929,8 @@ function startMandoAutoRefresh(){
       setTimeout(loadMando, 1500);
       startMandoAutoRefresh();
     }
+    // Pintar la tab-bar consolidada de reportes (respeta visibilidad de Mando)
+    if(typeof pintarRepTabbars === 'function') pintarRepTabbars();
   };
   setTimeout(check, 800);
   setTimeout(check, 3500);
@@ -17747,6 +19483,9 @@ async function loadUsuarios(){
   // Mostrar la zona peligrosa solo si es SUPER_ADMIN
   var resetCard = document.getElementById('admin-reset-card');
   if(resetCard) resetCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
+  // Token de integración: solo SUPER_ADMIN
+  var tokCard = document.getElementById('admin-token-card');
+  if(tokCard) tokCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
 
   var tbody=document.getElementById('usuarios-body');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3)">Cargando…</td></tr>';
@@ -17907,6 +19646,35 @@ async function crearUsuario(){
     if(r.ok){toast('Éxito',d.message||'Usuario creado','success');document.getElementById('u-nombre').value='';document.getElementById('u-email').value='';document.getElementById('u-pass').value='';loadUsuarios();}
     else{toast('Error',d.detail||'Error creando usuario','error');}
   }catch(e){toast('Error',e.message,'error');}
+}
+
+async function generarTokenIntegracion(){
+  var email=(document.getElementById('tok-email').value||'').trim();
+  var dias=parseInt(document.getElementById('tok-dias').value)||365;
+  if(!email){toast('Falta email','Indica el email de la cuenta de servicio','warning');return;}
+  try{
+    var fd=new FormData();
+    fd.append('email',email);
+    fd.append('dias',dias);
+    var r=await fetch('/auth/token-integracion',{method:'POST',headers:{'Authorization':'Bearer '+TOKEN},body:fd});
+    var d=await r.json();
+    if(!r.ok){toast('Error',d.detail||'No se pudo generar el token','error');return;}
+    document.getElementById('tok-valor').value=d.access_token;
+    document.getElementById('tok-resultado').style.display='block';
+    toast('Token generado','Válido '+d.expira_en_dias+' días · rol '+d.rol+'. Cópialo ahora.','success');
+  }catch(e){toast('Error',e.message,'error');}
+}
+
+function copiarTokenIntegracion(){
+  var ta=document.getElementById('tok-valor');
+  ta.select();
+  try{
+    navigator.clipboard.writeText(ta.value);
+    toast('Copiado','Token en el portapapeles. Pégalo en MOTOR_TOKEN del jump-box.','success');
+  }catch(e){
+    document.execCommand('copy');
+    toast('Copiado','Token en el portapapeles','success');
+  }
 }
 
 async function cambiarPass(id,email){
@@ -18527,6 +20295,159 @@ async function registrarResultadoConciliacion(id){
   var d=await r.json();
   toast(r.ok?'Resultado registrado':'Error',d.message||d.detail,r.ok?'success':'error');
   if(r.ok)loadConciliaciones();
+}
+
+// ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
+var AS_FILAS = [];
+
+function abrirActaSinac(){
+  AS_FILAS = [];
+  var modal = document.getElementById('acta-sinac-modal');
+  modal.style.display = 'flex';
+  // Default values
+  var hoy = new Date().toISOString().slice(0,10);
+  document.getElementById('as-fecha').value = hoy;
+  var mes = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'][new Date().getMonth()];
+  document.getElementById('as-periodo').value = mes + ' ' + new Date().getFullYear();
+  document.getElementById('as-hus-correo').value = (window.USUARIO_EMAIL || '');
+  document.getElementById('as-hus-nombre').value = (window.USUARIO_NOMBRE || '');
+  as_renderFilas();
+}
+
+function cerrarActaSinac(){
+  document.getElementById('acta-sinac-modal').style.display = 'none';
+}
+
+function as_renderFilas(){
+  var tb = document.getElementById('as-filas-body');
+  if(!AS_FILAS.length){
+    tb.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:1.5rem;color:var(--text3)">Sin filas. Pega una factura arriba o agrega fila manual.</td></tr>';
+    return;
+  }
+  tb.innerHTML = AS_FILAS.map(function(f,i){
+    var t = function(field, valor, type){
+      type = type || 'text';
+      return '<input type="'+type+'" value="'+(valor||'').toString().replace(/"/g,'&quot;')+'" onchange="AS_FILAS['+i+'].'+field+'=(this.type===\'number\'?parseFloat(this.value)||0:this.value)" style="width:100%;border:0;background:transparent;color:var(--text);font-size:.74rem;padding:.2rem"/>';
+    };
+    var tn = function(field, valor){ return t(field, valor||0, 'number'); };
+    return '<tr>'+
+      '<td style="text-align:center;font-weight:700;padding:.3rem">'+(i+1)+'</td>'+
+      '<td>'+t('numero_factura', f.numero_factura)+'</td>'+
+      '<td>'+t('fecha_factura', f.fecha_factura, 'date')+'</td>'+
+      '<td>'+t('tipo_glosa', f.tipo_glosa)+'</td>'+
+      '<td>'+t('tipificacion', f.tipificacion)+'</td>'+
+      '<td>'+t('cod_glosa', f.cod_glosa)+'</td>'+
+      '<td>'+t('descripcion_glosa', f.descripcion_glosa)+'</td>'+
+      '<td>'+tn('valor_factura', f.valor_factura)+'</td>'+
+      '<td>'+tn('valor_glosa_inicial', f.valor_glosa_inicial)+'</td>'+
+      '<td>'+tn('valor_pendiente_conciliar', f.valor_pendiente_conciliar)+'</td>'+
+      '<td>'+tn('valor_acepta_ips', f.valor_acepta_ips)+'</td>'+
+      '<td style="text-align:center"><button onclick="AS_FILAS.splice('+i+',1);as_renderFilas()" style="background:none;border:0;color:#dc2626;cursor:pointer;font-size:1rem">×</button></td>'+
+      '</tr>';
+  }).join('');
+}
+
+async function as_buscarFactura(){
+  var inp = document.getElementById('as-busqueda-glosa');
+  var termino = (inp.value || '').trim();
+  if(!termino) return;
+  try{
+    var r = await fetch('/glosas/buscar/'+encodeURIComponent(termino), {headers: authH()});
+    if(!r.ok){ toast('Error','No se pudo buscar (HTTP '+r.status+')','error'); return; }
+    var matches = await r.json();
+    if(!matches || matches.length === 0){
+      toast('No encontrada','No hay glosas con "'+termino+'"','warning');
+      return;
+    }
+    matches.forEach(function(g){
+      AS_FILAS.push({
+        glosa_id: g.id,
+        radicado_acta_entidad: '-',
+        numero_factura: g.factura || termino,
+        fecha_factura: (g.fecha_radicacion_factura||'').slice(0,10) || '',
+        tipo_glosa: 'ADMINISTRATIVA',
+        tipificacion: g.tipo_glosa_excel || '',
+        cod_glosa: g.codigo_glosa || '',
+        descripcion_glosa: (g.observacion_eps || g.glosa_texto || '').slice(0,300),
+        valor_factura: g.valor_factura || 0,
+        valor_glosa_inicial: g.valor_objetado || 0,
+        valor_pendiente_conciliar: g.valor_objetado || 0,
+        valor_acepta_ips: 0
+      });
+    });
+    inp.value = '';
+    as_renderFilas();
+    toast('Agregadas', matches.length + ' fila(s) cargada(s)', 'success');
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+function as_agregarManual(){
+  AS_FILAS.push({
+    radicado_acta_entidad: '-',
+    numero_factura: '',
+    fecha_factura: '',
+    tipo_glosa: 'ADMINISTRATIVA',
+    tipificacion: '',
+    cod_glosa: '',
+    descripcion_glosa: '',
+    valor_factura: 0,
+    valor_glosa_inicial: 0,
+    valor_pendiente_conciliar: 0,
+    valor_acepta_ips: 0
+  });
+  as_renderFilas();
+}
+
+async function as_generarPdf(){
+  var acta = (document.getElementById('as-acta').value || '').trim();
+  var nit = (document.getElementById('as-nit').value || '').trim();
+  var razon = (document.getElementById('as-razon').value || '').trim();
+  if(!acta || !nit || !razon){
+    toast('Faltan datos', 'N° acta, NIT y Razón Social son obligatorios', 'warning');
+    return;
+  }
+  if(!AS_FILAS.length){
+    toast('Sin filas', 'Agrega al menos una glosa antes de generar el acta', 'warning');
+    return;
+  }
+  var payload = {
+    acta_numero: acta,
+    nit: nit,
+    razon_social: razon,
+    periodo: document.getElementById('as-periodo').value,
+    fecha_acta: document.getElementById('as-fecha').value,
+    filas: AS_FILAS,
+    observaciones: document.getElementById('as-obs').value,
+    firmante_eps_nombre: document.getElementById('as-eps-nombre').value,
+    firmante_eps_cargo: document.getElementById('as-eps-cargo').value,
+    firmante_eps_correo: document.getElementById('as-eps-correo').value,
+    firmante_hus_nombre: document.getElementById('as-hus-nombre').value,
+    firmante_hus_cargo: document.getElementById('as-hus-cargo').value,
+    firmante_hus_correo: document.getElementById('as-hus-correo').value
+  };
+  try{
+    var r = await fetch('/conciliaciones/acta-sinac/pdf', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){
+      var msg = await r.text();
+      toast('Error generando', msg.slice(0,200), 'error');
+      return;
+    }
+    var html = await r.text();
+    var w = window.open('', '_blank');
+    if(!w){
+      toast('Bloqueado','El popup fue bloqueado. Permite ventanas emergentes para iaglosassinac.help','warning');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    toast('Acta generada','Imprime o guarda como PDF desde la nueva ventana','success');
+  }catch(e){
+    toast('Error', e.message, 'error');
+  }
 }
 
 // ─── AUDIT LOG ─────────────────────────────────────────────────────────────
@@ -19831,10 +21752,38 @@ const PA_AGENTES_DEFINICION = [
   {id:'verifier',  nombre:'Citation verifier',        desc:'valida cada cita normativa'},
 ];
 
+// Handles del simulador para poderlo cancelar entre análisis o ante error.
+// Sin esto, los setTimeout del intento anterior seguían marcando verdes y
+// el usuario veía "EN CURSO" + todo verde aunque la pre-validación había
+// rechazado el input (bug 10-jun-2026).
+let _paPipelineTimers = [];
+
+function _paCancelarSimulador(){
+  _paPipelineTimers.forEach(t => clearTimeout(t));
+  _paPipelineTimers = [];
+}
+
+function paResetPipelineEstados(){
+  // Limpia clases running/done/fail de cada agente — necesario porque
+  // el clic del nuevo análisis no siempre regenera el innerHTML antes
+  // de que terminen de disparar los timers viejos.
+  PA_AGENTES_DEFINICION.forEach(a => {
+    const el = document.getElementById('pa-ag-'+a.id);
+    if(!el) return;
+    el.classList.remove('running','done','fail');
+    const d = el.querySelector('.pa-agent-detail');
+    if(d) d.textContent = a.desc;
+  });
+}
+
 function paShowPipeline(){
   const wrap = document.getElementById('pa-pipeline');
   const list = document.getElementById('pa-agent-list');
   if(!wrap || !list) return;
+  // Cancelar cualquier simulador previo antes de regenerar — si no, los
+  // setTimeout del intento anterior siguen disparando paSetAgentState
+  // sobre los nuevos divs y aparecen verdes sin que el análisis termine.
+  _paCancelarSimulador();
   list.innerHTML = PA_AGENTES_DEFINICION.map(a =>
     '<div class="pa-agent-row" id="pa-ag-'+a.id+'">'+
       '<div class="pa-agent-dot"></div>'+
@@ -19851,9 +21800,18 @@ function paShowPipeline(){
 }
 
 function paHidePipeline(){
+  _paCancelarSimulador();
   const wrap = document.getElementById('pa-pipeline');
   if(wrap) wrap.style.display = 'none';
   // No mostrar landing-hero de vuelta (el dictamen tomara el espacio)
+}
+
+function paMarcarFallaPipeline(){
+  // Llamado cuando el backend devuelve error (400 pre-val, 500, etc.):
+  // ocultar pipeline tras un breve flash en rojo del agente parser.
+  _paCancelarSimulador();
+  paSetAgentState('parser', 'fail');
+  setTimeout(paHidePipeline, 400);
 }
 
 function paSetAgentState(id, state, detail){
@@ -19868,7 +21826,9 @@ function paSetAgentState(id, state, detail){
 }
 
 function paSimularAvancePipeline(){
-  // Sin SSE real del backend, avanzamos con timings realistas
+  // Sin SSE real del backend, avanzamos con timings realistas.
+  // Los handles quedan en _paPipelineTimers para poder cancelar si el
+  // request termina (ok o fail) antes de que el simulador llegue al final.
   const orden = ['parser','tarifa','normativa','precedente','auditor','redactor','verifier'];
   let i = 0;
   paSetAgentState(orden[0], 'running');
@@ -19878,10 +21838,10 @@ function paSimularAvancePipeline(){
     i++;
     if(i < orden.length){
       paSetAgentState(orden[i], 'running');
-      setTimeout(tick, 1500 + Math.random() * 1500);
+      _paPipelineTimers.push(setTimeout(tick, 1500 + Math.random() * 1500));
     }
   };
-  setTimeout(tick, 1800);
+  _paPipelineTimers.push(setTimeout(tick, 1800));
 }
 
 // ─── CITATION VERIFIER (post-analisis) ───────────────────────────
@@ -20290,7 +22250,7 @@ function paBuildEmptyStateHTML(data){
     if(presence.gemini && presence.gemini.cargada) proveedores.push('Gemini');
     if(presence.groq && presence.groq.cargada) proveedores.push('Groq');
     const primary = (presence.primary_ai || 'auto').toLowerCase();
-    const primaryLabel = {anthropic:'Anthropic Claude', gemini:'Google Gemini', groq:'Groq Llama'}[primary] || primary.toUpperCase();
+    const primaryLabel = {anthropic:'Anthropic Claude', gemini:'Google Gemini', groq:'Groq'}[primary] || primary.toUpperCase();
     partes.push(
       '<div class="pa-pulse">'+
         '<span class="pa-pulse-dot"></span>'+
@@ -20852,5 +22812,11 @@ function paAjustarMisGlosas(){
   };
 })();
 </script>
+<!-- SINAC UX 2.0 — Modo Enfocado + Command Palette + atajos -->
+<script src="/static/sinac-ux.js"></script>
+<!-- SINAC Asistente Predictivo — Ola 4: detecta código/valor/plantilla en vivo -->
+<script src="/static/sinac-asistente.js"></script>
+<!-- SINAC Analizar PRO — transforma gauge/chips/dictamen vía MutationObserver -->
+<script src="/static/sinac-analizar-pro.js"></script>
 </body>
 </html>

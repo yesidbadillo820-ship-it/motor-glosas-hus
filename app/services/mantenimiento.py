@@ -154,9 +154,22 @@ def purgar_papelera_caducada(
 
 def ejecutar_mantenimiento_completo(db: Session, dry_run: bool = False) -> dict:
     """Ejecuta todas las purgas en orden. Útil para el scheduler diario."""
-    return {
+    resultado = {
         "ai_cache": purgar_ai_cache_viejo(db, dias=30, dry_run=dry_run),
         "ai_calls": purgar_ai_calls_viejos(db, dias=90, dry_run=dry_run),
         "papelera": purgar_papelera_caducada(db, dias=30, dry_run=dry_run),
         "ejecutado_en": ahora_utc().isoformat(),
     }
+    # Backup diario de la DB SQLite al volumen (no-op en Postgres o dry_run).
+    # Va al final para que un fallo de backup no impida las purgas.
+    if not dry_run:
+        try:
+            from app.services.backup_sqlite import crear_backup
+
+            resultado["backup_sqlite"] = crear_backup()
+        except Exception as e:  # noqa: BLE001
+            from app.core.logging_utils import logger
+
+            logger.error(f"[MANTENIMIENTO] backup SQLite falló: {e}")
+            resultado["backup_sqlite"] = {"error": str(e)}
+    return resultado

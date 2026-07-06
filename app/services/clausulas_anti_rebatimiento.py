@@ -9,6 +9,8 @@ Uso:
     extra = clausulas_para_codigo("TA0801")  # → "SIN QUE SEA ADMISIBLE..."
 """
 
+import re
+
 # Contra-argumentos típicos EPS y cláusula de pre-anulación por tipo de glosa
 CLAUSULAS_POR_TIPO: dict[str, list[dict]] = {
     "TA": [
@@ -113,14 +115,83 @@ def clausulas_transversales(max_n: int = 1) -> list[str]:
     return CLAUSULAS_TRANSVERSALES[:max_n]
 
 
-def clausulas_para_codigo(codigo: str, max_clausulas: int = 2) -> list[str]:
+# ── Bifurcación AU (12-jun-2026, ronda 2) ───────────────────────────────
+# Evidencia de producción: glosa "TA0201, SO0601, AU0301 ... sin autorización
+# previa para procedimiento PROGRAMADO" salió con "LA ATENCIÓN DE URGENCIAS,
+# COMO LA PRESTADA, NO REQUIERE AUTORIZACIÓN PREVIA" — la IA copió la
+# cláusula AU de urgencias que este módulo inyectaba SIN mirar el supuesto
+# fáctico, pisando la bifurcación del SYSTEM_AU (PR #103). La misma regla
+# del system aplica aquí: urgencias SOLO si consta en el texto de la glosa.
+_PAT_AU_URGENCIAS = re.compile(
+    r"URGENCIA|URGENTE|EMERGENCIA|TRIAGE|C[ÓO]DIGO\s+AZUL|REANIMACI[ÓO]N|\bRCP\b",
+    re.IGNORECASE,
+)
+_PAT_AU_ELECTIVO = re.compile(
+    r"PROGRAMAD[OA]|ELECTIV[OA]|AMBULATORI[OA]",
+    re.IGNORECASE,
+)
+
+# Cláusulas AU para el supuesto ELECTIVO/desconocido (caso B del SYSTEM_AU):
+# silencio administrativo positivo + la autorización como trámite del
+# pagador, NUNCA la afirmación de que la atención fue de urgencias.
+_CLAUSULAS_AU_ELECTIVO: list[dict] = [
+    {
+        "contra": "La EPS alega 'falta de autorización previa' en servicio electivo/programado.",
+        "preanulacion": (
+            "LA FALTA DE RESPUESTA OPORTUNA DE LA ENTIDAD PAGADORA A LA SOLICITUD DE "
+            "AUTORIZACIÓN, EN LOS PLAZOS DE LA RESOLUCIÓN 2284 DE 2023, CONFIGURA "
+            "AUTORIZACIÓN POR SILENCIO ADMINISTRATIVO POSITIVO (T-313/2007), SIN QUE LA "
+            "FALTA DE AUTORIZACIÓN EXIMA DEL PAGO DEL SERVICIO EFECTIVAMENTE PRESTADO "
+            "CON PERTINENCIA MÉDICA."
+        ),
+    },
+    {
+        "contra": "La EPS traslada a la IPS el trámite administrativo de autorización.",
+        "preanulacion": (
+            "NO PUEDE TRASLADARSE A LA IPS LA CARGA DE UN TRÁMITE ADMINISTRATIVO PROPIO "
+            "DE LA ENTIDAD PAGADORA: LA AUTORIZACIÓN ES UN TRÁMITE ENTRE PAGADOR Y "
+            "AFILIADO, NO UNA CONDICIÓN DE EXISTENCIA DE LA PRESTACIÓN, POR LO QUE "
+            "CORRESPONDE VERIFICAR EL TRÁMITE EN LOS SISTEMAS DE LA ENTIDAD ANTES DE "
+            "RATIFICAR."
+        ),
+    },
+]
+
+
+def _clausulas_au_segun_supuesto(texto_glosa: str) -> list[dict]:
+    """Bifurcación del SYSTEM_AU aplicada a las cláusulas anti-rebatimiento.
+
+    (A) URGENCIAS consta en el texto Y no se declara programado/electivo →
+        cláusulas AU clásicas (urgencia vital, Art. 168 Ley 100; T-1025/2002).
+    (B) Electivo declarado, o supuesto desconocido (texto vacío) → PROHIBIDO
+        afirmar urgencias: cláusulas de silencio administrativo positivo.
+    """
+    t = texto_glosa or ""
+    es_urgencias = bool(_PAT_AU_URGENCIAS.search(t)) and not _PAT_AU_ELECTIVO.search(t)
+    if es_urgencias:
+        return CLAUSULAS_POR_TIPO.get("AU", [])
+    return _CLAUSULAS_AU_ELECTIVO
+
+
+def clausulas_para_codigo(codigo: str, max_clausulas: int = 2, texto_glosa: str = "") -> list[str]:
     """Retorna las cláusulas anti-rebatimiento aplicables a un código de glosa.
+
+    Args:
+        codigo: código de glosa (TA0801, AU0301, ...).
+        max_clausulas: tope de cláusulas a retornar.
+        texto_glosa: texto de la objeción — OBLIGATORIO para que la familia
+            AU evalúe el supuesto fáctico (urgencias vs electivo). Si no se
+            pasa, AU asume supuesto DESCONOCIDO y usa la defensa electiva
+            (la opción conservadora: jamás inventa que fue urgencias).
 
     Ejemplo:
         clausulas_para_codigo("TA0801", 2)  # → 2 cláusulas TA más relevantes
     """
     prefijo = (codigo or "")[:2].upper()
-    cls = CLAUSULAS_POR_TIPO.get(prefijo, [])
+    if prefijo == "AU":
+        cls = _clausulas_au_segun_supuesto(texto_glosa)
+    else:
+        cls = CLAUSULAS_POR_TIPO.get(prefijo, [])
     return [c["preanulacion"] for c in cls[:max_clausulas]]
 
 

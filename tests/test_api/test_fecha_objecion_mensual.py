@@ -69,11 +69,12 @@ def _seed(db, dias_atras_objecion, valor=1000):
 
 class TestFechaObjecionMensual:
     def test_serie(self, client, db_session):
-        # Anclar al mes actual: con días fijos (5 y 10 atrás) el test fallaba
-        # los primeros días de cada mes, cuando una fecha caía en el mes anterior.
-        primer_dia_del_mes = ahora_utc().day - 1
+        # Anclamos a hoy (dias_atras=0) en ambos seeds para que SIEMPRE caigan
+        # en el mes actual. Antes se usaba 5 y 10 días → en los primeros 10
+        # días del mes (p.ej. hoy 9 jun) -5 sigue en junio pero -10 cae en
+        # mayo y el test fallaba intermitentemente según fecha del calendario.
         _seed(db_session, dias_atras_objecion=0, valor=1000)
-        _seed(db_session, dias_atras_objecion=primer_dia_del_mes, valor=2000)
+        _seed(db_session, dias_atras_objecion=0, valor=2000)
 
         r = client.get("/glosas/stats/fecha-objecion-mensual?meses=2")
         d = r.json()

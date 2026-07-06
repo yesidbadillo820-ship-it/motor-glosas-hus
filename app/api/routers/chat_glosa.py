@@ -186,10 +186,13 @@ async def enviar_mensaje(
                 primary_ai=cfg.primary_ai,
                 anthropic_model=cfg.anthropic_model,
                 groq_model=cfg.groq_model,
+                groq_model_fallback_1=cfg.groq_model_fallback_1,
+                groq_model_fallback_2=cfg.groq_model_fallback_2,
+                groq_model_fallback_3=getattr(
+                    cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"
+                ),
                 gemini_api_key=cfg.gemini_api_key,
                 gemini_model=cfg.gemini_model,
-                openrouter_api_key=cfg.openrouter_api_key,
-                openrouter_model=cfg.openrouter_model,
             )
             nuevo = await svc.refinar_dictamen(
                 dictamen_actual_html=glosa.dictamen or "",

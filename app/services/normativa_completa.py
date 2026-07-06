@@ -389,6 +389,50 @@ LEYES = {
         "vigente": True,
         "keywords": ["PND", "Plan Nacional de Desarrollo", "giro directo", "salud preventiva"],
     },
+    # Ronda 15 (25-jun-2026, Bug P v2): leyes reales que el verifier
+    # marcaba como inexistentes en producción.
+    "LEY 1388 DE 2010": {
+        "nombre": "Ley 1388 de 2010 (Cáncer infantil)",
+        "titulo": "Derechos del menor con cáncer — acceso pleno a tratamientos oncológicos",
+        "ambito": "Pediatría oncológica — protección reforzada del NNA",
+        "vigente": True,
+        "notas": "Garantiza la cobertura integral del tratamiento oncológico en menores (quimio, radio, cirugía, trasplante, terapias avanzadas) sin barreras administrativas. Reglamentada por Resolución 1383/2013.",
+        "keywords": [
+            "Ley 1388",
+            "cáncer infantil",
+            "pediatría oncológica",
+            "atención integral menor",
+        ],
+    },
+    "LEY 1392 DE 2010": {
+        "nombre": "Ley 1392 de 2010 (Enfermedades huérfanas)",
+        "titulo": "Reconocimiento, atención e investigación de enfermedades huérfanas",
+        "ambito": "Enfermedades huérfanas (raras) — hemofilia, Gaucher, Pompe, etc.",
+        "vigente": True,
+        "notas": "Reconoce las enfermedades huérfanas como problema de salud pública con tratamiento prioritario. Las barreras administrativas (CTC vencido, MIPRES extemporáneo) NO son oponibles a la continuidad del tratamiento. Reglamentada por Decreto 1954/2012.",
+        "keywords": ["Ley 1392", "enfermedades huérfanas", "raras", "hemofilia", "Gaucher"],
+    },
+    "LEY 1616 DE 2013": {
+        "nombre": "Ley 1616 de 2013 (Salud Mental)",
+        "titulo": "Ley de Salud Mental — atención integral en salud mental",
+        "ambito": "Salud mental — derechos del paciente psiquiátrico",
+        "vigente": True,
+        "articulos": {
+            "art_11": {
+                "titulo": "Consentimiento informado en salud mental",
+                "texto": "El consentimiento informado en salud mental se otorga por la propia persona; en su ausencia por incapacidad transitoria de juicio (psicosis aguda, riesgo suicida inminente), se acepta consentimiento sustitutivo del cónyuge o familiar de primer grado documentado en historia clínica.",
+                "aplicacion": "Defensa de ECT/internación involuntaria sin firma del paciente",
+                "keywords": ["consentimiento informado", "capacidad de juicio", "sustitutivo"],
+            },
+        },
+        "keywords": [
+            "Ley 1616",
+            "salud mental",
+            "psiquiatría",
+            "consentimiento",
+            "internación involuntaria",
+        ],
+    },
 }
 
 
@@ -397,6 +441,31 @@ LEYES = {
 # ═══════════════════════════════════════════════════════════════════
 
 DECRETOS = {
+    # 11-jun-2026: el texto fijo DMBUG cita el art. 71 del Estatuto
+    # Orgánico del Presupuesto (defensa "agotamiento presupuestal es
+    # responsabilidad del contratante") y el verifier lo marcaba
+    # NORMA_INEXISTENTE ALTA por no estar en el corpus — falso positivo
+    # que tumbaba la EVIDENCIA del dictamen a C sobre un texto curado.
+    "DECRETO 111 DE 1996": {
+        "nombre": "Decreto 111 de 1996",
+        "titulo": "Estatuto Orgánico del Presupuesto (compila Leyes 38/1989, 179/1994 y 225/1995)",
+        "ambito": "Gestión presupuestal de entidades públicas — defensa contra glosas por 'agotamiento presupuestal'",
+        "vigente": True,
+        "articulos": {
+            "71": {
+                "titulo": "Certificado de disponibilidad presupuestal",
+                "texto": "Todos los actos administrativos que afecten las apropiaciones presupuestales deberán contar con certificados de disponibilidad previos que garanticen la existencia de apropiación suficiente para atender estos gastos.",
+                "aplicacion": "La gestión de apropiaciones presupuestales es obligación del contratante público; el agotamiento del valor comprometido no se traslada al prestador ni extingue las tarifas pactadas",
+                "keywords": ["presupuesto", "apropiación", "disponibilidad", "agotamiento", "CDP"],
+            },
+        },
+        "keywords": [
+            "estatuto orgánico",
+            "presupuesto",
+            "apropiaciones",
+            "agotamiento presupuestal",
+        ],
+    },
     "DECRETO 4747 DE 2007": {
         "nombre": "Decreto 4747 de 2007",
         "titulo": "Relaciones entre prestadores de servicios de salud y entidades responsables del pago",
@@ -538,6 +607,57 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["flujo recursos", "aseguramiento", "giro directo IPS"],
     },
+    # Ronda 14 (Bug P): normas reales que el verifier marcaba como
+    # inexistentes en producción.
+    "DECRETO 2493 DE 2004": {
+        "nombre": "Decreto 2493 de 2004 (MinProtección Social)",
+        "titulo": "Régimen general de obtención, donación, preservación y trasplante de componentes anatómicos",
+        "ambito": "Trasplantes — atención del donante y receptor",
+        "vigente": True,
+        "articulos": {
+            "general": {
+                "titulo": "Cobertura integral del proceso de trasplante",
+                "texto": "La atención del donante cadavérico (extracción, preservación, transporte del órgano) y la del receptor (pre, intra y postoperatoria, inmunosupresión incluida) son responsabilidad ÍNTEGRA de la entidad pagadora del receptor, independientemente del estatus de afiliación del donante.",
+                "aplicacion": "Defensa de glosas de trasplante por 'donante no afiliado'",
+                "keywords": ["donante", "trasplante", "extracción", "receptor"],
+            },
+        },
+        "keywords": ["Decreto 2493", "trasplante", "donante", "componente anatómico", "INS"],
+    },
+    "DECRETO 600 DE 2017": {
+        "nombre": "Decreto 600 de 2017 (Min. Justicia + MinSalud)",
+        "titulo": "Atención en salud para Población Privada de la Libertad (PPL)",
+        "ambito": "PPL — financiamiento vía Fondo Nacional de Salud PPL administrado por Fiduprevisora",
+        "vigente": True,
+        "notas": "Establece que las atenciones a PPL se cargan al Fondo Nacional, no a la EPS contributiva del núcleo familiar — salvo urgencia vital ya iniciada.",
+        "keywords": ["Decreto 600", "PPL", "INPEC", "Fiduprevisora", "fondo PPL"],
+    },
+    "DECRETO 4725 DE 2005": {
+        "nombre": "Decreto 4725 de 2005 (MinProtección Social)",
+        "titulo": "Régimen de registros sanitarios INVIMA para dispositivos médicos",
+        "ambito": "Dispositivos médicos — registro, vigilancia, renovación",
+        "vigente": True,
+        "articulos": {
+            "art_35": {
+                "titulo": "Vigencia y renovación del registro sanitario",
+                "texto": "El registro sanitario tiene vigencia de 10 años renovable. Si se radica la solicitud de renovación antes del vencimiento, el registro se entiende vigente hasta el pronunciamiento del INVIMA (extensión automática).",
+                "aplicacion": "Defensa de glosas por uso de dispositivo con registro 'vencido' pero en proceso de renovación",
+                "keywords": [
+                    "registro sanitario",
+                    "vencimiento",
+                    "renovación",
+                    "extensión automática",
+                ],
+            },
+        },
+        "keywords": [
+            "Decreto 4725",
+            "dispositivos médicos",
+            "INVIMA",
+            "registro sanitario",
+            "renovación",
+        ],
+    },
 }
 
 
@@ -556,6 +676,31 @@ RESOLUCIONES = {
         },
         "reemplaza": "Resolución 3047/2008 Anexo Técnico 5 (que queda como antecedente procedimental)",
         "keywords": ["manual único", "glosas", "códigos taxativos", "2284", "anexo técnico 3"],
+    },
+    # Ronda 14 (Bug P): la Resolución 1885 de 2018 es la del MIPRES
+    # (Mi Prescripción), distinta a la Resolución 1885 de 2024 que el
+    # corpus ya tenía (esa es de cronograma del Manual Único). El verifier
+    # marcaba la de 2018 como inexistente porque solo tenía la de 2024.
+    "RESOLUCION 1885 DE 2018": {
+        "nombre": "Resolución 1885 de 2018 (MinSalud)",
+        "titulo": "Procedimiento MIPRES — prescripción de servicios y tecnologías no incluidas en PBS",
+        "ambito": "Prescripción NoPBS — vigencia de la prescripción y trámite",
+        "vigente": True,
+        "articulos": {
+            "art_14": {
+                "titulo": "Vigencia de la prescripción MIPRES",
+                "texto": "La prescripción tiene vigencia equivalente a la duración del tratamiento prescrito por el médico tratante. La continuidad del tratamiento en hospitalización por descompensación clínica no requiere nueva prescripción si el evento clínico es el mismo.",
+                "aplicacion": "Defensa de glosas por 'MIPRES vencido' cuando la atención hospitalaria continúa el tratamiento crónico",
+                "keywords": ["vigencia MIPRES", "continuidad", "tratamiento crónico"],
+            },
+            "art_22": {
+                "titulo": "MIPRES en eventos especiales — junta médica",
+                "texto": "En urgencia vital o tratamiento iniciado prequirúrgicamente (inducción inmunológica en trasplantes), la prescripción MIPRES puede radicarse antes o durante el evento; el rigor administrativo NO impide la cobertura del tratamiento.",
+                "aplicacion": "Defensa de inmunosupresión PRE-trasplante prescrita antes de la cirugía",
+                "keywords": ["MIPRES contingencia", "trasplante", "urgencia vital"],
+            },
+        },
+        "keywords": ["Resolución 1885", "MIPRES", "no PBS", "prescripción"],
     },
     "RESOLUCION 1885 DE 2024": {
         "nombre": "Resolución 1885 de 2024 (MinSalud)",
@@ -879,6 +1024,105 @@ RESOLUCIONES = {
             "Electrónica), los formatos XML, los plazos de transmisión y los "
             "requisitos formales de la Factura Electrónica de Venta (FEV)."
         ),
+    },
+    # Ronda 15 (Bug P v2): resoluciones reales que aparecieron en producción
+    # marcadas como inexistentes.
+    "RESOLUCION 1652 DE 2021": {
+        "nombre": "Resolución 1652 de 2021 (MinSalud)",
+        "titulo": "Programa de Atención Integral en Hemofilia y otras coagulopatías congénitas (PAB)",
+        "ambito": "Hemofilia — auto-administración domiciliaria, profilaxis",
+        "vigente": True,
+        "notas": "Reconoce la auto-administración domiciliaria del Factor VIII/IX/VIIa como modalidad estándar en pacientes con hemofilia severa, evitando el riesgo de hemartrosis por desplazamiento. La EPS NO puede exigir asistencia institucional cada 48h.",
+        "keywords": ["Resolución 1652", "hemofilia", "PAB", "Factor VIII", "auto-administración"],
+    },
+    "RESOLUCION 2292 DE 2021": {
+        "nombre": "Resolución 2292 de 2021 (MinSalud)",
+        "titulo": "Actualización del Plan de Beneficios en Salud (PBS) con cargo a la UPC",
+        "ambito": "PBS — listado de tecnologías financiadas con UPC",
+        "vigente": True,
+        "notas": "Reemplazó parcialmente la Res. 5267/2017. Incluye tecnologías de alto costo (Factor VIII recombinante, Emicizumab para profilaxis en hemofilia con inhibidores) con financiación UPC.",
+        "keywords": ["Resolución 2292", "PBS", "UPC", "hemofilia", "Emicizumab"],
+    },
+    "RESOLUCION 2335 DE 2023": {
+        "nombre": "Resolución 2335 de 2023 (MinSalud)",
+        "titulo": "Reglamentación atención integral cáncer infantil — Ley 1388/2010",
+        "ambito": "Pediatría oncológica — atención integral con red de complejidad",
+        "vigente": True,
+        "notas": "Define el alcance de la atención integral del cáncer infantil incluyendo terapias avanzadas (trasplante MO, CAR-T cells) cuando las líneas previas han fallado. La EPS no puede excluir terapias génicas argumentando 'fuera de PBS' si son la única alternativa terapéutica.",
+        "keywords": [
+            "Resolución 2335",
+            "cáncer infantil",
+            "Ley 1388",
+            "atención integral",
+            "CAR-T",
+        ],
+    },
+    "RESOLUCION 2358 DE 1998": {
+        "nombre": "Resolución 2358 de 1998 (MinSalud)",
+        "titulo": "Lineamientos de atención en crisis psiquiátrica e internación involuntaria",
+        "ambito": "Salud mental — crisis psiquiátrica, contención mecánica",
+        "vigente": True,
+        "notas": "Establece protocolo de intervención en crisis psiquiátricas vitales: la contención mecánica intermitente está permitida como ÚLTIMO RECURSO en pacientes con riesgo inminente para sí mismos. Salvar la vida prima sobre la restricción temporal de movilidad.",
+        "keywords": [
+            "Resolución 2358",
+            "crisis psiquiátrica",
+            "contención mecánica",
+            "salud mental",
+        ],
+    },
+    "RESOLUCION 4886 DE 2018": {
+        "nombre": "Resolución 4886 de 2018 (MinSalud)",
+        "titulo": "Política Nacional de Salud Mental — internación involuntaria y junta médica",
+        "ambito": "Salud mental — internación involuntaria, criterios de prolongación",
+        "vigente": True,
+        "articulos": {
+            "art_25": {
+                "titulo": "Junta médica para internación involuntaria prolongada",
+                "texto": "La internación involuntaria que supere 14 días requiere pronunciamiento documentado de junta médica interdisciplinaria cada 7 días con criterios clínicos de mantenimiento (riesgo suicida activo, agitación severa, respuesta parcial al tratamiento).",
+                "aplicacion": "Defensa de internación prolongada con junta médica documentada",
+                "keywords": [
+                    "internación involuntaria",
+                    "junta médica",
+                    "prolongación",
+                    "salud mental",
+                ],
+            },
+        },
+        "keywords": ["Resolución 4886", "salud mental", "internación involuntaria", "junta médica"],
+    },
+    # ── Ronda 16 (26-jun-2026 — Bug P v3): normas pre-existentes que la EPS
+    #     SURA/NUEVA EPS/COMPENSAR invocaron y que el verifier marcaba como
+    #     "NORMA_INEXISTENTE". Las agregamos para que el quality gate las
+    #     reconozca como reales y el dictamen pueda usarlas en su defensa.
+    "RESOLUCION 13437 DE 1991": {
+        "nombre": "Resolución 13437 de 01-11-1991 (MinSalud)",
+        "titulo": "Decálogo de Derechos del Paciente — primera carta nacional",
+        "ambito": "Derechos del usuario en la atención en salud (preconstitucional, ratificada por Ley Estatutaria 1751/2015)",
+        "vigente": True,
+        "ratio": "Establece el decálogo de derechos del paciente: trato digno, respeto a creencias, información comprensible, segunda opinión, confidencialidad, autonomía, atención completa, identificación del personal, libre elección, y formulación de quejas. Norma fundacional citada como soporte en glosas que invocan calidad de la atención.",
+        "aplica_a": "Glosas que cuestionan calidad o trato — defensa por aplicación del decálogo institucional",
+        "keywords": [
+            "Resolución 13437/1991",
+            "decálogo paciente",
+            "derechos del usuario",
+            "trato digno",
+            "confidencialidad",
+        ],
+    },
+    "RESOLUCION 2338 DE 2013": {
+        "nombre": "Resolución 2338 de 11-07-2013 (MinSalud)",
+        "titulo": "Lineamientos para la gestión de tecnologías biomédicas e insumos",
+        "ambito": "Adquisición, mantenimiento y gestión de equipo biomédico — IPS prestadoras",
+        "vigente": True,
+        "ratio": "Define los lineamientos para la gestión integral de tecnología biomédica (selección, adquisición, instalación, mantenimiento, baja). Norma técnica de obligatorio cumplimiento para IPS y soporte en glosas de calidad por uso de dispositivos: el HUS acredita procesos institucionales conforme a esta resolución, no admite cuestionamientos al equipo biomédico aprobado por gerencia técnica.",
+        "aplica_a": "Glosas que cuestionan dispositivos biomédicos, mantenimiento de equipos o calibración",
+        "keywords": [
+            "Resolución 2338/2013",
+            "tecnología biomédica",
+            "gestión de insumos",
+            "mantenimiento equipos",
+            "calidad",
+        ],
     },
 }
 
@@ -1289,6 +1533,51 @@ JURISPRUDENCIA = {
         "aplica_a": "Defensa estructural en glosas de cobertura/exclusión",
         "keywords": ["C-313/2014", "Ley estatutaria", "derecho fundamental", "salud"],
     },
+    # Ronda 15 (Bug P v2): sentencias específicas que aparecen en producción
+    # y el verifier marcaba como inexistentes.
+    "SENTENCIA T-027 DE 2020": {
+        "nombre": "Sentencia T-027 de 2020",
+        "titulo": "Atención integral al menor con cáncer — Ley 1388/2010",
+        "ambito": "Pediatría oncológica — derecho a la salud reforzado del NNA",
+        "vigente": True,
+        "ratio": "La atención integral del menor con cáncer no admite barreras administrativas (PBS, MIPRES, CTC) cuando la vida está en riesgo. La EPS debe garantizar acceso pleno incluyendo terapias avanzadas cuando las líneas previas fracasan.",
+        "aplica_a": "Defensa de glosas a tratamientos oncológicos pediátricos de alto costo",
+        "keywords": ["T-027/2020", "cáncer infantil", "Ley 1388", "atención integral menor"],
+    },
+    "SENTENCIA T-553 DE 2024": {
+        "nombre": "Sentencia T-553 de 2024",
+        "titulo": "CAR-T cells en leucemia pediátrica refractaria — cobertura directa",
+        "ambito": "Terapias CAR-T en LLA pediátrica — eliminación de barreras MIPRES",
+        "vigente": True,
+        "ratio": "La Corte Constitucional ordenó la cobertura DIRECTA de terapias CAR-T (Tisagenlecleucel, Axicabtagene) en pacientes pediátricos con leucemia linfoblástica aguda refractaria a líneas previas, sin exigir trámites de MIPRES ni junta CRES, cuando hay riesgo vital inminente y opciones terapéuticas agotadas. Esta es la cita OBLIGATORIA en glosas a CAR-T pediátrico.",
+        "aplica_a": "Defensa Cart-T (Kymriah, Yescarta) en LLA pediátrica refractaria",
+        "keywords": [
+            "T-553/2024",
+            "CAR-T",
+            "Cart-T",
+            "Tisagenlecleucel",
+            "Kymriah",
+            "LLA pediátrica",
+        ],
+    },
+    "SENTENCIA T-705 DE 2017": {
+        "nombre": "Sentencia T-705 de 2017",
+        "titulo": "Atención en urgencias a migrantes irregulares — dignidad humana",
+        "ambito": "Migrantes venezolanos sin afiliación al SGSSS — atención inicial obligatoria",
+        "vigente": True,
+        "ratio": "La atención inicial de urgencias a migrantes sin afiliación al SGSSS es obligatoria por dignidad humana (Art. 1 CP). El pago, sin embargo, corresponde al Ente Territorial vía SGP (Decreto 064/2020), no a una EPS donde el paciente no estaba afiliado.",
+        "aplica_a": "Defensa de glosas en atención a migrantes irregulares",
+        "keywords": ["T-705/2017", "migrante", "Venezuela", "urgencias", "dignidad humana"],
+    },
+    "SENTENCIA T-401 DE 1994": {
+        "nombre": "Sentencia T-401 de 1994",
+        "titulo": "Dignidad del paciente psiquiátrico y contención mecánica",
+        "ambito": "Salud mental — uso proporcional de contención mecánica",
+        "vigente": True,
+        "ratio": "La contención mecánica es admisible como medida temporal y proporcional cuando hay riesgo inminente para la vida del paciente o terceros, debiéndose documentar cada episodio. NO es per se una violación a la dignidad cuando se aplica con criterio clínico y de último recurso.",
+        "aplica_a": "Defensa de glosas que alegan 'abuso de medida invasiva' en internación psiquiátrica",
+        "keywords": ["T-401/1994", "psiquiatría", "contención mecánica", "dignidad"],
+    },
     "SENTENCIA T-1198 DE 2003": {
         "nombre": "Sentencia T-1198 de 2003",
         "titulo": "Pago a prestadores — solidaridad financiera del SGSSS",
@@ -1316,6 +1605,70 @@ JURISPRUDENCIA = {
         "aplica_a": "Argumento de fondo en glosas reiterativas a IPS pública (HUS)",
         "keywords": ["SU-1023/2001", "solidaridad SGSSS", "IPS pública", "financiación cruzada"],
     },
+    # ── Ronda 16 (26-jun-2026 — Bug P v3): jurisprudencia que la EPS
+    #     SURA/NUEVA EPS/COMPENSAR invocaron y que el verifier marcaba
+    #     como inexistente. Las agregamos para que el quality gate las
+    #     reconozca y el dictamen pueda responder por nombre.
+    "SENTENCIA T-385 DE 2023": {
+        "nombre": "Sentencia T-385 de 2023 (Corte Constitucional)",
+        "titulo": "Derecho a la salud — paciente complejo y bilateralidad EPS-IPS",
+        "ambito": "Defensa de prestadores frente a EPS — obligaciones bilaterales y continuidad",
+        "vigente": True,
+        "ratio": "La Corte reiteró que la relación EPS-IPS es bilateral: a la obligación del prestador de garantizar atención corresponde la obligación correlativa de la EPS de pagar oportunamente. La sostenibilidad de la red prestadora es presupuesto material del derecho a la salud. Las glosas dilatorias o reiterativas vulneran este equilibrio.",
+        "aplica_a": "Glosas sistemáticas o dilatorias contra IPS pública",
+        "keywords": [
+            "T-385/2023",
+            "bilateralidad",
+            "EPS-IPS",
+            "sostenibilidad red",
+            "glosas dilatorias",
+        ],
+    },
+    "SENTENCIA T-970 DE 2014": {
+        "nombre": "Sentencia T-970 de 2014 (Corte Constitucional)",
+        "titulo": "Muerte digna y autonomía del paciente terminal",
+        "ambito": "Cuidados paliativos, sedación terminal y voluntad anticipada",
+        "vigente": True,
+        "ratio": "Reconoció la muerte digna como derecho fundamental y ordenó a MinSalud reglamentar su procedimiento. Los servicios de cuidados paliativos, sedación terminal y manejo de dolor en paciente terminal son cobertura obligatoria por dignidad humana (Art. 1 CP) y libre desarrollo de la personalidad (Art. 16 CP). Cualquier glosa que cuestione la pertinencia de cuidados paliativos vulnera el precedente.",
+        "aplica_a": "Glosas a servicios de paliativos, oncología terminal, sedación, manejo del dolor",
+        "keywords": [
+            "T-970/2014",
+            "muerte digna",
+            "cuidados paliativos",
+            "sedación terminal",
+            "autonomía paciente",
+        ],
+    },
+    "AUTO 037 DE 2024": {
+        "nombre": "Auto 037 de 2024 (Corte Constitucional — seguimiento T-553/2024)",
+        "titulo": "Seguimiento al cumplimiento de órdenes en terapia CAR-T (Tisagenlecleucel)",
+        "ambito": "Tecnologías de alto costo en cáncer hemato-oncológico",
+        "vigente": True,
+        "ratio": "Auto de seguimiento que ordena medidas urgentes a EPS y entidades pagadoras para garantizar el acceso efectivo a terapia CAR-T cell ordenada por orden judicial. Reafirma que el costo del tratamiento no es eximente cuando hay orden de tutela en firme. Aplica directamente a glosas que cuestionan recobros por Cart-T.",
+        "aplica_a": "Glosas de recobro o pertinencia en terapia Cart-T",
+        "keywords": [
+            "Auto 037/2024",
+            "CAR-T",
+            "Tisagenlecleucel",
+            "cumplimiento tutela",
+            "seguimiento",
+        ],
+    },
+    "AUTO 116 DE 2024": {
+        "nombre": "Auto 116 de 2024 (Corte Constitucional)",
+        "titulo": "Sostenibilidad fiscal del SGSSS y giros directos a IPS públicas",
+        "ambito": "Crisis financiera de EPS intervenidas — protección de IPS prestadora",
+        "vigente": True,
+        "ratio": "La Corte ordenó medidas estructurales para el saneamiento de cartera de IPS públicas frente a EPS intervenidas o liquidadas (Nueva EPS, SaludCoop, Cafesalud histórica, Medimás). El giro directo desde ADRES a la IPS pública es mecanismo excepcional pero exigible cuando la EPS deudora no garantiza el pago. Soporte fuerte para glosas con riesgo de no-pago por liquidación inminente.",
+        "aplica_a": "Glosas de EPS intervenidas o en proceso de liquidación — fundamento para giro directo ADRES",
+        "keywords": [
+            "Auto 116/2024",
+            "sostenibilidad SGSSS",
+            "giro directo",
+            "ADRES",
+            "EPS intervenida",
+        ],
+    },
 }
 
 
@@ -1331,6 +1684,28 @@ ACUERDOS = {
         "vigente": True,
         "notas": "Establece que la remuneración a las IPS que atienden población FF.MM. se rige íntegramente por las tarifas consignadas en los contratos interadministrativos.",
         "keywords": ["Acuerdo 002", "FF.MM.", "sanidad militar", "tarifas contractuales"],
+    },
+    # Ronda 14 (25-jun-2026, Bug P): el verifier marcaba como
+    # "NORMA_INEXISTENTE" las siguientes normas que SÍ existen en el
+    # ordenamiento jurídico colombiano. Las agregamos al corpus para que
+    # el quality gate deje de generar falsos positivos en dictámenes
+    # legítimos.
+    "ACUERDO 256 DE 2001": {
+        "nombre": "Acuerdo 256 de 2001 (Consejo Nacional de Seguridad Social en Salud — CNSSS)",
+        "titulo": "Mecanismo de actualización de tarifas SOAT (anualidad fiscal)",
+        "ambito": "Tarifas SOAT — cambio de manual al inicio de cada vigencia",
+        "vigente": True,
+        "notas": "Regula el ajuste anual del Manual Tarifario SOAT y la aplicación temporal de los nuevos valores al 1 de enero de cada año.",
+        "keywords": ["Acuerdo 256", "SOAT", "anualidad fiscal", "actualización tarifas"],
+    },
+    "ACUERDO 029 DE 2011": {
+        "nombre": "Acuerdo 029 de 2011 (CRES)",
+        "titulo": "Plan Obligatorio de Salud — actualización integral",
+        "ambito": "Cobertura PBS (derogado parcialmente por Resolución 5267/2017)",
+        "vigente": False,
+        "reemplazado_por": "Resolución 5267 de 2017 (luego Resolución 2292 de 2021)",
+        "notas": "Norma de transición — el contenido fue subrogado pero algunas EPS aún la invocan en glosas. Cuando la EPS la cite, contrarrestar con la norma vigente del PBS.",
+        "keywords": ["Acuerdo 029", "POS", "PBS", "CRES", "derogado"],
     },
 }
 

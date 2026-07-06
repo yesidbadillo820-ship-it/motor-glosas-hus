@@ -1,0 +1,140 @@
+{
+  "_meta": {
+    "descripcion": "Golden set de evaluación de CALIDAD del pipeline determinista del motor (detectores + sanitizers, SIN llamar al LLM). Mide que cada cambio no rompa la detección de EPS, sub-conceptos, complejidad, sanciones, contratos, ni reintroduzca bugs de placeholders ya corregidos. Cada caso viene de una glosa real auditada por Yesid.",
+    "version": "2026-06-30",
+    "como_correr": "pytest tests/test_golden_set.py -v  ·  o  python tools/correr_golden_set.py"
+  },
+  "casos_glosa": [
+    {
+      "id": "salud_total_tms",
+      "descripcion": "SALUD TOTAL TMS $98M — multi-concepto, dropdown militar errado, sanción 10%, contrato citado",
+      "glosa": "SALUD TOTAL: Se objeta integralmente la atención por las siguientes razones: (1) la terapia de Estimulación Magnética Transcraneal (TMS) NO se encuentra dentro del PBS, conforme a la Resolución 2292 de 2021; (2) la hospitalización psiquiátrica de 22 días excede los lineamientos de pertinencia, máximo recomendado 14 días; (3) la atención inicial NO fue tramitada vía solicitud de autorización previa (AU0301). SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO, conforme a la Cláusula 18 del contrato CTR-2024-SALUDTOTAL-HUS. Adicionalmente, se objeta la cobertura del acompañamiento familiar protocolizado por no estar incluido en el PBS.",
+      "eps_dropdown": "DISPENSARIO MEDICO",
+      "criterios": {
+        "eps_efectiva_contiene": "SALUD TOTAL",
+        "eps_fue_corregida": true,
+        "min_subconceptos": 5,
+        "detecta_sancion_ilegal": true,
+        "contrato_citado": "CTR-2024-SALUDTOTAL-HUS",
+        "clausulas_citadas": [18],
+        "es_complejo": true,
+        "complejidad_motivo_contiene": "TMS",
+        "defensa_clinica_titulo_contiene": "TMS"
+      }
+    },
+    {
+      "id": "ecoopsos_implante_coclear",
+      "descripcion": "ECOOPSOS implante coclear bilateral pediátrico $389M — valor alto, cláusula 24, contrato",
+      "glosa": "OBSERVACIONES ECOOPSOS: La paciente cuenta con 14 meses de edad. (I) el implante coclear bilateral es PREMATURO; (II) se objeta la BILATERALIDAD por costo del segundo dispositivo Med-El; (III) el procesador SONNET 2 es de gama PREMIUM. Cláusula 24 del Contrato CTR-2025-ECOOPSOS-HUS exige cotización comparativa de al menos 3 proveedores, NO aportada.",
+      "eps_dropdown": "OTRA / SIN DEFINIR",
+      "valor_objetado": "389700000",
+      "criterios": {
+        "eps_efectiva_contiene": "ECOOPSOS",
+        "min_subconceptos": 3,
+        "contrato_citado": "CTR-2025-ECOOPSOS-HUS",
+        "clausulas_citadas": [24],
+        "es_complejo": true,
+        "complejidad_motivo_contiene": "IMPLANTE COCLEAR",
+        "defensa_clinica_titulo_contiene": "coclear"
+      }
+    },
+    {
+      "id": "medimas_da_vinci",
+      "descripcion": "MEDIMÁS da Vinci $273M — EPS en liquidación, evento adverso prevenible, contrato, da Vinci",
+      "glosa": "OBSERVACIONES MEDIMÁS EPS-S (LIQUIDACIÓN): (I) PERTINENCIA: la prostatectomía radical ABIERTA es alternativa válida; el uso de plataforma robótica da Vinci Xi NO se justifica. (II) EVENTO ADVERSO PREVENIBLE: la fístula urinaria post-operatoria es complicación EVITABLE atribuible a falla en la técnica quirúrgica. (III) TARIFA: el contrato vigente CTR-2024-MEDIMAS-HUS define SOAT × 0.85; la facturación aplicó SOAT pleno + 35%. (IV) SOPORTES: no se aporta el consentimiento informado para plataforma robótica conforme a la cláusula 31 del contrato.",
+      "eps_dropdown": "OTRA / SIN DEFINIR",
+      "valor_objetado": "273180000",
+      "criterios": {
+        "eps_efectiva_contiene": "MEDIM",
+        "min_subconceptos": 4,
+        "contrato_citado": "CTR-2024-MEDIMAS-HUS",
+        "clausulas_citadas": [31],
+        "es_complejo": true,
+        "complejidad_motivo_contiene": "EVENTO ADVERSO",
+        "defensa_clinica_titulo_contiene": "robótica"
+      }
+    },
+    {
+      "id": "quemado_epicel",
+      "descripcion": "Quemado grave Epicel $487M — palabra-clave Epicel + valor alto",
+      "glosa": "SURA: Se objeta el uso de Epicel (queratinocitos autólogos cultivados) en paciente con quemadura SCQ 45% por considerarse tecnología experimental no incluida en el PBS.",
+      "eps_dropdown": "OTRA / SIN DEFINIR",
+      "valor_objetado": "487000000",
+      "criterios": {
+        "eps_efectiva_contiene": "SURA",
+        "es_complejo": true,
+        "complejidad_motivo_contiene": "EPICEL",
+        "defensa_clinica_titulo_contiene": "Epicel"
+      }
+    },
+    {
+      "id": "norwood_neonatal",
+      "descripcion": "Norwood cardiopatía neonatal $678M — palabra-clave Norwood + valor alto",
+      "glosa": "NUEVA EPS: Se objeta la cirugía estadiada de Norwood para síndrome de hipoplasia ventricular izquierdo por considerar que la cirugía paliativa no es procedente en neonato.",
+      "eps_dropdown": "OTRA / SIN DEFINIR",
+      "valor_objetado": "678000000",
+      "criterios": {
+        "eps_efectiva_contiene": "NUEVA EPS",
+        "es_complejo": true,
+        "complejidad_motivo_contiene": "NORWOOD",
+        "defensa_clinica_titulo_contiene": "Norwood"
+      }
+    },
+    {
+      "id": "tarifa_simple",
+      "descripcion": "Caso SIMPLE de tarifa — NO debe escalar a Claude ni detectar sub-conceptos",
+      "glosa": "TA0201 TARIFA: el valor facturado de consulta de control excede la tarifa SOAT pactada en el contrato.",
+      "eps_dropdown": "FAMISANAR EPS",
+      "valor_objetado": "45000",
+      "criterios": {
+        "min_subconceptos": 0,
+        "max_subconceptos": 1,
+        "detecta_sancion_ilegal": false
+      }
+    }
+  ],
+  "dictamenes_con_bugs": [
+    {
+      "id": "contrato_duplicado_FF",
+      "descripcion": "Bug FF (ronda 20): contrato duplicado y truncado",
+      "glosa_contexto": "conforme a la Cláusula 18 del contrato CTR-2024-SALUDTOTAL-HUS",
+      "dictamen_sucio": "Contrato: SIN CONTRATO PACTADO. El servicio fue prestado.",
+      "aplicar": "reescribir_negacion_contrato",
+      "no_debe_contener": ["SIN CONTRATO PACTADO", "contrato contrato"],
+      "debe_contener": ["CTR-2024-SALUDTOTAL-HUS"]
+    },
+    {
+      "id": "placeholder_servicio_GG",
+      "descripcion": "Bug GG (ronda 20): placeholder pegado al servicio",
+      "dictamen_sucio": "<div>HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS, el procedimiento facturado según historia clínica</div>",
+      "aplicar": "neutralizar_alucinaciones_prompt",
+      "no_debe_contener": ["procedimiento facturado según historia clínica"],
+      "debe_contener": ["HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS"]
+    },
+    {
+      "id": "carece_facultad",
+      "descripcion": "Bug CARECE (concepto-x-concepto): verbo elidido",
+      "dictamen_sucio": "la entidad pagadora de facultad sancionatoria sobre el prestador",
+      "aplicar": "neutralizar_alucinaciones_prompt",
+      "no_debe_contener": ["pagadora de facultad"],
+      "debe_contener": ["carece de facultad sancionatoria"]
+    },
+    {
+      "id": "eps_entidad_pagadora_HH",
+      "descripcion": "Bug HH (ronda 20): EPS + la entidad pagadora roto",
+      "dictamen_sucio": "la sanción aplicada por salud total la entidad pagadora el servicio prestado",
+      "aplicar": "neutralizar_alucinaciones_prompt",
+      "no_debe_contener": ["salud total la entidad pagadora"],
+      "debe_contener": ["respecto del servicio"]
+    },
+    {
+      "id": "sancion_aceptada_U",
+      "descripcion": "Bug U (ronda 16): rechazo de sanción ilegal",
+      "glosa_contexto": "SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO",
+      "dictamen_sucio": "EL HUS SE AJUSTA A LA SANCIÓN APLICADA POR LA EPS.",
+      "aplicar": "rechazar_sancion_eps_ilegal",
+      "no_debe_contener": ["SE AJUSTA A LA SANCIÓN"],
+      "debe_contener_alguno": ["rechaza", "vicio de competencia", "Ley 1438"]
+    }
+  ]
+}

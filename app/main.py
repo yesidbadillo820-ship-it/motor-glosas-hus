@@ -97,6 +97,51 @@ CONTRATOS_DEFAULT = {
 }
 
 
+def _sembrar_contratos_default(db, *, force_reseed: bool = False) -> None:
+    """Siembra los contratos default SOLO cuando faltan en la BD.
+
+    La BD es la fuente de verdad: los textos editados por la coordinación
+    desde la UI (POST /contratos) NO se sobrescriben en cada arranque.
+    Antes este seed hacía `existente.detalles = v` en cada boot (revirtiendo
+    las ediciones de las 14 EPS default) y además BORRABA cualquier contrato
+    cuyo EPS no estuviera en CONTRATOS_DEFAULT — perdiendo contratos creados
+    por el equipo. Auditoría jun-2026, P1 #4.
+
+    FORCE_RESEED_CONTRATOS=1 restaura la re-sincronización masiva
+    (sobrescribe textos con el default y elimina los no-default), espejo
+    del toggle FORCE_RESEED_USERS para usuarios.
+    """
+    for k, v in CONTRATOS_DEFAULT.items():
+        existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
+        if not existente:
+            db.add(ContratoRecord(eps=k, detalles=v))
+            logger.info(f"Contrato default sembrado: {k}")
+        elif force_reseed and existente.detalles != v:
+            logger.warning(f"[FORCE_RESEED_CONTRATOS] {k}: detalles re-sincronizados al default")
+            existente.detalles = v
+
+    if force_reseed:
+        eps_default = set(CONTRATOS_DEFAULT.keys())
+        for contrato in db.query(ContratoRecord).all():
+            if contrato.eps not in eps_default:
+                logger.warning(
+                    f"[FORCE_RESEED_CONTRATOS] ELIMINANDO contrato no-default: {contrato.eps}"
+                )
+                db.delete(contrato)
+
+
+# Índices calientes de historial, creados de forma idempotente en el
+# lifespan (CREATE INDEX IF NOT EXISTS) porque create_all() no agrega
+# índices a tablas pre-existentes. Los nombres DEBEN coincidir con los
+# Index() declarados en GlosaRecord.__table_args__ (app/models/db.py)
+# para que ambos mecanismos converjan sin duplicados.
+_INDICES_HISTORIAL = [
+    ("ix_historial_creado_en", "creado_en"),
+    ("ix_historial_factura", "factura"),
+    ("ix_historial_workflow_state", "workflow_state"),
+]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=== INICIANDO APLICACIÓN ===")
@@ -286,6 +331,10 @@ async def lifespan(app: FastAPI):
         ("tercero_nit", "VARCHAR(30)"),
         ("dias_radicacion_dgh", "INTEGER DEFAULT 0"),
         ("tercero_nombre", "VARCHAR(300)"),
+        # Evidencia de radicación ante la entidad (marcar-radicada)
+        ("radicado_en", "TIMESTAMP WITH TIME ZONE"),
+        ("radicado_por", "VARCHAR(200)"),
+        ("radicado_observacion", "TEXT"),
         # Nota crédito (commit cfafe7d / hotfix 4adbb7b)
         ("numero_nota_credito", "VARCHAR(60)"),
         ("fecha_nota_credito", "TIMESTAMP WITH TIME ZONE"),
@@ -327,6 +376,21 @@ async def lifespan(app: FastAPI):
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
+
+    # Índices idempotentes para caminos calientes de historial (auditoría
+    # jun-2026 P2 #10): /historial ordena por creado_en, "responder por
+    # factura" filtra por factura y el tablero de workflow por
+    # workflow_state. Mismo mecanismo que el índice de nota_credito; los
+    # nombres coinciden con los Index() de GlosaRecord.__table_args__.
+    for _ix_nombre, _ix_col in _INDICES_HISTORIAL:
+        try:
+            if _tiene_tabla("historial") and _tiene_columna("historial", _ix_col):
+                db.execute(
+                    text(f"CREATE INDEX IF NOT EXISTS {_ix_nombre} ON historial ({_ix_col})")
+                )
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
 
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
@@ -438,6 +502,22 @@ async def lifespan(app: FastAPI):
     _CONTRATOS_MISSING = [
         ("pdf_path", "VARCHAR(500)"),
         ("pdf_subido_en", _TS_TIPO),
+        # Metadatos enriquecidos (auditoría 10-jun-2026 P0-CITADA): la
+        # otra IA cita NIT, número de proceso SECOP, fecha exacta y
+        # plazo. Sin esto el sistema producía dictámenes genéricos.
+        ("numero_contrato", "VARCHAR(120)"),
+        ("nit_eps", "VARCHAR(40)"),
+        ("nit_ips", "VARCHAR(40)"),
+        ("razon_social_eps", "VARCHAR(300)"),
+        ("razon_social_ips", "VARCHAR(300)"),
+        ("numero_proceso_secop", "VARCHAR(120)"),
+        ("secop_url", "VARCHAR(500)"),
+        ("fecha_suscripcion", _TS_TIPO),
+        ("fecha_inicio", _TS_TIPO),
+        ("fecha_fin", _TS_TIPO),
+        ("objeto_contractual", "TEXT"),
+        ("anexos_descripcion", "TEXT"),
+        ("modalidades_tarifarias", "TEXT"),
     ]
     for col_name, col_ddl in _CONTRATOS_MISSING:
         try:
@@ -489,21 +569,13 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
 
     try:
-        # Cargar contratos iniciales
-        # Primero eliminar contratos que ya no existen en la lista actual
-        eps_actuales = list(CONTRATOS_DEFAULT.keys())
-        contratos_existentes = db.query(ContratoRecord).all()
-        for contrato in contratos_existentes:
-            if contrato.eps not in eps_actuales:
-                logger.warning(f"ELIMINANDO contrato obsoleto: {contrato.eps}")
-                db.delete(contrato)
-
-        for k, v in CONTRATOS_DEFAULT.items():
-            existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
-            if existente:
-                existente.detalles = v
-            else:
-                db.add(ContratoRecord(eps=k, detalles=v))
+        # Contratos default: solo sembrar los que FALTAN. Los textos
+        # editados desde la UI persisten entre deploys (la BD manda);
+        # FORCE_RESEED_CONTRATOS=1 fuerza la re-sincronización masiva.
+        _sembrar_contratos_default(
+            db,
+            force_reseed=os.getenv("FORCE_RESEED_CONTRATOS", "").lower() in ("1", "true", "yes"),
+        )
 
         # Crear admin solo si no existe
         # CORRECCIÓN: contraseña desde variable de entorno, sin hardcodear.
@@ -815,12 +887,12 @@ async def lifespan(app: FastAPI):
         _ant = os.getenv("ANTHROPIC_API_KEY", "")
         _gem = os.getenv("GEMINI_API_KEY", "")
         _grq = os.getenv("GROQ_API_KEY", "")
-        _prim = os.getenv("PRIMARY_AI", "gemini")
+        _prim = os.getenv("PRIMARY_AI", "groq")
         logger.info(
-            f"[IA-PROVIDERS] primary={_prim} | "
+            f"[IA-PROVIDERS] primary={_prim} (dictamen: groq+anthropic) | "
+            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'} | "
             f"anthropic={'OK ' + _ant[:10] + '...' if _ant else 'AUSENTE'} | "
-            f"gemini={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'} | "
-            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'}"
+            f"gemini(solo OCR)={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'}"
         )
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
@@ -1023,6 +1095,7 @@ from app.api.routers.audit import router as audit_router
 # salud_total: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
 from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
+from app.api.routers.credenciales import router as credenciales_router
 from app.api.routers.admin import router as admin_router
 from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
@@ -1030,6 +1103,8 @@ from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
+from app.api.routers.asistente_predictivo import router as asistente_predictivo_router
+from app.api.routers.quality_gate_stats import router as quality_gate_stats_router
 from app.api.routers.versiones import router as versiones_router
 from app.api.routers.papelera import router as papelera_router
 from app.api.routers.simulador import router as simulador_router
@@ -1068,6 +1143,8 @@ from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
 from app.api.routers.ia_status import router as ia_status_router
 
 app.include_router(auth_router)
+app.include_router(asistente_predictivo_router)  # Ola 4: inteligencia ambiental
+app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
 app.include_router(contratos_router)
 app.include_router(analytics_router)
@@ -1081,6 +1158,7 @@ app.include_router(audit_router)
 # salud_total_router: stub removido
 app.include_router(tarifas_contratadas_router)
 app.include_router(tarifa_liquidador_router)
+app.include_router(credenciales_router)  # Vault cifrado de credenciales EPS
 app.include_router(admin_router)
 app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)

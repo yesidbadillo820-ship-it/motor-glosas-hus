@@ -47,7 +47,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          # requirements-dev.txt incluye -r requirements.txt + pytest y
+          # pytest-asyncio (sin esto el job fallaba con "No module named pytest"
+          # y las pruebas nunca corrían).
+          pip install -r requirements-dev.txt
           # cryptography from PyPI overrides any broken system package
           pip install "cryptography>=42.0.0"
           # pytest no está en requirements.txt; el runner lo necesita para correr
