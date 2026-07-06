@@ -69,8 +69,10 @@ def _seed(db, dias_atras_objecion, valor=1000):
 
 class TestFechaObjecionMensual:
     def test_serie(self, client, db_session):
-        _seed(db_session, dias_atras_objecion=5, valor=1000)
-        _seed(db_session, dias_atras_objecion=10, valor=2000)
+        # Ambas HOY: con dias_atras > 0 el test caducaba al inicio de cada mes
+        # (p. ej. el 6 de julio, "hace 10 días" cae en junio y la serie da 2).
+        _seed(db_session, dias_atras_objecion=0, valor=1000)
+        _seed(db_session, dias_atras_objecion=0, valor=2000)
 
         r = client.get("/glosas/stats/fecha-objecion-mensual?meses=2")
         d = r.json()
