@@ -19,18 +19,19 @@ categoría y entidad pagadora.
 4. Genera el PDF del correo (como la "impresión" manual de Gmail) y guarda
    los adjuntos renombrados con la misma convención del archivo manual:
 
-       <base>\<AÑO>\<MM MES>\<DD>\<CATEGORÍA>\<ENTIDAD OK>\
-           ├── <ENTIDAD> <h.mm> OK.pdf         (glosas: hora de llegada, ej. "AXA 7.21 OK.pdf")
-           ├── <Asunto del correo> OK.pdf      (devoluciones: nombre por asunto)
-           └── <ENTIDAD> <h.mm> OK.zip/.xlsx   (adjuntos, misma base + " (2)" si chocan)
+       <base>\<AÑO>\<MM MES>\<DD>\<CATEGORÍA>\<ENTIDAD>\
+           ├── <ENTIDAD> <h.mm>.pdf            (glosas: hora de llegada, ej. "AXA 7.21.pdf")
+           ├── <Asunto del correo>.pdf         (devoluciones: nombre por asunto)
+           └── <ENTIDAD> <h.mm>.zip/.xlsx      (adjuntos, misma base + " (2)" si chocan)
 
    Ejemplo real:
 
-       Z:\SERVIDOR GLOSAS\F\RECEPCIÓN DE GLOSAS (NO ELIMINAR CARPETA)\03-GLOSAS ESCANEADAS 2.0 (NO ELIMINAR CARPETA )\2026\07 JULIO\02\DEVOLUCIONES\DISPENSARIO OK\Devolución de Factura del Radicado No 100881 OK.pdf
+       Z:\SERVIDOR GLOSAS\F\RECEPCIÓN DE GLOSAS (NO ELIMINAR CARPETA)\03-GLOSAS ESCANEADAS 2.0 (NO ELIMINAR CARPETA )\2026\07 JULIO\02\DEVOLUCIONES\DISPENSARIO\Devolución de Factura del Radicado No 100881.pdf
 
    Si la carpeta del mes/día/categoría/entidad ya existe con marcas manuales
    (`07.JULIO`, `01 OK SOLO NUEVA`, `DEVOLUCIONES OK`, `DISPENSARIO SOFIA OK`),
-   el script la **reutiliza** en vez de crear una duplicada. Los nombres
+   el script la **reutiliza** en vez de crear una duplicada. El bot NO pone
+   la marca " OK": esa la agregan los gestores cuando ya gestionaron. Los nombres
    originales de los adjuntos quedan en el registro CSV (columna `archivos`,
    formato `final <- original`); con `"renombrar_adjuntos": false` en el config
    conservan su nombre original.
@@ -133,10 +134,10 @@ Las plantillas de nombres también se configuran ahí:
 
 ```json
 "plantillas": {
-  "carpeta_entidad": "{entidad} OK",
+  "carpeta_entidad": "{entidad}",
   "pdf_correo": {
-    "DEVOLUCIONES": "{asunto} OK",
-    "*": "{entidad} {hora} OK"
+    "DEVOLUCIONES": "{asunto}",
+    "*": "{entidad} {hora}"
   }
 }
 ```

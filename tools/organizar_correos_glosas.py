@@ -5,14 +5,15 @@ cada correo en INICIAL / RATIFICADA / DEVOLUCIONES / CONCILIACIONES (o 0-REVISAR
 si no hay certeza), detecta la entidad pagadora (DISPENSARIO/AUDITOOL, AXA,
 SEGUROS BOLIVAR, SALUD MIA, ...) y guarda en la estructura del servidor de glosas:
 
-    <base>\\<AÑO>\\<MM MES>\\<DD>\\<CATEGORÍA>\\<ENTIDAD OK>\\
-        ├── <ENTIDAD> <h.mm> OK.pdf   (el correo impreso a PDF; h.mm = hora de llegada,
-        │                              como el archivo manual: "AXA 7.21 OK.pdf")
+    <base>\\<AÑO>\\<MM MES>\\<DD>\\<CATEGORÍA>\\<ENTIDAD>\\
+        ├── <ENTIDAD> <h.mm>.pdf      (el correo impreso a PDF; h.mm = hora de llegada,
+        │                              como el archivo manual: "AXA 7.21.pdf")
         └── <adjuntos>                (renombrados con la misma convención)
 
-Si la carpeta del día/categoría/entidad ya existe con marcas manuales
-("01 OK SOLO NUEVA", "DEVOLUCIONES OK", "DISPENSARIO SOFIA OK", "07.JULIO"),
-se REUTILIZA esa carpeta en vez de crear una duplicada.
+El bot NO agrega la marca " OK": esa la ponen los gestores cuando ya
+gestionaron la carpeta/archivo. Si la carpeta del día/categoría/entidad ya
+existe con marcas manuales ("01 OK SOLO NUEVA", "DEVOLUCIONES OK",
+"DISPENSARIO SOFIA OK", "07.JULIO"), se REUTILIZA en vez de crear una duplicada.
 
 La fecha de carpeta es la fecha de LLEGADA del correo (hora Colombia), no la de
 ejecución. Nunca sobreescribe archivos (agrega " (2)") y nunca borra ni mueve
@@ -236,10 +237,10 @@ CONFIG_DEFECTO: dict = {
         },
     ],
     "plantillas": {
-        "carpeta_entidad": "{entidad} OK",
+        "carpeta_entidad": "{entidad}",
         "pdf_correo": {
-            "DEVOLUCIONES": "{asunto} OK",
-            "*": "{entidad} {hora} OK",
+            "DEVOLUCIONES": "{asunto}",
+            "*": "{entidad} {hora}",
         },
     },
     # Los adjuntos toman el mismo nombre que el PDF del correo (convención del
@@ -749,7 +750,7 @@ def construir_carpeta_destino(
     try:
         nombre_nuevo = plantilla.format(entidad=entidad)
     except (ValueError, KeyError, IndexError):
-        nombre_nuevo = f"{entidad} OK"
+        nombre_nuevo = entidad
     return carpeta_equivalente(cat, entidad, nombre_nuevo)
 
 
@@ -805,7 +806,7 @@ def nombre_pdf_correo(
     {consecutivo} (contador por día/entidad; solo se gasta si la plantilla lo usa).
     """
     plantillas = config.get("plantillas", {}).get("pdf_correo", {})
-    plantilla = plantillas.get(categoria) or plantillas.get("*") or "{entidad} {hora} OK"
+    plantilla = plantillas.get(categoria) or plantillas.get("*") or "{entidad} {hora}"
     valores = {
         "entidad": entidad,
         "hora": hora_correo(fecha),
@@ -823,7 +824,7 @@ def nombre_pdf_correo(
     except (ValueError, KeyError, IndexError):
         # plantilla mal escrita en el config: nunca frenar el archivado
         logger.warning(f"Plantilla inválida '{plantilla}'; uso la de fábrica")
-        nombre = "{entidad} {hora} OK".format_map(_SinFaltantes(valores))
+        nombre = "{entidad} {hora}".format_map(_SinFaltantes(valores))
     return nombre_archivo_seguro(nombre, max_tallo=120) + ".pdf"
 
 

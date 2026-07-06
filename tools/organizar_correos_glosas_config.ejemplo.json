@@ -227,10 +227,10 @@
     }
   ],
   "plantillas": {
-    "carpeta_entidad": "{entidad} OK",
+    "carpeta_entidad": "{entidad}",
     "pdf_correo": {
-      "DEVOLUCIONES": "{asunto} OK",
-      "*": "{entidad} {hora} OK"
+      "DEVOLUCIONES": "{asunto}",
+      "*": "{entidad} {hora}"
     }
   },
   "renombrar_adjuntos": true

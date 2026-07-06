@@ -123,7 +123,7 @@ def test_entidad_desconocida_usa_dominio():
 def test_construir_carpeta_destino_estructura_servidor(tmp_path):
     fecha = datetime(2026, 7, 2, 8, 11, tzinfo=org.TZ_COLOMBIA)
     carpeta = org.construir_carpeta_destino(tmp_path, fecha, "DEVOLUCIONES", "DISPENSARIO", CONFIG)
-    assert carpeta == tmp_path / "2026" / "07 JULIO" / "02" / "DEVOLUCIONES" / "DISPENSARIO OK"
+    assert carpeta == tmp_path / "2026" / "07 JULIO" / "02" / "DEVOLUCIONES" / "DISPENSARIO"
 
 
 def test_construir_carpeta_reutiliza_marcas_manuales(tmp_path):
@@ -173,7 +173,7 @@ def test_nombre_pdf_devolucion_usa_asunto():
         lambda: estado.siguiente_consecutivo(fecha, "DISPENSARIO"),
         CONFIG,
     )
-    assert nombre == "Devolución de Factura del Radicado No 100881 OK.pdf"
+    assert nombre == "Devolución de Factura del Radicado No 100881.pdf"
     # la plantilla de devoluciones no usa consecutivo: no debe gastarlo
     assert estado.datos["consecutivos"] == {}
 
@@ -181,7 +181,7 @@ def test_nombre_pdf_devolucion_usa_asunto():
 def test_nombre_pdf_glosa_usa_hora_de_llegada():
     fecha = datetime(2026, 7, 2, 7, 21, tzinfo=org.TZ_COLOMBIA)
     nombre = org.nombre_pdf_correo("INICIAL", "AXA", "objeciones", fecha, lambda: 1, CONFIG)
-    assert nombre == "AXA 7.21 OK.pdf"
+    assert nombre == "AXA 7.21.pdf"
 
 
 def test_consecutivo_por_dia_y_entidad():
@@ -257,14 +257,14 @@ def test_procesar_mensaje_archiva_pdf_y_adjuntos(tmp_path):
         sin_pdf_correo=False,
         navegador=None,  # forzar la vía reportlab, determinista en CI
     )
-    carpeta = tmp_path / "2026" / "07 JULIO" / "02" / "DEVOLUCIONES" / "DISPENSARIO OK"
+    carpeta = tmp_path / "2026" / "07 JULIO" / "02" / "DEVOLUCIONES" / "DISPENSARIO"
     assert fila["estado"] == "ARCHIVADO"
     assert Path(fila["carpeta"]) == carpeta
-    pdf_correo = carpeta / "Devolución de Factura del Radicado No 100881 OK.pdf"
+    pdf_correo = carpeta / "Devolución de Factura del Radicado No 100881.pdf"
     assert pdf_correo.exists() and pdf_correo.stat().st_size > 0
     assert pdf_correo.read_bytes()[:5] == b"%PDF-"
     # el adjunto se renombra con la convención manual y queda ' (2)' por el choque
-    adjunto = carpeta / "Devolución de Factura del Radicado No 100881 OK (2).pdf"
+    adjunto = carpeta / "Devolución de Factura del Radicado No 100881 (2).pdf"
     assert adjunto.read_bytes() == b"%PDF-1.4 contenido de prueba"
     assert "DEV028158_324.pdf" in fila["archivos"]  # el original queda en el registro
 
@@ -307,7 +307,7 @@ def test_procesar_glosa_inicial_nombra_por_hora(tmp_path):
     """Dos correos AXA el mismo minuto: 'AXA 7.35 OK.pdf' y 'AXA 7.35 OK (2).pdf'."""
     pytest.importorskip("reportlab")
     estado = org.Estado(None)
-    esperados = ("AXA 7.35 OK.pdf", "AXA 7.35 OK (2).pdf")
+    esperados = ("AXA 7.35.pdf", "AXA 7.35 (2).pdf")
     for numero, esperado in enumerate(esperados, start=1):
         msg = EmailMessage()
         msg["Subject"] = f"{52 + numero} Notificación de objeciones diarias 01 de julio."
@@ -325,7 +325,7 @@ def test_procesar_glosa_inicial_nombra_por_hora(tmp_path):
             navegador=None,
         )
         assert fila["categoria"] == "INICIAL"
-        carpeta = tmp_path / "2026" / "07 JULIO" / "02" / "INICIAL" / "AXA OK"
+        carpeta = tmp_path / "2026" / "07 JULIO" / "02" / "INICIAL" / "AXA"
         assert (carpeta / esperado).exists()
 
 
@@ -372,8 +372,8 @@ def test_config_parcial_de_plantillas_no_rompe(tmp_path):
     )
     config = org.cargar_config(propio)
     assert config["plantillas"]["pdf_correo"]["DEVOLUCIONES"] == "{radicado} DEV"
-    assert config["plantillas"]["pdf_correo"]["*"] == "{entidad} {hora} OK"
-    assert config["plantillas"]["carpeta_entidad"] == "{entidad} OK"
+    assert config["plantillas"]["pdf_correo"]["*"] == "{entidad} {hora}"
+    assert config["plantillas"]["carpeta_entidad"] == "{entidad}"
 
 
 def test_entidades_extra_se_suman_sin_borrar_las_de_fabrica(tmp_path):
@@ -392,7 +392,7 @@ def test_plantilla_invalida_usa_la_de_fabrica():
     config = json.loads(json.dumps(org.CONFIG_DEFECTO))
     config["plantillas"]["pdf_correo"]["*"] = "{entidad} {variable_inventada} {mal:d}"
     nombre = org.nombre_pdf_correo("INICIAL", "AXA", "x", fecha, lambda: 1, config)
-    assert nombre == "AXA 7.21 OK.pdf"
+    assert nombre == "AXA 7.21.pdf"
 
 
 def test_nombre_archivo_seguro_conserva_extension_y_reservados():
