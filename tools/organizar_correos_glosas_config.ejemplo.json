@@ -1,0 +1,107 @@
+{
+  "etiqueta_gmail": "Archivado-Glosas",
+  "categoria_revision": "0-REVISAR",
+  "revisar_si_glosa_y_devolucion": true,
+  "min_bytes_imagen_inline": 15000,
+  "ignorar_asuntos": [
+    "CARGUE EXITOSO",
+    "ERRORES EN EL PROCESAMIENTO DEL ZIP"
+  ],
+  "categorias": [
+    {
+      "nombre": "CONCILIACIONES",
+      "patrones": [
+        "CONCILIACION"
+      ]
+    },
+    {
+      "nombre": "RATIFICADAS",
+      "patrones": [
+        "RATIFICA"
+      ]
+    },
+    {
+      "nombre": "DEVOLUCIONES",
+      "patrones": [
+        "DEVOLUCION",
+        "DEVUELTA",
+        "\\bDEV[O0]?\\d"
+      ]
+    },
+    {
+      "nombre": "INICIAL",
+      "patrones": [
+        "GLOSA",
+        "OBJECION",
+        "AUDITORIA"
+      ]
+    }
+  ],
+  "entidades": [
+    {
+      "carpeta": "DISPENSARIO",
+      "remitente": [
+        "@TOOL\\.COM\\.CO",
+        "AUDITOOL"
+      ],
+      "asunto": [
+        "AUDITOOL",
+        "SANIDAD MILITAR",
+        "DISPENSARIO"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "AXA",
+      "remitente": [
+        "GRUPOMOK",
+        "COLPATRIA",
+        "\\bAXA\\b"
+      ],
+      "asunto": [
+        "\\bAXA\\b",
+        "COLPATRIA"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SEGUROS BOLIVAR",
+      "remitente": [
+        "SEGUROSBOLIVAR",
+        "BOLIVAR"
+      ],
+      "asunto": [
+        "SEGUROS BOLIVAR",
+        "BOLIVAR"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SALUD MIA",
+      "remitente": [
+        "SALUDMIA"
+      ],
+      "asunto": [
+        "SALUD MIA"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "FACTRAMED",
+      "remitente": [
+        "FACTRAMED"
+      ],
+      "asunto": [
+        "FACTRAMED"
+      ],
+      "adjuntos": []
+    }
+  ],
+  "plantillas": {
+    "carpeta_entidad": "{entidad} OK",
+    "pdf_correo": {
+      "DEVOLUCIONES": "{asunto} OK",
+      "*": "{entidad} {consecutivo} OK"
+    }
+  }
+}
