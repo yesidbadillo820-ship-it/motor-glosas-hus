@@ -10,23 +10,30 @@ categoría y entidad pagadora.
 1. Se conecta por IMAP a la bandeja institucional (Gmail) y revisa los correos
    de los últimos N días (default: 3).
 2. Clasifica cada correo por asunto y nombres de adjuntos en:
-   `INICIAL`, `RATIFICADAS`, `DEVOLUCIONES`, `CONCILIACIONES` o `0-REVISAR`
+   `INICIAL`, `RATIFICADA`, `DEVOLUCIONES`, `CONCILIACIONES` o `0-REVISAR`
    (cuando no hay certeza — por ejemplo un correo que mezcla glosas y
    devoluciones — para que un humano decida; nada se pierde).
 3. Detecta la entidad pagadora (DISPENSARIO/AUDITOOL, AXA, SEGUROS BOLIVAR,
    SALUD MIA, FACTRAMED, ...) por remitente, asunto o nombre de adjunto. Si no
    la reconoce, usa el dominio del remitente como carpeta.
 4. Genera el PDF del correo (como la "impresión" manual de Gmail) y guarda
-   todos los adjuntos en:
+   los adjuntos renombrados con la misma convención del archivo manual:
 
        <base>\<AÑO>\<MM MES>\<DD>\<CATEGORÍA>\<ENTIDAD OK>\
-           ├── <ENTIDAD> <n> OK.pdf            (glosas: consecutivo del día)
+           ├── <ENTIDAD> <h.mm> OK.pdf         (glosas: hora de llegada, ej. "AXA 7.21 OK.pdf")
            ├── <Asunto del correo> OK.pdf      (devoluciones: nombre por asunto)
-           └── <adjuntos originales>
+           └── <ENTIDAD> <h.mm> OK.zip/.xlsx   (adjuntos, misma base + " (2)" si chocan)
 
    Ejemplo real:
 
        Z:\SERVIDOR GLOSAS\F\RECEPCIÓN DE GLOSAS (NO ELIMINAR CARPETA)\03-GLOSAS ESCANEADAS 2.0 (NO ELIMINAR CARPETA )\2026\07 JULIO\02\DEVOLUCIONES\DISPENSARIO OK\Devolución de Factura del Radicado No 100881 OK.pdf
+
+   Si la carpeta del mes/día/categoría/entidad ya existe con marcas manuales
+   (`07.JULIO`, `01 OK SOLO NUEVA`, `DEVOLUCIONES OK`, `DISPENSARIO SOFIA OK`),
+   el script la **reutiliza** en vez de crear una duplicada. Los nombres
+   originales de los adjuntos quedan en el registro CSV (columna `archivos`,
+   formato `final <- original`); con `"renombrar_adjuntos": false` en el config
+   conservan su nombre original.
 
 5. Deja registro CSV mensual de todo lo archivado (abre directo en Excel) y le
    pone la etiqueta `Archivado-Glosas` al correo en Gmail.
@@ -129,15 +136,14 @@ Las plantillas de nombres también se configuran ahí:
   "carpeta_entidad": "{entidad} OK",
   "pdf_correo": {
     "DEVOLUCIONES": "{asunto} OK",
-    "*": "{entidad} {consecutivo} OK"
+    "*": "{entidad} {hora} OK"
   }
 }
 ```
 
-Variables disponibles: `{entidad}`, `{asunto}`, `{consecutivo}` (contador por
-día y entidad) y `{radicado}` (número extraído del asunto, si hay). Si el
-consecutivo que usan hoy sigue otra regla (por ejemplo `4.4`), ajusta la
-plantilla o cuéntanos la regla exacta para incorporarla.
+Variables disponibles: `{entidad}`, `{hora}` (hora de llegada del correo en
+formato 12 horas, ej. `7.21` o `1.30`), `{asunto}`, `{consecutivo}` (contador
+por día y entidad) y `{radicado}` (número extraído del asunto, si hay).
 
 ## Registro CSV y carpeta de control
 

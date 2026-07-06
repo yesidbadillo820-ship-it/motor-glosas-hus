@@ -15,7 +15,7 @@
       ]
     },
     {
-      "nombre": "RATIFICADAS",
+      "nombre": "RATIFICADA",
       "patrones": [
         "RATIFICA"
       ]
@@ -101,7 +101,8 @@
     "carpeta_entidad": "{entidad} OK",
     "pdf_correo": {
       "DEVOLUCIONES": "{asunto} OK",
-      "*": "{entidad} {consecutivo} OK"
+      "*": "{entidad} {hora} OK"
     }
-  }
+  },
+  "renombrar_adjuntos": true
 }

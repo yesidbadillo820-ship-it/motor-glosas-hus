@@ -1,13 +1,18 @@
 """organizar_correos_glosas.py — Archiva correos de glosas/devoluciones en el servidor Z:.
 
 Lee la bandeja institucional (glosasydevoluciones@hus.gov.co) por IMAP, clasifica
-cada correo en INICIAL / RATIFICADAS / DEVOLUCIONES / CONCILIACIONES (o 0-REVISAR
+cada correo en INICIAL / RATIFICADA / DEVOLUCIONES / CONCILIACIONES (o 0-REVISAR
 si no hay certeza), detecta la entidad pagadora (DISPENSARIO/AUDITOOL, AXA,
 SEGUROS BOLIVAR, SALUD MIA, ...) y guarda en la estructura del servidor de glosas:
 
     <base>\\<AÑO>\\<MM MES>\\<DD>\\<CATEGORÍA>\\<ENTIDAD OK>\\
-        ├── <ENTIDAD> <n> OK.pdf      (el correo impreso a PDF, como el proceso manual)
-        └── <adjuntos originales>     (PDF, Excel, CSV, ZIP, ...)
+        ├── <ENTIDAD> <h.mm> OK.pdf   (el correo impreso a PDF; h.mm = hora de llegada,
+        │                              como el archivo manual: "AXA 7.21 OK.pdf")
+        └── <adjuntos>                (renombrados con la misma convención)
+
+Si la carpeta del día/categoría/entidad ya existe con marcas manuales
+("01 OK SOLO NUEVA", "DEVOLUCIONES OK", "DISPENSARIO SOFIA OK", "07.JULIO"),
+se REUTILIZA esa carpeta en vez de crear una duplicada.
 
 La fecha de carpeta es la fecha de LLEGADA del correo (hora Colombia), no la de
 ejecución. Nunca sobreescribe archivos (agrega " (2)") y nunca borra ni mueve
@@ -124,7 +129,7 @@ CONFIG_DEFECTO: dict = {
     ],
     "categorias": [
         {"nombre": "CONCILIACIONES", "patrones": ["CONCILIACION"]},
-        {"nombre": "RATIFICADAS", "patrones": ["RATIFICA"]},
+        {"nombre": "RATIFICADA", "patrones": ["RATIFICA"]},
         {"nombre": "DEVOLUCIONES", "patrones": ["DEVOLUCION", "DEVUELTA", "\\bDEV[O0]?\\d"]},
         {"nombre": "INICIAL", "patrones": ["GLOSA", "OBJECION", "AUDITORIA"]},
     ],
@@ -164,9 +169,13 @@ CONFIG_DEFECTO: dict = {
         "carpeta_entidad": "{entidad} OK",
         "pdf_correo": {
             "DEVOLUCIONES": "{asunto} OK",
-            "*": "{entidad} {consecutivo} OK",
+            "*": "{entidad} {hora} OK",
         },
     },
+    # Los adjuntos toman el mismo nombre que el PDF del correo (convención del
+    # archivo manual: "AXA 7.21 OK.pdf" + "AXA 7.21 OK (2).pdf"). Con false
+    # conservan su nombre original.
+    "renombrar_adjuntos": True,
 }
 
 
@@ -549,19 +558,48 @@ def generar_pdf_correo(
 # ─── Rutas de destino y estado ───────────────────────────────────────────────
 
 
+def _clave_carpeta(nombre: str) -> str:
+    """Normaliza un nombre de carpeta para compararlo: '07.JULIO' == '07 JULIO'."""
+    texto = _normalizar(nombre).replace(".", " ")
+    return re.sub(r"\s+", " ", texto).strip()
+
+
+def carpeta_equivalente(padre: Path, objetivo: str, nombre_nuevo: str | None = None) -> Path:
+    """Reutiliza una carpeta existente aunque tenga marcas manuales.
+
+    El personal agrega sufijos a mano ('01 OK SOLO NUEVA', 'DEVOLUCIONES OK',
+    'DISPENSARIO SOFIA OK', '07.JULIO'): si en `padre` ya hay una carpeta cuyo
+    nombre normalizado es igual al objetivo, empieza por 'objetivo ' o es el
+    plural 'objetivoS', se usa esa en vez de crear una duplicada. Si no hay,
+    devuelve padre/nombre_nuevo (o padre/objetivo).
+    """
+    clave = _clave_carpeta(objetivo)
+    try:
+        existentes = [d for d in padre.iterdir() if d.is_dir()]
+    except OSError:
+        existentes = []
+    candidatas = []
+    for carpeta in existentes:
+        nombre = _clave_carpeta(carpeta.name)
+        if nombre == clave or nombre == clave + "S" or nombre.startswith(clave + " "):
+            candidatas.append(carpeta)
+    if candidatas:
+        # la de nombre más corto es la más cercana al objetivo
+        return min(candidatas, key=lambda c: len(c.name))
+    return padre / sanitizar(nombre_nuevo or objetivo)
+
+
 def construir_carpeta_destino(
     base: Path, fecha: datetime, categoria: str, entidad: str, config: dict
 ) -> Path:
     plantilla = config["plantillas"].get("carpeta_entidad", "{entidad}")
-    carpeta_entidad = sanitizar(plantilla.format(entidad=entidad))
-    return (
-        base
-        / f"{fecha.year}"
-        / f"{fecha.month:02d} {MESES_ES[fecha.month - 1]}"
-        / f"{fecha.day:02d}"
-        / sanitizar(categoria)
-        / carpeta_entidad
-    )
+    anio = base / f"{fecha.year}"
+    mes = carpeta_equivalente(anio, f"{fecha.month:02d} {MESES_ES[fecha.month - 1]}")
+    dia = carpeta_equivalente(mes, f"{fecha.day:02d}")
+    cat = carpeta_equivalente(dia, categoria)
+    # la entidad se busca por su nombre pelado ('DISPENSARIO' encuentra
+    # 'DISPENSARIO SOFIA OK'); si no existe se crea con la plantilla (+' OK')
+    return carpeta_equivalente(cat, entidad, plantilla.format(entidad=entidad))
 
 
 def nombre_disponible(carpeta: Path, nombre: str) -> Path:
@@ -576,18 +614,25 @@ def nombre_disponible(carpeta: Path, nombre: str) -> Path:
     return carpeta / f"{tallo} ({numero}){extension}"
 
 
+def hora_correo(fecha: datetime) -> str:
+    """Hora de llegada en el formato del archivo manual: 7.21, 1.30 (12 horas)."""
+    hora_12 = fecha.hour % 12 or 12
+    return f"{hora_12}.{fecha.minute:02d}"
+
+
 def nombre_pdf_correo(
-    categoria: str, entidad: str, asunto: str, consecutivo_fn, config: dict
+    categoria: str, entidad: str, asunto: str, fecha: datetime, consecutivo_fn, config: dict
 ) -> str:
     """Nombre del PDF del correo según plantilla por categoría.
 
-    consecutivo_fn se invoca SOLO si la plantilla usa {consecutivo}, para no
-    gastar numeración cuando no hace falta.
+    Variables: {entidad}, {hora} (llegada, ej. 7.21), {asunto}, {radicado},
+    {consecutivo} (contador por día/entidad; solo se gasta si la plantilla lo usa).
     """
     plantillas = config["plantillas"]["pdf_correo"]
-    plantilla = plantillas.get(categoria, plantillas.get("*", "{entidad} {consecutivo} OK"))
+    plantilla = plantillas.get(categoria, plantillas.get("*", "{entidad} {hora} OK"))
     valores = {
         "entidad": entidad,
+        "hora": hora_correo(fecha),
         "asunto": _acotar(sanitizar(asunto), 80),
         "radicado": extraer_radicado(asunto),
         "consecutivo": consecutivo_fn() if "{consecutivo}" in plantilla else "",
@@ -792,12 +837,21 @@ def procesar_mensaje(
             categoria,
             entidad,
             asunto,
+            fecha,
             lambda: estado.siguiente_consecutivo(fecha, entidad),
             config,
         )
 
+    def _nombre_adjunto(original: str) -> str:
+        """Convención manual: el adjunto toma el nombre del correo, con su extensión."""
+        if config.get("renombrar_adjuntos", True) and nombre_pdf:
+            return Path(nombre_pdf).stem + Path(original).suffix.lower()
+        return _acotar(sanitizar(original), 120)
+
     if dry_run:
-        archivos = ([nombre_pdf] if nombre_pdf else []) + [sanitizar(n) for n in nombres_adjuntos]
+        archivos = ([nombre_pdf] if nombre_pdf else []) + [
+            f"{_nombre_adjunto(n)} <- {sanitizar(n)}" for n in nombres_adjuntos
+        ]
         fila.update(estado="DRY_RUN", archivos=" | ".join(archivos), pdf_correo=nombre_pdf)
         return fila
 
@@ -816,9 +870,9 @@ def procesar_mensaje(
         fila["pdf_correo"] = f"{destino_pdf.name} [{motor}]"
         guardados.append(destino_pdf.name)
     for nombre, contenido in adjuntos:
-        destino = nombre_disponible(carpeta, _acotar(sanitizar(nombre), 120))
+        destino = nombre_disponible(carpeta, _nombre_adjunto(nombre))
         destino.write_bytes(contenido)
-        guardados.append(destino.name)
+        guardados.append(f"{destino.name} <- {sanitizar(nombre)}")
 
     estado_fila = "REVISAR" if categoria == config["categoria_revision"] else "ARCHIVADO"
     fila.update(estado=estado_fila, archivos=" | ".join(guardados))

@@ -63,7 +63,7 @@ def test_extraer_texto_html():
         ("53 Notificación de objeciones diarias 01 de julio.", "INICIAL"),
         ("Devolución de Factura del Radicado No 100881", "DEVOLUCIONES"),
         ("Solicitud cita de conciliación glosas ratificadas", "CONCILIACIONES"),
-        ("Resultado glosas RATIFICADAS radicado 998", "RATIFICADAS"),
+        ("Resultado glosas RATIFICADAS radicado 998", "RATIFICADA"),
         ("Envió Documentos a Terceros", "0-REVISAR"),
     ],
 )
@@ -126,6 +126,35 @@ def test_construir_carpeta_destino_estructura_servidor(tmp_path):
     assert carpeta == tmp_path / "2026" / "07 JULIO" / "02" / "DEVOLUCIONES" / "DISPENSARIO OK"
 
 
+def test_construir_carpeta_reutiliza_marcas_manuales(tmp_path):
+    """El personal renombra carpetas a mano; el script debe reutilizarlas,
+    no crear duplicadas: 07.JULIO, '01 OK SOLO NUEVA', 'DEVOLUCIONES OK',
+    'DISPENSARIO SOFIA OK' (estructura real del servidor)."""
+    existente = tmp_path / "2026" / "07.JULIO" / "01 OK SOLO NUEVA" / "DEVOLUCIONES OK"
+    (existente / "DISPENSARIO SOFIA OK").mkdir(parents=True)
+    fecha = datetime(2026, 7, 1, 8, 11, tzinfo=org.TZ_COLOMBIA)
+    carpeta = org.construir_carpeta_destino(tmp_path, fecha, "DEVOLUCIONES", "DISPENSARIO", CONFIG)
+    assert carpeta == existente / "DISPENSARIO SOFIA OK"
+
+
+def test_carpeta_equivalente_acepta_plural_y_prefiere_la_mas_corta(tmp_path):
+    (tmp_path / "RATIFICADAS").mkdir()
+    assert org.carpeta_equivalente(tmp_path, "RATIFICADA").name == "RATIFICADAS"
+    # '02' no debe confundirse con '021' ni con otra carpeta numérica
+    (tmp_path / "021").mkdir()
+    assert org.carpeta_equivalente(tmp_path, "02").name == "02"
+    (tmp_path / "02 OK").mkdir()
+    (tmp_path / "02 OK REVISADA COMPLETA").mkdir()
+    assert org.carpeta_equivalente(tmp_path, "02").name == "02 OK"
+
+
+def test_hora_correo_formato_manual():
+    assert org.hora_correo(datetime(2026, 7, 2, 7, 21)) == "7.21"
+    assert org.hora_correo(datetime(2026, 7, 2, 13, 30)) == "1.30"
+    assert org.hora_correo(datetime(2026, 7, 2, 0, 5)) == "12.05"
+    assert org.hora_correo(datetime(2026, 7, 2, 12, 0)) == "12.00"
+
+
 def test_nombre_disponible_no_sobreescribe(tmp_path):
     (tmp_path / "DEV028158_324.pdf").write_bytes(b"x")
     assert org.nombre_disponible(tmp_path, "DEV028158_324.pdf").name == "DEV028158_324 (2).pdf"
@@ -135,16 +164,24 @@ def test_nombre_disponible_no_sobreescribe(tmp_path):
 
 def test_nombre_pdf_devolucion_usa_asunto():
     estado = org.Estado(None)
+    fecha = datetime(2026, 7, 2, 8, 11, tzinfo=org.TZ_COLOMBIA)
     nombre = org.nombre_pdf_correo(
         "DEVOLUCIONES",
         "DISPENSARIO",
         "Devolución de Factura del Radicado No 100881",
-        lambda: estado.siguiente_consecutivo(datetime.now(org.TZ_COLOMBIA), "DISPENSARIO"),
+        fecha,
+        lambda: estado.siguiente_consecutivo(fecha, "DISPENSARIO"),
         CONFIG,
     )
     assert nombre == "Devolución de Factura del Radicado No 100881 OK.pdf"
     # la plantilla de devoluciones no usa consecutivo: no debe gastarlo
     assert estado.datos["consecutivos"] == {}
+
+
+def test_nombre_pdf_glosa_usa_hora_de_llegada():
+    fecha = datetime(2026, 7, 2, 7, 21, tzinfo=org.TZ_COLOMBIA)
+    nombre = org.nombre_pdf_correo("INICIAL", "AXA", "objeciones", fecha, lambda: 1, CONFIG)
+    assert nombre == "AXA 7.21 OK.pdf"
 
 
 def test_consecutivo_por_dia_y_entidad():
@@ -223,11 +260,13 @@ def test_procesar_mensaje_archiva_pdf_y_adjuntos(tmp_path):
     carpeta = tmp_path / "2026" / "07 JULIO" / "02" / "DEVOLUCIONES" / "DISPENSARIO OK"
     assert fila["estado"] == "ARCHIVADO"
     assert Path(fila["carpeta"]) == carpeta
-    adjunto = carpeta / "DEV028158_324.pdf"
-    assert adjunto.read_bytes() == b"%PDF-1.4 contenido de prueba"
     pdf_correo = carpeta / "Devolución de Factura del Radicado No 100881 OK.pdf"
     assert pdf_correo.exists() and pdf_correo.stat().st_size > 0
     assert pdf_correo.read_bytes()[:5] == b"%PDF-"
+    # el adjunto se renombra con la convención manual y queda ' (2)' por el choque
+    adjunto = carpeta / "Devolución de Factura del Radicado No 100881 OK (2).pdf"
+    assert adjunto.read_bytes() == b"%PDF-1.4 contenido de prueba"
+    assert "DEV028158_324.pdf" in fila["archivos"]  # el original queda en el registro
 
 
 def test_procesar_mensaje_dry_run_no_escribe(tmp_path):
@@ -264,10 +303,12 @@ def test_procesar_mensaje_ignorado_no_clasifica(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_procesar_glosa_inicial_usa_consecutivo(tmp_path):
+def test_procesar_glosa_inicial_nombra_por_hora(tmp_path):
+    """Dos correos AXA el mismo minuto: 'AXA 7.35 OK.pdf' y 'AXA 7.35 OK (2).pdf'."""
     pytest.importorskip("reportlab")
     estado = org.Estado(None)
-    for numero in (1, 2):
+    esperados = ("AXA 7.35 OK.pdf", "AXA 7.35 OK (2).pdf")
+    for numero, esperado in enumerate(esperados, start=1):
         msg = EmailMessage()
         msg["Subject"] = f"{52 + numero} Notificación de objeciones diarias 01 de julio."
         msg["From"] = "Archivo Colpatria <archivo.colpatria@grupomok.com>"
@@ -285,7 +326,7 @@ def test_procesar_glosa_inicial_usa_consecutivo(tmp_path):
         )
         assert fila["categoria"] == "INICIAL"
         carpeta = tmp_path / "2026" / "07 JULIO" / "02" / "INICIAL" / "AXA OK"
-        assert (carpeta / f"AXA {numero} OK.pdf").exists()
+        assert (carpeta / esperado).exists()
 
 
 def test_extraer_partes_omite_logo_inline_pequeno():
