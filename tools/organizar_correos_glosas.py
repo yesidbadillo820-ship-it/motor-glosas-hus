@@ -126,6 +126,9 @@ CONFIG_DEFECTO: dict = {
     "ignorar_asuntos": [
         "CARGUE EXITOSO",
         "ERRORES EN EL PROCESAMIENTO DEL ZIP",
+        # certificados de radicación de facturas (no son glosas) — inundan la bandeja
+        "NOTIFICACION RADICACION FACTRAMED",
+        "SOPORTES EXITOSOS",
     ],
     "categorias": [
         {"nombre": "CONCILIACIONES", "patrones": ["CONCILIACION"]},

@@ -5,7 +5,9 @@
   "min_bytes_imagen_inline": 15000,
   "ignorar_asuntos": [
     "CARGUE EXITOSO",
-    "ERRORES EN EL PROCESAMIENTO DEL ZIP"
+    "ERRORES EN EL PROCESAMIENTO DEL ZIP",
+    "NOTIFICACION RADICACION FACTRAMED",
+    "SOPORTES EXITOSOS"
   ],
   "categorias": [
     {
