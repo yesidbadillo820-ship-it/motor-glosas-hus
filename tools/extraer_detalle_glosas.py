@@ -870,19 +870,30 @@ def elegir_parser(nombre: str):
 
 
 def _parser_xlsx_auto(contenido: bytes, nombre: str, **kwargs) -> list[dict]:
-    for parser in (
-        parser_sanitas_xlsx,
-        parser_objeciones_xlsx,
-        parser_savia_xlsx,
-        parser_coosalud_xlsx,
-        parser_policia_rad_xlsx,
-    ):
-        filas = parser(contenido, nombre)
-        if filas:
-            return filas
-    filas = parser_factramed_xlsx(contenido, nombre, **kwargs)
+    """Lee el encabezado UNA vez y enruta por firma de columnas (un día grande
+    trae 20+ zips de COOSALUD: probar todos los parsers reabriendo cada xlsx
+    multiplicaba el tiempo por 7)."""
+    try:
+        encabezado = {_normalizar(str(c or "")) for c in next(_filas_xlsx(contenido), [])}
+    except Exception:
+        encabezado = set()
+    if "NUMERO DE FACTURA" in encabezado and any("VALOR GLOSADO" in c for c in encabezado):
+        return parser_sanitas_xlsx(contenido, nombre)
+    if "CRNCXC" in encabezado:
+        return parser_objeciones_xlsx(contenido, nombre)
+    if "NUMERO_FACTURA" in encabezado and "VALOR_TOTAL_GLOSA" in encabezado:
+        return parser_coosalud_xlsx(contenido, nombre)
+    if "NUMERO_FACTURA" in encabezado and "VALOR_GLOSA" in encabezado:
+        return parser_savia_xlsx(contenido, nombre)
+    if "NUMERO_FACTURA" in encabezado and "CODIGO_GLOSA_DEV" in encabezado:
+        return parser_factramed_xlsx(contenido, nombre, **kwargs)
+    filas = parser_policia_rad_xlsx(contenido, nombre)  # encabezado en fila intermedia
     if filas:
         return filas
+    # los DETALLE/HUSxxxx.xlsx acompañan al GLOSAS de COOSALUD: mismo contenido,
+    # no deben producir filas 'completar a mano' junto a las reales
+    if _normalizar(Path(nombre).stem).startswith(("DETALLE", "HUS")):
+        return []
     return _fila_minima_por_nombre(nombre)
 
 
@@ -995,6 +1006,9 @@ def agrupar_por_factura(crudas: list[dict]) -> list[dict]:
         grupo["items"] += 1
         if fila.get("valor") is not None:
             grupo["valor"] = (grupo.get("valor") or 0) + fila["valor"]
+            # un valor real supera la advertencia de una fila mínima previa
+            if "completar a mano" in (grupo.get("observacion") or ""):
+                grupo["observacion"] = fila.get("observacion", "")
         if fila.get("valor_factura") and not grupo.get("valor_factura"):
             grupo["valor_factura"] = fila["valor_factura"]
         for campo in ("fecha_notificacion", "fecha_radicacion", "fecha_factura", "radicado"):
