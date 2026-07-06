@@ -137,7 +137,8 @@ FERIADOS_CO = {
 RE_FACTURA_HUS = re.compile(r"\b(E?HUS\d{4,})\b")
 RE_RADICADO_NOMBRE = re.compile(r"RADICADO\s*N?[O0]?\.?\s*(\d+)", re.IGNORECASE)
 
-ARCHIVOS_IGNORADOS = re.compile(r"MANUAL-GESTION|DETALLE DE CAMPOS|^~\$", re.IGNORECASE)
+# _LIGERO: copias reducidas hechas a mano para compartir; duplicarían los valores
+ARCHIVOS_IGNORADOS = re.compile(r"MANUAL-GESTION|DETALLE DE CAMPOS|_LIGERO|^~\$", re.IGNORECASE)
 
 logger = logging.getLogger("extraer_detalle")
 
@@ -200,6 +201,12 @@ GESTORES_DEFECTO: dict = {
         "POLICIA": {"empresa": "DIRECCION DE SANIDAD POLICIA NACIONAL"},
         "SALUD MIA": {"empresa": "SALUD MIA EPS"},
         "FACTRAMED": {"empresa": "NUEVA EMPRESA PROMOTORA DE SALUD S.A."},
+        "LA PREVISORA": {"empresa": "LA PREVISORA S A COMPAÑIA DE SEGUROS"},
+        "PREVISORA": {"empresa": "LA PREVISORA S A COMPAÑIA DE SEGUROS"},
+        "SAVIA SALUD": {"empresa": "SAVIA SALUD EPS"},
+        "POSITIVA": {"empresa": "POSITIVA COMPAÑIA DE SEGUROS"},
+        "MUTUAL": {"empresa": "ASOCIACION MUTUAL SER"},
+        "FOMAG": {"empresa": "FOMAG - FIDUPREVISORA"},
     },
 }
 
@@ -598,6 +605,143 @@ def parser_factramed_xlsx(
     return resultados
 
 
+def parser_savia_xlsx(contenido: bytes, nombre: str) -> list[dict]:
+    """SAVIA SALUD: una fila por servicio glosado (Numero_factura / Valor_Glosa)."""
+    filas = _filas_xlsx(contenido)
+    encabezado = [_normalizar(c or "") for c in next(filas, [])]
+    if "NUMERO_FACTURA" not in encabezado or "VALOR_GLOSA" not in encabezado:
+        return []
+    idx = {c: i for i, c in enumerate(encabezado)}
+    resultados = []
+    for fila in filas:
+        factura = fila[idx["NUMERO_FACTURA"]]
+        if not factura:
+            continue
+        resultados.append(
+            {
+                "categoria": None,
+                "factura": str(factura).strip(),
+                "valor": a_numero(fila[idx["VALOR_GLOSA"]]),
+                "fecha_notificacion": None,
+                "fecha_radicacion": a_fecha(fila[idx.get("FECHA_RADICACION", -1)])
+                if "FECHA_RADICACION" in idx
+                else None,
+                "fecha_factura": a_fecha(fila[idx.get("FECHA_FACTURA", -1)])
+                if "FECHA_FACTURA" in idx
+                else None,
+                "no_glosa": str(fila[idx.get("MOTIVO_GLOSA_VALOR_A", 0)] or "").strip()[:12],
+                "radicado": str(fila[idx.get("NUMERO_RADICADO", 0)] or "").strip()
+                if "NUMERO_RADICADO" in idx
+                else "",
+                "observacion": "",
+            }
+        )
+    return resultados
+
+
+def parser_coosalud_xlsx(contenido: bytes, nombre: str) -> list[dict]:
+    """COOSALUD: GLOSAS HUS*.xlsx dentro de zips anidados (una fila por ítem)."""
+    filas = _filas_xlsx(contenido)
+    encabezado = [_normalizar(c or "") for c in next(filas, [])]
+    if "NUMERO_FACTURA" not in encabezado or "VALOR_TOTAL_GLOSA" not in encabezado:
+        return []
+    idx = {c: i for i, c in enumerate(encabezado)}
+    resultados = []
+    for fila in filas:
+        factura = fila[idx["NUMERO_FACTURA"]]
+        if not factura:
+            continue
+        codigo = str(fila[idx.get("CODIGO_GLOSA", 0)] or "")
+        resultados.append(
+            {
+                "categoria": _categoria_por_codigo(codigo),
+                "factura": str(factura).strip(),
+                "valor": a_numero(fila[idx["VALOR_TOTAL_GLOSA"]]),
+                "fecha_notificacion": a_fecha(fila[idx.get("FECHA_GLOSA", -1)])
+                if "FECHA_GLOSA" in idx
+                else None,
+                "fecha_radicacion": None,
+                "fecha_factura": None,
+                "no_glosa": codigo.strip(),
+                "radicado": "",
+                "observacion": "",
+            }
+        )
+    return resultados
+
+
+def parser_policia_rad_xlsx(contenido: bytes, nombre: str) -> list[dict]:
+    """POLICÍA 'GLOSA A RAD NNNN.xlsx': certificación con encabezado en la
+    fila ~14 (No.FACTURA / VR. GLOSA) y el radicado unas filas arriba."""
+    filas = list(_filas_xlsx(contenido))
+    idx_encabezado = None
+    for i, fila in enumerate(filas[:25]):
+        normalizados = [_normalizar(str(c or "")) for c in fila]
+        if any("NO.FACTURA" in c or "NO. FACTURA" in c for c in normalizados):
+            idx_encabezado = i
+            break
+    if idx_encabezado is None:
+        return []
+    encabezado = [_normalizar(str(c or "")) for c in filas[idx_encabezado]]
+
+    def col(nombre_col: str) -> int | None:
+        return next((i for i, c in enumerate(encabezado) if nombre_col in c), None)
+
+    i_factura = col("NO.FACTURA") or col("NO. FACTURA")
+    i_valor = col("VR. GLOSA")
+    i_fglosa = col("FECHA GLOSA")
+    i_ffactura = col("FECHA DE FACTURA")
+    radicado = ""
+    for fila in filas[:idx_encabezado]:
+        textos = [str(c) for c in fila if c is not None]
+        for j, texto in enumerate(textos):
+            if "RADICACION" in _normalizar(texto) and j + 1 < len(textos):
+                radicado = re.sub(r"\D", "", textos[j + 1])[:10]
+    if not radicado:
+        m = re.search(r"RAD\D*(\d+)", _normalizar(nombre))
+        radicado = m.group(1) if m else ""
+    resultados = []
+    for fila in filas[idx_encabezado + 1 :]:
+        factura = fila[i_factura] if i_factura is not None and len(fila) > i_factura else None
+        if not factura or not RE_FACTURA_HUS.search(str(factura)):
+            continue
+        resultados.append(
+            {
+                "categoria": None,
+                "factura": str(factura).strip(),
+                "valor": a_numero(fila[i_valor]) if i_valor is not None else None,
+                "fecha_notificacion": a_fecha(fila[i_fglosa]) if i_fglosa is not None else None,
+                "fecha_radicacion": None,
+                "fecha_factura": a_fecha(fila[i_ffactura]) if i_ffactura is not None else None,
+                "no_glosa": "",
+                "radicado": radicado,
+                "observacion": "",
+            }
+        )
+    return resultados
+
+
+def _fila_minima_por_nombre(nombre: str) -> list[dict]:
+    """Último recurso: la factura viene en el nombre del archivo (ej. MUTUAL
+    'Validación de subsanación Factura N° HUS492542 OK.xlsx')."""
+    factura = RE_FACTURA_HUS.search(_normalizar(nombre))
+    if not factura:
+        return []
+    return [
+        {
+            "categoria": None,
+            "factura": factura.group(1),
+            "valor": None,
+            "fecha_notificacion": None,
+            "fecha_radicacion": None,
+            "fecha_factura": None,
+            "no_glosa": "",
+            "radicado": "",
+            "observacion": f"formato sin parser ({nombre}): completar a mano",
+        }
+    ]
+
+
 def _texto_pdf(contenido: bytes) -> str:
     try:
         import pdfplumber
@@ -726,11 +870,20 @@ def elegir_parser(nombre: str):
 
 
 def _parser_xlsx_auto(contenido: bytes, nombre: str, **kwargs) -> list[dict]:
-    for parser in (parser_sanitas_xlsx, parser_objeciones_xlsx):
+    for parser in (
+        parser_sanitas_xlsx,
+        parser_objeciones_xlsx,
+        parser_savia_xlsx,
+        parser_coosalud_xlsx,
+        parser_policia_rad_xlsx,
+    ):
         filas = parser(contenido, nombre)
         if filas:
             return filas
-    return parser_factramed_xlsx(contenido, nombre, **kwargs)
+    filas = parser_factramed_xlsx(contenido, nombre, **kwargs)
+    if filas:
+        return filas
+    return _fila_minima_por_nombre(nombre)
 
 
 # ─── Recorrido de la carpeta del día ─────────────────────────────────────────
@@ -750,6 +903,8 @@ def extraer_de_archivo(
     ruta_o_nombre: str, contenido: bytes, ventana: tuple[date | None, date | None]
 ) -> tuple[list[dict], bool]:
     """(filas, tenia_parser). Abre .zip recursivamente."""
+    if ARCHIVOS_IGNORADOS.search(_normalizar(Path(ruta_o_nombre).name)):
+        return [], True  # ignorado a propósito (manuales, copias _LIGERO): sin reporte
     if Path(ruta_o_nombre).suffix.lower() == ".zip":
         filas, alguno = [], False
         try:

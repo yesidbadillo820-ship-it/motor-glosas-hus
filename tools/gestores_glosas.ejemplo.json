@@ -63,6 +63,24 @@
     },
     "FACTRAMED": {
       "empresa": "NUEVA EMPRESA PROMOTORA DE SALUD S.A."
+    },
+    "LA PREVISORA": {
+      "empresa": "LA PREVISORA S A COMPAÑIA DE SEGUROS"
+    },
+    "PREVISORA": {
+      "empresa": "LA PREVISORA S A COMPAÑIA DE SEGUROS"
+    },
+    "SAVIA SALUD": {
+      "empresa": "SAVIA SALUD EPS"
+    },
+    "POSITIVA": {
+      "empresa": "POSITIVA COMPAÑIA DE SEGUROS"
+    },
+    "MUTUAL": {
+      "empresa": "ASOCIACION MUTUAL SER"
+    },
+    "FOMAG": {
+      "empresa": "FOMAG - FIDUPREVISORA"
     }
   }
 }

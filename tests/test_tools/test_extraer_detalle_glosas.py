@@ -313,3 +313,107 @@ def test_flujo_completo_genera_excel(tmp_path):
     # carpeta DEVOLUCIONES donde estaba guardado, y agrupa 38200+10000
     assert por_factura["HUS521123"][8] == 48200.0
     assert por_factura["HUS518355"][8] == 2400.0  # famisanar CO0601
+
+
+# ─── Parsers de la estructura real de julio (COOSALUD, SAVIA, POLICÍA, MUTUAL) ─
+
+
+def test_parser_coosalud_glosas_xlsx():
+    contenido = _xlsx_bytes(
+        [
+            "id_glosa",
+            "id_cuenta",
+            "numero_factura",
+            "codigo_glosa",
+            "tipo_glosa",
+            "valor_uni_glosa",
+            "valor_total_glosa",
+            "fecha_glosa",
+        ],
+        [
+            [
+                51111255,
+                6799865,
+                "HUS507721",
+                "TA2901",
+                "TARIFAS",
+                125330,
+                125330,
+                date(2026, 5, 11),
+            ],
+            [51111256, 6799865, "HUS507721", "TA2901", "TARIFAS", 10580, 10580, date(2026, 5, 11)],
+        ],
+    )
+    filas = ext.parser_coosalud_xlsx(contenido, "GLOSAS HUS507721.xlsx")
+    assert len(filas) == 2
+    assert filas[0]["factura"] == "HUS507721"
+    assert filas[0]["valor"] == 125330.0
+    assert filas[0]["no_glosa"] == "TA2901"
+    assert filas[0]["fecha_notificacion"] == date(2026, 5, 11)
+
+
+def test_parser_savia_xlsx():
+    contenido = _xlsx_bytes(
+        [
+            "Numero_Radicado",
+            "NIT_IPS",
+            "Numero_factura",
+            "Valor_Factura",
+            "Fecha_Radicacion",
+            "Valor_Glosa",
+            "Motivo_Glosa_Valor_A",
+        ],
+        [[4468235, 900006037, "HUS464792", 9002220, "2026-06-11", 150000, "TA29"]],
+    )
+    filas = ext.parser_savia_xlsx(contenido, "SAVIA SALUD 4.07 OK.xlsx")
+    assert len(filas) == 1
+    assert filas[0]["factura"] == "HUS464792"
+    assert filas[0]["valor"] == 150000.0
+    assert filas[0]["radicado"] == "4468235"
+
+
+def test_parser_policia_rad_encabezado_en_fila_intermedia():
+    filas_xlsx = [
+        ["ADMINISTRACIÓN"],
+        [],
+        ["No. RADICACION", 2190, "DEL", "2026-07-03"],
+        [],
+        [
+            "N.",
+            "No.FACTURA",
+            "FECHA DE FACTURA",
+            "NOMBRE PACIENTE",
+            "VR. FACTURADO",
+            "FECHA GLOSA",
+            "VR. GLOSA ",
+            "VALOR ACEPTADO IPS",
+        ],
+        [1, "HUS529263", date(2026, 6, 23), "PACIENTE X", 240101500, date(2026, 7, 3), 6165700, 0],
+        [None, None, None, None, 240101500, None, 6165700, 0],
+    ]
+    contenido = _xlsx_bytes(filas_xlsx[0], filas_xlsx[1:])
+    filas = ext.parser_policia_rad_xlsx(contenido, "GLOSA A RAD 2190.xlsx")
+    assert len(filas) == 1  # la fila de totales sin factura no cuenta
+    assert filas[0]["factura"] == "HUS529263"
+    assert filas[0]["valor"] == 6165700.0
+    assert filas[0]["radicado"] == "2190"
+    assert filas[0]["fecha_notificacion"] == date(2026, 7, 3)
+
+
+def test_xlsx_desconocido_cae_a_fila_minima_por_nombre():
+    contenido = _xlsx_bytes(["Ítem"], [["1"], ["2"]])  # formulario MUTUAL de 1 columna
+    filas = ext._parser_xlsx_auto(
+        contenido, "Validación de subsanación Factura N° HUS492542 OK.xlsx"
+    )
+    assert len(filas) == 1
+    assert filas[0]["factura"] == "HUS492542"
+    assert "completar a mano" in filas[0]["observacion"]
+
+
+def test_ligero_se_ignora():
+    """Las copias *_LIGERO (hechas a mano para compartir) duplicarían valores."""
+    ventana = (None, None)
+    filas, tenia = ext.extraer_de_archivo("FAMISANAR 7.23 OK_LIGERO.zip", b"x", ventana)
+    assert (filas, tenia) == ([], True)  # ignorado sin reportarse como 'sin parser'
+    filas, _ = ext.extraer_de_archivo("DEVYGLOSAS0514737_900006037.txt", TXT_FAMISANAR, ventana)
+    assert len(filas) == 2  # el original sí se procesa
