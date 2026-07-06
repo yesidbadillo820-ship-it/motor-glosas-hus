@@ -68,11 +68,10 @@
       "carpeta": "SEGUROS BOLIVAR",
       "remitente": [
         "SEGUROSBOLIVAR",
-        "BOLIVAR"
+        "@BOLIVAR"
       ],
       "asunto": [
-        "SEGUROS BOLIVAR",
-        "BOLIVAR"
+        "SEGUROS\\s+BOLIVAR"
       ],
       "adjuntos": []
     },

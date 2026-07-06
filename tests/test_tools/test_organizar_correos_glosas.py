@@ -350,3 +350,139 @@ def test_extraer_partes_omite_logo_inline_pequeno():
     _, _, inlines, adjuntos = org.extraer_partes(msg, CONFIG)
     assert [n for n, _ in adjuntos] == ["soporte.pdf"]
     assert "logo@firma" in inlines  # sí disponible para incrustar en el PDF del correo
+
+
+# ─── Endurecimiento (hallazgos de la revisión adversarial) ───────────────────
+
+
+def test_charset_desconocido_no_tumba_la_corrida():
+    """'unknown-8bit' o 'iso-8859-8-i' lanzan LookupError en decode() aunque se
+    pase errors='replace': un solo correo así congelaba el archivado 3 días."""
+    codificado = "=?unknown-8bit?B?SG9sYQ==?="  # 'Hola'
+    assert org.decodificar_encabezado(codificado) == "Hola"
+    assert org._decodificar_bytes(b"caf\xe9", "iso-8859-8-i") == "café"
+
+
+def test_config_parcial_de_plantillas_no_rompe(tmp_path):
+    """Un config que solo redefine una plantilla conserva las demás de fábrica."""
+    propio = tmp_path / "config.json"
+    propio.write_text(
+        json.dumps({"plantillas": {"pdf_correo": {"DEVOLUCIONES": "{radicado} DEV"}}}),
+        encoding="utf-8",
+    )
+    config = org.cargar_config(propio)
+    assert config["plantillas"]["pdf_correo"]["DEVOLUCIONES"] == "{radicado} DEV"
+    assert config["plantillas"]["pdf_correo"]["*"] == "{entidad} {hora} OK"
+    assert config["plantillas"]["carpeta_entidad"] == "{entidad} OK"
+
+
+def test_entidades_extra_se_suman_sin_borrar_las_de_fabrica(tmp_path):
+    propio = tmp_path / "config.json"
+    propio.write_text(
+        json.dumps({"entidades_extra": [{"carpeta": "COOSALUD", "remitente": ["COOSALUD"]}]}),
+        encoding="utf-8",
+    )
+    config = org.cargar_config(propio)
+    assert config["entidades"][0]["carpeta"] == "COOSALUD"
+    assert any(e["carpeta"] == "AXA" for e in config["entidades"])
+
+
+def test_plantilla_invalida_usa_la_de_fabrica():
+    fecha = datetime(2026, 7, 2, 7, 21, tzinfo=org.TZ_COLOMBIA)
+    config = json.loads(json.dumps(org.CONFIG_DEFECTO))
+    config["plantillas"]["pdf_correo"]["*"] = "{entidad} {variable_inventada} {mal:d}"
+    nombre = org.nombre_pdf_correo("INICIAL", "AXA", "x", fecha, lambda: 1, config)
+    assert nombre == "AXA 7.21 OK.pdf"
+
+
+def test_nombre_archivo_seguro_conserva_extension_y_reservados():
+    largo = "A" * 300 + ".xlsx"
+    seguro = org.nombre_archivo_seguro(largo, max_tallo=50)
+    assert seguro.endswith(".xlsx") and len(seguro) <= 56
+    assert org.nombre_archivo_seguro("CON.pdf") == "_CON.pdf"
+
+
+def test_nombre_disponible_recorta_rutas_muy_largas(tmp_path):
+    carpeta = tmp_path / ("SUB" * 60)  # carpeta de ~180 chars
+    carpeta.mkdir()
+    destino = org.nombre_disponible(carpeta, "B" * 200 + ".pdf")
+    assert len(str(destino)) <= org.MAX_RUTA_WINDOWS
+    assert destino.suffix == ".pdf"
+
+
+def test_fecha_correo_absurda_usa_hoy():
+    msg = EmailMessage()
+    msg["Date"] = "Thu, 2 Jul 2043 07:35:00 -0500"  # reloj dañado del remitente
+    assert org.fecha_local_correo(msg).year == datetime.now().year
+    msg2 = EmailMessage()
+    msg2["Date"] = "Thu, 2 Jul 2003 07:35:00 -0500"
+    assert org.fecha_local_correo(msg2).year == datetime.now().year
+
+
+def test_adjunto_sin_nombre_no_se_pierde():
+    msg = EmailMessage()
+    msg["Subject"] = "x"
+    msg.set_content("hola")
+    msg.add_attachment(b"%PDF-1.4 sin nombre", maintype="application", subtype="pdf")
+    for part in msg.walk():  # simular remitente que no manda filename
+        if part.get_content_type() == "application/pdf":
+            del part["Content-Disposition"]
+            part["Content-Disposition"] = "attachment"
+    _, _, _, adjuntos = org.extraer_partes(msg, CONFIG)
+    assert len(adjuntos) == 1
+    assert adjuntos[0][0].startswith("adjunto sin nombre 1")
+    assert adjuntos[0][1] == b"%PDF-1.4 sin nombre"
+
+
+def test_reenvio_rfc822_se_guarda_como_eml_sin_mezclar_cuerpos():
+    interno = EmailMessage()
+    interno["Subject"] = "Notificación original de Bolívar"
+    interno.set_content("cuerpo interno que NO debe volverse el cuerpo principal")
+    msg = EmailMessage()
+    msg["Subject"] = "Fwd: Envió Documentos a Terceros"
+    msg.set_content("cuerpo principal del reenvío")
+    msg.add_attachment(interno)
+    texto, _, _, adjuntos = org.extraer_partes(msg, CONFIG)
+    assert "cuerpo principal" in texto
+    assert "cuerpo interno" not in texto
+    assert [n for n, _ in adjuntos] == ["Notificación original de Bolívar.eml"]
+    assert b"cuerpo interno" in adjuntos[0][1]
+
+
+def test_estado_reintentos_y_depuracion_de_consecutivos():
+    estado = org.Estado(None)
+    assert estado.fallos("<x@y>") == 0
+    assert estado.registrar_fallo("<x@y>") == 1
+    assert estado.registrar_fallo("<x@y>") == 2
+    estado.marcar("<x@y>")  # al procesarse bien, se limpia el contador
+    assert estado.fallos("<x@y>") == 0
+    estado.datos["consecutivos"]["2020-01-01|VIEJA"] = 5
+    estado.siguiente_consecutivo(datetime.now(org.TZ_COLOMBIA), "AXA")
+    estado.depurar(dias=30)
+    assert "2020-01-01|VIEJA" not in estado.datos["consecutivos"]
+    assert len(estado.datos["consecutivos"]) == 1
+
+
+def test_etiqueta_segura_y_carpeta_imap():
+    assert org.etiqueta_segura('Archivado "Glosas" ya') == "Archivado-Glosas-ya"
+    assert org.etiqueta_segura("Glosas Archivadás") == "Glosas-Archivadas"
+    assert org._codificar_carpeta_imap("INBOX") == "INBOX"
+    assert org._codificar_carpeta_imap("Glosas/Año") != "Glosas/Año"  # UTF-7 modificado
+
+
+def test_lock_impide_corridas_solapadas(tmp_path):
+    lock = tmp_path / "organizador.lock"
+    assert org._adquirir_lock(lock) is True
+    assert org._adquirir_lock(lock) is False  # segunda instancia no entra
+    org._liberar_lock(lock)
+    assert org._adquirir_lock(lock) is True
+
+
+def test_registrar_fila_con_csv_bloqueado_usa_pendiente(tmp_path, monkeypatch):
+    """Si el registro mensual está abierto en Excel, la fila cae al _pendiente."""
+    mes = datetime.now(org.TZ_COLOMBIA).strftime("%Y-%m")
+    (tmp_path / f"registro_{mes}.csv").mkdir()  # un directorio fuerza OSError al abrir
+    org.registrar_fila(tmp_path, {"asunto": "x", "estado": "ARCHIVADO"})
+    pendiente = tmp_path / f"registro_{mes}_pendiente.csv"
+    assert pendiente.exists()
+    assert "ARCHIVADO" in pendiente.read_text(encoding="utf-8-sig")

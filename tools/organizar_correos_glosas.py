@@ -148,8 +148,8 @@ CONFIG_DEFECTO: dict = {
         },
         {
             "carpeta": "SEGUROS BOLIVAR",
-            "remitente": ["SEGUROSBOLIVAR", "BOLIVAR"],
-            "asunto": ["SEGUROS BOLIVAR", "BOLIVAR"],
+            "remitente": ["SEGUROSBOLIVAR", "@BOLIVAR"],
+            "asunto": ["SEGUROS\\s+BOLIVAR"],
             "adjuntos": [],
         },
         {
@@ -219,21 +219,45 @@ def _acotar(texto: str, max_len: int) -> str:
     return texto if len(texto) <= max_len else texto[:max_len].rstrip()
 
 
+def _decodificar_bytes(texto: bytes, charset: str | None) -> str:
+    """decode() lanza LookupError con charsets inexistentes ('unknown-8bit',
+    'iso-8859-8-i') aunque se pase errors='replace': probar con fallbacks."""
+    for codec, errores in ((charset or "utf-8", "replace"), ("utf-8", "strict")):
+        try:
+            return texto.decode(codec, errores)
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return texto.decode("latin-1", errors="replace")
+
+
 def decodificar_encabezado(valor: str | None) -> str:
-    """Decodifica encabezados MIME (=?UTF-8?Q?...?=) a texto plano."""
+    """Decodifica encabezados MIME (=?UTF-8?Q?...?=) a texto plano.
+
+    Nunca lanza: un charset corrupto en un solo correo no puede tumbar la
+    corrida programada (quedaría en bucle venenoso cada 15 minutos).
+    """
     if not valor:
         return ""
     partes: list[str] = []
-    for texto, charset in email.header.decode_header(valor):
+    try:
+        fragmentos = email.header.decode_header(valor)
+    except Exception:
+        return re.sub(r"\s+", " ", str(valor)).strip()
+    for texto, charset in fragmentos:
         if isinstance(texto, bytes):
-            partes.append(texto.decode(charset or "utf-8", errors="replace"))
+            partes.append(_decodificar_bytes(texto, charset))
         else:
             partes.append(texto)
     return re.sub(r"\s+", " ", "".join(partes)).strip()
 
 
 def cargar_config(ruta: Path | None) -> dict:
-    """Config por defecto, con las claves presentes en el JSON del usuario encima."""
+    """Config por defecto, con las claves presentes en el JSON del usuario encima.
+
+    'plantillas' se fusiona clave por clave (un config parcial no puede dejar
+    al script sin plantilla); 'entidades_extra' se antepone a las entidades de
+    fábrica sin reemplazarlas; el resto de claves de primer nivel reemplazan.
+    """
     config = json.loads(json.dumps(CONFIG_DEFECTO))  # copia profunda
     if ruta is None:
         return config
@@ -248,7 +272,16 @@ def cargar_config(ruta: Path | None) -> dict:
     if not isinstance(propia, dict):
         sys.stderr.write(f"ERROR: el config {ruta} debe ser un objeto JSON\n")
         sys.exit(2)
+    plantillas_propias = propia.pop("plantillas", None)
+    entidades_extra = propia.pop("entidades_extra", None)
     config.update(propia)
+    if isinstance(plantillas_propias, dict):
+        pdf_propio = plantillas_propias.pop("pdf_correo", None)
+        config["plantillas"].update(plantillas_propias)
+        if isinstance(pdf_propio, dict):
+            config["plantillas"]["pdf_correo"].update(pdf_propio)
+    if isinstance(entidades_extra, list):
+        config["entidades"] = entidades_extra + config["entidades"]
     return config
 
 
@@ -355,11 +388,13 @@ def extraer_texto_html(html: str) -> str:
 
 def _texto_de_parte(part: email.message.Message) -> str:
     payload = part.get_payload(decode=True) or b""
-    charset = part.get_content_charset() or "utf-8"
-    try:
-        return payload.decode(charset, errors="replace")
-    except LookupError:
-        return payload.decode("utf-8", errors="replace")
+    return _decodificar_bytes(payload, part.get_content_charset())
+
+
+def _extension_por_mime(ctype: str) -> str:
+    import mimetypes
+
+    return mimetypes.guess_extension(ctype or "") or ".bin"
 
 
 def extraer_partes(
@@ -369,16 +404,40 @@ def extraer_partes(
 
     - imagenes_inline_por_cid: para incrustar en el PDF del correo (data URI).
     - adjuntos: [(nombre, contenido)] a guardar en la carpeta destino. Se omiten
-      logos de firma (imágenes inline pequeñas) y firmas S/MIME.
+      logos de firma (imágenes inline pequeñas) y firmas S/MIME. Los adjuntos
+      sin nombre reciben uno generado (nunca se descartan). Los correos
+      reenviados como adjunto (message/rfc822) se guardan como .eml y sus
+      partes internas no contaminan el cuerpo del correo principal.
     """
     min_inline = int(config.get("min_bytes_imagen_inline", 15000))
     texto_plano, html = "", ""
     inlines: dict[str, tuple[str, bytes]] = {}
     adjuntos: list[tuple[str, bytes]] = []
+    sin_nombre = 0
+
+    # correos reenviados como adjunto: serializarlos y excluir sus sub-partes
+    partes_anidadas: set[int] = set()
     for part in msg.walk():
-        if part.get_content_maintype() == "multipart":
+        if part.get_content_type() == "message/rfc822" and id(part) not in partes_anidadas:
+            for sub in part.walk():
+                if sub is not part:
+                    partes_anidadas.add(id(sub))
+            anidado = part.get_payload(0) if part.get_payload() else None
+            if anidado is not None:
+                asunto_interno = decodificar_encabezado(anidado.get("Subject")) or "correo adjunto"
+                try:
+                    crudo = anidado.as_bytes()
+                except Exception:
+                    crudo = b""
+                if crudo:
+                    adjuntos.append((f"{asunto_interno}.eml", crudo))
+
+    for part in msg.walk():
+        if id(part) in partes_anidadas or part.get_content_maintype() == "multipart":
             continue
         ctype = part.get_content_type()
+        if ctype == "message/rfc822":
+            continue  # ya serializado arriba
         disposicion = (part.get_content_disposition() or "").lower()
         nombre = decodificar_encabezado(part.get_filename())
         contenido = part.get_payload(decode=True) or b""
@@ -388,9 +447,15 @@ def extraer_partes(
         if not nombre:
             if ctype == "text/plain" and disposicion != "attachment" and not texto_plano:
                 texto_plano = _texto_de_parte(part)
-            elif ctype == "text/html" and disposicion != "attachment" and not html:
+                continue
+            if ctype == "text/html" and disposicion != "attachment" and not html:
                 html = _texto_de_parte(part)
-            continue
+                continue
+            if ctype.startswith("text/") or not contenido:
+                continue
+            # adjunto sin nombre: generarle uno en vez de perder el documento
+            sin_nombre += 1
+            nombre = f"adjunto sin nombre {sin_nombre}{_extension_por_mime(ctype)}"
         if Path(nombre).suffix.lower() in EXTENSIONES_OMITIDAS:
             continue
         es_inline = disposicion == "inline" or bool(content_id)
@@ -402,23 +467,31 @@ def extraer_partes(
 
 
 def fecha_local_correo(msg: email.message.Message) -> datetime:
+    """Fecha de llegada en hora Colombia, acotada a un rango sano: un remitente
+    con el reloj dañado no puede archivar en '2003' ni en el futuro."""
+    ahora = datetime.now(TZ_COLOMBIA)
     valor = msg.get("Date")
     if valor:
         try:
             fecha = email.utils.parsedate_to_datetime(valor)
             if fecha.tzinfo is None:
                 fecha = fecha.replace(tzinfo=TZ_COLOMBIA)
-            return fecha.astimezone(TZ_COLOMBIA)
-        except (TypeError, ValueError):
+            fecha = fecha.astimezone(TZ_COLOMBIA)
+            if fecha.year >= 2020 and fecha <= ahora + timedelta(days=2):
+                return fecha
+            logger.warning(f"Fecha de correo fuera de rango ({fecha:%Y-%m-%d}); uso hoy")
+        except (TypeError, ValueError, OverflowError):
             pass
-    return datetime.now(TZ_COLOMBIA)
+    return ahora
 
 
 def id_mensaje(msg: email.message.Message) -> str:
     mid = (msg.get("Message-ID") or "").strip()
     if mid:
         return mid
-    huella = f"{msg.get('Date', '')}|{msg.get('From', '')}|{msg.get('Subject', '')}"
+    # solo campos presentes también en el fetch de encabezados, para que el
+    # id del pre-chequeo coincida con el del mensaje completo
+    huella = "|".join(str(msg.get(campo, "")) for campo in ("Date", "From", "To", "Subject"))
     return "sha1:" + hashlib.sha1(huella.encode("utf-8", errors="replace")).hexdigest()
 
 
@@ -480,6 +553,10 @@ def generar_pdf_navegador(html_final: str, destino: Path, navegador: str) -> boo
             "--headless",
             "--disable-gpu",
             "--no-sandbox",
+            "--disable-extensions",
+            # proxy inalcanzable: el HTML del remitente no puede cargar recursos
+            # remotos ni servir de beacon/SSRF; las imágenes van como data: URI
+            "--proxy-server=127.0.0.1:9",
             "--print-to-pdf-no-header",
             f"--print-to-pdf={destino}",
             origen.as_uri(),
@@ -599,15 +676,44 @@ def construir_carpeta_destino(
     cat = carpeta_equivalente(dia, categoria)
     # la entidad se busca por su nombre pelado ('DISPENSARIO' encuentra
     # 'DISPENSARIO SOFIA OK'); si no existe se crea con la plantilla (+' OK')
-    return carpeta_equivalente(cat, entidad, plantilla.format(entidad=entidad))
+    try:
+        nombre_nuevo = plantilla.format(entidad=entidad)
+    except (ValueError, KeyError, IndexError):
+        nombre_nuevo = f"{entidad} OK"
+    return carpeta_equivalente(cat, entidad, nombre_nuevo)
+
+
+_NOMBRES_RESERVADOS = {"CON", "PRN", "AUX", "NUL"} | {
+    f"{p}{n}" for p in ("COM", "LPT") for n in range(1, 10)
+}
+MAX_RUTA_WINDOWS = 255  # margen bajo el MAX_PATH de 260 (LongPathsEnabled suele estar apagado)
+
+
+def nombre_archivo_seguro(nombre: str, max_tallo: int = 100) -> str:
+    """Sanitiza conservando la extensión y evitando nombres reservados (CON, PRN...)."""
+    limpio = sanitizar(nombre) or "sin nombre"
+    tallo, extension = Path(limpio).stem, Path(limpio).suffix[:10]
+    tallo = _acotar(tallo, max_tallo).rstrip(". ") or "sin nombre"
+    if tallo.upper() in _NOMBRES_RESERVADOS:
+        tallo = f"_{tallo}"
+    return f"{tallo}{extension}"
 
 
 def nombre_disponible(carpeta: Path, nombre: str) -> Path:
-    """Nunca sobreescribir: si ya existe, agrega ' (2)', ' (3)', ..."""
+    """Nunca sobreescribir: si ya existe, agrega ' (2)', ' (3)', ...
+    Recorta el nombre si la ruta completa supera el MAX_PATH de Windows."""
+    extension = Path(nombre).suffix
+    # +6 de margen para el sufijo ' (99)'
+    exceso = len(str(carpeta / nombre)) + 6 - MAX_RUTA_WINDOWS
+    if exceso > 0:
+        tallo = Path(nombre).stem
+        tallo = _acotar(tallo, max(8, len(tallo) - exceso)).rstrip(". ")
+        nombre = f"{tallo}{extension}"
+        logger.warning(f"Ruta muy larga: nombre recortado a '{nombre}'")
     candidato = carpeta / nombre
     if not candidato.exists():
         return candidato
-    tallo, extension = Path(nombre).stem, Path(nombre).suffix
+    tallo = Path(nombre).stem
     numero = 2
     while (carpeta / f"{tallo} ({numero}){extension}").exists():
         numero += 1
@@ -628,8 +734,8 @@ def nombre_pdf_correo(
     Variables: {entidad}, {hora} (llegada, ej. 7.21), {asunto}, {radicado},
     {consecutivo} (contador por día/entidad; solo se gasta si la plantilla lo usa).
     """
-    plantillas = config["plantillas"]["pdf_correo"]
-    plantilla = plantillas.get(categoria, plantillas.get("*", "{entidad} {hora} OK"))
+    plantillas = config.get("plantillas", {}).get("pdf_correo", {})
+    plantilla = plantillas.get(categoria) or plantillas.get("*") or "{entidad} {hora} OK"
     valores = {
         "entidad": entidad,
         "hora": hora_correo(fecha),
@@ -637,35 +743,51 @@ def nombre_pdf_correo(
         "radicado": extraer_radicado(asunto),
         "consecutivo": consecutivo_fn() if "{consecutivo}" in plantilla else "",
     }
-    nombre = sanitizar(plantilla.format(**valores))
-    return _acotar(nombre, 120) + ".pdf"
+
+    class _SinFaltantes(dict):
+        def __missing__(self, clave: str) -> str:
+            return ""
+
+    try:
+        nombre = plantilla.format_map(_SinFaltantes(valores))
+    except (ValueError, KeyError, IndexError):
+        # plantilla mal escrita en el config: nunca frenar el archivado
+        logger.warning(f"Plantilla inválida '{plantilla}'; uso la de fábrica")
+        nombre = "{entidad} {hora} OK".format_map(_SinFaltantes(valores))
+    return nombre_archivo_seguro(nombre, max_tallo=120) + ".pdf"
+
+
+MAX_REINTENTOS_CORREO = 3
 
 
 class Estado:
-    """Estado persistente: Message-ID procesados + consecutivos por día/entidad."""
+    """Estado persistente: Message-ID procesados, reintentos fallidos y
+    consecutivos por día/entidad."""
 
     def __init__(self, ruta: Path | None, datos: dict | None = None) -> None:
         self.ruta = ruta
-        self.datos = datos or {"procesados": {}, "consecutivos": {}}
+        self.datos = datos or {}
+        self.datos.setdefault("procesados", {})
+        self.datos.setdefault("consecutivos", {})
+        self.datos.setdefault("fallidos", {})
 
     @classmethod
-    def cargar(cls, ruta: Path) -> Estado:
+    def cargar(cls, ruta: Path, respaldar_corrupto: bool = True) -> Estado:
         try:
             datos = json.loads(ruta.read_text(encoding="utf-8"))
             if not isinstance(datos, dict):
                 raise ValueError("estado no es un objeto")
-            datos.setdefault("procesados", {})
-            datos.setdefault("consecutivos", {})
             return cls(ruta, datos)
         except FileNotFoundError:
             return cls(ruta)
         except (json.JSONDecodeError, ValueError):
-            respaldo = ruta.with_suffix(".corrupto.json")
-            shutil.copy2(ruta, respaldo)
-            logger.warning(
-                f"Estado corrupto; respaldado en {respaldo}. OJO: se pierde la "
-                "deduplicación previa, puede archivar duplicados con ' (2)'."
-            )
+            if respaldar_corrupto:
+                respaldo = ruta.with_suffix(".corrupto.json")
+                shutil.copy2(ruta, respaldo)
+                logger.warning(
+                    f"Estado corrupto; respaldado en {respaldo}. OJO: se pierde la "
+                    "deduplicación previa, puede archivar duplicados con ' (2)'."
+                )
             return cls(ruta)
 
     def ya_procesado(self, mid: str) -> bool:
@@ -673,6 +795,16 @@ class Estado:
 
     def marcar(self, mid: str) -> None:
         self.datos["procesados"][mid] = datetime.now(TZ_COLOMBIA).isoformat(timespec="seconds")
+        self.datos["fallidos"].pop(mid, None)
+
+    def registrar_fallo(self, mid: str) -> int:
+        """Cuenta un intento fallido; devuelve el total acumulado."""
+        total = int(self.datos["fallidos"].get(mid, 0)) + 1
+        self.datos["fallidos"][mid] = total
+        return total
+
+    def fallos(self, mid: str) -> int:
+        return int(self.datos["fallidos"].get(mid, 0))
 
     def siguiente_consecutivo(self, fecha: datetime, entidad: str) -> int:
         clave = f"{fecha:%Y-%m-%d}|{_normalizar(entidad)}"
@@ -685,6 +817,11 @@ class Estado:
         procesados = self.datos["procesados"]
         for mid in [m for m, cuando in procesados.items() if cuando < limite]:
             del procesados[mid]
+        # los consecutivos llevan la fecha en la clave: podar los viejos también
+        limite_dia = limite[:10]
+        consecutivos = self.datos["consecutivos"]
+        for clave in [c for c in consecutivos if c[:10] < limite_dia]:
+            del consecutivos[clave]
 
     def guardar(self) -> None:
         if self.ruta is None:
@@ -714,17 +851,45 @@ CAMPOS_REGISTRO = [
 def registrar_fila(control: Path, fila: dict) -> None:
     """Agrega la fila al registro mensual (CSV que abre directo en Excel)."""
     ahora = datetime.now(TZ_COLOMBIA)
-    ruta = control / f"registro_{ahora:%Y-%m}.csv"
-    nuevo = not ruta.exists()
-    # BOM solo al crear el archivo; en append el códec utf-8-sig lo duplicaría
-    with ruta.open("a", encoding="utf-8-sig" if nuevo else "utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=CAMPOS_REGISTRO)
-        if nuevo:
-            writer.writeheader()
-        writer.writerow({k: fila.get(k, "") for k in CAMPOS_REGISTRO})
+    candidatas = (
+        control / f"registro_{ahora:%Y-%m}.csv",
+        # si el registro está abierto en Excel (PermissionError), la fila cae
+        # al archivo pendiente en vez de perderse o tumbar la corrida
+        control / f"registro_{ahora:%Y-%m}_pendiente.csv",
+    )
+    for ruta in candidatas:
+        nuevo = not ruta.exists()
+        try:
+            # BOM solo al crear el archivo; en append el códec utf-8-sig lo duplicaría
+            with ruta.open("a", encoding="utf-8-sig" if nuevo else "utf-8", newline="") as fh:
+                writer = csv.DictWriter(fh, fieldnames=CAMPOS_REGISTRO)
+                if nuevo:
+                    writer.writeheader()
+                writer.writerow({k: fila.get(k, "") for k in CAMPOS_REGISTRO})
+            return
+        except OSError as exc:
+            logger.warning(f"No pude escribir en {ruta.name}: {exc}")
+    logger.error("Fila de registro perdida (¿CSV abierto en Excel y disco lleno?)")
 
 
 # ─── IMAP ────────────────────────────────────────────────────────────────────
+
+
+def _codificar_carpeta_imap(carpeta: str) -> str:
+    """Nombre de carpeta en UTF-7 modificado de IMAP (RFC 3501) si trae no-ASCII."""
+    try:
+        carpeta.encode("ascii")
+        return carpeta
+    except UnicodeEncodeError:
+        codificada = carpeta.encode("utf-7").decode("ascii")
+        return codificada.replace("+", "&").replace("/", ",")
+
+
+def etiqueta_segura(etiqueta: str) -> str:
+    """X-GM-LABELS viaja como literal ASCII entre comillas: sin tildes ni comillas."""
+    plana = _quitar_diacriticos(etiqueta).replace('"', "").replace("\\", "")
+    plana = re.sub(r"[^\x20-\x7e]", "", plana).strip()
+    return re.sub(r"\s+", "-", plana) or "Archivado-Glosas"
 
 
 def cargar_credenciales() -> tuple[str, str, str]:
@@ -748,7 +913,9 @@ def cargar_credenciales() -> tuple[str, str, str]:
 
 def conectar_imap(host: str, user: str, password: str, carpeta: str) -> imaplib.IMAP4_SSL:
     try:
-        conexion = imaplib.IMAP4_SSL(host)
+        # timeout: un socket colgado (VPN caída, firewall) no puede congelar la
+        # tarea programada para siempre
+        conexion = imaplib.IMAP4_SSL(host, timeout=60)
         conexion.login(user, password)
     except imaplib.IMAP4.error as exc:
         sys.stderr.write(
@@ -757,7 +924,10 @@ def conectar_imap(host: str, user: str, password: str, carpeta: str) -> imaplib.
             "contraseña sea una CONTRASEÑA DE APLICACIÓN (no la clave normal).\n"
         )
         sys.exit(2)
-    typ, _ = conexion.select(f'"{carpeta}"')
+    except OSError as exc:
+        sys.stderr.write(f"ERROR: no pude conectar a {host}: {exc}\n")
+        sys.exit(2)
+    typ, _ = conexion.select(f'"{_codificar_carpeta_imap(carpeta)}"')
     if typ != "OK":
         sys.stderr.write(f"ERROR: no pude abrir la carpeta IMAP '{carpeta}'\n")
         sys.exit(2)
@@ -772,24 +942,40 @@ def buscar_uids(conexion: imaplib.IMAP4_SSL, desde: datetime) -> list[bytes]:
     return data[0].split()
 
 
-def obtener_mensaje(conexion: imaplib.IMAP4_SSL, uid: bytes) -> email.message.Message | None:
-    # BODY.PEEK[]: no marca el correo como leído (bandeja compartida con humanos)
-    typ, data = conexion.uid("FETCH", uid, "(BODY.PEEK[])")
-    if typ != "OK" or not data:
-        return None
-    for parte in data:
+def _mensaje_de_fetch(data) -> email.message.Message | None:
+    for parte in data or []:
         if isinstance(parte, tuple) and len(parte) >= 2 and isinstance(parte[1], bytes):
             return email.message_from_bytes(parte[1])
     return None
 
 
+def obtener_encabezados(conexion: imaplib.IMAP4_SSL, uid: bytes) -> email.message.Message | None:
+    """Solo los encabezados que necesita la dedup: evita re-descargar cuerpos
+    completos de toda la ventana en cada corrida (límite de ancho de banda
+    IMAP de Gmail: ~2.5 GB/día)."""
+    typ, data = conexion.uid(
+        "FETCH", uid, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID DATE FROM TO SUBJECT)])"
+    )
+    if typ != "OK":
+        return None
+    return _mensaje_de_fetch(data)
+
+
+def obtener_mensaje(conexion: imaplib.IMAP4_SSL, uid: bytes) -> email.message.Message | None:
+    # BODY.PEEK[]: no marca el correo como leído (bandeja compartida con humanos)
+    typ, data = conexion.uid("FETCH", uid, "(BODY.PEEK[])")
+    if typ != "OK":
+        return None
+    return _mensaje_de_fetch(data)
+
+
 def etiquetar_procesado(conexion: imaplib.IMAP4_SSL, uid: bytes, etiqueta: str) -> None:
     """Etiqueta Gmail visual para los humanos; la dedup real es el archivo de estado."""
     try:
-        typ, _ = conexion.uid("STORE", uid, "+X-GM-LABELS", f'("{etiqueta}")')
+        typ, _ = conexion.uid("STORE", uid, "+X-GM-LABELS", f'("{etiqueta_segura(etiqueta)}")')
         if typ != "OK":
             logger.warning(f"No pude etiquetar UID {uid.decode()} con '{etiqueta}'")
-    except imaplib.IMAP4.error as exc:
+    except (imaplib.IMAP4.error, UnicodeEncodeError) as exc:
         logger.warning(f"El servidor no aceptó la etiqueta (¿no es Gmail?): {exc}")
 
 
@@ -846,7 +1032,7 @@ def procesar_mensaje(
         """Convención manual: el adjunto toma el nombre del correo, con su extensión."""
         if config.get("renombrar_adjuntos", True) and nombre_pdf:
             return Path(nombre_pdf).stem + Path(original).suffix.lower()
-        return _acotar(sanitizar(original), 120)
+        return nombre_archivo_seguro(original, max_tallo=120)
 
     if dry_run:
         archivos = ([nombre_pdf] if nombre_pdf else []) + [
@@ -889,6 +1075,127 @@ def _parsear_fecha(valor: str) -> datetime:
         except ValueError:
             continue
     raise argparse.ArgumentTypeError(f"fecha inválida: {valor} (usa AAAA-MM-DD o DD/MM/AAAA)")
+
+
+LOCK_VIEJO_MINUTOS = 90  # un lock más viejo que esto se considera huérfano (crash previo)
+
+
+def _adquirir_lock(ruta: Path) -> bool:
+    try:
+        antiguedad = datetime.now().timestamp() - ruta.stat().st_mtime
+        if antiguedad > LOCK_VIEJO_MINUTOS * 60:
+            logger.warning("Lock huérfano de una corrida caída; lo reemplazo")
+            ruta.unlink(missing_ok=True)
+    except FileNotFoundError:
+        pass
+    try:
+        descriptor = os.open(ruta, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(descriptor, str(os.getpid()).encode("ascii"))
+        os.close(descriptor)
+        return True
+    except FileExistsError:
+        return False
+    except OSError as exc:
+        logger.warning(f"No pude crear el lock ({exc}); continúo sin él")
+        return True
+
+
+def _liberar_lock(ruta: Path) -> None:
+    with contextlib.suppress(OSError):
+        ruta.unlink(missing_ok=True)
+
+
+def _fila_error(mid: str, cab: email.message.Message, detalle: str, estado_fila: str) -> dict:
+    return {
+        "fecha_proceso": datetime.now(TZ_COLOMBIA).isoformat(timespec="seconds"),
+        "asunto": decodificar_encabezado(cab.get("Subject")),
+        "remitente": decodificar_encabezado(cab.get("From")),
+        "mensaje_id": mid,
+        "estado": estado_fila,
+        "detalle": detalle,
+    }
+
+
+def _procesar_uid(
+    conexion: imaplib.IMAP4_SSL,
+    uid: bytes,
+    estado: Estado,
+    config: dict,
+    args,
+    navegador: str | None,
+    control: Path,
+    resumen: dict[str, int],
+) -> dict | None:
+    """Pipeline de un correo: dedup por encabezados → descarga → archivado →
+    persistencia. Devuelve la fila (o None si se saltó sin procesar)."""
+
+    def _contar(clave: str) -> None:
+        resumen[clave] = resumen.get(clave, 0) + 1
+
+    # 1. Solo encabezados para la dedup: no re-descargar cuerpos ya procesados
+    cab = obtener_encabezados(conexion, uid)
+    if cab is None:
+        logger.warning(f"UID {uid.decode()}: no pude leer los encabezados")
+        _contar("DESCARGA_FALLIDA")
+        return {"estado": "ERROR"}
+    mid = id_mensaje(cab)
+    if estado.ya_procesado(mid):
+        _contar("YA_PROCESADO")
+        return None
+
+    # 2. Correo venenoso: tras N intentos fallidos se descarta con rastro en el
+    #    CSV, para que no bloquee ni duplique cada 15 minutos para siempre
+    if not args.dry_run and estado.fallos(mid) >= MAX_REINTENTOS_CORREO:
+        fila = _fila_error(
+            mid, cab, f"descartado tras {MAX_REINTENTOS_CORREO} intentos", "ERROR_DESCARTADO"
+        )
+        logger.error(f"[ERROR_DESCARTADO] {_acotar(fila['asunto'], 70)} — revisar a mano")
+        estado.marcar(mid)
+        estado.guardar()
+        registrar_fila(control, fila)
+        _contar("ERROR_DESCARTADO")
+        return fila
+
+    # 3. Descarga completa y procesamiento
+    msg = obtener_mensaje(conexion, uid)
+    if msg is None:
+        logger.warning(f"UID {uid.decode()}: no pude descargar el mensaje")
+        _contar("DESCARGA_FALLIDA")
+        return {"estado": "ERROR"}
+    try:
+        fila = procesar_mensaje(
+            msg,
+            base=args.base,
+            config=config,
+            estado=estado,
+            dry_run=args.dry_run,
+            sin_pdf_correo=args.sin_pdf_correo,
+            navegador=navegador,
+        )
+    except Exception as exc:  # correo con errores no debe frenar el lote
+        logger.exception(f"UID {uid.decode()}: error procesando")
+        fila = _fila_error(mid, cab, str(exc), "ERROR")
+        if not args.dry_run:
+            intento = estado.registrar_fallo(mid)
+            estado.guardar()
+            registrar_fila(control, fila | {"detalle": f"{exc} (intento {intento})"})
+
+    estado_fila = fila.get("estado", "ERROR")
+    _contar(estado_fila)
+    logger.info(
+        f"[{estado_fila}] {fila.get('categoria', '-')} / {fila.get('entidad', '-')} "
+        f"<- {_acotar(fila.get('asunto', ''), 70)}"
+    )
+    if estado_fila == "ERROR":
+        return fila
+    if not args.dry_run:
+        estado.marcar(mid)
+        estado.depurar()
+        estado.guardar()
+        registrar_fila(control, fila)
+        if not args.no_marcar:
+            etiquetar_procesado(conexion, uid, config["etiqueta_gmail"])
+    return fila
 
 
 def main() -> int:
@@ -946,6 +1253,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if not args.dry_run and not args.base.is_dir():
+        # nunca crear silenciosamente un árbol Z:\... fantasma en el disco local
+        sys.stderr.write(
+            f"ERROR: la carpeta base no existe: {args.base}\n"
+            "¿Está mapeada la unidad Z:? Para probar sin ella: --base C:\\pruebas --dry-run\n"
+        )
+        return 2
+
     control: Path = args.control or (args.base / DEFAULT_CONTROL)
     log_file = args.log
     if log_file is None and not args.dry_run:
@@ -955,10 +1270,7 @@ def main() -> int:
             control.mkdir(parents=True, exist_ok=True)
         setup_logging(log_file)
     except OSError as exc:
-        sys.stderr.write(
-            f"ERROR: no pude crear la carpeta de control {control}: {exc}\n"
-            "¿Está mapeada la unidad Z:? Puedes probar con --base C:\\pruebas --dry-run\n"
-        )
+        sys.stderr.write(f"ERROR: no pude crear la carpeta de control {control}: {exc}\n")
         return 2
 
     config = cargar_config(args.config)
@@ -974,80 +1286,63 @@ def main() -> int:
             )
             return 2
 
-    ruta_estado = control / "estado_organizador.json"
-    if args.dry_run:
-        try:
-            estado = Estado.cargar(ruta_estado)
-        except OSError:
-            estado = Estado(None)
-        estado.ruta = None  # jamás persistir en simulacro
-    else:
-        estado = Estado.cargar(ruta_estado)
-
-    host, user, password = cargar_credenciales()
-    desde = args.desde or (datetime.now(TZ_COLOMBIA) - timedelta(days=args.dias))
-    logger.info(f"Conectando a {host} como {user} (carpeta {args.carpeta_imap})")
-    conexion = conectar_imap(host, user, password, args.carpeta_imap)
+    # lock: la tarea de 15 min y una corrida manual no deben solaparse
+    # (duplicarían archivos y corromperían estado/CSV)
+    lock = None
+    if not args.dry_run:
+        lock = control / "organizador.lock"
+        if not _adquirir_lock(lock):
+            logger.info("Otra corrida está en curso; salgo sin hacer nada")
+            return 0
 
     try:
-        uids = buscar_uids(conexion, desde)
-        logger.info(f"Correos desde {desde:%d/%m/%Y}: {len(uids)} en la bandeja")
+        ruta_estado = control / "estado_organizador.json"
+        if args.dry_run:
+            try:
+                estado = Estado.cargar(ruta_estado, respaldar_corrupto=False)
+            except OSError:
+                estado = Estado(None)
+            estado.ruta = None  # jamás persistir en simulacro
+        else:
+            estado = Estado.cargar(ruta_estado)
+
+        host, user, password = cargar_credenciales()
+        desde = args.desde or (datetime.now(TZ_COLOMBIA) - timedelta(days=args.dias))
+        logger.info(f"Conectando a {host} como {user} (carpeta {args.carpeta_imap})")
+        conexion = conectar_imap(host, user, password, args.carpeta_imap)
+
         resumen: dict[str, int] = {}
         errores = 0
         procesados = 0
-        for uid in uids:
-            if procesados >= args.max:
-                logger.warning(f"Alcanzado --max {args.max}; quedan correos pendientes")
-                break
-            msg = obtener_mensaje(conexion, uid)
-            if msg is None:
-                logger.warning(f"UID {uid.decode()}: no pude descargar el mensaje")
-                errores += 1
-                continue
-            mid = id_mensaje(msg)
-            if estado.ya_procesado(mid):
-                resumen["YA_PROCESADO"] = resumen.get("YA_PROCESADO", 0) + 1
-                continue
-            procesados += 1
-            try:
-                fila = procesar_mensaje(
-                    msg,
-                    base=args.base,
-                    config=config,
-                    estado=estado,
-                    dry_run=args.dry_run,
-                    sin_pdf_correo=args.sin_pdf_correo,
-                    navegador=navegador,
-                )
-            except Exception as exc:  # correo con errores no debe frenar el lote
-                logger.exception(f"UID {uid.decode()}: error procesando")
-                fila = {
-                    "fecha_proceso": datetime.now(TZ_COLOMBIA).isoformat(timespec="seconds"),
-                    "asunto": decodificar_encabezado(msg.get("Subject")),
-                    "remitente": decodificar_encabezado(msg.get("From")),
-                    "mensaje_id": mid,
-                    "estado": "ERROR",
-                    "detalle": str(exc),
-                }
-            estado_fila = fila.get("estado", "ERROR")
-            resumen[estado_fila] = resumen.get(estado_fila, 0) + 1
-            logger.info(
-                f"[{estado_fila}] {fila.get('categoria', '-')} / {fila.get('entidad', '-')} "
-                f"<- {_acotar(fila.get('asunto', ''), 70)}"
-            )
-            if estado_fila == "ERROR":
-                errores += 1
-                continue  # sin marcar: se reintenta en la próxima corrida
-            if not args.dry_run:
-                estado.marcar(mid)
-                estado.depurar()
-                estado.guardar()
-                registrar_fila(control, fila)
-                if not args.no_marcar:
-                    etiquetar_procesado(conexion, uid, config["etiqueta_gmail"])
+        try:
+            uids = buscar_uids(conexion, desde)
+            logger.info(f"Correos desde {desde:%d/%m/%Y}: {len(uids)} en la bandeja")
+            for uid in uids:
+                if procesados >= args.max:
+                    logger.warning(f"Alcanzado --max {args.max}; quedan correos pendientes")
+                    break
+                try:
+                    fila_o_none = _procesar_uid(
+                        conexion, uid, estado, config, args, navegador, control, resumen
+                    )
+                except (imaplib.IMAP4.abort, OSError) as exc:
+                    # conexión perdida a mitad de lote: lo hecho queda hecho,
+                    # el resto se retoma en la próxima corrida
+                    logger.error(f"Conexión IMAP perdida ({exc}); retomo en la próxima corrida")
+                    resumen["CONEXION_PERDIDA"] = resumen.get("CONEXION_PERDIDA", 0) + 1
+                    errores += 1
+                    break
+                if fila_o_none is None:
+                    continue
+                procesados += 1
+                if fila_o_none.get("estado") == "ERROR":
+                    errores += 1
+        finally:
+            with contextlib.suppress(OSError, imaplib.IMAP4.error):
+                conexion.logout()
     finally:
-        with contextlib.suppress(OSError, imaplib.IMAP4.error):
-            conexion.logout()
+        if lock is not None:
+            _liberar_lock(lock)
 
     logger.info("=" * 60)
     logger.info("RESUMEN FINAL")

@@ -43,6 +43,10 @@ if "!CORREO!"=="" (
 echo [OK] Correo: !CORREO!
 
 set "CLAVE=%GLOSAS_IMAP_PASSWORD%"
+if not "!CLAVE!"=="" (
+  set /p CAMBIAR="Ya hay una contrasena guardada. Reemplazarla por una nueva? (S/N): "
+  if /i "!CAMBIAR!"=="S" set "CLAVE="
+)
 if "!CLAVE!"=="" (
   echo.
   echo Necesitas una CONTRASENA DE APLICACION de Google, no la clave normal:
@@ -52,6 +56,7 @@ if "!CLAVE!"=="" (
   echo   3. Crea una con nombre "Bot Glosas" y copia las 16 letras
   echo.
   set /p CLAVE="Pega aqui la contrasena de aplicacion, sin espacios: "
+  set "CLAVE=!CLAVE: =!"
   setx GLOSAS_IMAP_PASSWORD "!CLAVE!" >nul
 )
 echo [OK] Credenciales guardadas en este equipo.
