@@ -142,8 +142,15 @@ CONFIG_DEFECTO: dict = {
         },
         {
             "carpeta": "AXA",
-            "remitente": ["GRUPOMOK", "COLPATRIA", "\\bAXA\\b"],
+            # Claimonline es la plataforma de notificaciones de AXA Colpatria
+            "remitente": ["GRUPOMOK", "COLPATRIA", "\\bAXA\\b", "CLAIMONLINE"],
             "asunto": ["\\bAXA\\b", "COLPATRIA"],
+            "adjuntos": ["^OBJECION_\\d+"],
+        },
+        {
+            "carpeta": "LA PREVISORA",
+            "remitente": ["PREVISORA"],
+            "asunto": ["LA PREVISORA"],
             "adjuntos": [],
         },
         {

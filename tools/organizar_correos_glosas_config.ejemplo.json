@@ -56,11 +56,24 @@
       "remitente": [
         "GRUPOMOK",
         "COLPATRIA",
-        "\\bAXA\\b"
+        "\\bAXA\\b",
+        "CLAIMONLINE"
       ],
       "asunto": [
         "\\bAXA\\b",
         "COLPATRIA"
+      ],
+      "adjuntos": [
+        "^OBJECION_\\d+"
+      ]
+    },
+    {
+      "carpeta": "LA PREVISORA",
+      "remitente": [
+        "PREVISORA"
+      ],
+      "asunto": [
+        "LA PREVISORA"
       ],
       "adjuntos": []
     },
