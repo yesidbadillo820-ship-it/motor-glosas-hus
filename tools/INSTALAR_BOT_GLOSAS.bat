@@ -6,6 +6,24 @@ echo ============================================
 echo    Instalador del BOT de glosas HUS
 echo ============================================
 echo.
+
+rem --- 0. Detectar ejecucion desde DENTRO del ZIP sin extraer ---
+if not exist "%~dp0organizar_correos_glosas.py" (
+  echo [X] No encuentro los archivos del bot junto a este instalador.
+  echo.
+  echo     Estas ejecutando desde DENTRO del archivo ZIP sin extraerlo.
+  echo     Windows solo saca el instalador a una carpeta temporal y deja
+  echo     el resto adentro, por eso falla.
+  echo.
+  echo     COMO HACERLO BIEN:
+  echo       1. Clic derecho al ZIP descargado - "Extraer todo..."
+  echo       2. Elige una carpeta fija, ej: C:\bot-glosas
+  echo       3. Entra a la carpeta extraida - tools
+  echo       4. Ejecuta este instalador desde alli
+  pause
+  exit /b 1
+)
+
 echo El bot lee la bandeja de correo, clasifica cada mensaje en
 echo INICIAL / RATIFICADA / DEVOLUCIONES / CONCILIACIONES, detecta
 echo la entidad y archiva todo en el servidor de glosas.
