@@ -35,7 +35,7 @@ PROVEEDORES_INFO = {
         "fortaleza": "Razonamiento juridico fino, citas precisas, redaccion legal en español",
         "tier": "Pago (creditos USD)",
         "modelos_disponibles": [
-            "claude-sonnet-4-6",
+            "claude-sonnet-4-5",
             "claude-haiku-4-5",
             "claude-opus-4-7",
         ],
@@ -62,9 +62,11 @@ PROVEEDORES_INFO = {
         "rol": "Proveedor PRIMARIO de dictamenes (gratis y rapido). Anthropic entra para casos complejos o como fallback de calidad.",
         "fortaleza": "Velocidad bestial (LPU dedicado): 200-400 tokens/s",
         "tier": "Free con rate limits",
-        # Cadena vigente 12-jun-2026 (gpt-oss-120b primario; los
-        # deprecados llama-3.1-70b / mixtral-8x7b salieron de Groq).
+        # Cadena vigente jul-2026: Llama 4 Scout es el PRIMARIO real de
+        # dictámenes (etiqueta de producción); gpt-oss/qwen quedan de
+        # respaldo en la cadena de retry.
         "modelos_disponibles": [
+            "meta-llama/llama-4-scout-17b-16e-instruct",
             "openai/gpt-oss-120b",
             "qwen/qwen3-32b",
             "llama-3.3-70b-versatile",

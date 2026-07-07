@@ -74,13 +74,13 @@ class TestContextoCompleto:
         g = _seed(db_session, eps="SANITAS", valor_objetado=5000)
         r = client.get(f"/glosas/{g.id}/contexto-completo")
         d = r.json()
-        # 4 secciones top-level
-        assert set(d.keys()) == {
+        # Ronda 29: superset — las 4 secciones base deben estar.
+        assert {
             "glosa",
             "sla",
             "audit_resumen",
             "relacionadas_count",
-        }
+        } <= set(d.keys())
         assert d["glosa"]["id"] == g.id
         assert d["glosa"]["eps"] == "SANITAS"
         assert d["glosa"]["valor_objetado"] == 5000.0

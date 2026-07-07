@@ -76,23 +76,3 @@ def detectar_copia_gold(
                 "fuente": ej.get("fuente", "?"),
             }
     return peor
-
-
-def instruccion_anti_copia(deteccion: dict) -> str:
-    """Bloque a anexar al prompt para forzar adaptación."""
-    if not deteccion:
-        return ""
-    return (
-        "\n\n═══ DETECCIÓN DE COPIA TEXTUAL ═══\n"
-        f"Tu respuesta anterior es {deteccion['similitud'] * 100:.0f}% "
-        f"idéntica al EJEMPLO de fuente {deteccion['fuente']} "
-        f"(id={deteccion['ejemplo_id']}). Esto es INACEPTABLE: el "
-        "ejemplo es solo REFERENCIA, no debe copiarse textualmente.\n"
-        "REGENERA el dictamen completo:\n"
-        "  • Usando los datos REALES del BLOQUE 1 (CUPS, valor, EPS).\n"
-        "  • Con ESTRUCTURA similar al ejemplo pero PALABRAS distintas.\n"
-        "  • Reformula cada oración con vocabulario propio.\n"
-        "  • Cita las MISMAS normas pero con frases distintas a las "
-        "    del ejemplo.\n"
-        "Responde de nuevo en el formato XML completo.\n"
-    )

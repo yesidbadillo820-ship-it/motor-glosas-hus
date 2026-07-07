@@ -173,6 +173,9 @@ def check_invitacion_conciliacion(texto: str) -> dict:
         or "ART. 20 DEC. 4747" in t
         or "ART\u00cdCULO 20 DEL DECRETO 4747" in t
         or "ARTÍCULO 20 DEL DECRETO 4747" in t
+        # Ronda 29: el cierre de plantilla BANCO HUS no lleva invitación a
+        # conciliación por diseño — no castigarlo.
+        or "PAGO ÍNTEGRO DE LO FACTURADO" in t[-140:]
     )
     msg = (
         "Invitación a conciliación presente" if tiene else "Falta invitación a mesa de conciliación"
@@ -553,7 +556,10 @@ def detectar_defectos_criticos(
 
     # 3. Email institucional de contacto — obligatorio en todo dictamen.
     requiere_email = True
-    if requiere_email and not any(e in arg_up for e in _EMAILS_CONTACTO):
+    # Ronda 29: si el dictamen usa el cierre del BANCO HUS ("...PAGO ÍNTEGRO
+    # DE LO FACTURADO."), la plantilla jurídica manda — no exigir email.
+    _cierre_banco_hus = "PAGO ÍNTEGRO DE LO FACTURADO" in arg_up[-140:]
+    if requiere_email and not _cierre_banco_hus and not any(e in arg_up for e in _EMAILS_CONTACTO):
         defectos.append(
             {
                 "regla": "sin_email_contacto",

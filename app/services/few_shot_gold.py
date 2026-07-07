@@ -376,24 +376,3 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
     partes.append("═══════════════════════════════════════════════════════════════════")
     partes.append("")
     return "\n".join(partes)
-
-
-def construir_bloque_gold(
-    db,
-    eps: str,
-    codigo: str,
-    max_ejemplos: int = _MAX_EJEMPLOS,
-    texto_glosa: str = "",
-) -> str:
-    """Helper de un solo paso: busca y formatea."""
-    try:
-        ejemplos = obtener_ejemplos_gold(db, eps, codigo, max_ejemplos, texto_glosa=texto_glosa)
-        if ejemplos:
-            logger.info(
-                f"[FEW-SHOT-GOLD] {len(ejemplos)} ejemplo(s) inyectado(s) "
-                f"para par ({eps}, {codigo})"
-            )
-        return bloque_few_shot_para_prompt(ejemplos)
-    except Exception as e:
-        logger.warning(f"few_shot_gold: error construyendo bloque: {e}")
-        return ""

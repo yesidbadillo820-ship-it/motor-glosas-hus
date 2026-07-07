@@ -102,7 +102,7 @@ def main() -> int:
     from app.database import Base
     from app.models.db import ClausulaContrato
 
-    db_url = os.environ.get("DATABASE_URL", "sqlite:///./motor_glosas.db")
+    db_url = os.environ.get("DATABASE_URL", "sqlite:///./glosas.db")
     engine = create_engine(
         db_url, connect_args={"check_same_thread": False} if "sqlite" in db_url else {}
     )

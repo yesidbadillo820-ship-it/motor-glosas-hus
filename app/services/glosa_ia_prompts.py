@@ -537,66 +537,6 @@ def contratos_ajenos_citados(texto: str, eps: str) -> list[str]:
 #  2.  DETECCIÓN DE CONTEXTO (tipo atención, CUPS, CIE-10, médico)
 # ══════════════════════════════════════════════════════════════════
 
-TIPO_ATENCION_KEYWORDS = {
-    "CONSULTA EXTERNA": [
-        "consulta externa",
-        "consulta medica",
-        "cita medica",
-        "consulta ambulatoria",
-        "valoracion ambulatoria",
-    ],
-    "URGENCIAS": ["urgencia", "urgente", "emergencia", "triage", "reanimacion", "shock", "rcp"],
-    "HOSPITALIZACIÓN": [
-        "hospitalizacion",
-        "hospitalizado",
-        "cama hospitalaria",
-        "internacion",
-        "estancia hospitalaria",
-        "dia cama",
-    ],
-    "CIRUGÍA": [
-        "cirugia",
-        "quirurgico",
-        "procedimiento quirurgico",
-        "sala de cirugia",
-        "procedimiento",
-        "intervencion quirurgica",
-    ],
-    "UCI": [
-        "uci",
-        "unidad de cuidados intensivos",
-        "cuidado critico",
-        "ventilacion mecanica",
-        "cuidado intensivo",
-    ],
-    "ONCOLOGÍA": [
-        "oncologia",
-        "quimioterapia",
-        "radioterapia",
-        "oncologico",
-        "cancer",
-        "tumor",
-        "neoplasia",
-    ],
-    "PROCEDIMIENTO Dx": [
-        "imagen diagnostica",
-        "ecografia",
-        "tomografia",
-        "resonancia",
-        "endoscopia",
-        "biopsia",
-        "laboratorio",
-    ],
-}
-
-
-def extraer_tipo_atencion(contexto_pdf: str, texto_glosa: str) -> str:
-    texto = (contexto_pdf + " " + texto_glosa).lower()
-    for tipo, palabras in TIPO_ATENCION_KEYWORDS.items():
-        if any(p in texto for p in palabras):
-            return tipo
-    return "NO ESPECIFICADO EN SOPORTES"
-
 
 def extraer_datos_soporte(contexto_pdf: str) -> dict:
     datos = {
@@ -724,10 +664,6 @@ def extraer_datos_soporte(contexto_pdf: str) -> dict:
         datos["evolucion"] = m.group(1).strip()[:300]
 
     return datos
-
-
-def tiene_soportes_reales(contexto_pdf: str) -> bool:
-    return bool(contexto_pdf and len(contexto_pdf.strip()) > 80)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -2908,30 +2844,6 @@ RECUERDA:
 3. Tono: conciliador institucional. NUNCA "SE EXIGE", "OBLIGA A", "ACTO ABUSIVO".
 4. Texto fuera de los tags XML será rechazado.
 """
-
-
-def build_all_variants(
-    texto_glosa: str,
-    contexto_pdf: str,
-    codigo: str,
-    eps: str,
-    numero_factura: Optional[str] = None,
-    numero_radicado: Optional[str] = None,
-    dias_habiles: Optional[int] = None,
-    es_extemporanea: bool = False,
-) -> list[str]:
-    """Compatibilidad: genera el mismo prompt 4 veces (antes producía 4 variantes hostiles)."""
-    base = build_user_prompt(
-        texto_glosa,
-        contexto_pdf,
-        codigo,
-        eps,
-        numero_factura,
-        numero_radicado,
-        dias_habiles,
-        es_extemporanea,
-    )
-    return [base] * 4
 
 
 # ── R59 P2: prompt de auditoría previa (modo neutral) ──────────────

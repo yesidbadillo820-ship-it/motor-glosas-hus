@@ -265,7 +265,7 @@ def diagnostico_completo(
             "estado": ping_estado,
             "mensaje": ping_msg,
             "data": {
-                "primary_ai": os.getenv("PRIMARY_AI", "anthropic"),
+                "primary_ai": os.getenv("PRIMARY_AI", "groq"),
                 "modelo_default": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
                 "tool_use_habilitado": os.getenv("TOOL_USE_HABILITADO", "0") == "1",
                 "multi_agent_habilitado": os.getenv("MULTI_AGENT_HABILITADO", "0") == "1",
