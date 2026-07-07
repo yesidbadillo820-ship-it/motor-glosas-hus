@@ -489,3 +489,12 @@ def test_registrar_fila_con_csv_bloqueado_usa_pendiente(tmp_path, monkeypatch):
     pendiente = tmp_path / f"registro_{mes}_pendiente.csv"
     assert pendiente.exists()
     assert "ARCHIVADO" in pendiente.read_text(encoding="utf-8-sig")
+
+
+def test_base_por_defecto_respeta_variable_de_entorno(monkeypatch):
+    monkeypatch.setenv("GLOSAS_BASE", r"D:\USUARIO CARTERA\Documents\PRUEBAS MAIL")
+    assert org.base_por_defecto() == Path(r"D:\USUARIO CARTERA\Documents\PRUEBAS MAIL")
+    monkeypatch.setenv("GLOSAS_BASE", "  ")  # vacía o espacios = servidor real
+    assert org.base_por_defecto() == Path(org.DEFAULT_BASE)
+    monkeypatch.delenv("GLOSAS_BASE")
+    assert org.base_por_defecto() == Path(org.DEFAULT_BASE)

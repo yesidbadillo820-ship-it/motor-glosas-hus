@@ -1139,6 +1139,12 @@ def procesar_mensaje(
 # ─── Orquestación ────────────────────────────────────────────────────────────
 
 
+def base_por_defecto() -> Path:
+    """La variable GLOSAS_BASE permite apuntar a una carpeta de pruebas
+    (ej. D:\\PRUEBAS MAIL) sin tocar código; vacía = servidor de glosas."""
+    return Path(os.environ.get("GLOSAS_BASE", "").strip() or DEFAULT_BASE)
+
+
 def _parsear_fecha(valor: str) -> datetime:
     for formato in ("%Y-%m-%d", "%d/%m/%Y"):
         try:
@@ -1277,8 +1283,11 @@ def main() -> int:
     parser.add_argument(
         "--base",
         type=Path,
-        default=Path(DEFAULT_BASE),
-        help=f"Carpeta raíz de glosas escaneadas (default: {DEFAULT_BASE})",
+        default=base_por_defecto(),
+        help=(
+            "Carpeta raíz donde archivar. Prioridad: este flag > variable de "
+            f"entorno GLOSAS_BASE > servidor ({DEFAULT_BASE})"
+        ),
     )
     parser.add_argument(
         "--control",
