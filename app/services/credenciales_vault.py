@@ -37,7 +37,6 @@ from cryptography.fernet import Fernet
 BLOQUE_RADICACION = "RADICACION"
 BLOQUE_CARTERA = "CARTERA"
 BLOQUE_DEVOLUCIONES = "DEVOLUCIONES"
-BLOQUES = (BLOQUE_RADICACION, BLOQUE_CARTERA, BLOQUE_DEVOLUCIONES)
 
 # Cache del Fernet keyed por la clave en uso: si la env var cambia
 # (tests, rotación manual), se reconstruye en el siguiente uso.

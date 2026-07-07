@@ -23,9 +23,12 @@ AURORA (ARL/Vida)          GID-ARL-0090 (2024)        PROPIAS + SOAT – 3 %
 SIN CONTRATO               —                           SOAT pleno
 """
 
+import logging
 import os
 import re
 from typing import Optional
+
+logger = logging.getLogger("motor_glosas")
 
 
 def _env_int(nombre: str, default: int) -> int:
@@ -382,6 +385,9 @@ def get_contrato(eps: str) -> dict:
     cae al falso "sin contrato".
     """
     eps_upper = (eps or "").upper().strip()
+    # Ronda 29: la UI puede mandar tildes ("POLICÍA") y el catálogo está
+    # verificado sin tildes — sin normalizar, el match fallaba silencioso.
+    eps_upper = eps_upper.translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU"))
     if not eps_upper or eps_upper in _EPS_SIN_CONTRATO:
         return _contrato_sin_pacto()
     # Auditoría jul-2026: match EXACTO primero y luego el candidato MÁS
@@ -399,10 +405,18 @@ def get_contrato(eps: str) -> dict:
             for t in clave.split()
         )
 
+    def _clave_en_eps(clave: str) -> bool:
+        # Ronda 29: una clave de UN token ("ARL", "PPL", "FOMAG") debe
+        # aparecer como PALABRA completa — antes "ARL" matcheaba dentro de
+        # "CHARLESTON SALUD". Las claves multi-palabra siguen por subcadena.
+        if " " in clave:
+            return clave in eps_upper
+        return bool(re.search(rf"(?<![A-ZÁÉÍÓÚÑ]){re.escape(clave)}(?![A-ZÁÉÍÓÚÑ])", eps_upper))
+
     candidatos = [
         k
         for k in CONTRATOS_HUS
-        if k in eps_upper
+        if _clave_en_eps(k)
         or (len(eps_upper) >= 4 and eps_upper in k)
         or (" " in k and _tokens_como_palabras(k))
     ]
@@ -2251,7 +2265,7 @@ def build_user_prompt(
                     '  para esa fecha o aplicar el marco normativo general".\n'
                 )
     except Exception:
-        pass
+        logger.warning("[VIGENCIA] chequeo de vigencia del contrato no evaluado", exc_info=True)
 
     # Concepto Manual Único
     try:
@@ -2308,7 +2322,9 @@ def build_user_prompt(
                 + "\n"
             )
     except Exception:
-        pass
+        logger.warning(
+            "[NORMATIVA-LITERAL] bloque de normativa literal no construido", exc_info=True
+        )
 
     # Definición taxativa del código de glosa (Manual Único Res. 2284/2023)
     # para refutación directa en párrafo 2
@@ -2326,7 +2342,7 @@ def build_user_prompt(
                 f"la definición taxativa punto por punto.\n"
             )
     except Exception:
-        pass
+        logger.warning("[TAXATIVA] definición taxativa del código no inyectada", exc_info=True)
 
     # Cláusulas anti-rebatimiento típicas por tipo de glosa (pre-anulan
     # contra-argumentos comunes de la EPS). Ronda 2 (12-jun-2026): se pasa

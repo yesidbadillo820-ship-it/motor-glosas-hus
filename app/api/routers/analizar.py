@@ -569,7 +569,7 @@ async def _persistir_y_responder(
         existente.dictamen = dictamen_final
         existente.dictamen_generado_en = datetime.now(_tz.utc)
         existente.dias_restantes = resultado.dias_restantes
-        existente.modelo_ia = resultado.modelo_ia
+        existente.modelo_ia = (resultado.modelo_ia or "")[:100]
         existente.score = resultado.score
         existente.numero_radicado = numero_radicado or existente.numero_radicado
         existente.texto_glosa_original = tabla_excel or existente.texto_glosa_original
@@ -598,7 +598,7 @@ async def _persistir_y_responder(
             estado=estado,
             dictamen=dictamen_final,
             dias_restantes=resultado.dias_restantes,
-            modelo_ia=resultado.modelo_ia,
+            modelo_ia=(resultado.modelo_ia or "")[:100],
             score=resultado.score,
             numero_radicado=numero_radicado,
             factura=numero_factura,
@@ -761,7 +761,19 @@ async def analizar(
                     detectar_complejidad_critica as _det_mm,
                 )
 
-                _vals_mm = [_pv_mm(m) for m in re.findall(r"\$[\d.,]+", tabla_excel or "")]
+                _txt_mm = tabla_excel or ""
+                _crudos_mm = re.findall(
+                    r"\btotal\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+                    _txt_mm,
+                    flags=re.IGNORECASE,
+                ) + re.findall(
+                    r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+                    _txt_mm,
+                    flags=re.IGNORECASE,
+                )
+                if not _crudos_mm:
+                    _crudos_mm = re.findall(r"\$\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)", _txt_mm)
+                _vals_mm = [_pv_mm(m) for m in _crudos_mm]
                 _valor_mm = int(max(_vals_mm)) if _vals_mm else 0
                 _capturar_raw = bool(
                     _det_mm(
@@ -772,7 +784,8 @@ async def analizar(
                         contexto_pdf="",
                     ).es_complejo
                 )
-            except Exception:
+            except Exception as _e_mm:
+                logger.warning(f"[MULTIMODAL] captura predictiva no evaluada: {_e_mm}")
                 _capturar_raw = False
         contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
             archivos,

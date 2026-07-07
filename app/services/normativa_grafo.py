@@ -34,18 +34,6 @@ from typing import Optional
 logger = logging.getLogger("motor_glosas")
 
 
-# Tipos de relación (controlled vocabulary)
-TIPOS_RELACION = {
-    "modifica_a",
-    "modificada_por",
-    "cita_a",
-    "reglamenta_a",
-    "deroga_a",
-    "fundamenta_a",
-    "complementa_a",
-}
-
-
 # Aristas del grafo. Cada tupla: (origen, tipo, destino, nota_breve).
 # Las claves usan la nomenclatura de _TODAS_LAS_NORMAS / claves típicas
 # del corpus normativa_completa. Si una clave no existe en el corpus,

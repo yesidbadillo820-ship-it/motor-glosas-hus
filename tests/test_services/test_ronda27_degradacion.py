@@ -31,7 +31,7 @@ TEXTO_C1 = (
 # ─── 1. Etiqueta de degradación anthropic → groq ─────────────────────
 
 
-async def test_llamar_ia_marca_degradacion_en_la_etiqueta():
+async def test_llamar_ia_marca_degradacion_en_la_etiqueta(caplog):
     from app.services.glosa_service import GlosaService
 
     gs = GlosaService.__new__(GlosaService)
@@ -49,15 +49,23 @@ async def test_llamar_ia_marca_degradacion_en_la_etiqueta():
     gs._llamar_anthropic = _anthropic_falla
     gs._llamar_groq_con_retry = _groq_ok
 
-    content, modelo = await gs._llamar_ia(
-        "sys",
-        "user",
-        modelo_override="claude-sonnet-4-5",
-        bypass_cache=True,
-    )
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="motor_glosas"):
+        content, modelo = await gs._llamar_ia(
+            "sys",
+            "user",
+            modelo_override="claude-sonnet-4-5",
+            bypass_cache=True,
+        )
     assert content == "<argumento>OK</argumento>"
-    assert "degradado de claude-sonnet-4-5" in modelo
-    assert "529" in modelo  # la causa viaja en la etiqueta
+    # Ronda 29: etiqueta CORTA a BD/UI (la larga desbordaba VARCHAR(80/100)
+    # en Postgres); la causa completa viaja al log [MODELO-DEGRADADO].
+    assert "[degradado]" in modelo
+    assert len(modelo) <= 80
+    log_degradado = [r.message for r in caplog.records if "[MODELO-DEGRADADO]" in r.message]
+    assert log_degradado and "529" in log_degradado[0]
+    assert "claude-sonnet-4-5" in log_degradado[0]
 
 
 async def test_llamar_ia_sin_override_no_agrega_etiqueta():

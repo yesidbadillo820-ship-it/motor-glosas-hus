@@ -571,17 +571,6 @@ def agregar_homologacion(codigo_viejo: str, cups_oficial: str, descripcion: str 
 
 # ─── Texto oficial para citar en dictámenes ────────────────────────────────
 
-TEXTO_RES_2641_2025 = (
-    "RESOLUCIÓN 2641 DE 2025 (Ministerio de Salud y Protección Social): "
-    "Por la cual se adopta la Clasificación Única de Procedimientos en "
-    "Salud (CUPS) versión 2025 y se establece la TABLA DE HOMOLOGACIÓN "
-    "entre códigos internos de prestadores, códigos CUPS anteriores y la "
-    "numeración oficial vigente. El uso de códigos homologados es de "
-    "OBLIGATORIO CUMPLIMIENTO para reportar al Registro Individual de "
-    "Prestación de Servicios de Salud (RIPS) y para la facturación "
-    "electrónica (FEV, Res. 2275/2023)."
-)
-
 
 def cita_res_2641(codigo_viejo: str, cups_oficial: str) -> str:
     """Construye la cita formal lista para inyectar al prompt IA o al

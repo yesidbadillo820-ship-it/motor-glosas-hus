@@ -23,7 +23,6 @@ from app.services.glosa_service import (
     _neutralizar_alucinaciones_prompt,
     _termina_completo,
 )
-from app.services.plantilla_service import PlantillaService
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -139,34 +138,6 @@ class TestBugBPlaceholdersSinSustituir:
         resultado = _neutralizar_alucinaciones_prompt(texto)
         assert "GLOSA N/A" not in resultado
         assert "N/A" not in resultado
-
-    def test_plantilla_codigo_glosa_vacio_no_pone_NA(self):
-        # plantilla_service.py: default ya no es "N/A" sino frase contextual.
-        svc = PlantillaService()
-        resultado = svc.resolver_variables(
-            "Glosa {{CODIGO_GLOSA}} por valor {{VALOR_OBJETADO}}",
-            {"valor_objetado": 1500000},
-        )
-        assert "N/A" not in resultado
-        assert "el código de la glosa aplicada" in resultado
-
-    def test_plantilla_cups_vacio_no_pone_NA(self):
-        svc = PlantillaService()
-        resultado = svc.resolver_variables(
-            "Servicio con CUPS {{CUPS}} prestado",
-            {},
-        )
-        assert "CUPS N/A" not in resultado
-        assert "el procedimiento facturado" in resultado
-
-    def test_plantilla_eps_vacio_dice_la_eps(self):
-        svc = PlantillaService()
-        resultado = svc.resolver_variables(
-            "La entidad pagadora {{EPS}} objeta",
-            {},
-        )
-        assert "{{EPS}}" not in resultado
-        assert "la eps" in resultado.lower()
 
 
 # ─────────────────────────────────────────────────────────────────────

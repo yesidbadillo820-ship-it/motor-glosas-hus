@@ -267,64 +267,6 @@ FERIADOS_CO = [
 # Las glosas extemporáneas son improcedentes, abusivas y no deben disminuir el pago a las IPS.
 DIAS_HABILES_LIMITE_EXTEMPORANEA = 20
 
-NORMATIVA_COLOMBIA = """
-NORMATIVA APLICABLE:
-- Ley 100 de 1993: Sistema de Seguridad Social Integral (Art. 168 - Urgencias)
-- Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 57 - Trámite de glosas; plazos: 20 días EPS formular | 15 días IPS responder | 10 días EPS decidir)
-- Ley 1751 de 2015: Ley Estatutaria de Salud (Derecho fundamental a la salud)
-- Ley 1122 de 2007: Flujo de recursos entre EPS e IPS (Art. 13)
-- Decreto 4747 de 2007: Regulaciones sobre glosas y devoluciones (Art. 20 - Conciliación)
-- Decreto 780 de 2016: Decreto Único Reglamentario del Sector Salud
-- Resolución 2175 de 2015: Procedimiento de conciliación de glosas médicas
-- Resolución 3047 de 2008: Anexo Técnico 5 (Procedimiento glosas)
-- Resolución 5269 de 2017: Plan de Beneficios en Salud
-- Circular Externa 047 de 2025 (MinSalud): Manual Tarifario SOAT 2026 indexado a UVB
-- UVB 2026: $12.110 (Resolución MinHacienda 31/12/2025). Fórmula: valor = Tarifa_UVB × $12.110 → centena más próxima
-- Decreto 780 de 2016 (Anexo Técnico 1): regla de redondeo a centena + marco general
-- Decreto 2423 de 1996: Manual tarifario SOAT histórico (base para servicios no incluidos en Circular 047)
-- Resolución 054 de 2026 (ESE HUS): Tarifas propias del hospital (aplican cuando el contrato dice "TIPO TARIFA = PROPIAS")
-- Código de Comercio: Artículo 871 (Principio de Buena Fe)
-- Circular 030 de 2013: Subsanación de errores formales en facturación
-- Resolución 1995 de 1999: Historia clínica como prueba plena
-- Sentencia T-760 de 2008: Obligaciones de las EPS en prestación de servicios
-- Sentencia T-1025 de 2002: Urgencias no requieren autorización previa
-- Sentencia T-478 de 1995: Autonomía médica como derecho fundamental
-"""
-
-ESTRATEGIAS_TIPO = {
-    "TA_TARIFA": """ESTRATEGIA TARIFARIA PROFESIONAL:
-- Verificar la tarifa liquidada vs tarifa contractual vigente (SOAT -15% o según convenio)
-- Citar específicamente el contrato vigente y sus anexos tarifarios
-- Invocar la Resolución Interna de Precios de la institución
-- Principio de buena fe contractual (Art. 871 Código Comercio)
-- Mencionar que la EPS no puede aplicar descuentos unilaterales sin sustento
-- El IPC es un referente NO una obligación para la IPS
-- Si hay incremento institucional debidamente aprobado, citar acto administrativo""",
-    "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 20 días hábiles para objetar (Art. 57 Ley 1438/2011).",
-    "AU_AUTORIZACION": "ESTRATEGIA AUTORIZACIÓN: Atención por urgencia vital. No requiere autorización previa. Art. 168 Ley 100/1993 y Resolución 5269/2017.",
-    "CO_COBERTURA": "ESTRATEGIA COBERTURA: Servicio dentro del Plan de Beneficios en Salud (Res. 5269/2017). EPS tiene obligación de pago. No hay exclusiones.",
-    "CL_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
-    "PE_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
-    "FA_FACTURACION": "ESTRATEGIA FACTURACIÓN: Error formal no es causal de glosa (Circular 030/2013). Los errores formales son subsanables. La prestación del servicio genera obligación de pago.",
-    "IN_INSUMOS": "ESTRATEGIA INSUMOS: Inherentes al acto médico. Se facturan al costo de adquisición más porcentaje administrativo pactado. Factura de compra disponible como soporte.",
-    "ME_MEDICAMENTOS": "ESTRATEGIA MEDICAMENTOS: Dispensados bajo fórmula médica. Plan de Beneficios los incluye (Res. 5269/2017). No existe alternativa terapéutica equivalente.",
-    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 57 Ley 1438/2011 + Decreto 4747/2007 establecen 20 días hábiles para formular glosas. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS.",
-}
-
-CODIGOS_GLOSA = {
-    "TA": "OBJECIÓN POR TARIFA",
-    "SO": "OBJECIÓN POR SOPORTES",
-    "AU": "OBJECIÓN POR AUTORIZACIÓN",
-    "CO": "OBJECIÓN POR COBERTURA",
-    "CL": "OBJECIÓN POR PERTINENCIA",
-    "PE": "OBJECIÓN POR PERTINENCIA",
-    "FA": "OBJECIÓN POR FACTURACIÓN",
-    "IN": "OBJECIÓN POR INSUMOS",
-    "ME": "OBJECIÓN POR MEDICAMENTOS",
-    "SE": "OBJECIÓN SIN ESPECIFICACIÓN",
-    "EX": "OBJECIÓN EXTEMPORÁNEA",
-}
-
 PLANTILLAS_CODIGO = {}
 
 
@@ -3002,7 +2944,8 @@ def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
         return texto
     try:
         from app.services.glosa_ia_prompts import contratos_ajenos_citados
-    except Exception:
+    except Exception as _e_imp:
+        logger.warning(f"[CONTRATO-AJENO] sanitizer inactivo (import falló): {_e_imp}")
         return texto
     ajenos = contratos_ajenos_citados(texto, eps)
     if not ajenos:
@@ -3171,7 +3114,8 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
 
     try:
         from app.services.citation_verifier import _normalizar as _norm_cita
-    except Exception:
+    except ImportError as _e_imp:
+        logger.warning(f"[CITAS] descomillado de citas falsas inactivo: {_e_imp}")
         return texto
 
     # El issue trae la cita truncada a 140 chars y envuelta en «»; usamos el
@@ -3532,7 +3476,8 @@ def _ajustar_score_por_evidencia(score: float, verif_citas, confianza) -> float:
             if isinstance(conf, (int, float)) and 0 <= conf <= 1:
                 s = min(s, conf * 100.0 + 10.0)
         return round(max(15.0, min(100.0, s)), 1)
-    except Exception:
+    except Exception as _e_aj:
+        logger.warning(f"[SCORE] ajuste por evidencia no aplicado: {_e_aj}")
         return score
 
 
@@ -4520,7 +4465,8 @@ class GlosaService:
                 from app.services.auto_pilot_decision import _parse_valor as _pval_vobj
 
                 _vobj = _pval_vobj(valor_raw)
-            except Exception:
+            except Exception as _e_vobj:
+                logger.warning(f"[TEXTO-FIJO] valor objetado ilegible ({valor_raw!r}): {_e_vobj}")
                 _vobj = 0.0
             if accion_ia == "DEFENDER_TOTAL":
                 valor_defender_ia = _vobj
@@ -5408,7 +5354,8 @@ class GlosaService:
                     )
 
                     _mm_auto = _mm_auto_fn(_es_complejo_forzar_claude, _modelo_override)
-                except Exception:
+                except Exception as _e_mma:
+                    logger.warning(f"[MULTIMODAL] auto-activación no evaluada: {_e_mma}")
                     _mm_auto = False
                 _quiere_multimodal = bool(pdfs_raw_para_multimodal) and (
                     bool(getattr(data, "usar_pdf_nativo_soportes", False)) or _mm_auto
@@ -5563,6 +5510,11 @@ class GlosaService:
                         resumen_defectos,
                     )
 
+                    _codigos_extra_val = [cups_verificado] if cups_verificado else []
+                    if info_tarifa and info_tarifa.get("encontrada"):
+                        _cups_tarifa = (info_tarifa.get("tarifa") or {}).get("codigo_cups")
+                        if _cups_tarifa:
+                            _codigos_extra_val.append(str(_cups_tarifa))
                     _defectos = detectar_defectos_criticos(
                         res_ia,
                         codigo_glosa=codigo_det,
@@ -5573,6 +5525,7 @@ class GlosaService:
                         es_extemporanea=es_extemporanea,
                         codigo_respuesta=cod_res,
                         texto_glosa=texto_base,
+                        codigos_validos_extra=_codigos_extra_val,
                     )
                     # Mejora #7: chequear si el dictamen es copia textual
                     # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -5657,6 +5610,8 @@ class GlosaService:
                                 es_ratificacion=es_ratificacion,
                                 es_extemporanea=es_extemporanea,
                                 codigo_respuesta=cod_res,
+                                texto_glosa=texto_base,
+                                codigos_validos_extra=_codigos_extra_val,
                             )
                             if len(_defectos_retry) < len(_defectos):
                                 logger.info(
@@ -5778,15 +5733,21 @@ class GlosaService:
 
             # Decisión autónoma de la IA (R-cerebro #8)
             accion_ia = (self._xml("accion", res_ia, "") or "").strip().upper()
+            # Ronda 29: parser colombiano compartido (el regex viejo leía
+            # "1.500.000" como 1.5) y log en vez de $0 mudo.
+            from app.utils.moneda import parse_valor_cop as _pvc_ia
+
+            _va = self._xml("valor_aceptar", res_ia, "0") or "0"
             try:
-                _va = self._xml("valor_aceptar", res_ia, "0") or "0"
-                valor_aceptar_ia = float(re.sub(r"[^\d.]", "", _va) or 0)
-            except Exception:
+                valor_aceptar_ia = float(_pvc_ia(_va))
+            except Exception as _e_va:
+                logger.warning(f"[IA-ACCION] valor_aceptar ilegible ({_va!r}): {_e_va}")
                 valor_aceptar_ia = 0.0
+            _vd = self._xml("valor_defender", res_ia, "0") or "0"
             try:
-                _vd = self._xml("valor_defender", res_ia, "0") or "0"
-                valor_defender_ia = float(re.sub(r"[^\d.]", "", _vd) or 0)
-            except Exception:
+                valor_defender_ia = float(_pvc_ia(_vd))
+            except Exception as _e_vd:
+                logger.warning(f"[IA-ACCION] valor_defender ilegible ({_vd!r}): {_e_vd}")
                 valor_defender_ia = 0.0
             if accion_ia:
                 logger.info(
@@ -7212,12 +7173,22 @@ class GlosaService:
             if valor_num > 0:
                 return f"$ {int(round(valor_num)):,}".replace(",", ".")
 
+        # Ronda 26/29: el OBJETADO ETIQUETADO manda. El lookahead consume la
+        # corrida numérica completa para que "VALOR OBJETADO 100%" no
+        # devuelva "$ 100" por backtracking; con varios sub-conceptos gana
+        # el TOTAL etiquetado y, en su defecto, el MAYOR valor objetado.
+        from app.utils.moneda import parse_valor_cop as _pvc_lab
+
+        for _p_lab in (
+            r"\btotal\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+        ):
+            _hits = re.findall(_p_lab, t, re.IGNORECASE)
+            if _hits:
+                _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
+                return f"$ {_mejor.strip().rstrip('.,')}"
+
         patrones = [
-            # Ronda 26: el VALOR OBJETADO etiquetado tiene prioridad. En
-            # textos multi-valor ("FACTURADO: $20.2M ... OBJETADO: $6.4M")
-            # el patrón genérico '$' agarraba el PRIMERO (el facturado):
-            # tabla del dictamen con valor errado y routing sobre-escalado.
-            r"\b(?:valor|total)\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})",
             r"\$\s*([\d][\d\.,]{2,})",
             r"%\s*([\d][\d\.,]{2,})",
             r"\bvalor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
@@ -8701,8 +8672,16 @@ class GlosaService:
                 # $6.4M + 2 PDFs cayó a Groq en silencio DOS veces y nadie
                 # supo por qué.
                 if nombre != "anthropic" and modelo_override and _causa_anthropic:
-                    modelo = f"{modelo} [degradado de {modelo_override}: {_causa_anthropic[:80]}]"
-                    logger.warning(f"[MODELO-DEGRADADO] {modelo}")
+                    # Ronda 29: causa COMPLETA al log; etiqueta CORTA a BD/UI.
+                    # La etiqueta larga (159+ chars) desbordaba
+                    # historial.modelo_ia VARCHAR(100/120) y ai_cache.modelo
+                    # VARCHAR(80) en Postgres → 500 tras pagar la llamada IA,
+                    # justo en los casos degradados.
+                    logger.warning(
+                        f"[MODELO-DEGRADADO] pedido={modelo_override} → usado={modelo} "
+                        f"| causa: {_causa_anthropic}"
+                    )
+                    modelo = f"{modelo} [degradado]"[:80]
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)
@@ -8783,9 +8762,13 @@ def _guardar_cache_ia_db(clave: str, respuesta: str, modelo: str) -> None:
             existente = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
             if existente:
                 existente.respuesta = respuesta
-                existente.modelo = modelo
+                existente.modelo = (modelo or "")[:80]
             else:
-                db.add(AICacheRecord(clave=clave, respuesta=respuesta, modelo=modelo, hit_count=0))
+                db.add(
+                    AICacheRecord(
+                        clave=clave, respuesta=respuesta, modelo=(modelo or "")[:80], hit_count=0
+                    )
+                )
             db.commit()
         finally:
             db.close()

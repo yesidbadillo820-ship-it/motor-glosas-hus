@@ -1106,6 +1106,7 @@ from app.api.routers.quality_gate_stats import router as quality_gate_stats_rout
 from app.api.routers.versiones import router as versiones_router
 from app.api.routers.papelera import router as papelera_router
 from app.api.routers.export_erp import router as export_erp_router
+from app.api.routers.exportar import router as exportar_router
 from app.api.routers.asignacion import router as asignacion_router
 from app.api.routers.bandeja import router as bandeja_router
 from app.api.routers.adjuntos import router as adjuntos_router
@@ -1118,7 +1119,7 @@ from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 
-# autopilot: stub removido — lógica real en app/services/autopilot_service.py
+# autopilot: removido en la limpieza de ronda 29 (módulo sin uso real).
 
 # control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
@@ -1162,6 +1163,7 @@ app.include_router(dos_fa_router)
 app.include_router(versiones_router)
 app.include_router(papelera_router)
 app.include_router(export_erp_router)
+app.include_router(exportar_router)  # Formato DGH (reconectado en ronda 29)
 app.include_router(asignacion_router)
 app.include_router(bandeja_router)
 app.include_router(adjuntos_router)

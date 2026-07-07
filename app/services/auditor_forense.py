@@ -162,9 +162,13 @@ def _guardar_cache_forense(clave: str, html: str, modelo: str) -> None:
             existente = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
             if existente:
                 existente.respuesta = html
-                existente.modelo = modelo
+                existente.modelo = (modelo or "")[:80]
             else:
-                db.add(AICacheRecord(clave=clave, respuesta=html, modelo=modelo, hit_count=0))
+                db.add(
+                    AICacheRecord(
+                        clave=clave, respuesta=html, modelo=(modelo or "")[:80], hit_count=0
+                    )
+                )
             db.commit()
         finally:
             db.close()

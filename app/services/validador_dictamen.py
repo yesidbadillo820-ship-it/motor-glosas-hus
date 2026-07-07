@@ -12,9 +12,12 @@ Umbrales:
 """
 
 from __future__ import annotations
+import logging
 import re
 from html import unescape
 from typing import Optional
+
+logger = logging.getLogger("motor_glosas")
 
 
 def _limpiar_html(html: str) -> str:
@@ -486,6 +489,7 @@ def detectar_defectos_criticos(
     es_extemporanea: bool = False,
     codigo_respuesta: str = "",
     texto_glosa: str = "",
+    codigos_validos_extra: Optional[list] = None,
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -592,7 +596,17 @@ def detectar_defectos_criticos(
     # se validan números explícitamente rotulados "CUPS" — los SOAT
     # homólogos, valores y CUM no se tocan.
     if texto_glosa:
-        _digitos_glosa = set(re.findall(r"\d{4,7}", texto_glosa))
+        # Los códigos pueden venir con separadores de miles ("27.535") en la
+        # glosa: se indexan ambas formas. Además, códigos verificados por el
+        # motor (CUPS de factura, homólogos tarifarios) cuentan como válidos.
+        _sin_sep = re.sub(r"(?<=\d)[.,\s](?=\d)", "", texto_glosa)
+        _digitos_glosa = set(re.findall(r"\d{4,7}", texto_glosa)) | set(
+            re.findall(r"\d{4,7}", _sin_sep)
+        )
+        for _cv in codigos_validos_extra or ():
+            _cv_dig = re.sub(r"\D", "", str(_cv))
+            if _cv_dig:
+                _digitos_glosa.add(_cv_dig)
         for _m_cups in re.finditer(r"CUPS\s*[:#]?\s*(\d{4,7})\b", arg_up):
             _num = _m_cups.group(1)
             if _num not in _digitos_glosa:
@@ -658,7 +672,10 @@ def detectar_defectos_criticos(
                         )
                         break
         except Exception:
-            pass
+            logger.warning(
+                "[SUBCONCEPTO-VALIDADOR] chequeo subconcepto_sin_respuesta no evaluado",
+                exc_info=True,
+            )
 
     # 4-quinquies. Placeholder dentro de una fórmula (Ronda 27): Groq produjo
     # "(el valor objetado consignado en el expediente - 10% = el valor
@@ -670,8 +687,11 @@ def detectar_defectos_criticos(
         "EL CUPS DE LA FACTURA",
     )
     for _fn in _FRASES_NEUTRAS_FORMULA:
-        if re.search(re.escape(_fn) + r"\s*[-−+*/=]", arg_up) or re.search(
-            r"[-−+*/=%]\s*" + re.escape(_fn), arg_up
+        _fn_re = re.escape(_fn)
+        if (
+            re.search(_fn_re + r"\s*[-−+*/=]\s*[\d$%(]", arg_up)
+            or re.search(r"[\d$%)]\s*[-−+*/=]\s*" + _fn_re, arg_up)
+            or re.search(_fn_re + r"\s*[-−+*/=]\s*" + _fn_re, arg_up)
         ):
             defectos.append(
                 {
