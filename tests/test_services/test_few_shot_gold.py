@@ -118,5 +118,3 @@ class TestBloque:
         b = bloque_few_shot_para_prompt(ejs)
         assert "TEXTO 1 GANADOR" in b
         assert "EJEMPLOS DE DICTÁMENES GANADORES" in b
-
-

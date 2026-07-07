@@ -121,5 +121,3 @@ class TestDetectarCopia:
         )
         assert det is not None
         assert det["ejemplo_id"] == 1
-
-

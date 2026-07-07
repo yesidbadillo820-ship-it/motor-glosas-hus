@@ -143,5 +143,3 @@ class TestBuscarCasosSimilares:
             assert r == []
         finally:
             empty.close()
-
-
