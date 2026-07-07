@@ -417,3 +417,78 @@ def test_ligero_se_ignora():
     assert (filas, tenia) == ([], True)  # ignorado sin reportarse como 'sin parser'
     filas, _ = ext.extraer_de_archivo("DEVYGLOSAS0514737_900006037.txt", TXT_FAMISANAR, ventana)
     assert len(filas) == 2  # el original sí se procesa
+
+
+# ─── Correcciones de la revisión total ───────────────────────────────────────
+
+
+def test_a_fecha_iso_con_t():
+    """FACTRAMED puede traer fechas ISO con 'T' como texto."""
+    assert ext.a_fecha("2026-06-11T08:33:20") == date(2026, 6, 11)
+
+
+def test_feriados_diciembre_2028_completos():
+    """La copia de festivos estaba truncada: faltaban 8 y 25 de dic de 2028."""
+    assert "2028-12-08" in ext.FERIADOS_CO
+    assert "2028-12-25" in ext.FERIADOS_CO
+
+
+def test_celda_no_lee_la_ultima_columna_cuando_falta():
+    idx = {"NRO_FACTURA": 0}
+    assert ext._celda(["HUS1", "999"], idx, "VALOR DEVOLUCION") == ""
+    assert ext._celda(["HUS1"], {"VALOR": 5}, "VALOR") == ""  # fila corta
+
+
+def test_sura_fila_corta_no_revienta():
+    contenido = (
+        "NITEAPB;NITIPS;PREFIJOFACTURA;NUMEROFACTURA;VALORGLOSA\n"
+        "800088702;900006037\n"  # fila truncada
+        "800088702;900006037;HUS;282713;61700\n"
+    ).encode("latin-1")
+    filas = ext.parser_sura_txt(contenido, "X_MASIVO.TXT")
+    assert len(filas) == 1
+    assert filas[0]["factura"] == "HUS282713"
+
+
+def test_zip_anidado_con_tope_de_profundidad():
+    interno = io.BytesIO()
+    with zipfile.ZipFile(interno, "w") as zf:
+        zf.writestr("DEVYGLOSAS01_900006037.txt", TXT_FAMISANAR)
+    nivel2 = io.BytesIO()
+    with zipfile.ZipFile(nivel2, "w") as zf:
+        zf.writestr("interno.zip", interno.getvalue())
+    filas, _ = ext.extraer_de_archivo("externo.zip", nivel2.getvalue(), (None, None))
+    assert len(filas) == 2  # dos niveles de zip: se procesa
+    muy_hondo = nivel2.getvalue()
+    for _ in range(4):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("capa.zip", muy_hondo)
+        muy_hondo = buf.getvalue()
+    filas, tenia = ext.extraer_de_archivo("bomba.zip", muy_hondo, (None, None))
+    assert filas == [] and tenia is True  # tope alcanzado sin recursión infinita
+
+
+def test_xlsx_corrupto_no_tumba_la_corrida(tmp_path):
+    dia = tmp_path / "2026" / "07 JULIO" / "02"
+    carpeta = dia / "INICIAL" / "AXA"
+    carpeta.mkdir(parents=True)
+    (carpeta / "roto.xlsx").write_bytes(b"esto no es un xlsx")
+    (carpeta / "DEVYGLOSAS01_900006037.txt").write_bytes(TXT_FAMISANAR)
+    filas, sin_parser = ext.recorrer_dia(dia, GESTORES, ventana_factramed=7)
+    assert len(filas) == 2  # el txt bueno se procesó igual
+    assert any("roto.xlsx" in s for s in sin_parser)
+
+
+def test_vencida_se_marca_en_observacion():
+    fila = {
+        "categoria": "INICIAL",
+        "empresa": "AXA",
+        "factura": "HUS1",
+        "valor": 100.0,
+        "fecha_notificacion": date(2026, 1, 2),
+        "reglas": {},
+        "observacion": "",
+    }
+    salida = ext._fila_para_hoja(fila, "INICIAL", date(2026, 7, 7), GESTORES)
+    assert "VENCIDA" in salida[14]  # columna OBSERVACION TECNICO

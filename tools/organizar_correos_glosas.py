@@ -201,8 +201,9 @@ CONFIG_DEFECTO: dict = {
         },
         {
             "carpeta": "MUTUAL",
-            "remitente": ["MUTUALSER", "MUTUAL"],
-            "asunto": ["MUTUAL SER", "SUBSANACION"],
+            # 'SUBSANACION' a secas era demasiado amplio: otras EPS también lo usan
+            "remitente": ["MUTUALSER", "\\bMUTUAL\\b"],
+            "asunto": ["MUTUAL SER", "ASOCIACION MUTUAL"],
             "adjuntos": [],
         },
         {
@@ -391,15 +392,17 @@ def detectar_entidad(
     usa el dominio del remitente como carpeta para no perder el correo."""
     rem = _normalizar(remitente)
     asu = _normalizar(asunto)
-    adj = _normalizar(" ".join(nombres_adjuntos))
+    # los patrones de adjuntos (muchos anclados con ^) se prueban POR CADA
+    # nombre, no contra la lista unida (el ancla solo aplicaría al primero)
+    adjs = [_normalizar(n) for n in nombres_adjuntos]
     for regla in config["entidades"]:
         campos = (
-            (regla.get("remitente", []), rem),
-            (regla.get("asunto", []), asu),
-            (regla.get("adjuntos", []), adj),
+            (regla.get("remitente", []), [rem]),
+            (regla.get("asunto", []), [asu]),
+            (regla.get("adjuntos", []), adjs),
         )
-        for patrones, texto in campos:
-            if any(re.search(p, texto) for p in patrones):
+        for patrones, textos in campos:
+            if any(re.search(p, texto) for p in patrones for texto in textos):
                 return regla["carpeta"], True
     dominio = RE_DOMINIO.search(rem)
     if dominio:
@@ -947,13 +950,14 @@ def registrar_fila(control: Path, fila: dict) -> None:
 
 
 def _codificar_carpeta_imap(carpeta: str) -> str:
-    """Nombre de carpeta en UTF-7 modificado de IMAP (RFC 3501) si trae no-ASCII."""
+    """Nombre de carpeta en UTF-7 modificado de IMAP (RFC 3501) si trae no-ASCII.
+    El '&' literal debe viajar como '&-' incluso en nombres ASCII."""
     try:
         carpeta.encode("ascii")
-        return carpeta
+        return carpeta.replace("&", "&-")
     except UnicodeEncodeError:
         codificada = carpeta.encode("utf-7").decode("ascii")
-        return codificada.replace("+", "&").replace("/", ",")
+        return codificada.replace("&", "&-").replace("+", "&").replace("/", ",")
 
 
 def etiqueta_segura(etiqueta: str) -> str:
@@ -1209,11 +1213,23 @@ def _procesar_uid(
     def _contar(clave: str) -> None:
         resumen[clave] = resumen.get(clave, 0) + 1
 
+    # 0. UID descartado en corridas previas por descargas imposibles
+    clave_uid = f"uid:{uid.decode()}"
+    if estado.ya_procesado(clave_uid):
+        _contar("YA_PROCESADO")
+        return None
+
     # 1. Solo encabezados para la dedup: no re-descargar cuerpos ya procesados
     cab = obtener_encabezados(conexion, uid)
     if cab is None:
         logger.warning(f"UID {uid.decode()}: no pude leer los encabezados")
         _contar("DESCARGA_FALLIDA")
+        if not args.dry_run:
+            # sin encabezados no hay Message-ID: el tope de reintentos va por UID
+            if estado.registrar_fallo(clave_uid) >= MAX_REINTENTOS_CORREO:
+                logger.error(f"UID {uid.decode()} descartado tras varios intentos de descarga")
+                estado.marcar(clave_uid)
+            estado.guardar()
         return {"estado": "ERROR"}
     mid = id_mensaje(cab)
     if estado.ya_procesado(mid):

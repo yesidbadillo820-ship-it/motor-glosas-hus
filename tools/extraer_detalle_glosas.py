@@ -132,6 +132,8 @@ FERIADOS_CO = {
     "2028-10-30",
     "2028-11-06",
     "2028-11-13",
+    "2028-12-08",
+    "2028-12-25",
 }
 
 RE_FACTURA_HUS = re.compile(r"\b(E?HUS\d{4,})\b")
@@ -282,14 +284,16 @@ def _normalizar(texto: str) -> str:
 
 
 def a_fecha(valor) -> date | None:
-    """Convierte lo que venga (datetime, '18/06/26', '2026/06/25', '01/07/2026 00:00')."""
+    """Convierte lo que venga (datetime, '18/06/26', '2026/06/25',
+    '01/07/2026 00:00', ISO '2026-06-11T08:33')."""
     if valor is None or valor == "":
         return None
     if isinstance(valor, datetime):
         return valor.date()
     if isinstance(valor, date):
         return valor
-    texto = str(valor).strip().split()[0] if str(valor).strip() else ""
+    crudo = str(valor).strip().replace("T", " ")
+    texto = crudo.split()[0] if crudo else ""
     for formato in ("%d/%m/%Y", "%d/%m/%y", "%Y/%m/%d", "%Y-%m-%d", "%d-%m-%Y"):
         try:
             fecha = datetime.strptime(texto, formato).date()
@@ -426,6 +430,16 @@ def parser_auditool_csv(contenido: bytes, nombre: str) -> list[dict]:
     return resultados
 
 
+def _celda(fila, idx: dict, clave: str) -> str:
+    """Celda por nombre de columna; '' si la columna no existe o la fila es corta.
+    (El patrón idx.get(clave, -1) leía la ÚLTIMA columna cuando faltaba el
+    encabezado: valor equivocado en silencio.)"""
+    i = idx.get(clave)
+    if i is None or i >= len(fila):
+        return ""
+    return str(fila[i] or "").strip()
+
+
 def parser_famisanar_txt(contenido: bytes, nombre: str) -> list[dict]:
     texto = contenido.decode("latin-1", errors="replace")
     filas = list(csv.reader(texto.splitlines(), delimiter="|"))
@@ -435,19 +449,20 @@ def parser_famisanar_txt(contenido: bytes, nombre: str) -> list[dict]:
     idx = {c: i for i, c in enumerate(encabezado)}
     resultados = []
     for fila in filas[1:]:
-        if len(fila) < len(encabezado):
+        factura = _celda(fila, idx, "NRO_FACTURA")
+        if not factura:
             continue
-        codigo = fila[idx.get("CODIGO_DEVOLUCION", -1)] if "CODIGO_DEVOLUCION" in idx else ""
+        codigo = _celda(fila, idx, "CODIGO_DEVOLUCION")
         resultados.append(
             {
                 "categoria": _categoria_por_codigo(codigo),
-                "factura": fila[idx["NRO_FACTURA"]].strip(),
-                "valor": a_numero(fila[idx.get("VALOR DEVOLUCION", -1)]),
-                "fecha_notificacion": a_fecha(fila[idx.get("FECHA_ENVIO", -1)]),
+                "factura": factura,
+                "valor": a_numero(_celda(fila, idx, "VALOR DEVOLUCION")),
+                "fecha_notificacion": a_fecha(_celda(fila, idx, "FECHA_ENVIO")),
                 "fecha_radicacion": None,
                 "fecha_factura": None,
-                "no_glosa": codigo.strip(),
-                "radicado": fila[idx.get("NRO_RADICACION", -1)].strip(),
+                "no_glosa": codigo,
+                "radicado": _celda(fila, idx, "NRO_RADICACION"),
                 "observacion": "",
             }
         )
@@ -462,19 +477,19 @@ def parser_sura_txt(contenido: bytes, nombre: str) -> list[dict]:
     idx = {_normalizar(c): i for i, c in enumerate(filas[0])}
     resultados = []
     for fila in filas[1:]:
-        if len(fila) < 3 or not fila[idx["NUMEROFACTURA"]].strip():
+        numero = _celda(fila, idx, "NUMEROFACTURA")
+        if not numero:
             continue
-        prefijo = fila[idx.get("PREFIJOFACTURA", -1)].strip() if "PREFIJOFACTURA" in idx else ""
         resultados.append(
             {
                 "categoria": "INICIAL",
-                "factura": f"{prefijo}{fila[idx['NUMEROFACTURA']].strip()}",
-                "valor": a_numero(fila[idx.get("VALORGLOSA", -1)]),
-                "fecha_notificacion": a_fecha(fila[idx.get("FECHAGLOSA", -1)]),
-                "fecha_radicacion": a_fecha(fila[idx.get("FECHARADICACION", -1)]),
-                "fecha_factura": a_fecha(fila[idx.get("FECHAFACTURA", -1)]),
-                "no_glosa": fila[idx.get("NUMEROGLOSA", -1)].strip(),
-                "radicado": fila[idx.get("NUMERORADICADO", -1)].strip(),
+                "factura": f"{_celda(fila, idx, 'PREFIJOFACTURA')}{numero}",
+                "valor": a_numero(_celda(fila, idx, "VALORGLOSA")),
+                "fecha_notificacion": a_fecha(_celda(fila, idx, "FECHAGLOSA")),
+                "fecha_radicacion": a_fecha(_celda(fila, idx, "FECHARADICACION")),
+                "fecha_factura": a_fecha(_celda(fila, idx, "FECHAFACTURA")),
+                "no_glosa": _celda(fila, idx, "NUMEROGLOSA"),
+                "radicado": _celda(fila, idx, "NUMERORADICADO"),
                 "observacion": "",
             }
         )
@@ -684,10 +699,11 @@ def parser_policia_rad_xlsx(contenido: bytes, nombre: str) -> list[dict]:
         return []
     encabezado = [_normalizar(str(c or "")) for c in filas[idx_encabezado]]
 
-    def col(nombre_col: str) -> int | None:
-        return next((i for i, c in enumerate(encabezado) if nombre_col in c), None)
+    def col(*nombres: str) -> int | None:
+        # no usar `or` entre llamadas: el índice 0 es falsy y saltaría a la otra variante
+        return next((i for i, c in enumerate(encabezado) for n in nombres if n in c), None)
 
-    i_factura = col("NO.FACTURA") or col("NO. FACTURA")
+    i_factura = col("NO.FACTURA", "NO. FACTURA")
     i_valor = col("VR. GLOSA")
     i_fglosa = col("FECHA GLOSA")
     i_ffactura = col("FECHA DE FACTURA")
@@ -910,20 +926,32 @@ def _categoria_de_carpeta(nombre: str) -> str | None:
     return None
 
 
+MAX_PROFUNDIDAD_ZIP = 3  # zip dentro de zip dentro de zip; más allá es anómalo
+
+
 def extraer_de_archivo(
-    ruta_o_nombre: str, contenido: bytes, ventana: tuple[date | None, date | None]
+    ruta_o_nombre: str,
+    contenido: bytes,
+    ventana: tuple[date | None, date | None],
+    profundidad: int = 0,
 ) -> tuple[list[dict], bool]:
-    """(filas, tenia_parser). Abre .zip recursivamente."""
+    """(filas, tenia_parser). Abre .zip recursivamente con tope de profundidad.
+    Un archivo corrupto se reporta y NO tumba el resto de la corrida."""
     if ARCHIVOS_IGNORADOS.search(_normalizar(Path(ruta_o_nombre).name)):
         return [], True  # ignorado a propósito (manuales, copias _LIGERO): sin reporte
     if Path(ruta_o_nombre).suffix.lower() == ".zip":
+        if profundidad >= MAX_PROFUNDIDAD_ZIP:
+            logger.warning(f"  ZIP demasiado anidado, omitido: {ruta_o_nombre}")
+            return [], True
         filas, alguno = [], False
         try:
             with zipfile.ZipFile(io.BytesIO(contenido)) as zf:
                 for interno in zf.namelist():
                     if interno.endswith("/"):
                         continue
-                    sub, tenia = extraer_de_archivo(interno, zf.read(interno), ventana)
+                    sub, tenia = extraer_de_archivo(
+                        interno, zf.read(interno), ventana, profundidad + 1
+                    )
                     filas.extend(sub)
                     alguno = alguno or tenia
         except zipfile.BadZipFile:
@@ -932,9 +960,15 @@ def extraer_de_archivo(
     parser = elegir_parser(ruta_o_nombre)
     if parser is None:
         return [], False
-    if parser is _parser_xlsx_auto:
-        return parser(contenido, Path(ruta_o_nombre).name, desde=ventana[0], hasta=ventana[1]), True
-    return parser(contenido, Path(ruta_o_nombre).name), True
+    try:
+        if parser is _parser_xlsx_auto:
+            return parser(
+                contenido, Path(ruta_o_nombre).name, desde=ventana[0], hasta=ventana[1]
+            ), True
+        return parser(contenido, Path(ruta_o_nombre).name), True
+    except Exception as exc:  # xlsx/pdf corrupto: seguir con el resto del día
+        logger.warning(f"  Archivo ilegible ({exc.__class__.__name__}): {ruta_o_nombre}")
+        return [], False
 
 
 def fecha_de_carpeta(carpeta: Path) -> date:
@@ -1026,8 +1060,13 @@ def agrupar_por_factura(crudas: list[dict]) -> list[dict]:
 def _fila_para_hoja(fila: dict, categoria: str, fecha_entrega: date, gestores: dict) -> list:
     responsable = responsable_para(fila.get("reglas", {}), categoria, gestores)
     vence = ""
+    observacion = fila.get("observacion", "")
     if categoria in PLAZO_HABILES and fila.get("fecha_notificacion"):
         vence = sumar_habiles(fila["fecha_notificacion"], PLAZO_HABILES[categoria])
+        if vence < fecha_entrega:
+            # notificación vieja: el plazo de respuesta ya se agotó — señalarlo
+            observacion = f"OJO: VENCIDA ({vence:%d/%m/%Y}). {observacion}".strip()
+    fila = fila | {"observacion": observacion}
     comun = {
         "responsable": responsable,
         "entrega": fecha_entrega,
@@ -1180,7 +1219,12 @@ def main() -> int:
         respaldo = salida.with_name(f"{salida.stem} ({datetime.now():%H.%M}){salida.suffix}")
         logger.warning(f"{salida.name} ya existe; escribo {respaldo.name}")
         salida = respaldo
-    escribir_entrega(filas, sin_parser, salida, hoy, gestores)
+    try:
+        salida.parent.mkdir(parents=True, exist_ok=True)
+        escribir_entrega(filas, sin_parser, salida, hoy, gestores)
+    except OSError as exc:
+        logger.error(f"No pude escribir {salida}: {exc}")
+        return 1
     logger.info(f"Excel de entrega: {salida}")
     return 0
 
