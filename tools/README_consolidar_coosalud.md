@@ -13,17 +13,20 @@ al detalle, filtrar/arreglar la base DGH y diligenciar el archivo de objeciones.
 
 ## 1) Uso
 
+**Forma fácil (sin terminal):** deja `CONSOLIDAR COOSALUD.bat` junto a
+`consolidar_coosalud.py`, arrastra la carpeta "CARGUE MASIVO COOSALUD" encima
+del `.bat` (o doble clic) y responde: fecha y, si la tienes, la ruta de la
+base DGH. Instala `openpyxl` solo la primera vez.
+
+**Por terminal** (los comandos van en UNA sola línea — el separador `^` solo
+funciona en CMD, no en PowerShell):
+
 ```bat
-REM Básico (sin base DGH: SLNSERPRO queda vacío)
-py consolidar_coosalud.py ^
-    --carpeta "D:\USUARIO CARTERA\Desktop\CARGUE MASIVO COOSALUD" ^
-    --fecha 04/07/2026
+REM Básico (sin base DGH: SLNSERPRO sale del codigo_servicio del detalle)
+py consolidar_coosalud.py --carpeta "D:\USUARIO CARTERA\Desktop\CARGUE MASIVO COOSALUD" --fecha 04/07/2026
 
 REM Completo, con la base DGH para el cruce
-py consolidar_coosalud.py ^
-    --carpeta   "D:\USUARIO CARTERA\Desktop\CARGUE MASIVO COOSALUD" ^
-    --fecha     04/07/2026 ^
-    --servicios "D:\...\SERVICIOS FACTURADOS COOSALUD DGH.xlsx"
+py consolidar_coosalud.py --carpeta "D:\USUARIO CARTERA\Desktop\CARGUE MASIVO COOSALUD" --fecha 04/07/2026 --servicios "D:\...\SERVICIOS FACTURADOS COOSALUD DGH.xlsx"
 ```
 
 | Parámetro     | Para qué sirve                                                | Por defecto |
@@ -60,13 +63,13 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
    | CRNCXC | factura con ceros: `HUS0000496207` |
    | CROCLAOBJ | 0 · GENUSUARIO4: `999` |
    | CRNCONOBJ | código completo de la glosa de **mayor valor** del servicio |
-   | SLNSERPRO | código DGH (cruce por factura+código con la base) |
+   | SLNSERPRO | `codigo_servicio` del DETALLE; con base DGH manda el código DGH (con sufijo `H` si lo trae) |
    | CROVALOBJ | valor_glosado del servicio (número) |
    | CRDOBSERV | OBSERVACIÓN FINAL combinada |
-   | CROTIPOBJ | 0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta |
+   | CROTIPOBJ | **por factura completa**: 0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta — si la factura es mixta, TODAS sus filas llevan 2 |
 
-   - Hoja `NO_CRUZADOS`: servicios que no cruzaron con la base DGH (SLNSERPRO
-     vacío) para revisarlos antes de subir.
+   - Hoja `NO_CRUZADOS`: servicios que no cruzaron con la base DGH (quedan con
+     el código del detalle) para revisarlos antes de subir.
 
 ## 3) Defensas incluidas (validadas con revisión adversarial)
 

@@ -29,11 +29,14 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
          CROCLAOBJ   0
          GENUSUARIO4 999 (texto)
          CRNCONOBJ   código completo de la glosa de MAYOR valor del servicio (TA2901, CL0201...)
-         SLNSERPRO   código DGH del servicio (cruce con la base por factura+código;
-                     si no cruza queda vacío y la fila va a la hoja NO_CRUZADOS)
+         SLNSERPRO   codigo_servicio del DETALLE; si se pasa la base DGH y la
+                     fila cruza, manda el código DGH (con sufijo H si lo trae);
+                     si hay base y no cruza, va a la hoja NO_CRUZADOS
          CROVALOBJ   valor_glosado del servicio (número)
          CRDOBSERV   OBSERVACION FINAL combinada (una línea por glosa)
-         CROTIPOBJ   0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta
+         CROTIPOBJ   por FACTURA completa: 0=administrativa (sin CL) ·
+                     1=médica (solo CL) · 2=mixta (CL + otros) — si la factura
+                     es mixta, TODAS sus filas llevan 2
 
 DEFENSAS (validado con revisión adversarial):
   - Valores en formato colombiano ("1.234.567,89", "26,140") se parsean bien.
@@ -630,6 +633,13 @@ def generar_objeciones(
     consecutivo = 0
     factura_actual: str | None = None
 
+    # CROTIPOBJ se clasifica por FACTURA completa: si la factura tiene glosas
+    # CL y de otros conceptos, TODAS sus filas van con 2 (mixta); solo CL -> 1
+    # en todas; sin CL -> 0 en todas.
+    conceptos_factura: dict[str, set] = {}
+    for srv in glosados:
+        conceptos_factura.setdefault(norm_factura(srv["factura"]), set()).update(srv["conceptos"])
+
     for srv in glosados:
         fact = srv["factura"]
         if fact != factura_actual:
@@ -638,11 +648,15 @@ def generar_objeciones(
         if _num_factura(fact) is None:
             malformadas.add(fact)
 
-        # Cruce con DGH para SLNSERPRO (vacío si no hay base o no cruza).
-        slnserpro = None
+        # SLNSERPRO: el codigo_servicio del DETALLE; si hay base DGH y la fila
+        # cruza, manda el código DGH (que puede traer sufijo H). Si hay base y
+        # NO cruza, se deja el del detalle y se reporta en NO_CRUZADOS.
+        slnserpro = norm_codigo(srv["codigo_servicio"]) or None
         if cruce is not None:
-            slnserpro = cruce.get((norm_factura(fact), norm_codigo(srv["codigo_servicio"]))) or None
-            if slnserpro is None:
+            del_dgh = cruce.get((norm_factura(fact), norm_codigo(srv["codigo_servicio"])))
+            if del_dgh:
+                slnserpro = del_dgh
+            else:
                 no_cruzados.append(
                     [
                         factura_dgh(fact),
@@ -652,7 +666,7 @@ def generar_objeciones(
                     ]
                 )
 
-        conceptos = srv["conceptos"]
+        conceptos = conceptos_factura[norm_factura(fact)]
         tiene_cl = "CL" in conceptos
         otros = bool(conceptos - {"CL"})
         tipo = 2 if (tiene_cl and otros) else (1 if tiene_cl else 0)
