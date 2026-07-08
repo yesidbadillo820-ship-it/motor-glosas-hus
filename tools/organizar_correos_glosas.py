@@ -134,12 +134,25 @@ CONFIG_DEFECTO: dict = {
         "PROCESO EN REVISION RADICADO",
         "CONFIRMACION DE RADICACION APROBADA",
         "MODULO MIPRES",
+        # comunicaciones internas del hospital y avisos que no son glosas
+        # (vistos en la salida real: 77 correos de @hus.gov.co eran esto)
+        "POLITICA ANTITRAMITES",
+        "SOCIALIZACION DE MEMORANDO",
+        "\\bSIIFA\\b",
+        "CARGUE CON INCONSISTENCIA",
+        "CODIGO UNICO DE VALIDACION",
+        "INVITACION A RADICAR",
+        "VERIFICACION EN DOS PASOS",
+        "ALERTA DE SEGURIDAD",
+        "CONOCE MAS SOBRE",
+        "NOTIFICACION DE PAGO",
     ],
     # remitentes de sistema que jamás traen glosas
     "ignorar_remitentes": [
         "ACCOUNTS\\.GOOGLE\\.COM",
         "MAILER-DAEMON",
         "POSTMASTER@",
+        "CREDICORPCAPITAL",
     ],
     # asignación directa de categoría por asunto (gana sobre las reglas generales):
     # los 'Reporte Glosas y Devoluciones' de COOSALUD van a INICIAL como los
@@ -287,8 +300,9 @@ CONFIG_DEFECTO: dict = {
         },
         {
             "carpeta": "SURA",
-            "remitente": ["\\bSURA\\b", "SURAMERICANA"],
-            "asunto": ["\\bSURA\\b"],
+            # 'EPSSURA' no tiene borde de palabra antes de SURA: incluirlo aparte
+            "remitente": ["EPSSURA", "SURAMERICANA", "@SURA", "\\bSURA\\b"],
+            "asunto": ["EPS SURA", "\\bSURA\\b"],
             "adjuntos": [],
         },
         {
@@ -462,11 +476,16 @@ def clasificar_categoria(asunto: str, nombres_adjuntos: list[str], config: dict)
     return config["categoria_revision"], "sin coincidencia de categoría"
 
 
+ENTIDAD_SIN_IDENTIFICAR = "SIN IDENTIFICAR"
+
+
 def detectar_entidad(
     remitente: str, asunto: str, nombres_adjuntos: list[str], config: dict
 ) -> tuple[str, bool]:
     """Devuelve (carpeta de entidad, identificada). Si ninguna regla coincide,
-    usa el dominio del remitente como carpeta para no perder el correo."""
+    NO usa el dominio del correo como carpeta (produce nombres basura como
+    HUS.GOV.CO o GMAIL.COM): manda a una única carpeta 'SIN IDENTIFICAR' para
+    que un humano le asigne la entidad y, si aplica, agregue la regla."""
     rem = _normalizar(remitente)
     asu = _normalizar(asunto)
     # los patrones de adjuntos (muchos anclados con ^) se prueban POR CADA
@@ -481,10 +500,7 @@ def detectar_entidad(
         for patrones, textos in campos:
             if any(re.search(p, texto) for p in patrones for texto in textos):
                 return regla["carpeta"], True
-    dominio = RE_DOMINIO.search(rem)
-    if dominio:
-        return dominio.group(1).strip(".").upper(), False
-    return "SIN REMITENTE", False
+    return ENTIDAD_SIN_IDENTIFICAR, False
 
 
 def extraer_radicado(asunto: str) -> str:

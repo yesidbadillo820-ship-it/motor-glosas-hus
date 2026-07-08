@@ -146,12 +146,37 @@ def test_detectar_entidad_conocida(remitente, asunto, carpeta):
     assert (entidad, identificada) == (carpeta, True)
 
 
-def test_entidad_desconocida_usa_dominio():
+def test_entidad_desconocida_va_a_sin_identificar():
+    """NUNCA usar el dominio del correo como carpeta (HUS.GOV.CO, GMAIL.COM...):
+    lo no reconocido cae en una sola carpeta limpia para revisión humana."""
     entidad, identificada = org.detectar_entidad(
         "Karin <radicacionhus04@sinacsc.com>", "Envió Documentos a Terceros", [], CONFIG
     )
-    assert entidad == "SINACSC.COM"
+    assert entidad == "SIN IDENTIFICAR"
     assert not identificada
+
+
+def test_sura_reconoce_dominio_epssura():
+    """'epssura.com.co' no tiene borde de palabra antes de SURA."""
+    entidad, ok = org.detectar_entidad(
+        "SURA <notificaciones@epssura.com.co>", "NOTIFICACIÓN DE GLOSAS", [], CONFIG
+    )
+    assert (entidad, ok) == ("SURA", True)
+
+
+def test_ignora_comunicaciones_internas_del_hospital():
+    """Los 77 correos @hus.gov.co de la salida real eran avisos internos."""
+    interno = "Cuentas HUS <glosas@hus.gov.co>"
+    for asu in (
+        "Conoce más sobre la Política Antitrámites",
+        "Fwd: Socialización de memorando SIIFA",
+        "Fwd: Notificación de cargue con inconsistencia .ZIP",
+        "Re: NUEVA EPS - CODIGO UNICO DE VALIDACION - RES 948 DE 2026",
+        "Invitación a radicar Fondo nacional de Salud PPL- Julio 2026",
+    ):
+        assert org.debe_ignorarse(asu, interno, CONFIG), asu
+    # pero un glosa reenviada internamente NO se ignora (la clasifica el contenido)
+    assert not org.debe_ignorarse("Fwd: Objeciones de glosa Factura HUS425560", interno, CONFIG)
 
 
 # ─── Rutas, nombres y estado ─────────────────────────────────────────────────

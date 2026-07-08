@@ -10,12 +10,23 @@
     "SOPORTES EXITOSOS",
     "PROCESO EN REVISION RADICADO",
     "CONFIRMACION DE RADICACION APROBADA",
-    "MODULO MIPRES"
+    "MODULO MIPRES",
+    "POLITICA ANTITRAMITES",
+    "SOCIALIZACION DE MEMORANDO",
+    "\\bSIIFA\\b",
+    "CARGUE CON INCONSISTENCIA",
+    "CODIGO UNICO DE VALIDACION",
+    "INVITACION A RADICAR",
+    "VERIFICACION EN DOS PASOS",
+    "ALERTA DE SEGURIDAD",
+    "CONOCE MAS SOBRE",
+    "NOTIFICACION DE PAGO"
   ],
   "ignorar_remitentes": [
     "ACCOUNTS\\.GOOGLE\\.COM",
     "MAILER-DAEMON",
-    "POSTMASTER@"
+    "POSTMASTER@",
+    "CREDICORPCAPITAL"
   ],
   "categorias_por_asunto": [
     {
@@ -301,10 +312,13 @@
     {
       "carpeta": "SURA",
       "remitente": [
-        "\\bSURA\\b",
-        "SURAMERICANA"
+        "EPSSURA",
+        "SURAMERICANA",
+        "@SURA",
+        "\\bSURA\\b"
       ],
       "asunto": [
+        "EPS SURA",
         "\\bSURA\\b"
       ],
       "adjuntos": []
