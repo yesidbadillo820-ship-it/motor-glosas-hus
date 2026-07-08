@@ -138,6 +138,8 @@ def elegir_fecha() -> str | None:
 
 def elegir_base() -> Path | None:
     print("\n--- PASO C: la base DGH (SERVICIOS FACTURADOS COOSALUD) ---")
+    print('  Es el Excel que se descarga de DGH, llamado tipo "SERVICIOS')
+    print('  FACTURADOS COOSALUD DGH.xlsx" (pesa bastante, 50MB+).')
     auto = buscar_base_dgh()
     if auto:
         r = pedir(
@@ -152,10 +154,18 @@ def elegir_base() -> Path | None:
         return None
     if r:
         p = Path(r)
-        if p.is_file():
-            return p
-        print(f"  AVISO: no existe '{p}', se sigue SIN base DGH.")
-        return None
+        if not p.is_file():
+            print(f"  AVISO: no existe '{p}', se sigue SIN base DGH.")
+            return None
+        if not RE_BASE_DGH.search(p.name):
+            print(f'\n  OJO: "{p.name}" NO parece la base DGH')
+            print('  (la base se llama tipo "SERVICIOS FACTURADOS COOSALUD DGH.xlsx").')
+            conf = pedir(
+                "  ¿Usar ese archivo de todas formas? (s = si / Enter = NO, seguir sin base): "
+            )
+            if conf.strip().lower() not in ("s", "si", "sí"):
+                return None
+        return p
     return auto
 
 

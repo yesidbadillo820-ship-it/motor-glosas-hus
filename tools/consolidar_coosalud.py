@@ -567,9 +567,17 @@ def cargar_base_dgh(
     idx_nom_med = col("NOMBRE_MEDICAMENTO")
 
     idx_salida = [col(c) for c in COLS_SERVICIOS]
-    for c, pos in zip(COLS_SERVICIOS, idx_salida):
-        if pos is None:
-            logger.warning("Base DGH: falta la columna '%s' (saldrá vacía).", c)
+    faltantes = [c for c, pos in zip(COLS_SERVICIOS, idx_salida) if pos is None]
+    if len(faltantes) >= 5:
+        # A este archivo le faltan casi todas las columnas: NO es la base DGH.
+        raise ValueError(
+            f"'{path.name}' NO parece la base DGH de SERVICIOS FACTURADOS "
+            f"(le faltan {len(faltantes)} columnas, ej: {', '.join(faltantes[:4])}...). "
+            "El archivo correcto se llama 'SERVICIOS FACTURADOS COOSALUD DGH.xlsx' "
+            "y trae SLNSERPRO_SERVICIO, SLNSERPRO_CUPS, CODIGO_MEDICAMENTO, etc."
+        )
+    for c in faltantes:
+        logger.warning("Base DGH: falta la columna '%s' (saldrá vacía).", c)
 
     def celda(row: list, i: int | None) -> str:
         return norm_texto(row[i]) if i is not None and i < len(row) else ""
@@ -615,6 +623,12 @@ def cargar_base_dgh(
         len(filas_filtradas),
         len(facturas_trabajadas),
     )
+    if not filas_filtradas:
+        raise ValueError(
+            f"la base '{path.name}' no contiene NINGUNA de las "
+            f"{len(facturas_trabajadas)} facturas trabajadas. ¿Es la base "
+            "correcta y está actualizada con las fechas de estas facturas?"
+        )
     return filas_filtradas, cruce
 
 
