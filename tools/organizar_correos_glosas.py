@@ -130,12 +130,30 @@ CONFIG_DEFECTO: dict = {
         # certificados de radicación de facturas (no son glosas) — inundan la bandeja
         "NOTIFICACION RADICACION FACTRAMED",
         "SOPORTES EXITOSOS",
+        # notificaciones de estado de radicación (vistas en el registro real)
+        "PROCESO EN REVISION RADICADO",
+        "CONFIRMACION DE RADICACION APROBADA",
+        "MODULO MIPRES",
+    ],
+    # remitentes de sistema que jamás traen glosas
+    "ignorar_remitentes": [
+        "ACCOUNTS\\.GOOGLE\\.COM",
+        "MAILER-DAEMON",
+        "POSTMASTER@",
+    ],
+    # asignación directa de categoría por asunto (gana sobre las reglas generales):
+    # los 'Reporte Glosas y Devoluciones' de COOSALUD van a INICIAL como los
+    # archivan los gestores — el detalle DE*/TA* del contenido decide en el
+    # Excel de entrega; las LIQ- son liquidaciones SOAT de Seguros Mundial
+    "categorias_por_asunto": [
+        {"patron": "^REPORTE GLOSAS Y DEVOLUCIONES", "categoria": "INICIAL"},
+        {"patron": "^LIQ-\\d", "categoria": "INICIAL"},
     ],
     "categorias": [
         {"nombre": "CONCILIACIONES", "patrones": ["CONCILIACION"]},
         {"nombre": "RATIFICADA", "patrones": ["RATIFICA"]},
         {"nombre": "DEVOLUCIONES", "patrones": ["DEVOLUCION", "DEVUELTA", "\\bDEV[O0]?\\d"]},
-        {"nombre": "INICIAL", "patrones": ["GLOSA", "OBJECION", "AUDITORIA"]},
+        {"nombre": "INICIAL", "patrones": ["GLOSA", "OBJECION", "OBJETAD", "AUDITORIA"]},
     ],
     "entidades": [
         {
@@ -159,8 +177,27 @@ CONFIG_DEFECTO: dict = {
         },
         {
             "carpeta": "SEGUROS BOLIVAR",
-            "remitente": ["SEGUROSBOLIVAR", "@BOLIVAR"],
+            # RGC Activa es el auditor que envía las actas de Bolívar
+            "remitente": ["SEGUROSBOLIVAR", "@BOLIVAR", "RGC\\.COM\\.CO"],
             "asunto": ["SEGUROS\\s+BOLIVAR"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "HDI SEGUROS",
+            "remitente": ["HDISEGUROS", "\\bHDI\\b"],
+            "asunto": ["HDI SEGUROS", "\\bHDI\\b"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "COLMENA",
+            "remitente": ["COLMENASEGUROS", "COLMENA"],
+            "asunto": ["COLMENA SEGUROS"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "ADRES",
+            "remitente": ["ADRES\\.GOV\\.CO"],
+            "asunto": ["EMITIDA POR ADRES", "\\bADRES\\b"],
             "adjuntos": [],
         },
         {
@@ -232,8 +269,10 @@ CONFIG_DEFECTO: dict = {
         },
         {
             "carpeta": "SEGUROS MUNDIAL",
+            # las liquidaciones llegan vía correo certificado (mailcert.lleida.net)
+            # con el remitente real solo en el asunto: 'LIQ-... de segurosmundial@...'
             "remitente": ["SEGUROSMUNDIAL", "MUNDIAL DE SEGUROS"],
-            "asunto": ["SEGUROS MUNDIAL", "MUNDIAL DE SEGUROS"],
+            "asunto": ["SEGUROS MUNDIAL", "MUNDIAL DE SEGUROS", "SEGUROSMUNDIAL"],
             "adjuntos": [],
         },
     ],
@@ -360,15 +399,23 @@ def cargar_config(ruta: Path | None) -> dict:
 # ─── Clasificación ───────────────────────────────────────────────────────────
 
 
-def debe_ignorarse(asunto: str, config: dict) -> bool:
+def debe_ignorarse(asunto: str, remitente: str, config: dict) -> bool:
     texto = _normalizar(asunto)
-    return any(re.search(patron, texto) for patron in config.get("ignorar_asuntos", []))
+    if any(re.search(patron, texto) for patron in config.get("ignorar_asuntos", [])):
+        return True
+    rem = _normalizar(remitente)
+    return any(re.search(patron, rem) for patron in config.get("ignorar_remitentes", []))
 
 
 def clasificar_categoria(asunto: str, nombres_adjuntos: list[str], config: dict) -> tuple[str, str]:
     """Devuelve (categoría, motivo). Solo mira asunto y nombres de adjuntos:
     el cuerpo trae boilerplate (firmas que mencionan conciliación/ratificadas)
     que produce falsos positivos."""
+    asunto_plano = _normalizar(asunto)
+    # reglas directas por asunto: ganan sobre las generales y sobre el 'mixto'
+    for regla in config.get("categorias_por_asunto", []):
+        if re.search(regla["patron"], asunto_plano):
+            return regla["categoria"], f"asunto directo '{regla['patron']}'"
     texto = _normalizar(asunto + " " + " ".join(nombres_adjuntos))
     coincidencias: list[tuple[str, str]] = []
     for regla in config["categorias"]:
@@ -1078,7 +1125,7 @@ def procesar_mensaje(
         "mensaje_id": id_mensaje(msg),
     }
 
-    if debe_ignorarse(asunto, config):
+    if debe_ignorarse(asunto, remitente, config):
         fila.update(estado="IGNORADO", motivo="asunto en lista de ignorados")
         return fila
 

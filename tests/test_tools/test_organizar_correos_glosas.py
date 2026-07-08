@@ -87,9 +87,46 @@ def test_clasificar_usa_nombres_de_adjuntos():
 
 
 def test_ignorar_notificaciones_de_radicacion():
-    assert org.debe_ignorarse("Cargue exitoso: 14 facturas procesadas", CONFIG)
-    assert org.debe_ignorarse("Errores en el procesamiento del ZIP: 178.zip", CONFIG)
-    assert not org.debe_ignorarse("GLOSA DEL DIA", CONFIG)
+    assert org.debe_ignorarse("Cargue exitoso: 14 facturas procesadas", "x@y.co", CONFIG)
+    assert org.debe_ignorarse("Errores en el procesamiento del ZIP: 178.zip", "x@y.co", CONFIG)
+    assert org.debe_ignorarse("Proceso en revisión Radicado No 102666", "x@y.co", CONFIG)
+    assert org.debe_ignorarse(
+        "Confirmación de Radicación Aprobada – Radicado No 1", "x@y.co", CONFIG
+    )
+    assert org.debe_ignorarse(
+        "Alerta de seguridad", "Google <no-reply@accounts.google.com>", CONFIG
+    )
+    assert not org.debe_ignorarse("GLOSA DEL DIA", "x@y.co", CONFIG)
+
+
+def test_categoria_directa_por_asunto():
+    """Los 'Reporte Glosas y Devoluciones' de COOSALUD (492 en el registro real
+    de julio) iban todos a 0-REVISAR por la regla del mixto: van a INICIAL."""
+    categoria, motivo = org.clasificar_categoria("Reporte Glosas y Devoluciones", [], CONFIG)
+    assert categoria == "INICIAL"
+    assert "asunto directo" in motivo
+    assert org.clasificar_categoria("LIQ-202606015779", [], CONFIG)[0] == "INICIAL"
+    assert org.clasificar_categoria("Factura objetada", [], CONFIG)[0] == "INICIAL"
+    # el mixto sigue vivo para los demás asuntos ambiguos
+    mixto = "NOTIFICACIÓN: FACTURAS GLOSADAS Y DEVUELTAS 30 JUNIO 2026"
+    assert org.clasificar_categoria(mixto, [], CONFIG)[0] == "0-REVISAR"
+
+
+def test_entidades_del_registro_real():
+    casos = [
+        ("HDI SEGUROS <glosas@hdiseguros.com.co>", "NOTIFICACION DE OBJECION", "HDI SEGUROS"),
+        ("auditoria <cuentas@rgc.com.co>", "Envío documentos", "SEGUROS BOLIVAR"),
+        ("ADRES <orfeo@adres.gov.co>", "Comunicación emitida por ADRES Orfeo 1", "ADRES"),
+        ("x <glosas@ext.colmenaseguros.com>", "objeción", "COLMENA"),
+        (
+            "certificado <no@mailcert.lleida.net>",
+            "LIQ-2026 (EMAIL CERTIFICADO de segurosmundial@mailer.co)",
+            "SEGUROS MUNDIAL",
+        ),
+    ]
+    for remitente, asunto, esperada in casos:
+        entidad, ok = org.detectar_entidad(remitente, asunto, [], CONFIG)
+        assert (entidad, ok) == (esperada, True), f"{remitente} -> {entidad}"
 
 
 # ─── Detección de entidad ────────────────────────────────────────────────────

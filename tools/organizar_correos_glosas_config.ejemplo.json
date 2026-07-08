@@ -7,7 +7,25 @@
     "CARGUE EXITOSO",
     "ERRORES EN EL PROCESAMIENTO DEL ZIP",
     "NOTIFICACION RADICACION FACTRAMED",
-    "SOPORTES EXITOSOS"
+    "SOPORTES EXITOSOS",
+    "PROCESO EN REVISION RADICADO",
+    "CONFIRMACION DE RADICACION APROBADA",
+    "MODULO MIPRES"
+  ],
+  "ignorar_remitentes": [
+    "ACCOUNTS\\.GOOGLE\\.COM",
+    "MAILER-DAEMON",
+    "POSTMASTER@"
+  ],
+  "categorias_por_asunto": [
+    {
+      "patron": "^REPORTE GLOSAS Y DEVOLUCIONES",
+      "categoria": "INICIAL"
+    },
+    {
+      "patron": "^LIQ-\\d",
+      "categoria": "INICIAL"
+    }
   ],
   "categorias": [
     {
@@ -35,6 +53,7 @@
       "patrones": [
         "GLOSA",
         "OBJECION",
+        "OBJETAD",
         "AUDITORIA"
       ]
     }
@@ -83,10 +102,45 @@
       "carpeta": "SEGUROS BOLIVAR",
       "remitente": [
         "SEGUROSBOLIVAR",
-        "@BOLIVAR"
+        "@BOLIVAR",
+        "RGC\\.COM\\.CO"
       ],
       "asunto": [
         "SEGUROS\\s+BOLIVAR"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "HDI SEGUROS",
+      "remitente": [
+        "HDISEGUROS",
+        "\\bHDI\\b"
+      ],
+      "asunto": [
+        "HDI SEGUROS",
+        "\\bHDI\\b"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "COLMENA",
+      "remitente": [
+        "COLMENASEGUROS",
+        "COLMENA"
+      ],
+      "asunto": [
+        "COLMENA SEGUROS"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "ADRES",
+      "remitente": [
+        "ADRES\\.GOV\\.CO"
+      ],
+      "asunto": [
+        "EMITIDA POR ADRES",
+        "\\bADRES\\b"
       ],
       "adjuntos": []
     },
@@ -221,7 +275,8 @@
       ],
       "asunto": [
         "SEGUROS MUNDIAL",
-        "MUNDIAL DE SEGUROS"
+        "MUNDIAL DE SEGUROS",
+        "SEGUROSMUNDIAL"
       ],
       "adjuntos": []
     }
