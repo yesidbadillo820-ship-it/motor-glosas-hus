@@ -18,6 +18,7 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
        - "Arreglada": en los medicamentos (que vienen con SLNSERPRO_SERVICIO
          vacío) se rellenan SERVICIO/CUPS y descripciones con el código y
          nombre del medicamento, igual que en el proceso manual.
+       - Se lee en streaming: la base puede pesar 80MB+ sin agotar la memoria.
   5. OBJECIONES.xlsx  (formato de cargue DGH, igual al archivo de ejemplo)
        - Una fila por servicio glosado (id_detalle con glosas):
          CDCONSEC    consecutivo por factura, como texto (1,1,1... 2,2,2...)
@@ -33,6 +34,16 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
          CROVALOBJ   valor_glosado del servicio (número)
          CRDOBSERV   OBSERVACION FINAL combinada (una línea por glosa)
          CROTIPOBJ   0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta
+
+DEFENSAS (validado con revisión adversarial):
+  - Valores en formato colombiano ("1.234.567,89", "26,140") se parsean bien.
+  - Archivos ~$ de Excel se ignoran; un xlsx corrupto aborta con nombre claro.
+  - Si un lote trae los encabezados en otro orden, las filas se reordenan por nombre.
+  - id_detalle/códigos tipados como número (123456.0) cruzan igual.
+  - Archivos o filas duplicadas (mismo id_glosa / id_detalle) se saltan con aviso
+    para no duplicar el valor objetado.
+  - xlsx del portal con "dimension" mentirosa se leen completos (reset_dimensions).
+  - Facturas que no siguen el patrón HUS se reportan.
 
 USO
 ---
@@ -60,6 +71,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Iterator
 
 try:
     import openpyxl
@@ -99,6 +111,8 @@ COLS_SERVICIOS = [
     "Vr_SERVICIO",
     "SALDO_FACT",
 ]
+# Columnas de COLS_SERVICIOS que llevan códigos (se normalizan, ej. 890466.0 -> 890466).
+COLS_SERVICIOS_CODIGO = {"SLNSERPRO_SERVICIO", "SLNSERPRO_CUPS", "CODIGO_MEDICAMENTO"}
 
 # Encabezados y formatos de celda del archivo de OBJECIONES (tomados de la
 # plantilla DGH real: fechas mm-dd-yy, valores con miles, el resto texto).
@@ -142,56 +156,90 @@ def norm_header(s: object) -> str:
     return re.sub(r"\s+", " ", norm_texto(s)).upper()
 
 
-def norm_factura(s: object) -> str:
-    """HUS0000512396 / HUS512396 / 512396 -> HUS512396 (clave para cruces)."""
+def _num_factura(s: object) -> int | None:
+    """Extrae el número de la factura: HUS0000512396 / HUS512396 / 512396 -> 512396."""
     txt = norm_texto(s).upper()
     m = RE_NUM_FACTURA.search(txt)
     if m:
-        return f"HUS{int(m.group(1))}"
+        return int(m.group(1))
     if txt.isdigit():
-        return f"HUS{int(txt)}"
-    return txt
+        return int(txt)
+    return None
+
+
+def norm_factura(s: object) -> str:
+    """Clave de cruce: HUS0000512396 / HUS512396 / 512396 -> HUS512396."""
+    n = _num_factura(s)
+    return f"HUS{n}" if n is not None else norm_texto(s).upper()
 
 
 def factura_dgh(s: object) -> str:
     """Factura en el formato del archivo de objeciones: HUS + 10 dígitos (HUS0000496207)."""
-    txt = norm_texto(s).upper()
-    m = RE_NUM_FACTURA.search(txt)
-    if m:
-        return f"HUS{int(m.group(1)):010d}"
-    return txt
+    n = _num_factura(s)
+    return f"HUS{n:010d}" if n is not None else norm_texto(s).upper()
 
 
 def norm_codigo(s: object) -> str:
-    """Código de servicio/medicamento para cruce: texto plano en mayúsculas."""
+    """Código/ID para cruce: texto plano en mayúsculas, sin el '.0' que Excel
+    agrega cuando la celda viene tipada como número (890466.0 -> 890466)."""
     txt = norm_texto(s).upper()
-    # Excel a veces entrega códigos numéricos como float: 890466.0
     if re.fullmatch(r"\d+\.0", txt):
         txt = txt[:-2]
     return txt
 
 
 def a_numero(v: object) -> float | None:
-    """Convierte a número si se puede (los xlsx del portal traen todo como texto)."""
+    """Convierte un valor monetario a número. Maneja formato colombiano
+    ("1.234.567,89"), US ("1,234,567.89"), miles sueltos ("26,140" / "1.234.567")
+    y negativos contables. Devuelve None si no es un número.
+    (Misma convención que app/services/recepcion_service._a_float.)
+    """
     if v is None:
         return None
     if isinstance(v, (int, float)):
         return float(v)
-    txt = norm_texto(v).replace(",", ".")
+    s = norm_texto(v)
+    if not s:
+        return None
+    negativo = s.startswith("-") or (s.startswith("(") and s.endswith(")"))
+    s = re.sub(r"[^\d.,]", "", s)
+    if not s or not any(c.isdigit() for c in s):
+        return None
+
+    tiene_punto, tiene_coma = "." in s, "," in s
+    if tiene_punto and tiene_coma:
+        # El separador decimal es el que aparece más a la derecha.
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")  # 1.234.567,89
+        else:
+            s = s.replace(",", "")  # 1,234,567.89
+    elif tiene_coma:
+        # Una sola coma con 1-2 decimales -> decimal; si no, miles.
+        if s.count(",") == 1 and len(s.split(",")[1]) in (1, 2):
+            s = s.replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif tiene_punto:
+        # Un solo punto con 1-2 decimales -> decimal; si no, miles.
+        if not (s.count(".") == 1 and len(s.split(".")[1]) in (1, 2)):
+            s = s.replace(".", "")
+
     try:
-        return float(txt)
+        n = float(s)
     except ValueError:
         return None
+    return -n if negativo else n
 
 
 def fmt_valor(v: object) -> str:
-    """Valor para concatenar en OBSERVACION FINAL: 26140, sin decimales si es entero."""
+    """Valor para concatenar en OBSERVACION FINAL: entero sin decimales
+    (26140) o con hasta 2 decimales (26140.5), nunca notación científica."""
     n = a_numero(v)
     if n is None:
         return norm_texto(v)
     if n == int(n):
         return str(int(n))
-    return f"{n:g}"
+    return f"{n:.2f}".rstrip("0").rstrip(".")
 
 
 def valor_o_numero(v: object) -> object:
@@ -203,10 +251,22 @@ def valor_o_numero(v: object) -> object:
 
 
 def leer_xlsx(path: Path) -> tuple[list[str], list[list]]:
-    """Lee la primera hoja: (encabezados, filas). Filas vacías se descartan."""
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    """Lee la primera hoja: (encabezados, filas). Filas vacías se descartan.
+
+    - reset_dimensions(): algunos xlsx de portales declaran un rango menor al
+      real y openpyxl en read_only los leería vacíos/truncados.
+    - Un archivo corrupto o bloqueado aborta con el nombre del archivo.
+    """
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    except Exception as exc:
+        raise ValueError(
+            f"No se pudo leer '{path.name}': {exc}. "
+            "¿Archivo corrupto, incompleto o abierto en Excel?"
+        ) from exc
     try:
         ws = wb.active
+        ws.reset_dimensions()
         it = ws.iter_rows(values_only=True)
         headers = [norm_texto(h) for h in next(it, [])]
         filas = []
@@ -220,11 +280,17 @@ def leer_xlsx(path: Path) -> tuple[list[str], list[list]]:
 
 
 def buscar_archivos(carpeta: Path, subcarpeta: str, patron: str) -> list[Path]:
-    """Busca recursivo (cubre LOTE 01, LOTE 02... o estructura plana)."""
+    """Busca recursivo (cubre LOTE 01, LOTE 02... o estructura plana).
+
+    Ignora los archivos de bloqueo de Excel (~$...) y ocultos.
+    """
     base = carpeta / subcarpeta
     if not base.is_dir():
         return []
-    return sorted(base.rglob(patron), key=lambda p: p.name.upper())
+    return sorted(
+        (p for p in base.rglob(patron) if not p.name.startswith(("~$", "."))),
+        key=lambda p: p.name.upper(),
+    )
 
 
 def indice_columnas(headers: list[str], requeridas: list[str], contexto: str) -> dict[str, int]:
@@ -239,6 +305,31 @@ def indice_columnas(headers: list[str], requeridas: list[str], contexto: str) ->
             )
         idx[col] = pos
     return idx
+
+
+def alinear_filas(
+    headers: list[str], filas: list[list], headers_base: list[str], contexto: str
+) -> list[list]:
+    """Deja las filas en el orden de columnas de headers_base.
+
+    Si los encabezados coinciden solo rellena filas cortas; si vienen en otro
+    orden (o con columnas extra/faltantes) las reordena POR NOMBRE y avisa,
+    para que el consolidado nunca quede desalineado en silencio.
+    """
+    norm_b = [norm_header(h) for h in headers_base]
+    norm_f = [norm_header(h) for h in headers]
+    if norm_f == norm_b:
+        n = len(headers_base)
+        return [f + [None] * (n - len(f)) if len(f) < n else f for f in filas]
+
+    logger.warning(
+        "  %s: encabezados distintos al primer archivo; se reordenan por nombre.", contexto
+    )
+    extras = [h for h in norm_f if h not in set(norm_b)]
+    if extras:
+        logger.warning("    columnas extra ignoradas: %s", ", ".join(extras[:6]))
+    pos = {h: i for i, h in enumerate(norm_f)}
+    return [[f[pos[h]] if h in pos and pos[h] < len(f) else None for h in norm_b] for f in filas]
 
 
 def escribir_hoja(
@@ -261,7 +352,9 @@ def escribir_hoja(
 def consolidar_glosas(archivos: list[Path]) -> tuple[list[str], list[list], dict[str, dict]]:
     """Une los GLOSAS *.xlsx, agrega OBSERVACION FINAL y agrupa por id_detalle.
 
-    Devuelve (headers, filas, agrupado) donde agrupado[id_detalle] = {
+    Deduplica por id_glosa (archivos o filas repetidas se saltan con aviso).
+
+    Devuelve (headers, filas, agrupado) donde agrupado[id_detalle_norm] = {
         'observacion':  texto combinado con saltos de línea,
         'conceptos':    set de prefijos de 2 letras (TA, CL, ...),
         'codigo_mayor': codigo_glosa completo de la glosa de mayor valor,
@@ -271,6 +364,8 @@ def consolidar_glosas(archivos: list[Path]) -> tuple[list[str], list[list], dict
     headers_base: list[str] | None = None
     filas: list[list] = []
     agrupado: dict[str, dict] = {}
+    vistas: set = set()
+    duplicadas = 0
 
     for arch in archivos:
         headers, rows = leer_xlsx(arch)
@@ -279,18 +374,29 @@ def consolidar_glosas(archivos: list[Path]) -> tuple[list[str], list[list], dict
             continue
         if headers_base is None:
             headers_base = headers
-        idx = indice_columnas(headers, COL_GLOSAS_REQ, arch.name)
+        rows = alinear_filas(headers, rows, headers_base, arch.name)
+        idx = indice_columnas(headers_base, COL_GLOSAS_REQ, arch.name)
+        mapa_h = {norm_header(h): i for i, h in enumerate(headers_base)}
+        idx_id_glosa = mapa_h.get("ID_GLOSA")
 
         for row in rows:
-            if len(row) < len(headers):
-                row = row + [None] * (len(headers) - len(row))
+            # Clave de duplicado: id_glosa si existe; si no, la fila completa.
+            if idx_id_glosa is not None and norm_texto(row[idx_id_glosa]):
+                clave = norm_codigo(row[idx_id_glosa])
+            else:
+                clave = tuple(norm_texto(c) for c in row)
+            if clave in vistas:
+                duplicadas += 1
+                continue
+            vistas.add(clave)
+
             codigo = norm_texto(row[idx["codigo_glosa"]])
             justif = norm_texto(row[idx["justificacion_glosa"]])
             valor = row[idx["valor_total_glosa"]]
             obs = f"{codigo} {justif}${fmt_valor(valor)}"
             filas.append(list(row) + [obs])
 
-            id_det = norm_texto(row[idx["id_detalle"]])
+            id_det = norm_codigo(row[idx["id_detalle"]])
             g = agrupado.setdefault(
                 id_det,
                 {"observacion": [], "conceptos": set(), "codigo_mayor": "", "max_valor": None},
@@ -298,12 +404,15 @@ def consolidar_glosas(archivos: list[Path]) -> tuple[list[str], list[list], dict
             g["observacion"].append(obs)
             g["conceptos"].add(codigo[:2].upper())
             v = a_numero(valor)
-            if not g["codigo_mayor"] or (
-                v is not None and (g["max_valor"] is None or v > g["max_valor"])
-            ):
-                if v is not None or not g["codigo_mayor"]:
-                    g["max_valor"] = v if v is not None else g["max_valor"]
-                    g["codigo_mayor"] = codigo
+            if not g["codigo_mayor"]:
+                g["codigo_mayor"] = codigo
+                g["max_valor"] = v
+            elif v is not None and (g["max_valor"] is None or v > g["max_valor"]):
+                g["codigo_mayor"] = codigo
+                g["max_valor"] = v
+
+    if duplicadas:
+        logger.warning("  OJO: %d glosas duplicadas se saltaron (archivos repetidos).", duplicadas)
 
     for g in agrupado.values():
         g["observacion"] = "\n".join(g["observacion"])
@@ -318,12 +427,14 @@ def consolidar_detalles(
 ) -> tuple[list[str], list[list], list[dict]]:
     """Une los DETALLE *.xlsx + OBSERVACION FINAL por id_detalle.
 
-    Devuelve además la lista de servicios glosados (insumo del archivo de
-    objeciones), en el orden de lectura (por factura).
+    Deduplica por id_detalle (un servicio repetido duplicaría el valor objetado).
+    Devuelve además la lista de servicios glosados (insumo de OBJECIONES).
     """
     headers_base: list[str] | None = None
     filas: list[list] = []
     glosados: list[dict] = []
+    vistos: set = set()
+    duplicados = 0
 
     for arch in archivos:
         headers, rows = leer_xlsx(arch)
@@ -332,12 +443,16 @@ def consolidar_detalles(
             continue
         if headers_base is None:
             headers_base = headers
-        idx = indice_columnas(headers, COL_DETALLE_REQ, arch.name)
+        rows = alinear_filas(headers, rows, headers_base, arch.name)
+        idx = indice_columnas(headers_base, COL_DETALLE_REQ, arch.name)
 
         for row in rows:
-            if len(row) < len(headers):
-                row = row + [None] * (len(headers) - len(row))
-            id_det = norm_texto(row[idx["id_detalle"]])
+            id_det = norm_codigo(row[idx["id_detalle"]])
+            if id_det in vistos:
+                duplicados += 1
+                continue
+            vistos.add(id_det)
+
             g = agrupado.get(id_det)
             obs = g["observacion"] if g else ""
             filas.append(list(row) + [obs])
@@ -355,6 +470,11 @@ def consolidar_detalles(
                     }
                 )
 
+    if duplicados:
+        logger.warning(
+            "  OJO: %d líneas de detalle duplicadas se saltaron (archivos repetidos).", duplicados
+        )
+
     if headers_base is None:
         raise ValueError("No se encontró ningún archivo DETALLE con datos.")
     return headers_base + ["OBSERVACION FINAL"], filas, glosados
@@ -363,25 +483,59 @@ def consolidar_detalles(
 def consolidar_facturas(archivos: list[Path]) -> tuple[list[str], list[list]]:
     headers_base: list[str] | None = None
     filas: list[list] = []
+    vistas: set = set()
     for arch in archivos:
         headers, rows = leer_xlsx(arch)
         if not rows:
             continue
         if headers_base is None:
             headers_base = headers
+        rows = alinear_filas(headers, rows, headers_base, arch.name)
         for row in rows:
-            if len(row) < len(headers):
-                row = row + [None] * (len(headers) - len(row))
+            clave = tuple(norm_texto(c) for c in row)
+            if clave in vistas:
+                continue
+            vistas.add(clave)
             filas.append(list(row))
     if headers_base is None:
         raise ValueError("No se encontró ningún archivo de FACTURAS con datos.")
     return headers_base, filas
 
 
+def _iterar_base(path: Path) -> Iterator[list]:
+    """Itera las filas de la base DGH (xlsx/csv/txt) en streaming, sin
+    materializarla: la base real pesa 80MB+ y cargarla entera agota la RAM.
+    La primera fila que produce es el encabezado."""
+    if path.suffix.lower() in {".csv", ".txt"}:
+        import csv as _csv
+
+        with open(path, newline="", encoding="utf-8-sig", errors="replace") as fh:
+            muestra = fh.read(4096)
+            fh.seek(0)
+            try:
+                dialecto = _csv.Sniffer().sniff(muestra, delimiters=";,\t|")
+            except _csv.Error:
+                dialecto = _csv.excel
+            for row in _csv.reader(fh, dialecto):
+                yield list(row)
+    else:
+        try:
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        except Exception as exc:
+            raise ValueError(f"No se pudo leer la base DGH '{path.name}': {exc}") from exc
+        try:
+            ws = wb.active
+            ws.reset_dimensions()
+            for row in ws.iter_rows(values_only=True):
+                yield list(row)
+        finally:
+            wb.close()
+
+
 def cargar_base_dgh(
     path: Path, facturas_trabajadas: set[str]
 ) -> tuple[list[list], dict[tuple[str, str], str]]:
-    """Lee la base DGH (xlsx/csv/txt), filtra las facturas trabajadas y la "arregla".
+    """Lee la base DGH en streaming, filtra las facturas trabajadas y la "arregla".
 
     El arreglo (igual al proceso manual): en las filas de medicamentos, que
     vienen con SLNSERPRO_SERVICIO vacío, se rellenan SERVICIO/CUPS y sus
@@ -393,22 +547,8 @@ def cargar_base_dgh(
     """
     logger.info("Leyendo base DGH: %s (puede tardar si pesa mucho)...", path)
 
-    if path.suffix.lower() in {".csv", ".txt"}:
-        import csv as _csv
-
-        with open(path, newline="", encoding="utf-8-sig", errors="replace") as fh:
-            muestra = fh.read(4096)
-            fh.seek(0)
-            try:
-                dialecto = _csv.Sniffer().sniff(muestra, delimiters=";,\t|")
-            except _csv.Error:
-                dialecto = _csv.excel
-            reader = _csv.reader(fh, dialecto)
-            headers = [norm_texto(h) for h in next(reader, [])]
-            filas_iter = list(reader)
-    else:
-        headers, filas_iter = leer_xlsx(path)
-
+    it = _iterar_base(path)
+    headers = [norm_texto(h) for h in next(it, [])]
     mapa = {norm_header(h): i for i, h in enumerate(headers)}
 
     def col(nombre: str) -> int | None:
@@ -434,18 +574,23 @@ def cargar_base_dgh(
     filas_filtradas: list[list] = []
     cruce: dict[tuple[str, str], str] = {}
     total = 0
-    for row in filas_iter:
+    for row in it:
         total += 1
+        if row is None or all(c is None or norm_texto(c) == "" for c in row):
+            continue
         fact = norm_factura(celda(row, idx_fact))
         if fact not in facturas_trabajadas:
             continue
 
-        servicio = celda(row, idx_srv)
-        cod_med = celda(row, idx_cod_med)
+        servicio = norm_codigo(celda(row, idx_srv))
+        cod_med = norm_codigo(celda(row, idx_cod_med))
         nom_med = celda(row, idx_nom_med)
 
         # --- Arreglo: medicamentos rellenan las columnas de servicio ---
-        valores = {c: celda(row, i) for c, i in zip(COLS_SERVICIOS, idx_salida)}
+        valores = {}
+        for c, i in zip(COLS_SERVICIOS, idx_salida):
+            v = celda(row, i)
+            valores[c] = norm_codigo(v) if c in COLS_SERVICIOS_CODIGO else v
         if not servicio and cod_med:
             valores["SLNSERPRO_SERVICIO"] = cod_med
             valores["DESCRIPCION INSTITUCIONAL"] = nom_med
@@ -481,6 +626,7 @@ def generar_objeciones(
     """
     filas: list[list] = []
     no_cruzados: list[list] = []
+    malformadas: set[str] = set()
     consecutivo = 0
     factura_actual: str | None = None
 
@@ -489,6 +635,8 @@ def generar_objeciones(
         if fact != factura_actual:
             consecutivo += 1
             factura_actual = fact
+        if _num_factura(fact) is None:
+            malformadas.add(fact)
 
         # Cruce con DGH para SLNSERPRO (vacío si no hay base o no cruza).
         slnserpro = None
@@ -528,6 +676,13 @@ def generar_objeciones(
                 srv["observacion"],  # CRDOBSERV
                 tipo,  # CROTIPOBJ
             ]
+        )
+
+    if malformadas:
+        logger.warning(
+            "OJO: %d factura(s) no siguen el patrón HUS y salen tal cual en CRNCXC: %s",
+            len(malformadas),
+            ", ".join(sorted(malformadas)[:5]),
         )
     return filas, no_cruzados
 
