@@ -145,8 +145,10 @@ def normalizar_factura(s: str) -> str:
     return m.group(1) if m else s.lstrip("0") or s
 
 
-def leer_excel_respuestas(ruta: Path) -> list[dict]:
-    """Devuelve una lista de dicts {factura, factura_corta, num, aceptado, detalle}.
+def leer_excel_respuestas(ruta: Path) -> dict[str, list[dict]]:
+    """Devuelve {factura_corta: [{factura, factura_corta, num, aceptado, detalle}, ...]},
+    agrupado por factura y ordenado por # de objeción (así lo consumen tanto el
+    bot de SIMED como el de DGH, que iteran `.items()`).
 
     Acepta cabeceras con variantes (tolerante mayúsculas/acentos/espacios).
     """
@@ -335,6 +337,36 @@ def _screenshot_debug(page: Page, etiqueta: str) -> Path:
     except Exception as e:
         logger.warning(f"  No pude tomar screenshot: {e}")
     return ruta
+
+
+def _screenshot_evidencia(
+    page: Page,
+    factura_corta: str,
+    evidencias_dir: Path | None,
+    sufijo: str = "",
+) -> Path | None:
+    """Captura de evidencia del cargue OK. Se llama con el diálogo del portal
+    todavía visible para que quede el mensaje 'Respuesta cargada/Registro
+    completado' en la imagen."""
+    if evidencias_dir is None:
+        return None
+    try:
+        evidencias_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.warning(f"  No pude crear carpeta de evidencias {evidencias_dir}: {e}")
+        return None
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    nombre = f"HUS{factura_corta}_{ts}"
+    if sufijo:
+        nombre += f"_{sufijo}"
+    ruta = evidencias_dir / f"{nombre}.png"
+    try:
+        page.screenshot(path=str(ruta), full_page=True)
+        logger.info(f"  Evidencia guardada: {ruta}")
+        return ruta
+    except Exception as e:
+        logger.warning(f"  No pude tomar screenshot de evidencia: {e}")
+        return None
 
 
 def login(page: Page, user: str, password: str) -> None:
@@ -1236,7 +1268,11 @@ def confirmar_form_principal(page: Page) -> None:
     page.wait_for_load_state("networkidle")
 
 
-def enviar_finalizar(page: Page, factura_corta: str) -> str:
+def enviar_finalizar(
+    page: Page,
+    factura_corta: str,
+    evidencias_dir: Path | None = None,
+) -> str:
     """Click botón verde de la grilla (igual que las NCs) y valida el OK del portal."""
     ir_a_respuesta_glosa_web(page)
     filtrar_por_factura(page, factura_corta)
@@ -1268,7 +1304,25 @@ def enviar_finalizar(page: Page, factura_corta: str) -> str:
 
     if not texto_msg:
         _screenshot_debug(page, f"sin_dialogo_final_{factura_corta}")
+        # Sin diálogo no tenemos confirmación textual; igual dejamos evidencia
+        # del estado de la grilla para que el usuario pueda revisar.
+        _screenshot_evidencia(page, factura_corta, evidencias_dir, sufijo="sin_dialogo")
         return "OK_SIN_DIALOGO"
+
+    up = texto_msg.upper()
+    # Éxito = "Registro completado/completo", "respuesta cargada", "exitoso",
+    # "guardado". Aceptamos la raíz COMPLET* (cubre completo/completado/
+    # completada) pero excluimos INCOMPLET* para no clasificar un error de
+    # "datos incompletos" como OK. Así la evidencia se dispara con cualquier
+    # variante de la redacción de éxito del portal.
+    es_ok = "INCOMPLET" not in up and any(
+        k in up for k in ("CARGAD", "COMPLET", "EXITOS", "GUARDAD", "REGISTRO COMPLET")
+    )
+
+    # Pantallazo de evidencia ANTES de cerrar el diálogo: así el mensaje del
+    # portal ("Registro completado") queda capturado dentro de la imagen.
+    if es_ok:
+        _screenshot_evidencia(page, factura_corta, evidencias_dir)
 
     # Confirmar/cerrar el diálogo de mensaje.
     for fr in page.frames:
@@ -1284,8 +1338,7 @@ def enviar_finalizar(page: Page, factura_corta: str) -> str:
         except Exception:
             continue
 
-    up = texto_msg.upper()
-    if any(k in up for k in ("RESPUESTA CARGADA", "COMPLETAD", "EXITOS")):
+    if es_ok:
         return "OK"
     if "PENDIENTE" in up:
         return f"PENDIENTES: {texto_msg[:140]}"
@@ -1304,6 +1357,7 @@ def procesar_factura(
     rehacer: bool = False,
     max_obj: int = 0,
     subir_soportes: bool = True,
+    evidencias_dir: Path | None = None,
 ) -> dict:
     """Procesa UNA factura: filtra, abre, loop objeciones, confirma, envia."""
     a_procesar = objeciones[:max_obj] if max_obj and max_obj > 0 else objeciones
@@ -1389,7 +1443,7 @@ def procesar_factura(
             confirmar_form_principal(page)
         except Exception as e:
             logger.warning(f"  (Confirmar del form principal no aplicó: {e})")
-        estado = enviar_finalizar(page, factura_corta)
+        estado = enviar_finalizar(page, factura_corta, evidencias_dir=evidencias_dir)
         reg["estado"] = estado
         reg["detalle"] = f"{respondidas} respondidas, {omitidas} omitidas" + (
             f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else ""
@@ -1466,6 +1520,19 @@ def main() -> int:
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_glosa.csv"))
     parser.add_argument("--log", type=Path, default=None)
+    parser.add_argument(
+        "--evidencias-dir",
+        type=Path,
+        default=Path("evidencias_glosa"),
+        help="Carpeta donde se guardan pantallazos de evidencia por factura "
+        "(capturados con el dialogo 'Respuesta cargada' del portal visible). "
+        "Default: evidencias_glosa/.",
+    )
+    parser.add_argument(
+        "--sin-evidencias",
+        action="store_true",
+        help="Desactiva la captura de pantallazos de evidencia por factura.",
+    )
     args = parser.parse_args()
     setup_logging(args.log)
 
@@ -1597,6 +1664,7 @@ def main() -> int:
                         rehacer=args.rehacer,
                         max_obj=args.max_obj,
                         subir_soportes=not args.sin_soportes,
+                        evidencias_dir=None if args.sin_evidencias else args.evidencias_dir,
                     )
                     if reg["estado"] == "ERROR" and _sesion_muerta(Exception(reg["detalle"])):
                         if relogins >= MAX_RELOGINS:

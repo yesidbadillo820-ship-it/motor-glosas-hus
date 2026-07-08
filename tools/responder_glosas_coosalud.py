@@ -1010,19 +1010,24 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
         )
         caja.fill(cod)
         page.wait_for_timeout(800)
-        opcion = _primer_visible(page.locator(f"li:has-text('{cod}')"))
+        opcion = _primer_visible(page.locator(f"li.select2-results__option:has-text('{cod}')"))
         if opcion is None:
-            # Fallback: el filtro de select2 a veces no encuentra la opción
+            # Fallback: el filtro de select2 a veces no devuelve la opcion
             # aunque exista (timing del ajax que filtra). Vaciamos la caja
             # para listar TODAS las opciones del dropdown y, si la lista
-            # contiene `cod`, la clickeamos directamente. Ese mismo barrido
-            # sirve también de diagnóstico cuando el portal realmente no
-            # ofrece el código (ej. tipo de glosa restringido).
+            # contiene `cod`, la clickeamos directamente. El mismo barrido
+            # sirve de diagnostico cuando el portal realmente no ofrece el
+            # codigo (ej. tipo de glosa restringido).
             ofrecidos: list[str] = []
             try:
                 caja.fill("")
-                page.wait_for_timeout(800)
-                for it in page.locator("li.select2-results__option:visible").all():
+                # Esperar la re-hidratacion del listado (mas robusto que un
+                # sleep fijo: si el ajax tarda >800ms igual lo captamos).
+                opciones = page.locator(
+                    "li.select2-results__option:not(.select2-results__message):visible"
+                )
+                opciones.first.wait_for(timeout=4000)
+                for it in opciones.all():
                     try:
                         txt = (it.inner_text() or "").strip()
                     except Exception:
@@ -1030,8 +1035,12 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
                     if not txt:
                         continue
                     ofrecidos.append(txt[:80])
-                    if opcion is None and cod in txt and "No results" not in txt:
-                        opcion = it
+                    if cod in txt:
+                        # Re-resolvemos por texto para el click: si el ajax
+                        # re-renderizo la lista entre el escaneo y el click,
+                        # el nth(K) podria haber cambiado de posicion.
+                        opcion = opciones.filter(has_text=cod).first
+                        break
             except Exception:
                 pass
             if opcion is None:

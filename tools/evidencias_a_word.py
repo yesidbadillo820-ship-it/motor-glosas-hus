@@ -49,15 +49,23 @@ def _factura_desde_nombre(p: Path) -> str:
 
 def _leer_lista(p: Path) -> list[Path]:
     """Lee un TXT con 1 ruta por linea. Ignora vacias, comentarios (#) y
-    quita comillas simples/dobles envolventes. Preserva el orden del TXT."""
-    for enc in ("utf-8-sig", "utf-8", "latin-1"):
-        try:
-            texto = p.read_text(encoding=enc)
-            break
-        except UnicodeDecodeError:
-            continue
+    quita comillas simples/dobles envolventes. Preserva el orden del TXT.
+
+    Detecta el encoding por BOM: UTF-16 LE/BE (default de `Out-File` y
+    `>` en PowerShell 5.1) o UTF-8 con BOM. Sin BOM: UTF-8 con caida a
+    latin-1. Esto evita que un TXT UTF-16 desde PowerShell se decodifique
+    como latin-1 con NULs intercalados y las rutas parezcan inexistentes."""
+    raw = p.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        # "utf-16" detecta endianness por BOM y lo consume.
+        texto = raw.decode("utf-16")
+    elif raw.startswith(b"\xef\xbb\xbf"):
+        texto = raw.decode("utf-8-sig")
     else:
-        raise RuntimeError(f"No pude decodificar la lista: {p}")
+        try:
+            texto = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            texto = raw.decode("latin-1")
     rutas: list[Path] = []
     for linea in texto.splitlines():
         s = linea.strip().strip('"').strip("'")
@@ -155,8 +163,17 @@ def main() -> int:
     ANCHO_MAX_CM = 17.0
     ALTO_MAX_CM = 22.0
 
+    generadas = 0
     for i, img in enumerate(imagenes):
         factura = _factura_desde_nombre(img)
+        # Salto de pagina ANTES del encabezado (excepto en la primera
+        # factura generada). Si esta iteracion falla al insertar la imagen,
+        # removemos el salto junto con el header huerfano para no dejar una
+        # hoja en blanco ni empujar la siguiente factura fuera de lugar.
+        saltopag = None
+        if generadas > 0:
+            saltopag = doc.add_paragraph()
+            saltopag.add_run().add_break(WD_BREAK.PAGE)
         # Encabezado: número de factura, grande, negrita, centrado.
         # Quitamos el space_after para que la imagen quede pegada y no fuerce
         # un overflow a la página siguiente.
@@ -193,16 +210,28 @@ def main() -> int:
                         p_img.add_run().add_picture(str(img), height=Cm(ALTO_MAX_CM))
         except Exception as e:
             logger.warning(f"  {img.name}: no se pudo insertar — {e}")
+            # Remover encabezado, contenedor de imagen y (si se creo) el
+            # salto de pagina previo — asi la siguiente factura no cae en
+            # esta misma hoja con un titulo huerfano encima.
+            for par in [p_img, h] + ([saltopag] if saltopag is not None else []):
+                par._element.getparent().remove(par._element)
             continue
+<<<<<<< HEAD
         # Salto de página (menos en la última).
         if i < len(imagenes) - 1:
             doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
         logger.info(f"  [{i + 1}/{len(imagenes)}] {factura} ← {img.name}")
+=======
+        generadas += 1
+        logger.info(f"  [{generadas}/{len(imagenes)}] {factura} ← {img.name}")
+>>>>>>> origin/claude/excel-reconciliation-data-9Bnpj
 
     args.salida.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(args.salida))
     logger.info(f"\nWord generado: {args.salida}")
-    logger.info(f"  Páginas: {len(imagenes)} (una factura por página)")
+    logger.info(f"  Páginas: {generadas} (una factura por página)")
+    if generadas < len(imagenes):
+        logger.info(f"  Imagenes que fallaron y se omitieron: {len(imagenes) - generadas}")
     return 0
 
 
