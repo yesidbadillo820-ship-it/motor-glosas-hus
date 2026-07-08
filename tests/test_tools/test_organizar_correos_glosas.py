@@ -560,3 +560,61 @@ def test_base_por_defecto_respeta_variable_de_entorno(monkeypatch):
     assert org.base_por_defecto() == Path(org.DEFAULT_BASE)
     monkeypatch.delenv("GLOSAS_BASE")
     assert org.base_por_defecto() == Path(org.DEFAULT_BASE)
+
+
+# ─── Determinación de categoría por CONTENIDO (glosas y/o devoluciones) ──────
+
+
+def test_categoria_por_contenido_glosa_vs_devolucion():
+    # texto con códigos: DE#### = devolución, resto = glosa
+    dev, _ = org.categoria_por_contenido([], "codigos DE1601 DE4401 DE0601", CONFIG)
+    assert dev == "DEVOLUCIONES"
+    glo, _ = org.categoria_por_contenido([], "codigos TA2901 SO3602 CO0601", CONFIG)
+    assert glo == "INICIAL"
+    nada, motivo = org.categoria_por_contenido([], "sin codigos aqui", CONFIG)
+    assert nada is None and "sin códigos" in motivo
+
+
+def test_categoria_por_contenido_lee_xlsx_adjunto():
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Numero_Factura", "Codigo_Glosa_Dev", "Valor"])
+    for cod in ("DE1601", "DE1601", "DE4401", "TA2901"):
+        ws.append(["HUS1", cod, 100])
+    buf = io.BytesIO()
+    wb.save(buf)
+    cat, motivo = org.categoria_por_contenido([("detalle.xlsx", buf.getvalue())], "", CONFIG)
+    assert cat == "DEVOLUCIONES"  # 3 DE* vs 1 glosa
+    assert "3 devoluciones" in motivo
+
+
+def test_procesar_notificacion_mixta_decide_por_contenido(tmp_path):
+    pytest.importorskip("reportlab")
+    msg = EmailMessage()
+    msg["Subject"] = "Notificación Glosas y/o Devoluciones Res. 2284 de 2023"
+    msg["From"] = "FACTRAMED <notificaciones@factramed.com>"
+    msg["Date"] = "Wed, 2 Jul 2026 09:00:00 -0500"
+    msg["Message-ID"] = "<mixto-1@factramed.com>"
+    msg.set_content("Cordial saludo, se anexan las glosas TA2901 y SO3602 del periodo.")
+    fila = org.procesar_mensaje(
+        msg,
+        base=tmp_path,
+        config=CONFIG,
+        estado=org.Estado(None),
+        dry_run=False,
+        sin_pdf_correo=True,
+        navegador=None,
+    )
+    # el asunto es ambiguo pero el cuerpo trae códigos de glosa -> INICIAL, no 0-REVISAR
+    assert fila["categoria"] == "INICIAL"
+    assert "contenido" in fila["motivo"]
+
+
+def test_ignora_radicacion_parcialmente_aprobada():
+    assert org.debe_ignorarse(
+        "Radicación Parcialmente Aprobada – Radicado No 102886", "x@y.co", CONFIG
+    )

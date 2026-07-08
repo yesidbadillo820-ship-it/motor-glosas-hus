@@ -133,6 +133,8 @@ CONFIG_DEFECTO: dict = {
         # notificaciones de estado de radicación (vistas en el registro real)
         "PROCESO EN REVISION RADICADO",
         "CONFIRMACION DE RADICACION APROBADA",
+        "RADICACION PARCIALMENTE APROBADA",
+        "RADICACION APROBADA",
         "MODULO MIPRES",
         # comunicaciones internas del hospital y avisos que no son glosas
         # (vistos en la salida real: 77 correos de @hus.gov.co eran esto)
@@ -469,11 +471,70 @@ def clasificar_categoria(asunto: str, nombres_adjuntos: list[str], config: dict)
                 break
     nombres = {nombre for nombre, _ in coincidencias}
     if config.get("revisar_si_glosa_y_devolucion", True) and {"DEVOLUCIONES", "INICIAL"} <= nombres:
+        # ambiguo por asunto: lo decide el contenido (ver categoria_por_contenido)
         return config["categoria_revision"], "GLOSA+DEVOLUCION en el mismo correo"
     if coincidencias:
         nombre, patron = coincidencias[0]
         return nombre, f"patrón '{patron}'"
     return config["categoria_revision"], "sin coincidencia de categoría"
+
+
+# códigos estándar de glosa/devolución (Res. 3047/2284): DE### = devolución
+RE_CODIGO_DEV = re.compile(r"\bDE\d{3,}\b")
+RE_CODIGO_GLOSA = re.compile(r"\b(?:FA|TA|SO|AU|CO|CL|UN|SU|PT)\d{3,}\b")
+
+
+def _codigos_de_bytes(contenido: bytes, nombre: str) -> str:
+    """Texto plano de un adjunto tabular (csv/txt/xlsx, incluso dentro de zip)
+    para contar códigos de glosa/devolución. Best-effort, nunca lanza."""
+    ext = Path(nombre).suffix.lower()
+    try:
+        if ext == ".zip":
+            import io
+            import zipfile
+
+            partes = []
+            with zipfile.ZipFile(io.BytesIO(contenido)) as zf:
+                for interno in zf.namelist()[:20]:
+                    if not interno.endswith("/"):
+                        partes.append(_codigos_de_bytes(zf.read(interno), interno))
+            return " ".join(partes)
+        if ext == ".xlsx":
+            import io
+
+            from openpyxl import load_workbook
+
+            wb = load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
+            celdas = []
+            for hoja in wb.worksheets:
+                for fila in hoja.iter_rows(max_row=400, values_only=True):
+                    celdas.extend(str(c) for c in fila if c is not None)
+            return " ".join(celdas)
+        if ext in (".csv", ".txt"):
+            return contenido[:2_000_000].decode("latin-1", errors="replace")
+    except Exception:
+        return ""
+    return ""
+
+
+def categoria_por_contenido(
+    adjuntos: list[tuple[str, bytes]], texto: str, config: dict
+) -> tuple[str | None, str]:
+    """Determina INICIAL vs DEVOLUCIONES leyendo los códigos del detalle
+    adjunto: prefijo 'DE' = devolución, el resto = glosa. Devuelve (categoría o
+    None si no se puede determinar, motivo). El correo se archiva completo en
+    UNA categoría (la dominante); el detalle fino lo separa el Excel de entrega.
+    """
+    corpus = texto or ""
+    for nombre, contenido in adjuntos:
+        corpus += " " + _codigos_de_bytes(contenido, nombre)
+    n_dev = len(RE_CODIGO_DEV.findall(corpus))
+    n_glosa = len(RE_CODIGO_GLOSA.findall(corpus))
+    if n_dev == 0 and n_glosa == 0:
+        return None, "sin códigos legibles en el contenido"
+    if n_dev > n_glosa:
+        return "DEVOLUCIONES", f"contenido: {n_dev} devoluciones vs {n_glosa} glosas"
+    return "INICIAL", f"contenido: {n_glosa} glosas vs {n_dev} devoluciones"
 
 
 ENTIDAD_SIN_IDENTIFICAR = "SIN IDENTIFICAR"
@@ -1178,9 +1239,16 @@ def procesar_mensaje(
     texto, html, inlines, adjuntos = extraer_partes(msg, config)
     nombres_adjuntos = [nombre for nombre, _ in adjuntos]
     categoria, motivo = clasificar_categoria(asunto, nombres_adjuntos, config)
+    # asunto ambiguo ('Glosas y/o Devoluciones'): leer el contenido y decidir
+    if categoria == config["categoria_revision"] and "GLOSA+DEVOLUCION" in motivo:
+        cat_contenido, motivo_contenido = categoria_por_contenido(
+            adjuntos, f"{texto} {extraer_texto_html(html)}", config
+        )
+        if cat_contenido:
+            categoria, motivo = cat_contenido, motivo_contenido
     entidad, identificada = detectar_entidad(remitente, asunto, nombres_adjuntos, config)
     if not identificada:
-        motivo += "; entidad por dominio del remitente"
+        motivo += "; entidad SIN IDENTIFICAR (revisar y asignar)"
 
     carpeta = construir_carpeta_destino(base, fecha, categoria, entidad, config)
     fila.update(categoria=categoria, entidad=entidad, motivo=motivo, carpeta=str(carpeta))
