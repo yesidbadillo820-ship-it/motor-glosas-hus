@@ -69,8 +69,12 @@ def _seed(db, dias_atras_objecion, valor=1000):
 
 class TestFechaObjecionMensual:
     def test_serie(self, client, db_session):
-        _seed(db_session, dias_atras_objecion=5, valor=1000)
-        _seed(db_session, dias_atras_objecion=10, valor=2000)
+        # Ambas objeciones hoy: garantiza que caen en el mismo mes calendario
+        # sin importar el día del mes en que corran los tests. Offsets relativos
+        # (p. ej. 5 y 10 días atrás) cruzan el borde de mes a comienzos de mes
+        # y volvían el test frágil por fecha.
+        _seed(db_session, dias_atras_objecion=0, valor=1000)
+        _seed(db_session, dias_atras_objecion=0, valor=2000)
 
         r = client.get("/glosas/stats/fecha-objecion-mensual?meses=2")
         d = r.json()

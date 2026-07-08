@@ -1,13 +1,23 @@
-"""organizar_cargue_masivo_coosalud.py — Extrae un ZIP de COOSALUD y organiza los Excel en carpetas.
+"""organizar_cargue_masivo_coosalud.py — Extrae un ZIP de COOSALUD y organiza los Excel en lotes.
 
-Toma el ZIP que descarga el equipo de cartera (p. ej. `COOSALUD 1.zip`), que trae
-cientos de archivos .xlsx sueltos en la raíz, y los reparte en tres carpetas según
-su nombre, dejando todo listo para el cargue masivo:
+Toma el ZIP que descarga el equipo de cartera (con miles de archivos .xlsx sueltos)
+y los reparte en tres carpetas según su nombre, y dentro de cada una las divide en
+LOTES de máximo 300 archivos, porque el portal de cargue solo deja subir 300 a la vez:
 
     <ESCRITORIO>\\CARGUE MASIVO COOSALUD\\
-        DETALLES\\    <- archivos "DETALLE HUS######.xlsx"
-        FACTURAS\\    <- archivos "HUS######.xlsx"        (sin prefijo)
-        GLOSAS\\      <- archivos "GLOSAS HUS######.xlsx"
+        DETALLES\\
+            LOTE 01\\   <- hasta 300 "DETALLE HUS######.xlsx"
+            LOTE 02\\   <- los siguientes 300
+            ...
+        FACTURAS\\
+            LOTE 01\\   <- hasta 300 "HUS######.xlsx"
+            ...
+        GLOSAS\\
+            LOTE 01\\   <- hasta 300 "GLOSAS HUS######.xlsx"
+            ...
+
+Los lotes se arman ordenando por número de factura, así el LOTE 01 de FACTURAS,
+DETALLES y GLOSAS corresponde al mismo grupo de facturas.
 
 CLASIFICACIÓN (por el nombre del archivo, sin importar mayúsculas/espacios):
     empieza por "DETALLE"  -> DETALLES
@@ -15,8 +25,8 @@ CLASIFICACIÓN (por el nombre del archivo, sin importar mayúsculas/espacios):
     empieza por "HUS<núm>" -> FACTURAS   (la factura, sin prefijo)
     cualquier otra cosa    -> SIN_CLASIFICAR (se reporta, no se pierde nada)
 
-Es IDEMPOTENTE: si lo corrés dos veces, los archivos que ya estén no se
-vuelven a escribir (salvo que uses --sobrescribir).
+Es IDEMPOTENTE: si lo corrés dos veces con el mismo ZIP, los archivos que ya
+estén no se vuelven a escribir (salvo que uses --sobrescribir).
 
 USO RÁPIDO
 ----------
@@ -27,12 +37,13 @@ USO RÁPIDO
     REM Ver qué haría, sin escribir nada (ensayo)
     py organizar_cargue_masivo_coosalud.py --zip "C:\\...\\COOSALUD 1.zip" --dry-run
 
-    REM Elegir otro Escritorio / nombre de carpeta / guardar reporte CSV
+    REM Cambiar el tamaño del lote (por defecto 300), destino, nombre o reporte CSV
     py organizar_cargue_masivo_coosalud.py ^
-        --zip     "C:\\...\\COOSALUD 1.zip" ^
-        --destino "D:\\USUARIO CARTERA\\Desktop" ^
-        --nombre  "CARGUE MASIVO COOSALUD" ^
-        --reporte "D:\\USUARIO CARTERA\\Desktop\\reporte_cargue.csv"
+        --zip          "C:\\...\\COOSALUD 1.zip" ^
+        --destino      "D:\\USUARIO CARTERA\\Desktop" ^
+        --nombre       "CARGUE MASIVO COOSALUD" ^
+        --max-por-lote 300 ^
+        --reporte      "D:\\USUARIO CARTERA\\Desktop\\reporte_cargue.csv"
 
 No requiere instalar nada: usa solo la librería estándar de Python 3.
 """
@@ -56,12 +67,20 @@ CARPETA_FACTURAS = "FACTURAS"
 CARPETA_GLOSAS = "GLOSAS"
 CARPETA_SIN_CLASIFICAR = "SIN_CLASIFICAR"
 
-# Escritorio por defecto del equipo de cartera.
+# Categorías que se dividen en lotes (SIN_CLASIFICAR queda plana, para revisión).
+CATEGORIAS_LOTE = [CARPETA_DETALLES, CARPETA_FACTURAS, CARPETA_GLOSAS]
+
+# Escritorio y nombre por defecto del equipo de cartera.
 DESTINO_DEFECTO = r"D:\USUARIO CARTERA\Desktop"
 NOMBRE_DEFECTO = "CARGUE MASIVO COOSALUD"
 
+# El portal de cargue de COOSALUD solo deja subir 300 archivos por tanda.
+MAX_POR_LOTE_DEFECTO = 300
+
 # Un archivo de factura es "HUS" seguido de dígitos (sin prefijo DETALLE/GLOSAS).
 RE_FACTURA = re.compile(r"^HUS\d+", re.IGNORECASE)
+# Número de factura para ordenar (HUS + dígitos, ignorando ceros a la izquierda).
+RE_NUM_FACTURA = re.compile(r"HUS0*(\d+)")
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -92,10 +111,23 @@ def clasificar(nombre_archivo: str) -> str:
     return CARPETA_SIN_CLASIFICAR
 
 
+def _clave_orden(nombre: str) -> tuple[int, str]:
+    """Ordena por número de factura (HUS######) para que los lotes se alineen."""
+    m = RE_NUM_FACTURA.search(_normalizar(nombre))
+    num = int(m.group(1)) if m else 10**18  # sin número -> al final
+    return (num, _normalizar(nombre))
+
+
 def _nombre_base(entrada: str) -> str:
     """Nombre del archivo aunque el ZIP traiga subcarpetas o rutas con \\ o /."""
     # Algunos ZIP de Windows usan backslash como separador interno.
     return entrada.replace("\\", "/").rstrip("/").split("/")[-1]
+
+
+def _lote_nombre(indice: int, total_lotes: int) -> str:
+    """Nombre de la subcarpeta de lote, con ceros para que ordene bien (LOTE 01)."""
+    ancho = max(2, len(str(total_lotes)))
+    return f"LOTE {indice:0{ancho}d}"
 
 
 def organizar_zip(
@@ -103,31 +135,24 @@ def organizar_zip(
     destino_base: Path,
     nombre_carpeta: str,
     *,
+    max_por_lote: int = MAX_POR_LOTE_DEFECTO,
     dry_run: bool = False,
     sobrescribir: bool = False,
 ) -> list[dict]:
-    """Extrae y clasifica el ZIP. Devuelve una lista de filas para el reporte."""
+    """Extrae, clasifica y divide en lotes. Devuelve una lista de filas para el reporte."""
     if not zip_path.is_file():
         raise FileNotFoundError(f"No existe el ZIP: {zip_path}")
     if not zipfile.is_zipfile(zip_path):
         raise ValueError(f"El archivo no es un ZIP válido: {zip_path}")
+    if max_por_lote < 1:
+        raise ValueError("--max-por-lote debe ser 1 o más.")
 
     raiz = destino_base / nombre_carpeta
     logger.info("ZIP     : %s", zip_path)
     logger.info("Destino : %s", raiz)
+    logger.info("Lote    : máximo %d archivos por carpeta", max_por_lote)
     if dry_run:
-        logger.info("MODO ENSAYO (--dry-run): no se escribe nada en disco.\n")
-
-    # Crear el árbol de carpetas destino (salvo en dry-run).
-    subcarpetas = [
-        CARPETA_DETALLES,
-        CARPETA_FACTURAS,
-        CARPETA_GLOSAS,
-        CARPETA_SIN_CLASIFICAR,
-    ]
-    if not dry_run:
-        for sub in subcarpetas:
-            (raiz / sub).mkdir(parents=True, exist_ok=True)
+        logger.info("MODO ENSAYO (--dry-run): no se escribe nada en disco.")
 
     filas: list[dict] = []
 
@@ -136,58 +161,94 @@ def organizar_zip(
         total = len(entradas)
         logger.info("Archivos dentro del ZIP: %d\n", total)
 
-        for i, entrada in enumerate(entradas, start=1):
+        # 1) Clasificar todas las entradas por categoría.
+        por_categoria: dict[str, list] = {}
+        for entrada in entradas:
             nombre = _nombre_base(entrada.filename)
             if not nombre:
                 continue
+            categoria = clasificar(nombre)
+            por_categoria.setdefault(categoria, []).append((nombre, entrada))
 
-            carpeta = clasificar(nombre)
-            destino_dir = raiz / carpeta
-            destino_file = destino_dir / nombre
+        # 2) Por cada categoría: ordenar, dividir en lotes y escribir.
+        for categoria in CATEGORIAS_LOTE + [CARPETA_SIN_CLASIFICAR]:
+            items = por_categoria.get(categoria, [])
+            if not items:
+                continue
+            items.sort(key=lambda par: _clave_orden(par[0]))
 
-            estado = "COPIADO"
-            if destino_file.exists() and not sobrescribir:
-                estado = "YA_EXISTIA"
-            elif dry_run:
-                estado = "SIMULADO"
+            if categoria == CARPETA_SIN_CLASIFICAR:
+                # No se lotea: queda plana para revisión manual.
+                grupos = [(None, items)]
             else:
-                # Extraer los bytes de esta entrada al archivo destino.
-                with zf.open(entrada) as origen, open(destino_file, "wb") as salida:
-                    salida.write(origen.read())
+                total_lotes = (len(items) + max_por_lote - 1) // max_por_lote
+                grupos = [
+                    (
+                        _lote_nombre(i + 1, total_lotes),
+                        items[i * max_por_lote : (i + 1) * max_por_lote],
+                    )
+                    for i in range(total_lotes)
+                ]
 
-            if carpeta == CARPETA_SIN_CLASIFICAR:
-                logger.warning("  [%d/%d] SIN CLASIFICAR: %s", i, total, nombre)
+            for lote_nombre, grupo in grupos:
+                destino_dir = raiz / categoria
+                if lote_nombre:
+                    destino_dir = destino_dir / lote_nombre
+                if not dry_run:
+                    destino_dir.mkdir(parents=True, exist_ok=True)
 
-            filas.append(
-                {
-                    "archivo": nombre,
-                    "carpeta": carpeta,
-                    "estado": estado,
-                    "destino": str(destino_file),
-                }
-            )
+                for nombre, entrada in grupo:
+                    destino_file = destino_dir / nombre
+                    if destino_file.exists() and not sobrescribir:
+                        estado = "YA_EXISTIA"
+                    elif dry_run:
+                        estado = "SIMULADO"
+                    else:
+                        with (
+                            zf.open(entrada) as origen,
+                            open(destino_file, "wb") as salida,
+                        ):
+                            salida.write(origen.read())
+                        estado = "COPIADO"
+
+                    if categoria == CARPETA_SIN_CLASIFICAR:
+                        logger.warning("  SIN CLASIFICAR: %s", nombre)
+
+                    filas.append(
+                        {
+                            "archivo": nombre,
+                            "carpeta": categoria,
+                            "lote": lote_nombre or "",
+                            "estado": estado,
+                            "destino": str(destino_file),
+                        }
+                    )
 
     return filas
 
 
-def resumen(filas: list[dict]) -> dict[str, int]:
-    conteo: dict[str, int] = {}
+def resumen(filas: list[dict]) -> dict[str, dict]:
+    """Cuenta archivos y lotes por categoría."""
+    conteo: dict[str, dict] = {}
     for f in filas:
-        conteo[f["carpeta"]] = conteo.get(f["carpeta"], 0) + 1
+        c = conteo.setdefault(f["carpeta"], {"archivos": 0, "lotes": set()})
+        c["archivos"] += 1
+        if f["lote"]:
+            c["lotes"].add(f["lote"])
     return conteo
 
 
 def escribir_reporte(filas: list[dict], ruta: Path) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     with open(ruta, "w", newline="", encoding="utf-8-sig") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["archivo", "carpeta", "estado", "destino"])
+        writer = csv.DictWriter(fh, fieldnames=["archivo", "carpeta", "lote", "estado", "destino"])
         writer.writeheader()
         writer.writerows(filas)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Extrae un ZIP de COOSALUD y reparte los Excel en DETALLES / FACTURAS / GLOSAS.",
+        description="Extrae un ZIP de COOSALUD y reparte los Excel en DETALLES / FACTURAS / GLOSAS, en lotes de 300.",
     )
     p.add_argument("--zip", required=True, help="Ruta al archivo .zip a procesar.")
     p.add_argument(
@@ -199,6 +260,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--nombre",
         default=NOMBRE_DEFECTO,
         help=f'Nombre de la carpeta que se crea. Def: "{NOMBRE_DEFECTO}"',
+    )
+    p.add_argument(
+        "--max-por-lote",
+        type=int,
+        default=MAX_POR_LOTE_DEFECTO,
+        help=f"Máximo de archivos por lote. Def: {MAX_POR_LOTE_DEFECTO}",
     )
     p.add_argument(
         "--reporte",
@@ -228,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.zip),
             Path(args.destino),
             args.nombre,
+            max_por_lote=args.max_por_lote,
             dry_run=args.dry_run,
             sobrescribir=args.sobrescribir,
         )
@@ -237,26 +305,29 @@ def main(argv: list[str] | None = None) -> int:
 
     conteo = resumen(filas)
     logger.info("\n===== RESUMEN =====")
-    for carpeta in [
-        CARPETA_DETALLES,
-        CARPETA_FACTURAS,
-        CARPETA_GLOSAS,
-        CARPETA_SIN_CLASIFICAR,
-    ]:
-        n = conteo.get(carpeta, 0)
-        if n or carpeta != CARPETA_SIN_CLASIFICAR:
-            logger.info("  %-16s %d", carpeta + ":", n)
+    for categoria in CATEGORIAS_LOTE:
+        c = conteo.get(categoria)
+        if not c:
+            logger.info("  %-16s 0 archivos", categoria + ":")
+            continue
+        n_lotes = len(c["lotes"])
+        logger.info(
+            "  %-16s %d archivos en %d lote(s)",
+            categoria + ":",
+            c["archivos"],
+            n_lotes,
+        )
     ya = sum(1 for f in filas if f["estado"] == "YA_EXISTIA")
     if ya:
         logger.info("  (ya existían, no se tocaron: %d)", ya)
-    logger.info("  TOTAL:           %d", len(filas))
+    logger.info("  TOTAL:           %d archivos", len(filas))
 
-    sin = conteo.get(CARPETA_SIN_CLASIFICAR, 0)
+    sin = conteo.get(CARPETA_SIN_CLASIFICAR)
     if sin:
         logger.warning(
             "\nOJO: %d archivo(s) no coincidieron con DETALLE/GLOSAS/HUS. "
             "Quedaron en la carpeta %s para revisión.",
-            sin,
+            sin["archivos"],
             CARPETA_SIN_CLASIFICAR,
         )
 
@@ -265,7 +336,8 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("\nReporte CSV: %s", args.reporte)
 
     logger.info(
-        "\nListo. %s", "(ensayo, no se escribió nada)" if args.dry_run else "Carpetas creadas."
+        "\nListo. %s",
+        "(ensayo, no se escribió nada)" if args.dry_run else "Carpetas y lotes creados.",
     )
     return 0
 
