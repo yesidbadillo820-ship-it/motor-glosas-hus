@@ -209,6 +209,14 @@ GESTORES_DEFECTO: dict = {
         "POSITIVA": {"empresa": "POSITIVA COMPAÑIA DE SEGUROS"},
         "MUTUAL": {"empresa": "ASOCIACION MUTUAL SER"},
         "FOMAG": {"empresa": "FOMAG - FIDUPREVISORA"},
+        "ASEGURADORA SOLIDARIA": {"empresa": "ASEGURADORA SOLIDARIA DE COLOMBIA"},
+        "SALUD TOTAL": {"empresa": "SALUD TOTAL EPS"},
+        "ASMET": {"empresa": "ASMET SALUD EPS"},
+        "ANASWAYUU": {"empresa": "EPS INDIGENA ANAS WAYUU"},
+        "AURORA": {"empresa": "EPS AURORA"},
+        "HDI": {"empresa": "HDI SEGUROS COLOMBIA"},
+        "HDI SEGUROS": {"empresa": "HDI SEGUROS COLOMBIA"},
+        "COLMENA": {"empresa": "COLMENA SEGUROS"},
     },
 }
 

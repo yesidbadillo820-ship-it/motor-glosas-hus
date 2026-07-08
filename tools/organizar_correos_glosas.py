@@ -195,6 +195,36 @@ CONFIG_DEFECTO: dict = {
             "adjuntos": [],
         },
         {
+            "carpeta": "ASEGURADORA SOLIDARIA",
+            "remitente": ["SOLIDARIA"],
+            "asunto": ["ASEGURADORA SOLIDARIA"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "SALUD TOTAL",
+            "remitente": ["SALUDTOTAL"],
+            "asunto": ["SALUD TOTAL"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "ASMET",
+            "remitente": ["ASMET"],
+            "asunto": ["ASMET"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "ANASWAYUU",
+            "remitente": ["ANASWAYUU", "ANAS WAYUU"],
+            "asunto": ["ANASWAYUU", "ANAS WAYUU"],
+            "adjuntos": [],
+        },
+        {
+            "carpeta": "AURORA",
+            "remitente": ["@AURORA", "EPSAURORA"],
+            "asunto": ["EPS AURORA", "\\bAURORA\\b"],
+            "adjuntos": [],
+        },
+        {
             "carpeta": "ADRES",
             "remitente": ["ADRES\\.GOV\\.CO"],
             "asunto": ["EMITIDA POR ADRES", "\\bADRES\\b"],
