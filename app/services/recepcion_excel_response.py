@@ -2,8 +2,8 @@
 importación de recepción.
 
 Toma el Excel original que subió el equipo de recepción, anota cada
-fila con la respuesta IA + estado + ID glosa, y resalta visualmente
-las filas asignadas al gestor destinatario.
+fila con la respuesta IA + estado + ID glosa + gestor asignado, y
+resalta visualmente las filas asignadas al gestor destinatario.
 
 El archivo resultante es lo que se adjunta al correo broadcast — el
 gestor lo abre y ya tiene su tabla original más la columna nueva de
@@ -35,11 +35,13 @@ from app.services.recepcion_service import (
     COLUMN_ALIASES,
     _buscar_fila_encabezado,
 )
+from app.utils.html_a_texto import dictamen_a_texto_plano
 
 
 _NUEVA_COL_RESPUESTA = "RESPUESTA IA"
 _NUEVA_COL_ESTADO = "ESTADO IA"
 _NUEVA_COL_GLOSA_ID = "ID GLOSA"
+_NUEVA_COL_GESTOR = "GESTOR ASIGNADO"
 
 # Colores para resaltar al gestor destinatario y el estado IA.
 _RESALTO_GESTOR_FILL = PatternFill("solid", fgColor="FEF3C7")  # amarillo suave
@@ -106,10 +108,13 @@ def generar_excel_con_respuestas(
 
     for nombre_hoja in wb.sheetnames:
         ws = wb[nombre_hoja]
-        # Localizar encabezados RECEPCION en esta hoja.
+        # Localizar encabezados RECEPCION en esta hoja. Ventana de 20
+        # filas, igual que el parser de importación: los export reales
+        # del DGH traen fila título + filas de banner antes del header
+        # (con 5 la hoja INICIAL podía quedar sin anotar).
         fila_h, idx = _buscar_fila_encabezado(
             ws,
-            max_filas=5,
+            max_filas=20,
             mapa=COLUMN_ALIASES,
             min_aciertos=3,
         )
@@ -128,12 +133,14 @@ def generar_excel_con_respuestas(
         col_resp = col_existentes + 1
         col_estado = col_existentes + 2
         col_id = col_existentes + 3
+        col_gestor_asig = col_existentes + 4
 
         # Escribir encabezados en la misma fila del header detectado
         ws.cell(row=fila_h, column=col_resp, value=_NUEVA_COL_RESPUESTA)
         ws.cell(row=fila_h, column=col_estado, value=_NUEVA_COL_ESTADO)
         ws.cell(row=fila_h, column=col_id, value=_NUEVA_COL_GLOSA_ID)
-        for c_idx in (col_resp, col_estado, col_id):
+        ws.cell(row=fila_h, column=col_gestor_asig, value=_NUEVA_COL_GESTOR)
+        for c_idx in (col_resp, col_estado, col_id, col_gestor_asig):
             celda = ws.cell(row=fila_h, column=c_idx)
             celda.font = Font(bold=True, color="FFFFFF")
             celda.fill = PatternFill("solid", fgColor="1E40AF")
@@ -174,13 +181,18 @@ def generar_excel_con_respuestas(
                         break
 
             if resp:
-                dictamen = _truncar_para_celda(resp.get("dictamen") or "")
+                # El dictamen se guarda como HTML — a la celda va texto
+                # plano legible (tabla de cabecera → "CÓDIGO GLOSA: ... |
+                # VALOR OBJETADO: ..."), nunca tags crudos.
+                dictamen = _truncar_para_celda(dictamen_a_texto_plano(resp.get("dictamen") or ""))
                 estado = (resp.get("estado") or "").upper()
                 glosa_id = resp.get("glosa_id") or ""
+                gestor_asignado = resp.get("gestor_asignado") or ""
             else:
                 dictamen = "—"
                 estado = "NO_PROCESADA"
                 glosa_id = ""
+                gestor_asignado = ""
 
             celda_resp = ws.cell(row=num_fila, column=col_resp, value=dictamen)
             celda_resp.alignment = Alignment(
@@ -207,6 +219,15 @@ def generar_excel_con_respuestas(
             celda_id.border = _BORDE_FINO
             celda_id.font = Font(size=9, color="6B7280")
 
+            celda_gestor = ws.cell(
+                row=num_fila,
+                column=col_gestor_asig,
+                value=gestor_asignado,
+            )
+            celda_gestor.alignment = Alignment(horizontal="left", vertical="center")
+            celda_gestor.border = _BORDE_FINO
+            celda_gestor.font = Font(size=9)
+
             # Resaltar columna gestor si coincide con el destinatario
             if gestor_norm and col_gestor_idx is not None and col_gestor_idx < len(fila):
                 gestor_val = _normalizar_clave(fila[col_gestor_idx].value)
@@ -222,6 +243,7 @@ def generar_excel_con_respuestas(
         ws.column_dimensions[get_column_letter(col_resp)].width = 80
         ws.column_dimensions[get_column_letter(col_estado)].width = 22
         ws.column_dimensions[get_column_letter(col_id)].width = 10
+        ws.column_dimensions[get_column_letter(col_gestor_asig)].width = 30
 
     out = BytesIO()
     try:
@@ -253,6 +275,9 @@ def construir_respuestas_por_clave(db, glosa_ids: list[int]) -> dict[tuple[str, 
             "estado": g.estado or "",
             "dictamen": g.dictamen or "",
             "modelo_ia": g.modelo_ia or "",
+            # Email del usuario asignado por la importación (o el nombre
+            # crudo del Excel si no hubo match) — columna GESTOR ASIGNADO.
+            "gestor_asignado": g.auditor_email or g.gestor_nombre or "",
         }
     if len(fuera) < len(glosa_ids):
         logger.warning(

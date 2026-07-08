@@ -1,5 +1,7 @@
 """Tests for GlosaService."""
 
+import pytest
+
 from app.services.glosa_service import (
     generar_texto_extemporanea,
     generar_texto_injustificada,
@@ -127,6 +129,76 @@ class TestCalculoDiasHabiles:
         """Should skip holidays in count."""
         result = glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-03")
         assert result == 1
+
+
+class TestDiasHabilesFechasInvalidas:
+    """Regresión auditoría jun-2026 P1 #5: con fechas imparseables el método
+    devolvía 0 → la glosa quedaba "DENTRO DE TÉRMINOS (0 DÍAS HÁBILES)" y la
+    defensa por extemporaneidad (RE9502) se perdía en silencio. Ahora debe
+    devolver None y analizar() debe pedir verificación de fechas."""
+
+    @pytest.mark.parametrize(
+        "f1,f2",
+        [
+            ("FECHA-INVALIDA", "2026-03-02"),
+            ("2026-03-02", "no-es-fecha"),
+            ("", ""),
+            (None, "2026-03-02"),
+            ("2026-13-45", "2026-03-02"),  # mes/día imposibles
+            ("02/03/2026", "03/03/2026"),  # formato no ISO
+        ],
+    )
+    def test_fechas_invalidas_devuelven_none(self, glosa_service, f1, f2):
+        assert glosa_service._calcular_dias_habiles(f1, f2) is None
+
+    def test_fechas_validas_siguen_devolviendo_int(self, glosa_service):
+        assert glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-09") == 5
+
+    def test_acepta_timestamp_iso_con_hora(self, glosa_service):
+        """El slice [:10] debe seguir aceptando 'YYYY-MM-DDTHH:MM:SS'."""
+        assert glosa_service._calcular_dias_habiles("2026-03-02T08:30:00", "2026-03-03") == 1
+
+    @pytest.mark.asyncio
+    async def test_analizar_no_clasifica_dentro_de_terminos(self, glosa_service, monkeypatch):
+        """Si el cálculo de días falla, el dictamen NO debe decir
+        'DENTRO DE TÉRMINOS' — debe pedir verificación de fechas."""
+        from app.models.schemas import GlosaInput
+
+        monkeypatch.setattr(glosa_service, "_calcular_dias_habiles", lambda f1, f2: None)
+        data = GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            fecha_radicacion="2026-03-02",
+            fecha_recepcion="2026-04-20",
+            tabla_excel="FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA",
+            valor_aceptado="0",
+        )
+        resultado = await glosa_service.analizar(
+            data, contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+        assert "DENTRO DE TÉRMINOS" not in resultado.mensaje_tiempo
+        assert "FECHAS NO VÁLIDAS" in resultado.mensaje_tiempo
+        assert resultado.color_tiempo == "bg-amber-500"
+
+    @pytest.mark.asyncio
+    async def test_analizar_extemporanea_sigue_funcionando(self, glosa_service):
+        """Control: con fechas válidas y >20 días hábiles la glosa se marca
+        EXTEMPORÁNEA como siempre (la defensa RE9502 se conserva)."""
+        from app.models.schemas import GlosaInput
+
+        data = GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            fecha_radicacion="2026-03-02",
+            fecha_recepcion="2026-04-20",  # ~35 días hábiles
+            tabla_excel="FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA",
+            valor_aceptado="0",
+        )
+        resultado = await glosa_service.analizar(
+            data, contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+        assert "EXTEMPORÁNEA" in resultado.mensaje_tiempo
+        assert resultado.color_tiempo == "bg-red-600"
 
 
 class TestConstantes:

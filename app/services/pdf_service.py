@@ -95,7 +95,7 @@ class PdfService:
         self,
         file_content: bytes,
         anthropic_api_key: str = "",
-        anthropic_model: str = "claude-sonnet-4-6",
+        anthropic_model: str = "claude-sonnet-4-5",
         gemini_api_key: str = "",
         gemini_model: str = "gemini-2.0-flash",
     ) -> tuple[str, str]:

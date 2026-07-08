@@ -12,9 +12,12 @@ Umbrales:
 """
 
 from __future__ import annotations
+import logging
 import re
 from html import unescape
 from typing import Optional
+
+logger = logging.getLogger("motor_glosas")
 
 
 def _limpiar_html(html: str) -> str:
@@ -149,6 +152,10 @@ def check_enumeracion(texto: str) -> dict:
     peso = 10
     t = texto.upper()
     tiene = "EN PRIMER LUGAR" in t and "EN SEGUNDO LUGAR" in t
+    # Auditoría jul-2026: el caso SIMPLE (2 párrafos) tiene PROHIBIDA la
+    # enumeración por el propio prompt — exento del check.
+    if not tiene and _contar_palabras(texto) <= 210:
+        tiene = True
     msg = "Enumeración presente" if tiene else "Falta enumeración técnica en P2"
     return {
         "id": "enumeracion",
@@ -169,6 +176,9 @@ def check_invitacion_conciliacion(texto: str) -> dict:
         or "ART. 20 DEC. 4747" in t
         or "ART\u00cdCULO 20 DEL DECRETO 4747" in t
         or "ARTÍCULO 20 DEL DECRETO 4747" in t
+        # Ronda 29: el cierre de plantilla BANCO HUS no lleva invitación a
+        # conciliación por diseño — no castigarlo.
+        or "PAGO ÍNTEGRO DE LO FACTURADO" in t[-140:]
     )
     msg = (
         "Invitación a conciliación presente" if tiene else "Falta invitación a mesa de conciliación"
@@ -189,8 +199,10 @@ def check_extension(texto: str) -> dict:
     nombre = "Extensión 230-310 palabras"
     peso = 8
     palabras = _contar_palabras(texto)
-    aprobado = 230 <= palabras <= 320 or (palabras < 230 and palabras >= 180)  # margen
-    if palabras < 180:
+    # Auditoría jul-2026: el prompt EXIGE 2 párrafos de 130-180 palabras
+    # en casos simples — el check castigaba al dictamen por obedecer.
+    aprobado = 130 <= palabras <= 320
+    if palabras < 130:
         msg = f"Demasiado corto ({palabras} palabras)"
     elif palabras > 320:
         msg = f"Demasiado largo ({palabras} palabras)"
@@ -417,6 +429,28 @@ _FRASES_PROHIBIDAS_CRITICAS = [
     "NO FUE RESPETADA",
 ]
 
+# Fase 2 Soportes (jul-2026): andamiaje del prompt (aviso de expediente,
+# reglas anti-invención, fallback sin-OCR) que NUNCA debe salir como texto
+# radicable si el modelo lo eco-ea. El repo ya tuvo fugas de prompt (bugs
+# EE/GG); este backstop las caza y fuerza reintento.
+_FRASES_FUGA_PROMPT_SOPORTES = [
+    "AVISO DE EXPEDIENTE",
+    "ALERTA DE EXPEDIENTE",
+    "DETECTOR DETERMINISTA",
+    "SOPORTES QUE RESPALDARÍAN",
+    "SOPORTES QUE RESPALDARIAN",
+    "SOPORTES QUE EL GESTOR",
+    "SIN TEXTO OCR",
+    "REGLA ANTI-INVENCIÓN",
+    "REGLA ANTI-INVENCION",
+    "REGLAS PARA ESTE DICTAMEN",
+    "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS",
+    "PROHIBIDO CITAR FOLIOS",
+    "NO INVENTES FOLIOS",
+    "EVIDENCIA FORENSE (FOLIOS AUDITADOS",
+    "FIN EVIDENCIA FORENSE",
+]
+
 # Errores típicos de citación legal (incorrecto → correcto)
 _CITAS_INCORRECTAS = [
     ("ART. 1601 ", "ART. 1602 "),
@@ -454,6 +488,8 @@ def detectar_defectos_criticos(
     es_ratificacion: bool = False,
     es_extemporanea: bool = False,
     codigo_respuesta: str = "",
+    texto_glosa: str = "",
+    codigos_validos_extra: Optional[list] = None,
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -524,7 +560,10 @@ def detectar_defectos_criticos(
 
     # 3. Email institucional de contacto — obligatorio en todo dictamen.
     requiere_email = True
-    if requiere_email and not any(e in arg_up for e in _EMAILS_CONTACTO):
+    # Ronda 29: si el dictamen usa el cierre del BANCO HUS ("...PAGO ÍNTEGRO
+    # DE LO FACTURADO."), la plantilla jurídica manda — no exigir email.
+    _cierre_banco_hus = "PAGO ÍNTEGRO DE LO FACTURADO" in arg_up[-140:]
+    if requiere_email and not _cierre_banco_hus and not any(e in arg_up for e in _EMAILS_CONTACTO):
         defectos.append(
             {
                 "regla": "sin_email_contacto",
@@ -550,6 +589,145 @@ def detectar_defectos_criticos(
                     ),
                 }
             )
+
+    # 4-ter. CUPS fantasma (Ronda 26, 2-jul-2026): el modelo etiquetó como
+    # "código CUPS 27535" un número que no existe en la glosa ni en ningún
+    # dato del caso (alucinación verificable por la EPS en segundos). Solo
+    # se validan números explícitamente rotulados "CUPS" — los SOAT
+    # homólogos, valores y CUM no se tocan.
+    if texto_glosa:
+        # Los códigos pueden venir con separadores de miles ("27.535") en la
+        # glosa: se indexan ambas formas. Además, códigos verificados por el
+        # motor (CUPS de factura, homólogos tarifarios) cuentan como válidos.
+        _sin_sep = re.sub(r"(?<=\d)[.,\s](?=\d)", "", texto_glosa)
+        _digitos_glosa = set(re.findall(r"\d{4,7}", texto_glosa)) | set(
+            re.findall(r"\d{4,7}", _sin_sep)
+        )
+        for _cv in codigos_validos_extra or ():
+            _cv_dig = re.sub(r"\D", "", str(_cv))
+            if _cv_dig:
+                _digitos_glosa.add(_cv_dig)
+        for _m_cups in re.finditer(r"CUPS\s*[:#]?\s*(\d{4,7})\b", arg_up):
+            _num = _m_cups.group(1)
+            if _num not in _digitos_glosa:
+                defectos.append(
+                    {
+                        "regla": "cups_fantasma",
+                        "mensaje": (
+                            f'El dictamen cita "CUPS {_num}", código que NO aparece '
+                            "en la glosa ni en los datos del caso."
+                        ),
+                        "sugerencia": (
+                            "Usa ÚNICAMENTE el CUPS del BLOQUE 1. Si te refieres al "
+                            "homólogo SOAT, rotúlalo 'código SOAT', nunca 'CUPS'."
+                        ),
+                    }
+                )
+                break
+
+    # 4-quater. Sub-concepto sin refutar (Ronda 27, 2-jul-2026): la glosa
+    # trae 2+ conceptos y el argumento ignora alguno — la prótesis de $3.9M
+    # quedó MUDA en producción. Anclas = palabras DISTINTIVAS del fragmento
+    # (las que no aparecen en los otros conceptos) + sus montos; si ninguna
+    # aparece en el argumento, el concepto no fue respondido.
+    if texto_glosa:
+        try:
+            from app.services.subconceptos_glosa import detectar_subconceptos
+
+            _subs = detectar_subconceptos(texto_glosa)
+            if len(_subs) >= 2:
+                _palabras_por_sub = [
+                    set(re.findall(r"[A-ZÁÉÍÓÚÑ]{6,}", (s.get("texto") or "").upper()))
+                    for s in _subs
+                ]
+                # Solo los conceptos ADICIONALES (2º en adelante): el primero
+                # siempre se responde (aunque parafraseado); el bug real de
+                # producción fue el ADICIONAL mudo. Orden determinista.
+                for _i, _sc in list(enumerate(_subs))[1:]:
+                    _otras = set().union(*(p for _j, p in enumerate(_palabras_por_sub) if _j != _i))
+                    _distintivas = sorted(
+                        _palabras_por_sub[_i] - _otras, key=lambda w: (-len(w), w)
+                    )[:8]
+                    _montos = re.findall(r"\$\s*[\d\.,]{5,}", (_sc.get("texto") or ""))
+                    _anclas = _distintivas + [m.replace(" ", "") for m in _montos]
+                    if not _anclas:
+                        continue
+                    _arg_compacto = arg_up.replace(" ", "")
+                    if not any(
+                        (a in arg_up) or (a.replace(" ", "") in _arg_compacto) for a in _anclas
+                    ):
+                        defectos.append(
+                            {
+                                "regla": "subconcepto_sin_respuesta",
+                                "mensaje": (
+                                    f"La glosa trae {len(_subs)} conceptos y el argumento "
+                                    f"NO responde el concepto '{_sc.get('id', '?')}' "
+                                    f"(esperaba mención de: {', '.join(_anclas[:4])})."
+                                ),
+                                "sugerencia": (
+                                    "Refuta CADA concepto de la glosa por separado. El "
+                                    f"concepto omitido dice: «{(_sc.get('texto') or '')[:180]}»"
+                                ),
+                            }
+                        )
+                        break
+        except Exception:
+            logger.warning(
+                "[SUBCONCEPTO-VALIDADOR] chequeo subconcepto_sin_respuesta no evaluado",
+                exc_info=True,
+            )
+
+    # 4-quinquies. Placeholder dentro de una fórmula (Ronda 27): Groq produjo
+    # "(el valor objetado consignado en el expediente - 10% = el valor
+    # objetado consignado en el expediente)" — la frase neutra anti-invención
+    # usada como operando de una ecuación sin sentido.
+    _FRASES_NEUTRAS_FORMULA = (
+        "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE",
+        "EL VALOR INDICADO EN EL EXPEDIENTE",
+        "EL CUPS DE LA FACTURA",
+    )
+    for _fn in _FRASES_NEUTRAS_FORMULA:
+        _fn_re = re.escape(_fn)
+        if (
+            re.search(_fn_re + r"\s*[-−+*/=]\s*[\d$%(]", arg_up)
+            or re.search(r"[\d$%)]\s*[-−+*/=]\s*" + _fn_re, arg_up)
+            or re.search(_fn_re + r"\s*[-−+*/=]\s*" + _fn_re, arg_up)
+        ):
+            defectos.append(
+                {
+                    "regla": "placeholder_en_formula",
+                    "mensaje": (
+                        f'La frase neutra "{_fn.title()}" aparece como operando de una '
+                        "fórmula/ecuación — texto sin sentido para la EPS."
+                    ),
+                    "sugerencia": (
+                        "Si no tienes las cifras exactas, describe la operación en prosa "
+                        "('aplicando el descuento pactado del 10% sobre la tarifa SOAT') "
+                        "sin ecuaciones con frases genéricas."
+                    ),
+                }
+            )
+            break
+
+    # 4-bis. Fuga del andamiaje del prompt de soportes (Fase 2, jul-2026)
+    for frase in _FRASES_FUGA_PROMPT_SOPORTES:
+        if frase in arg_up:
+            defectos.append(
+                {
+                    "regla": "fuga_prompt_soportes",
+                    "mensaje": (
+                        f'Se filtró andamiaje del prompt al dictamen: "{frase}". '
+                        "Es una instrucción interna, no texto radicable."
+                    ),
+                    "sugerencia": (
+                        "Redacta el argumento SIN mencionar avisos de expediente, "
+                        "reglas anti-invención ni la ausencia de OCR: si no hay "
+                        "evidencia clínica a la vista, defiende con contrato y norma "
+                        "de forma natural."
+                    ),
+                }
+            )
+            break
 
     # 5. Citas legales con sintaxis incorrecta
     for incorrecto, correcto in _CITAS_INCORRECTAS:

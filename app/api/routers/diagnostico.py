@@ -3,7 +3,7 @@ diagnostico.py — Status / Diagnostic page del motor (A.2 del plan UX).
 
 Endpoint admin que devuelve health de TODO el sistema en un solo
 JSON:
-  - Conexión a DB Neon
+  - Conexión a la BD (SQLite local en la VM del HUS o Postgres remoto)
   - Estado del indexer de soportes (cuántos archivos, última build)
   - Estado de noticias (cuántas indexadas, última fetch)
   - Estados de los schedulers (mantenimiento, soportes-reindex,
@@ -15,6 +15,11 @@ JSON:
 Uso: el admin entra a /admin/diagnostico (tab del SPA) y ve un panel
 verde-amarillo-rojo con cada componente. Si algo está rojo, tiene
 botones "Reindexar ahora" / "Refrescar noticias" para auto-fix.
+
+Nota histórica: este motor migró el 23-jun-2026 de Fly.io + Neon Postgres
+a self-hosted en VM Google Cloud + SQLite en volumen local + cloudflared
+tunnel ($0/mes). Las labels y mensajes de este endpoint se actualizaron
+para reflejar el nuevo stack.
 """
 
 from __future__ import annotations
@@ -27,6 +32,7 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.api.deps import get_admin
+from app.core.config import get_settings
 from app.models.db import (
     UsuarioRecord,
     GlosaRecord,
@@ -75,15 +81,31 @@ def diagnostico_completo(
         "secciones": {},
     }
 
-    # ─── DB Neon Postgres ──────────────────────────────────────────
+    # ─── Base de datos (SQLite local en VM HUS o Postgres remoto) ──
+    # Detecta el tipo desde DATABASE_URL: SQLite (self-hosted, default
+    # desde 23-jun-2026) o Postgres (Neon antiguo). Mostrar correctamente
+    # para que el panel no diga "Neon Postgres" cuando ya migramos.
     try:
         n_glosas = db.query(func.count(GlosaRecord.id)).scalar() or 0
         n_usuarios = db.query(func.count(UsuarioRecord.id)).scalar() or 0
         n_contratos = db.query(func.count(ContratoRecord.eps)).scalar() or 0
+        _db_url = os.getenv("DATABASE_URL", "")
+        if _db_url.startswith("sqlite"):
+            _db_label = "SQLite local (volumen /data)"
+        elif "neon" in _db_url.lower():
+            _db_label = "Neon Postgres"
+        elif _db_url.startswith("postgres"):
+            _db_label = "Postgres"
+        else:
+            _db_label = "Base de datos"
         out["secciones"]["base_de_datos"] = {
             "estado": "ok",
-            "mensaje": f"Neon Postgres conectado · {n_glosas} glosas, {n_usuarios} usuarios, {n_contratos} contratos",
+            "mensaje": (
+                f"{_db_label} conectada · {n_glosas} glosas, "
+                f"{n_usuarios} usuarios, {n_contratos} contratos"
+            ),
             "data": {
+                "tipo": _db_label,
                 "glosas": n_glosas,
                 "usuarios": n_usuarios,
                 "contratos": n_contratos,
@@ -105,9 +127,10 @@ def diagnostico_completo(
         if stats.get("facturas_indexadas", 0) == 0:
             estado = "warning"
             mensaje = (
-                "Indexer sin archivos. "
-                "Verificá que el jump-box (tools/jumpbox_sync.py) esté corriendo "
-                "y subiendo soportes al volumen Fly."
+                "Indexer sin archivos en /data/soportes. Subí los PDFs vía la "
+                "tab 'Soportes' del panel admin, o copialos manualmente al "
+                "volumen montado en la VM (/opt/motor-glosas/data/soportes/) "
+                "y andá a la tab Diagnóstico → 'Reindexar soportes'."
             )
         else:
             ultima = stats.get("construido_hace_seg")
@@ -183,7 +206,10 @@ def diagnostico_completo(
     if not anthropic_key:
         out["secciones"]["anthropic"] = {
             "estado": "error",
-            "mensaje": "ANTHROPIC_API_KEY no configurada en Fly Secrets",
+            "mensaje": (
+                "ANTHROPIC_API_KEY no configurada en /opt/motor-glosas/.env. "
+                "Editá el .env de la VM con sudo nano y agregá la clave."
+            ),
             "data": {},
         }
     else:
@@ -239,7 +265,7 @@ def diagnostico_completo(
             "estado": ping_estado,
             "mensaje": ping_msg,
             "data": {
-                "primary_ai": os.getenv("PRIMARY_AI", "anthropic"),
+                "primary_ai": os.getenv("PRIMARY_AI", "groq"),
                 "modelo_default": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
                 "tool_use_habilitado": os.getenv("TOOL_USE_HABILITADO", "0") == "1",
                 "multi_agent_habilitado": os.getenv("MULTI_AGENT_HABILITADO", "0") == "1",
@@ -256,20 +282,46 @@ def diagnostico_completo(
             "data": {},
         }
     else:
+        # Cadena de modelos Groq desde Settings (12-jun-2026): primario +
+        # 2 fallbacks internos antes de saltar a Anthropic. Espejo de
+        # GlosaService._modelos_groq (dedupe por si un override por env
+        # repite un modelo). Mismo patrón que la sección Anthropic, que ya
+        # muestra su modelo activo.
+        cfg = get_settings()
+        cadena_groq: list[str] = []
+        for _m in (cfg.groq_model, cfg.groq_model_fallback_1, cfg.groq_model_fallback_2):
+            if _m and _m not in cadena_groq:
+                cadena_groq.append(_m)
+        partes_cadena = [f"Primario: {cadena_groq[0]}"] + [
+            f"Fallback {i}: {m}" for i, m in enumerate(cadena_groq[1:], start=1)
+        ]
         out["secciones"]["groq"] = {
             "estado": "ok",
-            "mensaje": f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…)",
+            "mensaje": (
+                f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…) · "
+                + " · ".join(partes_cadena)
+            ),
             "data": {
-                "modelo": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                "modelo": cfg.groq_model,
+                "modelo_fallback_1": cfg.groq_model_fallback_1,
+                "modelo_fallback_2": cfg.groq_model_fallback_2,
+                "cadena_modelos": cadena_groq,
             },
         }
 
-    # ─── Gemini API key + ping (tercer proveedor, free tier) ────────
+    # ─── Gemini API key + ping (SOLO OCR de PDFs escaneados) ────────
+    # Jun-2026: Gemini ya no genera dictámenes — quedó como fallback de
+    # lectura de PDFs (pdf_service + pdf_fallback_patch). Sin esta key,
+    # todo el OCR de escaneados cae sobre Anthropic (quema créditos).
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not gemini_key:
         out["secciones"]["gemini"] = {
             "estado": "warning",
-            "mensaje": "GEMINI_API_KEY no configurada — agrega clave en aistudio.google.com/apikey (15 RPM gratis)",
+            "mensaje": (
+                "GEMINI_API_KEY no configurada — sin ella el OCR de PDFs "
+                "escaneados depende 100% de Anthropic (gasta créditos de "
+                "Claude). Agrega clave en aistudio.google.com/apikey (gratis)."
+            ),
             "data": {},
         }
     else:
@@ -279,13 +331,16 @@ def diagnostico_completo(
             try:
                 import httpx as _httpx_g
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
+                # Key por header x-goog-api-key, NUNCA en la URL: el logger
+                # INFO de httpx escribe la URL completa y la key quedaba en
+                # texto plano en los logs de Fly (visto en prod 10-jun-2026).
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent"
                 payload = {
                     "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
                     "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
                 }
                 with _httpx_g.Client(timeout=10.0) as client:
-                    rg = client.post(url, json=payload)
+                    rg = client.post(url, json=payload, headers={"x-goog-api-key": gemini_key})
                 if rg.status_code == 200:
                     return (
                         "ok",
@@ -312,74 +367,8 @@ def diagnostico_completo(
             "data": {
                 "modelo": gemini_modelo,
                 "key_prefix": gemini_key[:10],
+                "rol": "solo OCR de PDFs escaneados (no genera dictámenes)",
                 "free_tier_info": "15 RPM / 1500 RPD para Flash · 2 RPM / 50 RPD para Pro",
-            },
-        }
-
-    # ─── OpenRouter API key + ping (cuarto proveedor — DeepSeek/Llama) ─
-    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-    if not openrouter_key:
-        out["secciones"]["openrouter"] = {
-            "estado": "warning",
-            "mensaje": (
-                "OPENROUTER_API_KEY no configurada — recomendado para tener "
-                "DeepSeek V3 como fallback barato (30× mas que Sonnet). "
-                "Conseguir en openrouter.ai/keys (~$5 = miles de queries)."
-            ),
-            "data": {},
-        }
-    else:
-        openrouter_modelo = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
-
-        def _do_ping_openrouter():
-            try:
-                import httpx as _httpx_or
-
-                with _httpx_or.Client(timeout=10.0) as client:
-                    r_or = client.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {openrouter_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://motor-glosas-hus.fly.dev",
-                            "X-Title": "Motor Glosas HUS",
-                        },
-                        json={
-                            "model": openrouter_modelo,
-                            "messages": [{"role": "user", "content": "ping"}],
-                            "max_tokens": 3,
-                            "temperature": 0,
-                        },
-                    )
-                if r_or.status_code == 200:
-                    return (
-                        "ok",
-                        f"API key OK · ping {openrouter_modelo} exitoso · {openrouter_key[:10]}…",
-                        {},
-                    )
-                if r_or.status_code in (401, 403):
-                    return "error", f"API key INVALIDA o sin permisos (HTTP {r_or.status_code})", {}
-                if r_or.status_code == 429:
-                    return (
-                        "warning",
-                        "Rate limit hit — esperar 60s o agregar credito en openrouter.ai/credits",
-                        {},
-                    )
-                if r_or.status_code == 402:
-                    return "error", "Sin credito — agregar fondos en openrouter.ai/credits", {}
-                return "warning", f"Ping HTTP {r_or.status_code}: {r_or.text[:120]}", {}
-            except Exception as _eor:
-                return "warning", f"No se pudo hacer ping: {str(_eor)[:120]}", {}
-
-        cache_key = f"openrouter::{openrouter_modelo}::{openrouter_key[:6]}"
-        ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_openrouter)
-        out["secciones"]["openrouter"] = {
-            "estado": ping_estado,
-            "mensaje": ping_msg,
-            "data": {
-                "modelo": openrouter_modelo,
-                "key_prefix": openrouter_key[:10],
-                "rol": "Fallback #1 (DeepSeek V3, ~30× mas barato que Sonnet)",
             },
         }
 
@@ -392,7 +381,9 @@ def diagnostico_completo(
                 "SENTRY_DSN no configurado — los errores en producción "
                 "se pierden silenciosamente. Setup en 5 min: crear cuenta "
                 "en sentry.io (free 5K events/mes), copiar DSN del "
-                "proyecto y `fly secrets set SENTRY_DSN=https://...`"
+                "proyecto y agregarlo al .env de la VM: "
+                "`sudo nano /opt/motor-glosas/.env` → SENTRY_DSN=https://... "
+                "→ `sudo docker compose restart motor`."
             ),
             "data": {},
         }
@@ -437,8 +428,9 @@ def diagnostico_completo(
                 "POSTHOG_API_KEY no configurada — no estamos midiendo "
                 "qué gestores usan qué features ni dónde se traban. "
                 "Setup en 3 min: posthog.com (free 1M eventos/mes), "
-                "Project Settings → API Key → "
-                "`fly secrets set POSTHOG_API_KEY=phc_...`"
+                "Project Settings → API Key → agregalo al .env de la VM: "
+                "`sudo nano /opt/motor-glosas/.env` → POSTHOG_API_KEY=phc_... "
+                "→ `sudo docker compose restart motor`."
             ),
             "data": {},
         }
@@ -506,7 +498,10 @@ def diagnostico_completo(
     except Exception as e:
         out["secciones"]["clausulas_contratos"] = {"estado": "error", "mensaje": str(e), "data": {}}
 
-    # ─── Volumen de Fly montado ───────────────────────────────────
+    # ─── Volumen de datos montado (self-hosted: /data en la VM HUS) ──
+    # Mantenemos la clave "volumen_fly" del JSON por backwards-compat con
+    # el frontend que la consume — el mensaje y el label sí están
+    # actualizados al stack actual (Google Cloud VM + bind mount Docker).
     try:
         soportes_root = os.getenv("SOPORTES_ROOT", "/data/soportes")
         existe = os.path.exists(soportes_root)
@@ -518,9 +513,13 @@ def diagnostico_completo(
         out["secciones"]["volumen_fly"] = {
             "estado": "ok" if existe else "error",
             "mensaje": (
-                f"Volumen montado en {soportes_root}, {mb_disponible} MB disponibles"
+                f"Volumen de datos montado en {soportes_root}, {mb_disponible} MB disponibles"
                 if existe
-                else f"Volumen NO montado en {soportes_root}"
+                else (
+                    f"Volumen de datos NO montado en {soportes_root}. "
+                    "Verificá `sudo docker compose ps` en la VM y que el "
+                    "bind mount ./data:/data esté en docker-compose.yml."
+                )
             ),
             "data": {"path": soportes_root, "existe": existe, "mb_disponibles": mb_disponible},
         }

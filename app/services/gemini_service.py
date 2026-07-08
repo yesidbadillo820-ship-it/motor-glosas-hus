@@ -28,19 +28,6 @@ import httpx
 
 logger = logging.getLogger("motor_glosas")
 
-
-# Modelos validos en v1beta de Generative Language API (mayo 2026).
-# El experimental 2.0-flash-exp fue deprecado al pasar 2.0-flash a GA.
-# 2.5 Flash/Pro son los newest. 1.5 sigue activo como fallback.
-GEMINI_MODELS = {
-    "2.0-flash": "gemini-2.0-flash",  # GA, default. 15 RPM/1500 RPD free
-    "2.0-flash-lite": "gemini-2.0-flash-lite",  # mas barato, mismo tier
-    "2.5-flash": "gemini-2.5-flash",  # newer, 15 RPM/1500 RPD free
-    "2.5-pro": "gemini-2.5-pro",  # mejor calidad, 5 RPM/25 RPD free
-    "1.5-flash": "gemini-1.5-flash",  # legacy estable, 1M ctx
-    "1.5-pro": "gemini-1.5-pro",  # legacy mejor calidad, 2M ctx
-}
-
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
 
 
@@ -101,7 +88,11 @@ class GeminiService:
         if not self.disponible:
             raise RuntimeError("GEMINI_API_KEY no configurada")
         modelo = modelo or self.default_model
-        url = f"{self.BASE_URL}/models/{modelo}:generateContent?key={self.api_key}"
+        # La key viaja por header (x-goog-api-key), NUNCA en la URL.
+        # Antes iba como query param (?key=...) y el logger INFO de httpx
+        # escribía la URL completa → la API key quedaba en texto plano en
+        # los logs de Fly. Visto en producción el 10-jun-2026; key rotada.
+        url = f"{self.BASE_URL}/models/{modelo}:generateContent"
 
         # Construir parts: PDFs + imagenes + texto del user
         parts: list[dict] = []
@@ -174,7 +165,14 @@ class GeminiService:
             ],
         }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.post(url, json=body, headers={"Content-Type": "application/json"})
+            r = await client.post(
+                url,
+                json=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self.api_key,
+                },
+            )
         if r.status_code != 200:
             err = r.text[:300]
             logger.warning(f"[GEMINI] HTTP {r.status_code}: {err}")

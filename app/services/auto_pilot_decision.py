@@ -18,6 +18,8 @@ Por defecto, todo va a revisión humana.
 import re
 import logging
 
+from app.utils.moneda import parse_valor_cop
+
 logger = logging.getLogger("motor_glosas")
 
 # Umbral default — Yesid pidió "el más alto, con buen contexto, argumento
@@ -55,35 +57,12 @@ def _detectar_conceptos_en_texto(texto_glosa: str) -> list[str]:
     return unicos
 
 
-def _parse_valor(valor_raw) -> float:
-    """Convierte string $1.234.567 o número a float COP."""
-    if valor_raw is None:
-        return 0.0
-    if isinstance(valor_raw, (int, float)):
-        return float(valor_raw)
-    s = str(valor_raw).strip()
-    # Quitar prefijos no numéricos al inicio ($, %, espacios, COL$, etc.)
-    s = re.sub(r"^[^\d\-]+", "", s)
-    if not s:
-        return 0.0
-    # Formato colombiano: puntos = miles, coma = decimal ("7.700,00" = 7700.00).
-    # Antes hacía re.sub(r"[^\d]", "", s) que para "7.700,00" daba "770000"
-    # (lectura como $770.000). Bug detectado el 12-may-2026.
-    if "," in s:
-        partes = s.rsplit(",", 1)
-        enteros = re.sub(r"[^\d\-]", "", partes[0])
-        decimales = partes[1].strip()
-        if 1 <= len(decimales) <= 2 and decimales.isdigit():
-            try:
-                return float(f"{enteros}.{decimales}")
-            except Exception:
-                return 0.0
-        # Coma no era decimal (más de 2 dígitos detrás) → todo a entero
-        cleaned = re.sub(r"[^\d]", "", s)
-        return float(cleaned) if cleaned else 0.0
-    # Sin coma: los puntos se asumen separadores de miles (Colombia)
-    cleaned = re.sub(r"[^\d]", "", s)
-    return float(cleaned) if cleaned else 0.0
+# Parser canónico COP. La implementación original vivía aquí (bug del
+# 12-may-2026: "7.700,00" leído como 770000); la auditoría jun-2026 la
+# extrajo a app/utils/moneda.py para reutilizarla en analizar.py,
+# glosas.py y schemas.py. Se conserva el alias _parse_valor porque
+# glosa_service.py y confidence_scorer.py lo importan con ese nombre.
+_parse_valor = parse_valor_cop
 
 
 def evaluar_caso_dificil(
@@ -188,6 +167,14 @@ def decidir_auto_envio(
     if es_ratificacion:
         razones_contra.append(
             "Es respuesta a glosa RATIFICADA: el siguiente paso es conciliación, requiere revisión humana"
+        )
+
+    # Auditoría jul-2026: el docstring prometía "NO es extemporánea" pero el
+    # cuerpo nunca evaluaba el parámetro — una extemporánea con confianza
+    # >= 90% se habría auto-enviado.
+    if es_extemporanea:
+        razones_contra.append(
+            "Glosa EXTEMPORÁNEA: requiere revisión humana antes de cualquier envío"
         )
 
     # Decidir estado final

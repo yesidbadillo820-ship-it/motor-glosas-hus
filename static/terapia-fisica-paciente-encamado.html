@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía de Terapia Física para el Paciente en Cama · SINAC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; scroll-behavior: smooth; }
+        .fade-in { animation: fadeIn 0.4s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .card { transition: box-shadow .2s, transform .2s; }
+        .card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.10); }
+        .step-num {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:1.9rem; height:1.9rem; border-radius:9999px;
+            background:#059669; color:#fff; font-weight:700; flex:0 0 auto;
+        }
+        @media print {
+            nav, .no-print { display:none !important; }
+            body { background:#fff; }
+            .card, section { box-shadow:none !important; break-inside: avoid; }
+        }
+        html { scroll-padding-top: 5rem; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+
+    <!-- NAV -->
+    <nav class="bg-emerald-700 text-white shadow-lg sticky top-0 z-40 no-print">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <h1 class="text-lg sm:text-xl font-bold flex items-center gap-2">
+                    🏥 <span>Terapia Física · Paciente en Cama</span>
+                </h1>
+                <button onclick="window.print()" class="px-3 py-1.5 bg-emerald-800 rounded-lg hover:bg-emerald-900 text-sm flex items-center gap-2">
+                    🖨️ <span class="hidden sm:inline">Imprimir / PDF</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+
+        <!-- HERO -->
+        <header class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl shadow-lg p-8 mb-8 fade-in">
+            <p class="uppercase tracking-widest text-emerald-100 text-xs font-semibold mb-2">Guía educativa de cuidado</p>
+            <h2 class="text-3xl sm:text-4xl font-extrabold mb-3">Cómo realizar terapias físicas a un paciente encamado</h2>
+            <p class="text-emerald-50 max-w-3xl">
+                Manual práctico paso a paso para cuidadores, familiares y personal de salud sobre movilización,
+                ejercicios de rango de movimiento, prevención de úlceras y complicaciones de la inmovilidad
+                prolongada en un paciente que permanece en cama.
+            </p>
+        </header>
+
+        <!-- AVISO IMPORTANTE -->
+        <div class="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-5 mb-8 shadow-sm fade-in">
+            <p class="font-bold text-amber-800 flex items-center gap-2">⚠️ Aviso importante</p>
+            <p class="text-amber-900 text-sm mt-1">
+                Este documento tiene fines <strong>educativos e informativos</strong>. No sustituye la valoración
+                ni las indicaciones de un <strong>fisioterapeuta, médico o profesional de la salud</strong>.
+                Todo plan de rehabilitación debe ser <strong>prescrito y supervisado</strong> por personal
+                calificado, especialmente en pacientes con fracturas, cirugía reciente, problemas cardíacos,
+                trombosis o estado clínico inestable. Ante cualquier duda o signo de alarma, consulte al equipo tratante.
+            </p>
+        </div>
+
+        <!-- ÍNDICE -->
+        <nav class="bg-white rounded-xl shadow p-6 mb-8 no-print fade-in">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">📑 Contenido</h3>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                <a href="#objetivos" class="text-emerald-700 hover:underline">1. Objetivos y beneficios</a>
+                <a href="#antes" class="text-emerald-700 hover:underline">2. Antes de empezar</a>
+                <a href="#contra" class="text-emerald-700 hover:underline">3. Cuándo NO movilizar</a>
+                <a href="#posicion" class="text-emerald-700 hover:underline">4. Cambios de posición</a>
+                <a href="#rom" class="text-emerald-700 hover:underline">5. Ejercicios de movilidad</a>
+                <a href="#respiracion" class="text-emerald-700 hover:underline">6. Ejercicios respiratorios</a>
+                <a href="#circulacion" class="text-emerald-700 hover:underline">7. Circulación y anti-trombosis</a>
+                <a href="#sentarse" class="text-emerald-700 hover:underline">8. Sentarse y transferencias</a>
+                <a href="#frecuencia" class="text-emerald-700 hover:underline">9. Frecuencia recomendada</a>
+                <a href="#alarma" class="text-emerald-700 hover:underline">10. Signos de alarma</a>
+            </div>
+        </nav>
+
+        <!-- 1. OBJETIVOS -->
+        <section id="objetivos" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🎯 1. Objetivos y beneficios</h3>
+            <p class="text-gray-600 mb-4">La movilización temprana y regular del paciente encamado busca prevenir las complicaciones de la inmovilidad y conservar su función.</p>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-emerald-50 rounded-lg p-4"><p class="font-semibold text-emerald-800">🦴 Mantener articulaciones</p><p class="text-sm text-gray-600 mt-1">Evita rigidez y contracturas conservando el rango de movimiento.</p></div>
+                <div class="bg-emerald-50 rounded-lg p-4"><p class="font-semibold text-emerald-800">💪 Conservar músculo</p><p class="text-sm text-gray-600 mt-1">Reduce la atrofia y la pérdida de fuerza por desuso.</p></div>
+                <div class="bg-emerald-50 rounded-lg p-4"><p class="font-semibold text-emerald-800">🩹 Prevenir úlceras</p><p class="text-sm text-gray-600 mt-1">Los cambios de posición alivian la presión sobre la piel.</p></div>
+                <div class="bg-emerald-50 rounded-lg p-4"><p class="font-semibold text-emerald-800">🫁 Cuidar los pulmones</p><p class="text-sm text-gray-600 mt-1">Disminuye el riesgo de neumonía y acumulación de secreciones.</p></div>
+                <div class="bg-emerald-50 rounded-lg p-4"><p class="font-semibold text-emerald-800">🩸 Activar circulación</p><p class="text-sm text-gray-600 mt-1">Ayuda a prevenir trombosis venosa profunda (coágulos).</p></div>
+                <div class="bg-emerald-50 rounded-lg p-4"><p class="font-semibold text-emerald-800">😊 Bienestar</p><p class="text-sm text-gray-600 mt-1">Mejora el ánimo, el descanso y la autonomía del paciente.</p></div>
+            </div>
+        </section>
+
+        <!-- 2. ANTES DE EMPEZAR -->
+        <section id="antes" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🧰 2. Antes de empezar</h3>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">Preparación del cuidador y el entorno</h4>
+                    <ul class="space-y-2 text-sm text-gray-700 list-disc list-inside">
+                        <li><strong>Lávese las manos</strong> antes y después de cada sesión.</li>
+                        <li>Ajuste la <strong>cama a la altura de su cadera</strong> para proteger su espalda; baje la baranda del lado que trabaja.</li>
+                        <li>Frene las ruedas de la cama y retire almohadas u obstáculos.</li>
+                        <li>Verifique <strong>sondas, vías, oxígeno y drenajes</strong>: deje holgura para que no se tiren.</li>
+                        <li>Cuide su postura: <strong>doble las rodillas, espalda recta</strong> y acerque el cuerpo del paciente hacia usted.</li>
+                        <li>Elija un momento sin dolor: si hay dolor, administre analgesia (según indicación) <strong>30–45 min antes</strong>.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">Comunicación con el paciente</h4>
+                    <ul class="space-y-2 text-sm text-gray-700 list-disc list-inside">
+                        <li><strong>Explique</strong> qué va a hacer, aunque el paciente parezca no responder.</li>
+                        <li>Pida su colaboración: que ayude con la fuerza que tenga.</li>
+                        <li>Trabaje con <strong>movimientos lentos, suaves y sin brusquedad</strong>.</li>
+                        <li>Sostenga siempre la articulación <strong>por arriba y por abajo</strong> (ej. codo y muñeca).</li>
+                        <li><strong>Nunca fuerce</strong> un movimiento hasta el dolor: llegue solo hasta una tensión cómoda.</li>
+                        <li>Observe la cara y la respiración: son sus mejores indicadores de tolerancia.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. CONTRAINDICACIONES -->
+        <section id="contra" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in border-t-4 border-red-400">
+            <h3 class="text-2xl font-bold text-red-600 mb-4 flex items-center gap-2">⛔ 3. Cuándo NO movilizar (consulte primero)</h3>
+            <p class="text-gray-600 mb-4 text-sm">Detenga o posponga los ejercicios y avise al equipo de salud si existe alguna de estas situaciones:</p>
+            <div class="grid sm:grid-cols-2 gap-3 text-sm">
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">🔴 Fractura reciente o sospecha de fractura no estabilizada.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">🔴 Cirugía reciente con indicación de reposo o zona operada.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">🔴 Trombosis venosa (coágulo) confirmada o sospechada en una pierna caliente, roja e hinchada.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">🔴 Dolor intenso, en el pecho o dificultad para respirar.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">🔴 Inestabilidad: presión, pulso o saturación muy alterados; fiebre alta.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">🔴 Articulación caliente, muy roja, inflamada o luxada.</div>
+            </div>
+        </section>
+
+        <!-- 4. CAMBIOS DE POSICIÓN -->
+        <section id="posicion" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🔄 4. Cambios de posición (prevención de úlceras por presión)</h3>
+            <p class="text-gray-600 mb-4">Cambie de posición al paciente <strong>cada 2 horas</strong> (día y noche) para evitar que la piel se lesione por la presión sostenida. Use almohadas para acomodar y proteger las zonas de apoyo.</p>
+
+            <div class="grid md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="font-semibold text-gray-800 mb-1">🛏️ Boca arriba (supino)</p>
+                    <p class="text-sm text-gray-600">Almohada bajo la cabeza, bajo las pantorrillas (talones flotando) y a los lados para alinear. Cabecera a 30°.</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="font-semibold text-gray-800 mb-1">↔️ De lado (lateral 30°)</p>
+                    <p class="text-sm text-gray-600">Apoye la espalda con almohada; otra entre las rodillas y tobillos; una para el brazo de arriba. Evite apoyar directo sobre la cadera.</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="font-semibold text-gray-800 mb-1">🪑 Semisentado (Fowler)</p>
+                    <p class="text-sm text-gray-600">Cabecera 45–60° para comer o respirar mejor. Evite que resbale hacia abajo (fuerzas de cizalla).</p>
+                </div>
+            </div>
+
+            <h4 class="font-semibold text-gray-800 mb-3">Girar al paciente de lado, paso a paso</h4>
+            <ol class="space-y-3">
+                <li class="flex gap-3 items-start"><span class="step-num">1</span><p class="text-sm text-gray-700 pt-0.5">Explíquele la maniobra y cruce el brazo del paciente sobre su pecho.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">2</span><p class="text-sm text-gray-700 pt-0.5">Flexione la rodilla del lado contrario al que va a girar (la pierna que quedará arriba).</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">3</span><p class="text-sm text-gray-700 pt-0.5">Coloque sus manos en el <strong>hombro y la cadera</strong> del paciente y gírelo suavemente hacia usted en bloque.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">4</span><p class="text-sm text-gray-700 pt-0.5">Acomode almohadas en espalda, entre las rodillas y bajo el brazo superior. Revise que la oreja, hombro y cadera queden alineados.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">5</span><p class="text-sm text-gray-700 pt-0.5">Inspeccione la piel de las zonas que estuvieron apoyadas: talones, sacro, caderas, codos, omóplatos y nuca. Si hay <strong>enrojecimiento que no desaparece</strong>, avise al personal.</p></li>
+            </ol>
+            <div class="mt-4 bg-emerald-50 border-l-4 border-emerald-500 rounded p-3 text-sm text-emerald-900">
+                💡 <strong>Consejo:</strong> mueva al paciente <em>levantándolo</em>, nunca arrastrándolo, para no rozar la piel. Mantenga las sábanas secas, limpias y sin arrugas.
+            </div>
+        </section>
+
+        <!-- 5. ROM -->
+        <section id="rom" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🤸 5. Ejercicios de rango de movimiento (movilidad)</h3>
+            <p class="text-gray-600 mb-4">
+                Mueva cada articulación en toda su amplitud, <strong>lento y suave</strong>, repitiendo cada movimiento
+                <strong>5 a 10 veces</strong>, dos a tres veces al día. Existen tres modalidades según la capacidad del paciente:
+            </p>
+            <div class="grid sm:grid-cols-3 gap-4 mb-6 text-sm">
+                <div class="bg-teal-50 rounded-lg p-4"><p class="font-semibold text-teal-800">Pasivos</p><p class="text-gray-600 mt-1">El cuidador realiza todo el movimiento; el paciente no puede colaborar.</p></div>
+                <div class="bg-teal-50 rounded-lg p-4"><p class="font-semibold text-teal-800">Activos-asistidos</p><p class="text-gray-600 mt-1">El paciente inicia el movimiento y el cuidador ayuda a completarlo.</p></div>
+                <div class="bg-teal-50 rounded-lg p-4"><p class="font-semibold text-teal-800">Activos</p><p class="text-gray-600 mt-1">El paciente lo hace solo; el cuidador supervisa y anima.</p></div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Miembro superior -->
+                <div class="border rounded-xl p-5">
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">💪 Miembros superiores</h4>
+                    <ul class="space-y-3 text-sm text-gray-700">
+                        <li><strong>Hombro:</strong> sostenga codo y muñeca; suba el brazo recto hacia la cabeza y bájelo. Ábralo y ciérrelo hacia el lado.</li>
+                        <li><strong>Codo:</strong> doble y estire el codo llevando la mano hacia el hombro y de vuelta.</li>
+                        <li><strong>Antebrazo:</strong> gire la palma hacia arriba y hacia abajo.</li>
+                        <li><strong>Muñeca:</strong> flexione, extienda y haga círculos suaves.</li>
+                        <li><strong>Dedos:</strong> abra y cierre la mano; separe y junte los dedos uno a uno.</li>
+                    </ul>
+                </div>
+                <!-- Miembro inferior -->
+                <div class="border rounded-xl p-5">
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">🦵 Miembros inferiores</h4>
+                    <ul class="space-y-3 text-sm text-gray-700">
+                        <li><strong>Cadera y rodilla:</strong> sujete bajo la rodilla y el talón; doble la pierna acercando la rodilla al pecho y estírela.</li>
+                        <li><strong>Cadera (apertura):</strong> con la pierna estirada, ábrala hacia afuera y regrésela al centro.</li>
+                        <li><strong>Tobillo:</strong> lleve el pie hacia arriba (hacia la cara) y hacia abajo; haga círculos.</li>
+                        <li><strong>Dedos del pie:</strong> flexione y extienda los dedos.</li>
+                        <li><strong>Talones:</strong> revise siempre que no queden apoyados con presión.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-4 bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-sm text-amber-900">
+                ⚠️ Sostenga siempre la extremidad con <strong>ambas manos</strong> (una arriba y otra abajo de la articulación). Si aparece dolor, resistencia brusca o rigidez marcada, deténgase y consulte.
+            </div>
+        </section>
+
+        <!-- 6. RESPIRACIÓN -->
+        <section id="respiracion" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🫁 6. Ejercicios respiratorios</h3>
+            <p class="text-gray-600 mb-4">Ayudan a expandir los pulmones, movilizar secreciones y prevenir infecciones. Realícelos con el paciente semisentado.</p>
+            <div class="grid md:grid-cols-3 gap-4 text-sm">
+                <div class="bg-sky-50 rounded-lg p-4">
+                    <p class="font-semibold text-sky-800 mb-1">Respiración diafragmática</p>
+                    <p class="text-gray-600">Una mano en el abdomen: inspire por la nariz inflando la barriga (3 s), exhale lento por la boca (4–6 s). Repita 5–10 veces.</p>
+                </div>
+                <div class="bg-sky-50 rounded-lg p-4">
+                    <p class="font-semibold text-sky-800 mb-1">Inspiración sostenida</p>
+                    <p class="text-gray-600">Inspire profundo y lento, mantenga el aire 2–3 s y suéltelo. Ideal con inspirómetro incentivo si lo indicó el equipo.</p>
+                </div>
+                <div class="bg-sky-50 rounded-lg p-4">
+                    <p class="font-semibold text-sky-800 mb-1">Tos asistida</p>
+                    <p class="text-gray-600">Tras 2–3 respiraciones profundas, pídale toser para expulsar secreciones. Puede abrazar una almohada sobre el pecho o el abdomen.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. CIRCULACIÓN -->
+        <section id="circulacion" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🩸 7. Circulación y prevención de trombosis</h3>
+            <p class="text-gray-600 mb-4">La inmovilidad favorece la formación de coágulos en las piernas. Estos ejercicios sencillos ayudan a activar el retorno venoso; hágalos varias veces al día.</p>
+            <ul class="space-y-2 text-sm text-gray-700 list-disc list-inside">
+                <li><strong>Bombeo de tobillos:</strong> mover los pies arriba y abajo, como pisando un pedal, 10–20 veces cada hora que esté despierto.</li>
+                <li><strong>Círculos con los tobillos</strong> en ambos sentidos.</li>
+                <li><strong>Contracción de pantorrillas y muslos:</strong> apretar los músculos 5 segundos y soltar.</li>
+                <li>Elevar ligeramente las piernas con una almohada si el equipo lo indica.</li>
+                <li>Use medias de compresión o dispositivos de compresión solo <strong>si están prescritos</strong>.</li>
+            </ul>
+            <div class="mt-4 bg-red-50 border-l-4 border-red-500 rounded p-3 text-sm text-red-900">
+                🚨 Avise de inmediato si una pierna se pone <strong>hinchada, roja, caliente y dolorosa</strong>: puede ser una trombosis y <strong>no</strong> debe masajearse.
+            </div>
+        </section>
+
+        <!-- 8. SENTARSE Y TRANSFERENCIAS -->
+        <section id="sentarse" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">🪑 8. Sentarse en el borde y transferencias</h3>
+            <p class="text-gray-600 mb-4">Cuando el equipo lo autorice, progrese de estar acostado a sentarse al borde de la cama. Hágalo <strong>despacio</strong> para evitar mareos por bajada de presión.</p>
+            <ol class="space-y-3">
+                <li class="flex gap-3 items-start"><span class="step-num">1</span><p class="text-sm text-gray-700 pt-0.5">Eleve la cabecera de la cama de forma progresiva y espere 1–2 minutos.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">2</span><p class="text-sm text-gray-700 pt-0.5">Gire al paciente de lado, cerca del borde, con las rodillas flexionadas.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">3</span><p class="text-sm text-gray-700 pt-0.5">Pase sus piernas fuera de la cama mientras, con la otra mano, lo ayuda a empujarse con el codo/brazo hasta quedar sentado.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">4</span><p class="text-sm text-gray-700 pt-0.5">Deje que los <strong>pies apoyen en el suelo</strong>; sosténgalo y verifique que no esté mareado ni pálido antes de continuar.</p></li>
+                <li class="flex gap-3 items-start"><span class="step-num">5</span><p class="text-sm text-gray-700 pt-0.5">Para pasar a una silla: acérquela y frénela, use cinturón/faja de transferencia si dispone, y pivotee con las rodillas del paciente bloqueadas contra las suyas.</p></li>
+            </ol>
+            <div class="mt-4 bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-sm text-amber-900">
+                ⚠️ Si el paciente se marea, pone pálido, suda frío o le falta el aire, <strong>recuéstelo de nuevo</strong> lentamente y avise al equipo. Nunca intente levantar solo a un paciente que no puede sostener su peso.
+            </div>
+        </section>
+
+        <!-- 9. FRECUENCIA -->
+        <section id="frecuencia" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in">
+            <h3 class="text-2xl font-bold text-emerald-700 mb-4 flex items-center gap-2">📅 9. Frecuencia recomendada (orientativa)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-emerald-700 text-white text-left">
+                            <th class="p-3 rounded-tl-lg">Actividad</th>
+                            <th class="p-3">Frecuencia</th>
+                            <th class="p-3 rounded-tr-lg">Repeticiones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <tr class="bg-white"><td class="p-3 font-medium">Cambio de posición</td><td class="p-3">Cada 2 horas</td><td class="p-3">—</td></tr>
+                        <tr class="bg-gray-50"><td class="p-3 font-medium">Rango de movimiento (articulaciones)</td><td class="p-3">2–3 veces/día</td><td class="p-3">5–10 por movimiento</td></tr>
+                        <tr class="bg-white"><td class="p-3 font-medium">Ejercicios respiratorios</td><td class="p-3">Cada 2–3 horas despierto</td><td class="p-3">5–10 respiraciones</td></tr>
+                        <tr class="bg-gray-50"><td class="p-3 font-medium">Bombeo de tobillos / circulación</td><td class="p-3">Cada hora despierto</td><td class="p-3">10–20 por pie</td></tr>
+                        <tr class="bg-white"><td class="p-3 font-medium">Sentarse al borde / silla</td><td class="p-3">Según tolerancia e indicación</td><td class="p-3">Progresivo</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">* Cifras generales de referencia. El plan real debe ajustarlo el fisioterapeuta o médico según el diagnóstico y la evolución del paciente.</p>
+        </section>
+
+        <!-- 10. SIGNOS DE ALARMA -->
+        <section id="alarma" class="bg-white rounded-xl shadow p-6 mb-8 card fade-in border-t-4 border-red-500">
+            <h3 class="text-2xl font-bold text-red-600 mb-4 flex items-center gap-2">🚨 10. Detenga la actividad y busque ayuda si aparece…</h3>
+            <div class="grid sm:grid-cols-2 gap-3 text-sm">
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Dolor en el pecho o dificultad para respirar.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Mareo, desmayo, palidez o sudoración fría.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Una pierna hinchada, roja, caliente y dolorosa.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Dolor articular intenso o un “chasquido” anormal.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Palpitaciones o pulso muy rápido/irregular.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Piel enrojecida que no aclara, ampollas o heridas.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Confusión, somnolencia excesiva o cambio brusco del estado.</div>
+                <div class="bg-red-50 rounded-lg p-3 text-red-900">• Fiebre, vómito o malestar general marcado.</div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="text-center text-xs text-gray-500 py-6">
+            <p class="mb-1">📘 Guía educativa de terapia física para pacientes encamados.</p>
+            <p>No reemplaza la valoración profesional. Consulte siempre a su fisioterapeuta o médico tratante.</p>
+        </footer>
+
+    </main>
+</body>
+</html>

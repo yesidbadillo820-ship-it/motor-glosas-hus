@@ -203,4 +203,5 @@ class TestCheckSaludConsolidado:
             "bots",
             "actividad_reciente",
         }
-        assert set(r["componentes"].keys()) == esperados
+        # Ronda 29: superset — monitorear un componente nuevo no rompe esto.
+        assert esperados <= set(r["componentes"].keys())

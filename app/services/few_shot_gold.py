@@ -20,6 +20,7 @@ Filosofía:
 from __future__ import annotations
 
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,29 @@ _MAX_CHARS_EJEMPLO = 1500
 _MAX_EJEMPLOS = 2
 
 
+def _contiene_contrato_ajeno(argumento: str, eps: str) -> bool:
+    """True si el ejemplo cita un contrato cuya EPS dueña NO es `eps`.
+
+    Ronda 2 (12-jun-2026, CONTRATO CRUZADO): los ejemplos del banco HUS
+    (eps=GENERICO) y los históricos venían con números de contrato reales de
+    OTRAS EPS, y la instrucción "copia el cuerpo VERBATIM" hacía que la IA
+    los arrastrara al dictamen (glosa DMBUG citando el S-13-1-03-1-04958 de
+    FAMISANAR). Un ejemplo así NO se inyecta: contamina más de lo que aporta.
+    """
+    try:
+        from app.services.glosa_ia_prompts import contratos_ajenos_citados
+
+        return bool(contratos_ajenos_citados(argumento or "", eps))
+    except Exception:
+        return False
+
+
 def obtener_ejemplos_gold(
     db,
     eps: str,
     codigo: str,
     max_ejemplos: int = _MAX_EJEMPLOS,
+    texto_glosa: str = "",
 ) -> list[dict]:
     """Devuelve hasta N dictámenes ganadores del par (eps, codigo).
 
@@ -79,6 +98,14 @@ def obtener_ejemplos_gold(
             arg = (h.argumento or "").strip()
             if len(arg) < 200:
                 continue
+            # Ronda 2 12-jun-2026: plantilla genérica con contrato de OTRA
+            # EPS (la IA lo copia verbatim) — no inyectar.
+            if _contiene_contrato_ajeno(arg, eps_norm):
+                logger.warning(
+                    f"[FEW-SHOT-GOLD] plantilla BANCO_HUS #{h.id} omitida: "
+                    f"cita contrato de otra EPS (glosa de {eps_norm})"
+                )
+                continue
             ejemplos.append(
                 {
                     "argumento": arg[:_MAX_CHARS_EJEMPLO],
@@ -113,6 +140,13 @@ def obtener_ejemplos_gold(
             # Evitar duplicados con banco HUS
             if any(arg[:200] == e["argumento"][:200] for e in ejemplos):
                 continue
+            # Ronda 2 12-jun-2026: plantilla curada con contrato ajeno — fuera.
+            if _contiene_contrato_ajeno(arg, eps_norm):
+                logger.warning(
+                    f"[FEW-SHOT-GOLD] plantilla GOLD #{g.id} omitida: "
+                    f"cita contrato de otra EPS (glosa de {eps_norm})"
+                )
+                continue
             ejemplos.append(
                 {
                     "argumento": arg[:_MAX_CHARS_EJEMPLO],
@@ -146,6 +180,13 @@ def obtener_ejemplos_gold(
             # Evitar duplicados: ya tenemos uno con este texto
             if any(arg[:200] == e["argumento"][:200] for e in ejemplos):
                 continue
+            # Ronda 2 12-jun-2026: histórico contaminado con contrato ajeno.
+            if _contiene_contrato_ajeno(arg, eps_norm):
+                logger.warning(
+                    f"[FEW-SHOT-GOLD] histórico #{r.id} omitido: "
+                    f"cita contrato de otra EPS (glosa de {eps_norm})"
+                )
+                continue
             ejemplos.append(
                 {
                     "argumento": arg[:_MAX_CHARS_EJEMPLO],
@@ -157,6 +198,58 @@ def obtener_ejemplos_gold(
                 break
     except Exception as e:
         logger.debug(f"few_shot_gold: error consultando GlosaRecord: {e}")
+
+    # 4) Fase 3 (jul-2026): completar por SIMILITUD BM25 al TEXTO de la glosa.
+    #    El match exacto (eps+código) de los pasos 1-3 tiene recall bajo:
+    #    si no hay histórico del par exacto, no hay ejemplo relevante. El
+    #    RAGService rankea por BM25 sobre precedentes GANADOS (LEVANTADA) de
+    #    CUALQUIER eps/código, con boost por eps/prefijo — trae el ejemplo más
+    #    parecido a ESTA glosa, no el más popular por código. Apagable:
+    #    GLOSA_FEWSHOT_BM25=0.
+    if (
+        texto_glosa
+        and len(ejemplos) < max_ejemplos
+        # No mezclar con las plantillas BANCO_HUS (modo "copiar verbatim"):
+        # meter un precedente "para estilo" al lado confunde la instrucción.
+        and not any(e.get("fuente") == "BANCO_HUS" for e in ejemplos)
+        and os.getenv("GLOSA_FEWSHOT_BM25", "1").strip().lower() not in ("0", "false", "no")
+    ):
+        try:
+            from app.services.rag_service import RAGService
+
+            _ya = {e["argumento"][:200] for e in ejemplos}
+            precedentes = RAGService().buscar_casos_similares(
+                texto_glosa=texto_glosa,
+                eps=eps_norm,
+                codigo_glosa=cod_norm,
+                db=db,
+                top_k=max_ejemplos * 3,
+                solo_exitosos=True,
+            )
+            for p in precedentes:
+                arg = (p.get("extracto_dictamen") or "").strip()
+                if len(arg) < 200 or arg[:200] in _ya:
+                    continue
+                # Los precedentes BM25 vienen de OTRAS EPS/códigos: si citan un
+                # contrato ajeno, la IA lo arrastraría — no inyectar.
+                if _contiene_contrato_ajeno(arg, eps_norm):
+                    logger.warning(
+                        f"[FEW-SHOT-GOLD] precedente BM25 #{p.get('id')} omitido: "
+                        f"cita contrato de otra EPS (glosa de {eps_norm})"
+                    )
+                    continue
+                ejemplos.append(
+                    {
+                        "argumento": arg[:_MAX_CHARS_EJEMPLO],
+                        "fuente": "SIMILAR_BM25",
+                        "id": p.get("id"),
+                    }
+                )
+                _ya.add(arg[:200])
+                if len(ejemplos) >= max_ejemplos:
+                    break
+        except Exception as e:
+            logger.debug(f"few_shot_gold: BM25 similar no disponible: {e}")
 
     return ejemplos
 
@@ -180,22 +273,41 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
     if solo_hus:
         partes = [
             "",
-            "═══ PLANTILLA(S) JURÍDICA(S) BASE — BANCO HUS ═══",
+            "═══════════════════════════════════════════════════════════════════",
+            "★★★ PLANTILLA(S) JURÍDICA(S) BASE — BANCO HUS — MÁXIMA PRIORIDAD ★★★",
+            "═══════════════════════════════════════════════════════════════════",
             (
-                "Las siguientes plantillas son argumentos jurídicos APROBADOS "
-                "por el equipo legal del HUS. Úsalas como ESQUELETO BASE del "
-                "dictamen — NO reescribas los argumentos legales (citas, normas, "
-                "sentencias, decretos): ya están redactados con rigor jurídico."
+                "ESTAS PLANTILLAS SON LA FUENTE OFICIAL DE LA RESPUESTA. "
+                "ANULAN cualquier 'REGLA DURA' del system prompt sobre formato "
+                "estándar de P1/P2/P3. El equipo jurídico del HUS aprobó cada "
+                "palabra: citas, normas, sentencias, decretos, encabezado y cierre."
             ),
-            ("TU ÚNICA TAREA es PERSONALIZAR la plantilla con los datos del caso actual:"),
-            "  1. NOMBRE DEL SERVICIO (CUPS/procedimiento del BLOQUE 1)",
-            "  2. VALORES MONETARIOS (objetado/facturado del BLOQUE 1)",
+            "",
+            "CÓMO USAR LA PLANTILLA (regla EXACTA):",
             (
-                "  3. NOMBRE DEL PACIENTE Y NÚMERO DE DOCUMENTO (si vienen en "
-                "soportes PDF; si NO hay soportes, OMITIR — no inventar)"
+                "  ① COPIA EL ENCABEZADO VERBATIM. La plantilla empieza con "
+                "'ESE HUS NO ACEPTA GLOSA POR CONCEPTO DE [X]...'. NO lo cambies "
+                "por el formato 'ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO "
+                "DE [Y] SOBRE EL CÓDIGO...' del template estándar."
             ),
-            ("  4. FECHAS DE ATENCIÓN (si vienen en soportes PDF; si NO, OMITIR — no inventar)"),
-            ('  5. Reemplazar "LA ENTIDAD PAGADORA" por el nombre real del pagador (del BLOQUE 1)'),
+            (
+                "  ② COPIA TODO EL CUERPO LEGAL VERBATIM — las citas a artículos, "
+                "decretos y sentencias son JURÍDICAMENTE VERIFICADAS. No las "
+                "reformules ni cambies los números."
+            ),
+            (
+                "  ③ COPIA EL CIERRE VERBATIM: termina en 'SE SOLICITA EL "
+                "LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LO FACTURADO.' — "
+                "NO agregues 'mesa de conciliación', '10 días hábiles', "
+                "emails @hus.gov.co ni nada después del cierre."
+            ),
+            "",
+            "ÚNICA PERSONALIZACIÓN PERMITIDA (los placeholders):",
+            "  • Reemplazar 'LA ENTIDAD PAGADORA' o '{PAGADOR}' por el nombre real del pagador (del BLOQUE 1)",
+            "  • Inyectar VALORES MONETARIOS del caso (objetado/facturado) si la plantilla deja huecos",
+            "  • Inyectar NOMBRE DEL SERVICIO / CUPS del caso si la plantilla deja huecos",
+            "  • NOMBRE DEL PACIENTE Y DOCUMENTO: solo si vienen en soportes PDF — si no hay PDF, OMITIR",
+            "  • FECHAS DE ATENCIÓN: solo si vienen en soportes PDF — si no hay PDF, OMITIR",
             "",
         ]
         for i, ej in enumerate(ejemplos, 1):
@@ -204,9 +316,32 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
             partes.append("--- FIN PLANTILLA ---")
             partes.append("")
         partes.append(
-            "⚠ PROHIBIDO inventar nombres de pacientes, números de documento o "
-            "fechas que NO estén explícitos en los soportes PDF o en el texto "
+            "⚠ PROHIBIDO ABSOLUTO: inventar nombres de pacientes, números de "
+            "documento o fechas que NO estén en los soportes PDF o en el texto "
             "de la glosa. Si el dato no existe, omitir la mención."
+        )
+        partes.append(
+            "⚠ PROHIBIDO ABSOLUTO: re-redactar las citas legales con palabras "
+            "propias. La plantilla DICE 'Artículo 87 del Decreto 2423 de 1996' "
+            "— NO digas 'Art. 10 Ley 1438 de 2011' ni otras citas inventadas."
+        )
+        partes.append(
+            "⚠ ⚠ ⚠ PROHIBIDO ABSOLUTO (mayo 2026, regla nueva): NO AGREGUES "
+            "NORMAS QUE NO ESTÉN LITERALMENTE EN LA PLANTILLA. El validador "
+            "del HUS marca como ERROR cualquier 'Art. X Ley Y' que no esté en "
+            "el corpus normativo cargado. La plantilla YA tiene las 2-3 normas "
+            "verificadas que necesitas — NO agregues 'Art. 10 Ley 1438', "
+            "'Art. 15 Ley 1122', 'Art. 2 Ley 1751' ni similares. Si tu instinto "
+            "es 'reforzar el argumento con más normas', RESÍSTELO: el equipo "
+            "jurídico ya seleccionó las normas óptimas."
+        )
+        partes.append(
+            "⚠ TERMINA EXACTAMENTE DONDE TERMINA LA PLANTILLA. Si la plantilla "
+            "termina en 'SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO "
+            "ÍNTEGRO DE LO FACTURADO.', tu respuesta termina ahí. NO agregues "
+            "párrafos 'DE ACUERDO CON EL ARTÍCULO X DE LA LEY Y' después del "
+            "cierre. NO agregues 'EN ESTE SENTIDO, SE DEBE TENER EN CUENTA QUE...' "
+            "con citas adicionales. La plantilla está completa por diseño."
         )
         partes.append("═══════════════════════════════════════════════════════════════════")
         partes.append("")
@@ -231,29 +366,13 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
         partes.append("--- FIN EJEMPLO ---")
         partes.append("")
     partes.append(
-        "⚠ El dictamen final debe usar los DATOS DEL BLOQUE 1 (CUPS, valor, "
-        "EPS exactos del caso actual), no los del ejemplo."
+        "⚠ Los ejemplos son de OTROS expedientes (elegidos por similitud). "
+        "Toma SOLO el ESTILO y la ESTRUCTURA jurídica. El dictamen final debe "
+        "usar los DATOS DEL BLOQUE 1 del caso actual (CUPS, valor, EPS). "
+        "PROHIBIDO copiar del ejemplo: folios, fechas, nombres de paciente, "
+        "números de contrato, cláusulas o valores — pertenecen a otro caso y "
+        "citarlos aquí sería un error verificable por la EPS."
     )
     partes.append("═══════════════════════════════════════════════════════════════════")
     partes.append("")
     return "\n".join(partes)
-
-
-def construir_bloque_gold(
-    db,
-    eps: str,
-    codigo: str,
-    max_ejemplos: int = _MAX_EJEMPLOS,
-) -> str:
-    """Helper de un solo paso: busca y formatea."""
-    try:
-        ejemplos = obtener_ejemplos_gold(db, eps, codigo, max_ejemplos)
-        if ejemplos:
-            logger.info(
-                f"[FEW-SHOT-GOLD] {len(ejemplos)} ejemplo(s) inyectado(s) "
-                f"para par ({eps}, {codigo})"
-            )
-        return bloque_few_shot_para_prompt(ejemplos)
-    except Exception as e:
-        logger.warning(f"few_shot_gold: error construyendo bloque: {e}")
-        return ""

@@ -67,9 +67,11 @@ def _seed(db, accion, usuario, dias_atras=0):
 
 class TestAuditActividadMensual:
     def test_serie_mensual(self, client, db_session):
-        # dias_atras=0 en los tres: sembrar a varios días atrás hacía que, al
-        # correr la suite a comienzo de mes, los eventos cruzaran el límite y la
-        # serie quedara partida en 2 meses (test flaky por fecha).
+        # Todos los eventos anclados a "ahora" (dias_atras=0) para que siempre
+        # caigan en el mes actual. Antes se usaban offsets de 2/5/1 días, lo
+        # que en los primeros días del mes empujaba algún evento al mes
+        # anterior (p.ej. correr el 4 con -5 días cae en el mes pasado) y el
+        # test fallaba de forma intermitente según la fecha del calendario.
         _seed(db_session, "UPDATE", "alice@x.com", dias_atras=0)
         _seed(db_session, "UPDATE", "alice@x.com", dias_atras=0)
         _seed(db_session, "DELETE", "bob@x.com", dias_atras=0)

@@ -1,8 +1,9 @@
 from __future__ import annotations
-import re
 from typing import Optional
 from datetime import date
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.utils.moneda import parse_valor_cop
 
 # ── Entrada ───────────────────────────────────────────────────────────────────
 
@@ -80,8 +81,15 @@ class GlosaInput(BaseModel):
     @field_validator("valor_aceptado")
     @classmethod
     def valor_solo_numeros(cls, v: str) -> str:
-        cleaned = re.sub(r"[^\d]", "", v)
-        return cleaned or "0"
+        # Normaliza a forma canónica COP re-parseable. El patrón anterior
+        # re.sub(r"[^\d]") convertía "7.700,00" en "770000" (100× — auditoría
+        # jun-2026 P0 #1). parse_valor_cop entiende puntos=miles, coma=decimal.
+        valor = parse_valor_cop(v)
+        if valor == int(valor):
+            return str(int(valor))
+        # Decimales reales: conservarlos con coma (formato colombiano) para
+        # que cualquier re-parse con parse_valor_cop devuelva el mismo valor.
+        return f"{valor:.2f}".replace(".", ",")
 
     # R55 P1: validators de enumeración para tono y modo_respuesta.
     # Si el cliente envía un valor desconocido, fallback al default
@@ -170,6 +178,14 @@ class GlosaResult(BaseModel):
     # propone AUTO_ENVIABLE. El gestor decide si activa el envío
     # automático global. Por defecto, cada caso requiere revisión.
     auto_pilot: Optional[dict] = None
+    # Mejora #3 (jun-2026): salida estructurada incremental. Bloque de los
+    # 6 campos críticos que el LLM confirmó (eps_efectiva, servicio_objetado,
+    # contrato_citado, clausulas_respondidas, sancion_rechazada,
+    # subconceptos_refutados) ya cruzados contra los valores deterministas,
+    # más telemetría de divergencias. None cuando el flag está OFF o el LLM
+    # no emitió el bloque (degradación elegante). Opcional para no romper
+    # consumidores que no lo esperan.
+    campos_estructurados: Optional[dict] = None
 
 
 class GlosaHistorialItem(BaseModel):

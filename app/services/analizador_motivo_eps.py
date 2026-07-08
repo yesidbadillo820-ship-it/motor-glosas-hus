@@ -74,10 +74,14 @@ _PAT_DEVOLUCION = re.compile(
 )
 
 # Normas citadas por la EPS
+# Ronda 21 (caso MEDIMÁS): ampliado para capturar abreviaturas (Res., Dto.,
+# Dec.), año con slash (Decreto 4747/2007) y sufijo de artículo contiguo
+# (Art. 20). Antes "Res. 0112/2012" y "Decreto 4747/2007 Art. 20" no se
+# extraían y nunca llegaban al bloque de puntos a refutar del prompt.
 _PAT_NORMA = re.compile(
-    r"(LEY\s+\d+(?:\s+DE\s+\d{4})?|"
-    r"RESOLUCI[ÓO]N\s+\d+(?:[/\s]\d{4})?|"
-    r"DECRETO\s+\d+(?:\s+DE\s+\d{4})?|"
+    r"\b(LEY\s+\d+(?:\s*(?:DE|/)\s*\d{4})?(?:\s+ART\.?\s*\d+)?|"
+    r"(?:RESOLUCI[ÓO]N|RES\.)\s+\d+(?:\s*[/\s]\s*\d{4})?(?:\s+ART\.?\s*\d+)?|"
+    r"(?:DECRETO|DTO\.|DEC\.)\s+\d+(?:\s*(?:DE|/)\s*\d{4})?(?:\s+ART\.?\s*\d+)?|"
     r"CIRCULAR\s+\d+(?:[/\s]\d{4})?)",
     re.IGNORECASE,
 )

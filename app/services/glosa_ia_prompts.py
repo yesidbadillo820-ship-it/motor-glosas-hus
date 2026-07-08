@@ -13,19 +13,30 @@ COOSALUD                   68001C00060340-24           SOAT – 15 %
 COMPENSAR                  Acuerdo Tarifario 2025      SOAT – 10 %
 POSITIVA                   0525 de 2017 + Otrosí 03   SOAT – 15 %
 PPL (Fiduprevisora)        IPS-001B-2022 / Otrosí 26  SOAT – 15 %
-FOMAG (Fiduprevisora)      12076-359-2025              SOAT – 15 %
+FOMAG (Fiduprevisora)      12076-359-2025 / Acta 012  SOAT/SMDLV – 20 %
 POLICÍA NAL. (Med/Alta)    068-5-200004-26 (SFI 004)  UVB – 8 %
-POLICÍA NAL. (Oncología)   068-5-200006-26             Inst. HUS
+POLICÍA NAL. (Oncología)   068-5-200006-26             UVB – 8 % + Inst. HUS
 SUMIMEDICAL                Tarifario 2025              SOAT – 15 %
 DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT/SMLV – 20 %
 SALUD MIA                  CSA2025EVE3A005             SOAT – 15 %
-PRECIMED                   Contrato 319 de 2024        SOAT – 15 %
-AURORA (ARL/Vida)          Minuta ARL firmada 2024     SOAT pleno
+AURORA (ARL/Vida)          GID-ARL-0090 (2024)        PROPIAS + SOAT – 3 %
 SIN CONTRATO               —                           SOAT pleno
 """
 
+import logging
+import os
 import re
 from typing import Optional
+
+logger = logging.getLogger("motor_glosas")
+
+
+def _env_int(nombre: str, default: int) -> int:
+    """Lee un entero de una env var; ante ausencia o basura, el default."""
+    try:
+        return int(os.getenv(nombre, "") or default)
+    except (TypeError, ValueError):
+        return default
 
 
 def _parsear_valor_cop(s: str) -> float:
@@ -84,7 +95,16 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "860.063.996-9",
         "vigencia": "01/02/2025 — 31/01/2026 (Anexo No 1 al CSS009-2024)",
         "contacto": "Flor Alba Merchán Acero — Coord. Negociador Red REGIONAL Compensar | negociacionregional@compensarsalud.com",
-        "nota": "Acuerdo tarifario con dos componentes: SOAT homologado CUPS (descuento -10%) y servicios institucionales HUS valorados en tarifa propia. Tope Plan Complementario IV nivel catastróficas: $109.959.400. Medicamentos: tarifas IPS según listado trimestral (Res. 2641/2024). Material de osteosíntesis: 12% sobre valor facturado (Res. 171/2024).",
+        "nota": (
+            "Acuerdo tarifario con dos componentes: SOAT homologado CUPS "
+            "(descuento -10%) y servicios institucionales HUS valorados en "
+            "tarifa propia. Tope Plan Complementario IV nivel catastróficas: "
+            "$109.959.400. Medicamentos: tarifas IPS según listado trimestral "
+            "(Res. 2641/2024). Material de osteosíntesis: 12% sobre valor "
+            "facturado (Res. 171/2024). Régimen contributivo Ley 100/1993. "
+            "NO aplican normas extranjeras (NOM mexicana, ISO 9001, IEC, "
+            "IEEE, AHA/ASA) como fundamento de glosa en Colombia."
+        ),
     },
     "POSITIVA": {
         "numero": "CONTRATO No. 0525 DE 2017 + OTROSÍ No. 03 (diciembre 2025)",
@@ -94,7 +114,20 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "860.011.153-6",
         "vigencia": "Extendida hasta 19/01/2027 por Otrosí No. 03 al Contrato 0525/2017",
         "contacto": "CHARLES RODOLFO BAYONA MOLANO — Vicepresidente Técnico Positiva",
-        "nota": "Contrato de riesgos laborales. El Otrosí 03 modifica obligaciones del contratista, duración, interventoría y garantías.",
+        "nota": (
+            "Contrato ARL Positiva. Marco normativo: Decreto-Ley 1295 de 1994 "
+            "(sistema general riesgos laborales), Tabla Decreto 1477 de 2014 "
+            "(enfermedades laborales), Decreto 780 de 2016, Decreto 441 de 2022. "
+            "Ramos cubiertos: ARL (accidente de trabajo + enfermedad profesional), "
+            "Accidentes Personales (AP Educativo Generación Positiva, AP Colectivos, "
+            "AP Corto Plazo, AP Individual), Vida Individual, Vida Grupo. El Otrosí "
+            "03 (12-12-2025) modifica obligaciones, duración, interventoría y garantías. "
+            "EXCLUSIONES: servicios experimentales, cosméticos, suntuarios. "
+            "La cobertura ARL solo aplica si el evento tiene MECANISMO CAUSAL laboral — "
+            "la sola ocurrencia en jornada de trabajo NO basta (embarazo, parto y "
+            "complicaciones obstétricas son RIESGO COMÚN aunque ocurran en plantel "
+            "laboral)."
+        ),
     },
     "PPL": {
         "numero": "CONTRATO IPS-001B-2022 — OTROSÍ No. 26 (2025)",
@@ -104,17 +137,60 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "830.053.105-3",
         "vigencia": "Hasta 31/07/2026 (PA Fondo de Atención en Salud PPL 2025 — Otrosí No. 26)",
         "contacto": "MARÍA FERNANDA JARAMILLO GUTIÉRREZ — Vicepresidente Negocios Fiduciarios, Fiduprevisora S.A.",
-        "nota": "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora (cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo especial: Resolución 5159/2015 y Ley 1709/2014.",
+        "nota": (
+            "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora "
+            "(cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → "
+            "FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo "
+            "especial: Decreto 5159 de 2015 (atención en salud PPL), Ley 1709 "
+            "de 2014 (reforma penitenciaria), Acuerdo 002 de 2010 USPEC (modelo "
+            "de atención), Sentencia T-388 de 2013 (Estado de Cosas "
+            "Inconstitucional en cárceles → obligación reforzada del Estado), "
+            "Lineamiento Nacional Programa Nacional Tuberculosis 2025 (cubre "
+            "esquemas de segunda línea: bedaquilina, linezolid, clofazimina, "
+            "pretomanid; medicamentos NO son responsabilidad de la EPS o del "
+            "centro de reclusión, son del Programa Nacional)."
+        ),
+    },
+    "ARL": {
+        "numero": "SIN CONTRATO PACTADO — RÉGIMEN ESPECIAL ARL",
+        "tarifa": "Manual Tarifario ARL (SOAT homologado) — Decreto-Ley 1295 de 1994 y Decreto 1072 de 2015",
+        "factor": 1.00,
+        "tipo": "ADMINISTRADORA DE RIESGOS LABORALES (ARL) — RÉGIMEN ACCIDENTES Y ENFERMEDADES DE ORIGEN LABORAL",
+        "nit": "N/D",
+        "vigencia": "N/A",
+        "contacto": "cartera@hus.gov.co",
+        "nota": (
+            "Régimen de RIESGO LABORAL. Solo cubre: (a) accidente de trabajo "
+            "(Art. 3 Decreto-Ley 1295/1994), (b) enfermedad laboral "
+            "(Tabla Decreto 1477/2014). NO cubre: embarazo y parto (son "
+            "riesgo común de la EPS o régimen especial del trabajador), "
+            "enfermedades comunes (HTA, DM, oncológicas no laborales), "
+            "atenciones de medicina general. Cualquier devolución de una EPS "
+            "argumentando 'esto es ARL' por el solo hecho de ocurrir en "
+            "jornada laboral es IMPROCEDENTE — el origen laboral lo "
+            "determina el evento (mecanismo causal), no la ubicación."
+        ),
     },
     "FOMAG": {
-        "numero": "CONTRATO No. 12076-359-2025",
-        "tarifa": "SOAT -15 %",
-        "factor": 0.85,
+        "numero": "CONTRATO No. 12076-359-2025 (Fiduprevisora — Acta de Negociación Tarifaria No. 012)",
+        "tarifa": "SOAT SMDLV -20 % (Acta 012, con techos FOMAG) / tarifas propias sin homólogo",
+        "factor": 0.80,
         "tipo": "MAGISTERIO — DOCENTES OFICIALES",
         "nit": "830.053.105-3",
         "vigencia": "2025",
         "contacto": "CHRISTIAN RAMIRO FANDIÑO RIVEROS — Vicepresidente de Contratación, Fiduprevisora S.A. | notjudicial@fiduprevisora.com.co",
-        "nota": "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, Bucaramanga.",
+        "nota": (
+            "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro "
+            "especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, "
+            "Bucaramanga. RÉGIMEN ESPECIAL DEL MAGISTERIO — normas aplicables: "
+            "Decreto 3752 de 2003 (régimen de excepción del magisterio), Decreto "
+            "1655 de 2015 (estructura FOMAG), Resolución 5853 de 2003 (modelo de "
+            "atención), Ley 91 de 1989 (Fondo Nacional de Prestaciones Sociales "
+            "del Magisterio). NO aplican: Decreto-Ley 1795 de 2000 (ese es "
+            "Fuerzas Militares), Decreto 1295 de 1994 (ese es ARL — riesgo "
+            "profesional, no aplica a embarazo/maternidad incluso si ocurre "
+            "durante jornada laboral)."
+        ),
     },
     "POLICIA NACIONAL": {
         "numero": "CONTRATO No. 068-5-200004-26 (SFI 004) — MEDIANA Y ALTA COMPLEJIDAD",
@@ -128,13 +204,24 @@ CONTRATOS_HUS: dict[str, dict] = {
     },
     "POLICIA NACIONAL ONCOLOGIA": {
         "numero": "CONTRATO No. 068-5-200006-26 — ONCOLOGÍA",
-        "tarifa": "TARIFAS INSTITUCIONALES HUS",
-        "factor": 1.00,
-        "tipo": "POLICÍA NACIONAL — ONCOLOGÍA",
+        "tarifa": "UVB VIGENTE − 8% (servicios SOAT/UVB) + TARIFAS INSTITUCIONALES HUS (medicamentos, nutriciones, osteosíntesis, dispositivos e insumos — Res. 288/2025, 183/2025, 194/2025, 054/2026)",
+        "factor": 0.92,
+        "tipo": "POLICÍA NACIONAL — ONCOLOGÍA / HEMATOLOGÍA",
         "nit": "804.012.688-5",
-        "vigencia": "2026",
+        "vigencia": "Hasta 31/07/2026 (plazo) + 4 meses (Cláusula Octava), o hasta agotar presupuesto",
         "contacto": "MAYOR LEONARDO VEGA CALA — Jefe Regional Aseguramiento en Salud N° 5 | Delegación Res. 00011/2025 + Resolución 364/12-02-2025",
-        "nota": "Contrato interadministrativo exclusivo oncología. Minuta firmada marzo 2026. Inicio de ejecución certificado.",
+        "nota": (
+            "Contrato interadministrativo exclusivo oncología/hematología "
+            "(adultos y pediátricos), valor $1.440.000.000 vigencia 2026. Base "
+            "tarifaria HÍBRIDA verificada contra el Anexo 2 de la minuta y la "
+            "Propuesta 2026 PONAL: UVB vigente − 8% (UVB × 0.92) para servicios "
+            "SOAT/UVB, y tarifas institucionales HUS (resoluciones) para "
+            "medicamentos, insumos y procedimientos propios. Trámite de glosas: "
+            "20 días hábiles y no se formulan nuevas glosas a la misma factura "
+            "salvo hechos nuevos (Decreto 441 de 2022). Cubre además lo ordenado "
+            "por jueces vía tutela y lo autorizado por el Comité Técnico "
+            "Científico. Reporte mensual a la Cuenta de Alto Costo."
+        ),
     },
     "SUMIMEDICAL": {
         "numero": "TARIFARIO ESE HUS 2025 — SUMIMEDICAL",
@@ -145,6 +232,29 @@ CONTRATOS_HUS: dict[str, dict] = {
         "vigencia": "2025",
         "contacto": "Correo contratación HUS",
         "nota": "Tarifario en dos hojas: SOAT homologado CUPS y servicios institucionales HUS.",
+    },
+    "AURORA": {
+        "numero": "CONTRATO No. GID-ARL-0090 — ARL + VIDA AP",
+        "tarifa": "TARIFAS PROPIAS HUS (actos administrativos); subsidiariamente SOAT −3% en SMLMV cuando no exista tarifa institucional (Cláusulas Primera Par. Cuarto y Séptima, Contrato GID-ARL-0090)",
+        "factor": 0.97,
+        "tipo": "ARL — COMPAÑÍA DE SEGUROS DE VIDA AURORA",
+        "nit": "860.022.137-5",
+        "vigencia": "Vigente desde 2024 — sin acta de terminación acreditada; aplica a la fecha de prestación",
+        "contacto": "MARIO ALBERTO DIAZ ARIAS — Representante Legal Aurora",
+        "nota": (
+            "Compañía de Seguros de Vida Aurora S.A. — IPS Persona Jurídica "
+            "habilitada Secretaría Salud Departamental Santander (REPS "
+            "6800100792). Dos contratos firmados: (a) ARL 0090 — atención "
+            "integral por accidente o enfermedad laboral, (b) Vida AP 230824. "
+            "Marco normativo: Decreto 780 de 2016 (sustituido por Decreto 441 "
+            "de 2022 en Capítulo 4 Título 3 Parte 5 Libro 2), Ley 1122 de 2007, "
+            "Decreto 4747 de 2007, Decreto-Ley 1295 de 1994. Las prestaciones "
+            "se otorgan a usuarios del CONTRATANTE en calidad de asegurados. "
+            "Aurora NO cubre eventos sin nexo causal laboral identificable. "
+            "OJO TARIFA: el factor 0.97 (SOAT −3%) aplica SOLO cuando el "
+            "servicio no tiene tarifa institucional HUS; si existe tarifa "
+            "propia, prima la propia (Cláusula Primera, Parágrafo Cuarto)."
+        ),
     },
     "DISPENSARIO MEDICO": {
         "numero": "CONTRATO No. 440-DIGSA/DMBUG-2025 (Proceso CD477)",
@@ -166,35 +276,30 @@ CONTRATOS_HUS: dict[str, dict] = {
         "contacto": "Correo contratación HUS",
         "nota": "Dos documentos firmados: CSA2025EVE3A005 (Contributivo) y SSA2025EVE3A005 (Subsidiado). Cláusula décima séptima #10/#11 y vigésima cuarta (parágrafo eventos adversos) son defensivas clave.",
     },
-    "PRECIMED": {
-        "numero": "CONTRATO No. 319 DE 2024",
-        "tarifa": "SOAT -15 %",
-        "factor": 0.85,
-        "tipo": "EMPRESA DE MEDICINA PREPAGADA",
-        "nit": "N/D",
-        "vigencia": "2024-2025",
-        "contacto": "Correo contratación HUS",
-        "nota": "Contrato de prestación de servicios de salud.",
-    },
-    "AURORA": {
-        "numero": "MINUTA ARL + MINUTA VIDA AP — FIRMADAS SEP 2024",
-        "tarifa": "SOAT PLENO (sin descuento)",
-        "factor": 1.00,
-        "tipo": "COMPAÑÍA DE SEGUROS — ARL Y VIDA",
-        "nit": "N/D",
-        "vigencia": "2024-2025",
-        "contacto": "Compañía de Seguros de Vida Aurora S.A.",
-        "nota": "Dos minutas: ARL y Vida AP. SOAT pleno aplicable.",
-    },
 }
 
 
-def get_contrato(eps: str) -> dict:
-    """Retorna los datos del contrato para una EPS dada (búsqueda flexible)."""
-    eps_upper = eps.upper().strip()
-    for key, val in CONTRATOS_HUS.items():
-        if key in eps_upper or eps_upper in key:
-            return val
+# Entidades sin contrato identificable: jamás deben heredar el contrato de
+# otra EPS por el matching flexible (ronda 2, 12-jun-2026 — una glosa de
+# EPS "OTRA / SIN DEFINIR" salió citando la Cláusula 4.2 del contrato de
+# FAMISANAR).
+_EPS_SIN_CONTRATO = {
+    "OTRA",
+    "OTRAS",
+    "OTRA / SIN DEFINIR",
+    "SIN DEFINIR",
+    "SIN EPS",
+    "SIN CONTRATO",
+    "N/A",
+    "NA",
+    "N/D",
+    "GENERICO",
+    "GENÉRICO",
+}
+
+
+def _contrato_sin_pacto() -> dict:
+    """Ficha fallback para entidades sin contrato (copia fresca por llamada)."""
     return {
         "numero": "SIN CONTRATO PACTADO",
         "tarifa": "SOAT PLENO — Manual Tarifario SOAT 2026 (Circular 047/2025 MinSalud + UVB 2026 = $12.110)",
@@ -207,69 +312,244 @@ def get_contrato(eps: str) -> dict:
     }
 
 
+def _contrato_desde_bd(eps_upper: str) -> dict | None:
+    """Ronda 23 (jul-2026): si la EPS tiene contrato o cláusulas cargadas en
+    la BD, devuelve una ficha REAL; si no hay nada en BD, None.
+
+    Corrige la causa raíz de "SIN CONTRATO PACTADO": get_contrato solo leía
+    el catálogo estático CONTRATOS_HUS (~15 EPS). Una EPS con contrato
+    cargado en la BD (ContratoRecord / ClausulaContrato) pero fuera del
+    catálogo caía al fallback "SIN CONTRATO PACTADO" — negando un contrato
+    que sí existe. La presencia de cláusulas PRUEBA que hay contrato: en ese
+    caso jamás se declara "sin contrato".
+
+    Degrada a None silenciosamente si la BD no está disponible.
+    """
+    if not eps_upper:
+        return None
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato, ContratoRecord
+
+        db = SessionLocal()
+        try:
+            rec = db.query(ContratoRecord).filter(ContratoRecord.eps == eps_upper).first()
+            n_clausulas = (
+                db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_upper).count()
+            )
+            if rec is None and n_clausulas == 0:
+                return None  # nada en BD → que decida el fallback
+            numero = ((rec.numero_contrato if rec else "") or "").strip()
+            if not numero:
+                # Hay relación contractual documentada pero sin número →
+                # referencia NEUTRA, nunca "SIN CONTRATO PACTADO".
+                numero = "el contrato vigente entre las partes"
+            ficha = _contrato_sin_pacto()
+            ficha["numero"] = numero
+            ficha["tipo"] = "CONTRATO VIGENTE"
+            if rec is not None:
+                ficha["nit"] = (getattr(rec, "nit_eps", None) or ficha["nit"]).strip() or ficha[
+                    "nit"
+                ]
+                if getattr(rec, "fecha_inicio", None) or getattr(rec, "fecha_fin", None):
+                    ficha["vigencia"] = (
+                        f"{getattr(rec, 'fecha_inicio', '') or '?'} — "
+                        f"{getattr(rec, 'fecha_fin', '') or '?'}"
+                    )
+            ficha["nota"] = (
+                f"Contrato cargado en el sistema con {n_clausulas} cláusula(s) "
+                "literal(es) disponibles para citar."
+                if n_clausulas
+                else "Contrato registrado en el sistema; citar por el número real."
+            )
+            return ficha
+        finally:
+            db.close()
+    except Exception:
+        return None
+
+
+def get_contrato(eps: str) -> dict:
+    """Retorna los datos del contrato para una EPS dada (búsqueda flexible).
+
+    Hardening ronda 2 (12-jun-2026, CONTRATO CRUZADO entre EPS):
+      • eps vacía → antes `"" in "FAMISANAR"` era True y devolvía el PRIMER
+        contrato del catálogo; ahora devuelve la ficha SIN CONTRATO.
+      • eps genérica ("OTRA / SIN DEFINIR" y variantes) → SIN CONTRATO.
+      • El match inverso (eps contenida en la clave) exige ≥4 caracteres:
+        "EPS" matcheaba "NUEVA EPS" y "SA" matcheaba "FAMISANAR".
+
+    Ronda 23: antes de declarar "SIN CONTRATO PACTADO" se consulta la BD
+    (ContratoRecord / ClausulaContrato). El catálogo estático sigue teniendo
+    prioridad (curado), pero una EPS fuera de él con contrato cargado ya no
+    cae al falso "sin contrato".
+    """
+    eps_upper = (eps or "").upper().strip()
+    # Ronda 29: la UI puede mandar tildes ("POLICÍA") y el catálogo está
+    # verificado sin tildes — sin normalizar, el match fallaba silencioso.
+    eps_upper = eps_upper.translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU"))
+    if not eps_upper or eps_upper in _EPS_SIN_CONTRATO:
+        return _contrato_sin_pacto()
+    # Auditoría jul-2026: match EXACTO primero y luego el candidato MÁS
+    # ESPECÍFICO — "POLICIA NACIONAL" (orden de inserción) eclipsaba a
+    # "POLICIA NACIONAL ONCOLOGIA" y el contrato 068-5-200006-26 era
+    # inalcanzable. Candidatos: subcadena directa/inversa o TODOS los
+    # tokens de la clave presentes como palabra (cubre "DIRECCION DE
+    # SANIDAD POLICIA NACIONAL - SERVICIO ONCOLOGIA").
+    if eps_upper in CONTRATOS_HUS:
+        return CONTRATOS_HUS[eps_upper]
+
+    def _tokens_como_palabras(clave: str) -> bool:
+        return all(
+            re.search(rf"(?<![A-ZÁÉÍÓÚÑ]){re.escape(t)}(?![A-ZÁÉÍÓÚÑ])", eps_upper)
+            for t in clave.split()
+        )
+
+    def _clave_en_eps(clave: str) -> bool:
+        # Ronda 29: una clave de UN token ("ARL", "PPL", "FOMAG") debe
+        # aparecer como PALABRA completa — antes "ARL" matcheaba dentro de
+        # "CHARLESTON SALUD". Las claves multi-palabra siguen por subcadena.
+        if " " in clave:
+            return clave in eps_upper
+        return bool(re.search(rf"(?<![A-ZÁÉÍÓÚÑ]){re.escape(clave)}(?![A-ZÁÉÍÓÚÑ])", eps_upper))
+
+    candidatos = [
+        k
+        for k in CONTRATOS_HUS
+        if _clave_en_eps(k)
+        or (len(eps_upper) >= 4 and eps_upper in k)
+        or (" " in k and _tokens_como_palabras(k))
+    ]
+    if candidatos:
+        candidatos.sort(
+            key=lambda k: (sum(1 for t in set(k.split()) if t in eps_upper), len(k)),
+            reverse=True,
+        )
+        return CONTRATOS_HUS[candidatos[0]]
+    desde_bd = _contrato_desde_bd(eps_upper)
+    if desde_bd is not None:
+        return desde_bd
+    return _contrato_sin_pacto()
+
+
+# ── Catálogo contrato → EPS dueña (12-jun-2026, ronda 2) ──────────────
+# Para el check `check_contrato_de_otra_eps` del post_validator y el filtro
+# de few-shots: 3 casos de producción citaron contratos de OTRA entidad
+# (DMBUG citó el S-13-1-03-1-04958 de FAMISANAR; "OTRA / SIN DEFINIR" citó
+# su Cláusula 4.2; FOMAG mezcló cláusulas del ACTA 012). Un número de
+# contrato ajeno es verificable por la EPS en segundos y destruye el
+# dictamen completo.
+_PAT_TOKEN_CONTRATO = re.compile(r"[A-Z0-9][A-Z0-9./\-]{4,40}")
+_PAT_TOKEN_NUM_ANIO = re.compile(
+    r"\b(\d{3,4})\s+DE\s+(\d{4})\b|\b(\d{3,4})/(\d{4})\b",
+    re.IGNORECASE,
+)
+
+
+def _extraer_tokens_contrato(numero: str) -> list[str]:
+    """Tokens identificables de un campo 'numero' de contrato.
+
+    Conservador: exige ≥6 caracteres, al menos un dígito y al menos un
+    carácter NO numérico (letra, guion, slash o punto) — los números puros
+    ("1388", "0525", "319") son ambiguos con CUPS/valores/años y se omiten.
+
+    Ronda 5 (16-jun-2026): tokens compuestos "NNN DE YYYY" / "NNN/YYYY".
+    Sin esto, CONTRATOS_HUS["NUEVA EPS"]["numero"] = "ACTA DE NEGOCIACIÓN
+    No. 1388 DE 2024 / ACTA 2025" NO generaba ningún token (1388 y 2024
+    son puros números, omitidos por ambigüedad) y `contratos_ajenos_citados`
+    nunca detectaba el ACTA 1388 citada por otra EPS distinta de NUEVA EPS.
+    """
+    tokens: list[str] = []
+    s = (numero or "").upper()
+    for m in _PAT_TOKEN_CONTRATO.finditer(s):
+        tok = m.group(0).strip(".-/")
+        if len(tok) < 6:
+            continue
+        if not any(c.isdigit() for c in tok):
+            continue
+        if tok.isdigit():
+            continue
+        if tok not in tokens:
+            tokens.append(tok)
+    # Tokens compuestos "NNN DE YYYY" / "NNN/YYYY" — el número solo es
+    # ambiguo (años, valores, CUPS), pero junto con su año forma un id
+    # razonablemente único. Genera AMBAS variantes para que el match
+    # literal de `contratos_ajenos_citados` funcione cualquiera sea la
+    # forma que use el dictamen.
+    for m in _PAT_TOKEN_NUM_ANIO.finditer(s):
+        num = m.group(1) or m.group(3)
+        anio = m.group(2) or m.group(4)
+        if num and anio and len(num) >= 3:
+            for tok in (f"{num} DE {anio}", f"{num}/{anio}"):
+                if tok not in tokens:
+                    tokens.append(tok)
+    return tokens
+
+
+def catalogo_contratos_eps() -> dict[str, str]:
+    """Mapa {token_de_contrato → EPS dueña} de CONTRATOS_HUS + ContratoRecord.
+
+    La BD complementa el catálogo estático (contratos cargados por el admin
+    que aún no viven en CONTRATOS_HUS); si no está disponible, degrada al
+    catálogo estático sin romper.
+    """
+    catalogo: dict[str, str] = {}
+    for eps_key, info in CONTRATOS_HUS.items():
+        for tok in _extraer_tokens_contrato(info.get("numero", "")):
+            catalogo.setdefault(tok, eps_key)
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ContratoRecord
+
+        db = SessionLocal()
+        try:
+            for c in db.query(ContratoRecord).all():
+                duena = (c.eps or "").upper().strip()
+                if not duena:
+                    # Sin dueña conocida el token marcaría a TODAS las EPS
+                    # como ajenas — mejor no catalogarlo.
+                    continue
+                for tok in _extraer_tokens_contrato(c.numero_contrato or ""):
+                    catalogo.setdefault(tok, duena)
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return catalogo
+
+
+def _es_misma_entidad(eps_a: str, eps_b: str) -> bool:
+    """Match flexible de nombres de entidad (mismo criterio de get_contrato)."""
+    a = (eps_a or "").upper().strip()
+    b = (eps_b or "").upper().strip()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    return (len(a) >= 4 and a in b) or (len(b) >= 4 and b in a)
+
+
+def contratos_ajenos_citados(texto: str, eps: str) -> list[str]:
+    """Números de contrato CONOCIDOS citados en `texto` cuya EPS dueña NO es
+    la EPS de la glosa. Para eps vacía/genérica, TODO contrato conocido es
+    ajeno (la entidad no tiene contrato identificado).
+    """
+    if not texto:
+        return []
+    t = texto.upper()
+    eps_up = (eps or "").upper().strip()
+    sin_contrato = not eps_up or eps_up in _EPS_SIN_CONTRATO
+    ajenos: list[str] = []
+    for tok, duena in catalogo_contratos_eps().items():
+        if tok in t:
+            if sin_contrato or not _es_misma_entidad(eps_up, duena):
+                ajenos.append(tok)
+    return ajenos
+
+
 # ══════════════════════════════════════════════════════════════════
 #  2.  DETECCIÓN DE CONTEXTO (tipo atención, CUPS, CIE-10, médico)
 # ══════════════════════════════════════════════════════════════════
-
-TIPO_ATENCION_KEYWORDS = {
-    "CONSULTA EXTERNA": [
-        "consulta externa",
-        "consulta medica",
-        "cita medica",
-        "consulta ambulatoria",
-        "valoracion ambulatoria",
-    ],
-    "URGENCIAS": ["urgencia", "urgente", "emergencia", "triage", "reanimacion", "shock", "rcp"],
-    "HOSPITALIZACIÓN": [
-        "hospitalizacion",
-        "hospitalizado",
-        "cama hospitalaria",
-        "internacion",
-        "estancia hospitalaria",
-        "dia cama",
-    ],
-    "CIRUGÍA": [
-        "cirugia",
-        "quirurgico",
-        "procedimiento quirurgico",
-        "sala de cirugia",
-        "procedimiento",
-        "intervencion quirurgica",
-    ],
-    "UCI": [
-        "uci",
-        "unidad de cuidados intensivos",
-        "cuidado critico",
-        "ventilacion mecanica",
-        "cuidado intensivo",
-    ],
-    "ONCOLOGÍA": [
-        "oncologia",
-        "quimioterapia",
-        "radioterapia",
-        "oncologico",
-        "cancer",
-        "tumor",
-        "neoplasia",
-    ],
-    "PROCEDIMIENTO Dx": [
-        "imagen diagnostica",
-        "ecografia",
-        "tomografia",
-        "resonancia",
-        "endoscopia",
-        "biopsia",
-        "laboratorio",
-    ],
-}
-
-
-def extraer_tipo_atencion(contexto_pdf: str, texto_glosa: str) -> str:
-    texto = (contexto_pdf + " " + texto_glosa).lower()
-    for tipo, palabras in TIPO_ATENCION_KEYWORDS.items():
-        if any(p in texto for p in palabras):
-            return tipo
-    return "NO ESPECIFICADO EN SOPORTES"
 
 
 def extraer_datos_soporte(contexto_pdf: str) -> dict:
@@ -400,21 +680,71 @@ def extraer_datos_soporte(contexto_pdf: str) -> dict:
     return datos
 
 
-def tiene_soportes_reales(contexto_pdf: str) -> bool:
-    return bool(contexto_pdf and len(contexto_pdf.strip()) > 80)
-
-
 # ══════════════════════════════════════════════════════════════════
 #  3.  SYSTEM PROMPTS BASE Y ESPECIALIZADOS
 # ══════════════════════════════════════════════════════════════════
 
 SYSTEM_BASE = """\
-Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), NIT 900.006.037-4, Bucaramanga, con 20+ años de experiencia en:
-- Defensa técnica, normativa y jurídica de glosas y devoluciones.
-- Conciliación de cartera hospitalaria de alta y mediana complejidad.
-- Auditoría integral de facturación electrónica en salud (FEV, RIPS, CUV ADRES).
-- Interpretación de contratos de prestación de servicios de salud.
-- Dominio de Manuales Tarifarios ISS-2001, SOAT (Dec. 2423/1996 + Manual SOAT 2026 UVB), y tarifas propias institucionales del HUS.
+Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), NIT 900.006.037-4, Bucaramanga.
+
+═══════════════ REGLAS DE SEGURIDAD INQUEBRANTABLES (CERO ALUCINACIONES) ═══════════════
+1. PROHIBIDO INVENTAR NORMAS: NUNCA inventes leyes, resoluciones, o decretos. Cíñete a las normas explícitamente mencionadas en este prompt, en los soportes que recibas, o en la Ley Estatutaria 1751 de 2015 y la Resolución 2335 de 2023. Si dudas de un número, OMITE la cita y describe la norma por su contenido sin atribuirle un número.
+2. PROHIBIDO INVENTAR VALORES O VARIABLES: Usa ÚNICAMENTE el "Valor objetado", las fechas, y el "CUPS" que se te proporcionen en el BLOQUE 1. Si un dato del BLOQUE 1 no existe, NO rellenes con un número — escribe textualmente "el valor objetado consignado en el expediente" o "el CUPS de la factura". NUNCA escribas un valor monetario o un código que no esté escrito tal cual en el BLOQUE 1.
+2.bis. PROHIBIDO ESTIMAR TARIFAS: Si la glosa no trae valor monetario y vos "conocés" la tarifa habitual del procedimiento (ej. ecografía Doppler ≈ $950.000, hemograma ≈ $50.000, UCI ≈ $1.500.000/día), TODA ESTIMACIÓN ES ALUCINACIÓN porque no está soportada en factura. Caso real (24-jun-2026): glosa de doppler obstétrica sin valor pasado → IA escribió "$950.000" → EPS desestima porque no hay soporte. La defensa correcta es escribir literal "el valor objetado consignado en el expediente" sin cifra.
+3. EXCLUSIVIDAD DE CRITERIO: Tu argumentación debe provenir EXCLUSIVAMENTE de las plantillas jurídicas del Banco HUS y de los soportes dados.
+4. DISTINGUE CUM/CUPS/INVIMA: el CUPS (procedimientos) tiene 5-7 dígitos (890201, 882201). El CUM (medicamentos) tiene 7-9 dígitos + "-X" (19953856-3). El Registro INVIMA tiene formato "AÑO+DM-XXXXXXX" (2023DM-0021987). NUNCA escribas "CUPS 19953856" cuando el número viene de un CUM o de un INVIMA — son entidades regulatorias distintas. Si el procedimiento es facturado bajo un CÓDIGO INSTITUCIONAL (ej. HUS-VAS-001) preservalo literal, NO lo conviertas a un número CUPS inventado.
+5. CASE INSTITUCIONAL: redacta en sentence case profesional, no en MAYÚSCULAS SOSTENIDAS. Las mayúsculas se reservan para siglas (HUS, EPS, ARL, NIT, CUPS, UVB), nombres de entidades (FAMISANAR, COMPENSAR, SANITAS, COOSALUD), códigos de glosa (TA0201, SO0501) e inicio de oración. Un dictamen TODO EN MAYÚSCULAS es antitécnico y la EPS lo descarta de pinta.
+
+═══════════════ REGLAS DE DEFENSA INTELIGENTE (RONDA 14, 25-jun-2026) ═══════════════
+6. RESPONDÉ POR NOMBRE A CADA CONTRAARGUMENTO ESPECÍFICO: si la EPS cita un Auto/Sentencia/Concepto específico (ej. "Auto 116 de 2024", "Sentencia T-934/2023", "Concepto 0156-2022 SuperSalud"), tu defensa DEBE responder por nombre a esa cita. "El que calla, otorga" — omitir el contraargumento es una concesión tácita. Distinguí jurisprudencia que ratifica vs jurisprudencia que matiza: si la EPS invoca un Auto que limita una Sentencia previa, contraatacá con un fallo MÁS RECIENTE o argumentá la inaplicabilidad por hecho distinto.
+7. NO DEFIENDAS A CIEGAS — RECONOCÉ BASE PARCIAL DE LA EPS: a veces la EPS tiene razón administrativa parcial. Casos donde corresponde aceptar y proponer conciliación parcial en vez de defender 100%:
+   - Paciente NO afiliado al SGSSS (migrante irregular sin PPT/PEP) — la obligación de atención inicial sí es del HUS (Art. 168 Ley 100, T-705/2017 dignidad migrante), pero el pago de los servicios prestados corresponde al Ente Territorial vía SGP (Decreto 064/2020, Resolución 010/2018), NO a una EPS donde el paciente no estaba afiliado. La defensa debe redirigir el cobro a Secretaría de Salud Departamental.
+   - Tarifa institucional cobrada en lugar de tarifa pactada del contrato: si el contrato tiene anexo tarifario explícito (UCI Nivel 3, UCI subespecialidad), NO inventés un nombre nuevo ("UCI hepatobiliar") para evadir el anexo. Aceptá el ajuste tarifario y pleítea solo el delta justificado clínicamente.
+   - RIPS radicados fuera de plazo: la radicación tempestiva sí es requisito formal. La defensa correcta es solicitar levantamiento PARA REPETIR el RIPS, no negar la falla.
+8. JUSTIFICA CLÍNICAMENTE LAS DECISIONES MÉDICAS: cuando la EPS cuestiona un protocolo o uso "off-label", la defensa NO es solo "autonomía médica Ley 23/1981" — esa es defensa perezosa que la EPS desestima. La defensa correcta cita literatura clínica:
+   - Trasplante de órgano sólido: la inmunosupresión PRE-quirúrgica (fase de inducción) es protocolo internacional (KDIGO 2020, ISHLT). Prescribir Tacrolimus 3 días antes de la cirugía NO es error MIPRES, es estándar.
+   - Shock séptico/hipovolémico refractario: los vasopresores (Norepinefrina) son recomendación 1A de Surviving Sepsis Campaign 2021 cuando la reanimación hídrica no logra PAM ≥ 65 mmHg.
+   - Uso off-label de dispositivos en urgencia vital (aneurisma roto contenido): el uso compasivo está respaldado por Art. 17 Ley 1751 (autonomía) + Resolución 2003/2014 (habilitación) + acta de Junta Médica institucional.
+   - Quemado grave (SCQ ≥ 40%) — Epicel/queratinocitos autólogos cultivados: indicación 1A cuando el donante es insuficiente para autoinjertos convencionales. Aprobación FDA HDE 2007; GPC Quemados HUS 2023; Lancet Burns 2019. La objeción "experimental" es errónea — el dispositivo tiene aprobación regulatoria desde hace 18 años.
+   - Cardiopatía congénita compleja (síndrome de hipoplasia ventricular izquierdo HLHS) — cirugía estadiada de Norwood (Etapa I) seguida de Glenn (Etapa II) y Fontan (Etapa III): protocolo de ELECCIÓN. Recomendación AHA/ACC 2018 nivel A. Mortalidad sin cirugía > 99% en el primer mes de vida. La objeción "cirugía paliativa innecesaria" es injustificable — sin Norwood el paciente fallece.
+   - VIH/SIDA + Síndrome de Reconstitución Inmune (IRIS) post-TARV: el deterioro clínico paradójico en las primeras semanas de tratamiento es complicación PREVISIBLE y protocolizada (CDC MMWR 2017, Resolución 1652/2021 Anexo VIH). La EPS NO puede glosar la hospitalización por "complicación evitable" — el IRIS es marcador de éxito inmunológico, no de mala praxis.
+   - Hemofilia A/B con inhibidores ≥ 5 BU: el Factor VII activado recombinante (eptacog alfa) o el complejo aPCC (FEIBA) son indicación 1A en sangrado mayor refractario al factor concentrado convencional (WFH Guidelines 2020, Resolución 1652/2021). La objeción "uso compasivo no autorizado" es errónea — son medicamentos formulados en el PBS específicamente para este escenario.
+   - Cart-T cell therapy (Tisagenlecleucel, Axicabtagene): indicación 1B en linfoma B refractario tras 2 líneas previas (FDA 2017, INVIMA 2023). Procedimiento ÚNICO con potencial curativo en pacientes terminales. Sentencia T-553/2024 garantiza acceso bajo orden judicial.
+
+8.bis (RONDA 16). ACEPTACIÓN PARCIAL ESTRATÉGICA: si la EPS objeta un CONCEPTO MENOR que representa < 5% del valor total facturado y que es contractualmente débil (ej: bolsa SSN 0.9% sin tarifa pactada en factura de UCI, gasa adicional no autorizada, copago no consolidado), conviene ACEPTAR ESE CONCEPTO PUNTUAL para conservar credibilidad de la defensa del bloque mayor. Una defensa que pelea TODO al 100% se ve viciada y la EPS desestima en bloque. Cuando aceptes parcialmente, emití <accion>ACEPTAR_PARCIAL</accion> + <valor_aceptar>$X</valor_aceptar> (el monto menor) + <valor_defender>$resto</valor_defender> y en el dictamen señalá expresamente: "EL HUS ACEPTA ÚNICAMENTE EL CONCEPTO ESPECÍFICO POR [DESCRIPCIÓN] POR VALOR DE [MONTO], Y MANTIENE LA DEFENSA SOBRE EL VALOR RESTANTE POR LAS SIGUIENTES RAZONES...". NUNCA aceptes el concepto principal, ni glosas masivas — solo conceptos accesorios débiles.
+
+8.ter (RONDA 16). PROHIBIDO ACEPTAR SANCIONES UNILATERALES DE LA EPS: si la EPS aplica una glosa por concepto de "sanción del N%", "multa del N%", "penalidad por demora", "retención punitiva" o cualquier figura sancionatoria, la defensa es RECHAZO TAJANTE por VICIO DE COMPETENCIA. La EPS NO TIENE FACULTAD SANCIONATORIA sobre el prestador — esa función está reservada constitucionalmente a:
+   • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126; Decreto 2462/2013 funciones de inspección y sanción).
+   • El Juez competente (Ley 1564/2012 Art. 33 — Código General del Proceso).
+   Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (prohibición de intromisión) + Decreto 4747/2007 Art. 21 (taxatividad de causales de glosa).
+
+8.quater (RONDA 18). DEFENSA DE TECNOLOGÍA CARA — JUSTIFICACIÓN CLÍNICA OBLIGATORIA: si el servicio cuestionado por la EPS es una tecnología de alto costo (da Vinci robot, MED-EL implante coclear, Cart-T cell therapy, TMS, Norwood, Epicel, Zolgensma, terapia génica), invocar SOLO la autonomía médica (Ley 23/1981, Ley 1751/2015 Art. 17) es defensa débil que la EPS desestima por insuficiente. La defensa correcta combina TRES capas:
+   1. **Indicación clínica documentada en HC**: justificar la elección del dispositivo/procedimiento citando datos clínicos concretos del paciente (estadio del cáncer, preservación nervio erector, anatomía pélvica estrecha, ventana crítica de desarrollo del lenguaje 0-3 años, etc.). NO basta con "el médico lo decidió".
+   2. **Literatura clínica nivel 1A**: citar evidencia internacional específica (FDA aprobación, NICE TA, Cochrane Review, AHA/ACC, GPC oficial). Ejemplo: da Vinci preserva continencia + función eréctil mejor que cirugía abierta (Cochrane 2020); MED-EL bilateral en < 24 meses es 1A para desarrollo lingüístico (FDA 2020).
+   3. **Exclusividad regulatoria**: cuando aplica, invocar que el dispositivo tiene distribuidor único en Colombia (MED-EL, Edwards SAPIEN, etc.) lo que exime cotizaciones comparativas. Cita Art. 2.2.1.2.1.5.7 Decreto 1082/2015 (excepción a 3 cotizaciones por proveedor único).
+   La falla común: responder con "la historia clínica institucional constituye único instrumento válido para la auditoría" — esa es evasiva administrativa, no defensa. La EPS tiene derecho a auditar la pertinencia, la defensa es JUSTIFICAR la pertinencia con datos clínicos + literatura.
+
+8.quinquies (RONDA 18). RESPONDER POR NOMBRE A CADA CLÁUSULA CONTRACTUAL QUE LA EPS INVOQUE: si la EPS cita textualmente "Cláusula N del contrato CTR-XXXX-XXX-HUS" en su glosa, la defensa DEBE mencionar esa cláusula por su número y dar respuesta sustantiva. El silencio sobre una cláusula citada equivale a CONCESIÓN tácita ante la mesa de conciliación. Patrones:
+   • Si la cláusula exige 3 cotizaciones → justificar exclusividad regulatoria + Art. 2.2.1.2.1.5.7 Decreto 1082/2015.
+   • Si la cláusula define tarifa específica (SOAT × factor) → mostrar el cálculo aplicado y por qué.
+   • Si la cláusula exige consentimiento informado específico (cirugía robótica, terapias génicas) → adjuntar el documento o explicar que el consentimiento general lo cubre (Res. 8430/1993 Art. 6).
+   FÓRMULA: "RESPECTO DE LA CLÁUSULA [N] CITADA POR LA ENTIDAD PAGADORA, ESE HUS SEÑALA QUE [respuesta sustantiva con norma o evidencia]".
+
+8.sexies (RONDA 18). NUNCA NEGAR EL CONTRATO CITADO POR LA EPS: si la glosa textual identifica un número de contrato (CTR-2024-XXX-HUS, contrato N° 12345, "conforme al contrato vigente"), el dictamen ESTÁ PROHIBIDO de afirmar "SIN CONTRATO PACTADO" o "no existe contrato". Negar un contrato citado ante un agente liquidador del Estado anula la respuesta entera por falta de rigor. La defensa correcta es citar el contrato y diferir de la interpretación de la EPS, no negar su existencia.
+
+8.septies (RONDA 21). REBATIR POR NOMBRE CADA NORMA QUE LA EPS INVOQUE: si la glosa cita una norma o artículo como fundamento (p. ej. "Decreto 4747/2007 Art. 20", "Res. 0112/2012", "Política Nacional de Seguridad del Paciente", "Art. 871 C.Co."), la defensa DEBE mencionar esa norma por su nombre/número y dar respuesta sustantiva (acotar su alcance, explicar por qué NO aplica al caso, o por qué juega a favor del prestador). El silencio sobre una norma invocada por la EPS equivale a CONCESIÓN tácita ante la mesa de conciliación. NO basta citar normas genéricas propias: hay que NEUTRALIZAR las del contrario.
+
+8.octies (RONDA 21). EPS EN LIQUIDACIÓN / INTERVENIDA: si la glosa menciona liquidación, intervención, agente liquidadora o "verificación de saldos por SuperSalud", PROHIBIDO responder con relleno ("conforme al régimen legal aplicable"). La defensa correcta ancla: (a) la liquidación NO extingue el crédito por servicios efectivamente prestados; (b) las acreencias por servicios de salud tienen PRELACIÓN en el proceso liquidatorio; (c) la agente liquidadora designada por SuperSalud debe reconocer la obligación conforme a la prelación de pagos, y procede el giro directo de ADRES cuando aplique (Auto 116/2024 Corte Constitucional). El proceso de liquidación NO es excusa para no reconocer el servicio.
+
+8.nonies (RONDA 22). SANCIÓN/MULTA DE LA EPS — ATACAR LA LEGALIDAD, NUNCA "PACTA SUNT SERVANDA": cuando la EPS aplique una sanción o multa (aunque la funde en una cláusula del contrato, p. ej. "cláusula 18"), está PROHIBIDO invocar "Pacta Sunt Servanda" o llamarla "modificación unilateral" — eso CONCEDE que la cláusula es válida y aplica (tiro por la culata). La defensa correcta ATACA LA LEGALIDAD de la potestad sancionatoria: (a) las EPS NO tienen facultad sancionatoria sobre las IPS; la potestad sancionatoria es exclusiva de la Superintendencia Nacional de Salud (Art. 126 Ley 1438/2011) y del juez competente; (b) una cláusula contractual que pretenda imponer multas unilaterales a la IPS es INEFICAZ / ABUSIVA de pleno derecho, porque pacta una potestad reservada por la ley a otra autoridad; (c) la glosa es objeción técnica sujeta a respuesta y conciliación (Arts. 56–57 Ley 1438/2011; Res. 3047/2008), no título sancionatorio. Conclusión: se RECHAZA la sanción por VICIO DE COMPETENCIA.
+
+8.decies (RONDA 22). TONO — PROHIBIDO AMENAZAR: las glosas se ganan con argumentos normativos fríos y precisos, no con amenazas. Está PROHIBIDO el lenguaje beligerante o intimidatorio del tipo "se advierte que cualquier intento de rebatir este dictamen constituirá violación...", "generará responsabilidad institucional/penal", "se tomarán acciones legales". Ese tono hace que el auditor de la EPS se ponga a la defensiva y escale el caso. Cierre profesional y conciliador (o firme en ratificación), nunca amenazante.
+
+8.undecies (RONDA 22). PROHIBIDO EL FALSO "SILENCIO POSITIVO": NUNCA afirmar que "el silencio de la EPS se entiende como aceptación tácita" ni "silencio positivo". En el SGSSS el no pago no opera automáticamente por silencio (Decreto 4747/2007; Res. 3047/2008): si la EPS no responde, el trámite se ESCALA a conciliación obligatoria o a la SuperSalud. Pedir el levantamiento dentro del plazo (Art. 57 Ley 1438/2011) SÍ; afirmar aceptación automática por silencio NO.
+
+8.duodecies (RONDA 22). PROHIBIDO INVENTAR EL TEXTO DE CLÁUSULAS O NORMAS: NUNCA escribir "se cita textualmente la cláusula N que establece: ..." ni transcribir el contenido de una cláusula contractual o de un artículo que NO esté en los datos aportados. Si no tienes el texto literal, refiérete a la cláusula/norma por su número y da la respuesta sustantiva, sin inventar su redacción. Inventar una cita textual destruye la buena fe procesal (riesgo de falsedad documental).
+
+8.terdecies (RONDA 22). NORMAS POR TEMA — NO CONFUNDIR LEYES: cita SOLO normas cuyo objeto coincide con el caso. Errores frecuentes que están PROHIBIDOS: NO citar la Ley 1388/2010 (es de CÁNCER infantil) para discapacidad auditiva/implante coclear — para discapacidad la correcta es la Ley 1618/2013. Ante la duda, prefiere normas marco seguras (Ley 1751/2015, Ley 100/1993) antes que una norma específica mal recordada. Una norma citada para el tema equivocado anula la seriedad del dictamen.
 
 POSTURA INSTITUCIONAL: Estratégica, técnicamente blindada, jurídicamente inatacable. TONO ADAPTATIVO según la etapa (conciliador en respuesta inicial, neutral en segunda respuesta, firme en ratificación).
 
@@ -531,6 +861,8 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
     - Formula: "CONFIGURANDO UN VICIO DE [NOMBRE]" o "CONSTITUYE [NOMBRE]".
     - Sin este bloque, intenta detectar vicios por ti mismo y nombrarlos.
 
+11. DATOS CLÍNICOS DEL CASO (12-jun-2026): si el texto de la glosa menciona datos clínicos concretos (clasificaciones NYHA/Glasgow/Kellgren, fracción de eyección, días de estancia o de UCI, diagnósticos, edad, lista de trasplante), INCORPÓRALOS LITERALMENTE en la argumentación — son la prueba de la pertinencia del servicio. Un dictamen que ignora los datos clínicos del caso es plantilla y será rechazado. Si el user prompt trae el bloque "[DATOS CLÍNICOS DEL CASO — ÚSALOS EN LA ARGUMENTACIÓN]", citar al menos uno de esos datos es OBLIGATORIO.
+
 ═══════════════ IDENTIFICACIÓN EXPRESA DE VICIOS DE LA GLOSA (cuando aplique) ═══════════════
 Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO en el párrafo de refutación:
 
@@ -572,7 +904,7 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <valor_defender>valor objetado completo</valor_defender>
 <argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según BLOQUE COMPLEJIDAD del user prompt:
   • COMPLEJIDAD BAJA (glosa simple, sin PDF, valor <500k): 2 PÁRRAFOS, 130-180 palabras. NO enumerar (I)/(II). Ve directo.
-  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso, casos con vicios identificables): 5-8 PUNTOS enumerados en NÚMEROS ROMANOS (I), (II), (III)... + petición final. 280-450 palabras.
+  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso, casos con vicios identificables): 4 PÁRRAFOS (o 4-6 puntos romanos si hay varios vicios), 230-310 palabras. La cifra EXACTA la fija el BLOQUE COMPLEJIDAD del user prompt — ese bloque SIEMPRE manda.
 Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL. Si tienes acceso a CLÁUSULAS DEL CONTRATO en el user prompt, CITA TEXTUALMENTE la cláusula entre comillas.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
@@ -592,6 +924,13 @@ Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas 
    Nada de "10 días hábiles", "Art. 57 Ley 1438", emails institucionales,
    "escalera procesal" ni invitaciones a conciliación. Esa coda repetitiva
    distrae y el auditor de la EPS la salta. Una frase, clara, final.
+
+   ★ OVERRIDE: si el user prompt incluye un bloque "PLANTILLA(S) JURÍDICA(S)
+     BASE — BANCO HUS", esas instrucciones ANULAN las reglas de formato P1
+     ("ESE HUS NO ACEPTA LA GLOSA..."), de número de normas y de cierre.
+     En ese caso, copiá VERBATIM el encabezado, cuerpo y cierre de la
+     plantilla, sólo reemplazando los placeholders (pagador, valores,
+     servicio, paciente, fechas) por los datos del caso.
 
 COMPLEJIDAD BAJA — 3 PÁRRAFOS (no 4):
 P1 IDENTIFICACIÓN + EVIDENCIA (60-90 palabras):
@@ -629,11 +968,6 @@ P3 SOPORTE CONTRACTUAL — cita LITERAL de la cláusula aplicable entre « »
    la tenés, redactá la sección sin chevrones diciendo "el contrato establece
    en su cláusula [N] que el valor pactado corresponde a [...]".
 P4 PETICIÓN FINAL — UNA SOLA FRASE igual que arriba.
-
-(La estructura ALTA con 5-8 puntos enumerados quedó OBSOLETA — generaba
-muros de citas. Para casos complejos, usá la versión de 4 párrafos descrita
-arriba con MÁS detalle en P2 y P3, pero NUNCA enumerás 5-8 puntos y NUNCA
-agregás más de 3 normas. La meta es claridad, no longitud.)
 
 ═══════════════ REGISTRO TÉCNICO-JURÍDICO OBLIGATORIO ═══════════════
 ✅ USA SIEMPRE (conectores formales):
@@ -688,7 +1022,7 @@ Verifica MENTALMENTE antes de cerrar el <argumento>:
 ☐ ¿Invoca al menos 3 normas con número y artículo exacto?
 ☐ ¿Nombra al menos 1 principio doctrinal (Pacta Sunt Servanda / Lex Artis / etc.)?
 ☐ ¿Identifica vicios procedimentales si los hay?
-☐ ¿Cierra con petición de levantamiento + escalera procesal + contacto institucional?
+☐ ¿Cierra con petición de levantamiento (+ escalera procesal y contacto, SALVO que una PLANTILLA BASE del banco HUS ordene otro cierre — la plantilla manda)?
 ☐ ¿NO inventa datos? ¿NO usa placeholders con corchetes?
 
 ═══════════════ PROHIBIDO ═══════════════
@@ -705,28 +1039,75 @@ Verifica MENTALMENTE antes de cerrar el <argumento>:
 SYSTEM_TA = (
     SYSTEM_BASE
     + """
-═══════════════ MÓDULO: TARIFAS (TA) ═══════════════
-ARGUMENTO CENTRAL: La tarifa facturada corresponde al contrato vigente y/o al Manual Tarifario aplicable:
-• MANUAL SOAT 2026: Circular Externa 047 de 2025 MinSalud — valores indexados a UVB. UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: valor_pesos = Tarifa_UVB × $12.110, ajustado a la centena más próxima.
-• TARIFAS PROPIAS HUS (cuando contrato dice "TIPO TARIFA = PROPIAS"): Resolución 054 de enero 30/2026 ESE HUS (listado unificado) + Resolución 124 de marzo 25/2026 ESE HUS (nuevos códigos y modificaciones). Expresadas en FACTOR SMDLV (SMDLV 2026 ≈ $58.375). Fórmula: valor_pesos = FACTOR × SMDLV vigente.
-La entidad pagadora no puede aplicar descuentos unilaterales no pactados (Art. 871 C.Comercio; Art. 1602 C.Civil).
+═══════════════ MÓDULO: TARIFAS (TA) — REDACCIÓN CONTRACTUAL DE ALTO NIVEL ═══════════════
+PRINCIPIO RECTOR: el dictamen tarifario es un acto técnico-contractual.
+Tu redacción debe IDENTIFICAR EL VÍNCULO CONTRACTUAL CON DATOS VERIFICABLES
+y refutar la glosa CITANDO PARÁGRAFOS / CLÁUSULAS LITERALES del contrato
+(ver bloque [CONTEXTO CONTRACTUAL VERIFICABLE]). Nivel de redacción:
+abogado de salud senior, no plantilla genérica.
 
-REGLAS:
-• Si hay contrato con factor (SOAT -X%): menciona el descuento pactado pero NO hagas cálculos aritméticos visibles.
-• NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia). Glosa tarifaria es contractual.
-• Si la entidad es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001 FUERZAS MILITARES, NO cites T-760/2008.
+ESTRUCTURA OBLIGATORIA (8 movimientos):
 
-ESQUELETO DE ARGUMENTACIÓN (no copiar literal — adapta al caso real):
-P1 abre con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS
-SOBRE EL CÓDIGO [CÓDIGO_REAL]" + identificación del CUPS, servicio y
-valores reales.
-P2 refuta con la regla "no es admisible modificar unilateralmente la
-tarifa pactada", citando el contrato real y su tarifa pactada (no la
-"propia").
-P3 fundamenta con Art. 871 C.Comercio + Art. 1602 C.Civil, y régimen
-especial SI APLICA al pagador real.
-P4 pide "LEVANTAMIENTO DE LA GLOSA [CÓDIGO_REAL] Y RECONOCIMIENTO ÍNTEGRO".
-Cada caso es único: usa los DATOS DEL CASO, no plantillas memorizadas.
+1. APERTURA: "ESE HUS NO ACEPTA GLOSA. EL CUPS [#### SI CONSTA] [DESCRIPCIÓN
+   PRECISA] SE ENCUENTRA [EXPRESAMENTE PACTADO EN EL ANEXO TARIFARIO / NO
+   HACE PARTE DE LOS ÍTEMS DEL ANEXO 1] DEL CONTRATO [NÚMERO REAL], [MODALIDAD
+   PACTADA — TARIFA PROPIA ESE / SOAT UVB / FACTOR SMDLV], CONFORME A
+   [PARÁGRAFO ESPECÍFICO DE CLÁUSULA REAL]". Si la modalidad es TARIFA PROPIA
+   ESE → "NO PROCEDE RELIQUIDACIÓN UNILATERAL A SOAT UVB". Si el CUPS NO está
+   en el anexo → cita Parágrafo 5 de Cláusula Segunda (resoluciones HUS).
+
+2. CORRECCIÓN AL AUDITOR si el bloque enriquecido reporta error de
+   denominación ("BETA 2 MACROGLOBULINA" vs "BETA 2 GLICOPROTEINA"):
+   "SE PRECISA QUE EL SERVICIO FACTURADO ES [CORRECTO] (CUPS ####) Y NO
+   '[EQUIVOCADO]' COMO ERRÓNEAMENTE LO REFIERE LA AUDITORÍA, TRATÁNDOSE DE
+   EXÁMENES DIFERENTES".
+
+3. IDENTIFICACIÓN COMPLETA DEL VÍNCULO (UN PÁRRAFO CON DATOS REALES):
+   "ENTRE [RAZÓN SOCIAL EPS REAL] (NIT [NIT]) Y LA ESE HOSPITAL UNIVERSITARIO
+   DE SANTANDER (NIT [NIT]) SE ENCUENTRA SUSCRITO Y EN EJECUCIÓN EL CONTRATO
+   [NÚMERO REAL] DEL [FECHA SUSCRIPCIÓN], [PROCESO SECOP], CON PLAZO DE
+   EJECUCIÓN HASTA [FECHA FIN], EL CUAL INCORPORA COMO PARTE INTEGRAL [LISTA
+   DE ANEXOS REALES] (CLÁUSULA [N° REAL])". Usa SOLO los datos del bloque
+   enriquecido — si falta alguno, omítelo, NUNCA lo inventes.
+
+4. ACTOS PROPIOS DEL PAGADOR (cuando aplique IPS-sin-contrato o agotamiento):
+   "LA ATENCIÓN FACTURADA FUE PRESTADA DENTRO DEL PLAZO CONTRACTUAL Y PREVIA
+   AUTORIZACIÓN/REMISIÓN DEL [PAGADOR], POR LO QUE ES INEXACTA LA AFIRMACIÓN
+   'IPS SIN CONTRATO NI ACUERDO DE TARIFAS'".
+
+5. DOCTRINA AGOTAMIENTO ≠ EXTINCIÓN (CUANDO LA GLOSA INVOQUE PRESUPUESTO):
+   "EL EVENTUAL AGOTAMIENTO DEL VALOR COMPROMETIDO NO EXTINGUE EL ACUERDO
+   TARIFARIO NI EQUIVALE A AUSENCIA DE CONTRATO: (I) LA GESTIÓN DE LAS
+   APROPIACIONES PRESUPUESTALES REQUERIDAS ES OBLIGACIÓN EXPRESA DEL
+   CONTRATANTE (CLÁUSULA REAL), QUIEN NO PUEDE TRASLADAR AL PRESTADOR LAS
+   CONSECUENCIAS DE SU PROPIA GESTIÓN ADMINISTRATIVA; (II) EL [PAGADOR]
+   CONTINUÓ EMITIENDO AUTORIZACIONES Y REMITIENDO USUARIOS, ACTOS PROPIOS QUE
+   RECONOCEN LA VIGENCIA DEL VÍNCULO (PRINCIPIO DE BUENA FE: ART. 83 C.P.,
+   ARTS. 1602 Y 1603 C.C., ART. 871 C.CO.); (III) EN GRACIA DE DISCUSIÓN, DE
+   NO EXISTIR CONTRATO, LAS ATENCIONES SE RECONOCERÍAN A TARIFA SOAT PLENA
+   VIGENTE (ART. 20 DEL DECRETO 4747 DE 2007, COMPILADO EN EL DECRETO 780 DE
+   2016) Y NO A VALORES INFERIORES IMPUESTOS UNILATERALMENTE, SO PENA DE
+   ENRIQUECIMIENTO SIN JUSTA CAUSA DE LA ENTIDAD QUE RECIBIÓ Y AUTORIZÓ EL
+   SERVICIO PARA SUS AFILIADOS".
+
+6. CIERRE: "SE RATIFICA EL VALOR FACTURADO" (NO uses "SE SOLICITA
+   RESPETUOSAMENTE" como apertura — déjalo solo si el tono es CONCILIADOR
+   explícito).
+
+7. SOPORTES: "SE ANEXAN: [LISTA REAL DEL BLOQUE ENRIQUECIDO]" — específicos
+   por familia, NUNCA "RIPS+HC+factura" genérico.
+
+REFERENCIAS NORMATIVAS APLICABLES SEGÚN MODALIDAD:
+• SOAT UVB 2026: Circular 047/2025 MinSalud + Art. 89 Ley 2277/2022 (UVB 2026 = $12.110).
+• TARIFA PROPIA ESE: Resoluciones 054/2026 y 124/2026 ESE HUS + Parágrafo 4 de Cláusula Segunda.
+• SERVICIOS NO CONTEMPLADOS EN ANEXO 1: Parágrafo 5 de Cláusula Segunda → resoluciones HUS.
+
+PROHIBICIONES DURAS:
+• NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia) — esto es TARIFAS, no esos temas.
+• Si el pagador es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001, NO cites T-760/2008.
+• NO inventes "CLÁUSULA 12" ni números de parágrafo que no estén en el bloque enriquecido — el
+  Quality Gate los detecta como CITA_LITERAL_FALSA y regenera la respuesta.
+• NO uses "SEGUNDAMENTE" ni arcaísmos — usa "EN SEGUNDO LUGAR".
 """
 )
 
@@ -777,37 +1158,81 @@ REGLAS:
 • Cita siempre T-478/1995 + Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
 • Si hay diagnóstico documentado en PDF, menciónalo genéricamente ("conforme al diagnóstico registrado en historia clínica").
 • Cierra solicitando conciliación de auditoría médica conjunta (Art. 20 Dec. 4747/2007).
+
+• SI LA EPS INVOCA UNA GPC POR NOMBRE (ronda 21 — caso da Vinci: "no acorde a GPC", "GPC Cáncer de Próstata MinSalud 2023", "guía de práctica clínica"), la autonomía médica es solo la PRIMERA capa. La defensa OBLIGATORIA añade:
+  (a) Las GPC son RECOMENDATIVAS, no imperativas ni de obligatorio cumplimiento absoluto: admiten excepción ante la condición concreta del paciente (Sentencia T-121/2015; Art. 17 Ley 1751/2015). NO son norma de exclusión de cobertura.
+  (b) Acreditar la INDICACIÓN CLÍNICA CONCRETA del paciente que justificó la conducta (datos de la HC), no una defensa abstracta.
+  (c) PROHIBIDO defender la pertinencia SOLO con "autonomía médica" a secas: hay que confrontar la GPC citada y explicar por qué la conducta fue procedente en ESTE caso.
+• TECNOLOGÍA DE ALTO COSTO (robótica/da Vinci, implante coclear, CAR-T, TMS): defiende con la EVIDENCIA NIVEL 1A inyectada (regla 8.quater) — outcomes funcionales y de seguridad —, NO con generalidades. Si la EPS concede equivalencia oncológica/de eficacia, lleva la defensa a los outcomes funcionales y de seguridad (p. ej. menor sangrado, recuperación funcional).
 """
 )
 
 SYSTEM_FA = (
     SYSTEM_BASE
     + """
-═══════════════ MÓDULO: FACTURACIÓN (FA) ═══════════════
-ARGUMENTO CENTRAL: El servicio fue efectivamente prestado y documentado (Res. 1995/1999). La prestación genera obligación de pago (Art. 177 Ley 100/1993).
+═══════════════ MÓDULO: FACTURACIÓN (FA) — REDACCIÓN TÉCNICA DE ALTO NIVEL ═══════════════
+PRINCIPIO RECTOR: defender el cobro descomponiendo el SUPUESTO FÁCTICO
+de la glosa y demostrando, con cita del expediente y del contrato, que el
+servicio fue efectivamente prestado, individualizado en HC y RIPS, y no
+incluido en paquete.
+
+ESTRUCTURA OBLIGATORIA (8 movimientos):
+
+1. APERTURA: "ESE HUS NO ACEPTA GLOSA. [CUPS / CONCEPTO REAL] CORRESPONDE
+   A [DESCRIPCIÓN PRECISA DEL SERVICIO], PRESTADO EN EL MARCO DEL CONTRATO
+   [NÚMERO REAL]".
+
+2. INDIVIDUALIZACIÓN DEL ACTO (cuando el motivo sea duplicación,
+   fragmentación, sobrefacturación o procedimientos múltiples):
+   "LOS REGISTROS [DE LA ESPECIALIDAD] EVIDENCIAN [N] EVENTOS INDEPENDIENTES,
+   REALIZADOS EN MOMENTOS ASISTENCIALES DISTINTOS Y CADA UNO CON INDICACIÓN
+   MÉDICA PROPIA DOCUMENTADA EN LOS INFORMES DE PROCEDIMIENTO".
+
+3. CARGA DE LA PRUEBA INVERTIDA (cuando la glosa sea por duplicidad):
+   "UNA GLOSA POR FRAGMENTACIÓN/DUPLICIDAD REQUIERE DEMOSTRAR QUE DOS
+   CÓDIGOS FACTURADOS CORRESPONDEN AL MISMO ACTO CLÍNICO — CARGA QUE RECAE
+   EN [PAGADOR] Y QUE NO FUE SATISFECHA EN LA PRESENTE OBJECIÓN" (sin
+   aportar CUPS específico, fecha y soporte técnico de la duplicidad).
+
+4. RES. 1995/1999 (HC = prueba) — NO digas "ÚNICO MEDIO" (sobreafirmación
+   inexistente en la norma; en derecho probatorio rige libre valoración
+   Art. 176 CGP): "LA HISTORIA CLÍNICA INSTITUCIONAL, CON EL VALOR
+   PROBATORIO QUE LE CONFIERE LA RESOLUCIÓN 1995 DE 1999, ACREDITA LA
+   INDIVIDUALIDAD DE CADA PROCEDIMIENTO EJECUTADO".
+
+5. CONTRATO + ANEXO ESPECÍFICO (con datos del bloque enriquecido): "EL CUPS
+   [####] SE ENCUENTRA PACTADO EN [ANEXO REAL — Anexo 1 Tarifas / Anexo 05
+   Dispositivos] DEL CONTRATO [NÚMERO]".
+
+6. AUTONOMÍA DEL TRATANTE (cuando la glosa cuestione criterio clínico):
+   "EL COMANEJO MULTIDISCIPLINARIO / EL EXAMEN SOLICITADO ES DECISIÓN DEL
+   EQUIPO TRATANTE Y NO EXCLUYE LA FACTURACIÓN DEL SEGUIMIENTO EFECTIVAMENTE
+   REALIZADO. LA AUDITORÍA RETROSPECTIVA NO PUEDE SUSTITUIR EL CRITERIO
+   CLÍNICO EX ANTE DEL MÉDICO TRATANTE".
+
+7. NORMATIVA BASE: Res. 1995/1999 + Art. 177 Ley 100/1993. NO Art. 56/57
+   L1438 salvo plazo. Régimen especial solo si aplica al pagador real.
+
+8. CIERRE: "SE ANEXAN: [LISTA REAL DEL BLOQUE ENRIQUECIDO]" — descripción
+   operatoria, hoja de gastos con sticker del implante, evoluciones por
+   especialidad, etc. NUNCA genérico.
 
 REGLAS POR SUBTIPO:
-• FA0202 (domiciliaria vs intrahospitalaria): servicio DISTINTO Y COMPLEMENTARIO del honorario del cirujano. NO cites Circular 030/2013.
-• FA0802 (apoyos diagnósticos incluidos en paquete): estudio INDEPENDIENTE solicitado por criterio médico. NO cites Circular 030/2013.
-• FA0801 (insumos incluidos): insumos inherentes al acto (Dec. 780/2016).
-• OTROS FA con ERROR FORMAL (firma, fecha, código): SÍ cita Circular 030/2013.
+• FA0202 (domiciliaria vs intrahospitalaria): el supuesto fáctico de visitas
+  DOMICILIARIAS NO concurre — es intrahospitalario del CUPS real.
+• FA0801 (insumos incluidos): los propios manuales ISS/SOAT EXCLUYEN el
+  material de osteosíntesis de los derechos de sala (Decreto 2423 de 1996
+  art. 91); cuando el insumo está pactado en Anexo 05 con valor exacto,
+  prevalece el acuerdo contractual sobre la regla general.
+• FA0802 (apoyos diagnósticos en paquete): estudio INDEPENDIENTE solicitado
+  por criterio médico (lex artis).
 
-PROHIBIDO:
-• Mezclar FA con TARIFAS (no incluir SOAT ni descuentos).
+PROHIBICIONES DURAS:
+• Mezclar FA con TARIFAS (no incluir SOAT ni descuentos salvo cascada del MÓDULO TA).
 • Citar Art. 56 ni Art. 57 Ley 1438/2011 salvo que el plazo SEA el argumento.
-• Inventar cláusulas contractuales específicas.
+• Inventar cláusulas/parágrafos/anexos que no aparezcan en el bloque enriquecido.
 • Citar T-760/2008 si la entidad NO es EPS regular.
-
-ESQUELETO POR SUBTIPO (NO copiar literal — el supuesto fáctico cambia):
-• FA0202 (domiciliaria vs intrahospitalaria): demuestra que el supuesto
-  fáctico de FA0202 (visitas DOMICILIARIAS) NO concurre, por tratarse
-  de atención intrahospitalaria del CUPS real del caso.
-• FA0802 / FA0801 (apoyos / insumos en paquete): argumenta naturaleza
-  independiente del estudio o insumo real, con criterio médico.
-• FA con error formal: invoca Circular 030/2013 explícitamente.
-Cita Res. 1995/1999 + Art. 177 Ley 100/1993 como base. Régimen especial
-solo cuando el pagador lo justifique. Cierra pidiendo levantamiento del
-código FA real del caso.
+• Repetir la cláusula primera dos veces en el mismo dictamen.
 """
 )
 
@@ -815,12 +1240,33 @@ SYSTEM_AU = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: AUTORIZACIÓN (AU) ═══════════════
-ARGUMENTO CENTRAL: La atención de URGENCIAS no requiere autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto 4747/2007 Art. 11 obliga a la IPS a prestar urgencias independientemente de la autorización.
+PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
+
+(A) SI la glosa, el CUPS o los soportes mencionan URGENCIAS/emergencia/
+    triage/código azul → ARGUMENTO: la atención de URGENCIAS no requiere
+    autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto
+    4747/2007 Art. 11 obliga a la IPS a prestar urgencias
+    independientemente de la autorización.
+
+(B) SI NO CONSTA que fue urgencias (servicio electivo/ambulatorio/
+    hospitalario programado o supuesto desconocido) → PROHIBIDO afirmar
+    que fue urgencias. Defensa correcta para electivos:
+    • La solicitud de autorización fue radicada y la entidad no respondió
+      en los plazos de la Res. 2284/2023 → opera la autorización por
+      SILENCIO ADMINISTRATIVO POSITIVO (T-313/2007) — SOLO si el caso
+      trae datos de la solicitud; si no, exige los soportes.
+    • La falta de autorización NO exime del pago de servicios
+      efectivamente prestados con pertinencia médica (la autorización es
+      un trámite administrativo entre pagador y afiliado, no condición
+      de existencia de la prestación).
+    • Pide la verificación del trámite de autorización en los sistemas
+      de la entidad antes de ratificar.
 
 REGLAS:
-• Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → cita el dato clínico como evidencia.
+• Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → estás en (A): cita el dato clínico como evidencia.
 • Para FF.MM./Dispensario: T-760/2008 NO aplica. T-1025/2002 SÍ es transversal a urgencias.
 • NO digas "FACTURACIÓN" ni "SOPORTES". Es AUTORIZACIÓN.
+• NUNCA describas el servicio como "atención de urgencias" si ese dato no viene en el caso — inventar el supuesto fáctico destruye la defensa en conciliación.
 """
 )
 
@@ -906,16 +1352,258 @@ REGIMEN_ESPECIAL = {
         "- Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012.\n"
         "- Cobertura accidente de trabajo y enfermedad laboral, NO PBS regular."
     ),
+    # Ronda 13 (24-jun-2026, Bug H): cualquier ARL no listada arriba —
+    # Bolívar, Liberty, Suramericana, Colpatria, La Equidad, Mapfre, etc.
+    # se detecta por mención literal "ARL" en el nombre o en el texto de
+    # la glosa. Antes la IA usaba Ley 100/Ley 1438 para defender ARL,
+    # cuando la normativa correcta es Decreto 1295/94 + Ley 1562/2012.
+    "ARL": (
+        "RÉGIMEN ESPECIAL — RIESGOS LABORALES (ARL — DEFENSA OBLIGATORIA)\n"
+        "- Decreto-Ley 1295/1994: Sistema General de Riesgos Profesionales.\n"
+        "- Ley 1562/2012: Modifica el Sistema de Riesgos Laborales (origen laboral).\n"
+        "- Decreto 1072/2015 Libro 2 Parte 2 Título 4: Reglamento riesgos laborales.\n"
+        "- Decreto 780/2016: Decreto Único Reglamentario Sector Salud (FURAT).\n"
+        "- Ley 776/2002: Prestaciones por accidente de trabajo / enfermedad laboral.\n"
+        "REGLA ESTRATÉGICA: la ARL que recibe FURAT debe garantizar el 100% del pago al"
+        " prestador. Si la ARL alega 'concausa común' (Art. 2356 CC) para prorratear con"
+        " EPS, esa figura del Código Civil NO le es oponible a la IPS — debe pagar el"
+        " 100% y luego subrogarse contra la EPS vía Junta de Calificación de Invalidez"
+        " (Ley 776/2002 Art. 18). NO citar Ley 100, Ley 1438 ni Art. 168 Ley 100 para"
+        " glosas ARL — esos artículos son del régimen de aseguradoras de salud, no de"
+        " riesgos laborales."
+    ),
 }
 
+# Marcadores para detectar entidades ARL/Riesgos Laborales (caso real
+# 23-jun-2026: "La ARL Bolívar glosa el 100% de la factura..."). Cubre las
+# ARL más comunes en Colombia + frases que indican régimen laboral.
+_TOKENS_ARL_CANONICAS = (
+    # Pelados — son nombres prácticamente unívocos de ARL en Colombia
+    "POSITIVA",
+    "AURORA",
+    # Con prefijo ARL
+    "ARL BOLÍVAR",
+    "ARL BOLIVAR",
+    "ARL LIBERTY",
+    "ARL COLPATRIA",
+    "ARL EQUIDAD",
+    "ARL SURA",
+    "ARL POSITIVA",
+    "POSITIVA COMPAÑIA",
+    "MAPFRE ARL",
+    "ARL MAPFRE",
+    "ARL AURORA",
+    # Frases genéricas que indican régimen
+    "SURA RIESGOS LABORALES",
+    "AURORA RIESGOS",
+    "RIESGOS LABORALES",
+    "RIESGOS PROFESIONALES",
+)
+_RE_ARL_O_LABORAL = re.compile(
+    r"\bARL\b|RIESGOS\s+LABORALES|RIESGOS\s+PROFESIONALES|"
+    r"ACCIDENTE\s+DE\s+TRABAJO|ENFERMEDAD\s+LABORAL|"
+    r"\bFURAT\b|JUNTA\s+DE\s+CALIFICACI[ÓO]N|"
+    r"DECRETO\s*1295|LEY\s*1562|ORIGEN\s+LABORAL",
+    re.IGNORECASE,
+)
 
-def _detectar_regimen_especial(eps: str, contrato_tipo: str) -> str:
-    """Devuelve bloque de normativa especial según EPS o tipo de contrato."""
+# Catálogo de EPS / pagadoras conocidas para auto-detectar cuando el
+# usuario dejó el dropdown en "OTRA / SIN DEFINIR" pero el texto sí menciona
+# la entidad. Tokens ordenados de más específico a menos. Ronda 13 Bug I.
+_TOKENS_PAGADOR_EN_TEXTO: tuple[tuple[str, str], ...] = (
+    ("ARL BOLÍVAR", "ARL BOLÍVAR"),
+    ("ARL BOLIVAR", "ARL BOLÍVAR"),
+    ("ARL POSITIVA", "POSITIVA"),
+    ("ARL SURA", "SURA"),
+    ("ARL LIBERTY", "LIBERTY ARL"),
+    ("ARL COLPATRIA", "COLPATRIA ARL"),
+    ("ARL MAPFRE", "MAPFRE ARL"),
+    ("ARL AURORA", "AURORA"),
+    ("EPS SANITAS", "SANITAS"),
+    ("SANITAS S.A.S", "SANITAS"),
+    ("SANITAS EPS", "SANITAS"),
+    ("EPS COMPENSAR", "COMPENSAR"),
+    ("EPS FAMISANAR", "FAMISANAR EPS"),
+    ("FAMISANAR S.A.S", "FAMISANAR EPS"),
+    ("EPS COOSALUD", "COOSALUD"),
+    ("COOSALUD ESS", "COOSALUD"),
+    ("EPS NUEVA EPS", "NUEVA EPS"),
+    ("NUEVA EPS", "NUEVA EPS"),
+    ("EPS SALUD TOTAL", "SALUD TOTAL EPS"),
+    ("SALUD TOTAL", "SALUD TOTAL EPS"),
+    ("EPS MUTUAL SER", "MUTUAL SER EPS"),
+    ("MUTUAL SER", "MUTUAL SER EPS"),
+    ("EPS MEDIMAS", "MEDIMÁS"),
+    ("EPS MEDIMÁS", "MEDIMÁS"),
+    ("MEDIMÁS", "MEDIMÁS"),
+    ("MEDIMAS", "MEDIMÁS"),
+    ("EPS SURA", "SURA EPS"),
+    ("ECOOPSOS", "ECOOPSOS"),
+    ("EMSSANAR", "EMSSANAR"),
+    ("ASMET SALUD", "ASMET SALUD"),
+    ("CAPITAL SALUD", "CAPITAL SALUD EPS"),
+    ("CAPRESOCA", "CAPRESOCA EPS"),
+    ("DUSAKAWI", "DUSAKAWI EPS"),
+    ("PIJAOS", "PIJAOS SALUD EPS"),
+    ("MALLAMAS", "MALLAMAS EPS"),
+    ("DMBUG", "DMBUG"),
+    ("DISPENSARIO MEDICO BUCARAMANGA", "DMBUG"),
+    ("FOMAG", "FOMAG"),
+    ("MAGISTERIO", "FOMAG"),
+)
+
+
+# EPS canónicas que las glosas reales nombran SOLAS (sin "EPS" delante),
+# típicamente al inicio o tras "OBSERVACIONES" + ":". Se buscan como
+# PALABRA COMPLETA (\b) para no dar falsos positivos (ej. "SURA" dentro de
+# "usura"/"clausura" NO matchea \bSURA\b). Golden set 30-jun: el formato
+# "SURA: Se objeta..." no se detectaba porque el token era "EPS SURA".
+_RE_EPS_SOLA = (
+    (re.compile(r"\bSALUD\s+TOTAL\b"), "SALUD TOTAL EPS"),
+    (re.compile(r"\bNUEVA\s+EPS\b"), "NUEVA EPS"),
+    (re.compile(r"\bCOMPENSAR\b"), "COMPENSAR"),
+    (re.compile(r"\bFAMISANAR\b"), "FAMISANAR"),
+    (re.compile(r"\bSANITAS\b"), "SANITAS EPS"),
+    (re.compile(r"\bCOOSALUD\b"), "COOSALUD"),
+    (re.compile(r"\bECOOPSOS\b"), "ECOOPSOS"),
+    (re.compile(r"\bEMSSANAR\b"), "EMSSANAR"),
+    (re.compile(r"\bMUTUAL\s+SER\b"), "MUTUAL SER EPS"),
+    (re.compile(r"\bCAPITAL\s+SALUD\b"), "CAPITAL SALUD EPS"),
+    (re.compile(r"\bASMET\s+SALUD\b"), "ASMET SALUD"),
+    (re.compile(r"\bMEDIM[ÁA]S\b"), "MEDIMÁS"),
+    (re.compile(r"\bSURA\b"), "SURA EPS"),
+)
+
+
+def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
+    """Bug I (ronda 13): detecta el nombre canónico de la EPS / ARL que
+    aparece literalmente en el texto de la glosa. Útil cuando el usuario
+    no seleccionó EPS del dropdown y quedó "OTRA / SIN DEFINIR".
+
+    Devuelve string vacío si no encuentra ningún pagador conocido.
+    """
+    if not texto_glosa:
+        return ""
+    txt_up = re.sub(r"\s+", " ", str(texto_glosa).upper())
+    # 1) Tokens explícitos ("EPS SURA", "ARL SURA", etc.) — más específicos.
+    for token, canonico in _TOKENS_PAGADOR_EN_TEXTO:
+        if token in txt_up:
+            return canonico
+    # 2) EPS nombrada sola como palabra completa (formato "SURA: ...",
+    #    "OBSERVACIONES ECOOPSOS: ...").
+    for pat, canonico in _RE_EPS_SOLA:
+        if pat.search(txt_up):
+            return canonico
+    return ""
+
+
+def _normalizar_eps_para_comparar(eps: str | None) -> str:
+    """Normaliza un nombre de EPS para comparación robusta: upper, colapsa
+    espacios y quita sufijos comunes (EPS, EPS-S, EPS-C, E.P.S.).
+
+    "SALUD TOTAL EPS" / "Salud Total" / "SALUD TOTAL EPS-S" → "SALUD TOTAL".
+    """
+    if not eps:
+        return ""
+    e = re.sub(r"\s+", " ", eps.upper().strip())
+    e = re.sub(r"\s+(?:EPS-S|EPS-C|EPS|E\.?P\.?S\.?)\b", "", e)
+    return e.strip()
+
+
+# EPS / regímenes que el dropdown puede traer como valor "genérico" — para
+# estos el texto de la glosa siempre manda (ronda 13-14, adelantado a ronda 19).
+_EPS_DROPDOWN_GENERICO = frozenset({"", "OTRA", "OTRA / SIN DEFINIR", "SIN DEFINIR", "N/A"})
+
+
+def resolver_eps_efectiva(
+    eps_dropdown: str | None,
+    texto_glosa: str | None,
+) -> tuple[str, bool, str]:
+    """Bug BB (ronda 19, 30-jun-2026): resuelve la EPS efectiva cuando el
+    dropdown contradice la EPS nombrada en el texto de la glosa.
+
+    Caso real 30-jun: el usuario seleccionó "DISPENSARIO MEDICO" (régimen
+    militar) en el dropdown pero la glosa empezaba con "SALUD TOTAL:". El
+    motor cargó el contrato militar 440-DIGSA/DMBUG y normas de FF.MM. para
+    una glosa de EPS contributiva → alucinación total.
+
+    Decisión del usuario (30-jun): PRIORIZAR EL TEXTO + ALERTAR. El texto de
+    la glosa es un documento oficial de la EPS y es la fuente de verdad; el
+    dropdown es propenso a error humano (queda de sesión anterior, default).
+
+    Returns:
+        (eps_efectiva, hubo_correccion, mensaje_alerta)
+        - eps_efectiva: la EPS a usar para contrato/régimen/prompts.
+        - hubo_correccion: True si se cambió respecto del dropdown.
+        - mensaje_alerta: texto para mostrar al gestor (vacío si no hay).
+    """
+    eps_dropdown = (eps_dropdown or "").strip()
+    eps_texto = _detectar_pagador_en_texto(texto_glosa)
+    if not eps_texto:
+        # No se detectó ninguna EPS conocida en el texto → respetar dropdown.
+        return eps_dropdown, False, ""
+
+    dropdown_norm = _normalizar_eps_para_comparar(eps_dropdown)
+    texto_norm = _normalizar_eps_para_comparar(eps_texto)
+
+    # 1) Dropdown genérico → usar la del texto (silencioso, comportamiento
+    #    histórico de rondas 13-14 ahora adelantado al inicio del flujo).
+    if eps_dropdown.upper() in _EPS_DROPDOWN_GENERICO:
+        return eps_texto, True, ""
+
+    # 2) Coinciden (exacto o uno contiene al otro) → respetar dropdown.
+    if (
+        dropdown_norm == texto_norm
+        or (len(dropdown_norm) >= 4 and dropdown_norm in texto_norm)
+        or (len(texto_norm) >= 4 and texto_norm in dropdown_norm)
+    ):
+        return eps_dropdown, False, ""
+
+    # 3) CONTRADICCIÓN: dropdown específico ≠ EPS del texto → priorizar texto.
+    mensaje = (
+        f"Seleccionaste «{eps_dropdown}» pero la glosa menciona «{eps_texto}». "
+        f"El motor usó «{eps_texto}» (la del texto de la glosa). Si el dropdown "
+        f"era correcto, corregilo y reanalizá."
+    )
+    return eps_texto, True, mensaje
+
+
+def _es_pagador_arl(eps: str | None, texto_glosa: str | None) -> bool:
+    """Bug H (ronda 13): determina si el régimen aplicable es ARL/Riesgos
+    Laborales — por el nombre de la entidad o por marcadores en el texto.
+    """
+    eps_up = (eps or "").upper()
+    txt = texto_glosa or ""
+    # Por nombre EPS
+    for token in _TOKENS_ARL_CANONICAS:
+        if token in eps_up:
+            return True
+    # Por texto (al menos 1 marcador fuerte)
+    if _RE_ARL_O_LABORAL.search(txt):
+        return True
+    return False
+
+
+def _detectar_regimen_especial(
+    eps: str,
+    contrato_tipo: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Devuelve bloque de normativa especial según EPS o tipo de contrato.
+
+    Ronda 13 (Bug H): si el texto de la glosa menciona ARL o riesgos
+    laborales — aunque la EPS del dropdown no esté listada — se inyecta el
+    bloque ARL genérico. Esto evita que la IA defienda con Ley 100/Ley 1438
+    una glosa que claramente es del régimen de riesgos laborales.
+    """
     eps_up = (eps or "").upper()
     tipo_up = (contrato_tipo or "").upper()
     for key, bloque in REGIMEN_ESPECIAL.items():
         if key in eps_up or key in tipo_up:
             return bloque
+    # Fallback: detección por texto para ARL no listadas
+    if texto_glosa and _es_pagador_arl(eps, texto_glosa):
+        return REGIMEN_ESPECIAL["ARL"]
     return ""
 
 
@@ -1123,10 +1811,24 @@ def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
     )
 
 
+# Fase 2 Soportes (jul-2026): el fallback viejo afirmaba "EL REGISTRO
+# CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN" — empujaba a la IA a asegurar
+# respaldo clínico que nunca vio. La v1 de Fase 2 lo pasó al extremo opuesto
+# ("PROHIBIDO citar folios — NO están a la vista"), que MIENTE cuando los
+# PDFs sí van adjuntos por vía multimodal en la misma llamada. Esta versión
+# es CONDICIONAL y siempre verdadera: cita solo lo que REALMENTE aparezca,
+# no inventes; sirva o no haya PDFs adjuntos.
 FALLBACK_SIN_SOPORTES = (
-    "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS EN ESTA RADICACIÓN. "
-    "EL REGISTRO CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN PRESTADA. "
-    "LA HISTORIA CLÍNICA (RES. 1995/1999) Y LOS RIPS (RES. 866/2021) DAN CUENTA DE LA PRESTACIÓN."
+    "SIN TEXTO OCR DE SOPORTES EN ESTE BLOQUE.\n"
+    "⚠ REGLA ANTI-INVENCIÓN (aplica SIEMPRE):\n"
+    "1. Si hay PDFs de soportes adjuntos, léelos y cita ÚNICAMENTE folios, "
+    "fechas, hallazgos o médicos que APAREZCAN literalmente en ellos.\n"
+    "2. Si no hay evidencia clínica a la vista, NO inventes folios ni "
+    "hallazgos: fundamenta en las cláusulas del contrato, la normativa y la "
+    "carga de la EPS de especificar y probar su objeción "
+    "(Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
+    "3. La historia clínica (Res. 1995/1999) y los RIPS "
+    "reposan en el archivo institucional a disposición de la entidad."
 )
 
 
@@ -1193,9 +1895,27 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
 
         db = SessionLocal()
         try:
+            # Ronda 23: emparejamiento FLEXIBLE de EPS (como get_contrato). La
+            # glosa puede traer "AURORA" o "COMPENSAR" y las cláusulas estar
+            # guardadas como "SEGUROS DE VIDA AURORA S.A." o "COMPENSAR EPS".
+            # El match exacto (== eps.upper()) las perdía.
+            eps_q = eps.upper().strip()
+            eps_match = eps_q
+            try:
+                almacenadas = [
+                    r[0] for r in db.query(ClausulaContrato.eps).distinct().all() if r[0]
+                ]
+                if eps_q not in {a.upper() for a in almacenadas}:
+                    for stored in almacenadas:
+                        su = stored.upper()
+                        if su in eps_q or (len(eps_q) >= 4 and eps_q in su):
+                            eps_match = stored
+                            break
+            except Exception:
+                pass
             q = (
                 db.query(ClausulaContrato)
-                .filter(ClausulaContrato.eps == eps.upper())
+                .filter(ClausulaContrato.eps == eps_match)
                 .filter(ClausulaContrato.tema.in_(temas_relevantes))
                 .order_by(ClausulaContrato.tema, ClausulaContrato.id)
                 .limit(max_clausulas)
@@ -1244,6 +1964,66 @@ def build_user_prompt(
       3. GLOSA ORIGINAL (texto exacto del motivo EPS)
       4. INSTRUCCIÓN (salida XML + estructura 4 párrafos)
     """
+    # ─── Bug I (ronda 13, 24-jun-2026): auto-detección de EPS ─────────
+    # Si el usuario dejó el dropdown en "OTRA / SIN DEFINIR" pero pegó
+    # un texto que menciona literalmente la EPS / ARL ("La EPS Sanitas
+    # glosa..." / "La ARL Bolívar glosa..."), usamos la canónica detectada
+    # para que el dictamen NO diga "OTRA / SIN DEFINIR" sino el nombre
+    # real. Esto también activa el régimen especial correcto (ARL) cuando
+    # la entidad detectada es de riesgos laborales.
+    eps_up_check = (eps or "").upper().strip()
+    eps_detectada = _detectar_pagador_en_texto(texto_glosa)
+    if not eps_up_check or eps_up_check in _EPS_SIN_CONTRATO:
+        # Bug I v2: dropdown genérico + texto trae EPS → usar la del texto
+        if eps_detectada:
+            try:
+                import logging as _log_eps
+
+                _log_eps.getLogger(__name__).info(
+                    f"[EPS-AUTO-DETECT] dropdown='{eps}' → detectado en texto='{eps_detectada}'"
+                )
+            except Exception:
+                pass
+            eps = eps_detectada
+    elif eps_detectada and eps_up_check != eps_detectada.upper():
+        # Bug R (ronda 15, 25-jun-2026): dropdown ESPECÍFICO pero TEXTO
+        # menciona OTRA EPS — caso real DPP psiquiátrica: dropdown
+        # "NUEVA EPS" (error del usuario) pero el texto dice "EPS
+        # COMPENSAR glosa". La IA usaba la del dropdown y citaba
+        # contraparte incorrecta en el dictamen.
+        #
+        # Cuando el match en el texto es muy explícito ("La EPS X glosa"
+        # / "La ARL X glosa" en las primeras 200 chars del input), damos
+        # prioridad al texto y emitimos advertencia. La EPS del texto es
+        # la que conoce el caso real, el dropdown puede ser un click
+        # equivocado.
+        _txt_head = (texto_glosa or "")[:400].upper()
+        _eps_det_up = eps_detectada.upper()
+        # Match contundente: el nombre detectado aparece después de
+        # "EPS", "ARL", "FAMISANAR", etc. en las primeras 400 chars
+        marcadores_explicitos = (
+            f"EPS {_eps_det_up}",
+            f"LA EPS {_eps_det_up}",
+            f"ARL {_eps_det_up}",
+            f"LA ARL {_eps_det_up}",
+            f"{_eps_det_up} EPS",
+            f"{_eps_det_up} GLOSA",
+            f"{_eps_det_up} RATIFICA",
+            f"{_eps_det_up} OBJETA",
+        )
+        if any(m in _txt_head for m in marcadores_explicitos):
+            try:
+                import logging as _log_disc
+
+                _log_disc.getLogger(__name__).warning(
+                    f"[EPS-DISCREPANCIA] dropdown='{eps}' "
+                    f"≠ texto='{eps_detectada}' → priorizamos el texto "
+                    f"(el dropdown puede ser un click equivocado)"
+                )
+            except Exception:
+                pass
+            eps = eps_detectada
+
     prefijo = codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA"
     if prefijo not in _NOMBRE_TIPO:
         prefijo = "FA"
@@ -1412,11 +2192,20 @@ def build_user_prompt(
     # Datos del PDF (si hay)
     datos = extraer_datos_soporte(contexto_pdf)
     cups = cups_verificado or datos["cups"]
+    _nota_cups = ""
     if cups == "NO IDENTIFICADO":
         # Antes: "CUPS INDICADO EN EL EXPEDIENTE" -- aparecia literal en el
         # dictamen y sonaba a placeholder sin reemplazar. Ahora damos un
         # fallback mas natural que la IA puede usar fluido sin parecer copy/paste.
         cups = "el procedimiento facturado conforme al CUPS detallado en la factura electronica"
+        # Ronda 2 (12-jun-2026): sin CUPS confiable la IA rellenaba el hueco
+        # con la fecha ("CUPS 2026-04") o la factura ("CUPS HUS0000522871").
+        # Instrucción explícita: omitir antes que inventar.
+        _nota_cups = (
+            "\n  ⚠ NO hay CUPS confiable en los datos: NO inventes ni rellenes el "
+            "CUPS — omite la referencia al CUPS si no está en los datos. NUNCA uses "
+            "fechas, números de factura ni radicados como CUPS."
+        )
 
     paciente = datos.get("paciente", "NO IDENTIFICADO")
     medico = datos.get("medico", "NO IDENTIFICADO")
@@ -1476,7 +2265,7 @@ def build_user_prompt(
                     '  para esa fecha o aplicar el marco normativo general".\n'
                 )
     except Exception:
-        pass
+        logger.warning("[VIGENCIA] chequeo de vigencia del contrato no evaluado", exc_info=True)
 
     # Concepto Manual Único
     try:
@@ -1487,7 +2276,13 @@ def build_user_prompt(
         concepto_oficial = "(catálogo no disponible)"
 
     # Régimen especial
-    bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
+    # Ronda 13 (Bug H): pasamos también texto_glosa al detector — así
+    # cuando el dropdown es genérico pero el texto menciona ARL, se
+    # inyecta el bloque normativo ARL (Decreto 1295/94 + Ley 1562/2012)
+    # en vez de defenderse con Ley 100 (régimen EPS) que no aplica.
+    bloque_regimen = _detectar_regimen_especial(
+        eps, contrato.get("tipo", ""), texto_glosa=texto_glosa
+    )
     bloque_regimen_str = (
         f"\n[RÉGIMEN ESPECIAL APLICABLE]\n{bloque_regimen}\n" if bloque_regimen else ""
     )
@@ -1527,7 +2322,9 @@ def build_user_prompt(
                 + "\n"
             )
     except Exception:
-        pass
+        logger.warning(
+            "[NORMATIVA-LITERAL] bloque de normativa literal no construido", exc_info=True
+        )
 
     # Definición taxativa del código de glosa (Manual Único Res. 2284/2023)
     # para refutación directa en párrafo 2
@@ -1545,15 +2342,19 @@ def build_user_prompt(
                 f"la definición taxativa punto por punto.\n"
             )
     except Exception:
-        pass
+        logger.warning("[TAXATIVA] definición taxativa del código no inyectada", exc_info=True)
 
     # Cláusulas anti-rebatimiento típicas por tipo de glosa (pre-anulan
-    # contra-argumentos comunes de la EPS)
+    # contra-argumentos comunes de la EPS). Ronda 2 (12-jun-2026): se pasa
+    # el texto de la glosa para que la familia AU bifurque urgencias vs
+    # electivo — antes la cláusula "LA AUTORIZACIÓN PREVIA NO CONSTITUYE
+    # REQUISITO EN LA ATENCIÓN DE URGENCIAS" se inyectaba SIEMPRE y la IA
+    # la copiaba en procedimientos PROGRAMADOS (evidencia AU0301).
     bloque_antirebatimiento_str = ""
     try:
         from app.services.clausulas_anti_rebatimiento import clausulas_para_codigo
 
-        cls = clausulas_para_codigo(codigo, max_clausulas=2)
+        cls = clausulas_para_codigo(codigo, max_clausulas=2, texto_glosa=texto_glosa or "")
         if cls:
             lineas_cl = [f"  • {c}" for c in cls]
             bloque_antirebatimiento_str = (
@@ -1579,9 +2380,14 @@ def build_user_prompt(
             texto = (cl.get("texto_literal") or "").strip()
             if not texto:
                 continue
-            # Truncar texto literal a 500 chars para no explotar tokens
-            if len(texto) > 500:
-                texto = texto[:500] + "…"
+            # Truncar texto literal solo si es muy largo. El límite anterior
+            # (500) cortaba a mitad de palabra y dejaba "…", que la IA copiaba
+            # literal dentro de las comillas → "VIGENCIA FISCAL 202…". Una
+            # cláusula típica cabe entera bajo 2000 chars (la BD guarda hasta
+            # 5000), así que en la práctica ya no se trunca; y si excede, se
+            # corta en frontera de palabra para nunca partir "2025" en "202".
+            if len(texto) > 2000:
+                texto = texto[:2000].rsplit(" ", 1)[0] + " […]"
             pagina = cl.get("pagina")
             pag_str = f" (pag. {pagina})" if pagina else ""
             lineas_cc.append(f"  • CLÁUSULA {num}{pag_str} — {titulo}:\n    «{texto}»")
@@ -1593,9 +2399,81 @@ def build_user_prompt(
                 "IMPORTANTE: estas cláusulas son TEXTO LITERAL del contrato firmado. "
                 "Cuando defiendas, CITA UNA O DOS entre comillas usando su número de cláusula "
                 "para que la EPS no pueda rebatir (firmó el documento que se cita).\n"
+                "⚠ Usa el identificador EXACTO que se muestra (ej. «Acuerdo Tarifario 2025», "
+                "«Octava, numeral 3») — NO inventes numeraciones ('cláusula tercera') que no "
+                "estén en esta lista: la EPS verifica el número en segundos.\n"
                 + "\n".join(lineas_cc)
                 + "\n"
             )
+
+    # Contexto contractual ENRIQUECIDO — auditoría 10-jun-2026: la "otra IA"
+    # produce dictámenes 9/10 porque su prompt incluye CUPS específico +
+    # tarifa pactada + NIT + SECOP + fechas + anexos + parágrafos. Este
+    # módulo construye ese bloque a partir de ContratoRecord,
+    # ClausulaContrato y TarifaContratadaRecord. Se inyecta DESPUÉS del
+    # bloque de cláusulas legacy (que ya está arriba) — ambos coexisten
+    # porque el legacy filtra 5 y el enriquecido trae más detalle.
+    bloque_contexto_enriquecido_str = ""
+    try:
+        from app.services.contexto_contractual_enriquecido import construir_contexto as _cc
+
+        _ctx = _cc(
+            eps=str(eps or ""),
+            codigo_glosa=str(codigo or ""),
+            texto_glosa=str(texto_glosa or ""),
+            familia=prefijo,
+        )
+        if not _ctx.es_vacio():
+            bloque_contexto_enriquecido_str = _ctx.a_bloque_prompt()
+    except Exception as _e_cc:
+        import logging as _lg
+
+        _lg.getLogger("motor_glosas").debug(f"[CONTEXTO-ENRIQUECIDO] no se inyectó: {_e_cc}")
+
+    # DATOS CLÍNICOS DEL ENUNCIADO (12-jun-2026, ronda 2): si la glosa trae
+    # datos clínicos concretos (NYHA, FE%, Glasgow, Kellgren, días de UCI,
+    # lista de trasplante...), se inyectan como bloque imperativo — la
+    # evidencia de estrés mostró dictámenes que ignoraban "NYHA III, FE 25%"
+    # y "47 días UCI por TCE severo" (plantilla pura, fácil de ratificar).
+    bloque_datos_clinicos_str = ""
+    try:
+        from app.services.contexto_contractual_enriquecido import (
+            bloque_datos_clinicos,
+            bloque_kits_normativos_especiales,
+            bloque_multi_factura,
+        )
+
+        bloque_datos_clinicos_str = bloque_datos_clinicos(texto_glosa or "")
+        # Ronda 6 (16-jun-2026 — fix H): si el texto detecta RN/prematuro,
+        # trasplante, MDR-TB o preeclampsia, inyectar las normas reales
+        # del régimen especial (Ley 1438 Art. 67, Decreto 2493/2004,
+        # Lineamiento TBC 2025, etc.). Anexado al MISMO bloque para no
+        # romper el orden del prompt.
+        kits = bloque_kits_normativos_especiales(texto_glosa or "")
+        if kits:
+            bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + kits
+        # Ronda 8 (16-jun-2026): few-shots del BANCO DE RESPUESTAS HUS.
+        # El dueño aportó 24 respuestas tipo del banco oficial del HUS
+        # (3 por familia × 8 familias: AU, TA, SO, CL, ME, IN, CO, FA).
+        # Cambio estructural — el modelo ya no genera con instrucciones
+        # genéricas, ahora tiene 1-2 ejemplos del ESTILO institucional
+        # como punto de partida. Aclaración explícita en el bloque: son
+        # plantillas, NO copia literal — adapta con los datos reales.
+        try:
+            from app.services.banco_respuestas_hus import bloque_banco_respuestas
+
+            banco_str = bloque_banco_respuestas(codigo or "", max_ejemplos=2)
+            if banco_str:
+                bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + banco_str
+        except Exception:
+            pass
+        # Ronda 6 (16-jun-2026 — fix K): si hay 2+ facturas en la glosa,
+        # avisar al modelo para que estructure por factura.
+        multif = bloque_multi_factura(texto_glosa or "")
+        if multif:
+            bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + multif
+    except Exception:
+        pass
 
     # Cálculo aritmético para glosas TA con contrato (factor conocido)
     bloque_calculo_str = ""
@@ -1633,10 +2511,11 @@ def build_user_prompt(
             bloque_referencias_str = (
                 "\n[REFERENCIAS DOCUMENTALES EXTRAÍDAS DEL EXPEDIENTE]\n"
                 f"{refs['resumen_citable']}\n"
-                "⚠ Cuando sea pertinente, CITA en la respuesta estas referencias de forma "
-                'textual (ej. "según consta en el folio 59 del expediente", "conforme a la '
-                'historia clínica N° 1234567 suscrita por el Dr. X"). Esto hace la respuesta '
-                "casi imposible de ratificar.\n"
+                "⚠ Cuando sea pertinente, CITA estas referencias de forma textual, "
+                "usando EXACTAMENTE el folio/HC/firmante que aparece arriba — "
+                "NUNCA inventes números de folio, historia clínica, ni nombres de profesionales. "
+                'Si no hay un dato concreto arriba, escribe "según consta en los soportes adjuntos" '
+                "sin más detalle. Esto hace la respuesta casi imposible de ratificar.\n"
             )
     except Exception:
         pass
@@ -1693,13 +2572,66 @@ def build_user_prompt(
     es_complejo = _puntos_complejidad >= 4
 
     # PDF: para casos COMPLEJOS enviamos hasta 40K chars (Claude Sonnet 4.6
-    # maneja 200K contexto sin problema). Para SIMPLES limitamos a 2000 para
-    # mantener respuestas concisas.
+    # maneja 200K contexto sin problema). Para SIMPLES el tope histórico era
+    # 2000 chars — tan poco que la IA argumentaba a ciegas aunque la HC
+    # estuviera adjunta (Fase 2 Soportes, jul-2026). Ahora 12K por defecto,
+    # tunable por env var sin redeploy.
     if es_complejo:
-        _max_pdf_chars = 40000
+        _max_pdf_chars = _env_int("GLOSA_SOPORTES_MAX_CHARS_COMPLEJO", 40000)
     else:
-        _max_pdf_chars = 2000
+        _max_pdf_chars = _env_int("GLOSA_SOPORTES_MAX_CHARS_SIMPLE", 12000)
     pdf_texto = contexto_pdf[:_max_pdf_chars].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES
+
+    # ─── Fase 2 Soportes (jul-2026): gate interactivo de expediente ───
+    # El mismo detector determinista del auto-responder avisa DENTRO del
+    # prompt cuando el código exige soportes y el expediente está flaco,
+    # para que la IA cite SOLO evidencia real y pivotee a defensa
+    # contractual/normativa si no la hay. Antes esto solo gateaba el lote
+    # batch; el flujo interactivo generaba en silencio.
+    # NOTA (fix jul-2026): el aviso usa lenguaje SIEMPRE-verdadero ("cita
+    # solo lo que aparezca") — no afirma "no hay documentos", porque los
+    # PDFs pueden ir adjuntos por multimodal en la misma llamada.
+    if len((contexto_pdf or "").strip()) < 800:
+        try:
+            from app.services.detector_requiere_soportes import (
+                evaluar as _eval_soportes,
+            )
+
+            _eval_res = _eval_soportes(
+                codigo_glosa=codigo,
+                texto_glosa=texto_glosa,
+                contexto_pdf=contexto_pdf or "",
+                valor_objetado=float(_valor_numerico or 0),
+            )
+            if _eval_res.get("requiere"):
+                _sugeridos = "".join(
+                    f"\n    • {s}" for s in _eval_res.get("soportes_sugeridos", [])
+                )
+                _alerta = (
+                    "⚠ AVISO DE EXPEDIENTE (detector determinista del motor):\n"
+                    f"  {_eval_res.get('motivo', '')}\n"
+                    f"  Soportes que respaldarían el caso:{_sugeridos}\n"
+                    "  REGLAS PARA ESTE DICTAMEN:\n"
+                    "  1. Cita ÚNICAMENTE folios, fechas, hallazgos o médicos que APAREZCAN\n"
+                    "     literalmente en los soportes a la vista (texto OCR o PDF adjunto).\n"
+                    "     NO inventes evidencia clínica que no puedas verificar.\n"
+                    "  2. Si no hay evidencia clínica a la vista, fundamenta en las cláusulas\n"
+                    "     del contrato, la normativa y la carga de la EPS de especificar y\n"
+                    "     probar su objeción (Res. 3047/2008 anexo técnico 5; Ley 1438 art. 57).\n"
+                    "  3. La historia clínica (Res. 1995/1999) reposa en el archivo\n"
+                    "     institucional a disposición de la entidad.\n"
+                    "  4. Exige a la EPS precisar el folio/documento echado de menos, sin\n"
+                    "     aceptar la glosa."
+                )
+                # Dedup (fix jul-2026): si el bloque venía vacío, pdf_texto ya
+                # es el FALLBACK — reemplazar, no apilar. Si trae OCR real
+                # (flaco pero presente), anteponer para preservarlo.
+                if contexto_pdf and contexto_pdf.strip():
+                    pdf_texto = _alerta + "\n\n" + pdf_texto
+                else:
+                    pdf_texto = _alerta
+        except Exception:
+            pass
 
     # Instrucción adaptativa de longitud
     if es_complejo:
@@ -1708,7 +2640,11 @@ def build_user_prompt(
             f"  • {_num_docs_pdf} documento(s) PDF adjunto(s), {_pdf_len:,} caracteres totales.\n"
             f"  • Texto de glosa: {_texto_glosa_len} caracteres.\n"
             f"  LONGITUD DE RESPUESTA: 4 PÁRRAFOS, 230-310 palabras total.\n"
-            f"  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos, médicos específicos.\n"
+            + (
+                "  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos y médicos que APAREZCAN en los soportes.\n"
+                if _pdf_len > 0
+                else "  Sin PDFs adjuntos: fundamenta en contrato y normativa; NO cites folios ni hallazgos clínicos.\n"
+            )
         )
     else:
         bloque_complejidad_str = (
@@ -1757,6 +2693,52 @@ def build_user_prompt(
     # y debe aceptar la diferencia. La IA necesita saberlo para producir la
     # acción correcta (ACEPTAR_PARCIAL / ACEPTAR_TOTAL) en lugar de defender
     # íntegramente cuando hay un excedente legítimo.
+    # ─── Bug O v2 (ronda 15, 25-jun): instrucciones explícitas del usuario ───
+    # Casos del 25-jun: el usuario escribió al final del texto pegado
+    # "Solicitamos defensa que cite expresamente la Sentencia T-553 de 2024"
+    # o "Solicitamos defensa que aborde la C-313/2014 + Resolución 2358/1998"
+    # — y la IA IGNORÓ esa instrucción. Detectamos los patrones tipo
+    # "solicitamos|necesitamos|exige|requiere defensa que (cite|aborde|
+    # invoque) X" y los promovemos a INSTRUCCIÓN OBLIGATORIA en bloque
+    # separado al final del user prompt para que el modelo no las pase.
+    bloque_instrucciones_usuario_str = ""
+    try:
+        _patrones_instruccion = (
+            re.compile(
+                r"(?:solicitamos|necesitamos|requerimos)\s+(?:defensa|respuesta|argumento)\s+"
+                r"que\s+(?:cite|aborde|invoque|incluya|mencione|fundamente)\s+([^.]{20,400}\.)",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"(?:debe|deber[áa])\s+(?:citar|invocar|incluir|fundamentar)\s+([^.]{20,400}\.)",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"(?:exigimos|exigir)\s+que\s+(?:cite|aborde|incluya)\s+([^.]{20,400}\.)",
+                re.IGNORECASE,
+            ),
+        )
+        instrucciones_capturadas: list[str] = []
+        for _pat_inst in _patrones_instruccion:
+            for _m_inst in _pat_inst.finditer(texto_glosa or ""):
+                _ins_text = _m_inst.group(1).strip()
+                if _ins_text and len(_ins_text) >= 15:
+                    instrucciones_capturadas.append(_ins_text)
+        if instrucciones_capturadas:
+            bloque_instrucciones_usuario_str = (
+                "\n═══ BLOQUE 3.bis: INSTRUCCIONES ESPECÍFICAS DEL GESTOR (OBLIGATORIAS) ═══\n"
+                "⚠ El gestor del HUS escribió en el texto las siguientes INSTRUCCIONES EXPLÍCITAS\n"
+                "para esta respuesta. DEBES seguirlas literalmente. Omitirlas = dictamen rechazado:\n\n"
+            )
+            for _i_ins, _ins in enumerate(instrucciones_capturadas[:5], 1):
+                bloque_instrucciones_usuario_str += f"  {_i_ins}. {_ins}\n"
+            bloque_instrucciones_usuario_str += (
+                "\nEn la argumentación DEBES citar TEXTUALMENTE las normas/sentencias/conceptos\n"
+                "que el gestor pidió. NO digas que 'la jurisprudencia respalda' — CITÁ EL NÚMERO.\n\n"
+            )
+    except Exception:
+        pass
+
     bloque_excedente_str = ""
     _vf = _parsear_valor_cop(valor_facturado)
     _vp = _parsear_valor_cop(valor_pactado)
@@ -1796,6 +2778,18 @@ def build_user_prompt(
                     f"  Código respuesta sugerido: RE9905.\n"
                 )
 
+    # Aviso anti contrato-cruzado (12-jun-2026, ronda 2): cuando la entidad
+    # NO tiene contrato identificado ("OTRA / SIN DEFINIR", fallback), la IA
+    # arrastraba números de contrato de OTRAS EPS desde ejemplos/históricos.
+    # Instrucción explícita: sin contrato identificado NO se cita ninguno.
+    _nota_contrato = ""
+    if numero_contrato == "SIN CONTRATO PACTADO":
+        _nota_contrato = (
+            "\n  ⚠ NO cites números de contrato: la entidad no tiene contrato "
+            "identificado en el sistema. Cualquier número de contrato que recuerdes "
+            "de otros casos pertenece a OTRA entidad y citarlo invalida el dictamen."
+        )
+
     # Regla de oro para la IA: los datos del BLOQUE 1 son AUTORITATIVOS.
     # La EPS a veces menciona CUPS o valores alternativos en el texto de
     # la glosa ("se reconoce tarifa SOAT UVB vigente código 39143") — eso
@@ -1806,10 +2800,10 @@ def build_user_prompt(
 ═══ BLOQUE 1: DATOS DEL CASO (AUTORITATIVOS — usa EXACTAMENTE estos) ═══
 • Tipo de glosa     : {nombre_tipo} ({codigo})
 • Entidad pagadora  : {eps}
-• Contrato vigente  : {numero_contrato}
+• Contrato vigente  : {numero_contrato}{_nota_contrato}
 • Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
-• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
+• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa{_nota_cups}
 • Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
 • Valor facturado   : {valor_facturado or "—"}
 • Valor pactado     : {valor_pactado or "—"}
@@ -1817,11 +2811,12 @@ def build_user_prompt(
 • Tiempo transcurrido: {contexto_tiempo}{_alerta_vigencia_block}
 
 ⚠ REGLA CRÍTICA DE DATOS (FALLAR ESTO DESCALIFICA LA RESPUESTA):
-  1. Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
-     literalmente en el argumento. NUNCA escribas "EL VALOR INDICADO EN EL
-     EXPEDIENTE" si tienes el número real.
-  2. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
-     "FMQ6296", "19914262-04"), ÚSALO COMPLETO, NO lo trunques.
+  1. Si "Valor objetado" arriba contiene un número, COPIA ESE NÚMERO
+     EXACTO en el argumento (los puntos de miles incluidos). NUNCA escribas
+     "EL VALOR INDICADO EN EL EXPEDIENTE" si tienes el número real arriba.
+     NUNCA cambies el monto por otro distinto del que ves arriba.
+  2. Si el CUPS arriba viene con sufijo (letra, guion o anexo), ÚSALO TAL
+     CUAL aparece arriba — NO lo trunques ni lo simplifiques.
   3. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
      (frases como "se reconoce código 39143", "tarifa SOAT código X", "se
      paga como CUPS Y"), ESE CUPS alternativo NO es el que HUS facturó —
@@ -1838,7 +2833,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
+{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
@@ -1850,7 +2845,7 @@ DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos 
 SOPORTES ADJUNTOS (extracto de PDF, si los hay):
 {pdf_texto}
 {bloque_excedente_str}
-═══ BLOQUE 4: INSTRUCCIÓN ═══
+{bloque_instrucciones_usuario_str}═══ BLOQUE 4: INSTRUCCIÓN ═══
 Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <paciente>...</paciente>
 <servicio>...</servicio>
@@ -1865,30 +2860,6 @@ RECUERDA:
 3. Tono: conciliador institucional. NUNCA "SE EXIGE", "OBLIGA A", "ACTO ABUSIVO".
 4. Texto fuera de los tags XML será rechazado.
 """
-
-
-def build_all_variants(
-    texto_glosa: str,
-    contexto_pdf: str,
-    codigo: str,
-    eps: str,
-    numero_factura: Optional[str] = None,
-    numero_radicado: Optional[str] = None,
-    dias_habiles: Optional[int] = None,
-    es_extemporanea: bool = False,
-) -> list[str]:
-    """Compatibilidad: genera el mismo prompt 4 veces (antes producía 4 variantes hostiles)."""
-    base = build_user_prompt(
-        texto_glosa,
-        contexto_pdf,
-        codigo,
-        eps,
-        numero_factura,
-        numero_radicado,
-        dias_habiles,
-        es_extemporanea,
-    )
-    return [base] * 4
 
 
 # ── R59 P2: prompt de auditoría previa (modo neutral) ──────────────

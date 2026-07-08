@@ -42,6 +42,15 @@ py generar_fur_servicios.py ^
     --salida  "C:\...\FACTURAS\HUS428139_FURSERVICIOS.xlsx"
 ```
 
+## Radicación masiva multi-entidad
+
+El procesamiento de **muchas facturas** con reporte (lo que figuraba como
+`cargar_masivo_adres.py`) y, además, la radicación ante **cualquier entidad**
+(no solo ADRES) vive ahora en `../radicar_facturacion.py`. Reutiliza estos
+mismos parsers (`rips_lectura.py`, `factura_lectura.py`), tipifica los soportes,
+valida la completitud por entidad y arma carpetas + ZIP. Ver
+`../README_radicar_facturacion.md`.
+
 ## Nombramiento ADRES de soportes (para el ZIP final)
 
 `FEV_`, `RIP_`, `CUV_`, `FUR_`, `SER_`, `OPF_`, `HEV_`, `CRC_`, `HAO_`, `PDX_`,

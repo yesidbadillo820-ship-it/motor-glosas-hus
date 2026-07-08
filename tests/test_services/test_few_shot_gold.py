@@ -12,7 +12,6 @@ from app.database import Base
 from app.models.db import GlosaRecord, PlantillaGoldRecord
 from app.services.few_shot_gold import (
     bloque_few_shot_para_prompt,
-    construir_bloque_gold,
     obtener_ejemplos_gold,
 )
 
@@ -75,12 +74,21 @@ class TestObtenerEjemplos:
         _seed_gold(db, "SAN", "TA01", "x" * 250, usos=20)
         _seed_glosa(db, "SAN", "TA01", "LEVANTADA", "y" * 250)
         ejs = obtener_ejemplos_gold(db, "SAN", "TA01", max_ejemplos=2)
-        # obtener_ejemplos_gold completa hasta max_ejemplos combinando fuentes por
-        # prioridad (GOLD primero, luego HISTORICO). Con 1 gold + 1 histórico y
-        # max=2 → 2 ejemplos, con el gold en primer lugar (prelación).
+        # La función devuelve "hasta N" ejemplos por prelación (banco HUS →
+        # gold → histórico). Con max=2, 1 gold y 1 histórico, devuelve ambos
+        # con el GOLD de primero (esa es la "preferencia" que valida el test).
         assert len(ejs) == 2
         assert ejs[0]["fuente"] == "GOLD"
         assert ejs[1]["fuente"] == "HISTORICO"
+
+    def test_gold_unico_cuando_max_1(self, db):
+        # Con max=1 y un gold disponible, el gold ocupa el único slot
+        # (no se cuela el histórico).
+        _seed_gold(db, "SAN", "TA01", "x" * 250, usos=20)
+        _seed_glosa(db, "SAN", "TA01", "LEVANTADA", "y" * 250)
+        ejs = obtener_ejemplos_gold(db, "SAN", "TA01", max_ejemplos=1)
+        assert len(ejs) == 1
+        assert ejs[0]["fuente"] == "GOLD"
 
     def test_fallback_a_historico(self, db):
         # Sin gold, hay glosa LEVANTADA
@@ -110,15 +118,3 @@ class TestBloque:
         b = bloque_few_shot_para_prompt(ejs)
         assert "TEXTO 1 GANADOR" in b
         assert "EJEMPLOS DE DICTÁMENES GANADORES" in b
-
-
-class TestConstruirIntegrado:
-    def test_un_paso(self, db):
-        _seed_gold(db, "SAN", "TA01", "ARGUMENTO GOLD " + "x" * 250)
-        bloque = construir_bloque_gold(db, "SAN", "TA01")
-        assert "GOLD" in bloque
-        assert "ARGUMENTO GOLD" in bloque
-
-    def test_un_paso_sin_datos(self, db):
-        bloque = construir_bloque_gold(db, "NOEXISTE", "ZZ99")
-        assert bloque == ""

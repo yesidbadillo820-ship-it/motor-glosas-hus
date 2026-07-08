@@ -18,8 +18,21 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.core.tz import ahora_utc
 from app.database import get_db
-from app.models.db import UsuarioRecord
+from app.models.db import (
+    AICacheRecord,
+    AICallRecord,
+    AuditLogRecord,
+    ConciliacionRecord,
+    ContratoRecord,
+    DictamenVersionRecord,
+    GlosaEliminadaRecord,
+    GlosaRecord,
+    PlantillaGoldRecord,
+    PlantillaRecord,
+    UsuarioRecord,
+)
 from app.services.health_monitor import checar_salud
 
 router = APIRouter(prefix="/sistema", tags=["sistema"])
@@ -58,8 +71,6 @@ def observabilidad(
       - ¿Cuántas líneas de código tiene el sistema?
     """
     import os
-
-    from app.core.tz import ahora_utc
 
     # Detección de configuración
     sentry_ok = bool(os.getenv("SENTRY_DSN"))
@@ -168,9 +179,6 @@ def metricas_ia(
     """
     from datetime import timedelta
 
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord
-
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
     q = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde)
     calls = q.all()
@@ -248,7 +256,6 @@ def metricas_ia_por_glosa(
     Útil para investigar glosas con dictamen sospechoso (latencia alta,
     cache fallido, modelo equivocado, costo desproporcionado).
     """
-    from app.models.db import AICallRecord
 
     calls = (
         db.query(AICallRecord)
@@ -300,9 +307,6 @@ def metricas_ia_por_usuario(
     interna en multi-tenancy futuro.
     """
     from datetime import timedelta
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord
 
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
     calls = (
@@ -363,8 +367,6 @@ def metricas_ia_billing_forense(
     queres saber donde se fue la plata.
     """
     from datetime import timedelta
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord
 
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
     todas = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
@@ -473,9 +475,6 @@ def alertas_criticas_consolidadas(
     from datetime import timedelta
 
     from sqlalchemy import func as _f
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord, GlosaRecord
 
     items = []
     estados_activos = ("RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA")
@@ -625,8 +624,6 @@ def healthcheck_profundo(
     from fastapi import status as _http_status
     from fastapi.responses import JSONResponse
 
-    from app.core.tz import ahora_utc
-
     componentes = {}
     todo_ok = True
 
@@ -705,9 +702,6 @@ def resumen_mensual_ejecutivo(
     from datetime import datetime, timezone
 
     from sqlalchemy import func as _f
-
-    from app.core.tz import ahora_utc
-    from app.models.db import GlosaRecord
 
     ahora = ahora_utc()
     year = year or ahora.year
@@ -833,11 +827,13 @@ def ia_presence_publica():
         }
 
     return {
-        "primary_ai": os.getenv("PRIMARY_AI", "gemini"),
+        "primary_ai": os.getenv("PRIMARY_AI", "groq"),
         "anthropic": _info("ANTHROPIC_API_KEY"),
-        "gemini": _info("GEMINI_API_KEY"),
+        "gemini": {**_info("GEMINI_API_KEY"), "rol": "solo OCR de PDFs escaneados"},
         "groq": _info("GROQ_API_KEY"),
         "nota": (
+            "Dictamenes: groq (primario) + anthropic (calidad/fallback). "
+            "Gemini quedo SOLO como OCR de PDFs escaneados (jun-2026). "
             "Si un proveedor muestra estado=AUSENTE, la API key NO llego al "
             "proceso (revisa 'fly secrets list'). Si muestra estado=OK pero "
             "los dictamenes siguen cayendo a Llama, mandame logs de un POST "
@@ -872,7 +868,6 @@ def info_version():
     import sys
 
     from app.core.config import get_settings
-    from app.core.tz import ahora_utc
 
     cfg = get_settings()
 
@@ -984,9 +979,6 @@ def info_kpis_negocio(
     """
     from datetime import timedelta, timezone
 
-    from app.core.tz import ahora_utc
-    from app.models.db import GlosaRecord
-
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
     todas = db.query(GlosaRecord).all()
@@ -1083,9 +1075,6 @@ def info_milestones(
     """
     from sqlalchemy import func as _f
 
-    from app.core.tz import ahora_utc
-    from app.models.db import GlosaRecord
-
     total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
     valor_recuperado = db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0)).scalar() or 0
     valor_recuperado = int(valor_recuperado)
@@ -1158,30 +1147,42 @@ def info_api_endpoints(
 
     Solo COORDINADOR/ADMIN.
     """
-    from fastapi.routing import APIRoute
-
     from app.main import app
 
+    # Ronda 29 (7-jul-2026): fuente de verdad = el esquema OpenAPI de la
+    # propia app. Inspeccionar app.routes dependía de internals de FastAPI
+    # que cambian entre versiones (APIRoute aplanado vs _IncludedRouter
+    # opaco) y devolvía 0 endpoints en local, rompiendo 5 tests.
+    _HTTP = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+    schema = app.openapi()
     items = []
     por_tag: dict[str, int] = {}
 
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
+    for path, metodos in (schema.get("paths") or {}).items():
+        if path.startswith("/_"):
             continue
-        # Excluir endpoints internos como /openapi.json
-        if route.path.startswith("/_") or route.path == "/openapi.json":
+        methods: list[str] = []
+        tags_ruta: set[str] = set()
+        name = ""
+        for metodo, op in metodos.items():
+            if metodo.upper() not in _HTTP or not isinstance(op, dict):
+                continue
+            methods.append(metodo.upper())
+            tags_ruta.update(op.get("tags") or [])
+            name = name or op.get("operationId") or ""
+        if not methods:
             continue
-        tags = list(route.tags) if route.tags else ["sin_tag"]
+        tags = sorted(tags_ruta) or ["sin_tag"]
         for t in tags:
             por_tag[t] = por_tag.get(t, 0) + 1
 
         item = {
-            "path": route.path,
-            "name": route.name,
+            "path": path,
+            "name": name,
             "tags": tags,
         }
         if incluir_metodos:
-            item["methods"] = sorted(route.methods or [])
+            item["methods"] = sorted(methods)
         items.append(item)
 
     items.sort(key=lambda x: x["path"])
@@ -1349,9 +1350,6 @@ def copilot_resumen(
     o landing.
     """
     from datetime import timezone
-
-    from app.core.tz import ahora_utc
-    from app.models.db import GlosaRecord
 
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
     ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
@@ -1620,7 +1618,7 @@ def info_about(
             "framework": "FastAPI + Pydantic v2",
             "orm": "SQLAlchemy",
             "db": "PostgreSQL",
-            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq Llama 3.3",
+            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq (gpt-oss-120b → qwen3-32b → llama-3.3)",
             "auth": "JWT + 2FA TOTP",
             "hosting": "Render",
         },
@@ -1707,9 +1705,6 @@ def info_auth_stats(
     from datetime import timedelta
 
     from sqlalchemy import func as _f
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AuditLogRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
 
@@ -1885,7 +1880,7 @@ def info_inventario_funcionalidades(
             "framework": "FastAPI + Pydantic v2",
             "orm": "SQLAlchemy",
             "db_prod": "PostgreSQL",
-            "llm": "Claude Sonnet 4.6 + Groq Llama 3.3",
+            "llm": "Claude Sonnet 4.6 + Groq (gpt-oss-120b → qwen3-32b → llama-3.3)",
             "auth": "JWT + 2FA TOTP",
             "hosting": "Render",
         },
@@ -1914,9 +1909,6 @@ def info_health_completo(
     import os
 
     from sqlalchemy import func as _f, text as _text
-
-    from app.core.tz import ahora_utc
-    from app.models.db import GlosaRecord
 
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
 
@@ -2015,9 +2007,6 @@ def info_health_score(
     """
     import os
     from datetime import timedelta
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AuditLogRecord, GlosaRecord
 
     desglose = []
 
@@ -2159,9 +2148,6 @@ def metricas_ia_cache_eficiencia(
     """
     from datetime import timedelta
 
-    from app.core.tz import ahora_utc
-    from app.models.db import AICacheRecord, AICallRecord
-
     desde = ahora_utc() - timedelta(days=int(dias))
 
     rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
@@ -2216,9 +2202,6 @@ def metricas_ia_budget(
       - pct_consumido / pct_proyectado
     """
     from calendar import monthrange
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
@@ -2289,9 +2272,6 @@ def metricas_ia_por_modelo(
     Ordenado DESC por cost_usd_total.
     """
     from datetime import timedelta
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
     rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
@@ -2473,9 +2453,6 @@ def info_import_history(
     """
     from datetime import timedelta, timezone
 
-    from app.core.tz import ahora_utc
-    from app.models.db import GlosaRecord
-
     desde = ahora_utc() - timedelta(days=int(dias))
     glosas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= desde).all()
 
@@ -2616,8 +2593,6 @@ def info_zonas_horarias(
     import os
     from datetime import datetime
 
-    from app.core.tz import ahora_utc
-
     ahora = ahora_utc()
     now_local = datetime.now()
 
@@ -2672,14 +2647,6 @@ def info_observabilidad_completa(
     from datetime import timedelta
 
     from sqlalchemy import func as _f
-
-    from app.core.tz import ahora_utc
-    from app.models.db import (
-        AICacheRecord,
-        AICallRecord,
-        AuditLogRecord,
-        GlosaRecord,
-    )
 
     ahora = ahora_utc()
     desde_1h = ahora - timedelta(hours=1)
@@ -2741,21 +2708,6 @@ def info_snapshot_general(
     """
     from sqlalchemy import func as _f
 
-    from app.core.tz import ahora_utc
-    from app.models.db import (
-        AICacheRecord,
-        AICallRecord,
-        AuditLogRecord,
-        ConciliacionRecord,
-        ContratoRecord,
-        DictamenVersionRecord,
-        GlosaEliminadaRecord,
-        GlosaRecord,
-        PlantillaGoldRecord,
-        PlantillaRecord,
-        UsuarioRecord,
-    )
-
     def _count(model):
         return db.query(_f.count()).select_from(model).scalar() or 0
 
@@ -2802,9 +2754,6 @@ def info_glosas_con_ia(
     Solo COORDINADOR/ADMIN.
     """
     from datetime import timedelta
-
-    from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord, GlosaRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
 
@@ -2879,7 +2828,7 @@ def info_feature_flags(
         {
             "nombre": "ia_groq",
             "activo": bool(cfg.groq_api_key),
-            "descripcion": "Groq Llama como LLM fallback",
+            "descripcion": "Groq (cadena gpt-oss-120b → qwen3-32b → llama-3.3) como LLM fallback",
         },
         {
             "nombre": "firma_digital_rsa",
@@ -2999,6 +2948,8 @@ def info_configuracion(
         "ia": {
             "primary_ai": cfg.primary_ai,
             "groq_model": cfg.groq_model,
+            "groq_model_fallback_1": cfg.groq_model_fallback_1,
+            "groq_model_fallback_2": cfg.groq_model_fallback_2,
             "anthropic_model": cfg.anthropic_model,
             "anthropic_configurado": bool(cfg.anthropic_api_key),
             "groq_configurado": bool(cfg.groq_api_key),

@@ -1,0 +1,127 @@
+# Motor Glosas HUS — Self-hosted en máquina del HUS con Cloudflare Tunnel
+#
+# Composición de 2 servicios:
+#   1) motor: la app FastAPI (mismo Dockerfile que Fly/Railway).
+#   2) cloudflared: túnel inverso que expone el motor a internet con HTTPS
+#      automático SIN abrir puertos en el firewall del hospital. Solo
+#      requiere conexión saliente (la conexión la inicia cloudflared, no
+#      al revés).
+#
+# Cómo levantarlo (en la máquina del HUS):
+#   1. Copiar este archivo + .env + deploy/cloudflared/config.yml a
+#      /opt/motor-glosas/
+#   2. docker compose up -d
+#   3. ¡Listo! La app responde en https://iaglosassinac.help (o el dominio
+#      que configures en cloudflared/config.yml).
+#
+# Cómo apagarlo:
+#   docker compose down  (el volumen persiste — los datos no se borran)
+#
+# Cómo actualizar a la última versión del código:
+#   docker compose pull && docker compose up -d --build
+
+services:
+  # ─── Motor Glosas IA (FastAPI + SQLite) ────────────────────────────
+  motor:
+    build: .
+    container_name: motor-glosas-hus
+    restart: unless-stopped
+    # Sin "ports:" — el motor NO se expone al host. Solo cloudflared lo
+    # alcanza vía la red interna `motor-net`. Más seguro.
+    expose:
+      - "8080"
+    networks:
+      - motor-net
+    volumes:
+      # Disco persistente para SQLite + soportes PDF.
+      # En la máquina del HUS, el path absoluto del host es /opt/motor-glosas/data.
+      - ./data:/data
+    environment:
+      # Lee de un archivo .env adjunto (no committeado). Ver .env.example.
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/motorglosas.db}
+      ENV: ${ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SOPORTES_ROOT: /data/soportes
+      SOPORTES_LOCAL_ROOT: /data/soportes
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      # Mejora #3 (jun-2026): salida estructurada incremental. OFF por
+      # defecto. Para activarla, poner GLOSA_CAMPOS_ESTRUCTURADOS=true en
+      # el .env y `docker compose up -d --build`. Reversible: volver a 0.
+      GLOSA_CAMPOS_ESTRUCTURADOS: ${GLOSA_CAMPOS_ESTRUCTURADOS:-0}
+      # Fase 2 Soportes (jul-2026): cuánto texto OCR de los soportes llega
+      # a la IA (antes: 2000 chars el caso simple — argumentaba a ciegas) y
+      # auto-activación de lectura PDF nativa cuando el caso escala a Claude.
+      GLOSA_SOPORTES_MAX_CHARS_SIMPLE: ${GLOSA_SOPORTES_MAX_CHARS_SIMPLE:-12000}
+      GLOSA_SOPORTES_MAX_CHARS_COMPLEJO: ${GLOSA_SOPORTES_MAX_CHARS_COMPLEJO:-40000}
+      GLOSA_MULTIMODAL_AUTO: ${GLOSA_MULTIMODAL_AUTO:-1}
+      # Fase 2b (jul-2026): pre-pass del Auditor Forense — lee los PDFs y
+      # antepone un mapa de folios al contexto para citar folios reales.
+      # Llamada Claude EXTRA (cacheada 14 días) → OFF por defecto. Poner a 1
+      # solo si querés máxima precisión de folios y aceptás el costo/latencia.
+      GLOSA_AUDITOR_FORENSE_PREPASS: ${GLOSA_AUDITOR_FORENSE_PREPASS:-0}
+      # Fase 3 (jul-2026): few-shots por SIMILITUD. Cuando el match exacto
+      # (eps+código) no llena los ejemplos, completa con precedentes GANADOS
+      # rankeados por BM25 al texto de la glosa (RAGService). Sin costo de
+      # tokens extra (BM25 local). ON por defecto; apagable con 0.
+      GLOSA_FEWSHOT_BM25: ${GLOSA_FEWSHOT_BM25:-1}
+      # Auditoría jul-2026: knobs que el código lee pero NO llegaban al
+      # contenedor (quedaban en su default silenciosamente).
+      PRIMARY_AI: ${PRIMARY_AI:-groq}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      ANTHROPIC_MODEL_OPUS: ${ANTHROPIC_MODEL_OPUS:-claude-opus-4-7}
+      # NOTA (incidente 3-jul-2026): NO agregar aquí variables con default
+      # VACÍO (VAR: ${VAR:-}) — compose inyecta string vacío "" y los campos
+      # tipados de Settings (ej. smtp_port: int) revientan el arranque.
+      # Los knobs opcionales (SMTP_*, ALERTAS_EMAIL, ALLOWED_ORIGINS,
+      # GLOSAS_ENCRYPTION_KEY, CRED_VAULT_KEY) se declaran SOLO en el .env
+      # cuando se necesiten — docker compose los toma de ahí vía env_file
+      # implícito de ${...} en este archivo, o agregalos aquí CON VALOR.
+      # Secretos — DEBEN venir del .env (no hardcodear)
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      FORCE_RESET_ADMIN_PASSWORD: ${FORCE_RESET_ADMIN_PASSWORD:-0}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Observability — opcionales. Sin estas vars el motor arranca igual
+      # pero el panel de Diagnóstico marca warning (los errores no llegan
+      # a Sentry y la analítica de uso no llega a PostHog). Setup gratis:
+      # sentry.io (5K events/mes), posthog.com (1M events/mes).
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-https://us.posthog.com}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ─── Cloudflare Tunnel (cloudflared) ───────────────────────────────
+  # Conecta la máquina del HUS con Cloudflare por una conexión saliente
+  # cifrada, y Cloudflare publica https://iaglosassinac.help apuntando
+  # al motor. SIN ABRIR PUERTOS en el router/firewall del hospital.
+  #
+  # Requiere haber corrido `cloudflared tunnel create` UNA VEZ desde la
+  # máquina (ver docs/SELF_HOSTED_HUS.md) — eso genera el archivo
+  # credentials JSON que va a deploy/cloudflared/.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: motor-glosas-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    depends_on:
+      - motor
+    networks:
+      - motor-net
+    volumes:
+      # Config del túnel + credentials JSON
+      - ./deploy/cloudflared:/etc/cloudflared:ro
+
+networks:
+  # Red privada entre motor y cloudflared. Nadie más en el host puede
+  # alcanzar el motor en el puerto 8080.
+  motor-net:
+    driver: bridge

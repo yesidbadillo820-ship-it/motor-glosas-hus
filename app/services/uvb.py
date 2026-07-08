@@ -57,8 +57,6 @@ MARCO_SOAT_2026 = (
     "valor_pesos = Tarifa_UVB × $12.110, ajustado a la centena más próxima."
 )
 
-MARCO_SOAT_2026_COMPACTO = "Circular 047/2025 MinSalud + UVB 2026 $12.110"
-
 MARCO_TARIFAS_PROPIAS_HUS = (
     "Tarifas propias de la ESE Hospital Universitario de Santander — "
     "Resolución 054 de enero 30 de 2026 (listado unificado) y Resolución "
@@ -66,8 +64,6 @@ MARCO_TARIFAS_PROPIAS_HUS = (
     f"modificaciones). Expresadas en FACTOR SMDLV (SMDLV 2026 ≈ ${SMDLV_2026:,}); "
     "valor_pesos = FACTOR × SMDLV vigente."
 )
-
-MARCO_PROPIAS_HUS_COMPACTO = f"Res. 054/2026 + Res. 124/2026 HUS · SMDLV ${SMDLV_2026:,}"
 
 
 def valor_uvb_vigente(anio: int = 2026) -> int:

@@ -528,8 +528,39 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
     # Si el regex captura uno de estos, lo descartamos y seguimos buscando.
     GLOSA_CODES = re.compile(r"^(TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX)\d{2,4}$")
 
+    # Ronda 2 (12-jun-2026): fechas y facturas se colaban como CUPS.
+    # Evidencia real: "CUPS 2026-04" (el regex del paso 1 capturaba "2026"
+    # + sufijo "-04" de la fecha 2026-04-15) y "CUPS HUS0000522871" (número
+    # de FACTURA). Exclusiones espejo de
+    # contexto_contractual_enriquecido.es_cups_descartable — duplicadas
+    # adrede: app/utils es capa hoja y no importa app/services.
+    FECHA_COMO_CUPS = re.compile(r"^\d{4}-\d{1,2}(?:-\d{1,2})?$")
+    ANIO_COMO_CUPS = re.compile(r"^(?:19|20)\d{2}$")
+    # Ronda 3 (16-jun-2026): "20260511" (yyyymmdd) entraba como CUPS válido.
+    FECHA_YYYYMMDD_COMO_CUPS = re.compile(
+        r"^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$"
+    )
+    fechas_en_texto = re.findall(
+        r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", texto_glosa or ""
+    )
+
     def _es_cups_valido(token: str) -> bool:
         if not token or GLOSA_CODES.match(token):
+            return False
+        tu = token.upper()
+        # (a) fecha "2026-04" / "2026-04-15" y (c) año suelto 19xx/20xx
+        if FECHA_COMO_CUPS.match(tu) or ANIO_COMO_CUPS.match(tu):
+            return False
+        # (a') fecha "20260511" yyyymmdd pegada (ronda 3, 16-jun-2026).
+        if FECHA_YYYYMMDD_COMO_CUPS.match(tu):
+            return False
+        # (b) prefijo de factura HUS/FE/FAC + dígitos ("HUS0000522871").
+        # FMQ/FMO siguen siendo códigos institucionales válidos del HUS.
+        for pref in ("HUS", "FE", "FAC"):
+            if tu.startswith(pref) and len(tu) > len(pref) and tu[len(pref)].isdigit():
+                return False
+        # (d) fragmento de una fecha del texto ("2026-04" ⊂ "2026-04-15")
+        if any(tu in f for f in fechas_en_texto):
             return False
         # Debe tener al menos 4 dígitos (CUPS reales son 4-8 dígitos)
         digitos = sum(1 for c in token if c.isdigit())
