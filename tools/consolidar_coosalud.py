@@ -787,11 +787,24 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         # --- Punto 4: base DGH filtrada y arreglada ----------------------------
+        # Si la base falla (ruta mala, archivo abierto/corrupto) NO se aborta:
+        # se avisa y se sigue sin cruce (SLNSERPRO sale del codigo del detalle),
+        # para no perder los consolidados ni el OBJECIONES por un problema de ruta.
         cruce = None
         f_serv: list[list] = []
+        base_ok = False
         if args.servicios:
             facturas_trabajadas = {norm_factura(s["factura"]) for s in glosados}
-            f_serv, cruce = cargar_base_dgh(Path(args.servicios), facturas_trabajadas)
+            try:
+                f_serv, cruce = cargar_base_dgh(Path(args.servicios), facturas_trabajadas)
+                base_ok = True
+            except ValueError as exc:
+                logger.warning(
+                    "\nAVISO: no se pudo usar la base DGH -> %s\n"
+                    "Se genera TODO igual, pero SLNSERPRO saldra del codigo_servicio "
+                    "del detalle (sin cruce DGH). Revisa la ruta del archivo.\n",
+                    exc,
+                )
 
         # --- Punto 5: archivo de objeciones ------------------------------------
         logger.info("[4/4] Generando OBJECIONES...")
@@ -829,7 +842,7 @@ def main(argv: list[str] | None = None) -> int:
             escribir_hoja(wb.active, h_fact, f_fact)
             wb.save(salida / "CONSOLIDADO FACTURAS.xlsx")
 
-        if args.servicios:
+        if base_ok:
             wb = openpyxl.Workbook()
             wb.active.title = "SERVICIOS"
             escribir_hoja(wb.active, COLS_SERVICIOS, f_serv)
@@ -861,8 +874,10 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("  CONSOLIDADO DETALLE.xlsx           %d líneas", len(f_det))
     if f_fact:
         logger.info("  CONSOLIDADO FACTURAS.xlsx          %d facturas", len(f_fact))
-    if args.servicios:
+    if base_ok:
         logger.info("  SERVICIOS FACTURADOS COOSALUD.xlsx %d filas", len(f_serv))
+    elif args.servicios:
+        logger.info("  (SIN base DGH: SLNSERPRO salió del codigo_servicio del detalle)")
     logger.info(
         "  OBJECIONES.xlsx                    %d filas · %d facturas%s",
         len(f_obj),
