@@ -121,13 +121,17 @@ class TestUserPrompt:
         )
         assert "J18.9" in prompt
 
-    def test_build_user_prompt_trunca_pdf(self):
-        """Should truncate long PDF context."""
-        long_pdf = "X" * 10000
+    def test_build_user_prompt_trunca_pdf(self, monkeypatch):
+        """Should truncate long PDF context at the configurable cap
+        (Fase 2 Soportes jul-2026: default 12K — era 2000 — vía
+        GLOSA_SOPORTES_MAX_CHARS_SIMPLE)."""
+        monkeypatch.setenv("GLOSA_SOPORTES_MAX_CHARS_SIMPLE", "4000")
+        long_pdf = "X" * 3999 + " MARCA_TRAS_EL_CAP " + "Y" * 6000
         prompt = build_user_prompt(
             texto_glosa="GLOSA", contexto_pdf=long_pdf, codigo="TA0001", eps="EPS TEST"
         )
-        assert len(prompt) < 15000
+        assert "XXXX" in prompt  # el inicio del PDF sí entra
+        assert "MARCA_TRAS_EL_CAP" not in prompt  # cortado en el cap
 
     def test_bloque_excedente_facturado_mayor_que_pactado(self):
         """Caso TA0201: HUS facturó $247.663, pactado $231.556, objetado

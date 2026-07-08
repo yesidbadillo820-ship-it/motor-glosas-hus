@@ -33,6 +33,7 @@ Cualquier condición que se cumpla → escalación a Claude. Caso simple
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 # Palabras-clave que históricamente le revientan el dictamen a Llama 4
@@ -60,6 +61,16 @@ PALABRAS_CLAVE_COMPLEJIDAD_CRITICA: tuple[str, ...] = (
     "AUTOTRASPLANT",
     # Hematología y enfermedades raras
     "HEMOFILIA",
+    # Agentes de baña / bypassing (hemofilia con inhibidores) — la glosa a
+    # veces no dice "hemofilia" sino el principio activo (caso real NUEVA EPS
+    # 30-jun: "factor VII activado recombinante / eptacog alfa"). Sin estas
+    # claves el caso —clínicamente complejo y de alto costo— se quedaba en
+    # Groq en vez de escalar a Claude.
+    "FACTOR VII",
+    "EPTACOG",
+    "INHIBIDOR",
+    "FEIBA",
+    "APCC",
     "GAUCHER",
     "POMPE",
     "CEREZYME",
@@ -197,10 +208,35 @@ def detectar_complejidad_critica(
     texto_upper = (f"{texto_glosa or ''} {contexto_pdf or ''}"[:longitud_max_busqueda]).upper()
     palabra_encontrada: str | None = None
     for kw in PALABRAS_CLAVE_COMPLEJIDAD_CRITICA:
-        if kw in texto_upper:
+        # Ronda 27 (2-jul-2026): las keywords CORTAS exigen frontera de
+        # palabra — "AME" (atrofia muscular espinal) matcheaba dentro de
+        # "PREVIAMENTE"/"ADECUADAMENTE" y escalaba falsos positivos.
+        if len(kw) <= 4:
+            if re.search(rf"(?<![A-ZÁÉÍÓÚÑ0-9]){re.escape(kw)}(?![A-ZÁÉÍÓÚÑ0-9])", texto_upper):
+                palabra_encontrada = kw
+                break
+        elif kw in texto_upper:
             palabra_encontrada = kw
             break
     if palabra_encontrada:
         motivos.append(f"palabra-clave-critica:{palabra_encontrada}")
 
     return ResultadoComplejidad(es_complejo=bool(motivos), motivos=motivos)
+
+
+def multimodal_auto_activado(es_complejo: bool, modelo_override: str | None) -> bool:
+    """Fase 2 Soportes (jul-2026): ¿auto-activar la lectura PDF nativa?
+
+    Envía los PDFs binarios a Claude SOLO cuando el caso YA se enruta a un
+    Claude "grande" (complejidad crítica u Opus por valor+multi-PDF). Los
+    casos simples que van a Groq/Haiku siguen con el texto OCR — así el
+    multimodal queda "ON por defecto" donde importa, sin convertir cada
+    glosa con PDF en una llamada cara (la trampa que el usuario vetó).
+
+    Apagable sin redeploy: GLOSA_MULTIMODAL_AUTO=0.
+    """
+    import os
+
+    if os.getenv("GLOSA_MULTIMODAL_AUTO", "1").strip().lower() in ("0", "false", "no"):
+        return False
+    return bool(es_complejo or (modelo_override or "").startswith("claude-opus"))

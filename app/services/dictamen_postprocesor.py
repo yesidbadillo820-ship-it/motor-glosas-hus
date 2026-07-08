@@ -28,6 +28,17 @@ _CIERRE_ANCLA = re.compile(
     re.IGNORECASE | re.UNICODE,
 )
 
+# Ronda 21 (caso MEDIMÁS): marcadores de CODA PROCESAL que la IA encadena
+# tras el cierre con una CONJUNCIÓN (sin punto), por lo que el truncado por
+# "primer punto" no los recortaba ("...de la glosa Y, de persistir
+# discrepancias, se invita a mesa de conciliación..."). Si un marcador
+# aparece ANTES del primer punto de la cola, se corta en el ancla.
+_MARCADORES_CODA = re.compile(
+    r"SE\s+INVITA|MESA\s+DE\s+CONCILIACI|DE\s+PERSISTIR|"
+    r"10\s+D[ÍI]AS|ART\.?\s*57|QUEDAMOS\s+ATENTOS|ESCALERA\s+PROCESAL",
+    re.IGNORECASE,
+)
+
 # Caudas conocidas que la IA suele encadenar tras el cierre y deben
 # desaparecer (solo registrar para telemetría/debug futura — no se usan
 # directamente, el truncado por punto final cubre todos los casos).
@@ -71,6 +82,13 @@ def truncar_despues_de_levantamiento(texto: str) -> str:
     # ÍNTEGRO DEL VALOR PACTADO EN EL ANEXO N° 1 DEL CONTRATO 440...").
     cola = texto[m.end() : m.end() + 200]
     rel = cola.find(".")
+    # Ronda 21: si una coda procesal arranca ANTES del primer punto (típico
+    # cuando se une por conjunción: "...de la glosa Y, de persistir..."),
+    # cortar en el ancla. La continuación legítima ("Y EL RECONOCIMIENTO
+    # ÍNTEGRO...") no trae estos marcadores y se preserva.
+    mc = _MARCADORES_CODA.search(cola)
+    if mc and (rel == -1 or mc.start() < rel):
+        return texto[: m.end()].rstrip().rstrip(",") + "."
     if rel == -1:
         # No hay punto cercano: cortamos en el fin del match y añadimos
         # el punto final faltante.

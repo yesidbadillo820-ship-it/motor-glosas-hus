@@ -1147,30 +1147,42 @@ def info_api_endpoints(
 
     Solo COORDINADOR/ADMIN.
     """
-    from fastapi.routing import APIRoute
-
     from app.main import app
 
+    # Ronda 29 (7-jul-2026): fuente de verdad = el esquema OpenAPI de la
+    # propia app. Inspeccionar app.routes dependía de internals de FastAPI
+    # que cambian entre versiones (APIRoute aplanado vs _IncludedRouter
+    # opaco) y devolvía 0 endpoints en local, rompiendo 5 tests.
+    _HTTP = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+    schema = app.openapi()
     items = []
     por_tag: dict[str, int] = {}
 
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
+    for path, metodos in (schema.get("paths") or {}).items():
+        if path.startswith("/_"):
             continue
-        # Excluir endpoints internos como /openapi.json
-        if route.path.startswith("/_") or route.path == "/openapi.json":
+        methods: list[str] = []
+        tags_ruta: set[str] = set()
+        name = ""
+        for metodo, op in metodos.items():
+            if metodo.upper() not in _HTTP or not isinstance(op, dict):
+                continue
+            methods.append(metodo.upper())
+            tags_ruta.update(op.get("tags") or [])
+            name = name or op.get("operationId") or ""
+        if not methods:
             continue
-        tags = list(route.tags) if route.tags else ["sin_tag"]
+        tags = sorted(tags_ruta) or ["sin_tag"]
         for t in tags:
             por_tag[t] = por_tag.get(t, 0) + 1
 
         item = {
-            "path": route.path,
-            "name": route.name,
+            "path": path,
+            "name": name,
             "tags": tags,
         }
         if incluir_metodos:
-            item["methods"] = sorted(route.methods or [])
+            item["methods"] = sorted(methods)
         items.append(item)
 
     items.sort(key=lambda x: x["path"])

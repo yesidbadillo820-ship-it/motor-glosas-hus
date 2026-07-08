@@ -6,7 +6,6 @@ from app.services.detector_copia import (
     _ngramas,
     _normalizar,
     detectar_copia_gold,
-    instruccion_anti_copia,
     similitud_jaccard,
 )
 
@@ -122,18 +121,3 @@ class TestDetectarCopia:
         )
         assert det is not None
         assert det["ejemplo_id"] == 1
-
-
-class TestInstruccionAntiCopia:
-    def test_sin_deteccion_devuelve_vacio(self):
-        assert instruccion_anti_copia({}) == ""
-        assert instruccion_anti_copia(None) == ""  # type: ignore[arg-type]
-
-    def test_con_deteccion_genera_bloque(self):
-        det = {"similitud": 0.78, "ejemplo_id": 7, "fuente": "GOLD"}
-        b = instruccion_anti_copia(det)
-        assert "DETECCIÓN DE COPIA TEXTUAL" in b
-        assert "78%" in b
-        assert "GOLD" in b
-        assert "id=7" in b
-        assert "REGENERA" in b

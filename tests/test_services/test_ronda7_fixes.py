@@ -192,8 +192,9 @@ def test_fix_u_aurora_contrato_ajeno():
 
 
 def test_fix_u_catalogo_cubre_15_entidades_principales():
-    """Total de EPSs/regímenes catalogados >= 15 (carga completa de
-    contratos del 16-jun-2026)."""
+    """Total de EPSs/regímenes catalogados >= 14. (Ronda 23: se quitó
+    PRECIMED — el contrato 319/2024 es de SUMINISTRO con PRECIMEC SAS, no
+    un pagador que glose — por eso el piso bajó de 15 a 14.)"""
     from app.services.glosa_ia_prompts import CONTRATOS_HUS
 
-    assert len(CONTRATOS_HUS) >= 15
+    assert len(CONTRATOS_HUS) >= 14

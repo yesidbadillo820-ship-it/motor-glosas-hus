@@ -28,19 +28,6 @@ import httpx
 
 logger = logging.getLogger("motor_glosas")
 
-
-# Modelos validos en v1beta de Generative Language API (mayo 2026).
-# El experimental 2.0-flash-exp fue deprecado al pasar 2.0-flash a GA.
-# 2.5 Flash/Pro son los newest. 1.5 sigue activo como fallback.
-GEMINI_MODELS = {
-    "2.0-flash": "gemini-2.0-flash",  # GA, default. 15 RPM/1500 RPD free
-    "2.0-flash-lite": "gemini-2.0-flash-lite",  # mas barato, mismo tier
-    "2.5-flash": "gemini-2.5-flash",  # newer, 15 RPM/1500 RPD free
-    "2.5-pro": "gemini-2.5-pro",  # mejor calidad, 5 RPM/25 RPD free
-    "1.5-flash": "gemini-1.5-flash",  # legacy estable, 1M ctx
-    "1.5-pro": "gemini-1.5-pro",  # legacy mejor calidad, 2M ctx
-}
-
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
 
 

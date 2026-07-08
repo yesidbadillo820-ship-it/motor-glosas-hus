@@ -6,8 +6,11 @@
 .gitignore
 .gitattributes
 
-# Tests (no van a producción)
+# Tests (no van a producción) — EXCEPTO el benchmark (tablero de calidad),
+# que sí viaja con la imagen para poder medir el motor desde el contenedor.
 tests/
+!tests/benchmark/
+!tests/benchmark/**
 
 # Documentación
 docs/
@@ -16,7 +19,10 @@ README*
 CLAUDE*
 
 # Tools (jump-box agent corre en la PC del HUS, no en el contenedor)
+# EXCEPTO los scoreboards (tablero de calidad), que sí van a la imagen.
 tools/
+!tools/scoreboard.py
+!tools/scoreboard_live.py
 
 # Python
 __pycache__/

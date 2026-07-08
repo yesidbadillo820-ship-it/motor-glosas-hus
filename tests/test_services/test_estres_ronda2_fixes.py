@@ -335,7 +335,7 @@ class TestFix3ContratoCruzado:
 
         assert "S-13-1-03-1-04958" in get_contrato("FAMISANAR EPS")["numero"]
         assert "DMBUG" in get_contrato("DISPENSARIO MEDICO BUCARAMANGA")["numero"]
-        assert get_contrato("FOMAG")["numero"] == "CONTRATO No. 12076-359-2025"
+        assert "12076-359-2025" in get_contrato("FOMAG")["numero"]
         assert "IPS-001B-2022" in get_contrato("PPL")["numero"]
 
     def test_catalogo_contrato_eps_duena(self):

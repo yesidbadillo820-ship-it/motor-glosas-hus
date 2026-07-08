@@ -55,8 +55,9 @@ class TestSistemaConfiguracion:
         r = client.get("/sistema/configuracion")
         assert r.status_code == 200, r.text
         d = r.json()
-        # Las 6 secciones deben estar
-        assert set(d.keys()) == {"app", "ia", "auth", "cors", "smtp", "ui"}
+        # Ronda 29: superset — las 6 secciones base deben estar; agregar
+        # una sección nueva no debe romper el test.
+        assert {"app", "ia", "auth", "cors", "smtp", "ui"} <= set(d.keys())
 
     def test_app_metadata(self, client):
         r = client.get("/sistema/configuracion")

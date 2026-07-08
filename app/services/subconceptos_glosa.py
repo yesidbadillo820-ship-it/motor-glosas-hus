@@ -43,7 +43,14 @@ _MARCADORES_CONCEPTO_SUELTO = (
     ),
     (re.compile(r"\bSE\s+APLICA\s+(?:UNA\s+)?MULTA\b", re.IGNORECASE), "multa aplicada por la EPS"),
     (
-        re.compile(r"\bADICIONALMENTE,?\s+SE\s+OBJETA\b", re.IGNORECASE),
+        # Ronda 26 (2-jul-2026): "ADICIONALMENTE SE GLOSA LA PRÓTESIS..."
+        # no partía el caso — solo se reconocía "SE OBJETA". La prótesis
+        # de $3.9M quedó SIN respuesta en el dictamen de producción.
+        re.compile(
+            r"\b(?:ADICIONALMENTE|AS[ÍI]\s+MISMO|DE\s+IGUAL\s+(?:FORMA|MANERA)|"
+            r"POR\s+OTRA\s+PARTE|TAMBI[ÉE]N),?\s+SE\s+(?:OBJETA|GLOSA)\b",
+            re.IGNORECASE,
+        ),
         "concepto adicional objetado",
     ),
     (
@@ -63,11 +70,20 @@ _MARCADORES_CONCEPTO_SUELTO = (
 )
 
 # Verbos que abren una objeción concreta (para resumir el sub-concepto).
+# Bug ronda 21 (caso MEDIMÁS da Vinci): faltaban tokens de dominios
+# enteros (evento adverso, liquidación), por lo que auditar_subconceptos_
+# respondidos no detectaba esos conceptos como "claves" y daba falsos
+# "respondido". Se añade vocabulario de evento adverso y liquidación.
 _RE_PALABRAS_RESUMEN = re.compile(
     r"\b(TMS|ESTIMULACI[ÓO]N\s+MAGN[ÉE]TICA|HOSPITALIZACI[ÓO]N|"
     r"AUTORIZACI[ÓO]N\s+PREVIA|PBS|SANCI[ÓO]N|MULTA|COBERTURA|"
     r"ACOMPA[ÑN]AMIENTO|REMISI[ÓO]N|PERTINENCIA|TARIFA|D[ÍI]AS|"
-    r"CONSENTIMIENTO|COTIZACI[ÓO]N|MIPRES)\b",
+    r"CONSENTIMIENTO|COTIZACI[ÓO]N|MIPRES|"
+    # Evento adverso / complicaciones
+    r"EVENTO\s+ADVERSO|PREVENIBLE|F[ÍI]STULA|SEPSIS|UCI|"
+    r"REINTERVENCI[ÓO]N|COMPLICACI[ÓO]N|FALLA|T[ÉE]CNICA\s+QUIR[ÚU]RGICA|"
+    # Liquidación / cartera de entidad intervenida
+    r"LIQUIDACI[ÓO]N|AGENTE\s+LIQUIDADORA|SALDOS|SUPERSALUD|INTERVENIDA)\b",
     re.IGNORECASE,
 )
 
@@ -124,6 +140,17 @@ def detectar_subconceptos(texto_glosa: str | None) -> list[dict]:
             if hay_numeracion and m.start() <= pos_ultima_num:
                 continue
             marcas.append((m.start(), m.start(), etiqueta))
+
+    # Ronda 26 (2-jul-2026): glosa en PROSA con un solo marcador suelto
+    # ("...SE GLOSA LA DIFERENCIA. ADICIONALMENTE SE GLOSA LA PRÓTESIS...")
+    # — el concepto principal vive ANTES del marcador y no tenía marca, así
+    # que len(marcas)==1 y el caso NO se partía: la prótesis de $3.9M quedó
+    # sin respuesta en producción. Se agrega una marca implícita al inicio
+    # cuando hay texto sustancial antes del primer marcador.
+    if not hay_numeracion and marcas:
+        primera_pos = min(m[0] for m in marcas)
+        if primera_pos >= _MIN_CONCEPTO_CHARS:
+            marcas.append((0, 0, "concepto principal"))
 
     if len(marcas) < 2:
         return []

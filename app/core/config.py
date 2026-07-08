@@ -1,5 +1,6 @@
 import logging
 import warnings
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -63,7 +64,7 @@ class Settings(BaseSettings):
     groq_model_fallback_1: str = "openai/gpt-oss-120b"
     groq_model_fallback_2: str = "qwen/qwen3-32b"
     groq_model_fallback_3: str = "llama-3.3-70b-versatile"
-    anthropic_model: str = "claude-sonnet-4-6"
+    anthropic_model: str = "claude-sonnet-4-5"
     # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
     # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
     # 2.0-flash paso a GA.
@@ -72,12 +73,33 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
+
+    @field_validator("smtp_port", mode="before")
+    @classmethod
+    def _smtp_port_vacio_usa_default(cls, v):
+        """Incidente 3-jul-2026: docker-compose inyectó SMTP_PORT="" (string
+        vacío) y Pydantic no parsea "" como int → la app moría al importar
+        (crash-loop + 502 en producción). Un env vacío = no configurado."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 587
+        return v
+
     smtp_user: str = ""
     smtp_password: str = ""
     alertas_email: str = ""
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.5.0"
     banner_capacitacion: str = ""
+    # Mejora #3 (jun-2026): salida estructurada incremental. Cuando está
+    # ON, el LLM emite — además del envelope XML — un bloque
+    # <CAMPOS_ESTRUCTURADOS>{...} con los 6 campos críticos ya validados
+    # (eps, servicio, contrato, cláusulas, sanción, sub-conceptos). El
+    # motor cruza ese JSON contra los valores DETERMINISTAS y, cuando
+    # coinciden, se salta los sanitizers frágiles de ese campo. Default
+    # OFF: con el flag apagado el pipeline es byte-idéntico al actual
+    # (degradación elegante total). Override por env:
+    # GLOSA_CAMPOS_ESTRUCTURADOS=true.
+    glosa_campos_estructurados: bool = False
 
     model_config = {
         "env_file": ".env",

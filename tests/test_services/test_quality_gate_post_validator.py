@@ -137,14 +137,15 @@ class TestPostValidarDictamen:
 
     def test_resultado_incluye_todas_las_claves_de_check(self):
         r = post_validar_dictamen(self.DICTAMEN_LIMPIO_SIN_CITAS)
-        assert set(r.checks.keys()) == {
+        # Ronda 29: superset — agregar un check nuevo no debe romper esto.
+        assert {
             "citas",
             "cierre",
             "coda",
             "longitud",
             "referencias_colgantes",
             "citas_truncadas",
-        }
+        } <= set(r.checks.keys())
 
     def test_score_no_negativo(self):
         # Texto pésimo: vacío

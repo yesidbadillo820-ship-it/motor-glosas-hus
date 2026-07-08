@@ -169,6 +169,14 @@ def decidir_auto_envio(
             "Es respuesta a glosa RATIFICADA: el siguiente paso es conciliación, requiere revisión humana"
         )
 
+    # Auditoría jul-2026: el docstring prometía "NO es extemporánea" pero el
+    # cuerpo nunca evaluaba el parámetro — una extemporánea con confianza
+    # >= 90% se habría auto-enviado.
+    if es_extemporanea:
+        razones_contra.append(
+            "Glosa EXTEMPORÁNEA: requiere revisión humana antes de cualquier envío"
+        )
+
     # Decidir estado final
     if not razones_contra:
         estado = "AUTO_ENVIABLE"

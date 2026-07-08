@@ -12,7 +12,6 @@ from app.database import Base
 from app.models.db import GlosaRecord, PlantillaGoldRecord
 from app.services.few_shot_gold import (
     bloque_few_shot_para_prompt,
-    construir_bloque_gold,
     obtener_ejemplos_gold,
 )
 
@@ -119,15 +118,3 @@ class TestBloque:
         b = bloque_few_shot_para_prompt(ejs)
         assert "TEXTO 1 GANADOR" in b
         assert "EJEMPLOS DE DICTÁMENES GANADORES" in b
-
-
-class TestConstruirIntegrado:
-    def test_un_paso(self, db):
-        _seed_gold(db, "SAN", "TA01", "ARGUMENTO GOLD " + "x" * 250)
-        bloque = construir_bloque_gold(db, "SAN", "TA01")
-        assert "GOLD" in bloque
-        assert "ARGUMENTO GOLD" in bloque
-
-    def test_un_paso_sin_datos(self, db):
-        bloque = construir_bloque_gold(db, "NOEXISTE", "ZZ99")
-        assert bloque == ""

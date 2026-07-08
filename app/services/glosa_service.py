@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import hashlib
 import asyncio
 import time
@@ -265,64 +266,6 @@ FERIADOS_CO = [
 # operacionalizado por Decreto 4747/2007 + Res. 3047/2008 + criterio institucional HUS).
 # Las glosas extemporáneas son improcedentes, abusivas y no deben disminuir el pago a las IPS.
 DIAS_HABILES_LIMITE_EXTEMPORANEA = 20
-
-NORMATIVA_COLOMBIA = """
-NORMATIVA APLICABLE:
-- Ley 100 de 1993: Sistema de Seguridad Social Integral (Art. 168 - Urgencias)
-- Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 57 - Trámite de glosas; plazos: 20 días EPS formular | 15 días IPS responder | 10 días EPS decidir)
-- Ley 1751 de 2015: Ley Estatutaria de Salud (Derecho fundamental a la salud)
-- Ley 1122 de 2007: Flujo de recursos entre EPS e IPS (Art. 13)
-- Decreto 4747 de 2007: Regulaciones sobre glosas y devoluciones (Art. 20 - Conciliación)
-- Decreto 780 de 2016: Decreto Único Reglamentario del Sector Salud
-- Resolución 2175 de 2015: Procedimiento de conciliación de glosas médicas
-- Resolución 3047 de 2008: Anexo Técnico 5 (Procedimiento glosas)
-- Resolución 5269 de 2017: Plan de Beneficios en Salud
-- Circular Externa 047 de 2025 (MinSalud): Manual Tarifario SOAT 2026 indexado a UVB
-- UVB 2026: $12.110 (Resolución MinHacienda 31/12/2025). Fórmula: valor = Tarifa_UVB × $12.110 → centena más próxima
-- Decreto 780 de 2016 (Anexo Técnico 1): regla de redondeo a centena + marco general
-- Decreto 2423 de 1996: Manual tarifario SOAT histórico (base para servicios no incluidos en Circular 047)
-- Resolución 054 de 2026 (ESE HUS): Tarifas propias del hospital (aplican cuando el contrato dice "TIPO TARIFA = PROPIAS")
-- Código de Comercio: Artículo 871 (Principio de Buena Fe)
-- Circular 030 de 2013: Subsanación de errores formales en facturación
-- Resolución 1995 de 1999: Historia clínica como prueba plena
-- Sentencia T-760 de 2008: Obligaciones de las EPS en prestación de servicios
-- Sentencia T-1025 de 2002: Urgencias no requieren autorización previa
-- Sentencia T-478 de 1995: Autonomía médica como derecho fundamental
-"""
-
-ESTRATEGIAS_TIPO = {
-    "TA_TARIFA": """ESTRATEGIA TARIFARIA PROFESIONAL:
-- Verificar la tarifa liquidada vs tarifa contractual vigente (SOAT -15% o según convenio)
-- Citar específicamente el contrato vigente y sus anexos tarifarios
-- Invocar la Resolución Interna de Precios de la institución
-- Principio de buena fe contractual (Art. 871 Código Comercio)
-- Mencionar que la EPS no puede aplicar descuentos unilaterales sin sustento
-- El IPC es un referente NO una obligación para la IPS
-- Si hay incremento institucional debidamente aprobado, citar acto administrativo""",
-    "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 20 días hábiles para objetar (Art. 57 Ley 1438/2011).",
-    "AU_AUTORIZACION": "ESTRATEGIA AUTORIZACIÓN: Atención por urgencia vital. No requiere autorización previa. Art. 168 Ley 100/1993 y Resolución 5269/2017.",
-    "CO_COBERTURA": "ESTRATEGIA COBERTURA: Servicio dentro del Plan de Beneficios en Salud (Res. 5269/2017). EPS tiene obligación de pago. No hay exclusiones.",
-    "CL_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
-    "PE_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
-    "FA_FACTURACION": "ESTRATEGIA FACTURACIÓN: Error formal no es causal de glosa (Circular 030/2013). Los errores formales son subsanables. La prestación del servicio genera obligación de pago.",
-    "IN_INSUMOS": "ESTRATEGIA INSUMOS: Inherentes al acto médico. Se facturan al costo de adquisición más porcentaje administrativo pactado. Factura de compra disponible como soporte.",
-    "ME_MEDICAMENTOS": "ESTRATEGIA MEDICAMENTOS: Dispensados bajo fórmula médica. Plan de Beneficios los incluye (Res. 5269/2017). No existe alternativa terapéutica equivalente.",
-    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 57 Ley 1438/2011 + Decreto 4747/2007 establecen 20 días hábiles para formular glosas. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS.",
-}
-
-CODIGOS_GLOSA = {
-    "TA": "OBJECIÓN POR TARIFA",
-    "SO": "OBJECIÓN POR SOPORTES",
-    "AU": "OBJECIÓN POR AUTORIZACIÓN",
-    "CO": "OBJECIÓN POR COBERTURA",
-    "CL": "OBJECIÓN POR PERTINENCIA",
-    "PE": "OBJECIÓN POR PERTINENCIA",
-    "FA": "OBJECIÓN POR FACTURACIÓN",
-    "IN": "OBJECIÓN POR INSUMOS",
-    "ME": "OBJECIÓN POR MEDICAMENTOS",
-    "SE": "OBJECIÓN SIN ESPECIFICACIÓN",
-    "EX": "OBJECIÓN EXTEMPORÁNEA",
-}
 
 PLANTILLAS_CODIGO = {}
 
@@ -1752,6 +1695,24 @@ def _neutralizar_art_177_relleno(
         re.IGNORECASE | re.DOTALL,
     )
     nuevo, n = pat_art177.subn("", dictamen)
+    # Ronda 21 (caso MEDIMÁS): cita "pelada" de Art. 177 Ley 100 SIN sufijo
+    # POS, usada como fundamento tarifario ("rige el manual ... conforme al
+    # art. 177 de la ley 100/1993"). El Art. 177 regula el deber de las EPS
+    # de movilizar recursos al POS — no es fundamento de una tarifa. En
+    # debate no-financiero se REEMPLAZA (no se borra, para no dejar la
+    # oración sin base) por el fundamento contractual correcto.
+    pat_art177_bare = re.compile(
+        r"(?:CONFORME\s+(?:AL?\s+)?|EL\s+|AL\s+)?"
+        r"(?:ART[ÍI]?CULO?S?|ARTS?\.?)\s*177"
+        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
+        re.IGNORECASE,
+    )
+    nuevo, n_bare = pat_art177_bare.subn(
+        "el régimen tarifario y contractual aplicable (Pacta Sunt Servanda — "
+        "Art. 1602 C.C. y Art. 871 C.Co.)",
+        nuevo,
+    )
+    n += n_bare
     # Limpieza: "Asimismo,  Conforme..." → "Conforme..." después de borrar
     nuevo = re.sub(
         r"\b(ASIMISMO|AS[ÍI]\s+MISMO)[,\s]+(CONFORME|EL\s+ART)", r"\2", nuevo, flags=re.IGNORECASE
@@ -2031,7 +1992,14 @@ def _reescribir_negacion_contrato(
         (
             re.compile(
                 r"SIN\s+CONTRATO\s+PACTADO|"
-                r"NO\s+EXISTE\s+CONTRATO\s+PACTADO|"
+                # Bug ronda 21 (30-jun-2026, caso MEDIMÁS da Vinci): el cuerpo
+                # decía DOS veces "al no existir contrato pactado" — forma
+                # verbal (infinitivo/conjugada) que el regex anterior (solo
+                # "NO EXISTE CONTRATO PACTADO") no capturaba, dejando una
+                # auto-contradicción: el campo Contrato corregido pero el
+                # cuerpo negando el contrato citado por la EPS. Se cubre
+                # existe/existen/existir/existía/existiendo + prefijo al/de.
+                r"(?:AL\s+|DE\s+)?NO\s+EXIST(?:E|EN|IR|[ÍI]A|IENDO)\s+(?:UN\s+)?CONTRATO(?:\s+PACTADO)?|"
                 r"AUSENCIA\s+DE\s+CONTRATO|"
                 r"EN\s+AUSENCIA\s+DE\s+CONTRATO\s+PACTADO",
                 re.IGNORECASE,
@@ -2324,6 +2292,334 @@ _RE_HTML_ESTRUCTURAL = re.compile(
 # Ej: S-13-1-03-1-04958, F-2024-001, T-553/2024, RES-456, AU-301.
 # Pattern: 1-3 mayúsculas iniciales + hífen/slash + alfanumérico (≥4 chars).
 _RE_CODIGO_HIFENADO = re.compile(r"\b[A-Z]{1,4}(?:[\-/][A-Z0-9]+){2,}\b")
+
+
+# ════════════════════════════════════════════════════════════════════
+# MEJORA #3 — Salida estructurada incremental (jun-2026)
+#
+# El LLM emite, DESPUÉS de </argumento> y como último bloque, un objeto
+# JSON delimitado por <CAMPOS_ESTRUCTURADOS>{...}</CAMPOS_ESTRUCTURADOS>
+# con los 6 campos críticos. El motor:
+#   1. lo PARSEA tolerante (_parsear_campos_estructurados),
+#   2. lo CRUZA contra los valores deterministas (_validar_campos_estructurados),
+#   3. cuando coinciden, marca que se pueden SALTAR los sanitizers frágiles
+#      de ese campo (defensa en profundidad: el cuerpo narrativo siempre
+#      se sanea).
+# Si el bloque falta o está roto → degradación elegante (None → pipeline
+# de texto+sanitizers intacto). El bloque se ELIMINA del texto antes de
+# extraer <argumento> para que jamás contamine el dictamen radicable.
+# Todo detrás del flag settings.glosa_campos_estructurados (default OFF).
+# ════════════════════════════════════════════════════════════════════
+
+# Tag específico y largo para no colisionar con el contrato XML ni con
+# texto del dictamen. Captura con o sin tag de cierre (truncamiento).
+_RE_CAMPOS_ESTRUCTURADOS = re.compile(
+    r"<CAMPOS_ESTRUCTURADOS>\s*(\{.*?\})\s*</CAMPOS_ESTRUCTURADOS>",
+    re.DOTALL | re.IGNORECASE,
+)
+# Fallback: tag de apertura sin cierre (max_tokens cortó la respuesta),
+# toma hasta la última llave de cierre del objeto.
+_RE_CAMPOS_ESTRUCTURADOS_SIN_CIERRE = re.compile(
+    r"<CAMPOS_ESTRUCTURADOS>\s*(\{.*\})",
+    re.DOTALL | re.IGNORECASE,
+)
+# Para borrar el bloque del texto (con o sin cierre) antes del wrap HTML.
+_RE_CAMPOS_ESTRUCTURADOS_BORRAR = re.compile(
+    r"<CAMPOS_ESTRUCTURADOS>.*?(?:</CAMPOS_ESTRUCTURADOS>|$)",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Las 6 claves del contrato estructurado.
+_CLAVES_CAMPOS_ESTRUCTURADOS = (
+    "eps_efectiva",
+    "servicio_objetado",
+    "contrato_citado",
+    "clausulas_respondidas",
+    "sancion_rechazada",
+    "subconceptos_refutados",
+)
+
+
+def _limpiar_bloque_campos_estructurados(texto: str) -> str:
+    """Elimina el bloque <CAMPOS_ESTRUCTURADOS>{...} del texto.
+
+    Se llama SIEMPRE (flag ON u OFF) antes de extraer <argumento> y de
+    cualquier wrap HTML, para garantizar que el bloque jamás aparezca en
+    el dictamen radicable. Si el bloque no existe → no-op.
+    """
+    if not texto or "CAMPOS_ESTRUCTURADOS" not in texto.upper():
+        return texto
+    return _RE_CAMPOS_ESTRUCTURADOS_BORRAR.sub("", texto).strip()
+
+
+def _cast_bool_tolerante(v) -> bool | None:
+    """Castea a bool tolerando 'true'/'si'/'1' y variantes. None si no se puede."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("true", "si", "sí", "1", "verdadero", "yes"):
+            return True
+        if s in ("false", "no", "0", "falso"):
+            return False
+    return None
+
+
+def _cast_lista_ints_tolerante(v) -> list[int] | None:
+    """Castea a lista de enteros tolerando strings ('24'), floats y mezcla.
+    None si el tipo es completamente inesperado (no lista)."""
+    if not isinstance(v, list):
+        return None
+    out: list[int] = []
+    for item in v:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            out.append(item)
+        elif isinstance(item, float):
+            out.append(int(item))
+        elif isinstance(item, str):
+            m = re.search(r"\d+", item)
+            if m:
+                out.append(int(m.group()))
+    return out
+
+
+def _cast_lista_strs_tolerante(v) -> list[str] | None:
+    """Castea a lista de strings no vacíos. None si no es lista."""
+    if not isinstance(v, list):
+        return None
+    out: list[str] = []
+    for item in v:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            out.append(str(item))
+    return out
+
+
+def _parsear_campos_estructurados(res_ia: str) -> dict | None:
+    """Extrae y parsea el bloque <CAMPOS_ESTRUCTURADOS>{...} del texto crudo.
+
+    Devuelve un dict normalizado campo-por-campo (cast tolerante de tipos)
+    o None si no hay bloque o el JSON es irreparable (degradación elegante).
+    NUNCA un campo malformado invalida el dict completo: el campo que no
+    valide se pone en None individualmente.
+    """
+    if not res_ia or "CAMPOS_ESTRUCTURADOS" not in res_ia.upper():
+        return None
+
+    m = _RE_CAMPOS_ESTRUCTURADOS.search(res_ia)
+    if not m:
+        # Fallback: tag sin cierre por truncamiento.
+        m = _RE_CAMPOS_ESTRUCTURADOS_SIN_CIERRE.search(res_ia)
+    if not m:
+        return None
+
+    bloque = m.group(1).strip()
+
+    datos = None
+    try:
+        datos = json.loads(bloque)
+    except (json.JSONDecodeError, ValueError):
+        # Segundo intento: reparar comillas tipográficas y comas colgantes.
+        reparado = bloque.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+        reparado = re.sub(r",\s*([}\]])", r"\1", reparado)
+        try:
+            datos = json.loads(reparado)
+        except (json.JSONDecodeError, ValueError):
+            return None
+
+    if not isinstance(datos, dict):
+        return None
+
+    # Normalización tolerante campo-por-campo. Cada campo inválido → None.
+    out: dict = {}
+
+    eps = datos.get("eps_efectiva")
+    out["eps_efectiva"] = eps.strip() if isinstance(eps, str) and eps.strip() else None
+
+    serv = datos.get("servicio_objetado")
+    out["servicio_objetado"] = serv.strip() if isinstance(serv, str) and serv.strip() else None
+
+    contrato = datos.get("contrato_citado")
+    out["contrato_citado"] = (
+        contrato.strip() if isinstance(contrato, str) and contrato.strip() else None
+    )
+
+    out["clausulas_respondidas"] = _cast_lista_ints_tolerante(datos.get("clausulas_respondidas"))
+    out["sancion_rechazada"] = _cast_bool_tolerante(datos.get("sancion_rechazada"))
+    out["subconceptos_refutados"] = _cast_lista_strs_tolerante(datos.get("subconceptos_refutados"))
+
+    return out
+
+
+def _normalizar_eps_para_match(eps: str) -> str:
+    """Normaliza un nombre de EPS para comparación: sin tildes, mayúsculas,
+    sin sufijos genéricos (EPS, EPS-S, S.A.S, etc.), sin espacios extra."""
+    if not eps:
+        return ""
+    s = eps.upper().strip()
+    # Quitar tildes
+    for a, b in (("Á", "A"), ("É", "E"), ("Í", "I"), ("Ó", "O"), ("Ú", "U"), ("Ñ", "N")):
+        s = s.replace(a, b)
+    # Quitar sufijos/ruido institucional
+    s = re.sub(r"\b(EPS-?S?|EPSS|S\.?A\.?S?\.?|SA|LTDA|CCF|EAPB)\b", " ", s)
+    s = re.sub(r"[^A-Z0-9 ]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+# EPS genéricas de dropdown que NO sirven como ancla determinista.
+_EPS_GENERICAS_NO_ANCLA = {
+    "",
+    "OTRA",
+    "OTRA SIN DEFINIR",
+    "SIN DEFINIR",
+    "NO DEFINIDA",
+    "DISPENSARIO MEDICO",
+}
+
+
+def _validar_campos_estructurados(
+    campos_llm: dict | None,
+    deterministas: dict,
+    *,
+    multi_codigo: bool = False,
+) -> dict:
+    """Cruza el JSON del LLM contra los valores DETERMINISTAS y decide qué
+    sanitizers se pueden saltar.
+
+    Args:
+        campos_llm: salida de _parsear_campos_estructurados (o None).
+        deterministas: dict con las claves disponibles calculadas pre/post-LLM:
+            'eps_efectiva' (str, resuelta por resolver_eps_efectiva),
+            'contrato_citado' (str|None, del catálogo/glosa),
+            'subconceptos' (list[str]),
+            'sancion_detectada' (bool),
+            'servicio_valido' (bool — si servicio_objetado del LLM no es placeholder).
+        multi_codigo: si True, NUNCA se saltan sanitizers (un único bloque no
+            representa N secciones).
+
+    Returns:
+        {
+          'campos_finales': dict — valores finales (determinista como verdad),
+          'saltar': set[str] — campos cuyos sanitizers se pueden omitir,
+          'divergencias': list[str] — telemetría LLM-vs-determinista.
+        }
+    """
+    saltar: set[str] = set()
+    divergencias: list[str] = []
+    campos_finales: dict = dict(campos_llm) if campos_llm else {}
+
+    if not campos_llm:
+        return {"campos_finales": campos_finales, "saltar": saltar, "divergencias": divergencias}
+
+    det_eps = (deterministas.get("eps_efectiva") or "").strip()
+    det_eps_norm = _normalizar_eps_para_match(det_eps)
+    eps_es_ancla = det_eps_norm and det_eps.upper().strip() not in _EPS_GENERICAS_NO_ANCLA
+
+    # ── EPS ──────────────────────────────────────────────────────────
+    eps_llm = campos_llm.get("eps_efectiva")
+    if eps_llm and eps_es_ancla:
+        if _normalizar_eps_para_match(eps_llm) == det_eps_norm:
+            # El LLM confirmó la EPS determinista → no inventó nada.
+            if not multi_codigo:
+                saltar.add("eps")
+        else:
+            divergencias.append(f"eps: llm={eps_llm!r} != det={det_eps!r}")
+    # La verdad SIEMPRE es la determinista.
+    if eps_es_ancla:
+        campos_finales["eps_efectiva"] = det_eps
+
+    # ── Contrato ─────────────────────────────────────────────────────
+    contrato_llm = campos_llm.get("contrato_citado")
+    det_contrato = (deterministas.get("contrato_citado") or "").strip()
+    if det_contrato:
+        if contrato_llm and contrato_llm.strip().upper() == det_contrato.upper():
+            if not multi_codigo:
+                saltar.add("contrato")
+        elif contrato_llm and contrato_llm.strip().upper() != det_contrato.upper():
+            divergencias.append(f"contrato: llm={contrato_llm!r} != det={det_contrato!r}")
+        campos_finales["contrato_citado"] = det_contrato
+
+    # ── Servicio ─────────────────────────────────────────────────────
+    # Sin fuente determinista canónica fuerte: se usa el del LLM SOLO si
+    # pasa validación de forma (no-placeholder), si no, sanitizer.
+    if deterministas.get("servicio_valido") and campos_llm.get("servicio_objetado"):
+        if not multi_codigo:
+            saltar.add("servicio")
+
+    # ── Sanción ──────────────────────────────────────────────────────
+    # NO se salta nunca el sanitizer (es generación de contenido legal).
+    # Solo telemetría de divergencia.
+    sancion_llm = campos_llm.get("sancion_rechazada")
+    sancion_det = bool(deterministas.get("sancion_detectada"))
+    if sancion_det and sancion_llm is False:
+        divergencias.append("sancion: detectada pero llm dice no-rechazada")
+
+    # ── Sub-conceptos ────────────────────────────────────────────────
+    det_subs = deterministas.get("subconceptos") or []
+    subs_llm = campos_llm.get("subconceptos_refutados") or []
+    if det_subs and len(subs_llm) < len(det_subs):
+        divergencias.append(f"subconceptos: llm refutó {len(subs_llm)}/{len(det_subs)}")
+
+    return {
+        "campos_finales": campos_finales,
+        "saltar": saltar,
+        "divergencias": divergencias,
+    }
+
+
+def _instruccion_campos_estructurados() -> str:
+    """Instrucción (nivel system) para que la IA emita el bloque estructurado
+    al FINAL de su respuesta, ADEMÁS del envelope XML. Mejora #3.
+
+    Solo se concatena al system prompt cuando el flag está ON — no se hornea
+    en la constante SYSTEM_BASE para no alterar el prompt en modo OFF.
+    """
+    return (
+        "\n\n═══ BLOQUE DE CONFIRMACIÓN ESTRUCTURADA (OBLIGATORIO) ═══\n"
+        "DESPUÉS de cerrar </argumento>, y como ÚLTIMO elemento de tu "
+        "respuesta, emite EXACTAMENTE este bloque con los datos REALES del "
+        "caso (NO lo metas dentro de <argumento>):\n"
+        "<CAMPOS_ESTRUCTURADOS>\n"
+        "{\n"
+        '  "eps_efectiva": "<nombre real de la EPS pagadora>",\n'
+        '  "servicio_objetado": "<servicio/procedimiento real, sin placeholders>",\n'
+        '  "contrato_citado": "<código CTR-... completo, o SIN CONTRATO PACTADO>",\n'
+        '  "clausulas_respondidas": [<números de cláusula que refutaste>],\n'
+        '  "sancion_rechazada": <true si la glosa aplica sanción y la rechazaste; si no, false>,\n'
+        '  "subconceptos_refutados": ["<id corto de cada sub-concepto atendido>"]\n'
+        "}\n"
+        "</CAMPOS_ESTRUCTURADOS>\n"
+        "Este bloque es ADICIONAL al XML y al <argumento>; NO los reemplaza. "
+        "Usa SOLO datos reales del caso; está PROHIBIDO inventar EPS, "
+        "contratos o CUPS. Si un dato no existe, deja el campo vacío "
+        '("" o []), nunca lo inventes.\n'
+    )
+
+
+def _bloque_campos_a_confirmar(eps: str, contrato: str | None, subconceptos: list) -> str:
+    """Bloque (nivel user) con los valores DETERMINISTAS que la IA debe
+    copiar/confirmar en el JSON estructurado. Mejora #3.
+
+    Le da a la IA los valores ya resueltos por el motor (EPS efectiva,
+    contrato del catálogo, sub-conceptos detectados) para que los CONFIRME
+    en vez de re-derivarlos (y arriesgarse a alucinar).
+    """
+    partes = ["\n\n═══ CAMPOS A CONFIRMAR EN EL BLOQUE ESTRUCTURADO ═══"]
+    if eps and eps.strip():
+        partes.append(f"- eps_efectiva DEBE ser exactamente: {eps.strip()}")
+    if contrato:
+        partes.append(f"- contrato_citado DEBE ser exactamente: {contrato}")
+    if subconceptos:
+        ids = ", ".join(str(s.get("id", s) if isinstance(s, dict) else s) for s in subconceptos)
+        partes.append(f"- subconceptos_refutados DEBE cubrir cada uno de: {ids}")
+    partes.append("Copia estos valores exactos en el JSON estructurado; no los cambies.")
+    return "\n".join(partes) + "\n"
 
 
 def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:
@@ -2648,7 +2944,8 @@ def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
         return texto
     try:
         from app.services.glosa_ia_prompts import contratos_ajenos_citados
-    except Exception:
+    except Exception as _e_imp:
+        logger.warning(f"[CONTRATO-AJENO] sanitizer inactivo (import falló): {_e_imp}")
         return texto
     ajenos = contratos_ajenos_citados(texto, eps)
     if not ajenos:
@@ -2743,6 +3040,42 @@ def _neutralizar_cups_falsos(texto: str) -> str:
     return resultado
 
 
+# ── Ronda 22: normas citadas para el TEMA EQUIVOCADO (alucinación grave) ──
+# Yesid 30-jun (caso ECOOPSOS): el dictamen citó "Ley 1388/2010 que garantiza
+# la atención integral a población con discapacidad auditiva" — pero la Ley
+# 1388/2010 es de CÁNCER INFANTIL. Una norma citada para el tema equivocado
+# anula la seriedad del dictamen ante el auditor. La regla 8.terdecies del
+# prompt lo previene; esta red es la defensa en profundidad: si aun así
+# aparece, se reemplaza por la norma correcta o se neutraliza.
+#
+# Formato: (regex_norma, regex_contexto_equivocado, reemplazo_de_la_norma).
+_NORMAS_TEMA_EQUIVOCADO = (
+    (
+        re.compile(r"\bley\s+1388\s*(?:de\s*|/)\s*2010\b", re.IGNORECASE),
+        re.compile(r"audit|coclear|hipoacusia|discapacidad\s+auditiva|sordera", re.IGNORECASE),
+        "Ley 1618 de 2013",
+    ),
+)
+
+
+def _corregir_norma_mal_aplicada(dictamen: str) -> str:
+    """Reemplaza normas citadas para un tema que no les corresponde por la
+    norma correcta. Conservador: solo dispara si AMBOS (la norma equivocada y
+    el contexto temático) están presentes en el dictamen."""
+    if not dictamen:
+        return dictamen
+    nuevo = dictamen
+    for re_norma, re_ctx, reemplazo in _NORMAS_TEMA_EQUIVOCADO:
+        if re_norma.search(nuevo) and re_ctx.search(nuevo):
+            nuevo, n = re_norma.subn(reemplazo, nuevo)
+            if n:
+                logger.warning(
+                    f"[NORMA-TEMA-EQUIVOCADO] {n} cita(s) corregida(s) → {reemplazo} "
+                    "(la norma original no corresponde al tema del dictamen)."
+                )
+    return nuevo
+
+
 # ── Sanitizer "descomillar citas ALTA" (12-jun-2026, ronda 2 — fix #2) ──
 # Evidencia: caso osteosíntesis ENTREGADO con «El pagador reconocerá la
 # factura dentro de los veintidós (22) días hábiles...» marcada
@@ -2781,7 +3114,8 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
 
     try:
         from app.services.citation_verifier import _normalizar as _norm_cita
-    except Exception:
+    except ImportError as _e_imp:
+        logger.warning(f"[CITAS] descomillado de citas falsas inactivo: {_e_imp}")
         return texto
 
     # El issue trae la cita truncada a 140 chars y envuelta en «»; usamos el
@@ -2831,6 +3165,12 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
         contenido = m.group(1)
         if _es_falsa(contenido):
             n_reemplazos += 1
+            # Ronda 26: si la cita ya arranca con un conector propio
+            # ("Conforme a...", "Según...", "De acuerdo..."), anteponer
+            # "en los términos de" produce "en los términos de conforme
+            # al..." (visto en producción 2-jul, dictamen COMPENSAR).
+            if re.match(r"\s*(conforme|seg[úu]n|de acuerdo)\b", contenido, re.IGNORECASE):
+                return contenido
             return _conector_por_contexto(texto, m.start()) + contenido
         return m.group(0)
 
@@ -3136,7 +3476,8 @@ def _ajustar_score_por_evidencia(score: float, verif_citas, confianza) -> float:
             if isinstance(conf, (int, float)) and 0 <= conf <= 1:
                 s = min(s, conf * 100.0 + 10.0)
         return round(max(15.0, min(100.0, s)), 1)
-    except Exception:
+    except Exception as _e_aj:
+        logger.warning(f"[SCORE] ajuste por evidencia no aplicado: {_e_aj}")
         return score
 
 
@@ -3788,7 +4129,7 @@ class GlosaService:
         groq_api_key: str = None,
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
-        anthropic_model: str = "claude-sonnet-4-6",
+        anthropic_model: str = "claude-sonnet-4-5",
         groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
@@ -3813,7 +4154,7 @@ class GlosaService:
                 "(proveedor retirado jun-2026). Normalizando a 'groq'."
             )
             self.primary_ai = "groq"
-        self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
+        self.anthropic_model = anthropic_model or "claude-sonnet-4-5"
         # Cadena de modelos DENTRO de Groq (decision 16-jun-2026 ronda 8,
         # ver app/core/config.py): llama-4-maverick → gpt-oss-120b →
         # qwen3-32b → llama-3.3-70b. Si el primario falla (429/transitorio/
@@ -3879,6 +4220,17 @@ class GlosaService:
                 self._eps_alerta_actual = _eps_alerta
         except Exception as _e_eps:
             logger.debug(f"[EPS-CORREGIDA] no aplicada: {_e_eps}")
+
+        # Mejora #3: flag de salida estructurada, leído una vez. Gobierna
+        # tanto la inyección al prompt (abajo) como el parseo/validación
+        # post-LLM. OFF (default) → todo el camino estructurado es inerte.
+        _flag_campos = False
+        try:
+            from app.core.config import get_settings as _get_settings_ce
+
+            _flag_campos = bool(_get_settings_ce().glosa_campos_estructurados)
+        except Exception:
+            _flag_campos = False
 
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
@@ -4113,7 +4465,8 @@ class GlosaService:
                 from app.services.auto_pilot_decision import _parse_valor as _pval_vobj
 
                 _vobj = _pval_vobj(valor_raw)
-            except Exception:
+            except Exception as _e_vobj:
+                logger.warning(f"[TEXTO-FIJO] valor objetado ilegible ({valor_raw!r}): {_e_vobj}")
                 _vobj = 0.0
             if accion_ia == "DEFENDER_TOTAL":
                 valor_defender_ia = _vobj
@@ -4203,7 +4556,38 @@ class GlosaService:
             es_asegura_soat = _es_aseguradora_soat(str(data.eps)) or _es_aseguradora_soat(
                 texto_base
             )
-            if es_asegura_soat:
+            # Bug ronda 21 (caso MEDIMÁS da Vinci): _es_aseguradora_soat da
+            # True por el keyword " SOAT" presente en "tarifa de SOAT × 0.85",
+            # disparando el hint "NO HAY CONTRATO PACTADO → SOAT pleno" aunque
+            # la glosa CITE un contrato con factor pactado. Eso indujo el
+            # dictamen a negar el contrato y a defender SOAT pleno. Si la glosa
+            # cita un CTR-XXXX, NO se inyecta el hint de "sin contrato": en su
+            # lugar se instruye defender DENTRO del contrato (respetar el
+            # factor pactado y discutir solo el adicional objetado).
+            _contrato_en_glosa = _detectar_contrato_citado_en_glosa(texto_base)
+            if es_asegura_soat and _contrato_en_glosa:
+                hint_contrato_soat = (
+                    "\n\n═══════════════════════════════════════════════════════\n"
+                    "⚠ TARIFA CON CONTRATO PACTADO (NO afirmar 'sin contrato')\n"
+                    f"La glosa cita el contrato {_contrato_en_glosa}. POR TANTO:\n"
+                    "1. NO afirmes que 'no existe contrato pactado' ni que rige\n"
+                    "   'SOAT pleno en su integridad' — sería negar el contrato\n"
+                    "   que la propia EPS invoca (confesión de parte).\n"
+                    "2. Reconoce el factor tarifario pactado y defiende SOLO el\n"
+                    "   componente objetado (p.ej. el adicional por la tecnología)\n"
+                    "   dentro del marco del contrato y su anexo tarifario.\n"
+                    "3. Si el adicional está soportado clínicamente, susténtalo\n"
+                    "   como prestación necesaria; no como modificación unilateral.\n"
+                    "4. Pacta Sunt Servanda (Art. 1602 C.C. / Art. 871 C.Co.):\n"
+                    "   ninguna parte modifica la tarifa unilateralmente.\n"
+                    "═══════════════════════════════════════════════════════"
+                )
+                system_prompt = system_prompt + hint_contrato_soat
+                logger.info(
+                    f"[SOAT-CON-CONTRATO] glosa cita {_contrato_en_glosa} — hint de "
+                    "defensa intra-contrato (no 'sin contrato')."
+                )
+            elif es_asegura_soat:
                 nombre_real = _extraer_nombre_entidad_real(texto_base) or str(data.eps)
                 hint_aseguradora = (
                     "\n\n═══════════════════════════════════════════════════════\n"
@@ -4313,6 +4697,12 @@ class GlosaService:
             except Exception as _e_cc:
                 logger.debug(f"[CLAUSULAS-CONTRATO] no disponibles: {_e_cc}")
 
+            # Mejora #3: si el flag está ON, pedirle a la IA el bloque
+            # <CAMPOS_ESTRUCTURADOS> al final (instrucción a nivel system).
+            # Concatenación condicional — el SYSTEM_BASE no cambia en OFF.
+            if _flag_campos:
+                system_prompt = system_prompt + _instruccion_campos_estructurados()
+
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
                 contexto_pdf=contexto_pdf,
@@ -4357,6 +4747,23 @@ class GlosaService:
                         )
             except Exception as _e_sc:
                 logger.debug(f"[SUBCONCEPTOS] no inyectados: {_e_sc}")
+
+            # Mejora #3: si el flag está ON, inyectar al user prompt los
+            # valores DETERMINISTAS (EPS efectiva, contrato del catálogo,
+            # sub-conceptos) para que la IA los CONFIRME en el JSON en vez de
+            # re-derivarlos y arriesgarse a alucinar.
+            if _flag_campos:
+                try:
+                    _contrato_det_cf = _detectar_contrato_citado_en_glosa(texto_base)
+                    _bloque_cf = _bloque_campos_a_confirmar(
+                        str(data.eps or ""),
+                        _contrato_det_cf,
+                        getattr(self, "_subconceptos_actuales", []) or [],
+                    )
+                    if _bloque_cf:
+                        user_prompt = user_prompt + _bloque_cf
+                except Exception as _e_cf:
+                    logger.debug(f"[CAMPOS-EST] bloque a confirmar no inyectado: {_e_cf}")
 
             # ── Defensa clínica reforzada (jun-2026) ──
             # Si el caso involucra tecnología de alto costo (Cart-T, da Vinci,
@@ -4658,6 +5065,7 @@ class GlosaService:
                         _db_fs,
                         str(data.eps),
                         codigo_det,
+                        texto_glosa=texto_base,
                     )
                 finally:
                     _db_fs.close()
@@ -4775,7 +5183,7 @@ class GlosaService:
                 else:
                     # OPUS: valor alto + multi-PDF (caso ricamente documentado).
                     if _valor_num_route >= 10_000_000 and _num_pdfs_route >= 2:
-                        _modelo_override = "claude-opus-4-7"
+                        _modelo_override = os.getenv("ANTHROPIC_MODEL_OPUS", "claude-opus-4-7")
                         logger.info(
                             "[ROUTING-IA] OPUS — "
                             f"valor=${_valor_num_route:,} pdfs={_num_pdfs_route}"
@@ -4784,7 +5192,7 @@ class GlosaService:
                     # Las palabras-clave críticas o valores ≥ $50M reventaban
                     # a Llama 4 Scout (rondas 14-15-16: Cart-T, Norwood, VIH).
                     elif _es_complejo_forzar_claude and self.primary_ai == "groq":
-                        _modelo_override = self.anthropic_model or "claude-sonnet-4-6"
+                        _modelo_override = self.anthropic_model or "claude-sonnet-4-5"
                         logger.warning(
                             "[ROUTING-IA] FORZANDO ANTHROPIC — primary_ai=groq pero "
                             f"caso complejo ({', '.join(_resultado_complej.motivos)}). "
@@ -4795,7 +5203,10 @@ class GlosaService:
                     # calidad porque el cerebro pre-IA ya hizo el trabajo
                     # duro (auditoría + bloque excedente + checklist).
                     elif (
-                        _valor_num_route < 500_000
+                        # Auditoría jul-2026: un caso con keyword crítica y
+                        # valor bajo caía en Haiku cuando primary_ai=anthropic.
+                        not _es_complejo_forzar_claude
+                        and _valor_num_route < 500_000
                         and _num_pdfs_route <= 1
                         and _len_pdf_route < 5_000
                         and _len_glosa_route < 800
@@ -4933,16 +5344,34 @@ class GlosaService:
                 # hacía la misma cadena y se reintentaba Gemini dos veces).
                 # Si la cadena completa falla, caemos a los paths de texto
                 # (Tool Use / clásico) con el contexto OCR ya extraído.
-                _quiere_multimodal = (
-                    bool(getattr(data, "usar_pdf_nativo_soportes", False))
-                    and pdfs_raw_para_multimodal
+                # Fase 2 Soportes (jul-2026): además del checkbox manual,
+                # AUTO-activar PDF nativo cuando el caso ya se enruta a un
+                # Claude grande (complejidad crítica / Opus). Los casos
+                # simples de Groq/Haiku siguen con texto OCR (ahora 12K).
+                try:
+                    from app.services.routing_complejidad import (
+                        multimodal_auto_activado as _mm_auto_fn,
+                    )
+
+                    _mm_auto = _mm_auto_fn(_es_complejo_forzar_claude, _modelo_override)
+                except Exception as _e_mma:
+                    logger.warning(f"[MULTIMODAL] auto-activación no evaluada: {_e_mma}")
+                    _mm_auto = False
+                _quiere_multimodal = bool(pdfs_raw_para_multimodal) and (
+                    bool(getattr(data, "usar_pdf_nativo_soportes", False)) or _mm_auto
                 )
+                if _quiere_multimodal and _mm_auto:
+                    logger.info(
+                        "[MULTIMODAL] AUTO-activado — caso escalado a Claude "
+                        f"(override={_modelo_override}, complejo={_es_complejo_forzar_claude})."
+                    )
                 if _quiere_multimodal:
                     try:
                         res_ia, modelo_usado = await self._llamar_anthropic_multimodal(
                             system_prompt,
                             user_prompt,
                             pdfs_raw_para_multimodal,
+                            modelo_override=_modelo_override,
                         )
                         _intento_ok = True
                     except Exception as _e_mm:
@@ -5081,6 +5510,11 @@ class GlosaService:
                         resumen_defectos,
                     )
 
+                    _codigos_extra_val = [cups_verificado] if cups_verificado else []
+                    if info_tarifa and info_tarifa.get("encontrada"):
+                        _cups_tarifa = (info_tarifa.get("tarifa") or {}).get("codigo_cups")
+                        if _cups_tarifa:
+                            _codigos_extra_val.append(str(_cups_tarifa))
                     _defectos = detectar_defectos_criticos(
                         res_ia,
                         codigo_glosa=codigo_det,
@@ -5090,6 +5524,8 @@ class GlosaService:
                         es_ratificacion=es_ratificacion,
                         es_extemporanea=es_extemporanea,
                         codigo_respuesta=cod_res,
+                        texto_glosa=texto_base,
+                        codigos_validos_extra=_codigos_extra_val,
                     )
                     # Mejora #7: chequear si el dictamen es copia textual
                     # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -5174,6 +5610,8 @@ class GlosaService:
                                 es_ratificacion=es_ratificacion,
                                 es_extemporanea=es_extemporanea,
                                 codigo_respuesta=cod_res,
+                                texto_glosa=texto_base,
+                                codigos_validos_extra=_codigos_extra_val,
                             )
                             if len(_defectos_retry) < len(_defectos):
                                 logger.info(
@@ -5191,6 +5629,33 @@ class GlosaService:
                 except Exception as _e:
                     logger.debug(f"Validación post-gen no aplicada: {_e}")
 
+            # ═══════════════════════════════════════════════════════════
+            #  Mejora #3 (jun-2026) — Salida estructurada incremental.
+            #  Si el flag está ON, parsear el bloque <CAMPOS_ESTRUCTURADOS>
+            #  ANTES de extraer <argumento>. SIEMPRE borrar el bloque de
+            #  res_ia (no-op si no existe) para que jamás contamine el
+            #  dictamen radicable. Flag OFF (default) → _campos_llm=None y el
+            #  pipeline queda idéntico al actual (degradación elegante).
+            # ═══════════════════════════════════════════════════════════
+            _campos_llm = None
+            _campos_saltar: set[str] = set()
+            _campos_finales: dict | None = None
+            if _flag_campos:
+                try:
+                    _campos_llm = _parsear_campos_estructurados(res_ia)
+                    if _campos_llm:
+                        logger.info(
+                            "[CAMPOS-EST] bloque parseado: "
+                            f"eps={_campos_llm.get('eps_efectiva')!r} "
+                            f"contrato={_campos_llm.get('contrato_citado')!r} "
+                            f"clausulas={_campos_llm.get('clausulas_respondidas')} "
+                            f"sancion={_campos_llm.get('sancion_rechazada')}"
+                        )
+                except Exception as _e_ce:
+                    logger.debug(f"[CAMPOS-EST] parseo falló: {_e_ce}")
+                    _campos_llm = None
+            res_ia = _limpiar_bloque_campos_estructurados(res_ia)
+
             razonamiento = self._xml("razonamiento", res_ia, "")
             if razonamiento:
                 logger.info(f"IA razonamiento: {razonamiento[:200]}")
@@ -5205,22 +5670,84 @@ class GlosaService:
             # para REEMPLAZAR un CUPS inventado, no para pegarla al servicio
             # que ya está descrito. Si el servicio tiene texto real ANTES del
             # placeholder, quitamos el placeholder.
-            servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
+            #
+            # Mejora #3: si el flag está ON y la IA entregó un servicio_objetado
+            # estructurado y LIMPIO (sin el placeholder), lo usamos directo —
+            # es la respuesta deliberada y confirmada de la IA — y saltamos el
+            # limpiador. Si no, pipeline actual sobre el <servicio> crudo. Solo
+            # se aplica a este campo AISLADO; los sanitizers del cuerpo
+            # narrativo siguen corriendo siempre (defensa en profundidad).
+            _serv_est = (_campos_llm or {}).get("servicio_objetado") if _flag_campos else None
+            if (
+                _serv_est
+                and "según historia clínica" not in _serv_est.lower()
+                and len(_serv_est.strip()) >= 4
+            ):
+                servicio_ia = _serv_est.strip()
+                _campos_saltar.add("servicio")
+            else:
+                servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
             contrato_ia = self._xml("contrato", res_ia, "")
             tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
             normas_clave = self._xml("normas_clave", res_ia, "")
+
+            # ── Mejora #3: cruzar campos estructurados vs deterministas ──
+            #  Telemetría de divergencia LLM-vs-determinista + construcción
+            #  de _campos_finales (verdad = determinista). NO se saltan
+            #  sanitizers del cuerpo narrativo: solo se registra. El único
+            #  skip aplicado es el de servicio (campo aislado, arriba).
+            if _flag_campos and _campos_llm is not None:
+                try:
+                    _det_contrato_ce = _detectar_contrato_citado_en_glosa(texto_base)
+                    _det_sancion_ce = bool(_RE_SANCION_EPS_MENCIONADA.search(texto_base))
+                    _det_ce = {
+                        "eps_efectiva": str(getattr(data, "eps", "") or ""),
+                        "contrato_citado": _det_contrato_ce,
+                        "subconceptos": getattr(self, "_subconceptos_actuales", []) or [],
+                        "sancion_detectada": _det_sancion_ce,
+                        # servicio ya se resolvió arriba; no re-skipear aquí.
+                        "servicio_valido": False,
+                    }
+                    _multi_ce = len(codigos_detectados) > 1
+                    _val_ce = _validar_campos_estructurados(
+                        _campos_llm, _det_ce, multi_codigo=_multi_ce
+                    )
+                    # 'eps'/'contrato' del validador NO gatean sanitizers en
+                    # esta versión (defensa en profundidad); se conservan en
+                    # _campos_saltar solo como telemetría junto a 'servicio'.
+                    _campos_saltar |= _val_ce["saltar"]
+                    _campos_finales = {
+                        **_val_ce["campos_finales"],
+                        "_divergencias": _val_ce["divergencias"],
+                        "_saltar": sorted(_campos_saltar),
+                    }
+                    if _val_ce["divergencias"]:
+                        logger.warning(
+                            f"[CAMPOS-EST] divergencias LLM-vs-determinista: "
+                            f"{_val_ce['divergencias']}"
+                        )
+                except Exception as _e_val_ce:
+                    logger.debug(f"[CAMPOS-EST] validación falló: {_e_val_ce}")
+                    _campos_finales = None
+
             # Decisión autónoma de la IA (R-cerebro #8)
             accion_ia = (self._xml("accion", res_ia, "") or "").strip().upper()
+            # Ronda 29: parser colombiano compartido (el regex viejo leía
+            # "1.500.000" como 1.5) y log en vez de $0 mudo.
+            from app.utils.moneda import parse_valor_cop as _pvc_ia
+
+            _va = self._xml("valor_aceptar", res_ia, "0") or "0"
             try:
-                _va = self._xml("valor_aceptar", res_ia, "0") or "0"
-                valor_aceptar_ia = float(re.sub(r"[^\d.]", "", _va) or 0)
-            except Exception:
+                valor_aceptar_ia = float(_pvc_ia(_va))
+            except Exception as _e_va:
+                logger.warning(f"[IA-ACCION] valor_aceptar ilegible ({_va!r}): {_e_va}")
                 valor_aceptar_ia = 0.0
+            _vd = self._xml("valor_defender", res_ia, "0") or "0"
             try:
-                _vd = self._xml("valor_defender", res_ia, "0") or "0"
-                valor_defender_ia = float(re.sub(r"[^\d.]", "", _vd) or 0)
-            except Exception:
+                valor_defender_ia = float(_pvc_ia(_vd))
+            except Exception as _e_vd:
+                logger.warning(f"[IA-ACCION] valor_defender ilegible ({_vd!r}): {_e_vd}")
                 valor_defender_ia = 0.0
             if accion_ia:
                 logger.info(
@@ -5862,6 +6389,16 @@ class GlosaService:
             except Exception as _e_cf:
                 logger.debug(f"[CUPS-FALSO] red final no aplicada: {_e_cf}")
 
+            # Ronda 22 — RED FINAL: norma citada para el tema equivocado
+            # (caso ECOOPSOS: Ley 1388/2010 —cáncer— citada para discapacidad
+            # auditiva). Defensa en profundidad de la regla 8.terdecies.
+            try:
+                _dictamen_norma_ok = _corregir_norma_mal_aplicada(dictamen)
+                if _dictamen_norma_ok != dictamen:
+                    dictamen = _dictamen_norma_ok
+            except Exception as _e_nm:
+                logger.debug(f"[NORMA-TEMA-EQUIVOCADO] red final no aplicada: {_e_nm}")
+
             # ═══════════════════════════════════════════════════════════
             #  Ronda 5 (16-jun-2026) — RED FINAL EPS inventada.
             #  Evidencia caso 4: con EPS=COOSALUD el dictamen escribió
@@ -6214,6 +6751,39 @@ class GlosaService:
         except Exception as _e_scval:
             logger.debug(f"[SUBCONCEPTOS-OMITIDOS] no auditados: {_e_scval}")
 
+        # ── Ronda 21 (Bug Z v2): cláusula citada por la EPS sin responder ──
+        # El auditor de cláusulas (Bug Z) solo registraba warning y se
+        # descartaba el retorno. Ahora, si la glosa cita "Cláusula N" y el
+        # dictamen no la responde, se antepone banner rojo + penaliza score,
+        # igual que con los sub-conceptos (caso MEDIMÁS: cláusula 31 evadida).
+        try:
+            if modo_resp != "auditoria_previa":
+                _ok_cl, _evadidas = _auditar_clausulas_citadas_en_glosa(
+                    dictamen, texto_glosa=texto_base
+                )
+                if _evadidas:
+                    logger.warning(
+                        f"[CLAUSULAS-EVADIDAS] el dictamen no respondió "
+                        f"la(s) cláusula(s) citada(s): {sorted(_evadidas)}"
+                    )
+                    _items_cl = "".join(
+                        f"<li>Cláusula {n} citada por la EPS — sin responder</li>"
+                        for n in sorted(_evadidas)
+                    )
+                    _banner_cl = (
+                        '<div style="margin-bottom:12px;padding:10px 14px;'
+                        "background:#fef2f2;border:2px solid #dc2626;"
+                        'border-radius:8px;font-size:12px;color:#991b1b;">'
+                        "⚠️ <b>Cláusulas del contrato SIN responder</b> "
+                        "(el silencio equivale a concesión tácita — refiná con "
+                        f"IA antes de radicar):<ul style='margin:6px 0 0 18px;'>{_items_cl}</ul>"
+                        "</div>"
+                    )
+                    dictamen = _banner_cl + dictamen
+                    score = max(0, score - 8 * len(_evadidas))
+        except Exception as _e_clval:
+            logger.debug(f"[CLAUSULAS-EVADIDAS] no auditadas (post): {_e_clval}")
+
         # ── Defensa clínica: checklist de literatura nivel 1A ──
         # Si el caso era de tecnología cara y el dictamen NO citó literatura
         # clínica (FDA/NICE/Cochrane/AHA), avisamos al gestor — una defensa
@@ -6262,6 +6832,10 @@ class GlosaService:
             verificacion_citas=verif_citas,
             confianza=confianza,
             auto_pilot=auto_pilot,
+            # Mejora #3: campos estructurados confirmados (None si flag OFF o
+            # la IA no emitió el bloque). locals().get evita NameError si el
+            # flujo no pasó por el bloque de extracción (p.ej. early-return).
+            campos_estructurados=locals().get("_campos_finales"),
         )
         # Memoria (Render Free 512 MB): el análisis dejó en memoria PDFs
         # decodificados, prompts grandes, y caché de respuestas IA. Si no
@@ -6599,11 +7173,25 @@ class GlosaService:
             if valor_num > 0:
                 return f"$ {int(round(valor_num)):,}".replace(",", ".")
 
+        # Ronda 26/29: el OBJETADO ETIQUETADO manda. El lookahead consume la
+        # corrida numérica completa para que "VALOR OBJETADO 100%" no
+        # devuelva "$ 100" por backtracking; con varios sub-conceptos gana
+        # el TOTAL etiquetado y, en su defecto, el MAYOR valor objetado.
+        from app.utils.moneda import parse_valor_cop as _pvc_lab
+
+        for _p_lab in (
+            r"\btotal\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+        ):
+            _hits = re.findall(_p_lab, t, re.IGNORECASE)
+            if _hits:
+                _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
+                return f"$ {_mejor.strip().rstrip('.,')}"
+
         patrones = [
             r"\$\s*([\d][\d\.,]{2,})",
             r"%\s*([\d][\d\.,]{2,})",
             r"\bvalor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
-            r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})",
             r"\bpor\s+valor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
             r"\b([\d][\d\.,]{4,})\s*(?:pesos|cop|cop\.|col\$)\b",
         ]
@@ -7221,7 +7809,7 @@ class GlosaService:
         )
         _modelo_override_refinar = None
         if _complej_refinar.es_complejo and self.anthropic_key:
-            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-6"
+            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-5"
             logger.warning(
                 f"[REFINAR-DICTAMEN] FORZANDO ANTHROPIC "
                 f"({', '.join(_complej_refinar.motivos)}) — "
@@ -7668,8 +8256,25 @@ class GlosaService:
                         )
                         return content_text, f"anthropic/{_modelo_efectivo}"
                     err = data.get("error", {}).get("message", str(data)[:300])
-                    # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     status = resp.status_code
+                    # Ronda 26 (2-jul-2026, visto en producción): si el modelo
+                    # ESCALADO no existe para esta API key (Opus → 404
+                    # not_found), degradar a self.anthropic_model (Sonnet) en
+                    # vez de reventar la cadena — el caso de $20.2M + 2 PDFs
+                    # terminaba en Groq/Llama: el caso más grande en el modelo
+                    # más débil.
+                    if (
+                        modelo_override
+                        and modelo_override != self.anthropic_model
+                        and (status == 404 or "not_found" in err.lower())
+                    ):
+                        logger.warning(
+                            f"[ANTHROPIC] modelo escalado '{modelo_override}' no disponible "
+                            f"(HTTP {status}: {err[:120]}); degradando a {self.anthropic_model}."
+                        )
+                        modelo_override = None
+                        continue
+                    # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     if status in (429, 529, 500, 502, 503, 504):
                         ultimo_error = RuntimeError(f"Anthropic HTTP {status}: {err[:200]}")
                         import asyncio as _aio
@@ -7808,6 +8413,7 @@ class GlosaService:
         system: str,
         user: str,
         pdfs_raw: list[tuple[str, bytes]],
+        modelo_override: str | None = None,
     ) -> tuple[str, str]:
         """Llama a Claude pasándole el user prompt + los PDFs de soportes
         como `document` content blocks (formato nativo Anthropic).
@@ -7870,7 +8476,11 @@ class GlosaService:
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json={
-                        "model": self.anthropic_model,
+                        # Fase 2 fix (jul-2026): respetar la escalación del
+                        # router. Antes usaba siempre self.anthropic_model
+                        # (Sonnet) — un caso Opus (≥$10M+2PDFs) auto-enviado
+                        # a multimodal se degradaba en silencio a Sonnet.
+                        "model": modelo_override or self.anthropic_model,
                         "max_tokens": 3000,
                         "temperature": 0.10,
                         "system": system,
@@ -7882,6 +8492,22 @@ class GlosaService:
             raise RuntimeError(f"Multimodal falló por red: {e}")
 
         if resp.status_code != 200:
+            # Ronda 26: modelo escalado inexistente para esta key (Opus 404)
+            # → reintentar UNA vez con el modelo base, conservando los PDFs
+            # nativos (antes se perdía el multimodal completo).
+            if (
+                modelo_override
+                and modelo_override != self.anthropic_model
+                and (resp.status_code == 404 or "not_found" in resp.text[:300].lower())
+            ):
+                logger.warning(
+                    f"[MULTIMODAL] modelo escalado '{modelo_override}' no disponible "
+                    f"(HTTP {resp.status_code}); degradando a {self.anthropic_model} "
+                    "con los mismos PDFs."
+                )
+                return await self._llamar_anthropic_multimodal(
+                    system, user, pdfs_raw, modelo_override=None
+                )
             logger.error(f"[MULTIMODAL] HTTP {resp.status_code}: {resp.text[:500]}")
             raise RuntimeError(f"Multimodal HTTP {resp.status_code}")
 
@@ -7897,7 +8523,7 @@ class GlosaService:
             f"[MULTIMODAL] OK con {len(pdfs_efectivos)} PDFs | "
             f"input_tokens={data.get('usage', {}).get('input_tokens', '?')}"
         )
-        return texto_final, f"anthropic/{self.anthropic_model}/multimodal"
+        return texto_final, f"anthropic/{modelo_override or self.anthropic_model}/multimodal"
 
     async def _llamar_ia(
         self,
@@ -8024,6 +8650,7 @@ class GlosaService:
                 intentos.append(("anthropic", self._llamar_anthropic))
 
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
+        _causa_anthropic = ""
         for nombre, fn in intentos:
             try:
                 # Solo Anthropic acepta modelo/temperature override
@@ -8038,12 +8665,31 @@ class GlosaService:
                     # Groq: propagar la marca de llamada corta para que
                     # gpt-oss use reasoning_effort 'low' (fix #9).
                     content, modelo = await fn(system, user, llamada_corta=llamada_corta)
+                # Ronda 27 (2-jul-2026): si el caso venía ESCALADO a Anthropic
+                # (modelo_override) y terminó respondiendo OTRO proveedor, la
+                # etiqueta lleva la causa — viaja a la UI/BD y permite
+                # diagnosticar sin acceso a logs. Visto en producción: caso de
+                # $6.4M + 2 PDFs cayó a Groq en silencio DOS veces y nadie
+                # supo por qué.
+                if nombre != "anthropic" and modelo_override and _causa_anthropic:
+                    # Ronda 29: causa COMPLETA al log; etiqueta CORTA a BD/UI.
+                    # La etiqueta larga (159+ chars) desbordaba
+                    # historial.modelo_ia VARCHAR(100/120) y ai_cache.modelo
+                    # VARCHAR(80) en Postgres → 500 tras pagar la llamada IA,
+                    # justo en los casos degradados.
+                    logger.warning(
+                        f"[MODELO-DEGRADADO] pedido={modelo_override} → usado={modelo} "
+                        f"| causa: {_causa_anthropic}"
+                    )
+                    modelo = f"{modelo} [degradado]"[:80]
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
+                if nombre == "anthropic":
+                    _causa_anthropic = str(e)[:200]
                 logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
                 continue
 
@@ -8116,9 +8762,13 @@ def _guardar_cache_ia_db(clave: str, respuesta: str, modelo: str) -> None:
             existente = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
             if existente:
                 existente.respuesta = respuesta
-                existente.modelo = modelo
+                existente.modelo = (modelo or "")[:80]
             else:
-                db.add(AICacheRecord(clave=clave, respuesta=respuesta, modelo=modelo, hit_count=0))
+                db.add(
+                    AICacheRecord(
+                        clave=clave, respuesta=respuesta, modelo=(modelo or "")[:80], hit_count=0
+                    )
+                )
             db.commit()
         finally:
             db.close()

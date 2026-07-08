@@ -9,6 +9,7 @@ Extraído de app/main.py (era ~365 LOC). Maneja:
   - Persistencia (GlosaRecord) + snapshot de versión inicial
 """
 
+import os
 import re
 from typing import Optional
 
@@ -568,7 +569,7 @@ async def _persistir_y_responder(
         existente.dictamen = dictamen_final
         existente.dictamen_generado_en = datetime.now(_tz.utc)
         existente.dias_restantes = resultado.dias_restantes
-        existente.modelo_ia = resultado.modelo_ia
+        existente.modelo_ia = (resultado.modelo_ia or "")[:100]
         existente.score = resultado.score
         existente.numero_radicado = numero_radicado or existente.numero_radicado
         existente.texto_glosa_original = tabla_excel or existente.texto_glosa_original
@@ -597,7 +598,7 @@ async def _persistir_y_responder(
             estado=estado,
             dictamen=dictamen_final,
             dias_restantes=resultado.dias_restantes,
-            modelo_ia=resultado.modelo_ia,
+            modelo_ia=(resultado.modelo_ia or "")[:100],
             score=resultado.score,
             numero_radicado=numero_radicado,
             factura=numero_factura,
@@ -740,10 +741,56 @@ async def analizar(
         raise HTTPException(status_code=400, detail=_msg)
 
     try:
+        # Fase 2 Soportes (jul-2026): capturar los bytes raw cuando el
+        # checkbox está ON o cuando el AUTO-multimodal probablemente dispare
+        # (caso que ya escala a Claude por complejidad). Se predice con el
+        # mismo detector determinista del router de modelo — así el capture
+        # se alinea con el uso y NO se retienen hasta 150MB por request (10
+        # PDFs × 15MB) en la VM de 1GB para casos simples que jamás usarán
+        # multimodal (fix del review adversarial, jul-2026).
+        _mm_auto_env = os.getenv("GLOSA_MULTIMODAL_AUTO", "1").strip().lower() not in (
+            "0",
+            "false",
+            "no",
+        )
+        _capturar_raw = bool(usar_pdf_nativo_soportes)
+        if not _capturar_raw and _mm_auto_env and archivos:
+            try:
+                from app.services.auto_pilot_decision import _parse_valor as _pv_mm
+                from app.services.routing_complejidad import (
+                    detectar_complejidad_critica as _det_mm,
+                )
+
+                _txt_mm = tabla_excel or ""
+                _crudos_mm = re.findall(
+                    r"\btotal\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+                    _txt_mm,
+                    flags=re.IGNORECASE,
+                ) + re.findall(
+                    r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+                    _txt_mm,
+                    flags=re.IGNORECASE,
+                )
+                if not _crudos_mm:
+                    _crudos_mm = re.findall(r"\$\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)", _txt_mm)
+                _vals_mm = [_pv_mm(m) for m in _crudos_mm]
+                _valor_mm = int(max(_vals_mm)) if _vals_mm else 0
+                _capturar_raw = bool(
+                    _det_mm(
+                        valor=_valor_mm,
+                        num_pdfs=len(archivos),
+                        num_codigos=0,
+                        texto_glosa=tabla_excel or "",
+                        contexto_pdf="",
+                    ).es_complejo
+                )
+            except Exception as _e_mm:
+                logger.warning(f"[MULTIMODAL] captura predictiva no evaluada: {_e_mm}")
+                _capturar_raw = False
         contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
             archivos,
             req_id,
-            capturar_raw=bool(usar_pdf_nativo_soportes),
+            capturar_raw=_capturar_raw,
         )
         _publicar_progreso(
             _tid,
@@ -771,6 +818,44 @@ async def analizar(
             # Contar como "archivos procesados" para que el motor IA detecte
             # que hay soportes disponibles y referencie en el dictamen.
             archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
+
+        # Fase 2b Soportes (jul-2026): PRE-PASS del Auditor Forense (OPT-IN).
+        # Lee los PDFs nativos y antepone al contexto un MAPA DE FOLIOS
+        # (folios + fechas + hallazgos) para que el dictamen cite folios
+        # REALES en vez de argumentar a ciegas. Es una llamada Claude extra
+        # (cacheada 14 días) → default OFF; corre solo en casos que ya
+        # escalan a Claude (mismo criterio que capturar_raw), para no
+        # convertir cada glosa en doble costo.
+        if (
+            os.getenv("GLOSA_AUDITOR_FORENSE_PREPASS", "0").strip().lower()
+            not in ("0", "false", "no")
+            and pdfs_raw
+            and _capturar_raw
+        ):
+            try:
+                from app.services.auditor_forense import evidencia_para_dictamen
+
+                _ev = await evidencia_para_dictamen(
+                    factura=numero_factura or "s/n",
+                    texto_glosa=tabla_excel or "",
+                    pdfs_raw=pdfs_raw,
+                    contexto_pdf_texto=contexto_pdf or "",
+                )
+                if _ev.get("evidencia"):
+                    contexto_pdf = (
+                        "═══ EVIDENCIA FORENSE (folios auditados de los soportes) ═══\n"
+                        f"{_ev['evidencia']}\n"
+                        "═══ FIN EVIDENCIA FORENSE ═══\n\n" + (contexto_pdf or "")
+                    )
+                    _publicar_progreso(
+                        _tid, "auditor_forense", {"cache_hit": _ev.get("cache_hit", False)}
+                    )
+                    logger.info(
+                        f"[{req_id}] Auditor forense pre-pass OK "
+                        f"(cache_hit={_ev.get('cache_hit')}, {len(_ev['evidencia'])} chars)"
+                    )
+            except Exception as _e_af:
+                logger.warning(f"[{req_id}] Auditor forense pre-pass falló: {_e_af}")
 
         contrato_repo = ContratoRepository(db)
         contratos = contrato_repo.como_dict()
@@ -906,7 +991,6 @@ async def preview_glosa(
             "POLICIA NACIONAL",
             "AURORA",
             "SUMIMEDICAL",
-            "PRECIMED",
             "SALUD MIA",
             "SANITAS",
             "SURA",
@@ -995,7 +1079,6 @@ async def extraer_de_correo(
         "POLICIA NACIONAL",
         "AURORA",
         "SUMIMEDICAL",
-        "PRECIMED",
         "SALUD MIA",
         "SANITAS",
         "SURA",

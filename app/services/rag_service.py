@@ -269,17 +269,3 @@ class RAGService:
                 f"codigo={codigo_glosa} top_score={resultados[0]['score_similitud']:.2f}"
             )
         return resultados
-
-    def construir_contexto_rag(self, casos: list[dict]) -> str:
-        if not casos:
-            return ""
-        lineas = [
-            "=== PRECEDENTES EXITOSOS DEL PROPIO HUS ===",
-            f"Se encontraron {len(casos)} caso(s) similar(es):\n",
-        ]
-        for i, c in enumerate(casos, 1):
-            lineas.append(
-                f"PRECEDENTE #{i} — Código: {c['codigo_glosa']} | EPS: {c['eps']}\n"
-                f"Extracto: {c['extracto_dictamen']}\n{'─' * 60}"
-            )
-        return "\n".join(lineas)

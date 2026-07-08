@@ -383,7 +383,7 @@ async def _generar_seccion_codigo(
     )
     _modelo_forzado = None
     if _complejidad.es_complejo and getattr(servicio, "anthropic_key", None):
-        _modelo_forzado = getattr(servicio, "anthropic_model", None) or "claude-sonnet-4-6"
+        _modelo_forzado = getattr(servicio, "anthropic_model", None) or "claude-sonnet-4-5"
         logger.warning(
             f"[MULTI-CODIGO] {codigo}: FORZANDO ANTHROPIC en sección adicional "
             f"({', '.join(_complejidad.motivos)}) — modelo={_modelo_forzado}"

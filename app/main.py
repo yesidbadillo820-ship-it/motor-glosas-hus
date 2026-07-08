@@ -91,8 +91,7 @@ CONTRATOS_DEFAULT = {
     "SUMIMEDICAL": "TARIFARIO ESE HUS 2025 — SUMIMEDICAL. TARIFA: SOAT -15%.",
     "DISPENSARIO MEDICO": "CONTRATO No. 440-DIGSA/DMBUG-2025. TARIFA: SOAT/SMLV -20%.",
     "SALUD MIA": "CONTRATO CSA2025EVE3A005. TARIFA: SOAT -15%.",
-    "PRECIMED": "CONTRATO No. 319 DE 2024. TARIFA: SOAT -15%.",
-    "AURORA": "MINUTA ARL + MINUTA VIDA AP — FIRMADAS SEP 2024. TARIFA: SOAT PLENO.",
+    "AURORA": "CONTRATO GID-ARL-0090 — ARL + VIDA AP (2024). TARIFA: PROPIAS HUS / SOAT -3% SUBSIDIARIA.",
     "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO.",
 }
 
@@ -1085,7 +1084,6 @@ from app.api.routers.glosas import router as glosas_router
 from app.api.routers.contratos import router as contratos_router
 from app.api.routers.analytics import router as analytics_router
 from app.api.routers.plantillas import router as plantillas_router
-from app.api.routers.exportar import router as exportar_router
 from app.api.routers.workflow import router as workflow_router
 from app.api.routers.alertas import router as alertas_router
 from app.api.routers.usuarios import router as usuarios_router
@@ -1107,10 +1105,9 @@ from app.api.routers.asistente_predictivo import router as asistente_predictivo_
 from app.api.routers.quality_gate_stats import router as quality_gate_stats_router
 from app.api.routers.versiones import router as versiones_router
 from app.api.routers.papelera import router as papelera_router
-from app.api.routers.simulador import router as simulador_router
 from app.api.routers.export_erp import router as export_erp_router
+from app.api.routers.exportar import router as exportar_router
 from app.api.routers.asignacion import router as asignacion_router
-from app.api.routers.push import router as push_router
 from app.api.routers.bandeja import router as bandeja_router
 from app.api.routers.adjuntos import router as adjuntos_router
 from app.api.routers.consulta_normativa import router as consulta_normativa_router
@@ -1122,8 +1119,7 @@ from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 
-# autopilot: stub removido — lógica real en app/services/autopilot_service.py
-from app.api.routers.digest import router as digest_router
+# autopilot: removido en la limpieza de ronda 29 (módulo sin uso real).
 
 # control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
@@ -1133,7 +1129,6 @@ from app.api.routers.eventos_live import router as eventos_live_router
 # notas_privadas: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
-from app.api.routers.prediccion_ia import router as prediccion_ia_router
 
 # chat_history: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
@@ -1149,7 +1144,6 @@ app.include_router(glosas_router)
 app.include_router(contratos_router)
 app.include_router(analytics_router)
 app.include_router(plantillas_router)
-app.include_router(exportar_router)
 app.include_router(workflow_router)
 app.include_router(alertas_router)
 app.include_router(usuarios_router)
@@ -1168,10 +1162,9 @@ app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)
 app.include_router(versiones_router)
 app.include_router(papelera_router)
-app.include_router(simulador_router)
 app.include_router(export_erp_router)
+app.include_router(exportar_router)  # Formato DGH (reconectado en ronda 29)
 app.include_router(asignacion_router)
-app.include_router(push_router)
 app.include_router(bandeja_router)
 app.include_router(adjuntos_router)
 app.include_router(consulta_normativa_router)
@@ -1183,7 +1176,6 @@ app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
 # autopilot_router: stub removido
-app.include_router(digest_router)
 # control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
@@ -1191,7 +1183,6 @@ app.include_router(eventos_live_router)
 # notas_privadas_router: stub removido
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
-app.include_router(prediccion_ia_router)
 # chat_history_router: stub removido
 app.include_router(dictamen_pdf_router)
 # comentarios_thread_router: stub removido
@@ -1228,9 +1219,7 @@ app.include_router(nota_credito_router)
 from app.api.routers.soportes import router as soportes_auto_router
 
 app.include_router(soportes_auto_router)
-from app.api.routers.noticias import router as noticias_router
 
-app.include_router(noticias_router)
 from app.api.routers.diagnostico import router as diagnostico_router
 
 app.include_router(diagnostico_router)
