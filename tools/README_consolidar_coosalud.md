@@ -68,11 +68,19 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
    | CRDOBSERV | OBSERVACIÓN FINAL combinada |
    | CROTIPOBJ | **por factura completa**: 0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta — si la factura es mixta, TODAS sus filas llevan 2 |
 
-   - Hoja `NO_CRUZADOS`: servicios que DGH **no tiene** en la factura. Por
-     defecto se dejan **FUERA** del OBJECIONES (para que el cargue pase sin el
-     error *"la cuenta por cobrar no tiene asociado el servicio"*) y quedan solo
-     en esta hoja para revisarlos a mano. Con `--incluir-no-cruzados` se dejan
-     dentro (marcarán error en DGH).
+   - El `OBJECIONES.xlsx` queda con **una sola hoja** (como la guía), ya limpio
+     para el cargue. Lo que DGH rechazaría se deja **FUERA** y se guarda en un
+     archivo aparte **`REVISAR (no van en el cargue).xlsx`**:
+     - `NO_INCLUIDOS`: servicios que DGH no tiene en la factura, o cuyo valor no
+       cabía (motivo explicado en cada fila).
+     - `VALOR_AJUSTADO`: objeciones que se **caparon** al máximo que DGH acepta
+       (no se pierde la objeción, solo se ajusta el valor). Ej: se glosó 117.300
+       pero el saldo era 112.300 → se objeta 112.300.
+
+   El cargue evita así los tres errores de DGH: *servicio no asociado a la
+   cuenta*, *valor objeción mayor al del servicio* y *valor objetado mayor al
+   saldo*. Con `--incluir-no-cruzados` los no cruzados vuelven al OBJECIONES
+   (marcarían error).
 
 ## 3) Defensas incluidas (validadas con revisión adversarial)
 

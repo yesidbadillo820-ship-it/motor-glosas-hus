@@ -30,8 +30,11 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
          GENUSUARIO4 999 (texto)
          CRNCONOBJ   código completo de la glosa de MAYOR valor del servicio (TA2901, CL0201...)
          SLNSERPRO   codigo_servicio del DETALLE; si se pasa la base DGH y la
-                     fila cruza, manda el código DGH (con sufijo H si lo trae);
-                     si hay base y no cruza, va a la hoja NO_CRUZADOS
+                     fila cruza, manda el código DGH (con sufijo H si lo trae).
+                     El OBJECIONES.xlsx queda con UNA sola hoja, ya limpio para
+                     el cargue; lo que DGH no acepta (servicio ausente, o valor
+                     por encima del servicio/saldo) se deja FUERA y se lista en
+                     un archivo aparte "REVISAR (no van en el cargue).xlsx".
          CROVALOBJ   valor_glosado del servicio (número)
          CRDOBSERV   OBSERVACION FINAL combinada (una línea por glosa)
          CROTIPOBJ   por FACTURA completa: 0=administrativa (sin CL) ·
@@ -222,20 +225,22 @@ def _cod_sufijo_num(cod: str) -> int:
 
 
 def cruzar_codigo(cruces: dict, fact: str, codigo_portal: object) -> str | None:
-    """Busca el código DGH del servicio, en 4 niveles (todos dentro de la factura):
-    1) código exacto  2) sufijo sin ceros  3) misma base (presentación distinta)
-    Devuelve None si ninguno cruza (el respaldo por descripción se prueba aparte).
+    """Busca el código DGH del servicio, por factura, en varios niveles:
+    1) código propio del servicio en DGH (SLNSERPRO_SERVICIO) idéntico
+    2) código idéntico en cualquier columna
+    3) sufijo sin ceros / misma base (presentación distinta): elige el sufijo
+       más cercano. El guardián de valor (en generar_objeciones) impide objetar
+       más de lo que DGH tiene, así que un cruce de más nunca genera error.
+    Devuelve None si ninguno cruza (el respaldo por descripción va aparte).
     """
     cod = norm_codigo(codigo_portal)
     if not cod:
         return None
-    r = cruces["exact"].get((fact, cod))
+    r = cruces["srv_exact"].get((fact, cod)) or cruces["exact"].get((fact, cod))
     if r:
         return r
-    r = cruces["sufijo"].get((fact, _cod_sufijo_norm(cod)))
-    if r:
-        return r
-    candidatos = cruces["base"].get((fact, _cod_base(cod)))
+    candidatos = cruces["sufijo"].get((fact, _cod_sufijo_norm(cod)), set())
+    candidatos = candidatos | cruces["base"].get((fact, _cod_base(cod)), set())
     if candidatos:
         objetivo = _cod_sufijo_num(cod)
         return min(candidatos, key=lambda c: (abs(_cod_sufijo_num(c) - objetivo), len(c), c))
@@ -621,6 +626,8 @@ def cargar_base_dgh(
     idx_nom_med = col("NOMBRE_MEDICAMENTO")
     idx_desc_inst = col("DESCRIPCION INSTITUCIONAL")
     idx_desc_cups = col("DESCRIPCION CUPS")
+    idx_vr = col("Vr_SERVICIO")
+    idx_saldo = col("SALDO_FACT")
 
     idx_salida = [col(c) for c in COLS_SERVICIOS]
     faltantes = [c for c, pos in zip(COLS_SERVICIOS, idx_salida) if pos is None]
@@ -640,13 +647,19 @@ def cargar_base_dgh(
 
     filas_filtradas: list[list] = []
     # Índices de cruce (todos por factura):
-    #   exact  = código idéntico          sufijo = código con el sufijo sin ceros
-    #   base   = misma base, presentación distinta (conjunto de códigos DGH)
-    #   desc   = por descripción, solo si es inequívoca (un único código DGH)
+    #   srv_exact = código == SLNSERPRO_SERVICIO propio (máxima prioridad)
+    #   exact     = código idéntico en cualquier columna
+    #   sufijo    = código con el sufijo sin ceros (conjunto de códigos DGH)
+    #   base      = misma base, presentación distinta (conjunto de códigos DGH)
+    #   desc      = por descripción, solo si es inequívoca
+    #   valor     = suma de Vr_SERVICIO por código   ·   saldo = SALDO_FACT por factura
+    cruce_srv_exact: dict[tuple[str, str], str] = {}
     cruce_exact: dict[tuple[str, str], str] = {}
-    cruce_sufijo: dict[tuple[str, str], str] = {}
+    cruce_sufijo: dict[tuple[str, str], set] = {}
     cruce_base: dict[tuple[str, str], set] = {}
     desc_a_cod: dict[tuple[str, str], set] = {}
+    valor: dict[tuple[str, str], float] = {}
+    saldo: dict[str, float] = {}
     total = 0
     for row in it:
         total += 1
@@ -675,24 +688,36 @@ def cargar_base_dgh(
         # --- Cruce: cualquier código conocido de la fila -> código DGH efectivo ---
         slnserpro = valores["SLNSERPRO_SERVICIO"]
         if slnserpro:
+            cruce_srv_exact.setdefault((fact, slnserpro), slnserpro)
             for i in (idx_srv, idx_cups, idx_cod_med, idx_cod_med_fact):
                 cod = norm_codigo(celda(row, i))
                 if cod:
                     cruce_exact.setdefault((fact, cod), slnserpro)
-                    cruce_sufijo.setdefault((fact, _cod_sufijo_norm(cod)), slnserpro)
+                    cruce_sufijo.setdefault((fact, _cod_sufijo_norm(cod)), set()).add(slnserpro)
                     cruce_base.setdefault((fact, _cod_base(cod)), set()).add(slnserpro)
+            # descripción del servicio DGH (respaldo de cruce por descripción)
             for i in (idx_desc_inst, idx_desc_cups):
                 desc = norm_desc(celda(row, i))
                 if desc:
                     desc_a_cod.setdefault((fact, desc), set()).add(slnserpro)
+            # valor del servicio (para no objetar más de lo que DGH tiene)
+            v = a_numero(celda(row, idx_vr))
+            if v is not None:
+                valor[(fact, slnserpro)] = valor.get((fact, slnserpro), 0.0) + v
+        s = a_numero(celda(row, idx_saldo))
+        if s is not None:
+            saldo[fact] = s
 
     # La descripción solo sirve de cruce si es inequívoca (un único código DGH).
     cruce_desc = {k: next(iter(v)) for k, v in desc_a_cod.items() if len(v) == 1}
     cruces = {
+        "srv_exact": cruce_srv_exact,
         "exact": cruce_exact,
         "sufijo": cruce_sufijo,
         "base": cruce_base,
         "desc": cruce_desc,
+        "valor": valor,
+        "saldo": saldo,
     }
 
     logger.info(
@@ -722,13 +747,18 @@ def generar_objeciones(
     no tiene en la factura NO se agregan al OBJECIONES (irían con error de
     "servicio no asociado"); quedan solo en la lista de NO_CRUZADOS.
 
-    Devuelve (filas_objeciones, filas_no_cruzadas).
+    Devuelve (filas_objeciones, filas_no_cruzadas, filas_ajustadas_por_valor).
     """
     filas: list[list] = []
     no_cruzados: list[list] = []
+    ajustados: list[list] = []
     malformadas: set[str] = set()
     por_respaldo = 0
     excluidos = 0
+    # Guardián de valor: lo ya objetado por (factura, código DGH) y por factura,
+    # para no pasarse del valor del servicio ni del saldo de la cuenta.
+    acum_cod: dict[tuple[str, str], float] = {}
+    acum_fac: dict[str, float] = {}
     consecutivo = 0
     factura_actual: str | None = None
 
@@ -746,9 +776,11 @@ def generar_objeciones(
 
         # SLNSERPRO: el codigo_servicio del DETALLE; si hay base DGH y la fila
         # cruza (código exacto, sufijo sin ceros, misma base o descripción),
-        # manda el código DGH. Si NO cruza, se reporta en NO_CRUZADOS.
+        # manda el código DGH. Si NO cruza, o el valor se pasa, va a NO_CRUZADOS.
         cod_portal = norm_codigo(srv["codigo_servicio"])
         slnserpro = cod_portal or None
+        valor_final = srv["valor_glosado"]
+        motivo = None
         if cruces is not None:
             fkey = norm_factura(fact)
             del_dgh = cruzar_codigo(cruces, fkey, srv["codigo_servicio"])
@@ -761,13 +793,56 @@ def generar_objeciones(
                     por_respaldo += 1
                 slnserpro = del_dgh
             else:
+                motivo = "no está en DGH"
+
+            # --- Guardián de valor/saldo (solo si el código cruzó) ---
+            # DGH no acepta objetar más que el valor del servicio ni más que el
+            # saldo de la cuenta. Se CAPA la objeción a lo que quede disponible
+            # (para no perder la objeción entera) y se reporta el ajuste. Si ya
+            # no queda cupo, se manda a NO_CRUZADOS.
+            if motivo is None:
+                valobj = a_numero(srv["valor_glosado"])
+                if valobj is not None:
+                    lim_cod = cruces["valor"].get((fkey, slnserpro))
+                    lim_sal = cruces["saldo"].get(fkey)
+                    cupo = float("inf")
+                    if lim_cod is not None:
+                        cupo = min(cupo, lim_cod - acum_cod.get((fkey, slnserpro), 0.0))
+                    if lim_sal is not None:
+                        cupo = min(cupo, lim_sal - acum_fac.get(fkey, 0.0))
+                    if cupo <= 0.5:
+                        motivo = "sin cupo en DGH (servicio o saldo ya cubierto por otras glosas)"
+                    elif valobj > cupo + 0.5:
+                        # Capar al máximo que DGH acepta y registrar el ajuste.
+                        capado = int(round(cupo))
+                        ajustados.append(
+                            [
+                                factura_dgh(fact),
+                                srv["id_detalle"],
+                                slnserpro,
+                                srv.get("descripcion", ""),
+                                srv["valor_glosado"],
+                                capado,
+                                srv["observacion"][:90],
+                            ]
+                        )
+                        valor_final = capado
+                        valobj = float(capado)
+                    acum_cod[(fkey, slnserpro)] = acum_cod.get((fkey, slnserpro), 0.0) + (
+                        valobj or 0.0
+                    )
+                    acum_fac[fkey] = acum_fac.get(fkey, 0.0) + (valobj or 0.0)
+
+            if motivo:
                 no_cruzados.append(
                     [
                         factura_dgh(fact),
                         srv["id_detalle"],
                         srv["codigo_servicio"],
                         srv.get("descripcion", ""),
-                        srv["observacion"][:100],
+                        srv["valor_glosado"],
+                        motivo,
+                        srv["observacion"][:90],
                     ]
                 )
                 if excluir_no_cruzados:
@@ -801,7 +876,7 @@ def generar_objeciones(
                 slnserpro,  # SLNSERPRO
                 None,  # IDRIPS
                 None,  # CTNCENCOS
-                srv["valor_glosado"],  # CROVALOBJ (número)
+                valor_final,  # CROVALOBJ (número; capado al tope DGH si aplicaba)
                 srv["observacion"],  # CRDOBSERV
                 tipo,  # CROTIPOBJ
             ]
@@ -818,13 +893,18 @@ def generar_objeciones(
             "(quedan en la hoja NO_CRUZADOS).",
             excluidos,
         )
+    if ajustados:
+        logger.info(
+            "  %d objeciones se CAPARON al valor que DGH acepta (hoja VALOR_AJUSTADO).",
+            len(ajustados),
+        )
     if malformadas:
         logger.warning(
             "OJO: %d factura(s) no siguen el patrón HUS y salen tal cual en CRNCXC: %s",
             len(malformadas),
             ", ".join(sorted(malformadas)[:5]),
         )
-    return filas, no_cruzados
+    return filas, no_cruzados, ajustados
 
 
 # --------------------------------------------------------------------------- main
@@ -940,7 +1020,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- Punto 5: archivo de objeciones ------------------------------------
         logger.info("[4/4] Generando OBJECIONES...")
-        f_obj, no_cruzados = generar_objeciones(
+        f_obj, no_cruzados, ajustados = generar_objeciones(
             glosados, fecha, cruces, excluir_no_cruzados=not args.incluir_no_cruzados
         )
         n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
@@ -982,6 +1062,7 @@ def main(argv: list[str] | None = None) -> int:
             escribir_hoja(wb.active, COLS_SERVICIOS, f_serv)
             wb.save(salida / "SERVICIOS FACTURADOS COOSALUD.xlsx")
 
+        # OBJECIONES.xlsx: una sola hoja (como la guía, lista para el cargue).
         wb = openpyxl.Workbook()
         wb.active.title = "OBJECIONES"
         escribir_hoja(
@@ -990,14 +1071,43 @@ def main(argv: list[str] | None = None) -> int:
             f_obj,
             formatos=[f for _, f in COLS_OBJECIONES],
         )
-        if no_cruzados:
-            ws_nc = wb.create_sheet("NO_CRUZADOS")
+        wb.save(salida / "OBJECIONES.xlsx")
+
+        # Lo que quedó fuera / ajustado va a un archivo APARTE (no se sube a DGH),
+        # solo para tu control. El OBJECIONES no lo lleva.
+        if no_cruzados or ajustados:
+            wb_rev = openpyxl.Workbook()
+            ws_nc = wb_rev.active
+            ws_nc.title = "NO_INCLUIDOS"
             escribir_hoja(
                 ws_nc,
-                ["factura", "id_detalle", "codigo_servicio", "descripcion", "observacion (inicio)"],
+                [
+                    "factura",
+                    "id_detalle",
+                    "codigo_servicio",
+                    "descripcion",
+                    "valor_glosado",
+                    "motivo",
+                    "observacion (inicio)",
+                ],
                 no_cruzados,
             )
-        wb.save(salida / "OBJECIONES.xlsx")
+            if ajustados:
+                ws_aj = wb_rev.create_sheet("VALOR_AJUSTADO")
+                escribir_hoja(
+                    ws_aj,
+                    [
+                        "factura",
+                        "id_detalle",
+                        "SLNSERPRO",
+                        "descripcion",
+                        "valor_glosado_portal",
+                        "valor_objetado_capado",
+                        "observacion (inicio)",
+                    ],
+                    ajustados,
+                )
+            wb_rev.save(salida / "REVISAR (no van en el cargue).xlsx")
 
     except ValueError as exc:
         logger.error("ERROR: %s", exc)
