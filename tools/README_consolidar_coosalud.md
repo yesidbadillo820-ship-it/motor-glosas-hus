@@ -111,4 +111,9 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
 3. Revisar los archivos "REVISAR (no van en el cargue)" de cada lote
 4. Subir a DGH el OBJECIONES de CADA lote, uno por uno
    (CONSOLIDADOS\LOTE 01\OBJECIONES LOTE 01.xlsx, luego LOTE 02, ...)
+5. Si DGH devuelve un Excel de errores: CORREGIR ERRORES DGH.bat
+   - Quita las facturas que "ya se encuentran Objetadas" (normal si ya se
+     subieron en un cargue anterior; no hay nada que hacer con ellas).
+   - Capa los valores que DGH no acepta (tarifa pactada menor a la base) y
+     arma el "OBJECIONES ... REINTENTO.xlsx" para volver a subir.
 ```
