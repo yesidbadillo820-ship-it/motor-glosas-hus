@@ -40,6 +40,14 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
 
 ## 2) Qué produce (en `<carpeta>\CONSOLIDADOS`)
 
+> **POR LOTE:** el cargue de DGH solo soporta **300 facturas**, así que si la
+> carpeta viene en `LOTE 01`, `LOTE 02`, … (como la deja el organizador), se
+> crea **una subcarpeta por lote** — `CONSOLIDADOS\LOTE 01\`, `LOTE 02\`… —
+> y cada una trae SU PROPIO juego de archivos con el nombre del lote:
+> `OBJECIONES LOTE 01.xlsx`, `CONSOLIDADO GLOSAS LOTE 01.xlsx`, etc.
+> Cada `OBJECIONES` arranca su consecutivo en 1 y **se sube a DGH por separado**.
+> Si la carpeta no tiene lotes, todo sale junto en `CONSOLIDADOS\` como siempre.
+
 1. **CONSOLIDADO GLOSAS.xlsx**
    - Hoja `GLOSAS`: todas las glosas + columna **OBSERVACION FINAL**
      (`codigo_glosa + " " + justificacion_glosa + "$" + valor`).
@@ -100,6 +108,7 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
 ```
 1. ORGANIZAR CARGUE COOSALUD.bat  <- arrastrar el ZIP del portal
 2. py consolidar_coosalud.py --carpeta ... --fecha DD/MM/AAAA --servicios BASE_DGH.xlsx
-3. Revisar la hoja NO_CRUZADOS de OBJECIONES.xlsx
-4. Subir OBJECIONES.xlsx a DGH
+3. Revisar los archivos "REVISAR (no van en el cargue)" de cada lote
+4. Subir a DGH el OBJECIONES de CADA lote, uno por uno
+   (CONSOLIDADOS\LOTE 01\OBJECIONES LOTE 01.xlsx, luego LOTE 02, ...)
 ```

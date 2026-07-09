@@ -225,7 +225,9 @@ def main() -> int:
     print("\n" + "=" * 72)
     print("   LISTO. Resultados en:")
     print(f"   {consolidados}")
-    print("   Revisa la hoja NO_CRUZADOS de OBJECIONES.xlsx antes de subir a DGH.")
+    print("   Hay una carpeta por LOTE (max 300 facturas), cada una con su")
+    print("   OBJECIONES para subir a DGH por separado. Lo que DGH no acepta")
+    print('   queda aparte en "REVISAR (no van en el cargue)".')
     print("=" * 72)
     try:
         os.startfile(consolidados)  # abre la carpeta en el Explorador (solo Windows)

@@ -20,6 +20,10 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
          nombre del medicamento, igual que en el proceso manual.
        - Se lee en streaming: la base puede pesar 80MB+ sin agotar la memoria.
   5. OBJECIONES.xlsx  (formato de cargue DGH, igual al archivo de ejemplo)
+       - POR LOTE: como el cargue de DGH solo soporta 300 facturas, si la
+         carpeta viene en LOTE 01/LOTE 02/... cada lote produce SU PROPIO juego
+         de archivos en CONSOLIDADOS\\LOTE XX\\ ("OBJECIONES LOTE 01.xlsx", etc.)
+         con el consecutivo arrancando en 1. Sin lotes, sale todo junto como antes.
        - Una fila por servicio glosado (id_detalle con glosas):
          CDCONSEC    consecutivo por factura, como texto (1,1,1... 2,2,2...)
          CDFECDOC    --fecha como fecha Excel (día de la carpeta que se revisa)
@@ -379,6 +383,26 @@ def buscar_archivos(carpeta: Path, subcarpeta: str, patron: str) -> list[Path]:
         (p for p in base.rglob(patron) if not p.name.startswith(("~$", "."))),
         key=lambda p: p.name.upper(),
     )
+
+
+def descubrir_lotes(carpeta: Path) -> dict[str, dict[str, list[Path]]]:
+    """Agrupa los archivos por LOTE (la subcarpeta donde viven) en cada categoría.
+
+    DGH solo acepta cargues de máximo 300 facturas, así que cada LOTE produce su
+    propio juego de consolidados + OBJECIONES. El organizador deja los lotes
+    ALINEADOS: el LOTE 01 de GLOSAS/DETALLES/FACTURAS cubre las mismas facturas.
+
+    Devuelve {lote: {"GLOSAS": [...], "DETALLES": [...], "FACTURAS": [...]}},
+    ordenado por nombre de lote. Estructura plana (archivos sueltos, sin
+    subcarpetas) -> un único lote "" y la salida queda como siempre.
+    """
+    lotes: dict[str, dict[str, list[Path]]] = {}
+    for cat in (CARPETA_GLOSAS, CARPETA_DETALLES, CARPETA_FACTURAS):
+        raiz = carpeta / cat
+        for p in buscar_archivos(carpeta, cat, "*.xlsx"):
+            lote = "" if p.parent == raiz else p.parent.name
+            lotes.setdefault(lote, {}).setdefault(cat, []).append(p)
+    return dict(sorted(lotes.items()))
 
 
 def indice_columnas(headers: list[str], requeridas: list[str], contexto: str) -> dict[str, int]:
@@ -1018,42 +1042,68 @@ def main(argv: list[str] | None = None) -> int:
     salida = Path(args.salida) if args.salida else carpeta / SALIDA_DEFECTO
     salida.mkdir(parents=True, exist_ok=True)
 
-    arch_glosas = buscar_archivos(carpeta, CARPETA_GLOSAS, "*.xlsx")
-    arch_detalles = buscar_archivos(carpeta, CARPETA_DETALLES, "*.xlsx")
-    arch_facturas = buscar_archivos(carpeta, CARPETA_FACTURAS, "*.xlsx")
+    lotes = descubrir_lotes(carpeta)
+    n_glo = sum(len(v.get(CARPETA_GLOSAS, [])) for v in lotes.values())
+    n_det = sum(len(v.get(CARPETA_DETALLES, [])) for v in lotes.values())
+    n_fac = sum(len(v.get(CARPETA_FACTURAS, [])) for v in lotes.values())
+    con_lotes = any(nombre for nombre in lotes)
     logger.info(
-        "Archivos: %d GLOSAS · %d DETALLES · %d FACTURAS",
-        len(arch_glosas),
-        len(arch_detalles),
-        len(arch_facturas),
+        "Archivos: %d GLOSAS · %d DETALLES · %d FACTURAS · %s",
+        n_glo,
+        n_det,
+        n_fac,
+        f"{len(lotes)} lote(s): un OBJECIONES por lote" if con_lotes else "sin lotes",
     )
-    if not arch_glosas or not arch_detalles:
+    if not n_glo or not n_det:
         logger.error("ERROR: faltan archivos en GLOSAS o DETALLES dentro de %s", carpeta)
         return 1
+    for nombre, archivos in lotes.items():
+        if not archivos.get(CARPETA_GLOSAS) or not archivos.get(CARPETA_DETALLES):
+            logger.error(
+                "ERROR: el lote '%s' no tiene archivos en GLOSAS o DETALLES. "
+                "Los lotes deben estar alineados (mismo LOTE en las 3 carpetas).",
+                nombre or "(raíz)",
+            )
+            return 1
 
     try:
-        # --- Puntos 2 y 3: consolidados + observación final -------------------
-        logger.info("\n[1/4] Consolidando GLOSAS...")
-        h_glosas, f_glosas, agrupado = consolidar_glosas(arch_glosas)
-        logger.info("  %d glosas · %d id_detalle distintos", len(f_glosas), len(agrupado))
+        # --- Puntos 2 y 3: consolidados + observación final, POR LOTE ----------
+        # (DGH solo acepta cargues de máx 300 facturas: cada lote sale aparte.)
+        datos: dict[str, dict] = {}
+        for nombre, archivos in lotes.items():
+            logger.info("\n===== %s =====", nombre or "CONSOLIDANDO (sin lotes)")
+            logger.info("[1/4] Consolidando GLOSAS...")
+            h_glosas, f_glosas, agrupado = consolidar_glosas(archivos[CARPETA_GLOSAS])
+            logger.info("  %d glosas · %d id_detalle distintos", len(f_glosas), len(agrupado))
 
-        logger.info("[2/4] Consolidando DETALLES (+ OBSERVACION FINAL)...")
-        h_det, f_det, glosados = consolidar_detalles(arch_detalles, agrupado)
-        logger.info("  %d líneas de detalle · %d servicios glosados", len(f_det), len(glosados))
+            logger.info("[2/4] Consolidando DETALLES (+ OBSERVACION FINAL)...")
+            h_det, f_det, glosados = consolidar_detalles(archivos[CARPETA_DETALLES], agrupado)
+            logger.info("  %d líneas de detalle · %d servicios glosados", len(f_det), len(glosados))
 
-        logger.info("[3/4] Consolidando FACTURAS...")
-        h_fact, f_fact = consolidar_facturas(arch_facturas) if arch_facturas else ([], [])
-        logger.info("  %d facturas", len(f_fact))
+            logger.info("[3/4] Consolidando FACTURAS...")
+            arch_fact = archivos.get(CARPETA_FACTURAS, [])
+            h_fact, f_fact = consolidar_facturas(arch_fact) if arch_fact else ([], [])
+            logger.info("  %d facturas", len(f_fact))
 
-        # Glosas cuyo id_detalle no apareció en ningún DETALLE (avisar, no perder).
-        ids_detalle = {g["id_detalle"] for g in glosados}
-        huerfanas = [k for k in agrupado if k not in ids_detalle]
-        if huerfanas:
-            logger.warning(
-                "OJO: %d id_detalle con glosas NO aparecen en los DETALLE (ej: %s)",
-                len(huerfanas),
-                ", ".join(huerfanas[:5]),
-            )
+            # Glosas cuyo id_detalle no apareció en ningún DETALLE (avisar, no perder).
+            ids_detalle = {g["id_detalle"] for g in glosados}
+            huerfanas = [k for k in agrupado if k not in ids_detalle]
+            if huerfanas:
+                logger.warning(
+                    "OJO: %d id_detalle con glosas NO aparecen en los DETALLE (ej: %s)",
+                    len(huerfanas),
+                    ", ".join(huerfanas[:5]),
+                )
+            datos[nombre] = {
+                "h_glosas": h_glosas,
+                "f_glosas": f_glosas,
+                "agrupado": agrupado,
+                "h_det": h_det,
+                "f_det": f_det,
+                "glosados": glosados,
+                "h_fact": h_fact,
+                "f_fact": f_fact,
+            }
 
         # --- Punto 4: base DGH filtrada y arreglada ----------------------------
         # Si la base falla (ruta mala, archivo abierto/corrupto) NO se aborta:
@@ -1063,7 +1113,11 @@ def main(argv: list[str] | None = None) -> int:
         f_serv: list[list] = []
         base_ok = False
         if args.servicios:
-            facturas_trabajadas = {norm_factura(s["factura"]) for s in glosados}
+            # La base pesa 80MB+: se lee UNA sola vez con las facturas de TODOS
+            # los lotes; luego cada lote usa el cruce y filtra sus propias filas.
+            facturas_trabajadas = {
+                norm_factura(s["factura"]) for d in datos.values() for s in d["glosados"]
+            }
             try:
                 f_serv, cruces = cargar_base_dgh(Path(args.servicios), facturas_trabajadas)
                 base_ok = True
@@ -1075,116 +1129,139 @@ def main(argv: list[str] | None = None) -> int:
                     exc,
                 )
 
-        # --- Punto 5: archivo de objeciones ------------------------------------
-        logger.info("[4/4] Generando OBJECIONES...")
-        f_obj, no_cruzados, ajustados = generar_objeciones(
-            glosados, fecha, cruces, excluir_no_cruzados=not args.incluir_no_cruzados
-        )
-        n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
-        logger.info("  %d filas de objeciones · %d facturas", len(f_obj), n_facturas_obj)
-        if no_cruzados:
-            logger.warning(
-                "  %d servicios NO cruzaron con la base DGH (hoja NO_CRUZADOS)", len(no_cruzados)
+        # --- Punto 5 + escritura: un juego de archivos POR LOTE -----------------
+        # Cada lote queda en CONSOLIDADOS\LOTE XX\ con su propio OBJECIONES
+        # (máx 300 facturas, que es lo que soporta el cargue de DGH). El
+        # consecutivo CDCONSEC arranca en 1 dentro de cada archivo.
+        resumen: list[tuple[str, int, int, int, int]] = []
+        for nombre, d in datos.items():
+            salida_lote = salida / nombre if nombre else salida
+            salida_lote.mkdir(parents=True, exist_ok=True)
+            sufijo = f" {nombre}" if nombre else ""
+
+            logger.info("\n[4/4] %s: generando OBJECIONES...", nombre or "FINAL")
+            f_obj, no_cruzados, ajustados = generar_objeciones(
+                d["glosados"], fecha, cruces, excluir_no_cruzados=not args.incluir_no_cruzados
             )
+            n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
+            logger.info("  %d filas de objeciones · %d facturas", len(f_obj), n_facturas_obj)
+            if no_cruzados:
+                logger.warning(
+                    "  %d servicios NO cruzaron con la base DGH (van al archivo REVISAR)",
+                    len(no_cruzados),
+                )
 
-        # --- Escritura ---------------------------------------------------------
-        logger.info("\nEscribiendo archivos en %s ...", salida)
+            logger.info("  Escribiendo en %s ...", salida_lote)
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "GLOSAS"
-        escribir_hoja(ws, h_glosas, f_glosas)
-        ws2 = wb.create_sheet("AGRUPADO")
-        escribir_hoja(
-            ws2,
-            ["id_detalle", "OBSERVACION FINAL"],
-            [[k, v["observacion"]] for k, v in agrupado.items()],
-        )
-        wb.save(salida / "CONSOLIDADO GLOSAS.xlsx")
-
-        wb = openpyxl.Workbook()
-        wb.active.title = "DETALLE"
-        escribir_hoja(wb.active, h_det, f_det)
-        wb.save(salida / "CONSOLIDADO DETALLE.xlsx")
-
-        if f_fact:
             wb = openpyxl.Workbook()
-            wb.active.title = "FACTURAS"
-            escribir_hoja(wb.active, h_fact, f_fact)
-            wb.save(salida / "CONSOLIDADO FACTURAS.xlsx")
-
-        if base_ok:
-            wb = openpyxl.Workbook()
-            wb.active.title = "SERVICIOS"
-            escribir_hoja(wb.active, COLS_SERVICIOS, f_serv)
-            wb.save(salida / "SERVICIOS FACTURADOS COOSALUD.xlsx")
-
-        # OBJECIONES.xlsx: una sola hoja (como la guía, lista para el cargue).
-        wb = openpyxl.Workbook()
-        wb.active.title = "OBJECIONES"
-        escribir_hoja(
-            wb.active,
-            [c for c, _ in COLS_OBJECIONES],
-            f_obj,
-            formatos=[f for _, f in COLS_OBJECIONES],
-        )
-        wb.save(salida / "OBJECIONES.xlsx")
-
-        # Lo que quedó fuera / ajustado va a un archivo APARTE (no se sube a DGH),
-        # solo para tu control. El OBJECIONES no lo lleva.
-        if no_cruzados or ajustados:
-            wb_rev = openpyxl.Workbook()
-            ws_nc = wb_rev.active
-            ws_nc.title = "NO_INCLUIDOS"
+            ws = wb.active
+            ws.title = "GLOSAS"
+            escribir_hoja(ws, d["h_glosas"], d["f_glosas"])
+            ws2 = wb.create_sheet("AGRUPADO")
             escribir_hoja(
-                ws_nc,
-                [
-                    "factura",
-                    "id_detalle",
-                    "codigo_servicio",
-                    "descripcion",
-                    "valor_glosado",
-                    "motivo",
-                    "observacion (inicio)",
-                ],
-                no_cruzados,
+                ws2,
+                ["id_detalle", "OBSERVACION FINAL"],
+                [[k, v["observacion"]] for k, v in d["agrupado"].items()],
             )
-            if ajustados:
-                ws_aj = wb_rev.create_sheet("VALOR_AJUSTADO")
+            wb.save(salida_lote / f"CONSOLIDADO GLOSAS{sufijo}.xlsx")
+
+            wb = openpyxl.Workbook()
+            wb.active.title = "DETALLE"
+            escribir_hoja(wb.active, d["h_det"], d["f_det"])
+            wb.save(salida_lote / f"CONSOLIDADO DETALLE{sufijo}.xlsx")
+
+            if d["f_fact"]:
+                wb = openpyxl.Workbook()
+                wb.active.title = "FACTURAS"
+                escribir_hoja(wb.active, d["h_fact"], d["f_fact"])
+                wb.save(salida_lote / f"CONSOLIDADO FACTURAS{sufijo}.xlsx")
+
+            if base_ok:
+                # Solo las filas DGH de las facturas de ESTE lote.
+                facts_lote = {norm_factura(s["factura"]) for s in d["glosados"]}
+                f_serv_lote = [r for r in f_serv if norm_factura(r[0]) in facts_lote]
+                wb = openpyxl.Workbook()
+                wb.active.title = "SERVICIOS"
+                escribir_hoja(wb.active, COLS_SERVICIOS, f_serv_lote)
+                wb.save(salida_lote / f"SERVICIOS FACTURADOS COOSALUD{sufijo}.xlsx")
+
+            # OBJECIONES: una sola hoja (como la guía, lista para el cargue).
+            wb = openpyxl.Workbook()
+            wb.active.title = "OBJECIONES"
+            escribir_hoja(
+                wb.active,
+                [c for c, _ in COLS_OBJECIONES],
+                f_obj,
+                formatos=[f for _, f in COLS_OBJECIONES],
+            )
+            wb.save(salida_lote / f"OBJECIONES{sufijo}.xlsx")
+
+            # Lo que quedó fuera / ajustado va a un archivo APARTE (no se sube
+            # a DGH), solo para tu control. El OBJECIONES no lo lleva.
+            if no_cruzados or ajustados:
+                wb_rev = openpyxl.Workbook()
+                ws_nc = wb_rev.active
+                ws_nc.title = "NO_INCLUIDOS"
                 escribir_hoja(
-                    ws_aj,
+                    ws_nc,
                     [
                         "factura",
                         "id_detalle",
-                        "SLNSERPRO",
+                        "codigo_servicio",
                         "descripcion",
-                        "valor_glosado_portal",
-                        "valor_objetado_capado",
+                        "valor_glosado",
+                        "motivo",
                         "observacion (inicio)",
                     ],
-                    ajustados,
+                    no_cruzados,
                 )
-            wb_rev.save(salida / "REVISAR (no van en el cargue).xlsx")
+                if ajustados:
+                    ws_aj = wb_rev.create_sheet("VALOR_AJUSTADO")
+                    escribir_hoja(
+                        ws_aj,
+                        [
+                            "factura",
+                            "id_detalle",
+                            "SLNSERPRO",
+                            "descripcion",
+                            "valor_glosado_portal",
+                            "valor_objetado_capado",
+                            "observacion (inicio)",
+                        ],
+                        ajustados,
+                    )
+                wb_rev.save(salida_lote / f"REVISAR (no van en el cargue){sufijo}.xlsx")
+
+            resumen.append(
+                (nombre, len(f_obj), n_facturas_obj, len(no_cruzados), len(d["f_glosas"]))
+            )
 
     except ValueError as exc:
         logger.error("ERROR: %s", exc)
         return 1
 
     logger.info("\n===== LISTO =====")
-    logger.info("  CONSOLIDADO GLOSAS.xlsx            %d glosas (+hoja AGRUPADO)", len(f_glosas))
-    logger.info("  CONSOLIDADO DETALLE.xlsx           %d líneas", len(f_det))
-    if f_fact:
-        logger.info("  CONSOLIDADO FACTURAS.xlsx          %d facturas", len(f_fact))
-    if base_ok:
-        logger.info("  SERVICIOS FACTURADOS COOSALUD.xlsx %d filas", len(f_serv))
-    elif args.servicios:
+    if not base_ok and args.servicios:
         logger.info("  (SIN base DGH: SLNSERPRO salió del codigo_servicio del detalle)")
-    logger.info(
-        "  OBJECIONES.xlsx                    %d filas · %d facturas%s",
-        len(f_obj),
-        n_facturas_obj,
-        f" · {len(no_cruzados)} sin cruce DGH" if no_cruzados else "",
-    )
+    for nombre, n_obj, n_fact_obj, n_nc, n_glosas in resumen:
+        etiqueta = f"{nombre}\\OBJECIONES {nombre}.xlsx" if nombre else "OBJECIONES.xlsx"
+        logger.info(
+            "  %-38s %d filas · %d facturas · %d glosas%s",
+            etiqueta,
+            n_obj,
+            n_fact_obj,
+            n_glosas,
+            f" · {n_nc} sin cruce DGH" if n_nc else "",
+        )
+    total_obj = sum(r[1] for r in resumen)
+    total_fact = sum(r[2] for r in resumen)
+    if len(resumen) > 1:
+        logger.info(
+            "  TOTAL: %d lotes · %d filas · %d facturas (cada OBJECIONES se sube por separado)",
+            len(resumen),
+            total_obj,
+            total_fact,
+        )
     return 0
 
 
