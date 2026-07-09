@@ -714,8 +714,13 @@ def generar_objeciones(
     glosados: list[dict],
     fecha: datetime,
     cruces: dict | None,
+    excluir_no_cruzados: bool = True,
 ) -> tuple[list[list], list[list]]:
     """Arma las filas del archivo de OBJECIONES (una por servicio glosado).
+
+    Si hay base DGH y `excluir_no_cruzados` (por defecto), los servicios que DGH
+    no tiene en la factura NO se agregan al OBJECIONES (irían con error de
+    "servicio no asociado"); quedan solo en la lista de NO_CRUZADOS.
 
     Devuelve (filas_objeciones, filas_no_cruzadas).
     """
@@ -723,6 +728,7 @@ def generar_objeciones(
     no_cruzados: list[list] = []
     malformadas: set[str] = set()
     por_respaldo = 0
+    excluidos = 0
     consecutivo = 0
     factura_actual: str | None = None
 
@@ -735,15 +741,12 @@ def generar_objeciones(
 
     for srv in glosados:
         fact = srv["factura"]
-        if fact != factura_actual:
-            consecutivo += 1
-            factura_actual = fact
         if _num_factura(fact) is None:
             malformadas.add(fact)
 
         # SLNSERPRO: el codigo_servicio del DETALLE; si hay base DGH y la fila
         # cruza (código exacto, sufijo sin ceros, misma base o descripción),
-        # manda el código DGH. Si NO cruza, se deja el del detalle y se reporta.
+        # manda el código DGH. Si NO cruza, se reporta en NO_CRUZADOS.
         cod_portal = norm_codigo(srv["codigo_servicio"])
         slnserpro = cod_portal or None
         if cruces is not None:
@@ -767,6 +770,16 @@ def generar_objeciones(
                         srv["observacion"][:100],
                     ]
                 )
+                if excluir_no_cruzados:
+                    # No se agrega al OBJECIONES (DGH lo marcaría con error).
+                    excluidos += 1
+                    continue
+
+        # El consecutivo solo avanza para las filas que SÍ quedan en el archivo,
+        # para no dejar huecos cuando se excluyen los no cruzados.
+        if fact != factura_actual:
+            consecutivo += 1
+            factura_actual = fact
 
         conceptos = conceptos_factura[norm_factura(fact)]
         tiene_cl = "CL" in conceptos
@@ -799,6 +812,12 @@ def generar_objeciones(
             "  %d servicios tomaron el código DGH por respaldo (sufijo/base/descripción).",
             por_respaldo,
         )
+    if excluidos:
+        logger.info(
+            "  %d servicios NO están en DGH: se dejaron FUERA del OBJECIONES "
+            "(quedan en la hoja NO_CRUZADOS).",
+            excluidos,
+        )
     if malformadas:
         logger.warning(
             "OJO: %d factura(s) no siguen el patrón HUS y salen tal cual en CRNCXC: %s",
@@ -827,6 +846,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--servicios",
         default=None,
         help="Base DGH de servicios facturados (xlsx/csv/txt) para el punto 4 y el cruce SLNSERPRO.",
+    )
+    p.add_argument(
+        "--incluir-no-cruzados",
+        action="store_true",
+        help="Deja en el OBJECIONES los servicios que DGH no tiene (marcarán error). "
+        "Por defecto se dejan FUERA (solo en la hoja NO_CRUZADOS) para que el cargue pase.",
     )
     p.add_argument(
         "--salida",
@@ -915,7 +940,9 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- Punto 5: archivo de objeciones ------------------------------------
         logger.info("[4/4] Generando OBJECIONES...")
-        f_obj, no_cruzados = generar_objeciones(glosados, fecha, cruces)
+        f_obj, no_cruzados = generar_objeciones(
+            glosados, fecha, cruces, excluir_no_cruzados=not args.incluir_no_cruzados
+        )
         n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
         logger.info("  %d filas de objeciones · %d facturas", len(f_obj), n_facturas_obj)
         if no_cruzados:

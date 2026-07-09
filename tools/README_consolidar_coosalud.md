@@ -68,8 +68,11 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
    | CRDOBSERV | OBSERVACIÓN FINAL combinada |
    | CROTIPOBJ | **por factura completa**: 0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta — si la factura es mixta, TODAS sus filas llevan 2 |
 
-   - Hoja `NO_CRUZADOS`: servicios que no cruzaron con la base DGH (quedan con
-     el código del detalle) para revisarlos antes de subir.
+   - Hoja `NO_CRUZADOS`: servicios que DGH **no tiene** en la factura. Por
+     defecto se dejan **FUERA** del OBJECIONES (para que el cargue pase sin el
+     error *"la cuenta por cobrar no tiene asociado el servicio"*) y quedan solo
+     en esta hoja para revisarlos a mano. Con `--incluir-no-cruzados` se dejan
+     dentro (marcarán error en DGH).
 
 ## 3) Defensas incluidas (validadas con revisión adversarial)
 
