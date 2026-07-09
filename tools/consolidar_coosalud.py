@@ -72,6 +72,7 @@ import argparse
 import logging
 import re
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
@@ -189,6 +190,15 @@ def norm_codigo(s: object) -> str:
     if re.fullmatch(r"\d+\.0", txt):
         txt = txt[:-2]
     return txt
+
+
+def norm_desc(s: object) -> str:
+    """Descripción de servicio para cruce de respaldo: mayúsculas, sin acentos,
+    sin espacios/puntuación duplicados (para comparar portal vs DGH)."""
+    txt = norm_texto(s)
+    txt = "".join(c for c in unicodedata.normalize("NFKD", txt) if not unicodedata.combining(c))
+    txt = re.sub(r"[^A-Z0-9]+", " ", txt.upper())
+    return txt.strip()
 
 
 def a_numero(v: object) -> float | None:
@@ -448,6 +458,8 @@ def consolidar_detalles(
             headers_base = headers
         rows = alinear_filas(headers, rows, headers_base, arch.name)
         idx = indice_columnas(headers_base, COL_DETALLE_REQ, arch.name)
+        mapa_h = {norm_header(h): i for i, h in enumerate(headers_base)}
+        idx_desc = mapa_h.get("DESCRIPCION")
 
         for row in rows:
             id_det = norm_codigo(row[idx["id_detalle"]])
@@ -466,6 +478,7 @@ def consolidar_detalles(
                         "factura": norm_texto(row[idx["numero_factura"]]),
                         "id_detalle": id_det,
                         "codigo_servicio": norm_texto(row[idx["codigo_servicio"]]),
+                        "descripcion": norm_texto(row[idx_desc]) if idx_desc is not None else "",
                         "valor_glosado": valor_o_numero(row[idx["valor_glosado"]]),
                         "observacion": obs,
                         "conceptos": g["conceptos"],
@@ -565,6 +578,8 @@ def cargar_base_dgh(
     idx_cod_med = col("CODIGO_MEDICAMENTO")
     idx_cod_med_fact = col("COD_MED_FACTURA")
     idx_nom_med = col("NOMBRE_MEDICAMENTO")
+    idx_desc_inst = col("DESCRIPCION INSTITUCIONAL")
+    idx_desc_cups = col("DESCRIPCION CUPS")
 
     idx_salida = [col(c) for c in COLS_SERVICIOS]
     faltantes = [c for c, pos in zip(COLS_SERVICIOS, idx_salida) if pos is None]
@@ -584,6 +599,10 @@ def cargar_base_dgh(
 
     filas_filtradas: list[list] = []
     cruce: dict[tuple[str, str], str] = {}
+    # Cruce de respaldo por (factura, descripcion) para cuando el codigo del
+    # portal NO coincide con el de DGH (ej: DERECHOS DE SALA PARA CURACIONES).
+    # Solo se usa si la descripcion apunta a un unico codigo DGH en la factura.
+    desc_a_cod: dict[tuple[str, str], set] = {}
     total = 0
     for row in it:
         total += 1
@@ -616,6 +635,13 @@ def cargar_base_dgh(
                 cod = norm_codigo(celda(row, i))
                 if cod:
                     cruce.setdefault((fact, cod), slnserpro)
+            for i in (idx_desc_inst, idx_desc_cups):
+                desc = norm_desc(celda(row, i))
+                if desc:
+                    desc_a_cod.setdefault((fact, desc), set()).add(slnserpro)
+
+    # La descripción solo sirve de cruce si es inequívoca (un único código DGH).
+    cruce_desc = {k: next(iter(v)) for k, v in desc_a_cod.items() if len(v) == 1}
 
     logger.info(
         "Base DGH: %d filas leídas · %d de las %d facturas trabajadas.",
@@ -629,13 +655,14 @@ def cargar_base_dgh(
             f"{len(facturas_trabajadas)} facturas trabajadas. ¿Es la base "
             "correcta y está actualizada con las fechas de estas facturas?"
         )
-    return filas_filtradas, cruce
+    return filas_filtradas, cruce, cruce_desc
 
 
 def generar_objeciones(
     glosados: list[dict],
     fecha: datetime,
     cruce: dict[tuple[str, str], str] | None,
+    cruce_desc: dict[tuple[str, str], str] | None = None,
 ) -> tuple[list[list], list[list]]:
     """Arma las filas del archivo de OBJECIONES (una por servicio glosado).
 
@@ -644,6 +671,7 @@ def generar_objeciones(
     filas: list[list] = []
     no_cruzados: list[list] = []
     malformadas: set[str] = set()
+    por_descripcion = 0
     consecutivo = 0
     factura_actual: str | None = None
 
@@ -667,7 +695,14 @@ def generar_objeciones(
         # NO cruza, se deja el del detalle y se reporta en NO_CRUZADOS.
         slnserpro = norm_codigo(srv["codigo_servicio"]) or None
         if cruce is not None:
-            del_dgh = cruce.get((norm_factura(fact), norm_codigo(srv["codigo_servicio"])))
+            fkey = norm_factura(fact)
+            del_dgh = cruce.get((fkey, norm_codigo(srv["codigo_servicio"])))
+            if not del_dgh and cruce_desc:
+                # Respaldo por descripción (rescata códigos que difieren entre
+                # portal y DGH, p. ej. DERECHOS DE SALA PARA CURACIONES).
+                del_dgh = cruce_desc.get((fkey, norm_desc(srv.get("descripcion", ""))))
+                if del_dgh:
+                    por_descripcion += 1
             if del_dgh:
                 slnserpro = del_dgh
             else:
@@ -676,6 +711,7 @@ def generar_objeciones(
                         factura_dgh(fact),
                         srv["id_detalle"],
                         srv["codigo_servicio"],
+                        srv.get("descripcion", ""),
                         srv["observacion"][:100],
                     ]
                 )
@@ -706,6 +742,11 @@ def generar_objeciones(
             ]
         )
 
+    if por_descripcion:
+        logger.info(
+            "  %d servicios cruzaron por DESCRIPCION (código distinto entre portal y DGH).",
+            por_descripcion,
+        )
     if malformadas:
         logger.warning(
             "OJO: %d factura(s) no siguen el patrón HUS y salen tal cual en CRNCXC: %s",
@@ -805,12 +846,15 @@ def main(argv: list[str] | None = None) -> int:
         # se avisa y se sigue sin cruce (SLNSERPRO sale del codigo del detalle),
         # para no perder los consolidados ni el OBJECIONES por un problema de ruta.
         cruce = None
+        cruce_desc = None
         f_serv: list[list] = []
         base_ok = False
         if args.servicios:
             facturas_trabajadas = {norm_factura(s["factura"]) for s in glosados}
             try:
-                f_serv, cruce = cargar_base_dgh(Path(args.servicios), facturas_trabajadas)
+                f_serv, cruce, cruce_desc = cargar_base_dgh(
+                    Path(args.servicios), facturas_trabajadas
+                )
                 base_ok = True
             except ValueError as exc:
                 logger.warning(
@@ -822,7 +866,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- Punto 5: archivo de objeciones ------------------------------------
         logger.info("[4/4] Generando OBJECIONES...")
-        f_obj, no_cruzados = generar_objeciones(glosados, fecha, cruce)
+        f_obj, no_cruzados = generar_objeciones(glosados, fecha, cruce, cruce_desc)
         n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
         logger.info("  %d filas de objeciones · %d facturas", len(f_obj), n_facturas_obj)
         if no_cruzados:
@@ -874,7 +918,7 @@ def main(argv: list[str] | None = None) -> int:
             ws_nc = wb.create_sheet("NO_CRUZADOS")
             escribir_hoja(
                 ws_nc,
-                ["factura", "id_detalle", "codigo_servicio", "observacion (inicio)"],
+                ["factura", "id_detalle", "codigo_servicio", "descripcion", "observacion (inicio)"],
                 no_cruzados,
             )
         wb.save(salida / "OBJECIONES.xlsx")

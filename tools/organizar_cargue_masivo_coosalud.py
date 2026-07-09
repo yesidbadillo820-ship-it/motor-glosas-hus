@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import logging
 import re
 import sys
@@ -130,6 +131,29 @@ def _lote_nombre(indice: int, total_lotes: int) -> str:
     return f"LOTE {indice:0{ancho}d}"
 
 
+def _iter_archivos_zip(zf: zipfile.ZipFile, _nivel: int = 0):
+    """Genera (nombre_base, bytes) de cada archivo del ZIP, ENTRANDO en los zips
+    anidados (el masivo de COOSALUD viene como un ZIP con 22 zips adentro).
+    """
+    if _nivel > 6:  # tope de seguridad contra anidamiento absurdo
+        return
+    for entrada in zf.infolist():
+        if entrada.is_dir():
+            continue
+        nombre = _nombre_base(entrada.filename)
+        if not nombre:
+            continue
+        if nombre.lower().endswith(".zip"):
+            try:
+                data = zf.read(entrada)
+                with zipfile.ZipFile(io.BytesIO(data)) as z_int:
+                    yield from _iter_archivos_zip(z_int, _nivel + 1)
+            except zipfile.BadZipFile:
+                logger.warning("  ZIP interno ilegible, se salta: %s", nombre)
+        else:
+            yield nombre, zf.read(entrada)
+
+
 def organizar_zip(
     zip_path: Path,
     destino_base: Path,
@@ -157,72 +181,65 @@ def organizar_zip(
     filas: list[dict] = []
 
     with zipfile.ZipFile(zip_path) as zf:
-        entradas = [e for e in zf.infolist() if not e.is_dir()]
-        total = len(entradas)
+        # 1) Leer todos los archivos (entrando en zips anidados) y clasificarlos.
+        por_categoria: dict[str, list] = {}
+        total = 0
+        for nombre, data in _iter_archivos_zip(zf):
+            total += 1
+            categoria = clasificar(nombre)
+            por_categoria.setdefault(categoria, []).append((nombre, data))
         logger.info("Archivos dentro del ZIP: %d\n", total)
 
-        # 1) Clasificar todas las entradas por categoría.
-        por_categoria: dict[str, list] = {}
-        for entrada in entradas:
-            nombre = _nombre_base(entrada.filename)
-            if not nombre:
-                continue
-            categoria = clasificar(nombre)
-            por_categoria.setdefault(categoria, []).append((nombre, entrada))
+    # 2) Por cada categoría: ordenar, dividir en lotes y escribir.
+    for categoria in CATEGORIAS_LOTE + [CARPETA_SIN_CLASIFICAR]:
+        items = por_categoria.get(categoria, [])
+        if not items:
+            continue
+        items.sort(key=lambda par: _clave_orden(par[0]))
 
-        # 2) Por cada categoría: ordenar, dividir en lotes y escribir.
-        for categoria in CATEGORIAS_LOTE + [CARPETA_SIN_CLASIFICAR]:
-            items = por_categoria.get(categoria, [])
-            if not items:
-                continue
-            items.sort(key=lambda par: _clave_orden(par[0]))
+        if categoria == CARPETA_SIN_CLASIFICAR:
+            # No se lotea: queda plana para revisión manual.
+            grupos = [(None, items)]
+        else:
+            total_lotes = (len(items) + max_por_lote - 1) // max_por_lote
+            grupos = [
+                (
+                    _lote_nombre(i + 1, total_lotes),
+                    items[i * max_por_lote : (i + 1) * max_por_lote],
+                )
+                for i in range(total_lotes)
+            ]
 
-            if categoria == CARPETA_SIN_CLASIFICAR:
-                # No se lotea: queda plana para revisión manual.
-                grupos = [(None, items)]
-            else:
-                total_lotes = (len(items) + max_por_lote - 1) // max_por_lote
-                grupos = [
-                    (
-                        _lote_nombre(i + 1, total_lotes),
-                        items[i * max_por_lote : (i + 1) * max_por_lote],
-                    )
-                    for i in range(total_lotes)
-                ]
+        for lote_nombre, grupo in grupos:
+            destino_dir = raiz / categoria
+            if lote_nombre:
+                destino_dir = destino_dir / lote_nombre
+            if not dry_run:
+                destino_dir.mkdir(parents=True, exist_ok=True)
 
-            for lote_nombre, grupo in grupos:
-                destino_dir = raiz / categoria
-                if lote_nombre:
-                    destino_dir = destino_dir / lote_nombre
-                if not dry_run:
-                    destino_dir.mkdir(parents=True, exist_ok=True)
+            for nombre, data in grupo:
+                destino_file = destino_dir / nombre
+                if destino_file.exists() and not sobrescribir:
+                    estado = "YA_EXISTIA"
+                elif dry_run:
+                    estado = "SIMULADO"
+                else:
+                    with open(destino_file, "wb") as salida:
+                        salida.write(data)
+                    estado = "COPIADO"
 
-                for nombre, entrada in grupo:
-                    destino_file = destino_dir / nombre
-                    if destino_file.exists() and not sobrescribir:
-                        estado = "YA_EXISTIA"
-                    elif dry_run:
-                        estado = "SIMULADO"
-                    else:
-                        with (
-                            zf.open(entrada) as origen,
-                            open(destino_file, "wb") as salida,
-                        ):
-                            salida.write(origen.read())
-                        estado = "COPIADO"
+                if categoria == CARPETA_SIN_CLASIFICAR:
+                    logger.warning("  SIN CLASIFICAR: %s", nombre)
 
-                    if categoria == CARPETA_SIN_CLASIFICAR:
-                        logger.warning("  SIN CLASIFICAR: %s", nombre)
-
-                    filas.append(
-                        {
-                            "archivo": nombre,
-                            "carpeta": categoria,
-                            "lote": lote_nombre or "",
-                            "estado": estado,
-                            "destino": str(destino_file),
-                        }
-                    )
+                filas.append(
+                    {
+                        "archivo": nombre,
+                        "carpeta": categoria,
+                        "lote": lote_nombre or "",
+                        "estado": estado,
+                        "destino": str(destino_file),
+                    }
+                )
 
     return filas
 

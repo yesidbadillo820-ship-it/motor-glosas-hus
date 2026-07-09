@@ -59,6 +59,11 @@ Mira el **nombre de cada archivo** (sin importar mayúsculas ni acentos):
 Nada se borra: si un archivo no coincide con ningún patrón, queda en
 `SIN_CLASIFICAR` para que lo revises a mano.
 
+> **ZIP dentro de ZIP:** si el archivo es un ZIP que a su vez contiene varios
+> ZIP (el masivo de COOSALUD viene como un ZIP con `COOSALUD 1.zip` …
+> `COOSALUD 22.zip` adentro), el bot **entra en todos** y junta las 2.000+
+> facturas en un solo `CARGUE MASIVO COOSALUD` con sus lotes de 300.
+
 ---
 
 ## 3) Forma fácil (sin terminal) — el `.bat`
