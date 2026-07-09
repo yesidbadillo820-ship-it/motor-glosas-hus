@@ -63,7 +63,7 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
    | CRNCXC | factura con ceros: `HUS0000496207` |
    | CROCLAOBJ | 0 · GENUSUARIO4: `999` |
    | CRNCONOBJ | código completo de la glosa de **mayor valor** del servicio |
-   | SLNSERPRO | `codigo_servicio` del DETALLE; con base DGH manda el código DGH (con sufijo `H` si lo trae). Si el código del portal no cruza pero la **descripción** sí coincide con DGH (ej. *DERECHOS DE SALA PARA CURACIONES*), toma igual el código DGH |
+   | SLNSERPRO | Código DGH del servicio. Se cruza en 4 niveles (todos dentro de la factura): **1)** código exacto · **2)** mismo código con el sufijo sin ceros (`19931216-05` = `19931216-5`) · **3)** misma base de medicamento, otra presentación (`20055559-1` → `20055559-14`) · **4)** por descripción (ej. *DERECHOS DE SALA PARA CURACIONES*). Si DGH **no tiene** ese servicio en la factura, se deja el código del portal y la fila va a `NO_CRUZADOS` |
    | CROVALOBJ | valor_glosado del servicio (número) |
    | CRDOBSERV | OBSERVACIÓN FINAL combinada |
    | CROTIPOBJ | **por factura completa**: 0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta — si la factura es mixta, TODAS sus filas llevan 2 |

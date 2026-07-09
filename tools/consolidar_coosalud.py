@@ -201,6 +201,47 @@ def norm_desc(s: object) -> str:
     return txt.strip()
 
 
+# Los medicamentos/insumos llevan un sufijo de presentación tras el último "-"
+# (19993036-01). El portal y DGH usan el mismo código base pero distinto sufijo:
+#   portal 19931216-05  ->  DGH 19931216-5   (mismo, con ceros de más)
+#   portal 20055559-1   ->  DGH 20055559-14  (misma base, otra presentación)
+def _cod_sufijo_norm(cod: str) -> str:
+    """Quita los ceros a la izquierda del sufijo: 19993036-01 -> 19993036-1."""
+    return re.sub(r"-0*(\d+)$", r"-\1", cod)
+
+
+def _cod_base(cod: str) -> str:
+    """Base del código, sin el sufijo de presentación: 20055559-14 -> 20055559."""
+    return re.sub(r"-\d+$", "", cod)
+
+
+def _cod_sufijo_num(cod: str) -> int:
+    """Número del sufijo de presentación (para elegir el más cercano)."""
+    m = re.search(r"-(\d+)$", cod)
+    return int(m.group(1)) if m else -1
+
+
+def cruzar_codigo(cruces: dict, fact: str, codigo_portal: object) -> str | None:
+    """Busca el código DGH del servicio, en 4 niveles (todos dentro de la factura):
+    1) código exacto  2) sufijo sin ceros  3) misma base (presentación distinta)
+    Devuelve None si ninguno cruza (el respaldo por descripción se prueba aparte).
+    """
+    cod = norm_codigo(codigo_portal)
+    if not cod:
+        return None
+    r = cruces["exact"].get((fact, cod))
+    if r:
+        return r
+    r = cruces["sufijo"].get((fact, _cod_sufijo_norm(cod)))
+    if r:
+        return r
+    candidatos = cruces["base"].get((fact, _cod_base(cod)))
+    if candidatos:
+        objetivo = _cod_sufijo_num(cod)
+        return min(candidatos, key=lambda c: (abs(_cod_sufijo_num(c) - objetivo), len(c), c))
+    return None
+
+
 def a_numero(v: object) -> float | None:
     """Convierte un valor monetario a número. Maneja formato colombiano
     ("1.234.567,89"), US ("1,234,567.89"), miles sueltos ("26,140" / "1.234.567")
@@ -598,10 +639,13 @@ def cargar_base_dgh(
         return norm_texto(row[i]) if i is not None and i < len(row) else ""
 
     filas_filtradas: list[list] = []
-    cruce: dict[tuple[str, str], str] = {}
-    # Cruce de respaldo por (factura, descripcion) para cuando el codigo del
-    # portal NO coincide con el de DGH (ej: DERECHOS DE SALA PARA CURACIONES).
-    # Solo se usa si la descripcion apunta a un unico codigo DGH en la factura.
+    # Índices de cruce (todos por factura):
+    #   exact  = código idéntico          sufijo = código con el sufijo sin ceros
+    #   base   = misma base, presentación distinta (conjunto de códigos DGH)
+    #   desc   = por descripción, solo si es inequívoca (un único código DGH)
+    cruce_exact: dict[tuple[str, str], str] = {}
+    cruce_sufijo: dict[tuple[str, str], str] = {}
+    cruce_base: dict[tuple[str, str], set] = {}
     desc_a_cod: dict[tuple[str, str], set] = {}
     total = 0
     for row in it:
@@ -634,7 +678,9 @@ def cargar_base_dgh(
             for i in (idx_srv, idx_cups, idx_cod_med, idx_cod_med_fact):
                 cod = norm_codigo(celda(row, i))
                 if cod:
-                    cruce.setdefault((fact, cod), slnserpro)
+                    cruce_exact.setdefault((fact, cod), slnserpro)
+                    cruce_sufijo.setdefault((fact, _cod_sufijo_norm(cod)), slnserpro)
+                    cruce_base.setdefault((fact, _cod_base(cod)), set()).add(slnserpro)
             for i in (idx_desc_inst, idx_desc_cups):
                 desc = norm_desc(celda(row, i))
                 if desc:
@@ -642,6 +688,12 @@ def cargar_base_dgh(
 
     # La descripción solo sirve de cruce si es inequívoca (un único código DGH).
     cruce_desc = {k: next(iter(v)) for k, v in desc_a_cod.items() if len(v) == 1}
+    cruces = {
+        "exact": cruce_exact,
+        "sufijo": cruce_sufijo,
+        "base": cruce_base,
+        "desc": cruce_desc,
+    }
 
     logger.info(
         "Base DGH: %d filas leídas · %d de las %d facturas trabajadas.",
@@ -655,14 +707,13 @@ def cargar_base_dgh(
             f"{len(facturas_trabajadas)} facturas trabajadas. ¿Es la base "
             "correcta y está actualizada con las fechas de estas facturas?"
         )
-    return filas_filtradas, cruce, cruce_desc
+    return filas_filtradas, cruces
 
 
 def generar_objeciones(
     glosados: list[dict],
     fecha: datetime,
-    cruce: dict[tuple[str, str], str] | None,
-    cruce_desc: dict[tuple[str, str], str] | None = None,
+    cruces: dict | None,
 ) -> tuple[list[list], list[list]]:
     """Arma las filas del archivo de OBJECIONES (una por servicio glosado).
 
@@ -671,7 +722,7 @@ def generar_objeciones(
     filas: list[list] = []
     no_cruzados: list[list] = []
     malformadas: set[str] = set()
-    por_descripcion = 0
+    por_respaldo = 0
     consecutivo = 0
     factura_actual: str | None = None
 
@@ -691,19 +742,20 @@ def generar_objeciones(
             malformadas.add(fact)
 
         # SLNSERPRO: el codigo_servicio del DETALLE; si hay base DGH y la fila
-        # cruza, manda el código DGH (que puede traer sufijo H). Si hay base y
-        # NO cruza, se deja el del detalle y se reporta en NO_CRUZADOS.
-        slnserpro = norm_codigo(srv["codigo_servicio"]) or None
-        if cruce is not None:
+        # cruza (código exacto, sufijo sin ceros, misma base o descripción),
+        # manda el código DGH. Si NO cruza, se deja el del detalle y se reporta.
+        cod_portal = norm_codigo(srv["codigo_servicio"])
+        slnserpro = cod_portal or None
+        if cruces is not None:
             fkey = norm_factura(fact)
-            del_dgh = cruce.get((fkey, norm_codigo(srv["codigo_servicio"])))
-            if not del_dgh and cruce_desc:
-                # Respaldo por descripción (rescata códigos que difieren entre
-                # portal y DGH, p. ej. DERECHOS DE SALA PARA CURACIONES).
-                del_dgh = cruce_desc.get((fkey, norm_desc(srv.get("descripcion", ""))))
-                if del_dgh:
-                    por_descripcion += 1
+            del_dgh = cruzar_codigo(cruces, fkey, srv["codigo_servicio"])
+            if not del_dgh:
+                # Último respaldo: por descripción (rescata códigos totalmente
+                # distintos, p. ej. DERECHOS DE SALA PARA CURACIONES).
+                del_dgh = cruces["desc"].get((fkey, norm_desc(srv.get("descripcion", ""))))
             if del_dgh:
+                if del_dgh != cod_portal:
+                    por_respaldo += 1
                 slnserpro = del_dgh
             else:
                 no_cruzados.append(
@@ -742,10 +794,10 @@ def generar_objeciones(
             ]
         )
 
-    if por_descripcion:
+    if por_respaldo:
         logger.info(
-            "  %d servicios cruzaron por DESCRIPCION (código distinto entre portal y DGH).",
-            por_descripcion,
+            "  %d servicios tomaron el código DGH por respaldo (sufijo/base/descripción).",
+            por_respaldo,
         )
     if malformadas:
         logger.warning(
@@ -845,16 +897,13 @@ def main(argv: list[str] | None = None) -> int:
         # Si la base falla (ruta mala, archivo abierto/corrupto) NO se aborta:
         # se avisa y se sigue sin cruce (SLNSERPRO sale del codigo del detalle),
         # para no perder los consolidados ni el OBJECIONES por un problema de ruta.
-        cruce = None
-        cruce_desc = None
+        cruces = None
         f_serv: list[list] = []
         base_ok = False
         if args.servicios:
             facturas_trabajadas = {norm_factura(s["factura"]) for s in glosados}
             try:
-                f_serv, cruce, cruce_desc = cargar_base_dgh(
-                    Path(args.servicios), facturas_trabajadas
-                )
+                f_serv, cruces = cargar_base_dgh(Path(args.servicios), facturas_trabajadas)
                 base_ok = True
             except ValueError as exc:
                 logger.warning(
@@ -866,7 +915,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- Punto 5: archivo de objeciones ------------------------------------
         logger.info("[4/4] Generando OBJECIONES...")
-        f_obj, no_cruzados = generar_objeciones(glosados, fecha, cruce, cruce_desc)
+        f_obj, no_cruzados = generar_objeciones(glosados, fecha, cruces)
         n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
         logger.info("  %d filas de objeciones · %d facturas", len(f_obj), n_facturas_obj)
         if no_cruzados:
