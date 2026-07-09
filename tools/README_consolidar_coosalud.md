@@ -62,7 +62,7 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
    | CDFECDOC / CROFECOBJ | `--fecha` como fecha Excel |
    | CRNCXC | factura con ceros: `HUS0000496207` |
    | CROCLAOBJ | 0 · GENUSUARIO4: `999` |
-   | CRNCONOBJ | código completo de la glosa de **mayor valor** del servicio |
+   | CRNCONOBJ | código completo de la glosa del servicio. **Una glosa CL (médica) manda por encima de todo**: si el servicio tiene alguna CL, va la CL (la de mayor valor entre las CL); si no hay CL, va la de mayor valor (TA2901, …) |
    | SLNSERPRO | Código DGH del servicio. Se cruza en 4 niveles (todos dentro de la factura): **1)** código exacto · **2)** mismo código con el sufijo sin ceros (`19931216-05` = `19931216-5`) · **3)** misma base de medicamento, otra presentación (`20055559-1` → `20055559-14`) · **4)** por descripción (ej. *DERECHOS DE SALA PARA CURACIONES*). Si DGH **no tiene** ese servicio en la factura, se deja el código del portal y la fila va a `NO_CRUZADOS` |
    | CROVALOBJ | valor_glosado del servicio (número) |
    | CRDOBSERV | OBSERVACIÓN FINAL combinada |

@@ -28,7 +28,10 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
          CROREFERE / CROOBSERV / CRNCLAOBJ / IDRIPS / CTNCENCOS   vacíos
          CROCLAOBJ   0
          GENUSUARIO4 999 (texto)
-         CRNCONOBJ   código completo de la glosa de MAYOR valor del servicio (TA2901, CL0201...)
+         CRNCONOBJ   código completo de la glosa del servicio. Una glosa CL
+                     (médica) tiene PRIORIDAD sobre las demás: si el servicio
+                     tiene alguna CL, va la CL (la de mayor valor entre las CL);
+                     si no hay CL, va la de mayor valor (TA2901, ...)
          SLNSERPRO   codigo_servicio del DETALLE; si se pasa la base DGH y la
                      fila cruza, manda el código DGH (con sufijo H si lo trae).
                      El OBJECIONES.xlsx queda con UNA sola hoja, ya limpio para
@@ -416,7 +419,8 @@ def consolidar_glosas(archivos: list[Path]) -> tuple[list[str], list[list], dict
     Devuelve (headers, filas, agrupado) donde agrupado[id_detalle_norm] = {
         'observacion':  texto combinado con saltos de línea,
         'conceptos':    set de prefijos de 2 letras (TA, CL, ...),
-        'codigo_mayor': codigo_glosa completo de la glosa de mayor valor,
+        'codigo_mayor': codigo_glosa del servicio; una glosa CL (médica) tiene
+                        prioridad; si no hay CL, la de mayor valor,
         'max_valor':    valor de esa glosa,
     }.
     """
@@ -458,17 +462,33 @@ def consolidar_glosas(archivos: list[Path]) -> tuple[list[str], list[list], dict
             id_det = norm_codigo(row[idx["id_detalle"]])
             g = agrupado.setdefault(
                 id_det,
-                {"observacion": [], "conceptos": set(), "codigo_mayor": "", "max_valor": None},
+                {
+                    "observacion": [],
+                    "conceptos": set(),
+                    "codigo_mayor": "",
+                    "max_valor": None,
+                    "mayor_es_cl": False,
+                },
             )
             g["observacion"].append(obs)
             g["conceptos"].add(codigo[:2].upper())
             v = a_numero(valor)
+            es_cl = codigo[:2].upper() == "CL"
             if not g["codigo_mayor"]:
                 g["codigo_mayor"] = codigo
                 g["max_valor"] = v
-            elif v is not None and (g["max_valor"] is None or v > g["max_valor"]):
-                g["codigo_mayor"] = codigo
-                g["max_valor"] = v
+                g["mayor_es_cl"] = es_cl
+            else:
+                # Una glosa CL (médica) manda por encima de cualquier otra, sin
+                # importar el valor. Dentro del mismo tipo (CL vs CL, u otra vs
+                # otra) gana la de mayor valor; los empates conservan la primera.
+                mayor_por_valor = v is not None and (g["max_valor"] is None or v > g["max_valor"])
+                if (es_cl and not g["mayor_es_cl"]) or (
+                    es_cl == g["mayor_es_cl"] and mayor_por_valor
+                ):
+                    g["codigo_mayor"] = codigo
+                    g["max_valor"] = v
+                    g["mayor_es_cl"] = es_cl
 
     if duplicadas:
         logger.warning("  OJO: %d glosas duplicadas se saltaron (archivos repetidos).", duplicadas)
@@ -872,7 +892,7 @@ def generar_objeciones(
                 0,  # CROCLAOBJ
                 None,  # CRNCLAOBJ
                 "999",  # GENUSUARIO4 (texto)
-                srv["codigo_mayor"],  # CRNCONOBJ (código completo: TA2901...)
+                srv["codigo_mayor"],  # CRNCONOBJ (CL manda; si no, la de mayor valor)
                 slnserpro,  # SLNSERPRO
                 None,  # IDRIPS
                 None,  # CTNCENCOS
