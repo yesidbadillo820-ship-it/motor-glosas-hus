@@ -20,8 +20,10 @@ se subió y produce "OBJECIONES REINTENTO.xlsx" listo para volver a cargar:
   4. Facturas con errores que no se pueden corregir automáticamente se dejan
      FUERA del reintento y se listan en pantalla para revisión manual.
 
-El reintento solo lleva las facturas que DGH rechazó por valores (las demás ya
-quedaron cargadas), con el consecutivo renumerado desde 1.
+OJO: DGH NO guarda ningún registro cuando el cargue trae errores — se vuelve a
+cargar el Excel COMPLETO. Por eso el reintento lleva TODAS las facturas del
+archivo original (con los valores ya corregidos), menos las que ya estaban
+objetadas y las de revisión manual, con el consecutivo renumerado desde 1.
 
 USO (sin argumentos pregunta todo, acepta rutas arrastradas):
     py corregir_errores_dgh.py
@@ -231,13 +233,15 @@ def corregir(path_err: Path, path_obj: Path, path_salida: Path | None = None) ->
             total_capadas += n
             corregidas.append(factura)
 
-    # El reintento SOLO lleva las facturas corregidas (las demás ya cargaron o
-    # ya estaban objetadas), con el consecutivo renumerado desde 1.
-    consec_corregidos = [
-        c for c in orden if norm_texto(por_consec[c][0][mapa["CRNCXC"]]) in set(corregidas)
+    # DGH no guarda NADA cuando el cargue trae errores: el reintento lleva el
+    # archivo COMPLETO (todas las facturas, ya corregidas), menos las que ya
+    # estaban objetadas y las de revisión manual. Consecutivo renumerado.
+    excluir = {f for f in ya_estaban} | {f for f, _ in manuales}
+    consec_salida = [
+        c for c in orden if norm_texto(por_consec[c][0][mapa["CRNCXC"]]) not in excluir
     ]
     filas_salida: list[list] = []
-    for nuevo, consec in enumerate(consec_corregidos, 1):
+    for nuevo, consec in enumerate(consec_salida, 1):
         for f in por_consec[consec]:
             f2 = [f[mapa[c.upper()]] if c.upper() in mapa else None for c in cols]
             f2[0] = str(nuevo)
@@ -252,7 +256,10 @@ def corregir(path_err: Path, path_obj: Path, path_salida: Path | None = None) ->
         f"  Ya estaban objetadas      : {len(ya_estaban)} facturas -> se QUITAN (normal si ya se subieron en un cargue anterior)"
     )
     print(
-        f"  Corregidas para reintento : {len(corregidas)} facturas · {total_capadas} valores capados a lo que DGH acepta"
+        f"  Valores corregidos        : {total_capadas} en {len(corregidas)} facturas, capados a lo que DGH acepta"
+    )
+    print(
+        f"  Facturas sin problema     : {len(consec_salida) - len(corregidas)} -> van igual (DGH no guardó nada, se recarga todo)"
     )
     if manuales:
         print(f"  Para revisar A MANO       : {len(manuales)} facturas (no van en el reintento):")
@@ -260,7 +267,7 @@ def corregir(path_err: Path, path_obj: Path, path_salida: Path | None = None) ->
             print(f"      {fact}: {motivo}")
 
     if not filas_salida:
-        print("\n  No hay nada que reintentar: todos los errores eran facturas ya objetadas.")
+        print("\n  No quedó ninguna factura para reintentar (todas ya estaban objetadas).")
         return 0
 
     salida = path_salida or path_obj.with_name(path_obj.stem + " REINTENTO.xlsx")
@@ -270,7 +277,7 @@ def corregir(path_err: Path, path_obj: Path, path_salida: Path | None = None) ->
     wb.save(salida)
     print(f"\n  LISTO: {salida}")
     print(
-        f"  {len(filas_salida)} filas · {len(consec_corregidos)} facturas · consecutivos 1..{len(consec_corregidos)}"
+        f"  {len(filas_salida)} filas · {len(consec_salida)} facturas · consecutivos 1..{len(consec_salida)}"
     )
     print("  Sube ese archivo a DGH igual que el original.")
     return 0

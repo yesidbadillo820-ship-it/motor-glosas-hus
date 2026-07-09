@@ -216,6 +216,13 @@ def main() -> int:
     argumentos = ["--carpeta", str(carpeta), "--fecha", fecha]
     if base:
         argumentos += ["--servicios", str(base)]
+    # Si junto a los bots hay un "FACTURAS YA OBJETADAS.txt" (una factura por
+    # línea), esas se dejan fuera del OBJECIONES: DGH rechaza el cargue
+    # completo si va una factura que ya está objetada.
+    ya_objetadas = AQUI / "FACTURAS YA OBJETADAS.txt"
+    if ya_objetadas.is_file():
+        print(f'  (Usando "{ya_objetadas.name}": esas facturas no van al OBJECIONES)')
+        argumentos += ["--omitir-facturas", str(ya_objetadas)]
     rc = con.main(argumentos)
     if rc != 0:
         print("\n  ERROR en el paso 2. Revisa arriba (y en _log_coosalud.txt).")

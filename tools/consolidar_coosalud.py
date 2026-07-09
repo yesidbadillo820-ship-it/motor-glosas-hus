@@ -1015,6 +1015,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "Por defecto se dejan FUERA (solo en la hoja NO_CRUZADOS) para que el cargue pase.",
     )
     p.add_argument(
+        "--omitir-facturas",
+        default=None,
+        help="Archivo de texto con facturas que YA están objetadas en DGH (una por "
+        "línea, ej. HUS509457). Se dejan fuera del OBJECIONES — si van, DGH "
+        "rechaza el cargue COMPLETO. Los consolidados sí las conservan.",
+    )
+    p.add_argument(
         "--salida",
         default=None,
         help=f"Carpeta de salida. Def: <carpeta>\\{SALIDA_DEFECTO}",
@@ -1041,6 +1048,22 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     salida = Path(args.salida) if args.salida else carpeta / SALIDA_DEFECTO
     salida.mkdir(parents=True, exist_ok=True)
+
+    # Facturas que ya están objetadas en DGH: se dejan fuera del OBJECIONES
+    # (DGH rechaza el cargue COMPLETO si va una repetida y no guarda nada).
+    omitidas: set[str] = set()
+    if args.omitir_facturas:
+        p_omit = Path(args.omitir_facturas)
+        if not p_omit.is_file():
+            logger.error("ERROR: no existe el archivo de --omitir-facturas: %s", p_omit)
+            return 1
+        with p_omit.open(encoding="utf-8", errors="replace") as fh:
+            omitidas = {norm_factura(lin) for lin in fh if lin.strip()}
+        logger.info(
+            "Se omitirán del OBJECIONES %d facturas ya objetadas en DGH (%s).",
+            len(omitidas),
+            p_omit.name,
+        )
 
     lotes = descubrir_lotes(carpeta)
     n_glo = sum(len(v.get(CARPETA_GLOSAS, [])) for v in lotes.values())
@@ -1140,8 +1163,20 @@ def main(argv: list[str] | None = None) -> int:
             sufijo = f" {nombre}" if nombre else ""
 
             logger.info("\n[4/4] %s: generando OBJECIONES...", nombre or "FINAL")
+            glosados_lote = d["glosados"]
+            if omitidas:
+                antes = {norm_factura(s["factura"]) for s in glosados_lote}
+                glosados_lote = [
+                    s for s in glosados_lote if norm_factura(s["factura"]) not in omitidas
+                ]
+                quitadas = len(antes & omitidas)
+                if quitadas:
+                    logger.info(
+                        "  %d facturas omitidas (ya objetadas en DGH, no van al OBJECIONES).",
+                        quitadas,
+                    )
             f_obj, no_cruzados, ajustados = generar_objeciones(
-                d["glosados"], fecha, cruces, excluir_no_cruzados=not args.incluir_no_cruzados
+                glosados_lote, fecha, cruces, excluir_no_cruzados=not args.incluir_no_cruzados
             )
             n_facturas_obj = int(f_obj[-1][0]) if f_obj else 0
             logger.info("  %d filas de objeciones · %d facturas", len(f_obj), n_facturas_obj)
