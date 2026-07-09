@@ -227,11 +227,34 @@ def _cod_sufijo_num(cod: str) -> int:
     return int(m.group(1)) if m else -1
 
 
-def cruzar_codigo(cruces: dict, fact: str, codigo_portal: object) -> str | None:
+def _cruzar_por_nombre_med(cruces: dict, fact: str, descripcion: object) -> str | None:
+    """Cruce por NOMBRE del medicamento cuando es inequívoco dentro de la factura.
+
+    Evita que dos medicamentos distintos que comparten base + cero a la izquierda
+    (portal 20048691-1 KETAMINA vs 20048691-01 SALBUTAMOL) se lleven el mismo
+    código DGH: DGH tiene cada uno con su propio código (KETAMINA 20048691-1,
+    SALBUTAMOL 20083667-1), y el nombre los separa. Solo cruza si UN único código
+    DGH de la factura coincide por nombre (prefijo en cualquier dirección).
+    """
+    port = norm_desc(descripcion)
+    if len(port) < 4:  # nombres muy cortos son ambiguos, se dejan al código
+        return None
+    candidatos = set()
+    for nombre, cod in cruces.get("nom_med", {}).get(fact, ()):  # (nombre_dgh, código)
+        if nombre == port or nombre.startswith(port + " ") or port.startswith(nombre + " "):
+            candidatos.add(cod)
+    return next(iter(candidatos)) if len(candidatos) == 1 else None
+
+
+def cruzar_codigo(
+    cruces: dict, fact: str, codigo_portal: object, descripcion: object = ""
+) -> str | None:
     """Busca el código DGH del servicio, por factura, en varios niveles:
     1) código propio del servicio en DGH (SLNSERPRO_SERVICIO) idéntico
     2) código idéntico en cualquier columna
-    3) sufijo sin ceros / misma base (presentación distinta): elige el sufijo
+    3) nombre de medicamento inequívoco (separa KETAMINA de SALBUTAMOL cuando el
+       código base coincide por un cero a la izquierda)
+    4) sufijo sin ceros / misma base (presentación distinta): elige el sufijo
        más cercano. El guardián de valor (en generar_objeciones) impide objetar
        más de lo que DGH tiene, así que un cruce de más nunca genera error.
     Devuelve None si ninguno cruza (el respaldo por descripción va aparte).
@@ -240,6 +263,9 @@ def cruzar_codigo(cruces: dict, fact: str, codigo_portal: object) -> str | None:
     if not cod:
         return None
     r = cruces["srv_exact"].get((fact, cod)) or cruces["exact"].get((fact, cod))
+    if r:
+        return r
+    r = _cruzar_por_nombre_med(cruces, fact, descripcion)
     if r:
         return r
     candidatos = cruces["sufijo"].get((fact, _cod_sufijo_norm(cod)), set())
@@ -678,6 +704,7 @@ def cargar_base_dgh(
     cruce_sufijo: dict[tuple[str, str], set] = {}
     cruce_base: dict[tuple[str, str], set] = {}
     desc_a_cod: dict[tuple[str, str], set] = {}
+    nom_med_idx: dict[str, set] = {}  # factura -> {(nombre_medicamento_norm, código DGH)}
     valor: dict[tuple[str, str], float] = {}
     saldo: dict[str, float] = {}
     total = 0
@@ -720,6 +747,13 @@ def cargar_base_dgh(
                 desc = norm_desc(celda(row, i))
                 if desc:
                     desc_a_cod.setdefault((fact, desc), set()).add(slnserpro)
+            # nombre del medicamento (para separar meds con base+cero a la
+            # izquierda). Se indexa por cod_med, que identifica a un medicamento
+            # tanto en la base cruda (SLNSERPRO vacío) como en la ya "arreglada".
+            if cod_med:
+                nom_med_norm = norm_desc(nom_med)
+                if nom_med_norm:
+                    nom_med_idx.setdefault(fact, set()).add((nom_med_norm, slnserpro))
             # valor del servicio (para no objetar más de lo que DGH tiene)
             v = a_numero(celda(row, idx_vr))
             if v is not None:
@@ -736,6 +770,7 @@ def cargar_base_dgh(
         "sufijo": cruce_sufijo,
         "base": cruce_base,
         "desc": cruce_desc,
+        "nom_med": {f: tuple(s) for f, s in nom_med_idx.items()},
         "valor": valor,
         "saldo": saldo,
     }
@@ -803,7 +838,9 @@ def generar_objeciones(
         motivo = None
         if cruces is not None:
             fkey = norm_factura(fact)
-            del_dgh = cruzar_codigo(cruces, fkey, srv["codigo_servicio"])
+            del_dgh = cruzar_codigo(
+                cruces, fkey, srv["codigo_servicio"], srv.get("descripcion", "")
+            )
             if not del_dgh:
                 # Último respaldo: por descripción (rescata códigos totalmente
                 # distintos, p. ej. DERECHOS DE SALA PARA CURACIONES).
