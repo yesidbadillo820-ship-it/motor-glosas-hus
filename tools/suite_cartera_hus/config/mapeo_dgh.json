@@ -1,0 +1,64 @@
+{
+  "_LEAME": [
+    "Este archivo controla el cruce masivo y el formato del OBJECIONES de DGH.",
+    "1) 'columnas_salida': pegue aquí los 16 encabezados EXACTOS (y en el mismo",
+    "   orden) de su archivo OBJECIONES actual que DGH acepta. Los de abajo son",
+    "   de referencia y DEBEN validarse contra un cargue real antes de usar.",
+    "2) 'mapa': para cada columna de salida indique de dónde sale el dato:",
+    "   - nombre de un campo interno: factura, codigo_servicio, nombre_servicio,",
+    "     codigo_glosa, valor_glosado, valor_objetado, valor_aceptado,",
+    "     observacion_final, tipo_glosa, consecutivo_item",
+    "   - un literal fijo empezando con '=' (ej: '=RE9901')",
+    "   - un token: {FECHA_HOY}, {NIT_ENTIDAD}, {NOMBRE_ENTIDAD}, {USUARIO}",
+    "3) 'campos_origen': sinónimos de encabezados con los que el motor busca",
+    "   cada campo en los Excel del portal (agregue los suyos si difieren)."
+  ],
+
+  "max_facturas_por_lote": 300,
+
+  "columnas_salida": [
+    "PREFIJO", "NUMERO_FACTURA", "CONSECUTIVO_ITEM", "CODIGO_SERVICIO",
+    "NOMBRE_SERVICIO", "CODIGO_GLOSA", "TIPO_GLOSA", "VALOR_GLOSADO",
+    "VALOR_OBJETADO", "VALOR_ACEPTADO", "OBSERVACION", "FECHA_OBJECION",
+    "NIT_ENTIDAD", "NOMBRE_ENTIDAD", "TIPO_OBJECION", "USUARIO"
+  ],
+
+  "mapa": {
+    "PREFIJO": "prefijo",
+    "NUMERO_FACTURA": "factura",
+    "CONSECUTIVO_ITEM": "consecutivo_item",
+    "CODIGO_SERVICIO": "codigo_servicio",
+    "NOMBRE_SERVICIO": "nombre_servicio",
+    "CODIGO_GLOSA": "codigo_glosa",
+    "TIPO_GLOSA": "tipo_glosa",
+    "VALOR_GLOSADO": "valor_glosado",
+    "VALOR_OBJETADO": "valor_objetado",
+    "VALOR_ACEPTADO": "valor_aceptado",
+    "OBSERVACION": "observacion_final",
+    "FECHA_OBJECION": "{FECHA_HOY}",
+    "NIT_ENTIDAD": "{NIT_ENTIDAD}",
+    "NOMBRE_ENTIDAD": "{NOMBRE_ENTIDAD}",
+    "TIPO_OBJECION": "tipo_objecion",
+    "USUARIO": "{USUARIO}"
+  },
+
+  "campos_origen": {
+    "factura": ["FACTURA", "NUMERO FACTURA", "NRO FACTURA", "NO FACTURA", "NUM FACTURA", "FACTURA NO", "DOCUMENTO"],
+    "prefijo": ["PREFIJO", "PREF"],
+    "consecutivo_item": ["CONSECUTIVO ITEM", "CONSECUTIVO", "ITEM", "NRO ITEM"],
+    "codigo_servicio": ["CODIGO SERVICIO", "COD SERVICIO", "CODIGO", "CUPS", "COD CUPS", "CODIGO PRODUCTO", "COD"],
+    "nombre_servicio": ["NOMBRE SERVICIO", "DESCRIPCION SERVICIO", "SERVICIO", "DESCRIPCION", "DETALLE", "NOMBRE PRODUCTO"],
+    "codigo_glosa": ["CODIGO GLOSA", "COD GLOSA", "GLOSA", "CODIGO DE GLOSA", "CONCEPTO GLOSA", "COD CONCEPTO"],
+    "descripcion_glosa": ["DESCRIPCION GLOSA", "OBSERVACION GLOSA", "OBSERVACIONES", "OBSERVACION", "MOTIVO GLOSA", "JUSTIFICACION"],
+    "valor_glosado": ["VALOR GLOSADO", "VLR GLOSADO", "VALOR GLOSA", "VLR GLOSA", "VALOR OBJETADO EPS"],
+    "valor_servicio": ["VALOR SERVICIO", "VLR SERVICIO", "VALOR FACTURADO", "VLR FACTURADO", "VALOR TOTAL", "VLR UNITARIO TOTAL"],
+    "saldo": ["SALDO", "SALDO CUENTA", "SALDO FACTURA", "VALOR SALDO"],
+    "copago": ["COPAGO", "CUOTA MODERADORA", "VALOR COPAGO", "CUOTA RECUPERACION"]
+  },
+
+  "respuesta_estandar": "Se objeta la glosa en su totalidad conforme al Manual Único de Glosas, Devoluciones y Respuestas (Res. 2284/2023) y al contrato vigente entre las partes; los soportes que acreditan la pertinencia del cobro se anexan a la presente respuesta.",
+
+  "tipos_glosa_medica": ["CL"],
+  "nit_hus": "900006037",
+  "usuario_defecto": "CARTERA_HUS"
+}

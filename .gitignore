@@ -64,6 +64,13 @@ htmlcov/
 deploy/cloudflared/config.yml
 deploy/cloudflared/*.json
 
+# Suite Cartera HUS — contraseñas reales de los portales EPS (LOCAL, NUNCA al repo).
+# El .example SÍ se commitea (plantilla); el real y su respaldo NO.
+tools/suite_cartera_hus/config/entidades.credenciales.json
+tools/suite_cartera_hus/config/entidades.credenciales.json.bak
+# Salidas generadas por la Suite (evidencias, control, objeciones de pacientes)
+tools/suite_cartera_hus/SALIDAS/
+
 # Carpeta de datos generada por install.sh (excepto los catálogos versionados)
 data/
 !data/plantillas_hus_base.json

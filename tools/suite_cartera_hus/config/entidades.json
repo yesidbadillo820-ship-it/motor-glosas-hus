@@ -1,0 +1,5583 @@
+{
+ "origen": "RADICAR_FACTURAS_ENTIDADES.xlsx",
+ "actualizado": "2026-07-10",
+ "entidades": [
+  {
+   "nit": "901037916",
+   "nombre": "ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD",
+   "radicacion": {
+    "link": "https://servicios.adres.gov.co/",
+    "usuario": "ECAT900006037",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "correspondencia2@adres.gov.co; correspondencia1@adres.gov.co; lizanyury.blanco@adres.gov.co; radicacionpjdop@adres.gov.co",
+    "contacto": "LIZANYURY BLANCO",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://servicios.adres.gov.co/login.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "800253526",
+   "nombre": "ALCALDIA MUNICIPAL DE CANTAGALLO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "salud@cantagallo-bolivar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890906445",
+   "nombre": "ALCALDIA MUNICIPAL DE CAUCASIA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "salud@caucasia-antioquia.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890205058",
+   "nombre": "ALCALDIA MUNICIPAL DE COROMORO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "saludcoromoro68217@hotmail.com; alcaldia@coromoro-santander.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800113389",
+   "nombre": "ALCALDIA MUNICIPAL DE IBAGUE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "calidad.servicios@ibague.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800043486",
+   "nombre": "ALCALDIA SAN MARTIN DE LOBA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "alcaldia@sanmartindeloba-bolivar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "ALIANSALUD",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "JuanDV@colmedica.com ; jorgeo@aliansalud.com.co",
+    "contacto": "Juan David Valencia Chaparro",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900604350",
+   "nombre": "ALIANZA MEDELLIN ANTIOQUIA EPS SAS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "claudia.murillo@saviasaludeps.com, correocertificado@saviasaludeps.com, luis.carrillo@saviasaludeps.com, tania.alcaraz@saviasaludeps.com, paolaa.marin@saviasaludeps.com, conciliaciones.cuentasmedicas@saviasaludeps.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://saviasaludeps.servisoft.com.co/mercurio/index.jsp?err=1\nhttps://conexiones.saviasaludeps.com/savia/cuenta_medica/rips/carga_rips.faces",
+    "credenciales": "",
+    "manual": "PLATAFORMA CONEXIONES\nUSUARIO: 900006037r01\nCONTRASEÑA: zKWQOBMB",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://saviasaludeps.servisoft.com.co/mercurio/index.jsp?err=1",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "Cuentas.medicas@saviasaludeps.com\nruby.mazo@saviasaludeps.com\t\ndiana.gallardo@saviasaludeps.com",
+    "nombre_contacto": "",
+    "observaciones": "PLATAFORMA CONEXIONES\nUSUARIO: 900006037r01\nCONTRASEÑA: zKWQOBMB",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "839000495",
+   "nombre": "ANAS WAYUU E P S I",
+   "radicacion": {
+    "link": "https://sga.epsianaswayuu.com/onRED.php?_gl=1*1uj8azp*_ga*MTU3NTI0NDM4OC4xNzMzODY1MDQw*_ga_V0ZEYTXSXC*MTczMzk0Njc5Ni4zLjAuMTczMzk0Njc5Ni4wLjAuMA..",
+    "usuario": "680010079201",
+    "contrasena": "",
+    "telefono": "3158303656",
+    "correo": "jvidal@epsianaswayuu.com; ebastidas@epsianaswayuu.com",
+    "contacto": "FRANCIA ANDREILIS URIANA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "Carrera 16 No. 16 - 31    Maicao La Guajira",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "mesadeayuda@epsianaswayuu.com\n(605) 7254147\n(605) 7256565 ext 152",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": "MAICAO"
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://sga.epsianaswayuu.com/onRED.php?_gl=1*1uj8azp*_ga*MTU3NTI0NDM4OC4xNzMzODY1MDQw*_ga_V0ZEYTXSXC*MTczMzk0Njc5Ni4zLjAuMTczMzk0Njc5Ni4wLjAuMA..",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860524654",
+   "nombre": "ASEGURADORA SOLIDARIA DE COLOMBIA ENTIDAD COOPERATIVA",
+   "radicacion": {
+    "link": "invoway",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "3192483534",
+    "correo": "soporte_solidariasoat@rgc.com.co; cartera_solidariasoat@rgc.com.co; dparra@solidaria.com.co; biriarte@solidaria.com.co; melba.celis@iq-online.com; ext.avega@solidaria.com.co; soportefev.soat.ape@solidaria.com.co; radicacionindemnizacionespersonas@solidaria.com.co; FECO@solidaria.com.co",
+    "contacto": "Ana María Quintero",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.activa-it.net/Index.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "para radicar accidentes escolares es por correo: glosas_apescolaressolidaria@rgc.com.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "FECO@solidaria.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "soportefev.soat.ape@solidaria.com.co",
+    "nombre_contacto": "",
+    "observaciones": "Las respuesta a glosas se deben enviar al correo elctronico FECO@solidaria.com.co con el asunto RESPUESTA OBJECIÓN #Factura. Y para el cargue de sosportes en pla plataforma.\n\nla solicitud de certificados de agotamiento SOAT para la ASEGURADORA SOLIDARIA ahora se deben solicitar por correo electronico y NO por la plataforma de activa como se venia haciendo.\ncorreo electronico : solicitudes.soat.ape@solidaria.com.co",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "900935126",
+   "nombre": "ASMET SALUD EPS S.A.S",
+   "radicacion": {
+    "link": "https://hylprestador.asmetsalud.com/hyl/faces/login.jsf?Adf-Window-Id=w0&_afrWindowMode=2&_afrRedirect=162424427946626&_afrLoop=162423902304352&_adf.ctrl-state=1buk6acy0u_3",
+    "usuario": "ehusantanderbucaramanga",
+    "contrasena": "",
+    "telefono": "3234866371",
+    "correo": "proveedores.salud@asmetsalud.com; arnoli.gutierrez@asmetsalud.com; david.munoz@asmetsalud.com; cristian.roa@asmetsalud.com; betty.anaya@asmetsalud.com; catalina.castrillon@asmetsalud.com; johan.portilla@asmetsalud.com; kevin.guaza@asmetsalud.com",
+    "contacto": "Johan Estiven Portilla Ipia",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://hylprestador.asmetsalud.com/hyl/faces/login.jsf?_afrLoop=137154661762052&Adf-Window-Id=w0&_afrWindowMode=0&_adf.ctrl-state=otbl1zudt_3&_afrRedirect=137154782617624",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "https://hylprestador.asmetsalud.com/hyl/faces/login.jsf?_afrLoop=137154661762052&Adf-Window-Id=w0&_afrWindowMode=0&_adf.ctrl-state=otbl1zudt_3&_afrRedirect=137154782617624",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "notificacionglosasydevoluciones@asmetsalud.com \nENFERMERO20@CARESOLUTIONS.COM.CO \nPOPAYAN@ASM ETSALU D.COM \nBOGOTA@ASM ETSALU D.COM",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "824001398",
+   "nombre": "ASOCIACION DE CABILDOS INDIGENAS DEL CESAR Y GUAJIRA DUSAKAWI EPS-I",
+   "radicacion": {
+    "link": "SIE::PRESTADORES",
+    "usuario": "900006037-C",
+    "contrasena": "",
+    "telefono": "3176489063 /  3126168899",
+    "correo": "cartera@dusakawiepsi.com",
+    "contacto": "EDUBER BARRIOS",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://141.148.22.87:8080/sie_dusakawi/homeIps.xhtml",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "SE RADICA HASTA EL 9 DE CADA MES LAS FACTURAS - OJO REVISAR INSTRUCTIVO",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://141.148.22.87:8080/sie_dusakawi/homeIps.xhtml",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "817001773",
+   "nombre": "ASOCIACION INDIGENA DEL CAUCA AIC.EPS",
+   "radicacion": {
+    "link": "https://salud.aicsalud.org.co/Externo/BoxaludExternoNS/Seguridad/Login.aspx",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "3128907814",
+    "correo": "cartera@aicsalud.org.co",
+    "contacto": "JOHANA ANACONA SERNA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "https://salud.aicsalud.org.co/Externo/BoxaludExternoNS/Seguridad/Login.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "3176584768 / (601)5801200",
+    "nombre_contacto": "",
+    "observaciones": "EL RIPS DEBE IR RENOMBRADO CON LA SIGUIENTE ESTRUCTURA\nRIPSRS(AÑOMESDIA¨DE RADICACION DEV¨)01NI000900006037 - DUPLICAR FACTURA",
+    "ciudad": "POPAYAN"
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "806008394",
+   "nombre": "ASOCIACION MUTUAL SER EMPRESA SOLIDARIA DE SALUD ESS",
+   "radicacion": {
+    "link": "https://portalzonaser.mutualser.com/auth/login",
+    "usuario": "rips@hus.gov.co\ngerencia@hus.gov.co",
+    "contrasena": "",
+    "telefono": "3183935049",
+    "correo": "analistascuentasporpagar@mutualser.org; gballest@mutualser.org; lmatute@mutualser.org; wilcarmona@mutualser.org",
+    "contacto": "Wilmer Carmona Paéz",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://portalzonaser.mutualser.com/auth/login",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "merosales@mutualser.org",
+    "nombre_contacto": "Marcos Eduardo Rosales",
+    "observaciones": "Carpetas separas por Ambulatorio - Hospitalario - Urgencias - Canasta Covid (Malla covid con el numero de la factura), dentro de cada carpeta una carpeta llamada facturacion eletronica # envio, dentro una carpeta para remision # envio - rips # envio - soportes # envio",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "https://mutualsereps-my.sharepoint.com/personal/zorozco_mutualser_org/_layouts/15/stream.aspx?id=%2Fpersonal%2Fzorozco%5Fmutualser%5Forg%2FDocuments%2F2%2E%20GERENCIA%20GENERAL%2FDIRECCION%20DE%20AUDITORIA%2FGLOSAS%2F12%2E%20MANUAL%2FMANUAL%20DE%20APLICACION%20AUDITORIA%20DE%20CUENTA%20M%C3%89DICA%2FDOCUMENTOS%20PRESTADOR%2FACM%2FRESPUESTA%20DE%20GLOSA%5FPrestador%2Emp4&ga=1&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2Ee125e1a8%2D2ea0%2D452e%2Da8a7%2Deb4e2dee1c79",
+    "credenciales": "",
+    "manual": "https://mutualsereps-my.sharepoint.com/:b:/r/personal/yechever_mutualser_org/Documents/CARPETA%20GESTION%20ACM/Preguntas_Actualizacion%20ModuloGRG_23Julio25/MANUAL%20DE%20USUARIO%20-%20preguntas%20frecuentes.pdf?csf=1&web=1&e=G81Dzd\n\nhttps://mutualsereps-my.sharepoint.com/:b:/r/personal/zorozco_mutualser_org/Documents/2.%20GERENCIA%20GENERAL/DIRECCION%20DE%20AUDITORIA/GLOSAS/12.%20MANUAL/MANUAL%20DE%20APLICACION%20AUDITORIA%20DE%20CUENTA%20M%C3%89DICA/DOCUMENTOS%20PRESTADOR/RFDS/Manual%20de%20Usuario%20RFDS%20-%20General%20-%20Prestador.pdf?csf=1&web=1&e=DQz66U",
+    "medio_contacto": "soportetramiteglosas@mutualser.com",
+    "nombre_contacto": "",
+    "observaciones": "verificar link para responder la glosa",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860002183",
+   "nombre": "AXA COLPATRIA SEGUROS DE VIDA S.A.",
+   "radicacion": {
+    "link": "ACTIVA IT",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3125781016",
+    "correo": "daniela.sanchez@axacolpatria.co, gestionsiniestros.sac@axacolpatria.co, carteraarl.mpp@axacolpatria.co, dennisse.ariza@axacolpatria.co, jennifer.castiblanco@axacolpatria.co",
+    "contacto": "Dennisse Ariza",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.activa-it.net/App_Customs/Externas/RadicacionLight/RadicacionLight.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://activa-it.net/Login.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860002184",
+   "nombre": "AXA COLPATRIA SEGUROS S.A. SOAT",
+   "radicacion": {
+    "link": "Claim Online",
+    "usuario": "IPS",
+    "contrasena": "",
+    "telefono": "3125781016 - 3118107298",
+    "correo": "gestionsiniestros.sac@axacolpatria.co; dennisse.ariza@axacolpatria.co; sandra.sandoval@axacolpatria2.co",
+    "contacto": "Dennisse Ariza - Sandra Sandoval",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://axa.claimonline.com.co/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "daniela.sanchez@axacolpatria.co\ngestionsiniestros.sac@axacolpatria.co\nnotificacionpagos.siniestros@axacolpatria.co\nenvioaterceros.axacolpatria@rgc.com.co\ngestionsiniestros.sac@axacolpatria.co    \ndennisse.ariza@axacolpatria.co \nmiguel.laborde@axacolpatria.co",
+    "nombre_contacto": "",
+    "observaciones": "para solicitud de certificados de agotamiento al siguiente correo: certificadosdeagotamientoaxa@grupomok.com\n\nSi tienes dudas sobre el proceso de radicación de facturación electrónica puedes revisar el instructivo adjunto o escribir al correo preguntas.recepciónFE@axacolpatria.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://axa.claimonline.com.co/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "daniela.sanchez@axacolpatria.co\ngestionsiniestros.sac@axacolpatria.co\nnotificacionpagos.siniestros@axacolpatria.co\nenvioaterceros.axacolpatria@rgc.com.co\ngestionsiniestros.sac@axacolpatria.co    \ndennisse.ariza@axacolpatria.co \nmiguel.laborde@axacolpatria.co",
+    "nombre_contacto": "",
+    "observaciones": "para solicitud de certificados de agotamiento al siguiente correo: certificadosdeagotamientoaxa@grupomok.com\n\nSi tienes dudas sobre el proceso de radicación de facturación electrónica puedes revisar el instructivo adjunto o escribir al correo preguntas.recepciónFE@axacolpatria.co",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "BAYOS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "(607) 6183814 - 316 2125267",
+    "correo": "Tesoreria@clinicaelpinar.co",
+    "contacto": "LAURA CORDERO LUNA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890102044",
+   "nombre": "CAJA DE COMPENSACION FAMILIAR CAJACOPI",
+   "radicacion": {
+    "link": "https://genesis.cajacopieps.com/index.html#%2Fradicaciondigital\n900006037\n1096950174\n900006037",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860066942",
+   "nombre": "CAJA DE COMPENSACION FAMILIAR COMPENSAR",
+   "radicacion": {
+    "link": "https://consorcio.elyon.com.co/login?logout=1\nSoporteElyonEPS@compensarsalud.com",
+    "usuario": "1005163651",
+    "contrasena": "",
+    "telefono": "3124425013",
+    "correo": "YPGONZALEZS@compensarsalud.com; cuentassaludcompensar@compensarsalud.com",
+    "contacto": "Yuri Paola González Silva",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "jcvargasr@compensarsalud.com, facturalabcovid@compensarsalud.com, cuentassaludcompensar@compensarsalud.com, daortiztl@compensarsalud.com, akortizt@compensarsalud.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "NO LLEVA RIPS, SE ENVIA EN FISICO",
+    "ciudad": "BOGOTA"
+   },
+   "glosas": {
+    "medio": "CORREO Y EN FISICO",
+    "link_direccion": "radicacionrtaglosaJson@compensarsalud.com\ncuentassaludcompensar@compensarsalud.com\nJPCASTELLANOSP@compensarsalud.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "ENVIAR CON ANTICIPACION - PARA BOGOTA REALIZAR OFICIO (AUD) - SE DEBE DAR RESPUESTA A LA ENTIDAD EN EXCEL DONDE ELLOS NOTIFICARON",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "891600091",
+   "nombre": "CAJA DE COMPENSACION FAMILIAR CONFAMILIAR CHOCO",
+   "radicacion": {
+    "link": "http://38.52.207.138:5321/IntegraARS/AD_inicio_sesion.aspx\nhttps://radicacionmasvidapluss.wetransfer.com/",
+    "usuario": "7T!yjoqufnatjkqiog",
+    "contrasena": "",
+    "telefono": "3155080929",
+    "correo": "cartera@comfachoco.com.co",
+    "contacto": "YULISA MOSQUERA RENTERIA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://177.93.59.82:5321/INTEGRAARS/AD_INICIO_SESION.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "890500675",
+   "nombre": "CAJA DE COMPENSACION FAMILIAR DEL ORIENTE COLOMBIANO COMFAORIENTE",
+   "radicacion": {
+    "link": "Prestadores - Comfaoriente EPS-S",
+    "usuario": "680010079201",
+    "contrasena": "",
+    "telefono": "3208817283 / 312-3067512",
+    "correo": "cristina gomez <cristina.gomez@comfaoriente.com>; niurka.mora@comfaoriente.com <niurka.mora@comfaoriente.com>; oscar cancino <oscar.cancino@comfaoriente.com> ;erika escalante <erika.escalante@comfaoriente.com>",
+    "contacto": "CRISTINA GOMEZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://epsonline.comfaoriente.com/login/prestador/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://epsonline.comfaoriente.com/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901543211",
+   "nombre": "CAJACOPI EPS S.A.S.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3178933111 \n3185930 3860032 EXT 115",
+    "correo": "Eusebio.molina@cajacopieps.com; nacional.auditor5@cajacopieps.com; maria.villanueva@cajacopieps.com; harold.neuman@cajacopieps.com; mario.morales@cajacopieps.com",
+    "contacto": "HAROLD NEUMAN\ncarlos ahumada auditor 3006785160",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "https://genesis.cajacopieps.com/",
+    "usuario": "1096950174",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "Calle 44 con carrera 46-72 Barrio abajo área de radicación Seccional Atlántico sede Hermandades, Barranquilla Atlántico",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "3016854022\niliana.deavila@cajacopieps.com\ndeivis.carmona@cajacopieps.com\nAuxiliar de cuentas medicas: YULIETH PAOLA DE MOYA\nCORREO: Yulieth.demoya@cajacopieps.com",
+    "nombre_contacto": "Validacion de RIPS y/o validacion o cambio de usuario en Genesis:LEONARDI GALINDO\nCORREO: atlantico.cm2@cajacopieps.com y yulieth.demoya@cajacopieps.com",
+    "observaciones": "cuando se validan los rips en la plataforma de genesis, tener en cuenta que para seleccionar el contrato el 6555 pertenece al subsidiado y el 1381 al contributivo",
+    "ciudad": "BARRANQUILLA"
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "luz.agudelo@cajacopieps.com\nheber.silva@cajacopieps.com; ana.molina@cajacopieps.com; nacional.auditor5@cajacopieps.com; rosa.rojano@cajacopieps.com; nacional.auditor13@cajacopieps.com;",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900298372",
+   "nombre": "CAPITAL SALUD ENTIDAD PROMOTORA DE SALUD DEL REGIMEN SUBSIDIADO S.A.S.",
+   "radicacion": {
+    "link": "https://miniportal.capitalsalud.gov.co:4203/autenticacion/login",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "3102043666, 318 393 6553\n3212791820",
+    "correo": "mariarg@capitalsalud.gov.co; marthahc@capitalsalud.gov.co; tesoreria@capitalsalud.gov.co;  profesional.contabilidad2@capitalsalud.gov.co\nprofesional.contable13@capitalsalud.gov.co",
+    "contacto": "CAROLINA VALDERRAMA, VIRGINIA AGUDELO\nDEISSY RAMIREZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "https://portal.capitalsalud.gov.co/portalservicios\nhttps://miniportal.capitalsalud.gov.co:4203/login",
+    "usuario": "900006037",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://miniportal.capitalsalud.gov.co:4203/radicacion/radicacion-facturas-electronicas",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "con los archivos planos y  cargando los soportes de las imágenes en la FTP correspondiente. Se debe enviar al correo radicacion.masiva@capitalsalud.gov.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "siscog@capitalsalud.gov.co\nglosasyconciliaciones@capitalsalud.gov.co \nanalistaconciliacion9@capitalsalud.gov.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "891856000",
+   "nombre": "CAPRESOCA E.P.S.",
+   "radicacion": {
+    "link": "SIE::PRESTADORES",
+    "usuario": "900006037-R",
+    "contrasena": "",
+    "telefono": "3189004363\n3154016753",
+    "correo": "cartera@capresoca-casanare.gov.co\nivongomeze@gmail.com",
+    "contacto": "XIMENA SALAZAR HERRERA - TÉCNICO CUENTAS POR PAGAR\nIVON ELENA GÓMEZ - LÍDER DE PROCESOS",
+    "cargo": "TÉCNICO CUENTAS POR PAGAR\nLÍDER DE PROCESOS"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://www.prestadores.capresoca.gov.co/app_sie/general_index_ips.xhtml#nbb",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://www.prestadores.capresoca.gov.co/app_sie/loginIps.xhtml;jsessionid=375656925DFC52EA1D0B6355BB51E834#nbb",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860026518",
+   "nombre": "CHUBB SEGUROS COLOMBIA SA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "6013190402",
+    "correo": "servicioalcliente.co@chubb.com; siniestros.co@chubb.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890209698",
+   "nombre": "CLINICA CHICAMOCHA S.A.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "6929991 EXT 0482",
+    "correo": "serviciosadscritos@clinicachicamocha.com",
+    "contacto": "YORLADY CELIS TORRES",
+    "cargo": "CONTABILIDAD"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890208758",
+   "nombre": "CLINICA MATERNO INFANTIL SAN LUIS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "607 6430026 EXT.1214",
+    "correo": "",
+    "contacto": "CUENTAS MEDICAS",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "901241255",
+   "nombre": "CLINISPORTS DE COLOMBIA SAS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3172932525",
+    "correo": "facturacion.clinisports@gmail.com",
+    "contacto": "ISABEL CRISTIAN ÁLVAREZ QUIÑONEZ",
+    "cargo": "COORDINADORA FACTURACIÓN Y CARTERA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800226175",
+   "nombre": "COLMENA SEGUROS RIESGOS LABORALES S.A., RIESGOS LABORALES COLMENA S.A. COMPAÑIA DE SEGUROS DE VIDA",
+   "radicacion": {
+    "link": "https://colmenaprodb2c.b2clogin.com/colmenaprodb2c.onmicrosoft.com/b2c_1_invoway/oauth2/v2.0/authorize?client_id=399b8dfe-8854-416e-991c-f0719c5bbfd1&redirect_uri=https%3A%2F%2Fportalproveedores.colmenaseguros.com%2Fseguridad%2FARP.AdminSeguridad.MenuApps%2FLogin&response_type=code&scope=openid%20profile%20offline_access%20399b8dfe-8854-416e-991c-f0719c5bbfd1&code_challenge=yUVy2S-f4dly3XOZHVyPvSsCdZ-GmWHQ8Y7P6BVvLhM&code_challenge_method=S256&response_mode=form_post&nonce=638956414489764717.ZGI1MDU2NmEtNmM3MC00YWVhLWI2ZTAtMTg5YTBlMDdlNDM2NjIyMDZkNWItNTc0Ni00MGViLWI4ZDUtMjA2YmQwMDk4YzI5&client_info=1&x-client-brkrver=IDWeb.3.8.4.0&state=CfDJ8Cc7u-r6bQpDtbc98kNhn9hbYe9cIE1dvVlj0uNaUk-dOchp8MkXzbgK8-c5e4oUoYt01l-deAypTPSmTHryw2lJFxyC6A56O7lrWwtn0eAipm79tQ0_LSeBMBTFEfqVRE79mLVhAejNGKd5g8jGH9-jqmC7V66ZUpxodSQ_Jw8i7u3DbxGdMxI4Yb8MHXNRsSLMElVDCYrtHKXEb8azdyBHU9CdIEN7_moFmGH_cZyztmE8--DPlfhdwaH3gc6CD0QVf7a0iE1dD81EU8Y1AYhJdelzPHv8ZhfHMZiLTfFhjqvJ1UvOvPkqkr6_nX5lImMCSKeLBjXXLm2O8BtPm2l5RaOxGrBzyCrKxa4LtcdrLt2IPZiW22ovorgRT0GvvcRsWbvBGFsh4-ax7ObaFlhdK3318MQIOnnY8WCTh5jzhA2nEQ-KOx3gLQJ-6hn7Rtd-WTTsjgqacPD5YMb9HqqAtlSl-E54yGz2aK72rKjyMBfMVv80tHQao56LdULupg&x-client-SKU=ID_NET8_0&x-client-ver=8.9.0.0",
+    "usuario": "OLRG1098",
+    "contrasena": "",
+    "telefono": "3162658935",
+    "correo": "MRuizd@fs.co; servicioalcliente@colmenaseguros.com; CArevalo@fundaciongruposocial.co; pagaduriacolmenaseguros@fundaciongruposocial.co",
+    "contacto": "CARLOS ALBERTO ARÉVALO GONZÁLEZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.colmenaseguros.com/Paginas/default.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "CuentasMedicas@ext.colmenaseguros.\ncuentasmedicas.colmena@serlefin.com",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://colmenaprodb2c.b2clogin.com/colmenaprodb2c.onmicrosoft.com/b2c_1_invoway/oauth2/v2.0/authorize?client_id=399b8dfe-8854-416e-991c-f0719c5bbfd1&redirect_uri=https%3A%2F%2Fportalproveedores.colmenaseguros.com%2Fseguridad%2FARP.AdminSeguridad.MenuApps%2FLogin&response_type=code&scope=openid%20profile%20offline_access%20399b8dfe-8854-416e-991c-f0719c5bbfd1&code_challenge=DIc663-2MTY4Dfysk3jaAEl1b-DXeMrtoe1CdUVVluI&code_challenge_method=S256&response_mode=form_post&nonce=638906308355527534.MjZmMDI0NGItOTNjNC00ZTQ3LWExODMtZGNmNGViM2JlNDc5OWZkNjk4OTEtNDUxMC00ZTgwLTlhNGItMmM5YTc4YzFiOTU2&client_info=1&x-client-brkrver=IDWeb.3.8.4.0&state=CfDJ8LOt-dghR2dHrt_scN1OEg5ORTAaxipHVEQVUCTvlN38VI0ofAf6-M4RbFAlrmO7yjaqBf__hwfG4Iho2k3Ju7j81Gy6A1Ee3t0nkONxleKhmG8K3iVku9qwb834Dtbx76msmaHa4NuE-dYaSqZFWKzvWgkmacGe5Iplgd03bPXuxQjmnLbw4JMwyc9FgqaEjLea5bwaLHKn2D1mc9rl-DRP6ssB2KS822QTQhf1pj_GSzZsBZOC3etcpznqy78dMdM_KlbnSywYYcwSPlTQcuNfOuG8INNw3Eva8SdQ0OpkEuTi_0ZYe5MJbTex4Bc9F0-VWP1bLotFfUCi0XfTNOQ78un5p4L24X-HWJFG_Vz7cVrpoFJ47TC8sBDm2r9wB1LgAzR05Ffw2Z_GOGZ93T00HtZOAl_kGLYa3-TG3pggNK-aKpB9pQb23r6KxlA_0HbCVx_Fhe3AYkNnvgAdLHKvCHqnnQf9KuJBnIcnhDkQcmLjOA_OPWFHae0D2jHu9g&x-client-SKU=ID_NET8_0&x-client-ver=8.9.0.0",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "servicioalcliente@colmenaseguros.com",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "COLOMBIANA DE SALUD",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "financieracds@gmail.com, carteracolombiana@hotmail.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "COMFENALCO VALLE",
+   "radicacion": {
+    "link": "https://portal.epsdelagente.com.co/Externo/BoxaludExterno/Seguridad/Login.aspx",
+    "usuario": "900006037.4",
+    "contrasena": "",
+    "telefono": "3226850722",
+    "correo": "revisionconciliacioncarteracuentassalud@epsdelagente.com.co",
+    "contacto": "",
+    "cargo": "DPTO CARTERA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "COMPARTA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "https://www.comparta.com.co/prestadores/comunicados-a-prestadores",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "860037013",
+   "nombre": "COMPAÑIA MUNDIAL DE SEGUROS S.A.",
+   "radicacion": {
+    "link": "https://prwmundial.iqdigital.com.co/login",
+    "usuario": "radicacionhus@gmail.com",
+    "contrasena": "",
+    "telefono": "3123463380",
+    "correo": "nyalba@segurosmundial.com.co; carteramundial@iq-online.com; carterasoat@segurosmundial.com.co; Seguros.MundialSC@iq-online.com; notificacionessoat@segurosmundial.com.co",
+    "contacto": "NATHALIA ALBA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://prwmundial.iqdigital.com.co/login",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "LAS DEVOLUCIONES SE CARGAN POR DOCUMENTO DE COBRO (PRIMERO OPCION)\n\npara expedir certificados de agotamiento en el siguiente link y llenar los campos\nhttps://siniestrossoat.mundialseguros.com.co/CertificacionesWEBSOAT/\n\ncuando se radica COMPAÑIA MUNDIAL DE SEGUROS S.A.  ACCIDENTES PERSONALES es por correo facturacionredmedica@segurosmundial.com.co  Soportes- SIN RIPS",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://prwmundial.iqdigital.com.co/login",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "PARA RESPUESTA DE GLOSAS, SE INGRESA A LA PLATAFORMA POR LA OPCION DE \"RESPUESTA DE OBJECION PARCIAL\"\n\npara expedir certificados de agotamiento en el siguiente link y llenar los campos\nhttps://siniestrossoat.mundialseguros.com.co/CertificacionesWEBSOAT/",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860002503",
+   "nombre": "COMPAÑIA SEGUROS BOLIVAR SA",
+   "radicacion": {
+    "link": "imaginex-autorizacion.segurosbolivar.com/index.php/ProveedoresBolivar/radicacion",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cartera.salud@segurosbolivar.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "https://www.activa-it.net/Login.aspx",
+    "link_direccion": "USUARIO: BOL680010079201\nCONTRASEÑA: Abril.2026*",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "para restablecimiento de contraseña le llega al correo de Jhon (glosashus04@sinacsc.com)",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://imaginex-autorizacion.segurosbolivar.com/index.php/ProveedoresBolivar/Radicacion",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "COMUNEROS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "(607) 6343536 Ext 1137",
+    "correo": "isney.penuela@loscomuneroshub.com",
+    "contacto": "Isney Peñuela Pelayo",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900226715",
+   "nombre": "COOSALUD ENTIDAD PROMOTORA DE SALUD S.A.",
+   "radicacion": {
+    "link": "https://vco.ctamedicas.com/app/radicaciones",
+    "usuario": "680010079201",
+    "contrasena": "",
+    "telefono": "3008375970",
+    "correo": "bvasquez@coosalud.com; yflorez@coosalud.com; mvega@coosalud.com",
+    "contacto": "Benjamin Vasquez Madrid",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://vco.ctamedicas.com/app/\nSERVIDOR: vco.ctamedicas.com\nUSUARIO WEB : 680010079201\nCLAVE WEB: Coosalud2025\nUSUARIO SFTP: 900006037\nCLAVE SFTP: Xu2Em6No7On9\n\nCOOSALUD FILEZILLA\nPUERTO: 22  URL: vco.ctamedicas.com\nUSUARIO: 900006037\nCONTRASEÑA: Xu2Em6No7On9",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://vco.ctamedicas.com/app/inicio\n\nFILEZILLA \nPUERTO: 22  URL: vco.ctamedicas.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "890210619",
+   "nombre": "CRUZ ROJA COLOMBIANA SECCIONAL SANTANDER",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "dir.administrativa@cruzrojasantander.org; vanesa.pineres@cruzrojasantander.org; aux.tesoreria@cruzrojasantander.org",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "CUV",
+   "radicacion": {
+    "link": "https://validadorderipscolombia.com/consulta-codigo-unico-de-validacion-cuv?cuv=82436628ddb32d7c606ce79cd022f55af16ef6486690ea049612dc6e5ef947500f04e370d13c370c8188fd57f47dc3ed",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "800103196",
+   "nombre": "DEPARTAMENTO DEL GUAVIARE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "",
+   "nombre": "DIAN",
+   "radicacion": {
+    "link": "https://catalogo-vpfe.dian.gov.co/User/SearchDocument",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901541137",
+   "nombre": "DISPENSARIO MEDICO BUCARAMANGA",
+   "radicacion": {
+    "link": "https://auditool25.tool.com.co/index.aspx",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "3017484384",
+    "correo": "dmbugcartera@gmail.com",
+    "contacto": "JULLIETH ORDUZ PATIÑO",
+    "cargo": "CARTERA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "890210619@factureinbox.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "VA EN FISICO CON CD DE RIPS",
+    "ciudad": "BUCARAMANGA"
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://auditool25.tool.com.co/index.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901541302",
+   "nombre": "DISPENSARIO MEDICO NIVEL II BOGOTA",
+   "radicacion": {
+    "link": "https://siais.fiduprevisora.danteti.co/login",
+    "usuario": "glosasydevoluciones@hus.gov.co",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "laura.aguirre@armada.mil.co",
+    "contacto": "LAURA VANESSA AGUIRRE NAVARRO",
+    "cargo": "TESORERÍA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901540793",
+   "nombre": "DISPENSARIO MÉDICO BAHÍA MÁLAGA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3115181003\n3217816988",
+    "correo": "jonathan.correa@armada.mil.co\ncuentasmedicasfnp@armada.mil.co",
+    "contacto": "JONATHAN ALEJANDRO CORREA GARCÍA\nADALGIZA LEONES",
+    "cargo": "JEFE FINANCIERO\nCUENTAS MEDICAS"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "Calle 5 N.º 85-38 Oficina Coordinación Sanidad Cali; Santiago de Cali-Valle del Cauca",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "032-4383400",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": "CALI"
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "899999068",
+   "nombre": "ECOPETROL S.A.",
+   "radicacion": {
+    "link": "https://prestadores.aplicativoasalud.co/InicioSesion/Login",
+    "usuario": "olricog",
+    "contrasena": "",
+    "telefono": "3163916635",
+    "correo": "cesar.cornejo@ecopetrol.com.co\ncuentasmedicassantander@asalud.co",
+    "contacto": "CÉSAR AUGUSTO CORNEJO MARTÍNEZ\nÁLVARO CALVETE CAMARGO",
+    "cargo": "PROFESIONAL DE GESTIÓN INTEGRAL\nLÍDER DE CUENTAS MÉDICAS REGIONAL CUS - ASALUD"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://prestadores.aplicativoasalud.co/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "actualmente se notifica RTA A GLOSA x CORREO",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "ECOPSOS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3102548414",
+    "correo": "conciliacioncartera@ecoopsos.com.co; requerimientostesoreria@ecoopsos.com.co",
+    "contacto": "ALEJANDRA GUERRERO",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800006150",
+   "nombre": "EMPRESA COOPERATIVA DE SERVICIOS DE SALUD EMCOSALUD",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3015562682",
+    "correo": "unidad.contabilidad.clinica@emcosalud.com, ANTRU1@hotmail.com\ndireccion.financiera@emcosalud.com",
+    "contacto": "TESORERIA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800084206",
+   "nombre": "EMPRESA SOCIAL DEL ESTADO INSTITUTO DE SALUD DE BUCARAMANGA - ISABU",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "jefeoficinajuridica@isabu.gov.co; tesoreria@isabu.gov.co; coordinacionsalapartoshln@gmail.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "901021565",
+   "nombre": "EMSSANAR ENTIDAD PROMOTORA DE SALUD SAS",
+   "radicacion": {
+    "link": "https://emssanarlazos.org/cas/login?service=https%3A%2F%2Femssanarlazos.org%3A443%2Fwap%2Fcuentasmedicas%2Ftrx%2FgestionarCuentasValidadas",
+    "usuario": "deror12",
+    "contrasena": "",
+    "telefono": "312 2262897\n3173414205",
+    "correo": "carterayrecobros@emssanar.org.co; olgagamboa@emssanar.org.co; soportepagostesoreria@emssanareps.co\nmariluzsanchez@emssanareps.co",
+    "contacto": "OLGA STELLA GAMBOA VILLOTA\nMariluz Sanchez Gamboa",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://erp.ripslink.app/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "LINK TOOLS: \nhttps://emssanarlazos.org/cas/login?service=https%3A%2F%2Femssanarlazos.org%2Fweb%2Fj_spring_cas_security_check\nUSUARIO: deror12\nCONTRASEÑA: Noviembre2024*\n\nSE DEBE HACER EL CARGUE DE RIPS Y SOPORTES POR LA PLATAFORMA Y DESPUES ENVIAR LOS SOPORTES DE LA FACTURA Y FACTURA AL CORREO radicacionfacturacion@emssanareps.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://erp.ripslink.app/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "conciliacion@emssanareps.co\nmesadeayudasieps@emssanareps.co",
+    "nombre_contacto": "",
+    "observaciones": "LINK ANTIGUA RESOLUCION:\nhttps://emssanarlazos.org/cas/login?service=https%3A%2F%2Femssanarlazos.org%2Fweb%2Fj_spring_cas_security_check\nUSUARIO: deror12      \nCONTRASEÑA: Junio2025*+",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "830003564",
+   "nombre": "ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S",
+   "radicacion": {
+    "link": "Servidor: 190.143.65.21",
+    "usuario": "Usuario: hounidesanese",
+    "contrasena": "",
+    "telefono": "3214201022",
+    "correo": "ysalazarm@famisanar.com.co; nbaquero@famisanar.com.co; fcastilloc@famisanar.com.co; correspondencia@famisanar.com.co; lacunar@famisanar.com.co; iavendanob@famisanar.com.co",
+    "contacto": "FREDY ANDRES CASTILLO CRUZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "respuestadevoluciones@famisanar.com.co  smorenog@famisanar.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "mhernandez@famisanar.com.co\nrespuestadevoluciones@famisanar.com.co",
+    "nombre_contacto": "Martha Biviana Hernandez Arenas",
+    "observaciones": "Todos los soportes de la factura con la respuesta unidos en pdf y comprimido en ,zip y SE ADJUNTA LA ESTRUCTURA EN EXCEL QUE TRAE LAS RESPUESTAS Y se envian al correo\nSOLO PARA EL ENVIO DE XML SE UTILIZA EL SIGUIENTE CORREO cuentas.medicas@facturacion.famisanar.com.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "respuestaglosas@famisanar.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "837000084",
+   "nombre": "ENTIDAD PROMOTORA DE SALUD MALLAMAS EPS",
+   "radicacion": {
+    "link": "http://190.121.144.132/#/auth/side-login",
+    "usuario": "orico",
+    "contrasena": "",
+    "telefono": "3153260617",
+    "correo": "cartera@mallamaseps.com",
+    "contacto": "MARIBEL CUATIN QUENAN",
+    "cargo": "COORDINACIÓN DE CARTERA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "radicacioncuentasmedicasipiales-2@mallamaseps.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Escaneo - rips - Soportes (certificacion Bancaria - Parafiscales - Planilla - Rut - Cuenta de cobro por envio)",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "800251440",
+   "nombre": "ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S",
+   "radicacion": {
+    "link": "PRED WEB",
+    "usuario": "DMONSALVE",
+    "contrasena": "",
+    "telefono": "3174014336",
+    "correo": "contactoprestadoreps@colsanitas.com; momartinez@epssanitas.com",
+    "contacto": "Mónica Martínez Paredes",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://predweb.iq-online.net.co/ATF_Site/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "glosas@colsanitas.com\nglosascuentasmedicas@colsanitas.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "al responder la glosa ante la entidad, tener en cuenta el archivo de notificacion de la glosa",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901543761",
+   "nombre": "EPS FAMILIAR DE COLOMBIA S.A.S.",
+   "radicacion": {
+    "link": "MESSIAH :: PRESTADORES",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "3142151169.",
+    "correo": "gestion.cuentas@epsfamiliardecolombia.com; lider.cuentas@epsfamiliardecolombia.com",
+    "contacto": "CALEB MANJARRES",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://eps.familiardecolombia.com/sie/loginIps.xhtml#nbb",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "http://familiardecolombia.com:8080/sie/loginIps.xhtml#nbb",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "800088702",
+   "nombre": "EPS Y MEDICINA PREPAGADA SURAMERICANA S.A",
+   "radicacion": {
+    "link": "https://login.sura.com/sso/servicelogin.aspx?continueTo=https%3A%2F%2Fepsapps.suramericana.com%2FPrestadores&service=epssura",
+    "usuario": "1098612385",
+    "contrasena": "",
+    "telefono": "3184333394",
+    "correo": "jsantamariap@sura.com.co",
+    "contacto": "JESSICA LUCIA SANTAMARIA PALACIO",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://epsapps.suramericana.com/Prestadores/faces/prestadores/login/loginPrestadores.jspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://epsapps.suramericana.com/Prestadores/faces/prestadores/login/loginPrestadores.jspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "pasos: \nprestadores - conciliacion eps - buscar por factura - e ir diligenciando - al final tomar pantallazo para evidencia de radicacion",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901542588",
+   "nombre": "ESM COMANDO AEREO DE COMBATE NO 3",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "jorge.gomez@fac.mil.co",
+    "contacto": "JORGE GÓMEZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "EVOLUCION CARE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "320 8612000",
+    "correo": "evoluzioncare@gmail.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "901495943",
+   "nombre": "FIDEICOMISO FONDO NACIONAL DE SALUD",
+   "radicacion": {
+    "link": "https://siais.fiduprevisora.danteti.co/login",
+    "usuario": "glosasydevoluciones@hus.gov.co",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "martha.piraquive@fondoppl.com - Johanna.Moreno@fondoppl.com",
+    "contacto": "MARTHA INES PIRAQUIVE MORENO",
+    "cargo": "JEFE UNIDAD DE LIQUIDACIÓN"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://siais.fiduprevisora.danteti.co/login",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "cuando se acepta una devolucion hay que radicar la factura a la entidad enviando lo siguiente: la nota credito, el tramite y la factura a los siguientes correos ERIKA JURADO <ejurado@vco.com.co>,CAROLINA MURCIA <cmurcia@vco.com.co>",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://siais.fiduprevisora.danteti.co/login",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901682277",
+   "nombre": "FIDEICOMISO FONDO NACIONAL DE SALUD",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "830053105",
+   "nombre": "FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A. - FOMAG",
+   "radicacion": {
+    "link": "https://horus2.horus-health.com/\nhttps://auditorias.dygconsultores.com.co/cuentasmedicasdyg_2024/ingreso.php",
+    "usuario": "1098612385@fomag.com",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "pqrppl@fiduprevisora.com.co\nppl_dramirez@fiduprevisora.com.co - ppl_ltrilleras@fiduprevisora.com.co\nconciliacioncartera@fomag.gov.co - financiera@fomag.gov.co",
+    "contacto": "VANESSA MARGARITA MEZA\nDIEGO ANDRÉS RAMÍREZ VERA\nROGER ALAIN CASTILLO SÁNCHEZ",
+    "cargo": "ASESOR\nCOORDINADOR DE PRESUPUESTO PPL"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://auditorias.dygconsultores.com.co/cuentasmedicasdyg_2024/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "Dev 321-9141855 - 302-3943455 - Glosas 312-5815694",
+    "nombre_contacto": "cuentasmedicas@dygconsultores.com",
+    "observaciones": "FOMAG HORUS (NUEVA PLATAFORMA)\nLINK: https://horus2.horus-health.com/\nUsuario: 1098612385@fomag.com\nContraseña: Fomag2026*+",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://auditorias.dygconsultores.com.co/cuentasmedicasdyg_2024/\nhttps://horus2.horus-health.com/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "CUANDO SE VAN A RADICAR MASIVA LAS GLOSAS SE DEBE TENER EN CUENTA UTILIZAR FILEZILLA PARA SUBIR LOS SOPORTES, PARA LO CUAL EL USUARIO Y LA CLAVE ESTA EN LA COLUMNA D, LOS PASOS ESTAN EN LA CARPETA INSTRUTIVO\n\nFOMAG HORUS (NUEVA PLATAFORMA)\nLINK: https://horus2.horus-health.com/\nUsuario: 1098612385@fomag.com\nContraseña: Fomag2026*+",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "900047282",
+   "nombre": "FIDUFOSYGA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "correspondencia2@adres.gov.co; correspondencia1@adres.gov.co; lizanyury.blanco@adres.gov.co; radicacionpjdop@adres.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800246953",
+   "nombre": "FONDO FINANCIERO DISTRITAL DE SALUD DE BOGOTA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3002625734",
+    "correo": "MLmorales@saludcapital.gov.co",
+    "contacto": "Martha Lucía Morales Macías",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890212568",
+   "nombre": "FUNDACION CARDIOVASCULAR DE COLOMBIA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "6796470 EXT 4073",
+    "correo": "dorisvillamizar@fcv.org - sindyvargas@fcv.org",
+    "contacto": "DORIS CECILIA VILLAMIZAR SUÁREZ",
+    "cargo": "JEFE TESORERÍA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900330752",
+   "nombre": "FUNDACION FOSUNAB",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "7000300 EXT 6062",
+    "correo": "analista.contablefi1@foscal.com.co",
+    "contacto": "GLADIS TERESA SERRANO MANTILLA",
+    "cargo": "ANALISTA CONTABLE"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800050068",
+   "nombre": "FUNDACION MEDICO PREVENTIVA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cuentasporpagar@fundamep.com; rodolfopinilla@fundamep.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890205361",
+   "nombre": "FUNDACION OFTALMOLOGICA DE SANTANDER - FOSCAL",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "7000300 EXT 6069",
+    "correo": "auxiliar.contable5@foscal.com.co",
+    "contacto": "DANIELA ANDREA BARRERA ANAYA",
+    "cargo": "ANALISTA CONTABLE"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900914254",
+   "nombre": "FUNDACION SALUD MIA EPS",
+   "radicacion": {
+    "link": "SaludMia IPS",
+    "usuario": "UNSA02",
+    "contrasena": "",
+    "telefono": "3134520286\n3176413446",
+    "correo": "tesoreria@saludmia.org\nedwinmelgarejo@saludmia.org",
+    "contacto": "GISETH NATALIA BIANCHA GÓMEZ\nEDWIN MELGAREJO",
+    "cargo": "PROFESIONAL DE TESORERÍA\nPROFESIONAL DE CUENTAS MÉDICAS"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://adminfin.saludmia.org/sagis/loginIps.xhtml?faces-redirect=true#nbb",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://adminfin.saludmia.org/sagis/loginIps.xhtml?faces-redirect=true#nbb",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "900232067",
+   "nombre": "FUNDACION SERVICIO DE LOS JESUITAS PARA LOS REFUGIADOS.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "860039988",
+   "nombre": "HDI SEGUROS COLOMBIA S.A.",
+   "radicacion": {
+    "link": "https://appbpm.hdiseguros.com.co/GM_WEB_PortalV1/?_afrLoop=1699907679274420&_afrWindowMode=2&Adf-Window-Id=w13l9y8j1r6&_afrPage=2&_afrFS=16&_afrMT=screen&_afrMFW=1322&_afrMFH=926&_afrMFDW=1920&_afrMFDH=1080&_afrMFC=8&_afrMFCI=0&_afrMFM=0&_afrMFR=96&_afrMFG=0&_afrMFS=0&_afrMFO=0",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3118124134",
+    "correo": "glosasycarteramedica@hdiseguros.com.co; margoth.ruiz@hdiseguros.com.co; solicitudes.tesoreria@hdiseguros.com.co; fabio.aldana@hdiseguros.com.co",
+    "contacto": "Margoth Ruiz\nJURIDICA - glosasycarteramedica@hdiseguros.com.co",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://appbpm.hdiseguros.com.co/GM_WEB_PortalV1/faces/PG_InicioPortalGM_New?_afrLoop=2288171925605075&_afrWindowMode=2&Adf-Window-Id=w16ndjg0903&_afrFS=16&_afrMT=screen&_afrMFW=1541&_afrMFH=911&_afrMFDW=1920&_afrMFDH=1080&_afrMFC=8&_afrMFCI=0&_afrMFM=0&_afrMFR=96&_afrMFG=0&_afrMFS=0&_afrMFO=0",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "Ruiz Anaya, Margoth Elena' <margoth.ruiz@hdiseguros.com.co>\nCentraldeNegocio@hdiseguros.com.co\nbpm@hdiseguros.com.co\nnotificacion.cuentasmedicas@hdiseguros.com.co",
+    "nombre_contacto": "",
+    "observaciones": "PARA SOLICITUD DE CERTIFICADOS DE AGOTAMIENTO POR EL SIGUIENTE CORREO: \nagotamientocoberturassoat@hdiseguros.com.co\nESPERAR DE 8 A 15 DIAS",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://appbpm.hdiseguros.com.co/GM_WEB_PortalV1/faces/PG_WelcomePortal?_afrRedirect=1796651066758055&_afrPage=6",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "CentraldeNegocio@hdiseguros.com.co\nbpm@hdiseguros.com.co\nnotificacion.cuentasmedicas@hdiseguros.com.co\n'Ruiz Anaya, Margoth Elena' <margoth.ruiz@hdiseguros.com.co>",
+    "nombre_contacto": "",
+    "observaciones": "Enviar glosas por correo para los casos cuando la plataforma este cerrada del 20 hasta fin de mes\nPARA SOLICITUD DE CERTIFICADOS DE AGOTAMIENTO POR EL SIGUIENTE CORREO: \nagotamientocoberturassoat@hdiseguros.com.co\nESPERAR DE 8 A 15 DIAS",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "901541021",
+   "nombre": "HOSPITAL NAVAL NIVEL III CARTAGENA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3128764487",
+    "correo": "tesoreria.honac@armada.mil.co\nauditoriahonac@gmail.com",
+    "contacto": "ROXANNA YANES\nDAMARIS",
+    "cargo": "CUENTAS POR PAGAR\nGLOSAS Y CONCILIACIONES"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "Carrera 2 # 14-210 Av. San Martin Entrada Bocagrande - Cartagena, Bolívar",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "lucas.reyes@armada.mil.co \nauditoriahonac@armada.mil.co\n(605) 6810707\n035-6778021 Extensión 117 / 106 - Celular: 3144701249",
+    "nombre_contacto": "LUCAS REYES",
+    "observaciones": "",
+    "ciudad": "CARTAGENA"
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891280001",
+   "nombre": "INSTITUTO DEPARTAMENTAL DE SALUD DE NARINO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "contactenos@idsn.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890500890",
+   "nombre": "INSTITUTO DEPARTAMENTAL DE SALUD DE NORTE DE SANTANDER",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3107736361",
+    "correo": "notificacionglosaspssids@gmail.com, financierapssids@gmail.com, correspondencia@ids.gov.co",
+    "contacto": "OMAIRA EDITH TORRADO",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "830008686",
+   "nombre": "LA EQUIDAD SEGUROS DE VIDA ORGANISMO COOPERATIVO",
+   "radicacion": {
+    "link": "https://portaltucarpeta.transfiriendo.com:3010/Web/Webforms/Account/Views/Index.aspx",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "Janny.urquijo@laequidadseguros.coop; Nubia.Verdugo@laequidadseguros.coop; alexandra.cifuentes@laequidadseguros.coop",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://portaltucarpeta.transfiriendo.com:3010/Web/Webforms/Account/Views/Index.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "paula.cortes@laequidadseguros.coop \njuancarlos.rodriguez@laequidadseguros.coop",
+    "nombre_contacto": "PAULA CORTES Y JUAN CARLOS RODRIGUEZ",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://portaltucarpeta.transfiriendo.com:3010/Web/Webforms/Account/Views/Index.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "Paula.Cortes@laequidadseguros.coop",
+    "nombre_contacto": "Paula Cortes",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860002400",
+   "nombre": "LA PREVISORA S A COMPAÑIA DE SEGUROS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cartera.previsora@grupomok.com; carterasoat@previsora.gov.co; marcela.campuzano@previsora.gov.co; soportessoat@previsora.gov.co; libia.mendivil@previsora.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://soatapjuridica.consorcioprevisora.com/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "carterasoat@previsora.gov.co\noperativo.digitalizacion@consorcioprevisora.com\ncarterasoat@previsora.gov.co\ncertificadocobertura_previsora@rgc.com.co",
+    "nombre_contacto": "",
+    "observaciones": "SOLO SE RADICA POR PLATAFORMA\nsolicitud de cert tope soat por activa credenciales \nlink: https://activa-it.net/Login.aspx\nusuario: prev900006037\ncontraseña: Junio.2026",
+    "ciudad": "BOGOTA"
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://soatapjuridica.consorcioprevisora.com/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "carterasoat@previsora.gov.co\noperativo.digitalizacion@consorcioprevisora.com\ncarterasoat@previsora.gov.co\ncertificadocobertura_previsora@rgc.com.co",
+    "nombre_contacto": "",
+    "observaciones": "En caso de presentar fallas o inconsistencias en el proceso de radicación, por favor reportar las mismas de manera inmediata a los correos electrónicos operativo.digitalizacion@consorcioprevisora.com y carterasoat@previsora.gov.co. \n\nPara el ingreso a la plataforma de Activa seguir el siguiente enlace \"descargar certificado agotamiento soat\"\nhttps://activa-it.net/Login.aspx\nUSUARIO: PREV900006037\nCONTRASEÑA: Junio.2026",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "860008645",
+   "nombre": "LIBERTY SEGUROS DE VIDA S.A.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cartera.cuentasmedicas@libertycolombia.com; daniel.valderrama@libertyseguros.co; ana.marsiglia@libertycolombia.com; Margoth.Ruiz@libertycolombia.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891700037 Y 830054904",
+   "nombre": "MAPFRE SEGUROS DE COLOMBIA S.A.",
+   "radicacion": {
+    "link": "https://app.godat.co/",
+    "usuario": "rips@hus.gov.co",
+    "contrasena": "",
+    "telefono": "3157160788",
+    "correo": "CLAPENA@mapfre.com.co; CMEDICAS@mapfre.com.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO \nPLATAFORMA SOAT",
+    "link_direccion": "CMEDICAS@mapfre.com.co\nhttps://app.godat.co/administration/dashboard",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "cmedicas@mapfre.com.co.\n3157160788\n601 6439600 Ext. 3583-3536-1467-3111",
+    "nombre_contacto": "",
+    "observaciones": "Para solicitar información adicional, cruce de estado de cartera o cita de conciliación de objeciones\n(devoluciones, objeciones parciales, objeciones totales), puede escribir al buzón electrónico\ncmedicas@mapfre.com.co con el fin de realizar un adecuado proceso de revisión y tramite a su solicitud.\nRecuerde nuestros datos de contacto: Teléfono 601 6439600 Ext. 3583-3536-1467-3111, Celular/WhatsApp 315\n7160788 cmedicas@mapfre.com.co. . Auditor: LUGONZA",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "www. https://www.mapfre.com.co/seguros-co/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "actualmente se envía x correo",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "800163827",
+   "nombre": "MAWDY SAS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "AMBUSTO@MAWDY.COM",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "MEDICINA INTEGRAL",
+   "radicacion": {
+    "link": "http://aseguramientomi.sismacorporation.com:81/sismaeps/public/login",
+    "usuario": "680010079201",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "MEDICOS Y ADITORES",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "asistencias medicos y auditores <operaciones@medicosyauditores.com>; Vanessa Avila <cfinanzas@medicosyauditores.com>",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "MEDISALUD UT",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3212023024\n(608) 7457702-7457380 ext 104",
+    "correo": "dirfinanciera@medisalud.com.co; tesoreria@medisalud.com.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "Carrera 6 Av norte # 65 - 195 Oficina 201 – 203, Tunja – Boyacá Lunes a viernes 07:30 am a 4:00pm Jornada",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": "TUNJA"
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "860005114",
+   "nombre": "MESSER COLOMBIA S.A.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3203477932",
+    "correo": "andrea.muriel@messer-co.com",
+    "contacto": "DRA ANDREA MURIEL",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "https://app.iproveedor.com/iprov/Supplier.jsp?lang_user=es#2",
+    "usuario": "900006037",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800096561",
+   "nombre": "MUNICIPIO DE AGUACHICA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "contactenos@aguachica-cesar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "892300815",
+   "nombre": "MUNICIPIO DE CHIMICHAGUA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "secretariadesalud@chimichagua-cesar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800096585",
+   "nombre": "MUNICIPIO DE CHIRIGUANÁ",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "alcaldia@chiriguana-cesar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "825000134",
+   "nombre": "MUNICIPIO DE DIBULLA - DEPARTAMENTO DE LA GUAJIRA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "acuerdo.ley550@laguajira.gov.co; contactenos@laguajira.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890204802",
+   "nombre": "MUNICIPIO DE GIRON",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "contactenos@giron-santander.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890480431",
+   "nombre": "MUNICIPIO DE MORALES",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "alcaldia@morales-bolivar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890981000",
+   "nombre": "MUNICIPIO DE PUERTO NARE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "secretariasalud@puertonare-antioquia.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890501434",
+   "nombre": "MUNICIPIO DE SAN JOSE DE CUCUTA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "rosa.acuna@cucuta.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800096626",
+   "nombre": "MUNICIPIO DE TAMALAMEQUE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "alcaldia@tamalameque-cesar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900156264",
+   "nombre": "NUEVA EMPRESA PROMOTORA DE SALUD S.A.",
+   "radicacion": {
+    "link": "https://neps.auditoriavco.com/cuentas/\nRadica2025\ne9GLpQ$;5l2VffBE\n\nAdmin900006037\nnUDG{!.RhL_h*{(k\n\nGlosasyDevolucion2025\n2?&7:;TomsMlac!V\n\nLesly900006037\nfiNdK,,L5i9.B.7B\n\nRadica2025\nqQElTp5A?xlMHkv3\n\nNUEVA EPS ANTIGUO \nhttps://solucionjb.nuevaeps.com.co/portalcuentasmedicasweb/login\n900006037\nQR0347UJN3PS\nhttps://radicacion-digital-nueva-eps.jimdosite.com/",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3178549703",
+    "correo": "cartera.prestadores@nuevaeps.com.co; ggprequerimientos@nuevaeps.com.co",
+    "contacto": "CARLOS GARCIA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "RIPS: PLATAFORMA\nSOPORTES: PLATAFORMA",
+    "link_direccion": "https://app.nuevaeps.com.co/#/\nhttps://solucionjb.nuevaeps.com.co/portalcuentasmedicasweb/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "gestionfinanciera@nuevaeps.com.co\ncuentas.tramitesinternos@nuevaeps.com.co",
+    "nombre_contacto": "",
+    "observaciones": "se debe adjuntar la sabana que me pasan los tecnicos junto con la factura en pdf y se envia",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://neps.auditoriavco.com/cuentas/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Notificar al correo: maribel.garzon@nuevaeps.com.co\nVictor Manuel Romero Contreras: victor.romero@iq-online.com \nAngelica Maria Paiba Benitez: 3004245033 Angelica.paiba@iq-online.com \nGina Rivera: gina.rivera@nuevaeps.com.co \nKaren Viviana Vigoya Gomez: karen.vigoya@iq-online.com \n\nARANDA\nlink de mesa de ayuda,los que no tengan usuario enviar los siguientes datos: \nNúmero de identificación, nombre completo. correo electrónico\n\ncall center 6012541986\nnumero del call\nhttps://aranda.clientes.iq-online.net.co/usdkv8/#!/login/?tokenBranding=\nhttps://aranda.clientes.iq-online.net.co/usdkv8/#!/login/?tokenBranding=\nusuario: Neps.Johan.Fonce\ncontraseña: Colombia.9",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "890102768",
+   "nombre": "ORGANIZACION CLINICA GENERAL DEL NORTE S.A.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3012304273/ 3091999 Ext. 11645",
+    "correo": "tesoreria12@clinicageneraldelnorte.com",
+    "contacto": "ELIANA REYES MOLINA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "FISICO",
+    "link_direccion": "Calle 70 No. 47-47 Primer piso Local 1 - Oficina de Radicación Cuentas de Salud\nCalle 70 No. 48-35 Oficina de Radicación Cuentas de Salud, Barranquilla Atlántico\nCarrera 48 No. 70 - 38 PBX 309 1999 Ext: 11215",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "3564455 – 3563021 - 3091999 - 3091666",
+    "nombre_contacto": "cuentas medicas@clinicageneraldelnorte.com.\ncgeneral@clinicageneraldelnorte.com",
+    "observaciones": "",
+    "ciudad": "BARRANQUILLA"
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "PDF24 TOOLS",
+   "radicacion": {
+    "link": "https://tools.pdf24.org/es/comprimir-pdf#s=1723130714682",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "809008362",
+   "nombre": "PIJAOS SALUD EPS",
+   "radicacion": {
+    "link": "https://gemanet.pijaossalud.com/gemanet/loginIps.xhtml#nbb",
+    "usuario": "DCOLMENARESA",
+    "contrasena": "",
+    "telefono": "3504474507",
+    "correo": "cartera@pijaossalud.com.co",
+    "contacto": "ANDRES FELIPE LIZCANO",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "SOPORTES: PLATAFORMA\nRIPS: PLATAFORMA",
+    "link_direccion": "https://eps.gemanet.pijaossalud.com/gemanet/homeIps.xhtml\n\nhttps://www.pijaossalud.com/rips-pijaos-salud-epsi/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "oficinavirtual@pijaossalud.com.co\n3108072364",
+    "nombre_contacto": "",
+    "observaciones": "cuando no funciona la plataforma se envia en fisico a la Carrera 8a No. 16-85 Barrio Interlaken, Ibagué - Tolima",
+    "ciudad": "TOLIMA"
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://gemanet.pijaossalud.com/gemanet/homeIps.xhtml",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "PONAL",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "desan.rases-aud@policia.gov.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "860011153",
+   "nombre": "POSITIVA COMPAÑIA DE SEGUROS S.A.",
+   "radicacion": {
+    "link": "https://positivacuida.positiva.gov.co/cas/login?service=https://positivacuida.positiva.gov.co/web/j_spring_cas_security_check",
+    "usuario": "radicahus",
+    "contrasena": "",
+    "telefono": "3203960153",
+    "correo": "prestacionesasistencialescuatro@positiva.gov.co; laura.torres@positiva.gov.co;  pasistencialesocho@positiva.gov.co",
+    "contacto": "ELIZABETH SOTO RODRIGUEZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.positivaenlinea.gov.co/cuentasmedicas/\nhttps://positivacuida.positiva.gov.co/cas/login?service=https://positivacuida.positiva.gov.co/web/j_spring_cas_security_check",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://positivacuida.positiva.gov.co/cas/login?service=https://positivacuida.positiva.gov.co/web/j_spring_cas_security_checkW",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "prestacionesasistencialescuatro@positiva.gov.co",
+    "nombre_contacto": "",
+    "observaciones": "tener en cuenta para el cargue de soportes en la plataforma se deben encriptar los archivos un escriptador unico de positiva. Solicitarlo a Sebastian Acuña o Alba Perez",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "804012688",
+   "nombre": "REGIONAL DE ASEGURAMENTO EN SALUD N°. 5",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "erika.jaimes2566@correo.policia.gov.co",
+    "contacto": "ERIKA JAIMES",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800130907",
+   "nombre": "SALUD TOTAL ENTIDAD PROMOTORA DE SALUD DEL REGIMEN CONTRIBUTIVO Y DEL REGIMEN SUBSIDIADO S.A.",
+   "radicacion": {
+    "link": "https://transaccional.saludtotal.com.co/Transaccional/ApoteosysCuentasMedicas/Default.aspx?q=BNLUr43N4yjO/GJs9TLc+uOnTReEgsPxgtch7YxLoSwW3yY+yYpD6YVcuncr7Zix",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3176442345\n3162737604",
+    "correo": "JenniferMF@saludtotal.com.co\nJavierMaA@saludtotal.com.co",
+    "contacto": "JENNIFER MARTINEZ FLOREZ \nJAVIER RICARDO MARÍN ANGULO",
+    "cargo": "ANALISTA DE OPERACIONES EN SALUD\nAUDITOR MÉDICO DE CONCILIACIONES"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA: FILEZILLA\n\nPLATAFORMA: SOPORTES",
+    "link_direccion": "transaccional.saludtotal.com.co/FactElectronica/900006037/BUCARAMANGA\n\nhttps://portalvirtual.saludtotal.com.co/Transaccional/plataforma/ingresar.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Para devoluciones despues de haber cargado las facturas como corresponde al filezilla se debe notificar a un correo donde se le informa que ya realizamos el cargue. cuentasmedicasbga@saludtotal.com.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO Y EN FISICO",
+    "link_direccion": "yesidqb@saludtotal.com.co\njavierMaA@saludtotal.com.co\ncomunicacionesctas@saludtotal.com.co\ncomunicacionesconciliaciones@saludtotal.com.co\ncuentasmedicasbga@saludtotal.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "ENVIAR CON ANTICIPACION EL TRAMITE(Y SUS SOPORTES) EN FISICO",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "900786849",
+   "nombre": "SANTANDER MEDICAL GROUP SAS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3163722995",
+    "correo": "santandermedicalgsas@gmail.com",
+    "contacto": "LILIANA MEDINA ESPINOSA",
+    "cargo": "GERENTE ADMINISTRATIVA Y FINANCIERA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891800498",
+   "nombre": "SECRETARIA DE SALUD DE BOYACA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "contactenos@boyaca.gov.co; bdafiliadossalud@boyaca.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800114312",
+   "nombre": "SECRETARIA DE SALUD DE CALDAS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "auditoriamedica@saluddecaldas.gov.co; auditoriacontable@saluddecaldas.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890480184",
+   "nombre": "SECRETARIA DE SALUD DE CARTAGENA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "financierapssids@gmail.com; financieradadis2019@gmail.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891855502",
+   "nombre": "SECRETARIA DE SALUD DE CASANARE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "salud.cuentas@casanare.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "812000243",
+   "nombre": "SECRETARIA DE SALUD DE CORDOBA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "secretaria.salud@cordoba.gov.co; contactenos@cordoba.gov.co; carterasalud@hotmail.com; notificacionesjudiciales@cordoba.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "899999113",
+   "nombre": "SECRETARIA DE SALUD DE CUNDINAMARCA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "carmenza.lozano@cundinamarca.gov.co, omar.villalba@cundinamarca.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891480085",
+   "nombre": "SECRETARIA DE SALUD DE RISARALDA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3217521392",
+    "correo": "carlos.orozco@utp.edu.co; contactenos@risaralda.gov.co",
+    "contacto": "Carlos Arturo Orozco Gutierrez",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890201235",
+   "nombre": "SECRETARIA DE SALUD DE SANTANDER",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "6336233 EXT 1220\n3006808034",
+    "correo": "ca.jsaavedra@santander.gov.co - gestionredprestadora@santander.gov.co\nedwindizzett@yahoo.com",
+    "contacto": "JULIETH DAYANA SAAVEDRA TARAZONA\nEDWIN DIZZETT",
+    "cargo": "PROFESIONAL DDS\nINGENIERO TOOL SS"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800113672",
+   "nombre": "SECRETARIA DE SALUD DE TOLIMA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cartera@saludtolima.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890102006",
+   "nombre": "SECRETARIA DE SALUD DEL ATLANTICO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "hcastro@atlantico.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800091594",
+   "nombre": "SECRETARIA DE SALUD DEL CAQUETA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "liquidacioncuentas@caqueta.gov.co; contactenos@caqueta.gov.co; ofi_juridica@caqueta.gov.co; liquidacioncuentas@caqueta.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891580016",
+   "nombre": "SECRETARIA DE SALUD DEL CAUCA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "mariainesceballosordonez@gmail.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891680004",
+   "nombre": "SECRETARIA DE SALUD DEL CHOCO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "auditoriacuentaschoco@udea.edu.co; notificacionesjudiciales@choco.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "892099152",
+   "nombre": "SECRETARIA DE SALUD DEL GUAINIA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "secretariasalud@guainia.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800103920",
+   "nombre": "SECRETARIA DE SALUD DEL MAGDALENA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "financierasalud@magdalena.gov.co; secretariadesalud@magdalena.gov.co; contactenos@magdalena.gov.co; notificacionjudicial@magdalena.gov.co; notificasalud@magdalena.gov.co; secretariadesalud@magdalena.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "892000148",
+   "nombre": "SECRETARIA DE SALUD DEL META",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cuentasmedicas@meta.gov.co; salud@meta.gov.co; notificacionesjudiciales@meta.gov.co; canaveralparraaleyda@gmail.com",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800094164",
+   "nombre": "SECRETARIA DE SALUD DEL PUTUMAYO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "auditoriacuentasssd@putumayo.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890001639",
+   "nombre": "SECRETARIA DE SALUD DEL QUINDIO",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cuentasmedicas@gobernacionquindio.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890399029",
+   "nombre": "SECRETARIA DE SALUD DEL VALLE DEL CAUCA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "obibata@valledelcauca.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890480126",
+   "nombre": "SECRETARIA DE SALUD DEPARTAMENTAL DE BOLIVAR",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "313731648",
+    "correo": "financierasalud@bolivar.gov.co; crperez@bolivar.gov.co; wperez@bolivar.gov.co",
+    "contacto": "GABRIELA TINOCO ALVAREZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890102018",
+   "nombre": "SECRETARIA DE SALUD DISTRITAL BARRANQUILLA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3015059751",
+    "correo": "orueda@barranquilla.gov.co",
+    "contacto": "Sandra Muriel Garay",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "892301093",
+   "nombre": "SECRETARIA DE SALUD SAN MARTIN CESAR",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3164371247",
+    "correo": "contactenos@sanmartin-cesar.gov.co; asesorsanmartincesar@gmail.com; secretariadehacienda@sanmartin-cesar.gov.co; secretariadesalud@sanmartin-cesar.gov.co",
+    "contacto": "Paola Piedad Pinto",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "891780009",
+   "nombre": "SECRETARIA DE SALUD SANTA MARTA",
+   "radicacion": {
+    "link": "http://38.52.207.138:5321/IntegraARS/AD_inicio_sesion.aspx",
+    "usuario": "7T!yjoqufnatjkqiog",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "resolucion6066@gmail.com; atencionalciudadano@santamarta.gov.co; notificacionesalcaldiadistrital@santamarta.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "892280016",
+   "nombre": "SECRETARIA DE SALUD Y SEGURIDAD SOCIAL SUCRE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "salud@sucre.gov.co; juridica@sucre.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "899999336",
+   "nombre": "SECRETARIA DEPARTAMENTAL DE SALUD DE AMAZONAS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "aseguramiento@amazonas.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "892300211",
+   "nombre": "SECRETARIA DEPARTAMENTAL DE SALUD DEL CESAR",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "judithnungo@gmail.com; rethus@saludcesar.gov.co; salud@cesar.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "890900286",
+   "nombre": "SECRETARIA SECCIONAL DE SALUD DE ANTIOQUIA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "emilse.posada@antioquia.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "860002180",
+   "nombre": "SEGUROS COMERCIALES BOLIVAR S.A.",
+   "radicacion": {
+    "link": "ACTIVA IT",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "cartera_bolivarsoat@rgc.com.co; mcelis@rgc.com.co",
+    "contacto": "SHAMASH RAMIREZ CUBILLOS",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "https://imaginex-autorizacion.segurosbolivar.com/index.php/ProveedoresBolivar/radicacion",
+    "link_direccion": "NO REQUIERE",
+    "credenciales": "",
+    "manual": "601-7427695",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.activa-it.net/Login.aspx",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "para restablecimiento de contraseña de activa le llega al correo de Jhon (glosashus04@sinacsc.com)",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860009174",
+   "nombre": "SEGUROS DE VIDA DEL ESTADO S.A.",
+   "radicacion": {
+    "link": ".: SIS :.",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "requerimientosjudicialesycartera@sis.co; mesadeayuda@sis.co.",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "890903790",
+   "nombre": "SEGUROS DE VIDA SURAMERICANA S.A.",
+   "radicacion": {
+    "link": "https://login.sura.com/sso/servicelogin.aspx?continueTo=https%3A%2F%2Fsucursalempresas.suramericana.com&service=clienteseguros",
+    "usuario": "1098612385",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "carteraarl@suramericana.com.co; cuentasmedica@suramericana.com.co; oatehortua@sura.com.co; mroman@sura.com.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "cuentasmedica@suramericana.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "ENVIAR CUENTA COMPRIMIDA EN .ZIP Y EL ASUNTO COLOCAR: Facturación de Póliza",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://login.sura.com/sso/servicelogin.aspx?continueTo=https%3A%2F%2Fwww.arlsura.com%2Fcomponent%2Farl_login&service=arpsura",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860009578",
+   "nombre": "SEGUROS DEL ESTADO S.A.",
+   "radicacion": {
+    "link": ".: SIS :.",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "requerimientosjudicialesycartera@sis.co; notificacionessegurosdelestadosoat@sis.co; pvargas@sis.co, cduran@sis.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.sis.co/sis/#/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "mesadeayuda@sis.co\nWhatsapp: 3003234868",
+    "nombre_contacto": "Lina Paola Luengas",
+    "observaciones": "SEGUROS DEL ESTADO CUANDO NO PERMITE RADICAR POR LA PLATAFORMA ENVIAR A requerimientosjudicialesycartera@sis.co, cduran@sis.co\ncargar los archivos planos de los FUIRPS 1 y 2 al mismo tiempo y cuando le solicite el cargue de las imágenes, éstas deben estar en un pdf por cada factura con los soportes. Un pdf por cada factura.\nal responder la glosa ante la entidad tener en cuenta descargar el excel de la plataforma y registrar la respuesta en el mismo excel, se carga el excel y los soportes \nPARA CERTICADO DE AGOTAMIENTO EN PLATAFORMA SIS Y SI NO PUEDE AL SIGUIENTE CORREO:\ncertificadossoatsura@sis.co. \nCertificacionAgotamientoCoberturaSoat@sis.co",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.sis.co/sis/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "al responder la glosa ante la entidad tener en cuenta descargar el excel de la plataforma y registrar la respuesta en el mismo excel, se carga el excel y los soportes \nPARA CERTICADO DE AGOTAMIENTO EN PLATAFORMA SIS Y SI NO PUEDE AL SIGUIENTE CORREO:\ncertificadossoatsura@sis.co. \nCertificacionAgotamientoCoberturaSoat@sis.co\n\nSEGUROS DEL ESTADO VIDA la clave es: Octubre2025*",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "890903407",
+   "nombre": "SEGUROS GENERALES SURAMERICANA S. A.",
+   "radicacion": {
+    "link": "SIS - Suramericana",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "6016767400",
+    "correo": "cartera_soat@rgc.com.co; blancheros@rgc.com.co; mesadeayudasoatsura@sis.co",
+    "contacto": "PAOLA ANDREA BARONA",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://soatsura.sis.co/#/piloto/auth/login",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "mesadeayudasoatsura@sis.co \n 3232255445",
+    "nombre_contacto": "",
+    "observaciones": "Anexo información requerida envió link Expedición de certificado de topes - REVISAR INSTRUCTIVO\n\nhttps://www.segurossura.com.co/paginas/otros-tramites-SOAT.aspx\n\n\ncesiniestrossoat@suramericana.onmicrosoft.com",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://soatsura.sis.co/#piloto/auth/loguin",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "mesadeayudasoatsura@sis.co",
+    "nombre_contacto": "",
+    "observaciones": "Anexo información requerida envió link Expedición de certificado de topes - REVISAR INSTRUCTIVO\n\nhttps://www.segurossura.com.co/paginas/otros-tramites-SOAT.aspx\n\n\ncesiniestrossoat@suramericana.onmicrosoft.com",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "860028415",
+   "nombre": "SEGUROS LA EQUIDAD",
+   "radicacion": {
+    "link": "https://equ.claimonline.com.co/",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3115469363",
+    "correo": "humberto.hernandez@laequidadseguros.coop; Nubia.Verdugo@laequidadseguros.coop; cartera.equidad@grupomok.com",
+    "contacto": "HUMBERTO HERNANDEZ",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://www.laequidadseguros.coop/contacto/que-hacer-en-caso-de-siniestros/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "Formulario de respuesta de glosas/devoluciones",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "soporte@tucarpeta.com.co \nwhatsapp: 3223536247",
+    "nombre_contacto": "",
+    "observaciones": "https://www.google.com/search?q=la+equidad+glosas&rlz=1C1CHBF_esCO1112CO1112&oq=&gs_lcrp=EgZjaHJvbWUqCQgAEEUYOxjCAzIJCAAQRRg7GMIDMgkIARBFGDsYwgMyCQgCEEUYOxjCAzIJCAMQRRg7GMIDMgkIBBBFGDsYwgMyCQgFEEUYOxjCAzIJCAYQRRg7GMIDMgkIBxBFGDsYwgPSAQkyODM5OGowajeoAgiwAgHxBV8NSkM6xkPr8QVfDUpDOsZD6w&sourceid=chrome&ie=UTF-8\n\n\ningresar al primer link (Formulario de respuesta de glosas/devoluciones)",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "SERVICIOS MEDICOS INTEGRALES",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "lore.valero@hotmail.es",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900007542",
+   "nombre": "SOCIEDAD DE ONCOLOGIA Y RADIOTERAPIA DE SANTANDER LTDA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3123780916",
+    "correo": "azablehs@yahoo.com - martha.amado@gmail.com",
+    "contacto": "MARTHA AMADO GÓMEZ",
+    "cargo": "ADMINISTRATIVA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "SOS",
+   "radicacion": {
+    "link": "https://radicacioncm.procesosyservicios.net.co/secureSos/Account/Login?ReturnUrl=%2FsecureSos%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Ddocumentmanagement%26redirect_uri%3Dhttps%253A%252F%252Fradicacioncm.procesosyservicios.net.co%252FDocumentManagementSosWeb%252Fauth-callback%252F%26response_type%3Did_token%2520token%26scope%3Dopenid%2520profile%26state%3D40315031faf343899bc8f7e19b31b7d0%26nonce%3D073076b9d46a4aa2b4e1a822740e4961",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "3206140580",
+    "correo": "conciliacioncartera@sos.com.co",
+    "contacto": "JUAN PABLO RUIZ VARGAS",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA \nFISICO",
+    "link_direccion": "https://radicacioncm.procesosyservicios.net.co/DocumentManagementSosWeb\n\n Calle 5 No. 39-37, B/ Tequendama\n\nrespuestadevolucionessos@sos.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "mrojas@sos.com.co",
+    "nombre_contacto": "María Eugenia Rojas",
+    "observaciones": "2. Al dar respuesta de la devolución citar en el asunto el nombre del archivo adjunto del correo de notificación que se envía: Ejemplo NI - 890000000 -20231003xlsx  Donde se relaciona el detalle de la(s) devolución(es) de factura(s",
+    "ciudad": "TEQUENDAMA"
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "conciliacionglosas@sos.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "SSS",
+   "radicacion": {
+    "link": "https://portal.receptech.app/login",
+    "usuario": "900006037",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "CORREO",
+    "link_direccion": "toolss.auditoria1@tool.com.co>",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "900033371",
+   "nombre": "SUMIMEDICAL S.A.S",
+   "radicacion": {
+    "link": "https://horus-health.com/",
+    "usuario": "900006037@sumimedical.com",
+    "contrasena": "",
+    "telefono": "3167439868",
+    "correo": "coordinacion.tesoreria@sumimedical.com - auxiliar.tesoreria2@sumimedical.com",
+    "contacto": "MARYORY RESTREPO ROJAS",
+    "cargo": "AUXILIAR DE TESORERÍA"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "radicacion@sumimedical.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Rips - soportes - certicado rips",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://horus-health.com/",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "SE DEBE NOTIFICAR AL CORREO \"cuentasmedicas@sumimedical.com\" Y ENVIAR EN EL FORMATO DE NOTIFICACION ( COMO SANITAS  Y COMPENSAR)",
+    "ciudad": ""
+   },
+   "estado_radicacion": "OPERATIVA"
+  },
+  {
+   "nit": "",
+   "nombre": "SUPERSALUD",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "correointernosns@supersalud.gov.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "800256161",
+   "nombre": "SURA COMPAÑIA SURAMERICANA RIESGOS PROFESIONALES S.A.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "carteraarl@suramericana.com.co; cuentasmedica@suramericana.com.co; oatehortua@sura.com.co; mroman@sura.com.co",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "PLATAFORMA",
+    "link_direccion": "https://login.sura.com/sso/servicelogin.aspx?continueTo=https%3A%2F%2Fasistenteproveedores.suramericana.com.co&service=proveedores",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "ceportalfacturacion@suramericana.com.co \ncuentamedicaarlsura@suramericana.com.co",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900869605",
+   "nombre": "TU SALUD PLUS IPS S.A.S.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  },
+  {
+   "nit": "",
+   "nombre": "UIS",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "(607) 6344000 EXT 2282",
+    "correo": "sisalud@uis.edu.co; laudiari@uis.edu.co",
+    "contacto": "SONIA STELLA SERRANO",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "salud@uis.edu.co\nsalud@uis.edu.co - facturacion.uisalud@uis.edu.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Rips- soportes (antecendentes disciplinarios - certificacion bancaria - parafiscales - planilla - rut) - escaneo",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "900034608",
+   "nombre": "UNIDAD ADMINISTRATIVA ESPECIAL DE SALUD DE ARAUCA",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "3138664748",
+    "correo": "cuentasxpagar@unisaludarauca.gov.co",
+    "contacto": "Dora Faisoly Cruz",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "901127521",
+   "nombre": "UNION TEMPORAL SERVISALUD SAN JOSE  - MAGISTERIO SAN JOSE",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "7440981 EXT 103",
+    "correo": "ejecutivo.cuenta6@utservisalud.com.co",
+    "contacto": "ANDRÉS FELIPE JOYA VARGAS",
+    "cargo": "EJECUTIVO DE CUENTA FINANCIERO"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "coord.radicacion@servisalud.com.co\nsoportesasistenciales@servisalud.com.co",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Rips - escaneo factura - escaneo soportes (tipificacion según la entidad) -",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "901153056",
+   "nombre": "UNION TEMPORAL UT RED INTEGRADA FOSCAL-CUB",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "700300 EXT 8632",
+    "correo": "cartera@avanzarfos.com",
+    "contacto": "GLADYS MERARY NIÑO CORDERO",
+    "cargo": "ASISTENTE FINANCIERO"
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "POR_ARMAR"
+  },
+  {
+   "nit": "",
+   "nombre": "ZURICH COLOMBIA SEGUROS S.A.",
+   "radicacion": {
+    "link": "",
+    "usuario": "",
+    "contrasena": "",
+    "telefono": "",
+    "correo": "",
+    "contacto": "",
+    "cargo": ""
+   },
+   "cartera": {
+    "link": "",
+    "usuario": "",
+    "clave": ""
+   },
+   "devoluciones": {
+    "medio": "CORREO",
+    "link_direccion": "atencioncliente@zurich.com",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "Rips - soportes - xml",
+    "ciudad": ""
+   },
+   "glosas": {
+    "medio": "",
+    "link_direccion": "",
+    "credenciales": "",
+    "manual": "",
+    "medio_contacto": "",
+    "nombre_contacto": "",
+    "observaciones": "",
+    "ciudad": ""
+   },
+   "estado_radicacion": "SIN_DATOS"
+  }
+ ]
+}
