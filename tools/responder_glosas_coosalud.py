@@ -174,8 +174,19 @@ def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str
         sys.exit(2)
 
     wb = load_workbook(filename=str(ruta), data_only=True, read_only=True)
+    # Match del nombre de hoja tolerante a mayus/minus y espacios: los
+    # Excel exportados por Power Query suelen traer nombres inconsistentes
+    # ('BASE ' con espacio al final, 'CALIDAD', etc.). Asi '--hoja BASE'
+    # encuentra la hoja 'BASE ' sin que el usuario tenga que adivinar el
+    # nombre exacto con el espacio.
     if hoja not in wb.sheetnames:
-        raise ValueError(f"El Excel no tiene la hoja '{hoja}'. Hojas: {wb.sheetnames}")
+        objetivo = hoja.strip().casefold()
+        real = next((s for s in wb.sheetnames if s.strip().casefold() == objetivo), None)
+        if real is None:
+            raise ValueError(f"El Excel no tiene la hoja '{hoja}'. Hojas: {wb.sheetnames}")
+        if real != hoja:
+            logger.info(f"  Hoja '{hoja}' → uso '{real}' (match tolerante a espacios/mayusculas).")
+        hoja = real
     ws = wb[hoja]
     rows = ws.iter_rows(values_only=True)
     headers = [_norm_header(str(h or "")) for h in next(rows)]
