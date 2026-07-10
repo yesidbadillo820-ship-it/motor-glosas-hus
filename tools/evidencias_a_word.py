@@ -216,15 +216,8 @@ def main() -> int:
             for par in [p_img, h] + ([saltopag] if saltopag is not None else []):
                 par._element.getparent().remove(par._element)
             continue
-<<<<<<< HEAD
-        # Salto de página (menos en la última).
-        if i < len(imagenes) - 1:
-            doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-        logger.info(f"  [{i + 1}/{len(imagenes)}] {factura} ← {img.name}")
-=======
         generadas += 1
         logger.info(f"  [{generadas}/{len(imagenes)}] {factura} ← {img.name}")
->>>>>>> origin/claude/excel-reconciliation-data-9Bnpj
 
     args.salida.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(args.salida))
