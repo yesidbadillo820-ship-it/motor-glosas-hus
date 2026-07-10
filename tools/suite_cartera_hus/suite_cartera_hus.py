@@ -11,10 +11,11 @@ Un solo programa para el analista:
 Toda salida queda en SALIDAS/<ENTIDAD>/<fecha>_<proceso>/ con el estándar
 CONTROL.csv + EVIDENCIAS.docx + REVISAR.csv + RESUMEN.txt.
 
-Interfaz en Tkinter puro (funciona sin internet en cualquier PC con Python).
-Si `customtkinter` está instalado, se usa automáticamente un tema moderno.
+Interfaz en Tkinter/ttk (tema 'clam' repintado): tarjetas, indicadores (KPI) y
+una tabla de resultados. Funciona sin internet en cualquier PC con Python.
 """
 
+import csv
 import os
 import queue
 import subprocess
@@ -22,7 +23,6 @@ import sys
 import threading
 import traceback
 import webbrowser
-
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -33,206 +33,456 @@ from nucleo import archivos, cruces_dgh, registro, reportes  # noqa: E402
 
 CARPETA_SALIDAS = os.path.join(BASE, "SALIDAS")
 
-# --------------------------------------------------------------- apariencia
-COLOR_FONDO = "#f4f6f8"
-COLOR_BARRA = "#0e4d64"  # verde-azul institucional
-COLOR_ACENTO = "#128a5e"
-COLOR_TEXTO_BARRA = "#ffffff"
-FUENTE = ("Segoe UI", 10)
-FUENTE_TITULO = ("Segoe UI", 15, "bold")
+# ------------------------------------------------------------------ paleta
+BG = "#eaeef2"  # fondo general
+CARD = "#ffffff"  # tarjetas
+HEADER = "#0e4d64"  # barra institucional (verde-azul)
+HEADER_2 = "#12617f"
+ACCENT = "#128a5e"  # verde acción
+ACCENT_HOVER = "#0f7550"
+BLUE = "#0e6ba8"
+INK = "#1b2a33"  # texto principal
+MUTED = "#63727c"  # texto secundario
+LINE = "#d6dee4"  # bordes
+VERDE = "#1f9d55"
+AMBAR = "#c9821a"
+ROJO = "#d94a3d"
+
+FAM = "Segoe UI"  # en Windows; en otros SO Tk cae a la fuente por defecto
+F = (FAM, 10)
+F_SM = (FAM, 9)
+F_MINI = (FAM, 8)
+F_BOLD = (FAM, 10, "bold")
+F_H1 = (FAM, 16, "bold")
+F_KPI = (FAM, 18, "bold")
+F_KPI_RES = (FAM, 14, "bold")  # tiles de resultados (importes, más angostos)
+F_KPI_LBL = (FAM, 8)
+
+ICONO_ESTADO = {"OPERATIVA": "🟢", "POR_ARMAR": "🟡", "SIN_DATOS": "🔴"}
 
 
 class Suite(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Suite Cartera HUS — Radicación · Glosas · Cruces masivos")
-        self.geometry("1080x680")
-        self.minsize(940, 600)
-        self.configure(bg=COLOR_FONDO)
+        self.geometry("1200x840")
+        self.minsize(1060, 720)
+        self.configure(bg=BG)
 
         self.entidades = registro.cargar_entidades()
         self.entidad_actual = None
         self.ruta_archivo = tk.StringVar(value="")
         self.cola_log = queue.Queue()
         self._ocupado = False
+        self._ultima_carpeta = None
 
+        self._estilos()
         self._construir()
         self._refrescar_lista()
+        self._kpis_entidades()
         self.after(120, self._vaciar_cola_log)
-        self.log("Suite Cartera HUS lista. Entidades cargadas: %d." % len(self.entidades))
-        conteo = registro.resumen_estados(self.entidades)
-        self.log(
-            "  🟢 Operativas: %d   🟡 Por armar: %d   🔴 Sin datos: %d"
-            % (conteo.get("OPERATIVA", 0), conteo.get("POR_ARMAR", 0), conteo.get("SIN_DATOS", 0))
-        )
+        self.log("Suite Cartera HUS lista. %d entidades cargadas." % len(self.entidades))
 
-    # ------------------------------------------------------------ interfaz
+    # ------------------------------------------------------------- estilos
+
+    def _estilos(self):
+        st = ttk.Style(self)
+        try:
+            st.theme_use("clam")
+        except tk.TclError:
+            pass
+        st.configure(".", background=BG, foreground=INK, font=F)
+        st.configure("Card.TFrame", background=CARD)
+        st.configure("Bg.TFrame", background=BG)
+        st.configure("Card.TLabel", background=CARD, foreground=INK, font=F)
+        st.configure("Muted.TLabel", background=CARD, foreground=MUTED, font=F_SM)
+        st.configure("H2.TLabel", background=CARD, foreground=INK, font=F_BOLD)
+        st.configure("KPI.TLabel", background=CARD, foreground=HEADER, font=F_KPI)
+        st.configure("KPILbl.TLabel", background=CARD, foreground=MUTED, font=F_KPI_LBL)
+
+        # entradas
+        st.configure(
+            "TEntry", fieldbackground="white", bordercolor=LINE, insertcolor=INK, padding=5
+        )
+        # botones de acción (secundarios, claros)
+        st.configure(
+            "Accion.TButton",
+            background="white",
+            foreground=INK,
+            font=F,
+            borderwidth=1,
+            focusthickness=0,
+            padding=(10, 12),
+        )
+        st.map(
+            "Accion.TButton",
+            background=[("active", "#eef6f2")],
+            bordercolor=[("active", ACCENT)],
+        )
+        # botón primario (verde)
+        st.configure(
+            "Primary.TButton",
+            background=ACCENT,
+            foreground="white",
+            font=F_BOLD,
+            borderwidth=0,
+            padding=(12, 8),
+        )
+        st.map("Primary.TButton", background=[("active", ACCENT_HOVER)])
+        # botón sutil (chip)
+        st.configure(
+            "Chip.TButton",
+            background="#eef2f5",
+            foreground=INK,
+            font=F_SM,
+            borderwidth=0,
+            padding=(8, 5),
+        )
+        st.map("Chip.TButton", background=[("active", "#dde6ec")])
+        # Treeview de resultados
+        st.configure(
+            "Res.Treeview",
+            background="white",
+            fieldbackground="white",
+            foreground=INK,
+            rowheight=24,
+            borderwidth=0,
+            font=F_SM,
+        )
+        st.configure(
+            "Res.Treeview.Heading",
+            background="#f0f4f7",
+            foreground=MUTED,
+            font=(FAM, 8, "bold"),
+            relief="flat",
+        )
+        st.map("Res.Treeview", background=[("selected", "#d7ebe1")], foreground=[("selected", INK)])
+        st.configure("TProgressbar", background=ACCENT, troughcolor=LINE, borderwidth=0)
+        st.configure("Vertical.TScrollbar", background="#cdd7de", borderwidth=0, arrowsize=12)
+
+    # ----------------------------------------------------------- utilidades UI
+
+    def _tarjeta(self, padre, **grid):
+        """Un marco blanco con borde fino (tarjeta)."""
+        cont = tk.Frame(padre, bg=LINE)  # borde
+        cont.grid(**grid)
+        cont.rowconfigure(0, weight=1)
+        cont.columnconfigure(0, weight=1)
+        card = ttk.Frame(cont, style="Card.TFrame", padding=1)
+        card.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
+        return card
+
+    def _titulo_tarjeta(self, card, texto, fila=0):
+        lbl = ttk.Label(card, text=texto, style="H2.TLabel")
+        lbl.grid(row=fila, column=0, columnspan=9, sticky="w", padx=12, pady=(10, 4))
+        return lbl
+
+    # -------------------------------------------------------------- construir
 
     def _construir(self):
-        barra = tk.Frame(self, bg=COLOR_BARRA, height=56)
+        # ---- barra superior
+        barra = tk.Frame(self, bg=HEADER, height=62)
         barra.pack(fill="x")
+        barra.pack_propagate(False)
         tk.Label(
             barra,
-            text="  Suite Cartera HUS",
-            bg=COLOR_BARRA,
-            fg=COLOR_TEXTO_BARRA,
-            font=FUENTE_TITULO,
-        ).pack(side="left", pady=10)
+            text="  🏥  Suite Cartera HUS",
+            bg=HEADER,
+            fg="white",
+            font=F_H1,
+        ).pack(side="left", pady=12, padx=6)
         tk.Label(
             barra,
-            text="ESE Hospital Universitario de Santander · "
-            "Cartera / Auditoría de Cuentas Médicas  ",
-            bg=COLOR_BARRA,
-            fg="#cfe3ec",
-            font=("Segoe UI", 9),
-        ).pack(side="right")
+            text="ESE Hospital Universitario de Santander\nCartera · Auditoría de Cuentas Médicas  ",
+            bg=HEADER,
+            fg="#bcd7e2",
+            font=F_MINI,
+            justify="right",
+        ).pack(side="right", pady=10)
 
-        cuerpo = tk.Frame(self, bg=COLOR_FONDO)
-        cuerpo.pack(fill="both", expand=True, padx=10, pady=8)
-        cuerpo.columnconfigure(0, weight=2, uniform="c")
-        cuerpo.columnconfigure(1, weight=3, uniform="c")
+        # ---- fila de KPIs de entidades
+        self.kpis_top = tk.Frame(self, bg=BG)
+        self.kpis_top.pack(fill="x", padx=12, pady=(10, 2))
+        self._kpi_tiles = {}
+        for i, (clave, etiqueta, color) in enumerate(
+            [
+                ("total", "ENTIDADES", HEADER),
+                ("OPERATIVA", "🟢 OPERATIVAS", VERDE),
+                ("POR_ARMAR", "🟡 POR ARMAR", AMBAR),
+                ("SIN_DATOS", "🔴 SIN DATOS", ROJO),
+            ]
+        ):
+            self.kpis_top.columnconfigure(i, weight=1)
+            self._kpi_tiles[clave] = self._kpi_tile(self.kpis_top, etiqueta, color, 0, i)
+
+        # ---- cuerpo: izquierda (entidad) / derecha (trabajo)
+        cuerpo = tk.Frame(self, bg=BG)
+        cuerpo.pack(fill="both", expand=True, padx=12, pady=8)
+        cuerpo.columnconfigure(0, weight=0, minsize=340)
+        cuerpo.columnconfigure(1, weight=1)
         cuerpo.rowconfigure(0, weight=1)
 
-        # ---------- panel izquierdo: entidad
-        izq = tk.LabelFrame(
-            cuerpo, text=" 1 · Entidad (EPS / pagador) ", bg=COLOR_FONDO, font=FUENTE
+        self._panel_entidad(cuerpo)
+        self._panel_trabajo(cuerpo)
+
+    def _kpi_tile(self, padre, etiqueta, color, r, c, font=F_KPI):
+        borde = tk.Frame(padre, bg=LINE)
+        borde.grid(row=r, column=c, sticky="ew", padx=4)
+        card = tk.Frame(borde, bg=CARD)
+        card.pack(fill="both", expand=True, padx=1, pady=1)
+        franja = tk.Frame(card, bg=color, width=5)
+        franja.pack(side="left", fill="y")
+        val = tk.Label(card, text="—", bg=CARD, fg=INK, font=font, anchor="w")
+        val.pack(anchor="w", padx=(12, 8), pady=(7, 0))
+        tk.Label(card, text=etiqueta, bg=CARD, fg=MUTED, font=F_KPI_LBL, anchor="w").pack(
+            anchor="w", padx=12, pady=(0, 7)
         )
-        izq.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        izq.columnconfigure(0, weight=1)
+        return val
+
+    def _panel_entidad(self, padre):
+        card = self._tarjeta(padre, row=0, column=0, sticky="nsew", padx=(0, 8))
+        card.columnconfigure(0, weight=1)
+        card.rowconfigure(3, weight=1)
+        self._titulo_tarjeta(card, "1 · Entidad  (EPS / pagador)")
 
         self.var_busqueda = tk.StringVar()
-        buscador = tk.Entry(izq, textvariable=self.var_busqueda, font=FUENTE)
-        buscador.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 2))
-        buscador.insert(0, "")
+        ent = ttk.Entry(card, textvariable=self.var_busqueda, font=F)
+        ent.grid(row=1, column=0, sticky="ew", padx=12, pady=(2, 0))
         self.var_busqueda.trace_add("write", lambda *_: self._refrescar_lista())
-        tk.Label(
-            izq,
-            text="Escriba nombre o NIT para filtrar",
-            bg=COLOR_FONDO,
-            fg="#666",
-            font=("Segoe UI", 8),
-        ).grid(row=1, column=0, sticky="w", padx=10)
-
-        self.lista = tk.Listbox(
-            izq,
-            font=FUENTE,
-            activestyle="none",
-            selectbackground=COLOR_ACENTO,
-            selectforeground="white",
-            height=12,
+        ttk.Label(card, text="🔎  Escriba nombre o NIT para filtrar", style="Muted.TLabel").grid(
+            row=2, column=0, sticky="w", padx=12, pady=(2, 6)
         )
-        self.lista.grid(row=2, column=0, sticky="nsew", padx=8, pady=4)
-        izq.rowconfigure(2, weight=1)
+
+        marco_lista = tk.Frame(card, bg=CARD)
+        marco_lista.grid(row=3, column=0, sticky="nsew", padx=12)
+        marco_lista.rowconfigure(0, weight=1)
+        marco_lista.columnconfigure(0, weight=1)
+        self.lista = tk.Listbox(
+            marco_lista,
+            font=F,
+            activestyle="none",
+            bg="white",
+            fg=INK,
+            selectbackground=ACCENT,
+            selectforeground="white",
+            highlightthickness=1,
+            highlightbackground=LINE,
+            relief="flat",
+            height=10,
+        )
+        self.lista.grid(row=0, column=0, sticky="nsew")
+        sb = ttk.Scrollbar(marco_lista, command=self.lista.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.lista.configure(yscrollcommand=sb.set)
         self.lista.bind("<<ListboxSelect>>", self._al_elegir)
 
+        # ficha
         self.ficha = tk.Text(
-            izq,
-            height=9,
-            font=("Segoe UI", 9),
-            bg="#ffffff",
-            relief="solid",
-            bd=1,
+            card,
+            height=8,
+            font=F_SM,
+            bg="#f7fafb",
+            fg=INK,
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=LINE,
             wrap="word",
+            padx=10,
+            pady=8,
             state="disabled",
         )
-        self.ficha.grid(row=3, column=0, sticky="ew", padx=8, pady=(2, 4))
+        self.ficha.grid(row=4, column=0, sticky="ew", padx=12, pady=8)
 
-        fila_btn = tk.Frame(izq, bg=COLOR_FONDO)
-        fila_btn.grid(row=4, column=0, sticky="ew", padx=8, pady=(0, 8))
-        ttk.Button(fila_btn, text="🌐 Abrir portal", command=self._abrir_portal).pack(side="left")
-        ttk.Button(fila_btn, text="📋 Copiar correo", command=self._copiar_correo).pack(
-            side="left", padx=6
-        )
+        fila = tk.Frame(card, bg=CARD)
+        fila.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 12))
+        ttk.Button(
+            fila, text="🌐  Abrir portal", style="Chip.TButton", command=self._abrir_portal
+        ).pack(side="left")
+        ttk.Button(
+            fila, text="📋  Copiar correo", style="Chip.TButton", command=self._copiar_correo
+        ).pack(side="left", padx=6)
 
-        # ---------- panel derecho: archivo + acciones
-        der = tk.Frame(cuerpo, bg=COLOR_FONDO)
+    def _panel_trabajo(self, padre):
+        der = tk.Frame(padre, bg=BG)
         der.grid(row=0, column=1, sticky="nsew")
         der.columnconfigure(0, weight=1)
         der.rowconfigure(2, weight=1)
 
-        arch = tk.LabelFrame(
-            der, text=" 2 · Archivo base (ZIP, Excel, PDF, .cmd…) ", bg=COLOR_FONDO, font=FUENTE
-        )
-        arch.grid(row=0, column=0, sticky="ew")
-        arch.columnconfigure(0, weight=1)
-        tk.Entry(arch, textvariable=self.ruta_archivo, font=("Segoe UI", 9), state="readonly").grid(
-            row=0, column=0, sticky="ew", padx=8, pady=8
-        )
-        ttk.Button(arch, text="Elegir archivo…", command=self._elegir_archivo).grid(
-            row=0, column=1, padx=(0, 4)
-        )
-        ttk.Button(arch, text="Elegir carpeta…", command=self._elegir_carpeta).grid(
-            row=0, column=2, padx=(0, 8)
-        )
+        # --- 2 · archivo
+        card = self._tarjeta(der, row=0, column=0, sticky="ew")
+        card.columnconfigure(0, weight=1)
+        self._titulo_tarjeta(card, "2 · Archivo base  (ZIP del portal, Excel, PDF, .cmd…)")
+        fila = tk.Frame(card, bg=CARD)
+        fila.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 12))
+        fila.columnconfigure(0, weight=1)
+        ent = ttk.Entry(fila, textvariable=self.ruta_archivo, font=F_SM, state="readonly")
+        ent.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ttk.Button(
+            fila, text="📄 Elegir archivo…", style="Chip.TButton", command=self._elegir_archivo
+        ).grid(row=0, column=1, padx=(0, 6))
+        ttk.Button(
+            fila, text="📁 Elegir carpeta…", style="Chip.TButton", command=self._elegir_carpeta
+        ).grid(row=0, column=2)
 
-        acc = tk.LabelFrame(der, text=" 3 · Acciones ", bg=COLOR_FONDO, font=FUENTE)
-        acc.grid(row=1, column=0, sticky="ew", pady=6)
+        # --- 3 · acciones (tarjetas)
+        card = self._tarjeta(der, row=1, column=0, sticky="ew", pady=8)
         for i in range(3):
-            acc.columnconfigure(i, weight=1)
-
-        botones = [
-            ("📦 Organizar masivo\n(ZIP → lotes de 300)", self.accion_organizar),
-            ("🔗 Consolidar + cruzar\n(Pandas, sin Excel)", self.accion_consolidar),
-            ("📋 Generar OBJECIONES\n(formato DGH)", self.accion_objeciones),
-            ("🖼️ Compilar evidencias\n(pantallazos → Word)", self.accion_evidencias),
-            ("🤖 Ejecutar bot\nde esta entidad", self.accion_bot),
-            ("➕ Registrar bot\nexistente", self.accion_registrar_bot),
+            card.columnconfigure(i, weight=1, uniform="acc")
+        self._titulo_tarjeta(card, "3 · Acciones")
+        acciones = [
+            ("📦", "Organizar masivo", "ZIP → lotes de 300", self.accion_organizar),
+            ("🔗", "Consolidar + cruzar", "Pandas, sin Excel", self.accion_consolidar),
+            ("📋", "Generar OBJECIONES", "formato DGH", self.accion_objeciones),
+            ("🖼️", "Compilar evidencias", "pantallazos → Word", self.accion_evidencias),
+            ("🤖", "Ejecutar bot", "de esta entidad", self.accion_bot),
+            ("➕", "Registrar bot", "apuntar .bat/.py", self.accion_registrar_bot),
         ]
-        for i, (texto, comando) in enumerate(botones):
-            b = tk.Button(
-                acc,
-                text=texto,
-                command=comando,
-                font=FUENTE,
-                bg="white",
-                relief="groove",
-                bd=1,
-                height=2,
-                cursor="hand2",
-                justify="center",
-            )
-            b.grid(row=i // 3, column=i % 3, sticky="ew", padx=6, pady=5)
-
-        fila2 = tk.Frame(acc, bg=COLOR_FONDO)
-        fila2.grid(row=2, column=0, columnspan=3, sticky="ew", padx=6, pady=(0, 6))
-        ttk.Button(fila2, text="📂 Abrir carpeta de SALIDAS", command=self._abrir_salidas).pack(
-            side="left"
-        )
-        self.progreso = ttk.Progressbar(fila2, mode="indeterminate", length=180)
+        for idx, (ic, tit, sub, cmd) in enumerate(acciones):
+            self._boton_accion(card, ic, tit, sub, cmd, 1 + idx // 3, idx % 3)
+        barra_inf = tk.Frame(card, bg=CARD)
+        barra_inf.grid(row=3, column=0, columnspan=3, sticky="ew", padx=12, pady=(2, 12))
+        ttk.Button(
+            barra_inf,
+            text="📂 Abrir carpeta de SALIDAS",
+            style="Chip.TButton",
+            command=self._abrir_salidas,
+        ).pack(side="left")
+        self.progreso = ttk.Progressbar(barra_inf, mode="indeterminate", length=180)
         self.progreso.pack(side="right")
+        self.lbl_estado = tk.Label(barra_inf, text="Listo", bg=CARD, fg=MUTED, font=F_SM)
+        self.lbl_estado.pack(side="right", padx=10)
 
-        consola_marco = tk.LabelFrame(
-            der, text=" Registro del proceso ", bg=COLOR_FONDO, font=FUENTE
+        # --- resultados (KPIs de proceso + tabla + consola)
+        card = self._tarjeta(der, row=2, column=0, sticky="nsew")
+        card.columnconfigure(0, weight=1)
+        card.rowconfigure(3, weight=1, minsize=170)  # la tabla siempre visible
+        self._titulo_tarjeta(card, "Resultados del último proceso")
+
+        kf = tk.Frame(card, bg=CARD)
+        kf.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))
+        self._kpi_res = {}
+        for i, (clave, etq, col) in enumerate(
+            [
+                ("facturas", "FACTURAS", HEADER),
+                ("glosado", "GLOSADO", ROJO),
+                ("objetado", "OBJETADO", ACCENT),
+                ("revisar", "REVISAR", AMBAR),
+            ]
+        ):
+            kf.columnconfigure(i, weight=1)
+            self._kpi_res[clave] = self._kpi_tile(kf, etq, col, 0, i, font=F_KPI_RES)
+
+        # tabla de resultados
+        marco_tabla = tk.Frame(card, bg=CARD)
+        marco_tabla.grid(row=3, column=0, sticky="nsew", padx=12, pady=4)
+        marco_tabla.rowconfigure(0, weight=1)
+        marco_tabla.columnconfigure(0, weight=1)
+        cols = ("factura", "estado", "detalle", "valor")
+        self.tabla = ttk.Treeview(
+            marco_tabla, columns=cols, show="headings", style="Res.Treeview", height=6
         )
-        consola_marco.grid(row=2, column=0, sticky="nsew")
-        consola_marco.columnconfigure(0, weight=1)
-        consola_marco.rowconfigure(0, weight=1)
+        for c, txt, w, anchor in [
+            ("factura", "FACTURA", 130, "w"),
+            ("estado", "ESTADO", 120, "w"),
+            ("detalle", "DETALLE", 260, "w"),
+            ("valor", "VALOR", 120, "e"),
+        ]:
+            self.tabla.heading(c, text=txt)
+            self.tabla.column(c, width=w, anchor=anchor)
+        self.tabla.grid(row=0, column=0, sticky="nsew")
+        sb = ttk.Scrollbar(marco_tabla, command=self.tabla.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.tabla.configure(yscrollcommand=sb.set)
+        self.tabla.tag_configure("par", background="#f6f9fb")
+
+        # consola (log técnico, colapsable visualmente)
+        cf = tk.Frame(card, bg=CARD)
+        cf.grid(row=4, column=0, sticky="ew", padx=12, pady=(4, 12))
+        cf.columnconfigure(0, weight=1)
         self.consola = tk.Text(
-            consola_marco,
-            font=("Consolas", 9),
-            bg="#101820",
-            fg="#d7e3ea",
-            state="disabled",
+            cf,
+            font=("Consolas", 8),
+            bg="#0f1a20",
+            fg="#cfe0e8",
+            height=4,
+            relief="flat",
             wrap="word",
+            state="disabled",
         )
-        self.consola.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-        scroll = ttk.Scrollbar(consola_marco, command=self.consola.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self.consola.configure(yscrollcommand=scroll.set)
+        self.consola.grid(row=0, column=0, sticky="ew")
+        sb = ttk.Scrollbar(cf, command=self.consola.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.consola.configure(yscrollcommand=sb.set)
 
-    # -------------------------------------------------------------- entidad
+    def _boton_accion(self, card, icono, titulo, sub, cmd, r, c):
+        borde = tk.Frame(card, bg=LINE, cursor="hand2")
+        borde.grid(row=r, column=c, sticky="nsew", padx=6, pady=6)
+        inner = tk.Frame(borde, bg="white")
+        inner.pack(fill="both", expand=True, padx=1, pady=1)
+        tk.Label(inner, text=icono, bg="white", font=(FAM, 20)).pack(pady=(9, 0))
+        tk.Label(
+            inner,
+            text=titulo,
+            bg="white",
+            fg=INK,
+            font=(FAM, 9, "bold"),
+            wraplength=150,
+            justify="center",
+        ).pack()
+        tk.Label(inner, text=sub, bg="white", fg=MUTED, font=F_MINI).pack(pady=(0, 9))
+
+        def _hover(_e, on):
+            col = "#eef6f2" if on else "white"
+            inner.configure(bg=col)
+            for w in inner.winfo_children():
+                w.configure(bg=col)
+            borde.configure(bg=ACCENT if on else LINE)
+
+        for w in (borde, inner, *inner.winfo_children()):
+            w.bind("<Button-1>", lambda _e: cmd())
+            w.bind("<Enter>", lambda e: _hover(e, True))
+            w.bind("<Leave>", lambda e: _hover(e, False))
+
+    # -------------------------------------------------------------- KPIs
+
+    def _kpis_entidades(self):
+        c = registro.resumen_estados(self.entidades)
+        self._kpi_tiles["total"].configure(text=str(len(self.entidades)))
+        for k in ("OPERATIVA", "POR_ARMAR", "SIN_DATOS"):
+            self._kpi_tiles[k].configure(text=str(c.get(k, 0)))
+
+    def _fmt_pesos(self, v):
+        try:
+            return "$ " + "{:,.0f}".format(float(v)).replace(",", ".")
+        except (ValueError, TypeError):
+            return "$ 0"
+
+    def _fmt_pesos_compacto(self, v):
+        """Importe corto para las fichas KPI: '$ 48,3 M', '$ 320 K', '$ 900'."""
+        try:
+            v = float(v)
+        except (ValueError, TypeError):
+            return "$ 0"
+        a = abs(v)
+        if a >= 1_000_000:
+            return ("$ %.1f M" % (v / 1_000_000)).replace(".", ",")
+        if a >= 1_000:
+            return "$ %.0f K" % (v / 1_000)
+        return "$ %.0f" % v
+
+    # ------------------------------------------------------------- entidad
 
     def _refrescar_lista(self):
         filtradas = registro.buscar(self.entidades, self.var_busqueda.get())
         self._visibles = filtradas
         self.lista.delete(0, "end")
-        icono = {"OPERATIVA": "🟢", "POR_ARMAR": "🟡", "SIN_DATOS": "🔴"}
         for e in filtradas:
             self.lista.insert(
-                "end", " %s %s" % (icono.get(e.get("estado_radicacion"), "⚪"), e["nombre"][:58])
+                "end",
+                "  %s  %s" % (ICONO_ESTADO.get(e.get("estado_radicacion"), "⚪"), e["nombre"][:52]),
             )
 
-    def _al_elegir(self, _evento=None):
+    def _al_elegir(self, _e=None):
         sel = self.lista.curselection()
         if not sel:
             return
@@ -252,7 +502,7 @@ class Suite(tk.Tk):
             "GLOSAS → %s" % (glo.get("medio") or "—"),
         ]
         if glo.get("observaciones"):
-            lineas.append("  Nota: %s" % glo["observaciones"][:180])
+            lineas.append("  Nota: %s" % glo["observaciones"][:160])
         bots = registro.bots_de(e["nombre"].split()[0]) or registro.bots_de(e["nombre"])
         if bots:
             lineas.append("Bots registrados: %d" % len(bots))
@@ -279,8 +529,7 @@ class Suite(tk.Tk):
         else:
             messagebox.showinfo(
                 "Sin portal",
-                "Esta entidad no tiene link de plataforma registrado.\n"
-                "Radicación por: %s"
+                "Esta entidad no tiene link de plataforma registrado.\nRadicación por: %s"
                 % (self.entidad_actual.get("radicacion", {}).get("correo") or "sin datos"),
             )
 
@@ -311,12 +560,9 @@ class Suite(tk.Tk):
         if ruta:
             self.ruta_archivo.set(ruta)
             tipo = archivos.tipo_real(ruta)
-            self.log(
-                "Archivo cargado: %s  →  tipo real detectado: %s"
-                % (os.path.basename(ruta), tipo.upper())
-            )
+            self.log("Archivo: %s  →  tipo real: %s" % (os.path.basename(ruta), tipo.upper()))
             if os.path.splitext(ruta)[1].lower() == ".cmd" and tipo == "pdf":
-                self.log("  (Es un PDF renombrado como .cmd: se procesa como PDF.)")
+                self.log("  (PDF renombrado como .cmd: se procesa como PDF.)")
 
     def _elegir_carpeta(self):
         ruta = filedialog.askdirectory(title="Elegir carpeta base")
@@ -350,6 +596,7 @@ class Suite(tk.Tk):
             return
         self._ocupado = True
         self.progreso.start(12)
+        self.lbl_estado.configure(text="Procesando: %s…" % nombre, fg=BLUE)
         self.log("")
         self.log("══════ %s ══════" % nombre.upper())
 
@@ -372,6 +619,9 @@ class Suite(tk.Tk):
                 if isinstance(item, tuple) and item[0] == "__FIN__":
                     self._ocupado = False
                     self.progreso.stop()
+                    self.lbl_estado.configure(text="Listo", fg=MUTED)
+                elif isinstance(item, tuple) and item[0] == "__RESULTADOS__":
+                    self._cargar_resultados(item[1])
                 else:
                     self._escribir(item)
         except queue.Empty:
@@ -386,6 +636,73 @@ class Suite(tk.Tk):
         self.consola.insert("end", str(texto) + "\n")
         self.consola.see("end")
         self.consola.configure(state="disabled")
+
+    def _senal_resultados(self, carpeta):
+        self._ultima_carpeta = carpeta
+        self.cola_log.put(("__RESULTADOS__", carpeta))
+
+    def _cargar_resultados(self, carpeta):
+        """Lee CONTROL.csv del proceso y llena la tabla + los KPIs."""
+        self.tabla.delete(*self.tabla.get_children())
+        ruta = os.path.join(carpeta, "CONTROL.csv")
+        filas = []
+        if os.path.exists(ruta):
+            try:
+                with open(ruta, encoding="utf-8-sig", newline="") as f:
+                    filas = list(csv.DictReader(f, delimiter=";"))
+            except OSError:
+                filas = []
+        total_valor = 0.0
+        for i, fila in enumerate(filas):
+            valor = cruces_dgh.a_numero(fila.get("valor", 0))
+            total_valor += valor
+            self.tabla.insert(
+                "",
+                "end",
+                values=(
+                    fila.get("factura", ""),
+                    fila.get("estado", ""),
+                    (fila.get("detalle", "") or "")[:60],
+                    self._fmt_pesos(valor),
+                ),
+                tags=("par",) if i % 2 else (),
+            )
+        facturas = len({f.get("factura", "") for f in filas})
+        self._kpi_res["facturas"].configure(text=str(facturas))
+        self._kpi_res["objetado"].configure(text=self._fmt_pesos_compacto(total_valor))
+
+        # glosado y a-revisar salen de otros artefactos, si existen
+        glosado = self._suma_columna_consolidado(carpeta)
+        self._kpi_res["glosado"].configure(
+            text=self._fmt_pesos_compacto(glosado) if glosado else "—"
+        )
+        revisar = self._contar_revisar(carpeta)
+        self._kpi_res["revisar"].configure(text=str(revisar))
+        self.log("Resultados cargados en la tabla: %d filas." % len(filas))
+
+    def _suma_columna_consolidado(self, carpeta):
+        ruta = os.path.join(carpeta, "CONSOLIDADO_GLOSAS.xlsx")
+        if not os.path.exists(ruta):
+            return 0.0
+        try:
+            import pandas as pd
+
+            df = pd.read_excel(ruta)
+            if "valor_glosado" in df.columns:
+                return float(df["valor_glosado"].map(cruces_dgh.a_numero).sum())
+        except Exception:
+            return 0.0
+        return 0.0
+
+    def _contar_revisar(self, carpeta):
+        ruta = os.path.join(carpeta, "REVISAR.csv")
+        if not os.path.exists(ruta):
+            return 0
+        try:
+            with open(ruta, encoding="utf-8-sig", newline="") as f:
+                return max(0, sum(1 for _ in f) - 1)
+        except OSError:
+            return 0
 
     # -------------------------------------------------------------- acciones
 
@@ -409,11 +726,11 @@ class Suite(tk.Tk):
             rep.registrar(
                 "(masivo)",
                 "ORGANIZADO",
-                "%(facturas)d facturas en %(lotes)d lotes · "
-                "%(sin_clasificar)d sin clasificar · "
+                "%(facturas)d facturas en %(lotes)d lotes · %(sin_clasificar)d sin clasificar · "
                 "%(incompletas)d incompletas" % resumen,
             )
             rep.cerrar()
+            self._senal_resultados(rep.carpeta)
 
         self._correr("Organizar masivo", tarea)
 
@@ -457,13 +774,11 @@ class Suite(tk.Tk):
                     "CONSOLIDADO_GLOSAS.xlsx",
                 )
             rep.cerrar()
-            self._guardar_consolidado(salida)
+            self._ultimo_consolidado = salida
+            self.log("→ Este consolidado queda listo para 'Generar OBJECIONES'.")
+            self._senal_resultados(rep.carpeta)
 
         self._correr("Consolidar + cruzar", tarea)
-
-    def _guardar_consolidado(self, ruta):
-        self._ultimo_consolidado = ruta
-        self.log("→ Este consolidado queda listo para 'Generar OBJECIONES'.")
 
     def accion_objeciones(self):
         if not self._exigir_entidad():
@@ -514,9 +829,10 @@ class Suite(tk.Tk):
             )
             rep.cerrar()
             self.log(
-                "Recuerde validar el PRIMER cargue contra DGH y ajustar "
-                "config/mapeo_dgh.json si algún encabezado difiere."
+                "Recuerde validar el PRIMER cargue contra DGH y ajustar config/mapeo_dgh.json "
+                "si algún encabezado difiere."
             )
+            self._senal_resultados(rep.carpeta)
 
         self._correr("Generar OBJECIONES DGH", tarea)
 
@@ -536,6 +852,7 @@ class Suite(tk.Tk):
             if ruta:
                 rep.registrar("(lote)", "COMPILADO", os.path.basename(ruta), "", ruta)
             rep.cerrar()
+            self._senal_resultados(rep.carpeta)
 
         self._correr("Compilar evidencias", tarea)
 
@@ -552,22 +869,22 @@ class Suite(tk.Tk):
         if not bots:
             messagebox.showinfo(
                 "Sin bots",
-                "Esta entidad no tiene bots registrados.\n"
-                "Use '➕ Registrar bot existente' para apuntar al .bat/.py "
-                "actual.",
+                "Esta entidad no tiene bots registrados.\nUse '➕ Registrar bot' para apuntar al "
+                ".bat/.py actual.",
             )
             return
         ventana = tk.Toplevel(self)
         ventana.title("Bots de %s" % nombre[:40])
-        ventana.configure(bg=COLOR_FONDO)
+        ventana.configure(bg=BG)
         ventana.geometry("460x%d" % (90 + 46 * len(bots)))
-        tk.Label(ventana, text="Elija el bot a ejecutar:", bg=COLOR_FONDO, font=FUENTE).pack(pady=8)
+        tk.Label(ventana, text="Elija el bot a ejecutar:", bg=BG, fg=INK, font=F_BOLD).pack(pady=10)
         for b in bots:
             tk.Button(
                 ventana,
-                text="🤖 %s" % b["nombre"],
-                font=FUENTE,
+                text="🤖  %s" % b["nombre"],
+                font=F,
                 bg="white",
+                fg=INK,
                 relief="groove",
                 cursor="hand2",
                 command=lambda r=b["ruta"], v=ventana: (
@@ -594,18 +911,21 @@ class Suite(tk.Tk):
         messagebox.showinfo("Registrado", "El bot quedó disponible en '🤖 Ejecutar bot'.")
 
     def _abrir_salidas(self):
-        os.makedirs(CARPETA_SALIDAS, exist_ok=True)
+        carpeta = self._ultima_carpeta or CARPETA_SALIDAS
+        os.makedirs(carpeta, exist_ok=True)
         if os.name == "nt":
-            os.startfile(CARPETA_SALIDAS)
+            os.startfile(carpeta)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", carpeta])
         else:
-            subprocess.Popen(["xdg-open", CARPETA_SALIDAS])
+            subprocess.Popen(["xdg-open", carpeta])
 
 
 def main():
     faltantes = []
     try:
-        import pandas  # noqa: F401
         import openpyxl  # noqa: F401
+        import pandas  # noqa: F401
     except ImportError:
         faltantes.append("pandas / openpyxl (cruces y OBJECIONES)")
     try:
@@ -616,10 +936,7 @@ def main():
     app = Suite()
     if faltantes:
         app.log("[!] Componentes opcionales sin instalar: " + "; ".join(faltantes))
-        app.log(
-            "    Ejecute INICIAR_SUITE.bat con internet una vez, o: "
-            "pip install pandas openpyxl python-docx"
-        )
+        app.log("    Ejecute INICIAR_SUITE.bat con internet una vez.")
     app.mainloop()
 
 
