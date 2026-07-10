@@ -1108,6 +1108,29 @@ def main(argv: list[str] | None = None) -> int:
             h_fact, f_fact = consolidar_facturas(arch_fact) if arch_fact else ([], [])
             logger.info("  %d facturas", len(f_fact))
 
+            # Facturas con COPAGO/cuota moderadora: DGH les descuenta el copago
+            # al valor de los servicios, así que la objeción puede salir mayor
+            # y el cargue marcaría error de valor. Se avisa desde ya.
+            mapa_det = {norm_header(h): i for i, h in enumerate(h_det)}
+            idx_cm = mapa_det.get(norm_header("valor_cuota_moderadora"))
+            idx_fac_det = mapa_det.get(norm_header("numero_factura"))
+            if idx_cm is not None and idx_fac_det is not None:
+                copagos: dict[str, float] = {}
+                for fila_det in f_det:
+                    cm = a_numero(fila_det[idx_cm])
+                    if cm and cm > 0:
+                        fkey = norm_factura(fila_det[idx_fac_det])
+                        copagos[fkey] = copagos.get(fkey, 0.0) + cm
+                if copagos:
+                    top = sorted(copagos.items(), key=lambda x: -x[1])
+                    logger.warning(
+                        "  OJO: %d factura(s) con COPAGO. Si DGH devuelve errores de "
+                        "valor en este lote, casi seguro son estas (las de copago "
+                        "grande suelen tocar A MANO en DGH): %s",
+                        len(copagos),
+                        " · ".join(f"{f} (${v:,.0f})" for f, v in top[:5]).replace(",", "."),
+                    )
+
             # Glosas cuyo id_detalle no apareció en ningún DETALLE (avisar, no perder).
             ids_detalle = {g["id_detalle"] for g in glosados}
             huerfanas = [k for k in agrupado if k not in ids_detalle]

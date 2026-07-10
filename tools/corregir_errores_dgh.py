@@ -262,9 +262,13 @@ def corregir(path_err: Path, path_obj: Path, path_salida: Path | None = None) ->
         f"  Facturas sin problema     : {len(consec_salida) - len(corregidas)} -> van igual (DGH no guardó nada, se recarga todo)"
     )
     if manuales:
-        print(f"  Para revisar A MANO       : {len(manuales)} facturas (no van en el reintento):")
+        print(f"  Para hacer A MANO en DGH  : {len(manuales)} facturas (no van en el reintento):")
         for fact, motivo in manuales:
             print(f"      {fact}: {motivo}")
+        print("      (Suele pasar en facturas con COPAGO: DGH descuenta el copago del")
+        print("       valor de cada servicio y el valor cambia por item. Hazlas en el")
+        print("       Editor de Recepcion de Objecion de DGH seleccionando los")
+        print("       servicios: ahi DGH calcula el valor objetado solo y no falla.)")
 
     if not filas_salida:
         print("\n  No quedó ninguna factura para reintentar (todas ya estaban objetadas).")
