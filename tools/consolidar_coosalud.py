@@ -47,6 +47,15 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
          CROTIPOBJ   por FACTURA completa: 0=administrativa (sin CL) ·
                      1=médica (solo CL) · 2=mixta (CL + otros) — si la factura
                      es mixta, TODAS sus filas llevan 2
+  6. CONSOLIDADO RESPUESTAS GLOSAS.xlsx  (respuestas predeterminadas del área)
+       - Una fila por glosa con: numero_factura2 (HUS0000...), FECHA RADICACION
+         (de la cabecera de factura), FECHA GLOSA (= --fecha), FECHA DE
+         VENCIMIENTO (+15 días hábiles), DIA (días hábiles radicación->glosa,
+         festivos de Colombia incluidos), EXTEMPORANEA (>20 días hábiles,
+         art. 57 Ley 1438/2011), COD RESPUESTA GLOSA / COD (RE9502 extemporánea
+         · RE9901 a tiempo) y OBSERVACION RTA GLOSA (texto del área según tipo:
+         TARIFAS, AUTORIZACION, FACTURACION, SOPORTES — editables arriba).
+       - Hoja FACTURAS con la lista de facturas del lote.
 
 DEFENSAS (validado con revisión adversarial):
   - Valores en formato colombiano ("1.234.567,89", "26,140") se parsean bien.
@@ -150,6 +159,98 @@ COLS_OBJECIONES = [
 ]
 
 RE_NUM_FACTURA = re.compile(r"HUS0*(\d+)", re.IGNORECASE)
+
+# ============================================================================
+# CONSOLIDADO DE RESPUESTAS A GLOSAS (respuestas predeterminadas del área)
+# ----------------------------------------------------------------------------
+# La Ley 1438 de 2011 (art. 57) da a la EPS 20 días HÁBILES desde la
+# radicación de la factura para formular la glosa. Si la glosa llegó después,
+# es EXTEMPORÁNEA y se responde con RE9502; si llegó a tiempo, se responde con
+# RE9901 y el texto predeterminado según el tipo de glosa.
+# Estos textos son EDITABLES: cambiarlos aquí cambia el archivo de respuestas.
+
+DIAS_HABILES_EPS = 20  # plazo de la EPS para glosar (art. 57, Ley 1438/2011)
+DIAS_HABILES_RESPUESTA = 15  # plazo del prestador para responder la glosa
+
+COD_RTA_EXTEMPORANEA = "RE9502"
+DESC_RTA_EXTEMPORANEA = (
+    "RE9502 - La glosa no procede por haber sido generada fuera de los términos "
+    "establecidos por la Ley configurándose la aceptación tácita de la factura "
+    "de venta en salud"
+)
+COD_RTA_NORMAL = "RE9901"
+DESC_RTA_NORMAL = "RE9901 - Respuesta a glosa dentro de los términos establecidos por la Ley"
+
+OBS_EXTEMPORANEA = (
+    "ESE HUS NO ACEPTA GLOSA, SE LE INFORMA A LA ENTIDAD QUE LA OBJECION ES "
+    "EXTEMPORANEA, NO FUE NOTIFICADA EN LOS TIEMPOS PERENTORIOS DE LA NORMA ESTO "
+    "EN FUNCION DE LA LEY 1438 DE 2011 EN SU ARTÍCULO 57º. TRÁMITE DE GLOSAS. "
+    "LAS ENTIDADES RESPONSABLES DEL PAGO DE SERVICIOS DE SALUD DENTRO DE LOS "
+    "VEINTE (20) DÍAS HÁBILES SIGUIENTES A LA PRESENTACIÓN DE LA FACTURA CON "
+    "TODOS SUS SOPORTES, FORMULARÁN Y COMUNICARÁN A LOS PRESTADORES DE SERVICIOS "
+    "DE SALUD LAS GLOSAS A CADA FACTURA, CON BASE EN LA CODIFICACIÓN Y ALCANCE "
+    "DEFINIDOS EN LA NORMATIVIDAD VIGENTE. UNA VEZ FORMULADAS LAS GLOSAS A UNA "
+    "FACTURA NO SE PODRÁN FORMULAR NUEVAS GLOSAS A LA MISMA FACTURA, SALVO LAS "
+    "QUE SURJAN DE HECHOS NUEVOS DETECTADOS EN LA RESPUESTA DADA A LA GLOSA "
+    "INICIAL."
+)
+
+OBS_POR_TIPO = {
+    "TARIFAS": (
+        "ESE HUS NO ACEPTA GLOSA POR TARIFAS, TENIENDO EN CUENTA CONTRATO "
+        "68001S00060339-24 Y 68001C00060340-24 VIGENTE ENTRE LAS PARTES PARA LA "
+        "PRESTACIÓN DEL SERVICIO, POR LO TANTO, SE FACTURA A TARIFA A TARIFAS "
+        "ESTABLECIDAS ENTRE LAS PARTES SOAT SMLV-15% Y TARIFAS INSTITUCIONALES "
+        "MEDIANTE RESOLUCIÓN DE LA ESE HUS. NOTA: DE ACUERDO AL ARTÍCULO 57 DE "
+        "LA LEY 1438 DE 2011, DE NO OBTENERSE RATIFICACIÓN DE LA RESPUESTA A LA "
+        "GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA "
+        "OBJECIÓN"
+    ),
+    "AUTORIZACION": (
+        "ESE HUS NO ACEPTA GLOSA POR AUTORIZACIÓN SE EVIDENCIA LA NOTIFICACIÓN A "
+        "LA EPS ANEXO AT 02 Y AT 03 Y ENVÍOS CORRESPONDIENTES (1-2-3 Y 4) ANEXOS "
+        "PRORROGAS Y EGRESO CON LOS ENVÍOS CORRESPONDIENTES PARA LA SOLICITUD "
+        "AUTORIZACIÓN SEGÚN RESOLUCIÓN 3047/2008 Y DECRETO 4747/2007, PACIENTE "
+        "CON ATENTACIÓN INTEGRAL. NOTA: DE ACUERDO AL ARTÍCULO 57 DE LA LEY 1438 "
+        "DE 2011, DE NO OBTENERSE RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS "
+        "TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN"
+    ),
+    "FACTURACION": (
+        "ESE HUS NO ACEPTA GLOSA POR FACTURACION EN SERVICIOS MEDICOS PRESTADOS "
+        "AL PACIENTE DURANTE SU ESTANCIA EN LA ESE HUS, SERVICIOS LOS CUALES SE "
+        "FACTURAN EN CONCORDANCIA CON EL DECRETO 2423 DEL 96, SERVICIOS PACTADOS "
+        "ENTRE LAS PARTES, LOS SERVICISO FACTURADOS ESTAN ORDENADOS SOPORTADOS Y "
+        "JUSTIFICADOS EN HISTORIA CLINICA ADJUNTA EN FACTURA ENVIADA A LA ENTIDAD"
+    ),
+    "SOPORTES": (
+        "ESE HUS NO ACEPTA GLOSA SE ANEXA SOPORTE CORRESPONDIENTE, NOTA: SEGÚN "
+        "NORMATIVIDAD VIGENTE DE NO OBTENERSE RATIFICACIÓN DE LA GLOSA EN LOS "
+        "TÉRMINOS LEGALES, SE DARÁ POR LEVANTADA LA OBJECIÓN DE ACUERDO ARTÍCULO "
+        "57 DE LA LEY 1438 DE 2011"
+    ),
+}
+
+# Respaldo por si alguna glosa viene sin tipo_glosa: prefijo del código -> tipo.
+TIPO_POR_PREFIJO = {
+    "TA": "TARIFAS",
+    "AU": "AUTORIZACION",
+    "FA": "FACTURACION",
+    "SO": "SOPORTES",
+    "CL": "CALIDAD",
+    "DE": "DEVOLUCION",
+}
+
+COLS_RESPUESTAS_EXTRA = [
+    "FECHA RADICACION",
+    "FECHA GLOSA",
+    "FECHA DE VENCIMIENTO",
+    "DEVOLUCIONES",
+    "DIA",
+    "EXTEMPORANEA",
+    "COD RESPUESTA GLOSA",
+    "COD",
+    "OBSERVACION RTA GLOSA",
+]
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -458,6 +559,218 @@ def escribir_hoja(
                 ws.cell(row=row_i, column=col_i).number_format = fmt
     for i, h in enumerate(headers, start=1):
         ws.column_dimensions[get_column_letter(i)].width = max(12, min(40, len(str(h)) + 4))
+
+
+# ------------------------------------------------------------- días hábiles CO
+def _pascua(anio: int) -> "datetime.date":
+    """Domingo de Pascua (algoritmo gregoriano anónimo)."""
+    from datetime import date as _date
+
+    a = anio % 19
+    b, c = divmod(anio, 100)
+    d, e = divmod(b, 4)
+    g = (8 * b + 13) // 25
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7  # noqa: E741
+    m = (a + 11 * h + 19 * l) // 433
+    mes = (h + l - 7 * m + 90) // 25
+    dia = (h + l - 7 * m + 33 * mes + 19) % 32
+    return _date(anio, mes, dia)
+
+
+def festivos_colombia(anio: int) -> set:
+    """Festivos de Colombia (Ley 51 de 1983 'Emiliani'). Verificado contra los
+    consolidados reales del área (mayo 18, junio 8/15/29 y julio 20 de 2026)."""
+    from datetime import date as _date
+    from datetime import timedelta
+
+    def lunes_siguiente(d):
+        return d if d.weekday() == 0 else d + timedelta(days=7 - d.weekday())
+
+    p = _pascua(anio)
+    fijos = {
+        _date(anio, 1, 1),  # Año Nuevo
+        _date(anio, 5, 1),  # Día del Trabajo
+        _date(anio, 7, 20),  # Independencia
+        _date(anio, 8, 7),  # Boyacá
+        _date(anio, 12, 8),  # Inmaculada
+        _date(anio, 12, 25),  # Navidad
+        p - timedelta(days=3),  # Jueves Santo
+        p - timedelta(days=2),  # Viernes Santo
+    }
+    emiliani = {
+        _date(anio, 1, 6),  # Reyes
+        _date(anio, 3, 19),  # San José
+        _date(anio, 6, 29),  # San Pedro y San Pablo
+        _date(anio, 8, 15),  # Asunción
+        _date(anio, 10, 12),  # Raza
+        _date(anio, 11, 1),  # Todos los Santos
+        _date(anio, 11, 11),  # Independencia de Cartagena
+        p + timedelta(days=39),  # Ascensión
+        p + timedelta(days=60),  # Corpus Christi
+        p + timedelta(days=68),  # Sagrado Corazón
+    }
+    return fijos | {lunes_siguiente(d) for d in emiliani}
+
+
+def _es_habil(d, festivos: set) -> bool:
+    return d.weekday() < 5 and d not in festivos
+
+
+def dias_habiles_entre(desde, hasta) -> int:
+    """Días hábiles en (desde, hasta]: sin contar el día de inicio, contando el
+    final. Con este conteo los consolidados reales del área cuadran exacto."""
+    from datetime import timedelta
+
+    if desde is None or hasta is None or hasta <= desde:
+        return 0
+    festivos = set()
+    for anio in range(desde.year, hasta.year + 1):
+        festivos |= festivos_colombia(anio)
+    n, d = 0, desde
+    while d < hasta:
+        d += timedelta(days=1)
+        if _es_habil(d, festivos):
+            n += 1
+    return n
+
+
+def sumar_dias_habiles(desde, n: int):
+    """Fecha del n-ésimo día hábil después de `desde`."""
+    from datetime import timedelta
+
+    festivos = festivos_colombia(desde.year) | festivos_colombia(desde.year + 1)
+    d = desde
+    while n > 0:
+        d += timedelta(days=1)
+        if _es_habil(d, festivos):
+            n -= 1
+    return d
+
+
+def a_fecha(v):
+    """Fecha desde celda Excel: datetime/date o texto dd/mm/aaaa · aaaa-mm-dd."""
+    from datetime import date as _date
+    from datetime import datetime as _dt
+
+    if isinstance(v, _dt):
+        return v.date()
+    if isinstance(v, _date):
+        return v
+    s = norm_texto(v)[:19]
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
+        try:
+            return _dt.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def generar_respuestas_glosas(
+    h_glosas: list[str],
+    f_glosas: list[list],
+    h_fact: list[str],
+    f_fact: list[list],
+    fecha_masivo,
+) -> tuple[list[str], list[list], dict]:
+    """Arma el consolidado de RESPUESTAS a las glosas (respuestas predeterminadas).
+
+    Por cada glosa: si la EPS la formuló pasados los 20 días hábiles desde la
+    radicación de la factura (art. 57, Ley 1438/2011) va con RE9502 y el texto
+    de extemporaneidad; si fue a tiempo, va con RE9901 y el texto del área
+    según el tipo de glosa (TARIFAS, AUTORIZACION, FACTURACION, SOPORTES).
+    """
+    mapa_g = {norm_header(h): i for i, h in enumerate(h_glosas)}
+    idx_fact_g = mapa_g.get(norm_header("numero_factura"))
+    idx_cod = mapa_g.get(norm_header("codigo_glosa"))
+    idx_tipo = mapa_g.get(norm_header("tipo_glosa"))
+    idx_obs_final = mapa_g.get(norm_header("OBSERVACION FINAL"))
+
+    # radicación por factura (viene en la cabecera HUS*.xlsx del portal)
+    mapa_f = {norm_header(h): i for i, h in enumerate(h_fact)}
+    idx_fact_f = mapa_f.get(norm_header("numero_factura"))
+    idx_rad = mapa_f.get(norm_header("fecha_radicacion"))
+    radicacion: dict[str, object] = {}
+    if idx_fact_f is not None and idx_rad is not None:
+        for r in f_fact:
+            f = norm_factura(r[idx_fact_f])
+            fec = a_fecha(r[idx_rad])
+            if fec and f not in radicacion:
+                radicacion[f] = fec
+
+    fecha_glosa_masivo = fecha_masivo.date() if hasattr(fecha_masivo, "date") else fecha_masivo
+    vencimiento = sumar_dias_habiles(fecha_glosa_masivo, DIAS_HABILES_RESPUESTA)
+
+    # encabezados: los del portal + numero_factura2 tras numero_factura,
+    # sin OBSERVACION FINAL (esa es del archivo de OBJECIONES), + las nuevas.
+    headers: list[str] = []
+    for i, h in enumerate(h_glosas):
+        if i == idx_obs_final:
+            continue
+        headers.append(h)
+        if i == idx_fact_g:
+            headers.append("numero_factura2")
+    headers += COLS_RESPUESTAS_EXTRA
+
+    filas: list[list] = []
+    sin_radicacion: set[str] = set()
+    filas_sin_rad = 0
+    sin_texto: dict[str, int] = {}
+    n_ext = 0
+    pos2 = headers.index("numero_factura2")
+    for r in f_glosas:
+        fact = r[idx_fact_g] if idx_fact_g is not None else ""
+        fkey = norm_factura(fact)
+        rad = radicacion.get(fkey)
+        codigo = norm_texto(r[idx_cod]) if idx_cod is not None else ""
+        tipo = norm_texto(r[idx_tipo]).upper() if idx_tipo is not None else ""
+        if not tipo:
+            tipo = TIPO_POR_PREFIJO.get(codigo[:2].upper(), "")
+
+        base = [c for i, c in enumerate(r) if i != idx_obs_final]
+        # numero_factura2 en la posición siguiente a numero_factura
+        base = base[:pos2] + [factura_dgh(fact)] + base[pos2:]
+
+        if rad is None:
+            sin_radicacion.add(fkey)
+            filas_sin_rad += 1
+            filas.append(base + [None, fecha_glosa_masivo, vencimiento, "NO", None, "", "", "", ""])
+            continue
+
+        dia = dias_habiles_entre(rad, fecha_glosa_masivo)
+        extemporanea = dia > DIAS_HABILES_EPS
+        if extemporanea:
+            n_ext += 1
+            cod, desc, obs = COD_RTA_EXTEMPORANEA, DESC_RTA_EXTEMPORANEA, OBS_EXTEMPORANEA
+        else:
+            cod, desc = COD_RTA_NORMAL, DESC_RTA_NORMAL
+            obs = OBS_POR_TIPO.get(tipo, "")
+            if not obs:
+                sin_texto[tipo or codigo[:2].upper()] = sin_texto.get(tipo or "?", 0) + 1
+        devol = "SI" if codigo[:2].upper() == "DE" or tipo == "DEVOLUCION" else "NO"
+        filas.append(
+            base
+            + [
+                rad,
+                fecha_glosa_masivo,
+                vencimiento,
+                devol,
+                dia,
+                "SI" if extemporanea else "NO",
+                desc,
+                cod,
+                obs,
+            ]
+        )
+
+    resumen = {
+        "extemporaneas": n_ext,
+        "a_tiempo": len(filas) - n_ext - filas_sin_rad,
+        "sin_radicacion": sin_radicacion,
+        "sin_texto": sin_texto,
+    }
+    return headers, filas, resumen
 
 
 # --------------------------------------------------------------------------- pasos
@@ -1233,6 +1546,48 @@ def main(argv: list[str] | None = None) -> int:
                 wb.active.title = "FACTURAS"
                 escribir_hoja(wb.active, d["h_fact"], d["f_fact"])
                 wb.save(salida_lote / f"CONSOLIDADO FACTURAS{sufijo}.xlsx")
+
+            # CONSOLIDADO RESPUESTAS GLOSAS: las respuestas predeterminadas del
+            # área para TODAS las glosas del lote (RE9502 extemporánea / RE9901
+            # a tiempo con el texto según tipo de glosa).
+            h_rta, f_rta, res_rta = generar_respuestas_glosas(
+                d["h_glosas"], d["f_glosas"], d["h_fact"], d["f_fact"], fecha
+            )
+            formatos_rta: list[str | None] = [None] * len(h_rta)
+            for col_fecha in ("FECHA RADICACION", "FECHA GLOSA", "FECHA DE VENCIMIENTO"):
+                formatos_rta[h_rta.index(col_fecha)] = "DD/MM/YYYY"
+            wb = openpyxl.Workbook()
+            wb.active.title = "BASE"
+            escribir_hoja(wb.active, h_rta, f_rta, formatos=formatos_rta)
+            pos_f2 = h_rta.index("numero_factura2")
+            vistas_f2: list[str] = []
+            for fila_rta in f_rta:
+                f2 = norm_texto(fila_rta[pos_f2])
+                if f2 and f2 not in vistas_f2:
+                    vistas_f2.append(f2)
+            ws_fact2 = wb.create_sheet("FACTURAS")
+            escribir_hoja(ws_fact2, ["FACTURAS"], [[f2] for f2 in vistas_f2])
+            wb.save(salida_lote / f"CONSOLIDADO RESPUESTAS GLOSAS{sufijo}.xlsx")
+            logger.info(
+                "  Respuestas a glosas: %d a tiempo (%s) · %d extemporáneas (%s).",
+                res_rta["a_tiempo"],
+                COD_RTA_NORMAL,
+                res_rta["extemporaneas"],
+                COD_RTA_EXTEMPORANEA,
+            )
+            if res_rta["sin_radicacion"]:
+                logger.warning(
+                    "  OJO: %d factura(s) sin fecha de radicación (la respuesta queda "
+                    "sin código, revisar): %s",
+                    len(res_rta["sin_radicacion"]),
+                    ", ".join(sorted(res_rta["sin_radicacion"])[:5]),
+                )
+            if res_rta["sin_texto"]:
+                logger.warning(
+                    "  OJO: glosas A TIEMPO sin texto predeterminado (quedan con la "
+                    "observación vacía para diligenciar a mano): %s",
+                    " · ".join(f"{t}: {n}" for t, n in res_rta["sin_texto"].items()),
+                )
 
             if base_ok:
                 # Solo las filas DGH de las facturas de ESTE lote.

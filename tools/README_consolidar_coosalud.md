@@ -76,6 +76,20 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
    | CRDOBSERV | OBSERVACIÓN FINAL combinada |
    | CROTIPOBJ | **por factura completa**: 0=administrativa (sin CL) · 1=médica (solo CL) · 2=mixta — si la factura es mixta, TODAS sus filas llevan 2 |
 
+6. **CONSOLIDADO RESPUESTAS GLOSAS.xlsx** — la respuesta predeterminada del
+   área para **cada glosa** del lote (hoja `BASE` + hoja `FACTURAS`):
+   - **FECHA RADICACION** (de la cabecera de la factura) · **FECHA GLOSA**
+     (la `--fecha`) · **FECHA DE VENCIMIENTO** (fecha glosa + 15 días hábiles).
+   - **DIA**: días **hábiles** entre radicación y glosa (festivos colombianos
+     incluidos) · **EXTEMPORANEA**: `SI` si pasó de 20 días hábiles
+     (art. 57, Ley 1438 de 2011).
+   - **COD / COD RESPUESTA GLOSA**: `RE9502` (extemporánea) o `RE9901`
+     (a tiempo) · **OBSERVACION RTA GLOSA**: el texto del área según el tipo
+     (TARIFAS, AUTORIZACION, FACTURACION, SOPORTES). Las glosas de CALIDAD a
+     tiempo quedan con la observación vacía (respuesta de auditoría médica).
+   - Los textos se editan al inicio de `consolidar_coosalud.py`
+     (constantes `OBS_POR_TIPO`, `OBS_EXTEMPORANEA`, `DESC_RTA_*`).
+
    - El `OBJECIONES.xlsx` queda con **una sola hoja** (como la guía), ya limpio
      para el cargue. Lo que DGH rechazaría se deja **FUERA** y se guarda en un
      archivo aparte **`REVISAR (no van en el cargue).xlsx`**:
