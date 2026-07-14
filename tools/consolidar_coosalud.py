@@ -747,6 +747,10 @@ def generar_respuestas_glosas(
             cod, desc = COD_RTA_NORMAL, DESC_RTA_NORMAL
             obs = OBS_POR_TIPO.get(tipo, "")
             if not obs:
+                # CALIDAD (y cualquier tipo sin texto del área): la respuesta es
+                # de auditoría médica — se deja TODO vacío (código y observación)
+                # para que las doctoras diligencien su propia respuesta.
+                cod, desc = "", ""
                 sin_texto[tipo or codigo[:2].upper()] = sin_texto.get(tipo or "?", 0) + 1
         devol = "SI" if codigo[:2].upper() == "DE" or tipo == "DEVOLUCION" else "NO"
         filas.append(
@@ -1584,8 +1588,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
             if res_rta["sin_texto"]:
                 logger.warning(
-                    "  OJO: glosas A TIEMPO sin texto predeterminado (quedan con la "
-                    "observación vacía para diligenciar a mano): %s",
+                    "  Glosas A TIEMPO que responde AUDITORÍA MÉDICA (quedan sin "
+                    "código ni observación, las diligencian las doctoras): %s",
                     " · ".join(f"{t}: {n}" for t, n in res_rta["sin_texto"].items()),
                 )
 
