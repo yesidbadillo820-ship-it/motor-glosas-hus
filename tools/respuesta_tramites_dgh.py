@@ -115,11 +115,17 @@ def cargar_radicaciones(carpeta: Path) -> dict[str, object]:
 
 
 def procesar(
-    plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None, max_facturas: int = 499
+    plantilla: Path,
+    carpeta: Path,
+    fecha_cargue,
+    salida: Path | None,
+    max_facturas: int = 499,
+    omitir: set[str] | None = None,
 ) -> int:
     print(f"\nLeyendo radicaciones del masivo: {carpeta} ...")
     radicacion = cargar_radicaciones(carpeta)
     print(f"  {len(radicacion)} facturas con fecha de radicación.")
+    omitir = omitir or set()
 
     print(f"Leyendo el export de trámites: {plantilla.name} ...")
     wb = openpyxl.load_workbook(plantilla, read_only=True, data_only=True)
@@ -152,9 +158,15 @@ def procesar(
     facturas_incompletas: set[str] = set()
     dia_cache: dict[tuple[str, str], int] = {}
     calculadas: list[tuple[str, list]] = []  # (factura_norm, fila completa)
+    ya_subidas = 0
     for r in filas[1:]:
         base = list(r[:n_base]) + [None] * (n_base - len(r))
         fkey = norm_factura(r[col_fact])
+        if fkey in omitir:
+            # Factura cuya respuesta de trámite YA se subió a DGH en un cargue
+            # anterior: no va (repetirla marcaría error).
+            ya_subidas += 1
+            continue
         rad = radicacion.get(fkey)
         fobj = a_fecha(r[col_fobj])
         codigo = norm_texto(r[col_cod])
@@ -238,6 +250,11 @@ def procesar(
         f"  TOTAL: {len(archivos_salida)} archivo(s) · {len(salida_filas)} conceptos · "
         f"{facturas_salida} facturas (de {total_facturas}) · máx {max_facturas} facturas por archivo"
     )
+    if omitir:
+        print(
+            f"  OMITIDAS: {len(omitir)} facturas en la lista de ya-subidas a DGH "
+            f"({ya_subidas} conceptos saltados)."
+        )
     print(f"  Extemporáneas ({COD_RTA_EXTEMPORANEA}): {n_ext}")
     print(f"  A tiempo ({COD_RTA_NORMAL}) con texto del área: {n_ok}")
     if facturas_incompletas:
@@ -305,6 +322,12 @@ def main(argv: list[str] | None = None) -> int:
         "--salida", default=None, help="Ruta del archivo final (def: MASIVO COOSALUD <fecha>.xlsx)."
     )
     p.add_argument(
+        "--omitir-facturas",
+        default=None,
+        help="TXT con facturas (una por línea) cuya respuesta de trámite YA se "
+        "subió a DGH: se dejan fuera para no repetirlas.",
+    )
+    p.add_argument(
         "--max-facturas-lote",
         type=int,
         default=499,
@@ -351,12 +374,22 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     try:
+        omitir: set[str] = set()
+        if args.omitir_facturas:
+            p_omit = Path(args.omitir_facturas)
+            if not p_omit.is_file():
+                print(f"  ERROR: no existe el archivo de --omitir-facturas: {p_omit}")
+                return 1
+            with p_omit.open(encoding="utf-8", errors="replace") as fh:
+                omitir = {norm_factura(lin) for lin in fh if lin.strip()}
+            print(f"  Se omitirán {len(omitir)} facturas ya subidas a DGH ({p_omit.name}).")
         return procesar(
             plantilla,
             carpeta,
             fecha_cargue,
             Path(args.salida) if args.salida else None,
             max_facturas=max(1, args.max_facturas_lote),
+            omitir=omitir,
         )
     except ValueError as exc:
         print(f"\n  ERROR: {exc}")
