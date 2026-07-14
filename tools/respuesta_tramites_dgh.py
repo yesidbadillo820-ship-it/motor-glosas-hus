@@ -114,7 +114,9 @@ def cargar_radicaciones(carpeta: Path) -> dict[str, object]:
     return radicacion
 
 
-def procesar(plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None) -> int:
+def procesar(
+    plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None, max_facturas: int = 499
+) -> int:
     print(f"\nLeyendo radicaciones del masivo: {carpeta} ...")
     radicacion = cargar_radicaciones(carpeta)
     print(f"  {len(radicacion)} facturas con fecha de radicación.")
@@ -187,25 +189,55 @@ def procesar(plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None) 
     n_ext = sum(1 for f in salida_filas if f[n_base + 1] == COD_RTA_EXTEMPORANEA)
     n_ok = sum(1 for f in salida_filas if f[n_base + 1] == COD_RTA_NORMAL)
 
-    out = salida or plantilla.with_name(f"MASIVO COOSALUD {fecha_cargue.strftime('%d%m%Y')}.xlsx")
-    wb2 = openpyxl.Workbook()
-    ws2 = wb2.active
-    ws2.title = nombre_hoja
-    ws2.append(hdr_base + COLS_NUEVAS)
-    for f in salida_filas:
-        ws2.append(f)
-    col_fc = n_base + 1
-    for row_i in range(2, len(salida_filas) + 2):
-        ws2.cell(row=row_i, column=col_fc).number_format = "DD/MM/YYYY"
-    for i, h in enumerate(hdr_base + COLS_NUEVAS, start=1):
-        ws2.column_dimensions[get_column_letter(i)].width = max(12, min(42, len(str(h)) + 4))
-    wb2.save(out)
+    # El cargue de trámites de DGH acepta máximo ~500 facturas: se parte en
+    # LOTES de max_facturas facturas (una factura NUNCA se parte entre lotes).
+    orden_facturas: list[str] = []
+    filas_por_factura: dict[str, list[list]] = {}
+    for fkey, fila in calculadas:
+        if fkey in facturas_incompletas:
+            continue
+        if fkey not in filas_por_factura:
+            orden_facturas.append(fkey)
+            filas_por_factura[fkey] = []
+        filas_por_factura[fkey].append(fila)
+
+    lotes_facturas = [
+        orden_facturas[i : i + max_facturas] for i in range(0, len(orden_facturas), max_facturas)
+    ]
+    base_nombre = salida or plantilla.with_name(
+        f"MASIVO COOSALUD {fecha_cargue.strftime('%d%m%Y')}.xlsx"
+    )
+    archivos_salida: list[tuple[Path, int, int]] = []
+    for n_lote, facturas_lote in enumerate(lotes_facturas, 1):
+        if len(lotes_facturas) == 1:
+            out = base_nombre
+        else:
+            out = base_nombre.with_name(f"{base_nombre.stem} LOTE {n_lote:02d}.xlsx")
+        filas_lote = [fila for fkey in facturas_lote for fila in filas_por_factura[fkey]]
+        wb2 = openpyxl.Workbook()
+        ws2 = wb2.active
+        ws2.title = nombre_hoja
+        ws2.append(hdr_base + COLS_NUEVAS)
+        for f in filas_lote:
+            ws2.append(f)
+        col_fc = n_base + 1
+        for row_i in range(2, len(filas_lote) + 2):
+            ws2.cell(row=row_i, column=col_fc).number_format = "DD/MM/YYYY"
+        for i, h in enumerate(hdr_base + COLS_NUEVAS, start=1):
+            ws2.column_dimensions[get_column_letter(i)].width = max(12, min(42, len(str(h)) + 4))
+        wb2.save(out)
+        archivos_salida.append((out, len(facturas_lote), len(filas_lote)))
+    out = base_nombre  # para el TXT de pendientes
 
     total_facturas = len({fkey for fkey, _ in calculadas})
     facturas_salida = total_facturas - len(facturas_incompletas)
     print("\n===== LISTO =====")
-    print(f"  {out}")
-    print(f"  {len(salida_filas)} conceptos · {facturas_salida} facturas (de {total_facturas})")
+    for ruta, n_fact, n_filas in archivos_salida:
+        print(f"  {ruta.name:46} {n_fact:>4} facturas · {n_filas:>6} conceptos")
+    print(
+        f"  TOTAL: {len(archivos_salida)} archivo(s) · {len(salida_filas)} conceptos · "
+        f"{facturas_salida} facturas (de {total_facturas}) · máx {max_facturas} facturas por archivo"
+    )
     print(f"  Extemporáneas ({COD_RTA_EXTEMPORANEA}): {n_ext}")
     print(f"  A tiempo ({COD_RTA_NORMAL}) con texto del área: {n_ok}")
     if facturas_incompletas:
@@ -272,6 +304,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--salida", default=None, help="Ruta del archivo final (def: MASIVO COOSALUD <fecha>.xlsx)."
     )
+    p.add_argument(
+        "--max-facturas-lote",
+        type=int,
+        default=499,
+        help="Máximo de facturas por archivo (el cargue de trámites de DGH "
+        "acepta hasta ~500). Def: 499. Si hay más, salen LOTE 01, LOTE 02, ...",
+    )
     args = p.parse_args(argv)
 
     print("=" * 72)
@@ -313,7 +352,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         return procesar(
-            plantilla, carpeta, fecha_cargue, Path(args.salida) if args.salida else None
+            plantilla,
+            carpeta,
+            fecha_cargue,
+            Path(args.salida) if args.salida else None,
+            max_facturas=max(1, args.max_facturas_lote),
         )
     except ValueError as exc:
         print(f"\n  ERROR: {exc}")
