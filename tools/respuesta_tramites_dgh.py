@@ -14,8 +14,14 @@ del cargue, con la MISMA lógica de las respuestas del portal:
     OBSERVACION         texto de extemporaneidad, o el texto del área según el
                         tipo (TARIFAS/AUTORIZACION/FACTURACION/SOPORTES)
 
-Las glosas de CALIDAD (CL) y COBERTURA (CO) que fueron A TIEMPO quedan con
-código y observación EN BLANCO: esas las responde auditoría médica.
+REGLA DE FACTURA COMPLETA (definida por el área):
+  - Factura EXTEMPORÁNEA (RE9502): TODOS sus ítems — incluidos los CL — llevan
+    la misma respuesta de extemporaneidad y la factura va completa al archivo.
+  - Factura A TIEMPO (RE9901) con ítems de CALIDAD (CL) o COBERTURA (CO): esos
+    ítems los responde auditoría médica, así que la factura se QUITA COMPLETA
+    del archivo (no solo el concepto CL) — se sube después, cuando las doctoras
+    respondan su parte. La lista de facturas excluidas queda en un TXT junto al
+    archivo final.
 
 La fecha de radicación de cada factura se lee de las cabeceras del portal
 (carpeta FACTURAS del "CARGUE MASIVO COOSALUD"); la fecha de la glosa sale de
@@ -136,11 +142,14 @@ def procesar(plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None) 
     hdr_base = [h for h in hdr if h.upper() not in {c.upper() for c in COLS_NUEVAS}]
     n_base = len(hdr_base)
 
-    n_ext = n_ok = 0
+    # PASADA 1: calcular la respuesta de cada fila y marcar las facturas
+    # INCOMPLETAS (a tiempo con ítems CL/CO de auditoría médica, o sin fecha
+    # de radicación). Esas facturas se quitan COMPLETAS del archivo.
     sin_rad: set[str] = set()
     blanco: dict[str, int] = {}
+    facturas_incompletas: set[str] = set()
     dia_cache: dict[tuple[str, str], int] = {}
-    salida_filas: list[list] = []
+    calculadas: list[tuple[str, list]] = []  # (factura_norm, fila completa)
     for r in filas[1:]:
         base = list(r[:n_base]) + [None] * (n_base - len(r))
         fkey = norm_factura(r[col_fact])
@@ -151,23 +160,32 @@ def procesar(plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None) 
 
         if rad is None or fobj is None:
             sin_rad.add(fkey)
-            salida_filas.append(base + [fecha_cargue, "", 0, ""])
+            facturas_incompletas.add(fkey)
+            calculadas.append((fkey, base + [fecha_cargue, "", 0, ""]))
             continue
         clave = (fkey, str(fobj))
         if clave not in dia_cache:
             dia_cache[clave] = dias_habiles_entre(rad, fobj)
         if dia_cache[clave] > DIAS_HABILES_EPS:
-            n_ext += 1
-            salida_filas.append(base + [fecha_cargue, COD_RTA_EXTEMPORANEA, 0, OBS_EXTEMPORANEA])
+            # Extemporánea: TODOS los ítems (incluidos CL) van con RE9502.
+            calculadas.append(
+                (fkey, base + [fecha_cargue, COD_RTA_EXTEMPORANEA, 0, OBS_EXTEMPORANEA])
+            )
         else:
             obs = OBS_POR_TIPO.get(tipo, "")
             if not obs:
-                # CALIDAD/COBERTURA a tiempo: responde auditoría médica.
+                # CALIDAD/COBERTURA a tiempo: responde auditoría médica ->
+                # la factura ENTERA se queda por fuera de este cargue.
                 blanco[tipo or codigo[:2].upper()] = blanco.get(tipo or "?", 0) + 1
-                salida_filas.append(base + [fecha_cargue, "", 0, ""])
+                facturas_incompletas.add(fkey)
+                calculadas.append((fkey, base + [fecha_cargue, "", 0, ""]))
             else:
-                n_ok += 1
-                salida_filas.append(base + [fecha_cargue, COD_RTA_NORMAL, 0, obs])
+                calculadas.append((fkey, base + [fecha_cargue, COD_RTA_NORMAL, 0, obs]))
+
+    # PASADA 2: solo las facturas COMPLETAS van al archivo.
+    salida_filas = [fila for fkey, fila in calculadas if fkey not in facturas_incompletas]
+    n_ext = sum(1 for f in salida_filas if f[n_base + 1] == COD_RTA_EXTEMPORANEA)
+    n_ok = sum(1 for f in salida_filas if f[n_base + 1] == COD_RTA_NORMAL)
 
     out = salida or plantilla.with_name(f"MASIVO COOSALUD {fecha_cargue.strftime('%d%m%Y')}.xlsx")
     wb2 = openpyxl.Workbook()
@@ -183,23 +201,29 @@ def procesar(plantilla: Path, carpeta: Path, fecha_cargue, salida: Path | None) 
         ws2.column_dimensions[get_column_letter(i)].width = max(12, min(42, len(str(h)) + 4))
     wb2.save(out)
 
+    total_facturas = len({fkey for fkey, _ in calculadas})
+    facturas_salida = total_facturas - len(facturas_incompletas)
     print("\n===== LISTO =====")
     print(f"  {out}")
-    print(
-        f"  {len(salida_filas)} conceptos · {len({norm_factura(r[col_fact]) for r in filas[1:]})} facturas"
-    )
+    print(f"  {len(salida_filas)} conceptos · {facturas_salida} facturas (de {total_facturas})")
     print(f"  Extemporáneas ({COD_RTA_EXTEMPORANEA}): {n_ext}")
     print(f"  A tiempo ({COD_RTA_NORMAL}) con texto del área: {n_ok}")
-    if blanco:
+    if facturas_incompletas:
+        pend = out.with_name(out.stem + " - FACTURAS PENDIENTES AUDITORIA MEDICA.txt")
+        pend.write_text("\n".join(sorted(facturas_incompletas)) + "\n", encoding="utf-8")
         print(
-            "  En BLANCO para auditoría médica: "
-            + " · ".join(f"{t}: {n}" for t, n in blanco.items())
+            f"  QUITADAS del archivo: {len(facturas_incompletas)} facturas COMPLETAS "
+            f"(a tiempo con ítems CL/CO de auditoría médica"
+            + (f"; {len(sin_rad)} sin radicación" if sin_rad else "")
+            + ")."
         )
-    if sin_rad:
-        print(
-            f"  OJO: {len(sin_rad)} factura(s) sin fecha de radicación (quedaron en "
-            f"blanco, revisar): {', '.join(sorted(sin_rad)[:5])}"
-        )
+        print(f"    Lista guardada en: {pend.name}")
+        print("    Se suben después, cuando las doctoras respondan su parte.")
+        if blanco:
+            print(
+                "    Ítems que esperan a auditoría médica: "
+                + " · ".join(f"{t}: {n}" for t, n in blanco.items())
+            )
     print(f"  FECHA DE CARGUE: {fecha_cargue.strftime('%d/%m/%Y')} · VALOR ACEPTADO: 0 en todas")
     return 0
 
