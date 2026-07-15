@@ -11,6 +11,9 @@ _UNCONFIGURED_ADMIN_PASSWORD = "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
 
 
 class Settings(BaseSettings):
+    # Ronda 30: URL pública para los enlaces de los correos (antes había
+    # hosts viejos y contradictorios: onrender.com y fly.dev).
+    app_base_url: str = "https://iaglosassinac.help"
     database_url: str = "sqlite:///./glosas.db"
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
