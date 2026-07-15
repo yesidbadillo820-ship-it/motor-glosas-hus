@@ -73,7 +73,8 @@ CRDOBSERV · CROTIPOBJ`
 
 4. **Validación por PDF.** La suma de `CROVALOBJ` se compara contra el
    "Valor Objetado" del encabezado del PDF. Si no cuadra, se avisa en consola con
-   `⚠ ... NO CUADRA` (y con `--estricto` esa factura se excluye del Excel).
+   `⚠ ... NO CUADRA` y el proceso termina con código de salida 1 (la factura igual
+   se incluye en el Excel, salvo con `--estricto`, que la excluye).
 
 5. **`CROTIPOBJ`**: 0 si el PDF dice `Tipo objeción: Glosa`, 2 si dice `Devolución`
    (forzable con `--tipobj`).

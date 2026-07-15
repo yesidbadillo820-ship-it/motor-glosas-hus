@@ -65,10 +65,20 @@ class PdfFalso:
 def test_parsear_dinero():
     assert org.parsear_dinero("$114.900") == 114900
     assert org.parsear_dinero("$2.177.341") == 2177341
+    assert org.parsear_dinero("$2,177,341") == 2177341  # miles con coma
     assert org.parsear_dinero("$700") == 700
     assert org.parsear_dinero("--") is None
     assert org.parsear_dinero("") is None
     assert org.parsear_dinero("114900") is None  # sin $ no es celda de dinero
+
+
+def test_parsear_dinero_coma_decimal():
+    """Los centavos NO son miles: '$1.365,50' debe dar 1365, no 136550 (si se
+    inflara x100, encabezado y renglones se inflan igual y la suma cuadraría)."""
+    assert org.parsear_dinero("$1.365,50") == 1365
+    assert org.parsear_dinero("$114.900,00") == 114900
+    assert org.parsear_dinero("$1,365.50") == 1365
+    assert org._a_entero("2.177.341,00") == 2177341
 
 
 def test_normalizar_factura():
@@ -256,6 +266,82 @@ def test_extraer_registros_codigos_apilados():
     assert r["componentes"][1]["observacion"] == "Se glosa CANULA no se reconoce"
 
 
+def test_extraer_registros_encabezado_repetido():
+    """Un encabezado de tabla repetido a mitad de página NO debe descartar los
+    registros anteriores (se usa el PRIMER encabezado y las repeticiones se
+    filtran como líneas de puro vocabulario de encabezado)."""
+    pagina = PaginaFalsa(
+        [
+            _linea(
+                100, (0, "Tecnología"), (1, "Cantidad"), (5, "Código Objeción"), (6, "Observación")
+            ),
+            _linea(
+                120,
+                (0, "890701 - CONSULTA"),
+                (1, "1"),
+                (2, "$114.900"),
+                (3, "--"),
+                (4, "$24.800"),
+                (5, "TA0201 - EL CARGO"),
+                (6, "sobrefacturado"),
+            ),
+            # encabezado repetido (con su segunda línea envuelta)
+            _linea(
+                200, (0, "Tecnología"), (1, "Cantidad"), (5, "Código Objeción"), (6, "Observación")
+            ),
+            _linea(212, (1, "Tecnología"), (3, "Objetada")),
+            _linea(
+                220,
+                (0, "902045 - TIEMPO DE"),
+                (1, "1"),
+                (2, "$70.600"),
+                (3, "--"),
+                (4, "$15.400"),
+                (5, "TA0801 - LOS CARGOS"),
+                (6, "sobrefacturado"),
+            ),
+        ]
+    )
+    registros = [org.consolidar_registro(r) for r in org.extraer_registros(PdfFalso([pagina]))]
+    assert [r["tec_codigo"] for r in registros] == ["890701", "902045"]
+    # el vocabulario del encabezado repetido no contamina ningún registro
+    assert all("Tecnología" not in r["tec_desc"] for r in registros)
+
+
+def test_extraer_registros_codigo_en_minusculas():
+    """Un código de tecnología en minúsculas también abre registro (si no, su
+    valor se fundiría silenciosamente en el registro anterior)."""
+    pagina = PaginaFalsa(
+        [
+            _linea(100, (0, "Tecnología"), (5, "Código"), (6, "Observación")),
+            _linea(
+                120,
+                (0, "890701 - CONSULTA"),
+                (1, "1"),
+                (2, "$114.900"),
+                (3, "1"),
+                (4, "$114.900"),
+                (5, "FA0205 - SE COBRAN"),
+                (6, "nota"),
+            ),
+            _linea(
+                140,
+                (0, "fmq0923 - LAPICERO"),
+                (1, "1"),
+                (2, "$35.600"),
+                (3, "1"),
+                (4, "$35.600"),
+                (5, "fa0502 - SE COBRAN"),
+                (6, "nota"),
+            ),
+        ]
+    )
+    registros = [org.consolidar_registro(r) for r in org.extraer_registros(PdfFalso([pagina]))]
+    assert [r["tec_codigo"] for r in registros] == ["890701", "FMQ0923"]
+    assert registros[1]["valor_objetado"] == 35600
+    assert registros[1]["componentes"][0]["codigo"] == "FA0502"
+
+
 def test_extraer_registros_corta_en_firmas():
     pagina = PaginaFalsa(
         [
@@ -325,6 +411,37 @@ def test_fusionar_respeta_sobrantes():
     fusionados = org.fusionar_dobles_glosas(renglones)
     assert len(fusionados) == 3
     assert sum(r["valor_objetado"] for r in fusionados) == 21600 + 98600 * 2
+
+
+def test_fusionar_gana_el_mayor_valor():
+    """Si la diferencia tarifaria supera al total (total de 1 unidad vs diferencia
+    sobre todas), CRNCONOBJ/CROVALOBJ deben salir de la MAYOR, como cuenta la EPS."""
+    renglones = [
+        _renglon("903839", "--", 86400, "TA0801"),  # diferencia sobre 4 unidades
+        _renglon("903839", "1", 24650, "CL0801"),  # total de 1 unidad
+    ]
+    fusionados = org.fusionar_dobles_glosas(renglones)
+    assert len(fusionados) == 1
+    assert fusionados[0]["componentes"][0]["codigo"] == "TA0801"
+    assert fusionados[0]["valor_objetado"] == 86400
+    assert [x["componentes"][0]["codigo"] for x in fusionados[0]["fusionados"]] == ["CL0801"]
+
+
+def test_fusionar_empareja_por_valor_no_por_posicion():
+    """Con varios totales de valores distintos, cada diferencia se empareja con el
+    total más afín por valor (mayor con mayor), no por orden del documento."""
+    renglones = [
+        _renglon("903839", "--", 60000, "TA0801"),
+        _renglon("903839", "1", 50000, "CL0801"),
+        _renglon("903839", "1", 100000, "CL0801"),
+        _renglon("903839", "--", 10000, "TA0801"),
+    ]
+    fusionados = org.fusionar_dobles_glosas(renglones)
+    assert len(fusionados) == 2
+    por_valor = {r["valor_objetado"]: r for r in fusionados}
+    # la dif de 60000 queda bajo el total de 100000; la de 10000 bajo el de 50000
+    assert por_valor[100000]["fusionados"][0]["valor_objetado"] == 60000
+    assert por_valor[50000]["fusionados"][0]["valor_objetado"] == 10000
 
 
 def test_fusionar_no_cruza_tecnologias():

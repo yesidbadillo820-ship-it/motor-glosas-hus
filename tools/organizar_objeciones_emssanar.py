@@ -77,8 +77,10 @@ logger = logging.getLogger("objeciones_emssanar")
 # arranca pegada al borde no se cae a la columna siguiente.
 BANDAS_X = (140, 180, 272, 320, 395, 588)
 
-RE_CODIGO_TEC = re.compile(r"^[A-Z]{0,3}\d[\dA-Z.\-]*$")  # 890701, 32606-01, FMQ0923, 129A02
-RE_CODIGO_OBJ = re.compile(r"^[A-Z]{2}\d{4}$")  # TA0801, FA0205, CL0801...
+# IGNORECASE: un código en minúsculas también debe abrir registro/componente —
+# si no, sus valores se funden silenciosamente en el registro anterior.
+RE_CODIGO_TEC = re.compile(r"^[A-Z]{0,3}\d[\dA-Z.\-]*$", re.IGNORECASE)  # 890701, FMQ0923, 129A02
+RE_CODIGO_OBJ = re.compile(r"^[A-Z]{2}\d{4}$", re.IGNORECASE)  # TA0801, FA0205, CL0801...
 RE_DINERO = re.compile(r"^\$[\d.,]+$")
 RE_PIE_PAGINA = re.compile(r"^Página \d+ de \d+|Reporte generado por", re.IGNORECASE)
 
@@ -297,12 +299,24 @@ def _exigir_openpyxl():
 # ─── Helpers de parseo ────────────────────────────────────────────────────────────────
 
 
+def _a_entero(texto: str) -> int | None:
+    """'1.365' → 1365, '2,177,341' → 2177341, '1.365,50' → 1365 (pesos enteros).
+
+    Un separador seguido de exactamente DOS dígitos al final es coma decimal
+    (formato '$1.365,50'): los grupos de miles siempre traen tres. Sin este
+    recorte los centavos inflarían todos los valores x100 y la validación de
+    suma no lo detectaría (encabezado y renglones se inflan por igual)."""
+    s = (texto or "").strip()
+    s = re.sub(r"[.,](\d{2})$", "", s)
+    digitos = re.sub(r"[^\d]", "", s)
+    return int(digitos) if digitos else None
+
+
 def parsear_dinero(texto: str) -> int | None:
     """'$114.900' → 114900 (los puntos/comas son separadores de miles)."""
     if not texto or not RE_DINERO.match(texto.strip()):
         return None
-    digitos = re.sub(r"[^\d]", "", texto)
-    return int(digitos) if digitos else None
+    return _a_entero(texto)
 
 
 def normalizar_factura(cruda: str) -> str:
@@ -352,10 +366,10 @@ def parsear_encabezado(texto_pagina1: str) -> dict:
         enc["fecha_objecion"] = datetime(anio, mes, dia)
     m = RE_VALOR_FACTURA.search(texto_pagina1)
     if m:
-        enc["valor_factura"] = int(re.sub(r"[^\d]", "", m.group(1)))
+        enc["valor_factura"] = _a_entero(m.group(1))
     m = RE_VALOR_OBJETADO.search(texto_pagina1)
     if m:
-        enc["valor_objetado"] = int(re.sub(r"[^\d]", "", m.group(1)))
+        enc["valor_objetado"] = _a_entero(m.group(1))
     return enc
 
 
@@ -376,6 +390,25 @@ def tipobj_desde_encabezado(tipo_objecion: str) -> int:
 # trae "CODIGO -". Un registro puede traer VARIOS componentes de objeción: bloques
 # "XX9999 - ..." apilados en la columna Código Objeción (el segundo bloque no repite
 # tecnología ni valores → mismo renglón, código adicional).
+
+
+# Vocabulario del encabezado de la tabla. Una línea compuesta SOLO por estas
+# palabras es encabezado (o su segunda línea envuelta, "Tecnología Objetada") y se
+# descarta; las líneas de datos siempre traen además códigos, montos o texto libre.
+_PALABRAS_ENCABEZADO = {
+    "Tecnología",
+    "Cantidad",
+    "Valor",
+    "Objetada",
+    "Objetado",
+    "Código",
+    "Objeción",
+    "Observación",
+}
+
+
+def _es_linea_encabezado(linea: list[dict]) -> bool:
+    return bool(linea) and {w["text"] for w in linea} <= _PALABRAS_ENCABEZADO
 
 
 def _columna_de(palabra: dict) -> int:
@@ -413,19 +446,25 @@ def extraer_registros(pdf) -> list[dict]:
     for page in pdf.pages:
         lineas = _lineas_de_pagina(page)
 
-        # Tope del encabezado de la tabla (si la página lo trae): se salta todo lo
-        # que esté a esa altura o por encima (título, NIT, valores, etc.).
+        # Tope del PRIMER encabezado de la tabla (si la página lo trae): se salta
+        # todo lo que esté a esa altura o por encima (título, NIT, valores, etc.).
+        # Se usa el primero a propósito: si una plantilla repitiera el encabezado a
+        # mitad de página, con el último se perderían los registros de arriba. Las
+        # repeticiones se filtran igual porque toda línea que sea puro vocabulario
+        # de encabezado se descarta (_es_linea_encabezado).
         tope_encabezado = None
         for linea in lineas:
-            texto = " ".join(w["text"] for w in linea)
-            if "Código" in texto and "Observación" in texto:
+            if _es_linea_encabezado(linea) and any(w["text"] == "Código" for w in linea):
                 tope_encabezado = max(w["top"] for w in linea)
+                break
 
         for linea in lineas:
             texto_linea = " ".join(w["text"] for w in linea)
             if RE_PIE_PAGINA.search(texto_linea):
                 continue
             if tope_encabezado is not None and linea[0]["top"] <= tope_encabezado + 13:
+                continue
+            if _es_linea_encabezado(linea):
                 continue
             # Bloque de firmas al final ("Auditor Principal:", correos): sin columnas
             # de tecnología ni código, se corta ahí.
@@ -482,13 +521,14 @@ def consolidar_registro(reg: dict) -> dict:
         cod, texto = separar_codigo_descripcion(_limpiar_texto(comp["palabras_cod"]))
         componentes.append(
             {
-                "codigo": cod,
+                # upper(): DGH y la tabla CUPS_A_DGH trabajan en mayúsculas
+                "codigo": cod.upper(),
                 "texto": texto,
                 "observacion": _limpiar_texto(comp["palabras_obs"]),
             }
         )
     return {
-        "tec_codigo": tec_codigo,
+        "tec_codigo": tec_codigo.upper(),
         "tec_desc": tec_desc,
         "cantidad": reg["cantidad"],
         "valor_tecnologia": reg["valor_tecnologia"],
@@ -504,25 +544,40 @@ def consolidar_registro(reg: dict) -> dict:
 def fusionar_dobles_glosas(renglones: list[dict]) -> list[dict]:
     """Cuando el mismo servicio trae una glosa de valor TOTAL (Cantidad Objetada
     numérica) y otra de DIFERENCIA tarifaria ("--"), la EPS solo cuenta la mayor en
-    su "Valor Objetado". Se fusionan de a pares (misma tecnología, en orden) en un
-    renglón cuyos componentes conservan cada código con su $valor."""
+    su "Valor Objetado". Se fusionan de a pares (misma tecnología) y el renglón
+    resultante toma CRNCONOBJ/CROVALOBJ del componente de MAYOR valor — normalmente
+    el total, pero puede ser la diferencia (p.ej. total de 1 unidad vs diferencia
+    sobre todas las unidades). Ambos códigos quedan en CRDOBSERV con su $valor."""
     por_tec: dict[str, dict[str, list[int]]] = defaultdict(lambda: {"total": [], "dif": []})
     for i, r in enumerate(renglones):
         clave = "total" if r["cantidad_objetada"].isdigit() else "dif"
         por_tec[r["tec_codigo"]][clave].append(i)
 
-    absorbidos: dict[int, int] = {}  # idx renglón "--" → idx renglón total que lo absorbe
+    def _valor(idx: int) -> int:
+        return renglones[idx]["valor_objetado"] or 0
+
+    # Emparejar por afinidad de valor (mayor con mayor), no por posición: con varios
+    # totales de valores distintos, el orden del documento cruzaría los pares.
+    pares: list[tuple[int, int]] = []
     for grupos in por_tec.values():
+        totales = sorted(grupos["total"], key=_valor, reverse=True)
+        difs = sorted(grupos["dif"], key=_valor, reverse=True)
         # strict=False a propósito: se emparejan tantos como haya de cada lado
-        for idx_total, idx_dif in zip(grupos["total"], grupos["dif"], strict=False):
-            absorbidos[idx_dif] = idx_total
+        pares += list(zip(totales, difs, strict=False))
+
+    absorbido_por: dict[int, int] = {}  # idx secundario → idx principal que lo absorbe
+    for idx_total, idx_dif in pares:
+        if _valor(idx_total) >= _valor(idx_dif):
+            absorbido_por[idx_dif] = idx_total
+        else:
+            absorbido_por[idx_total] = idx_dif
 
     fusionados: list[dict] = []
     extras: dict[int, list[dict]] = defaultdict(list)
-    for idx_dif, idx_total in absorbidos.items():
-        extras[idx_total].append(renglones[idx_dif])
+    for sec, prin in absorbido_por.items():
+        extras[prin].append(renglones[sec])
     for i, r in enumerate(renglones):
-        if i in absorbidos:
+        if i in absorbido_por:
             continue
         if i in extras:
             r = dict(r)
@@ -745,6 +800,7 @@ def main(argv: list[str] | None = None) -> int:
 
     resultados = []
     con_error = 0
+    sin_cuadrar = 0
     for ruta in pdfs:
         try:
             res = procesar_pdf(ruta, aplicar_sufijo_h=not args.sin_sufijo_h)
@@ -760,10 +816,12 @@ def main(argv: list[str] | None = None) -> int:
             f"suma ${res['suma']:,} vs encabezado "
             f"${enc.get('valor_objetado', 0):,} → {estado}"
         )
-        if not res["cuadra"] and args.estricto:
-            logger.error(f"  descartado por --estricto: {ruta.name}")
-            con_error += 1
-            continue
+        if not res["cuadra"]:
+            sin_cuadrar += 1
+            if args.estricto:
+                logger.error(f"  descartado por --estricto: {ruta.name}")
+                con_error += 1
+                continue
         res["factura"] = factura
         resultados.append(res)
 
@@ -819,7 +877,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     if con_error:
         logger.warning(f"({con_error} PDF(s) con problemas — revisar arriba)")
-    return 0 if not con_error else 1
+    if sin_cuadrar and not args.estricto:
+        logger.warning(
+            f"(⚠ {sin_cuadrar} factura(s) NO CUADRAN con el encabezado del PDF: "
+            "se incluyeron igual — revisar antes de cargar)"
+        )
+    # exit != 0 también cuando alguna factura no cuadró: que el aviso no pase
+    # desapercibido en corridas automatizadas (el Excel igual queda escrito).
+    return 0 if not con_error and not sin_cuadrar else 1
 
 
 if __name__ == "__main__":
