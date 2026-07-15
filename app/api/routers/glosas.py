@@ -5592,6 +5592,12 @@ async def importar_recepcion(
     y tumbe la app (incidente 2026-05-19).
     """
     req_id = set_request_id()
+    # Ronda 30: validar el tamaño ANTES de cargar todo a RAM. archivo.size
+    # ya viene del multipart spooleado a disco por Starlette (no depende del
+    # Content-Length del cliente). En la VM de 1GB, un upload gigante hacía
+    # OOM justo al await read().
+    if archivo.size is not None and archivo.size > 15_000_000:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (>15 MB)")
     contenido = await archivo.read()
     if not contenido:
         raise HTTPException(status_code=400, detail="Archivo vacío")
