@@ -62,6 +62,19 @@ logs/
 *.sqlite3
 glosas.db
 local.db
+**/*.db
+
+# Ronda 30 — DATOS DE PACIENTES (PHI): en la VM el build context es
+# /opt/motor-glosas, que contiene ./data con la BD de producción, los
+# backups y los PDFs de soporte. El runtime los usa vía el volumen /data,
+# NUNCA vía /app/data, así que excluirlos del build es inocuo y evita
+# hornear historia clínica dentro de cada imagen Docker. Los 3 fixtures
+# .json (plantillas, cláusulas, perfiles) sí viajan — ver COPY data/*.json
+# en el Dockerfile.
+data/soportes/
+data/backups/
+data/*.db
+backups/
 
 # Archivos sensibles que NUNCA deben ir al contenedor
 .env

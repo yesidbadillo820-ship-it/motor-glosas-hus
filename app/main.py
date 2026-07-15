@@ -822,7 +822,7 @@ async def lifespan(app: FastAPI):
             if not archivo_hus.exists():
                 logger.warning(
                     f"[SEED-HUS] archivo no encontrado en {archivo_hus} — "
-                    "el banco HUS NO se cargará. Verificar COPY data/ en Dockerfile."
+                    "el banco HUS NO se cargará. Verificar COPY data/*.json en Dockerfile."
                 )
             else:
                 with archivo_hus.open(encoding="utf-8") as _fh:
