@@ -8596,7 +8596,8 @@ class GlosaService:
                 return respuesta, modelo
 
             # 2) Caché persistente en BD (si hay sesión global disponible)
-            cached_db = _buscar_cache_ia_db(clave_cache)
+            # Ronda 30: query SQLAlchemy sync fuera del event loop.
+            cached_db = await asyncio.to_thread(_buscar_cache_ia_db, clave_cache)
             if cached_db is not None:
                 respuesta, modelo = cached_db
                 async with _CACHE_IA_LOCK:
@@ -8684,7 +8685,7 @@ class GlosaService:
                     modelo = f"{modelo} [degradado]"[:80]
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
-                _guardar_cache_ia_db(clave_cache, content, modelo)
+                await asyncio.to_thread(_guardar_cache_ia_db, clave_cache, content, modelo)
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
