@@ -1097,7 +1097,8 @@ class RecepcionService:
                     eps_codigo=eps_codigo or None,
                     paciente="N/A",
                     factura=factura,
-                    numero_radicado=numero_radicado_real,
+                    numero_radicado=(numero_radicado_real or None)
+                    and str(numero_radicado_real)[:50],
                     consecutivo_dgh=consecutivo or None,
                     gestor_nombre=gestor,
                     tecnico_recepcion=tecnico_recepcion or None,
@@ -1192,6 +1193,13 @@ class RecepcionService:
                 )
 
             except Exception as e:
+                # Ronda 30: sanear la sesión — un flush fallido la deja
+                # envenenada y TODAS las filas siguientes (y el commit final)
+                # fallan, perdiendo el lote entero.
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
                 resumen.errores.append(f"Fila {num_fila}: {e}")
                 logger.warning(f"Error procesando fila {num_fila}: {e}")
                 continue

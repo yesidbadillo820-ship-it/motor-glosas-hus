@@ -163,7 +163,9 @@ _BANCO_DEFENSAS: tuple[dict, ...] = (
     {
         "key": "hemofilia_inhibidores",
         "patron": re.compile(
-            r"HEMOFILIA|FACTOR\s+VII|EPTACOG|FEIBA|INHIBIDOR(?:ES)?\b",
+            # Ronda 30: "INHIBIDOR" suelto disparaba defensa de hemofilia en
+            # glosas de "inhibidor de bomba de protones". Exige contexto factor.
+            r"HEMOFILIA|FACTOR\s+VII|EPTACOG|FEIBA|\bINHIBIDOR(?:ES)?\s+(?:DEL?\s+|CONTRA\s+EL\s+)?FACTOR\b",
             re.IGNORECASE,
         ),
         "titulo": "Hemofilia con inhibidores (Factor VIIa / aPCC)",
@@ -183,7 +185,8 @@ _BANCO_DEFENSAS: tuple[dict, ...] = (
     {
         "key": "iris_vih",
         "patron": re.compile(
-            r"\bIRIS\b|RECONSTITUCI[ÓO]N\s+INMUNE|VIH.{0,20}TARV|SIDA",
+            # Ronda 30: "SIDA" sin frontera matcheaba dentro de otras palabras.
+            r"\bIRIS\b|RECONSTITUCI[ÓO]N\s+INMUNE|VIH.{0,20}TARV|\bSIDA\b",
             re.IGNORECASE,
         ),
         "titulo": "Síndrome de Reconstitución Inmune (IRIS) post-TARV en VIH/SIDA",
