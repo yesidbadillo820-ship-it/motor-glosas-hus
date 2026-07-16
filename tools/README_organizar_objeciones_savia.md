@@ -1,120 +1,94 @@
-# Guía: `organizar_objeciones_savia.py` — Organizador de objeciones de SAVIA SALUD
+# Guía: `organizar_objeciones_savia.py` — Objeciones de SAVIA SALUD → formato Dispensario
 
-Herramienta que toma el/los export(s) **crudos del Dispensario**
-(`OBJECIONES_DISPENSARIO_HUS*.xlsx`) y arma un Excel **limpio y organizado** con
-el formato exacto que usa el equipo para trabajar las glosas de **SAVIA SALUD**
-(tomado como plantilla del archivo `SAVIA_SALUD_8.03.xlsx`).
-
-Es el mismo patrón que `convertir_tramite_masivo.py` (que convierte el export del
-CRRP al formato de SIMED), pero apuntando al formato de SAVIA SALUD.
+Herramienta que toma el Excel de **glosas de SAVIA SALUD** (las 8 columnas de
+`SAVIA_SALUD_8.03.xlsx`) y lo convierte al **formato del Dispensario** — el mismo
+layout de 16 columnas de `OBJECIONES_DISPENSARIO_HUS*.xlsx`, que es la
+**guía/plantilla de salida**. Genera **un archivo por factura**, nombrado igual
+que la guía (`OBJECIONES_DISPENSARIO_<factura>.xlsx`), listo para tramitar en el
+Dispensario.
 
 ---
 
 ## 1) Por qué existe
 
-El Dispensario exporta las objeciones en un Excel **técnico y difícil de leer**:
-16 columnas con nombres de sistema (`CRNCXC`, `CRNCONOBJ`, `SLNSERPRO`,
-`CROVALOBJ`, `CRDOBSERV`, …), una fila por objeción, con el número de factura en
-formato largo (`HUS0000530265`) y el nombre del servicio, la cantidad y el valor
-unitario **embebidos dentro del texto** de la objeción.
+SAVIA SALUD entrega sus glosas en una tabla limpia de 8 columnas:
 
-Para trabajar las glosas de SAVIA el equipo necesita, en cambio, una tabla de
-**8 columnas limpias**:
+```
+Numero_factura | Cod_Servicio | Servicio | Cantidad_Servicio |
+Valor_Unitario | Valor_Glosa | Motivo_Esp_Glosa_Valor_A | Observacion_Glosa_A
+```
 
-| Columna | Contenido |
+Pero para trabajarlas/cargarlas en el **Dispensario** hacen falta en el layout de
+16 columnas que ese sistema usa (hoja `OBJECIONES`):
+
+```
+CDCONSEC | CDFECDOC | CRNCXC | CROFECOBJ | CROREFERE | CROOBSERV | CROCLAOBJ |
+CRNCLAOBJ | GENUSUARIO4 | CRNCONOBJ | SLNSERPRO | IDRIPS | CTNCENCOS |
+CROVALOBJ | CRDOBSERV | CROTIPOBJ
+```
+
+Este bot hace esa conversión automáticamente y saca **un archivo por factura**,
+con el mismo nombre y estructura que traían los originales del Dispensario.
+
+---
+
+## 2) Insumos
+
+### Entrada (`--entrada`)
+
+El Excel de SAVIA SALUD (8 columnas, como `SAVIA_SALUD_8.03.xlsx`). Las columnas
+se detectan **por nombre de encabezado** (tolerante a tildes/mayúsculas); si el
+archivo trajera otros nombres, cae a los índices fijos (0..7 en el orden de
+arriba).
+
+### Salida (`--salida`)
+
+- **Por defecto:** una **carpeta**. El bot escribe ahí un
+  `OBJECIONES_DISPENSARIO_<factura>.xlsx` por cada factura.
+- **Con `--consolidado`:** `--salida` es un `.xlsx` único con todas las facturas
+  juntas.
+
+---
+
+## 3) Mapeo de campos (SAVIA → Dispensario)
+
+| Salida (Dispensario) | Origen (SAVIA) | Cómo se obtiene |
+|---|---|---|
+| `CRNCXC` | `Numero_factura` | Se pasa a formato largo: `HUS443697` → `HUS0000443697` (10 dígitos). |
+| `CRNCONOBJ` | `Motivo_Esp_Glosa_Valor_A` | Se completa a 6 caracteres: `TA08` → `TA0801` (ver **§4**). |
+| `SLNSERPRO` | `Cod_Servicio` | Directo. |
+| `CROVALOBJ` | `Valor_Glosa` | Directo (valor objetado). |
+| `CRDOBSERV` | `Observacion_Glosa_A` | Directo (texto de la objeción). |
+| `CDFECDOC`, `CROFECOBJ` | — | Fecha de `--fecha` (default: hoy). |
+| `CDCONSEC` | — | Constante `1` (como la guía). Se cambia con `--consecutivo`. |
+| `CROCLAOBJ`, `GENUSUARIO4`, `CROTIPOBJ` | — | Constantes `0`, `999`, `0` (de la guía). |
+| `CROREFERE`, `CROOBSERV`, `CRNCLAOBJ`, `IDRIPS`, `CTNCENCOS` | — | Vacíos. |
+
+---
+
+## 4) Código de objeción (`--codigo-sufijo` / `--mapa-codigos`)
+
+SAVIA usa códigos de **4 caracteres** (grupo + concepto): `TA08`, `CL07`, `SO61`.
+El Dispensario usa **6** (grupo + concepto + consecutivo): `TA0801`, `CL0701`,
+`SO6101`. Por defecto el bot **completa con el sufijo `01`** (el que traía la
+guía original).
+
+| Flag | Efecto |
 |---|---|
-| `Numero_factura` | Factura corta (`HUS530265`) |
-| `Cod_Servicio` | Código del servicio/insumo glosado |
-| `Servicio` | Nombre del servicio |
-| `Cantidad_Servicio` | Cantidad facturada |
-| `Valor_Unitario` | Valor unitario facturado |
-| `Valor_Glosa` | Valor objetado |
-| `Motivo_Esp_Glosa_Valor_A` | Código de objeción (p.ej. `CL08`, `TA08`, `SO61`) |
-| `Observacion_Glosa_A` | Texto de la objeción |
+| `--codigo-sufijo 05` | Usa otro consecutivo: `TA08` → `TA0805`. |
+| `--mapa-codigos mapa.json` | Fuerza el código exacto por concepto (tiene prioridad). |
 
-Este bot hace esa transformación de forma automática y **consolida muchas
-facturas** (una carpeta llena de `OBJECIONES_DISPENSARIO_*.xlsx`) en un solo
-Excel ordenado por factura.
-
----
-
-## 2) Insumos que necesita
-
-### A) Export(es) del Dispensario (`--entrada`)
-
-Uno o más `OBJECIONES_DISPENSARIO_HUS*.xlsx`, **o una carpeta** que los contenga
-(los toma todos con `*.xlsx`, ignorando los temporales `~$…`). Las columnas se
-detectan **por nombre de encabezado** (tolerante a tildes/mayúsculas); si el
-export viniera con encabezados distintos, cae a los índices fijos observados:
-
-| Concepto | Columna del Dispensario | Índice de respaldo |
-|---|---|---|
-| Factura | `CRNCXC` | 2 |
-| Código de objeción | `CRNCONOBJ` | 9 |
-| Código de servicio | `SLNSERPRO` | 10 |
-| Valor objetado | `CROVALOBJ` | 13 |
-| Texto de la objeción | `CRDOBSERV` | 14 |
-
-### B) Excel de salida (`--salida`)
-
-Ruta del Excel organizado que se va a generar (se crea la carpeta si no existe).
-
----
-
-## 3) Mapeo de campos (crudo → SAVIA)
-
-| Salida (SAVIA) | Origen (Dispensario) | Cómo se obtiene |
-|---|---|---|
-| `Numero_factura` | `CRNCXC` | Se acorta: `HUS0000530265` → `HUS530265` (mismo criterio que `radicar_facturacion.factura_corta`). Se puede desactivar con `--sin-normalizar-factura`. |
-| `Cod_Servicio` | `SLNSERPRO` | Directo. |
-| `Servicio` | `CRDOBSERV` | Se extrae del texto: lo que sigue a `SE GLOSA CODIGO <cod>` hasta el primer punto / `SE FACTURA`. Si no hay código de servicio (p.ej. estancias), usa el nombre del concepto del encabezado. Si no se puede, queda vacío. |
-| `Cantidad_Servicio` | `CRDOBSERV` | Del texto: `SE FACTURA UNA UNIDAD` → 1, `SE FACTURAN DOS UNIDADES` → 2. Default 1. |
-| `Valor_Unitario` | `CRDOBSERV` / `CROVALOBJ` | Del texto: `POR VALOR DE N PESOS` (valor facturado) ÷ cantidad. Si no está, asume objeción de línea completa (`Valor_Glosa` ÷ cantidad). |
-| `Valor_Glosa` | `CROVALOBJ` | Directo (valor objetado). |
-| `Motivo_Esp_Glosa_Valor_A` | `CRNCONOBJ` | Ver **§4**. |
-| `Observacion_Glosa_A` | `CRDOBSERV` | Texto de la objeción, quitándole el `$NNNNN` que el Dispensario pega al final. |
-
-> **Nota sobre la extracción de `Servicio`, `Cantidad_Servicio` y
-> `Valor_Unitario`:** estos tres campos **no existen como columna** en el export
-> del Dispensario — van embebidos en la redacción de la objeción. La herramienta
-> los extrae con reglas de texto (best-effort) y siempre deja un valor de
-> respaldo razonable (cantidad 1, unitario = valor glosado, servicio vacío). Es
-> recomendable una revisión rápida de estas columnas cuando la redacción del
-> Dispensario sea atípica.
-
----
-
-## 4) Código de objeción (`--codigo`)
-
-El Dispensario usa códigos de **6 caracteres**: `<GG><CC><SS>` (grupo + concepto
-+ consecutivo), p.ej. `CL0801`, `TA0801`, `SO0801`. La plantilla de SAVIA usa los
-**4 primeros** (grupo + concepto): `CL08`, `TA08`, `SO08`.
-
-Esto se verificó contra la plantilla `SAVIA_SALUD_8.03.xlsx`:
-`TA0801 → TA08` y `CL0801 → CL08` (ambos "apoyo diagnóstico").
-
-| `--codigo` | Efecto | Ejemplo |
-|---|---|---|
-| `corto` (default) | Los 4 primeros caracteres (grupo + concepto). Coincide con la plantilla de SAVIA. | `CL0801` → `CL08` |
-| `completo` | El código tal cual del Dispensario (trazable). | `CL0801` → `CL0801` |
-
-### Mapeo puntual (`--mapa-codigos`)
-
-Si SAVIA espera un código distinto para algún concepto, se puede pasar un JSON
-que **fuerza** el mapeo de esos códigos (se aplica antes que `--codigo`):
+Ejemplo de `mapa.json`:
 
 ```json
 {
-  "CL0801": "CL06",
-  "SO0801": "SO61"
+  "TA08": "TA0805",
+  "SO61": "SO6102"
 }
 ```
 
-```
---mapa-codigos "mapa_savia.json"
-```
-
-Los códigos que no estén en el JSON siguen la regla de `--codigo`.
+> Si SAVIA/el Dispensario ya trae un mapeo oficial de estos códigos, cargalo por
+> `--mapa-codigos` y esos ganan; el resto sigue la regla del sufijo.
 
 ---
 
@@ -122,58 +96,61 @@ Los códigos que no estén en el JSON siguen la regla de `--codigo`.
 
 | Flag | Default | Uso |
 |---|---|---|
-| `--entrada` | — (requerido) | Uno o más Excel del Dispensario, o carpeta(s) con `OBJECIONES_DISPENSARIO_*.xlsx`. |
-| `--salida` | — (requerido) | Excel destino con el formato organizado de SAVIA. |
-| `--codigo` | `corto` | `corto` (CL0801→CL08) o `completo` (CL0801 tal cual). |
-| `--mapa-codigos` | — | JSON opcional para forzar códigos puntuales. |
-| `--limpiar-encabezado` | off | Quita el código del inicio del texto (`CL0801 …`), que ya va en su columna. |
-| `--sin-normalizar-factura` | off | Deja la factura larga (`HUS0000530265`) en vez de acortarla. |
+| `--entrada` | — (requerido) | Excel de SAVIA SALUD (8 columnas). |
+| `--salida` | — (requerido) | Carpeta destino (o `.xlsx` si `--consolidado`). |
+| `--consolidado` | off | Un solo Excel con todas las facturas en vez de uno por factura. |
+| `--fecha` | hoy | Fecha `YYYY-MM-DD` para `CDFECDOC`/`CROFECOBJ`. |
+| `--codigo-sufijo` | `01` | Consecutivo con que se completa el código (4→6). |
+| `--mapa-codigos` | — | JSON para forzar códigos puntuales. |
+| `--consecutivo` | `1` | Valor de `CDCONSEC`. |
 | `--log` | — | Guarda un log adicional a archivo. |
 
 ---
 
 ## 6) Comandos típicos
 
-### Un solo Excel del Dispensario
+### Un archivo por factura (lo normal)
 
 ```cmd
 py tools\organizar_objeciones_savia.py ^
-  --entrada "D:\...\OBJECIONES_DISPENSARIO_HUS0000530265.xlsx" ^
-  --salida  "D:\...\SAVIA_SALUD_organizado.xlsx"
+  --entrada "D:\...\SAVIA_SALUD_8.03.xlsx" ^
+  --salida  "D:\...\OBJECIONES_SAVIA"
 ```
 
-### Muchas facturas (una carpeta con todos los exports)
+Deja en `OBJECIONES_SAVIA\` un `OBJECIONES_DISPENSARIO_HUS0000443697.xlsx`,
+`OBJECIONES_DISPENSARIO_HUS0000503425.xlsx`, etc.
+
+### Con fecha específica de radicación
 
 ```cmd
 py tools\organizar_objeciones_savia.py ^
-  --entrada "D:\...\OBJECIONES SAVIA" ^
-  --salida  "D:\...\SAVIA_SALUD_organizado.xlsx"
+  --entrada "D:\...\SAVIA_SALUD_8.03.xlsx" ^
+  --salida  "D:\...\OBJECIONES_SAVIA" ^
+  --fecha 2026-07-10
 ```
 
-### Conservando el código completo del Dispensario
+### Todo junto en un solo Excel
 
 ```cmd
 py tools\organizar_objeciones_savia.py ^
-  --entrada "D:\...\OBJECIONES SAVIA" ^
-  --salida  "D:\...\SAVIA_SALUD_organizado.xlsx" ^
-  --codigo completo
+  --entrada "D:\...\SAVIA_SALUD_8.03.xlsx" ^
+  --salida  "D:\...\SAVIA_consolidado.xlsx" ^
+  --consolidado
 ```
 
 ---
 
 ## 7) Qué imprime
 
-Al terminar, además del Excel, muestra un resumen:
-
 ```
-Excel organizado: ...\SAVIA_SALUD_organizado.xlsx
-  Facturas: 1  |  Objeciones: 4
-  Valor glosado total: $5,763,297
-  Códigos de objeción:
-    CL01: 1
-    CL03: 1
-    CL08: 1
-    SO08: 1
+2 archivo(s) del Dispensario en: ...\OBJECIONES_SAVIA
+  Facturas: 2  |  Objeciones: 161
+  Valor glosado total: $4,177,858
+  Códigos de objeción (CRNCONOBJ):
+    TA0801: 142
+    CL0701: 6
+    TA0201: 6
+    ...
 ```
 
 ---
@@ -186,13 +163,11 @@ py -m pip install openpyxl
 
 ---
 
-## 9) Limitaciones conocidas
+## 9) Cosas para revisar
 
-- **Extracción por texto**: `Servicio`, `Cantidad_Servicio` y `Valor_Unitario`
-  se derivan de la redacción de la objeción. Si el Dispensario cambia el estilo
-  de redacción, esos tres campos pueden requerir revisión manual (los demás —
-  factura, código de servicio, valor glosado, código de objeción, observación —
-  vienen de columnas y son exactos).
-- **Mapeo de código**: la regla `corto` (4 primeros caracteres) coincide con la
-  plantilla de SAVIA para los casos verificados. Si SAVIA usa un catálogo de
-  códigos propio para algún concepto, usar `--mapa-codigos` para forzarlo.
+- **Código `CRNCONOBJ`**: la regla por defecto completa con `01`. Si algún
+  concepto necesita otro consecutivo, usá `--mapa-codigos`.
+- **Fecha**: `CDFECDOC`/`CROFECOBJ` toman `--fecha` (o el día de hoy). Poné la
+  fecha de radicación/objeción que corresponda.
+- **`CDCONSEC` / `GENUSUARIO4` / constantes**: se replican de la guía
+  (`1` / `999` / `0`). Si tu Dispensario espera otros valores, avisá y se ajustan.
