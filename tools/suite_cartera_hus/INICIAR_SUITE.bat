@@ -21,10 +21,10 @@ if errorlevel 1 (
 )
 
 rem --- 2) Instalar lo que falte (solo la primera vez) -------------
-python -c "import pandas, openpyxl, docx, fitz" >nul 2>nul
+python -c "import pandas, openpyxl, docx, fitz, pdf2docx, pdfplumber, pptx" >nul 2>nul
 if errorlevel 1 (
     echo Instalando componentes por primera vez ^(requiere internet^)...
-    python -m pip install --quiet --disable-pip-version-warning pandas openpyxl python-docx pymupdf
+    python -m pip install --quiet --disable-pip-version-warning pandas openpyxl python-docx pymupdf pdf2docx pdfplumber python-pptx
     if errorlevel 1 (
         echo.
         echo [!] No se pudieron instalar los componentes ^(sin internet?^).

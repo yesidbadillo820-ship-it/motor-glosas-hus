@@ -22,7 +22,14 @@ import sys
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from nucleo import archivos, cruces_dgh, pdf_tools, registro, reportes  # noqa: E402
+from nucleo import (  # noqa: E402
+    archivos,
+    cruces_dgh,
+    office_tools,
+    pdf_tools,
+    registro,
+    reportes,
+)
 
 CARPETA_SALIDAS = os.path.join(BASE, "SALIDAS")
 
@@ -285,6 +292,17 @@ def cmd_pdf(args):
         print(pdf_tools.censurar(uno(), textos, sal, log=log))
     elif op == "info":
         pdf_tools.info(uno(), log=log)
+    # --- conversiones Office (fase 2) ---
+    elif op == "office2pdf":
+        print(office_tools.a_pdf(uno(), salida=sal, log=log))
+    elif op == "pdf2word":
+        print(office_tools.pdf_a_word(uno(), sal, log=log))
+    elif op == "pdf2excel":
+        print(office_tools.pdf_a_excel(uno(), sal, log=log))
+    elif op == "pdf2ppt":
+        print(office_tools.pdf_a_powerpoint(uno(), sal, log=log))
+    elif op == "pdfa":
+        print(office_tools.pdf_a_pdfa(uno(), salida=sal, log=log))
     return 0
 
 
@@ -354,6 +372,11 @@ def construir_parser():
             "desbloquear",
             "censurar",
             "info",
+            "office2pdf",
+            "pdf2word",
+            "pdf2excel",
+            "pdf2ppt",
+            "pdfa",
         ],
         help="Operación a realizar.",
     )

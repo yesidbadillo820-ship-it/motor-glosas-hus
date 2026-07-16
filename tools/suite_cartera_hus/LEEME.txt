@@ -117,14 +117,23 @@ Sirve para el papeleo diario de facturas, glosas y soportes:
     Imágenes ...... imágenes → PDF · PDF → imágenes (pantallazos)
     Editar ........ marca de agua · números de página · recortar
     Seguridad ..... proteger con clave · desbloquear · censurar (tachar datos)
+    Convertir ..... Office->PDF · PDF->Word · PDF->Excel · PDF->PowerPoint · PDF->PDF/A
     HUS ........... renombrar PDF ↔ .cmd
 El resultado queda en SALIDAS/HERRAMIENTAS_PDF/. También por consola:
     python suite_cli.py pdf unir a.pdf b.pdf -o UNIDO.pdf
     python suite_cli.py pdf comprimir factura.pdf
+    python suite_cli.py pdf pdf2excel glosas.pdf   (tablas del PDF a Excel)
+    python suite_cli.py pdf office2pdf carta.docx  (Word/Excel/PPT -> PDF)
     python suite_cli.py pdf --help   (todas las operaciones)
+
+Nota sobre conversiones Office:
+    · PDF -> Word/Excel/PowerPoint funciona sin internet ni programas extra.
+    · Office -> PDF y PDF -> PDF/A necesitan LibreOffice instalado (gratis:
+      https://es.libreoffice.org/descarga/). Si no está, la Suite lo avisa.
 
 REQUISITOS
 ----------
-Windows con Python 3.8+ · pandas · openpyxl · python-docx · pymupdf (el .bat
-los instala solo). La interfaz es Tkinter puro: no necesita internet.
+Windows con Python 3.8+ · pandas · openpyxl · python-docx · pymupdf ·
+pdf2docx · pdfplumber · python-pptx (el .bat los instala solos). LibreOffice
+es opcional, solo para Office->PDF. La interfaz es Tkinter puro.
 ════════════════════════════════════════════════════════════════════

@@ -29,7 +29,14 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from nucleo import archivos, cruces_dgh, pdf_tools, registro, reportes  # noqa: E402
+from nucleo import (  # noqa: E402
+    archivos,
+    cruces_dgh,
+    office_tools,
+    pdf_tools,
+    registro,
+    reportes,
+)
 
 CARPETA_SALIDAS = os.path.join(BASE, "SALIDAS")
 CARPETA_PDF = os.path.join(CARPETA_SALIDAS, "HERRAMIENTAS_PDF")
@@ -994,6 +1001,16 @@ class Suite(tk.Tk):
                     ("⬛ Censurar", self._pdf_censurar),
                 ],
             ),
+            (
+                "CONVERTIR (Office)",
+                [
+                    ("📄 Office → PDF", self._of_office2pdf),
+                    ("📝 PDF → Word", self._of_pdf2word),
+                    ("📊 PDF → Excel", self._of_pdf2excel),
+                    ("📽 PDF → PowerPoint", self._of_pdf2ppt),
+                    ("📕 PDF → PDF/A", self._of_pdf2pdfa),
+                ],
+            ),
             ("HUS", [("🏷 PDF ↔ .cmd", self._pdf_cmd)]),
         ]
         for titulo, items in grupos:
@@ -1261,6 +1278,70 @@ class Suite(tk.Tk):
         self._pdf_run(
             "Renombrar PDF↔CMD",
             lambda: pdf_tools.renombrar_extension(ruta, ext, salida, log=self.log),
+        )
+
+    # -- conversiones Office (fase 2: LibreOffice + libs offline) --
+
+    def _of_salida(self, ruta, ext):
+        base = os.path.splitext(os.path.basename(ruta))[0]
+        return os.path.join(CARPETA_PDF, base + ext)
+
+    def _of_office2pdf(self):
+        ruta = filedialog.askopenfilename(
+            title="Elegir documento Office o HTML",
+            filetypes=[
+                (
+                    "Office / HTML",
+                    "*.docx *.doc *.odt *.rtf *.txt *.xlsx *.xls *.ods *.csv *.pptx *.ppt *.odp *.html *.htm",
+                ),
+                ("Todos", "*.*"),
+            ],
+        )
+        if not ruta:
+            return
+        if not office_tools.hay_libreoffice():
+            messagebox.showwarning("Falta LibreOffice", office_tools.MENSAJE_SIN_LO)
+            return
+        self._pdf_run("Office → PDF", lambda: office_tools.a_pdf(ruta, CARPETA_PDF, log=self.log))
+
+    def _of_pdf2word(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run(
+            "PDF → Word",
+            lambda: office_tools.pdf_a_word(ruta, self._of_salida(ruta, ".docx"), log=self.log),
+        )
+
+    def _of_pdf2excel(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run(
+            "PDF → Excel",
+            lambda: office_tools.pdf_a_excel(ruta, self._of_salida(ruta, ".xlsx"), log=self.log),
+        )
+
+    def _of_pdf2ppt(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run(
+            "PDF → PowerPoint",
+            lambda: office_tools.pdf_a_powerpoint(
+                ruta, self._of_salida(ruta, ".pptx"), log=self.log
+            ),
+        )
+
+    def _of_pdf2pdfa(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        if not office_tools.hay_libreoffice():
+            messagebox.showwarning("Falta LibreOffice", office_tools.MENSAJE_SIN_LO)
+            return
+        self._pdf_run(
+            "PDF → PDF/A", lambda: office_tools.pdf_a_pdfa(ruta, CARPETA_PDF, log=self.log)
         )
 
 
