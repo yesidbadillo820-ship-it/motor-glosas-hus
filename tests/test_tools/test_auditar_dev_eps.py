@@ -102,36 +102,40 @@ def test_extraer_documento_ignora_institucionales():
     assert mod.extraer_documento("NIT 900006037 CODIGO 680010079201")[1] == ""
 
 
-def test_extraer_autorizacion_toma_el_de_la_pos():
+def test_extraer_autorizaciones_todas_ultimos_9_digitos():
     mod = _cargar()
-    # con la esperada del JSON, la confirma
-    assert mod.extraer_autorizacion(_TEXTO_SOPORTE, ["316003877"]) == "316003877"
-    # sin esperada, toma el número plausible cerca de "Autorizacion" (no el 5251)
-    assert mod.extraer_autorizacion("N Autorizacion: (POS) 5251-316003877") == "316003877"
-
-
-def test_extraer_autorizacion_mayusculas_y_salto_de_linea():
-    mod = _cargar()
-    # etiqueta EN MAYUSCULAS (como en los soportes impresos)
-    assert mod.extraer_autorizacion("AUTORIZACION 316003877") == "316003877"
-    assert mod.extraer_autorizacion("NUMERO DE AUTORIZACION\n316003877") == "316003877"
-
-
-def test_extraer_autorizacion_no_toma_radicado_largo():
-    mod = _cargar()
-    # el radicado de 16 dígitos NO debe ganarle a la autorización real
-    assert (
-        mod.extraer_autorizacion("Autorizacion No 316003877 Radicado 2023011512345678")
-        == "316003877"
+    # el PDE real trae varias, con prefijo (POS) 5251-/P071-: solo los ultimos 9
+    texto = (
+        "N° Autorización: (POS) 5251-313608762\n"
+        "N° Autorización: (POS) 5251-313608676\n"
+        "N° Autorización: (POS) P071-314624922\n"
     )
+    assert mod.extraer_autorizaciones(texto) == ["313608762", "313608676", "314624922"]
+    # ultimos 9 aunque el prefijo tenga letras (P071 -> 071...)
+    assert mod._ultimos9("P071-314624922") == "314624922"
+    assert mod._ultimos9("5251-316003877") == "316003877"
 
 
-def test_extraer_autorizacion_esperada_no_matchea_dentro_de_fecha():
+def test_extraer_autorizaciones_del_soporte_simple():
     mod = _cargar()
-    # '88123' aparece dentro de una fecha con guiones: no debe aceptarse como token,
-    # y la autorización real es otra
-    texto = "No. Autorizacion (POS): 5251-999999999\nFecha de expedicion: 2024-88123-01"
-    assert mod.extraer_autorizacion(texto, ["88123"]) == "999999999"
+    assert mod.extraer_autorizaciones(_TEXTO_SOPORTE) == ["316003877"]
+    # etiqueta en mayusculas y salto de linea
+    assert mod.extraer_autorizaciones("NUMERO DE AUTORIZACION\n5251-316003877") == ["316003877"]
+
+
+def test_json_autorizacion_null_se_reporta_tal_cual(tmp_path):
+    mod = _cargar()
+    j = tmp_path / "Rips_x.json"
+    j.write_text(
+        '{"numFactura":"HUS1","usuarios":[{"tipoDocumentoIdentificacion":"CC",'
+        '"numDocumentoIdentificacion":"63508124","servicios":{'
+        '"consultas":[{"numAutorizacion":null,"codConsulta":"890201"}],'
+        '"procedimientos":[{"numAutorizacion":"313608762"}]}}]}',
+        encoding="utf-8",
+    )
+    rips = mod.leer_rips(j)
+    auts = mod.autorizaciones_del_json(rips)
+    assert "null" in auts and "313608762" in auts
 
 
 def test_extraer_nombre_no_cruza_lineas():
@@ -186,44 +190,51 @@ def test_leer_rips_estructura(tmp_path):
 
 def test_observacion_recien_nacido_reproduce_el_ejemplo():
     mod = _cargar()
-    sop = {"doc": "1244781967", "autoriz": "316003877"}
+    sop = {"doc": "1244781967", "autorizaciones": ["316003877"]}
     obs = mod.observacion("26066910192188", ["316003877"], sop)
     assert obs == "OK - DIFERENCIA DEL NUMERO DE DOCUMENTO DGH VS JSON"
 
 
 def test_observacion_todo_coincide_es_ok():
     mod = _cargar()
-    sop = {"doc": "1244781967", "autoriz": "316003877"}
+    sop = {"doc": "1244781967", "autorizaciones": ["316003877"]}
     obs = mod.observacion("1244781967", ["316003877"], sop)
     assert obs == "OK"
 
 
 def test_observacion_autorizacion_diferente():
     mod = _cargar()
-    sop = {"doc": "111", "autoriz": "999999999"}
+    sop = {"doc": "111", "autorizaciones": ["999999999"]}
     obs = mod.observacion("111", ["316003877"], sop)
     assert "AUTORIZACION DIFERENTE" in obs
 
 
-def test_observacion_multi_autorizacion_no_marca_falso_diferente():
+def test_observacion_varias_autorizaciones_coinciden_como_conjunto():
     mod = _cargar()
-    # el JSON trae dos autorizaciones; el soporte trae la segunda: es OK
-    sop = {"doc": "111", "autoriz": "999999999"}
-    obs = mod.observacion("111", ["316003877", "999999999"], sop)
+    # JSON y soporte traen el mismo conjunto de autorizaciones (en otro orden)
+    sop = {"doc": "111", "autorizaciones": ["313608676", "313608762"]}
+    obs = mod.observacion("111", ["313608762", "313608676"], sop)
     assert obs == "OK"
+
+
+def test_observacion_avisa_json_null():
+    mod = _cargar()
+    sop = {"doc": "111", "autorizaciones": ["313608762"]}
+    obs = mod.observacion("111", ["null", "313608762"], sop)
+    assert obs.startswith("OK") and "NULL" in obs.upper()
 
 
 def test_observacion_no_dice_ok_si_soporte_sin_documento():
     mod = _cargar()
     # autorización coincide pero el OCR no sacó documento: no debe quedar "OK" a secas
-    sop = {"doc": "", "autoriz": "316003877"}
+    sop = {"doc": "", "autorizaciones": ["316003877"]}
     obs = mod.observacion("1122334455", ["316003877"], sop)
     assert obs == "OK - SIN DOCUMENTO EN EL SOPORTE (no verificado)"
 
 
 def test_observacion_sin_autorizacion_en_ambos():
     mod = _cargar()
-    sop = {"doc": "1122334455", "autoriz": ""}
+    sop = {"doc": "1122334455", "autorizaciones": []}
     obs = mod.observacion("1122334455", [], sop)
     assert obs == "SIN AUTORIZACION EN JSON NI SOPORTE"
 

@@ -267,6 +267,17 @@ _SERVICIOS_JSON = (
 )
 
 
+def _autoriz_json_bruto(s: dict) -> str:
+    """Nº de autorización del servicio TAL CUAL viene en el JSON: si el campo
+    existe y es null, se reporta 'null'; si no existe, ''."""
+    if "numAutorizacion" not in s:
+        return ""
+    valor = s.get("numAutorizacion")
+    if valor is None:
+        return "null"
+    return str(valor).strip()
+
+
 def leer_rips(ruta: Path) -> dict:
     """Devuelve {factura, usuarios:[{tipo,doc,servicios:[...]}], error}."""
     datos = {"factura": "", "usuarios": [], "error": ""}
@@ -312,7 +323,9 @@ def leer_rips(ruta: Path) -> dict:
                         usuario["servicios"].append(
                             {
                                 "grupo": clave,
-                                "autoriz": str(s.get("numAutorizacion") or "").strip(),
+                                # si el JSON trae numAutorizacion en null, se
+                                # reporta tal cual ("null"), no como vacío.
+                                "autoriz": _autoriz_json_bruto(s),
                                 "cod": str(
                                     s.get("codProcedimiento")
                                     or s.get("codConsulta")
@@ -331,7 +344,8 @@ def leer_rips(ruta: Path) -> dict:
 
 
 def autorizaciones_del_json(rips: dict) -> list[str]:
-    """Todas las autorizaciones del JSON (sin vacías, sin repetir, en orden)."""
+    """Todas las autorizaciones del JSON tal cual (incluye 'null'), sin repetir
+    y en orden. Se usa para la columna del Excel."""
     vistas, out = set(), []
     for u in rips["usuarios"]:
         for s in u["servicios"]:
@@ -347,24 +361,31 @@ def autorizaciones_del_json(rips: dict) -> list[str]:
 # --------------------------------------------------------------------------
 
 
-def extraer_autorizacion(texto: str, esperadas: list[str] | None = None) -> str:
-    """Nº de autorización del soporte. Si alguna del JSON aparece cerca de la
-    etiqueta o como token aislado, se prefiere esa."""
-    esperadas = esperadas or []
-    for esp in esperadas:
-        # aparece pegada a "autoriza..." (hasta 40 chars, incluye salto de linea)
-        if re.search(r"autoriza\w*[\s\S]{0,40}?(?<!\d)" + re.escape(esp) + r"(?!\d)", texto, re.I):
-            return esp
-        # o como token realmente aislado (rodeado de espacios/parentesis, no dentro de fecha 2024-88123-01)
-        if re.search(r"(?:^|[\s(])" + re.escape(esp) + r"(?:[\s).]|$)", texto):
-            return esp
-    # sin esperada util: el PRIMER numero de 5+ digitos tras "autoriza" (el mas
-    # cercano; evita radicados/fechas que vienen despues), cruzando saltos de
-    # linea y saltando rellenos como "No", ":", "(POS) 5251-".
-    for m in re.finditer(r"autoriza\w*[\s\S]{0,25}?(\d{5,20})", texto, re.I):
-        if m.group(1) not in _INSTITUCIONALES:
-            return m.group(1)
-    return ""
+# "N° Autorizacion: (POS) 5251-313608762" / "P071-314624922" / bare digits.
+_RE_AUT = re.compile(
+    r"(?:N[°ºo]?\s*)?Autorizaci[oó]n\b[^0-9A-Za-z]{0,8}(?:\(?POS\)?\s*)?"
+    r"([0-9A-Za-z]{2,8}-\d{5,12}|\d{6,15})",
+    re.I,
+)
+
+
+def _ultimos9(token: str) -> str:
+    """Solo los últimos 9 dígitos del número de autorización (5251-313608762
+    -> 313608762). Si trae menos de 9 dígitos, los que haya; '' si ninguno."""
+    d = re.sub(r"\D", "", str(token or ""))
+    return d[-9:] if len(d) >= 9 else d
+
+
+def extraer_autorizaciones(texto: str) -> list[str]:
+    """TODAS las autorizaciones del soporte, cada una reducida a sus últimos 9
+    dígitos, sin repetir y en orden de aparición."""
+    vistas, out = set(), []
+    for m in _RE_AUT.finditer(texto):
+        v = _ultimos9(m.group(1))
+        if v and v not in _INSTITUCIONALES and v not in vistas:
+            vistas.add(v)
+            out.append(v)
+    return out
 
 
 def extraer_documento(texto: str) -> tuple[str, str]:
@@ -454,9 +475,11 @@ def extraer_servicio(texto: str) -> str:
     return ""
 
 
-def leer_soportes(pdfs: list[Path], autoriz_json: list[str]) -> dict:
-    """Combina el texto de los soportes (OPF/PDE) y extrae los campos clave."""
+def leer_soportes(pdfs: list[Path]) -> dict:
+    """Combina el texto de los soportes (OPF/PDE) y extrae los campos clave.
+    'autorizaciones' trae TODAS (últimos 9 dígitos); 'autoriz' es su unión."""
     res = {
+        "autorizaciones": [],
         "autoriz": "",
         "tipo": "",
         "doc": "",
@@ -475,7 +498,8 @@ def leer_soportes(pdfs: list[Path], autoriz_json: list[str]) -> dict:
         res["sin_texto"] = bool(pdfs)  # había PDF pero sin texto (¿escaneado?)
         return res
     texto = "\n".join(textos)
-    res["autoriz"] = extraer_autorizacion(texto, autoriz_json)
+    res["autorizaciones"] = extraer_autorizaciones(texto)
+    res["autoriz"] = ", ".join(res["autorizaciones"])
     res["tipo"], res["doc"] = extraer_documento(texto)
     res["nombre"] = extraer_nombre(texto)
     res["servicio"] = extraer_servicio(texto)
@@ -643,35 +667,51 @@ def _fundir(dst: dict, extra: dict) -> None:
 
 
 def observacion(rips_doc: str, autoriz_json: list[str], sop: dict) -> str:
-    """Compara el documento y la autorización del JSON contra el soporte."""
+    """Compara documento y autorizaciones (por sus últimos 9 dígitos) del JSON
+    contra el soporte. Avisa cuando el JSON trae la autorización en null."""
     partes = []
-    sop_aut = sop.get("autoriz", "")
     sop_doc = sop.get("doc", "")
-    set_json = {normalizar_factura(a) for a in autoriz_json}
+    set_sop = {a for a in sop.get("autorizaciones", []) if a}
+    set_json = {_ultimos9(a) for a in autoriz_json if _ultimos9(a)}
+    hay_null = any(str(a).strip().lower() == "null" for a in autoriz_json)
 
     # --- autorización ---
-    if not autoriz_json and not sop_aut:
-        partes.append("SIN AUTORIZACION EN JSON NI SOPORTE")
-    elif not autoriz_json:
-        partes.append("SIN AUTORIZACION EN EL JSON")
-    elif not sop_aut:
-        if sop.get("sin_texto"):
+    if not set_json and not set_sop:
+        if hay_null:
+            partes.append("JSON CON AUTORIZACION EN NULL")
+        elif sop.get("sin_texto"):
             partes.append("SOPORTE SIN TEXTO (revisar/OCR)")
         else:
-            partes.append("SIN AUTORIZACION EN EL SOPORTE")
-    elif normalizar_factura(sop_aut) in set_json:
+            partes.append("SIN AUTORIZACION EN JSON NI SOPORTE")
+    elif not set_sop:
+        partes.append(
+            "SOPORTE SIN TEXTO (revisar/OCR)"
+            if sop.get("sin_texto")
+            else "SIN AUTORIZACION EN EL SOPORTE"
+        )
+    elif not set_json:
+        partes.append(
+            "JSON CON AUTORIZACION EN NULL" if hay_null else "SIN AUTORIZACION EN EL JSON"
+        )
+    elif set_json == set_sop or set_json <= set_sop or set_sop <= set_json:
         partes.append("OK")
+        if hay_null:
+            partes.append("OJO: alguna autorizacion del JSON en NULL")
     else:
-        muestra = ", ".join(autoriz_json[:2])
-        partes.append(f"AUTORIZACION DIFERENTE (JSON {muestra} vs SOPORTE {sop_aut})")
+        solo_json = sorted(set_json - set_sop)
+        solo_sop = sorted(set_sop - set_json)
+        det = []
+        if solo_json:
+            det.append("en JSON no en soporte: " + ", ".join(solo_json[:5]))
+        if solo_sop:
+            det.append("en soporte no en JSON: " + ", ".join(solo_sop[:5]))
+        partes.append("AUTORIZACION DIFERENTE (" + "; ".join(det) + ")")
 
     # --- documento del paciente: JSON (RIPS) vs soporte (= FACTURA DGH) ---
     if not rips_doc:
         partes.append("SIN USUARIO EN EL JSON")
     elif not sop_doc:
-        if sop.get("sin_texto"):
-            pass  # ya avisado arriba
-        else:
+        if not sop.get("sin_texto"):
             partes.append("SIN DOCUMENTO EN EL SOPORTE (no verificado)")
     elif normalizar_factura(rips_doc) != normalizar_factura(sop_doc):
         partes.append("DIFERENCIA DEL NUMERO DE DOCUMENTO DGH VS JSON")
@@ -844,7 +884,7 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
         primer = (
             rips["usuarios"][0] if rips["usuarios"] else {"tipo": "", "doc": "", "servicios": []}
         )
-        sop = leer_soportes(pdfs, autoriz_json)
+        sop = leer_soportes(pdfs)
 
         ws.cell(fila, COL["dgh_tipo"]).value = sop["tipo"]
         ws.cell(fila, COL["dgh_doc"]).value = sop["doc"]

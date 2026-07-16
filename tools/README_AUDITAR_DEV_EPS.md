@@ -41,10 +41,15 @@ los soportes (`1244781967`). El bot lo marca:
 ## Qué compara y de dónde
 
 - **RIPS - JSON**: del `Rips_<FAC>.json` — tipo y documento del usuario y el
-  número de autorización de cada servicio.
-- **SOPORTES AUTORIZACIÓN**: de los PDF `OPF_*` y `PDE_*` — número de
-  autorización, tipo y documento del paciente (ignora NIT del hospital y
-  código de prestador).
+  número de autorización de cada servicio **tal cual viene**; si el campo
+  `numAutorizacion` está en **`null`**, se reporta `null` (no se oculta).
+- **SOPORTES AUTORIZACIÓN**: de los PDF `OPF_*` y `PDE_*` — se extraen **TODAS**
+  las autorizaciones (un PDE puede traer varias, una por servicio), cada una
+  reducida a sus **últimos 9 dígitos** (`(POS) 5251-313608762` → `313608762`),
+  más el tipo y documento del paciente (ignora NIT del hospital y prestador).
+- **OBSERVACIÓN**: `OK` cuando las autorizaciones del JSON coinciden con las del
+  soporte (por sus últimos 9 dígitos); avisa si el JSON trae alguna en `null`,
+  y marca las que están en uno y no en el otro.
 - **FACTURA DGH**: nombre, documento y servicio del paciente tomados de los
   soportes (lista de chequeo / autorización).
 - **OBSERVACIÓN**: `OK` cuando la autorización coincide; marca la diferencia
