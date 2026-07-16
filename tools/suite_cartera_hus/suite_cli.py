@@ -22,7 +22,7 @@ import sys
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from nucleo import archivos, cruces_dgh, registro, reportes  # noqa: E402
+from nucleo import archivos, cruces_dgh, pdf_tools, registro, reportes  # noqa: E402
 
 CARPETA_SALIDAS = os.path.join(BASE, "SALIDAS")
 
@@ -238,6 +238,56 @@ def cmd_todo(args):
     return 0
 
 
+def cmd_pdf(args):
+    """Caja de herramientas PDF (offline). Cada operación imprime la ruta de salida."""
+    op = args.op
+    ent = args.entradas
+    sal = args.salida
+
+    def uno():
+        if not ent:
+            raise SystemExit("Falta el PDF de entrada.")
+        return ent[0]
+
+    if op == "unir":
+        print(pdf_tools.unir(ent, sal or "UNIDO.pdf", log=log))
+    elif op == "dividir":
+        pdf_tools.dividir(uno(), sal, cada=args.cada, log=log)
+    elif op == "extraer":
+        print(pdf_tools.extraer_paginas(uno(), args.paginas, sal, log=log))
+    elif op == "eliminar":
+        print(pdf_tools.eliminar_paginas(uno(), args.paginas, sal, log=log))
+    elif op == "reordenar":
+        orden = [int(x) for x in args.orden.replace(" ", "").split(",") if x]
+        print(pdf_tools.reordenar(uno(), orden, sal, log=log))
+    elif op == "rotar":
+        print(pdf_tools.rotar(uno(), args.grados, args.paginas, sal, log=log))
+    elif op == "recortar":
+        print(pdf_tools.recortar(uno(), args.margen, sal, log=log))
+    elif op == "numerar":
+        print(pdf_tools.numerar(uno(), sal, log=log))
+    elif op == "marca":
+        print(pdf_tools.marca_agua(uno(), args.texto or "CARTERA HUS", sal, log=log))
+    elif op == "img2pdf":
+        print(pdf_tools.imagenes_a_pdf(ent, sal or "IMAGENES.pdf", log=log))
+    elif op == "pdf2img":
+        pdf_tools.pdf_a_imagenes(uno(), sal, dpi=args.dpi, log=log)
+    elif op == "comprimir":
+        print(pdf_tools.comprimir(uno(), sal, log=log))
+    elif op == "reparar":
+        print(pdf_tools.reparar(uno(), sal, log=log))
+    elif op == "proteger":
+        print(pdf_tools.proteger(uno(), args.password, sal, log=log))
+    elif op == "desbloquear":
+        print(pdf_tools.desbloquear(uno(), args.password or "", sal, log=log))
+    elif op == "censurar":
+        textos = [t.strip() for t in (args.texto or "").split(",") if t.strip()]
+        print(pdf_tools.censurar(uno(), textos, sal, log=log))
+    elif op == "info":
+        pdf_tools.info(uno(), log=log)
+    return 0
+
+
 def construir_parser():
     p = argparse.ArgumentParser(
         prog="suite_cli",
@@ -282,6 +332,42 @@ def construir_parser():
         "--ya-objetadas", default="", help="(Opcional) Listado de facturas ya objetadas a excluir."
     )
     s.set_defaults(func=cmd_todo)
+
+    s = sub.add_parser("pdf", help="Caja de herramientas PDF (unir, dividir, comprimir…).")
+    s.add_argument(
+        "op",
+        choices=[
+            "unir",
+            "dividir",
+            "extraer",
+            "eliminar",
+            "reordenar",
+            "rotar",
+            "recortar",
+            "numerar",
+            "marca",
+            "img2pdf",
+            "pdf2img",
+            "comprimir",
+            "reparar",
+            "proteger",
+            "desbloquear",
+            "censurar",
+            "info",
+        ],
+        help="Operación a realizar.",
+    )
+    s.add_argument("entradas", nargs="*", help="PDF(s) o imágenes de entrada.")
+    s.add_argument("-o", "--salida", default=None, help="Ruta/carpeta de salida.")
+    s.add_argument("--paginas", default=None, help="Rango de páginas, ej: '1-3,5'.")
+    s.add_argument("--orden", default="", help="Nuevo orden para 'reordenar', ej: '3,1,2'.")
+    s.add_argument("--grados", type=int, default=90, help="Grados para 'rotar' (90/180/270).")
+    s.add_argument("--cada", type=int, default=1, help="Páginas por archivo en 'dividir'.")
+    s.add_argument("--dpi", type=int, default=150, help="Resolución para 'pdf2img'.")
+    s.add_argument("--margen", type=float, default=0.05, help="Margen (0-0.45) para 'recortar'.")
+    s.add_argument("--password", default=None, help="Contraseña para proteger/desbloquear.")
+    s.add_argument("--texto", default=None, help="Texto para 'marca' o términos de 'censurar'.")
+    s.set_defaults(func=cmd_pdf)
     return p
 
 

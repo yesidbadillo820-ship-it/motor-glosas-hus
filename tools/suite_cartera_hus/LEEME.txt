@@ -108,8 +108,23 @@ equipos sin pantalla). Todo cae en el mismo estándar SALIDAS/…:
     python suite_cli.py todo PORTAL.zip --entidad COOSALUD   (encadena las 3)
 Vea el detalle con:  python suite_cli.py --help
 
+HERRAMIENTAS PDF (botón «🧰 Herramientas PDF»)
+---------------------------------------------
+Caja de utilidades PDF que corre en el mismo PC, sin internet ni Acrobat.
+Sirve para el papeleo diario de facturas, glosas y soportes:
+    Ordenar ....... unir · dividir · eliminar/extraer/reordenar páginas · rotar
+    Optimizar ..... comprimir · reparar · info del PDF
+    Imágenes ...... imágenes → PDF · PDF → imágenes (pantallazos)
+    Editar ........ marca de agua · números de página · recortar
+    Seguridad ..... proteger con clave · desbloquear · censurar (tachar datos)
+    HUS ........... renombrar PDF ↔ .cmd
+El resultado queda en SALIDAS/HERRAMIENTAS_PDF/. También por consola:
+    python suite_cli.py pdf unir a.pdf b.pdf -o UNIDO.pdf
+    python suite_cli.py pdf comprimir factura.pdf
+    python suite_cli.py pdf --help   (todas las operaciones)
+
 REQUISITOS
 ----------
-Windows con Python 3.8+ · pandas · openpyxl · python-docx (el .bat los
-instala solo). La interfaz es Tkinter puro: no necesita internet.
+Windows con Python 3.8+ · pandas · openpyxl · python-docx · pymupdf (el .bat
+los instala solo). La interfaz es Tkinter puro: no necesita internet.
 ════════════════════════════════════════════════════════════════════

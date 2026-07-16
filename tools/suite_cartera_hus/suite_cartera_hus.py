@@ -24,14 +24,15 @@ import threading
 import traceback
 import webbrowser
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from nucleo import archivos, cruces_dgh, registro, reportes  # noqa: E402
+from nucleo import archivos, cruces_dgh, pdf_tools, registro, reportes  # noqa: E402
 
 CARPETA_SALIDAS = os.path.join(BASE, "SALIDAS")
+CARPETA_PDF = os.path.join(CARPETA_SALIDAS, "HERRAMIENTAS_PDF")
 
 # ------------------------------------------------------------------ paleta
 BG = "#eaeef2"  # fondo general
@@ -347,6 +348,12 @@ class Suite(tk.Tk):
             style="Chip.TButton",
             command=self._abrir_salidas,
         ).pack(side="left")
+        ttk.Button(
+            barra_inf,
+            text="🧰 Herramientas PDF",
+            style="Primary.TButton",
+            command=self.abrir_herramientas_pdf,
+        ).pack(side="left", padx=8)
         self.progreso = ttk.Progressbar(barra_inf, mode="indeterminate", length=180)
         self.progreso.pack(side="right")
         self.lbl_estado = tk.Label(barra_inf, text="Listo", bg=CARD, fg=MUTED, font=F_SM)
@@ -919,6 +926,342 @@ class Suite(tk.Tk):
             subprocess.Popen(["open", carpeta])
         else:
             subprocess.Popen(["xdg-open", carpeta])
+
+    # ----------------------------------------------------- herramientas PDF
+
+    def abrir_herramientas_pdf(self):
+        """Ventana con la caja de herramientas PDF (offline, motor PyMuPDF)."""
+        win = tk.Toplevel(self)
+        win.title("🧰 Herramientas PDF — Suite Cartera HUS")
+        win.configure(bg=BG)
+        win.geometry("700x600")
+        tk.Label(win, text="  🧰  Herramientas PDF", bg=HEADER, fg="white", font=F_H1).pack(
+            fill="x", ipady=10
+        )
+        tk.Label(
+            win,
+            text="Elija la operación. El resultado queda en SALIDAS/HERRAMIENTAS_PDF/ "
+            "y el detalle en la consola de la ventana principal.",
+            bg=BG,
+            fg=MUTED,
+            font=F_SM,
+            wraplength=670,
+            justify="left",
+        ).pack(anchor="w", padx=14, pady=(8, 2))
+        cont = tk.Frame(win, bg=BG)
+        cont.pack(fill="both", expand=True, padx=10, pady=6)
+
+        grupos = [
+            (
+                "ORDENAR",
+                [
+                    ("📎 Unir PDF", self._pdf_unir),
+                    ("✂ Dividir", self._pdf_dividir),
+                    ("🗑 Eliminar páginas", self._pdf_eliminar),
+                    ("📤 Extraer páginas", self._pdf_extraer),
+                    ("🔀 Reordenar", self._pdf_reordenar),
+                    ("🔁 Rotar", self._pdf_rotar),
+                ],
+            ),
+            (
+                "OPTIMIZAR",
+                [
+                    ("🗜 Comprimir", self._pdf_comprimir),
+                    ("🩹 Reparar", self._pdf_reparar),
+                    ("ℹ Info del PDF", self._pdf_info),
+                ],
+            ),
+            (
+                "IMÁGENES",
+                [
+                    ("🖼 Imágenes → PDF", self._pdf_img2pdf),
+                    ("📸 PDF → Imágenes", self._pdf_pdf2img),
+                ],
+            ),
+            (
+                "EDITAR",
+                [
+                    ("💧 Marca de agua", self._pdf_marca),
+                    ("🔢 Números de página", self._pdf_numerar),
+                    ("🔲 Recortar", self._pdf_recortar),
+                ],
+            ),
+            (
+                "SEGURIDAD",
+                [
+                    ("🔒 Proteger", self._pdf_proteger),
+                    ("🔓 Desbloquear", self._pdf_desbloquear),
+                    ("⬛ Censurar", self._pdf_censurar),
+                ],
+            ),
+            ("HUS", [("🏷 PDF ↔ .cmd", self._pdf_cmd)]),
+        ]
+        for titulo, items in grupos:
+            lf = tk.LabelFrame(cont, text=" " + titulo + " ", bg=BG, fg=HEADER, font=F_BOLD)
+            lf.pack(fill="x", pady=3)
+            fila = tk.Frame(lf, bg=BG)
+            fila.pack(fill="x", padx=4, pady=4)
+            for i, (txt, cmd) in enumerate(items):
+                tk.Button(
+                    fila,
+                    text=txt,
+                    font=F_SM,
+                    bg="white",
+                    fg=INK,
+                    relief="groove",
+                    bd=1,
+                    cursor="hand2",
+                    anchor="w",
+                    command=cmd,
+                ).grid(row=i // 3, column=i % 3, padx=4, pady=3, sticky="ew")
+            for c in range(3):
+                fila.columnconfigure(c, weight=1)
+
+    # -- helpers de la caja PDF --
+
+    def _pdf_in(self, multi=False, imagenes=False):
+        tipos = ([("Imágenes", "*.png;*.jpg;*.jpeg")] if imagenes else [("PDF", "*.pdf")]) + [
+            ("Todos", "*.*")
+        ]
+        if multi:
+            return list(filedialog.askopenfilenames(title="Elegir archivo(s)", filetypes=tipos))
+        return filedialog.askopenfilename(title="Elegir archivo", filetypes=tipos)
+
+    def _pdf_out(self, ruta, sufijo, ext=".pdf"):
+        base = os.path.splitext(os.path.basename(ruta))[0]
+        return os.path.join(CARPETA_PDF, "%s_%s%s" % (base, sufijo, ext))
+
+    def _pdf_run(self, nombre, funcion):
+        os.makedirs(CARPETA_PDF, exist_ok=True)
+        self._ultima_carpeta = CARPETA_PDF
+        self._correr(nombre, funcion)
+
+    def _pdf_unir(self):
+        rutas = self._pdf_in(multi=True)
+        if len(rutas) < 2:
+            messagebox.showinfo("Unir PDF", "Elija al menos 2 PDF (Ctrl para varios).")
+            return
+        salida = os.path.join(CARPETA_PDF, "UNIDO.pdf")
+        self._pdf_run("Unir PDF", lambda: pdf_tools.unir(rutas, salida, log=self.log))
+
+    def _pdf_dividir(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        cada = (
+            simpledialog.askinteger(
+                "Dividir", "¿Cada cuántas páginas por archivo?", initialvalue=1, minvalue=1
+            )
+            or 1
+        )
+        carpeta = os.path.join(
+            CARPETA_PDF, os.path.splitext(os.path.basename(ruta))[0] + "_dividido"
+        )
+        self._pdf_run(
+            "Dividir PDF", lambda: pdf_tools.dividir(ruta, carpeta, cada=cada, log=self.log)
+        )
+
+    def _pdf_eliminar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        pag = simpledialog.askstring("Eliminar páginas", "Páginas a QUITAR (ej: 2,4-6):")
+        if not pag:
+            return
+        self._pdf_run(
+            "Eliminar páginas",
+            lambda: pdf_tools.eliminar_paginas(
+                ruta, pag, self._pdf_out(ruta, "sin_paginas"), log=self.log
+            ),
+        )
+
+    def _pdf_extraer(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        pag = simpledialog.askstring("Extraer páginas", "Páginas a CONSERVAR (ej: 1-3,5):")
+        if not pag:
+            return
+        self._pdf_run(
+            "Extraer páginas",
+            lambda: pdf_tools.extraer_paginas(
+                ruta, pag, self._pdf_out(ruta, "extraido"), log=self.log
+            ),
+        )
+
+    def _pdf_reordenar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        s = simpledialog.askstring("Reordenar", "Nuevo orden de páginas (ej: 3,1,2):")
+        if not s:
+            return
+        try:
+            orden = [int(x) for x in s.replace(" ", "").split(",") if x]
+        except ValueError:
+            messagebox.showwarning("Reordenar", "Formato inválido. Use números separados por coma.")
+            return
+        self._pdf_run(
+            "Reordenar",
+            lambda: pdf_tools.reordenar(
+                ruta, orden, self._pdf_out(ruta, "reordenado"), log=self.log
+            ),
+        )
+
+    def _pdf_rotar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        g = simpledialog.askinteger("Rotar", "Grados (90, 180 o 270):", initialvalue=90) or 90
+        self._pdf_run(
+            "Rotar",
+            lambda: pdf_tools.rotar(ruta, g, None, self._pdf_out(ruta, "rotado"), log=self.log),
+        )
+
+    def _pdf_comprimir(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run(
+            "Comprimir",
+            lambda: pdf_tools.comprimir(ruta, self._pdf_out(ruta, "comprimido"), log=self.log),
+        )
+
+    def _pdf_reparar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run(
+            "Reparar",
+            lambda: pdf_tools.reparar(ruta, self._pdf_out(ruta, "reparado"), log=self.log),
+        )
+
+    def _pdf_info(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run("Info", lambda: pdf_tools.info(ruta, log=self.log))
+
+    def _pdf_img2pdf(self):
+        imgs = self._pdf_in(multi=True, imagenes=True)
+        if not imgs:
+            return
+        salida = os.path.join(CARPETA_PDF, "IMAGENES.pdf")
+        self._pdf_run(
+            "Imágenes → PDF", lambda: pdf_tools.imagenes_a_pdf(imgs, salida, log=self.log)
+        )
+
+    def _pdf_pdf2img(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        dpi = (
+            simpledialog.askinteger(
+                "PDF → Imágenes", "Resolución (DPI):", initialvalue=150, minvalue=50
+            )
+            or 150
+        )
+        carpeta = os.path.join(
+            CARPETA_PDF, os.path.splitext(os.path.basename(ruta))[0] + "_imagenes"
+        )
+        self._pdf_run(
+            "PDF → Imágenes", lambda: pdf_tools.pdf_a_imagenes(ruta, carpeta, dpi=dpi, log=self.log)
+        )
+
+    def _pdf_marca(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        texto = simpledialog.askstring("Marca de agua", "Texto:", initialvalue="CARTERA HUS")
+        if not texto:
+            return
+        self._pdf_run(
+            "Marca de agua",
+            lambda: pdf_tools.marca_agua(
+                ruta, texto, self._pdf_out(ruta, "marca_agua"), log=self.log
+            ),
+        )
+
+    def _pdf_numerar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        self._pdf_run(
+            "Numerar páginas",
+            lambda: pdf_tools.numerar(ruta, self._pdf_out(ruta, "numerado"), log=self.log),
+        )
+
+    def _pdf_recortar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        pct = (
+            simpledialog.askinteger(
+                "Recortar",
+                "Margen a recortar por lado (%):",
+                initialvalue=5,
+                minvalue=1,
+                maxvalue=45,
+            )
+            or 5
+        )
+        self._pdf_run(
+            "Recortar",
+            lambda: pdf_tools.recortar(
+                ruta, pct / 100.0, self._pdf_out(ruta, "recortado"), log=self.log
+            ),
+        )
+
+    def _pdf_proteger(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        pw = simpledialog.askstring("Proteger", "Contraseña para el PDF:", show="*")
+        if not pw:
+            return
+        self._pdf_run(
+            "Proteger",
+            lambda: pdf_tools.proteger(ruta, pw, self._pdf_out(ruta, "protegido"), log=self.log),
+        )
+
+    def _pdf_desbloquear(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        pw = simpledialog.askstring("Desbloquear", "Contraseña actual del PDF:", show="*") or ""
+        self._pdf_run(
+            "Desbloquear",
+            lambda: pdf_tools.desbloquear(
+                ruta, pw, self._pdf_out(ruta, "desbloqueado"), log=self.log
+            ),
+        )
+
+    def _pdf_censurar(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        s = simpledialog.askstring("Censurar", "Texto(s) a tachar (separados por coma):")
+        if not s:
+            return
+        textos = [t.strip() for t in s.split(",") if t.strip()]
+        self._pdf_run(
+            "Censurar",
+            lambda: pdf_tools.censurar(
+                ruta, textos, self._pdf_out(ruta, "censurado"), log=self.log
+            ),
+        )
+
+    def _pdf_cmd(self):
+        ruta = self._pdf_in()
+        if not ruta:
+            return
+        ext = ".pdf" if ruta.lower().endswith(".cmd") else ".cmd"
+        base = os.path.splitext(os.path.basename(ruta))[0]
+        salida = os.path.join(CARPETA_PDF, base + ext)
+        self._pdf_run(
+            "Renombrar PDF↔CMD",
+            lambda: pdf_tools.renombrar_extension(ruta, ext, salida, log=self.log),
+        )
 
 
 def main():
