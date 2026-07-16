@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 24" role="img" aria-label="separador mayor">
+  <!-- Tres destellos enlazados por un filete finísimo. Aperturas de parte / cierres. -->
+  <line x1="14" y1="12" x2="106" y2="12" stroke="#8f78ad" stroke-width="0.5"/>
+  <path fill="#4a2c6d" transform="translate(48,0) scale(1)"
+        d="M12 3.2c.46 5.1 2.88 7.52 7.98 7.98-5.1.46-7.52 2.88-7.98 7.98-.46-5.1-2.88-7.52-7.98-7.98 5.1-.46 7.52-2.88 7.98-7.98Z"/>
+  <path fill="#4a2c6d" transform="translate(6,6) scale(0.55)"
+        d="M12 3.2c.46 5.1 2.88 7.52 7.98 7.98-5.1.46-7.52 2.88-7.98 7.98-.46-5.1-2.88-7.52-7.98-7.98 5.1-.46 7.52-2.88 7.98-7.98Z"/>
+  <path fill="#4a2c6d" transform="translate(90,6) scale(0.55)"
+        d="M12 3.2c.46 5.1 2.88 7.52 7.98 7.98-5.1.46-7.52 2.88-7.98 7.98-.46-5.1-2.88-7.52-7.98-7.98 5.1-.46 7.52-2.88 7.98-7.98Z"/>
+</svg>

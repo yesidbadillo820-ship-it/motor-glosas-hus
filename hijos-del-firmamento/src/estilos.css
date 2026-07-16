@@ -1,0 +1,247 @@
+/* =========================================================================
+   HIJOS DEL FIRMAMENTO · Libro Primero
+   HOJA DE ESTILO EDITORIAL (CSS Paged Media / WeasyPrint)
+   -------------------------------------------------------------------------
+   Familia única: Alegreya + Alegreya SC (Huerta Tipográfica).
+   Tres tintas: negro tipográfico · gris · violeta (paleta.css).
+   Formato: 130 × 200 mm. Composición justificada, partición española.
+   ========================================================================= */
+@import "../paleta/paleta.css";
+
+/* ---------- FUNDICIÓN ---------------------------------------------------- */
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-Regular.ttf");font-weight:400;font-style:normal;}
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-Italic.ttf");font-weight:400;font-style:italic;}
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-Medium.ttf");font-weight:500;font-style:normal;}
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-MediumItalic.ttf");font-weight:500;font-style:italic;}
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-Bold.ttf");font-weight:700;font-style:normal;}
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-BoldItalic.ttf");font-weight:700;font-style:italic;}
+@font-face{font-family:Alegreya;src:url("../fonts/alegreya/Alegreya-ExtraBold.ttf");font-weight:800;font-style:normal;}
+@font-face{font-family:"Alegreya SC";src:url("../fonts/alegreya/AlegreyaSC-Regular.ttf");font-weight:400;font-style:normal;}
+@font-face{font-family:"Alegreya SC";src:url("../fonts/alegreya/AlegreyaSC-Italic.ttf");font-weight:400;font-style:italic;}
+@font-face{font-family:"Alegreya SC";src:url("../fonts/alegreya/AlegreyaSC-Medium.ttf");font-weight:500;font-style:normal;}
+@font-face{font-family:"Alegreya SC";src:url("../fonts/alegreya/AlegreyaSC-Bold.ttf");font-weight:700;font-style:normal;}
+
+/* ---------- VARIABLES DE COMPOSICIÓN ------------------------------------ */
+:root{
+  --medida: 10.7pt;          /* cuerpo */
+  --interlinea: 1.485;       /* interlineado (≈15.9pt) */
+  --sangria: 1.2em;          /* sangría de primera línea */
+  --sc: "Alegreya SC";
+}
+
+/* ---------- PÁGINAS MAESTRAS --------------------------------------------- */
+@page{
+  size: 130mm 200mm;
+  margin: 18mm 16mm 19mm 19mm;      /* sup / ext / inf / int (recto por defecto) */
+  @bottom-center{
+    content: counter(page);
+    font-family: Alegreya; font-size: 9.3pt; color: var(--gris-folio);
+    font-feature-settings:"onum" 1; letter-spacing:.3px; margin-top:5mm;
+  }
+}
+/* Cornisas con supresión automática en la página de apertura (first-except):
+   verso = título del libro · recto = título del capítulo/sección.            */
+@page:right{ margin: 18mm 16mm 19mm 19mm;
+  @top-center{ content: string(seccion, first-except); font-family:var(--sc);
+    font-size:7.7pt; letter-spacing:1.4px; color:var(--gris-encabezado); margin-bottom:5mm; }
+}
+@page:left{ margin: 18mm 19mm 19mm 16mm;
+  @top-center{ content: string(libro, first-except); font-family:var(--sc);
+    font-size:7.7pt; letter-spacing:1.4px; color:var(--gris-encabezado); margin-bottom:5mm; }
+}
+
+/* Página limpia (preliminares): sin cornisa ni folio */
+@page limpia{ margin: 22mm 18mm 22mm 18mm;
+  @top-center{content:none;} @bottom-center{content:none;} }
+@page limpia-izq{ @top-center{content:none;} @bottom-center{content:none;} }
+
+/* Página de gran apertura (libro / parte): sin cornisa, folio discreto o nulo */
+@page apertura{ margin: 24mm 18mm 24mm 20mm;
+  @top-center{content:none;} @bottom-center{content:none;} }
+
+/* La primera página impresa nunca lleva folio */
+@page:first{ @top-center{content:none;} @bottom-center{content:none;} }
+
+/* ---------- CUERPO ------------------------------------------------------- */
+html{ font-family:Alegreya; color:var(--tinta); }
+body{ margin:0; hyphens:auto; -weasy-hyphens:auto; text-rendering:optimizeLegibility; }
+
+p{
+  margin:0; font-size:var(--medida); line-height:var(--interlinea);
+  text-align:justify; text-indent:var(--sangria);
+  hyphens:auto; hyphenate-limit-chars: 6 3 2; orphans:2; widows:2;
+  font-feature-settings:"onum" 1, "liga" 1, "kern" 1;
+}
+p.primero, p.noindent{ text-indent:0; }
+em{ font-style:italic; }
+/* Incipit: primeras palabras del primer párrafo en versalitas */
+.incipit{ font-family:var(--sc); font-style:normal; letter-spacing:.4px; }
+
+/* Marca de consulta editorial (corrupción del origen) — sólo modo revisión */
+.q{ }
+body.revision .q{ color:var(--violeta); }
+body.revision .q::after{ content:"°"; color:var(--violeta); font-size:.7em;
+  vertical-align:super; font-family:Alegreya; }
+
+/* ---------- SALTO DE ESCENA --------------------------------------------- */
+.escena{ text-align:center; margin:1.9em 0 1.6em; line-height:0;
+  break-inside:avoid; }
+.escena svg{ width:9px; height:9px; vertical-align:middle; }
+.escena.mayor svg{ width:96px; height:19px; }
+
+/* ---------- ENTRADA DE DIARIO / CUADERNO -------------------------------- */
+.diario{
+  font-size:9.9pt; line-height:1.4; text-align:left; text-indent:0;
+  margin:1.5em auto 1.5em; max-width:82%; color:var(--tinta);
+  padding-left:12px; border-left:1.1px solid var(--violeta-tenue);
+  font-style:italic; break-inside:avoid;
+}
+.diario .fecha{ font-family:var(--sc); font-style:normal; color:var(--violeta-oscuro);
+  letter-spacing:.6px; }
+
+/* Onomatopeya aislada (p. ej. «Rrrrip.») */
+.onoma{ text-align:center; text-indent:0; font-style:italic; letter-spacing:1px;
+  color:var(--violeta-oscuro); margin:1.1em 0; }
+
+/* ============ APERTURAS ================================================= */
+
+/* --- Apertura de LIBRO --- */
+.abre-libro{ page:apertura; break-before:right; break-after:page;
+  text-align:center; padding-top:34mm; }
+.abre-libro .kicker{ font-family:var(--sc); font-size:10pt; letter-spacing:6px;
+  color:var(--violeta); margin-bottom:10mm; }
+.abre-libro .numeral{ font-size:15pt; font-family:var(--sc); letter-spacing:5px;
+  color:var(--gris-encabezado); }
+.abre-libro h1{ font-family:var(--sc); font-weight:400; font-size:25pt;
+  letter-spacing:2.5px; color:var(--tinta-fuerte); margin:0 0 7mm; line-height:1.15; }
+.abre-libro .subt{ font-style:italic; font-size:15.5pt; color:var(--violeta-oscuro);
+  font-weight:400; margin-top:2mm; }
+.abre-libro .estrella-grande{ margin:14mm auto 0; width:16px; }
+
+/* --- Apertura de PARTE --- */
+.abre-parte{ page:apertura; break-before:right; break-after:page;
+  text-align:center; padding-top:52mm; }
+.abre-parte .rom{ font-size:46pt; font-family:Alegreya; font-weight:500;
+  color:var(--violeta); line-height:1; font-feature-settings:"onum" 1;
+  letter-spacing:1px; }
+.abre-parte .rotulo{ font-family:var(--sc); font-size:11pt; letter-spacing:5px;
+  color:var(--gris-encabezado); margin-top:9mm; }
+.abre-parte .constel{ margin:12mm auto 0; width:104px; }
+
+/* --- Apertura de CAPÍTULO / PRÓLOGO --- */
+.abre-cap{ break-before:page; padding-top:24mm; margin-bottom:11mm; text-align:center; }
+.abre-cap .capnum{ font-family:Alegreya; font-weight:500; font-size:40pt;
+  color:var(--violeta); line-height:.9; font-feature-settings:"onum" 1; }
+.abre-cap .caprotulo{ font-family:var(--sc); font-size:8.4pt; letter-spacing:4px;
+  color:var(--gris-encabezado); display:block; margin-bottom:3mm; }
+.abre-cap .filete{ width:26px; height:0; border:0; border-top:.8pt solid var(--violeta-tenue);
+  margin:6mm auto 5mm; }
+.abre-cap h2{ font-family:Alegreya; font-weight:400; font-style:italic; font-size:16.5pt;
+  color:var(--tinta-fuerte); margin:0; line-height:1.22; letter-spacing:.2px;
+  string-set: seccion content(), libro "Hijos del Firmamento"; }
+.abre-cap.prologo .capnum{ font-size:16px; }
+
+/* ============ PRELIMINARES ============================================== */
+.pagina{ page:limpia; break-before:right; }
+.pagina.par{ break-before:left; }
+.blanca{ page:limpia; break-before:page; }
+
+/* Portadilla (half-title) */
+.portadilla{ page:limpia; break-before:right; text-align:center; padding-top:46mm; }
+.portadilla .t{ font-family:var(--sc); font-size:14pt; letter-spacing:4px;
+  color:var(--tinta-fuerte); }
+.portadilla .estrella{ width:11px; margin:9mm auto 0; }
+
+/* Portada interior (title page) */
+.portada{ page:limpia; break-before:right; text-align:center; padding-top:30mm;
+  display:flex; flex-direction:column; min-height:150mm; }
+.portada .autor{ font-family:var(--sc); font-size:11.5pt; letter-spacing:3px;
+  color:var(--gris-folio); margin-bottom:20mm; }
+.portada .titulo{ font-family:var(--sc); font-weight:400; font-size:33pt;
+  letter-spacing:2px; color:var(--tinta-fuerte); line-height:1.05; margin:0; }
+.portada .hair{ width:38px; border:0; border-top:.8pt solid var(--violeta);
+  margin:11mm auto; }
+.portada .vol{ font-family:var(--sc); font-size:10pt; letter-spacing:4px;
+  color:var(--violeta); }
+.portada .subt{ font-style:italic; font-size:15pt; color:var(--violeta-oscuro); margin-top:3mm; }
+.portada .pie{ margin-top:auto; font-family:var(--sc); font-size:9pt; letter-spacing:2.5px;
+  color:var(--gris-encabezado); padding-top:22mm; }
+
+/* Página legal (copyright) */
+.legal{ page:limpia-izq; break-before:left; font-size:8pt; line-height:1.55;
+  color:var(--gris-folio); text-align:left; }
+.legal.abajo{ display:flex; flex-direction:column; min-height:150mm; }
+.legal .fill{ margin-top:auto; }
+.legal p{ font-size:8pt; text-indent:0; text-align:left; line-height:1.55;
+  margin:0 0 2.2mm; hyphens:none; }
+.legal .marca{ font-family:var(--sc); letter-spacing:1.5px; color:var(--tinta);
+  font-size:9pt; margin-bottom:3mm; }
+.legal .estrella{ width:8px; margin-bottom:4mm; }
+
+/* Dedicatoria */
+.dedicatoria{ page:limpia; break-before:right; text-align:right; padding-top:58mm;
+  padding-right:4mm; }
+.dedicatoria .texto{ font-style:italic; font-size:12.5pt; line-height:1.7;
+  color:var(--tinta); }
+.dedicatoria .texto .n{ font-family:var(--sc); font-style:normal; letter-spacing:.5px;
+  color:var(--violeta-oscuro); }
+
+/* Epígrafe */
+.epigrafe{ page:limpia; break-before:right; padding-top:60mm; }
+.epigrafe .cita{ font-style:italic; font-size:12pt; line-height:1.62; color:var(--tinta);
+  max-width:74%; margin:0 0 0 auto; text-align:left; }
+.epigrafe .fuente{ font-family:var(--sc); font-size:8.6pt; letter-spacing:1.6px;
+  color:var(--violeta-oscuro); text-align:right; margin-top:6mm; max-width:74%;
+  margin-left:auto; }
+.epigrafe .estrella{ width:9px; margin:0 0 8mm auto; display:block; }
+
+/* ============ CIERRE ==================================================== */
+.cierre{ break-before:page; text-align:center; padding-top:40mm; }
+.cierre .fin{ font-family:var(--sc); font-size:11pt; letter-spacing:4px;
+  color:var(--violeta); }
+.cierre .estrella{ width:13px; margin:9mm auto; }
+.cierre .teaser{ font-style:italic; font-size:11.5pt; color:var(--tinta);
+  max-width:78%; margin:6mm auto 0; line-height:1.5; hyphens:none; text-wrap:balance; }
+.cierre .teaser b{ font-weight:400; font-style:normal; font-family:var(--sc);
+  letter-spacing:.5px; color:var(--violeta-oscuro); }
+
+/* Sub-sección especial (ATLAS DE LAS VOCES) dentro de capítulo */
+.atlas{ text-align:center; text-indent:0; margin:2.2em 0 1.4em; break-inside:avoid; }
+.atlas .r{ font-family:var(--sc); font-size:11pt; letter-spacing:3.5px;
+  color:var(--violeta); }
+.atlas hr{ width:40px; border:0; border-top:.7pt solid var(--violeta-tenue);
+  margin:4mm auto 0; }
+
+/* ============ ÍNDICE ==================================================== */
+.indice{ page:limpia; break-before:right; }
+.indice h2{ font-family:var(--sc); font-weight:400; font-size:15pt; letter-spacing:3px;
+  color:var(--tinta-fuerte); text-align:center; margin:6mm 0 12mm; }
+.indice .grupo{ font-family:var(--sc); font-size:9pt; letter-spacing:3px;
+  color:var(--violeta); margin:7mm 0 3mm; text-align:center; }
+.indice a.fila{ display:flex; align-items:baseline; font-size:10.6pt; margin:1.9mm 0;
+  text-decoration:none; color:var(--tinta); }
+.indice a.fila .tit{ white-space:nowrap; }
+.indice a.fila .tit em{ font-style:italic; }
+.indice a.fila .num{ font-feature-settings:"onum" 1; color:var(--violeta-oscuro);
+  margin-right:.5em; }
+.indice a.fila .pts{ flex:1; border-bottom:.5pt dotted var(--gris-fino);
+  margin:0 6px; transform:translateY(-3px); min-width:12px; }
+.indice a.fila::after{ content: target-counter(attr(href), page);
+  font-feature-settings:"onum" 1; color:var(--gris-folio); white-space:nowrap; }
+.indice a.fila.prol .tit{ font-style:italic; }
+
+/* ---------- MARCADORES PDF (índice navegable) --------------------------- */
+h1, h2, h3{ bookmark-level: none; }        /* anular marcadores automáticos */
+.abre-libro{ bookmark-level:1; bookmark-label:"Libro Primero · Las voces que nacieron del fuego"; }
+.abre-parte{ bookmark-level:2; bookmark-label: content(text); }
+.abre-cap.prologo{ bookmark-level:2; bookmark-label:"Prólogo · La primera pregunta"; }
+.abre-cap{ bookmark-level:3; bookmark-label: content(text); }
+
+/* ============ COLOFÓN =================================================== */
+.colofon{ page:limpia; break-before:right; text-align:center;
+  display:flex; flex-direction:column; min-height:150mm; }
+.colofon .in{ margin:auto; max-width:76%; }
+.colofon .estrella{ width:12px; margin:0 auto 8mm; }
+.colofon p{ font-size:9.6pt; line-height:1.75; text-indent:0; text-align:center;
+  color:var(--tinta); hyphens:none; }
+.colofon .sc{ font-family:var(--sc); letter-spacing:1.5px; color:var(--violeta-oscuro); }

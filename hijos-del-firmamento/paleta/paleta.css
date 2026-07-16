@@ -1,0 +1,26 @@
+/* =========================================================================
+   PALETA EDITORIAL · «Hijos del Firmamento»
+   -------------------------------------------------------------------------
+   Tres tintas, ni una más:  negro tipográfico · gris · violeta.
+   El violeta es la ÚNICA variable de marca: cámbialo por el HEX exacto
+   muestreado de la portada y todo el libro se reafina solo.
+   ========================================================================= */
+:root {
+  /* — VIOLETA DE MARCA (provisional; sustituir por el de la portada) —— */
+  --violeta:        #4a2c6d;   /* violeta de tinta, profundo y sobrio      */
+  --violeta-oscuro: #35204e;   /* para textos pequeños sobre blanco        */
+  --violeta-tenue:  #8f78ad;   /* filetes y detalles muy discretos         */
+  --violeta-niebla: #efeaf4;   /* veladuras/fondos apenas insinuados       */
+
+  /* — NEGRO TIPOGRÁFICO (cálido, con levísima alma violeta, nunca #000) — */
+  --tinta:          #1c1a22;   /* cuerpo de texto                          */
+  --tinta-fuerte:   #100e16;   /* titulares                                */
+
+  /* — GRISES —————————————————————————————————————————————————————————— */
+  --gris-encabezado:#6d6a74;   /* cornisas / encabezados                   */
+  --gris-folio:     #4b4954;   /* folios                                   */
+  --gris-fino:      #b9b6c0;   /* filetes finos neutros                    */
+  --gris-humo:      #f4f3f6;   /* reservas                                 */
+
+  --papel:          #fdfcfb;   /* blanco cálido de papel ahuesado          */
+}
