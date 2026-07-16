@@ -80,16 +80,21 @@ set "FBASE=%FBASE:"=%"
 if not defined FBASE set "FBASE=\\172.16.32.83\factura_electronica_net22"
 :fbs
 if "%FBASE:~-1%"=="\" ( set "FBASE=%FBASE:~0,-1%" & goto fbs )
+if "%FBASE:~-1%"==":" set "FBASE=%FBASE%\."
 echo.
 REM --- 6) Base de soportes (OPF/PDE) ---------------------------------
 set "SBASE=Y:\"
-echo   Carpeta de los soportes de autorizacion (Enter para Y:\):
+echo   Carpeta de los soportes (Enter para Y:\; para que sea RAPIDO puedes
+echo   poner la carpeta del mes, p. ej. "Y:\7. JULIO 2026 - SOPORTES RADICACION"):
 setlocal EnableDelayedExpansion
 echo   [!SBASE!]
 endlocal
 set /p "SBASE=  Ruta: "
 set "SBASE=%SBASE:"=%"
 if not defined SBASE set "SBASE=Y:\"
+:sbs
+if "%SBASE:~-1%"=="\" ( set "SBASE=%SBASE:~0,-1%" & goto sbs )
+if "%SBASE:~-1%"==":" set "SBASE=%SBASE%\."
 echo.
 
 REM --- 7) Ejecutar ---------------------------------------------------
@@ -482,51 +487,154 @@ def leer_soportes(pdfs: list[Path], autoriz_json: list[str]) -> dict:
 # --------------------------------------------------------------------------
 
 
-def indexar(base: Path, facturas_norm: set[str]) -> dict[str, dict]:
-    """Recorre `base` una vez y agrupa por factura los archivos de interés.
+_RE_HUS_DIR = re.compile(r"^HUS\d+$", re.I)
+_RE_ENV_DIR = re.compile(r"ENV[-_ ]?(\d+)", re.I)
+_RE_MES_DIR = re.compile(r"^\d{6}$")
 
-    Empareja por el token 'HUS<num>' del NOMBRE del archivo; si el archivo no
-    trae factura en el nombre (p. ej. la factura fv), usa la carpeta. Así no
-    confunde HUS532392 con HUS5323921, no concatena el NIT, y no roba archivos
-    de otra factura que estén en una carpeta mal rotulada."""
-    indice = {
-        n: {"json": None, "fv": None, "opf": [], "pde": [], "otros": []} for n in facturas_norm
-    }
-    patrones = {n: _patron_factura(n) for n in facturas_norm}
-    if not base:
-        return indice
+
+def _es_dir(p: Path) -> bool:
     try:
-        es_dir = base.is_dir()
+        return p.is_dir()
     except OSError:
-        es_dir = False
-    if not es_dir:
-        return indice
+        return False
 
-    for root, _dirs, files in os.walk(str(base), onerror=lambda _e: None):
+
+def _slot_vacio() -> dict:
+    return {"json": None, "fv": None, "opf": [], "pde": [], "otros": []}
+
+
+def _clasificar_archivo(slot: dict, p: Path) -> None:
+    ext = p.suffix.lower()
+    up = p.name.upper()
+    if ext == ".json" and "RIPS" in up:
+        slot["json"] = slot["json"] or p
+    elif ext == ".pdf" and up.startswith("OPF"):
+        slot["opf"].append(p)
+    elif ext == ".pdf" and up.startswith("PDE"):
+        slot["pde"].append(p)
+    elif ext == ".pdf" and up.startswith("FV"):
+        slot["fv"] = slot["fv"] or p
+    elif ext == ".pdf":
+        slot["otros"].append(p)
+
+
+def _recolectar_carpeta(carpeta: Path, patron: re.Pattern, slot: dict) -> None:
+    """Mete en `slot` los archivos de `carpeta` (y su subcarpeta RIPS) que
+    correspondan a la factura (por el token del nombre; los que no traen HUS
+    en el nombre, como fv, se aceptan por estar en la carpeta de la factura)."""
+    for sub in (carpeta, carpeta / "RIPS", carpeta / "SOPORTES"):
+        if not _es_dir(sub):
+            continue
+        try:
+            entradas = list(os.scandir(sub))
+        except OSError:
+            continue
+        for e in entradas:
+            try:
+                if not e.is_file():
+                    continue
+            except OSError:
+                continue
+            nombre = e.name
+            ext = os.path.splitext(nombre)[1].lower()
+            if ext not in (".json", ".pdf"):
+                continue
+            if patron.search(nombre) or "HUS" not in nombre.upper():
+                _clasificar_archivo(slot, Path(e.path))
+
+
+def indexar_directo(base: Path, facturas: list[tuple[str, str, str]]) -> dict[str, dict]:
+    """Va DIRECTO a la carpeta de cada factura (sin recorrer todo el árbol).
+    facturas: [(fac_original, norm, mes_yyyymm)]. Estructura esperada:
+        <base>\\<AAAAMM>\\FACTURAS_SALUD\\<HUS...>\\(RIPS\\)
+    Devuelve el índice y el conjunto de facturas que NO encontró así."""
+    indice = {norm: _slot_vacio() for _, norm, _ in facturas}
+    faltan = set()
+    for fac, norm, mes in facturas:
+        patron = _patron_factura(norm)
+        candidatas = []
+        meses = [m for m in (mes,) if m] or []
+        # meses probables: el de la factura y el anterior/siguiente por si acaso
+        for mm in meses:
+            for nombre_fac in (fac, f"HUS{norm}", f"HUS{norm.zfill(6)}"):
+                candidatas.append(base / mm / "FACTURAS_SALUD" / nombre_fac)
+                candidatas.append(base / mm / "FACTURAS_SALUD" / nombre_fac / "RIPS")
+        hallo = False
+        for c in candidatas:
+            if _es_dir(c):
+                _recolectar_carpeta(c if c.name != "RIPS" else c.parent, patron, indice[norm])
+                hallo = True
+        if not (hallo and indice[norm]["json"]):
+            faltan.add(norm)
+    return indice, faltan
+
+
+def indexar_arbol(
+    base: Path,
+    facturas_norm: set[str],
+    envios: set[str] | None = None,
+    meses: set[str] | None = None,
+    etiqueta: str = "",
+) -> dict[str, dict]:
+    """Recorre `base` UNA vez, pero PODANDO las ramas que no sirven para no
+    tardar horas sobre una unidad de red: se salta las carpetas de facturas
+    que no son objetivo (las más numerosas), los envíos ajenos y los meses
+    ajenos. Muestra progreso para que nunca parezca colgado."""
+    indice = {n: _slot_vacio() for n in facturas_norm}
+    patrones = {n: _patron_factura(n) for n in facturas_norm}
+    if not _es_dir(base):
+        return indice
+    envios = envios or set()
+    meses = meses or set()
+    vistos = 0
+    for root, dirs, files in os.walk(str(base), onerror=lambda _e: None):
+        vistos += 1
+        if vistos % 400 == 0:
+            print(
+                f"    ... {vistos} carpetas revisadas{(' en ' + etiqueta) if etiqueta else ''}",
+                flush=True,
+            )
+        # ---- podar subcarpetas antes de descender ----
+        conservar = []
+        for d in dirs:
+            if _RE_HUS_DIR.match(d):  # carpeta de UNA factura
+                if not any(pat.search(d) for pat in patrones.values()):
+                    continue  # es de otra factura: no entrar (aquí está el ahorro)
+            elif meses and _RE_MES_DIR.match(d) and d not in meses:
+                continue  # mes que no nos interesa
+            else:
+                menv = _RE_ENV_DIR.fullmatch(d) or _RE_ENV_DIR.match(d)
+                if envios and menv:
+                    e = menv.group(1)
+                    if e not in envios and normalizar_factura(e) not in envios:
+                        continue  # envío ajeno
+            conservar.append(d)
+        dirs[:] = conservar
+        # ---- clasificar archivos de esta carpeta ----
         for fn in files:
             ext = os.path.splitext(fn)[1].lower()
             if ext not in (".json", ".pdf"):
                 continue
             objetivo = next((n for n, pat in patrones.items() if pat.search(fn)), None)
             if objetivo is None and "HUS" not in fn.upper():
-                # archivo sin factura en el nombre (fv...): usar la carpeta
                 objetivo = next((n for n, pat in patrones.items() if pat.search(root)), None)
             if objetivo is None:
                 continue
-            p = Path(root) / fn
-            up = fn.upper()
-            slot = indice[objetivo]
-            if ext == ".json" and "RIPS" in up:
-                slot["json"] = slot["json"] or p
-            elif ext == ".pdf" and up.startswith("OPF"):
-                slot["opf"].append(p)
-            elif ext == ".pdf" and up.startswith("PDE"):
-                slot["pde"].append(p)
-            elif ext == ".pdf" and up.startswith("FV"):
-                slot["fv"] = slot["fv"] or p
-            elif ext == ".pdf":
-                slot["otros"].append(p)
+            _clasificar_archivo(indice[objetivo], Path(root) / fn)
     return indice
+
+
+def _fundir(dst: dict, extra: dict) -> None:
+    """Suma al índice `dst` lo que traiga `extra` (para completar lo que el
+    modo directo no encontró usando el recorrido podado)."""
+    for norm, slot in extra.items():
+        if norm not in dst:
+            dst[norm] = _slot_vacio()
+        d = dst[norm]
+        d["json"] = d["json"] or slot["json"]
+        d["fv"] = d["fv"] or slot["fv"]
+        for k in ("opf", "pde", "otros"):
+            d[k] = d[k] or slot[k]
 
 
 # --------------------------------------------------------------------------
@@ -586,6 +694,34 @@ def _detectar_cabecera(ws) -> int | None:
     return None
 
 
+def _mes_yyyymm(valor) -> str:
+    """Mes 'AAAAMM' de la FECHA FACTURA (datetime de Excel o texto dd/mm/aaaa)."""
+    from datetime import date, datetime
+
+    if isinstance(valor, (datetime, date)):
+        return f"{valor.year:04d}{valor.month:02d}"
+    s = str(valor or "").strip()
+    m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", s)
+    if m:
+        return f"{int(m.group(3)):04d}{int(m.group(2)):02d}"
+    m = re.search(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", s)
+    if m:
+        return f"{int(m.group(1)):04d}{int(m.group(2)):02d}"
+    return ""
+
+
+def _mes_adyacente(yyyymm: str, delta: int) -> str:
+    if not re.fullmatch(r"\d{6}", yyyymm or ""):
+        return ""
+    y, mth = int(yyyymm[:4]), int(yyyymm[4:])
+    mth += delta
+    if mth == 0:
+        y, mth = y - 1, 12
+    elif mth == 13:
+        y, mth = y + 1, 1
+    return f"{y:04d}{mth:02d}"
+
+
 def _es_factura(valor) -> bool:
     """La celda FAC parece una factura (no una fila de TOTAL/subtotal)."""
     s = str(valor or "").strip()
@@ -634,7 +770,9 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
     for fila in range(fila_cab + 1, ws.max_row + 1):
         fac = ws.cell(fila, COL["fac"]).value
         if _es_factura(fac):
-            facturas.append((fila, str(fac).strip()))
+            envio = str(ws.cell(fila, 6).value or "").strip()
+            mes = _mes_yyyymm(ws.cell(fila, COL["fecha"]).value)
+            facturas.append((fila, str(fac).strip(), envio, mes))
 
     print("=" * 66)
     print("  AUDITAR DEVOLUCIONES EPS — DGH vs RIPS(JSON) vs soportes")
@@ -642,11 +780,28 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
     print(f"  Excel: {excel.name}   Facturas: {len(facturas)}")
     print(f"  Base facturas/JSON: {facturas_base}")
     print(f"  Base soportes:      {soportes_base}")
-    print("  Indexando archivos (una pasada por cada base)...")
 
-    norms = {normalizar_factura(fac) for _, fac in facturas}
-    idx_fact = indexar(facturas_base, norms)
-    idx_sop = indexar(soportes_base, norms)
+    norms = {normalizar_factura(fac) for _, fac, _, _ in facturas}
+    envios = {normalizar_factura(e) for _, _, e, _ in facturas if e}
+    meses = {m for _, _, _, m in facturas if m}
+    # los soportes de junio/julio también pueden estar en el mes de radicación
+    meses |= {_mes_adyacente(m, d) for m in list(meses) for d in (-1, 1)}
+    meses.discard("")
+
+    # 1) FACTURAS/JSON: ir DIRECTO a la carpeta de cada factura (rapidísimo)
+    print("  [1/2] Buscando los JSON de RIPS (directo por carpeta)...", flush=True)
+    directo = [(fac, normalizar_factura(fac), mes) for _, fac, _, mes in facturas]
+    idx_fact, faltan = indexar_directo(facturas_base, directo)
+    if faltan:
+        print(
+            f"        {len(faltan)} sin ruta directa: buscando en el arbol (podado)...", flush=True
+        )
+        extra = indexar_arbol(facturas_base, faltan, meses=meses, etiqueta="facturas")
+        _fundir(idx_fact, extra)
+
+    # 2) SOPORTES: recorrido podado (salta facturas/envios/meses ajenos)
+    print("  [2/2] Buscando los soportes OPF/PDE (arbol podado, con progreso)...", flush=True)
+    idx_sop = indexar_arbol(soportes_base, norms, envios=envios, meses=meses, etiqueta="soportes")
     print("-" * 66)
 
     verde = PatternFill("solid", fgColor="E2EFDA")
@@ -669,7 +824,7 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
     ]
     con_dif = con_ok = sin_datos = 0
 
-    for fila, fac in facturas:
+    for fila, fac, _envio, _mes in facturas:
         norm = normalizar_factura(fac)
         arch_f = idx_fact.get(norm, {})
         arch_s = idx_sop.get(norm, {})
@@ -797,8 +952,15 @@ def main(argv: list[str] | None = None) -> int:
     if not excel.is_file():
         sys.stderr.write(f"ERROR: no existe el Excel: {excel}\n")
         return 2
+
+    def _limpiar_base(v: str) -> Path:
+        v = (v or "").strip().strip('"')  # quita comillas sueltas del batch
+        return Path(os.path.normpath(v)) if v else Path(v)
+
+    fbase = _limpiar_base(args.facturas_base)
+    sbase = _limpiar_base(args.soportes_base)
     salida = args.salida or excel.with_name(excel.stem + "_AUDITADO.xlsx")
-    return procesar(excel, Path(args.facturas_base), Path(args.soportes_base), salida)
+    return procesar(excel, fbase, sbase, salida)
 
 
 if __name__ == "__main__":

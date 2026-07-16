@@ -26,6 +26,13 @@ los soportes (`1244781967`). El bot lo marca:
    - la **carpeta de facturas/JSON** (por defecto la red del HUS
      `\\172.16.32.83\factura_electronica_net22`),
    - la **carpeta de soportes** (por defecto `Y:\`).
+
+   > ⚡ **Para que sea más rápido**: en la carpeta de soportes, en vez de `Y:\`
+   > (todo el disco), puedes poner la carpeta del mes, p. ej.
+   > `Y:\7. JULIO 2026 - SOPORTES RADICACION`. El bot ya va **directo** a la
+   > carpeta de cada factura y **poda** los envíos/facturas que no son del lote,
+   > así que no recorre todo el disco; darle la carpeta del mes lo hace aún más
+   > veloz. Va mostrando el progreso, así que **nunca se queda "colgado"**.
 4. Queda **`NUEVA_EPS_DEV_AUDITADO.xlsx`** junto al original:
    - los bloques RIPS-JSON y SOPORTES llenos y la **OBSERVACIÓN** en color
      (verde = OK, rojo = diferencia, amarillo = revisar / sin datos),

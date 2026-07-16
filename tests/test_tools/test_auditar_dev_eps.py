@@ -288,7 +288,7 @@ def test_indexar_no_confunde_facturas_por_substring(tmp_path):
     (tmp_path / "HUS532392" / "Rips_HUS532392.json").write_text(_RIPS_JSON, encoding="utf-8")
     (tmp_path / "HUS5323921").mkdir()
     (tmp_path / "HUS5323921" / "Rips_HUS5323921.json").write_text(_RIPS_JSON, encoding="utf-8")
-    idx = mod.indexar(tmp_path, {mod.normalizar_factura("HUS532392")})
+    idx = mod.indexar_arbol(tmp_path, {mod.normalizar_factura("HUS532392")})
     # solo la 532392 debe indexarse, no la 5323921
     assert idx[mod.normalizar_factura("HUS532392")]["json"] is not None
     assert mod.normalizar_factura("HUS5323921") not in idx
@@ -304,7 +304,7 @@ def test_indexar_estructura_plana_real_con_nit_en_el_nombre(tmp_path):
     (env / "PDE_900006037_HUS532392.pdf").write_bytes(b"%PDF")
     (env / "Rips_HUS532392.json").write_text(_RIPS_JSON, encoding="utf-8")
     norm = mod.normalizar_factura("HUS532392")
-    idx = mod.indexar(tmp_path, {norm})
+    idx = mod.indexar_arbol(tmp_path, {norm})
     assert len(idx[norm]["opf"]) == 1
     assert len(idx[norm]["pde"]) == 1
     assert idx[norm]["json"] is not None
@@ -318,7 +318,7 @@ def test_indexar_no_roba_soportes_de_otra_factura_en_carpeta_mal_rotulada(tmp_pa
     carpeta.mkdir()
     (carpeta / "OPF_900006037_HUS777888.pdf").write_bytes(b"%PDF")
     norm = mod.normalizar_factura("HUS532392")
-    idx = mod.indexar(tmp_path, {norm})
+    idx = mod.indexar_arbol(tmp_path, {norm})
     assert idx[norm]["opf"] == []  # no se lo roba
 
 
