@@ -20,6 +20,8 @@ informe de gestión para gerencia sin trabajo manual.
 | 11 | **SEMAFORO_GLOSAS** | Plazos de respuesta en **días hábiles** (festivos de Colombia incluidos): NEGRO vencida, ROJO 1-4, AMARILLO 5-10, VERDE 11+. Para no perder una glosa por extemporaneidad. |
 | 12 | **BUSCAR_FACTURA** | Con `facturas.txt` al lado, rastrea la carpeta compartida y copia TODOS los archivos de esas facturas a `SOPORTES_ENCONTRADOS\<factura>\`. Arma el paquete de respuesta en minutos. |
 | 8 | **REVISAR_XML** | Saca a un Excel la información de contrato de los XML (el anexo de prueba de la glosa "sin contrato"). |
+| 13 | **INFORME_GERENCIA** | Genera el informe de gestión para gerencia desde la bitácora `REGISTRO_BOTS.csv`: usos por bot, por persona y por semana, en HTML listo para imprimir. Se abre solo al terminar. |
+| 14 | **VIGILANTE_NOCTURNO** | Deja programada una tarea de Windows que **todas las noches** convierte los `.txt` nuevos de la carpeta que elijas (sin doble clic de nadie). Instalar/probar/desinstalar desde su menú; todo queda en `VIGILANTE_LOG.txt`. |
 
 ## Los bots de archivos
 

@@ -278,3 +278,45 @@ def test_menu_motor_hus_es_ascii_crlf():
     assert raw.count(b"\n") == raw.count(b"\r\n")  # CRLF puro
     assert all(b < 128 for b in raw), "el batch debe ser 100% ASCII"
     assert b"REGISTRO_BOTS.csv" in raw  # la bitacora esta conectada
+
+
+# ----------------------------- informe_gerencia ---------------------------
+
+
+def test_informe_gerencia_desde_bitacora(tmp_path):
+    (tmp_path / "REGISTRO_BOTS.csv").write_text(
+        "fecha;hora;usuario;equipo;bot\n"
+        "14/07/2026;08:12:33;yesid;AUD-PC01;UNIR_PDFS.cmd\n"
+        "Wed 07/16/2026;11:45:00;maria;AUD-PC02;CRUZAR_GLOSAS.cmd\n",
+        encoding="utf-8",
+    )
+    mod = _cargar("informe_gerencia")
+    salida = tmp_path / "INF.html"
+    assert mod.main([str(tmp_path / "REGISTRO_BOTS.csv"), "--salida", str(salida)]) == 0
+    html = salida.read_text(encoding="utf-8")
+    assert "UNIR_PDFS.cmd" in html and "maria" in html
+    # el formato gringo Wed 07/16/2026 se interpreta bien (16 de julio)
+    assert mod.parsear_fecha("Wed 07/16/2026").day == 16
+    assert mod.parsear_fecha("14/07/2026").day == 14
+
+
+def test_informe_gerencia_sin_bitacora(tmp_path):
+    mod = _cargar("informe_gerencia")
+    assert mod.main([str(tmp_path / "NO_EXISTE.csv")]) == 2
+
+
+# ----------------------------- vigilante nocturno -------------------------
+
+
+def test_vigilante_nocturno_estructura():
+    """Batch puro con el RUN_NOCTURNO embebido tras #RUNSTART#, todo ASCII CRLF."""
+    raw = (_RAIZ / "tools" / "VIGILANTE_NOCTURNO.cmd").read_bytes()
+    assert raw.count(b"\n") == raw.count(b"\r\n")
+    assert all(b < 128 for b in raw)
+    marcador = ("#RUN" + "START#").encode()
+    assert raw.count(marcador) == 1
+    run = raw.decode("ascii").split("#RUN" + "START#\r\n", 1)[1]
+    assert run.startswith("@echo off")
+    assert "motor_nocturno.py" in run and "VIGILANTE_LOG.txt" in run
+    assert "schtasks /create" in raw.decode("ascii")  # instala la tarea
+    assert "schtasks /delete" in raw.decode("ascii")  # y se puede quitar

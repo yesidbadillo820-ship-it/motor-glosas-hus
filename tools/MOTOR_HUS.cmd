@@ -29,6 +29,8 @@ echo    9. Chequea el lote ANTES de radicar
 echo   10. Cruza el Excel de la EPS con los XML + borradores
 echo   11. Plazos de respuesta en dias habiles
 echo   12. Recolecta los soportes de una lista de facturas
+echo   13. Informe para gerencia (desde la bitacora)
+echo   14. Tarea nocturna: convierte los .txt solos
 echo.
 echo    0. Salir
 echo.
@@ -47,6 +49,8 @@ if "%OP%"=="9" ( call :lanzar VERIFICAR_RADICACION.cmd & goto inicio )
 if "%OP%"=="10" ( call :lanzar CRUZAR_GLOSAS.cmd & goto inicio )
 if "%OP%"=="11" ( call :lanzar SEMAFORO_GLOSAS.cmd & goto inicio )
 if "%OP%"=="12" ( call :lanzar BUSCAR_FACTURA.cmd & goto inicio )
+if "%OP%"=="13" ( call :lanzar INFORME_GERENCIA.cmd & goto inicio )
+if "%OP%"=="14" ( call :lanzar VIGILANTE_NOCTURNO.cmd & goto inicio )
 echo.
 echo   [!] Opcion no valida. Intenta de nuevo...
 timeout /t 2 >nul
