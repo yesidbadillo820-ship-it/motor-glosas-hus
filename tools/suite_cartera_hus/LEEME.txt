@@ -118,6 +118,7 @@ Sirve para el papeleo diario de facturas, glosas y soportes:
     Editar ........ marca de agua · números de página · recortar
     Seguridad ..... proteger con clave · desbloquear · censurar (tachar datos)
     Convertir ..... Office->PDF · PDF->Word · PDF->Excel · PDF->PowerPoint · PDF->PDF/A
+    IA ............ resumir · traducir · PDF->Markdown · OCR (extraer texto)
     HUS ........... renombrar PDF ↔ .cmd
 El resultado queda en SALIDAS/HERRAMIENTAS_PDF/. También por consola:
     python suite_cli.py pdf unir a.pdf b.pdf -o UNIDO.pdf
@@ -130,6 +131,16 @@ Nota sobre conversiones Office:
     · PDF -> Word/Excel/PowerPoint funciona sin internet ni programas extra.
     · Office -> PDF y PDF -> PDF/A necesitan LibreOffice instalado (gratis:
       https://es.libreoffice.org/descarga/). Si no está, la Suite lo avisa.
+
+Nota sobre las funciones de IA (grupo "PDF INTELLIGENCE"):
+    Resumir, traducir, PDF->Markdown y OCR usan Google Gemini (el MISMO del
+    motor de glosas). Necesitan INTERNET y la variable de entorno
+    GEMINI_API_KEY. Sin ella, la Suite lo avisa y el resto sigue funcionando.
+    El OCR lee hasta escaneos (sin capa de texto), página por página.
+        set GEMINI_API_KEY=su_clave      (Windows, en la sesión)
+        python suite_cli.py pdf resumir informe.pdf
+        python suite_cli.py pdf traducir carta.pdf --idioma inglés
+        python suite_cli.py pdf ocr escaneo.pdf
 
 REQUISITOS
 ----------

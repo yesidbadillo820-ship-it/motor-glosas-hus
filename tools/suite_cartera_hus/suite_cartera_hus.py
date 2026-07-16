@@ -30,6 +30,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
 from nucleo import (  # noqa: E402
+    ai_tools,
     archivos,
     cruces_dgh,
     office_tools,
@@ -1011,6 +1012,15 @@ class Suite(tk.Tk):
                     ("📕 PDF → PDF/A", self._of_pdf2pdfa),
                 ],
             ),
+            (
+                "PDF INTELLIGENCE (IA · internet)",
+                [
+                    ("📝 Resumir con IA", self._ai_resumir),
+                    ("🌐 Traducir PDF", self._ai_traducir),
+                    ("🔡 PDF → Markdown", self._ai_markdown),
+                    ("👁 OCR (extraer texto)", self._ai_ocr),
+                ],
+            ),
             ("HUS", [("🏷 PDF ↔ .cmd", self._pdf_cmd)]),
         ]
         for titulo, items in grupos:
@@ -1342,6 +1352,55 @@ class Suite(tk.Tk):
             return
         self._pdf_run(
             "PDF → PDF/A", lambda: office_tools.pdf_a_pdfa(ruta, CARPETA_PDF, log=self.log)
+        )
+
+    # -- inteligencia / IA (fase 3: Gemini, requiere internet + GEMINI_API_KEY) --
+
+    def _ai_guard(self):
+        if not ai_tools.disponible():
+            messagebox.showwarning("Falta la API key de IA", ai_tools.MENSAJE_SIN_KEY)
+            return False
+        return True
+
+    def _ai_resumir(self):
+        ruta = self._pdf_in()
+        if not ruta or not self._ai_guard():
+            return
+        self._pdf_run(
+            "Resumir con IA",
+            lambda: ai_tools.resumir(ruta, self._of_salida(ruta, "_resumen.md"), log=self.log),
+        )
+
+    def _ai_traducir(self):
+        ruta = self._pdf_in()
+        if not ruta or not self._ai_guard():
+            return
+        idioma = simpledialog.askstring("Traducir PDF", "¿A qué idioma?", initialvalue="inglés")
+        if not idioma:
+            return
+        self._pdf_run(
+            "Traducir PDF",
+            lambda: ai_tools.traducir(
+                ruta, idioma, self._of_salida(ruta, "_traducido.docx"), log=self.log
+            ),
+        )
+
+    def _ai_markdown(self):
+        ruta = self._pdf_in()
+        if not ruta or not self._ai_guard():
+            return
+        self._pdf_run(
+            "PDF → Markdown",
+            lambda: ai_tools.a_markdown(ruta, self._of_salida(ruta, ".md"), log=self.log),
+        )
+
+    def _ai_ocr(self):
+        ruta = self._pdf_in()
+        if not ruta or not self._ai_guard():
+            return
+        self._pdf_run(
+            "OCR (extraer texto)",
+            lambda: ai_tools.ocr(ruta, self._of_salida(ruta, "_texto.txt"), log=self.log),
         )
 
 

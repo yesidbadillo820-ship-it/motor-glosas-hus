@@ -23,6 +23,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
 from nucleo import (  # noqa: E402
+    ai_tools,
     archivos,
     cruces_dgh,
     office_tools,
@@ -303,6 +304,15 @@ def cmd_pdf(args):
         print(office_tools.pdf_a_powerpoint(uno(), sal, log=log))
     elif op == "pdfa":
         print(office_tools.pdf_a_pdfa(uno(), salida=sal, log=log))
+    # --- inteligencia / IA (fase 3, requiere GEMINI_API_KEY) ---
+    elif op == "resumir":
+        print(ai_tools.resumir(uno(), sal, log=log))
+    elif op == "traducir":
+        print(ai_tools.traducir(uno(), args.idioma, sal, log=log))
+    elif op == "markdown":
+        print(ai_tools.a_markdown(uno(), sal, log=log))
+    elif op == "ocr":
+        print(ai_tools.ocr(uno(), sal, log=log))
     return 0
 
 
@@ -377,6 +387,10 @@ def construir_parser():
             "pdf2excel",
             "pdf2ppt",
             "pdfa",
+            "resumir",
+            "traducir",
+            "markdown",
+            "ocr",
         ],
         help="Operación a realizar.",
     )
@@ -390,6 +404,7 @@ def construir_parser():
     s.add_argument("--margen", type=float, default=0.05, help="Margen (0-0.45) para 'recortar'.")
     s.add_argument("--password", default=None, help="Contraseña para proteger/desbloquear.")
     s.add_argument("--texto", default=None, help="Texto para 'marca' o términos de 'censurar'.")
+    s.add_argument("--idioma", default="inglés", help="Idioma destino para 'traducir'.")
     s.set_defaults(func=cmd_pdf)
     return p
 
