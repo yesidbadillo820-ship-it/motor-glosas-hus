@@ -350,8 +350,6 @@ def leer_soportes(pdfs: list[Path]) -> dict:
 
 
 _RE_HUS_DIR = re.compile(r"^HUS\d+$", re.I)
-_RE_ENV_DIR = re.compile(r"ENV[-_ ]?(\d+)", re.I)
-_RE_MES_DIR = re.compile(r"^\d{6}$")
 
 
 def _es_dir(p: Path) -> bool:
@@ -414,40 +412,32 @@ def indexar_directo(base: Path, facturas: list[tuple[str, str, str]]) -> dict[st
     faltan = set()
     for fac, norm, mes in facturas:
         patron = _patron_factura(norm)
+        # meses probables: el de la factura y el anterior/siguiente (por si se
+        # radicó en un mes distinto al de la fecha de la factura).
+        meses = [m for m in (mes, _mes_adyacente(mes, 1), _mes_adyacente(mes, -1)) if m]
         candidatas = []
-        meses = [m for m in (mes,) if m] or []
-        # meses probables: el de la factura y el anterior/siguiente por si acaso
         for mm in meses:
             for nombre_fac in (fac, f"HUS{norm}", f"HUS{norm.zfill(6)}"):
                 candidatas.append(base / mm / "FACTURAS_SALUD" / nombre_fac)
-                candidatas.append(base / mm / "FACTURAS_SALUD" / nombre_fac / "RIPS")
         hallo = False
         for c in candidatas:
             if _es_dir(c):
-                _recolectar_carpeta(c if c.name != "RIPS" else c.parent, patron, indice[norm])
+                _recolectar_carpeta(c, patron, indice[norm])
                 hallo = True
         if not (hallo and indice[norm]["json"]):
             faltan.add(norm)
     return indice, faltan
 
 
-def indexar_arbol(
-    base: Path,
-    facturas_norm: set[str],
-    envios: set[str] | None = None,
-    meses: set[str] | None = None,
-    etiqueta: str = "",
-) -> dict[str, dict]:
-    """Recorre `base` UNA vez, pero PODANDO las ramas que no sirven para no
-    tardar horas sobre una unidad de red: se salta las carpetas de facturas
-    que no son objetivo (las más numerosas), los envíos ajenos y los meses
-    ajenos. Muestra progreso para que nunca parezca colgado."""
+def indexar_arbol(base: Path, facturas_norm: set[str], etiqueta: str = "") -> dict[str, dict]:
+    """Recorre `base` UNA vez. Para no tardar horas sobre una unidad de red se
+    salta descender a las carpetas de facturas que NO son objetivo (las más
+    numerosas), pero NADA más: así siempre encuentra los soportes, sin importar
+    bajo qué envío/mes/gestor estén archivados. Muestra progreso."""
     indice = {n: _slot_vacio() for n in facturas_norm}
     patrones = {n: _patron_factura(n) for n in facturas_norm}
     if not _es_dir(base):
         return indice
-    envios = envios or set()
-    meses = meses or set()
     vistos = 0
     for root, dirs, files in os.walk(str(base), onerror=lambda _e: None):
         vistos += 1
@@ -456,20 +446,14 @@ def indexar_arbol(
                 f"    ... {vistos} carpetas revisadas{(' en ' + etiqueta) if etiqueta else ''}",
                 flush=True,
             )
-        # ---- podar subcarpetas antes de descender ----
+        # ---- poda SEGURA: solo se salta descender a la carpeta de UNA factura
+        #      que NO es objetivo (las mas numerosas). NO se poda por envio ni
+        #      por mes: el envio de la devolucion no siempre coincide con el de
+        #      la carpeta de soportes, y podar por eso hacia perder todo. ----
         conservar = []
         for d in dirs:
-            if _RE_HUS_DIR.match(d):  # carpeta de UNA factura
-                if not any(pat.search(d) for pat in patrones.values()):
-                    continue  # es de otra factura: no entrar (aquí está el ahorro)
-            elif meses and _RE_MES_DIR.match(d) and d not in meses:
-                continue  # mes que no nos interesa
-            else:
-                menv = _RE_ENV_DIR.fullmatch(d) or _RE_ENV_DIR.match(d)
-                if envios and menv:
-                    e = menv.group(1)
-                    if e not in envios and normalizar_factura(e) not in envios:
-                        continue  # envío ajeno
+            if _RE_HUS_DIR.match(d) and not any(pat.search(d) for pat in patrones.values()):
+                continue  # carpeta de otra factura: no entrar (aqui esta el ahorro)
             conservar.append(d)
         dirs[:] = conservar
         # ---- clasificar archivos de esta carpeta ----
@@ -660,26 +644,33 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
     print(f"  Base soportes:      {soportes_base}")
 
     norms = {normalizar_factura(fac) for _, fac, _, _ in facturas}
-    envios = {normalizar_factura(e) for _, _, e, _ in facturas if e}
-    meses = {m for _, _, _, m in facturas if m}
-    # los soportes de junio/julio también pueden estar en el mes de radicación
-    meses |= {_mes_adyacente(m, d) for m in list(meses) for d in (-1, 1)}
-    meses.discard("")
 
     # 1) FACTURAS/JSON: ir DIRECTO a la carpeta de cada factura (rapidísimo)
     print("  [1/2] Buscando los JSON de RIPS (directo por carpeta)...", flush=True)
     directo = [(fac, normalizar_factura(fac), mes) for _, fac, _, mes in facturas]
     idx_fact, faltan = indexar_directo(facturas_base, directo)
     if faltan:
-        print(
-            f"        {len(faltan)} sin ruta directa: buscando en el arbol (podado)...", flush=True
-        )
-        extra = indexar_arbol(facturas_base, faltan, meses=meses, etiqueta="facturas")
+        print(f"        {len(faltan)} sin ruta directa: buscando en el arbol...", flush=True)
+        extra = indexar_arbol(facturas_base, faltan, etiqueta="facturas")
         _fundir(idx_fact, extra)
 
-    # 2) SOPORTES: recorrido podado (salta facturas/envios/meses ajenos)
-    print("  [2/2] Buscando los soportes OPF/PDE (arbol podado, con progreso)...", flush=True)
-    idx_sop = indexar_arbol(soportes_base, norms, envios=envios, meses=meses, etiqueta="soportes")
+    # 2) SOPORTES: recorrido del arbol (salta solo las facturas ajenas). Los
+    #    soportes tambien pueden estar en la base de facturas -> se fusiona.
+    print("  [2/2] Buscando los soportes OPF/PDE (con progreso)...", flush=True)
+    idx_sop = indexar_arbol(soportes_base, norms, etiqueta="soportes")
+    _fundir(idx_sop, {n: idx_fact.get(n, _slot_vacio()) for n in norms})
+
+    con_json = sum(1 for n in norms if idx_fact.get(n, {}).get("json"))
+    con_sop = sum(
+        1 for n in norms if (idx_sop.get(n, {}).get("opf") or idx_sop.get(n, {}).get("pde"))
+    )
+    print("-" * 66)
+    print(f"  JSON de RIPS encontrados:   {con_json} de {len(norms)}")
+    print(f"  Soportes OPF/PDE encontrados: {con_sop} de {len(norms)}")
+    if con_sop == 0:
+        print("  [OJO] No se hallo ningun soporte. Revisa la carpeta de soportes:")
+        print("        deben existir archivos OPF_*_<FACTURA>.pdf / PDE_*_<FACTURA>.pdf")
+        print(f"        por debajo de: {soportes_base}")
     print("-" * 66)
 
     verde = PatternFill("solid", fgColor="E2EFDA")

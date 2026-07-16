@@ -379,3 +379,18 @@ def test_motor_embebido_en_cmd_identico_al_py():
     embebido = "\n".join(lineas[idx + 1 :]).strip("\n")
     fuente = _MOTOR.read_text(encoding="utf-8").replace("\r\n", "\n").strip("\n")
     assert embebido == fuente, "regenerar AUDITAR_DEV_EPS.cmd: difiere del .py"
+
+
+def test_soportes_se_hallan_aunque_el_envio_no_coincida(tmp_path):
+    """Regresion: antes se podaba por envio y si el envio de la carpeta no era
+    el del Excel, no hallaba NINGUN soporte. Ahora debe hallarlos igual."""
+    mod = _cargar()
+    # el Excel dice envio 230601, pero el soporte esta archivado en ENV-999888
+    sd = tmp_path / "NUEVA EPS" / "GESTOR" / "ENV-999888-XX" / "SOPORTES" / "HUS532392"
+    sd.mkdir(parents=True)
+    (sd / "OPF_900006037_HUS532392.pdf").write_bytes(b"%PDF")
+    (sd / "PDE_900006037_HUS532392.pdf").write_bytes(b"%PDF")
+    norm = mod.normalizar_factura("HUS532392")
+    idx = mod.indexar_arbol(tmp_path, {norm})
+    assert len(idx[norm]["opf"]) == 1
+    assert len(idx[norm]["pde"]) == 1
