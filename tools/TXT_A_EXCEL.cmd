@@ -33,10 +33,14 @@ if not defined PYEXE ( python3 -c "import sys" >nul 2>&1 && set "PYEXE=python3" 
 if not defined PYEXE goto instalarpython
 
 :deps
-REM --- 2) Asegurar openpyxl (para el Excel) ---------------------------
+REM --- 2) Asegurar openpyxl (para el Excel), verificando que quedo ----
 %PYEXE% -c "import openpyxl" >nul 2>&1 && goto motor
 echo [i] Instalando el componente de Excel (openpyxl) por unica vez, espera...
 %PYEXE% -m pip install --quiet --user openpyxl >nul 2>&1
+%PYEXE% -c "import openpyxl" >nul 2>&1 && goto motor
+echo [ATENCION] No quedo instalado openpyxl (revisa el internet). Los .csv
+echo            saldran bien, pero los .xlsx pueden fallar en esta corrida.
+echo.
 
 :motor
 REM --- 3) Localizar el motor Python -----------------------------------
@@ -53,21 +57,29 @@ if not exist "%MOTOR%" goto sinmotor
 
 :pedir
 REM --- 4) Pedir carpeta (por defecto, donde esta este .cmd) -----------
-set "CARPETA=%~dp0"
-if "%CARPETA:~-1%"=="\" set "CARPETA=%CARPETA:~0,-1%"
+set "DEFCARP=%~dp0"
+if "%DEFCARP:~-1%"=="\" set "DEFCARP=%DEFCARP:~0,-1%"
+set "CARPETA=%DEFCARP%"
 echo   Carpeta a procesar (Enter para usar la carpeta de este .cmd):
-echo   [%CARPETA%]
+setlocal EnableDelayedExpansion
+echo   [!CARPETA!]
+endlocal
 set /p "CARPETA=  Ruta: "
 set "CARPETA=%CARPETA:"=%"
-if "%CARPETA:~-1%"=="\" set "CARPETA=%CARPETA:~0,-1%"
+if not defined CARPETA set "CARPETA=%DEFCARP%"
+:quitarbs
+if "%CARPETA:~-1%"=="\" ( set "CARPETA=%CARPETA:~0,-1%" & goto quitarbs )
+if not defined CARPETA set "CARPETA=%DEFCARP%"
 if "%CARPETA:~-1%"==":" set "CARPETA=%CARPETA%/"
 echo.
 set "RECUR=S"
 set /p "RECUR=  Incluir subcarpetas? (S/N, Enter = S): "
+set "RECUR=%RECUR:"=%"
+if not defined RECUR set "RECUR=S"
 echo.
 
 REM --- 5) Ejecutar -----------------------------------------------------
-if /i "%RECUR%"=="N" (
+if /i "%RECUR:~0,1%"=="N" (
   %PYEXE% "%MOTOR%" "%CARPETA%" --sin-recursion
 ) else (
   %PYEXE% "%MOTOR%" "%CARPETA%"
@@ -145,7 +157,9 @@ nunca se toca; junto a él quedan NOMBRE.csv y NOMBRE.xlsx.
 
 Cómo parte las columnas (por archivo, automático):
 
-    1. Si el .txt ya viene delimitado (TAB, ";", "|" o ","), usa ese signo.
+    1. Si el .txt ya viene delimitado (TAB, ";", "|" o ","), parte por ese
+       signo TAL CUAL (sin interpretar comillas: una pulgada escrita como
+       5" en un insumo no daña el registro).
     2. Si no, detecta el ANCHO FIJO: las posiciones que son espacio en TODAS
        las líneas marcan la frontera entre columnas (reportes alineados).
     3. Si tampoco, parte por tandas de 2+ espacios; y en el peor caso cada
@@ -153,11 +167,12 @@ Cómo parte las columnas (por archivo, automático):
 
 Reglas de seguridad (datos de facturación):
 
-    - El .csv va delimitado por comas tal cual (comillas solo si el dato trae
-      coma), en ANSI (cp1252), que es lo que esperan las plataformas.
-    - En el .xlsx, los códigos con ceros a la izquierda (HUS0000533470, 001)
-      y los números de más de 15 dígitos (NIT, CUFE) quedan como TEXTO.
-      Lo ambiguo tipo 480.200 no se toca. En el .csv todo va textual.
+    - El .csv va delimitado por comas, fiel al dato: comillas solo se agregan
+      si el dato trae coma o salto de línea. Sale en ANSI (cp1252), que es lo
+      que esperan las plataformas; si un dato no cabe en ANSI se avisa.
+    - En el .xlsx, los códigos con ceros a la izquierda (HUS0000533470, 001,
+      007.10) y los números de más de 15 dígitos (NIT, CUFE) quedan como
+      TEXTO. Lo ambiguo tipo 480.200 no se toca. En el .csv todo va textual.
     - Si el NOMBRE.csv / NOMBRE.xlsx destino ya existe y NO lo generó este
       bot, se omite (jamás pisa un archivo ajeno). Los del bot sí se refrescan.
 
@@ -174,8 +189,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import csv
-import io
 import re
 import sys
 from pathlib import Path
@@ -194,7 +207,10 @@ _RE_DOS_ESPACIOS = re.compile(r" {2,}")
 
 
 def decodificar(crudo: bytes) -> str:
-    """UTF-8 (con o sin BOM) y, si no, cp1252 (tildes típicas de Windows)."""
+    """UTF-16 (Notepad 'Unicode'), UTF-8 (con o sin BOM) o cp1252 (ANSI)."""
+    if crudo.startswith(b"\xff\xfe") or crudo.startswith(b"\xfe\xff"):
+        with contextlib.suppress(UnicodeDecodeError):
+            return crudo.decode("utf-16")
     for cod in ("utf-8-sig", "cp1252"):
         try:
             return crudo.decode(cod)
@@ -214,67 +230,87 @@ def lineas_datos(texto: str) -> list[str]:
 
 
 def detectar_delimitador(lineas: list[str]) -> str | None:
-    """El delimitador si el archivo YA viene delimitado; None si es de espacios."""
+    """El delimitador si el archivo YA viene delimitado; None si es de espacios.
+
+    Una sola coma por línea seguida de espacio suele ser texto ('PEREZ, JUAN'),
+    no delimitador. TAB, ';' y '|' son estructurales y ganan el empate.
+    """
     muestra = lineas[:30]
-    mejor, mejor_puntaje = None, 0.0
-    for d in DELIMITADORES:
+    candidatos = []
+    for idx, d in enumerate(DELIMITADORES):
         cuentas = [ln.count(d) for ln in muestra]
         if not cuentas or max(cuentas) == 0:
             continue
         moda = max(set(cuentas), key=cuentas.count)
         if moda == 0:
             continue
+        if d == "," and moda == 1:
+            con_texto = sum(1 for ln in muestra if ", " in ln) / len(muestra)
+            if con_texto >= 0.5:
+                continue  # 'PEREZ, JUAN': es coma de texto, no delimitador
         consistencia = cuentas.count(moda) / len(cuentas)
         if consistencia < 0.7:
             continue  # aparece suelto: no es el delimitador del archivo
-        puntaje = consistencia * 100 + moda
-        if puntaje > mejor_puntaje:
-            mejor_puntaje, mejor = puntaje, d
-    return mejor
+        estructural = 0 if d == "," else 1
+        candidatos.append((estructural, consistencia, moda, -idx, d))
+    return max(candidatos)[4] if candidatos else None
 
 
 def cortes_ancho_fijo(lineas: list[str]) -> list[tuple[int, int | None]]:
-    """Campos (ini, fin) de un reporte alineado: las posiciones que son espacio
-    en TODAS las líneas de la muestra separan las columnas."""
-    muestra = lineas[:400]
-    ancho = max(len(ln) for ln in muestra)
-    perfil = [True] * ancho  # True = espacio en todas las líneas
-    for ln in muestra:
-        for i, ch in enumerate(ln):
-            if ch != " " and perfil[i]:
-                perfil[i] = False
-    campos: list[tuple[int, int | None]] = []
+    """Campos (ini, fin) de un reporte alineado. Solo separan columnas las
+    BANDAS de 2+ espacios que lo son en TODAS las líneas: un espacio suelto
+    (el interior de 'GLOSA TOTAL 999') no parte el dato. Se revisan TODAS
+    las líneas para no truncar datos que solo aparecen tarde en el archivo."""
+    ancho = max(len(ln) for ln in lineas)
+    candidatas = set(range(ancho))  # posiciones que siguen siendo espacio en todas
+    for ln in lineas:
+        if not candidatas:
+            break
+        quitar = [i for i in candidatas if i < len(ln) and ln[i] != " "]
+        candidatas.difference_update(quitar)
+    separadores: list[tuple[int, int]] = []
     i = 0
     while i < ancho:
-        if not perfil[i]:
+        if i in candidatas:
             j = i
-            while j < ancho and not perfil[j]:
+            while j < ancho and j in candidatas:
                 j += 1
-            campos.append((i, j))
+            if j - i >= 2:
+                separadores.append((i, j))
             i = j
         else:
             i += 1
+    campos: list[tuple[int, int | None]] = []
+    pos = 0
+    for a, b in separadores:
+        if a > pos:
+            campos.append((pos, a))
+        pos = b
+    if pos < ancho:
+        campos.append((pos, ancho))
     if campos:
-        # el último campo llega hasta el final real de cada línea, por si
-        # alguna línea fuera de la muestra es más larga
+        # el último campo llega hasta el final real de cada línea
         campos[-1] = (campos[-1][0], None)
     return campos
 
 
 def partir_lineas(lineas: list[str], delimitador: str | None = None) -> tuple[list[list[str]], str]:
-    """Parte las líneas en campos. Devuelve (filas, método usado)."""
+    """Parte las líneas en campos. Devuelve (filas, método usado).
+
+    Con delimitador se usa un corte plano (sin interpretar comillas): es lo
+    que hacen las plataformas y no daña datos con " (pulgadas, medidas).
+    """
     d = delimitador or detectar_delimitador(lineas)
     if d:
-        csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
-        crudas = csv.reader(io.StringIO("\n".join(lineas)), delimiter=d)
-        filas = [[c.strip() for c in f] for f in crudas if f]
+        filas = [[c.strip() for c in ln.split(d)] for ln in lineas]
         nombres = {"\t": "TAB", ",": "comas"}
         return filas, nombres.get(d, d)
 
-    campos = cortes_ancho_fijo(lineas)
-    if len(campos) >= 2:
-        filas = [[ln[a:b].strip() for a, b in campos] for ln in lineas]
-        return filas, "ancho fijo"
+    if len(lineas) >= 3:  # con menos líneas no hay evidencia de alineación
+        campos = cortes_ancho_fijo(lineas)
+        if len(campos) >= 2:
+            filas = [[ln[a:b].strip() for a, b in campos] for ln in lineas]
+            return filas, "ancho fijo"
 
     filas = [_RE_DOS_ESPACIOS.split(ln.strip()) for ln in lineas]
     if max(len(f) for f in filas) >= 2:
@@ -296,7 +332,13 @@ def valor_celda(campo: str):
             return t  # Excel pierde precisión: NIT largos, CUFE, etc.
         return int(t)
     if _RE_DECIMAL.fullmatch(t):
-        if t.lstrip("-").startswith("0."):
+        sin_signo = t.lstrip("-")
+        entera = sin_signo.split(".", 1)[0]
+        if len(entera) > 1 and entera.startswith("0"):
+            return t  # 007.10: código, no cantidad
+        if len(sin_signo.replace(".", "")) > 15:
+            return t  # demasiados dígitos: Excel lo dañaría
+        if sin_signo.startswith("0."):
             return float(t)
         if _RE_MILES_AMBIGUO.fullmatch(t):
             return t  # 480.200 podría ser 480200: en la duda, texto
@@ -348,16 +390,25 @@ def _anchos_columnas(valores: list[list], max_col: int) -> list[int]:
     return [min(60, max(8, a + 2)) for a in anchos]
 
 
-def escribir_csv(filas: list[list[str]], destino: Path) -> None:
-    """CSV delimitado por comas, en ANSI (cp1252): es lo que esperan las
-    plataformas y lo que Excel asume al abrir un .csv sin BOM."""
-    datos = io.StringIO()
-    csv.writer(datos).writerows(filas)
-    contenido = datos.getvalue()
+def _campo_csv(campo: str) -> str:
+    """Comillas SOLO si el dato trae coma o salto de línea; una comilla suelta
+    en el dato (5" de pulgada) se deja tal cual, fiel al original."""
+    if "," in campo or "\n" in campo or "\r" in campo:
+        return '"' + campo.replace('"', '""') + '"'
+    return campo
+
+
+def escribir_csv(filas: list[list[str]], destino: Path) -> str:
+    """CSV delimitado por comas en ANSI (cp1252), que es lo que esperan las
+    plataformas. Devuelve una nota si tocó usar UTF-8."""
+    lineas = [",".join(_campo_csv(c) for c in f) for f in filas]
+    contenido = "\r\n".join(lineas) + "\r\n"
+    nota = ""
     try:
         crudo = contenido.encode("cp1252")
     except UnicodeEncodeError:
-        crudo = contenido.encode("utf-8-sig")  # tiene caracteres fuera de ANSI
+        crudo = contenido.encode("utf-8-sig")
+        nota = "csv en UTF-8: trae caracteres que no existen en ANSI"
     tmp = destino.with_name(destino.name + ".tmp")
     try:
         tmp.write_bytes(crudo)
@@ -366,6 +417,7 @@ def escribir_csv(filas: list[list[str]], destino: Path) -> None:
         with contextlib.suppress(OSError):
             tmp.unlink()
         raise
+    return nota
 
 
 def escribir_xlsx(filas: list[list[str]], destino: Path) -> str:
@@ -446,7 +498,7 @@ def convertir_uno(ruta: Path, delimitador: str | None = None, simulacro: bool = 
     res["columnas"] = max(len(f) for f in filas)
     res["metodo"] = metodo
 
-    # Jamás pisar archivos ajenos: la marca vive en el .xlsx del par.
+    # Jamás pisar archivos ajenos: la marca del par vive en el .xlsx.
     nuestro = destino_xlsx.exists() and es_del_bot(destino_xlsx)
     if destino_xlsx.exists() and not nuestro:
         res.update(
@@ -454,25 +506,38 @@ def convertir_uno(ruta: Path, delimitador: str | None = None, simulacro: bool = 
         )
         return res
     if destino_csv.exists() and not nuestro:
-        res.update(estado="omitido", motivo=f"ya existe {destino_csv.name} y no lo genero este bot")
+        res.update(
+            estado="omitido",
+            motivo=f"ya existe {destino_csv.name} sin su Excel del bot; borralo para regenerarlo",
+        )
         return res
     if simulacro:
         res["estado"] = "simulacro"
         return res
 
-    try:
-        escribir_csv(filas, destino_csv)
-    except Exception as exc:
-        res.update(estado="error", motivo=f"no se pudo escribir el .csv ({type(exc).__name__})")
-        return res
+    # Primero el .xlsx (lleva la marca del par); luego el .csv.
+    notas = []
+    error_xlsx = ""
     try:
         nota = escribir_xlsx(filas, destino_xlsx)
         if nota:
-            res["motivo"] = nota
+            notas.append(nota)
     except Exception as exc:
-        res.update(
-            estado="error", motivo=f"el .csv quedo, pero fallo el Excel ({type(exc).__name__})"
-        )
+        error_xlsx = f"fallo el Excel ({type(exc).__name__})"
+    try:
+        nota = escribir_csv(filas, destino_csv)
+        if nota:
+            notas.append(nota)
+    except Exception as exc:
+        detalle = f"no se pudo escribir el .csv ({type(exc).__name__})"
+        if error_xlsx:
+            detalle += f"; ademas {error_xlsx}"
+        res.update(estado="error", motivo=detalle)
+        return res
+    if error_xlsx:
+        res.update(estado="error", motivo=f"el .csv quedo bien, pero {error_xlsx}")
+        return res
+    res["motivo"] = " · ".join(notas)
     return res
 
 
@@ -509,8 +574,7 @@ def procesar(
             ok += 1
             extra = f"  [{r['motivo']}]" if r["motivo"] else ""
             print(
-                f"  ✓ {rel}  ->  .csv + .xlsx"
-                f"  ({r['filas']} fila(s) x {r['columnas']} col, {r['metodo']}){extra}"
+                f"  ✓ {rel}  ->  .csv + .xlsx  ({r['filas']} fila(s) x {r['columnas']} col, {r['metodo']}){extra}"
             )
         elif r["estado"] == "omitido":
             omitidos += 1
@@ -524,7 +588,7 @@ def procesar(
     if simulacro:
         print("  (simulacro: nada quedo escrito)")
     print("=" * 66)
-    return 0
+    return 0 if errores == 0 else 1
 
 
 def main(argv: list[str] | None = None) -> int:

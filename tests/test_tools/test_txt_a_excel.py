@@ -199,6 +199,93 @@ def test_muchas_filas_se_reparten_en_hojas(tmp_path):
     wb.close()
 
 
+def test_comillas_de_pulgadas_no_danan_el_registro(tmp_path):
+    """Una comilla suelta (5" de pulgada en un insumo) NO debe fusionar
+    registros ni desaparecer: el corte es plano, sin interpretar comillas."""
+    contenido = 'HUS311371,169895,2,"5 CATETER,1,69700,69700,69700\r\nHUS311372,169895,2,SONDA "ARROW",1,643400,643400,643400\r\n'
+    (tmp_path / "f.txt").write_bytes(contenido.encode("cp1252"))
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+
+    # el .csv reproduce las lineas TAL CUAL, byte a byte (fiel para la plataforma)
+    crudo = (tmp_path / "f.csv").read_bytes().decode("cp1252")
+    assert crudo == contenido
+    assert len(crudo.strip().splitlines()) == 2  # nada de fusionar registros
+    celdas = _celdas(tmp_path / "f.xlsx")
+    assert celdas[0][3] == '"5 CATETER'  # la comilla sobrevive
+    assert celdas[1][3] == 'SONDA "ARROW"'
+
+
+def test_nombre_con_coma_no_engana_al_detector(tmp_path):
+    """'PEREZ, JUAN' (una coma por linea) no debe volverse el delimitador:
+    el reporte de ancho fijo debe cortarse por sus columnas."""
+    lineas = ["FACTURA        PACIENTE            VALOR"]
+    for i in range(20):
+        lineas.append(f"HUS000053{i:04d}  PEREZ, JUAN {i:03d}     480200")
+    (tmp_path / "r.txt").write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+
+    filas = _filas_csv(tmp_path / "r.csv")
+    assert filas[0] == ["FACTURA", "PACIENTE", "VALOR"]
+    assert filas[1] == ["HUS0000530000", "PEREZ, JUAN 000", "480200"]
+    assert all(len(f) == 3 for f in filas)
+
+
+def test_ancho_fijo_no_trunca_datos_tardios(tmp_path):
+    """Una columna que solo trae datos despues de la linea 400 no se pierde
+    (el perfil de columnas se calcula con TODAS las lineas)."""
+    lineas = ["FACTURA        VALOR    OBS"]
+    for i in range(440):
+        lineas.append(f"HUS{i:010d}  480200   ")
+    lineas.append("HUS9999999999  480649   GLOSA TOTAL 999")
+    (tmp_path / "g.txt").write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+
+    filas = _filas_csv(tmp_path / "g.csv")
+    assert filas[-1] == ["HUS9999999999", "480649", "GLOSA TOTAL 999"]  # completo
+
+
+def test_utf16_de_notepad_se_decodifica(tmp_path):
+    (tmp_path / "u.txt").write_bytes("HUS311371,169895,2,19624\r\n".encode("utf-16"))
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+    assert _filas_csv(tmp_path / "u.csv")[0] == ["HUS311371", "169895", "2", "19624"]
+
+
+def test_bom_utf8_no_contamina_el_primer_campo(tmp_path):
+    (tmp_path / "b.txt").write_bytes(b"\xef\xbb\xbf" + b"HUS311371,169895,2\r\n")
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+    assert _filas_csv(tmp_path / "b.csv")[0][0] == "HUS311371"
+
+
+def test_encabezado_negrita_y_freeze_solo_cuando_aplica(tmp_path):
+    from openpyxl import load_workbook
+
+    (tmp_path / "con.txt").write_text("FACTURA;VALOR\nHUS1;480200\n", encoding="utf-8")
+    (tmp_path / "sin.txt").write_text("HUS1;480200\nHUS2;190000\n", encoding="utf-8")
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+
+    wb = load_workbook(tmp_path / "con.xlsx")
+    assert wb.active["A1"].font.bold and wb.active.freeze_panes == "A2"
+    wb.close()
+    wb = load_workbook(tmp_path / "sin.xlsx")
+    assert not wb.active["A1"].font.bold and wb.active.freeze_panes is None
+    wb.close()
+
+
+def test_csv_huerfano_sin_su_excel_no_se_pisa(tmp_path):
+    (tmp_path / "d.txt").write_text("a,b,c\n1,2,3\n", encoding="utf-8")
+    (tmp_path / "d.csv").write_text("csv ajeno", encoding="utf-8")  # sin d.xlsx
+    mod = _cargar_modulo()
+    assert mod.main([str(tmp_path)]) == 0
+    assert (tmp_path / "d.csv").read_text(encoding="utf-8") == "csv ajeno"  # intacto
+    assert not (tmp_path / "d.xlsx").exists()
+
+
 def test_motor_embebido_en_cmd_identico_al_py():
     """La copia embebida tras #PYSTART# en TXT_A_EXCEL.cmd debe ser el .py exacto."""
     cmd_path = _RAIZ / "tools" / "TXT_A_EXCEL.cmd"
