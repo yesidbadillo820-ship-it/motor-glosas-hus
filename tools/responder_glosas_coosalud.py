@@ -152,6 +152,14 @@ COLUMNAS = {
     "obs_rta": {"OBSERVACION RTA GLOSA", "OBSERVACION RESPUESTA GLOSA"},
 }
 
+# Códigos de respuesta que NO requieren adjuntar soporte, aunque la glosa
+# original sea de tipo_glosa == SOPORTES. RE9502 = glosa extemporánea
+# (aceptación tácita por radicación fuera de términos): la glosa se rechaza
+# por vencimiento del plazo legal, no por falta de soporte clínico, así que
+# el portal no espera ningún PDF. Sin esto, esas glosas quedaban PENDIENTE_PDX
+# buscando un soporte que no corresponde.
+CODIGOS_SIN_SOPORTE = {"RE9502"}
+
 
 def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str, dict]:
     """Devuelve {factura: {"grupos": [...], "calidad": N}} donde cada grupo es
@@ -174,8 +182,19 @@ def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str
         sys.exit(2)
 
     wb = load_workbook(filename=str(ruta), data_only=True, read_only=True)
+    # Match del nombre de hoja tolerante a mayus/minus y espacios: los
+    # Excel exportados por Power Query suelen traer nombres inconsistentes
+    # ('BASE ' con espacio al final, 'CALIDAD', etc.). Asi '--hoja BASE'
+    # encuentra la hoja 'BASE ' sin que el usuario tenga que adivinar el
+    # nombre exacto con el espacio.
     if hoja not in wb.sheetnames:
-        raise ValueError(f"El Excel no tiene la hoja '{hoja}'. Hojas: {wb.sheetnames}")
+        objetivo = hoja.strip().casefold()
+        real = next((s for s in wb.sheetnames if s.strip().casefold() == objetivo), None)
+        if real is None:
+            raise ValueError(f"El Excel no tiene la hoja '{hoja}'. Hojas: {wb.sheetnames}")
+        if real != hoja:
+            logger.info(f"  Hoja '{hoja}' → uso '{real}' (match tolerante a espacios/mayusculas).")
+        hoja = real
     ws = wb[hoja]
     rows = ws.iter_rows(values_only=True)
     headers = [_norm_header(str(h or "")) for h in next(rows)]
@@ -226,7 +245,11 @@ def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str
             }
             grupos_por_fac[fac][key] = g
         g["ids"].append(id_glosa)
-        if tipo == "SOPORTES":
+        # Solo exigimos soporte si la glosa es de tipo SOPORTES Y el código de
+        # respuesta efectivamente lo requiere. Para RE9502 (extemporánea) no se
+        # sube soporte, así que no marcamos es_soporte y la glosa se responde y
+        # cierra normal en vez de quedar PENDIENTE_PDX.
+        if tipo == "SOPORTES" and g["cod_corto"] not in CODIGOS_SIN_SOPORTE:
             g["es_soporte"] = True
 
     todas = set(grupos_por_fac) | set(calidad_por_fac)
