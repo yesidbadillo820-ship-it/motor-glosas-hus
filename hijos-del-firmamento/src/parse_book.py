@@ -76,30 +76,45 @@ def is_corrupt_token(tok):
     return False
 
 
-# Conjunto curado de tokens dañados detectados en la auditoría (respaldo del
-# detector heurístico, para el manuscrito actual).  Con un manuscrito limpio,
-# este conjunto simplemente no se activa.
-KNOWN_CORRUPT = {
-    "Yaloleí",
-    "Yomereí",
-    "Yomecallé",
-    "Yomedetuve",
-    "Yolamiré",
-    "Yosalté",
-    "Yotampoco",
-    "Yosabíaperfectamenteloqueganaba",
-    "Teníarazón",
-    "Volveríaahacerlo",
-    "Vacíauna",
-    "Todoslosjueves",
-    "DonTuliosequedópensando",
-    "conelsombreroenlasmanos",
-    "Ledijeolvídaloamiesposaparanotenerque",
-    "quélindo",
-    "mirepues",
-    "esoque",
-    "elarchivo",
-    "loscuadernos",
+# --- Restauración de ESPACIOS perdidos (puro re-espaciado; NO cambia letras) --
+# Verificado: para cada entrada, quitar los espacios reproduce exactamente el
+# token dañado.  Es la misma clase de reparación mecánica que los guiones y los
+# párrafos: restituye límites de palabra que el volcado borró, sin tocar el texto.
+SAFE_RESPACE = {
+    "Yaloleí": "Ya lo leí",
+    "Yodije": "Yo dije",
+    "Yolamiré": "Yo la miré",
+    "Yolepuse": "Yo le puse",
+    "Yomecallé": "Yo me callé",
+    "Yomedetuve": "Yo me detuve",
+    "Yomereí": "Yo me reí",
+    "Yosalté": "Yo salté",
+    "Yosonreí": "Yo sonreí",
+    "Yotampoco": "Yo tampoco",
+    "Yoteníarazón": "Yo tenía razón",
+    "Yosabíaperfectamenteloqueganaba": "Yo sabía perfectamente lo que ganaba",
+    "Yotuvequeapurarelpaso": "Yo tuve que apurar el paso",
+    "yyosoymásalto": "y yo soy más alto",
+    "Teníarazón": "Tenía razón",
+    "Teestoycontando": "Te estoy contando",
+    "Todoslosjueves": "Todos los jueves",
+    "Veinteminutos": "Veinte minutos",
+    "Volveríaahacerlo": "Volvería a hacerlo",
+    "Vacíauna": "Vacía una",
+    "DonTuliosequedópensando": "Don Tulio se quedó pensando",
+    "conelsombreroenlasmanos": "con el sombrero en las manos",
+    "Ledijeolvídaloamiesposaparanotenerque": "Le dije olvídalo a mi esposa para no tener que",
+    "Caminarapidísimo": "Camina rapidísimo",
+    "quélindo": "qué lindo",
+    "mirepues": "mire pues",
+    "esoque": "eso que",
+    "elarchivo": "el archivo",
+    "loscuadernos": "los cuadernos",
+}
+
+# --- Palabras con LETRAS BARAJADAS: irrecuperables sin el original del autor. --
+# NO se reparan; se catalogan y se señalan en el PDF de revisión.
+SCRAMBLED = {
     "reaszótrna",
     "mesecnritbiríad",
     "comnienngtúanrio",
@@ -128,6 +143,37 @@ KNOWN_CORRUPT = {
     "ELos",
     "bídecirle",
 }
+# Sólo se MARCAN las barajadas (las de espacios ya quedan restauradas en el texto).
+KNOWN_CORRUPT = SCRAMBLED
+
+# Re-espaciado tras puntuación que también perdió su espacio (coma, punto, etc.).
+_PUNCT_SPACE = [
+    (re.compile(r"([,;:])(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ¿¡])"), r"\1 "),
+    (re.compile(r"([.!?…])(?=[A-ZÁÉÍÓÚÜÑ¿¡])"), r"\1 "),
+]
+_SAFE_RE = None
+
+
+def restore_spacing(s, log):
+    """Restituye los espacios perdidos (tokens verificados + tras puntuación)."""
+    global _SAFE_RE
+    if _SAFE_RE is None:
+        keys = sorted(SAFE_RESPACE, key=len, reverse=True)
+        _SAFE_RE = re.compile(
+            r"(?<![\wÁÉÍÓÚÜÑáéíóúüñ])("
+            + "|".join(re.escape(k) for k in keys)
+            + r")(?![\wÁÉÍÓÚÜÑáéíóúüñ])"
+        )
+
+    def rep(m):
+        r = SAFE_RESPACE[m.group(1)]
+        log.append(("respace", m.group(1), r))
+        return r
+
+    s = _SAFE_RE.sub(rep, s)
+    for rgx, repl in _PUNCT_SPACE:
+        s = rgx.sub(repl, s)
+    return s
 
 
 def flag_corrupt(text):
@@ -246,7 +292,7 @@ def reconstruct(fragments, log):
     final = []
     for item in out:
         if item[0] == "para":
-            final.append(("para", _dehyphenate(item[1], log)))
+            final.append(("para", restore_spacing(_dehyphenate(item[1], log), log)))
         else:
             final.append(item)
     return final
@@ -265,10 +311,12 @@ def parse():
     log = []
     corrupt = []  # (loc, token)
 
-    # localizar corrupción por índice de párrafo (para el informe)
+    # localizar la corrupción PENDIENTE (barajadas) por índice de párrafo, para
+    # el informe. Las de espacios ya se restauran en el texto; aquí sólo van las
+    # que requieren al autor (set curado y verificado).
     for i, p in enumerate(ps):
         for tok in re.findall(r"[\wÁÉÍÓÚÜÑáéíóúüñ]+", p.text):
-            if is_corrupt_token(tok) or tok in KNOWN_CORRUPT:
+            if tok in SCRAMBLED:
                 corrupt.append((i, tok))
 
     blocks = []
