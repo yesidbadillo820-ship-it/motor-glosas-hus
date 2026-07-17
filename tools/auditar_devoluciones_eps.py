@@ -470,6 +470,36 @@ def indexar_arbol(base: Path, facturas_norm: set[str], etiqueta: str = "") -> di
     return indice
 
 
+def diagnostico_soportes(base: Path) -> None:
+    """Cuando no se halla ningun soporte, dice qué se ve realmente bajo `base`
+    (para saber si la ruta es la correcta y cómo se llaman los archivos)."""
+    print("  [DIAGNOSTICO] Revisando qué hay en la carpeta de soportes...", flush=True)
+    if not base or not _es_dir(base):
+        print(f"  [DIAGNOSTICO] La ruta NO existe o no es accesible: {base}")
+        print("               Verifica que la unidad (p. ej. Y:) este conectada.")
+        return
+    carpetas = pdfs = 0
+    ejemplos = []
+    for root, _dirs, files in os.walk(str(base), onerror=lambda _e: None):
+        carpetas += 1
+        for fn in files:
+            if fn.lower().endswith(".pdf"):
+                pdfs += 1
+                if len(ejemplos) < 12:
+                    ejemplos.append(str(Path(root) / fn))
+        if carpetas >= 40000 or len(ejemplos) >= 12:
+            break
+    print(f"  [DIAGNOSTICO] Carpetas revisadas: {carpetas}   PDFs vistos: {pdfs}")
+    if ejemplos:
+        print("  [DIAGNOSTICO] Ejemplos de PDF encontrados (asi se llaman):")
+        for e in ejemplos:
+            print(f"                {e}")
+        print("  [DIAGNOSTICO] Si estos NO son los soportes de estas facturas, la")
+        print("               ruta de soportes esta equivocada; usa la carpeta correcta.")
+    else:
+        print("  [DIAGNOSTICO] No hay NINGUN PDF bajo esa ruta: es la carpeta equivocada.")
+
+
 def _fundir(dst: dict, extra: dict) -> None:
     """Suma al índice `dst` lo que traiga `extra` (para completar lo que el
     modo directo no encontró usando el recorrido podado)."""
@@ -662,15 +692,20 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
 
     con_json = sum(1 for n in norms if idx_fact.get(n, {}).get("json"))
     con_sop = sum(
-        1 for n in norms if (idx_sop.get(n, {}).get("opf") or idx_sop.get(n, {}).get("pde"))
+        1
+        for n in norms
+        if (
+            idx_sop.get(n, {}).get("opf")
+            or idx_sop.get(n, {}).get("pde")
+            or idx_sop.get(n, {}).get("otros")
+        )
     )
     print("-" * 66)
     print(f"  JSON de RIPS encontrados:   {con_json} de {len(norms)}")
     print(f"  Soportes OPF/PDE encontrados: {con_sop} de {len(norms)}")
     if con_sop == 0:
-        print("  [OJO] No se hallo ningun soporte. Revisa la carpeta de soportes:")
-        print("        deben existir archivos OPF_*_<FACTURA>.pdf / PDE_*_<FACTURA>.pdf")
-        print(f"        por debajo de: {soportes_base}")
+        print("  [OJO] No se hallo NINGUN soporte bajo la carpeta indicada.")
+        diagnostico_soportes(soportes_base)
     print("-" * 66)
 
     verde = PatternFill("solid", fgColor="E2EFDA")
@@ -695,14 +730,14 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
 
     for fila, fac, _envio, _mes in facturas:
         norm = normalizar_factura(fac)
-        arch_f = idx_fact.get(norm, {})
-        arch_s = idx_sop.get(norm, {})
-        pdfs = (
-            (arch_s.get("opf") or [])
-            + (arch_s.get("pde") or [])
-            + (arch_f.get("opf") or [])
-            + (arch_f.get("pde") or [])
-        )
+        arch_f = idx_fact.get(norm, {})  # el JSON viene de la base de facturas
+        arch_s = idx_sop.get(norm, {})  # soportes (ya fusionados con facturas)
+        pdfs, vistos_pdf = [], set()
+        for k in ("opf", "pde", "otros"):  # tambien PDFs con otro nombre
+            for p in arch_s.get(k) or []:
+                if str(p) not in vistos_pdf:
+                    vistos_pdf.add(str(p))
+                    pdfs.append(p)
 
         rips = (
             leer_rips(arch_f["json"])
