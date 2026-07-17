@@ -104,7 +104,7 @@ DEPTOS_DANE = {
 }
 
 TIPOS_DOC_VICTIMA = {"CC", "CE", "CN", "PA", "TI", "RC", "AS", "MS", "CD", "SC", "PE", "PT", "DE"}
-TIPOS_DOC_PROPIETARIO = {"CC", "CE", "CD", "DE", "SC", "PE", "PT", "NI", "TI", "NIT"}
+TIPOS_DOC_PROPIETARIO = {"CC", "CE", "CD", "DE", "SC", "PE", "PT", "NI", "TI"}
 TIPOS_DOC_CONDUCTOR = {"CC", "CE", "PA", "RC", "TI", "MS", "AS", "CD", "SC", "DE", "PE", "PT"}
 TIPOS_DOC_MEDICO = {"CC", "CE", "PE", "PA", "PT"}
 NATURALEZAS_EVENTO = {
@@ -152,7 +152,7 @@ TIPOS_SERVICIO_F2 = {
 }
 
 _RE_FECHA = re.compile(r"^\d{2}/\d{2}/\d{4}$")
-_RE_HORA = re.compile(r"^\d{1,2}:\d{2}$")
+_RE_HORA = re.compile(r"^\d{2}:\d{2}$")
 _RE_CIE10 = re.compile(r"^[A-Z]\d{2}[0-9A-Z]?$")
 _RE_PLACA = re.compile(r"^[A-Z0-9]{3,10}$")
 _RE_NUM = re.compile(r"^\d+$")
@@ -287,7 +287,7 @@ E1 = [
         6,
         None,
         None,
-        "NO",
+        "C_ESTANCIA",
     ),
     (
         39,
@@ -316,13 +316,13 @@ E1 = [
         None,
         "NO",
     ),
-    (42, "VI. Atención de la víctima", "Se prestó servicio UCI", 1, None, {"0", "1"}, "NO"),
+    (42, "VI. Atención de la víctima", "Se prestó servicio UCI", 1, None, {"0", "1"}, "C_UCI_F2"),
     (43, "VI. Atención de la víctima", "Días de UCI reclamados", 2, "num", None, "C_UCI"),
     (
         44,
         "VII. Propietario del vehículo",
         "Tipo documento del propietario",
-        3,
+        2,
         None,
         TIPOS_DOC_PROPIETARIO,
         "C_PROP",
@@ -658,13 +658,15 @@ TEXTO_OBLIG = {
     "C_VEH_NO3": "Obligatorio salvo vehículo fantasma (28=3)",
     "C_VEH_PLACA": "Obligatorio si estado aseg. = 1,2,4,6,7",
     "C_VEH_POLIZA": "Obligatorio si estado aseg. = 1,4,6",
-    "C_PROP": "Obligatorio si estado aseg. = 1,2,4,6,7",
-    "C_PROP_NAT": "Obligatorio (persona natural) si estado aseg. = 1,2,4,6,7",
+    "C_PROP": "Obligatorio si estado aseg. = 1,2,4,6 (con 7/8 se revisa)",
+    "C_PROP_NAT": "Obligatorio (persona natural) si estado aseg. = 1,2,4,6 (con 7/8 se revisa)",
     "C_COND": "Obligatorio si estado aseg. = 1,2,4,6,8",
     "C_REMISION": "Obligatorio si existe remisión (grupo IX)",
     "C_TRANSP": "Obligatorio si se cobra transporte primario",
     "C_QX": "Obligatorio si se facturan procedimientos quirúrgicos",
-    "C_UCI": "Obligatorio si se prestó UCI (campo 42=1)",
+    "C_UCI": "Obligatorio si se prestó UCI (campo 42=1 o UCI en FURIPS2)",
+    "C_ESTANCIA": "Obligatorio cuando se reclama estancia (líneas de estancia en FURIPS2)",
+    "C_UCI_F2": "Obligatorio cuando se factura estancia en UCI (FURIPS2)",
 }
 
 
@@ -681,10 +683,10 @@ def normalizar(texto: str) -> str:
 
 
 def norm_factura(valor: str) -> str:
-    """HUS0000374152 → HUS374152 (clave de cruce tolerante a ceros)."""
-    v = normalizar(valor).replace(" ", "")
-    m = re.match(r"^([A-Z]+)0*(\d+)$", v)
-    if m:
+    """HUS0000374152 / FE-00123 / 0001234 → clave tolerante a ceros y guiones."""
+    v = normalizar(valor).replace(" ", "").replace("-", "")
+    m = re.match(r"^([A-Z]*)0*(\d+)$", v)
+    if m and m.group(2):
         return m.group(1) + m.group(2)
     return v
 
@@ -769,10 +771,9 @@ def extraer_montos(texto: str) -> set[int]:
     for m in re.finditer(r"\$?\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{2})?|\d{4,})", texto):
         crudo = m.group(1)
         limpio = crudo
-        # quitar decimales ',00' / '.00' y separadores de miles
-        if re.search(r"[.,]\d{2}$", limpio) and (
-            "." in limpio[:-3] or "," in limpio[:-3] or len(limpio) > 6
-        ):
+        # quitar decimales ',00' / '.00' (un sufijo [.,]dd es siempre decimal:
+        # los grupos de miles son de 3 dígitos) y separadores de miles
+        if re.search(r"[.,]\d{2}$", limpio):
             limpio = limpio[:-3]
         limpio = limpio.replace(".", "").replace(",", "")
         if limpio.isdigit() and len(limpio) >= 3:
@@ -797,7 +798,9 @@ def extraer_fechas(texto: str) -> set[date]:
     return fechas
 
 
-def cargar_json_tolerante(ruta: Path) -> dict | None:
+def cargar_json_tolerante(ruta: Path):
+    """Devuelve el JSON parseado (cualquier tipo) o None si no parsea.
+    El llamador debe verificar isinstance(x, dict) antes de usar .get()."""
     for enc in ("utf-8-sig", "utf-8", "latin-1"):
         try:
             with ruta.open(encoding=enc) as fh:
@@ -813,9 +816,16 @@ def leer_texto_tolerante(ruta: Path) -> str:
     for enc in ("utf-8-sig", "cp1252", "latin-1"):
         try:
             return ruta.read_text(encoding=enc)
-        except (UnicodeDecodeError, OSError):
+        except UnicodeDecodeError:
             continue
-    return ruta.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            logger.error(f"No pude leer {ruta}: {e}")
+            return ""
+    try:
+        return ruta.read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        logger.error(f"No pude leer {ruta}: {e}")
+        return ""
 
 
 # ─── Extracción de texto PDF (pdfplumber → pypdf → nada) ─────────────────────
@@ -1028,6 +1038,9 @@ def leer_furips2(rutas: list[Path]) -> tuple[dict[str, list[list[str]]], list[st
                 campos = campos + [""] * (9 - len(campos))
             campos = [c.strip() for c in campos]
             clave = norm_factura(campos[0])
+            if not clave:
+                obs.append(f"{ruta.name} línea {nro}: sin número de factura (campo 1).")
+                clave = f"(SIN FACTURA) {ruta.name}:{nro}"
             lineas.setdefault(clave, []).append(campos)
     return lineas, obs
 
@@ -1055,14 +1068,17 @@ def _evaluar_condicion(cond: str, c: dict[int, str], ctx: dict) -> tuple[bool, b
     if cond == "C_NAT17":
         return nat == "17", False
     if cond == "C_VEH_NO3":
-        return (nat == "01" and estado not in ("", "3")), estado == "3"
+        # Con vehículo fantasma (3) pasan a ser OPCIONALES (no prohibidos)
+        return (nat == "01" and estado not in ("", "3")), False
     if cond == "C_VEH_PLACA":
         return estado in {"1", "2", "4", "6", "7"}, estado == "3"
     if cond == "C_VEH_POLIZA":
         return estado in {"1", "4", "6"}, False
     if cond in ("C_PROP", "C_PROP_NAT"):
-        # Persona jurídica: razón social va en 46 y el primer nombre (48) puede ir vacío
-        oblig = estado in {"1", "2", "4", "6", "7"}
+        # Persona jurídica: razón social va en 46 y el primer nombre (48) puede ir vacío.
+        # Estados 7 (propietario indeterminado) y 8: la Tabla 1 y el instructivo VII
+        # se contradicen — se degradan a ADVERTENCIA aparte (ver validar_malla_f1).
+        oblig = estado in {"1", "2", "4", "6"}
         if cond == "C_PROP_NAT" and c.get(44, "") in ("NI", "NIT"):
             oblig = False
         return oblig, estado == "3"
@@ -1075,7 +1091,11 @@ def _evaluar_condicion(cond: str, c: dict[int, str], ctx: dict) -> tuple[bool, b
     if cond == "C_QX":
         return ctx["hay_qx"], False
     if cond == "C_UCI":
-        return c.get(42, "") == "1", False
+        return (c.get(42, "") == "1" or ctx.get("hay_uci", False)), False
+    if cond == "C_ESTANCIA":
+        return ctx.get("hay_estancia", False), False
+    if cond == "C_UCI_F2":
+        return ctx.get("hay_uci", False), False
     return False, False
 
 
@@ -1089,7 +1109,11 @@ def validar_malla_f1(res: ResultadoFactura) -> None:
             "Registro FURIPS 1",
             "",
             "Circular 022/2023",
-            "La factura tiene carpeta de soportes pero NO tiene registro en el FURIPS 1.",
+            (
+                "La factura tiene carpeta de soportes pero NO tiene registro en el FURIPS 1."
+                if res.carpeta is not None
+                else "La factura NO tiene registro en el FURIPS 1."
+            ),
         )
         return
     c = {n: reg[n - 1] for n in range(1, 103)}
@@ -1099,19 +1123,77 @@ def validar_malla_f1(res: ResultadoFactura) -> None:
         "hay_transporte": (a_entero(c.get(99, "")) or 0) > 0
         or any(ln[2] == "3" for ln in res.lineas_f2),
         "hay_qx": _hay_lineas_quirurgicas(res.lineas_f2),
+        # Heurística sobre el FURIPS2: códigos SOAT de estancia (381xx) y de
+        # cuidado intensivo (385xx), o descripciones de estancia/UCI.
+        "hay_estancia": any(
+            ln[2] == "2"
+            and (
+                ln[3].startswith(("381", "385"))
+                or re.search(
+                    r"ESTANCIA|HABITACI|INTERNACI|CUIDADO\s+(INTENSIVO|INTERMEDIO)|\bUCI\b",
+                    ln[4],
+                    re.IGNORECASE,
+                )
+            )
+            for ln in res.lineas_f2
+        ),
+        "hay_uci": any(
+            ln[2] == "2"
+            and (
+                ln[3].startswith("385")
+                or re.search(r"CUIDADO\s+INTENSIVO|\bUCI\b", ln[4], re.IGNORECASE)
+            )
+            for ln in res.lineas_f2
+        ),
     }
+
+    nat = c.get(20, "")
+    estado_aseg = c.get(28, "")
+    seccion_v_prohibida = nat in NATURALEZAS_EVENTO and nat != "01"
 
     for n, _seccion, nombre, longitud, formato, permitidos, oblig in E1:
         valor = c.get(n, "")
         estado, obs = OK, ""
         obligatorio, debe_vacio = _evaluar_condicion(oblig, c, ctx)
 
+        # Instructivo secc. V: solo se diligencia en accidentes de tránsito.
+        if seccion_v_prohibida and 28 <= n <= 37:
+            obligatorio = False
+            if valor:
+                debe_vacio = True
+
         if debe_vacio and valor:
             estado = ERROR
-            obs = f"Debe estar VACÍO cuando el vehículo es fantasma (28=3) y tiene '{valor}'."
+            if seccion_v_prohibida and 28 <= n <= 37:
+                obs = (
+                    f"La sección V (vehículo) solo se diligencia en accidentes de "
+                    f"tránsito (naturaleza 01); con naturaleza {nat} debe ir vacía "
+                    f"y tiene '{valor}' (instructivo Circular 022/2023)."
+                )
+            else:
+                obs = f"Debe estar VACÍO cuando el vehículo es fantasma (28=3) y tiene '{valor}'."
         elif obligatorio and not valor:
             estado = ERROR
             obs = f"Campo obligatorio sin diligenciar ({TEXTO_OBLIG.get(oblig, oblig)})."
+            # Activación por heurística sobre el FURIPS2 (no por un campo del
+            # propio registro): se degrada a ADVERTENCIA para acotar falsos
+            # positivos si la IPS usa códigos atípicos.
+            if oblig in ("C_ESTANCIA", "C_UCI_F2") or (oblig == "C_UCI" and c.get(42, "") != "1"):
+                estado = ADVERTENCIA
+                obs += " (Detectado por las líneas de estancia/UCI del FURIPS 2.)"
+        elif (
+            not valor
+            and oblig in ("C_PROP", "C_PROP_NAT")
+            and estado_aseg in ("7", "8")
+            and not (oblig == "C_PROP_NAT" and c.get(44, "") in ("NI", "NIT"))
+        ):
+            estado = ADVERTENCIA
+            obs = (
+                f"Vacío con estado de aseguramiento {estado_aseg}: la Tabla 1 y el "
+                "instructivo VII de la Circular se contradicen sobre su exigencia "
+                "(el 7 se define como 'se desconocen los datos del propietario'). "
+                "Documentar el caso en la reclamación."
+            )
         elif valor:
             if len(valor) > longitud:
                 estado = ERROR
@@ -1121,10 +1203,10 @@ def validar_malla_f1(res: ResultadoFactura) -> None:
                 obs = (
                     obs + " " if obs else ""
                 ) + f"Valor '{valor}' fuera de los permitidos: {', '.join(sorted(permitidos))}."
-            if formato == "fecha" and not parse_fecha_ddmmaaaa(valor):
+            if formato == "fecha" and not (_RE_FECHA.match(valor) and parse_fecha_ddmmaaaa(valor)):
                 estado = ERROR
                 obs = (obs + " " if obs else "") + f"'{valor}' no es fecha DD/MM/AAAA válida."
-            elif formato == "hora" and not parse_hora(valor):
+            elif formato == "hora" and not (_RE_HORA.match(valor) and parse_hora(valor)):
                 estado = ERROR
                 obs = (obs + " " if obs else "") + f"'{valor}' no es hora HH:MM (24h) válida."
             elif formato == "num" and not _RE_NUM.match(valor):
@@ -1220,7 +1302,11 @@ def _validar_coherencia_f1(res: ResultadoFactura, c: dict[int, str], ctx: dict) 
                 "La fecha de nacimiento es posterior a la fecha del evento.",
             )
         elif f_ingreso:
-            edad = (f_ingreso - f_nac).days // 365
+            edad = (
+                f_ingreso.year
+                - f_nac.year
+                - ((f_ingreso.month, f_ingreso.day) < (f_nac.month, f_nac.day))
+            )
             tipo_doc = c.get(10, "")
             if tipo_doc == "TI" and edad >= 18:
                 res.agregar(
@@ -1298,6 +1384,19 @@ def _validar_coherencia_f1(res: ResultadoFactura, c: dict[int, str], ctx: dict) 
                 "Los días de UCI superan la estancia total (ingreso→egreso).",
             )
 
+    if c.get(32, "") and c.get(28, "") in ("2", "7", "8"):
+        res.agregar(
+            "MALLA FURIPS1",
+            ADVERTENCIA,
+            "32",
+            "Código de aseguradora con vehículo no asegurado",
+            c.get(32, ""),
+            "Instructivo V Circular 022/2023",
+            "El vehículo figura como no asegurado y trae código de aseguradora: "
+            "'la ADRES no es una aseguradora, no debe ir ningún código si el "
+            "vehículo es no asegurado'.",
+        )
+
     if c.get(37, "") == "1" and c.get(28, "") != "6":
         res.agregar(
             "MALLA FURIPS1",
@@ -1357,8 +1456,21 @@ def validar_furips2(res: ResultadoFactura) -> None:
             )
         return
 
+    if reg is None:
+        res.agregar(
+            "FURIPS2",
+            ERROR,
+            "-",
+            "Líneas FURIPS 2 sin registro FURIPS 1",
+            f"{len(res.lineas_f2)} líneas",
+            "Circular 022/2023 Tabla 2",
+            "La factura tiene líneas en el FURIPS 2 pero NO aparece en el "
+            "FURIPS 1: la malla ADRES rechaza el archivo.",
+        )
+
     # Cada observación lleva su propia severidad: (severidad, texto).
-    hallazgos_linea: list[tuple[int, str, str, str]] = []  # (línea, severidad, obs, tipo)
+    # (línea, severidad, obs, tipo, valor de la línea)
+    hallazgos_linea: list[tuple[int, str, str, str, str]] = []
     vistas: dict[tuple, int] = {}
     for i, ln in enumerate(res.lineas_f2, 1):
         partes: list[tuple[str, str]] = []
@@ -1418,13 +1530,28 @@ def validar_furips2(res: ResultadoFactura) -> None:
                     (ERROR, f"{etiqueta.capitalize()} '{crudo}' trae separadores/decimales.")
                 )
 
-        es_linea_principal_qx = tipo == "2" and n_cant == 0 and n_fact == 0
-        if None not in (n_cant, n_unit, n_fact):
-            if not es_linea_principal_qx and n_cant <= 0:
+        es_linea_principal_qx = (
+            tipo == "2" and n_cant == 0 and n_unit == 0 and n_fact == 0 and n_recl == 0
+        )
+        if None not in (n_cant, n_unit, n_fact) and not es_linea_principal_qx:
+            if n_cant <= 0:
                 partes.append(
                     (ERROR, "Cantidad debe ser mayor a cero (salvo línea principal quirúrgica).")
                 )
-            if n_cant * n_unit != n_fact and not es_linea_principal_qx:
+            for etq_v, num_v in (
+                ("Valor unitario", n_unit),
+                ("Valor facturado", n_fact),
+                ("Valor reclamado", n_recl),
+            ):
+                if num_v is not None and num_v <= 0:
+                    partes.append(
+                        (
+                            ERROR,
+                            f"{etq_v} debe ser mayor a cero (campos 7-9 Tabla 2, "
+                            "salvo línea principal quirúrgica).",
+                        )
+                    )
+            if n_cant * n_unit != n_fact:
                 partes.append(
                     (
                         ERROR,
@@ -1453,20 +1580,31 @@ def validar_furips2(res: ResultadoFactura) -> None:
         estado = ERROR if any(s == ERROR for s, _ in partes) else ADVERTENCIA if partes else OK
         obs = " ".join(t for _s, t in partes) if partes else "Línea válida."
         res.estado_lineas_f2.append((estado, obs))
+        valor_ln = " | ".join(
+            x
+            for x in (
+                f"cód '{codigo}'" if codigo else "cód vacío",
+                descripcion[:30],
+                f"cant {cantidad}",
+                f"vr.fact {vr_fact}",
+                f"vr.recl {vr_recl}",
+            )
+            if x
+        )
         for sev, texto in partes:
-            hallazgos_linea.append((i, sev, texto, tipo))
+            hallazgos_linea.append((i, sev, texto, tipo, valor_ln))
 
     # Agrupar los hallazgos por PATRÓN para no repetir cientos de filas iguales
     # (el detalle línea a línea queda completo en la hoja FURIPS2 LINEAS).
-    grupos: dict[tuple[str, str], list[tuple[int, str, str]]] = {}
-    for i, sev, texto, tipo in hallazgos_linea:
+    grupos: dict[tuple[str, str], list[tuple[int, str, str, str]]] = {}
+    for i, sev, texto, tipo, valor_ln in hallazgos_linea:
         patron = re.sub(r"\d[\d.,]*", "N", re.sub(r"'[^']*'", "'…'", texto))
-        grupos.setdefault((sev, patron), []).append((i, texto, tipo))
+        grupos.setdefault((sev, patron), []).append((i, texto, tipo, valor_ln))
     for (sev, _patron), casos in grupos.items():
-        lineas_txt = ", ".join(f"L{i}" for i, _p, _t in casos[:8])
+        lineas_txt = ", ".join(f"L{i}" for i, _p, _t, _v in casos[:8])
         if len(casos) > 8:
             lineas_txt += f" … (+{len(casos) - 8} más)"
-        tipos_grupo = {t for _i, _p, t in casos}
+        tipos_grupo = {t for _i, _p, t, _v in casos}
         tipo0 = casos[0][2]
         concepto = (
             f"{len(casos)} línea(s) — tipo {tipo0} {TIPOS_SERVICIO_F2.get(tipo0, '')}"
@@ -1478,7 +1616,7 @@ def validar_furips2(res: ResultadoFactura) -> None:
             sev,
             lineas_txt,
             concepto,
-            casos[0][1][:60],
+            casos[0][3][:80] + (" (y otras líneas)" if len(casos) > 1 else ""),
             "Circular 022/2023 Tabla 2",
             casos[0][1]
             + (
@@ -1620,7 +1758,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
     # RIPS
     if "RIPS JSON" in encontrados:
         rips = cargar_json_tolerante(encontrados["RIPS JSON"])
-        if rips:
+        if isinstance(rips, dict) and rips:
             datos["rips"] = rips
         else:
             res.agregar(
@@ -1630,7 +1768,10 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
                 "RIPS JSON",
                 encontrados["RIPS JSON"].name,
                 "Res. 2284/2023",
-                "El RIPS no se pudo parsear como JSON.",
+                "El RIPS no se pudo parsear como JSON."
+                if rips is None
+                else "El RIPS parsea pero está vacío o no tiene la estructura "
+                "esperada (objeto con numFactura/usuarios).",
             )
     else:
         res.agregar(
@@ -1646,7 +1787,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
     # CUV
     if "CUV JSON" in encontrados:
         cuv = cargar_json_tolerante(encontrados["CUV JSON"])
-        if cuv:
+        if isinstance(cuv, dict) and cuv:
             datos["cuv"] = cuv
         else:
             res.agregar(
@@ -1656,7 +1797,10 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
                 "CUV JSON",
                 encontrados["CUV JSON"].name,
                 "Res. 2284/2023",
-                "El CUV no se pudo parsear como JSON.",
+                "El CUV no se pudo parsear como JSON."
+                if cuv is None
+                else "El CUV parsea pero está vacío o no tiene la estructura "
+                "esperada (objeto con NumFactura/CodigoUnicoValidacion).",
             )
     else:
         res.agregar(
@@ -1793,6 +1937,9 @@ def _agregar_cruce(
     resultado: str,
     obs: str = "",
 ) -> None:
+    if resultado == "COINCIDE" and not any(v for v in valores.values()):
+        # Ninguna fuente aportó valor: no se comparó nada realmente.
+        resultado = "SIN DATO PARA CRUZAR"
     res.cruces.append(
         {
             "dato": dato,
@@ -1816,7 +1963,9 @@ def _nombres_en_texto(nombres: list[str], texto_norm: str) -> bool:
 def cruzar_soportes(res: ResultadoFactura) -> None:
     reg = res.registro_f1
     datos = res.datos_soportes
-    if reg is None:
+    if reg is None or not datos:
+        # Sin registro FURIPS o sin ningún soporte extraíble no hay cruce:
+        # la ausencia ya queda reportada en SOPORTES/RESUMEN.
         return
     c = {n: reg[n - 1] for n in range(1, 103)}
 
@@ -2147,7 +2296,7 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     total_xml = _monto_xml(fev.get("total_pagar", "")) if fev else None
     suma_rips = (
         sum(
-            int(p.get("vrServicio") or 0)
+            (a_entero(str(p.get("vrServicio") or "")) or 0)
             for u in (rips.get("usuarios") or [])
             for tipo in (
                 "consultas",
@@ -2374,6 +2523,9 @@ def generar_excel(
     def fila(ws, valores, col_estado=None, estado=None, cols_moneda=()):
         r = ws.max_row + 1
         for j, v in enumerate(valores, 1):
+            if isinstance(v, str):
+                # openpyxl rechaza caracteres de control (TXT truncados/binarios)
+                v = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", v)
             cel = ws.cell(row=r, column=j, value=v)
             cel.border = BORDE
             cel.alignment = Alignment(vertical="top", wrap_text=True)
@@ -2434,8 +2586,10 @@ def generar_excel(
         estado = "CON ERRORES" if res.errores else "REVISAR" if res.advertencias else "CUMPLE"
         principales = "; ".join(
             f"[{h.severidad[:3]}] {h.concepto}: {h.detalle[:80]}"
-            for h in sorted(res.hallazgos, key=lambda h: (h.severidad != ERROR, h.origen))[:3]
-            if h.severidad in (ERROR, ADVERTENCIA)
+            for h in sorted(
+                (h for h in res.hallazgos if h.severidad in (ERROR, ADVERTENCIA)),
+                key=lambda h: (h.severidad != ERROR, h.origen),
+            )[:3]
         )
         paciente = " ".join(x for x in (c.get(8), c.get(9), c.get(6), c.get(7)) if x)
         fila(
@@ -2633,7 +2787,13 @@ def generar_excel(
     )
     for res in resultados:
         for cz in res.cruces:
-            estado = OK if cz["resultado"] == "COINCIDE" else ADVERTENCIA
+            estado = (
+                OK
+                if cz["resultado"] == "COINCIDE"
+                else INFO
+                if cz["resultado"] == "SIN DATO PARA CRUZAR"
+                else ADVERTENCIA
+            )
             fila(
                 ws,
                 [
@@ -2820,7 +2980,7 @@ def procesar(
         # Modo una-carpeta: solo validar las facturas de esa carpeta
         claves = set(carpetas) & set(registros_f1) or set(carpetas)
     else:
-        claves = set(registros_f1) | set(carpetas)
+        claves = set(registros_f1) | set(carpetas) | set(lineas_f2)
 
     resultados: list[ResultadoFactura] = []
     for clave in sorted(claves):
@@ -2886,6 +3046,10 @@ def main() -> int:
     if not base.is_dir():
         logger.error(f"No existe la carpeta: {base}")
         return 1
+    for etiqueta, ruta in (("--furips1", args.furips1), ("--furips2", args.furips2)):
+        if ruta is not None and not ruta.is_file():
+            logger.error(f"No existe el archivo {etiqueta}: {ruta}")
+            return 1
 
     try:
         import openpyxl  # noqa: F401

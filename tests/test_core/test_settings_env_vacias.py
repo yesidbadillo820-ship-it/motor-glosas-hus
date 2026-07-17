@@ -49,6 +49,9 @@ def test_compose_sin_defaults_vacios():
         "SENTRY_DSN",
         "POSTHOG_API_KEY",
         "ALLOWED_ORIGINS",
+        # agente_lotes_token es str y "" significa "endpoints del agente
+        # deshabilitados" — comportamiento diseñado (piloto 17-jul-2026).
+        "AGENTE_LOTES_TOKEN",
     }
     problematicas = [v for v in vacias if v not in permitidas]
     assert not problematicas, (

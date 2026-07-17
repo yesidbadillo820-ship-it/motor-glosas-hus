@@ -629,6 +629,152 @@ def generar_word(facturas: list[Factura], salida: Path, ciudad: str, elaborado: 
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Informe Excel (relación de facturas + extractos de trabajo social)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def generar_excel(facturas: list[Factura], salida: Path) -> None:
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        sys.stderr.write("ERROR: falta openpyxl. Instalar con: py -m pip install openpyxl\n")
+        raise SystemExit(1) from None
+
+    FILL_HEADER = PatternFill("solid", fgColor="1F4E79")
+    FONT_HEADER = Font(color="FFFFFF", bold=True, size=10)
+    FILL_OK = PatternFill("solid", fgColor="C6EFCE")
+    FONT_OK = Font(color="006100", size=10)
+    FILL_MAL = PatternFill("solid", fgColor="FFC7CE")
+    FONT_MAL = Font(color="9C0006", bold=True, size=10)
+    BORDE = Border(*(Side(style="thin", color="D9D9D9"),) * 4)
+
+    wb = Workbook()
+
+    def hoja(nombre, encabezados, anchos):
+        ws = wb.create_sheet(nombre)
+        for j, (enc, ancho) in enumerate(zip(encabezados, anchos, strict=False), 1):
+            cel = ws.cell(row=1, column=j, value=enc)
+            cel.fill, cel.font = FILL_HEADER, FONT_HEADER
+            cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            ws.column_dimensions[get_column_letter(j)].width = ancho
+        ws.freeze_panes = "A2"
+        ws.row_dimensions[1].height = 30
+        return ws
+
+    def fila(ws, valores, cols_moneda=(), col_semaforo=None, bueno=True):
+        r = ws.max_row + 1
+        for j, v in enumerate(valores, 1):
+            cel = ws.cell(row=r, column=j, value=v)
+            cel.border = BORDE
+            cel.alignment = Alignment(vertical="top", wrap_text=True)
+            cel.font = Font(size=10)
+            if j in cols_moneda and isinstance(v, (int, float)):
+                cel.number_format = "#,##0"
+                cel.alignment = Alignment(vertical="top", horizontal="right")
+        if col_semaforo:
+            cel = ws.cell(row=r, column=col_semaforo)
+            cel.fill = FILL_OK if bueno else FILL_MAL
+            cel.font = FONT_OK if bueno else FONT_MAL
+
+    ws = hoja(
+        "RELACION DE FACTURAS",
+        [
+            "No.",
+            "FACTURA",
+            "PACIENTE",
+            "DOCUMENTO",
+            "FECHA ATENCIÓN",
+            "VALOR",
+            "INFORME TRABAJO SOCIAL",
+            "PÁGINAS T. SOCIAL",
+            "SITUACIÓN (TRABAJO SOCIAL)",
+            "FUENTE (PDF UNIDO)",
+            "PÁGINAS PDF",
+            "OBSERVACIONES",
+            "CONCLUSIÓN",
+        ],
+        [6, 15, 30, 14, 14, 14, 16, 12, 40, 26, 9, 45, 40],
+    )
+    wb.active = ws
+    del wb["Sheet"]
+    for i, f in enumerate(facturas, 1):
+        fila(
+            ws,
+            [
+                i,
+                f.numero,
+                f.paciente or "(por confirmar)",
+                f.documento or "(por confirmar)",
+                f.fecha_ingreso,
+                f.valor,
+                "SI" if f.tsocial_texto else "NO — REVISAR",
+                ", ".join(str(n) for n in f.tsocial_paginas[:6]),
+                "; ".join(etq for etq, _ in f.situaciones),
+                f.fuente_pdf,
+                f.paginas,
+                " | ".join(f.observaciones),
+                f"Se presenta para depuración/baja: no cumple los parámetros de la {RESOLUCION} "
+                "para entrega al área de cartera.",
+            ],
+            cols_moneda=(6,),
+            col_semaforo=7,
+            bueno=bool(f.tsocial_texto),
+        )
+    total = sum(f.valor or 0 for f in facturas)
+    fila(ws, ["", "TOTAL", "", "", "", total, "", "", "", "", "", "", ""], cols_moneda=(6,))
+    ws.auto_filter.ref = f"A1:M{ws.max_row - 1}"
+
+    ws = hoja(
+        "EXTRACTOS TRABAJO SOCIAL",
+        ["FACTURA", "VALOR", "SITUACIÓN(ES)", "EXTRACTO DEL INFORME DE TRABAJO SOCIAL"],
+        [15, 14, 35, 120],
+    )
+    for f in facturas:
+        extracto = limpiar_parrafo(f.tsocial_texto)
+        if len(extracto) > 2500:
+            extracto = extracto[:2500].rsplit(" ", 1)[0] + " […]"
+        fila(
+            ws,
+            [
+                f.numero,
+                f.valor,
+                "; ".join(etq for etq, _ in f.situaciones),
+                extracto or "(SIN INFORME DE TRABAJO SOCIAL UBICADO EN EL PDF UNIDO)",
+            ],
+            cols_moneda=(2,),
+        )
+    ws.auto_filter.ref = f"A1:D{ws.max_row}"
+
+    ws = hoja("LEYENDA", ["SECCIÓN", "EXPLICACIÓN"], [30, 120])
+    for sec, exp in (
+        (
+            "Qué contiene",
+            "Relación de las facturas presentadas para depuración/baja por no cumplir "
+            f"los parámetros de la {RESOLUCION} (manual de cartera) para su entrega al "
+            "área de cartera, ordenadas de la más cara a la más económica, con la "
+            "situación consignada por trabajo social y el extracto de cada informe. "
+            "Acompaña al documento Word del mismo nombre.",
+        ),
+        (
+            "INFORME TRABAJO SOCIAL = NO (rojo)",
+            "En el PDF unido de esa factura no se ubicó el informe de trabajo social "
+            "(o está escaneado sin texto): completar el expediente antes de presentar.",
+        ),
+        (
+            "Herramienta",
+            "tools/generar_informe_baja_cartera.py — Motor Glosas HUS. Genera este "
+            "Excel y el Word en la misma corrida.",
+        ),
+    ):
+        fila(ws, [sec, exp])
+
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(salida)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Orquestación
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -644,6 +790,12 @@ def main() -> int:
         help="Raíz con las carpetas de factura (cada una con su _UNIDO_*.pdf/.cmd)",
     )
     parser.add_argument("--salida", type=Path, default=None, help="Ruta del Word de salida")
+    parser.add_argument(
+        "--salida-excel",
+        type=Path,
+        default=None,
+        help="Ruta del Excel de salida (por defecto, junto al Word con extensión .xlsx)",
+    )
     parser.add_argument("--ciudad", default="Bucaramanga", help="Ciudad del encabezado")
     parser.add_argument(
         "--elaborado",
@@ -686,6 +838,8 @@ def main() -> int:
 
     salida = args.salida or (args.raiz / f"INFORME_BAJA_CARTERA_{date.today():%Y%m%d}.docx")
     generar_word(facturas, salida, args.ciudad, args.elaborado)
+    salida_excel = args.salida_excel or salida.with_suffix(".xlsx")
+    generar_excel(facturas, salida_excel)
 
     sin_ts = sum(1 for f in facturas if not f.tsocial_texto)
     logger.info("")
@@ -694,9 +848,10 @@ def main() -> int:
     if sin_ts:
         logger.info(
             f"⚠ {sin_ts} factura(s) SIN informe de trabajo social ubicado: quedaron "
-            "marcadas con NOTA DE REVISIÓN dentro del Word."
+            "marcadas con NOTA DE REVISIÓN en el Word y en rojo en el Excel."
         )
     logger.info(f"WORD:      {salida}")
+    logger.info(f"EXCEL:     {salida_excel}")
     logger.info("=" * 72)
     return 0
 

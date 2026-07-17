@@ -8,7 +8,9 @@ REM  (manual de cartera) para entregar a cartera, para su tramite de
 REM  depuracion / baja. Lee el PDF UNIDO (_UNIDO_*.pdf o su copia .cmd
 REM  que deja el bot UNIR_PDFS) de cada carpeta de factura, extrae el
 REM  valor y el INFORME DE TRABAJO SOCIAL, ordena de la mas cara a la
-REM  mas economica y concluye cada factura una a una.
+REM  mas economica y concluye cada factura una a una. Entrega DOS
+REM  informes en la misma corrida: el WORD (documento para presentar)
+REM  y el EXCEL (relacion de facturas + extractos de trabajo social).
 REM
 REM  USO:
 REM   1) Corra primero UNIR_PDFS.cmd en la carpeta de las facturas.
@@ -16,8 +18,9 @@ REM   2) Copie este .cmd JUNTO con generar_informe_baja_cartera.py a la
 REM      carpeta raiz de las facturas y dele doble clic. Tambien puede
 REM      ARRASTRAR una carpeta encima del .cmd.
 REM
-REM  Se instala solo python-docx y pypdf si faltan. Solo LEE los PDF;
-REM  no modifica nada. El Word queda como INFORME_BAJA_CARTERA_*.docx.
+REM  Se instala solo python-docx, openpyxl y pypdf si faltan. Solo LEE
+REM  los PDF; no modifica nada. Salidas: INFORME_BAJA_CARTERA_*.docx
+REM  y INFORME_BAJA_CARTERA_*.xlsx.
 REM ====================================================================
 chcp 65001 >nul 2>&1
 setlocal EnableExtensions DisableDelayedExpansion
@@ -56,6 +59,10 @@ if not defined PYEXE (
     pause
     exit /b 1
 )
+%PYEXE% -c "import openpyxl" >nul 2>&1 || (
+    echo [i] Instalando el componente de Excel ^(openpyxl^), espere...
+    %PYEXE% -m pip install --quiet --user openpyxl >nul 2>&1
+)
 %PYEXE% -c "import pypdf" >nul 2>&1 || %PYEXE% -c "import pdfplumber" >nul 2>&1 || (
     echo [i] Instalando el lector de PDF ^(pypdf^), espere...
     %PYEXE% -m pip install --quiet --user pypdf >nul 2>&1
@@ -70,8 +77,9 @@ if not exist "%~dp0generar_informe_baja_cartera.py" (
 %PYEXE% "%~dp0generar_informe_baja_cartera.py" --raiz "%CARPETA%"
 echo.
 echo ============================================================
-echo   Listo. Revise el Word INFORME_BAJA_CARTERA_*.docx que
-echo   quedo en: "%CARPETA%"
+echo   Listo. Revise el Word INFORME_BAJA_CARTERA_*.docx y el
+echo   Excel INFORME_BAJA_CARTERA_*.xlsx que quedaron en:
+echo   "%CARPETA%"
 echo   OJO: las facturas SIN informe de trabajo social quedan con
 echo   NOTA DE REVISION dentro del documento - completelas antes
 echo   de presentar el informe.
