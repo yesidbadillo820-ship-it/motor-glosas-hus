@@ -893,6 +893,8 @@ def consolidar_detalles(
         idx = indice_columnas(headers_base, COL_DETALLE_REQ, arch.name)
         mapa_h = {norm_header(h): i for i, h in enumerate(headers_base)}
         idx_desc = mapa_h.get("DESCRIPCION")
+        idx_vt = mapa_h.get(norm_header("valor_total"))
+        idx_cm = mapa_h.get(norm_header("valor_cuota_moderadora"))
 
         for row in rows:
             id_det = norm_codigo(row[idx["id_detalle"]])
@@ -913,6 +915,8 @@ def consolidar_detalles(
                         "codigo_servicio": norm_texto(row[idx["codigo_servicio"]]),
                         "descripcion": norm_texto(row[idx_desc]) if idx_desc is not None else "",
                         "valor_glosado": valor_o_numero(row[idx["valor_glosado"]]),
+                        "valor_servicio": row[idx_vt] if idx_vt is not None else None,
+                        "copago": row[idx_cm] if idx_cm is not None else None,
                         "observacion": obs,
                         "conceptos": g["conceptos"],
                         "codigo_mayor": g["codigo_mayor"],
@@ -1150,6 +1154,7 @@ def generar_objeciones(
     ajustados: list[list] = []
     malformadas: set[str] = set()
     por_respaldo = 0
+    capados_copago = 0
     excluidos = 0
     # Guardián de valor: lo ya objetado por (factura, código DGH) y por factura,
     # para no pasarse del valor del servicio ni del saldo de la cuenta.
@@ -1208,6 +1213,19 @@ def generar_objeciones(
                         cupo = min(cupo, lim_cod - acum_cod.get((fkey, slnserpro), 0.0))
                     if lim_sal is not None:
                         cupo = min(cupo, lim_sal - acum_fac.get(fkey, 0.0))
+                    # Copago (cuota moderadora): DGH descuenta el copago del
+                    # valor del servicio, así que el máximo objetable de esta
+                    # línea es (valor del servicio - copago). La cuota la paga
+                    # el paciente, no la EPS; si se objeta de más, DGH la rechaza
+                    # con "El VALOR OBJECION no puede ser mayor al valor del
+                    # servicio". Se capa la línea a lo que DGH sí acepta.
+                    vserv = a_numero(srv.get("valor_servicio"))
+                    copago = a_numero(srv.get("copago")) or 0.0
+                    if vserv is not None and copago > 0.5:
+                        tope_copago = vserv - copago
+                        if tope_copago < cupo:
+                            cupo = tope_copago
+                            capados_copago += 1
                     if cupo <= 0.5:
                         motivo = "sin cupo en DGH (servicio o saldo ya cubierto por otras glosas)"
                     elif valobj > cupo + 0.5:
@@ -1295,6 +1313,12 @@ def generar_objeciones(
         logger.info(
             "  %d objeciones se CAPARON al valor que DGH acepta (hoja VALOR_AJUSTADO).",
             len(ajustados),
+        )
+    if capados_copago:
+        logger.info(
+            "  %d de esas objeciones se caparon por COPAGO (cuota moderadora): "
+            "DGH no deja objetar la parte que paga el paciente.",
+            capados_copago,
         )
     if malformadas:
         logger.warning(
