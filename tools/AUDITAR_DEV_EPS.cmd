@@ -45,11 +45,23 @@ if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" goto motor
 if exist "%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe" goto motor
 echo [i] Instalando el motor de OCR (Tesseract) por unica vez, espera...
 where winget >nul 2>&1 && winget install -e --id UB-Mannheim.TesseractOCR --silent --disable-interactivity --accept-package-agreements --accept-source-agreements >nul 2>&1
-where tesseract >nul 2>&1 || if not exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" if not exist "%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe" (
-  echo [ATENCION] No se pudo instalar Tesseract. Los PDF con texto se leen igual;
-  echo            los que son SOLO imagen no se podran leer con OCR hasta instalarlo
-  echo            desde https://github.com/UB-Mannheim/tesseract/wiki
-)
+if exist "%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe" goto motor
+if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" goto motor
+where tesseract >nul 2>&1 && goto motor
+REM winget no sirvio: descargar el instalador oficial (por usuario, sin admin)
+set "TESS=%TEMP%\tesseract_hus.exe"
+set "TESSURL=https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.3.3.20231005.exe"
+del "%TESS%" >nul 2>&1
+echo [i] Descargando el motor de OCR (50 MB aprox.), espera...
+curl.exe -L -s -o "%TESS%" "%TESSURL%" 2>nul
+if not exist "%TESS%" powershell -NoProfile -Command "Invoke-WebRequest -Uri $env:TESSURL -OutFile $env:TESS" >nul 2>&1
+if exist "%TESS%" "%TESS%" /S /D=%LOCALAPPDATA%\Programs\Tesseract-OCR
+del "%TESS%" >nul 2>&1
+if exist "%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe" goto motor
+echo [ATENCION] No se pudo instalar Tesseract (OCR). Tranquilo: los PDF que
+echo            tienen texto se leen y auditan igual; solo los soportes que son
+echo            SOLO imagen quedaran pendientes de OCR. Se puede instalar a mano
+echo            desde https://github.com/UB-Mannheim/tesseract/wiki
 
 :motor
 REM --- 3) Localizar el motor Python -----------------------------------
