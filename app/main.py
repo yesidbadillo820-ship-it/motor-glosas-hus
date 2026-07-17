@@ -1227,3 +1227,10 @@ app.include_router(diagnostico_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)
+
+# Lotes de portal (Fase 1 app unificada): subida del Excel consolidado
+# + cola del agente local que corre los bots en el PC del hospital.
+from app.api.routers.lotes import router as lotes_router, agente_router as agente_lotes_router
+
+app.include_router(lotes_router)
+app.include_router(agente_lotes_router)

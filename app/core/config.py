@@ -101,6 +101,13 @@ class Settings(BaseSettings):
     # GLOSA_CAMPOS_ESTRUCTURADOS=true.
     glosa_campos_estructurados: bool = False
 
+    # Token compartido del agente local de lotes (tools/agente_lotes.py).
+    # El agente corre headless en el PC del hospital y no puede usar JWT
+    # de usuario (expiran a las 8h): se autentica con este token estático
+    # vía header X-Agente-Token. Vacío = endpoints del agente deshabilitados
+    # (devuelven 503), así un deploy sin configurar no expone la cola.
+    agente_lotes_token: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
