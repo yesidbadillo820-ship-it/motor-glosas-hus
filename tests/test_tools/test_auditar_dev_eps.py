@@ -394,3 +394,29 @@ def test_soportes_se_hallan_aunque_el_envio_no_coincida(tmp_path):
     idx = mod.indexar_arbol(tmp_path, {norm})
     assert len(idx[norm]["opf"]) == 1
     assert len(idx[norm]["pde"]) == 1
+
+
+def test_excel_incluye_rutas_de_los_archivos(tmp_path):
+    pytest.importorskip("fitz")
+    mod = _cargar()
+    fbase = tmp_path / "facturas"
+    sbase = tmp_path / "soportes"
+    jd = fbase / "202606" / "FACTURAS_SALUD" / "HUS532392" / "RIPS"
+    jd.mkdir(parents=True)
+    (jd / "Rips_HUS532392.json").write_text(_RIPS_JSON, encoding="utf-8")
+    sd = sbase / "NUEVA EPS" / "ENV-230601" / "SOPORTES" / "HUS532392"
+    sd.mkdir(parents=True)
+    _pdf(sd / "OPF_900006037_HUS532392.pdf", _TEXTO_SOPORTE)
+
+    excel = tmp_path / "DEV.xlsx"
+    _excel_dev(excel, [("HUS532392", "2026-06-30", 3397900, "230601")])
+    salida = tmp_path / "OUT.xlsx"
+    assert mod.procesar(excel, fbase, sbase, salida) == 0
+
+    from openpyxl import load_workbook
+
+    ws = load_workbook(salida).active
+    assert ws.cell(2, 18).value == "RUTA DEL JSON"
+    assert ws.cell(2, 19).value == "RUTA DE LOS SOPORTES"
+    assert ws.cell(3, 18).value.endswith("Rips_HUS532392.json")
+    assert "OPF_900006037_HUS532392.pdf" in ws.cell(3, 19).value

@@ -36,7 +36,13 @@ los soportes (`1244781967`). El bot lo marca:
 4. Queda **`NUEVA_EPS_DEV_AUDITADO.xlsx`** junto al original:
    - los bloques RIPS-JSON y SOPORTES llenos y la **OBSERVACIÓN** en color
      (verde = OK, rojo = diferencia, amarillo = revisar / sin datos),
+   - dos columnas al final con la **RUTA DEL JSON** y la **RUTA DE LOS
+     SOPORTES** de cada factura, para ir directo a los archivos,
    - una hoja **DETALLE** con TODOS los usuarios y servicios de cada factura.
+
+Al terminar, en la ventana negra muestra **cuántos JSON y cuántos soportes**
+encontró; si no halla soportes, imprime un **diagnóstico** con ejemplos de los
+PDF que sí vio en esa ruta (para saber si la carpeta es la correcta).
 
 ## Qué compara y de dónde
 

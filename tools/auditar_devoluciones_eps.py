@@ -656,7 +656,12 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
         "sop_tipo": 15,
         "sop_doc": 16,
         "obs": 17,
+        "ruta_json": 18,
+        "ruta_sop": 19,
     }
+    # encabezados de las dos columnas nuevas (rutas de los archivos)
+    ws.cell(fila_cab, COL["ruta_json"]).value = "RUTA DEL JSON"
+    ws.cell(fila_cab, COL["ruta_sop"]).value = "RUTA DE LOS SOPORTES"
 
     facturas = []
     for fila in range(fila_cab + 1, ws.max_row + 1):
@@ -761,6 +766,10 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
         ws.cell(fila, COL["sop_tipo"]).value = sop["tipo"]
         ws.cell(fila, COL["sop_doc"]).value = sop["doc"]
 
+        # rutas de los archivos (para que sea facil ir a buscarlos)
+        ws.cell(fila, COL["ruta_json"]).value = str(arch_f["json"]) if arch_f.get("json") else ""
+        ws.cell(fila, COL["ruta_sop"]).value = "\n".join(str(p) for p in pdfs)
+
         if rips.get("error") and not pdfs:
             obs = "SIN JSON NI SOPORTES (revisar ruta)"
             sin_datos += 1
@@ -806,12 +815,25 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
             f"  {marca:2s} {fac:16s} JSON doc={primer['doc'] or '-':16s} sop doc={sop['doc'] or '-':12s} aut={', '.join(autoriz_json) or '-'}"
         )
 
+    # estilo de las dos columnas de ruta (encabezado + ancho + ajuste de texto)
+    from openpyxl.styles import Alignment
+    from openpyxl.utils import get_column_letter
+
+    azul = PatternFill("solid", fgColor="1F4E79")
+    for col in (COL["ruta_json"], COL["ruta_sop"]):
+        cab = ws.cell(fila_cab, col)
+        cab.font = Font(bold=True, color="FFFFFF")
+        cab.fill = azul
+        cab.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws.column_dimensions[get_column_letter(col)].width = 60
+        for fila in range(fila_cab + 1, ws.max_row + 1):
+            ws.cell(fila, col).alignment = Alignment(vertical="top", wrap_text=True)
+
     if "DETALLE" in wb.sheetnames:
         del wb["DETALLE"]
     ws2 = wb.create_sheet("DETALLE")
     for r in detalle:
         ws2.append(r)
-    azul = PatternFill("solid", fgColor="1F4E79")
     for c in ws2[1]:
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = azul
