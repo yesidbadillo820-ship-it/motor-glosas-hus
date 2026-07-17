@@ -416,7 +416,33 @@ def test_excel_incluye_rutas_de_los_archivos(tmp_path):
     from openpyxl import load_workbook
 
     ws = load_workbook(salida).active
-    assert ws.cell(2, 18).value == "RUTA DEL JSON"
-    assert ws.cell(2, 19).value == "RUTA DE LOS SOPORTES"
-    assert ws.cell(3, 18).value.endswith("Rips_HUS532392.json")
-    assert "OPF_900006037_HUS532392.pdf" in ws.cell(3, 19).value
+    assert ws.cell(2, 18).value == "VALIDACION SAT (PDE)"
+    assert ws.cell(2, 19).value == "RUTA DEL JSON"
+    assert ws.cell(2, 20).value == "RUTA DE LOS SOPORTES"
+    assert ws.cell(3, 19).value.endswith("Rips_HUS532392.json")
+    assert "OPF_900006037_HUS532392.pdf" in ws.cell(3, 20).value
+
+
+def test_validacion_sat_detecta_proceso_exitoso():
+    mod = _cargar()
+    texto = (
+        "Mi Seguridad Social - Confirmacion de la novedad\n"
+        "Proceso exitoso. Su afiliacion al regimen subsidiado se ha reportado "
+        "de manera exitosa realizada bajo el numero 074CC13514092080620260856000001\n"
+        "https://sat.miseguridadsocial.gov.co/Novedades/Novedad/GuardarNovedad"
+    )
+    sat = mod.validacion_sat(texto)
+    assert sat["es_sat"] and sat["exitoso"]
+    assert sat["numero"] == "074CC13514092080620260856000001"
+    assert "PROCESO EXITOSO" in mod.texto_validacion_sat(sat)
+    # un soporte que NO es de SAT no reporta nada
+    assert mod.validacion_sat("Autorizacion Nueva EPS 316003877")["es_sat"] is False
+    assert mod.texto_validacion_sat({"es_sat": False}) == ""
+
+
+def test_validacion_sat_sin_proceso_exitoso():
+    mod = _cargar()
+    texto = "Mi Seguridad Social. GuardarNovedad. La novedad no pudo procesarse."
+    sat = mod.validacion_sat(texto)
+    assert sat["es_sat"] and not sat["exitoso"]
+    assert "NO se evidencia" in mod.texto_validacion_sat(sat)

@@ -69,7 +69,76 @@ def _patron_factura(norm: str) -> re.Pattern:
     return re.compile(rf"HUS0*{re.escape(norm)}(?![0-9])", re.I)
 
 
-def _texto_pdf(ruta: Path) -> str:
+_OCR_LANG = None  # se resuelve la primera vez ("spa+eng", "spa", "eng" o "")
+
+
+def _configurar_tesseract() -> None:
+    """Si tesseract no está en el PATH, lo busca en las rutas típicas de
+    Windows (instalador UB-Mannheim) y se lo indica a pytesseract."""
+    try:
+        import shutil
+
+        import pytesseract
+    except Exception:
+        return
+    if shutil.which("tesseract"):
+        return
+    candidatas = [
+        os.path.expandvars(r"%ProgramFiles%\Tesseract-OCR\tesseract.exe"),
+        os.path.expandvars(r"%ProgramFiles(x86)%\Tesseract-OCR\tesseract.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Tesseract-OCR\tesseract.exe"),
+    ]
+    for c in candidatas:
+        if os.path.isfile(c):
+            pytesseract.pytesseract.tesseract_cmd = c
+            return
+
+
+def _lang_ocr() -> str:
+    """Idiomas disponibles para OCR (español si está, si no inglés)."""
+    global _OCR_LANG
+    if _OCR_LANG is not None:
+        return _OCR_LANG
+    _configurar_tesseract()
+    try:
+        import pytesseract
+
+        disp = set(pytesseract.get_languages(config=""))
+        if "spa" in disp and "eng" in disp:
+            _OCR_LANG = "spa+eng"
+        elif "spa" in disp:
+            _OCR_LANG = "spa"
+        elif "eng" in disp:
+            _OCR_LANG = "eng"
+        else:
+            _OCR_LANG = ""
+    except Exception:
+        _OCR_LANG = ""
+    return _OCR_LANG
+
+
+def _ocr_pagina(pg) -> str:
+    """OCR de una página (imagen). '' si no hay Tesseract/Pillow o falla."""
+    lang = _lang_ocr()
+    if not lang:
+        return ""
+    try:
+        import io
+
+        import pytesseract
+        from PIL import Image
+
+        pix = pg.get_pixmap(dpi=200)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        return pytesseract.image_to_string(img, lang=lang)
+    except Exception:
+        return ""
+
+
+def _texto_pdf(ruta: Path, ocr: bool = True, max_ocr_pag: int = 20) -> str:
+    """Texto del PDF. Si una página no trae capa de texto pero sí imágenes,
+    se lee con OCR (hasta max_ocr_pag páginas, que es lo lento)."""
     try:
         import fitz
     except ImportError:
@@ -79,12 +148,24 @@ def _texto_pdf(ruta: Path) -> str:
     except Exception:
         return ""
     partes = []
+    ocr_hechas = 0
     try:
         for pg in doc:
             try:
-                partes.append(pg.get_text())
+                t = pg.get_text()
             except Exception:
-                continue  # página dañada/cifrada: se omite, no revienta
+                t = ""
+            if ocr and len(t.strip()) < 20 and ocr_hechas < max_ocr_pag:
+                try:
+                    tiene_img = bool(pg.get_images())
+                except Exception:
+                    tiene_img = False
+                if tiene_img:
+                    t_ocr = _ocr_pagina(pg)
+                    if t_ocr.strip():
+                        t = t_ocr
+                        ocr_hechas += 1
+            partes.append(t)
     finally:
         doc.close()
     return "\n".join(partes)
@@ -313,6 +394,49 @@ def extraer_servicio(texto: str) -> str:
     return ""
 
 
+# --- Validación en SAT (Mi Seguridad Social) del PDE ---
+_RE_SAT = re.compile(
+    r"(miseguridadsocial|mi\s+seguridad\s+social|guardarnovedad|"
+    r"afiliaci[oó]n\s+al\s+r[eé]gimen|sistema\s+de\s+afiliaci[oó]n\s+transaccional)",
+    re.I,
+)
+_RE_SAT_EXITO = re.compile(
+    r"(proceso\s+exitoso|de\s+manera\s+exitosa|reportad[oa]\s+de\s+manera\s+exitosa)", re.I
+)
+_RE_SAT_NUM = re.compile(
+    r"bajo\s+el\s+n[uú]mero\s*[:\-]?\s*([0-9A-Za-z][0-9A-Za-z\- ]{8,45})", re.I
+)
+_RE_SAT_NUM2 = re.compile(r"\b(\d{3}[A-Z]{2}\d{10,})\b")
+
+
+def validacion_sat(texto: str) -> dict:
+    """Detecta si el soporte trae una autorización/afiliación tramitada en SAT
+    (Mi Seguridad Social) y si el proceso quedó EXITOSO, con su número."""
+    res = {"es_sat": False, "exitoso": False, "numero": ""}
+    if not _RE_SAT.search(texto):
+        return res
+    res["es_sat"] = True
+    res["exitoso"] = bool(_RE_SAT_EXITO.search(texto))
+    m = _RE_SAT_NUM.search(texto)
+    if m:
+        res["numero"] = re.sub(r"\s+", "", m.group(1)).strip()
+    else:
+        m2 = _RE_SAT_NUM2.search(texto)
+        if m2:
+            res["numero"] = m2.group(1)
+    return res
+
+
+def texto_validacion_sat(sat: dict) -> str:
+    """Frase para la columna VALIDACION SAT."""
+    if not sat.get("es_sat"):
+        return ""
+    if sat.get("exitoso"):
+        base = "SAT: PROCESO EXITOSO"
+        return f"{base} - N° {sat['numero']}" if sat.get("numero") else base
+    return "SAT: NO se evidencia 'Proceso exitoso' (revisar)"
+
+
 def leer_soportes(pdfs: list[Path]) -> dict:
     """Combina el texto de los soportes (OPF/PDE) y extrae los campos clave.
     'autorizaciones' trae TODAS (últimos 9 dígitos); 'autoriz' es su unión."""
@@ -325,7 +449,10 @@ def leer_soportes(pdfs: list[Path]) -> dict:
         "servicio": "",
         "archivos": [],
         "sin_texto": False,
+        "sat": {"es_sat": False, "exitoso": False, "numero": ""},
     }
+    # el PDE es el soporte de autorizacion que SIEMPRE se revisa: se lee primero
+    pdfs = sorted(pdfs, key=lambda p: 0 if p.name.upper().startswith("PDE") else 1)
     textos = []
     for p in pdfs:
         t = _texto_pdf(p)
@@ -341,6 +468,7 @@ def leer_soportes(pdfs: list[Path]) -> dict:
     res["tipo"], res["doc"] = extraer_documento(texto)
     res["nombre"] = extraer_nombre(texto)
     res["servicio"] = extraer_servicio(texto)
+    res["sat"] = validacion_sat(texto)
     return res
 
 
@@ -656,10 +784,12 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
         "sop_tipo": 15,
         "sop_doc": 16,
         "obs": 17,
-        "ruta_json": 18,
-        "ruta_sop": 19,
+        "sat": 18,
+        "ruta_json": 19,
+        "ruta_sop": 20,
     }
-    # encabezados de las dos columnas nuevas (rutas de los archivos)
+    # encabezados de las columnas nuevas
+    ws.cell(fila_cab, COL["sat"]).value = "VALIDACION SAT (PDE)"
     ws.cell(fila_cab, COL["ruta_json"]).value = "RUTA DEL JSON"
     ws.cell(fila_cab, COL["ruta_sop"]).value = "RUTA DE LOS SOPORTES"
 
@@ -766,6 +896,9 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
         ws.cell(fila, COL["sop_tipo"]).value = sop["tipo"]
         ws.cell(fila, COL["sop_doc"]).value = sop["doc"]
 
+        # validacion en SAT (Mi Seguridad Social) del PDE
+        ws.cell(fila, COL["sat"]).value = texto_validacion_sat(sop.get("sat") or {})
+
         # rutas de los archivos (para que sea facil ir a buscarlos)
         ws.cell(fila, COL["ruta_json"]).value = str(arch_f["json"]) if arch_f.get("json") else ""
         ws.cell(fila, COL["ruta_sop"]).value = "\n".join(str(p) for p in pdfs)
@@ -820,12 +953,13 @@ def procesar(excel: Path, facturas_base: Path, soportes_base: Path, salida: Path
     from openpyxl.utils import get_column_letter
 
     azul = PatternFill("solid", fgColor="1F4E79")
-    for col in (COL["ruta_json"], COL["ruta_sop"]):
+    anchos_nuevos = {COL["sat"]: 34, COL["ruta_json"]: 60, COL["ruta_sop"]: 60}
+    for col, ancho in anchos_nuevos.items():
         cab = ws.cell(fila_cab, col)
         cab.font = Font(bold=True, color="FFFFFF")
         cab.fill = azul
         cab.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col)].width = 60
+        ws.column_dimensions[get_column_letter(col)].width = ancho
         for fila in range(fila_cab + 1, ws.max_row + 1):
             ws.cell(fila, col).alignment = Alignment(vertical="top", wrap_text=True)
 

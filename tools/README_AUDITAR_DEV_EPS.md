@@ -56,6 +56,14 @@ PDF que sí vio en esa ruta (para saber si la carpeta es la correcta).
 - **OBSERVACIÓN**: `OK` cuando las autorizaciones del JSON coinciden con las del
   soporte (por sus últimos 9 dígitos); avisa si el JSON trae alguna en `null`,
   y marca las que están en uno y no en el otro.
+- **VALIDACIÓN SAT (PDE)**: en el PDE (el soporte que siempre se revisa), si la
+  autorización se tramitó en **SAT / Mi Seguridad Social**, mira dentro y
+  confirma que el proceso quedó **"Proceso exitoso"**, con su número de
+  novedad. Si no aparece esa confirmación, lo marca para revisar.
+- **OCR automático**: los PDF que son **solo imagen** (escaneados, sin texto)
+  se leen con OCR (Tesseract) para poder sacar de ellos la autorización, el
+  documento y la validación SAT. El motor de OCR se instala solo la primera
+  vez; si no se puede, los PDF con texto se leen igual.
 - **FACTURA DGH**: nombre, documento y servicio del paciente tomados de los
   soportes (lista de chequeo / autorización).
 - **OBSERVACIÓN**: `OK` cuando la autorización coincide; marca la diferencia
