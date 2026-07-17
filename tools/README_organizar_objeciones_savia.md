@@ -57,13 +57,18 @@ arriba).
 |---|---|---|
 | `CRNCXC` | `Numero_factura` | Se pasa a formato largo: `HUS443697` → `HUS0000443697` (10 dígitos). |
 | `CRNCONOBJ` | `Motivo_Esp_Glosa_Valor_A` | Se completa a 6 caracteres: `TA08` → `TA0801` (ver **§4**). |
-| `SLNSERPRO` | `Cod_Servicio` | Directo. |
-| `CROVALOBJ` | `Valor_Glosa` | Directo (valor objetado). |
-| `CRDOBSERV` | `Observacion_Glosa_A` | Directo (texto de la objeción). |
-| `CDFECDOC`, `CROFECOBJ` | — | Fecha de `--fecha` (default: hoy). |
-| `CDCONSEC` | — | Constante `1` (como la guía). Se cambia con `--consecutivo`. |
-| `CROCLAOBJ`, `GENUSUARIO4`, `CROTIPOBJ` | — | Constantes `0`, `999`, `0` (de la guía). |
+| `SLNSERPRO` | `Cod_Servicio` | Directo (conserva el sufijo `-NN` de medicamentos, como los archivos reales). |
+| `CROVALOBJ` | `Valor_Glosa` | Directo (valor objetado, como número). |
+| `CRDOBSERV` | `Observacion_Glosa_A` | En el formato real: `<código> <texto>$<valor>` (ej. `TA0801 …$15400`). |
+| `CDFECDOC`, `CROFECOBJ` | — | Fecha de `--fecha` (default: hoy), en **fecha corta** (sin horas). |
+| `CDCONSEC` | — | **Consecutivo por factura**: todas las filas de la 1ª factura llevan `1`, las de la 2ª `2`, … (como texto). `--consecutivo` cambia el número inicial. |
+| `CROTIPOBJ` | — | **Por factura, según sus conceptos**: solo TA/FA/SO/AU → `0`; solo CL → `1`; TA/FA/SO/AU + CL → `2`. Todas las filas de la factura llevan el mismo valor. |
+| `CROCLAOBJ`, `GENUSUARIO4` | — | Constantes `0` (número) y `999` (texto), como la guía. |
 | `CROREFERE`, `CROOBSERV`, `CRNCLAOBJ`, `IDRIPS`, `CTNCENCOS` | — | Vacíos. |
+
+> Los **formatos de celda** (fecha corta, texto `@`, contable de miles en
+> `CROVALOBJ`) se copian 1:1 de los archivos reales — verificado 16/16 columnas
+> contra `OBJECIONES_EMSSANAR_HUS0000515948.xlsx`.
 
 ---
 
