@@ -179,9 +179,10 @@ def test_construir_registros_mapea_al_layout_dispensario(tmp_path):
     assert reg["CROVALOBJ"] == 7603
     # CRDOBSERV en formato Dispensario: "<código> <texto>$<valor>".
     assert reg["CRDOBSERV"] == "TA0201 Se objeta mayor valor...$7603"
-    assert reg["CDCONSEC"] == 1
+    # CDCONSEC y GENUSUARIO4 como TEXTO; CROCLAOBJ/CROTIPOBJ como número.
+    assert reg["CDCONSEC"] == "1"
     assert reg["CROCLAOBJ"] == 0
-    assert reg["GENUSUARIO4"] == 999
+    assert reg["GENUSUARIO4"] == "999"
     assert reg["CROTIPOBJ"] == 0
     assert reg["CDFECDOC"] == _FECHA
     assert reg["CROFECOBJ"] == _FECHA
@@ -276,7 +277,7 @@ def test_cdconsec_consecutivo_por_factura(tmp_path):
     regs = org.construir_registros(
         ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
     )
-    assert [r["CDCONSEC"] for r in regs] == [1, 1, 2]
+    assert [r["CDCONSEC"] for r in regs] == ["1", "1", "2"]
 
 
 def test_cli_consolidado(tmp_path):
@@ -295,8 +296,8 @@ def test_cli_consolidado(tmp_path):
     ws = openpyxl.load_workbook(str(salida), data_only=True).active
     filas = list(ws.iter_rows(values_only=True))[1:]
     assert len(filas) == 3
-    # CDCONSEC por factura: 1,1 para HUS443697 y 2 para HUS503425.
-    assert [f[0] for f in filas] == [1, 1, 2]
+    # CDCONSEC por factura (texto): 1,1 para HUS443697 y 2 para HUS503425.
+    assert [f[0] for f in filas] == ["1", "1", "2"]
 
 
 def test_por_factura_reinicia_cdconsec(tmp_path):
@@ -314,7 +315,7 @@ def test_por_factura_reinicia_cdconsec(tmp_path):
     for nombre in ("OBJECIONES_SAVIA_HUS0000443697.xlsx", "OBJECIONES_SAVIA_HUS0000503425.xlsx"):
         ws = openpyxl.load_workbook(str(salida / nombre), data_only=True).active
         filas = list(ws.iter_rows(values_only=True))[1:]
-        assert all(f[0] == 1 for f in filas)
+        assert all(f[0] == "1" for f in filas)
 
 
 def test_cli_entrada_inexistente(tmp_path):

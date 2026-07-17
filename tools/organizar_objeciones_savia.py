@@ -81,9 +81,11 @@ COLUMNAS_DISPENSARIO: tuple[str, ...] = (
 )
 
 # Valores constantes tomados tal cual de la guía OBJECIONES_DISPENSARIO_*.xlsx.
+# OJO con los tipos: en los archivos reales CDCONSEC y GENUSUARIO4 se guardan
+# como TEXTO ('1', '999'); CROCLAOBJ/CROVALOBJ/CROTIPOBJ como NÚMERO.
 CDCONSEC_DEFAULT = 1
 CROCLAOBJ_CONST = 0
-GENUSUARIO4_CONST = 999
+GENUSUARIO4_CONST = "999"
 CROTIPOBJ_CONST = 0
 CODIGO_SUFIJO_DEFAULT = "01"
 
@@ -275,7 +277,8 @@ def construir_registros(
         valor = _num(_cell(r, idx, "valor_glosa"))
         registros.append(
             {
-                "CDCONSEC": consec_por_factura[crncxc],
+                # CDCONSEC como TEXTO, igual que los archivos reales.
+                "CDCONSEC": str(consec_por_factura[crncxc]),
                 "CDFECDOC": fecha,
                 "CRNCXC": crncxc,
                 "CROFECOBJ": fecha,
@@ -353,9 +356,9 @@ def escribir_por_factura(
 
     generados: list[Path] = []
     for crncxc, regs in sorted(por_factura.items()):
-        # Archivo standalone: su única factura es el consecutivo 1.
+        # Archivo standalone: su única factura es el consecutivo 1 (como TEXTO).
         for reg in regs:
-            reg["CDCONSEC"] = consecutivo
+            reg["CDCONSEC"] = str(consecutivo)
         destino = carpeta / f"{prefijo}_{crncxc}.xlsx"
         _escribir_hoja(regs, destino)
         generados.append(destino)
