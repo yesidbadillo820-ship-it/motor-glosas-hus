@@ -79,6 +79,49 @@ class TestConfig:
         assert ag.cargar_config() == {}
 
 
+class TestApiLotes:
+    def test_request_manda_user_agent_y_token(self, monkeypatch):
+        # Cloudflare (error 1010) bloquea el UA por defecto de urllib: toda
+        # petición debe salir identificada con UA_AGENTE y el token.
+        capturado = {}
+
+        class RespuestaFake:
+            status = 200
+
+            def read(self):
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def urlopen_fake(req, timeout=None):
+            capturado["req"] = req
+            return RespuestaFake()
+
+        monkeypatch.setattr(ag.urllib.request, "urlopen", urlopen_fake)
+        api = ag.ApiLotes("http://servidor:8000/", "tok-123", "pc")
+        status, cuerpo = api._request("POST", "/agente/lotes/tareas/reclamar", {"agente": "pc"})
+        assert status == 200
+        req = capturado["req"]
+        assert req.full_url == "http://servidor:8000/agente/lotes/tareas/reclamar"
+        assert req.get_header("User-agent") == ag.UA_AGENTE
+        assert "Python-urllib" not in req.get_header("User-agent")
+        assert req.get_header("X-agente-token") == "tok-123"
+
+    def test_detalle_http_explica_bloqueo_cloudflare(self):
+        detalle = ag.detalle_http("reclamar", 403, b"error code: 1010\n")
+        assert "Cloudflare" in detalle
+        assert "Bot Fight Mode" in detalle
+
+    def test_detalle_http_sin_hint_para_otros_errores(self):
+        detalle = ag.detalle_http("reclamar", 401, b'{"detail":"Token invalido"}')
+        assert "Cloudflare" not in detalle
+        assert "HTTP 401" in detalle
+
+
 class TestLeerReporte:
     def test_lee_csv_del_bot(self, tmp_path):
         # Mismo formato que escribe responder_glosas_coosalud.py (utf-8-sig).
