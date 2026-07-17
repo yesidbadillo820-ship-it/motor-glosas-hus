@@ -200,8 +200,14 @@ def test_escribir_por_factura_un_archivo_por_factura(tmp_path):
     generados = org.escribir_por_factura(regs, tmp_path / "out")
     nombres = sorted(p.name for p in generados)
     assert nombres == [
-        "OBJECIONES_DISPENSARIO_HUS0000443697.xlsx",
-        "OBJECIONES_DISPENSARIO_HUS0000503425.xlsx",
+        "OBJECIONES_SAVIA_HUS0000443697.xlsx",
+        "OBJECIONES_SAVIA_HUS0000503425.xlsx",
+    ]
+    # El prefijo es configurable.
+    otros = org.escribir_por_factura(regs, tmp_path / "out2", prefijo="SAVIA")
+    assert sorted(p.name for p in otros) == [
+        "SAVIA_HUS0000443697.xlsx",
+        "SAVIA_HUS0000503425.xlsx",
     ]
     # El archivo generado tiene la hoja OBJECIONES y los 16 encabezados exactos.
     ws = openpyxl.load_workbook(str(generados[0]), data_only=True).active
@@ -224,12 +230,12 @@ def test_cli_end_to_end_por_factura(tmp_path):
     assert rc == 0
     files = sorted(p.name for p in salida.glob("*.xlsx"))
     assert files == [
-        "OBJECIONES_DISPENSARIO_HUS0000443697.xlsx",
-        "OBJECIONES_DISPENSARIO_HUS0000503425.xlsx",
+        "OBJECIONES_SAVIA_HUS0000443697.xlsx",
+        "OBJECIONES_SAVIA_HUS0000503425.xlsx",
     ]
     # La factura HUS443697 debe traer sus 2 objeciones.
     ws = openpyxl.load_workbook(
-        str(salida / "OBJECIONES_DISPENSARIO_HUS0000443697.xlsx"), data_only=True
+        str(salida / "OBJECIONES_SAVIA_HUS0000443697.xlsx"), data_only=True
     ).active
     filas = list(ws.iter_rows(values_only=True))[1:]
     assert len(filas) == 2

@@ -1,11 +1,11 @@
 # Guía: `organizar_objeciones_savia.py` — Objeciones de SAVIA SALUD → formato Dispensario
 
 Herramienta que toma el Excel de **glosas de SAVIA SALUD** (las 8 columnas de
-`SAVIA_SALUD_8.03.xlsx`) y lo convierte al **formato del Dispensario** — el mismo
-layout de 16 columnas de `OBJECIONES_DISPENSARIO_HUS*.xlsx`, que es la
-**guía/plantilla de salida**. Genera **un archivo por factura**, nombrado igual
-que la guía (`OBJECIONES_DISPENSARIO_<factura>.xlsx`), listo para tramitar en el
-Dispensario.
+`SAVIA_SALUD_8.03.xlsx`) y lo reordena en la **estructura de 16 columnas** de la
+guía `OBJECIONES_DISPENSARIO_HUS*.xlsx` (ese archivo del Dispensario se usa solo
+como **plantilla de columnas**). Genera **un archivo por factura**, identificado
+como de SAVIA (`OBJECIONES_SAVIA_<factura>.xlsx` por defecto; se cambia con
+`--prefijo`).
 
 ---
 
@@ -44,7 +44,8 @@ arriba).
 ### Salida (`--salida`)
 
 - **Por defecto:** una **carpeta**. El bot escribe ahí un
-  `OBJECIONES_DISPENSARIO_<factura>.xlsx` por cada factura.
+  `OBJECIONES_SAVIA_<factura>.xlsx` por cada factura (el prefijo se cambia con
+  `--prefijo`).
 - **Con `--consolidado`:** `--salida` es un `.xlsx` único con todas las facturas
   juntas.
 
@@ -98,6 +99,7 @@ Ejemplo de `mapa.json`:
 |---|---|---|
 | `--entrada` | — (requerido) | Excel de SAVIA SALUD (8 columnas). |
 | `--salida` | — (requerido) | Carpeta destino (o `.xlsx` si `--consolidado`). |
+| `--prefijo` | `OBJECIONES_SAVIA` | Prefijo del nombre de cada archivo por factura. |
 | `--consolidado` | off | Un solo Excel con todas las facturas en vez de uno por factura. |
 | `--fecha` | hoy | Fecha `YYYY-MM-DD` para `CDFECDOC`/`CROFECOBJ`. |
 | `--codigo-sufijo` | `01` | Consecutivo con que se completa el código (4→6). |
@@ -117,8 +119,8 @@ py tools\organizar_objeciones_savia.py ^
   --salida  "D:\...\OBJECIONES_SAVIA"
 ```
 
-Deja en `OBJECIONES_SAVIA\` un `OBJECIONES_DISPENSARIO_HUS0000443697.xlsx`,
-`OBJECIONES_DISPENSARIO_HUS0000503425.xlsx`, etc.
+Deja en `OBJECIONES_SAVIA\` un `OBJECIONES_SAVIA_HUS0000443697.xlsx`,
+`OBJECIONES_SAVIA_HUS0000503425.xlsx`, etc. (para otro prefijo, usá `--prefijo`).
 
 ### Con fecha específica de radicación
 

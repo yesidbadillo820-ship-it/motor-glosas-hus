@@ -11,9 +11,10 @@ archivo `OBJECIONES_DISPENSARIO_HUS*.xlsx`, que es la GUÍA/plantilla de salida:
     CRNCLAOBJ | GENUSUARIO4 | CRNCONOBJ | SLNSERPRO | IDRIPS | CTNCENCOS |
     CROVALOBJ | CRDOBSERV | CROTIPOBJ
 
-Genera **un archivo por factura**, nombrado igual que la guía
-(`OBJECIONES_DISPENSARIO_<CRNCXC>.xlsx`), para poder cargarlo/tramitarlo en el
-Dispensario tal como venían los originales.
+Genera **un archivo por factura** identificado como de SAVIA
+(`OBJECIONES_SAVIA_<CRNCXC>.xlsx` por defecto; se cambia con `--prefijo`). La
+estructura interna es la de la guía, pero el archivo es de SAVIA, no del
+Dispensario.
 
 MAPEO DE CAMPOS (SAVIA → Dispensario):
     CRNCXC       ← Numero_factura            (HUS443697 → HUS0000443697, 10 dígitos)
@@ -298,16 +299,23 @@ def _escribir_hoja(registros: list[dict], salida: Path) -> None:
     wb.save(str(salida))
 
 
-def escribir_por_factura(registros: list[dict], carpeta: Path) -> list[Path]:
-    """Escribe un archivo por factura, nombrado OBJECIONES_DISPENSARIO_<CRNCXC>.xlsx
-    (igual que la guía). Devuelve las rutas generadas."""
+PREFIJO_DEFAULT = "OBJECIONES_SAVIA"
+
+
+def escribir_por_factura(
+    registros: list[dict], carpeta: Path, prefijo: str = PREFIJO_DEFAULT
+) -> list[Path]:
+    """Escribe un archivo por factura, nombrado <prefijo>_<CRNCXC>.xlsx (por
+    defecto OBJECIONES_SAVIA_<CRNCXC>.xlsx). La estructura interna es la de la
+    guía del Dispensario, pero el archivo se identifica como de SAVIA.
+    Devuelve las rutas generadas."""
     por_factura: dict[str, list[dict]] = defaultdict(list)
     for reg in registros:
         por_factura[reg["CRNCXC"]].append(reg)
 
     generados: list[Path] = []
     for crncxc, regs in sorted(por_factura.items()):
-        destino = carpeta / f"OBJECIONES_DISPENSARIO_{crncxc}.xlsx"
+        destino = carpeta / f"{prefijo}_{crncxc}.xlsx"
         _escribir_hoja(regs, destino)
         generados.append(destino)
         logger.info(f"  {destino.name}: {len(regs)} objeciones")
@@ -377,8 +385,14 @@ def main(argv: list[str] | None = None) -> int:
         "--salida",
         type=Path,
         required=True,
-        help="Carpeta destino (un archivo OBJECIONES_DISPENSARIO_<factura>.xlsx por factura), "
+        help="Carpeta destino (un archivo <prefijo>_<factura>.xlsx por factura), "
         "o archivo .xlsx si se usa --consolidado.",
+    )
+    parser.add_argument(
+        "--prefijo",
+        default=PREFIJO_DEFAULT,
+        help=f"Prefijo del nombre de cada archivo por factura. Default: {PREFIJO_DEFAULT} "
+        f"(→ {PREFIJO_DEFAULT}_HUS0000443697.xlsx).",
     )
     parser.add_argument(
         "--consolidado",
@@ -439,10 +453,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.consolidado:
         escribir_consolidado(registros, args.salida)
-        logger.info(f"\nExcel del Dispensario (consolidado): {args.salida}")
+        logger.info(f"\nExcel de SAVIA (consolidado, formato de la guía): {args.salida}")
     else:
-        generados = escribir_por_factura(registros, args.salida)
-        logger.info(f"\n{len(generados)} archivo(s) del Dispensario en: {args.salida}")
+        generados = escribir_por_factura(registros, args.salida, prefijo=args.prefijo)
+        logger.info(f"\n{len(generados)} archivo(s) de SAVIA en: {args.salida}")
 
     _resumen(registros)
     return 0
