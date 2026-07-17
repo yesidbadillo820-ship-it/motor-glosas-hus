@@ -86,6 +86,12 @@ py tools\agente_lotes.py --una-vez --con-cabeza   # prueba piloto
 - **La ventana dice "Sin conexión con la app"** → revisa la URL (¿el
   servidor está prendido y alcanzable desde este PC?) y que el token sea
   exactamente el del `.env` del servidor.
+- **`HTTP 403: error code: 1010`** → no es la app: es **Cloudflare**
+  (el firewall del dominio) bloqueando al agente por su firma de
+  navegador. El agente ya se identifica con un User-Agent de navegador
+  para pasar ese filtro; si aun así aparece, en el panel de Cloudflare:
+  *Security → Bots → desactivar Bot Fight Mode*, o crear una regla WAF
+  que permita (skip) la ruta `/agente/*`.
 - **El lote queda en ERROR con "código 2"** → casi siempre faltan
   `playwright` o las credenciales del portal en este PC; abre
   `bot.log` dentro de la carpeta del lote para ver el motivo exacto.

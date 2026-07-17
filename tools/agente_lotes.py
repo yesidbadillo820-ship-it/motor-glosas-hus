@@ -106,6 +106,28 @@ def construir_comando(
     return comando
 
 
+# Piloto 17-jul-2026: Cloudflare (delante de iaglosassinac.help) bloqueaba
+# al agente con 403 "error code: 1010" — Bot Fight Mode corta el User-Agent
+# por defecto de urllib ("Python-urllib/3.x") antes de llegar a la app.
+# Identificarse con un UA de navegador + nombre propio pasa el filtro de
+# firma. Si el dominio endurece las reglas, la salida es una excepción WAF
+# para /agente/* (ver README).
+UA_AGENTE = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AgenteLotesHUS/1.0"
+
+
+def detalle_http(accion: str, status: int, cuerpo: bytes) -> str:
+    """Mensaje de error legible; con hint cuando el que bloquea es Cloudflare."""
+    detalle = f"{accion} → HTTP {status}: {cuerpo[:300]!r}"
+    if status == 403 and b"1010" in cuerpo:
+        detalle += (
+            " | El firewall del dominio (Cloudflare, error 1010) está "
+            "bloqueando al agente, no la app. Solución: en Cloudflare, "
+            "Security → Bots → desactivar Bot Fight Mode, o crear una "
+            "regla WAF que permita la ruta /agente/*."
+        )
+    return detalle
+
+
 class ApiLotes:
     def __init__(self, base_url: str, token: str, agente: str):
         self.base = base_url.rstrip("/")
@@ -120,6 +142,7 @@ class ApiLotes:
             headers={
                 "X-Agente-Token": self.token,
                 "Content-Type": "application/json",
+                "User-Agent": UA_AGENTE,
             },
         )
         try:
@@ -135,13 +158,13 @@ class ApiLotes:
         if status == 204:
             return None
         if status != 200:
-            raise RuntimeError(f"reclamar → HTTP {status}: {cuerpo[:300]!r}")
+            raise RuntimeError(detalle_http("reclamar", status, cuerpo))
         return json.loads(cuerpo)
 
     def descargar_excel(self, tarea_id: int, destino: Path) -> None:
         status, cuerpo = self._request("GET", f"/agente/lotes/tareas/{tarea_id}/excel")
         if status != 200:
-            raise RuntimeError(f"descargar excel → HTTP {status}: {cuerpo[:300]!r}")
+            raise RuntimeError(detalle_http("descargar excel", status, cuerpo))
         destino.parent.mkdir(parents=True, exist_ok=True)
         destino.write_bytes(cuerpo)
 
@@ -152,7 +175,7 @@ class ApiLotes:
             {"exito": True, "resultados": resultados},
         )
         if status != 200:
-            logger.warning(f"progreso → HTTP {status}: {cuerpo[:200]!r}")
+            logger.warning(detalle_http("progreso", status, cuerpo))
 
     def completar(
         self, tarea_id: int, exito: bool, resultados: list[dict], error: str | None
@@ -163,7 +186,7 @@ class ApiLotes:
             {"exito": exito, "resultados": resultados, "error": error},
         )
         if status != 200:
-            raise RuntimeError(f"completar → HTTP {status}: {cuerpo[:300]!r}")
+            raise RuntimeError(detalle_http("completar", status, cuerpo))
 
 
 def leer_reporte(ruta: Path) -> list[dict]:
