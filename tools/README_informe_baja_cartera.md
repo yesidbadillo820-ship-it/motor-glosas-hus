@@ -20,9 +20,14 @@ lo tanto se presentan para trámite de **depuración / baja**.
   apoyo, habitante de calle, paciente fallecido, sin identificación,
   población migrante sin aseguramiento…).
 - Ordena las facturas **de la más cara a la más económica**.
-- Arma el Word: introducción del área de facturación, marco normativo
-  (Resolución 577/2019), relación de facturas en tabla, **análisis individual
-  con conclusión de baja para cada factura** y conclusión general con firmas.
+- Entrega **DOS informes en la misma corrida**:
+  - **Word**: introducción del área de facturación, marco normativo
+    (Resolución 577/2019), relación de facturas en tabla, **análisis
+    individual con conclusión de baja para cada factura** y conclusión
+    general con firmas.
+  - **Excel**: hoja `RELACION DE FACTURAS` (con semáforo del informe de
+    trabajo social, valores con formato y total), hoja `EXTRACTOS TRABAJO
+    SOCIAL` (el concepto transcrito por factura) y `LEYENDA`.
 
 **Importante:** el documento deja constancia de que **no fue posible remitir
 las facturas al área de cartera** conforme a la Resolución 577/2019 y por eso
@@ -56,6 +61,7 @@ clic (o arrastre una carpeta encima del `.cmd`).
 ## Dependencias
 
 - `python-docx` (obligatoria, para el Word).
+- `openpyxl` (obligatoria, para el Excel).
 - `pypdf` **o** `pdfplumber` (para leer los PDF unidos).
 
 El `.cmd` las instala solo si faltan.
