@@ -280,6 +280,33 @@ def test_cdconsec_consecutivo_por_factura(tmp_path):
     assert [r["CDCONSEC"] for r in regs] == ["1", "1", "2"]
 
 
+def test_formatos_de_celda_como_archivo_real(tmp_path):
+    # Formatos copiados del archivo real (EMSSANAR): fechas en FECHA CORTA
+    # (mm-dd-yy, sin horas), texto '@' en casi todo, contable en CROVALOBJ.
+    ruta = _crear_savia(
+        tmp_path / "SAVIA.xlsx",
+        [["HUS443697", "890701", "CONSULTA", 1, 93400, 7603, "TA02", "a"]],
+    )
+    regs = org.construir_registros(
+        ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
+    )
+    salida = tmp_path / "out.xlsx"
+    org.escribir_consolidado(regs, salida)
+    ws = openpyxl.load_workbook(str(salida)).active  # sin data_only: leer formatos
+    fmt = {
+        nombre: ws.cell(row=2, column=i).number_format
+        for i, nombre in enumerate(org.COLUMNAS_DISPENSARIO, start=1)
+    }
+    assert fmt["CDFECDOC"] == "mm-dd-yy"
+    assert fmt["CROFECOBJ"] == "mm-dd-yy"
+    assert fmt["CRNCXC"] == "@"
+    assert fmt["CDCONSEC"] == "@"
+    assert fmt["GENUSUARIO4"] == "@"
+    assert fmt["CRDOBSERV"] == "@"
+    assert fmt["CROTIPOBJ"] == "0"
+    assert "#,##0" in fmt["CROVALOBJ"]
+
+
 def test_cli_consolidado(tmp_path):
     ruta = _crear_savia(
         tmp_path / "SAVIA.xlsx",

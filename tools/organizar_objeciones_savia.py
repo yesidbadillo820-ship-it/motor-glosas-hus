@@ -303,6 +303,30 @@ def construir_registros(
 # ─── Escritura del/los Excel del Dispensario ─────────────────────────────────
 
 
+# Formato de celda POR COLUMNA, copiado 1:1 del archivo real
+# (OBJECIONES_EMSSANAR_HUS0000515948.xlsx). 'mm-dd-yy' es el formato builtin
+# de FECHA CORTA de Excel (se muestra dd/mm/yyyy según la config regional, sin
+# horas); '@' es texto; CROVALOBJ lleva el formato contable de miles.
+FORMATOS_DISPENSARIO: dict[str, str] = {
+    "CDCONSEC": "@",
+    "CDFECDOC": "mm-dd-yy",
+    "CRNCXC": "@",
+    "CROFECOBJ": "mm-dd-yy",
+    "CROREFERE": "@",
+    "CROOBSERV": "@",
+    "CROCLAOBJ": "General",
+    "CRNCLAOBJ": "@",
+    "GENUSUARIO4": "@",
+    "CRNCONOBJ": "@",
+    "SLNSERPRO": "@",
+    "IDRIPS": "@",
+    "CTNCENCOS": "@",
+    "CROVALOBJ": '_-* #,##0_-;\\-* #,##0_-;_-* "-"_-;_-@_-',
+    "CRDOBSERV": "@",
+    "CROTIPOBJ": "0",
+}
+
+
 def _escribir_hoja(registros: list[dict], salida: Path) -> None:
     """Escribe UN archivo del Dispensario (hoja OBJECIONES) con las 16 columnas."""
     from openpyxl import Workbook
@@ -323,10 +347,7 @@ def _escribir_hoja(registros: list[dict], salida: Path) -> None:
     for reg in registros:
         for col, nombre in enumerate(COLUMNAS_DISPENSARIO, start=1):
             celda = ws.cell(row=fila, column=col, value=reg.get(nombre))
-            if nombre in ("CDFECDOC", "CROFECOBJ") and reg.get(nombre) is not None:
-                celda.number_format = "yyyy-mm-dd hh:mm:ss"
-            elif nombre == "CROVALOBJ":
-                celda.number_format = "#,##0"
+            celda.number_format = FORMATOS_DISPENSARIO[nombre]
         fila += 1
 
     ws.freeze_panes = "A2"
