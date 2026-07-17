@@ -96,6 +96,12 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Token del agente local de lotes (tools/AgenteLotes.pyw). Sin esta
+      # línea la variable del .env NO llega al contenedor y /agente/lotes
+      # responde 503 para siempre (piloto 17-jul-2026). El default vacío
+      # es seguro aquí: agente_lotes_token es str y "" significa
+      # "endpoints del agente deshabilitados" — el comportamiento diseñado.
+      AGENTE_LOTES_TOKEN: ${AGENTE_LOTES_TOKEN:-}
       # Observability — opcionales. Sin estas vars el motor arranca igual
       # pero el panel de Diagnóstico marca warning (los errores no llegan
       # a Sentry y la analítica de uso no llega a PostHog). Setup gratis:
