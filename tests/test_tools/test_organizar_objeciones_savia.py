@@ -263,12 +263,29 @@ def test_cli_end_to_end_por_factura(tmp_path):
     assert {f[9] for f in filas} == {"TA0201", "CL0801"}  # CRNCONOBJ expandido
 
 
+def test_cdconsec_consecutivo_por_factura(tmp_path):
+    # 2 filas de la 1ª factura y 1 de la 2ª → CDCONSEC 1,1,2 (numeración por factura).
+    ruta = _crear_savia(
+        tmp_path / "SAVIA.xlsx",
+        [
+            ["HUS443697", "890701", "CONSULTA", 1, 93400, 7603, "TA02", "a"],
+            ["HUS443697", "906841", "PROCALCITONINA", 1, 293100, 293100, "CL08", "b"],
+            ["HUS503425", "902210", "HEMOGRAMA", 1, 39400, 3199, "TA08", "c"],
+        ],
+    )
+    regs = org.construir_registros(
+        ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
+    )
+    assert [r["CDCONSEC"] for r in regs] == [1, 1, 2]
+
+
 def test_cli_consolidado(tmp_path):
     ruta = _crear_savia(
         tmp_path / "SAVIA.xlsx",
         [
             ["HUS443697", "890701", "CONSULTA", 1, 93400, 7603, "TA02", "a"],
-            ["HUS503425", "902210", "HEMOGRAMA", 1, 39400, 3199, "TA08", "b"],
+            ["HUS443697", "906841", "PROCALCITONINA", 1, 293100, 293100, "CL08", "b"],
+            ["HUS503425", "902210", "HEMOGRAMA", 1, 39400, 3199, "TA08", "c"],
         ],
     )
     salida = tmp_path / "todo.xlsx"
@@ -276,7 +293,28 @@ def test_cli_consolidado(tmp_path):
     assert rc == 0
     assert salida.is_file()
     ws = openpyxl.load_workbook(str(salida), data_only=True).active
-    assert len(list(ws.iter_rows(values_only=True))) == 3  # header + 2
+    filas = list(ws.iter_rows(values_only=True))[1:]
+    assert len(filas) == 3
+    # CDCONSEC por factura: 1,1 para HUS443697 y 2 para HUS503425.
+    assert [f[0] for f in filas] == [1, 1, 2]
+
+
+def test_por_factura_reinicia_cdconsec(tmp_path):
+    # En archivos por factura (standalone), cada uno arranca su CDCONSEC en 1.
+    ruta = _crear_savia(
+        tmp_path / "SAVIA.xlsx",
+        [
+            ["HUS443697", "890701", "CONSULTA", 1, 93400, 7603, "TA02", "a"],
+            ["HUS503425", "902210", "HEMOGRAMA", 1, 39400, 3199, "TA08", "b"],
+        ],
+    )
+    salida = tmp_path / "out"
+    rc = org.main(["--entrada", str(ruta), "--salida", str(salida)])
+    assert rc == 0
+    for nombre in ("OBJECIONES_SAVIA_HUS0000443697.xlsx", "OBJECIONES_SAVIA_HUS0000503425.xlsx"):
+        ws = openpyxl.load_workbook(str(salida / nombre), data_only=True).active
+        filas = list(ws.iter_rows(values_only=True))[1:]
+        assert all(f[0] == 1 for f in filas)
 
 
 def test_cli_entrada_inexistente(tmp_path):

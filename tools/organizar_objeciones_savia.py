@@ -23,7 +23,8 @@ MAPEO DE CAMPOS (SAVIA → Dispensario):
     CROVALOBJ    ← Valor_Glosa
     CRDOBSERV    ← "<CRNCONOBJ> <Observacion_Glosa_A>$<Valor_Glosa>" (formato Dispensario)
     CDFECDOC / CROFECOBJ ← --fecha (default: hoy)
-    CDCONSEC=1, CROCLAOBJ=0, GENUSUARIO4=999, CROTIPOBJ=0  (constantes de la guía)
+    CDCONSEC     ← consecutivo POR FACTURA (1-1-1 la 1ª, 2-2-2 la 2ª, …)
+    CROCLAOBJ=0, GENUSUARIO4=999, CROTIPOBJ=0  (constantes de la guía)
     CROREFERE, CROOBSERV, CRNCLAOBJ, IDRIPS, CTNCENCOS ← vacíos
 
 CÓDIGO DE OBJECIÓN (--codigo-sufijo / --mapa-codigos):
@@ -251,6 +252,11 @@ def construir_registros(
         return []
     idx = _resolver_columnas([str(h) for h in headers])
 
+    # CDCONSEC es el consecutivo POR FACTURA: todas las filas de la 1ª factura
+    # llevan `consecutivo`, las de la 2ª `consecutivo+1`, y así (1-1-1, 2-2-2…),
+    # numerando por orden de aparición.
+    consec_por_factura: dict[str, int] = {}
+
     registros: list[dict] = []
     for r in filas:
         if r is None:
@@ -262,13 +268,16 @@ def construir_registros(
         if not factura_raw and not observacion and not motivo:
             continue
 
+        crncxc = factura_larga(factura_raw)
+        if crncxc not in consec_por_factura:
+            consec_por_factura[crncxc] = consecutivo + len(consec_por_factura)
         codigo = codigo_dispensario(motivo, codigo_sufijo, mapa_codigos)
         valor = _num(_cell(r, idx, "valor_glosa"))
         registros.append(
             {
-                "CDCONSEC": consecutivo,
+                "CDCONSEC": consec_por_factura[crncxc],
                 "CDFECDOC": fecha,
-                "CRNCXC": factura_larga(factura_raw),
+                "CRNCXC": crncxc,
                 "CROFECOBJ": fecha,
                 "CROREFERE": None,
                 "CROOBSERV": None,
@@ -326,18 +335,27 @@ PREFIJO_DEFAULT = "OBJECIONES_SAVIA"
 
 
 def escribir_por_factura(
-    registros: list[dict], carpeta: Path, prefijo: str = PREFIJO_DEFAULT
+    registros: list[dict],
+    carpeta: Path,
+    prefijo: str = PREFIJO_DEFAULT,
+    consecutivo: int = CDCONSEC_DEFAULT,
 ) -> list[Path]:
     """Escribe un archivo por factura, nombrado <prefijo>_<CRNCXC>.xlsx (por
     defecto OBJECIONES_SAVIA_<CRNCXC>.xlsx). La estructura interna es la de la
     guía del Dispensario, pero el archivo se identifica como de SAVIA.
-    Devuelve las rutas generadas."""
+
+    Cada archivo lleva UNA factura, así que su CDCONSEC arranca en `consecutivo`
+    (1 por defecto), igual que la guía de una sola factura. Devuelve las rutas
+    generadas."""
     por_factura: dict[str, list[dict]] = defaultdict(list)
     for reg in registros:
         por_factura[reg["CRNCXC"]].append(reg)
 
     generados: list[Path] = []
     for crncxc, regs in sorted(por_factura.items()):
+        # Archivo standalone: su única factura es el consecutivo 1.
+        for reg in regs:
+            reg["CDCONSEC"] = consecutivo
         destino = carpeta / f"{prefijo}_{crncxc}.xlsx"
         _escribir_hoja(regs, destino)
         generados.append(destino)
@@ -442,7 +460,8 @@ def main(argv: list[str] | None = None) -> int:
         "--consecutivo",
         type=int,
         default=CDCONSEC_DEFAULT,
-        help=f"Valor de la columna CDCONSEC. Default: {CDCONSEC_DEFAULT} (como la guía).",
+        help=f"Número inicial del consecutivo por factura (CDCONSEC). Default: {CDCONSEC_DEFAULT}. "
+        "En el consolidado la 1ª factura lleva este valor, la 2ª +1, etc. (1-1-1, 2-2-2…).",
     )
     parser.add_argument("--log", type=Path, default=None, help="Guarda un log adicional a archivo.")
     args = parser.parse_args(argv)
@@ -478,7 +497,9 @@ def main(argv: list[str] | None = None) -> int:
         escribir_consolidado(registros, args.salida)
         logger.info(f"\nExcel de SAVIA (consolidado, formato de la guía): {args.salida}")
     else:
-        generados = escribir_por_factura(registros, args.salida, prefijo=args.prefijo)
+        generados = escribir_por_factura(
+            registros, args.salida, prefijo=args.prefijo, consecutivo=args.consecutivo
+        )
         logger.info(f"\n{len(generados)} archivo(s) de SAVIA en: {args.salida}")
 
     _resumen(registros)
