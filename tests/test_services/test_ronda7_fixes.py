@@ -192,9 +192,10 @@ def test_fix_u_aurora_contrato_ajeno():
 
 
 def test_fix_u_catalogo_cubre_15_entidades_principales():
-    """Total de EPSs/regímenes catalogados >= 14. (Ronda 23: se quitó
-    PRECIMED — el contrato 319/2024 es de SUMINISTRO con PRECIMEC SAS, no
-    un pagador que glose — por eso el piso bajó de 15 a 14.)"""
+    """Total de EPSs/regímenes catalogados >= 13. (Ronda 23: se quitó
+    PRECIMED — contrato de SUMINISTRO, no un pagador que glose — bajando el
+    piso de 15 a 14. Jul-2026: se quitó SALUD MIA porque el contrato
+    CSA2025EVE3A005 culminó, bajando el piso a 13.)"""
     from app.services.glosa_ia_prompts import CONTRATOS_HUS
 
-    assert len(CONTRATOS_HUS) >= 14
+    assert len(CONTRATOS_HUS) >= 13

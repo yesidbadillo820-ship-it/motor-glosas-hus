@@ -18,7 +18,6 @@ POLICÍA NAL. (Med/Alta)    068-5-200004-26 (SFI 004)  UVB – 8 %
 POLICÍA NAL. (Oncología)   068-5-200006-26             UVB – 8 % + Inst. HUS
 SUMIMEDICAL                Tarifario 2025              SOAT – 15 %
 DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT/SMLV – 20 %
-SALUD MIA                  CSA2025EVE3A005             SOAT – 15 %
 AURORA (ARL/Vida)          GID-ARL-0090 (2024)        PROPIAS + SOAT – 3 %
 SIN CONTRATO               —                           SOAT pleno
 """
@@ -265,16 +264,6 @@ CONTRATOS_HUS: dict[str, dict] = {
         "vigencia": "Dic 2025 – Jul 2026 o hasta agotar presupuesto",
         "contacto": "DIRECCIÓN DE SANIDAD EJÉRCITO — DISPENSARIO MÉDICO BUCARAMANGA | gerencia@hus.gov.co",
         "nota": "Contrato interadministrativo. Valor: $3.235.050.000 M/CTE. Cobertura: servicios de salud mediana y alta complejidad para afiliados Fuerzas Militares Regional 2. Tarifa pactada: SOAT/SMLV -20%. Objeto idéntico al ACUERDO 002 del 27-04-2001 del Consejo Superior de Salud FF.MM.",
-    },
-    "SALUD MIA": {
-        "numero": "CONTRATOS CSA2025EVE3A005 + SSA2025EVE3A005",
-        "tarifa": "SOAT -15 %",
-        "factor": 0.85,
-        "tipo": "EPS / ASEGURADORA",
-        "nit": "N/D",
-        "vigencia": "Desde 01/06/2025 con renovación automática",
-        "contacto": "Correo contratación HUS",
-        "nota": "Dos documentos firmados: CSA2025EVE3A005 (Contributivo) y SSA2025EVE3A005 (Subsidiado). Cláusula décima séptima #10/#11 y vigésima cuarta (parágrafo eventos adversos) son defensivas clave.",
     },
 }
 
