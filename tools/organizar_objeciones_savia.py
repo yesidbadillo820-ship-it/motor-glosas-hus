@@ -21,7 +21,7 @@ MAPEO DE CAMPOS (SAVIA → Dispensario):
     CRNCONOBJ    ← Motivo_Esp_Glosa_Valor_A  (TA08 → TA0801, se completa el consecutivo)
     SLNSERPRO    ← Cod_Servicio
     CROVALOBJ    ← Valor_Glosa
-    CRDOBSERV    ← Observacion_Glosa_A
+    CRDOBSERV    ← "<CRNCONOBJ> <Observacion_Glosa_A>$<Valor_Glosa>" (formato Dispensario)
     CDFECDOC / CROFECOBJ ← --fecha (default: hoy)
     CDCONSEC=1, CROCLAOBJ=0, GENUSUARIO4=999, CROTIPOBJ=0  (constantes de la guía)
     CROREFERE, CROOBSERV, CRNCLAOBJ, IDRIPS, CTNCENCOS ← vacíos
@@ -202,6 +202,27 @@ def codigo_dispensario(
     return cod
 
 
+# ─── Texto de la observación en el formato del Dispensario ───────────────────
+
+_RE_VALOR_FINAL = re.compile(r"\$\s*[\d.,]+\s*$")
+
+
+def construir_crdobserv(codigo: str, observacion: str, valor: int) -> str:
+    """Arma el CRDOBSERV con el formato del Dispensario: ``<código> <texto>$<valor>``.
+
+    Verificado contra los archivos reales (OBJECIONES_DISPENSARIO / EMSSANAR):
+    el texto SIEMPRE empieza con el código de objeción y termina pegado a
+    ``$<valor objetado>``. Evita duplicar el código o el ``$valor`` si el texto
+    de SAVIA ya los trajera."""
+    t = (observacion or "").strip()
+    cod = (codigo or "").strip()
+    if cod and t.upper().startswith(cod.upper()):
+        t = t[len(cod) :].strip()
+    t = _RE_VALOR_FINAL.sub("", t).strip()
+    prefijo = f"{cod} " if cod else ""
+    return f"{prefijo}{t}${valor}"
+
+
 # ─── Transformación SAVIA → Dispensario ──────────────────────────────────────
 
 
@@ -241,6 +262,8 @@ def construir_registros(
         if not factura_raw and not observacion and not motivo:
             continue
 
+        codigo = codigo_dispensario(motivo, codigo_sufijo, mapa_codigos)
+        valor = _num(_cell(r, idx, "valor_glosa"))
         registros.append(
             {
                 "CDCONSEC": consecutivo,
@@ -252,12 +275,12 @@ def construir_registros(
                 "CROCLAOBJ": CROCLAOBJ_CONST,
                 "CRNCLAOBJ": None,
                 "GENUSUARIO4": GENUSUARIO4_CONST,
-                "CRNCONOBJ": codigo_dispensario(motivo, codigo_sufijo, mapa_codigos),
+                "CRNCONOBJ": codigo,
                 "SLNSERPRO": str(_cell(r, idx, "cod_servicio") or "").strip() or None,
                 "IDRIPS": None,
                 "CTNCENCOS": None,
-                "CROVALOBJ": _num(_cell(r, idx, "valor_glosa")),
-                "CRDOBSERV": observacion,
+                "CROVALOBJ": valor,
+                "CRDOBSERV": construir_crdobserv(codigo, observacion, valor),
                 "CROTIPOBJ": CROTIPOBJ_CONST,
             }
         )

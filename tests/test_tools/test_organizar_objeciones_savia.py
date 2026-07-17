@@ -99,6 +99,26 @@ def test_codigo_dispensario_tolera_espacios_minusculas():
     assert org.codigo_dispensario("  ta08 ") == "TA0801"
 
 
+# ─── construir_crdobserv (formato Dispensario) ───────────────────────────────
+
+
+def test_construir_crdobserv_formato_dispensario():
+    # "<código> <texto>$<valor>", igual que los archivos reales.
+    assert (
+        org.construir_crdobserv("TA0801", "LOS CARGOS POR APOYO...", 15400)
+        == "TA0801 LOS CARGOS POR APOYO...$15400"
+    )
+
+
+def test_construir_crdobserv_no_duplica_codigo_ni_valor():
+    # Si el texto ya trae el código al inicio o el $valor al final, no se repiten.
+    assert org.construir_crdobserv("TA0801", "TA0801 texto$15400", 15400) == "TA0801 texto$15400"
+
+
+def test_construir_crdobserv_sin_codigo():
+    assert org.construir_crdobserv("", "texto", 500) == "texto$500"
+
+
 # ─── _num ────────────────────────────────────────────────────────────────────
 
 
@@ -157,7 +177,8 @@ def test_construir_registros_mapea_al_layout_dispensario(tmp_path):
     assert reg["CRNCONOBJ"] == "TA0201"
     assert reg["SLNSERPRO"] == "890701"
     assert reg["CROVALOBJ"] == 7603
-    assert reg["CRDOBSERV"] == "Se objeta mayor valor..."
+    # CRDOBSERV en formato Dispensario: "<código> <texto>$<valor>".
+    assert reg["CRDOBSERV"] == "TA0201 Se objeta mayor valor...$7603"
     assert reg["CDCONSEC"] == 1
     assert reg["CROCLAOBJ"] == 0
     assert reg["GENUSUARIO4"] == 999
