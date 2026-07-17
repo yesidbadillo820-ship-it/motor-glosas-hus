@@ -1,0 +1,77 @@
+@echo off
+REM ====================================================================
+REM  VALIDAR_FURIPS.cmd  -  Bot de doble clic del Motor Glosas HUS.
+REM
+REM  Valida los FURIPS 1 y 2 (TXT) contra la malla de la Circular 022
+REM  de 2023 de la ADRES y contra los soportes de cada carpeta de
+REM  factura (RIPS, CUV, factura XML/PDF, epicrisis) y deja un informe
+REM  Excel detallado: INFORME_VALIDACION_FURIPS_AAAAMMDD.xlsx.
+REM
+REM  USO:
+REM   1) Copie este .cmd JUNTO con validar_furips.py (y los demas .py
+REM      de la carpeta tools\adres) a la carpeta raiz de las facturas.
+REM   2) Doble clic. Tambien puede ARRASTRAR una carpeta encima del
+REM      .cmd para validar esa carpeta.
+REM
+REM  Se instala solo openpyxl y pypdf si faltan. No toca los archivos
+REM  originales: solo LEE y genera el Excel.
+REM ====================================================================
+chcp 65001 >nul 2>&1
+setlocal EnableExtensions DisableDelayedExpansion
+title VALIDAR FURIPS - Motor Glosas HUS
+
+echo.
+echo ============================================================
+echo   VALIDAR FURIPS - Circular 022/2023 ADRES + soportes
+echo ============================================================
+echo.
+
+REM --- 1) Carpeta a procesar: la arrastrada o la del propio .cmd ------
+set "CARPETA=%~1"
+if not defined CARPETA set "CARPETA=%~dp0"
+if "%CARPETA:~-1%"=="\" set "CARPETA=%CARPETA:~0,-1%"
+echo [i] Carpeta a validar: "%CARPETA%"
+echo.
+
+REM --- 2) Buscar Python (validando por ejecucion) ---------------------
+set "PYEXE="
+py -3 -c "import sys" >nul 2>&1 && set "PYEXE=py -3"
+if not defined PYEXE ( python -c "import sys" >nul 2>&1 && set "PYEXE=python" )
+if not defined PYEXE ( python3 -c "import sys" >nul 2>&1 && set "PYEXE=python3" )
+if not defined PYEXE (
+    echo [X] No se encontro Python. Instalelo desde https://www.python.org/downloads/
+    echo     marcando la casilla "Add Python to PATH" y vuelva a dar doble clic.
+    pause
+    exit /b 1
+)
+
+REM --- 3) Asegurar openpyxl (Excel) y pypdf (lectura de PDF) ----------
+%PYEXE% -c "import openpyxl" >nul 2>&1 || (
+    echo [i] Instalando el componente de Excel ^(openpyxl^), espere...
+    %PYEXE% -m pip install --quiet --user openpyxl >nul 2>&1
+)
+%PYEXE% -c "import openpyxl" >nul 2>&1 || (
+    echo [X] No se pudo instalar openpyxl. Ejecute a mano:
+    echo     %PYEXE% -m pip install openpyxl
+    pause
+    exit /b 1
+)
+%PYEXE% -c "import pypdf" >nul 2>&1 || %PYEXE% -c "import pdfplumber" >nul 2>&1 || (
+    echo [i] Instalando el lector de PDF ^(pypdf^), espere...
+    %PYEXE% -m pip install --quiet --user pypdf >nul 2>&1
+)
+
+REM --- 4) Correr el bot ----------------------------------------------
+if not exist "%~dp0validar_furips.py" (
+    echo [X] No encuentro validar_furips.py junto a este .cmd.
+    echo     Copie AMBOS archivos a la misma carpeta.
+    pause
+    exit /b 1
+)
+%PYEXE% "%~dp0validar_furips.py" --raiz "%CARPETA%"
+echo.
+echo ============================================================
+echo   Listo. Revise el Excel INFORME_VALIDACION_FURIPS_*.xlsx
+echo   que quedo en: "%CARPETA%"
+echo ============================================================
+pause
