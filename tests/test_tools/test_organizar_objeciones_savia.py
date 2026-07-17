@@ -183,7 +183,7 @@ def test_construir_registros_mapea_al_layout_dispensario(tmp_path):
     assert reg["CDCONSEC"] == "1"
     assert reg["CROCLAOBJ"] == 0
     assert reg["GENUSUARIO4"] == "999"
-    assert reg["CROTIPOBJ"] == 0
+    assert reg["CROTIPOBJ"] == 0  # factura solo TA → administrativa
     assert reg["CDFECDOC"] == _FECHA
     assert reg["CROFECOBJ"] == _FECHA
     # Columnas vacías del formato.
@@ -278,6 +278,40 @@ def test_cdconsec_consecutivo_por_factura(tmp_path):
         ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
     )
     assert [r["CDCONSEC"] for r in regs] == ["1", "1", "2"]
+
+
+def test_crotipobj_por_factura():
+    # solo administrativos → 0; solo CL → 1; mezcla → 2.
+    assert org.crotipobj_factura({"TA", "FA", "SO"}) == 0
+    assert org.crotipobj_factura({"AU"}) == 0
+    assert org.crotipobj_factura({"CL"}) == 1
+    assert org.crotipobj_factura({"TA", "CL"}) == 2
+    assert org.crotipobj_factura({"TA", "FA", "SO", "AU", "CL"}) == 2
+
+
+def test_crotipobj_asignado_a_todas_las_filas_de_la_factura(tmp_path):
+    # HUS443697 mezcla TA y CL → 2 en TODAS sus filas; HUS503425 solo TA → 0;
+    # HUS111111 solo CL → 1.
+    ruta = _crear_savia(
+        tmp_path / "SAVIA.xlsx",
+        [
+            ["HUS443697", "890701", "CONSULTA", 1, 93400, 7603, "TA02", "a"],
+            ["HUS443697", "906841", "PROCALCITONINA", 1, 293100, 293100, "CL08", "b"],
+            ["HUS503425", "902210", "HEMOGRAMA", 1, 39400, 3199, "TA08", "c"],
+            ["HUS111111", "20065058", "ONDANSETRON", 1, 3700, 3700, "CL07", "d"],
+        ],
+    )
+    regs = org.construir_registros(
+        ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
+    )
+    tipos = {(r["CRNCXC"], r["CROTIPOBJ"]) for r in regs}
+    assert tipos == {
+        ("HUS0000443697", 2),
+        ("HUS0000503425", 0),
+        ("HUS0000111111", 1),
+    }
+    # Y las DOS filas de HUS443697 llevan 2 (no solo la de CL).
+    assert [r["CROTIPOBJ"] for r in regs if r["CRNCXC"] == "HUS0000443697"] == [2, 2]
 
 
 def test_formatos_de_celda_como_archivo_real(tmp_path):

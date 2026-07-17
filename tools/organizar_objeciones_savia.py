@@ -24,7 +24,8 @@ MAPEO DE CAMPOS (SAVIA → Dispensario):
     CRDOBSERV    ← "<CRNCONOBJ> <Observacion_Glosa_A>$<Valor_Glosa>" (formato Dispensario)
     CDFECDOC / CROFECOBJ ← --fecha (default: hoy)
     CDCONSEC     ← consecutivo POR FACTURA (1-1-1 la 1ª, 2-2-2 la 2ª, …)
-    CROCLAOBJ=0, GENUSUARIO4=999, CROTIPOBJ=0  (constantes de la guía)
+    CROTIPOBJ    ← por factura: solo TA/FA/SO/AU→0, solo CL→1, mezcla con CL→2
+    CROCLAOBJ=0, GENUSUARIO4=999  (constantes de la guía)
     CROREFERE, CROOBSERV, CRNCLAOBJ, IDRIPS, CTNCENCOS ← vacíos
 
 CÓDIGO DE OBJECIÓN (--codigo-sufijo / --mapa-codigos):
@@ -83,10 +84,10 @@ COLUMNAS_DISPENSARIO: tuple[str, ...] = (
 # Valores constantes tomados tal cual de la guía OBJECIONES_DISPENSARIO_*.xlsx.
 # OJO con los tipos: en los archivos reales CDCONSEC y GENUSUARIO4 se guardan
 # como TEXTO ('1', '999'); CROCLAOBJ/CROVALOBJ/CROTIPOBJ como NÚMERO.
+# CROTIPOBJ NO es constante: se calcula por factura (ver crotipobj_factura).
 CDCONSEC_DEFAULT = 1
 CROCLAOBJ_CONST = 0
 GENUSUARIO4_CONST = "999"
-CROTIPOBJ_CONST = 0
 CODIGO_SUFIJO_DEFAULT = "01"
 
 
@@ -205,6 +206,29 @@ def codigo_dispensario(
     return cod
 
 
+# ─── CROTIPOBJ: tipo de objeción por factura ─────────────────────────────────
+
+# Grupos ADMINISTRATIVOS del catálogo (tarifas, facturación, soportes,
+# autorizaciones…). CL (calidad/pertinencia) es el grupo clínico.
+GRUPO_CLINICO = "CL"
+
+
+def crotipobj_factura(grupos: set[str]) -> int:
+    """Tipo de objeción de la factura según sus grupos de concepto (2 letras):
+
+    - solo administrativos (TA/FA/SO/AU…)  → 0
+    - solo CL (calidad)                    → 1
+    - administrativos + CL (mezclada)      → 2
+    """
+    tiene_cl = GRUPO_CLINICO in grupos
+    tiene_admin = any(g != GRUPO_CLINICO for g in grupos)
+    if tiene_cl and tiene_admin:
+        return 2
+    if tiene_cl:
+        return 1
+    return 0
+
+
 # ─── Texto de la observación en el formato del Dispensario ───────────────────
 
 _RE_VALOR_FINAL = re.compile(r"\$\s*[\d.,]+\s*$")
@@ -293,10 +317,21 @@ def construir_registros(
                 "CTNCENCOS": None,
                 "CROVALOBJ": valor,
                 "CRDOBSERV": construir_crdobserv(codigo, observacion, valor),
-                "CROTIPOBJ": CROTIPOBJ_CONST,
+                "CROTIPOBJ": 0,  # placeholder: se calcula por factura abajo
             }
         )
     wb.close()
+
+    # CROTIPOBJ se define POR FACTURA según la mezcla de conceptos que lleve:
+    #   solo administrativos (TA/FA/SO/AU…) → 0
+    #   solo CL (calidad/pertinencia)       → 1
+    #   administrativos + CL                → 2
+    # Todas las filas de la factura llevan el mismo valor.
+    grupos_por_factura: dict[str, set[str]] = defaultdict(set)
+    for reg in registros:
+        grupos_por_factura[reg["CRNCXC"]].add(str(reg["CRNCONOBJ"])[:2].upper())
+    for reg in registros:
+        reg["CROTIPOBJ"] = crotipobj_factura(grupos_por_factura[reg["CRNCXC"]])
     return registros
 
 
