@@ -43,9 +43,20 @@ GEN_FACTURA, GEN_VAL_ACEPTADO, GEN_ACTA, GEN_FECHA, GEN_CONCEPTO = 1, 5, 11, 12,
 
 RE_ACTA = re.compile(r"ACTA\s*(?:DE\s+CONCILIACI\w+\s*)?(?:N\s*[°º\.]?\s*)?(\d{3,4})", re.I)
 RE_FECHA_DMA = re.compile(r"(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})")
-MESES = {"ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6,
-         "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11,
-         "DICIEMBRE": 12}
+MESES = {
+    "ENERO": 1,
+    "FEBRERO": 2,
+    "MARZO": 3,
+    "ABRIL": 4,
+    "MAYO": 5,
+    "JUNIO": 6,
+    "JULIO": 7,
+    "AGOSTO": 8,
+    "SEPTIEMBRE": 9,
+    "OCTUBRE": 10,
+    "NOVIEMBRE": 11,
+    "DICIEMBRE": 12,
+}
 RE_FECHA_TEXTO = re.compile(r"(\d{1,2})\s+DE\s+(" + "|".join(MESES) + r")\s+DE\s+(\d{4})", re.I)
 
 
@@ -84,7 +95,7 @@ def parsear_obs(obs):
     m = RE_ACTA.search(texto)
     acta = int(m.group(1)) if m else None
     fecha = None
-    resto = texto[m.end():] if m else texto
+    resto = texto[m.end() :] if m else texto
     mf = RE_FECHA_DMA.search(resto[:60])
     if mf:
         d, mth, y = (int(x) for x in mf.groups())
@@ -103,11 +114,11 @@ def parsear_obs(obs):
     respuesta = ""
     ancla = re.search(r"DONDE\s*:?|EN LA CUAL\s*[;:]?", resto, re.I)
     if ancla:
-        respuesta = resto[ancla.end():]
+        respuesta = resto[ancla.end() :]
     else:
         inicio = re.search(r"EN CONCILI\w+|ESE HUS", resto, re.I)
         if inicio:
-            respuesta = resto[inicio.start():]
+            respuesta = resto[inicio.start() :]
     respuesta = respuesta.strip(" :;,.\n")
     # colapsa el texto cuando la observacion trae la misma respuesta duplicada
     mitad = len(respuesta) // 2
@@ -148,12 +159,14 @@ def cargar_general(ruta):
         if not factura.upper().startswith("HUS"):
             continue
         acta = a_numero(fila[GEN_ACTA])
-        por_factura[factura.upper()].append({
-            "val": a_numero(fila[GEN_VAL_ACEPTADO]),
-            "acta": acta or None,
-            "fecha": a_fecha(fila[GEN_FECHA]),
-            "concepto": limpiar(fila[GEN_CONCEPTO]),
-        })
+        por_factura[factura.upper()].append(
+            {
+                "val": a_numero(fila[GEN_VAL_ACEPTADO]),
+                "acta": acta or None,
+                "fecha": a_fecha(fila[GEN_FECHA]),
+                "concepto": limpiar(fila[GEN_CONCEPTO]),
+            }
+        )
     wb.close()
     return por_factura
 
@@ -172,25 +185,33 @@ def resolver_fila(factura, valor, obs, general):
         if acta_obs in por_acta:
             grupo = por_acta[acta_obs]
         else:
-            con_cuadre = [g for g in por_acta.values()
-                          if buscar_subconjunto([c["val"] for c in g], valor)]
+            con_cuadre = [
+                g for g in por_acta.values() if buscar_subconjunto([c["val"] for c in g], valor)
+            ]
             candidatos = con_cuadre or list(por_acta.values())
             grupo = max(candidatos, key=lambda g: g[0]["fecha"] or datetime.min)
             if acta_obs and grupo:
-                notas.append(f"NC cita acta {acta_obs}; circularizacion la registra en acta {grupo[0]['acta']}")
+                notas.append(
+                    f"NC cita acta {acta_obs}; circularizacion la registra en acta {grupo[0]['acta']}"
+                )
 
     if grupo:
         acta, fecha = grupo[0]["acta"], grupo[0]["fecha"]
         subconjunto = buscar_subconjunto([c["val"] for c in grupo], valor)
         if subconjunto is not None:
-            conceptos = list(dict.fromkeys(
-                grupo[i]["concepto"] for i in subconjunto if grupo[i]["concepto"]))
+            conceptos = list(
+                dict.fromkeys(grupo[i]["concepto"] for i in subconjunto if grupo[i]["concepto"])
+            )
             return " | ".join(conceptos), acta, fecha, notas
         total = sum(c["val"] for c in grupo)
-        notas.append(f"valor aceptado {valor:,} no cuadra con el acta ({total:,}); respuesta tomada de la observacion de la NC")
+        notas.append(
+            f"valor aceptado {valor:,} no cuadra con el acta ({total:,}); respuesta tomada de la observacion de la NC"
+        )
         if resp_obs:
             return resp_obs, acta, fecha, notas
-        notas.append("sin texto extraible en la observacion; se unifican todos los conceptos del acta")
+        notas.append(
+            "sin texto extraible en la observacion; se unifican todos los conceptos del acta"
+        )
         return " | ".join(c["concepto"] for c in grupo if c["concepto"]), acta, fecha, notas
 
     notas.append("factura no esta en la circularizacion; datos tomados de la observacion de la NC")
@@ -221,13 +242,15 @@ def main():
         factura = limpiar(fila[BD_FACTURA].value)
         if not factura:
             continue
-        pendiente = (not limpiar(fila[BD_RESPUESTA].value)
-                     and fila[BD_NUM].value is None and fila[BD_FECHA].value is None)
+        pendiente = (
+            not limpiar(fila[BD_RESPUESTA].value)
+            and fila[BD_NUM].value is None
+            and fila[BD_FECHA].value is None
+        )
         if not pendiente:
             continue
         valor = a_numero(fila[BD_VALOR].value)
-        respuesta, acta, fecha, notas = resolver_fila(
-            factura, valor, fila[BD_OBS].value, general)
+        respuesta, acta, fecha, notas = resolver_fila(factura, valor, fila[BD_OBS].value, general)
         if respuesta:
             fila[BD_RESPUESTA].value = respuesta
         if acta:
@@ -239,8 +262,15 @@ def main():
         if not (respuesta and acta and fecha):
             notas.append("INCOMPLETA: revisar manualmente")
         for n in notas:
-            reporte.append({"fila": fila[0].row, "factura": factura,
-                            "valor_aceptado": valor, "acta": acta, "nota": n})
+            reporte.append(
+                {
+                    "fila": fila[0].row,
+                    "factura": factura,
+                    "valor_aceptado": valor,
+                    "acta": acta,
+                    "nota": n,
+                }
+            )
 
     wb.save(ruta_salida)
     print(f"Filas diligenciadas: {llenas}")
