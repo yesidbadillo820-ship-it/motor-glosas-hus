@@ -45,14 +45,20 @@ py validar_furips.py --raiz "C:\FACTURAS" --sin-pdf
 raíz de las facturas y dele doble clic (o arrastre una carpeta encima del
 `.cmd`). Instala solo `openpyxl`/`pypdf` si faltan.
 
-## Cómo asocia facturas con carpetas
+## Cómo asocia facturas con soportes
 
 - Cada registro del FURIPS 1 se identifica por el **número de factura**
   (campo 3), normalizado (`HUS0000374152` = `HUS374152`).
-- Una carpeta se considera "de factura" si contiene soportes (RIPS, CUV,
-  XML, PDF) y su nombre contiene el número de factura.
-- Se reportan también las facturas **sin carpeta** de soportes y las
-  carpetas **sin registro** FURIPS.
+- Los soportes se agrupan por el **número de factura en el nombre de cada
+  archivo** (`680010079201_HUS374152_EPICRIS.pdf` → `HUS374152`), por lo
+  que funcionan las **dos organizaciones** reales:
+  - una **carpeta por factura** (`HUS374152\…`), o
+  - una **carpeta plana** (p. ej. `SOPORTES\`) con los archivos de muchas
+    facturas mezclados.
+- Si un archivo no trae el número en el nombre, se intenta con el nombre
+  de su carpeta.
+- Se reportan también las facturas **sin soportes** y los soportes **sin
+  registro** FURIPS.
 
 ## El informe Excel (7 hojas)
 
