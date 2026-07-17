@@ -8,12 +8,19 @@ y reporta el resultado factura por factura leyendo el CSV --reporte del bot.
 Solo usa stdlib (urllib): en el PC del hospital no hay que instalar nada
 más que lo que ya usa el bot (Python + playwright + openpyxl).
 
-Uso (PowerShell):
-    setx MOTOR_GLOSAS_URL "http://servidor-hus:8000"
-    setx AGENTE_LOTES_TOKEN "<mismo token del .env del servidor>"
-    py tools\\agente_lotes.py                # loop infinito (servicio)
+Versión de escritorio (recomendada para el día a día): doble clic en
+tools\\AgenteLotes.pyw — abre una ventana donde se configura URL/token una
+sola vez y se inicia/detiene el agente con un botón. Este CLI queda para
+uso avanzado y automatización.
+
+Uso CLI (PowerShell, desde la carpeta del proyecto):
+    py tools\\agente_lotes.py --url http://servidor:8000 --token <token>
     py tools\\agente_lotes.py --una-vez      # procesa 1 tarea y sale
     py tools\\agente_lotes.py --con-cabeza   # muestra el browser (debug)
+
+URL y token también pueden venir de las variables MOTOR_GLOSAS_URL /
+AGENTE_LOTES_TOKEN, o de la configuración guardada por la ventana de
+escritorio (%APPDATA%\\MotorGlosasHUS\\agente_lotes.json).
 """
 
 from __future__ import annotations
@@ -38,6 +45,65 @@ BOTS_POR_TIPO = {"RESPONDER_COOSALUD": TOOLS_DIR / "responder_glosas_coosalud.py
 # Cada cuántos segundos se relee el CSV del bot para reportar progreso
 # incremental (el bot escribe append-as-you-go).
 INTERVALO_PROGRESO = 30
+
+
+# ─── Configuración compartida con la ventana de escritorio ───────────────────
+
+
+def ruta_config() -> Path:
+    """%APPDATA%\\MotorGlosasHUS\\agente_lotes.json (o ~/.config en Linux)."""
+    base = os.environ.get("APPDATA")
+    raiz = Path(base) if base else Path.home() / ".config"
+    return raiz / "MotorGlosasHUS" / "agente_lotes.json"
+
+
+def cargar_config() -> dict:
+    try:
+        return json.loads(ruta_config().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def guardar_config(config: dict) -> None:
+    ruta = ruta_config()
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def construir_comando(
+    bot: Path,
+    tarea: dict,
+    carpeta: Path,
+    *,
+    indice: Path | None = None,
+    cerrar_residuales: bool = False,
+    con_cabeza: bool = False,
+) -> list[str]:
+    """Arma la línea de comando del bot para una tarea (CLI y ventana)."""
+    comando = [
+        sys.executable,
+        str(bot),
+        "--excel",
+        str(carpeta / tarea["nombre_archivo"]),
+        "--hoja",
+        tarea["hoja"],
+        "--todas",
+        "--reporte",
+        str(carpeta / "reporte.csv"),
+        "--evidencias",
+        str(carpeta / "EVIDENCIA"),
+        "--log",
+        str(carpeta / "bot.log"),
+    ]
+    if tarea.get("incluir_calidad"):
+        comando.append("--incluir-calidad")
+    if indice:
+        comando += ["--indice", str(indice)]
+    if cerrar_residuales:
+        comando.append("--cerrar-residuales")
+    if con_cabeza:
+        comando.append("--con-cabeza")
+    return comando
 
 
 class ApiLotes:
@@ -124,34 +190,17 @@ def procesar_tarea(api: ApiLotes, tarea: dict, args: argparse.Namespace) -> None
         return
 
     carpeta = args.workdir / f"lote_{tarea['lote_id']}"
-    excel = carpeta / tarea["nombre_archivo"]
     reporte = carpeta / "reporte.csv"
-    api.descargar_excel(tarea_id, excel)
+    api.descargar_excel(tarea_id, carpeta / tarea["nombre_archivo"])
 
-    comando = [
-        sys.executable,
-        str(bot),
-        "--excel",
-        str(excel),
-        "--hoja",
-        tarea["hoja"],
-        "--todas",
-        "--reporte",
-        str(reporte),
-        "--evidencias",
-        str(carpeta / "EVIDENCIA"),
-        "--log",
-        str(carpeta / "bot.log"),
-    ]
-    if tarea.get("incluir_calidad"):
-        comando.append("--incluir-calidad")
-    if args.indice:
-        comando += ["--indice", str(args.indice)]
-    if args.cerrar_residuales:
-        comando.append("--cerrar-residuales")
-    if args.con_cabeza:
-        comando.append("--con-cabeza")
-
+    comando = construir_comando(
+        bot,
+        tarea,
+        carpeta,
+        indice=args.indice,
+        cerrar_residuales=args.cerrar_residuales,
+        con_cabeza=args.con_cabeza,
+    )
     logger.info(f"Tarea {tarea_id} (lote {tarea['lote_id']}): {' '.join(comando)}")
     proceso = subprocess.Popen(comando)
     reportadas = 0
@@ -171,16 +220,17 @@ def procesar_tarea(api: ApiLotes, tarea: dict, args: argparse.Namespace) -> None
 
 
 def main() -> int:
+    config = cargar_config()
     parser = argparse.ArgumentParser(description="Agente local de lotes del Motor Glosas.")
     parser.add_argument(
         "--url",
-        default=os.environ.get("MOTOR_GLOSAS_URL", ""),
-        help="URL de la app (o env MOTOR_GLOSAS_URL).",
+        default=os.environ.get("MOTOR_GLOSAS_URL", "") or config.get("url", ""),
+        help="URL de la app (o env MOTOR_GLOSAS_URL, o la config de la ventana).",
     )
     parser.add_argument(
         "--token",
-        default=os.environ.get("AGENTE_LOTES_TOKEN", ""),
-        help="Token compartido (o env AGENTE_LOTES_TOKEN).",
+        default=os.environ.get("AGENTE_LOTES_TOKEN", "") or config.get("token", ""),
+        help="Token compartido (o env AGENTE_LOTES_TOKEN, o la config de la ventana).",
     )
     parser.add_argument(
         "--workdir",
@@ -206,7 +256,9 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     if not args.url or not args.token:
         sys.stderr.write(
-            "ERROR: faltan MOTOR_GLOSAS_URL y/o AGENTE_LOTES_TOKEN (env o --url/--token).\n"
+            "ERROR: faltan MOTOR_GLOSAS_URL y/o AGENTE_LOTES_TOKEN "
+            "(env, --url/--token, o configuralos una vez en la ventana "
+            "de escritorio: doble clic en tools\\AgenteLotes.pyw).\n"
         )
         return 2
 
