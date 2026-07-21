@@ -28,6 +28,7 @@ import tempfile
 import threading
 import uuid
 import zipfile
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -328,6 +329,44 @@ def resultado_validacion(trabajo_id: str):
     resumen = tr["resumen"]
     tot_err = sum(r["errores"] for r in resumen)
     tot_adv = sum(r["advertencias"] for r in resumen)
+
+    # Agregaciones para las gráficas del tablero
+    por_origen: Counter = Counter()
+    por_concepto: Counter = Counter()
+    for res in tr["resultados"]:
+        for h in res.hallazgos:
+            if h.severidad in ("ERROR", "ADVERTENCIA"):
+                por_origen[(h.origen, h.severidad)] += 1
+                etiqueta = h.concepto
+                if h.campo and h.campo not in ("-",) and not h.campo.startswith("L"):
+                    etiqueta = f"Campo {h.campo} · {h.concepto}"
+                por_concepto[(etiqueta, h.severidad)] += 1
+    origenes = sorted(
+        {o for (o, _s) in por_origen},
+        key=lambda o: -sum(por_origen.get((o, sev), 0) for sev in ("ERROR", "ADVERTENCIA")),
+    )
+    graf_origen = [
+        {
+            "origen": o,
+            "error": por_origen.get((o, "ERROR"), 0),
+            "advertencia": por_origen.get((o, "ADVERTENCIA"), 0),
+        }
+        for o in origenes
+    ]
+    conceptos = sorted(
+        {c for (c, _s) in por_concepto},
+        key=lambda c: -sum(por_concepto.get((c, sev), 0) for sev in ("ERROR", "ADVERTENCIA")),
+    )[:10]
+    graf_conceptos = [
+        {
+            "concepto": c,
+            "error": por_concepto.get((c, "ERROR"), 0),
+            "advertencia": por_concepto.get((c, "ADVERTENCIA"), 0),
+        }
+        for c in conceptos
+    ]
+    top_facturas = sorted(resumen, key=lambda r: (-r["errores"], -r["advertencias"]))[:10]
+
     return {
         "estado": "LISTO",
         "kpis": {
@@ -339,9 +378,48 @@ def resultado_validacion(trabajo_id: str):
             "advertencias": tot_adv,
             "vr_facturado": sum(r["vr_facturado"] or 0 for r in resumen),
         },
+        "graficas": {
+            "por_origen": graf_origen,
+            "por_concepto": graf_conceptos,
+            "top_facturas": [
+                {
+                    "factura": r["factura"],
+                    "errores": r["errores"],
+                    "advertencias": r["advertencias"],
+                    "vr": r["vr_facturado"],
+                }
+                for r in top_facturas
+                if r["errores"] or r["advertencias"]
+            ],
+        },
         "obs_archivos": tr["obs"],
         "facturas": resumen,
     }
+
+
+@app.get("/api/validaciones/{trabajo_id}/hallazgos")
+def hallazgos_globales(trabajo_id: str):
+    tr = _trabajos.get(trabajo_id)
+    if not tr or tr["estado"] != "LISTO":
+        raise HTTPException(404, "Validación no disponible.")
+    hallazgos = [
+        {
+            "factura": res.factura,
+            "origen": h.origen,
+            "severidad": h.severidad,
+            "campo": h.campo,
+            "concepto": h.concepto,
+            "valor_furips": h.valor_furips,
+            "valor_soporte": h.valor_soporte,
+            "fuente": h.fuente,
+            "regla": h.regla,
+            "detalle": h.detalle,
+        }
+        for res in tr["resultados"]
+        for h in res.hallazgos
+    ]
+    hallazgos.sort(key=lambda h: (_severidad_orden(h["severidad"]), h["factura"]))
+    return {"hallazgos": hallazgos}
 
 
 @app.get("/api/validaciones/{trabajo_id}/facturas/{factura}")

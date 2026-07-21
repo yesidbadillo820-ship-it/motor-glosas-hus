@@ -3,22 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Validador ADRES — FURIPS · Circular 022/2023</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-subir" viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-bajar" viewBox="0 0 24 24"><path d="M12 4v12m0 0 4-4m-4 4-4-4M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m8.5 12.5 2.5 2.5 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-adv" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9.5v4.5m0 3v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-err" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m9 9 6 6m0-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-luna" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+      <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5m14 0h2.5M4.9 4.9l1.8 1.8m10.6 10.6 1.8 1.8m0-14.2-1.8 1.8M6.7 17.3l-1.8 1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-izq" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-der" viewBox="0 0 24 24"><path d="m10 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 2 4 5.5V11c0 5 3.4 9.3 8 10.5 4.6-1.2 8-5.5 8-10.5V5.5L12 2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    </defs>
+  </svg>
+
   <header class="cabecera">
     <div class="cabecera-int">
       <div class="marca">
-        <div class="marca-logo">A</div>
+        <div class="marca-logo"><svg class="ic" width="26" height="26"><use href="#i-escudo"/></svg></div>
         <div>
-          <h1>Validador ADRES — FURIPS</h1>
-          <p>Malla Circular 022/2023 · cruce contra RIPS, CUV, factura DIAN y epicrisis · E.S.E. HUS</p>
+          <h1>Validador ADRES <span class="marca-sep">·</span> FURIPS</h1>
+          <p>Malla Circular 022/2023 · cruce RIPS · CUV · factura DIAN · epicrisis · E.S.E. HUS</p>
         </div>
       </div>
       <div class="cabecera-acciones">
-        <button id="btn-nueva" class="btn btn-sec oculto">Nueva validación</button>
-        <a id="btn-excel" class="btn btn-pri oculto" href="#" download>⬇ Descargar Excel</a>
+        <button id="btn-tema" class="btn btn-icono" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
+          <svg class="ic" width="18" height="18"><use href="#i-luna"/></svg>
+        </button>
+        <button id="btn-nueva" class="btn btn-sec oculto">
+          <svg class="ic" width="16" height="16"><use href="#i-subir"/></svg> Nueva validación
+        </button>
+        <a id="btn-excel" class="btn btn-pri oculto" href="#" download>
+          <svg class="ic" width="16" height="16"><use href="#i-bajar"/></svg> Descargar Excel
+        </a>
       </div>
     </div>
   </header>
@@ -26,79 +51,143 @@
   <main class="contenido">
 
     <!-- Paso 1: carga -->
-    <section id="panel-carga" class="tarjeta">
+    <section id="panel-carga" class="tarjeta anim-entrada">
       <h2>Nueva validación</h2>
       <p class="ayuda">
         Suba los <strong>TXT FURIPS 1 y 2</strong> y un <strong>ZIP con los soportes</strong>
         (RIPS/CUV <code>.json</code>, factura <code>.xml</code>/<code>.pdf</code>, epicrisis
-        <code>.pdf</code>). Sirven las dos organizaciones: carpetas por factura o una carpeta
-        plana tipo <code>SOPORTES</code> — los archivos se asocian por el número de factura del
-        nombre (<code>680010079201_HUS374152_EPICRIS.pdf</code>). También puede meter los TXT
-        dentro del mismo ZIP.
+        <code>.pdf</code>). Sirven carpetas por factura o una carpeta plana tipo
+        <code>SOPORTES</code>; los archivos se asocian por el número de factura del nombre.
+        Los TXT también pueden ir dentro del ZIP.
       </p>
       <div id="zona-drop" class="zona-drop" tabindex="0" role="button"
            aria-label="Soltar archivos o hacer clic para elegirlos">
-        <div class="zona-drop-icono">📁</div>
+        <svg class="ic zona-drop-icono" width="42" height="42"><use href="#i-subir"/></svg>
         <div><strong>Arrastre aquí los archivos</strong> o haga clic para elegirlos</div>
-        <div class="zona-drop-sub">FURIPS1*.txt · FURIPS2*.txt · soportes.zip (máx. 500 MB por archivo)</div>
+        <div class="zona-drop-sub">FURIPS1*.txt · FURIPS2*.txt · soportes.zip · máx. 500 MB por archivo</div>
         <input id="input-archivos" type="file" multiple accept=".txt,.zip" hidden>
       </div>
       <ul id="lista-archivos" class="lista-archivos"></ul>
       <div class="fila-opciones">
         <label class="check">
           <input type="checkbox" id="chk-sin-pdf">
-          Validación rápida sin leer el contenido de los PDF (solo malla + RIPS/CUV/XML)
+          Validación rápida sin leer PDFs (solo malla + RIPS/CUV/XML)
         </label>
-        <button id="btn-validar" class="btn btn-pri" disabled>Validar</button>
+        <button id="btn-validar" class="btn btn-pri btn-grande" disabled>
+          <svg class="ic" width="17" height="17"><use href="#i-escudo"/></svg> Validar
+        </button>
       </div>
       <p id="error-carga" class="error oculto" role="alert"></p>
     </section>
 
     <!-- Paso 2: progreso -->
-    <section id="panel-progreso" class="tarjeta oculto" aria-live="polite">
-      <h2>Validando…</h2>
+    <section id="panel-progreso" class="tarjeta anim-entrada oculto" aria-live="polite">
+      <div class="progreso-cab">
+        <h2>Validando facturas…</h2>
+        <span id="progreso-pct" class="progreso-pct">0%</span>
+      </div>
       <div class="barra"><div id="barra-relleno" class="barra-relleno" style="width:0%"></div></div>
       <p id="progreso-texto" class="ayuda">Subiendo archivos…</p>
+      <div id="progreso-log" class="progreso-log" aria-hidden="true"></div>
     </section>
 
     <!-- Paso 3: resultados -->
     <section id="panel-resultados" class="oculto">
       <div class="kpis" id="kpis"></div>
 
-      <div class="tarjeta">
-        <div class="distro-titulo">
-          <h2>Estado de las facturas</h2>
-          <span id="distro-total" class="ayuda"></span>
-        </div>
-        <div id="barra-distro" class="distro" role="img" aria-label="Distribución de facturas por estado"></div>
-        <div id="leyenda-distro" class="leyenda"></div>
-      </div>
+      <nav class="vistas" role="tablist" aria-label="Vistas del resultado">
+        <button class="vista activo" data-vista="tablero" role="tab">Tablero</button>
+        <button class="vista" data-vista="facturas" role="tab">Facturas</button>
+        <button class="vista" data-vista="hallazgos" role="tab">Hallazgos</button>
+      </nav>
 
-      <div class="tarjeta">
-        <div class="toolbar">
-          <h2>Facturas</h2>
-          <input id="buscar" type="search" placeholder="Buscar factura, paciente o documento…"
-                 aria-label="Buscar en las facturas">
-          <div class="filtros" id="filtros-estado" role="group" aria-label="Filtrar por estado">
-            <button class="filtro activo" data-estado="">Todas</button>
-            <button class="filtro" data-estado="CON ERRORES">Con errores</button>
-            <button class="filtro" data-estado="REVISAR">Revisar</button>
-            <button class="filtro" data-estado="CUMPLE">Cumplen</button>
+      <!-- Vista: tablero -->
+      <div id="vista-tablero" class="vista-panel">
+        <div class="tarjeta anim-entrada">
+          <div class="distro-titulo">
+            <h2>Estado de las facturas</h2>
+            <span id="distro-total" class="ayuda"></span>
+          </div>
+          <div id="barra-distro" class="distro" role="img" aria-label="Distribución de facturas por estado"></div>
+          <div id="leyenda-distro" class="leyenda"></div>
+        </div>
+        <div class="rejilla-2">
+          <div class="tarjeta anim-entrada">
+            <h2>Hallazgos por origen</h2>
+            <p class="ayuda">De dónde vienen los errores y advertencias (malla, FURIPS 2, cruces, soportes).</p>
+            <div id="graf-origen" class="grafica"></div>
+          </div>
+          <div class="tarjeta anim-entrada">
+            <h2>Hallazgos más frecuentes</h2>
+            <p class="ayuda">Los conceptos que más se repiten — corrigiendo estos baja casi todo el informe.</p>
+            <div id="graf-conceptos" class="grafica"></div>
           </div>
         </div>
-        <div class="tabla-scroll">
-          <table class="tabla" id="tabla-facturas">
-            <thead>
-              <tr>
-                <th>Factura</th><th>Paciente</th><th>Documento</th><th>Ingreso</th>
-                <th class="num">Vr. facturado</th><th>Soportes</th>
-                <th class="num">Err.</th><th class="num">Adv.</th><th>Estado</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div class="tarjeta anim-entrada">
+          <h2>Facturas con más hallazgos</h2>
+          <div id="graf-top" class="grafica"></div>
         </div>
-        <p id="obs-archivos" class="ayuda oculto"></p>
+      </div>
+
+      <!-- Vista: facturas -->
+      <div id="vista-facturas" class="vista-panel oculto">
+        <div class="tarjeta anim-entrada">
+          <div class="toolbar">
+            <div class="buscador">
+              <svg class="ic" width="16" height="16"><use href="#i-lupa"/></svg>
+              <input id="buscar" type="search" placeholder="Buscar factura, paciente o documento…"
+                     aria-label="Buscar en las facturas">
+            </div>
+            <div class="filtros" id="filtros-estado" role="group" aria-label="Filtrar por estado">
+              <button class="filtro activo" data-estado="">Todas</button>
+              <button class="filtro f-err" data-estado="CON ERRORES">Con errores</button>
+              <button class="filtro f-adv" data-estado="REVISAR">Revisar</button>
+              <button class="filtro f-ok" data-estado="CUMPLE">Cumplen</button>
+            </div>
+          </div>
+          <div class="tabla-scroll">
+            <table class="tabla" id="tabla-facturas">
+              <thead><tr>
+                <th data-orden="factura" class="ordenable">Factura</th>
+                <th data-orden="paciente" class="ordenable">Paciente</th>
+                <th data-orden="documento" class="ordenable">Documento</th>
+                <th data-orden="ingreso" class="ordenable">Ingreso</th>
+                <th data-orden="vr_facturado" class="ordenable num">Vr. facturado</th>
+                <th>Soportes</th>
+                <th data-orden="errores" class="ordenable num">Err.</th>
+                <th data-orden="advertencias" class="ordenable num">Adv.</th>
+                <th data-orden="estado" class="ordenable">Estado</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="sin-filas" class="ayuda oculto">Ninguna factura coincide con el filtro.</p>
+          <p id="obs-archivos" class="ayuda oculto"></p>
+        </div>
+      </div>
+
+      <!-- Vista: hallazgos globales -->
+      <div id="vista-hallazgos" class="vista-panel oculto">
+        <div class="tarjeta anim-entrada">
+          <div class="toolbar">
+            <div class="buscador">
+              <svg class="ic" width="16" height="16"><use href="#i-lupa"/></svg>
+              <input id="buscar-hallazgo" type="search" placeholder="Buscar en los hallazgos…"
+                     aria-label="Buscar en los hallazgos">
+            </div>
+            <div class="filtros" id="filtros-sev" role="group" aria-label="Filtrar por severidad">
+              <button class="filtro activo" data-sev="">Todos</button>
+              <button class="filtro f-err" data-sev="ERROR">Errores</button>
+              <button class="filtro f-adv" data-sev="ADVERTENCIA">Advertencias</button>
+              <button class="filtro" data-sev="INFO">Info</button>
+            </div>
+            <select id="filtro-origen" class="selector" aria-label="Filtrar por origen">
+              <option value="">Todos los orígenes</option>
+            </select>
+          </div>
+          <p class="ayuda"><span id="conteo-hallazgos"></span> — haga clic en un hallazgo para abrir su factura.</p>
+          <div id="lista-hallazgos" class="lista-hallazgos"></div>
+        </div>
       </div>
     </section>
   </main>
@@ -107,16 +196,25 @@
   <div id="fondo-detalle" class="fondo-detalle oculto">
     <aside id="panel-detalle" class="detalle" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo">
       <header class="detalle-cab">
-        <div>
+        <div class="detalle-nav">
+          <button id="btn-fact-ant" class="btn btn-icono" title="Factura anterior" aria-label="Factura anterior">
+            <svg class="ic" width="18" height="18"><use href="#i-izq"/></svg>
+          </button>
+          <button id="btn-fact-sig" class="btn btn-icono" title="Factura siguiente" aria-label="Factura siguiente">
+            <svg class="ic" width="18" height="18"><use href="#i-der"/></svg>
+          </button>
+        </div>
+        <div class="detalle-titular">
           <h2 id="detalle-titulo"></h2>
           <p id="detalle-sub" class="ayuda"></p>
         </div>
-        <button id="btn-cerrar-detalle" class="btn btn-sec" aria-label="Cerrar detalle">✕ Cerrar</button>
+        <span id="detalle-chip"></span>
+        <button id="btn-cerrar-detalle" class="btn btn-sec" aria-label="Cerrar detalle">✕</button>
       </header>
       <nav class="tabs" role="tablist">
-        <button class="tab activo" data-tab="hallazgos" role="tab">Hallazgos</button>
-        <button class="tab" data-tab="campos" role="tab">FURIPS 1 (102 campos)</button>
-        <button class="tab" data-tab="lineas" role="tab">FURIPS 2</button>
+        <button class="tab activo" data-tab="hallazgos" role="tab">Hallazgos <span id="n-hallazgos" class="pildora"></span></button>
+        <button class="tab" data-tab="campos" role="tab">FURIPS 1 <span class="pildora">102</span></button>
+        <button class="tab" data-tab="lineas" role="tab">FURIPS 2 <span id="n-lineas" class="pildora"></span></button>
         <button class="tab" data-tab="cruces" role="tab">Cruce soportes</button>
         <button class="tab" data-tab="archivos" role="tab">Archivos</button>
       </nav>
@@ -124,9 +222,12 @@
     </aside>
   </div>
 
+  <div id="tooltip" class="tooltip oculto" role="tooltip"></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
   <footer class="pie">
     Validador ADRES · Motor Glosas HUS · Circular 022 de 2023 ADRES — Res. 2284/2023 —
-    Decreto 780/2016 (mod. 2466/2022) · Los datos se procesan en su servidor, no salen de su red.
+    Decreto 780/2016 (mod. 2466/2022) · Los datos se procesan en su servidor: no salen de su red.
   </footer>
 
   <script src="app.js"></script>
