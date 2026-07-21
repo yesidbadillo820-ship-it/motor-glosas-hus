@@ -2115,6 +2115,12 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     txt_epi = normalizar((datos.get("epicrisis") or {}).get("texto", ""))
     fac_legible = len(txt_fac) >= MIN_TEXTO_PDF
     epi_legible = len(txt_epi) >= MIN_TEXTO_PDF
+    # La "Representación Gráfica" DIAN trae número de factura y totales pero NO
+    # los datos del paciente (esos van en la imagen de la factura del hospital):
+    # no tiene sentido buscarlos en su texto.
+    repr_dian = "REPRESENTACION GRAFICA" in txt_fac
+    fac_paciente = fac_legible and not repr_dian
+    NA_DIAN = "N/A (repr. gráfica DIAN sin datos de paciente)"
 
     usuario = (rips.get("usuarios") or [{}])[0] if rips else {}
     procs = ((usuario.get("servicios") or {}).get("procedimientos") or []) if usuario else []
@@ -2126,7 +2132,7 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
         "cuv": cuv.get("NumFactura", ""),
         "xml": fev.get("num_factura", ""),
         "factura_pdf": "presente"
-        if fac_legible and norm_factura(c[3]) in txt_fac.replace(" ", "")
+        if fac_legible and norm_factura(c[3]) in re.sub(r"[\s\-.]", "", txt_fac)
         else ("" if not fac_legible else "NO ENCONTRADO"),
     }
     difs = [
@@ -2162,8 +2168,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     doc = c[11]
     valores = {
         "rips": f"{usuario.get('tipoDocumentoIdentificacion', '')} {usuario.get('numDocumentoIdentificacion', '')}".strip(),
-        "factura_pdf": ""
-        if not fac_legible
+        "factura_pdf": (NA_DIAN if repr_dian and fac_legible else "")
+        if not fac_paciente
         else ("presente" if doc and doc in txt_fac else "NO ENCONTRADO"),
         "epicrisis": ""
         if not epi_legible
@@ -2212,8 +2218,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     nombres = [c[8], c[9], c[6], c[7]]  # nombres + apellidos
     nombre_completo = " ".join(n for n in nombres if n)
     valores = {
-        "factura_pdf": ""
-        if not fac_legible
+        "factura_pdf": (NA_DIAN if repr_dian and fac_legible else "")
+        if not fac_paciente
         else ("presente" if _nombres_en_texto(nombres, txt_fac) else "NO ENCONTRADO"),
         "epicrisis": ""
         if not epi_legible
@@ -2333,15 +2339,15 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     f_ing = parse_fecha_ddmmaaaa(c[80])
     fechas_rips = parse_fecha_flexible(proc0.get("fechaInicioAtencion", "")) if proc0 else None
     fechas_fac = (
-        extraer_fechas((datos.get("factura_pdf") or {}).get("texto", "")) if fac_legible else set()
+        extraer_fechas((datos.get("factura_pdf") or {}).get("texto", "")) if fac_paciente else set()
     )
     fechas_epi = (
         extraer_fechas((datos.get("epicrisis") or {}).get("texto", "")) if epi_legible else set()
     )
     valores = {
         "rips": proc0.get("fechaInicioAtencion", "") if proc0 else "",
-        "factura_pdf": ""
-        if not fac_legible
+        "factura_pdf": (NA_DIAN if repr_dian and fac_legible else "")
+        if not fac_paciente
         else ("presente" if f_ing in fechas_fac else "NO ENCONTRADA"),
         "epicrisis": ""
         if not epi_legible
@@ -2495,7 +2501,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
         _agregar_cruce(res, "Total facturado (97+99)", f"{total_fact:,}", valores, "COINCIDE")
 
     # ── Consecutivo (nro de ingreso) en factura PDF ──────────────────────────
-    if fac_legible and c[4]:
+    # (la representación gráfica DIAN no trae el número de ingreso)
+    if fac_paciente and c[4]:
         r = "COINCIDE" if c[4] in txt_fac else "NO ENCONTRADO"
         _agregar_cruce(
             res,
