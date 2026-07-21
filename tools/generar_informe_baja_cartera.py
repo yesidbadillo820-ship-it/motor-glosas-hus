@@ -322,36 +322,53 @@ def _extraer_trabajo_social(paginas: list[str]) -> tuple[str, list[int]]:
     return "\n".join(lineas), nums
 
 
-def analizar_carpeta(carpeta: Path) -> Factura | None:
+def analizar_carpeta(
+    carpeta: Path, pdfs: list[Path] | None = None, numero_hint: str = ""
+) -> Factura | None:
+    """Analiza una factura. Con `pdfs` se leen SOLO esos archivos (carpeta
+    plana con soportes de muchas facturas); sin `pdfs`, la carpeta completa."""
     f = Factura(carpeta=carpeta)
-    pdf = hallar_pdf_unido(carpeta)
-    if pdf is None:
-        # sin _UNIDO_: usar todos los PDF sueltos de la carpeta como respaldo
-        sueltos = sorted(p for p in carpeta.glob("*.pdf"))
+    if pdfs is not None:
+        sueltos = sorted(pdfs)
         if not sueltos:
             return None
-        f.observaciones.append(
-            "No se encontró el consolidado _UNIDO_ (bot UNIR_PDFS); se leyeron "
-            f"los {len(sueltos)} PDF sueltos de la carpeta."
-        )
+        logger.info(f"  Leyendo {numero_hint or carpeta.name}: {len(sueltos)} PDF...")
         paginas = [pg for p in sueltos for pg in extraer_paginas_pdf(p)]
-        f.fuente_pdf = f"{len(sueltos)} PDF sueltos"
+        f.fuente_pdf = f"{len(sueltos)} PDF de la factura (carpeta plana)"
     else:
-        paginas = extraer_paginas_pdf(pdf)
-        f.fuente_pdf = pdf.name
+        pdf = hallar_pdf_unido(carpeta)
+        if pdf is None:
+            # sin _UNIDO_: usar todos los PDF sueltos de la carpeta como respaldo
+            sueltos = sorted(p for p in carpeta.glob("*.pdf"))
+            if not sueltos:
+                return None
+            f.observaciones.append(
+                "No se encontró el consolidado _UNIDO_ (bot UNIR_PDFS); se leyeron "
+                f"los {len(sueltos)} PDF sueltos de la carpeta."
+            )
+            logger.info(f"  Leyendo {carpeta.name}: {len(sueltos)} PDF sueltos...")
+            paginas = [pg for p in sueltos for pg in extraer_paginas_pdf(p)]
+            f.fuente_pdf = f"{len(sueltos)} PDF sueltos"
+        else:
+            logger.info(f"  Leyendo {carpeta.name}: {pdf.name}...")
+            paginas = extraer_paginas_pdf(pdf)
+            f.fuente_pdf = pdf.name
     f.paginas = len(paginas)
+    if numero_hint:
+        f.numero = numero_hint
     if not paginas:
         f.observaciones.append("El PDF no se pudo leer (¿escaneado sin texto o corrupto?).")
 
     texto_total = "\n".join(paginas)
 
-    # Número de factura: del texto o del nombre de la carpeta
-    m = _RE_FACTURA_TXT.search(texto_total)
-    if m:
-        f.numero = m.group(1).upper()
-    else:
-        m = _RE_FACTURA_NOMBRE.search(normalizar(carpeta.name).replace(" ", ""))
-        f.numero = m.group(1) if m else carpeta.name
+    # Número de factura: del nombre de los archivos (hint), del texto o de la carpeta
+    if not f.numero:
+        m = _RE_FACTURA_TXT.search(texto_total)
+        if m:
+            f.numero = m.group(1).upper()
+        else:
+            m = _RE_FACTURA_NOMBRE.search(normalizar(carpeta.name).replace(" ", ""))
+            f.numero = m.group(1) if m else carpeta.name
 
     # Paciente y documento
     m = _RE_PACIENTE_FAC.search(texto_total)
@@ -822,6 +839,47 @@ def main() -> int:
 
     facturas: list[Factura] = []
     for carpeta in carpetas:
+        if carpeta.name.startswith(("__", ".")):
+            continue
+
+        if hallar_pdf_unido(carpeta) is None:
+            # ¿Carpeta PLANA con los soportes de VARIAS facturas mezclados
+            # (p.ej. SOPORTES\ con <codHab>_<factura>_<TIPO>.pdf)? Se agrupan
+            # los PDF por el número de factura del nombre y se procesa cada
+            # factura por separado, con progreso visible (la lectura de PDF
+            # por red puede tardar).
+            pdfs = sorted(carpeta.glob("*.pdf"))
+            grupos: dict[str, list[Path]] = {}
+            for pdf in pdfs:
+                m = _RE_FACTURA_NOMBRE.search(normalizar(pdf.stem).replace(" ", ""))
+                grupos.setdefault(m.group(1) if m else "", []).append(pdf)
+            con_id = {k: v for k, v in grupos.items() if k}
+            if len(con_id) >= 2:
+                logger.info(
+                    f"Carpeta plana detectada: {carpeta.name} — "
+                    f"{len(con_id)} facturas en {len(pdfs)} PDF"
+                )
+                if grupos.get(""):
+                    logger.info(
+                        f"  ({len(grupos[''])} PDF sin número de factura en el nombre: se omiten)"
+                    )
+                for fact, lista in sorted(con_id.items()):
+                    f = analizar_carpeta(carpeta, pdfs=lista, numero_hint=fact)
+                    if f is None:
+                        continue
+                    facturas.append(f)
+                    ts = "con trabajo social" if f.tsocial_texto else "SIN trabajo social"
+                    logger.info(f"  {f.numero}: {pesos(f.valor)} — {ts} — {f.fuente_pdf}")
+                continue
+            if len(pdfs) > 25:
+                logger.warning(
+                    f"  {carpeta.name}: {len(pdfs)} PDF sueltos sin _UNIDO_ y sin "
+                    "número de factura reconocible en los nombres — SE OMITE para "
+                    "no leer cientos de archivos. Corra UNIR_PDFS.cmd o nombre los "
+                    "PDF como <codHabilitacion>_<factura>_<TIPO>.pdf."
+                )
+                continue
+
         f = analizar_carpeta(carpeta)
         if f is None:
             continue
@@ -830,7 +888,11 @@ def main() -> int:
         logger.info(f"  {f.numero}: {pesos(f.valor)} — {ts} — {f.fuente_pdf}")
 
     if not facturas:
-        logger.error("No se encontró ninguna carpeta con PDF para procesar.")
+        logger.error(
+            "No se encontró ninguna carpeta con PDF para procesar. Este bot "
+            "necesita: carpetas por factura con su _UNIDO_*.pdf (bot UNIR_PDFS), "
+            "o una carpeta plana con PDF nombrados <codHab>_<factura>_<TIPO>.pdf."
+        )
         return 1
 
     # De la más cara a la más económica (sin valor van al final)
