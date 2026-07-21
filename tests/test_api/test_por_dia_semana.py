@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -63,6 +63,17 @@ def _seed(db, fecha):
     db.commit()
 
 
+def _lunes_pasado():
+    """Lunes de la semana pasada 10:00 UTC — siempre dentro de la ventana de 90d.
+
+    Con fechas fijas el test explotaba cuando la fecha quedaba a más de 90
+    días de "hoy" (ventana default del endpoint).
+    """
+    hoy = ahora_utc()
+    lunes = hoy - timedelta(days=hoy.weekday() + 7)
+    return lunes.replace(hour=10, minute=0, second=0, microsecond=0)
+
+
 class TestPorDiaSemana:
     def test_estructura(self, client):
         r = client.get("/glosas/stats/por-dia-semana")
@@ -74,11 +85,11 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # 2026-04-20 fue Lunes
-        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 20, 11, 0, tzinfo=timezone.utc))
-        # 2026-04-22 fue Miércoles
-        _seed(db_session, datetime(2026, 4, 22, 10, 0, tzinfo=timezone.utc))
+        lunes = _lunes_pasado()
+        _seed(db_session, lunes)
+        _seed(db_session, lunes.replace(hour=11))
+        # Miércoles de esa misma semana
+        _seed(db_session, lunes + timedelta(days=2))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -88,11 +99,12 @@ class TestPorDiaSemana:
         assert d["total_glosas"] == 3
 
     def test_pct_del_total(self, client, db_session):
+        lunes = _lunes_pasado()
         # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+            _seed(db_session, lunes)
         # 1 glosa el martes
-        _seed(db_session, datetime(2026, 4, 21, 10, 0, tzinfo=timezone.utc))
+        _seed(db_session, lunes + timedelta(days=1))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()

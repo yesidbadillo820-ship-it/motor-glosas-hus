@@ -65,6 +65,16 @@ def _seed(db, fecha_iso):
     db.commit()
 
 
+def _lunes_pasado():
+    """Fecha del lunes de la semana pasada — siempre dentro de la ventana de 90d.
+
+    Con fechas fijas el test explotaba cuando quedaban a más de 90 días de
+    "hoy" (ventana default del endpoint).
+    """
+    hoy = ahora_utc()
+    return (hoy - timedelta(days=hoy.weekday() + 7)).date()
+
+
 class TestHeatmapActividad:
     def test_vacio(self, client):
         r = client.get("/glosas/stats/heatmap-actividad")
@@ -85,11 +95,12 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        # Lunes (weekday=0). 09:30 → fila 0, col 9
+        lunes = _lunes_pasado()
+        _seed(db_session, f"{lunes} 09:30")
+        _seed(db_session, f"{lunes} 09:45")
+        # Miércoles (weekday=2). 14:15 → fila 2, col 14
+        _seed(db_session, f"{lunes + timedelta(days=2)} 14:15")
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()
