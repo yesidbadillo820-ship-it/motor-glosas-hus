@@ -56,9 +56,15 @@ REM --- 3) Asegurar openpyxl (Excel) y pypdf (lectura de PDF) ----------
     pause
     exit /b 1
 )
-%PYEXE% -c "import pypdf" >nul 2>&1 || %PYEXE% -c "import pdfplumber" >nul 2>&1 || (
+%PYEXE% -c "import pypdf" >nul 2>&1 || (
     echo [i] Instalando el lector de PDF ^(pypdf^), espere...
     %PYEXE% -m pip install --quiet --user pypdf >nul 2>&1
+)
+REM pdfplumber lee mejor algunos PDF dificiles; se intenta pero no es
+REM obligatorio (si falla la instalacion, el bot corre igual con pypdf).
+%PYEXE% -c "import pdfplumber" >nul 2>&1 || (
+    echo [i] Instalando lector adicional de PDF ^(pdfplumber^), espere...
+    %PYEXE% -m pip install --quiet --user pdfplumber >nul 2>&1
 )
 
 REM --- 4) Correr el bot ----------------------------------------------

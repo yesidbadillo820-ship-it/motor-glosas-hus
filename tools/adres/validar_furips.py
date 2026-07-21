@@ -206,7 +206,7 @@ E1 = [
         "III. Datos de la víctima",
         "Dirección de residencia de la víctima",
         100,
-        None,
+        "dir",
         None,
         "SI",
     ),
@@ -361,7 +361,7 @@ E1 = [
         "VII. Propietario del vehículo",
         "Dirección de residencia del propietario",
         200,
-        None,
+        "dir",
         None,
         "C_PROP",
     ),
@@ -411,7 +411,7 @@ E1 = [
         "VIII. Conductor del vehículo",
         "Dirección de residencia del conductor",
         200,
-        None,
+        "dir",
         None,
         "C_COND",
     ),
@@ -693,6 +693,89 @@ def norm_factura(valor: str) -> str:
 
 _RE_FACTURA_TOKEN = re.compile(r"^[A-Z]{2,}0*\d{3,}$")
 
+# Palabras que hacen reconocible una dirección/nomenclatura o un lugar rural
+_PALABRAS_DIRECCION = {
+    "CALLE",
+    "CLL",
+    "CL",
+    "CRA",
+    "CR",
+    "CARRERA",
+    "KRA",
+    "KR",
+    "AV",
+    "AVE",
+    "AVENIDA",
+    "AVDA",
+    "DIAGONAL",
+    "DIAG",
+    "DG",
+    "TRANSVERSAL",
+    "TRANSV",
+    "TV",
+    "MANZANA",
+    "MZ",
+    "CASA",
+    "LOTE",
+    "APTO",
+    "APARTAMENTO",
+    "INTERIOR",
+    "INT",
+    "TORRE",
+    "BLOQUE",
+    "PISO",
+    "KM",
+    "KILOMETRO",
+    "VEREDA",
+    "VDA",
+    "FINCA",
+    "BARRIO",
+    "BRR",
+    "SECTOR",
+    "URBANIZACION",
+    "URB",
+    "CONJUNTO",
+    "EDIFICIO",
+    "CORREGIMIENTO",
+    "VIA",
+    "SALIDA",
+    "PARCELA",
+    "HACIENDA",
+    "ETAPA",
+    "CAMINO",
+    "CARRETERA",
+    "LOCAL",
+    "CENTRO",
+}
+_EXCEPCIONES_DIRECCION = ("SIN INFORMACION", "NO REFIERE", "NO REPORTA", "NO APLICA")
+
+
+def observacion_direccion(valor: str) -> str | None:
+    """Detecta direcciones que la auditoría rechaza: solo un código numérico o
+    solo el nombre de un municipio/departamento, sin nomenclatura.
+
+    Devuelve la observación o None si la dirección parece completa.
+    """
+    v = normalizar(valor)
+    if not v:
+        return None
+    if any(exc in v for exc in _EXCEPCIONES_DIRECCION):
+        return None
+    if re.fullmatch(r"[\d\s#.\-]+", v):
+        return (
+            "La dirección es solo números (parece un código, ej. DANE): debe ir la "
+            "nomenclatura completa (ej. CALLE 51 # 15-20, MANZANA X CASA Y)."
+        )
+    tiene_digito = any(ch.isdigit() for ch in v)
+    tiene_palabra = any(t in _PALABRAS_DIRECCION for t in re.split(r"[\s#.\-/]+", v))
+    if not tiene_digito and not tiene_palabra:
+        return (
+            "La dirección parece solo el nombre de un municipio/departamento o lugar "
+            f"('{valor}'): debe ir la nomenclatura completa (ej. CALLE 51 # 15-20, "
+            "MANZANA X CASA Y, VEREDA/FINCA con nombre)."
+        )
+    return None
+
 
 def factura_desde_nombre(nombre: str) -> str:
     """Extrae el número de factura del nombre de un archivo o carpeta.
@@ -869,27 +952,57 @@ def _detectar_motor_pdf() -> str:
     return _MOTOR_PDF
 
 
-def extraer_texto_pdf(ruta: Path) -> tuple[str, int]:
-    """Devuelve (texto, nro_paginas). Texto vacío si no hay motor o es escaneado."""
-    motor = _detectar_motor_pdf()
-    try:
-        if motor == "pdfplumber":
-            import pdfplumber
+# Menos texto que esto (total) se considera "sin capa de texto" (escaneado):
+# los cruces contra ese PDF se omiten en vez de reportar falsos NO ENCONTRADO.
+MIN_TEXTO_PDF = 200
 
-            with pdfplumber.open(ruta) as pdf:
-                paginas = len(pdf.pages)
-                partes = [(p.extract_text() or "") for p in pdf.pages]
-                return ("\n".join(partes), paginas)
-        if motor == "pypdf":
-            from pypdf import PdfReader
 
-            reader = PdfReader(str(ruta))
-            partes = [(p.extract_text() or "") for p in reader.pages]
-            return ("\n".join(partes), len(reader.pages))
-    except Exception as e:  # PDF corrupto/cifrado: se reporta, no se aborta
-        logger.warning(f"  No pude leer el PDF {ruta.name}: {e}")
-        return ("", 0)
+def _extraer_con_motor(motor: str, ruta: Path) -> tuple[str, int]:
+    if motor == "pdfplumber":
+        import pdfplumber
+
+        with pdfplumber.open(ruta) as pdf:
+            return ("\n".join((p.extract_text() or "") for p in pdf.pages), len(pdf.pages))
+    if motor == "pypdf":
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(ruta))
+        return ("\n".join((p.extract_text() or "") for p in reader.pages), len(reader.pages))
     return ("", 0)
+
+
+def _motores_disponibles() -> list[str]:
+    motores = []
+    for modulo in ("pdfplumber", "pypdf"):
+        try:
+            __import__(modulo)
+            motores.append(modulo)
+        except ImportError:
+            continue
+    return motores
+
+
+def extraer_texto_pdf(ruta: Path) -> tuple[str, int]:
+    """Devuelve (texto, nro_paginas).
+
+    Intenta con todos los motores disponibles (pdfplumber y pypdf): si el
+    primero extrae poco texto (PDF difícil), prueba el otro y se queda con el
+    que más texto obtenga. Texto vacío si no hay motor o el PDF es escaneado.
+    """
+    mejor_texto, mejor_paginas = "", 0
+    for motor in _motores_disponibles():
+        try:
+            texto, paginas = _extraer_con_motor(motor, ruta)
+        except Exception as e:  # PDF corrupto/cifrado: se reporta, no se aborta
+            logger.warning(f"  No pude leer el PDF {ruta.name} con {motor}: {e}")
+            continue
+        if len(texto.strip()) > len(mejor_texto.strip()):
+            mejor_texto, mejor_paginas = texto, paginas
+        else:
+            mejor_paginas = mejor_paginas or paginas
+        if len(mejor_texto.strip()) >= MIN_TEXTO_PDF:
+            break
+    return (mejor_texto, mejor_paginas)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1254,6 +1367,11 @@ def validar_malla_f1(res: ResultadoFactura) -> None:
                 obs = (
                     obs + " " if obs else ""
                 ) + f"Placa '{valor}' con caracteres no permitidos (solo letras y números)."
+            elif formato == "dir":
+                obs_dir = observacion_direccion(valor)
+                if obs_dir:
+                    estado = ERROR
+                    obs = (obs + " " if obs else "") + obs_dir
             if "�" in valor:
                 if estado == OK:
                     estado = ADVERTENCIA
@@ -1884,8 +2002,8 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
         datos[etiqueta] = {"texto": texto, "paginas": paginas, "archivo": encontrados[tipo].name}
         for s in res.soportes:
             if s["archivo"] == encontrados[tipo].name:
-                s["legible"] = "SI" if len(texto.strip()) > 50 else "NO (escaneado)"
-        if len(texto.strip()) <= 50:
+                s["legible"] = "SI" if len(texto.strip()) >= MIN_TEXTO_PDF else "NO (escaneado)"
+        if len(texto.strip()) < MIN_TEXTO_PDF:
             res.agregar(
                 "SOPORTES",
                 ADVERTENCIA,
@@ -1893,8 +2011,10 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
                 tipo,
                 encontrados[tipo].name,
                 "Legibilidad",
-                f"El PDF ({paginas} páginas) no tiene capa de texto "
-                "(parece escaneado): el cruce automático no es posible, revisar manualmente.",
+                f"El PDF ({paginas} páginas, {len(texto.strip())} caracteres de texto) "
+                "no tiene capa de texto suficiente (parece escaneado): el cruce "
+                "automático contra este PDF SE OMITE — revisar manualmente o "
+                "aplicar OCR al documento.",
             )
 
 
@@ -1993,8 +2113,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     fev = datos.get("fev") or {}
     txt_fac = normalizar((datos.get("factura_pdf") or {}).get("texto", ""))
     txt_epi = normalizar((datos.get("epicrisis") or {}).get("texto", ""))
-    fac_legible = len(txt_fac) > 50
-    epi_legible = len(txt_epi) > 50
+    fac_legible = len(txt_fac) >= MIN_TEXTO_PDF
+    epi_legible = len(txt_epi) >= MIN_TEXTO_PDF
 
     usuario = (rips.get("usuarios") or [{}])[0] if rips else {}
     procs = ((usuario.get("servicios") or {}).get("procedimientos") or []) if usuario else []
@@ -2022,13 +2142,16 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
             res, "Número de factura", c[3], valores, "DIFERENCIA", f"No coincide en: {fuentes}"
         )
         res.agregar(
-            "CRUCE FEV XML" if "xml" in difs else "CRUCE RIPS",
-            ERROR,
+            "CRUCE FEV XML" if "xml" in difs else ("CRUCE RIPS" if difs else "CRUCE FACTURA PDF"),
+            ERROR if difs else ADVERTENCIA,
             "3",
             "Número de factura",
             c[3],
             "Cruce FURIPS vs soportes",
-            f"El número de factura difiere en: {fuentes}.",
+            f"El número de factura difiere en: {fuentes}."
+            if difs
+            else "El número de factura no se encontró en el TEXTO de la factura PDF "
+            "(RIPS, CUV y XML sí coinciden): verificar visualmente el PDF.",
             valor_soporte="; ".join(f"{k}={v}" for k, v in valores.items() if v),
             fuente=fuentes,
         )
@@ -2057,6 +2180,7 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
             problemas.append(
                 f"RIPS trae tipo {usuario.get('tipoDocumentoIdentificacion')} y FURIPS {c[10]}"
             )
+    problemas_rips = list(problemas)
     if valores["factura_pdf"] == "NO ENCONTRADO":
         problemas.append("documento no aparece en la factura PDF")
     if valores["epicrisis"] == "NO ENCONTRADO":
@@ -2071,8 +2195,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
             "; ".join(problemas),
         )
         res.agregar(
-            "CRUCE RIPS" if usuario else "CRUCE EPICRISIS",
-            ERROR,
+            "CRUCE RIPS" if problemas_rips else "CRUCE EPICRISIS",
+            ERROR if problemas_rips else ADVERTENCIA,
             "10/11",
             "Documento de la víctima",
             f"{c[10]} {doc}",
@@ -2906,8 +3030,16 @@ def generar_excel(
         ),
         (
             "Cruce 'NO ENCONTRADO'",
-            "El dato del FURIPS no aparece textualmente en el PDF. Si el PDF es escaneado "
-            "(sin capa de texto) el cruce no es posible y se marca 'SIN TEXTO'.",
+            "El dato del FURIPS no aparece textualmente en el PDF (severidad ADVERTENCIA "
+            "cuando RIPS/CUV/XML sí coinciden). Si el PDF es escaneado o tiene poco texto "
+            "(menos de 200 caracteres) el cruce contra ese PDF SE OMITE y el archivo queda "
+            "marcado 'SIN TEXTO' en RESUMEN y SOPORTES: revisarlo manualmente o aplicarle OCR.",
+        ),
+        (
+            "Direcciones (campos 15, 50 y 60)",
+            "La dirección de residencia no puede ser solo el nombre de un municipio/"
+            "departamento ni un código numérico: debe registrarse la nomenclatura completa "
+            "(ej. CALLE 51 # 15-20, MANZANA X CASA Y, VEREDA/FINCA con nombre).",
         ),
         (
             "Normativa",
