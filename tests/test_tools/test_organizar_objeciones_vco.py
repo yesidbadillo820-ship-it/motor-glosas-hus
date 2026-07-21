@@ -188,6 +188,28 @@ def test_detecta_consolidado_con_alias(tmp_path):
     assert idx["acta"] == 0 and idx["codigo_glosa"] == 3
 
 
+def test_detecta_consolidado_variante_radicado(tmp_path):
+    """Encabezados reales del CONSOLIDADO_VCO_FIDUPREVISORA.xlsx del usuario."""
+    encabezados = [
+        "NUMERO RADICADO",
+        "NUMERO FACTURA",
+        "VALOR GLOSA",
+        "CODIGO GLOSA ESPECIFICA",
+        "DESCRIPCION GLOSA AUDITOR",
+        "CODIGO SERVICIO",
+        "DESCRIPCION SERVICIO",
+        "CANTIDAD",
+        "VALOR UNITARIO SERVICIO",
+        "VALOR TOTAL SERVICIO",
+    ]
+    ruta = _xlsx_consolidado(tmp_path / "radicado.xlsx", encabezados=encabezados)
+    formato, _, idx = org.leer_entrada(ruta)
+    assert formato == "consolidado"
+    assert idx["acta"] == 0  # NUMERO RADICADO → acta
+    assert idx["observacion"] == 4  # DESCRIPCION GLOSA AUDITOR → observación
+    assert idx["descripcion_servicio"] == 6  # no se confunde con la col E
+
+
 def test_detecta_cargue(tmp_path):
     ruta = _xlsx_cargue(tmp_path / "cargue.xlsx")
     formato, filas, idx = org.leer_entrada(ruta)

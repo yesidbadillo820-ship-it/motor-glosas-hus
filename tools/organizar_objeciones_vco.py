@@ -97,7 +97,16 @@ COLUMNAS_CONSOLIDADO = [
 
 # Alias tolerantes por campo del consolidado (ya normalizados con _norm).
 _ALIAS_CONSOLIDADO = {
-    "acta": ["CROOBSERV", "ACTA", "REFERENCIA", "NUMERO ACTA", "ACTA VCO"],
+    "acta": [
+        "CROOBSERV",
+        "ACTA",
+        "REFERENCIA",
+        "NUMERO ACTA",
+        "ACTA VCO",
+        "NUMERO RADICADO",
+        "NRO RADICADO",
+        "RADICADO",
+    ],
     "factura": [
         "NUMERO FACTURA",
         "NUMERO DE FACTURA",
@@ -119,7 +128,15 @@ _ALIAS_CONSOLIDADO = {
         "CODIGO GLOSA ESPECIFICO",
         "CODIGO",
     ],
-    "observacion": ["OBSERVACION", "OBSERVACIONES", "DETALLE", "DETALLE GLOSA"],
+    "observacion": [
+        "OBSERVACION",
+        "OBSERVACIONES",
+        "DETALLE",
+        "DETALLE GLOSA",
+        "DESCRIPCION GLOSA AUDITOR",
+        "DESCRIPCION GLOSA",
+        "OBSERVACION GLOSA",
+    ],
     "codigo_servicio": [
         "CODIGO SERVICIO",
         "COD SERVICIO",
