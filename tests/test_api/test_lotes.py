@@ -52,12 +52,14 @@ def client(db_session, usuario, monkeypatch):
     get_settings.cache_clear()
 
 
-def subir_lote(client, **data):
+def subir_lote(client, contenido: bytes | None = None, **data):
     payload = {"pagador": "COOSALUD", "hoja": "BASE", "incluir_calidad": "false"}
     payload.update(data)
+    if contenido is None:
+        contenido = excel_bytes()
     return client.post(
         "/lotes/",
-        files={"archivo": ("lote.xlsx", excel_bytes(), "application/octet-stream")},
+        files={"archivo": ("lote.xlsx", contenido, "application/octet-stream")},
         data=payload,
     )
 
@@ -119,7 +121,10 @@ def test_agente_deshabilitado_sin_token_configurado(client, monkeypatch):
 
 
 def test_flujo_completo_del_agente(client):
-    lote_id = subir_lote(client).json()["id"]
+    # openpyxl incrusta la hora de creación: dos llamadas a excel_bytes() en
+    # segundos distintos dan bytes distintos. Se compara contra lo subido.
+    contenido = excel_bytes()
+    lote_id = subir_lote(client, contenido=contenido).json()["id"]
     headers = {"X-Agente-Token": TOKEN}
 
     # Sin reclamar, el excel de una tarea inexistente es 404
@@ -139,7 +144,7 @@ def test_flujo_completo_del_agente(client):
     # El Excel descargado es el original
     r = client.get(f"/agente/lotes/tareas/{tarea['tarea_id']}/excel", headers=headers)
     assert r.status_code == 200
-    assert r.content == excel_bytes()
+    assert r.content == contenido
 
     # Progreso incremental → el semáforo avanza
     r = client.post(
