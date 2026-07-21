@@ -691,6 +691,25 @@ def norm_factura(valor: str) -> str:
     return v
 
 
+_RE_FACTURA_TOKEN = re.compile(r"^[A-Z]{2,}0*\d{3,}$")
+
+
+def factura_desde_nombre(nombre: str) -> str:
+    """Extrae el número de factura del nombre de un archivo o carpeta.
+
+    Convención HUS: 680010079201_HUS374152_EPICRIS.pdf → HUS374152.
+    También acepta 'HUS374152', 'FACTURA HUS999 (2)', etc. Devuelve ""
+    si el nombre no contiene un identificador de factura reconocible
+    (prefijo alfabético + dígitos).
+    """
+    base = normalizar(nombre.rsplit(".", 1)[0])
+    for token in base.replace("-", "_").replace(" ", "_").split("_"):
+        if _RE_FACTURA_TOKEN.match(token):
+            return token
+    m = re.search(r"\b([A-Z]{2,}0*\d{3,})\b", base)
+    return m.group(1) if m else ""
+
+
 def parse_fecha_ddmmaaaa(valor: str) -> date | None:
     try:
         return datetime.strptime(valor.strip(), "%d/%m/%Y").date()
@@ -896,6 +915,7 @@ class ResultadoFactura:
     registro_f1: list[str] | None = None
     lineas_f2: list[list[str]] = field(default_factory=list)
     carpeta: Path | None = None
+    archivos: list[Path] = field(default_factory=list)
     hallazgos: list[Hallazgo] = field(default_factory=list)
     estado_campos_f1: dict[int, tuple[str, str]] = field(default_factory=dict)  # n -> (estado, obs)
     estado_lineas_f2: list[tuple[str, str]] = field(default_factory=list)
@@ -1719,39 +1739,38 @@ def clasificar_soporte(nombre: str) -> str:
 
 
 def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
-    """Inventaría la carpeta, extrae datos de cada soporte y valida presencia."""
-    carpeta = res.carpeta
-    if carpeta is None:
+    """Inventaría los soportes de la factura, los lee y valida presencia."""
+    if not res.archivos:
         res.agregar(
             "SOPORTES",
             ADVERTENCIA,
             "-",
-            "Carpeta de soportes",
+            "Soportes de la factura",
             "",
             "Res. 2284/2023",
-            "No se encontró carpeta de soportes para esta factura.",
+            "No se encontraron soportes para esta factura: ni carpeta propia ni "
+            "archivos con el número de factura en el nombre "
+            "(<codHabilitacion>_<factura>_<TIPO>.ext).",
         )
         return
 
     datos = res.datos_soportes
     encontrados: dict[str, Path] = {}
-    for p in sorted(carpeta.iterdir()):
-        if not p.is_file():
-            continue
-        if _RE_ARCHIVO_F1.match(p.name) or _RE_ARCHIVO_F2.match(p.name):
-            tipo = "FURIPS TXT"
-        else:
-            tipo = clasificar_soporte(p.name)
-        legible, obs = "-", ""
+    for p in res.archivos:
+        tipo = clasificar_soporte(p.name)
         if tipo not in encontrados:
             encontrados[tipo] = p
+        try:
+            tam = p.stat().st_size
+        except OSError:
+            tam = 0
         res.soportes.append(
             {
                 "archivo": p.name,
                 "tipo": tipo,
-                "bytes": p.stat().st_size,
-                "legible": legible,
-                "obs": obs,
+                "bytes": tam,
+                "legible": "-",
+                "obs": "",
             }
         )
 
@@ -1781,7 +1800,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
             "RIPS JSON",
             "",
             "Res. 2284/2023",
-            "FALTA el RIPS JSON en la carpeta (soporte obligatorio ADRES).",
+            "FALTA el RIPS JSON de esta factura (soporte obligatorio ADRES).",
         )
 
     # CUV
@@ -1810,7 +1829,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
             "CUV JSON",
             "",
             "Res. 2284/2023",
-            "FALTA el CUV (código único de validación RIPS) en la carpeta.",
+            "FALTA el CUV (código único de validación RIPS) de esta factura.",
         )
 
     # FEV XML
@@ -1824,7 +1843,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
             "Factura electrónica XML",
             "",
             "Res. 2284/2023",
-            "FALTA la factura electrónica DIAN (XML) en la carpeta.",
+            "FALTA la factura electrónica DIAN (XML) de esta factura.",
         )
 
     # PDFs
@@ -1839,7 +1858,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
                 tipo,
                 "",
                 "Res. 2284/2023",
-                f"FALTA el soporte {tipo} en la carpeta."
+                f"FALTA el soporte {tipo} para esta factura."
                 + (
                     " (La epicrisis/resumen de atención es soporte obligatorio.)"
                     if tipo == "EPICRISIS"
@@ -2574,7 +2593,7 @@ def generar_excel(
         tipos = {s["tipo"]: s for s in res.soportes}
 
         def sop(tipo, res=res, tipos=tipos):
-            if res.carpeta is None:
+            if not res.archivos:
                 return "—"
             s = tipos.get(tipo)
             if not s:
@@ -2841,17 +2860,17 @@ def generar_excel(
                     s["obs"],
                 ],
             )
-        if res.carpeta is None:
+        if not res.archivos:
             fila(
                 ws,
                 [
                     res.factura,
-                    "(SIN CARPETA)",
+                    "(SIN SOPORTES)",
                     "",
                     "",
                     "",
                     "",
-                    "No se encontró carpeta de soportes para esta factura.",
+                    "No se encontraron soportes para esta factura.",
                 ],
             )
     ws.auto_filter.ref = f"A1:G{ws.max_row}"
@@ -2913,30 +2932,31 @@ def generar_excel(
 # ─────────────────────────────────────────────────────────────────────────────
 # Orquestación
 # ─────────────────────────────────────────────────────────────────────────────
-def descubrir_carpetas(raiz: Path) -> dict[str, Path]:
-    """Mapa factura_norm → carpeta. Una carpeta es 'de factura' si contiene soportes."""
-    carpetas: dict[str, Path] = {}
-    candidatas = [d for d in raiz.rglob("*") if d.is_dir()]
-    candidatas.append(raiz)
-    for d in candidatas:
-        try:
-            tiene_soportes = any(
-                p.is_file()
-                and clasificar_soporte(p.name)
-                in ("RIPS JSON", "CUV JSON", "FACTURA XML", "FACTURA PDF", "EPICRISIS")
-                for p in d.iterdir()
-            )
-        except OSError:
+def descubrir_soportes(base: Path) -> dict[str, list[Path]]:
+    """Mapa factura_norm → archivos de soporte, agrupados por NOMBRE de archivo.
+
+    Soporta las dos organizaciones reales del HUS:
+    - Una carpeta por factura (HUS374152/...): el número de factura viene
+      igual en el nombre de cada soporte (<codhab>_<factura>_<TOKEN>.ext).
+    - Una carpeta PLANA (p.ej. SOPORTES/) con los archivos de muchas
+      facturas mezclados: se agrupan por el número de factura del nombre.
+    Si el archivo no trae el número, se intenta con el nombre de su carpeta.
+    """
+    soportes: dict[str, list[Path]] = {}
+    try:
+        archivos = [p for p in base.rglob("*") if p.is_file()]
+    except OSError:
+        return soportes
+    for p in archivos:
+        if _RE_ARCHIVO_F1.match(p.name) or _RE_ARCHIVO_F2.match(p.name):
             continue
-        if not tiene_soportes:
+        if clasificar_soporte(p.name) == "OTRO":
             continue
-        clave = norm_factura(d.name)
-        # nombre tipo '680010079201_HUS374152_...' o 'HUS374152'
-        m = re.search(r"([A-Z]{2,}\s?0*\d+)", normalizar(d.name))
-        if m:
-            clave = norm_factura(m.group(1))
-        carpetas.setdefault(clave, d)
-    return carpetas
+        fact = factura_desde_nombre(p.name) or factura_desde_nombre(p.parent.name)
+        if not fact:
+            continue
+        soportes.setdefault(norm_factura(fact), []).append(p)
+    return soportes
 
 
 def procesar(
@@ -2966,27 +2986,21 @@ def procesar(
     lineas_f2, obs2 = leer_furips2(rutas_f2)
     obs_archivos = obs1 + obs2
 
-    if carpeta:
-        clave = norm_factura(carpeta.name)
-        m = re.search(r"([A-Z]{2,}\s?0*\d+)", normalizar(carpeta.name))
-        if m:
-            clave = norm_factura(m.group(1))
-        carpetas = {clave: carpeta}
-    else:
-        carpetas = descubrir_carpetas(base)
-    logger.info(f"Carpetas de factura detectadas: {len(carpetas)}")
+    soportes = descubrir_soportes(base)
+    logger.info(f"Facturas con soportes detectadas: {len(soportes)}")
 
     if carpeta:
-        # Modo una-carpeta: solo validar las facturas de esa carpeta
-        claves = set(carpetas) & set(registros_f1) or set(carpetas)
+        # Modo una-carpeta: solo validar las facturas con soportes en ella
+        claves = set(soportes) or (set(registros_f1) | set(lineas_f2))
     else:
-        claves = set(registros_f1) | set(carpetas) | set(lineas_f2)
+        claves = set(registros_f1) | set(soportes) | set(lineas_f2)
 
     resultados: list[ResultadoFactura] = []
     for clave in sorted(claves):
         regs = registros_f1.get(clave, [])
         res = ResultadoFactura(factura=clave)
-        res.carpeta = carpetas.get(clave)
+        res.archivos = sorted(soportes.get(clave, []))
+        res.carpeta = res.archivos[0].parent if res.archivos else None
         res.lineas_f2 = lineas_f2.get(clave, [])
         if len(regs) > 1:
             res.agregar(
@@ -3008,7 +3022,7 @@ def procesar(
         resultados.append(res)
         logger.info(
             f"  {clave}: {res.errores} errores, {res.advertencias} advertencias"
-            f"{' (sin carpeta de soportes)' if res.carpeta is None else ''}"
+            f"{' (sin soportes)' if not res.archivos else ''}"
             f"{' (sin registro FURIPS1)' if res.registro_f1 is None else ''}"
         )
     return resultados, obs_archivos
