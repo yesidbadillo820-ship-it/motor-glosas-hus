@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Validador ADRES — FURIPS · Circular 022/2023</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="cabecera">
+    <div class="cabecera-int">
+      <div class="marca">
+        <div class="marca-logo">A</div>
+        <div>
+          <h1>Validador ADRES — FURIPS</h1>
+          <p>Malla Circular 022/2023 · cruce contra RIPS, CUV, factura DIAN y epicrisis · E.S.E. HUS</p>
+        </div>
+      </div>
+      <div class="cabecera-acciones">
+        <button id="btn-nueva" class="btn btn-sec oculto">Nueva validación</button>
+        <a id="btn-excel" class="btn btn-pri oculto" href="#" download>⬇ Descargar Excel</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="contenido">
+
+    <!-- Paso 1: carga -->
+    <section id="panel-carga" class="tarjeta">
+      <h2>Nueva validación</h2>
+      <p class="ayuda">
+        Suba los <strong>TXT FURIPS 1 y 2</strong> y un <strong>ZIP con los soportes</strong>
+        (RIPS/CUV <code>.json</code>, factura <code>.xml</code>/<code>.pdf</code>, epicrisis
+        <code>.pdf</code>). Sirven las dos organizaciones: carpetas por factura o una carpeta
+        plana tipo <code>SOPORTES</code> — los archivos se asocian por el número de factura del
+        nombre (<code>680010079201_HUS374152_EPICRIS.pdf</code>). También puede meter los TXT
+        dentro del mismo ZIP.
+      </p>
+      <div id="zona-drop" class="zona-drop" tabindex="0" role="button"
+           aria-label="Soltar archivos o hacer clic para elegirlos">
+        <div class="zona-drop-icono">📁</div>
+        <div><strong>Arrastre aquí los archivos</strong> o haga clic para elegirlos</div>
+        <div class="zona-drop-sub">FURIPS1*.txt · FURIPS2*.txt · soportes.zip (máx. 500 MB por archivo)</div>
+        <input id="input-archivos" type="file" multiple accept=".txt,.zip" hidden>
+      </div>
+      <ul id="lista-archivos" class="lista-archivos"></ul>
+      <div class="fila-opciones">
+        <label class="check">
+          <input type="checkbox" id="chk-sin-pdf">
+          Validación rápida sin leer el contenido de los PDF (solo malla + RIPS/CUV/XML)
+        </label>
+        <button id="btn-validar" class="btn btn-pri" disabled>Validar</button>
+      </div>
+      <p id="error-carga" class="error oculto" role="alert"></p>
+    </section>
+
+    <!-- Paso 2: progreso -->
+    <section id="panel-progreso" class="tarjeta oculto" aria-live="polite">
+      <h2>Validando…</h2>
+      <div class="barra"><div id="barra-relleno" class="barra-relleno" style="width:0%"></div></div>
+      <p id="progreso-texto" class="ayuda">Subiendo archivos…</p>
+    </section>
+
+    <!-- Paso 3: resultados -->
+    <section id="panel-resultados" class="oculto">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="tarjeta">
+        <div class="distro-titulo">
+          <h2>Estado de las facturas</h2>
+          <span id="distro-total" class="ayuda"></span>
+        </div>
+        <div id="barra-distro" class="distro" role="img" aria-label="Distribución de facturas por estado"></div>
+        <div id="leyenda-distro" class="leyenda"></div>
+      </div>
+
+      <div class="tarjeta">
+        <div class="toolbar">
+          <h2>Facturas</h2>
+          <input id="buscar" type="search" placeholder="Buscar factura, paciente o documento…"
+                 aria-label="Buscar en las facturas">
+          <div class="filtros" id="filtros-estado" role="group" aria-label="Filtrar por estado">
+            <button class="filtro activo" data-estado="">Todas</button>
+            <button class="filtro" data-estado="CON ERRORES">Con errores</button>
+            <button class="filtro" data-estado="REVISAR">Revisar</button>
+            <button class="filtro" data-estado="CUMPLE">Cumplen</button>
+          </div>
+        </div>
+        <div class="tabla-scroll">
+          <table class="tabla" id="tabla-facturas">
+            <thead>
+              <tr>
+                <th>Factura</th><th>Paciente</th><th>Documento</th><th>Ingreso</th>
+                <th class="num">Vr. facturado</th><th>Soportes</th>
+                <th class="num">Err.</th><th class="num">Adv.</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="obs-archivos" class="ayuda oculto"></p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detalle de factura -->
+  <div id="fondo-detalle" class="fondo-detalle oculto">
+    <aside id="panel-detalle" class="detalle" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo">
+      <header class="detalle-cab">
+        <div>
+          <h2 id="detalle-titulo"></h2>
+          <p id="detalle-sub" class="ayuda"></p>
+        </div>
+        <button id="btn-cerrar-detalle" class="btn btn-sec" aria-label="Cerrar detalle">✕ Cerrar</button>
+      </header>
+      <nav class="tabs" role="tablist">
+        <button class="tab activo" data-tab="hallazgos" role="tab">Hallazgos</button>
+        <button class="tab" data-tab="campos" role="tab">FURIPS 1 (102 campos)</button>
+        <button class="tab" data-tab="lineas" role="tab">FURIPS 2</button>
+        <button class="tab" data-tab="cruces" role="tab">Cruce soportes</button>
+        <button class="tab" data-tab="archivos" role="tab">Archivos</button>
+      </nav>
+      <div id="detalle-cuerpo" class="detalle-cuerpo"></div>
+    </aside>
+  </div>
+
+  <footer class="pie">
+    Validador ADRES · Motor Glosas HUS · Circular 022 de 2023 ADRES — Res. 2284/2023 —
+    Decreto 780/2016 (mod. 2466/2022) · Los datos se procesan en su servidor, no salen de su red.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
