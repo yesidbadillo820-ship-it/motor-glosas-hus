@@ -27,8 +27,7 @@ Edición corregida y maquetada capítulo a capítulo a partir del manuscrito ori
 | Portadilla y dedicatoria | — | ✅ |
 | **LIBRO I** | *Las Voces Que Nacieron Del Fuego* | |
 | Prólogo | La primera pregunta | ✅ |
-| Capítulo I | Trescientos padres | ✅ |
-| Capítulos II–XV | Uno que no se muera … El ruido del peine | ⏳ |
+| Capítulos I–XV | Trescientos padres … El ruido del peine | ✅ |
 | **LIBRO II** | *Las Cicatrices De Los Que Ardieron* | |
 | Capítulos I–XV | Cuarenta y siete voces … Las cicatrices | ⏳ |
 | **LIBRO III** | *El Mapa Del Firmamento* | |

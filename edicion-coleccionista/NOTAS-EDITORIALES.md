@@ -114,6 +114,13 @@ Yo te estaba avisando."
   enseñaste vos a mí, no al revés* / *no, mi amor, todas están ahí*) y en las preguntas de
   Dania; 4 separadores ✦ ✦ ✦ (los del original) + respiro suave ✦ antes de la coda;
   "PERÉZ" → "PÉREZ".
-- Pendientes de revisión con el autor: I.VII "con la boleta de un cine en la mano yo y ella
-  parada" (sintaxis dañada en el original); II cap. VIII "las doce y treinta y cinco de la
-  mañana" (¿del día?); II.X párrafo dislocado l. 8219–8229.
+- **Libro I completo (caps. II–XV)**: editado con el mismo protocolo; separadores 1:1 con las
+  "C" del original en todos los capítulos; cursiva extendida por paralelismo a miembros no
+  corruptibles de series de habla recordada (*ah*, *escoge*, *Ilíada*, *Pídale.*) — criterio
+  registrado en los reportes por capítulo.
+- Pendientes de revisión con el autor: I.VII frase dañada reparada como "yo sentado y ella
+  parada" (en I.I Daniela aparece sentada: ¿distorsión deliberada del recuerdo?); I.VII "Doce
+  años cerrando esa puerta" (Dania tiene 7); I.VIII "con los brazos en la mesa" (la escena es
+  en el escalón del patio); I.IX resolución del grito "—¡Dani!—" + eco "Dani." (l. 4327–4331);
+  I.X "treinta años" (edad del narrador según cronología: ~40); II cap. VIII "las doce y
+  treinta y cinco de la mañana" (¿del día?); II.X párrafo dislocado l. 8219–8229.
