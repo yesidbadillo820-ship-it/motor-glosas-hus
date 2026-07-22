@@ -131,15 +131,6 @@ NATURALEZAS_EVENTO = {
 }
 TIPOS_VEHICULO = {"1", "2", "3", "4", "5", "6", "7", "8", "10", "14", "17", "19", "20", "21", "22"}
 ESTADOS_ASEGURAMIENTO = {"1", "2", "3", "4", "6", "7", "8"}
-NOMBRE_ESTADO_ASEG = {
-    "1": "Asegurado",
-    "2": "No asegurado",
-    "3": "Vehículo fantasma",
-    "4": "Póliza falsa",
-    "6": "Asegurado D.2497",
-    "7": "No aseg. propietario indeterminado",
-    "8": "No asegurado sin placa",
-}
 TIPOS_SERVICIO_F2 = {
     "1": "Medicamentos",
     "2": "Procedimientos",
@@ -647,7 +638,6 @@ E2 = [
     (9, "Valor total reclamado", 15, "num", "SI"),
 ]
 
-NOMBRE_CAMPO_F1 = {n: nombre for (n, _sec, nombre, _l, _f, _v, _o) in E1}
 
 TEXTO_OBLIG = {
     "SI": "Obligatorio",
@@ -1082,7 +1072,11 @@ def _evaluar_condicion(cond: str, c: dict[int, str], ctx: dict) -> tuple[bool, b
     if cond == "NO":
         return False, False
     if cond == "C_RGO":
-        return bool(c.get(2, "")), False
+        # Ronda 31: el campo 2 (RGO) admite {"0","1","6"}. "0" = NO es
+        # respuesta a glosa, así que el radicado anterior NO es obligatorio.
+        # bool("0") es True → falso positivo "campo obligatorio sin
+        # diligenciar" en toda reclamación fresca. Solo se exige con 1/6.
+        return c.get(2, "") in ("1", "6"), False
     if cond == "C_NAT01":
         return nat == "01", False
     if cond == "C_NAT17":
@@ -1917,24 +1911,10 @@ def _leer_fev(ruta: Path) -> dict:
     info: dict = {"archivo": ruta.name, "items": items}
     m = re.search(r"<(?:\w+:)?Invoice[\s>].*?<(?:\w+:)?ID[^>]*>([^<]+)</", texto, re.DOTALL)
     info["num_factura"] = m.group(1).strip() if m else ""
-    m = re.search(r"<(?:\w+:)?IssueDate>([^<]+)<", texto)
-    info["fecha_emision"] = m.group(1).strip() if m else ""
-    m = re.search(
-        r"AccountingSupplierParty.*?<(?:\w+:)?RegistrationName>([^<]+)<", texto, re.DOTALL
-    )
-    info["emisor"] = m.group(1).strip() if m else ""
     m = re.search(r"AccountingSupplierParty.*?<(?:\w+:)?CompanyID[^>]*>([^<]+)<", texto, re.DOTALL)
     info["nit_emisor"] = m.group(1).strip() if m else ""
-    m = re.search(
-        r"AccountingCustomerParty.*?<(?:\w+:)?RegistrationName>([^<]+)<", texto, re.DOTALL
-    )
-    info["adquiriente"] = m.group(1).strip() if m else ""
     m = re.search(r"LegalMonetaryTotal.*?<(?:\w+:)?PayableAmount[^>]*>([^<]+)<", texto, re.DOTALL)
     info["total_pagar"] = m.group(1).strip() if m else ""
-    m = re.search(
-        r"LegalMonetaryTotal.*?<(?:\w+:)?LineExtensionAmount[^>]*>([^<]+)<", texto, re.DOTALL
-    )
-    info["total_lineas"] = m.group(1).strip() if m else ""
     return info
 
 
@@ -2545,6 +2525,12 @@ def generar_excel(
             if isinstance(v, str):
                 # openpyxl rechaza caracteres de control (TXT truncados/binarios)
                 v = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", v)
+                # Ronda 31: neutralizar prefijo de fórmula (=,+,-,@) — el texto
+                # viene crudo de los PDF/XML (emisor DIAN, descripción de línea,
+                # Descripción del CUV del MSPS) y el auditor abre el informe en
+                # su PC, donde Excel ejecutaría =HYPERLINK/=WEBSERVICE/DDE.
+                if v[:1] in ("=", "+", "-", "@"):
+                    v = "'" + v
             cel = ws.cell(row=r, column=j, value=v)
             cel.border = BORDE
             cel.alignment = Alignment(vertical="top", wrap_text=True)

@@ -76,9 +76,32 @@ def normalizar(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip().upper()
 
 
+# Ronda 31: caracteres de control que openpyxl (xlsx) y python-docx (XML)
+# rechazan/rompen. Se quitan de todo texto que va a los informes.
+_CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
 def limpiar_parrafo(texto: str) -> str:
     """Colapsa espacios y saltos para citar en el Word sin basura de layout."""
+    texto = _CTRL_RE.sub("", texto)
     return re.sub(r"\s+", " ", texto).strip()
+
+
+def _celda_segura(v):
+    """Neutraliza una celda de texto para openpyxl (ronda 31).
+
+    Quita caracteres de control (que tumban el .xlsx) y antepone un
+    apóstrofo si el texto empieza con un prefijo de fórmula (=,+,-,@) —
+    el texto viene crudo de los PDF y el informe lo abre el auditor en su
+    PC, donde Excel ejecutaría =HYPERLINK/=WEBSERVICE/DDE. Los números
+    (valores de cartera) pasan intactos.
+    """
+    if not isinstance(v, str):
+        return v
+    s = _CTRL_RE.sub("", v)
+    if s[:1] in ("=", "+", "-", "@"):
+        s = "'" + s
+    return s
 
 
 def extraer_montos(texto: str) -> list[int]:
@@ -618,6 +641,17 @@ def generar_word(facturas: list[Factura], salida: Path, ciudad: str, elaborado: 
         "consideración de las instancias competentes para su depuración y "
         "baja de los estados financieros de la institución."
     )
+    # Ronda 31: el "Valor total" suma f.valor (0 cuando no se pudo extraer del
+    # PDF). Dejar constancia de cuántas facturas NO aportan al total para que
+    # el documento legal no oculte que hay valores pendientes de confirmar.
+    _sin_valor = sum(1 for f in facturas if f.valor is None)
+    if _sin_valor:
+        parrafo(
+            f"NOTA: {_sin_valor} factura(s) se relacionan con el valor "
+            "pendiente de confirmar (no fue posible extraerlo del PDF) y NO "
+            "están incluidas en el valor total citado; deben verificarse "
+            "manualmente antes de la depuración."
+        )
     doc.add_paragraph()
     doc.add_paragraph()
     parrafo("_________________________________")
@@ -655,7 +689,7 @@ def generar_excel(facturas: list[Factura], salida: Path) -> None:
     def hoja(nombre, encabezados, anchos):
         ws = wb.create_sheet(nombre)
         for j, (enc, ancho) in enumerate(zip(encabezados, anchos, strict=False), 1):
-            cel = ws.cell(row=1, column=j, value=enc)
+            cel = ws.cell(row=1, column=j, value=_celda_segura(enc))
             cel.fill, cel.font = FILL_HEADER, FONT_HEADER
             cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             ws.column_dimensions[get_column_letter(j)].width = ancho
@@ -666,7 +700,9 @@ def generar_excel(facturas: list[Factura], salida: Path) -> None:
     def fila(ws, valores, cols_moneda=(), col_semaforo=None, bueno=True):
         r = ws.max_row + 1
         for j, v in enumerate(valores, 1):
-            cel = ws.cell(row=r, column=j, value=v)
+            # v se conserva sin tocar para el chequeo de cols_moneda de abajo;
+            # solo la celda escrita se sanea (ronda 31).
+            cel = ws.cell(row=r, column=j, value=_celda_segura(v))
             cel.border = BORDE
             cel.alignment = Alignment(vertical="top", wrap_text=True)
             cel.font = Font(size=10)

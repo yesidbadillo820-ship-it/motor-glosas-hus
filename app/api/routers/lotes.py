@@ -9,11 +9,12 @@ token estático AGENTE_LOTES_TOKEN, no con JWT de usuario.
 from __future__ import annotations
 
 import json
+import re
 import secrets
 
 from fastapi import APIRouter, Depends, Form, Header, HTTPException, Response, UploadFile, File
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.api.deps import get_auditor_o_superior, get_usuario_actual
 from app.core.config import get_settings
@@ -62,9 +63,21 @@ async def crear_lote(
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Sube el Excel consolidado y encola la corrida del bot."""
-    nombre = archivo.filename or "lote.xlsx"
+    # Ronda 31: sanear el nombre — el agente local lo usa para escribir el
+    # archivo en disco (path traversal en el PC del HUS) y el motor lo
+    # refleja en Content-Disposition. El servidor es Linux, así que
+    # Path(...).name NO recorta el '\' de Windows: se recortan AMBOS
+    # separadores y se rechazan control chars/comillas.
+    raw = archivo.filename or "lote.xlsx"
+    nombre = re.split(r"[\\/]", raw)[-1].strip() or "lote.xlsx"
+    if nombre in (".", "..") or any(c in nombre for c in '"\r\n\x00'):
+        raise HTTPException(400, "Nombre de archivo inválido.")
     if not nombre.lower().endswith((".xlsx", ".xlsm")):
         raise HTTPException(400, "El archivo debe ser un Excel (.xlsx / .xlsm).")
+    if archivo.size is not None and archivo.size > lotes_service.MAX_EXCEL_BYTES:
+        raise HTTPException(
+            400, f"Archivo excede {lotes_service.MAX_EXCEL_BYTES // (1024 * 1024)} MB."
+        )
     contenido = await archivo.read()
     if len(contenido) > lotes_service.MAX_EXCEL_BYTES:
         raise HTTPException(
@@ -91,8 +104,16 @@ def listar_lotes(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
+    # Ronda 31: defer(excel_archivo) — el listado NO usa el BLOB (ver
+    # _lote_a_dict), pero sin esto traía hasta 200 archivos de 20MB a RAM
+    # y reventaba la e2-micro de 1GB. descargar_excel sigue trayéndolo con
+    # su carga normal (una sola fila).
     lotes = (
-        db.query(LoteRecord).order_by(LoteRecord.id.desc()).limit(max(1, min(limite, 200))).all()
+        db.query(LoteRecord)
+        .options(defer(LoteRecord.excel_archivo))
+        .order_by(LoteRecord.id.desc())
+        .limit(max(1, min(limite, 200)))
+        .all()
     )
     return [_lote_a_dict(lo) for lo in lotes]
 
@@ -213,10 +234,13 @@ def descargar_excel(
 ):
     tarea = _tarea_reclamada_o_404(db, tarea_id)
     lote = db.query(LoteRecord).filter(LoteRecord.id == tarea.lote_id).first()
+    # Ronda 31: defensa en profundidad para lotes viejos creados antes del
+    # saneo en crear_lote — un nombre con comillas/CRLF rompería el header.
+    _nombre = re.sub(r'[\r\n"\\]', "_", lote.nombre_archivo or "lote.xlsx")[:300] or "lote.xlsx"
     return Response(
         content=lote.excel_archivo,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{lote.nombre_archivo}"'},
+        headers={"Content-Disposition": f'attachment; filename="{_nombre}"'},
     )
 
 

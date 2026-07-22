@@ -141,3 +141,29 @@ class TestLeerReporte:
 
     def test_reporte_inexistente(self, tmp_path):
         assert ag.leer_reporte(tmp_path / "no_existe.csv") == []
+
+
+# ── Ronda 31: nombre_archivo_seguro (path traversal desde el servidor) ──
+
+import pytest  # noqa: E402
+
+
+def test_nombre_seguro_acepta_basename():
+    assert ag.nombre_archivo_seguro("lote_coosalud.xlsx") == "lote_coosalud.xlsx"
+
+
+@pytest.mark.parametrize(
+    "malicioso",
+    [
+        "../../etc/passwd",
+        r"..\..\Windows\System32\x.xlsx",
+        "sub/dir/x.xlsx",
+        r"C:\temp\x.xlsx",
+        "..",
+        ".",
+        "",
+    ],
+)
+def test_nombre_seguro_rechaza_rutas(malicioso):
+    with pytest.raises(RuntimeError):
+        ag.nombre_archivo_seguro(malicioso)

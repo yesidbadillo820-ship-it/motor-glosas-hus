@@ -75,7 +75,16 @@ if not exist "%~dp0generar_informe_baja_cartera.py" (
     exit /b 1
 )
 %PYEXE% "%~dp0generar_informe_baja_cartera.py" --raiz "%CARPETA%"
+set "RC=%ERRORLEVEL%"
 echo.
+if not "%RC%"=="0" (
+    echo ============================================================
+    echo   [X] La generacion FALLO ^(codigo %RC%^). NO se genero el informe.
+    echo   Revise los mensajes de arriba. NO presente nada de esta corrida.
+    echo ============================================================
+    pause
+    exit /b %RC%
+)
 echo ============================================================
 echo   Listo. Revise el Word INFORME_BAJA_CARTERA_*.docx y el
 echo   Excel INFORME_BAJA_CARTERA_*.xlsx que quedaron en:

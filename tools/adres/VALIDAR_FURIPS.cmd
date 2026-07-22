@@ -69,7 +69,16 @@ if not exist "%~dp0validar_furips.py" (
     exit /b 1
 )
 %PYEXE% "%~dp0validar_furips.py" --raiz "%CARPETA%"
+set "RC=%ERRORLEVEL%"
 echo.
+if not "%RC%"=="0" (
+    echo ============================================================
+    echo   [X] La validacion FALLO ^(codigo %RC%^). NO se genero el Excel.
+    echo   Revise los mensajes de arriba. NO radique con este informe.
+    echo ============================================================
+    pause
+    exit /b %RC%
+)
 echo ============================================================
 echo   Listo. Revise el Excel INFORME_VALIDACION_FURIPS_*.xlsx
 echo   que quedo en: "%CARPETA%"
