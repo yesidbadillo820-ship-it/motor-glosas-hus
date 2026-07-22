@@ -1,0 +1,33 @@
+{
+  "ontologia": "normativa",
+  "version": "1.0",
+  "descripcion": "Las normas como conceptos relacionados: norma → qué exige → qué documento. Responde '¿por qué se bloqueó esta factura?' con la cadena completa. Se referencia desde las reglas (campo 'fuente') y desde los hallazgos del Expediente.",
+  "fuentes": ["Textos oficiales de las resoluciones citadas"],
+  "conceptos": {
+    "RES-2284-2023": {
+      "nombre": "Resolución 2284 de 2023 — soportes de la factura de venta en salud",
+      "tipo": "resolucion",
+      "exige_documentos": ["FEV", "RIP", "CUV", "EPI", "HEV", "HAU", "OPF", "DQX", "RAN", "PDX", "PDE"],
+      "relacion_reglas": "todas las reglas R-BASE-* y R-SERV-* del motor citan esta norma",
+      "vigencia_desde": "2024-01-01"
+    },
+    "RES-2275-2023": {
+      "nombre": "Resolución 2275 de 2023 — RIPS como soporte de la factura electrónica",
+      "tipo": "resolucion",
+      "exige_documentos": ["RIP", "CUV"],
+      "vigencia_desde": "2024-01-01"
+    },
+    "RES-1995-1999": {
+      "nombre": "Resolución 1995 de 1999 — manejo de la historia clínica",
+      "tipo": "resolucion",
+      "define": "atributos mínimos de los registros clínicos (identificación, fecha, firma del profesional)",
+      "aplica_a_clase": "CLINICO"
+    },
+    "RES-2641-2025": {
+      "nombre": "Resolución 2641 de 2025 — actualización CUPS",
+      "tipo": "resolucion",
+      "define": "nomenclatura vigente de procedimientos (CUPS 2025)",
+      "relacion": "el homologador del Motor de Glosas traduce códigos antiguos a esta nomenclatura"
+    }
+  }
+}

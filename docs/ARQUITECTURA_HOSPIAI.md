@@ -320,6 +320,7 @@ v1: los HTML actuales leyendo del expediente. Futuro: panel unificado.
 | **1 · Hecha** | El Expediente Digital | `hospiai.db` + esquema §4; el radicador persiste cada corrida (CSV intacto); reglas declarativas §6; `analizador-ruta` completo (responsable + lote); consola/panel; corrida diaria + guía |
 | **1.5 · Arquitectura Cognitiva** | **Hecha:** vigencias normativas (la regla correcta según la fecha), catálogo institucional (NIT/régimen/plazo/periodicidad → `pagadores`+`contratos`), Motor de Evidencias v1 (evidencia + confianza por hallazgo, vista `vw_evidencias`, comando `evidencia`), grafo consultable (vistas + `grafo` export JSON), memoria de glosas (solución/aprendizaje/tiempo) |
 | **1.6 · Agent Framework** | **Entrega 1 (hecha):** el SDK de agentes (`tools/hospiai_sdk.py`) — contrato único (`Agente`: id/dominio/versión/entradas/salidas/capacidades + `ejecutar/validar/registrar/explicar`; las subclases solo implementan `_trabajar`), formato estándar de resultado (`ResultadoAgente`: mismo dict para todos, con confianza, evidencias, duración y versiones agente+reglas+catálogo), **cola de misiones persistente** (tabla `misiones`: los agentes nunca se llaman entre sí — publican misiones; prioridad, reintentos, auditoría), **Registro Central** (`data/agentes.json`: AG001–AG010 con estado y capacidades; el Supervisor consume SOLO el registro), primeros agentes reales sobre el SDK (AG002 AnalizadorRuta, AG003 ClasificadorDocumental) y el **DSL de reglas** (`tools/hospiai_dsl.py`: un auditor escribe `REGLA… SI SERVICIO = CIRUGIA… REQUIERE… SI FALTA… FUENTE… FIN` y compila al JSON del motor sin tocarlo; errores con línea y motivo; `data/ejemplo_reglas.hospiai` espejo de las reglas vigentes con paridad probada). **Entrega 2:** Supervisor (AG010) consumiendo solo Registro+Cola, y migración progresiva de los agentes legacy al SDK |
+| **Knowledge Layer** | **Entrega 1 (hecha):** el Motor Semántico (`tools/hospiai_semantica.py`) — la capa que convierte códigos en SIGNIFICADO. Cinco ontologías en `data/ontologias/`: **documental** (27 conceptos: qué ES cada soporte, clase, relaciones — DQX acompañada de RAN/EPI —, atributos exigidos con fuente Res. 1995/1999), **clínica** (tipos de atención → soportes esperados: QUIRURGICO ⇒ DQX+RAN+EPI+HEV; semilla CIE-10 verificada + cargador de la tabla oficial `cargar-cie10` — los códigos JAMÁS se inventan), **CUPS** (158 procedimientos oficiales Res. 2641/2025 **reutilizados del Motor de Glosas** vía `importar-cups`, extracción AST sin ejecutar), **normativa** (norma → exige → documento: responde "¿por qué se bloqueó?") y **contractual** (esquema por pagador para autorizaciones/anexos — la llena el área). Agente **AG011 MotorSemantico** (capacidad EXPLICAR_CONCEPTO) en el registro. `explicar K35` responde: apendicitis → quirúrgico → se esperan DQX, RAN, EPI. **Entrega 2:** conectar la implicación semántica al dictamen (dx/CUPS del RIPS → tipo de atención → exigencias) y cargar las tablas oficiales completas |
 | **2 · Dominios D1/D5** | Calidad y operación | `calidad-archivos` (dañados/vacíos/duplicados), `tiempos-proceso` |
 | **3 · Dominio D2** | Inteligencia clínica | `lector-ocr` (reutilizando la lectura de documentos del Motor de Glosas) escribiendo hallazgos con confianza < 1.0 sobre el Motor de Evidencias, `coherencia-clinica`, `identidad-paciente` |
 | **4 · Dominios D4/D6** | Cartera y gerencia | `gestor-devoluciones` + histórico → grafo activo → `recomendador`, `alertas-preventivas` (plazos del catálogo) y agente conversacional; con histórico suficiente, predicción de glosas |
@@ -329,6 +330,29 @@ Regla de oro de la hoja de ruta: **cada fase entrega valor usable por sí sola**
 (como hasta ahora: cada semana salió algo que el área ya usa).
 
 ---
+
+## 9.5 Mapa de productos (modularidad estratégica)
+
+Para que HOSPIAI pueda llegar a otros hospitales, los componentes se organizan
+como **productos con fronteras claras** desde ya. Decisión de ingeniería: hoy
+viven en el MISMO repositorio (un solo equipo, una sola instalación — separar
+físicamente ahora solo agregaría fricción); la separación en paquetes/repos se
+ejecuta cuando exista el segundo hospital, y será barata porque las fronteras
+ya están trazadas:
+
+| Producto | Qué es | Dónde vive hoy |
+|---|---|---|
+| **HOSPIAI Core** | Expediente Digital, SDK de agentes, misiones, registro | `tools/hospiai_db.py`, `tools/hospiai_sdk.py`, `data/agentes.json` |
+| **HOSPIAI Knowledge** | Ontologías + Motor Semántico + catálogo institucional | `tools/hospiai_semantica.py`, `data/ontologias/`, `data/perfiles_radicacion.json` |
+| **HOSPIAI Rules** | DSL + motor normativo/contractual con vigencias | `tools/hospiai_dsl.py`, `data/reglas_radicacion.json`, `cargar_reglas()` |
+| **HOSPIAI Intelligence** | OCR, extracción documental, IA clínica, predicción | Fase 3+ (reutilizará la lectura de documentos del Motor de Glosas) |
+| **HOSPIAI RPA** | Automatización de portales | Fase 5 (condicionada a gerencia/TI) |
+| **HOSPIAI Analytics** | Paneles, indicadores, informes | `tools/hospiai.py`, tablero, explorador, informes ejecutivos |
+
+Regla de dependencia entre productos: **Analytics/Intelligence/RPA dependen de
+Core+Knowledge+Rules; nunca al revés.** El conocimiento no depende de ninguna
+tecnología de ejecución — es el activo que sobrevive a los agentes, a los
+modelos y a las tecnologías.
 
 ## 10. Decisiones que corresponden al hospital (no al código)
 

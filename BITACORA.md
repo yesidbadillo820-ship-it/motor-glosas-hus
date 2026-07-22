@@ -77,6 +77,13 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Primeros agentes reales:** el Analizador de Ruta (AG002) y el Clasificador Documental (AG003) ya corren con el contrato nuevo.
   - **Lenguaje propio de reglas (DSL):** un auditor puede escribir "REGLA … SI SERVICIO = CIRUGIA … REQUIERE DQX RAN EPI … SI FALTA BLOQUEAR … FUENTE Resolución 2284" en un archivo de texto y compilarlo al motor con un comando — sin programar. Con verificación que señala línea y motivo de cualquier error. Ejemplo listo en `data/ejemplo_reglas.hospiai` (paridad probada con las reglas vigentes).
   - **124 pruebas automáticas** en verde.
+- **HOSPIAI KNOWLEDGE LAYER (entrega 1) — la capa de conocimiento:** la plataforma dejó de leer códigos y empezó a entenderlos:
+  - **Motor Semántico** (`py tools\hospiai_semantica.py explicar K35`): responde "K35 = apendicitis aguda → atención quirúrgica → se esperan descripción quirúrgica, registro anestésico y epicrisis". Lo mismo para documentos: "DQX = descripción quirúrgica, documento clínico, acompañada del registro anestésico, debe llevar paciente, fecha y firma (Res. 1995/1999)".
+  - **Cinco ontologías** en `data/ontologias/`: documental (27 soportes con clase, relaciones y atributos), clínica (tipos de atención → soportes; semilla verificada), CUPS (**158 procedimientos oficiales Res. 2641/2025 reutilizados del Motor de Glosas** — no se inventó ni un código), normativa (norma → exigencia → documento) y contractual (esquema para que el área cargue autorizaciones por contrato).
+  - **Cargadores de tablas oficiales:** `cargar-cie10` (para la tabla CIE-10 completa del hospital) e `importar-cups`. Principio: los códigos clínicos jamás se inventan — solo se cargan de fuente oficial.
+  - **Nuevo agente AG011 (MotorSemantico)** registrado y probado en el SDK.
+  - **Mapa de productos** definido en la arquitectura (Core / Knowledge / Rules / Intelligence / RPA / Analytics) con fronteras trazadas desde ya, para que otro hospital pueda adoptar módulos sueltos en el futuro.
+  - **136 pruebas automáticas** en verde.
 
 ---
 

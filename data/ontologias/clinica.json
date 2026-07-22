@@ -1,0 +1,64 @@
+{
+  "ontologia": "clinica",
+  "version": "0.2-semilla",
+  "descripcion": "Conocimiento clínico: qué significa un código y qué implica para la auditoría. Esta es la SEMILLA con la estructura y ejemplos verificados; las tablas completas (CIE-10 ~12.000 códigos, CUPS) se cargan desde los archivos oficiales del hospital con: py tools\\hospiai_semantica.py cargar-cie10 <archivo.csv> | importar-cups. NUNCA se inventan códigos: solo se cargan de fuente oficial.",
+  "fuentes": [
+    "CIE-10 (clasificación internacional de enfermedades, OMS/MinSalud)",
+    "CUPS Resolución 2641 de 2025 (se importa del homologador del Motor de Glosas)"
+  ],
+  "tipos_atencion": {
+    "QUIRURGICO": {
+      "nombre": "Atención quirúrgica",
+      "soportes_esperados": ["DQX", "RAN", "EPI", "HEV"],
+      "nota": "Toda cirugía exige descripción quirúrgica, registro anestésico y epicrisis."
+    },
+    "URGENCIAS": {
+      "nombre": "Atención de urgencias",
+      "soportes_esperados": ["HAU"]
+    },
+    "HOSPITALIZACION": {
+      "nombre": "Hospitalización",
+      "soportes_esperados": ["EPI"]
+    },
+    "AMBULATORIO": {
+      "nombre": "Consulta ambulatoria",
+      "soportes_esperados": []
+    },
+    "MEDICAMENTOS": {
+      "nombre": "Dispensación de medicamentos",
+      "soportes_esperados": ["OPF", "HAM"]
+    }
+  },
+  "conceptos": {
+    "K35": {
+      "nombre": "Apendicitis aguda",
+      "tipo": "diagnostico_cie10",
+      "tipo_atencion_frecuente": "QUIRURGICO",
+      "semilla": true
+    },
+    "K80": {
+      "nombre": "Colelitiasis",
+      "tipo": "diagnostico_cie10",
+      "tipo_atencion_frecuente": "QUIRURGICO",
+      "semilla": true
+    },
+    "J18": {
+      "nombre": "Neumonía, organismo no especificado",
+      "tipo": "diagnostico_cie10",
+      "tipo_atencion_frecuente": "HOSPITALIZACION",
+      "semilla": true
+    },
+    "I10": {
+      "nombre": "Hipertensión esencial (primaria)",
+      "tipo": "diagnostico_cie10",
+      "tipo_atencion_frecuente": "AMBULATORIO",
+      "semilla": true
+    },
+    "O80": {
+      "nombre": "Parto único espontáneo",
+      "tipo": "diagnostico_cie10",
+      "tipo_atencion_frecuente": "HOSPITALIZACION",
+      "semilla": true
+    }
+  }
+}

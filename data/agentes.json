@@ -9,7 +9,10 @@
       "dominio": "D1",
       "version": "1.0",
       "estado": "ACTIVO",
-      "capacidades": ["EXPLORAR", "DESCUBRIR_FACTURAS"],
+      "capacidades": [
+        "EXPLORAR",
+        "DESCUBRIR_FACTURAS"
+      ],
       "depende_de": [],
       "implementacion": "legacy: radicar_facturacion.descubrir_auto",
       "notas": "Recorre el share de FE y ancla expedientes. Solo lectura."
@@ -20,8 +23,12 @@
       "dominio": "D1",
       "version": "1.1",
       "estado": "ACTIVO",
-      "capacidades": ["ANALIZAR_RUTA"],
-      "depende_de": ["AG001"],
+      "capacidades": [
+        "ANALIZAR_RUTA"
+      ],
+      "depende_de": [
+        "AG001"
+      ],
       "implementacion": "sdk: hospiai_agentes.AgenteAnalizadorRuta",
       "notas": "Ruta → año, mes, entidad, responsable, lote, factura."
     },
@@ -31,8 +38,12 @@
       "dominio": "D1",
       "version": "1.1",
       "estado": "ACTIVO",
-      "capacidades": ["CLASIFICAR_DOCUMENTO"],
-      "depende_de": ["AG001"],
+      "capacidades": [
+        "CLASIFICAR_DOCUMENTO"
+      ],
+      "depende_de": [
+        "AG001"
+      ],
       "implementacion": "sdk: hospiai_agentes.AgenteClasificadorDocumental",
       "notas": "Nombre de archivo → código ADRES (diccionario oficial + alias HUS)."
     },
@@ -42,8 +53,15 @@
       "dominio": "D2",
       "version": "0.1",
       "estado": "PLANEADO",
-      "capacidades": ["OCR", "PDF", "HISTORIA_CLINICA", "EPICRISIS"],
-      "depende_de": ["AG003"],
+      "capacidades": [
+        "OCR",
+        "PDF",
+        "HISTORIA_CLINICA",
+        "EPICRISIS"
+      ],
+      "depende_de": [
+        "AG003"
+      ],
       "implementacion": "pendiente (Fase 3; reutilizará la lectura de documentos del Motor de Glosas)",
       "notas": "Escribirá hallazgos con confianza < 1.0 sobre el Motor de Evidencias."
     },
@@ -53,7 +71,9 @@
       "dominio": "D3",
       "version": "1.0",
       "estado": "ACTIVO",
-      "capacidades": ["RESOLVER_ENTIDAD"],
+      "capacidades": [
+        "RESOLVER_ENTIDAD"
+      ],
       "depende_de": [],
       "implementacion": "legacy: radicar_facturacion.resolver_entidad",
       "notas": "Identifica el pagador por catálogo + razón social del FEV (25+ entidades)."
@@ -64,8 +84,13 @@
       "dominio": "D3",
       "version": "1.0",
       "estado": "ACTIVO",
-      "capacidades": ["AUDITAR_COMPLETITUD"],
-      "depende_de": ["AG003", "AG005"],
+      "capacidades": [
+        "AUDITAR_COMPLETITUD"
+      ],
+      "depende_de": [
+        "AG003",
+        "AG005"
+      ],
       "implementacion": "legacy: radicar_facturacion.procesar_factura",
       "notas": "Cruza inventario vs. reglas vigentes → dictamen con hallazgos y evidencia."
     },
@@ -75,8 +100,12 @@
       "dominio": "D3",
       "version": "1.0",
       "estado": "ACTIVO",
-      "capacidades": ["CRUZAR_SOPORTES"],
-      "depende_de": ["AG006"],
+      "capacidades": [
+        "CRUZAR_SOPORTES"
+      ],
+      "depende_de": [
+        "AG006"
+      ],
       "implementacion": "legacy: radicar_facturacion.indexar_soportes_clinicos / _desde_indice",
       "notas": "Completa expedientes con los soportes clínicos de Y:/Z:/X:."
     },
@@ -86,8 +115,12 @@
       "dominio": "D1",
       "version": "1.1",
       "estado": "ACTIVO",
-      "capacidades": ["PERSISTIR"],
-      "depende_de": ["AG006"],
+      "capacidades": [
+        "PERSISTIR"
+      ],
+      "depende_de": [
+        "AG006"
+      ],
       "implementacion": "sdk-nucleo: hospiai_db.persistir_corrida",
       "notas": "Escribe expedientes, documentos, hallazgos y eventos en hospiai.db."
     },
@@ -97,8 +130,16 @@
       "dominio": "D6",
       "version": "1.1",
       "estado": "ACTIVO",
-      "capacidades": ["PANEL", "RESUMEN", "EVIDENCIA", "GRAFO", "CATALOGO"],
-      "depende_de": ["AG008"],
+      "capacidades": [
+        "PANEL",
+        "RESUMEN",
+        "EVIDENCIA",
+        "GRAFO",
+        "CATALOGO"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
       "implementacion": "sdk-nucleo: hospiai.py",
       "notas": "Consola y panel del Expediente Digital (solo lee)."
     },
@@ -108,10 +149,25 @@
       "dominio": "ORQUESTACION",
       "version": "0.1",
       "estado": "PLANEADO",
-      "capacidades": ["ORQUESTAR"],
+      "capacidades": [
+        "ORQUESTAR"
+      ],
       "depende_de": [],
       "implementacion": "pendiente (Fase 1.6 entrega 2): consumirá SOLO el Registro y la ColaMisiones",
       "notas": "No procesa, no clasifica, no radica: solo mueve misiones."
+    },
+    {
+      "id": "AG011",
+      "nombre": "MotorSemantico",
+      "dominio": "KNOWLEDGE",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "EXPLICAR_CONCEPTO"
+      ],
+      "depende_de": [],
+      "implementacion": "sdk: hospiai_agentes.AgenteSemantico",
+      "notas": "Knowledge Layer: código → significado → implicaciones (ontologías documental/clínica/CUPS/normativa)."
     }
   ]
 }

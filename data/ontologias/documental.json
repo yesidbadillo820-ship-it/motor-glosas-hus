@@ -1,0 +1,215 @@
+{
+  "ontologia": "documental",
+  "version": "1.0",
+  "descripcion": "Qué ES cada soporte, a qué clase pertenece, con qué se relaciona y qué atributos debe tener. Generada desde el catálogo ADRES del motor (mismos códigos y nombres).",
+  "fuentes": [
+    "Resolución 2284 de 2023 (catálogo de soportes)",
+    "Resolución 1995 de 1999 (historia clínica: atributos mínimos)"
+  ],
+  "conceptos": {
+    "FEV": {
+      "nombre": "Factura electrónica de venta (XML DIAN)",
+      "clase": "FACTURACION"
+    },
+    "FAC": {
+      "nombre": "Factura de venta (PDF)",
+      "clase": "FACTURACION"
+    },
+    "FAT": {
+      "nombre": "Factura / detalle de cobro",
+      "clase": "FACTURACION"
+    },
+    "FED": {
+      "nombre": "Factura electrónica DIAN — documento adjunto (AttachedDocument/CUFE)",
+      "clase": "FACTURACION",
+      "equivale_a": "FEV (documento adjunto DIAN con CUFE)"
+    },
+    "ARD": {
+      "nombre": "Acuse de la DIAN (ApplicationResponse)",
+      "clase": "FACTURACION"
+    },
+    "RIP": {
+      "nombre": "RIPS — registro individual de prestación de servicios",
+      "clase": "VALIDACION"
+    },
+    "CUV": {
+      "nombre": "Resultado de validación RIPS (MSPS / FEVRIPS)",
+      "clase": "VALIDACION",
+      "valida_a": "RIP"
+    },
+    "EPI": {
+      "nombre": "Epicrisis",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "parte_de": "historia clínica",
+      "asociado_a": "hospitalización / egreso",
+      "satisfecho_por": [
+        "HEV"
+      ]
+    },
+    "HEV": {
+      "nombre": "Resumen de atención u hoja de evolución (historia clínica)",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "parte_de": "historia clínica",
+      "asociado_a": "evolución del paciente"
+    },
+    "HAU": {
+      "nombre": "Hoja de atención de urgencias",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "parte_de": "historia clínica",
+      "asociado_a": "atención de urgencias",
+      "satisfecho_por": [
+        "HEV"
+      ]
+    },
+    "HAO": {
+      "nombre": "Hoja de atención odontológica",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)"
+    },
+    "HAM": {
+      "nombre": "Hoja de administración de medicamentos",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "administración de medicamentos"
+    },
+    "OPF": {
+      "nombre": "Orden o prescripción facultativa",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "medicamentos e insumos ordenados"
+    },
+    "PDX": {
+      "nombre": "Resultado de procedimientos de apoyo diagnóstico",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "apoyo diagnóstico realizado"
+    },
+    "PDE": {
+      "nombre": "Resultado de procedimientos / evolución",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "procedimientos realizados"
+    },
+    "DQX": {
+      "nombre": "Descripción quirúrgica",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "procedimientos quirúrgicos",
+      "acompanado_de": [
+        "RAN",
+        "EPI",
+        "HEV"
+      ]
+    },
+    "RAN": {
+      "nombre": "Registro de anestesia",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "procedimientos con anestesia",
+      "acompanado_de": [
+        "DQX"
+      ]
+    },
+    "CRC": {
+      "nombre": "Comprobante de recibido del usuario / a cobro",
+      "clase": "ADMINISTRATIVO"
+    },
+    "TAP": {
+      "nombre": "Hoja de traslado asistencial de pacientes",
+      "clase": "CLINICO",
+      "atributos_requeridos": [
+        "identificacion_paciente",
+        "fecha",
+        "firma_profesional"
+      ],
+      "fuente_atributos": "Resolución 1995 de 1999 (registros de la historia clínica)",
+      "asociado_a": "traslado asistencial"
+    },
+    "FMO": {
+      "nombre": "Factura de material de osteosíntesis e insumos",
+      "clase": "FACTURACION"
+    },
+    "LDP": {
+      "nombre": "Lista de precios",
+      "clase": "FACTURACION"
+    },
+    "FUR": {
+      "nombre": "Formato Único de Reclamación (SOAT / ADRES)",
+      "clase": "RECLAMACION_SOAT",
+      "asociado_a": "reclamación SOAT/ADRES"
+    },
+    "SER": {
+      "nombre": "FUR Servicios (detalle de servicios reclamados)",
+      "clase": "RECLAMACION_SOAT"
+    },
+    "IPO": {
+      "nombre": "Informe policial de accidente / aviso a autoridad",
+      "clase": "RECLAMACION_SOAT"
+    },
+    "CRA": {
+      "nombre": "Constancia de atención / certificación",
+      "clase": "ADMINISTRATIVO"
+    },
+    "VAL": {
+      "nombre": "Validación RIPS — envío al validador (Doker), auxiliar",
+      "clase": "AUXILIAR"
+    },
+    "ADM": {
+      "nombre": "Documento administrativo / otros soportes",
+      "clase": "ADMINISTRATIVO"
+    }
+  }
+}

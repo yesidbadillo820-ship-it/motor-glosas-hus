@@ -85,4 +85,40 @@ def registro_con_implementaciones(ruta=None) -> RegistroAgentes:
     reg = RegistroAgentes(ruta)
     reg.registrar_clase(AgenteAnalizadorRuta)
     reg.registrar_clase(AgenteClasificadorDocumental)
+    reg.registrar_clase(AgenteSemantico)
     return reg
+
+
+class AgenteSemantico(Agente):
+    """AG011 — Explica qué SIGNIFICA un código (documento, diagnóstico CIE-10,
+    procedimiento CUPS) y qué implica para la auditoría, usando las ontologías
+    del Knowledge Layer. Si el código no está en las ontologías, lo reporta
+    con confianza baja para que se cargue la tabla oficial que falta."""
+
+    id = "AG011"
+    nombre = "MotorSemantico"
+    dominio = "KNOWLEDGE"
+    version = "1.0"
+    entradas = ["codigo"]
+    salidas = ["cadena", "hallado", "ontologia"]
+    depende_de = []
+    herramientas = ["ontologias data/ontologias/*.json"]
+    capacidades = ["EXPLICAR_CONCEPTO"]
+
+    def _trabajar(self, mision: Mision, contexto: dict, res: ResultadoAgente) -> None:
+        from hospiai_semantica import MotorSemantico
+
+        motor = MotorSemantico(contexto.get("dir_ontologias"))
+        codigo = mision.datos["codigo"]
+        hallado = motor.concepto(codigo)
+        res.salida = {
+            "cadena": motor.explicar(codigo),
+            "hallado": hallado is not None,
+            "ontologia": hallado[0] if hallado else "",
+        }
+        res.evidencias.append({"tipo": "ontologias", "valor": ", ".join(motor.resumen())})
+        if hallado is None:
+            res.confianza = 0.2
+            res.detalle = f"'{codigo}' no está en las ontologías: cargar la tabla oficial."
+        else:
+            res.detalle = res.salida["cadena"][0]

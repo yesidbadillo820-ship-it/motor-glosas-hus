@@ -1,0 +1,643 @@
+{
+ "ontologia": "cups",
+ "version": "2641-2025",
+ "descripcion": "Procedimientos CUPS con descripción oficial, importados del homologador del Motor de Glosas (Res. 2641 de 2025). Regenerar con: py tools\\hospiai_semantica.py importar-cups",
+ "fuentes": [
+  "Resolución 2641 de 2025",
+  "app/services/homologador_cups.py"
+ ],
+ "conceptos": {
+  "890101": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR MEDICINA GENERAL",
+   "tipo": "procedimiento_cups"
+  },
+  "890102": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR MEDICINA FAMILIAR",
+   "tipo": "procedimiento_cups"
+  },
+  "890103": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR MEDICINA DEL TRABAJO",
+   "tipo": "procedimiento_cups"
+  },
+  "890104": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ENFERMERÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890105": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR NUTRICIÓN Y DIETÉTICA",
+   "tipo": "procedimiento_cups"
+  },
+  "890106": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR PSICOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890107": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA",
+   "tipo": "procedimiento_cups"
+  },
+  "890108": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR FONOAUDIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890109": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR TERAPIA OCUPACIONAL",
+   "tipo": "procedimiento_cups"
+  },
+  "890110": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR OPTOMETRÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890111": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ODONTOLOGÍA GENERAL",
+   "tipo": "procedimiento_cups"
+  },
+  "890301": {
+   "nombre": "CONSULTA DE CONTROL POR MEDICINA GENERAL",
+   "tipo": "procedimiento_cups"
+  },
+  "890303": {
+   "nombre": "CONSULTA DE CONTROL POR ENFERMERÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890304": {
+   "nombre": "CONSULTA DE CONTROL POR NUTRICIÓN Y DIETÉTICA",
+   "tipo": "procedimiento_cups"
+  },
+  "890305": {
+   "nombre": "CONSULTA DE CONTROL POR PSICOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890306": {
+   "nombre": "CONSULTA DE CONTROL POR FISIOTERAPIA",
+   "tipo": "procedimiento_cups"
+  },
+  "890307": {
+   "nombre": "CONSULTA DE CONTROL POR FONOAUDIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890201": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA INTERNA",
+   "tipo": "procedimiento_cups"
+  },
+  "890202": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ELECTROFISIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890205": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ANESTESIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890207": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN NEUROLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890208": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN CARDIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890209": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN NEUMOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890210": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GASTROENTEROLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890211": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ENDOCRINOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890213": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN NEFROLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890215": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN HEMATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890217": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ONCOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890218": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN REUMATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890222": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN PEDIATRÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890225": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GINECOBSTETRICIA",
+   "tipo": "procedimiento_cups"
+  },
+  "890230": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN CIRUGÍA GENERAL",
+   "tipo": "procedimiento_cups"
+  },
+  "890235": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ORTOPEDIA Y TRAUMATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890240": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN UROLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890245": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN OFTALMOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890248": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GENÉTICA MÉDICA",
+   "tipo": "procedimiento_cups"
+  },
+  "890250": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN OTORRINOLARINGOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890253": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN HEPATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890255": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN DERMATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890260": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN PSIQUIATRÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890265": {
+   "nombre": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FÍSICA Y REHABILITACIÓN",
+   "tipo": "procedimiento_cups"
+  },
+  "890308": {
+   "nombre": "CONSULTA DE CONTROL POR ESPECIALISTA EN CARDIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890322": {
+   "nombre": "CONSULTA DE CONTROL POR ESPECIALISTA EN PEDIATRÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890325": {
+   "nombre": "CONSULTA DE CONTROL POR ESPECIALISTA EN GINECOBSTETRICIA",
+   "tipo": "procedimiento_cups"
+  },
+  "890335": {
+   "nombre": "CONSULTA DE CONTROL POR ESPECIALISTA EN ORTOPEDIA Y TRAUMATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890348": {
+   "nombre": "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+   "tipo": "procedimiento_cups"
+  },
+  "890351": {
+   "nombre": "CONSULTA DE CONTROL POR ESPECIALISTA EN MEDICINA INTERNA",
+   "tipo": "procedimiento_cups"
+  },
+  "890402": {
+   "nombre": "INTERCONSULTA HOSPITALARIA POR ELECTROFISIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890405": {
+   "nombre": "INTERCONSULTA HOSPITALARIA POR ENFERMERÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890410": {
+   "nombre": "INTERCONSULTA HOSPITALARIA POR AUDIOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890453": {
+   "nombre": "INTERCONSULTA HOSPITALARIA POR HEPATOLOGÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "890701": {
+   "nombre": "CONSULTA DE URGENCIAS POR MEDICINA GENERAL",
+   "tipo": "procedimiento_cups"
+  },
+  "890750": {
+   "nombre": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN GINECOLOGÍA Y OBSTETRICIA",
+   "tipo": "procedimiento_cups"
+  },
+  "890793": {
+   "nombre": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN MEDICINA DE EMERGENCIAS",
+   "tipo": "procedimiento_cups"
+  },
+  "901040": {
+   "nombre": "GLICEMIA PRE Y POST CARGA DE GLUCOSA",
+   "tipo": "procedimiento_cups"
+  },
+  "901225": {
+   "nombre": "GLUCOSA EN SUERO U OTROS FLUIDOS DIFERENTES A ORINA",
+   "tipo": "procedimiento_cups"
+  },
+  "901226": {
+   "nombre": "HEMOGLOBINA GLICOSILADA HBA1C",
+   "tipo": "procedimiento_cups"
+  },
+  "901415": {
+   "nombre": "PERFIL LIPÍDICO (COLESTEROL TOTAL, HDL, LDL, TRIGLICÉRIDOS)",
+   "tipo": "procedimiento_cups"
+  },
+  "903422": {
+   "nombre": "TIROTROPINA (TSH)",
+   "tipo": "procedimiento_cups"
+  },
+  "903419": {
+   "nombre": "TIROXINA LIBRE (T4 LIBRE)",
+   "tipo": "procedimiento_cups"
+  },
+  "903866": {
+   "nombre": "CREATININA EN SUERO U OTROS FLUIDOS",
+   "tipo": "procedimiento_cups"
+  },
+  "903868": {
+   "nombre": "CREATININA EN ORINA DE 24 HORAS",
+   "tipo": "procedimiento_cups"
+  },
+  "903895": {
+   "nombre": "TRANSAMINASA GLUTÁMICA OXALACÉTICA (AST)",
+   "tipo": "procedimiento_cups"
+  },
+  "903896": {
+   "nombre": "TRANSAMINASA GLUTÁMICA PIRÚVICA (ALT)",
+   "tipo": "procedimiento_cups"
+  },
+  "904906": {
+   "nombre": "ELECTROLITOS SÉRICOS (NA, K, CL)",
+   "tipo": "procedimiento_cups"
+  },
+  "906225": {
+   "nombre": "PROTEÍNA C REACTIVA (PCR) CUANTITATIVA",
+   "tipo": "procedimiento_cups"
+  },
+  "906039": {
+   "nombre": "PARCIAL DE ORINA",
+   "tipo": "procedimiento_cups"
+  },
+  "907106": {
+   "nombre": "UROANÁLISIS CON MICROSCOPIO DE CAMPO, SEDIMENTO Y DENSIDAD URINARIA",
+   "tipo": "procedimiento_cups"
+  },
+  "902207": {
+   "nombre": "HEMOGRAMA IV (HEMATOCRITO, HEMOGLOBINA, RECUENTO ERITROCITOS, ÍNDICES, LEUCOGRAMA)",
+   "tipo": "procedimiento_cups"
+  },
+  "902210": {
+   "nombre": "HEMOGRAMA III (HEMATOCRITO, HEMOGLOBINA, RECUENTO ERITROCITOS, LEUCOGRAMA)",
+   "tipo": "procedimiento_cups"
+  },
+  "902208": {
+   "nombre": "RECUENTO DE PLAQUETAS",
+   "tipo": "procedimiento_cups"
+  },
+  "902049": {
+   "nombre": "TIEMPO DE PROTROMBINA (TP-INR)",
+   "tipo": "procedimiento_cups"
+  },
+  "902045": {
+   "nombre": "TIEMPO DE TROMBOPLASTINA PARCIAL ACTIVADA (TTPA)",
+   "tipo": "procedimiento_cups"
+  },
+  "906915": {
+   "nombre": "VELOCIDAD DE SEDIMENTACIÓN GLOBULAR (VSG)",
+   "tipo": "procedimiento_cups"
+  },
+  "907111": {
+   "nombre": "UROCULTIVO Y RECUENTO DE COLONIAS",
+   "tipo": "procedimiento_cups"
+  },
+  "908436": {
+   "nombre": "PRUEBA RÁPIDA PARA VIH (TAMIZAJE)",
+   "tipo": "procedimiento_cups"
+  },
+  "906320": {
+   "nombre": "PRUEBA TREPONÉMICA SIFILIS (FTA-ABS)",
+   "tipo": "procedimiento_cups"
+  },
+  "906916": {
+   "nombre": "TAMIZAJE PARA HEPATITIS B (HBsAg)",
+   "tipo": "procedimiento_cups"
+  },
+  "870101": {
+   "nombre": "RADIOGRAFÍA DE CRÁNEO PA O AP Y LATERAL",
+   "tipo": "procedimiento_cups"
+  },
+  "871040": {
+   "nombre": "RADIOGRAFÍA DE COLUMNA LUMBOSACRA",
+   "tipo": "procedimiento_cups"
+  },
+  "871020": {
+   "nombre": "RADIOGRAFÍA DE COLUMNA CERVICAL",
+   "tipo": "procedimiento_cups"
+  },
+  "871021": {
+   "nombre": "RADIOGRAFÍA DE COLUMNA TORÁCICA",
+   "tipo": "procedimiento_cups"
+  },
+  "871121": {
+   "nombre": "RADIOGRAFÍA DE TÓRAX PA O AP",
+   "tipo": "procedimiento_cups"
+  },
+  "871122": {
+   "nombre": "RADIOGRAFÍA DE TÓRAX (PA Y LATERAL)",
+   "tipo": "procedimiento_cups"
+  },
+  "871330": {
+   "nombre": "RADIOGRAFÍA DE ABDOMEN SIMPLE",
+   "tipo": "procedimiento_cups"
+  },
+  "873101": {
+   "nombre": "RADIOGRAFÍA DE HOMBRO",
+   "tipo": "procedimiento_cups"
+  },
+  "873205": {
+   "nombre": "RADIOGRAFÍA DE CODO",
+   "tipo": "procedimiento_cups"
+  },
+  "873305": {
+   "nombre": "RADIOGRAFÍA DE MANO",
+   "tipo": "procedimiento_cups"
+  },
+  "874101": {
+   "nombre": "RADIOGRAFÍA DE PELVIS",
+   "tipo": "procedimiento_cups"
+  },
+  "874201": {
+   "nombre": "RADIOGRAFÍA DE CADERA",
+   "tipo": "procedimiento_cups"
+  },
+  "874305": {
+   "nombre": "RADIOGRAFÍA DE FÉMUR",
+   "tipo": "procedimiento_cups"
+  },
+  "874501": {
+   "nombre": "RADIOGRAFÍA DE RODILLA",
+   "tipo": "procedimiento_cups"
+  },
+  "874601": {
+   "nombre": "RADIOGRAFÍA DE TIBIA Y PERONÉ",
+   "tipo": "procedimiento_cups"
+  },
+  "874701": {
+   "nombre": "RADIOGRAFÍA DE TOBILLO",
+   "tipo": "procedimiento_cups"
+  },
+  "874801": {
+   "nombre": "RADIOGRAFÍA DE PIE",
+   "tipo": "procedimiento_cups"
+  },
+  "881201": {
+   "nombre": "ECOGRAFÍA DE TIROIDES",
+   "tipo": "procedimiento_cups"
+  },
+  "881330": {
+   "nombre": "ECOGRAFÍA DE ABDOMEN TOTAL",
+   "tipo": "procedimiento_cups"
+  },
+  "881331": {
+   "nombre": "ECOGRAFÍA DE HÍGADO Y VÍAS BILIARES",
+   "tipo": "procedimiento_cups"
+  },
+  "881332": {
+   "nombre": "ECOGRAFÍA DE RIÑONES Y VÍAS URINARIAS",
+   "tipo": "procedimiento_cups"
+  },
+  "881401": {
+   "nombre": "ECOGRAFÍA OBSTÉTRICA TRANSABDOMINAL",
+   "tipo": "procedimiento_cups"
+  },
+  "881402": {
+   "nombre": "ECOGRAFÍA OBSTÉTRICA TRANSVAGINAL",
+   "tipo": "procedimiento_cups"
+  },
+  "881403": {
+   "nombre": "ECOGRAFÍA DE PELVIS GINECOLÓGICA",
+   "tipo": "procedimiento_cups"
+  },
+  "881431": {
+   "nombre": "ECOGRAFÍA DOPPLER OBSTÉTRICA",
+   "tipo": "procedimiento_cups"
+  },
+  "881434": {
+   "nombre": "PERFIL BIOFÍSICO",
+   "tipo": "procedimiento_cups"
+  },
+  "881501": {
+   "nombre": "ECOGRAFÍA DE PARTES BLANDAS",
+   "tipo": "procedimiento_cups"
+  },
+  "881601": {
+   "nombre": "ECOGRAFÍA TESTICULAR",
+   "tipo": "procedimiento_cups"
+  },
+  "881701": {
+   "nombre": "ECOCARDIOGRAFÍA TRANSTORÁCICA",
+   "tipo": "procedimiento_cups"
+  },
+  "881702": {
+   "nombre": "ECOCARDIOGRAFÍA TRANSESOFÁGICA",
+   "tipo": "procedimiento_cups"
+  },
+  "881901": {
+   "nombre": "ECOGRAFÍA DOPPLER VENOSA DE MIEMBROS INFERIORES",
+   "tipo": "procedimiento_cups"
+  },
+  "881902": {
+   "nombre": "ECOGRAFÍA DOPPLER ARTERIAL DE MIEMBROS INFERIORES",
+   "tipo": "procedimiento_cups"
+  },
+  "883101": {
+   "nombre": "TAC DE CRÁNEO SIMPLE",
+   "tipo": "procedimiento_cups"
+  },
+  "883102": {
+   "nombre": "TAC DE CRÁNEO CON CONTRASTE",
+   "tipo": "procedimiento_cups"
+  },
+  "883201": {
+   "nombre": "TAC DE TÓRAX SIMPLE",
+   "tipo": "procedimiento_cups"
+  },
+  "883202": {
+   "nombre": "TAC DE TÓRAX CON CONTRASTE",
+   "tipo": "procedimiento_cups"
+  },
+  "883301": {
+   "nombre": "TAC DE ABDOMEN SIMPLE",
+   "tipo": "procedimiento_cups"
+  },
+  "883302": {
+   "nombre": "TAC DE ABDOMEN CON CONTRASTE",
+   "tipo": "procedimiento_cups"
+  },
+  "883303": {
+   "nombre": "TAC DE PELVIS",
+   "tipo": "procedimiento_cups"
+  },
+  "883401": {
+   "nombre": "TAC DE COLUMNA CERVICAL",
+   "tipo": "procedimiento_cups"
+  },
+  "883402": {
+   "nombre": "TAC DE COLUMNA LUMBOSACRA",
+   "tipo": "procedimiento_cups"
+  },
+  "884003": {
+   "nombre": "RESONANCIA MAGNÉTICA DE CEREBRO SIMPLE",
+   "tipo": "procedimiento_cups"
+  },
+  "884004": {
+   "nombre": "RESONANCIA MAGNÉTICA DE CEREBRO CON CONTRASTE",
+   "tipo": "procedimiento_cups"
+  },
+  "884101": {
+   "nombre": "RESONANCIA MAGNÉTICA DE COLUMNA CERVICAL",
+   "tipo": "procedimiento_cups"
+  },
+  "884102": {
+   "nombre": "RESONANCIA MAGNÉTICA DE COLUMNA LUMBOSACRA",
+   "tipo": "procedimiento_cups"
+  },
+  "884201": {
+   "nombre": "RESONANCIA MAGNÉTICA DE ABDOMEN",
+   "tipo": "procedimiento_cups"
+  },
+  "884301": {
+   "nombre": "RESONANCIA MAGNÉTICA DE RODILLA",
+   "tipo": "procedimiento_cups"
+  },
+  "884302": {
+   "nombre": "RESONANCIA MAGNÉTICA DE HOMBRO",
+   "tipo": "procedimiento_cups"
+  },
+  "891101": {
+   "nombre": "ELECTROCARDIOGRAMA DE REPOSO",
+   "tipo": "procedimiento_cups"
+  },
+  "891201": {
+   "nombre": "ELECTROENCEFALOGRAMA",
+   "tipo": "procedimiento_cups"
+  },
+  "892101": {
+   "nombre": "ESPIROMETRÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "893101": {
+   "nombre": "AUDIOMETRÍA TONAL",
+   "tipo": "procedimiento_cups"
+  },
+  "897011": {
+   "nombre": "MONITORIA FETAL ANTEPARTO",
+   "tipo": "procedimiento_cups"
+  },
+  "873306": {
+   "nombre": "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA",
+   "tipo": "procedimiento_cups"
+  },
+  "898101": {
+   "nombre": "ESTUDIO ANATOMOPATOLÓGICO EN BIOPSIA",
+   "tipo": "procedimiento_cups"
+  },
+  "898102": {
+   "nombre": "ESTUDIO ANATOMOPATOLÓGICO EN ESPECIMEN QUIRÚRGICO",
+   "tipo": "procedimiento_cups"
+  },
+  "898104": {
+   "nombre": "INMUNOHISTOQUÍMICA",
+   "tipo": "procedimiento_cups"
+  },
+  "898201": {
+   "nombre": "CITOLOGÍA CÉRVICO-UTERINA CONVENCIONAL",
+   "tipo": "procedimiento_cups"
+  },
+  "470301": {
+   "nombre": "APENDICECTOMÍA POR LAPAROTOMÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "470302": {
+   "nombre": "APENDICECTOMÍA LAPAROSCÓPICA",
+   "tipo": "procedimiento_cups"
+  },
+  "511001": {
+   "nombre": "COLECISTECTOMÍA POR LAPAROTOMÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "511002": {
+   "nombre": "COLECISTECTOMÍA LAPAROSCÓPICA",
+   "tipo": "procedimiento_cups"
+  },
+  "740101": {
+   "nombre": "PARTO VAGINAL ESPONTÁNEO",
+   "tipo": "procedimiento_cups"
+  },
+  "740301": {
+   "nombre": "PARTO POR CESÁREA",
+   "tipo": "procedimiento_cups"
+  },
+  "861101": {
+   "nombre": "SUTURA DE PIEL",
+   "tipo": "procedimiento_cups"
+  },
+  "861201": {
+   "nombre": "DESBRIDAMIENTO DE TEJIDO BLANDO",
+   "tipo": "procedimiento_cups"
+  },
+  "865101": {
+   "nombre": "CURACIÓN MAYOR",
+   "tipo": "procedimiento_cups"
+  },
+  "S11101": {
+   "nombre": "ESTANCIA EN HABITACIÓN COMPARTIDA",
+   "tipo": "procedimiento_cups"
+  },
+  "S11201": {
+   "nombre": "ESTANCIA EN UCI ADULTOS",
+   "tipo": "procedimiento_cups"
+  },
+  "S11202": {
+   "nombre": "ESTANCIA EN UCI PEDIÁTRICA",
+   "tipo": "procedimiento_cups"
+  },
+  "S11203": {
+   "nombre": "ESTANCIA EN UCI NEONATAL",
+   "tipo": "procedimiento_cups"
+  },
+  "S11301": {
+   "nombre": "ESTANCIA EN UCE (UNIDAD DE CUIDADOS ESPECIALES)",
+   "tipo": "procedimiento_cups"
+  },
+  "S12101": {
+   "nombre": "ESTANCIA EN PEDIATRÍA",
+   "tipo": "procedimiento_cups"
+  },
+  "S13101": {
+   "nombre": "ESTANCIA EN GINECOOBSTETRICIA",
+   "tipo": "procedimiento_cups"
+  },
+  "M01101": {
+   "nombre": "OXÍGENO MEDICINAL POR HORA",
+   "tipo": "procedimiento_cups"
+  },
+  "M02101": {
+   "nombre": "TRANSFUSIÓN DE GLÓBULOS ROJOS EMPACADOS",
+   "tipo": "procedimiento_cups"
+  },
+  "391001": {
+   "nombre": "CURACIÓN MENOR DE HERIDA",
+   "tipo": "procedimiento_cups"
+  },
+  "390402": {
+   "nombre": "NEBULIZACIÓN CON BRONCODILATADOR",
+   "tipo": "procedimiento_cups"
+  },
+  "994001": {
+   "nombre": "VACUNACIÓN (APLICACIÓN DE BIOLÓGICO)",
+   "tipo": "procedimiento_cups"
+  },
+  "898306": {
+   "nombre": "CITOLOGÍA EN BASE LÍQUIDA",
+   "tipo": "procedimiento_cups"
+  }
+ }
+}

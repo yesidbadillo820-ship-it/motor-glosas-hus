@@ -1,0 +1,20 @@
+{
+  "ontologia": "contractual",
+  "version": "0.1-esquema",
+  "descripcion": "Particularidades por pagador que NO salen de la norma sino del CONTRATO: cuándo exige autorización, qué anexos técnicos aplican, plazos especiales. El área la llena con los contratos reales; el ejemplo muestra el formato. Se cruza con el catálogo (data/perfiles_radicacion.json) por el id del pagador.",
+  "fuentes": ["Contratos vigentes por pagador (suministra el área de Cuentas Médicas)"],
+  "conceptos": {
+    "_EJEMPLO_NO_USAR": {
+      "pagador_id": "ASMET",
+      "contrato": "2026",
+      "autorizacion": {
+        "URGENCIAS": "NO_REQUERIDA",
+        "QUIRURGICO_PROGRAMADO": "OBLIGATORIA",
+        "AMBULATORIO": "SEGUN_ANEXO"
+      },
+      "anexos_tecnicos": [],
+      "plazo_radicacion_dias": null,
+      "nota": "Plantilla: copiar, quitar el prefijo _EJEMPLO y llenar con el contrato real."
+    }
+  }
+}
