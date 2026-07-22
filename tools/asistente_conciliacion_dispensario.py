@@ -314,6 +314,35 @@ def indexar_soportes(raiz: Path, facturas: set[str], ocr: bool) -> dict[str, lis
     return idx
 
 
+def docs_desde_indice(
+    indice_ruta: Path, facturas: set[str], ocr: bool
+) -> dict[str, list[Documento]]:
+    """Arma los documentos del lote consultando un INDICE ya construido.
+
+    No recorre `Y:\\`: lee del JSON las rutas de los documentos de cada factura y
+    abre SOLO esos archivos. Mucho mas rapido que escanear la unidad de red.
+    """
+    idx: dict[str, list[Documento]] = {f: [] for f in facturas}
+    try:
+        payload = json.loads(Path(indice_ruta).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error("No pude leer el indice %s: %s", indice_ruta, e)
+        return idx
+    total = 0
+    for reg in payload.get("documentos", []):
+        corta = str(reg.get("factura", ""))
+        if corta not in idx:
+            continue
+        ruta = Path(reg.get("ruta", ""))
+        if not ruta.exists():
+            logger.warning("El indice apunta a un archivo que ya no existe: %s", ruta)
+            continue
+        idx[corta].append(leer_documento(ruta, ocr))
+        total += 1
+    logger.info("Del indice: %d documentos para %d facturas del lote", total, len(facturas))
+    return idx
+
+
 # ---------------------------------------------------------------------------
 # Motor de cruces / coherencia
 # ---------------------------------------------------------------------------
@@ -670,7 +699,16 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Asistente de conciliacion de glosas del Dispensario.")
     ap.add_argument("--excel", type=Path, required=True, help="Excel de glosas (layout HUS.xlsx)")
     ap.add_argument(
-        "--soportes-raiz", type=Path, required=True, help="Carpeta raiz de soportes (Y:\\...)"
+        "--soportes-raiz",
+        type=Path,
+        default=None,
+        help="Carpeta raiz de soportes (Y:\\...). Recorre la unidad. Alternativa: --indice.",
+    )
+    ap.add_argument(
+        "--indice",
+        type=Path,
+        default=None,
+        help="Indice JSON de soportes (indexar_soportes_dispensario.py). Evita recorrer Y:\\.",
     )
     ap.add_argument(
         "--salida", type=Path, required=True, help="Excel de salida (matriz + respuestas)"
@@ -694,6 +732,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
+    if not args.soportes_raiz and not args.indice:
+        ap.error("indica --indice <json> (recomendado) o --soportes-raiz <carpeta>")
+
     glosas = cargar_glosas(args.excel, args.solo)
     if not glosas:
         logger.error("No se cargaron glosas del Excel (¿--solo con factura inexistente?)")
@@ -701,7 +742,10 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Glosas a procesar: %d", len(glosas))
 
     facturas = {factura_corta(g.factura) for g in glosas}
-    idx = indexar_soportes(args.soportes_raiz, facturas, args.ocr)
+    if args.indice:
+        idx = docs_desde_indice(args.indice, facturas, args.ocr)
+    else:
+        idx = indexar_soportes(args.soportes_raiz, facturas, args.ocr)
     kb = cargar_kb(args.kb) if args.kb else {}
     resultados = procesar(glosas, idx, kb)
 

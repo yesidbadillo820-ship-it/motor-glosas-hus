@@ -102,6 +102,11 @@
     evidencia por glosa, cruza coherencia, concluye procede/improcede/parcial
     con % de confianza y redacta el oficio de respuesta. Corre en el equipo del
     HUS (donde está montada `Y:\`). Nunca inventa evidencia.
+  - **Nueva herramienta `tools/indexar_soportes_dispensario.py`:** indexa la
+    carpeta de soportes (`Y:\`) **una sola vez** y crea un índice (JSON); así el
+    asistente ya no recorre toda la unidad de red (que se colgaba) — con
+    `--indice` abre solo los archivos de la factura. Soporta actualización
+    incremental y búsqueda por factura/paciente. Con README y pruebas.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
