@@ -6409,6 +6409,49 @@ function logout(){
   document.getElementById('login-pass').value='';
 }
 
+// ─── Capa de Vida (ronda 32) ───────────────────────────────────────────
+// Aditivo y 100% defensivo: si cualquier cosa falla, el motor sigue igual.
+// Consume /vida/saludo (saludo cálido + resumen del día) y /vida/celebraciones
+// (victorias recientes) y las muestra como toasts. El saludo se muestra una
+// vez por día para no cansar.
+async function iniciarCapaDeVida(){
+  try {
+    if(!TOKEN) return;
+    // Saludo: máximo una vez por día por usuario.
+    var hoy = new Date().toISOString().slice(0,10);
+    if(localStorage.getItem('hus_saludo_dia') !== hoy){
+      try {
+        var rs = await fetch('/vida/saludo', {headers: authH()});
+        if(rs.ok){
+          var s = await rs.json();
+          var partes = [];
+          if(s.nuevas_hoy) partes.push(s.nuevas_hoy + ' glosa(s) nueva(s) hoy');
+          if(s.por_vencer) partes.push('⏰ ' + s.por_vencer + ' por vencer');
+          if(s.recuperado_semana) partes.push('💰 $' + Number(s.recuperado_semana).toLocaleString('es-CO') + ' recuperados esta semana');
+          if(s.racha_dias >= 3) partes.push('🔥 racha de ' + s.racha_dias + ' días');
+          var cuerpo = partes.length ? partes.join(' · ') : (s.mensaje_pendientes || s.frase);
+          if(typeof toast === 'function'){
+            toast(s.saludo + ', ' + s.nombre + ' 👋', cuerpo, 'info', {duracion: 9000});
+          }
+          localStorage.setItem('hus_saludo_dia', hoy);
+        }
+      } catch(e){}
+    }
+    // Celebraciones: victorias recientes, escalonadas para que se disfruten.
+    try {
+      var rc = await fetch('/vida/celebraciones', {headers: authH()});
+      if(rc.ok){
+        var c = await rc.json();
+        (c.eventos || []).slice(0,3).forEach(function(ev, i){
+          setTimeout(function(){
+            if(typeof toast === 'function') toast('¡Un logro! 🎉', ev.mensaje, 'success', {duracion: 8000});
+          }, 1500 + i*2600);
+        });
+      }
+    } catch(e){}
+  } catch(e){ /* la Capa de Vida jamás debe romper la app */ }
+}
+
 async function initApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('show');
@@ -6438,6 +6481,8 @@ async function initApp(){
   if(typeof filtrarAccionesPorRol === 'function') filtrarAccionesPorRol();
   // Poblar KPIs del landing hero del panel Analizar
   if(typeof poblarLandingKPIs === 'function') poblarLandingKPIs();
+  // Capa de Vida (ronda 32): saludo cálido + celebración de logros.
+  if(typeof iniciarCapaDeVida === 'function') iniciarCapaDeVida();
   // Cargar ticker de noticias del sector salud Colombia (RSS)
   if(typeof cargarTickerNoticias === 'function') cargarTickerNoticias();
   // Hash routing — si el usuario llega a /#importacion-masiva, abrir

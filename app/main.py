@@ -1183,6 +1183,7 @@ from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.vida import router as vida_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
 from app.api.routers.asistente_predictivo import router as asistente_predictivo_router
@@ -1242,6 +1243,7 @@ app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
+app.include_router(vida_router)  # Capa de Vida (ronda 32): saludo + celebraciones
 app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)
 app.include_router(versiones_router)
