@@ -383,6 +383,57 @@ def cmd_grafo(db: Path, salida: Path, limite: int) -> int:
     return 0
 
 
+def cmd_agentes() -> int:
+    """Registro Central de Agentes: identidad, versión, estado y capacidades."""
+    from hospiai_agentes import registro_con_implementaciones
+
+    reg = registro_con_implementaciones()
+    print("=" * 92)
+    print(f"{'ID':<7} {'NOMBRE':<24} {'DOM.':<6} {'VER.':<6} {'ESTADO':<14} CAPACIDADES")
+    for a in reg.listar():
+        print(
+            f"{a['id']:<7} {a.get('nombre', ''):<24} {a.get('dominio', ''):<6}"
+            f" {a.get('version', ''):<6} {a.get('estado', ''):<14}"
+            f" {', '.join(a.get('capacidades') or [])}"
+        )
+    print("=" * 92)
+    activos = len(reg.disponibles())
+    print(
+        f"{activos} activo(s) de {len(reg.listar())} registrados. "
+        "El Supervisor consume este registro, nunca clases concretas."
+    )
+    return 0
+
+
+def cmd_misiones(db: Path) -> int:
+    """Estado de la cola de misiones (el bus de trabajo entre agentes)."""
+    con = hospiai_db.abrir(db)
+    try:
+        estados = _q(con, "SELECT estado, COUNT(*) n FROM misiones GROUP BY estado")
+        ultimas = _q(
+            con,
+            "SELECT codigo, tipo, expediente, prioridad, estado, agente_asignado, actualizada"
+            " FROM misiones ORDER BY id DESC LIMIT 12",
+        )
+    finally:
+        con.close()
+    print("=" * 80)
+    print("Cola de misiones:")
+    if not estados:
+        print("  (vacía — ningún agente ha publicado trabajo todavía)")
+    for e in estados:
+        print(f"  {e['estado']:<12} {e['n']:>5,}")
+    if ultimas:
+        print("  Últimas:")
+        for m in ultimas:
+            print(
+                f"    {m['codigo']}  {m['tipo']:<20} {m['expediente'] or '—':<10}"
+                f" [{m['prioridad']}] {m['estado']:<10} {m['agente_asignado'] or ''}"
+            )
+    print("=" * 80)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Consola del Expediente Digital HOSPIAI (solo lee).")
     p.add_argument("--db", type=Path, default=DB_DEFAULT, help="Ruta de hospiai.db.")
@@ -390,6 +441,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init", help="Crea la base vacía con el esquema.")
     sub.add_parser("resumen", help="Resumen del expediente en consola.")
     sub.add_parser("catalogo", help="Catálogo institucional: ficha por pagador.")
+    sub.add_parser("agentes", help="Registro Central de Agentes (identidad/estado/capacidades).")
+    sub.add_parser("misiones", help="Estado de la cola de misiones.")
     sp = sub.add_parser("panel", help="Panel HTML autocontenido leyendo de la base.")
     sp.add_argument("--salida", type=Path, default=Path("panel_hospiai.html"))
     sp.add_argument("--titulo", type=str, default="HOSPIAI — Panel de Cuentas Médicas · ESE HUS")
@@ -404,11 +457,15 @@ def main(argv: list[str] | None = None) -> int:
         hospiai_db.abrir(args.db).close()
         print(f"Expediente Digital creado/verificado: {args.db}")
         return 0
+    if args.cmd == "agentes":  # lee el registro, no la base
+        return cmd_agentes()
     if not Path(args.db).is_file():
         print(f"ERROR: no existe la base {args.db}. Corré primero el radicador o 'init'.")
         return 1
     if args.cmd == "resumen":
         return cmd_resumen(args.db)
+    if args.cmd == "misiones":
+        return cmd_misiones(args.db)
     if args.cmd == "catalogo":
         return cmd_catalogo(args.db)
     if args.cmd == "evidencia":

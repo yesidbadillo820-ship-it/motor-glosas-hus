@@ -70,6 +70,13 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Grafo de conocimiento consultable:** vistas en la base + exportación a JSON (`py tools\hospiai.py grafo`) con pagadores, expedientes, responsables, lotes y reglas incumplidas.
   - **Memoria institucional:** la tabla de glosas ahora guarda solución aplicada, aprendizaje y tiempo — el insumo del aprendizaje continuo.
   - **105 pruebas automáticas** en verde. La base de la Fase 1 se migra sola (sin perder datos).
+- **FASE 1.6 — Plataforma de Agentes (entrega 1):** HOSPIAI dejó de ser módulos y pasó a ser un sistema multiagente:
+  - **Contrato único de agente** (el "SDK"): todos los agentes tienen identidad (AG001, AG002…), versión, dominio, capacidades, y devuelven exactamente el mismo formato de resultado (con confianza, evidencias y duración). Un agente que falla no tumba la plataforma.
+  - **Registro Central de Agentes** (`data/agentes.json` + `py tools\hospiai.py agentes`): la plataforma sabe qué agentes existen, cuáles están activos, en mantenimiento o planeados, y qué sabe hacer cada uno. El futuro Supervisor consultará este registro, nunca el código.
+  - **Misiones:** los agentes no se llaman entre sí — publican misiones en una cola guardada en la base (con prioridad y reintentos). `py tools\hospiai.py misiones` muestra la cola.
+  - **Primeros agentes reales:** el Analizador de Ruta (AG002) y el Clasificador Documental (AG003) ya corren con el contrato nuevo.
+  - **Lenguaje propio de reglas (DSL):** un auditor puede escribir "REGLA … SI SERVICIO = CIRUGIA … REQUIERE DQX RAN EPI … SI FALTA BLOQUEAR … FUENTE Resolución 2284" en un archivo de texto y compilarlo al motor con un comando — sin programar. Con verificación que señala línea y motivo de cualquier error. Ejemplo listo en `data/ejemplo_reglas.hospiai` (paridad probada con las reglas vigentes).
+  - **124 pruebas automáticas** en verde.
 
 ---
 

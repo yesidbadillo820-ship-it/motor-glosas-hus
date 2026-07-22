@@ -153,6 +153,22 @@ CREATE TABLE IF NOT EXISTS pagos(
   fuente TEXT DEFAULT '',
   detalle TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS misiones(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo TEXT UNIQUE,
+  expediente TEXT DEFAULT '',
+  tipo TEXT NOT NULL,
+  prioridad TEXT DEFAULT 'NORMAL',
+  estado TEXT DEFAULT 'PENDIENTE',
+  creada TEXT NOT NULL,
+  actualizada TEXT NOT NULL,
+  creada_por TEXT DEFAULT '',
+  agente_asignado TEXT DEFAULT '',
+  intentos INTEGER DEFAULT 0,
+  max_intentos INTEGER DEFAULT 2,
+  datos TEXT DEFAULT '{}',
+  resultado TEXT DEFAULT ''
+);
 CREATE INDEX IF NOT EXISTS ix_documentos_fac ON documentos(factura_norm);
 CREATE INDEX IF NOT EXISTS ix_hallazgos_fac ON hallazgos(factura_norm);
 CREATE INDEX IF NOT EXISTS ix_hallazgos_corrida ON hallazgos(corrida_id);
@@ -160,6 +176,7 @@ CREATE INDEX IF NOT EXISTS ix_eventos_fac ON eventos(factura_norm);
 CREATE INDEX IF NOT EXISTS ix_exped_dictamen ON expedientes(dictamen);
 CREATE INDEX IF NOT EXISTS ix_exped_responsable ON expedientes(responsable);
 CREATE INDEX IF NOT EXISTS ix_exped_pagador ON expedientes(pagador_id);
+CREATE INDEX IF NOT EXISTS ix_misiones_estado ON misiones(estado, tipo);
 """
 
 # Dictámenes que bloquean la radicación (hallazgo crítico a nivel de expediente).

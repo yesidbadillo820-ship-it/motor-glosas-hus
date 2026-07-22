@@ -1,0 +1,70 @@
+# HOSPIAI — Reglas de radicación en el DSL institucional (Fase 1.6).
+# Un auditor funcional edita ESTE archivo (sin programar) y lo compila:
+#   py tools\hospiai_dsl.py verificar data\ejemplo_reglas.hospiai
+#   py tools\hospiai_dsl.py compilar  data\ejemplo_reglas.hospiai --salida data\reglas_radicacion.json
+# Espejo de las reglas vigentes v1.0 (mismo comportamiento del motor).
+
+VERSION 1.0
+
+EQUIVALENCIA EPI = EPI HEV
+EQUIVALENCIA HAU = HAU HEV
+
+REGLA R-BASE-001
+SI TODAS
+REQUIERE FEV RIP CUV
+SI FALTA BLOQUEAR
+FUENTE Resolución 2284 de 2023 (soportes de la factura de venta en salud) y Resolución 2275 de 2023 (RIPS)
+VIGENCIA DESDE 2024-01-01
+NOTA Toda cuenta exige la factura electrónica, el RIPS y su validación (CUV). Excepciones de CUV: en el perfil del pagador.
+FIN
+
+REGLA R-SERV-PROC-001
+SI SERVICIO = PROCEDIMIENTOS
+REQUIERE HEV
+SI FALTA REVISAR
+FUENTE Resolución 2284 de 2023 — soportes según servicio facturado
+VIGENCIA DESDE 2024-01-01
+NOTA Los procedimientos exigen la hoja de evolución / resumen de atención.
+FIN
+
+REGLA R-SERV-URG-001
+SI SERVICIO = URGENCIAS
+REQUIERE HAU
+SI FALTA REVISAR
+FUENTE Resolución 2284 de 2023 — soportes según servicio facturado
+VIGENCIA DESDE 2024-01-01
+NOTA La cubre la historia clínica (HEV) por equivalencia.
+FIN
+
+REGLA R-SERV-HOSP-001
+SI SERVICIO = HOSPITALIZACION
+REQUIERE EPI
+SI FALTA REVISAR
+FUENTE Resolución 2284 de 2023 — soportes según servicio facturado
+VIGENCIA DESDE 2024-01-01
+NOTA La cubre la historia clínica (HEV) por equivalencia.
+FIN
+
+REGLA R-SERV-MED-001
+SI SERVICIO = MEDICAMENTOS
+REQUIERE OPF
+SI FALTA REVISAR
+FUENTE Resolución 2284 de 2023 — soportes según servicio facturado
+VIGENCIA DESDE 2024-01-01
+FIN
+
+REGLA R-SERV-OTROS-001
+SI SERVICIO = OTROS
+REQUIERE OPF
+SI FALTA REVISAR
+FUENTE Resolución 2284 de 2023 — soportes según servicio facturado
+VIGENCIA DESDE 2024-01-01
+FIN
+
+REGLA R-SERV-RN-001
+SI SERVICIO = RECIEN NACIDOS
+REQUIERE EPI
+SI FALTA REVISAR
+FUENTE Resolución 2284 de 2023 — soportes según servicio facturado
+VIGENCIA DESDE 2024-01-01
+FIN

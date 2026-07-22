@@ -1,0 +1,117 @@
+{
+  "_comentario": "HOSPIAI — Registro Central de Agentes (Fase 1.6). El Supervisor y la consola consumen ESTE registro, nunca clases concretas. Estados: ACTIVO, MANTENIMIENTO, EXPERIMENTAL, PLANEADO, RETIRADO. 'implementacion' documenta dónde vive hoy el código (los marcados 'legacy' corren dentro del radicador y se migran al SDK progresivamente).",
+  "version": "1.0",
+  "actualizado": "2026-07-22",
+  "agentes": [
+    {
+      "id": "AG001",
+      "nombre": "ExploradorServidor",
+      "dominio": "D1",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": ["EXPLORAR", "DESCUBRIR_FACTURAS"],
+      "depende_de": [],
+      "implementacion": "legacy: radicar_facturacion.descubrir_auto",
+      "notas": "Recorre el share de FE y ancla expedientes. Solo lectura."
+    },
+    {
+      "id": "AG002",
+      "nombre": "AnalizadorRuta",
+      "dominio": "D1",
+      "version": "1.1",
+      "estado": "ACTIVO",
+      "capacidades": ["ANALIZAR_RUTA"],
+      "depende_de": ["AG001"],
+      "implementacion": "sdk: hospiai_agentes.AgenteAnalizadorRuta",
+      "notas": "Ruta → año, mes, entidad, responsable, lote, factura."
+    },
+    {
+      "id": "AG003",
+      "nombre": "ClasificadorDocumental",
+      "dominio": "D1",
+      "version": "1.1",
+      "estado": "ACTIVO",
+      "capacidades": ["CLASIFICAR_DOCUMENTO"],
+      "depende_de": ["AG001"],
+      "implementacion": "sdk: hospiai_agentes.AgenteClasificadorDocumental",
+      "notas": "Nombre de archivo → código ADRES (diccionario oficial + alias HUS)."
+    },
+    {
+      "id": "AG004",
+      "nombre": "OCRClinico",
+      "dominio": "D2",
+      "version": "0.1",
+      "estado": "PLANEADO",
+      "capacidades": ["OCR", "PDF", "HISTORIA_CLINICA", "EPICRISIS"],
+      "depende_de": ["AG003"],
+      "implementacion": "pendiente (Fase 3; reutilizará la lectura de documentos del Motor de Glosas)",
+      "notas": "Escribirá hallazgos con confianza < 1.0 sobre el Motor de Evidencias."
+    },
+    {
+      "id": "AG005",
+      "nombre": "ResolutorEntidad",
+      "dominio": "D3",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": ["RESOLVER_ENTIDAD"],
+      "depende_de": [],
+      "implementacion": "legacy: radicar_facturacion.resolver_entidad",
+      "notas": "Identifica el pagador por catálogo + razón social del FEV (25+ entidades)."
+    },
+    {
+      "id": "AG006",
+      "nombre": "AuditorCompletitud",
+      "dominio": "D3",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": ["AUDITAR_COMPLETITUD"],
+      "depende_de": ["AG003", "AG005"],
+      "implementacion": "legacy: radicar_facturacion.procesar_factura",
+      "notas": "Cruza inventario vs. reglas vigentes → dictamen con hallazgos y evidencia."
+    },
+    {
+      "id": "AG007",
+      "nombre": "CruceSoportes",
+      "dominio": "D3",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": ["CRUZAR_SOPORTES"],
+      "depende_de": ["AG006"],
+      "implementacion": "legacy: radicar_facturacion.indexar_soportes_clinicos / _desde_indice",
+      "notas": "Completa expedientes con los soportes clínicos de Y:/Z:/X:."
+    },
+    {
+      "id": "AG008",
+      "nombre": "PersistenciaExpediente",
+      "dominio": "D1",
+      "version": "1.1",
+      "estado": "ACTIVO",
+      "capacidades": ["PERSISTIR"],
+      "depende_de": ["AG006"],
+      "implementacion": "sdk-nucleo: hospiai_db.persistir_corrida",
+      "notas": "Escribe expedientes, documentos, hallazgos y eventos en hospiai.db."
+    },
+    {
+      "id": "AG009",
+      "nombre": "PanelDirector",
+      "dominio": "D6",
+      "version": "1.1",
+      "estado": "ACTIVO",
+      "capacidades": ["PANEL", "RESUMEN", "EVIDENCIA", "GRAFO", "CATALOGO"],
+      "depende_de": ["AG008"],
+      "implementacion": "sdk-nucleo: hospiai.py",
+      "notas": "Consola y panel del Expediente Digital (solo lee)."
+    },
+    {
+      "id": "AG010",
+      "nombre": "SupervisorMisiones",
+      "dominio": "ORQUESTACION",
+      "version": "0.1",
+      "estado": "PLANEADO",
+      "capacidades": ["ORQUESTAR"],
+      "depende_de": [],
+      "implementacion": "pendiente (Fase 1.6 entrega 2): consumirá SOLO el Registro y la ColaMisiones",
+      "notas": "No procesa, no clasifica, no radica: solo mueve misiones."
+    }
+  ]
+}
