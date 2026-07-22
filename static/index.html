@@ -6452,6 +6452,78 @@ async function iniciarCapaDeVida(){
   } catch(e){ /* la Capa de Vida jamás debe romper la app */ }
 }
 
+// Capa de Vida (ronda 32): narración en vivo del análisis. Consume el SSE
+// /eventos/analizar/{traceId} vía fetch-stream (EventSource no puede mandar
+// el header Bearer). Muestra un panel flotante con los pasos del pipeline a
+// medida que ocurren, y se auto-cierra con 'finalizado'/'error'/timeout.
+// 100% defensivo: si algo falla, no afecta el análisis (que va por su POST).
+function iniciarNarracion(traceId){
+  try {
+    var panel = document.createElement('div');
+    panel.style.cssText = 'position:fixed;bottom:22px;right:22px;z-index:99999;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px 18px;box-shadow:0 10px 40px rgba(0,0,0,.35);font-size:.85rem;max-width:340px;line-height:1.55;';
+    panel.innerHTML = '<div style="font-weight:700;margin-bottom:6px;color:#38bdf8;">⚙️ Trabajando en tu dictamen…</div><div class="narr-steps"></div>';
+    document.body.appendChild(panel);
+    var steps = panel.querySelector('.narr-steps');
+    var COPY = {
+      inicio: function(d){ return '🔎 Preparando el análisis' + (d.eps ? ' para ' + d.eps : '') + '…'; },
+      pdfs_extraidos: function(d){ return '📄 Leí ' + (d.n_archivos||0) + ' soporte(s) del expediente…'; },
+      auditor_forense: function(){ return '🕵️ Revisé los soportes (folios, historia clínica)…'; },
+      tarifa_lookup: function(d){ return d.encontrada ? '💲 Verifiqué la tarifa pactada del contrato…' : '💲 Revisé el contrato de la EPS…'; },
+      few_shots: function(){ return '📚 Busqué precedentes ganados parecidos…'; },
+      ia_iniciada: function(d){ return '✍️ Redactando el dictamen' + (d.proveedor ? ' con ' + d.proveedor : '') + '…'; },
+      ia_completada: function(){ return '✅ Dictamen redactado, afinando detalles…'; },
+      persistido: function(){ return '💾 Guardado en el historial…'; },
+      finalizado: function(){ return '🎉 ¡Listo!'; },
+      error: function(d){ return '⚠️ ' + (d.mensaje || 'Hubo un problema'); }
+    };
+    function agregar(tipo, datos){
+      var fn = COPY[tipo]; if(!fn || !steps) return;
+      var line = document.createElement('div');
+      line.style.cssText = 'opacity:0;transition:opacity .3s;margin:3px 0;';
+      line.textContent = fn(datos||{});
+      steps.appendChild(line);
+      requestAnimationFrame(function(){ line.style.opacity='1'; });
+    }
+    var ctrl = new AbortController();
+    var cerrado = false;
+    function cerrar(){
+      if(cerrado) return; cerrado = true;
+      try{ ctrl.abort(); }catch(e){}
+      setTimeout(function(){ if(panel && panel.parentNode) panel.parentNode.removeChild(panel); }, 900);
+    }
+    setTimeout(cerrar, 180000);
+    (async function(){
+      try {
+        var resp = await fetch('/eventos/analizar/'+encodeURIComponent(traceId), {headers: authH(), signal: ctrl.signal});
+        if(!resp.ok || !resp.body){ cerrar(); return; }
+        var reader = resp.body.getReader();
+        var dec = new TextDecoder();
+        var buf = '';
+        while(true){
+          var chunk = await reader.read();
+          if(chunk.done) break;
+          buf += dec.decode(chunk.value, {stream:true});
+          var frames = buf.split('\n\n');
+          buf = frames.pop();
+          frames.forEach(function(f){
+            var ev=null, data='';
+            f.split('\n').forEach(function(l){
+              if(l.indexOf('event:')===0) ev=l.slice(6).trim();
+              else if(l.indexOf('data:')===0) data=l.slice(5).trim();
+            });
+            if(!ev) return;
+            var datos={}; try{ datos=JSON.parse(data||'{}'); }catch(e){}
+            agregar(ev, datos);
+            if(ev==='finalizado' || ev==='error' || ev==='timeout') cerrar();
+          });
+        }
+      } catch(e){ /* abort/red: cierre silencioso */ }
+      cerrar();
+    })();
+    return { cerrar: cerrar };
+  } catch(e){ return { cerrar: function(){} }; }
+}
+
 // Capa de Vida (ronda 32): llena los badges de confianza de cada dictamen.
 // Busca [data-conf-glosa] dentro de `raiz`, consulta /vida/confianza/{id} y
 // muestra el nivel + en qué se apoya. 100% defensivo: si falla, oculta el
@@ -14813,6 +14885,11 @@ async function analizar(modoOverride){
   showLoading();
 
   var fd=new FormData();
+  // Capa de Vida (ronda 32): narración en vivo — trace_id + SSE de progreso.
+  var _traceId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : ('t-' + Date.now() + '-' + Math.floor(Math.random()*1e6));
+  fd.append('trace_id', _traceId);
+  var _narr = (typeof iniciarNarracion === 'function') ? iniciarNarracion(_traceId) : null;
   fd.append('eps',eps);
   fd.append('etapa',document.getElementById('etapa-v').value);
   fd.append('fecha_radicacion',document.getElementById('f-rad').value||'');
@@ -14868,6 +14945,7 @@ async function analizar(modoOverride){
       // aunque el backend ya falló (pre-validación) — el usuario veía
       // "EN CURSO + todo verde" sin dictamen. Marcar fallo + ocultar.
       if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
+      if(_narr) try{ _narr.cerrar(); }catch(e){}
       hideLoading();_rehab();return;
     }
     var d=await r.json();
@@ -14884,6 +14962,7 @@ async function analizar(modoOverride){
     toast('Error de conexión','No se pudo conectar con el servidor','error');
     if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
   }
+  if(_narr) try{ _narr.cerrar(); }catch(e){}  // Capa de Vida: cerrar narración
   hideLoading();
   _rehab();
 }
