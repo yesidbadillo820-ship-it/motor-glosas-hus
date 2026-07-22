@@ -4,6 +4,7 @@ Uso: python3 ensamblar_pdf.py libro.pdf portada.pdf fondo.pdf salida.pdf
 (el libro debe estar compuesto al tamaño del fondo: 396.75 x 663 pt)
 """
 import sys
+
 from pypdf import PdfReader, PdfWriter
 
 libro, portada, fondo, salida = sys.argv[1:5]
