@@ -37,6 +37,12 @@ import hospiai_db
 
 RUTA_REGISTRO_DEFAULT = Path(__file__).resolve().parent.parent / "data" / "agentes.json"
 
+# Versión del contrato del SDK (gobernanza): los agentes declaran en su ficha
+# `requiere_sdk` con qué versión MAYOR fueron construidos; el verificador de
+# compatibilidad (hospiai_gobernanza) detecta automáticamente cuándo un cambio
+# del Core rompería a un agente, antes de que pase en producción.
+VERSION_SDK = "1.0"
+
 ESTADOS_AGENTE = ("ACTIVO", "MANTENIMIENTO", "EXPERIMENTAL", "PLANEADO", "RETIRADO")
 ESTADOS_MISION = ("PENDIENTE", "EN_CURSO", "OK", "ERROR", "CANCELADA")
 PRIORIDADES = ("ALTA", "NORMAL", "BAJA")

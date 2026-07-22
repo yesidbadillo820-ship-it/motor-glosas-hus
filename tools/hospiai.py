@@ -290,6 +290,36 @@ def cmd_evidencia(db: Path, factura: str) -> int:
     return 0
 
 
+def cmd_decision(db: Path, factura: str) -> int:
+    """Decision Records: cada dictamen como objeto auditable con las versiones
+    exactas de motor y reglas que lo produjeron."""
+    norm = _norm_factura(factura)
+    con = hospiai_db.abrir(db)
+    try:
+        filas = _q(
+            con,
+            "SELECT * FROM decisiones WHERE factura_norm=? ORDER BY id DESC LIMIT 10",
+            (norm,),
+        )
+    finally:
+        con.close()
+    if not filas:
+        print(f"Sin decisiones registradas para '{factura}' (clave {norm}).")
+        return 1
+    for d in filas:
+        print("=" * 70)
+        print(f"{d['codigo']}  ·  {d['fecha']}  ·  corrida #{d['corrida_id']}")
+        print(f"  dictamen : {d['dictamen']}   confianza: {d['confianza']:.2f}")
+        print(f"  motivo   : {d['motivo']}")
+        if d["regla_id"]:
+            print(f"  regla    : {d['regla_id']}")
+        print(
+            f"  agente   : {d['agente']}   motor v{d['version_motor']}   reglas v{d['version_reglas']}"
+        )
+    print("=" * 70)
+    return 0
+
+
 def cmd_catalogo(db: Path) -> int:
     """Catálogo institucional: la ficha operativa de cada pagador."""
     con = hospiai_db.abrir(db)
@@ -448,6 +478,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--titulo", type=str, default="HOSPIAI — Panel de Cuentas Médicas · ESE HUS")
     se = sub.add_parser("evidencia", help="Cadena hallazgo→regla→norma→evidencia de una factura.")
     se.add_argument("factura", help="Número de factura (HUS528043 o 528043).")
+    sd = sub.add_parser("decision", help="Decision Records de una factura (dictámenes auditables).")
+    sd.add_argument("factura")
     sg = sub.add_parser("grafo", help="Exporta el grafo de conocimiento a JSON.")
     sg.add_argument("--salida", type=Path, default=Path("grafo_hospiai.json"))
     sg.add_argument("--limite", type=int, default=5000, help="Máx. expedientes (def. 5000).")
@@ -470,6 +502,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_catalogo(args.db)
     if args.cmd == "evidencia":
         return cmd_evidencia(args.db, args.factura)
+    if args.cmd == "decision":
+        return cmd_decision(args.db, args.factura)
     if args.cmd == "grafo":
         return cmd_grafo(args.db, args.salida, args.limite)
     return cmd_panel(args.db, args.salida, args.titulo)

@@ -30,7 +30,8 @@
         "AG001"
       ],
       "implementacion": "sdk: hospiai_agentes.AgenteAnalizadorRuta",
-      "notas": "Ruta → año, mes, entidad, responsable, lote, factura."
+      "notas": "Ruta → año, mes, entidad, responsable, lote, factura.",
+      "requiere_sdk": "1.0"
     },
     {
       "id": "AG003",
@@ -45,7 +46,8 @@
         "AG001"
       ],
       "implementacion": "sdk: hospiai_agentes.AgenteClasificadorDocumental",
-      "notas": "Nombre de archivo → código ADRES (diccionario oficial + alias HUS)."
+      "notas": "Nombre de archivo → código ADRES (diccionario oficial + alias HUS).",
+      "requiere_sdk": "1.0"
     },
     {
       "id": "AG004",
@@ -167,7 +169,8 @@
       ],
       "depende_de": [],
       "implementacion": "sdk: hospiai_agentes.AgenteSemantico",
-      "notas": "Knowledge Layer: código → significado → implicaciones (ontologías documental/clínica/CUPS/normativa)."
+      "notas": "Knowledge Layer: código → significado → implicaciones (ontologías documental/clínica/CUPS/normativa).",
+      "requiere_sdk": "1.0"
     }
   ]
 }

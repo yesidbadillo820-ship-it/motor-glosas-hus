@@ -84,6 +84,14 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Nuevo agente AG011 (MotorSemantico)** registrado y probado en el SDK.
   - **Mapa de productos** definido en la arquitectura (Core / Knowledge / Rules / Intelligence / RPA / Analytics) con fronteras trazadas desde ya, para que otro hospital pueda adoptar módulos sueltos en el futuro.
   - **136 pruebas automáticas** en verde.
+- **FASE 1.7 — ARCHITECTURE GOVERNANCE (entrega 1):** el sistema que gobierna la propia plataforma, para evolucionar años sin perder trazabilidad ni calidad:
+  - **Registro único de artefactos** (`py tools\hospiai_gobernanza.py artefactos`): todo es un artefacto versionado (motor, reglas, catálogo, ontologías, agentes, SDK) con huella digital que **detecta cambios sin subir de versión** (deriva silenciosa).
+  - **Contratos de compatibilidad** (`compatibilidad`): se verifica en vivo que cada agente cumpla el contrato del SDK — si un cambio del núcleo rompiera un agente, se detecta solo (y corre en las pruebas automáticas).
+  - **Banco de casos de referencia** (`golden`): 10 expedientes sintéticos representativos (cirugía, urgencias, hospitalización, sin RIPS, sin CUV…); en cada cambio se corre el motor real sobre ellos y se compara el resultado — la red que evita regresiones funcionales. *Al repo solo entran casos sintéticos; los reales anonimizados se agregan en copias locales.*
+  - **Registros de Decisión** (`py tools\hospiai.py decision HUS…`): cada dictamen queda como objeto auditable DEC-xxxxxx con motivo, regla, norma y las versiones exactas del motor y las reglas que lo produjeron.
+  - **API interna estable** (`py tools\hospiai_api.py servir`): el contrato de consulta (expedientes, decisiones, evidencias, agentes, ontología, salud) con el que mañana se integrarán HIS/ERP/BI — solo lectura, solo en el equipo local.
+  - **Observabilidad** (`salud`): misiones pendientes/fallidas, reintentos, tiempos y corridas — para ver cuándo algo se degrada.
+  - **146 pruebas automáticas** en verde.
 
 ---
 

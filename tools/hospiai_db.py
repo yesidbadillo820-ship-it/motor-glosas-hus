@@ -153,6 +153,20 @@ CREATE TABLE IF NOT EXISTS pagos(
   fuente TEXT DEFAULT '',
   detalle TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS decisiones(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo TEXT UNIQUE,
+  factura_norm TEXT NOT NULL,
+  corrida_id INTEGER,
+  dictamen TEXT NOT NULL,
+  motivo TEXT DEFAULT '',
+  regla_id TEXT DEFAULT '',
+  agente TEXT DEFAULT '',
+  version_motor TEXT DEFAULT '',
+  version_reglas TEXT DEFAULT '',
+  confianza REAL DEFAULT 1.0,
+  fecha TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS misiones(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   codigo TEXT UNIQUE,
@@ -177,6 +191,7 @@ CREATE INDEX IF NOT EXISTS ix_exped_dictamen ON expedientes(dictamen);
 CREATE INDEX IF NOT EXISTS ix_exped_responsable ON expedientes(responsable);
 CREATE INDEX IF NOT EXISTS ix_exped_pagador ON expedientes(pagador_id);
 CREATE INDEX IF NOT EXISTS ix_misiones_estado ON misiones(estado, tipo);
+CREATE INDEX IF NOT EXISTS ix_decisiones_fac ON decisiones(factura_norm);
 """
 
 # Dictámenes que bloquean la radicación (hallazgo crítico a nivel de expediente).
@@ -517,6 +532,35 @@ def persistir_corrida(
                         corrida_id,
                         f"{len(hallazgos)} hallazgo(s)",
                     ),
+                )
+                # Decision Record (gobernanza): cada dictamen es un objeto
+                # auditable con las versiones exactas que lo produjeron.
+                if res.estado == "LISTA":
+                    motivo, regla_dec = "Cumple todos los requisitos vigentes.", ""
+                elif hallazgos:
+                    t, c, _crit, det, rid = hallazgos[0][:5]
+                    motivo, regla_dec = (f"{t} {c}".strip() + f": {det}")[:300], rid
+                else:
+                    motivo, regla_dec = " ".join(res.detalle)[:300], ""
+                cur_dec = con.execute(
+                    "INSERT INTO decisiones(codigo, factura_norm, corrida_id, dictamen, motivo,"
+                    " regla_id, agente, version_motor, version_reglas, confianza, fecha)"
+                    " VALUES('', ?,?,?,?,?,?,?,?,1.0,?)",
+                    (
+                        norm,
+                        corrida_id,
+                        res.estado,
+                        motivo,
+                        regla_dec,
+                        agente,
+                        version_motor,
+                        version_reglas,
+                        ahora,
+                    ),
+                )
+                con.execute(
+                    "UPDATE decisiones SET codigo=? WHERE id=?",
+                    (f"DEC-{cur_dec.lastrowid:06d}", cur_dec.lastrowid),
                 )
 
             con.execute(

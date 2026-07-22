@@ -1,0 +1,86 @@
+{
+ "CORE-SDK": {
+  "version": "1.0",
+  "huella": "3b2ce62472b1360c"
+ },
+ "CORE-MOTOR": {
+  "version": "1.0-fase1",
+  "huella": "df73df51817c4eb2"
+ },
+ "CORE-EXPEDIENTE": {
+  "version": "1.2",
+  "huella": "bbff203567212957"
+ },
+ "RULES-RADICACION": {
+  "version": "1.0",
+  "huella": "4c21f6cbb5414d82"
+ },
+ "CATALOGO-PAGADORES": {
+  "version": "1",
+  "huella": "fe1b2e44b7e8de6a"
+ },
+ "ONTOLOGIA-CLINICA": {
+  "version": "0.2-semilla",
+  "huella": "57a23c29ebce4dd1"
+ },
+ "ONTOLOGIA-CONTRACTUAL": {
+  "version": "0.1-esquema",
+  "huella": "de76e103dbd8853c"
+ },
+ "ONTOLOGIA-CUPS": {
+  "version": "2641-2025",
+  "huella": "2409a33d94ad16a0"
+ },
+ "ONTOLOGIA-DOCUMENTAL": {
+  "version": "1.0",
+  "huella": "ea12b5846e7df974"
+ },
+ "ONTOLOGIA-NORMATIVA": {
+  "version": "1.0",
+  "huella": "34eb2ab14bed5fd6"
+ },
+ "AG001": {
+  "version": "1.0",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG002": {
+  "version": "1.1",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG003": {
+  "version": "1.1",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG004": {
+  "version": "0.1",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG005": {
+  "version": "1.0",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG006": {
+  "version": "1.0",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG007": {
+  "version": "1.0",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG008": {
+  "version": "1.1",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG009": {
+  "version": "1.1",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG010": {
+  "version": "0.1",
+  "huella": "78a9bb765802c6fc"
+ },
+ "AG011": {
+  "version": "1.0",
+  "huella": "78a9bb765802c6fc"
+ }
+}

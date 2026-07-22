@@ -1,0 +1,86 @@
+{
+  "_comentario": "HOSPIAI — Banco de casos de referencia (golden dataset). Expedientes SINTÉTICOS representativos: el runner (hospiai_gobernanza golden) construye cada uno, corre el motor real y compara contra 'esperado'. Si una regla o un agente cambia un resultado, se detecta AQUÍ antes de producción. Casos reales anonimizados: agregarlos en una copia local, nunca al repositorio.",
+  "version": "1.0",
+  "casos": [
+    {
+      "id": "consulta_externa_completa",
+      "descripcion": "Consulta ambulatoria con FEV+RIPS+CUV: radicable.",
+      "factura": "HUS900001",
+      "entidad": "COOSALUD",
+      "construir": {"servicios": {"consultas": [{"vrServicio": 52300}]}},
+      "esperado": {"dictamen": "LISTA", "faltan": []}
+    },
+    {
+      "id": "cirugia_sin_soportes_clinicos",
+      "descripcion": "Procedimiento quirúrgico sin la historia (HEV): a revisión.",
+      "factura": "HUS900002",
+      "entidad": "COOSALUD",
+      "construir": {"servicios": {"procedimientos": [{"vrServicio": 150000}]}},
+      "esperado": {"dictamen": "REVISAR_TIPIFICACION", "faltan": ["HEV"]}
+    },
+    {
+      "id": "cirugia_con_historia_completa",
+      "descripcion": "Procedimiento con HEV presente: radicable.",
+      "factura": "HUS900003",
+      "entidad": "COOSALUD",
+      "construir": {"servicios": {"procedimientos": [{"vrServicio": 150000}]}, "soportes_extra": ["HEV"]},
+      "esperado": {"dictamen": "LISTA", "faltan": []}
+    },
+    {
+      "id": "urgencias_sin_hoja_de_atencion",
+      "descripcion": "Urgencias sin HAU ni HEV: a revisión.",
+      "factura": "HUS900004",
+      "entidad": "NUEVA EPS",
+      "construir": {"servicios": {"urgencias": [{"vrServicio": 80000}]}},
+      "esperado": {"dictamen": "REVISAR_TIPIFICACION", "faltan": ["HAU"]}
+    },
+    {
+      "id": "urgencias_cubierta_por_historia",
+      "descripcion": "Urgencias sin HAU pero con HEV: la equivalencia la cubre.",
+      "factura": "HUS900005",
+      "entidad": "NUEVA EPS",
+      "construir": {"servicios": {"urgencias": [{"vrServicio": 80000}]}, "soportes_extra": ["HEV"]},
+      "esperado": {"dictamen": "LISTA", "faltan": []}
+    },
+    {
+      "id": "hospitalizacion_sin_epicrisis",
+      "descripcion": "Hospitalización sin EPI ni HEV: a revisión.",
+      "factura": "HUS900006",
+      "entidad": "COOSALUD",
+      "construir": {"servicios": {"hospitalizacion": [{"vrServicio": 900000}]}},
+      "esperado": {"dictamen": "REVISAR_TIPIFICACION", "faltan": ["EPI"]}
+    },
+    {
+      "id": "medicamentos_sin_orden",
+      "descripcion": "Medicamentos sin la orden (OPF): a revisión.",
+      "factura": "HUS900007",
+      "entidad": "COOSALUD",
+      "construir": {"servicios": {"medicamentos": [{"vrServicio": 30000}]}},
+      "esperado": {"dictamen": "REVISAR_TIPIFICACION", "faltan": ["OPF"]}
+    },
+    {
+      "id": "glosa_potencial_sin_rips",
+      "descripcion": "Sin RIPS: bloqueada (causa clásica de devolución).",
+      "factura": "HUS900008",
+      "entidad": "COOSALUD",
+      "construir": {"con_rips": false},
+      "esperado": {"dictamen": "SIN_RIPS", "faltan": ["RIP"]}
+    },
+    {
+      "id": "glosa_potencial_sin_cuv",
+      "descripcion": "Sin la validación del RIPS (CUV): bloqueada.",
+      "factura": "HUS900009",
+      "entidad": "COOSALUD",
+      "construir": {"con_cuv": false},
+      "esperado": {"dictamen": "SIN_CUV", "faltan": ["CUV"]}
+    },
+    {
+      "id": "pagador_no_identificado",
+      "descripcion": "Sin pista de entidad y FEV sin adquiriente: no resuelta.",
+      "factura": "HUS900010",
+      "entidad": null,
+      "construir": {},
+      "esperado": {"dictamen": "ENTIDAD_NO_RESUELTA", "faltan": []}
+    }
+  ]
+}
