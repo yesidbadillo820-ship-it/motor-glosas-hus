@@ -92,6 +92,23 @@
   - Se armó también un **consolidado de 116 facturas / 238 objeciones /
     $94.150.626** con las respuestas dadas (para radicación/soporte).
   - Se creó esta bitácora y la instrucción en `CLAUDE.md`.
+  - **Nueva herramienta `tools/organizar_objeciones_dispensario.py`:** convierte
+    el PDF de auditoría del Dispensario (AUDITOOL) al Excel de OBJECIONES que se
+    importa en Dinámica Gerencial (mismo formato del ejemplo de EMSSANAR), y
+    valida que las cuentas cuadren contra el "Total Factura" del PDF.
+  - **Nueva herramienta `tools/asistente_conciliacion_dispensario.py`:** para la
+    **conciliación de cartera con el Dispensario**. Recorre la carpeta de
+    soportes (`Y:\...`), lee RIPS/XML/CUV/PDF (OCR opcional), arma la matriz de
+    evidencia por glosa, cruza coherencia, concluye procede/improcede/parcial
+    con % de confianza y redacta el oficio de respuesta. Corre en el equipo del
+    HUS (donde está montada `Y:\`). Nunca inventa evidencia.
+  - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
+    / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
+    glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
+    tienen contrato (342 → 287, 30 → 440). Base tarifaria: 287 = SOAT −15 %,
+    440 = SOAT −20 %. **Pendiente:** confirmar acta de inicio del 287 y el mapeo
+    de códigos internos de cartera (U22031/C26001…), y correr el asistente en
+    piloto sobre 1–2 facturas reales contra `Y:\`.
 
 ### Los números de la operación SIMED (respuesta de glosas Dispensario)
 | Lote | Facturas | Objeciones | Valor defendido | Estado |
