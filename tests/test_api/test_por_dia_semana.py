@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -48,6 +48,18 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _ultimo(dia_semana: int, hora: int = 10, minuto: int = 0):
+    """Última ocurrencia PASADA (1-7 días atrás) del día pedido (0=Lunes).
+
+    Fechas relativas a hoy para que el test no caduque: con fechas fijas
+    (abril 2026) los eventos salían de la ventana default de 90 días del
+    endpoint y los counts daban 0 (bomba de tiempo detectada el 22-jul-2026)."""
+    ahora = ahora_utc()
+    atras = (ahora.weekday() - dia_semana) % 7 or 7
+    base = ahora - timedelta(days=atras)
+    return base.replace(hour=hora, minute=minuto, second=0, microsecond=0)
+
+
 def _seed(db, fecha):
     db.add(
         GlosaRecord(
@@ -74,11 +86,11 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # 2026-04-20 fue Lunes
-        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 20, 11, 0, tzinfo=timezone.utc))
-        # 2026-04-22 fue Miércoles
-        _seed(db_session, datetime(2026, 4, 22, 10, 0, tzinfo=timezone.utc))
+        # Último lunes (dentro de la ventana de 90 días)
+        _seed(db_session, _ultimo(0, hora=10))
+        _seed(db_session, _ultimo(0, hora=11))
+        # Último miércoles
+        _seed(db_session, _ultimo(2, hora=10))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -88,11 +100,11 @@ class TestPorDiaSemana:
         assert d["total_glosas"] == 3
 
     def test_pct_del_total(self, client, db_session):
-        # 4 glosas el lunes
+        # 4 glosas el último lunes
         for _ in range(4):
-            _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
-        # 1 glosa el martes
-        _seed(db_session, datetime(2026, 4, 21, 10, 0, tzinfo=timezone.utc))
+            _seed(db_session, _ultimo(0, hora=10))
+        # 1 glosa el último martes
+        _seed(db_session, _ultimo(1, hora=10))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()

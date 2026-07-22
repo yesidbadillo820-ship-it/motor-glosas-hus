@@ -48,6 +48,16 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _ultimo(dia_semana: int, hhmm: str) -> str:
+    """'YYYY-MM-DD HH:MM' de la última ocurrencia PASADA (1-7 días atrás) del
+    día pedido (0=Lunes). Relativo a hoy para que el test no caduque al salir
+    de la ventana de 90 días (bomba de tiempo detectada el 22-jul-2026)."""
+    ahora = ahora_utc()
+    atras = (ahora.weekday() - dia_semana) % 7 or 7
+    base = ahora - timedelta(days=atras)
+    return f"{base.strftime('%Y-%m-%d')} {hhmm}"
+
+
 def _seed(db, fecha_iso):
     """fecha_iso: '2026-04-20 09:00' (UTC)."""
     creado = datetime.fromisoformat(fecha_iso).replace(tzinfo=timezone.utc)
@@ -85,11 +95,11 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        # Último lunes (weekday=0), 09:30 → fila 0, col 9
+        _seed(db_session, _ultimo(0, "09:30"))
+        _seed(db_session, _ultimo(0, "09:45"))
+        # Último miércoles (weekday=2), 14:15 → fila 2, col 14
+        _seed(db_session, _ultimo(2, "14:15"))
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()

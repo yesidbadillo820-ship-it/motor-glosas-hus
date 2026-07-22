@@ -11,7 +11,7 @@ Gerencial, EMSSANAR, etc.).
 Al iniciar una sesión de trabajo se lee primero; al terminar, se anota lo hecho,
 lo pendiente y lo que sigue, con la fecha.
 
-**Última actualización:** 16 de julio de 2026.
+**Última actualización:** 22 de julio de 2026.
 
 ---
 
@@ -145,11 +145,16 @@ lo pendiente y lo que sigue, con la fecha.
     pruebas automáticas; pasó una verificación independiente fila por fila.
 - Quedó en el **PR #162** (propuesta de cambio en revisión, en borrador).
 
-### 16 de julio de 2026
+### 22 de julio de 2026
 - Verificación del PR #162: revisión automática en verde (las tres
   comprobaciones pasan), sin conflictos, listo para aprobar y unir.
 - Se creó esta bitácora y la instrucción para que todos los chats la usen como
   memoria común.
+- Se arreglaron 3 pruebas automáticas "bomba de tiempo" que no tenían que ver
+  con el bot: usaban fechas fijas de abril y, al pasar los 90 días de la
+  ventana de estadísticas, empezaron a fallar y bloqueaban la revisión
+  automática de cualquier cambio. Ahora usan fechas relativas al día actual y
+  no volverán a caducar.
 
 ---
 
