@@ -80,6 +80,10 @@ que ya existía y que administra la información de las glosas.
   ahora") y una **bitácora del proyecto**.
 - Se creó **este archivo de control central** (BITACORA.md) como memoria común, y
   se dejó la instrucción de leerlo y actualizarlo en cada jornada.
+- Se dejaron **en verde las pruebas automáticas** del proyecto: dos pruebas del
+  sistema principal fallaban por usar fechas fijas de abril que quedaron fuera de
+  la ventana de 90 días; se corrigieron para que usen fechas recientes. No se
+  tocó el funcionamiento del sistema, solo las pruebas.
 
 ---
 
