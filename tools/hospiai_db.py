@@ -170,6 +170,16 @@ CREATE TABLE IF NOT EXISTS conocimiento(
   fuente_agente TEXT DEFAULT '',
   actualizado TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS indicadores(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  corrida_id INTEGER NOT NULL,
+  categoria TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  valor REAL,
+  texto TEXT DEFAULT '',
+  calculado TEXT NOT NULL,
+  UNIQUE(corrida_id, nombre)
+);
 CREATE TABLE IF NOT EXISTS decisiones(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   codigo TEXT UNIQUE,

@@ -1,0 +1,48 @@
+{
+  "_comentario": "HOSPIAI — Esfuerzo estimado por acción (Fase 3 · AG024 Plan de Recuperación). Minutos y área responsable por tipo de soporte a conseguir. Lo cura el área de Cuentas Médicas: son hipótesis operativas iniciales, editables sin programar. El plan SIEMPRE cita esta fuente ('estimación del área'); si un código no está aquí, el plan dice 'por estimar' — nunca inventa tiempos. La entrada especial ASOCIAR aplica cuando el soporte YA existe en un servidor indexado: el cruce lo anexa solo en la próxima corrida.",
+  "ASOCIAR": {
+    "minutos": 1,
+    "area": "Radicación",
+    "nota": "el soporte ya existe: lo anexa el cruce del radicador en la próxima corrida"
+  },
+  "HEV": {
+    "minutos": 3,
+    "area": "Archivo Clínico"
+  },
+  "EPI": {
+    "minutos": 3,
+    "area": "Historias Clínicas"
+  },
+  "HAU": {
+    "minutos": 3,
+    "area": "Urgencias / Archivo clínico"
+  },
+  "DQX": {
+    "minutos": 4,
+    "area": "Cirugía / Archivo clínico"
+  },
+  "RAN": {
+    "minutos": 4,
+    "area": "Cirugía / Archivo clínico"
+  },
+  "FEV": {
+    "minutos": 5,
+    "area": "Facturación"
+  },
+  "RIP": {
+    "minutos": 10,
+    "area": "Facturación / Sistemas"
+  },
+  "CUV": {
+    "minutos": 5,
+    "area": "Radicación"
+  },
+  "ENTIDAD_NO_RESUELTA": {
+    "minutos": 4,
+    "area": "Coordinación de Cartera"
+  },
+  "SIN_TIPIFICAR": {
+    "minutos": 2,
+    "area": "Radicación (digitalización)"
+  }
+}

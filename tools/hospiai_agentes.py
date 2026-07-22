@@ -122,6 +122,19 @@ def registro_con_implementaciones(ruta=None) -> RegistroAgentes:
     reg.registrar_clase(AgenteRecommendation)
     reg.registrar_clase(AgenteRootCause)
     reg.registrar_clase(AgenteProcessMiner)
+    from hospiai_operacion import (
+        AgenteContratos,
+        AgenteCorreccionMasiva,
+        AgenteGemeloEPS,
+        AgenteMejoraContinua,
+        AgentePlanRecuperacion,
+    )
+
+    reg.registrar_clase(AgentePlanRecuperacion)
+    reg.registrar_clase(AgenteCorreccionMasiva)
+    reg.registrar_clase(AgenteContratos)
+    reg.registrar_clase(AgenteGemeloEPS)
+    reg.registrar_clase(AgenteMejoraContinua)
     return reg
 
 

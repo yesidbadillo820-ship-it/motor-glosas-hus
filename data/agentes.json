@@ -364,6 +364,123 @@
       "implementacion": "sdk: hospiai_conocimiento.AgenteProcessMiner",
       "requiere_sdk": "1.0",
       "notas": "Reconstruye el flujo real desde los eventos del Expediente y mide horas promedio entre etapas: dónde se pierde el tiempo (cuello de botella)."
+    },
+    {
+      "id": "AG024",
+      "nombre": "PlanRecuperacion",
+      "dominio": "OPERACION",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "PLAN_RECUPERACION"
+      ],
+      "depende_de": [
+        "AG021"
+      ],
+      "implementacion": "sdk: hospiai_operacion.AgentePlanRecuperacion",
+      "requiere_sdk": "1.0",
+      "notas": "Radication Readiness Engine: convierte los hallazgos de una factura en un plan accionable (qué, quién, cuánto tarda, probabilidad, impacto). Si el soporte YA existe en un servidor indexado la acción es ASOCIAR. Comando: hospiai.py plan HUSxxxxxx.",
+      "justificacion_operativa": {
+        "problema": "El funcionario sabe QUÉ falta pero no qué hacer, con quién ni cuánto tarda: cada factura pendiente exige investigación manual.",
+        "dinero": "El valor de cada expediente REVISAR que pasa a LISTA al ejecutar el plan (se imprime en el propio plan).",
+        "horas": "Minutos por factura de investigación manual eliminados; el plan trae responsable y tiempo estimado curado por el área.",
+        "indicador": "% LISTAS y días hasta LISTA (tabla indicadores).",
+        "medicion": "Antes/después por corrida: transiciones REVISAR→LISTA y dias_hasta_lista en la tabla indicadores."
+      }
+    },
+    {
+      "id": "AG025",
+      "nombre": "CorreccionMasiva",
+      "dominio": "OPERACION",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "CORRECCION_MASIVA"
+      ],
+      "depende_de": [
+        "AG008",
+        "AG001"
+      ],
+      "implementacion": "sdk: hospiai_operacion.AgenteCorreccionMasiva",
+      "requiere_sdk": "1.0",
+      "notas": "Mass Correction Engine: encuentra soluciones por miles (soportes que YA existen en los índices → asociar; faltantes únicos → conseguir; archivos sin tipificar; entidades sin catálogo). SOLO PROPONE: jamás ejecuta ni mueve archivos. Comando: hospiai.py oportunidades.",
+      "justificacion_operativa": {
+        "problema": "Las correcciones se hacen factura por factura cuando miles comparten la misma solución.",
+        "dinero": "Suma exacta (por reglas vigentes) del valor de las facturas que quedan LISTAS por cada corrección masiva.",
+        "horas": "Una acción masiva (p.ej. correr el cruce con el índice) reemplaza miles de gestiones individuales.",
+        "indicador": "Valor recuperable y % REVISAR.",
+        "medicion": "valor_recuperable y pct_revisar por corrida en la tabla indicadores, antes y después de ejecutar la propuesta."
+      }
+    },
+    {
+      "id": "AG026",
+      "nombre": "InteligenciaContratos",
+      "dominio": "OPERACION",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "FICHA_CONTRATO"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_operacion.AgenteContratos",
+      "requiere_sdk": "1.0",
+      "notas": "Contract Intelligence: la ficha viva de cada pagador/contrato — % listas, valor detenido, causas frecuentes, plazo, glosas (cuando el historial esté cargado) y recomendación. Sin historial dice 'sin historial', no inventa.",
+      "justificacion_operativa": {
+        "problema": "Nadie tiene la foto por contrato: cuánto se detiene, por qué, y qué exige cada pagador.",
+        "dinero": "Valor detenido por pagador visible y priorizable (la ficha lo imprime).",
+        "horas": "Elimina el armado manual de informes por EPS para las mesas de conciliación.",
+        "indicador": "Valor detenido por pagador y % LISTAS por pagador.",
+        "medicion": "Comparar la ficha entre corridas (misma consulta, misma base)."
+      }
+    },
+    {
+      "id": "AG027",
+      "nombre": "GemeloEPS",
+      "dominio": "OPERACION",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "GEMELO_EPS"
+      ],
+      "depende_de": [
+        "AG008",
+        "AG019"
+      ],
+      "implementacion": "sdk: hospiai_operacion.AgenteGemeloEPS",
+      "requiere_sdk": "1.0",
+      "notas": "EPS Digital Twin: cómo se comporta cada EPS, calculado de los datos — exigencia observada, faltantes típicos, lecciones VALIDADAS, devoluciones frecuentes (con historial de glosas). Los campos sin historial lo declaran (demora promedio queda NULL hasta cargar pagos).",
+      "justificacion_operativa": {
+        "problema": "Cada factura se prepara igual para todas las EPS, aunque cada una exige y devuelve distinto.",
+        "dinero": "Menos devoluciones/glosas al preparar el paquete según el comportamiento real de la EPS destino.",
+        "horas": "Evita reprocesos de radicación devuelta (el reproceso es el doble de trabajo).",
+        "indicador": "Devoluciones y % LISTAS por EPS.",
+        "medicion": "Devoluciones por EPS antes/después (requiere cargar historial de glosas; mientras tanto, % LISTAS por EPS por corrida)."
+      }
+    },
+    {
+      "id": "AG028",
+      "nombre": "MejoraContinua",
+      "dominio": "OPERACION",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "MEJORA_CONTINUA"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_operacion.AgenteMejoraContinua",
+      "requiere_sdk": "1.0",
+      "notas": "Continuous Improvement Engine: cada viernes responde qué mejoró, qué empeoró, qué aprendimos y qué cambiamos el lunes — comparando las dos últimas corridas con los Decision Records. corrida_diaria.ps1 lo corre solo los viernes.",
+      "justificacion_operativa": {
+        "problema": "El área no tiene un cierre semanal objetivo: las mejoras y retrocesos pasan sin medirse.",
+        "dinero": "Prioriza para el lunes las oportunidades con mayor valor liberable (las imprime con su cifra exacta).",
+        "horas": "Reemplaza la preparación manual del informe semanal.",
+        "indicador": "Todos los de la tabla indicadores (es quien los compara semana a semana).",
+        "medicion": "Delta de % LISTAS y de hallazgos por causa entre corridas, registrado cada viernes."
+      }
     }
   ]
 }

@@ -20,6 +20,12 @@ y siempre con aprobación humana):
     GET /recomendaciones/{factura} → acciones con base y casos (Knowledge Engine)
     GET /simulaciones[/{codigo}]   → motor de hipótesis: ¿qué pasaría si…?
     GET /conocimiento              → memoria institucional VALIDADA (AG019)
+    GET /plan/{factura}            → plan de recuperación del expediente (AG024)
+    GET /oportunidades             → correcciones masivas propuestas (AG025)
+    GET /indicadores               → indicadores de la última corrida (Fase 3)
+    GET /fichas[/{pagador}]        → ficha viva por pagador/contrato (AG026)
+    GET /gemelo/{eps}              → gemelo digital de la EPS (AG027)
+    GET /mejora                    → informe de mejora continua (AG028)
 
 Uso local:
     py tools\\hospiai_api.py servir --puerto 8765
@@ -175,6 +181,44 @@ class Servicios:
             for f in MemoriaInstitucional(self.db_path).consultar(solo_validado=True)[:30]
         ]
 
+    # ── Endpoints de Operational Intelligence (Fase 3) ─────────────────────
+
+    def plan(self, factura: str) -> dict:
+        """Plan de Recuperación del expediente (AG024)."""
+        from hospiai_operacion import plan_expediente
+
+        return plan_expediente(self.db_path, factura)
+
+    def oportunidades(self) -> dict:
+        """Correcciones masivas propuestas con dinero exacto (AG025)."""
+        from hospiai_operacion import oportunidades
+
+        return oportunidades(self.db_path)
+
+    def indicadores(self) -> dict:
+        """Los 4 bloques de indicadores de la última corrida (sin persistir)."""
+        from hospiai_operacion import calcular_indicadores
+
+        return calcular_indicadores(self.db_path, guardar=False)
+
+    def fichas(self, pagador: str | None = None) -> list[dict]:
+        """Ficha viva por pagador/contrato (AG026)."""
+        from hospiai_operacion import ficha_pagador
+
+        return ficha_pagador(self.db_path, pagador)
+
+    def gemelo(self, eps: str) -> dict:
+        """Gemelo digital de la EPS (AG027)."""
+        from hospiai_operacion import gemelo_eps
+
+        return gemelo_eps(self.db_path, eps)
+
+    def mejora(self) -> dict:
+        """Informe de mejora continua (AG028)."""
+        from hospiai_operacion import mejora_semanal
+
+        return mejora_semanal(self.db_path)
+
 
 class _Manejador(BaseHTTPRequestHandler):
     servicios: Servicios  # inyectado por servir()
@@ -209,6 +253,14 @@ class _Manejador(BaseHTTPRequestHandler):
             return s.simulaciones()
         if partes == ["conocimiento"]:
             return s.conocimiento()
+        if partes == ["oportunidades"]:
+            return s.oportunidades()
+        if partes == ["indicadores"]:
+            return s.indicadores()
+        if partes == ["fichas"]:
+            return s.fichas()
+        if partes == ["mejora"]:
+            return s.mejora()
         if len(partes) == 2:
             recurso, clave = partes
             if recurso == "expedientes":
@@ -223,6 +275,12 @@ class _Manejador(BaseHTTPRequestHandler):
                 return s.recomendaciones(clave)
             if recurso == "simulaciones":
                 return s.simulaciones(clave)
+            if recurso == "plan":
+                return s.plan(clave)
+            if recurso == "fichas":
+                return s.fichas(clave)
+            if recurso == "gemelo":
+                return s.gemelo(clave)
         return None
 
     def _json(self, cuerpo, codigo: int) -> None:

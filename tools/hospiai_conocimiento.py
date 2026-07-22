@@ -319,6 +319,7 @@ def recomendar_expediente(db_path: Path, factura: str) -> dict:
         restantes = [c for c in causas if c != causa]
         accion = {
             "accion": f"Conseguir/corregir {causa}",
+            "causa": causa,
             "regla": h["regla_id"] or "",
             "restantes_despues": restantes,
         }

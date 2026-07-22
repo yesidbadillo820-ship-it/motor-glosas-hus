@@ -73,6 +73,7 @@ def render(servicios: Servicios) -> str:
     tareas = servicios.tareas()
     sim = servicios.simulaciones()
     saber = servicios.conocimiento()
+    op = servicios.oportunidades()
     r = inf["resumen"]
     rec = inf["recomendaciones"][:3]
     peor_resp = min(inf["responsables"], key=lambda x: x["pct_listas"], default=None)
@@ -241,6 +242,27 @@ def render(servicios: Servicios) -> str:
             ],
         ),
     ]
+    # Fase 3: oportunidades masivas — la decisión más rentable primero.
+    if op.get("oportunidades"):
+        partes += [
+            "<h2>Oportunidades de alto impacto (AG025 — propuestas, nada se ejecuta)</h2>",
+            _tabla(
+                ["Oportunidad", "Acción", "Facturas que se liberan", "Impacto", "Base"],
+                [
+                    [
+                        html.escape(o["oportunidad"]),
+                        html.escape(o["accion"]),
+                        f"{o['facturas_liberadas']:,}" if o["facturas_liberadas"] else "—",
+                        _p(o["valor_liberado"]) if o["valor_liberado"] else "—",
+                        html.escape(o["base"]),
+                    ]
+                    for o in op["oportunidades"][:6]
+                ],
+            ),
+            f"<p style='font-size:13px;color:#94a3b8'>Total recuperable: "
+            f"<b>{_p(op['total_recuperable'])}</b> en {op['facturas_potenciales']:,} facturas "
+            f"potencialmente liberables. {html.escape(op['nota'])}</p>",
+        ]
     # Panel Gerencial 2.0 (Fase 2.2): decisiones, no solo indicadores.
     if sim.get("escenarios"):
         filas_sim = [

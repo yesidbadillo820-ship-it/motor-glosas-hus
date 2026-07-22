@@ -8,6 +8,8 @@ Consulta la base `data/hospiai.db` que alimenta el radicador:
     py tools\\hospiai.py panel --salida panel.html # panel HTML autocontenido
     py tools\\hospiai.py recomendar HUS528043      # acciones con base y casos (Fase 2.2)
     py tools\\hospiai.py simular [--codigo HEV]    # ¿qué pasaría si…? (Fase 2.2)
+    py tools\\hospiai.py plan HUS528043            # plan de recuperación (Fase 3)
+    py tools\\hospiai.py oportunidades             # correcciones masivas (Fase 3)
 
 Solo LEE la base y ESCRIBE el HTML del panel. No toca los shares.
 """
@@ -490,6 +492,99 @@ def cmd_simular(db: Path, codigo: str | None) -> int:
     return 0
 
 
+def cmd_plan(db: Path, factura: str) -> int:
+    """AG024 · Plan de Recuperación: cada hallazgo convertido en una acción con
+    responsable, tiempo estimado (curado por el área), probabilidad calculada e
+    impacto. Si el soporte YA existe en un servidor indexado, la acción es
+    ASOCIAR (la próxima corrida lo anexa sola)."""
+    from hospiai_operacion import plan_expediente
+
+    p = plan_expediente(db, factura)
+    print("=" * 70)
+    print(f"PLAN DE RECUPERACIÓN · {p['factura']}")
+    if p.get("error"):
+        print(f"  {p['error']}")
+        print("=" * 70)
+        return 1
+    print(
+        f"  Estado actual: {p['dictamen']}   Valor: $ {p.get('valor') or 0:,.0f}"
+        f"   Pagador: {p.get('pagador') or '—'}"
+    )
+    if p.get("nota"):
+        print(f"  {p['nota']}")
+    if not p["pasos"]:
+        print("=" * 70)
+        return 0
+    print("  Para quedar LISTA debe:")
+    for i, paso in enumerate(p["pasos"], 1):
+        print("-" * 70)
+        print(f"  {i}. {paso['accion']}")
+        print(f"     Responsable      : {paso['responsable']}")
+        print(
+            "     Tiempo estimado  : "
+            + (
+                f"{paso['tiempo_min']} min ({paso['fuente_tiempo']})"
+                if paso["tiempo_min"] is not None
+                else paso["fuente_tiempo"]
+            )
+        )
+        print(
+            "     Probabilidad     : "
+            + (
+                f"{paso['probabilidad']:.0%}"
+                if paso["probabilidad"] is not None
+                else "sin historia validada aún"
+            )
+            + f"  [{paso['base_probabilidad']}]"
+        )
+        print(f"     Impacto          : {paso['impacto']}")
+    print("-" * 70)
+    if p.get("tiempos_completos"):
+        print(f"  Tiempo total estimado del plan: ~{p['total_minutos']} minutos")
+    else:
+        print("  Tiempo total: parcial (hay pasos sin estimación — curar data/esfuerzos.json)")
+    print("=" * 70)
+    return 0
+
+
+def cmd_oportunidades(db: Path) -> int:
+    """AG025 · Oportunidades de alto impacto: soluciones masivas PROPUESTAS
+    (jamás ejecutadas), con dinero EXACTO por reglas vigentes."""
+    from hospiai_operacion import oportunidades
+
+    op = oportunidades(db)
+    print("=" * 70)
+    print(f"OPORTUNIDADES DE ALTO IMPACTO · corrida #{op['corrida']}")
+    if not op["oportunidades"] and not op["sin_tipificar"]:
+        print("  Sin pendientes con hallazgos: nada masivo que proponer. ✔")
+        print("=" * 70)
+        return 0
+    for i, o in enumerate(op["oportunidades"], 1):
+        print("-" * 70)
+        print(f"  {i}. {o['oportunidad']}")
+        print(f"     Acción   : {o['accion']}")
+        if o["valor_liberado"] is not None:
+            print(
+                f"     Impacto  : $ {o['valor_liberado']:,.0f}"
+                f" ({o['facturas_liberadas']:,} facturas quedan LISTAS)"
+            )
+        print(f"     Base     : {o['base']}")
+    if op["sin_tipificar"]:
+        o = op["sin_tipificar"]
+        print("-" * 70)
+        print(f"  + {o['oportunidad']}")
+        print(f"     Acción   : {o['accion']}")
+        print(f"     Base     : {o['base']}")
+    print("-" * 70)
+    print(
+        f"  TOTAL recuperable: $ {op['total_recuperable']:,.0f}"
+        f"   Facturas potencialmente liberadas: {op['facturas_potenciales']:,}"
+    )
+    print(f"  ({op['nota']})")
+    print("=" * 70)
+    return 0
+
+
 def cmd_agentes() -> int:
     """Registro Central de Agentes: identidad, versión, estado y capacidades."""
     from hospiai_agentes import registro_con_implementaciones
@@ -564,6 +659,9 @@ def main(argv: list[str] | None = None) -> int:
     sr.add_argument("factura", help="Número de factura (HUS528043 o 528043).")
     sm = sub.add_parser("simular", help="Motor de Hipótesis: ¿qué pasaría si…? (Fase 2.2).")
     sm.add_argument("--codigo", help="Simular solo la corrección de este código (p.ej. HEV).")
+    spl = sub.add_parser("plan", help="Plan de Recuperación de un expediente (AG024 · Fase 3).")
+    spl.add_argument("factura", help="Número de factura (HUS528043 o 528043).")
+    sub.add_parser("oportunidades", help="Oportunidades masivas de alto impacto (AG025 · Fase 3).")
     args = p.parse_args(argv)
 
     if args.cmd == "init":
@@ -591,6 +689,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_recomendar(args.db, args.factura)
     if args.cmd == "simular":
         return cmd_simular(args.db, args.codigo)
+    if args.cmd == "plan":
+        return cmd_plan(args.db, args.factura)
+    if args.cmd == "oportunidades":
+        return cmd_oportunidades(args.db)
     return cmd_panel(args.db, args.salida, args.titulo)
 
 
