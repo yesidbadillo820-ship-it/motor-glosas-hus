@@ -6524,6 +6524,81 @@ function iniciarNarracion(traceId){
   } catch(e){ return { cerrar: function(){} }; }
 }
 
+// Capa de Vida (ronda 32): chat conversacional con el dictamen. Usa el
+// endpoint /chat-glosa/{id}/mensaje (ya existía en el backend, sin UI):
+// responde preguntas ("¿por qué ese código?") y aplica ajustes ("hacelo
+// más corto"). 100% aditivo y defensivo.
+function toggleChatGlosa(glosaId, btn){
+  try {
+    var cont = document.getElementById('chat-glosa-'+glosaId);
+    if(!cont) return;
+    if(cont.style.display !== 'none'){ cont.style.display='none'; return; }
+    cont.style.display='block';
+    if(cont.getAttribute('data-init') === '1') return;
+    cont.setAttribute('data-init','1');
+    cont.innerHTML =
+      '<div style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;">'
+      + '<div class="chat-msgs" style="max-height:240px;overflow-y:auto;padding:10px;background:#f8fafc;font-size:.82rem;">'
+      +   '<div style="color:#64748b;">💬 Preguntá lo que quieras sobre este dictamen o pedí un ajuste. Ej: <i>"hacelo más corto"</i> · <i>"¿por qué ese código de respuesta?"</i> · <i>"citá la cláusula octava"</i>.</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:.4rem;padding:8px;border-top:1px solid #e2e8f0;background:#fff;">'
+      +   '<input type="text" class="chat-input" placeholder="Escribí tu mensaje…" onkeydown="if(event.keyCode===13)enviarChatGlosa('+glosaId+')" style="flex:1;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;"/>'
+      +   '<button type="button" onclick="enviarChatGlosa('+glosaId+')" style="padding:.5rem .9rem;background:#0369a1;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.8rem;cursor:pointer;">Enviar</button>'
+      + '</div>'
+      + '</div>';
+    var inp = cont.querySelector('.chat-input'); if(inp) inp.focus();
+  } catch(e){}
+}
+
+function _chatBurbuja(cont, quien, texto){
+  var msgs = cont.querySelector('.chat-msgs');
+  var b = document.createElement('div');
+  var mio = quien === 'yo';
+  b.style.cssText = 'margin:6px 0;padding:7px 11px;border-radius:10px;max-width:85%;white-space:pre-wrap;'
+    + (mio ? 'background:#0369a1;color:#fff;margin-left:auto;' : 'background:#fff;border:1px solid #e2e8f0;color:#1e293b;');
+  b.textContent = texto;
+  msgs.appendChild(b);
+  msgs.scrollTop = msgs.scrollHeight;
+  return b;
+}
+
+async function enviarChatGlosa(glosaId){
+  var cont = document.getElementById('chat-glosa-'+glosaId);
+  if(!cont) return;
+  var input = cont.querySelector('.chat-input');
+  var texto = (input && input.value || '').trim();
+  if(!texto) return;
+  try {
+    input.value=''; input.disabled=true;
+    _chatBurbuja(cont, 'yo', texto);
+    var pensando = _chatBurbuja(cont, 'ia', '…');
+    var r = await fetch('/chat-glosa/'+glosaId+'/mensaje', {
+      method:'POST', headers: H({'Content-Type':'application/json'}), body: JSON.stringify({texto: texto})
+    });
+    var d = r.ok ? await r.json() : null;
+    if(!d){ pensando.textContent = '⚠️ No pude responder ahora. Probá de nuevo.'; input.disabled=false; input.focus(); return; }
+    pensando.textContent = d.respuesta || '(sin respuesta)';
+    if(d.nuevo_dictamen){
+      var btnAp = document.createElement('button');
+      btnAp.type='button'; btnAp.textContent='✅ Aplicar este ajuste al dictamen';
+      btnAp.style.cssText='display:block;margin:8px 0 0 0;padding:.5rem .9rem;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.8rem;cursor:pointer;';
+      btnAp.onclick = function(){
+        try {
+          var bodyId = cont.getAttribute('data-body');
+          var body = bodyId ? document.getElementById(bodyId) : null;
+          if(body){ body.innerHTML = d.nuevo_dictamen; }
+          btnAp.textContent = '✔ Aplicado (revisá y guardá con Refinar si querés persistirlo)';
+          btnAp.disabled = true; btnAp.style.background='#64748b';
+        } catch(e){}
+      };
+      cont.querySelector('.chat-msgs').appendChild(btnAp);
+    }
+    input.disabled=false; input.focus();
+  } catch(e){
+    if(input){ input.disabled=false; }
+  }
+}
+
 // Capa de Vida (ronda 32): llena los badges de confianza de cada dictamen.
 // Busca [data-conf-glosa] dentro de `raiz`, consulta /vida/confianza/{id} y
 // muestra el nivel + en qué se apoya. 100% defensivo: si falla, oculta el
@@ -9840,9 +9915,12 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
         out += '        <input type="checkbox" id="lote-refinar-guardar-'+j+'" checked/> Guardar cambios';
         out += '      </label>';
         out += '      <button type="button" onclick="aplicarRefinarLote('+r.glosa_id+','+j+')" style="padding:.5rem .9rem;background:var(--c-teal2);color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">✨ Refinar</button>';
+        out += '      <button type="button" onclick="toggleChatGlosa('+r.glosa_id+',this)" style="padding:.5rem .9rem;background:#0f172a;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">💬 Conversar</button>';
         out += '      <div id="lote-refinar-status-'+j+'" style="font-size:.72rem;color:var(--text3);min-height:1em;"></div>';
         out += '    </div>';
         out += '  </div>';
+        // Capa de Vida (ronda 32): contenedor del chat conversacional.
+        out += '  <div id="chat-glosa-'+r.glosa_id+'" data-body="lote-body-'+j+'" style="display:none;margin-top:.7rem;"></div>';
         out += '</div>';
       }
       out += '</details>';
