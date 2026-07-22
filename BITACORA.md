@@ -106,6 +106,14 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Panel Ejecutivo** (`py tools\hospiai_panel_ejecutivo.py`): 6 vistas (Estado General, Riesgo Financiero, Responsables, EPS, Hallazgos, Predicción) + las **6 preguntas de aceptación respondidas de frente**, alimentado **exclusivamente desde la API** (el módulo no toca la base — hay una prueba que lo verifica).
   - Nuevos endpoints de la API: `/informe`, `/caja`, `/tareas`. **165 pruebas automáticas** en verde.
   - ⚠ Los números del panel serán los reales de los 12.523 en cuanto se corra la primera corrida (índice de soportes pendiente en el equipo del área).
+- **AG001 — SERVICIO DE INDEXACIÓN PERMANENTE (reemplaza el archivo de texto):** por directiva, el índice dejó de ser un `.txt` gigante y pasó a ser un servicio:
+  - **Bases SQLite por servidor** (`data\indices\indice_y.db`, `indice_z.db`, `indice_x.db`): si un servidor falla, los demás siguen sirviendo. La búsqueda une todas (vista global).
+  - **Guardado inmediato**: cada archivo encontrado se inserta al momento (lotes de 5.000) — nunca se espera al final. **Progreso en tiempo real**: conteo, velocidad, minutos y % con tiempo restante en las pasadas siguientes.
+  - **Indexación incremental**: después de la primera vez solo se revisa qué cambió (fechas/tamaños) — segundos si no hay novedades. Lo borrado queda marcado AUSENTE (no se pierde el historial).
+  - **Búsqueda instantánea**: `py tools\hospiai_indexador.py buscar HUS528043` → milisegundos, con tipo de soporte, servidor y estado.
+  - **Vigilante** (`vigilar --cada 300`): rescan incremental en bucle — el "watcher" correcto para discos de red, donde los eventos de Windows no son confiables.
+  - **El radicador ya lo usa solo**: si existen bases en `data\indices\`, las autodetecta (o `--soportes-db`); el cruce se carga desde SQLite en milisegundos. El `.txt` queda como respaldo de compatibilidad, fuera del flujo diario.
+  - `corrida_diaria.ps1` actualizada: 1) índice incremental → 2) radicador → 3) directores → 4) paneles. **174 pruebas automáticas** en verde.
 
 ---
 

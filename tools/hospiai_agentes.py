@@ -97,6 +97,9 @@ def registro_con_implementaciones(ruta=None) -> RegistroAgentes:
     reg.registrar_clase(AgenteDirectorOperativo)
     reg.registrar_clase(AgenteDirectorGerencial)
     reg.registrar_clase(AgenteAprendizaje)
+    from hospiai_indexador import AgenteIndexador
+
+    reg.registrar_clase(AgenteIndexador)
     return reg
 
 

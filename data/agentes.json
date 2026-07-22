@@ -5,17 +5,18 @@
   "agentes": [
     {
       "id": "AG001",
-      "nombre": "ExploradorServidor",
+      "nombre": "IndexadorPermanente",
       "dominio": "D1",
-      "version": "1.0",
+      "version": "2.0",
       "estado": "ACTIVO",
       "capacidades": [
-        "EXPLORAR",
-        "DESCUBRIR_FACTURAS"
+        "INDEXAR",
+        "BUSCAR_ARCHIVO"
       ],
       "depende_de": [],
-      "implementacion": "legacy: radicar_facturacion.descubrir_auto",
-      "notas": "Recorre el share de FE y ancla expedientes. Solo lectura."
+      "implementacion": "sdk: hospiai_indexador.AgenteIndexador",
+      "notas": "Servicio de Indexación Permanente: bases SQLite por servidor (data/indices/), guardado inmediato, incremental, búsqueda instantánea. Reemplaza idx_soportes_2026.txt.",
+      "requiere_sdk": "1.0"
     },
     {
       "id": "AG002",

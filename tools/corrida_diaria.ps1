@@ -1,28 +1,32 @@
 # HOSPIAI — corrida diaria (solo lectura sobre los shares).
-# Corre el radicador con el índice de soportes, actualiza el Expediente Digital
-# (data\hospiai.db), y regenera el reporte y el panel en el Escritorio.
+# 1) Actualiza el ÍNDICE PERMANENTE (incremental: segundos si nada cambió).
+# 2) Corre el radicador (usa el índice permanente automáticamente).
+# 3) Directores + paneles.
 #
-# Programarla (una vez, en PowerShell como el usuario del área):
+# Programarla (una vez):
 #   schtasks /Create /TN "HOSPIAI corrida diaria" /SC DAILY /ST 06:00 `
 #     /TR "powershell -ExecutionPolicy Bypass -File C:\Users\cartera\motor-glosas-hus\tools\corrida_diaria.ps1"
-#
-# Parámetros editables:
 param(
     [string]$Origen = "\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_SALUD",
-    [string]$Indice = "data\idx_soportes_2026.txt"
+    [string[]]$Raices = @("Y:\", "Z:\SERVIDOR GLOSAS", "X:\SERVIDOR RADICACION\2. SINAC SC SAS - 2026")
 )
 
 Set-Location (Split-Path $PSScriptRoot -Parent)   # raíz del repo
 New-Item -ItemType Directory -Force -Path "data\logs" | Out-Null
 $fecha = Get-Date -Format "yyyyMMdd"
 
-# 1) Auditoría del lote + Expediente Digital (el CSV/XLSX de siempre siguen saliendo).
+# 1) Índice permanente (AG001) — incremental, con progreso.
+py tools\hospiai_indexador.py indexar @Raices
+
+# 2) Auditoría del lote + Expediente Digital (autodetecta data\indices\*.db).
 py tools\radicar_facturacion.py --origen $Origen `
-    --soportes-indice $Indice `
     --reporte "$env:USERPROFILE\Desktop\radicacion_fe.csv" `
     --xlsx    "$env:USERPROFILE\Desktop\radicacion_fe.xlsx" `
     --db      "data\hospiai.db" `
     --log     "data\logs\corrida_$fecha.log"
 
-# 2) Panel del Expediente Digital, listo para abrir con doble clic.
+# 3) Directores + paneles del día.
+py tools\hospiai_directores.py informe
+py tools\hospiai_directores.py aprendizaje
 py tools\hospiai.py --db "data\hospiai.db" panel --salida "$env:USERPROFILE\Desktop\panel_hospiai.html"
+py tools\hospiai_panel_ejecutivo.py --salida "$env:USERPROFILE\Desktop\panel_ejecutivo.html"

@@ -47,6 +47,7 @@ class TestPolicyEngine:
 
     def test_tope_de_concurrencia(self, tmp_path):
         pe = _politicas(tmp_path)
+        pe._ahora = lambda: datetime(2026, 7, 22, 10, 0)  # dentro del horario laboral
         m = sdk.Mision(codigo="MISION-000002", tipo="OCR")
         assert pe.permitida(m, {"OCR": 0})[0] is True
         ok, motivo = pe.permitida(m, {"OCR": 1})

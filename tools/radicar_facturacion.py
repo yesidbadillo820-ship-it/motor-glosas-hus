@@ -1455,6 +1455,35 @@ def indexar_soportes_desde_indice(ruta_indice: Path, patron: str) -> dict[str, l
     return dict(indice)
 
 
+def indexar_soportes_desde_db(rutas_db: list[Path]) -> dict[str, list[Path]]:
+    """Construye el índice de cruce desde el SERVICIO DE INDEXACIÓN PERMANENTE
+    (AG001, bases data/indices/indice_*.db). No recorre la red ni lee listados:
+    consulta SQLite → milisegundos, aunque haya millones de archivos. La clave
+    y la tipificación ya vienen calculadas por el indexador con el MISMO
+    criterio del motor."""
+    import sqlite3
+
+    indice: dict[str, list[Path]] = defaultdict(list)
+    n = 0
+    for ruta_db in rutas_db:
+        con = sqlite3.connect(str(ruta_db))
+        try:
+            filas = con.execute(
+                "SELECT factura, ruta FROM archivos"
+                " WHERE factura<>'' AND reconocido=1 AND estado='ACTIVO'"
+            )
+            for factura, ruta in filas:
+                indice[factura].append(PureWindowsPath(ruta))
+                n += 1
+        finally:
+            con.close()
+    logger.info(
+        f"Índice permanente: {n:,} archivo(s) para {len(indice):,} factura(s) "
+        f"desde {len(rutas_db)} base(s) ({', '.join(p.name for p in rutas_db)})"
+    )
+    return dict(indice)
+
+
 # ─── Manifiesto factura → entidad ────────────────────────────────────────────
 
 
@@ -1957,6 +1986,18 @@ def build_parser() -> argparse.ArgumentParser:
         "(que puede traer varias rutas separadas por ';').",
     )
     p.add_argument(
+        "--soportes-db",
+        type=Path,
+        nargs="+",
+        default=None,
+        dest="soportes_db",
+        metavar="BASE",
+        help="Base(s) del Servicio de Indexación Permanente (AG001, data\\indices\\indice_*.db). "
+        "Es la fuente RECOMENDADA del cruce: consulta SQLite en milisegundos y se mantiene "
+        "al día con 'py tools\\hospiai_indexador.py indexar' (incremental). Si no pasás "
+        "ninguna fuente de soportes y existen bases en data\\indices\\, se usan solas.",
+    )
+    p.add_argument(
         "--soportes-indice",
         type=Path,
         default=None,
@@ -2051,6 +2092,27 @@ def main(argv: list[str] | None = None) -> int:
     #                      (o $SOPORTES_ROOT, con rutas separadas por os.pathsep).
     soportes_idx: dict[str, list[Path]] | None = None
     fusion: dict[str, list[Path]] = defaultdict(list)
+    # Fuente preferida: el Servicio de Indexación Permanente (AG001). Explícito
+    # con --soportes-db, o AUTODETECTADO si no se pasó ninguna otra fuente.
+    rutas_db: list[Path] = list(args.soportes_db) if args.soportes_db else []
+    if not rutas_db and args.soportes_indice is None and not args.soportes:
+        dir_indices = Path(__file__).resolve().parent.parent / "data" / "indices"
+        rutas_db = sorted(dir_indices.glob("indice_*.db")) if dir_indices.is_dir() else []
+        if rutas_db:
+            logger.info(
+                f"Usando el índice permanente autodetectado ({len(rutas_db)} base(s) en data/indices/)."
+            )
+    if rutas_db:
+        invalidas_db = [d for d in rutas_db if not d.is_file()]
+        if invalidas_db:
+            logger.error(
+                "--soportes-db: no existe(n): "
+                + ", ".join(str(x) for x in invalidas_db)
+                + '\n  Armá el índice con: py tools\\hospiai_indexador.py indexar "Y:\\" …'
+            )
+            return 1
+        for fac, rutas in indexar_soportes_desde_db(rutas_db).items():
+            fusion[fac].extend(rutas)
     if args.soportes_indice is not None:
         if not args.soportes_indice.is_file():
             logger.error(
@@ -2086,9 +2148,9 @@ def main(argv: list[str] | None = None) -> int:
     if fusion:
         soportes_idx = dict(fusion)
         logger.info(f"Soportes clínicos: {len(soportes_idx)} factura(s) con soporte para cruzar.")
-    # Se pidió cruce (--soportes/--soportes-indice/$SOPORTES_ROOT) → reportá cuántas
+    # Se pidió cruce (soportes-db/soportes/indice/$SOPORTES_ROOT) → reportá cuántas
     # facturas quedaron indexadas (0 incluido, para diagnosticar share vacío).
-    cruce_pedido = bool(rutas_soportes) or args.soportes_indice is not None
+    cruce_pedido = bool(rutas_soportes) or args.soportes_indice is not None or bool(rutas_db)
     n_indice_soportes = len(fusion) if cruce_pedido else None
 
     if args.layout == "lote":
