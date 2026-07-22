@@ -100,6 +100,15 @@ def registro_con_implementaciones(ruta=None) -> RegistroAgentes:
     from hospiai_indexador import AgenteIndexador
 
     reg.registrar_clase(AgenteIndexador)
+    from hospiai_documento import (
+        AgenteDocumentCurator,
+        AgenteIngesta,
+        AgenteStorageOptimizer,
+    )
+
+    reg.registrar_clase(AgenteDocumentCurator)
+    reg.registrar_clase(AgenteStorageOptimizer)
+    reg.registrar_clase(AgenteIngesta)
     return reg
 
 

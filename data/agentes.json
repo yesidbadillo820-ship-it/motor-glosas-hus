@@ -5,17 +5,18 @@
   "agentes": [
     {
       "id": "AG001",
-      "nombre": "IndexadorPermanente",
+      "nombre": "DocumentIntelligenceService",
       "dominio": "D1",
       "version": "2.0",
       "estado": "ACTIVO",
       "capacidades": [
         "INDEXAR",
-        "BUSCAR_ARCHIVO"
+        "BUSCAR_ARCHIVO",
+        "PERFILAR_DOCUMENTO"
       ],
       "depende_de": [],
       "implementacion": "sdk: hospiai_indexador.AgenteIndexador",
-      "notas": "Servicio de Indexación Permanente: bases SQLite por servidor (data/indices/), guardado inmediato, incremental, búsqueda instantánea. Reemplaza idx_soportes_2026.txt.",
+      "notas": "DIS: el servicio documental de la plataforma — índice permanente + fingerprint + clasificación con confianza + calidad + duplicados + timeline. Los documentos son objetos inteligentes, no archivos.",
       "requiere_sdk": "1.0"
     },
     {
@@ -237,6 +238,54 @@
       "implementacion": "sdk: hospiai_directores.AgenteAprendizajeInstitucional",
       "requiere_sdk": "1.0",
       "notas": "Registra cada transición de dictamen entre corridas (qué cambió, por qué, qué aprendimos): la memoria institucional."
+    },
+    {
+      "id": "AG016",
+      "nombre": "DocumentCurator",
+      "dominio": "D1",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "CURAR_DOCUMENTOS"
+      ],
+      "depende_de": [
+        "AG001"
+      ],
+      "implementacion": "sdk: hospiai_documento.AgenteDocumentCurator",
+      "requiere_sdk": "1.0",
+      "notas": "Revisa documentos, nunca expedientes: corruptos, vacíos, duplicados, sin texto, cifrados — antes del OCR."
+    },
+    {
+      "id": "AG017",
+      "nombre": "StorageOptimizer",
+      "dominio": "D1",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "OPTIMIZAR_ALMACENAMIENTO"
+      ],
+      "depende_de": [
+        "AG001"
+      ],
+      "implementacion": "sdk: hospiai_documento.AgenteStorageOptimizer",
+      "requiere_sdk": "1.0",
+      "notas": "GB por servidor, duplicados recuperables, ausentes y candidatos a archivar. Solo informa: mover/borrar es decisión humana."
+    },
+    {
+      "id": "AG018",
+      "nombre": "IngestaInteligente",
+      "dominio": "D1",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "INGESTA"
+      ],
+      "depende_de": [
+        "AG001"
+      ],
+      "implementacion": "sdk: hospiai_documento.AgenteIngestaInteligente",
+      "requiere_sdk": "1.0",
+      "notas": "Rescan incremental + perfilado inmediato de lo nuevo + evento en el Expediente, sin esperar la corrida nocturna."
     }
   ]
 }

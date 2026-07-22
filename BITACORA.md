@@ -114,6 +114,16 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Vigilante** (`vigilar --cada 300`): rescan incremental en bucle — el "watcher" correcto para discos de red, donde los eventos de Windows no son confiables.
   - **El radicador ya lo usa solo**: si existen bases en `data\indices\`, las autodetecta (o `--soportes-db`); el cruce se carga desde SQLite en milisegundos. El `.txt` queda como respaldo de compatibilidad, fuera del flujo diario.
   - `corrida_diaria.ps1` actualizada: 1) índice incremental → 2) radicador → 3) directores → 4) paneles. **174 pruebas automáticas** en verde.
+- **FASE 2.1 — DOCUMENT INTELLIGENCE SERVICE (DIS):** AG001 dejó de ser un indexador: es el servicio documental de la plataforma. **El documento dejó de ser un archivo: es un objeto inteligente.**
+  - **Fingerprint real** de cada PDF (leyendo su estructura, sin librerías): hash, páginas, autor, productor, fechas del documento, firma digital, texto extraíble, cifrado, rotación. *Honestidad: dpi y % de legibilidad existen en el perfil pero quedan vacíos hasta el OCR (Fase 3) — no se inventan medidas.*
+  - **Clasificación con confianza**: token en el nombre 98% · alias reconocido 90% · solo carpeta 50% · sin evidencia 30%.
+  - **Calidad A–D/X** por señales verificables: A = válido+texto+firmado · B = con texto · C = escaneo puro (necesitará OCR) · D = sospechoso · X = corrupto/vacío.
+  - **Duplicados inteligentes**: exactos (mismo hash → apuntan al canónico) y funcionales (mismo tipo de soporte repetido en la misma factura). El nivel paciente+fecha llega con el OCR.
+  - **Timeline** por documento: creado → indexado → perfilado + la historia del expediente (decisiones, hallazgos, eventos).
+  - **AG016 Document Curator** (`curar`): corruptos, vacíos, incompletos, duplicados, sin texto, cifrados — detectados ANTES del OCR, con hallazgos en el Expediente.
+  - **AG017 Storage Optimizer** (`almacenamiento`): GB por servidor, duplicados recuperables, ausentes, candidatos a archivar (>2 años). Solo informa: mover/borrar es decisión humana.
+  - **AG018 Ingesta Inteligente** (`ingesta`): incremental + perfilado inmediato de lo nuevo + evento DOCUMENTO_NUEVO en el Expediente — sin esperar la corrida nocturna.
+  - **Criterio de aceptación cumplido**: `py tools\hospiai_documento.py perfil HUS528043` responde el objeto documental completo (clase, calidad, confianza, hash, páginas, texto, firma, duplicado, timeline, expediente). **187 pruebas automáticas** en verde. 18 agentes registrados.
 
 ---
 
