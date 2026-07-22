@@ -116,6 +116,15 @@ tres frentes:
 - Todo quedó guardado en el repositorio con 36 pruebas automáticas en verde
   (Pull Request #164, verificación automática aprobada).
 
+**22 de julio — Bitácora + arreglo de pruebas "bomba de tiempo"**
+- Se creó esta **bitácora** (memoria común del proyecto) y la regla en
+  `CLAUDE.md` para que toda sesión la lea al iniciar y la actualice al cerrar.
+- La verificación automática del repositorio falló por **3 pruebas antiguas**
+  (mapa de calor y estadística por día de semana) que usaban fechas fijas de
+  abril: al pasar 90 días, quedaron fuera de la ventana que mide el sistema y
+  "explotaron" solas (nada que ver con el bot de SAVIA). Se corrigieron para
+  que usen fechas relativas a la fecha actual y no vuelvan a vencerse.
+
 ---
 
 ## PENDIENTE
@@ -144,4 +153,5 @@ tres frentes:
 
 ---
 
-*Última actualización: 17 de julio de 2026 — sesión del bot de SAVIA SALUD.*
+*Última actualización: 22 de julio de 2026 — creación de la bitácora y arreglo
+de las 3 pruebas con fechas vencidas.*
