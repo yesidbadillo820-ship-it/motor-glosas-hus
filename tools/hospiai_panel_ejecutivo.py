@@ -54,11 +54,48 @@ td{padding:7px 10px;border-top:1px solid #273449;font-variant-numeric:tabular-nu
 .barra{background:#0f172a;border-radius:6px;height:10px;overflow:hidden}
 .barra i{display:block;height:100%;background:linear-gradient(90deg,#22c55e,#4ade80)}
 footer{margin-top:30px;color:#64748b;font-size:12px}
+.situacion{background:#0b1220;border:1px solid #334155;border-radius:14px;padding:18px 20px;margin-bottom:18px}
+.sit-cabe{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.sit-cabe>span{font-size:13px;font-weight:700;letter-spacing:.12em;color:#7dd3fc}
+.hos{display:flex;align-items:baseline;gap:10px}
+.hos b{font-size:40px;font-variant-numeric:tabular-nums;line-height:1}
+.hos span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8}
+.hos-ok b{color:#4ade80}.hos-warn b{color:#fbbf24}.hos-mal b{color:#f87171}.hos-neu b{color:#e2e8f0}
+.sit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.sit-item{background:#1e293b;border:1px solid #334155;border-left:3px solid #38bdf8;border-radius:8px;padding:10px 12px}
+.sit-item span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:3px}
+.sit-item b{font-size:14px;color:#f1f5f9;font-weight:600}
 """
 
 
 def _p(v) -> str:
     return f"$ {v:,.0f}"
+
+
+_NIVEL_CLASE = {"Excelente": "ok", "Bueno": "ok", "Aceptable": "warn", "Crítico": "mal"}
+
+
+def _situacion_html(sit: dict) -> str:
+    """La banda 'SITUACIÓN DEL DÍA': lo primero que ve un director — HOS y las
+    decisiones, no gráficos. En menos de un minuto sabe dónde actuar."""
+    nivel = sit.get("nivel", "—")
+    clase = _NIVEL_CLASE.get(nivel, "neu")
+    tarjetas = [
+        ("Hoy pueden recuperarse", _p(sit["recuperable_hoy"])),
+        ("Prioridad máxima", html.escape(sit["prioridad_maxima"])),
+        ("Riesgo principal", html.escape(sit["riesgo_principal"])),
+        ("Cuello de botella", html.escape(sit["cuello_de_botella"])),
+        ("Acción inmediata", html.escape(sit["accion_inmediata"])),
+    ]
+    return (
+        "<div class='situacion'>"
+        "<div class='sit-cabe'><span>SITUACIÓN DEL DÍA</span>"
+        f"<div class='hos hos-{clase}'><b>{sit['hos']}</b>"
+        f"<span>Hospital Operational Score · {html.escape(nivel)}</span></div></div>"
+        "<div class='sit-grid'>"
+        + "".join(f"<div class='sit-item'><span>{t}</span><b>{v}</b></div>" for t, v in tarjetas)
+        + "</div></div>"
+    )
 
 
 def _tabla(headers: list[str], filas: list[list[str]]) -> str:
@@ -74,6 +111,7 @@ def render(servicios: Servicios) -> str:
     sim = servicios.simulaciones()
     saber = servicios.conocimiento()
     op = servicios.oportunidades()
+    sit = servicios.situacion()
     r = inf["resumen"]
     rec = inf["recomendaciones"][:3]
     peor_resp = min(inf["responsables"], key=lambda x: x["pct_listas"], default=None)
@@ -128,6 +166,8 @@ def render(servicios: Servicios) -> str:
         "<header><h1>HOSPIAI — Panel Ejecutivo de Cuentas Médicas</h1>",
         f"<p>ESE HUS · corrida #{inf['corrida'].get('id', '—')} · generado {inf['generado']}"
         " · alimentado 100% desde la API</p></header>",
+        # SITUACIÓN DEL DÍA — el tablero abre con decisiones, no con gráficos.
+        _situacion_html(sit),
         "<div class='preguntas'>",
         *(f"<div class='preg'><b>{html.escape(t)}</b>{html.escape(v)}</div>" for t, v in preguntas),
         "</div>",

@@ -35,7 +35,10 @@ py tools\hospiai_operacion.py indicadores
 py tools\hospiai.py --db "data\hospiai.db" panel --salida "$env:USERPROFILE\Desktop\panel_hospiai.html"
 py tools\hospiai_panel_ejecutivo.py --salida "$env:USERPROFILE\Desktop\panel_ejecutivo.html"
 
-# 4) Ritual del viernes: ¿qué mejoró, qué empeoró, qué aprendimos, qué cambiamos el lunes?
+# 4) EL "BUENOS DÍAS": el copiloto llega con las decisiones del día (AG029).
+py tools\hospiai.py iniciar-dia | Tee-Object "data\logs\dia_$fecha.txt"
+
+# 5) Ritual del viernes: ¿qué mejoró, qué empeoró, qué aprendimos, qué cambiamos el lunes?
 if ((Get-Date).DayOfWeek -eq 'Friday') {
     py tools\hospiai_operacion.py mejora | Tee-Object "data\logs\mejora_$fecha.txt"
 }

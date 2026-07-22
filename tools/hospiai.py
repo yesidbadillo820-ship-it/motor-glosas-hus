@@ -10,6 +10,8 @@ Consulta la base `data/hospiai.db` que alimenta el radicador:
     py tools\\hospiai.py simular [--codigo HEV]    # ¿qué pasaría si…? (Fase 2.2)
     py tools\\hospiai.py plan HUS528043            # plan de recuperación (Fase 3)
     py tools\\hospiai.py oportunidades             # correcciones masivas (Fase 3)
+    py tools\\hospiai.py iniciar-dia               # el "buenos días" operativo (Fase 4)
+    py tools\\hospiai.py preguntar "..."           # copiloto ejecutivo (Fase 4)
 
 Solo LEE la base y ESCRIBE el HTML del panel. No toca los shares.
 """
@@ -585,6 +587,79 @@ def cmd_oportunidades(db: Path) -> int:
     return 0
 
 
+def cmd_iniciar_dia(db: Path) -> int:
+    """AG029 · El 'buenos días': el sistema llega con las decisiones del día —
+    acciones por retorno económico, objetivo en pesos, riesgos y cuello."""
+    from hospiai_comando import iniciar_dia
+
+    d = iniciar_dia(db)
+    print("=" * 68)
+    print(f"  {d['saludo']}")
+    print(f"  Hospital Operational Score: {d['hos']} ({d['nivel']})")
+    print("-" * 68)
+    if not d["acciones"]:
+        print("  Sin acciones con impacto pendientes: nada que priorizar hoy. ✔")
+        print("=" * 68)
+        return 0
+    print("  Hoy recomendamos:")
+    for a in d["acciones"]:
+        print(
+            f"   {a['orden']:>2}. {a['accion']}"
+            f"   →  impacto $ {a['impacto']:,.0f} ({a['facturas']:,} facturas)"
+        )
+    print("-" * 68)
+    print(f"  OBJETIVO DEL DÍA: liberar $ {d['objetivo_del_dia']:,.0f}")
+    print("-" * 68)
+    print(f"  Riesgo principal : {d['riesgo_principal']}")
+    print(f"  Cuello de botella: {d['cuello_de_botella']}")
+    print(f"  Acción inmediata : {d['accion_inmediata']}")
+    if d["tareas_por_funcionario"]:
+        print("  Carga por funcionario:")
+        for t in d["tareas_por_funcionario"]:
+            print(
+                f"    {t['responsable'][:20]:<20} {t['pendientes']:>5,} pendientes"
+                f"  ({t['carga_pct']:.0f}%)"
+            )
+    print("=" * 68)
+    return 0
+
+
+_PREGUNTAS_EJEMPLO = [
+    "¿Qué debo hacer hoy para liberar la mayor cantidad de dinero?",
+    "¿Qué riesgo debo atender primero?",
+    "¿Qué mejoró desde ayer? ¿Qué empeoró?",
+    "¿Dónde está detenido el dinero?",
+    "¿Qué decisión genera mayor impacto?",
+]
+
+
+def cmd_preguntar(db: Path, pregunta: str | None) -> int:
+    """AG033 · Copiloto ejecutivo: responde en lenguaje natural con evidencia,
+    indicadores, confianza y recomendaciones. Sin pregunta, contesta la batería
+    de ejemplo (criterio de aceptación)."""
+    from hospiai_comando import preguntar
+
+    preguntas = [pregunta] if pregunta else _PREGUNTAS_EJEMPLO
+    for q in preguntas:
+        r = preguntar(db, q)
+        print("=" * 70)
+        print(f"  ❓ {r['pregunta']}")
+        print(f"  → {r['respuesta']}")
+        if r["evidencia"]:
+            print("  Evidencia:")
+            for e in r["evidencia"]:
+                print(f"    · {e}")
+        if r["indicadores"]:
+            print("  Indicadores: " + "  ".join(f"{k}: {v}" for k, v in r["indicadores"].items()))
+        print(f"  Confianza: {r['confianza']} ({r['confianza_motivo']})")
+        if r["recomendaciones"]:
+            print("  Recomendaciones:")
+            for rec in r["recomendaciones"]:
+                print(f"    → {rec}")
+    print("=" * 70)
+    return 0
+
+
 def cmd_agentes() -> int:
     """Registro Central de Agentes: identidad, versión, estado y capacidades."""
     from hospiai_agentes import registro_con_implementaciones
@@ -662,6 +737,11 @@ def main(argv: list[str] | None = None) -> int:
     spl = sub.add_parser("plan", help="Plan de Recuperación de un expediente (AG024 · Fase 3).")
     spl.add_argument("factura", help="Número de factura (HUS528043 o 528043).")
     sub.add_parser("oportunidades", help="Oportunidades masivas de alto impacto (AG025 · Fase 3).")
+    sub.add_parser("iniciar-dia", help="El 'buenos días': plan operativo del día (AG029 · Fase 4).")
+    spr = sub.add_parser(
+        "preguntar", help="Copiloto ejecutivo en lenguaje natural (AG033 · Fase 4)."
+    )
+    spr.add_argument("texto", nargs="?", help="La pregunta (si se omite, batería de ejemplo).")
     args = p.parse_args(argv)
 
     if args.cmd == "init":
@@ -693,6 +773,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_plan(args.db, args.factura)
     if args.cmd == "oportunidades":
         return cmd_oportunidades(args.db)
+    if args.cmd == "iniciar-dia":
+        return cmd_iniciar_dia(args.db)
+    if args.cmd == "preguntar":
+        return cmd_preguntar(args.db, args.texto)
     return cmd_panel(args.db, args.salida, args.titulo)
 
 

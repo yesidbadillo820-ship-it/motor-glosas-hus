@@ -135,6 +135,19 @@ def registro_con_implementaciones(ruta=None) -> RegistroAgentes:
     reg.registrar_clase(AgenteContratos)
     reg.registrar_clase(AgenteGemeloEPS)
     reg.registrar_clase(AgenteMejoraContinua)
+    from hospiai_comando import (
+        AgenteDailyOrchestrator,
+        AgenteEarlyWarning,
+        AgenteExecutiveCopilot,
+        AgenteKpiForecaster,
+        AgenteWorkloadBalancer,
+    )
+
+    reg.registrar_clase(AgenteDailyOrchestrator)
+    reg.registrar_clase(AgenteWorkloadBalancer)
+    reg.registrar_clase(AgenteEarlyWarning)
+    reg.registrar_clase(AgenteKpiForecaster)
+    reg.registrar_clase(AgenteExecutiveCopilot)
     return reg
 
 

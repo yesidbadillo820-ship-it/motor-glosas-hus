@@ -8,7 +8,7 @@
 - **Al empezar el día / una sesión:** leer esta bitácora para saber en qué punto vamos.
 - **Al terminar:** anotar abajo, con la fecha, lo que se hizo, lo que quedó pendiente y lo que sigue mañana.
 
-**Última actualización:** 22 de julio de 2026
+**Última actualización:** 22 de julio de 2026 (Fase 4 — Hospital Command Center)
 
 ---
 
@@ -146,6 +146,17 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **API** suma `/plan/{factura}`, `/oportunidades`, `/indicadores`, `/fichas`, `/gemelo/{eps}`, `/mejora`; el **panel ejecutivo** abre ahora con "Oportunidades de alto impacto". La corrida diaria quedó completa: índice → radicador → directores → aprendizaje → curaduría → indicadores → paneles (+ viernes: mejora).
   - **Objetivo fijado por la dirección** (sobre el lote real): subir LISTAS de 7.840 a **9.000+** sin más personal, bajar REVISAR **-30%**, menos tiempo de preparación y priorizar por retorno económico. El sistema ya lo mide corrida a corrida.
   - **229 pruebas automáticas** en verde. **28 agentes registrados** (AG001–AG028).
+- **FASE 4 — HOSPITAL COMMAND CENTER (el copiloto):** aprobada la Fase 3, cambia otra vez el eje: HOSPIAI deja de esperar preguntas y **llega cada mañana con las decisiones**. Ya no se mide por número de agentes o tablas, solo por impacto operativo.
+  - **Hospital Operational Score (HOS)** — el indicador único que gobierna toda la plataforma (`py tools\hospiai_comando.py hos`). Combina calidad (% listas), tiempo de radicación, devoluciones, recuperación, productividad y aprendizaje, en una escala 92-100 Excelente / 80-91 Bueno / 60-79 Aceptable / <60 Crítico. **Honestidad:** solo promedia los componentes que TIENEN datos; los que faltan (hoy: tiempo, devoluciones y recuperación, que esperan el historial de radicación y pagos) se **excluyen con su razón** y el puntaje se re-pondera — nunca se inventa un número para rellenar. Aparece en todos los paneles.
+  - **AG029 Daily Orchestrator** — criterio de aceptación cumplido: `py tools\hospiai.py iniciar-dia` imprime el "BUENOS DÍAS" con las acciones del día **ordenadas por retorno económico**, el **objetivo del día en pesos** ("hoy liberar $X"), la carga por funcionario, el riesgo principal y el cuello de botella. Es el copiloto que arranca la jornada sin que nadie pregunte.
+  - **AG030 Workload Balancer** (`carga`): no solo mide la carga — **propone mover expedientes** del funcionario saturado al más libre, con las cargas antes/después exactas. La ganancia de productividad va **etiquetada como estimación** (depende de la capacidad real, que no se mide); el reparto sí es aritmética exacta.
+  - **AG031 Early Warning** (`alertas`): detecta el riesgo de devolución **antes de que llegue la glosa**, con señales verificables del Document Profile (DQX/RAN sin firma, calidad D/X, documento corrupto) y las lecciones VALIDADAS por EPS. Nunca inventa una probabilidad: si la memoria la respalda la cita; si no, deja el riesgo cualitativo con su motivo concreto.
+  - **AG032 KPI Forecaster** (`proyeccion`): "si seguimos así, ¿cómo termina el mes?" — proyección lineal al ritmo de las últimas corridas, **con el supuesto declarado**. Con menos de 2 corridas medibles lo dice ("historial insuficiente"); dinero, glosas y recaudo esperan su historial (no se proyectan al aire).
+  - **AG033 Executive Copilot** — criterio de aceptación cumplido: `py tools\hospiai.py preguntar "¿Dónde está detenido el dinero?"` (o sin pregunta, la batería de ejemplo). Responde en lenguaje natural dónde está la plata detenida, qué EPS llamar primero (por dinero, no por número de folios), qué funcionario necesita apoyo, qué contrato renegociar y qué pasó esta semana — y **cada respuesta trae evidencia, indicadores, confianza y recomendaciones. Nunca opiniones.**
+  - **El tablero abre con decisiones, no con gráficos:** el panel ejecutivo ahora empieza con la banda "SITUACIÓN DEL DÍA" — HOS grande, cuánto se puede recuperar hoy, prioridad máxima, riesgo principal, cuello de botella y acción inmediata. En menos de un minuto un gerente sabe dónde actuar.
+  - **API** suma `/hos`, `/situacion`, `/iniciar-dia`, `/carga`, `/alertas`, `/proyeccion` y `/preguntar?q=...`. La corrida diaria ahora termina con el "buenos días" automático (y el informe de mejora los viernes).
+  - El cambio de fondo: de "usuario → pregunta → respuesta" a **"sistema → observa → detecta → prioriza → recomienda → aprende → mide"**. Ese ciclo es el objetivo real del proyecto.
+  - **251 pruebas automáticas** en verde. **33 agentes registrados** (AG001–AG033).
 
 ---
 
@@ -203,6 +214,7 @@ Estado actual de cada parte de la visión:
 1. **Estrenar HOSPIAI con el lote real:** `git pull`, armar el índice de soportes (si no está: `py tools\hospiai_indexador.py indexar "Y:\" "Z:\SERVIDOR GLOSAS" "X:\SERVIDOR RADICACION\2. SINAC SC SAS - 2026"`), correr el motor (ya escribe el Expediente Digital solo) y ver `py tools\hospiai.py resumen` + el panel. Anotar aquí el nuevo porcentaje de listas y los primeros indicadores por responsable.
 2. **Estrenar el cerebro (Fase 2.2):** con la base poblada, probar `py tools\hospiai.py recomendar HUS528043` y `py tools\hospiai.py simular` — y correr `py tools\hospiai_conocimiento.py patrones`, `causas` y `curar` para las primeras lecciones validadas.
    Y el plan operativo (Fase 3): `py tools\hospiai.py plan HUS528043` y `py tools\hospiai.py oportunidades` — esta última dirá cuánta plata se libera con cada corrección masiva y cuántos soportes YA existen en los servidores.
+   Y el copiloto (Fase 4): `py tools\hospiai.py iniciar-dia` (el "buenos días" con las acciones y el objetivo del día) y `py tools\hospiai.py preguntar "¿Qué debo hacer hoy para liberar la mayor cantidad de dinero?"`. El panel ejecutivo ahora abre con el Hospital Operational Score y la "situación del día".
 3. **Programar la corrida diaria** con la línea de `schtasks` de la guía (`tools/README_hospiai.md`), para que el panel amanezca actualizado.
 4. **Regenerar el explorador y el tablero** con el reporte actualizado.
 5. **Revisar la lista de EPS no reconocidas** y agregarlas al catálogo, para bajar el grupo "entidad por resolver".

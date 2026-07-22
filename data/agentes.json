@@ -481,6 +481,125 @@
         "indicador": "Todos los de la tabla indicadores (es quien los compara semana a semana).",
         "medicion": "Delta de % LISTAS y de hallazgos por causa entre corridas, registrado cada viernes."
       }
+    },
+    {
+      "id": "AG029",
+      "nombre": "DailyOrchestrator",
+      "dominio": "COMANDO",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "INICIAR_DIA"
+      ],
+      "depende_de": [
+        "AG025",
+        "AG012"
+      ],
+      "implementacion": "sdk: hospiai_comando.AgenteDailyOrchestrator",
+      "requiere_sdk": "1.0",
+      "notas": "El copiloto de la mañana: cada día LLEGA con las decisiones (no espera preguntas) — acciones ordenadas por retorno, objetivo del día en pesos, tareas por funcionario, riesgo y cuello. Comando: hospiai.py iniciar-dia.",
+      "justificacion_operativa": {
+        "problema": "El día empieza sin foco: nadie sabe cuáles de miles de facturas atacar primero para mover caja.",
+        "dinero": "Ordena las acciones por valor liberable y fija el objetivo del día en pesos (suma exacta por reglas).",
+        "horas": "Elimina la priorización manual de cada mañana; el plan llega hecho.",
+        "indicador": "% LISTAS, valor recuperable y HOS.",
+        "medicion": "Objetivo del día propuesto vs. valor efectivamente liberado en la corrida siguiente."
+      }
+    },
+    {
+      "id": "AG030",
+      "nombre": "WorkloadBalancer",
+      "dominio": "COMANDO",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "BALANCEAR_CARGA"
+      ],
+      "depende_de": [
+        "AG012"
+      ],
+      "implementacion": "sdk: hospiai_comando.AgenteWorkloadBalancer",
+      "requiere_sdk": "1.0",
+      "notas": "No solo mide productividad: PROPONE mover expedientes del funcionario saturado al más libre. Cargas antes/después exactas; el efecto en throughput va etiquetado como estimación (depende de capacidad real).",
+      "justificacion_operativa": {
+        "problema": "El trabajo se reparte disparejo: uno se satura (138%) mientras otro está al 72%, y la caja se frena en el saturado.",
+        "dinero": "Destraba el valor detenido en el funcionario sobrecargado al repartirlo hacia capacidad ociosa.",
+        "horas": "Equilibra la carga para que el cuello humano deje de retrasar la radicación.",
+        "indicador": "Carga máxima vs. equilibrio (componente productividad del HOS).",
+        "medicion": "Dispersión de carga y % LISTAS por funcionario antes/después de redistribuir."
+      }
+    },
+    {
+      "id": "AG031",
+      "nombre": "EarlyWarning",
+      "dominio": "COMANDO",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "ALERTA_TEMPRANA"
+      ],
+      "depende_de": [
+        "AG016",
+        "AG019"
+      ],
+      "implementacion": "sdk: hospiai_comando.AgenteEarlyWarning",
+      "requiere_sdk": "1.0",
+      "notas": "Detecta riesgo de devolución ANTES de la glosa con señales verificables del Document Profile (firma ausente, calidad D/X, corrupto) + lecciones VALIDADAS por EPS. Nunca inventa probabilidad: la cita de la memoria o deja el riesgo cualitativo con su motivo.",
+      "justificacion_operativa": {
+        "problema": "Las devoluciones se descubren cuando la EPS ya glosó: tarde y con reproceso.",
+        "dinero": "Evita glosas y devoluciones al corregir la señal antes de radicar (cada devolución congela el valor de la factura).",
+        "horas": "Un reproceso por devolución cuesta el doble; prevenirlo lo ahorra.",
+        "indicador": "Devoluciones (componente del HOS) y % LISTAS efectivas.",
+        "medicion": "Tasa de devolución de las facturas alertadas vs. no alertadas, cuando el historial de glosas se cargue."
+      }
+    },
+    {
+      "id": "AG032",
+      "nombre": "KpiForecaster",
+      "dominio": "COMANDO",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "PROYECTAR_KPI"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_comando.AgenteKpiForecaster",
+      "requiere_sdk": "1.0",
+      "notas": "¿Cómo termina el mes si seguimos así? Proyección lineal al ritmo de las últimas corridas con el supuesto declarado. Con <2 corridas medibles lo dice; dinero/glosas/recaudo esperan historial (no se proyectan al aire).",
+      "justificacion_operativa": {
+        "problema": "La gerencia no sabe si el mes cerrará bien o mal hasta que ya pasó.",
+        "dinero": "Anticipa el % LISTAS de fin de mes para actuar a tiempo sobre la caja proyectada.",
+        "horas": "Reemplaza la proyección manual en hoja de cálculo.",
+        "indicador": "Proyección de % LISTAS y tendencia (mejora/estable/empeora).",
+        "medicion": "Proyección vs. cierre real de mes; el error de proyección afina el modelo."
+      }
+    },
+    {
+      "id": "AG033",
+      "nombre": "ExecutiveCopilot",
+      "dominio": "COMANDO",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "PREGUNTAR"
+      ],
+      "depende_de": [
+        "AG012",
+        "AG025",
+        "AG019"
+      ],
+      "implementacion": "sdk: hospiai_comando.AgenteExecutiveCopilot",
+      "requiere_sdk": "1.0",
+      "notas": "El copiloto ejecutivo: responde preguntas en lenguaje natural (dónde está detenido el dinero, qué EPS llamar, quién necesita apoyo, qué contrato renegociar, qué pasó esta semana) con evidencia, indicadores, confianza y recomendaciones. Nunca opiniones: todo sale de la evidencia, las reglas, la memoria y los indicadores. Comando: hospiai.py preguntar.",
+      "justificacion_operativa": {
+        "problema": "Cada consulta gerencial exige que alguien arme un reporte a mano; las decisiones se demoran.",
+        "dinero": "Dirige la atención al mayor valor detenido/recuperable en segundos, con la evidencia al lado.",
+        "horas": "Responde en el acto lo que antes tomaba horas de consolidación manual.",
+        "indicador": "HOS y todos los indicadores (los cita en cada respuesta).",
+        "medicion": "Tiempo de respuesta a una consulta ejecutiva antes/después; decisiones tomadas con evidencia."
+      }
     }
   ]
 }

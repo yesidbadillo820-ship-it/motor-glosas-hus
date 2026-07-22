@@ -26,6 +26,13 @@ y siempre con aprobación humana):
     GET /fichas[/{pagador}]        → ficha viva por pagador/contrato (AG026)
     GET /gemelo/{eps}              → gemelo digital de la EPS (AG027)
     GET /mejora                    → informe de mejora continua (AG028)
+    GET /hos                       → Hospital Operational Score (Fase 4)
+    GET /situacion                 → la situación del día (tablero de decisiones)
+    GET /iniciar-dia               → el 'buenos días' operativo (AG029)
+    GET /carga                     → balance de carga por funcionario (AG030)
+    GET /alertas                   → riesgos de devolución tempranos (AG031)
+    GET /proyeccion                → proyección de cierre de mes (AG032)
+    GET /preguntar?q=...           → copiloto ejecutivo en lenguaje natural (AG033)
 
 Uso local:
     py tools\\hospiai_api.py servir --puerto 8765
@@ -219,22 +226,71 @@ class Servicios:
 
         return mejora_semanal(self.db_path)
 
+    # ── Endpoints del Hospital Command Center (Fase 4) ─────────────────────
+
+    def hos(self) -> dict:
+        """Hospital Operational Score — el indicador que gobierna todo."""
+        from hospiai_comando import hospital_operational_score
+
+        return hospital_operational_score(self.db_path)
+
+    def situacion(self) -> dict:
+        """La situación del día: HOS + decisiones (lo primero que ve un director)."""
+        from hospiai_comando import situacion_del_dia
+
+        return situacion_del_dia(self.db_path)
+
+    def iniciar_dia(self) -> dict:
+        """El 'buenos días' operativo (AG029)."""
+        from hospiai_comando import iniciar_dia
+
+        return iniciar_dia(self.db_path)
+
+    def carga(self) -> dict:
+        """Balance de carga por funcionario con propuesta de redistribución (AG030)."""
+        from hospiai_comando import balancear_carga
+
+        return balancear_carga(self.db_path)
+
+    def alertas(self) -> dict:
+        """Riesgos de devolución detectados antes de la glosa (AG031)."""
+        from hospiai_comando import alertas_tempranas
+
+        return alertas_tempranas(self.db_path)
+
+    def proyeccion(self) -> dict:
+        """Proyección de cierre de mes al ritmo actual (AG032)."""
+        from hospiai_comando import proyectar_mes
+
+        return proyectar_mes(self.db_path)
+
+    def preguntar(self, q: str) -> dict:
+        """Copiloto ejecutivo en lenguaje natural (AG033)."""
+        from hospiai_comando import preguntar
+
+        return preguntar(self.db_path, q)
+
 
 class _Manejador(BaseHTTPRequestHandler):
     servicios: Servicios  # inyectado por servir()
 
     def do_GET(self):  # noqa: N802 (nombre exigido por http.server)
-        partes = [p for p in self.path.split("?", 1)[0].split("/") if p]
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(self.path)
+        partes = [p for p in parsed.path.split("/") if p]
+        consulta = parse_qs(parsed.query)
         try:
-            cuerpo = self._enrutar(partes)
+            cuerpo = self._enrutar(partes, consulta)
         except Exception as e:
             return self._json({"error": str(e)}, 500)
         if cuerpo is None:
             return self._json({"error": "no encontrado"}, 404)
         return self._json(cuerpo, 200)
 
-    def _enrutar(self, partes: list[str]):
+    def _enrutar(self, partes: list[str], consulta: dict | None = None):
         s = self.servicios
+        consulta = consulta or {}
         if partes == ["salud"]:
             return s.salud()
         if partes == ["agentes"]:
@@ -261,6 +317,21 @@ class _Manejador(BaseHTTPRequestHandler):
             return s.fichas()
         if partes == ["mejora"]:
             return s.mejora()
+        if partes == ["hos"]:
+            return s.hos()
+        if partes == ["situacion"]:
+            return s.situacion()
+        if partes == ["iniciar-dia"]:
+            return s.iniciar_dia()
+        if partes == ["carga"]:
+            return s.carga()
+        if partes == ["alertas"]:
+            return s.alertas()
+        if partes == ["proyeccion"]:
+            return s.proyeccion()
+        if partes == ["preguntar"]:
+            q = (consulta.get("q") or [""])[0]
+            return s.preguntar(q) if q else {"error": "falta el parámetro ?q=<pregunta>"}
         if len(partes) == 2:
             recurso, clave = partes
             if recurso == "expedientes":
