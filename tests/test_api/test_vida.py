@@ -134,3 +134,48 @@ class TestConfianza:
         gid = db_session.query(GlosaRecord).first().id
         d = client.get(f"/vida/confianza/{gid}").json()
         assert d["nivel"] == "baja"
+
+
+class TestOcrImagen:
+    def test_sin_gemini_key_503(self, client, monkeypatch):
+        from app.core.config import get_settings
+
+        monkeypatch.setenv("GEMINI_API_KEY", "")
+        get_settings.cache_clear()
+        r = client.post(
+            "/vida/ocr-imagen",
+            files={"archivo": ("glosa.png", b"\x89PNG\r\n", "image/png")},
+        )
+        get_settings.cache_clear()
+        assert r.status_code == 503
+
+    def test_tipo_invalido_400(self, client):
+        r = client.post(
+            "/vida/ocr-imagen",
+            files={"archivo": ("glosa.pdf", b"%PDF", "application/pdf")},
+        )
+        assert r.status_code == 400
+
+    def test_ocr_ok_mockeando_gemini(self, client, monkeypatch):
+        from app.core.config import get_settings
+
+        monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+        get_settings.cache_clear()
+
+        class _FakeGemini:
+            def __init__(self, *a, **k):
+                pass
+
+            async def completar(self, *a, **k):
+                return ("TA0801 CONSULTA URGENCIAS VALOR OBJETADO $149.000", "gemini-fake")
+
+        import app.services.gemini_service as gs
+
+        monkeypatch.setattr(gs, "GeminiService", _FakeGemini)
+        r = client.post(
+            "/vida/ocr-imagen",
+            files={"archivo": ("glosa.png", b"\x89PNG\r\nfakeimg", "image/png")},
+        )
+        get_settings.cache_clear()
+        assert r.status_code == 200
+        assert "TA0801" in r.json()["texto"]

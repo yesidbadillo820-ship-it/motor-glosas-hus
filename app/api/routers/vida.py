@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual
@@ -172,3 +172,62 @@ def confianza(
     return confianza_dictamen.analizar_confianza(
         g.dictamen, numero_contrato=numero_contrato, score=g.score
     )
+
+
+_TIPOS_IMG_OK = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic", "image/heif"}
+_MAX_IMG_BYTES = 7 * 1024 * 1024  # límite de Gemini por imagen
+
+_PROMPT_OCR = (
+    "Sos un asistente de auditoría de glosas de un hospital. La imagen es una "
+    "GLOSA (objeción de una EPS a una factura). Transcribí TEXTUALMENTE su "
+    "contenido: código de glosa, descripción/servicio, valores y justificación. "
+    "Devolvé SOLO el texto transcrito, sin comentarios ni interpretaciones. Si "
+    "algo es ilegible, escribí [ilegible]."
+)
+
+
+@router.post("/ocr-imagen")
+async def ocr_imagen(
+    archivo: UploadFile = File(...),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Foto → texto: transcribe la glosa de una imagen (Gemini visión).
+
+    Aditivo: alimenta el textarea de la glosa; no genera dictamen ni toca
+    nada del pipeline. Requiere GEMINI_API_KEY (si no, 503 claro).
+    """
+    mime = (archivo.content_type or "").lower()
+    if mime not in _TIPOS_IMG_OK:
+        raise HTTPException(
+            400, f"Tipo no soportado: {mime or 'desconocido'}. Usá PNG/JPG/WEBP/HEIC."
+        )
+    if archivo.size is not None and archivo.size > _MAX_IMG_BYTES:
+        raise HTTPException(400, "La imagen supera 7 MB.")
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(400, "Imagen vacía.")
+    if len(contenido) > _MAX_IMG_BYTES:
+        raise HTTPException(400, "La imagen supera 7 MB.")
+
+    from app.core.config import get_settings
+
+    cfg = get_settings()
+    if not (cfg.gemini_api_key or "").strip():
+        raise HTTPException(
+            503, "OCR de imagen no disponible (falta GEMINI_API_KEY en el servidor)."
+        )
+
+    from app.services.gemini_service import GeminiService
+
+    gem = GeminiService(api_key=cfg.gemini_api_key, default_model=cfg.gemini_model, timeout=120.0)
+    try:
+        texto, _modelo = await gem.completar(
+            system=_PROMPT_OCR,
+            user="Transcribí el texto de la glosa de la imagen adjunta.",
+            imagenes_raw=[(archivo.filename or "glosa.png", contenido)],
+            max_tokens=2000,
+        )
+    except Exception as e:
+        raise HTTPException(502, f"No se pudo leer la imagen: {str(e)[:200]}")
+
+    return {"texto": (texto or "").strip()}

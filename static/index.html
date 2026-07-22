@@ -2191,6 +2191,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
                   Voz
                 </button>
+                <button type="button" class="pa-tbtn" onclick="fotoGlosaOCR()" title="Sacá una foto de la glosa (o subí una imagen) y la app transcribe el texto">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Foto
+                </button>
+                <input type="file" id="f-foto-glosa" accept="image/*" capture="environment" style="display:none" onchange="_procesarFotoGlosa(this)"/>
                 <button type="button" class="pa-tbtn" onclick="paLimpiarFormulario()" title="Limpiar todos los campos del formulario">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                   Limpiar
@@ -6524,6 +6529,54 @@ function iniciarNarracion(traceId){
   } catch(e){ return { cerrar: function(){} }; }
 }
 
+// Capa de Vida (ronda 32) etapa 5: FOTO → glosa. Saca/sube una imagen de la
+// glosa y la transcribe (Gemini visión, endpoint /vida/ocr-imagen).
+function fotoGlosaOCR(){
+  try { var inp = document.getElementById('f-foto-glosa'); if(inp) inp.click(); } catch(e){}
+}
+async function _procesarFotoGlosa(input){
+  try {
+    var file = input.files && input.files[0];
+    if(!file) return;
+    input.value = '';
+    if(typeof toast==='function') toast('📷 Leyendo la foto…','Transcribiendo el texto de la glosa','info');
+    var fd = new FormData(); fd.append('archivo', file);
+    var r = await fetch('/vida/ocr-imagen', {method:'POST', headers: authH(), body: fd});
+    if(!r.ok){
+      var er = await r.json().catch(function(){return{};});
+      if(typeof toast==='function') toast('No pude leer la foto', (er && er.detail)||'Probá con otra imagen o pegá el texto','error');
+      return;
+    }
+    var d = await r.json();
+    var ta = document.getElementById('f-glosa');
+    if(ta && d.texto){
+      ta.value = (ta.value ? ta.value + '\n' : '') + d.texto;
+      if(typeof detectarEpsEnGlosa==='function') detectarEpsEnGlosa();
+      if(typeof paPreviewLiveDebounced==='function') paPreviewLiveDebounced();
+      if(typeof toast==='function') toast('✓ Foto transcrita','Revisá el texto antes de analizar','success');
+    }
+  } catch(e){
+    if(typeof toast==='function') toast('Error','No se pudo procesar la imagen','error');
+  }
+}
+
+// Capa de Vida (ronda 32) etapa 5: ESCUCHAR el dictamen en voz alta.
+function escucharDictamen(bodyId, btn){
+  try {
+    if(!('speechSynthesis' in window)){ if(typeof toast==='function') toast('No disponible','Tu navegador no soporta lectura por voz','warning'); return; }
+    if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); if(btn) btn.textContent='🔊 Escuchar'; return; }
+    var body = document.getElementById(bodyId);
+    if(!body) return;
+    var texto = (body.innerText || body.textContent || '').trim();
+    if(!texto) return;
+    var u = new SpeechSynthesisUtterance(texto.slice(0, 6000));
+    u.lang = 'es-CO'; u.rate = 1.02;
+    u.onend = function(){ if(btn) btn.textContent='🔊 Escuchar'; };
+    if(btn) btn.textContent='⏹ Detener';
+    window.speechSynthesis.speak(u);
+  } catch(e){}
+}
+
 // Capa de Vida (ronda 32): chat conversacional con el dictamen. Usa el
 // endpoint /chat-glosa/{id}/mensaje (ya existía en el backend, sin UI):
 // responde preguntas ("¿por qué ese código?") y aplica ajustes ("hacelo
@@ -9916,6 +9969,7 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
         out += '      </label>';
         out += '      <button type="button" onclick="aplicarRefinarLote('+r.glosa_id+','+j+')" style="padding:.5rem .9rem;background:var(--c-teal2);color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">✨ Refinar</button>';
         out += '      <button type="button" onclick="toggleChatGlosa('+r.glosa_id+',this)" style="padding:.5rem .9rem;background:#0f172a;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">💬 Conversar</button>';
+        out += '      <button type="button" onclick="escucharDictamen(\'lote-body-'+j+'\',this)" style="padding:.5rem .9rem;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">🔊 Escuchar</button>';
         out += '      <div id="lote-refinar-status-'+j+'" style="font-size:.72rem;color:var(--text3);min-height:1em;"></div>';
         out += '    </div>';
         out += '  </div>';
