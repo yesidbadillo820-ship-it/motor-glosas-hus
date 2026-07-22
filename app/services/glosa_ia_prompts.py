@@ -1307,6 +1307,25 @@ SYSTEM_MAP = {
     "ME": SYSTEM_ME,
 }
 
+# Ronda 32 (22-jul-2026): regla estratégica ARL COMPARTIDA. Antes solo el
+# bloque "ARL" genérico la traía; POSITIVA y AURORA tenían bloques débiles de
+# 3 líneas y en el caso de prueba 2 del 22-jul (AURORA) el dictamen ni citó
+# el Decreto-Ley 1295/1994 ni corrigió a la ARL que encuadró la glosa en
+# "Ley 100 régimen contributivo". Ahora las tres entradas ARL la incluyen.
+_REGLA_ARL_ESTRATEGICA = (
+    "REGLA ESTRATÉGICA: la ARL que recibe FURAT debe garantizar el pago del 100% al"
+    " prestador. Si la ARL alega 'concausa común' (Art. 2356 CC) para prorratear con"
+    " la EPS, esa controversia ENTRE PAGADORES no le es oponible a la IPS: la"
+    " discusión de origen se tramita ante la Junta de Calificación de Invalidez"
+    " (Decreto 1352/2013) sin trasladar la carga al prestador. NO citar Ley 100,"
+    " Ley 1438 ni Art. 168 Ley 100 COMO FUNDAMENTO DEL RÉGIMEN aplicable en glosas"
+    " ARL — el marco sustantivo del SGRL es el Decreto-Ley 1295/1994 con la Ley"
+    " 1562/2012 y la Ley 776/2002 (los plazos del trámite de glosas sí pueden"
+    " citarse, aplican a toda entidad responsable del pago). Si la glosa invoca"
+    " 'Ley 100' o 'régimen contributivo', el dictamen DEBE señalar expresamente el"
+    " error de encuadre y reconducir la defensa al régimen de riesgos laborales."
+)
+
 # Bloques de normativa especial por tipo de pagador
 REGIMEN_ESPECIAL = {
     "PPL": (
@@ -1342,15 +1361,17 @@ REGIMEN_ESPECIAL = {
     ),
     "POSITIVA": (
         "RÉGIMEN ESPECIAL — RIESGOS LABORALES (ARL)\n"
-        "- Decreto 1295/1994: Sistema General de Riesgos Profesionales.\n"
+        "- Decreto-Ley 1295/1994: Sistema General de Riesgos Profesionales.\n"
         "- Decreto 1072/2015: Decreto Único Reglamentario Sector Trabajo, Libro 2 Parte 2 Título 4.\n"
         "- Ley 1562/2012: Modifica el Sistema de Riesgos Laborales.\n"
-        "- Las atenciones por accidente de trabajo o enfermedad laboral NO se rigen por el PBS."
+        "- Las atenciones por accidente de trabajo o enfermedad laboral NO se rigen por el PBS.\n"
+        + _REGLA_ARL_ESTRATEGICA
     ),
     "AURORA": (
         "RÉGIMEN ESPECIAL — RIESGOS LABORALES (ARL)\n"
-        "- Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012.\n"
-        "- Cobertura accidente de trabajo y enfermedad laboral, NO PBS regular."
+        "- Decreto-Ley 1295/1994 + Decreto 1072/2015 + Ley 1562/2012.\n"
+        "- Cobertura accidente de trabajo y enfermedad laboral, NO PBS regular.\n"
+        + _REGLA_ARL_ESTRATEGICA
     ),
     # Ronda 13 (24-jun-2026, Bug H): cualquier ARL no listada arriba —
     # Bolívar, Liberty, Suramericana, Colpatria, La Equidad, Mapfre, etc.
@@ -1364,15 +1385,13 @@ REGIMEN_ESPECIAL = {
         "- Decreto 1072/2015 Libro 2 Parte 2 Título 4: Reglamento riesgos laborales.\n"
         "- Decreto 780/2016: Decreto Único Reglamentario Sector Salud (FURAT).\n"
         "- Ley 776/2002: Prestaciones por accidente de trabajo / enfermedad laboral.\n"
-        "REGLA ESTRATÉGICA: la ARL que recibe FURAT debe garantizar el 100% del pago al"
-        " prestador. Si la ARL alega 'concausa común' (Art. 2356 CC) para prorratear con"
-        " EPS, esa figura del Código Civil NO le es oponible a la IPS — debe pagar el"
-        " 100% y luego subrogarse contra la EPS vía Junta de Calificación de Invalidez"
-        " (Ley 776/2002 Art. 18). NO citar Ley 100, Ley 1438 ni Art. 168 Ley 100 para"
-        " glosas ARL — esos artículos son del régimen de aseguradoras de salud, no de"
-        " riesgos laborales."
+        + _REGLA_ARL_ESTRATEGICA
     ),
 }
+
+# Claves de REGIMEN_ESPECIAL que corresponden a riesgos laborales — para la
+# corrección de encuadre de la ronda 32 (ver _detectar_regimen_especial).
+_KEYS_REGIMEN_ARL = {"POSITIVA", "AURORA", "ARL"}
 
 # Marcadores para detectar entidades ARL/Riesgos Laborales (caso real
 # 23-jun-2026: "La ARL Bolívar glosa el 100% de la factura..."). Cubre las
@@ -1404,6 +1423,19 @@ _RE_ARL_O_LABORAL = re.compile(
     r"ACCIDENTE\s+DE\s+TRABAJO|ENFERMEDAD\s+LABORAL|"
     r"\bFURAT\b|JUNTA\s+DE\s+CALIFICACI[ÓO]N|"
     r"DECRETO\s*1295|LEY\s*1562|ORIGEN\s+LABORAL",
+    re.IGNORECASE,
+)
+
+# Ronda 32 (22-jul-2026): la glosa ARL viene a veces encuadrada por la
+# aseguradora en el régimen EQUIVOCADO ("conforme a la Ley 100, régimen
+# contributivo…" — caso de prueba 2, AURORA). Si detectamos ese encuadre en
+# una glosa de riesgos laborales, el dictamen debe CORREGIRLO expresamente.
+# SOLO menciones EXPRESAS: la revisión adversarial del 22-jul mostró que
+# PBS/POS/"plan de beneficios" sobre-disparaban (una glosa que dice "curación
+# pos-quirúrgica" o "no incluido en el PBS" NO está invocando la Ley 100, y
+# el dictamen terminaba imputándole a la ARL un encuadre que nunca hizo).
+_RE_LEY100_EN_GLOSA = re.compile(
+    r"LEY\s*100\b|R[EÉ]GIMEN\s+CONTRIBUTIVO|R[EÉ]GIMEN\s+SUBSIDIADO",
     re.IGNORECASE,
 )
 
@@ -1595,16 +1627,37 @@ def _detectar_regimen_especial(
     laborales — aunque la EPS del dropdown no esté listada — se inyecta el
     bloque ARL genérico. Esto evita que la IA defienda con Ley 100/Ley 1438
     una glosa que claramente es del régimen de riesgos laborales.
+
+    Ronda 32 (22-jul-2026): si la glosa ARL viene encuadrada en "Ley 100 /
+    régimen contributivo" (caso AURORA de las pruebas), se agrega la orden
+    de CORREGIR el régimen en el dictamen. Solo entra por el user-prompt
+    (que pasa texto_glosa) — el system prompt sigue estable para el cache.
     """
     eps_up = (eps or "").upper()
     tipo_up = (contrato_tipo or "").upper()
+    bloque_elegido, es_arl = "", False
     for key, bloque in REGIMEN_ESPECIAL.items():
         if key in eps_up or key in tipo_up:
-            return bloque
+            bloque_elegido = bloque
+            es_arl = key in _KEYS_REGIMEN_ARL
+            break
     # Fallback: detección por texto para ARL no listadas
-    if texto_glosa and _es_pagador_arl(eps, texto_glosa):
-        return REGIMEN_ESPECIAL["ARL"]
-    return ""
+    if not bloque_elegido and texto_glosa and _es_pagador_arl(eps, texto_glosa):
+        bloque_elegido, es_arl = REGIMEN_ESPECIAL["ARL"], True
+    if not bloque_elegido:
+        return ""
+    if es_arl and texto_glosa and _RE_LEY100_EN_GLOSA.search(texto_glosa):
+        bloque_elegido += (
+            "\n⚠ CORRECCIÓN DE RÉGIMEN OBLIGATORIA: el texto de la glosa "
+            "invoca Ley 100 / régimen contributivo, pero esta atención es de "
+            "RIESGOS LABORALES (origen laboral). El dictamen DEBE señalar "
+            "expresamente ese error de encuadre — el marco sustantivo es el "
+            "Decreto-Ley 1295/1994, la Ley 1562/2012 y la Ley 776/2002 — y "
+            "reconducir la defensa a ese régimen, SIN abandonar la defensa "
+            "de fondo (pertinencia, tarifas, soportes): el error de encuadre "
+            "REFUERZA la respuesta, no la reemplaza."
+        )
+    return bloque_elegido
 
 
 def get_system_prompt(prefijo: str, eps: str) -> str:
@@ -2206,6 +2259,15 @@ def build_user_prompt(
             "CUPS — omite la referencia al CUPS si no está en los datos. NUNCA uses "
             "fechas, números de factura ni radicados como CUPS."
         )
+        # Ronda 32 (22-jul-2026): en los 4 casos de prueba la IA rellenó el
+        # CUPS con el número de factura. Nombrar el número concreto prohibido
+        # es más efectivo que la regla genérica (y la red final
+        # _neutralizar_cups_igual_factura queda de malla de seguridad).
+        if numero_factura:
+            _nota_cups += (
+                f"\n  ⚠ El número {numero_factura} es el NÚMERO DE FACTURA, "
+                "no un código CUPS — nunca lo presentes como CUPS."
+            )
 
     paciente = datos.get("paciente", "NO IDENTIFICADO")
     medico = datos.get("medico", "NO IDENTIFICADO")

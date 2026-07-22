@@ -109,6 +109,44 @@
     440 = SOAT −20 %. **Pendiente:** confirmar acta de inicio del 287 y el mapeo
     de códigos internos de cartera (U22031/C26001…), y correr el asistente en
     piloto sobre 1–2 facturas reales contra `Y:\`.
+  - **Chat del motor (auditoría del código):** se cerraron dos frentes grandes:
+    la **ronda 31 de revisión** (7 errores corregidos y limpieza en lotes,
+    validador FURIPS, agente e informe de baja de cartera — PR #180) y la
+    **"Capa de Vida"** (PR #182): el motor ahora saluda al gestor, celebra las
+    glosas ganadas, narra el análisis en vivo, permite conversar con la IA
+    sobre cada dictamen, muestra un semáforo de confianza (en qué se apoyó la
+    respuesta), lee glosas desde una foto y puede leer el dictamen en voz alta.
+  - **Prueba de fuego del motor:** se corrieron 4 casos difíciles inventados a
+    propósito (EPS equivocada en el formulario, ARL con régimen mal citado,
+    glosa extemporánea con fechas solo en el texto, descuentos apilados
+    improcedentes). La IA acertó el fondo en los 4 (corrigió la EPS 2 veces y
+    rechazó las 2 trampas de descuento), pero se detectaron 5 fallas
+    repetidas. De ahí salió la **ronda 32 de correcciones** (este mismo día):
+    1. **El número de factura ya no se puede colar como código CUPS** en el
+       dictamen (pasaba en los 4 casos) — red determinística nueva.
+    2. **Las glosas de $10 millones o más ahora van al modelo potente
+       (Claude)** aunque vengan sin PDF (antes solo desde $50M; los casos de
+       $16.8M y $18.6M habían salido por el modelo económico).
+    3. **Si una ARL encuadra la glosa en "Ley 100 / régimen contributivo", el
+       dictamen ahora corrige el régimen** y cita el Decreto-Ley 1295/1994
+       (riesgos laborales) — antes AURORA/POSITIVA tenían la instrucción débil.
+    4. **Si el formulario viene sin fechas pero el texto de la glosa las trae**
+       (fecha de factura y fecha de radicación de la glosa), el motor las lee,
+       calcula los días hábiles y — si superan los 20 de ley — agrega la
+       defensa por extemporaneidad como sección adicional marcada
+       "verificar fechas antes de radicar" (no reemplaza la defensa de fondo,
+       porque las fechas son inferidas y la redacción queda condicional:
+       "de confirmarse las fechas…").
+  - Antes de subir la ronda 32 se le pasó una **revisión adversarial** (panel
+    de 25 agentes de IA tratando de romper los cambios): confirmó 18 detalles
+    y se corrigieron todos. Los más importantes: una cita legal mal atribuida
+    que venía de antes (el Art. 18 de la Ley 776/2002 es de *prescripción*,
+    no de subrogación — se reemplazó por el Decreto 1352/2013, Juntas de
+    Calificación); dos formas en que el lector de fechas podía "inventar" una
+    extemporaneidad con fechas de otra cláusula (se blindaron los patrones);
+    y que la palabra "pos-quirúrgica" disparaba por error la corrección de
+    régimen ARL (ahora solo dispara con mención expresa de "Ley 100" o
+    "régimen contributivo/subsidiado").
 
 ### Los números de la operación SIMED (respuesta de glosas Dispensario)
 | Lote | Facturas | Objeciones | Valor defendido | Estado |
@@ -147,6 +185,17 @@
    defendido" del lote 9-jul (sale de `reporte_glosa.csv`).
 7. **Notas crédito Lote V2:** siguen 6 facturas con CUV inválido (diagnóstico
    del 25 de junio) — decidir si se reprocesan o se radican por otra vía.
+8. **Desplegar la ronda 32 en el servidor** (VM de Google): en la VM,
+   `cd /opt/motor-glosas && git pull && docker compose stop motor &&
+   docker compose build motor && docker compose up -d`. Después, volver a
+   correr los 4 casos de prueba y comparar contra los dictámenes del 22-jul.
+9. **Rotar la clave de Gemini** (quedó expuesta en el historial del repo y
+   ahora también la usa la función foto→texto): crear clave nueva en Google
+   AI Studio, actualizar el `.env` de la VM y borrar la vieja.
+10. **Fallas de las pruebas aún sin corregir** (candidatas a ronda 33):
+    detectar "glosa RATIFICADA" desde el texto cuando el desplegable quedó en
+    "Inicial" (caso 4), y el texto truncado/con comillas colgantes del caso 1
+    (revisar límite de tokens de salida del modelo económico).
 
 ---
 
@@ -160,6 +209,10 @@
    y conseguir el consecutivo GI-33 del lote 17 para su PDF.
 4. Cuando llegue el próximo Excel de glosas del Dispensario, generarlo con el
    motor de plantillas ya verificado (mismo flujo de los lotes anteriores).
+5. Desplegar la **ronda 32** en la VM (comandos en PENDIENTE #8) y repetir los
+   4 casos de prueba para confirmar que: el CUPS ya no sale con el número de
+   factura, los casos de >$10M van a Claude, la ARL cita el Decreto-Ley
+   1295/1994 y la extemporánea del caso 3 sale marcada.
 
 ---
 
