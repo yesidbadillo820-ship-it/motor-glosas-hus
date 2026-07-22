@@ -109,6 +109,19 @@ def registro_con_implementaciones(ruta=None) -> RegistroAgentes:
     reg.registrar_clase(AgenteDocumentCurator)
     reg.registrar_clase(AgenteStorageOptimizer)
     reg.registrar_clase(AgenteIngesta)
+    from hospiai_conocimiento import (
+        AgenteKnowledgeCurator,
+        AgentePatternDiscovery,
+        AgenteProcessMiner,
+        AgenteRecommendation,
+        AgenteRootCause,
+    )
+
+    reg.registrar_clase(AgenteKnowledgeCurator)
+    reg.registrar_clase(AgentePatternDiscovery)
+    reg.registrar_clase(AgenteRecommendation)
+    reg.registrar_clase(AgenteRootCause)
+    reg.registrar_clase(AgenteProcessMiner)
     return reg
 
 

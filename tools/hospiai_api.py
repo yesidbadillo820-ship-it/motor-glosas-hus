@@ -17,6 +17,9 @@ y siempre con aprobación humana):
     GET /decisiones/{factura}      → Decision Records de la factura
     GET /evidencias/{factura}      → cadena hallazgo→regla→norma→evidencia
     GET /ontologia/{codigo}        → explicación semántica del código
+    GET /recomendaciones/{factura} → acciones con base y casos (Knowledge Engine)
+    GET /simulaciones[/{codigo}]   → motor de hipótesis: ¿qué pasaría si…?
+    GET /conocimiento              → memoria institucional VALIDADA (AG019)
 
 Uso local:
     py tools\\hospiai_api.py servir --puerto 8765
@@ -145,6 +148,33 @@ class Servicios:
             " CASE prioridad WHEN 'ALTA' THEN 0 ELSE 1 END, id DESC LIMIT 50"
         )
 
+    # ── Endpoints del Knowledge Engine (Fase 2.2) ──────────────────────────
+
+    def recomendaciones(self, factura: str) -> dict:
+        """Acciones recomendadas para la factura (AG021: reglas vigentes +
+        memoria VALIDADA; cada probabilidad declara su base)."""
+        from hospiai_conocimiento import recomendar_expediente
+
+        return recomendar_expediente(self.db_path, factura)
+
+    def simulaciones(self, codigo: str | None = None) -> dict:
+        """Motor de hipótesis: escenarios EXACTOS por reglas; las estimaciones
+        de comportamiento van etiquetadas como tales."""
+        from hospiai_conocimiento import simular
+
+        return simular(self.db_path, codigo=codigo)
+
+    def conocimiento(self) -> list[dict]:
+        """La memoria institucional SERVIBLE: solo conocimiento VALIDADO por
+        el Knowledge Curator (regla de arquitectura de la Fase 2.2)."""
+        from hospiai_conocimiento import MemoriaInstitucional
+
+        campos = ("codigo", "tipo", "enunciado", "confianza", "ocurrencias", "exitos", "version")
+        return [
+            {k: f[k] for k in campos}
+            for f in MemoriaInstitucional(self.db_path).consultar(solo_validado=True)[:30]
+        ]
+
 
 class _Manejador(BaseHTTPRequestHandler):
     servicios: Servicios  # inyectado por servir()
@@ -175,6 +205,10 @@ class _Manejador(BaseHTTPRequestHandler):
             return s.caja()
         if partes == ["tareas"]:
             return s.tareas()
+        if partes == ["simulaciones"]:
+            return s.simulaciones()
+        if partes == ["conocimiento"]:
+            return s.conocimiento()
         if len(partes) == 2:
             recurso, clave = partes
             if recurso == "expedientes":
@@ -185,6 +219,10 @@ class _Manejador(BaseHTTPRequestHandler):
                 return {"factura": clave, "evidencias": s.evidencias(clave)}
             if recurso == "ontologia":
                 return s.ontologia(clave)
+            if recurso == "recomendaciones":
+                return s.recomendaciones(clave)
+            if recurso == "simulaciones":
+                return s.simulaciones(clave)
         return None
 
     def _json(self, cuerpo, codigo: int) -> None:

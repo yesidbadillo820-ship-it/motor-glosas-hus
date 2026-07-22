@@ -153,6 +153,23 @@ CREATE TABLE IF NOT EXISTS pagos(
   fuente TEXT DEFAULT '',
   detalle TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS conocimiento(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo TEXT UNIQUE,
+  clave TEXT UNIQUE NOT NULL,
+  tipo TEXT NOT NULL,
+  enunciado TEXT NOT NULL,
+  contexto TEXT DEFAULT '{}',
+  evidencia TEXT DEFAULT '',
+  ocurrencias INTEGER DEFAULT 0,
+  exitos INTEGER DEFAULT 0,
+  confianza REAL DEFAULT 0,
+  vigente_desde TEXT DEFAULT '',
+  version INTEGER DEFAULT 1,
+  estado TEXT DEFAULT 'CANDIDATO',
+  fuente_agente TEXT DEFAULT '',
+  actualizado TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS decisiones(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   codigo TEXT UNIQUE,

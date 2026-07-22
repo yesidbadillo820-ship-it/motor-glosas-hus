@@ -1,0 +1,35 @@
+{
+  "_comentario": "HOSPIAI — Mapa curado de causa raíz por código de hallazgo (Fase 2.2 · AG022). Lo mantiene el área de Cuentas Médicas y Cartera: cuando un hallazgo se CONCENTRA (>=60%) en un lote/responsable/entidad, el RootCauseEngine explica el porqué con la entrada de este archivo. Si un código no está aquí, el sistema dice 'por determinar' — NUNCA inventa. Estas entradas iniciales son hipótesis del área para curar/ajustar; editarlas no requiere tocar código.",
+  "HEV": {
+    "causa": "La hoja de evidencia no se genera o no se escanea al egreso del paciente",
+    "area": "Facturación / Archivo clínico"
+  },
+  "EPI": {
+    "causa": "La epicrisis no queda adjunta al expediente al cierre de la historia clínica",
+    "area": "Historias Clínicas"
+  },
+  "HAU": {
+    "causa": "La hoja de atención de urgencias no se anexa al armar el paquete",
+    "area": "Urgencias / Archivo clínico"
+  },
+  "FEV": {
+    "causa": "La factura electrónica no se exporta a la carpeta del lote",
+    "area": "Facturación"
+  },
+  "RIP": {
+    "causa": "Los RIPS no se generan o no se copian junto a la factura",
+    "area": "Facturación / Sistemas"
+  },
+  "CUV": {
+    "causa": "La validación ADRES (CUV) está pendiente o no se descargó",
+    "area": "Radicación"
+  },
+  "ENTIDAD_NO_RESUELTA": {
+    "causa": "Carpeta fuera de la estructura por EPS, o entidad nueva sin ficha en el catálogo",
+    "area": "Coordinación de Cartera"
+  },
+  "SIN_TIPIFICAR": {
+    "causa": "Archivos escaneados sin renombrar con el código del soporte",
+    "area": "Radicación (digitalización)"
+  }
+}

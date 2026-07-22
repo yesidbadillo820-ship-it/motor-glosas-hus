@@ -124,6 +124,17 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **AG017 Storage Optimizer** (`almacenamiento`): GB por servidor, duplicados recuperables, ausentes, candidatos a archivar (>2 años). Solo informa: mover/borrar es decisión humana.
   - **AG018 Ingesta Inteligente** (`ingesta`): incremental + perfilado inmediato de lo nuevo + evento DOCUMENTO_NUEVO en el Expediente — sin esperar la corrida nocturna.
   - **Criterio de aceptación cumplido**: `py tools\hospiai_documento.py perfil HUS528043` responde el objeto documental completo (clase, calidad, confianza, hash, páginas, texto, firma, duplicado, timeline, expediente). **187 pruebas automáticas** en verde. 18 agentes registrados.
+- **FASE 2.2 — ENTERPRISE KNOWLEDGE ENGINE (el cerebro):** el DIS quedó aprobado como Base Documental (ningún agente lee PDFs: solo el Document Profile) y la plataforma pasó de procesar a **aprender, explicar y recomendar** — siempre con evidencia:
+  - **Memoria Institucional** (tabla `conocimiento`): todo lo que el sistema aprende entra como **CANDIDATO** con su evidencia (qué expediente, qué corrida, cuántas veces, desde cuándo). **Regla de arquitectura obligatoria:** ningún agente aprende por su cuenta ni crea reglas; sin pasar por el Curador, ningún conocimiento se usa. Hay una prueba automática que lo garantiza.
+  - **AG019 Curador de Conocimiento** (`py tools\hospiai_conocimiento.py curar`): consolida la memoria — deduplica, recalcula la confianza con estadística honesta (con 1 caso NO se reporta 100%; se usa suavizado de Laplace), **promueve a VALIDADO** solo con muestra suficiente (3+ casos, 60%+ confianza y evidencia) y **retira** lo que pierde sustento. Cada cambio de estado queda versionado.
+  - **AG020 Descubridor de Patrones** (`patrones`): recorre la base y encuentra patrones por EPS, responsable y mes ("en COOSALUD el faltante más frecuente es HEV") y los PROPONE a la memoria — no crea reglas.
+  - **AG021 Recomendador** — criterio de aceptación cumplido: `py tools\hospiai.py recomendar HUS528043` responde las acciones con su base declarada: **POR REGLA VIGENTE** (es lo único que falta: al conseguirlo queda LISTA — cita la regla) o **historia validada** (probabilidad calculada de casos reales, citando cuántos). Las probabilidades jamás se inventan.
+  - **AG022 Causa Raíz** (`causas`): cuando un hallazgo se concentra (60%+) en un lote/responsable/entidad lo dice con números, y explica el porqué con el **mapa curado por el área** (`data/causas_raiz.json`, editable sin programar); si no hay entrada, dice "por determinar" — no inventa.
+  - **AG023 Minero de Proceso** (`flujo`): reconstruye el flujo real con los eventos del Expediente y mide en horas dónde se pierde el tiempo (cuello de botella).
+  - **Motor de Hipótesis** — criterio de aceptación cumplido: `py tools\hospiai.py simular` responde "¿qué pasaría si corrijo HEV en todo?" → facturas y pesos que se liberan, con base declarada: **EXACTO por reglas** (se libera lo que solo espera ese soporte) o **ESTIMACIÓN etiquetada con su supuesto** (redistribución entre funcionarios). `--codigo HEV` simula una sola causa.
+  - **AG015 conectado a la memoria:** cada lección entre corridas ("se resolvió HEV → pasó a LISTA") entra a la Memoria como candidata, en versión general y por EPS — así las recomendaciones ganan base histórica con cada corrida.
+  - **API y Panel Gerencial 2.0:** endpoints `/recomendaciones/{factura}`, `/simulaciones`, `/conocimiento`; el Panel Ejecutivo suma la sección "¿Qué pasaría si…?" (decisiones con valor liberado) y "Lo que el hospital ya aprendió" (solo memoria VALIDADA) — siempre desde la API.
+  - **211 pruebas automáticas** en verde. **23 agentes registrados** (AG001–AG023). ⚠ La memoria arranca vacía: se llena con las corridas reales — por eso los porcentajes tipo "94%" aparecerán cuando haya historia acumulada, no antes.
 
 ---
 
@@ -168,7 +179,9 @@ Estado actual de cada parte de la visión:
 - [x] ~~HOSPIAI Fase 1 — Fundación~~ **HECHA (22 de julio):** Expediente Digital, reglas declarativas, responsable+lote, consola/panel, corrida diaria y guía.
 - [ ] **Estrenar la Fase 1 con datos reales:** correr el motor sobre el lote real (con el índice de soportes) para poblar `data/hospiai.db` por primera vez, y **programar la corrida diaria** en el equipo del área (una línea de `schtasks`; está en `tools/README_hospiai.md`).
 - [ ] **Mostrar responsable y lote también en el explorador** (la herramienta del buscador vive en otra rama; el reporte ya trae las columnas).
-- [ ] **HOSPIAI Fase 2 (D1/D5):** auditor de calidad de archivos (PDF dañados, vacíos, duplicados de contenido) y tiempos de proceso por expediente.
+- [x] ~~HOSPIAI Fase 2 (D1/D5): auditor de calidad de archivos y tiempos de proceso~~ **HECHA (22 de julio):** calidad de archivos = DIS (AG016); tiempos = Minero de Proceso (AG023).
+- [ ] **Alimentar la memoria institucional con corridas reales:** correr el ciclo completo varias veces (radicador → aprendizaje → curar) para que las recomendaciones tengan base histórica con casos reales.
+- [ ] **Curar el mapa de causas raíz** (`data/causas_raiz.json`): el área revisa/ajusta las causas y áreas responsables iniciales (editable sin programar).
 - [ ] **Validar el diccionario de siglas** con el área (los significados oficiales ADRES ya están en el motor; confirmar los usos internos del HUS).
 - [ ] Completar la **ficha de cada pagador**: plazos de radicación, periodicidad y plataforma donde se radica (la tabla `contratos` ya está lista en la base).
 
@@ -176,10 +189,11 @@ Estado actual de cada parte de la visión:
 
 ## 📌 PARA MAÑANA (lo próximo a trabajar)
 
-1. **Estrenar HOSPIAI con el lote real:** `git pull`, armar el índice de soportes (si no está), correr el motor (ya escribe el Expediente Digital solo) y ver `py tools\hospiai.py resumen` + el panel. Anotar aquí el nuevo porcentaje de listas y los primeros indicadores por responsable.
-2. **Programar la corrida diaria** con la línea de `schtasks` de la guía (`tools/README_hospiai.md`), para que el panel amanezca actualizado.
-3. **Regenerar el explorador y el tablero** con el reporte actualizado.
-4. **Revisar la lista de EPS no reconocidas** y agregarlas al catálogo, para bajar el grupo "entidad por resolver".
+1. **Estrenar HOSPIAI con el lote real:** `git pull`, armar el índice de soportes (si no está: `py tools\hospiai_indexador.py indexar "Y:\" "Z:\SERVIDOR GLOSAS" "X:\SERVIDOR RADICACION\2. SINAC SC SAS - 2026"`), correr el motor (ya escribe el Expediente Digital solo) y ver `py tools\hospiai.py resumen` + el panel. Anotar aquí el nuevo porcentaje de listas y los primeros indicadores por responsable.
+2. **Estrenar el cerebro (Fase 2.2):** con la base poblada, probar `py tools\hospiai.py recomendar HUS528043` y `py tools\hospiai.py simular` — y correr `py tools\hospiai_conocimiento.py patrones`, `causas` y `curar` para las primeras lecciones validadas.
+3. **Programar la corrida diaria** con la línea de `schtasks` de la guía (`tools/README_hospiai.md`), para que el panel amanezca actualizado.
+4. **Regenerar el explorador y el tablero** con el reporte actualizado.
+5. **Revisar la lista de EPS no reconocidas** y agregarlas al catálogo, para bajar el grupo "entidad por resolver".
 
 ---
 

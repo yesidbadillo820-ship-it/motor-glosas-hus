@@ -6,6 +6,8 @@ Consulta la base `data/hospiai.db` que alimenta el radicador:
     py tools\\hospiai.py init                      # crea la base vacía
     py tools\\hospiai.py resumen                   # estado en consola
     py tools\\hospiai.py panel --salida panel.html # panel HTML autocontenido
+    py tools\\hospiai.py recomendar HUS528043      # acciones con base y casos (Fase 2.2)
+    py tools\\hospiai.py simular [--codigo HEV]    # ¿qué pasaría si…? (Fase 2.2)
 
 Solo LEE la base y ESCRIBE el HTML del panel. No toca los shares.
 """
@@ -413,6 +415,81 @@ def cmd_grafo(db: Path, salida: Path, limite: int) -> int:
     return 0
 
 
+def cmd_recomendar(db: Path, factura: str) -> int:
+    """AG021 · Recomendaciones para UNA factura: qué conseguir, con qué base
+    (regla vigente o historia VALIDADA por el Curator) y cuántos casos la
+    respaldan. Nunca inventa porcentajes: los calcula o no los muestra."""
+    from hospiai_conocimiento import recomendar_expediente
+
+    r = recomendar_expediente(db, factura)
+    print("=" * 70)
+    print(f"RECOMENDACIONES · {r['factura']}")
+    if r.get("error"):
+        print(f"  {r['error']}")
+        print("=" * 70)
+        return 1
+    print(
+        f"  dictamen: {r['dictamen']}   valor: $ {r.get('valor') or 0:,.0f}"
+        f"   pagador: {r.get('pagador') or '—'}"
+    )
+    if r.get("nota"):
+        print(f"  {r['nota']}")
+    for i, a in enumerate(r["acciones"], 1):
+        etiqueta = (
+            f"{a['base']} · al conseguirlo queda LISTA ({a['probabilidad']:.0%})"
+            if a["base"] == "POR REGLA VIGENTE"
+            else f"{a['base']} — necesaria, pero no basta por sí sola"
+        )
+        print("-" * 70)
+        print(f"  {i}. {a['accion']}   [{etiqueta}]")
+        print(f"     {a['explicacion']}")
+        if a.get("historico"):
+            h = a["historico"]
+            print(
+                f"     Historia validada: {h['probabilidad']:.0%} de éxito en"
+                f" {h['casos']} caso(s) — {h['conocimiento']}"
+            )
+    print("=" * 70)
+    return 0
+
+
+def cmd_simular(db: Path, codigo: str | None) -> int:
+    """Motor de Hipótesis (Fase 2.2): ¿qué pasaría si…? Escenarios EXACTOS por
+    reglas vigentes; las estimaciones de comportamiento van etiquetadas."""
+    from hospiai_conocimiento import simular
+
+    s = simular(db, codigo=codigo)
+    print("=" * 70)
+    print(f"MOTOR DE HIPÓTESIS · ¿Qué pasaría si…?   (corrida #{s['corrida']})")
+    if not s["escenarios"]:
+        print("  Sin expedientes pendientes con hallazgos: nada que simular. ✔")
+        print("=" * 70)
+        return 0
+    for e in s["escenarios"]:
+        print("-" * 70)
+        print(f"  {e['escenario']}")
+        print(
+            f"     → se liberan {e['facturas_liberadas']:,} facturas por"
+            f" $ {e['valor_liberado']:,.0f}"
+        )
+        print(f"     base: {e['base']}")
+    c = s["combinado_top3"]
+    print("-" * 70)
+    print(f"  {c['escenario']}")
+    print(
+        f"     → se liberan {c['facturas_liberadas']:,} facturas por $ {c['valor_liberado']:,.0f}"
+    )
+    print(f"     base: {c['base']}")
+    if s.get("redistribucion"):
+        rd = s["redistribucion"]
+        print("-" * 70)
+        print(f"  {rd['escenario']}")
+        print(f"     → +{rd['facturas_adicionales_estimadas']:,} facturas estimadas")
+        print(f"     base: {rd['base']}")
+    print("=" * 70)
+    return 0
+
+
 def cmd_agentes() -> int:
     """Registro Central de Agentes: identidad, versión, estado y capacidades."""
     from hospiai_agentes import registro_con_implementaciones
@@ -483,6 +560,10 @@ def main(argv: list[str] | None = None) -> int:
     sg = sub.add_parser("grafo", help="Exporta el grafo de conocimiento a JSON.")
     sg.add_argument("--salida", type=Path, default=Path("grafo_hospiai.json"))
     sg.add_argument("--limite", type=int, default=5000, help="Máx. expedientes (def. 5000).")
+    sr = sub.add_parser("recomendar", help="Acciones recomendadas para una factura (AG021).")
+    sr.add_argument("factura", help="Número de factura (HUS528043 o 528043).")
+    sm = sub.add_parser("simular", help="Motor de Hipótesis: ¿qué pasaría si…? (Fase 2.2).")
+    sm.add_argument("--codigo", help="Simular solo la corrección de este código (p.ej. HEV).")
     args = p.parse_args(argv)
 
     if args.cmd == "init":
@@ -506,6 +587,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_decision(args.db, args.factura)
     if args.cmd == "grafo":
         return cmd_grafo(args.db, args.salida, args.limite)
+    if args.cmd == "recomendar":
+        return cmd_recomendar(args.db, args.factura)
+    if args.cmd == "simular":
+        return cmd_simular(args.db, args.codigo)
     return cmd_panel(args.db, args.salida, args.titulo)
 
 

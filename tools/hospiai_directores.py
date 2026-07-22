@@ -351,6 +351,7 @@ class AgenteAprendizaje(Agente):
                 ).fetchall()
             ]
             aprendizajes = []
+            para_memoria: list[dict] = []
             ahora = datetime.now().isoformat(timespec="seconds")
             with con:
                 for t in transiciones:
@@ -384,6 +385,21 @@ class AgenteAprendizaje(Agente):
                         ),
                     }
                     aprendizajes.append(leccion)
+                    pag = con.execute(
+                        "SELECT pagador_nombre FROM expedientes WHERE factura_norm=?",
+                        (t["factura_norm"],),
+                    ).fetchone()
+                    para_memoria.append(
+                        {
+                            "codigos": resueltos,
+                            "eps": pag["pagador_nombre"] if pag else "",
+                            "exito": t["despues"] == "LISTA",
+                            "evidencia": (
+                                f"expediente {t['factura_norm']}: {t['antes']}→{t['despues']}"
+                                f" (corridas #{t['c1']}→#{t['c2']})"
+                            ),
+                        }
+                    )
                     con.execute(
                         "INSERT INTO eventos(factura_norm, fecha, agente, tipo, resultado,"
                         " corrida_id, detalle) VALUES(?,?,?,?,?,?,?)",
@@ -399,8 +415,38 @@ class AgenteAprendizaje(Agente):
                     )
         finally:
             con.close()
+        # Regla de arquitectura (Fase 2.2): el aprendizaje no se queda en eventos.
+        # Entra como CANDIDATO a la Memoria Institucional; solo el Knowledge
+        # Curator (AG019) lo valida antes de que otro agente pueda usarlo.
+        from hospiai_conocimiento import MemoriaInstitucional
+
+        memoria = MemoriaInstitucional(db)
+        enviadas = 0
+        for pm in para_memoria:
+            for cod in pm["codigos"]:
+                memoria.registrar(
+                    "LECCION",
+                    f"Resolver {cod} destraba el expediente (pasa a LISTA).",
+                    {"codigo": cod},
+                    evidencia=pm["evidencia"],
+                    exito=pm["exito"],
+                    fuente_agente=self.id,
+                )
+                enviadas += 1
+                if pm["eps"]:
+                    memoria.registrar(
+                        "LECCION",
+                        f"En {pm['eps']}, resolver {cod} destraba el expediente.",
+                        {"codigo": cod, "eps": pm["eps"]},
+                        evidencia=pm["evidencia"],
+                        exito=pm["exito"],
+                        fuente_agente=self.id,
+                    )
+                    enviadas += 1
         res.salida = {"aprendizajes": aprendizajes}
-        res.detalle = f"{len(aprendizajes)} lección(es) nuevas registradas"
+        res.detalle = f"{len(aprendizajes)} lección(es) nuevas registradas" + (
+            f" · {enviadas} enviadas a la Memoria Institucional (CANDIDATO)" if enviadas else ""
+        )
 
 
 # ─── CLI ─────────────────────────────────────────────────────────────────────

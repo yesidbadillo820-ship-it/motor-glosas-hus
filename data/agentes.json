@@ -235,9 +235,9 @@
       "depende_de": [
         "AG008"
       ],
-      "implementacion": "sdk: hospiai_directores.AgenteAprendizajeInstitucional",
+      "implementacion": "sdk: hospiai_directores.AgenteAprendizaje",
       "requiere_sdk": "1.0",
-      "notas": "Registra cada transición de dictamen entre corridas (qué cambió, por qué, qué aprendimos): la memoria institucional."
+      "notas": "Registra cada transición de dictamen entre corridas y envía cada lección como CANDIDATO a la Memoria Institucional (tabla conocimiento) para que AG019 la valide."
     },
     {
       "id": "AG016",
@@ -286,6 +286,84 @@
       "implementacion": "sdk: hospiai_documento.AgenteIngestaInteligente",
       "requiere_sdk": "1.0",
       "notas": "Rescan incremental + perfilado inmediato de lo nuevo + evento en el Expediente, sin esperar la corrida nocturna."
+    },
+    {
+      "id": "AG019",
+      "nombre": "KnowledgeCurator",
+      "dominio": "KNOWLEDGE",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "CURAR_CONOCIMIENTO"
+      ],
+      "depende_de": [],
+      "implementacion": "sdk: hospiai_conocimiento.AgenteKnowledgeCurator",
+      "requiere_sdk": "1.0",
+      "notas": "El guardián de la memoria: consolida, deduplica, recalcula confianza (Laplace), promueve CANDIDATO→VALIDADO (n≥3, conf≥0.6, con evidencia), retira lo que pierde sustento y versiona cada cambio. Ningún conocimiento se usa sin pasar por aquí."
+    },
+    {
+      "id": "AG020",
+      "nombre": "PatternDiscovery",
+      "dominio": "KNOWLEDGE",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "DESCUBRIR_PATRONES"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_conocimiento.AgentePatternDiscovery",
+      "requiere_sdk": "1.0",
+      "notas": "Descubre patrones por EPS/responsable/mes desde la evidencia de la base y los PROPONE a la memoria como CANDIDATOS — nunca crea reglas directamente."
+    },
+    {
+      "id": "AG021",
+      "nombre": "RecommendationEngine",
+      "dominio": "KNOWLEDGE",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "RECOMENDAR"
+      ],
+      "depende_de": [
+        "AG019"
+      ],
+      "implementacion": "sdk: hospiai_conocimiento.AgenteRecommendation",
+      "requiere_sdk": "1.0",
+      "notas": "Acciones por expediente con base declarada: POR REGLA VIGENTE (determinística, cita la regla) o histórica (solo conocimiento VALIDADO, cita casos). Comando: hospiai.py recomendar HUSxxxxx."
+    },
+    {
+      "id": "AG022",
+      "nombre": "RootCauseEngine",
+      "dominio": "KNOWLEDGE",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "CAUSA_RAIZ"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_conocimiento.AgenteRootCause",
+      "requiere_sdk": "1.0",
+      "notas": "¿Por qué ocurrió?: concentración (≥60%) por lote/responsable/entidad + mapa curado data/causas_raiz.json. Si el mapa no tiene la entrada, dice 'por determinar' — no inventa."
+    },
+    {
+      "id": "AG023",
+      "nombre": "ProcessMiner",
+      "dominio": "KNOWLEDGE",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "MINAR_PROCESO"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_conocimiento.AgenteProcessMiner",
+      "requiere_sdk": "1.0",
+      "notas": "Reconstruye el flujo real desde los eventos del Expediente y mide horas promedio entre etapas: dónde se pierde el tiempo (cuello de botella)."
     }
   ]
 }

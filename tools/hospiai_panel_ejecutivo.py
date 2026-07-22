@@ -71,6 +71,8 @@ def render(servicios: Servicios) -> str:
     inf = servicios.informe()
     caja = servicios.caja()
     tareas = servicios.tareas()
+    sim = servicios.simulaciones()
+    saber = servicios.conocimiento()
     r = inf["resumen"]
     rec = inf["recomendaciones"][:3]
     peor_resp = min(inf["responsables"], key=lambda x: x["pct_listas"], default=None)
@@ -239,6 +241,58 @@ def render(servicios: Servicios) -> str:
             ],
         ),
     ]
+    # Panel Gerencial 2.0 (Fase 2.2): decisiones, no solo indicadores.
+    if sim.get("escenarios"):
+        filas_sim = [
+            [
+                html.escape(e["escenario"]),
+                f"{e['facturas_liberadas']:,}",
+                _p(e["valor_liberado"]),
+                html.escape(e["base"]),
+            ]
+            for e in sim["escenarios"][:6]
+        ]
+        combo = sim.get("combinado_top3")
+        if combo:
+            filas_sim.append(
+                [
+                    f"<b>{html.escape(combo['escenario'])}</b>",
+                    f"<b>{combo['facturas_liberadas']:,}</b>",
+                    f"<b>{_p(combo['valor_liberado'])}</b>",
+                    html.escape(combo["base"]),
+                ]
+            )
+        partes += [
+            "<h2>Decisiones · ¿Qué pasaría si…? (Motor de Hipótesis AG019–AG023)</h2>",
+            _tabla(
+                ["Escenario", "Facturas que se liberan", "Valor que se libera", "Base del cálculo"],
+                filas_sim,
+            ),
+        ]
+        if sim.get("redistribucion"):
+            rd = sim["redistribucion"]
+            partes.append(
+                f"<p style='font-size:13px;color:#94a3b8'>{html.escape(rd['escenario'])}: "
+                f"+{rd['facturas_adicionales_estimadas']:,} facturas. "
+                f"{html.escape(rd['base'])}</p>"
+            )
+    if saber:
+        partes += [
+            "<h2>Lo que el hospital ya aprendió (memoria VALIDADA por AG019)</h2>",
+            _tabla(
+                ["Código", "Tipo", "Lección", "Confianza", "Casos (éxitos/total)"],
+                [
+                    [
+                        html.escape(k["codigo"] or ""),
+                        html.escape(k["tipo"]),
+                        html.escape(k["enunciado"][:95]),
+                        f"{k['confianza']:.0%}",
+                        f"{k['exitos']}/{k['ocurrencias']}",
+                    ]
+                    for k in saber[:10]
+                ],
+            ),
+        ]
     if tareas:
         import json as _json
 
