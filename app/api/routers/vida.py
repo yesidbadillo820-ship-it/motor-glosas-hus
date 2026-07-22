@@ -12,15 +12,15 @@ from __future__ import annotations
 
 from datetime import timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual
 from app.api.routers.mi_desempeno import _calcular_racha, _glosas_del_gestor
 from app.core.tz import ahora_bogota, ahora_utc
 from app.database import get_db
-from app.models.db import UsuarioRecord
-from app.services import copy_calido
+from app.models.db import GlosaRecord, UsuarioRecord
+from app.services import confianza_dictamen, copy_calido
 
 router = APIRouter(prefix="/vida", tags=["vida"])
 
@@ -136,3 +136,39 @@ def celebraciones(
         eventos.append({"tipo": "hito", "mensaje": msg_hito, "total": round(total_rec)})
 
     return {"eventos": eventos, "total": len(eventos)}
+
+
+@router.get("/confianza/{glosa_id}")
+def confianza(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Confianza visible de un dictamen ya generado: en qué se apoyó.
+
+    Solo-lectura: no cambia el dictamen. Explica por qué confiar (contrato
+    real, soportes, norma) para que el gestor no vea una caja negra.
+    """
+    g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not g:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not (g.dictamen or "").strip():
+        return {
+            "nivel": "baja",
+            "resumen": "Sin dictamen generado aún.",
+            "fuentes": [],
+            "senales": {},
+        }
+
+    # Número de contrato real de la EPS (para verificar si el dictamen lo cita).
+    numero_contrato = ""
+    try:
+        from app.services.glosa_ia_prompts import get_contrato
+
+        numero_contrato = str((get_contrato(g.eps or "") or {}).get("numero") or "")
+    except Exception:
+        numero_contrato = ""
+
+    return confianza_dictamen.analizar_confianza(
+        g.dictamen, numero_contrato=numero_contrato, score=g.score
+    )

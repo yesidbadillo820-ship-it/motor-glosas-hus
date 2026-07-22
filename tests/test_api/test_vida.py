@@ -106,3 +106,31 @@ class TestCelebraciones:
         lev = next(e for e in d["eventos"] if e["tipo"] == "levantada")
         assert "COMPENSAR" in lev["mensaje"]
         assert lev["valor"] == 6_400_000
+
+
+class TestConfianza:
+    def test_glosa_inexistente_404(self, client):
+        assert client.get("/vida/confianza/999").status_code == 404
+
+    def test_dictamen_con_soportes_y_norma(self, client, db_session):
+        _glosa(
+            db_session,
+            eps="FAMISANAR",
+            estado="RESPONDIDA",
+            dictamen=(
+                "ESE HUS NO ACEPTA. Conforme al folio 2 de la historia clínica "
+                "y a la Ley 1438 de 2011, se solicita el levantamiento."
+            ),
+            score=8,
+        )
+        gid = db_session.query(GlosaRecord).first().id
+        d = client.get(f"/vida/confianza/{gid}").json()
+        assert d["nivel"] in ("alta", "media")
+        assert d["senales"]["cita_soportes"] is True
+        assert d["senales"]["cita_norma"] is True
+
+    def test_sin_dictamen(self, client, db_session):
+        _glosa(db_session, eps="X", estado="PENDIENTE")
+        gid = db_session.query(GlosaRecord).first().id
+        d = client.get(f"/vida/confianza/{gid}").json()
+        assert d["nivel"] == "baja"

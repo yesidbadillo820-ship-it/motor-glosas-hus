@@ -6452,6 +6452,35 @@ async function iniciarCapaDeVida(){
   } catch(e){ /* la Capa de Vida jamás debe romper la app */ }
 }
 
+// Capa de Vida (ronda 32): llena los badges de confianza de cada dictamen.
+// Busca [data-conf-glosa] dentro de `raiz`, consulta /vida/confianza/{id} y
+// muestra el nivel + en qué se apoya. 100% defensivo: si falla, oculta el
+// badge y el dictamen queda igual que antes.
+async function cargarBadgesConfianza(raiz){
+  try {
+    var nodos = (raiz || document).querySelectorAll('[data-conf-glosa]');
+    var COLORES = {alta:'#16a34a', media:'#d97706', baja:'#dc2626'};
+    var ICONO = {alta:'🟢', media:'🟡', baja:'🔴'};
+    for(var i=0; i<nodos.length; i++){
+      (function(el){
+        var gid = el.getAttribute('data-conf-glosa');
+        fetch('/vida/confianza/'+gid, {headers: authH()}).then(function(r){
+          return r.ok ? r.json() : null;
+        }).then(function(c){
+          if(!c || !c.nivel){ el.style.display='none'; return; }
+          var col = COLORES[c.nivel] || '#64748b';
+          var fuentes = (c.fuentes && c.fuentes.length)
+            ? ' · se apoya en: ' + c.fuentes.join(', ')
+            : '';
+          el.style.color = col;
+          el.innerHTML = (ICONO[c.nivel]||'') + ' <b>' + escHtml(c.resumen) + '</b>'
+            + '<span style="color:#64748b;font-weight:400;">' + escHtml(fuentes) + '</span>';
+        }).catch(function(){ el.style.display='none'; });
+      })(nodos[i]);
+    }
+  } catch(e){ /* la Capa de Vida jamás rompe la app */ }
+}
+
 async function initApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('show');
@@ -9722,6 +9751,10 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
       out += '<span style="background:rgba(255,255,255,.2);padding:4px 10px;border-radius:20px;font-size:.8rem;">' + valorFmt + '</span>';
       out += '</summary>';
       out += '<div style="padding:14px;background:#fff" id="lote-body-'+j+'">' + r.html + '</div>';
+      // Capa de Vida (ronda 32): badge de confianza — se llena tras el render.
+      if(r.glosa_id){
+        out += '<div data-conf-glosa="'+r.glosa_id+'" style="padding:.5rem 1rem;font-size:.78rem;color:#94a3b8;background:#fff;border-top:1px dashed #e2e8f0;">🔎 Analizando en qué se apoya el dictamen…</div>';
+      }
       // Panel refinar por concepto (usa glosa_id específico)
       if(r.glosa_id){
         out += '<div style="padding:.8rem 1rem;background:#f8fafc;border-top:1px solid #e2e8f0;">';
@@ -9745,6 +9778,8 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
     out += '<div style="height:40px;"></div>';  // espacio extra abajo para scroll cómodo
     out += '</div>';
     area.innerHTML = out;
+    // Capa de Vida (ronda 32): llenar los badges de confianza.
+    if(typeof cargarBadgesConfianza === 'function') cargarBadgesConfianza(area);
     // Forzar que el wrapper se posicione al tope para ver el resumen primero
     setTimeout(function(){
       var w = area.querySelector('.batch-results-wrap');
