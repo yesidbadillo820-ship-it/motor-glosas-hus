@@ -97,6 +97,10 @@ Se agregó a la Suite un botón **🧰 Herramientas PDF** con 26 utilidades, en 
   todo lo anterior desde la historia de Git.
 - Se creó **CLAUDE.md** con la instrucción de leer y actualizar esta bitácora en
   cada sesión.
+- Se corrigió un **fallo de CI heredado** (ajeno al trabajo de Cartera/PDF): dos
+  pruebas del Motor usaban fechas fijas de abril que se salieron de la ventana de
+  90 días y empezaron a fallar solas el 19-jul. Se anclaron a "la semana pasada"
+  para que no vuelvan a caducar. La funcionalidad real nunca estuvo mal.
 
 ---
 
