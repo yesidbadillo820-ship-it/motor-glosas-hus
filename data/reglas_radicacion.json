@@ -4,81 +4,135 @@
   "actualizado": "2026-07-22",
   "equivalencias": {
     "_comentario": "Un documento 'paraguas' satisface una exigencia más específica. En el HUS la epicrisis (EPI) y la atención de urgencias (HAU) se escanean DENTRO de la historia clínica / hoja de evolución (HEV).",
-    "EPI": ["EPI", "HEV"],
-    "HAU": ["HAU", "HEV"]
+    "EPI": [
+      "EPI",
+      "HEV"
+    ],
+    "HAU": [
+      "HAU",
+      "HEV"
+    ]
   },
   "reglas": [
     {
       "id": "R-BASE-001",
-      "ambito": { "aplica": "todas" },
-      "exige": ["FEV", "RIP", "CUV"],
+      "ambito": {
+        "aplica": "todas"
+      },
+      "exige": [
+        "FEV",
+        "RIP",
+        "CUV"
+      ],
       "criticidad": "BLOQUEA_RADICACION",
       "accion": "BLOQUEAR_RADICACION",
       "fuente": "Resolución 2284 de 2023 (soportes de la factura de venta en salud) y Resolución 2275 de 2023 (RIPS como soporte de la factura electrónica)",
-      "nota": "Toda cuenta exige la factura electrónica (FEV), el RIPS (RIP) y el resultado de validación del RIPS (CUV). Algunos pagadores eximen el CUV: eso se marca en su perfil (cuv_obligatorio=false), no aquí."
+      "nota": "Toda cuenta exige la factura electrónica (FEV), el RIPS (RIP) y el resultado de validación del RIPS (CUV). Algunos pagadores eximen el CUV: eso se marca en su perfil (cuv_obligatorio=false), no aquí.",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-PROC-001",
-      "ambito": { "servicio": "procedimientos" },
-      "exige": ["HEV"],
+      "ambito": {
+        "servicio": "procedimientos"
+      },
+      "exige": [
+        "HEV"
+      ],
       "criticidad": "REVISAR",
       "accion": "REVISAR_ANTES_DE_RADICAR",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Los procedimientos exigen la hoja de evolución / resumen de atención (HEV)."
+      "nota": "Los procedimientos exigen la hoja de evolución / resumen de atención (HEV).",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-URG-001",
-      "ambito": { "servicio": "urgencias" },
-      "exige": ["HAU"],
+      "ambito": {
+        "servicio": "urgencias"
+      },
+      "exige": [
+        "HAU"
+      ],
       "criticidad": "REVISAR",
       "accion": "REVISAR_ANTES_DE_RADICAR",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Las atenciones de urgencias exigen la hoja de atención de urgencias (HAU); la cubre la historia clínica (HEV) por equivalencia."
+      "nota": "Las atenciones de urgencias exigen la hoja de atención de urgencias (HAU); la cubre la historia clínica (HEV) por equivalencia.",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-HOSP-001",
-      "ambito": { "servicio": "hospitalizacion" },
-      "exige": ["EPI"],
+      "ambito": {
+        "servicio": "hospitalizacion"
+      },
+      "exige": [
+        "EPI"
+      ],
       "criticidad": "REVISAR",
       "accion": "REVISAR_ANTES_DE_RADICAR",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Las hospitalizaciones exigen la epicrisis (EPI); la cubre la historia clínica (HEV) por equivalencia."
+      "nota": "Las hospitalizaciones exigen la epicrisis (EPI); la cubre la historia clínica (HEV) por equivalencia.",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-MED-001",
-      "ambito": { "servicio": "medicamentos" },
-      "exige": ["OPF"],
+      "ambito": {
+        "servicio": "medicamentos"
+      },
+      "exige": [
+        "OPF"
+      ],
       "criticidad": "REVISAR",
       "accion": "REVISAR_ANTES_DE_RADICAR",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Los medicamentos exigen la orden o prescripción facultativa (OPF)."
+      "nota": "Los medicamentos exigen la orden o prescripción facultativa (OPF).",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-OTROS-001",
-      "ambito": { "servicio": "otrosServicios" },
-      "exige": ["OPF"],
+      "ambito": {
+        "servicio": "otrosServicios"
+      },
+      "exige": [
+        "OPF"
+      ],
       "criticidad": "REVISAR",
       "accion": "REVISAR_ANTES_DE_RADICAR",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Los otros servicios (insumos, traslados…) exigen la orden que los sustenta (OPF)."
+      "nota": "Los otros servicios (insumos, traslados…) exigen la orden que los sustenta (OPF).",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-RN-001",
-      "ambito": { "servicio": "recienNacidos" },
-      "exige": ["EPI"],
+      "ambito": {
+        "servicio": "recienNacidos"
+      },
+      "exige": [
+        "EPI"
+      ],
       "criticidad": "REVISAR",
       "accion": "REVISAR_ANTES_DE_RADICAR",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Las atenciones de recién nacidos exigen la epicrisis (EPI)."
+      "nota": "Las atenciones de recién nacidos exigen la epicrisis (EPI).",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     },
     {
       "id": "R-SERV-CONS-001",
-      "ambito": { "servicio": "consultas" },
+      "ambito": {
+        "servicio": "consultas"
+      },
       "exige": [],
       "criticidad": "REVISAR",
       "accion": "NINGUNA",
       "fuente": "Resolución 2284 de 2023 — soportes según servicio facturado",
-      "nota": "Las consultas ambulatorias no exigen soporte clínico adicional a los de base."
+      "nota": "Las consultas ambulatorias no exigen soporte clínico adicional a los de base.",
+      "vigencia_desde": "2024-01-01",
+      "vigencia_hasta": ""
     }
   ]
 }

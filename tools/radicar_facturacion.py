@@ -374,6 +374,11 @@ class PerfilEntidad:
     formato_paquete: str = "CARPETA"
     bot: str = ""
     observaciones: str = ""
+    # Catálogo institucional (HOSPIAI Fase 1.5): la ficha operativa del pagador.
+    # Los valores los suministra el área desde los contratos; 0/"" = sin definir.
+    plazo_radicacion_dias: int = 0
+    periodicidad: str = ""  # DIARIA / SEMANAL / QUINCENAL / MENSUAL / EVENTUAL
+    tipo_radicacion: str = ""  # p.ej. INICIAL, COMPLEMENTARIA, RESPUESTA_GLOSA
 
 
 @dataclass
@@ -454,17 +459,28 @@ def cargar_perfiles(ruta: Path | None) -> ConfigRadicacion:
                 formato_paquete=e.get("formato_paquete", "CARPETA"),
                 bot=e.get("bot", ""),
                 observaciones=e.get("observaciones", ""),
+                plazo_radicacion_dias=int(e.get("plazo_radicacion_dias", 0) or 0),
+                periodicidad=e.get("periodicidad", ""),
+                tipo_radicacion=e.get("tipo_radicacion", ""),
             )
         )
     logger.info(f"Perfiles cargados: {len(cfg.entidades)} entidades desde {ruta.name}")
     return cfg
 
 
-def cargar_reglas(ruta: Path | None, cfg: ConfigRadicacion) -> None:
+def cargar_reglas(
+    ruta: Path | None, cfg: ConfigRadicacion, fecha_referencia: str | None = None
+) -> None:
     """Carga el motor de reglas DECLARATIVO (data/reglas_radicacion.json) sobre
     la configuración. Las reglas dejan de vivir en el código: el área puede
     editarlas, cada una lleva su fuente normativa, y la corrida registra la
     versión usada (HOSPIAI Fase 1; formato en docs/ARQUITECTURA_HOSPIAI.md §6).
+
+    Versionamiento del conocimiento (Fase 1.5): cada regla puede llevar
+    `vigencia_desde` / `vigencia_hasta` (AAAA-MM-DD). Solo las reglas VIGENTES a
+    `fecha_referencia` (def.: hoy) entran a la validación — si mañana cambia la
+    norma, conviven ambas versiones y aplica la correcta según la fecha. Todas
+    quedan igual en el registro para el Expediente Digital.
 
     Si el archivo no existe, quedan los defaults embebidos (mismo contenido).
     Los perfiles por entidad (soportes_extra, cuv_obligatorio, equivalencias
@@ -483,11 +499,20 @@ def cargar_reglas(ruta: Path | None, cfg: ConfigRadicacion) -> None:
         logger.warning(f"No pude leer las reglas de {ruta}: {e} — sigo con los defaults.")
         return
 
+    # Vigencia: comparación lexicográfica de fechas ISO (AAAA-MM-DD).
+    fecha = fecha_referencia or datetime.now().strftime("%Y-%m-%d")
     base: list[str] = []
     por_servicio: dict[str, list[str]] = {}
     idx: dict[str, str] = {}
     registro: list = []
+    n_fuera = 0
     for rg in data.get("reglas", []):
+        registro.append(rg)  # TODAS quedan en el registro (memoria del expediente)
+        vig_d = str(rg.get("vigencia_desde") or "")
+        vig_h = str(rg.get("vigencia_hasta") or "")
+        if (vig_d and fecha < vig_d) or (vig_h and fecha > vig_h):
+            n_fuera += 1
+            continue  # regla no vigente a la fecha: no valida, pero se conoce
         ambito = rg.get("ambito") or {}
         exige = [
             str(c).upper() for c in (rg.get("exige") or rg.get("documentos_obligatorios") or [])
@@ -500,7 +525,6 @@ def cargar_reglas(ruta: Path | None, cfg: ConfigRadicacion) -> None:
             dest.extend(c for c in exige if c not in dest)
         for cod in exige:
             idx.setdefault(cod, rg.get("id", ""))
-        registro.append(rg)
 
     if base:
         cfg.soportes_base = list(base)
@@ -513,8 +537,10 @@ def cargar_reglas(ruta: Path | None, cfg: ConfigRadicacion) -> None:
     cfg.version_reglas = str(data.get("version", "?"))
     cfg.regla_id_por_codigo = idx
     cfg.reglas_registro = registro
+    vigencia_txt = f" ({n_fuera} fuera de vigencia al {fecha})" if n_fuera else ""
     logger.info(
-        f"Reglas: v{cfg.version_reglas} — {len(registro)} regla(s) declarativas desde {ruta.name}"
+        f"Reglas: v{cfg.version_reglas} — {len(registro) - n_fuera} regla(s) vigentes"
+        f" desde {ruta.name}{vigencia_txt}"
     )
 
 
@@ -2027,7 +2053,14 @@ def main(argv: list[str] | None = None) -> int:
     fusion: dict[str, list[Path]] = defaultdict(list)
     if args.soportes_indice is not None:
         if not args.soportes_indice.is_file():
-            logger.error(f"--soportes-indice no existe o no es archivo: {args.soportes_indice}")
+            logger.error(
+                f"--soportes-indice no existe o no es archivo: {args.soportes_indice}\n"
+                "  Armalo UNA vez (tarda unos minutos y sirve para todas las corridas):\n"
+                '  Get-ChildItem "Y:\\","Z:\\SERVIDOR GLOSAS","X:\\SERVIDOR RADICACION\\2. '
+                'SINAC SC SAS - 2026" -Recurse -File -ErrorAction SilentlyContinue | '
+                "ForEach-Object FullName | "
+                f'Set-Content "{args.soportes_indice}" -Encoding UTF8'
+            )
             return 1
         for fac, rutas in indexar_soportes_desde_indice(
             args.soportes_indice, cfg.patron_factura
@@ -2133,6 +2166,19 @@ def main(argv: list[str] | None = None) -> int:
                 version_motor=VERSION_MOTOR,
                 regla_id_por_codigo=cfg.regla_id_por_codigo,
                 reglas_registro=cfg.reglas_registro,
+                catalogo=[
+                    {
+                        "id": e.id,
+                        "nombre": e.nombre,
+                        "nit": e.nit,
+                        "regimen": e.regimen,
+                        "canal": e.canal,
+                        "plazo_radicacion_dias": e.plazo_radicacion_dias,
+                        "periodicidad": e.periodicidad,
+                        "tipo_radicacion": e.tipo_radicacion,
+                    }
+                    for e in cfg.entidades
+                ],
                 origen=str(args.origen),
                 parametros=" ".join(argv if argv is not None else sys.argv[1:]),
                 clasificar=lambda nombre: clasificar_soporte(nombre)[0],

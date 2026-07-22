@@ -63,6 +63,13 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Consola y panel de HOSPIAI** (`tools/hospiai.py`): resumen del expediente en pantalla y panel HTML que lee de la base.
   - **Corrida diaria** (`tools/corrida_diaria.ps1`) lista para programar en Windows + **guía de instalación y operación** (`tools/README_hospiai.md`).
   - Todo **solo lectura** sobre los shares; **100 pruebas automáticas** en verde.
+- **Revisión de arquitectura y FASE 1.5 — Arquitectura Cognitiva (entrega 1):** tras una revisión formal se decidió construir la capa de conocimiento ANTES del OCR. Se entregó el mismo día:
+  - **Vigencias normativas:** cada regla puede tener "desde/hasta"; el motor aplica la regla correcta según la fecha (si cambia la norma, conviven las dos versiones).
+  - **Catálogo institucional:** la ficha de cada pagador (NIT, régimen, plataforma, plazo de radicación, periodicidad) ahora vive en la base (`pagadores` + `contratos`) y se consulta con `py tools\hospiai.py catalogo`. Los plazos los debe suministrar el área.
+  - **Motor de Evidencias:** cada hallazgo guarda su evidencia observada y su nivel de confianza, y se consulta la cadena completa (hallazgo → regla → norma → evidencia) con `py tools\hospiai.py evidencia HUS528043` — la vista con la que un auditor defiende un dictamen.
+  - **Grafo de conocimiento consultable:** vistas en la base + exportación a JSON (`py tools\hospiai.py grafo`) con pagadores, expedientes, responsables, lotes y reglas incumplidas.
+  - **Memoria institucional:** la tabla de glosas ahora guarda solución aplicada, aprendizaje y tiempo — el insumo del aprendizaje continuo.
+  - **105 pruebas automáticas** en verde. La base de la Fase 1 se migra sola (sin perder datos).
 
 ---
 

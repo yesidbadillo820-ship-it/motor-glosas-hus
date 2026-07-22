@@ -229,15 +229,175 @@ def cmd_panel(db: Path, salida: Path, titulo: str) -> int:
     return 0
 
 
+def _norm_factura(fac: str) -> str:
+    f = (fac or "").strip().upper()
+    f = f[3:] if f.startswith("HUS") else f
+    return f.lstrip("0") or "0"
+
+
+def cmd_evidencia(db: Path, factura: str) -> int:
+    """Motor de Evidencias: la cadena completa hallazgo → regla → norma →
+    evidencia → confianza de UNA factura. Es la vista con la que un auditor
+    defiende (o corrige) el dictamen."""
+    norm = _norm_factura(factura)
+    con = hospiai_db.abrir(db)
+    try:
+        exp = con.execute("SELECT * FROM expedientes WHERE factura_norm=?", (norm,)).fetchone()
+        if exp is None:
+            print(f"No hay expediente para '{factura}' (clave {norm}).")
+            return 1
+        evs = _q(
+            con,
+            "SELECT * FROM vw_evidencias WHERE factura_norm=? ORDER BY fecha DESC, id DESC",
+            (norm,),
+        )
+        eventos = _q(
+            con,
+            "SELECT fecha, agente, tipo, resultado, version_reglas FROM eventos"
+            " WHERE factura_norm=? ORDER BY fecha DESC LIMIT 10",
+            (norm,),
+        )
+    finally:
+        con.close()
+    print("=" * 70)
+    print(f"EXPEDIENTE {exp['factura']}  ·  {exp['pagador_nombre']}")
+    print(
+        f"  dictamen: {exp['dictamen']}   valor: $ {exp['valor_total']:,.0f}"
+        f"   responsable: {exp['responsable'] or '—'}   lote: {exp['lote'] or '—'}"
+    )
+    print(f"  carpeta: {exp['carpeta']}")
+    if not evs:
+        print("  Sin hallazgos registrados: expediente limpio en la última auditoría. ✔")
+    for h in evs:
+        print("-" * 70)
+        print(
+            f"  HALLAZGO [{h['criticidad']}] {h['tipo']}{' · ' + h['codigo'] if h['codigo'] else ''}"
+        )
+        print(f"    detalle   : {h['detalle']}")
+        if h["regla_id"]:
+            print(f"    regla     : {h['regla_id']}")
+            print(f"    norma     : {h['fuente_normativa'] or '—'}")
+        if h["evidencia"]:
+            print(f"    evidencia : {h['evidencia']}")
+        print(
+            f"    confianza : {h['confianza']:.2f}   fecha: {h['fecha']}   reglas v{h['version_reglas']}"
+        )
+    print("-" * 70)
+    print("  Línea de tiempo:")
+    for ev in eventos:
+        print(f"    {ev['fecha']}  {ev['agente']}  {ev['tipo']} → {ev['resultado']}")
+    print("=" * 70)
+    return 0
+
+
+def cmd_catalogo(db: Path) -> int:
+    """Catálogo institucional: la ficha operativa de cada pagador."""
+    con = hospiai_db.abrir(db)
+    try:
+        rows = _q(
+            con,
+            "SELECT p.id, p.nombre, p.nit, p.regimen, p.canal, c.plazo_dias, c.periodicidad,"
+            " (SELECT COUNT(*) FROM expedientes e WHERE e.pagador_id=p.id) n"
+            " FROM pagadores p LEFT JOIN contratos c"
+            "   ON c.pagador_id=p.id AND c.nombre='FICHA-CATALOGO'"
+            " ORDER BY n DESC",
+        )
+    finally:
+        con.close()
+    print("=" * 96)
+    print(
+        f"{'ID':<20} {'NIT':<11} {'RÉGIMEN':<12} {'CANAL':<10} {'PLAZO':<6} {'PERIOD.':<10} {'EXP.':>6}"
+    )
+    for r in rows:
+        print(
+            f"{r['id'][:20]:<20} {r['nit'] or '—':<11} {(r['regimen'] or '—')[:12]:<12}"
+            f" {(r['canal'] or '—')[:10]:<10} {r['plazo_dias'] or '—':<6}"
+            f" {(r['periodicidad'] or '—')[:10]:<10} {r['n']:>6,}"
+        )
+    print("=" * 96)
+    print("Plazo/periodicidad vacíos = ficha contractual pendiente de cargar por el área.")
+    return 0
+
+
+def cmd_grafo(db: Path, salida: Path, limite: int) -> int:
+    """Exporta el grafo de conocimiento (nodos y relaciones) a JSON: pagador ←
+    expediente → responsable/lote/regla-incumplida. Base para visualizadores y
+    para el agente conversacional (Fase 1.5 entrega 2)."""
+    con = hospiai_db.abrir(db)
+    try:
+        exps = _q(
+            con,
+            "SELECT factura_norm, factura, pagador_id, pagador_nombre, responsable, lote,"
+            " dictamen, valor_total FROM expedientes LIMIT ?",
+            (limite,),
+        )
+        ultima = con.execute("SELECT MAX(id) m FROM corridas").fetchone()["m"] or 0
+        halls = _q(
+            con,
+            "SELECT factura_norm, regla_id FROM hallazgos WHERE corrida_id=? AND regla_id<>''",
+            (ultima,),
+        )
+    finally:
+        con.close()
+    nodos: dict[str, dict] = {}
+    aristas: list[dict] = []
+    for e in exps:
+        nid = f"exp:{e['factura_norm']}"
+        nodos[nid] = {
+            "id": nid,
+            "tipo": "expediente",
+            "label": e["factura"],
+            "dictamen": e["dictamen"],
+            "valor": e["valor_total"],
+        }
+        if e["pagador_id"]:
+            pid = f"pag:{e['pagador_id']}"
+            nodos.setdefault(pid, {"id": pid, "tipo": "pagador", "label": e["pagador_nombre"]})
+            aristas.append({"de": nid, "a": pid, "tipo": "PAGA"})
+        if e["responsable"]:
+            rid = f"resp:{e['responsable']}"
+            nodos.setdefault(rid, {"id": rid, "tipo": "responsable", "label": e["responsable"]})
+            aristas.append({"de": rid, "a": nid, "tipo": "RADICA"})
+        if e["lote"]:
+            lid = f"lote:{e['lote']}"
+            nodos.setdefault(lid, {"id": lid, "tipo": "lote", "label": e["lote"]})
+            aristas.append({"de": nid, "a": lid, "tipo": "EN_LOTE"})
+    en_grafo = {f"exp:{e['factura_norm']}" for e in exps}
+    for h in halls:
+        nid = f"exp:{h['factura_norm']}"
+        if nid not in en_grafo:
+            continue
+        gid = f"regla:{h['regla_id']}"
+        nodos.setdefault(gid, {"id": gid, "tipo": "regla", "label": h["regla_id"]})
+        aristas.append({"de": nid, "a": gid, "tipo": "INCUMPLE"})
+    import json as _json
+
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    salida.write_text(
+        _json.dumps(
+            {"nodos": list(nodos.values()), "aristas": aristas}, ensure_ascii=False, indent=1
+        ),
+        encoding="utf-8",
+    )
+    print(f"Grafo: {len(nodos)} nodo(s), {len(aristas)} relación(es) → {salida}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Consola del Expediente Digital HOSPIAI (solo lee).")
     p.add_argument("--db", type=Path, default=DB_DEFAULT, help="Ruta de hospiai.db.")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init", help="Crea la base vacía con el esquema.")
     sub.add_parser("resumen", help="Resumen del expediente en consola.")
+    sub.add_parser("catalogo", help="Catálogo institucional: ficha por pagador.")
     sp = sub.add_parser("panel", help="Panel HTML autocontenido leyendo de la base.")
     sp.add_argument("--salida", type=Path, default=Path("panel_hospiai.html"))
     sp.add_argument("--titulo", type=str, default="HOSPIAI — Panel de Cuentas Médicas · ESE HUS")
+    se = sub.add_parser("evidencia", help="Cadena hallazgo→regla→norma→evidencia de una factura.")
+    se.add_argument("factura", help="Número de factura (HUS528043 o 528043).")
+    sg = sub.add_parser("grafo", help="Exporta el grafo de conocimiento a JSON.")
+    sg.add_argument("--salida", type=Path, default=Path("grafo_hospiai.json"))
+    sg.add_argument("--limite", type=int, default=5000, help="Máx. expedientes (def. 5000).")
     args = p.parse_args(argv)
 
     if args.cmd == "init":
@@ -249,6 +409,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.cmd == "resumen":
         return cmd_resumen(args.db)
+    if args.cmd == "catalogo":
+        return cmd_catalogo(args.db)
+    if args.cmd == "evidencia":
+        return cmd_evidencia(args.db, args.factura)
+    if args.cmd == "grafo":
+        return cmd_grafo(args.db, args.salida, args.limite)
     return cmd_panel(args.db, args.salida, args.titulo)
 
 

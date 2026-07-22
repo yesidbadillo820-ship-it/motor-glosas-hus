@@ -240,3 +240,162 @@ class TestConsolaHospiai:
         assert hospiai.main(["--db", str(db), "panel", "--salida", str(salida)]) == 0
         html_txt = salida.read_text(encoding="utf-8")
         assert "HOSPIAI" in html_txt and "COOSALUD" in html_txt
+
+
+class TestFase15ArquitecturaCognitiva:
+    """Fase 1.5: vigencias normativas, motor de evidencias, catálogo y grafo."""
+
+    def test_vigencias_filtran_reglas_por_fecha(self, tmp_path):
+        reglas = {
+            "version": "2.0",
+            "reglas": [
+                {
+                    "id": "R-VIEJA",
+                    "ambito": {"servicio": "procedimientos"},
+                    "exige": ["OPF"],
+                    "vigencia_desde": "2020-01-01",
+                    "vigencia_hasta": "2025-12-31",
+                },
+                {
+                    "id": "R-ACTUAL",
+                    "ambito": {"servicio": "procedimientos"},
+                    "exige": ["HEV"],
+                    "vigencia_desde": "2026-01-01",
+                },
+                {
+                    "id": "R-FUTURA",
+                    "ambito": {"servicio": "procedimientos"},
+                    "exige": ["PDX"],
+                    "vigencia_desde": "2030-01-01",
+                },
+            ],
+        }
+        f = tmp_path / "reglas.json"
+        f.write_text(json.dumps(reglas), encoding="utf-8")
+        cfg = rad.ConfigRadicacion()
+        rad.cargar_reglas(f, cfg, fecha_referencia="2026-07-22")
+        # Solo la regla ACTUAL valida; la vieja y la futura no aplican hoy…
+        assert cfg.soportes_por_servicio["procedimientos"] == ["HEV"]
+        # …pero TODAS quedan en el registro (memoria del expediente).
+        assert len(cfg.reglas_registro) == 3
+        # Y en otra fecha aplica la otra versión (la norma correcta por fecha).
+        cfg2 = rad.ConfigRadicacion()
+        rad.cargar_reglas(f, cfg2, fecha_referencia="2024-06-01")
+        assert cfg2.soportes_por_servicio["procedimientos"] == ["OPF"]
+
+    def test_evidencia_y_confianza_en_hallazgos(self, tmp_path):
+        cfg = rad.cargar_perfiles(None)
+        rad.cargar_reglas(None, cfg)
+        d = _factura(tmp_path / "fe", "HUS528043", servicios=_SERV_PROC)
+        archivos = rad._archivos_de(d)
+        res = rad.procesar_factura("HUS528043", archivos, d, "COOSALUD", cfg)
+        db = tmp_path / "h.db"
+        hdb.persistir_corrida(
+            db,
+            [res],
+            {res.factura_norm: archivos},
+            version_reglas=cfg.version_reglas,
+            version_motor="t",
+            regla_id_por_codigo=cfg.regla_id_por_codigo,
+            reglas_registro=cfg.reglas_registro,
+            clasificar=lambda n: rad.clasificar_soporte(n)[0],
+        )
+        con = sqlite3.connect(db)
+        con.row_factory = sqlite3.Row
+        h = con.execute("SELECT * FROM hallazgos WHERE codigo='HEV'").fetchone()
+        assert h["confianza"] == 1.0
+        assert "Servicios del RIPS" in h["evidencia"]
+        # La vista del Motor de Evidencias une el hallazgo con su norma.
+        v = con.execute("SELECT * FROM vw_evidencias WHERE codigo='HEV'").fetchone()
+        assert "2284" in v["fuente_normativa"]
+        con.close()
+
+    def test_catalogo_sincroniza_pagadores_y_contratos(self, tmp_path):
+        db = tmp_path / "h.db"
+        con = hdb.abrir(db)
+        with con:
+            hdb.sincronizar_catalogo(
+                con,
+                [
+                    {
+                        "id": "COOSALUD",
+                        "nombre": "COOSALUD EPS",
+                        "nit": "900226715",
+                        "regimen": "SUBSIDIADO",
+                        "canal": "PORTAL",
+                        "plazo_radicacion_dias": 22,
+                        "periodicidad": "MENSUAL",
+                    },
+                    {"id": "SIN_FICHA", "nombre": "OTRA", "nit": "", "regimen": "", "canal": ""},
+                ],
+            )
+        pag = con.execute("SELECT * FROM pagadores WHERE id='COOSALUD'").fetchone()
+        assert pag["nit"] == "900226715"
+        contrato = con.execute("SELECT * FROM contratos WHERE pagador_id='COOSALUD'").fetchone()
+        assert contrato["plazo_dias"] == 22 and contrato["periodicidad"] == "MENSUAL"
+        # Sin plazo ni periodicidad no se inventa contrato.
+        assert con.execute("SELECT COUNT(*) FROM contratos").fetchone()[0] == 1
+        con.close()
+
+    def test_migracion_agrega_columnas_a_base_vieja(self, tmp_path):
+        # Simula una base de Fase 1 (sin evidencia/confianza) y verifica que
+        # abrir() la migra sin perder filas.
+        db = tmp_path / "vieja.db"
+        con = sqlite3.connect(db)
+        con.execute(
+            "CREATE TABLE hallazgos(id INTEGER PRIMARY KEY, factura_norm TEXT,"
+            " corrida_id INTEGER, agente TEXT, tipo TEXT, codigo TEXT, criticidad TEXT,"
+            " detalle TEXT, regla_id TEXT, fecha TEXT, resuelto INTEGER DEFAULT 0)"
+        )
+        con.execute(
+            "INSERT INTO hallazgos(factura_norm, corrida_id, agente, tipo, codigo,"
+            " criticidad, detalle, regla_id, fecha) VALUES('1',1,'a','T','','REVISAR','d','','f')"
+        )
+        con.commit()
+        con.close()
+        con = hdb.abrir(db)
+        fila = con.execute("SELECT confianza, evidencia FROM hallazgos").fetchone()
+        assert fila["confianza"] == 1.0 and fila["evidencia"] == ""
+        con.close()
+
+    def test_comandos_evidencia_catalogo_grafo(self, tmp_path, capsys):
+        import hospiai
+
+        cfg = rad.cargar_perfiles(None)
+        rad.cargar_reglas(None, cfg)
+        d = _factura(tmp_path / "fe", "HUS528043", servicios=_SERV_PROC)
+        archivos = rad._archivos_de(d)
+        res = rad.procesar_factura("HUS528043", archivos, d, "COOSALUD", cfg)
+        db = tmp_path / "h.db"
+        hdb.persistir_corrida(
+            db,
+            [res],
+            {res.factura_norm: archivos},
+            version_reglas=cfg.version_reglas,
+            version_motor="t",
+            regla_id_por_codigo=cfg.regla_id_por_codigo,
+            reglas_registro=cfg.reglas_registro,
+            catalogo=[
+                {
+                    "id": "COOSALUD",
+                    "nombre": "COOSALUD EPS",
+                    "nit": "1",
+                    "regimen": "S",
+                    "canal": "PORTAL",
+                    "plazo_radicacion_dias": 22,
+                    "periodicidad": "MENSUAL",
+                }
+            ],
+            clasificar=lambda n: rad.clasificar_soporte(n)[0],
+        )
+        assert hospiai.main(["--db", str(db), "evidencia", "HUS528043"]) == 0
+        out = capsys.readouterr().out
+        assert "HALLAZGO" in out and "2284" in out and "confianza" in out
+        assert hospiai.main(["--db", str(db), "catalogo"]) == 0
+        assert "COOSALUD" in capsys.readouterr().out
+        salida = tmp_path / "grafo.json"
+        assert hospiai.main(["--db", str(db), "grafo", "--salida", str(salida)]) == 0
+        grafo = json.loads(salida.read_text(encoding="utf-8"))
+        tipos = {n["tipo"] for n in grafo["nodos"]}
+        assert {"expediente", "pagador", "regla"} <= tipos
+        assert any(a["tipo"] == "INCUMPLE" for a in grafo["aristas"])

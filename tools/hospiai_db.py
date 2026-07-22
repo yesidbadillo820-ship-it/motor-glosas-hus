@@ -61,7 +61,9 @@ CREATE TABLE IF NOT EXISTS reglas(
   fuente TEXT DEFAULT '',
   nota TEXT DEFAULT '',
   version TEXT DEFAULT '',
-  actualizada TEXT DEFAULT ''
+  actualizada TEXT DEFAULT '',
+  vigencia_desde TEXT DEFAULT '',
+  vigencia_hasta TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS expedientes(
   factura_norm TEXT PRIMARY KEY,
@@ -104,6 +106,8 @@ CREATE TABLE IF NOT EXISTS hallazgos(
   criticidad TEXT NOT NULL,
   detalle TEXT DEFAULT '',
   regla_id TEXT DEFAULT '',
+  evidencia TEXT DEFAULT '',
+  confianza REAL DEFAULT 1.0,
   fecha TEXT NOT NULL,
   resuelto INTEGER DEFAULT 0
 );
@@ -136,7 +140,10 @@ CREATE TABLE IF NOT EXISTS glosas(
   codigo_glosa TEXT DEFAULT '',
   valor REAL DEFAULT 0,
   estado TEXT DEFAULT 'ABIERTA',
-  detalle TEXT DEFAULT ''
+  detalle TEXT DEFAULT '',
+  solucion TEXT DEFAULT '',
+  aprendizaje TEXT DEFAULT '',
+  tiempo_dias INTEGER
 );
 CREATE TABLE IF NOT EXISTS pagos(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,12 +173,57 @@ _DICTAMENES_BLOQUEANTES = {
 }
 
 
+# Columnas agregadas por fases posteriores a la creación de la base: si la base
+# existe de una fase anterior, se le agregan sin perder datos (migración suave).
+_MIGRACIONES: dict[str, dict[str, str]] = {
+    "hallazgos": {"evidencia": "TEXT DEFAULT ''", "confianza": "REAL DEFAULT 1.0"},
+    "glosas": {
+        "solucion": "TEXT DEFAULT ''",
+        "aprendizaje": "TEXT DEFAULT ''",
+        "tiempo_dias": "INTEGER",
+    },
+    "reglas": {"vigencia_desde": "TEXT DEFAULT ''", "vigencia_hasta": "TEXT DEFAULT ''"},
+}
+
+# Vistas: el GRAFO DE CONOCIMIENTO consultable. No son otra base — son el mismo
+# expediente leído por sus relaciones (docs/ARQUITECTURA_HOSPIAI.md §7).
+VISTAS_SQL = """
+CREATE VIEW IF NOT EXISTS vw_evidencias AS
+  SELECT h.id, h.factura_norm, e.factura, e.pagador_nombre, e.responsable,
+         h.tipo, h.codigo, h.criticidad, h.detalle, h.evidencia, h.confianza,
+         h.regla_id, r.fuente AS fuente_normativa, r.nota AS regla_nota,
+         h.fecha, c.version_reglas, h.resuelto
+  FROM hallazgos h
+  LEFT JOIN reglas r ON r.id = h.regla_id
+  LEFT JOIN expedientes e ON e.factura_norm = h.factura_norm
+  LEFT JOIN corridas c ON c.id = h.corrida_id;
+CREATE VIEW IF NOT EXISTS vw_productividad AS
+  SELECT responsable, COUNT(*) AS facturas,
+         SUM(CASE WHEN dictamen='LISTA' THEN 1 ELSE 0 END) AS listas,
+         SUM(valor_total) AS valor
+  FROM expedientes WHERE responsable <> '' GROUP BY responsable;
+CREATE VIEW IF NOT EXISTS vw_memoria_glosas AS
+  SELECT g.*, e.pagador_nombre, e.responsable, e.lote
+  FROM glosas g LEFT JOIN expedientes e ON e.factura_norm = g.factura_norm;
+"""
+
+
 def _ahora() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+def _migrar(con: sqlite3.Connection) -> None:
+    """Agrega a una base existente las columnas de fases nuevas (sin tocar datos)."""
+    for tabla, columnas in _MIGRACIONES.items():
+        existentes = {r[1] for r in con.execute(f"PRAGMA table_info({tabla})")}
+        for col, tipo in columnas.items():
+            if col not in existentes:
+                con.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
+
+
 def abrir(ruta: Path) -> sqlite3.Connection:
-    """Abre (creando si no existe) la base del Expediente Digital con su esquema."""
+    """Abre (creando si no existe) la base del Expediente Digital con su esquema,
+    aplica migraciones suaves y crea las vistas del grafo."""
     ruta = Path(ruta)
     ruta.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(ruta))
@@ -179,6 +231,8 @@ def abrir(ruta: Path) -> sqlite3.Connection:
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA synchronous=NORMAL")
     con.executescript(ESQUEMA_SQL)
+    _migrar(con)
+    con.executescript(VISTAS_SQL)
     return con
 
 
@@ -189,10 +243,12 @@ def sincronizar_reglas(con: sqlite3.Connection, registro: list[dict], version: s
     for rg in registro:
         con.execute(
             "INSERT INTO reglas(id, ambito, exige, criticidad, accion, fuente, nota, version,"
-            " actualizada) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET"
+            " actualizada, vigencia_desde, vigencia_hasta) VALUES(?,?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(id) DO UPDATE SET"
             " ambito=excluded.ambito, exige=excluded.exige, criticidad=excluded.criticidad,"
             " accion=excluded.accion, fuente=excluded.fuente, nota=excluded.nota,"
-            " version=excluded.version, actualizada=excluded.actualizada",
+            " version=excluded.version, actualizada=excluded.actualizada,"
+            " vigencia_desde=excluded.vigencia_desde, vigencia_hasta=excluded.vigencia_hasta",
             (
                 rg.get("id", ""),
                 json.dumps(rg.get("ambito", {}), ensure_ascii=False),
@@ -203,14 +259,65 @@ def sincronizar_reglas(con: sqlite3.Connection, registro: list[dict], version: s
                 rg.get("nota", ""),
                 version,
                 ahora,
+                str(rg.get("vigencia_desde") or ""),
+                str(rg.get("vigencia_hasta") or ""),
             ),
         )
 
 
-def _hallazgos_de(res, regla_id_por_codigo: dict[str, str]) -> list[tuple[str, str, str, str, str]]:
-    """(tipo, codigo, criticidad, detalle, regla_id) detectados para un resultado
-    del radicador. Cada hallazgo es trazable a la regla que lo sustenta."""
-    filas: list[tuple[str, str, str, str, str]] = []
+def sincronizar_catalogo(con: sqlite3.Connection, catalogo: list[dict]) -> None:
+    """Refleja el catálogo institucional (perfiles por entidad) en las tablas
+    `pagadores` y `contratos`: NIT, régimen, plataforma, plazo de radicación y
+    periodicidad quedan consultables junto al expediente."""
+    for ent in catalogo:
+        con.execute(
+            "INSERT INTO pagadores(id, nombre, nit, regimen, canal) VALUES(?,?,?,?,?)"
+            " ON CONFLICT(id) DO UPDATE SET nombre=excluded.nombre, nit=excluded.nit,"
+            " regimen=excluded.regimen, canal=excluded.canal",
+            (
+                ent.get("id", ""),
+                ent.get("nombre", ""),
+                ent.get("nit", ""),
+                ent.get("regimen", ""),
+                ent.get("canal", ""),
+            ),
+        )
+        plazo = int(ent.get("plazo_radicacion_dias", 0) or 0)
+        periodicidad = ent.get("periodicidad", "")
+        if not plazo and not periodicidad:
+            continue  # sin ficha contractual todavía: nada que registrar
+        existe = con.execute(
+            "SELECT id FROM contratos WHERE pagador_id=? AND nombre='FICHA-CATALOGO'",
+            (ent.get("id", ""),),
+        ).fetchone()
+        if existe:
+            con.execute(
+                "UPDATE contratos SET plazo_dias=?, periodicidad=?, modalidad=? WHERE id=?",
+                (plazo or None, periodicidad, ent.get("tipo_radicacion", ""), existe[0]),
+            )
+        else:
+            con.execute(
+                "INSERT INTO contratos(pagador_id, nombre, modalidad, plazo_dias, periodicidad)"
+                " VALUES(?,?,?,?,?)",
+                (
+                    ent.get("id", ""),
+                    "FICHA-CATALOGO",
+                    ent.get("tipo_radicacion", ""),
+                    plazo or None,
+                    periodicidad,
+                ),
+            )
+
+
+def _hallazgos_de(res, regla_id_por_codigo: dict[str, str]) -> list[tuple]:
+    """(tipo, codigo, criticidad, detalle, regla_id, evidencia, confianza) por
+    resultado del radicador. Motor de Evidencias v1: cada hallazgo es trazable a
+    la regla que lo sustenta Y a la evidencia observada. La confianza es 1.0
+    porque estas validaciones son determinísticas (inventario de archivos);
+    los agentes de lectura de contenido (OCR, Fase 3) reportarán < 1.0."""
+    filas: list[tuple] = []
+    inventario = f"Inventario de {res.carpeta}: {' '.join(res.soportes_presentes) or 'vacío'}"
+    servicios = json.dumps(res.servicios, ensure_ascii=False) if res.servicios else "{}"
     for cod in res.soportes_faltantes:
         filas.append(
             (
@@ -219,6 +326,8 @@ def _hallazgos_de(res, regla_id_por_codigo: dict[str, str]) -> list[tuple[str, s
                 "BLOQUEA_RADICACION",
                 f"Falta el soporte obligatorio {cod}.",
                 regla_id_por_codigo.get(cod, "R-BASE-001"),
+                inventario,
+                1.0,
             )
         )
     for cod in res.soportes_esperados_faltantes:
@@ -229,6 +338,8 @@ def _hallazgos_de(res, regla_id_por_codigo: dict[str, str]) -> list[tuple[str, s
                 "REVISAR",
                 f"Falta el soporte clínico {cod} esperado según los servicios facturados.",
                 regla_id_por_codigo.get(cod, ""),
+                f"Servicios del RIPS que lo exigen: {servicios}. {inventario}",
+                1.0,
             )
         )
     for nombre in res.archivos_sin_clasificar:
@@ -239,12 +350,26 @@ def _hallazgos_de(res, regla_id_por_codigo: dict[str, str]) -> list[tuple[str, s
                 "ADVERTENCIA",
                 f"Archivo sin tipificar: {nombre}",
                 "",
+                f"Archivo observado en {res.carpeta}",
+                1.0,
             )
         )
     if res.estado in ("SIN_RIPS", "SIN_FEV", "SIN_CUV", "FACTURA_INCONSISTENTE"):
-        filas.append((res.estado, "", "BLOQUEA_RADICACION", " ".join(res.detalle), "R-BASE-001"))
+        filas.append(
+            (
+                res.estado,
+                "",
+                "BLOQUEA_RADICACION",
+                " ".join(res.detalle),
+                "R-BASE-001",
+                inventario,
+                1.0,
+            )
+        )
     elif res.estado == "ENTIDAD_NO_RESUELTA":
-        filas.append((res.estado, "", "BLOQUEA_RADICACION", " ".join(res.detalle), ""))
+        filas.append(
+            (res.estado, "", "BLOQUEA_RADICACION", " ".join(res.detalle), "", inventario, 1.0)
+        )
     return filas
 
 
@@ -257,6 +382,7 @@ def persistir_corrida(
     version_motor: str,
     regla_id_por_codigo: dict[str, str] | None = None,
     reglas_registro: list[dict] | None = None,
+    catalogo: list[dict] | None = None,
     origen: str = "",
     parametros: str = "",
     clasificar=None,
@@ -282,6 +408,8 @@ def persistir_corrida(
             corrida_id = cur.lastrowid
             if reglas_registro:
                 sincronizar_reglas(con, reglas_registro, version_reglas)
+            if catalogo:
+                sincronizar_catalogo(con, catalogo)
 
             n_docs = n_hall = 0
             for res in resultados:
@@ -350,10 +478,11 @@ def persistir_corrida(
                 hallazgos = _hallazgos_de(res, regla_id_por_codigo)
                 con.executemany(
                     "INSERT INTO hallazgos(factura_norm, corrida_id, agente, tipo, codigo,"
-                    " criticidad, detalle, regla_id, fecha) VALUES(?,?,?,?,?,?,?,?,?)",
+                    " criticidad, detalle, regla_id, evidencia, confianza, fecha)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     [
-                        (norm, corrida_id, agente, t, c, crit, det, rid, ahora)
-                        for t, c, crit, det, rid in hallazgos
+                        (norm, corrida_id, agente, t, c, crit, det, rid, evid, conf, ahora)
+                        for t, c, crit, det, rid, evid, conf in hallazgos
                     ],
                 )
                 n_hall += len(hallazgos)

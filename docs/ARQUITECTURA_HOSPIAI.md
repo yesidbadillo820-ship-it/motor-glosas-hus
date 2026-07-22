@@ -299,13 +299,29 @@ v1: los HTML actuales leyendo del expediente. Futuro: panel unificado.
 
 ## 9. Hoja de ruta evolutiva
 
+> **Revisión de arquitectura (22-jul-2026).** Tras la entrega de la Fase 1 se
+> hizo una revisión formal que reordenó la hoja de ruta: antes del OCR se
+> construye la **capa cognitiva** (catálogo, vigencias, evidencias, grafo,
+> supervisor), porque el OCR debe escribir SOBRE esa capa, no antes que ella.
+> Veredictos: **adoptado** → catálogo institucional ampliado, versionamiento con
+> vigencias, motor de evidencias (evidencia + confianza por hallazgo), vistas
+> del grafo + export, memoria institucional en glosas (solución/aprendizaje).
+> **Adaptado** → el grafo vive como vistas/export del expediente; un motor de
+> grafos dedicado solo si el volumen lo exige (los agentes no cambiarían).
+> El "bus de eventos" v1 ES la tabla `eventos` + `corridas` (un solo equipo, un
+> solo nodo: un bus real sería sobre-ingeniería hoy). **Diferido con criterio**
+> → agente conversacional (requiere decidir integración con la IA del Motor de
+> Glosas), predicción ML de glosas (requiere ≥1 ciclo de glosas históricas
+> cargadas en la base — primero datos, después modelos).
+
 | Fase | Entrega | Contenido |
 |---|---|---|
-| **0 · Hecha** | Motor probado con lote real | Radicador + cruce (42%→49%), explorador, tablero, diagnóstico, 89 tests |
-| **1 · Fundación** | El Expediente Digital | `hospiai.db` + esquema §4; el radicador escribe al expediente (además del CSV); reglas del motor exportadas al formato §6; contrato de agente §8.2; `analizador-ruta` completo (responsable + lote) |
-| **2 · Dominios D1/D5** | Calidad y operación | `calidad-archivos` (dañados/vacíos/duplicados), `productividad`, `tiempos-proceso`, orquestador v1 con misión diaria programada |
-| **3 · Dominio D2** | Inteligencia clínica | `lector-ocr` (reutilizando la lectura de documentos del Motor de Glosas), `coherencia-clinica`, `identidad-paciente` |
-| **4 · Dominios D4/D6** | Cartera y gerencia | `gestor-devoluciones` + histórico → grafo activo → `recomendador` y `alertas-preventivas`; plazos por contrato en el catálogo |
+| **0 · Hecha** | Motor probado con lote real | Radicador + cruce (42%→49%), explorador, tablero, diagnóstico |
+| **1 · Hecha** | El Expediente Digital | `hospiai.db` + esquema §4; el radicador persiste cada corrida (CSV intacto); reglas declarativas §6; `analizador-ruta` completo (responsable + lote); consola/panel; corrida diaria + guía |
+| **1.5 · Arquitectura Cognitiva** | **Entrega 1 (hecha):** vigencias normativas (la regla correcta según la fecha), catálogo institucional (NIT/régimen/plazo/periodicidad → `pagadores`+`contratos`), Motor de Evidencias v1 (evidencia + confianza por hallazgo, vista `vw_evidencias`, comando `evidencia`), grafo consultable (vistas + `grafo` export JSON), memoria de glosas (solución/aprendizaje/tiempo). **Entrega 2:** orquestador-supervisor (misiones, quién corrió/falló/reintenta), diccionario documental institucional validado |
+| **2 · Dominios D1/D5** | Calidad y operación | `calidad-archivos` (dañados/vacíos/duplicados), `tiempos-proceso` |
+| **3 · Dominio D2** | Inteligencia clínica | `lector-ocr` (reutilizando la lectura de documentos del Motor de Glosas) escribiendo hallazgos con confianza < 1.0 sobre el Motor de Evidencias, `coherencia-clinica`, `identidad-paciente` |
+| **4 · Dominios D4/D6** | Cartera y gerencia | `gestor-devoluciones` + histórico → grafo activo → `recomendador`, `alertas-preventivas` (plazos del catálogo) y agente conversacional; con histórico suficiente, predicción de glosas |
 | **5 · Portales** | Radicación automática | `radicador-portales` con human-in-the-loop — **solo** tras autorización de gerencia/TI y análisis legal |
 
 Regla de oro de la hoja de ruta: **cada fase entrega valor usable por sí sola**
