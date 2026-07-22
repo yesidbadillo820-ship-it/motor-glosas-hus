@@ -55,17 +55,20 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
 - Se creó **esta bitácora** como memoria común del proyecto.
 - Se corrigieron **2 pruebas automáticas del Motor de Glosas** que fallaban solas por el paso del calendario (usaban fechas fijas de abril que quedaron fuera de la ventana de 90 días). No era un error del trabajo de radicación.
 - Se recibió y adoptó la **especificación del sistema completo** (ver "Norte del proyecto" abajo): la visión de un auditor inteligente de cuentas médicas de punta a punta. Se hizo el mapa de qué partes ya existen y cuáles siguen.
+- Se definió la **arquitectura definitiva de la plataforma: HOSPIAI** (Sistema Operativo Inteligente de Cuentas Médicas). El proyecto deja de ser una herramienta y pasa a ser una plataforma de agentes organizados en 6 dominios, con expediente digital, catálogo institucional, motor de reglas, grafo de conocimiento y orquestador. Documento completo: `docs/ARQUITECTURA_HOSPIAI.md`. Todo lo ya construido se convierte en los primeros agentes (no se bota nada).
 
 ---
 
-## 🧭 NORTE DEL PROYECTO — el sistema completo al que vamos
+## 🧭 NORTE DEL PROYECTO — HOSPIAI
 
-El 22 de julio se definió la **especificación del sistema final**: un auditor
-inteligente de cuentas médicas que explore el servidor, entienda cada carpeta,
-inventaríe y valide los documentos contra la norma y el contrato de cada
-pagador, detecte errores ANTES de radicar, y haga seguimiento — con tableros y
-aprendizaje continuo. La especificación se organiza en 5 capas y varios
-"agentes". Estado actual de cada parte:
+El 22 de julio se definió la **especificación del sistema final** y su
+**arquitectura de plataforma: HOSPIAI** (Sistema Operativo Inteligente de
+Cuentas Médicas) — un sistema de agentes especializados en 6 dominios (gestión
+documental, inteligencia clínica, administrativa, financiera, operacional y
+gerencial), sobre un expediente digital, un catálogo institucional, un motor de
+reglas con fuente normativa y un grafo de conocimiento. **La arquitectura
+completa y su hoja de ruta por fases están en `docs/ARQUITECTURA_HOSPIAI.md`.**
+Estado actual de cada parte de la visión:
 
 | Parte de la visión | Estado hoy |
 |---|---|
@@ -94,6 +97,7 @@ aprendizaje continuo. La especificación se organiza en 5 capas y varios
 - [ ] **Soportes de SOAT / tránsito.** Los formularios FURIPS de los accidentes de tránsito no traen el número de factura en el nombre, por lo que no cruzan automáticamente. Es un grupo pequeño que requiere una solución aparte.
 - [ ] **Escanear los soportes que faltan.** Parte de las facturas "en revisión" simplemente todavía no tienen sus soportes clínicos escaneados. Esa es una tarea operativa del área; el explorador ya dice cuáles son y qué les falta.
 - [ ] **Dejar las mejoras disponibles en forma permanente.** Integrar el trabajo a la versión principal del proyecto para que esté en todas las sesiones, sin importar en qué rama se trabaje.
+- [ ] **HOSPIAI Fase 1 — Fundación (el Expediente Digital):** crear la base de datos de expedientes (`data/hospiai.db`), hacer que el motor de radicación escriba en ella (además del reporte de siempre), pasar las reglas al formato declarativo con fuente normativa, y definir el contrato de agente. Detalle en `docs/ARQUITECTURA_HOSPIAI.md`, sección 9.
 - [ ] **Primeros pasos del "norte" (especificación del 22 de julio):**
   - [ ] Sacar de la ruta de cada factura el **responsable** (Karin, Liliana…) y el **lote de envío** (ENV-…), y mostrarlos en el reporte y el explorador.
   - [ ] **Auditor de calidad de archivos**: detectar PDF dañados, archivos vacíos y duplicados de contenido (solo lectura).
