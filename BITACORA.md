@@ -140,6 +140,22 @@
     parcial / escalar / conciliar). El jurídico y la argumentación luego solo
     fundamentan y redactan esa decisión. Con README y pruebas. La plataforma va:
     índice → expediente → evidencia → hechos probados → **decisión**.
+  - **Nuevo `tools/piloto_conciliacion_dispensario.py` (orquestador del piloto):**
+    corre todo el flujo extremo a extremo sobre 5 casos representativos
+    (mayor valor, más glosas, contrato 287, contrato 440, y uno conocido) y deja
+    **una carpeta por expediente** (expediente/evidencia/hechos/decision.json +
+    resumen.txt + log.txt) más un `METRICAS.json` con indicadores y los
+    **umbrales de aceptación** (≥95 % facturas con soporte, ≥90 % glosas con
+    evidencia, 0 levantamientos sin hecho probado, 100 % trazables). Marca
+    `piloto_ok`. Si no cumple, la prioridad es corregir el flujo, no agregar
+    funciones. Con README y pruebas.
+  - **Casos del piloto (elegidos con datos reales):** 1) HUS0000446262 ($46,7 M,
+    287, mixto); 2) HUS0000452150 (62 glosas, 287); 3) HUS0000426013 (COBERTURA
+    SOAT $32,5 M, 287); 4) HUS0000455554 ($14,4 M, 440); 5) el que elija el
+    auditor (sugerido HUS0000436483).
+  - Nota de escala: el servidor de radicación tiene ~2,2 millones de archivos —
+    por eso el índice (una sola pasada, filtrando `HUS<n>`) es indispensable;
+    conviene apuntar la indexación a la subcarpeta del Dispensario, no a todo `X:\`.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
