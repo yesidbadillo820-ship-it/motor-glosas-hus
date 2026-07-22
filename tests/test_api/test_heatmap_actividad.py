@@ -48,6 +48,16 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _lunes_reciente():
+    """Un lunes reciente (el de la semana pasada), siempre en el pasado y
+    dentro de la ventana por defecto de 90 días — así el test no caduca al
+    avanzar el calendario."""
+    hoy = ahora_utc()
+    return (hoy - timedelta(days=hoy.weekday() + 7)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+
 def _seed(db, fecha_iso):
     """fecha_iso: '2026-04-20 09:00' (UTC)."""
     creado = datetime.fromisoformat(fecha_iso).replace(tzinfo=timezone.utc)
@@ -85,11 +95,13 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        lunes = _lunes_reciente()
+        # Lunes (weekday=0). 09:30 y 09:45 → fila 0, col 9
+        _seed(db_session, lunes.replace(hour=9, minute=30).strftime("%Y-%m-%d %H:%M"))
+        _seed(db_session, lunes.replace(hour=9, minute=45).strftime("%Y-%m-%d %H:%M"))
+        # Miércoles (weekday=2, dos días después). 14:15 → fila 2, col 14
+        miercoles = lunes + timedelta(days=2)
+        _seed(db_session, miercoles.replace(hour=14, minute=15).strftime("%Y-%m-%d %H:%M"))
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()
