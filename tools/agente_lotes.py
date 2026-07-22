@@ -205,6 +205,25 @@ def leer_reporte(ruta: Path) -> list[dict]:
         ]
 
 
+def nombre_archivo_seguro(nombre: str) -> str:
+    """Valida que `nombre` sea un nombre base, no una ruta (ronda 31).
+
+    El servidor guarda el nombre del upload y el agente lo usa para escribir
+    en disco. Un nombre con separadores permitiría escribir fuera de la
+    carpeta del lote (path traversal). El chequeo es OS-independiente (no usa
+    Path().name, que en Linux no corta el '\\' de Windows).
+    """
+    if (
+        not nombre
+        or nombre in (".", "..")
+        or "/" in nombre
+        or "\\" in nombre
+        or (len(nombre) >= 2 and nombre[1] == ":")  # C:\ estilo unidad Windows
+    ):
+        raise RuntimeError(f"nombre_archivo inseguro del servidor: {nombre!r}")
+    return nombre
+
+
 def procesar_tarea(api: ApiLotes, tarea: dict, args: argparse.Namespace) -> None:
     tarea_id = tarea["tarea_id"]
     bot = BOTS_POR_TIPO.get(tarea["tipo"])
@@ -212,6 +231,10 @@ def procesar_tarea(api: ApiLotes, tarea: dict, args: argparse.Namespace) -> None
         api.completar(tarea_id, False, [], f"Tipo de tarea no soportado: {tarea['tipo']}")
         return
 
+    # Ronda 31: sanear el nombre en el dict — lo usan tanto la descarga como
+    # construir_comando (--excel). Un nombre con separadores permitiría
+    # escribir/leer fuera de la carpeta del lote (path traversal).
+    tarea["nombre_archivo"] = nombre_archivo_seguro(tarea["nombre_archivo"])
     carpeta = args.workdir / f"lote_{tarea['lote_id']}"
     reporte = carpeta / "reporte.csv"
     api.descargar_excel(tarea_id, carpeta / tarea["nombre_archivo"])
@@ -290,7 +313,12 @@ def main() -> int:
     while True:
         try:
             tarea = api.reclamar()
-        except (RuntimeError, urllib.error.URLError) as e:
+        except Exception as e:
+            # Ronda 31: antes solo (RuntimeError, URLError) — un timeout de
+            # lectura (socket.timeout → OSError) o una respuesta no-JSON
+            # (JSONDecodeError) tumbaba el agente. Exception no atrapa
+            # KeyboardInterrupt/SystemExit (son BaseException), así que Ctrl+C
+            # sigue deteniéndolo. La recuperación (reintento) queda intacta.
             logger.warning(f"No pude reclamar tarea ({e}); reintento en {args.intervalo}s.")
             tarea = None
         if tarea is not None:
