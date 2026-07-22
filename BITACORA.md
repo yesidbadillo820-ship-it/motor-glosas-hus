@@ -35,6 +35,18 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 - **08 al 10-04:** primera versión de la aplicación: análisis de glosas con IA,
   dictámenes con normativa colombiana (Res. 3047/2008, Ley 1438/2011, etc.),
   importación masiva desde Excel, exportación a Excel, seguridad de acceso.
+- **13 al 25-04:** la aplicación crece: generación masiva en lote, conciliación
+  bilateral con acta y PDF institucional, informe ejecutivo mensual para
+  gerencia, catálogo de tarifas pactadas por EPS, homologación Res. 2641/2025,
+  exportes con el formato exacto del DGH, pre-análisis automático diario y
+  dashboard ejecutivo.
+- **26 al 30-04:** panel de administración completo (usuarios, equipos,
+  notificaciones), sincronización de soportes desde el servidor del hospital
+  (jumpbox) y tarifas FOMAG actualizadas al contrato nuevo.
+
+### Mayo 2026 — Estabilización
+- Importación masiva con progreso e historial, auditor forense IA, panel de
+  diagnóstico del sistema, y correcciones a partir del uso real diario.
 
 ### Junio 2026 — Nacen los robots de carga
 - **11-06:** primera versión del **bot de COOSALUD**: entra al portal, busca cada
@@ -48,17 +60,24 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   médica (`--incluir-calidad`), cerrar glosas residuales que el Excel no traía
   (`--cerrar-residuales`), buscar el PDF de soporte en carpetas alternativas del
   share. Guías escritas de los bots. Bot SIMED: manejo de ventanas emergentes.
+  **Respuesta de glosas Dispensario en SIMED:** lote cerrado completo — 8
+  facturas / 24 objeciones en 26,9 minutos con el robot.
 - **23 y 24-06:** **cargue DIA 3 JUNIO (COOSALUD):** se cerraron las 118 facturas
   pendientes de la hoja BASE y las 26 de la hoja CALIDAD (4.936 glosas). Dos
   facturas fallaron por un detalle del portal al elegir el código de respuesta;
   se corrigió el bot y cerraron en la segunda pasada.
 - **25 y 26-06:** Word de evidencias del **lote 69** (46 de 69 facturas tenían
   pantallazo; 23 quedaron identificadas sin evidencia). Nace `evidencias_a_pdf.py`.
-  Diagnóstico de las 12 facturas pendientes del Lote V2 del Dispensario.
+  **Diagnóstico de las 12 facturas pendientes del Lote V2 del Dispensario:** se
+  descubrió que el registro estaba equivocado en 6 — cinco que figuraban
+  "subidas OK" nunca tuvieron validación del Ministerio (el servicio interno
+  de validación estaba caído y guardó el error como si fuera el resultado).
+  Se armó la carpeta `PENDIENTES_12` con ficha de estado por factura.
 - **30-06:** arranca el **bot de Dinámica Gerencial (DGH)** (muchas iteraciones
   para dominar el programa de escritorio). **Tablero de Radicación y Cartera**
   (informe HTML con alertas de mora +90 días, exportar a Excel). Mejoras al
-  motor IA (rondas 19-22) y set de evaluación de calidad de los dictámenes.
+  motor IA (rondas 19-22) y set de evaluación de calidad de los dictámenes:
+  la calidad del motor pasó de **2,5 a ~9 sobre 10**.
 
 ### Julio 2026 — Contratos reales, lotes masivos y cierre de pendientes
 - **01 al 03-07:** el motor IA aprende los **contratos reales por EPS**
@@ -71,7 +90,9 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   extemporáneas (código RE9502) no exijan soporte PDF (5 facturas que estaban
   trabadas cerraron de una). Se definió la estructura de carpetas por
   mes/día para archivar evidencias y Word. **Informe de efectividad para
-  gerencia** (página web con el antes/después).
+  gerencia** (página web con el antes/después). También: **informe de gestión
+  del Lote V2 de notas crédito** (`INFORME_GERENCIA.md`, 12 facturas por
+  $108,5 millones facturados con comparativo manual vs. automatizado).
 - **10 al 21-07 (corridas del auditor):** se analizaron y lanzaron los
   **LOTES 02 (300 fact.), 06 (300), 07 (300) y 08 (75)** de COOSALUD.
   El LOTE 7 llegó primero como listado de objeciones sin respuestas
@@ -79,18 +100,24 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   En los lotes 06/07/08 quedaron 37 facturas con la pertinencia médica
   sin responder (el médico aún no la tipificaba).
 - **17-07:** informe técnico en Word de los **rechazos CUV de 4 facturas
-  conciliadas** (para enviar al área).
+  conciliadas** (`INFORME_RECHAZOS_CUV.docx`, para enviar al área): 3 rechazadas
+  por el Ministerio con código RVC086 ("código de diagnóstico repetido", con el
+  campo exacto del RIPS a corregir) y 1 cuya validación nunca corrió (servicio
+  interno caído). Incluye el argumento clave: lo que al radicar la factura
+  salía como *objeción* se convirtió en *error bloqueante* en la nota crédito.
+  Dato: SISTEMAS ya reintentó 2 el 25-06 sin corregir el RIPS y volvió a fallar.
 - **22-07 (hoy):** llegaron las respuestas de pertinencia en 3 archivos
   ("PERTINENCIA (1)", "ok" y "15"). Se detectó que **cada archivo estaba
   incompleto pero se complementaban** entre sí → se fusionaron en
   **CONSOLIDADO_PERTINENCIA_6JULIO_FUSIONADO.xlsx** (37 facturas, 5.736
   glosas, cero sin respuesta, todas RE9901). Quedó listo el comando para
-  correrlo. Se creó esta bitácora.
+  correrlo. Se creó esta bitácora (fusionando el trabajo de dos chats).
 
 ---
 
 ## 3) PENDIENTE
 
+### COOSALUD
 1. **Correr el consolidado fusionado de pertinencia** (37 facturas / 5.736
    glosas) con `--hoja CALIDAD --incluir-calidad`. Con eso los LOTES 06, 07 y
    08 quedan cerrados al 100%. El archivo está en Downloads como
@@ -104,21 +131,42 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    por revisar): decidir si se reprocesan o se documentan como están.
 5. **HUS504096:** factura mencionada en un cruce de junio que no aparece en
    ningún consolidado. Verificar de qué lote es o si el número está mal escrito.
-6. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
-   proceso manual y cuántas personas) para poner el multiplicador exacto.
-7. **Rechazos CUV:** hacer seguimiento a la respuesta del área sobre las 4
-   facturas conciliadas (informe enviado el 17-07).
+
+### Notas crédito Dispensario (Lote V2) — detalle en `docs/diagnostico_lote_v2_pendientes/`
+6. **Rechazos CUV:** hacer seguimiento a la respuesta del área sobre las 4
+   facturas conciliadas (informe enviado el 17-07). Esperando de SISTEMAS:
+   - Corregir el RIPS y revalidar las 3 con **RVC086** (HUS404136, HUS410675,
+     HUS435485) — el reintento sin corregir ya se probó el 25-06 y volvió a fallar.
+   - Reejecutar la validación que nunca corrió (servicio caído) de las 6:
+     HUS411234, HUS420099, HUS421733, HUS418576, HUS420160, HUS422238.
+   - Cuando confirmen: revalidar los CUV (comando en el README de la carpeta
+     del diagnóstico) y radicar en SIMED con el robot.
+7. **Descargar del DIAN los PDF de 2 notas:** HUS413266 (radicado 492346) y
+   HUS417459 (radicado 521665). Sin ese PDF no se pueden armar las carpetas.
+8. **Dos consultas a FACTURACIÓN:** (a) HUS440328 — ¿la nota vigente es la
+   302111 del histórico o emitieron una nueva?; (b) HUS422238 — confirmar que
+   la nota 311199 sí le corresponde (no aparece en el histórico de conciliación).
+9. **Verificar el resto del Lote V2:** las que estaban "COMPLETA" sin subir
+   (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
+   437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
+
+### Informes
+10. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
+    proceso manual y cuántas personas) para poner el multiplicador exacto.
 
 ## 4) PARA MAÑANA
 
-1. Correr la **pertinencia fusionada** (punto 1 de pendientes) y verificar que
-   las 37 facturas cierren con evidencia.
+1. Correr la **pertinencia fusionada** (pendiente #1) y verificar que las 37
+   facturas cierren con evidencia.
 2. Con los reportes en mano, **cerrar los flecos de los lotes 02/06/07/08**
    (segunda pasada de las que queden pendientes).
 3. Generar los **Words de evidencia** de todo lo cerrado y archivarlos en sus
    carpetas por mes/día.
 4. Actualizar el **informe de gerencia** con el acumulado real de julio
    (facturas y glosas cerradas por lote).
+5. Si hay tiempo, avanzar el frente Dispensario: verificar si SISTEMAS ya
+   corrigió algún CUV (pendiente #6) y descargar los 2 PDF del DIAN
+   (pendiente #7).
 
 ---
 
@@ -131,6 +179,11 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   `COOSALUD_PASSWORD`). Nunca escritas en archivos ni en comandos.
 - **Índice de soportes:** `D:\USUARIO CARTERA\Desktop\BUSCADOR_HUS\indice_facturas_HUS.txt`.
 - **Reportes y evidencias:** `D:\USUARIO CARTERA\Documents\COOSALUD\`.
+- **Notas crédito Dispensario:** diagnóstico e informes en
+  `docs/diagnostico_lote_v2_pendientes/` (repo); carpetas de trabajo en
+  `D:\USUARIO CARTERA\Documents\NOTAS ANTIGUAS\LOTE_DISPENSARIO_2026-06_V2\`
+  (subcarpeta `PENDIENTES_12` con ficha por factura); fuente oficial XML/CUV en
+  `\\172.16.32.83\factura_electronica_net22\<AAAAMM>\FACTURAS_NOTA\<nota>\`.
 - **Regla de reanudación:** si un cargue se corta (luz, portal caído), NO se
   pierde nada: se relanza con `--saltar-csv <reporte anterior>` y un nombre de
   reporte nuevo. El bot salta lo ya cerrado y no duplica respuestas.
