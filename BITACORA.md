@@ -4,7 +4,7 @@
 > Al iniciar cualquier sesión: leer este archivo primero.
 > Al terminar: actualizarlo con lo hecho, lo pendiente y lo que sigue, con la fecha.
 
-**Última actualización: 22/07/2026**
+**Última actualización: 22/07/2026 (tarde — cierre del lote 1.600)**
 
 ---
 
@@ -60,32 +60,39 @@
   - Todas a tiempo (RE9901): el consolidado de respuestas salió con los textos oficiales del área.
   - Homologación de códigos de glosa vieja→nueva resolución: 206→TA0601 · 207→TA0701 (confirmado) · 223→TA2301 · 423→AU2301.
   - **CONSOLIDADO RESPUESTAS GLOSAS MASIVO 1600.xlsx**: un solo Excel con las 4.395 respuestas de los 6 lotes.
-- **22/07** — **Operación** (chat):
-  - Arrancó la respuesta masiva de las 1.600 en el portal COOSALUD con el bot.
-  - Se dividió el trabajo en **4 ventanas en paralelo** (listas de 400 facturas cada una) para acelerar: PARALELO_1 a 4, cada una con su reporte y su carpeta de evidencias.
+- **22/07** — **Operación** (chat) — día de cierre del lote 1.600:
+  - **Portal COOSALUD en paralelo**: 4 ventanas a la vez (listas de 400). En 2,5 horas se cerraron **1.425 facturas** (+84 de la corrida de la mañana = 1.509); quedaron 90 "no en bolsa" y 1 error.
+  - La plataforma reportó **137 facturas pendientes** (las 41 del lote del 16/07 + 96 del 1.600). Se les armó su Excel de respuestas (`CONSOLIDADO RESPUESTAS PENDIENTES 137.xlsx`) y su lista para el bot, con `--incluir-calidad` porque las extemporáneas responden TODO con RE9502.
+  - **Objeciones del lote 1.600 confirmadas en DGH** (el export de seguimiento las trae con fecha 17/07).
+  - **Trámites DGH generados y entregados**: 4 lotes de máximo 499 (1.599 facturas, RE9901) + el archivo de las **35 restantes del lote del 16/07** (RE9502). Listos para que los suban los de DGH.
+  - **HUS530335** no se pudo objetar ("no está en DGH", igual que las 5 famosas) → registro manual.
+  - Sorpresa: 4 de las 5 que no cruzaban (513595, 515251, 516765, 520580) **ya aparecen registradas en DGH** (06/07) — alguien las metió a mano.
+  - **Excel GI-33-5181-2026**: control de 2.215 facturas contra todo lo trabajado en el chat — las 2.215 están, 0 NA.
+  - Se dejaron los comandos para unificar las evidencias (Word + PDF `GI-33-5181-2026`) y armar la carpeta en el servidor Z: (RESPUESTA GLOSA INICIAL\GI-33-5181-2026 + EVIDENCIAS SUBIDAS).
+  - Se creó esta **bitácora** y la instrucción en CLAUDE.md; se arregló el CI (3 pruebas con fechas vencidas) y quedó en verde.
 
 ---
 
 ## PENDIENTE
 
-1. **Terminar la respuesta de las 1.600 en el portal COOSALUD** (4 ventanas en paralelo corriendo). Al final: cuadrar los 4 reportes (reporte_R1..R4.csv) contra las 1.600 y revisar las que salgan NO_EN_BOLSA.
-2. **Confirmar el cargue a DGH de los 6 OBJECIONES del lote 1.600** (ya generados con la base DGH).
-3. **Trámites del lote 41**: re-exportar el seguimiento en DGH (bajando el scroll hasta el final para que salgan todas) y generar el archivo de las **35 facturas restantes**. Las 6 primeras ya tienen archivo (MASIVO COOSALUD 21072026 PARCIAL).
-4. **37 facturas de auditoría médica** (36 En Pausa + 1 En Bolsa del masivo del 14/07): subir sus trámites cuando las doctoras respondan.
-5. **5 facturas que no cruzan en DGH** (HUS506920, HUS513595, HUS515251, HUS516765, HUS520580): registrarlas manualmente en DGH o esperar base actualizada.
-6. **Casos sueltos por verificar**: HUS531067 (trámite del 14/07 que apareció en un export) y HUS520206 (quedó sin responder en el portal).
-7. **Confirmar en DGH** que existen los códigos TA0601, TA2301 y AU2301; si se confirman, agregar la tabla de homologación al bot consolidador.
-8. **Evidencias del lote 1.600**: cuando termine el portal, unificar los pantallazos en Word/PDF y armar la carpeta GI-33-XXXX-2026.
+1. **Correr el comando de las 137 pendientes** en el portal (Excel y lista ya entregados) y cuadrar con su reporte.
+2. **Que los de DGH suban los 5 archivos de trámites** entregados el 22/07 (4 lotes del 1.600 + 35 restantes). Si el parcial de 6 facturas del 21/07 no se ha subido, subirlo también.
+3. **Evidencias**: correr los 4 pasos (lista → Word → PDF `GI-33-5181-2026` → carpeta en Z:) cuando estén cerradas las 137.
+4. **Registrar manualmente en DGH**: HUS530335 y HUS506920 (sus servicios no están en la base DGH).
+5. **4 de las 5 no-cruzadas ya registradas en DGH** (513595, 515251, 516765, 520580): definir su respuesta y generar su mini-trámite.
+6. **37 facturas de auditoría médica** (masivo del 14/07): subir sus trámites cuando las doctoras respondan (sus conceptos ya vienen en el export del 22/07).
+7. **Casos sueltos**: HUS531067 (trámite del 14/07, verificar si ya tiene respuesta) y HUS520206 (está entre las 37 de doctoras).
+8. **Confirmar en DGH** los códigos TA0601, TA2301 y AU2301 para dejar la homologación 206/207/223/423 en el bot.
 
 ---
 
 ## PARA MAÑANA (23/07/2026)
 
-1. Revisar cómo amanecieron las 4 ventanas del paralelo; reanudar las que falten con `--saltar-csv` y cerrar las 1.600.
-2. Hacer el cuadre final: 4 reportes CSV vs las 1.600 (cerradas / no en bolsa / pendientes) e informe del día.
-3. Re-export de seguimiento DGH del lote 41 → generar y subir el archivo de trámites de las 35 restantes.
-4. Confirmar (o hacer) el cargue de los 6 OBJECIONES del lote 1.600 en DGH; si DGH devuelve errores, usar el bot CORREGIR ERRORES DGH.
-5. Preguntar a auditoría médica por las 37 facturas de CALIDAD pendientes.
+1. Verificar que los de DGH hayan subido los 5 archivos de trámites; si devuelven errores, corregir y reintentar.
+2. Correr (si no se corrió hoy) el comando de las 137 pendientes y confirmar que el portal quede en cero.
+3. Evidencias → PDF GI-33-5181-2026 → carpeta en el servidor Z:.
+4. Registrar a mano HUS530335 y HUS506920 en DGH.
+5. Preguntar a auditoría médica por las 37 de CALIDAD.
 
 ---
 
