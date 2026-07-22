@@ -68,7 +68,10 @@ PALABRAS_CLAVE_COMPLEJIDAD_CRITICA: tuple[str, ...] = (
     # Groq en vez de escalar a Claude.
     "FACTOR VII",
     "EPTACOG",
-    "INHIBIDOR",
+    # Ronda 30: "INHIBIDOR" suelto escalaba cualquier glosa con IBP/IECA
+    # ("inhibidor de bomba de protones"). Exige contexto hematológico.
+    "INHIBIDOR DEL FACTOR",
+    "INHIBIDORES DEL FACTOR",
     "FEIBA",
     "APCC",
     "GAUCHER",

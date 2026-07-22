@@ -1,7 +1,7 @@
 import re
 import uuid
 from typing import Optional
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -1086,7 +1086,7 @@ def buscar_avanzado(
     Devuelve hasta `limit` resultados (default 50, max 500), ordenados
     DESC por creado_en.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     q = db.query(GlosaRecord)
     if eps:
@@ -1117,10 +1117,11 @@ def buscar_avanzado(
             raise HTTPException(400, "fecha_desde debe ser YYYY-MM-DD")
     if fecha_hasta:
         try:
-            dt = datetime.strptime(fecha_hasta, "%Y-%m-%d").replace(
+            # Ronda 30: inclusive del día completo (antes excluía el día 'hasta').
+            dt = (datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)).replace(
                 tzinfo=timezone.utc,
             )
-            q = q.filter(GlosaRecord.creado_en <= dt)
+            q = q.filter(GlosaRecord.creado_en < dt)
         except ValueError:
             raise HTTPException(400, "fecha_hasta debe ser YYYY-MM-DD")
 
@@ -1726,8 +1727,10 @@ def dashboard_plata_recuperada(
             raise HTTPException(400, "desde debe ser YYYY-MM-DD")
     if hasta:
         try:
-            h = datetime.fromisoformat(hasta)
-            base_q = base_q.filter(GlosaRecord.creado_en <= h)
+            # Ronda 30: 'hasta' inclusive del día completo — antes 'YYYY-MM-DD'
+            # parseaba a medianoche 00:00 y excluía todo ese día.
+            h = datetime.strptime(hasta, "%Y-%m-%d") + timedelta(days=1)
+            base_q = base_q.filter(GlosaRecord.creado_en < h)
         except ValueError:
             raise HTTPException(400, "hasta debe ser YYYY-MM-DD")
 
@@ -2655,12 +2658,15 @@ def exportar_resumen_eps_csv(
         estado = (g.estado or "").upper()
         if estado in ESTADOS_CERRADOS:
             b["cerradas"] += 1
-            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
-                b["decididas"] += 1
-                if estado == "LEVANTADA":
-                    b["levantadas"] += 1
         else:
             b["abiertas"] += 1
+        # Ronda 30: RATIFICADA NO está en ESTADOS_CERRADOS, así que la rama
+        # anidada de decididas era código muerto — la EPS que ratifica sí
+        # DECIDIÓ. El conteo de decididas/levantadas va desanidado.
+        if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
 
     def _generar():
         buf = io.StringIO()
@@ -5586,6 +5592,12 @@ async def importar_recepcion(
     y tumbe la app (incidente 2026-05-19).
     """
     req_id = set_request_id()
+    # Ronda 30: validar el tamaño ANTES de cargar todo a RAM. archivo.size
+    # ya viene del multipart spooleado a disco por Starlette (no depende del
+    # Content-Length del cliente). En la VM de 1GB, un upload gigante hacía
+    # OOM justo al await read().
+    if archivo.size is not None and archivo.size > 15_000_000:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (>15 MB)")
     contenido = await archivo.read()
     if not contenido:
         raise HTTPException(status_code=400, detail="Archivo vacío")

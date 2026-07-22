@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import Optional
-from slowapi.util import get_remote_address
+from app.core.rate_limit import get_client_ip
 
 from app.core.logging_utils import logger
 from app.database import get_db
@@ -30,7 +30,7 @@ async def login_for_access_token(
     # IP del cliente para auditoría de seguridad. Se loguea en TODOS los
     # outcomes (éxito, password incorrecto, 2FA fallido) para detectar
     # patrones de brute-force en logs centralizados / Sentry.
-    ip_cliente = get_remote_address(request)
+    ip_cliente = get_client_ip(request)
     email_intento = (form_data.username or "").strip().lower()
 
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -174,7 +174,7 @@ def logout(
       - Forense: si hay duda sobre actividad post-logout
       - Cumplimiento Habeas Data (Ley 1581/2012)
     """
-    ip = get_remote_address(request)
+    ip = get_client_ip(request)
     logger.info(f"[AUTH-LOGOUT] Cierre de sesión | email={current_user.email} | ip={ip}")
     return {
         "ok": True,
@@ -207,7 +207,7 @@ def emitir_token_integracion(
       • Para revocar: desactivar la cuenta de servicio en el panel Usuarios
         (get_usuario_actual valida `activo` en cada request).
     """
-    ip = get_remote_address(request)
+    ip = get_client_ip(request)
     email_norm = (email or "").strip().lower()
 
     destino = db.query(UsuarioRecord).filter(UsuarioRecord.email == email_norm).first()
@@ -268,7 +268,7 @@ def refresh_token(
             detail="Usuario desactivado",
         )
     cfg = get_settings()
-    ip = get_remote_address(request)
+    ip = get_client_ip(request)
     expires = timedelta(minutes=cfg.access_token_expire_minutes)
     new_token = create_access_token(
         data={"sub": current_user.email},

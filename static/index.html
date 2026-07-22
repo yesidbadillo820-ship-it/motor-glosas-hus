@@ -6256,6 +6256,18 @@ function fmtCOP(v){return v?fmt.format(v):'$0'}
 function authH(){return {'Authorization':'Bearer '+TOKEN}}
 function H(obj){return Object.assign({'Authorization':'Bearer '+TOKEN},obj||{})}
 
+// Ronda 30: escape HTML para datos crudos (eps, factura, paciente, radicado,
+// detalles de contrato...) que se inyectan con innerHTML. Sin esto, un valor
+// como una EPS o una observación con '<img onerror=...>' ejecutaba script en
+// la sesión del auditor (XSS almacenado). NO usar sobre HTML legítimo que el
+// propio front arma (badges, el dictamen que viene como HTML del backend).
+function escHtml(v){
+  if(v===null||v===undefined) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // Sonidos opcionales para toasts (success/error). Se desactivan desde el
 // panel Usuarios con localStorage('sonidos_off'=='1'). Web Audio API sin
 // archivos externos — genera tonos sintetizados de 50ms.
@@ -13088,10 +13100,10 @@ function _renderMisGlosas(dataRaw){
 
       return '<tr data-glosa-id="' + g.id + '">' +
         '<td class="cell-center"><input type="checkbox" class="bulk-chk" value="' + g.id + '" onchange="actualizarContadorLote()"/></td>' +
-        '<td>' + prioBadge + (g.gestor_nombre || '—') + '</td>' +
-        '<td>' + (g.eps || '—') + '<span class="mis-tasa-badge" data-tasa-for="' + g.id + '"></span></td>' +
-        '<td class="mono">' + (g.factura || '—') + '</td>' +
-        '<td class="mono">' + (g.consecutivo_dgh || '—') + '</td>' +
+        '<td>' + prioBadge + escHtml(g.gestor_nombre || '—') + '</td>' +
+        '<td>' + escHtml(g.eps || '—') + '<span class="mis-tasa-badge" data-tasa-for="' + g.id + '"></span></td>' +
+        '<td class="mono">' + escHtml(g.factura || '—') + '</td>' +
+        '<td class="mono">' + escHtml(g.consecutivo_dgh || '—') + '</td>' +
         '<td>' + radicadoTxt + '</td>' +
         '<td>' + tipoTxt + '</td>' +
         '<td class="num">$' + valor + '</td>' +
@@ -14294,9 +14306,9 @@ async function loadContratos(){
     grid.innerHTML='';
     document.getElementById('n-contratos').textContent=data.length;
     data.forEach(function(c){
-      sel.innerHTML+='<option value="'+c.eps+'">'+c.eps+'</option>';
-      hEps.innerHTML+='<option value="'+c.eps+'">'+c.eps+'</option>';
-      grid.innerHTML+='<div class="contrato-card"><div class="contrato-eps">'+c.eps+'</div><div class="contrato-det">'+c.detalles+'</div></div>';
+      sel.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
+      hEps.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
+      grid.innerHTML+='<div class="contrato-card"><div class="contrato-eps">'+escHtml(c.eps)+'</div><div class="contrato-det">'+escHtml(c.detalles)+'</div></div>';
     });
   }catch(e){console.error(e);}
 }

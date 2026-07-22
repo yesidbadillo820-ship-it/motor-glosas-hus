@@ -42,6 +42,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.core.logging_utils import logger
+from app.utils.excel_seguro import sanear_celda_excel
 from app.core.tz import ahora_utc
 from app.models.db import (
     ClausulaContrato,
@@ -537,7 +538,9 @@ def _armar_hoja_respuesta(ws: Worksheet, ctx: _ContextoLote, filas: list[dict]) 
             f["respuesta"],
         ]
         for col, valor in enumerate(valores, start=1):
-            celda = ws.cell(row=fila_excel, column=col, value=valor)
+            # Ronda 30: sanear texto de EPS/dictamen (inyección de fórmulas
+            # Excel + caracteres de control). Los números pasan intactos.
+            celda = ws.cell(row=fila_excel, column=col, value=sanear_celda_excel(valor))
             celda.border = _BORDE_FINO
             if col in (5, 9):  # VR FACTURA / VR GLOSADO
                 celda.font = fuente_dato

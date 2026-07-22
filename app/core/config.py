@@ -11,6 +11,9 @@ _UNCONFIGURED_ADMIN_PASSWORD = "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
 
 
 class Settings(BaseSettings):
+    # Ronda 30: URL pública para los enlaces de los correos (antes había
+    # hosts viejos y contradictorios: onrender.com y fly.dev).
+    app_base_url: str = "https://iaglosassinac.help"
     database_url: str = "sqlite:///./glosas.db"
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
@@ -100,6 +103,13 @@ class Settings(BaseSettings):
     # (degradación elegante total). Override por env:
     # GLOSA_CAMPOS_ESTRUCTURADOS=true.
     glosa_campos_estructurados: bool = False
+
+    # Token compartido del agente local de lotes (tools/agente_lotes.py).
+    # El agente corre headless en el PC del hospital y no puede usar JWT
+    # de usuario (expiran a las 8h): se autentica con este token estático
+    # vía header X-Agente-Token. Vacío = endpoints del agente deshabilitados
+    # (devuelven 503), así un deploy sin configurar no expone la cola.
+    agente_lotes_token: str = ""
 
     model_config = {
         "env_file": ".env",

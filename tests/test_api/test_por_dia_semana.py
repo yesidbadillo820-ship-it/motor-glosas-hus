@@ -48,16 +48,13 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _ultimo(dia_semana: int, hora: int = 10, minuto: int = 0):
-    """Última ocurrencia PASADA (1-7 días atrás) del día pedido (0=Lunes).
-
-    Fechas relativas a hoy para que el test no caduque: con fechas fijas
-    (abril 2026) los eventos salían de la ventana default de 90 días del
-    endpoint y los counts daban 0 (bomba de tiempo detectada el 22-jul-2026)."""
+def _lunes_reciente():
+    """Lunes de la semana pasada (7-13 días atrás): siempre en el pasado y
+    dentro de la ventana default de 90 días, sin importar la fecha de hoy."""
     ahora = ahora_utc()
-    atras = (ahora.weekday() - dia_semana) % 7 or 7
-    base = ahora - timedelta(days=atras)
-    return base.replace(hour=hora, minute=minuto, second=0, microsecond=0)
+    return (ahora - timedelta(days=ahora.weekday() + 7)).replace(
+        hour=10, minute=0, second=0, microsecond=0
+    )
 
 
 def _seed(db, fecha):
@@ -86,11 +83,11 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # Último lunes (dentro de la ventana de 90 días)
-        _seed(db_session, _ultimo(0, hora=10))
-        _seed(db_session, _ultimo(0, hora=11))
-        # Último miércoles
-        _seed(db_session, _ultimo(2, hora=10))
+        lunes = _lunes_reciente()
+        _seed(db_session, lunes)
+        _seed(db_session, lunes + timedelta(hours=1))
+        miercoles = lunes + timedelta(days=2)
+        _seed(db_session, miercoles)
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -100,11 +97,12 @@ class TestPorDiaSemana:
         assert d["total_glosas"] == 3
 
     def test_pct_del_total(self, client, db_session):
-        # 4 glosas el último lunes
+        lunes = _lunes_reciente()
+        # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session, _ultimo(0, hora=10))
-        # 1 glosa el último martes
-        _seed(db_session, _ultimo(1, hora=10))
+            _seed(db_session, lunes)
+        # 1 glosa el martes
+        _seed(db_session, lunes + timedelta(days=1))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -113,8 +111,6 @@ class TestPorDiaSemana:
         assert items["Martes"]["pct_del_total"] == 20.0
 
     def test_excluye_fuera_ventana(self, client, db_session):
-        from datetime import timedelta
-
         ahora = ahora_utc()
         # Reciente
         _seed(db_session, ahora - timedelta(days=10))

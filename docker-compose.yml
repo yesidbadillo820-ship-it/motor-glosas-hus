@@ -26,6 +26,19 @@ services:
     build: .
     container_name: motor-glosas-hus
     restart: unless-stopped
+    # Ronda 30: la VM e2-micro (1GB) no tenía tope de memoria — cuando el
+    # motor picaba, el OOM killer del kernel mataba procesos AL AZAR (incluso
+    # cloudflared o sshd). Con mem_limit el cgroup mata al uvicorn (exit 137)
+    # y restart: unless-stopped lo revive, contenido y sin arrastrar al resto.
+    # memswap_limit igual a mem_limit → falla rápido en vez de swappear.
+    mem_limit: 640m
+    memswap_limit: 640m
+    # Rotación de logs: sin esto json-file crece sin límite y llena el disco.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     # Sin "ports:" — el motor NO se expone al host. Solo cloudflared lo
     # alcanza vía la red interna `motor-net`. Más seguro.
     expose:
@@ -83,6 +96,12 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Token del agente local de lotes (tools/AgenteLotes.pyw). Sin esta
+      # línea la variable del .env NO llega al contenedor y /agente/lotes
+      # responde 503 para siempre (piloto 17-jul-2026). El default vacío
+      # es seguro aquí: agente_lotes_token es str y "" significa
+      # "endpoints del agente deshabilitados" — el comportamiento diseñado.
+      AGENTE_LOTES_TOKEN: ${AGENTE_LOTES_TOKEN:-}
       # Observability — opcionales. Sin estas vars el motor arranca igual
       # pero el panel de Diagnóstico marca warning (los errores no llegan
       # a Sentry y la analítica de uso no llega a PostHog). Setup gratis:
@@ -112,6 +131,14 @@ services:
     container_name: motor-glosas-cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    # Ronda 30: tope de memoria para que un pico de buffers QUIC no lo deje
+    # a merced del OOM global; 128m deja margen sobre el idle de ~30-60MB.
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       - motor
     networks:

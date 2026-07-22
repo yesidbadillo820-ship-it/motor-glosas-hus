@@ -305,6 +305,16 @@ def stats_concentracion_pareto(
 
     valores = sorted(por_eps.values(), reverse=True)
     total = sum(valores)
+    # Ronda 30: si el objetado total es 0 (o negativo), evitar ZeroDivision
+    # (500) en el cálculo de Pareto/Gini — devolver el payload vacío.
+    if total <= 0:
+        return {
+            "total_eps": len(por_eps),
+            "valor_total": 0,
+            "eps_para_80_pct": 0,
+            "gini_coefficient": 0.0,
+            "top_eps_concentracion": [],
+        }
 
     # Pareto: cuántas EPS para 80%
     acumulado = 0.0
@@ -924,8 +934,10 @@ def stats_estatus_eps(
         b = por_eps[eps]
         b["total"] += 1
         estado = (g.estado or "").upper()
-        if estado in ESTADOS_CERRADOS:
-            if estado in {"LEVANTADA", "ACEPTADA"}:
+        # Ronda 30: RATIFICADA es una DECISIÓN de la EPS (cerró el trámite),
+        # no una glosa abierta — antes caía al else y contaba como vencida.
+        if estado in ESTADOS_CERRADOS or estado == "RATIFICADA":
+            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
                 b["decididas"] += 1
                 if estado == "LEVANTADA":
                     b["levantadas"] += 1
@@ -5482,7 +5494,18 @@ def stats_dashboard_cobranza(
     por_eps: dict[str, float] = {}
     por_factura: dict[str, dict] = {}
 
+    # Ronda 30: saldo_factura y valor_factura son campos a NIVEL DE FACTURA.
+    # Si una factura tiene varias glosas abiertas, el saldo se sumaba una vez
+    # por glosa → doble/triple conteo de la cartera en los KPIs. Se procesa
+    # cada factura UNA sola vez; las glosas sin factura (o "N/A") se cuentan
+    # individualmente por id para no perderlas del total.
+    _repr_factura: dict[str, GlosaRecord] = {}
     for g in abiertas:
+        factura = (g.factura or "").strip()
+        clave = factura if (factura and factura != "N/A") else f"__id_{g.id}"
+        _repr_factura.setdefault(clave, g)
+
+    for g in _repr_factura.values():
         saldo = float(g.saldo_factura or 0)
         valor = float(g.valor_factura or 0)
         saldo_total += saldo

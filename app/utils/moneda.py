@@ -30,13 +30,22 @@ __all__ = ["parse_valor_cop", "palabras_a_numero"]
 # 10-jun-2026 una glosa de "$850 millones" entró a BD como $850 (misma
 # clase de bug que el 100×, segunda aparición). El orden importa:
 # "mil millones" debe evaluarse antes que "millones" y que "mil".
+# Ronda 30: los patrones exigen un DÍGITO adyacente (lookbehind) a la palabra
+# escala. Antes buscaban la palabra en TODO el string, así que
+# "$5.000.000 (CINCO MILLONES DE PESOS M/CTE)" detectaba "millones" y
+# multiplicaba la cifra ya completa por 1.000.000 (error de 10^6). Con el
+# lookbehind, "850 millones" sigue matcheando (dígito + espacio + palabra)
+# pero "CINCO MILLONES" (letras antes de la palabra) no.
 _MULTIPLICADORES = (
     (
-        re.compile(r"\bmil(?:es)?\s+de\s+millones\b|\bmil\s+millones\b", re.IGNORECASE),
+        re.compile(
+            r"(?<=\d)\s*(?:de\s+)?\b(?:mil(?:es)?\s+de\s+millones|mil\s+millones)\b",
+            re.IGNORECASE,
+        ),
         1_000_000_000,
     ),
-    (re.compile(r"\bmillon(?:es)?\b|\bmillón\b|\bmillones\b", re.IGNORECASE), 1_000_000),
-    (re.compile(r"\bmil(?:es)?\b", re.IGNORECASE), 1_000),
+    (re.compile(r"(?<=\d)\s*(?:de\s+)?\b(?:millon(?:es)?|millón)\b", re.IGNORECASE), 1_000_000),
+    (re.compile(r"(?<=\d)\s*(?:de\s+)?\bmil(?:es)?\b", re.IGNORECASE), 1_000),
 )
 
 
@@ -232,27 +241,44 @@ def parse_valor_cop(valor_raw) -> float:
         # palabras sin un solo dígito — "novecientos cincuenta y dos
         # millones de pesos" llegaba aquí y se persistía como $0.00.
         return palabras_a_numero(s_original)
+    # Ronda 30: el signo se detecta UNA sola vez. Antes "-1.500" perdía el
+    # signo (la rama sin coma lo borraba con re.sub) mientras "-1.500,00" sí
+    # lo conservaba — inconsistencia según el formato.
+    signo = -1.0 if s.startswith("-") else 1.0
+    s = s.lstrip("-")
+    # Ronda 30: formato ambiguo con coma Y punto. El separador MÁS A LA
+    # DERECHA es el decimal — "1.234,56" (colombiano) vs "1,234.56" (US).
+    # Antes "1,234,567.89" caía a la rama de coma y se inflaba ×100.
+    if "," in s and "." in s:
+        limpio = re.sub(r"[^\d.,]", "", s)
+        if limpio.rfind(",") > limpio.rfind("."):
+            limpio = limpio.replace(".", "").replace(",", ".")  # colombiano
+        else:
+            limpio = limpio.replace(",", "")  # US
+        try:
+            return float(limpio) * factor * signo
+        except ValueError:
+            return 0.0
     # Formato colombiano: puntos = miles, coma = decimal ("7.700,00" = 7700.00).
     if "," in s:
         partes = s.rsplit(",", 1)
-        enteros = re.sub(r"[^\d\-]", "", partes[0])
-        decimales = partes[1].strip()
+        enteros = re.sub(r"[^\d]", "", partes[0])
         # Con multiplicador, la coma decimal es lo usual: "2,5 millones".
-        decimales = re.sub(r"[^\d]", "", decimales)
+        decimales = re.sub(r"[^\d]", "", partes[1].strip())
         if 1 <= len(decimales) <= 2 and decimales.isdigit():
             try:
-                return float(f"{enteros}.{decimales}") * factor
+                return float(f"{enteros}.{decimales}") * factor * signo
             except Exception:
                 return 0.0
         # Coma no era decimal (más de 2 dígitos detrás) → todo a entero
         cleaned = re.sub(r"[^\d]", "", s)
-        return float(cleaned) * factor if cleaned else 0.0
+        return float(cleaned) * factor * signo if cleaned else 0.0
     # Con multiplicador y UN punto con 1-2 decimales ("1.5 millones" estilo
     # informal) → punto decimal, no separador de miles.
     if factor > 1:
         m_dec = re.fullmatch(r"(\d+)\.(\d{1,2})\D*", s)
         if m_dec:
-            return float(f"{m_dec.group(1)}.{m_dec.group(2)}") * factor
+            return float(f"{m_dec.group(1)}.{m_dec.group(2)}") * factor * signo
     # Sin coma: los puntos se asumen separadores de miles (Colombia)
     cleaned = re.sub(r"[^\d]", "", s)
-    return float(cleaned) * factor if cleaned else 0.0
+    return float(cleaned) * factor * signo if cleaned else 0.0

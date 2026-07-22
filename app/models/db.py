@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    Text,
+    ForeignKey,
+    Index,
+    LargeBinary,
+)
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -955,3 +965,99 @@ class CredencialAccesoLog(Base):
     accion = Column(String(20), nullable=False)  # REVELAR | IMPORTAR | LISTAR
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     motivo = Column(Text, nullable=True)
+
+
+# ─── Lotes de portal (Fase 1 de la app unificada, jul-2026) ──────────────────
+# Un "lote" es un Excel consolidado de glosas de un pagador (COOSALUD por
+# ahora) que el auditor sube a la app. La app lo parsea, crea una fila por
+# factura y encola una tarea que el agente local (tools/agente_lotes.py,
+# corriendo en el PC del hospital con acceso a los portales) reclama,
+# ejecuta con el bot Playwright y reporta de vuelta factura por factura.
+
+LOTE_ESTADO_EN_COLA = "EN_COLA"
+LOTE_ESTADO_EN_PROCESO = "EN_PROCESO"
+LOTE_ESTADO_COMPLETADO = "COMPLETADO"
+LOTE_ESTADO_COMPLETADO_CON_PENDIENTES = "COMPLETADO_CON_PENDIENTES"
+LOTE_ESTADO_ERROR = "ERROR"
+
+TAREA_ESTADO_PENDIENTE = "PENDIENTE"
+TAREA_ESTADO_RECLAMADA = "RECLAMADA"
+TAREA_ESTADO_COMPLETADA = "COMPLETADA"
+TAREA_ESTADO_ERROR = "ERROR"
+
+FACTURA_LOTE_ESTADO_PENDIENTE = "PENDIENTE"
+# Estados terminales de éxito que reporta el bot COOSALUD en su CSV
+# (columna "estado" de --reporte). Cualquier otro valor cuenta como
+# pendiente/fallo al calcular el estado final del lote.
+FACTURA_LOTE_ESTADOS_EXITO = {
+    "OK",
+    "OK_CALIDAD_ABIERTA",
+    "OK_SIN_DIALOGO",
+    "YA_PROCESADA",
+    "SOLO_CALIDAD",
+    "TERMINADA_SIN_CARTEL",
+}
+
+
+class LoteRecord(Base):
+    """Un Excel consolidado subido para respuesta masiva en un portal."""
+
+    __tablename__ = "lotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    creado_por = Column(String(200), nullable=False)
+    pagador = Column(String(50), nullable=False, index=True)  # COOSALUD, SIMED, ...
+    nombre_archivo = Column(String(300), nullable=False)
+    hoja = Column(String(100), default="BASE")
+    incluir_calidad = Column(Integer, default=0)
+    estado = Column(String(50), default=LOTE_ESTADO_EN_COLA, index=True)
+    total_facturas = Column(Integer, default=0)
+    total_glosas = Column(Integer, default=0)
+    total_calidad = Column(Integer, default=0)  # glosas CALIDAD excluidas
+    # El Excel original tal como se subió: el agente local lo descarga de
+    # aquí para correr el bot — el PC del hospital no comparte disco con
+    # el servidor de la app.
+    excel_archivo = Column(LargeBinary, nullable=False)
+    resumen = Column(Text, nullable=True)  # JSON: conteo de estados al cierre
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FacturaLoteRecord(Base):
+    """Estado por factura dentro de un lote (el semáforo de la UI)."""
+
+    __tablename__ = "facturas_lote"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    factura = Column(String(50), nullable=False, index=True)
+    grupos = Column(Integer, default=0)  # grupos de respuesta (cod+obs)
+    glosas = Column(Integer, default=0)  # ids de glosa a responder
+    calidad = Column(Integer, default=0)  # glosas CALIDAD excluidas
+    requiere_soporte = Column(Integer, default=0)
+    estado = Column(String(50), default=FACTURA_LOTE_ESTADO_PENDIENTE, index=True)
+    detalle = Column(Text, nullable=True)  # motivo textual del bot (RECHAZADA: ...)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (Index("ix_facturas_lote_lote_factura", "lote_id", "factura", unique=True),)
+
+
+class TareaLoteRecord(Base):
+    """Cola de trabajos para el agente local (una tarea por corrida de bot)."""
+
+    __tablename__ = "tareas_lote"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    tipo = Column(String(50), default="RESPONDER_COOSALUD", nullable=False)
+    estado = Column(String(50), default=TAREA_ESTADO_PENDIENTE, index=True)
+    agente = Column(String(200), nullable=True)  # hostname del PC que la reclamó
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    reclamada_en = Column(DateTime(timezone=True), nullable=True)
+    terminada_en = Column(DateTime(timezone=True), nullable=True)
+    error = Column(Text, nullable=True)
+    resultado = Column(Text, nullable=True)  # JSON: resumen que reportó el agente

@@ -295,7 +295,9 @@ def _agregar_banner_tarifa_post(
     es_ta = (resultado.codigo_glosa or "").upper().startswith("TA")
     if not es_ta:
         return
-    cups_ext, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cups_ext, _ = _extraer_cups_servicio(
+        tabla_excel or "", contexto_pdf, montos_excluir=[val_obj, val_ac]
+    )
     if not cups_ext:
         return
     try:
@@ -531,7 +533,9 @@ async def _persistir_y_responder(
         )
 
     tipo_final = f"RESPUESTA {cod_resp_acept}" if cod_resp_acept else resultado.tipo
-    cup_ext, servicio_ext = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cup_ext, servicio_ext = _extraer_cups_servicio(
+        tabla_excel or "", contexto_pdf, montos_excluir=[val_obj, val_ac]
+    )
     cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
     cod_resp = cod_resp_m.group(0) if cod_resp_m else (cod_resp_acept or "")
 
