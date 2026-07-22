@@ -107,6 +107,14 @@
     asistente ya no recorre toda la unidad de red (que se colgaba) — con
     `--indice` abre solo los archivos de la factura. Soporta actualización
     incremental y búsqueda por factura/paciente. Con README y pruebas.
+  - **Nueva base `tools/expediente_conciliacion.py` (modelo de datos ÚNICO):**
+    arma un EXPEDIENTE por factura con un `id_expediente` que amarra todo —
+    factura, paciente, contrato (287/440 + base tarifaria + código interno de
+    cartera), radicado, glosas, soportes (del índice), cartera (saldo/edad/
+    deterioro) y estado. Es la "fuente de la verdad" que consultarán los demás
+    módulos (evidencia, jurídico, argumentación, dashboard) en vez de repetir
+    búsquedas. Genera `expedientes.json`. Probado con el lote real (147
+    expedientes). Con pruebas.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
