@@ -131,6 +131,15 @@
     en RIPS). Marca cada expediente como *defendible* o no. Así el motor de
     argumentación no inventará: ensamblará la defensa desde hechos ya probados y
     trazables. Con README y pruebas.
+  - **Nuevo `tools/motor_decision_dispensario.py` (Motor de Decisión — el
+    cerebro):** con reglas de negocio (no IA) califica por glosa la
+    **defendibilidad (0–100 %)**, evalúa **riesgos** (probatorio, documental,
+    contractual, tarifario, financiero, jurídico) con su razón, aplica la
+    **matriz de precedencia** (qué documentos necesita cada tipo de glosa) y
+    emite la **acción recomendada** (solicitar levantamiento / soporte / aceptar
+    parcial / escalar / conciliar). El jurídico y la argumentación luego solo
+    fundamentan y redactan esa decisión. Con README y pruebas. La plataforma va:
+    índice → expediente → evidencia → hechos probados → **decisión**.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
