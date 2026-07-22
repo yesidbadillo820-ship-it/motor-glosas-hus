@@ -115,6 +115,13 @@
     módulos (evidencia, jurídico, argumentación, dashboard) en vez de repetir
     búsquedas. Genera `expedientes.json`. Probado con el lote real (147
     expedientes). Con pruebas.
+  - **Nuevo `tools/motor_evidencia_dispensario.py` (Motor de Evidencia, Mod 3):**
+    lee los soportes clínicos **página por página** y localiza, por glosa, **en
+    qué página** está la prueba, con el fragmento textual. Marca cada evidencia
+    como *fuerte* (código CUPS/CUM) o *débil* (palabra) e ignora palabras
+    genéricas para no dar falsos positivos. Trabaja sobre el expediente (abre
+    solo los archivos de cada factura, no recorre `Y:\`). Nunca inventa. Con
+    README y pruebas.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
