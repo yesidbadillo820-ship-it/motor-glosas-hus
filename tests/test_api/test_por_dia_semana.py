@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -63,6 +61,19 @@ def _seed(db, fecha):
     db.commit()
 
 
+def _fecha_reciente(weekday, hora=10, minuto=0):
+    """Fecha del `weekday` (0=Lunes) más reciente hace 7-13 días.
+
+    El endpoint solo cuenta una ventana de 90 días; una fecha fija caduca
+    cuando el calendario avanza (los tests pasaban y luego fallaban solos).
+    """
+    from datetime import timedelta
+
+    base = ahora_utc() - timedelta(days=7)
+    base -= timedelta(days=(base.weekday() - weekday) % 7)
+    return base.replace(hour=hora, minute=minuto, second=0, microsecond=0)
+
+
 class TestPorDiaSemana:
     def test_estructura(self, client):
         r = client.get("/glosas/stats/por-dia-semana")
@@ -74,11 +85,9 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # 2026-04-20 fue Lunes
-        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 20, 11, 0, tzinfo=timezone.utc))
-        # 2026-04-22 fue Miércoles
-        _seed(db_session, datetime(2026, 4, 22, 10, 0, tzinfo=timezone.utc))
+        _seed(db_session, _fecha_reciente(0, hora=10))  # Lunes
+        _seed(db_session, _fecha_reciente(0, hora=11))  # Lunes
+        _seed(db_session, _fecha_reciente(2, hora=10))  # Miércoles
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -90,9 +99,9 @@ class TestPorDiaSemana:
     def test_pct_del_total(self, client, db_session):
         # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+            _seed(db_session, _fecha_reciente(0))
         # 1 glosa el martes
-        _seed(db_session, datetime(2026, 4, 21, 10, 0, tzinfo=timezone.utc))
+        _seed(db_session, _fecha_reciente(1))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()

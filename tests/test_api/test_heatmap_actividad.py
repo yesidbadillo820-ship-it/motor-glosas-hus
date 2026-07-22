@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -48,9 +48,7 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, fecha_iso):
-    """fecha_iso: '2026-04-20 09:00' (UTC)."""
-    creado = datetime.fromisoformat(fecha_iso).replace(tzinfo=timezone.utc)
+def _seed(db, creado):
     db.add(
         GlosaRecord(
             eps="X",
@@ -63,6 +61,17 @@ def _seed(db, fecha_iso):
         )
     )
     db.commit()
+
+
+def _fecha_reciente(weekday, hora, minuto):
+    """Fecha del `weekday` (0=Lunes) más reciente hace 7-13 días.
+
+    El endpoint solo cuenta una ventana de 90 días; una fecha fija caduca
+    cuando el calendario avanza (los tests pasaban y luego fallaban solos).
+    """
+    base = ahora_utc() - timedelta(days=7)
+    base -= timedelta(days=(base.weekday() - weekday) % 7)
+    return base.replace(hour=hora, minute=minuto, second=0, microsecond=0)
 
 
 class TestHeatmapActividad:
@@ -85,11 +94,11 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        # Lunes (weekday=0) 09:30 → fila 0, col 9
+        _seed(db_session, _fecha_reciente(0, 9, 30))
+        _seed(db_session, _fecha_reciente(0, 9, 45))
+        # Miércoles (weekday=2) 14:15 → fila 2, col 14
+        _seed(db_session, _fecha_reciente(2, 14, 15))
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()
