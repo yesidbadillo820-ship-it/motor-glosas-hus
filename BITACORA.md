@@ -122,6 +122,15 @@
     genéricas para no dar falsos positivos. Trabaja sobre el expediente (abre
     solo los archivos de cada factura, no recorre `Y:\`). Nunca inventa. Con
     README y pruebas.
+  - **Nuevo `tools/motor_verificacion_dispensario.py` (Verificación, Mod 3.5):**
+    con **reglas deterministas** (no IA) convierte el expediente en
+    **probatorio**: por cada glosa fija los HECHOS a demostrar (ej. la prestación
+    fue *ordenada* y *ejecutada*) y verifica si quedaron **probados**, con nivel
+    de confianza y qué documento falta. Corre un **motor de contradicciones**
+    (factura no en cartera, paciente que no coincide con el RIPS, CUPS ausente
+    en RIPS). Marca cada expediente como *defendible* o no. Así el motor de
+    argumentación no inventará: ensamblará la defensa desde hechos ya probados y
+    trazables. Con README y pruebas.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
