@@ -49,10 +49,40 @@ Se corrigió el cruce para tomar el número de factura de la **carpeta que la co
 ### 2 de julio de 2026 · Robustez y optimización
 Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows. Con apoyo de un segundo modelo de revisión (todo verificado y probado), se corrigieron varios errores finos y se optimizó el motor para procesar decenas de miles de archivos mucho más rápido. **89 pruebas automáticas** respaldan cada cálculo.
 
-### 22 de julio de 2026 · Medición de impacto e informe para gerencia
+### 22 de julio de 2026 · Medición de impacto, informe para gerencia y hoja de ruta
 - Se midió el resultado sobre el lote real de junio (**12.523 facturas**): al cruzar los soportes de todos los meses, las facturas listas para radicar pasaron de **42% a 49% (+961 facturas)**, y el cruce completó automáticamente **6.328 facturas** con 32.866 soportes.
 - Se preparó un **informe ejecutivo** para socializar ante gerencia, comparando el proceso anterior (revisión manual) con el actual (motor automatizado).
 - Se creó **esta bitácora** como memoria común del proyecto.
+- Se corrigieron **2 pruebas automáticas del Motor de Glosas** que fallaban solas por el paso del calendario (usaban fechas fijas de abril que quedaron fuera de la ventana de 90 días). No era un error del trabajo de radicación.
+- Se recibió y adoptó la **especificación del sistema completo** (ver "Norte del proyecto" abajo): la visión de un auditor inteligente de cuentas médicas de punta a punta. Se hizo el mapa de qué partes ya existen y cuáles siguen.
+
+---
+
+## 🧭 NORTE DEL PROYECTO — el sistema completo al que vamos
+
+El 22 de julio se definió la **especificación del sistema final**: un auditor
+inteligente de cuentas médicas que explore el servidor, entienda cada carpeta,
+inventaríe y valide los documentos contra la norma y el contrato de cada
+pagador, detecte errores ANTES de radicar, y haga seguimiento — con tableros y
+aprendizaje continuo. La especificación se organiza en 5 capas y varios
+"agentes". Estado actual de cada parte:
+
+| Parte de la visión | Estado hoy |
+|---|---|
+| Explorar el servidor y detectar facturas (Agente 1–2: ruta = año/mes/entidad/lote/factura) | ✅ Construido (motor de radicación); falta solo la vigilancia automática permanente |
+| Inventario documental por factura (Agente 3) | ✅ Construido (soportes presentes/faltantes por factura) |
+| Diccionario de siglas institucional (Agente 4) | ✅ Construido con el diccionario oficial ADRES; ⚠ falta validar significados con el área |
+| Auditor por tipo de servicio: cirugía exige sus soportes, urgencias los suyos… (Agente 6) | ✅ Construido (reglas por servicio del RIPS, configurables por entidad) |
+| Calidad de archivos: dañados, vacíos, duplicados, ilegibles (Agente 7) | 🔶 Parcial (duplicados sí; dañados/vacíos/firmas: siguiente paso) |
+| Leer el CONTENIDO de los PDF: paciente, fechas, firmas, médico (Agente 5, OCR) | 🔜 Proyecto aparte (el Motor de Glosas ya tiene una base de lectura de documentos) |
+| Ficha de cada entidad: NIT, régimen, plataforma, plazos (catálogo de pagadores) | ✅ Construido (25+ entidades); falta plazos y periodicidad por contrato |
+| Verificar el cargue y RADICAR automáticamente en las plataformas de las EPS (Capa 4) | 🔴 Requiere decisión de gerencia y TI (credenciales, acceso a portales, marco legal) |
+| Tableros e indicadores (Capa 5) | ✅ Construido (tablero de cartera + explorador + informe ejecutivo) |
+| Aprendizaje continuo de glosas/devoluciones | 🔜 Futuro (necesita historial de devoluciones cargado) |
+
+> ⚠️ **Regla vigente:** todo lo construido es **solo lectura**. El único punto de
+> la visión que rompe esa regla es la radicación automática en portales (Capa 4):
+> eso NO se hará sin autorización expresa de gerencia y TI.
 
 ---
 
@@ -64,6 +94,12 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
 - [ ] **Soportes de SOAT / tránsito.** Los formularios FURIPS de los accidentes de tránsito no traen el número de factura en el nombre, por lo que no cruzan automáticamente. Es un grupo pequeño que requiere una solución aparte.
 - [ ] **Escanear los soportes que faltan.** Parte de las facturas "en revisión" simplemente todavía no tienen sus soportes clínicos escaneados. Esa es una tarea operativa del área; el explorador ya dice cuáles son y qué les falta.
 - [ ] **Dejar las mejoras disponibles en forma permanente.** Integrar el trabajo a la versión principal del proyecto para que esté en todas las sesiones, sin importar en qué rama se trabaje.
+- [ ] **Primeros pasos del "norte" (especificación del 22 de julio):**
+  - [ ] Sacar de la ruta de cada factura el **responsable** (Karin, Liliana…) y el **lote de envío** (ENV-…), y mostrarlos en el reporte y el explorador.
+  - [ ] **Auditor de calidad de archivos**: detectar PDF dañados, archivos vacíos y duplicados de contenido (solo lectura).
+  - [ ] **Corrida automática diaria** en el computador del área (Programador de tareas de Windows) para que el reporte amanezca actualizado.
+  - [ ] **Validar el diccionario de siglas** con el área (los significados oficiales ADRES ya están en el motor; confirmar los usos internos del HUS).
+  - [ ] Completar la **ficha de cada pagador**: plazos de radicación, periodicidad y plataforma donde se radica.
 
 ---
 
