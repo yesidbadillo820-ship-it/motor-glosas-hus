@@ -5,13 +5,24 @@
     "OCR": 2
   },
   "horario_laboral": {
-    "aplica_a_tipos": ["OCR"],
+    "aplica_a_tipos": [
+      "OCR"
+    ],
     "desde": "05:00",
     "hasta": "21:00"
   },
-  "requiere_aprobacion_humana": ["RPA", "RADICAR", "SUBIR_PORTAL"],
+  "requiere_aprobacion_humana": [
+    "RPA",
+    "RADICAR",
+    "SUBIR_PORTAL",
+    "TAREA_HUMANA"
+  ],
   "max_intentos_default": 2,
-  "backoff_segundos": [5, 60, 300],
+  "backoff_segundos": [
+    5,
+    60,
+    300
+  ],
   "cadenas": {
     "_comentario": "Misiones que se generan automáticamente al terminar OK otra: {'TIPO_TERMINADO': [{'tipo': 'SIGUIENTE', 'prioridad': 'NORMAL'}]}. Vacío = ninguna."
   }

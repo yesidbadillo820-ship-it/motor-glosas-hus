@@ -172,6 +172,70 @@
       "implementacion": "sdk: hospiai_agentes.AgenteSemantico",
       "notas": "Knowledge Layer: código → significado → implicaciones (ontologías documental/clínica/CUPS/normativa).",
       "requiere_sdk": "1.0"
+    },
+    {
+      "id": "AG012",
+      "nombre": "DirectorAuditoria",
+      "dominio": "D6",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "INFORME_AUDITORIA"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_directores.AgenteDirectorAuditoria",
+      "requiere_sdk": "1.0",
+      "notas": "Interpreta la corrida completa: informe ejecutivo con riesgo financiero explicado, rankings, hallazgos valorizados, predicción estadística y recomendaciones por impacto."
+    },
+    {
+      "id": "AG013",
+      "nombre": "DirectorOperativo",
+      "dominio": "D5",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "PLAN_OPERATIVO"
+      ],
+      "depende_de": [
+        "AG012"
+      ],
+      "implementacion": "sdk: hospiai_directores.AgenteDirectorOperativo",
+      "requiere_sdk": "1.0",
+      "notas": "Convierte el informe en las tareas del día por funcionario (misiones TAREA_HUMANA retenidas por política)."
+    },
+    {
+      "id": "AG014",
+      "nombre": "DirectorGerencial",
+      "dominio": "D6",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "RESPUESTAS_CAJA"
+      ],
+      "depende_de": [
+        "AG012"
+      ],
+      "implementacion": "sdk: hospiai_directores.AgenteDirectorGerencial",
+      "requiere_sdk": "1.0",
+      "notas": "Habla solo en dinero: radicable hoy, detenido, recuperable por causa, retorno por funcionario, EPS que frena caja."
+    },
+    {
+      "id": "AG015",
+      "nombre": "AprendizajeInstitucional",
+      "dominio": "D6",
+      "version": "1.0",
+      "estado": "ACTIVO",
+      "capacidades": [
+        "APRENDIZAJE"
+      ],
+      "depende_de": [
+        "AG008"
+      ],
+      "implementacion": "sdk: hospiai_directores.AgenteAprendizajeInstitucional",
+      "requiere_sdk": "1.0",
+      "notas": "Registra cada transición de dictamen entre corridas (qué cambió, por qué, qué aprendimos): la memoria institucional."
     }
   ]
 }

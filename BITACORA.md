@@ -98,6 +98,14 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **Interfaz RPA lista sin adaptadores** (`tools/hospiai_rpa.py`, Prioridad 5): el contrato login/subir/confirmar/descargar/cerrar existe; registrar un adaptador real será un acto deliberado de la Fase 5 con autorización de gerencia/TI.
   - AG010 pasó a **ACTIVO** en el registro. **159 pruebas automáticas** en verde.
   - Sprints siguientes de la fase: 2) migrar los agentes legacy al SDK, 3) semántica→dictamen, 4) OCR clínico, 5) OCR→expediente, 6) **primera corrida real de los 12.523 expedientes** (requiere el índice de soportes en el equipo del área).
+- **FASE 2 · Sprint 2A+2B — LOS DIRECTORES Y EL PANEL EJECUTIVO (entregados):** la plataforma ya convierte los datos en decisiones:
+  - **AG012 Director de Auditoría** (`py tools\hospiai_directores.py informe`): al final de cada corrida genera el informe gerencial completo — resumen ejecutivo, **riesgo financiero explicado por causa**, ranking por responsable, riesgo por entidad con su **causa principal** (ASMET → HEV), hallazgos **valorizados en pesos con su norma**, **predicción estadística** ("si se corrige HEV suben N facturas por $X" — cuenta las facturas donde eso es lo ÚNICO que falta) y **recomendaciones priorizadas por impacto económico**. Queda guardado en `data/informes/`.
+  - **AG013 Director Operativo** (`tareas`): convierte el informe en las tareas del día por funcionario, como misiones TAREA_HUMANA **retenidas por política** hasta que una persona las tome — con el valor en juego de cada una.
+  - **AG014 Director Gerencial** (`caja`): responde en dinero las 5 preguntas de gerencia (radicable hoy, detenido, recuperable por causa, funcionario con mayor retorno, EPS que frena caja).
+  - **AG015 Aprendizaje Institucional** (`aprendizaje`): registra cada transición entre corridas (REVISAR → LISTA): qué cambió, por qué, qué aprendimos — la memoria del hospital, sin duplicados.
+  - **Panel Ejecutivo** (`py tools\hospiai_panel_ejecutivo.py`): 6 vistas (Estado General, Riesgo Financiero, Responsables, EPS, Hallazgos, Predicción) + las **6 preguntas de aceptación respondidas de frente**, alimentado **exclusivamente desde la API** (el módulo no toca la base — hay una prueba que lo verifica).
+  - Nuevos endpoints de la API: `/informe`, `/caja`, `/tareas`. **165 pruebas automáticas** en verde.
+  - ⚠ Los números del panel serán los reales de los 12.523 en cuanto se corra la primera corrida (índice de soportes pendiente en el equipo del área).
 
 ---
 

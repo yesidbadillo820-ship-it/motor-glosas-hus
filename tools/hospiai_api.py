@@ -119,6 +119,32 @@ class Servicios:
             "cadena": motor.explicar(codigo),
         }
 
+    # ── Endpoints ejecutivos (Fase 2 · directores) ─────────────────────────
+
+    def informe(self) -> dict:
+        """El informe ejecutivo de la última corrida (analítica AG012)."""
+        from hospiai_directores import analizar_corrida
+
+        return analizar_corrida(self.db_path)
+
+    def caja(self) -> list[dict]:
+        """Las respuestas de dinero (AG014), calculadas al momento."""
+        from hospiai_directores import AgenteDirectorGerencial
+        from hospiai_sdk import Mision
+
+        res = AgenteDirectorGerencial().ejecutar(
+            Mision(codigo="MISION-API", tipo="RESPUESTAS_CAJA"), {"db_path": self.db_path}
+        )
+        return res.salida.get("respuestas", [])
+
+    def tareas(self) -> list[dict]:
+        """Las tareas del día (misiones TAREA_HUMANA pendientes, del AG013)."""
+        return self._filas(
+            "SELECT codigo, prioridad, datos, creada FROM misiones"
+            " WHERE tipo='TAREA_HUMANA' AND estado='PENDIENTE' ORDER BY"
+            " CASE prioridad WHEN 'ALTA' THEN 0 ELSE 1 END, id DESC LIMIT 50"
+        )
+
 
 class _Manejador(BaseHTTPRequestHandler):
     servicios: Servicios  # inyectado por servir()
@@ -143,6 +169,12 @@ class _Manejador(BaseHTTPRequestHandler):
             return s.capacidades()
         if partes == ["misiones"]:
             return s.misiones()
+        if partes == ["informe"]:
+            return s.informe()
+        if partes == ["caja"]:
+            return s.caja()
+        if partes == ["tareas"]:
+            return s.tareas()
         if len(partes) == 2:
             recurso, clave = partes
             if recurso == "expedientes":
