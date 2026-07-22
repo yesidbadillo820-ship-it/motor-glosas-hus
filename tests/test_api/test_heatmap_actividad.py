@@ -85,11 +85,22 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        # Fechas relativas para no salir de la ventana (default 90d) con el
+        # paso del tiempo. Anclamos a un lunes reciente: weekday()+7 garantiza
+        # que quede en el pasado aunque hoy sea lunes.
+        ahora = ahora_utc()
+        lunes = (ahora - timedelta(days=ahora.weekday() + 7)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        miercoles = lunes + timedelta(days=2)
+        # Lunes (weekday=0). 09:30 y 09:45 → fila 0, col 9
+        e_lun_1 = lunes + timedelta(hours=9, minutes=30)
+        e_lun_2 = lunes + timedelta(hours=9, minutes=45)
+        # Miércoles (weekday=2). 14:15 → fila 2, col 14
+        e_mie = miercoles + timedelta(hours=14, minutes=15)
+        _seed(db_session, e_lun_1.strftime("%Y-%m-%d %H:%M"))
+        _seed(db_session, e_lun_2.strftime("%Y-%m-%d %H:%M"))
+        _seed(db_session, e_mie.strftime("%Y-%m-%d %H:%M"))
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()
