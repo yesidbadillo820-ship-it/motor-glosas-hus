@@ -843,7 +843,7 @@ class TestCLI:
         _factura_folder(origen / "COOSALUD", "HUS480001")  # LISTA
         _factura_folder(origen / "NUEVA EPS", "HUS480002", con_cuv=False)  # SIN_CUV
         reporte = tmp_path / "rep.csv"
-        rc = rad.main(["--origen", str(origen), "--reporte", str(reporte)])
+        rc = rad.main(["--sin-db", "--origen", str(origen), "--reporte", str(reporte)])
         assert rc == 1  # hay problemas (SIN_CUV)
         assert reporte.is_file()
         contenido = reporte.read_text(encoding="utf-8-sig")
@@ -854,12 +854,18 @@ class TestCLI:
         _factura_folder(origen / "COOSALUD", "HUS480001")
         _factura_folder(origen / "COOSALUD", "HUS480003")
         reporte = tmp_path / "rep.csv"
-        rc = rad.main(["--origen", str(origen), "--reporte", str(reporte)])
+        rc = rad.main(["--sin-db", "--origen", str(origen), "--reporte", str(reporte)])
         assert rc == 0
 
     def test_main_origen_inexistente(self, tmp_path):
         rc = rad.main(
-            ["--origen", str(tmp_path / "no_existe"), "--reporte", str(tmp_path / "r.csv")]
+            [
+                "--sin-db",
+                "--origen",
+                str(tmp_path / "no_existe"),
+                "--reporte",
+                str(tmp_path / "r.csv"),
+            ]
         )
         assert rc == 1
 
@@ -874,6 +880,7 @@ class TestCLI:
         reporte = tmp_path / "rep.csv"
         rc = rad.main(
             [
+                "--sin-db",
                 "--origen",
                 str(origen),
                 "--reporte",
@@ -893,6 +900,7 @@ class TestCLI:
         _factura_folder(origen / "COOSALUD", "HUS487523")
         rc = rad.main(
             [
+                "--sin-db",
                 "--origen",
                 str(origen),
                 "--reporte",
@@ -915,7 +923,15 @@ class TestCLI:
         )
         reporte = tmp_path / "rep.csv"
         rc = rad.main(
-            ["--origen", str(origen), "--reporte", str(reporte), "--soportes-indice", str(indice)]
+            [
+                "--sin-db",
+                "--origen",
+                str(origen),
+                "--reporte",
+                str(reporte),
+                "--soportes-indice",
+                str(indice),
+            ]
         )
         assert rc == 0, reporte.read_text(encoding="utf-8-sig")
         assert "LISTA" in reporte.read_text(encoding="utf-8-sig")
@@ -935,7 +951,7 @@ class TestCLI:
             FEV_XML.format(fac="HUS469401"), encoding="utf-8"
         )
         reporte = tmp_path / "rep.csv"
-        rc = rad.main(["--origen", str(tmp_path), "--reporte", str(reporte)])
+        rc = rad.main(["--sin-db", "--origen", str(tmp_path), "--reporte", str(reporte)])
         assert rc == 0, reporte.read_text(encoding="utf-8-sig")
         contenido = reporte.read_text(encoding="utf-8-sig")
         assert "LISTA" in contenido and "COOSALUD" in contenido
@@ -963,6 +979,7 @@ class TestCLI:
         reporte = tmp_path / "rep.csv"
         rc = rad.main(
             [
+                "--sin-db",
                 "--origen",
                 str(tmp_path),
                 "--manifiesto",
@@ -1000,6 +1017,7 @@ class TestCLI:
         reporte = tmp_path / "rep.csv"
         rc = rad.main(
             [
+                "--sin-db",
                 "--origen",
                 str(tmp_path),
                 "--manifiesto",
@@ -1025,7 +1043,7 @@ class TestCLI:
             FEV_DIAN.format(fac="520761", eps="NUEVA EPS S.A."), encoding="utf-8"
         )
         reporte = tmp_path / "rep.csv"
-        rc = rad.main(["--origen", str(tmp_path), "--reporte", str(reporte)])
+        rc = rad.main(["--sin-db", "--origen", str(tmp_path), "--reporte", str(reporte)])
         contenido = reporte.read_text(encoding="utf-8-sig")
         assert "LISTA" in contenido, contenido
         assert "NUEVA EPS" in contenido.upper()

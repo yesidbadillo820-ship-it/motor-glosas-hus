@@ -56,6 +56,13 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
 - Se corrigieron **2 pruebas automáticas del Motor de Glosas** que fallaban solas por el paso del calendario (usaban fechas fijas de abril que quedaron fuera de la ventana de 90 días). No era un error del trabajo de radicación.
 - Se recibió y adoptó la **especificación del sistema completo** (ver "Norte del proyecto" abajo): la visión de un auditor inteligente de cuentas médicas de punta a punta. Se hizo el mapa de qué partes ya existen y cuáles siguen.
 - Se definió la **arquitectura definitiva de la plataforma: HOSPIAI** (Sistema Operativo Inteligente de Cuentas Médicas). El proyecto deja de ser una herramienta y pasa a ser una plataforma de agentes organizados en 6 dominios, con expediente digital, catálogo institucional, motor de reglas, grafo de conocimiento y orquestador. Documento completo: `docs/ARQUITECTURA_HOSPIAI.md`. Todo lo ya construido se convierte en los primeros agentes (no se bota nada).
+- **Se construyó la FASE 1 — FUNDACIÓN de HOSPIAI** (aprobada y entregada el mismo día):
+  - **Expediente Digital** (`data/hospiai.db`): cada corrida del motor queda guardada — expedientes, documentos vistos, hallazgos con la regla que los sustenta, y eventos con fecha y versión. Aunque cambie el código, el historial no se pierde. El CSV/XLSX de siempre siguen saliendo igual.
+  - **Reglas como datos** (`data/reglas_radicacion.json`): qué soporte exige cada tipo de atención, con su fuente normativa (Res. 2284/2023). El área puede editarlas sin programar y cada corrida registra qué versión usó.
+  - **Analizador de ruta completo**: ahora el motor lee de la ruta del share el **responsable** (funcionario) y el **lote de envío**, y los muestra en el reporte, el resumen y el panel — primeros indicadores por funcionario (Dominio 5).
+  - **Consola y panel de HOSPIAI** (`tools/hospiai.py`): resumen del expediente en pantalla y panel HTML que lee de la base.
+  - **Corrida diaria** (`tools/corrida_diaria.ps1`) lista para programar en Windows + **guía de instalación y operación** (`tools/README_hospiai.md`).
+  - Todo **solo lectura** sobre los shares; **100 pruebas automáticas** en verde.
 
 ---
 
@@ -97,21 +104,20 @@ Estado actual de cada parte de la visión:
 - [ ] **Soportes de SOAT / tránsito.** Los formularios FURIPS de los accidentes de tránsito no traen el número de factura en el nombre, por lo que no cruzan automáticamente. Es un grupo pequeño que requiere una solución aparte.
 - [ ] **Escanear los soportes que faltan.** Parte de las facturas "en revisión" simplemente todavía no tienen sus soportes clínicos escaneados. Esa es una tarea operativa del área; el explorador ya dice cuáles son y qué les falta.
 - [ ] **Dejar las mejoras disponibles en forma permanente.** Integrar el trabajo a la versión principal del proyecto para que esté en todas las sesiones, sin importar en qué rama se trabaje.
-- [ ] **HOSPIAI Fase 1 — Fundación (el Expediente Digital):** crear la base de datos de expedientes (`data/hospiai.db`), hacer que el motor de radicación escriba en ella (además del reporte de siempre), pasar las reglas al formato declarativo con fuente normativa, y definir el contrato de agente. Detalle en `docs/ARQUITECTURA_HOSPIAI.md`, sección 9.
-- [ ] **Primeros pasos del "norte" (especificación del 22 de julio):**
-  - [ ] Sacar de la ruta de cada factura el **responsable** (Karin, Liliana…) y el **lote de envío** (ENV-…), y mostrarlos en el reporte y el explorador.
-  - [ ] **Auditor de calidad de archivos**: detectar PDF dañados, archivos vacíos y duplicados de contenido (solo lectura).
-  - [ ] **Corrida automática diaria** en el computador del área (Programador de tareas de Windows) para que el reporte amanezca actualizado.
-  - [ ] **Validar el diccionario de siglas** con el área (los significados oficiales ADRES ya están en el motor; confirmar los usos internos del HUS).
-  - [ ] Completar la **ficha de cada pagador**: plazos de radicación, periodicidad y plataforma donde se radica.
+- [x] ~~HOSPIAI Fase 1 — Fundación~~ **HECHA (22 de julio):** Expediente Digital, reglas declarativas, responsable+lote, consola/panel, corrida diaria y guía.
+- [ ] **Estrenar la Fase 1 con datos reales:** correr el motor sobre el lote real (con el índice de soportes) para poblar `data/hospiai.db` por primera vez, y **programar la corrida diaria** en el equipo del área (una línea de `schtasks`; está en `tools/README_hospiai.md`).
+- [ ] **Mostrar responsable y lote también en el explorador** (la herramienta del buscador vive en otra rama; el reporte ya trae las columnas).
+- [ ] **HOSPIAI Fase 2 (D1/D5):** auditor de calidad de archivos (PDF dañados, vacíos, duplicados de contenido) y tiempos de proceso por expediente.
+- [ ] **Validar el diccionario de siglas** con el área (los significados oficiales ADRES ya están en el motor; confirmar los usos internos del HUS).
+- [ ] Completar la **ficha de cada pagador**: plazos de radicación, periodicidad y plataforma donde se radica (la tabla `contratos` ya está lista en la base).
 
 ---
 
 ## 📌 PARA MAÑANA (lo próximo a trabajar)
 
-1. **Correr el motor con el índice completo de soportes** (los 3 pasos: armar el índice una vez → actualizar → correr leyendo el índice) y anotar aquí el nuevo porcentaje de facturas listas.
-2. **Regenerar el explorador y el tablero** con el reporte actualizado, para ver el resultado nuevo factura por factura.
-3. **Empezar a cargar el tablero** con los pagos y glosas reales de una EPS grande, para que el saldo de cartera deje de estar en cero.
+1. **Estrenar HOSPIAI con el lote real:** `git pull`, armar el índice de soportes (si no está), correr el motor (ya escribe el Expediente Digital solo) y ver `py tools\hospiai.py resumen` + el panel. Anotar aquí el nuevo porcentaje de listas y los primeros indicadores por responsable.
+2. **Programar la corrida diaria** con la línea de `schtasks` de la guía (`tools/README_hospiai.md`), para que el panel amanezca actualizado.
+3. **Regenerar el explorador y el tablero** con el reporte actualizado.
 4. **Revisar la lista de EPS no reconocidas** y agregarlas al catálogo, para bajar el grupo "entidad por resolver".
 
 ---

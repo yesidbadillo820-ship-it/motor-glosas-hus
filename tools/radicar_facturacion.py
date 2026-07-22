@@ -226,6 +226,9 @@ EQUIVALENCIAS_SOPORTE_DEFAULT: dict[str, list[str]] = {
 
 PRESTADOR_NIT_DEFAULT = "900006037"
 PATRON_FACTURA_DEFAULT = r"HUS\d{4,12}"
+# Versión del motor que queda registrada en cada corrida del Expediente Digital
+# (HOSPIAI): permite saber qué código auditó cada factura y reproducir corridas.
+VERSION_MOTOR = "1.0-fase1"
 
 # Estados de salida (ordenados de peor a mejor para el resumen).
 ESTADOS_PROBLEMA = (
@@ -386,6 +389,12 @@ class ConfigRadicacion:
         default_factory=lambda: {k: list(v) for k, v in EQUIVALENCIAS_SOPORTE_DEFAULT.items()}
     )
     entidades: list[PerfilEntidad] = field(default_factory=list)
+    # Trazabilidad HOSPIAI: versión de las reglas cargadas (data/
+    # reglas_radicacion.json) y mapa código exigido → id de la regla que lo
+    # sustenta, para que cada hallazgo del Expediente Digital cite su regla.
+    version_reglas: str = "defaults-embebidos"
+    regla_id_por_codigo: dict[str, str] = field(default_factory=dict, repr=False, compare=False)
+    reglas_registro: list = field(default_factory=list, repr=False, compare=False)
     # Cache interno de resolver_entidad {pista: perfil|None}: en un lote las
     # mismas pistas (carpeta de EPS, razón social del FEV) se repiten miles de
     # veces y cada resolución escanea todo el catálogo normalizando alias.
@@ -449,6 +458,64 @@ def cargar_perfiles(ruta: Path | None) -> ConfigRadicacion:
         )
     logger.info(f"Perfiles cargados: {len(cfg.entidades)} entidades desde {ruta.name}")
     return cfg
+
+
+def cargar_reglas(ruta: Path | None, cfg: ConfigRadicacion) -> None:
+    """Carga el motor de reglas DECLARATIVO (data/reglas_radicacion.json) sobre
+    la configuración. Las reglas dejan de vivir en el código: el área puede
+    editarlas, cada una lleva su fuente normativa, y la corrida registra la
+    versión usada (HOSPIAI Fase 1; formato en docs/ARQUITECTURA_HOSPIAI.md §6).
+
+    Si el archivo no existe, quedan los defaults embebidos (mismo contenido).
+    Los perfiles por entidad (soportes_extra, cuv_obligatorio, equivalencias
+    propias) siguen aplicando por encima, como siempre."""
+    if ruta is None:
+        cand = Path(__file__).resolve().parent.parent / "data" / "reglas_radicacion.json"
+        ruta = cand if cand.is_file() else None
+    if ruta is None:
+        return
+    if not ruta.is_file():
+        logger.warning(f"--reglas no existe: {ruta} — sigo con los defaults embebidos.")
+        return
+    try:
+        data = json.loads(ruta.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning(f"No pude leer las reglas de {ruta}: {e} — sigo con los defaults.")
+        return
+
+    base: list[str] = []
+    por_servicio: dict[str, list[str]] = {}
+    idx: dict[str, str] = {}
+    registro: list = []
+    for rg in data.get("reglas", []):
+        ambito = rg.get("ambito") or {}
+        exige = [
+            str(c).upper() for c in (rg.get("exige") or rg.get("documentos_obligatorios") or [])
+        ]
+        if ambito.get("aplica") == "todas":
+            base = exige
+        serv = ambito.get("servicio")
+        if serv:
+            dest = por_servicio.setdefault(serv, [])
+            dest.extend(c for c in exige if c not in dest)
+        for cod in exige:
+            idx.setdefault(cod, rg.get("id", ""))
+        registro.append(rg)
+
+    if base:
+        cfg.soportes_base = list(base)
+    if por_servicio:
+        cfg.soportes_por_servicio = {k: list(v) for k, v in por_servicio.items()}
+    eq = data.get("equivalencias") or {}
+    eq = {k: list(v) for k, v in eq.items() if not k.startswith("_")}
+    if eq:
+        cfg.equivalencias_soporte = eq
+    cfg.version_reglas = str(data.get("version", "?"))
+    cfg.regla_id_por_codigo = idx
+    cfg.reglas_registro = registro
+    logger.info(
+        f"Reglas: v{cfg.version_reglas} — {len(registro)} regla(s) declarativas desde {ruta.name}"
+    )
 
 
 def resolver_entidad(hint: str | None, cfg: ConfigRadicacion) -> PerfilEntidad | None:
@@ -652,6 +719,11 @@ class ResultadoFactura:
     archivos_sin_clasificar: list[str] = field(default_factory=list)
     # Rutas de los soportes clínicos anexados desde el share --soportes (gap-fill).
     soportes_clinicos: list[str] = field(default_factory=list)
+    # Datos operativos leídos de la RUTA (HOSPIAI D5): quién radica y en qué lote.
+    responsable: str = ""
+    lote: str = ""
+    anio: int = 0
+    mes: int = 0
     n_archivos: int = 0
     estado: str = ""
     detalle: list[str] = field(default_factory=list)
@@ -817,6 +889,23 @@ def procesar_factura(
             res.soportes_clinicos.append(ruta_sp)
         res.soportes_presentes = sorted(presentes)
 
+    # ── Ruta operativa: responsable, lote, año y mes (HOSPIAI D5) ───────────
+    # Primero la carpeta del lote; si ahí no está (el share de FE no trae
+    # funcionario), se completa desde las rutas de los soportes cruzados
+    # (Y:\…\<EPS>\<RESPONSABLE>\ENV-…\…).
+    info_ruta = analizar_ruta(str(carpeta))
+    if res.soportes_clinicos and (not info_ruta.get("responsable") or not info_ruta.get("lote")):
+        for sp in res.soportes_clinicos:
+            extra = analizar_ruta(sp)
+            for k, v in extra.items():
+                info_ruta.setdefault(k, v)
+            if info_ruta.get("responsable") and info_ruta.get("lote"):
+                break
+    res.responsable = info_ruta.get("responsable", "")
+    res.lote = info_ruta.get("lote", "")
+    res.anio = info_ruta.get("anio", 0)
+    res.mes = info_ruta.get("mes", 0)
+
     # ── Completitud ─────────────────────────────────────────────────────────
     base = set(cfg.soportes_base)
     if perfil is not None and not perfil.cuv_obligatorio:
@@ -964,6 +1053,74 @@ def _debe_armar(estado: str, forzar: bool) -> bool:
 _RE_CARPETA_CONTENEDORA = re.compile(
     r"(?i)^(env[-_].*|escaneo|soportes.*|rips|fe|factura.*|xml|pdf|\d+\..*)$"
 )
+
+# ── Analizador de Ruta (HOSPIAI D1/D5) ──────────────────────────────────────
+# Cada nivel de la ruta del share significa algo:
+#   Y:\7. JULIO 2026 - SOPORTES RADICACION\ASMET SALUD\LILIANA\ENV-230314-OKDGH\HUS528043
+#        └── mes/año ──┘                    └─ entidad ─┘└ resp ┘└─── lote ────┘└ factura ┘
+# De ahí salen el RESPONSABLE (funcionario que radica) y el LOTE (envío), que
+# alimentan los indicadores por funcionario (Dominio 5 — Int. Operacional).
+
+_RE_LOTE = re.compile(r"^ENV[-_][\w-]+$", re.IGNORECASE)
+# Año suelto (2020–2039) no pegado a otros dígitos (evita leer "2076" de HUS520761).
+_RE_ANIO = re.compile(r"(?<!\d)(20[2-3]\d)(?!\d)")
+# Año+mes compactos estilo 202606.
+_RE_ANIOMES = re.compile(r"(?<!\d)(20[2-3]\d)(0[1-9]|1[0-2])(?!\d)")
+_MESES = {
+    "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6,
+    "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11,
+    "DICIEMBRE": 12,
+}  # fmt: skip
+# Tokens que delatan que una carpeta es una ENTIDAD u otra cosa, no un
+# funcionario (el nivel responsable es un nombre de persona: KARIN, LILIANA…).
+_NO_RESPONSABLE = frozenset(
+    "EPS SALUD SEGUROS SEGURO SOAT ARL ADRES SA SAS LTDA IPS ESE UT UNION TEMPORAL "
+    "COMPARTIDA FACTURACION RADICACION DIGITAL CARPETA SERVIDOR GLOSAS SINAC OK "
+    "NUEVA COOSALUD ASMET FOMAG COMPENSAR SANITAS FAMISANAR DISPENSARIO POSITIVA "
+    "PREVISORA MUNDIAL AXA HDI SURA SURAMERICANA SOLIDARIA EQUIDAD PPL REGIONAL".split()
+)
+
+
+def _es_responsable(nombre: str) -> bool:
+    """¿La carpeta parece el NOMBRE de un funcionario (no una EPS/contenedora)?"""
+    n = nombre.strip()
+    if not (2 <= len(n) <= 40) or any(ch.isdigit() for ch in n):
+        return False
+    if _RE_CARPETA_CONTENEDORA.match(n):
+        return False
+    tokens = re.split(r"[\s._-]+", n.upper())
+    return bool(tokens) and not any(t in _NO_RESPONSABLE for t in tokens)
+
+
+def analizar_ruta(ruta: str) -> dict:
+    """Extrae de una ruta del share: año, mes, lote (ENV-…), responsable y
+    factura. Devuelve solo las claves halladas. Tolera rutas Windows y POSIX."""
+    partes = [p for p in re.split(r"[\\/]+", str(ruta)) if p and not p.endswith(":")]
+    info: dict = {}
+    rx_fac = re.compile(PATRON_FACTURA_DEFAULT, re.IGNORECASE)
+    for i, parte in enumerate(partes):
+        pu = parte.upper()
+        if "lote" not in info and _RE_LOTE.match(parte):
+            info["lote"] = parte
+            if i > 0 and "responsable" not in info and _es_responsable(partes[i - 1]):
+                info["responsable"] = partes[i - 1].strip()
+        if "anio" not in info:
+            m = _RE_ANIOMES.search(pu)
+            if m:
+                info["anio"], info["mes"] = int(m.group(1)), int(m.group(2))
+            else:
+                m = _RE_ANIO.search(pu)
+                if m:
+                    info["anio"] = int(m.group(1))
+        if "mes" not in info:
+            for nombre_mes, num in _MESES.items():
+                if nombre_mes in pu:
+                    info["mes"] = num
+                    break
+        m = rx_fac.search(parte)
+        if m:
+            info["factura"] = m.group(0)  # la más profunda gana
+    return info
 
 
 def _entidad_desde_ruta(carpeta: Path, origen: Path, cfg: ConfigRadicacion) -> str | None:
@@ -1471,6 +1628,8 @@ CAMPOS_REPORTE = [
     "entidad",
     "entidad_id",
     "canal",
+    "responsable",
+    "lote",
     "valor_total",
     "usuarios",
     "servicios",
@@ -1495,6 +1654,8 @@ def _fila_reporte(res: ResultadoFactura) -> dict:
         "entidad": res.entidad_nombre,
         "entidad_id": res.entidad_id,
         "canal": res.canal,
+        "responsable": res.responsable,
+        "lote": res.lote,
         "valor_total": f"{res.valor_total:.0f}",
         "usuarios": res.num_usuarios,
         "servicios": serv,
@@ -1560,6 +1721,8 @@ def escribir_reporte_xlsx(resultados: list[ResultadoFactura], ruta: Path) -> Non
         "carpeta": 40,
         "acciones": 30,
         "servicios": 24,
+        "responsable": 14,
+        "lote": 20,
     }
     for c, h in enumerate(CAMPOS_REPORTE, 1):
         ws.column_dimensions[get_column_letter(c)].width = anchos.get(h, 16)
@@ -1614,6 +1777,7 @@ def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = 
     valor_total = 0.0
     revisar: list[ResultadoFactura] = []
     con_cruce = n_files = 0
+    por_resp: dict[str, list] = {}  # responsable → [n, listas, valor]
     for r in resultados:
         por_estado[r.estado] += 1
         valor_total += r.valor_total
@@ -1622,6 +1786,11 @@ def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = 
         if r.soportes_clinicos:
             con_cruce += 1
             n_files += len(r.soportes_clinicos)
+        if r.responsable:
+            acc = por_resp.setdefault(r.responsable, [0, 0, 0.0])
+            acc[0] += 1
+            acc[1] += 1 if r.estado == "LISTA" else 0
+            acc[2] += r.valor_total
     total = len(resultados)
     logger.info("=" * 64)
     logger.info("RESUMEN DE RADICACIÓN")
@@ -1674,6 +1843,14 @@ def imprimir_resumen(resultados: list[ResultadoFactura], n_indice: int | None = 
                 "    ⚠ hay soportes indexados pero NINGUNO cruzó con el lote: la numeración "
                 "del share no coincide con la del lote (revisar rango/normalización)."
             )
+    # Por responsable (HOSPIAI D5): quién radica qué, leído de la ruta del share.
+    if por_resp:
+        logger.info("  Por responsable (leído de la ruta):")
+        top = sorted(por_resp.items(), key=lambda kv: -kv[1][0])[:10]
+        for nombre, (n, listas, valor) in top:
+            logger.info(
+                f"    {nombre[:24]:<24} {n:>5,} facturas | {listas:>5,} listas | $ {valor:,.0f}"
+            )
     logger.info("  Por entidad:")
     for ent, d in _resumen_por_entidad(resultados).items():
         logger.info(
@@ -1713,6 +1890,26 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="JSON de perfiles (def.: data/perfiles_radicacion.json).",
+    )
+    p.add_argument(
+        "--reglas",
+        type=Path,
+        default=None,
+        help="Motor de reglas declarativo (def.: data/reglas_radicacion.json). "
+        "Cada regla lleva su fuente normativa; la corrida registra la versión usada.",
+    )
+    p.add_argument(
+        "--db",
+        type=Path,
+        default=None,
+        help="Expediente Digital HOSPIAI donde persistir la corrida "
+        "(def.: data/hospiai.db del repo). El CSV/XLSX se generan igual.",
+    )
+    p.add_argument(
+        "--sin-db",
+        action="store_true",
+        dest="sin_db",
+        help="No escribir en el Expediente Digital (solo CSV/XLSX).",
     )
     p.add_argument(
         "--manifiesto",
@@ -1810,6 +2007,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = cargar_perfiles(args.perfiles)
     cfg.prestador_nit = cfg.prestador_nit or PRESTADOR_NIT_DEFAULT
+    cargar_reglas(args.reglas, cfg)
 
     manifiesto: dict[str, str] = {}
     if args.manifiesto is not None:
@@ -1884,11 +2082,13 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     resultados: list[ResultadoFactura] = []
+    docs_por_factura: dict[str, list[Path]] = {}
     consecutivo = args.consecutivo
     for i, (fac_hint, archivos, carpeta, ent_hint) in enumerate(items, 1):
         res = procesar_factura(fac_hint, archivos, carpeta, ent_hint, cfg, soportes_idx)
         if filtro_ent and not _coincide_entidad(filtro_ent, res):
             continue
+        docs_por_factura[res.factura_norm or res.factura] = archivos
         logger.info(f"[{i}/{len(items)}] {res.factura} → {res.entidad_nombre}  [{res.estado}]")
         if args.armar:
             perfil = resolver_entidad(ent_hint, cfg)
@@ -1916,6 +2116,39 @@ def main(argv: list[str] | None = None) -> int:
     escribir_reporte_csv(resultados, args.reporte)
     if args.xlsx is not None:
         escribir_reporte_xlsx(resultados, args.xlsx)
+
+    # ── Expediente Digital (HOSPIAI Fase 1) ─────────────────────────────────
+    # Memoria ADICIONAL y persistente de la corrida: expedientes, documentos,
+    # hallazgos y eventos con la versión de reglas usada. No reemplaza el CSV.
+    if not args.sin_db:
+        db_path = args.db or Path(__file__).resolve().parent.parent / "data" / "hospiai.db"
+        try:
+            import hospiai_db
+
+            resumen_db = hospiai_db.persistir_corrida(
+                db_path,
+                resultados,
+                docs_por_factura,
+                version_reglas=cfg.version_reglas,
+                version_motor=VERSION_MOTOR,
+                regla_id_por_codigo=cfg.regla_id_por_codigo,
+                reglas_registro=cfg.reglas_registro,
+                origen=str(args.origen),
+                parametros=" ".join(argv if argv is not None else sys.argv[1:]),
+                clasificar=lambda nombre: clasificar_soporte(nombre)[0],
+            )
+            logger.info(
+                f"Expediente Digital: {resumen_db['expedientes']:,} expediente(s), "
+                f"{resumen_db['documentos']:,} documento(s), {resumen_db['hallazgos']:,} "
+                f"hallazgo(s) → {db_path} (corrida #{resumen_db['corrida_id']}, "
+                f"reglas v{cfg.version_reglas})"
+            )
+        except Exception as e:  # la corrida no se pierde por un fallo de la BD
+            logger.warning(
+                f"No pude escribir el Expediente Digital en {db_path}: {e} — "
+                "el CSV/XLSX sí quedaron generados."
+            )
+
     imprimir_resumen(resultados, n_indice_soportes)
 
     listas = sum(1 for r in resultados if r.estado in ESTADOS_OK)
