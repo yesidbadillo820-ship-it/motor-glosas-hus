@@ -181,7 +181,17 @@ CREATE TABLE IF NOT EXISTS misiones(
   intentos INTEGER DEFAULT 0,
   max_intentos INTEGER DEFAULT 2,
   datos TEXT DEFAULT '{}',
-  resultado TEXT DEFAULT ''
+  resultado TEXT DEFAULT '',
+  no_antes TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS mision_log(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mision_codigo TEXT NOT NULL,
+  de_estado TEXT DEFAULT '',
+  a_estado TEXT NOT NULL,
+  agente TEXT DEFAULT '',
+  fecha TEXT NOT NULL,
+  detalle TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS ix_documentos_fac ON documentos(factura_norm);
 CREATE INDEX IF NOT EXISTS ix_hallazgos_fac ON hallazgos(factura_norm);
@@ -192,6 +202,7 @@ CREATE INDEX IF NOT EXISTS ix_exped_responsable ON expedientes(responsable);
 CREATE INDEX IF NOT EXISTS ix_exped_pagador ON expedientes(pagador_id);
 CREATE INDEX IF NOT EXISTS ix_misiones_estado ON misiones(estado, tipo);
 CREATE INDEX IF NOT EXISTS ix_decisiones_fac ON decisiones(factura_norm);
+CREATE INDEX IF NOT EXISTS ix_misionlog_cod ON mision_log(mision_codigo);
 """
 
 # Dictámenes que bloquean la radicación (hallazgo crítico a nivel de expediente).
@@ -215,6 +226,7 @@ _MIGRACIONES: dict[str, dict[str, str]] = {
         "tiempo_dias": "INTEGER",
     },
     "reglas": {"vigencia_desde": "TEXT DEFAULT ''", "vigencia_hasta": "TEXT DEFAULT ''"},
+    "misiones": {"no_antes": "TEXT DEFAULT ''"},
 }
 
 # Vistas: el GRAFO DE CONOCIMIENTO consultable. No son otra base — son el mismo

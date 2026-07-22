@@ -1,0 +1,18 @@
+{
+  "_comentario": "HOSPIAI — Políticas de ejecución del Supervisor (AG010). Las políticas NUNCA van en código: el área o TI las edita aquí y el Policy Engine las aplica en la siguiente pasada. Horas en formato HH:MM (hora local del equipo).",
+  "version": "1.0",
+  "max_procesos_por_tipo": {
+    "OCR": 2
+  },
+  "horario_laboral": {
+    "aplica_a_tipos": ["OCR"],
+    "desde": "05:00",
+    "hasta": "21:00"
+  },
+  "requiere_aprobacion_humana": ["RPA", "RADICAR", "SUBIR_PORTAL"],
+  "max_intentos_default": 2,
+  "backoff_segundos": [5, 60, 300],
+  "cadenas": {
+    "_comentario": "Misiones que se generan automáticamente al terminar OK otra: {'TIPO_TERMINADO': [{'tipo': 'SIGUIENTE', 'prioridad': 'NORMAL'}]}. Vacío = ninguna."
+  }
+}

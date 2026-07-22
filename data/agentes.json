@@ -149,14 +149,15 @@
       "id": "AG010",
       "nombre": "SupervisorMisiones",
       "dominio": "ORQUESTACION",
-      "version": "0.1",
-      "estado": "PLANEADO",
+      "version": "1.0",
+      "estado": "ACTIVO",
       "capacidades": [
         "ORQUESTAR"
       ],
       "depende_de": [],
-      "implementacion": "pendiente (Fase 1.6 entrega 2): consumirá SOLO el Registro y la ColaMisiones",
-      "notas": "No procesa, no clasifica, no radica: solo mueve misiones."
+      "implementacion": "sdk-nucleo: hospiai_supervisor.Supervisor",
+      "notas": "Orquestador: Scheduler + Dispatcher + RetryManager + PolicyEngine + MissionLogger. No procesa, no clasifica, no radica: solo mueve misiones consultando el Registro y las políticas (data/politicas.json).",
+      "requiere_sdk": "1.0"
     },
     {
       "id": "AG011",

@@ -105,8 +105,10 @@ class TestRegistroCentral:
         reg = hag.registro_con_implementaciones()
         ids = [a["id"] for a in reg.listar()]
         assert "AG002" in ids and "AG010" in ids
-        # El planeado (Supervisor) NO está disponible.
-        assert all(a["id"] != "AG010" for a in reg.disponibles())
+        # AG010 (Supervisor) ya es ACTIVO desde Fase 2; el OCR sigue PLANEADO
+        # y por eso NO aparece entre los disponibles.
+        assert any(a["id"] == "AG010" for a in reg.disponibles())
+        assert all(a["id"] != "AG004" for a in reg.disponibles())
 
     def test_busqueda_por_capacidad(self):
         reg = hag.registro_con_implementaciones()

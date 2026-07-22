@@ -92,6 +92,12 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - **API interna estable** (`py tools\hospiai_api.py servir`): el contrato de consulta (expedientes, decisiones, evidencias, agentes, ontología, salud) con el que mañana se integrarán HIS/ERP/BI — solo lectura, solo en el equipo local.
   - **Observabilidad** (`salud`): misiones pendientes/fallidas, reintentos, tiempos y corridas — para ver cuándo algo se degrada.
   - **146 pruebas automáticas** en verde.
+- **FASE 2 — IMPLEMENTACIÓN FUNCIONAL · Sprint 1 (AG010 Supervisor) ENTREGADO:** por directiva, se terminó la etapa de arquitectura y empezó la de agentes trabajando. El Supervisor quedó **funcionando**:
+  - **Seis piezas separadas** (`tools/hospiai_supervisor.py`): *Scheduler* (prioridad ALTA primero, dependencias entre misiones, backoff), *Dispatcher* (elige el agente SOLO por el Registro Central y compatibilidad — jamás conoce clases), *Retry Manager* (error → reintento con espera creciente → error definitivo con Registro de Decisión; **nada queda bloqueado**), *Policy Engine* (las políticas viven en `data/politicas.json`, no en código: topes de concurrencia, horario laboral, y RPA/radicación **retenidas hasta aprobación humana**), *Mission Logger* (cada transición PENDIENTE→ASIGNADA→EJECUTANDO→FINALIZADA/REINTENTO/ERROR queda persistida) y el ciclo que las une.
+  - Probado **end-to-end con agentes reales**: `py tools\hospiai_supervisor.py correr` drena la cola; `estado` muestra el log de transiciones.
+  - **Interfaz RPA lista sin adaptadores** (`tools/hospiai_rpa.py`, Prioridad 5): el contrato login/subir/confirmar/descargar/cerrar existe; registrar un adaptador real será un acto deliberado de la Fase 5 con autorización de gerencia/TI.
+  - AG010 pasó a **ACTIVO** en el registro. **159 pruebas automáticas** en verde.
+  - Sprints siguientes de la fase: 2) migrar los agentes legacy al SDK, 3) semántica→dictamen, 4) OCR clínico, 5) OCR→expediente, 6) **primera corrida real de los 12.523 expedientes** (requiere el índice de soportes en el equipo del área).
 
 ---
 

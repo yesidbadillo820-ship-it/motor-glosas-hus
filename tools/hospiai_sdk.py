@@ -169,9 +169,10 @@ class ColaMisiones:
             with con:
                 fila = con.execute(
                     "SELECT * FROM misiones WHERE estado='PENDIENTE' AND tipo IN (%s)"
+                    " AND (no_antes='' OR no_antes IS NULL OR no_antes<=?)"
                     " ORDER BY CASE prioridad WHEN 'ALTA' THEN 0 WHEN 'NORMAL' THEN 1"
                     " ELSE 2 END, id LIMIT 1" % ",".join("?" * len(tipos)),
-                    tipos,
+                    [*tipos, _ahora()],
                 ).fetchone()
                 if fila is None:
                     return None
@@ -228,6 +229,83 @@ class ColaMisiones:
             return {f["estado"]: f["n"] for f in filas}
         finally:
             con.close()
+
+    # ── Primitivas para el Supervisor (AG010) ──────────────────────────────
+
+    def pendientes(self) -> list[Mision]:
+        """Misiones PENDIENTES ya elegibles (respeta `no_antes` del backoff),
+        ordenadas por prioridad y llegada. El Scheduler decide sobre esta lista."""
+        con = hospiai_db.abrir(self.db_path)
+        try:
+            filas = con.execute(
+                "SELECT * FROM misiones WHERE estado='PENDIENTE'"
+                " AND (no_antes='' OR no_antes IS NULL OR no_antes<=?)"
+                " ORDER BY CASE prioridad WHEN 'ALTA' THEN 0 WHEN 'NORMAL' THEN 1"
+                " ELSE 2 END, id",
+                (_ahora(),),
+            ).fetchall()
+            return [self._a_mision(f) for f in filas]
+        finally:
+            con.close()
+
+    def estados_de(self, codigos: list[str]) -> dict[str, str]:
+        """{codigo: estado} para verificar dependencias entre misiones."""
+        if not codigos:
+            return {}
+        con = hospiai_db.abrir(self.db_path)
+        try:
+            filas = con.execute(
+                "SELECT codigo, estado FROM misiones WHERE codigo IN (%s)"
+                % ",".join("?" * len(codigos)),
+                codigos,
+            ).fetchall()
+            return {f["codigo"]: f["estado"] for f in filas}
+        finally:
+            con.close()
+
+    def asignar(self, mision: Mision, agente_id: str) -> None:
+        """PENDIENTE → EN_CURSO para un agente concreto (decisión del Dispatcher)."""
+        con = hospiai_db.abrir(self.db_path)
+        try:
+            with con:
+                con.execute(
+                    "UPDATE misiones SET estado='EN_CURSO', agente_asignado=?, actualizada=?,"
+                    " intentos=intentos+1 WHERE id=? AND estado='PENDIENTE'",
+                    (agente_id, _ahora(), mision.id),
+                )
+        finally:
+            con.close()
+        mision.estado = "EN_CURSO"
+        mision.intentos += 1
+
+    def reprogramar(self, mision: Mision, segundos: int) -> None:
+        """Backoff del Retry Manager: vuelve a PENDIENTE pero no elegible hasta
+        dentro de `segundos`."""
+        no_antes = datetime.fromtimestamp(time.time() + segundos).isoformat(timespec="seconds")
+        con = hospiai_db.abrir(self.db_path)
+        try:
+            with con:
+                con.execute(
+                    "UPDATE misiones SET estado='PENDIENTE', no_antes=?, actualizada=? WHERE id=?",
+                    (no_antes, _ahora(), mision.id),
+                )
+        finally:
+            con.close()
+        mision.estado = "PENDIENTE"
+
+    def _a_mision(self, fila) -> Mision:
+        return Mision(
+            codigo=fila["codigo"],
+            tipo=fila["tipo"],
+            expediente=fila["expediente"],
+            prioridad=fila["prioridad"],
+            estado=fila["estado"],
+            datos=json.loads(fila["datos"] or "{}"),
+            creada_por=fila["creada_por"],
+            intentos=fila["intentos"],
+            max_intentos=fila["max_intentos"],
+            id=fila["id"],
+        )
 
 
 # ─── Contrato único de agente ────────────────────────────────────────────────
