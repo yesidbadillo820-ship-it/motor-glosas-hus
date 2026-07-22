@@ -102,6 +102,60 @@
     evidencia por glosa, cruza coherencia, concluye procede/improcede/parcial
     con % de confianza y redacta el oficio de respuesta. Corre en el equipo del
     HUS (donde está montada `Y:\`). Nunca inventa evidencia.
+  - **Nueva herramienta `tools/indexar_soportes_dispensario.py`:** indexa la
+    carpeta de soportes (`Y:\`) **una sola vez** y crea un índice (JSON); así el
+    asistente ya no recorre toda la unidad de red (que se colgaba) — con
+    `--indice` abre solo los archivos de la factura. Soporta actualización
+    incremental y búsqueda por factura/paciente. Con README y pruebas.
+  - **Nueva base `tools/expediente_conciliacion.py` (modelo de datos ÚNICO):**
+    arma un EXPEDIENTE por factura con un `id_expediente` que amarra todo —
+    factura, paciente, contrato (287/440 + base tarifaria + código interno de
+    cartera), radicado, glosas, soportes (del índice), cartera (saldo/edad/
+    deterioro) y estado. Es la "fuente de la verdad" que consultarán los demás
+    módulos (evidencia, jurídico, argumentación, dashboard) en vez de repetir
+    búsquedas. Genera `expedientes.json`. Probado con el lote real (147
+    expedientes). Con pruebas.
+  - **Nuevo `tools/motor_evidencia_dispensario.py` (Motor de Evidencia, Mod 3):**
+    lee los soportes clínicos **página por página** y localiza, por glosa, **en
+    qué página** está la prueba, con el fragmento textual. Marca cada evidencia
+    como *fuerte* (código CUPS/CUM) o *débil* (palabra) e ignora palabras
+    genéricas para no dar falsos positivos. Trabaja sobre el expediente (abre
+    solo los archivos de cada factura, no recorre `Y:\`). Nunca inventa. Con
+    README y pruebas.
+  - **Nuevo `tools/motor_verificacion_dispensario.py` (Verificación, Mod 3.5):**
+    con **reglas deterministas** (no IA) convierte el expediente en
+    **probatorio**: por cada glosa fija los HECHOS a demostrar (ej. la prestación
+    fue *ordenada* y *ejecutada*) y verifica si quedaron **probados**, con nivel
+    de confianza y qué documento falta. Corre un **motor de contradicciones**
+    (factura no en cartera, paciente que no coincide con el RIPS, CUPS ausente
+    en RIPS). Marca cada expediente como *defendible* o no. Así el motor de
+    argumentación no inventará: ensamblará la defensa desde hechos ya probados y
+    trazables. Con README y pruebas.
+  - **Nuevo `tools/motor_decision_dispensario.py` (Motor de Decisión — el
+    cerebro):** con reglas de negocio (no IA) califica por glosa la
+    **defendibilidad (0–100 %)**, evalúa **riesgos** (probatorio, documental,
+    contractual, tarifario, financiero, jurídico) con su razón, aplica la
+    **matriz de precedencia** (qué documentos necesita cada tipo de glosa) y
+    emite la **acción recomendada** (solicitar levantamiento / soporte / aceptar
+    parcial / escalar / conciliar). El jurídico y la argumentación luego solo
+    fundamentan y redactan esa decisión. Con README y pruebas. La plataforma va:
+    índice → expediente → evidencia → hechos probados → **decisión**.
+  - **Nuevo `tools/piloto_conciliacion_dispensario.py` (orquestador del piloto):**
+    corre todo el flujo extremo a extremo sobre 5 casos representativos
+    (mayor valor, más glosas, contrato 287, contrato 440, y uno conocido) y deja
+    **una carpeta por expediente** (expediente/evidencia/hechos/decision.json +
+    resumen.txt + log.txt) más un `METRICAS.json` con indicadores y los
+    **umbrales de aceptación** (≥95 % facturas con soporte, ≥90 % glosas con
+    evidencia, 0 levantamientos sin hecho probado, 100 % trazables). Marca
+    `piloto_ok`. Si no cumple, la prioridad es corregir el flujo, no agregar
+    funciones. Con README y pruebas.
+  - **Casos del piloto (elegidos con datos reales):** 1) HUS0000446262 ($46,7 M,
+    287, mixto); 2) HUS0000452150 (62 glosas, 287); 3) HUS0000426013 (COBERTURA
+    SOAT $32,5 M, 287); 4) HUS0000455554 ($14,4 M, 440); 5) el que elija el
+    auditor (sugerido HUS0000436483).
+  - Nota de escala: el servidor de radicación tiene ~2,2 millones de archivos —
+    por eso el índice (una sola pasada, filtrando `HUS<n>`) es indispensable;
+    conviene apuntar la indexación a la subcarpeta del Dispensario, no a todo `X:\`.
   - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
     / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
     glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
