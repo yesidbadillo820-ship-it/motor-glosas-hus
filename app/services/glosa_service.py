@@ -1246,6 +1246,51 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "el medicamento facturado según historia clínica",
     ),
+    # ── Ronda 33 — costuras nuevas del placeholder (dictámenes PPL 22-jul) ──
+    # "RESPECTO DEL PROCEDIMIENTO FACTURADO CON EL PROCEDIMIENTO FACTURADO
+    # SEGÚN HISTORIA CLÍNICA": el modelo escribió "el procedimiento facturado
+    # con CUPS <factura>" y la malla CUPS convirtió el segundo tramo en el
+    # placeholder → tartamudeo con conector en el medio. Conservamos el
+    # primer tramo (con su mayúscula original, vía backreference).
+    (
+        re.compile(
+            r"\b((?:el|del)\s+procedimiento\s+facturado)\s+"
+            r"(?:con|de|del|por)\s+el\s+procedimiento\s+facturado\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    # Variante sin conector: "el procedimiento facturado el procedimiento
+    # facturado" (la v5 de ronda 16 solo cubría combos con sufijo "según
+    # historia clínica" o mezcla procedimiento/medicamento).
+    (
+        re.compile(
+            r"\b((?:el|del)\s+procedimiento\s+facturado)\s+el\s+procedimiento\s+facturado\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    # "descripción detallada de los servicios el procedimiento facturado
+    # según historia clínica": el placeholder reemplazó un "CUPS NNN" que
+    # venía pegado a "los servicios" y la frase quedó descosida. La
+    # reparación gramatical mínima es "los servicios facturados".
+    (
+        re.compile(
+            r"\b(los\s+servicios)\s+el\s+procedimiento\s+facturado\b",
+            re.IGNORECASE,
+        ),
+        r"\1 facturados",
+    ),
+    # "a nombre de el fondo/de el paciente" — contracción rota que la IA
+    # produce al ensamblar el adquirente (dictamen PPL 22-jul). Acotado a
+    # "de el" + artículo de entidad/persona para no tocar títulos citados.
+    (
+        re.compile(
+            r"\b([dD])e\s+el\s+(fondo|paciente|prestador|contrato|expediente|hospital)\b",
+            re.IGNORECASE,
+        ),
+        r"\1el \2",
+    ),
     # ── Ronda 16 — Bug B v6: palabra duplicada consecutiva ──
     # Casos 26-jun: la IA escribió "la glosa aplicada aplicada por SURA",
     # "según según el contrato", "el el código CUPS". Limpiamos cualquier

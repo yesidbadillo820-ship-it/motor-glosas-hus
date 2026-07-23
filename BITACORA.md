@@ -147,6 +147,28 @@
     y que la palabra "pos-quirúrgica" disparaba por error la corrección de
     régimen ARL (ahora solo dispara con mención expresa de "Ley 100" o
     "régimen contributivo/subsidiado").
+- **Ronda 33 (mismo día, sobre dos dictámenes PPL reales que trajo Yesid —
+  glosas de $218.145 y $5.800).** Lo detectado y corregido:
+  1. **Normas repetidas y normas "de relleno":** la respuesta citaba la
+     Resolución 1995/1999 dos veces con número completo y dejaba caer la
+     Ley 1438 sin usarla para nada. Nueva regla en el prompt: cada norma se
+     cita UNA sola vez y solo si sostiene un argumento del caso; además se
+     precisó que los plazos del trámite de glosas son del **Art. 57** de la
+     Ley 1438 (el 56 es de pagos) y que la historia clínica no se llama
+     "prueba plena".
+  2. **Costuras del borrado de CUPS dudosos:** frases como "del procedimiento
+     facturado CON el procedimiento facturado" o "los servicios el
+     procedimiento facturado" ahora se cosen solas ("del procedimiento
+     facturado", "los servicios facturados"). También "a nombre de el
+     fondo" → "del fondo".
+  3. **Cláusula de prórroga mal usada:** el dictamen citaba la cláusula de
+     prórroga del Otrosí 26 bajo "pacta sunt servanda" como si resolviera
+     una glosa de soportes. Nueva regla: una cláusula de prórroga/vigencia
+     solo se presenta como prueba de que el contrato está vigente.
+  4. **Nombre del pagador PPL:** nunca más "el fondo PPL" — el pagador se
+     nombra "Fondo Nacional de Salud de las Personas Privadas de la
+     Libertad" (PPL es la población, no la entidad).
+  - 13 tests nuevos (`test_ronda33_fixes.py`). Va en el mismo PR #183.
 
 ### Los números de la operación SIMED (respuesta de glosas Dispensario)
 | Lote | Facturas | Objeciones | Valor defendido | Estado |
