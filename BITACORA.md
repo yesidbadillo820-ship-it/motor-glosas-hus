@@ -8,7 +8,7 @@
 - **Al empezar el día / una sesión:** leer esta bitácora para saber en qué punto vamos.
 - **Al terminar:** anotar abajo, con la fecha, lo que se hizo, lo que quedó pendiente y lo que sigue mañana.
 
-**Última actualización:** 22 de julio de 2026 (Fase 4 — Hospital Command Center)
+**Última actualización:** 23 de julio de 2026 (**HOSPIAI v1.0 en producción** — primera corrida real + cierre del Sprint 5)
 
 ---
 
@@ -158,6 +158,22 @@ Se hizo la herramienta tolerante a los distintos formatos de archivo de Windows.
   - El cambio de fondo: de "usuario → pregunta → respuesta" a **"sistema → observa → detecta → prioriza → recomienda → aprende → mide"**. Ese ciclo es el objetivo real del proyecto.
   - **251 pruebas automáticas** en verde. **33 agentes registrados** (AG001–AG033).
 
+### 23 de julio de 2026 · 🚀 HOSPIAI v1.0 EN PRODUCCIÓN — primera corrida real y cierre del Sprint 5
+Por directiva, se detuvo el desarrollo de funcionalidades para **consolidar la versión 1.0**. Lo que pasó hoy:
+- **HOSPIAI corrió por primera vez sobre los datos reales del hospital** (corrida #2, 12.523 facturas). El resultado quedó guardado como línea base:
+  - **7.840 facturas LISTAS (62,6 %)** · **$38.646 millones listos para radicar**; $49.293 millones auditados en total.
+  - El cruce anexó soportes automáticamente a **10.823 facturas**.
+  - **Hallazgo grande:** 3.275 facturas ($1.256 millones) están a **un solo soporte clínico (HEV)** de quedar LISTAS → resolverlo sube las listas a **11.115 (88,8 %)**, superando la meta de gerencia (9.000+).
+  - Quick-wins: 29 facturas ($551 M) solo esperan que se agregue la entidad al catálogo; 84 facturas quirúrgicas solo-OPF valen $1.648 M.
+- **Se cerró el Sprint 5 (Puesta en Producción)** con los entregables de la V1.0:
+  - **Acta de línea base** (`docs/ACTA_LINEA_BASE.md`): el punto de partida medido, en cifras agregadas, para gerencia.
+  - **Manual de usuario** (`docs/MANUAL_USUARIO.md`): uso diario sin tecnicismos.
+  - **Manual técnico** (`docs/MANUAL_TECNICO.md`): arquitectura, módulos, 33 agentes, esquema, instalación, pruebas, cómo extender.
+  - **Guión del video de demostración** (`docs/GUION_VIDEO_DEMO.md`): 5–10 minutos, escena por escena, con las cifras reales.
+  - Etiqueta **`v1.0.0`** en el repositorio.
+- **Aprendizaje operativo del go-live:** el 100 % de la fricción fue de entorno (carpeta equivocada, rama local atrasada 18 commits, marcador `<FE>` tomado literal), no del código. Eso confirma que el próximo valor no está en más agentes sino en un arranque a prueba de errores (el "doctor" propuesto) — pero eso es V1.1, no ahora.
+- **Siguiente etapa (Entrega 2, 2–4 semanas): NO desarrollar agentes.** Usar la plataforma todos los días y medir contra la línea base: LISTAS iniciales vs. finales, valor recuperado, tiempo promedio, hallazgos corregidos y evolución del HOS. Eso convierte el proyecto en un caso de éxito medible.
+
 ---
 
 ## 🧭 NORTE DEL PROYECTO — HOSPIAI
@@ -199,7 +215,7 @@ Estado actual de cada parte de la visión:
 - [ ] **Escanear los soportes que faltan.** Parte de las facturas "en revisión" simplemente todavía no tienen sus soportes clínicos escaneados. Esa es una tarea operativa del área; el explorador ya dice cuáles son y qué les falta.
 - [ ] **Dejar las mejoras disponibles en forma permanente.** Integrar el trabajo a la versión principal del proyecto para que esté en todas las sesiones, sin importar en qué rama se trabaje.
 - [x] ~~HOSPIAI Fase 1 — Fundación~~ **HECHA (22 de julio):** Expediente Digital, reglas declarativas, responsable+lote, consola/panel, corrida diaria y guía.
-- [ ] **Estrenar la Fase 1 con datos reales:** correr el motor sobre el lote real (con el índice de soportes) para poblar `data/hospiai.db` por primera vez, y **programar la corrida diaria** en el equipo del área (una línea de `schtasks`; está en `tools/README_hospiai.md`).
+- [x] ~~Estrenar la Fase 1 con datos reales~~ **HECHA (23 de julio):** primera corrida real de 12.523 facturas, `data/hospiai.db` poblada, línea base capturada (62,6 % LISTAS · $38.646 M listos). Falta solo **programar la corrida diaria** con `schtasks` (línea en `docs/MANUAL_USUARIO.md`).
 - [ ] **Mostrar responsable y lote también en el explorador** (la herramienta del buscador vive en otra rama; el reporte ya trae las columnas).
 - [x] ~~HOSPIAI Fase 2 (D1/D5): auditor de calidad de archivos y tiempos de proceso~~ **HECHA (22 de julio):** calidad de archivos = DIS (AG016); tiempos = Minero de Proceso (AG023).
 - [ ] **Alimentar la memoria institucional con corridas reales:** correr el ciclo completo varias veces (radicador → aprendizaje → curar) para que las recomendaciones tengan base histórica con casos reales.
@@ -209,15 +225,19 @@ Estado actual de cada parte de la visión:
 
 ---
 
-## 📌 PARA MAÑANA (lo próximo a trabajar)
+## 📌 PARA MAÑANA — Entrega 2: medición de impacto (2–4 semanas, SIN construir agentes)
 
-1. **Estrenar HOSPIAI con el lote real:** `git pull`, armar el índice de soportes (si no está: `py tools\hospiai_indexador.py indexar "Y:\" "Z:\SERVIDOR GLOSAS" "X:\SERVIDOR RADICACION\2. SINAC SC SAS - 2026"`), correr el motor (ya escribe el Expediente Digital solo) y ver `py tools\hospiai.py resumen` + el panel. Anotar aquí el nuevo porcentaje de listas y los primeros indicadores por responsable.
-2. **Estrenar el cerebro (Fase 2.2):** con la base poblada, probar `py tools\hospiai.py recomendar HUS528043` y `py tools\hospiai.py simular` — y correr `py tools\hospiai_conocimiento.py patrones`, `causas` y `curar` para las primeras lecciones validadas.
-   Y el plan operativo (Fase 3): `py tools\hospiai.py plan HUS528043` y `py tools\hospiai.py oportunidades` — esta última dirá cuánta plata se libera con cada corrección masiva y cuántos soportes YA existen en los servidores.
-   Y el copiloto (Fase 4): `py tools\hospiai.py iniciar-dia` (el "buenos días" con las acciones y el objetivo del día) y `py tools\hospiai.py preguntar "¿Qué debo hacer hoy para liberar la mayor cantidad de dinero?"`. El panel ejecutivo ahora abre con el Hospital Operational Score y la "situación del día".
-3. **Programar la corrida diaria** con la línea de `schtasks` de la guía (`tools/README_hospiai.md`), para que el panel amanezca actualizado.
-4. **Regenerar el explorador y el tablero** con el reporte actualizado.
-5. **Revisar la lista de EPS no reconocidas** y agregarlas al catálogo, para bajar el grupo "entidad por resolver".
+> Directiva vigente: **detener el desarrollo de funcionalidades**. La V1.0 ya está
+> cerrada y en producción. Ahora se **usa la plataforma todos los días y se mide**
+> el impacto contra la línea base (`docs/ACTA_LINEA_BASE.md`). Eso convierte el
+> proyecto en un caso de éxito real.
+
+1. **Correr `py tools\hospiai.py oportunidades`** y anotar cuántas de las 3.275 HEV **ya están escaneadas** (asociar, $0) vs. hay que conseguir. Ese es el primer objetivo operativo.
+2. **Atacar los quick-wins:** agregar al catálogo las 29 entidades no resueltas ($551 M) y priorizar las quirúrgicas de alto valor (OPF, $1.648 M).
+3. **Programar la corrida diaria** con `schtasks` (línea en `docs/MANUAL_USUARIO.md`) para que el panel amanezca actualizado y el HOS se registre solo.
+4. **Cada viernes:** correr `py tools\hospiai_operacion.py mejora` y anotar en esta bitácora qué mejoró, qué empeoró y el HOS de la semana.
+5. **Medir contra la línea base** semana a semana: LISTAS iniciales vs. finales, valor recuperado, tiempo hasta LISTA, hallazgos corregidos, evolución del HOS. Con eso se arma el informe del primer mes de operación.
+6. **Diferido a la V1.1 (no ahora):** el arranque a prueba de errores (el "doctor"), integrar la rama al `main` de forma permanente, y —solo cuando haya historia suficiente— predicción / OCR / RPA (Entrega 3).
 
 ---
 
