@@ -38,9 +38,13 @@ import logging
 import re
 import sys
 import unicodedata
-from pathlib import Path
+import zipfile
+from collections import Counter
+from pathlib import Path, PurePosixPath
 
 logger = logging.getLogger("informe_xml_dian")
+
+VERSION = "2.1 (23 de julio de 2026)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Utilidades
@@ -277,37 +281,106 @@ def construir_conclusion(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def indexar_archivos(raiz: Path) -> tuple[dict[str, list[Path]], dict[str, list[Path]]]:
-    """Índices {factura: [xml]} y {factura: [json]}.
+class ArchivoEnZip:
+    """Un .xml/.json guardado dentro de un .zip (paquete de la DIAN).
+
+    Imita lo mínimo de Path (name, stem, suffix, read_text, stat) para que
+    el resto del bot lo trate igual que un archivo suelto.
+    """
+
+    def __init__(self, zip_path: Path, miembro: str):
+        self._zip = zip_path
+        self._miembro = miembro
+        pm = PurePosixPath(miembro.replace("\\", "/"))
+        self.name = f"{zip_path.name} → {pm.name}"
+        self.stem = pm.stem
+        self.suffix = pm.suffix.lower()
+
+    def read_text(self, encoding: str = "utf-8", errors: str = "ignore") -> str:
+        try:
+            with zipfile.ZipFile(self._zip) as z:
+                return z.read(self._miembro).decode(encoding, errors=errors)
+        except (zipfile.BadZipFile, KeyError, RuntimeError) as e:
+            raise OSError(str(e)) from e
+
+    def stat(self):
+        return self._zip.stat()
+
+
+def indexar_archivos(raiz: Path) -> tuple[dict, dict, dict]:
+    """Índices {factura: [xml]} y {factura: [json]} + diagnóstico de la ruta.
 
     El número de factura se busca en el nombre del archivo Y en el nombre de
     las carpetas que lo contienen: los repositorios de facturación suelen
     guardar cada factura en su propia subcarpeta (FACTURAS_SALUD\\HUS533650\\…)
     con archivos de nombre genérico de la DIAN (ad0901…xml) que no traen el
-    número por ninguna parte.
+    número por ninguna parte. Si el XML/JSON viene comprimido en un .zip
+    (paquete DIAN), también se lee adentro del .zip.
     """
-    xmls: dict[str, list[Path]] = {}
-    jsons: dict[str, list[Path]] = {}
-    total = 0
-    for p in raiz.rglob("*"):
-        if not p.is_file():
-            continue
-        ext = p.suffix.lower()
-        if ext not in (".xml", ".json"):
-            continue
-        total += 1
-        claves = set(facturas_en_nombre(p.stem))
+    xmls: dict[str, list] = {}
+    jsons: dict[str, list] = {}
+    diag: dict = {
+        "total": 0,
+        "por_ext": Counter(),
+        "subcarpetas": 0,
+        "muestra_carpetas": [],
+        "muestra_archivos": [],
+        "zip_miembros": 0,
+        "zip_danados": 0,
+    }
+
+    def claves_de(stem: str, p: Path) -> set[str]:
+        claves = set(facturas_en_nombre(stem))
         for carpeta in p.parents:
             if carpeta == raiz or carpeta == carpeta.parent:
                 break
             claves |= facturas_en_nombre(carpeta.name)
-        destino = xmls if ext == ".xml" else jsons
-        for fact in claves:
-            destino.setdefault(fact, []).append(p)
+        return claves
+
+    try:
+        for hijo in sorted(raiz.iterdir()):
+            if hijo.is_dir():
+                diag["subcarpetas"] += 1
+                if len(diag["muestra_carpetas"]) < 15:
+                    diag["muestra_carpetas"].append(hijo.name)
+    except OSError as e:
+        logger.error(f"  No se pudo listar la ruta: {e}")
+
+    for p in raiz.rglob("*"):
+        if not p.is_file():
+            continue
+        ext = p.suffix.lower()
+        diag["total"] += 1
+        diag["por_ext"][ext or "(sin extensión)"] += 1
+        if len(diag["muestra_archivos"]) < 25:
+            try:
+                diag["muestra_archivos"].append(str(p.relative_to(raiz)))
+            except ValueError:
+                diag["muestra_archivos"].append(str(p))
+        if ext in (".xml", ".json"):
+            destino = xmls if ext == ".xml" else jsons
+            for fact in claves_de(p.stem, p):
+                destino.setdefault(fact, []).append(p)
+        elif ext == ".zip":
+            try:
+                with zipfile.ZipFile(p) as z:
+                    miembros = z.namelist()
+            except (zipfile.BadZipFile, OSError):
+                diag["zip_danados"] += 1
+                continue
+            for miembro in miembros:
+                a = ArchivoEnZip(p, miembro)
+                if a.suffix not in (".xml", ".json"):
+                    continue
+                diag["zip_miembros"] += 1
+                destino = xmls if a.suffix == ".xml" else jsons
+                for fact in claves_de(a.stem, p) | facturas_en_nombre(p.stem):
+                    destino.setdefault(fact, []).append(a)
     logger.info(
-        f"  Archivos indexados: {total} ({len(xmls)} claves con XML, {len(jsons)} con JSON)"
+        f"  Archivos vistos: {diag['total']} | XML/JSON dentro de ZIP: {diag['zip_miembros']} | "
+        f"claves con XML: {len(xmls)} | con JSON: {len(jsons)}"
     )
-    return xmls, jsons
+    return xmls, jsons, diag
 
 
 def ordenar_xmls(candidatos: list[Path], factura: str = "") -> list[Path]:
@@ -385,7 +458,7 @@ def completar(excel: Path, raiz: Path, salida: Path, hoja: str | None) -> int:
     col = {nombre: encabezados[nombre] for nombre in COLUMNAS_SALIDA}
 
     logger.info(f"  Hoja '{ws.title}': {ws.max_row - 1} facturas por completar")
-    xmls, jsons = indexar_archivos(raiz)
+    xmls, jsons, diag = indexar_archivos(raiz)
 
     FILL_OK = PatternFill("solid", fgColor="C6EFCE")
     FONT_OK = Font(color="006100", size=10)
@@ -484,6 +557,7 @@ def completar(excel: Path, raiz: Path, salida: Path, hoja: str | None) -> int:
             "CUFE + firma digital + acuse DIAN 02 + sector salud "
             "(NUMERO_CONTRATO y COBERTURA_PLAN_BENEFICIOS) + cruce de valor y RIPS/CUV",
         ),
+        ("Versión del bot", VERSION),
     ]
     for j, (a, b) in enumerate(filas_resumen, 1):
         res.cell(row=j, column=1, value=a)
@@ -492,6 +566,44 @@ def completar(excel: Path, raiz: Path, salida: Path, hoja: str | None) -> int:
     res.cell(row=1, column=1).font = BLANCA
     res.column_dimensions["A"].width = 48
     res.column_dimensions["B"].width = 90
+
+    # Hoja DIAGNOSTICO: qué vio el bot en la ruta. Es la clave para entender
+    # a distancia por qué una corrida sale "SIN XML".
+    if "DIAGNOSTICO" in wb.sheetnames:
+        del wb["DIAGNOSTICO"]
+    dg = wb.create_sheet("DIAGNOSTICO")
+    ext_txt = " | ".join(f"{e}: {n}" for e, n in diag["por_ext"].most_common()) or "NINGUNO"
+    filas_diag: list[tuple[str, object]] = [
+        ("DIAGNÓSTICO DE LA RUTA DE FACTURAS", ""),
+        (
+            "Para qué sirve esta hoja",
+            "Muestra qué encontró el bot en la ruta. Si el informe sale con muchas "
+            "facturas SIN XML, envíe este mismo Excel para el diagnóstico.",
+        ),
+        ("Versión del bot", VERSION),
+        ("Ruta analizada", str(raiz)),
+        ("Subcarpetas de primer nivel", diag["subcarpetas"]),
+        ("Archivos vistos en total", diag["total"]),
+        ("Archivos por tipo", ext_txt),
+        ("XML/JSON hallados dentro de ZIP", diag["zip_miembros"]),
+        ("ZIP dañados o ilegibles", diag["zip_danados"]),
+        ("Facturas del informe CON XML hallado", sum(conteo.values()) - conteo["SIN XML"]),
+        ("Facturas del informe SIN XML", conteo["SIN XML"]),
+        ("", ""),
+        ("Primeras subcarpetas vistas", " | ".join(diag["muestra_carpetas"]) or "NINGUNA"),
+        ("Primeros archivos vistos (ruta relativa)", ""),
+    ]
+    for m in diag["muestra_archivos"]:
+        filas_diag.append(("", m))
+    if not diag["muestra_archivos"]:
+        filas_diag.append(("", "NINGÚN ARCHIVO VISTO — revisar la ruta o los permisos de red"))
+    for j, (a, b) in enumerate(filas_diag, 1):
+        dg.cell(row=j, column=1, value=a)
+        dg.cell(row=j, column=2, value=b)
+    dg.cell(row=1, column=1).fill = AZUL
+    dg.cell(row=1, column=1).font = BLANCA
+    dg.column_dimensions["A"].width = 42
+    dg.column_dimensions["B"].width = 100
 
     wb.save(salida)
     logger.info("")
@@ -531,7 +643,7 @@ def main() -> int:
     )
 
     logger.info("=" * 70)
-    logger.info("COMPLETAR INFORME XML DIAN (DE4401) — Motor Glosas HUS")
+    logger.info(f"COMPLETAR INFORME XML DIAN (DE4401) — Motor Glosas HUS — v{VERSION}")
     logger.info("=" * 70)
     if not args.excel.is_file():
         logger.error(f"No existe el Excel: {args.excel}")

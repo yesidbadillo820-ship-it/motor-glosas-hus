@@ -112,6 +112,12 @@ _Última actualización: 23 de julio de 2026._
   número correcto por dentro.
 - También se mejoró la redacción de la conclusión cuando el XML hallado
   corresponde a otra factura.
+- El usuario volvió a correr y salió igual (411 SIN XML), sin forma de saber
+  a distancia qué había en la ruta. **Versión 2.1:** el bot ahora también
+  lee los XML/JSON que vienen **comprimidos dentro de un .zip** (paquete
+  DIAN) y agrega al Excel una hoja **DIAGNOSTICO** que dice qué versión
+  corrió, cuántas subcarpetas y archivos vio, de qué tipos, y muestra los
+  primeros nombres — con esa hoja se puede diagnosticar cualquier corrida.
 - Se reenviaron los dos archivos al usuario para reemplazar en el servidor:
   `completar_informe_xml_dian.py` + `COMPLETAR_INFORME_XML.cmd`.
 
