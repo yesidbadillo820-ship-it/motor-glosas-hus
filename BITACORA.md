@@ -5,7 +5,7 @@
 > **Toda sesión de Claude debe leerlo al empezar y actualizarlo al terminar**
 > (ver CLAUDE.md). Escrito para un auditor, sin tecnicismos.
 
-_Última actualización: 22 de julio de 2026._
+_Última actualización: 22 de julio de 2026 (tarde)._
 
 ---
 
@@ -89,9 +89,16 @@ _Última actualización: 22 de julio de 2026._
 - Corrida real sobre las 50 facturas ADRES del servidor: 27 con errores,
   18 para revisar, 5 cumplen; a HUS410606 y HUS472103 les faltan RIPS y CUV.
 
-### 22 de julio de 2026 — Memoria común
+### 22 de julio de 2026 — Memoria común + informe XML NUEVA EPS
 - Se creó esta **BITÁCORA** y la instrucción (CLAUDE.md) para que todos los
   chats de Claude la lean al empezar y la actualicen al terminar.
+- **Bot del informe de revisión XML (devoluciones DE4401 de NUEVA EPS)**
+  (`tools/completar_informe_xml_dian.py` + `COMPLETAR_INFORME_XML.cmd`):
+  toma el Excel del informe (411 facturas devueltas), busca el XML DIAN de
+  cada factura en el repositorio de facturación, y completa VALOR (XML),
+  NUMERO_CONTRATO, COBERTURA_PLAN_BENEFICIOS, VALIDACIÓN DIAN (CUFE, firma,
+  acuse), la CONCLUSIÓN (si la devolución procede o no, con norma) y la
+  RESPUESTA para el portal DGH — con semáforo y hoja RESUMEN.
 
 ---
 
