@@ -217,6 +217,19 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     7.231 filas). Si el envío trae varias facturas, se repite el número y
     salen en orden ("2 de 5"). Instrucciones en la hoja LEYENDA.
 
+### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
+- **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
+  fusionadas desde la rama principal:
+  - **Ronda 32:** el número de factura ya no se cuela como código CUPS en el
+    dictamen (red determinística nueva); las glosas de $10 millones o más van
+    al modelo potente; se corrigieron citas legales. Pasó una revisión
+    adversarial (panel de 25 agentes) que confirmó y corrigió 18 detalles.
+  - **Ronda 33** (dos dictámenes PPL reales, glosas de $218.145 y $5.800):
+    se quitaron normas repetidas y de relleno; 13 pruebas nuevas
+    (`test_ronda33_fixes.py`). Pendiente: desplegar la ronda 32 en la VM de
+    Google (`cd /opt/motor-glosas && git pull && docker compose build motor &&
+    docker compose up -d`) y repetir los 4 casos de prueba.
+
 ---
 
 ## 3) PENDIENTE

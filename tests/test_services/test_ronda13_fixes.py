@@ -365,9 +365,15 @@ class TestBugHRegimenARL:
 
     def test_arl_bloque_explica_subrogacion(self):
         # Punto clave para la defensa real: si la ARL alega concausa,
-        # debe pagar al hospital y subrogar contra EPS (no prorratear).
+        # debe pagar al hospital el 100% (no prorratear) y su controversia
+        # con la EPS no es oponible a la IPS. Ronda 32 (22-jul-2026): la
+        # redacción cambió — la revisión adversarial encontró que la cita
+        # "subrogarse ... Ley 776/2002 Art. 18" estaba MAL atribuida (el
+        # Art. 18 es prescripción); ahora la controversia de origen se
+        # funda en la Junta de Calificación (Decreto 1352/2013).
         bloque = REGIMEN_ESPECIAL["ARL"]
-        assert "subrogarse" in bloque.lower() or "subrogación" in bloque.lower()
+        assert "no le es oponible a la IPS" in bloque
+        assert "Junta de Calificación" in bloque
         assert "100%" in bloque
 
     def test_eps_sanitas_NO_dispara_arl(self):
