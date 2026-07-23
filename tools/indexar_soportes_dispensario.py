@@ -64,6 +64,27 @@ def facturas_en(nombre: str, carpeta: str) -> set[str]:
     return {m.lstrip("0") for m in RE_FACTURA.findall(texto)}
 
 
+def descubrir_dispensario(root: Path) -> list[Path]:
+    """Encuentra TODAS las carpetas 'DISPENSARIO' bajo `root` (estructura
+    <root>\\<año>\\<mes>\\DISPENSARIO, y variantes a 1 o 3 niveles). Solo lista
+    carpetas (no recorre archivos), asi que es barato aun sobre la red. Evita asi
+    que el auditor tenga que enumerar mes por mes."""
+    encontradas: list[Path] = []
+    if not root.exists():
+        logger.warning("Raiz inexistente para autodescubrir: %s", root)
+        return encontradas
+    vistas: set[str] = set()
+    for patron in ("DISPENSARIO", "*/DISPENSARIO", "*/*/DISPENSARIO", "*/*/*/DISPENSARIO"):
+        try:
+            for p in root.glob(patron):
+                if p.is_dir() and str(p) not in vistas:
+                    vistas.add(str(p))
+                    encontradas.append(p)
+        except OSError:
+            continue
+    return sorted(encontradas)
+
+
 def meta_liviana(ruta: Path) -> dict:
     """Metadatos baratos: para RIPS json, numFactura + primer paciente."""
     if ruta.suffix.lower() != ".json":
@@ -191,6 +212,12 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="Carpeta raiz de soportes (se puede repetir para varios meses)",
     )
+    ap.add_argument(
+        "--auto-dispensario",
+        type=Path,
+        default=None,
+        help="Carpeta raiz del servidor: busca solo TODAS las carpetas DISPENSARIO (todos los meses)",
+    )
     ap.add_argument("--salida", type=Path, required=True, help="Archivo JSON del indice")
     ap.add_argument("--actualizar", action="store_true", help="Incremental: reusa lo ya indexado")
     ap.add_argument("--con-meta", action="store_true", help="Leer RIPS para paciente/numFactura")
@@ -208,13 +235,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [{d['tipo']}] {d['nombre']}  ->  {d['ruta']}")
         return 0
 
-    if not args.raiz:
-        logger.error("Indica al menos una --raiz para indexar.")
+    raices = list(args.raiz)
+    if args.auto_dispensario:
+        descubiertas = descubrir_dispensario(args.auto_dispensario)
+        logger.info("Autodescubiertas %d carpetas DISPENSARIO:", len(descubiertas))
+        for d in descubiertas:
+            logger.info("    %s", d)
+        raices.extend(descubiertas)
+    if not raices:
+        logger.error("Indica al menos una --raiz (o --auto-dispensario) para indexar.")
         return 2
     previo = cargar_indice(args.salida) if args.actualizar else {}
     previos = {d["ruta"]: d for d in previo.get("documentos", [])} if previo else {}
-    documentos = construir_indice(args.raiz, previos, args.con_meta)
-    guardar_indice(documentos, args.raiz, args.salida)
+    documentos = construir_indice(raices, previos, args.con_meta)
+    guardar_indice(documentos, raices, args.salida)
     r = resumen(documentos)
     logger.info("Indice guardado en %s", args.salida)
     logger.info("  %d documentos de %d facturas", r["documentos"], r["facturas"])

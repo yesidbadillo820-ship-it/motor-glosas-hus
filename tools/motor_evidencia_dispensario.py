@@ -159,8 +159,29 @@ def _snippet(texto: str, pos: int, ancho: int = 70) -> str:
 # ---------------------------------------------------------------------------
 # Localizacion de evidencia
 # ---------------------------------------------------------------------------
+def cachear_texto(clinicos: list[dict], ocr: bool = False) -> dict[str, list[str]]:
+    """Lee cada soporte clinico UNA sola vez y devuelve {ruta: [paginas]}.
+
+    Clave de rendimiento para el lote completo: sin esto, el motor releeria el
+    mismo PDF una vez por cada glosa de la factura (una factura con 10 glosas
+    leeria sus PDF 10 veces).
+    """
+    cache: dict[str, list[str]] = {}
+    for doc in clinicos:
+        ruta = Path(doc.get("ruta", ""))
+        clave = str(ruta)
+        if clave in cache or not ruta.exists():
+            continue
+        cache[clave] = texto_por_pagina(ruta, ocr)
+    return cache
+
+
 def evidencias_para_glosa(
-    servicio: str, motivo: str, clinicos: list[dict], ocr: bool = False
+    servicio: str,
+    motivo: str,
+    clinicos: list[dict],
+    ocr: bool = False,
+    cache: dict[str, list[str]] | None = None,
 ) -> list[dict]:
     """Localiza la evidencia de una glosa y devuelve SOLO las paginas mas
     relevantes (no todas las que contengan una palabra generica).
@@ -170,9 +191,10 @@ def evidencias_para_glosa(
     luego por puntaje, y devuelve como maximo MAX_EVIDENCIAS_POR_GLOSA paginas.
     Asi la cita es usable en un oficio ("paginas 9-11"), no un listado de 300.
 
-    clinicos: lista de {tipo, nombre, ruta}. Cada evidencia:
-    {tipo, nombre, ruta, pagina, termino, fuerza, puntaje, fragmento}. Sin
-    coincidencias -> [].
+    clinicos: lista de {tipo, nombre, ruta}. `cache` (opcional): texto ya leido
+    por ruta (ver cachear_texto) para no releer los PDF en cada glosa. Cada
+    evidencia: {tipo, nombre, ruta, pagina, termino, fuerza, puntaje, fragmento}.
+    Sin coincidencias -> [].
     """
     terminos = terminos_de_glosa(servicio, motivo)
     if not terminos:
@@ -181,9 +203,14 @@ def evidencias_para_glosa(
     candidatas: list[dict] = []
     for doc in clinicos:
         ruta = Path(doc.get("ruta", ""))
-        if not ruta.exists():
+        clave = str(ruta)
+        if cache is not None and clave in cache:
+            paginas = cache[clave]
+        elif ruta.exists():
+            paginas = texto_por_pagina(ruta, ocr)
+        else:
             continue
-        for npag, texto in enumerate(texto_por_pagina(ruta, ocr), 1):
+        for npag, texto in enumerate(paginas, 1):
             up = texto.upper()
             aciertos: list[tuple[str, int]] = []
             for term in terminos:
@@ -219,8 +246,12 @@ def enriquecer_expedientes(payload: dict, ocr: bool = False) -> dict:
     total_ev = 0
     for exp in payload.get("expedientes", []):
         clinicos = [s for s in exp.get("soportes", []) if s.get("tipo") in CLINICOS]
+        # Lee cada PDF de la factura UNA vez y reusa el texto en todas sus glosas.
+        cache = cachear_texto(clinicos, ocr)
         for g in exp.get("glosas", []):
-            ev = evidencias_para_glosa(g.get("servicio", ""), g.get("motivo", ""), clinicos, ocr)
+            ev = evidencias_para_glosa(
+                g.get("servicio", ""), g.get("motivo", ""), clinicos, ocr, cache
+            )
             g["evidencias"] = ev
             total_ev += len(ev)
     payload["evidencias_localizadas"] = total_ev
