@@ -218,7 +218,7 @@ def construir_conclusion(
     problemas = []
     num_xml = norm_factura(x.get("num_factura", ""))
     if num_xml and num_xml != factura:
-        problemas.append(f"el XML hallado corresponde a OTRA factura ({x.get('num_factura')})")
+        problemas.append(f"el archivo corresponde a OTRA factura ({x.get('num_factura')})")
     if not dian_ok:
         problemas.append("la validación DIAN presenta observaciones")
     if not contrato or normalizar(contrato) in ("SIN CONTRATO", "N/A", "NA", "0"):
@@ -256,7 +256,7 @@ def construir_conclusion(
         return conclusion, respuesta, "NO PROCEDE DEVOLUCIÓN"
 
     conclusion = (
-        f"REVISAR: en el XML de la factura {x.get('num_factura') or factura} "
+        f"REVISAR: en el XML hallado para la factura {factura} "
         + "; ".join(problemas)
         + nota_valor
         + (f". {rips_ok}" if rips_ok else "")
@@ -278,7 +278,14 @@ def construir_conclusion(
 
 
 def indexar_archivos(raiz: Path) -> tuple[dict[str, list[Path]], dict[str, list[Path]]]:
-    """Índices {factura: [xml]} y {factura: [json]} por nombre de archivo."""
+    """Índices {factura: [xml]} y {factura: [json]}.
+
+    El número de factura se busca en el nombre del archivo Y en el nombre de
+    las carpetas que lo contienen: los repositorios de facturación suelen
+    guardar cada factura en su propia subcarpeta (FACTURAS_SALUD\\HUS533650\\…)
+    con archivos de nombre genérico de la DIAN (ad0901…xml) que no traen el
+    número por ninguna parte.
+    """
     xmls: dict[str, list[Path]] = {}
     jsons: dict[str, list[Path]] = {}
     total = 0
@@ -289,23 +296,38 @@ def indexar_archivos(raiz: Path) -> tuple[dict[str, list[Path]], dict[str, list[
         if ext not in (".xml", ".json"):
             continue
         total += 1
+        claves = set(facturas_en_nombre(p.stem))
+        for carpeta in p.parents:
+            if carpeta == raiz or carpeta == carpeta.parent:
+                break
+            claves |= facturas_en_nombre(carpeta.name)
         destino = xmls if ext == ".xml" else jsons
-        for fact in facturas_en_nombre(p.stem):
+        for fact in claves:
             destino.setdefault(fact, []).append(p)
     logger.info(
-        f"  Archivos indexados: {total} ({len(xmls)} facturas con XML, {len(jsons)} con JSON)"
+        f"  Archivos indexados: {total} ({len(xmls)} claves con XML, {len(jsons)} con JSON)"
     )
     return xmls, jsons
 
 
-def elegir_xml(candidatos: list[Path]) -> Path:
-    """Prefiere el XML de FACTURA (no FACOSTE/nota) y el más reciente."""
+def ordenar_xmls(candidatos: list[Path], factura: str = "") -> list[Path]:
+    """Mejor candidato primero: el que trae el número de esta factura en el
+    nombre, luego el de FACTURA (no FACOSTE/nota) y el más reciente."""
 
     def puntaje(p: Path):
         nu = p.name.upper()
-        return ("FACOSTE" in nu, "FACTURA" not in nu, -p.stat().st_mtime)
+        return (
+            bool(factura) and factura not in facturas_en_nombre(p.stem),
+            "FACOSTE" in nu,
+            "FACTURA" not in nu,
+            -p.stat().st_mtime,
+        )
 
-    return sorted(candidatos, key=puntaje)[0]
+    return sorted(candidatos, key=puntaje)
+
+
+def elegir_xml(candidatos: list[Path], factura: str = "") -> Path:
+    return ordenar_xmls(candidatos, factura)[0]
 
 
 def revisar_json(candidatos: list[Path], factura: str) -> str:
@@ -384,7 +406,16 @@ def completar(excel: Path, raiz: Path, salida: Path, hoja: str | None) -> int:
         candidatos = xmls.get(factura, [])
         x = None
         if candidatos:
-            x = analizar_xml(elegir_xml(candidatos))
+            orden = ordenar_xmls(candidatos, factura)
+            x = analizar_xml(orden[0])
+            # La carpeta de la factura puede traer varios XML (factura, notas,
+            # acuses). Si el elegido no corresponde, se prueban los demás.
+            if norm_factura(x.get("num_factura", "")) != factura:
+                for otro in orden[1:]:
+                    alt = analizar_xml(otro)
+                    if norm_factura(alt.get("num_factura", "")) == factura:
+                        x = alt
+                        break
         rips_nota = revisar_json(jsons.get(factura, []), factura)
         texto_dian, dian_ok = validar_dian(x) if x else ("", False)
         conclusion, respuesta, estado = construir_conclusion(

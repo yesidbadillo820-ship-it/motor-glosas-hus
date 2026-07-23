@@ -5,7 +5,7 @@
 > **Toda sesión de Claude debe leerlo al empezar y actualizarlo al terminar**
 > (ver CLAUDE.md). Escrito para un auditor, sin tecnicismos.
 
-_Última actualización: 22 de julio de 2026 (tarde)._
+_Última actualización: 23 de julio de 2026._
 
 ---
 
@@ -100,6 +100,21 @@ _Última actualización: 22 de julio de 2026 (tarde)._
   acuse), la CONCLUSIÓN (si la devolución procede o no, con norma) y la
   RESPUESTA para el portal DGH — con semáforo y hoja RESUMEN.
 
+### 23 de julio de 2026 — Arreglo del bot XML: carpeta por factura
+- El usuario corrió el bot del informe XML y las 411 facturas salieron
+  "SIN XML". Causa: en el servidor de facturación **cada factura está en su
+  propia subcarpeta** (`FACTURAS_SALUD\HUS533650\…`) y los archivos de
+  adentro tienen nombres genéricos de la DIAN (`ad0901…xml`) que no traen
+  el número de factura.
+- **Corregido:** el bot ahora reconoce la factura también por el **nombre de
+  la subcarpeta** que contiene cada XML/JSON. Y si en la carpeta hay varios
+  XML (factura, notas, acuses), abre cada uno y se queda con el que trae el
+  número correcto por dentro.
+- También se mejoró la redacción de la conclusión cuando el XML hallado
+  corresponde a otra factura.
+- Se reenviaron los dos archivos al usuario para reemplazar en el servidor:
+  `completar_informe_xml_dian.py` + `COMPLETAR_INFORME_XML.cmd`.
+
 ---
 
 ## DÓNDE ESTÁ CADA COSA (mapa rápido)
@@ -139,10 +154,13 @@ _Última actualización: 22 de julio de 2026 (tarde)._
 
 ## PARA MAÑANA
 
-1. Verificar en el servidor el bot de carpeta `CMD_CONVERTIDOS` (pendiente 2).
-2. Fusionar el PR #176 y actualizar los archivos del servidor con el último
+1. Volver a correr `COMPLETAR_INFORME_XML.cmd` con los archivos corregidos
+   del 23 de julio y revisar el nuevo Excel `_COMPLETO` (debe encontrar los
+   XML dentro de las subcarpetas HUS…).
+2. Verificar en el servidor el bot de carpeta `CMD_CONVERTIDOS` (pendiente 2).
+3. Fusionar el PR #176 y actualizar los archivos del servidor con el último
    paquete (ZIP de bots + app web).
-3. Empezar la corrección de las facturas ADRES con errores usando el informe
+4. Empezar la corrección de las facturas ADRES con errores usando el informe
    Excel / la app web, priorizando las de mayor valor.
 
 ---
