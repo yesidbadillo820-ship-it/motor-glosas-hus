@@ -225,6 +225,7 @@ def calcular_metricas(
 
     hechos = [h for g in glosas for h in g.get("hechos_probados", [])]
     probados = sum(1 for h in hechos if h.get("probado"))
+    glosas_con_hechos = sum(1 for g in glosas if g.get("hechos_probados"))
     contradicciones = sum(len(e.get("alertas", [])) for e in exps)
 
     decisiones = Counter(g.get("decision", {}).get("decision", "") for g in glosas)
@@ -242,9 +243,8 @@ def calcular_metricas(
     aceptacion = {
         "pct_facturas_con_soporte": round(100 * fact_con_soporte / n_exp, 1),
         "pct_glosas_con_evidencia": round(100 * glosas_con_ev / n_gl, 1),
-        "pct_hechos_evaluados": round(100 * len(hechos) / max(1, sum(1 for g in glosas)), 1)
-        if hechos
-        else 0.0,
+        # % de glosas cuyos hechos fueron evaluados (0-100), no hechos/glosa.
+        "pct_hechos_evaluados": round(100 * glosas_con_hechos / n_gl, 1),
         "decisiones_sin_soporte_probatorio": lev_sin_prueba,
         "pct_decisiones_trazables": round(100 * trazables / n_gl, 1),
     }

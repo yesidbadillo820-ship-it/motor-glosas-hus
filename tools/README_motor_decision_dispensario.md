@@ -8,8 +8,11 @@ limpia, transparente y auditable.
 
 ## Qué calcula por cada glosa
 
-- **Defendibilidad (0–100 %)** — qué tan sostenible es el cobro con lo que hay
-  (promedio de la confianza de los hechos probados).
+- **Defendibilidad (0–100 %)** — qué tan sostenible es el cobro con lo que hay.
+  Es el promedio de la **confianza graduada** de cada hecho, así que refleja la
+  **calidad** de la evidencia: un código CUPS localizado pesa más que el nombre
+  del servicio, y este más que "documento presente pero sin cita". Ya no es un
+  85 % fijo para toda glosa de calidad.
 - **Riesgos multidimensionales** — `probatorio`, `documental`, `contractual`,
   `tarifario`, `financiero`, `jurídico` (cada uno ALTO/MEDIO/BAJO **con su razón**).
   Ej.: *Probatorio ALTO → "No se probó: la prestación fue ejecutada"*.

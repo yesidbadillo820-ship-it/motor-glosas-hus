@@ -20,11 +20,24 @@ responder la glosa.
 |---|---|---|
 | **SOPORTES** | La prestación fue **ordenada** · fue **ejecutada/registrada** | Orden médica / HC · Descripción quirúrgica / Epicrisis / HAM / Lab (+ el CUPS presente) |
 | **TARIFAS** | El servicio fue **facturado** · hay **contrato** aplicable | Factura/RIPS · Contrato 287/440 por fecha |
-| **CALIDAD / PERTINENCIA** | Existe **soporte clínico** | HC / Epicrisis / Descripción quirúrgica |
+| **CALIDAD / PERTINENCIA** | La prestación glosada está **sustentada** en la HC | HC / Epicrisis / Descripción quirúrgica (**el servicio debe aparecer citado**) |
 | **COBERTURA / AUTORIZACIÓN** | Existe **autorización** | Autorización / MIPRES |
 
 Cada hecho: `{hecho, probado, nivel_confianza, evidencia[pág], faltantes[]}`.
 La confianza sube si el **código CUPS** aparece en el soporte (evidencia fuerte).
+
+### Existencia ≠ pertinencia (calidad)
+
+Para las glosas de **calidad/pertinencia**, que exista la historia clínica **no
+prueba** el hecho: el **servicio glosado tiene que aparecer citado**. La confianza
+se gradúa según la evidencia:
+
+- código CUPS localizado (fuerte) → **0.90**
+- servicio citado por nombre → **0.75**
+- historia clínica presente pero el servicio **no aparece** → **no probado (0.40)**,
+  con el faltante *"Referencia del servicio glosado en la historia clínica"*.
+
+Así una glosa de calidad ya **no** se defiende sola con *"existe historia clínica"*.
 
 ## Contradicciones que detecta
 

@@ -187,6 +187,21 @@ def soportes_por_factura(indice: dict) -> dict[str, list[dict]]:
     return out
 
 
+def _dedup_glosas(gs: list) -> list:
+    """Quita filas de glosa EXACTAMENTE duplicadas (la misma glosa repetida en el
+    Excel origen: mismo numero, codigo, servicio y valor). Conserva el orden y no
+    afecta servicios distintos ni valores distintos."""
+    vistas: set = set()
+    unicas: list = []
+    for g in gs:
+        clave = (str(g.num_glosa), str(g.codigo), str(g.servicio), _int(g.valor_objetado))
+        if clave in vistas:
+            continue
+        vistas.add(clave)
+        unicas.append(g)
+    return unicas
+
+
 # ---------------------------------------------------------------------------
 # Ensamblado
 # ---------------------------------------------------------------------------
@@ -199,6 +214,7 @@ def construir_expedientes(glosas, indice: dict, cartera: dict) -> list[Expedient
     sop = soportes_por_factura(indice)
     expedientes: list[Expediente] = []
     for factura, gs in por_factura.items():
+        gs = _dedup_glosas(gs)
         corta = factura_corta(factura)
         g0 = gs[0]
         contr = contrato_por_fecha(g0.fecha_atencion)

@@ -49,6 +49,11 @@ Piloto/
 
 ## Indicadores que mide (`METRICAS.json`)
 
+> Las glosas **exactamente duplicadas** en el Excel origen (misma factura, código,
+> servicio y valor) se descartan al armar el expediente, para no contar dos veces.
+> El indicador `pct_hechos_evaluados` es el **% de glosas evaluadas (0–100)**, no
+> el promedio de hechos por glosa.
+
 - **Índice:** facturas del piloto, documentos encontrados, con soporte, huérfanos.
 - **Evidencia:** localizadas, fuertes, débiles, glosas sin evidencia.
 - **Hechos:** probados / no probados, contradicciones.

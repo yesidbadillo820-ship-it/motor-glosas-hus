@@ -31,6 +31,11 @@ from pathlib import Path
 
 logger = logging.getLogger("motor_evidencia")
 
+# Maximo de paginas citadas por glosa. Evita el "disparo de escopeta" (citar
+# toda la historia clinica: 300 paginas no son una prueba usable en un oficio).
+# Se conservan las paginas MAS relevantes, no las primeras que aparezcan.
+MAX_EVIDENCIAS_POR_GLOSA = 6
+
 # Tipos de soporte donde tiene sentido buscar evidencia clinica.
 CLINICOS = {
     "Historia clinica / Evolucion",
@@ -157,39 +162,56 @@ def _snippet(texto: str, pos: int, ancho: int = 70) -> str:
 def evidencias_para_glosa(
     servicio: str, motivo: str, clinicos: list[dict], ocr: bool = False
 ) -> list[dict]:
-    """Busca los terminos de la glosa en cada soporte clinico, pagina por pagina.
+    """Localiza la evidencia de una glosa y devuelve SOLO las paginas mas
+    relevantes (no todas las que contengan una palabra generica).
 
-    clinicos: lista de {tipo, nombre, ruta}. Devuelve una lista de evidencias:
-    {tipo, nombre, ruta, pagina, termino, fragmento}. Sin coincidencias -> [].
+    Por cada pagina calcula un puntaje: cada codigo CUPS/CUM pesa 10 y cada
+    palabra del servicio pesa 1. Ordena por evidencia fuerte (codigo) primero,
+    luego por puntaje, y devuelve como maximo MAX_EVIDENCIAS_POR_GLOSA paginas.
+    Asi la cita es usable en un oficio ("paginas 9-11"), no un listado de 300.
+
+    clinicos: lista de {tipo, nombre, ruta}. Cada evidencia:
+    {tipo, nombre, ruta, pagina, termino, fuerza, puntaje, fragmento}. Sin
+    coincidencias -> [].
     """
     terminos = terminos_de_glosa(servicio, motivo)
     if not terminos:
         return []
-    evidencias: list[dict] = []
+    codigos = {t for t in terminos if re.fullmatch(r"\d{4,7}[A-Z]?", t)}
+    candidatas: list[dict] = []
     for doc in clinicos:
         ruta = Path(doc.get("ruta", ""))
         if not ruta.exists():
             continue
-        paginas = texto_por_pagina(ruta, ocr)
-        for npag, texto in enumerate(paginas, 1):
+        for npag, texto in enumerate(texto_por_pagina(ruta, ocr), 1):
             up = texto.upper()
+            aciertos: list[tuple[str, int]] = []
             for term in terminos:
                 pos = up.find(term)
                 if pos >= 0:
-                    es_codigo = bool(re.fullmatch(r"\d{4,7}[A-Z]?", term))
-                    evidencias.append(
-                        {
-                            "tipo": doc.get("tipo", ""),
-                            "nombre": doc.get("nombre", ""),
-                            "ruta": str(ruta),
-                            "pagina": npag,
-                            "termino": term,
-                            "fuerza": "fuerte" if es_codigo else "debil",
-                            "fragmento": _snippet(texto, pos),
-                        }
-                    )
-                    break  # una evidencia por pagina basta
-    return evidencias
+                    aciertos.append((term, pos))
+            if not aciertos:
+                continue
+            hay_codigo = any(t in codigos for t, _ in aciertos)
+            puntaje = sum(10 if t in codigos else 1 for t, _ in aciertos)
+            # Fragmento del termino mas fuerte (el codigo, si aparece).
+            aciertos.sort(key=lambda a: (a[0] not in codigos, a[1]))
+            term_best, pos_best = aciertos[0]
+            candidatas.append(
+                {
+                    "tipo": doc.get("tipo", ""),
+                    "nombre": doc.get("nombre", ""),
+                    "ruta": str(ruta),
+                    "pagina": npag,
+                    "termino": term_best,
+                    "fuerza": "fuerte" if hay_codigo else "debil",
+                    "puntaje": puntaje,
+                    "fragmento": _snippet(texto, pos_best),
+                }
+            )
+    # Fuertes (con codigo) primero, luego por puntaje y numero de pagina.
+    candidatas.sort(key=lambda e: (e["fuerza"] != "fuerte", -e["puntaje"], e["pagina"]))
+    return candidatas[:MAX_EVIDENCIAS_POR_GLOSA]
 
 
 def enriquecer_expedientes(payload: dict, ocr: bool = False) -> dict:

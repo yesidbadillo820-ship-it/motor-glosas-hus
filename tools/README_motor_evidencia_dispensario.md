@@ -23,6 +23,15 @@ Por cada glosa arma términos de búsqueda a partir del servicio y el motivo:
 
 Cada evidencia queda marcada como **fuerte** o **débil** para no exagerar.
 
+### Cita acotada (no "disparo de escopeta")
+
+Antes, una glosa de calidad podía citar **las 300 páginas** de la historia
+clínica (cualquier página con una palabra genérica). Eso no es una prueba usable
+en un oficio. Ahora el motor **puntúa cada página** (cada código CUPS pesa 10,
+cada palabra 1), ordena por **evidencia fuerte primero** y cita como máximo
+`MAX_EVIDENCIAS_POR_GLOSA` (6) páginas — las más relevantes. La cita pasa de
+*"páginas 1 a 300"* a *"páginas 9-11"*, que sí ahorra trabajo al auditor.
+
 ## Uso
 
 ```powershell
