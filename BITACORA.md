@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 22-07-2026
+**Última actualización:** 23-07-2026
 
 ---
 
@@ -113,6 +113,27 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   glosas, cero sin respuesta, todas RE9901). Quedó listo el comando para
   correrlo. Se creó esta bitácora (fusionando el trabajo de dos chats).
 
+- **23-07:** nace el **módulo de Pre-auditoría SINAC** (rama
+  `claude/invoice-audit-bot-qa2koy`, página `/preauditoria` de la app web),
+  a partir de los archivos guía CONSOLIDADO_PRE_AUDITORIA_2026 y
+  OFICIOS_DEVOLUCIONES_CONSECUTIVOS. Qué hace:
+  - Registrar el **oficio radicado** por Facturación con **fecha y hora** de
+    recibido.
+  - Importar el Excel del **consecutivo de DGH** y contar **cuántas facturas
+    trae cada número de envío**.
+  - Auditar cada factura: **Soportes OK (radicar)** o **Devuelta con motivo**.
+    Máximo **3 devoluciones** por factura (la 4.ª se bloquea); cuando la
+    factura vuelve corregida queda **SUBSANADA** o **NUEVAMENTE DEVUELTA**.
+  - Generar el **oficio de devolución en PDF** con consecutivo SINAC
+    (DEV-PRE-AUD-####-AAAA), logo y bloque de firmas, igual al formato del
+    Excel de oficios.
+  - **Semáforo** del plazo de 3 días hábiles (cuentan desde el día siguiente
+    al recibo): verde / amarillo (penúltimo día) / rojo (último) / vencido.
+  - **Estadísticas**: auditadas, OK, devueltas, subsanadas, por auditor y
+    facturas reincidentes; vista masiva con filtros y vista individual con
+    el historial completo de cada factura.
+  - 29 pruebas automáticas en verde (`tests/test_api/test_preauditoria.py`).
+
 ---
 
 ## 3) PENDIENTE
@@ -153,6 +174,21 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ### Informes
 10. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
     proceso manual y cuántas personas) para poner el multiplicador exacto.
+
+### Módulo de Pre-auditoría (nuevo, 23-07)
+11. **Revisar y aprobar el PR** de la rama `claude/invoice-audit-bot-qa2koy`
+    y probarlo con datos reales (un oficio piloto antes de uso masivo).
+12. **Definiciones que quedaron con supuesto y hay que confirmar con el
+    auditor:** (a) el plazo de 3 días se contó en **días hábiles lunes-viernes**
+    (sin festivos colombianos); (b) los nombres/cargos de las firmas del
+    oficio PDF se tomaron del Excel de oficios — si cambian, se ajustan en
+    `app/services/oficio_devolucion_pdf.py`; (c) si se quiere la firma
+    escaneada en el PDF, subir la imagen como
+    `static/firma_preauditoria.png` (el módulo la toma solo).
+13. **Cargar el histórico** del CONSOLIDADO_PRE_AUDITORIA_2026.xlsx al módulo
+    (el importador ya entiende ese formato de columnas, se puede subir por
+    oficio) para que las estadísticas y el control de 3 devoluciones
+    arranquen con la historia real.
 
 ## 4) PARA MAÑANA
 

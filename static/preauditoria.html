@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Pre-auditoría · SINAC SC</title>
+<style>
+  :root{
+    --azul:#0b3d91; --azul-osc:#082c6b; --azul-claro:#eef3fb; --borde:#d7e0ef;
+    --verde:#1e8e3e; --amarillo:#e8a200; --rojo:#d93025; --gris:#5f6a7d;
+    --fondo:#f4f6fa; --blanco:#ffffff; --radio:10px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif; background:var(--fondo); color:#1c2733; min-height:100vh;}
+  a{color:var(--azul); text-decoration:none;}
+  header{background:var(--azul); color:#fff; padding:10px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  header img{height:34px; background:#fff; border-radius:6px; padding:3px 8px;}
+  header h1{font-size:1.05rem; font-weight:600; flex:1; min-width:200px;}
+  header .hd-user{font-size:.85rem; opacity:.9;}
+  header button{background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.4); border-radius:6px; padding:5px 12px; cursor:pointer; font-size:.8rem;}
+  header a.volver{color:#fff; font-size:.85rem; border:1px solid rgba(255,255,255,.4); border-radius:6px; padding:5px 12px;}
+  .tabs{display:flex; gap:6px; padding:12px 22px 0; flex-wrap:wrap;}
+  .tabs button{border:1px solid var(--borde); background:#fff; padding:8px 16px; border-radius:8px 8px 0 0; cursor:pointer; font-size:.9rem; color:var(--gris);}
+  .tabs button.on{background:var(--azul); color:#fff; border-color:var(--azul); font-weight:600;}
+  main{padding:16px 22px 60px; max-width:1400px; margin:0 auto;}
+  .vista{display:none;}
+  .vista.on{display:block;}
+  .card{background:var(--blanco); border:1px solid var(--borde); border-radius:var(--radio); padding:16px; margin-bottom:16px;}
+  .card h2{font-size:1rem; color:var(--azul); margin-bottom:10px;}
+  .fila-form{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;}
+  .campo{display:flex; flex-direction:column; gap:4px; font-size:.8rem; color:var(--gris);}
+  .campo input,.campo select,.campo textarea{border:1px solid var(--borde); border-radius:6px; padding:7px 10px; font-size:.88rem; min-width:180px; font-family:inherit;}
+  .btn{border:none; border-radius:7px; padding:8px 16px; cursor:pointer; font-size:.86rem; font-weight:600;}
+  .btn-azul{background:var(--azul); color:#fff;}
+  .btn-borde{background:#fff; color:var(--azul); border:1px solid var(--azul);}
+  .btn-verde{background:var(--verde); color:#fff;}
+  .btn-rojo{background:var(--rojo); color:#fff;}
+  .btn-chico{padding:4px 10px; font-size:.78rem;}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+  table{width:100%; border-collapse:collapse; font-size:.83rem;}
+  th{background:var(--azul-claro); color:var(--azul-osc); text-align:left; padding:8px; border-bottom:2px solid var(--borde); white-space:nowrap;}
+  td{padding:7px 8px; border-bottom:1px solid var(--borde); vertical-align:top;}
+  tr:hover td{background:#f8faff;}
+  .tbl-scroll{overflow-x:auto;}
+  .sem{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:.78rem; padding:3px 10px; border-radius:20px; white-space:nowrap;}
+  .sem::before{content:''; width:9px; height:9px; border-radius:50%; background:currentColor;}
+  .sem-VERDE{color:var(--verde); background:#e6f4ea;}
+  .sem-AMARILLO{color:var(--amarillo); background:#fdf3d7;}
+  .sem-ROJO{color:var(--rojo); background:#fde8e6;}
+  .sem-VENCIDO{color:#fff; background:var(--rojo);}
+  .sem-VENCIDO::before{background:#fff;}
+  .sem-COMPLETADO{color:var(--azul); background:var(--azul-claro);}
+  .chip{display:inline-block; padding:2px 9px; border-radius:12px; font-size:.75rem; font-weight:600;}
+  .chip-PENDIENTE{background:#f0f2f6; color:var(--gris);}
+  .chip-RADICAR{background:#e6f4ea; color:var(--verde);}
+  .chip-DEVUELTA{background:#fde8e6; color:var(--rojo);}
+  .chip-ronda{background:var(--azul-claro); color:var(--azul);}
+  .chip-sub-ok{background:#e6f4ea; color:var(--verde);}
+  .chip-sub-mal{background:#fde8e6; color:var(--rojo);}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px;}
+  .kpi{background:#fff; border:1px solid var(--borde); border-radius:var(--radio); padding:12px 14px;}
+  .kpi .v{font-size:1.5rem; font-weight:700; color:var(--azul);}
+  .kpi .l{font-size:.75rem; color:var(--gris); margin-top:2px;}
+  .kpi.k-verde .v{color:var(--verde);} .kpi.k-rojo .v{color:var(--rojo);} .kpi.k-ama .v{color:var(--amarillo);}
+  .aviso{padding:10px 14px; border-radius:8px; font-size:.85rem; margin:10px 0;}
+  .aviso-ok{background:#e6f4ea; color:var(--verde);}
+  .aviso-err{background:#fde8e6; color:var(--rojo);}
+  .aviso-warn{background:#fdf3d7; color:#8a6d00;}
+  .mono{font-family:ui-monospace,Consolas,monospace; font-size:.82rem;}
+  .modal-fondo{display:none; position:fixed; inset:0; background:rgba(10,20,40,.5); z-index:50; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto;}
+  .modal-fondo.on{display:flex;}
+  .modal{background:#fff; border-radius:12px; max-width:760px; width:100%; padding:20px;}
+  .modal h3{color:var(--azul); font-size:1rem; margin-bottom:12px;}
+  .modal .cerrar{float:right; background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--gris);}
+  .pager{display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; font-size:.85rem; color:var(--gris);}
+  .leyenda{font-size:.78rem; color:var(--gris); margin-top:8px;}
+  .detalle-envios{font-size:.8rem; color:var(--gris);}
+  .filtros{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;}
+  @media (max-width:700px){ .campo input,.campo select{min-width:130px;} }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/static/sinac-logo.png" alt="SINAC">
+  <h1>Pre-auditoría de facturas — recepción, devoluciones y radicación</h1>
+  <span class="hd-user" id="hd-user"></span>
+  <a class="volver" href="/">← Motor de Glosas</a>
+  <button onclick="salir()">Cerrar sesión</button>
+</header>
+
+<div class="tabs">
+  <button class="on" data-v="oficios" onclick="verTab(this)">📥 Oficios recibidos</button>
+  <button data-v="facturas" onclick="verTab(this)">🧾 Facturas</button>
+  <button data-v="devoluciones" onclick="verTab(this)">📄 Oficios de devolución</button>
+  <button data-v="stats" onclick="verTab(this)">📊 Estadísticas</button>
+</div>
+
+<main>
+
+<!-- ============ VISTA OFICIOS ============ -->
+<section class="vista on" id="v-oficios">
+  <div class="card">
+    <h2>1 · Registrar oficio recibido de Facturación</h2>
+    <div class="fila-form">
+      <label class="campo">Número de radicado del oficio
+        <input id="of-radicado" placeholder="FHUS-AS-I00768-26">
+      </label>
+      <label class="campo">Fecha y hora de recibido
+        <input id="of-fecha" type="datetime-local">
+      </label>
+      <label class="campo">Observaciones (opcional)
+        <input id="of-obs" placeholder="">
+      </label>
+      <button class="btn btn-azul" onclick="crearOficio()">Registrar oficio</button>
+    </div>
+    <div id="of-msg"></div>
+    <p class="leyenda">El plazo para auditar es de <b>3 días hábiles</b> y empieza a contar el día
+      siguiente al recibo del oficio. Semáforo: <span class="sem sem-VERDE">VERDE</span>
+      <span class="sem sem-AMARILLO">AMARILLO — penúltimo día</span>
+      <span class="sem sem-ROJO">ROJO — último día</span>
+      <span class="sem sem-VENCIDO">VENCIDO</span>
+      <span class="sem sem-COMPLETADO">COMPLETADO</span></p>
+  </div>
+
+  <div class="card">
+    <h2>Oficios en pre-auditoría</h2>
+    <div class="filtros">
+      <label class="campo">Buscar radicado <input id="fo-q" oninput="debounce(cargarOficios)"></label>
+      <label class="campo">Semáforo
+        <select id="fo-estado" onchange="cargarOficios()">
+          <option value="">Todos</option>
+          <option>VERDE</option><option>AMARILLO</option><option>ROJO</option>
+          <option>VENCIDO</option><option>COMPLETADO</option>
+        </select>
+      </label>
+      <button class="btn btn-borde btn-chico" onclick="cargarOficios()">Actualizar</button>
+    </div>
+    <div class="tbl-scroll"><table>
+      <thead><tr>
+        <th>Radicado</th><th>Recibido</th><th>Plazo</th><th>Facturas</th><th>Envíos</th>
+        <th>Pend.</th><th>OK</th><th>Dev.</th><th>Valor</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="tb-oficios"></tbody>
+    </table></div>
+    <div class="pager" id="pg-oficios"></div>
+  </div>
+</section>
+
+<!-- ============ VISTA FACTURAS ============ -->
+<section class="vista" id="v-facturas">
+  <div class="card">
+    <h2>Facturas en pre-auditoría — vista masiva con filtros</h2>
+    <div class="filtros">
+      <label class="campo">Buscar (factura / entidad / NIT)
+        <input id="ff-q" oninput="debounce(cargarFacturas)"></label>
+      <label class="campo">Resultado
+        <select id="ff-res" onchange="cargarFacturas()">
+          <option value="">Todos</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="RADICAR">OK para radicar</option>
+          <option value="DEVUELTA">Devuelta</option>
+        </select>
+      </label>
+      <label class="campo">Auditor <input id="ff-aud" oninput="debounce(cargarFacturas)"></label>
+      <label class="campo">Nº envío <input id="ff-envio" oninput="debounce(cargarFacturas)"></label>
+      <label class="campo">Desde <input id="ff-desde" type="date" onchange="cargarFacturas()"></label>
+      <label class="campo">Hasta <input id="ff-hasta" type="date" onchange="cargarFacturas()"></label>
+      <label class="campo" style="flex-direction:row; align-items:center; gap:6px;">
+        <input type="checkbox" id="ff-rein" onchange="cargarFacturas()" style="min-width:auto;"> Solo subsanaciones (ronda 2+)
+      </label>
+    </div>
+    <div class="tbl-scroll"><table>
+      <thead><tr>
+        <th>Factura</th><th>Envío</th><th>Entidad</th><th>Valor</th><th>Ronda</th>
+        <th>Resultado</th><th>Subsanación</th><th>Auditor</th><th>Auditada</th><th></th>
+      </tr></thead>
+      <tbody id="tb-facturas"></tbody>
+    </table></div>
+    <div class="pager" id="pg-facturas"></div>
+  </div>
+</section>
+
+<!-- ============ VISTA OFICIOS DE DEVOLUCIÓN ============ -->
+<section class="vista" id="v-devoluciones">
+  <div class="card">
+    <h2>Oficios de devolución generados (consecutivo SINAC)</h2>
+    <div class="tbl-scroll"><table>
+      <thead><tr>
+        <th>Consecutivo</th><th>Fecha</th><th>Oficio origen</th><th>Facturas</th>
+        <th>Valor</th><th>Generado por</th><th>PDF</th>
+      </tr></thead>
+      <tbody id="tb-devoluciones"></tbody>
+    </table></div>
+    <div class="pager" id="pg-devoluciones"></div>
+  </div>
+</section>
+
+<!-- ============ VISTA ESTADÍSTICAS ============ -->
+<section class="vista" id="v-stats">
+  <div class="card">
+    <h2>Estadísticas de pre-auditoría</h2>
+    <div class="filtros">
+      <label class="campo">Desde <input id="st-desde" type="date"></label>
+      <label class="campo">Hasta <input id="st-hasta" type="date"></label>
+      <button class="btn btn-azul btn-chico" onclick="cargarStats()">Calcular</button>
+    </div>
+    <div class="kpis" id="st-kpis"></div>
+    <div class="kpis" id="st-semaforo"></div>
+  </div>
+  <div class="card">
+    <h2>Por auditor</h2>
+    <div class="tbl-scroll"><table>
+      <thead><tr><th>Auditor</th><th>Auditadas</th><th>OK radicar</th><th>Devueltas</th><th>% devolución</th><th>Valor auditado</th></tr></thead>
+      <tbody id="tb-auditores"></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>Facturas reincidentes (devueltas 2+ veces)</h2>
+    <div id="st-limite"></div>
+    <div class="tbl-scroll"><table>
+      <thead><tr><th>Factura</th><th>Veces devuelta</th><th>Límite</th></tr></thead>
+      <tbody id="tb-reincidentes"></tbody>
+    </table></div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ MODAL: detalle de oficio + importar DGH ============ -->
+<div class="modal-fondo" id="m-oficio">
+  <div class="modal">
+    <button class="cerrar" onclick="cerrarModal('m-oficio')">✕</button>
+    <h3 id="mo-titulo">Oficio</h3>
+    <div id="mo-cuerpo"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: auditar factura ============ -->
+<div class="modal-fondo" id="m-auditar">
+  <div class="modal">
+    <button class="cerrar" onclick="cerrarModal('m-auditar')">✕</button>
+    <h3>Auditar factura</h3>
+    <div id="ma-cuerpo"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: vista individual (historial) ============ -->
+<div class="modal-fondo" id="m-detalle">
+  <div class="modal">
+    <button class="cerrar" onclick="cerrarModal('m-detalle')">✕</button>
+    <h3 id="md-titulo">Factura</h3>
+    <div id="md-cuerpo"></div>
+  </div>
+</div>
+
+<script>
+// ---------- auth ----------
+var TOKEN = localStorage.getItem('hus_token') || '';
+if (!TOKEN) { alert('Debes iniciar sesión primero'); location.href = '/'; }
+document.getElementById('hd-user').textContent = localStorage.getItem('hus_user') || '';
+function salir(){ localStorage.removeItem('hus_token'); localStorage.removeItem('hus_user'); location.href='/'; }
+function authH(extra){ return Object.assign({'Authorization':'Bearer '+TOKEN}, extra||{}); }
+async function api(url, opts){
+  opts = opts || {};
+  opts.headers = authH(opts.headers);
+  var r = await fetch(url, opts);
+  if (r.status === 401) { salir(); throw new Error('sesión vencida'); }
+  var d = null;
+  try { d = await r.json(); } catch(e) {}
+  if (!r.ok) { throw new Error((d && d.detail) ? d.detail : ('Error ' + r.status)); }
+  return d;
+}
+
+// ---------- utilidades ----------
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function cop(v){ return '$ ' + Math.round(v||0).toLocaleString('es-CO'); }
+function fBog(iso){ if(!iso) return '—'; var d = new Date(iso);
+  return d.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' +
+         d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}); }
+function fDia(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+var _deb = null;
+function debounce(fn){ clearTimeout(_deb); _deb = setTimeout(fn, 350); }
+function cerrarModal(id){ document.getElementById(id).classList.remove('on'); }
+function abrirModal(id){ document.getElementById(id).classList.add('on'); }
+function semHtml(s){
+  if (!s) return '';
+  var extra = '';
+  if (s.estado==='VENCIDO') extra = ' hace ' + s.dias_vencido + ' día(s)';
+  else if (s.estado!=='COMPLETADO') extra = ' · quedan ' + s.dias_habiles_restantes + ' día(s)';
+  return '<span class="sem sem-'+s.estado+'" title="Límite: '+esc(s.fecha_limite)+'">'+s.estado+extra+'</span>';
+}
+function subHtml(f){
+  if (f.ronda <= 1) return '—';
+  if (!f.estado_subsanacion) return '<span class="chip chip-ronda">EN REVISIÓN</span>';
+  var cls = f.estado_subsanacion === 'SUBSANADA' ? 'chip-sub-ok' : (f.estado_subsanacion === 'NUEVAMENTE DEVUELTA' ? 'chip-sub-mal' : 'chip-ronda');
+  return '<span class="chip '+cls+'">'+esc(f.estado_subsanacion)+'</span>';
+}
+function pager(el, data, fn){
+  var pags = Math.max(1, Math.ceil(data.total / data.per_page));
+  el.innerHTML = '<button class="btn btn-borde btn-chico" '+(data.page<=1?'disabled':'')+
+    ' onclick="'+fn+'('+(data.page-1)+')">←</button> Página '+data.page+' de '+pags+
+    ' ('+data.total+' registros) <button class="btn btn-borde btn-chico" '+(data.page>=pags?'disabled':'')+
+    ' onclick="'+fn+'('+(data.page+1)+')">→</button>';
+}
+
+// ---------- tabs ----------
+function verTab(btn){
+  document.querySelectorAll('.tabs button').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('.vista').forEach(function(v){ v.classList.remove('on'); });
+  btn.classList.add('on');
+  document.getElementById('v-' + btn.dataset.v).classList.add('on');
+  if (btn.dataset.v === 'oficios') cargarOficios();
+  if (btn.dataset.v === 'facturas') cargarFacturas();
+  if (btn.dataset.v === 'devoluciones') cargarDevoluciones();
+  if (btn.dataset.v === 'stats') cargarStats();
+}
+
+// ---------- oficios ----------
+async function crearOficio(){
+  var rad = document.getElementById('of-radicado').value.trim();
+  var fec = document.getElementById('of-fecha').value;
+  var msg = document.getElementById('of-msg');
+  if (!rad || !fec) { msg.innerHTML = '<div class="aviso aviso-err">Escriba el número de radicado y la fecha/hora de recibido.</div>'; return; }
+  try {
+    var o = await api('/preauditoria/oficios', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ numero_radicado: rad, fecha_recibido: fec,
+        observaciones: document.getElementById('of-obs').value }) });
+    msg.innerHTML = '<div class="aviso aviso-ok">Oficio <b>'+esc(o.numero_radicado)+'</b> registrado. Ahora cargue el Excel del consecutivo DGH.</div>';
+    document.getElementById('of-radicado').value=''; document.getElementById('of-obs').value='';
+    cargarOficios();
+    abrirOficio(o.id);
+  } catch(e) { msg.innerHTML = '<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
+}
+
+async function cargarOficios(page){
+  var url = '/preauditoria/oficios?page='+(page||1)+'&per_page=20';
+  var q = document.getElementById('fo-q').value.trim();
+  var est = document.getElementById('fo-estado').value;
+  if (q) url += '&q='+encodeURIComponent(q);
+  if (est) url += '&estado='+est;
+  try {
+    var d = await api(url);
+    var tb = document.getElementById('tb-oficios');
+    if (!d.items.length) { tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--gris)">Sin oficios registrados</td></tr>'; }
+    else tb.innerHTML = d.items.map(function(o){
+      var envs = o.envios.map(function(e){ return esc(e.envio)+' ('+e.cantidad_facturas+')'; }).join(', ');
+      return '<tr>'+
+        '<td class="mono"><a href="javascript:abrirOficio('+o.id+')">'+esc(o.numero_radicado)+'</a></td>'+
+        '<td>'+fBog(o.fecha_recibido)+'</td>'+
+        '<td>'+semHtml(o.semaforo)+'</td>'+
+        '<td><b>'+o.total_facturas+'</b></td>'+
+        '<td class="detalle-envios">'+(envs||'—')+'</td>'+
+        '<td>'+o.pendientes+'</td>'+
+        '<td style="color:var(--verde);font-weight:600">'+o.radicar+'</td>'+
+        '<td style="color:var(--rojo);font-weight:600">'+o.devueltas+'</td>'+
+        '<td>'+cop(o.valor_total)+'</td>'+
+        '<td><button class="btn btn-borde btn-chico" onclick="abrirOficio('+o.id+')">Abrir</button></td>'+
+      '</tr>';
+    }).join('');
+    pager(document.getElementById('pg-oficios'), d, 'cargarOficios');
+  } catch(e){ console.error(e); }
+}
+
+async function abrirOficio(id){
+  try {
+    var o = await api('/preauditoria/oficios/'+id);
+    document.getElementById('mo-titulo').textContent = 'Oficio ' + o.numero_radicado;
+    var envs = o.envios.map(function(e){
+      return '<li>El envío <b>'+esc(e.envio)+'</b> lleva <b>'+e.cantidad_facturas+'</b> factura(s) por '+cop(e.valor_total)+'</li>';
+    }).join('');
+    var filas = (o.facturas||[]).map(function(f){
+      return '<tr>'+
+        '<td class="mono">'+esc(f.factura)+'</td>'+
+        '<td>'+esc(f.envio)+'</td>'+
+        '<td>'+esc(f.entidad||'—')+'</td>'+
+        '<td>'+cop(f.valor)+'</td>'+
+        '<td><span class="chip chip-ronda">R'+f.ronda+'</span>'+(f.devoluciones_totales?' <span class="chip chip-DEVUELTA" title="Devoluciones acumuladas">'+f.devoluciones_totales+'/'+f.max_devoluciones+'</span>':'')+'</td>'+
+        '<td><span class="chip chip-'+f.resultado+'">'+f.resultado+'</span></td>'+
+        '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
+            '<button class="btn btn-borde btn-chico" onclick="abrirDetalle('+f.id+')">Ver</button></td>'+
+      '</tr>';
+    }).join('');
+    document.getElementById('mo-cuerpo').innerHTML =
+      '<p>Recibido: <b>'+fBog(o.fecha_recibido)+'</b> &nbsp; '+semHtml(o.semaforo)+
+      '<br>Registrado por: '+esc(o.creado_por||'—')+
+      (o.observaciones? '<br>Observaciones: '+esc(o.observaciones):'')+'</p>'+
+      '<div style="margin:12px 0; padding:12px; background:var(--azul-claro); border-radius:8px;">'+
+        '<b>2 · Cargar facturas del consecutivo DGH</b><br>'+
+        '<input type="file" id="dgh-file" accept=".xlsx,.xlsm" style="margin:8px 0;"> '+
+        '<button class="btn btn-azul btn-chico" onclick="importarDGH('+o.id+')">Importar Excel</button>'+
+        '<div id="dgh-msg"></div></div>'+
+      (o.total_facturas ?
+        '<p><b>'+o.total_facturas+' factura(s)</b> · Pendientes: '+o.pendientes+' · OK: '+o.radicar+' · Devueltas: '+o.devueltas+'</p>'+
+        '<ul style="margin:8px 0 12px 20px;">'+envs+'</ul>'+
+        '<div class="tbl-scroll" style="max-height:340px;overflow-y:auto;"><table>'+
+        '<thead><tr><th>Factura</th><th>Envío</th><th>Entidad</th><th>Valor</th><th>Ronda</th><th>Resultado</th><th></th></tr></thead>'+
+        '<tbody>'+filas+'</tbody></table></div>'+
+        '<div style="margin-top:12px;">'+
+          '<button class="btn btn-rojo" '+(o.devueltas? '':'disabled')+' onclick="generarOficioDev('+o.id+')">📄 Generar oficio de devolución (PDF con consecutivo SINAC)</button>'+
+        '</div>'
+        : '<p class="leyenda">Aún no se han importado facturas para este oficio.</p>');
+    abrirModal('m-oficio');
+  } catch(e){ alert(e.message); }
+}
+
+async function importarDGH(id){
+  var inp = document.getElementById('dgh-file');
+  var msg = document.getElementById('dgh-msg');
+  if (!inp.files.length) { msg.innerHTML = '<div class="aviso aviso-err">Seleccione el Excel del consecutivo DGH.</div>'; return; }
+  var fd = new FormData(); fd.append('archivo', inp.files[0]);
+  msg.innerHTML = '<div class="aviso aviso-warn">Importando…</div>';
+  try {
+    var d = await api('/preauditoria/oficios/'+id+'/importar-dgh', { method:'POST', body: fd });
+    var envs = d.envios.map(function(e){ return '<li>El envío <b>'+esc(e.envio)+'</b> lleva <b>'+e.cantidad_facturas+'</b> factura(s)</li>'; }).join('');
+    var html = '<div class="aviso aviso-ok">Se importaron <b>'+d.importadas+'</b> factura(s).</div><ul style="margin-left:20px;">'+envs+'</ul>';
+    (d.alertas_limite_devoluciones||[]).forEach(function(a){ html += '<div class="aviso aviso-err">⚠️ '+esc(a)+'</div>'; });
+    (d.advertencias||[]).forEach(function(a){ html += '<div class="aviso aviso-warn">'+esc(a)+'</div>'; });
+    msg.innerHTML = html;
+    cargarOficios();
+    setTimeout(function(){ abrirOficio(id); }, 900);
+  } catch(e){ msg.innerHTML = '<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
+}
+
+async function generarOficioDev(id){
+  if (!confirm('¿Generar el oficio de devolución con las facturas DEVUELTAS de este radicado? Se asignará el siguiente consecutivo SINAC.')) return;
+  try {
+    var d = await api('/preauditoria/oficios/'+id+'/oficio-devolucion', { method:'POST' });
+    alert('Oficio generado: ' + d.consecutivo + ' ('+d.total_facturas+' facturas)');
+    verPdf(d.pdf_url);
+    cerrarModal('m-oficio');
+    cargarDevoluciones();
+  } catch(e){ alert(e.message); }
+}
+
+async function verPdf(url){
+  try {
+    var r = await fetch(url, { headers: authH() });
+    if (!r.ok) throw new Error('No se pudo descargar el PDF');
+    var blob = await r.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch(e){ alert(e.message); }
+}
+
+// ---------- facturas ----------
+async function cargarFacturas(page){
+  var url = '/preauditoria/facturas?page='+(page||1)+'&per_page=25';
+  var v = function(id){ return document.getElementById(id).value.trim(); };
+  if (v('ff-q')) url += '&q='+encodeURIComponent(v('ff-q'));
+  if (v('ff-res')) url += '&resultado='+v('ff-res');
+  if (v('ff-aud')) url += '&auditor='+encodeURIComponent(v('ff-aud'));
+  if (v('ff-envio')) url += '&envio='+encodeURIComponent(v('ff-envio'));
+  if (v('ff-desde')) url += '&desde='+v('ff-desde');
+  if (v('ff-hasta')) url += '&hasta='+v('ff-hasta');
+  if (document.getElementById('ff-rein').checked) url += '&solo_reincidentes=true';
+  try {
+    var d = await api(url);
+    var tb = document.getElementById('tb-facturas');
+    if (!d.items.length) { tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--gris)">Sin resultados con esos filtros</td></tr>'; }
+    else tb.innerHTML = d.items.map(function(f){
+      return '<tr>'+
+        '<td class="mono"><a href="javascript:abrirDetalle('+f.id+')">'+esc(f.factura)+'</a></td>'+
+        '<td>'+esc(f.envio)+'</td>'+
+        '<td>'+esc(f.entidad||'—')+'</td>'+
+        '<td>'+cop(f.valor)+'</td>'+
+        '<td><span class="chip chip-ronda">R'+f.ronda+'</span></td>'+
+        '<td><span class="chip chip-'+f.resultado+'">'+f.resultado+'</span></td>'+
+        '<td>'+subHtml(f)+'</td>'+
+        '<td>'+esc(f.auditor||'—')+'</td>'+
+        '<td>'+fDia(f.fecha_auditoria)+'</td>'+
+        '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button></td>'+
+      '</tr>';
+    }).join('');
+    pager(document.getElementById('pg-facturas'), d, 'cargarFacturas');
+  } catch(e){ console.error(e); }
+}
+
+async function abrirAuditar(id){
+  try {
+    var d = await api('/preauditoria/facturas/'+id);
+    var f = d.actual;
+    var limite = d.devoluciones_totales >= d.max_devoluciones;
+    document.getElementById('ma-cuerpo').innerHTML =
+      '<p class="mono" style="font-size:1rem;"><b>'+esc(f.factura)+'</b> · Envío '+esc(f.envio)+' · '+cop(f.valor)+'</p>'+
+      '<p>'+esc(f.entidad||'')+' · Ronda <b>'+f.ronda+'</b>'+(f.ronda>1?' (subsanación)':'')+
+      ' · Devoluciones acumuladas: <b>'+d.devoluciones_totales+' de '+d.max_devoluciones+'</b></p>'+
+      (limite ? '<div class="aviso aviso-err">⚠️ Esta factura ya agotó las '+d.max_devoluciones+' devoluciones permitidas: debe radicarse o escalarse al coordinador.</div>' : '')+
+      (f.motivo_devolucion ? '<p class="leyenda">Motivo actual: '+esc(f.motivo_devolucion)+'</p>' : '')+
+      '<label class="campo" style="margin:10px 0;">Motivo de la devolución (obligatorio si devuelve)'+
+      '<textarea id="au-motivo" rows="4" style="width:100%;">'+esc(f.motivo_devolucion||'')+'</textarea></label>'+
+      '<label class="campo" style="margin:10px 0;">Observaciones (opcional)'+
+      '<input id="au-obs" style="width:100%;" value="'+esc(f.observaciones||'')+'"></label>'+
+      '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">'+
+        '<button class="btn btn-verde" onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes OK — radicar</button>'+
+        '<button class="btn btn-rojo" '+(limite?'disabled':'')+' onclick="auditar('+f.id+',\'DEVUELTA\')">✖ Devolver a Facturación</button>'+
+        '<button class="btn btn-borde" onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button>'+
+      '</div>';
+    abrirModal('m-auditar');
+  } catch(e){ alert(e.message); }
+}
+
+async function auditar(id, resultado){
+  try {
+    await api('/preauditoria/facturas/'+id+'/auditar', { method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ resultado: resultado,
+        motivo_devolucion: document.getElementById('au-motivo').value,
+        observaciones: document.getElementById('au-obs').value }) });
+    cerrarModal('m-auditar');
+    cargarFacturas(); cargarOficios();
+  } catch(e){ alert(e.message); }
+}
+
+async function abrirDetalle(id){
+  try {
+    var d = await api('/preauditoria/facturas/'+id);
+    document.getElementById('md-titulo').textContent = 'Factura ' + d.actual.factura + ' — historial completo';
+    var filas = d.historial.map(function(h){
+      return '<tr>'+
+        '<td><span class="chip chip-ronda">R'+h.ronda+'</span></td>'+
+        '<td class="mono">'+esc(h.oficio_radicado||'—')+'</td>'+
+        '<td>'+fDia(h.oficio_fecha_recibido)+'</td>'+
+        '<td><span class="chip chip-'+h.resultado+'">'+h.resultado+'</span></td>'+
+        '<td>'+subHtml(h)+'</td>'+
+        '<td>'+esc(h.auditor||'—')+'</td>'+
+        '<td style="max-width:260px;">'+esc(h.motivo_devolucion||'—')+'</td>'+
+      '</tr>';
+    }).join('');
+    document.getElementById('md-cuerpo').innerHTML =
+      '<p>'+esc(d.actual.entidad||'')+' · '+cop(d.actual.valor)+
+      ' · Devoluciones: <b>'+d.devoluciones_totales+' de '+d.max_devoluciones+'</b></p>'+
+      '<div class="tbl-scroll"><table>'+
+      '<thead><tr><th>Ronda</th><th>Oficio</th><th>Recibida</th><th>Resultado</th><th>Subsanación</th><th>Auditor</th><th>Motivo devolución</th></tr></thead>'+
+      '<tbody>'+filas+'</tbody></table></div>';
+    abrirModal('m-detalle');
+  } catch(e){ alert(e.message); }
+}
+
+// ---------- oficios de devolución ----------
+async function cargarDevoluciones(page){
+  try {
+    var d = await api('/preauditoria/oficios-devolucion?page='+(page||1)+'&per_page=20');
+    var tb = document.getElementById('tb-devoluciones');
+    if (!d.items.length) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gris)">Aún no se han generado oficios de devolución</td></tr>'; }
+    else tb.innerHTML = d.items.map(function(o){
+      return '<tr>'+
+        '<td class="mono"><b>'+esc(o.consecutivo)+'</b></td>'+
+        '<td>'+fBog(o.fecha_generado)+'</td>'+
+        '<td class="mono">'+esc(o.oficio_radicado||'—')+'</td>'+
+        '<td>'+o.total_facturas+'</td>'+
+        '<td>'+cop(o.total_valor)+'</td>'+
+        '<td>'+esc(o.generado_por||'—')+'</td>'+
+        '<td><button class="btn btn-borde btn-chico" onclick="verPdf(\''+o.pdf_url+'\')">📄 Ver PDF</button></td>'+
+      '</tr>';
+    }).join('');
+    pager(document.getElementById('pg-devoluciones'), d, 'cargarDevoluciones');
+  } catch(e){ console.error(e); }
+}
+
+// ---------- estadísticas ----------
+async function cargarStats(){
+  var url = '/preauditoria/estadisticas?';
+  var de = document.getElementById('st-desde').value, ha = document.getElementById('st-hasta').value;
+  if (de) url += 'desde='+de+'&'; if (ha) url += 'hasta='+ha;
+  try {
+    var d = await api(url);
+    document.getElementById('st-kpis').innerHTML =
+      '<div class="kpi"><div class="v">'+d.total_facturas+'</div><div class="l">Facturas recibidas</div></div>'+
+      '<div class="kpi"><div class="v">'+d.auditadas+'</div><div class="l">Auditadas</div></div>'+
+      '<div class="kpi k-ama"><div class="v">'+d.pendientes+'</div><div class="l">Pendientes</div></div>'+
+      '<div class="kpi k-verde"><div class="v">'+d.radicar+'</div><div class="l">OK para radicar</div></div>'+
+      '<div class="kpi k-rojo"><div class="v">'+d.devueltas+'</div><div class="l">Devueltas</div></div>'+
+      '<div class="kpi k-verde"><div class="v">'+d.subsanadas+'</div><div class="l">Subsanadas</div></div>'+
+      '<div class="kpi k-rojo"><div class="v">'+d.nuevamente_devueltas+'</div><div class="l">Nuevamente devueltas</div></div>'+
+      '<div class="kpi"><div class="v" style="font-size:1.05rem;">'+cop(d.valor_total)+'</div><div class="l">Valor recibido</div></div>';
+    var s = d.semaforo_oficios;
+    document.getElementById('st-semaforo').innerHTML =
+      '<div class="kpi k-verde"><div class="v">'+s.VERDE+'</div><div class="l">Oficios en verde</div></div>'+
+      '<div class="kpi k-ama"><div class="v">'+s.AMARILLO+'</div><div class="l">En amarillo</div></div>'+
+      '<div class="kpi k-rojo"><div class="v">'+s.ROJO+'</div><div class="l">En rojo (último día)</div></div>'+
+      '<div class="kpi k-rojo"><div class="v">'+s.VENCIDO+'</div><div class="l">Vencidos</div></div>'+
+      '<div class="kpi"><div class="v">'+s.COMPLETADO+'</div><div class="l">Completados</div></div>';
+    document.getElementById('tb-auditores').innerHTML = d.por_auditor.length ? d.por_auditor.map(function(a){
+      var pct = a.auditadas ? Math.round(100*a.devueltas/a.auditadas) : 0;
+      return '<tr><td><b>'+esc(a.auditor)+'</b></td><td>'+a.auditadas+'</td>'+
+        '<td style="color:var(--verde)">'+a.radicar+'</td><td style="color:var(--rojo)">'+a.devueltas+'</td>'+
+        '<td>'+pct+'%</td><td>'+cop(a.valor)+'</td></tr>';
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--gris)">Sin auditorías registradas</td></tr>';
+    document.getElementById('st-limite').innerHTML = d.en_limite_devoluciones.length ?
+      '<div class="aviso aviso-err">⚠️ '+d.en_limite_devoluciones.length+' factura(s) ya agotaron las '+d.max_devoluciones+' devoluciones permitidas.</div>' : '';
+    document.getElementById('tb-reincidentes').innerHTML = d.reincidentes.length ? d.reincidentes.map(function(r){
+      var tope = r.veces_devuelta >= d.max_devoluciones;
+      return '<tr><td class="mono">'+esc(r.factura)+'</td><td><b>'+r.veces_devuelta+'</b> de '+d.max_devoluciones+'</td>'+
+        '<td>'+(tope?'<span class="chip chip-DEVUELTA">LÍMITE ALCANZADO</span>':'<span class="chip chip-ronda">En proceso</span>')+'</td></tr>';
+    }).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--gris)">Ninguna factura devuelta más de una vez</td></tr>';
+  } catch(e){ console.error(e); }
+}
+
+// arranque
+(function(){
+  var f = document.getElementById('of-fecha');
+  var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  f.value = d.toISOString().slice(0,16);
+  cargarOficios();
+})();
+</script>
+</body>
+</html>

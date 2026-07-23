@@ -955,3 +955,97 @@ class CredencialAccesoLog(Base):
     accion = Column(String(20), nullable=False)  # REVELAR | IMPORTAR | LISTAR
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     motivo = Column(Text, nullable=True)
+
+
+# ============================================================
+# PRE-AUDITORÍA SINAC — recepción de oficios de Facturación,
+# auditoría de soportes y oficios de devolución (DEV-PRE-AUD).
+# ============================================================
+
+
+class OficioRecepcionRecord(Base):
+    """Oficio radicado por Facturación que entrega facturas a pre-auditoría.
+
+    El plazo para auditar es de 3 días hábiles, contados a partir del día
+    siguiente al recibo del oficio (semáforo verde/amarillo/rojo/vencido).
+    """
+
+    __tablename__ = "preaud_oficios_recepcion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero_radicado = Column(String(60), nullable=False)  # ej. FHUS-AS-I00768-26
+    fecha_recibido = Column(DateTime(timezone=True), nullable=False, index=True)  # con hora
+    observaciones = Column(Text, nullable=True)
+    archivo_dgh = Column(String(300), nullable=True)  # Excel del consecutivo DGH importado
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    creado_por = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("ix_preaud_oficio_radicado", "numero_radicado", unique=True),
+    )
+
+
+class FacturaPreauditoriaRecord(Base):
+    """Una factura recibida en un oficio, con su resultado de pre-auditoría.
+
+    La misma factura puede llegar en varios oficios: la ronda 1 es la primera
+    revisión; de la ronda 2 en adelante es una subsanación (vuelve corregida
+    y queda SUBSANADA si se radica, o NUEVAMENTE DEVUELTA si se devuelve).
+    Se aceptan máximo 3 devoluciones por factura.
+    """
+
+    __tablename__ = "preaud_facturas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    oficio_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=False
+    )
+    envio = Column(String(30), index=True, nullable=False)
+    factura = Column(String(30), index=True, nullable=False)
+    fecha_factura = Column(DateTime(timezone=True), nullable=True)
+    valor = Column(Float, default=0.0, nullable=False)
+    nit = Column(String(30), nullable=True)
+    entidad = Column(String(300), nullable=True)
+    correo_fe = Column(String(10), nullable=True)  # SI | NO — soporte de correo F.E.
+    ronda = Column(Integer, default=1, nullable=False)  # 1=primera vez, 2+=subsanación
+    resultado = Column(String(15), default="PENDIENTE", index=True)  # PENDIENTE | RADICAR | DEVUELTA
+    motivo_devolucion = Column(Text, nullable=True)
+    observaciones = Column(Text, nullable=True)
+    auditor = Column(String(120), index=True, nullable=True)
+    fecha_auditoria = Column(DateTime(timezone=True), nullable=True)
+    oficio_devolucion_id = Column(
+        Integer, ForeignKey("preaud_oficios_devolucion.id"), index=True, nullable=True
+    )
+
+    __table_args__ = (
+        # Una factura no puede venir dos veces en el mismo oficio.
+        Index("ix_preaud_fact_oficio_factura", "oficio_id", "factura", unique=True),
+        Index("ix_preaud_fact_factura", "factura", "ronda"),
+    )
+
+
+class OficioDevolucionRecord(Base):
+    """Oficio de devolución con consecutivo SINAC (DEV-PRE-AUD-####-AAAA).
+
+    Agrupa las facturas devueltas de un oficio de recepción; el PDF se
+    genera con logo y bloque de firmas para entregar a Facturación.
+    """
+
+    __tablename__ = "preaud_oficios_devolucion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    consecutivo = Column(String(40), nullable=False)  # DEV-PRE-AUD-0007-2026
+    anio = Column(Integer, index=True, nullable=False)
+    numero = Column(Integer, nullable=False)  # parte numérica del consecutivo
+    oficio_recepcion_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    fecha_generado = Column(DateTime(timezone=True), server_default=func.now())
+    generado_por = Column(String(200), nullable=True)
+    total_facturas = Column(Integer, default=0, nullable=False)
+    total_valor = Column(Float, default=0.0, nullable=False)
+
+    __table_args__ = (
+        Index("ix_preaud_dev_consecutivo", "consecutivo", unique=True),
+        Index("ix_preaud_dev_anio_numero", "anio", "numero", unique=True),
+    )

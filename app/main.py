@@ -1215,6 +1215,9 @@ app.include_router(tareas_diarias_router)
 from app.api.routers.nota_credito import router as nota_credito_router
 
 app.include_router(nota_credito_router)
+from app.api.routers.preauditoria import router as preauditoria_router
+
+app.include_router(preauditoria_router)
 # auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 
