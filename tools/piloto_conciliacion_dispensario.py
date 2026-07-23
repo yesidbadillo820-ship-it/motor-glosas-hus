@@ -206,6 +206,93 @@ def escribir_expediente(exp: dict, base: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Hoja de trabajo de conciliacion (Excel consolidado)
+# ---------------------------------------------------------------------------
+def escribir_excel_conciliacion(payload: dict, salida: Path) -> None:
+    """Una fila por glosa, lista para que el auditor trabaje la conciliacion:
+    factura, paciente, contrato, cartera, glosa, valor, defendibilidad, decision,
+    evidencia citada (paginas), faltantes, riesgo, alertas y motivo. Coloreada
+    por decision."""
+    import openpyxl
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    color = {
+        "SOLICITAR_LEVANTAMIENTO": "D9EAD3",
+        "ACEPTAR_PARCIAL": "FFF2CC",
+        "SOLICITAR_SOPORTE": "FCE5CD",
+        "CONCILIAR": "F4CCCC",
+        "ESCALAR": "EAD1DC",
+    }
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Conciliacion"
+    ws.append(
+        [
+            "Factura",
+            "Paciente",
+            "Contrato",
+            "Saldo cartera",
+            "Edad (d)",
+            "Codigo glosa",
+            "Servicio",
+            "Valor objetado",
+            "Defendibilidad %",
+            "Decision",
+            "Prioridad",
+            "Evidencia (paginas)",
+            "Documentos faltantes",
+            "Riesgo probatorio",
+            "Alertas del expediente",
+            "Motivo / accion",
+        ]
+    )
+    for c in ws[1]:
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor="1F4E5F")
+        c.alignment = Alignment(vertical="center", wrap_text=True)
+    for exp in payload.get("expedientes", []):
+        alertas = "; ".join(exp.get("alertas", []))
+        for g in exp.get("glosas", []):
+            d = g.get("decision", {})
+            evid = "; ".join(
+                ref for h in g.get("hechos_probados", []) for ref in h.get("evidencia", [])
+            )
+            ws.append(
+                [
+                    exp.get("factura", ""),
+                    exp.get("paciente", {}).get("nombre", ""),
+                    exp.get("contrato", {}).get("codigo", ""),
+                    exp.get("cartera", {}).get("saldo", 0),
+                    exp.get("cartera", {}).get("edad_dias", 0),
+                    g.get("codigo_corto", ""),
+                    str(g.get("servicio", ""))[:60],
+                    g.get("valor_objetado", 0),
+                    d.get("defendibilidad", 0),
+                    d.get("decision", ""),
+                    d.get("prioridad", ""),
+                    evid,
+                    "; ".join(d.get("documentos_faltantes", [])),
+                    d.get("riesgos", {}).get("probatorio", ""),
+                    alertas,
+                    d.get("motivo_decision", ""),
+                ]
+            )
+            fila = ws.max_row
+            ws.cell(row=fila, column=4).number_format = "#,##0"
+            ws.cell(row=fila, column=8).number_format = "#,##0"
+            cc = ws.cell(row=fila, column=10)
+            if d.get("decision") in color:
+                cc.fill = PatternFill("solid", fgColor=color[d["decision"]])
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:P{ws.max_row}"
+    anchos = (15, 26, 9, 14, 8, 12, 48, 14, 13, 22, 9, 46, 30, 14, 40, 46)
+    for w, col in zip(anchos, "ABCDEFGHIJKLMNOP"):
+        ws.column_dimensions[col].width = w
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(salida))
+
+
+# ---------------------------------------------------------------------------
 # Metricas + umbrales
 # ---------------------------------------------------------------------------
 def calcular_metricas(
@@ -327,6 +414,7 @@ def correr_piloto(
     salida_dir.mkdir(parents=True, exist_ok=True)
     for exp in payload["expedientes"]:
         escribir_expediente(exp, salida_dir)
+    escribir_excel_conciliacion(payload, salida_dir / "CONCILIACION.xlsx")
 
     metricas = calcular_metricas(payload, indice, lote_facturas, time.perf_counter() - t0)
     (salida_dir / "METRICAS.json").write_text(
@@ -362,6 +450,7 @@ def main(argv: list[str] | None = None) -> int:
         args.excel, args.indice, args.cartera, facturas, args.auto, args.conocido, args.salida_dir
     )
     logger.info("Piloto -> %s", args.salida_dir)
+    logger.info("  Hoja de conciliacion: %s", args.salida_dir / "CONCILIACION.xlsx")
     logger.info(
         "  Facturas: %d | Docs: %d | Evidencias: %d (fuertes %d) | Hechos probados: %d/%d | Contradicciones: %d",
         metricas["indice"]["facturas_piloto"],

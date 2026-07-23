@@ -44,8 +44,14 @@ Piloto/
 │   ├── resumen.txt       ← todo lo anterior, legible
 │   └── log.txt           ← traza de las etapas
 ├── ...
+├── CONCILIACION.xlsx     ← hoja de trabajo: 1 fila por glosa, lista para conciliar
 └── METRICAS.json         ← indicadores + umbrales de aceptación (piloto_ok sí/no)
 ```
+
+La **`CONCILIACION.xlsx`** consolida todo en una hoja para el auditor: factura,
+paciente, contrato, cartera, código y servicio de la glosa, valor objetado,
+**defendibilidad %**, **decisión** (coloreada), prioridad, **evidencia citada
+(páginas)**, documentos faltantes, riesgo probatorio, alertas y motivo/acción.
 
 ## Indicadores que mide (`METRICAS.json`)
 
