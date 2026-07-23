@@ -29,10 +29,7 @@ RECIBE_NOMBRE = "ANGELICA LORENA POVEDA"
 RECIBE_CARGO = "Coordinadora de Facturacion - Encargada"
 RECIBE_EMPRESA = "Administracion en Salud CTA - ESE Hospital Universitario de Santander"
 
-TITULO = (
-    "ENTREGA DE NO ACEPTACIONES POR PRE AUDITORÍA PARA CORRECCIÓN "
-    "POR PARTE DE FACTURACIÓN HUS"
-)
+TITULO = "ENTREGA DE NO ACEPTACIONES POR PRE AUDITORÍA PARA CORRECCIÓN POR PARTE DE FACTURACIÓN HUS"
 SUBTITULO = "FACTURAS CON INCONVENIENTES DE LAS DIFERENTES E.R.P."
 
 NOTA = (
@@ -79,25 +76,42 @@ def generar_pdf_oficio_devolucion(
     gris = HexColor("#555555")
 
     st_titulo = ParagraphStyle(
-        "titulo", fontName="Helvetica-Bold", fontSize=10.5, leading=13,
-        alignment=TA_CENTER, textColor=navy,
+        "titulo",
+        fontName="Helvetica-Bold",
+        fontSize=10.5,
+        leading=13,
+        alignment=TA_CENTER,
+        textColor=navy,
     )
     st_sub = ParagraphStyle(
-        "sub", fontName="Helvetica", fontSize=9, leading=11,
-        alignment=TA_CENTER, textColor=gris,
+        "sub",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=11,
+        alignment=TA_CENTER,
+        textColor=gris,
     )
     st_meta = ParagraphStyle(
-        "meta", fontName="Helvetica-Bold", fontSize=9.5, leading=12,
+        "meta",
+        fontName="Helvetica-Bold",
+        fontSize=9.5,
+        leading=12,
     )
     st_celda = ParagraphStyle("celda", fontName="Helvetica", fontSize=7.5, leading=9)
-    st_celda_b = ParagraphStyle(
-        "celda_b", fontName="Helvetica-Bold", fontSize=7.5, leading=9
-    )
+    st_celda_b = ParagraphStyle("celda_b", fontName="Helvetica-Bold", fontSize=7.5, leading=9)
     st_nota = ParagraphStyle(
-        "nota", fontName="Helvetica", fontSize=8.5, leading=11, alignment=TA_JUSTIFY,
+        "nota",
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=11,
+        alignment=TA_JUSTIFY,
     )
     st_firma = ParagraphStyle(
-        "firma", fontName="Helvetica", fontSize=8.5, leading=11, alignment=TA_CENTER,
+        "firma",
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=11,
+        alignment=TA_CENTER,
     )
 
     buf = BytesIO()
@@ -149,7 +163,14 @@ def generar_pdf_oficio_devolucion(
 
     # --- Tabla de facturas devueltas -------------------------------
     encabezados = [
-        "No.", "ENVÍO", "FACTURA", "F. FACTURA", "VALOR", "NIT", "ENTIDAD", "MOTIVO DE LA DEVOLUCIÓN",
+        "No.",
+        "ENVÍO",
+        "FACTURA",
+        "F. FACTURA",
+        "VALOR",
+        "NIT",
+        "ENTIDAD",
+        "MOTIVO DE LA DEVOLUCIÓN",
     ]
     filas = [[Paragraph(f"<b>{h}</b>", st_celda_b) for h in encabezados]]
     total = 0.0
@@ -172,13 +193,23 @@ def generar_pdf_oficio_devolucion(
     filas.append(
         [
             Paragraph(f"<b>TOTAL — {len(facturas)} factura(s)</b>", st_celda_b),
-            "", "", "",
+            "",
+            "",
+            "",
             Paragraph(f"<b>{_formatear_cop(total)}</b>", st_celda_b),
-            "", "", "",
+            "",
+            "",
+            "",
         ]
     )
     anchos = [
-        0.9 * cm, 1.8 * cm, 3.0 * cm, 2.0 * cm, 2.2 * cm, 2.2 * cm, 4.6 * cm,
+        0.9 * cm,
+        1.8 * cm,
+        3.0 * cm,
+        2.0 * cm,
+        2.2 * cm,
+        2.2 * cm,
+        4.6 * cm,
         ancho_util - (0.9 + 1.8 + 3.0 + 2.0 + 2.2 + 2.2 + 4.6) * cm,
     ]
     tabla = Table(filas, colWidths=anchos, repeatRows=1)
@@ -234,9 +265,7 @@ def generar_pdf_oficio_devolucion(
         firma_entrega = Image(RUTA_FIRMA, width=4.2 * cm, height=1.6 * cm)
     else:
         firma_entrega = Spacer(1, 1.3 * cm)
-    bloque_izq = _bloque_firma(
-        firma_entrega, FIRMANTE_NOMBRE, FIRMANTE_CARGO, FIRMANTE_EMPRESA
-    )
+    bloque_izq = _bloque_firma(firma_entrega, FIRMANTE_NOMBRE, FIRMANTE_CARGO, FIRMANTE_EMPRESA)
     bloque_der = [
         Paragraph("<b>RECIBIDO:</b>", st_firma),
         _bloque_firma(Spacer(1, 1.3 * cm), RECIBE_NOMBRE, RECIBE_CARGO, RECIBE_EMPRESA),
@@ -256,8 +285,12 @@ def generar_pdf_oficio_devolucion(
     story.append(t_firmas)
 
     st_pie = ParagraphStyle(
-        "pie", fontName="Helvetica", fontSize=7, leading=9,
-        alignment=TA_CENTER, textColor=gris,
+        "pie",
+        fontName="Helvetica",
+        fontSize=7,
+        leading=9,
+        alignment=TA_CENTER,
+        textColor=gris,
     )
     generado = ahora_bogota().strftime("%d/%m/%Y %H:%M")
     story.append(Spacer(1, 12))

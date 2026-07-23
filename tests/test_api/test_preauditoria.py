@@ -232,7 +232,7 @@ class TestAuditoria:
 
         # La factura vuelve corregida en un oficio nuevo → ronda 2.
         o2 = _crear_oficio(client, "FHUS-AS-I00804-26", "2026-07-21T08:00")
-        d = _importar(client, o2["id"], [FILA_1])
+        _importar(client, o2["id"], [FILA_1])
         f2 = _factura_id(client, o2["id"], "HUS0000517026")
         detalle = client.get(f"/preauditoria/facturas/{f2}").json()
         assert detalle["actual"]["ronda"] == 2

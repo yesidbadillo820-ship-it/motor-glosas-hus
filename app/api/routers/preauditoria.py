@@ -126,9 +126,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
     pendientes = sum(1 for f in facturas if f.resultado == svc.RESULTADO_PENDIENTE)
     radicar = sum(1 for f in facturas if f.resultado == svc.RESULTADO_RADICAR)
     devueltas = sum(1 for f in facturas if f.resultado == svc.RESULTADO_DEVUELTA)
-    semaforo = svc.calcular_semaforo(
-        o.fecha_recibido, completado=svc.oficio_completado(facturas)
-    )
+    semaforo = svc.calcular_semaforo(o.fecha_recibido, completado=svc.oficio_completado(facturas))
     d = {
         "id": o.id,
         "numero_radicado": o.numero_radicado,
@@ -391,9 +389,7 @@ def listar_facturas(
     if auditor:
         consulta = consulta.filter(FacturaPreauditoriaRecord.auditor.ilike(f"%{auditor.strip()}%"))
     if resultado:
-        consulta = consulta.filter(
-            FacturaPreauditoriaRecord.resultado == resultado.strip().upper()
-        )
+        consulta = consulta.filter(FacturaPreauditoriaRecord.resultado == resultado.strip().upper())
     if solo_reincidentes:
         consulta = consulta.filter(FacturaPreauditoriaRecord.ronda >= 2)
     if desde:
@@ -527,7 +523,11 @@ def listar_oficios_devolucion(
     recepciones = {
         o.id: o.numero_radicado
         for o in db.query(OficioRecepcionRecord)
-        .filter(OficioRecepcionRecord.id.in_({f.oficio_recepcion_id for f in filas if f.oficio_recepcion_id}))
+        .filter(
+            OficioRecepcionRecord.id.in_(
+                {f.oficio_recepcion_id for f in filas if f.oficio_recepcion_id}
+            )
+        )
         .all()
     }
     return {
@@ -566,9 +566,7 @@ def descargar_pdf_oficio_devolucion(
         .all()
     )
     recepcion = (
-        db.get(OficioRecepcionRecord, dev.oficio_recepcion_id)
-        if dev.oficio_recepcion_id
-        else None
+        db.get(OficioRecepcionRecord, dev.oficio_recepcion_id) if dev.oficio_recepcion_id else None
     )
     fecha_local = a_utc(dev.fecha_generado)
     pdf = generar_pdf_oficio_devolucion(
@@ -643,9 +641,7 @@ def estadisticas(
             a["radicar"] += 1
         elif f.resultado == svc.RESULTADO_DEVUELTA:
             a["devueltas"] += 1
-    lista_auditores = sorted(
-        por_auditor.values(), key=lambda a: a["auditadas"], reverse=True
-    )
+    lista_auditores = sorted(por_auditor.values(), key=lambda a: a["auditadas"], reverse=True)
 
     # Reincidencia: cuántas veces fue devuelta cada factura (histórico completo)
     filas_dev = (
@@ -658,20 +654,14 @@ def estadisticas(
         .all()
     )
     reincidentes = sorted(
-        (
-            {"factura": fac, "veces_devuelta": n}
-            for fac, n in filas_dev
-            if n >= 2
-        ),
+        ({"factura": fac, "veces_devuelta": n} for fac, n in filas_dev if n >= 2),
         key=lambda r: r["veces_devuelta"],
         reverse=True,
     )
     en_limite = [r for r in reincidentes if r["veces_devuelta"] >= svc.MAX_DEVOLUCIONES]
 
     # Subsanaciones (rondas 2+ ya auditadas)
-    subsanadas = sum(
-        1 for f in facturas if f.ronda > 1 and f.resultado == svc.RESULTADO_RADICAR
-    )
+    subsanadas = sum(1 for f in facturas if f.ronda > 1 and f.resultado == svc.RESULTADO_RADICAR)
     nuevamente_devueltas = sum(
         1 for f in facturas if f.ronda > 1 and f.resultado == svc.RESULTADO_DEVUELTA
     )

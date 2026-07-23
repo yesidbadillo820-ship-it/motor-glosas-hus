@@ -24,7 +24,6 @@ from app.core.tz import TZ_BOGOTA, a_utc
 from app.models.db import (
     FacturaPreauditoriaRecord,
     OficioDevolucionRecord,
-    OficioRecepcionRecord,
 )
 
 # Regla del proceso: una misma factura se acepta devuelta máximo 3 veces.
@@ -272,7 +271,9 @@ def parsear_excel_dgh(contenido: bytes) -> dict:
             if not factura or _normalizar_encabezado(factura) in {"FACTURA", "TOTAL"}:
                 continue
             if factura in vistas:
-                advertencias.append(f"Factura repetida en el archivo (se tomó una sola vez): {factura}")
+                advertencias.append(
+                    f"Factura repetida en el archivo (se tomó una sola vez): {factura}"
+                )
                 continue
             vistas.add(factura)
 
