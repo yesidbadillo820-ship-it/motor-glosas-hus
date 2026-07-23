@@ -202,6 +202,20 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     facturas reincidentes; vista masiva con filtros y vista individual con
     el historial completo de cada factura.
   - 29 pruebas automáticas en verde (`tests/test_api/test_preauditoria.py`).
+- **23-07 (tarde):** dos entregas más del mismo frente:
+  - El **PDF del oficio de devolución** quedó con el formato exacto de la guía
+    del equipo (GUIA_DE_PDF): título "ENTREGA DE NO ACEPTACIONES PARA
+    CORRECCION...", subtítulo "OBSERVACIONES DE PREAUDITORÍA PARA SUBSANACIÓN",
+    consecutivo y fecha arriba a la derecha y columna OFICIO (radicado FHUS)
+    en cada fila.
+  - **CONSOLIDADO_PRE_AUDITORIA_2026_INTERACTIVO.xlsx** (entregado por chat,
+    NO va al repo porque el DGReport trae datos de pacientes): se escribe el
+    número de ENVÍO y se llenan solas F_RECIBIDO, FACTURA, F_FACTURA, VALOR,
+    NIT, ENTIDAD y CORREO F.E. Las fuentes las alimenta el auditor pegando
+    los reportes de DGH en las hojas RADICACION (radicación de cuentas;
+    precargada con 36.765 filas) y DGREPORT (correos de factura electrónica;
+    7.231 filas). Si el envío trae varias facturas, se repite el número y
+    salen en orden ("2 de 5"). Instrucciones en la hoja LEYENDA.
 
 ---
 
