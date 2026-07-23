@@ -581,6 +581,7 @@ def descargar_pdf_oficio_devolucion(
                 "valor": f.valor,
                 "nit": f.nit,
                 "entidad": f.entidad,
+                "oficio": recepcion.numero_radicado if recepcion else None,
                 "motivo_devolucion": f.motivo_devolucion,
             }
             for f in facturas

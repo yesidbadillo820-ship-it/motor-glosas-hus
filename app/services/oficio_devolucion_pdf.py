@@ -29,8 +29,8 @@ RECIBE_NOMBRE = "ANGELICA LORENA POVEDA"
 RECIBE_CARGO = "Coordinadora de Facturacion - Encargada"
 RECIBE_EMPRESA = "Administracion en Salud CTA - ESE Hospital Universitario de Santander"
 
-TITULO = "ENTREGA DE NO ACEPTACIONES POR PRE AUDITORÍA PARA CORRECCIÓN POR PARTE DE FACTURACIÓN HUS"
-SUBTITULO = "FACTURAS CON INCONVENIENTES DE LAS DIFERENTES E.R.P."
+TITULO = "ENTREGA DE NO ACEPTACIONES PARA CORRECCION POR PARTE DE FACTURACION HUS"
+SUBTITULO = "OBSERVACIONES DE PREAUDITORÍA PARA SUBSANACIÓN"
 
 NOTA = (
     "NOTA: Se procedió a realizar la preauditoría de soportes de las facturas "
@@ -139,7 +139,6 @@ def generar_pdf_oficio_devolucion(
     meta = [
         Paragraph(f"Consecutivo: <b>{consecutivo}</b>", st_meta),
         Paragraph(f"Fecha: {fecha_txt}", st_meta),
-        Paragraph(f"Oficio recibido: {numero_radicado or '—'}", st_meta),
     ]
     cab = Table(
         [[logo, [Paragraph(TITULO, st_titulo), Spacer(1, 2), Paragraph(SUBTITULO, st_sub)], meta]],
@@ -161,16 +160,17 @@ def generar_pdf_oficio_devolucion(
     story.append(cab)
     story.append(Spacer(1, 10))
 
-    # --- Tabla de facturas devueltas -------------------------------
+    # --- Tabla de facturas devueltas (formato de la guía) ----------
     encabezados = [
         "No.",
-        "ENVÍO",
+        "ENVIO",
         "FACTURA",
-        "F. FACTURA",
+        "F_FACTURA",
         "VALOR",
         "NIT",
         "ENTIDAD",
-        "MOTIVO DE LA DEVOLUCIÓN",
+        "OFICIO",
+        "MOTIVO",
     ]
     filas = [[Paragraph(f"<b>{h}</b>", st_celda_b) for h in encabezados]]
     total = 0.0
@@ -187,6 +187,7 @@ def generar_pdf_oficio_devolucion(
                 Paragraph(_formatear_cop(f.get("valor") or 0), st_celda),
                 Paragraph(str(f.get("nit") or "—"), st_celda),
                 Paragraph(str(f.get("entidad") or "—"), st_celda),
+                Paragraph(str(f.get("oficio") or numero_radicado or "—"), st_celda),
                 Paragraph(str(f.get("motivo_devolucion") or "—"), st_celda),
             ]
         )
@@ -200,17 +201,19 @@ def generar_pdf_oficio_devolucion(
             "",
             "",
             "",
+            "",
         ]
     )
     anchos = [
         0.9 * cm,
-        1.8 * cm,
+        1.7 * cm,
+        2.9 * cm,
+        1.9 * cm,
+        2.1 * cm,
+        2.1 * cm,
+        4.2 * cm,
         3.0 * cm,
-        2.0 * cm,
-        2.2 * cm,
-        2.2 * cm,
-        4.6 * cm,
-        ancho_util - (0.9 + 1.8 + 3.0 + 2.0 + 2.2 + 2.2 + 4.6) * cm,
+        ancho_util - (0.9 + 1.7 + 2.9 + 1.9 + 2.1 + 2.1 + 4.2 + 3.0) * cm,
     ]
     tabla = Table(filas, colWidths=anchos, repeatRows=1)
     tabla.setStyle(
@@ -219,7 +222,7 @@ def generar_pdf_oficio_devolucion(
                 ("BACKGROUND", (0, 0), (-1, 0), navy),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("SPAN", (0, -1), (3, -1)),
-                ("SPAN", (5, -1), (7, -1)),
+                ("SPAN", (5, -1), (8, -1)),
                 ("GRID", (0, 0), (-1, -1), 0.4, HexColor("#9db3d6")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, HexColor("#eef3fb")]),
