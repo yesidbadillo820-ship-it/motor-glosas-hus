@@ -9,7 +9,42 @@
 > arriba una entrada nueva con la fecha: qué se hizo, qué quedó pendiente y qué
 > sigue mañana.
 
-**Última actualización:** 22-jul-2026
+**Última actualización:** 23-jul-2026
+
+---
+
+## Entrada 23-jul-2026 — Consolidados de cartera de 5 entidades (formato FAMISANAR)
+
+**Qué se hizo hoy:**
+- Se generaron los **5 informes consolidados de estado de cartera** con corte
+  30/06/2026, imitando tal cual el formato del ejemplo FAMISANAR (5 hojas:
+  CARTERA detalle por factura · RESUMEN por vigencia · CARTERA POR EDADES ·
+  RAD VS REC mensual · ACTAS DE GLOSAS), a partir de los 6 cortes mensuales
+  DGH (enero a junio 2026) que envió el analista:
+  - **DISPENSARIO MÉDICO** (Sanidad Ejército, 2 NIT): 5.571 facturas,
+    saldo $13.621.817.612. Incluye actas SINAC 709 ($230,0 millones
+    levantados a favor del HUS) y 720 ($15,6 millones), y el giro directo
+    real de mayo ($83,0 M) y junio ($78,4 M) del libro de pagos SAP.
+  - **PROTEGER EPS** (antes Cajacopi EPS, mismo NIT): 532 facturas,
+    saldo $4.268.767.084. OJO: en los cortes de ENE-FEB aparece con el
+    nombre viejo "CAJACOPI EPS S.A.S.".
+  - **CAJACOPI (Caja de Compensación)**: 115 facturas, saldo $302.274.693 —
+    cartera SIN MOVIMIENTO en los 6 meses (misma cifra desde enero).
+  - **COMPENSAR**: 39 facturas, saldo $193.065.583.
+  - **MESSER**: sin cartera al corte (su única factura, $1.554.000, salió
+    del corte en abril: recaudada o depurada).
+- Verificación: fórmulas recalculadas sin errores y 30 de 30 totales
+  cuadrados contra los cortes originales.
+
+**Pendiente:**
+- No existe corte de JULIO 2026: la columna de recaudo de julio quedó en 0.
+  Cuando el analista tenga el corte 31/07/2026, se actualizan los 5 informes.
+- El recaudo mensual se derivó del cruce de saldos entre cortes (incluye
+  pagos y depuraciones juntos); si Tesorería entrega el giro directo real por
+  entidad, se puede discriminar como en el informe FAMISANAR.
+
+**Sigue mañana:** lo del PR #160 (igual que antes) y, si llega el corte de
+julio o los soportes de tesorería, actualizar estos consolidados.
 
 ---
 
