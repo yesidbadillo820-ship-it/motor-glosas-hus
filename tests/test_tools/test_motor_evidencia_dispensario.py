@@ -101,3 +101,34 @@ def test_enriquecer_expedientes(tmp_path):
     assert len(ev) == 1
     assert ev[0]["pagina"] == 2
     assert out["evidencias_localizadas"] == 1
+
+
+def _hc_muchas_paginas(ruta: Path, n: int = 10):
+    pytest.importorskip("reportlab")
+    from reportlab.pdfgen import canvas
+
+    c = canvas.Canvas(str(ruta))
+    for i in range(1, n + 1):
+        # Todas las paginas mencionan el servicio por nombre (evidencia debil);
+        # solo la pagina 7 trae ademas el codigo CUPS (evidencia fuerte).
+        linea = f"EVOLUCION DIA {i} TOMOGRAFIA DE CUELLO CONTROL"
+        if i == 7:
+            linea += " CODIGO 879101"
+        c.drawString(70, 800, linea)
+        c.showPage()
+    c.save()
+
+
+def test_evidencia_acota_a_las_mas_relevantes(tmp_path):
+    """No cita 300 paginas: tope MAX y la pagina con el codigo (fuerte) primero."""
+    pdf = tmp_path / "hc.pdf"
+    _hc_muchas_paginas(pdf, n=10)
+    clinicos = [{"tipo": "Historia clinica / Evolucion", "nombre": "hc.pdf", "ruta": str(pdf)}]
+    ev = mev.evidencias_para_glosa("TOMOGRAFIA DE CUELLO 879101", "SE GLOSA 879101", clinicos)
+    # Las 10 paginas coinciden por nombre, pero solo se citan las MAS relevantes.
+    assert len(ev) == mev.MAX_EVIDENCIAS_POR_GLOSA
+    # La pagina con el codigo va primero y es evidencia fuerte.
+    assert ev[0]["pagina"] == 7
+    assert ev[0]["fuerza"] == "fuerte"
+    # No arrastra todas las paginas (p. ej. la 10 queda fuera del tope).
+    assert 10 not in [e["pagina"] for e in ev]

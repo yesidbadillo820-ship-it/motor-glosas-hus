@@ -183,3 +183,20 @@ def test_guardarrail_sin_levantamiento_sin_prueba(tmp_path):
         salida_dir=out,
     )
     assert metricas["aceptacion"]["decisiones_sin_soporte_probatorio"] == 0
+
+
+def test_pct_hechos_evaluados_no_supera_100(tmp_path):
+    """El indicador es % de glosas evaluadas (0-100), no hechos/glosa."""
+    xls = tmp_path / "HUS.xlsx"
+    _excel(xls)
+    out = tmp_path / "Piloto"
+    metricas = pil.correr_piloto(
+        excel=xls,
+        indice_ruta=None,
+        cartera_ruta=None,
+        facturas=["HUS0000436483", "HUS0000455554"],
+        auto=False,
+        conocido=None,
+        salida_dir=out,
+    )
+    assert 0 <= metricas["aceptacion"]["pct_hechos_evaluados"] <= 100.0

@@ -77,7 +77,11 @@ def calificar_glosa(glosa: dict, exp: dict) -> dict:
     """Decision determinista para una glosa. Devuelve el bloque 'decision'."""
     hechos = glosa.get("hechos_probados", [])
     valor = float(glosa.get("valor_objetado", 0) or 0)
-    confs = [(h["nivel_confianza"] if h.get("probado") else 0.0) for h in hechos]
+    # Defendibilidad graduada por la CALIDAD de la evidencia (no un pase/no-pase
+    # fijo). Cada hecho aporta su nivel de confianza: codigo CUPS localizado pesa
+    # mas que el nombre del servicio, y este mas que "documento presente pero sin
+    # cita". Un hecho sin prueba real ya trae confianza 0.0 desde la verificacion.
+    confs = [float(h.get("nivel_confianza", 0.0) or 0.0) for h in hechos]
     defendibilidad = round(100 * sum(confs) / len(confs)) if confs else 0
     faltantes = sorted({f for h in hechos for f in h.get("faltantes", [])})
 

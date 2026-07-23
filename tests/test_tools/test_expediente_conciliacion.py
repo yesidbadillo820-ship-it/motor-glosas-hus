@@ -91,6 +91,25 @@ def test_construir_expediente_amarra_todo():
     assert e.estado == "PENDIENTE"
 
 
+def test_dedup_glosas_exactamente_duplicadas():
+    """Una fila de glosa repetida en el Excel origen no se cuenta dos veces."""
+    g1 = _glosa("468966", "CL08 01", datetime(2026, 2, 15), 250811, servicio="HEMOCULTIVO")
+    g2 = _glosa("468966", "CL08 01", datetime(2026, 2, 15), 250811, servicio="HEMOCULTIVO")
+    exps = exp.construir_expedientes([g1, g2], {"documentos": []}, {})
+    assert len(exps) == 1
+    assert len(exps[0].glosas) == 1  # el duplicado exacto se elimina
+    assert exps[0].valor_objetado_total == 250811  # no se suma dos veces
+
+
+def test_no_dedup_servicios_distintos():
+    """Servicios distintos (aunque compartan codigo) se conservan ambos."""
+    g1 = _glosa("468966", "CL08 01", datetime(2026, 2, 15), 250811, servicio="HEMOCULTIVO")
+    g2 = _glosa("468966", "CL08 01", datetime(2026, 2, 15), 172623, servicio="UROCULTIVO")
+    exps = exp.construir_expedientes([g1, g2], {"documentos": []}, {})
+    assert len(exps[0].glosas) == 2
+    assert exps[0].valor_objetado_total == 250811 + 172623
+
+
 def test_contrato_440_por_fecha():
     glosas = [_glosa("500000", "TA02 01", datetime(2026, 2, 15), 1000)]
     exps = exp.construir_expedientes(glosas, {"documentos": []}, {})

@@ -72,23 +72,25 @@ HECHOS_POR_FAMILIA: dict[str, list[dict]] = {
     ],
     "CALIDAD": [
         {
-            "clave": "soporte_clinico",
-            "hecho": "Existe soporte clinico de la atencion",
+            "clave": "sustento_clinico",
+            "hecho": "La prestacion glosada esta sustentada en la historia clinica",
             "requiere_alguno": [
                 "Historia clinica / Evolucion",
                 "Historia clinica",
                 "Epicrisis",
                 "Descripcion quirurgica",
             ],
-            "por_codigo": False,
+            # Que exista la historia clinica NO basta: el servicio glosado debe
+            # aparecer citado (existencia != pertinencia).
+            "exige_referencia": True,
         },
     ],
     "PERTINENCIA": [
         {
-            "clave": "soporte_clinico",
-            "hecho": "Existe soporte clinico que sustenta la pertinencia",
+            "clave": "sustento_pertinencia",
+            "hecho": "La pertinencia del servicio esta sustentada en la historia clinica",
             "requiere_alguno": ["Historia clinica / Evolucion", "Epicrisis"],
-            "por_codigo": False,
+            "exige_referencia": True,
         },
     ],
     "TARIFAS": [
@@ -184,8 +186,27 @@ def verificar_hechos(glosa: dict, soportes: list[dict], contrato: dict) -> list[
             continue
         refs = [f"{e['tipo']} pag.{e['pagina']}" for e in evid if e.get("tipo") in presentes]
         fuerte = any(e.get("fuerza") == "fuerte" for e in evid if e.get("tipo") in presentes)
+        # Calidad/pertinencia: que exista el documento NO prueba el hecho; el
+        # servicio glosado tiene que aparecer citado. Si no aparece, no se
+        # sostiene por existencia y queda como "por confirmar" (defendibilidad baja).
+        if spec.get("exige_referencia") and not refs:
+            hechos.append(
+                {
+                    "hecho": spec["hecho"],
+                    "probado": False,
+                    "nivel_confianza": 0.40,
+                    "evidencia": [
+                        f"{presentes[0]} presente, pero el servicio glosado no aparece citado"
+                    ],
+                    "faltantes": ["Referencia del servicio glosado en la historia clinica"],
+                }
+            )
+            continue
         if spec.get("por_codigo"):
             conf = 0.95 if fuerte else (0.80 if refs else 0.60)
+        elif spec.get("exige_referencia"):
+            # Referencia por codigo CUPS (fuerte) pesa mas que por nombre del servicio.
+            conf = 0.90 if fuerte else 0.75
         else:
             conf = 0.85 if refs else 0.70
         hechos.append(

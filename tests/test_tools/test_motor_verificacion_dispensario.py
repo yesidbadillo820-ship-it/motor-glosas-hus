@@ -62,6 +62,41 @@ def test_hechos_tarifas_contrato_probado():
     assert "287" in contrato_h["evidencia"][0]
 
 
+def test_calidad_existencia_no_prueba_pertinencia():
+    """Historia clinica presente, pero el servicio glosado NO aparece citado:
+    no se prueba por mera existencia (defendibilidad baja)."""
+    glosa = {"familia": "CALIDAD", "servicio": "TOMOGRAFIA DE CUELLO", "evidencias": []}
+    soportes = [{"tipo": "Historia clinica / Evolucion"}]
+    hechos = ver.verificar_hechos(glosa, soportes, {})
+    assert len(hechos) == 1
+    assert hechos[0]["probado"] is False
+    assert hechos[0]["nivel_confianza"] == 0.40
+    assert hechos[0]["faltantes"]  # dice qué falta (referencia del servicio)
+
+
+def test_calidad_referencia_por_nombre_confianza_media():
+    glosa = {
+        "familia": "CALIDAD",
+        "servicio": "TOMOGRAFIA DE CUELLO",
+        "evidencias": [{"tipo": "Historia clinica / Evolucion", "pagina": 12, "fuerza": "debil"}],
+    }
+    hechos = ver.verificar_hechos(glosa, [{"tipo": "Historia clinica / Evolucion"}], {})
+    assert hechos[0]["probado"] is True
+    assert hechos[0]["nivel_confianza"] == 0.75  # por nombre, no por codigo
+    assert any("pag.12" in e for e in hechos[0]["evidencia"])
+
+
+def test_calidad_referencia_por_codigo_confianza_alta():
+    glosa = {
+        "familia": "CALIDAD",
+        "servicio": "TOMOGRAFIA DE CUELLO 879101",
+        "evidencias": [{"tipo": "Historia clinica / Evolucion", "pagina": 12, "fuerza": "fuerte"}],
+    }
+    hechos = ver.verificar_hechos(glosa, [{"tipo": "Historia clinica / Evolucion"}], {})
+    assert hechos[0]["probado"] is True
+    assert hechos[0]["nivel_confianza"] == 0.90  # codigo CUPS localizado
+
+
 def test_contradiccion_factura_no_en_cartera():
     exp = {
         "factura_corta": "436483",
