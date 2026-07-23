@@ -161,8 +161,10 @@ class TestEscalamientoHumano:
             generador=gen,
         )
         assert r.estado == "ESCALAR_HUMANO"
-        # El de mayor score debería ser el que tiene cierre + cita inventada
-        # (cierre OK = +30 vs los otros que no tienen cierre)
+        # Ronda 30: la aserción vivía SOLO en un comentario. El de mayor
+        # score es el que tiene cierre + cita inventada (cierre OK = +30 vs
+        # los otros que no tienen cierre) → es el que se entrega como borrador.
+        assert r.dictamen_final == DICTAMEN_CON_CITA_INVENTADA
 
 
 class TestMaxIntentosConfigurable:

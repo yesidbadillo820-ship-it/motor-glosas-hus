@@ -144,7 +144,9 @@ def _tokenizar(texto: str) -> list[str]:
     if not texto:
         return []
     repl = str.maketrans("áéíóúñ", "aeioun")
-    norm = texto.translate(repl).lower()
+    # Ronda 30: lower() ANTES de quitar tildes — si no, 'Á' no baja a 'a'
+    # y los textos en MAYÚSCULAS tokenizaban distinto que el corpus.
+    norm = texto.lower().translate(repl)
     tokens = re.findall(r"[a-z]{4,}", norm)
     return [t for t in tokens if t not in _STOPWORDS]
 

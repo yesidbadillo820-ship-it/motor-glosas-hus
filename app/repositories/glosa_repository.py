@@ -172,7 +172,7 @@ class GlosaRepository:
         semaforo: Optional[str] = None,
         workflow: Optional[str] = None,
     ):
-        from datetime import datetime as _dt
+        from datetime import datetime as _dt, timedelta as _td
 
         q = self.db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc())
 
@@ -204,8 +204,9 @@ class GlosaRepository:
                 pass
         if fecha_hasta:
             try:
-                d = _dt.fromisoformat(fecha_hasta)
-                q = q.filter(GlosaRecord.creado_en <= d)
+                # Ronda 30: inclusive del día completo (antes excluía 'hasta').
+                d = _dt.strptime(fecha_hasta, "%Y-%m-%d") + _td(days=1)
+                q = q.filter(GlosaRecord.creado_en < d)
             except ValueError:
                 pass
         if search:

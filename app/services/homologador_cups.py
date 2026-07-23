@@ -79,8 +79,9 @@ HOMOLOGACIONES_EXPLICITAS: dict[str, tuple[str, str]] = {
     ),
     # CONSULTA DE PRIMERA VEZ por especialista en genética
     "39143A-18": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GENÉTICA MÉDICA"),
-    "39143A-16": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ANESTESIOLOGÍA"),
-    "39143A-19": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN DERMATOLOGÍA"),
+    # Ronda 30: 39143A-16/-19 (anestesiología/dermatología) se quitaron —
+    # mapeaban al CUPS de GENÉTICA (890248), tarifa y descripción erradas.
+    # Sin la entrada, la resolución cae a la tarifa contratada real del Excel.
     # ─── Consulta otras especialidades ──────────────────────────────────────
     # Códigos IPS con sufijo H1/H2 (variantes de especialidad HUS)
     # Estos están ya en tarifas_oficiales.py; se listan también acá para
