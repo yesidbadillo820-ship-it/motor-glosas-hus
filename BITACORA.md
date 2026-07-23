@@ -13,6 +13,31 @@
 
 ---
 
+## Entrada 23-jul-2026 (2) — Serie mensual + cruce completo de actas del Dispensario
+
+**Qué se hizo (continuación del mismo día):**
+- Se generó la **serie mensual completa**: 30 informes (5 entidades × 6 cortes,
+  del 31-01 al 30-06-2026), todos verificados (30/30 sin errores de fórmula,
+  150/150 totales cuadrados). Entregados en un ZIP con una carpeta por corte.
+- Se hizo el **cruce factura por factura de las 13 actas del Dispensario**
+  (2 SINAC en Excel + 11 en PDF, ~1.900 páginas leídas): el informe del
+  Dispensario corte 30-06 ahora dice, por cada factura, si su glosa está
+  **LEVANTADA, ACEPTADA por la IPS, RATIFICADA (pendiente de conciliar) o
+  EN TRÁMITE**, con hoja de actas anclada a los totales oficiales y hoja de
+  auditoría factura×acta (1.710 filas).
+- Resultado clave: **$523,1 millones levantados en conciliación** a favor del
+  HUS (+$173,2M levantados en respuestas AR) y **$1.013 millones aún
+  ratificados** en actas de respuesta pendientes de conciliar (el mayor:
+  AR003215 con $399,5M).
+- Nota técnica: las 5 actas de conciliación validaron 100% al centavo; en las
+  de respuesta (AR) el detalle por factura quedó al 95-98% y el resto quedó
+  documentado en el propio informe (los totales por acta son los oficiales).
+
+**Pendiente:** los mismos de la entrada anterior (corte de julio, giro directo
+por entidad de Tesorería).
+
+---
+
 ## Entrada 23-jul-2026 — Consolidados de cartera de 5 entidades (formato FAMISANAR)
 
 **Qué se hizo hoy:**
