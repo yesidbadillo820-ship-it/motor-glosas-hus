@@ -993,44 +993,204 @@ class OficioRecepcionRecord(Base):
     __table_args__ = (Index("ix_preaud_oficio_radicado", "numero_radicado", unique=True),)
 
 
-class FacturaPreauditoriaRecord(Base):
-    """Una factura recibida en un oficio, con su resultado de pre-auditoría.
+# ---------- FUENTES: las alimenta el auditor subiendo Excel (upsert) ----------
 
-    La misma factura puede llegar en varios oficios: la ronda 1 es la primera
-    revisión; de la ronda 2 en adelante es una subsanación (vuelve corregida
-    y queda SUBSANADA si se radica, o NUEVAMENTE DEVUELTA si se devuelve).
-    Se aceptan máximo 3 devoluciones por factura.
+
+class RadicacionCuentaRecord(Base):
+    """FUENTE 1 — RADICACIÓN DE CUENTAS (reporte de DGH).
+
+    Dice, por factura, en qué ENVÍO (consecutivo de radicación) va, cuándo se
+    recibió el documento, el valor, el NIT y la entidad. El auditor la alimenta
+    subiendo el Excel; al re-subir se ACTUALIZA fila por fila (upsert por
+    factura) y nunca se duplica: la última carga es la verdad vigente. El
+    consolidado toma de aquí F_RECIBIDO, F_FACTURA, VALOR, NIT y ENTIDAD.
+    """
+
+    __tablename__ = "preaud_fuente_radicacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura = Column(String(30), nullable=False)  # identidad de la fuente
+    envio = Column(String(30), nullable=False, index=True)
+    f_recibido = Column(DateTime(timezone=True), nullable=True)  # Radicacion.FechaDocumento
+    f_factura = Column(DateTime(timezone=True), nullable=True)  # CxC.Fecha
+    valor = Column(Float, default=0.0, nullable=False)  # CxC.Valor
+    nit = Column(String(30), nullable=True, index=True)  # Tercero.Documento
+    entidad = Column(String(300), nullable=True)  # Tercero.NombreCompletoNA
+    estado_radicacion = Column(String(40), nullable=True)  # Radicado_Entidad, etc.
+    fuente_archivo = Column(String(300), nullable=True)
+    importado_por = Column(String(200), nullable=True)
+    importado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        # DEDUP / upsert: una sola fila vigente por factura.
+        Index("ix_preaud_rad_factura", "factura", unique=True),
+        # Cruce: traer todas las facturas de un envío.
+        Index("ix_preaud_rad_envio", "envio"),
+    )
+
+
+class DgReportRecord(Base):
+    """FUENTE 2 — DGREPORT (facturas con correo de factura electrónica).
+
+    Dice, por factura, si salió el correo de F.E. Se alimenta subiendo el
+    DGReport. Upsert por factura. El consolidado marca CORREO F.E. = SI si la
+    factura está aquí, NO si no está.
+    """
+
+    __tablename__ = "preaud_fuente_dgreport"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura = Column(String(30), nullable=False)
+    correo_fe = Column(String(2), default="SI", nullable=False)  # SI | NO
+    fecha_correo = Column(DateTime(timezone=True), nullable=True)
+    numero_fe = Column(String(80), nullable=True)  # CUFE / nº de F.E. si viene
+    fuente_archivo = Column(String(300), nullable=True)
+    importado_por = Column(String(200), nullable=True)
+    importado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (Index("ix_preaud_dgreport_factura", "factura", unique=True),)
+
+
+class EnvioCargadoRecord(Base):
+    """Ledger de cada ENVÍO ya volcado al consolidado (dedup del punto 3).
+
+    Al escribir un envío se inserta aquí; si ya existe (único por envío), se
+    responde "El envío ya fue cargado" y NO se recrean facturas.
+    """
+
+    __tablename__ = "preaud_envios_cargados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    envio = Column(String(30), nullable=False)
+    oficio_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    total_facturas = Column(Integer, default=0, nullable=False)
+    nuevas = Column(Integer, default=0, nullable=False)
+    reingresos = Column(Integer, default=0, nullable=False)
+    cargado_por = Column(String(200), nullable=True)
+    cargado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_preaud_envio_cargado", "envio", unique=True),)
+
+
+# ---------- CONSOLIDADO: la factura canónica (una sola fila por factura) ------
+
+
+class FacturaPreauditoriaRecord(Base):
+    """La FACTURA como entidad CANÓNICA: UNA sola fila por número de factura,
+    aunque reingrese varias veces (subsanaciones).
+
+    Guarda solo el ESTADO del proceso de pre-auditoría. Los datos descriptivos
+    (F_FACTURA, VALOR, NIT, ENTIDAD, CORREO F.E.) NO se copian aquí: se resuelven
+    por JOIN a las fuentes al leer, de modo que corregir un Excel se refleja solo
+    (auto-sync, punto 5). F_RECIBIDO se toma del oficio actual.
+
+    num_devoluciones / num_subsanacion son un caché del historial de eventos,
+    mantenido en la misma transacción del evento.
     """
 
     __tablename__ = "preaud_facturas"
 
     id = Column(Integer, primary_key=True, index=True)
-    oficio_id = Column(
-        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=False
+    factura = Column(String(30), nullable=False)  # identidad canónica
+
+    # Posición actual dentro del proceso (cambian al reingresar)
+    envio_actual = Column(String(30), index=True, nullable=True)
+    oficio_actual_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
     )
-    envio = Column(String(30), index=True, nullable=False)
-    factura = Column(String(30), index=True, nullable=False)
-    fecha_factura = Column(DateTime(timezone=True), nullable=True)
-    valor = Column(Float, default=0.0, nullable=False)
-    nit = Column(String(30), nullable=True)
-    entidad = Column(String(300), nullable=True)
-    correo_fe = Column(String(10), nullable=True)  # SI | NO — soporte de correo F.E.
-    ronda = Column(Integer, default=1, nullable=False)  # 1=primera vez, 2+=subsanación
-    resultado = Column(
+    oficio_fhus = Column(String(60), index=True, nullable=True)  # radicado FHUS actual
+    f_recibido = Column(DateTime(timezone=True), nullable=True)  # del oficio actual
+
+    # Estado del proceso
+    estado = Column(String(25), default="NUEVA", nullable=False, index=True)
+    # NUEVA | RADICADA | DEVUELTA_PEND_SUBSANACION | EN_SUBSANACION | SUBSANADA
+    # | NUEVAMENTE_DEVUELTA | BLOQUEADA_LIMITE
+    resultado_actual = Column(
         String(15), default="PENDIENTE", index=True
     )  # PENDIENTE | RADICAR | DEVUELTA
-    motivo_devolucion = Column(Text, nullable=True)
-    observaciones = Column(Text, nullable=True)
+    ronda_actual = Column(Integer, default=1, nullable=False)  # 1=primera; 2+=subsanación
+    num_subsanacion = Column(Integer, default=0, nullable=False)  # 0,1,2,3 = ronda_actual-1
+    num_devoluciones = Column(Integer, default=0, nullable=False)  # veces devuelta (tope 3)
+    pendiente_subsanacion = Column(Integer, default=0, nullable=False)  # 0/1
+
+    # Última auditoría
     auditor = Column(String(120), index=True, nullable=True)
     fecha_auditoria = Column(DateTime(timezone=True), nullable=True)
+    motivo_ultima_devolucion = Column(Text, nullable=True)
+    observaciones = Column(Text, nullable=True)
     oficio_devolucion_id = Column(
         Integer, ForeignKey("preaud_oficios_devolucion.id"), index=True, nullable=True
     )
 
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    creado_por = Column(String(200), nullable=True)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
     __table_args__ = (
-        # Una factura no puede venir dos veces en el mismo oficio.
-        Index("ix_preaud_fact_oficio_factura", "oficio_id", "factura", unique=True),
-        Index("ix_preaud_fact_factura", "factura", "ronda"),
+        # DEDUP canónico (punto 4): una sola factura por número.
+        Index("ix_preaud_fact_canonica", "factura", unique=True),
+        Index("ix_preaud_fact_envio", "envio_actual"),
+        Index("ix_preaud_fact_estado_auditor", "estado", "auditor"),
+    )
+
+
+class FacturaEventoRecord(Base):
+    """Historial INMUTABLE de la vida de una factura en pre-auditoría (punto 5).
+
+    Una fila por transición; nunca se actualiza, solo se inserta. Conserva un
+    SNAPSHOT de los valores de la fuente EN EL MOMENTO del evento (fidelidad
+    legal: el oficio de devolución muestra el valor de ese día).
+    """
+
+    __tablename__ = "preaud_factura_eventos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura_id = Column(
+        Integer,
+        ForeignKey("preaud_facturas.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    factura = Column(String(30), index=True, nullable=False)  # denormalizado
+
+    tipo_evento = Column(String(30), index=True, nullable=False)
+    # ESCRITA | RADICADA | DEVUELTA | REINGRESO | SUBSANADA
+    # | NUEVAMENTE_DEVUELTA | REVERTIDA
+    subsanacion_num = Column(Integer, default=0, nullable=False)  # ronda del evento
+    ronda = Column(Integer, default=1, nullable=False)
+    estado_resultante = Column(String(25), nullable=True)
+
+    envio = Column(String(30), nullable=True)
+    oficio_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    oficio_fhus = Column(String(60), nullable=True)
+    f_recibido = Column(DateTime(timezone=True), nullable=True)
+    resultado = Column(String(15), nullable=True)
+    auditor = Column(String(120), index=True, nullable=True)
+    motivo = Column(Text, nullable=True)
+    oficio_devolucion_id = Column(
+        Integer, ForeignKey("preaud_oficios_devolucion.id"), index=True, nullable=True
+    )
+
+    # Snapshot de la fuente al momento del evento
+    valor_snapshot = Column(Float, default=0.0)
+    nit_snapshot = Column(String(30), nullable=True)
+    entidad_snapshot = Column(String(300), nullable=True)
+    correo_fe_snapshot = Column(String(2), nullable=True)
+    fecha_factura_snapshot = Column(DateTime(timezone=True), nullable=True)
+
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    creado_por = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("ix_preaud_evt_factura_ts", "factura_id", "creado_en"),
+        Index("ix_preaud_evt_tipo", "tipo_evento"),
+        Index("ix_preaud_evt_oficio_dev", "oficio_devolucion_id"),
     )
 
 

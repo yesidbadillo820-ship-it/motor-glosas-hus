@@ -217,6 +217,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     7.231 filas). Si el envío trae varias facturas, se repite el número y
     salen en orden ("2 de 5"). Instrucciones en la hoja LEYENDA.
 
+### 24-07 — Pre-auditoría v2: la aplicación web es el consolidado oficial
+- **24-07:** el módulo de pre-auditoría deja de depender del Excel: ahora la
+  **aplicación web es el consolidado oficial** (misma rama/PR #186). El auditor
+  solo hace 4 cosas y el sistema arma todo:
+  1. **Sube la Radicación de Cuentas** (reporte de DGH) → el sistema la guarda
+     como fuente (upsert por factura, no duplica; excluye radicaciones
+     'Anulado'; se probó con las 36.723 facturas reales del reporte).
+  2. **Sube el DGReport** → de ahí sale CORREO F.E. (SI/NO).
+  3. **Registra el oficio recibido** (FHUS + fecha/hora).
+  4. **Escribe el número de envío** → el sistema crea automáticamente una fila
+     por cada factura del envío, autocompletando F_RECIBIDO, F_FACTURA, VALOR,
+     NIT, ENTIDAD y CORREO F.E. desde las fuentes.
+  - **No duplica:** si el envío ya se cargó, avisa "El envío ya fue cargado".
+  - **Una factura = una sola fila** (canónica) + un **historial de eventos**
+    con toda la trazabilidad. Si una factura devuelta reingresa en un envío
+    nuevo, la reconoce y numera **Subsanación 1/2/3** sin crear factura nueva.
+  - **Auto-sincroniza:** corregir un dato en el Excel y volver a subirlo se
+    refleja solo en el consolidado (los datos descriptivos se leen de la fuente
+    más reciente, no se copian).
+  - **Auditoría:** el auditor solo decide **Radicar** o **Devolver con motivo**;
+    máximo 3 devoluciones (la 4.ª se bloquea).
+  - **Oficio de devolución PDF** con consecutivo SINAC (formato de la guía),
+    armado desde un **snapshot inmutable**: un reingreso posterior no altera un
+    oficio ya emitido.
+  - **Consolidado consultable y exportable a Excel** + estadísticas (por
+    auditor, reincidentes, semáforo, tasa de devolución).
+  - Diseño verificado con un panel de agentes IA (mapeo de columnas contra los
+    archivos reales, esquema, flujo) y una **revisión adversarial** que encontró
+    y corrigió: corrimiento de fechas de un día, inmutabilidad del PDF ante
+    reingreso, bloqueo de doble devolución, y consultas que no escalaban a 36k
+    filas. **30 pruebas del módulo + 4.327 de todo el repo en verde.**
+  - Pendiente operativo: al sacar el DGReport, ampliar el rango de fechas para
+    que cubra el mismo periodo que la Radicación (si no, algunas facturas
+    marcan CORREO F.E.=NO por quedar fuera de la ventana del reporte).
+
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
   fusionadas desde la rama principal:

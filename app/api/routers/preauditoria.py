@@ -1,17 +1,14 @@
-"""API del módulo de PRE-AUDITORÍA SINAC.
+"""API del módulo de PRE-AUDITORÍA SINAC (v2 — el consolidado como base de datos).
 
-Flujo del proceso:
-  1. Se registra el oficio radicado por Facturación (número + fecha y hora
-     de recibido).
-  2. Se importa el Excel del consecutivo de DGH con las facturas del oficio
-     (el sistema informa cuántas facturas trae cada número de envío).
-  3. Cada factura se audita: RADICAR (soportes OK) o DEVUELTA (con motivo).
-     Una factura se acepta devuelta máximo 3 veces; cuando vuelve corregida
-     (ronda 2+) queda SUBSANADA o NUEVAMENTE DEVUELTA.
-  4. Con las devueltas se genera el oficio de devolución en PDF con
-     consecutivo SINAC (DEV-PRE-AUD-####-AAAA), logo y firmas.
-  5. Semáforo de plazo (3 días hábiles desde el día siguiente al recibo)
-     y estadísticas por auditor, resultado y reincidencia.
+Flujo del auditor:
+  1. Subir RADICACIÓN DE CUENTAS  → POST /preauditoria/fuentes/radicacion
+  2. Subir DGREPORT               → POST /preauditoria/fuentes/dgreport
+  3. Registrar el oficio recibido → POST /preauditoria/oficios
+  4. Escribir un envío            → POST /preauditoria/oficios/{id}/envios
+       (el sistema crea una fila por cada factura, autocompleta y reconoce
+        subsanaciones sin duplicar)
+  5. Radicar o devolver           → PATCH /preauditoria/facturas/{id}/auditar
+  6. Oficio de devolución PDF + estadísticas + consolidado consultable/exportable
 """
 
 from __future__ import annotations
@@ -27,12 +24,16 @@ from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual
-from app.core.tz import TZ_BOGOTA, a_utc, ahora_utc
+from app.core.tz import TZ_BOGOTA, a_utc
 from app.database import get_db
 from app.models.db import (
+    DgReportRecord,
+    EnvioCargadoRecord,
+    FacturaEventoRecord,
     FacturaPreauditoriaRecord,
     OficioDevolucionRecord,
     OficioRecepcionRecord,
+    RadicacionCuentaRecord,
     UsuarioRecord,
 )
 from app.services import preauditoria_service as svc
@@ -48,9 +49,12 @@ router = APIRouter(prefix="/preauditoria", tags=["preauditoria"])
 
 class OficioIn(BaseModel):
     numero_radicado: str = Field(..., min_length=3, max_length=60)
-    # "2026-07-22T14:35" (hora local de Bogotá)
-    fecha_recibido: str = Field(..., min_length=10)
+    fecha_recibido: str = Field(..., min_length=10)  # "2026-07-22T14:35" hora Bogotá
     observaciones: Optional[str] = Field(None, max_length=2000)
+
+
+class EnvioIn(BaseModel):
+    envio: str = Field(..., min_length=1, max_length=30)
 
 
 class AuditarIn(BaseModel):
@@ -65,11 +69,7 @@ class AuditarIn(BaseModel):
 
 
 def _parsear_fecha_local(texto: str) -> datetime:
-    """'2026-07-22T14:35' (hora Bogotá) → datetime TZ-aware en UTC.
-
-    Se persiste en UTC para que el valor sea el mismo en Postgres
-    (TIMESTAMPTZ) y en SQLite (que guarda el datetime sin offset).
-    """
+    """'2026-07-22T14:35' (hora Bogotá) → datetime TZ-aware en UTC."""
     limpio = texto.strip().replace("Z", "")
     for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
@@ -85,87 +85,219 @@ def _nombre_auditor(u: UsuarioRecord) -> str:
 
 
 def _fecha_iso(dt) -> Optional[str]:
+    """Para fechas del proceso guardadas en UTC (ej. la fecha de recibido del
+    oficio): convierte a hora Bogotá."""
     if dt is None:
         return None
     dt = a_utc(dt)
     return dt.astimezone(TZ_BOGOTA).isoformat()
 
 
-def _factura_dict(f: FacturaPreauditoriaRecord, devoluciones_totales: int = None) -> dict:
+def _fecha_fuente_iso(dt) -> Optional[str]:
+    """Para fechas que vienen de las fuentes (F_FACTURA, F_RECIBIDO de la
+    Radicación, fecha de correo): son fechas de calendario, no timestamps con
+    zona. Se serializan SIN corrimiento de zona (el navegador las lee como
+    locales) para que no se corran un día."""
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        return dt.strftime("%Y-%m-%dT%H:%M:%S")
+    return dt.isoformat()
+
+
+async def _leer_xlsx(archivo: UploadFile) -> bytes:
+    nombre = archivo.filename or "archivo.xlsx"
+    if not nombre.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(400, "El archivo debe ser un Excel (.xlsx)")
+    contenido = await archivo.read()
+    if len(contenido) > 30 * 1024 * 1024:
+        raise HTTPException(400, "Archivo demasiado grande (máx. 30 MB)")
+    return contenido
+
+
+def _factura_dict(db: Session, f: FacturaPreauditoriaRecord, fuente: dict = None) -> dict:
+    if fuente is None:
+        fuente = svc.datos_fuente(db, f.factura)
     return {
         "id": f.id,
-        "oficio_id": f.oficio_id,
-        "envio": f.envio,
         "factura": f.factura,
-        "fecha_factura": _fecha_iso(f.fecha_factura),
-        "valor": f.valor,
-        "nit": f.nit,
-        "entidad": f.entidad,
-        "correo_fe": f.correo_fe,
-        "ronda": f.ronda,
-        "es_subsanacion": f.ronda > 1,
-        "estado_subsanacion": svc.estado_subsanacion(f),
-        "resultado": f.resultado,
-        "motivo_devolucion": f.motivo_devolucion,
+        "envio": f.envio_actual or fuente.get("envio"),
+        "oficio_fhus": f.oficio_fhus,
+        "f_recibido": _fecha_iso(f.f_recibido) or _fecha_fuente_iso(fuente.get("f_recibido")),
+        "f_factura": _fecha_fuente_iso(fuente.get("f_factura")),
+        "valor": fuente.get("valor") or 0.0,
+        "nit": fuente.get("nit"),
+        "entidad": fuente.get("entidad"),
+        "correo_fe": fuente.get("correo_fe"),
+        "estado": f.estado,
+        "resultado": f.resultado_actual,
+        "ronda": f.ronda_actual,
+        "num_subsanacion": f.num_subsanacion,
+        "num_devoluciones": f.num_devoluciones,
+        "max_devoluciones": svc.MAX_DEVOLUCIONES,
+        "pendiente_subsanacion": bool(f.pendiente_subsanacion),
+        "en_limite": f.num_devoluciones >= svc.MAX_DEVOLUCIONES,
+        "motivo_devolucion": f.motivo_ultima_devolucion,
         "observaciones": f.observaciones,
         "auditor": f.auditor,
         "fecha_auditoria": _fecha_iso(f.fecha_auditoria),
         "oficio_devolucion_id": f.oficio_devolucion_id,
-        "devoluciones_totales": devoluciones_totales,
-        "max_devoluciones": svc.MAX_DEVOLUCIONES,
     }
 
 
 def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = False) -> dict:
     facturas = (
         db.query(FacturaPreauditoriaRecord)
-        .filter(FacturaPreauditoriaRecord.oficio_id == o.id)
-        .order_by(FacturaPreauditoriaRecord.envio, FacturaPreauditoriaRecord.factura)
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == o.id)
+        .order_by(FacturaPreauditoriaRecord.envio_actual, FacturaPreauditoriaRecord.factura)
         .all()
     )
-    pendientes = sum(1 for f in facturas if f.resultado == svc.RESULTADO_PENDIENTE)
-    radicar = sum(1 for f in facturas if f.resultado == svc.RESULTADO_RADICAR)
-    devueltas = sum(1 for f in facturas if f.resultado == svc.RESULTADO_DEVUELTA)
-    semaforo = svc.calcular_semaforo(o.fecha_recibido, completado=svc.oficio_completado(facturas))
+    pendientes = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_PENDIENTE)
+    radicar = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_RADICAR)
+    devueltas = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_DEVUELTA)
+    completado = bool(facturas) and pendientes == 0
+    envios = (
+        db.query(EnvioCargadoRecord)
+        .filter(EnvioCargadoRecord.oficio_id == o.id)
+        .order_by(EnvioCargadoRecord.envio)
+        .all()
+    )
     d = {
         "id": o.id,
         "numero_radicado": o.numero_radicado,
         "fecha_recibido": _fecha_iso(o.fecha_recibido),
         "observaciones": o.observaciones,
-        "archivo_dgh": o.archivo_dgh,
         "creado_por": o.creado_por,
         "total_facturas": len(facturas),
         "pendientes": pendientes,
         "radicar": radicar,
         "devueltas": devueltas,
-        "valor_total": sum(float(f.valor or 0) for f in facturas),
-        "semaforo": semaforo,
-        "envios": svc.resumen_por_envio(facturas),
+        "semaforo": svc.calcular_semaforo(o.fecha_recibido, completado=completado),
+        "envios_escritos": [
+            {"envio": e.envio, "total_facturas": e.total_facturas, "reingresos": e.reingresos}
+            for e in envios
+        ],
     }
     if con_facturas:
-        # nº de devoluciones acumuladas por factura (todas las rondas)
-        nombres = [f.factura for f in facturas]
-        conteos = {}
-        if nombres:
-            filas = (
-                db.query(
-                    FacturaPreauditoriaRecord.factura,
-                    sa_func.count(FacturaPreauditoriaRecord.id),
-                )
-                .filter(
-                    FacturaPreauditoriaRecord.factura.in_(nombres),
-                    FacturaPreauditoriaRecord.resultado == svc.RESULTADO_DEVUELTA,
-                )
-                .group_by(FacturaPreauditoriaRecord.factura)
-                .all()
-            )
-            conteos = {fac: n for fac, n in filas}
-        d["facturas"] = [_factura_dict(f, conteos.get(f.factura, 0)) for f in facturas]
+        d["facturas"] = [_factura_dict(db, f) for f in facturas]
     return d
 
 
 # ------------------------------------------------------------------
-# 1-2. Oficios de recepción (radicado + fecha/hora de recibido)
+# 1-2. Fuentes (Radicación de Cuentas + DGReport)
+# ------------------------------------------------------------------
+
+
+@router.post("/fuentes/radicacion")
+async def subir_radicacion(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    contenido = await _leer_xlsx(archivo)
+    try:
+        parsed = svc.parsear_excel_radicacion(contenido)
+    except Exception:
+        raise HTTPException(400, "No se pudo leer el Excel de Radicación de Cuentas.")
+    facturas = parsed["facturas"]
+    if not facturas:
+        raise HTTPException(422, "; ".join(parsed["advertencias"]) or "Sin facturas válidas.")
+    res = svc.upsert_radicacion(db, facturas, archivo.filename or "", _nombre_auditor(current_user))
+    return {
+        "tipo": "RADICACION",
+        "filas_leidas": parsed.get("leidas", 0),
+        "facturas_validas": len(facturas),
+        **res,
+        "advertencias": parsed["advertencias"][:50],
+    }
+
+
+@router.post("/fuentes/dgreport")
+async def subir_dgreport(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    contenido = await _leer_xlsx(archivo)
+    try:
+        parsed = svc.parsear_excel_dgreport(contenido)
+    except Exception:
+        raise HTTPException(400, "No se pudo leer el Excel de DGReport.")
+    facturas = parsed["facturas"]
+    if not facturas:
+        raise HTTPException(422, "; ".join(parsed["advertencias"]) or "Sin facturas válidas.")
+    res = svc.upsert_dgreport(db, facturas, archivo.filename or "", _nombre_auditor(current_user))
+    return {
+        "tipo": "DGREPORT",
+        "filas_leidas": parsed.get("leidas", 0),
+        "facturas_validas": len(facturas),
+        **res,
+        "advertencias": parsed["advertencias"][:50],
+    }
+
+
+@router.get("/fuentes/resumen")
+def resumen_fuentes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    n_rad = db.query(sa_func.count(RadicacionCuentaRecord.id)).scalar() or 0
+    n_envios = db.query(sa_func.count(sa_func.distinct(RadicacionCuentaRecord.envio))).scalar() or 0
+    n_dg = db.query(sa_func.count(DgReportRecord.id)).scalar() or 0
+    return {
+        "radicacion_facturas": n_rad,
+        "radicacion_envios": n_envios,
+        "dgreport_facturas": n_dg,
+    }
+
+
+@router.get("/fuentes/radicacion")
+def listar_radicacion(
+    q: Optional[str] = Query(None),
+    envio: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    consulta = db.query(RadicacionCuentaRecord)
+    if q:
+        patron = f"%{q.strip()}%"
+        consulta = consulta.filter(
+            RadicacionCuentaRecord.factura.ilike(patron)
+            | RadicacionCuentaRecord.entidad.ilike(patron)
+            | RadicacionCuentaRecord.nit.ilike(patron)
+        )
+    if envio:
+        consulta = consulta.filter(RadicacionCuentaRecord.envio == envio.strip())
+    total = consulta.count()
+    filas = (
+        consulta.order_by(RadicacionCuentaRecord.envio, RadicacionCuentaRecord.factura)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "factura": r.factura,
+                "envio": r.envio,
+                "f_recibido": _fecha_fuente_iso(r.f_recibido),
+                "f_factura": _fecha_fuente_iso(r.f_factura),
+                "valor": r.valor,
+                "nit": r.nit,
+                "entidad": r.entidad,
+            }
+            for r in filas
+        ],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
+
+
+# ------------------------------------------------------------------
+# 3. Oficios de recepción (FHUS + fecha/hora de recibido)
 # ------------------------------------------------------------------
 
 
@@ -198,7 +330,7 @@ def crear_oficio(
 @router.get("/oficios")
 def listar_oficios(
     estado: Optional[str] = Query(None, description="VERDE|AMARILLO|ROJO|VENCIDO|COMPLETADO"),
-    q: Optional[str] = Query(None, description="Busca en el número de radicado"),
+    q: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -234,79 +366,50 @@ def ver_oficio(
 
 
 # ------------------------------------------------------------------
-# 3-5. Importar el Excel del consecutivo DGH (facturas por envío)
+# 4. Escribir un envío (autocompleta facturas + subsanaciones)
 # ------------------------------------------------------------------
 
 
-@router.post("/oficios/{oficio_id}/importar-dgh")
-async def importar_dgh(
+@router.get("/oficios/{oficio_id}/envios/{envio}/preview")
+def preview_envio(
     oficio_id: int,
-    archivo: UploadFile = File(...),
+    envio: str,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     o = db.get(OficioRecepcionRecord, oficio_id)
     if not o:
         raise HTTPException(404, "Oficio no encontrado")
-    nombre = archivo.filename or "consecutivo_dgh.xlsx"
-    if not nombre.lower().endswith((".xlsx", ".xlsm")):
-        raise HTTPException(400, "El archivo debe ser un Excel (.xlsx) del consecutivo DGH")
-    contenido = await archivo.read()
-    if len(contenido) > 15 * 1024 * 1024:
-        raise HTTPException(400, "Archivo demasiado grande (máx. 15 MB)")
-    try:
-        resultado = svc.parsear_excel_dgh(contenido)
-    except Exception:
-        raise HTTPException(400, "No se pudo leer el Excel: verifique el formato DGH")
+    return svc.preview_envio(db, o, envio)
 
-    existentes = {
-        fila[0]
-        for fila in db.query(FacturaPreauditoriaRecord.factura)
-        .filter(FacturaPreauditoriaRecord.oficio_id == oficio_id)
-        .all()
-    }
-    advertencias = list(resultado["advertencias"])
-    nuevas = 0
-    alertas_limite = []
-    for datos in resultado["facturas"]:
-        if datos["factura"] in existentes:
-            advertencias.append(f"{datos['factura']} ya estaba en este oficio: no se duplicó")
-            continue
-        ronda = svc.calcular_ronda(db, datos["factura"], oficio_id=oficio_id)
-        devueltas = svc.devoluciones_previas(db, datos["factura"])
-        if devueltas >= svc.MAX_DEVOLUCIONES:
-            alertas_limite.append(
-                f"{datos['factura']} ya fue devuelta {devueltas} veces "
-                f"(máximo {svc.MAX_DEVOLUCIONES}): en esta ronda solo debería radicarse"
-            )
-        f = FacturaPreauditoriaRecord(
-            oficio_id=oficio_id,
-            envio=datos["envio"],
-            factura=datos["factura"],
-            fecha_factura=datos["fecha_factura"],
-            valor=datos["valor"],
-            nit=datos["nit"],
-            entidad=datos["entidad"],
-            correo_fe=datos["correo_fe"],
-            ronda=ronda,
-            resultado=svc.RESULTADO_PENDIENTE,
-        )
-        db.add(f)
-        nuevas += 1
-    o.archivo_dgh = nombre
-    db.commit()
-    db.refresh(o)
 
-    detalle = _oficio_dict(db, o)
-    detalle["importadas"] = nuevas
-    detalle["advertencias"] = advertencias
-    detalle["alertas_limite_devoluciones"] = alertas_limite
-    return detalle
+@router.post("/oficios/{oficio_id}/envios")
+def escribir_envio(
+    oficio_id: int,
+    body: EnvioIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    o = db.get(OficioRecepcionRecord, oficio_id)
+    if not o:
+        raise HTTPException(404, "Oficio no encontrado")
+    res = svc.escribir_envio(db, o, body.envio, _nombre_auditor(current_user))
+    if res.get("ya_cargado"):
+        return {**res, "oficio": _oficio_dict(db, o)}
+    if res.get("existe_en_fuente") is False:
+        raise HTTPException(404, res["mensaje"])
+    return {**res, "oficio": _oficio_dict(db, o)}
 
 
 # ------------------------------------------------------------------
-# 6-7. Auditar factura (RADICAR / DEVOLVER, máx. 3 devoluciones)
+# 5. Auditar factura (RADICAR / DEVOLVER)
 # ------------------------------------------------------------------
+
+_MAP_RESULTADO = {
+    "RADICAR": svc.RESULTADO_RADICAR,
+    "DEVUELTA": svc.RESULTADO_DEVUELTA,
+    "PENDIENTE": svc.RESULTADO_PENDIENTE,
+}
 
 
 @router.patch("/facturas/{factura_id}/auditar")
@@ -319,86 +422,64 @@ def auditar_factura(
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
         raise HTTPException(404, "Factura no encontrada")
-    if f.oficio_devolucion_id and body.resultado != svc.RESULTADO_DEVUELTA:
-        raise HTTPException(
-            409,
-            "Esta factura ya salió en un oficio de devolución; "
-            "regístrela cuando vuelva en un oficio nuevo (subsanación)",
-        )
-
-    if body.resultado == svc.RESULTADO_DEVUELTA:
-        if not (body.motivo_devolucion or "").strip():
-            raise HTTPException(400, "Para devolver la factura debe escribir el motivo")
-        previas = svc.devoluciones_previas(db, f.factura, excluir_id=f.id)
-        if previas >= svc.MAX_DEVOLUCIONES:
-            raise HTTPException(
-                409,
-                f"La factura {f.factura} ya fue devuelta {previas} veces; "
-                f"el proceso acepta máximo {svc.MAX_DEVOLUCIONES} devoluciones. "
-                "Debe resolverse en esta ronda (radicar o escalar al coordinador).",
-            )
-
-    f.resultado = body.resultado
-    f.motivo_devolucion = (
-        (body.motivo_devolucion or "").strip() or None
-        if body.resultado == svc.RESULTADO_DEVUELTA
-        else None
+    res = svc.auditar_factura(
+        db,
+        f,
+        _MAP_RESULTADO[body.resultado],
+        _nombre_auditor(current_user),
+        motivo=body.motivo_devolucion,
+        observaciones=body.observaciones,
     )
-    f.observaciones = (body.observaciones or "").strip() or f.observaciones
-    if body.resultado == svc.RESULTADO_PENDIENTE:
-        f.auditor = None
-        f.fecha_auditoria = None
-    else:
-        f.auditor = _nombre_auditor(current_user)
-        f.fecha_auditoria = ahora_utc()
-    db.commit()
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 400), res.get("mensaje", "No se pudo auditar"))
     db.refresh(f)
-    return _factura_dict(f, svc.devoluciones_previas(db, f.factura))
+    return _factura_dict(db, f)
 
 
-@router.get("/facturas")
-def listar_facturas(
+# ------------------------------------------------------------------
+# Consolidado (una fila por factura) + historial + export
+# ------------------------------------------------------------------
+
+
+@router.get("/consolidado")
+def consolidado(
     q: Optional[str] = Query(None, description="Factura, entidad o NIT"),
     oficio_id: Optional[int] = None,
     envio: Optional[str] = None,
     auditor: Optional[str] = None,
     resultado: Optional[str] = Query(None, description="PENDIENTE|RADICAR|DEVUELTA"),
-    solo_reincidentes: bool = Query(False, description="Solo facturas con ronda 2+"),
-    desde: Optional[str] = Query(None, description="AAAA-MM-DD (fecha de recibido)"),
-    hasta: Optional[str] = None,
+    estado: Optional[str] = None,
+    solo_reincidentes: bool = Query(False),
     page: int = Query(1, ge=1),
-    per_page: int = Query(25, ge=1, le=200),
+    per_page: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    consulta = db.query(FacturaPreauditoriaRecord).join(
-        OficioRecepcionRecord,
-        FacturaPreauditoriaRecord.oficio_id == OficioRecepcionRecord.id,
-    )
-    if q:
-        patron = f"%{q.strip()}%"
-        consulta = consulta.filter(
-            FacturaPreauditoriaRecord.factura.ilike(patron)
-            | FacturaPreauditoriaRecord.entidad.ilike(patron)
-            | FacturaPreauditoriaRecord.nit.ilike(patron)
-        )
+    consulta = db.query(FacturaPreauditoriaRecord)
     if oficio_id:
-        consulta = consulta.filter(FacturaPreauditoriaRecord.oficio_id == oficio_id)
+        consulta = consulta.filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio_id)
     if envio:
-        consulta = consulta.filter(FacturaPreauditoriaRecord.envio == envio.strip())
+        consulta = consulta.filter(FacturaPreauditoriaRecord.envio_actual == envio.strip())
     if auditor:
         consulta = consulta.filter(FacturaPreauditoriaRecord.auditor.ilike(f"%{auditor.strip()}%"))
     if resultado:
-        consulta = consulta.filter(FacturaPreauditoriaRecord.resultado == resultado.strip().upper())
-    if solo_reincidentes:
-        consulta = consulta.filter(FacturaPreauditoriaRecord.ronda >= 2)
-    if desde:
         consulta = consulta.filter(
-            OficioRecepcionRecord.fecha_recibido >= _parsear_fecha_local(desde)
+            FacturaPreauditoriaRecord.resultado_actual == resultado.strip().upper()
         )
-    if hasta:
+    if estado:
+        consulta = consulta.filter(FacturaPreauditoriaRecord.estado == estado.strip().upper())
+    if solo_reincidentes:
+        consulta = consulta.filter(FacturaPreauditoriaRecord.num_devoluciones >= 1)
+    if q:
+        patron = f"%{q.strip()}%"
+        # entidad/NIT viven en la fuente → subquery correlacionada (NO materializar
+        # la lista: con 36k facturas rompería el límite de variables de SQLite).
+        sub = db.query(RadicacionCuentaRecord.factura).filter(
+            RadicacionCuentaRecord.entidad.ilike(patron) | RadicacionCuentaRecord.nit.ilike(patron)
+        )
         consulta = consulta.filter(
-            OficioRecepcionRecord.fecha_recibido <= _parsear_fecha_local(hasta + "T23:59:59")
+            FacturaPreauditoriaRecord.factura.ilike(patron)
+            | FacturaPreauditoriaRecord.factura.in_(sub)
         )
     total = consulta.count()
     filas = (
@@ -407,12 +488,33 @@ def listar_facturas(
         .limit(per_page)
         .all()
     )
-    return {
-        "items": [_factura_dict(f) for f in filas],
-        "total": total,
-        "page": page,
-        "per_page": per_page,
+    # batch de datos-fuente
+    numeros = [f.factura for f in filas]
+    rad = {
+        r.factura: r
+        for r in db.query(RadicacionCuentaRecord)
+        .filter(RadicacionCuentaRecord.factura.in_(numeros))
+        .all()
     }
+    dg = {
+        r.factura: r
+        for r in db.query(DgReportRecord).filter(DgReportRecord.factura.in_(numeros)).all()
+    }
+    items = []
+    for f in filas:
+        r = rad.get(f.factura)
+        d = dg.get(f.factura)
+        fuente = {
+            "envio": r.envio if r else None,
+            "f_recibido": r.f_recibido if r else None,
+            "f_factura": r.f_factura if r else None,
+            "valor": r.valor if r else 0.0,
+            "nit": r.nit if r else None,
+            "entidad": r.entidad if r else None,
+            "correo_fe": d.correo_fe if d else "NO",
+        }
+        items.append(_factura_dict(db, f, fuente))
+    return {"items": items, "total": total, "page": page, "per_page": per_page}
 
 
 @router.get("/facturas/{factura_id}")
@@ -421,40 +523,126 @@ def ver_factura(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Vista individual: la factura y todo su historial de rondas."""
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
         raise HTTPException(404, "Factura no encontrada")
-    historial = (
+    return _factura_dict(db, f)
+
+
+@router.get("/facturas/{numero}/historial")
+def historial_factura(
+    numero: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    f = (
         db.query(FacturaPreauditoriaRecord)
-        .filter(FacturaPreauditoriaRecord.factura == f.factura)
-        .order_by(FacturaPreauditoriaRecord.ronda, FacturaPreauditoriaRecord.id)
+        .filter(FacturaPreauditoriaRecord.factura == numero.strip().upper())
+        .one_or_none()
+    )
+    if not f:
+        raise HTTPException(404, "Factura no encontrada en el consolidado")
+    eventos = (
+        db.query(FacturaEventoRecord)
+        .filter(FacturaEventoRecord.factura_id == f.id)
+        .order_by(FacturaEventoRecord.creado_en, FacturaEventoRecord.id)
         .all()
     )
-    devueltas = sum(1 for h in historial if h.resultado == svc.RESULTADO_DEVUELTA)
-    oficios = {
-        o.id: o
-        for o in db.query(OficioRecepcionRecord)
-        .filter(OficioRecepcionRecord.id.in_({h.oficio_id for h in historial}))
-        .all()
-    }
-    hist = []
-    for h in historial:
-        d = _factura_dict(h, devueltas)
-        of = oficios.get(h.oficio_id)
-        d["oficio_radicado"] = of.numero_radicado if of else None
-        d["oficio_fecha_recibido"] = _fecha_iso(of.fecha_recibido) if of else None
-        hist.append(d)
     return {
-        "actual": _factura_dict(f, devueltas),
-        "historial": hist,
-        "devoluciones_totales": devueltas,
-        "max_devoluciones": svc.MAX_DEVOLUCIONES,
+        "actual": _factura_dict(db, f),
+        "eventos": [
+            {
+                "tipo": e.tipo_evento,
+                "ronda": e.ronda,
+                "num_subsanacion": e.subsanacion_num,
+                "envio": e.envio,
+                "oficio_fhus": e.oficio_fhus,
+                "resultado": e.resultado,
+                "estado_resultante": e.estado_resultante,
+                "auditor": e.auditor,
+                "motivo": e.motivo,
+                "valor": e.valor_snapshot,
+                "fecha": _fecha_iso(e.creado_en),
+            }
+            for e in eventos
+        ],
     }
+
+
+@router.get("/consolidado/export.xlsx")
+def exportar_consolidado(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    from openpyxl import Workbook
+
+    # Un solo JOIN a las fuentes (evita N+1 sobre miles de facturas).
+    filas = (
+        db.query(FacturaPreauditoriaRecord, RadicacionCuentaRecord, DgReportRecord)
+        .outerjoin(
+            RadicacionCuentaRecord,
+            RadicacionCuentaRecord.factura == FacturaPreauditoriaRecord.factura,
+        )
+        .outerjoin(DgReportRecord, DgReportRecord.factura == FacturaPreauditoriaRecord.factura)
+        .order_by(FacturaPreauditoriaRecord.envio_actual, FacturaPreauditoriaRecord.factura)
+        .all()
+    )
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "CONSOLIDADO"
+    encabezados = [
+        "ENVIO",
+        "F_RECIBIDO",
+        "OFICIO FHUS",
+        "FACTURA",
+        "F_FACTURA",
+        "VALOR",
+        "NIT",
+        "ENTIDAD",
+        "CORREO F.E.",
+        "ESTADO",
+        "RESULTADO",
+        "N SUBSANACION",
+        "DEVOLUCIONES",
+        "AUDITOR",
+        "MOTIVO DEVOLUCION",
+    ]
+    ws.append(encabezados)
+    for f, rad, dg in filas:
+        ws.append(
+            [
+                f.envio_actual or (rad.envio if rad else None),
+                (
+                    _fecha_iso(f.f_recibido)
+                    or _fecha_fuente_iso(rad.f_recibido if rad else None)
+                    or ""
+                )[:10],
+                f.oficio_fhus,
+                f.factura,
+                (_fecha_fuente_iso(rad.f_factura if rad else None) or "")[:10],
+                (rad.valor if rad else 0) or 0,
+                rad.nit if rad else None,
+                rad.entidad if rad else None,
+                dg.correo_fe if dg else "NO",
+                f.estado,
+                f.resultado_actual,
+                f.num_subsanacion,
+                f.num_devoluciones,
+                f.auditor,
+                f.motivo_ultima_devolucion,
+            ]
+        )
+    buf = BytesIO()
+    wb.save(buf)
+    return StreamingResponse(
+        BytesIO(buf.getvalue()),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="CONSOLIDADO_PRE_AUDITORIA.xlsx"'},
+    )
 
 
 # ------------------------------------------------------------------
-# 8. Oficio de devolución en PDF (consecutivo SINAC, logo y firma)
+# 6. Oficio de devolución (consecutivo SINAC + PDF)
 # ------------------------------------------------------------------
 
 
@@ -470,20 +658,21 @@ def generar_oficio_devolucion(
     devueltas = (
         db.query(FacturaPreauditoriaRecord)
         .filter(
-            FacturaPreauditoriaRecord.oficio_id == oficio_id,
-            FacturaPreauditoriaRecord.resultado == svc.RESULTADO_DEVUELTA,
+            FacturaPreauditoriaRecord.oficio_actual_id == oficio_id,
+            FacturaPreauditoriaRecord.resultado_actual == svc.RESULTADO_DEVUELTA,
             FacturaPreauditoriaRecord.oficio_devolucion_id.is_(None),
         )
-        .order_by(FacturaPreauditoriaRecord.envio, FacturaPreauditoriaRecord.factura)
+        .order_by(FacturaPreauditoriaRecord.envio_actual, FacturaPreauditoriaRecord.factura)
         .all()
     )
     if not devueltas:
         raise HTTPException(
             400,
             "No hay facturas devueltas sin oficio en este radicado: "
-            "primero marque las devoluciones con su motivo",
+            "primero marque las devoluciones con su motivo.",
         )
     consecutivo, numero, anio = svc.siguiente_consecutivo(db)
+    total_valor = sum(svc.datos_fuente(db, f.factura).get("valor") or 0 for f in devueltas)
     dev = OficioDevolucionRecord(
         consecutivo=consecutivo,
         anio=anio,
@@ -491,12 +680,27 @@ def generar_oficio_devolucion(
         oficio_recepcion_id=oficio_id,
         generado_por=_nombre_auditor(current_user),
         total_facturas=len(devueltas),
-        total_valor=sum(float(f.valor or 0) for f in devueltas),
+        total_valor=total_valor,
     )
     db.add(dev)
     db.flush()
     for f in devueltas:
         f.oficio_devolucion_id = dev.id
+        # Sellar el evento de DEVOLUCIÓN de esta ronda con el oficio: el PDF se
+        # arma desde estos eventos (snapshot inmutable), no desde la fila
+        # canónica que un reingreso posterior modificaría.
+        evt = (
+            db.query(FacturaEventoRecord)
+            .filter(
+                FacturaEventoRecord.factura_id == f.id,
+                FacturaEventoRecord.tipo_evento.in_(["DEVUELTA", "NUEVAMENTE_DEVUELTA"]),
+                FacturaEventoRecord.oficio_devolucion_id.is_(None),
+            )
+            .order_by(FacturaEventoRecord.creado_en.desc(), FacturaEventoRecord.id.desc())
+            .first()
+        )
+        if evt:
+            evt.oficio_devolucion_id = dev.id
     db.commit()
     db.refresh(dev)
     return {
@@ -559,74 +763,74 @@ def descargar_pdf_oficio_devolucion(
     dev = db.get(OficioDevolucionRecord, dev_id)
     if not dev:
         raise HTTPException(404, "Oficio de devolución no encontrado")
-    facturas = (
-        db.query(FacturaPreauditoriaRecord)
-        .filter(FacturaPreauditoriaRecord.oficio_devolucion_id == dev_id)
-        .order_by(FacturaPreauditoriaRecord.envio, FacturaPreauditoriaRecord.factura)
-        .all()
-    )
     recepcion = (
         db.get(OficioRecepcionRecord, dev.oficio_recepcion_id) if dev.oficio_recepcion_id else None
     )
+    # El PDF se arma desde los EVENTOS sellados (snapshot inmutable del día de la
+    # devolución): un reingreso posterior de la factura no altera este documento.
+    eventos = (
+        db.query(FacturaEventoRecord)
+        .filter(FacturaEventoRecord.oficio_devolucion_id == dev_id)
+        .order_by(FacturaEventoRecord.envio, FacturaEventoRecord.factura)
+        .all()
+    )
     fecha_local = a_utc(dev.fecha_generado)
+    filas_pdf = [
+        {
+            "envio": e.envio,
+            "factura": e.factura,
+            "fecha_factura": e.fecha_factura_snapshot,
+            "valor": e.valor_snapshot,
+            "nit": e.nit_snapshot,
+            "entidad": e.entidad_snapshot,
+            "oficio": e.oficio_fhus or (recepcion.numero_radicado if recepcion else ""),
+            "motivo_devolucion": e.motivo,
+        }
+        for e in eventos
+    ]
     pdf = generar_pdf_oficio_devolucion(
         consecutivo=dev.consecutivo,
         fecha_generado=fecha_local.astimezone(TZ_BOGOTA) if fecha_local else None,
         numero_radicado=recepcion.numero_radicado if recepcion else "",
-        facturas=[
-            {
-                "envio": f.envio,
-                "factura": f.factura,
-                "fecha_factura": f.fecha_factura,
-                "valor": f.valor,
-                "nit": f.nit,
-                "entidad": f.entidad,
-                "oficio": recepcion.numero_radicado if recepcion else None,
-                "motivo_devolucion": f.motivo_devolucion,
-            }
-            for f in facturas
-        ],
+        facturas=filas_pdf,
         generado_por=dev.generado_por or "",
     )
-    nombre = f"{dev.consecutivo}.pdf"
     return StreamingResponse(
         BytesIO(pdf),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{nombre}"'},
+        headers={"Content-Disposition": f'inline; filename="{dev.consecutivo}.pdf"'},
     )
 
 
 # ------------------------------------------------------------------
-# 9-10. Semáforo global y estadísticas
+# Estadísticas
 # ------------------------------------------------------------------
 
 
 @router.get("/estadisticas")
 def estadisticas(
-    desde: Optional[str] = Query(None, description="AAAA-MM-DD (fecha de recibido)"),
-    hasta: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    consulta = db.query(FacturaPreauditoriaRecord).join(
-        OficioRecepcionRecord,
-        FacturaPreauditoriaRecord.oficio_id == OficioRecepcionRecord.id,
-    )
-    if desde:
-        consulta = consulta.filter(
-            OficioRecepcionRecord.fecha_recibido >= _parsear_fecha_local(desde)
-        )
-    if hasta:
-        consulta = consulta.filter(
-            OficioRecepcionRecord.fecha_recibido <= _parsear_fecha_local(hasta + "T23:59:59")
-        )
-    facturas = consulta.all()
-
+    facturas = db.query(FacturaPreauditoriaRecord).all()
     total = len(facturas)
-    radicar = sum(1 for f in facturas if f.resultado == svc.RESULTADO_RADICAR)
-    devueltas = sum(1 for f in facturas if f.resultado == svc.RESULTADO_DEVUELTA)
+    radicar = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_RADICAR)
+    devueltas = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_DEVUELTA)
     pendientes = total - radicar - devueltas
     auditadas = radicar + devueltas
+    subsanadas = sum(1 for f in facturas if f.estado == svc.ESTADO_SUBSANADA)
+    nuevamente = sum(1 for f in facturas if f.estado == svc.ESTADO_NUEV_DEVUELTA)
+
+    # valores desde la fuente: un JOIN (evita IN masivo con miles de binds).
+    valores = {
+        fac: (val or 0)
+        for fac, val in db.query(
+            FacturaPreauditoriaRecord.factura, RadicacionCuentaRecord.valor
+        ).outerjoin(
+            RadicacionCuentaRecord,
+            RadicacionCuentaRecord.factura == FacturaPreauditoriaRecord.factura,
+        )
+    }
 
     por_auditor: dict[str, dict] = {}
     for f in facturas:
@@ -637,46 +841,48 @@ def estadisticas(
             {"auditor": f.auditor, "auditadas": 0, "radicar": 0, "devueltas": 0, "valor": 0.0},
         )
         a["auditadas"] += 1
-        a["valor"] += float(f.valor or 0)
-        if f.resultado == svc.RESULTADO_RADICAR:
+        a["valor"] += valores.get(f.factura, 0)
+        if f.resultado_actual == svc.RESULTADO_RADICAR:
             a["radicar"] += 1
-        elif f.resultado == svc.RESULTADO_DEVUELTA:
+        elif f.resultado_actual == svc.RESULTADO_DEVUELTA:
             a["devueltas"] += 1
-    lista_auditores = sorted(por_auditor.values(), key=lambda a: a["auditadas"], reverse=True)
 
-    # Reincidencia: cuántas veces fue devuelta cada factura (histórico completo)
-    filas_dev = (
-        db.query(
-            FacturaPreauditoriaRecord.factura,
-            sa_func.count(FacturaPreauditoriaRecord.id),
-        )
-        .filter(FacturaPreauditoriaRecord.resultado == svc.RESULTADO_DEVUELTA)
-        .group_by(FacturaPreauditoriaRecord.factura)
-        .all()
-    )
     reincidentes = sorted(
-        ({"factura": fac, "veces_devuelta": n} for fac, n in filas_dev if n >= 2),
+        (
+            {"factura": f.factura, "veces_devuelta": f.num_devoluciones}
+            for f in facturas
+            if f.num_devoluciones >= 2
+        ),
         key=lambda r: r["veces_devuelta"],
         reverse=True,
     )
-    en_limite = [r for r in reincidentes if r["veces_devuelta"] >= svc.MAX_DEVOLUCIONES]
+    en_limite = [
+        {"factura": f.factura, "veces_devuelta": f.num_devoluciones}
+        for f in facturas
+        if f.num_devoluciones >= svc.MAX_DEVOLUCIONES
+    ]
 
-    # Subsanaciones (rondas 2+ ya auditadas)
-    subsanadas = sum(1 for f in facturas if f.ronda > 1 and f.resultado == svc.RESULTADO_RADICAR)
-    nuevamente_devueltas = sum(
-        1 for f in facturas if f.ronda > 1 and f.resultado == svc.RESULTADO_DEVUELTA
-    )
-
-    # Semáforo de todos los oficios del rango
+    # Conteos por oficio en UNA query agrupada (evita N+1 por oficio).
     oficios = db.query(OficioRecepcionRecord).all()
+    totales = dict(
+        db.query(
+            FacturaPreauditoriaRecord.oficio_actual_id,
+            sa_func.count(FacturaPreauditoriaRecord.id),
+        ).group_by(FacturaPreauditoriaRecord.oficio_actual_id)
+    )
+    pend = dict(
+        db.query(
+            FacturaPreauditoriaRecord.oficio_actual_id,
+            sa_func.count(FacturaPreauditoriaRecord.id),
+        )
+        .filter(FacturaPreauditoriaRecord.resultado_actual == svc.RESULTADO_PENDIENTE)
+        .group_by(FacturaPreauditoriaRecord.oficio_actual_id)
+    )
     conteo_semaforo = {"VERDE": 0, "AMARILLO": 0, "ROJO": 0, "VENCIDO": 0, "COMPLETADO": 0}
     for o in oficios:
-        fo = (
-            db.query(FacturaPreauditoriaRecord)
-            .filter(FacturaPreauditoriaRecord.oficio_id == o.id)
-            .all()
-        )
-        s = svc.calcular_semaforo(o.fecha_recibido, completado=svc.oficio_completado(fo))
+        n_tot = totales.get(o.id, 0)
+        completado = n_tot > 0 and pend.get(o.id, 0) == 0
+        s = svc.calcular_semaforo(o.fecha_recibido, completado=completado)
         conteo_semaforo[s["estado"]] = conteo_semaforo.get(s["estado"], 0) + 1
 
     return {
@@ -686,9 +892,10 @@ def estadisticas(
         "radicar": radicar,
         "devueltas": devueltas,
         "subsanadas": subsanadas,
-        "nuevamente_devueltas": nuevamente_devueltas,
-        "valor_total": sum(float(f.valor or 0) for f in facturas),
-        "por_auditor": lista_auditores,
+        "nuevamente_devueltas": nuevamente,
+        "tasa_devolucion": round(devueltas / auditadas, 4) if auditadas else 0,
+        "valor_total": sum(valores.values()),
+        "por_auditor": sorted(por_auditor.values(), key=lambda a: a["auditadas"], reverse=True),
         "reincidentes": reincidentes[:50],
         "en_limite_devoluciones": en_limite,
         "semaforo_oficios": conteo_semaforo,

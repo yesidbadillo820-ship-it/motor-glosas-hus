@@ -443,6 +443,38 @@ async def lifespan(app: FastAPI):
                 pass
             logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
 
+    # Pre-auditoría v2: la tabla `preaud_facturas` cambió de forma
+    # oficio-céntrica (Modelo A, con `oficio_id`) a factura canónica (Modelo B,
+    # con `num_subsanacion`). create_all() NO altera una tabla existente, así
+    # que si quedó el esquema viejo Y está vacía, la recreamos con la forma
+    # nueva. Si tuviera datos, se avisa para migración manual (no se destruye).
+    try:
+        if (
+            _tiene_tabla("preaud_facturas")
+            and _tiene_columna("preaud_facturas", "oficio_id")
+            and not _tiene_columna("preaud_facturas", "num_subsanacion")
+        ):
+            _n_preaud = db.execute(text("SELECT COUNT(*) FROM preaud_facturas")).scalar() or 0
+            if _n_preaud == 0:
+                logger.warning(
+                    "MIGRACIÓN pre-auditoría: recreando preaud_facturas con el esquema v2"
+                )
+                db.execute(text("DROP TABLE preaud_facturas"))
+                db.commit()
+                from app.models.db import FacturaPreauditoriaRecord
+
+                FacturaPreauditoriaRecord.__table__.create(bind=engine)
+            else:
+                logger.warning(
+                    "preaud_facturas tiene datos con esquema v1; requiere migración manual a v2"
+                )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría v2: {e}")
+
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
     # "value too long for type character varying(50)" en EPS oficial
