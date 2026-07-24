@@ -2112,6 +2112,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6A2 2 0 0 0 4 4V20A2 2 0 0 0 6 22H18A2 2 0 0 0 20 20V8Z"/><polyline points="14 2 14 8 20 8"/><polyline points="16 13 12 9 8 13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>
           <span class="sn-item-label">Importación masiva</span>
         </button>
+        <button class="sn-item sn-highlight" data-tip="Pre-auditoría de facturas" onclick="window.location.href='/preauditoria'">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+          <span class="sn-item-label">Pre-auditoría</span>
+        </button>
       </div>
       <div class="sn-brand-footer">
         <img src="/static/sinac-logo.png" alt="SINAC SC SAS" style="width:100%;max-height:48px;object-fit:contain;opacity:.9;"/>
@@ -10844,6 +10848,7 @@ var CP_ACCIONES = [
   // Acciones rápidas
   {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", accion:function(){window.location.href='/importar-recepcion'}},
   {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
+  {seccion:"Acciones", icono:"🧾", titulo:"Pre-auditoría", hint:"Consolidado de facturas", accion:function(){window.location.href='/preauditoria'}},
   {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
   {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
   {seccion:"Acciones", icono:"🎯", titulo:"Modo Focus", hint:"Ocultar UI para análisis profundo (Esc para salir)", accion:function(){cerrarCommandPalette();toggleModoFocus(true)}},
@@ -19744,8 +19749,9 @@ function aplicarRestriccionesRol(){
   var items = document.querySelectorAll('.sn-item');
   items.forEach(function(btn){
     var onclickStr = btn.getAttribute('onclick') || '';
-    // Ignorar botones externos (importar recepción/masiva) — esos van a URLs
+    // Ignorar botones externos (importar recepción, pre-auditoría) — van a URLs
     if(onclickStr.indexOf("window.location.href='/importar") >= 0) return;
+    if(onclickStr.indexOf("window.location.href='/preauditoria") >= 0) return;
     var match = onclickStr.match(/sidebarTab\(this,'([^']+)'\)/);
     if(!match) return;
     var tab = match[1];
