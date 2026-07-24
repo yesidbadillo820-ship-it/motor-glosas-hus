@@ -93,6 +93,37 @@ def test_guardar_cargar_y_buscar(tmp_path):
     assert len(hits_pac) >= 1  # el RIPS trae el paciente
 
 
+def _mes_dispensario(base: Path, anio: str, mes: str, fac: str):
+    d = base / anio / mes / "DISPENSARIO" / f"ENV-{fac} ok" / f"HUS{fac}"
+    d.mkdir(parents=True)
+    (d / f"RIPS_900006037_HUS{fac}.json").write_text(
+        json.dumps(_rips(fac, "1029407046")), encoding="utf-8"
+    )
+
+
+def test_descubrir_dispensario(tmp_path):
+    _mes_dispensario(tmp_path, "1. SINAC SC SAS - 2025", "12. DICIEMBRE", "400001")
+    _mes_dispensario(tmp_path, "2. SINAC SC SAS - 2026", "01. ENERO", "465001")
+    _mes_dispensario(tmp_path, "2. SINAC SC SAS - 2026", "02. FEBRERO", "465002")
+    # una carpeta de otra EPS no debe colarse
+    (tmp_path / "2. SINAC SC SAS - 2026" / "02. FEBRERO" / "COOSALUD").mkdir(parents=True)
+
+    carpetas = idxr.descubrir_dispensario(tmp_path)
+    assert len(carpetas) == 3
+    assert all(p.name == "DISPENSARIO" for p in carpetas)
+
+
+def test_auto_dispensario_cli_indexa_todos_los_meses(tmp_path):
+    _mes_dispensario(tmp_path, "1. SINAC SC SAS - 2025", "12. DICIEMBRE", "400001")
+    _mes_dispensario(tmp_path, "2. SINAC SC SAS - 2026", "02. FEBRERO", "465002")
+    salida = tmp_path / "indice_completo.json"
+    rc = idxr.main(["--auto-dispensario", str(tmp_path), "--salida", str(salida), "--con-meta"])
+    assert rc == 0
+    indice = idxr.cargar_indice(salida)
+    facturas = {d["factura"] for d in indice["documentos"]}
+    assert facturas == {"400001", "465002"}  # ambos meses quedaron indexados
+
+
 def test_asistente_docs_desde_indice(tmp_path):
     _carpeta(tmp_path)
     salida = tmp_path / "indice.json"

@@ -103,6 +103,21 @@ def test_enriquecer_expedientes(tmp_path):
     assert out["evidencias_localizadas"] == 1
 
 
+def test_cache_texto_da_mismo_resultado(tmp_path):
+    """Leer el PDF una vez (cache) y reusarlo da la misma evidencia que releerlo."""
+    pdf = tmp_path / "hc.pdf"
+    _hc_dos_paginas(pdf)
+    clinicos = [{"tipo": "Historia clinica / Evolucion", "nombre": "hc.pdf", "ruta": str(pdf)}]
+    cache = mev.cachear_texto(clinicos)
+    assert str(pdf) in cache and len(cache[str(pdf)]) == 2  # leido una vez, 2 paginas
+    sin_cache = mev.evidencias_para_glosa("CONSULTA CONTROL 890201", "890201", clinicos)
+    con_cache = mev.evidencias_para_glosa(
+        "CONSULTA CONTROL 890201", "890201", clinicos, cache=cache
+    )
+    assert [e["pagina"] for e in sin_cache] == [e["pagina"] for e in con_cache]
+    assert con_cache and con_cache[0]["termino"] == "890201"
+
+
 def _hc_muchas_paginas(ruta: Path, n: int = 10):
     pytest.importorskip("reportlab")
     from reportlab.pdfgen import canvas

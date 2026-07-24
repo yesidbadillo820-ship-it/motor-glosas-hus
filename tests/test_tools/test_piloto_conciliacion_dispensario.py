@@ -150,6 +150,15 @@ def test_correr_piloto_genera_carpetas_y_metricas(tmp_path):
         ):
             assert (carpeta / nombre).exists(), f"falta {fac}/{nombre}"
     assert (out / "METRICAS.json").exists()
+    # hoja de trabajo consolidada para conciliar
+    assert (out / "CONCILIACION.xlsx").exists()
+    import openpyxl
+
+    wb = openpyxl.load_workbook(out / "CONCILIACION.xlsx")
+    ws = wb.active
+    encabezados = [c.value for c in ws[1]]
+    assert "Decision" in encabezados and "Defendibilidad %" in encabezados
+    assert ws.max_row >= 2  # al menos una glosa
 
     # Metricas basicas
     assert metricas["indice"]["facturas_piloto"] == 2
