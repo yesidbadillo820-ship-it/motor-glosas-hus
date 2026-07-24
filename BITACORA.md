@@ -5,7 +5,7 @@
 > **Todo chat debe leerlo al empezar y actualizarlo al terminar** (así lo ordena
 > `CLAUDE.md`). Escrito en lenguaje claro para el auditor de cartera del HUS.
 
-**Última actualización:** 22 de julio de 2026.
+**Última actualización:** 24 de julio de 2026.
 
 ---
 
@@ -174,6 +174,37 @@
 | 14 de julio | 28 | 44 | $46.016.019 | Excel listo — confirmar subida |
 | 17 de julio | 58 | 115 | $87.605.050 | Excel listo — confirmar subida |
 | Pendientes junio | 3 | 38 | $20.054.751 | Excel listo — subir YA (plazos vencidos) |
+
+### 24 de julio de 2026 — Expediente Inteligente de Conciliación (Hoja Maestra)
+- **Nueva herramienta `tools/hoja_maestra_conciliacion.py`:** arma en un solo
+  Excel el **expediente de conciliación** del Dispensario con **un único
+  registro maestro por factura** (nada duplicado). Cruza las tres bases que ya
+  existen (no transcribe ni inventa):
+  - **CARTERA** (corte 30/06/2026) como columna vertebral: 5.571 facturas, con
+    su valor, saldo, estado de glosa, edades y lo levantado/aceptado/ratificado
+    en actas.
+  - **RECEPCIÓN DE OBJECIONES** (la glosa que puso la EPS): trae el **motivo
+    exacto de la EPS** en texto (ej. *"SE RECONOCE A TARIFA SOAT... SIN
+    CONTRATO"*), el concepto, el CUPS y el servicio.
+  - **TRÁMITE DE OBJECIÓN** (nuestra respuesta): el valor objetado, el valor
+    aceptado y el **argumento del ESE HUS** (ej. *"ESE HUS NO ACEPTA GLOSA..."*).
+    Se une a la recepción por el consecutivo (4.063 de 4.066 cruzan).
+- **El libro entregado tiene 5 hojas:** `00_DASHBOARD` (tablero con 15
+  indicadores + cartera por vigencia/estado/edades), `01_MAESTRA` (una fila por
+  factura, con resultado final a color), `02_GLOSAS` (una fila por glosa con el
+  **motivo de la EPS y nuestra respuesta lado a lado**), `03_ACTAS` (una fila
+  por factura+acta) y `04_CRUCES` (los 11 controles de consistencia).
+- **Cifras que cuadran con lo ya verificado:** glosado $7.000.506.193; aceptado
+  por IPS $1.122.029.872; **levantado a favor del HUS $707.499.754**;
+  **ratificado (pdte. conciliar) $980.141.374**; saldo pendiente DGH
+  $13.621.817.613. Total: 5.571 facturas (3.935 con glosa), 18.378 glosas (179
+  aún sin respuesta). Se excluye el acta AC000639 por ser **duplicada** de la
+  SINAC 720.
+- **Lo que ninguna base trae queda marcado PENDIENTE** (no en blanco): la
+  bandera de factura electrónica (CUFE), la normatividad citada por respuesta,
+  el valor pagado real, y las **raíces exactas Y:/X:** de los soportes (por
+  ahora se deja la ruta derivada por mes AAAAMM + la de factura electrónica
+  `\\172.16.32.83\factura_electronica_net22\AAAAMM`). Con pruebas.
 
 ---
 
