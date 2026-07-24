@@ -2,304 +2,396 @@
 
 > **Qué es este archivo:** la memoria común de todos los chats de Claude Code.
 > Aquí queda registrado qué se ha hecho, qué está pendiente y qué sigue.
-> **Todo chat debe leerlo al empezar y actualizarlo al terminar** (así lo ordena
-> `CLAUDE.md`). Escrito en lenguaje claro para el auditor de cartera del HUS.
+> **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
+> (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
+> para el auditor de cartera del HUS.
 
-**Última actualización:** 22 de julio de 2026.
+**Última actualización:** 23-07-2026
 
 ---
 
-## 1. RESUMEN DE LO YA HECHO (por fecha)
+## 1) Las patas del proyecto
 
-### Abril 2026 — Se construyó la plataforma "Motor de Glosas HUS"
-- **8 de abril:** nace el proyecto (primer commit). Motor de respuestas a glosas
-  con inteligencia artificial, códigos de respuesta según normativa (RE9901
-  "no acepta", RE9502 extemporánea, etc.) y plazos de la Ley (20 días hábiles).
-- **9 al 17 de abril:** correcciones de normativa (Resolución 3047/2008),
-  mejores respuestas de la IA, usuarios y claves para los gestores de cartera,
-  tarifas del Dispensario Médico.
-- **20 al 27 de abril:** la página web del motor quedó de nivel profesional:
-  inicio de sesión, panel "Mis Glosas", importación masiva desde Excel,
-  exportes, dashboards de desempeño, asistente inteligente y seguridad
-  (firma digital de dictámenes). El 26 de abril fue la jornada más grande
-  (más de 400 cambios en un día).
+1. **Motor de Glosas (aplicación web con IA):** recibe las glosas y redacta el
+   dictamen de defensa del hospital (cita contrato, tarifas, normativa). Vive en
+   la carpeta `app/` y se usa desde el navegador. Incluye además el **módulo de
+   Pre-auditoría SINAC** (página `/preauditoria`, nuevo 23-07).
+2. **Bots de carga (robots que suben respuestas a las plataformas):**
+   - `tools/responder_glosas_coosalud.py` — portal de COOSALUD (vco.ctamedicas.com).
+   - `tools/responder_glosas_simed.py` y `tools/cargar_soportes_simed.py` — SIMED (Dispensario Médico).
+   - `tools/responder_glosas_dgh.py` — Dinámica Gerencial (programa de escritorio del hospital).
+   - Otros: Mutual Ser, FOMAG, radicador de facturación.
+3. **Plataforma de conciliación del Dispensario** (`tools/`):
+   índice de soportes → expediente por factura → motor de evidencia → hechos
+   probados → motor de decisión → piloto (`piloto_conciliacion_dispensario.py`).
+4. **Herramientas de apoyo:** armar el Word/PDF de evidencias
+   (`tools/evidencias_a_word.py`, `evidencias_a_pdf.py`), notas crédito del
+   Dispensario (renombrar, organizar, verificar CUV), tablero de cartera
+   (`tools/tablero_cartera.py`).
 
-### Mayo 2026 — El motor en producción y primer bot de portal
-- **4 al 12 de mayo:** importación masiva de glosas mejorada, lectura de PDF
-  con respaldo cuando una IA falla, panel de análisis renovado, contratos y
-  vigencias reales del HUS cargados.
-- **20 de mayo:** pruebas automáticas y banco de plantillas de respuesta del
-  HUS cargado de fábrica.
-- **21 al 29 de mayo:** primer robot del portal **SIMED** (Dispensario), en ese
-  momento para el **cargue de notas crédito** con sus soportes y validación
-  del CUV de MinSalud.
+Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
+`CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`.
 
-### Junio 2026 — Los robots de portales y la operación diaria
-- **2 de junio:** arranca el módulo **ADRES/FURIPS** (armar formularios FUR
-  desde los RIPS).
-- **9 y 10 de junio:** auditoría profunda del motor (7 fallas corregidas, 76
-  pruebas nuevas), control de calidad automático de los dictámenes y divisor
-  de notas por acta (correo vs. SIMED).
-- **11 y 12 de junio:** robot de **COOSALUD** (portal vco.ctamedicas.com) para
-  responder glosas masivamente, con verificador de pendientes.
-- **16 y 17 de junio:** herramienta de respuestas sugeridas desde el histórico
-  y primer piloto de ingreso automático a **Dinámica Gerencial (DGH)**.
-- **19 al 26 de junio:** mejoras al robot COOSALUD (residuales, glosas de
-  calidad), guías de contexto para los chats, evidencias en Word y PDF,
-  pantallazo de evidencia por factura en SIMED, y diagnóstico del Lote V2 de
-  notas crédito (12 facturas pendientes: 6 con CUV inválido).
-- **26 de junio:** **primer lote de RESPUESTA DE GLOSAS del Dispensario en
-  SIMED** (archivo `respuestas_glosa_INICIAL_DSE_26JUN.xlsx`).
-- **30 de junio:** día intensivo del robot **DGH**: se logró abrir el editor,
-  cargar la factura y abrir la ventana de respuesta; quedó pendiente el llenado
-  final (la ventana no se deja leer por dentro y hay que operarla por
-  coordenadas de pantalla).
+---
 
-### Julio 2026 — Respuesta masiva de glosas del Dispensario (lo fuerte del mes)
-- **1 y 2 de julio:** robot DGH aprendió a llenar la ventana de respuesta por
-  coordenadas (modo `--calibrar`); revisión de código con el modelo Fable
-  (se corrigió una falla real de búsqueda de ventanas). Lote del 1 de julio
-  respondido (`respuestas_glosa_INICIAL_DSE_01JUL.xlsx`).
-- **3, 7 y 15 de julio:** rondas de auditoría del motor (27 a 30): se
-  corrigieron errores de producción, tarifas, números de cartera y exportes.
-- **6 de julio:** lote del Dispensario respondido y **subido a SIMED**
-  (65 objeciones en 53 facturas), con pantallazos de evidencia.
-- **9 y 10 de julio:** lote grande respondido y **subido a SIMED completo:
-  102 facturas, 225 objeciones**, verificado al 100 % (ninguna quedó sin
-  responder). La subida tomó ~22 minutos. Se hizo también el **informe para
-  gerencia** comparando el antes (manual, días) y el ahora (minutos).
-- **14 y 15 de julio:** lote del 14 de julio: **28 facturas, 44 objeciones,
-  $46.016.019 defendidos**. Las respuestas se revisaron con verificación
-  adversarial (varios agentes de IA buscando fallas) y se corrigieron citas
-  normativas (se eliminó la Res. 3047/2008 derogada, se ancló todo en la
-  Res. 2284/2023, el contrato 440-DIGSA/DMBUG-2025 y las Resoluciones de
-  tarifas HUS 054 y 124 de 2026). El PDF de evidencias debe llamarse
-  **GI-33-5182-2026**.
-- **17 de julio:** dos frentes:
-  - Lote del 17 de julio: **58 facturas, 115 objeciones, $87.605.050**.
-    Verificado con 33 agentes; se corrigieron 8 casos donde la respuesta no
-    atacaba el punto real de la glosa (dispositivos, día-cama, lista de
-    precios, desagregación de procedimientos).
-  - En el motor: validador de FURIPS endurecido (22 hallazgos) e **informe de
-    baja de cartera en Excel + Word** (Res. 577/2019).
-- **21 de julio:** merge del último trabajo del validador ADRES (PR #175).
-- **22 de julio:** 
-  - Se detectaron **3 facturas de junio sin respuesta** (HUS0000518186,
-    HUS0000515107, HUS0000515773). Con las recepciones de objeción se
-    generaron sus respuestas: **38 objeciones, $20.054.751**
-    (`respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`). Los totales cuadran
-    al peso con cada recepción.
-  - Se armó también un **consolidado de 116 facturas / 238 objeciones /
-    $94.150.626** con las respuestas dadas (para radicación/soporte).
-  - Se creó esta bitácora y la instrucción en `CLAUDE.md`.
-  - **Nueva herramienta `tools/organizar_objeciones_dispensario.py`:** convierte
-    el PDF de auditoría del Dispensario (AUDITOOL) al Excel de OBJECIONES que se
-    importa en Dinámica Gerencial (mismo formato del ejemplo de EMSSANAR), y
-    valida que las cuentas cuadren contra el "Total Factura" del PDF.
-  - **Nueva herramienta `tools/asistente_conciliacion_dispensario.py`:** para la
-    **conciliación de cartera con el Dispensario**. Recorre la carpeta de
-    soportes (`Y:\...`), lee RIPS/XML/CUV/PDF (OCR opcional), arma la matriz de
-    evidencia por glosa, cruza coherencia, concluye procede/improcede/parcial
-    con % de confianza y redacta el oficio de respuesta. Corre en el equipo del
-    HUS (donde está montada `Y:\`). Nunca inventa evidencia.
-  - **Nueva herramienta `tools/indexar_soportes_dispensario.py`:** indexa la
-    carpeta de soportes (`Y:\`) **una sola vez** y crea un índice (JSON); así el
-    asistente ya no recorre toda la unidad de red (que se colgaba) — con
-    `--indice` abre solo los archivos de la factura. Soporta actualización
-    incremental y búsqueda por factura/paciente. Con README y pruebas.
-  - **Nueva base `tools/expediente_conciliacion.py` (modelo de datos ÚNICO):**
-    arma un EXPEDIENTE por factura con un `id_expediente` que amarra todo —
-    factura, paciente, contrato (287/440 + base tarifaria + código interno de
-    cartera), radicado, glosas, soportes (del índice), cartera (saldo/edad/
-    deterioro) y estado. Es la "fuente de la verdad" que consultarán los demás
-    módulos (evidencia, jurídico, argumentación, dashboard) en vez de repetir
-    búsquedas. Genera `expedientes.json`. Probado con el lote real (147
-    expedientes). Con pruebas.
-  - **Nuevo `tools/motor_evidencia_dispensario.py` (Motor de Evidencia, Mod 3):**
-    lee los soportes clínicos **página por página** y localiza, por glosa, **en
-    qué página** está la prueba, con el fragmento textual. Marca cada evidencia
-    como *fuerte* (código CUPS/CUM) o *débil* (palabra) e ignora palabras
-    genéricas para no dar falsos positivos. Trabaja sobre el expediente (abre
-    solo los archivos de cada factura, no recorre `Y:\`). Nunca inventa. Con
-    README y pruebas.
-  - **Nuevo `tools/motor_verificacion_dispensario.py` (Verificación, Mod 3.5):**
-    con **reglas deterministas** (no IA) convierte el expediente en
-    **probatorio**: por cada glosa fija los HECHOS a demostrar (ej. la prestación
-    fue *ordenada* y *ejecutada*) y verifica si quedaron **probados**, con nivel
-    de confianza y qué documento falta. Corre un **motor de contradicciones**
-    (factura no en cartera, paciente que no coincide con el RIPS, CUPS ausente
-    en RIPS). Marca cada expediente como *defendible* o no. Así el motor de
-    argumentación no inventará: ensamblará la defensa desde hechos ya probados y
-    trazables. Con README y pruebas.
-  - **Nuevo `tools/motor_decision_dispensario.py` (Motor de Decisión — el
-    cerebro):** con reglas de negocio (no IA) califica por glosa la
-    **defendibilidad (0–100 %)**, evalúa **riesgos** (probatorio, documental,
-    contractual, tarifario, financiero, jurídico) con su razón, aplica la
-    **matriz de precedencia** (qué documentos necesita cada tipo de glosa) y
-    emite la **acción recomendada** (solicitar levantamiento / soporte / aceptar
-    parcial / escalar / conciliar). El jurídico y la argumentación luego solo
-    fundamentan y redactan esa decisión. Con README y pruebas. La plataforma va:
-    índice → expediente → evidencia → hechos probados → **decisión**.
-  - **Nuevo `tools/piloto_conciliacion_dispensario.py` (orquestador del piloto):**
-    corre todo el flujo extremo a extremo sobre 5 casos representativos
-    (mayor valor, más glosas, contrato 287, contrato 440, y uno conocido) y deja
-    **una carpeta por expediente** (expediente/evidencia/hechos/decision.json +
-    resumen.txt + log.txt) más un `METRICAS.json` con indicadores y los
-    **umbrales de aceptación** (≥95 % facturas con soporte, ≥90 % glosas con
-    evidencia, 0 levantamientos sin hecho probado, 100 % trazables). Marca
-    `piloto_ok`. Si no cumple, la prioridad es corregir el flujo, no agregar
-    funciones. Con README y pruebas.
-  - **Casos del piloto (elegidos con datos reales):** 1) HUS0000446262 ($46,7 M,
-    287, mixto); 2) HUS0000452150 (62 glosas, 287); 3) HUS0000426013 (COBERTURA
-    SOAT $32,5 M, 287); 4) HUS0000455554 ($14,4 M, 440); 5) el que elija el
-    auditor (sugerido HUS0000436483).
-  - Nota de escala: el servidor de radicación tiene ~2,2 millones de archivos —
-    por eso el índice (una sola pasada, filtrando `HUS<n>`) es indispensable;
-    conviene apuntar la indexación a la subcarpeta del Dispensario, no a todo `X:\`.
-  - Diagnóstico de conciliación del lote que envió el Dispensario (147 facturas
-    / 444 glosas): 146/147 cruzan con la cartera (falta HUS0000443525); 372
-    glosas venían mal marcadas "SIN CONTRATO" cuando por fecha de atención sí
-    tienen contrato (342 → 287, 30 → 440). Base tarifaria: 287 = SOAT −15 %,
-    440 = SOAT −20 %. **Pendiente:** confirmar acta de inicio del 287 y el mapeo
-    de códigos internos de cartera (U22031/C26001…), y correr el asistente en
-    piloto sobre 1–2 facturas reales contra `Y:\`.
-  - **Chat del motor (auditoría del código):** se cerraron dos frentes grandes:
-    la **ronda 31 de revisión** (7 errores corregidos y limpieza en lotes,
-    validador FURIPS, agente e informe de baja de cartera — PR #180) y la
-    **"Capa de Vida"** (PR #182): el motor ahora saluda al gestor, celebra las
-    glosas ganadas, narra el análisis en vivo, permite conversar con la IA
-    sobre cada dictamen, muestra un semáforo de confianza (en qué se apoyó la
-    respuesta), lee glosas desde una foto y puede leer el dictamen en voz alta.
-  - **Prueba de fuego del motor:** se corrieron 4 casos difíciles inventados a
-    propósito (EPS equivocada en el formulario, ARL con régimen mal citado,
-    glosa extemporánea con fechas solo en el texto, descuentos apilados
-    improcedentes). La IA acertó el fondo en los 4 (corrigió la EPS 2 veces y
-    rechazó las 2 trampas de descuento), pero se detectaron 5 fallas
-    repetidas. De ahí salió la **ronda 32 de correcciones** (este mismo día):
-    1. **El número de factura ya no se puede colar como código CUPS** en el
-       dictamen (pasaba en los 4 casos) — red determinística nueva.
-    2. **Las glosas de $10 millones o más ahora van al modelo potente
-       (Claude)** aunque vengan sin PDF (antes solo desde $50M; los casos de
-       $16.8M y $18.6M habían salido por el modelo económico).
-    3. **Si una ARL encuadra la glosa en "Ley 100 / régimen contributivo", el
-       dictamen ahora corrige el régimen** y cita el Decreto-Ley 1295/1994
-       (riesgos laborales) — antes AURORA/POSITIVA tenían la instrucción débil.
-    4. **Si el formulario viene sin fechas pero el texto de la glosa las trae**
-       (fecha de factura y fecha de radicación de la glosa), el motor las lee,
-       calcula los días hábiles y — si superan los 20 de ley — agrega la
-       defensa por extemporaneidad como sección adicional marcada
-       "verificar fechas antes de radicar" (no reemplaza la defensa de fondo,
-       porque las fechas son inferidas y la redacción queda condicional:
-       "de confirmarse las fechas…").
-  - Antes de subir la ronda 32 se le pasó una **revisión adversarial** (panel
-    de 25 agentes de IA tratando de romper los cambios): confirmó 18 detalles
-    y se corrigieron todos. Los más importantes: una cita legal mal atribuida
-    que venía de antes (el Art. 18 de la Ley 776/2002 es de *prescripción*,
-    no de subrogación — se reemplazó por el Decreto 1352/2013, Juntas de
-    Calificación); dos formas en que el lector de fechas podía "inventar" una
-    extemporaneidad con fechas de otra cláusula (se blindaron los patrones);
-    y que la palabra "pos-quirúrgica" disparaba por error la corrección de
-    régimen ARL (ahora solo dispara con mención expresa de "Ley 100" o
-    "régimen contributivo/subsidiado").
-- **Ronda 33 (mismo día, sobre dos dictámenes PPL reales que trajo Yesid —
-  glosas de $218.145 y $5.800).** Lo detectado y corregido:
-  1. **Normas repetidas y normas "de relleno":** la respuesta citaba la
-     Resolución 1995/1999 dos veces con número completo y dejaba caer la
-     Ley 1438 sin usarla para nada. Nueva regla en el prompt: cada norma se
-     cita UNA sola vez y solo si sostiene un argumento del caso; además se
-     precisó que los plazos del trámite de glosas son del **Art. 57** de la
-     Ley 1438 (el 56 es de pagos) y que la historia clínica no se llama
-     "prueba plena".
-  2. **Costuras del borrado de CUPS dudosos:** frases como "del procedimiento
-     facturado CON el procedimiento facturado" o "los servicios el
-     procedimiento facturado" ahora se cosen solas ("del procedimiento
-     facturado", "los servicios facturados"). También "a nombre de el
-     fondo" → "del fondo".
-  3. **Cláusula de prórroga mal usada:** el dictamen citaba la cláusula de
-     prórroga del Otrosí 26 bajo "pacta sunt servanda" como si resolviera
-     una glosa de soportes. Nueva regla: una cláusula de prórroga/vigencia
-     solo se presenta como prueba de que el contrato está vigente.
-  4. **Nombre del pagador PPL:** nunca más "el fondo PPL" — el pagador se
-     nombra "Fondo Nacional de Salud de las Personas Privadas de la
-     Libertad" (PPL es la población, no la entidad).
-  - 13 tests nuevos (`test_ronda33_fixes.py`). Va en el mismo PR #183.
+## 2) Resumen de lo ya hecho (por fecha)
 
-### Los números de la operación SIMED (respuesta de glosas Dispensario)
+### Abril 2026 — Nace el Motor de Glosas
+- **08 al 10-04:** primera versión de la aplicación: análisis de glosas con IA,
+  dictámenes con normativa colombiana (Res. 3047/2008, Ley 1438/2011, etc.),
+  importación masiva desde Excel, exportación a Excel, seguridad de acceso.
+- **13 al 25-04:** la aplicación crece: generación masiva en lote, conciliación
+  bilateral con acta y PDF institucional, informe ejecutivo mensual para
+  gerencia, catálogo de tarifas pactadas por EPS, homologación Res. 2641/2025,
+  exportes con el formato exacto del DGH, pre-análisis automático diario y
+  dashboard ejecutivo.
+- **26 al 30-04:** panel de administración completo (usuarios, equipos,
+  notificaciones), sincronización de soportes desde el servidor del hospital
+  (jumpbox) y tarifas FOMAG actualizadas al contrato nuevo.
+
+### Mayo 2026 — Estabilización
+- Importación masiva con progreso e historial, auditor forense IA, panel de
+  diagnóstico del sistema, y correcciones a partir del uso real diario.
+- **21 al 29-05:** primer robot del portal **SIMED** (Dispensario), en ese
+  momento para el cargue de notas crédito con validación del CUV.
+
+### Junio 2026 — Nacen los robots de carga
+- **11-06:** primera versión del **bot de COOSALUD**: entra al portal, busca cada
+  factura, responde las glosas en grupo y captura el pantallazo de cierre como
+  evidencia. Ese mismo día nace `evidencias_a_word.py` (une los pantallazos en
+  un Word, una factura por página).
+- **12 al 19-06:** herramientas de **notas crédito del Dispensario**: renombrar
+  y organizar PDFs por carpeta, consolidar, verificar el estado del CUV ante
+  MinSalud. Auditoría rápida de pendientes COOSALUD (`verificar_glosas_coosalud.py`).
+- **22-06:** mejoras grandes del bot COOSALUD: responder también la pertinencia
+  médica (`--incluir-calidad`), cerrar glosas residuales que el Excel no traía
+  (`--cerrar-residuales`), buscar el PDF de soporte en carpetas alternativas del
+  share. Guías escritas de los bots. Bot SIMED: manejo de ventanas emergentes.
+  **Respuesta de glosas Dispensario en SIMED:** lote cerrado completo — 8
+  facturas / 24 objeciones en 26,9 minutos con el robot.
+- **23 y 24-06:** **cargue DIA 3 JUNIO (COOSALUD):** se cerraron las 118 facturas
+  pendientes de la hoja BASE y las 26 de la hoja CALIDAD (4.936 glosas). Dos
+  facturas fallaron por un detalle del portal al elegir el código de respuesta;
+  se corrigió el bot y cerraron en la segunda pasada.
+- **25 y 26-06:** Word de evidencias del **lote 69** (46 de 69 facturas tenían
+  pantallazo; 23 quedaron identificadas sin evidencia). Nace `evidencias_a_pdf.py`.
+  **Diagnóstico de las 12 facturas pendientes del Lote V2 del Dispensario:** se
+  descubrió que el registro estaba equivocado en 6 — cinco que figuraban
+  "subidas OK" nunca tuvieron validación del Ministerio (el servicio interno
+  de validación estaba caído y guardó el error como si fuera el resultado).
+  Se armó la carpeta `PENDIENTES_12` con ficha de estado por factura.
+  **Primer lote de respuesta de glosas del Dispensario en SIMED**
+  (`respuestas_glosa_INICIAL_DSE_26JUN.xlsx`).
+- **30-06:** arranca el **bot de Dinámica Gerencial (DGH)** (muchas iteraciones
+  para dominar el programa de escritorio; la ventana de respuesta no se deja
+  leer por dentro y hay que operarla por coordenadas de pantalla). **Tablero de
+  Radicación y Cartera** (informe HTML con alertas de mora +90 días, exportar a
+  Excel). Mejoras al motor IA (rondas 19-22) y set de evaluación de calidad de
+  los dictámenes: la calidad del motor pasó de **2,5 a ~9 sobre 10**.
+
+### Julio 2026 — Contratos reales, lotes masivos y cierre de pendientes
+- **01 al 03-07:** el motor IA aprende los **contratos reales por EPS**
+  (COOSALUD SOAT −15%, FOMAG, Dispensario FF.MM., Famisanar, Aurora, Compensar,
+  etc.) — fin del falso "sin contrato pactado". Rondas 23-28 de mejoras.
+- **07 y 08-07:** ronda 29 de limpieza y corrección (27 hallazgos de auditoría).
+- **10-07:** **cargue DIA 3 JULIO (COOSALUD): 100 de 100 facturas cerradas
+  (2.436 glosas)** — incluida una recuperación automática tras un corte de luz
+  a mitad del cargue, sin duplicar nada. Se corrigió el bot para que las glosas
+  extemporáneas (código RE9502) no exijan soporte PDF (5 facturas que estaban
+  trabadas cerraron de una). Se definió la estructura de carpetas por
+  mes/día para archivar evidencias y Word. **Informe de efectividad para
+  gerencia** (página web con el antes/después). También: **informe de gestión
+  del Lote V2 de notas crédito** (`INFORME_GERENCIA.md`, 12 facturas por
+  $108,5 millones facturados con comparativo manual vs. automatizado).
+- **10 al 21-07 (corridas del auditor):** se analizaron y lanzaron los
+  **LOTES 02 (300 fact.), 06 (300), 07 (300) y 08 (75)** de COOSALUD.
+  El LOTE 7 llegó primero como listado de objeciones sin respuestas
+  (OBJECIONES.xlsx) y fue reemplazado por el consolidado correcto.
+  En los lotes 06/07/08 quedaron 37 facturas con la pertinencia médica
+  sin responder (el médico aún no la tipificaba).
+- **17-07:** informe técnico en Word de los **rechazos CUV de 4 facturas
+  conciliadas** (`INFORME_RECHAZOS_CUV.docx`, para enviar al área): 3 rechazadas
+  por el Ministerio con código RVC086 ("código de diagnóstico repetido", con el
+  campo exacto del RIPS a corregir) y 1 cuya validación nunca corrió (servicio
+  interno caído). Incluye el argumento clave: lo que al radicar la factura
+  salía como *objeción* se convirtió en *error bloqueante* en la nota crédito.
+  Dato: SISTEMAS ya reintentó 2 el 25-06 sin corregir el RIPS y volvió a fallar.
+- **22-07:** llegaron las respuestas de pertinencia en 3 archivos
+  ("PERTINENCIA (1)", "ok" y "15"). Se detectó que **cada archivo estaba
+  incompleto pero se complementaban** entre sí → se fusionaron en
+  **CONSOLIDADO_PERTINENCIA_6JULIO_FUSIONADO.xlsx** (37 facturas, 5.736
+  glosas, cero sin respuesta, todas RE9901). Quedó listo el comando para
+  correrlo. Se creó esta bitácora (fusionando el trabajo de dos chats).
+
+### Julio 2026 — Frente Dispensario: respuesta masiva de glosas en SIMED
+(trabajo del chat del bot Dispensario, fusionado a esta bitácora el 23-07)
+- **01 y 02-07:** el robot DGH aprendió a llenar la ventana de respuesta por
+  coordenadas (modo `--calibrar`). Lote del 1 de julio respondido.
+- **06-07:** lote respondido y **subido a SIMED** (65 objeciones / 53 facturas)
+  con pantallazos de evidencia.
+- **09 y 10-07:** lote grande **subido a SIMED completo: 102 facturas, 225
+  objeciones**, verificado al 100% (subida en ~22 minutos).
+- **14 y 15-07:** lote del 14-07: **28 facturas, 44 objeciones, $46.016.019
+  defendidos**. Respuestas revisadas con verificación adversarial; citas
+  normativas corregidas (fuera la Res. 3047/2008 derogada; todo anclado en la
+  Res. 2284/2023, el contrato 440-DIGSA/DMBUG-2025 y las Res. de tarifas HUS
+  054 y 124 de 2026). El PDF de evidencias debe llamarse **GI-33-5182-2026**.
+- **17-07:** lote del 17-07: **58 facturas, 115 objeciones, $87.605.050**
+  (verificado con 33 agentes; 8 respuestas corregidas). En el motor: validador
+  FURIPS endurecido (22 hallazgos) e informe de baja de cartera (Res. 577/2019).
+- **22-07:** se detectaron **3 facturas de junio sin respuesta** (HUS0000518186,
+  HUS0000515107, HUS0000515773) → generadas sus respuestas: **38 objeciones,
+  $20.054.751** (`respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`). También
+  un consolidado de 116 facturas / 238 objeciones / $94.150.626. Y nació la
+  **plataforma de conciliación del Dispensario** (todas con README y pruebas):
+  - `tools/organizar_objeciones_dispensario.py` — PDF de AUDITOOL → Excel de
+    OBJECIONES para DGH, validando totales.
+  - `tools/asistente_conciliacion_dispensario.py` — arma la matriz de evidencia
+    por glosa desde los soportes (`Y:\`) y redacta el oficio de respuesta.
+  - `tools/indexar_soportes_dispensario.py` — indexa `Y:\` una sola vez (el
+    servidor tiene ~2,2 millones de archivos; sin índice se colgaba).
+  - `tools/expediente_conciliacion.py` — EXPEDIENTE único por factura (contrato
+    287/440, radicado, glosas, soportes, cartera). Probado con el lote real
+    (147 expedientes).
+  - `tools/motor_evidencia_dispensario.py` — localiza la prueba de cada glosa
+    página por página (evidencia fuerte/débil, nunca inventa).
+  - `tools/motor_verificacion_dispensario.py` — reglas deterministas: fija los
+    HECHOS a probar por glosa, motor de contradicciones, marca *defendible*.
+  - `tools/motor_decision_dispensario.py` — califica defendibilidad (0-100%),
+    riesgos y acción recomendada (levantar / pedir soporte / aceptar parcial /
+    escalar / conciliar).
+  - `tools/piloto_conciliacion_dispensario.py` — orquesta el piloto de 5 casos
+    (HUS0000446262, HUS0000452150, HUS0000426013, HUS0000455554 + 1 del
+    auditor) con métricas y umbrales de aceptación (≥95% con soporte, ≥90% con
+    evidencia, 0 levantamientos sin hecho probado, 100% trazables).
+  - Diagnóstico del lote de conciliación (147 facturas / 444 glosas): 146/147
+    cruzan con cartera (falta HUS0000443525); 372 glosas venían mal marcadas
+    "SIN CONTRATO" cuando sí tienen contrato por fecha (342 → 287, 30 → 440).
+    Base tarifaria: 287 = SOAT −15%, 440 = SOAT −20%.
+
+**Los números de la operación SIMED (respuesta de glosas Dispensario):**
+
 | Lote | Facturas | Objeciones | Valor defendido | Estado |
 |---|---|---|---|---|
 | 26 de junio | ~30 | ~40 | — | Subido |
 | 1 de julio | ~50 | ~70 | — | Subido |
 | 6 de julio | 53 | 65 | — | Subido |
-| 9 de julio | 102 | 225 | — | Subido y verificado 100 % |
+| 9 de julio | 102 | 225 | — | Subido y verificado 100% |
 | 14 de julio | 28 | 44 | $46.016.019 | Excel listo — confirmar subida |
 | 17 de julio | 58 | 115 | $87.605.050 | Excel listo — confirmar subida |
 | Pendientes junio | 3 | 38 | $20.054.751 | Excel listo — subir YA (plazos vencidos) |
 
+### 23-07 — Módulo de Pre-auditoría SINAC
+- **23-07:** nace el **módulo de Pre-auditoría SINAC** (rama
+  `claude/invoice-audit-bot-qa2koy`, PR #186, página `/preauditoria` de la app
+  web), a partir de los archivos guía CONSOLIDADO_PRE_AUDITORIA_2026 y
+  OFICIOS_DEVOLUCIONES_CONSECUTIVOS. Qué hace:
+  - Registrar el **oficio radicado** por Facturación con **fecha y hora** de
+    recibido.
+  - Importar el Excel del **consecutivo de DGH** y contar **cuántas facturas
+    trae cada número de envío**.
+  - Auditar cada factura: **Soportes OK (radicar)** o **Devuelta con motivo**.
+    Máximo **3 devoluciones** por factura (la 4.ª se bloquea); cuando la
+    factura vuelve corregida queda **SUBSANADA** o **NUEVAMENTE DEVUELTA**.
+  - Generar el **oficio de devolución en PDF** con consecutivo SINAC
+    (DEV-PRE-AUD-####-AAAA), logo y bloque de firmas, igual al formato del
+    Excel de oficios.
+  - **Semáforo** del plazo de 3 días hábiles (cuentan desde el día siguiente
+    al recibo): verde / amarillo (penúltimo día) / rojo (último) / vencido.
+  - **Estadísticas**: auditadas, OK, devueltas, subsanadas, por auditor y
+    facturas reincidentes; vista masiva con filtros y vista individual con
+    el historial completo de cada factura.
+  - 29 pruebas automáticas en verde (`tests/test_api/test_preauditoria.py`).
+- **23-07 (tarde):** dos entregas más del mismo frente:
+  - El **PDF del oficio de devolución** quedó con el formato exacto de la guía
+    del equipo (GUIA_DE_PDF): título "ENTREGA DE NO ACEPTACIONES PARA
+    CORRECCION...", subtítulo "OBSERVACIONES DE PREAUDITORÍA PARA SUBSANACIÓN",
+    consecutivo y fecha arriba a la derecha y columna OFICIO (radicado FHUS)
+    en cada fila.
+  - **CONSOLIDADO_PRE_AUDITORIA_2026_INTERACTIVO.xlsx** (entregado por chat,
+    NO va al repo porque el DGReport trae datos de pacientes): se escribe el
+    número de ENVÍO y se llenan solas F_RECIBIDO, FACTURA, F_FACTURA, VALOR,
+    NIT, ENTIDAD y CORREO F.E. Las fuentes las alimenta el auditor pegando
+    los reportes de DGH en las hojas RADICACION (radicación de cuentas;
+    precargada con 36.765 filas) y DGREPORT (correos de factura electrónica;
+    7.231 filas). Si el envío trae varias facturas, se repite el número y
+    salen en orden ("2 de 5"). Instrucciones en la hoja LEYENDA.
+
+### 24-07 — Pre-auditoría v2: la aplicación web es el consolidado oficial
+- **24-07:** el módulo de pre-auditoría deja de depender del Excel: ahora la
+  **aplicación web es el consolidado oficial** (misma rama/PR #186). El auditor
+  solo hace 4 cosas y el sistema arma todo:
+  1. **Sube la Radicación de Cuentas** (reporte de DGH) → el sistema la guarda
+     como fuente (upsert por factura, no duplica; excluye radicaciones
+     'Anulado'; se probó con las 36.723 facturas reales del reporte).
+  2. **Sube el DGReport** → de ahí sale CORREO F.E. (SI/NO).
+  3. **Registra el oficio recibido** (FHUS + fecha/hora).
+  4. **Escribe el número de envío** → el sistema crea automáticamente una fila
+     por cada factura del envío, autocompletando F_RECIBIDO, F_FACTURA, VALOR,
+     NIT, ENTIDAD y CORREO F.E. desde las fuentes.
+  - **No duplica:** si el envío ya se cargó, avisa "El envío ya fue cargado".
+  - **Una factura = una sola fila** (canónica) + un **historial de eventos**
+    con toda la trazabilidad. Si una factura devuelta reingresa en un envío
+    nuevo, la reconoce y numera **Subsanación 1/2/3** sin crear factura nueva.
+  - **Auto-sincroniza:** corregir un dato en el Excel y volver a subirlo se
+    refleja solo en el consolidado (los datos descriptivos se leen de la fuente
+    más reciente, no se copian).
+  - **Auditoría:** el auditor solo decide **Radicar** o **Devolver con motivo**;
+    máximo 3 devoluciones (la 4.ª se bloquea).
+  - **Oficio de devolución PDF** con consecutivo SINAC (formato de la guía),
+    armado desde un **snapshot inmutable**: un reingreso posterior no altera un
+    oficio ya emitido.
+  - **Consolidado consultable y exportable a Excel** + estadísticas (por
+    auditor, reincidentes, semáforo, tasa de devolución).
+  - Diseño verificado con un panel de agentes IA (mapeo de columnas contra los
+    archivos reales, esquema, flujo) y una **revisión adversarial** que encontró
+    y corrigió: corrimiento de fechas de un día, inmutabilidad del PDF ante
+    reingreso, bloqueo de doble devolución, y consultas que no escalaban a 36k
+    filas. **30 pruebas del módulo + 4.327 de todo el repo en verde.**
+  - Pendiente operativo: al sacar el DGReport, ampliar el rango de fechas para
+    que cubra el mismo periodo que la Radicación (si no, algunas facturas
+    marcan CORREO F.E.=NO por quedar fuera de la ventana del reporte).
+
+### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
+- **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
+  fusionadas desde la rama principal:
+  - **Ronda 32:** el número de factura ya no se cuela como código CUPS en el
+    dictamen (red determinística nueva); las glosas de $10 millones o más van
+    al modelo potente; se corrigieron citas legales. Pasó una revisión
+    adversarial (panel de 25 agentes) que confirmó y corrigió 18 detalles.
+  - **Ronda 33** (dos dictámenes PPL reales, glosas de $218.145 y $5.800):
+    se quitaron normas repetidas y de relleno; 13 pruebas nuevas
+    (`test_ronda33_fixes.py`). Pendiente: desplegar la ronda 32 en la VM de
+    Google (`cd /opt/motor-glosas && git pull && docker compose build motor &&
+    docker compose up -d`) y repetir los 4 casos de prueba.
+
 ---
 
-## 2. PENDIENTE
+## 3) PENDIENTE
 
-1. **Subir a SIMED las 3 facturas de junio** (518186 / 515107 / 515773) con
-   `respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`. **URGENTE: sus fechas
-   de vencimiento (6 y 8 de julio) ya pasaron.** Si el portal ya no las deja
-   responder, radicar la respuesta por oficio/correo dejando constancia.
-2. **Confirmar la subida a SIMED de los lotes del 14 y 17 de julio** (los
-   Excel están listos; falta ver el log de la corrida y la pasada de
-   verificación que debe dar 0 pendientes).
-3. **Generar los PDF de evidencias**:
-   - Lote 14 de julio → `GI-33-5182-2026.pdf` (comando ya entregado).
-   - Lote 17 de julio → falta el consecutivo GI-33 (pedirlo al auditor).
-4. **Soportes por adjuntar del lote 17 de julio** (casos puntuales): notas de
-   enfermería del 16-jun (529093), renglón tarifario de dispositivos (coils,
-   AIRVO, material de osteosíntesis), descripción quirúrgica del vaciamiento
-   de cuello (529291), reporte de lactato/piruvato y aclaración de la biopsia
-   vs. estereotaxia (CL0301), justificación de la segunda hemoclasificación.
-5. **Robot DGH (Dinámica Gerencial):** correr el modo `--calibrar` en el
-   equipo de la oficina y validar el llenado de la ventana de respuesta por
-   coordenadas. Es lo único que falta para cargar respuestas también en DGH.
-6. **Informe para gerencia:** completar el campo "valor total objetado
-   defendido" del lote 9-jul (sale de `reporte_glosa.csv`).
-7. **Notas crédito Lote V2:** siguen 6 facturas con CUV inválido (diagnóstico
-   del 25 de junio) — decidir si se reprocesan o se radican por otra vía.
-8. **Desplegar la ronda 32 en el servidor** (VM de Google): en la VM,
-   `cd /opt/motor-glosas && git pull && docker compose stop motor &&
-   docker compose build motor && docker compose up -d`. Después, volver a
-   correr los 4 casos de prueba y comparar contra los dictámenes del 22-jul.
-9. **Rotar la clave de Gemini** (quedó expuesta en el historial del repo y
-   ahora también la usa la función foto→texto): crear clave nueva en Google
-   AI Studio, actualizar el `.env` de la VM y borrar la vieja.
-10. **Fallas de las pruebas aún sin corregir** (candidatas a ronda 33):
-    detectar "glosa RATIFICADA" desde el texto cuando el desplegable quedó en
-    "Inicial" (caso 4), y el texto truncado/con comillas colgantes del caso 1
-    (revisar límite de tokens de salida del modelo económico).
+### COOSALUD
+1. **Correr el consolidado fusionado de pertinencia** (37 facturas / 5.736
+   glosas) con `--hoja CALIDAD --incluir-calidad`. Con eso los LOTES 06, 07 y
+   08 quedan cerrados al 100%. El archivo está en Downloads como
+   `CONSOLIDADO_PERTINENCIA_6JULIO_FUSIONADO.xlsx`.
+2. **Confirmar los resultados de los LOTES 02, 06, 07 y 08:** revisar los
+   reportes CSV en `D:\USUARIO CARTERA\Documents\COOSALUD\` (cuántas OK,
+   cuántas PENDIENTE_PDX o pendientes) y hacer segunda pasada donde falte.
+3. **Words de evidencia de los lotes recientes** (02, 06, 07, 08 y pertinencia),
+   cada uno en su carpeta `MES AÑO\DD-MM-AAAA\` con subcarpeta SOPORTES.
+4. **Lote 69 — 23 facturas sin pantallazo** (4 nunca estuvieron en bolsa, resto
+   por revisar): decidir si se reprocesan o se documentan como están.
+5. **HUS504096:** factura mencionada en un cruce de junio que no aparece en
+   ningún consolidado. Verificar de qué lote es o si el número está mal escrito.
+
+### Notas crédito Dispensario (Lote V2) — detalle en `docs/diagnostico_lote_v2_pendientes/`
+6. **Rechazos CUV:** hacer seguimiento a la respuesta del área sobre las 4
+   facturas conciliadas (informe enviado el 17-07). Esperando de SISTEMAS:
+   - Corregir el RIPS y revalidar las 3 con **RVC086** (HUS404136, HUS410675,
+     HUS435485) — el reintento sin corregir ya se probó el 25-06 y volvió a fallar.
+   - Reejecutar la validación que nunca corrió (servicio caído) de las 6:
+     HUS411234, HUS420099, HUS421733, HUS418576, HUS420160, HUS422238.
+   - Cuando confirmen: revalidar los CUV (comando en el README de la carpeta
+     del diagnóstico) y radicar en SIMED con el robot.
+7. **Descargar del DIAN los PDF de 2 notas:** HUS413266 (radicado 492346) y
+   HUS417459 (radicado 521665). Sin ese PDF no se pueden armar las carpetas.
+8. **Dos consultas a FACTURACIÓN:** (a) HUS440328 — ¿la nota vigente es la
+   302111 del histórico o emitieron una nueva?; (b) HUS422238 — confirmar que
+   la nota 311199 sí le corresponde (no aparece en el histórico de conciliación).
+9. **Verificar el resto del Lote V2:** las que estaban "COMPLETA" sin subir
+   (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
+   437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
+
+### Dispensario — respuesta de glosas SIMED y conciliación
+10. **Subir a SIMED las 3 facturas de junio** (518186 / 515107 / 515773) con
+    `respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`. **URGENTE: sus fechas
+    de vencimiento (6 y 8 de julio) ya pasaron.** Si el portal ya no las deja
+    responder, radicar la respuesta por oficio/correo dejando constancia.
+11. **Confirmar la subida a SIMED de los lotes del 14 y 17 de julio** (los
+    Excel están listos; falta el log de la corrida y la pasada de verificación
+    que debe dar 0 pendientes).
+12. **Generar los PDF de evidencias:** lote 14-07 → `GI-33-5182-2026.pdf`
+    (comando ya entregado); lote 17-07 → falta el consecutivo GI-33 (pedirlo
+    al auditor).
+13. **Soportes por adjuntar del lote 17-07** (casos puntuales): notas de
+    enfermería del 16-jun (529093), renglón tarifario de dispositivos (coils,
+    AIRVO, material de osteosíntesis), descripción quirúrgica del vaciamiento
+    de cuello (529291), reporte de lactato/piruvato y aclaración de la biopsia
+    vs. estereotaxia (CL0301), justificación de la segunda hemoclasificación.
+14. **Robot DGH:** correr el modo `--calibrar` en el equipo de la oficina y
+    validar el llenado de la ventana de respuesta por coordenadas.
+15. **Conciliación:** confirmar el acta de inicio del contrato 287 y el mapeo
+    de códigos internos de cartera (U22031/C26001…), y correr el asistente en
+    piloto sobre 1-2 facturas reales contra `Y:\`.
+
+### Informes
+16. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
+    proceso manual y cuántas personas) para poner el multiplicador exacto.
+    Completar también el "valor total objetado defendido" del lote 9-jul
+    (sale de `reporte_glosa.csv`).
+
+### Módulo de Pre-auditoría (nuevo, 23-07)
+17. **Revisar y aprobar el PR #186** de la rama `claude/invoice-audit-bot-qa2koy`
+    y probarlo con datos reales (un oficio piloto antes de uso masivo).
+18. **Definiciones que quedaron con supuesto y hay que confirmar con el
+    auditor:** (a) el plazo de 3 días se contó en **días hábiles lunes-viernes**
+    (sin festivos colombianos); (b) los nombres/cargos de las firmas del
+    oficio PDF se tomaron del Excel de oficios — si cambian, se ajustan en
+    `app/services/oficio_devolucion_pdf.py`; (c) si se quiere la firma
+    escaneada en el PDF, subir la imagen como
+    `static/firma_preauditoria.png` (el módulo la toma solo).
+19. **Cargar el histórico** del CONSOLIDADO_PRE_AUDITORIA_2026.xlsx al módulo
+    (el importador ya entiende ese formato de columnas, se puede subir por
+    oficio) para que las estadísticas y el control de 3 devoluciones
+    arranquen con la historia real.
+
+## 4) PARA MAÑANA
+
+1. **Dispensario prioridad 1:** subir a SIMED el Excel de las 3 facturas de
+   junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
+   14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
+   verificación) y generar sus PDF de evidencias.
+2. Correr la **pertinencia fusionada** COOSALUD (pendiente #1) y verificar que
+   las 37 facturas cierren con evidencia.
+3. Con los reportes en mano, **cerrar los flecos de los lotes 02/06/07/08**
+   (segunda pasada de las que queden pendientes).
+4. Generar los **Words de evidencia** de todo lo cerrado y archivarlos en sus
+   carpetas por mes/día.
+5. Actualizar el **informe de gerencia** con el acumulado real de julio
+   (facturas y glosas cerradas por lote).
+6. Si hay tiempo: verificar si SISTEMAS ya corrigió algún CUV (pendiente #6),
+   descargar los 2 PDF del DIAN (pendiente #7) y revisar el PR #186 del módulo
+   de pre-auditoría.
 
 ---
 
-## 3. PARA MAÑANA (23 de julio de 2026)
+## 5) Datos fijos que siempre se necesitan
 
-1. Subir a SIMED el Excel de las **3 facturas de junio** (prioridad 1) y
-   guardar el pantallazo de evidencia de cada una.
-2. Si los lotes del **14 y 17 de julio** aún no están subidos, subirlos
-   (piloto de 1 factura → lote completo → segunda pasada de verificación).
-3. Correr la consolidación de evidencias del lote 14 → **GI-33-5182-2026.pdf**
-   y conseguir el consecutivo GI-33 del lote 17 para su PDF.
-4. Cuando llegue el próximo Excel de glosas del Dispensario, generarlo con el
-   motor de plantillas ya verificado (mismo flujo de los lotes anteriores).
-5. Desplegar la **ronda 32** en la VM (comandos en PENDIENTE #8) y repetir los
-   4 casos de prueba para confirmar que: el CUPS ya no sale con el número de
-   factura, los casos de >$10M van a Claude, la ARL cita el Decreto-Ley
-   1295/1994 y la extemporánea del caso 3 sale marcada.
+- **Carpeta de trabajo en Windows:** `C:\temp-notas` (ahí vive el repo).
+- **Credenciales:** siempre en variables de entorno (`COOSALUD_USER`,
+  `COOSALUD_PASSWORD`). Nunca escritas en archivos ni en comandos.
+- **Índice de soportes:** `D:\USUARIO CARTERA\Desktop\BUSCADOR_HUS\indice_facturas_HUS.txt`.
+- **Reportes y evidencias:** `D:\USUARIO CARTERA\Documents\COOSALUD\`.
+- **Notas crédito Dispensario:** diagnóstico e informes en
+  `docs/diagnostico_lote_v2_pendientes/` (repo); carpetas de trabajo en
+  `D:\USUARIO CARTERA\Documents\NOTAS ANTIGUAS\LOTE_DISPENSARIO_2026-06_V2\`
+  (subcarpeta `PENDIENTES_12` con ficha por factura); fuente oficial XML/CUV en
+  `\\172.16.32.83\factura_electronica_net22\<AAAAMM>\FACTURAS_NOTA\<nota>\`.
+- **Regla de reanudación:** si un cargue se corta (luz, portal caído), NO se
+  pierde nada: se relanza con `--saltar-csv <reporte anterior>` y un nombre de
+  reporte nuevo. El bot salta lo ya cerrado y no duplica respuestas.
+- **Regla de soportes:** las glosas extemporáneas (RE9502) NO llevan PDF de
+  soporte. Las demás (ej. RE9901 en glosas de soportes) sí, y salen del share
+  vía el índice.
 
----
-
-## Notas de método (para cualquier chat nuevo)
+### Notas de método del flujo Dispensario (para cualquier chat nuevo)
 
 - **Solo se trabaja el Dispensario Médico (DSE Ejército)** en este flujo de
   respuestas; si el Excel trae otras entidades, se omiten.
 - Toda respuesta va en **MAYÚSCULAS, un solo párrafo**, empieza con
   *"ESE HUS NO ACEPTA LA GLOSA APLICADA A LA FACTURA…"* y cierra citando la
   mesa de conciliación y los correos de cartera.
-- Postura institucional: **NO ACEPTA (RE9901), se defiende el 100 % del valor.**
+- Postura institucional: **NO ACEPTA (RE9901), se defiende el 100% del valor.**
 - Normas ancla: Res. 2284/2023 (Manual Único de Glosas — la 3047/2008 está
   DEROGADA, no citarla), contrato 440-DIGSA/DMBUG-2025 (el Dispensario ES
   parte), Resoluciones de tarifas HUS 054 y 124 de 2026 (y 194/2025 para
@@ -308,5 +400,3 @@
 - Los generadores de respuestas de cada lote viven en el scratchpad de las
   sesiones (`glosa_motor.py` es la fuente única de plantillas); los robots de
   portal están en `tools/` de este repo.
-- Guías detalladas por flujo: `docs/CONTEXTO_DISPENSARIO_GLOSAS.md`,
-  `docs/CONTEXTO_DISPENSARIO_NOTAS.md`, `docs/CONTEXTO_COOSALUD.md`.
