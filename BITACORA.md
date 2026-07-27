@@ -124,6 +124,11 @@ tres frentes:
   abril: al pasar 90 días, quedaron fuera de la ventana que mide el sistema y
   "explotaron" solas (nada que ver con el bot de SAVIA). Se corrigieron para
   que usen fechas relativas a la fecha actual y no vuelvan a vencerse.
+- Se redactó el **documento técnico de entrega del módulo SAVIA**
+  (`docs/ENTREGA_TECNICA_BOT_SAVIA.md`): reconstrucción completa de todo lo
+  hecho en esta rama — objetivo, arquitectura, funciones, reglas del formato,
+  decisiones, descartes, riesgos, pendientes y pasos para fusionarlo al
+  proyecto principal.
 
 ---
 
