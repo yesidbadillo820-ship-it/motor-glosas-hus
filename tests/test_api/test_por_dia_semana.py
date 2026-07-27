@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -48,6 +48,15 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _reciente(dia_semana: int, hora: int):
+    """Datetime UTC de un día reciente que cae en `dia_semana` (0=Lunes),
+    relativo a hoy (dentro de la ventana de 90 días). Reemplaza las fechas
+    fijas de abril que fallaban solas al avanzar el calendario (time-bomb CI)."""
+    base = ahora_utc().replace(hour=0, minute=0, second=0, microsecond=0)
+    lunes = base - timedelta(days=base.weekday() + 7)  # lunes de la semana pasada
+    return (lunes + timedelta(days=dia_semana)).replace(hour=hora)
+
+
 def _seed(db, fecha):
     db.add(
         GlosaRecord(
@@ -74,11 +83,10 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # 2026-04-20 fue Lunes
-        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 20, 11, 0, tzinfo=timezone.utc))
-        # 2026-04-22 fue Miércoles
-        _seed(db_session, datetime(2026, 4, 22, 10, 0, tzinfo=timezone.utc))
+        # Lunes (x2) y Miércoles recientes (relativos, dentro de la ventana).
+        _seed(db_session, _reciente(0, 10))
+        _seed(db_session, _reciente(0, 11))
+        _seed(db_session, _reciente(2, 10))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -90,9 +98,9 @@ class TestPorDiaSemana:
     def test_pct_del_total(self, client, db_session):
         # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+            _seed(db_session, _reciente(0, 10))
         # 1 glosa el martes
-        _seed(db_session, datetime(2026, 4, 21, 10, 0, tzinfo=timezone.utc))
+        _seed(db_session, _reciente(1, 10))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -101,8 +109,6 @@ class TestPorDiaSemana:
         assert items["Martes"]["pct_del_total"] == 20.0
 
     def test_excluye_fuera_ventana(self, client, db_session):
-        from datetime import timedelta
-
         ahora = ahora_utc()
         # Reciente
         _seed(db_session, ahora - timedelta(days=10))

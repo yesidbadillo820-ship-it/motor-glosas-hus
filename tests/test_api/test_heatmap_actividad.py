@@ -48,6 +48,15 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _reciente_iso(dia_semana: int, hora: int, minuto: int) -> str:
+    """ISO (UTC, naive) de un día reciente que cae en `dia_semana` (0=Lunes) a
+    la hora dada. Relativo a hoy para NO caer fuera de la ventana de 90 días al
+    avanzar el calendario (antes usaba fechas fijas de abril → time-bomb de CI)."""
+    base = ahora_utc().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    lunes = base - timedelta(days=base.weekday() + 7)  # lunes de la semana pasada
+    return (lunes + timedelta(days=dia_semana)).replace(hour=hora, minute=minuto).isoformat(sep=" ")
+
+
 def _seed(db, fecha_iso):
     """fecha_iso: '2026-04-20 09:00' (UTC)."""
     creado = datetime.fromisoformat(fecha_iso).replace(tzinfo=timezone.utc)
@@ -85,11 +94,12 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        # Lunes reciente (weekday=0). 09:30 → fila 0, col 9. Fechas relativas
+        # para no salirse de la ventana de 90 días al pasar el calendario.
+        _seed(db_session, _reciente_iso(0, 9, 30))
+        _seed(db_session, _reciente_iso(0, 9, 45))
+        # Miércoles reciente (weekday=2). 14:15 → fila 2, col 14
+        _seed(db_session, _reciente_iso(2, 14, 15))
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()
