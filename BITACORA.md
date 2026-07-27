@@ -67,6 +67,14 @@ ayudas que hacen ese trabajo casi solo:
   parte del sistema con fechas fijas**, ajenas a este trabajo; no requieren acción de
   nuestro lado.
 
+### 22/07/2026 — Memoria común y entrega técnica
+- Se creó la **BITÁCORA** (este archivo) y el **CLAUDE.md** para que cualquier chat lea
+  primero la memoria común y la actualice al terminar.
+- Se redactó la **documentación técnica oficial del módulo**
+  (`docs/MODULO_GLOSAS_MUTUAL_SER.md`): 17 secciones con objetivo, arquitectura,
+  funciones, flujo, riesgos, decisiones y recomendaciones para fusionarlo al proyecto
+  principal sin perder trabajo.
+
 ---
 
 ## PENDIENTE (lo que falta)
