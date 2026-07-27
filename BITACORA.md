@@ -44,6 +44,12 @@ Todos los bots viven en la carpeta **`tools/`** y se abren desde el menú
 - Se intentó correr `AUDITAR_DEV_EPS` con el Excel *ARCHIVO JUNIO 2026-GLOSAS
   ACEPTADAS.xlsx*: el bot se detuvo porque ese archivo tiene **otra estructura**
   (no es el formato de devoluciones). Queda pendiente adaptarlo — ver más abajo.
+- **Se corrigió el CI** que fallaba en el PR: dos pruebas del aplicativo web
+  (`test_por_dia_semana`, `test_heatmap_actividad`) **caducaban** por usar fechas
+  fijas de abril fuera de la ventana de 90 días. Se anclaron a un lunes reciente.
+- **Documento técnico de entrega** del módulo para el equipo principal:
+  `docs/ENTREGA_MODULO_KIT_AUDITORIA.md` (arquitectura, funciones, flujos,
+  riesgos, pendientes y cómo fusionarlo — reconstrucción completa de esta rama).
 
 ### 17 de julio de 2026 — `AUDITAR_DEV_EPS` más completo
 - **Validación SAT en el PDE:** cuando la autorización se tramitó por *Mi
