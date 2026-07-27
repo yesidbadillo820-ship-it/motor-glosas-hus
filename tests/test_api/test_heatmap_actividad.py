@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 import pytest
 from fastapi.testclient import TestClient
@@ -85,11 +85,14 @@ class TestHeatmapActividad:
         assert d["horas"] == list(range(24))
 
     def test_ubica_eventos_en_celda_correcta(self, client, db_session):
-        # 2026-04-20 fue Lunes (weekday=0). 09:30 → fila 0, col 9
-        _seed(db_session, "2026-04-20 09:30")
-        _seed(db_session, "2026-04-20 09:45")
-        # 2026-04-22 fue Miércoles (weekday=2). 14:15 → fila 2, col 14
-        _seed(db_session, "2026-04-22 14:15")
+        # Pick a recent Monday (within default 90-day window)
+        today = date.today()
+        days_since_monday = today.weekday()  # Monday=0
+        recent_monday = today - timedelta(days=days_since_monday if days_since_monday > 0 else 7)
+        recent_wednesday = recent_monday + timedelta(days=2)
+        _seed(db_session, f"{recent_monday.isoformat()} 09:30")
+        _seed(db_session, f"{recent_monday.isoformat()} 09:45")
+        _seed(db_session, f"{recent_wednesday.isoformat()} 14:15")
 
         r = client.get("/glosas/stats/heatmap-actividad")
         d = r.json()

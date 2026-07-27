@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 22-07-2026
+**Última actualización:** 27-07-2026
 
 ---
 
@@ -115,6 +115,12 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   Además se escribió la **documentación técnica de entrega del módulo de
   diagnóstico del Lote V2** (`docs/diagnostico_lote_v2_pendientes/DOCUMENTACION_MODULO.md`)
   para consolidarlo en el proyecto principal sin perder conocimiento.
+- **27-07:** se generó el **informe técnico completo** de todo el trabajo
+  realizado (bot + evidencias + mejoras + lotes): 1.075 facturas procesadas,
+  45.134+ glosas respondidas, 7 mejoras al bot, 8 lotes cerrados o en proceso.
+  Publicado como artifact para socializar ante gerencia. Se generó también el
+  cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
+  consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
 
 ---
 

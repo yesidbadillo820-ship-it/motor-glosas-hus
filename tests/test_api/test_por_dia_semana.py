@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -74,11 +74,44 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # 2026-04-20 fue Lunes
-        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 20, 11, 0, tzinfo=timezone.utc))
-        # 2026-04-22 fue Miércoles
-        _seed(db_session, datetime(2026, 4, 22, 10, 0, tzinfo=timezone.utc))
+        # Pick a recent Monday (within default 90-day window)
+        today = date.today()
+        days_since_monday = today.weekday()
+        recent_monday = today - timedelta(days=days_since_monday if days_since_monday > 0 else 7)
+        recent_wednesday = recent_monday + timedelta(days=2)
+        _seed(
+            db_session,
+            datetime(
+                recent_monday.year,
+                recent_monday.month,
+                recent_monday.day,
+                10,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
+        _seed(
+            db_session,
+            datetime(
+                recent_monday.year,
+                recent_monday.month,
+                recent_monday.day,
+                11,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
+        _seed(
+            db_session,
+            datetime(
+                recent_wednesday.year,
+                recent_wednesday.month,
+                recent_wednesday.day,
+                10,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -88,11 +121,35 @@ class TestPorDiaSemana:
         assert d["total_glosas"] == 3
 
     def test_pct_del_total(self, client, db_session):
+        today = date.today()
+        days_since_monday = today.weekday()
+        recent_monday = today - timedelta(days=days_since_monday if days_since_monday > 0 else 7)
+        recent_tuesday = recent_monday + timedelta(days=1)
         # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+            _seed(
+                db_session,
+                datetime(
+                    recent_monday.year,
+                    recent_monday.month,
+                    recent_monday.day,
+                    10,
+                    0,
+                    tzinfo=timezone.utc,
+                ),
+            )
         # 1 glosa el martes
-        _seed(db_session, datetime(2026, 4, 21, 10, 0, tzinfo=timezone.utc))
+        _seed(
+            db_session,
+            datetime(
+                recent_tuesday.year,
+                recent_tuesday.month,
+                recent_tuesday.day,
+                10,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
