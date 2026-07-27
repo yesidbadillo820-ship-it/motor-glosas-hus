@@ -279,6 +279,15 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   - 35 pruebas del módulo en verde; verificado en navegador con los archivos
     reales (36.723 facturas).
 
+### 27-07 (tarde) — Documentación técnica oficial del módulo de Pre-auditoría
+- Se generó **`docs/PREAUDITORIA_DOCUMENTACION_TECNICA.md`**: documento de
+  entrega al equipo principal que reconstruye TODO el desarrollo del módulo
+  (objetivo, arquitectura, funciones, flujo, base de datos, backend, frontend,
+  decisiones tomadas y descartadas, riesgos, pendientes y guía de fusión).
+  Es la referencia para integrar este módulo al proyecto principal sin perder
+  conocimiento. PRs del módulo: #186 (v1→v2), #187 (botón menú), #189
+  (mejoras post primer uso).
+
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
   fusionadas desde la rama principal:
