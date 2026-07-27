@@ -5,7 +5,7 @@
 > **Todo chat debe leerlo al empezar y actualizarlo al terminar** (así lo ordena
 > `CLAUDE.md`). Escrito en lenguaje claro para el auditor de cartera del HUS.
 
-**Última actualización:** 24 de julio de 2026.
+**Última actualización:** 27 de julio de 2026.
 
 ---
 
@@ -206,6 +206,52 @@
   ahora se deja la ruta derivada por mes AAAAMM + la de factura electrónica
   `\\172.16.32.83\factura_electronica_net22\AAAAMM`). Con pruebas.
 
+### 27 de julio de 2026 — Acta de conciliación de las 147 facturas (formato SINAC)
+- **Cambio de enfoque pedido por el auditor.** El expediente del 24-jul cubría
+  las 5.571 facturas de toda la cartera. El auditor lo devolvió: *"el universo
+  de trabajo son únicamente las 147 facturas que actualmente están pendientes
+  por conciliar"*. Ahora todo gira alrededor de esas 147.
+- **Identificación del universo (antes de construir nada).** Las 147 salen del
+  `HUS.xlsx` que envió el Dispensario (el mismo lote del `CONCILIACION.xlsx`):
+  **147 facturas / 444 glosas**. Se cruzaron contra el estado de cartera: **146
+  de 147 cruzan**; la única que no aparece en cartera es **HUS0000443525**. El
+  estado de glosa de las 147 confirma que todas están pendientes (98
+  ratificadas pdte. conciliar, 25 parte levantada/parte ratificada, 23 en
+  trámite DGH). Se entregó el listado `LISTADO_147_PARA_APROBAR.xlsx` para
+  revisión previa.
+- **Nueva herramienta `tools/generar_acta_conciliacion_dispensario.py`:** arma
+  el acta **sobre el archivo real del ACTA SINAC N.º 720** (no una imitación):
+  conserva logos, encabezado oficial, celdas combinadas, zona de firmas y
+  macros. Solo cambia el contenido. La tabla se expande de 11 a **444 filas**
+  sin romper el formato.
+- **Lo que quedó en el acta:** una fila por glosa, **agrupadas por factura** y
+  ordenadas de mayor a menor valor glosado (al abrir una factura se ven todas
+  sus glosas seguidas — la HUS0000452150 con sus 62). Cada fila trae el
+  **motivo exacto de la EPS** y, al lado, **nuestra respuesta completa**, más
+  código, tipificación, valores, fechas, radicados, resultado en actas
+  previas, rutas de soportes y de factura electrónica (con hipervínculo).
+- **Hoja DASHBOARD** (la primera del libro) con los 12 indicadores pedidos,
+  todos como **fórmulas vivas**: al diligenciar la mesa el tablero se
+  actualiza solo.
+- **Cifras verificadas:** 147 facturas · 444 glosas · facturado
+  **$1.267.976.805** (sin duplicar por factura) · glosado y pendiente por
+  conciliar **$317.640.524** · aceptado en trámite **$1.758.956** ·
+  recuperable **$315.881.568**. 471 fórmulas, **0 errores**.
+- **Columnas completadas con el estado de cartera** (a solicitud del auditor):
+  *VALOR ACEPTADO EN TRÁMITE* (8 facturas, $1.758.956), *CENTRO DE COSTO*
+  (444 de 444 líneas, del export de recepción) y *ABOGADO ASIGNADO* (115
+  facturas). La *CUENTA CONTABLE* quedó en **PENDIENTE**: no existe en
+  ninguna base disponible (ni en el acta 720 original).
+- **Tres hallazgos para llevar a la mesa:** (1) la entidad **no ha confirmado
+  el recibo de ninguna de las 444 respuestas**, aunque todas tienen radicado
+  de entrega; (2) **29 facturas** tienen diferencia entre el valor glosado del
+  lote y el de la cartera; (3) el lote dice que **no aceptamos nada** (RE9901)
+  pero la cartera registra **$1.758.956 aceptados** en 8 facturas — hay que
+  aclararlo antes de firmar.
+- **Documentación de entrega:** `docs/MODULO_CONCILIACION_DISPENSARIO.md`, con
+  todo el módulo (objetivo, arquitectura, funciones, flujo, riesgos,
+  pendientes y cómo fusionarlo al proyecto principal).
+
 ---
 
 ## 2. PENDIENTE
@@ -235,16 +281,36 @@
 
 ---
 
-## 3. PARA MAÑANA (23 de julio de 2026)
+## 3. PARA MAÑANA (28 de julio de 2026)
 
-1. Subir a SIMED el Excel de las **3 facturas de junio** (prioridad 1) y
+**De la conciliación de las 147 facturas:**
+
+1. **Revisar y aprobar el listado de las 147** (`LISTADO_147_PARA_APROBAR.xlsx`)
+   y decidir qué se hace con **HUS0000443525**, que está en el lote de glosas
+   pero **no aparece en el estado de cartera**: ¿se incluye (147) o se excluye
+   (146)? Hoy está incluida.
+2. **Aclarar la discrepancia del aceptado:** el lote dice $0 (RE9901) pero la
+   cartera registra **$1.758.956** aceptados en 8 facturas. Debe resolverse
+   antes de firmar el acta.
+3. **Revisar las 29 facturas con diferencia** entre el valor glosado del lote y
+   el de la cartera.
+4. **Confirmar las raíces exactas `Y:` / `X:`** de los soportes para cerrar la
+   columna de ubicación (hoy queda la ruta derivada por mes + PENDIENTE).
+5. **Conseguir la CUENTA CONTABLE** con contabilidad/DGH: es el único campo del
+   acta que no existe en ninguna base disponible.
+6. Plantear en la mesa que la entidad **no ha confirmado el recibo de ninguna
+   de las 444 respuestas**, pese a que todas tienen radicado de entrega.
+
+**De la respuesta de glosas en SIMED (sigue pendiente de antes):**
+
+7. Subir a SIMED el Excel de las **3 facturas de junio** (prioridad 1) y
    guardar el pantallazo de evidencia de cada una.
-2. Si los lotes del **14 y 17 de julio** aún no están subidos, subirlos
+8. Si los lotes del **14 y 17 de julio** aún no están subidos, subirlos
    (piloto de 1 factura → lote completo → segunda pasada de verificación).
-3. Correr la consolidación de evidencias del lote 14 → **GI-33-5182-2026.pdf**
+9. Correr la consolidación de evidencias del lote 14 → **GI-33-5182-2026.pdf**
    y conseguir el consecutivo GI-33 del lote 17 para su PDF.
-4. Cuando llegue el próximo Excel de glosas del Dispensario, generarlo con el
-   motor de plantillas ya verificado (mismo flujo de los lotes anteriores).
+10. Cuando llegue el próximo Excel de glosas del Dispensario, generarlo con el
+    motor de plantillas ya verificado (mismo flujo de los lotes anteriores).
 
 ---
 
