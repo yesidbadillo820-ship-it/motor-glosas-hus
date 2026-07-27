@@ -112,6 +112,9 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   **CONSOLIDADO_PERTINENCIA_6JULIO_FUSIONADO.xlsx** (37 facturas, 5.736
   glosas, cero sin respuesta, todas RE9901). Quedó listo el comando para
   correrlo. Se creó esta bitácora (fusionando el trabajo de dos chats).
+  Además se escribió la **documentación técnica de entrega del módulo de
+  diagnóstico del Lote V2** (`docs/diagnostico_lote_v2_pendientes/DOCUMENTACION_MODULO.md`)
+  para consolidarlo en el proyecto principal sin perder conocimiento.
 
 ---
 
