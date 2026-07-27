@@ -155,50 +155,92 @@ No hay ORM ni esquema SQL. Las estructuras son diccionarios y listas de Python:
 ```python
 # cargar_cartera → { "HUS0000316347": {...} }
 {
-  "factura": str,             "vigencia": str,          "estado": str,
-  "fecha_radicado": datetime, "valor_factura": float,   "saldo_dgh": float,
-  "saldo_eps": float,         "valor_devolucion": float,"valor_glosa": float,
-  "valor_libre_pago": float,  "soporte_pago": str,      "edades": str,
-  "levantada_actas": float,   "aceptada_actas": float,  "ratificada_actas": float,
-  "actas": str,               "estado_glosa": str,
+    "factura": str,
+    "vigencia": str,
+    "estado": str,
+    "fecha_radicado": datetime,
+    "valor_factura": float,
+    "saldo_dgh": float,
+    "saldo_eps": float,
+    "valor_devolucion": float,
+    "valor_glosa": float,
+    "valor_libre_pago": float,
+    "soporte_pago": str,
+    "edades": str,
+    "levantada_actas": float,
+    "aceptada_actas": float,
+    "ratificada_actas": float,
+    "actas": str,
+    "estado_glosa": str,
 }
 
 # cargar_recepcion → { "104341": [ {...}, {...} ] }   (indexado por CONSECUTIVO)
 {
-  "consecutivo": str, "factura": str,   "fecha_glosa": datetime,
-  "fecha_factura": datetime, "tipo": str, "codigo": str, "concepto": str,
-  "cups": str,        "servicio": str,  "valor": float,  "motivo_eps": str,
+    "consecutivo": str,
+    "factura": str,
+    "fecha_glosa": datetime,
+    "fecha_factura": datetime,
+    "tipo": str,
+    "codigo": str,
+    "concepto": str,
+    "cups": str,
+    "servicio": str,
+    "valor": float,
+    "motivo_eps": str,
 }
 
 # cargar_tramite → [ {...}, ... ]  (lista plana, una por línea de respuesta)
 {
-  "factura": str, "rec_consecutivo": str, "fecha_glosa": datetime,
-  "fecha_factura": datetime, "fecha_respuesta": datetime,
-  "radicado_respuesta": str, "tipo": str, "estado_cxc": str,
-  "contrato_cod": str, "codigo_glosa": str, "concepto_glosa": str,
-  "servicio": str, "glosado": float, "aceptado": float,
-  "objetado": float,   # DERIVADO = glosado - aceptado
-  "argumento": str,
+    "factura": str,
+    "rec_consecutivo": str,
+    "fecha_glosa": datetime,
+    "fecha_factura": datetime,
+    "fecha_respuesta": datetime,
+    "radicado_respuesta": str,
+    "tipo": str,
+    "estado_cxc": str,
+    "contrato_cod": str,
+    "codigo_glosa": str,
+    "concepto_glosa": str,
+    "servicio": str,
+    "glosado": float,
+    "aceptado": float,
+    "objetado": float,  # DERIVADO = glosado - aceptado
+    "argumento": str,
 }
 
 # cargar_cruce_actas → [ {...}, ... ]  (una por par FACTURA+ACTA)
 {
-  "factura": str, "acta": str, "tipo": str, "glosa_inicial": float,
-  "aceptada": float, "levantada": float, "ratificada": float,
-  "a_pagar": float,  "duplicada": bool,   # True si acta == AC000639
+    "factura": str,
+    "acta": str,
+    "tipo": str,
+    "glosa_inicial": float,
+    "aceptada": float,
+    "levantada": float,
+    "ratificada": float,
+    "a_pagar": float,
+    "duplicada": bool,  # True si acta == AC000639
 }
 
 # construir_glosas → [ {...}, ... ]  (LA ESTRUCTURA CENTRAL: glosa + respuesta juntas)
 {
-  "factura": str, "consecutivo": str, "fecha_glosa": datetime, "tipo": str,
-  "codigo_glosa": str, "concepto_glosa": str, "servicio": str, "cups": str,
-  "motivo_eps": str,                          # ← lo que objetó la EPS
-  "valor_glosado": float,
-  "fecha_respuesta": datetime, "radicado_respuesta": str,
-  "valor_aceptado": float, "valor_objetado": float,
-  "argumento": str,                           # ← lo que respondió el HUS
-  "estado_respuesta": "RESPONDIDA" | "SIN RESPUESTA",
-  "origen": "TRAMITE" | "RECEPCION",
+    "factura": str,
+    "consecutivo": str,
+    "fecha_glosa": datetime,
+    "tipo": str,
+    "codigo_glosa": str,
+    "concepto_glosa": str,
+    "servicio": str,
+    "cups": str,
+    "motivo_eps": str,  # ← lo que objetó la EPS
+    "valor_glosado": float,
+    "fecha_respuesta": datetime,
+    "radicado_respuesta": str,
+    "valor_aceptado": float,
+    "valor_objetado": float,
+    "argumento": str,  # ← lo que respondió el HUS
+    "estado_respuesta": "RESPONDIDA" | "SIN RESPUESTA",
+    "origen": "TRAMITE" | "RECEPCION",
 }
 ```
 
@@ -934,11 +976,11 @@ Regla operativa permanente: **jamás se modifican los archivos originales**. Los
 **Generador A** (líneas 68–73):
 
 ```python
-EPS_NOMBRE     = "DIRECCION DE SANIDAD EJERCITO"
-NIT_TERCERO    = "901541137"
-PRESTADOR      = "DISPENSARIO MEDICO BUCARAMANGA"
-FE_RAIZ        = r"\\172.16.32.83\factura_electronica_net22"
-SOPORTES_NOTA  = "RAIZ Y:/X: PENDIENTE confirmar con auditor; subcarpeta = AAAAMM"
+EPS_NOMBRE = "DIRECCION DE SANIDAD EJERCITO"
+NIT_TERCERO = "901541137"
+PRESTADOR = "DISPENSARIO MEDICO BUCARAMANGA"
+FE_RAIZ = r"\\172.16.32.83\factura_electronica_net22"
+SOPORTES_NOTA = "RAIZ Y:/X: PENDIENTE confirmar con auditor; subcarpeta = AAAAMM"
 ACTA_DUPLICADA = "AC000639"
 ```
 
