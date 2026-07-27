@@ -436,15 +436,19 @@ def exportar_oficio_adres(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Excel con la INFORMACIÓN COMPLETA de las facturas ADRES de un oficio.
+    """Excel de las facturas ADRES de un oficio, con el formato del consolidado
+    que se maneja con esa entidad.
 
-    ADRES exige que sus oficios se acompañen de un Excel con todos los datos
-    de cada factura (fuentes + resultado de la pre-auditoría + CUFE).
-    Solo salen las facturas cuya entidad es ADRES.
+    SINAC diligencia desde "Item" hasta "Fecha_Entrega_Fact" (esta última
+    queda en blanco: es la fecha de entrega física a Facturación). Las
+    columnas siguientes (Observación_FACTURACIÓN … INFOPOL) pertenecen a las
+    otras áreas y van incluidas pero vacías, para que continúen el mismo
+    archivo. Solo salen las facturas cuya entidad es ADRES.
     """
     import re as _re
 
     from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
 
     o = db.get(OficioRecepcionRecord, oficio_id)
     if not o:
@@ -486,62 +490,107 @@ def exportar_oficio_adres(
         else {}
     )
 
+    # Tramo que diligencia SINAC + tramo de las otras áreas (va vacío).
+    COLS_SINAC = [
+        "Item",
+        "Fecha_Recibido",
+        "Envío",
+        "AUD",
+        "HUS",
+        "Fecha_Factura",
+        "Valor",
+        "NIT",
+        "Entidad",
+        "Correo F.E.",
+        "Observación Preauditoria Radicación SINAC",
+        "Radicar_1",
+        "Observaciones Adicionales",
+        "Fecha_Entrega_Fact",
+    ]
+    COLS_OTRAS_AREAS = [
+        "Observación_FACTURACIÓN",
+        "Fecha_Dev_CARTERA",
+        "Fecha_Segunda_Revisión",
+        "Segunda_Observación_SINAC",
+        "Fecha_Dev_FACTURACIÓN",
+        "Segunda_Observación_FACTURACIÓN",
+        "Fecha_Dev_CARTERA",
+        "Radicar_2",
+        "Fecha_Radicación",
+        "Número_Radicado",
+        "INFOPOL",
+    ]
+
     wb = Workbook()
     ws = wb.active
     ws.title = "ADRES"
-    ws.append(
-        [
-            "OFICIO FHUS",
-            "F_RECIBIDO",
-            "ENVIO",
-            "FACTURA",
-            "F_FACTURA",
-            "VALOR",
-            "NIT",
-            "ENTIDAD",
-            "CORREO F.E.",
-            "FECHA CORREO F.E.",
-            "CUFE / N° F.E.",
-            "ESTADO",
-            "RESULTADO",
-            "RONDA",
-            "N SUBSANACION",
-            "DEVOLUCIONES",
-            "AUDITOR",
-            "FECHA AUDITORIA",
-            "MOTIVO DEVOLUCION",
-            "OBSERVACIONES",
-            "OFICIO DEVOLUCION SINAC",
-            "RECEPCIONADO POR",
-        ]
-    )
-    for f, rad, dg in adres:
+    ws.append(COLS_SINAC + COLS_OTRAS_AREAS)
+    for idx, (f, rad, dg) in enumerate(adres, start=1):
+        if f.resultado_actual == svc.RESULTADO_DEVUELTA:
+            obs = f.motivo_ultima_devolucion or "DEVUELTA"
+            cons = consecutivos.get(f.oficio_devolucion_id)
+            if cons:
+                obs = f"{obs} — Oficio {cons}"
+            radicar_1 = "NO"
+        elif f.resultado_actual == svc.RESULTADO_RADICAR:
+            obs = "SOPORTES COMPLETOS"
+            radicar_1 = "SI"
+        else:
+            obs = ""
+            radicar_1 = ""
         ws.append(
             [
-                f.oficio_fhus or o.numero_radicado,
+                idx,
                 (_fecha_iso(f.f_recibido) or "").replace("T", " ")[:16],
                 f.envio_actual or (rad.envio if rad else None),
+                f.auditor,
                 f.factura,
                 (_fecha_fuente_iso(rad.f_factura if rad else None) or "")[:10],
                 (rad.valor if rad else 0) or 0,
                 rad.nit if rad else None,
                 rad.entidad if rad else None,
                 dg.correo_fe if dg else "NO",
-                (_fecha_fuente_iso(dg.fecha_correo if dg else None) or "")[:10],
-                dg.numero_fe if dg else None,
-                f.estado,
-                f.resultado_actual,
-                f.ronda_actual,
-                f.num_subsanacion,
-                f.num_devoluciones,
-                f.auditor,
-                (_fecha_iso(f.fecha_auditoria) or "").replace("T", " ")[:16],
-                f.motivo_ultima_devolucion,
+                obs,
+                radicar_1,
                 f.observaciones,
-                consecutivos.get(f.oficio_devolucion_id),
-                o.creado_por,
+                "",  # Fecha_Entrega_Fact: la diligencia a mano quien entrega
             ]
+            + [""] * len(COLS_OTRAS_AREAS)
         )
+
+    # Presentación: encabezado azul (tramo SINAC) / gris (otras áreas),
+    # primera fila congelada, valor con formato de miles.
+    azul = PatternFill("solid", fgColor="1F4E79")
+    gris = PatternFill("solid", fgColor="808080")
+    blanco = Font(bold=True, color="FFFFFF", size=9)
+    for c, _titulo in enumerate(COLS_SINAC + COLS_OTRAS_AREAS, start=1):
+        celda = ws.cell(row=1, column=c)
+        celda.fill = azul if c <= len(COLS_SINAC) else gris
+        celda.font = blanco
+        celda.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    anchos = {
+        1: 5,
+        2: 17,
+        3: 9,
+        4: 16,
+        5: 15,
+        6: 11,
+        7: 13,
+        8: 11,
+        9: 34,
+        10: 9,
+        11: 40,
+        12: 9,
+        13: 24,
+        14: 12,
+    }
+    for c in range(1, len(COLS_SINAC + COLS_OTRAS_AREAS) + 1):
+        letra = ws.cell(row=1, column=c).column_letter
+        ws.column_dimensions[letra].width = anchos.get(c, 16)
+    for r in range(2, ws.max_row + 1):
+        ws.cell(row=r, column=7).number_format = "#,##0"
+    ws.freeze_panes = "A2"
+
     buf = BytesIO()
     wb.save(buf)
     nombre = _re.sub(r"[^A-Za-z0-9_-]+", "_", o.numero_radicado or "oficio")

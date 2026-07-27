@@ -323,6 +323,22 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 - **Para dejar la página limpia:** después de desplegar en la VM, entrar como
   administrador → Fuentes → Zona de administración → "Borrar todos los datos"
   (sin marcar la casilla de fuentes, para no volver a subir los Excel).
+- **Ajuste posterior (mismo día):** el auditor pidió que el Excel de ADRES
+  salga con el formato del consolidado que se maneja con esa entidad. Quedó
+  así: SINAC diligencia de **Item** a **Fecha_Entrega_Fact** (Item,
+  Fecha_Recibido, Envío, AUD, HUS, Fecha_Factura, Valor, NIT, Entidad,
+  Correo F.E., Observación Preauditoria Radicación SINAC, Radicar_1,
+  Observaciones Adicionales, Fecha_Entrega_Fact) y después vienen las
+  columnas de las otras áreas **vacías** para que continúen el mismo archivo
+  (Observación_FACTURACIÓN, Fecha_Dev_CARTERA, Fecha_Segunda_Revisión,
+  Segunda_Observación_SINAC, Fecha_Dev_FACTURACIÓN,
+  Segunda_Observación_FACTURACIÓN, Fecha_Dev_CARTERA, Radicar_2,
+  Fecha_Radicación, Número_Radicado, INFOPOL). El sistema llena: Radicar_1
+  (SI/NO según la auditoría), la Observación (el motivo de devolución con el
+  consecutivo DEV-PRE-AUD, o "SOPORTES COMPLETOS" si va a radicar) y deja
+  **Fecha_Entrega_Fact en blanco** (esa fecha la escribe a mano quien
+  entrega a Facturación). Encabezados azules el tramo SINAC y grises el de
+  las otras áreas.
 
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,

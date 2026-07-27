@@ -640,18 +640,21 @@ ENTIDAD_ADRES = "ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA GENERAL DE SEGURIDAD
 
 
 class TestExportAdres:
-    def test_descarga_con_informacion_completa(self, client):
+    def test_descarga_con_formato_del_consolidado(self, client):
         _subir_radicacion(
             client,
             [
                 _rad_fila(ENV, F1, 250700, nit=svc.NIT_ADRES, entidad=ENTIDAD_ADRES),
-                _rad_fila(ENV, F2, 98000),  # otra entidad: NO debe salir en el Excel
+                _rad_fila(ENV, F2, 98000, nit=svc.NIT_ADRES, entidad=ENTIDAD_ADRES),
+                _rad_fila(ENV, F3, 55000),  # otra entidad: NO debe salir en el Excel
             ],
         )
         _subir_dgreport(client, [F1])
         o = _crear_oficio(client)
         _escribir(client, o["id"], ENV)
         _radicar(client, _factura_id(client, F1))
+        _devolver(client, _factura_id(client, F2), motivo="Falta FURIPS")
+        assert client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").status_code == 200
         # La lista de oficios marca que este tiene facturas de ADRES.
         of = client.get("/preauditoria/oficios").json()["items"][0]
         assert of["tiene_adres"] is True
@@ -662,18 +665,52 @@ class TestExportAdres:
         ws = load_workbook(BytesIO(r.content)).active
         filas = list(ws.iter_rows(values_only=True))
         encabezado = list(filas[0])
-        for col in ("FACTURA", "VALOR", "CORREO F.E.", "CUFE / N° F.E.", "MOTIVO DEVOLUCION"):
-            assert col in encabezado
-        assert len(filas) == 2  # encabezado + solo la factura ADRES
-        fila = dict(zip(encabezado, filas[1]))
-        assert fila["FACTURA"] == F1
-        assert str(fila["NIT"]) == svc.NIT_ADRES
-        assert fila["ENTIDAD"] == ENTIDAD_ADRES.strip()
-        assert fila["CORREO F.E."] == "SI"
-        assert fila["CUFE / N° F.E."] == "CUFE" + F1
-        assert fila["RESULTADO"] == "RADICAR"
-        assert fila["VALOR"] == 250700
-        assert fila["AUDITOR"] == "CLAUDIA"
+        # Tramo SINAC en el orden del consolidado real…
+        assert encabezado[:14] == [
+            "Item",
+            "Fecha_Recibido",
+            "Envío",
+            "AUD",
+            "HUS",
+            "Fecha_Factura",
+            "Valor",
+            "NIT",
+            "Entidad",
+            "Correo F.E.",
+            "Observación Preauditoria Radicación SINAC",
+            "Radicar_1",
+            "Observaciones Adicionales",
+            "Fecha_Entrega_Fact",
+        ]
+        # …seguido de las columnas de las otras áreas (vienen vacías).
+        assert encabezado[14] == "Observación_FACTURACIÓN"
+        assert encabezado[-1] == "INFOPOL"
+        assert "Radicar_2" in encabezado
+        assert len(filas) == 3  # encabezado + las 2 facturas ADRES (F3 no sale)
+        assert [f[0] for f in filas[1:]] == [1, 2]  # Item consecutivo
+        por_hus = {
+            dict(zip(encabezado[:14], f))["HUS"]: dict(zip(encabezado[:14], f)) for f in filas[1:]
+        }
+        # F1 radicada
+        f1 = por_hus[F1]
+        assert f1["HUS"] == F1
+        assert f1["AUD"] == "CLAUDIA"
+        assert str(f1["NIT"]) == svc.NIT_ADRES
+        assert f1["Entidad"] == ENTIDAD_ADRES.strip()
+        assert f1["Correo F.E."] == "SI"
+        assert f1["Valor"] == 250700
+        assert f1["Radicar_1"] == "SI"
+        assert f1["Observación Preauditoria Radicación SINAC"] == "SOPORTES COMPLETOS"
+        assert f1["Fecha_Entrega_Fact"] in ("", None)  # la llena a mano quien entrega
+        # F2 devuelta: motivo + consecutivo del oficio de devolución, Radicar_1=NO
+        f2 = por_hus[F2]
+        assert f2["HUS"] == F2
+        assert f2["Correo F.E."] == "NO"
+        assert f2["Radicar_1"] == "NO"
+        obs2 = f2["Observación Preauditoria Radicación SINAC"]
+        assert "Falta FURIPS" in obs2 and "DEV-PRE-AUD-0001" in obs2
+        # el tramo de las otras áreas viene vacío
+        assert all(v in ("", None) for v in filas[1][14:])
 
     def test_reconoce_adres_por_nombre_sin_nit(self, client):
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700, nit="901037916-6", entidad="ADRES ")])
