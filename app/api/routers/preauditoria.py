@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual
 from app.core.tz import TZ_BOGOTA, a_utc
 from app.database import get_db
 from app.models.db import (
@@ -162,12 +162,17 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         .order_by(EnvioCargadoRecord.envio)
         .all()
     )
+    auditores = sorted({f.auditor for f in facturas if f.auditor})
     d = {
         "id": o.id,
         "numero_radicado": o.numero_radicado,
         "fecha_recibido": _fecha_iso(o.fecha_recibido),
         "observaciones": o.observaciones,
         "creado_por": o.creado_por,
+        # Fase 1: quién RECEPCIONÓ el oficio (lo registró en el sistema).
+        "recepcionado_por": o.creado_por,
+        # Fase 2: quién(es) están AUDITANDO sus facturas.
+        "auditores": auditores,
         "total_facturas": len(facturas),
         "pendientes": pendientes,
         "radicar": radicar,
@@ -363,6 +368,52 @@ def ver_oficio(
     if not o:
         raise HTTPException(404, "Oficio no encontrado")
     return _oficio_dict(db, o, con_facturas=True)
+
+
+class EliminarOficiosIn(BaseModel):
+    ids: list[int] = Field(..., min_length=1, max_length=100)
+
+
+@router.delete("/oficios/{oficio_id}")
+def eliminar_oficio(
+    oficio_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Elimina un oficio mal registrado (solo SUPER_ADMIN/COORDINADOR)."""
+    o = db.get(OficioRecepcionRecord, oficio_id)
+    if not o:
+        raise HTTPException(404, "Oficio no encontrado")
+    res = svc.eliminar_oficio(db, o)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 409), res.get("mensaje", "No se pudo eliminar"))
+    return res
+
+
+@router.post("/oficios/eliminar-masivo")
+def eliminar_oficios_masivo(
+    body: EliminarOficiosIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Elimina varios oficios a la vez (solo SUPER_ADMIN/COORDINADOR).
+
+    Los que no se puedan eliminar (PDF de devolución emitido) se reportan
+    sin frenar a los demás.
+    """
+    eliminados = []
+    rechazados = []
+    for oid in body.ids:
+        o = db.get(OficioRecepcionRecord, oid)
+        if not o:
+            rechazados.append({"id": oid, "motivo": "No encontrado"})
+            continue
+        res = svc.eliminar_oficio(db, o)
+        if res.get("ok"):
+            eliminados.append(res["radicado"])
+        else:
+            rechazados.append({"id": oid, "motivo": res.get("mensaje", "")})
+    return {"eliminados": eliminados, "rechazados": rechazados}
 
 
 # ------------------------------------------------------------------
@@ -847,6 +898,40 @@ def estadisticas(
         elif f.resultado_actual == svc.RESULTADO_DEVUELTA:
             a["devueltas"] += 1
 
+    # Por entidad (top 10 por nº de facturas), con desglose de resultado.
+    entidades: dict[str, dict] = {}
+    ent_por_factura = {
+        fac: (ent or "SIN ENTIDAD")
+        for fac, ent in db.query(
+            FacturaPreauditoriaRecord.factura, RadicacionCuentaRecord.entidad
+        ).outerjoin(
+            RadicacionCuentaRecord,
+            RadicacionCuentaRecord.factura == FacturaPreauditoriaRecord.factura,
+        )
+    }
+    for f in facturas:
+        ent = ent_por_factura.get(f.factura, "SIN ENTIDAD")
+        e = entidades.setdefault(
+            ent,
+            {
+                "entidad": ent,
+                "facturas": 0,
+                "radicar": 0,
+                "devueltas": 0,
+                "pendientes": 0,
+                "valor": 0.0,
+            },
+        )
+        e["facturas"] += 1
+        e["valor"] += valores.get(f.factura, 0)
+        if f.resultado_actual == svc.RESULTADO_RADICAR:
+            e["radicar"] += 1
+        elif f.resultado_actual == svc.RESULTADO_DEVUELTA:
+            e["devueltas"] += 1
+        else:
+            e["pendientes"] += 1
+    por_entidad = sorted(entidades.values(), key=lambda e: e["facturas"], reverse=True)[:10]
+
     reincidentes = sorted(
         (
             {"factura": f.factura, "veces_devuelta": f.num_devoluciones}
@@ -896,6 +981,7 @@ def estadisticas(
         "tasa_devolucion": round(devueltas / auditadas, 4) if auditadas else 0,
         "valor_total": sum(valores.values()),
         "por_auditor": sorted(por_auditor.values(), key=lambda a: a["auditadas"], reverse=True),
+        "por_entidad": por_entidad,
         "reincidentes": reincidentes[:50],
         "en_limite_devoluciones": en_limite,
         "semaforo_oficios": conteo_semaforo,

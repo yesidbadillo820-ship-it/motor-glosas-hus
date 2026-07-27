@@ -265,7 +265,13 @@ def generar_pdf_oficio_devolucion(
         return t
 
     if os.path.exists(RUTA_FIRMA):
-        firma_entrega = Image(RUTA_FIRMA, width=4.2 * cm, height=1.6 * cm)
+        # Conservar la proporción real de la firma escaneada.
+        from reportlab.lib.utils import ImageReader
+
+        iw, ih = ImageReader(RUTA_FIRMA).getSize()
+        ancho_firma = 6.0 * cm
+        alto_firma = ancho_firma * ih / iw if iw else 1.3 * cm
+        firma_entrega = Image(RUTA_FIRMA, width=ancho_firma, height=alto_firma)
     else:
         firma_entrega = Spacer(1, 1.3 * cm)
     bloque_izq = _bloque_firma(firma_entrega, FIRMANTE_NOMBRE, FIRMANTE_CARGO, FIRMANTE_EMPRESA)

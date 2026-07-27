@@ -807,6 +807,19 @@ def auditar_factura(
             }
 
     if resultado == RESULTADO_RADICAR:
+        # Regla del proceso: sin soporte de facturación electrónica (CORREO
+        # F.E. = NO) la factura no se puede radicar — solo devolverse.
+        if (fuente.get("correo_fe") or "NO") != "SI":
+            return {
+                "ok": False,
+                "codigo": 409,
+                "mensaje": (
+                    f"La factura {canon.factura} no tiene soporte de facturación "
+                    "electrónica (CORREO F.E. = NO): solo puede devolverse. Si el "
+                    "soporte ya existe, suba el Formato Facturación Electrónica "
+                    "actualizado en la pestaña Fuentes."
+                ),
+            }
         canon.resultado_actual = RESULTADO_RADICAR
         canon.estado = ESTADO_RADICADA if canon.ronda_actual == 1 else ESTADO_SUBSANADA
         canon.pendiente_subsanacion = 0
@@ -904,3 +917,105 @@ def auditar_factura(
         return {"ok": True}
 
     return {"ok": False, "codigo": 400, "mensaje": "Resultado inválido."}
+
+
+# ==================================================================
+# Eliminar un oficio mal registrado (solo administradores)
+# ==================================================================
+
+
+def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
+    """Elimina un oficio de recepción con salvaguardas.
+
+    - Si alguna de sus facturas ya salió en un oficio de devolución (PDF con
+      consecutivo emitido), NO se elimina: devuelve el motivo.
+    - Facturas de ronda 1 (nacieron en este oficio): se borran con sus eventos.
+    - Facturas en subsanación (ronda 2+, reingresaron aquí): NO se borran; se
+      revierte el reingreso y vuelven a su estado DEVUELTA anterior, con su
+      historial intacto.
+    - Se liberan los envíos del ledger para poder re-escribirlos.
+    """
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio.id)
+        .all()
+    )
+    con_pdf = [f.factura for f in facturas if f.oficio_devolucion_id]
+    en_pdf_por_evento = (
+        db.query(FacturaEventoRecord.factura)
+        .filter(
+            FacturaEventoRecord.oficio_id == oficio.id,
+            FacturaEventoRecord.oficio_devolucion_id.isnot(None),
+        )
+        .all()
+    )
+    con_pdf += [r[0] for r in en_pdf_por_evento]
+    if con_pdf:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El oficio {oficio.numero_radicado} tiene factura(s) en un oficio de "
+                f"devolución ya emitido ({', '.join(sorted(set(con_pdf))[:5])}...): "
+                "no se puede eliminar."
+            ),
+        }
+
+    borradas = 0
+    revertidas = 0
+    for f in facturas:
+        if f.ronda_actual <= 1:
+            db.query(FacturaEventoRecord).filter(FacturaEventoRecord.factura_id == f.id).delete(
+                synchronize_session=False
+            )
+            db.delete(f)
+            borradas += 1
+        else:
+            # Reingreso: revertir a la devolución anterior sin perder historial.
+            evento_dev = (
+                db.query(FacturaEventoRecord)
+                .filter(
+                    FacturaEventoRecord.factura_id == f.id,
+                    FacturaEventoRecord.tipo_evento.in_(["DEVUELTA", "NUEVAMENTE_DEVUELTA"]),
+                    FacturaEventoRecord.oficio_id != oficio.id,
+                )
+                .order_by(FacturaEventoRecord.creado_en.desc(), FacturaEventoRecord.id.desc())
+                .first()
+            )
+            db.query(FacturaEventoRecord).filter(
+                FacturaEventoRecord.factura_id == f.id,
+                FacturaEventoRecord.oficio_id == oficio.id,
+            ).delete(synchronize_session=False)
+            f.ronda_actual -= 1
+            f.num_subsanacion = max(0, f.ronda_actual - 1)
+            f.resultado_actual = RESULTADO_DEVUELTA
+            f.pendiente_subsanacion = 1
+            if f.num_devoluciones >= MAX_DEVOLUCIONES:
+                f.estado = ESTADO_BLOQUEADA
+            elif f.ronda_actual == 1:
+                f.estado = ESTADO_DEVUELTA_PEND
+            else:
+                f.estado = ESTADO_NUEV_DEVUELTA
+            if evento_dev:
+                f.envio_actual = evento_dev.envio
+                f.oficio_actual_id = evento_dev.oficio_id
+                f.oficio_fhus = evento_dev.oficio_fhus
+                f.f_recibido = evento_dev.f_recibido
+                f.auditor = evento_dev.auditor
+                f.motivo_ultima_devolucion = evento_dev.motivo
+                f.fecha_auditoria = evento_dev.creado_en
+            revertidas += 1
+
+    envios = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.oficio_id == oficio.id).all()
+    for e in envios:
+        db.delete(e)
+    radicado = oficio.numero_radicado
+    db.delete(oficio)
+    db.commit()
+    return {
+        "ok": True,
+        "radicado": radicado,
+        "facturas_borradas": borradas,
+        "subsanaciones_revertidas": revertidas,
+        "envios_liberados": len(envios),
+    }

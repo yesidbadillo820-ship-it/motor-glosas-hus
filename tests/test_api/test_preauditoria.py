@@ -259,9 +259,25 @@ def _radicar(client, fid):
 class TestAuditoria:
     def _setup(self, client, envio=ENV, factura=F1, valor=250700):
         _subir_radicacion(client, [_rad_fila(envio, factura, valor)])
+        _subir_dgreport(client, [factura])  # con F.E.: se permite radicar
         o = _crear_oficio(client, f"FHUS-{envio}", "2026-07-20T08:00")
         _escribir(client, o["id"], envio)
         return o, _factura_id(client, factura)
+
+    def test_sin_facturacion_electronica_no_se_radica(self, client):
+        # Regla: CORREO F.E. = NO → solo se puede devolver.
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])  # SIN dgreport
+        o = _crear_oficio(client, f"FHUS-{ENV}", "2026-07-20T08:00")
+        _escribir(client, o["id"], ENV)
+        fid = _factura_id(client, F1)
+        r = _radicar(client, fid)
+        assert r.status_code == 409
+        assert (
+            "facturación electrónica" in r.json()["detail"].lower()
+            or "electr" in r.json()["detail"].lower()
+        )
+        # devolver sí se permite
+        assert _devolver(client, fid).status_code == 200
 
     def test_radicar_registra_auditor(self, client):
         o, fid = self._setup(client)
@@ -285,6 +301,7 @@ class TestAuditoria:
 
     def test_subsanacion_reingreso_no_duplica(self, client):
         # F1 en envío ENV, devuelta; reingresa en un envío NUEVO (re-radicación)
+        _subir_dgreport(client, [F1])
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
         o1 = _crear_oficio(client, "FHUS-1", "2026-07-20T08:00")
         _escribir(client, o1["id"], ENV)
@@ -340,6 +357,7 @@ class TestAuditoria:
         assert abs(len(pdf1) - len(pdf2)) < 500  # contenido equivalente
 
     def test_tope_3_devoluciones(self, client):
+        _subir_dgreport(client, [F1])
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
         # ronda 1
         o = _crear_oficio(client, "FHUS-A", "2026-07-20T08:00")
@@ -410,6 +428,7 @@ class TestDevolucionYStats:
             client,
             [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 10615224), _rad_fila(ENV, F3, 73500)],
         )
+        _subir_dgreport(client, [F1, F2, F3])
         o = _crear_oficio(client)
         _escribir(client, o["id"], ENV)
         for f in (F1, F2):
@@ -443,6 +462,78 @@ class TestDevolucionYStats:
         assert d["radicar"] == 1
         assert d["por_auditor"][0]["auditor"] == "CLAUDIA"
         assert d["valor_total"] == 250700 + 10615224 + 73500
+
+
+# ------------------------------------------------------------------
+# Eliminar oficios (solo admin/coordinador)
+# ------------------------------------------------------------------
+
+
+class TestEliminarOficio:
+    def _admin(self, db_session):
+        u = UsuarioRecord(
+            id=2,
+            nombre="ADMIN",
+            email="admin@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        return u
+
+    def test_auditor_no_puede_eliminar(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        r = client.delete(f"/preauditoria/oficios/{o['id']}")
+        assert r.status_code == 403  # el fixture es rol AUDITOR
+
+    def test_admin_elimina_y_libera_envio(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        admin = self._admin(db_session)
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        r = client.delete(f"/preauditoria/oficios/{o['id']}")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["facturas_borradas"] == 1 and d["envios_liberados"] == 1
+        # el consolidado quedó limpio y el envío se puede volver a escribir
+        assert client.get("/preauditoria/consolidado").json()["total"] == 0
+        o2 = _crear_oficio(client, "FHUS-NUEVO-1", "2026-07-21T08:00")
+        assert _escribir(client, o2["id"], ENV).json()["nuevas"] == 1
+
+    def test_no_elimina_con_pdf_emitido(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        admin = self._admin(db_session)
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _devolver(client, _factura_id(client, F1))
+        client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        r = client.delete(f"/preauditoria/oficios/{o['id']}")
+        assert r.status_code == 409
+        assert "devolución" in r.json()["detail"]
+
+    def test_masivo_reporta_rechazados(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        admin = self._admin(db_session)
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        r = client.post("/preauditoria/oficios/eliminar-masivo", json={"ids": [o["id"], 9999]})
+        d = r.json()
+        assert len(d["eliminados"]) == 1
+        assert d["rechazados"][0]["id"] == 9999
 
 
 # ------------------------------------------------------------------
