@@ -75,8 +75,15 @@ REM instalar, el bot corre igual (los escaneados quedan SIN TEXTO).
 )
 %PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 || (
     echo [i] Instalando el motor OCR ^(rapidocr-onnxruntime^) para leer PDF
-    echo     ESCANEADOS. La primera vez puede tardar varios minutos...
-    %PYEXE% -m pip install --quiet --user rapidocr-onnxruntime >nul 2>&1
+    echo     ESCANEADOS. Descarga ~200 MB SOLO la primera vez. NO cierre la
+    echo     ventana: abajo se ve el avance de la descarga...
+    %PYEXE% -m pip install --user rapidocr-onnxruntime
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 && (
+    echo [i] Lector OCR listo.
+) || (
+    echo [!] OCR no disponible: se continua igual y los PDF escaneados
+    echo     quedaran marcados SIN TEXTO para revision manual.
 )
 
 if not exist "%~dp0generar_informe_baja_cartera.py" (
