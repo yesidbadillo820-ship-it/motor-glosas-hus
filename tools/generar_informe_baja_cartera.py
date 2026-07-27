@@ -107,8 +107,8 @@ def pesos(valor: int | None) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def extraer_paginas_pdf(ruta: Path) -> list[str]:
-    """Devuelve el texto por página. Lista vacía si no hay lector o falla."""
+def _paginas_capa_texto(ruta: Path) -> list[str]:
+    """Texto por página con la capa de texto del PDF (sin OCR)."""
     try:
         import pdfplumber
 
@@ -130,6 +130,116 @@ def extraer_paginas_pdf(ruta: Path) -> list[str]:
     except Exception as e:
         logger.warning(f"  pypdf no pudo leer {ruta.name}: {e}")
         return []
+
+
+# OCR para páginas escaneadas del PDF unido: se reconocen máximo estas
+# páginas por factura (las de poco texto), para no eternizar la corrida.
+OCR_MAX_PAGINAS = 15
+_OCR_ESCALA = 200 / 72  # ≈200 DPI
+_ocr_motor: tuple | None = None
+
+
+def _preparar_ocr() -> tuple:
+    """Detecta el motor OCR disponible una sola vez: Tesseract o RapidOCR."""
+    global _ocr_motor
+    if _ocr_motor is not None:
+        return _ocr_motor
+    motor: tuple = (None, None)
+    try:
+        import shutil as _sh
+
+        import pytesseract
+
+        ruta_tess = _sh.which("tesseract")
+        if not ruta_tess:
+            for candidata in (
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            ):
+                if Path(candidata).exists():
+                    ruta_tess = candidata
+                    break
+        if ruta_tess:
+            pytesseract.pytesseract.tesseract_cmd = ruta_tess
+            motor = ("tesseract", pytesseract)
+    except ImportError:
+        pass
+    if motor[0] is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+
+            motor = ("rapidocr", RapidOCR())
+        except Exception:
+            pass
+    _ocr_motor = motor
+    if motor[0]:
+        logger.info(f"  Motor OCR disponible para páginas escaneadas: {motor[0]}")
+    return motor
+
+
+def _ocr_paginas(ruta: Path, indices: list[int]) -> dict[int, str]:
+    """OCR de las páginas indicadas → {índice: texto}. Nunca lanza excepción."""
+    nombre_motor, motor = _preparar_ocr()
+    if nombre_motor is None or not indices:
+        return {}
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return {}
+    reconocidas: dict[int, str] = {}
+    try:
+        pdf = pdfium.PdfDocument(str(ruta))
+        try:
+            for i in indices:
+                if i >= len(pdf):
+                    continue
+                imagen = pdf[i].render(scale=_OCR_ESCALA).to_pil()
+                if nombre_motor == "tesseract":
+                    try:
+                        t = motor.image_to_string(imagen, lang="spa+eng")
+                    except Exception:
+                        t = motor.image_to_string(imagen)
+                else:
+                    import numpy as np
+
+                    resultado, _ = motor(np.array(imagen))
+                    t = "\n".join(x[1] for x in (resultado or []))
+                reconocidas[i] = t or ""
+        finally:
+            pdf.close()
+    except Exception as e:
+        logger.warning(f"  OCR falló en {ruta.name}: {e}")
+    return reconocidas
+
+
+def extraer_paginas_pdf(ruta: Path) -> list[str]:
+    """Texto por página; a las páginas escaneadas (sin texto) les aplica OCR.
+
+    Devuelve lista vacía solo si no hay lector de PDF o el archivo está
+    dañado y tampoco el OCR pudo abrirlo.
+    """
+    paginas = _paginas_capa_texto(ruta)
+    if not paginas:
+        # PDF ilegible para pdfplumber/pypdf: intento de rescate solo-OCR.
+        rescate = _ocr_paginas(ruta, list(range(OCR_MAX_PAGINAS)))
+        if rescate:
+            logger.info(f"  {ruta.name}: rescatado por OCR ({len(rescate)} página(s))")
+            return [rescate.get(i, "") for i in range(max(rescate) + 1)]
+        return paginas
+    pobres = [i for i, t in enumerate(paginas) if len((t or "").strip()) < 40]
+    if pobres and _preparar_ocr()[0]:
+        if len(pobres) > OCR_MAX_PAGINAS:
+            logger.info(
+                f"  {ruta.name}: {len(pobres)} páginas escaneadas; se aplica OCR "
+                f"solo a las primeras {OCR_MAX_PAGINAS}."
+            )
+        reconocidas = _ocr_paginas(ruta, pobres[:OCR_MAX_PAGINAS])
+        for i, t in reconocidas.items():
+            if len(t.strip()) > len((paginas[i] or "").strip()):
+                paginas[i] = t
+        if reconocidas:
+            logger.info(f"  {ruta.name}: OCR aplicado a {len(reconocidas)} página(s)")
+    return paginas
 
 
 def hallar_pdf_unido(carpeta: Path) -> Path | None:

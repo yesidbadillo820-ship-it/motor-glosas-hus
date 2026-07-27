@@ -121,12 +121,29 @@ _Última actualización: 27 de julio de 2026._
 - Se reenviaron los dos archivos al usuario para reemplazar en el servidor:
   `completar_informe_xml_dian.py` + `COMPLETAR_INFORME_XML.cmd`.
 
-### 27 de julio de 2026 — Documento de entrega del módulo ADRES
+### 27 de julio de 2026 — Documento de entrega + OCR + paquete completo
 - Se escribió la **documentación técnica oficial de entrega** del módulo
   (`docs/ENTREGA_MODULO_ADRES_FURIPS.md`): objetivo, arquitectura, todas
   las funciones, flujos, riesgos, pendientes y pasos para fusionar este
   desarrollo dentro del proyecto principal sin perder nada. Sirve para
   entregar el módulo a otro equipo o consolidar los repositorios.
+- **OCR para PDF escaneados** (pendiente 7, ¡resuelto!): el validador
+  FURIPS y el informe de baja ahora LEEN los PDF escaneados con OCR
+  automático (Tesseract si está instalado, o RapidOCR que se instala solo
+  con pip). Los cruces se hacen sobre el texto reconocido y en el Excel
+  queda "SI (OCR)". Si no hay motor OCR, todo sigue como antes (SIN TEXTO).
+- **Soportes dentro y fuera de carpetas**: el validador ahora también
+  asocia soportes guardados en subcarpetas internas de la carpeta de la
+  factura (HUS374152\PDF\..., HUS374152\DATOS\...) y reconoce nombres
+  genéricos (epicrisis.pdf, fe.xml, ad0901….xml, ResultadosMSPS.json).
+- Los tres bots de doble clic instalan solos los componentes de OCR la
+  primera vez (si la instalación falla, corren igual sin OCR).
+- Probado de punta a punta con una estructura mixta real: carpeta por
+  factura con subcarpetas, archivos sueltos en la raíz y epicrisis
+  escaneada — encontró, leyó por OCR y cruzó todo correctamente.
+- Se entregó el **PAQUETE COMPLETO** en un ZIP con los 5 frentes (validador
+  FURIPS, app web, informe de baja, bot XML DE4401 y bots de PDF) +
+  documentación, listo para copiar al servidor.
 
 ---
 

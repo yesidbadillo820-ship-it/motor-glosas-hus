@@ -4,3 +4,6 @@ python-multipart>=0.0.9
 openpyxl>=3.1
 pypdf>=4.0
 pdfplumber>=0.11
+# OCR para PDF escaneados (opcional: sin esto los escaneados quedan "SIN TEXTO")
+pypdfium2>=4.30
+rapidocr-onnxruntime>=1.3

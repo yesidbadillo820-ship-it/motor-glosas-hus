@@ -76,3 +76,10 @@ docker run -p 8010:8010 validador-adres
 
 Circular 022 de 2023 ADRES · Resolución 2284 de 2023 · Decreto 780/2016
 (mod. 2466/2022) · Resolución 762 de 2023 ADRES.
+
+## OCR para PDF escaneados
+
+La app aplica OCR automático a los PDF escaneados del ZIP de soportes si el
+motor está disponible (`pypdfium2` + `rapidocr-onnxruntime`, incluidos en
+`requirements.txt`; también sirve Tesseract instalado en el equipo). Sin
+OCR, esos PDF quedan "SIN TEXTO" y su cruce se omite.

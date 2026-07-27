@@ -37,6 +37,18 @@ echo [i] Verificando dependencias (primera vez puede tardar)...
     exit /b 1
 )
 
+REM OCR para PDF escaneados (opcional pero recomendado): si no se puede
+REM instalar, la app corre igual (los escaneados quedan SIN TEXTO).
+%PYEXE% -c "import pypdfium2" >nul 2>&1 || (
+    echo [i] Instalando el visor de paginas para OCR ^(pypdfium2^), espere...
+    %PYEXE% -m pip install --quiet --user pypdfium2 >nul 2>&1
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 || (
+    echo [i] Instalando el motor OCR ^(rapidocr-onnxruntime^) para leer PDF
+    echo     ESCANEADOS. La primera vez puede tardar varios minutos...
+    %PYEXE% -m pip install --quiet --user rapidocr-onnxruntime >nul 2>&1
+)
+
 echo.
 echo ============================================================
 echo   VALIDADOR ADRES WEB  -  http://localhost:8010
