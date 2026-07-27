@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -48,11 +48,11 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _lunes_reciente() -> datetime:
-    """Lunes de la semana pasada (7-13 días atrás): siempre dentro de la
-    ventana default de 90 días, sin importar cuándo corra la suite."""
-    hoy = ahora_utc()
-    return (hoy - timedelta(days=hoy.weekday() + 7)).replace(
+def _lunes_reciente():
+    """Lunes de la semana pasada (7-13 días atrás): siempre en el pasado y
+    dentro de la ventana default de 90 días, sin importar la fecha de hoy."""
+    ahora = ahora_utc()
+    return (ahora - timedelta(days=ahora.weekday() + 7)).replace(
         hour=10, minute=0, second=0, microsecond=0
     )
 
@@ -84,9 +84,9 @@ class TestPorDiaSemana:
 
     def test_clasifica_por_dia(self, client, db_session):
         lunes = _lunes_reciente()
-        miercoles = lunes + timedelta(days=2)
         _seed(db_session, lunes)
-        _seed(db_session, lunes.replace(hour=11))
+        _seed(db_session, lunes + timedelta(hours=1))
+        miercoles = lunes + timedelta(days=2)
         _seed(db_session, miercoles)
 
         r = client.get("/glosas/stats/por-dia-semana")
@@ -98,6 +98,7 @@ class TestPorDiaSemana:
 
     def test_pct_del_total(self, client, db_session):
         lunes = _lunes_reciente()
+        # 4 glosas el lunes
         for _ in range(4):
             _seed(db_session, lunes)
         # 1 glosa el martes
@@ -110,8 +111,6 @@ class TestPorDiaSemana:
         assert items["Martes"]["pct_del_total"] == 20.0
 
     def test_excluye_fuera_ventana(self, client, db_session):
-        from datetime import timedelta
-
         ahora = ahora_utc()
         # Reciente
         _seed(db_session, ahora - timedelta(days=10))

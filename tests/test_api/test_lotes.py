@@ -182,3 +182,31 @@ def test_flujo_completo_del_agente(client):
         headers=headers,
     )
     assert r.status_code == 409
+
+
+# ── Ronda 31: saneo del nombre de archivo (path traversal + header) ──────
+
+
+def test_nombre_archivo_con_traversal_se_sanea(client):
+    r = client.post(
+        "/lotes/",
+        files={
+            "archivo": (
+                r"..\..\..\Windows\System32\evil.xlsx",
+                excel_bytes(),
+                "application/octet-stream",
+            )
+        },
+        data={"pagador": "COOSALUD", "hoja": "BASE", "incluir_calidad": "false"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["nombre_archivo"] == "evil.xlsx"
+
+
+def test_nombre_archivo_solo_puntos_rechazado(client):
+    r = client.post(
+        "/lotes/",
+        files={"archivo": (r"carpeta\..", excel_bytes(), "application/octet-stream")},
+        data={"pagador": "COOSALUD", "hoja": "BASE", "incluir_calidad": "false"},
+    )
+    assert r.status_code == 400

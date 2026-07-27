@@ -2112,6 +2112,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6A2 2 0 0 0 4 4V20A2 2 0 0 0 6 22H18A2 2 0 0 0 20 20V8Z"/><polyline points="14 2 14 8 20 8"/><polyline points="16 13 12 9 8 13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>
           <span class="sn-item-label">Importación masiva</span>
         </button>
+        <button class="sn-item sn-highlight" data-tip="Pre-auditoría de facturas" onclick="window.location.href='/preauditoria'">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+          <span class="sn-item-label">Pre-auditoría</span>
+        </button>
       </div>
       <div class="sn-brand-footer">
         <img src="/static/sinac-logo.png" alt="SINAC SC SAS" style="width:100%;max-height:48px;object-fit:contain;opacity:.9;"/>
@@ -2191,6 +2195,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
                   Voz
                 </button>
+                <button type="button" class="pa-tbtn" onclick="fotoGlosaOCR()" title="Sacá una foto de la glosa (o subí una imagen) y la app transcribe el texto">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Foto
+                </button>
+                <input type="file" id="f-foto-glosa" accept="image/*" capture="environment" style="display:none" onchange="_procesarFotoGlosa(this)"/>
                 <button type="button" class="pa-tbtn" onclick="paLimpiarFormulario()" title="Limpiar todos los campos del formulario">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                   Limpiar
@@ -6409,6 +6418,273 @@ function logout(){
   document.getElementById('login-pass').value='';
 }
 
+// ─── Capa de Vida (ronda 32) ───────────────────────────────────────────
+// Aditivo y 100% defensivo: si cualquier cosa falla, el motor sigue igual.
+// Consume /vida/saludo (saludo cálido + resumen del día) y /vida/celebraciones
+// (victorias recientes) y las muestra como toasts. El saludo se muestra una
+// vez por día para no cansar.
+async function iniciarCapaDeVida(){
+  try {
+    if(!TOKEN) return;
+    // Saludo: máximo una vez por día por usuario.
+    var hoy = new Date().toISOString().slice(0,10);
+    if(localStorage.getItem('hus_saludo_dia') !== hoy){
+      try {
+        var rs = await fetch('/vida/saludo', {headers: authH()});
+        if(rs.ok){
+          var s = await rs.json();
+          var partes = [];
+          if(s.nuevas_hoy) partes.push(s.nuevas_hoy + ' glosa(s) nueva(s) hoy');
+          if(s.por_vencer) partes.push('⏰ ' + s.por_vencer + ' por vencer');
+          if(s.recuperado_semana) partes.push('💰 $' + Number(s.recuperado_semana).toLocaleString('es-CO') + ' recuperados esta semana');
+          if(s.racha_dias >= 3) partes.push('🔥 racha de ' + s.racha_dias + ' días');
+          var cuerpo = partes.length ? partes.join(' · ') : (s.mensaje_pendientes || s.frase);
+          if(typeof toast === 'function'){
+            toast(s.saludo + ', ' + s.nombre + ' 👋', cuerpo, 'info', {duracion: 9000});
+          }
+          localStorage.setItem('hus_saludo_dia', hoy);
+        }
+      } catch(e){}
+    }
+    // Celebraciones: victorias recientes, escalonadas para que se disfruten.
+    try {
+      var rc = await fetch('/vida/celebraciones', {headers: authH()});
+      if(rc.ok){
+        var c = await rc.json();
+        (c.eventos || []).slice(0,3).forEach(function(ev, i){
+          setTimeout(function(){
+            if(typeof toast === 'function') toast('¡Un logro! 🎉', ev.mensaje, 'success', {duracion: 8000});
+          }, 1500 + i*2600);
+        });
+      }
+    } catch(e){}
+  } catch(e){ /* la Capa de Vida jamás debe romper la app */ }
+}
+
+// Capa de Vida (ronda 32): narración en vivo del análisis. Consume el SSE
+// /eventos/analizar/{traceId} vía fetch-stream (EventSource no puede mandar
+// el header Bearer). Muestra un panel flotante con los pasos del pipeline a
+// medida que ocurren, y se auto-cierra con 'finalizado'/'error'/timeout.
+// 100% defensivo: si algo falla, no afecta el análisis (que va por su POST).
+function iniciarNarracion(traceId){
+  try {
+    var panel = document.createElement('div');
+    panel.style.cssText = 'position:fixed;bottom:22px;right:22px;z-index:99999;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px 18px;box-shadow:0 10px 40px rgba(0,0,0,.35);font-size:.85rem;max-width:340px;line-height:1.55;';
+    panel.innerHTML = '<div style="font-weight:700;margin-bottom:6px;color:#38bdf8;">⚙️ Trabajando en tu dictamen…</div><div class="narr-steps"></div>';
+    document.body.appendChild(panel);
+    var steps = panel.querySelector('.narr-steps');
+    var COPY = {
+      inicio: function(d){ return '🔎 Preparando el análisis' + (d.eps ? ' para ' + d.eps : '') + '…'; },
+      pdfs_extraidos: function(d){ return '📄 Leí ' + (d.n_archivos||0) + ' soporte(s) del expediente…'; },
+      auditor_forense: function(){ return '🕵️ Revisé los soportes (folios, historia clínica)…'; },
+      tarifa_lookup: function(d){ return d.encontrada ? '💲 Verifiqué la tarifa pactada del contrato…' : '💲 Revisé el contrato de la EPS…'; },
+      few_shots: function(){ return '📚 Busqué precedentes ganados parecidos…'; },
+      ia_iniciada: function(d){ return '✍️ Redactando el dictamen' + (d.proveedor ? ' con ' + d.proveedor : '') + '…'; },
+      ia_completada: function(){ return '✅ Dictamen redactado, afinando detalles…'; },
+      persistido: function(){ return '💾 Guardado en el historial…'; },
+      finalizado: function(){ return '🎉 ¡Listo!'; },
+      error: function(d){ return '⚠️ ' + (d.mensaje || 'Hubo un problema'); }
+    };
+    function agregar(tipo, datos){
+      var fn = COPY[tipo]; if(!fn || !steps) return;
+      var line = document.createElement('div');
+      line.style.cssText = 'opacity:0;transition:opacity .3s;margin:3px 0;';
+      line.textContent = fn(datos||{});
+      steps.appendChild(line);
+      requestAnimationFrame(function(){ line.style.opacity='1'; });
+    }
+    var ctrl = new AbortController();
+    var cerrado = false;
+    function cerrar(){
+      if(cerrado) return; cerrado = true;
+      try{ ctrl.abort(); }catch(e){}
+      setTimeout(function(){ if(panel && panel.parentNode) panel.parentNode.removeChild(panel); }, 900);
+    }
+    setTimeout(cerrar, 180000);
+    (async function(){
+      try {
+        var resp = await fetch('/eventos/analizar/'+encodeURIComponent(traceId), {headers: authH(), signal: ctrl.signal});
+        if(!resp.ok || !resp.body){ cerrar(); return; }
+        var reader = resp.body.getReader();
+        var dec = new TextDecoder();
+        var buf = '';
+        while(true){
+          var chunk = await reader.read();
+          if(chunk.done) break;
+          buf += dec.decode(chunk.value, {stream:true});
+          var frames = buf.split('\n\n');
+          buf = frames.pop();
+          frames.forEach(function(f){
+            var ev=null, data='';
+            f.split('\n').forEach(function(l){
+              if(l.indexOf('event:')===0) ev=l.slice(6).trim();
+              else if(l.indexOf('data:')===0) data=l.slice(5).trim();
+            });
+            if(!ev) return;
+            var datos={}; try{ datos=JSON.parse(data||'{}'); }catch(e){}
+            agregar(ev, datos);
+            if(ev==='finalizado' || ev==='error' || ev==='timeout') cerrar();
+          });
+        }
+      } catch(e){ /* abort/red: cierre silencioso */ }
+      cerrar();
+    })();
+    return { cerrar: cerrar };
+  } catch(e){ return { cerrar: function(){} }; }
+}
+
+// Capa de Vida (ronda 32) etapa 5: FOTO → glosa. Saca/sube una imagen de la
+// glosa y la transcribe (Gemini visión, endpoint /vida/ocr-imagen).
+function fotoGlosaOCR(){
+  try { var inp = document.getElementById('f-foto-glosa'); if(inp) inp.click(); } catch(e){}
+}
+async function _procesarFotoGlosa(input){
+  try {
+    var file = input.files && input.files[0];
+    if(!file) return;
+    input.value = '';
+    if(typeof toast==='function') toast('📷 Leyendo la foto…','Transcribiendo el texto de la glosa','info');
+    var fd = new FormData(); fd.append('archivo', file);
+    var r = await fetch('/vida/ocr-imagen', {method:'POST', headers: authH(), body: fd});
+    if(!r.ok){
+      var er = await r.json().catch(function(){return{};});
+      if(typeof toast==='function') toast('No pude leer la foto', (er && er.detail)||'Probá con otra imagen o pegá el texto','error');
+      return;
+    }
+    var d = await r.json();
+    var ta = document.getElementById('f-glosa');
+    if(ta && d.texto){
+      ta.value = (ta.value ? ta.value + '\n' : '') + d.texto;
+      if(typeof detectarEpsEnGlosa==='function') detectarEpsEnGlosa();
+      if(typeof paPreviewLiveDebounced==='function') paPreviewLiveDebounced();
+      if(typeof toast==='function') toast('✓ Foto transcrita','Revisá el texto antes de analizar','success');
+    }
+  } catch(e){
+    if(typeof toast==='function') toast('Error','No se pudo procesar la imagen','error');
+  }
+}
+
+// Capa de Vida (ronda 32) etapa 5: ESCUCHAR el dictamen en voz alta.
+function escucharDictamen(bodyId, btn){
+  try {
+    if(!('speechSynthesis' in window)){ if(typeof toast==='function') toast('No disponible','Tu navegador no soporta lectura por voz','warning'); return; }
+    if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); if(btn) btn.textContent='🔊 Escuchar'; return; }
+    var body = document.getElementById(bodyId);
+    if(!body) return;
+    var texto = (body.innerText || body.textContent || '').trim();
+    if(!texto) return;
+    var u = new SpeechSynthesisUtterance(texto.slice(0, 6000));
+    u.lang = 'es-CO'; u.rate = 1.02;
+    u.onend = function(){ if(btn) btn.textContent='🔊 Escuchar'; };
+    if(btn) btn.textContent='⏹ Detener';
+    window.speechSynthesis.speak(u);
+  } catch(e){}
+}
+
+// Capa de Vida (ronda 32): chat conversacional con el dictamen. Usa el
+// endpoint /chat-glosa/{id}/mensaje (ya existía en el backend, sin UI):
+// responde preguntas ("¿por qué ese código?") y aplica ajustes ("hacelo
+// más corto"). 100% aditivo y defensivo.
+function toggleChatGlosa(glosaId, btn){
+  try {
+    var cont = document.getElementById('chat-glosa-'+glosaId);
+    if(!cont) return;
+    if(cont.style.display !== 'none'){ cont.style.display='none'; return; }
+    cont.style.display='block';
+    if(cont.getAttribute('data-init') === '1') return;
+    cont.setAttribute('data-init','1');
+    cont.innerHTML =
+      '<div style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;">'
+      + '<div class="chat-msgs" style="max-height:240px;overflow-y:auto;padding:10px;background:#f8fafc;font-size:.82rem;">'
+      +   '<div style="color:#64748b;">💬 Preguntá lo que quieras sobre este dictamen o pedí un ajuste. Ej: <i>"hacelo más corto"</i> · <i>"¿por qué ese código de respuesta?"</i> · <i>"citá la cláusula octava"</i>.</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:.4rem;padding:8px;border-top:1px solid #e2e8f0;background:#fff;">'
+      +   '<input type="text" class="chat-input" placeholder="Escribí tu mensaje…" onkeydown="if(event.keyCode===13)enviarChatGlosa('+glosaId+')" style="flex:1;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;"/>'
+      +   '<button type="button" onclick="enviarChatGlosa('+glosaId+')" style="padding:.5rem .9rem;background:#0369a1;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.8rem;cursor:pointer;">Enviar</button>'
+      + '</div>'
+      + '</div>';
+    var inp = cont.querySelector('.chat-input'); if(inp) inp.focus();
+  } catch(e){}
+}
+
+function _chatBurbuja(cont, quien, texto){
+  var msgs = cont.querySelector('.chat-msgs');
+  var b = document.createElement('div');
+  var mio = quien === 'yo';
+  b.style.cssText = 'margin:6px 0;padding:7px 11px;border-radius:10px;max-width:85%;white-space:pre-wrap;'
+    + (mio ? 'background:#0369a1;color:#fff;margin-left:auto;' : 'background:#fff;border:1px solid #e2e8f0;color:#1e293b;');
+  b.textContent = texto;
+  msgs.appendChild(b);
+  msgs.scrollTop = msgs.scrollHeight;
+  return b;
+}
+
+async function enviarChatGlosa(glosaId){
+  var cont = document.getElementById('chat-glosa-'+glosaId);
+  if(!cont) return;
+  var input = cont.querySelector('.chat-input');
+  var texto = (input && input.value || '').trim();
+  if(!texto) return;
+  try {
+    input.value=''; input.disabled=true;
+    _chatBurbuja(cont, 'yo', texto);
+    var pensando = _chatBurbuja(cont, 'ia', '…');
+    var r = await fetch('/chat-glosa/'+glosaId+'/mensaje', {
+      method:'POST', headers: H({'Content-Type':'application/json'}), body: JSON.stringify({texto: texto})
+    });
+    var d = r.ok ? await r.json() : null;
+    if(!d){ pensando.textContent = '⚠️ No pude responder ahora. Probá de nuevo.'; input.disabled=false; input.focus(); return; }
+    pensando.textContent = d.respuesta || '(sin respuesta)';
+    if(d.nuevo_dictamen){
+      var btnAp = document.createElement('button');
+      btnAp.type='button'; btnAp.textContent='✅ Aplicar este ajuste al dictamen';
+      btnAp.style.cssText='display:block;margin:8px 0 0 0;padding:.5rem .9rem;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.8rem;cursor:pointer;';
+      btnAp.onclick = function(){
+        try {
+          var bodyId = cont.getAttribute('data-body');
+          var body = bodyId ? document.getElementById(bodyId) : null;
+          if(body){ body.innerHTML = d.nuevo_dictamen; }
+          btnAp.textContent = '✔ Aplicado (revisá y guardá con Refinar si querés persistirlo)';
+          btnAp.disabled = true; btnAp.style.background='#64748b';
+        } catch(e){}
+      };
+      cont.querySelector('.chat-msgs').appendChild(btnAp);
+    }
+    input.disabled=false; input.focus();
+  } catch(e){
+    if(input){ input.disabled=false; }
+  }
+}
+
+// Capa de Vida (ronda 32): llena los badges de confianza de cada dictamen.
+// Busca [data-conf-glosa] dentro de `raiz`, consulta /vida/confianza/{id} y
+// muestra el nivel + en qué se apoya. 100% defensivo: si falla, oculta el
+// badge y el dictamen queda igual que antes.
+async function cargarBadgesConfianza(raiz){
+  try {
+    var nodos = (raiz || document).querySelectorAll('[data-conf-glosa]');
+    var COLORES = {alta:'#16a34a', media:'#d97706', baja:'#dc2626'};
+    var ICONO = {alta:'🟢', media:'🟡', baja:'🔴'};
+    for(var i=0; i<nodos.length; i++){
+      (function(el){
+        var gid = el.getAttribute('data-conf-glosa');
+        fetch('/vida/confianza/'+gid, {headers: authH()}).then(function(r){
+          return r.ok ? r.json() : null;
+        }).then(function(c){
+          if(!c || !c.nivel){ el.style.display='none'; return; }
+          var col = COLORES[c.nivel] || '#64748b';
+          var fuentes = (c.fuentes && c.fuentes.length)
+            ? ' · se apoya en: ' + c.fuentes.join(', ')
+            : '';
+          el.style.color = col;
+          el.innerHTML = (ICONO[c.nivel]||'') + ' <b>' + escHtml(c.resumen) + '</b>'
+            + '<span style="color:#64748b;font-weight:400;">' + escHtml(fuentes) + '</span>';
+        }).catch(function(){ el.style.display='none'; });
+      })(nodos[i]);
+    }
+  } catch(e){ /* la Capa de Vida jamás rompe la app */ }
+}
+
 async function initApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('show');
@@ -6438,6 +6714,8 @@ async function initApp(){
   if(typeof filtrarAccionesPorRol === 'function') filtrarAccionesPorRol();
   // Poblar KPIs del landing hero del panel Analizar
   if(typeof poblarLandingKPIs === 'function') poblarLandingKPIs();
+  // Capa de Vida (ronda 32): saludo cálido + celebración de logros.
+  if(typeof iniciarCapaDeVida === 'function') iniciarCapaDeVida();
   // Cargar ticker de noticias del sector salud Colombia (RSS)
   if(typeof cargarTickerNoticias === 'function') cargarTickerNoticias();
   // Hash routing — si el usuario llega a /#importacion-masiva, abrir
@@ -9677,6 +9955,10 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
       out += '<span style="background:rgba(255,255,255,.2);padding:4px 10px;border-radius:20px;font-size:.8rem;">' + valorFmt + '</span>';
       out += '</summary>';
       out += '<div style="padding:14px;background:#fff" id="lote-body-'+j+'">' + r.html + '</div>';
+      // Capa de Vida (ronda 32): badge de confianza — se llena tras el render.
+      if(r.glosa_id){
+        out += '<div data-conf-glosa="'+r.glosa_id+'" style="padding:.5rem 1rem;font-size:.78rem;color:#94a3b8;background:#fff;border-top:1px dashed #e2e8f0;">🔎 Analizando en qué se apoya el dictamen…</div>';
+      }
       // Panel refinar por concepto (usa glosa_id específico)
       if(r.glosa_id){
         out += '<div style="padding:.8rem 1rem;background:#f8fafc;border-top:1px solid #e2e8f0;">';
@@ -9690,9 +9972,13 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
         out += '        <input type="checkbox" id="lote-refinar-guardar-'+j+'" checked/> Guardar cambios';
         out += '      </label>';
         out += '      <button type="button" onclick="aplicarRefinarLote('+r.glosa_id+','+j+')" style="padding:.5rem .9rem;background:var(--c-teal2);color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">✨ Refinar</button>';
+        out += '      <button type="button" onclick="toggleChatGlosa('+r.glosa_id+',this)" style="padding:.5rem .9rem;background:#0f172a;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">💬 Conversar</button>';
+        out += '      <button type="button" onclick="escucharDictamen(\'lote-body-'+j+'\',this)" style="padding:.5rem .9rem;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.78rem;cursor:pointer;">🔊 Escuchar</button>';
         out += '      <div id="lote-refinar-status-'+j+'" style="font-size:.72rem;color:var(--text3);min-height:1em;"></div>';
         out += '    </div>';
         out += '  </div>';
+        // Capa de Vida (ronda 32): contenedor del chat conversacional.
+        out += '  <div id="chat-glosa-'+r.glosa_id+'" data-body="lote-body-'+j+'" style="display:none;margin-top:.7rem;"></div>';
         out += '</div>';
       }
       out += '</details>';
@@ -9700,6 +9986,8 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
     out += '<div style="height:40px;"></div>';  // espacio extra abajo para scroll cómodo
     out += '</div>';
     area.innerHTML = out;
+    // Capa de Vida (ronda 32): llenar los badges de confianza.
+    if(typeof cargarBadgesConfianza === 'function') cargarBadgesConfianza(area);
     // Forzar que el wrapper se posicione al tope para ver el resumen primero
     setTimeout(function(){
       var w = area.querySelector('.batch-results-wrap');
@@ -10560,6 +10848,7 @@ var CP_ACCIONES = [
   // Acciones rápidas
   {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", accion:function(){window.location.href='/importar-recepcion'}},
   {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
+  {seccion:"Acciones", icono:"🧾", titulo:"Pre-auditoría", hint:"Consolidado de facturas", accion:function(){window.location.href='/preauditoria'}},
   {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
   {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
   {seccion:"Acciones", icono:"🎯", titulo:"Modo Focus", hint:"Ocultar UI para análisis profundo (Esc para salir)", accion:function(){cerrarCommandPalette();toggleModoFocus(true)}},
@@ -14733,6 +15022,11 @@ async function analizar(modoOverride){
   showLoading();
 
   var fd=new FormData();
+  // Capa de Vida (ronda 32): narración en vivo — trace_id + SSE de progreso.
+  var _traceId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : ('t-' + Date.now() + '-' + Math.floor(Math.random()*1e6));
+  fd.append('trace_id', _traceId);
+  var _narr = (typeof iniciarNarracion === 'function') ? iniciarNarracion(_traceId) : null;
   fd.append('eps',eps);
   fd.append('etapa',document.getElementById('etapa-v').value);
   fd.append('fecha_radicacion',document.getElementById('f-rad').value||'');
@@ -14788,6 +15082,7 @@ async function analizar(modoOverride){
       // aunque el backend ya falló (pre-validación) — el usuario veía
       // "EN CURSO + todo verde" sin dictamen. Marcar fallo + ocultar.
       if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
+      if(_narr) try{ _narr.cerrar(); }catch(e){}
       hideLoading();_rehab();return;
     }
     var d=await r.json();
@@ -14804,6 +15099,7 @@ async function analizar(modoOverride){
     toast('Error de conexión','No se pudo conectar con el servidor','error');
     if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
   }
+  if(_narr) try{ _narr.cerrar(); }catch(e){}  // Capa de Vida: cerrar narración
   hideLoading();
   _rehab();
 }
@@ -19453,8 +19749,9 @@ function aplicarRestriccionesRol(){
   var items = document.querySelectorAll('.sn-item');
   items.forEach(function(btn){
     var onclickStr = btn.getAttribute('onclick') || '';
-    // Ignorar botones externos (importar recepción/masiva) — esos van a URLs
+    // Ignorar botones externos (importar recepción, pre-auditoría) — van a URLs
     if(onclickStr.indexOf("window.location.href='/importar") >= 0) return;
+    if(onclickStr.indexOf("window.location.href='/preauditoria") >= 0) return;
     var match = onclickStr.match(/sidebarTab\(this,'([^']+)'\)/);
     if(!match) return;
     var tab = match[1];
