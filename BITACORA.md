@@ -5,7 +5,7 @@
 > **Toda sesión de Claude debe leerlo al empezar y actualizarlo al terminar**
 > (ver CLAUDE.md). Escrito para un auditor, sin tecnicismos.
 
-_Última actualización: 23 de julio de 2026._
+_Última actualización: 27 de julio de 2026._
 
 ---
 
@@ -120,6 +120,13 @@ _Última actualización: 23 de julio de 2026._
   primeros nombres — con esa hoja se puede diagnosticar cualquier corrida.
 - Se reenviaron los dos archivos al usuario para reemplazar en el servidor:
   `completar_informe_xml_dian.py` + `COMPLETAR_INFORME_XML.cmd`.
+
+### 27 de julio de 2026 — Documento de entrega del módulo ADRES
+- Se escribió la **documentación técnica oficial de entrega** del módulo
+  (`docs/ENTREGA_MODULO_ADRES_FURIPS.md`): objetivo, arquitectura, todas
+  las funciones, flujos, riesgos, pendientes y pasos para fusionar este
+  desarrollo dentro del proyecto principal sin perder nada. Sirve para
+  entregar el módulo a otro equipo o consolidar los repositorios.
 
 ---
 
