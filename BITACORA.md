@@ -5,7 +5,7 @@
 > actualízalo: qué se hizo hoy (con fecha), qué quedó pendiente y qué sigue
 > mañana. Escrito en lenguaje claro, para un auditor, no para un programador.
 >
-> **Última actualización: 22 de julio de 2026.**
+> **Última actualización: 27 de julio de 2026.**
 
 ---
 
@@ -137,6 +137,12 @@ Santander (HUS)**, apoyado en herramientas construidas en este repositorio:
 - **22 jul** — Se creó esta bitácora como memoria común de los chats, y el
   archivo CLAUDE.md que ordena leerla al inicio y actualizarla al final de
   cada sesión.
+- **27 jul** — **Documento de entrega técnica del módulo de objeciones VCO**
+  (`docs/ENTREGA_MODULO_ORGANIZAR_OBJECIONES_VCO.md`): reconstrucción
+  completa de todo lo hecho en la rama del PR #167 para consolidarlo en el
+  proyecto principal sin perder conocimiento — objetivo, arquitectura,
+  cada función, flujo, decisiones tomadas y descartadas, riesgos, campos
+  del ERP aún por validar, y el paso a paso para fusionarlo.
 
 ---
 
