@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 23-07-2026
+**Última actualización:** 27-07-2026
 
 ---
 
@@ -287,6 +287,19 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   Es la referencia para integrar este módulo al proyecto principal sin perder
   conocimiento. PRs del módulo: #186 (v1→v2), #187 (botón menú), #189
   (mejoras post primer uso).
+
+### 27-07 (tarde) — Documentación técnica oficial del módulo Glosas Dispensario/SIMED
+- Se generó **`docs/ENTREGA_MODULO_GLOSAS_DISPENSARIO_SIMED.md`** (PR #191,
+  fusionado): entrega al equipo principal del chat "GLOSAS DISPENSARIO —
+  SIMED": objetivo, arquitectura, el clasificador de 14 reglas y las 16
+  plantillas de respuesta con sus 4 rondas de verificación adversarial
+  (qué normas NO citar y por qué), el contrato operativo del robot SIMED
+  (numeración por línea de concepto, estados, reintentos, evidencias),
+  cifras de los 7 lotes del Dispensario, el bot DGH por coordenadas (PR
+  #134), riesgos, pendientes y el plan para fusionar todo sin perder nada.
+  Recomendación clave que quedó escrita: mover `glosa_motor.py` y los
+  generadores de lotes (hoy en el scratchpad de la sesión) a
+  `tools/glosas_dispensario/` en el repo.
 
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
