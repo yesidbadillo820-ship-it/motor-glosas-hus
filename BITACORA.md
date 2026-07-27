@@ -252,6 +252,33 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     que cubra el mismo periodo que la Radicación (si no, algunas facturas
     marcan CORREO F.E.=NO por quedar fuera de la ventana del reporte).
 
+### 27-07 — Pre-auditoría: mejoras pedidas tras el primer uso real
+- **27-07:** el módulo ya está desplegado y en uso (2 oficios, 22 facturas
+  auditadas el primer día). Con el feedback del auditor se agregó:
+  - **Firma de Yudy en el PDF**: se extrajo la firma manuscrita de la guía y
+    ahora sale automáticamente en cada oficio de devolución
+    (`static/firma_preauditoria.png`, con su proporción real).
+  - **Regla nueva: sin facturación electrónica NO se radica.** Si la factura
+    no está en el Formato Facturación Electrónica (CORREO F.E. = NO), el botón
+    "Soportes completos" queda deshabilitado y el servidor también lo bloquea:
+    solo se puede devolver.
+  - **Eliminar radicados (solo administradores):** individual o masivo, para
+    oficios que quedaron mal registrados. Con salvaguardas: no se puede
+    eliminar uno con PDF de devolución ya emitido; las subsanaciones se
+    revierten sin perder el historial; los envíos quedan libres para
+    re-escribirse.
+  - **Dos fases con nombre:** cada oficio muestra quién lo RECEPCIONÓ y
+    quién(es) lo están AUDITANDO (gestores distintos).
+  - **Botón "Ver"** en el consolidado para consultar la respuesta y el
+    historial completo de cada factura sin entrar a auditarla.
+  - Se renombró DGReport → **"Formato Facturación Electrónica"** en la
+    pantalla de fuentes.
+  - **Estadísticas interactivas:** dona de resultados con clic-para-filtrar,
+    barras por auditor y por entidad (top 10) con tooltips, y semáforo visual.
+    Colores verificados para daltonismo.
+  - 35 pruebas del módulo en verde; verificado en navegador con los archivos
+    reales (36.723 facturas).
+
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
   fusionadas desde la rama principal:
