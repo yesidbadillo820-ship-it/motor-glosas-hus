@@ -163,6 +163,19 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         .all()
     )
     auditores = sorted({f.auditor for f in facturas if f.auditor})
+    # ¿El oficio tiene facturas de ADRES? (habilita el Excel especial que esa
+    # entidad exige). Se resuelve contra la fuente con una sola consulta.
+    entidades = (
+        db.query(RadicacionCuentaRecord.nit, RadicacionCuentaRecord.entidad)
+        .join(
+            FacturaPreauditoriaRecord,
+            FacturaPreauditoriaRecord.factura == RadicacionCuentaRecord.factura,
+        )
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == o.id)
+        .distinct()
+        .all()
+    )
+    tiene_adres = any(svc.es_adres(nit, ent) for nit, ent in entidades)
     d = {
         "id": o.id,
         "numero_radicado": o.numero_radicado,
@@ -173,6 +186,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         "recepcionado_por": o.creado_por,
         # Fase 2: quién(es) están AUDITANDO sus facturas.
         "auditores": auditores,
+        "tiene_adres": tiene_adres,
         "total_facturas": len(facturas),
         "pendientes": pendientes,
         "radicar": radicar,
@@ -414,6 +428,128 @@ def eliminar_oficios_masivo(
         else:
             rechazados.append({"id": oid, "motivo": res.get("mensaje", "")})
     return {"eliminados": eliminados, "rechazados": rechazados}
+
+
+@router.get("/oficios/{oficio_id}/export-adres.xlsx")
+def exportar_oficio_adres(
+    oficio_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Excel con la INFORMACIÓN COMPLETA de las facturas ADRES de un oficio.
+
+    ADRES exige que sus oficios se acompañen de un Excel con todos los datos
+    de cada factura (fuentes + resultado de la pre-auditoría + CUFE).
+    Solo salen las facturas cuya entidad es ADRES.
+    """
+    import re as _re
+
+    from openpyxl import Workbook
+
+    o = db.get(OficioRecepcionRecord, oficio_id)
+    if not o:
+        raise HTTPException(404, "Oficio no encontrado")
+
+    filas = (
+        db.query(FacturaPreauditoriaRecord, RadicacionCuentaRecord, DgReportRecord)
+        .outerjoin(
+            RadicacionCuentaRecord,
+            RadicacionCuentaRecord.factura == FacturaPreauditoriaRecord.factura,
+        )
+        .outerjoin(DgReportRecord, DgReportRecord.factura == FacturaPreauditoriaRecord.factura)
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio_id)
+        .order_by(FacturaPreauditoriaRecord.envio_actual, FacturaPreauditoriaRecord.factura)
+        .all()
+    )
+    adres = [
+        (f, rad, dg)
+        for f, rad, dg in filas
+        if svc.es_adres(rad.nit if rad else None, rad.entidad if rad else None)
+    ]
+    if not adres:
+        raise HTTPException(
+            404,
+            "Este oficio no tiene facturas de ADRES: el Excel especial solo "
+            "aplica a oficios de esa entidad.",
+        )
+
+    # Consecutivos de oficios de devolución ya emitidos (para la columna).
+    dev_ids = {f.oficio_devolucion_id for f, _, _ in adres if f.oficio_devolucion_id}
+    consecutivos = (
+        {
+            d.id: d.consecutivo
+            for d in db.query(OficioDevolucionRecord)
+            .filter(OficioDevolucionRecord.id.in_(dev_ids))
+            .all()
+        }
+        if dev_ids
+        else {}
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "ADRES"
+    ws.append(
+        [
+            "OFICIO FHUS",
+            "F_RECIBIDO",
+            "ENVIO",
+            "FACTURA",
+            "F_FACTURA",
+            "VALOR",
+            "NIT",
+            "ENTIDAD",
+            "CORREO F.E.",
+            "FECHA CORREO F.E.",
+            "CUFE / N° F.E.",
+            "ESTADO",
+            "RESULTADO",
+            "RONDA",
+            "N SUBSANACION",
+            "DEVOLUCIONES",
+            "AUDITOR",
+            "FECHA AUDITORIA",
+            "MOTIVO DEVOLUCION",
+            "OBSERVACIONES",
+            "OFICIO DEVOLUCION SINAC",
+            "RECEPCIONADO POR",
+        ]
+    )
+    for f, rad, dg in adres:
+        ws.append(
+            [
+                f.oficio_fhus or o.numero_radicado,
+                (_fecha_iso(f.f_recibido) or "").replace("T", " ")[:16],
+                f.envio_actual or (rad.envio if rad else None),
+                f.factura,
+                (_fecha_fuente_iso(rad.f_factura if rad else None) or "")[:10],
+                (rad.valor if rad else 0) or 0,
+                rad.nit if rad else None,
+                rad.entidad if rad else None,
+                dg.correo_fe if dg else "NO",
+                (_fecha_fuente_iso(dg.fecha_correo if dg else None) or "")[:10],
+                dg.numero_fe if dg else None,
+                f.estado,
+                f.resultado_actual,
+                f.ronda_actual,
+                f.num_subsanacion,
+                f.num_devoluciones,
+                f.auditor,
+                (_fecha_iso(f.fecha_auditoria) or "").replace("T", " ")[:16],
+                f.motivo_ultima_devolucion,
+                f.observaciones,
+                consecutivos.get(f.oficio_devolucion_id),
+                o.creado_por,
+            ]
+        )
+    buf = BytesIO()
+    wb.save(buf)
+    nombre = _re.sub(r"[^A-Za-z0-9_-]+", "_", o.numero_radicado or "oficio")
+    return StreamingResponse(
+        BytesIO(buf.getvalue()),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="ADRES_{nombre}.xlsx"'},
+    )
 
 
 # ------------------------------------------------------------------
@@ -987,3 +1123,31 @@ def estadisticas(
         "semaforo_oficios": conteo_semaforo,
         "max_devoluciones": svc.MAX_DEVOLUCIONES,
     }
+
+
+# ------------------------------------------------------------------
+# Administración: borrar TODOS los datos del módulo
+# ------------------------------------------------------------------
+
+
+class LimpiarTodoIn(BaseModel):
+    confirmacion: str = Field(..., description='Escriba exactamente "BORRAR TODO"')
+    incluir_fuentes: bool = False
+
+
+@router.post("/admin/limpiar-todo")
+def limpiar_todo(
+    body: LimpiarTodoIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Deja el módulo limpio para empezar a trabajar (solo SUPER_ADMIN/COORDINADOR).
+
+    Borra oficios, facturas, historial, envíos y oficios de devolución.
+    Con incluir_fuentes=true borra también las dos fuentes cargadas.
+    Requiere escribir "BORRAR TODO" como confirmación.
+    """
+    if body.confirmacion.strip().upper() != "BORRAR TODO":
+        raise HTTPException(400, 'Para confirmar escriba exactamente "BORRAR TODO".')
+    conteos = svc.limpiar_modulo(db, incluir_fuentes=body.incluir_fuentes)
+    return {"ok": True, "borrado": conteos}

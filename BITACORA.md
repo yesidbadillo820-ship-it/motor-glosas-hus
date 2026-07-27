@@ -301,6 +301,29 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   generadores de lotes (hoy en el scratchpad de la sesión) a
   `tools/glosas_dispensario/` en el repo.
 
+### 27-07 (noche) — Pre-auditoría: borrado total (solo admin) y Excel para ADRES
+- **Zona de administración** nueva en la pestaña Fuentes (solo la ven
+  SUPER_ADMIN/COORDINADOR): botón **"Borrar todos los datos"** para dejar la
+  página limpia y que el equipo empiece a trabajar de cero. Borra oficios,
+  facturas, historial, envíos y oficios de devolución; las **fuentes se
+  conservan** salvo que se marque la casilla para borrarlas también. Pide
+  escribir **BORRAR TODO** + una confirmación final, y el servidor exige rol
+  de administrador (un auditor recibe "no autorizado"). Ojo: al limpiar, el
+  consecutivo DEV-PRE-AUD vuelve a empezar en 0001.
+- **Excel especial para ADRES:** cuando un oficio tiene facturas de ADRES
+  (se reconoce por NIT 901037916 o por el nombre de la entidad), aparece el
+  botón **"⬇ ADRES"** en la lista de oficios y dentro del oficio. Descarga un
+  Excel con la **información completa** de esas facturas: envío, oficio FHUS,
+  fechas, valor, NIT, entidad, correo F.E., fecha del correo, **CUFE**,
+  estado, resultado, ronda, subsanaciones, devoluciones, auditor, motivo,
+  oficio de devolución SINAC y quién recepcionó. Solo salen las facturas de
+  ADRES (si el oficio trae mezcla de entidades, las otras no van).
+- 42 pruebas del módulo en verde (7 nuevas: permisos del borrado, conteos,
+  confirmación obligatoria, contenido del Excel ADRES).
+- **Para dejar la página limpia:** después de desplegar en la VM, entrar como
+  administrador → Fuentes → Zona de administración → "Borrar todos los datos"
+  (sin marcar la casilla de fuentes, para no volver a subir los Excel).
+
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
   fusionadas desde la rama principal:
@@ -380,8 +403,11 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     (sale de `reporte_glosa.csv`).
 
 ### Módulo de Pre-auditoría (nuevo, 23-07)
-17. **Revisar y aprobar el PR #186** de la rama `claude/invoice-audit-bot-qa2koy`
-    y probarlo con datos reales (un oficio piloto antes de uso masivo).
+17. **Revisar y aprobar el PR nuevo** (borrado total admin + Excel ADRES) de la
+    rama `claude/invoice-audit-bot-qa2koy`; los PRs #186, #187, #189 y #190 ya
+    están fusionados. Después de aprobar: desplegar en la VM y **usar el botón
+    "Borrar todos los datos"** (como administrador, sin marcar la casilla de
+    fuentes) para dejar la página limpia antes del arranque real del equipo.
 18. **Definiciones que quedaron con supuesto y hay que confirmar con el
     auditor:** (a) el plazo de 3 días se contó en **días hábiles lunes-viernes**
     (sin festivos colombianos); (b) los nombres/cargos de las firmas del
