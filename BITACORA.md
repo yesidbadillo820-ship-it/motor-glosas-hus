@@ -5,7 +5,7 @@
 > en qué va todo. Al terminar cada sesión, debe actualizarse con: lo que se hizo
 > hoy, lo que quedó pendiente y lo que sigue mañana, siempre con la fecha.
 
-**Última actualización:** 22 de julio de 2026
+**Última actualización:** 27 de julio de 2026
 
 ---
 
@@ -194,7 +194,23 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
   chats, reconstruyendo el historial completo del proyecto (1.647 cambios
   registrados en Git desde el 8 de abril), y se dejó la instrucción
   permanente en `CLAUDE.md` de leerla al inicio y actualizarla al final de
-  cada sesión.
+  cada sesión. Ese mismo día se corrigieron **dos pruebas automáticas que
+  se dañaron solas con el paso del calendario**: sembraban datos con fechas
+  fijas de abril y los reportes que revisan solo miran los últimos 90 días,
+  así que al pasar los 90 días empezaron a fallar sin que nadie hubiera
+  tocado nada. Ahora usan fechas relativas al día en que se ejecutan.
+- **27 julio:** Se completaron dos archivos de nota crédito que traían la
+  casilla de respuesta con el error **#N/D** (facturas HUS0000340948 del
+  acta 509 y HUS0000384193 del acta 604, ambas de vigencia 2025): se
+  verificó que no están en la circularización 2026 y se llenaron con el
+  texto del acta que trae la propia observación de la nota. Se advirtió que
+  en la segunda el acta suma $113.700 y la nota crédito es por $52.100.
+  Además se redactó el **documento técnico de entrega del módulo**
+  (`docs/HANDOVER_TRAMITE_GLOSAS_ACEPTADAS.md`) para poder consolidar este
+  desarrollo dentro del proyecto principal sin perder nada: explica el
+  objetivo, cómo funciona por dentro, cada decisión que se tomó y por qué,
+  los datos del cruce de junio, los riesgos al integrarlo y el paso a paso
+  para fusionarlo.
 
 ---
 
@@ -230,18 +246,37 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
 5. **Robot de Dinámica Gerencial** (`responder_glosas_dgh.py`): quedó en
    piloto (junio 30 – julio 1) con el modo de calibración; falta la puesta en
    marcha completa en la máquina del HUS.
+6. **Revisar las demás pruebas automáticas con fechas fijas.** Se arreglaron
+   las dos que fallaron, pero seguramente quedan más esperando su turno: es
+   un problema que ya se repitió cuatro veces (9 y 24 de junio, 30 de junio
+   y 22 de julio). Vale la pena hacer una revisión de una sola vez.
+7. **La herramienta de glosas aceptadas no tiene pruebas automáticas
+   propias.** Funciona y se verificó a mano, pero conviene agregarlas para
+   que nadie la dañe sin darse cuenta.
+8. **Instalar el entorno de desarrollo falla en máquinas limpias** por dos
+   paquetes (`http-ece` y `sgmllib3k`) que quedaron en la lista pero
+   pertenecen a funciones ya retiradas del sistema en mayo. Conviene
+   sacarlos de la lista.
+9. **Consolidación del proyecto:** este desarrollo debe integrarse al
+   proyecto principal siguiendo el paso a paso del documento
+   `docs/HANDOVER_TRAMITE_GLOSAS_ACEPTADAS.md` (ojo: la rama principal del
+   repositorio se llama `motor-glosas`, no `main`).
 
 ---
 
-## PARA MAÑANA (23 de julio de 2026)
+## PARA MAÑANA (28 de julio de 2026)
 
 1. Revisar con el auditor los **casos marcados del Excel de junio**
-   (acta 786 vs 879/862 y los 17 valores parciales) y, si hay correcciones,
+   (acta 786 vs 879/862 y los 19 valores parciales) y, si hay correcciones,
    re-generar el archivo con la herramienta (es un solo comando).
-2. **Aprobar/fusionar el PR #166** para dejar la herramienta disponible.
+2. **Aprobar/fusionar el PR #166** para dejar la herramienta disponible, y
+   luego consolidarlo en el proyecto principal con la guía del documento de
+   entrega.
 3. Retomar el **seguimiento a SISTEMAS** por las 9 notas del Lote V2
    bloqueadas por RIPS/CUV.
-4. Si llega el consolidado de otro mes (julio), correr la misma herramienta
+4. Validar contra el acta física el caso de **HUS0000384193 (acta 604)**,
+   donde el acta suma $113.700 y la nota crédito es por $52.100.
+5. Si llega el consolidado de otro mes (julio), correr la misma herramienta
    de glosas aceptadas.
 
 ---
@@ -251,3 +286,4 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
 | Fecha | Quién | Qué se actualizó |
 |---|---|---|
 | 22-jul-2026 | Claude Code | Creación de la bitácora con la reconstrucción completa del historial (abril–julio 2026). |
+| 27-jul-2026 | Claude Code | Se agregó el arreglo de las pruebas caducas (22-jul), el llenado de los dos archivos con #N/D y el documento técnico de entrega del módulo. Se ampliaron los pendientes (revisión de pruebas con fechas fijas, pruebas de la herramienta, entorno de desarrollo, consolidación) y se reescribió "Para mañana". |
