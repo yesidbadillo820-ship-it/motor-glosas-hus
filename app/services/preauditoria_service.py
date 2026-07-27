@@ -1019,3 +1019,59 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
         "subsanaciones_revertidas": revertidas,
         "envios_liberados": len(envios),
     }
+
+
+def limpiar_modulo(db: Session, incluir_fuentes: bool = False) -> dict:
+    """Borra TODOS los datos del módulo de pre-auditoría (solo administradores).
+
+    Deja la página lista para empezar a trabajar desde cero: elimina el
+    historial de eventos, las facturas del consolidado, los envíos escritos,
+    los oficios de devolución emitidos y los oficios de recepción.
+
+    Con ``incluir_fuentes=True`` borra también las dos fuentes cargadas
+    (Radicación de Cuentas y Formato Facturación Electrónica); por defecto se
+    conservan para no tener que subirlas otra vez.
+
+    Ojo: al borrar los oficios de devolución, el consecutivo SINAC
+    (DEV-PRE-AUD-####-AAAA) vuelve a empezar en 0001 para el año.
+    Devuelve el conteo de filas borradas por tabla.
+    """
+    conteos = {}
+    # Orden seguro respecto a llaves foráneas: primero las tablas hijas.
+    conteos["eventos"] = db.query(FacturaEventoRecord).delete(synchronize_session=False)
+    conteos["facturas"] = db.query(FacturaPreauditoriaRecord).delete(synchronize_session=False)
+    conteos["envios_cargados"] = db.query(EnvioCargadoRecord).delete(synchronize_session=False)
+    conteos["oficios_devolucion"] = db.query(OficioDevolucionRecord).delete(
+        synchronize_session=False
+    )
+    conteos["oficios_recepcion"] = db.query(OficioRecepcionRecord).delete(synchronize_session=False)
+    if incluir_fuentes:
+        conteos["fuente_radicacion"] = db.query(RadicacionCuentaRecord).delete(
+            synchronize_session=False
+        )
+        conteos["fuente_facturacion_electronica"] = db.query(DgReportRecord).delete(
+            synchronize_session=False
+        )
+    db.commit()
+    conteos["total"] = sum(conteos.values())
+    return conteos
+
+
+# ==================================================================
+# ADRES — los oficios de esta entidad exigen entregar un Excel con la
+# información completa de las facturas.
+# ==================================================================
+
+NIT_ADRES = "901037916"
+
+
+def es_adres(nit, entidad) -> bool:
+    """¿La factura pertenece a ADRES (Administradora de los Recursos del
+    Sistema General de Seguridad Social en Salud)? Se reconoce por NIT
+    (901037916, con o sin dígito de verificación) o por el nombre."""
+    if nit:
+        digitos = re.sub(r"\D", "", str(nit))
+        if digitos.startswith(NIT_ADRES):
+            return True
+    e = (entidad or "").upper()
+    return "ADRES" in e or "ADMINISTRADORA DE LOS RECURSOS" in e

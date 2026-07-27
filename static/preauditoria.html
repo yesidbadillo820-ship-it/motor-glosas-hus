@@ -128,6 +128,14 @@
     </div>
     <div class="kpis" id="src-resumen" style="margin-top:12px"></div>
   </div>
+
+  <div class="card" id="zona-admin" style="display:none;border:1px solid var(--rojo)">
+    <h2>🧹 Zona de administración</h2>
+    <p class="sub">Borra <b>todos</b> los datos del módulo (oficios, facturas, historial, envíos y
+      oficios de devolución) para dejar la página lista y empezar a trabajar de cero.
+      Solo administradores.</p>
+    <button class="btn btn-rojo" onclick="abrirLimpiar()">Borrar todos los datos…</button>
+  </div>
 </section>
 
 <!-- ============ OFICIOS Y ENVÍOS ============ -->
@@ -259,6 +267,24 @@
   <button class="cerrar" onclick="cerrarModal('m-hist')">✕</button>
   <h3 id="mh-titulo">Historial</h3><div id="mh-cuerpo"></div></div></div>
 
+<!-- MODAL limpiar todo (solo administradores) -->
+<div class="modal-fondo" id="m-limpiar"><div class="modal">
+  <button class="cerrar" onclick="cerrarModal('m-limpiar')">✕</button>
+  <h3>🧹 Borrar todos los datos del módulo</h3>
+  <div class="aviso aviso-err"><b>Esta acción no se puede deshacer.</b> Se borran todos los oficios
+    registrados, sus facturas, el historial, los envíos escritos y los oficios de devolución
+    (el consecutivo DEV-PRE-AUD vuelve a empezar en 0001).</div>
+  <label style="display:flex;align-items:center;gap:6px;margin:12px 0;">
+    <input type="checkbox" id="lp-fuentes" style="min-width:auto">
+    Borrar también las fuentes (Radicación y Formato F.E.) — tocará subirlas de nuevo</label>
+  <label class="campo">Para confirmar escriba <b>BORRAR TODO</b>
+    <input id="lp-conf" placeholder="BORRAR TODO" autocomplete="off"></label>
+  <div style="margin-top:12px">
+    <button class="btn btn-rojo" onclick="ejecutarLimpiar()">Borrar definitivamente</button>
+    <button class="btn btn-borde" onclick="cerrarModal('m-limpiar')">Cancelar</button></div>
+  <div id="lp-msg"></div>
+</div></div>
+
 <script>
 var TOKEN = localStorage.getItem('hus_token') || '';
 if (!TOKEN) { alert('Debes iniciar sesión primero'); location.href = '/'; }
@@ -270,6 +296,7 @@ if (ES_ADMIN) {
   document.addEventListener('DOMContentLoaded', function(){
     var b=document.getElementById('admin-del-bar'); if(b) b.style.display='block';
     var t=document.getElementById('th-sel'); if(t) t.style.display='';
+    var z=document.getElementById('zona-admin'); if(z) z.style.display='block';
   });
 }
 function salir(){ localStorage.removeItem('hus_token'); localStorage.removeItem('hus_user'); location.href='/'; }
@@ -328,6 +355,30 @@ async function cargarResumenFuentes(){
   }catch(e){}
 }
 
+// ---------- limpiar todo (solo administradores) ----------
+function abrirLimpiar(){
+  document.getElementById('lp-conf').value='';
+  document.getElementById('lp-fuentes').checked=false;
+  document.getElementById('lp-msg').innerHTML='';
+  abrirModal('m-limpiar');
+}
+async function ejecutarLimpiar(){
+  var conf=document.getElementById('lp-conf').value.trim(), msg=document.getElementById('lp-msg');
+  if(conf.toUpperCase()!=='BORRAR TODO'){ msg.innerHTML='<div class="aviso aviso-err">Para confirmar escriba exactamente <b>BORRAR TODO</b>.</div>'; return; }
+  var fuentes=document.getElementById('lp-fuentes').checked;
+  if(!confirm('Última confirmación: se borrarán TODOS los datos del módulo'+(fuentes?' INCLUYENDO las fuentes':' (las fuentes se conservan)')+'. ¿Continuar?')) return;
+  try{
+    var d=await api('/preauditoria/admin/limpiar-todo',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({confirmacion:conf, incluir_fuentes:fuentes})});
+    var b=d.borrado||{};
+    msg.innerHTML='<div class="aviso aviso-ok">Módulo limpio: '+(b.total||0)+' filas borradas '+
+      '(oficios '+(b.oficios_recepcion||0)+', facturas '+(b.facturas||0)+', eventos '+(b.eventos||0)+
+      ', envíos '+(b.envios_cargados||0)+', oficios de devolución '+(b.oficios_devolucion||0)+
+      (fuentes?(', fuentes '+((b.fuente_radicacion||0)+(b.fuente_facturacion_electronica||0))):'')+'). La página queda lista para empezar.</div>';
+    cargarResumenFuentes(); cargarOficios();
+  }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
+}
+
 // ---------- oficios ----------
 async function crearOficio(){
   var rad=document.getElementById('of-radicado').value.trim(), fec=document.getElementById('of-fecha').value, msg=document.getElementById('of-msg');
@@ -359,6 +410,7 @@ async function cargarOficios(page){
         '<td><b>'+o.total_facturas+'</b></td><td>'+o.pendientes+'</td><td style="color:var(--verde)">'+o.radicar+'</td>'+
         '<td style="color:var(--rojo)">'+o.devueltas+'</td>'+
         '<td><button class="btn btn-borde btn-chico" onclick="abrirOficio('+o.id+')">Abrir</button>'+
+        (o.tiene_adres ? ' <button class="btn btn-verde btn-chico" title="Excel con la información completa para ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ ADRES</button>' : '')+
         (ES_ADMIN ? ' <button class="btn btn-rojo btn-chico" onclick="eliminarOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">🗑</button>' : '')+
         '</td></tr>';
     }).join('');
@@ -386,7 +438,9 @@ async function abrirOficio(id){
       (o.total_facturas?
         '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+'</p>'+
         '<div class="tbl-scroll" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Factura</th><th>Envío</th><th>Valor</th><th>F.E.</th><th>Estado</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
-        '<div style="margin-top:12px"><button class="btn btn-rojo" '+(o.devueltas?'':'disabled')+' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button></div>'
+        '<div style="margin-top:12px"><button class="btn btn-rojo" '+(o.devueltas?'':'disabled')+' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
+        (o.tiene_adres ? ' <button class="btn btn-verde" title="Excel con la información completa que exige ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ Excel ADRES</button>' : '')+
+        '</div>'
         : '<p class="leyenda">Aún no ha cargado envíos en este oficio.</p>');
     abrirModal('m-oficio');
   }catch(e){ alert(e.message); }
@@ -519,12 +573,18 @@ async function cargarDevoluciones(page){
     pager(document.getElementById('pg-devoluciones'),d,'cargarDevoluciones');
   }catch(e){ console.error(e); }
 }
-async function verPdf(url,descargar){
-  try{ var r=await fetch(url,{headers:authH()}); if(!r.ok) throw new Error('No se pudo descargar'); var b=await r.blob();
+async function verPdf(url,descargar,nombre){
+  try{ var r=await fetch(url,{headers:authH()});
+    if(!r.ok){ var det=''; try{ det=(await r.json()).detail||''; }catch(e2){} throw new Error(det||'No se pudo descargar'); }
+    var b=await r.blob();
     var u=URL.createObjectURL(b);
-    if(descargar){ var a=document.createElement('a'); a.href=u; a.download='CONSOLIDADO_PRE_AUDITORIA.xlsx'; a.click(); }
+    if(descargar){ var a=document.createElement('a'); a.href=u; a.download=nombre||'CONSOLIDADO_PRE_AUDITORIA.xlsx'; a.click(); }
     else window.open(u,'_blank');
   }catch(e){ alert(e.message); }
+}
+function descargarAdres(id, radicado){
+  var nombre='ADRES_'+String(radicado||id).replace(/[^A-Za-z0-9_-]+/g,'_')+'.xlsx';
+  verPdf('/preauditoria/oficios/'+id+'/export-adres.xlsx', true, nombre);
 }
 
 // ---------- stats (tablero interactivo) ----------

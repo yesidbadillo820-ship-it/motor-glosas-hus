@@ -537,6 +537,162 @@ class TestEliminarOficio:
 
 
 # ------------------------------------------------------------------
+# Limpiar TODO el módulo (solo admin/coordinador)
+# ------------------------------------------------------------------
+
+
+class TestLimpiarTodo:
+    def _admin(self, db_session):
+        u = UsuarioRecord(
+            id=3,
+            nombre="ADMIN",
+            email="admin2@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        return u
+
+    def _poblar(self, client):
+        """Deja el módulo con datos de todas las tablas: 1 oficio, 1 envío,
+        2 facturas (1 radicada + 1 devuelta), 4 eventos y 1 oficio de
+        devolución emitido."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        _subir_dgreport(client, [F1])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _radicar(client, _factura_id(client, F1))
+        _devolver(client, _factura_id(client, F2))
+        assert client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").status_code == 200
+        return o
+
+    def test_auditor_no_puede(self, client):
+        r = client.post("/preauditoria/admin/limpiar-todo", json={"confirmacion": "BORRAR TODO"})
+        assert r.status_code == 403  # el fixture es rol AUDITOR
+
+    def test_exige_confirmacion_exacta(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        r = client.post("/preauditoria/admin/limpiar-todo", json={"confirmacion": "si, borrar"})
+        assert r.status_code == 400
+        assert "BORRAR TODO" in r.json()["detail"]
+
+    def test_limpia_proceso_y_conserva_fuentes(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        self._poblar(client)
+        # La confirmación tolera minúsculas/espacios.
+        r = client.post("/preauditoria/admin/limpiar-todo", json={"confirmacion": " borrar todo "})
+        assert r.status_code == 200, r.text
+        b = r.json()["borrado"]
+        assert b["oficios_recepcion"] == 1
+        assert b["facturas"] == 2
+        assert b["eventos"] == 4  # 2 escritas + 1 radicada + 1 devuelta
+        assert b["envios_cargados"] == 1
+        assert b["oficios_devolucion"] == 1
+        assert "fuente_radicacion" not in b  # las fuentes NO se tocaron
+        # El proceso quedó en cero…
+        assert client.get("/preauditoria/oficios").json()["total"] == 0
+        assert client.get("/preauditoria/consolidado").json()["total"] == 0
+        assert client.get("/preauditoria/oficios-devolucion").json()["total"] == 0
+        # …pero las fuentes siguen cargadas.
+        res = client.get("/preauditoria/fuentes/resumen").json()
+        assert res["radicacion_facturas"] == 2
+        assert res["dgreport_facturas"] == 1
+        # Se puede empezar de cero: mismo envío re-escribible y consecutivo
+        # SINAC reiniciado en 0001.
+        o2 = _crear_oficio(client, "FHUS-DESPUES-1")
+        assert _escribir(client, o2["id"], ENV).json()["nuevas"] == 2
+        _devolver(client, _factura_id(client, F2))
+        d = client.post(f"/preauditoria/oficios/{o2['id']}/oficio-devolucion").json()
+        assert d["consecutivo"].startswith("DEV-PRE-AUD-0001-")
+
+    def test_limpia_incluyendo_fuentes(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        self._poblar(client)
+        r = client.post(
+            "/preauditoria/admin/limpiar-todo",
+            json={"confirmacion": "BORRAR TODO", "incluir_fuentes": True},
+        )
+        assert r.status_code == 200, r.text
+        b = r.json()["borrado"]
+        assert b["fuente_radicacion"] == 2
+        assert b["fuente_facturacion_electronica"] == 1
+        res = client.get("/preauditoria/fuentes/resumen").json()
+        assert res["radicacion_facturas"] == 0
+        assert res["dgreport_facturas"] == 0
+
+
+# ------------------------------------------------------------------
+# Excel especial para oficios de ADRES (información completa)
+# ------------------------------------------------------------------
+
+ENTIDAD_ADRES = "ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD "
+
+
+class TestExportAdres:
+    def test_descarga_con_informacion_completa(self, client):
+        _subir_radicacion(
+            client,
+            [
+                _rad_fila(ENV, F1, 250700, nit=svc.NIT_ADRES, entidad=ENTIDAD_ADRES),
+                _rad_fila(ENV, F2, 98000),  # otra entidad: NO debe salir en el Excel
+            ],
+        )
+        _subir_dgreport(client, [F1])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _radicar(client, _factura_id(client, F1))
+        # La lista de oficios marca que este tiene facturas de ADRES.
+        of = client.get("/preauditoria/oficios").json()["items"][0]
+        assert of["tiene_adres"] is True
+        r = client.get(f"/preauditoria/oficios/{o['id']}/export-adres.xlsx")
+        assert r.status_code == 200
+        from openpyxl import load_workbook
+
+        ws = load_workbook(BytesIO(r.content)).active
+        filas = list(ws.iter_rows(values_only=True))
+        encabezado = list(filas[0])
+        for col in ("FACTURA", "VALOR", "CORREO F.E.", "CUFE / N° F.E.", "MOTIVO DEVOLUCION"):
+            assert col in encabezado
+        assert len(filas) == 2  # encabezado + solo la factura ADRES
+        fila = dict(zip(encabezado, filas[1]))
+        assert fila["FACTURA"] == F1
+        assert str(fila["NIT"]) == svc.NIT_ADRES
+        assert fila["ENTIDAD"] == ENTIDAD_ADRES.strip()
+        assert fila["CORREO F.E."] == "SI"
+        assert fila["CUFE / N° F.E."] == "CUFE" + F1
+        assert fila["RESULTADO"] == "RADICAR"
+        assert fila["VALOR"] == 250700
+        assert fila["AUDITOR"] == "CLAUDIA"
+
+    def test_reconoce_adres_por_nombre_sin_nit(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700, nit="901037916-6", entidad="ADRES ")])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        assert client.get("/preauditoria/oficios").json()["items"][0]["tiene_adres"] is True
+
+    def test_oficio_sin_adres_no_aplica(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        of = client.get("/preauditoria/oficios").json()["items"][0]
+        assert of["tiene_adres"] is False
+        r = client.get(f"/preauditoria/oficios/{o['id']}/export-adres.xlsx")
+        assert r.status_code == 404
+        assert "ADRES" in r.json()["detail"]
+
+
+# ------------------------------------------------------------------
 # Semáforo (unidad, sin cambios respecto de v1)
 # ------------------------------------------------------------------
 
