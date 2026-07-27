@@ -210,7 +210,12 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
   desarrollo dentro del proyecto principal sin perder nada: explica el
   objetivo, cómo funciona por dentro, cada decisión que se tomó y por qué,
   los datos del cruce de junio, los riesgos al integrarlo y el paso a paso
-  para fusionarlo.
+  para fusionarlo. Al subirlo, el revisor automático de código (que el
+  proyecto instala siempre en su versión más reciente) acababa de cambiar
+  de versión y empezó a revisar también los documentos: rechazó el nuevo
+  documento por detalles de espaciado en sus ejemplos de código. Se
+  corrigió el formato y quedó anotado el pendiente de fijar la versión de
+  esa herramienta para que no vuelva a pasar.
 
 ---
 

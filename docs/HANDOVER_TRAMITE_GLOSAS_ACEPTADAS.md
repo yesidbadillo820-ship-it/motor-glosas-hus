@@ -417,8 +417,7 @@ wb.close()
 
 **Detalle de la selección de acta cuando la citada no coincide** (línea 188-196):
 ```python
-con_cuadre = [g for g in por_acta.values()
-              if buscar_subconjunto([c["val"] for c in g], valor)]
+con_cuadre = [g for g in por_acta.values() if buscar_subconjunto([c["val"] for c in g], valor)]
 candidatos = con_cuadre or list(por_acta.values())
 grupo = max(candidatos, key=lambda g: g[0]["fecha"] or datetime.min)
 ```
@@ -779,7 +778,33 @@ FAILED tests/test_api/test_por_dia_semana.py::TestPorDiaSemana::test_pct_del_tot
 
 **Solución.** Fechas relativas al momento de ejecución, ancladas al día de la semana requerido, siempre dentro de la ventana. Verificado localmente: **8 tests pasan** (los 4 de cada archivo), `ruff check --select F,W6` limpio y `ruff format --check` limpio.
 
-### 10.8 Archivos **NO** modificados que conviene declarar
+### 10.8 Segundo incidente de CI — ruff 0.16.0 empieza a formatear Markdown
+
+**Síntoma.** El 27-jul-2026, tras el push del commit `28044fa` (que **solo agregaba este documento y actualizaba la bitácora**, ambos `.md`), el job `Lint (ruff)` falló:
+
+```
+unformatted: File would be reformatted
+  --> docs/HANDOVER_TRAMITE_GLOSAS_ACEPTADAS.md:1:1
+1 file would be reformatted, 868 files already formatted
+```
+
+**Causa raíz.** El workflow instala el linter **sin fijar versión** (`pip install ruff`). Entre la ejecución anterior y esta, ruff pasó de la serie 0.15 a **0.16.0**, versión que introduce el **formateo de bloques de código Python embebidos en archivos Markdown**. Los fragmentos ` ```python ` de este documento —escritos a mano para legibilidad— quedaron sujetos al formateador.
+
+Detalle revelador del propio log: la corrida contaba **869 archivos** (`1 file would be reformatted, 868 files already formatted`), mientras que localmente con ruff 0.15.8 contaba **837**. Los 32 archivos de diferencia son los `.md` del repositorio, que la versión anterior ni siquiera miraba.
+
+**Diagnóstico complementario.** En el contenedor de desarrollo había **dos binarios de ruff** (`/root/.local/bin/ruff` en 0.15.8, que sombreaba a `/usr/local/bin/ruff`), lo que ocultó el problema al intentar reproducirlo: el `ruff --version` del PATH seguía reportando la versión vieja aunque `pip` hubiera instalado la nueva. Hubo que invocar el binario por ruta absoluta para reproducir el fallo.
+
+**Solución aplicada.** `ruff format` sobre el documento con la versión 0.16.0. Los tres cambios son **exclusivamente de espaciado, sin ninguna alteración semántica**:
+
+1. Una comprensión de lista partida a mano en dos líneas se unificó en una sola (99 caracteres, dentro del límite de 100 del proyecto).
+2. Los comentarios alineados con espacios múltiples en el bloque de constantes se normalizaron a dos espacios.
+3. En el fragmento del Anexo C: se añadieron las dos líneas en blanco reglamentarias alrededor del `def` y se normalizó el *slice* `t[m.end():]` a `t[m.end() :]`.
+
+Verificado con **ambas versiones**: `ruff format --check .` limpio en 0.16.0 (869 archivos) y en 0.15.8 (837 archivos), y `ruff check . --select F,W6` limpio.
+
+**Implicación para el equipo, más allá de este documento.** Un linter sin versión fijada significa que **una publicación nueva de la herramienta puede tumbar el build sobre un commit que no cambió nada relevante** — exactamente lo que ocurrió aquí. Además, desde ahora **todo archivo Markdown del repositorio con bloques ` ```python ` queda sujeto al formateador**, incluidos `README.md`, `CHANGELOG.md`, `ARCHITECTURE.md` y los documentos de `docs/`. Ver riesgo **R11** y pendiente **§15.10**.
+
+### 10.9 Archivos **NO** modificados que conviene declarar
 
 Para tranquilidad de la integración, esta rama **no toca**: `app/` (ningún router, servicio, modelo o middleware), `alembic/`, `data/`, `static/`, `scripts/`, `requirements.txt`, `requirements-dev.txt`, `pyproject.toml`, `pytest.ini`, `Dockerfile`, `docker-compose.yml`, `fly.toml`, `.github/workflows/`, ni ninguna otra herramienta de `tools/`.
 
@@ -841,12 +866,12 @@ Si el formato de los Excel cambia, **solo hay que tocar estas líneas**:
 
 ```python
 # Hoja BD del consolidado de glosas aceptadas (índices 0-based)
-BD_FACTURA, BD_OBS, BD_VALOR = 2, 8, 9              # C, I, J
-BD_RESPUESTA, BD_NUM, BD_FECHA, BD_TIPO_TRAMITE = 22, 23, 24, 26   # W, X, Y, AA
+BD_FACTURA, BD_OBS, BD_VALOR = 2, 8, 9  # C, I, J
+BD_RESPUESTA, BD_NUM, BD_FECHA, BD_TIPO_TRAMITE = 22, 23, 24, 26  # W, X, Y, AA
 BD_HEADER_ROW = 4
 
 # Hoja GENERAL de la circularización (índices 0-based)
-GEN_FACTURA, GEN_VAL_ACEPTADO, GEN_ACTA, GEN_FECHA, GEN_CONCEPTO = 1, 5, 11, 12, 13   # B, F, L, M, N
+GEN_FACTURA, GEN_VAL_ACEPTADO, GEN_ACTA, GEN_FECHA, GEN_CONCEPTO = 1, 5, 11, 12, 13  # B, F, L, M, N
 ```
 
 **Nota:** `BD_TIPO_TRAMITE` (columna AA, `TRAMITE Y/O ACTA`, con valores `TRAMITE` / `ACTA`) está **definida pero no utilizada** en la versión entregada. Se dejó porque documenta el mapa completo de la hoja y porque es el gancho natural si en el futuro se quiere diferenciar el tratamiento de filas `TRAMITE` (objeciones) frente a `ACTA` (conciliaciones). Ver §15.2.
@@ -888,6 +913,7 @@ El workflow `.github/workflows/*.yml` corre en `push` a `main`, `develop` y `cla
 | **R8** | **openpyxl y los elementos no soportados.** Al reescribir un `.xlsx`, openpyxl puede perder elementos que no modela (algunos gráficos, tablas dinámicas, ciertos objetos de dibujo). En los archivos procesados no había ninguno, pero un consolidado futuro podría traerlos. | Baja | Medio | Antes de entregar, comparar visualmente el archivo de salida con el original. La verificación programática que se hizo cubre valores de celda, no objetos gráficos. |
 | **R9** | **Nombre de herramienta similar a otra existente.** Ya existe `tools/convertir_tramite_masivo.py`. Un desarrollador puede confundirlas. | Baja | Bajo | Los docstrings de ambas son explícitos. Considerar un `tools/README.md` índice. |
 | **R10** | **Ejecución sobre el mismo archivo de entrada y salida.** Si alguien pasa la misma ruta en los argumentos 1 y 3, se sobrescribe el original y se pierde la posibilidad de comparar. | Baja | Medio | El módulo **no lo impide**. Ver §15.1. |
+| **R11** | **El CI instala ruff sin versión fijada** (`pip install ruff`). Cada publicación nueva del linter puede tumbar el build sobre commits que no cambiaron nada relevante. Ya ocurrió el 27-jul-2026: ruff 0.16.0 empezó a formatear los bloques ` ```python ` de los `.md` y el gate falló sobre un commit de solo documentación (§10.8). Desde esa versión, **todo Markdown del repo con código Python embebido está sujeto al formateador** (`README.md`, `CHANGELOG.md`, `ARCHITECTURE.md`, `docs/`). | Alta | Medio | Fijar la versión en el workflow (`pip install "ruff==0.16.0"`) y subirla deliberadamente, corriendo `ruff format .` en el mismo commit. Ver §15.10. |
 
 ### 13.2 Riesgos de datos (los que debe conocer el auditor, no el programador)
 
@@ -998,7 +1024,13 @@ No son de este módulo, pero forman parte del estado que esta rama documenta y *
 4. **Checklist técnico de la auditoría de mayo** (`AUDIT_CHECKLIST.md`): siguen abiertos los puntos de seguridad de nivel medio (endurecer `migracion_emergencia` y `dedup_historial` en `admin.py`, exigir `password_actual` al cambiar contraseña, aplicar rate-limit a `/auth/login`, `/usuarios/{id}/password` y los endpoints de 2FA) y los de consistencia de datos en `contratos.py` y `glosas.py`. **Los puntos relativos a Fly.io ya no aplican**: el despliegue se retiró el 08-jul-2026 y todo corre en servidor propio del HUS.
 5. **Robot de Dinámica Gerencial** (`tools/responder_glosas_dgh.py`): quedó en piloto con modo `--calibrar`; falta puesta en marcha completa en la máquina del HUS.
 
-### 15.10 Errores conocidos del módulo
+### 15.10 Fijar la versión de ruff en el CI
+
+El workflow instala el linter con `pip install ruff` sin versión. El 27-jul-2026 eso hizo fallar el gate de lint sobre un commit de solo documentación, porque ruff 0.16.0 empezó a formatear los bloques de código Python dentro de los Markdown (incidente completo en §10.8, riesgo **R11**).
+
+**Acción recomendada:** fijar `pip install "ruff==0.16.0"` en `.github/workflows/` (y en `.pre-commit-config.yaml` si aplica), y subir de versión deliberadamente: en el mismo commit del cambio de versión, correr `ruff format .` sobre todo el árbol para absorber los cambios de formato de la versión nueva. **No se hizo en esta rama** porque tocar el workflow del CI excede el alcance de la entrega y merece su propio cambio revisado.
+
+### 15.11 Errores conocidos del módulo
 
 **Ninguno.** No se detectó ningún defecto funcional durante el desarrollo, la verificación ni el uso real. Las limitaciones conocidas son las de §15.1 y §15.2, que son ausencias de funcionalidad, no fallos.
 
@@ -1602,6 +1634,7 @@ Aplicada a `archivo.xlsx` y `archivo_1.xlsx`. Se registra íntegra aquí para qu
 ```python
 import openpyxl, re
 
+
 def extraer_respuesta(obs):
     """Parte de la observacion posterior a la referencia del acta (misma regla
     usada en el consolidado de junio: el texto tras 'EN LA CUAL'/'FIRMADA...')."""
@@ -1611,9 +1644,10 @@ def extraer_respuesta(obs):
         m = re.search(r"FIRMADA POR[^.]*\.\s*", t)
     if not m:
         m = re.search(r"DONDE\s*:?\s*", t)
-    resto = t[m.end():] if m else t
+    resto = t[m.end() :] if m else t
     ini = re.search(r"EN CONCILIACION|ESE HUS", resto)
-    return (resto[ini.start():] if ini else resto).strip(" :;,.\n")
+    return (resto[ini.start() :] if ini else resto).strip(" :;,.\n")
+
 
 wb = openpyxl.load_workbook(path)
 ws = wb.active
