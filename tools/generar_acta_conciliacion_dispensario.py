@@ -52,9 +52,13 @@ HUS = U / "ed760996-HUS.xlsx"
 TRA = U / "1dd26b78-TRAMITE_DE_OBJECCION_DISPENSARIO_MEDICO.xlsx"
 REC = U / "b7d039e7-RECEPCION_DE_OBJECIONES_DISPENSARIO_MEDICO.xlsx"
 CAR = U / "2ba94eec-DISPENSARIO_MEDICO_CORTE_30062026_CRUCE_ACTAS.xlsx"
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(
-    "/tmp/claude-0/-home-user-motor-glosas-hus/116eb458-ad18-5e2c-a877-732ea7f1ccbe/"
-    "scratchpad/ACTA_CONCILIACION_147_DISPENSARIO.xlsm"
+OUT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else Path(
+        "/tmp/claude-0/-home-user-motor-glosas-hus/116eb458-ad18-5e2c-a877-732ea7f1ccbe/"
+        "scratchpad/ACTA_CONCILIACION_147_DISPENSARIO.xlsm"
+    )
 )
 
 FE_RAIZ = r"\\172.16.32.83\factura_electronica_net22"
@@ -272,9 +276,7 @@ INS_AT = FIRST + 1  # insertar despues de la primera fila de datos
 merges_abajo = [str(m) for m in ws.merged_cells.ranges if m.min_row >= INS_AT]
 for m in merges_abajo:
     ws.unmerge_cells(m)
-alturas_abajo = {
-    r: d.height for r, d in ws.row_dimensions.items() if r >= INS_AT and d.height
-}
+alturas_abajo = {r: d.height for r, d in ws.row_dimensions.items() if r >= INS_AT and d.height}
 
 # 2) insertar filas
 ws.insert_rows(INS_AT, extra)
@@ -412,8 +414,9 @@ for i, g in enumerate(glosas):
 # 7) fila TOTAL (ahora en TOT): reescribir formulas al rango nuevo
 ws.cell(row=TOT, column=9, value="TOTAL ")
 ws.cell(
-    row=TOT, column=11,
-    value=f"=SUMPRODUCT((E{FIRST}:E{LAST}<>E{FIRST-1}:E{LAST-1})*K{FIRST}:K{LAST})",
+    row=TOT,
+    column=11,
+    value=f"=SUMPRODUCT((E{FIRST}:E{LAST}<>E{FIRST - 1}:E{LAST - 1})*K{FIRST}:K{LAST})",
 )
 for c in (12, 13, 14, 15, 16, 20, 23, 26):
     col = L(c)
@@ -422,7 +425,7 @@ ws.cell(row=TOT, column=21, value="-")
 
 # 8) encabezado del acta
 ws["F9"] = "2025 - 2026"
-ws["K9"] = f"=SUMPRODUCT((E{FIRST}:E{LAST}<>E{FIRST-1}:E{LAST-1})*1)"
+ws["K9"] = f"=SUMPRODUCT((E{FIRST}:E{LAST}<>E{FIRST - 1}:E{LAST - 1})*1)"
 ws["M9"] = f"=M{TOT}"
 ws["P9"] = f"=N{TOT}"
 ws["R9"] = f"=O{TOT}"
@@ -451,27 +454,54 @@ dash["B3"] = (
 )
 dash["B3"].font = SUB
 kpis = [
-    ("Numero total de facturas pendientes por conciliar",
-     f"=SUMPRODUCT((ACTA!E{FIRST}:E{LAST}<>ACTA!E{FIRST-1}:E{LAST-1})*1)", "0"),
+    (
+        "Numero total de facturas pendientes por conciliar",
+        f"=SUMPRODUCT((ACTA!E{FIRST}:E{LAST}<>ACTA!E{FIRST - 1}:E{LAST - 1})*1)",
+        "0",
+    ),
     ("Valor total pendiente por conciliar", f"=SUM(ACTA!M{FIRST}:M{LAST})", "#,##0"),
     ("Valor total glosado (glosa inicial)", f"=SUM(ACTA!L{FIRST}:L{LAST})", "#,##0"),
-    ("Valor recuperable (defendido por el HUS = glosado - aceptado)",
-     f"=SUM(ACTA!L{FIRST}:L{LAST})-SUM(ACTA!T{FIRST}:T{LAST})", "#,##0"),
+    (
+        "Valor recuperable (defendido por el HUS = glosado - aceptado)",
+        f"=SUM(ACTA!L{FIRST}:L{LAST})-SUM(ACTA!T{FIRST}:T{LAST})",
+        "#,##0",
+    ),
     ("Valor ratificado por el HUS en respuesta", f"=SUM(ACTA!M{FIRST}:M{LAST})", "#,##0"),
-    ("Valor levantado (resultado mesa - se llena en conciliacion)",
-     f"=SUM(ACTA!O{FIRST}:O{LAST})", "#,##0"),
-    ("Valor sin respuesta",
-     f'=SUMIF(ACTA!AM{FIRST}:AM{LAST},"SIN RESPUESTA",ACTA!L{FIRST}:L{LAST})', "#,##0"),
-    ("Valor conciliado (acepta IPS + levanta entidad - se llena en mesa)",
-     f"=SUM(ACTA!N{FIRST}:N{LAST})+SUM(ACTA!O{FIRST}:O{LAST})", "#,##0"),
-    ("Facturas sin soporte de entrega ESM",
-     f'=SUMPRODUCT((ACTA!E{FIRST}:E{LAST}<>ACTA!E{FIRST-1}:E{LAST-1})*(ACTA!AO{FIRST}:AO{LAST}="NO"))', "0"),
-    ("Facturas con glosas sin respuesta",
-     f'=SUMPRODUCT((ACTA!E{FIRST}:E{LAST}<>ACTA!E{FIRST-1}:E{LAST-1})*(ACTA!AM{FIRST}:AM{LAST}="SIN RESPUESTA"))', "0"),
-    ("Facturas con diferencias vs cartera",
-     f'=SUMPRODUCT((ACTA!AP{FIRST}:AP{LAST}<>"")*(ACTA!AP{FIRST}:AP{LAST}<>0)*1)', "0"),
-    ("Facturas listas para conciliar (respondida + sin dif. + en cartera)",
-     f'=COUNTIF(ACTA!AS{FIRST}:AS{LAST},"SI")', "0"),
+    (
+        "Valor levantado (resultado mesa - se llena en conciliacion)",
+        f"=SUM(ACTA!O{FIRST}:O{LAST})",
+        "#,##0",
+    ),
+    (
+        "Valor sin respuesta",
+        f'=SUMIF(ACTA!AM{FIRST}:AM{LAST},"SIN RESPUESTA",ACTA!L{FIRST}:L{LAST})',
+        "#,##0",
+    ),
+    (
+        "Valor conciliado (acepta IPS + levanta entidad - se llena en mesa)",
+        f"=SUM(ACTA!N{FIRST}:N{LAST})+SUM(ACTA!O{FIRST}:O{LAST})",
+        "#,##0",
+    ),
+    (
+        "Facturas sin soporte de entrega ESM",
+        f'=SUMPRODUCT((ACTA!E{FIRST}:E{LAST}<>ACTA!E{FIRST - 1}:E{LAST - 1})*(ACTA!AO{FIRST}:AO{LAST}="NO"))',
+        "0",
+    ),
+    (
+        "Facturas con glosas sin respuesta",
+        f'=SUMPRODUCT((ACTA!E{FIRST}:E{LAST}<>ACTA!E{FIRST - 1}:E{LAST - 1})*(ACTA!AM{FIRST}:AM{LAST}="SIN RESPUESTA"))',
+        "0",
+    ),
+    (
+        "Facturas con diferencias vs cartera",
+        f'=SUMPRODUCT((ACTA!AP{FIRST}:AP{LAST}<>"")*(ACTA!AP{FIRST}:AP{LAST}<>0)*1)',
+        "0",
+    ),
+    (
+        "Facturas listas para conciliar (respondida + sin dif. + en cartera)",
+        f'=COUNTIF(ACTA!AS{FIRST}:AS{LAST},"SI")',
+        "0",
+    ),
 ]
 dash["B5"] = "INDICADOR"
 dash["E5"] = "VALOR"
