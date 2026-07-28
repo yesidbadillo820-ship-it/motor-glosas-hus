@@ -56,6 +56,42 @@ Mirar una sola fila subestima la glosa, que es el error típico del proceso
 manual. En la bitácora CSV la columna `FILAS_REPORTE` dice cuántas filas se
 sumaron para cada ítem.
 
+**No es un caso raro.** Sobre el reporte real del paquete 31068 (19.256 filas,
+581 facturas), en las 324 facturas del lote:
+
+- **el 32 % de los ítems (3.068 de 9.616) viene repartido en más de una fila**;
+- el peor caso es la terapia respiratoria de `HUS311371`: **38 filas** del mismo
+  ítem;
+- en el **1,1 %** de las filas la columna `Cantidad Aprobada` **no cuadra** con
+  `Valor Aprobado ÷ valor unitario` (como en la venda de gasa: dice 2 pero el
+  valor corresponde a 1). Por eso el bot calcula la cantidad desde el **valor
+  glosado**, no desde la columna de cantidad.
+
+---
+
+## Verificado contra el reporte real del paquete 31068
+
+| | |
+|---|---|
+| Hoja | `ReporteGlosasReclamPJ_RADICACIO` |
+| Encabezados | fila 7 (arriba va el título `ADRES — REPORTE DE GLOSAS…`) |
+| Filas de datos | 19.256 |
+| Facturas en el reporte | 581 |
+| Facturas del lote a trabajar | 324 — **las 324 están en el reporte** |
+| Hojas que se borrarían del detallado | 257 (facturas del reporte que no van en el lote) |
+
+Cifras de las 324 facturas:
+
+| Concepto | Valor |
+|---|---|
+| Reclamado | $2.870.214.655 |
+| Aprobado (lo que paga el ADRES) | $1.835.864.089 — 64,0 % |
+| **Sigue glosado** | **$1.034.350.566 — 36,0 %** |
+
+De los 9.616 ítems: **6.805 se quitan** (aprobados al 100 %), **472 se ajustan**
+(aprobados a medias) y **2.712 se dejan** (glosados al 100 %). Ninguna factura
+queda vacía, y en todas se cumple `reclamado = aprobado + glosado`.
+
 ---
 
 ## Instalación

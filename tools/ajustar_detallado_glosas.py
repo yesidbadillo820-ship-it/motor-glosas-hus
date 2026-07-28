@@ -377,12 +377,12 @@ class ResultadoHoja:
 # ─── Lectura de tablas ───────────────────────────────────────────────────────
 
 
-def _abrir_libro(ruta: Path, *, solo_datos: bool = True):
+def _abrir_libro(ruta: Path, *, solo_datos: bool = True, solo_lectura: bool = False):
     try:
         import openpyxl
     except ImportError:  # pragma: no cover - depende del entorno
         raise SystemExit("Falta openpyxl. Instalalo con:  py -m pip install openpyxl") from None
-    return openpyxl.load_workbook(ruta, data_only=solo_datos)
+    return openpyxl.load_workbook(ruta, data_only=solo_datos, read_only=solo_lectura)
 
 
 def _leer_filas(ruta: Path, hoja: str | None = None) -> list[list]:
@@ -400,7 +400,9 @@ def _leer_filas(ruta: Path, hoja: str | None = None) -> list[list]:
             for fila in csv.reader(fh, dialecto):
                 filas.append(list(fila))
         return filas
-    wb = _abrir_libro(ruta)
+    # read_only: el ReporteGlosasReclamPAQUETE trae decenas de miles de filas y
+    # solo lo leemos (sin read_only tarda ~30 s en vez de ~3 s).
+    wb = _abrir_libro(ruta, solo_lectura=True)
     try:
         hojas = [wb[hoja]] if hoja else list(wb.worksheets)
         filas = []

@@ -135,6 +135,16 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   filas** (la venda de gasa de la HUS352890 viene en dos: 4 y 2 unidades). El
   bot las suma → siguen glosados **$47.000**, no $9.400 como quedó en el ejemplo
   hecho a mano. Falta que el auditor confirme ese criterio (ver PENDIENTE #11).
+  **Validado contra el reporte real del paquete 31068** (19.256 filas, 581
+  facturas): las **324 facturas del lote están todas** en el reporte y se
+  reconocen sin ajustes. Del total reclamado **$2.870.214.655**, el ADRES aprobó
+  **$1.835.864.089 (64%)** y **sigue glosado $1.034.350.566 (36%)**. De 9.616
+  ítems: 6.805 se quitan, 472 se ajustan y 2.712 se dejan. El **32% de los ítems
+  viene repartido en más de una fila** del reporte (el peor: 38 filas para la
+  terapia respiratoria de HUS311371) y en el 1,1% de las filas la columna
+  "Cantidad Aprobada" no cuadra con el valor — por eso el bot suma y calcula la
+  cantidad desde el valor glosado. Falta el **Excel con la impresión de las
+  facturas (el detallado)** para poder correrlo completo.
 
 ---
 
@@ -179,10 +189,11 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     sumando las **dos** filas del reporte siguen glosadas **5 unidades /
     $47.000** (subtotal $132.800 en vez de $95.200). El bot hace la suma. Si el
     criterio del auditor es otro, se cambia con `--modo-parcial`.
-12. **Correr el bot contra los archivos reales** (consolidado, detallado y
-    `ReporteGlosasReclamPAQUETE 31068.xlsx`) con `--diagnostico` y revisar la
-    salida: si el formato del detallado real difiere del ejemplo, ajustar la
-    detección (marcas `CÓDIGO/NOMBRE/CANT` y `VALOR SUBTOTAL…`).
+12. **Falta el Excel con la impresión (detallado) de las 324 facturas.** El
+    reporte de glosas y la lista de facturas ya están verificados; sin el
+    detallado no se puede correr el bot completo. Cuando llegue: correr con
+    `--diagnostico` y, si el formato difiere del ejemplo, ajustar la detección
+    (marcas `CÓDIGO/NOMBRE/CANT` y `VALOR SUBTOTAL…`).
 13. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
     aparecen en el reporte): hoy se conservan y se marcan.
 
