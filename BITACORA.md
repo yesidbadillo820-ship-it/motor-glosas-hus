@@ -588,6 +588,76 @@ rama principal: están listos, probados y a un clic de distancia.
   los 2 rastreos de anticuerpos con su orden médica; otrosí o prórroga que
   acredite la vigencia 2026 del contrato 440-DIGSA/DMBUG-2025.
 
+### 28-07 (noche) — Contrato de Construcción de SINAC OS: el plano se volvió obra
+
+Hasta hoy teníamos el **plano** (el Manual de Arquitectura: qué queremos que
+sea SINAC OS). Faltaba el **contrato de obra**: qué se construye, en qué orden,
+quién lo aprueba y cómo se comprueba que quedó bien. Eso es lo que quedó hecho.
+
+Está en `docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`: **veinte capítulos y un
+anexo**, unas 306.000 palabras. Cada capítulo termina con una tabla donde toda
+fila tiene **criterio de aceptación** y **el comando exacto que lo comprueba**,
+para que nadie tenga que preguntar si algo quedó hecho. En total **730 tareas**.
+
+**Lo importante para el área, en una frase:** de las 730 tareas, **69 producen
+los siete resultados que usted puede ver funcionando**, y cuestan 163,5 jornadas
+—el 10 % del esfuerzo total—. Las otras 661 el Contrato nunca las amarró a un
+resultado visible.
+
+Los siete resultados, en el orden en que llegarían:
+
+1. **La plata deja de contarse mal.** Un solo lector de valores en pesos: se
+   acaba el error del ×100 que hacía leer `950.000` como `950`.
+2. **Lo vencido deja de esconderse.** Encabeza la lista en vez de desaparecer
+   de ella, y escala solo al coordinador. Es el caso de las tres facturas de
+   junio por $20.054.751 que se descubrieron 45 días tarde.
+3. **Una entidad nueva se activa sin programar.** SIMED encolable desde una
+   ficha, sin esperar semanas de desarrollo.
+4. **Un expediente por factura y una sola cifra por concepto.** Se acaba que
+   "recuperado" dé cuatro números distintos según la pestaña.
+5. **Un solo documento radicable**, generado en un solo lugar.
+6. **El robot corre solo y se ve mientras corre**, con la plata en juego a la
+   vista.
+7. **Una institución nueva queda instalada en una jornada.**
+
+**Cuatro problemas se encontraron al juntar los capítulos** y quedaron
+corregidos o registrados:
+
+- **El plan eran diecinueve planes que no se miraban.** De 773 dependencias
+  declaradas, 742 apuntaban a una tarea del mismo capítulo: casi ninguna decía
+  que el trabajo de un capítulo necesita el cimiento que vive en otro. Se
+  agregaron 563 dependencias derivadas de nueve cimientos escritos, con la
+  regla a la vista para que se pueda discutir.
+- **La columna que separa los datos de una institución de los de otra tenía
+  tres nombres** (`institucion_id`, `hospital_id`, `tenant_id`). Construido así
+  quedaban tres columnas para lo mismo, y la protección de datos se activa
+  sobre una sola: las tablas con las otras dos quedaban abiertas. Se unificó en
+  `institucion_id` (287 reemplazos y 8 líneas a mano). Se eligió ese nombre
+  porque SINAC OS también debe poder instalarse en una clínica o en una IPS.
+- **Más de la mitad del plan estaba marcada como urgente** (380 de 730). Una
+  urgencia que le toca a la mitad no prioriza nada. Se volvió a priorizar con
+  una regla verificable: P0 es lo que hace falta para los tres primeros
+  resultados y nada más. Quedaron 37.
+- **El Contrato completo compromete casi siete años de una persona**
+  (1.625,5 jornadas). Se dice sin adornos: **no es ejecutable de punta a punta**
+  con el equipo de hoy. Por eso el anexo separa lo que sí cabe.
+
+También se cerraron defectos que habrían costado retrabajo: ocho dependencias
+apuntaban a tareas inexistentes, el capítulo 14 numeraba 40 tareas con códigos
+que ya significaban otra cosa en otros capítulos (`GOB-09` era "parser
+monetario" en uno y "política de vida de rama" en otro), y dos tareas se
+declaraban prerrequisito de sí mismas. Todo eso quedó arreglado y explicado en
+el **Anexo I**.
+
+**Las cifras del Contrato se comprueban solas.** La portada trae una tabla que
+vuelve a medir contra el repositorio lo que el documento afirma. Hoy: 43 tablas,
+4.530 pruebas, 59 ramas sin fusionar, 44 llamadas a `prompt()` y 1 sola
+migración formal **coinciden**; las rutas de la API subieron de 686 a 712
+porque el sistema siguió creciendo mientras se escribía.
+
+Todo esto es **documentación y plan**. No se tocó una línea del código que
+corre en producción: la suite de 4.530 pruebas pasa igual que antes.
+
 ---
 
 ## 3) PENDIENTE
@@ -724,6 +794,29 @@ rama principal: están listos, probados y a un clic de distancia.
 12. **Siguiente paso de construcción**, según el plan: terminar la limpieza de
     módulos sin uso y arrancar la **Fase 2 — modelo real del dominio**
     (Factura → Glosa → Soporte → Conciliación → Acta).
+
+### Contrato de Construcción — decisiones que dependen de Yesid (28-07 noche)
+
+13. **Leer el Anexo I del Contrato** (`docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`,
+    al final). Son diez páginas y responden lo único que importa ahora: qué se
+    construye primero, qué se ve funcionando y cuánto cuesta. Con eso basta
+    para decidir; los veinte capítulos son el detalle.
+14. **Aprobar o cambiar los siete resultados comprometidos.** Están escritos
+    como cosas que usted ve en pantalla, no como tareas técnicas. Si alguno no
+    le sirve o falta uno, se cambia ahí y el plan se recalcula solo.
+15. **Decidir qué pasa con las 661 tareas que quedaron fuera de todo
+    resultado** (1.462 jornadas, el 90 % del esfuerzo). Dos salidas honestas
+    por cada una: o se le escribe el resultado que justifica su existencia, o
+    se acepta que va después. Lo que no sirve es dejarlas marcadas urgentes
+    sin destinatario, que es como estaban.
+16. **Decidir el tamaño del equipo.** El Contrato completo son 1.625,5 jornadas
+    ≈ siete años de una persona. La primera entrega —los tres resultados que
+    recuperan plata ya— son 79,5 jornadas ≈ cuatro meses de una persona, o un
+    mes de cuatro. De esa decisión sale todo lo demás.
+17. **Tres tareas están escritas dos veces** en capítulos distintos (migrar los
+    perfiles de pagador a YAML, la pantalla de Perfiles, y las pruebas de
+    arquitectura bloqueantes). Hay que decidir cuál capítulo conserva cada una
+    antes de que dos personas las construyan por separado.
 
 ---
 
