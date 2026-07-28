@@ -619,6 +619,27 @@ def preview_envio(
     return svc.preview_envio(db, o, envio)
 
 
+@router.delete("/oficios/{oficio_id}/envios/{envio}")
+def eliminar_envio(
+    oficio_id: int,
+    envio: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Deshace un envío cargado por error (solo SUPER_ADMIN/COORDINADOR).
+
+    Borra las facturas que entraron con ese envío y lo libera para volver a
+    escribirlo. El resto del oficio no se toca.
+    """
+    o = db.get(OficioRecepcionRecord, oficio_id)
+    if not o:
+        raise HTTPException(404, "Oficio no encontrado")
+    res = svc.eliminar_envio(db, o, envio)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 409), res.get("mensaje", "No se pudo eliminar"))
+    return {**res, "oficio": _oficio_dict(db, o)}
+
+
 @router.post("/oficios/{oficio_id}/envios")
 def escribir_envio(
     oficio_id: int,
@@ -797,6 +818,7 @@ def historial_factura(
                 "estado_resultante": e.estado_resultante,
                 "auditor": e.auditor,
                 "motivo": e.motivo,
+                "observaciones": e.observaciones,
                 "valor": e.valor_snapshot,
                 "fecha": _fecha_iso(e.creado_en),
             }

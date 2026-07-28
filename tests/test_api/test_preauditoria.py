@@ -323,6 +323,48 @@ class TestAuditoria:
         # radicar → SUBSANADA
         assert _radicar(client, d["actual"]["id"]).json()["estado"] == "SUBSANADA"
 
+    def test_clics_repetidos_no_duplican_el_historial(self, client):
+        """Si el servidor va lento el auditor hace varios clics: solo uno debe
+        quedar. (En producción llegaron 5 eventos RADICADA de la misma factura.)"""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        respuestas = [_radicar(client, fid) for _ in range(5)]
+        assert respuestas[0].status_code == 200
+        assert all(r.status_code == 409 for r in respuestas[1:])
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        radicadas = [e for e in h["eventos"] if e["tipo"] == "RADICADA"]
+        assert len(radicadas) == 1
+
+    def test_devolver_sin_motivo_no_cambia_el_estado(self, client):
+        """La validación va ANTES de tomar la factura: un intento inválido no
+        puede dejarla marcada como devuelta."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": "   "},
+        )
+        assert r.status_code == 400
+        d = client.get(f"/preauditoria/facturas/{fid}").json()
+        assert d["resultado"] == "PENDIENTE" and d["num_devoluciones"] == 0
+        # y después sí se puede decidir normalmente
+        assert _radicar(client, fid).status_code == 200
+
+    def test_la_observacion_se_guarda_y_queda_en_el_historial(self, client):
+        """Lo que el auditor escribe al radicar ya no se pierde."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "RADICAR", "observaciones": "Soportes revisados con la EPS"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["observaciones"] == "Soportes revisados con la EPS"
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert h["actual"]["observaciones"] == "Soportes revisados con la EPS"
+        radicada = [e for e in h["eventos"] if e["tipo"] == "RADICADA"][0]
+        assert radicada["observaciones"] == "Soportes revisados con la EPS"
+
     def test_no_doble_devolucion_sin_reingreso(self, client):
         # BUG: devolver dos veces sin reingreso NO debe inflar el contador.
         o, fid = self._setup(client)
@@ -535,6 +577,105 @@ class TestEliminarOficio:
         d = r.json()
         assert len(d["eliminados"]) == 1
         assert d["rechazados"][0]["id"] == 9999
+
+
+# ------------------------------------------------------------------
+# Eliminar UN envío cargado por error (solo admin/coordinador)
+# ------------------------------------------------------------------
+
+
+class TestEliminarEnvio:
+    def _admin(self, db_session):
+        u = UsuarioRecord(
+            id=4,
+            nombre="ADMIN",
+            email="admin4@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        return u
+
+    def _como_admin(self, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+
+    def test_auditor_no_puede(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        assert client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}").status_code == 403
+
+    def test_borra_solo_ese_envio_y_lo_libera(self, client, db_session):
+        self._como_admin(db_session)
+        otro = "229999"
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000), _rad_fila(otro, F3, 55000)],
+        )
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _escribir(client, o["id"], otro)
+        assert client.get("/preauditoria/consolidado").json()["total"] == 3
+
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["envio"] == ENV and d["facturas_borradas"] == 2
+
+        # el otro envío quedó intacto…
+        cons = client.get("/preauditoria/consolidado").json()
+        assert cons["total"] == 1 and cons["items"][0]["factura"] == F3
+        # …el oficio sigue existiendo con un solo envío…
+        assert [e["envio"] for e in d["oficio"]["envios_escritos"]] == [otro]
+        # …y el envío borrado se puede volver a escribir
+        assert _escribir(client, o["id"], ENV).json()["nuevas"] == 2
+
+    def test_envio_inexistente(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}")
+        assert r.status_code == 404
+        assert "no está cargado" in r.json()["detail"]
+
+    def test_no_borra_con_pdf_emitido(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _devolver(client, _factura_id(client, F1))
+        client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}")
+        assert r.status_code == 409
+        assert "devolución ya" in r.json()["detail"]
+
+    def test_reingreso_vuelve_a_su_devolucion(self, client, db_session):
+        """Si el envío traía una factura a subsanar, quitarlo la devuelve a su
+        estado anterior sin borrarla ni perder el historial."""
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-1")
+        _escribir(client, o1["id"], ENV)
+        _devolver(client, _factura_id(client, F1), motivo="Falta epicrisis")
+        # reingresa en otro oficio/envío para subsanar
+        _subir_radicacion(client, [_rad_fila("229305", F1, 250700)])
+        o2 = _crear_oficio(client, "FHUS-2", "2026-07-21T08:00")
+        assert _escribir(client, o2["id"], "229305").json()["reingresos"] == 1
+
+        r = client.delete(f"/preauditoria/oficios/{o2['id']}/envios/229305")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["facturas_borradas"] == 0 and d["subsanaciones_revertidas"] == 1
+        # la factura sigue viva, devuelta y en su oficio original
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert h["actual"]["resultado"] == "DEVUELTA"
+        assert h["actual"]["oficio_fhus"] == "FHUS-1"
+        assert h["actual"]["motivo_devolucion"] == "Falta epicrisis"
 
 
 # ------------------------------------------------------------------

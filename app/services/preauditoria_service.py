@@ -661,6 +661,7 @@ def _nuevo_evento(
     fuente: dict,
     usuario: str,
     motivo: str = None,
+    observaciones: str = None,
     resultado: str = None,
     oficio_devolucion_id: int = None,
 ) -> FacturaEventoRecord:
@@ -678,6 +679,7 @@ def _nuevo_evento(
         resultado=resultado if resultado is not None else factura_row.resultado_actual,
         auditor=usuario,
         motivo=motivo,
+        observaciones=observaciones,
         oficio_devolucion_id=oficio_devolucion_id,
         valor_snapshot=fuente.get("valor") or 0.0,
         nit_snapshot=fuente.get("nit"),
@@ -893,21 +895,7 @@ def auditar_factura(
     )
     fuente = datos_fuente(db, canon.factura)
 
-    # Guard de estado: solo se puede radicar/devolver una factura PENDIENTE.
-    # Para cambiar una decisión ya tomada hay que revertir primero (→ PENDIENTE).
-    # Esto evita inflar el contador de devoluciones con doble clic o re-envíos.
-    if resultado in (RESULTADO_RADICAR, RESULTADO_DEVUELTA):
-        if canon.resultado_actual != RESULTADO_PENDIENTE:
-            etiqueta = "radicada" if canon.resultado_actual == RESULTADO_RADICAR else "devuelta"
-            return {
-                "ok": False,
-                "codigo": 409,
-                "mensaje": (
-                    f"La factura {canon.factura} ya fue {etiqueta} en esta ronda. "
-                    "Para cambiar la decisión, primero use 'Dejar pendiente' (revertir)."
-                ),
-            }
-
+    # --- Validaciones del proceso (antes de tocar nada) ---
     if resultado == RESULTADO_RADICAR:
         # Regla del proceso: sin soporte de facturación electrónica (CORREO
         # F.E. = NO) la factura no se puede radicar — solo devolverse.
@@ -922,6 +910,53 @@ def auditar_factura(
                     "actualizado en la pestaña Fuentes."
                 ),
             }
+    elif resultado == RESULTADO_DEVUELTA:
+        if not (motivo or "").strip():
+            return {"ok": False, "codigo": 400, "mensaje": "Para devolver debe escribir el motivo."}
+        if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+            return {
+                "ok": False,
+                "codigo": 409,
+                "mensaje": (
+                    f"La factura {canon.factura} ya fue devuelta {canon.num_devoluciones} veces; "
+                    f"el proceso acepta máximo {MAX_DEVOLUCIONES} devoluciones. Debe radicarse "
+                    "o escalarse al coordinador."
+                ),
+            }
+
+    # Guard de estado: solo se puede radicar/devolver una factura PENDIENTE.
+    # Para cambiar una decisión ya tomada hay que revertir primero (→ PENDIENTE).
+    #
+    # Se toma con una actualización condicional (un solo UPDATE ... WHERE
+    # resultado_actual = 'PENDIENTE'), no leyendo y luego escribiendo: si el
+    # auditor hace varios clics seguidos porque el servidor va lento, llegan
+    # varias peticiones a la vez y todas leerían "PENDIENTE" antes de que la
+    # primera guarde, duplicando el evento en el historial. Así solo una gana.
+    if resultado in (RESULTADO_RADICAR, RESULTADO_DEVUELTA):
+        tomada = (
+            db.query(FacturaPreauditoriaRecord)
+            .filter(
+                FacturaPreauditoriaRecord.id == canon.id,
+                FacturaPreauditoriaRecord.resultado_actual == RESULTADO_PENDIENTE,
+            )
+            .update({"resultado_actual": resultado}, synchronize_session=False)
+        )
+        if not tomada:
+            db.rollback()
+            db.refresh(canon)
+            etiqueta = "radicada" if canon.resultado_actual == RESULTADO_RADICAR else "devuelta"
+            return {
+                "ok": False,
+                "codigo": 409,
+                "mensaje": (
+                    f"La factura {canon.factura} ya fue {etiqueta} en esta ronda. "
+                    "Para cambiar la decisión, primero use 'Dejar pendiente' (revertir)."
+                ),
+            }
+        # El objeto en memoria quedó desfasado respecto de la actualización.
+        canon.resultado_actual = resultado
+
+    if resultado == RESULTADO_RADICAR:
         canon.resultado_actual = RESULTADO_RADICAR
         canon.estado = ESTADO_RADICADA if canon.ronda_actual == 1 else ESTADO_SUBSANADA
         canon.pendiente_subsanacion = 0
@@ -939,6 +974,7 @@ def auditar_factura(
                 oficio=oficio,
                 fuente=fuente,
                 usuario=usuario,
+                observaciones=canon.observaciones,
                 resultado=RESULTADO_RADICAR,
             )
         )
@@ -946,18 +982,6 @@ def auditar_factura(
         return {"ok": True}
 
     if resultado == RESULTADO_DEVUELTA:
-        if not (motivo or "").strip():
-            return {"ok": False, "codigo": 400, "mensaje": "Para devolver debe escribir el motivo."}
-        if canon.num_devoluciones >= MAX_DEVOLUCIONES:
-            return {
-                "ok": False,
-                "codigo": 409,
-                "mensaje": (
-                    f"La factura {canon.factura} ya fue devuelta {canon.num_devoluciones} veces; "
-                    f"el proceso acepta máximo {MAX_DEVOLUCIONES} devoluciones. Debe radicarse "
-                    "o escalarse al coordinador."
-                ),
-            }
         canon.num_devoluciones += 1
         canon.resultado_actual = RESULTADO_DEVUELTA
         canon.motivo_ultima_devolucion = motivo.strip()
@@ -982,6 +1006,7 @@ def auditar_factura(
                 fuente=fuente,
                 usuario=usuario,
                 motivo=motivo.strip(),
+                observaciones=canon.observaciones,
                 resultado=RESULTADO_DEVUELTA,
             )
         )
@@ -1026,43 +1051,38 @@ def auditar_factura(
 # ==================================================================
 
 
-def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
-    """Elimina un oficio de recepción con salvaguardas.
+def _facturas_en_pdf_emitido(db: Session, facturas: list, oficio_id: int) -> list[str]:
+    """Facturas del lote que ya salieron en un oficio de devolución emitido.
 
-    - Si alguna de sus facturas ya salió en un oficio de devolución (PDF con
-      consecutivo emitido), NO se elimina: devuelve el motivo.
-    - Facturas de ronda 1 (nacieron en este oficio): se borran con sus eventos.
-    - Facturas en subsanación (ronda 2+, reingresaron aquí): NO se borran; se
-      revierte el reingreso y vuelven a su estado DEVUELTA anterior, con su
-      historial intacto.
-    - Se liberan los envíos del ledger para poder re-escribirlos.
+    Mientras exista una de estas, no se puede deshacer nada: el PDF ya se
+    entregó a la entidad y debe seguir cuadrando con el sistema.
     """
-    facturas = (
-        db.query(FacturaPreauditoriaRecord)
-        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio.id)
-        .all()
-    )
     con_pdf = [f.factura for f in facturas if f.oficio_devolucion_id]
-    en_pdf_por_evento = (
-        db.query(FacturaEventoRecord.factura)
-        .filter(
-            FacturaEventoRecord.oficio_id == oficio.id,
-            FacturaEventoRecord.oficio_devolucion_id.isnot(None),
+    ids = {f.id for f in facturas}
+    if ids:
+        sellados = (
+            db.query(FacturaEventoRecord.factura)
+            .filter(
+                FacturaEventoRecord.oficio_id == oficio_id,
+                FacturaEventoRecord.oficio_devolucion_id.isnot(None),
+                FacturaEventoRecord.factura_id.in_(ids),
+            )
+            .all()
         )
-        .all()
-    )
-    con_pdf += [r[0] for r in en_pdf_por_evento]
-    if con_pdf:
-        return {
-            "ok": False,
-            "codigo": 409,
-            "mensaje": (
-                f"El oficio {oficio.numero_radicado} tiene factura(s) en un oficio de "
-                f"devolución ya emitido ({', '.join(sorted(set(con_pdf))[:5])}...): "
-                "no se puede eliminar."
-            ),
-        }
+        con_pdf += [r[0] for r in sellados]
+    return sorted(set(con_pdf))
 
+
+def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int, int]:
+    """Deshace la carga de esas facturas en ese oficio.
+
+    - Ronda 1 (nacieron aquí): se borran con sus eventos.
+    - Ronda 2+ (reingresaron aquí para subsanar): NO se borran; se revierte el
+      reingreso y vuelven a su estado DEVUELTA anterior, con su historial
+      intacto.
+
+    Devuelve (borradas, revertidas).
+    """
     borradas = 0
     revertidas = 0
     for f in facturas:
@@ -1079,14 +1099,14 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
                 .filter(
                     FacturaEventoRecord.factura_id == f.id,
                     FacturaEventoRecord.tipo_evento.in_(["DEVUELTA", "NUEVAMENTE_DEVUELTA"]),
-                    FacturaEventoRecord.oficio_id != oficio.id,
+                    FacturaEventoRecord.oficio_id != oficio_id,
                 )
                 .order_by(FacturaEventoRecord.creado_en.desc(), FacturaEventoRecord.id.desc())
                 .first()
             )
             db.query(FacturaEventoRecord).filter(
                 FacturaEventoRecord.factura_id == f.id,
-                FacturaEventoRecord.oficio_id == oficio.id,
+                FacturaEventoRecord.oficio_id == oficio_id,
             ).delete(synchronize_session=False)
             f.ronda_actual -= 1
             f.num_subsanacion = max(0, f.ronda_actual - 1)
@@ -1107,7 +1127,33 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
                 f.motivo_ultima_devolucion = evento_dev.motivo
                 f.fecha_auditoria = evento_dev.creado_en
             revertidas += 1
+    return borradas, revertidas
 
+
+def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
+    """Elimina un oficio de recepción mal registrado, con salvaguardas.
+
+    Si alguna de sus facturas ya salió en un oficio de devolución emitido, no
+    se elimina. Los envíos quedan libres para volver a escribirse.
+    """
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio.id)
+        .all()
+    )
+    con_pdf = _facturas_en_pdf_emitido(db, facturas, oficio.id)
+    if con_pdf:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El oficio {oficio.numero_radicado} tiene factura(s) en un oficio de "
+                f"devolución ya emitido ({', '.join(con_pdf[:5])}...): "
+                "no se puede eliminar."
+            ),
+        }
+
+    borradas, revertidas = _deshacer_facturas(db, facturas, oficio.id)
     envios = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.oficio_id == oficio.id).all()
     for e in envios:
         db.delete(e)
@@ -1120,6 +1166,65 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
         "facturas_borradas": borradas,
         "subsanaciones_revertidas": revertidas,
         "envios_liberados": len(envios),
+    }
+
+
+def eliminar_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dict:
+    """Deshace UN envío cargado por error, sin tocar el resto del oficio.
+
+    Sirve para cuando el gestor escribe un número de envío equivocado: se
+    borran las facturas que entraron con ese envío (o se revierte su
+    reingreso si venían de una devolución) y el envío queda libre para
+    volver a escribirse, aquí o en otro oficio.
+
+    No se puede deshacer si alguna de esas facturas ya salió en un oficio de
+    devolución con consecutivo emitido.
+    """
+    envio = (envio or "").strip()
+    cargado = (
+        db.query(EnvioCargadoRecord)
+        .filter(
+            EnvioCargadoRecord.oficio_id == oficio.id,
+            EnvioCargadoRecord.envio == envio,
+        )
+        .first()
+    )
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(
+            FacturaPreauditoriaRecord.oficio_actual_id == oficio.id,
+            FacturaPreauditoriaRecord.envio_actual == envio,
+        )
+        .all()
+    )
+    if cargado is None and not facturas:
+        return {
+            "ok": False,
+            "codigo": 404,
+            "mensaje": f"El envío {envio} no está cargado en el oficio {oficio.numero_radicado}.",
+        }
+
+    con_pdf = _facturas_en_pdf_emitido(db, facturas, oficio.id)
+    if con_pdf:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El envío {envio} tiene factura(s) en un oficio de devolución ya "
+                f"emitido ({', '.join(con_pdf[:5])}...): no se puede eliminar."
+            ),
+        }
+
+    borradas, revertidas = _deshacer_facturas(db, facturas, oficio.id)
+    if cargado is not None:
+        db.delete(cargado)
+    db.commit()
+    return {
+        "ok": True,
+        "envio": envio,
+        "radicado": oficio.numero_radicado,
+        "facturas_borradas": borradas,
+        "subsanaciones_revertidas": revertidas,
     }
 
 
