@@ -424,6 +424,20 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
   de devolución solo se puede generar si hay al menos una factura devuelta,
   porque es la carta con la que se le regresan las facturas a la entidad.
 
+### 28-07 (tarde) — Pre-auditoría: el consecutivo del oficio lo escribe el auditor
+- El auditor recordó un pedido anterior: **la numeración de los oficios de
+  devolución la lleva SINAC internamente**, así que el sistema no debe
+  asignarla sola. Ahora, al oprimir **"Generar oficio de devolución"**, se
+  abre una ventana para **escribir el consecutivo que corresponde**.
+- Viene precargado con el que seguiría según lo registrado en la página (solo
+  como sugerencia) y se puede cambiar. Se acepta escribir **solo el número**
+  (`89` → se completa como DEV-PRE-AUD-0089-2026) o el **consecutivo
+  completo**. Si se escribe uno ya usado, el sistema lo rechaza diciendo en
+  cuál oficio está. Si se deja vacío, usa el sugerido.
+- La sugerencia siguiente continúa desde el que se escribió (si usó el 89, la
+  próxima vez sugiere el 90).
+- 3 pruebas nuevas + prueba en navegador de la ventana completa.
+
 - **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
   tamaño, la solución de fondo es que **el cargue no haga esperar al
   navegador**: subir el archivo, responder de inmediato "recibido, procesando"

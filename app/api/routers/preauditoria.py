@@ -63,6 +63,13 @@ class AuditarIn(BaseModel):
     observaciones: Optional[str] = Field(None, max_length=2000)
 
 
+class OficioDevolucionIn(BaseModel):
+    # La numeración de los oficios de devolución la lleva SINAC por fuera del
+    # sistema: el auditor escribe el consecutivo que va. Si no lo escribe, se
+    # usa el siguiente sugerido.
+    consecutivo: Optional[str] = Field(None, max_length=60)
+
+
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
@@ -904,9 +911,24 @@ def exportar_consolidado(
 # ------------------------------------------------------------------
 
 
+@router.get("/consecutivo-sugerido")
+def consecutivo_sugerido(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Consecutivo que seguiría según lo ya registrado aquí.
+
+    Es solo una sugerencia: la numeración real la lleva SINAC por fuera del
+    sistema, así que el auditor puede cambiarla al generar el oficio.
+    """
+    consecutivo, numero, anio = svc.siguiente_consecutivo(db)
+    return {"consecutivo": consecutivo, "numero": numero, "anio": anio}
+
+
 @router.post("/oficios/{oficio_id}/oficio-devolucion")
 def generar_oficio_devolucion(
     oficio_id: int,
+    body: Optional[OficioDevolucionIn] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
@@ -929,7 +951,10 @@ def generar_oficio_devolucion(
             "No hay facturas devueltas sin oficio en este radicado: "
             "primero marque las devoluciones con su motivo.",
         )
-    consecutivo, numero, anio = svc.siguiente_consecutivo(db)
+    try:
+        consecutivo, numero, anio = svc.reservar_consecutivo(db, body.consecutivo if body else None)
+    except ValueError as e:
+        raise HTTPException(409 if "ya fue usado" in str(e) else 400, str(e))
     total_valor = sum(svc.datos_fuente(db, f.factura).get("valor") or 0 for f in devueltas)
     dev = OficioDevolucionRecord(
         consecutivo=consecutivo,
