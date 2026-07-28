@@ -4,8 +4,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.alerta_service import AlertaService
-from app.api.deps import get_usuario_actual
-from app.models.db import UsuarioRecord
+from app.api.deps import (
+    get_auditor_o_superior,
+    get_coordinador_o_admin,
+    get_usuario_actual,
+)
+from app.models.db import ROL_COORDINADOR, ROL_SUPER_ADMIN, UsuarioRecord
 
 router = APIRouter(prefix="/alertas", tags=["alertas"])
 
@@ -110,13 +114,18 @@ def obtener_config_alertas(
 def tablero_vencimientos(
     incluir_cerradas: bool = Query(False, description="Incluir glosas ya resueltas"),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Fotografía del riesgo por vencimiento: cuántas, de qué urgencia y cuánta plata.
 
     Funciona SIEMPRE, esté o no configurado el correo: es preferible que el
     área vea el listado en pantalla a que nadie se entere.
+
+    Acceso: AUDITOR o superior. El VIEWER queda fuera porque el tablero
+    concentra el mapa completo de plata en riesgo del hospital.
     """
+    import os
+
     from app.models.db import GlosaRecord
     from app.services.motor_vencimientos import Destinatarios, Umbrales, evaluar
 
@@ -127,6 +136,7 @@ def tablero_vencimientos(
 
     umbrales = Umbrales.desde_entorno()
     destinatarios = Destinatarios.desde_entorno()
+    smtp_ok = bool((os.getenv("SMTP_USER") or "").strip() and (os.getenv("SMTP_PASSWORD") or ""))
     return {
         **resumen.como_dict(),
         "umbrales": {
@@ -136,6 +146,10 @@ def tablero_vencimientos(
         },
         "avisos_configurados": destinatarios.hay_alguno,
         "escalamiento_configurado": destinatarios.hay_escalamiento,
+        # La interfaz avisa cuando el correo no está listo, en vez de dejar al
+        # área creyendo que los avisos salen.
+        "smtp_configurado": smtp_ok,
+        "puede_notificar": current_user.rol in (ROL_SUPER_ADMIN, ROL_COORDINADOR),
     }
 
 
@@ -143,12 +157,15 @@ def tablero_vencimientos(
 def notificar_vencimientos(
     simular: bool = Query(True, description="Solo mostrar a quién se avisaría, sin enviar"),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Avisa a cada responsable de lo suyo: un correo por persona, no por glosa.
 
     Por defecto SIMULA (`simular=true`): devuelve a quién le llegaría qué, sin
     enviar nada. Es la forma segura de estrenar la configuración.
+
+    Acceso: COORDINADOR o superior. Disparar correos a dirección financiera y
+    auditoría interna es un acto de coordinación, no de gestión diaria.
     """
     from app.models.db import GlosaRecord
     from app.services.motor_vencimientos import (

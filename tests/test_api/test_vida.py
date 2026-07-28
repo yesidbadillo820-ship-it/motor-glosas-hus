@@ -69,6 +69,20 @@ class TestSaludo:
         assert d["nuevas_hoy"] == 0
         assert d["sin_pendientes"] is True
 
+    def test_una_glosa_vencida_cuenta_como_pendiente(self, client, db_session):
+        """El filtro era `0 <= dias <= 3`, así que una glosa con el plazo YA
+        cumplido quedaba fuera y el saludo anunciaba "sin pendientes" con
+        plata sangrando — el mismo modo de falla del semáforo NEGRO que no
+        disparaba nada (28-jul-2026)."""
+        _glosa(db_session, eps="DISPENSARIO", estado="PENDIENTE", dias_restantes=-45)
+        d = client.get("/vida/saludo").json()
+        assert d["por_vencer"] == 1
+        assert d["sin_pendientes"] is False
+
+    def test_una_glosa_ya_cerrada_no_cuenta_aunque_este_vencida(self, client, db_session):
+        _glosa(db_session, eps="DISPENSARIO", estado="LEVANTADA", dias_restantes=-45)
+        assert client.get("/vida/saludo").json()["sin_pendientes"] is True
+
     def test_cuenta_nuevas_hoy_y_recuperado(self, client, db_session):
         _glosa(db_session, eps="COMPENSAR", estado="PENDIENTE", valor_objetado=1_000_000)
         _glosa(
