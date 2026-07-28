@@ -466,10 +466,10 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
   importar y no hay límite de tiempo que valga. Queda propuesto.
 - **~~PENDIENTE recomendado~~ — YA HECHO:** subir la máquina virtual a
   **`e2-small`**. Al revisar la VM el 28-07 la memoria total salió en 1.971 MB
-  (~2 GB): la `e2-micro` tiene 1 GB y la `e2-small` tiene 2 GB, así que el
-  cambio ya está aplicado. No hay que detener ni editar nada. Para
-  confirmarlo, desde Cloud Shell:
+  (~2 GB): la `e2-micro` tiene 1 GB y la `e2-small` tiene 2 GB. Se confirmó
+  además preguntándole directamente a Google, que respondió `e2-small`:
   `gcloud compute instances describe motor-glosas --zone=us-west1-a --format="value(machineType)"`
+  No hay que detener ni editar nada.
 
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
