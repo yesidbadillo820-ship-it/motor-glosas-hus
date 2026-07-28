@@ -8,7 +8,7 @@ Está escrito para dos lectores a la vez: el auditor de glosas, que necesita sab
 
 ### Vigencia de las cifras
 
-El Contrato cita números del sistema tal como estaba al auditarlo. Se volvieron a medir contra el repositorio en el commit `6e2b266` (2026-07-28):
+El Contrato cita números del sistema tal como estaba al auditarlo. Se volvieron a medir contra el código del repositorio en su último cambio —commit `5ba3a3f`, 2026-07-28—:
 
 | Cifra | Dice el Contrato | Mide hoy | |
 |---|---:|---:|---|
