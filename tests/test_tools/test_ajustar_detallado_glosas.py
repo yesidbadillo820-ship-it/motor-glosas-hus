@@ -61,8 +61,12 @@ def _hoja_detallado(ws, factura: str, grupos=GRUPOS_HUS352890) -> None:
     ws.merge_cells(start_row=12, start_column=2, end_row=12, end_column=6)
 
     for col, etiqueta in (
-        (COL_CODIGO - 1, "CÓDIGO"), (COL_NOMBRE, "NOMBRE"), (COL_CANT, "CANT"),
-        (COL_UNIT, "VR UNIT"), (COL_PAC, "VR PAC"), (COL_ENT, "VR ENT"),
+        (COL_CODIGO - 1, "CÓDIGO"),
+        (COL_NOMBRE, "NOMBRE"),
+        (COL_CANT, "CANT"),
+        (COL_UNIT, "VR UNIT"),
+        (COL_PAC, "VR PAC"),
+        (COL_ENT, "VR ENT"),
     ):
         ws.cell(row=20, column=col, value=etiqueta)
 
@@ -106,16 +110,49 @@ def _hoja_detallado(ws, factura: str, grupos=GRUPOS_HUS352890) -> None:
 FILAS_REPORTE = [
     # cod, descripcion, cant_recl, vlr_recl, cant_apr, vlr_apr, glosado, glosa
     ("39221", "Derechos de sala de yesos", 1, 100700, 1, 100700, 0, ""),
-    ("2016DM-0000315-R2", "VENDA DE GASA 6 X 5 YARDAS", 4, 37600, 0, 0, 37600,
-     "3106- Soporte de material ausente o incompleto"),
-    ("39145", "Consulta de urgencias", 1, 85800, 0, 0, 85800,
-     "3202- La consulta no esta justificada"),
+    (
+        "2016DM-0000315-R2",
+        "VENDA DE GASA 6 X 5 YARDAS",
+        4,
+        37600,
+        0,
+        0,
+        37600,
+        "3106- Soporte de material ausente o incompleto",
+    ),
+    (
+        "39145",
+        "Consulta de urgencias",
+        1,
+        85800,
+        0,
+        0,
+        85800,
+        "3202- La consulta no esta justificada",
+    ),
     ("2022DM-0008875-R1", "VENDA DE ALGODON 6 X 5 YARDAS", 4, 18400, 4, 18400, 0, ""),
     ("2017DM-0016044", "VENDA ELASTICA 6 X 5 YARDAS", 4, 21600, 4, 21600, 0, ""),
-    ("2016DM-0000315-R2", "VENDA DE GASA 6 X 5 YARDAS", 2, 18800, 2, 9400, 9400,
-     "3106- Soporte de material ausente o incompleto"),
+    (
+        "2016DM-0000315-R2",
+        "VENDA DE GASA 6 X 5 YARDAS",
+        2,
+        18800,
+        2,
+        9400,
+        9400,
+        "3106- Soporte de material ausente o incompleto",
+    ),
     ("19992190-3", "DICLOFENACO SODICO 75MG/3ML CAJA POR 10 AMPOLLAS", 1, 900, 1, 900, 0, ""),
-    ("37206", "Inmovilización miembro superior o inferior total o parcial", 1, 82000, 1, 82000, 0, ""),
+    (
+        "37206",
+        "Inmovilización miembro superior o inferior total o parcial",
+        1,
+        82000,
+        1,
+        82000,
+        0,
+        "",
+    ),
     ("21102", "Brazo, pierna, rodilla, fémur, hombro, omoplato", 1, 95300, 1, 95300, 0, ""),
 ]
 
@@ -135,17 +172,47 @@ def archivos(tmp_path: Path):
 
     wbg = openpyxl.Workbook()
     wsg = wbg.active
-    wsg.append([
-        "Código Habilitación", "Número Radicación", "Número Factura", "Número Paquete",
-        "Cantidad Reclamado", "Valor Reclamado", "Cantidad Aprobada", "Valor Aprobado",
-        "Valor Glosado", "Tip- Num Doc Victima", "Consecutivo Item", "Tipo Elemento",
-        "Cod Elemento", "Descripción Elemento", "Descripción Glosa", "Descripción Anotación",
-    ])
+    wsg.append(
+        [
+            "Código Habilitación",
+            "Número Radicación",
+            "Número Factura",
+            "Número Paquete",
+            "Cantidad Reclamado",
+            "Valor Reclamado",
+            "Cantidad Aprobada",
+            "Valor Aprobado",
+            "Valor Glosado",
+            "Tip- Num Doc Victima",
+            "Consecutivo Item",
+            "Tipo Elemento",
+            "Cod Elemento",
+            "Descripción Elemento",
+            "Descripción Glosa",
+            "Descripción Anotación",
+        ]
+    )
     for cod, desc, cr, vr, ca, va, vg, glosa in FILAS_REPORTE:
-        wsg.append([
-            "680010079201", "14344788", "HUS352890", "31068", cr, vr, ca, va, vg,
-            "CC-1005338825", "", "Procedimientos", cod, desc, glosa, "",
-        ])
+        wsg.append(
+            [
+                "680010079201",
+                "14344788",
+                "HUS352890",
+                "31068",
+                cr,
+                vr,
+                ca,
+                va,
+                vg,
+                "CC-1005338825",
+                "",
+                "Procedimientos",
+                cod,
+                desc,
+                glosa,
+                "",
+            ]
+        )
     reporte = tmp_path / "ReporteGlosasReclamPAQUETE 31068.xlsx"
     wbg.save(reporte)
 
@@ -306,14 +373,26 @@ class TestCruce:
 class TestDecidir:
     def _item(self, cant=1, unit=1000):
         return aj.ItemDetallado(
-            fila=1, filas=[1], grupo="G", codigo="X", nombre="N",
-            cantidad=cant, vr_unit=unit, vr_pac=0, vr_ent=cant * unit,
+            fila=1,
+            filas=[1],
+            grupo="G",
+            codigo="X",
+            nombre="N",
+            cantidad=cant,
+            vr_unit=unit,
+            vr_pac=0,
+            vr_ent=cant * unit,
         )
 
     def _glosa(self, recl, apr, glosado, cant_recl=1, cant_apr=0):
         return aj.FilaGlosa(
-            factura="HUS1", codigo="X", descripcion="N", cant_reclamada=cant_recl,
-            valor_reclamado=recl, cant_aprobada=cant_apr, valor_aprobado=apr,
+            factura="HUS1",
+            codigo="X",
+            descripcion="N",
+            cant_reclamada=cant_recl,
+            valor_reclamado=recl,
+            cant_aprobada=cant_apr,
+            valor_aprobado=apr,
             valor_glosado=glosado,
         )
 
@@ -357,14 +436,21 @@ class TestCorridaCompleta:
         detallado, reporte, consolidado = archivos
         salida = tmp_path / "salida.xlsx"
         bitacora = tmp_path / "bitacora.csv"
-        codigo = aj.main([
-            "--consolidado", str(consolidado),
-            "--detallado", str(detallado),
-            "--reporte-glosas", str(reporte),
-            "--salida", str(salida),
-            "--reporte-csv", str(bitacora),
-            *extra,
-        ])
+        codigo = aj.main(
+            [
+                "--consolidado",
+                str(consolidado),
+                "--detallado",
+                str(detallado),
+                "--reporte-glosas",
+                str(reporte),
+                "--salida",
+                str(salida),
+                "--reporte-csv",
+                str(bitacora),
+                *extra,
+            ]
+        )
         assert codigo == 0
         return salida, bitacora
 
@@ -377,9 +463,7 @@ class TestCorridaCompleta:
 
         # Encabezado institucional fuera y título cambiado.
         assert ws.cell(row=1, column=1).value == aj.TITULO_NUEVO
-        texto = "\n".join(
-            str(c.value) for f in ws.iter_rows() for c in f if c.value is not None
-        )
+        texto = "\n".join(str(c.value) for f in ws.iter_rows() for c in f if c.value is not None)
         assert "CUFE" not in texto
         assert "Bucaramanga" not in texto
         assert aj.TITULO_ORIGINAL not in texto
@@ -396,7 +480,9 @@ class TestCorridaCompleta:
         salida, _ = self._correr(archivos, tmp_path)
         ws = openpyxl.load_workbook(salida)["HUS352890"]
         fila = next(
-            c.row for f in ws.iter_rows() for c in f
+            c.row
+            for f in ws.iter_rows()
+            for c in f
             if str(c.value or "").startswith("VENDA DE GASA")
         )
         assert ws.cell(row=fila, column=COL_CANT).value == 5.0
@@ -427,20 +513,31 @@ class TestCorridaCompleta:
     def test_diagnostico_no_escribe_salida(self, archivos, tmp_path):
         detallado, reporte, consolidado = archivos
         salida = tmp_path / "no_debe_existir.xlsx"
-        assert aj.main([
-            "--consolidado", str(consolidado),
-            "--detallado", str(detallado),
-            "--reporte-glosas", str(reporte),
-            "--salida", str(salida),
-            "--diagnostico",
-        ]) == 0
+        assert (
+            aj.main(
+                [
+                    "--consolidado",
+                    str(consolidado),
+                    "--detallado",
+                    str(detallado),
+                    "--reporte-glosas",
+                    str(reporte),
+                    "--salida",
+                    str(salida),
+                    "--diagnostico",
+                ]
+            )
+            == 0
+        )
         assert not salida.exists()
 
     def test_modo_parcial_conservar(self, archivos, tmp_path):
         salida, _ = self._correr(archivos, tmp_path, extra=["--modo-parcial", "conservar"])
         ws = openpyxl.load_workbook(salida)["HUS352890"]
         fila = next(
-            c.row for f in ws.iter_rows() for c in f
+            c.row
+            for f in ws.iter_rows()
+            for c in f
             if str(c.value or "").startswith("VENDA DE GASA")
         )
         assert ws.cell(row=fila, column=COL_CANT).value == 6.0

@@ -194,16 +194,49 @@ def _parse_valor(v) -> float:
 # ─── Total en letras ─────────────────────────────────────────────────────────
 
 _UNI = (
-    "", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE",
-    "DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISEIS", "DIECISIETE",
-    "DIECIOCHO", "DIECINUEVE", "VEINTE", "VEINTIUNO", "VEINTIDOS", "VEINTITRES",
-    "VEINTICUATRO", "VEINTICINCO", "VEINTISEIS", "VEINTISIETE", "VEINTIOCHO",
+    "",
+    "UNO",
+    "DOS",
+    "TRES",
+    "CUATRO",
+    "CINCO",
+    "SEIS",
+    "SIETE",
+    "OCHO",
+    "NUEVE",
+    "DIEZ",
+    "ONCE",
+    "DOCE",
+    "TRECE",
+    "CATORCE",
+    "QUINCE",
+    "DIECISEIS",
+    "DIECISIETE",
+    "DIECIOCHO",
+    "DIECINUEVE",
+    "VEINTE",
+    "VEINTIUNO",
+    "VEINTIDOS",
+    "VEINTITRES",
+    "VEINTICUATRO",
+    "VEINTICINCO",
+    "VEINTISEIS",
+    "VEINTISIETE",
+    "VEINTIOCHO",
     "VEINTINUEVE",
 )
 _DEC = ("", "", "", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA")
 _CEN = (
-    "", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS",
-    "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS",
+    "",
+    "CIENTO",
+    "DOSCIENTOS",
+    "TRESCIENTOS",
+    "CUATROCIENTOS",
+    "QUINIENTOS",
+    "SEISCIENTOS",
+    "SETECIENTOS",
+    "OCHOCIENTOS",
+    "NOVECIENTOS",
 )
 
 
@@ -348,9 +381,7 @@ def _abrir_libro(ruta: Path, *, solo_datos: bool = True):
     try:
         import openpyxl
     except ImportError:  # pragma: no cover - depende del entorno
-        raise SystemExit(
-            "Falta openpyxl. Instalalo con:  py -m pip install openpyxl"
-        ) from None
+        raise SystemExit("Falta openpyxl. Instalalo con:  py -m pip install openpyxl") from None
     return openpyxl.load_workbook(ruta, data_only=solo_datos)
 
 
@@ -701,8 +732,11 @@ def decidir(
     if not filas:
         if sin_cruce == "quitar":
             return "QUITADO", 0.0, 0.0, "No aparece en el reporte de glosas"
-        return "SIN_CRUCE", item.cantidad, item.vr_ent, (
-            "No aparece en el reporte de glosas: se conserva, REVISAR a mano"
+        return (
+            "SIN_CRUCE",
+            item.cantidad,
+            item.vr_ent,
+            ("No aparece en el reporte de glosas: se conserva, REVISAR a mano"),
         )
 
     glosado = sum(g.valor_glosado for g in filas)
@@ -714,12 +748,20 @@ def decidir(
 
     # Aprobado a medias.
     if modo_parcial == "conservar":
-        return "CONSERVADO", item.cantidad, item.vr_ent, (
-            f"Aprobado parcial (glosado ${glosado:,.0f}), se conserva completo por --modo-parcial"
+        return (
+            "CONSERVADO",
+            item.cantidad,
+            item.vr_ent,
+            (
+                f"Aprobado parcial (glosado ${glosado:,.0f}), se conserva completo por --modo-parcial"
+            ),
         )
     if modo_parcial == "quitar":
-        return "QUITADO", 0.0, 0.0, (
-            f"Aprobado parcial (glosado ${glosado:,.0f}), se quita por --modo-parcial"
+        return (
+            "QUITADO",
+            0.0,
+            0.0,
+            (f"Aprobado parcial (glosado ${glosado:,.0f}), se quita por --modo-parcial"),
         )
 
     if item.vr_unit > 0:
@@ -760,8 +802,11 @@ def _ajustar_merges(ws, borrada: int) -> None:
             max_r -= 1
         ws.merged_cells.ranges.remove(rango)
         if max_r >= min_r and not (min_r == max_r and rango.min_col == rango.max_col):
-            nuevos.append(CellRange(min_col=rango.min_col, min_row=min_r,
-                                    max_col=rango.max_col, max_row=max_r))
+            nuevos.append(
+                CellRange(
+                    min_col=rango.min_col, min_row=min_r, max_col=rango.max_col, max_row=max_r
+                )
+            )
     for r in nuevos:
         ws.merged_cells.add(r)
 
@@ -1028,7 +1073,9 @@ def procesar_libro(
 
     if aplicar and salida is not None:
         if not wb.worksheets:
-            logger.warning("%s: ninguna hoja quedó en pie, no se escribe salida", ruta_detallado.name)
+            logger.warning(
+                "%s: ninguna hoja quedó en pie, no se escribe salida", ruta_detallado.name
+            )
         else:
             salida.parent.mkdir(parents=True, exist_ok=True)
             wb.save(salida)
@@ -1037,9 +1084,22 @@ def procesar_libro(
 
 
 CAMPOS_CSV = [
-    "FACTURA", "HOJA", "GRUPO", "CODIGO", "NOMBRE", "CANT_ORIGINAL", "VR_ENT_ORIGINAL",
-    "VALOR_RECLAMADO", "VALOR_APROBADO", "VALOR_GLOSADO", "ACCION", "CANT_NUEVA",
-    "VR_ENT_NUEVO", "CRUCE_POR", "FILAS_REPORTE", "OBSERVACION",
+    "FACTURA",
+    "HOJA",
+    "GRUPO",
+    "CODIGO",
+    "NOMBRE",
+    "CANT_ORIGINAL",
+    "VR_ENT_ORIGINAL",
+    "VALOR_RECLAMADO",
+    "VALOR_APROBADO",
+    "VALOR_GLOSADO",
+    "ACCION",
+    "CANT_NUEVA",
+    "VR_ENT_NUEVO",
+    "CRUCE_POR",
+    "FILAS_REPORTE",
+    "OBSERVACION",
 ]
 
 
@@ -1050,17 +1110,48 @@ def escribir_bitacora(ruta: Path, resultados: list[ResultadoHoja]) -> None:
         w.writerow(CAMPOS_CSV)
         for hoja in resultados:
             if not hoja.detalle:
-                w.writerow([hoja.factura, hoja.hoja, "", "", "", "", "", "", "", "",
-                            hoja.estado, "", "", "", "", hoja.observacion])
+                w.writerow(
+                    [
+                        hoja.factura,
+                        hoja.hoja,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        hoja.estado,
+                        "",
+                        "",
+                        "",
+                        "",
+                        hoja.observacion,
+                    ]
+                )
                 continue
             for d in hoja.detalle:
-                w.writerow([
-                    d.factura, d.hoja, d.grupo, d.codigo, d.nombre,
-                    f"{d.cant_orig:g}", f"{d.vr_ent_orig:.0f}",
-                    f"{d.valor_reclamado:.0f}", f"{d.valor_aprobado:.0f}",
-                    f"{d.valor_glosado:.0f}", d.accion, f"{d.cant_nueva:g}",
-                    f"{d.vr_ent_nuevo:.0f}", d.cruce, d.filas_reporte, d.observacion,
-                ])
+                w.writerow(
+                    [
+                        d.factura,
+                        d.hoja,
+                        d.grupo,
+                        d.codigo,
+                        d.nombre,
+                        f"{d.cant_orig:g}",
+                        f"{d.vr_ent_orig:.0f}",
+                        f"{d.valor_reclamado:.0f}",
+                        f"{d.valor_aprobado:.0f}",
+                        f"{d.valor_glosado:.0f}",
+                        d.accion,
+                        f"{d.cant_nueva:g}",
+                        f"{d.vr_ent_nuevo:.0f}",
+                        d.cruce,
+                        d.filas_reporte,
+                        d.observacion,
+                    ]
+                )
 
 
 def _resumir(resultados: list[ResultadoHoja]) -> None:
@@ -1073,25 +1164,38 @@ def _resumir(resultados: list[ResultadoHoja]) -> None:
     logger.info("Hojas ajustadas .......... %d", len(ajustadas))
     logger.info("Hojas eliminadas ......... %d (no estaban en el consolidado)", len(eliminadas))
     if sin_glosas:
-        logger.warning("Hojas sin glosas ......... %d  → %s", len(sin_glosas),
-                       ", ".join(r.factura for r in sin_glosas[:10]))
+        logger.warning(
+            "Hojas sin glosas ......... %d  → %s",
+            len(sin_glosas),
+            ", ".join(r.factura for r in sin_glosas[:10]),
+        )
     if sin_estruct:
-        logger.warning("Hojas sin estructura ..... %d  → %s", len(sin_estruct),
-                       ", ".join(r.factura for r in sin_estruct[:10]))
+        logger.warning(
+            "Hojas sin estructura ..... %d  → %s",
+            len(sin_estruct),
+            ", ".join(r.factura for r in sin_estruct[:10]),
+        )
     if not ajustadas:
         return
-    logger.info("Ítems: %d quitados, %d ajustados, %d conservados, %d sin cruce",
-                sum(r.items_quitados for r in ajustadas),
-                sum(r.items_ajustados for r in ajustadas),
-                sum(r.items_conservados for r in ajustadas),
-                sum(r.items_sin_cruce for r in ajustadas))
-    logger.info("Valor: antes $%s → sigue glosado $%s",
-                f"{sum(r.subtotal_antes for r in ajustadas):,.0f}",
-                f"{sum(r.subtotal_despues for r in ajustadas):,.0f}")
+    logger.info(
+        "Ítems: %d quitados, %d ajustados, %d conservados, %d sin cruce",
+        sum(r.items_quitados for r in ajustadas),
+        sum(r.items_ajustados for r in ajustadas),
+        sum(r.items_conservados for r in ajustadas),
+        sum(r.items_sin_cruce for r in ajustadas),
+    )
+    logger.info(
+        "Valor: antes $%s → sigue glosado $%s",
+        f"{sum(r.subtotal_antes for r in ajustadas):,.0f}",
+        f"{sum(r.subtotal_despues for r in ajustadas):,.0f}",
+    )
     revisar = [d for r in ajustadas for d in r.detalle if d.accion == "SIN_CRUCE"]
     if revisar:
-        logger.warning("REVISAR: %d ítem(s) no cruzaron con el reporte de glosas "
-                       "(quedaron en la factura). Ver la bitácora CSV.", len(revisar))
+        logger.warning(
+            "REVISAR: %d ítem(s) no cruzaron con el reporte de glosas "
+            "(quedaron en la factura). Ver la bitácora CSV.",
+            len(revisar),
+        )
 
 
 def _diagnosticar(resultados: list[ResultadoHoja]) -> None:
@@ -1099,17 +1203,34 @@ def _diagnosticar(resultados: list[ResultadoHoja]) -> None:
         if r.estado == "ELIMINADA":
             logger.info("%-14s hoja '%s' → SE ELIMINA (%s)", r.factura, r.hoja, r.observacion)
             continue
-        logger.info("%-14s hoja '%s' → %s | ítems %d (quitar %d, ajustar %d, dejar %d, revisar %d)"
-                    " | $%s → $%s", r.factura, r.hoja, r.estado, r.items_total, r.items_quitados,
-                    r.items_ajustados, r.items_conservados, r.items_sin_cruce,
-                    f"{r.subtotal_antes:,.0f}", f"{r.subtotal_despues:,.0f}")
+        logger.info(
+            "%-14s hoja '%s' → %s | ítems %d (quitar %d, ajustar %d, dejar %d, revisar %d)"
+            " | $%s → $%s",
+            r.factura,
+            r.hoja,
+            r.estado,
+            r.items_total,
+            r.items_quitados,
+            r.items_ajustados,
+            r.items_conservados,
+            r.items_sin_cruce,
+            f"{r.subtotal_antes:,.0f}",
+            f"{r.subtotal_despues:,.0f}",
+        )
         if r.observacion:
             logger.info("               %s", r.observacion)
         for d in r.detalle:
-            logger.info("               [%-10s] %-12s %-42s %g → %g  ($%s → $%s) %s",
-                        d.accion, d.codigo, d.nombre[:42], d.cant_orig, d.cant_nueva,
-                        f"{d.vr_ent_orig:,.0f}", f"{d.vr_ent_nuevo:,.0f}",
-                        f"[{d.cruce}]" if d.cruce else "[sin cruce]")
+            logger.info(
+                "               [%-10s] %-12s %-42s %g → %g  ($%s → $%s) %s",
+                d.accion,
+                d.codigo,
+                d.nombre[:42],
+                d.cant_orig,
+                d.cant_nueva,
+                f"{d.vr_ent_orig:,.0f}",
+                f"{d.vr_ent_nuevo:,.0f}",
+                f"[{d.cruce}]" if d.cruce else "[sin cruce]",
+            )
 
 
 def construir_parser() -> argparse.ArgumentParser:
@@ -1117,25 +1238,46 @@ def construir_parser() -> argparse.ArgumentParser:
         description="Deja el detallado de factura solo con lo que sigue glosado.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--consolidado", type=Path,
-                   help="Excel/CSV con las facturas a trabajar (se le quitan los duplicados). "
-                        "Si se omite, se trabajan TODAS las hojas del detallado.")
-    p.add_argument("--detallado", type=Path, nargs="+", required=True,
-                   help="Excel del detallado (una hoja por factura). Admite varios archivos.")
-    p.add_argument("--reporte-glosas", type=Path, required=True,
-                   help="ReporteGlosasReclamPAQUETE NNNNN.xlsx")
-    p.add_argument("--salida", type=Path,
-                   help="Excel corregido (o carpeta, si se pasan varios --detallado).")
+    p.add_argument(
+        "--consolidado",
+        type=Path,
+        help="Excel/CSV con las facturas a trabajar (se le quitan los duplicados). "
+        "Si se omite, se trabajan TODAS las hojas del detallado.",
+    )
+    p.add_argument(
+        "--detallado",
+        type=Path,
+        nargs="+",
+        required=True,
+        help="Excel del detallado (una hoja por factura). Admite varios archivos.",
+    )
+    p.add_argument(
+        "--reporte-glosas", type=Path, required=True, help="ReporteGlosasReclamPAQUETE NNNNN.xlsx"
+    )
+    p.add_argument(
+        "--salida", type=Path, help="Excel corregido (o carpeta, si se pasan varios --detallado)."
+    )
     p.add_argument("--reporte-csv", type=Path, help="Bitácora CSV ítem por ítem.")
     p.add_argument("--paquete", help="Filtrar el reporte de glosas por número de paquete.")
-    p.add_argument("--modo-parcial", choices=("ajustar", "conservar", "quitar"), default="ajustar",
-                   help="Qué hacer con los ítems que la entidad aprobó a medias. "
-                        "ajustar (por defecto): deja solo la parte que sigue glosada.")
-    p.add_argument("--sin-cruce", choices=("conservar", "quitar"), default="conservar",
-                   help="Qué hacer con los ítems de la factura que NO aparecen en el reporte "
-                        "de glosas. Por defecto se conservan y se marcan para revisión.")
-    p.add_argument("--diagnostico", action="store_true",
-                   help="Solo analiza y muestra qué haría; no escribe el Excel de salida.")
+    p.add_argument(
+        "--modo-parcial",
+        choices=("ajustar", "conservar", "quitar"),
+        default="ajustar",
+        help="Qué hacer con los ítems que la entidad aprobó a medias. "
+        "ajustar (por defecto): deja solo la parte que sigue glosada.",
+    )
+    p.add_argument(
+        "--sin-cruce",
+        choices=("conservar", "quitar"),
+        default="conservar",
+        help="Qué hacer con los ítems de la factura que NO aparecen en el reporte "
+        "de glosas. Por defecto se conservan y se marcan para revisión.",
+    )
+    p.add_argument(
+        "--diagnostico",
+        action="store_true",
+        help="Solo analiza y muestra qué haría; no escribe el Excel de salida.",
+    )
     p.add_argument("--verbose", action="store_true", help="Log detallado.")
     return p
 
@@ -1157,8 +1299,11 @@ def main(argv: list[str] | None = None) -> int:
             logger.error("No existe el consolidado: %s", args.consolidado)
             return 2
         facturas, duplicadas = leer_consolidado(args.consolidado)
-        logger.info("Consolidado: %d factura(s) únicas, %d duplicada(s) descartada(s)",
-                    len(facturas), len(duplicadas))
+        logger.info(
+            "Consolidado: %d factura(s) únicas, %d duplicada(s) descartada(s)",
+            len(facturas),
+            len(duplicadas),
+        )
         if duplicadas:
             logger.info("Duplicadas: %s", ", ".join(duplicadas[:20]))
         if not facturas:
@@ -1171,14 +1316,20 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("No existe el reporte de glosas: %s", args.reporte_glosas)
         return 2
     glosas = leer_reporte_glosas(args.reporte_glosas, paquete=args.paquete)
-    logger.info("Reporte de glosas: %d factura(s), %d fila(s)",
-                len(glosas), sum(len(v) for v in glosas.values()))
+    logger.info(
+        "Reporte de glosas: %d factura(s), %d fila(s)",
+        len(glosas),
+        sum(len(v) for v in glosas.values()),
+    )
 
     if facturas:
         faltan = [f for f in facturas if normalizar_factura(f) not in glosas]
         if faltan:
-            logger.warning("%d factura(s) del consolidado no están en el reporte de glosas: %s",
-                           len(faltan), ", ".join(faltan[:20]))
+            logger.warning(
+                "%d factura(s) del consolidado no están en el reporte de glosas: %s",
+                len(faltan),
+                ", ".join(faltan[:20]),
+            )
 
     varios = len(args.detallado) > 1
     resultados: list[ResultadoHoja] = []
@@ -1192,7 +1343,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Procesando %s …", ruta.name)
         resultados.extend(
             procesar_libro(
-                ruta, facturas, glosas,
+                ruta,
+                facturas,
+                glosas,
                 modo_parcial=args.modo_parcial,
                 sin_cruce=args.sin_cruce,
                 aplicar=not args.diagnostico,
