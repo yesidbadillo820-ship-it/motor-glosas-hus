@@ -9,7 +9,53 @@
 > arriba una entrada nueva con la fecha: qué se hizo, qué quedó pendiente y qué
 > sigue mañana.
 
-**Última actualización:** 23-jul-2026
+**Última actualización:** 28-jul-2026
+
+---
+
+## Entrada 28-jul-2026 — Bot: correos de pagos (.msg) → Excel consolidado
+
+**Qué se hizo hoy:**
+- Se creó un **bot nuevo dentro de la Suite Cartera HUS**: el botón
+  **"📧 Correos de Pagos → Excel"**. Las entidades pagadoras mandan la
+  "relación de pagos del día" como un correo de Outlook (.msg) con el
+  detalle en un Excel adjunto; este bot junta varios de esos correos
+  (sueltos, una carpeta, o el .zip que manda el portal) en **un solo
+  Excel**, sin dañar el dato:
+  - Las fechas quedan como fechas y los montos como números (nunca como
+    texto), para poder sumar y filtrar directo, sin arreglar nada a mano.
+  - Si la misma factura+comprobante+valor aparece en más de un correo, la
+    fila queda **marcada** como posible repetido (no se borra sola: la
+    decide el analista).
+  - Si algún correo no traía el Excel adjunto, queda avisado aparte para
+    revisarlo a mano.
+  - Trae una hoja RESUMEN con cuántas filas aportó cada correo y el total
+    pagado.
+- Se probó con los 13 correos reales de relación de pagos que envió el
+  analista: **237 filas, $2.207.118.593 pagados en total**, verificado
+  cruzando el valor a mano contra los 13 archivos originales — cuadra al
+  peso. Ese Excel de prueba se entregó directo al analista (no se sube al
+  repositorio, igual que los demás resultados con datos reales de
+  entidades).
+- Además del botón dentro de la Suite, se entregó un **bot suelto**
+  (ZIP con doble clic) para poder usarlo hoy mismo sin depender de
+  actualizar la Suite completa.
+- Nota técnica para quien dé soporte: el lector de correos .msg
+  (`extract-msg`) trae una piecita accesoria (`red-black-tree-mod`) que NO
+  se puede instalar en Windows con las versiones actuales de Python — esa
+  piecita solo serviría para RE-ESCRIBIR un .msg, algo que este bot nunca
+  hace (solo LEE), así que se resolvió sin necesitarla. `INICIAR_SUITE.bat`
+  ya instala todo lo demás solo, la primera vez que se abre con internet.
+
+**Pendiente:**
+- Falta hacer commit y push de este bot al repositorio (código, sin los
+  datos reales de pagos ni los correos .msg originales).
+- Los mismos pendientes de las entradas anteriores (corte de julio de
+  cartera, giro directo por entidad de Tesorería).
+
+**Sigue mañana:** confirmar que el botón nuevo funciona igual en la Suite
+ya actualizada, y seguir con el corte de julio de cartera cuando el
+analista lo tenga listo.
 
 ---
 

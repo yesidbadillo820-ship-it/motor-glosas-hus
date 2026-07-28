@@ -26,6 +26,7 @@ from nucleo import (  # noqa: E402
     ai_tools,
     archivos,
     cruces_dgh,
+    msg_tools,
     office_tools,
     pdf_tools,
     registro,
@@ -316,6 +317,12 @@ def cmd_pdf(args):
     return 0
 
 
+def cmd_correos(args):
+    """Correos .msg de relación de pagos -> Excel consolidado (una sola fila por pago)."""
+    print(msg_tools.consolidar(args.entradas, args.salida, log=log))
+    return 0
+
+
 def construir_parser():
     p = argparse.ArgumentParser(
         prog="suite_cli",
@@ -406,6 +413,13 @@ def construir_parser():
     s.add_argument("--texto", default=None, help="Texto para 'marca' o términos de 'censurar'.")
     s.add_argument("--idioma", default="inglés", help="Idioma destino para 'traducir'.")
     s.set_defaults(func=cmd_pdf)
+
+    s = sub.add_parser("correos", help="Correos .msg de relación de pagos -> Excel consolidado.")
+    s.add_argument(
+        "entradas", nargs="+", help="Archivo(s) .msg, carpeta con .msg, y/o .zip que los contenga."
+    )
+    s.add_argument("-o", "--salida", required=True, help="Ruta del Excel consolidado de salida.")
+    s.set_defaults(func=cmd_correos)
     return p
 
 
