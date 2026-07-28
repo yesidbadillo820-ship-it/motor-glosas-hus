@@ -269,18 +269,47 @@ def evaluar(glosas: Iterable[Any], umbrales: Optional[Umbrales] = None) -> Resum
 class Destinatarios:
     """A quién le llega cada nivel de urgencia.
 
-    Configuración por variables de entorno, en listas separadas por coma:
+    Modelo de gobierno definido por el área (28-jul-2026):
 
-      VENCIMIENTOS_CORREO_GESTOR    ¿se le avisa al gestor asignado? (1/0)
-      VENCIMIENTOS_CORREO_ALTA      correos que reciben ALTA y peores
-      VENCIMIENTOS_CORREO_CRITICA   correos que reciben CRÍTICA y peores
-      VENCIMIENTOS_CORREO_VENCIDA   correos del escalamiento
+      ┌─────────────┬──────────────────────────────────────────────────────┐
+      │ Preventivo  │ gestor de la glosa · analista responsable            │
+      │ (10 días)   │                                                      │
+      ├─────────────┼──────────────────────────────────────────────────────┤
+      │ Alta        │ gestor · coordinador de cartera/glosas               │
+      │ (5 días)    │                                                      │
+      ├─────────────┼──────────────────────────────────────────────────────┤
+      │ Crítica     │ gestor · coordinador · líder financiero              │
+      │ (2 días)    │                                                      │
+      ├─────────────┼──────────────────────────────────────────────────────┤
+      │ Vencida     │ gestor · coordinador · dirección financiera ·        │
+      │             │ auditoría interna                                    │
+      └─────────────┴──────────────────────────────────────────────────────┘
 
-    El escalamiento es la razón de ser del diseño: una glosa vencida no
-    puede avisarle únicamente al gestor que ya la dejó vencer.
+    Dos reglas de gobierno, no de programación:
+
+    1. **El gestor recibe SIEMPRE sus casos**, en todos los niveles. Es quien
+       puede actuar; enterarlo tarde no tiene defensa.
+    2. **El escalamiento entra al superar el umbral, y no se repite.** Los
+       niveles son acumulativos hacia arriba: a quien se declara en ALTA le
+       llegan ALTA, CRÍTICA y VENCIDA sin necesidad de repetir su correo en
+       las tres variables. Por eso el coordinador se declara UNA vez.
+
+    Configuración (listas separadas por coma; el orden de las variables sigue
+    la tabla de arriba):
+
+      VENCIMIENTOS_CORREO_GESTOR      ¿se le avisa al gestor asignado? (1/0)
+      VENCIMIENTOS_CORREO_PREVENTIVO  analista responsable
+      VENCIMIENTOS_CORREO_ALTA        coordinador de cartera/glosas
+      VENCIMIENTOS_CORREO_CRITICA     líder financiero
+      VENCIMIENTOS_CORREO_VENCIDA     dirección financiera · auditoría interna
+
+    La cuenta emisora (SMTP_FROM) debe ser institucional —del estilo
+    `sinac.alertas@hus.gov.co`— y nunca personal: el aviso tiene que
+    sobrevivir a los cambios de personas.
     """
 
     avisar_al_gestor: bool = True
+    preventivo: tuple[str, ...] = ()
     alta: tuple[str, ...] = ()
     critica: tuple[str, ...] = ()
     vencida: tuple[str, ...] = ()
@@ -297,22 +326,20 @@ class Destinatarios:
         flag = (os.getenv("VENCIMIENTOS_CORREO_GESTOR", "1") or "").strip().lower()
         return cls(
             avisar_al_gestor=flag not in ("0", "false", "no", ""),
+            preventivo=cls._lista("VENCIMIENTOS_CORREO_PREVENTIVO"),
             alta=cls._lista("VENCIMIENTOS_CORREO_ALTA"),
             critica=cls._lista("VENCIMIENTOS_CORREO_CRITICA"),
             vencida=cls._lista("VENCIMIENTOS_CORREO_VENCIDA"),
         )
 
     def para(self, item: GlosaEnRiesgo) -> list[str]:
-        """Correos que deben enterarse de ESTA glosa, sin repetidos.
-
-        Los niveles son acumulativos hacia arriba: quien recibe ALTA también
-        recibe CRÍTICA y VENCIDA, sin necesidad de repetir su correo en las
-        tres variables.
-        """
+        """Correos que deben enterarse de ESTA glosa, sin repetidos."""
         destinos: list[str] = []
         if self.avisar_al_gestor and item.responsable:
             destinos.append(item.responsable)
         sev = severidad(item.urgencia)
+        if sev >= severidad(Urgencia.PREVENTIVO):
+            destinos.extend(self.preventivo)
         if sev >= severidad(Urgencia.ALTA):
             destinos.extend(self.alta)
         if sev >= severidad(Urgencia.CRITICA):
@@ -329,7 +356,19 @@ class Destinatarios:
 
     @property
     def hay_alguno(self) -> bool:
-        return bool(self.alta or self.critica or self.vencida or self.avisar_al_gestor)
+        return bool(
+            self.preventivo or self.alta or self.critica or self.vencida or self.avisar_al_gestor
+        )
+
+    @property
+    def hay_escalamiento(self) -> bool:
+        """¿Hay alguien por encima del gestor?
+
+        Si solo se avisa al gestor, una glosa vencida le llega únicamente a
+        quien la dejó vencer — que es exactamente lo que falló con las tres
+        facturas de junio. El tablero lo reporta para que se vea.
+        """
+        return bool(self.preventivo or self.alta or self.critica or self.vencida)
 
 
 def agrupar_por_destinatario(
