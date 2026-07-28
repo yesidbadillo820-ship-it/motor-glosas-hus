@@ -56,6 +56,13 @@ jobs:
           # pytest no está en requirements.txt; el runner lo necesita para correr
           # la suite. pytest-asyncio para los tests async (@pytest.mark.asyncio).
           pip install pytest pytest-asyncio
+          # extract-msg (tests/test_tools/test_msg_tools.py) declara como
+          # dependencia obligatoria "red-black-tree-mod", cuyo instalador
+          # legado (setup.py install) es incompatible con setuptools moderno.
+          # Esa pieza solo hace falta para RE-ESCRIBIR .msg; nucleo/msg_tools.py
+          # solo los LEE, así que se instala sin esa dependencia rota.
+          pip install --no-deps extract-msg
+          pip install olefile beautifulsoup4 compressed-rtf ebcdic RTFDE tzlocal
 
       - name: Run tests
         run: |
