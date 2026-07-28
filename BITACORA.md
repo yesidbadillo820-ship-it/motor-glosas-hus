@@ -595,7 +595,7 @@ sea SINAC OS). Faltaba el **contrato de obra**: qué se construye, en qué orden
 quién lo aprueba y cómo se comprueba que quedó bien. Eso es lo que quedó hecho.
 
 Está en `docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`: **veinte capítulos y un
-anexo**, unas 306.000 palabras. Cada capítulo termina con una tabla donde toda
+anexo**, unas 323.000 palabras. Cada capítulo termina con una tabla donde toda
 fila tiene **criterio de aceptación** y **el comando exacto que lo comprueba**,
 para que nadie tenga que preguntar si algo quedó hecho. En total **730 tareas**.
 
@@ -655,8 +655,18 @@ vuelve a medir contra el repositorio lo que el documento afirma. Hoy: 43 tablas,
 migración formal **coinciden**; las rutas de la API subieron de 686 a 712
 porque el sistema siguió creciendo mientras se escribía.
 
+**La Regla 11 quedó cumplida en los veintiuno.** Todo capítulo cierra
+respondiendo qué habría que cambiar para soportar 100 hospitales, 10 millones
+de expedientes y 10.000 usuarios a la vez. De esas respuestas salió un defecto
+que ningún capítulo podía ver solo: **la escala de referencia tiene tres cifras
+distintas para la misma cosa** —2.350.000, 4.000.000 y 6.000.000 de objeciones
+para los mismos 500.000 expedientes— y dos para el almacenamiento (2,4 TB
+contra 8 TB). La medida es la primera: sale del acervo real del hospital,
+18.371 objeciones para 3.933 facturas. No se corrigió porque elegir la cifra
+buena decide el tamaño de medio Contrato, y esa decisión es del área.
+
 Todo esto es **documentación y plan**. No se tocó una línea del código que
-corre en producción: la suite de 4.530 pruebas pasa igual que antes.
+corre en producción: la suite de 4.533 pruebas pasa igual que antes.
 
 ---
 
