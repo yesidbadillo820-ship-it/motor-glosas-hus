@@ -430,7 +430,12 @@ async function cargarOficios(page){
     pager(document.getElementById('pg-oficios'),d,'cargarOficios');
   }catch(e){ errorTabla('tb-oficios', cols, e); }
 }
+// Qué oficio está abierto en pantalla, para poder refrescarlo después de
+// auditar una de sus facturas (si no, la ventana se queda con datos viejos y
+// tocaba recargar la página para ver el cambio).
+var OFICIO_ABIERTO = null;
 async function abrirOficio(id){
+  OFICIO_ABIERTO = id;
   try{ var o=await api('/preauditoria/oficios/'+id);
     document.getElementById('mo-titulo').textContent='Oficio '+o.numero_radicado;
     var filas=(o.facturas||[]).map(function(f){
@@ -457,8 +462,11 @@ async function abrirOficio(id){
       (o.total_facturas?
         '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+'</p>'+
         '<div class="tbl-scroll" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Factura</th><th>Envío</th><th>Valor</th><th>F.E.</th><th>Estado</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
-        '<div style="margin-top:12px"><button class="btn btn-rojo" '+(o.devueltas?'':'disabled')+' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
+        '<div style="margin-top:12px"><button class="btn btn-rojo" '+
+          (o.devueltas?'':'disabled title="Este oficio no tiene facturas devueltas"')+
+          ' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
         (o.tiene_adres ? ' <button class="btn btn-verde" title="Excel con la información completa que exige ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ Excel ADRES</button>' : '')+
+        (o.devueltas?'':'<p class="leyenda">El oficio de devolución solo se puede generar cuando hay al menos una factura <b>devuelta</b>: es la carta con la que se le regresan las facturas a la entidad. Este oficio tiene '+o.radicar+' radicada(s) y '+o.pendientes+' pendiente(s), ninguna devuelta.</p>')+
         '</div>'
         : '<p class="leyenda">Aún no ha cargado envíos en este oficio.</p>');
     abrirModal('m-oficio');
@@ -524,7 +532,8 @@ async function generarDev(id){
   if(!confirm('¿Generar el oficio de devolución con las facturas DEVUELTAS de este oficio? Se asigna el siguiente consecutivo SINAC.')) return;
   try{ var d=await api('/preauditoria/oficios/'+id+'/oficio-devolucion',{method:'POST'});
     alert('Oficio generado: '+d.consecutivo+' ('+d.total_facturas+' facturas)');
-    verPdf(d.pdf_url); cerrarModal('m-oficio'); cargarDevoluciones();
+    verPdf(d.pdf_url); cerrarModal('m-oficio');
+    await Promise.all([cargarDevoluciones(), cargarOficios(), cargarConsolidado()]);
   }catch(e){ alert(e.message); }
 }
 
@@ -595,7 +604,14 @@ async function auditar(id,resultado){
       })});
     if(msg) msg.innerHTML = '<div class="aviso aviso-ok">Guardado.</div>';
     cerrarModal('m-auditar');
-    await Promise.all([cargarConsolidado(), cargarOficios()]);
+    var tareas = [cargarConsolidado(), cargarOficios()];
+    // Si se auditó desde la ventana del oficio, esa ventana también se
+    // refresca: así se ven al instante los contadores (Pend/OK/Dev) y se
+    // habilita el botón del oficio de devolución cuando ya hay devueltas.
+    if(document.getElementById('m-oficio').classList.contains('on') && OFICIO_ABIERTO){
+      tareas.push(abrirOficio(OFICIO_ABIERTO));
+    }
+    await Promise.all(tareas);
   }catch(e){
     if(msg) msg.innerHTML = '<div class="aviso aviso-err">'+esc(e.message)+'</div>';
     else alert(e.message);

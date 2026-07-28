@@ -414,6 +414,15 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
   sus facturas ya salió en un oficio de devolución emitido.
 - 58 pruebas del módulo (8 nuevas) y 4.361 de la suite completa en verde, más
   verificación en navegador de los cuatro puntos.
+- **Faltaba un caso (corregido enseguida):** cuando el auditor audita **desde
+  la ventana del oficio** (que es como se trabaja normalmente), esa ventana
+  no se refrescaba. Seguía mostrando los contadores viejos "Pend · OK · Dev"
+  y, como el botón del oficio de devolución se habilita según ese dato, se
+  quedaba bloqueado aunque ya hubiera facturas devueltas: por eso "no dejaba
+  generar el PDF" y tocaba recargar. Ahora esa ventana se actualiza sola al
+  guardar. Además, cuando el botón está bloqueado **dice por qué**: el oficio
+  de devolución solo se puede generar si hay al menos una factura devuelta,
+  porque es la carta con la que se le regresan las facturas a la entidad.
 
 - **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
   tamaño, la solución de fondo es que **el cargue no haga esperar al
