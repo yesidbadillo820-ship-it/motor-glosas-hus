@@ -301,6 +301,15 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
     advertencias: list[str] = []
     anuladas = 0
     leidas = 0
+    _repetidos: dict = {}
+
+    def _compartido(valor):
+        """ENTIDAD, NIT, ENVÍO y ESTADO repiten el mismo texto en miles de
+        filas. Se guarda una sola copia y todas las filas la comparten, en vez
+        de una copia por fila (importa en archivos de decenas de miles)."""
+        if valor is None:
+            return None
+        return _repetidos.setdefault(valor, valor)
 
     for ws in wb.worksheets:
         fila_hdr, mapa = _hallar_encabezado(ws, _ALIAS_RADICACION, {"factura", "envio"})
@@ -327,14 +336,14 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
             f_recibido = _como_fecha(_celda("f_recibido"))
             registro = {
                 "factura": factura,
-                "envio": str(_celda("envio") or "").strip() or "SIN ENVÍO",
+                "envio": _compartido(str(_celda("envio") or "").strip() or "SIN ENVÍO"),
                 "f_recibido": f_recibido,
                 "f_factura": _como_fecha(_celda("f_factura")),
                 "valor": _como_valor(_celda("valor")),
-                "nit": _texto(_celda("nit")),
+                "nit": _compartido(_texto(_celda("nit"))),
                 # ENTIDAD trae espacios al final en la fuente real: strip.
-                "entidad": _texto(_celda("entidad")),
-                "estado_radicacion": estado,
+                "entidad": _compartido(_texto(_celda("entidad"))),
+                "estado_radicacion": _compartido(estado),
             }
             previo = por_factura.get(factura)
             if previo is None:
@@ -413,104 +422,146 @@ def parsear_excel_dgreport(contenido: bytes) -> dict:
 # ==================================================================
 
 
+# Cuántas facturas se guardan por bloque en un cargue masivo.
+# El servidor del hospital tiene 1 GB de memoria: guardar las 36.723 filas de
+# un solo golpe consumía +154 MB y el sistema mataba la aplicación a mitad del
+# cargue (el auditor veía "Error 524"). Guardando por bloques el consumo se
+# mantiene plano sin importar el tamaño del archivo.
+TAM_BLOQUE_UPSERT = 2000
+
+
+def _guardar_bloque(db: Session, tocados) -> None:
+    """Confirma el bloque y suelta sus filas de la memoria.
+
+    Solo se sueltan las filas que tocó ESTE bloque: no se toca nada más que
+    la petición pueda estar usando (por ejemplo el usuario conectado).
+    """
+    db.commit()
+    for obj in tocados:
+        try:
+            if obj in db:
+                db.expunge(obj)
+        except Exception:  # pragma: no cover - defensivo
+            pass
+
+
+def _upsert_por_bloques(db: Session, filas: list[dict], aplicar) -> dict:
+    """Recorre las filas en bloques; cada bloque se guarda y se libera.
+
+    Si el proceso se interrumpe a mitad de un cargue (corte, falta de memoria),
+    lo ya guardado NO se pierde: al volver a subir el mismo archivo el cargue
+    retoma donde quedó, porque el upsert nunca duplica.
+    """
+    totales = {"nuevas": 0, "actualizadas": 0, "sin_cambio": 0}
+    for i in range(0, len(filas), TAM_BLOQUE_UPSERT):
+        parciales = aplicar(filas[i : i + TAM_BLOQUE_UPSERT])
+        for clave in totales:
+            totales[clave] += parciales[clave]
+    return totales
+
+
+def _indice_existentes(db: Session, modelo, numeros: list[str]) -> dict:
+    """Pre-carga las filas ya guardadas de esas facturas (evita N consultas)."""
+    indice = {}
+    for i in range(0, len(numeros), 900):
+        for row in db.query(modelo).filter(modelo.factura.in_(numeros[i : i + 900])):
+            indice[row.factura] = row
+    return indice
+
+
 def upsert_radicacion(db: Session, filas: list[dict], archivo: str, usuario: str) -> dict:
     """Inserta/actualiza RADICACIÓN por factura. Reporta nuevas/actualizadas/sin cambio."""
-    nuevas = actualizadas = sin_cambio = 0
     ahora = ahora_utc()
-    # Pre-cargar las existentes en un dict (evita N queries en cargues masivos).
-    numeros = [r["factura"] for r in filas]
-    indice: dict[str, RadicacionCuentaRecord] = {}
-    for i in range(0, len(numeros), 900):
-        for row in db.query(RadicacionCuentaRecord).filter(
-            RadicacionCuentaRecord.factura.in_(numeros[i : i + 900])
-        ):
-            indice[row.factura] = row
-    for r in filas:
-        existente = indice.get(r["factura"])
-        if existente is None:
-            nuevo = RadicacionCuentaRecord(
-                factura=r["factura"],
-                envio=r["envio"],
-                f_recibido=r["f_recibido"],
-                f_factura=r["f_factura"],
-                valor=r["valor"],
-                nit=r["nit"],
-                entidad=r["entidad"],
-                estado_radicacion=r.get("estado_radicacion"),
-                fuente_archivo=archivo,
-                importado_por=usuario,
-            )
-            db.add(nuevo)
-            indice[r["factura"]] = nuevo  # blinda contra la misma factura repetida en el lote
-            nuevas += 1
-        else:
-            cambio = (
-                existente.envio != r["envio"]
-                or existente.valor != r["valor"]
-                or existente.nit != r["nit"]
-                or (existente.entidad or None) != r["entidad"]
-                or not _misma_fecha(existente.f_recibido, r["f_recibido"])
-                or not _misma_fecha(existente.f_factura, r["f_factura"])
-            )
-            if cambio:
-                existente.envio = r["envio"]
-                existente.f_recibido = r["f_recibido"]
-                existente.f_factura = r["f_factura"]
-                existente.valor = r["valor"]
-                existente.nit = r["nit"]
-                existente.entidad = r["entidad"]
-                existente.estado_radicacion = r.get("estado_radicacion")
-                existente.fuente_archivo = archivo
-                existente.importado_por = usuario
-                existente.actualizado_en = ahora
-                actualizadas += 1
+
+    def aplicar(bloque: list[dict]) -> dict:
+        nuevas = actualizadas = sin_cambio = 0
+        indice = _indice_existentes(db, RadicacionCuentaRecord, [r["factura"] for r in bloque])
+        for r in bloque:
+            existente = indice.get(r["factura"])
+            if existente is None:
+                nuevo = RadicacionCuentaRecord(
+                    factura=r["factura"],
+                    envio=r["envio"],
+                    f_recibido=r["f_recibido"],
+                    f_factura=r["f_factura"],
+                    valor=r["valor"],
+                    nit=r["nit"],
+                    entidad=r["entidad"],
+                    estado_radicacion=r.get("estado_radicacion"),
+                    fuente_archivo=archivo,
+                    importado_por=usuario,
+                )
+                db.add(nuevo)
+                indice[r["factura"]] = nuevo  # misma factura repetida en el lote
+                nuevas += 1
             else:
-                sin_cambio += 1
-    db.commit()
-    return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+                cambio = (
+                    existente.envio != r["envio"]
+                    or existente.valor != r["valor"]
+                    or existente.nit != r["nit"]
+                    or (existente.entidad or None) != r["entidad"]
+                    or not _misma_fecha(existente.f_recibido, r["f_recibido"])
+                    or not _misma_fecha(existente.f_factura, r["f_factura"])
+                )
+                if cambio:
+                    existente.envio = r["envio"]
+                    existente.f_recibido = r["f_recibido"]
+                    existente.f_factura = r["f_factura"]
+                    existente.valor = r["valor"]
+                    existente.nit = r["nit"]
+                    existente.entidad = r["entidad"]
+                    existente.estado_radicacion = r.get("estado_radicacion")
+                    existente.fuente_archivo = archivo
+                    existente.importado_por = usuario
+                    existente.actualizado_en = ahora
+                    actualizadas += 1
+                else:
+                    sin_cambio += 1
+        _guardar_bloque(db, indice.values())
+        return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+
+    return _upsert_por_bloques(db, filas, aplicar)
 
 
 def upsert_dgreport(db: Session, filas: list[dict], archivo: str, usuario: str) -> dict:
     """Inserta/actualiza DGREPORT por factura."""
-    nuevas = actualizadas = sin_cambio = 0
     ahora = ahora_utc()
-    numeros = [r["factura"] for r in filas]
-    indice: dict[str, DgReportRecord] = {}
-    for i in range(0, len(numeros), 900):
-        for row in db.query(DgReportRecord).filter(
-            DgReportRecord.factura.in_(numeros[i : i + 900])
-        ):
-            indice[row.factura] = row
-    for r in filas:
-        existente = indice.get(r["factura"])
-        if existente is None:
-            nuevo = DgReportRecord(
-                factura=r["factura"],
-                correo_fe=r.get("correo_fe", "SI"),
-                fecha_correo=r.get("fecha_correo"),
-                numero_fe=r.get("numero_fe"),
-                fuente_archivo=archivo,
-                importado_por=usuario,
-            )
-            db.add(nuevo)
-            indice[r["factura"]] = nuevo
-            nuevas += 1
-        else:
-            cambio = existente.correo_fe != r.get(
-                "correo_fe", "SI"
-            ) or existente.numero_fe != r.get("numero_fe")
-            if cambio:
-                existente.correo_fe = r.get("correo_fe", "SI")
-                existente.fecha_correo = r.get("fecha_correo")
-                existente.numero_fe = r.get("numero_fe")
-                existente.fuente_archivo = archivo
-                existente.importado_por = usuario
-                existente.actualizado_en = ahora
-                actualizadas += 1
+
+    def aplicar(bloque: list[dict]) -> dict:
+        nuevas = actualizadas = sin_cambio = 0
+        indice = _indice_existentes(db, DgReportRecord, [r["factura"] for r in bloque])
+        for r in bloque:
+            existente = indice.get(r["factura"])
+            if existente is None:
+                nuevo = DgReportRecord(
+                    factura=r["factura"],
+                    correo_fe=r.get("correo_fe", "SI"),
+                    fecha_correo=r.get("fecha_correo"),
+                    numero_fe=r.get("numero_fe"),
+                    fuente_archivo=archivo,
+                    importado_por=usuario,
+                )
+                db.add(nuevo)
+                indice[r["factura"]] = nuevo
+                nuevas += 1
             else:
-                sin_cambio += 1
-    db.commit()
-    return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+                cambio = existente.correo_fe != r.get(
+                    "correo_fe", "SI"
+                ) or existente.numero_fe != r.get("numero_fe")
+                if cambio:
+                    existente.correo_fe = r.get("correo_fe", "SI")
+                    existente.fecha_correo = r.get("fecha_correo")
+                    existente.numero_fe = r.get("numero_fe")
+                    existente.fuente_archivo = archivo
+                    existente.importado_por = usuario
+                    existente.actualizado_en = ahora
+                    actualizadas += 1
+                else:
+                    sin_cambio += 1
+        _guardar_bloque(db, indice.values())
+        return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+
+    return _upsert_por_bloques(db, filas, aplicar)
 
 
 # ==================================================================

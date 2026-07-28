@@ -340,6 +340,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   entrega a Facturación). Encabezados azules el tramo SINAC y grises el de
   las otras áreas.
 
+### 28-07 — La página se caía al subir las fuentes: causa y solución
+- **Qué pasó:** durante la mañana la página mostró varias veces "Error 524",
+  "Failed to fetch" y "Bad gateway 502", y **el cargue del Excel no entraba**
+  (los contadores seguían mostrando el cargue anterior).
+- **Causa real (medida, no supuesta):** el servidor de Google tiene **1 GB de
+  memoria** y la aplicación se quedaba sin aire al procesar el archivo de
+  36.723 facturas. El sistema operativo mataba la aplicación a mitad del
+  cargue (5 veces en 45 minutos, confirmado en el registro del servidor), y
+  al morir la base de datos deshacía todo: por eso no quedaba nada cargado.
+  Reparto medido del consumo: aplicación en reposo 140 MB, leer el Excel
+  +70 MB, **guardar en la base +154 MB** (todas las filas se guardaban de un
+  solo golpe al final), más lo que consume el tablero cuando el equipo entra
+  a la vez.
+- **Solución en el código:** el cargue ahora **se guarda por bloques de 2.000
+  facturas** en vez de todo al final, y los textos que se repiten miles de
+  veces (entidad, NIT, envío) se guardan una sola vez y se comparten.
+  Resultado medido con el archivo real: **pico de 263 MB → 119 MB** (menos de
+  la mitad) y además más rápido (5,3 s → 3,7 s en el guardado). Ventaja
+  adicional: si el cargue se interrumpe, **lo ya guardado no se pierde** —
+  al volver a subir el mismo archivo el cargue retoma donde quedó (el
+  sistema nunca duplica). 47 pruebas del módulo en verde (5 nuevas que fijan
+  que trocear el cargue no altera los conteos ni duplica facturas).
+- **Paliativo aplicado ese día en el servidor** (mientras se despliega lo
+  anterior): se subió el tope de memoria del contenedor de 640 MB a 1.400 MB
+  con uso de disco como apoyo, para que la aplicación se ponga lenta en vez
+  de morirse.
+- **PENDIENTE recomendado:** subir la máquina virtual de `e2-micro` (1 GB) a
+  **`e2-small`** (2 GB, ~US$13 más al mes). Se hace desde la consola de
+  Google: Compute Engine → VM `motor-glosas` → Detener → Editar → Tipo de
+  máquina `e2-small` → Guardar → Iniciar (5 minutos de página caída). Ojo:
+  esos comandos NO funcionan desde adentro de la VM (la VM no tiene permiso
+  para modificarse a sí misma); hay que hacerlo desde la consola web o
+  desde Cloud Shell.
+
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
   fusionadas desde la rama principal:

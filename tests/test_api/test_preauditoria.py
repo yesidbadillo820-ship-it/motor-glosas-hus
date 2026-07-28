@@ -19,7 +19,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth import get_password_hash
 from app.database import Base, get_db
-from app.models.db import UsuarioRecord
+from app.models.db import DgReportRecord, RadicacionCuentaRecord, UsuarioRecord
 from app.services import preauditoria_service as svc
 
 
@@ -727,6 +727,92 @@ class TestExportAdres:
         r = client.get(f"/preauditoria/oficios/{o['id']}/export-adres.xlsx")
         assert r.status_code == 404
         assert "ADRES" in r.json()["detail"]
+
+
+# ------------------------------------------------------------------
+# Cargue masivo por bloques (memoria acotada en el servidor de 1 GB)
+# ------------------------------------------------------------------
+
+
+class TestCargueMasivoPorBloques:
+    """Los archivos grandes se guardan por bloques para no agotar la memoria.
+
+    Estas pruebas fijan que trocear el cargue NO cambia el resultado: mismos
+    conteos, sin duplicar y sin perder la idempotencia del upsert.
+    """
+
+    def _filas(self, n, valor=100.0):
+        return [
+            {
+                "factura": f"HUS{i:07d}",
+                "envio": ENV,
+                "f_recibido": datetime(2026, 7, 20),
+                "f_factura": datetime(2026, 7, 1),
+                "valor": valor + i,
+                "nit": svc.NIT_ADRES,
+                "entidad": "ADRES",
+                "estado_radicacion": "Registrado",
+            }
+            for i in range(n)
+        ]
+
+    def test_conteos_exactos_cruzando_bloques(self, db_session, monkeypatch):
+        monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 3)  # 10 filas → 4 bloques
+        filas = self._filas(10)
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
+            "nuevas": 10,
+            "actualizadas": 0,
+            "sin_cambio": 0,
+        }
+        # re-subir el mismo archivo: todo sin cambio (idempotente)
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
+            "nuevas": 0,
+            "actualizadas": 0,
+            "sin_cambio": 10,
+        }
+        # subir el archivo corregido: todo actualizado, sin duplicar
+        for f in filas:
+            f["valor"] += 1
+        assert svc.upsert_radicacion(db_session, filas, "b.xlsx", "YESID") == {
+            "nuevas": 0,
+            "actualizadas": 10,
+            "sin_cambio": 0,
+        }
+        assert db_session.query(RadicacionCuentaRecord).count() == 10
+
+    def test_factura_repetida_en_otro_bloque_no_duplica(self, db_session, monkeypatch):
+        monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 2)
+        filas = self._filas(3)
+        filas.append(dict(filas[0]))  # la misma factura, ya en otro bloque
+        res = svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")
+        assert res["nuevas"] == 3 and res["sin_cambio"] == 1
+        assert db_session.query(RadicacionCuentaRecord).count() == 3
+
+    def test_dgreport_por_bloques(self, db_session, monkeypatch):
+        monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 2)
+        filas = [
+            {"factura": f"HUS{i:07d}", "correo_fe": "SI", "numero_fe": f"CUFE{i}"} for i in range(7)
+        ]
+        assert svc.upsert_dgreport(db_session, filas, "d.xlsx", "YESID")["nuevas"] == 7
+        assert svc.upsert_dgreport(db_session, filas, "d.xlsx", "YESID")["sin_cambio"] == 7
+        assert db_session.query(DgReportRecord).count() == 7
+
+    def test_archivo_mas_grande_que_un_bloque_real(self, db_session):
+        """Con el tamaño de bloque real (2.000): un archivo de 2.500 filas."""
+        filas = self._filas(2500)
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")["nuevas"] == 2500
+        assert db_session.query(RadicacionCuentaRecord).count() == 2500
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")["sin_cambio"] == 2500
+
+    def test_el_parseo_comparte_los_textos_repetidos(self, client):
+        """ENTIDAD/NIT se repiten miles de veces: deben compartir una sola copia."""
+        filas = [_rad_fila(ENV, f"HUS{i:07d}", 1000 + i) for i in range(50)]
+        datos = svc.parsear_excel_radicacion(_excel(RAD_HEADERS, filas))
+        entidades = [f["entidad"] for f in datos["facturas"]]
+        assert len(entidades) == 50
+        # todas las filas apuntan al MISMO objeto de texto, no a 50 copias
+        assert len({id(e) for e in entidades}) == 1
+        assert entidades[0] == "AXA COLPATRIA"  # y se sigue recortando
 
 
 # ------------------------------------------------------------------
