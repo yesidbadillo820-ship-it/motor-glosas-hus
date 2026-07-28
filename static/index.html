@@ -1362,6 +1362,83 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .chip-rojo{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
 .chip-negro{background:#0f172a;color:#fff;border-color:#0f172a}
 .chip-estado{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+
+/* ── Motor de Vencimientos ────────────────────────────────────────────
+   Cuatro niveles de urgencia con el mismo lenguaje visual del semáforo que
+   el área ya lee: ámbar preventivo, naranja alta, rojo crítica, negro
+   vencida. El color se usa en la tarjeta del tablero, en los chips de la
+   tabla y en el borde izquierdo de cada fila, para que la prioridad se lea
+   sin tener que leer. */
+.venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
+.venc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+.venc-title{margin:0;font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
+.venc-sub{margin:.2rem 0 0;font-size:.82rem;color:var(--text3)}
+.venc-acciones{display:flex;gap:.5rem;flex-wrap:wrap}
+
+.venc-aviso{display:flex;align-items:flex-start;gap:.6rem;padding:.7rem .9rem;border-radius:var(--r);
+  border:1px solid #fde68a;background:#fefce8;color:#854d0e;font-size:.8rem;line-height:1.5}
+body.dark .venc-aviso{background:#3f2d0b;border-color:#854d0e;color:#fde68a}
+.venc-aviso b{font-weight:700}
+
+.venc-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem}
+@media(max-width:900px){.venc-cards{grid-template-columns:repeat(2,1fr)}}
+.venc-card{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--u-color,var(--border));
+  border-radius:var(--r);padding:.85rem .95rem;display:flex;flex-direction:column;gap:3px;cursor:pointer;
+  transition:transform .15s var(--ease),border-color .15s var(--ease)}
+.venc-card:hover{transform:translateY(-1px)}
+.venc-card.sel{box-shadow:0 0 0 2px var(--u-color)}
+.venc-card .vc-n{font-size:1.55rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--u-color)}
+.venc-card .vc-l{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--text3)}
+.venc-card .vc-v{font-size:.78rem;color:var(--text2);font-variant-numeric:tabular-nums}
+.venc-card .vc-d{font-size:.66rem;color:var(--text3)}
+.u-preventivo{--u-color:#a16207}
+.u-alta{--u-color:#c2410c}
+.u-critica{--u-color:#b91c1c}
+.u-vencida{--u-color:#0f172a}
+body.dark .u-vencida{--u-color:#94a3b8}
+body.dark .u-preventivo{--u-color:#fbbf24}
+body.dark .u-alta{--u-color:#fb923c}
+body.dark .u-critica{--u-color:#f87171}
+
+.venc-filtros{display:flex;gap:.7rem;flex-wrap:wrap;align-items:flex-end;
+  background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--r);padding:.75rem .9rem}
+.venc-f{display:flex;flex-direction:column;gap:3px;min-width:140px}
+.venc-f label{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--text3)}
+.venc-f select,.venc-f input{padding:.4rem .55rem;border:1px solid var(--border);border-radius:6px;
+  background:var(--bg-card);color:var(--text);font-size:.8rem;font-family:inherit}
+.venc-rango{display:flex;align-items:center;gap:.35rem}
+.venc-rango input{width:100%;min-width:0}
+.venc-rango span{font-size:.72rem;color:var(--text3)}
+.venc-f-dias,.venc-f-fechas{min-width:210px}
+.venc-limpiar{align-self:flex-end}
+.venc-conteo{font-size:.78rem;color:var(--text3)}
+
+.venc-tabla tbody tr{border-left:4px solid transparent}
+.venc-tabla tbody tr.u-preventivo,.venc-tabla tbody tr.u-alta,
+.venc-tabla tbody tr.u-critica,.venc-tabla tbody tr.u-vencida{border-left-color:var(--u-color)}
+.venc-tabla .venc-dias{font-variant-numeric:tabular-nums;font-weight:700;color:var(--u-color)}
+.venc-vacio{padding:2rem 1rem;text-align:center;color:var(--text3);font-size:.85rem}
+
+.venc-simulacion{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:1rem}
+.venc-simulacion h4{margin:0 0 .3rem;font-size:.95rem;color:var(--text)}
+.venc-simulacion .vs-sub{font-size:.78rem;color:var(--text3);margin-bottom:.7rem}
+.venc-simulacion table{width:100%;border-collapse:collapse;font-size:.8rem}
+.venc-simulacion th{text-align:left;font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--text3);padding:.4rem .5rem;border-bottom:1px solid var(--border)}
+.venc-simulacion td{padding:.45rem .5rem;border-bottom:1px solid var(--border);color:var(--text2)}
+.venc-simulacion td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* Tarjeta del tablero de inicio */
+.venc-tarjeta{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:1rem 1.1rem;margin-bottom:1rem;cursor:pointer;transition:border-color .2s,transform .2s}
+.venc-tarjeta:hover{border-color:var(--c-teal2);transform:translateY(-1px)}
+.venc-tarjeta:focus-visible{outline:2px solid var(--c-teal2);outline-offset:2px}
+.venc-tarjeta-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;gap:1rem}
+.venc-tarjeta-title{font-size:.9rem;font-weight:700;color:var(--text)}
+.venc-tarjeta-link{font-size:.75rem;color:var(--c-teal2);font-weight:600;white-space:nowrap}
+.venc-tarjeta-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem}
+@media(max-width:900px){.venc-tarjeta-cards{grid-template-columns:repeat(2,1fr)}}
+.venc-tarjeta-pie{margin-top:.7rem;font-size:.76rem;color:var(--text3)}
 .chip-tipo-administrativo{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
 .chip-tipo-medico{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
 .chip-tipo-mixta{background:#fefce8;color:#a16207;border-color:#fde68a}
@@ -2016,6 +2093,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span class="sn-item-label">Historial</span>
         </button>
+        <button class="sn-item" data-tip="Vencimientos" onclick="sidebarTab(this,'vencimientos')" id="sn-vencimientos">
+          <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+          <span class="sn-item-label">Vencimientos</span>
+          <span class="sn-badge" id="venc-badge-side" style="display:none">0</span>
+        </button>
         <button class="sn-item" data-tip="Alertas" onclick="sidebarTab(this,'alertas')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M6 8A6 6 0 0 1 18 8C18 15 21 17 21 17H3S6 15 6 8"/><path d="M10.3 21A1.94 1.94 0 0 0 13.7 21"/></svg>
           <span class="sn-item-label">Alertas</span>
@@ -2386,6 +2468,22 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <div class="panel" id="p-dashboard">
       <div class="dash-area">
         <div class="rep-tabbar-host" data-activo="dashboard"></div>
+
+        <!-- Tarjeta de vencimientos: lo primero que debe verse al abrir el
+             tablero. Nace del caso de las 3 facturas de junio ($20.054.751)
+             que nadie vio hasta 45 días después del plazo. -->
+        <div class="venc-tarjeta" id="venc-tarjeta" style="display:none"
+             onclick="vencIrAlListado()" role="button" tabindex="0"
+             onkeydown="if(event.keyCode===13||event.keyCode===32){vencIrAlListado()}"
+             title="Ver el listado completo">
+          <div class="venc-tarjeta-head">
+            <span class="venc-tarjeta-title">Glosas contra el reloj</span>
+            <span class="venc-tarjeta-link">Ver listado →</span>
+          </div>
+          <div class="venc-tarjeta-cards" id="venc-tarjeta-cards"></div>
+          <div class="venc-tarjeta-pie" id="venc-tarjeta-pie"></div>
+        </div>
+
         <div class="kpi-grid" id="kpi-grid">
           <div class="kpi"><div class="kpi-lbl">Total glosas</div><div class="kpi-num" id="k-total">—</div><div class="kpi-sub">procesadas en el mes</div></div>
           <div class="kpi"><div class="kpi-lbl">Valor objetado</div><div class="kpi-num" id="k-obj">—</div><div class="kpi-sub">acumulado del mes</div></div>
@@ -3091,6 +3189,102 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- ALERTAS -->
     <div class="panel" id="p-alertas">
       <div class="alert-area" id="alertas-list"></div>
+    </div>
+
+    <!-- VENCIMIENTOS — Motor de Vencimientos
+         El semáforo tenía estado NEGRO para lo vencido y no disparaba nada:
+         tres facturas de junio por $20.054.751 se descubrieron 45 días tarde.
+         Esta pantalla es la superficie de esa capacidad. -->
+    <div class="panel" id="p-vencimientos">
+      <div class="venc-area">
+
+        <div class="venc-head">
+          <div>
+            <h2 class="venc-title">Vencimientos</h2>
+            <p class="venc-sub" id="venc-sub">Glosas que compiten contra el reloj, de la más urgente a la menos.</p>
+          </div>
+          <div class="venc-acciones">
+            <button class="btn btn-ghost btn-sm" onclick="vencCargar()" title="Volver a consultar">
+              <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15A9 9 0 1 1 18.36 5.64L23 10"/></svg>
+              Actualizar
+            </button>
+            <button class="btn btn-primary btn-sm" id="venc-btn-simular" onclick="vencSimular()" style="display:none">
+              <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 4H20V16H5.17L4 17.17V4Z"/></svg>
+              Simular notificaciones
+            </button>
+          </div>
+        </div>
+
+        <div id="venc-aviso-smtp" class="venc-aviso" style="display:none"></div>
+
+        <div class="venc-cards" id="venc-cards"></div>
+
+        <div class="venc-filtros">
+          <div class="venc-f">
+            <label for="venc-f-urgencia">Urgencia</label>
+            <select id="venc-f-urgencia" onchange="vencPintarTabla()">
+              <option value="">Todas</option>
+              <option value="VENCIDA">Vencidas</option>
+              <option value="CRITICA">Críticas</option>
+              <option value="ALTA">Alerta alta</option>
+              <option value="PREVENTIVO">Preventivas</option>
+            </select>
+          </div>
+          <div class="venc-f">
+            <label for="venc-f-pagador">Pagador</label>
+            <select id="venc-f-pagador" onchange="vencPintarTabla()"><option value="">Todos</option></select>
+          </div>
+          <div class="venc-f">
+            <label for="venc-f-responsable">Responsable</label>
+            <select id="venc-f-responsable" onchange="vencPintarTabla()"><option value="">Todos</option></select>
+          </div>
+          <div class="venc-f">
+            <label for="venc-f-estado">Estado</label>
+            <select id="venc-f-estado" onchange="vencPintarTabla()"><option value="">Todos</option></select>
+          </div>
+          <div class="venc-f venc-f-dias">
+            <label>Días para vencer</label>
+            <div class="venc-rango">
+              <input type="number" id="venc-f-dmin" placeholder="desde" oninput="vencPintarTabla()" />
+              <span>a</span>
+              <input type="number" id="venc-f-dmax" placeholder="hasta" oninput="vencPintarTabla()" />
+            </div>
+          </div>
+          <div class="venc-f venc-f-fechas">
+            <label>Vence entre</label>
+            <div class="venc-rango">
+              <input type="date" id="venc-f-fdesde" onchange="vencPintarTabla()" />
+              <span>y</span>
+              <input type="date" id="venc-f-fhasta" onchange="vencPintarTabla()" />
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm venc-limpiar" onclick="vencLimpiarFiltros()">Limpiar</button>
+        </div>
+
+        <div class="venc-conteo" id="venc-conteo"></div>
+
+        <div class="tbl-modern venc-tabla">
+          <table>
+            <thead>
+              <tr>
+                <th>Urgencia</th>
+                <th>Días</th>
+                <th>Vence</th>
+                <th>Factura</th>
+                <th>Pagador</th>
+                <th>Código</th>
+                <th>Responsable</th>
+                <th>Estado</th>
+                <th class="num">Valor objetado</th>
+              </tr>
+            </thead>
+            <tbody id="venc-tbody"></tbody>
+          </table>
+        </div>
+
+        <div id="venc-simulacion" class="venc-simulacion" style="display:none"></div>
+
+      </div>
     </div>
 
     <!-- CONTRATOS -->
@@ -7654,6 +7848,7 @@ function tab(btn,id){
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
+  if(id==='vencimientos') vencCargar();
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
@@ -18246,6 +18441,9 @@ function hideLoading(){
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 var charts={};
 async function loadDash(){
+  // La tarjeta de vencimientos se carga aparte y sin bloquear: si el tablero
+  // de analítica falla, el aviso de lo que está por vencerse igual aparece.
+  vencCargarTarjeta();
   try{
     var r=await fetch('/analytics/',{headers:authH()});
     var a=await r.json();
@@ -19711,6 +19909,272 @@ async function loadAlertas(){
         +'</div>';
     }).join('');
   } catch(e){list.innerHTML='<div style="color:var(--c-red);padding:1rem">Error cargando alertas</div>';}
+}
+
+// ─── MOTOR DE VENCIMIENTOS ───────────────────────────────────────────────
+// Superficie de la capacidad `motor_vencimientos`. Antes solo existía como
+// endpoint: la funcionalidad estaba viva y era invisible. El caso que la
+// justifica: tres facturas de junio por $20.054.751 que nadie vio hasta 45
+// días después del plazo.
+var VENC = {datos:null, glosas:[]};
+
+var VENC_NIVELES = [
+  {k:'VENCIDA',    cls:'u-vencida',    lbl:'Vencidas',   nota:'plazo cumplido'},
+  {k:'CRITICA',    cls:'u-critica',    lbl:'Críticas',   nota:'2 días o menos'},
+  {k:'ALTA',       cls:'u-alta',       lbl:'Alerta alta',nota:'5 días o menos'},
+  {k:'PREVENTIVO', cls:'u-preventivo', lbl:'Preventivas',nota:'10 días o menos'}
+];
+
+function vencClase(u){
+  var n = VENC_NIVELES.filter(function(x){return x.k===u})[0];
+  return n ? n.cls : '';
+}
+
+function vencIrAlListado(){
+  var btn=document.getElementById('sn-vencimientos');
+  if(btn) sidebarTab(btn,'vencimientos'); else tab(null,'vencimientos');
+}
+
+async function vencCargar(){
+  var tb=document.getElementById('venc-tbody');
+  if(tb) tb.innerHTML='<tr><td colspan="9" class="venc-vacio">Consultando…</td></tr>';
+  try{
+    var r=await fetch('/alertas/vencimientos',{headers:authH()});
+    if(r.status===403){
+      if(tb) tb.innerHTML='<tr><td colspan="9" class="venc-vacio">Tu perfil no tiene acceso a este tablero.</td></tr>';
+      return;
+    }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    VENC.datos=await r.json();
+    VENC.glosas=VENC.datos.glosas||[];
+    vencPintarCards();
+    vencLlenarFiltros();
+    vencPintarTabla();
+    vencPintarAvisoSmtp();
+    vencPintarTarjetaInicio();
+    var b=document.getElementById('venc-btn-simular');
+    if(b) b.style.display = VENC.datos.puede_notificar ? '' : 'none';
+    var u=VENC.datos.umbrales||{};
+    var sub=document.getElementById('venc-sub');
+    if(sub) sub.textContent='Glosas que compiten contra el reloj, de la más urgente a la menos. '
+      +'Umbrales vigentes: '+u.preventivo+' días preventivo · '+u.alta+' alerta alta · '+u.critica+' crítica.';
+  }catch(e){
+    if(tb) tb.innerHTML='<tr><td colspan="9" class="venc-vacio">No se pudo consultar el tablero. Intentá de nuevo.</td></tr>';
+  }
+}
+
+function vencPintarCards(){
+  var cont=document.getElementById('venc-cards');
+  if(!cont||!VENC.datos) return;
+  var c=VENC.datos.conteos||{};
+  cont.innerHTML = VENC_NIVELES.map(function(n){
+    var glosas = VENC.glosas.filter(function(g){return g.urgencia===n.k});
+    var valor = glosas.reduce(function(a,g){return a+(Number(g.valor_objetado)||0)},0);
+    return '<div class="venc-card '+n.cls+'" onclick="vencFiltrarPor(\''+n.k+'\')" '
+      +'title="Ver solo estas">'
+      +'<div class="vc-l">'+n.lbl+'</div>'
+      +'<div class="vc-n">'+(c[n.k]||0)+'</div>'
+      +'<div class="vc-v">'+fmtCOP(valor)+'</div>'
+      +'<div class="vc-d">'+n.nota+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function vencPintarTarjetaInicio(){
+  var t=document.getElementById('venc-tarjeta');
+  if(!t||!VENC.datos) return;
+  var total=VENC.datos.total_en_riesgo||0;
+  if(!total){ t.style.display='none'; return; }
+  t.style.display='';
+  var c=VENC.datos.conteos||{};
+  document.getElementById('venc-tarjeta-cards').innerHTML = VENC_NIVELES.map(function(n){
+    var glosas = VENC.glosas.filter(function(g){return g.urgencia===n.k});
+    var valor = glosas.reduce(function(a,g){return a+(Number(g.valor_objetado)||0)},0);
+    return '<div class="venc-card '+n.cls+'">'
+      +'<div class="vc-l">'+n.lbl+'</div>'
+      +'<div class="vc-n">'+(c[n.k]||0)+'</div>'
+      +'<div class="vc-v">'+fmtCOP(valor)+'</div>'
+      +'</div>';
+  }).join('');
+  var pie=document.getElementById('venc-tarjeta-pie');
+  var txt=total+' glosa'+(total===1?'':'s')+' en riesgo · '+fmtCOP(VENC.datos.valor_en_riesgo||0)+' comprometidos';
+  if(VENC.datos.sin_plazo) txt+=' · '+VENC.datos.sin_plazo+' sin fecha de vencimiento cargada';
+  pie.textContent=txt;
+  var badge=document.getElementById('venc-badge-side');
+  if(badge){
+    var urgentes=(c.VENCIDA||0)+(c.CRITICA||0);
+    if(urgentes){ badge.textContent=urgentes; badge.style.display=''; }
+    else badge.style.display='none';
+  }
+}
+
+// Carga solo para la tarjeta del tablero de inicio. Silenciosa: si el
+// usuario no tiene permiso o falla la consulta, la tarjeta no aparece y el
+// resto del tablero sigue igual.
+async function vencCargarTarjeta(){
+  try{
+    var r=await fetch('/alertas/vencimientos',{headers:authH()});
+    if(!r.ok) return;
+    VENC.datos=await r.json();
+    VENC.glosas=VENC.datos.glosas||[];
+    vencPintarTarjetaInicio();
+  }catch(_){}
+}
+
+function vencPintarAvisoSmtp(){
+  var el=document.getElementById('venc-aviso-smtp');
+  if(!el||!VENC.datos) return;
+  var faltas=[];
+  if(!VENC.datos.smtp_configurado) faltas.push('no hay servidor de correo configurado (SMTP)');
+  if(!VENC.datos.avisos_configurados) faltas.push('no hay destinatarios definidos');
+  else if(!VENC.datos.escalamiento_configurado) faltas.push('solo se avisa al gestor: sin escalamiento, una glosa vencida le llega únicamente a quien la dejó vencer');
+  if(!faltas.length){ el.style.display='none'; return; }
+  el.style.display='';
+  el.innerHTML='<span>⚠</span><span><b>Los avisos por correo no están activos.</b> '
+    +escHtml(faltas.join('; '))+'. El tablero funciona igual, pero nadie recibe notificaciones.</span>';
+}
+
+function vencLlenarFiltros(){
+  function llenar(id, valores){
+    var s=document.getElementById(id);
+    if(!s) return;
+    var actual=s.value;
+    var opts=['<option value="">Todos</option>'];
+    valores.sort().forEach(function(v){
+      opts.push('<option value="'+escHtml(v)+'">'+escHtml(v)+'</option>');
+    });
+    s.innerHTML=opts.join('');
+    if(actual) s.value=actual;
+  }
+  function unicos(campo){
+    var vistos={};
+    VENC.glosas.forEach(function(g){ if(g[campo]) vistos[g[campo]]=1; });
+    return Object.keys(vistos);
+  }
+  llenar('venc-f-pagador', unicos('eps'));
+  llenar('venc-f-estado', unicos('estado'));
+  var resp={};
+  VENC.glosas.forEach(function(g){
+    var r=g.responsable||g.gestor;
+    if(r) resp[r]=1;
+  });
+  llenar('venc-f-responsable', Object.keys(resp));
+}
+
+function vencFiltrarPor(urgencia){
+  var s=document.getElementById('venc-f-urgencia');
+  if(s){ s.value = (s.value===urgencia) ? '' : urgencia; }
+  vencPintarTabla();
+  var tabla=document.querySelector('.venc-tabla');
+  if(tabla && tabla.scrollIntoView) tabla.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function vencLimpiarFiltros(){
+  ['venc-f-urgencia','venc-f-pagador','venc-f-responsable','venc-f-estado',
+   'venc-f-dmin','venc-f-dmax','venc-f-fdesde','venc-f-fhasta'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  vencPintarTabla();
+}
+
+function vencFiltradas(){
+  function val(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; }
+  var fu=val('venc-f-urgencia'), fp=val('venc-f-pagador'),
+      fr=val('venc-f-responsable'), fe=val('venc-f-estado'),
+      dmin=val('venc-f-dmin'), dmax=val('venc-f-dmax'),
+      fd=val('venc-f-fdesde'), fh=val('venc-f-fhasta');
+  return VENC.glosas.filter(function(g){
+    if(fu && g.urgencia!==fu) return false;
+    if(fp && g.eps!==fp) return false;
+    if(fe && g.estado!==fe) return false;
+    if(fr && (g.responsable||g.gestor)!==fr) return false;
+    if(dmin!=='' && Number(g.dias_restantes) < Number(dmin)) return false;
+    if(dmax!=='' && Number(g.dias_restantes) > Number(dmax)) return false;
+    if(fd || fh){
+      if(!g.fecha_vencimiento) return false;
+      var f=String(g.fecha_vencimiento).slice(0,10);
+      if(fd && f < fd) return false;
+      if(fh && f > fh) return false;
+    }
+    return true;
+  });
+}
+
+function vencPintarTabla(){
+  var tb=document.getElementById('venc-tbody');
+  if(!tb) return;
+  var filas=vencFiltradas();  // ya vienen ordenadas por prioridad desde el servidor
+  var cont=document.getElementById('venc-conteo');
+  if(cont){
+    var valor=filas.reduce(function(a,g){return a+(Number(g.valor_objetado)||0)},0);
+    cont.textContent = filas.length
+      ? filas.length+' de '+VENC.glosas.length+' glosas · '+fmtCOP(valor)+' comprometidos'
+      : '';
+  }
+  if(!filas.length){
+    tb.innerHTML='<tr><td colspan="9" class="venc-vacio">'
+      +(VENC.glosas.length ? 'Ninguna glosa coincide con los filtros.' : 'No hay glosas en riesgo de vencerse. 🎉')
+      +'</td></tr>';
+    return;
+  }
+  tb.innerHTML = filas.map(function(g){
+    var cls=vencClase(g.urgencia);
+    var nivel=VENC_NIVELES.filter(function(n){return n.k===g.urgencia})[0];
+    var dias=Number(g.dias_restantes);
+    var diasTxt = dias<0 ? ('hace '+Math.abs(dias)) : (dias===0 ? 'hoy' : dias);
+    var fv = g.fecha_vencimiento ? String(g.fecha_vencimiento).slice(0,10) : '—';
+    return '<tr class="'+cls+'">'
+      +'<td><span class="chip" style="border-color:currentColor;color:var(--u-color)">'+(nivel?nivel.lbl:escHtml(g.urgencia))+'</span></td>'
+      +'<td class="venc-dias">'+diasTxt+'</td>'
+      +'<td class="mono">'+escHtml(fv)+'</td>'
+      +'<td class="mono">'+escHtml(g.factura||'—')+'</td>'
+      +'<td>'+escHtml(g.eps||'—')+'</td>'
+      +'<td class="mono">'+escHtml(g.codigo_glosa||'—')+'</td>'
+      +'<td>'+escHtml(g.responsable||g.gestor||'sin asignar')+'</td>'
+      +'<td>'+escHtml(g.estado||'—')+'</td>'
+      +'<td class="num">'+fmtCOP(g.valor_objetado)+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+async function vencSimular(){
+  var cont=document.getElementById('venc-simulacion');
+  if(!cont) return;
+  cont.style.display='';
+  cont.innerHTML='<div class="vs-sub">Calculando a quién le llegaría cada glosa…</div>';
+  try{
+    var r=await fetch('/alertas/vencimientos/notificar?simular=true',{method:'POST',headers:authH()});
+    if(r.status===403){
+      cont.innerHTML='<div class="vs-sub">Tu perfil no puede disparar notificaciones.</div>';
+      return;
+    }
+    var d=await r.json();
+    var bandejas=d.bandejas||{};
+    var correos=Object.keys(bandejas);
+    if(!correos.length){
+      cont.innerHTML='<h4>Simulación de notificaciones</h4>'
+        +'<div class="vs-sub">'+escHtml(d.detalle||'No hay a quién avisar con la configuración actual.')+'</div>';
+      return;
+    }
+    var filas=correos.map(function(c){
+      var b=bandejas[c], u=b.por_urgencia||{};
+      return '<tr><td>'+escHtml(c)+'</td>'
+        +'<td class="num">'+(u.VENCIDA||0)+'</td>'
+        +'<td class="num">'+(u.CRITICA||0)+'</td>'
+        +'<td class="num">'+(u.ALTA||0)+'</td>'
+        +'<td class="num">'+(u.PREVENTIVO||0)+'</td>'
+        +'<td class="num"><b>'+b.total+'</b></td></tr>';
+    }).join('');
+    cont.innerHTML='<h4>Simulación de notificaciones</h4>'
+      +'<div class="vs-sub">Esto es lo que recibiría cada persona. <b>No se envió ningún correo.</b> '
+      +'Cada una recibe un solo mensaje con todas sus glosas.</div>'
+      +'<table><thead><tr><th>Destinatario</th><th class="num">Vencidas</th><th class="num">Críticas</th>'
+      +'<th class="num">Alta</th><th class="num">Preventivas</th><th class="num">Total</th></tr></thead>'
+      +'<tbody>'+filas+'</tbody></table>';
+    toast('Simulación lista', correos.length+' destinatario(s) recibirían aviso. No se envió nada.','success');
+  }catch(e){
+    cont.innerHTML='<div class="vs-sub">No se pudo simular. Intentá de nuevo.</div>';
+  }
 }
 
 // ─── USUARIOS ────────────────────────────────────────────────────────────

@@ -180,6 +180,7 @@ class GlosaEnRiesgo:
 
     def como_dict(self) -> dict:
         g = self.glosa
+        venc = getattr(g, "fecha_vencimiento", None)
         return {
             "id": self.id,
             "factura": getattr(g, "factura", None),
@@ -189,8 +190,11 @@ class GlosaEnRiesgo:
             "dias_restantes": self.dias_restantes,
             "urgencia": self.urgencia.value,
             "responsable": self.responsable or None,
-            # El nombre del paciente NO viaja en las alertas: son correos que
-            # salen del sistema y pueden reenviarse (Ley 1581/2012).
+            "gestor": (getattr(g, "gestor_nombre", "") or "").strip() or None,
+            "estado": (getattr(g, "estado", "") or "").strip() or None,
+            "fecha_vencimiento": venc.isoformat() if venc else None,
+            # El nombre del paciente NO viaja acá: este mismo diccionario
+            # alimenta los correos, que se reenvían (Ley 1581/2012).
         }
 
 

@@ -57,11 +57,15 @@ def saludo(
         1 for g in glosas_30 if _aware(g.creado_en) and _aware(g.creado_en) >= inicio_hoy
     )
 
-    # Próximas a vencer (≤ 3 días, no cerradas).
+    # Próximas a vencer (≤ 3 días, no cerradas) — Y LAS YA VENCIDAS.
+    # El filtro anterior era `0 <= dias <= 3`, así que una glosa con el plazo
+    # cumplido (días negativos) quedaba fuera y el saludo anunciaba "sin
+    # pendientes" con plata sangrando. Es el mismo modo de falla del semáforo
+    # NEGRO que no disparaba nada: el sistema tranquilizando al gestor.
     por_vencer = sum(
         1
         for g in glosas_30
-        if (g.dias_restantes is not None and 0 <= g.dias_restantes <= 3)
+        if (g.dias_restantes is not None and g.dias_restantes <= 3)
         and (g.estado or "").upper() not in {"LEVANTADA", "ACEPTADA", "ARCHIVADA", "CONCILIADA"}
     )
 
