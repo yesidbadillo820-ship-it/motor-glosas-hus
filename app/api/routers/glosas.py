@@ -1,7 +1,7 @@
 import re
 import uuid
 from typing import Optional
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -16,7 +16,15 @@ from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
-from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
+from app.models.db import (
+    UsuarioRecord,
+    GlosaRecord,
+    ConceptoGlosaRecord,
+    ContratoRecord,
+    ROL_SUPER_ADMIN,
+    ROL_COORDINADOR,
+    ROL_VIEWER,
+)
 from app.utils.moneda import parse_valor_cop
 from app.utils.html_a_texto import dictamen_a_texto_plano
 
@@ -184,6 +192,45 @@ def _limpiar_observacion(dictamen_html: str) -> str:
     return txt.strip()
 
 
+def _puede_ver_paciente(usuario: UsuarioRecord, glosa) -> bool:
+    """¿Este usuario tiene relación legítima con los datos de este paciente?
+
+    E00 (Ley 1581/2012): el nombre del paciente es dato sensible y solo lo ve
+    quien lo necesita para trabajar el caso — el gestor asignado — o quien
+    tiene responsabilidad sobre todo el proceso (coordinación y administración).
+    Antes, `GET /glosas/historial` devolvía el nombre de TODOS los pacientes
+    del hospital a cualquier usuario autenticado.
+    """
+    if usuario.rol in (ROL_SUPER_ADMIN, ROL_COORDINADOR):
+        return True
+    if usuario.rol == ROL_VIEWER:
+        return False
+    duenio_correo = (glosa.auditor_email or "").strip().lower()
+    duenio_nombre = (glosa.gestor_nombre or "").strip().lower()
+    # Glosa sin asignar: es trabajo que cualquier auditor puede tomar, y
+    # ocultarle el paciente le impediría trabajarla. Se protege lo que YA
+    # tiene dueño, que es donde el dato de otro paciente no le corresponde.
+    if not duenio_correo and not duenio_nombre:
+        return True
+    correo = (usuario.email or "").strip().lower()
+    if correo and duenio_correo == correo:
+        return True
+    nombre = (usuario.nombre or "").strip().lower()
+    return bool(nombre) and duenio_nombre == nombre
+
+
+def _paciente_visible(usuario: UsuarioRecord, glosa) -> Optional[str]:
+    """Nombre del paciente, o sus iniciales si el usuario no tiene relación.
+
+    Se enmascara en vez de omitir para que las filas sigan siendo
+    distinguibles en pantalla sin revelar la identidad.
+    """
+    nombre = (glosa.paciente or "").strip()
+    if not nombre or _puede_ver_paciente(usuario, glosa):
+        return glosa.paciente
+    return " ".join(f"{p[0]}." for p in nombre.split() if p)[:60] or None
+
+
 @router.get("/historial", response_model=list)
 def historial(
     # le=500: sin tope, un limit=10_000_000 serializa la tabla completa
@@ -216,7 +263,7 @@ def historial(
                 "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
                 "entidad": entidad_real,
                 "eps": g.eps,  # alias para compatibilidad (valor raw, sin resolver)
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "concepto_glosa": g.concepto_glosa,
@@ -288,7 +335,7 @@ def historial_paginado(
                 "id": g.id,
                 "eps": g.eps,
                 "entidad": entidad_real,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "concepto_glosa": g.concepto_glosa,
@@ -361,7 +408,7 @@ def exportar_json(
                 "id": g.id,
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
                 "eps": g.eps,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
@@ -1086,7 +1133,7 @@ def buscar_avanzado(
     Devuelve hasta `limit` resultados (default 50, max 500), ordenados
     DESC por creado_en.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     q = db.query(GlosaRecord)
     if eps:
@@ -1117,10 +1164,11 @@ def buscar_avanzado(
             raise HTTPException(400, "fecha_desde debe ser YYYY-MM-DD")
     if fecha_hasta:
         try:
-            dt = datetime.strptime(fecha_hasta, "%Y-%m-%d").replace(
+            # Ronda 30: inclusive del día completo (antes excluía el día 'hasta').
+            dt = (datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)).replace(
                 tzinfo=timezone.utc,
             )
-            q = q.filter(GlosaRecord.creado_en <= dt)
+            q = q.filter(GlosaRecord.creado_en < dt)
         except ValueError:
             raise HTTPException(400, "fecha_hasta debe ser YYYY-MM-DD")
 
@@ -1135,7 +1183,7 @@ def buscar_avanzado(
                 "id": g.id,
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
                 "eps": g.eps,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
@@ -1200,7 +1248,7 @@ def buscar_por_id_o_factura(
             "consecutivo_dgh": g.consecutivo_dgh,
             "numero_radicado": g.numero_radicado,
             "codigo_glosa": g.codigo_glosa,
-            "paciente": g.paciente,
+            "paciente": _paciente_visible(current_user, g),
             "valor_objetado": float(g.valor_objetado or 0),
             "estado": g.estado,
             "creado_en": g.creado_en.isoformat() if g.creado_en else None,
@@ -1726,8 +1774,10 @@ def dashboard_plata_recuperada(
             raise HTTPException(400, "desde debe ser YYYY-MM-DD")
     if hasta:
         try:
-            h = datetime.fromisoformat(hasta)
-            base_q = base_q.filter(GlosaRecord.creado_en <= h)
+            # Ronda 30: 'hasta' inclusive del día completo — antes 'YYYY-MM-DD'
+            # parseaba a medianoche 00:00 y excluía todo ese día.
+            h = datetime.strptime(hasta, "%Y-%m-%d") + timedelta(days=1)
+            base_q = base_q.filter(GlosaRecord.creado_en < h)
         except ValueError:
             raise HTTPException(400, "hasta debe ser YYYY-MM-DD")
 
@@ -2655,12 +2705,15 @@ def exportar_resumen_eps_csv(
         estado = (g.estado or "").upper()
         if estado in ESTADOS_CERRADOS:
             b["cerradas"] += 1
-            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
-                b["decididas"] += 1
-                if estado == "LEVANTADA":
-                    b["levantadas"] += 1
         else:
             b["abiertas"] += 1
+        # Ronda 30: RATIFICADA NO está en ESTADOS_CERRADOS, así que la rama
+        # anidada de decididas era código muerto — la EPS que ratifica sí
+        # DECIDIÓ. El conteo de decididas/levantadas va desanidado.
+        if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
 
     def _generar():
         buf = io.StringIO()
@@ -5586,6 +5639,12 @@ async def importar_recepcion(
     y tumbe la app (incidente 2026-05-19).
     """
     req_id = set_request_id()
+    # Ronda 30: validar el tamaño ANTES de cargar todo a RAM. archivo.size
+    # ya viene del multipart spooleado a disco por Starlette (no depende del
+    # Content-Length del cliente). En la VM de 1GB, un upload gigante hacía
+    # OOM justo al await read().
+    if archivo.size is not None and archivo.size > 15_000_000:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (>15 MB)")
     contenido = await archivo.read()
     if not contenido:
         raise HTTPException(status_code=400, detail="Archivo vacío")
@@ -7793,7 +7852,7 @@ def historicos_ganadores(
                     g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
                 ),
                 "auditor_email": g.auditor_email or "",
-                "paciente": g.paciente or "",
+                "paciente": _paciente_visible(current_user, g) or "",
             }
             for g in filas
         ],

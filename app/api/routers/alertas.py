@@ -97,3 +97,110 @@ def obtener_config_alertas(
         else [],
         "umbral_default": 5,
     }
+
+
+# ─── Motor de Vencimientos ───────────────────────────────────────────────
+# El semáforo tenía estado NEGRO para lo vencido y no disparaba nada: tres
+# facturas de junio por $20.054.751 se descubrieron 45 días tarde. Estos dos
+# endpoints exponen la capacidad del núcleo (`motor_vencimientos`), que
+# clasifica por urgencia y resuelve a quién le toca cada glosa.
+
+
+@router.get("/vencimientos")
+def tablero_vencimientos(
+    incluir_cerradas: bool = Query(False, description="Incluir glosas ya resueltas"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Fotografía del riesgo por vencimiento: cuántas, de qué urgencia y cuánta plata.
+
+    Funciona SIEMPRE, esté o no configurado el correo: es preferible que el
+    área vea el listado en pantalla a que nadie se entere.
+    """
+    from app.models.db import GlosaRecord
+    from app.services.motor_vencimientos import Destinatarios, Umbrales, evaluar
+
+    q = db.query(GlosaRecord)
+    if not incluir_cerradas:
+        q = q.filter(GlosaRecord.dias_restantes.isnot(None))
+    resumen = evaluar(q.all())
+
+    umbrales = Umbrales.desde_entorno()
+    destinatarios = Destinatarios.desde_entorno()
+    return {
+        **resumen.como_dict(),
+        "umbrales": {
+            "preventivo": umbrales.preventivo,
+            "alta": umbrales.alta,
+            "critica": umbrales.critica,
+        },
+        "avisos_configurados": destinatarios.hay_alguno,
+        "escalamiento_configurado": destinatarios.hay_escalamiento,
+    }
+
+
+@router.post("/vencimientos/notificar")
+def notificar_vencimientos(
+    simular: bool = Query(True, description="Solo mostrar a quién se avisaría, sin enviar"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Avisa a cada responsable de lo suyo: un correo por persona, no por glosa.
+
+    Por defecto SIMULA (`simular=true`): devuelve a quién le llegaría qué, sin
+    enviar nada. Es la forma segura de estrenar la configuración.
+    """
+    from app.models.db import GlosaRecord
+    from app.services.motor_vencimientos import (
+        Destinatarios,
+        agrupar_por_destinatario,
+        evaluar,
+    )
+
+    destinatarios = Destinatarios.desde_entorno()
+    if not destinatarios.hay_alguno:
+        return {
+            "enviados": 0,
+            "simulado": simular,
+            "detalle": (
+                "No hay destinatarios configurados. Definí VENCIMIENTOS_CORREO_ALTA, "
+                "_CRITICA y _VENCIDA (o dejá VENCIMIENTOS_CORREO_GESTOR=1) antes de "
+                "activar los avisos."
+            ),
+            "bandejas": {},
+        }
+
+    resumen = evaluar(db.query(GlosaRecord).filter(GlosaRecord.dias_restantes.isnot(None)).all())
+    bandejas = agrupar_por_destinatario(resumen, destinatarios)
+
+    plan = {
+        correo: {
+            "total": len(items),
+            "por_urgencia": {
+                n: len([i for i in items if i.urgencia.value == n])
+                for n in ("VENCIDA", "CRITICA", "ALTA", "PREVENTIVO")
+            },
+        }
+        for correo, items in bandejas.items()
+    }
+
+    if simular:
+        return {"enviados": 0, "simulado": True, "bandejas": plan}
+
+    servicio = AlertaService()
+    enviados, fallidos = 0, []
+    for correo, items in bandejas.items():
+        try:
+            ok, msg = servicio.email_service.enviar_alerta_glosas(
+                [i.glosa for i in items],
+                dias_limite=max((i.dias_restantes or 0) for i in items),
+                destinatarios=[correo],
+            )
+            if ok:
+                enviados += 1
+            else:
+                fallidos.append({"correo": correo, "error": msg})
+        except Exception as e:  # el fallo de un correo no puede tumbar el resto
+            fallidos.append({"correo": correo, "error": str(e)[:200]})
+
+    return {"enviados": enviados, "simulado": False, "fallidos": fallidos, "bandejas": plan}

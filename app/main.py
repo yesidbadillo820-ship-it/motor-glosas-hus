@@ -211,6 +211,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN creado_en: {e}")
 
     try:
@@ -219,6 +223,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN activo INTEGER DEFAULT 1"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN activo: {e}")
 
     try:
@@ -227,6 +235,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'AUDITOR'"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN rol: {e}")
 
     try:
@@ -235,6 +247,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN workload INTEGER DEFAULT 100"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN workload: {e}")
 
     try:
@@ -243,6 +259,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN nota_workflow TEXT"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN nota_workflow: {e}")
 
     # Campo must_change_password (forzar cambio en primer login)
@@ -256,6 +276,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN must_change_password: {e}")
 
     # Campo password_changed_at (timestamp último cambio)
@@ -265,6 +289,10 @@ async def lifespan(app: FastAPI):
             db.execute(text(f"ALTER TABLE usuarios ADD COLUMN password_changed_at {_TS_TIPO}"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN password_changed_at: {e}")
 
     # Campo equipo (agrupación de usuarios que comparten bandeja)
@@ -274,6 +302,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN equipo VARCHAR(50)"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN equipo: {e}")
 
     try:
@@ -282,6 +314,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE historial ADD COLUMN numero_radicado VARCHAR(50)"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
     try:
@@ -294,6 +330,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN historial: {e}")
 
     _HISTORIAL_MISSING_COLUMNS = [
@@ -360,6 +400,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE historial ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
 
     # Índice idempotente sobre numero_nota_credito (declarado index=True en
@@ -374,6 +418,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
 
     # Índices idempotentes para caminos calientes de historial (auditoría
@@ -389,7 +437,60 @@ async def lifespan(app: FastAPI):
                 )
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
+
+    # Pre-auditoría v2: la tabla `preaud_facturas` cambió de forma
+    # oficio-céntrica (Modelo A, con `oficio_id`) a factura canónica (Modelo B,
+    # con `num_subsanacion`). create_all() NO altera una tabla existente, así
+    # que si quedó el esquema viejo Y está vacía, la recreamos con la forma
+    # nueva. Si tuviera datos, se avisa para migración manual (no se destruye).
+    try:
+        if (
+            _tiene_tabla("preaud_facturas")
+            and _tiene_columna("preaud_facturas", "oficio_id")
+            and not _tiene_columna("preaud_facturas", "num_subsanacion")
+        ):
+            _n_preaud = db.execute(text("SELECT COUNT(*) FROM preaud_facturas")).scalar() or 0
+            if _n_preaud == 0:
+                logger.warning(
+                    "MIGRACIÓN pre-auditoría: recreando preaud_facturas con el esquema v2"
+                )
+                db.execute(text("DROP TABLE preaud_facturas"))
+                db.commit()
+                from app.models.db import FacturaPreauditoriaRecord
+
+                FacturaPreauditoriaRecord.__table__.create(bind=engine)
+            else:
+                logger.warning(
+                    "preaud_facturas tiene datos con esquema v1; requiere migración manual a v2"
+                )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría v2: {e}")
+
+    # Pre-auditoría: la observación que escribe el auditor ahora también queda
+    # en el historial de la factura (antes solo se guardaba el motivo de las
+    # devoluciones y lo escrito al radicar se perdía).
+    try:
+        if _tiene_tabla("preaud_factura_eventos") and not _tiene_columna(
+            "preaud_factura_eventos", "observaciones"
+        ):
+            logger.warning("MIGRACIÓN pre-auditoría: agregando observaciones a los eventos")
+            db.execute(text("ALTER TABLE preaud_factura_eventos ADD COLUMN observaciones TEXT"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría observaciones: {e}")
 
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
@@ -414,6 +515,10 @@ async def lifespan(app: FastAPI):
                     )
                     db.commit()
             except Exception as e:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
                 logger.warning(f"MIGRACIÓN resize {col_name}: {e}")
 
     # Migraciones para usuarios - 2FA TOTP
@@ -428,6 +533,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
     # Migraciones para conciliaciones - trazabilidad bilateral
@@ -453,6 +562,10 @@ async def lifespan(app: FastAPI):
                 )
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
 
     # Migraciones para tarifas_contratadas - soporte formulaic (SOAT %)
@@ -476,6 +589,10 @@ async def lifespan(app: FastAPI):
                 )
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN tarifas_contratadas {col_name}: {e}")
 
     # Migraciones para conceptos_glosa (Ronda 50 — bug #4 DGH)
@@ -492,6 +609,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE conceptos_glosa ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN conceptos_glosa {col_name}: {e}")
 
     # Migraciones para contratos (PDF + cláusulas extraídas con IA)
@@ -525,6 +646,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN contratos {col_name}: {e}")
 
     # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
@@ -545,6 +670,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
     # Vacaciones / delegacion temporal: 4 columnas opcionales
@@ -561,6 +690,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
     db.close()
@@ -822,7 +955,7 @@ async def lifespan(app: FastAPI):
             if not archivo_hus.exists():
                 logger.warning(
                     f"[SEED-HUS] archivo no encontrado en {archivo_hus} — "
-                    "el banco HUS NO se cargará. Verificar COPY data/ en Dockerfile."
+                    "el banco HUS NO se cargará. Verificar COPY data/*.json en Dockerfile."
                 )
             else:
                 with archivo_hus.open(encoding="utf-8") as _fh:
@@ -1099,6 +1232,7 @@ from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.vida import router as vida_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
 from app.api.routers.asistente_predictivo import router as asistente_predictivo_router
@@ -1158,6 +1292,7 @@ app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
+app.include_router(vida_router)  # Capa de Vida (ronda 32): saludo + celebraciones
 app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)
 app.include_router(versiones_router)
@@ -1215,6 +1350,9 @@ app.include_router(tareas_diarias_router)
 from app.api.routers.nota_credito import router as nota_credito_router
 
 app.include_router(nota_credito_router)
+from app.api.routers.preauditoria import router as preauditoria_router
+
+app.include_router(preauditoria_router)
 # auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 
@@ -1227,3 +1365,10 @@ app.include_router(diagnostico_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)
+
+# Lotes de portal (Fase 1 app unificada): subida del Excel consolidado
+# + cola del agente local que corre los bots en el PC del hospital.
+from app.api.routers.lotes import router as lotes_router, agente_router as agente_lotes_router
+
+app.include_router(lotes_router)
+app.include_router(agente_lotes_router)

@@ -51,6 +51,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.db import ConceptoGlosaRecord, GlosaRecord
+from app.utils.excel_seguro import sanear_celda_excel
 
 try:
     from openpyxl import Workbook
@@ -534,7 +535,10 @@ def generar_excel_dgh(
     filas = generar_filas_dgh(db, glosas, fecha_cargue=fecha_cargue)
     for i, fila in enumerate(filas, start=2):
         for col_idx, col in enumerate(COLUMNAS_DGH, start=1):
-            v = fila.get(col, "")
+            # Ronda 30: sanear — un carácter de control en cualquier
+            # observación tumbaba todo el export (IllegalCharacterError) y el
+            # texto de la EPS/dictamen podía inyectar fórmulas.
+            v = sanear_celda_excel(fila.get(col, ""))
             ws.cell(row=i, column=col_idx, value=v)
 
     # Ancho básico por columna

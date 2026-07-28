@@ -1246,6 +1246,51 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "el medicamento facturado según historia clínica",
     ),
+    # ── Ronda 33 — costuras nuevas del placeholder (dictámenes PPL 22-jul) ──
+    # "RESPECTO DEL PROCEDIMIENTO FACTURADO CON EL PROCEDIMIENTO FACTURADO
+    # SEGÚN HISTORIA CLÍNICA": el modelo escribió "el procedimiento facturado
+    # con CUPS <factura>" y la malla CUPS convirtió el segundo tramo en el
+    # placeholder → tartamudeo con conector en el medio. Conservamos el
+    # primer tramo (con su mayúscula original, vía backreference).
+    (
+        re.compile(
+            r"\b((?:el|del)\s+procedimiento\s+facturado)\s+"
+            r"(?:con|de|del|por)\s+el\s+procedimiento\s+facturado\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    # Variante sin conector: "el procedimiento facturado el procedimiento
+    # facturado" (la v5 de ronda 16 solo cubría combos con sufijo "según
+    # historia clínica" o mezcla procedimiento/medicamento).
+    (
+        re.compile(
+            r"\b((?:el|del)\s+procedimiento\s+facturado)\s+el\s+procedimiento\s+facturado\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    # "descripción detallada de los servicios el procedimiento facturado
+    # según historia clínica": el placeholder reemplazó un "CUPS NNN" que
+    # venía pegado a "los servicios" y la frase quedó descosida. La
+    # reparación gramatical mínima es "los servicios facturados".
+    (
+        re.compile(
+            r"\b(los\s+servicios)\s+el\s+procedimiento\s+facturado\b",
+            re.IGNORECASE,
+        ),
+        r"\1 facturados",
+    ),
+    # "a nombre de el fondo/de el paciente" — contracción rota que la IA
+    # produce al ensamblar el adquirente (dictamen PPL 22-jul). Acotado a
+    # "de el" + artículo de entidad/persona para no tocar títulos citados.
+    (
+        re.compile(
+            r"\b([dD])e\s+el\s+(fondo|paciente|prestador|contrato|expediente|hospital)\b",
+            re.IGNORECASE,
+        ),
+        r"\1el \2",
+    ),
     # ── Ronda 16 — Bug B v6: palabra duplicada consecutiva ──
     # Casos 26-jun: la IA escribió "la glosa aplicada aplicada por SURA",
     # "según según el contrato", "el el código CUPS". Limpiamos cualquier
@@ -3040,6 +3085,55 @@ def _neutralizar_cups_falsos(texto: str) -> str:
     return resultado
 
 
+def _neutralizar_cups_igual_factura(texto: str, numero_factura: str | None) -> str:
+    """Ronda 32 (22-jul-2026): la IA usa el NÚMERO DE FACTURA como CUPS.
+
+    Evidencia: los 4 casos de prueba del 22-jul citaron "CUPS 224871",
+    "CUPS 225930", "CUPS 219004" y "CUPS 220617" — todos números de factura,
+    ninguno un código de servicio. La red estática (_neutralizar_cups_falsos)
+    no puede atraparlos: una factura de 6 dígitos es indistinguible de un
+    CUPS real de 6 dígitos sin conocer la factura del expediente. Acá SÍ la
+    conocemos: si el número citado como CUPS coincide con los dígitos de la
+    factura → "el procedimiento facturado".
+    """
+    if not texto or not (numero_factura or "").strip():
+        return texto
+    # Corridas de dígitos significativas de la factura: "HUS0000224871" →
+    # {"0000224871", "224871"} (con y sin ceros a la izquierda). Se excluyen
+    # las corridas de 4 dígitos que parecen AÑO ("FE-2026-15" → "2026"): un
+    # "CUPS 2026" ya lo neutraliza la red estática de 3-4 dígitos, y así esta
+    # red no le pisa el reemplazo (revisión adversarial 22-jul).
+    corridas: set[str] = set()
+    for run in re.findall(r"\d{4,}", str(numero_factura)):
+        corridas.add(run)
+        corridas.add(run.lstrip("0"))
+    corridas = {c for c in corridas if len(c) >= 4 and not re.fullmatch(r"(?:19|20)\d\d", c)}
+    if not corridas:
+        return texto
+    alternativas = "|".join(sorted((re.escape(c) for c in corridas), key=len, reverse=True))
+    # Marcador "N°/No./Nro." opcional (la clase incluye la O: "CUPS No. 224871"
+    # es la abreviatura más común y la versión inicial no la cubría). El
+    # lookahead final excluye enumeraciones ("CUPS 224871, 890201 y 890301"):
+    # consumir ahí la palabra CUPS dejaría huérfanos los códigos reales.
+    pat = re.compile(
+        r"(?:C[ÓO]DIGO\s+)?CUPS\s*[:\-#]?\s*(?:N[°ºO\.]{0,2}\s*)?(?:HUS)?0*(?:"
+        + alternativas
+        + r")\b(?![\d\-])(?!\s*,\s*\d)",
+        re.IGNORECASE,
+    )
+    resultado, n = pat.subn("el procedimiento facturado", texto)
+    if n:
+        # Limpieza gramatical de residuos ("EL el ...", "del el ...").
+        resultado = re.sub(r"\b(facturado|facturada)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
+        resultado = re.sub(r"\b(el|la|del|de\s+la)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
+        resultado = re.sub(r"\b(del|al)\s+el\b", r"\1", resultado, flags=re.IGNORECASE)
+        logger.warning(
+            f"[CUPS-FACTURA] {n} mención(es) del número de factura citado como CUPS "
+            "neutralizadas en el dictamen final (ronda 32)."
+        )
+    return resultado
+
+
 # ── Ronda 22: normas citadas para el TEMA EQUIVOCADO (alucinación grave) ──
 # Yesid 30-jun (caso ECOOPSOS): el dictamen citó "Ley 1388/2010 que garantiza
 # la atención integral a población con discapacidad auditiva" — pero la Ley
@@ -3996,6 +4090,31 @@ def generar_texto_extemporanea(dias: int) -> str:
     )
 
 
+def generar_texto_extemporanea_condicional(dias: int, fecha_inicio: str, fecha_glosa: str) -> str:
+    """Ronda 32: variante CONDICIONAL para fechas INFERIDAS del texto.
+
+    Cuando las fechas no vienen confirmadas en el formulario sino leídas del
+    texto de la glosa (extemporaneidad_texto), NO se puede radicar el texto
+    canónico categórico de generar_texto_extemporanea(): (1) afirma la
+    aceptación tácita como hecho consumado sobre fechas no verificadas,
+    (2) arrastra el cierre institucional reservado a RE95xx/RE96xx
+    (directiva mayo-2026, ver limpiar_cierre_extemporanea_indebido), y
+    (3) cita el Art. 57 Ley 1438 — cita que en glosas ARL choca con la
+    regla de régimen. Esta variante condiciona todo a la confirmación de
+    las fechas, sin cierre ni cita normativa (el auditor las agrega al
+    confirmar fechas y régimen del pagador).
+    """
+    return (
+        f"DE CONFIRMARSE LAS FECHAS QUE REGISTRA EL TEXTO DE LA GLOSA "
+        f"(FACTURA: {fecha_inicio}; GLOSA: {fecha_glosa}), LA OBJECIÓN HABRÍA SIDO "
+        f"FORMULADA {dias} DÍAS HÁBILES DESPUÉS, SUPERANDO EL PLAZO LEGAL DE 20 DÍAS "
+        f"HÁBILES PREVISTO PARA LA FORMULACIÓN DE GLOSAS. EN TAL CASO HABRÍA OPERADO "
+        f"LA ACEPTACIÓN TÁCITA DE LA FACTURA Y PROCEDERÍA EL LEVANTAMIENTO DE LA "
+        f"OBJECIÓN POR EXTEMPORÁNEA. SE SOLICITA A LA ENTIDAD ACREDITAR LA FECHA DE "
+        f"RADICACIÓN DE LA FACTURA Y LA FECHA DE NOTIFICACIÓN DE LA GLOSA."
+    )
+
+
 # Keywords que identifican ASEGURADORAS SOAT/ARL/PÓLIZAS sin contrato (pagos
 # bajo Manual Tarifario SOAT vigente — Circular 047/2025 MinSalud + UVB 2026 $12.110).
 # Estas entidades son muy estrictas con tarifas; si no se cita la normativa
@@ -4260,6 +4379,7 @@ class GlosaService:
         valor_raw = self._extraer_valor(texto_base)
 
         msg_tiempo, color_tiempo, dias = "Fechas no ingresadas", "bg-slate-500", 0
+        _ext_texto_det = None  # Ronda 32: extemporaneidad INFERIDA del texto
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
                 dias_calc = self._calcular_dias_habiles(
@@ -4284,6 +4404,37 @@ class GlosaService:
                     color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
             except Exception as e:
                 logger.error(f"Error fechas: {e}")
+        else:
+            # Ronda 32 (22-jul-2026, caso 3 de las pruebas): el formulario
+            # venía sin fechas pero el TEXTO de la glosa las traía (factura
+            # 02/04/2026, glosa 28/05/2026 ≈ 38 hábiles) y el motor perdió
+            # el argumento de extemporaneidad. Fallback conservador: leer
+            # SOLO fechas etiquetadas del texto. La señal es INFERIDA → NO
+            # reemplaza el dictamen de fondo (eso queda reservado a fechas
+            # confirmadas del formulario, `dias` sigue en 0): badge ámbar +
+            # sección adicional de extemporaneidad al final del dictamen.
+            try:
+                from app.services.extemporaneidad_texto import (
+                    detectar_extemporaneidad_en_texto,
+                )
+
+                _ext_texto_det = detectar_extemporaneidad_en_texto(texto_base)
+            except Exception as _e_ext_txt:
+                logger.debug(f"[EXT-TEXTO] detección no aplicada: {_e_ext_txt}")
+            if _ext_texto_det and _ext_texto_det["es_extemporanea"]:
+                msg_tiempo = (
+                    f"POSIBLE EXTEMPORÁNEA ({_ext_texto_det['dias_habiles']} DÍAS "
+                    "HÁBILES SEGÚN FECHAS DEL TEXTO — VERIFICAR)"
+                )
+                color_tiempo = "bg-amber-500"
+                logger.info(
+                    "[EXT-TEXTO] posible extemporaneidad inferida del texto: "
+                    f"{_ext_texto_det['fecha_inicio']} → {_ext_texto_det['fecha_glosa']} "
+                    f"= {_ext_texto_det['dias_habiles']} hábiles "
+                    f"({_ext_texto_det['etiqueta_inicio']} / {_ext_texto_det['etiqueta_glosa']})"
+                )
+            else:
+                _ext_texto_det = None  # dentro de términos o sin señal → nada
 
         # CORRECCIÓN: inicializar tipo_glosa antes de usarlo para evitar UnboundLocalError
         tipo_glosa = self._determinar_tipo_glosa(prefijo, texto_base)
@@ -6389,6 +6540,23 @@ class GlosaService:
             except Exception as _e_cf:
                 logger.debug(f"[CUPS-FALSO] red final no aplicada: {_e_cf}")
 
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 32 (22-jul-2026) — RED FINAL factura citada como CUPS.
+            #  Evidencia: los 4 casos de prueba del 22-jul ("CUPS 224871",
+            #  "CUPS 225930", "CUPS 219004", "CUPS 220617") — en todos el
+            #  número citado era la FACTURA. La red estática no distingue
+            #  una factura de 6 dígitos de un CUPS real; esta compara
+            #  contra la factura del expediente, que sí conocemos.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_cups_factura = _neutralizar_cups_igual_factura(
+                    dictamen, str(getattr(data, "numero_factura", "") or "")
+                )
+                if _dictamen_sin_cups_factura != dictamen:
+                    dictamen = _dictamen_sin_cups_factura
+            except Exception as _e_cfx:
+                logger.debug(f"[CUPS-FACTURA] red final no aplicada: {_e_cfx}")
+
             # Ronda 22 — RED FINAL: norma citada para el tema equivocado
             # (caso ECOOPSOS: Ley 1388/2010 —cáncer— citada para discapacidad
             # auditiva). Defensa en profundidad de la regla 8.terdecies.
@@ -6812,6 +6980,42 @@ class GlosaService:
                     score = max(0, score - 6)
         except Exception as _e_lit:
             logger.debug(f"[DEFENSA-CLINICA-DEBIL] no auditada: {_e_lit}")
+
+        # ── Ronda 32 (22-jul-2026): extemporaneidad INFERIDA del texto ──
+        # Solo sobre dictámenes generados por IA en modo defensa (los
+        # caminos texto_fijo / plantilla / directo_auditor tienen textos
+        # curados que no se tocan). El argumento va como sección ADICIONAL
+        # con redacción CONDICIONAL (generar_texto_extemporanea_condicional):
+        # las fechas se leyeron del texto, no del formulario, así que nada
+        # se afirma como hecho consumado y SIEMPRE se pide verificación
+        # humana antes de radicar. Si el auditor confirma las fechas en el
+        # formulario y reanaliza, ahí sí corre el camino canónico RE9502.
+        try:
+            if (
+                _ext_texto_det
+                and modelo_usado not in ("texto_fijo", "plantilla", "directo_auditor")
+                and modo_resp == "defender"
+            ):
+                _dias_ext = int(_ext_texto_det["dias_habiles"])
+                _seccion_ext = (
+                    '<div style="background:#fef3c7;border-left:4px solid #d97706;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#92400e;margin:0 0 8px 0;">DEFENSA ADICIONAL — '
+                    f"POSIBLE EXTEMPORANEIDAD ({_dias_ext} DÍAS HÁBILES)</h4>"
+                    '<p style="font-size:11px;color:#b45309;margin:0 0 10px 0;">'
+                    "Fechas leídas del TEXTO de la glosa: "
+                    f"{_ext_texto_det['fecha_inicio']} ({_ext_texto_det['etiqueta_inicio']}) → "
+                    f"{_ext_texto_det['fecha_glosa']} ({_ext_texto_det['etiqueta_glosa']}). "
+                    "⚠ Verificá estas fechas contra el expediente antes de radicar. "
+                    "Si se confirman, ingresalas en el formulario y reanalizá para "
+                    "emitir la respuesta canónica por extemporaneidad.</p>"
+                    '<p style="font-size:13px;line-height:1.7;color:#78350f;">'
+                    f"{generar_texto_extemporanea_condicional(_dias_ext, _ext_texto_det['fecha_inicio'], _ext_texto_det['fecha_glosa'])}"
+                    "</p></div>"
+                )
+                dictamen = dictamen + _seccion_ext
+        except Exception as _e_ext_sec:
+            logger.debug(f"[EXT-TEXTO] sección adicional no agregada: {_e_ext_sec}")
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
@@ -8596,7 +8800,8 @@ class GlosaService:
                 return respuesta, modelo
 
             # 2) Caché persistente en BD (si hay sesión global disponible)
-            cached_db = _buscar_cache_ia_db(clave_cache)
+            # Ronda 30: query SQLAlchemy sync fuera del event loop.
+            cached_db = await asyncio.to_thread(_buscar_cache_ia_db, clave_cache)
             if cached_db is not None:
                 respuesta, modelo = cached_db
                 async with _CACHE_IA_LOCK:
@@ -8684,7 +8889,7 @@ class GlosaService:
                     modelo = f"{modelo} [degradado]"[:80]
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
-                _guardar_cache_ia_db(clave_cache, content, modelo)
+                await asyncio.to_thread(_guardar_cache_ia_db, clave_cache, content, modelo)
                 return content, modelo
             except Exception as e:
                 ultimo_error = e

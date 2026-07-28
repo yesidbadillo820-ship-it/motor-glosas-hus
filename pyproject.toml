@@ -11,6 +11,13 @@ exclude = [
     "alembic/versions/",
     "__pycache__",
     ".venv",
+    # Documentación: desde ruff 0.16 el formateador entra a los bloques
+    # ```python de los archivos Markdown. Los ejemplos de docs/ son bocetos de
+    # API para leer (firmas de una línea con su comentario alineado), no
+    # módulos compilables: reformatearlos los vuelve ilegibles y rompe el CI
+    # de cualquier rama que solo agregue documentación.
+    "docs/",
+    "*.md",
 ]
 
 [tool.ruff.lint]

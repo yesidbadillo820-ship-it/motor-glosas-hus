@@ -34,7 +34,11 @@ async def _ejecutar_safe() -> None:
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
 
-        stats = get_indexer().rebuild()
+        # Ronda 30: rebuild() recorre el share CIFS completo (IO/CPU-bound).
+        # Corría síncrono dentro de esta corrutina y bloqueaba el event loop
+        # —congelando TODO el sitio— durante el build inicial al arranque y
+        # cada reindex. Se ejecuta en un thread aparte.
+        stats = await asyncio.to_thread(get_indexer().rebuild)
         logger.info(
             f"[SOPORTES-REINDEX] OK: {stats['archivos_indexados']} archivos / "
             f"{stats['facturas_indexadas']} facturas"
