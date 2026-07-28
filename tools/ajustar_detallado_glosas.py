@@ -5,12 +5,12 @@ Automatiza el trabajo manual de depurar los "detallados de factura" antes de
 armar la respuesta a la entidad. En una sola corrida:
 
   1. Lee el **consolidado** de facturas a trabajar y le **quita los duplicados**.
-  2. Abre el **Excel del detallado** (el que baja el sistema con una hoja por
-     factura, que trae más facturas de las que se van a trabajar) y **borra las
-     hojas de las facturas que no están en el consolidado**.
-  3. En cada hoja que queda: **quita el encabezado institucional** (logo, dirección,
-     NIT, ciudad, QR, CUFE, "Página 1/1") y cambia el título
-     "FACTURA ELECTRONICA DE" por **"DETALLADO DE FACTURA"**.
+  2. Abre el **Excel del detallado** (el que baja el sistema con todas las
+     facturas del lote apiladas una tras otra, muchas más de las que se van a
+     trabajar) y **borra las facturas que no están en el consolidado**.
+  3. **Quita el encabezado institucional** (logo, dirección, NIT, ciudad, QR,
+     CUFE, "Página 1/1") y cambia el título "FACTURA ELECTRONICA DE VENTA" por
+     **"DETALLADO DE FACTURA"** en cada factura que queda.
   4. Cruza cada ítem contra el **ReporteGlosasReclamPAQUETE NNNNN.xlsx** (lo que
      la entidad aprobó vs. lo que sigue glosando) y:
        - **quita** los ítems que la entidad ya aprobó (valor glosado = 0),
@@ -90,6 +90,27 @@ MARCA_COPAGO_USUARIO = "VALOR CUOTA DE COPAGO Y/O CUOTA MODERADORA ASUMIDA POR E
 MARCA_TOTAL_ORDEN = "VALOR TOTAL ORDEN DE SERVICIO"
 MARCA_TOTAL_LETRAS = "TOTAL:"
 
+# Pie que el sistema imprime UNA vez al final del archivo (texto legal, nombre
+# del reporte, licencia). No pertenece a ninguna factura y no se toca.
+MARCAS_PIE_ARCHIVO = (
+    "AUTORIZACION FACTURA ELECTRONICA DE VENTA RESOLUCION",
+    "LA PRESENTE FACTURA SE ASIMILA",
+    "UNA VEZ VENCIDO EL PLAZO",
+    "POR LA SUPERINTENDENCIA BANCARIA",
+    "NOMBRE REPORTE",
+    "LICENCIADO A:",
+)
+
+# Membrete del hospital: lo que hay que quitar del detallado.
+_PATRONES_MEMBRETE = (
+    r"CARR+ERA 33 ?# ?28",
+    r"\bNIT 900\.?006\.?037",
+    r"^BUCARAMANGA$",
+    r"\bPAGINA \d+ ?/ ?\d+",
+    r"\bCUFE\b",
+    r"^[0-9A-F]{60,}$",  # la línea del CUFE cuando viene sin el rótulo
+)
+
 # Encabezados de la tabla de ítems del detallado (tolerante a variantes).
 _ALIAS_COL_ITEM: dict[str, tuple[str, ...]] = {
     "codigo": ("CODIGO", "COD", "COD.", "CODIGO SERVICIO"),
@@ -155,10 +176,20 @@ def _norm_desc(s) -> str:
 
 
 def _norm_codigo(s) -> str:
-    """Clave para comparar códigos: sin espacios ni puntos, en mayúsculas."""
-    t = _norm(s)
-    t = re.sub(r"[\s.]+", "", t)
-    return t
+    """Clave para comparar códigos entre la factura y el reporte del ADRES.
+
+    Los dos sistemas escriben el mismo código con distinto relleno de ceros:
+    la factura dice ``19935303-4`` y el reporte ``19935303-04``. Se quitan
+    espacios y puntos y se normalizan los ceros a la izquierda de cada tramo.
+    """
+    t = re.sub(r"[\s.]+", "", _norm(s))
+    if not t:
+        return ""
+    tramos = []
+    for tramo in t.split("-"):
+        sin_ceros = tramo.lstrip("0")
+        tramos.append(sin_ceros if sin_ceros else "0")
+    return "-".join(tramos)
 
 
 def _parse_valor(v) -> float:
@@ -272,11 +303,9 @@ def _letras_miles(n: int, apocope: bool = False) -> str:
     return " ".join(p for p in partes if p)
 
 
-def numero_a_letras(valor: float) -> str:
-    """95200 → 'NOVENTA Y CINCO MIL DOSCIENTOS PESOS M/CTE'."""
-    n = int(round(abs(_parse_valor(valor))))
+def _letras_entero(n: int) -> str:
     if n == 0:
-        return "CERO PESOS M/CTE"
+        return "CERO"
     millones, resto = divmod(n, 1_000_000)
     partes = []
     if millones == 1:
@@ -285,7 +314,20 @@ def numero_a_letras(valor: float) -> str:
         partes.append(_letras_miles(millones, apocope=True) + " MILLONES")
     if resto:
         partes.append(_letras_miles(resto))
-    return " ".join(p for p in partes if p) + " PESOS M/CTE"
+    return " ".join(p for p in partes if p)
+
+
+def numero_a_letras(valor: float) -> str:
+    """2096754 → 'DOS MILLONES ... CUATRO PESOS CON CERO CTVS M/Cte.'
+
+    Reproduce el mismo texto que imprime el sistema en la fila 'TOTAL:'.
+    """
+    total = abs(_parse_valor(valor))
+    pesos = int(total)
+    ctvs = int(round((total - pesos) * 100))
+    if ctvs == 100:  # 1234,999 → 1235,00
+        pesos, ctvs = pesos + 1, 0
+    return f"{_letras_entero(pesos)} PESOS CON {_letras_entero(ctvs)} CTVS M/Cte."
 
 
 # ─── Modelo ──────────────────────────────────────────────────────────────────
@@ -318,7 +360,7 @@ class ItemDetallado:
     """Un ítem (servicio/insumo) dentro de la hoja del detallado."""
 
     fila: int
-    filas: list[int]  # la fila del ítem + las de continuación del nombre
+    filas: list[int]  # todas las filas que ocupa (los merges son verticales)
     grupo: str
     codigo: str
     nombre: str
@@ -326,6 +368,10 @@ class ItemDetallado:
     vr_unit: float
     vr_pac: float
     vr_ent: float
+    # Celdas reales donde escribir cuando el ítem se ajusta (resueltas por
+    # solapamiento de rangos combinados, no por índice de columna).
+    celda_cantidad: Celda | None = None
+    celda_vr_ent: Celda | None = None
 
 
 @dataclass
@@ -353,8 +399,9 @@ class ResultadoItem:
     accion: str = ""  # QUITADO | AJUSTADO | CONSERVADO | SIN_CRUCE
     cant_nueva: float = 0.0
     vr_ent_nuevo: float = 0.0
-    cruce: str = ""  # codigo | descripcion | valor_unitario | (vacío)
+    cruce: str = ""  # codigo | descripcion | descripcion~ | cantidad+valor | valor
     filas_reporte: int = 0
+    causales: str = ""
     observacion: str = ""
 
 
@@ -371,6 +418,10 @@ class ResultadoHoja:
     subtotal_antes: float = 0.0
     subtotal_despues: float = 0.0
     detalle: list[ResultadoItem] = field(default_factory=list)
+    # Glosas del reporte que no encontraron su ítem en el detallado, y glosas
+    # a la reclamación completa (que no corresponden a ningún ítem).
+    glosas_sin_item: list = field(default_factory=list)
+    reclamacion: list = field(default_factory=list)
     observacion: str = ""
 
 
@@ -539,123 +590,270 @@ def leer_reporte_glosas(ruta: Path, paquete: str | None = None) -> dict[str, lis
 
 
 # ─── 3) Lectura de la hoja del detallado ─────────────────────────────────────
+#
+# El detallado que baja el sistema NO trae una hoja por factura: trae UNA hoja
+# con todas las facturas apiladas, y cada celda visible es en realidad un
+# *rango combinado* (merge). Peor: los merges del encabezado de la tabla y los
+# de los ítems NO están alineados —leer "VR ENT" en la columna del rótulo
+# devuelve el valor de "VR PAC"—, así que las columnas se resuelven por
+# solapamiento de rangos, no por índice de columna.
 
 
-def _ancla_merge(ws, fila: int, col: int) -> tuple[int, int]:
-    """Si la celda está combinada, devuelve la celda superior izquierda."""
-    for rango in ws.merged_cells.ranges:
-        if rango.min_row <= fila <= rango.max_row and rango.min_col <= col <= rango.max_col:
-            return rango.min_row, rango.min_col
-    return fila, col
+@dataclass
+class Celda:
+    """Un valor de la hoja con el rango de filas/columnas que ocupa."""
+
+    fila: int
+    fila_fin: int
+    col: int
+    col_fin: int
+    valor: object
+
+    @property
+    def texto(self) -> str:
+        return "" if self.valor is None else str(self.valor).strip()
 
 
-def _leer(ws, fila: int, col: int):
-    f, c = _ancla_merge(ws, fila, col)
-    return ws.cell(row=f, column=c).value
+class IndiceHoja:
+    """Índice de la hoja: celdas por fila y rangos combinados.
 
+    Se arma una sola vez por hoja (O(celdas)); sin él, resolver cada celda
+    combinada costaría un barrido de los ~22.000 merges que trae cada archivo.
+    """
 
-def _escribir(ws, fila: int, col: int, valor) -> None:
-    f, c = _ancla_merge(ws, fila, col)
-    ws.cell(row=f, column=c).value = valor
-
-
-def _buscar_fila(ws, marca: str, desde: int = 1, hasta: int | None = None) -> tuple[int, int]:
-    """(fila, columna) de la primera celda cuyo texto empieza por `marca`."""
-    marca_n = _norm(marca)
-    hasta = hasta or ws.max_row
-    for fila in ws.iter_rows(min_row=desde, max_row=hasta):
-        for celda in fila:
+    def __init__(self, ws):
+        self.ws = ws
+        self.anclas: dict[tuple[int, int], tuple[int, int]] = {}
+        for r in ws.merged_cells.ranges:
+            self.anclas[(r.min_row, r.min_col)] = (r.max_row, r.max_col)
+        por_fila: dict[int, list[Celda]] = {}
+        for (fila, col), celda in ws._cells.items():
             if celda.value is None:
                 continue
-            texto = _norm(celda.value)
-            if texto.startswith(marca_n):
-                return celda.row, celda.column
-    return -1, -1
+            fila_fin, col_fin = self.anclas.get((fila, col), (fila, col))
+            por_fila.setdefault(fila, []).append(Celda(fila, fila_fin, col, col_fin, celda.value))
+        for celdas in por_fila.values():
+            celdas.sort(key=lambda c: c.col)
+        self.por_fila = por_fila
+        self.max_fila = max(por_fila) if por_fila else 0
+
+    def celdas(self, fila: int) -> list[Celda]:
+        return self.por_fila.get(fila, [])
+
+    def texto_fila(self, fila: int) -> str:
+        return " ".join(c.texto for c in self.celdas(fila) if c.texto)
+
+    def escribir(self, celda: Celda, valor) -> None:
+        self.ws.cell(row=celda.fila, column=celda.col).value = valor
+        celda.valor = valor
 
 
-def _celdas_con_texto(ws, fila: int) -> list[tuple[int, str]]:
-    out = []
-    for celda in ws[fila]:
-        if celda.value is None:
+def _solapamiento(a: tuple[int, int], b: tuple[int, int]) -> int:
+    return max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
+
+
+def mapear_por_solapamiento(
+    cabeceras: list[tuple[str, tuple[int, int]]], celdas: list[Celda]
+) -> dict[str, Celda]:
+    """Asigna cada rótulo del encabezado a la celda del ítem que le corresponde.
+
+    Criterio: mayor solapamiento de columnas, cada celda se usa una sola vez y
+    los empates se resuelven de izquierda a derecha. Con eso 'VR ENT' [53-64]
+    no se lleva el bloque de 'VR PAC' [44-58] cuando ambos solapan 6 columnas:
+    el de pac ya quedó tomado por el rótulo anterior.
+    """
+    usadas: set[int] = set()
+    asignado: dict[str, Celda] = {}
+    for campo, span in cabeceras:
+        mejor, mejor_ov = None, 0
+        for i, celda in enumerate(celdas):
+            if i in usadas:
+                continue
+            ov = _solapamiento(span, (celda.col, celda.col_fin))
+            if ov > mejor_ov:
+                mejor, mejor_ov = i, ov
+        if mejor is not None:
+            usadas.add(mejor)
+            asignado[campo] = celdas[mejor]
+
+    # Rótulos sin solapamiento (formatos sin celdas combinadas): se les asigna
+    # la celda libre más cercana que caiga entre el rótulo anterior y el siguiente.
+    for pos, (campo, span) in enumerate(cabeceras):
+        if campo in asignado:
             continue
-        texto = str(celda.value).strip()
-        if texto:
-            out.append((celda.column, texto))
-    return out
+        antes = max((asignado[c].col_fin for c, _ in cabeceras[:pos] if c in asignado), default=0)
+        despues = min(
+            (asignado[c].col for c, _ in cabeceras[pos + 1 :] if c in asignado),
+            default=10**6,
+        )
+        libres = [
+            (abs(c.col - span[0]), i)
+            for i, c in enumerate(celdas)
+            if i not in usadas and antes < c.col < despues
+        ]
+        if libres:
+            _, i = min(libres)
+            usadas.add(i)
+            asignado[campo] = celdas[i]
+    return asignado
 
 
-def detectar_estructura(ws) -> dict:
-    """Ubica el título, la tabla de ítems y el bloque de totales de la hoja."""
-    fila_titulo, col_titulo = _buscar_fila(ws, TITULO_ORIGINAL)
-    if fila_titulo < 0:
-        fila_titulo, col_titulo = _buscar_fila(ws, TITULO_NUEVO)
-
-    fila_hdr = -1
-    cols: dict[str, int] = {}
-    for fila in ws.iter_rows(min_row=max(fila_titulo, 1), max_row=ws.max_row):
-        etiquetas = {_norm(c.value): c.column for c in fila if c.value is not None}
-        if not etiquetas:
+def _cabeceras_tabla(celdas: list[Celda]) -> list[tuple[str, tuple[int, int]]] | None:
+    """Reconoce la fila 'CÓDIGO / NOMBRE / CANT / VR UNIT / VR PAC / VR ENT'."""
+    encontrados: list[tuple[str, tuple[int, int]]] = []
+    vistos: set[str] = set()
+    for celda in celdas:
+        etiqueta = _norm(celda.texto)
+        if not etiqueta:
             continue
-        cand = _mapear_columnas_ws(etiquetas)
-        if {"nombre", "cantidad"} <= set(cand) and ("vr_ent" in cand or "vr_unit" in cand):
-            fila_hdr, cols = fila[0].row, cand
+        for campo, opciones in _ALIAS_COL_ITEM.items():
+            if campo in vistos:
+                continue
+            if etiqueta in opciones or any(etiqueta.startswith(o) for o in opciones):
+                vistos.add(campo)
+                encontrados.append((campo, (celda.col, celda.col_fin)))
+                break
+    if {"nombre", "cantidad"} <= vistos and ("vr_ent" in vistos or "vr_unit" in vistos):
+        return sorted(encontrados, key=lambda x: x[1][0])
+    return None
+
+
+@dataclass
+class FacturaEnHoja:
+    """Una factura dentro de la hoja: dónde empieza, dónde termina y su número."""
+
+    factura: str
+    fila_ini: int  # fila del título
+    fila_fin: int
+    celda_titulo: Celda
+
+
+def _es_titulo(texto: str) -> bool:
+    t = _norm(texto)
+    return t.startswith(TITULO_ORIGINAL) or t.startswith(TITULO_NUEVO)
+
+
+def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
+    """Parte la hoja en facturas. Sirve igual si la hoja trae una sola."""
+    inicios: list[tuple[int, Celda]] = []
+    for fila in sorted(idx.por_fila):
+        for celda in idx.celdas(fila):
+            if _es_titulo(celda.texto):
+                inicios.append((fila, celda))
+                break
+
+    fin_util = idx.max_fila
+    for fila in range(idx.max_fila, 0, -1):
+        texto = _norm(idx.texto_fila(fila))
+        if not texto:
+            continue
+        if any(m in texto for m in MARCAS_PIE_ARCHIVO):
+            fin_util = fila - 1
+        else:
             break
 
-    fila_subtotal, _ = _buscar_fila(ws, MARCA_SUBTOTAL, desde=max(fila_hdr, 1))
-    return {
-        "fila_titulo": fila_titulo,
-        "col_titulo": col_titulo,
-        "fila_hdr": fila_hdr,
-        "cols": cols,
-        "fila_subtotal": fila_subtotal,
-    }
+    facturas = []
+    for i, (fila, celda) in enumerate(inicios):
+        fin = inicios[i + 1][0] - 1 if i + 1 < len(inicios) else fin_util
+        texto = idx.texto_fila(fila)
+        m = _RE_FACTURA.search(texto)
+        facturas.append(
+            FacturaEnHoja(
+                factura=m.group(0).replace(" ", "") if m else "",
+                fila_ini=fila,
+                fila_fin=max(fin, fila),
+                celda_titulo=celda,
+            )
+        )
+    return facturas
 
 
-def _mapear_columnas_ws(etiquetas: dict[str, int]) -> dict[str, int]:
-    cols: dict[str, int] = {}
-    for campo, opciones in _ALIAS_COL_ITEM.items():
-        for etiqueta, col in etiquetas.items():
-            if etiqueta in opciones or any(etiqueta.startswith(o) for o in opciones):
-                cols.setdefault(campo, col)
-                break
-    return cols
+def filas_encabezado_institucional(idx: IndiceHoja, hasta: int) -> set[int]:
+    """Filas del membrete del hospital (logo, dirección, NIT, ciudad, QR, CUFE,
+    'Página 1/1'). Van antes de la primera factura y no se repiten por factura,
+    pero se buscan también en el resto por si el formato cambia."""
+    filas = set(range(1, hasta))  # incluye los renglones en blanco del membrete
+    for fila in idx.por_fila:
+        if fila in filas:
+            continue
+        texto = _norm(idx.texto_fila(fila))
+        if any(re.search(p, texto) for p in _PATRONES_MEMBRETE):
+            filas.add(fila)
+    return filas
 
 
-def leer_bloques(ws, est: dict) -> list[Bloque]:
-    """Recorre la tabla de ítems y la parte en grupos, ítems y continuaciones.
+@dataclass
+class EstructuraFactura:
+    fila_hdr: int
+    cabeceras: list[tuple[str, tuple[int, int]]]
+    fila_subtotal: int
 
-    - **Ítem**: la fila trae cantidad y valor.
+
+def detectar_estructura(idx: IndiceHoja, fac: FacturaEnHoja) -> EstructuraFactura | None:
+    """Ubica la tabla de ítems y la fila de subtotal dentro de la factura."""
+    fila_hdr, cabeceras = -1, None
+    for fila in range(fac.fila_ini, fac.fila_fin + 1):
+        cab = _cabeceras_tabla(idx.celdas(fila))
+        if cab:
+            fila_hdr, cabeceras = fila, cab
+            break
+    if fila_hdr < 0 or cabeceras is None:
+        return None
+    fila_sub = -1
+    for fila in range(fila_hdr + 1, fac.fila_fin + 1):
+        if _norm(idx.texto_fila(fila)).startswith(MARCA_SUBTOTAL):
+            fila_sub = fila
+            break
+    if fila_sub < 0:
+        return None
+    return EstructuraFactura(fila_hdr=fila_hdr, cabeceras=cabeceras, fila_subtotal=fila_sub)
+
+
+def leer_bloques(idx: IndiceHoja, est: EstructuraFactura) -> list[Bloque]:
+    """Recorre la tabla y la parte en grupos, ítems y continuaciones de nombre.
+
+    - **Ítem**: la fila trae cantidad y valor. Puede ocupar varias filas (los
+      merges son verticales cuando el nombre es largo).
     - **Título de grupo**: texto que arranca a la izquierda de la columna NOMBRE.
-    - **Continuación**: texto en la columna NOMBRE (nombres largos que el
-      sistema parte en dos renglones); pertenece al ítem de arriba.
+    - **Continuación**: texto en la columna NOMBRE, sin cantidad; es del ítem
+      de arriba.
     """
-    fila_hdr, fila_fin = est["fila_hdr"], est["fila_subtotal"]
-    cols = est["cols"]
-    if fila_hdr < 0 or fila_fin < 0:
-        return []
+    col_nombre = dict(est.cabeceras).get("nombre", (2, 2))[0]
+    bloques: list[Bloque] = [Bloque(titulo="", fila_titulo=None, fila_fin=est.fila_subtotal - 1)]
 
-    col_nombre = cols.get("nombre", 2)
-    bloques: list[Bloque] = [Bloque(titulo="", fila_titulo=None, fila_fin=fila_fin - 1)]
+    fila = est.fila_hdr + 1
+    while fila < est.fila_subtotal:
+        celdas = idx.celdas(fila)
+        if not celdas:
+            fila += 1
+            continue
 
-    for fila in range(fila_hdr + 1, fila_fin):
-        contenido = _celdas_con_texto(ws, fila)
-        cantidad = _parse_valor(_leer(ws, fila, cols["cantidad"])) if "cantidad" in cols else 0.0
-        vr_unit = _parse_valor(_leer(ws, fila, cols["vr_unit"])) if "vr_unit" in cols else 0.0
-        vr_ent = _parse_valor(_leer(ws, fila, cols["vr_ent"])) if "vr_ent" in cols else 0.0
-        vr_pac = _parse_valor(_leer(ws, fila, cols["vr_pac"])) if "vr_pac" in cols else 0.0
+        campos = mapear_por_solapamiento(est.cabeceras, celdas)
+        cantidad = _parse_valor(campos["cantidad"].valor) if "cantidad" in campos else 0.0
+        vr_unit = _parse_valor(campos["vr_unit"].valor) if "vr_unit" in campos else 0.0
+        vr_ent = _parse_valor(campos["vr_ent"].valor) if "vr_ent" in campos else 0.0
+        vr_pac = _parse_valor(campos["vr_pac"].valor) if "vr_pac" in campos else 0.0
 
         if cantidad > 0 and (vr_unit > 0 or vr_ent > 0):
-            codigo = str(_leer(ws, fila, cols["codigo"]) or "").strip() if "codigo" in cols else ""
+            fila_fin = max(c.fila_fin for c in celdas)
+            codigo = campos["codigo"].texto if "codigo" in campos else ""
+            nombre = campos["nombre"].texto if "nombre" in campos else ""
             if not codigo:
-                # El sistema imprime el código indentado, no bajo el rótulo
-                # 'CÓDIGO': lo tomamos del primer texto a la izquierda del nombre.
-                izquierda = [t for c, t in contenido if c < col_nombre]
-                codigo = izquierda[0] if izquierda else ""
-            nombre = str(_leer(ws, fila, col_nombre) or "").strip()
+                izquierda = [c.texto for c in celdas if c.col_fin < col_nombre and c.texto]
+                codigo = izquierda[-1] if izquierda else ""
+            # Nombres largos: unas veces el sistema los mete en una celda
+            # combinada de dos filas (ya viene entero) y otras los parte en un
+            # segundo renglón dentro del alto del ítem. Ese resto se pega acá.
+            for siguiente in range(fila + 1, fila_fin + 1):
+                resto = " ".join(
+                    c.texto for c in idx.celdas(siguiente) if c.texto and c.col >= col_nombre
+                )
+                if resto:
+                    nombre = f"{nombre} {resto}".strip()
             bloques[-1].items.append(
                 ItemDetallado(
                     fila=fila,
-                    filas=[fila],
+                    filas=list(range(fila, fila_fin + 1)),
                     grupo=bloques[-1].titulo,
                     codigo=codigo,
                     nombre=nombre,
@@ -663,90 +861,325 @@ def leer_bloques(ws, est: dict) -> list[Bloque]:
                     vr_unit=vr_unit,
                     vr_pac=vr_pac,
                     vr_ent=vr_ent or cantidad * vr_unit,
+                    celda_cantidad=campos.get("cantidad"),
+                    celda_vr_ent=campos.get("vr_ent"),
                 )
             )
+            fila = fila_fin + 1
             continue
 
-        if not contenido:
-            continue
-
-        col_ini = min(c for c, _ in contenido)
+        col_ini = min(c.col for c in celdas)
         if col_ini < col_nombre:
-            # Título de grupo: cierra el bloque anterior y abre uno nuevo.
             bloques[-1].fila_fin = fila - 1
-            titulo = " ".join(t for _, t in contenido)
-            bloques.append(Bloque(titulo=titulo, fila_titulo=fila, fila_fin=fila_fin - 1))
+            titulo = " ".join(c.texto for c in celdas if c.texto)
+            bloques.append(Bloque(titulo=titulo, fila_titulo=fila, fila_fin=est.fila_subtotal - 1))
         elif bloques[-1].items:
-            # Continuación del nombre del ítem anterior.
             item = bloques[-1].items[-1]
+            extra = " ".join(c.texto for c in celdas if c.texto)
             item.filas.append(fila)
-            item.nombre = f"{item.nombre} {' '.join(t for _, t in contenido)}".strip()
+            item.nombre = f"{item.nombre} {extra}".strip()
+        fila += 1
 
     return [b for b in bloques if b.items or b.fila_titulo is not None]
 
 
 # ─── 4) Cruce contra el reporte de glosas ────────────────────────────────────
+#
+# El reporte del ADRES y el detallado del hospital NO hablan el mismo idioma:
+#
+#   - los códigos llevan distinto relleno de ceros (19935303-4 / 19935303-04);
+#   - a los materiales de osteosíntesis el reporte les agrega un sufijo
+#     ("… MATERIAL DE OSTEOSINTESIS UNIDAD 01");
+#   - los dispositivos médicos vienen con código INVIMA en el reporte y con
+#     código interno en la factura;
+#   - el reporte parte un mismo ítem en varias filas.
+#
+# Por eso el emparejamiento se hace **por rondas**, de la evidencia más fuerte
+# a la más débil, y en cada ronda solo se acepta un par cuando es **mutuamente
+# único**: si un ítem del detallado empata con dos del reporte (o al revés), se
+# deja para una ronda posterior que pueda desempatar por valor. Emparejar de a
+# uno "al primero que aparezca" es justo lo que hacía que la PIPERACILINA se
+# llevara la glosa del NITRÓGENO URÉICO por tener el mismo valor unitario.
+
+TIPO_RECLAMACION = "RECLAMACION"
 
 
-def _indexar(glosas: list[FilaGlosa]) -> dict[str, dict[str, list[FilaGlosa]]]:
-    idx: dict[str, dict[str, list[FilaGlosa]]] = {"codigo": {}, "descripcion": {}, "unitario": {}}
-    for g in glosas:
-        if g.codigo:
-            idx["codigo"].setdefault(_norm_codigo(g.codigo), []).append(g)
-        if g.descripcion:
-            idx["descripcion"].setdefault(_norm_desc(g.descripcion), []).append(g)
-        if g.vr_unit:
-            idx["unitario"].setdefault(f"{round(g.vr_unit, 2):.2f}", []).append(g)
-    return idx
+@dataclass
+class ItemReporte:
+    """Todas las filas del reporte que corresponden a un mismo ítem."""
+
+    codigo: str
+    descripcion: str
+    tipo: str
+    filas: list[FilaGlosa] = field(default_factory=list)
+    emparejado: bool = False
+
+    @property
+    def cant_reclamada(self) -> float:
+        return sum(f.cant_reclamada for f in self.filas)
+
+    @property
+    def valor_reclamado(self) -> float:
+        return sum(f.valor_reclamado for f in self.filas)
+
+    @property
+    def valor_aprobado(self) -> float:
+        return sum(f.valor_aprobado for f in self.filas)
+
+    @property
+    def valor_glosado(self) -> float:
+        return sum(f.valor_glosado for f in self.filas)
+
+    @property
+    def causales(self) -> str:
+        vistas = []
+        for f in self.filas:
+            if f.descripcion_glosa and f.descripcion_glosa not in vistas:
+                vistas.append(f.descripcion_glosa)
+        return " | ".join(vistas)
 
 
-def cruzar_item(
-    item: ItemDetallado, idx: dict[str, dict[str, list[FilaGlosa]]]
-) -> tuple[list[FilaGlosa], str]:
-    """Filas del reporte que corresponden al ítem, y por qué criterio cruzaron.
+def agrupar_reporte(glosas: list[FilaGlosa]) -> tuple[list[ItemReporte], list[FilaGlosa]]:
+    """Agrupa las filas del reporte por ítem.
 
-    Se busca por código, luego por descripción y por último por valor unitario
-    (los dispositivos médicos traen código INVIMA en el reporte y código interno
-    en la factura, así que el código NO siempre cruza). Las filas se marcan como
-    usadas para que dos ítems distintos no se lleven las mismas.
+    Devuelve (ítems, filas de reclamación). Las filas con Tipo Elemento
+    'Reclamacion' NO son ítems: son glosas a la reclamación completa (falta un
+    anexo, formulario incompleto…), vienen sin código ni descripción y su valor
+    repite el de la factura. Si se cruzaran como ítems, duplicarían la glosa.
     """
-    intentos = (
-        ("codigo", _norm_codigo(item.codigo)),
-        ("descripcion", _norm_desc(item.nombre)),
-        ("unitario", f"{round(item.vr_unit, 2):.2f}" if item.vr_unit else ""),
-    )
-    for criterio, clave in intentos:
-        if not clave:
+    items: dict[tuple[str, str], ItemReporte] = {}
+    reclamacion: list[FilaGlosa] = []
+    for g in glosas:
+        if _norm(g.tipo_elemento) == TIPO_RECLAMACION or (
+            not g.codigo.strip() and not g.descripcion.strip()
+        ):
+            reclamacion.append(g)
             continue
-        candidatas = [g for g in idx[criterio].get(clave, []) if not g.usada]
-        if not candidatas:
-            continue
-        for g in candidatas:
-            g.usada = True
-        return candidatas, criterio
-    return [], ""
+        clave = (_norm_codigo(g.codigo), _norm_desc(g.descripcion))
+        item = items.get(clave)
+        if item is None:
+            item = ItemReporte(codigo=g.codigo, descripcion=g.descripcion, tipo=g.tipo_elemento)
+            items[clave] = item
+        item.filas.append(g)
+    return list(items.values()), reclamacion
+
+
+def _prefijo(a: str, b: str, minimo: int = 12) -> bool:
+    """¿Una descripción es el principio de la otra? (sufijos del reporte)."""
+    if len(a) < minimo or len(b) < minimo:
+        return False
+    return a.startswith(b) or b.startswith(a)
+
+
+def _clave_valor(item) -> str:
+    return f"{round(_valor_item(item), 2):.2f}"
+
+
+def _valor_item(item) -> float:
+    return item.vr_ent if isinstance(item, ItemDetallado) else item.valor_reclamado
+
+
+def _cantidad_item(item) -> float:
+    return item.cantidad if isinstance(item, ItemDetallado) else item.cant_reclamada
+
+
+# Cada ronda es (nombre, función que devuelve la clave del ítem del detallado,
+# función que devuelve la clave del ítem del reporte). Clave vacía = no aplica.
+RONDAS_CRUCE: tuple[tuple[str, object, object], ...] = (
+    ("codigo", lambda d: _norm_codigo(d.codigo), lambda r: _norm_codigo(r.codigo)),
+    ("descripcion", lambda d: _norm_desc(d.nombre), lambda r: _norm_desc(r.descripcion)),
+    (
+        "cantidad+valor",
+        lambda d: f"{_cantidad_item(d):g}|{_clave_valor(d)}",
+        lambda r: f"{_cantidad_item(r):g}|{_clave_valor(r)}",
+    ),
+    ("valor", _clave_valor, _clave_valor),
+)
+
+
+def _emparejar_por_clave(
+    pendientes_det: list[ItemDetallado],
+    pendientes_rep: list[ItemReporte],
+    clave_det,
+    clave_rep,
+) -> list[tuple[ItemDetallado, ItemReporte]]:
+    """Empareja solo cuando la clave es única de los dos lados."""
+    por_det: dict[str, list[ItemDetallado]] = {}
+    for d in pendientes_det:
+        k = clave_det(d)
+        if k:
+            por_det.setdefault(k, []).append(d)
+    por_rep: dict[str, list[ItemReporte]] = {}
+    for r in pendientes_rep:
+        k = clave_rep(r)
+        if k:
+            por_rep.setdefault(k, []).append(r)
+    return [
+        (ds[0], por_rep[k][0])
+        for k, ds in por_det.items()
+        if len(ds) == 1 and len(por_rep.get(k, [])) == 1
+    ]
+
+
+def emparejar(
+    items: list[ItemDetallado], reporte: list[ItemReporte]
+) -> tuple[dict[int, tuple[ItemReporte, str]], list[ItemReporte]]:
+    """Empareja los ítems del detallado con los del reporte.
+
+    Devuelve ({índice del ítem: (ítem del reporte, criterio)}, ítems del reporte
+    que no encontraron pareja).
+    """
+    pares: dict[int, tuple[ItemReporte, str]] = {}
+    pos = {id(d): i for i, d in enumerate(items)}
+    pendientes_det = list(items)
+    pendientes_rep = list(reporte)
+
+    def registrar(nuevos, criterio):
+        for d, r in nuevos:
+            pares[pos[id(d)]] = (r, criterio)
+            r.emparejado = True
+        emparejados_det = {id(d) for d, _ in nuevos}
+        emparejados_rep = {id(r) for _, r in nuevos}
+        return (
+            [d for d in pendientes_det if id(d) not in emparejados_det],
+            [r for r in pendientes_rep if id(r) not in emparejados_rep],
+        )
+
+    for criterio, clave_det, clave_rep in RONDAS_CRUCE:
+        if not pendientes_det or not pendientes_rep:
+            break
+        nuevos = _emparejar_por_clave(pendientes_det, pendientes_rep, clave_det, clave_rep)
+        pendientes_det, pendientes_rep = registrar(nuevos, criterio)
+
+        if criterio == "descripcion" and pendientes_det and pendientes_rep:
+            # El reporte le agrega sufijos a la descripción ("… MATERIAL DE
+            # OSTEOSINTESIS UNIDAD 01"): se acepta el prefijo si es único.
+            nuevos = []
+            for d in pendientes_det:
+                nd = _norm_desc(d.nombre)
+                cand = [r for r in pendientes_rep if _prefijo(nd, _norm_desc(r.descripcion))]
+                if (
+                    len(cand) == 1
+                    and sum(
+                        1
+                        for otro in pendientes_det
+                        if _prefijo(_norm_desc(otro.nombre), _norm_desc(cand[0].descripcion))
+                    )
+                    == 1
+                ):
+                    nuevos.append((d, cand[0]))
+            pendientes_det, pendientes_rep = registrar(nuevos, "descripcion~")
+
+    # Última ronda: VARIOS renglones del detallado contra UNO del reporte.
+    # Pasa seguido con los materiales (dos renglones de "TORNILLO BLOQUEADO DE
+    # 3.5 MM", uno de 1 y otro de 4 unidades, que el reporte trae como uno solo
+    # de 5). Solo se acepta si las cantidades y los valores cuadran exacto, y a
+    # cada renglón se le asigna su parte proporcional de la glosa.
+    if pendientes_det and pendientes_rep:
+        for grupo, rep in _agrupar_varios_a_uno(pendientes_det, pendientes_rep):
+            total = sum(d.vr_ent for d in grupo)
+            for d in grupo:
+                porcion = _porcion(rep, d.vr_ent / total)
+                pares[pos[id(d)]] = (porcion, "varios-a-uno")
+            rep.emparejado = True
+
+    return pares, [r for r in reporte if not r.emparejado]
+
+
+def _agrupar_varios_a_uno(
+    pendientes_det: list[ItemDetallado], pendientes_rep: list[ItemReporte]
+) -> list[tuple[list[ItemDetallado], ItemReporte]]:
+    """Grupos de renglones del detallado que son UN solo ítem del reporte."""
+    salida: list[tuple[list[ItemDetallado], ItemReporte]] = []
+    usados_det: set[int] = set()
+    usados_rep: set[int] = set()
+
+    def intentar(clave_det, clave_rep, prefijo=False):
+        por_det: dict[str, list[ItemDetallado]] = {}
+        for d in pendientes_det:
+            if id(d) in usados_det:
+                continue
+            k = clave_det(d)
+            if k:
+                por_det.setdefault(k, []).append(d)
+        for k, grupo in por_det.items():
+            if len(grupo) < 2:
+                continue
+            if prefijo:
+                cand = [
+                    r
+                    for r in pendientes_rep
+                    if id(r) not in usados_rep and _prefijo(k, _norm_desc(r.descripcion))
+                ]
+            else:
+                cand = [r for r in pendientes_rep if id(r) not in usados_rep and clave_rep(r) == k]
+            if len(cand) != 1:
+                continue
+            rep = cand[0]
+            cuadra_valor = abs(sum(d.vr_ent for d in grupo) - rep.valor_reclamado) <= len(grupo)
+            cuadra_cant = abs(sum(d.cantidad for d in grupo) - rep.cant_reclamada) <= 0.01
+            if cuadra_valor and cuadra_cant:
+                salida.append((grupo, rep))
+                usados_det.update(id(d) for d in grupo)
+                usados_rep.add(id(rep))
+
+    intentar(lambda d: _norm_codigo(d.codigo), lambda r: _norm_codigo(r.codigo))
+    intentar(lambda d: _norm_desc(d.nombre), lambda r: _norm_desc(r.descripcion))
+    intentar(lambda d: _norm_desc(d.nombre), None, prefijo=True)
+    return salida
+
+
+def _porcion(rep: ItemReporte, fraccion: float) -> ItemReporte:
+    """Copia del ítem del reporte con los valores prorrateados."""
+    filas = []
+    for f in rep.filas:
+        datos = dict(f.__dict__)
+        for campo in (
+            "cant_reclamada",
+            "valor_reclamado",
+            "cant_aprobada",
+            "valor_aprobado",
+            "valor_glosado",
+        ):
+            datos[campo] = datos[campo] * fraccion
+        datos["usada"] = False
+        filas.append(FilaGlosa(**datos))
+    return ItemReporte(codigo=rep.codigo, descripcion=rep.descripcion, tipo=rep.tipo, filas=filas)
 
 
 def decidir(
-    item: ItemDetallado, filas: list[FilaGlosa], modo_parcial: str, sin_cruce: str
+    item: ItemDetallado, rep: ItemReporte | None, modo_parcial: str, sin_cruce: str
 ) -> tuple[str, float, float, str]:
     """(accion, cantidad_nueva, vr_ent_nuevo, observacion)."""
-    if not filas:
+    if rep is None:
         if sin_cruce == "quitar":
             return "QUITADO", 0.0, 0.0, "No aparece en el reporte de glosas"
         return (
             "SIN_CRUCE",
             item.cantidad,
             item.vr_ent,
-            ("No aparece en el reporte de glosas: se conserva, REVISAR a mano"),
+            "No aparece en el reporte de glosas: se conserva, REVISAR a mano",
         )
 
-    glosado = sum(g.valor_glosado for g in filas)
+    glosado = rep.valor_glosado
     if glosado <= TOLERANCIA_PESOS:
-        return "QUITADO", 0.0, 0.0, "La entidad ya lo aprobó (valor glosado 0)"
+        nota = "La entidad ya lo aprobó (valor glosado 0)"
+        if rep.valor_reclamado <= TOLERANCIA_PESOS:
+            nota = "El reporte no le reconoce valor (reclamado 0): va dentro de otro servicio"
+        return "QUITADO", 0.0, 0.0, nota
 
     if glosado >= item.vr_ent - TOLERANCIA_PESOS:
-        return "CONSERVADO", item.cantidad, item.vr_ent, "Sigue glosado en su totalidad"
+        nota = "Sigue glosado en su totalidad"
+        if glosado > item.vr_ent + TOLERANCIA_PESOS:
+            # El reporte del ADRES glosa más de lo que dice la factura impresa.
+            # Se conserva el valor de la factura (no se puede cobrar de más),
+            # pero hay que revisar de dónde sale la diferencia.
+            nota = (
+                f"REVISAR: el reporte glosa ${glosado:,.0f} y el detallado dice "
+                f"${item.vr_ent:,.0f} (dif ${glosado - item.vr_ent:,.0f}); "
+                "se deja el valor del detallado"
+            )
+        return "CONSERVADO", item.cantidad, item.vr_ent, nota
 
     # Aprobado a medias.
     if modo_parcial == "conservar":
@@ -754,198 +1187,233 @@ def decidir(
             "CONSERVADO",
             item.cantidad,
             item.vr_ent,
-            (
-                f"Aprobado parcial (glosado ${glosado:,.0f}), se conserva completo por --modo-parcial"
-            ),
+            f"Aprobado parcial (glosado ${glosado:,.0f}), se conserva completo por --modo-parcial",
         )
     if modo_parcial == "quitar":
         return (
             "QUITADO",
             0.0,
             0.0,
-            (f"Aprobado parcial (glosado ${glosado:,.0f}), se quita por --modo-parcial"),
+            f"Aprobado parcial (glosado ${glosado:,.0f}), se quita por --modo-parcial",
         )
 
-    if item.vr_unit > 0:
-        cantidad = round(glosado / item.vr_unit, 2)
+    # La cantidad se recalcula con el valor unitario QUE PAGA LA ENTIDAD
+    # (vr_ent / cantidad): cuando hay cuota del paciente, vr_unit es el precio
+    # completo y no sirve para prorratear lo que sigue glosado.
+    unitario = item.vr_ent / item.cantidad if item.cantidad else 0.0
+    unidades = glosado / unitario if unitario > 0 else 0.0
+    enteras = round(unidades)
+
+    if enteras >= 1 and abs(unidades - enteras) <= 0.01:
+        # Glosa POR UNIDADES: la entidad pagó unas y objetó otras.
+        cantidad = float(enteras)
+        nota = f"Aprobado parcial: de {item.cantidad:g} queda(n) {cantidad:g} sin pagar"
     else:
-        cantidad = sum(g.cant_reclamada - g.cant_aprobada for g in filas)
-    cantidad = round(cantidad, 2)
-    if cantidad == int(cantidad):
-        cantidad = float(int(cantidad))
-    nota = f"Aprobado parcial: de {item.cantidad:g} queda(n) {cantidad:g} sin pagar"
-    if len(filas) > 1:
-        nota += f" (sumadas {len(filas)} filas del reporte)"
+        # Glosa POR VALOR (diferencia de tarifa, no de unidades): la cantidad
+        # NO se toca —redondearla daría 0 y el renglón quedaría inservible—,
+        # solo baja el valor a lo que sigue glosado.
+        cantidad = item.cantidad
+        nota = (
+            f"Aprobado parcial por VALOR (no por unidades): quedan las "
+            f"{cantidad:g} unidad(es) por ${glosado:,.0f} de ${item.vr_ent:,.0f}"
+        )
+    if len(rep.filas) > 1:
+        nota += f" (sumadas {len(rep.filas)} filas del reporte)"
     return "AJUSTADO", cantidad, glosado, nota
 
 
 # ─── 5) Edición de la hoja ───────────────────────────────────────────────────
 
 
-def eliminar_filas(ws, filas: set[int]) -> None:
-    """Borra filas ajustando a mano lo que openpyxl NO ajusta: celdas
-    combinadas, altos de fila e imágenes ancladas."""
-    for fila in sorted(filas, reverse=True):
-        ws.delete_rows(fila, 1)
-        _ajustar_merges(ws, fila)
-        _ajustar_altos(ws, fila)
-        _ajustar_imagenes(ws, fila)
+def eliminar_filas(ws, filas: set[int]) -> int:
+    """Borra filas de una hoja re-indexándolas en sitio.
 
-
-def _ajustar_merges(ws, borrada: int) -> None:
+    `ws.delete_rows()` mueve las celdas una por una y no corrige ni las celdas
+    combinadas ni los altos de fila: en estos archivos (30.000+ filas, 22.000+
+    merges, de los que hay que borrar el 60-90 %) tarda minutos. Re-mapear los
+    índices de golpe hace lo mismo en menos de un segundo, y de paso corrige
+    merges, altos e imágenes.
+    """
     from openpyxl.worksheet.cell_range import CellRange
 
-    nuevos = []
-    for rango in list(ws.merged_cells.ranges):
-        min_r, max_r = rango.min_row, rango.max_row
-        if min_r > borrada:
-            min_r, max_r = min_r - 1, max_r - 1
-        elif max_r >= borrada:
-            max_r -= 1
-        ws.merged_cells.ranges.remove(rango)
-        if max_r >= min_r and not (min_r == max_r and rango.min_col == rango.max_col):
-            nuevos.append(
-                CellRange(
-                    min_col=rango.min_col, min_row=min_r, max_col=rango.max_col, max_row=max_r
-                )
-            )
-    for r in nuevos:
-        ws.merged_cells.add(r)
+    if not filas:
+        return ws.max_row
+    max_fila = ws.max_row
+    nuevo: dict[int, int | None] = {}
+    corridas = 0
+    for f in range(1, max_fila + 1):
+        if f in filas:
+            corridas += 1
+            nuevo[f] = None
+        else:
+            nuevo[f] = f - corridas
 
-
-def _ajustar_altos(ws, borrada: int) -> None:
-    dims = dict(ws.row_dimensions.items())
-    ws.row_dimensions.clear()
-    for fila, dim in sorted(dims.items()):
-        if fila == borrada:
+    celdas = {}
+    for (f, c), celda in ws._cells.items():
+        destino = nuevo.get(f)
+        if destino is None:
             continue
-        destino = fila - 1 if fila > borrada else fila
+        celda.row = destino
+        celdas[(destino, c)] = celda
+    ws._cells = celdas
+
+    rangos = []
+    for r in ws.merged_cells.ranges:
+        vivas = [nuevo.get(x) for x in range(r.min_row, r.max_row + 1)]
+        vivas = [x for x in vivas if x is not None]
+        if not vivas or (len(vivas) == 1 and r.min_col == r.max_col):
+            continue
+        rangos.append(
+            CellRange(min_col=r.min_col, min_row=min(vivas), max_col=r.max_col, max_row=max(vivas))
+        )
+    ws.merged_cells.ranges = rangos
+
+    dims = dict(ws.row_dimensions)
+    ws.row_dimensions.clear()
+    for f, dim in sorted(dims.items()):
+        destino = nuevo.get(f)
+        if destino is None:
+            continue
         dim.index = destino
         ws.row_dimensions[destino] = dim
 
-
-def _ajustar_imagenes(ws, borrada: int) -> None:
     imagenes = getattr(ws, "_images", None)
-    if not imagenes:
-        return
-    quedan = []
-    for img in imagenes:
-        ancla = getattr(img, "anchor", None)
-        desde = getattr(ancla, "_from", None)
-        if desde is None:
-            quedan.append(img)
-            continue
-        if desde.row + 1 == borrada:  # el ancla es 0-based
-            continue  # la imagen vivía en la fila borrada (logo, QR)
-        if desde.row + 1 > borrada:
-            desde.row -= 1
-            hasta = getattr(ancla, "to", None)
+    if imagenes:
+        quedan = []
+        for img in imagenes:
+            desde = getattr(getattr(img, "anchor", None), "_from", None)
+            if desde is None:
+                quedan.append(img)
+                continue
+            destino = nuevo.get(desde.row + 1)
+            if destino is None:
+                continue  # la imagen vivía en una fila borrada (logo, QR)
+            corrido = desde.row + 1 - destino
+            desde.row -= corrido
+            hasta = getattr(img.anchor, "to", None)
             if hasta is not None:
-                hasta.row -= 1
-        quedan.append(img)
-    ws._images = quedan
+                hasta.row -= corrido
+            quedan.append(img)
+        ws._images = quedan
+
+    ws._current_row = max_fila - corridas
+    return ws._current_row
 
 
-def _valor_totales(ws, fila: int, col_valor: int) -> tuple[int, int]:
-    """Celda donde vive el importe de una fila de totales."""
-    if col_valor:
-        f, c = _ancla_merge(ws, fila, col_valor)
-        if ws.cell(row=f, column=c).value is not None:
-            return f, c
-    ultima = (fila, col_valor or 1)
-    for celda in ws[fila]:
-        if celda.value is None:
-            continue
-        if isinstance(celda.value, (int, float)) or _parse_valor(celda.value):
-            ultima = (celda.row, celda.column)
-    return ultima
+def _celdas_numericas(celdas: list[Celda]) -> list[Celda]:
+    return [c for c in celdas if isinstance(c.valor, (int, float))]
 
 
-def recalcular_totales(ws, est: dict, subtotal: float) -> None:
-    """Reescribe subtotal, total de la orden y el total en letras."""
-    col_valor = est["cols"].get("vr_ent", 0)
-    fila_sub = est["fila_subtotal"]
-    if fila_sub > 0:
-        f, c = _valor_totales(ws, fila_sub, col_valor)
-        ws.cell(row=f, column=c).value = subtotal
+def recalcular_totales(
+    idx: IndiceHoja, fac: FacturaEnHoja, est: EstructuraFactura, subtotal: float, n_items: int
+) -> None:
+    """Reescribe subtotal, total de la orden y el total en letras.
+
+    En la fila de subtotal hay DOS números: la **cantidad de ítems** y el
+    **importe**. El importe es siempre el último de la fila.
+    """
+    fila_sub = est.fila_subtotal
+    numeros = _celdas_numericas(idx.celdas(fila_sub))
+    if numeros:
+        idx.escribir(numeros[-1], subtotal)
+    if len(numeros) > 1:
+        idx.escribir(numeros[-2], n_items)
 
     descuentos = 0.0
-    for marca in (MARCA_COPAGO, MARCA_ANTICIPO, MARCA_COPAGO_USUARIO):
-        fila, _ = _buscar_fila(ws, marca, desde=fila_sub if fila_sub > 0 else 1)
-        if fila > 0:
-            f, c = _valor_totales(ws, fila, col_valor)
-            descuentos += _parse_valor(ws.cell(row=f, column=c).value)
+    fila_total = -1
+    for fila in range(fila_sub + 1, fac.fila_fin + 1):
+        texto = _norm(idx.texto_fila(fila))
+        if texto.startswith(MARCA_TOTAL_ORDEN):
+            fila_total = fila
+            break
+        if any(texto.startswith(m) for m in (MARCA_COPAGO, MARCA_ANTICIPO, MARCA_COPAGO_USUARIO)):
+            numeros = _celdas_numericas(idx.celdas(fila))
+            if numeros:
+                descuentos += _parse_valor(numeros[-1].valor)
 
     total = subtotal - descuentos
-    fila_total, _ = _buscar_fila(ws, MARCA_TOTAL_ORDEN, desde=fila_sub if fila_sub > 0 else 1)
     if fila_total > 0:
-        f, c = _valor_totales(ws, fila_total, col_valor)
-        ws.cell(row=f, column=c).value = total
+        numeros = _celdas_numericas(idx.celdas(fila_total))
+        if numeros:
+            idx.escribir(numeros[-1], total)
 
-    fila_letras, col_letras = _buscar_fila(
-        ws, MARCA_TOTAL_LETRAS, desde=fila_total if fila_total > 0 else 1
-    )
-    if fila_letras > 0:
-        for col in range(col_letras + 1, (col_valor or ws.max_column) + 1):
-            f, c = _ancla_merge(ws, fila_letras, col)
-            if (f, c) != (fila_letras, col_letras):
-                ws.cell(row=f, column=c).value = numero_a_letras(total)
+    for fila in range(fila_total + 1 if fila_total > 0 else fila_sub + 1, fac.fila_fin + 1):
+        celdas = idx.celdas(fila)
+        if not celdas or not _norm(celdas[0].texto).startswith(MARCA_TOTAL_LETRAS):
+            continue
+        for celda in celdas[1:]:
+            if isinstance(celda.valor, str):
+                idx.escribir(celda, numero_a_letras(total))
                 break
+        break
 
 
-def procesar_hoja(
-    ws,
-    factura: str,
+def procesar_factura(
+    idx: IndiceHoja,
+    fac: FacturaEnHoja,
     glosas: list[FilaGlosa],
     *,
+    hoja: str,
     modo_parcial: str = "ajustar",
     sin_cruce: str = "conservar",
     aplicar: bool = True,
-) -> ResultadoHoja:
-    """Limpia el encabezado, poda los ítems aprobados y recalcula los totales."""
-    res = ResultadoHoja(hoja=ws.title, factura=factura, estado="AJUSTADA")
-    est = detectar_estructura(ws)
-    if est["fila_hdr"] < 0 or est["fila_subtotal"] < 0:
+) -> tuple[ResultadoHoja, set[int]]:
+    """Poda los ítems ya aprobados de UNA factura y recalcula sus totales.
+
+    Devuelve el resultado y las filas que hay que borrar de la hoja (el borrado
+    se hace de una sola vez al final, para no re-indexar la hoja 300 veces).
+    """
+    res = ResultadoHoja(hoja=hoja, factura=fac.factura, estado="AJUSTADA")
+    est = detectar_estructura(idx, fac)
+    if est is None:
         res.estado = "SIN_ESTRUCTURA"
         res.observacion = (
             "No encontré la tabla de ítems (CÓDIGO/NOMBRE/CANT) o la fila "
-            f"'{MARCA_SUBTOTAL}'. La hoja queda sin tocar."
+            f"'{MARCA_SUBTOTAL}'. La factura queda sin tocar."
         )
-        return res
+        return res, set()
 
-    bloques = leer_bloques(ws, est)
+    bloques = leer_bloques(idx, est)
     items = [i for b in bloques for i in b.items]
     res.items_total = len(items)
     res.subtotal_antes = sum(i.vr_ent for i in items)
 
-    idx = _indexar(glosas)
+    items_reporte, reclamacion = agrupar_reporte(glosas)
+    pares, sin_pareja = emparejar(items, items_reporte)
+    res.reclamacion = reclamacion
+    res.glosas_sin_item = [r for r in sin_pareja if r.valor_glosado > TOLERANCIA_PESOS]
+
+    posicion = {id(i): n for n, i in enumerate(items)}
     a_borrar: set[int] = set()
     subtotal = 0.0
+    vivos_factura = 0
 
     for bloque in bloques:
         vivos = 0
         for item in bloque.items:
-            filas, criterio = cruzar_item(item, idx)
-            accion, cant, valor, nota = decidir(item, filas, modo_parcial, sin_cruce)
-            det = ResultadoItem(
-                factura=factura,
-                hoja=ws.title,
-                grupo=bloque.titulo,
-                codigo=item.codigo,
-                nombre=item.nombre,
-                cant_orig=item.cantidad,
-                vr_ent_orig=item.vr_ent,
-                valor_reclamado=sum(g.valor_reclamado for g in filas),
-                valor_aprobado=sum(g.valor_aprobado for g in filas),
-                valor_glosado=sum(g.valor_glosado for g in filas),
-                accion=accion,
-                cant_nueva=cant,
-                vr_ent_nuevo=valor,
-                cruce=criterio,
-                filas_reporte=len(filas),
-                observacion=nota,
+            rep, criterio = pares.get(posicion[id(item)], (None, ""))
+            accion, cant, valor, nota = decidir(item, rep, modo_parcial, sin_cruce)
+            res.detalle.append(
+                ResultadoItem(
+                    factura=fac.factura,
+                    hoja=hoja,
+                    grupo=bloque.titulo,
+                    codigo=item.codigo,
+                    nombre=item.nombre,
+                    cant_orig=item.cantidad,
+                    vr_ent_orig=item.vr_ent,
+                    valor_reclamado=rep.valor_reclamado if rep else 0.0,
+                    valor_aprobado=rep.valor_aprobado if rep else 0.0,
+                    valor_glosado=rep.valor_glosado if rep else 0.0,
+                    accion=accion,
+                    cant_nueva=cant,
+                    vr_ent_nuevo=valor,
+                    cruce=criterio,
+                    filas_reporte=len(rep.filas) if rep else 0,
+                    causales=rep.causales if rep else "",
+                    observacion=nota,
+                )
             )
-            res.detalle.append(det)
 
             if accion == "QUITADO":
                 res.items_quitados += 1
@@ -953,13 +1421,15 @@ def procesar_hoja(
                 continue
 
             vivos += 1
+            vivos_factura += 1
             subtotal += valor
             if accion == "AJUSTADO":
                 res.items_ajustados += 1
                 if aplicar:
-                    _escribir(ws, item.fila, est["cols"]["cantidad"], cant)
-                    if "vr_ent" in est["cols"]:
-                        _escribir(ws, item.fila, est["cols"]["vr_ent"], valor)
+                    if item.celda_cantidad is not None:
+                        idx.escribir(item.celda_cantidad, cant)
+                    if item.celda_vr_ent is not None:
+                        idx.escribir(item.celda_vr_ent, valor)
             elif accion == "SIN_CRUCE":
                 res.items_sin_cruce += 1
             else:
@@ -971,50 +1441,17 @@ def procesar_hoja(
             a_borrar.update(range(bloque.fila_titulo, bloque.fila_fin + 1))
 
     res.subtotal_despues = subtotal
-
     if not aplicar:
-        return res
+        return res, set()
 
-    # Título y encabezado institucional.
-    fila_titulo = est["fila_titulo"]
-    if fila_titulo > 0:
-        celda = ws.cell(row=fila_titulo, column=est["col_titulo"])
-        texto = str(celda.value or "")
-        celda.value = re.sub(re.escape(TITULO_ORIGINAL), TITULO_NUEVO, texto, flags=re.IGNORECASE)
-        a_borrar.update(range(1, fila_titulo))
-    else:
-        res.observacion = (
-            f"No encontré el título '{TITULO_ORIGINAL}': no se quitó el encabezado "
-            "institucional ni se renombró el título."
-        )
-
-    eliminar_filas(ws, a_borrar)
-
-    est2 = detectar_estructura(ws)
-    recalcular_totales(ws, est2 if est2["fila_subtotal"] > 0 else est, subtotal)
-    return res
+    celda = fac.celda_titulo
+    if _norm(celda.texto).startswith(TITULO_ORIGINAL):
+        idx.escribir(celda, TITULO_NUEVO)
+    recalcular_totales(idx, fac, est, subtotal, vivos_factura)
+    return res, a_borrar
 
 
 # ─── Orquestación ────────────────────────────────────────────────────────────
-
-
-def factura_de_hoja(ws, est: dict | None = None) -> str:
-    """Número de factura de la hoja: al lado del título, en cualquier celda o
-    en el nombre de la hoja."""
-    est = est or detectar_estructura(ws)
-    fila = est.get("fila_titulo", -1)
-    if fila > 0:
-        for celda in ws[fila]:
-            m = _RE_FACTURA.search(str(celda.value or ""))
-            if m:
-                return m.group(0).replace(" ", "")
-    for f in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 40)):
-        for celda in f:
-            m = _RE_FACTURA.search(str(celda.value or ""))
-            if m:
-                return m.group(0).replace(" ", "")
-    m = _RE_FACTURA.search(ws.title)
-    return m.group(0).replace(" ", "") if m else ws.title
 
 
 def procesar_libro(
@@ -1032,51 +1469,77 @@ def procesar_libro(
     resultados: list[ResultadoHoja] = []
 
     for ws in list(wb.worksheets):
-        factura = factura_de_hoja(ws)
-        clave = normalizar_factura(factura)
-        if quiero and clave not in quiero:
-            resultados.append(
-                ResultadoHoja(
-                    hoja=ws.title,
-                    factura=factura,
-                    estado="ELIMINADA",
-                    observacion="No está en el consolidado de facturas a trabajar",
-                )
-            )
-            if aplicar:
-                wb.remove(ws)
-            continue
-
-        glosas = glosas_por_factura.get(clave, [])
-        if not glosas:
-            resultados.append(
-                ResultadoHoja(
-                    hoja=ws.title,
-                    factura=factura,
-                    estado="SIN_GLOSAS",
-                    observacion=(
-                        "No tiene filas en el reporte de glosas: la hoja queda "
-                        "tal cual. REVISAR (¿otro paquete?)"
-                    ),
-                )
+        idx = IndiceHoja(ws)
+        enHoja = segmentar_facturas(idx)
+        if not enHoja:
+            logger.warning(
+                "%s / hoja '%s': no encontré ninguna factura", ruta_detallado.name, ws.title
             )
             continue
+        logger.info(
+            "%s / hoja '%s': %d factura(s), %d filas",
+            ruta_detallado.name,
+            ws.title,
+            len(enHoja),
+            idx.max_fila,
+        )
 
-        resultados.append(
-            procesar_hoja(
-                ws,
-                factura,
+        a_borrar = filas_encabezado_institucional(idx, enHoja[0].fila_ini) if aplicar else set()
+        for fac in enHoja:
+            clave = normalizar_factura(fac.factura)
+            if quiero and clave not in quiero:
+                resultados.append(
+                    ResultadoHoja(
+                        hoja=ws.title,
+                        factura=fac.factura,
+                        estado="ELIMINADA",
+                        observacion="No está en el consolidado de facturas a trabajar",
+                    )
+                )
+                if aplicar:
+                    a_borrar.update(range(fac.fila_ini, fac.fila_fin + 1))
+                continue
+
+            glosas = glosas_por_factura.get(clave, [])
+            if not glosas:
+                resultados.append(
+                    ResultadoHoja(
+                        hoja=ws.title,
+                        factura=fac.factura,
+                        estado="SIN_GLOSAS",
+                        observacion=(
+                            "No tiene filas en el reporte de glosas: la factura queda "
+                            "tal cual. REVISAR (¿otro paquete?)"
+                        ),
+                    )
+                )
+                continue
+
+            res, filas = procesar_factura(
+                idx,
+                fac,
                 [FilaGlosa(**{**g.__dict__, "usada": False}) for g in glosas],
+                hoja=ws.title,
                 modo_parcial=modo_parcial,
                 sin_cruce=sin_cruce,
                 aplicar=aplicar,
             )
-        )
+            resultados.append(res)
+            a_borrar.update(filas)
 
+        if aplicar and a_borrar:
+            quedan = eliminar_filas(ws, a_borrar)
+            logger.info("   se borran %d filas; la hoja queda con %d", len(a_borrar), quedan)
+
+    trabajadas = sum(1 for r in resultados if r.estado not in ("ELIMINADA",))
     if aplicar and salida is not None:
-        if not wb.worksheets:
+        if not trabajadas:
+            # Este archivo no trae ninguna factura del consolidado: escribir la
+            # salida solo dejaría una hoja vacía.
             logger.warning(
-                "%s: ninguna hoja quedó en pie, no se escribe salida", ruta_detallado.name
+                "%s: ninguna de sus %d facturas está en el consolidado; no se escribe salida",
+                ruta_detallado.name,
+                len(resultados),
             )
         else:
             salida.parent.mkdir(parents=True, exist_ok=True)
@@ -1101,6 +1564,7 @@ CAMPOS_CSV = [
     "VR_ENT_NUEVO",
     "CRUCE_POR",
     "FILAS_REPORTE",
+    "CAUSALES_GLOSA",
     "OBSERVACION",
 ]
 
@@ -1151,7 +1615,54 @@ def escribir_bitacora(ruta: Path, resultados: list[ResultadoHoja]) -> None:
                         f"{d.vr_ent_nuevo:.0f}",
                         d.cruce,
                         d.filas_reporte,
+                        d.causales,
                         d.observacion,
+                    ]
+                )
+            # Glosas del reporte que no encontraron su item en el detallado y
+            # glosas a la reclamacion completa: el auditor tiene que verlas.
+            for r in hoja.glosas_sin_item:
+                w.writerow(
+                    [
+                        hoja.factura,
+                        hoja.hoja,
+                        "",
+                        r.codigo,
+                        r.descripcion,
+                        f"{r.cant_reclamada:g}",
+                        "",
+                        f"{r.valor_reclamado:.0f}",
+                        f"{r.valor_aprobado:.0f}",
+                        f"{r.valor_glosado:.0f}",
+                        "GLOSA_SIN_ITEM",
+                        "",
+                        "",
+                        "",
+                        len(r.filas),
+                        r.causales,
+                        "El reporte glosa este item pero no aparece en el detallado. REVISAR",
+                    ]
+                )
+            for g in hoja.reclamacion:
+                w.writerow(
+                    [
+                        hoja.factura,
+                        hoja.hoja,
+                        "",
+                        "",
+                        "(toda la reclamación)",
+                        "",
+                        "",
+                        f"{g.valor_reclamado:.0f}",
+                        f"{g.valor_aprobado:.0f}",
+                        f"{g.valor_glosado:.0f}",
+                        "GLOSA_RECLAMACION",
+                        "",
+                        "",
+                        "",
+                        1,
+                        g.descripcion_glosa,
+                        "Glosa a la reclamación completa, no a un ítem: no se descuenta del detallado",
                     ]
                 )
 
@@ -1354,7 +1865,7 @@ def main(argv: list[str] | None = None) -> int:
                 salida=salida,
             )
         )
-        if salida:
+        if salida and salida.exists():
             logger.info("Escrito: %s", salida)
 
     if args.diagnostico:

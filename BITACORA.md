@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 28-07-2026
+**Última actualización:** 28-07-2026 (noche)
 
 ---
 
@@ -143,8 +143,18 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   viene repartido en más de una fila** del reporte (el peor: 38 filas para la
   terapia respiratoria de HUS311371) y en el 1,1% de las filas la columna
   "Cantidad Aprobada" no cuadra con el valor — por eso el bot suma y calcula la
-  cantidad desde el valor glosado. Falta el **Excel con la impresión de las
-  facturas (el detallado)** para poder correrlo completo.
+  cantidad desde el valor glosado.
+  **Llegaron los 7 archivos de detallados y se corrió el paquete 31068 completo.**
+  El formato real resultó distinto del supuesto: **una sola hoja con todas las
+  facturas apiladas** (no una hoja por factura) y cada dato dentro de una celda
+  combinada cuyos límites NO coinciden con los del encabezado. Se reescribió el
+  núcleo del bot: segmentación de facturas dentro de la hoja, mapeo de columnas
+  por solapamiento de rangos, borrado masivo de filas re-indexando en sitio
+  (0,3 s en vez de minutos) y emparejamiento por rondas con unicidad mutua.
+  **Resultado: 320 de las 324 facturas procesadas** (150.919 filas de entrada),
+  $3.093.039.640 facturados de los cuales **siguen glosados $727.056.325 (23,5%)**.
+  Se generaron 5 Excel ajustados + bitácora ítem por ítem + resumen por factura,
+  y una verificación independiente los revisa todos sin fallas.
 
 ---
 
@@ -184,17 +194,21 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
 
 ### Ajustador de detallados (`tools/ajustar_detallado_glosas.py`)
-11. **Confirmar el criterio de los ítems aprobados a medias.** En el ejemplo
+11. **Las 4 facturas que no aparecen en ningún detallado:** HUS0000311371,
+    HUS0000367368, HUS0000380246 y HUS0000394817. Pedir su impresión para
+    poder cerrarlas.
+12. **Revisar los 100 ítems marcados `SIN_CRUCE`** (73 facturas) y los 24
+    `GLOSA_SIN_ITEM` ($11.220.692): son renglones que no cruzaron entre la
+    factura impresa y el reporte del ADRES.
+13. **Glosas a toda la reclamación:** 46 filas por $335.585.041 con causales
+    como "2102- formulario de reclamación incompleto" y "3122- debe anexar el
+    informe de ambulancia". No corresponden a ningún ítem: se responden aparte.
+14. **Confirmar el criterio de los ítems aprobados a medias.** En el ejemplo
     `HUS352890` la venda de gasa quedó a mano en **1 unidad / $9.400**, pero
     sumando las **dos** filas del reporte siguen glosadas **5 unidades /
     $47.000** (subtotal $132.800 en vez de $95.200). El bot hace la suma. Si el
     criterio del auditor es otro, se cambia con `--modo-parcial`.
-12. **Falta el Excel con la impresión (detallado) de las 324 facturas.** El
-    reporte de glosas y la lista de facturas ya están verificados; sin el
-    detallado no se puede correr el bot completo. Cuando llegue: correr con
-    `--diagnostico` y, si el formato difiere del ejemplo, ajustar la detección
-    (marcas `CÓDIGO/NOMBRE/CANT` y `VALOR SUBTOTAL…`).
-13. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
+15. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
     aparecen en el reporte): hoy se conservan y se marcan.
 
 ### Informes
@@ -214,8 +228,8 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 5. Si hay tiempo, avanzar el frente Dispensario: verificar si SISTEMAS ya
    corrigió algún CUV (pendiente #6) y descargar los 2 PDF del DIAN
    (pendiente #7).
-6. **Probar el ajustador de detallados** con los archivos reales del paquete
-   31068 (pendientes #11 a #13). Guía completa en
+6. **Revisar los Excel ajustados del paquete 31068** que quedaron generados y
+   los pendientes #11 a #15. Guía completa en
    `tools/README_ajustar_detallado_glosas.md`.
 
 ---

@@ -11,13 +11,13 @@ renglones y volver a sumar.
 
 1. **Lee el consolidado** de facturas que se van a trabajar y le **quita los
    duplicados** (`HUS352890`, `HUS0000352890` y `hus352890` cuentan como una).
-2. **Abre el Excel del detallado** (el que baja el sistema con **una hoja por
-   factura**, que siempre trae más facturas de las que se necesitan) y
-   **elimina las hojas de las facturas que no están en el consolidado**.
-3. En cada hoja que queda:
+2. **Abre el Excel del detallado** (el que baja el sistema: **una sola hoja con
+   todas las facturas del lote apiladas**, siempre muchas más de las que se
+   necesitan) y **elimina las facturas que no están en el consolidado**.
+3. En cada factura que queda:
    - **quita el encabezado institucional** (logo, `Carrera 33 # 28-126`, NIT,
      Bucaramanga, el QR, la línea `CUFE:` y `Página 1/1`);
-   - cambia el título **`FACTURA ELECTRONICA DE` → `DETALLADO DE FACTURA`**.
+   - cambia el título **`FACTURA ELECTRONICA DE VENTA` → `DETALLADO DE FACTURA`**.
 4. **Cruza cada ítem contra el `ReporteGlosasReclamPAQUETE NNNNN.xlsx`** y:
 
    | Situación en el reporte | Qué hace el bot |
@@ -30,9 +30,10 @@ renglones y volver a sumar.
 5. **Borra los títulos de grupo que quedaron vacíos** (`MEDICAMENTOS POS`,
    `DERECHOS DE SALA`, `IMAGENOLOGIA`, …) con su renglón en blanco, igual que
    se hace a mano.
-6. **Recalcula** el `VALOR SUBTOTAL DE SERVICIOS PRESTADOS`, el
-   `VALOR TOTAL ORDEN DE SERVICIO` y escribe el **total en letras**
-   (`CIENTO TREINTA Y DOS MIL OCHOCIENTOS PESOS M/CTE`).
+6. **Recalcula** el `VALOR SUBTOTAL DE SERVICIOS PRESTADOS` (importe **y**
+   cantidad de ítems), el `VALOR TOTAL ORDEN DE SERVICIO` y escribe el **total
+   en letras** con el mismo formato del sistema
+   (`CIENTO TREINTA Y DOS MIL OCHOCIENTOS PESOS CON CERO CTVS M/Cte.`).
 7. Escribe el **Excel corregido** y una **bitácora CSV** ítem por ítem.
 
 > **Seguro por defecto:** NO toca los archivos originales. Solo los **lee** y
@@ -69,28 +70,37 @@ sumaron para cada ítem.
 
 ---
 
-## Verificado contra el reporte real del paquete 31068
+## Corrido sobre el paquete 31068 completo
 
 | | |
 |---|---|
-| Hoja | `ReporteGlosasReclamPJ_RADICACIO` |
-| Encabezados | fila 7 (arriba va el título `ADRES — REPORTE DE GLOSAS…`) |
-| Filas de datos | 19.256 |
-| Facturas en el reporte | 581 |
-| Facturas del lote a trabajar | 324 — **las 324 están en el reporte** |
-| Hojas que se borrarían del detallado | 257 (facturas del reporte que no van en el lote) |
-
-Cifras de las 324 facturas:
+| Reporte de glosas | `ReporteGlosasReclamPJ_RADICACIO`, encabezados en la fila 7, 19.256 filas, 581 facturas |
+| Detallados | 7 archivos, 150.919 filas, 2.137 facturas |
+| Facturas del lote | 324 — **320 encontradas**; faltan 311371, 367368, 380246 y 394817 |
+| Resultado | 5 archivos ajustados, 1.817 facturas borradas por no ir en el lote |
 
 | Concepto | Valor |
 |---|---|
-| Reclamado | $2.870.214.655 |
-| Aprobado (lo que paga el ADRES) | $1.835.864.089 — 64,0 % |
-| **Sigue glosado** | **$1.034.350.566 — 36,0 %** |
+| Valor facturado de las 320 | $3.093.039.640 |
+| Ya pagado (renglones que se quitan) | $2.365.983.315 |
+| **Sigue glosado** | **$727.056.325 — 23,5 %** |
 
-De los 9.616 ítems: **6.805 se quitan** (aprobados al 100 %), **472 se ajustan**
-(aprobados a medias) y **2.712 se dejan** (glosados al 100 %). Ninguna factura
-queda vacía, y en todas se cumple `reclamado = aprobado + glosado`.
+De 9.912 ítems: **7.052 se quitan**, **501 se ajustan**, **2.259 se dejan** y
+**100 quedan marcados para revisión**.
+
+---
+
+## Dos cosas del reporte que NO son ítems
+
+1. **Glosas a toda la reclamación.** 46 filas del reporte vienen con
+   `Tipo Elemento = Reclamacion`, sin código ni descripción, y su valor **repite
+   el total de la factura** (causales tipo "2102- La reclamación presenta
+   formulario incompleto"). Si se cruzaran como ítems **duplicarían la glosa**:
+   en el paquete 31068 son **$335.585.041** que aparecerían dos veces. El bot las
+   separa y las anota en la bitácora como `GLOSA_RECLAMACION`.
+2. **Glosas sin ítem en el detallado.** 24 ítems que el reporte glosa
+   ($11.220.692) no existen en la factura impresa. Se anotan como
+   `GLOSA_SIN_ITEM` para que el auditor los revise.
 
 ---
 
@@ -142,7 +152,7 @@ py tools\ajustar_detallado_glosas.py ^
 | Opción | Para qué sirve |
 |---|---|
 | `--consolidado` | Excel/CSV con las facturas a trabajar. Si se omite, se trabajan **todas** las hojas del detallado. |
-| `--detallado` | El Excel del detallado. Se pueden pasar **varios**; en ese caso `--salida` es una **carpeta**. |
+| `--detallado` | El/los Excel del detallado (una sola hoja con las facturas apiladas). Se pueden pasar **varios**; en ese caso `--salida` es una **carpeta**. |
 | `--reporte-glosas` | El `ReporteGlosasReclamPAQUETE NNNNN.xlsx`. |
 | `--salida` | Excel corregido (o carpeta, si son varios detallados). |
 | `--reporte-csv` | Bitácora ítem por ítem (recomendado siempre). |
@@ -160,12 +170,13 @@ Una fila por ítem, separada por `;` (se abre en Excel con doble clic):
 
 `FACTURA · HOJA · GRUPO · CODIGO · NOMBRE · CANT_ORIGINAL · VR_ENT_ORIGINAL ·
 VALOR_RECLAMADO · VALOR_APROBADO · VALOR_GLOSADO · ACCION · CANT_NUEVA ·
-VR_ENT_NUEVO · CRUCE_POR · FILAS_REPORTE · OBSERVACION`
+VR_ENT_NUEVO · CRUCE_POR · FILAS_REPORTE · CAUSALES_GLOSA · OBSERVACION`
 
-- **ACCION**: `QUITADO`, `AJUSTADO`, `CONSERVADO`, `SIN_CRUCE`, o el estado de
-  la hoja (`ELIMINADA`, `SIN_GLOSAS`, `SIN_ESTRUCTURA`).
-- **CRUCE_POR**: `codigo`, `descripcion` o `unitario` — cómo se emparejó el
-  ítem con el reporte.
+- **ACCION**: `QUITADO`, `AJUSTADO`, `CONSERVADO`, `SIN_CRUCE`,
+  `GLOSA_SIN_ITEM`, `GLOSA_RECLAMACION`, o el estado de la factura
+  (`ELIMINADA`, `SIN_GLOSAS`, `SIN_ESTRUCTURA`).
+- **CRUCE_POR**: cómo se emparejó el ítem — `codigo`, `descripcion`,
+  `descripcion~` (por prefijo), `cantidad+valor` o `varios-a-uno`.
 
 **Revisar siempre las filas `SIN_CRUCE`**: son ítems de la factura que no
 aparecieron en el reporte de glosas. El bot los deja puestos (no borra nada por
@@ -175,17 +186,31 @@ las dudas) y los marca para que el auditor decida.
 
 ## Cómo cruza los ítems
 
-Los códigos **no siempre coinciden** entre los dos archivos: en la factura la
-venda de gasa es `FMQ0046` y en el reporte es `2016DM-0000315-R2` (código
-INVIMA). Por eso el bot intenta en este orden:
+Los dos archivos no hablan el mismo idioma:
 
-1. **por código** (procedimientos y medicamentos: `39145`, `19992190-3`, …);
-2. **por descripción** (dispositivos médicos: `VENDA DE GASA 6 X 5 YARDAS`),
-   sin tildes ni signos;
-3. **por valor unitario**.
+- los códigos llevan distinto relleno de ceros (`19935303-4` / `19935303-04`);
+- a los materiales el reporte les agrega un sufijo
+  (`… MATERIAL DE OSTEOSINTESIS UNIDAD 01`);
+- los dispositivos traen código INVIMA en el reporte (`2016DM-0000315-R2`) y
+  código interno en la factura (`FMQ0046`);
+- un mismo ítem puede estar partido en varias filas del reporte, o al revés:
+  dos renglones de la factura ser uno solo del reporte.
 
-Una fila del reporte se usa **una sola vez**, para que dos ítems distintos no
-se lleven la misma glosa.
+El emparejamiento se hace **por rondas**, de la evidencia más fuerte a la más
+débil, y en cada ronda **solo se acepta un par cuando es mutuamente único**:
+
+1. por **código** (normalizando los ceros);
+2. por **descripción** exacta;
+3. por **descripción con sufijo** (prefijo);
+4. por **cantidad + valor** exactos;
+5. por **valor** exacto;
+6. **varios renglones de la factura ↔ un ítem del reporte**, solo si cantidades
+   y valores cuadran exacto (la glosa se reparte proporcionalmente).
+
+Si un ítem empata con dos del reporte, **no se adivina**: pasa a la ronda
+siguiente y, si nada lo resuelve, queda `SIN_CRUCE` para revisión. Emparejar
+"al primero que aparezca" es lo que hacía que la PIPERACILINA se llevara la
+glosa del NITRÓGENO URÉICO por compartir el valor unitario.
 
 ---
 
@@ -193,8 +218,9 @@ se lleven la misma glosa.
 
 | Mensaje | Qué significa | Qué hacer |
 |---|---|---|
-| `Hojas sin glosas` | La factura no tiene filas en el reporte | ¿Es de otro paquete? La hoja queda sin tocar. |
+| `Hojas sin glosas` | La factura no tiene filas en el reporte | ¿Es de otro paquete? La factura queda sin tocar. |
 | `Hojas sin estructura` | No encontró la tabla `CÓDIGO / NOMBRE / CANT` ni la fila `VALOR SUBTOTAL…` | El formato del detallado cambió: pasar el archivo para ajustar el bot. |
+| `ninguna de sus N facturas está en el consolidado` | Ese archivo es de otro lote | No se escribe salida (quedaría vacía). |
 | `REVISAR: N ítem(s) no cruzaron` | Ítems de la factura ausentes del reporte | Mirar la bitácora, columna `OBSERVACION`. |
 | `X factura(s) del consolidado no están en el reporte de glosas` | El consolidado y el paquete no corresponden | Verificar que sean del mismo paquete. |
 
@@ -206,7 +232,8 @@ se lleven la misma glosa.
 py -m pytest tests/test_tools/test_ajustar_detallado_glosas.py -q
 ```
 
-Los tests reconstruyen la factura `HUS352890` del ejemplo (el "ANTES") y
-verifican que quede exactamente el "DESPUÉS": encabezado fuera, título
-cambiado, los 6 ítems pagados quitados, la venda de gasa ajustada y los totales
-recalculados.
+Los tests reconstruyen el formato real (facturas apiladas en una hoja, celdas
+combinadas desalineadas, membrete al principio y pie legal al final) con la
+factura `HUS352890` del ejemplo, y verifican que quede exactamente el "DESPUÉS":
+membrete fuera, título cambiado, los 6 ítems pagados quitados, la venda de gasa
+ajustada a 5 unidades y los totales recalculados.
