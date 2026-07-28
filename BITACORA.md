@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 27-07-2026
+**Última actualización:** 28-07-2026
 
 ---
 
@@ -121,6 +121,20 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   Publicado como artifact para socializar ante gerencia. Se generó también el
   cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
   consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
+- **28-07 (hoy):** nace el **ajustador de detallados de factura**
+  (`tools/ajustar_detallado_glosas.py` + README + 36 tests). Automatiza el
+  trabajo manual de dejar el detallado **solo con lo que la entidad sigue
+  glosando**: quita duplicados del consolidado, borra del Excel las hojas de las
+  facturas que no se van a trabajar, quita el encabezado institucional (logo,
+  NIT, QR, CUFE), cambia el título a **"DETALLADO DE FACTURA"**, cruza cada ítem
+  contra el `ReporteGlosasReclamPAQUETE` (quita lo aprobado, ajusta lo aprobado
+  a medias, deja lo glosado), borra los grupos que quedan vacíos y recalcula
+  subtotal, total y **total en letras**. Deja bitácora CSV ítem por ítem y tiene
+  modo `--diagnostico` para ver qué haría antes de escribir nada.
+  **Hallazgo:** el reporte de glosas trae **el mismo ítem repartido en varias
+  filas** (la venda de gasa de la HUS352890 viene en dos: 4 y 2 unidades). El
+  bot las suma → siguen glosados **$47.000**, no $9.400 como quedó en el ejemplo
+  hecho a mano. Falta que el auditor confirme ese criterio (ver PENDIENTE #11).
 
 ---
 
@@ -159,6 +173,19 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
    437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
 
+### Ajustador de detallados (`tools/ajustar_detallado_glosas.py`)
+11. **Confirmar el criterio de los ítems aprobados a medias.** En el ejemplo
+    `HUS352890` la venda de gasa quedó a mano en **1 unidad / $9.400**, pero
+    sumando las **dos** filas del reporte siguen glosadas **5 unidades /
+    $47.000** (subtotal $132.800 en vez de $95.200). El bot hace la suma. Si el
+    criterio del auditor es otro, se cambia con `--modo-parcial`.
+12. **Correr el bot contra los archivos reales** (consolidado, detallado y
+    `ReporteGlosasReclamPAQUETE 31068.xlsx`) con `--diagnostico` y revisar la
+    salida: si el formato del detallado real difiere del ejemplo, ajustar la
+    detección (marcas `CÓDIGO/NOMBRE/CANT` y `VALOR SUBTOTAL…`).
+13. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
+    aparecen en el reporte): hoy se conservan y se marcan.
+
 ### Informes
 10. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
     proceso manual y cuántas personas) para poner el multiplicador exacto.
@@ -176,6 +203,9 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 5. Si hay tiempo, avanzar el frente Dispensario: verificar si SISTEMAS ya
    corrigió algún CUV (pendiente #6) y descargar los 2 PDF del DIAN
    (pendiente #7).
+6. **Probar el ajustador de detallados** con los archivos reales del paquete
+   31068 (pendientes #11 a #13). Guía completa en
+   `tools/README_ajustar_detallado_glosas.md`.
 
 ---
 
