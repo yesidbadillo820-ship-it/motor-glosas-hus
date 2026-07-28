@@ -152,9 +152,16 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   por solapamiento de rangos, borrado masivo de filas re-indexando en sitio
   (0,3 s en vez de minutos) y emparejamiento por rondas con unicidad mutua.
   **Resultado: 320 de las 324 facturas procesadas** (150.919 filas de entrada),
-  $3.093.039.640 facturados de los cuales **siguen glosados $727.056.325 (23,5%)**.
-  Se generaron 5 Excel ajustados + bitácora ítem por ítem + resumen por factura,
-  y una verificación independiente los revisa todos sin fallas.
+  $2.464.092.099 facturados de los cuales **siguen glosados $714.332.225 (29,0%)**.
+  Se generaron 5 Excel ajustados + bitácora ítem por ítem + resumen por factura.
+  Un análisis en paralelo sobre los 4 primeros archivos (1.306 facturas) destapó
+  que **los procedimientos quirúrgicos traen renglones de DESGLOSE sin
+  consecutivo** cuyo valor ya está incluido en el renglón de arriba: son 3.794
+  renglones en 302 facturas y sumarlos inflaba el valor de la factura en
+  $628.947.541. Ya se descuentan. Nace también
+  `tools/verificar_detallado_ajustado.py`, que relee el Excel ajustado y lo
+  contrasta contra el original, el consolidado y el reporte del ADRES: los 5
+  archivos pasan sin fallas.
 
 ---
 

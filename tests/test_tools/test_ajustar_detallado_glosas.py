@@ -467,6 +467,108 @@ class TestLecturaHoja:
         assert (gasa.cantidad, gasa.vr_unit, gasa.vr_ent) == (6.0, 9400.0, 56400.0)
 
 
+class TestDesglose:
+    """Los procedimientos quirúrgicos abren renglones SIN consecutivo cuyo valor
+    ya está incluido en el renglón que los encabeza: no vuelven a sumar."""
+
+    def _hoja(self, tmp_path):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Sheet"
+        _poner(ws, 1, (6, 26), "FACTURA ELECTRONICA DE VENTA")
+        _poner(ws, 1, (27, 49), "HUS400000")
+        fila = 5
+        for campo, span in HDR.items():
+            _poner(
+                ws,
+                fila,
+                span,
+                {
+                    "codigo": "CÓDIGO",
+                    "nombre": "NOMBRE",
+                    "cantidad": "CANT",
+                    "vr_unit": "VR UNIT",
+                    "vr_pac": "VR PAC",
+                    "vr_ent": "VR ENT",
+                }[campo],
+            )
+        _poner(ws, fila + 1, (2, 67), "PROCEDIMIENTOS TERAPEUTICOS QUIRURGICOS")
+        # Renglón principal (con consecutivo) por 1.000.000…
+        _poner(ws, fila + 2, ITEM["consecutivo"], 1)
+        _poner(ws, fila + 2, ITEM["codigo"], "15103")
+        _poner(ws, fila + 2, ITEM["nombre"], "DESBRIDAMIENTO")
+        _poner(ws, fila + 2, ITEM["cantidad"], 1.0)
+        _poner(ws, fila + 2, ITEM["vr_unit"], 1000000.0)
+        _poner(ws, fila + 2, ITEM["vr_pac"], 0.0)
+        _poner(ws, fila + 2, ITEM["vr_ent"], 1000000.0)
+        # …y su desglose (sin consecutivo), que suma lo mismo.
+        for n, (cod, nom, val) in enumerate(
+            [("39005", "HONORARIOS CIRUJANO", 600000.0), ("39209", "DERECHOS DE SALA", 400000.0)]
+        ):
+            f = fila + 3 + n
+            _poner(ws, f, (8, 13), cod)
+            _poner(ws, f, (14, 30), nom)
+            _poner(ws, f, (31, 33), 1.0)
+            _poner(ws, f, (34, 45), val)
+            _poner(ws, f, (46, 58), 0.0)
+            _poner(ws, f, (59, 64), val)
+        fila += 6
+        _poner(ws, fila, TOT_ETIQUETA, "VALOR SUBTOTAL DE SERVICIOS PRESTADOS")
+        _poner(ws, fila, TOT_CANT, 1)
+        _poner(ws, fila, TOT_VALOR, 1000000.0)
+        _poner(ws, fila + 1, TOT_ETIQUETA, "VALOR TOTAL ORDEN DE SERVICIO")
+        _poner(ws, fila + 1, TOT_VALOR, 1000000.0)
+        _poner(ws, fila + 2, (6, 10), "TOTAL:")
+        _poner(ws, fila + 2, (11, 66), aj.numero_a_letras(1000000))
+        ruta = tmp_path / "desglose.xlsx"
+        wb.save(ruta)
+        return ruta
+
+    def test_marca_los_renglones_sin_consecutivo(self, tmp_path):
+        idx = aj.IndiceHoja(openpyxl.load_workbook(self._hoja(tmp_path))["Sheet"])
+        fac = aj.segmentar_facturas(idx)[0]
+        est = aj.detectar_estructura(idx, fac)
+        items = [i for b in aj.leer_bloques(idx, est) for i in b.items]
+        assert [i.desglose for i in items] == [False, True, True]
+        assert [i.codigo for i in items] == ["15103", "39005", "39209"]
+
+    def test_el_valor_de_la_factura_no_se_cuenta_dos_veces(self, tmp_path):
+        """Sumar los tres renglones daría 2.000.000; la factura vale 1.000.000."""
+        idx = aj.IndiceHoja(openpyxl.load_workbook(self._hoja(tmp_path))["Sheet"])
+        fac = aj.segmentar_facturas(idx)[0]
+        glosas = [
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo="15103",
+                descripcion="Desbridamiento",
+                tipo_elemento="Procedimientos",
+                cant_reclamada=0,
+                valor_reclamado=0,
+            ),
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo="39005",
+                descripcion="Honorarios cirujano",
+                tipo_elemento="Procedimientos",
+                cant_reclamada=1,
+                valor_reclamado=600000,
+                valor_glosado=600000,
+            ),
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo="39209",
+                descripcion="Derechos de sala",
+                tipo_elemento="Procedimientos",
+                cant_reclamada=1,
+                valor_reclamado=400000,
+                valor_aprobado=400000,
+            ),
+        ]
+        res, _ = aj.procesar_factura(idx, fac, glosas, hoja="Sheet", aplicar=False)
+        assert res.subtotal_antes == 1000000  # el subtotal real, no la suma de renglones
+        assert res.subtotal_despues == 600000  # solo el honorario sigue glosado
+
+
 class TestMapeoPorSolapamiento:
     def test_vr_ent_no_se_lleva_el_bloque_de_vr_pac(self):
         """La columna del rótulo VR ENT (53) cae dentro del rango VR PAC del

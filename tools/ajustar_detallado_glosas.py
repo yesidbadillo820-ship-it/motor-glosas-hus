@@ -368,6 +368,9 @@ class ItemDetallado:
     vr_unit: float
     vr_pac: float
     vr_ent: float
+    # Renglón de desglose (sin consecutivo): su valor ya viene sumado en el
+    # renglón de arriba, así que NO cuenta para el total de la factura.
+    desglose: bool = False
     # Celdas reales donde escribir cuando el ítem se ajusta (resueltas por
     # solapamiento de rangos combinados, no por índice de columna).
     celda_cantidad: Celda | None = None
@@ -402,6 +405,7 @@ class ResultadoItem:
     cruce: str = ""  # codigo | descripcion | descripcion~ | cantidad+valor | valor
     filas_reporte: int = 0
     causales: str = ""
+    desglose: bool = False
     observacion: str = ""
 
 
@@ -850,6 +854,11 @@ def leer_bloques(idx: IndiceHoja, est: EstructuraFactura) -> list[Bloque]:
                 )
                 if resto:
                     nombre = f"{nombre} {resto}".strip()
+            # Los renglones de DESGLOSE (los que abren un procedimiento
+            # quirúrgico en honorarios, derechos de sala, materiales…) vienen
+            # SIN número consecutivo. Su valor ya está incluido en el del
+            # renglón de arriba, así que no suman al total de la factura.
+            a_la_izquierda = [c for c in celdas if c.col_fin < col_nombre and c.texto]
             bloques[-1].items.append(
                 ItemDetallado(
                     fila=fila,
@@ -861,6 +870,7 @@ def leer_bloques(idx: IndiceHoja, est: EstructuraFactura) -> list[Bloque]:
                     vr_unit=vr_unit,
                     vr_pac=vr_pac,
                     vr_ent=vr_ent or cantidad * vr_unit,
+                    desglose=len(a_la_izquierda) < 2,
                     celda_cantidad=campos.get("cantidad"),
                     celda_vr_ent=campos.get("vr_ent"),
                 )
@@ -1376,7 +1386,14 @@ def procesar_factura(
     bloques = leer_bloques(idx, est)
     items = [i for b in bloques for i in b.items]
     res.items_total = len(items)
-    res.subtotal_antes = sum(i.vr_ent for i in items)
+    # El valor de la factura sale de su propia fila de subtotal, NO de sumar los
+    # renglones: los de desglose repiten el valor del renglón que los encabeza.
+    numeros = _celdas_numericas(idx.celdas(est.fila_subtotal))
+    res.subtotal_antes = (
+        _parse_valor(numeros[-1].valor)
+        if numeros
+        else sum(i.vr_ent for i in items if not i.desglose)
+    )
 
     items_reporte, reclamacion = agrupar_reporte(glosas)
     pares, sin_pareja = emparejar(items, items_reporte)
@@ -1384,6 +1401,17 @@ def procesar_factura(
     res.glosas_sin_item = [r for r in sin_pareja if r.valor_glosado > TOLERANCIA_PESOS]
 
     posicion = {id(i): n for n, i in enumerate(items)}
+    # Cada renglón de desglose "cuelga" del último renglón numerado anterior.
+    padre_de: dict[int, ItemDetallado | None] = {}
+    ultimo: ItemDetallado | None = None
+    for i in items:
+        if i.desglose:
+            padre_de[id(i)] = ultimo
+        else:
+            padre_de[id(i)] = None
+            ultimo = i
+    sobrevive: dict[int, bool] = {}
+
     a_borrar: set[int] = set()
     subtotal = 0.0
     vivos_factura = 0
@@ -1411,9 +1439,11 @@ def procesar_factura(
                     cruce=criterio,
                     filas_reporte=len(rep.filas) if rep else 0,
                     causales=rep.causales if rep else "",
+                    desglose=item.desglose,
                     observacion=nota,
                 )
             )
+            sobrevive[id(item)] = accion != "QUITADO"
 
             if accion == "QUITADO":
                 res.items_quitados += 1
@@ -1421,8 +1451,16 @@ def procesar_factura(
                 continue
 
             vivos += 1
-            vivos_factura += 1
-            subtotal += valor
+            # Un renglón de desglose solo suma si el renglón que lo encabeza ya
+            # NO está: si quedaran los dos, el valor se contaría dos veces.
+            padre = padre_de.get(id(item))
+            if item.desglose and padre is not None and sobrevive.get(id(padre)):
+                res.detalle[
+                    -1
+                ].observacion += " | no suma al total: su renglón principal sigue en la factura"
+            else:
+                vivos_factura += 1
+                subtotal += valor
             if accion == "AJUSTADO":
                 res.items_ajustados += 1
                 if aplicar:
@@ -1565,6 +1603,7 @@ CAMPOS_CSV = [
     "CRUCE_POR",
     "FILAS_REPORTE",
     "CAUSALES_GLOSA",
+    "TIPO_RENGLON",
     "OBSERVACION",
 ]
 
@@ -1616,6 +1655,7 @@ def escribir_bitacora(ruta: Path, resultados: list[ResultadoHoja]) -> None:
                         d.cruce,
                         d.filas_reporte,
                         d.causales,
+                        "DESGLOSE" if d.desglose else "ITEM",
                         d.observacion,
                     ]
                 )

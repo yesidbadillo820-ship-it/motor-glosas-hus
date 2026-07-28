@@ -81,12 +81,31 @@ sumaron para cada ítem.
 
 | Concepto | Valor |
 |---|---|
-| Valor facturado de las 320 | $3.093.039.640 |
-| Ya pagado (renglones que se quitan) | $2.365.983.315 |
-| **Sigue glosado** | **$727.056.325 — 23,5 %** |
+| Valor facturado de las 320 | $2.464.092.099 |
+| Ya pagado (renglones que se quitan) | $1.749.759.874 |
+| **Sigue glosado** | **$714.332.225 — 29,0 %** |
 
-De 9.912 ítems: **7.052 se quitan**, **501 se ajustan**, **2.259 se dejan** y
-**100 quedan marcados para revisión**.
+De 9.912 renglones: **7.052 se quitan**, **501 se ajustan**, **2.259 se dejan**
+y **100 quedan marcados para revisión**.
+
+---
+
+## Los procedimientos quirúrgicos traen renglones de desglose
+
+Debajo de un procedimiento quirúrgico el sistema imprime su **desglose**
+(honorarios del cirujano, del anestesiólogo, ayudantía, derechos de sala,
+materiales y suturas). Esos renglones **no llevan número consecutivo** y su
+valor **ya está incluido** en el renglón que los encabeza: la factura suma solo
+los renglones numerados.
+
+En los 4 primeros archivos son **3.794 renglones en 302 facturas**, y sumarlos
+como si fueran ítems **inflaba el valor de la factura en $628.947.541** sobre el
+paquete 31068. El bot los marca `DESGLOSE` en la bitácora y los descuenta del
+total cuando el renglón que los encabeza sigue en la factura.
+
+> El reporte del ADRES lo modela al revés: el procedimiento va en $0 y son los
+> componentes los que llevan el valor. Por eso el procedimiento se quita
+> (`reclamado 0`) y son sus componentes los que quedan glosados.
 
 ---
 
@@ -223,6 +242,28 @@ glosa del NITRÓGENO URÉICO por compartir el valor unitario.
 | `ninguna de sus N facturas está en el consolidado` | Ese archivo es de otro lote | No se escribe salida (quedaría vacía). |
 | `REVISAR: N ítem(s) no cruzaron` | Ítems de la factura ausentes del reporte | Mirar la bitácora, columna `OBSERVACION`. |
 | `X factura(s) del consolidado no están en el reporte de glosas` | El consolidado y el paquete no corresponden | Verificar que sean del mismo paquete. |
+
+---
+
+## Segunda opinión: `verificar_detallado_ajustado.py`
+
+Antes de mandar nada, conviene que **otro programa revise el resultado**. Este
+vuelve a leer el Excel ajustado y lo contrasta contra el original, el
+consolidado y el reporte del ADRES —sin confiar en lo que el bot dijo que hizo:
+
+```bat
+py tools\verificar_detallado_ajustado.py ^
+    --ajustado       "D:\...\DETALLADOS_31068_AJUSTADO.xlsx" ^
+    --original       "D:\...\DETALLADOS PAQUETE 31068.xlsx" ^
+    --consolidado    "D:\...\CONSOLIDADO.xlsx" ^
+    --reporte-glosas "D:\...\ReporteGlosasReclamPAQUETE 31068.xlsx" ^
+    --bitacora       "D:\...\bitacora_31068.csv"
+```
+
+Comprueba que no quede membrete ni el título viejo, que las facturas sean
+exactamente las del consolidado, que suma de renglones = subtotal = total, que
+ese total cuadre con lo que el ADRES dice que sigue glosado, y que el total en
+letras corresponda al número. Devuelve `SIN FALLAS` o la lista de diferencias.
 
 ---
 
