@@ -475,6 +475,23 @@ async def lifespan(app: FastAPI):
             pass
         logger.warning(f"MIGRACIÓN pre-auditoría v2: {e}")
 
+    # Pre-auditoría: la observación que escribe el auditor ahora también queda
+    # en el historial de la factura (antes solo se guardaba el motivo de las
+    # devoluciones y lo escrito al radicar se perdía).
+    try:
+        if _tiene_tabla("preaud_factura_eventos") and not _tiene_columna(
+            "preaud_factura_eventos", "observaciones"
+        ):
+            logger.warning("MIGRACIÓN pre-auditoría: agregando observaciones a los eventos")
+            db.execute(text("ALTER TABLE preaud_factura_eventos ADD COLUMN observaciones TEXT"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría observaciones: {e}")
+
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
     # "value too long for type character varying(50)" en EPS oficial

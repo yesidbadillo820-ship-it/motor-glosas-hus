@@ -1173,6 +1173,10 @@ class FacturaEventoRecord(Base):
     resultado = Column(String(15), nullable=True)
     auditor = Column(String(120), index=True, nullable=True)
     motivo = Column(Text, nullable=True)
+    # Lo que escribió el auditor al decidir. A diferencia del motivo (que solo
+    # aplica a las devoluciones), la observación se guarda también cuando la
+    # factura se radica, y queda visible en el historial.
+    observaciones = Column(Text, nullable=True)
     oficio_devolucion_id = Column(
         Integer, ForeignKey("preaud_oficios_devolucion.id"), index=True, nullable=True
     )

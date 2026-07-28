@@ -387,6 +387,34 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   original: 191.859 leídas, 189.446 facturas, 2.413 anuladas). Cada parte
   tarda 17 segundos, muy por debajo del límite. Se puede partir sin riesgo
   porque en ese archivo **ninguna factura se repite**.
+### 28-07 (tarde) — Tres fallas del uso real y el borrado de envíos
+Reportadas por el auditor durante la jornada, con evidencia en pantalla:
+- **La misma factura quedó radicada 5 veces.** En el historial aparecían cinco
+  eventos RADICADA idénticos, del mismo auditor y a la misma hora. Causa: como
+  la página no avisaba que estaba guardando, el gestor volvía a hacer clic, y
+  las peticiones llegaban al servidor **al mismo tiempo**; todas veían la
+  factura "pendiente" antes de que la primera alcanzara a guardar. Corregido
+  por los dos lados: el botón se bloquea y muestra "Guardando…", y el servidor
+  toma la factura con una sola operación indivisible, así solo el primer clic
+  gana y los demás reciben un aviso claro.
+- **Lo que se escribía se perdía.** El único campo del formulario decía "Motivo
+  de la devolución" y, al radicar, ese texto se descartaba. Ahora hay un campo
+  **Observaciones** aparte que **se guarda siempre** (también al radicar) y
+  queda visible en el historial de la factura, con su propia columna.
+- **La página no se actualizaba sola.** Había que recargarla a mano para ver si
+  algo se había guardado, porque cuando el servidor iba lento los refrescos
+  fallaban **en silencio**. Ahora las tablas muestran "Cargando…" mientras
+  responden y, si algo falla, lo **dicen** en pantalla con opción de
+  reintentar, en vez de quedarse mostrando datos viejos.
+- **Nuevo: quitar un envío cargado por error.** En el detalle del oficio, cada
+  envío tiene una ✕ (solo administradores) que lo deshace sin tocar el resto
+  del oficio: borra las facturas que entraron con ese envío, y las que venían
+  de una devolución vuelven a su estado anterior sin perder historial. El
+  envío queda libre para volver a escribirlo. No se puede quitar si alguna de
+  sus facturas ya salió en un oficio de devolución emitido.
+- 58 pruebas del módulo (8 nuevas) y 4.361 de la suite completa en verde, más
+  verificación en navegador de los cuatro puntos.
+
 - **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
   tamaño, la solución de fondo es que **el cargue no haga esperar al
   navegador**: subir el archivo, responder de inmediato "recibido, procesando"
