@@ -366,6 +366,32 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   anterior): se subió el tope de memoria del contenedor de 640 MB a 1.400 MB
   con uso de disco como apoyo, para que la aplicación se ponga lenta en vez
   de morirse.
+- **Segundo hallazgo (misma tarde): los archivos crecieron mucho.** Al revisar
+  los archivos reales de hoy resultó que ya no son del tamaño de antes:
+  - Formato Facturación Electrónica: **203.484 filas** (antes 7.231).
+  - Radicación de Cuentas: **191.859 filas → 189.446 facturas** (antes 36.723),
+    17,6 MB, con 2.413 radicaciones anuladas.
+  Con ese tamaño el cargue tardaba 49 segundos en un equipo rápido, y en el
+  servidor del hospital pasaba de los **100 segundos que Cloudflare tolera**
+  antes de cortar la conexión: de ahí los errores 524 y 502.
+- **Segunda optimización (lectura del Excel):** se encontró que los reportes de
+  Dinámica Gerencial **no declaran sus dimensiones** dentro del archivo. Cuando
+  ese dato falta, la librería que lee Excel recorre el archivo COMPLETO solo
+  para averiguar su tamaño y después lo vuelve a recorrer para leerlo: 12
+  segundos perdidos de 36. Como el sistema nunca usa ese dato, ahora se omite
+  ese primer barrido. Además se quitó una normalización de texto costosa que
+  se ejecutaba 383.740 veces (dos por fila). **Resultado: la lectura pasó de
+  45 a 28 segundos**, leyendo exactamente lo mismo.
+- **Solución entregada al auditor ese día:** se partió el archivo de Radicación
+  en 3 partes (verificando que las 3 suman exactamente lo mismo que el
+  original: 191.859 leídas, 189.446 facturas, 2.413 anuladas). Cada parte
+  tarda 17 segundos, muy por debajo del límite. Se puede partir sin riesgo
+  porque en ese archivo **ninguna factura se repite**.
+- **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
+  tamaño, la solución de fondo es que **el cargue no haga esperar al
+  navegador**: subir el archivo, responder de inmediato "recibido, procesando"
+  y que la página muestre el avance. Así el tamaño del archivo deja de
+  importar y no hay límite de tiempo que valga. Queda propuesto.
 - **PENDIENTE recomendado:** subir la máquina virtual de `e2-micro` (1 GB) a
   **`e2-small`** (2 GB, ~US$13 más al mes). Se hace desde la consola de
   Google: Compute Engine → VM `motor-glosas` → Detener → Editar → Tipo de
