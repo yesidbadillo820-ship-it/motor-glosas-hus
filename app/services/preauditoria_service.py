@@ -20,6 +20,7 @@ SINAC de los oficios de devolución (DEV-PRE-AUD-####-AAAA).
 from __future__ import annotations
 
 import re
+import threading
 import unicodedata
 from datetime import date, datetime, timedelta
 from io import BytesIO
@@ -275,6 +276,52 @@ def _misma_fecha(a, b) -> bool:
     return da == db_
 
 
+_LOCK_OPENPYXL = threading.Lock()
+
+
+def _abrir_libro(contenido: bytes):
+    """Abre el Excel en modo lectura, sin el barrido previo de dimensiones.
+
+    Los reportes de Dinámica Gerencial no declaran `<dimension>` en su XML.
+    Cuando ese dato falta, openpyxl recorre el archivo ENTERO solo para
+    averiguar su tamaño y después lo vuelve a recorrer para leerlo: con el
+    reporte real de Radicación (191.859 filas) son 12 segundos perdidos de 36.
+    Aquí solo se recorre con `iter_rows` y nunca se consultan `ws.max_row` ni
+    `ws.max_column`, así que ese primer barrido no aporta nada.
+
+    El ajuste es sobre la clase de openpyxl; se toma un candado y se restaura
+    de inmediato, de modo que solo cubre la apertura de este libro y no afecta
+    a otros cargues del sistema que sí usen las dimensiones.
+    """
+    from openpyxl import load_workbook  # import perezoso
+    from openpyxl.worksheet._read_only import ReadOnlyWorksheet
+
+    with _LOCK_OPENPYXL:
+        original = ReadOnlyWorksheet._get_size
+        ReadOnlyWorksheet._get_size = lambda self: None
+        try:
+            return load_workbook(BytesIO(contenido), data_only=True, read_only=True)
+        finally:
+            ReadOnlyWorksheet._get_size = original
+
+
+# Valores de la columna FACTURA que en realidad son encabezados o totales
+# repetidos dentro del reporte: se saltan.
+_FACTURA_NO_ES_FACTURA = {"FACTURA", "TOTAL"}
+
+
+def _es_fila_de_encabezado(factura: str) -> bool:
+    """¿El valor de la columna FACTURA es en realidad un encabezado/total?
+
+    Se evita normalizar (NFKD + expresiones regulares) en cada una de las
+    191.859 filas: un número de factura real es ASCII alfanumérico y no cambia
+    al normalizarse, así que basta compararlo directo.
+    """
+    if factura.isascii() and factura.isalnum():
+        return factura in _FACTURA_NO_ES_FACTURA
+    return _normalizar_encabezado(factura) in _FACTURA_NO_ES_FACTURA
+
+
 def _hallar_encabezado(ws, alias: dict, requeridos: set, max_filas: int = 15):
     """Busca la fila de encabezados (primeras `max_filas`) y devuelve
     (numero_fila, mapa) o (None, None) si no aparece."""
@@ -294,14 +341,15 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
     'Anulado' y, si una factura tiene varias radicaciones válidas, se conserva
     la de mayor F_RECIBIDO). {"facturas": [...], "advertencias": [...]}.
     """
-    from openpyxl import load_workbook  # import perezoso
-
-    wb = load_workbook(BytesIO(contenido), data_only=True, read_only=True)
+    wb = _abrir_libro(contenido)
     por_factura: dict[str, dict] = {}
     advertencias: list[str] = []
     anuladas = 0
     leidas = 0
     _repetidos: dict = {}
+    # Los estados se repiten (unos pocos valores distintos en todo el archivo):
+    # se normaliza cada uno una sola vez, no una vez por fila.
+    _anulado: dict = {}
 
     def _compartido(valor):
         """ENTIDAD, NIT, ENVÍO y ESTADO repiten el mismo texto en miles de
@@ -326,13 +374,18 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
                 return fila[idx]
 
             factura = (str(_celda("factura") or "").strip() or "").upper()
-            if not factura or _normalizar_encabezado(factura) in {"FACTURA", "TOTAL"}:
+            if not factura or _es_fila_de_encabezado(factura):
                 continue
             leidas += 1
             estado = _texto(_celda("estado_radicacion"))
-            if estado and _normalizar_encabezado(estado).startswith("ANULAD"):
-                anuladas += 1
-                continue
+            if estado is not None:
+                es_anulado = _anulado.get(estado)
+                if es_anulado is None:
+                    es_anulado = _normalizar_encabezado(estado).startswith("ANULAD")
+                    _anulado[estado] = es_anulado
+                if es_anulado:
+                    anuladas += 1
+                    continue
             f_recibido = _como_fecha(_celda("f_recibido"))
             registro = {
                 "factura": factura,
@@ -372,9 +425,7 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
 
 def parsear_excel_dgreport(contenido: bytes) -> dict:
     """Lee el Excel de DGREPORT. Devuelve una fila por factura (con correo F.E.)."""
-    from openpyxl import load_workbook
-
-    wb = load_workbook(BytesIO(contenido), data_only=True, read_only=True)
+    wb = _abrir_libro(contenido)
     por_factura: dict[str, dict] = {}
     advertencias: list[str] = []
     leidas = 0

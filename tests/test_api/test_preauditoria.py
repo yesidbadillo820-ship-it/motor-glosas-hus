@@ -8,6 +8,7 @@ el auto-sync (re-subir una fuente corregida se refleja en el consolidado).
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from io import BytesIO
 
@@ -869,3 +870,60 @@ class TestParsers:
     def test_radicacion_sin_columnas_avisa(self):
         r = svc.parsear_excel_radicacion(_excel(["OTRA", "COSA"], [[1, 2]]))
         assert r["facturas"] == [] and r["advertencias"]
+
+    def test_salta_encabezados_y_totales_repetidos(self):
+        """El reporte real repite el encabezado y trae filas de TOTAL: se saltan.
+
+        Cubre el atajo rápido del parseo (evitar normalizar 191.859 veces):
+        los valores ASCII alfanuméricos se comparan directo y los que traen
+        acentos o signos siguen pasando por la normalización completa.
+        """
+        filas = [
+            _rad_fila(ENV, F1, 250700),
+            _rad_fila(ENV, "FACTURA", 0),  # encabezado repetido
+            _rad_fila(ENV, "Total", 999),  # fila de total
+            _rad_fila(ENV, " total ", 999),  # con espacios
+            _rad_fila(ENV, "FACTÚRA", 0),  # con acento → normalizada
+            _rad_fila(ENV, F2, 98000),
+        ]
+        r = svc.parsear_excel_radicacion(_excel(RAD_HEADERS, filas))
+        assert sorted(f["factura"] for f in r["facturas"]) == sorted([F1, F2])
+
+    def test_anulado_en_cualquier_forma_se_descarta(self):
+        """El estado llega escrito de varias formas; todas cuentan como anulada."""
+        filas = [
+            _rad_fila(ENV, F1, 1, estado="Anulado"),
+            _rad_fila(ENV, F2, 2, estado="ANULADA"),
+            _rad_fila(ENV, F3, 3, estado="anulado_entidad"),
+            _rad_fila(ENV, "HUS0000999999", 4, estado="Radicado_Entidad"),
+        ]
+        r = svc.parsear_excel_radicacion(_excel(RAD_HEADERS, filas))
+        assert [f["factura"] for f in r["facturas"]] == ["HUS0000999999"]
+        assert "3 radicación(es) 'Anulado' descartada(s)" in r["advertencias"]
+
+    def test_lee_archivos_sin_dimensiones_declaradas(self):
+        """El reporte de DGH no declara <dimension>: debe leerse igual.
+
+        Se omite el barrido previo de openpyxl (12 s en el archivo real), así
+        que esta prueba fija que quitarlo no cambia lo que se lee.
+        """
+        import zipfile
+
+        contenido = _excel(RAD_HEADERS, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        # el Excel de prueba sí declara dimensiones: se le quitan para simular
+        # el reporte real de Dinámica Gerencial
+        entrada = BytesIO()
+        with zipfile.ZipFile(BytesIO(contenido)) as orig:
+            with zipfile.ZipFile(entrada, "w", zipfile.ZIP_DEFLATED) as nuevo:
+                for item in orig.infolist():
+                    datos = orig.read(item.filename)
+                    if item.filename.startswith("xl/worksheets/sheet"):
+                        datos = re.sub(rb"<dimension[^>]*/>", b"", datos)
+                    nuevo.writestr(item, datos)
+        sin_dim = entrada.getvalue()
+        assert b"<dimension" not in zipfile.ZipFile(BytesIO(sin_dim)).read(
+            "xl/worksheets/sheet1.xml"
+        )
+        r = svc.parsear_excel_radicacion(sin_dim)
+        assert sorted(f["factura"] for f in r["facturas"]) == sorted([F1, F2])
+        assert r["leidas"] == 2
