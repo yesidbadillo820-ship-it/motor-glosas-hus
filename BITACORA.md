@@ -521,6 +521,39 @@ rama principal: están listos, probados y a un clic de distancia.
   **desconectado**. Es justo lo que faltó cuando las tres facturas de junio
   ($20.054.751) se descubrieron 45 días tarde.
 
+### 28-07 (noche) — Verificación adversarial del lote de glosas Dispensario del 28-jul
+- Lote de **97 objeciones**. Solo se atacaron las **6 decisiones nuevas** (el
+  resto del banco de plantillas ya pasó 4 rondas adversariales y no se re-evalúa).
+- Resultado: **3 calzan con reserva** (FA0201 equipo interdisciplinario,
+  FA2303 transfusión, TA listado→tarifa) y **3 NO calzan** (FA0801 segundo
+  rastreo de anticuerpos, SO5801 biopsia endometrio/AMEU, FA0101 conteo de
+  días de estancia).
+- **Veredicto: el lote NO está listo para subir.** Hay correcciones de texto
+  obligatorias antes del cargue:
+  - Quitar frases que refutan reclamos que el pagador no hizo ("no se anexa
+    acuerdo de tarifas", "paquete", "procedimiento principal", SOAT UVB):
+    delatan respuesta enlatada y permiten descalificarla por no pertinente
+    (la Res. 2284/2023 exige coherencia entre glosa y respuesta).
+  - Responder los prongs reales de cada observación: identificación del
+    equipo interdisciplinario y defensa de la cantidad 29 (FA0201); la tesis
+    "enfermería está incluida en la estancia" (FA2303: la estancia cubre el
+    cuidado básico, no procedimientos con renglón propio); la regla de 72
+    horas del banco de sangre (FA0801: voltearla — la muestra pretransfusional
+    VENCE a las 72 h en paciente transfundido, Decreto 1571/1993, o sea el
+    nuevo evento OBLIGA al nuevo rastreo); la homologación AMEU→legrado
+    (SO5801); y el conteo aritmético 32 vs 34 días (FA0101).
+  - Quitar frases autolesivas: la remisión genérica a la nota operatoria en
+    SO5801 (si la nota no describe biopsia aparte, confirma la glosa) y la
+    prueba de "permanencia del día objetado" en FA0101 (34 días no caben
+    entre el 17-may y el 18-jun); en TA, afirmar la vigencia 2026 del
+    contrato 440 (prórroga/adiciones), no solo que el pagador "es parte".
+- Verificaciones del auditor antes de cargar esos grupos: leer la nota
+  operatoria del caso AMEU (¿hubo toma de biopsia como acto aparte?);
+  reconstruir día a día los 34 días de estancia (si solo se prueban 32-33,
+  procede aceptar parcial el excedente, no forzar el 100%); fechas y horas de
+  los 2 rastreos de anticuerpos con su orden médica; otrosí o prórroga que
+  acredite la vigencia 2026 del contrato 440-DIGSA/DMBUG-2025.
+
 ---
 
 ## 3) PENDIENTE
@@ -579,6 +612,13 @@ rama principal: están listos, probados y a un clic de distancia.
 15. **Conciliación:** confirmar el acta de inicio del contrato 287 y el mapeo
     de códigos internos de cartera (U22031/C26001…), y correr el asistente en
     piloto sobre 1-2 facturas reales contra `Y:\`.
+- **(28-07) Lote del 28-jul (97 objeciones): NO subir todavía.** Aplicar las
+  correcciones de texto de la verificación (3 grupos no calzan: FA0801,
+  SO5801, FA0101; y ajustes obligatorios en FA0201, FA2303 y TA) y completar
+  las verificaciones del auditor: nota operatoria del caso AMEU, desglose día
+  a día de los 34 días de estancia, horas/órdenes de los 2 rastreos de
+  anticuerpos y prórroga 2026 del contrato 440. Detalle en la sección
+  "28-07 (noche)".
 
 ### Informes
 16. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
@@ -610,6 +650,10 @@ rama principal: están listos, probados y a un clic de distancia.
    junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
    14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
    verificación) y generar sus PDF de evidencias.
+   **Lote del 28-jul: NO subir hasta corregir los textos** señalados por la
+   verificación (3 grupos no calzan) y resolver las verificaciones del
+   auditor (nota operatoria AMEU, desglose de los 34 días, horas de los 2
+   rastreos, prórroga 2026 del contrato 440).
 2. Correr la **pertinencia fusionada** COOSALUD (pendiente #1) y verificar que
    las 37 facturas cierren con evidencia.
 3. Con los reportes en mano, **cerrar los flecos de los lotes 02/06/07/08**
