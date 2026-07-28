@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 27-07-2026
+**Última actualización:** 28-07-2026
 
 ---
 
@@ -441,6 +441,77 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
     Google (`cd /opt/motor-glosas && git pull && docker compose build motor &&
     docker compose up -d`) y repetir los 4 casos de prueba.
 
+### 28-07 — SINAC OS: se pasó de "una aplicación" a una plataforma con plan
+
+Día de dos mitades: primero se documentó a dónde vamos, después se empezó a
+construir. Todo está en la rama principal.
+
+**Lo que se documentó** (PR #197, cuatro archivos en `docs/`):
+- `SINAC_OS.md` — el plano maestro que escribió Yesid: visión, principios,
+  agentes, módulos y las siete fases del proyecto. Es el documento rector:
+  ningún desarrollo puede contradecirlo sin actualizarlo primero.
+- `MANUAL_ARQUITECTURA_SINAC_OS.md` — 19 capítulos que explican **cómo** se
+  construye SINAC OS. La idea de fondo: el proceso administrativo deja de ser
+  una carpeta de archivos y pasa a ser un objeto vivo que nunca muere, solo
+  cambia de estado (Factura → Glosa → Objeción → Respuesta → Radicación →
+  Conciliación → Aceptación → Pago → Archivo → Histórico). Cada capítulo cierra
+  respondiendo qué existe hoy, qué se reutiliza, qué se elimina, qué se crea y
+  cómo se migra sin romper nada.
+- `MAPA_CAPACIDADES.md` — la misma plataforma explicada sin tecnicismos, para
+  gerencia o para alguien que llega nuevo al área.
+- `ANEXO_AUDITORIA.md` — la radiografía del sistema tal como estaba antes,
+  guardada como memoria de por qué se decidió cada cosa.
+
+**Lo que se descubrió al revisar el sistema entero** (15 auditorías sobre el
+código real): el sistema sabe mucho pero está mal conectado consigo mismo. La
+mitad que piensa (la aplicación web) y la mitad que ejecuta (los robots de
+portal) **no se hablan**: el puente es un Excel que viaja en el escritorio de
+una PC. Y hay **39 archivos de módulos ya terminados** (SAVIA, EMSSANAR, VCO,
+FOMAG, Mutual Ser, el organizador de correos) que nunca se fusionaron a la
+rama principal: están listos, probados y a un clic de distancia.
+
+**Lo que ya se construyó y está funcionando:**
+
+- **Seguridad y trazabilidad (PR #199).** Siete arreglos:
+  1. El sistema decía que ciframos los datos del paciente **y no los ciframos**.
+     Ahora dice la verdad; cifrarlos de verdad queda para el siguiente paso.
+  2. El nombre del paciente ya no se le muestra a cualquiera: solo al gestor
+     asignado, al coordinador y al administrador. Si la glosa **no** tiene
+     gestor, sigue visible para todos — es trabajo que cualquiera puede tomar.
+  3. Un usuario de solo lectura podía cerrar glosas por una puerta lateral,
+     **incluso 500 de un golpe**. Cerrada.
+  4. Si faltaba la clave secreta en la configuración, el sistema arrancaba
+     igual y firmaba las sesiones con una clave vacía. Ahora no arranca.
+  5. La página de "estado del sistema", que es pública, hacía un recorrido
+     pesado de 30 días en cada consulta. Ahora es liviana.
+  6. El registro de auditoría (quién hizo qué) ya **no se puede borrar**.
+  7. Ese registro ahora guarda también desde qué computador se hizo cada cosa.
+  - Además: el servidor pasó a hora de Bogotá. Estaba en hora de Londres, así
+    que las tareas programadas "de las 3 de la mañana" corrían a las 10 de la
+    noche.
+- **Un solo lector de valores en pesos (PR #201).** Había cuatro copias del
+  mismo código leyendo montos, y dos se equivocaban en plata:
+  - El **informe de cartera de gerencia** leía `950.000` como **950 pesos**
+    (cualquier monto con un solo punto se dividía por mil). Solo pasaba con
+    valores en texto, como los que exporta el DGH. **Conviene revisar un
+    informe reciente.**
+  - El cargue de tarifas leía como **cero** dos formas de escribir comunes
+    (`1'500.000` y `850 millones`). Una tarifa en cero se propaga al dictamen.
+  - Al unificar apareció un tercer error: `0.99` se leía como 99 pesos.
+  - Ahora hay un solo lector, y una prueba que caza a quien vuelva a escribir
+    otro por su cuenta.
+
+**Dos hallazgos que conviene no perder de vista:**
+- El robot de SAVIA **multiplica por cien** los valores con decimales
+  (`1.365,50` → `136.550`). El módulo de EMSSANAR ya había corregido ese mismo
+  error, pero el arreglo nunca llegó porque las ramas nunca se juntaron. Si el
+  Excel de SAVIA trae decimales, los archivos generados con ese robot llevan
+  valores inflados.
+- El sistema **ya tiene construido** un avisador por correo de glosas próximas
+  a vencer (ordena por urgencia, arma el correo, todo). Está terminado y
+  **desconectado**. Es justo lo que faltó cuando las tres facturas de junio
+  ($20.054.751) se descubrieron 45 días tarde.
+
 ---
 
 ## 3) PENDIENTE
@@ -541,6 +612,31 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
 6. Si hay tiempo: verificar si SISTEMAS ya corrigió algún CUV (pendiente #6),
    descargar los 2 PDF del DIAN (pendiente #7) y revisar el PR #186 del módulo
    de pre-auditoría.
+
+### SINAC OS — decisiones que dependen de Yesid (28-07)
+
+7. **Revisar un informe de cartera reciente.** El lector de montos leía
+   `950.000` como `950` cuando el valor venía en texto. Ya está corregido, pero
+   conviene mirar si algún informe salió con cifras bajas.
+8. **Revisar un Excel de SAVIA.** Si la columna de valor trae comas decimales,
+   los archivos que generó ese robot llevan los montos multiplicados por cien.
+   El arreglo existe (lo tiene el módulo de EMSSANAR); falta juntarlos.
+9. **Decidir qué hacer con los 39 archivos huérfanos** (SAVIA, EMSSANAR, VCO,
+   FOMAG, Mutual Ser, organizador de correos, herramientas de cartera): están
+   en ramas de otras sesiones con sus PR en borrador (#162, #164, #167). Se
+   fusionan desde acá o se cierran desde esas sesiones — pero conviene no
+   dejarlos más tiempo sueltos, que es justo lo que produjo dos robots
+   distintos para el mismo pagador.
+10. **Decidir si se enciende el avisador de vencimientos por correo.** Está
+    construido y desconectado. Para prenderlo hace falta definir: quién recibe
+    los avisos, con cuántos días de anticipación, y desde qué cuenta de correo
+    salen (hoy no hay servidor de correo configurado).
+11. **Comprobar que el enmascarado del nombre del paciente no estorbe** en el
+    trabajo diario. Si una glosa tiene gestor asignado, los demás auditores
+    ven iniciales en vez del nombre. Si molesta, se ajusta en una línea.
+12. **Siguiente paso de construcción**, según el plan: terminar la limpieza de
+    módulos sin uso y arrancar la **Fase 2 — modelo real del dominio**
+    (Factura → Glosa → Soporte → Conciliación → Acta).
 
 ---
 
