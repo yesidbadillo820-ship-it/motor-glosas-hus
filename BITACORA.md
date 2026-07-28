@@ -437,19 +437,39 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
 - La sugerencia siguiente continúa desde el que se escribió (si usó el 89, la
   próxima vez sugiere el 90).
 - 3 pruebas nuevas + prueba en navegador de la ventana completa.
+- **Ya quedó desplegado en la VM** (PR #208 fusionado). No hubo que hacer nada
+  a mano: el auto-despliegue que corre cada 5 minutos lo aplicó solo y el
+  motor quedó corriendo el commit `5ba3a3f`, sano. Para verlo en pantalla hay
+  que refrescar el navegador con **Ctrl+F5** (si no, muestra la versión vieja
+  que tiene guardada).
+- **Nota para no perder tiempo la próxima vez:** en la VM el repositorio está
+  en `/opt/motor-glosas` y el motor corre en **Docker**, no como servicio de
+  systemd. El comando para mirar cómo está, desde Cloud Shell y en un solo
+  paso (entra a la VM y ejecuta allá adentro):
+
+  ```bash
+  gcloud compute ssh motor-glosas --zone=us-west1-a --tunnel-through-iap --command '
+  cd /opt/motor-glosas && git log --oneline -1
+  sudo docker compose ps
+  free -m | head -2
+  '
+  ```
+
+  Cuidado con confundir las dos máquinas: si el prompt dice `@cloudshell`
+  estás **fuera** de la VM y los comandos no encuentran nada; dentro de la VM
+  el prompt dice `@motor-glosas`.
 
 - **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
   tamaño, la solución de fondo es que **el cargue no haga esperar al
   navegador**: subir el archivo, responder de inmediato "recibido, procesando"
   y que la página muestre el avance. Así el tamaño del archivo deja de
   importar y no hay límite de tiempo que valga. Queda propuesto.
-- **PENDIENTE recomendado:** subir la máquina virtual de `e2-micro` (1 GB) a
-  **`e2-small`** (2 GB, ~US$13 más al mes). Se hace desde la consola de
-  Google: Compute Engine → VM `motor-glosas` → Detener → Editar → Tipo de
-  máquina `e2-small` → Guardar → Iniciar (5 minutos de página caída). Ojo:
-  esos comandos NO funcionan desde adentro de la VM (la VM no tiene permiso
-  para modificarse a sí misma); hay que hacerlo desde la consola web o
-  desde Cloud Shell.
+- **~~PENDIENTE recomendado~~ — YA HECHO:** subir la máquina virtual a
+  **`e2-small`**. Al revisar la VM el 28-07 la memoria total salió en 1.971 MB
+  (~2 GB): la `e2-micro` tiene 1 GB y la `e2-small` tiene 2 GB, así que el
+  cambio ya está aplicado. No hay que detener ni editar nada. Para
+  confirmarlo, desde Cloud Shell:
+  `gcloud compute instances describe motor-glosas --zone=us-west1-a --format="value(machineType)"`
 
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
