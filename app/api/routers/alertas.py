@@ -135,6 +135,7 @@ def tablero_vencimientos(
             "critica": umbrales.critica,
         },
         "avisos_configurados": destinatarios.hay_alguno,
+        "escalamiento_configurado": destinatarios.hay_escalamiento,
     }
 
 

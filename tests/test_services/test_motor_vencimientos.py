@@ -167,32 +167,77 @@ class TestResumen:
         assert r.valor_en_riesgo == 0.0
 
 
-class TestDestinatarios:
+class TestGobiernoDeDestinatarios:
+    """El modelo que definió el área el 28-jul:
+
+    Preventivo → gestor · analista
+    Alta       → gestor · coordinador
+    Crítica    → gestor · coordinador · líder financiero
+    Vencida    → gestor · coordinador · dirección financiera · auditoría
+    """
+
     def _dest(self):
         return Destinatarios(
             avisar_al_gestor=True,
+            preventivo=("analista@hus.com",),
             alta=("coordinador@hus.com",),
-            critica=("cartera@hus.com",),
-            vencida=("direccion@hus.com",),
+            critica=("lider.financiero@hus.com",),
+            vencida=("direccion@hus.com", "auditoria.interna@hus.com"),
         )
 
-    def test_preventivo_solo_le_llega_al_gestor(self):
+    def test_preventivo_gestor_y_analista(self):
         r = evaluar([G(dias_restantes=8, auditor_email="ana@hus.com")], UMB)
-        assert self._dest().para(r.en_riesgo[0]) == ["ana@hus.com"]
+        assert self._dest().para(r.en_riesgo[0]) == ["ana@hus.com", "analista@hus.com"]
 
     def test_alta_suma_al_coordinador(self):
         r = evaluar([G(dias_restantes=4, auditor_email="ana@hus.com")], UMB)
-        assert self._dest().para(r.en_riesgo[0]) == ["ana@hus.com", "coordinador@hus.com"]
+        assert self._dest().para(r.en_riesgo[0]) == [
+            "ana@hus.com",
+            "analista@hus.com",
+            "coordinador@hus.com",
+        ]
 
-    def test_los_niveles_son_acumulativos(self):
-        """Quien recibe ALTA no necesita repetirse en CRÍTICA ni en VENCIDA."""
+    def test_critica_suma_al_lider_financiero(self):
+        r = evaluar([G(dias_restantes=1, auditor_email="ana@hus.com")], UMB)
+        assert self._dest().para(r.en_riesgo[0]) == [
+            "ana@hus.com",
+            "analista@hus.com",
+            "coordinador@hus.com",
+            "lider.financiero@hus.com",
+        ]
+
+    def test_vencida_escala_a_direccion_y_auditoria(self):
         r = evaluar([G(dias_restantes=-2, auditor_email="ana@hus.com")], UMB)
         assert self._dest().para(r.en_riesgo[0]) == [
             "ana@hus.com",
+            "analista@hus.com",
             "coordinador@hus.com",
-            "cartera@hus.com",
+            "lider.financiero@hus.com",
             "direccion@hus.com",
+            "auditoria.interna@hus.com",
         ]
+
+    def test_el_gestor_recibe_siempre_sus_casos(self):
+        """Regla 1 del gobierno: en todos los niveles, sin excepción."""
+        d = self._dest()
+        for dias in (9, 4, 1, -30):
+            r = evaluar([G(dias_restantes=dias, auditor_email="ana@hus.com")], UMB)
+            assert d.para(r.en_riesgo[0])[0] == "ana@hus.com", dias
+
+    def test_el_escalamiento_no_se_declara_dos_veces(self):
+        """Regla 2: el coordinador se declara UNA vez, en ALTA, y recibe
+        también CRÍTICA y VENCIDA sin repetir su correo."""
+        d = self._dest()
+        for dias in (4, 1, -5):
+            r = evaluar([G(dias_restantes=dias)], UMB)
+            destinos = d.para(r.en_riesgo[0])
+            assert destinos.count("coordinador@hus.com") == 1, dias
+
+    def test_hay_escalamiento_distingue_del_gestor_solo(self):
+        solo_gestor = Destinatarios(avisar_al_gestor=True)
+        assert solo_gestor.hay_alguno is True
+        assert solo_gestor.hay_escalamiento is False
+        assert self._dest().hay_escalamiento is True
 
     def test_una_vencida_escala_aunque_no_tenga_gestor(self):
         """Es el caso de las 3 facturas de junio: sin dueño y vencidas."""
