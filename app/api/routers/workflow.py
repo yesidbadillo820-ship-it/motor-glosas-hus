@@ -6,7 +6,7 @@ from app.database import get_db
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.workflow_service import WorkflowService, EstadoGlosa
 from app.api.deps import get_usuario_actual
-from app.models.db import UsuarioRecord
+from app.models.db import UsuarioRecord, ROL_AUDITOR, ROL_VIEWER
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
@@ -79,6 +79,16 @@ def transicionar_glosa(
 
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
+
+    # E00: este endpoint escribe glosa.workflow_state y glosa.estado — las
+    # mismas columnas que PATCH /glosas/{id}/workflow, que sí comprueba el rol.
+    # Sin esta guarda, un VIEWER cerraba glosas por la puerta de al lado.
+    if current_user.rol == ROL_VIEWER:
+        raise HTTPException(status_code=403, detail="VIEWER no puede cambiar estados")
+    if current_user.rol == ROL_AUDITOR:
+        duenio = (glosa.auditor_email or "").strip().lower()
+        if duenio and duenio != (current_user.email or "").strip().lower():
+            raise HTTPException(status_code=403, detail="Esta glosa está asignada a otro auditor")
 
     exito, mensaje = WorkflowService.transicionar(
         glosa=glosa,
@@ -196,6 +206,11 @@ def transicionar_lote(
     if len(data.glosa_ids) > 500:
         raise HTTPException(400, "Máximo 500 glosas por lote")
 
+    # E00: misma guarda que la transición individual. Acá pesa más: una sola
+    # llamada mueve hasta 500 glosas.
+    if current_user.rol == ROL_VIEWER:
+        raise HTTPException(status_code=403, detail="VIEWER no puede cambiar estados")
+
     destino = (data.hacia or "").upper().strip()
     if not destino:
         raise HTTPException(400, "Estado destino requerido")
@@ -214,6 +229,11 @@ def transicionar_lote(
         if not glosa:
             resumen["fallidas"].append({"id": gid, "error": "no encontrada"})
             continue
+        if current_user.rol == ROL_AUDITOR:
+            duenio = (glosa.auditor_email or "").strip().lower()
+            if duenio and duenio != (current_user.email or "").strip().lower():
+                resumen["fallidas"].append({"id": gid, "error": "asignada a otro auditor"})
+                continue
         estado_actual = (glosa.workflow_state or glosa.estado or "").upper()
         if estado_actual == destino:
             resumen["ya_en_estado"] += 1
