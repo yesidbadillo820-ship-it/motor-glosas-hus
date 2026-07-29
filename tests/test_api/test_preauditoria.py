@@ -1346,3 +1346,76 @@ class TestParsers:
         r = svc.parsear_excel_radicacion(sin_dim)
         assert sorted(f["factura"] for f in r["facturas"]) == sorted([F1, F2])
         assert r["leidas"] == 2
+
+
+# ------------------------------------------------------------------
+# Buscar en el consolidado (por factura, entidad o NIT)
+# ------------------------------------------------------------------
+
+
+class TestBuscarEnConsolidado:
+    """La búsqueda cruza el consolidado con la fuente, que en producción tiene
+    ~190.000 filas. La subconsulta se restringe primero a las facturas que ya
+    están en el consolidado; estas pruebas fijan que el resultado sea el mismo
+    que recorriendo la fuente entera."""
+
+    def _preparar(self, client):
+        _subir_radicacion(
+            client,
+            [
+                _rad_fila(ENV, F1, 250700, nit="860002184", entidad="AXA COLPATRIA SEGUROS S.A."),
+                _rad_fila(ENV, F2, 10615224, nit="860002400", entidad="LA PREVISORA S A"),
+                # Este envío NO se escribe: la factura queda solo en la fuente.
+                _rad_fila(
+                    "999999", F3, 73500, nit="860002184", entidad="AXA COLPATRIA SEGUROS S.A."
+                ),
+            ],
+        )
+        _subir_dgreport(client, [F1])  # con correo F.E., para poder radicarla
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+
+    def _buscar(self, client, q):
+        d = client.get(f"/preauditoria/consolidado?q={q}").json()
+        assert d["total"] == len(d["items"]), "el contador y las filas no coinciden"
+        return sorted(i["factura"] for i in d["items"])
+
+    def test_busca_por_entidad(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "AXA") == [F1]
+
+    def test_busca_por_nit(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "860002400") == [F2]
+
+    def test_busca_por_numero_de_factura(self, client):
+        self._preparar(client)
+        assert self._buscar(client, F2) == [F2]
+
+    def test_no_trae_lo_que_solo_vive_en_la_fuente(self, client):
+        """F3 tiene la MISMA entidad que F1, pero su envío nunca se escribió:
+        no está en el consolidado y no debe aparecer. Es la razón por la que
+        restringir la subconsulta no cambia el resultado."""
+        self._preparar(client)
+        assert F3 not in self._buscar(client, "AXA")
+
+    def test_no_distingue_mayusculas(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "axa") == self._buscar(client, "AXA") == [F1]
+
+    def test_coincidencia_parcial(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "PREVISORA") == [F2]
+
+    def test_sin_resultados(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "SANITAS") == []
+
+    def test_se_combina_con_los_otros_filtros(self, client):
+        """Buscar 'AXA' y filtrar por radicadas no debe traer la pendiente."""
+        self._preparar(client)
+        d = client.get("/preauditoria/consolidado?q=AXA&resultado=RADICAR").json()
+        assert d["total"] == 0
+        _radicar(client, _factura_id(client, F1))
+        d = client.get("/preauditoria/consolidado?q=AXA&resultado=RADICAR").json()
+        assert [i["factura"] for i in d["items"]] == [F1]
