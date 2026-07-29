@@ -773,8 +773,19 @@ def consolidado(
         patron = f"%{q.strip()}%"
         # entidad/NIT viven en la fuente → subquery correlacionada (NO materializar
         # la lista: con 36k facturas rompería el límite de variables de SQLite).
+        #
+        # La fuente tiene ~190.000 filas y buscar texto ahí recorría la tabla
+        # ENTERA: 1 segundo medido en la VM, y dos veces por búsqueda (una para
+        # contar y otra para paginar) = ~2 segundos por cada letra buscada.
+        #
+        # Pero la fuente solo importa para las facturas que YA están en el
+        # consolidado: el OR de abajo las intersecta de todos modos. Así que se
+        # restringe primero por `factura` —que tiene índice único— y el filtro
+        # de texto cae sobre ese puñado de filas en vez de sobre 190.000. El
+        # resultado es idéntico; el tiempo baja de ~1 s a menos de 1 ms.
         sub = db.query(RadicacionCuentaRecord.factura).filter(
-            RadicacionCuentaRecord.entidad.ilike(patron) | RadicacionCuentaRecord.nit.ilike(patron)
+            RadicacionCuentaRecord.factura.in_(db.query(FacturaPreauditoriaRecord.factura)),
+            RadicacionCuentaRecord.entidad.ilike(patron) | RadicacionCuentaRecord.nit.ilike(patron),
         )
         consulta = consulta.filter(
             FacturaPreauditoriaRecord.factura.ilike(patron)
