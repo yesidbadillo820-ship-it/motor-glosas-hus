@@ -1113,6 +1113,7 @@ def descargar_pdf_oficio_devolucion(
         .all()
     )
     fecha_local = a_utc(dev.fecha_generado)
+    recibido_local = a_utc(recepcion.fecha_recibido) if recepcion else None
     filas_pdf = [
         {
             "envio": e.envio,
@@ -1132,6 +1133,7 @@ def descargar_pdf_oficio_devolucion(
         numero_radicado=recepcion.numero_radicado if recepcion else "",
         facturas=filas_pdf,
         generado_por=dev.generado_por or "",
+        fecha_recibido=recibido_local.astimezone(TZ_BOGOTA) if recibido_local else None,
     )
     return StreamingResponse(
         BytesIO(pdf),

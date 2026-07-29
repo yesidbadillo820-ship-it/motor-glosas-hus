@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 28-07-2026
+**Última actualización:** 29-07-2026
 
 ---
 
@@ -721,9 +721,80 @@ buena decide el tamaño de medio Contrato, y esa decisión es del área.
 Todo esto es **documentación y plan**. No se tocó una línea del código que
 corre en producción: la suite de 4.533 pruebas pasa igual que antes.
 
+### 29-07 — Pre-auditoría: lo que escribía el auditor se perdía
+
+Día de uso real con cuatro auditores trabajando (Vanessa, Camilo, Edgar y
+Yesid) y tres arreglos que salieron de lo que ellos vieron en pantalla.
+
+**1. Las observaciones no se guardaban (PR #220, ya en producción).**
+El auditor reportó que escribían "OKAY SOPORTES" al radicar y la columna
+Observaciones del historial salía vacía en todas las facturas. La causa no
+era el historial: **el texto se descartaba en silencio**. La ventana de
+auditar tiene dos recuadros —"Motivo de la devolución" arriba y
+"Observaciones" abajo— y escribían en el de arriba, que es el que más se ve.
+Al radicar, ese motivo no se guardaba en ninguna parte.
+
+Cómo se confirmó, contra la base de producción: **0 de 55** facturas y
+**0 de 79** eventos tenían observación guardada, mientras que 4 eventos sí
+tenían motivo (todos de devoluciones). Ese contraste fue la prueba.
+
+Ahora nada de lo que escribe el auditor se descarta: si escribió solo en
+Motivo, ese texto queda como la observación; si escribió en los dos, se
+conservan ambos. Además se pueden **anotar las facturas ya radicadas** sin
+revertir la decisión (botón "✎ Guardar observación" en el historial), y los
+dos recuadros quedaron rotulados sin ambigüedad, con Observaciones primero.
+
+**2. Se pueden borrar los oficios de devolución (PR #225, ya en producción).**
+Cuando el PDF salía con el consecutivo equivocado no había forma de
+deshacerlo: el número quedaba quemado y las facturas atrapadas (con el oficio
+emitido, revertirlas está bloqueado). Ahora hay un botón 🗑 en la pestaña de
+oficios de devolución, **solo para administradores y coordinación**. Las
+facturas no cambian de decisión —siguen devueltas— y solo quedan libres para
+salir en un oficio nuevo; el consecutivo vuelve a estar disponible y el
+historial no se borra. Avisa antes: si el PDF ya se entregó a la entidad, no
+hay que eliminarlo.
+
+**3. El PDF del oficio muestra los días transcurridos (PR #228).**
+El documento solo traía la fecha de generación. Ahora el encabezado dice
+cuándo se recibió el oficio (con hora), cuándo se generó el PDF y cuántos
+días completos pasaron. **Un día solo cuenta pasadas 24 horas enteras:** del
+22 a las 2:35 p.m. al 24 a las 11:23 a.m. hay 1 día, no 2, aunque el
+calendario haya cambiado dos veces. Así el número no depende de la hora a la
+que se registró el oficio. Las fechas salen de lo guardado, no del momento de
+imprimir: reimprimir el mismo oficio meses después da el mismo documento.
+
+**Lo aprendido sobre la VM, para no volver a perder tiempo.** Los comandos
+que se intentaron primero fallaron porque en la VM el repositorio está en
+`/opt/motor-glosas` (no en la carpeta personal) y el motor corre en **Docker**,
+no como servicio de systemd. Además, **el despliegue es automático**: un
+proceso revisa cada 5 minutos si hay código nuevo y lo aplica solo. Cuidado
+con confundir las dos máquinas: si el prompt dice `@cloudshell` se está fuera
+de la VM y nada se encuentra; dentro dice `@motor-glosas`. Comando para mirar
+cómo está, desde Cloud Shell y en un solo paso:
+
+```bash
+gcloud compute ssh motor-glosas --zone=us-west1-a --tunnel-through-iap --command '
+cd /opt/motor-glosas && git log --oneline -1
+sudo docker compose ps
+free -m | head -2
+'
+```
+
 ---
 
 ## 3) PENDIENTE
+
+### Pre-auditoría
+0. **La lentitud de la página — falta MEDIR antes de tocar nada.** El auditor
+   reportó el 29-07 que la página "se demora para sacar los datos". Se revisó
+   el código y **el consolidado ya está optimizado** (carga los datos de las
+   36.000 facturas de la fuente en bloque, no una por una), así que la causa
+   no está ahí y no conviene cambiar código a ciegas. Falta correr el medidor
+   de tiempos dentro de la VM y responder **qué es lo que se siente lento**:
+   abrir la pestaña Consolidado, guardar al radicar, o abrir el historial. Si
+   es al guardar, ya hay sospecha: la página recarga el consolidado completo y
+   la lista de oficios después de cada radicación, en vez de actualizar solo
+   la fila que cambió.
 
 ### COOSALUD
 1. **Correr el consolidado fusionado de pertinencia** (37 facturas / 5.736
