@@ -40,6 +40,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+# Lector de pesos compartido (ver `tools/_dinero.py`).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _dinero import a_numero as a_numero_compartido  # noqa: E402
+
 # Reutiliza los lectores del repo (tools/adres/).
 _ADRES = Path(__file__).resolve().parent / "adres"
 if str(_ADRES) not in sys.path:
@@ -172,10 +176,16 @@ def setup_logging() -> None:
 
 
 def _num(x) -> float:
-    try:
-        return float(str(x).replace(",", "").replace("$", "") or 0)
-    except (TypeError, ValueError):
-        return 0.0
+    """Pesos → float, con el lector único de `tools/_dinero.py`.
+
+    Undécima copia de la misma regla, y también rota: quitaba comas y el signo
+    peso, nada más.
+
+        "1.234.567"  →  ValueError  →  0,00
+        "$ 950.000"  →  950,00                dividido por mil
+        "1.365,50"   →  1,37                  la coma decimal desaparecía
+    """
+    return a_numero_compartido(x)
 
 
 def norm_factura(f) -> str:

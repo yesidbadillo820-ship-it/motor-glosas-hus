@@ -443,6 +443,55 @@ async def lifespan(app: FastAPI):
                 pass
             logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
 
+    # Pre-auditoría v2: la tabla `preaud_facturas` cambió de forma
+    # oficio-céntrica (Modelo A, con `oficio_id`) a factura canónica (Modelo B,
+    # con `num_subsanacion`). create_all() NO altera una tabla existente, así
+    # que si quedó el esquema viejo Y está vacía, la recreamos con la forma
+    # nueva. Si tuviera datos, se avisa para migración manual (no se destruye).
+    try:
+        if (
+            _tiene_tabla("preaud_facturas")
+            and _tiene_columna("preaud_facturas", "oficio_id")
+            and not _tiene_columna("preaud_facturas", "num_subsanacion")
+        ):
+            _n_preaud = db.execute(text("SELECT COUNT(*) FROM preaud_facturas")).scalar() or 0
+            if _n_preaud == 0:
+                logger.warning(
+                    "MIGRACIÓN pre-auditoría: recreando preaud_facturas con el esquema v2"
+                )
+                db.execute(text("DROP TABLE preaud_facturas"))
+                db.commit()
+                from app.models.db import FacturaPreauditoriaRecord
+
+                FacturaPreauditoriaRecord.__table__.create(bind=engine)
+            else:
+                logger.warning(
+                    "preaud_facturas tiene datos con esquema v1; requiere migración manual a v2"
+                )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría v2: {e}")
+
+    # Pre-auditoría: la observación que escribe el auditor ahora también queda
+    # en el historial de la factura (antes solo se guardaba el motivo de las
+    # devoluciones y lo escrito al radicar se perdía).
+    try:
+        if _tiene_tabla("preaud_factura_eventos") and not _tiene_columna(
+            "preaud_factura_eventos", "observaciones"
+        ):
+            logger.warning("MIGRACIÓN pre-auditoría: agregando observaciones a los eventos")
+            db.execute(text("ALTER TABLE preaud_factura_eventos ADD COLUMN observaciones TEXT"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría observaciones: {e}")
+
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
     # "value too long for type character varying(50)" en EPS oficial
@@ -1165,6 +1214,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from app.api.routers.auth_router import router as auth_router
 from app.api.routers.glosas import router as glosas_router
+from app.api.routers.automatizaciones import router as automatizaciones_router
 from app.api.routers.contratos import router as contratos_router
 from app.api.routers.analytics import router as analytics_router
 from app.api.routers.plantillas import router as plantillas_router
@@ -1183,6 +1233,7 @@ from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.vida import router as vida_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
 from app.api.routers.asistente_predictivo import router as asistente_predictivo_router
@@ -1225,6 +1276,7 @@ app.include_router(auth_router)
 app.include_router(asistente_predictivo_router)  # Ola 4: inteligencia ambiental
 app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
+app.include_router(automatizaciones_router)
 app.include_router(contratos_router)
 app.include_router(analytics_router)
 app.include_router(plantillas_router)
@@ -1242,6 +1294,7 @@ app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
+app.include_router(vida_router)  # Capa de Vida (ronda 32): saludo + celebraciones
 app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)
 app.include_router(versiones_router)
@@ -1296,9 +1349,10 @@ app.include_router(sugerencias_router)
 from app.api.routers.tareas_diarias import router as tareas_diarias_router
 
 app.include_router(tareas_diarias_router)
-from app.api.routers.nota_credito import router as nota_credito_router
 
-app.include_router(nota_credito_router)
+from app.api.routers.preauditoria import router as preauditoria_router
+
+app.include_router(preauditoria_router)
 # auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 

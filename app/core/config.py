@@ -121,8 +121,28 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
 
+class ConfiguracionInsegura(RuntimeError):
+    """El arranque se aborta: hay una configuración que rompe la seguridad."""
+
+
 def check_security_config() -> None:
     settings = get_settings()
+    # E00: docker-compose inyecta SECRET_KEY: ${SECRET_KEY}; si la variable no
+    # está en el .env, llega VACÍA y hasta ahora nadie lo detectaba — se
+    # firmaban los tokens de sesión con cadena vacía. Esto no es una
+    # advertencia: es motivo para no arrancar.
+    clave = (settings.secret_key or "").strip()
+    if not clave:
+        raise ConfiguracionInsegura(
+            "SECRET_KEY está vacía: los tokens de sesión se firmarían con una clave "
+            "nula y cualquiera podría falsificarlos. Definí SECRET_KEY en el .env "
+            "(mínimo 32 caracteres aleatorios) antes de arrancar."
+        )
+    if len(clave) < 32 and clave != _DEFAULT_SECRET:
+        warnings.warn(
+            "ADVERTENCIA DE SEGURIDAD: SECRET_KEY tiene menos de 32 caracteres.",
+            stacklevel=2,
+        )
     if settings.secret_key == _DEFAULT_SECRET:
         warnings.warn(
             "ADVERTENCIA DE SEGURIDAD: Se esta usando el SECRET_KEY por defecto. "

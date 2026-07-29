@@ -53,6 +53,22 @@ def _lote_a_dict(lote: LoteRecord) -> dict:
     }
 
 
+@router.get("/pagadores")
+def pagadores_encolables(
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Qué pagadores se pueden encolar hoy, y qué archivo pide cada uno.
+
+    Sale del registro de perfiles (`services/perfiles_lote`), el mismo que usa
+    el agente para saber qué bot correr. Antes esto era el conjunto literal
+    `{"COOSALUD"}` escrito en el servicio: habilitar un pagador exigía tocar
+    tres archivos y desplegar, aunque su bot ya existiera en `tools/`.
+    """
+    from app.services import perfiles_lote
+
+    return {"total": len(perfiles_lote.PERFILES), "pagadores": perfiles_lote.catalogo()}
+
+
 @router.post("/", status_code=201)
 async def crear_lote(
     archivo: UploadFile = File(...),

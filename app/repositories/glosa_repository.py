@@ -438,12 +438,33 @@ class GlosaRepository:
         return self.db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
 
     def alertas_proximas(self, dias_limite: int = 5) -> list[GlosaRecord]:
+        """Lo que está contra el reloj: por vencer **y ya vencido**.
+
+        Tenía `dias_restantes > 0`, y eso escondía justo lo que más urge. En
+        la pantalla de inicio se veía así: el tablero nuevo de Vencimientos
+        contaba 1, y al mismo tiempo la tarjeta decía «Próximas a vencer: 0»
+        y el saludo remataba con «sin glosas próximas a vencer». Una glosa
+        con el plazo cumplido desaparecía de la única pantalla que el gestor
+        mira al entrar.
+
+        Es el modo de falla que costó $20.054.751: tres facturas de junio
+        descubiertas 45 días tarde. El mismo arreglo ya se hizo en el saludo
+        (`api/routers/vida.py`); este sitio quedó vivo.
+
+        Lo vencido va **primero**: `dias_restantes` ascendente pone los
+        números negativos arriba, que es donde tienen que estar.
+        """
+        from app.services.motor_vencimientos import ESTADOS_CERRADOS
+
         return (
             self.db.query(GlosaRecord)
             .filter(
+                GlosaRecord.dias_restantes.isnot(None),
                 GlosaRecord.dias_restantes <= dias_limite,
-                GlosaRecord.dias_restantes > 0,
-                GlosaRecord.estado != "LEVANTADA",
+                # Antes solo excluía LEVANTADA; una glosa ACEPTADA o
+                # CONCILIADA tampoco compite contra el reloj, y alertar
+                # sobre ella es el ruido que hace ignorar las que sí importan.
+                GlosaRecord.estado.notin_(ESTADOS_CERRADOS),
             )
             .order_by(GlosaRecord.dias_restantes.asc())
             .all()

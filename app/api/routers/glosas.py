@@ -16,7 +16,16 @@ from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
-from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
+from app.models.db import (
+    UsuarioRecord,
+    GlosaRecord,
+    ConceptoGlosaRecord,
+    ContratoRecord,
+    ROL_SUPER_ADMIN,
+    ROL_COORDINADOR,
+    ROL_AUDITOR,
+    ROL_VIEWER,
+)
 from app.utils.moneda import parse_valor_cop
 from app.utils.html_a_texto import dictamen_a_texto_plano
 
@@ -184,6 +193,45 @@ def _limpiar_observacion(dictamen_html: str) -> str:
     return txt.strip()
 
 
+def _puede_ver_paciente(usuario: UsuarioRecord, glosa) -> bool:
+    """¿Este usuario tiene relación legítima con los datos de este paciente?
+
+    E00 (Ley 1581/2012): el nombre del paciente es dato sensible y solo lo ve
+    quien lo necesita para trabajar el caso — el gestor asignado — o quien
+    tiene responsabilidad sobre todo el proceso (coordinación y administración).
+    Antes, `GET /glosas/historial` devolvía el nombre de TODOS los pacientes
+    del hospital a cualquier usuario autenticado.
+    """
+    if usuario.rol in (ROL_SUPER_ADMIN, ROL_COORDINADOR):
+        return True
+    if usuario.rol == ROL_VIEWER:
+        return False
+    duenio_correo = (glosa.auditor_email or "").strip().lower()
+    duenio_nombre = (glosa.gestor_nombre or "").strip().lower()
+    # Glosa sin asignar: es trabajo que cualquier auditor puede tomar, y
+    # ocultarle el paciente le impediría trabajarla. Se protege lo que YA
+    # tiene dueño, que es donde el dato de otro paciente no le corresponde.
+    if not duenio_correo and not duenio_nombre:
+        return True
+    correo = (usuario.email or "").strip().lower()
+    if correo and duenio_correo == correo:
+        return True
+    nombre = (usuario.nombre or "").strip().lower()
+    return bool(nombre) and duenio_nombre == nombre
+
+
+def _paciente_visible(usuario: UsuarioRecord, glosa) -> Optional[str]:
+    """Nombre del paciente, o sus iniciales si el usuario no tiene relación.
+
+    Se enmascara en vez de omitir para que las filas sigan siendo
+    distinguibles en pantalla sin revelar la identidad.
+    """
+    nombre = (glosa.paciente or "").strip()
+    if not nombre or _puede_ver_paciente(usuario, glosa):
+        return glosa.paciente
+    return " ".join(f"{p[0]}." for p in nombre.split() if p)[:60] or None
+
+
 @router.get("/historial", response_model=list)
 def historial(
     # le=500: sin tope, un limit=10_000_000 serializa la tabla completa
@@ -216,7 +264,7 @@ def historial(
                 "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
                 "entidad": entidad_real,
                 "eps": g.eps,  # alias para compatibilidad (valor raw, sin resolver)
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "concepto_glosa": g.concepto_glosa,
@@ -288,7 +336,7 @@ def historial_paginado(
                 "id": g.id,
                 "eps": g.eps,
                 "entidad": entidad_real,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "concepto_glosa": g.concepto_glosa,
@@ -361,7 +409,7 @@ def exportar_json(
                 "id": g.id,
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
                 "eps": g.eps,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
@@ -1136,7 +1184,7 @@ def buscar_avanzado(
                 "id": g.id,
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
                 "eps": g.eps,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
@@ -1201,7 +1249,7 @@ def buscar_por_id_o_factura(
             "consecutivo_dgh": g.consecutivo_dgh,
             "numero_radicado": g.numero_radicado,
             "codigo_glosa": g.codigo_glosa,
-            "paciente": g.paciente,
+            "paciente": _paciente_visible(current_user, g),
             "valor_objetado": float(g.valor_objetado or 0),
             "estado": g.estado,
             "creado_en": g.creado_en.isoformat() if g.creado_en else None,
@@ -2603,8 +2651,24 @@ def actualizar_estado(
             status_code=422,
             detail=f"Estado '{estado_norm}' inválido. Use uno de: {', '.join(sorted(estados_validos))}",
         )
+
+    # E00 · la cuarta puerta. Las tres de `workflow.py` ya están cerradas; esta
+    # es la más ancha de todas: pone la glosa en cualquiera de los once estados,
+    # incluidos LEVANTADA (el hospital ganó) y ACEPTADA (el hospital desistió).
+    # Cualquier usuario autenticado podía hacerlo.
+    if current_user.rol == ROL_VIEWER:
+        raise HTTPException(status_code=403, detail="VIEWER no puede cambiar estados")
+
     repo = GlosaRepository(db)
-    glosa = repo.actualizar_estado(glosa_id, estado_norm, responsable="sistema")
+    glosa_previa = repo.obtener_por_id(glosa_id)
+    if glosa_previa and current_user.rol == ROL_AUDITOR:
+        duenio = (glosa_previa.auditor_email or "").strip().lower()
+        if duenio and duenio != (current_user.email or "").strip().lower():
+            raise HTTPException(status_code=403, detail="Esta glosa está asignada a otro auditor")
+
+    # Y quedaba escrito `responsable="sistema"`: el registro no decía quién lo
+    # hizo. Ahora queda el correo de quien lo pidió.
+    glosa = repo.actualizar_estado(glosa_id, estado_norm, responsable=current_user.email)
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
     logger.info(f"Estado actualizado | glosa_id={glosa_id} | nuevo_estado={nuevo_estado}")
@@ -7805,7 +7869,7 @@ def historicos_ganadores(
                     g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
                 ),
                 "auditor_email": g.auditor_email or "",
-                "paciente": g.paciente or "",
+                "paciente": _paciente_visible(current_user, g) or "",
             }
             for g in filas
         ],

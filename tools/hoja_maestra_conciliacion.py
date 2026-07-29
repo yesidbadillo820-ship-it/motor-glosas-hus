@@ -60,6 +60,12 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+
+# Lector de pesos compartido (ver `tools/_dinero.py`): el que vivía aquí
+# dividía por mil los valores con un solo punto de miles.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _dinero import a_numero as a_numero_compartido  # noqa: E402
+
 logger = logging.getLogger("hoja_maestra")
 
 # ----------------------------------------------------------------------------
@@ -107,26 +113,17 @@ def setup_logging() -> None:
 # Utilidades
 # ----------------------------------------------------------------------------
 def _num(x) -> float:
-    """Convierte a numero tolerando '$ 3.211.891', comas y None -> 0.0."""
-    if x is None:
-        return 0.0
-    if isinstance(x, (int, float)):
-        return float(x)
-    s = str(x).strip().replace("$", "").replace(" ", "")
-    if not s or s in ("-", "None"):
-        return 0.0
-    # formato colombiano: puntos de miles y coma decimal
-    if "," in s and "." in s:
-        s = s.replace(".", "").replace(",", ".")
-    elif "," in s:
-        s = s.replace(",", ".")
-    elif s.count(".") > 1:
-        # varios puntos y sin coma -> todos son separadores de miles
-        s = s.replace(".", "")
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+    """Valor monetario → float, con el lector único del repo.
+
+    Tenía el mismo agujero que el informe de cartera: un **solo** punto de
+    miles no se manejaba. La condición era `s.count(".") > 1`, así que
+    `"3.211.891"` salía bien pero `"$ 950.000"` se leía como **950,00** y
+    `"2.500"` como **2,50** — dividido por mil.
+
+    Es el bug que el auditor ya había visto en un informe. Ahora este archivo
+    usa el lector único de `tools/_dinero.py`.
+    """
+    return a_numero_compartido(x)
 
 
 def _txt(x) -> str:

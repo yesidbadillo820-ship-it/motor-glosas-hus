@@ -91,3 +91,14 @@ atípica; revisar), **INFO** (azul — contexto, no impide radicar).
 - **Resolución 2284 de 2023** — soportes de la reclamación.
 - **Decreto 780/2016** (mod. Decreto 2466/2022) — manual tarifario SOAT.
 - **Resolución 762 de 2023 ADRES** — identificación AS/MS.
+
+## OCR para PDF escaneados (nuevo)
+
+Si un PDF no tiene capa de texto (escaneado), el bot le aplica **OCR
+automáticamente** a las primeras 8 páginas y hace los cruces sobre el texto
+reconocido; en la hoja SOPORTES queda "SI (OCR)" y en HALLAZGOS un aviso
+INFO. Motores soportados (se detectan solos): **Tesseract** (si está
+instalado en el PC, el más preciso) o **RapidOCR** (`pip install pypdfium2
+rapidocr-onnxruntime`, sin programas externos; el .cmd lo instala solo la
+primera vez). Si ninguno está disponible, el PDF queda "SIN TEXTO" como
+antes y el cruce se omite.
