@@ -763,6 +763,25 @@ calendario haya cambiado dos veces. Así el número no depende de la hora a la
 que se registró el oficio. Las fechas salen de lo guardado, no del momento de
 imprimir: reimprimir el mismo oficio meses después da el mismo documento.
 
+**4. La lentitud: eran las búsquedas (PR #230).** El auditor dijo que la
+página "se demora para sacar los datos". Se midió contra la base de
+producción antes de tocar nada, y **todo el sistema estaba sano** menos una
+cosa: las consultas del consolidado tardan entre 0 y 27 milisegundos, la red
+responde en 70, el procesador va al 0,2% y sobra memoria — pero **buscar por
+entidad tardaba 1.031 milisegundos**.
+
+La razón: la entidad y el NIT no están en el consolidado (que son 55
+facturas), sino en la tabla de la fuente, que tiene **189.452 filas**. Cada
+búsqueda las recorría todas, y lo hacía **dos veces** (una para contar y otra
+para traer la página): unos **2 segundos cada vez que alguien escribía en el
+buscador**.
+
+El arreglo: la fuente solo importa para las facturas que ya están en el
+consolidado, así que ahora se buscan primero esas —por el número de factura,
+que sí tiene índice— y el filtro de texto cae sobre ese puñado. Comprobado
+reproduciendo la tabla real: **de 73 ms a 0,1 ms**, con resultados idénticos
+en 7 patrones distintos. No cambia lo que se ve, solo cómo se llega.
+
 **Lo aprendido sobre la VM, para no volver a perder tiempo.** Los comandos
 que se intentaron primero fallaron porque en la VM el repositorio está en
 `/opt/motor-glosas` (no en la carpeta personal) y el motor corre en **Docker**,
@@ -785,16 +804,13 @@ free -m | head -2
 ## 3) PENDIENTE
 
 ### Pre-auditoría
-0. **La lentitud de la página — falta MEDIR antes de tocar nada.** El auditor
-   reportó el 29-07 que la página "se demora para sacar los datos". Se revisó
-   el código y **el consolidado ya está optimizado** (carga los datos de las
-   36.000 facturas de la fuente en bloque, no una por una), así que la causa
-   no está ahí y no conviene cambiar código a ciegas. Falta correr el medidor
-   de tiempos dentro de la VM y responder **qué es lo que se siente lento**:
-   abrir la pestaña Consolidado, guardar al radicar, o abrir el historial. Si
-   es al guardar, ya hay sospecha: la página recarga el consolidado completo y
-   la lista de oficios después de cada radicación, en vez de actualizar solo
-   la fila que cambió.
+0. **~~La lentitud de la página~~ — DIAGNOSTICADA Y ARREGLADA el 29-07**
+   (ver la entrada del día). Queda una sola cosa por decidir: **el buscador de
+   la pestaña Fuentes sigue lento** (recorre las 189.452 filas de la fuente, y
+   ahí es a propósito: esa pantalla existe para buscar entre TODAS las
+   facturas, no solo las del consolidado). Hacerlo rápido necesita búsqueda de
+   texto completo, que es un cambio mayor. **Preguntar al auditor si esa
+   pantalla le molesta en el día a día** antes de meterle mano.
 
 ### COOSALUD
 1. **Correr el consolidado fusionado de pertinencia** (37 facturas / 5.736
