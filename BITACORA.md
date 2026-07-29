@@ -955,6 +955,20 @@ Sprint de construcción del día (varios PR fusionados en cadena):
 - La misma carpeta la entrega la API y el chat IA («¿qué documentos hay
   de la factura…?»). Guía corta en `docs/CENTRO_DOCUMENTAL.md`.
 
+### 29-07 (sexta parte) — Épica: el Motor Universal
+
+- **Un perfil único por pagador.** En la pantalla Contratos, al expandir
+  cualquier pagador aparece «El sistema con este pagador»: si el análisis
+  cita su contrato por fecha, si hay respuesta masiva por lotes y con qué
+  bot, qué conversores de Automatización le aplican y si hay contacto de
+  radicación. Lo mismo responde el chat («¿qué se puede hacer con
+  COOSALUD?») y la API.
+- **La regla que queda sellada**: agregar un pagador o una capacidad
+  nunca vuelve a ser tocar código repartido — es agregar una ficha en el
+  registro que corresponde (malla, perfil de lote o catálogo de
+  automatización) y el perfil la muestra solo en las tres superficies.
+- Guía corta en `docs/MOTOR_UNIVERSAL.md`.
+
 ---
 
 ## 3) PENDIENTE
