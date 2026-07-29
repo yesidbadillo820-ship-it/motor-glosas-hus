@@ -1491,6 +1491,20 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .auto-resumen{background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.55rem .7rem;font-size:.84rem;line-height:1.5}
 .auto-resumen small{display:block;margin-top:.3rem;color:var(--text-3);font-size:.75rem}
 .auto-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
+/* Centro de Inteligencia: la lista de qué hacer hoy, por prioridad. */
+.intel-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.intel-resumen{display:flex;gap:.7rem;flex-wrap:wrap;max-width:980px}
+.intel-kpi{flex:1 1 180px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.8rem 1rem}
+.intel-kpi b{display:block;font-size:1.35rem;font-weight:750}
+.intel-kpi span{font-size:.75rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em}
+.intel-acciones{display:flex;flex-direction:column;gap:.7rem;max-width:980px}
+.intel-card{display:flex;gap:1rem;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--intel-c,#94a3b8);border-radius:var(--r-lg);padding:.85rem 1rem}
+.intel-card .ico{font-size:1.3rem;line-height:1;margin-top:.1rem}
+.intel-card .cuerpo{flex:1;min-width:0}
+.intel-card .titulo{font-weight:650;font-size:.93rem;line-height:1.35}
+.intel-card .porque{font-size:.83rem;color:var(--text-2);line-height:1.45;margin-top:.25rem}
+.intel-card .plata{font-size:.8rem;font-weight:700;margin-top:.3rem;color:var(--intel-c,#94a3b8)}
+.intel-card .btn{flex-shrink:0;align-self:center}
 /* Expediente: la historia completa de una glosa como pantalla de primera
    clase (antes era un popup aparte). Misma receta de scroll que las demás. */
 .exp-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
@@ -2220,6 +2234,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
       <div class="sn-group">
         <div class="sn-label">Análisis</div>
+        <button class="sn-item" data-tip="Inteligencia" onclick="sidebarTab(this,'inteligencia')" id="sn-inteligencia">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+          <span class="sn-item-label">Inteligencia</span>
+          <span class="sn-badge" id="intel-badge-side" style="display:none">0</span>
+        </button>
         <button class="sn-item active" data-tip="Analizar" onclick="sidebarTab(this,'analizar')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
@@ -3363,6 +3382,20 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
          actualiza contratación y que el área de glosas miraba cuando se
          acordaba; el sistema tenía las vigencias como texto libre y nunca las
          leía. -->
+    <!-- Centro de Inteligencia: el sistema dice qué hacer hoy. -->
+    <div class="panel" id="p-inteligencia">
+      <div class="intel-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Centro de Inteligencia</h2>
+            <p class="malla-sub" id="intel-titular">El barrido de toda la operación: qué hacer hoy, por cuánta plata y en qué pantalla.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="intelCargar(true)">Actualizar</button>
+        </div>
+        <div id="intel-cuerpo"><div class="malla-vacio">Barriendo la operación…</div></div>
+      </div>
+    </div>
+
     <!-- Expediente: todo lo que ha pasado con una glosa, en una pantalla.
          Reemplaza al popup de timeline que se abría en otra ventana. -->
     <div class="panel" id="p-expediente">
@@ -7192,6 +7225,9 @@ async function initApp(){
     syncSidebarBadge('mis-badge','mis-badge-side');
     syncSidebarBadge('alert-badge','alert-badge-side');
   }, 800);
+  // Centro de Inteligencia: el badge de urgencias se entera solo
+  setTimeout(intelBadge, 2500);
+  setInterval(intelBadge, 300000);
   // B.2: live channel — polling de eventos recientes y refresco automatico
   setTimeout(iniciarLiveChannel, 2000);
   // Smart digest: que paso desde la ultima visita
@@ -8101,6 +8137,7 @@ function tab(btn,id){
   if(id==='vencimientos') vencCargar();
   if(id==='automatizacion') autoCargar();
   if(id==='malla') mallaCargar();
+  if(id==='inteligencia') intelCargar();
   if(id==='expediente'){ var _eq=document.getElementById('exp-q'); if(_eq && !EXP.datos) setTimeout(function(){_eq.focus()},60); }
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
@@ -9149,6 +9186,86 @@ async function descargarDictamenMd(){
     document.body.appendChild(a); a.click(); a.remove();
     toast('Descargado', fname, 'success');
   } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ══ CENTRO DE INTELIGENCIA: el sistema dice qué hacer hoy ══
+
+var INTEL = {datos: null};
+
+function intelColor(p){ return p === 1 ? '#dc2626' : (p === 2 ? '#b45309' : '#475569'); }
+
+function intelIrA(pantalla){
+  var btn = document.querySelector('.sn-item[onclick*="\'' + pantalla + '\'"]');
+  if(btn) sidebarTab(btn, pantalla);
+}
+
+function intelBadgeAplicar(d){
+  var b = document.getElementById('intel-badge-side');
+  if(!b) return;
+  var n = d.urgentes || 0;
+  b.textContent = n;
+  b.style.display = n > 0 ? '' : 'none';
+}
+
+async function intelCargar(forzar){
+  var cuerpo = document.getElementById('intel-cuerpo');
+  if(INTEL.datos && !forzar){ intelPintar(); return; }
+  if(cuerpo) cuerpo.innerHTML = '<div class="malla-vacio">Barriendo la operación…</div>';
+  try{
+    var r = await fetch('/inteligencia/diagnostico', {headers: authH()});
+    if(!r.ok){ if(cuerpo) cuerpo.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    INTEL.datos = await r.json();
+    intelBadgeAplicar(INTEL.datos);
+    intelPintar();
+  }catch(e){ if(cuerpo) cuerpo.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+// Solo el badge, para el arranque: si el panel está abierto, repinta.
+async function intelBadge(){
+  try{
+    var r = await fetch('/inteligencia/diagnostico', {headers: authH()});
+    if(!r.ok) return;
+    INTEL.datos = await r.json();
+    intelBadgeAplicar(INTEL.datos);
+    var panel = document.getElementById('p-inteligencia');
+    if(panel && panel.classList.contains('active')) intelPintar();
+  }catch(e){ /* el badge es cortesía: sin red, sin ruido */ }
+}
+
+function intelPintar(){
+  var d = INTEL.datos; if(!d) return;
+  var titular = document.getElementById('intel-titular');
+  if(titular) titular.textContent = d.titular;
+  var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+
+  var html = '<div class="intel-resumen">'
+    + '<div class="intel-kpi"><b style="color:' + (d.urgentes ? '#dc2626' : '#16a34a') + '">' + d.urgentes + '</b><span>frentes urgentes</span></div>'
+    + '<div class="intel-kpi"><b>' + d.acciones.length + '</b><span>acciones sugeridas</span></div>'
+    + '<div class="intel-kpi"><b>' + cop(d.valor_en_juego) + '</b><span>plata en juego</span></div>'
+    + '</div>';
+
+  if(!d.acciones.length){
+    html += '<div class="malla-vacio">✅ ' + escHtml(d.titular) + '</div>';
+  } else {
+    html += '<div class="intel-acciones">';
+    d.acciones.forEach(function(a){
+      var c = intelColor(a.prioridad);
+      html += '<div class="intel-card" style="--intel-c:' + c + '">'
+        + '<div class="ico">' + a.icono + '</div>'
+        + '<div class="cuerpo">'
+        +   '<div class="titulo">' + escHtml(a.titulo) + '</div>'
+        +   '<div class="porque">' + escHtml(a.por_que) + '</div>'
+        +   (a.valor_en_juego ? '<div class="plata">' + cop(a.valor_en_juego) + ' en juego</div>' : '')
+        + '</div>'
+        + '<button class="btn btn-primary btn-sm" onclick="intelIrA(\'' + escHtml(a.pantalla) + '\')">' + escHtml(a.etiqueta_boton) + '</button>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  if(d.fuentes_caidas && d.fuentes_caidas.length){
+    html += '<div class="malla-vacio">⚠ No se pudo revisar: ' + escHtml(d.fuentes_caidas.join(', ')) + '.</div>';
+  }
+  document.getElementById('intel-cuerpo').innerHTML = html;
 }
 
 // ══ EXPEDIENTE: la historia completa de una glosa como pantalla ══

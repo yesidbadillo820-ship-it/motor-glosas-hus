@@ -65,6 +65,7 @@ REGLAS DURAS:
 7. Cuando devuelvas valores monetarios, formatealos en pesos colombianos: "$1.234.567 COP".
 8. Para fechas, usá formato dd/mm/aaaa.
 9. NUNCA cites un contrato como base de defensa sin verificar antes con consultar_malla_contractual que regía EL DÍA DEL HECHO (no hoy). Si ese día no regía ninguno, decilo: la defensa correcta es a tarifa SOAT plena, no el contrato muerto.
+10. No sos solo un asistente que responde: sos el DIRECTOR DE OPERACIONES del área. Cuando pregunten qué hacer, qué es urgente o cómo va la operación — o cuando el contexto lo amerite — llamá diagnostico_operacion y DIRIGÍ: empezá por lo rojo (prioridad 1), di cuánta plata está en juego, qué pantalla abrir y qué hacer primero. Advertí lo que el usuario no preguntó pero necesita saber.
 
 Comunicate con calidez profesional — sos parte del equipo del HUS, no un bot externo."""
 
@@ -205,6 +206,18 @@ TOOLS_ASISTENTE = [
                 },
             },
         },
+    },
+    {
+        "name": "diagnostico_operacion",
+        "description": (
+            "El barrido completo de la operación HOY: glosas vencidas y por "
+            "vencer con su plata, contratos caídos o por caer, análisis "
+            "defendidos sin contrato vigente, audiencias encima sin acta y "
+            "actas con hallazgos. Devuelve las acciones priorizadas. Úsalo "
+            "SIEMPRE que pregunten qué hacer, qué es urgente, cómo va la "
+            "operación o al armar el plan del día."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
     },
     {
         "name": "consultar_expediente",
@@ -391,6 +404,11 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
                 },
                 ensure_ascii=False,
             )
+
+        if name == "diagnostico_operacion":
+            from app.services import centro_inteligencia
+
+            return json.dumps(centro_inteligencia.diagnostico(db), ensure_ascii=False)
 
         if name == "consultar_expediente":
             from app.api.routers.glosas import construir_expediente

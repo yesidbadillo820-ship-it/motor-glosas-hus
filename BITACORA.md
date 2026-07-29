@@ -921,6 +921,25 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   pantalla. Cada uso del acta queda registrado en la auditoría del sistema.
 - Guía corta en `docs/EXPEDIENTE_INTELIGENTE.md`.
 
+### 29-07 (cuarta parte) — Épica: el Centro de Inteligencia + arreglo de producción
+
+- **El sistema ahora dice qué hacer hoy.** Nueva primera opción del menú:
+  **Inteligencia**. Barre toda la operación —glosas vencidas y por vencer
+  con su plata, contratos caídos o por caer, análisis defendidos sin
+  contrato, audiencias encima sin acta, actas a medio cuadrar— y entrega
+  la lista de acciones ordenada por urgencia y valor, cada una con el
+  botón que lleva a la pantalla donde se resuelve. El número rojo del
+  menú (frentes urgentes) se actualiza solo.
+- **La IA pasó de asistente a directora**: al preguntarle «¿qué hago
+  hoy?» corre el mismo barrido y dirige — empieza por lo rojo, dice la
+  plata en juego y qué abrir primero.
+- **Se arregló la causa raíz del «Error 500» de Automatización en el
+  servidor**: la imagen de producción no llevaba la carpeta de
+  herramientas (regla vieja del empaque). Quedó la lista blanca, una
+  guardia en la suite para que no vuelva a pasar, y además ningún robot
+  vuelve a contestar «Error 500» pelado: ahora explican qué pasó.
+- Guía corta en `docs/CENTRO_INTELIGENCIA.md`.
+
 ---
 
 ## 3) PENDIENTE
