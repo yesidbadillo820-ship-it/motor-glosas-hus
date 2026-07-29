@@ -1842,7 +1842,7 @@ def _detectar_regimen_especial(
     return bloque_elegido
 
 
-def get_system_prompt(prefijo: str, eps: str) -> str:
+def get_system_prompt(prefijo: str, eps: str, fecha_hecho=None) -> str:
     """Retorna el system prompt especializado + régimen especial.
 
     **Optimización #2 (token saving)**: este prompt ahora es ESTABLE por
@@ -1856,7 +1856,9 @@ def get_system_prompt(prefijo: str, eps: str) -> str:
     Después: ~3000 tokens por llamada, cache hit ≥90% después del warm-up.
     """
     base = SYSTEM_MAP.get(prefijo.upper(), SYSTEM_FA)
-    contrato = get_contrato(eps)
+    # La fecha del hecho decide QUÉ contrato aplica (la malla resuelve por
+    # vigencia). Sin fecha se asume hoy, que era el comportamiento anterior.
+    contrato = get_contrato(eps, fecha_hecho)
 
     # Calculadora tarifaria: texto ESTÁTICO por tipo de factor (pactado/no).
     # No incluye el factor numérico específico para no romper cache.
@@ -1943,6 +1945,63 @@ def validar_factura_en_vigencia(eps: str, fecha_factura: str) -> dict:
     import re as _re
     from datetime import date as _date
 
+    # La malla oficial primero: trae fechas REALES por contrato, no el texto
+    # libre del catálogo. El parseo de texto queda solo de respaldo para
+    # pagadores que aún no estén en la malla.
+    f_malla = None
+    if fecha_factura:
+        s0 = str(fecha_factura).strip()
+        m0 = _re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", s0) or None
+        if m0:
+            try:
+                f_malla = _date(int(m0.group(1)), int(m0.group(2)), int(m0.group(3)))
+            except ValueError:
+                f_malla = None
+        else:
+            m0 = _re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s0)
+            if m0:
+                try:
+                    f_malla = _date(int(m0.group(3)), int(m0.group(2)), int(m0.group(1)))
+                except ValueError:
+                    f_malla = None
+    if f_malla is not None:
+        try:
+            from app.services import malla_contractual as _mc
+
+            conocidos = _mc.contratos_de(eps)
+            if conocidos:
+                vig = _mc.vigente(eps, f_malla)
+                if vig is not None:
+                    return {
+                        "en_vigencia": True,
+                        "fecha_factura": str(f_malla),
+                        "vigencia_str": f"{vig.desde} → {vig.hasta or 'indeterminado'}",
+                        "vigencia_inicio": str(vig.desde),
+                        "vigencia_fin": str(vig.hasta) if vig.hasta else "",
+                        "diagnostico": (
+                            f"OK · factura {f_malla} cubierta por el contrato "
+                            f"{vig.numero or 'sin número'} ({vig.desde} → "
+                            f"{vig.hasta or 'indeterminado'}) según la malla oficial"
+                        ),
+                    }
+                fechas = " · ".join(
+                    f"{c.numero or 'sin número'}: {c.desde} → {c.hasta or 'indeterminado'}"
+                    for c in conocidos
+                )
+                return {
+                    "en_vigencia": False,
+                    "fecha_factura": str(f_malla),
+                    "vigencia_str": fechas,
+                    "vigencia_inicio": "",
+                    "vigencia_fin": "",
+                    "diagnostico": (
+                        f"ATENCION: el {f_malla} ningún contrato de {eps} estaba "
+                        f"vigente según la malla oficial. Contratos registrados: {fechas}."
+                    ),
+                }
+        except Exception:
+            pass  # la malla nunca puede tumbar la validación
+
     contrato = get_contrato(eps)
     v_str = contrato.get("vigencia", "")
     v_ini, v_fin = _parsear_vigencia(v_str)
@@ -2001,6 +2060,7 @@ def validar_factura_en_vigencia(eps: str, fecha_factura: str) -> dict:
 
 
 def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
+    # (la firma se conserva; el contrato ahora se resuelve a la fecha)
     """Devuelve un bloque con los datos contractuales específicos de la EPS.
     Si se pasa fecha_factura, valida que esté dentro de la vigencia del
     contrato y agrega una alerta visible cuando NO matchea.
@@ -2190,6 +2250,7 @@ def build_user_prompt(
     valor_pactado: Optional[str] = None,
     tono: Optional[str] = "conciliador",
     clausulas_contrato: Optional[list] = None,
+    fecha_hecho=None,
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -2419,8 +2480,11 @@ def build_user_prompt(
             + "\n"
         )
 
-    # Datos contractuales
-    contrato = get_contrato(eps)
+    # Datos contractuales — resueltos a la FECHA DEL HECHO. Si ese día no
+    # había contrato vigente, la ficha llega con SOAT pleno y la nota que lo
+    # explica, y el dictamen se arma sobre esa base en vez de citar un
+    # contrato muerto que la EPS verifica en segundos.
+    contrato = get_contrato(eps, fecha_hecho)
     numero_contrato = contrato["numero"]
     tarifa = contrato["tarifa"]
 
@@ -3205,7 +3269,7 @@ OBLIGATORIO:
 """
 
 
-def get_system_prompt_auditoria(eps: str) -> str:
+def get_system_prompt_auditoria(eps: str, fecha_hecho=None) -> str:
     """R59 P2: prompt para modo 'auditoria_previa' (diagnóstico neutral).
 
     A diferencia de get_system_prompt(), este NO depende del prefijo de
@@ -3213,7 +3277,7 @@ def get_system_prompt_auditoria(eps: str) -> str:
     El régimen especial sí se inyecta para que el auditor sepa que es
     SOAT/Sanidad Militar/etc. al evaluar tarifas.
     """
-    contrato = get_contrato(eps)
+    contrato = get_contrato(eps, fecha_hecho)
     bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
     if bloque_regimen:
         bloque_regimen = (

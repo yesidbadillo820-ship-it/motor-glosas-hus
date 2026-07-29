@@ -4670,12 +4670,21 @@ class GlosaService:
             # prompt neutral que NO redacta dictamen sino diagnóstico.
             # No depende del prefijo — el flujo de auditoría es uniforme
             # para todos los tipos de glosa.
+            # La fecha del hecho decide QUÉ contrato aplica. La radicación de
+            # la factura es la mejor fecha disponible en el formulario (la
+            # atención la precede por días); sin ella, la recepción; sin
+            # ninguna, hoy — que era el comportamiento anterior.
+            _fecha_hecho = getattr(data, "fecha_radicacion", None) or getattr(
+                data, "fecha_recepcion", None
+            )
             if modo_resp == "auditoria_previa":
                 from app.services.glosa_ia_prompts import get_system_prompt_auditoria
 
-                system_prompt = get_system_prompt_auditoria(eps=data.eps)
+                system_prompt = get_system_prompt_auditoria(eps=data.eps, fecha_hecho=_fecha_hecho)
             else:
-                system_prompt = get_system_prompt(prefijo=prefijo, eps=data.eps)
+                system_prompt = get_system_prompt(
+                    prefijo=prefijo, eps=data.eps, fecha_hecho=_fecha_hecho
+                )
             # Fase 3: inyectar contexto de tarifa oficial si es TA con CUPS
             # conocido. Le da a la IA el valor EXACTO publicado (Res. 124/2026
             # HUS o Circular 047/2025 SOAT) para que arme un dictamen con
@@ -4869,6 +4878,7 @@ class GlosaService:
                 valor_pactado=_val_pact_str,
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
                 clausulas_contrato=_clausulas_contrato,
+                fecha_hecho=_fecha_hecho,
             )
 
             # ── Concepto×concepto (jun-2026) ──
@@ -5415,7 +5425,11 @@ class GlosaService:
                 try:
                     from app.services.glosa_ia_prompts import get_contrato
 
-                    _ctr = get_contrato(str(data.eps))
+                    _ctr = get_contrato(
+                        str(data.eps),
+                        getattr(data, "fecha_radicacion", None)
+                        or getattr(data, "fecha_recepcion", None),
+                    )
                     _num_contrato_real = _ctr.get("numero", "") if _ctr else ""
                 except Exception:
                     pass
