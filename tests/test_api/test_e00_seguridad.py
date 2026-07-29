@@ -199,6 +199,84 @@ class TestWorkflowSinBypass:
         r = cliente.post(f"/workflow/{gid}/transicionar", json={"hacia": "RESPONDIDA"})
         assert r.status_code == 200
 
+    # ── La tercera puerta: reabrir para corregir ──────────────────────────
+    #
+    # `transicionar` y `transicionar-lote` ya cerraban el paso al VIEWER.
+    # `reabrir-para-corregir` quedó abierta, y mueve hasta 200 glosas de
+    # RESPONDIDA a pendiente en una sola llamada. Que la pantalla no le
+    # muestre el botón no es una guarda: la API se puede llamar directo.
+
+    def test_viewer_no_puede_reabrir(self, cliente, db_session):
+        _glosa(db_session, estado="RESPONDIDA", workflow_state="RESPONDIDA")
+        gid = db_session.query(GlosaRecord).first().id
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post(
+            "/workflow/reabrir-para-corregir",
+            json={"glosa_ids": [gid], "motivo": "El dictamen citaba un contrato vencido"},
+        )
+        assert r.status_code == 403
+
+    def test_auditor_no_reabre_la_glosa_de_otro(self, cliente, db_session):
+        _glosa(
+            db_session,
+            estado="RESPONDIDA",
+            workflow_state="RESPONDIDA",
+            auditor_email="otro@hus.com",
+        )
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.post(
+            "/workflow/reabrir-para-corregir",
+            json={"glosa_ids": [gid], "motivo": "El dictamen citaba un contrato vencido"},
+        )
+        assert r.json()["reabiertas"] == 0
+        assert r.json()["fallidas"][0]["error"] == "asignada a otro auditor"
+
+    def test_coordinador_si_reabre(self, cliente, db_session):
+        _glosa(db_session, estado="RESPONDIDA", workflow_state="RESPONDIDA")
+        gid = db_session.query(GlosaRecord).first().id
+        cliente.estado["usuario"] = _usuario(rol=ROL_COORDINADOR)
+        r = cliente.post(
+            "/workflow/reabrir-para-corregir",
+            json={"glosa_ids": [gid], "motivo": "El dictamen citaba un contrato vencido"},
+        )
+        assert r.status_code == 200
+        assert r.json()["reabiertas"] == 1
+
+
+class TestMotivoDeReaperturaQuedaEnAuditoria:
+    """Reabrir una glosa ya respondida rehace trabajo cerrado.
+
+    El motivo tenía valor por defecto en el servidor —"Reabrir para corregir
+    dictamen"—, así que la pantalla lo pedía pero nada lo exigía: una llamada
+    sin motivo dejaba esa frase genérica en el registro de auditoría, y
+    después no había forma de saber por qué se reabrió.
+    """
+
+    def test_sin_motivo_no_se_reabre(self, cliente, db_session):
+        _glosa(db_session, estado="RESPONDIDA", workflow_state="RESPONDIDA")
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.post("/workflow/reabrir-para-corregir", json={"glosa_ids": [gid]})
+        assert r.status_code == 422
+
+    def test_un_motivo_de_relleno_tampoco_pasa(self, cliente, db_session):
+        _glosa(db_session, estado="RESPONDIDA", workflow_state="RESPONDIDA")
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.post(
+            "/workflow/reabrir-para-corregir", json={"glosa_ids": [gid], "motivo": "   x  "}
+        )
+        assert r.status_code == 422
+
+    def test_el_motivo_real_queda_escrito_en_la_glosa(self, cliente, db_session):
+        _glosa(db_session, estado="RESPONDIDA", workflow_state="RESPONDIDA")
+        gid = db_session.query(GlosaRecord).first().id
+        motivo = "El dictamen citaba la Res. 3047, derogada por la 2284"
+        r = cliente.post(
+            "/workflow/reabrir-para-corregir", json={"glosa_ids": [gid], "motivo": motivo}
+        )
+        assert r.status_code == 200
+        db_session.expire_all()
+        assert db_session.query(GlosaRecord).get(gid).nota_workflow == motivo
+
     def test_lote_salta_las_de_otro_sin_abortar(self, cliente, db_session):
         _glosa(db_session, estado="RADICADA", workflow_state="RADICADA", factura="A")
         _glosa(

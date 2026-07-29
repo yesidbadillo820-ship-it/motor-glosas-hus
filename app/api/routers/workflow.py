@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -111,7 +111,13 @@ def transicionar_glosa(
 
 class ReabrirParaCorregirInput(BaseModel):
     glosa_ids: list[int]
-    motivo: str = "Reabrir para corregir dictamen"
+    # El motivo NO lleva valor por defecto a propósito. Lo tenía
+    # —"Reabrir para corregir dictamen"—, así que la pantalla lo pedía pero el
+    # servidor no lo exigía: una llamada sin motivo dejaba en el registro de
+    # auditoría una frase genérica en vez de la razón real. Reabrir una glosa
+    # ya respondida es de las pocas acciones que rehacen trabajo cerrado; el
+    # motivo es la única forma de saber después por qué se hizo.
+    motivo: str = Field(..., min_length=8, max_length=500)
 
 
 @router.post("/reabrir-para-corregir")
@@ -135,6 +141,17 @@ def reabrir_para_corregir(
     if len(data.glosa_ids) > 200:
         raise HTTPException(400, "Máximo 200 glosas por reapertura")
 
+    # E00: la tercera puerta. `transicionar` y `transicionar-lote` ya cierran
+    # el paso al VIEWER; esta quedó abierta, y mueve hasta 200 glosas de
+    # RESPONDIDA a pendiente de una sola llamada. Que la pantalla no le muestre
+    # el botón no es una guarda: la API se puede llamar directo.
+    if current_user.rol == ROL_VIEWER:
+        raise HTTPException(status_code=403, detail="VIEWER no puede reabrir glosas")
+
+    motivo = data.motivo.strip()
+    if len(motivo) < 8:
+        raise HTTPException(400, "El motivo de la reapertura queda en auditoría: escríbalo")
+
     repo = GlosaRepository(db)
     estados_reabribles = {"RESPONDIDA", "CONCILIADA"}
     resumen = {
@@ -143,7 +160,7 @@ def reabrir_para_corregir(
         "ya_no_estaban_cerradas": 0,
         "fallidas": [],
     }
-    nota = (data.motivo or "Reabrir para corregir dictamen")[:500]
+    nota = motivo[:500]
 
     for gid in data.glosa_ids:
         glosa = repo.obtener_por_id(gid)
@@ -155,6 +172,13 @@ def reabrir_para_corregir(
         if wf_actual not in estados_reabribles and est_actual not in estados_reabribles:
             resumen["ya_no_estaban_cerradas"] += 1
             continue
+        # Misma regla que la transición individual: el AUDITOR solo mueve lo
+        # suyo. Sin esto, un gestor reabría el trabajo cerrado de otro.
+        if current_user.rol == ROL_AUDITOR:
+            duenio = (glosa.auditor_email or "").strip().lower()
+            if duenio and duenio != (current_user.email or "").strip().lower():
+                resumen["fallidas"].append({"id": gid, "error": "asignada a otro auditor"})
+                continue
         # Revertir a RADICADA — no usamos WorkflowService.transicionar
         # porque la transición RESPONDIDA → RADICADA no está en el grafo
         # válido. Lo hacemos directamente con auditoría explícita.
