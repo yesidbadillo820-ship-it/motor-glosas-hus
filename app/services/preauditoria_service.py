@@ -955,6 +955,26 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
 # ==================================================================
 
 
+def _unir_observacion(observaciones: str = None, motivo: str = None) -> Optional[str]:
+    """Junta lo escrito en "Observaciones" con lo escrito en "Motivo" al radicar.
+
+    Al radicar no existe un "motivo de devolución", pero el auditor igual puede
+    haber escrito ahí: ese recuadro está arriba y es el que más se ve. Antes su
+    texto se descartaba en silencio y el historial quedaba vacío (caso real
+    29-07-2026: se escribió "OKAY SOPORTES" al radicar y no quedó registrado en
+    ninguna parte). Ahora nunca se pierde: se guarda como observación.
+    """
+    obs = (observaciones or "").strip()
+    mot = (motivo or "").strip()
+    if not mot:
+        return observaciones
+    if not obs:
+        return mot
+    if mot in obs:  # ya lo escribió en los dos recuadros: no duplicar
+        return observaciones
+    return f"{obs} — {mot}"
+
+
 def auditar_factura(
     db: Session,
     canon: FacturaPreauditoriaRecord,
@@ -1034,6 +1054,10 @@ def auditar_factura(
         canon.resultado_actual = resultado
 
     if resultado == RESULTADO_RADICAR:
+        # Nada de lo que escribió el auditor se descarta: si escribió en el
+        # recuadro de motivo (que al radicar no aplica), su texto pasa a la
+        # observación en vez de perderse.
+        observaciones = _unir_observacion(observaciones, motivo)
         canon.resultado_actual = RESULTADO_RADICAR
         canon.estado = ESTADO_RADICADA if canon.ronda_actual == 1 else ESTADO_SUBSANADA
         canon.pendiente_subsanacion = 0
@@ -1114,6 +1138,9 @@ def auditar_factura(
                 oficio=oficio,
                 fuente=fuente,
                 usuario=usuario,
+                # La observación viaja también en la fila REVERTIDA: al revisar
+                # el historial se ve qué había anotado quien decidió antes.
+                observaciones=canon.observaciones,
                 resultado=RESULTADO_PENDIENTE,
             )
         )
@@ -1121,6 +1148,50 @@ def auditar_factura(
         return {"ok": True}
 
     return {"ok": False, "codigo": 400, "mensaje": "Resultado inválido."}
+
+
+# ==================================================================
+# Anotar la observación de una factura YA auditada (sin revertirla)
+# ==================================================================
+
+
+def anotar_observacion(
+    db: Session,
+    canon: FacturaPreauditoriaRecord,
+    observaciones: str,
+    usuario: str,
+) -> dict:
+    """Agrega o corrige la observación sin cambiar la decisión de la factura.
+
+    Sirve para las facturas que ya se radicaron sin observación (o cuya
+    observación se perdió por el error del recuadro equivocado): se anota
+    ahora, sin tener que revertir y volver a radicar. Queda como un evento
+    más del historial, con quién la escribió y cuándo.
+    """
+    texto = (observaciones or "").strip()
+    if not texto:
+        return {"ok": False, "codigo": 400, "mensaje": "Escriba la observación."}
+
+    oficio = (
+        db.get(OficioRecepcionRecord, canon.oficio_actual_id) if canon.oficio_actual_id else None
+    )
+    fuente = datos_fuente(db, canon.factura)
+    canon.observaciones = texto
+    db.flush()
+    db.add(
+        _nuevo_evento(
+            canon,
+            "OBSERVACION",
+            oficio=oficio,
+            fuente=fuente,
+            usuario=usuario,
+            observaciones=texto,
+            # No cambia la decisión: el evento conserva la que ya tenía.
+            resultado=canon.resultado_actual,
+        )
+    )
+    db.commit()
+    return {"ok": True}
 
 
 # ==================================================================
