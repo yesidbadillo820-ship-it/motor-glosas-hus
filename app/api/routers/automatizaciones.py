@@ -57,6 +57,15 @@ def listar_automatizaciones(
     }
 
 
+def _nombre_para_header(nombre: str) -> str:
+    """Los encabezados HTTP solo aguantan latin-1: un nombre de archivo con
+    una flecha «→» o un emoji tumbaba la descarga con un error 500 mudo."""
+    limpio = "".join(
+        c if (31 < ord(c) < 256 and c not in '";\r\n') else "_" for c in (nombre or "")
+    )
+    return limpio.strip() or "archivo"
+
+
 @router.post("/{id_automatizacion}/previsualizar")
 async def previsualizar_automatizacion(
     id_automatizacion: str,
@@ -81,11 +90,18 @@ async def previsualizar_automatizacion(
     except svc.ErrorAutomatizacion as e:
         raise HTTPException(400, str(e))
 
+    try:
+        resumen = svc.resumir(resultado.archivos)
+    except Exception:
+        # El resumen es un extra de cortesía: si un archivo generado no se
+        # deja resumir, la previsualización igual dice qué salió.
+        resumen = {}
+
     return {
         "ok": True,
         "segundos": round(resultado.segundos, 2),
         "archivos": resultado.nombres,
-        "resumen": svc.resumir(resultado.archivos),
+        "resumen": resumen,
         "salida_texto": resultado.salida_texto[-800:],
     }
 
@@ -149,7 +165,7 @@ async def ejecutar_automatizacion(
             io.BytesIO(datos),
             media_type="application/octet-stream",
             headers={
-                "Content-Disposition": f'attachment; filename="{nombre}"',
+                "Content-Disposition": f'attachment; filename="{_nombre_para_header(nombre)}"',
                 "X-Archivos-Generados": "1",
                 "X-Segundos": f"{resultado.segundos:.2f}",
             },

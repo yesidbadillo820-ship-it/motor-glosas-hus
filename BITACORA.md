@@ -901,6 +901,26 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   lista para pegar) y **Automatización** (robots de cartera desde el
   navegador, arrastrando el archivo).
 
+### 29-07 (tercera parte) — Épica: el Expediente Inteligente
+
+- **Pantalla nueva «Expediente»** en el menú: se busca por ID de glosa o por
+  factura y aparece TODO en un solo lugar — la ficha, el contrato que rige
+  con su color (verde/ámbar/rojo), las conciliaciones, los soportes y la
+  línea de tiempo completa con filtros de un clic. El popup viejo de
+  timeline (ventana aparte) se eliminó: el botón 📜 ahora entra acá.
+- **El acta de la mesa se cuadra sola.** En la pantalla Conciliación se sube
+  el mismo Excel que se diligencia en la audiencia (el de las 147 del
+  Dispensario, por ejemplo) y el sistema: dice qué no cuadra (fila por
+  fila), devuelve el libro optimizado con el resultado de cada línea y una
+  hoja REVISION, y arma el acta lista para imprimir y firmar con la cláusula
+  de mérito ejecutivo y las firmas leídas del propio libro. Probado con el
+  acta real: 444 líneas, 147 facturas, $317.640.524 glosados y los
+  $11.836.399 levantados, cuadre exacto.
+- **La IA ya consulta expedientes**: en el chat se puede preguntar «¿qué ha
+  pasado con la factura HUS…?» y responde con la misma información de la
+  pantalla. Cada uso del acta queda registrado en la auditoría del sistema.
+- Guía corta en `docs/EXPEDIENTE_INTELIGENTE.md`.
+
 ---
 
 ## 3) PENDIENTE

@@ -425,7 +425,12 @@ def ejecutar(
     if faltan:
         raise ErrorAutomatizacion("Faltan datos obligatorios: " + ", ".join(faltan))
 
-    modulo = _cargar(auto.modulo)
+    try:
+        modulo = _cargar(auto.modulo)
+    except Exception as e:
+        raise ErrorAutomatizacion(
+            f"No se pudo cargar la herramienta '{auto.modulo}': {type(e).__name__}: {e}"
+        ) from e
     if not hasattr(modulo, "main"):
         raise ErrorAutomatizacion(f"La herramienta '{auto.modulo}' no se puede correr desde aquí")
 
@@ -481,5 +486,14 @@ def ejecutar(
             salida_texto=buffer.getvalue().strip()[-2000:],
             segundos=segundos,
         )
+    except ErrorAutomatizacion:
+        raise
+    except Exception as e:
+        # Al auditor nunca le llega un «Error 500» pelado: cualquier tropiezo
+        # inesperado (armar argumentos, escribir el temporal, leer la salida)
+        # se convierte en un mensaje que dice qué pasó.
+        raise ErrorAutomatizacion(
+            f"La corrida falló de forma inesperada: {type(e).__name__}: {e}"
+        ) from e
     finally:
         shutil.rmtree(trabajo, ignore_errors=True)

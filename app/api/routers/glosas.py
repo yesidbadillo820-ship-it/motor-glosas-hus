@@ -10232,6 +10232,177 @@ def timeline_glosa(
     }
 
 
+def construir_expediente(glosa_id: int, db: Session) -> dict:
+    """El expediente completo de una glosa, consolidado en una sola llamada.
+
+    Es la fuente única que usan la pantalla Expediente, la API y el
+    asistente IA: la ficha, el contrato que regía el día del hecho, la
+    constancia contractual, la línea de tiempo completa, las conciliaciones
+    y los soportes documentales conocidos.
+    """
+    import json as _json
+
+    from app.models.db import AuditLogRecord, DictamenVersionRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    tl = timeline_glosa(glosa_id, db=db, current_user=None)
+
+    # El contrato que rige HOY el expediente (la constancia guarda el del
+    # día del análisis; esto muestra además si a la fecha sigue vigente).
+    contrato = None
+    try:
+        from app.services import malla_contractual as _mc
+
+        dia_hecho = (
+            glosa.fecha_radicacion_factura.date()
+            if glosa.fecha_radicacion_factura
+            else (glosa.fecha_recepcion.date() if glosa.fecha_recepcion else date.today())
+        )
+        _vig = _mc.vigente(glosa.eps or "", dia_hecho)
+        if _vig is not None:
+            contrato = {**_vig.como_dict(), "fecha_evaluada": dia_hecho.isoformat()}
+    except Exception:
+        contrato = None
+
+    # La última verificación contractual registrada en el expediente
+    constancia = None
+    fila_c = (
+        db.query(AuditLogRecord)
+        .filter(
+            AuditLogRecord.accion == "VERIFICACION_CONTRACTUAL",
+            AuditLogRecord.registro_id == glosa_id,
+            AuditLogRecord.tabla.in_(("glosas", "historial")),
+        )
+        .order_by(AuditLogRecord.id.desc())
+        .first()
+    )
+    if fila_c is not None:
+        try:
+            constancia = _json.loads(fila_c.detalle or "")
+        except Exception:
+            constancia = {"veredicto": fila_c.campo, "resumen": (fila_c.detalle or "")[:200]}
+
+    conciliaciones = []
+    try:
+        from app.repositories.conciliacion_repository import ConciliacionRepository
+
+        for c in ConciliacionRepository(db).listar_por_glosa(glosa_id):
+            conciliaciones.append(
+                {
+                    "id": c.id,
+                    "fecha_audiencia": (
+                        c.fecha_audiencia.isoformat() if c.fecha_audiencia else None
+                    ),
+                    "resultado": c.resultado,
+                    "valor_conciliado": float(c.valor_conciliado or 0),
+                    "acta_numero": c.acta_numero,
+                }
+            )
+    except Exception:
+        conciliaciones = []
+
+    soportes = []
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        if glosa.factura:
+            for s in (get_indexer().lookup(glosa.factura, auto_rebuild=False) or [])[:25]:
+                soportes.append(
+                    {
+                        "nombre": s.get("nombre_archivo"),
+                        "tipo": s.get("tipo_codigo"),
+                        "ruta": s.get("ruta"),
+                    }
+                )
+    except Exception:
+        soportes = []
+
+    versiones = (
+        db.query(DictamenVersionRecord).filter(DictamenVersionRecord.glosa_id == glosa_id).count()
+    )
+
+    return {
+        "glosa_id": glosa.id,
+        "ficha": {
+            "eps": glosa.eps,
+            "factura": glosa.factura,
+            "paciente": glosa.paciente,
+            "codigo_glosa": glosa.codigo_glosa,
+            "concepto": getattr(glosa, "concepto_glosa", None),
+            "etapa": glosa.etapa,
+            "estado": glosa.estado,
+            "valor_objetado": float(glosa.valor_objetado or 0),
+            "valor_aceptado": float(glosa.valor_aceptado or 0),
+            "dias_restantes": glosa.dias_restantes,
+            "auditor": glosa.auditor_email,
+            "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
+            "tiene_dictamen": bool(glosa.dictamen),
+        },
+        "contrato": contrato,
+        "constancia_contractual": constancia,
+        "timeline": tl["eventos"],
+        "total_eventos": tl["total_eventos"],
+        "conciliaciones": conciliaciones,
+        "soportes": soportes,
+        "versiones_dictamen": versiones,
+    }
+
+
+@router.get("/{glosa_id}/expediente")
+def expediente_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """La vista única del expediente: quién es, con qué contrato se
+    defiende, qué ha pasado (línea de tiempo completa), en qué mesas ha
+    estado y qué soportes existen. Lo que antes exigía abrir cuatro
+    pantallas y un popup."""
+    return construir_expediente(glosa_id, db)
+
+
+@router.get("/expediente/buscar")
+def expediente_buscar(
+    q: str = Query(..., min_length=1, description="ID de glosa o número de factura"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Encuentra el expediente por ID de glosa o por número de factura
+    (completo o con los ceros que sea): es la caja de búsqueda de la
+    pantalla Expediente."""
+    texto = q.strip()
+    encontradas = []
+    if texto.isdigit() and len(texto) <= 9:
+        g = GlosaRepository(db).obtener_por_id(int(texto))
+        if g:
+            encontradas = [g]
+    if not encontradas:
+        like = f"%{texto.upper().replace('HUS', '').lstrip('0') or texto}%"
+        encontradas = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.factura.ilike(f"%{texto}%") | GlosaRecord.factura.ilike(like))
+            .order_by(GlosaRecord.id.desc())
+            .limit(10)
+            .all()
+        )
+    return {
+        "resultados": [
+            {
+                "glosa_id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+            for g in encontradas
+        ]
+    }
+
+
 class _PreviewAuditoriaIn(BaseModel):
     texto_glosa: str = Field(..., min_length=1, max_length=10_000)
     eps: str = Field(default="")
