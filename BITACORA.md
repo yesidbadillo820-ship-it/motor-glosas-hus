@@ -877,6 +877,30 @@ free -m | head -2
 '
 ```
 
+### 29-07 (segunda parte) — El contrato correcto, en todas las pantallas
+
+Sprint de construcción del día (varios PR fusionados en cadena):
+
+- **Al analizar una glosa, manda la fecha del hecho.** El dictamen cita el
+  contrato que regía el día de la atención, no el de hoy. Si ese día no regía
+  ninguno (ej.: COMPENSAR después del 3 de abril de 2026), la IA recibe la
+  alerta y defiende a tarifa SOAT plena en vez de citar un contrato muerto.
+- **Cada análisis deja constancia en el expediente.** En la línea de tiempo de
+  la glosa queda escrito qué contrato se usó, si estaba vigente ese día y con
+  qué factor, en una frase clara y con color según el veredicto: verde
+  (vigente), ámbar (sin contrato ese día), rojo (pagador fuera de la malla).
+  Cuando la EPS discuta la tarifa meses después, la respuesta está escrita en
+  el expediente, no en la memoria de nadie.
+- **El asistente del chat ya consulta la malla.** Preguntas como «¿qué
+  contrato de COMPENSAR regía en septiembre?» se responden con la malla
+  oficial, y el asistente tiene prohibido citar un contrato sin verificar
+  primero que regía el día del hecho.
+- Pantallas nuevas de los días previos, ya fusionadas y desplegadas:
+  **Contratos** (malla completa con buscador, filtros de un clic y semáforo de
+  vencimientos, más el buscador de material de osteosíntesis con la defensa
+  lista para pegar) y **Automatización** (robots de cartera desde el
+  navegador, arrastrando el archivo).
+
 ---
 
 ## 3) PENDIENTE
@@ -1057,6 +1081,12 @@ free -m | head -2
 12. **Siguiente paso de construcción**, según el plan: terminar la limpieza de
     módulos sin uso y arrancar la **Fase 2 — modelo real del dominio**
     (Factura → Glosa → Soporte → Conciliación → Acta).
+13. **Preguntar a contratación por las prórrogas.** Según la malla del 28-07,
+    los contratos de COMPENSAR y COOSALUD subsidiado ya vencieron y los de
+    NUEVA EPS y SALUD MIA están al límite. Si hay prórroga u otrosí firmado,
+    avisar para actualizar la malla del sistema; mientras tanto, el sistema
+    defiende esas atenciones a tarifa SOAT plena, que es lo correcto sin
+    contrato vigente.
 
 ### Contrato de Construcción — decisiones que dependen de Yesid (28-07 noche)
 

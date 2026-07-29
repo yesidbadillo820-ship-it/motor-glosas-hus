@@ -6380,7 +6380,7 @@ def descargar_paquete_evidencia(
                 "tipo": f"AUDIT_{a.accion or 'ACCION'}",
                 "actor": a.usuario_email,
                 "timestamp": a.timestamp.isoformat() if a.timestamp else None,
-                "detalle": (a.detalle or "")[:200],
+                "detalle": _detalle_legible(a.detalle)[0][:200],
             }
         )
     for c in db.query(ComentarioGlosaRecord).filter_by(glosa_id=glosa_id).all():
@@ -10059,6 +10059,26 @@ def audit_resumen_glosa(
     }
 
 
+def _detalle_legible(crudo: Optional[str]) -> tuple[str, Optional[dict]]:
+    """Las constancias que guardan JSON con un campo `resumen` se muestran
+    en cristiano; el JSON completo pasa a metadata para quien lo necesite.
+
+    Sin esto, la línea de tiempo le mostraba al auditor un pedazo de JSON
+    cortado a los 300 caracteres — ilegible y con pinta de error.
+    """
+    texto = crudo or ""
+    if texto.lstrip().startswith("{"):
+        import json
+
+        try:
+            datos = json.loads(texto)
+            if isinstance(datos, dict) and datos.get("resumen"):
+                return str(datos["resumen"]), datos
+        except Exception:
+            pass
+    return texto, None
+
+
 @router.get("/{glosa_id}/timeline")
 def timeline_glosa(
     glosa_id: int,
@@ -10137,18 +10157,22 @@ def timeline_glosa(
         .all()
     )
     for a in auditorias:
+        detalle_txt, constancia = _detalle_legible(a.detalle)
+        meta = {
+            "campo": a.campo,
+            "valor_anterior": (a.valor_anterior or "")[:80],
+            "valor_nuevo": (a.valor_nuevo or "")[:80],
+            "ip": a.ip,
+        }
+        if constancia:
+            meta["constancia"] = constancia
         eventos.append(
             {
                 "timestamp": a.timestamp.isoformat() if a.timestamp else None,
                 "tipo": f"AUDIT_{a.accion or 'ACCION'}",
                 "actor": a.usuario_email or "—",
-                "detalle": (a.detalle or "")[:300],
-                "metadata": {
-                    "campo": a.campo,
-                    "valor_anterior": (a.valor_anterior or "")[:80],
-                    "valor_nuevo": (a.valor_nuevo or "")[:80],
-                    "ip": a.ip,
-                },
+                "detalle": detalle_txt[:300],
+                "metadata": meta,
             }
         )
 

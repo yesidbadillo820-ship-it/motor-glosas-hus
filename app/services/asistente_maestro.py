@@ -64,6 +64,7 @@ REGLAS DURAS:
 6. Si el usuario pide "audita esta factura" sin más, asumí que quiere el auditor_forense con pregunta genérica.
 7. Cuando devuelvas valores monetarios, formatealos en pesos colombianos: "$1.234.567 COP".
 8. Para fechas, usá formato dd/mm/aaaa.
+9. NUNCA cites un contrato como base de defensa sin verificar antes con consultar_malla_contractual que regía EL DÍA DEL HECHO (no hoy). Si ese día no regía ninguno, decilo: la defensa correcta es a tarifa SOAT plena, no el contrato muerto.
 
 Comunicate con calidez profesional — sos parte del equipo del HUS, no un bot externo."""
 
@@ -182,6 +183,28 @@ TOOLS_ASISTENTE = [
         "name": "estadisticas_sistema",
         "description": "Devuelve KPIs globales: total glosas, valor objetado mes, valor recuperado, tasa éxito, EPS top, glosas vencidas, etc.",
         "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "consultar_malla_contractual",
+        "description": (
+            "La malla contractual oficial del HUS. Con pagador devuelve el contrato "
+            "que regía ESE día (número, vigencia, tarifa, factor, qué cubre y qué no); "
+            "sin pagador devuelve el panorama completo: vencidos, por vencer y vigentes. "
+            "Úsala SIEMPRE antes de citar un contrato como base de defensa."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "pagador": {
+                    "type": "string",
+                    "description": "EPS o entidad (ej: COMPENSAR, FOMAG, POLICIA). Vacío = panorama completo.",
+                },
+                "fecha": {
+                    "type": "string",
+                    "description": "Fecha del hecho AAAA-MM-DD. Vacío = hoy.",
+                },
+            },
+        },
     },
 ]
 
@@ -311,6 +334,42 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
                     "codigo_glosa": args.get("codigo_glosa"),
                     "limite": args.get("limite", 3),
                 }
+            )
+
+        if name == "consultar_malla_contractual":
+            from datetime import date as _date
+            from datetime import datetime as _dt
+
+            from app.services import malla_contractual as _malla
+
+            pagador = (args.get("pagador") or "").strip()
+            crudo = (args.get("fecha") or "").strip()
+            try:
+                dia = _dt.strptime(crudo, "%Y-%m-%d").date() if crudo else _date.today()
+            except ValueError:
+                return json.dumps(
+                    {"error": "La fecha debe venir como AAAA-MM-DD"}, ensure_ascii=False
+                )
+
+            if not pagador:
+                return json.dumps(_malla.estado_vigencia(dia), ensure_ascii=False)
+
+            contrato = _malla.vigente(pagador, dia)
+            todos = _malla.contratos_de(pagador)
+            return json.dumps(
+                {
+                    "pagador": pagador,
+                    "fecha": dia.isoformat(),
+                    "malla_al": _malla.FECHA_MALLA.isoformat(),
+                    "hay_contrato": contrato is not None,
+                    "contrato": contrato.como_dict() if contrato else None,
+                    "otros_contratos": [
+                        c.como_dict()
+                        for c in todos
+                        if contrato is None or c.numero != contrato.numero
+                    ],
+                },
+                ensure_ascii=False,
             )
 
         if name == "estadisticas_sistema":

@@ -9099,9 +9099,14 @@ async function verTimelineGlosa(){
       if(t === 'AI_CALL') return '🤖';
       if(t === 'COMENTARIO') return '💬';
       if(t === 'COMENTARIO_RESUELTO') return '✅';
+      if(t === 'AUDIT_VERIFICACION_CONTRACTUAL') return '⚖️';
       if(t.indexOf('VERSION_') === 0) return '📝';
       if(t.indexOf('AUDIT_') === 0) return '🛡️';
       return '•';
+    };
+    // "AUDIT_VERIFICACION_CONTRACTUAL" se lee mal; "VERIFICACION CONTRACTUAL" se lee bien
+    var nombreTipo = function(t){
+      return String(t||'').replace(/^AUDIT_/,'').replace(/_/g,' ');
     };
     var html = '<html><head><meta charset="utf-8"><title>Timeline Glosa #' + CURRENT_GLOSA_ID + '</title>'
              + '<style>body{font-family:Segoe UI,Arial;padding:20px;background:#f8fafc;color:#1f2937;line-height:1.5}'
@@ -9122,9 +9127,16 @@ async function verTimelineGlosa(){
     d.eventos.forEach(function(e){
       var color = colorPorTipo(e.tipo || '');
       var icon = iconoPorTipo(e.tipo || '');
+      // La verificación contractual se colorea por su veredicto, no por su tipo:
+      // verde = había contrato ese día; ámbar = ese día no regía ninguno;
+      // rojo = el pagador ni aparece en la malla.
+      if(e.tipo === 'AUDIT_VERIFICACION_CONTRACTUAL' && e.metadata && e.metadata.campo){
+        color = e.metadata.campo === 'VIGENTE' ? '#16a34a'
+              : (e.metadata.campo === 'SIN_CONTRATO_VIGENTE' ? '#b45309' : '#dc2626');
+      }
       var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
       html += '<div class="ev" data-icon="' + icon + '" style="--c:' + color + ';border-left:4px solid ' + color + ';">'
-            + '<div class="tipo" style="color:' + color + '">' + esc(e.tipo) + '</div>'
+            + '<div class="tipo" style="color:' + color + '">' + esc(nombreTipo(e.tipo)) + '</div>'
             + '<div class="actor">' + esc(e.actor || '—') + ' · <span class="fecha">' + fecha + '</span></div>'
             + '<div class="detalle">' + esc(e.detalle || '—') + '</div>';
       if(e.metadata && Object.keys(e.metadata).length > 0){
