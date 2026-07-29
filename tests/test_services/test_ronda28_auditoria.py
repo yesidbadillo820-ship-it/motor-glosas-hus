@@ -43,9 +43,38 @@ def test_policia_mediana_alta_no_regresa():
 
 
 def test_match_generico_no_regresa():
+    """COMPENSAR sigue resolviendo a SU contrato, no a uno ajeno.
+
+    Cambió el cómo: ahora se resuelve por la FECHA DEL HECHO. El contrato
+    CSS009-2024 rigió del 4-abr-2025 al 3-abr-2026 según la malla oficial, así
+    que se comprueba dentro de ese rango.
+    """
+    import datetime as dt
+
     from app.services.glosa_ia_prompts import get_contrato
 
-    assert "CSS009-2024" in get_contrato("COMPENSAR")["numero"]
+    ficha = get_contrato("COMPENSAR", dt.date(2025, 9, 15))
+    assert "CSS009-2024" in ficha["numero"]
+
+
+def test_compensar_sin_contrato_despues_de_abril_2026():
+    """Y después de que venció, el sistema lo dice en vez de inventarlo.
+
+    Antes devolvía siempre la misma ficha con factor 0,90 —que además no
+    coincidía con el 0,85 de la malla—. Ahora, sin contrato vigente, se
+    defiende a tarifa SOAT plena, que es lo que corresponde jurídicamente y
+    además es más favorable al hospital que el descuento pactado.
+    """
+    import datetime as dt
+
+    from app.services.glosa_ia_prompts import get_contrato
+
+    ficha = get_contrato("COMPENSAR", dt.date(2026, 7, 29))
+    assert ficha["numero"] == "SIN CONTRATO PACTADO"
+    assert ficha["factor"] == 1.00
+    assert "no había contrato vigente" in ficha["nota"]
+    # Y dice cuál existió, para que el auditor sepa qué pasó.
+    assert "CSS009-2024" in ficha["nota"]
     assert get_contrato("EPS")["numero"] == "SIN CONTRATO PACTADO"
 
 
