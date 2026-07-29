@@ -48,9 +48,10 @@ motivos, estructura).
 - **Bernal**: único confidente de Yazid en la corte; cubre sus ausencias sin hacer preguntas.
 - **Infanta Elvira de Aurión**: prometida política de Yazid. Personaje generoso, no antagonista:
   tiene su propio amor en otra parte y se libera del compromiso con alivio, no con rencor.
-- **Duque Rodrigo de Ferrant**: consejero tradicionalista que se opone a que el rey se case con
-  una plebeya. Antagonista "blando": se le vence con argumento y dignidad, no con violencia ni
-  humillación.
+- **Duque Rodrigo de Ferrant**: consejero tradicionalista, leal a la corona desde el reinado del
+  padre de Yazid. Antagonista "blando": se opone al matrimonio con una plebeya por convicción de
+  Estado, no por maldad; se le vence con argumento y dignidad, no con violencia ni humillación.
+  Ya presentado (cap. I.3): exige el compromiso con Aurión por el cierre del paso de Renglar.
 - (Reservado para libros II-III): un mentor/caballero de confianza para Yazid; una amiga cercana
   de Daniela — se introducirán según haga falta, sin sobrecargar el reparto.
 
@@ -82,12 +83,27 @@ sabe y el otro no. Prosa cálida y sensorial (fuego, vino, lluvia, madera), dist
 frío/archivístico de otra obra del autor. Diálogos con raya española (—). Cursiva para
 pensamientos internos y para el motivo-frase recurrente.
 
+## Datos ya plantados (no contradecir en capítulos futuros)
+
+- Excusa oficial de Yazid para ausentarse: "rondas de inspección real" a los pueblos de la
+  frontera sur, sin séquito ni anuncio — cubre visitas periódicas a Ferrol de Abajo.
+  Argumento presentado a Rodrigo: "un rey que nunca sale de su castillo gobierna un reino que
+  nunca conoce."
+- Conflicto con Aurión: cierran el paso comercial de Renglar a los carros de grano de Valduero
+  (tres veces en dos meses) para presionar el compromiso matrimonial. Rodrigo pidió el
+  compromiso formal; Yazid ganó un mes de plazo.
+- Bernal sabe del secreto de Yazid y lo cubre; a cambio, le pidió una botella del vino de La
+  Parra la próxima vez.
+- Ampolla en la palma derecha de Yazid (de partir leña) — motivo físico de que los tres días
+  fueron reales.
+
 ## Progreso
 
 | Libro | Capítulo | Título | Estado |
 |---|---|---|---|
 | I | 1 | El Forastero | ✅ |
 | I | 2 | Tres Días | ✅ |
-| I | 3-9 | — | ⏳ |
+| I | 3 | El Trono Frío | ✅ |
+| I | 4-9 | — | ⏳ |
 | II | 1-9 | — | ⏳ |
 | III | 1-9 + Epílogo | — | ⏳ |
