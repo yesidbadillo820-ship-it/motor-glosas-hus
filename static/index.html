@@ -20640,6 +20640,9 @@ function mallaLista(g, filas){
           ? '<div class="malla-det-g malla-det-excl"><span>No se contrata</span>'
             + c.exclusiones.map(function(x){ return '<em>' + escHtml(x) + '</em>'; }).join('') + '</div>' : '')
       +   (c.observacion ? '<div class="malla-det-g"><span>Observación</span>' + escHtml(c.observacion) + '</div>' : '')
+      // Motor Universal: qué sabe hacer el sistema con este pagador,
+      // cargado la primera vez que se abre la fila.
+      +   '<div class="malla-det-g malla-cap" id="cap-' + id + '" data-pagador="' + escHtml(c.pagador) + '"><span>El sistema con este pagador</span><em style="color:var(--text-3)">…</em></div>'
       + '</div>'
       + '</div>';
   });
@@ -20652,6 +20655,23 @@ function mallaExpandir(id){
   var fila = el.closest('.malla-fila');
   var abierta = fila.classList.contains('abierta');
   fila.classList.toggle('abierta', !abierta);
+  if(!abierta) mallaCapacidades(id);
+}
+
+// Motor Universal: el perfil del pagador se pide una sola vez por fila.
+async function mallaCapacidades(id){
+  var caja = document.getElementById('cap-' + id);
+  if(!caja || caja.dataset.listo) return;
+  caja.dataset.listo = '1';
+  try{
+    var r = await fetch('/malla/perfil?pagador=' + encodeURIComponent(caja.dataset.pagador || ''), {headers: authH()});
+    if(!r.ok){ caja.style.display = 'none'; return; }
+    var p = await r.json();
+    var caps = p.capacidades || [];
+    if(!caps.length){ caja.style.display = 'none'; return; }
+    caja.innerHTML = '<span>El sistema con este pagador</span>'
+      + caps.map(function(c){ return '🤖 ' + escHtml(c); }).join('<br>');
+  }catch(e){ caja.style.display = 'none'; }
 }
 
 // ─── Centro de Automatización ──────────────────────────────────────────

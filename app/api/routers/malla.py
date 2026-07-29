@@ -38,6 +38,30 @@ def estado_de_la_malla(
     return malla.estado_vigencia(date.today(), dias_aviso=dias_aviso)
 
 
+@router.get("/pagadores")
+def mapa_de_pagadores(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El Motor Universal en una respuesta: cada pagador de la malla con
+    TODO lo que el sistema sabe hacer con él (contrato por fecha, lotes
+    masivos y su bot, conversores, contacto de radicación)."""
+    from app.services import perfil_pagador
+
+    return {"pagadores": perfil_pagador.catalogo()}
+
+
+@router.get("/perfil")
+def perfil_de_pagador(
+    pagador: str = Query(..., min_length=2, description="EPS o entidad pagadora"),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El perfil universal de UN pagador: qué sabe hacer el sistema con él
+    y de qué registro sale cada capacidad."""
+    from app.services import perfil_pagador
+
+    return perfil_pagador.perfil(pagador)
+
+
 @router.get("/vigente")
 def contrato_vigente(
     pagador: str = Query(..., min_length=2, description="EPS o entidad pagadora"),
