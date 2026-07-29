@@ -33,31 +33,44 @@ from app.models.db import (
     LoteRecord,
     TareaLoteRecord,
 )
+from app.services import perfiles_lote
 
 logger = logging.getLogger("motor_glosas")
 
-PAGADORES_SOPORTADOS = {"COOSALUD"}
+
+# Qué pagadores se pueden encolar sale del registro de perfiles, no de un
+# conjunto escrito acá. Era `{"COOSALUD"}`: los bots de SIMED, SAVIA y los
+# demás ya existían en `tools/` y ninguno se podía encolar sin tocar código.
+def PAGADORES_SOPORTADOS() -> set[str]:  # noqa: N802 - se conserva el nombre
+    return set(perfiles_lote.pagadores())
+
+
 MAX_EXCEL_BYTES = 20 * 1024 * 1024  # consolidados reales pesan < 5 MB
 
 
-def parsear_excel_coosalud(contenido: bytes, hoja: str, incluir_calidad: bool) -> dict[str, dict]:
-    """Parsea el Excel consolidado con el MISMO parser del bot.
+def parsear_excel(
+    perfil: "perfiles_lote.PerfilLote",
+    contenido: bytes,
+    hoja: str,
+    incluir_calidad: bool,
+) -> dict[str, "perfiles_lote.FacturaLote"]:
+    """Parsea el Excel con el MISMO lector que después usa el bot.
 
-    tools/responder_glosas_coosalud.leer_excel es la fuente de verdad
-    (match tolerante de hoja, exclusión de CALIDAD, RE9502 sin soporte):
-    si la app parseara distinto de lo que después ejecuta el bot, el
-    semáforo de la UI mentiría. leer_excel lee de disco, así que el
-    upload pasa por un archivo temporal.
+    Que la aplicación lea el archivo distinto de como lo lee el bot sería
+    peor que no leerlo: el semáforo de la pantalla mostraría un conteo y el
+    bot trabajaría sobre otro. Por eso cada perfil apunta al lector de su
+    propio bot, y acá solo se normaliza la forma.
+
+    Los lectores leen de disco, así que lo que sube el auditor pasa por un
+    archivo temporal que se borra al terminar.
 
     Lanza ValueError si falta la hoja o alguna columna obligatoria.
     """
-    from tools.responder_glosas_coosalud import leer_excel
-
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         tmp.write(contenido)
         ruta = Path(tmp.name)
     try:
-        return leer_excel(ruta, hoja, incluir_calidad=incluir_calidad)
+        return perfil.leer(ruta, hoja, incluir_calidad)
     finally:
         ruta.unlink(missing_ok=True)
 
@@ -74,11 +87,13 @@ def crear_lote(
 ) -> LoteRecord:
     """Parsea el Excel, crea el lote con sus facturas y encola la tarea."""
     pagador = pagador.strip().upper()
-    if pagador not in PAGADORES_SOPORTADOS:
+    perfil = perfiles_lote.obtener(pagador)
+    if perfil is None:
         raise ValueError(
-            f"Pagador '{pagador}' no soportado todavía. Disponibles: {sorted(PAGADORES_SOPORTADOS)}"
+            f"Pagador '{pagador}' no soportado todavía. "
+            f"Disponibles: {sorted(perfiles_lote.pagadores())}"
         )
-    facturas = parsear_excel_coosalud(contenido, hoja, incluir_calidad)
+    facturas = parsear_excel(perfil, contenido, hoja, incluir_calidad)
     if not facturas:
         raise ValueError("El Excel no tiene facturas con glosas para responder.")
 
@@ -90,8 +105,8 @@ def crear_lote(
         incluir_calidad=1 if incluir_calidad else 0,
         estado=LOTE_ESTADO_EN_COLA,
         total_facturas=len(facturas),
-        total_glosas=sum(len(g["ids"]) for f in facturas.values() for g in f["grupos"]),
-        total_calidad=sum(f["calidad"] for f in facturas.values()),
+        total_glosas=sum(f.glosas for f in facturas.values()),
+        total_calidad=sum(f.calidad for f in facturas.values()),
         excel_archivo=contenido,
     )
     db.add(lote)
@@ -102,14 +117,14 @@ def crear_lote(
             FacturaLoteRecord(
                 lote_id=lote.id,
                 factura=factura,
-                grupos=len(info["grupos"]),
-                glosas=sum(len(g["ids"]) for g in info["grupos"]),
-                calidad=info["calidad"],
-                requiere_soporte=1 if any(g["es_soporte"] for g in info["grupos"]) else 0,
+                grupos=info.grupos,
+                glosas=info.glosas,
+                calidad=info.calidad,
+                requiere_soporte=1 if info.requiere_soporte else 0,
                 estado=FACTURA_LOTE_ESTADO_PENDIENTE,
             )
         )
-    db.add(TareaLoteRecord(lote_id=lote.id, tipo=f"RESPONDER_{pagador}"))
+    db.add(TareaLoteRecord(lote_id=lote.id, tipo=perfil.tarea))
     db.commit()
     db.refresh(lote)
     logger.info(
