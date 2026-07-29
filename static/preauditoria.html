@@ -462,7 +462,10 @@ async function abrirOficio(id){
     document.getElementById('mo-titulo').textContent='Oficio '+o.numero_radicado;
     var filas=(o.facturas||[]).map(function(f){
       return '<tr><td class="mono">'+esc(f.factura)+'</td><td>'+esc(f.envio||'—')+'</td><td>'+cop(f.valor)+'</td>'+
-        '<td>'+esc(f.correo_fe||'')+'</td><td>'+estadoChip(f.estado)+(f.num_devoluciones?' <span class="chip chip-ronda">'+f.num_devoluciones+'/'+f.max_devoluciones+'</span>':'')+'</td>'+
+        '<td>'+esc(f.correo_fe||'')+'</td><td>'+estadoChip(f.estado)+(f.num_devoluciones?' <span class="chip chip-ronda">'+f.num_devoluciones+'/'+f.max_devoluciones+'</span>':'')+
+        // Si ya salió en un oficio de devolución se dice cuál: así se entiende
+        // por qué no vuelve a entrar en el próximo.
+        (f.consecutivo_devolucion?'<br><span class="leyenda">📄 ya salió en '+esc(f.consecutivo_devolucion)+'</span>':'')+'</td>'+
         '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
         '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button></td></tr>';
     }).join('');
@@ -482,13 +485,19 @@ async function abrirOficio(id){
         '<button class="btn btn-azul btn-chico" onclick="commitEnvio('+o.id+')">Cargar envío</button>'+
         '<div id="env-msg"></div></div>'+
       (o.total_facturas?
-        '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+'</p>'+
+        '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+
+          (o.devueltas && o.devueltas_sin_oficio < o.devueltas
+            ? ' <span class="leyenda">('+(o.devueltas-o.devueltas_sin_oficio)+' ya salieron en un oficio · '+
+              o.devueltas_sin_oficio+' por incluir)</span>'
+            : '')+'</p>'+
         '<div class="tbl-scroll" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Factura</th><th>Envío</th><th>Valor</th><th>F.E.</th><th>Estado</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
         '<div style="margin-top:12px"><button class="btn btn-rojo" '+
-          (o.devueltas?'':'disabled title="Este oficio no tiene facturas devueltas"')+
-          ' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
+          (o.devueltas_sin_oficio?'':'disabled title="No hay facturas devueltas pendientes de salir en un oficio"')+
+          ' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución'+
+          (o.devueltas_sin_oficio?' ('+o.devueltas_sin_oficio+' factura'+(o.devueltas_sin_oficio==1?'':'s')+')':'')+'</button>'+
         (o.tiene_adres ? ' <button class="btn btn-verde" title="Excel con la información completa que exige ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ Excel ADRES</button>' : '')+
         (o.devueltas?'':'<p class="leyenda">El oficio de devolución solo se puede generar cuando hay al menos una factura <b>devuelta</b>: es la carta con la que se le regresan las facturas a la entidad. Este oficio tiene '+o.radicar+' radicada(s) y '+o.pendientes+' pendiente(s), ninguna devuelta.</p>')+
+        (o.devueltas && !o.devueltas_sin_oficio?'<p class="leyenda">Las '+o.devueltas+' factura(s) devuelta(s) de este oficio <b>ya salieron</b> en un oficio de devolución. Una factura no se repite en dos oficios: la entidad recibiría el mismo cobro dos veces. Si necesita rehacerlo, elimine el oficio anterior desde la pestaña <b>Oficios de devolución</b>.</p>':'')+
         '</div>'
         : '<p class="leyenda">Aún no ha cargado envíos en este oficio.</p>');
     abrirModal('m-oficio');

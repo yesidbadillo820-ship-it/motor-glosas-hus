@@ -177,6 +177,15 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
     pendientes = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_PENDIENTE)
     radicar = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_RADICAR)
     devueltas = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_DEVUELTA)
+    # Cuántas devueltas entrarían REALMENTE en el próximo oficio de devolución:
+    # las que ya salieron en uno emitido no se repiten (la entidad recibiría el
+    # mismo cobro dos veces). Sin este dato la pantalla decía "Dev 3" y el PDF
+    # salía con 1, sin explicar por qué.
+    devueltas_sin_oficio = sum(
+        1
+        for f in facturas
+        if f.resultado_actual == svc.RESULTADO_DEVUELTA and f.oficio_devolucion_id is None
+    )
     completado = bool(facturas) and pendientes == 0
     envios = (
         db.query(EnvioCargadoRecord)
@@ -213,6 +222,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         "pendientes": pendientes,
         "radicar": radicar,
         "devueltas": devueltas,
+        "devueltas_sin_oficio": devueltas_sin_oficio,
         "semaforo": svc.calcular_semaforo(o.fecha_recibido, completado=completado),
         "envios_escritos": [
             {"envio": e.envio, "total_facturas": e.total_facturas, "reingresos": e.reingresos}
@@ -220,7 +230,26 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         ],
     }
     if con_facturas:
-        d["facturas"] = [_factura_dict(db, f) for f in facturas]
+        # Consecutivo del oficio en que salió cada devuelta, para que la fila
+        # lo muestre y se entienda por qué no entra en el próximo.
+        ids_dev = {f.oficio_devolucion_id for f in facturas if f.oficio_devolucion_id}
+        consecutivos = (
+            {
+                dv.id: dv.consecutivo
+                for dv in db.query(OficioDevolucionRecord)
+                .filter(OficioDevolucionRecord.id.in_(ids_dev))
+                .all()
+            }
+            if ids_dev
+            else {}
+        )
+        d["facturas"] = [
+            {
+                **_factura_dict(db, f),
+                "consecutivo_devolucion": consecutivos.get(f.oficio_devolucion_id),
+            }
+            for f in facturas
+        ]
     return d
 
 
@@ -992,6 +1021,24 @@ def generar_oficio_devolucion(
         .all()
     )
     if not devueltas:
+        # Dos situaciones muy distintas, y antes se explicaban con el mismo
+        # mensaje: que no haya devoluciones, o que YA hayan salido todas.
+        ya_salieron = (
+            db.query(FacturaPreauditoriaRecord)
+            .filter(
+                FacturaPreauditoriaRecord.oficio_actual_id == oficio_id,
+                FacturaPreauditoriaRecord.resultado_actual == svc.RESULTADO_DEVUELTA,
+            )
+            .count()
+        )
+        if ya_salieron:
+            raise HTTPException(
+                400,
+                f"Las {ya_salieron} factura(s) devuelta(s) de este radicado ya salieron en un "
+                "oficio de devolución. Una factura no se repite en dos oficios: la entidad "
+                "recibiría el mismo cobro dos veces. Si necesita rehacerlo, elimine el oficio "
+                "anterior desde la pestaña Oficios de devolución.",
+            )
         raise HTTPException(
             400,
             "No hay facturas devueltas sin oficio en este radicado: "

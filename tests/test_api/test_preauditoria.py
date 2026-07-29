@@ -1419,3 +1419,92 @@ class TestBuscarEnConsolidado:
         _radicar(client, _factura_id(client, F1))
         d = client.get("/preauditoria/consolidado?q=AXA&resultado=RADICAR").json()
         assert [i["factura"] for i in d["items"]] == [F1]
+
+
+# ------------------------------------------------------------------
+# Una factura devuelta no se repite en dos oficios de devolución
+# ------------------------------------------------------------------
+
+
+class TestDevueltasYaSalidas:
+    """Caso real del 29-07: el oficio decía "Dev 3" y el PDF salió con 1
+    factura, porque las otras dos ya habían salido en un oficio anterior. El
+    sistema hacía lo correcto; lo que faltaba era decirlo en pantalla."""
+
+    def _tres_devueltas(self, client):
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 175500), _rad_fila(ENV, F2, 13781171), _rad_fila(ENV, F3, 13229822)],
+        )
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        for f in (F1, F2, F3):
+            _devolver(client, _factura_id(client, f))
+        return o
+
+    def test_cuenta_las_que_faltan_por_salir(self, client):
+        o = self._tres_devueltas(client)
+        d = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        assert d["devueltas"] == 3
+        assert d["devueltas_sin_oficio"] == 3
+
+    def test_tras_generar_no_quedan_por_salir(self, client):
+        o = self._tres_devueltas(client)
+        dev = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").json()
+        assert dev["total_facturas"] == 3
+        d = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        # siguen devueltas, pero ya salieron: el botón debe quedar deshabilitado
+        assert d["devueltas"] == 3
+        assert d["devueltas_sin_oficio"] == 0
+
+    def test_cada_factura_dice_en_que_oficio_salio(self, client):
+        o = self._tres_devueltas(client)
+        dev = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").json()
+        d = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        for f in d["facturas"]:
+            assert f["consecutivo_devolucion"] == dev["consecutivo"]
+
+    def test_el_segundo_oficio_solo_lleva_la_nueva(self, client):
+        """La secuencia exacta del auditor: genera un oficio con 2, después
+        devuelve una tercera y genera otro. El segundo lleva SOLO esa."""
+        _subir_radicacion(
+            client, [_rad_fila(ENV, F1, 175500), _rad_fila(ENV, F2, 13781171), _rad_fila(ENV, F3, 13229822)]
+        )
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _devolver(client, _factura_id(client, F1))
+        _devolver(client, _factura_id(client, F2))
+        primero = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").json()
+        assert primero["total_facturas"] == 2
+
+        _devolver(client, _factura_id(client, F3))
+        d = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        assert d["devueltas"] == 3 and d["devueltas_sin_oficio"] == 1
+
+        segundo = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").json()
+        assert segundo["total_facturas"] == 1
+        assert segundo["consecutivo"] != primero["consecutivo"]
+        # y cada una quedó sellada con SU oficio
+        porf = {f["factura"]: f["consecutivo_devolucion"] for f in
+                client.get(f"/preauditoria/oficios/{o['id']}").json()["facturas"]}
+        assert porf[F1] == porf[F2] == primero["consecutivo"]
+        assert porf[F3] == segundo["consecutivo"]
+
+    def test_mensaje_claro_si_ya_salieron_todas(self, client):
+        o = self._tres_devueltas(client)
+        client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        r = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        assert r.status_code == 400
+        detalle = r.json()["detail"]
+        assert "ya salieron" in detalle
+        assert "no se repite" in detalle
+        # NO debe decir que falte marcar devoluciones: eso confundía
+        assert "primero marque" not in detalle
+
+    def test_mensaje_distinto_si_no_hay_devoluciones(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 175500)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        r = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        assert r.status_code == 400
+        assert "primero marque" in r.json()["detail"]
