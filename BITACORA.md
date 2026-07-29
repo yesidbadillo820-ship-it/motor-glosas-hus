@@ -33,11 +33,26 @@
    consolida las glosas, cruza contra la base DGH y arma las OBJECIONES listas
    para cargar. Incluye una **caja de Herramientas PDF** (26 utilidades: unir/
    dividir/rotar páginas, proteger/censurar, conversión Office↔PDF, resumir/
-   traducir/OCR con IA) y el bot de **correos de pagos (.msg) → Excel**.
+   traducir/OCR con IA), el bot de **correos de pagos (.msg) → Excel** y el
+   bot de **unir Exceles** (apilar filas u hoja por archivo).
    Versión de ventana (`suite_cartera_hus.py`) y de consola (`suite_cli.py`).
+6. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
+   - `tools/adres/validar_furips.py` + `VALIDAR_FURIPS.cmd` — validador masivo
+     FURIPS 1/2 contra la Circular 022/2023 + cruce con soportes (RIPS, CUV,
+     XML DIAN, factura PDF, epicrisis) con OCR para PDF escaneados.
+   - `validador-adres/` — la misma validación como APP WEB (navegador,
+     puerto 8010, `VALIDADOR_ADRES_WEB.cmd`).
+   - `tools/generar_informe_baja_cartera.py` + `INFORME_BAJA_CARTERA.cmd` —
+     informe Word + Excel de baja de facturas (Res. 577/2019), también con OCR.
+   - `tools/completar_informe_xml_dian.py` + `COMPLETAR_INFORME_XML.cmd` —
+     completa el informe de devoluciones DE4401 de NUEVA EPS leyendo los XML
+     DIAN del repositorio de facturación (v2.1: subcarpetas, ZIP, DIAGNOSTICO).
+   - Bots PDF de doble clic: `UNIR_PDFS.cmd`, `PDF_A_CMD.cmd`,
+     `PDF_A_CMD_EN_CARPETA.cmd`.
 
 Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
-`CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`.
+`CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`,
+`ENTREGA_MODULO_ADRES_FURIPS.md` (entrega técnica del módulo ADRES).
 
 ---
 
@@ -236,6 +251,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 **Pendiente de este frente:** no existe corte de cartera de julio 2026 (la
 columna de recaudo de julio de los 5 consolidados y la serie mensual queda en
 0 hasta que el analista lo entregue); revisar y fusionar el PR #160.
+
+### Julio 2026 — Frente ADRES/FURIPS (chat "VALIDADOR ADRES", PR #173-#176)
+- **17-07:** nace el **bot validador FURIPS**: valida masivamente los TXT
+  FURIPS 1 y 2 contra la Circular 022 de 2023 de la ADRES (102 + 9 campos,
+  obligatoriedad condicional) y cruza cada factura con sus soportes (RIPS,
+  CUV, factura XML DIAN, factura PDF, epicrisis). Informe Excel de 7 hojas
+  con semáforo. Revisión adversarial de 28 agentes: 22 correcciones el mismo
+  día. También el **informe de baja de cartera** (Res. 577/2019): Word para
+  presentar + Excel de relación, leyendo el PDF unido de cada factura.
+- **21-07:** afinación con datos reales: direcciones con nomenclatura
+  completa (campos 15/50/60), PDF escaneados sin falsos errores,
+  representación gráfica DIAN cruzada contra la epicrisis, informe de baja
+  en carpeta plana con progreso. **APP WEB "Validador ADRES"**
+  (`validador-adres/`): validación desde el navegador con tablero, semáforo,
+  gráficas y descarga del Excel. Bot `PDF_A_CMD_EN_CARPETA` (carpeta
+  `CMD_CONVERTIDOS`) y blindaje CRLF de todos los `.cmd`. Corrida real de
+  las 50 facturas ADRES: 27 con errores, 18 por revisar, 5 cumplen.
+- **22-07:** **bot del informe XML DE4401 de NUEVA EPS** (411 facturas
+  devueltas): busca el XML DIAN de cada factura y completa valor, contrato,
+  cobertura, validación DIAN (CUFE, firma, acuse 02), conclusión con norma
+  (Res. 506/2021 y 2275/2023) y respuesta para el portal DGH.
+- **23-07:** el servidor guarda cada factura en su subcarpeta con nombres
+  genéricos (`ad0901….xml`) → el bot busca también por el nombre de la
+  subcarpeta, dentro de los **.zip** DIAN, verifica el número POR DENTRO del
+  XML, y deja una hoja **DIAGNOSTICO** en el Excel (versión 2.1) para
+  diagnosticar corridas a distancia.
+- **27-07:** **documentación técnica de entrega del módulo**
+  (`docs/ENTREGA_MODULO_ADRES_FURIPS.md`). **OCR automático** para PDF
+  escaneados en el validador y el informe de baja (Tesseract o RapidOCR,
+  se instala solo desde el .cmd; el soporte queda "SI (OCR)"). Soportes
+  reconocidos a cualquier profundidad (subcarpetas internas, sueltos en la
+  raíz) y con nombres genéricos (epicrisis.pdf, fe.xml, ResultadosMSPS.json).
+  Se entregó el **PAQUETE COMPLETO** en ZIP (5 frentes + documentación).
+- **29-07:** el **PR #176 quedó FUSIONADO** en la rama principal (se
+  resolvieron dos rondas de conflictos con los otros chats — bitácora,
+  CLAUDE.md y dos archivos de pruebas que ambos frentes habían corregido
+  igual). Los lanzadores `.cmd` ahora muestran el avance de la descarga del
+  OCR (~200 MB la primera vez) para que no parezcan congelados; el auditor
+  ya corrió el validador con OCR en su PC ("YA ARRANCO TODO BIEN").
 
 ### 23-07 — Módulo de Pre-auditoría SINAC
 - **23-07:** nace el **módulo de Pre-auditoría SINAC** (rama
@@ -750,6 +804,14 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
   visibles y el Contrato de Construcción de SINAC OS) y se volvió a fusionar
   aquí, combinando otra vez las dos bitácoras con la misma regla de no
   perder nada.
+- **Nota (tarde):** otro chat hizo un "rescate" de la Suite copiando sus
+  archivos directo a la rama principal (commit del 29-07 15:26), pero desde
+  una foto VIEJA — sin los bots de correos de pagos ni de unir Exceles. Al
+  fusionar aquí se reconciliaron las dos copias: quedó la versión completa
+  (con los dos bots nuevos) más la mejora que traía el rescate (el lector
+  de pesos de `cruces_dgh` ahora usa el lector único `tools/_dinero.py`,
+  el mismo de toda la casa). El PR #160 ahora solo aporta lo que la rama
+  principal no tiene: los dos bots, sus pruebas y esta bitácora combinada.
 
 ---
 
@@ -823,6 +885,21 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
     Completar también el "valor total objetado defendido" del lote 9-jul
     (sale de `reporte_glosa.csv`).
 
+### Módulo ADRES/FURIPS (chat "VALIDADOR ADRES")
+20. ~~Fusionar el PR #176~~ — **HECHO el 29-07**: todo el módulo (validador
+    con OCR, app web, bot DE4401 v2.1, documentación de entrega) ya está en
+    la rama principal.
+21. **Bot DE4401:** correr la versión 2.1 con los archivos reenviados y, si
+    algo sale "SIN XML", enviar el Excel `_COMPLETO` (la hoja DIAGNOSTICO
+    dice la causa exacta).
+22. **Confirmar en el servidor** que `PDF_A_CMD_EN_CARPETA.cmd` genera la
+    carpeta `CMD_CONVERTIDOS`.
+23. **Corregir las 27 facturas ADRES con errores** de la corrida de 50 (usar
+    el Excel o la app web, priorizando las de mayor valor) y completar los
+    soportes de HUS410606 y HUS472103 (les faltan RIPS y CUV).
+24. **Facturas de baja:** completar el informe de trabajo social donde el
+    Word quedó con "NOTA DE REVISIÓN".
+
 ### Módulo de Pre-auditoría (nuevo, 23-07)
 17. **Revisar y aprobar el PR nuevo** (borrado total admin + Excel ADRES) de la
     rama `claude/invoice-audit-bot-qa2koy`; los PRs #186, #187, #189 y #190 ya
@@ -880,6 +957,8 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
 6. Si hay tiempo: verificar si SISTEMAS ya corrigió algún CUV (pendiente #6),
    descargar los 2 PDF del DIAN (pendiente #7) y revisar el PR #186 del módulo
    de pre-auditoría.
+7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
+   COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 
@@ -959,6 +1038,12 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
   `LEEME.txt`). Las contraseñas de los portales van en
   `config/entidades.credenciales.json` (local, no versionado; la Suite las une
   con `entidades.json` en memoria al abrir).
+- **ADRES/FURIPS:** repositorio de XML de facturación
+  `\\172.16.32.83\factura_electronica_net22\<AAAAMM>\FACTURAS_SALUD\` (una
+  subcarpeta por factura; la ruta se edita en la línea RUTA_FACTURAS de
+  `COMPLETAR_INFORME_XML.cmd` cuando cambia el período). Los `.cmd` de
+  `tools/` DEBEN conservar finales de línea CRLF (regla en `.gitattributes`);
+  con LF la ventana se cierra sin ejecutar nada.
 
 ### Notas de método del flujo Dispensario (para cualquier chat nuevo)
 

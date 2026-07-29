@@ -8,14 +8,40 @@ todas las sesiones y todos los chats de Claude Code.
 - **Al INICIAR cualquier sesión:** lee primero **`BITACORA.md`**. Ahí está el
   resumen de todo lo trabajado, lo que quedó pendiente y lo que sigue.
 - **Al TERMINAR la sesión:** actualiza **`BITACORA.md`** con:
-  - lo que **se hizo hoy** (una entrada nueva, arriba, con la **fecha**),
-  - lo que **quedó pendiente**,
-  - lo que **sigue mañana**.
-  Mantén el formato existente del archivo (sección de hechos por fecha,
-  sección **PENDIENTE** y sección **PARA MAÑANA**). Después de actualizarla,
-  haz commit y push de `BITACORA.md`.
+  - lo que **se hizo hoy** (agregado en "LO YA HECHO" con la **fecha**),
+  - lo que **quedó pendiente** (sección **PENDIENTE**),
+  - lo próximo a trabajar (sección **PARA MAÑANA**).
+  Mantén el formato existente del archivo e incluye la actualización en el
+  commit final (y push).
 - Escribe la bitácora en **español claro, sin tecnicismos**, pensando en el
   área de Cartera / Auditoría de Cuentas Médicas del HUS (no en programadores).
+
+## Contexto del proyecto
+
+- Dueño: auditoría de facturación de la E.S.E. Hospital Universitario de
+  Santander (HUS). Los mensajes del usuario llegan en español; responde
+  siempre en español.
+- **Motor de Glosas** (`app/`): aplicación web que genera con IA las respuestas
+  técnico-jurídicas a las glosas de las EPS, según la norma colombiana. Incluye
+  el módulo de **Pre-auditoría SINAC** (página `/preauditoria`) y los flujos de
+  Dispensario/SIMED y COOSALUD.
+- **Bots de carga** (`tools/`): suben las respuestas a cada portal — COOSALUD,
+  SIMED (Dispensario Médico), Dinámica Gerencial (DGH), Mutual Ser, FOMAG, etc.
+- **Módulo ADRES/FURIPS** (`tools/adres/`, `validador-adres/`, `tools/*.cmd`):
+  validación de reclamaciones FURIPS (Circular 022/2023), informes Excel/Word
+  y bots de doble clic para Windows.
+- **Suite Cartera HUS** (`tools/suite_cartera_hus/`): programa de escritorio del
+  analista (organizar portales → consolidar glosas → cruzar DGH → OBJECIONES),
+  con una **caja de Herramientas PDF** (botón 🧰), el bot de **correos de
+  pagos .msg → Excel** (botón 📧) y el bot de **unir Exceles** (botón 📊).
+  Tiene versión de ventana (`suite_cartera_hus.py`) y de consola (`suite_cli.py`).
+- Los `.cmd` de `tools/` son bots de doble clic para auditores en Windows:
+  deben conservar finales de línea CRLF (ya hay regla en `.gitattributes`)
+  y autoinstalar sus dependencias.
+- Las entregas al usuario suelen ser: archivo(s) listos para copiar al
+  servidor de cartera + commit/push + pull request en borrador.
+- Historia detallada por fechas: ver `CHANGELOG.md` y, en lenguaje llano,
+  `BITACORA.md`.
 
 ## Reglas del repo
 
@@ -37,20 +63,7 @@ Contexto adicional por flujo de trabajo (léelos cuando el tema aplique):
 - `docs/CONTEXTO_DISPENSARIO_GLOSAS.md` — respuesta de glosas del Dispensario en SIMED.
 - `docs/CONTEXTO_DISPENSARIO_NOTAS.md` — cargue de notas crédito en SIMED.
 - `docs/CONTEXTO_COOSALUD.md` — respuesta de glosas COOSALUD.
-
-## Contexto rápido del proyecto
-
-- **Motor de Glosas** (`app/`): aplicación web que genera con IA las respuestas
-  técnico-jurídicas a las glosas de las EPS, según la norma colombiana. Incluye
-  el módulo de **Pre-auditoría SINAC** (página `/preauditoria`).
-- **Bots de carga** (`tools/`): suben las respuestas a cada portal — COOSALUD,
-  SIMED (Dispensario Médico), Dinámica Gerencial (DGH), Mutual Ser, FOMAG, etc.
-- **Suite Cartera HUS** (`tools/suite_cartera_hus/`): programa de escritorio del
-  analista (organizar portales → consolidar glosas → cruzar DGH → OBJECIONES),
-  con una **caja de Herramientas PDF** (botón 🧰). Tiene versión de ventana
-  (`suite_cartera_hus.py`) y de consola (`suite_cli.py`).
-- Historia detallada por fechas: ver `CHANGELOG.md` y, en lenguaje llano,
-  `BITACORA.md`.
+- `docs/ENTREGA_MODULO_ADRES_FURIPS.md` — entrega técnica del módulo ADRES/FURIPS.
 
 ## Notas técnicas útiles
 

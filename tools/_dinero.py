@@ -32,12 +32,23 @@ except Exception:  # pragma: no cover - el bot corre sin el paquete `app`
     _CORE = None
 
 
+def _es_negativo_contable(texto: str) -> bool:
+    """`(1.234)` es −1.234: así escriben los negativos los informes de cartera.
+
+    Sin esto el signo se voltea, que en un consolidado de cartera convierte una
+    nota crédito en un cargo.
+    """
+    t = texto.strip()
+    return t.startswith("(") and t.endswith(")")
+
+
 def _respaldo(texto: str) -> float:
     """Misma regla que el núcleo, para cuando `app/` no está disponible."""
+    neg_contable = _es_negativo_contable(texto)
     s = re.sub(r"[^\d,.\-]", "", texto)
     if not s or s in {"-", ".", ","}:
         return 0.0
-    neg = s.startswith("-")
+    neg = s.startswith("-") or neg_contable
     s = s.lstrip("-")
     # Con los dos separadores presentes, el último que aparece manda.
     if "," in s and "." in s:
@@ -72,7 +83,11 @@ def a_numero(valor: object) -> float:
         return 0.0
     if _CORE is not None:
         try:
-            return float(_CORE(texto))
+            n = float(_CORE(texto))
+            # El núcleo lee informes de la EPS, donde el paréntesis no se usa;
+            # los consolidados de cartera sí lo traen, así que el signo se
+            # aplica aquí en vez de tocar el parser de la aplicación web.
+            return -abs(n) if _es_negativo_contable(texto) else n
         except Exception:
             pass
     return _respaldo(texto)

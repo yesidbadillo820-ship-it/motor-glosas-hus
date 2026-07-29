@@ -33,6 +33,13 @@ from datetime import date
 
 from . import archivos
 
+import sys
+from pathlib import Path
+
+# Lector de pesos compartido (ver `tools/_dinero.py`).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from _dinero import a_numero as a_numero_compartido  # noqa: E402
+
 try:
     import pandas as pd
 except ImportError:  # el launcher avisa; aquí solo evitamos romper el import
@@ -86,41 +93,16 @@ def encontrar_columna(df, candidatos):
 
 
 def a_numero(v):
-    """Convierte importes en formato colombiano/UE a float.
+    """Importe → float, con el lector único de `tools/_dinero.py`.
 
-    Reglas (coma = decimal, punto = miles, como en los portales de EPS):
-      · '1.234.567,89' -> 1234567.89      · '1234,56' -> 1234.56
-      · '1.234.567'    -> 1234567         · '50.000'  -> 50000   · '2.500' -> 2500
-      · '1.5' / '12.34' / '100.5'         -> se respetan como decimal real
-      · '1,234,567.89' (formato US)       -> 1234567.89
-    El caso ambiguo de un solo punto se resuelve por el nº de dígitos a la
-    derecha: exactamente 3 => separador de miles (así viene el peso colombiano).
+    Era la quinta copia de la misma regla en `tools/`. Esta la aplicaba bien;
+    la de SAVIA multiplicaba por cien y la de glosas aceptadas devolvía cero
+    ante el formato colombiano. Ahora todas cuelgan del mismo lector, que a su
+    vez apunta al parser del núcleo.
     """
     if v is None or (isinstance(v, float) and pd is not None and pd.isna(v)):
         return 0.0
-    if isinstance(v, (int, float)):
-        return float(v)
-    # deja solo dígitos, signo y separadores (quita '$', 'COP', espacios, NBSP…)
-    s = re.sub(r"[^0-9,.\-]", "", str(v).strip())
-    if not s or s in ("-", ".", ","):
-        return 0.0
-    if "," in s and "." in s:
-        # el separador que aparece de último es el decimal
-        if s.rfind(",") > s.rfind("."):
-            s = s.replace(".", "").replace(",", ".")  # 1.234.567,89 (CO/UE)
-        else:
-            s = s.replace(",", "")  # 1,234,567.89 (US)
-    elif "," in s:
-        s = s.replace(",", ".")  # 1234,56
-    elif "." in s:
-        decimales = s.rpartition(".")[2]
-        if s.count(".") > 1 or len(decimales) == 3:
-            s = s.replace(".", "")  # 1.234.567 / 50.000 / 2.500 -> miles
-        # 1, 2 o >3 dígitos a la derecha -> es decimal real: se deja igual
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+    return a_numero_compartido(v)
 
 
 def leer_tabla(ruta, log=print):

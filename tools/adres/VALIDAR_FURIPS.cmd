@@ -56,9 +56,34 @@ REM --- 3) Asegurar openpyxl (Excel) y pypdf (lectura de PDF) ----------
     pause
     exit /b 1
 )
-%PYEXE% -c "import pypdf" >nul 2>&1 || %PYEXE% -c "import pdfplumber" >nul 2>&1 || (
+%PYEXE% -c "import pypdf" >nul 2>&1 || (
     echo [i] Instalando el lector de PDF ^(pypdf^), espere...
     %PYEXE% -m pip install --quiet --user pypdf >nul 2>&1
+)
+REM pdfplumber lee mejor algunos PDF dificiles; se intenta pero no es
+REM obligatorio (si falla la instalacion, el bot corre igual con pypdf).
+%PYEXE% -c "import pdfplumber" >nul 2>&1 || (
+    echo [i] Instalando lector adicional de PDF ^(pdfplumber^), espere...
+    %PYEXE% -m pip install --quiet --user pdfplumber >nul 2>&1
+)
+
+REM OCR para PDF escaneados (opcional pero recomendado): si no se puede
+REM instalar, el bot corre igual (los escaneados quedan SIN TEXTO).
+%PYEXE% -c "import pypdfium2" >nul 2>&1 || (
+    echo [i] Instalando el visor de paginas para OCR ^(pypdfium2^), espere...
+    %PYEXE% -m pip install --quiet --user pypdfium2 >nul 2>&1
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 || (
+    echo [i] Instalando el motor OCR ^(rapidocr-onnxruntime^) para leer PDF
+    echo     ESCANEADOS. Descarga ~200 MB SOLO la primera vez. NO cierre la
+    echo     ventana: abajo se ve el avance de la descarga...
+    %PYEXE% -m pip install --user rapidocr-onnxruntime
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 && (
+    echo [i] Lector OCR listo.
+) || (
+    echo [!] OCR no disponible: se continua igual y los PDF escaneados
+    echo     quedaran marcados SIN TEXTO para revision manual.
 )
 
 REM --- 4) Correr el bot ----------------------------------------------

@@ -68,3 +68,25 @@ def test_acepta_numeros_ya_parseados():
     assert a_numero(1365) == 1365.0
     assert a_numero(1365.5) == 1365.5
     assert a_entero(1365.9) == 1365
+
+
+class TestNegativoContable:
+    """`(1.234)` es −1.234: así escriben los negativos los informes de cartera.
+
+    Sin esto el signo se voltea, y en un consolidado eso convierte una nota
+    crédito en un cargo. Lo trae `consolidar_coosalud`, que era la cuarta copia
+    de este mismo lector.
+    """
+
+    @pytest.mark.parametrize(
+        "crudo,esperado",
+        [("(1.234)", -1234.0), ("(1.234,50)", -1234.50), ("($ 26.140)", -26140.0)],
+    )
+    def test_el_parentesis_es_signo_menos(self, crudo, esperado):
+        assert a_numero(crudo) == pytest.approx(esperado)
+        assert _respaldo(crudo) == pytest.approx(esperado)
+
+    def test_no_confunde_un_parentesis_suelto(self):
+        """Solo cuenta si abre y cierra: un texto a medias no cambia el signo."""
+        assert a_numero("1.234)") == pytest.approx(1234.0)
+        assert a_numero("(1.234") == pytest.approx(1234.0)

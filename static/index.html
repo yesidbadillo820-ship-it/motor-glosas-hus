@@ -13689,9 +13689,21 @@ async function reabrirParaCorregirLote(){
   var ids = _idsSeleccionados();
   if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa con el checkbox','warning'); return; }
   if(ids.length > 200){ toast('Demasiadas','Máximo 200 por reapertura','warning'); return; }
+  // El motivo es obligatorio y el servidor ahora lo exige (mínimo 8
+  // caracteres). Antes tenía un valor por defecto en el backend, así que una
+  // reapertura sin motivo dejaba en auditoría una frase genérica en vez de la
+  // razón real. Se pide hasta que haya algo escrito, o se cancela.
   var motivo = prompt('Motivo de la reapertura (queda en auditoría):',
     'Corrección de dictamen — RE incorrecto / texto obsoleto');
   if(motivo === null) return;
+  motivo = (motivo || '').trim();
+  while(motivo.length < 8){
+    motivo = prompt('El motivo queda en el registro de auditoría: escribí al menos '
+      + 'unas palabras que expliquen por qué se reabre.\n\n'
+      + 'Motivo de la reapertura:', motivo);
+    if(motivo === null) return;
+    motivo = (motivo || '').trim();
+  }
   if(!confirm('Reabrir ' + ids.length + ' glosa(s) para corrección.\n\n'
     + 'Las que estén en RESPONDIDA o CONCILIADA volverán a "Pendientes" '
     + 'con su dictamen actual visible. Después puedes seleccionarlas, '
@@ -13702,7 +13714,7 @@ async function reabrirParaCorregirLote(){
     var r = await fetch('/workflow/reabrir-para-corregir', {
       method:'POST',
       headers: Object.assign({'Content-Type':'application/json'}, authH()),
-      body: JSON.stringify({glosa_ids: ids, motivo: motivo || ''}),
+      body: JSON.stringify({glosa_ids: ids, motivo: motivo}),
     });
     var d = await r.json();
     if(!r.ok){ toast('Error', d.detail || 'Error al reabrir', 'error'); return; }

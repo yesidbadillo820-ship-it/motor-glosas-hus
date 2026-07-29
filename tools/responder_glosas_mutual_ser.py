@@ -1,0 +1,1143 @@
+"""responder_glosas_mutual_ser.py — Respuesta a glosas en el portal MUTUAL SER (Zona Ser).
+
+Portal: https://portalzonaser.mutualser.com
+Módulo: AUDITORIA DE CUENTAS MEDICAS → GESTIÓN DE RESPUESTAS DE GLOSAS →
+        CONSULTAR CUENTAS MÉDICAS GLOSADAS
+
+Bot Playwright que carga las respuestas a glosas del HUS (una fila por objeción,
+generadas por `extraer_respuestas_glosa_mutualser.py`) sin intervención humana,
+siguiendo el mismo patrón que responder_glosas_coosalud.py / _simed.py.
+
+⚠ ESTADO: v1 — IMPLEMENTADO (selectores calibrados con el volcado real), PENDIENTE
+    de PILOTO. El portal es React/MUI; los selectores usan texto/rol + posición de
+    celda (las clases/ids son inestables). Flujo de SUBSANACIÓN implementado:
+    abrir factura → SUBSANAR GLOSA → expandir TODOS los ítems (cada "+" revela 1..N
+    sub-filas de glosa; un ítem puede traer varias) → por cada glosa: VALOR RATIFICADO
+    ACEPTADO IPS = 0, OBSERVACIÓN (modal ≤1000) y —si se pasa --soportes— subir el PDF
+    → elegir CÓDIGO SUBSANACIÓN (RE9901 SUBSANADA TOTAL) → ENVIAR SUBSANACIÓN (arriba a
+    la derecha; sólo se pone verde tras completar todo y elegir el código). SEGURIDAD:
+    sin --finalizar el bot SOLO llena (no envía); --max-items N limita a N glosas para
+    pilotear. Modo --explorar sigue disponible para re-calibrar.
+
+CREDENCIALES (variables de entorno, NO en el código):
+    setx MUTUALSER_USER  gerencia@hus.gov.co
+    setx MUTUALSER_PASSWORD  <contraseña>
+    (cerrar y reabrir la terminal para que tomen efecto)
+
+INSTALACIÓN (una vez):
+    py -m pip install playwright openpyxl
+    py -m playwright install chromium
+
+reCAPTCHA — IMPORTANTE:
+    El login tiene reCAPTCHA y NO valida en un navegador automatizado (Playwright).
+    Solución recomendada: abrí TU Chrome con puerto de depuración, logueate a mano
+    (ahí el captcha sí pasa) y el bot se CONECTA a ese Chrome con --cdp:
+
+    REM (1 vez) cerrá Chrome y abrilo con depuración + perfil dedicado:
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^
+        --remote-debugging-port=9222 --user-data-dir="C:\\temp-notas\\zonaser-chrome"
+    REM en ese Chrome: entrá a https://portalzonaser.mutualser.com, logueate, abrí el módulo.
+
+USO:
+    REM 1) Explorar/calibrar conectándose a tu Chrome (recomendado):
+    py responder_glosas_mutual_ser.py --explorar --cdp http://localhost:9222
+
+    REM 1b) Explorar lanzando el browser (si el captcha te deja):
+    py responder_glosas_mutual_ser.py --explorar --con-cabeza
+
+    REM 2) PILOTO SEGURO: llena SOLO 1 ítem y NO envía (para revisar en pantalla):
+    py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
+        --solo HUS0000510639 --cdp http://127.0.0.1:9222 --max-items 1
+
+    REM 3) Factura completa, llena todo, sube soportes y ENVÍA (ENVIAR SUBSANACIÓN):
+    py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx ^
+        --solo HUS0000510639 --cdp http://127.0.0.1:9222 ^
+        --soportes C:\\temp-notas\\pdfs_mutualser --finalizar
+
+    REM 4) Masivo (todas), con soportes, enviando:
+    py responder_glosas_mutual_ser.py --excel respuestas_mutualser.xlsx --todas ^
+        --cdp http://127.0.0.1:9222 --soportes C:\\temp-notas\\pdfs_mutualser ^
+        --finalizar --reporte reporte_mutualser.csv
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import csv
+import logging
+import os
+import re
+import sys
+import time
+import unicodedata
+from pathlib import Path
+
+try:
+    from playwright.sync_api import (
+        Page,
+        sync_playwright,
+    )
+    from playwright.sync_api import (
+        TimeoutError as PlaywrightTimeout,
+    )
+except ImportError:
+    Page = object  # type: ignore[assignment,misc]
+    PlaywrightTimeout = Exception  # type: ignore[assignment,misc]
+    sync_playwright = None  # type: ignore[assignment]
+
+
+def _exigir_playwright() -> None:
+    if sync_playwright is None:
+        sys.stderr.write(
+            "ERROR: falta playwright.\n"
+            "    py -m pip install playwright\n"
+            "    py -m playwright install chromium\n"
+        )
+        sys.exit(2)
+
+
+# ─── Constantes del portal ───────────────────────────────────────────────────
+
+PORTAL_BASE = "https://portalzonaser.mutualser.com"
+PORTAL_LOGIN = f"{PORTAL_BASE}/auth/login"
+PORTAL_DASHBOARD = f"{PORTAL_BASE}/dashboard"
+PORTAL_MODULO = (
+    f"{PORTAL_BASE}/dashboard/applications/auditoria-de-cuentas-medicas/GESTION-RESPUESTAS-GLOSAS"
+)
+
+# Señal de login exitoso: textos/URL que sólo aparecen ya autenticado.
+LOGIN_OK_TEXTOS = ("Inicio", "AUDITORIA DE CUENTAS MEDICAS", "GESTIÓN DE RESPUESTAS")
+
+STORAGE_STATE_DEFAULT = "mutualser_session.json"
+MAX_PDF_MB = 10
+
+logger = logging.getLogger("responder_mutualser")
+
+
+# ─── Setup ───────────────────────────────────────────────────────────────────
+
+
+def setup_logging(log_file: Path | None = None) -> None:
+    fmt = "%(asctime)s [%(levelname)s] %(message)s"
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    if log_file is not None:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+    logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
+
+
+def cargar_credenciales() -> tuple[str, str]:
+    user = os.environ.get("MUTUALSER_USER", "").strip()
+    password = os.environ.get("MUTUALSER_PASSWORD", "").strip()
+    if not user or not password:
+        sys.stderr.write(
+            "ERROR: faltan credenciales. Setealas con:\n"
+            "    setx MUTUALSER_USER <correo>\n"
+            "    setx MUTUALSER_PASSWORD <contraseña>\n"
+            "Despues cerra y reabri la terminal.\n"
+        )
+        sys.exit(2)
+    return user, password
+
+
+# ─── Lectura del Excel de respuestas (salida del extractor MUTUAL SER) ────────
+
+
+def _norm_header(h: str) -> str:
+    s = unicodedata.normalize("NFKD", (h or "").strip().upper())
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return " ".join(s.split())
+
+
+# Alias tolerantes por columna (acepta la salida del extractor y variantes manuales).
+COLUMNAS = {
+    "factura": {"FACTURA", "# FACTURA", "NUMERO FACTURA", "NUMERO_FACTURA"},
+    "num": {"# OBJECION", "NUM OBJECION", "OBJECION", "ITEM", "# OBJECIÓN"},
+    "cod_glosa": {"CODIGO GLOSA", "COD GLOSA", "CODIGO_GLOSA", "COD."},
+    "cod_rta": {"CODIGO RESPUESTA", "COD RESPUESTA", "COD RESPUESTA GLOSA"},
+    "servicio": {"SERVICIO"},
+    "aceptado": {"VALOR ACEPTADO", "ACEPTADO"},
+    "objetado": {"VALOR OBJETADO", "OBJETADO"},
+    "detalle": {"DETALLE RESPUESTA", "OBSERVACION RTA GLOSA", "OBSERVACIONES", "DETALLE"},
+}
+
+
+def normalizar_factura(f: str) -> str:
+    """'HUS0000492542' -> '492542' (sin prefijo HUS ni ceros a la izquierda)."""
+    s = re.sub(r"(?i)^hus", "", (f or "").strip())
+    s = s.lstrip("0")
+    return s or "0"
+
+
+def _to_int(s) -> int:
+    if s is None:
+        return 0
+    if isinstance(s, (int, float)):
+        return int(s)
+    txt = str(s).split(",")[0]
+    return int(re.sub(r"[^\d]", "", txt) or "0")
+
+
+def leer_excel_respuestas(ruta: Path) -> dict[str, dict]:
+    """Devuelve {factura: {"items": [...], "grupos": [...]}} donde cada item es
+    {num, cod_glosa, cod_rta, servicio, aceptado, detalle} y cada grupo agrupa los
+    items por (cod_rta, detalle) idénticos (respuesta masiva)."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        sys.stderr.write("ERROR: falta openpyxl. Instalalo con: py -m pip install openpyxl\n")
+        sys.exit(2)
+
+    wb = load_workbook(ruta, data_only=True, read_only=True)
+    ws = wb.active
+    filas = ws.iter_rows(values_only=True)
+    encabezados = [_norm_header(str(c)) for c in next(filas)]
+
+    idx: dict[str, int] = {}
+    for clave, alias in COLUMNAS.items():
+        for i, h in enumerate(encabezados):
+            if h in alias:
+                idx[clave] = i
+                break
+
+    faltan = [k for k in ("factura", "detalle") if k not in idx]
+    if faltan:
+        sys.stderr.write(
+            f"ERROR: el Excel no tiene columnas {faltan}. Encabezados: {encabezados}\n"
+        )
+        sys.exit(2)
+
+    por_factura: dict[str, dict] = {}
+    for fila in filas:
+        if not fila:
+            continue
+        fac_raw = fila[idx["factura"]] if idx.get("factura") is not None else None
+        detalle = fila[idx["detalle"]] if idx.get("detalle") is not None else None
+        if not fac_raw or not detalle:
+            continue
+        fac = str(fac_raw).strip().upper()
+        item = {
+            "num": _to_int(fila[idx["num"]]) if "num" in idx else 0,
+            "cod_glosa": str(fila[idx["cod_glosa"]]).strip()
+            if "cod_glosa" in idx and fila[idx["cod_glosa"]]
+            else "",
+            "cod_rta": str(fila[idx["cod_rta"]]).strip()
+            if "cod_rta" in idx and fila[idx["cod_rta"]]
+            else "",
+            "servicio": str(fila[idx["servicio"]]).strip()
+            if "servicio" in idx and fila[idx["servicio"]]
+            else "",
+            "aceptado": _to_int(fila[idx["aceptado"]]) if "aceptado" in idx else 0,
+            "objetado": _to_int(fila[idx["objetado"]]) if "objetado" in idx else 0,
+            "detalle": str(detalle).strip(),
+        }
+        por_factura.setdefault(fac, {"items": []})["items"].append(item)
+
+    # Agrupar por (cod_rta, detalle) idénticos — en glosa ratificada es un solo grupo.
+    for datos in por_factura.values():
+        grupos: dict[tuple, dict] = {}
+        for it in datos["items"]:
+            clave = (it["cod_rta"], it["detalle"])
+            g = grupos.setdefault(
+                clave, {"cod_rta": it["cod_rta"], "detalle": it["detalle"], "items": []}
+            )
+            g["items"].append(it)
+        datos["grupos"] = list(grupos.values())
+    wb.close()  # read_only=True mantiene abierto el handle del zip hasta cerrarlo.
+    return por_factura
+
+
+def sanitizar(texto: str) -> str:
+    """Deja SOLO [A-Za-z0-9] y espacios, translitera tildes/ñ. Se usa SOLO si el
+    portal de MUTUAL SER rechaza caracteres especiales (a confirmar en --explorar;
+    por defecto el bot manda el texto tal cual)."""
+    s = unicodedata.normalize("NFKD", texto or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"[^A-Za-z0-9]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+# ─── Login con reCAPTCHA (sesión persistida) ─────────────────────────────────
+
+
+def _login_ok(page: Page) -> bool:
+    try:
+        if "/auth/login" in page.url:
+            return False
+        for t in LOGIN_OK_TEXTOS:
+            if page.get_by_text(t, exact=False).count() > 0:
+                return True
+        return "/dashboard" in page.url
+    except Exception:
+        return False
+
+
+def login_interactivo(page: Page, user: str, password: str, timeout_captcha_s: int = 240) -> None:
+    """Login que rellena usuario/clave y ESPERA a que un humano resuelva el
+    reCAPTCHA y entre. Al detectar la sesión activa, el llamador guarda el
+    storage_state para reusarlo sin captcha en corridas posteriores."""
+    logger.info("Abriendo login de MUTUAL SER…")
+    page.goto(PORTAL_LOGIN, wait_until="domcontentloaded")
+    if _login_ok(page):
+        logger.info("Sesión ya activa.")
+        return
+
+    # Rellenar credenciales (selectores tolerantes).
+    try:
+        page.locator(
+            "input[type=email], input[name*=correo i], input[name*=email i], input[type=text]"
+        ).first.fill(user)
+        page.locator("input[type=password]").first.fill(password)
+        logger.info("Usuario y contraseña rellenados.")
+    except Exception as e:
+        logger.warning(f"No pude rellenar credenciales automáticamente: {e}")
+
+    logger.warning(
+        "⏳ RESOLVÉ EL reCAPTCHA y hacé clic en INGRESAR en la ventana del browser. "
+        f"Espero hasta {timeout_captcha_s}s a que entres…"
+    )
+    t0 = time.time()
+    while time.time() - t0 < timeout_captcha_s:
+        if _login_ok(page):
+            logger.info("✅ Login exitoso (sesión activa).")
+            return
+        time.sleep(2)
+    raise RuntimeError("No se detectó login tras esperar el captcha (timeout).")
+
+
+def abrir_sesion(p, args, user: str, password: str):
+    """Abre/conecta el browser. Devuelve (browser, ctx, page, es_cdp).
+
+    MODO --cdp URL (recomendado por el reCAPTCHA): se CONECTA a un Chrome real que
+    el usuario abrió con --remote-debugging-port y donde YA inició sesión a mano. El
+    captcha lo resuelve el usuario en su Chrome normal, así reCAPTCHA nunca ve un
+    navegador automatizado (que es lo que lo hace fallar). El bot sólo maneja la
+    pestaña ya autenticada. NO cierra ese Chrome al terminar.
+
+    MODO default: lanza Chromium/Chrome controlado por Playwright y reutiliza
+    --storage-state si existe; si no, login interactivo. OJO: en este modo el
+    reCAPTCHA suele NEGARSE a validar (navegador detectado como automatizado) — usá
+    --cdp si el captcha no pasa.
+    """
+    if args.cdp:
+        logger.info(f"Conectando a tu Chrome vía CDP: {args.cdp}")
+        # En Windows 'localhost' suele resolver a IPv6 (::1) y Chrome escucha en IPv4
+        # (127.0.0.1) -> ECONNREFUSED. Probar variantes IPv4 automáticamente.
+        candidatos = [args.cdp]
+        for alias in ("localhost", "::1", "0.0.0.0"):
+            if alias in args.cdp:
+                candidatos.append(args.cdp.replace(alias, "127.0.0.1"))
+        browser = None
+        ultimo_error: Exception | None = None
+        for url in dict.fromkeys(candidatos):  # dedup preservando orden
+            try:
+                browser = p.chromium.connect_over_cdp(url)
+                if url != args.cdp:
+                    logger.info(f"Conectado usando {url} (fallback IPv4).")
+                break
+            except Exception as e:  # noqa: BLE001
+                ultimo_error = e
+        if browser is None:
+            raise RuntimeError(
+                f"No pude conectarme a Chrome en {args.cdp} (ni por 127.0.0.1). Abrí "
+                "Chrome con --remote-debugging-port=9222 y "
+                '--user-data-dir="C:\\temp-notas\\zonaser-chrome", verificá '
+                f"http://127.0.0.1:9222/json/version, y reintentá. Detalle: {ultimo_error}"
+            ) from ultimo_error
+        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        # Preferir la pestaña que YA está en el portal (el usuario puede tener otras).
+        page = next(
+            (pg for pg in ctx.pages if PORTAL_BASE in pg.url),
+            ctx.pages[0] if ctx.pages else ctx.new_page(),
+        )
+        page.set_default_navigation_timeout(120000)
+        page.set_default_timeout(30000)
+        page.on("dialog", lambda d: d.accept())
+        if not _login_ok(page):
+            logger.warning(
+                "No detecto sesión activa en ese Chrome. En esa ventana: iniciá "
+                "sesión en el portal (resolvé el captcha) y abrí el módulo / la "
+                "factura ANTES de seguir. Igual continúo con la pestaña actual."
+            )
+        return browser, ctx, page, True
+
+    storage = Path(args.storage_state)
+    launch_kwargs = {
+        "headless": not args.con_cabeza,
+        "slow_mo": 300 if args.lento else 0,
+        # Reduce la huella de automatización (ayuda algo, pero el reCAPTCHA igual
+        # puede fallar — para eso está --cdp).
+        "args": ["--disable-blink-features=AutomationControlled"],
+    }
+    if args.canal:
+        launch_kwargs["channel"] = args.canal
+    browser = p.chromium.launch(**launch_kwargs)
+    ctx_kwargs = {"accept_downloads": True}
+    if storage.is_file():
+        logger.info(f"Reutilizando sesión guardada: {storage}")
+        ctx_kwargs["storage_state"] = str(storage)
+    ctx = browser.new_context(**ctx_kwargs)
+    page = ctx.new_page()
+    page.set_default_navigation_timeout(120000)
+    page.set_default_timeout(30000)
+    page.on("dialog", lambda d: d.accept())
+
+    # Validar la sesión reutilizada; si no sirve, re-login interactivo.
+    page.goto(PORTAL_MODULO, wait_until="domcontentloaded")
+    if not _login_ok(page):
+        if not args.con_cabeza:
+            raise RuntimeError(
+                "Sesión inválida/expirada y estás headless. Corré una vez con "
+                "--con-cabeza (o mejor --cdp) para autenticarte y regenerar la sesión."
+            )
+        login_interactivo(page, user, password)
+        ctx.storage_state(path=str(storage))
+        logger.info(f"Sesión guardada en {storage} (reutilizable sin captcha).")
+        page.goto(PORTAL_MODULO, wait_until="domcontentloaded")
+    return browser, ctx, page, False
+
+
+# ─── Exploración/calibración del DOM (equivalente web de dump_dg.py) ──────────
+
+
+def explorar(page: Page, salida_dir: Path) -> None:
+    """Vuelca la estructura del módulo para calibrar los  # TODO(portal):
+    screenshot + inventario de inputs, botones, selects, links y cabeceras de tabla."""
+    salida_dir.mkdir(parents=True, exist_ok=True)
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    page.wait_for_timeout(3000)
+    shot = salida_dir / f"explorar_{ts}.png"
+    try:
+        page.screenshot(path=str(shot), full_page=True)
+        logger.info(f"Screenshot: {shot}")
+    except Exception as e:
+        logger.warning(f"No pude sacar screenshot: {e}")
+
+    dump = page.evaluate(
+        """() => {
+        const txt = el => (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().slice(0,80);
+        // data-testid o class del/los SVG interno(s) (MUI: AddIcon, CloudUploadIcon...).
+        const svgInfo = el => Array.from(el.querySelectorAll('svg'))
+            .map(s => s.getAttribute('data-testid') || (s.getAttribute('class')||'').slice(0,45))
+            .filter(Boolean).join(' , ');
+        const desc = el => {
+            const a = [];
+            for (const at of ['id','name','type','placeholder','role','aria-label','data-testid','title','class']) {
+                const v = el.getAttribute(at); if (v) a.push(at+'='+v.slice(0,55));
+            }
+            const svg = svgInfo(el);
+            return el.tagName.toLowerCase()+' {'+a.join(' ')+'}'+(svg?' [svg: '+svg+']':'')+' '+txt(el);
+        };
+        const pick = (sel,n=100) => Array.from(document.querySelectorAll(sel)).slice(0,n).map(desc);
+        const clean = h => (h||'').replace(/\\s+/g,' ');
+        // HTML crudo de la 1ª tabla y de cualquier modal/dialog abierto — la fuente de
+        // verdad para ver cómo se anidan input de valor y botón de observación.
+        const tabla = document.querySelector('table');
+        const dialog = document.querySelector('[role=dialog], .MuiDialog-root, .MuiModal-root');
+        return {
+            url: location.href,
+            botones: pick('button, [role=button], input[type=button], input[type=submit], a[href]', 160),
+            inputs: pick('input, textarea'),
+            selects: pick('select, [role=combobox], mat-select'),
+            iconos: Array.from(document.querySelectorAll('svg[data-testid]'))
+                .slice(0,200).map(s => s.getAttribute('data-testid')),
+            th: Array.from(document.querySelectorAll('th, [role=columnheader]')).slice(0,60).map(e=>txt(e)),
+            links: Array.from(document.querySelectorAll('a')).slice(0,80).map(a=>({t:txt(a), href:a.getAttribute('href')})),
+            tabla_html: clean(tabla ? tabla.outerHTML : '').slice(0, 40000),
+            dialog_html: clean(dialog ? dialog.outerHTML : '').slice(0, 8000),
+        };
+    }"""
+    )
+    out = salida_dir / f"explorar_{ts}.txt"
+    with out.open("w", encoding="utf-8") as f:
+        f.write(f"URL: {dump.get('url')}\n\n")
+        for seccion in ("th", "botones", "iconos", "selects", "inputs", "links"):
+            f.write(f"===== {seccion.upper()} =====\n")
+            for row in dump.get(seccion, []):
+                f.write(f"  {row}\n")
+            f.write("\n")
+        for seccion in ("dialog_html", "tabla_html"):
+            html = dump.get(seccion) or ""
+            f.write(f"===== {seccion.upper()} ({len(html)} chars) =====\n")
+            f.write(html + "\n\n")
+    logger.info(f"Volcado del DOM: {out}")
+    logger.info(
+        "Usá este volcado para completar los  # TODO(portal)  de este script "
+        "(grilla, apertura de factura, formulario de respuesta, finalizar)."
+    )
+
+
+# ─── Procesamiento por factura (TODO: calibrar contra el portal) ─────────────
+
+
+# Índices de columna (0-based) de la tabla "Detalle de respuesta de glosa"
+# (24 columnas, confirmados con el volcado --explorar 2026-07-01):
+COL_TECNOLOGIA = 2  # celda con el botón "+" que expande/activa la fila
+COL_VALOR_ACEPTADO = 19  # VALOR RATIFICADO ACEPTADO IPS (input al activar la fila)
+COL_OBSERVACION = 21  # OBSERVACIONES DE SUBSANACIÓN (input + botón libro -> modal)
+COL_SOPORTE = 22  # SOPORTE DE SUBSANACIÓN (íconos: ver / subir / cancelar)
+
+
+def _abrir_factura(page: Page, factura: str) -> None:
+    """Va a la grilla y abre la factura por su número corto (ej. 'HUS510639').
+    Deja la pantalla en 'Detalle de respuesta de glosa'."""
+    page.goto(PORTAL_MODULO, wait_until="domcontentloaded")
+    corto = "HUS" + normalizar_factura(factura)  # 'HUS0000510639' -> 'HUS510639'
+    logger.info(f"  Buscando {corto} en la grilla…")
+    objetivo = page.get_by_text(corto, exact=True)
+    objetivo.first.wait_for(timeout=90000)
+    objetivo.first.click()
+    # Señal de que abrió el detalle: el botón SUBSANAR GLOSA.
+    page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).wait_for(timeout=60000)
+    logger.info(f"  Detalle de {corto} abierto.")
+
+
+def _dump_tabla(page: Page, evidencias: Path, nombre: str) -> None:
+    """Diagnóstico: vuelca el outerHTML de la 1ª tabla a un archivo para inspeccionar
+    la estructura real (clases MUI estables) cuando un selector falla."""
+    try:
+        evidencias.mkdir(parents=True, exist_ok=True)
+        html = page.locator("table").first.evaluate("e => e.outerHTML")
+        (evidencias / nombre).write_text(html, encoding="utf-8")
+        logger.info(f"    [diag] tabla volcada: {evidencias / nombre}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"    [diag] no pude volcar la tabla: {e}")
+
+
+def _dump_modal(page: Page, evidencias: Path, nombre: str = "dbg_modal.html") -> None:
+    """Diagnóstico: vuelca el HTML del overlay/modal MUI visible, si hay alguno."""
+    try:
+        loc = page.locator(".MuiModal-root, .MuiDialog-root, [role=presentation]")
+        if loc.count() == 0:
+            return
+        evidencias.mkdir(parents=True, exist_ok=True)
+        html = loc.last.evaluate("e => e.outerHTML")
+        (evidencias / nombre).write_text(html, encoding="utf-8")
+        logger.info(f"    [diag] modal volcado: {evidencias / nombre}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"    [diag] no pude volcar el modal: {e}")
+
+
+def _item_rows(page: Page):
+    """Filas de ÍTEM padre: las que tienen el botón "+" en la celda TECNOLOGÍA (3ª).
+    Al expandir un ítem se insertan 1..N sub-filas de glosa (que NO tienen ese botón),
+    así que esto devuelve exactamente los ítems padre, en orden y estable aunque haya
+    varias expandidas (el portal NO es acordeón: permite varias abiertas a la vez)."""
+    return page.locator("table tbody tr:has(td:nth-child(3) button)")
+
+
+def _detail_rows(page: Page):
+    """Sub-filas de DETALLE (una por glosa): las únicas con el input editable de
+    VALOR RATIFICADO ACEPTADO IPS. OJO: un ítem puede tener VARIAS glosas (p. ej. las
+    tecnologías 799/dispositivos traen TA0201 + TA0601), y cada una es una sub-fila
+    propia que hay que responder. Los ítems padre no tienen ese input."""
+    return page.locator("table tbody tr:has(input.MuiInputBase-inputAdornedEnd)")
+
+
+def _set_valor(detail, valor: int, timeout: int = 12000) -> None:
+    # Input de VALOR RATIFICADO ACEPTADO IPS dentro de la sub-fila de detalle del ítem
+    # (clase MUI estable). Se resuelve DENTRO de `detail` para no pisar otra fila.
+    inp = detail.locator("input.MuiInputBase-inputAdornedEnd").first
+    inp.wait_for(state="visible", timeout=timeout)
+    inp.click()
+    inp.fill(str(valor))
+    inp.press("Tab")  # dispara la validación (check verde)
+
+
+def _set_observacion(page: Page, detail, texto: str) -> None:
+    # Botón de OBSERVACIONES DE SUBSANACIÓN (col 21) de ESTA sub-fila -> modal.
+    detail.locator("td").nth(COL_OBSERVACION).locator("button").first.click()
+    # El modal NO expone role=dialog fiable y hay decenas de textareas OCULTAS (una por
+    # fila) -> tomar la ÚNICA textarea VISIBLE (la del modal) + el botón ACEPTAR.
+    ta = page.locator("textarea:visible").last
+    ta.wait_for(state="visible", timeout=15000)
+    ta.fill(texto)
+    page.get_by_role("button", name="ACEPTAR", exact=True).click()
+    ta.wait_for(state="hidden", timeout=15000)
+
+
+def _subir_soporte(page: Page, detail, pdf: Path, evidencias: Path) -> None:
+    """Sube `pdf` como SOPORTE DE SUBSANACIÓN de ESTA sub-fila de detalle.
+
+    La celda SOPORTE (col 22) tiene 3 botones en <span aria-label=…>: "Ver
+    documentos", el de subir (nube; su aria-label cambia según el estado) y "Limpiar
+    soporte". Clic en el de subir -> modal "SOPORTE - Cargar archivos" -> input file
+    + GUARDAR -> toast "Carga de archivo exitosa"."""
+    cell = detail.locator("td").nth(COL_SOPORTE)
+    botones = cell.get_by_role("button")
+    botones.first.wait_for(state="visible", timeout=8000)
+    # El de subir es el del medio (2º de 3); si hubiera menos, tomo el primero.
+    idx = 1 if botones.count() >= 3 else 0
+    botones.nth(idx).click()
+    # Esperar el título del modal ("SOPORTE - Cargar archivos") en vez de 800ms fijos;
+    # si el título no matchea, el cap de 2s deja el comportamiento como antes.
+    with contextlib.suppress(Exception):
+        page.get_by_text(re.compile(r"cargar archivos", re.I)).last.wait_for(timeout=2000)
+    try:
+        finp = page.locator('input[type="file"]').last
+        finp.wait_for(state="attached", timeout=8000)
+        finp.set_input_files(str(pdf))
+    except Exception as e:  # noqa: BLE001
+        _dump_modal(page, evidencias, "dbg_modal_soporte.html")
+        raise RuntimeError(
+            f"no encontré el input de archivo del soporte ({str(e)[:100]}). Volqué el "
+            f"modal en {evidencias / 'dbg_modal_soporte.html'} para calibrar."
+        ) from e
+    # Confirmar/guardar dentro del modal (si el modal tiene su propio GUARDAR).
+    guardar = page.get_by_role("button", name=re.compile(r"^guardar$", re.I))
+    with contextlib.suppress(Exception):
+        guardar.last.wait_for(state="visible", timeout=5000)
+        guardar.last.click()
+    # Esperar el toast de carga exitosa (si aparece); si no, seguir igual.
+    with contextlib.suppress(Exception):
+        page.get_by_text(re.compile(r"exitos", re.I)).first.wait_for(timeout=12000)
+    # Esperar a que el modal se cierre (GUARDAR desaparece) en vez de 400ms fijos.
+    with contextlib.suppress(Exception):
+        guardar.last.wait_for(state="hidden", timeout=8000)
+
+
+def subsanar_items(
+    page: Page,
+    valor: int,
+    texto: str,
+    evidencias: Path,
+    max_items: int = 0,
+    lento: bool = False,
+    soporte: Path | None = None,
+) -> int:
+    """Activa el modo SUBSANAR, EXPANDE todos los ítems y llena CADA sub-fila de glosa
+    con (valor, texto) y —si se pasó `soporte`— sube ese PDF. Un ítem puede tener
+    varias glosas (cada una es su propia sub-fila) y hay que responderlas TODAS, o el
+    botón ENVIAR SUBSANACIÓN no se habilita. Devuelve cuántas glosas se llenaron.
+    NOTA: procesa la página actual (>1 página aún es un TODO)."""
+    page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
+    # Esperar a que la tabla del modo subsanar termine de renderizar: el conteo de
+    # ítems padre debe ser >0 y estable en dos lecturas seguidas (antes: 1500ms fijos).
+    prev = -1
+    t0 = time.time()
+    while time.time() - t0 < 10:
+        cur = _item_rows(page).count()
+        if cur and cur == prev:
+            break
+        prev = cur
+        page.wait_for_timeout(300)
+    _dump_tabla(page, evidencias, "dbg_subsanar_inicial.html")
+
+    # 1) Expandir TODOS los ítems padre: cada "+" revela 1..N sub-filas de glosa.
+    n_items = _item_rows(page).count()
+    logger.info(f"  Modo subsanar activo. Ítems padre: {n_items}. Expandiendo todos…")
+    for i in range(n_items):
+        parent = _item_rows(page).nth(i)
+        antes = _detail_rows(page).count()
+        with contextlib.suppress(Exception):
+            parent.locator("td:nth-child(3) button").first.scroll_into_view_if_needed()
+            parent.locator("td:nth-child(3) button").first.click()
+        # Esperar a que aparezcan las sub-filas de ESTE ítem (antes: 250ms fijos). El
+        # cap de 2s sólo se agota si el click no expandió nada (antes pasaba en
+        # silencio y la glosa quedaba sin llenar).
+        t1 = time.time()
+        while _detail_rows(page).count() <= antes and time.time() - t1 < 2:
+            page.wait_for_timeout(50)
+    page.wait_for_timeout(300)
+    _dump_tabla(page, evidencias, "dbg_expandido.html")
+
+    # 2) Llenar TODAS las sub-filas de detalle (una por glosa). Los ítems 799 traen 2.
+    total = _detail_rows(page).count()
+    n = min(total, max_items) if max_items else total
+    logger.info(
+        f"  Glosas a subsanar: {total} — a llenar: {n}" + ("  (con soporte PDF)" if soporte else "")
+    )
+    if total < n_items:
+        logger.warning(
+            f"  ⚠ Se detectaron {total} glosas pero {n_items} ítems: puede que algún "
+            "ítem no se expandiera. Revisá dbg_expandido.html."
+        )
+    hechos = 0
+    for i in range(n):
+        detail = _detail_rows(page).nth(i)  # re-query por el re-render de cada llenado
+        with contextlib.suppress(Exception):
+            detail.scroll_into_view_if_needed()
+        try:
+            _set_valor(detail, valor)
+            _set_observacion(page, detail, texto)
+            if soporte is not None:
+                _subir_soporte(page, detail, soporte, evidencias)
+        except Exception as e:  # noqa: BLE001
+            _dump_tabla(page, evidencias, f"dbg_error_glosa{i + 1}.html")
+            _dump_modal(page, evidencias, f"dbg_modal_glosa{i + 1}.html")
+            raise RuntimeError(
+                f"Falló el llenado de la glosa {i + 1}: {str(e)[:150]}. Se volcó el HTML "
+                f"de la tabla en {evidencias} (dbg_*.html) para calibrar el selector."
+            ) from e
+        hechos += 1
+        logger.info(f"    glosa {i + 1}/{n} ✓")
+        if lento:
+            page.wait_for_timeout(300)
+    return hechos
+
+
+def _seleccionar_codigo(page: Page, codigo: str, evidencias: Path) -> None:
+    """Selecciona el CÓDIGO SUBSANACIÓN (dropdown abajo, junto a ACEPTAR TOTAL
+    RATIFICADO) que HABILITA (pone verde) el botón ENVIAR SUBSANACIÓN. En glosa
+    ratificada total el código es `RE9901` (la opción real dice 'RE9901 SUBSANADA
+    TOTAL'). Puede haber otros combobox en la pantalla (p. ej. el paginador), así que
+    probamos cada uno y elegimos el que ofrezca ese código."""
+    rx = re.compile(re.escape(codigo), re.I)
+    page.wait_for_timeout(900)  # dejar asentar el selector tras el llenado
+
+    def _buscar_opcion():
+        """La opción del menú puede ser role=option, role=menuitem o un <li> con el
+        texto. Devuelve el primer locator VISIBLE que matchee el código, o None."""
+        for cand in (
+            page.get_by_role("option", name=rx),
+            page.get_by_role("menuitem", name=rx),
+            page.locator("li", has_text=rx),
+        ):
+            with contextlib.suppress(Exception):
+                el = cand.first
+                if el.count() and el.is_visible():
+                    return el
+        return None
+
+    def _elegir(combo) -> bool:
+        """Abre `combo`, espera hasta ~4s a que aparezca la opción del código, la
+        clickea y verifica el valor mostrado. Devuelve True si quedó seleccionado."""
+        try:
+            combo.scroll_into_view_if_needed()
+            combo.click()
+        except Exception:  # noqa: BLE001
+            return False
+        el = None
+        t0 = time.time()
+        while time.time() - t0 < 4:  # el menú puede tardar en renderizar (página grande)
+            el = _buscar_opcion()
+            if el is not None:
+                break
+            # Si el menú YA desplegó opciones visibles y ninguna matchea, es el combo
+            # equivocado (p. ej. el paginador): salir ya en vez de agotar los 4s.
+            if time.time() - t0 > 0.8:
+                with contextlib.suppress(Exception):
+                    if page.locator("[role=option]:visible").count() > 0:
+                        break
+            page.wait_for_timeout(250)
+        if el is None:
+            with contextlib.suppress(Exception):  # menú equivocado/vacío: cerrar
+                page.keyboard.press("Escape")
+            return False
+        etiqueta = ""
+        with contextlib.suppress(Exception):
+            etiqueta = (el.inner_text() or "").strip()
+        el.click()
+        # VERIFICACIÓN: esperar (hasta 3s) a que el selector muestre el código elegido.
+        # Si muestra OTRO código RE#### distinto, abortar ANTES de enviar (no mandar el
+        # equivocado). Antes: 700ms fijos + una sola lectura.
+        mostrado = ""
+        t1 = time.time()
+        while time.time() - t1 < 3:
+            with contextlib.suppress(Exception):
+                mostrado = (combo.inner_text() or "").strip()
+            if mostrado and rx.search(mostrado):
+                break
+            page.wait_for_timeout(150)
+        if mostrado and re.search(r"RE\d{3,4}", mostrado) and not rx.search(mostrado):
+            _dump_modal(page, evidencias, "dbg_codigo.html")
+            raise RuntimeError(
+                f"¡El selector quedó en '{mostrado}', NO en '{codigo}'! Aborto ANTES de "
+                "enviar para no mandar un código equivocado."
+            )
+        logger.info(
+            f"  Código de subsanación seleccionado: {codigo} "
+            f"(opción='{etiqueta or '?'}' · selector muestra='{mostrado or '?'}')"
+        )
+        return True
+
+    # 1) Combobox por rol (puede haber varios: paginador, filtros de columna…).
+    combos = page.get_by_role("combobox")
+    try:
+        n = combos.count()
+    except Exception:  # noqa: BLE001
+        n = 0
+    for j in range(n):
+        if _elegir(combos.nth(j)):
+            return
+        page.wait_for_timeout(150)
+
+    # 2) Fallback: abrir el selector por su placeholder ("…seleccione una opción").
+    with contextlib.suppress(Exception):
+        ph = page.get_by_text(re.compile(r"seleccione una opci", re.I)).last
+        if ph.count() and _elegir(ph):
+            return
+
+    # 3) Fallback: cualquier div[role=combobox] o .MuiSelect-select del pie.
+    for sel in ("div[role=combobox]", ".MuiSelect-select", "[aria-haspopup=listbox]"):
+        loc = page.locator(sel)
+        with contextlib.suppress(Exception):
+            for j in range(loc.count()):
+                if _elegir(loc.nth(j)):
+                    return
+
+    _dump_modal(page, evidencias, "dbg_codigo.html")
+    with contextlib.suppress(Exception):
+        (evidencias / "dbg_codigo_page.html").write_text(page.content()[:250000], encoding="utf-8")
+    raise RuntimeError(
+        f"no pude seleccionar el CÓDIGO SUBSANACIÓN '{codigo}' (no apareció la opción). "
+        f"Volqué {evidencias / 'dbg_codigo.html'} y dbg_codigo_page.html para calibrar."
+    )
+
+
+def finalizar_factura(page: Page, factura: str, evidencias: Path, codigo: str = "RE9901") -> str:
+    """Cierra la subsanación: (1) elige el CÓDIGO SUBSANACIÓN (habilita el envío) y
+    (2) hace clic en ENVIAR SUBSANACIÓN (arriba a la derecha); captura evidencia. El
+    botón sólo se habilita cuando TODOS los ítems tienen valor + observación + soporte
+    y se seleccionó el código; por eso lo elegimos primero y esperamos el enable."""
+    _seleccionar_codigo(page, codigo, evidencias)
+    btn = page.get_by_role("button", name=re.compile(r"enviar\s+subsanaci", re.I))
+    btn.first.wait_for(timeout=20000)
+    # Esperar hasta ~40s a que se habilite (se activa al completar todos los campos).
+    t0 = time.time()
+    while time.time() - t0 < 40:
+        with contextlib.suppress(Exception):
+            if btn.first.is_enabled():
+                break
+        page.wait_for_timeout(1000)
+    else:
+        with contextlib.suppress(Exception):
+            page.screenshot(path=str(evidencias / f"{factura}_no_habilita.png"), full_page=True)
+        raise RuntimeError(
+            "El botón ENVIAR SUBSANACIÓN siguió DESHABILITADO tras elegir el código. "
+            "Revisá que TODAS las glosas tengan valor + observación + soporte PDF "
+            f"(re-corré con --soportes <carpeta con {factura}.pdf>) y que el CÓDIGO "
+            "SUBSANACIÓN haya quedado seleccionado."
+        )
+    # Evidencia ANTES de enviar: muestra el CÓDIGO elegido + el botón verde. Es la
+    # prueba real de qué se envió, porque AL ENVIAR el dropdown se resetea a su 1er
+    # valor por defecto (RE9602) y una foto post-envío puede confundir.
+    evidencias.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(Exception):
+        page.screenshot(path=str(evidencias / f"{factura}_pre_envio.png"), full_page=True)
+    btn.first.click()
+    page.wait_for_timeout(1500)
+    # Posible modal de confirmación ("¿Está seguro?" -> ACEPTAR / CONFIRMAR / SÍ / ENVIAR).
+    with contextlib.suppress(Exception):
+        conf = page.get_by_role(
+            "button", name=re.compile(r"^(aceptar|confirmar|s[ií]|enviar)$", re.I)
+        )
+        if conf.count() and conf.last.is_visible():
+            conf.last.click()
+            page.wait_for_timeout(1500)
+    page.wait_for_timeout(2000)
+    shot = evidencias / f"{factura}_ok.png"
+    with contextlib.suppress(Exception):
+        page.screenshot(path=str(shot), full_page=True)
+    return f"enviada; código {codigo}; evidencia {shot.name} (+ {factura}_pre_envio.png)"
+
+
+def _resolver_soporte(soportes_dir: Path | None, factura: str) -> Path | None:
+    """Ubica el PDF de soporte de la factura dentro de `soportes_dir`. Acepta
+    '<factura>.pdf' (ej. HUS0000510639.pdf) o 'HUS<numero>.pdf'."""
+    if soportes_dir is None:
+        return None
+    candidatos = [
+        soportes_dir / f"{factura}.pdf",
+        soportes_dir / f"{factura.upper()}.pdf",
+        soportes_dir / f"HUS{normalizar_factura(factura)}.pdf",
+    ]
+    for c in candidatos:
+        if c.is_file():
+            return c
+    logger.warning(
+        f"  No hallé el PDF de soporte de {factura} en {soportes_dir} "
+        f"(busqué {', '.join(c.name for c in candidatos)}). Sigo SIN soporte."
+    )
+    return None
+
+
+def procesar_factura(
+    page: Page,
+    factura: str,
+    datos: dict,
+    evidencias: Path,
+    max_items: int = 0,
+    finalizar: bool = False,
+    lento: bool = False,
+    soportes_dir: Path | None = None,
+    codigo: str = "RE9901",
+    solo_finalizar: bool = False,
+) -> dict:
+    grupos = datos["grupos"]
+    items = [it for g in grupos for it in g["items"]]
+    # Respuesta uniforme (glosa ratificada): 1 grupo -> mismo (aceptado, detalle) para todos.
+    valor = grupos[0]["items"][0]["aceptado"] if grupos and grupos[0]["items"] else 0
+    texto = grupos[0]["detalle"] if grupos else ""
+    soporte = _resolver_soporte(soportes_dir, factura)
+    reg = {
+        "factura": factura,
+        "grupos": len(grupos),
+        "items": len(items),
+        "estado": "",
+        "detalle": "",
+    }
+    # GUARDA: el flujo llena TODAS las glosas del portal con el MISMO (valor, texto).
+    # Si el Excel trae respuestas distintas por ítem, NO hay mapeo fila↔ítem: abortar
+    # esta factura (no enviar datos equivocados) y seguir con la siguiente.
+    if not solo_finalizar and (len(grupos) > 1 or any(it["aceptado"] != valor for it in items)):
+        reg["estado"] = "ERROR"
+        reg["detalle"] = (
+            f"{len(grupos)} grupos de respuesta / valores aceptados no uniformes: el "
+            "flujo actual sólo soporta respuesta uniforme; se omite para no enviar "
+            "datos equivocados."
+        )
+        return reg
+    if len(texto) > 1000:
+        logger.warning(
+            f"  ⚠ Observación de {factura}: {len(texto)} caracteres (>1000, el máximo "
+            "del modal). Se trunca a 1000."
+        )
+        texto = texto[:1000]
+    try:
+        _abrir_factura(page, factura)
+        if solo_finalizar:
+            # La factura YA fue llenada en una corrida previa (el draft persiste). Sólo
+            # entramos a modo subsanar (para que aparezca el selector de código) y
+            # cerramos: elegir CÓDIGO + ENVIAR. Evita re-llenar y re-subir soportes.
+            page.get_by_role("button", name="SUBSANAR GLOSA", exact=True).click()
+            page.wait_for_timeout(2500)
+            det = finalizar_factura(page, factura, evidencias, codigo=codigo)
+            reg["estado"] = "OK"
+            reg["detalle"] = f"solo-finalizar; {det}"
+            return reg
+        hechos = subsanar_items(
+            page, valor, texto, evidencias, max_items=max_items, lento=lento, soporte=soporte
+        )
+        if finalizar:
+            det = finalizar_factura(page, factura, evidencias, codigo=codigo)
+            reg["estado"] = "OK"
+            reg["detalle"] = f"{hechos} glosas; {det}"
+        else:
+            reg["estado"] = "LLENADO_SIN_ENVIAR"
+            reg["detalle"] = f"{hechos} glosas llenadas; revisá y re-corré con --finalizar"
+    except Exception as e:
+        reg["estado"] = "ERROR"
+        reg["detalle"] = str(e)[:300]
+        # Evidencia del estado en que quedó la pantalla (clave en corridas masivas).
+        with contextlib.suppress(Exception):
+            evidencias.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(evidencias / f"{factura}_error.png"), full_page=True)
+    return reg
+
+
+# ─── CLI / main ──────────────────────────────────────────────────────────────
+
+
+def _seleccionar_facturas(por_factura: dict, args) -> dict:
+    if args.solo:
+        objetivo = {args.solo.strip().upper()}
+    elif args.facturas:
+        objetivo = {f.strip().upper() for f in args.facturas.split(",") if f.strip()}
+    elif args.lista:
+        objetivo = {
+            ln.strip().upper()
+            for ln in Path(args.lista).read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        }
+    else:  # --todas
+        return por_factura
+    return {f: d for f, d in por_factura.items() if f in objetivo}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Respuesta a glosas en el portal MUTUAL SER (Zona Ser).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--excel", type=Path, help="Excel de respuestas (extraer_respuestas_glosa_mutualser.py)."
+    )
+    grupo = parser.add_mutually_exclusive_group(required=False)
+    grupo.add_argument("--solo", type=str, help="Procesar SOLO esta factura (piloto).")
+    grupo.add_argument("--facturas", type=str, help="Lista separada por coma.")
+    grupo.add_argument("--lista", type=Path, help="TXT con una factura por línea.")
+    grupo.add_argument("--todas", action="store_true", help="Todas las facturas del Excel.")
+    parser.add_argument(
+        "--explorar",
+        action="store_true",
+        help="Volcar el DOM del módulo para calibrar (no responde).",
+    )
+    parser.add_argument(
+        "--storage-state",
+        type=str,
+        default=STORAGE_STATE_DEFAULT,
+        help="JSON de sesión (evita el captcha).",
+    )
+    parser.add_argument(
+        "--evidencias",
+        type=Path,
+        default=Path("EVIDENCIA_MUTUALSER"),
+        help="Carpeta de screenshots de cierre.",
+    )
+    parser.add_argument(
+        "--con-cabeza",
+        action="store_true",
+        help="Browser visible (necesario para resolver el captcha).",
+    )
+    parser.add_argument(
+        "--cdp",
+        type=str,
+        default=None,
+        help=(
+            "Conectar a un Chrome REAL ya abierto (ej. http://localhost:9222) donde "
+            "vos iniciaste sesión a mano. Evita que el reCAPTCHA detecte automatización."
+        ),
+    )
+    parser.add_argument(
+        "--canal",
+        type=str,
+        default=None,
+        help="Canal del browser en modo lanzado (ej. 'chrome' o 'msedge').",
+    )
+    parser.add_argument("--lento", action="store_true", help="slow_mo 300ms (debug visual).")
+    parser.add_argument(
+        "--max-items",
+        type=int,
+        default=0,
+        help="Llenar como mucho N ítems por factura (piloto). 0 = todos.",
+    )
+    parser.add_argument(
+        "--soportes",
+        type=Path,
+        default=None,
+        help=(
+            "Carpeta con los PDF de soporte por factura (ej. HUS0000510639.pdf). Si se "
+            "pasa, el bot sube ese PDF en el SOPORTE de cada ítem (suele ser obligatorio "
+            "para que se habilite ENVIAR SUBSANACIÓN)."
+        ),
+    )
+    parser.add_argument(
+        "--codigo",
+        type=str,
+        default="RE9901",
+        help=(
+            "CÓDIGO SUBSANACIÓN a elegir antes de enviar (habilita ENVIAR SUBSANACIÓN). "
+            "Por defecto 'RE9901' (opción 'RE9901 SUBSANADA TOTAL' = glosa ratificada "
+            "rechazada). Se busca por coincidencia del texto de la opción."
+        ),
+    )
+    parser.add_argument(
+        "--finalizar",
+        action="store_true",
+        help=(
+            "Elegir el CÓDIGO SUBSANACIÓN y hacer click en ENVIAR SUBSANACIÓN al "
+            "terminar (envía). SIN este flag el bot SOLO llena los campos y NO envía."
+        ),
+    )
+    parser.add_argument(
+        "--solo-finalizar",
+        action="store_true",
+        help=(
+            "NO llena nada: asume que la factura YA está llena (draft) y sólo elige el "
+            "CÓDIGO SUBSANACIÓN y ENVÍA. Útil si un intento anterior llenó todo pero "
+            "falló en el paso del código (evita re-llenar y re-subir soportes)."
+        ),
+    )
+    parser.add_argument(
+        "--reporte", type=Path, default=Path("reporte_mutualser.csv"), help="CSV de salida."
+    )
+    parser.add_argument("--log", type=Path, default=None, help="Archivo de log adicional.")
+    args = parser.parse_args()
+
+    setup_logging(args.log)
+    _exigir_playwright()
+    # En modo --cdp el login lo hace el usuario en su Chrome: no hacen falta credenciales.
+    user, password = ("", "") if args.cdp else cargar_credenciales()
+
+    if not args.explorar and not args.excel:
+        parser.error("indicá --excel (o usá --explorar para calibrar el portal).")
+    if not args.explorar and not (args.solo or args.facturas or args.lista or args.todas):
+        parser.error("elegí qué facturas procesar: --solo / --facturas / --lista / --todas.")
+    if args.finalizar and args.max_items:
+        logger.warning(
+            "--finalizar con --max-items: si quedan glosas sin llenar, ENVIAR "
+            "SUBSANACIÓN no se habilita y la factura terminará en ERROR (tras ~40s)."
+        )
+
+    with sync_playwright() as p:
+        browser, ctx, page, es_cdp = abrir_sesion(p, args, user, password)
+        try:
+            if args.explorar:
+                if es_cdp:
+                    logger.info(
+                        "Modo CDP: vuelco la pestaña ACTUAL de tu Chrome "
+                        "(abrí la factura en modo subsanación para capturar esos botones)."
+                    )
+                explorar(page, args.evidencias)
+                return 0
+
+            por_factura = leer_excel_respuestas(args.excel)
+            seleccion = _seleccionar_facturas(por_factura, args)
+            if not seleccion:
+                logger.warning("No hay facturas que coincidan con la selección.")
+                return 0
+            logger.info(f"Facturas a procesar: {len(seleccion)}")
+
+            args.reporte.parent.mkdir(parents=True, exist_ok=True)
+            f_rep = args.reporte.open("w", newline="", encoding="utf-8-sig")
+            w_rep = csv.DictWriter(
+                f_rep, fieldnames=["factura", "grupos", "items", "estado", "detalle"]
+            )
+            w_rep.writeheader()
+            resultados: list[dict] = []
+            t0 = time.time()
+            try:
+                for i, (factura, datos) in enumerate(seleccion.items(), start=1):
+                    n_items = sum(len(g["items"]) for g in datos["grupos"])
+                    logger.info(
+                        f"[{i}/{len(seleccion)}] {factura} — {len(datos['grupos'])} grupo(s), {n_items} ítems"
+                    )
+                    reg = procesar_factura(
+                        page,
+                        factura,
+                        datos,
+                        args.evidencias,
+                        max_items=args.max_items,
+                        finalizar=args.finalizar,
+                        lento=args.lento,
+                        soportes_dir=args.soportes,
+                        codigo=args.codigo,
+                        solo_finalizar=args.solo_finalizar,
+                    )
+                    resultados.append(reg)
+                    w_rep.writerow(reg)
+                    f_rep.flush()  # filas chicas: no perder la auditoría si algo corta
+                    logger.info(f"    → {reg['estado']}: {reg['detalle']}")
+                    if page.is_closed():
+                        logger.error(
+                            "La pestaña/Chrome se cerró: corto el lote acá (lo hecho "
+                            "hasta ahora quedó en el reporte)."
+                        )
+                        break
+            finally:
+                f_rep.close()
+
+            from collections import Counter
+
+            dur = (time.time() - t0) / 60
+            logger.info(f"\nReporte: {args.reporte} | {len(resultados)} facturas en {dur:.1f} min")
+            for estado, n in Counter(r["estado"] for r in resultados).items():
+                logger.info(f"  {estado}: {n}")
+            if any(r["estado"] == "LLENADO_SIN_ENVIAR" for r in resultados):
+                logger.warning(
+                    "Se LLENARON los campos pero NO se envió (sin --finalizar). Revisá en "
+                    "el browser y, si está OK, re-corré agregando  --finalizar."
+                )
+        finally:
+            # browser.close() sobre una conexión CDP sólo DESCONECTA (no mata el
+            # Chrome del usuario); sobre un browser lanzado, lo cierra.
+            with contextlib.suppress(Exception):
+                browser.close()
+    # Código de salida ≠0 si alguna factura terminó en ERROR (para scripts/wrappers).
+    return 1 if any(r["estado"] == "ERROR" for r in resultados) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
