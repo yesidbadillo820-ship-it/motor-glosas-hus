@@ -1369,6 +1369,19 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
    vencida. El color se usa en la tarjeta del tablero, en los chips de la
    tabla y en el borde izquierdo de cada fila, para que la prioridad se lea
    sin tener que leer. */
+/* ── Material de osteosíntesis ──────────────────────────────────────── */
+.maos-buscador{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.9rem 1rem;display:flex;flex-direction:column;gap:.4rem}
+.maos-lbl{font-size:.86rem;font-weight:650}
+.maos-fila{display:flex;gap:.5rem;flex-wrap:wrap}
+.maos-fila input{flex:1;min-width:220px;padding:.45rem .6rem;border:1px solid var(--border);border-radius:var(--r-sm);background:transparent;color:inherit;font-size:.86rem}
+.maos-nota{color:var(--text-3);font-size:.74rem}
+.maos-cargando,.maos-nada{padding:.7rem 0;color:var(--text-3);font-size:.84rem}
+.maos-tbl{margin-top:.6rem}
+.maos-precio{font-weight:650;white-space:nowrap}
+.maos-defensa{margin-top:.7rem;background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.7rem .85rem}
+.maos-defensa-t{font-size:.78rem;font-weight:650;color:var(--text-2);margin-bottom:.35rem}
+.maos-defensa p{margin:0 0 .5rem;font-size:.82rem;line-height:1.55;text-align:justify}
+
 /* ── Malla contractual ──────────────────────────────────────────────── */
 .malla-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
 .malla-titulo{margin:0;font-size:1.15rem;font-weight:700}
@@ -3269,6 +3282,16 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <h2 class="malla-titulo">Malla contractual</h2>
             <p class="malla-sub" id="malla-sub">Qué contrato rige con cada pagador y hasta cuándo.</p>
           </div>
+        </div>
+        <div class="maos-buscador">
+          <label class="maos-lbl">Material de osteosíntesis — precio institucional</label>
+          <div class="maos-fila">
+            <input id="maos-q" placeholder="Código FMO o descripción: tornillo cortical 3.5"
+                   onkeydown="if(event.key==='Enter') maosBuscar()">
+            <button class="btn btn-primary btn-sm" onclick="maosBuscar()">Buscar</button>
+          </div>
+          <small class="maos-nota">Anexo 09 de la Resolución 194 de 2025 · 1.216 códigos con su precio.</small>
+          <div id="maos-resultado"></div>
         </div>
         <div class="malla-cards" id="malla-cards"></div>
         <div id="malla-listas"><div class="malla-vacio">Cargando…</div></div>
@@ -20053,6 +20076,65 @@ var VENC_NIVELES = [
 function vencClase(u){
   var n = VENC_NIVELES.filter(function(x){return x.k===u})[0];
   return n ? n.cls : '';
+}
+
+// ─── Material de osteosíntesis (Anexo 09, Resolución 194 de 2025) ──────
+// La EPS objeta el valor diciendo que "no está pactado". La respuesta está en
+// un PDF de 18 páginas y 1.216 códigos que había que revisar a ojo.
+
+async function maosBuscar(){
+  var q = (document.getElementById('maos-q') || {}).value || '';
+  var cont = document.getElementById('maos-resultado');
+  if(!q.trim()){ cont.innerHTML=''; return; }
+  cont.innerHTML = '<div class="maos-cargando">Buscando…</div>';
+  try{
+    var r = await fetch('/maos/buscar?q=' + encodeURIComponent(q.trim()), {headers: authH()});
+    var d = await r.json();
+    if(!d.encontrado){
+      cont.innerHTML = '<div class="maos-nada">' + escHtml(d.mensaje || 'Sin resultados.') + '</div>';
+      return;
+    }
+    var h = '<table class="tbl-modern maos-tbl"><thead><tr><th>Código</th><th>Descripción</th>'
+          + '<th>Precio</th><th></th></tr></thead><tbody>';
+    d.resultados.forEach(function(x){
+      h += '<tr><td><b>' + escHtml(x.codigo) + '</b></td>'
+        + '<td><small>' + escHtml(x.descripcion) + '</small></td>'
+        + '<td class="maos-precio">' + fmtCOP(x.precio) + '</td>'
+        + '<td><button class="btn btn-ghost btn-sm" onclick="maosDefensa(\'' + x.codigo + '\')">Defensa</button></td>'
+        + '</tr>';
+    });
+    cont.innerHTML = h + '</tbody></table><div id="maos-defensa"></div>';
+    if(d.defensa) maosPintarDefensa(d.defensa);
+  }catch(e){
+    cont.innerHTML = '<div class="maos-nada">No se pudo consultar: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function maosDefensa(codigo){
+  try{
+    var r = await fetch('/maos/defensa/' + encodeURIComponent(codigo), {headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('No disponible', d.detail || '', 'warning'); return; }
+    maosPintarDefensa(d.defensa);
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+function maosPintarDefensa(texto){
+  var cont = document.getElementById('maos-defensa');
+  if(!cont) return;
+  cont.innerHTML = '<div class="maos-defensa">'
+    + '<div class="maos-defensa-t">Párrafo para el dictamen</div>'
+    + '<p id="maos-defensa-txt">' + escHtml(texto) + '</p>'
+    + '<button class="btn btn-ghost btn-sm" onclick="maosCopiar()">Copiar</button>'
+    + '</div>';
+}
+
+function maosCopiar(){
+  var el = document.getElementById('maos-defensa-txt');
+  if(!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function(){
+    toast('Copiado', 'Pegalo en el dictamen', 'success');
+  }).catch(function(){ toast('No se pudo copiar','Seleccionalo a mano','warning'); });
 }
 
 // ─── Malla contractual ─────────────────────────────────────────────────
