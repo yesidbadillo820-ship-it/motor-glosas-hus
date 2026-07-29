@@ -369,7 +369,139 @@ def _contrato_desde_bd(eps_upper: str) -> dict | None:
         return None
 
 
-def get_contrato(eps: str) -> dict:
+def _desde_malla(eps: str, dia) -> dict | None:
+    """La ficha del contrato que regía ese día, según la malla oficial.
+
+    La malla (`services/malla_contractual`) es lo que mantiene contratación y
+    manda sobre el catálogo curado de este archivo. Se descubrió cotejándolas:
+
+      COMPENSAR  el catálogo decía SOAT -10% (factor 0,90) y la malla dice
+                 -15% (0,85). El prompt escribe "SOAT pleno × factor" como una
+                 CIFRA EN PESOS, así que sobre $100 millones el dictamen le
+                 reclamaba a COMPENSAR $5 millones que el contrato no respalda.
+      FOMAG      el catálogo decía factor 0,80 y la malla dice 0,85: al revés,
+                 el dictamen renunciaba a $5 millones por cada $100. Y citaba
+                 un número de contrato que la malla no reconoce — ahí la X
+                 está en CARTA DE INTENCIÓN, no en CONTRATO.
+
+    Del catálogo curado se conservan el contacto y las notas de trabajo, que
+    la malla no trae y que el área usa a diario.
+    """
+    from app.services import malla_contractual
+
+    contrato = malla_contractual.vigente(eps, dia)
+    if contrato is None:
+        return None
+
+    vigencia = f"{contrato.desde.isoformat()} — "
+    vigencia += contrato.hasta.isoformat() if contrato.hasta else "indeterminado"
+    if contrato.hasta_agotar_recurso:
+        vigencia += " (o hasta agotar recurso, lo que primero ocurra)"
+
+    ficha = {
+        "numero": contrato.numero or "SIN NÚMERO EN LA MALLA — no citar número de contrato",
+        "tarifa": contrato.tarifa_texto,
+        "factor": contrato.factor if contrato.factor is not None else 1.00,
+        "tipo": contrato.nombre_malla,
+        "nit": "N/D",
+        "vigencia": vigencia,
+        "contacto": "cartera@hus.gov.co",
+        "nota": contrato.observacion or "",
+        "_fuente": f"malla contractual al {malla_contractual.FECHA_MALLA.isoformat()}",
+    }
+    if contrato.exclusiones:
+        # Que la EPS no cubra algo cambia por completo la defensa: si el
+        # medicamento oncológico lo suministra la EPS, no hay nada que
+        # defender por tarifa.
+        ficha["nota"] = (
+            (ficha["nota"] + " " if ficha["nota"] else "")
+            + "NO SE CONTRATA: "
+            + " · ".join(contrato.exclusiones)
+        ).strip()
+
+    # QUÉ MANDA DE CADA FUENTE. La malla es de contratación: manda en lo que
+    # ella custodia —qué contratos existen, desde cuándo, hasta cuándo—. El
+    # catálogo curado se armó leyendo los contratos firmados y trae lo que la
+    # malla no puede traer: el número de cláusula, el orden de prelación entre
+    # tarifa institucional y SOAT, el contacto de glosas.
+    #
+    # Ejemplo real: para AURORA la malla resume "SOAT -3%, TARIFAS
+    # INSTITUCIONALES" y el catálogo precisa "TARIFAS PROPIAS HUS (actos
+    # administrativos); subsidiariamente SOAT −3% en SMLMV cuando no exista
+    # tarifa institucional (Cláusulas Primera Par. Cuarto y Séptima)". Dicen
+    # lo mismo, pero la segunda es la que se puede citar en un dictamen.
+    #
+    # Si el FACTOR discrepa, gana la malla y punto: es la cifra que el prompt
+    # convierte en pesos, y contratación es quien la custodia. Así se
+    # corrigieron COMPENSAR (0,90 → 0,85, reclamaba de más) y FOMAG
+    # (0,80 → 0,85, renunciaba a plata del hospital).
+    curado = CONTRATOS_HUS.get(_clave_curada(eps))
+    if curado:
+        if curado.get("contacto"):
+            ficha["contacto"] = curado["contacto"]
+        if curado.get("nit"):
+            ficha["nit"] = curado["nit"]
+        mismo_factor = (
+            contrato.factor is not None
+            and curado.get("factor") is not None
+            and abs(float(curado["factor"]) - float(contrato.factor)) < 0.001
+        )
+        if mismo_factor:
+            if curado.get("numero"):
+                ficha["numero"] = curado["numero"]
+            if curado.get("tarifa"):
+                ficha["tarifa"] = curado["tarifa"]
+            if curado.get("nota"):
+                ficha["nota"] = (curado["nota"] + " " + ficha["nota"]).strip()
+        else:
+            ficha["nota"] = (
+                ficha["nota"]
+                + f" [El catálogo interno tenía factor {curado.get('factor')} y la malla "
+                f"del área de contratación dice {contrato.factor}; manda la malla.]"
+            ).strip()
+
+        # Si la malla no trae número pero el catálogo sí, se conserva el del
+        # catálogo — salió de leer el documento firmado— y se deja dicho que
+        # la malla no lo reconoce. Es el caso de FOMAG: el catálogo tiene el
+        # contrato 12076-359-2025 y en la malla la X está en CARTA DE
+        # INTENCIÓN, no en CONTRATO. Borrarlo sería tirar un dato que alguien
+        # verificó; citarlo sin advertencia sería exponerse a que la EPS
+        # responda que ese contrato no existe. Se dicen las dos cosas y decide
+        # el auditor.
+        if not contrato.numero and curado.get("numero"):
+            ficha["numero"] = curado["numero"]
+            ficha["nota"] = (
+                ficha["nota"]
+                + " [ATENCIÓN: la malla de contratación no registra número de contrato "
+                "para esta entidad; el número viene del catálogo interno. Confirmar con "
+                "contratación antes de citarlo en el dictamen.]"
+            ).strip()
+    return ficha
+
+
+def _clave_curada(eps: str) -> str:
+    """La clave de CONTRATOS_HUS que corresponde a esta EPS, si existe.
+
+    Gana la MÁS específica, no la primera que aparezca en el diccionario. Con
+    el orden de inserción, "POLICIA NACIONAL" se llevaba las glosas de
+    "POLICIA NACIONAL ONCOLOGIA" y le pegaba a la ficha el número del contrato
+    general — otro objeto y otro presupuesto.
+    """
+    e = (eps or "").upper().strip().translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU"))
+    if e in CONTRATOS_HUS:
+        return e
+    candidatos = [
+        k
+        for k in CONTRATOS_HUS
+        if k in e or (len(e) >= 4 and e in k) or all(t in e.split() for t in k.split())
+    ]
+    if not candidatos:
+        return ""
+    candidatos.sort(key=lambda k: (len(k.split()), len(k)), reverse=True)
+    return candidatos[0]
+
+
+def get_contrato(eps: str, fecha_hecho=None) -> dict:
     """Retorna los datos del contrato para una EPS dada (búsqueda flexible).
 
     Hardening ronda 2 (12-jun-2026, CONTRATO CRUZADO entre EPS):
@@ -390,6 +522,48 @@ def get_contrato(eps: str) -> dict:
     eps_upper = eps_upper.translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU"))
     if not eps_upper or eps_upper in _EPS_SIN_CONTRATO:
         return _contrato_sin_pacto()
+
+    # La malla oficial manda: es lo que mantiene contratación y trae la
+    # vigencia real. Se resuelve por la FECHA DEL HECHO —una atención de marzo
+    # de 2026 no está cubierta por un contrato que empezó en abril— y si ese
+    # día no había contrato, se sigue de largo hasta el fallback, que aplica
+    # SOAT pleno. Antes se elegía por nombre y nunca se miraba la fecha.
+    try:
+        import datetime as _dt
+
+        dia = fecha_hecho or _dt.date.today()
+        if isinstance(dia, str):
+            dia = _dt.datetime.strptime(dia.strip()[:10], "%Y-%m-%d").date()
+        elif isinstance(dia, _dt.datetime):
+            dia = dia.date()
+        de_malla = _desde_malla(eps_upper, dia)
+        if de_malla is not None:
+            return de_malla
+        # La malla CONOCE al pagador pero ningún contrato suyo cubría ese día.
+        # Eso no es un fallo de búsqueda: es la respuesta. Caer al catálogo
+        # viejo sería devolver un contrato que ese día no regía, que es
+        # justamente el error que este cambio corrige — y el que la EPS usa
+        # para ratificar la glosa.
+        from app.services import malla_contractual as _malla
+
+        otros = _malla.contratos_de(eps_upper)
+        if otros:
+            ficha = _contrato_sin_pacto()
+            fechas = " · ".join(
+                f"{c.numero or 'sin número'}: {c.desde.isoformat()} → "
+                f"{c.hasta.isoformat() if c.hasta else 'indeterminado'}"
+                for c in otros
+            )
+            ficha["nota"] = (
+                f"El {dia.isoformat()} no había contrato vigente con esta entidad. "
+                f"Contratos registrados en la malla: {fechas}. "
+                "Se aplica tarifa SOAT plena (Circular Externa 047 de 2025 del "
+                "MinSalud, Manual SOAT 2026 indexado a UVB) y Decreto 780 de 2016."
+            )
+            ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
+            return ficha
+    except Exception:  # la malla nunca puede tumbar un dictamen
+        pass
     # Auditoría jul-2026: match EXACTO primero y luego el candidato MÁS
     # ESPECÍFICO — "POLICIA NACIONAL" (orden de inserción) eclipsaba a
     # "POLICIA NACIONAL ONCOLOGIA" y el contrato 068-5-200006-26 era
