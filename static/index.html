@@ -1435,10 +1435,21 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .auto-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .auto-titulo{margin:0;font-size:1.15rem;font-weight:700}
 .auto-sub{margin:.3rem 0 0;color:var(--text-2);font-size:.88rem;max-width:62ch}
-.auto-grupo{margin:.6rem 0 .1rem;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2)}
-.auto-fichas{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:.9rem}
-.auto-ficha{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.95rem 1rem;display:flex;flex-direction:column;gap:.55rem}
-.auto-ficha:hover{border-color:var(--c-teal2)}
+/* Lista VERTICAL: una herramienta por fila, a lo ancho. La cuadrícula
+   anterior dejaba filas cojas (4 tarjetas, luego 1 sola) y alturas
+   disparejas; en columna todo queda alineado y se lee de arriba abajo. */
+.auto-grupo{margin:.6rem 0 .1rem;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);max-width:980px;border-bottom:1px solid var(--border);padding-bottom:.35rem}
+.auto-fichas{display:flex;flex-direction:column;gap:.85rem;max-width:980px}
+.auto-ficha{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.15rem;display:flex;gap:1.35rem;align-items:stretch}
+.auto-ficha:hover{border-color:var(--c-teal2);box-shadow:0 1px 6px color-mix(in srgb,var(--c-teal2) 12%,transparent)}
+/* Dos zonas: a la izquierda qué es y para qué sirve; a la derecha el
+   archivo, las opciones y los botones. */
+.auto-ficha-info{flex:1 1 44%;min-width:0;display:flex;flex-direction:column;gap:.45rem}
+.auto-ficha-accion{flex:1 1 56%;min-width:0;display:flex;flex-direction:column;gap:.55rem;border-left:1px solid var(--border);padding-left:1.35rem;justify-content:center}
+@media(max-width:860px){
+  .auto-ficha{flex-direction:column;gap:.6rem}
+  .auto-ficha-accion{border-left:0;padding-left:0}
+}
 .auto-ficha-nombre{font-weight:650;font-size:.95rem;line-height:1.3}
 .auto-ficha-que{font-size:.84rem;color:var(--text-2);line-height:1.45}
 .auto-ficha-cuando{font-size:.8rem;color:var(--text-3);font-style:italic;line-height:1.4}
@@ -20436,9 +20447,14 @@ function autoFicha(a){
   }).join('');
   var ext = (a.extensiones || []).join(', ');
   return '<div class="auto-ficha" id="auto-f-' + a.id + '">'
+    // Zona izquierda: qué es la herramienta y cuándo se usa.
+    + '<div class="auto-ficha-info">'
     + '<div class="auto-ficha-nombre">' + escHtml(a.nombre) + '</div>'
     + '<div class="auto-ficha-que">' + escHtml(a.que_hace) + '</div>'
     + '<div class="auto-ficha-cuando">' + escHtml(a.cuando_usarla) + '</div>'
+    + '</div>'
+    // Zona derecha: el archivo, las opciones y los botones.
+    + '<div class="auto-ficha-accion">'
     // Zona de arrastre: clic o soltar el archivo encima. El input nativo
     // queda oculto pero sigue siendo el dueño del archivo elegido.
     + '<div class="auto-drop" id="auto-drop-' + a.id + '" '
@@ -20461,6 +20477,7 @@ function autoFicha(a){
     +   '<button class="btn btn-primary btn-sm" onclick="autoEjecutar(\'' + a.id + '\')" id="auto-btn-' + a.id + '">Descargar resultado</button>'
     + '</div>'
     + '<div class="auto-estado" id="auto-estado-' + a.id + '"></div>'
+    + '</div>'   // cierra auto-ficha-accion
     + '</div>';
 }
 
