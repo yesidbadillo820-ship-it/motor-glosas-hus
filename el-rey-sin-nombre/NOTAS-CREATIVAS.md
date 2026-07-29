@@ -140,6 +140,24 @@ pensamientos internos y para el motivo-frase recurrente.
   tratado firmado a finales de febrero). Libro III abre con Yazid partiendo hacia Ferrol de
   Abajo, esta vez sin disfraz, con su nombre y su corona, dispuesto a decir toda la verdad.
 
+## Cierre de la novela (Libro III)
+
+- Yazid vuelve a Ferrol de Abajo con su nombre y corona completos; el pueblo lo reconoce como
+  su propio rey. Daniela pide tiempo y honestidad total, no perdón inmediato.
+- Reconciliación gradual durante meses (primavera): Yazid gobierna desde Ferrol de Abajo,
+  gana la confianza del pueblo y de Tomás de nuevo.
+- Gesto final: Yazid lleva la corte ENTERA a Ferrol de Abajo (no al revés) — declaración pública
+  en la plaza, se arrodilla, dice su nombre completo ("Yazid, hijo de Alarico"), le da un anillo
+  sencillo de plata, la pide en matrimonio delante de todo el reino y del pueblo. Ella acepta con
+  el brindis ritual ("Aquí no hay coronas" — "Solo sed").
+- Boda en Ferrol de Abajo, bajo el emparrado de La Parra, votos improvisados (no protocolo de
+  corte). Callback al brindis y al vino especiado en los votos mismos.
+- Epílogo, un año exacto después de la boda (coincide con el "1 año casados" real del autor):
+  Daniela y Yazid vuelven a La Parra, brindan otra vez con la misma frase, y ella le anuncia que
+  está embarazada — cierre cálido, sin pérdidas, con el brindis final repetido una última vez.
+- Personajes secundarios con final feliz propio: Tomás (orgulloso, sigue en La Parra), Rodrigo
+  (de antagonista a aliado y amigo), Elvira e Íñigo (juntos y libres).
+
 ## Progreso
 
 | Libro | Capítulo | Título | Estado |
@@ -162,4 +180,12 @@ pensamientos internos y para el motivo-frase recurrente.
 | II | 7 | El Duque Se Opone | ✅ |
 | II | 8 | El Tratado | ✅ |
 | II | 9 | La Infanta Libre | ✅ (cierra Libro II) |
-| III | 1-9 + Epílogo | — | ⏳ |
+| III | 1 | El Camino de Vuelta | ✅ |
+| III | 2 | El Reencuentro | ✅ |
+| III | 3 | Lo Que Se Reconstruye | ✅ |
+| III | 4 | Los Preparativos | ✅ |
+| III | 5 | El Gesto | ✅ |
+| III | 6 | La Boda | ✅ |
+| Epílogo | — | Un Año Después | ✅ (cierra la novela) |
+
+**NOVELA COMPLETA — 25 capítulos + epílogo, 3 libros.**
