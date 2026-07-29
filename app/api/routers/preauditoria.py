@@ -9,6 +9,12 @@ Flujo del auditor:
         subsanaciones sin duplicar)
   5. Radicar o devolver           → PATCH /preauditoria/facturas/{id}/auditar
   6. Oficio de devolución PDF + estadísticas + consolidado consultable/exportable
+
+Acceso: las siete rutas que escriben exigen **AUDITOR o superior**. Antes
+bastaba con estar autenticado, así que un VIEWER podía subir una fuente,
+auditar una factura o emitir un oficio de devolución —un documento que sale
+del hospital con un consecutivo—. Consultar el consolidado sigue abierto a
+cualquier usuario autenticado: leer no cambia nada.
 """
 
 from __future__ import annotations
@@ -23,7 +29,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import (
+    get_auditor_o_superior,
+    get_coordinador_o_admin,
+    get_usuario_actual,
+)
 from app.core.tz import TZ_BOGOTA, a_utc
 from app.database import get_db
 from app.models.db import (
@@ -223,7 +233,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
 async def subir_radicacion(
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     contenido = await _leer_xlsx(archivo)
     try:
@@ -247,7 +257,7 @@ async def subir_radicacion(
 async def subir_dgreport(
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     contenido = await _leer_xlsx(archivo)
     try:
@@ -336,7 +346,7 @@ def listar_radicacion(
 def crear_oficio(
     body: OficioIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     radicado = body.numero_radicado.strip().upper()
     existe = (
@@ -657,7 +667,7 @@ def escribir_envio(
     oficio_id: int,
     body: EnvioIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     o = db.get(OficioRecepcionRecord, oficio_id)
     if not o:
@@ -686,7 +696,7 @@ def auditar_factura(
     factura_id: int,
     body: AuditarIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
@@ -710,7 +720,7 @@ def anotar_observacion(
     factura_id: int,
     body: ObservacionIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Agrega o corrige la observación sin tocar la decisión ya tomada."""
     f = db.get(FacturaPreauditoriaRecord, factura_id)
@@ -955,7 +965,7 @@ def generar_oficio_devolucion(
     oficio_id: int,
     body: Optional[OficioDevolucionIn] = None,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     o = db.get(OficioRecepcionRecord, oficio_id)
     if not o:
