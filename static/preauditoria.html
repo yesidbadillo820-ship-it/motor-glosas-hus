@@ -210,7 +210,7 @@
     <h2>Oficios de devolución (consecutivo SINAC)</h2>
     <div class="tbl-scroll"><table>
       <thead><tr><th>Consecutivo</th><th>Fecha</th><th>Oficio origen</th><th>Facturas</th>
-        <th>Valor</th><th>Generado por</th><th>PDF</th></tr></thead>
+        <th>Valor</th><th>Generado por</th><th>Acciones</th></tr></thead>
       <tbody id="tb-devoluciones"></tbody></table></div>
     <div class="pager" id="pg-devoluciones"></div>
   </div>
@@ -708,10 +708,25 @@ async function cargarDevoluciones(page){
     else tb.innerHTML=d.items.map(function(o){
       return '<tr><td class="mono"><b>'+esc(o.consecutivo)+'</b></td><td>'+fBog(o.fecha_generado)+'</td>'+
         '<td class="mono">'+esc(o.oficio_radicado||'—')+'</td><td>'+o.total_facturas+'</td><td>'+cop(o.total_valor)+'</td>'+
-        '<td>'+esc(o.generado_por||'—')+'</td><td><button class="btn btn-borde btn-chico" onclick="verPdf(\''+o.pdf_url+'\')">📄 PDF</button></td></tr>';
+        '<td>'+esc(o.generado_por||'—')+'</td><td><button class="btn btn-borde btn-chico" onclick="verPdf(\''+o.pdf_url+'\')">📄 PDF</button>'+
+        (ES_ADMIN?' <button class="btn btn-rojo btn-chico" title="Eliminar este oficio de devolución" onclick="eliminarOficioDevolucion('+o.id+',\''+esc(o.consecutivo)+'\','+o.total_facturas+')">🗑</button>':'')+
+        '</td></tr>';
     }).join('');
     pager(document.getElementById('pg-devoluciones'),d,'cargarDevoluciones');
   }catch(e){ errorTabla('tb-devoluciones', 7, e); }
+}
+// Borra un oficio de devolución generado por error (consecutivo equivocado,
+// por ejemplo). Las facturas NO cambian de decisión: siguen devueltas y
+// quedan libres para entrar en un oficio nuevo.
+async function eliminarOficioDevolucion(id, consecutivo, nFacturas){
+  if(!confirm('¿Eliminar el oficio de devolución '+consecutivo+'?\n\n'+
+              'Sus '+nFacturas+' factura(s) SIGUEN devueltas, pero quedan libres para salir en un oficio nuevo, '+
+              'y el consecutivo vuelve a quedar disponible.\n\n'+
+              'Si ya entregó el PDF a la entidad, no lo elimine.')) return;
+  try{ var d=await api('/preauditoria/oficios-devolucion/'+id, {method:'DELETE'});
+    alert('Oficio '+d.consecutivo+' eliminado ('+d.facturas_liberadas+' factura(s) liberadas).');
+    await Promise.all([cargarDevoluciones(), cargarConsolidado(), cargarOficios()]);
+  }catch(e){ alert(e.message); }
 }
 async function verPdf(url,descargar,nombre){
   try{ var r=await fetch(url,{headers:authH()});

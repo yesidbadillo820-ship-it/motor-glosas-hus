@@ -1317,6 +1317,43 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
     }
 
 
+def eliminar_oficio_devolucion(db: Session, dev: OficioDevolucionRecord) -> dict:
+    """Elimina un oficio de devolución ya generado (solo coordinación/admin).
+
+    Sirve cuando el PDF salió con el consecutivo equivocado o se generó por
+    error. Las facturas NO cambian de decisión: siguen devueltas, pero quedan
+    libres para entrar en un oficio nuevo. El consecutivo vuelve a quedar
+    disponible.
+
+    El historial NO se borra: a los eventos solo se les quita el sello del
+    oficio que deja de existir, así queda constancia de que la factura sí fue
+    devuelta ese día.
+    """
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(FacturaPreauditoriaRecord.oficio_devolucion_id == dev.id)
+        .all()
+    )
+    eventos = (
+        db.query(FacturaEventoRecord)
+        .filter(FacturaEventoRecord.oficio_devolucion_id == dev.id)
+        .all()
+    )
+    for f in facturas:
+        f.oficio_devolucion_id = None
+    for e in eventos:
+        e.oficio_devolucion_id = None
+    consecutivo = dev.consecutivo
+    db.flush()
+    db.delete(dev)
+    db.commit()
+    return {
+        "ok": True,
+        "consecutivo": consecutivo,
+        "facturas_liberadas": len(facturas),
+    }
+
+
 def eliminar_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dict:
     """Deshace UN envío cargado por error, sin tocar el resto del oficio.
 
