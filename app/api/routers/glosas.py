@@ -23,6 +23,7 @@ from app.models.db import (
     ContratoRecord,
     ROL_SUPER_ADMIN,
     ROL_COORDINADOR,
+    ROL_AUDITOR,
     ROL_VIEWER,
 )
 from app.utils.moneda import parse_valor_cop
@@ -2650,8 +2651,24 @@ def actualizar_estado(
             status_code=422,
             detail=f"Estado '{estado_norm}' inválido. Use uno de: {', '.join(sorted(estados_validos))}",
         )
+
+    # E00 · la cuarta puerta. Las tres de `workflow.py` ya están cerradas; esta
+    # es la más ancha de todas: pone la glosa en cualquiera de los once estados,
+    # incluidos LEVANTADA (el hospital ganó) y ACEPTADA (el hospital desistió).
+    # Cualquier usuario autenticado podía hacerlo.
+    if current_user.rol == ROL_VIEWER:
+        raise HTTPException(status_code=403, detail="VIEWER no puede cambiar estados")
+
     repo = GlosaRepository(db)
-    glosa = repo.actualizar_estado(glosa_id, estado_norm, responsable="sistema")
+    glosa_previa = repo.obtener_por_id(glosa_id)
+    if glosa_previa and current_user.rol == ROL_AUDITOR:
+        duenio = (glosa_previa.auditor_email or "").strip().lower()
+        if duenio and duenio != (current_user.email or "").strip().lower():
+            raise HTTPException(status_code=403, detail="Esta glosa está asignada a otro auditor")
+
+    # Y quedaba escrito `responsable="sistema"`: el registro no decía quién lo
+    # hizo. Ahora queda el correo de quien lo pidió.
+    glosa = repo.actualizar_estado(glosa_id, estado_norm, responsable=current_user.email)
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
     logger.info(f"Estado actualizado | glosa_id={glosa_id} | nuevo_estado={nuevo_estado}")
