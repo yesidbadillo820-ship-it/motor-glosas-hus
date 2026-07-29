@@ -1072,6 +1072,26 @@ def listar_oficios_devolucion(
     }
 
 
+@router.delete("/oficios-devolucion/{dev_id}")
+def eliminar_oficio_devolucion(
+    dev_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Elimina un oficio de devolución generado por error (coordinación/admin).
+
+    Las facturas siguen devueltas: solo quedan libres para entrar en un oficio
+    nuevo, y el consecutivo vuelve a estar disponible.
+    """
+    dev = db.get(OficioDevolucionRecord, dev_id)
+    if not dev:
+        raise HTTPException(404, "Oficio de devolución no encontrado")
+    res = svc.eliminar_oficio_devolucion(db, dev)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 409), res.get("mensaje", "No se pudo eliminar"))
+    return res
+
+
 @router.get("/oficios-devolucion/{dev_id}/pdf")
 def descargar_pdf_oficio_devolucion(
     dev_id: int,
