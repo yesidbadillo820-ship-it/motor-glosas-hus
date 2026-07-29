@@ -227,6 +227,12 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   reconocidos a cualquier profundidad (subcarpetas internas, sueltos en la
   raíz) y con nombres genéricos (epicrisis.pdf, fe.xml, ResultadosMSPS.json).
   Se entregó el **PAQUETE COMPLETO** en ZIP (5 frentes + documentación).
+- **29-07:** el **PR #176 quedó FUSIONADO** en la rama principal (se
+  resolvieron dos rondas de conflictos con los otros chats — bitácora,
+  CLAUDE.md y dos archivos de pruebas que ambos frentes habían corregido
+  igual). Los lanzadores `.cmd` ahora muestran el avance de la descarga del
+  OCR (~200 MB la primera vez) para que no parezcan congelados; el auditor
+  ya corrió el validador con OCR en su PC ("YA ARRANCO TODO BIEN").
 
 ### 23-07 — Módulo de Pre-auditoría SINAC
 - **23-07:** nace el **módulo de Pre-auditoría SINAC** (rama
@@ -788,8 +794,9 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
     (sale de `reporte_glosa.csv`).
 
 ### Módulo ADRES/FURIPS (chat "VALIDADOR ADRES")
-20. **Fusionar el PR #176** (validador con OCR, app web, bot DE4401 v2.1,
-    documentación de entrega — ya sin conflictos con la rama principal).
+20. ~~Fusionar el PR #176~~ — **HECHO el 29-07**: todo el módulo (validador
+    con OCR, app web, bot DE4401 v2.1, documentación de entrega) ya está en
+    la rama principal.
 21. **Bot DE4401:** correr la versión 2.1 con los archivos reenviados y, si
     algo sale "SIN XML", enviar el Excel `_COMPLETO` (la hoja DIAGNOSTICO
     dice la causa exacta).
@@ -840,8 +847,8 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
 6. Si hay tiempo: verificar si SISTEMAS ya corrigió algún CUV (pendiente #6),
    descargar los 2 PDF del DIAN (pendiente #7) y revisar el PR #186 del módulo
    de pre-auditoría.
-7. **ADRES:** fusionar el PR #176, copiar al servidor el PAQUETE COMPLETO
-   (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendientes #20 y #21).
+7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
+   COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 
