@@ -1214,6 +1214,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from app.api.routers.auth_router import router as auth_router
 from app.api.routers.glosas import router as glosas_router
+from app.api.routers.automatizaciones import router as automatizaciones_router
 from app.api.routers.contratos import router as contratos_router
 from app.api.routers.analytics import router as analytics_router
 from app.api.routers.plantillas import router as plantillas_router
@@ -1275,6 +1276,7 @@ app.include_router(auth_router)
 app.include_router(asistente_predictivo_router)  # Ola 4: inteligencia ambiental
 app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
+app.include_router(automatizaciones_router)
 app.include_router(contratos_router)
 app.include_router(analytics_router)
 app.include_router(plantillas_router)
@@ -1347,9 +1349,7 @@ app.include_router(sugerencias_router)
 from app.api.routers.tareas_diarias import router as tareas_diarias_router
 
 app.include_router(tareas_diarias_router)
-from app.api.routers.nota_credito import router as nota_credito_router
 
-app.include_router(nota_credito_router)
 from app.api.routers.preauditoria import router as preauditoria_router
 
 app.include_router(preauditoria_router)

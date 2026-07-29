@@ -9,6 +9,12 @@ Flujo del auditor:
         subsanaciones sin duplicar)
   5. Radicar o devolver           → PATCH /preauditoria/facturas/{id}/auditar
   6. Oficio de devolución PDF + estadísticas + consolidado consultable/exportable
+
+Acceso: las siete rutas que escriben exigen **AUDITOR o superior**. Antes
+bastaba con estar autenticado, así que un VIEWER podía subir una fuente,
+auditar una factura o emitir un oficio de devolución —un documento que sale
+del hospital con un consecutivo—. Consultar el consolidado sigue abierto a
+cualquier usuario autenticado: leer no cambia nada.
 """
 
 from __future__ import annotations
@@ -23,7 +29,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import (
+    get_auditor_o_superior,
+    get_coordinador_o_admin,
+    get_usuario_actual,
+)
 from app.core.tz import TZ_BOGOTA, a_utc
 from app.database import get_db
 from app.models.db import (
@@ -223,7 +233,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
 async def subir_radicacion(
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     contenido = await _leer_xlsx(archivo)
     try:
@@ -247,7 +257,7 @@ async def subir_radicacion(
 async def subir_dgreport(
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     contenido = await _leer_xlsx(archivo)
     try:
@@ -336,7 +346,7 @@ def listar_radicacion(
 def crear_oficio(
     body: OficioIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     radicado = body.numero_radicado.strip().upper()
     existe = (
@@ -657,7 +667,7 @@ def escribir_envio(
     oficio_id: int,
     body: EnvioIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     o = db.get(OficioRecepcionRecord, oficio_id)
     if not o:
@@ -686,7 +696,7 @@ def auditar_factura(
     factura_id: int,
     body: AuditarIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
@@ -710,7 +720,7 @@ def anotar_observacion(
     factura_id: int,
     body: ObservacionIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Agrega o corrige la observación sin tocar la decisión ya tomada."""
     f = db.get(FacturaPreauditoriaRecord, factura_id)
@@ -763,8 +773,19 @@ def consolidado(
         patron = f"%{q.strip()}%"
         # entidad/NIT viven en la fuente → subquery correlacionada (NO materializar
         # la lista: con 36k facturas rompería el límite de variables de SQLite).
+        #
+        # La fuente tiene ~190.000 filas y buscar texto ahí recorría la tabla
+        # ENTERA: 1 segundo medido en la VM, y dos veces por búsqueda (una para
+        # contar y otra para paginar) = ~2 segundos por cada letra buscada.
+        #
+        # Pero la fuente solo importa para las facturas que YA están en el
+        # consolidado: el OR de abajo las intersecta de todos modos. Así que se
+        # restringe primero por `factura` —que tiene índice único— y el filtro
+        # de texto cae sobre ese puñado de filas en vez de sobre 190.000. El
+        # resultado es idéntico; el tiempo baja de ~1 s a menos de 1 ms.
         sub = db.query(RadicacionCuentaRecord.factura).filter(
-            RadicacionCuentaRecord.entidad.ilike(patron) | RadicacionCuentaRecord.nit.ilike(patron)
+            RadicacionCuentaRecord.factura.in_(db.query(FacturaPreauditoriaRecord.factura)),
+            RadicacionCuentaRecord.entidad.ilike(patron) | RadicacionCuentaRecord.nit.ilike(patron),
         )
         consulta = consulta.filter(
             FacturaPreauditoriaRecord.factura.ilike(patron)
@@ -955,7 +976,7 @@ def generar_oficio_devolucion(
     oficio_id: int,
     body: Optional[OficioDevolucionIn] = None,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     o = db.get(OficioRecepcionRecord, oficio_id)
     if not o:
@@ -1062,6 +1083,26 @@ def listar_oficios_devolucion(
     }
 
 
+@router.delete("/oficios-devolucion/{dev_id}")
+def eliminar_oficio_devolucion(
+    dev_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Elimina un oficio de devolución generado por error (coordinación/admin).
+
+    Las facturas siguen devueltas: solo quedan libres para entrar en un oficio
+    nuevo, y el consecutivo vuelve a estar disponible.
+    """
+    dev = db.get(OficioDevolucionRecord, dev_id)
+    if not dev:
+        raise HTTPException(404, "Oficio de devolución no encontrado")
+    res = svc.eliminar_oficio_devolucion(db, dev)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 409), res.get("mensaje", "No se pudo eliminar"))
+    return res
+
+
 @router.get("/oficios-devolucion/{dev_id}/pdf")
 def descargar_pdf_oficio_devolucion(
     dev_id: int,
@@ -1083,6 +1124,7 @@ def descargar_pdf_oficio_devolucion(
         .all()
     )
     fecha_local = a_utc(dev.fecha_generado)
+    recibido_local = a_utc(recepcion.fecha_recibido) if recepcion else None
     filas_pdf = [
         {
             "envio": e.envio,
@@ -1102,6 +1144,7 @@ def descargar_pdf_oficio_devolucion(
         numero_radicado=recepcion.numero_radicado if recepcion else "",
         facturas=filas_pdf,
         generado_por=dev.generado_por or "",
+        fecha_recibido=recibido_local.astimezone(TZ_BOGOTA) if recibido_local else None,
     )
     return StreamingResponse(
         BytesIO(pdf),

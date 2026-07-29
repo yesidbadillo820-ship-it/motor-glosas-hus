@@ -252,6 +252,83 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 columna de recaudo de julio de los 5 consolidados y la serie mensual queda en
 0 hasta que el analista lo entregue); revisar y fusionar el PR #160.
 
+### 24 de julio de 2026 — Expediente Inteligente de Conciliación (Hoja Maestra)
+- **Nueva herramienta `tools/hoja_maestra_conciliacion.py`:** arma en un solo
+  Excel el **expediente de conciliación** del Dispensario con **un único
+  registro maestro por factura** (nada duplicado). Cruza las tres bases que ya
+  existen (no transcribe ni inventa):
+  - **CARTERA** (corte 30/06/2026) como columna vertebral: 5.571 facturas, con
+    su valor, saldo, estado de glosa, edades y lo levantado/aceptado/ratificado
+    en actas.
+  - **RECEPCIÓN DE OBJECIONES** (la glosa que puso la EPS): trae el **motivo
+    exacto de la EPS** en texto (ej. *"SE RECONOCE A TARIFA SOAT... SIN
+    CONTRATO"*), el concepto, el CUPS y el servicio.
+  - **TRÁMITE DE OBJECIÓN** (nuestra respuesta): el valor objetado, el valor
+    aceptado y el **argumento del ESE HUS** (ej. *"ESE HUS NO ACEPTA GLOSA..."*).
+    Se une a la recepción por el consecutivo (4.063 de 4.066 cruzan).
+- **El libro entregado tiene 5 hojas:** `00_DASHBOARD` (tablero con 15
+  indicadores + cartera por vigencia/estado/edades), `01_MAESTRA` (una fila por
+  factura, con resultado final a color), `02_GLOSAS` (una fila por glosa con el
+  **motivo de la EPS y nuestra respuesta lado a lado**), `03_ACTAS` (una fila
+  por factura+acta) y `04_CRUCES` (los 11 controles de consistencia).
+- **Cifras que cuadran con lo ya verificado:** glosado $7.000.506.193; aceptado
+  por IPS $1.122.029.872; **levantado a favor del HUS $707.499.754**;
+  **ratificado (pdte. conciliar) $980.141.374**; saldo pendiente DGH
+  $13.621.817.613. Total: 5.571 facturas (3.935 con glosa), 18.378 glosas (179
+  aún sin respuesta). Se excluye el acta AC000639 por ser **duplicada** de la
+  SINAC 720.
+- **Lo que ninguna base trae queda marcado PENDIENTE** (no en blanco): la
+  bandera de factura electrónica (CUFE), la normatividad citada por respuesta,
+  el valor pagado real, y las **raíces exactas Y:/X:** de los soportes (por
+  ahora se deja la ruta derivada por mes AAAAMM + la de factura electrónica
+  `\\172.16.32.83\factura_electronica_net22\AAAAMM`). Con pruebas.
+
+### 27 de julio de 2026 — Acta de conciliación de las 147 facturas (formato SINAC)
+- **Cambio de enfoque pedido por el auditor.** El expediente del 24-jul cubría
+  las 5.571 facturas de toda la cartera. El auditor lo devolvió: *"el universo
+  de trabajo son únicamente las 147 facturas que actualmente están pendientes
+  por conciliar"*. Ahora todo gira alrededor de esas 147.
+- **Identificación del universo (antes de construir nada).** Las 147 salen del
+  `HUS.xlsx` que envió el Dispensario (el mismo lote del `CONCILIACION.xlsx`):
+  **147 facturas / 444 glosas**. Se cruzaron contra el estado de cartera: **146
+  de 147 cruzan**; la única que no aparece en cartera es **HUS0000443525**. El
+  estado de glosa de las 147 confirma que todas están pendientes (98
+  ratificadas pdte. conciliar, 25 parte levantada/parte ratificada, 23 en
+  trámite DGH). Se entregó el listado `LISTADO_147_PARA_APROBAR.xlsx` para
+  revisión previa.
+- **Nueva herramienta `tools/generar_acta_conciliacion_dispensario.py`:** arma
+  el acta **sobre el archivo real del ACTA SINAC N.º 720** (no una imitación):
+  conserva logos, encabezado oficial, celdas combinadas, zona de firmas y
+  macros. Solo cambia el contenido. La tabla se expande de 11 a **444 filas**
+  sin romper el formato.
+- **Lo que quedó en el acta:** una fila por glosa, **agrupadas por factura** y
+  ordenadas de mayor a menor valor glosado (al abrir una factura se ven todas
+  sus glosas seguidas — la HUS0000452150 con sus 62). Cada fila trae el
+  **motivo exacto de la EPS** y, al lado, **nuestra respuesta completa**, más
+  código, tipificación, valores, fechas, radicados, resultado en actas
+  previas, rutas de soportes y de factura electrónica (con hipervínculo).
+- **Hoja DASHBOARD** (la primera del libro) con los 12 indicadores pedidos,
+  todos como **fórmulas vivas**: al diligenciar la mesa el tablero se
+  actualiza solo.
+- **Cifras verificadas:** 147 facturas · 444 glosas · facturado
+  **$1.267.976.805** (sin duplicar por factura) · glosado y pendiente por
+  conciliar **$317.640.524** · aceptado en trámite **$1.758.956** ·
+  recuperable **$315.881.568**. 471 fórmulas, **0 errores**.
+- **Columnas completadas con el estado de cartera** (a solicitud del auditor):
+  *VALOR ACEPTADO EN TRÁMITE* (8 facturas, $1.758.956), *CENTRO DE COSTO*
+  (444 de 444 líneas, del export de recepción) y *ABOGADO ASIGNADO* (115
+  facturas). La *CUENTA CONTABLE* quedó en **PENDIENTE**: no existe en
+  ninguna base disponible (ni en el acta 720 original).
+- **Tres hallazgos para llevar a la mesa:** (1) la entidad **no ha confirmado
+  el recibo de ninguna de las 444 respuestas**, aunque todas tienen radicado
+  de entrega; (2) **29 facturas** tienen diferencia entre el valor glosado del
+  lote y el de la cartera; (3) el lote dice que **no aceptamos nada** (RE9901)
+  pero la cartera registra **$1.758.956 aceptados** en 8 facturas — hay que
+  aclararlo antes de firmar.
+- **Documentación de entrega:** `docs/MODULO_CONCILIACION_DISPENSARIO.md`, con
+  todo el módulo (objetivo, arquitectura, funciones, flujo, riesgos,
+  pendientes y cómo fusionarlo al proyecto principal).
+
 ### Julio 2026 — Frente ADRES/FURIPS (chat "VALIDADOR ADRES", PR #173-#176)
 - **17-07:** nace el **bot validador FURIPS**: valida masivamente los TXT
   FURIPS 1 y 2 contra la Circular 022 de 2023 de la ADRES (102 + 9 campos,
@@ -813,9 +890,114 @@ corre en producción: la suite de 4.533 pruebas pasa igual que antes.
   el mismo de toda la casa). El PR #160 ahora solo aporta lo que la rama
   principal no tiene: los dos bots, sus pruebas y esta bitácora combinada.
 
+### 29-07 — Pre-auditoría: lo que escribía el auditor se perdía
+
+Día de uso real con cuatro auditores trabajando (Vanessa, Camilo, Edgar y
+Yesid) y tres arreglos que salieron de lo que ellos vieron en pantalla.
+
+**1. Las observaciones no se guardaban (PR #220, ya en producción).**
+El auditor reportó que escribían "OKAY SOPORTES" al radicar y la columna
+Observaciones del historial salía vacía en todas las facturas. La causa no
+era el historial: **el texto se descartaba en silencio**. La ventana de
+auditar tiene dos recuadros —"Motivo de la devolución" arriba y
+"Observaciones" abajo— y escribían en el de arriba, que es el que más se ve.
+Al radicar, ese motivo no se guardaba en ninguna parte.
+
+Cómo se confirmó, contra la base de producción: **0 de 55** facturas y
+**0 de 79** eventos tenían observación guardada, mientras que 4 eventos sí
+tenían motivo (todos de devoluciones). Ese contraste fue la prueba.
+
+Ahora nada de lo que escribe el auditor se descarta: si escribió solo en
+Motivo, ese texto queda como la observación; si escribió en los dos, se
+conservan ambos. Además se pueden **anotar las facturas ya radicadas** sin
+revertir la decisión (botón "✎ Guardar observación" en el historial), y los
+dos recuadros quedaron rotulados sin ambigüedad, con Observaciones primero.
+
+**2. Se pueden borrar los oficios de devolución (PR #225, ya en producción).**
+Cuando el PDF salía con el consecutivo equivocado no había forma de
+deshacerlo: el número quedaba quemado y las facturas atrapadas (con el oficio
+emitido, revertirlas está bloqueado). Ahora hay un botón 🗑 en la pestaña de
+oficios de devolución, **solo para administradores y coordinación**. Las
+facturas no cambian de decisión —siguen devueltas— y solo quedan libres para
+salir en un oficio nuevo; el consecutivo vuelve a estar disponible y el
+historial no se borra. Avisa antes: si el PDF ya se entregó a la entidad, no
+hay que eliminarlo.
+
+**3. El PDF del oficio muestra los días transcurridos (PR #228).**
+El documento solo traía la fecha de generación. Ahora el encabezado dice
+cuándo se recibió el oficio (con hora), cuándo se generó el PDF y cuántos
+días completos pasaron. **Un día solo cuenta pasadas 24 horas enteras:** del
+22 a las 2:35 p.m. al 24 a las 11:23 a.m. hay 1 día, no 2, aunque el
+calendario haya cambiado dos veces. Así el número no depende de la hora a la
+que se registró el oficio. Las fechas salen de lo guardado, no del momento de
+imprimir: reimprimir el mismo oficio meses después da el mismo documento.
+
+**4. La lentitud: eran las búsquedas (PR #230).** El auditor dijo que la
+página "se demora para sacar los datos". Se midió contra la base de
+producción antes de tocar nada, y **todo el sistema estaba sano** menos una
+cosa: las consultas del consolidado tardan entre 0 y 27 milisegundos, la red
+responde en 70, el procesador va al 0,2% y sobra memoria — pero **buscar por
+entidad tardaba 1.031 milisegundos**.
+
+La razón: la entidad y el NIT no están en el consolidado (que son 55
+facturas), sino en la tabla de la fuente, que tiene **189.452 filas**. Cada
+búsqueda las recorría todas, y lo hacía **dos veces** (una para contar y otra
+para traer la página): unos **2 segundos cada vez que alguien escribía en el
+buscador**.
+
+El arreglo: la fuente solo importa para las facturas que ya están en el
+consolidado, así que ahora se buscan primero esas —por el número de factura,
+que sí tiene índice— y el filtro de texto cae sobre ese puñado. Comprobado
+reproduciendo la tabla real: **de 73 ms a 0,1 ms**, con resultados idénticos
+en 7 patrones distintos. No cambia lo que se ve, solo cómo se llega.
+
+**Lo aprendido sobre la VM, para no volver a perder tiempo.** Los comandos
+que se intentaron primero fallaron porque en la VM el repositorio está en
+`/opt/motor-glosas` (no en la carpeta personal) y el motor corre en **Docker**,
+no como servicio de systemd. Además, **el despliegue es automático**: un
+proceso revisa cada 5 minutos si hay código nuevo y lo aplica solo. Cuidado
+con confundir las dos máquinas: si el prompt dice `@cloudshell` se está fuera
+de la VM y nada se encuentra; dentro dice `@motor-glosas`. Comando para mirar
+cómo está, desde Cloud Shell y en un solo paso:
+
+```bash
+gcloud compute ssh motor-glosas --zone=us-west1-a --tunnel-through-iap --command '
+cd /opt/motor-glosas && git log --oneline -1
+sudo docker compose ps
+free -m | head -2
+'
+```
+
 ---
 
 ## 3) PENDIENTE
+
+### Conciliación Dispensario (147 facturas objeto de mesa)
+
+1. **Revisar y aprobar el listado de las 147** (`LISTADO_147_PARA_APROBAR.xlsx`)
+   y decidir qué se hace con **HUS0000443525**, que está en el lote de glosas
+   pero **no aparece en el estado de cartera**: ¿se incluye (147) o se excluye
+   (146)? Hoy está incluida.
+2. **Aclarar la discrepancia del aceptado:** el lote dice $0 (RE9901) pero la
+   cartera registra **$1.758.956** aceptados en 8 facturas. Debe resolverse
+   antes de firmar el acta.
+3. **Revisar las 29 facturas con diferencia** entre el valor glosado del lote y
+   el de la cartera.
+4. **Confirmar las raíces exactas `Y:` / `X:`** de los soportes para cerrar la
+   columna de ubicación (hoy queda la ruta derivada por mes + PENDIENTE).
+5. **Conseguir la CUENTA CONTABLE** con contabilidad/DGH: es el único campo del
+   acta que no existe en ninguna base disponible.
+6. Plantear en la mesa que la entidad **no ha confirmado el recibo de ninguna
+   de las 444 respuestas**, pese a que todas tienen radicado de entrega.
+
+### Pre-auditoría
+0. **~~La lentitud de la página~~ — DIAGNOSTICADA Y ARREGLADA el 29-07**
+   (ver la entrada del día). Queda una sola cosa por decidir: **el buscador de
+   la pestaña Fuentes sigue lento** (recorre las 189.452 filas de la fuente, y
+   ahí es a propósito: esa pantalla existe para buscar entre TODAS las
+   facturas, no solo las del consolidado). Hacerlo rápido necesita búsqueda de
+   texto completo, que es un cambio mayor. **Preguntar al auditor si esa
+   pantalla le molesta en el día a día** antes de meterle mano.
 
 ### COOSALUD
 1. **Correr el consolidado fusionado de pertinencia** (37 facturas / 5.736

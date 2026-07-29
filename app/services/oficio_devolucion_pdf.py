@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from io import BytesIO
 
-from app.core.tz import ahora_bogota
+from app.core.tz import ahora_bogota, dias_completos
 
 RUTA_LOGO = os.path.join("static", "LOGO SINAC.png")
 RUTA_FIRMA = os.path.join("static", "firma_preauditoria.png")
@@ -51,11 +51,17 @@ def generar_pdf_oficio_devolucion(
     numero_radicado: str,
     facturas: list[dict],
     generado_por: str = "",
+    fecha_recibido=None,
 ) -> bytes:
     """Arma el PDF del oficio de devolución y devuelve los bytes.
 
     `facturas`: lista de dicts con envio, factura, fecha_factura, valor,
     nit, entidad y motivo_devolucion.
+
+    `fecha_recibido`: cuándo se recibió el oficio de recepción (con hora).
+    Junto con `fecha_generado` permite imprimir los días que la cuenta estuvo
+    en pre-auditoría. Ambas se toman de lo guardado, no del momento de
+    imprimir: reimprimir el mismo oficio meses después da el mismo documento.
     """
     from reportlab.lib import colors
     from reportlab.lib.colors import HexColor
@@ -136,10 +142,22 @@ def generar_pdf_oficio_devolucion(
     fecha_txt = ""
     if fecha_generado is not None:
         fecha_txt = fecha_generado.strftime("%d/%m/%Y")
-    meta = [
-        Paragraph(f"Consecutivo: <b>{consecutivo}</b>", st_meta),
-        Paragraph(f"Fecha: {fecha_txt}", st_meta),
-    ]
+    meta = [Paragraph(f"Consecutivo: <b>{consecutivo}</b>", st_meta)]
+    # Trazabilidad del tiempo de respuesta: cuándo llegó el oficio, cuándo se
+    # generó este documento y cuántos días completos pasaron entre lo uno y lo
+    # otro (un día solo cuenta pasadas 24 horas enteras).
+    if fecha_recibido is not None:
+        meta.append(
+            Paragraph(f"Oficio recibido: {fecha_recibido.strftime('%d/%m/%Y %H:%M')}", st_meta)
+        )
+    if fecha_generado is not None:
+        meta.append(Paragraph(f"Generado: {fecha_generado.strftime('%d/%m/%Y %H:%M')}", st_meta))
+    else:
+        meta.append(Paragraph(f"Fecha: {fecha_txt}", st_meta))
+    dias = dias_completos(fecha_recibido, fecha_generado)
+    if dias is not None:
+        unidad = "día" if dias == 1 else "días"
+        meta.append(Paragraph(f"Transcurridos: <b>{dias} {unidad}</b>", st_meta))
     cab = Table(
         [[logo, [Paragraph(TITULO, st_titulo), Spacer(1, 2), Paragraph(SUBTITULO, st_sub)], meta]],
         colWidths=[5.6 * cm, ancho_util - 5.6 * cm - 6.2 * cm, 6.2 * cm],

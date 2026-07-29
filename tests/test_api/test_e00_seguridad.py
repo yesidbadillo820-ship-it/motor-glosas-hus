@@ -409,3 +409,137 @@ class TestIpEnAuditoria:
             client = None
 
         assert _ip_del_cliente(_Req()) == "9.9.9.9"
+
+
+class TestLaCuartaPuerta:
+    """`PATCH /glosas/{id}/estado` era la más ancha de las cuatro.
+
+    Las tres de `workflow.py` ya están cerradas. Esta pone la glosa en
+    cualquiera de los once estados —incluidos LEVANTADA (el hospital ganó) y
+    ACEPTADA (el hospital desistió)— y bastaba con estar autenticado. Encima
+    guardaba `responsable="sistema"`, así que el registro no decía quién fue.
+    """
+
+    def test_viewer_no_puede_cambiar_el_estado(self, cliente, db_session):
+        _glosa(db_session, estado="RADICADA", workflow_state="RADICADA")
+        gid = db_session.query(GlosaRecord).first().id
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.patch(f"/glosas/{gid}/estado?nuevo_estado=LEVANTADA")
+        assert r.status_code == 403
+
+    def test_auditor_no_cambia_el_estado_de_otro(self, cliente, db_session):
+        _glosa(db_session, estado="RADICADA", auditor_email="otro@hus.com")
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.patch(f"/glosas/{gid}/estado?nuevo_estado=LEVANTADA")
+        assert r.status_code == 403
+
+    def test_queda_escrito_quien_lo_hizo_no_el_sistema(self, cliente, db_session):
+        _glosa(db_session, estado="RADICADA", auditor_email="ana@hus.com")
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.patch(f"/glosas/{gid}/estado?nuevo_estado=LEVANTADA")
+        assert r.status_code == 200
+        db_session.expire_all()
+        glosa = db_session.query(GlosaRecord).get(gid)
+        assert glosa.responsable != "sistema"
+        assert glosa.responsable == "ana@hus.com"
+
+
+class TestContratosNoLosBorraCualquiera:
+    """El contrato es la base de todo dictamen de esa EPS.
+
+    Borrarlo —o borrar sus cláusulas— deja a la IA sin nada literal que citar.
+    Bastaba con estar autenticado, así que un VIEWER podía hacerlo.
+    """
+
+    def test_viewer_no_borra_un_contrato(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        assert cliente.delete("/contratos/COOSALUD").status_code == 403
+
+    def test_auditor_tampoco_borra(self, cliente):
+        """Subir el contrato sí es su trabajo; borrarlo no."""
+        assert cliente.delete("/contratos/COOSALUD").status_code == 403
+
+    def test_viewer_no_sube_un_contrato(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/contratos/upsert", json={"eps": "COOSALUD", "contenido": "x"})
+        assert r.status_code == 403
+
+
+class TestPreauditoriaNoLaEscribeUnViewer:
+    """Las siete rutas que escriben en Pre-auditoría son del flujo del auditor.
+
+    La más delicada es la última: el oficio de devolución es un documento que
+    **sale del hospital** con un consecutivo. Bastaba con estar autenticado.
+    Leer el consolidado sigue abierto: leer no cambia nada.
+    """
+
+    def test_viewer_no_registra_un_oficio(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/preauditoria/oficios", json={"numero": "FHUS-1"})
+        assert r.status_code == 403
+
+    def test_viewer_no_audita_una_factura(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.patch("/preauditoria/facturas/1/auditar", json={"resultado": "RADICADA"})
+        assert r.status_code == 403
+
+    def test_viewer_no_emite_oficio_de_devolucion(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/preauditoria/oficios/1/oficio-devolucion", json={})
+        assert r.status_code == 403
+
+    def test_el_auditor_conserva_su_trabajo(self, cliente):
+        """No se cierra de más: registrar el oficio es su tarea diaria."""
+        r = cliente.post("/preauditoria/oficios", json={"numero": "FHUS-1"})
+        assert r.status_code != 403
+
+
+class TestPlantillasYNotasCredito:
+    """Tercer lote del barrido: lo compartido y lo que mueve plata.
+
+    Las plantillas son de todo el equipo: la que escribe un gestor la usan
+    todos al responder, y desactivarla se la quita a todos. La nota crédito es
+    plata que el hospital devuelve.
+    """
+
+    def test_viewer_no_crea_plantillas(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/plantillas/", json={"nombre": "x", "contenido": "y"})
+        assert r.status_code == 403
+
+    def test_auditor_si_crea_plantillas(self, cliente):
+        """Escribir una plantilla es su trabajo; no se cierra de más."""
+        r = cliente.post("/plantillas/", json={"nombre": "x", "contenido": "y"})
+        assert r.status_code != 403
+
+    def test_auditor_no_borra_una_plantilla_del_equipo(self, cliente):
+        assert cliente.delete("/plantillas/1").status_code == 403
+
+    def test_coordinador_si_la_borra(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_COORDINADOR)
+        assert cliente.delete("/plantillas/1").status_code != 403
+
+    def test_viewer_no_escribe_una_nota_credito(self, cliente, db_session):
+        _glosa(db_session, estado="ACEPTADA", valor_aceptado=100000)
+        gid = db_session.query(GlosaRecord).first().id
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.patch(f"/glosas/{gid}/nota-credito", json={"numero_nota": "NC-1"})
+        assert r.status_code == 403
+
+    def test_la_nota_credito_esta_implementada_una_sola_vez(self):
+        """Estaba dos veces: en `glosas.py` y en `nota_credito.py`.
+
+        Las dos se montaban en la misma ruta, así que servía la primera —la de
+        `glosas.py`, que además registra en auditoría— y la otra era código
+        muerto que nadie ejecutaba nunca. Nadie lo sabía: el arreglo de
+        permisos que se le hizo a la copia muerta no habría tenido efecto.
+        """
+        from app.main import app
+
+        rutas = [r for r in app.routes if getattr(r, "path", "").endswith("/nota-credito")]
+        por_metodo = {}
+        for r in rutas:
+            for m in getattr(r, "methods", set()) - {"HEAD", "OPTIONS"}:
+                por_metodo.setdefault(m, []).append(r.path)
+        duplicadas = {m: p for m, p in por_metodo.items() if len(p) > 1}
+        assert not duplicadas, f"La nota crédito volvió a estar duplicada: {duplicadas}"

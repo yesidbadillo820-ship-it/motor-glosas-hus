@@ -735,6 +735,129 @@ class TestEliminarOficio:
 
 
 # ------------------------------------------------------------------
+# Eliminar un oficio de DEVOLUCIÓN generado por error
+# ------------------------------------------------------------------
+
+
+class TestEliminarOficioDevolucion:
+    def _admin(self, db_session):
+        u = UsuarioRecord(
+            id=3,
+            nombre="ADMIN",
+            email="admin2@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        return u
+
+    def _con_devolucion(self, client):
+        """Deja una factura devuelta y su oficio de devolución generado."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _devolver(client, _factura_id(client, F1))
+        dev = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").json()
+        return o, dev
+
+    def test_auditor_no_puede_eliminar(self, client):
+        _o, dev = self._con_devolucion(client)
+        r = client.delete(f"/preauditoria/oficios-devolucion/{dev['id']}")
+        assert r.status_code == 403  # el fixture es rol AUDITOR
+
+    def test_admin_elimina_y_libera_las_facturas(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        _o, dev = self._con_devolucion(client)
+        r = client.delete(f"/preauditoria/oficios-devolucion/{dev['id']}")
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == dev["consecutivo"]
+        assert r.json()["facturas_liberadas"] == 1
+        # desaparece del listado y su PDF ya no existe
+        assert client.get("/preauditoria/oficios-devolucion").json()["total"] == 0
+        assert client.get(f"/preauditoria/oficios-devolucion/{dev['id']}/pdf").status_code == 404
+        # la factura SIGUE devuelta: no se le cambió la decisión
+        f = client.get(f"/preauditoria/facturas/{_factura_id(client, F1)}").json()
+        assert f["resultado"] == "DEVUELTA"
+        assert f["num_devoluciones"] == 1
+        assert f["oficio_devolucion_id"] is None
+
+    def test_tras_eliminar_se_puede_generar_el_oficio_de_nuevo(self, client, db_session):
+        """El caso de uso real: el consecutivo salió equivocado y hay que
+        rehacer el oficio con el número correcto."""
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        o, dev = self._con_devolucion(client)
+        client.delete(f"/preauditoria/oficios-devolucion/{dev['id']}")
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion",
+            json={"consecutivo": "77"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"].startswith("DEV-PRE-AUD-0077-")
+        assert r.json()["total_facturas"] == 1
+
+    def test_el_consecutivo_borrado_se_puede_reutilizar(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        o, dev = self._con_devolucion(client)
+        usado = dev["consecutivo"]
+        client.delete(f"/preauditoria/oficios-devolucion/{dev['id']}")
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion",
+            json={"consecutivo": usado},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == usado
+
+    def test_tras_eliminar_la_factura_se_puede_revertir(self, client, db_session):
+        """Con el oficio emitido la reversión está bloqueada; al eliminarlo,
+        la factura vuelve a poder corregirse."""
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        _o, dev = self._con_devolucion(client)
+        fid = _factura_id(client, F1)
+        bloqueada = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"}
+        )
+        assert bloqueada.status_code == 409
+        client.delete(f"/preauditoria/oficios-devolucion/{dev['id']}")
+        r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r.status_code == 200, r.text
+        assert client.get(f"/preauditoria/facturas/{fid}").json()["resultado"] == "PENDIENTE"
+
+    def test_el_historial_de_la_devolucion_no_se_borra(self, client, db_session):
+        """Queda constancia de que la factura sí fue devuelta ese día."""
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        _o, dev = self._con_devolucion(client)
+        client.delete(f"/preauditoria/oficios-devolucion/{dev['id']}")
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        devueltas = [e for e in h["eventos"] if e["tipo"] == "DEVUELTA"]
+        assert len(devueltas) == 1
+        assert devueltas[0]["motivo"]
+
+    def test_eliminar_uno_que_no_existe(self, client, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+        assert client.delete("/preauditoria/oficios-devolucion/9999").status_code == 404
+
+
+# ------------------------------------------------------------------
 # Eliminar UN envío cargado por error (solo admin/coordinador)
 # ------------------------------------------------------------------
 
@@ -1223,3 +1346,76 @@ class TestParsers:
         r = svc.parsear_excel_radicacion(sin_dim)
         assert sorted(f["factura"] for f in r["facturas"]) == sorted([F1, F2])
         assert r["leidas"] == 2
+
+
+# ------------------------------------------------------------------
+# Buscar en el consolidado (por factura, entidad o NIT)
+# ------------------------------------------------------------------
+
+
+class TestBuscarEnConsolidado:
+    """La búsqueda cruza el consolidado con la fuente, que en producción tiene
+    ~190.000 filas. La subconsulta se restringe primero a las facturas que ya
+    están en el consolidado; estas pruebas fijan que el resultado sea el mismo
+    que recorriendo la fuente entera."""
+
+    def _preparar(self, client):
+        _subir_radicacion(
+            client,
+            [
+                _rad_fila(ENV, F1, 250700, nit="860002184", entidad="AXA COLPATRIA SEGUROS S.A."),
+                _rad_fila(ENV, F2, 10615224, nit="860002400", entidad="LA PREVISORA S A"),
+                # Este envío NO se escribe: la factura queda solo en la fuente.
+                _rad_fila(
+                    "999999", F3, 73500, nit="860002184", entidad="AXA COLPATRIA SEGUROS S.A."
+                ),
+            ],
+        )
+        _subir_dgreport(client, [F1])  # con correo F.E., para poder radicarla
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+
+    def _buscar(self, client, q):
+        d = client.get(f"/preauditoria/consolidado?q={q}").json()
+        assert d["total"] == len(d["items"]), "el contador y las filas no coinciden"
+        return sorted(i["factura"] for i in d["items"])
+
+    def test_busca_por_entidad(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "AXA") == [F1]
+
+    def test_busca_por_nit(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "860002400") == [F2]
+
+    def test_busca_por_numero_de_factura(self, client):
+        self._preparar(client)
+        assert self._buscar(client, F2) == [F2]
+
+    def test_no_trae_lo_que_solo_vive_en_la_fuente(self, client):
+        """F3 tiene la MISMA entidad que F1, pero su envío nunca se escribió:
+        no está en el consolidado y no debe aparecer. Es la razón por la que
+        restringir la subconsulta no cambia el resultado."""
+        self._preparar(client)
+        assert F3 not in self._buscar(client, "AXA")
+
+    def test_no_distingue_mayusculas(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "axa") == self._buscar(client, "AXA") == [F1]
+
+    def test_coincidencia_parcial(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "PREVISORA") == [F2]
+
+    def test_sin_resultados(self, client):
+        self._preparar(client)
+        assert self._buscar(client, "SANITAS") == []
+
+    def test_se_combina_con_los_otros_filtros(self, client):
+        """Buscar 'AXA' y filtrar por radicadas no debe traer la pendiente."""
+        self._preparar(client)
+        d = client.get("/preauditoria/consolidado?q=AXA&resultado=RADICAR").json()
+        assert d["total"] == 0
+        _radicar(client, _factura_id(client, F1))
+        d = client.get("/preauditoria/consolidado?q=AXA&resultado=RADICAR").json()
+        assert [i["factura"] for i in d["items"]] == [F1]

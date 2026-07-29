@@ -97,7 +97,7 @@ def test_subir_extension_invalida(client):
 
 
 def test_subir_pagador_no_soportado(client):
-    r = subir_lote(client, pagador="SIMED")
+    r = subir_lote(client, pagador="SANITAS")
     assert r.status_code == 400
     assert "no soportado" in r.json()["detail"]
 
@@ -215,3 +215,29 @@ def test_nombre_archivo_solo_puntos_rechazado(client):
         data={"pagador": "COOSALUD", "hoja": "BASE", "incluir_calidad": "false"},
     )
     assert r.status_code == 400
+
+
+def test_catalogo_de_pagadores_encolables(client):
+    """La pantalla y el agente leen del mismo registro.
+
+    Antes esto era `{"COOSALUD"}` escrito en el servicio: el bot del
+    Dispensario existía en `tools/` y no se podía encolar sin editar tres
+    archivos y desplegar.
+    """
+    d = client.get("/lotes/pagadores").json()
+    pagadores = {p["pagador"] for p in d["pagadores"]}
+    assert {"COOSALUD", "SIMED"} <= pagadores
+    for p in d["pagadores"]:
+        assert p["ayuda"].strip(), f"{p['pagador']} no dice qué archivo subir"
+        assert p["tarea"] == f"RESPONDER_{p['pagador']}"
+
+
+def test_se_puede_encolar_un_lote_de_simed(client):
+    """El primer cobro: SIMED encolable sin escribir una línea de código."""
+    from app.services import perfiles_lote
+
+    assert perfiles_lote.obtener("SIMED") is not None
+    d = client.get("/lotes/pagadores").json()
+    simed = next(p for p in d["pagadores"] if p["pagador"] == "SIMED")
+    assert "Dispensario" in simed["nombre"]
+    assert simed["soporta_calidad"] is False
