@@ -1,0 +1,24 @@
+{
+  "_LEAME": "Apunte cada bot existente a su .bat/.py/.exe real. También puede hacerlo desde la Suite con el botón 'Registrar bot existente'. Las rutas de ejemplo deben reemplazarse.",
+  "COOSALUD": [
+    {"nombre": "HACER TODO (masivo COOSALUD)", "ruta": "C:\\RUTA\\PENDIENTE\\HACER_TODO.bat"},
+    {"nombre": "Corregir errores DGH", "ruta": "C:\\RUTA\\PENDIENTE\\CORREGIR_ERRORES_DGH.bat"},
+    {"nombre": "Robot respuesta glosas portal", "ruta": "C:\\RUTA\\PENDIENTE\\robot_coosalud.py"}
+  ],
+  "MUTUAL SER": [
+    {"nombre": "Extractor trámite de objeción", "ruta": "C:\\RUTA\\PENDIENTE\\extractor_mutualser.py"},
+    {"nombre": "Robot de carga Zona Ser", "ruta": "C:\\RUTA\\PENDIENTE\\robot_mutualser.py"}
+  ],
+  "FOMAG": [
+    {"nombre": "Robot glosas ratificadas (Horus)", "ruta": "C:\\RUTA\\PENDIENTE\\robot_fomag.py"}
+  ],
+  "DISPENSARIO MEDICO": [
+    {"nombre": "Robot SIMED respuesta glosas", "ruta": "C:\\RUTA\\PENDIENTE\\robot_simed.py"},
+    {"nombre": "Diagnóstico notas crédito", "ruta": "C:\\RUTA\\PENDIENTE\\diagnosticar_local.ps1"}
+  ],
+  "HERRAMIENTAS GENERALES": [
+    {"nombre": "UNIR_PDFS", "ruta": "C:\\RUTA\\PENDIENTE\\UNIR_PDFS.bat"},
+    {"nombre": "PDF_A_CMD", "ruta": "C:\\RUTA\\PENDIENTE\\PDF_A_CMD.cmd"},
+    {"nombre": "PARTIR_ZIP_30MB", "ruta": "C:\\RUTA\\PENDIENTE\\PARTIR_ZIP_30MB.bat"}
+  ]
+}

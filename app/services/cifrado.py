@@ -1,4 +1,4 @@
-"""Cifrado opcional de campos sensibles con Fernet (AES-128 AEAD).
+"""Cifrado de campos sensibles con Fernet (AES-128 AEAD).
 
 Activación: setear env var ``GLOSAS_ENCRYPTION_KEY`` con una clave Fernet.
 Generar con:  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -10,6 +10,19 @@ Uso:
     from app.services.cifrado import cifrar, descifrar
     dato_seguro = cifrar("nombre paciente")     # -> bytes base64 si hay key
     plano = descifrar(dato_seguro)               # -> str original
+
+──────────────────────────────────────────────────────────────────────────
+CAMPOS_CIFRADOS — el registro de la verdad (épica E00, 28-jul-2026)
+──────────────────────────────────────────────────────────────────────────
+Tener la clave configurada NO significa que algún dato esté cifrado: hay
+que además CABLEAR el cifrado en el modelo que guarda ese dato. Durante
+meses el sistema informó "cifrado_fernet: true" con solo tener la variable
+de entorno puesta, mientras este módulo no tenía un solo importador en
+producción y el nombre del paciente viajaba en texto plano.
+
+Esta tupla es la única fuente de verdad de qué está cifrado de verdad.
+Cada vez que se cablee un campo nuevo se agrega acá, y el reporte de
+capacidades del sistema (`/sistema/observabilidad`) lo refleja solo.
 """
 
 from __future__ import annotations
@@ -17,6 +30,25 @@ import os
 import logging
 
 logger = logging.getLogger("motor_glosas")
+
+#: Campos que HOY se cifran en reposo, como "tabla.columna".
+#: Vacío = ningún dato está cifrado, por más que exista GLOSAS_ENCRYPTION_KEY.
+CAMPOS_CIFRADOS: tuple[str, ...] = ()
+
+
+def hay_clave() -> bool:
+    """True si hay una clave Fernet válida configurada."""
+    return _get_fernet() is not None
+
+
+def cifrado_activo() -> bool:
+    """True solo si hay clave Y además algún campo está realmente cifrado.
+
+    Es lo que debe reportarse al usuario: la promesa de protección se
+    cumple cuando el dato viaja cifrado, no cuando la variable existe.
+    """
+    return bool(CAMPOS_CIFRADOS) and hay_clave()
+
 
 _FERNET = None
 

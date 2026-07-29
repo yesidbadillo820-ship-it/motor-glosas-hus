@@ -20,6 +20,7 @@ SINAC de los oficios de devolución (DEV-PRE-AUD-####-AAAA).
 from __future__ import annotations
 
 import re
+import threading
 import unicodedata
 from datetime import date, datetime, timedelta
 from io import BytesIO
@@ -139,7 +140,11 @@ def calcular_semaforo(
 
 
 def siguiente_consecutivo(db: Session, anio: Optional[int] = None) -> tuple[str, int, int]:
-    """Siguiente consecutivo DEV-PRE-AUD-####-AAAA (reinicia cada año)."""
+    """Siguiente consecutivo DEV-PRE-AUD-####-AAAA (reinicia cada año).
+
+    Es solo una SUGERENCIA: el consecutivo real lo lleva SINAC por fuera del
+    sistema, así que el auditor puede escribir el que corresponda.
+    """
     if anio is None:
         anio = datetime.now(TZ_BOGOTA).year
     ultimo = (
@@ -149,6 +154,79 @@ def siguiente_consecutivo(db: Session, anio: Optional[int] = None) -> tuple[str,
     )
     numero = int(ultimo or 0) + 1
     return f"{PREFIJO_CONSECUTIVO}-{numero:04d}-{anio}", numero, anio
+
+
+def interpretar_consecutivo(texto: str, anio_actual: Optional[int] = None) -> tuple[str, int, int]:
+    """Interpreta el consecutivo que escribe el auditor.
+
+    La numeración de los oficios de devolución la lleva SINAC internamente, así
+    que el auditor escribe el que va. Se acepta:
+
+      - solo el número          → "89"                    → DEV-PRE-AUD-0089-2026
+      - el consecutivo completo → "DEV-PRE-AUD-0089-2026" → se respeta
+      - cualquier otro texto    → se respeta tal cual (numeración especial)
+
+    Devuelve (consecutivo, numero, anio). Para el texto libre, `numero` viene
+    en 0: quien llama debe asignarle uno interno que no choque (ese campo solo
+    sirve para ordenar y sugerir el siguiente, no se le muestra a nadie).
+    """
+    if anio_actual is None:
+        anio_actual = datetime.now(TZ_BOGOTA).year
+    limpio = " ".join((texto or "").split()).upper()
+    if not limpio:
+        raise ValueError("Escriba el consecutivo del oficio de devolución.")
+    if len(limpio) > 60:
+        raise ValueError("El consecutivo es demasiado largo (máx. 60 caracteres).")
+
+    solo_numero = re.fullmatch(r"(\d{1,6})", limpio)
+    if solo_numero:
+        numero = int(solo_numero.group(1))
+        return f"{PREFIJO_CONSECUTIVO}-{numero:04d}-{anio_actual}", numero, anio_actual
+
+    completo = re.fullmatch(rf"{PREFIJO_CONSECUTIVO}-(\d{{1,6}})-(\d{{4}})", limpio)
+    if completo:
+        numero, anio = int(completo.group(1)), int(completo.group(2))
+        return f"{PREFIJO_CONSECUTIVO}-{numero:04d}-{anio}", numero, anio
+
+    return limpio, 0, anio_actual
+
+
+def reservar_consecutivo(db: Session, texto: Optional[str]) -> tuple[str, int, int]:
+    """Deja listo el consecutivo a usar, validando que no esté repetido.
+
+    Sin texto, toma el siguiente sugerido. Con texto, respeta lo que escribió
+    el auditor. Lanza ValueError con un mensaje claro si ya se usó.
+    """
+    if not (texto or "").strip():
+        return siguiente_consecutivo(db)
+
+    consecutivo, numero, anio = interpretar_consecutivo(texto)
+    repetido = (
+        db.query(OficioDevolucionRecord)
+        .filter(OficioDevolucionRecord.consecutivo == consecutivo)
+        .first()
+    )
+    if repetido:
+        raise ValueError(f"El consecutivo {consecutivo} ya fue usado en otro oficio de devolución.")
+
+    # `numero` solo ordena y alimenta la sugerencia siguiente; si el que se
+    # dedujo ya está ocupado (o es texto libre), se toma el primero libre.
+    ocupado = (
+        db.query(OficioDevolucionRecord.id)
+        .filter(
+            OficioDevolucionRecord.anio == anio,
+            OficioDevolucionRecord.numero == numero,
+        )
+        .first()
+    )
+    if numero <= 0 or ocupado:
+        ultimo = (
+            db.query(sa_func.max(OficioDevolucionRecord.numero))
+            .filter(OficioDevolucionRecord.anio == anio)
+            .scalar()
+        )
+        numero = int(ultimo or 0) + 1
+    return consecutivo, numero, anio
 
 
 # ==================================================================
@@ -275,6 +353,52 @@ def _misma_fecha(a, b) -> bool:
     return da == db_
 
 
+_LOCK_OPENPYXL = threading.Lock()
+
+
+def _abrir_libro(contenido: bytes):
+    """Abre el Excel en modo lectura, sin el barrido previo de dimensiones.
+
+    Los reportes de Dinámica Gerencial no declaran `<dimension>` en su XML.
+    Cuando ese dato falta, openpyxl recorre el archivo ENTERO solo para
+    averiguar su tamaño y después lo vuelve a recorrer para leerlo: con el
+    reporte real de Radicación (191.859 filas) son 12 segundos perdidos de 36.
+    Aquí solo se recorre con `iter_rows` y nunca se consultan `ws.max_row` ni
+    `ws.max_column`, así que ese primer barrido no aporta nada.
+
+    El ajuste es sobre la clase de openpyxl; se toma un candado y se restaura
+    de inmediato, de modo que solo cubre la apertura de este libro y no afecta
+    a otros cargues del sistema que sí usen las dimensiones.
+    """
+    from openpyxl import load_workbook  # import perezoso
+    from openpyxl.worksheet._read_only import ReadOnlyWorksheet
+
+    with _LOCK_OPENPYXL:
+        original = ReadOnlyWorksheet._get_size
+        ReadOnlyWorksheet._get_size = lambda self: None
+        try:
+            return load_workbook(BytesIO(contenido), data_only=True, read_only=True)
+        finally:
+            ReadOnlyWorksheet._get_size = original
+
+
+# Valores de la columna FACTURA que en realidad son encabezados o totales
+# repetidos dentro del reporte: se saltan.
+_FACTURA_NO_ES_FACTURA = {"FACTURA", "TOTAL"}
+
+
+def _es_fila_de_encabezado(factura: str) -> bool:
+    """¿El valor de la columna FACTURA es en realidad un encabezado/total?
+
+    Se evita normalizar (NFKD + expresiones regulares) en cada una de las
+    191.859 filas: un número de factura real es ASCII alfanumérico y no cambia
+    al normalizarse, así que basta compararlo directo.
+    """
+    if factura.isascii() and factura.isalnum():
+        return factura in _FACTURA_NO_ES_FACTURA
+    return _normalizar_encabezado(factura) in _FACTURA_NO_ES_FACTURA
+
+
 def _hallar_encabezado(ws, alias: dict, requeridos: set, max_filas: int = 15):
     """Busca la fila de encabezados (primeras `max_filas`) y devuelve
     (numero_fila, mapa) o (None, None) si no aparece."""
@@ -294,13 +418,23 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
     'Anulado' y, si una factura tiene varias radicaciones válidas, se conserva
     la de mayor F_RECIBIDO). {"facturas": [...], "advertencias": [...]}.
     """
-    from openpyxl import load_workbook  # import perezoso
-
-    wb = load_workbook(BytesIO(contenido), data_only=True, read_only=True)
+    wb = _abrir_libro(contenido)
     por_factura: dict[str, dict] = {}
     advertencias: list[str] = []
     anuladas = 0
     leidas = 0
+    _repetidos: dict = {}
+    # Los estados se repiten (unos pocos valores distintos en todo el archivo):
+    # se normaliza cada uno una sola vez, no una vez por fila.
+    _anulado: dict = {}
+
+    def _compartido(valor):
+        """ENTIDAD, NIT, ENVÍO y ESTADO repiten el mismo texto en miles de
+        filas. Se guarda una sola copia y todas las filas la comparten, en vez
+        de una copia por fila (importa en archivos de decenas de miles)."""
+        if valor is None:
+            return None
+        return _repetidos.setdefault(valor, valor)
 
     for ws in wb.worksheets:
         fila_hdr, mapa = _hallar_encabezado(ws, _ALIAS_RADICACION, {"factura", "envio"})
@@ -317,24 +451,29 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
                 return fila[idx]
 
             factura = (str(_celda("factura") or "").strip() or "").upper()
-            if not factura or _normalizar_encabezado(factura) in {"FACTURA", "TOTAL"}:
+            if not factura or _es_fila_de_encabezado(factura):
                 continue
             leidas += 1
             estado = _texto(_celda("estado_radicacion"))
-            if estado and _normalizar_encabezado(estado).startswith("ANULAD"):
-                anuladas += 1
-                continue
+            if estado is not None:
+                es_anulado = _anulado.get(estado)
+                if es_anulado is None:
+                    es_anulado = _normalizar_encabezado(estado).startswith("ANULAD")
+                    _anulado[estado] = es_anulado
+                if es_anulado:
+                    anuladas += 1
+                    continue
             f_recibido = _como_fecha(_celda("f_recibido"))
             registro = {
                 "factura": factura,
-                "envio": str(_celda("envio") or "").strip() or "SIN ENVÍO",
+                "envio": _compartido(str(_celda("envio") or "").strip() or "SIN ENVÍO"),
                 "f_recibido": f_recibido,
                 "f_factura": _como_fecha(_celda("f_factura")),
                 "valor": _como_valor(_celda("valor")),
-                "nit": _texto(_celda("nit")),
+                "nit": _compartido(_texto(_celda("nit"))),
                 # ENTIDAD trae espacios al final en la fuente real: strip.
-                "entidad": _texto(_celda("entidad")),
-                "estado_radicacion": estado,
+                "entidad": _compartido(_texto(_celda("entidad"))),
+                "estado_radicacion": _compartido(estado),
             }
             previo = por_factura.get(factura)
             if previo is None:
@@ -363,9 +502,7 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
 
 def parsear_excel_dgreport(contenido: bytes) -> dict:
     """Lee el Excel de DGREPORT. Devuelve una fila por factura (con correo F.E.)."""
-    from openpyxl import load_workbook
-
-    wb = load_workbook(BytesIO(contenido), data_only=True, read_only=True)
+    wb = _abrir_libro(contenido)
     por_factura: dict[str, dict] = {}
     advertencias: list[str] = []
     leidas = 0
@@ -413,104 +550,146 @@ def parsear_excel_dgreport(contenido: bytes) -> dict:
 # ==================================================================
 
 
+# Cuántas facturas se guardan por bloque en un cargue masivo.
+# El servidor del hospital tiene 1 GB de memoria: guardar las 36.723 filas de
+# un solo golpe consumía +154 MB y el sistema mataba la aplicación a mitad del
+# cargue (el auditor veía "Error 524"). Guardando por bloques el consumo se
+# mantiene plano sin importar el tamaño del archivo.
+TAM_BLOQUE_UPSERT = 2000
+
+
+def _guardar_bloque(db: Session, tocados) -> None:
+    """Confirma el bloque y suelta sus filas de la memoria.
+
+    Solo se sueltan las filas que tocó ESTE bloque: no se toca nada más que
+    la petición pueda estar usando (por ejemplo el usuario conectado).
+    """
+    db.commit()
+    for obj in tocados:
+        try:
+            if obj in db:
+                db.expunge(obj)
+        except Exception:  # pragma: no cover - defensivo
+            pass
+
+
+def _upsert_por_bloques(db: Session, filas: list[dict], aplicar) -> dict:
+    """Recorre las filas en bloques; cada bloque se guarda y se libera.
+
+    Si el proceso se interrumpe a mitad de un cargue (corte, falta de memoria),
+    lo ya guardado NO se pierde: al volver a subir el mismo archivo el cargue
+    retoma donde quedó, porque el upsert nunca duplica.
+    """
+    totales = {"nuevas": 0, "actualizadas": 0, "sin_cambio": 0}
+    for i in range(0, len(filas), TAM_BLOQUE_UPSERT):
+        parciales = aplicar(filas[i : i + TAM_BLOQUE_UPSERT])
+        for clave in totales:
+            totales[clave] += parciales[clave]
+    return totales
+
+
+def _indice_existentes(db: Session, modelo, numeros: list[str]) -> dict:
+    """Pre-carga las filas ya guardadas de esas facturas (evita N consultas)."""
+    indice = {}
+    for i in range(0, len(numeros), 900):
+        for row in db.query(modelo).filter(modelo.factura.in_(numeros[i : i + 900])):
+            indice[row.factura] = row
+    return indice
+
+
 def upsert_radicacion(db: Session, filas: list[dict], archivo: str, usuario: str) -> dict:
     """Inserta/actualiza RADICACIÓN por factura. Reporta nuevas/actualizadas/sin cambio."""
-    nuevas = actualizadas = sin_cambio = 0
     ahora = ahora_utc()
-    # Pre-cargar las existentes en un dict (evita N queries en cargues masivos).
-    numeros = [r["factura"] for r in filas]
-    indice: dict[str, RadicacionCuentaRecord] = {}
-    for i in range(0, len(numeros), 900):
-        for row in db.query(RadicacionCuentaRecord).filter(
-            RadicacionCuentaRecord.factura.in_(numeros[i : i + 900])
-        ):
-            indice[row.factura] = row
-    for r in filas:
-        existente = indice.get(r["factura"])
-        if existente is None:
-            nuevo = RadicacionCuentaRecord(
-                factura=r["factura"],
-                envio=r["envio"],
-                f_recibido=r["f_recibido"],
-                f_factura=r["f_factura"],
-                valor=r["valor"],
-                nit=r["nit"],
-                entidad=r["entidad"],
-                estado_radicacion=r.get("estado_radicacion"),
-                fuente_archivo=archivo,
-                importado_por=usuario,
-            )
-            db.add(nuevo)
-            indice[r["factura"]] = nuevo  # blinda contra la misma factura repetida en el lote
-            nuevas += 1
-        else:
-            cambio = (
-                existente.envio != r["envio"]
-                or existente.valor != r["valor"]
-                or existente.nit != r["nit"]
-                or (existente.entidad or None) != r["entidad"]
-                or not _misma_fecha(existente.f_recibido, r["f_recibido"])
-                or not _misma_fecha(existente.f_factura, r["f_factura"])
-            )
-            if cambio:
-                existente.envio = r["envio"]
-                existente.f_recibido = r["f_recibido"]
-                existente.f_factura = r["f_factura"]
-                existente.valor = r["valor"]
-                existente.nit = r["nit"]
-                existente.entidad = r["entidad"]
-                existente.estado_radicacion = r.get("estado_radicacion")
-                existente.fuente_archivo = archivo
-                existente.importado_por = usuario
-                existente.actualizado_en = ahora
-                actualizadas += 1
+
+    def aplicar(bloque: list[dict]) -> dict:
+        nuevas = actualizadas = sin_cambio = 0
+        indice = _indice_existentes(db, RadicacionCuentaRecord, [r["factura"] for r in bloque])
+        for r in bloque:
+            existente = indice.get(r["factura"])
+            if existente is None:
+                nuevo = RadicacionCuentaRecord(
+                    factura=r["factura"],
+                    envio=r["envio"],
+                    f_recibido=r["f_recibido"],
+                    f_factura=r["f_factura"],
+                    valor=r["valor"],
+                    nit=r["nit"],
+                    entidad=r["entidad"],
+                    estado_radicacion=r.get("estado_radicacion"),
+                    fuente_archivo=archivo,
+                    importado_por=usuario,
+                )
+                db.add(nuevo)
+                indice[r["factura"]] = nuevo  # misma factura repetida en el lote
+                nuevas += 1
             else:
-                sin_cambio += 1
-    db.commit()
-    return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+                cambio = (
+                    existente.envio != r["envio"]
+                    or existente.valor != r["valor"]
+                    or existente.nit != r["nit"]
+                    or (existente.entidad or None) != r["entidad"]
+                    or not _misma_fecha(existente.f_recibido, r["f_recibido"])
+                    or not _misma_fecha(existente.f_factura, r["f_factura"])
+                )
+                if cambio:
+                    existente.envio = r["envio"]
+                    existente.f_recibido = r["f_recibido"]
+                    existente.f_factura = r["f_factura"]
+                    existente.valor = r["valor"]
+                    existente.nit = r["nit"]
+                    existente.entidad = r["entidad"]
+                    existente.estado_radicacion = r.get("estado_radicacion")
+                    existente.fuente_archivo = archivo
+                    existente.importado_por = usuario
+                    existente.actualizado_en = ahora
+                    actualizadas += 1
+                else:
+                    sin_cambio += 1
+        _guardar_bloque(db, indice.values())
+        return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+
+    return _upsert_por_bloques(db, filas, aplicar)
 
 
 def upsert_dgreport(db: Session, filas: list[dict], archivo: str, usuario: str) -> dict:
     """Inserta/actualiza DGREPORT por factura."""
-    nuevas = actualizadas = sin_cambio = 0
     ahora = ahora_utc()
-    numeros = [r["factura"] for r in filas]
-    indice: dict[str, DgReportRecord] = {}
-    for i in range(0, len(numeros), 900):
-        for row in db.query(DgReportRecord).filter(
-            DgReportRecord.factura.in_(numeros[i : i + 900])
-        ):
-            indice[row.factura] = row
-    for r in filas:
-        existente = indice.get(r["factura"])
-        if existente is None:
-            nuevo = DgReportRecord(
-                factura=r["factura"],
-                correo_fe=r.get("correo_fe", "SI"),
-                fecha_correo=r.get("fecha_correo"),
-                numero_fe=r.get("numero_fe"),
-                fuente_archivo=archivo,
-                importado_por=usuario,
-            )
-            db.add(nuevo)
-            indice[r["factura"]] = nuevo
-            nuevas += 1
-        else:
-            cambio = existente.correo_fe != r.get(
-                "correo_fe", "SI"
-            ) or existente.numero_fe != r.get("numero_fe")
-            if cambio:
-                existente.correo_fe = r.get("correo_fe", "SI")
-                existente.fecha_correo = r.get("fecha_correo")
-                existente.numero_fe = r.get("numero_fe")
-                existente.fuente_archivo = archivo
-                existente.importado_por = usuario
-                existente.actualizado_en = ahora
-                actualizadas += 1
+
+    def aplicar(bloque: list[dict]) -> dict:
+        nuevas = actualizadas = sin_cambio = 0
+        indice = _indice_existentes(db, DgReportRecord, [r["factura"] for r in bloque])
+        for r in bloque:
+            existente = indice.get(r["factura"])
+            if existente is None:
+                nuevo = DgReportRecord(
+                    factura=r["factura"],
+                    correo_fe=r.get("correo_fe", "SI"),
+                    fecha_correo=r.get("fecha_correo"),
+                    numero_fe=r.get("numero_fe"),
+                    fuente_archivo=archivo,
+                    importado_por=usuario,
+                )
+                db.add(nuevo)
+                indice[r["factura"]] = nuevo
+                nuevas += 1
             else:
-                sin_cambio += 1
-    db.commit()
-    return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+                cambio = existente.correo_fe != r.get(
+                    "correo_fe", "SI"
+                ) or existente.numero_fe != r.get("numero_fe")
+                if cambio:
+                    existente.correo_fe = r.get("correo_fe", "SI")
+                    existente.fecha_correo = r.get("fecha_correo")
+                    existente.numero_fe = r.get("numero_fe")
+                    existente.fuente_archivo = archivo
+                    existente.importado_por = usuario
+                    existente.actualizado_en = ahora
+                    actualizadas += 1
+                else:
+                    sin_cambio += 1
+        _guardar_bloque(db, indice.values())
+        return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
+
+    return _upsert_por_bloques(db, filas, aplicar)
 
 
 # ==================================================================
@@ -559,6 +738,7 @@ def _nuevo_evento(
     fuente: dict,
     usuario: str,
     motivo: str = None,
+    observaciones: str = None,
     resultado: str = None,
     oficio_devolucion_id: int = None,
 ) -> FacturaEventoRecord:
@@ -576,6 +756,7 @@ def _nuevo_evento(
         resultado=resultado if resultado is not None else factura_row.resultado_actual,
         auditor=usuario,
         motivo=motivo,
+        observaciones=observaciones,
         oficio_devolucion_id=oficio_devolucion_id,
         valor_snapshot=fuente.get("valor") or 0.0,
         nit_snapshot=fuente.get("nit"),
@@ -791,21 +972,7 @@ def auditar_factura(
     )
     fuente = datos_fuente(db, canon.factura)
 
-    # Guard de estado: solo se puede radicar/devolver una factura PENDIENTE.
-    # Para cambiar una decisión ya tomada hay que revertir primero (→ PENDIENTE).
-    # Esto evita inflar el contador de devoluciones con doble clic o re-envíos.
-    if resultado in (RESULTADO_RADICAR, RESULTADO_DEVUELTA):
-        if canon.resultado_actual != RESULTADO_PENDIENTE:
-            etiqueta = "radicada" if canon.resultado_actual == RESULTADO_RADICAR else "devuelta"
-            return {
-                "ok": False,
-                "codigo": 409,
-                "mensaje": (
-                    f"La factura {canon.factura} ya fue {etiqueta} en esta ronda. "
-                    "Para cambiar la decisión, primero use 'Dejar pendiente' (revertir)."
-                ),
-            }
-
+    # --- Validaciones del proceso (antes de tocar nada) ---
     if resultado == RESULTADO_RADICAR:
         # Regla del proceso: sin soporte de facturación electrónica (CORREO
         # F.E. = NO) la factura no se puede radicar — solo devolverse.
@@ -820,6 +987,53 @@ def auditar_factura(
                     "actualizado en la pestaña Fuentes."
                 ),
             }
+    elif resultado == RESULTADO_DEVUELTA:
+        if not (motivo or "").strip():
+            return {"ok": False, "codigo": 400, "mensaje": "Para devolver debe escribir el motivo."}
+        if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+            return {
+                "ok": False,
+                "codigo": 409,
+                "mensaje": (
+                    f"La factura {canon.factura} ya fue devuelta {canon.num_devoluciones} veces; "
+                    f"el proceso acepta máximo {MAX_DEVOLUCIONES} devoluciones. Debe radicarse "
+                    "o escalarse al coordinador."
+                ),
+            }
+
+    # Guard de estado: solo se puede radicar/devolver una factura PENDIENTE.
+    # Para cambiar una decisión ya tomada hay que revertir primero (→ PENDIENTE).
+    #
+    # Se toma con una actualización condicional (un solo UPDATE ... WHERE
+    # resultado_actual = 'PENDIENTE'), no leyendo y luego escribiendo: si el
+    # auditor hace varios clics seguidos porque el servidor va lento, llegan
+    # varias peticiones a la vez y todas leerían "PENDIENTE" antes de que la
+    # primera guarde, duplicando el evento en el historial. Así solo una gana.
+    if resultado in (RESULTADO_RADICAR, RESULTADO_DEVUELTA):
+        tomada = (
+            db.query(FacturaPreauditoriaRecord)
+            .filter(
+                FacturaPreauditoriaRecord.id == canon.id,
+                FacturaPreauditoriaRecord.resultado_actual == RESULTADO_PENDIENTE,
+            )
+            .update({"resultado_actual": resultado}, synchronize_session=False)
+        )
+        if not tomada:
+            db.rollback()
+            db.refresh(canon)
+            etiqueta = "radicada" if canon.resultado_actual == RESULTADO_RADICAR else "devuelta"
+            return {
+                "ok": False,
+                "codigo": 409,
+                "mensaje": (
+                    f"La factura {canon.factura} ya fue {etiqueta} en esta ronda. "
+                    "Para cambiar la decisión, primero use 'Dejar pendiente' (revertir)."
+                ),
+            }
+        # El objeto en memoria quedó desfasado respecto de la actualización.
+        canon.resultado_actual = resultado
+
+    if resultado == RESULTADO_RADICAR:
         canon.resultado_actual = RESULTADO_RADICAR
         canon.estado = ESTADO_RADICADA if canon.ronda_actual == 1 else ESTADO_SUBSANADA
         canon.pendiente_subsanacion = 0
@@ -837,6 +1051,7 @@ def auditar_factura(
                 oficio=oficio,
                 fuente=fuente,
                 usuario=usuario,
+                observaciones=canon.observaciones,
                 resultado=RESULTADO_RADICAR,
             )
         )
@@ -844,18 +1059,6 @@ def auditar_factura(
         return {"ok": True}
 
     if resultado == RESULTADO_DEVUELTA:
-        if not (motivo or "").strip():
-            return {"ok": False, "codigo": 400, "mensaje": "Para devolver debe escribir el motivo."}
-        if canon.num_devoluciones >= MAX_DEVOLUCIONES:
-            return {
-                "ok": False,
-                "codigo": 409,
-                "mensaje": (
-                    f"La factura {canon.factura} ya fue devuelta {canon.num_devoluciones} veces; "
-                    f"el proceso acepta máximo {MAX_DEVOLUCIONES} devoluciones. Debe radicarse "
-                    "o escalarse al coordinador."
-                ),
-            }
         canon.num_devoluciones += 1
         canon.resultado_actual = RESULTADO_DEVUELTA
         canon.motivo_ultima_devolucion = motivo.strip()
@@ -880,6 +1083,7 @@ def auditar_factura(
                 fuente=fuente,
                 usuario=usuario,
                 motivo=motivo.strip(),
+                observaciones=canon.observaciones,
                 resultado=RESULTADO_DEVUELTA,
             )
         )
@@ -924,43 +1128,38 @@ def auditar_factura(
 # ==================================================================
 
 
-def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
-    """Elimina un oficio de recepción con salvaguardas.
+def _facturas_en_pdf_emitido(db: Session, facturas: list, oficio_id: int) -> list[str]:
+    """Facturas del lote que ya salieron en un oficio de devolución emitido.
 
-    - Si alguna de sus facturas ya salió en un oficio de devolución (PDF con
-      consecutivo emitido), NO se elimina: devuelve el motivo.
-    - Facturas de ronda 1 (nacieron en este oficio): se borran con sus eventos.
-    - Facturas en subsanación (ronda 2+, reingresaron aquí): NO se borran; se
-      revierte el reingreso y vuelven a su estado DEVUELTA anterior, con su
-      historial intacto.
-    - Se liberan los envíos del ledger para poder re-escribirlos.
+    Mientras exista una de estas, no se puede deshacer nada: el PDF ya se
+    entregó a la entidad y debe seguir cuadrando con el sistema.
     """
-    facturas = (
-        db.query(FacturaPreauditoriaRecord)
-        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio.id)
-        .all()
-    )
     con_pdf = [f.factura for f in facturas if f.oficio_devolucion_id]
-    en_pdf_por_evento = (
-        db.query(FacturaEventoRecord.factura)
-        .filter(
-            FacturaEventoRecord.oficio_id == oficio.id,
-            FacturaEventoRecord.oficio_devolucion_id.isnot(None),
+    ids = {f.id for f in facturas}
+    if ids:
+        sellados = (
+            db.query(FacturaEventoRecord.factura)
+            .filter(
+                FacturaEventoRecord.oficio_id == oficio_id,
+                FacturaEventoRecord.oficio_devolucion_id.isnot(None),
+                FacturaEventoRecord.factura_id.in_(ids),
+            )
+            .all()
         )
-        .all()
-    )
-    con_pdf += [r[0] for r in en_pdf_por_evento]
-    if con_pdf:
-        return {
-            "ok": False,
-            "codigo": 409,
-            "mensaje": (
-                f"El oficio {oficio.numero_radicado} tiene factura(s) en un oficio de "
-                f"devolución ya emitido ({', '.join(sorted(set(con_pdf))[:5])}...): "
-                "no se puede eliminar."
-            ),
-        }
+        con_pdf += [r[0] for r in sellados]
+    return sorted(set(con_pdf))
 
+
+def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int, int]:
+    """Deshace la carga de esas facturas en ese oficio.
+
+    - Ronda 1 (nacieron aquí): se borran con sus eventos.
+    - Ronda 2+ (reingresaron aquí para subsanar): NO se borran; se revierte el
+      reingreso y vuelven a su estado DEVUELTA anterior, con su historial
+      intacto.
+
+    Devuelve (borradas, revertidas).
+    """
     borradas = 0
     revertidas = 0
     for f in facturas:
@@ -977,14 +1176,14 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
                 .filter(
                     FacturaEventoRecord.factura_id == f.id,
                     FacturaEventoRecord.tipo_evento.in_(["DEVUELTA", "NUEVAMENTE_DEVUELTA"]),
-                    FacturaEventoRecord.oficio_id != oficio.id,
+                    FacturaEventoRecord.oficio_id != oficio_id,
                 )
                 .order_by(FacturaEventoRecord.creado_en.desc(), FacturaEventoRecord.id.desc())
                 .first()
             )
             db.query(FacturaEventoRecord).filter(
                 FacturaEventoRecord.factura_id == f.id,
-                FacturaEventoRecord.oficio_id == oficio.id,
+                FacturaEventoRecord.oficio_id == oficio_id,
             ).delete(synchronize_session=False)
             f.ronda_actual -= 1
             f.num_subsanacion = max(0, f.ronda_actual - 1)
@@ -1005,7 +1204,33 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
                 f.motivo_ultima_devolucion = evento_dev.motivo
                 f.fecha_auditoria = evento_dev.creado_en
             revertidas += 1
+    return borradas, revertidas
 
+
+def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
+    """Elimina un oficio de recepción mal registrado, con salvaguardas.
+
+    Si alguna de sus facturas ya salió en un oficio de devolución emitido, no
+    se elimina. Los envíos quedan libres para volver a escribirse.
+    """
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio.id)
+        .all()
+    )
+    con_pdf = _facturas_en_pdf_emitido(db, facturas, oficio.id)
+    if con_pdf:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El oficio {oficio.numero_radicado} tiene factura(s) en un oficio de "
+                f"devolución ya emitido ({', '.join(con_pdf[:5])}...): "
+                "no se puede eliminar."
+            ),
+        }
+
+    borradas, revertidas = _deshacer_facturas(db, facturas, oficio.id)
     envios = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.oficio_id == oficio.id).all()
     for e in envios:
         db.delete(e)
@@ -1018,6 +1243,65 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
         "facturas_borradas": borradas,
         "subsanaciones_revertidas": revertidas,
         "envios_liberados": len(envios),
+    }
+
+
+def eliminar_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dict:
+    """Deshace UN envío cargado por error, sin tocar el resto del oficio.
+
+    Sirve para cuando el gestor escribe un número de envío equivocado: se
+    borran las facturas que entraron con ese envío (o se revierte su
+    reingreso si venían de una devolución) y el envío queda libre para
+    volver a escribirse, aquí o en otro oficio.
+
+    No se puede deshacer si alguna de esas facturas ya salió en un oficio de
+    devolución con consecutivo emitido.
+    """
+    envio = (envio or "").strip()
+    cargado = (
+        db.query(EnvioCargadoRecord)
+        .filter(
+            EnvioCargadoRecord.oficio_id == oficio.id,
+            EnvioCargadoRecord.envio == envio,
+        )
+        .first()
+    )
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(
+            FacturaPreauditoriaRecord.oficio_actual_id == oficio.id,
+            FacturaPreauditoriaRecord.envio_actual == envio,
+        )
+        .all()
+    )
+    if cargado is None and not facturas:
+        return {
+            "ok": False,
+            "codigo": 404,
+            "mensaje": f"El envío {envio} no está cargado en el oficio {oficio.numero_radicado}.",
+        }
+
+    con_pdf = _facturas_en_pdf_emitido(db, facturas, oficio.id)
+    if con_pdf:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El envío {envio} tiene factura(s) en un oficio de devolución ya "
+                f"emitido ({', '.join(con_pdf[:5])}...): no se puede eliminar."
+            ),
+        }
+
+    borradas, revertidas = _deshacer_facturas(db, facturas, oficio.id)
+    if cargado is not None:
+        db.delete(cargado)
+    db.commit()
+    return {
+        "ok": True,
+        "envio": envio,
+        "radicado": oficio.numero_radicado,
+        "facturas_borradas": borradas,
+        "subsanaciones_revertidas": revertidas,
     }
 
 

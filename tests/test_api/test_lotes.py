@@ -55,11 +55,15 @@ def client(db_session, usuario, monkeypatch):
 def subir_lote(client, contenido: bytes | None = None, **data):
     payload = {"pagador": "COOSALUD", "hoja": "BASE", "incluir_calidad": "false"}
     payload.update(data)
-    if contenido is None:
-        contenido = excel_bytes()
     return client.post(
         "/lotes/",
-        files={"archivo": ("lote.xlsx", contenido, "application/octet-stream")},
+        files={
+            "archivo": (
+                "lote.xlsx",
+                excel_bytes() if contenido is None else contenido,
+                "application/octet-stream",
+            )
+        },
         data=payload,
     )
 
@@ -121,10 +125,11 @@ def test_agente_deshabilitado_sin_token_configurado(client, monkeypatch):
 
 
 def test_flujo_completo_del_agente(client):
-    # openpyxl incrusta la hora de creación: dos llamadas a excel_bytes() en
-    # segundos distintos dan bytes distintos. Se compara contra lo subido.
+    # Se guarda el contenido subido para compararlo después: openpyxl estampa
+    # la hora actual dentro del .xlsx, así que generar el archivo dos veces da
+    # bytes distintos si las dos llamadas caen en segundos diferentes.
     contenido = excel_bytes()
-    lote_id = subir_lote(client, contenido=contenido).json()["id"]
+    lote_id = subir_lote(client, contenido).json()["id"]
     headers = {"X-Agente-Token": TOKEN}
 
     # Sin reclamar, el excel de una tarea inexistente es 404

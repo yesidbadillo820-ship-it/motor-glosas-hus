@@ -267,6 +267,23 @@
   <button class="cerrar" onclick="cerrarModal('m-hist')">✕</button>
   <h3 id="mh-titulo">Historial</h3><div id="mh-cuerpo"></div></div></div>
 
+<!-- MODAL generar oficio de devolución (consecutivo escrito por el auditor) -->
+<div class="modal-fondo" id="m-gendev"><div class="modal">
+  <button class="cerrar" onclick="cerrarModal('m-gendev')">✕</button>
+  <h3>📄 Generar oficio de devolución</h3>
+  <p class="sub">Se incluirán las facturas DEVUELTAS de este oficio que aún no tengan
+    oficio de devolución emitido.</p>
+  <label class="campo">Consecutivo del oficio
+    <input id="gd-consec" placeholder="DEV-PRE-AUD-0089-2026" autocomplete="off"></label>
+  <p class="leyenda" id="gd-sug"></p>
+  <p class="leyenda">Puede escribir solo el número (<b>89</b>) y se completa como
+    DEV-PRE-AUD-0089-<span id="gd-anio"></span>, o el consecutivo completo.</p>
+  <div style="margin-top:12px">
+    <button class="btn btn-rojo" onclick="confirmarGenerarDev()">Generar oficio</button>
+    <button class="btn btn-borde" onclick="cerrarModal('m-gendev')">Cancelar</button></div>
+  <div id="gd-msg"></div>
+</div></div>
+
 <!-- MODAL limpiar todo (solo administradores) -->
 <div class="modal-fondo" id="m-limpiar"><div class="modal">
   <button class="cerrar" onclick="cerrarModal('m-limpiar')">✕</button>
@@ -299,6 +316,11 @@ if (ES_ADMIN) {
     var z=document.getElementById('zona-admin'); if(z) z.style.display='block';
   });
 }
+document.addEventListener('DOMContentLoaded', function(){
+  var a=document.getElementById('gd-anio'); if(a) a.textContent=new Date().getFullYear();
+  var c=document.getElementById('gd-consec');
+  if(c) c.addEventListener('keydown', function(ev){ if(ev.key==='Enter') confirmarGenerarDev(); });
+});
 function salir(){ localStorage.removeItem('hus_token'); localStorage.removeItem('hus_user'); location.href='/'; }
 function authH(extra){ return Object.assign({'Authorization':'Bearer '+TOKEN}, extra||{}); }
 async function api(url, opts){
@@ -318,6 +340,18 @@ function cerrarModal(id){ document.getElementById(id).classList.remove('on'); }
 function abrirModal(id){ document.getElementById(id).classList.add('on'); }
 function semHtml(s){ if(!s) return ''; var x=''; if(s.estado==='VENCIDO') x=' hace '+s.dias_vencido+'d'; else if(s.estado!=='COMPLETADO') x=' · '+s.dias_habiles_restantes+'d'; return '<span class="sem sem-'+s.estado+'">'+s.estado+x+'</span>'; }
 function estadoChip(e){ return '<span class="chip e-'+e+'">'+esc((e||'').replace(/_/g,' '))+'</span>'; }
+// Si un refresco falla (servidor ocupado, sesión caída), la tabla lo DICE en
+// vez de quedarse callada mostrando datos viejos, que era lo que obligaba a
+// recargar la página a mano para saber si algo se había guardado.
+function errorTabla(idTabla, columnas, e){
+  var tb=document.getElementById(idTabla);
+  if(tb) tb.innerHTML='<tr><td colspan="'+columnas+'" style="text-align:center;color:var(--rojo)">'+
+    'No se pudo actualizar: '+esc(e.message)+' · <a href="javascript:location.reload()">reintentar</a></td></tr>';
+}
+function cargandoTabla(idTabla, columnas){
+  var tb=document.getElementById(idTabla);
+  if(tb) tb.innerHTML='<tr><td colspan="'+columnas+'" style="text-align:center;color:var(--gris)">Cargando…</td></tr>';
+}
 function pager(el,data,fn){ var p=Math.max(1,Math.ceil(data.total/data.per_page)); el.innerHTML='<button class="btn btn-borde btn-chico" '+(data.page<=1?'disabled':'')+' onclick="'+fn+'('+(data.page-1)+')">←</button> Pág '+data.page+'/'+p+' ('+data.total+') <button class="btn btn-borde btn-chico" '+(data.page>=p?'disabled':'')+' onclick="'+fn+'('+(data.page+1)+')">→</button>'; }
 
 function verTab(btn){
@@ -387,15 +421,16 @@ async function crearOficio(){
     var o=await api('/preauditoria/oficios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({numero_radicado:rad,fecha_recibido:fec})});
     msg.innerHTML='<div class="aviso aviso-ok">Oficio <b>'+esc(o.numero_radicado)+'</b> registrado. Ahora escriba los números de envío.</div>';
     document.getElementById('of-radicado').value='';
-    cargarOficios(); abrirOficio(o.id);
+    await cargarOficios(); abrirOficio(o.id);
   }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
 async function cargarOficios(page){
   var url='/preauditoria/oficios?page='+(page||1)+'&per_page=20';
   var q=document.getElementById('fo-q').value.trim(), est=document.getElementById('fo-estado').value;
   if(q) url+='&q='+encodeURIComponent(q); if(est) url+='&estado='+est;
+  var cols = ES_ADMIN ? 12 : 11;
+  cargandoTabla('tb-oficios', cols);
   try{ var d=await api(url); var tb=document.getElementById('tb-oficios');
-    var cols = ES_ADMIN ? 12 : 11;
     if(!d.items.length){ tb.innerHTML='<tr><td colspan="'+cols+'" style="text-align:center;color:var(--gris)">Sin oficios</td></tr>'; }
     else tb.innerHTML=d.items.map(function(o){
       var envs=o.envios_escritos.map(function(e){return esc(e.envio)+'('+e.total_facturas+')';}).join(' ');
@@ -415,9 +450,14 @@ async function cargarOficios(page){
         '</td></tr>';
     }).join('');
     pager(document.getElementById('pg-oficios'),d,'cargarOficios');
-  }catch(e){ console.error(e); }
+  }catch(e){ errorTabla('tb-oficios', cols, e); }
 }
+// Qué oficio está abierto en pantalla, para poder refrescarlo después de
+// auditar una de sus facturas (si no, la ventana se queda con datos viejos y
+// tocaba recargar la página para ver el cambio).
+var OFICIO_ABIERTO = null;
 async function abrirOficio(id){
+  OFICIO_ABIERTO = id;
   try{ var o=await api('/preauditoria/oficios/'+id);
     document.getElementById('mo-titulo').textContent='Oficio '+o.numero_radicado;
     var filas=(o.facturas||[]).map(function(f){
@@ -426,8 +466,14 @@ async function abrirOficio(id){
         '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
         '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button></td></tr>';
     }).join('');
+    var envios=(o.envios_escritos||[]).map(function(e){
+      return '<span class="chip" style="margin:2px 4px 2px 0">'+esc(e.envio)+' ('+e.total_facturas+')'+
+        (ES_ADMIN?' <a href="javascript:eliminarEnvio('+o.id+',\''+esc(e.envio)+'\')" title="Quitar este envío del oficio" style="color:var(--rojo);font-weight:700">✕</a>':'')+
+        '</span>';
+    }).join('');
     document.getElementById('mo-cuerpo').innerHTML=
       '<p>Recibido: <b>'+fBog(o.fecha_recibido)+'</b> &nbsp;'+semHtml(o.semaforo)+'</p>'+
+      (envios?'<p class="leyenda">Envíos cargados: '+envios+(ES_ADMIN?'<br>La ✕ quita un envío cargado por error (solo administradores).':'')+'</p>':'')+
       '<div style="margin:12px 0;padding:12px;background:var(--azul-claro);border-radius:8px;">'+
         '<b><span class="paso">4</span> Escribir un número de envío</b><br>'+
         '<p class="leyenda">El sistema traerá TODAS las facturas de ese envío desde las fuentes.</p>'+
@@ -438,8 +484,11 @@ async function abrirOficio(id){
       (o.total_facturas?
         '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+'</p>'+
         '<div class="tbl-scroll" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Factura</th><th>Envío</th><th>Valor</th><th>F.E.</th><th>Estado</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
-        '<div style="margin-top:12px"><button class="btn btn-rojo" '+(o.devueltas?'':'disabled')+' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
+        '<div style="margin-top:12px"><button class="btn btn-rojo" '+
+          (o.devueltas?'':'disabled title="Este oficio no tiene facturas devueltas"')+
+          ' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
         (o.tiene_adres ? ' <button class="btn btn-verde" title="Excel con la información completa que exige ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ Excel ADRES</button>' : '')+
+        (o.devueltas?'':'<p class="leyenda">El oficio de devolución solo se puede generar cuando hay al menos una factura <b>devuelta</b>: es la carta con la que se le regresan las facturas a la entidad. Este oficio tiene '+o.radicar+' radicada(s) y '+o.pendientes+' pendiente(s), ninguna devuelta.</p>')+
         '</div>'
         : '<p class="leyenda">Aún no ha cargado envíos en este oficio.</p>');
     abrirModal('m-oficio');
@@ -466,17 +515,28 @@ async function commitEnvio(id){
     (d.advertencias||[]).forEach(function(a){ h+='<div class="aviso aviso-warn">'+esc(a)+'</div>'; });
     msg.innerHTML=h;
     document.getElementById('env-num').value='';
-    cargarOficios(); setTimeout(function(){ abrirOficio(id); },700);
+    await Promise.all([cargarOficios(), cargarConsolidado()]);
+    abrirOficio(id);
   }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
 function selTodos(chk){
   document.querySelectorAll('.sel-oficio').forEach(function(c){ c.checked = chk.checked; });
 }
+async function eliminarEnvio(oficioId, envio){
+  if(!confirm('¿Quitar el envío '+envio+' de este oficio?\n\nSe borran las facturas que entraron con ese envío (las que ya venían de una devolución vuelven a su estado anterior) y el envío queda libre para volver a escribirlo.')) return;
+  try{
+    var d=await api('/preauditoria/oficios/'+oficioId+'/envios/'+encodeURIComponent(envio),{method:'DELETE'});
+    alert('Envío '+d.envio+' eliminado ('+d.facturas_borradas+' factura(s) borradas'+
+      (d.subsanaciones_revertidas?', '+d.subsanaciones_revertidas+' subsanación(es) revertida(s)':'')+').');
+    await Promise.all([cargarOficios(), cargarConsolidado()]);
+    abrirOficio(oficioId);
+  }catch(e){ alert(e.message); }
+}
 async function eliminarOficio(id, radicado){
   if(!confirm('¿Eliminar el oficio '+radicado+'? Se borran sus facturas pendientes y se liberan sus envíos. Esta acción no se puede deshacer.')) return;
   try{ var d=await api('/preauditoria/oficios/'+id, {method:'DELETE'});
     alert('Oficio '+d.radicado+' eliminado ('+d.facturas_borradas+' facturas, '+d.envios_liberados+' envíos liberados'+(d.subsanaciones_revertidas?', '+d.subsanaciones_revertidas+' subsanaciones revertidas':'')+').');
-    cargarOficios(); cargarConsolidado();
+    await Promise.all([cargarOficios(), cargarConsolidado()]);
   }catch(e){ alert(e.message); }
 }
 async function eliminarSeleccionados(){
@@ -487,15 +547,33 @@ async function eliminarSeleccionados(){
       headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids:ids})});
     var msg='Eliminados: '+d.eliminados.length;
     if(d.rechazados.length) msg += '\nNo eliminados:\n'+d.rechazados.map(function(r){return ' - id '+r.id+': '+r.motivo;}).join('\n');
-    alert(msg); cargarOficios(); cargarConsolidado();
+    alert(msg); await Promise.all([cargarOficios(), cargarConsolidado()]);
   }catch(e){ alert(e.message); }
 }
+var _devOficioId = null;
 async function generarDev(id){
-  if(!confirm('¿Generar el oficio de devolución con las facturas DEVUELTAS de este oficio? Se asigna el siguiente consecutivo SINAC.')) return;
-  try{ var d=await api('/preauditoria/oficios/'+id+'/oficio-devolucion',{method:'POST'});
+  _devOficioId = id;
+  document.getElementById('gd-msg').innerHTML='';
+  var inp=document.getElementById('gd-consec');
+  inp.value='';
+  abrirModal('m-gendev');
+  try{ var s=await api('/preauditoria/consecutivo-sugerido');
+    inp.value=s.consecutivo;
+    document.getElementById('gd-sug').textContent='Según lo registrado aquí seguiría el '+s.consecutivo+', pero escriba el que corresponda.';
+  }catch(e){ document.getElementById('gd-sug').textContent=''; }
+  inp.focus(); inp.select();
+}
+async function confirmarGenerarDev(){
+  var consec=document.getElementById('gd-consec').value.trim(), msg=document.getElementById('gd-msg');
+  if(!consec){ msg.innerHTML='<div class="aviso aviso-err">Escriba el consecutivo del oficio.</div>'; return; }
+  msg.innerHTML='<div class="aviso aviso-warn">Generando…</div>';
+  try{ var d=await api('/preauditoria/oficios/'+_devOficioId+'/oficio-devolucion',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({consecutivo:consec})});
+    cerrarModal('m-gendev');
     alert('Oficio generado: '+d.consecutivo+' ('+d.total_facturas+' facturas)');
-    verPdf(d.pdf_url); cerrarModal('m-oficio'); cargarDevoluciones();
-  }catch(e){ alert(e.message); }
+    verPdf(d.pdf_url); cerrarModal('m-oficio');
+    await Promise.all([cargarDevoluciones(), cargarOficios(), cargarConsolidado()]);
+  }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
 
 // ---------- consolidado ----------
@@ -507,6 +585,7 @@ async function cargarConsolidado(page){
   if(v('fc-envio')) url+='&envio='+encodeURIComponent(v('fc-envio'));
   if(v('fc-aud')) url+='&auditor='+encodeURIComponent(v('fc-aud'));
   if(document.getElementById('fc-rein').checked) url+='&solo_reincidentes=true';
+  cargandoTabla('tb-consolidado', 11);
   try{ var d=await api(url); var tb=document.getElementById('tb-consolidado');
     if(!d.items.length){ tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--gris)">Sin facturas</td></tr>'; }
     else tb.innerHTML=d.items.map(function(f){
@@ -518,7 +597,7 @@ async function cargarConsolidado(page){
         '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">👁 Ver</button></td></tr>';
     }).join('');
     pager(document.getElementById('pg-consolidado'),d,'cargarConsolidado');
-  }catch(e){ console.error(e); }
+  }catch(e){ errorTabla('tb-consolidado', 11, e); }
 }
 function exportarConsolidado(){ verPdf('/preauditoria/consolidado/export.xlsx', true); }
 
@@ -534,18 +613,49 @@ async function abrirAuditar(id){
       (limite?'<div class="aviso aviso-err">⚠️ Agotó las '+f.max_devoluciones+' devoluciones: debe radicarse o escalarse.</div>':'')+
       (sinFE?'<div class="aviso aviso-err">🚫 Sin soporte de <b>facturación electrónica</b> (Correo F.E. = NO): solo puede DEVOLVERSE. Si el soporte ya existe, suba el Formato Facturación Electrónica actualizado en Fuentes.</div>':'')+
       (f.motivo_devolucion?'<p class="leyenda">Motivo actual: '+esc(f.motivo_devolucion)+'</p>':'')+
-      '<label class="campo" style="margin:10px 0">Motivo de la devolución (obligatorio si devuelve)<textarea id="au-motivo" rows="4" style="width:100%">'+esc(f.motivo_devolucion||'')+'</textarea></label>'+
-      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
+      '<label class="campo" style="margin:10px 0">Motivo de la devolución (obligatorio si devuelve)<textarea id="au-motivo" rows="3" style="width:100%">'+esc(f.motivo_devolucion||'')+'</textarea></label>'+
+      '<label class="campo" style="margin:10px 0">Observaciones (se guardan siempre, también al radicar)<textarea id="au-obs" rows="3" style="width:100%">'+esc(f.observaciones||'')+'</textarea></label>'+
+      '<div id="au-msg"></div>'+
+      '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
         '<button class="btn btn-rojo" '+(limite?'disabled':'')+' onclick="auditar('+f.id+',\'DEVUELTA\')">✖ Devolver</button>'+
         '<button class="btn btn-borde" onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
   }catch(e){ document.getElementById('ma-cuerpo').innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
+// Evita que un doble clic (o clics repetidos porque el servidor va lento)
+// mande la misma decisión varias veces y duplique el historial.
+var _auditando = false;
 async function auditar(id,resultado){
-  try{ await api('/preauditoria/facturas/'+id+'/auditar',{method:'PATCH',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({resultado:resultado, motivo_devolucion:(document.getElementById('au-motivo')||{}).value||null})});
-    cerrarModal('m-auditar'); cargarConsolidado(); cargarOficios();
-  }catch(e){ alert(e.message); }
+  if(_auditando) return;
+  _auditando = true;
+  var botones = document.querySelectorAll('#au-botones button');
+  // Se recuerda cuáles ya estaban bloqueados (sin F.E. o en el tope de
+  // devoluciones) para no habilitarlos por error si algo falla.
+  botones.forEach(function(b){ b.dataset.bloqueado = b.disabled ? '1' : ''; b.disabled = true; });
+  var msg = document.getElementById('au-msg');
+  if(msg) msg.innerHTML = '<div class="aviso aviso-warn">Guardando… no cierre esta ventana.</div>';
+  try{
+    await api('/preauditoria/facturas/'+id+'/auditar',{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        resultado: resultado,
+        motivo_devolucion: (document.getElementById('au-motivo')||{}).value || null,
+        observaciones: (document.getElementById('au-obs')||{}).value || null
+      })});
+    if(msg) msg.innerHTML = '<div class="aviso aviso-ok">Guardado.</div>';
+    cerrarModal('m-auditar');
+    var tareas = [cargarConsolidado(), cargarOficios()];
+    // Si se auditó desde la ventana del oficio, esa ventana también se
+    // refresca: así se ven al instante los contadores (Pend/OK/Dev) y se
+    // habilita el botón del oficio de devolución cuando ya hay devueltas.
+    if(document.getElementById('m-oficio').classList.contains('on') && OFICIO_ABIERTO){
+      tareas.push(abrirOficio(OFICIO_ABIERTO));
+    }
+    await Promise.all(tareas);
+  }catch(e){
+    if(msg) msg.innerHTML = '<div class="aviso aviso-err">'+esc(e.message)+'</div>';
+    else alert(e.message);
+    botones.forEach(function(b){ b.disabled = b.dataset.bloqueado === '1'; });
+  }finally{ _auditando = false; }
 }
 async function verHist(numero){
   try{ var d=await api('/preauditoria/facturas/'+encodeURIComponent(numero)+'/historial');
@@ -553,10 +663,13 @@ async function verHist(numero){
     var filas=d.eventos.map(function(e){
       return '<tr><td><span class="chip chip-ronda">R'+e.ronda+'</span></td><td>'+esc(e.tipo)+'</td>'+
         '<td class="mono">'+esc(e.oficio_fhus||'—')+'</td><td>'+esc(e.envio||'—')+'</td>'+
-        '<td>'+esc(e.auditor||'—')+'</td><td>'+fBog(e.fecha)+'</td><td style="max-width:240px">'+esc(e.motivo||'—')+'</td></tr>';
+        '<td>'+esc(e.auditor||'—')+'</td><td>'+fBog(e.fecha)+'</td>'+
+        '<td style="max-width:220px">'+esc(e.motivo||'—')+'</td>'+
+        '<td style="max-width:220px">'+esc(e.observaciones||'—')+'</td></tr>';
     }).join('');
     document.getElementById('mh-cuerpo').innerHTML='<p>'+estadoChip(d.actual.estado)+' · Devoluciones <b>'+d.actual.num_devoluciones+'</b> · Subsanación '+d.actual.num_subsanacion+'</p>'+
-      '<div class="tbl-scroll"><table><thead><tr><th>Ronda</th><th>Evento</th><th>Oficio</th><th>Envío</th><th>Auditor</th><th>Fecha</th><th>Motivo</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
+      (d.actual.observaciones?'<div class="aviso aviso-ok"><b>Observación actual:</b> '+esc(d.actual.observaciones)+'</div>':'')+
+      '<div class="tbl-scroll"><table><thead><tr><th>Ronda</th><th>Evento</th><th>Oficio</th><th>Envío</th><th>Auditor</th><th>Fecha</th><th>Motivo</th><th>Observaciones</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
     abrirModal('m-hist');
   }catch(e){ alert(e.message); }
 }
@@ -571,7 +684,7 @@ async function cargarDevoluciones(page){
         '<td>'+esc(o.generado_por||'—')+'</td><td><button class="btn btn-borde btn-chico" onclick="verPdf(\''+o.pdf_url+'\')">📄 PDF</button></td></tr>';
     }).join('');
     pager(document.getElementById('pg-devoluciones'),d,'cargarDevoluciones');
-  }catch(e){ console.error(e); }
+  }catch(e){ errorTabla('tb-devoluciones', 7, e); }
 }
 async function verPdf(url,descargar,nombre){
   try{ var r=await fetch(url,{headers:authH()});

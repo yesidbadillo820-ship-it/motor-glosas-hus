@@ -32,34 +32,17 @@ router = APIRouter(prefix="/tarifas-contratadas", tags=["Tarifas Contratadas"])
 
 
 def _normalizar_valor(v: str) -> float:
-    """Parsea un string con formato COP (puntos/comas/signo peso) a float."""
-    if not v:
-        return 0.0
-    s = str(v).strip().replace("$", "").replace(" ", "")
-    # Excel exporta "1.500.000" o "1,500,000" — normalizar a int
-    # Si trae "," y "." → el último es decimal (formato europeo o US)
-    if "," in s and "." in s:
-        if s.rfind(",") > s.rfind("."):
-            # formato europeo: 1.500,00 → 1500.00
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            # formato US: 1,500.00 → 1500.00
-            s = s.replace(",", "")
-    else:
-        # Solo puntos o solo comas: pueden ser miles o decimal.
-        # Si hay UN solo punto/coma seguido de 1-2 digitos al final → decimal.
-        # Caso contrario (múltiples o más de 2 dígitos tras) → miles.
-        import re as _rex
+    """Parsea un string con formato COP (puntos/comas/signo peso) a float.
 
-        match_dec = _rex.match(r"^(\d+)[\.,](\d{1,2})$", s)
-        if match_dec:
-            s = f"{match_dec.group(1)}.{match_dec.group(2)}"
-        else:
-            s = s.replace(".", "").replace(",", "")
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+    E01 — Principio N.º 1 (SINAC CORE primero): delega en el parser único del
+    núcleo (`app.utils.moneda.parse_valor_cop`). Era una copia literal de la de
+    `tarifas_excel_parser`, con el mismo par de puntos ciegos: el separador de
+    miles con apóstrofo (`1'500.000`) y las cifras en palabras (`850 millones`)
+    se leían como CERO.
+    """
+    from app.utils.moneda import parse_valor_cop
+
+    return parse_valor_cop(v)
 
 
 def _parsear_fecha_opcional(v: str) -> Optional[datetime]:

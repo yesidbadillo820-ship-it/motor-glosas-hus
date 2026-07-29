@@ -8,6 +8,7 @@ el auto-sync (re-subir una fuente corregida se refleja en el consolidado).
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from io import BytesIO
 
@@ -19,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth import get_password_hash
 from app.database import Base, get_db
-from app.models.db import UsuarioRecord
+from app.models.db import DgReportRecord, RadicacionCuentaRecord, UsuarioRecord
 from app.services import preauditoria_service as svc
 
 
@@ -322,6 +323,48 @@ class TestAuditoria:
         # radicar → SUBSANADA
         assert _radicar(client, d["actual"]["id"]).json()["estado"] == "SUBSANADA"
 
+    def test_clics_repetidos_no_duplican_el_historial(self, client):
+        """Si el servidor va lento el auditor hace varios clics: solo uno debe
+        quedar. (En producción llegaron 5 eventos RADICADA de la misma factura.)"""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        respuestas = [_radicar(client, fid) for _ in range(5)]
+        assert respuestas[0].status_code == 200
+        assert all(r.status_code == 409 for r in respuestas[1:])
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        radicadas = [e for e in h["eventos"] if e["tipo"] == "RADICADA"]
+        assert len(radicadas) == 1
+
+    def test_devolver_sin_motivo_no_cambia_el_estado(self, client):
+        """La validación va ANTES de tomar la factura: un intento inválido no
+        puede dejarla marcada como devuelta."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": "   "},
+        )
+        assert r.status_code == 400
+        d = client.get(f"/preauditoria/facturas/{fid}").json()
+        assert d["resultado"] == "PENDIENTE" and d["num_devoluciones"] == 0
+        # y después sí se puede decidir normalmente
+        assert _radicar(client, fid).status_code == 200
+
+    def test_la_observacion_se_guarda_y_queda_en_el_historial(self, client):
+        """Lo que el auditor escribe al radicar ya no se pierde."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "RADICAR", "observaciones": "Soportes revisados con la EPS"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["observaciones"] == "Soportes revisados con la EPS"
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert h["actual"]["observaciones"] == "Soportes revisados con la EPS"
+        radicada = [e for e in h["eventos"] if e["tipo"] == "RADICADA"][0]
+        assert radicada["observaciones"] == "Soportes revisados con la EPS"
+
     def test_no_doble_devolucion_sin_reingreso(self, client):
         # BUG: devolver dos veces sin reingreso NO debe inflar el contador.
         o, fid = self._setup(client)
@@ -435,6 +478,58 @@ class TestDevolucionYStats:
             _devolver(client, _factura_id(client, f))
         return o
 
+    def test_consecutivo_escrito_por_el_auditor(self, client):
+        """La numeración la lleva SINAC por fuera: el auditor escribe la que va."""
+        anio = datetime.now().year
+        # el sistema sugiere el siguiente según lo registrado aquí
+        sug = client.get("/preauditoria/consecutivo-sugerido").json()
+        assert sug["consecutivo"] == f"DEV-PRE-AUD-0001-{anio}"
+
+        o = self._setup_devueltas(client)
+        # …pero el auditor escribe el 89, que es el que le corresponde
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion", json={"consecutivo": "89"}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == f"DEV-PRE-AUD-0089-{anio}"
+        # el PDF sale con ese consecutivo
+        pdf = client.get(r.json()["pdf_url"])
+        assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
+        # y la sugerencia siguiente continúa desde ahí
+        assert client.get("/preauditoria/consecutivo-sugerido").json()["consecutivo"] == (
+            f"DEV-PRE-AUD-0090-{anio}"
+        )
+
+    def test_consecutivo_completo_y_repetido(self, client):
+        anio = datetime.now().year
+        o = self._setup_devueltas(client)
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion",
+            json={"consecutivo": f"dev-pre-aud-0120-{anio}"},  # completo, en minúsculas
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == f"DEV-PRE-AUD-0120-{anio}"
+
+        # el mismo consecutivo en otro oficio: se rechaza con mensaje claro
+        _subir_radicacion(client, [_rad_fila("777777", "HUS0000700001", 5000)])
+        o2 = _crear_oficio(client, "FHUS-OTRO-1", "2026-07-21T08:00")
+        _escribir(client, o2["id"], "777777")
+        _devolver(client, _factura_id(client, "HUS0000700001"))
+        r2 = client.post(
+            f"/preauditoria/oficios/{o2['id']}/oficio-devolucion",
+            json={"consecutivo": f"DEV-PRE-AUD-0120-{anio}"},
+        )
+        assert r2.status_code == 409
+        assert "ya fue usado" in r2.json()["detail"]
+
+    def test_consecutivo_vacio_usa_el_sugerido(self, client):
+        o = self._setup_devueltas(client)
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion", json={"consecutivo": "  "}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == f"DEV-PRE-AUD-0001-{datetime.now().year}"
+
     def test_consecutivo_y_pdf(self, client):
         o = self._setup_devueltas(client)
         r = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
@@ -534,6 +629,105 @@ class TestEliminarOficio:
         d = r.json()
         assert len(d["eliminados"]) == 1
         assert d["rechazados"][0]["id"] == 9999
+
+
+# ------------------------------------------------------------------
+# Eliminar UN envío cargado por error (solo admin/coordinador)
+# ------------------------------------------------------------------
+
+
+class TestEliminarEnvio:
+    def _admin(self, db_session):
+        u = UsuarioRecord(
+            id=4,
+            nombre="ADMIN",
+            email="admin4@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        return u
+
+    def _como_admin(self, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+
+    def test_auditor_no_puede(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        assert client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}").status_code == 403
+
+    def test_borra_solo_ese_envio_y_lo_libera(self, client, db_session):
+        self._como_admin(db_session)
+        otro = "229999"
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000), _rad_fila(otro, F3, 55000)],
+        )
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _escribir(client, o["id"], otro)
+        assert client.get("/preauditoria/consolidado").json()["total"] == 3
+
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["envio"] == ENV and d["facturas_borradas"] == 2
+
+        # el otro envío quedó intacto…
+        cons = client.get("/preauditoria/consolidado").json()
+        assert cons["total"] == 1 and cons["items"][0]["factura"] == F3
+        # …el oficio sigue existiendo con un solo envío…
+        assert [e["envio"] for e in d["oficio"]["envios_escritos"]] == [otro]
+        # …y el envío borrado se puede volver a escribir
+        assert _escribir(client, o["id"], ENV).json()["nuevas"] == 2
+
+    def test_envio_inexistente(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}")
+        assert r.status_code == 404
+        assert "no está cargado" in r.json()["detail"]
+
+    def test_no_borra_con_pdf_emitido(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        _devolver(client, _factura_id(client, F1))
+        client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/envios/{ENV}")
+        assert r.status_code == 409
+        assert "devolución ya" in r.json()["detail"]
+
+    def test_reingreso_vuelve_a_su_devolucion(self, client, db_session):
+        """Si el envío traía una factura a subsanar, quitarlo la devuelve a su
+        estado anterior sin borrarla ni perder el historial."""
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-1")
+        _escribir(client, o1["id"], ENV)
+        _devolver(client, _factura_id(client, F1), motivo="Falta epicrisis")
+        # reingresa en otro oficio/envío para subsanar
+        _subir_radicacion(client, [_rad_fila("229305", F1, 250700)])
+        o2 = _crear_oficio(client, "FHUS-2", "2026-07-21T08:00")
+        assert _escribir(client, o2["id"], "229305").json()["reingresos"] == 1
+
+        r = client.delete(f"/preauditoria/oficios/{o2['id']}/envios/229305")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["facturas_borradas"] == 0 and d["subsanaciones_revertidas"] == 1
+        # la factura sigue viva, devuelta y en su oficio original
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert h["actual"]["resultado"] == "DEVUELTA"
+        assert h["actual"]["oficio_fhus"] == "FHUS-1"
+        assert h["actual"]["motivo_devolucion"] == "Falta epicrisis"
 
 
 # ------------------------------------------------------------------
@@ -640,18 +834,21 @@ ENTIDAD_ADRES = "ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA GENERAL DE SEGURIDAD
 
 
 class TestExportAdres:
-    def test_descarga_con_informacion_completa(self, client):
+    def test_descarga_con_formato_del_consolidado(self, client):
         _subir_radicacion(
             client,
             [
                 _rad_fila(ENV, F1, 250700, nit=svc.NIT_ADRES, entidad=ENTIDAD_ADRES),
-                _rad_fila(ENV, F2, 98000),  # otra entidad: NO debe salir en el Excel
+                _rad_fila(ENV, F2, 98000, nit=svc.NIT_ADRES, entidad=ENTIDAD_ADRES),
+                _rad_fila(ENV, F3, 55000),  # otra entidad: NO debe salir en el Excel
             ],
         )
         _subir_dgreport(client, [F1])
         o = _crear_oficio(client)
         _escribir(client, o["id"], ENV)
         _radicar(client, _factura_id(client, F1))
+        _devolver(client, _factura_id(client, F2), motivo="Falta FURIPS")
+        assert client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").status_code == 200
         # La lista de oficios marca que este tiene facturas de ADRES.
         of = client.get("/preauditoria/oficios").json()["items"][0]
         assert of["tiene_adres"] is True
@@ -662,18 +859,52 @@ class TestExportAdres:
         ws = load_workbook(BytesIO(r.content)).active
         filas = list(ws.iter_rows(values_only=True))
         encabezado = list(filas[0])
-        for col in ("FACTURA", "VALOR", "CORREO F.E.", "CUFE / N° F.E.", "MOTIVO DEVOLUCION"):
-            assert col in encabezado
-        assert len(filas) == 2  # encabezado + solo la factura ADRES
-        fila = dict(zip(encabezado, filas[1]))
-        assert fila["FACTURA"] == F1
-        assert str(fila["NIT"]) == svc.NIT_ADRES
-        assert fila["ENTIDAD"] == ENTIDAD_ADRES.strip()
-        assert fila["CORREO F.E."] == "SI"
-        assert fila["CUFE / N° F.E."] == "CUFE" + F1
-        assert fila["RESULTADO"] == "RADICAR"
-        assert fila["VALOR"] == 250700
-        assert fila["AUDITOR"] == "CLAUDIA"
+        # Tramo SINAC en el orden del consolidado real…
+        assert encabezado[:14] == [
+            "Item",
+            "Fecha_Recibido",
+            "Envío",
+            "AUD",
+            "HUS",
+            "Fecha_Factura",
+            "Valor",
+            "NIT",
+            "Entidad",
+            "Correo F.E.",
+            "Observación Preauditoria Radicación SINAC",
+            "Radicar_1",
+            "Observaciones Adicionales",
+            "Fecha_Entrega_Fact",
+        ]
+        # …seguido de las columnas de las otras áreas (vienen vacías).
+        assert encabezado[14] == "Observación_FACTURACIÓN"
+        assert encabezado[-1] == "INFOPOL"
+        assert "Radicar_2" in encabezado
+        assert len(filas) == 3  # encabezado + las 2 facturas ADRES (F3 no sale)
+        assert [f[0] for f in filas[1:]] == [1, 2]  # Item consecutivo
+        por_hus = {
+            dict(zip(encabezado[:14], f))["HUS"]: dict(zip(encabezado[:14], f)) for f in filas[1:]
+        }
+        # F1 radicada
+        f1 = por_hus[F1]
+        assert f1["HUS"] == F1
+        assert f1["AUD"] == "CLAUDIA"
+        assert str(f1["NIT"]) == svc.NIT_ADRES
+        assert f1["Entidad"] == ENTIDAD_ADRES.strip()
+        assert f1["Correo F.E."] == "SI"
+        assert f1["Valor"] == 250700
+        assert f1["Radicar_1"] == "SI"
+        assert f1["Observación Preauditoria Radicación SINAC"] == "SOPORTES COMPLETOS"
+        assert f1["Fecha_Entrega_Fact"] in ("", None)  # la llena a mano quien entrega
+        # F2 devuelta: motivo + consecutivo del oficio de devolución, Radicar_1=NO
+        f2 = por_hus[F2]
+        assert f2["HUS"] == F2
+        assert f2["Correo F.E."] == "NO"
+        assert f2["Radicar_1"] == "NO"
+        obs2 = f2["Observación Preauditoria Radicación SINAC"]
+        assert "Falta FURIPS" in obs2 and "DEV-PRE-AUD-0001" in obs2
+        # el tramo de las otras áreas viene vacío
+        assert all(v in ("", None) for v in filas[1][14:])
 
     def test_reconoce_adres_por_nombre_sin_nit(self, client):
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700, nit="901037916-6", entidad="ADRES ")])
@@ -690,6 +921,92 @@ class TestExportAdres:
         r = client.get(f"/preauditoria/oficios/{o['id']}/export-adres.xlsx")
         assert r.status_code == 404
         assert "ADRES" in r.json()["detail"]
+
+
+# ------------------------------------------------------------------
+# Cargue masivo por bloques (memoria acotada en el servidor de 1 GB)
+# ------------------------------------------------------------------
+
+
+class TestCargueMasivoPorBloques:
+    """Los archivos grandes se guardan por bloques para no agotar la memoria.
+
+    Estas pruebas fijan que trocear el cargue NO cambia el resultado: mismos
+    conteos, sin duplicar y sin perder la idempotencia del upsert.
+    """
+
+    def _filas(self, n, valor=100.0):
+        return [
+            {
+                "factura": f"HUS{i:07d}",
+                "envio": ENV,
+                "f_recibido": datetime(2026, 7, 20),
+                "f_factura": datetime(2026, 7, 1),
+                "valor": valor + i,
+                "nit": svc.NIT_ADRES,
+                "entidad": "ADRES",
+                "estado_radicacion": "Registrado",
+            }
+            for i in range(n)
+        ]
+
+    def test_conteos_exactos_cruzando_bloques(self, db_session, monkeypatch):
+        monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 3)  # 10 filas → 4 bloques
+        filas = self._filas(10)
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
+            "nuevas": 10,
+            "actualizadas": 0,
+            "sin_cambio": 0,
+        }
+        # re-subir el mismo archivo: todo sin cambio (idempotente)
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
+            "nuevas": 0,
+            "actualizadas": 0,
+            "sin_cambio": 10,
+        }
+        # subir el archivo corregido: todo actualizado, sin duplicar
+        for f in filas:
+            f["valor"] += 1
+        assert svc.upsert_radicacion(db_session, filas, "b.xlsx", "YESID") == {
+            "nuevas": 0,
+            "actualizadas": 10,
+            "sin_cambio": 0,
+        }
+        assert db_session.query(RadicacionCuentaRecord).count() == 10
+
+    def test_factura_repetida_en_otro_bloque_no_duplica(self, db_session, monkeypatch):
+        monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 2)
+        filas = self._filas(3)
+        filas.append(dict(filas[0]))  # la misma factura, ya en otro bloque
+        res = svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")
+        assert res["nuevas"] == 3 and res["sin_cambio"] == 1
+        assert db_session.query(RadicacionCuentaRecord).count() == 3
+
+    def test_dgreport_por_bloques(self, db_session, monkeypatch):
+        monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 2)
+        filas = [
+            {"factura": f"HUS{i:07d}", "correo_fe": "SI", "numero_fe": f"CUFE{i}"} for i in range(7)
+        ]
+        assert svc.upsert_dgreport(db_session, filas, "d.xlsx", "YESID")["nuevas"] == 7
+        assert svc.upsert_dgreport(db_session, filas, "d.xlsx", "YESID")["sin_cambio"] == 7
+        assert db_session.query(DgReportRecord).count() == 7
+
+    def test_archivo_mas_grande_que_un_bloque_real(self, db_session):
+        """Con el tamaño de bloque real (2.000): un archivo de 2.500 filas."""
+        filas = self._filas(2500)
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")["nuevas"] == 2500
+        assert db_session.query(RadicacionCuentaRecord).count() == 2500
+        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")["sin_cambio"] == 2500
+
+    def test_el_parseo_comparte_los_textos_repetidos(self, client):
+        """ENTIDAD/NIT se repiten miles de veces: deben compartir una sola copia."""
+        filas = [_rad_fila(ENV, f"HUS{i:07d}", 1000 + i) for i in range(50)]
+        datos = svc.parsear_excel_radicacion(_excel(RAD_HEADERS, filas))
+        entidades = [f["entidad"] for f in datos["facturas"]]
+        assert len(entidades) == 50
+        # todas las filas apuntan al MISMO objeto de texto, no a 50 copias
+        assert len({id(e) for e in entidades}) == 1
+        assert entidades[0] == "AXA COLPATRIA"  # y se sigue recortando
 
 
 # ------------------------------------------------------------------
@@ -746,3 +1063,60 @@ class TestParsers:
     def test_radicacion_sin_columnas_avisa(self):
         r = svc.parsear_excel_radicacion(_excel(["OTRA", "COSA"], [[1, 2]]))
         assert r["facturas"] == [] and r["advertencias"]
+
+    def test_salta_encabezados_y_totales_repetidos(self):
+        """El reporte real repite el encabezado y trae filas de TOTAL: se saltan.
+
+        Cubre el atajo rápido del parseo (evitar normalizar 191.859 veces):
+        los valores ASCII alfanuméricos se comparan directo y los que traen
+        acentos o signos siguen pasando por la normalización completa.
+        """
+        filas = [
+            _rad_fila(ENV, F1, 250700),
+            _rad_fila(ENV, "FACTURA", 0),  # encabezado repetido
+            _rad_fila(ENV, "Total", 999),  # fila de total
+            _rad_fila(ENV, " total ", 999),  # con espacios
+            _rad_fila(ENV, "FACTÚRA", 0),  # con acento → normalizada
+            _rad_fila(ENV, F2, 98000),
+        ]
+        r = svc.parsear_excel_radicacion(_excel(RAD_HEADERS, filas))
+        assert sorted(f["factura"] for f in r["facturas"]) == sorted([F1, F2])
+
+    def test_anulado_en_cualquier_forma_se_descarta(self):
+        """El estado llega escrito de varias formas; todas cuentan como anulada."""
+        filas = [
+            _rad_fila(ENV, F1, 1, estado="Anulado"),
+            _rad_fila(ENV, F2, 2, estado="ANULADA"),
+            _rad_fila(ENV, F3, 3, estado="anulado_entidad"),
+            _rad_fila(ENV, "HUS0000999999", 4, estado="Radicado_Entidad"),
+        ]
+        r = svc.parsear_excel_radicacion(_excel(RAD_HEADERS, filas))
+        assert [f["factura"] for f in r["facturas"]] == ["HUS0000999999"]
+        assert "3 radicación(es) 'Anulado' descartada(s)" in r["advertencias"]
+
+    def test_lee_archivos_sin_dimensiones_declaradas(self):
+        """El reporte de DGH no declara <dimension>: debe leerse igual.
+
+        Se omite el barrido previo de openpyxl (12 s en el archivo real), así
+        que esta prueba fija que quitarlo no cambia lo que se lee.
+        """
+        import zipfile
+
+        contenido = _excel(RAD_HEADERS, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        # el Excel de prueba sí declara dimensiones: se le quitan para simular
+        # el reporte real de Dinámica Gerencial
+        entrada = BytesIO()
+        with zipfile.ZipFile(BytesIO(contenido)) as orig:
+            with zipfile.ZipFile(entrada, "w", zipfile.ZIP_DEFLATED) as nuevo:
+                for item in orig.infolist():
+                    datos = orig.read(item.filename)
+                    if item.filename.startswith("xl/worksheets/sheet"):
+                        datos = re.sub(rb"<dimension[^>]*/>", b"", datos)
+                    nuevo.writestr(item, datos)
+        sin_dim = entrada.getvalue()
+        assert b"<dimension" not in zipfile.ZipFile(BytesIO(sin_dim)).read(
+            "xl/worksheets/sheet1.xml"
+        )
+        r = svc.parsear_excel_radicacion(sin_dim)
+        assert sorted(f["factura"] for f in r["facturas"]) == sorted([F1, F2])
+        assert r["leidas"] == 2

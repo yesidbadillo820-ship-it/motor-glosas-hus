@@ -279,6 +279,16 @@ def parse_valor_cop(valor_raw) -> float:
         m_dec = re.fullmatch(r"(\d+)\.(\d{1,2})\D*", s)
         if m_dec:
             return float(f"{m_dec.group(1)}.{m_dec.group(2)}") * factor * signo
-    # Sin coma: los puntos se asumen separadores de miles (Colombia)
+    # Sin coma: los puntos se asumen separadores de miles (Colombia). Pero un
+    # separador de miles SIEMPRE lleva exactamente 3 dígitos detrás, así que un
+    # último grupo de 1 o 2 dígitos delata un punto decimal (E01, 28-jul-2026).
+    # Antes "20000.50" se leía como 2.000.050 y "0,99 USD" escrito "0.99" como
+    # 99 pesos. Los formatos colombianos no cambian: "1.500"→1500,
+    # "12.345"→12345, "1.500.000"→1500000.
+    grupos = s.split(".")
+    if len(grupos) >= 2 and grupos[0].isdigit() and 1 <= len(grupos[-1]) <= 2:
+        if all(g.isdigit() for g in grupos) and all(len(g) == 3 for g in grupos[1:-1]):
+            enteros = "".join(grupos[:-1])
+            return float(f"{enteros}.{grupos[-1]}") * factor * signo
     cleaned = re.sub(r"[^\d]", "", s)
     return float(cleaned) * factor * signo if cleaned else 0.0

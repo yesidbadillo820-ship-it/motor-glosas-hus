@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 27-07-2026
+**Última actualización:** 28-07-2026
 
 ---
 
@@ -370,6 +370,153 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 - **Para dejar la página limpia:** después de desplegar en la VM, entrar como
   administrador → Fuentes → Zona de administración → "Borrar todos los datos"
   (sin marcar la casilla de fuentes, para no volver a subir los Excel).
+- **Ajuste posterior (mismo día):** el auditor pidió que el Excel de ADRES
+  salga con el formato del consolidado que se maneja con esa entidad. Quedó
+  así: SINAC diligencia de **Item** a **Fecha_Entrega_Fact** (Item,
+  Fecha_Recibido, Envío, AUD, HUS, Fecha_Factura, Valor, NIT, Entidad,
+  Correo F.E., Observación Preauditoria Radicación SINAC, Radicar_1,
+  Observaciones Adicionales, Fecha_Entrega_Fact) y después vienen las
+  columnas de las otras áreas **vacías** para que continúen el mismo archivo
+  (Observación_FACTURACIÓN, Fecha_Dev_CARTERA, Fecha_Segunda_Revisión,
+  Segunda_Observación_SINAC, Fecha_Dev_FACTURACIÓN,
+  Segunda_Observación_FACTURACIÓN, Fecha_Dev_CARTERA, Radicar_2,
+  Fecha_Radicación, Número_Radicado, INFOPOL). El sistema llena: Radicar_1
+  (SI/NO según la auditoría), la Observación (el motivo de devolución con el
+  consecutivo DEV-PRE-AUD, o "SOPORTES COMPLETOS" si va a radicar) y deja
+  **Fecha_Entrega_Fact en blanco** (esa fecha la escribe a mano quien
+  entrega a Facturación). Encabezados azules el tramo SINAC y grises el de
+  las otras áreas.
+
+### 28-07 — La página se caía al subir las fuentes: causa y solución
+- **Qué pasó:** durante la mañana la página mostró varias veces "Error 524",
+  "Failed to fetch" y "Bad gateway 502", y **el cargue del Excel no entraba**
+  (los contadores seguían mostrando el cargue anterior).
+- **Causa real (medida, no supuesta):** el servidor de Google tiene **1 GB de
+  memoria** y la aplicación se quedaba sin aire al procesar el archivo de
+  36.723 facturas. El sistema operativo mataba la aplicación a mitad del
+  cargue (5 veces en 45 minutos, confirmado en el registro del servidor), y
+  al morir la base de datos deshacía todo: por eso no quedaba nada cargado.
+  Reparto medido del consumo: aplicación en reposo 140 MB, leer el Excel
+  +70 MB, **guardar en la base +154 MB** (todas las filas se guardaban de un
+  solo golpe al final), más lo que consume el tablero cuando el equipo entra
+  a la vez.
+- **Solución en el código:** el cargue ahora **se guarda por bloques de 2.000
+  facturas** en vez de todo al final, y los textos que se repiten miles de
+  veces (entidad, NIT, envío) se guardan una sola vez y se comparten.
+  Resultado medido con el archivo real: **pico de 263 MB → 119 MB** (menos de
+  la mitad) y además más rápido (5,3 s → 3,7 s en el guardado). Ventaja
+  adicional: si el cargue se interrumpe, **lo ya guardado no se pierde** —
+  al volver a subir el mismo archivo el cargue retoma donde quedó (el
+  sistema nunca duplica). 47 pruebas del módulo en verde (5 nuevas que fijan
+  que trocear el cargue no altera los conteos ni duplica facturas).
+- **Paliativo aplicado ese día en el servidor** (mientras se despliega lo
+  anterior): se subió el tope de memoria del contenedor de 640 MB a 1.400 MB
+  con uso de disco como apoyo, para que la aplicación se ponga lenta en vez
+  de morirse.
+- **Segundo hallazgo (misma tarde): los archivos crecieron mucho.** Al revisar
+  los archivos reales de hoy resultó que ya no son del tamaño de antes:
+  - Formato Facturación Electrónica: **203.484 filas** (antes 7.231).
+  - Radicación de Cuentas: **191.859 filas → 189.446 facturas** (antes 36.723),
+    17,6 MB, con 2.413 radicaciones anuladas.
+  Con ese tamaño el cargue tardaba 49 segundos en un equipo rápido, y en el
+  servidor del hospital pasaba de los **100 segundos que Cloudflare tolera**
+  antes de cortar la conexión: de ahí los errores 524 y 502.
+- **Segunda optimización (lectura del Excel):** se encontró que los reportes de
+  Dinámica Gerencial **no declaran sus dimensiones** dentro del archivo. Cuando
+  ese dato falta, la librería que lee Excel recorre el archivo COMPLETO solo
+  para averiguar su tamaño y después lo vuelve a recorrer para leerlo: 12
+  segundos perdidos de 36. Como el sistema nunca usa ese dato, ahora se omite
+  ese primer barrido. Además se quitó una normalización de texto costosa que
+  se ejecutaba 383.740 veces (dos por fila). **Resultado: la lectura pasó de
+  45 a 28 segundos**, leyendo exactamente lo mismo.
+- **Solución entregada al auditor ese día:** se partió el archivo de Radicación
+  en 3 partes (verificando que las 3 suman exactamente lo mismo que el
+  original: 191.859 leídas, 189.446 facturas, 2.413 anuladas). Cada parte
+  tarda 17 segundos, muy por debajo del límite. Se puede partir sin riesgo
+  porque en ese archivo **ninguna factura se repite**.
+### 28-07 (tarde) — Tres fallas del uso real y el borrado de envíos
+Reportadas por el auditor durante la jornada, con evidencia en pantalla:
+- **La misma factura quedó radicada 5 veces.** En el historial aparecían cinco
+  eventos RADICADA idénticos, del mismo auditor y a la misma hora. Causa: como
+  la página no avisaba que estaba guardando, el gestor volvía a hacer clic, y
+  las peticiones llegaban al servidor **al mismo tiempo**; todas veían la
+  factura "pendiente" antes de que la primera alcanzara a guardar. Corregido
+  por los dos lados: el botón se bloquea y muestra "Guardando…", y el servidor
+  toma la factura con una sola operación indivisible, así solo el primer clic
+  gana y los demás reciben un aviso claro.
+- **Lo que se escribía se perdía.** El único campo del formulario decía "Motivo
+  de la devolución" y, al radicar, ese texto se descartaba. Ahora hay un campo
+  **Observaciones** aparte que **se guarda siempre** (también al radicar) y
+  queda visible en el historial de la factura, con su propia columna.
+- **La página no se actualizaba sola.** Había que recargarla a mano para ver si
+  algo se había guardado, porque cuando el servidor iba lento los refrescos
+  fallaban **en silencio**. Ahora las tablas muestran "Cargando…" mientras
+  responden y, si algo falla, lo **dicen** en pantalla con opción de
+  reintentar, en vez de quedarse mostrando datos viejos.
+- **Nuevo: quitar un envío cargado por error.** En el detalle del oficio, cada
+  envío tiene una ✕ (solo administradores) que lo deshace sin tocar el resto
+  del oficio: borra las facturas que entraron con ese envío, y las que venían
+  de una devolución vuelven a su estado anterior sin perder historial. El
+  envío queda libre para volver a escribirlo. No se puede quitar si alguna de
+  sus facturas ya salió en un oficio de devolución emitido.
+- 58 pruebas del módulo (8 nuevas) y 4.361 de la suite completa en verde, más
+  verificación en navegador de los cuatro puntos.
+- **Faltaba un caso (corregido enseguida):** cuando el auditor audita **desde
+  la ventana del oficio** (que es como se trabaja normalmente), esa ventana
+  no se refrescaba. Seguía mostrando los contadores viejos "Pend · OK · Dev"
+  y, como el botón del oficio de devolución se habilita según ese dato, se
+  quedaba bloqueado aunque ya hubiera facturas devueltas: por eso "no dejaba
+  generar el PDF" y tocaba recargar. Ahora esa ventana se actualiza sola al
+  guardar. Además, cuando el botón está bloqueado **dice por qué**: el oficio
+  de devolución solo se puede generar si hay al menos una factura devuelta,
+  porque es la carta con la que se le regresan las facturas a la entidad.
+
+### 28-07 (tarde) — Pre-auditoría: el consecutivo del oficio lo escribe el auditor
+- El auditor recordó un pedido anterior: **la numeración de los oficios de
+  devolución la lleva SINAC internamente**, así que el sistema no debe
+  asignarla sola. Ahora, al oprimir **"Generar oficio de devolución"**, se
+  abre una ventana para **escribir el consecutivo que corresponde**.
+- Viene precargado con el que seguiría según lo registrado en la página (solo
+  como sugerencia) y se puede cambiar. Se acepta escribir **solo el número**
+  (`89` → se completa como DEV-PRE-AUD-0089-2026) o el **consecutivo
+  completo**. Si se escribe uno ya usado, el sistema lo rechaza diciendo en
+  cuál oficio está. Si se deja vacío, usa el sugerido.
+- La sugerencia siguiente continúa desde el que se escribió (si usó el 89, la
+  próxima vez sugiere el 90).
+- 3 pruebas nuevas + prueba en navegador de la ventana completa.
+- **Ya quedó desplegado en la VM** (PR #208 fusionado). No hubo que hacer nada
+  a mano: el auto-despliegue que corre cada 5 minutos lo aplicó solo y el
+  motor quedó corriendo el commit `5ba3a3f`, sano. Para verlo en pantalla hay
+  que refrescar el navegador con **Ctrl+F5** (si no, muestra la versión vieja
+  que tiene guardada).
+- **Nota para no perder tiempo la próxima vez:** en la VM el repositorio está
+  en `/opt/motor-glosas` y el motor corre en **Docker**, no como servicio de
+  systemd. El comando para mirar cómo está, desde Cloud Shell y en un solo
+  paso (entra a la VM y ejecuta allá adentro):
+
+  ```bash
+  gcloud compute ssh motor-glosas --zone=us-west1-a --tunnel-through-iap --command '
+  cd /opt/motor-glosas && git log --oneline -1
+  sudo docker compose ps
+  free -m | head -2
+  '
+  ```
+
+  Cuidado con confundir las dos máquinas: si el prompt dice `@cloudshell`
+  estás **fuera** de la VM y los comandos no encuentran nada; dentro de la VM
+  el prompt dice `@motor-glosas`.
+
+- **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
+  tamaño, la solución de fondo es que **el cargue no haga esperar al
+  navegador**: subir el archivo, responder de inmediato "recibido, procesando"
+  y que la página muestre el avance. Así el tamaño del archivo deja de
+  importar y no hay límite de tiempo que valga. Queda propuesto.
+- **~~PENDIENTE recomendado~~ — YA HECHO:** subir la máquina virtual a
+  **`e2-small`**. Al revisar la VM el 28-07 la memoria total salió en 1.971 MB
+  (~2 GB): la `e2-micro` tiene 1 GB y la `e2-small` tiene 2 GB. Se confirmó
+  además preguntándole directamente a Google, que respondió `e2-small`:
+  `gcloud compute instances describe motor-glosas --zone=us-west1-a --format="value(machineType)"`
+  No hay que detener ni editar nada.
 
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
@@ -383,6 +530,190 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
     (`test_ronda33_fixes.py`). Pendiente: desplegar la ronda 32 en la VM de
     Google (`cd /opt/motor-glosas && git pull && docker compose build motor &&
     docker compose up -d`) y repetir los 4 casos de prueba.
+
+### 28-07 — SINAC OS: se pasó de "una aplicación" a una plataforma con plan
+
+Día de dos mitades: primero se documentó a dónde vamos, después se empezó a
+construir. Todo está en la rama principal.
+
+**Lo que se documentó** (PR #197, cuatro archivos en `docs/`):
+- `SINAC_OS.md` — el plano maestro que escribió Yesid: visión, principios,
+  agentes, módulos y las siete fases del proyecto. Es el documento rector:
+  ningún desarrollo puede contradecirlo sin actualizarlo primero.
+- `MANUAL_ARQUITECTURA_SINAC_OS.md` — 19 capítulos que explican **cómo** se
+  construye SINAC OS. La idea de fondo: el proceso administrativo deja de ser
+  una carpeta de archivos y pasa a ser un objeto vivo que nunca muere, solo
+  cambia de estado (Factura → Glosa → Objeción → Respuesta → Radicación →
+  Conciliación → Aceptación → Pago → Archivo → Histórico). Cada capítulo cierra
+  respondiendo qué existe hoy, qué se reutiliza, qué se elimina, qué se crea y
+  cómo se migra sin romper nada.
+- `MAPA_CAPACIDADES.md` — la misma plataforma explicada sin tecnicismos, para
+  gerencia o para alguien que llega nuevo al área.
+- `ANEXO_AUDITORIA.md` — la radiografía del sistema tal como estaba antes,
+  guardada como memoria de por qué se decidió cada cosa.
+
+**Lo que se descubrió al revisar el sistema entero** (15 auditorías sobre el
+código real): el sistema sabe mucho pero está mal conectado consigo mismo. La
+mitad que piensa (la aplicación web) y la mitad que ejecuta (los robots de
+portal) **no se hablan**: el puente es un Excel que viaja en el escritorio de
+una PC. Y hay **39 archivos de módulos ya terminados** (SAVIA, EMSSANAR, VCO,
+FOMAG, Mutual Ser, el organizador de correos) que nunca se fusionaron a la
+rama principal: están listos, probados y a un clic de distancia.
+
+**Lo que ya se construyó y está funcionando:**
+
+- **Seguridad y trazabilidad (PR #199).** Siete arreglos:
+  1. El sistema decía que ciframos los datos del paciente **y no los ciframos**.
+     Ahora dice la verdad; cifrarlos de verdad queda para el siguiente paso.
+  2. El nombre del paciente ya no se le muestra a cualquiera: solo al gestor
+     asignado, al coordinador y al administrador. Si la glosa **no** tiene
+     gestor, sigue visible para todos — es trabajo que cualquiera puede tomar.
+  3. Un usuario de solo lectura podía cerrar glosas por una puerta lateral,
+     **incluso 500 de un golpe**. Cerrada.
+  4. Si faltaba la clave secreta en la configuración, el sistema arrancaba
+     igual y firmaba las sesiones con una clave vacía. Ahora no arranca.
+  5. La página de "estado del sistema", que es pública, hacía un recorrido
+     pesado de 30 días en cada consulta. Ahora es liviana.
+  6. El registro de auditoría (quién hizo qué) ya **no se puede borrar**.
+  7. Ese registro ahora guarda también desde qué computador se hizo cada cosa.
+  - Además: el servidor pasó a hora de Bogotá. Estaba en hora de Londres, así
+    que las tareas programadas "de las 3 de la mañana" corrían a las 10 de la
+    noche.
+- **Un solo lector de valores en pesos (PR #201).** Había cuatro copias del
+  mismo código leyendo montos, y dos se equivocaban en plata:
+  - El **informe de cartera de gerencia** leía `950.000` como **950 pesos**
+    (cualquier monto con un solo punto se dividía por mil). Solo pasaba con
+    valores en texto, como los que exporta el DGH. **Conviene revisar un
+    informe reciente.**
+  - El cargue de tarifas leía como **cero** dos formas de escribir comunes
+    (`1'500.000` y `850 millones`). Una tarifa en cero se propaga al dictamen.
+  - Al unificar apareció un tercer error: `0.99` se leía como 99 pesos.
+  - Ahora hay un solo lector, y una prueba que caza a quien vuelva a escribir
+    otro por su cuenta.
+
+**Dos hallazgos que conviene no perder de vista:**
+- El robot de SAVIA **multiplica por cien** los valores con decimales
+  (`1.365,50` → `136.550`). El módulo de EMSSANAR ya había corregido ese mismo
+  error, pero el arreglo nunca llegó porque las ramas nunca se juntaron. Si el
+  Excel de SAVIA trae decimales, los archivos generados con ese robot llevan
+  valores inflados.
+- El sistema **ya tiene construido** un avisador por correo de glosas próximas
+  a vencer (ordena por urgencia, arma el correo, todo). Está terminado y
+  **desconectado**. Es justo lo que faltó cuando las tres facturas de junio
+  ($20.054.751) se descubrieron 45 días tarde.
+
+### 28-07 (noche) — Verificación adversarial del lote de glosas Dispensario del 28-jul
+- Lote de **97 objeciones**. Solo se atacaron las **6 decisiones nuevas** (el
+  resto del banco de plantillas ya pasó 4 rondas adversariales y no se re-evalúa).
+- Resultado: **3 calzan con reserva** (FA0201 equipo interdisciplinario,
+  FA2303 transfusión, TA listado→tarifa) y **3 NO calzan** (FA0801 segundo
+  rastreo de anticuerpos, SO5801 biopsia endometrio/AMEU, FA0101 conteo de
+  días de estancia).
+- **Veredicto: el lote NO está listo para subir.** Hay correcciones de texto
+  obligatorias antes del cargue:
+  - Quitar frases que refutan reclamos que el pagador no hizo ("no se anexa
+    acuerdo de tarifas", "paquete", "procedimiento principal", SOAT UVB):
+    delatan respuesta enlatada y permiten descalificarla por no pertinente
+    (la Res. 2284/2023 exige coherencia entre glosa y respuesta).
+  - Responder los prongs reales de cada observación: identificación del
+    equipo interdisciplinario y defensa de la cantidad 29 (FA0201); la tesis
+    "enfermería está incluida en la estancia" (FA2303: la estancia cubre el
+    cuidado básico, no procedimientos con renglón propio); la regla de 72
+    horas del banco de sangre (FA0801: voltearla — la muestra pretransfusional
+    VENCE a las 72 h en paciente transfundido, Decreto 1571/1993, o sea el
+    nuevo evento OBLIGA al nuevo rastreo); la homologación AMEU→legrado
+    (SO5801); y el conteo aritmético 32 vs 34 días (FA0101).
+  - Quitar frases autolesivas: la remisión genérica a la nota operatoria en
+    SO5801 (si la nota no describe biopsia aparte, confirma la glosa) y la
+    prueba de "permanencia del día objetado" en FA0101 (34 días no caben
+    entre el 17-may y el 18-jun); en TA, afirmar la vigencia 2026 del
+    contrato 440 (prórroga/adiciones), no solo que el pagador "es parte".
+- Verificaciones del auditor antes de cargar esos grupos: leer la nota
+  operatoria del caso AMEU (¿hubo toma de biopsia como acto aparte?);
+  reconstruir día a día los 34 días de estancia (si solo se prueban 32-33,
+  procede aceptar parcial el excedente, no forzar el 100%); fechas y horas de
+  los 2 rastreos de anticuerpos con su orden médica; otrosí o prórroga que
+  acredite la vigencia 2026 del contrato 440-DIGSA/DMBUG-2025.
+
+### 28-07 (noche) — Contrato de Construcción de SINAC OS: el plano se volvió obra
+
+Hasta hoy teníamos el **plano** (el Manual de Arquitectura: qué queremos que
+sea SINAC OS). Faltaba el **contrato de obra**: qué se construye, en qué orden,
+quién lo aprueba y cómo se comprueba que quedó bien. Eso es lo que quedó hecho.
+
+Está en `docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`: **veinte capítulos y un
+anexo**, unas 323.000 palabras. Cada capítulo termina con una tabla donde toda
+fila tiene **criterio de aceptación** y **el comando exacto que lo comprueba**,
+para que nadie tenga que preguntar si algo quedó hecho. En total **730 tareas**.
+
+**Lo importante para el área, en una frase:** de las 730 tareas, **69 producen
+los siete resultados que usted puede ver funcionando**, y cuestan 163,5 jornadas
+—el 10 % del esfuerzo total—. Las otras 661 el Contrato nunca las amarró a un
+resultado visible.
+
+Los siete resultados, en el orden en que llegarían:
+
+1. **La plata deja de contarse mal.** Un solo lector de valores en pesos: se
+   acaba el error del ×100 que hacía leer `950.000` como `950`.
+2. **Lo vencido deja de esconderse.** Encabeza la lista en vez de desaparecer
+   de ella, y escala solo al coordinador. Es el caso de las tres facturas de
+   junio por $20.054.751 que se descubrieron 45 días tarde.
+3. **Una entidad nueva se activa sin programar.** SIMED encolable desde una
+   ficha, sin esperar semanas de desarrollo.
+4. **Un expediente por factura y una sola cifra por concepto.** Se acaba que
+   "recuperado" dé cuatro números distintos según la pestaña.
+5. **Un solo documento radicable**, generado en un solo lugar.
+6. **El robot corre solo y se ve mientras corre**, con la plata en juego a la
+   vista.
+7. **Una institución nueva queda instalada en una jornada.**
+
+**Cuatro problemas se encontraron al juntar los capítulos** y quedaron
+corregidos o registrados:
+
+- **El plan eran diecinueve planes que no se miraban.** De 773 dependencias
+  declaradas, 742 apuntaban a una tarea del mismo capítulo: casi ninguna decía
+  que el trabajo de un capítulo necesita el cimiento que vive en otro. Se
+  agregaron 563 dependencias derivadas de nueve cimientos escritos, con la
+  regla a la vista para que se pueda discutir.
+- **La columna que separa los datos de una institución de los de otra tenía
+  tres nombres** (`institucion_id`, `hospital_id`, `tenant_id`). Construido así
+  quedaban tres columnas para lo mismo, y la protección de datos se activa
+  sobre una sola: las tablas con las otras dos quedaban abiertas. Se unificó en
+  `institucion_id` (287 reemplazos y 8 líneas a mano). Se eligió ese nombre
+  porque SINAC OS también debe poder instalarse en una clínica o en una IPS.
+- **Más de la mitad del plan estaba marcada como urgente** (380 de 730). Una
+  urgencia que le toca a la mitad no prioriza nada. Se volvió a priorizar con
+  una regla verificable: P0 es lo que hace falta para los tres primeros
+  resultados y nada más. Quedaron 37.
+- **El Contrato completo compromete casi siete años de una persona**
+  (1.625,5 jornadas). Se dice sin adornos: **no es ejecutable de punta a punta**
+  con el equipo de hoy. Por eso el anexo separa lo que sí cabe.
+
+También se cerraron defectos que habrían costado retrabajo: ocho dependencias
+apuntaban a tareas inexistentes, el capítulo 14 numeraba 40 tareas con códigos
+que ya significaban otra cosa en otros capítulos (`GOB-09` era "parser
+monetario" en uno y "política de vida de rama" en otro), y dos tareas se
+declaraban prerrequisito de sí mismas. Todo eso quedó arreglado y explicado en
+el **Anexo I**.
+
+**Las cifras del Contrato se comprueban solas.** La portada trae una tabla que
+vuelve a medir contra el repositorio lo que el documento afirma. Hoy: 43 tablas,
+4.530 pruebas, 59 ramas sin fusionar, 44 llamadas a `prompt()` y 1 sola
+migración formal **coinciden**; las rutas de la API subieron de 686 a 712
+porque el sistema siguió creciendo mientras se escribía.
+
+**La Regla 11 quedó cumplida en los veintiuno.** Todo capítulo cierra
+respondiendo qué habría que cambiar para soportar 100 hospitales, 10 millones
+de expedientes y 10.000 usuarios a la vez. De esas respuestas salió un defecto
+que ningún capítulo podía ver solo: **la escala de referencia tiene tres cifras
+distintas para la misma cosa** —2.350.000, 4.000.000 y 6.000.000 de objeciones
+para los mismos 500.000 expedientes— y dos para el almacenamiento (2,4 TB
+contra 8 TB). La medida es la primera: sale del acervo real del hospital,
+18.371 objeciones para 3.933 facturas. No se corrigió porque elegir la cifra
+buena decide el tamaño de medio Contrato, y esa decisión es del área.
+
+Todo esto es **documentación y plan**. No se tocó una línea del código que
+corre en producción: la suite de 4.533 pruebas pasa igual que antes.
 
 ---
 
@@ -442,6 +773,13 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 15. **Conciliación:** confirmar el acta de inicio del contrato 287 y el mapeo
     de códigos internos de cartera (U22031/C26001…), y correr el asistente en
     piloto sobre 1-2 facturas reales contra `Y:\`.
+- **(28-07) Lote del 28-jul (97 objeciones): NO subir todavía.** Aplicar las
+  correcciones de texto de la verificación (3 grupos no calzan: FA0801,
+  SO5801, FA0101; y ajustes obligatorios en FA0201, FA2303 y TA) y completar
+  las verificaciones del auditor: nota operatoria del caso AMEU, desglose día
+  a día de los 34 días de estancia, horas/órdenes de los 2 rastreos de
+  anticuerpos y prórroga 2026 del contrato 440. Detalle en la sección
+  "28-07 (noche)".
 
 ### Informes
 16. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
@@ -487,6 +825,10 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
    14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
    verificación) y generar sus PDF de evidencias.
+   **Lote del 28-jul: NO subir hasta corregir los textos** señalados por la
+   verificación (3 grupos no calzan) y resolver las verificaciones del
+   auditor (nota operatoria AMEU, desglose de los 34 días, horas de los 2
+   rastreos, prórroga 2026 del contrato 440).
 2. Correr la **pertinencia fusionada** COOSALUD (pendiente #1) y verificar que
    las 37 facturas cierren con evidencia.
 3. Con los reportes en mano, **cerrar los flecos de los lotes 02/06/07/08**
@@ -500,6 +842,54 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    de pre-auditoría.
 7. **ADRES:** fusionar el PR #176, copiar al servidor el PAQUETE COMPLETO
    (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendientes #20 y #21).
+
+### SINAC OS — decisiones que dependen de Yesid (28-07)
+
+7. **Revisar un informe de cartera reciente.** El lector de montos leía
+   `950.000` como `950` cuando el valor venía en texto. Ya está corregido, pero
+   conviene mirar si algún informe salió con cifras bajas.
+8. **Revisar un Excel de SAVIA.** Si la columna de valor trae comas decimales,
+   los archivos que generó ese robot llevan los montos multiplicados por cien.
+   El arreglo existe (lo tiene el módulo de EMSSANAR); falta juntarlos.
+9. **Decidir qué hacer con los 39 archivos huérfanos** (SAVIA, EMSSANAR, VCO,
+   FOMAG, Mutual Ser, organizador de correos, herramientas de cartera): están
+   en ramas de otras sesiones con sus PR en borrador (#162, #164, #167). Se
+   fusionan desde acá o se cierran desde esas sesiones — pero conviene no
+   dejarlos más tiempo sueltos, que es justo lo que produjo dos robots
+   distintos para el mismo pagador.
+10. **Decidir si se enciende el avisador de vencimientos por correo.** Está
+    construido y desconectado. Para prenderlo hace falta definir: quién recibe
+    los avisos, con cuántos días de anticipación, y desde qué cuenta de correo
+    salen (hoy no hay servidor de correo configurado).
+11. **Comprobar que el enmascarado del nombre del paciente no estorbe** en el
+    trabajo diario. Si una glosa tiene gestor asignado, los demás auditores
+    ven iniciales en vez del nombre. Si molesta, se ajusta en una línea.
+12. **Siguiente paso de construcción**, según el plan: terminar la limpieza de
+    módulos sin uso y arrancar la **Fase 2 — modelo real del dominio**
+    (Factura → Glosa → Soporte → Conciliación → Acta).
+
+### Contrato de Construcción — decisiones que dependen de Yesid (28-07 noche)
+
+13. **Leer el Anexo I del Contrato** (`docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`,
+    al final). Son diez páginas y responden lo único que importa ahora: qué se
+    construye primero, qué se ve funcionando y cuánto cuesta. Con eso basta
+    para decidir; los veinte capítulos son el detalle.
+14. **Aprobar o cambiar los siete resultados comprometidos.** Están escritos
+    como cosas que usted ve en pantalla, no como tareas técnicas. Si alguno no
+    le sirve o falta uno, se cambia ahí y el plan se recalcula solo.
+15. **Decidir qué pasa con las 661 tareas que quedaron fuera de todo
+    resultado** (1.462 jornadas, el 90 % del esfuerzo). Dos salidas honestas
+    por cada una: o se le escribe el resultado que justifica su existencia, o
+    se acepta que va después. Lo que no sirve es dejarlas marcadas urgentes
+    sin destinatario, que es como estaban.
+16. **Decidir el tamaño del equipo.** El Contrato completo son 1.625,5 jornadas
+    ≈ siete años de una persona. La primera entrega —los tres resultados que
+    recuperan plata ya— son 79,5 jornadas ≈ cuatro meses de una persona, o un
+    mes de cuatro. De esa decisión sale todo lo demás.
+17. **Tres tareas están escritas dos veces** en capítulos distintos (migrar los
+    perfiles de pagador a YAML, la pantalla de Perfiles, y las pruebas de
+    arquitectura bloqueantes). Hay que decidir cuál capítulo conserva cada una
+    antes de que dos personas las construyan por separado.
 
 ---
 
