@@ -40,6 +40,28 @@ Daniela se rió, y alzó su copa, con el mismo gesto exacto de la primera noche,
 
 <p align="center">✦ ✦ ✦</p>
 
+Mateo entró un rato después, con su esposa Rosa del brazo y un bebé pequeño dormido contra su pecho, y al ver a la pareja real sentada tan campante junto al fuego, hizo una reverencia exagerada que le ganó una carcajada a Daniela.
+
+—Con que de vuelta de incógnito, Majestades —dijo, sonriendo—. Aunque en este pueblo, la verdad, ya nadie se molesta en fingir sorpresa cuando los ve llegar.
+
+—Es que este pueblo, Mateo, siempre fue el único lugar donde no necesitábamos fingir nada —contestó Yazid, levantándose a saludar al pequeño con una ternura que sorprendía todavía a quienes no lo conocían bien—. ¿Y esta belleza cómo se llama?
+
+—Daniela —dijo Mateo, con una sonrisa cómplice—. Rosa insistió. Dijo que si la reina de Valduero había sido capaz de enseñarle al pueblo entero que el corazón elige mejor que la conveniencia, merecía que alguna niña llevara su nombre con orgullo.
+
+Daniela sintió que se le llenaban los ojos de lágrimas, y abrazó a Rosa con una gratitud que ninguna palabra lograba expresar del todo, pensando en lo extraño y hermoso que resultaba, después de todo lo vivido, ver su propio nombre convertido en una bendición para una vida nueva que apenas comenzaba.
+
+<p align="center">✦ ✦ ✦</p>
+
+Más tarde, ya con Mateo y su familia despedidos hacia su propia casa, Daniela le contó a Yazid, con el mismo orgullo tranquilo con que solía hablar de sus proyectos, todo lo que había logrado cambiar ese primer año como reina: el nuevo sistema de graneros compartidos entre los pueblos de la frontera sur, que aseguraba que ninguna aldea pasara hambre mientras otra tuviera excedente; la escuela pequeña que había fundado en Ferrol de Abajo, la primera de su tipo en todo ese rincón del reino, donde los hijos de labriegos aprendían a leer junto a los hijos de comerciantes, sin ninguna distinción; y el nuevo consejo de mujeres artesanas que asesoraba directamente a la corona sobre asuntos de comercio, algo que ningún rey anterior habría considerado siquiera posible.
+
+—El duque Rodrigo se opuso a casi todo eso, al principio —recordó Yazid, sirviéndose un poco más de vino—. Y mírate ahora: has cambiado más cosas en un año de las que yo logré cambiar en tres años de reinado solo.
+
+—Es que tú tenías que aprender primero a escuchar, Yazid. Yo llevaba toda la vida escuchando a la gente común detrás de ese mostrador. Solo tuve que aplicar, con una corona puesta, lo que ya sabía hacer sin ella.
+
+—Y ese, precisamente, es el motivo por el cual este reino te adora, aunque apenas lleves un año como reina.
+
+<p align="center">✦ ✦ ✦</p>
+
 Afuera, la noche caía sobre Ferrol de Abajo con esa calma particular de los pueblos que no necesitan aparecer en ningún mapa para ser, para quien los conoce de verdad, el centro entero del mundo. El emparrado de La Parra, cargado de sus frutas moradas, seguía creciendo torcido hacia el sur, exactamente como siempre, indiferente a que la mujer que una vez lo había cosechado con sus propias manos fuera ahora reina de todo un reino.
 
 —Tengo algo que decirte —dijo Daniela, después de un rato, con una sonrisa que Yazid no le había visto nunca del todo así, mezcla de nervios y de una felicidad que apenas cabía en su cara.

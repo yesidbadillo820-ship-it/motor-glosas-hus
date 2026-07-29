@@ -1,4 +1,4 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; I X</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; X V I I</h2>
 
 <h4 align="center">TREINTA DÍAS</h4>
 
@@ -6,7 +6,7 @@
 
 El mensajero llegó a Ferrol de Abajo al amanecer, cubierto de polvo de tres días de camino, preguntando por un forastero llamado Yaz con una descripción tan precisa que no dejaba lugar a dudas de que Bernal, y solo Bernal, podía haberla dado.
 
-Yazid leyó la nota en el patio, a solas, mientras Daniela terminaba de abrir la taberna para el día, sin saber todavía que el mundo que ambos habían construido durante dos meses estaba a punto de encogerse hasta caber en unas pocas líneas de tinta apretada.
+Yazid leyó la nota en el patio, a solas, mientras Daniela terminaba de abrir la taberna para el día, sin saber todavía que el mundo que ambos habían construido durante meses estaba a punto de encogerse hasta caber en unas pocas líneas de tinta apretada.
 
 *Majestad: el plazo se cumple mañana. El duque exige respuesta formal sobre el compromiso con Aurión antes de que termine la semana, o amenaza con llevar el asunto directamente ante el consejo pleno sin su presencia. No hay más tiempo que ganar. Vuelva hoy. — B.*
 
@@ -14,7 +14,7 @@ Yazid se quedó con el papel en la mano un largo rato, sintiendo que el patio en
 
 <p align="center">✦ ✦ ✦</p>
 
-—Tengo que irme hoy —dijo, cuando por fin entró a la cocina, con una voz que no logró disimular del todo.
+—Tengo que irme hoy —dijo, cuando por fin entró a la cocina, con el brazo todavía vendado y una voz que no logró disimular del todo.
 
 Daniela levantó la vista de las cuentas que estaba revisando, y algo en la cara de Yazid debió delatarlo, porque dejó la pluma a un lado de inmediato.
 
@@ -22,7 +22,7 @@ Daniela levantó la vista de las cuentas que estaba revisando, y algo en la cara
 
 —Un asunto de la corona. Urgente. No puedo explicarle más que eso, todavía.
 
-—Todavía —repitió Daniela, con un tono que ya no era del todo paciente—. Lleva dos meses diciéndome "todavía".
+—Todavía —repitió Daniela, con un tono que ya no era del todo paciente—. Lleva meses diciéndome "todavía".
 
 —Lo sé. —Yazid se acercó, le tomó las manos entre las suyas, con una desesperación que no había sentido nunca frente a ningún consejo, ningún duque, ninguna amenaza real de guerra—. Y sé que no es suficiente. Pero le pido que confíe en mí un poco más. Un mes, quizás menos. Voy a resolver esto, y cuando lo haga, voy a volver, y esa vez le voy a contar todo, sin dejar nada afuera. Se lo juro por lo que sea que usted quiera que jure.
 
@@ -32,7 +32,7 @@ Yazid se quedó callado, porque no tenía nada que decir a eso que no sonara, in
 
 <p align="center">✦ ✦ ✦</p>
 
-Se despidieron en el patio, bajo un cielo gris que amenazaba nieve temprana, con Tomás observando desde la puerta de la cocina con esa expresión suya que ya no era del todo bondadosa, como si también él hubiera empezado, después de dos meses, a hacerse preguntas que no se atrevía a formular en voz alta.
+Se despidieron en el patio, bajo un cielo gris que amenazaba nieve temprana, con Tomás observando desde la puerta de la cocina con esa expresión suya que ya no era del todo bondadosa, como si también él hubiera empezado, después de tantos meses, a hacerse preguntas que no se atrevía a formular en voz alta.
 
 —¿Va a volver de verdad esta vez? —preguntó Daniela, con los brazos cruzados contra el frío, o quizás contra algo más.
 
@@ -54,7 +54,7 @@ Daniela seguía de pie en el patio, bajo el emparrado desnudo, con los brazos cr
 
 Cabalgó de vuelta al castillo con una sola idea fija en la cabeza, repitiéndosela como quien reza: tenía que encontrar la manera de deshacer el compromiso con Aurión sin desatar la guerra que el duque Rodrigo llevaba meses advirtiendo, y tenía que hacerlo antes de que la verdad sobre quién era llegara a Ferrol de Abajo por cualquier otro camino que no fuera su propia boca.
 
-No sabía, mientras cruzaba las puertas del castillo con el mismo silencio de piedra de siempre, que el tiempo que tanto necesitaba ya se le había acabado sin que él lo supiera: que el destino, con esa crueldad particular que solo tiene con los que más se demoran en decir la verdad, ya había puesto en marcha, sin pedirle permiso, todas las piezas que iban a llevar a Daniela hasta la capital, hasta el salón del trono, hasta el momento exacto en que iba a ver, con sus propios ojos, el rostro que llevaba dos meses conociendo bajo otro nombre.
+No sabía, mientras cruzaba las puertas del castillo con el mismo silencio de piedra de siempre, que el tiempo que tanto necesitaba ya se le había acabado sin que él lo supiera: que el destino, con esa crueldad particular que solo tiene con los que más se demoran en decir la verdad, ya había puesto en marcha, sin pedirle permiso, todas las piezas que iban a llevar a Daniela hasta la capital, hasta el salón del trono, hasta el momento exacto en que iba a ver, con sus propios ojos, el rostro que llevaba meses conociendo bajo otro nombre.
 
 Bernal lo esperaba en el patio de las caballerizas, con una cara que Yazid no le había visto en veinte años de servicio.
 

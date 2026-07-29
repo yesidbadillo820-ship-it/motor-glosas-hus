@@ -1,10 +1,10 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; V I</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; V I I I</h2>
 
 <h4 align="center">LA PRIMERA VERDAD</h4>
 
 <br>
 
-Para cuando llegó octubre, Yazid ya había vuelto a Ferrol de Abajo seis veces, y Daniela había dejado, en algún momento que no supo señalar, de contar los días entre una visita y otra.
+Para cuando llegó octubre, Yazid ya había vuelto a Ferrol de Abajo ocho veces, y Daniela había dejado, en algún momento que no supo señalar, de contar los días entre una visita y otra.
 
 Las rondas de inspección de la corona, según entendía ella, eran cosa larga y sin calendario fijo: a veces Yaz aparecía a la semana, a veces tardaba casi tres, siempre con la misma bolsa de cuero al hombro y las mismas ganas, cada vez más torpes de disimular, de que ella lo notara llegar. Daniela había dejado también de calcularle la cuenta del cuarto con el mismo rigor de antes, aunque nunca se lo dijo, y su padre, que veía todo y no comentaba casi nada, había empezado a guardarle a Yaz el mejor lugar de la mesa —el mismo, junto al fuego, que le caía el humo cuando el viento venía del norte— sin que nadie se lo pidiera.
 

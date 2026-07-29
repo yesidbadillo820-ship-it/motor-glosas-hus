@@ -1,4 +1,4 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; I I</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; I I I</h2>
 
 <h4 align="center">EL CAMINO A LA CAPITAL</h4>
 

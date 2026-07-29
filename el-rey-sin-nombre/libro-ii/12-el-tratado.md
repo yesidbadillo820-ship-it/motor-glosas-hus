@@ -1,4 +1,4 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; V I I I</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; X I I</h2>
 
 <h4 align="center">EL TRATADO</h4>
 

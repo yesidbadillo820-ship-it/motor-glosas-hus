@@ -1,4 +1,4 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; V I I I</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; X I</h2>
 
 <h4 align="center">LO QUE NO SE DICE</h4>
 
@@ -40,7 +40,7 @@ Daniela lo miró fijamente, con esa evaluación suya que llevaba usando desde el
 
 —Usted lleva las manos limpias desde el primer día que llegó aquí, y me dijo una vez que era porque no había trabajado en años. Habla como si cada palabra le costara una negociación, y me dijo que era manía de mercader. Un mercader viejo saca una moneda con su cara grabada y nadie mira dos veces, pero un caballero con armadura entra a esta taberna y por poco lo llama Majestad. —Se inclinó un poco hacia adelante—. Yo no soy tonta. Practico y tonta no son lo mismo.
 
-Yazid sintió, en ese momento, el peso entero de todo lo que llevaba dos meses sin decir, apretándole el pecho de una manera que ningún consejo, ningún duque, ninguna corona le había hecho sentir jamás. Tuvo, por un instante que después recordaría durante años con un arrepentimiento que no se le iba a quitar fácilmente, la boca abierta para decirle la verdad entera: su nombre completo, el castillo, el trono, todo.
+Yazid sintió, en ese momento, el peso entero de todo lo que llevaba meses sin decir, apretándole el pecho de una manera que ningún consejo, ningún duque, ninguna corona le había hecho sentir jamás. Tuvo, por un instante que después recordaría durante años con un arrepentimiento que no se le iba a quitar fácilmente, la boca abierta para decirle la verdad entera: su nombre completo, el castillo, el trono, todo.
 
 Y entonces pensó en Rodrigo, en el mes de plazo, en la infanta Elvira esperando una respuesta al otro lado del reino, en todo lo que se le vendría encima —a él, y peor todavía, a ella— si esa verdad salía de esa cocina antes de que él tuviera un plan de verdad para protegerla.
 
@@ -62,7 +62,7 @@ Daniela lo estudió un largo rato, y algo en su cara se suavizó, aunque no del 
 
 —Pronto —dijo Yazid, y esta vez la palabra le salió con una convicción tan genuina que hasta él mismo, por un instante, quiso creerla del todo—. Le doy mi palabra.
 
-Daniela asintió, despacio, y aunque no volvió a sacar el tema esa noche, ni tampoco en las semanas siguientes, Yazid notó que algo había cambiado entre los dos, algo pequeño pero real: una pregunta que ya no dormía, esperando, en algún rincón de la mente de Daniela, y que él sabía, con una certeza que le quitaba el sueño, que tarde o temprano volvería a despertarse, con toda la fuerza de dos meses de espera acumulada, y esa vez él no iba a tener ninguna respuesta a medias que le sirviera de escudo.
+Daniela asintió, despacio, y aunque no volvió a sacar el tema esa noche, ni tampoco en las semanas siguientes, Yazid notó que algo había cambiado entre los dos, algo pequeño pero real: una pregunta que ya no dormía, esperando, en algún rincón de la mente de Daniela, y que él sabía, con una certeza que le quitaba el sueño, que tarde o temprano volvería a despertarse, con toda la fuerza de meses de espera acumulada, y esa vez él no iba a tener ninguna respuesta a medias que le sirviera de escudo.
 
 Se fue de Ferrol de Abajo tres días después, con la promesa de volver pronto, y con la certeza, cada vez más pesada, de que el tiempo que le quedaba para decir la verdad por su propia voluntad, antes de que alguien más se la dijera por él, se le estaba acabando más rápido de lo que había calculado.
 

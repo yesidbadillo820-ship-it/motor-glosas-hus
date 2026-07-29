@@ -1,191 +1,83 @@
 # EL REY SIN NOMBRE — Notas creativas
 
 Novela de romance histórico-medieval, dedicada por el autor a su esposa. Los protagonistas
-llevan los nombres reales del autor y su esposa, adaptados al tono de época. Documento de
-continuidad para mantener consistencia a lo largo de toda la escritura (mundo, personajes,
-motivos, estructura).
+llevan los nombres reales del autor y su esposa, adaptados al tono de época.
+
+**Estado: NOVELA COMPLETA — 51 capítulos + epílogo, 3 libros, 246 páginas, ~46.300 palabras.**
 
 ## Título
 
 **EL REY SIN NOMBRE**
 *Una historia de amor donde un reino entero no pesó tanto como una promesa hecha en una taberna.*
 
-## Reglas del encargo (no negociables)
+## Reglas del encargo (cumplidas)
 
-- Final **feliz**, con lágrimas de emoción — no de duelo. **Nadie muere. Nadie pierde a nadie
-  de forma permanente.** Los obstáculos se vencen con coraje y elección, no con tragedia.
+- Final **feliz**, con lágrimas de emoción — no de duelo. Nadie muere ni pierde a nadie de forma
+  permanente. Todos los personajes secundarios (Tomás, Rodrigo, Elvira, Íñigo, Bernal, Mateo)
+  cierran con su propio final feliz.
 - Protagonistas: **Rey Yazid** y **Daniela de la Parra** — nombres reales del autor y su esposa,
-  adaptados (Yesid → Yazid, raíz árabe real de época andalusí; Daniela se conserva casi intacta).
-- Se conocieron "en un bar" en la vida real → transformado en la taberna **La Parra**, nombrada
-  así por el apellido real de la esposa (Parra), que además significa "vid" — de ahí el
-  emparrado que da nombre al lugar y el motivo del vino/brindis que atraviesa el libro.
-- Llevan 1 año casados en la vida real → el libro cierra con un epílogo situado **exactamente
-  un año después de la boda** de Yazid y Daniela.
-- Extensión objetivo: novela completa, 250-350 páginas, 3 libros de ~9-10 capítulos cada uno.
+  adaptados (Yesid → Yazid, raíz árabe real de época andalusí; Daniela intacta).
+- Se conocieron "en un bar" → taberna **La Parra**, nombrada por el apellido real de la esposa
+  (Parra = vid), de ahí el emparrado y el motivo del vino/brindis que atraviesa todo el libro.
+- 1 año casados en la vida real → el epílogo transcurre exactamente un año después de la boda.
 
-## El mundo
+## El mundo y personajes principales
 
-- **Reino de Valduero**: reino ibérico de fantasía histórica, sin atarlo a fechas o hechos
-  reales exactos (libertad creativa total).
-- **Reino de Aurión**: reino vecino/rival, con quien el consejo de Valduero quiere sellar una
-  alianza matrimonial.
-- **Ferrol de Abajo**: pueblo pequeño, no figura en los mapas de la corte — elegido por Yazid
-  precisamente por eso.
-- **La Parra**: la taberna/posada de Ferrol de Abajo, con un emparrado de vides en el patio de
-  entrada. Regentada por Tomás y su hija Daniela.
-
-## Personajes
-
-- **Rey Yazid de Valduero**: joven rey, agobiado por el consejo que quiere casarlo por
-  conveniencia política con la infanta de Aurión. Se escapa disfrazado de caballero errante
-  bajo el nombre de **"Yaz"**. Arco: de rey que se esconde a rey que elige, en público, sin
-  corona de por medio.
-- **Daniela de la Parra**: hija del tabernero Tomás; práctica, sin filtro, inmune a las
-  formalidades y al encanto fácil. No sabe que Yaz es el rey durante buena parte del libro.
-  Arco: de recelo justificado a amor pleno, pasando por la herida de sentirse engañada.
-- **Tomás**: padre de Daniela, tabernero. Vivo, presente, cálido — sin tragedias familiares
-  (regla del encargo: nada de pérdidas).
-- **Bernal**: único confidente de Yazid en la corte; cubre sus ausencias sin hacer preguntas.
-- **Infanta Elvira de Aurión**: prometida política de Yazid. Personaje generoso, no antagonista:
-  tiene su propio amor en otra parte y se libera del compromiso con alivio, no con rencor.
-- **Duque Rodrigo de Ferrant**: consejero tradicionalista, leal a la corona desde el reinado del
-  padre de Yazid. Antagonista "blando": se opone al matrimonio con una plebeya por convicción de
-  Estado, no por maldad; se le vence con argumento y dignidad, no con violencia ni humillación.
-  Ya presentado (cap. I.3): exige el compromiso con Aurión por el cierre del paso de Renglar.
-- (Reservado para libros II-III): un mentor/caballero de confianza para Yazid; una amiga cercana
-  de Daniela — se introducirán según haga falta, sin sobrecargar el reparto.
+- **Reino de Valduero** / **Reino de Aurión** (rival/aliado) — fantasía histórica sin atarse a
+  fechas reales.
+- **Ferrol de Abajo**: pueblo fronterizo sin mapa; **La Parra**: la taberna de Tomás y su hija.
+- **Rey Yazid**: se disfraza de caballero errante ("Yaz") para escapar de un matrimonio de
+  conveniencia con la infanta de Aurión.
+- **Daniela de la Parra**: práctica, sin filtro, inmune a las formalidades; no sabe que Yaz es
+  el rey hasta la asamblea del Libro II.
+- **Tomás** (padre de Daniela), **Bernal** (confidente y luego Consejero Mayor), **duque Rodrigo
+  de Ferrant** (antagonista blando → aliado y amigo), **infanta Elvira de Aurión** (liberada del
+  compromiso, enamorada de su capitán **Íñigo**), **Mateo** (pretendiente de Daniela, luego
+  felizmente casado con Rosa de Sauzal).
 
 ## Motivo central
 
-Un brindis compartido la primera noche, con vino especiado, en la misma mesa junto al fuego de
-La Parra. La frase que lo acompaña, dicha por Daniela la noche del encuentro:
+Un brindis con vino especiado la primera noche, con la frase de Daniela: *"Aquí no hay coronas,
+solo sed."* Se repite —roto, y luego sanado— en cada punto de inflexión del libro, hasta el
+brindis final del epílogo.
 
-> "Aquí no hay coronas, solo sed."
+## Estructura final (3 libros, 17 capítulos cada uno + epílogo)
 
-Este brindis y esta frase se repiten —rotos, y luego sanados— en los puntos de quiebre e
-inflexión del libro: el primer encuentro, la ruptura al descubrirse el engaño, la reconciliación,
-la boda, y el epílogo un año después.
+### LIBRO I — El Forastero de La Parra (17 caps., pp. 4-91)
+I El Forastero · II Tres Días · III El Trono Frío · IV El Regreso · V El Mercado ·
+VI La Vendimia · VII Mateo · VIII La Primera Verdad · IX El Beso ·
+X La Leyenda del Primer Rey · XI Lo Que No Se Dice · XII La Fiesta de Invierno · XIII Casi ·
+XIV La Herida · XV Los Regalos Pequeños · XVI El Peso Que Carga un Rey · XVII Treinta Días
+(cierre: Bernal anuncia "un problema mucho más grande que el duque Rodrigo").
 
-## Estructura (provisional, se ajusta en la marcha)
+### LIBRO II — La Corona Que Pesa (17 caps., pp. 92-168)
+I La Asamblea · II La Infanta de Aurión · III El Camino a la Capital · IV El Rostro del Rey
+(la doble revelación: es el rey Y se compromete con otra) · V La Búsqueda · VI La Carta Que No
+Abrió · VII Lo Que Se Rompe · VIII El Peso de Elegir · IX La Verdad de Elvira ·
+X El Duque Se Opone · XI Las Negociaciones de Aurión · XII El Tratado (resuelve el conflicto
+SIN matrimonio) · XIII Rumores de Palacio · XIV Medio Año · XV El Pueblo Se Entera ·
+XVI La Paciencia de Tomás · XVII La Infanta Libre (cierre: Yazid parte sin disfraz hacia
+Ferrol de Abajo).
 
-- **LIBRO I — El Forastero de La Parra**: el encuentro, el enamoramiento en secreto, las noches
-  robadas en la taberna durante semanas de visitas encubiertas de Yazid.
-- **LIBRO II — La Corona Que Pesa**: la corte lo reclama, se anuncia el compromiso con Aurión,
-  Daniela descubre la verdad (no por él) y lo aleja.
-- **LIBRO III — El Rey Que Eligió**: la reconciliación, el gesto público ante todo el reino,
-  la boda, epílogo un año después.
+### LIBRO III — El Rey Que Eligió (17 caps. + epílogo, pp. 169-246)
+I El Camino de Vuelta · II El Reencuentro · III Lo Que Se Reconstruye · IV El Mar, Otra Vez
+(Daniela abre por fin las cartas guardadas) · V La Decisión de Daniela · VI Los Preparativos ·
+VII El Gesto (la propuesta pública, el anillo, "Yazid, hijo de Alarico") · VIII El Pueblo Se
+Prepara · IX La Gratitud de un Rey (Bernal nombrado Consejero Mayor) · X Los Invitados Llegan ·
+XI La Víspera · XII La Bendición de Tomás · XIII La Mañana de la Boda · XIV El Rey Espera ·
+XV La Boda · XVI El Banquete · XVII Los Primeros Días · **EPÍLOGO: Un Año Después**
+(brindis final, anuncio del embarazo, "FIN DE EL REY SIN NOMBRE").
 
 ## Voz y estilo
 
-Tercera persona cercana, alternando punto de vista entre Yazid y Daniela (por capítulo o por
-escena), para que el lector sienta ambos corazones y la ironía dramática de lo que cada uno
-sabe y el otro no. Prosa cálida y sensorial (fuego, vino, lluvia, madera), distinta al registro
-frío/archivístico de otra obra del autor. Diálogos con raya española (—). Cursiva para
-pensamientos internos y para el motivo-frase recurrente.
+Tercera persona cercana, alternando punto de vista entre Yazid y Daniela por capítulo. Prosa
+cálida y sensorial (fuego, vino, lluvia, madera, vides), distinta al registro archivístico de
+otra obra del autor. Diálogos con raya española (—). Cursiva para pensamientos internos y para
+el motivo-frase recurrente ("Aquí no hay coronas, solo sed").
 
-## Datos ya plantados (no contradecir en capítulos futuros)
+## Compilación
 
-- Excusa oficial de Yazid para ausentarse: "rondas de inspección real" a los pueblos de la
-  frontera sur, sin séquito ni anuncio — cubre visitas periódicas a Ferrol de Abajo.
-  Argumento presentado a Rodrigo: "un rey que nunca sale de su castillo gobierna un reino que
-  nunca conoce."
-- Conflicto con Aurión: cierran el paso comercial de Renglar a los carros de grano de Valduero
-  (tres veces en dos meses) para presionar el compromiso matrimonial. Rodrigo pidió el
-  compromiso formal; Yazid ganó un mes de plazo.
-- Bernal sabe del secreto de Yazid y lo cubre; a cambio, le pidió una botella del vino de La
-  Parra la próxima vez.
-- Ampolla en la palma derecha de Yazid (de partir leña) — motivo físico de que los tres días
-  fueron reales.
-
-## Hechos plantados en el Libro I (no contradecir)
-
-- Yazid visitó La Parra 7 veces documentadas en el Libro I (excusa: "rondas de inspección").
-- Cap. 5 "El Mercado": un mercader pagó con una moneda de plata con el rostro de Yazid grabado;
-  Daniela la guardó en la caja sin mirarla. Nadie la reconoció. (Elemento para retomar si hace
-  falta un cabo suelto, aunque no es imprescindible.)
-- Cap. 6: Daniela reveló que su madre murió de fiebre cuando ella tenía 9 años; su padre Tomás
-  nunca volvió a hablar de ella. (Detalle de trasfondo, NO es la "pérdida" que la trama central
-  debe evitar — es historia pasada de un personaje secundario ya fallecido antes del inicio del
-  libro, no una muerte dentro del arco romántico.)
-- Cap. 7: primer beso, durante una tormenta, en la séptima visita de Yazid.
-- Cap. 8: un caballero por poco lo llama "Majestad" frente a Daniela. Ella confrontó a Yazid;
-  él le dio una verdad a medias ("trabajo para la corona, en algo delicado") y prometió contarle
-  todo "pronto". Sembrada la semilla de sospecha de Daniela.
-- Cap. 9 (cierre Libro I): Bernal manda mensajero urgente — el plazo del mes se cumplió. Yazid
-  se despide de Daniela sin decirle la verdad; ella advierte que su paciencia tiene límite.
-  Bernal le dice al llegar: "Tenemos un problema mucho más grande que el duque Rodrigo" —
-  a resolver en la apertura del Libro II (el duque Rodrigo adelantó una asamblea pública en la
-  capital para presentar a la infanta Elvira y anunciar el compromiso, usando como ocasión las
-  quejas de los pueblos fronterizos por el cierre del paso de Renglar).
-
-## Hechos plantados en el Libro II (no contradecir)
-
-- Rodrigo adelantó la asamblea; en ella se anunció a la vez la presentación de Elvira Y el
-  compromiso formal — doble golpe para Daniela (descubre que es el rey Y que se va a casar con
-  otra en el mismo instante).
-- Daniela y Tomás huyeron de la capital; Yazid los alcanzó en una posada a medio camino; ella
-  se negó a verlo, solo habló a través de la puerta. Él prometió no volver hasta que ella
-  estuviera lista.
-- Personaje nuevo: **Íñigo**, capitán de la guardia de Elvira, su amor secreto desde que ella
-  tenía 14 años. Elvira e Íñigo quedan libres y felices al final del libro (ningún personaje
-  pierde su final feliz — regla del encargo).
-- El conflicto político se resuelve con un **tratado comercial** (no matrimonio): escolta
-  compartida para el paso de Renglar, tarifas revisadas cada 5 años, arbitraje previo a
-  cualquier bloqueo futuro. Rodrigo lo negoció personalmente con el rey de Aurión (padre de
-  Elvira) y volvió a finales de febrero con la firma. El compromiso Yazid-Elvira quedó disuelto
-  "por mutuo acuerdo, sin deshonor para ninguna casa".
-- Rodrigo pasó de antagonista a aliado: Yazid lo convenció con argumentos en consejo pleno
-  (cap. II.7); el duque reconoció el cambio ("Empiezo a notarlo").
-- Han pasado ~4 meses desde la asamblea hasta el cierre del Libro II (asamblea en otoño →
-  tratado firmado a finales de febrero). Libro III abre con Yazid partiendo hacia Ferrol de
-  Abajo, esta vez sin disfraz, con su nombre y su corona, dispuesto a decir toda la verdad.
-
-## Cierre de la novela (Libro III)
-
-- Yazid vuelve a Ferrol de Abajo con su nombre y corona completos; el pueblo lo reconoce como
-  su propio rey. Daniela pide tiempo y honestidad total, no perdón inmediato.
-- Reconciliación gradual durante meses (primavera): Yazid gobierna desde Ferrol de Abajo,
-  gana la confianza del pueblo y de Tomás de nuevo.
-- Gesto final: Yazid lleva la corte ENTERA a Ferrol de Abajo (no al revés) — declaración pública
-  en la plaza, se arrodilla, dice su nombre completo ("Yazid, hijo de Alarico"), le da un anillo
-  sencillo de plata, la pide en matrimonio delante de todo el reino y del pueblo. Ella acepta con
-  el brindis ritual ("Aquí no hay coronas" — "Solo sed").
-- Boda en Ferrol de Abajo, bajo el emparrado de La Parra, votos improvisados (no protocolo de
-  corte). Callback al brindis y al vino especiado en los votos mismos.
-- Epílogo, un año exacto después de la boda (coincide con el "1 año casados" real del autor):
-  Daniela y Yazid vuelven a La Parra, brindan otra vez con la misma frase, y ella le anuncia que
-  está embarazada — cierre cálido, sin pérdidas, con el brindis final repetido una última vez.
-- Personajes secundarios con final feliz propio: Tomás (orgulloso, sigue en La Parra), Rodrigo
-  (de antagonista a aliado y amigo), Elvira e Íñigo (juntos y libres).
-
-## Progreso
-
-| Libro | Capítulo | Título | Estado |
-|---|---|---|---|
-| I | 1 | El Forastero | ✅ |
-| I | 2 | Tres Días | ✅ |
-| I | 3 | El Trono Frío | ✅ |
-| I | 4 | El Regreso | ✅ |
-| I | 5 | El Mercado | ✅ |
-| I | 6 | La Primera Verdad | ✅ |
-| I | 7 | El Beso | ✅ |
-| I | 8 | Lo Que No Se Dice | ✅ |
-| I | 9 | Treinta Días | ✅ (cierra Libro I) |
-| II | 1 | La Asamblea | ✅ |
-| II | 2 | El Camino a la Capital | ✅ |
-| II | 3 | El Rostro del Rey | ✅ |
-| II | 4 | La Búsqueda | ✅ |
-| II | 5 | Lo Que Se Rompe | ✅ |
-| II | 6 | La Verdad de Elvira | ✅ |
-| II | 7 | El Duque Se Opone | ✅ |
-| II | 8 | El Tratado | ✅ |
-| II | 9 | La Infanta Libre | ✅ (cierra Libro II) |
-| III | 1 | El Camino de Vuelta | ✅ |
-| III | 2 | El Reencuentro | ✅ |
-| III | 3 | Lo Que Se Reconstruye | ✅ |
-| III | 4 | Los Preparativos | ✅ |
-| III | 5 | El Gesto | ✅ |
-| III | 6 | La Boda | ✅ |
-| Epílogo | — | Un Año Después | ✅ (cierra la novela) |
-
-**NOVELA COMPLETA — 25 capítulos + epílogo, 3 libros.**
+El script de composición (`gen-rey-sin-nombre.js`, formato idéntico al de la Edición
+Coleccionista de "Hijos del Firmamento": Garamond, 396.75×663pt, portadilla + dedicatoria +
+3 libros) vive en el scratchpad de la sesión. Para regenerar el DOCX/PDF, reejecutarlo sobre
+esta carpeta (`libro-i/`, `libro-ii/`, `libro-iii/`).

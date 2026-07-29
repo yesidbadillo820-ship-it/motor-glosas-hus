@@ -1,4 +1,4 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; V I</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; I X</h2>
 
 <h4 align="center">LA VERDAD DE ELVIRA</h4>
 

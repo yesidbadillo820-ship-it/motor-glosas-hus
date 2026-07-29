@@ -1,4 +1,4 @@
-<h2 align="center">C A P Í T U L O&nbsp;&nbsp; V I I</h2>
+<h2 align="center">C A P Í T U L O&nbsp;&nbsp; I X</h2>
 
 <h4 align="center">EL BESO</h4>
 
@@ -32,7 +32,7 @@ Yazid no entendió la pregunta al principio, o la entendió demasiado bien y nec
 
 —¿Qué quiere decir?
 
-—Usted podría estar en cualquier parte. Es evidente que tiene dinero, que tiene modales, que en algún lugar lo esperan cosas más grandes que esta taberna. Y sin embargo lleva dos meses volviendo aquí, a un pueblo que no está en ningún mapa, a sentarse siempre en el peor lugar de la casa, con una tabernera que no le tiene ningún respeto. —Se giró a mirarlo por fin, con una vulnerabilidad que Yazid no le había visto antes, ni siquiera la noche que le habló de su madre—. ¿Por qué yo?
+—Usted podría estar en cualquier parte. Es evidente que tiene dinero, que tiene modales, que en algún lugar lo esperan cosas más grandes que esta taberna. Y sin embargo lleva tres meses volviendo aquí, a un pueblo que no está en ningún mapa, a sentarse siempre en el peor lugar de la casa, con una tabernera que no le tiene ningún respeto. —Se giró a mirarlo por fin, con una vulnerabilidad que Yazid no le había visto antes, ni siquiera la noche que le habló de su madre—. ¿Por qué yo?
 
 Yazid dejó la copa sobre la mesa, con cuidado, como si el gesto necesitara toda su concentración para no temblarle la mano.
 
@@ -58,7 +58,7 @@ Cuando se separaron, Daniela apoyó la frente contra la de él, con los ojos cer
 
 —Yo llevaba meses.
 
-—Mentiroso. Nos conocemos hace dos meses.
+—Mentiroso. Nos conocemos hace tres meses.
 
 —Exacto —dijo Yazid—. Meses.
 
