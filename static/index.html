@@ -1393,6 +1393,9 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .auto-ok{color:var(--c-verde,#16a34a)}
 .auto-error{color:var(--c-rojo,#dc2626)}
 .auto-corriendo{color:var(--text-2)}
+.auto-acciones{display:flex;gap:.5rem;flex-wrap:wrap}
+.auto-resumen{background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.55rem .7rem;font-size:.84rem;line-height:1.5}
+.auto-resumen small{display:block;margin-top:.3rem;color:var(--text-3);font-size:.75rem}
 .auto-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
 .venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
 .venc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
@@ -20071,6 +20074,49 @@ function autoFicha(a){
     + '</div>';
 }
 
+function _autoDatos(id){
+  var input = document.getElementById('auto-file-' + id);
+  if(!input || !input.files.length) return null;
+  var ficha = null;
+  AUTO.grupos.forEach(function(g){ (g.automatizaciones||[]).forEach(function(a){ if(a.id===id) ficha=a; }); });
+  var opciones = {};
+  (ficha && ficha.parametros || []).forEach(function(p){
+    var el = document.getElementById('auto-p-' + id + '-' + p.nombre);
+    if(el && el.value.trim()) opciones[p.nombre] = el.value.trim();
+  });
+  var fd = new FormData();
+  fd.append('archivo', input.files[0]);
+  fd.append('opciones', JSON.stringify(opciones));
+  return fd;
+}
+
+// Ver qué sale ANTES de cargarlo al ERP. La regla del área es no hacer un
+// cargue masivo sin mirar antes lo que se va a cargar; hasta ahora "mirar"
+// era abrir el Excel a mano.
+async function autoPrevisualizar(id){
+  var estado = document.getElementById('auto-estado-' + id);
+  var boton = document.getElementById('auto-prev-' + id);
+  var fd = _autoDatos(id);
+  if(!fd){ estado.innerHTML = '<span class="auto-error">Elegí primero el archivo.</span>'; return; }
+  boton.disabled = true;
+  estado.innerHTML = '<span class="auto-corriendo">Revisando…</span>';
+  try{
+    var r = await fetch('/automatizaciones/' + id + '/previsualizar', {method:'POST', headers: authH(), body: fd});
+    var d = await r.json();
+    if(!r.ok){ estado.innerHTML = '<span class="auto-error">' + escHtml(d.detail || ('Error ' + r.status)) + '</span>'; return; }
+    var res = d.resumen || {};
+    var partes = [];
+    if(res.facturas) partes.push('<b>' + res.facturas + '</b> factura(s)');
+    if(res.filas) partes.push('<b>' + res.filas + '</b> objecion(es)');
+    if(res.valor_total) partes.push('<b>' + fmtCOP(res.valor_total) + '</b> glosado');
+    if(!partes.length) partes.push('<b>' + (res.archivos||0) + '</b> archivo(s)');
+    estado.innerHTML = '<div class="auto-resumen">' + partes.join(' · ')
+      + '<small>Revisá que el total coincida con el del archivo que mandó la EPS antes de cargarlo.</small></div>';
+  }catch(e){
+    estado.innerHTML = '<span class="auto-error">Conexión: ' + escHtml(e.message) + '</span>';
+  }finally{ boton.disabled = false; }
+}
+
 async function autoEjecutar(id){
   var input = document.getElementById('auto-file-' + id);
   var estado = document.getElementById('auto-estado-' + id);
@@ -20079,18 +20125,7 @@ async function autoEjecutar(id){
     estado.innerHTML = '<span class="auto-error">Elegí primero el archivo.</span>';
     return;
   }
-  var ficha = null;
-  AUTO.grupos.forEach(function(g){ (g.automatizaciones||[]).forEach(function(a){ if(a.id===id) ficha=a; }); });
-
-  var opciones = {};
-  (ficha && ficha.parametros || []).forEach(function(p){
-    var el = document.getElementById('auto-p-' + id + '-' + p.nombre);
-    if(el && el.value.trim()) opciones[p.nombre] = el.value.trim();
-  });
-
-  var fd = new FormData();
-  fd.append('archivo', input.files[0]);
-  fd.append('opciones', JSON.stringify(opciones));
+  var fd = _autoDatos(id);
 
   boton.disabled = true;
   estado.innerHTML = '<span class="auto-corriendo">Procesando…</span>';
