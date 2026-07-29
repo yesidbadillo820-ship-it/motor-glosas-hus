@@ -197,7 +197,7 @@ E1 = [
         "III. Datos de la víctima",
         "Dirección de residencia de la víctima",
         100,
-        None,
+        "dir",
         None,
         "SI",
     ),
@@ -352,7 +352,7 @@ E1 = [
         "VII. Propietario del vehículo",
         "Dirección de residencia del propietario",
         200,
-        None,
+        "dir",
         None,
         "C_PROP",
     ),
@@ -402,7 +402,7 @@ E1 = [
         "VIII. Conductor del vehículo",
         "Dirección de residencia del conductor",
         200,
-        None,
+        "dir",
         None,
         "C_COND",
     ),
@@ -683,6 +683,89 @@ def norm_factura(valor: str) -> str:
 
 _RE_FACTURA_TOKEN = re.compile(r"^[A-Z]{2,}0*\d{3,}$")
 
+# Palabras que hacen reconocible una dirección/nomenclatura o un lugar rural
+_PALABRAS_DIRECCION = {
+    "CALLE",
+    "CLL",
+    "CL",
+    "CRA",
+    "CR",
+    "CARRERA",
+    "KRA",
+    "KR",
+    "AV",
+    "AVE",
+    "AVENIDA",
+    "AVDA",
+    "DIAGONAL",
+    "DIAG",
+    "DG",
+    "TRANSVERSAL",
+    "TRANSV",
+    "TV",
+    "MANZANA",
+    "MZ",
+    "CASA",
+    "LOTE",
+    "APTO",
+    "APARTAMENTO",
+    "INTERIOR",
+    "INT",
+    "TORRE",
+    "BLOQUE",
+    "PISO",
+    "KM",
+    "KILOMETRO",
+    "VEREDA",
+    "VDA",
+    "FINCA",
+    "BARRIO",
+    "BRR",
+    "SECTOR",
+    "URBANIZACION",
+    "URB",
+    "CONJUNTO",
+    "EDIFICIO",
+    "CORREGIMIENTO",
+    "VIA",
+    "SALIDA",
+    "PARCELA",
+    "HACIENDA",
+    "ETAPA",
+    "CAMINO",
+    "CARRETERA",
+    "LOCAL",
+    "CENTRO",
+}
+_EXCEPCIONES_DIRECCION = ("SIN INFORMACION", "NO REFIERE", "NO REPORTA", "NO APLICA")
+
+
+def observacion_direccion(valor: str) -> str | None:
+    """Detecta direcciones que la auditoría rechaza: solo un código numérico o
+    solo el nombre de un municipio/departamento, sin nomenclatura.
+
+    Devuelve la observación o None si la dirección parece completa.
+    """
+    v = normalizar(valor)
+    if not v:
+        return None
+    if any(exc in v for exc in _EXCEPCIONES_DIRECCION):
+        return None
+    if re.fullmatch(r"[\d\s#.\-]+", v):
+        return (
+            "La dirección es solo números (parece un código, ej. DANE): debe ir la "
+            "nomenclatura completa (ej. CALLE 51 # 15-20, MANZANA X CASA Y)."
+        )
+    tiene_digito = any(ch.isdigit() for ch in v)
+    tiene_palabra = any(t in _PALABRAS_DIRECCION for t in re.split(r"[\s#.\-/]+", v))
+    if not tiene_digito and not tiene_palabra:
+        return (
+            "La dirección parece solo el nombre de un municipio/departamento o lugar "
+            f"('{valor}'): debe ir la nomenclatura completa (ej. CALLE 51 # 15-20, "
+            "MANZANA X CASA Y, VEREDA/FINCA con nombre)."
+        )
+    return None
+
 
 def factura_desde_nombre(nombre: str) -> str:
     """Extrae el número de factura del nombre de un archivo o carpeta.
@@ -859,27 +942,160 @@ def _detectar_motor_pdf() -> str:
     return _MOTOR_PDF
 
 
-def extraer_texto_pdf(ruta: Path) -> tuple[str, int]:
-    """Devuelve (texto, nro_paginas). Texto vacío si no hay motor o es escaneado."""
-    motor = _detectar_motor_pdf()
+# Menos texto que esto (total) se considera "sin capa de texto" (escaneado):
+# antes de omitir el cruce se intenta OCR; si tampoco hay OCR disponible,
+# el cruce se omite en vez de reportar falsos NO ENCONTRADO.
+MIN_TEXTO_PDF = 200
+
+# OCR de PDF escaneados: se reconocen las primeras páginas (donde están los
+# datos del paciente y del evento); más páginas = más lento sin ganancia.
+OCR_MAX_PAGINAS = 8
+_OCR_ESCALA = 200 / 72  # ≈200 DPI: buen balance precisión/velocidad
+
+# (nombre_motor, objeto) detectado una sola vez; None = aún no se buscó.
+_ocr_motor: tuple[str | None, object] | None = None
+
+
+def _preparar_ocr() -> tuple[str | None, object]:
+    """Detecta el mejor motor OCR disponible (se busca una sola vez).
+
+    1) Tesseract (si el programa está instalado en el PC): el más preciso
+       para español. 2) RapidOCR (rapidocr-onnxruntime): se instala solo con
+       pip, funciona sin internet y sin programas externos.
+    """
+    global _ocr_motor
+    if _ocr_motor is not None:
+        return _ocr_motor
+    motor: tuple[str | None, object] = (None, None)
     try:
-        if motor == "pdfplumber":
-            import pdfplumber
+        import shutil as _sh
 
-            with pdfplumber.open(ruta) as pdf:
-                paginas = len(pdf.pages)
-                partes = [(p.extract_text() or "") for p in pdf.pages]
-                return ("\n".join(partes), paginas)
-        if motor == "pypdf":
-            from pypdf import PdfReader
+        import pytesseract
 
-            reader = PdfReader(str(ruta))
-            partes = [(p.extract_text() or "") for p in reader.pages]
-            return ("\n".join(partes), len(reader.pages))
-    except Exception as e:  # PDF corrupto/cifrado: se reporta, no se aborta
-        logger.warning(f"  No pude leer el PDF {ruta.name}: {e}")
+        ruta_tess = _sh.which("tesseract")
+        if not ruta_tess:
+            for candidata in (
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            ):
+                if Path(candidata).exists():
+                    ruta_tess = candidata
+                    break
+        if ruta_tess:
+            pytesseract.pytesseract.tesseract_cmd = ruta_tess
+            motor = ("tesseract", pytesseract)
+    except ImportError:
+        pass
+    if motor[0] is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+
+            motor = ("rapidocr", RapidOCR())
+        except Exception:
+            pass
+    _ocr_motor = motor
+    if motor[0]:
+        logger.info(f"  Motor OCR disponible para PDF escaneados: {motor[0]}")
+    return motor
+
+
+def ocr_disponible() -> bool:
+    return _preparar_ocr()[0] is not None
+
+
+def _ocr_pdf(ruta: Path, max_paginas: int = OCR_MAX_PAGINAS) -> tuple[str, int]:
+    """OCR de las primeras páginas de un PDF escaneado → (texto, págs leídas).
+
+    Nunca lanza excepción: si algo falla devuelve ("", 0) y el PDF queda
+    "SIN TEXTO" como antes.
+    """
+    nombre_motor, motor = _preparar_ocr()
+    if nombre_motor is None:
         return ("", 0)
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return ("", 0)
+    textos: list[str] = []
+    leidas = 0
+    try:
+        pdf = pdfium.PdfDocument(str(ruta))
+        try:
+            for i in range(min(len(pdf), max_paginas)):
+                imagen = pdf[i].render(scale=_OCR_ESCALA).to_pil()
+                if nombre_motor == "tesseract":
+                    try:
+                        t = motor.image_to_string(imagen, lang="spa+eng")
+                    except Exception:
+                        t = motor.image_to_string(imagen)
+                else:
+                    import numpy as np
+
+                    resultado, _ = motor(np.array(imagen))
+                    t = "\n".join(x[1] for x in (resultado or []))
+                textos.append(t or "")
+                leidas += 1
+        finally:
+            pdf.close()
+    except Exception as e:
+        logger.warning(f"  OCR falló en {ruta.name}: {e}")
+        return ("", 0)
+    return ("\n".join(textos).strip(), leidas)
+
+
+def _extraer_con_motor(motor: str, ruta: Path) -> tuple[str, int]:
+    if motor == "pdfplumber":
+        import pdfplumber
+
+        with pdfplumber.open(ruta) as pdf:
+            return ("\n".join((p.extract_text() or "") for p in pdf.pages), len(pdf.pages))
+    if motor == "pypdf":
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(ruta))
+        return ("\n".join((p.extract_text() or "") for p in reader.pages), len(reader.pages))
     return ("", 0)
+
+
+def _motores_disponibles() -> list[str]:
+    motores = []
+    for modulo in ("pdfplumber", "pypdf"):
+        try:
+            __import__(modulo)
+            motores.append(modulo)
+        except ImportError:
+            continue
+    return motores
+
+
+def extraer_texto_pdf(ruta: Path) -> tuple[str, int, str]:
+    """Devuelve (texto, nro_paginas, metodo) con metodo ∈ {"texto", "ocr", ""}.
+
+    Intenta con todos los motores disponibles (pdfplumber y pypdf): si el
+    primero extrae poco texto (PDF difícil), prueba el otro y se queda con el
+    que más texto obtenga. Si aun así el PDF parece escaneado (sin capa de
+    texto), se aplica OCR a las primeras páginas con el motor disponible
+    (Tesseract o RapidOCR). Texto vacío si nada funcionó.
+    """
+    mejor_texto, mejor_paginas = "", 0
+    for motor in _motores_disponibles():
+        try:
+            texto, paginas = _extraer_con_motor(motor, ruta)
+        except Exception as e:  # PDF corrupto/cifrado: se reporta, no se aborta
+            logger.warning(f"  No pude leer el PDF {ruta.name} con {motor}: {e}")
+            continue
+        if len(texto.strip()) > len(mejor_texto.strip()):
+            mejor_texto, mejor_paginas = texto, paginas
+        else:
+            mejor_paginas = mejor_paginas or paginas
+        if len(mejor_texto.strip()) >= MIN_TEXTO_PDF:
+            return (mejor_texto, mejor_paginas, "texto")
+    if ocr_disponible():
+        logger.info(f"  Aplicando OCR a {ruta.name} (PDF escaneado)…")
+        texto_ocr, leidas = _ocr_pdf(ruta)
+        if len(texto_ocr.strip()) > len(mejor_texto.strip()):
+            return (texto_ocr, mejor_paginas or leidas, "ocr")
+    return (mejor_texto, mejor_paginas, "texto" if mejor_texto.strip() else "")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1248,6 +1464,11 @@ def validar_malla_f1(res: ResultadoFactura) -> None:
                 obs = (
                     obs + " " if obs else ""
                 ) + f"Placa '{valor}' con caracteres no permitidos (solo letras y números)."
+            elif formato == "dir":
+                obs_dir = observacion_direccion(valor)
+                if obs_dir:
+                    estado = ERROR
+                    obs = (obs + " " if obs else "") + obs_dir
             if "�" in valor:
                 if estado == OK:
                     estado = ADVERTENCIA
@@ -1701,6 +1922,7 @@ TOKENS_SOPORTE = {
     "RIP": "RIPS JSON",
     "RIPS": "RIPS JSON",
     "CUV": "CUV JSON",
+    "RESULTADOSMSPS": "CUV JSON",
     "FACTURA": "FACTURA",
     "FEV": "FACTURA XML",
     "EPICRIS": "EPICRISIS",
@@ -1722,13 +1944,26 @@ TOKENS_SOPORTE = {
 
 def clasificar_soporte(nombre: str) -> str:
     base = nombre.rsplit(".", 1)[0]
-    for t in reversed(base.replace("-", "_").split("_")):
-        tu = t.upper()
+    es_xml = nombre.lower().endswith(".xml")
+
+    def resolver(tipo: str) -> str:
+        if tipo == "FACTURA":
+            return "FACTURA XML" if es_xml else "FACTURA PDF"
+        return tipo
+
+    tokens = [t.upper() for t in base.replace("-", "_").replace(" ", "_").split("_") if t]
+    for tu in reversed(tokens):
         if tu in TOKENS_SOPORTE:
-            tipo = TOKENS_SOPORTE[tu]
-            if tipo == "FACTURA":
-                return "FACTURA XML" if nombre.lower().endswith(".xml") else "FACTURA PDF"
-            return tipo
+            return resolver(TOKENS_SOPORTE[tu])
+    # Segunda pasada tolerante: nombres "humanos" o alargados donde el token
+    # va pegado o extendido (epicrisis.pdf, FacturaEscaneada.pdf, RIPS2.json).
+    for tu in reversed(tokens):
+        for clave, tipo in TOKENS_SOPORTE.items():
+            if len(clave) >= 3 and tu.startswith(clave):
+                return resolver(tipo)
+    # XML de nombre corto o genérico DIAN: fe.xml, fev.xml, ad0901….xml
+    if es_xml and any(t in ("FE", "FEV") or t.startswith("AD09") for t in tokens):
+        return "FACTURA XML"
     return "OTRO"
 
 
@@ -1874,12 +2109,42 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
                 "no se pudo leer el contenido del PDF.",
             )
             continue
-        texto, paginas = extraer_texto_pdf(encontrados[tipo])
+        texto, paginas, metodo = extraer_texto_pdf(encontrados[tipo])
         datos[etiqueta] = {"texto": texto, "paginas": paginas, "archivo": encontrados[tipo].name}
         for s in res.soportes:
             if s["archivo"] == encontrados[tipo].name:
-                s["legible"] = "SI" if len(texto.strip()) > 50 else "NO (escaneado)"
-        if len(texto.strip()) <= 50:
+                if metodo == "ocr":
+                    s["legible"] = "SI (OCR)"
+                else:
+                    s["legible"] = "SI" if len(texto.strip()) >= MIN_TEXTO_PDF else "NO (escaneado)"
+        if metodo == "ocr":
+            res.agregar(
+                "SOPORTES",
+                INFO,
+                "-",
+                tipo,
+                encontrados[tipo].name,
+                "OCR",
+                f"PDF escaneado leído por OCR ({min(paginas, OCR_MAX_PAGINAS)} página(s) "
+                "reconocidas): los cruces se hacen sobre el texto reconocido, que puede "
+                "traer pequeñas imprecisiones propias del escaneo.",
+            )
+        elif len(texto.strip()) < MIN_TEXTO_PDF:
+            if ocr_disponible():
+                detalle = (
+                    f"El PDF ({paginas} páginas, {len(texto.strip())} caracteres de "
+                    "texto) no tiene capa de texto y el OCR TAMPOCO obtuvo texto "
+                    "legible (imagen en blanco, borrosa o de muy baja calidad): el "
+                    "cruce automático contra este PDF SE OMITE — revisarlo manualmente."
+                )
+            else:
+                detalle = (
+                    f"El PDF ({paginas} páginas, {len(texto.strip())} caracteres de "
+                    "texto) no tiene capa de texto suficiente (parece escaneado) y no "
+                    "hay motor OCR instalado: el cruce automático contra este PDF SE "
+                    "OMITE. Para habilitar el OCR instale con pip: pypdfium2 y "
+                    "rapidocr-onnxruntime (el bot de doble clic lo intenta solo)."
+                )
             res.agregar(
                 "SOPORTES",
                 ADVERTENCIA,
@@ -1887,8 +2152,7 @@ def analizar_carpeta(res: ResultadoFactura, sin_pdf: bool = False) -> None:
                 tipo,
                 encontrados[tipo].name,
                 "Legibilidad",
-                f"El PDF ({paginas} páginas) no tiene capa de texto "
-                "(parece escaneado): el cruce automático no es posible, revisar manualmente.",
+                detalle,
             )
 
 
@@ -1973,8 +2237,14 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     fev = datos.get("fev") or {}
     txt_fac = normalizar((datos.get("factura_pdf") or {}).get("texto", ""))
     txt_epi = normalizar((datos.get("epicrisis") or {}).get("texto", ""))
-    fac_legible = len(txt_fac) > 50
-    epi_legible = len(txt_epi) > 50
+    fac_legible = len(txt_fac) >= MIN_TEXTO_PDF
+    epi_legible = len(txt_epi) >= MIN_TEXTO_PDF
+    # La "Representación Gráfica" DIAN trae número de factura y totales pero NO
+    # los datos del paciente (esos van en la imagen de la factura del hospital):
+    # no tiene sentido buscarlos en su texto.
+    repr_dian = "REPRESENTACION GRAFICA" in txt_fac
+    fac_paciente = fac_legible and not repr_dian
+    NA_DIAN = "N/A (repr. gráfica DIAN sin datos de paciente)"
 
     usuario = (rips.get("usuarios") or [{}])[0] if rips else {}
     procs = ((usuario.get("servicios") or {}).get("procedimientos") or []) if usuario else []
@@ -1986,7 +2256,7 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
         "cuv": cuv.get("NumFactura", ""),
         "xml": fev.get("num_factura", ""),
         "factura_pdf": "presente"
-        if fac_legible and norm_factura(c[3]) in txt_fac.replace(" ", "")
+        if fac_legible and norm_factura(c[3]) in re.sub(r"[\s\-.]", "", txt_fac)
         else ("" if not fac_legible else "NO ENCONTRADO"),
     }
     difs = [
@@ -2002,13 +2272,16 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
             res, "Número de factura", c[3], valores, "DIFERENCIA", f"No coincide en: {fuentes}"
         )
         res.agregar(
-            "CRUCE FEV XML" if "xml" in difs else "CRUCE RIPS",
-            ERROR,
+            "CRUCE FEV XML" if "xml" in difs else ("CRUCE RIPS" if difs else "CRUCE FACTURA PDF"),
+            ERROR if difs else ADVERTENCIA,
             "3",
             "Número de factura",
             c[3],
             "Cruce FURIPS vs soportes",
-            f"El número de factura difiere en: {fuentes}.",
+            f"El número de factura difiere en: {fuentes}."
+            if difs
+            else "El número de factura no se encontró en el TEXTO de la factura PDF "
+            "(RIPS, CUV y XML sí coinciden): verificar visualmente el PDF.",
             valor_soporte="; ".join(f"{k}={v}" for k, v in valores.items() if v),
             fuente=fuentes,
         )
@@ -2019,8 +2292,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     doc = c[11]
     valores = {
         "rips": f"{usuario.get('tipoDocumentoIdentificacion', '')} {usuario.get('numDocumentoIdentificacion', '')}".strip(),
-        "factura_pdf": ""
-        if not fac_legible
+        "factura_pdf": (NA_DIAN if repr_dian and fac_legible else "")
+        if not fac_paciente
         else ("presente" if doc and doc in txt_fac else "NO ENCONTRADO"),
         "epicrisis": ""
         if not epi_legible
@@ -2037,6 +2310,7 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
             problemas.append(
                 f"RIPS trae tipo {usuario.get('tipoDocumentoIdentificacion')} y FURIPS {c[10]}"
             )
+    problemas_rips = list(problemas)
     if valores["factura_pdf"] == "NO ENCONTRADO":
         problemas.append("documento no aparece en la factura PDF")
     if valores["epicrisis"] == "NO ENCONTRADO":
@@ -2051,8 +2325,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
             "; ".join(problemas),
         )
         res.agregar(
-            "CRUCE RIPS" if usuario else "CRUCE EPICRISIS",
-            ERROR,
+            "CRUCE RIPS" if problemas_rips else "CRUCE EPICRISIS",
+            ERROR if problemas_rips else ADVERTENCIA,
             "10/11",
             "Documento de la víctima",
             f"{c[10]} {doc}",
@@ -2068,8 +2342,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     nombres = [c[8], c[9], c[6], c[7]]  # nombres + apellidos
     nombre_completo = " ".join(n for n in nombres if n)
     valores = {
-        "factura_pdf": ""
-        if not fac_legible
+        "factura_pdf": (NA_DIAN if repr_dian and fac_legible else "")
+        if not fac_paciente
         else ("presente" if _nombres_en_texto(nombres, txt_fac) else "NO ENCONTRADO"),
         "epicrisis": ""
         if not epi_legible
@@ -2189,15 +2463,15 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
     f_ing = parse_fecha_ddmmaaaa(c[80])
     fechas_rips = parse_fecha_flexible(proc0.get("fechaInicioAtencion", "")) if proc0 else None
     fechas_fac = (
-        extraer_fechas((datos.get("factura_pdf") or {}).get("texto", "")) if fac_legible else set()
+        extraer_fechas((datos.get("factura_pdf") or {}).get("texto", "")) if fac_paciente else set()
     )
     fechas_epi = (
         extraer_fechas((datos.get("epicrisis") or {}).get("texto", "")) if epi_legible else set()
     )
     valores = {
         "rips": proc0.get("fechaInicioAtencion", "") if proc0 else "",
-        "factura_pdf": ""
-        if not fac_legible
+        "factura_pdf": (NA_DIAN if repr_dian and fac_legible else "")
+        if not fac_paciente
         else ("presente" if f_ing in fechas_fac else "NO ENCONTRADA"),
         "epicrisis": ""
         if not epi_legible
@@ -2351,7 +2625,8 @@ def cruzar_soportes(res: ResultadoFactura) -> None:
         _agregar_cruce(res, "Total facturado (97+99)", f"{total_fact:,}", valores, "COINCIDE")
 
     # ── Consecutivo (nro de ingreso) en factura PDF ──────────────────────────
-    if fac_legible and c[4]:
+    # (la representación gráfica DIAN no trae el número de ingreso)
+    if fac_paciente and c[4]:
         r = "COINCIDE" if c[4] in txt_fac else "NO ENCONTRADO"
         _agregar_cruce(
             res,
@@ -2586,6 +2861,8 @@ def generar_excel(
                 return "FALTA"
             if s.get("legible") == "NO (escaneado)":
                 return "SIN TEXTO"
+            if s.get("legible") == "SI (OCR)":
+                return "SI (OCR)"
             return "SI"
 
         estado = "CON ERRORES" if res.errores else "REVISAR" if res.advertencias else "CUMPLE"
@@ -2892,8 +3169,17 @@ def generar_excel(
         ),
         (
             "Cruce 'NO ENCONTRADO'",
-            "El dato del FURIPS no aparece textualmente en el PDF. Si el PDF es escaneado "
-            "(sin capa de texto) el cruce no es posible y se marca 'SIN TEXTO'.",
+            "El dato del FURIPS no aparece textualmente en el PDF (severidad ADVERTENCIA "
+            "cuando RIPS/CUV/XML sí coinciden). Si el PDF es escaneado, el bot le aplica OCR "
+            "automáticamente (queda 'SI (OCR)' en SOPORTES) y cruza sobre el texto reconocido. "
+            "Solo si no hay motor OCR instalado el cruce SE OMITE y el archivo queda marcado "
+            "'SIN TEXTO': revisarlo manualmente o instalar el OCR (pypdfium2 + rapidocr-onnxruntime).",
+        ),
+        (
+            "Direcciones (campos 15, 50 y 60)",
+            "La dirección de residencia no puede ser solo el nombre de un municipio/"
+            "departamento ni un código numérico: debe registrarse la nomenclatura completa "
+            "(ej. CALLE 51 # 15-20, MANZANA X CASA Y, VEREDA/FINCA con nombre).",
         ),
         (
             "Normativa",
@@ -2921,12 +3207,15 @@ def generar_excel(
 def descubrir_soportes(base: Path) -> dict[str, list[Path]]:
     """Mapa factura_norm → archivos de soporte, agrupados por NOMBRE de archivo.
 
-    Soporta las dos organizaciones reales del HUS:
+    Soporta las organizaciones reales del HUS:
     - Una carpeta por factura (HUS374152/...): el número de factura viene
       igual en el nombre de cada soporte (<codhab>_<factura>_<TOKEN>.ext).
     - Una carpeta PLANA (p.ej. SOPORTES/) con los archivos de muchas
       facturas mezclados: se agrupan por el número de factura del nombre.
-    Si el archivo no trae el número, se intenta con el nombre de su carpeta.
+    - Archivos SUELTOS en la raíz (fuera de toda carpeta) o en subcarpetas
+      internas (HUS374152/PDF/..., HUS374152/SOPORTES/...): si el archivo
+      no trae el número en su nombre, se sube por las carpetas que lo
+      contienen hasta encontrar una que sí lo traiga.
     """
     soportes: dict[str, list[Path]] = {}
     try:
@@ -2938,7 +3227,14 @@ def descubrir_soportes(base: Path) -> dict[str, list[Path]]:
             continue
         if clasificar_soporte(p.name) == "OTRO":
             continue
-        fact = factura_desde_nombre(p.name) or factura_desde_nombre(p.parent.name)
+        fact = factura_desde_nombre(p.name)
+        if not fact:
+            for carpeta in p.parents:
+                if carpeta == base or carpeta == carpeta.parent:
+                    break
+                fact = factura_desde_nombre(carpeta.name)
+                if fact:
+                    break
         if not fact:
             continue
         soportes.setdefault(norm_factura(fact), []).append(p)

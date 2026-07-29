@@ -71,3 +71,10 @@ El `.cmd` las instala solo si faltan.
 El Word es un **borrador estructurado**: revise nombre/cargo de quien firma,
 los extractos citados de trabajo social y las facturas con NOTA DE REVISIÓN.
 El área de facturación es responsable del contenido final que presenta.
+
+## OCR para páginas escaneadas (nuevo)
+
+Las páginas del PDF unido que no traen texto (escaneadas) ahora se leen por
+**OCR** (máximo 15 páginas por factura, para no alargar la corrida). El
+motor se detecta solo: Tesseract si está instalado, o RapidOCR
+(`pip install pypdfium2 rapidocr-onnxruntime` — el .cmd lo intenta solo).

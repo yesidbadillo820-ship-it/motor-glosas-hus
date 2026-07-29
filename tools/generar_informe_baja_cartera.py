@@ -130,8 +130,8 @@ def pesos(valor: int | None) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def extraer_paginas_pdf(ruta: Path) -> list[str]:
-    """Devuelve el texto por página. Lista vacía si no hay lector o falla."""
+def _paginas_capa_texto(ruta: Path) -> list[str]:
+    """Texto por página con la capa de texto del PDF (sin OCR)."""
     try:
         import pdfplumber
 
@@ -153,6 +153,116 @@ def extraer_paginas_pdf(ruta: Path) -> list[str]:
     except Exception as e:
         logger.warning(f"  pypdf no pudo leer {ruta.name}: {e}")
         return []
+
+
+# OCR para páginas escaneadas del PDF unido: se reconocen máximo estas
+# páginas por factura (las de poco texto), para no eternizar la corrida.
+OCR_MAX_PAGINAS = 15
+_OCR_ESCALA = 200 / 72  # ≈200 DPI
+_ocr_motor: tuple | None = None
+
+
+def _preparar_ocr() -> tuple:
+    """Detecta el motor OCR disponible una sola vez: Tesseract o RapidOCR."""
+    global _ocr_motor
+    if _ocr_motor is not None:
+        return _ocr_motor
+    motor: tuple = (None, None)
+    try:
+        import shutil as _sh
+
+        import pytesseract
+
+        ruta_tess = _sh.which("tesseract")
+        if not ruta_tess:
+            for candidata in (
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            ):
+                if Path(candidata).exists():
+                    ruta_tess = candidata
+                    break
+        if ruta_tess:
+            pytesseract.pytesseract.tesseract_cmd = ruta_tess
+            motor = ("tesseract", pytesseract)
+    except ImportError:
+        pass
+    if motor[0] is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+
+            motor = ("rapidocr", RapidOCR())
+        except Exception:
+            pass
+    _ocr_motor = motor
+    if motor[0]:
+        logger.info(f"  Motor OCR disponible para páginas escaneadas: {motor[0]}")
+    return motor
+
+
+def _ocr_paginas(ruta: Path, indices: list[int]) -> dict[int, str]:
+    """OCR de las páginas indicadas → {índice: texto}. Nunca lanza excepción."""
+    nombre_motor, motor = _preparar_ocr()
+    if nombre_motor is None or not indices:
+        return {}
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return {}
+    reconocidas: dict[int, str] = {}
+    try:
+        pdf = pdfium.PdfDocument(str(ruta))
+        try:
+            for i in indices:
+                if i >= len(pdf):
+                    continue
+                imagen = pdf[i].render(scale=_OCR_ESCALA).to_pil()
+                if nombre_motor == "tesseract":
+                    try:
+                        t = motor.image_to_string(imagen, lang="spa+eng")
+                    except Exception:
+                        t = motor.image_to_string(imagen)
+                else:
+                    import numpy as np
+
+                    resultado, _ = motor(np.array(imagen))
+                    t = "\n".join(x[1] for x in (resultado or []))
+                reconocidas[i] = t or ""
+        finally:
+            pdf.close()
+    except Exception as e:
+        logger.warning(f"  OCR falló en {ruta.name}: {e}")
+    return reconocidas
+
+
+def extraer_paginas_pdf(ruta: Path) -> list[str]:
+    """Texto por página; a las páginas escaneadas (sin texto) les aplica OCR.
+
+    Devuelve lista vacía solo si no hay lector de PDF o el archivo está
+    dañado y tampoco el OCR pudo abrirlo.
+    """
+    paginas = _paginas_capa_texto(ruta)
+    if not paginas:
+        # PDF ilegible para pdfplumber/pypdf: intento de rescate solo-OCR.
+        rescate = _ocr_paginas(ruta, list(range(OCR_MAX_PAGINAS)))
+        if rescate:
+            logger.info(f"  {ruta.name}: rescatado por OCR ({len(rescate)} página(s))")
+            return [rescate.get(i, "") for i in range(max(rescate) + 1)]
+        return paginas
+    pobres = [i for i, t in enumerate(paginas) if len((t or "").strip()) < 40]
+    if pobres and _preparar_ocr()[0]:
+        if len(pobres) > OCR_MAX_PAGINAS:
+            logger.info(
+                f"  {ruta.name}: {len(pobres)} páginas escaneadas; se aplica OCR "
+                f"solo a las primeras {OCR_MAX_PAGINAS}."
+            )
+        reconocidas = _ocr_paginas(ruta, pobres[:OCR_MAX_PAGINAS])
+        for i, t in reconocidas.items():
+            if len(t.strip()) > len((paginas[i] or "").strip()):
+                paginas[i] = t
+        if reconocidas:
+            logger.info(f"  {ruta.name}: OCR aplicado a {len(reconocidas)} página(s)")
+    return paginas
 
 
 def hallar_pdf_unido(carpeta: Path) -> Path | None:
@@ -345,36 +455,53 @@ def _extraer_trabajo_social(paginas: list[str]) -> tuple[str, list[int]]:
     return "\n".join(lineas), nums
 
 
-def analizar_carpeta(carpeta: Path) -> Factura | None:
+def analizar_carpeta(
+    carpeta: Path, pdfs: list[Path] | None = None, numero_hint: str = ""
+) -> Factura | None:
+    """Analiza una factura. Con `pdfs` se leen SOLO esos archivos (carpeta
+    plana con soportes de muchas facturas); sin `pdfs`, la carpeta completa."""
     f = Factura(carpeta=carpeta)
-    pdf = hallar_pdf_unido(carpeta)
-    if pdf is None:
-        # sin _UNIDO_: usar todos los PDF sueltos de la carpeta como respaldo
-        sueltos = sorted(p for p in carpeta.glob("*.pdf"))
+    if pdfs is not None:
+        sueltos = sorted(pdfs)
         if not sueltos:
             return None
-        f.observaciones.append(
-            "No se encontró el consolidado _UNIDO_ (bot UNIR_PDFS); se leyeron "
-            f"los {len(sueltos)} PDF sueltos de la carpeta."
-        )
+        logger.info(f"  Leyendo {numero_hint or carpeta.name}: {len(sueltos)} PDF...")
         paginas = [pg for p in sueltos for pg in extraer_paginas_pdf(p)]
-        f.fuente_pdf = f"{len(sueltos)} PDF sueltos"
+        f.fuente_pdf = f"{len(sueltos)} PDF de la factura (carpeta plana)"
     else:
-        paginas = extraer_paginas_pdf(pdf)
-        f.fuente_pdf = pdf.name
+        pdf = hallar_pdf_unido(carpeta)
+        if pdf is None:
+            # sin _UNIDO_: usar todos los PDF sueltos de la carpeta como respaldo
+            sueltos = sorted(p for p in carpeta.glob("*.pdf"))
+            if not sueltos:
+                return None
+            f.observaciones.append(
+                "No se encontró el consolidado _UNIDO_ (bot UNIR_PDFS); se leyeron "
+                f"los {len(sueltos)} PDF sueltos de la carpeta."
+            )
+            logger.info(f"  Leyendo {carpeta.name}: {len(sueltos)} PDF sueltos...")
+            paginas = [pg for p in sueltos for pg in extraer_paginas_pdf(p)]
+            f.fuente_pdf = f"{len(sueltos)} PDF sueltos"
+        else:
+            logger.info(f"  Leyendo {carpeta.name}: {pdf.name}...")
+            paginas = extraer_paginas_pdf(pdf)
+            f.fuente_pdf = pdf.name
     f.paginas = len(paginas)
+    if numero_hint:
+        f.numero = numero_hint
     if not paginas:
         f.observaciones.append("El PDF no se pudo leer (¿escaneado sin texto o corrupto?).")
 
     texto_total = "\n".join(paginas)
 
-    # Número de factura: del texto o del nombre de la carpeta
-    m = _RE_FACTURA_TXT.search(texto_total)
-    if m:
-        f.numero = m.group(1).upper()
-    else:
-        m = _RE_FACTURA_NOMBRE.search(normalizar(carpeta.name).replace(" ", ""))
-        f.numero = m.group(1) if m else carpeta.name
+    # Número de factura: del nombre de los archivos (hint), del texto o de la carpeta
+    if not f.numero:
+        m = _RE_FACTURA_TXT.search(texto_total)
+        if m:
+            f.numero = m.group(1).upper()
+        else:
+            m = _RE_FACTURA_NOMBRE.search(normalizar(carpeta.name).replace(" ", ""))
+            f.numero = m.group(1) if m else carpeta.name
 
     # Paciente y documento
     m = _RE_PACIENTE_FAC.search(texto_total)
@@ -858,6 +985,47 @@ def main() -> int:
 
     facturas: list[Factura] = []
     for carpeta in carpetas:
+        if carpeta.name.startswith(("__", ".")):
+            continue
+
+        if hallar_pdf_unido(carpeta) is None:
+            # ¿Carpeta PLANA con los soportes de VARIAS facturas mezclados
+            # (p.ej. SOPORTES\ con <codHab>_<factura>_<TIPO>.pdf)? Se agrupan
+            # los PDF por el número de factura del nombre y se procesa cada
+            # factura por separado, con progreso visible (la lectura de PDF
+            # por red puede tardar).
+            pdfs = sorted(carpeta.glob("*.pdf"))
+            grupos: dict[str, list[Path]] = {}
+            for pdf in pdfs:
+                m = _RE_FACTURA_NOMBRE.search(normalizar(pdf.stem).replace(" ", ""))
+                grupos.setdefault(m.group(1) if m else "", []).append(pdf)
+            con_id = {k: v for k, v in grupos.items() if k}
+            if len(con_id) >= 2:
+                logger.info(
+                    f"Carpeta plana detectada: {carpeta.name} — "
+                    f"{len(con_id)} facturas en {len(pdfs)} PDF"
+                )
+                if grupos.get(""):
+                    logger.info(
+                        f"  ({len(grupos[''])} PDF sin número de factura en el nombre: se omiten)"
+                    )
+                for fact, lista in sorted(con_id.items()):
+                    f = analizar_carpeta(carpeta, pdfs=lista, numero_hint=fact)
+                    if f is None:
+                        continue
+                    facturas.append(f)
+                    ts = "con trabajo social" if f.tsocial_texto else "SIN trabajo social"
+                    logger.info(f"  {f.numero}: {pesos(f.valor)} — {ts} — {f.fuente_pdf}")
+                continue
+            if len(pdfs) > 25:
+                logger.warning(
+                    f"  {carpeta.name}: {len(pdfs)} PDF sueltos sin _UNIDO_ y sin "
+                    "número de factura reconocible en los nombres — SE OMITE para "
+                    "no leer cientos de archivos. Corra UNIR_PDFS.cmd o nombre los "
+                    "PDF como <codHabilitacion>_<factura>_<TIPO>.pdf."
+                )
+                continue
+
         f = analizar_carpeta(carpeta)
         if f is None:
             continue
@@ -866,7 +1034,11 @@ def main() -> int:
         logger.info(f"  {f.numero}: {pesos(f.valor)} — {ts} — {f.fuente_pdf}")
 
     if not facturas:
-        logger.error("No se encontró ninguna carpeta con PDF para procesar.")
+        logger.error(
+            "No se encontró ninguna carpeta con PDF para procesar. Este bot "
+            "necesita: carpetas por factura con su _UNIDO_*.pdf (bot UNIR_PDFS), "
+            "o una carpeta plana con PDF nombrados <codHab>_<factura>_<TIPO>.pdf."
+        )
         return 1
 
     # De la más cara a la más económica (sin valor van al final)

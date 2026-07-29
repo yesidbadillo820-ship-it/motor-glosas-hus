@@ -67,6 +67,24 @@ if not defined PYEXE (
     echo [i] Instalando el lector de PDF ^(pypdf^), espere...
     %PYEXE% -m pip install --quiet --user pypdf >nul 2>&1
 )
+REM OCR para PDF escaneados (opcional pero recomendado): si no se puede
+REM instalar, el bot corre igual (los escaneados quedan SIN TEXTO).
+%PYEXE% -c "import pypdfium2" >nul 2>&1 || (
+    echo [i] Instalando el visor de paginas para OCR ^(pypdfium2^), espere...
+    %PYEXE% -m pip install --quiet --user pypdfium2 >nul 2>&1
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 || (
+    echo [i] Instalando el motor OCR ^(rapidocr-onnxruntime^) para leer PDF
+    echo     ESCANEADOS. Descarga ~200 MB SOLO la primera vez. NO cierre la
+    echo     ventana: abajo se ve el avance de la descarga...
+    %PYEXE% -m pip install --user rapidocr-onnxruntime
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 && (
+    echo [i] Lector OCR listo.
+) || (
+    echo [!] OCR no disponible: se continua igual y los PDF escaneados
+    echo     quedaran marcados SIN TEXTO para revision manual.
+)
 
 if not exist "%~dp0generar_informe_baja_cartera.py" (
     echo [X] No encuentro generar_informe_baja_cartera.py junto a este .cmd.
