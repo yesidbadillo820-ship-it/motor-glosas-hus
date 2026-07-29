@@ -225,8 +225,10 @@ TOOLS_ASISTENTE = [
             "El expediente completo de una glosa: ficha, contrato que rige, "
             "constancia contractual, línea de tiempo de TODO lo que ha pasado "
             "(análisis, versiones, cambios de estado, comentarios, actas), "
-            "conciliaciones y soportes conocidos. Úsalo cuando pregunten "
-            "'¿qué ha pasado con…?' o antes de recomendar el siguiente paso."
+            "conciliaciones y el CENTRO DOCUMENTAL (dictamen PDF, actas, "
+            "paquete de evidencia, soportes del share con su ruta). Úsalo "
+            "cuando pregunten '¿qué ha pasado con…?', '¿qué documentos hay?' "
+            "o antes de recomendar el siguiente paso."
         ),
         "input_schema": {
             "type": "object",
