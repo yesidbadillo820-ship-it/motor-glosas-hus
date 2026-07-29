@@ -63,6 +63,11 @@ class AuditarIn(BaseModel):
     observaciones: Optional[str] = Field(None, max_length=2000)
 
 
+class ObservacionIn(BaseModel):
+    # Anotar la observación de una factura ya auditada, sin revertir la decisión.
+    observaciones: str = Field(..., max_length=2000)
+
+
 class OficioDevolucionIn(BaseModel):
     # La numeración de los oficios de devolución la lleva SINAC por fuera del
     # sistema: el auditor escribe el consecutivo que va. Si no lo escribe, se
@@ -696,6 +701,26 @@ def auditar_factura(
     )
     if not res.get("ok"):
         raise HTTPException(res.get("codigo", 400), res.get("mensaje", "No se pudo auditar"))
+    db.refresh(f)
+    return _factura_dict(db, f)
+
+
+@router.patch("/facturas/{factura_id}/observacion")
+def anotar_observacion(
+    factura_id: int,
+    body: ObservacionIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Agrega o corrige la observación sin tocar la decisión ya tomada."""
+    f = db.get(FacturaPreauditoriaRecord, factura_id)
+    if not f:
+        raise HTTPException(404, "Factura no encontrada")
+    res = svc.anotar_observacion(db, f, body.observaciones, _nombre_auditor(current_user))
+    if not res.get("ok"):
+        raise HTTPException(
+            res.get("codigo", 400), res.get("mensaje", "No se pudo guardar la observación")
+        )
     db.refresh(f)
     return _factura_dict(db, f)
 

@@ -613,8 +613,8 @@ async function abrirAuditar(id){
       (limite?'<div class="aviso aviso-err">⚠️ Agotó las '+f.max_devoluciones+' devoluciones: debe radicarse o escalarse.</div>':'')+
       (sinFE?'<div class="aviso aviso-err">🚫 Sin soporte de <b>facturación electrónica</b> (Correo F.E. = NO): solo puede DEVOLVERSE. Si el soporte ya existe, suba el Formato Facturación Electrónica actualizado en Fuentes.</div>':'')+
       (f.motivo_devolucion?'<p class="leyenda">Motivo actual: '+esc(f.motivo_devolucion)+'</p>':'')+
-      '<label class="campo" style="margin:10px 0">Motivo de la devolución (obligatorio si devuelve)<textarea id="au-motivo" rows="3" style="width:100%">'+esc(f.motivo_devolucion||'')+'</textarea></label>'+
-      '<label class="campo" style="margin:10px 0">Observaciones (se guardan siempre, también al radicar)<textarea id="au-obs" rows="3" style="width:100%">'+esc(f.observaciones||'')+'</textarea></label>'+
+      '<label class="campo" style="margin:10px 0">Observaciones — escriba aquí si va a RADICAR (se guardan siempre)<textarea id="au-obs" rows="3" style="width:100%">'+esc(f.observaciones||'')+'</textarea></label>'+
+      '<label class="campo" style="margin:10px 0">Motivo de la devolución — solo si DEVUELVE<textarea id="au-motivo" rows="3" style="width:100%">'+esc(f.motivo_devolucion||'')+'</textarea></label>'+
       '<div id="au-msg"></div>'+
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
@@ -669,9 +669,36 @@ async function verHist(numero){
     }).join('');
     document.getElementById('mh-cuerpo').innerHTML='<p>'+estadoChip(d.actual.estado)+' · Devoluciones <b>'+d.actual.num_devoluciones+'</b> · Subsanación '+d.actual.num_subsanacion+'</p>'+
       (d.actual.observaciones?'<div class="aviso aviso-ok"><b>Observación actual:</b> '+esc(d.actual.observaciones)+'</div>':'')+
-      '<div class="tbl-scroll"><table><thead><tr><th>Ronda</th><th>Evento</th><th>Oficio</th><th>Envío</th><th>Auditor</th><th>Fecha</th><th>Motivo</th><th>Observaciones</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
+      // Permite anotar la observación en facturas ya decididas, sin revertirlas.
+      '<label class="campo" style="margin:10px 0">'+(d.actual.observaciones?'Corregir la observación':'Anotar la observación que falta')+
+        '<textarea id="mh-obs" rows="2" style="width:100%" placeholder="Ej.: OKAY SOPORTES">'+esc(d.actual.observaciones||'')+'</textarea></label>'+
+      '<div id="mh-msg"></div>'+
+      '<button class="btn btn-borde btn-chico" onclick="guardarObservacion('+d.actual.id+',\''+esc(numero)+'\')">✎ Guardar observación</button>'+
+      '<div class="tbl-scroll" style="margin-top:12px"><table><thead><tr><th>Ronda</th><th>Evento</th><th>Oficio</th><th>Envío</th><th>Auditor</th><th>Fecha</th><th>Motivo</th><th>Observaciones</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
     abrirModal('m-hist');
   }catch(e){ alert(e.message); }
+}
+// Guarda la observación de una factura YA decidida, sin revertirla. Queda como
+// un evento más del historial (quién la escribió y cuándo).
+var _guardandoObs = false;
+async function guardarObservacion(id, numero){
+  if(_guardandoObs) return;
+  var caja = document.getElementById('mh-obs');
+  var msg = document.getElementById('mh-msg');
+  var texto = caja ? caja.value.trim() : '';
+  if(!texto){ if(msg) msg.innerHTML='<div class="aviso aviso-err">Escriba la observación.</div>'; return; }
+  _guardandoObs = true;
+  if(msg) msg.innerHTML='<div class="aviso aviso-warn">Guardando…</div>';
+  try{
+    await api('/preauditoria/facturas/'+id+'/observacion',{method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({observaciones: texto})});
+    await verHist(numero);            // repinta el historial con el evento nuevo
+    await cargarConsolidado();
+  }catch(e){
+    if(msg) msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>';
+    else alert(e.message);
+  }finally{ _guardandoObs = false; }
 }
 
 // ---------- devoluciones ----------

@@ -365,6 +365,111 @@ class TestAuditoria:
         radicada = [e for e in h["eventos"] if e["tipo"] == "RADICADA"][0]
         assert radicada["observaciones"] == "Soportes revisados con la EPS"
 
+    def test_lo_escrito_en_motivo_al_radicar_no_se_pierde(self, client):
+        """Caso real 29-07-2026: el auditor escribió "OKAY SOPORTES" en el
+        recuadro de motivo (el de arriba) y radicó. El texto se descartaba en
+        silencio y el historial salía vacío. Ahora se guarda como observación."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "RADICAR", "motivo_devolucion": "OKAY SOPORTES"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["observaciones"] == "OKAY SOPORTES"
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert h["actual"]["observaciones"] == "OKAY SOPORTES"
+        radicada = [e for e in h["eventos"] if e["tipo"] == "RADICADA"][0]
+        assert radicada["observaciones"] == "OKAY SOPORTES"
+
+    def test_si_escribe_en_los_dos_recuadros_se_conservan_ambos(self, client):
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={
+                "resultado": "RADICAR",
+                "observaciones": "Soportes completos",
+                "motivo_devolucion": "OKAY SOPORTES",
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["observaciones"] == "Soportes completos — OKAY SOPORTES"
+
+    def test_el_mismo_texto_en_los_dos_recuadros_no_se_duplica(self, client):
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={
+                "resultado": "RADICAR",
+                "observaciones": "OKAY SOPORTES",
+                "motivo_devolucion": "OKAY SOPORTES",
+            },
+        )
+        assert r.json()["observaciones"] == "OKAY SOPORTES"
+
+    def test_al_devolver_el_motivo_sigue_siendo_motivo(self, client):
+        """El arreglo del radicar no puede contaminar la devolución: ahí el
+        motivo es motivo y no debe colarse en la observación."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": "Falta epicrisis"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["motivo_devolucion"] == "Falta epicrisis"
+        assert not r.json()["observaciones"]
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        dev = [e for e in h["eventos"] if e["tipo"] == "DEVUELTA"][0]
+        assert dev["motivo"] == "Falta epicrisis"
+
+    def test_anotar_la_observacion_de_una_factura_ya_radicada(self, client):
+        """Las facturas que ya se radicaron sin observación se pueden anotar
+        ahora, sin revertirlas ni volverlas a radicar."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        assert _radicar(client, fid).status_code == 200
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/observacion",
+            json={"observaciones": "OKAY SOPORTES"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["observaciones"] == "OKAY SOPORTES"
+        # la decisión NO cambió
+        assert r.json()["resultado"] == "RADICAR"
+        assert r.json()["estado"] == "RADICADA"
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        anotacion = [e for e in h["eventos"] if e["tipo"] == "OBSERVACION"]
+        assert len(anotacion) == 1
+        assert anotacion[0]["observaciones"] == "OKAY SOPORTES"
+        # y la RADICADA original sigue intacta (historial inmutable)
+        assert len([e for e in h["eventos"] if e["tipo"] == "RADICADA"]) == 1
+
+    def test_no_se_puede_anotar_una_observacion_vacia(self, client):
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        _radicar(client, fid)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "   "}
+        )
+        assert r.status_code == 400
+
+    def test_la_fila_revertida_muestra_la_observacion(self, client):
+        """Antes la fila REVERTIDA salía siempre vacía en el historial."""
+        self._setup(client)
+        fid = _factura_id(client, F1)
+        client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "RADICAR", "observaciones": "OKAY SOPORTES"},
+        )
+        r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r.status_code == 200, r.text
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        rev = [e for e in h["eventos"] if e["tipo"] == "REVERTIDA"][0]
+        assert rev["observaciones"] == "OKAY SOPORTES"
+
     def test_no_doble_devolucion_sin_reingreso(self, client):
         # BUG: devolver dos veces sin reingreso NO debe inflar el contador.
         o, fid = self._setup(client)
