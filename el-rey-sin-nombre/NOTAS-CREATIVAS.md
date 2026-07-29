@@ -97,6 +97,27 @@ pensamientos internos y para el motivo-frase recurrente.
 - Ampolla en la palma derecha de Yazid (de partir leña) — motivo físico de que los tres días
   fueron reales.
 
+## Hechos plantados en el Libro I (no contradecir)
+
+- Yazid visitó La Parra 7 veces documentadas en el Libro I (excusa: "rondas de inspección").
+- Cap. 5 "El Mercado": un mercader pagó con una moneda de plata con el rostro de Yazid grabado;
+  Daniela la guardó en la caja sin mirarla. Nadie la reconoció. (Elemento para retomar si hace
+  falta un cabo suelto, aunque no es imprescindible.)
+- Cap. 6: Daniela reveló que su madre murió de fiebre cuando ella tenía 9 años; su padre Tomás
+  nunca volvió a hablar de ella. (Detalle de trasfondo, NO es la "pérdida" que la trama central
+  debe evitar — es historia pasada de un personaje secundario ya fallecido antes del inicio del
+  libro, no una muerte dentro del arco romántico.)
+- Cap. 7: primer beso, durante una tormenta, en la séptima visita de Yazid.
+- Cap. 8: un caballero por poco lo llama "Majestad" frente a Daniela. Ella confrontó a Yazid;
+  él le dio una verdad a medias ("trabajo para la corona, en algo delicado") y prometió contarle
+  todo "pronto". Sembrada la semilla de sospecha de Daniela.
+- Cap. 9 (cierre Libro I): Bernal manda mensajero urgente — el plazo del mes se cumplió. Yazid
+  se despide de Daniela sin decirle la verdad; ella advierte que su paciencia tiene límite.
+  Bernal le dice al llegar: "Tenemos un problema mucho más grande que el duque Rodrigo" —
+  a resolver en la apertura del Libro II (el duque Rodrigo adelantó una asamblea pública en la
+  capital para presentar a la infanta Elvira y anunciar el compromiso, usando como ocasión las
+  quejas de los pueblos fronterizos por el cierre del paso de Renglar).
+
 ## Progreso
 
 | Libro | Capítulo | Título | Estado |
@@ -104,6 +125,11 @@ pensamientos internos y para el motivo-frase recurrente.
 | I | 1 | El Forastero | ✅ |
 | I | 2 | Tres Días | ✅ |
 | I | 3 | El Trono Frío | ✅ |
-| I | 4-9 | — | ⏳ |
+| I | 4 | El Regreso | ✅ |
+| I | 5 | El Mercado | ✅ |
+| I | 6 | La Primera Verdad | ✅ |
+| I | 7 | El Beso | ✅ |
+| I | 8 | Lo Que No Se Dice | ✅ |
+| I | 9 | Treinta Días | ✅ (cierra Libro I) |
 | II | 1-9 | — | ⏳ |
 | III | 1-9 + Epílogo | — | ⏳ |
