@@ -162,6 +162,23 @@ El resultado queda en SALIDAS/CORREOS_PAGOS/. También por consola:
     python suite_cli.py correos CARPETA_CON_MSG/ -o CONSOLIDADO.xlsx
     python suite_cli.py correos RELACION_PAGOS.zip -o CONSOLIDADO.xlsx
 
+UNIR EXCELES (botón «📊 Unir Exceles»)
+--------------------------------------
+Une varios archivos Excel (.xlsx/.xlsm) en UNO, sin perder calidad del
+dato (fechas como fechas, montos como números — nunca texto). Acepta
+archivos sueltos, una carpeta o un .zip. Dos modos:
+    APILAR .... archivos con las MISMAS columnas (cortes mensuales,
+                exportes del portal): todas las filas en una sola tabla.
+                Si un archivo trae columnas nuevas, se agregan al final;
+                ninguna fila ni columna se pierde. Cada fila queda
+                marcada con su archivo de origen y hay hoja RESUMEN.
+    HOJAS ..... cada archivo queda como una hoja aparte del mismo libro.
+Se lee la PRIMERA hoja de cada archivo; si hay un título encima del
+encabezado, el bot lo salta solo. El resultado queda en
+SALIDAS/EXCELES_UNIDOS/. También por consola:
+    python suite_cli.py exceles enero.xlsx febrero.xlsx -o UNIDO.xlsx
+    python suite_cli.py exceles CARPETA/ -o UNIDO.xlsx --modo hojas
+
 REQUISITOS
 ----------
 Windows con Python 3.8+ · pandas · openpyxl · python-docx · pymupdf ·

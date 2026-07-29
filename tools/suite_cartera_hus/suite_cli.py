@@ -26,6 +26,7 @@ from nucleo import (  # noqa: E402
     ai_tools,
     archivos,
     cruces_dgh,
+    excel_tools,
     msg_tools,
     office_tools,
     pdf_tools,
@@ -323,6 +324,12 @@ def cmd_correos(args):
     return 0
 
 
+def cmd_exceles(args):
+    """Une varios Excel en uno (apilar filas u hoja por archivo)."""
+    print(excel_tools.unir(args.entradas, args.salida, modo=args.modo, log=log))
+    return 0
+
+
 def construir_parser():
     p = argparse.ArgumentParser(
         prog="suite_cli",
@@ -420,6 +427,19 @@ def construir_parser():
     )
     s.add_argument("-o", "--salida", required=True, help="Ruta del Excel consolidado de salida.")
     s.set_defaults(func=cmd_correos)
+
+    s = sub.add_parser("exceles", help="Une varios Excel en uno (apilar u hoja por archivo).")
+    s.add_argument(
+        "entradas", nargs="+", help="Archivo(s) .xlsx/.xlsm, carpeta, y/o .zip que los contenga."
+    )
+    s.add_argument("-o", "--salida", required=True, help="Ruta del Excel unido de salida.")
+    s.add_argument(
+        "--modo",
+        choices=["apilar", "hojas"],
+        default="apilar",
+        help="apilar = todas las filas en una tabla; hojas = una hoja por archivo.",
+    )
+    s.set_defaults(func=cmd_exceles)
     return p
 
 

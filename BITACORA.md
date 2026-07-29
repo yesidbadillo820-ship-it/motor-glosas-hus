@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 28-07-2026
+**Última actualización:** 29-07-2026
 
 ---
 
@@ -576,6 +576,28 @@ rama principal: están listos, probados y a un clic de distancia.
   a vencer (ordena por urgencia, arma el correo, todo). Está terminado y
   **desconectado**. Es justo lo que faltó cuando las tres facturas de junio
   ($20.054.751) se descubrieron 45 días tarde.
+
+### 29-07 — Se juntaron las dos memorias del proyecto + bot de Unir Exceles
+- **Se fusionó la rama principal en el PR #160** (la Suite Cartera HUS). Al
+  hacerlo se descubrió que había **dos bitácoras paralelas** — una en la rama
+  principal (todo el frente del Motor/Pre-auditoría/Dispensario) y otra en la
+  rama de la Suite (consolidados de cartera, actas, herramientas PDF, bot de
+  correos) — porque dos chats trabajaron cada uno con la suya sin saberlo.
+  **Se combinaron en esta sola bitácora sin perder ninguna entrada** de
+  ningún lado, y lo mismo con las instrucciones del repo (CLAUDE.md). El PR
+  #160 quedó **sin conflictos y con las 3 verificaciones en verde** (4.611
+  pruebas), listo para revisar y fusionar.
+- **Bot nuevo: «📊 Unir Exceles»** (en la Suite y también entregado como ZIP
+  suelto de doble clic): une varios archivos Excel en UNO, sin dañar el dato
+  (fechas como fechas, montos como números — nunca texto). Dos modos:
+  **APILAR** (todas las filas en una sola tabla — para cortes mensuales o
+  exportes con las mismas columnas; si un archivo trae columnas nuevas se
+  agregan al final y nada se pierde; cada fila queda marcada con su archivo
+  de origen y hay hoja RESUMEN) y **HOJAS** (cada archivo queda como una
+  hoja aparte del mismo libro). Acepta archivos sueltos, una carpeta o un
+  .zip, y salta solo los títulos que vienen encima de los encabezados.
+  Por consola: `python suite_cli.py exceles archivo1.xlsx archivo2.xlsx -o
+  UNIDO.xlsx` (o `--modo hojas`). Con 9 pruebas automáticas nuevas.
 
 ---
 
