@@ -409,3 +409,57 @@ class TestIpEnAuditoria:
             client = None
 
         assert _ip_del_cliente(_Req()) == "9.9.9.9"
+
+
+class TestLaCuartaPuerta:
+    """`PATCH /glosas/{id}/estado` era la más ancha de las cuatro.
+
+    Las tres de `workflow.py` ya están cerradas. Esta pone la glosa en
+    cualquiera de los once estados —incluidos LEVANTADA (el hospital ganó) y
+    ACEPTADA (el hospital desistió)— y bastaba con estar autenticado. Encima
+    guardaba `responsable="sistema"`, así que el registro no decía quién fue.
+    """
+
+    def test_viewer_no_puede_cambiar_el_estado(self, cliente, db_session):
+        _glosa(db_session, estado="RADICADA", workflow_state="RADICADA")
+        gid = db_session.query(GlosaRecord).first().id
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.patch(f"/glosas/{gid}/estado?nuevo_estado=LEVANTADA")
+        assert r.status_code == 403
+
+    def test_auditor_no_cambia_el_estado_de_otro(self, cliente, db_session):
+        _glosa(db_session, estado="RADICADA", auditor_email="otro@hus.com")
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.patch(f"/glosas/{gid}/estado?nuevo_estado=LEVANTADA")
+        assert r.status_code == 403
+
+    def test_queda_escrito_quien_lo_hizo_no_el_sistema(self, cliente, db_session):
+        _glosa(db_session, estado="RADICADA", auditor_email="ana@hus.com")
+        gid = db_session.query(GlosaRecord).first().id
+        r = cliente.patch(f"/glosas/{gid}/estado?nuevo_estado=LEVANTADA")
+        assert r.status_code == 200
+        db_session.expire_all()
+        glosa = db_session.query(GlosaRecord).get(gid)
+        assert glosa.responsable != "sistema"
+        assert glosa.responsable == "ana@hus.com"
+
+
+class TestContratosNoLosBorraCualquiera:
+    """El contrato es la base de todo dictamen de esa EPS.
+
+    Borrarlo —o borrar sus cláusulas— deja a la IA sin nada literal que citar.
+    Bastaba con estar autenticado, así que un VIEWER podía hacerlo.
+    """
+
+    def test_viewer_no_borra_un_contrato(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        assert cliente.delete("/contratos/COOSALUD").status_code == 403
+
+    def test_auditor_tampoco_borra(self, cliente):
+        """Subir el contrato sí es su trabajo; borrarlo no."""
+        assert cliente.delete("/contratos/COOSALUD").status_code == 403
+
+    def test_viewer_no_sube_un_contrato(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/contratos/upsert", json={"eps": "COOSALUD", "contenido": "x"})
+        assert r.status_code == 403

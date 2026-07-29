@@ -451,9 +451,7 @@ class TestAuditoria:
         self._setup(client)
         fid = _factura_id(client, F1)
         _radicar(client, fid)
-        r = client.patch(
-            f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "   "}
-        )
+        r = client.patch(f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "   "})
         assert r.status_code == 400
 
     def test_la_fila_revertida_muestra_la_observacion(self, client):
