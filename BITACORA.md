@@ -480,18 +480,52 @@ Reportadas por el auditor durante la jornada, con evidencia en pantalla:
   de devolución solo se puede generar si hay al menos una factura devuelta,
   porque es la carta con la que se le regresan las facturas a la entidad.
 
+### 28-07 (tarde) — Pre-auditoría: el consecutivo del oficio lo escribe el auditor
+- El auditor recordó un pedido anterior: **la numeración de los oficios de
+  devolución la lleva SINAC internamente**, así que el sistema no debe
+  asignarla sola. Ahora, al oprimir **"Generar oficio de devolución"**, se
+  abre una ventana para **escribir el consecutivo que corresponde**.
+- Viene precargado con el que seguiría según lo registrado en la página (solo
+  como sugerencia) y se puede cambiar. Se acepta escribir **solo el número**
+  (`89` → se completa como DEV-PRE-AUD-0089-2026) o el **consecutivo
+  completo**. Si se escribe uno ya usado, el sistema lo rechaza diciendo en
+  cuál oficio está. Si se deja vacío, usa el sugerido.
+- La sugerencia siguiente continúa desde el que se escribió (si usó el 89, la
+  próxima vez sugiere el 90).
+- 3 pruebas nuevas + prueba en navegador de la ventana completa.
+- **Ya quedó desplegado en la VM** (PR #208 fusionado). No hubo que hacer nada
+  a mano: el auto-despliegue que corre cada 5 minutos lo aplicó solo y el
+  motor quedó corriendo el commit `5ba3a3f`, sano. Para verlo en pantalla hay
+  que refrescar el navegador con **Ctrl+F5** (si no, muestra la versión vieja
+  que tiene guardada).
+- **Nota para no perder tiempo la próxima vez:** en la VM el repositorio está
+  en `/opt/motor-glosas` y el motor corre en **Docker**, no como servicio de
+  systemd. El comando para mirar cómo está, desde Cloud Shell y en un solo
+  paso (entra a la VM y ejecuta allá adentro):
+
+  ```bash
+  gcloud compute ssh motor-glosas --zone=us-west1-a --tunnel-through-iap --command '
+  cd /opt/motor-glosas && git log --oneline -1
+  sudo docker compose ps
+  free -m | head -2
+  '
+  ```
+
+  Cuidado con confundir las dos máquinas: si el prompt dice `@cloudshell`
+  estás **fuera** de la VM y los comandos no encuentran nada; dentro de la VM
+  el prompt dice `@motor-glosas`.
+
 - **PENDIENTE importante (para que no vuelva a pasar):** con archivos de este
   tamaño, la solución de fondo es que **el cargue no haga esperar al
   navegador**: subir el archivo, responder de inmediato "recibido, procesando"
   y que la página muestre el avance. Así el tamaño del archivo deja de
   importar y no hay límite de tiempo que valga. Queda propuesto.
-- **PENDIENTE recomendado:** subir la máquina virtual de `e2-micro` (1 GB) a
-  **`e2-small`** (2 GB, ~US$13 más al mes). Se hace desde la consola de
-  Google: Compute Engine → VM `motor-glosas` → Detener → Editar → Tipo de
-  máquina `e2-small` → Guardar → Iniciar (5 minutos de página caída). Ojo:
-  esos comandos NO funcionan desde adentro de la VM (la VM no tiene permiso
-  para modificarse a sí misma); hay que hacerlo desde la consola web o
-  desde Cloud Shell.
+- **~~PENDIENTE recomendado~~ — YA HECHO:** subir la máquina virtual a
+  **`e2-small`**. Al revisar la VM el 28-07 la memoria total salió en 1.971 MB
+  (~2 GB): la `e2-micro` tiene 1 GB y la `e2-small` tiene 2 GB. Se confirmó
+  además preguntándole directamente a Google, que respondió `e2-small`:
+  `gcloud compute instances describe motor-glosas --zone=us-west1-a --format="value(machineType)"`
+  No hay que detener ni editar nada.
 
 ### Motor IA — rondas 32 y 33 (viene de la rama principal, PR #183)
 - **22 y 23-07 (motor de dictámenes):** dos rondas más de corrección del motor,
@@ -577,6 +611,119 @@ rama principal: están listos, probados y a un clic de distancia.
   **desconectado**. Es justo lo que faltó cuando las tres facturas de junio
   ($20.054.751) se descubrieron 45 días tarde.
 
+### 28-07 (noche) — Verificación adversarial del lote de glosas Dispensario del 28-jul
+- Lote de **97 objeciones**. Solo se atacaron las **6 decisiones nuevas** (el
+  resto del banco de plantillas ya pasó 4 rondas adversariales y no se re-evalúa).
+- Resultado: **3 calzan con reserva** (FA0201 equipo interdisciplinario,
+  FA2303 transfusión, TA listado→tarifa) y **3 NO calzan** (FA0801 segundo
+  rastreo de anticuerpos, SO5801 biopsia endometrio/AMEU, FA0101 conteo de
+  días de estancia).
+- **Veredicto: el lote NO está listo para subir.** Hay correcciones de texto
+  obligatorias antes del cargue:
+  - Quitar frases que refutan reclamos que el pagador no hizo ("no se anexa
+    acuerdo de tarifas", "paquete", "procedimiento principal", SOAT UVB):
+    delatan respuesta enlatada y permiten descalificarla por no pertinente
+    (la Res. 2284/2023 exige coherencia entre glosa y respuesta).
+  - Responder los prongs reales de cada observación: identificación del
+    equipo interdisciplinario y defensa de la cantidad 29 (FA0201); la tesis
+    "enfermería está incluida en la estancia" (FA2303: la estancia cubre el
+    cuidado básico, no procedimientos con renglón propio); la regla de 72
+    horas del banco de sangre (FA0801: voltearla — la muestra pretransfusional
+    VENCE a las 72 h en paciente transfundido, Decreto 1571/1993, o sea el
+    nuevo evento OBLIGA al nuevo rastreo); la homologación AMEU→legrado
+    (SO5801); y el conteo aritmético 32 vs 34 días (FA0101).
+  - Quitar frases autolesivas: la remisión genérica a la nota operatoria en
+    SO5801 (si la nota no describe biopsia aparte, confirma la glosa) y la
+    prueba de "permanencia del día objetado" en FA0101 (34 días no caben
+    entre el 17-may y el 18-jun); en TA, afirmar la vigencia 2026 del
+    contrato 440 (prórroga/adiciones), no solo que el pagador "es parte".
+- Verificaciones del auditor antes de cargar esos grupos: leer la nota
+  operatoria del caso AMEU (¿hubo toma de biopsia como acto aparte?);
+  reconstruir día a día los 34 días de estancia (si solo se prueban 32-33,
+  procede aceptar parcial el excedente, no forzar el 100%); fechas y horas de
+  los 2 rastreos de anticuerpos con su orden médica; otrosí o prórroga que
+  acredite la vigencia 2026 del contrato 440-DIGSA/DMBUG-2025.
+
+### 28-07 (noche) — Contrato de Construcción de SINAC OS: el plano se volvió obra
+
+Hasta hoy teníamos el **plano** (el Manual de Arquitectura: qué queremos que
+sea SINAC OS). Faltaba el **contrato de obra**: qué se construye, en qué orden,
+quién lo aprueba y cómo se comprueba que quedó bien. Eso es lo que quedó hecho.
+
+Está en `docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`: **veinte capítulos y un
+anexo**, unas 323.000 palabras. Cada capítulo termina con una tabla donde toda
+fila tiene **criterio de aceptación** y **el comando exacto que lo comprueba**,
+para que nadie tenga que preguntar si algo quedó hecho. En total **730 tareas**.
+
+**Lo importante para el área, en una frase:** de las 730 tareas, **69 producen
+los siete resultados que usted puede ver funcionando**, y cuestan 163,5 jornadas
+—el 10 % del esfuerzo total—. Las otras 661 el Contrato nunca las amarró a un
+resultado visible.
+
+Los siete resultados, en el orden en que llegarían:
+
+1. **La plata deja de contarse mal.** Un solo lector de valores en pesos: se
+   acaba el error del ×100 que hacía leer `950.000` como `950`.
+2. **Lo vencido deja de esconderse.** Encabeza la lista en vez de desaparecer
+   de ella, y escala solo al coordinador. Es el caso de las tres facturas de
+   junio por $20.054.751 que se descubrieron 45 días tarde.
+3. **Una entidad nueva se activa sin programar.** SIMED encolable desde una
+   ficha, sin esperar semanas de desarrollo.
+4. **Un expediente por factura y una sola cifra por concepto.** Se acaba que
+   "recuperado" dé cuatro números distintos según la pestaña.
+5. **Un solo documento radicable**, generado en un solo lugar.
+6. **El robot corre solo y se ve mientras corre**, con la plata en juego a la
+   vista.
+7. **Una institución nueva queda instalada en una jornada.**
+
+**Cuatro problemas se encontraron al juntar los capítulos** y quedaron
+corregidos o registrados:
+
+- **El plan eran diecinueve planes que no se miraban.** De 773 dependencias
+  declaradas, 742 apuntaban a una tarea del mismo capítulo: casi ninguna decía
+  que el trabajo de un capítulo necesita el cimiento que vive en otro. Se
+  agregaron 563 dependencias derivadas de nueve cimientos escritos, con la
+  regla a la vista para que se pueda discutir.
+- **La columna que separa los datos de una institución de los de otra tenía
+  tres nombres** (`institucion_id`, `hospital_id`, `tenant_id`). Construido así
+  quedaban tres columnas para lo mismo, y la protección de datos se activa
+  sobre una sola: las tablas con las otras dos quedaban abiertas. Se unificó en
+  `institucion_id` (287 reemplazos y 8 líneas a mano). Se eligió ese nombre
+  porque SINAC OS también debe poder instalarse en una clínica o en una IPS.
+- **Más de la mitad del plan estaba marcada como urgente** (380 de 730). Una
+  urgencia que le toca a la mitad no prioriza nada. Se volvió a priorizar con
+  una regla verificable: P0 es lo que hace falta para los tres primeros
+  resultados y nada más. Quedaron 37.
+- **El Contrato completo compromete casi siete años de una persona**
+  (1.625,5 jornadas). Se dice sin adornos: **no es ejecutable de punta a punta**
+  con el equipo de hoy. Por eso el anexo separa lo que sí cabe.
+
+También se cerraron defectos que habrían costado retrabajo: ocho dependencias
+apuntaban a tareas inexistentes, el capítulo 14 numeraba 40 tareas con códigos
+que ya significaban otra cosa en otros capítulos (`GOB-09` era "parser
+monetario" en uno y "política de vida de rama" en otro), y dos tareas se
+declaraban prerrequisito de sí mismas. Todo eso quedó arreglado y explicado en
+el **Anexo I**.
+
+**Las cifras del Contrato se comprueban solas.** La portada trae una tabla que
+vuelve a medir contra el repositorio lo que el documento afirma. Hoy: 43 tablas,
+4.530 pruebas, 59 ramas sin fusionar, 44 llamadas a `prompt()` y 1 sola
+migración formal **coinciden**; las rutas de la API subieron de 686 a 712
+porque el sistema siguió creciendo mientras se escribía.
+
+**La Regla 11 quedó cumplida en los veintiuno.** Todo capítulo cierra
+respondiendo qué habría que cambiar para soportar 100 hospitales, 10 millones
+de expedientes y 10.000 usuarios a la vez. De esas respuestas salió un defecto
+que ningún capítulo podía ver solo: **la escala de referencia tiene tres cifras
+distintas para la misma cosa** —2.350.000, 4.000.000 y 6.000.000 de objeciones
+para los mismos 500.000 expedientes— y dos para el almacenamiento (2,4 TB
+contra 8 TB). La medida es la primera: sale del acervo real del hospital,
+18.371 objeciones para 3.933 facturas. No se corrigió porque elegir la cifra
+buena decide el tamaño de medio Contrato, y esa decisión es del área.
+
+Todo esto es **documentación y plan**. No se tocó una línea del código que
+corre en producción: la suite de 4.533 pruebas pasa igual que antes.
+
 ### 29-07 — Se juntaron las dos memorias del proyecto + bot de Unir Exceles
 - **Se fusionó la rama principal en el PR #160** (la Suite Cartera HUS). Al
   hacerlo se descubrió que había **dos bitácoras paralelas** — una en la rama
@@ -598,6 +745,11 @@ rama principal: están listos, probados y a un clic de distancia.
   .zip, y salta solo los títulos que vienen encima de los encabezados.
   Por consola: `python suite_cli.py exceles archivo1.xlsx archivo2.xlsx -o
   UNIDO.xlsx` (o `--modo hojas`). Con 9 pruebas automáticas nuevas.
+- **Nota del mismo día:** la rama principal volvió a avanzar (PRs #208-#213:
+  consecutivo manual del oficio de devolución, bots de pagadores, vencidas
+  visibles y el Contrato de Construcción de SINAC OS) y se volvió a fusionar
+  aquí, combinando otra vez las dos bitácoras con la misma regla de no
+  perder nada.
 
 ---
 
@@ -657,6 +809,13 @@ rama principal: están listos, probados y a un clic de distancia.
 15. **Conciliación:** confirmar el acta de inicio del contrato 287 y el mapeo
     de códigos internos de cartera (U22031/C26001…), y correr el asistente en
     piloto sobre 1-2 facturas reales contra `Y:\`.
+- **(28-07) Lote del 28-jul (97 objeciones): NO subir todavía.** Aplicar las
+  correcciones de texto de la verificación (3 grupos no calzan: FA0801,
+  SO5801, FA0101; y ajustes obligatorios en FA0201, FA2303 y TA) y completar
+  las verificaciones del auditor: nota operatoria del caso AMEU, desglose día
+  a día de los 34 días de estancia, horas/órdenes de los 2 rastreos de
+  anticuerpos y prórroga 2026 del contrato 440. Detalle en la sección
+  "28-07 (noche)".
 
 ### Informes
 16. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
@@ -706,6 +865,10 @@ rama principal: están listos, probados y a un clic de distancia.
    junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
    14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
    verificación) y generar sus PDF de evidencias.
+   **Lote del 28-jul: NO subir hasta corregir los textos** señalados por la
+   verificación (3 grupos no calzan) y resolver las verificaciones del
+   auditor (nota operatoria AMEU, desglose de los 34 días, horas de los 2
+   rastreos, prórroga 2026 del contrato 440).
 2. Correr la **pertinencia fusionada** COOSALUD (pendiente #1) y verificar que
    las 37 facturas cierren con evidencia.
 3. Con los reportes en mano, **cerrar los flecos de los lotes 02/06/07/08**
@@ -743,11 +906,34 @@ rama principal: están listos, probados y a un clic de distancia.
     módulos sin uso y arrancar la **Fase 2 — modelo real del dominio**
     (Factura → Glosa → Soporte → Conciliación → Acta).
 
+### Contrato de Construcción — decisiones que dependen de Yesid (28-07 noche)
+
+13. **Leer el Anexo I del Contrato** (`docs/CONTRATO_CONSTRUCCION_SINAC_OS.md`,
+    al final). Son diez páginas y responden lo único que importa ahora: qué se
+    construye primero, qué se ve funcionando y cuánto cuesta. Con eso basta
+    para decidir; los veinte capítulos son el detalle.
+14. **Aprobar o cambiar los siete resultados comprometidos.** Están escritos
+    como cosas que usted ve en pantalla, no como tareas técnicas. Si alguno no
+    le sirve o falta uno, se cambia ahí y el plan se recalcula solo.
+15. **Decidir qué pasa con las 661 tareas que quedaron fuera de todo
+    resultado** (1.462 jornadas, el 90 % del esfuerzo). Dos salidas honestas
+    por cada una: o se le escribe el resultado que justifica su existencia, o
+    se acepta que va después. Lo que no sirve es dejarlas marcadas urgentes
+    sin destinatario, que es como estaban.
+16. **Decidir el tamaño del equipo.** El Contrato completo son 1.625,5 jornadas
+    ≈ siete años de una persona. La primera entrega —los tres resultados que
+    recuperan plata ya— son 79,5 jornadas ≈ cuatro meses de una persona, o un
+    mes de cuatro. De esa decisión sale todo lo demás.
+17. **Tres tareas están escritas dos veces** en capítulos distintos (migrar los
+    perfiles de pagador a YAML, la pantalla de Perfiles, y las pruebas de
+    arquitectura bloqueantes). Hay que decidir cuál capítulo conserva cada una
+    antes de que dos personas las construyan por separado.
+
 ### Suite Cartera HUS
-13. **Revisar y fusionar el PR #160** (Suite Cartera HUS + Herramientas PDF +
-    bot de correos de pagos). Decidir si se arranca la "fase 4" de
-    Herramientas PDF (editar texto, formularios, firma digital, comparar PDF)
-    o se prioriza otro pendiente de Cartera.
+18. **Revisar y fusionar el PR #160** (Suite Cartera HUS + Herramientas PDF +
+    bots de correos de pagos y de unir Exceles). Decidir si se arranca la
+    "fase 4" de Herramientas PDF (editar texto, formularios, firma digital,
+    comparar PDF) o se prioriza otro pendiente de Cartera.
 
 ---
 

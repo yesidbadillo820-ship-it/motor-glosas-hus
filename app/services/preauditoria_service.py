@@ -140,7 +140,11 @@ def calcular_semaforo(
 
 
 def siguiente_consecutivo(db: Session, anio: Optional[int] = None) -> tuple[str, int, int]:
-    """Siguiente consecutivo DEV-PRE-AUD-####-AAAA (reinicia cada año)."""
+    """Siguiente consecutivo DEV-PRE-AUD-####-AAAA (reinicia cada año).
+
+    Es solo una SUGERENCIA: el consecutivo real lo lleva SINAC por fuera del
+    sistema, así que el auditor puede escribir el que corresponda.
+    """
     if anio is None:
         anio = datetime.now(TZ_BOGOTA).year
     ultimo = (
@@ -150,6 +154,79 @@ def siguiente_consecutivo(db: Session, anio: Optional[int] = None) -> tuple[str,
     )
     numero = int(ultimo or 0) + 1
     return f"{PREFIJO_CONSECUTIVO}-{numero:04d}-{anio}", numero, anio
+
+
+def interpretar_consecutivo(texto: str, anio_actual: Optional[int] = None) -> tuple[str, int, int]:
+    """Interpreta el consecutivo que escribe el auditor.
+
+    La numeración de los oficios de devolución la lleva SINAC internamente, así
+    que el auditor escribe el que va. Se acepta:
+
+      - solo el número          → "89"                    → DEV-PRE-AUD-0089-2026
+      - el consecutivo completo → "DEV-PRE-AUD-0089-2026" → se respeta
+      - cualquier otro texto    → se respeta tal cual (numeración especial)
+
+    Devuelve (consecutivo, numero, anio). Para el texto libre, `numero` viene
+    en 0: quien llama debe asignarle uno interno que no choque (ese campo solo
+    sirve para ordenar y sugerir el siguiente, no se le muestra a nadie).
+    """
+    if anio_actual is None:
+        anio_actual = datetime.now(TZ_BOGOTA).year
+    limpio = " ".join((texto or "").split()).upper()
+    if not limpio:
+        raise ValueError("Escriba el consecutivo del oficio de devolución.")
+    if len(limpio) > 60:
+        raise ValueError("El consecutivo es demasiado largo (máx. 60 caracteres).")
+
+    solo_numero = re.fullmatch(r"(\d{1,6})", limpio)
+    if solo_numero:
+        numero = int(solo_numero.group(1))
+        return f"{PREFIJO_CONSECUTIVO}-{numero:04d}-{anio_actual}", numero, anio_actual
+
+    completo = re.fullmatch(rf"{PREFIJO_CONSECUTIVO}-(\d{{1,6}})-(\d{{4}})", limpio)
+    if completo:
+        numero, anio = int(completo.group(1)), int(completo.group(2))
+        return f"{PREFIJO_CONSECUTIVO}-{numero:04d}-{anio}", numero, anio
+
+    return limpio, 0, anio_actual
+
+
+def reservar_consecutivo(db: Session, texto: Optional[str]) -> tuple[str, int, int]:
+    """Deja listo el consecutivo a usar, validando que no esté repetido.
+
+    Sin texto, toma el siguiente sugerido. Con texto, respeta lo que escribió
+    el auditor. Lanza ValueError con un mensaje claro si ya se usó.
+    """
+    if not (texto or "").strip():
+        return siguiente_consecutivo(db)
+
+    consecutivo, numero, anio = interpretar_consecutivo(texto)
+    repetido = (
+        db.query(OficioDevolucionRecord)
+        .filter(OficioDevolucionRecord.consecutivo == consecutivo)
+        .first()
+    )
+    if repetido:
+        raise ValueError(f"El consecutivo {consecutivo} ya fue usado en otro oficio de devolución.")
+
+    # `numero` solo ordena y alimenta la sugerencia siguiente; si el que se
+    # dedujo ya está ocupado (o es texto libre), se toma el primero libre.
+    ocupado = (
+        db.query(OficioDevolucionRecord.id)
+        .filter(
+            OficioDevolucionRecord.anio == anio,
+            OficioDevolucionRecord.numero == numero,
+        )
+        .first()
+    )
+    if numero <= 0 or ocupado:
+        ultimo = (
+            db.query(sa_func.max(OficioDevolucionRecord.numero))
+            .filter(OficioDevolucionRecord.anio == anio)
+            .scalar()
+        )
+        numero = int(ultimo or 0) + 1
+    return consecutivo, numero, anio
 
 
 # ==================================================================

@@ -104,16 +104,44 @@ class TestAlertasProximas:
         assert "ABIERTA" in pacientes
         assert "LEVANTADA" not in pacientes
 
-    def test_excluye_dias_negativos_o_cero(self, db):
-        """alertas_proximas requiere dias_restantes > 0."""
-        _seed(db, paciente="VENCIDA", dias_restantes=0)
+    def test_incluye_las_ya_vencidas(self, db):
+        """Lo vencido es lo que más urge: no puede desaparecer de la alerta.
+
+        Esta prueba antes exigía lo contrario (`dias_restantes > 0`), y por
+        eso la pantalla de inicio decía «Próximas a vencer: 0» mientras el
+        tablero de Vencimientos contaba 1. Es el modo de falla de las tres
+        facturas de junio: $20.054.751 descubiertos 45 días tarde.
+        """
+        _seed(db, paciente="VENCIDA_HOY", dias_restantes=0)
+        _seed(db, paciente="VENCIDA_HACE_45", dias_restantes=-45)
         _seed(db, paciente="POR_VENCER", dias_restantes=2)
+        _seed(db, paciente="LEJANA", dias_restantes=20)
         repo = GlosaRepository(db)
-        alertas = repo.alertas_proximas(dias_limite=5)
-        pacientes = [g.paciente for g in alertas]
-        # >0 → vencida (=0) NO entra
+        pacientes = [g.paciente for g in repo.alertas_proximas(dias_limite=5)]
+        assert "VENCIDA_HACE_45" in pacientes
+        assert "VENCIDA_HOY" in pacientes
         assert "POR_VENCER" in pacientes
-        assert "VENCIDA" not in pacientes
+        assert "LEJANA" not in pacientes
+
+    def test_lo_vencido_encabeza_la_lista(self, db):
+        """El orden importa: si lo vencido queda al final, nadie lo ve."""
+        _seed(db, paciente="POR_VENCER", dias_restantes=3)
+        _seed(db, paciente="VENCIDA_HACE_45", dias_restantes=-45)
+        repo = GlosaRepository(db)
+        assert [g.paciente for g in repo.alertas_proximas(dias_limite=5)][0] == "VENCIDA_HACE_45"
+
+    def test_excluye_los_estados_cerrados_no_solo_levantada(self, db):
+        """Una glosa ACEPTADA o CONCILIADA ya no compite contra el reloj.
+
+        Antes solo se excluía LEVANTADA, así que las demás cerradas seguían
+        alertando. El ruido es lo que hace que se ignoren las alertas reales.
+        """
+        _seed(db, paciente="ABIERTA", dias_restantes=-2, estado="RADICADA")
+        for cerrada in ("ACEPTADA", "CONCILIADA", "ARCHIVADA", "RESUELTA"):
+            _seed(db, paciente=cerrada, dias_restantes=-2, estado=cerrada)
+        repo = GlosaRepository(db)
+        pacientes = [g.paciente for g in repo.alertas_proximas(dias_limite=5)]
+        assert pacientes == ["ABIERTA"]
 
 
 class TestMetrics:

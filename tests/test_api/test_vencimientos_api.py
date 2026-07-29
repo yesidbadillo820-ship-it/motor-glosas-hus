@@ -39,14 +39,23 @@ def cliente(db_session):
     from app.api.deps import get_usuario_actual
     from app.main import app
 
-    usuario = UsuarioRecord(
-        id=1, email="ana@hus.com", nombre="Ana Torres", rol="COORDINADOR", activo=1
-    )
+    estado = {
+        "usuario": UsuarioRecord(
+            id=1, email="ana@hus.com", nombre="Ana Torres", rol="COORDINADOR", activo=1
+        )
+    }
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
-    app.dependency_overrides[get_usuario_actual] = lambda: usuario
+    app.dependency_overrides[get_usuario_actual] = lambda: estado["usuario"]
     with TestClient(app) as c:
+        c.estado = estado  # el test cambia el rol con c.estado["usuario"] = ...
         yield c
     app.dependency_overrides.clear()
+
+
+def _con_rol(cliente, rol):
+    cliente.estado["usuario"] = UsuarioRecord(
+        id=1, email="ana@hus.com", nombre="Ana Torres", rol=rol, activo=1
+    )
 
 
 def _glosa(db, dias, **kw):
@@ -157,3 +166,94 @@ class TestNotificar:
         d = cliente.post("/alertas/vencimientos/notificar?simular=false").json()
         assert d["enviados"] == 1
         assert d["fallidos"][0]["correo"] == "ana@hus.com"
+
+
+# ─── Acceso: solo los perfiles autorizados ────────────────────────────────
+
+
+class TestAcceso:
+    """El tablero concentra el mapa completo de plata en riesgo del hospital;
+    disparar correos a dirección y auditoría es un acto de coordinación."""
+
+    def test_viewer_no_ve_el_tablero(self, cliente, db_session):
+        _glosa(db_session, -1, factura="A")
+        _con_rol(cliente, "VIEWER")
+        assert cliente.get("/alertas/vencimientos").status_code == 403
+
+    def test_auditor_si_ve_el_tablero(self, cliente, db_session):
+        _glosa(db_session, -1, factura="A")
+        _con_rol(cliente, "AUDITOR")
+        assert cliente.get("/alertas/vencimientos").status_code == 200
+
+    def test_auditor_no_puede_notificar(self, cliente, db_session):
+        _glosa(db_session, -1, factura="A")
+        _con_rol(cliente, "AUDITOR")
+        assert cliente.post("/alertas/vencimientos/notificar").status_code == 403
+
+    def test_coordinador_si_puede_notificar(self, cliente, db_session, monkeypatch):
+        monkeypatch.setenv("VENCIMIENTOS_CORREO_VENCIDA", "direccion@hus.com")
+        _glosa(db_session, -1, factura="A")
+        assert cliente.post("/alertas/vencimientos/notificar").status_code == 200
+
+    def test_el_tablero_dice_si_puedo_notificar(self, cliente, db_session):
+        _glosa(db_session, -1, factura="A")
+        assert cliente.get("/alertas/vencimientos").json()["puede_notificar"] is True
+        _con_rol(cliente, "AUDITOR")
+        assert cliente.get("/alertas/vencimientos").json()["puede_notificar"] is False
+
+
+class TestAvisoDeCorreo:
+    """La interfaz avisa cuando el correo no está listo, en vez de dejar al
+    área creyendo que los avisos salen."""
+
+    def test_reporta_smtp_sin_configurar(self, cliente, db_session, monkeypatch):
+        monkeypatch.delenv("SMTP_USER", raising=False)
+        monkeypatch.delenv("SMTP_PASSWORD", raising=False)
+        _glosa(db_session, -1, factura="A")
+        assert cliente.get("/alertas/vencimientos").json()["smtp_configurado"] is False
+
+    def test_reporta_smtp_listo(self, cliente, db_session, monkeypatch):
+        monkeypatch.setenv("SMTP_USER", "sinac.alertas@hus.gov.co")
+        monkeypatch.setenv("SMTP_PASSWORD", "clave-de-aplicacion")
+        _glosa(db_session, -1, factura="A")
+        assert cliente.get("/alertas/vencimientos").json()["smtp_configurado"] is True
+
+    def test_distingue_escalamiento_de_solo_gestor(self, cliente, db_session, monkeypatch):
+        for v in (
+            "VENCIMIENTOS_CORREO_PREVENTIVO",
+            "VENCIMIENTOS_CORREO_ALTA",
+            "VENCIMIENTOS_CORREO_CRITICA",
+            "VENCIMIENTOS_CORREO_VENCIDA",
+        ):
+            monkeypatch.setenv(v, "")
+        monkeypatch.setenv("VENCIMIENTOS_CORREO_GESTOR", "1")
+        _glosa(db_session, -1, factura="A")
+        d = cliente.get("/alertas/vencimientos").json()
+        assert d["avisos_configurados"] is True
+        assert d["escalamiento_configurado"] is False
+
+
+class TestDatosParaLaTabla:
+    """La tabla filtra por pagador, responsable, estado, días y fechas."""
+
+    def test_cada_fila_trae_lo_que_la_tabla_muestra(self, cliente, db_session):
+        import datetime as dt
+
+        _glosa(
+            db_session,
+            3,
+            factura="HUS1",
+            eps="COOSALUD",
+            codigo_glosa="TA0201",
+            auditor_email="ana@hus.com",
+            gestor_nombre="Ana Torres",
+            estado="PENDIENTE",
+            fecha_vencimiento=dt.datetime(2026, 8, 5, tzinfo=dt.timezone.utc),
+        )
+        g = cliente.get("/alertas/vencimientos").json()["glosas"][0]
+        assert g["eps"] == "COOSALUD"
+        assert g["responsable"] == "ana@hus.com"
+        assert g["gestor"] == "Ana Torres"
+        assert g["estado"] == "PENDIENTE"
+        assert g["fecha_vencimiento"].startswith("2026-08-05")
+        assert g["urgencia"] == "ALTA"

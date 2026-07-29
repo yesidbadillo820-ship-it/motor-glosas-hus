@@ -267,6 +267,23 @@
   <button class="cerrar" onclick="cerrarModal('m-hist')">✕</button>
   <h3 id="mh-titulo">Historial</h3><div id="mh-cuerpo"></div></div></div>
 
+<!-- MODAL generar oficio de devolución (consecutivo escrito por el auditor) -->
+<div class="modal-fondo" id="m-gendev"><div class="modal">
+  <button class="cerrar" onclick="cerrarModal('m-gendev')">✕</button>
+  <h3>📄 Generar oficio de devolución</h3>
+  <p class="sub">Se incluirán las facturas DEVUELTAS de este oficio que aún no tengan
+    oficio de devolución emitido.</p>
+  <label class="campo">Consecutivo del oficio
+    <input id="gd-consec" placeholder="DEV-PRE-AUD-0089-2026" autocomplete="off"></label>
+  <p class="leyenda" id="gd-sug"></p>
+  <p class="leyenda">Puede escribir solo el número (<b>89</b>) y se completa como
+    DEV-PRE-AUD-0089-<span id="gd-anio"></span>, o el consecutivo completo.</p>
+  <div style="margin-top:12px">
+    <button class="btn btn-rojo" onclick="confirmarGenerarDev()">Generar oficio</button>
+    <button class="btn btn-borde" onclick="cerrarModal('m-gendev')">Cancelar</button></div>
+  <div id="gd-msg"></div>
+</div></div>
+
 <!-- MODAL limpiar todo (solo administradores) -->
 <div class="modal-fondo" id="m-limpiar"><div class="modal">
   <button class="cerrar" onclick="cerrarModal('m-limpiar')">✕</button>
@@ -299,6 +316,11 @@ if (ES_ADMIN) {
     var z=document.getElementById('zona-admin'); if(z) z.style.display='block';
   });
 }
+document.addEventListener('DOMContentLoaded', function(){
+  var a=document.getElementById('gd-anio'); if(a) a.textContent=new Date().getFullYear();
+  var c=document.getElementById('gd-consec');
+  if(c) c.addEventListener('keydown', function(ev){ if(ev.key==='Enter') confirmarGenerarDev(); });
+});
 function salir(){ localStorage.removeItem('hus_token'); localStorage.removeItem('hus_user'); location.href='/'; }
 function authH(extra){ return Object.assign({'Authorization':'Bearer '+TOKEN}, extra||{}); }
 async function api(url, opts){
@@ -528,13 +550,30 @@ async function eliminarSeleccionados(){
     alert(msg); await Promise.all([cargarOficios(), cargarConsolidado()]);
   }catch(e){ alert(e.message); }
 }
+var _devOficioId = null;
 async function generarDev(id){
-  if(!confirm('¿Generar el oficio de devolución con las facturas DEVUELTAS de este oficio? Se asigna el siguiente consecutivo SINAC.')) return;
-  try{ var d=await api('/preauditoria/oficios/'+id+'/oficio-devolucion',{method:'POST'});
+  _devOficioId = id;
+  document.getElementById('gd-msg').innerHTML='';
+  var inp=document.getElementById('gd-consec');
+  inp.value='';
+  abrirModal('m-gendev');
+  try{ var s=await api('/preauditoria/consecutivo-sugerido');
+    inp.value=s.consecutivo;
+    document.getElementById('gd-sug').textContent='Según lo registrado aquí seguiría el '+s.consecutivo+', pero escriba el que corresponda.';
+  }catch(e){ document.getElementById('gd-sug').textContent=''; }
+  inp.focus(); inp.select();
+}
+async function confirmarGenerarDev(){
+  var consec=document.getElementById('gd-consec').value.trim(), msg=document.getElementById('gd-msg');
+  if(!consec){ msg.innerHTML='<div class="aviso aviso-err">Escriba el consecutivo del oficio.</div>'; return; }
+  msg.innerHTML='<div class="aviso aviso-warn">Generando…</div>';
+  try{ var d=await api('/preauditoria/oficios/'+_devOficioId+'/oficio-devolucion',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({consecutivo:consec})});
+    cerrarModal('m-gendev');
     alert('Oficio generado: '+d.consecutivo+' ('+d.total_facturas+' facturas)');
     verPdf(d.pdf_url); cerrarModal('m-oficio');
     await Promise.all([cargarDevoluciones(), cargarOficios(), cargarConsolidado()]);
-  }catch(e){ alert(e.message); }
+  }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
 
 // ---------- consolidado ----------

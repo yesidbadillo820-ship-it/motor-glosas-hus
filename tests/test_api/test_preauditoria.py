@@ -478,6 +478,58 @@ class TestDevolucionYStats:
             _devolver(client, _factura_id(client, f))
         return o
 
+    def test_consecutivo_escrito_por_el_auditor(self, client):
+        """La numeración la lleva SINAC por fuera: el auditor escribe la que va."""
+        anio = datetime.now().year
+        # el sistema sugiere el siguiente según lo registrado aquí
+        sug = client.get("/preauditoria/consecutivo-sugerido").json()
+        assert sug["consecutivo"] == f"DEV-PRE-AUD-0001-{anio}"
+
+        o = self._setup_devueltas(client)
+        # …pero el auditor escribe el 89, que es el que le corresponde
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion", json={"consecutivo": "89"}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == f"DEV-PRE-AUD-0089-{anio}"
+        # el PDF sale con ese consecutivo
+        pdf = client.get(r.json()["pdf_url"])
+        assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
+        # y la sugerencia siguiente continúa desde ahí
+        assert client.get("/preauditoria/consecutivo-sugerido").json()["consecutivo"] == (
+            f"DEV-PRE-AUD-0090-{anio}"
+        )
+
+    def test_consecutivo_completo_y_repetido(self, client):
+        anio = datetime.now().year
+        o = self._setup_devueltas(client)
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion",
+            json={"consecutivo": f"dev-pre-aud-0120-{anio}"},  # completo, en minúsculas
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == f"DEV-PRE-AUD-0120-{anio}"
+
+        # el mismo consecutivo en otro oficio: se rechaza con mensaje claro
+        _subir_radicacion(client, [_rad_fila("777777", "HUS0000700001", 5000)])
+        o2 = _crear_oficio(client, "FHUS-OTRO-1", "2026-07-21T08:00")
+        _escribir(client, o2["id"], "777777")
+        _devolver(client, _factura_id(client, "HUS0000700001"))
+        r2 = client.post(
+            f"/preauditoria/oficios/{o2['id']}/oficio-devolucion",
+            json={"consecutivo": f"DEV-PRE-AUD-0120-{anio}"},
+        )
+        assert r2.status_code == 409
+        assert "ya fue usado" in r2.json()["detail"]
+
+    def test_consecutivo_vacio_usa_el_sugerido(self, client):
+        o = self._setup_devueltas(client)
+        r = client.post(
+            f"/preauditoria/oficios/{o['id']}/oficio-devolucion", json={"consecutivo": "  "}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["consecutivo"] == f"DEV-PRE-AUD-0001-{datetime.now().year}"
+
     def test_consecutivo_y_pdf(self, client):
         o = self._setup_devueltas(client)
         r = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
