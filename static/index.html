@@ -10680,15 +10680,32 @@ async function poblarLandingKPIs(){
   }
 
   // ─── Alertas: número + texto del pill ───
-  var nVencen = 0;
-  if(alertas && Array.isArray(alertas.alertas)) nVencen = alertas.alertas.length;
+  // La lista ahora trae también las YA VENCIDAS (antes el repositorio las
+  // escondía con `dias_restantes > 0`). Se cuentan aparte porque no es lo
+  // mismo "vence pronto" que "ya se venció": decirle al gestor que algo
+  // vence pronto cuando el plazo ya pasó es tranquilizarlo al revés.
+  var nVencen = 0, nVencidas = 0;
+  if(alertas && Array.isArray(alertas.alertas)){
+    nVencen = alertas.alertas.length;
+    nVencidas = alertas.alertas.filter(function(a){ return (a.dias_restantes||0) <= 0; }).length;
+  }
   if($('land-alertas')) $('land-alertas').textContent = nVencen;
+  var deltaA = $('land-alertas-delta');
+  if(deltaA){
+    deltaA.textContent = nVencidas > 0
+      ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
+      : 'en 5 días';
+    deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+  }
 
   // ─── Saludo: pills de contexto ───
   var nContratos = (contratos && Array.isArray(contratos) ? contratos.length : 0);
   var pillV = $('land-saludo-pill-vencen');
   if(pillV){
-    if(nVencen > 0){
+    if(nVencidas > 0){
+      pillV.innerHTML = '🔴 <b>' + nVencidas + '</b> glosa' + (nVencidas===1?'':'s') + ' con el plazo <b>ya vencido</b>';
+      pillV.className = 'pill warn';
+    } else if(nVencen > 0){
       pillV.innerHTML = '⏰ <b>' + nVencen + '</b> glosa' + (nVencen===1?'':'s') + ' vence' + (nVencen===1?'':'n') + ' pronto';
       pillV.className = 'pill warn';
     } else {
