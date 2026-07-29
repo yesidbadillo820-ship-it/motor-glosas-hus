@@ -364,6 +364,14 @@ class TestVerQueSaleAntesDeCargarlo:
         assert self._previsualizar(cliente).status_code == 403
 
     def test_la_pantalla_tiene_el_boton(self):
+        """El botón EN LA FICHA, no solo la función.
+
+        La versión anterior verificaba que existiera la función
+        `autoPrevisualizar` — y pasaba mientras el botón que la llama nunca
+        llegó a la ficha (un reemplazo con escapes falló en silencio). El
+        auditor lo vio en producción: solo aparecía "Ejecutar". Ahora se exige
+        el botón dentro del generador de fichas.
+        """
         from pathlib import Path
 
         html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
@@ -371,3 +379,21 @@ class TestVerQueSaleAntesDeCargarlo:
         )
         assert "autoPrevisualizar" in html
         assert "/previsualizar" in html
+        assert "Ver qué sale" in html, "el botón de previsualizar no está en la ficha"
+        assert "auto-prev-" in html, "falta el id del botón en la ficha"
+
+    def test_la_pantalla_es_interactiva(self):
+        """Lo que el área pidió con nombre propio: arrastrar el archivo,
+        filtrar por grupo, buscar en vivo. Y el scroll, que no existía."""
+        import re
+        from pathlib import Path
+
+        html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        assert "autoSoltar" in html, "no se puede arrastrar el archivo"
+        assert "auto-chip" in html, "no hay pestañas por grupo"
+        assert "autoBuscarEnVivo" in html, "no hay búsqueda en vivo"
+        # El scroll: .panel es overflow:hidden, el área DEBE traer el suyo.
+        area = re.search(r"\.auto-area\{[^}]*\}", html).group(0)
+        assert "overflow-y:auto" in area, "la pantalla queda estática: no scrollea"
