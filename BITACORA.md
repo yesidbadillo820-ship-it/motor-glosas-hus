@@ -195,6 +195,84 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 | 17 de julio | 58 | 115 | $87.605.050 | Excel listo — confirmar subida |
 | Pendientes junio | 3 | 38 | $20.054.751 | Excel listo — subir YA (plazos vencidos) |
 
+### 24 de julio de 2026 — Expediente Inteligente de Conciliación (Hoja Maestra)
+- **Nueva herramienta `tools/hoja_maestra_conciliacion.py`:** arma en un solo
+  Excel el **expediente de conciliación** del Dispensario con **un único
+  registro maestro por factura** (nada duplicado). Cruza las tres bases que ya
+  existen (no transcribe ni inventa):
+  - **CARTERA** (corte 30/06/2026) como columna vertebral: 5.571 facturas, con
+    su valor, saldo, estado de glosa, edades y lo levantado/aceptado/ratificado
+    en actas.
+  - **RECEPCIÓN DE OBJECIONES** (la glosa que puso la EPS): trae el **motivo
+    exacto de la EPS** en texto (ej. *"SE RECONOCE A TARIFA SOAT... SIN
+    CONTRATO"*), el concepto, el CUPS y el servicio.
+  - **TRÁMITE DE OBJECIÓN** (nuestra respuesta): el valor objetado, el valor
+    aceptado y el **argumento del ESE HUS** (ej. *"ESE HUS NO ACEPTA GLOSA..."*).
+    Se une a la recepción por el consecutivo (4.063 de 4.066 cruzan).
+- **El libro entregado tiene 5 hojas:** `00_DASHBOARD` (tablero con 15
+  indicadores + cartera por vigencia/estado/edades), `01_MAESTRA` (una fila por
+  factura, con resultado final a color), `02_GLOSAS` (una fila por glosa con el
+  **motivo de la EPS y nuestra respuesta lado a lado**), `03_ACTAS` (una fila
+  por factura+acta) y `04_CRUCES` (los 11 controles de consistencia).
+- **Cifras que cuadran con lo ya verificado:** glosado $7.000.506.193; aceptado
+  por IPS $1.122.029.872; **levantado a favor del HUS $707.499.754**;
+  **ratificado (pdte. conciliar) $980.141.374**; saldo pendiente DGH
+  $13.621.817.613. Total: 5.571 facturas (3.935 con glosa), 18.378 glosas (179
+  aún sin respuesta). Se excluye el acta AC000639 por ser **duplicada** de la
+  SINAC 720.
+- **Lo que ninguna base trae queda marcado PENDIENTE** (no en blanco): la
+  bandera de factura electrónica (CUFE), la normatividad citada por respuesta,
+  el valor pagado real, y las **raíces exactas Y:/X:** de los soportes (por
+  ahora se deja la ruta derivada por mes AAAAMM + la de factura electrónica
+  `\\172.16.32.83\factura_electronica_net22\AAAAMM`). Con pruebas.
+
+### 27 de julio de 2026 — Acta de conciliación de las 147 facturas (formato SINAC)
+- **Cambio de enfoque pedido por el auditor.** El expediente del 24-jul cubría
+  las 5.571 facturas de toda la cartera. El auditor lo devolvió: *"el universo
+  de trabajo son únicamente las 147 facturas que actualmente están pendientes
+  por conciliar"*. Ahora todo gira alrededor de esas 147.
+- **Identificación del universo (antes de construir nada).** Las 147 salen del
+  `HUS.xlsx` que envió el Dispensario (el mismo lote del `CONCILIACION.xlsx`):
+  **147 facturas / 444 glosas**. Se cruzaron contra el estado de cartera: **146
+  de 147 cruzan**; la única que no aparece en cartera es **HUS0000443525**. El
+  estado de glosa de las 147 confirma que todas están pendientes (98
+  ratificadas pdte. conciliar, 25 parte levantada/parte ratificada, 23 en
+  trámite DGH). Se entregó el listado `LISTADO_147_PARA_APROBAR.xlsx` para
+  revisión previa.
+- **Nueva herramienta `tools/generar_acta_conciliacion_dispensario.py`:** arma
+  el acta **sobre el archivo real del ACTA SINAC N.º 720** (no una imitación):
+  conserva logos, encabezado oficial, celdas combinadas, zona de firmas y
+  macros. Solo cambia el contenido. La tabla se expande de 11 a **444 filas**
+  sin romper el formato.
+- **Lo que quedó en el acta:** una fila por glosa, **agrupadas por factura** y
+  ordenadas de mayor a menor valor glosado (al abrir una factura se ven todas
+  sus glosas seguidas — la HUS0000452150 con sus 62). Cada fila trae el
+  **motivo exacto de la EPS** y, al lado, **nuestra respuesta completa**, más
+  código, tipificación, valores, fechas, radicados, resultado en actas
+  previas, rutas de soportes y de factura electrónica (con hipervínculo).
+- **Hoja DASHBOARD** (la primera del libro) con los 12 indicadores pedidos,
+  todos como **fórmulas vivas**: al diligenciar la mesa el tablero se
+  actualiza solo.
+- **Cifras verificadas:** 147 facturas · 444 glosas · facturado
+  **$1.267.976.805** (sin duplicar por factura) · glosado y pendiente por
+  conciliar **$317.640.524** · aceptado en trámite **$1.758.956** ·
+  recuperable **$315.881.568**. 471 fórmulas, **0 errores**.
+- **Columnas completadas con el estado de cartera** (a solicitud del auditor):
+  *VALOR ACEPTADO EN TRÁMITE* (8 facturas, $1.758.956), *CENTRO DE COSTO*
+  (444 de 444 líneas, del export de recepción) y *ABOGADO ASIGNADO* (115
+  facturas). La *CUENTA CONTABLE* quedó en **PENDIENTE**: no existe en
+  ninguna base disponible (ni en el acta 720 original).
+- **Tres hallazgos para llevar a la mesa:** (1) la entidad **no ha confirmado
+  el recibo de ninguna de las 444 respuestas**, aunque todas tienen radicado
+  de entrega; (2) **29 facturas** tienen diferencia entre el valor glosado del
+  lote y el de la cartera; (3) el lote dice que **no aceptamos nada** (RE9901)
+  pero la cartera registra **$1.758.956 aceptados** en 8 facturas — hay que
+  aclararlo antes de firmar.
+- **Documentación de entrega:** `docs/MODULO_CONCILIACION_DISPENSARIO.md`, con
+  todo el módulo (objetivo, arquitectura, funciones, flujo, riesgos,
+  pendientes y cómo fusionarlo al proyecto principal).
+
+---
 ### Julio 2026 — Frente ADRES/FURIPS (chat "VALIDADOR ADRES", PR #173-#176)
 - **17-07:** nace el **bot validador FURIPS**: valida masivamente los TXT
   FURIPS 1 y 2 contra la Circular 022 de 2023 de la ADRES (102 + 9 campos,
@@ -802,6 +880,24 @@ free -m | head -2
 ---
 
 ## 3) PENDIENTE
+
+### Conciliación Dispensario (147 facturas objeto de mesa)
+
+1. **Revisar y aprobar el listado de las 147** (`LISTADO_147_PARA_APROBAR.xlsx`)
+   y decidir qué se hace con **HUS0000443525**, que está en el lote de glosas
+   pero **no aparece en el estado de cartera**: ¿se incluye (147) o se excluye
+   (146)? Hoy está incluida.
+2. **Aclarar la discrepancia del aceptado:** el lote dice $0 (RE9901) pero la
+   cartera registra **$1.758.956** aceptados en 8 facturas. Debe resolverse
+   antes de firmar el acta.
+3. **Revisar las 29 facturas con diferencia** entre el valor glosado del lote y
+   el de la cartera.
+4. **Confirmar las raíces exactas `Y:` / `X:`** de los soportes para cerrar la
+   columna de ubicación (hoy queda la ruta derivada por mes + PENDIENTE).
+5. **Conseguir la CUENTA CONTABLE** con contabilidad/DGH: es el único campo del
+   acta que no existe en ninguna base disponible.
+6. Plantear en la mesa que la entidad **no ha confirmado el recibo de ninguna
+   de las 444 respuestas**, pese a que todas tienen radicado de entrega.
 
 ### Pre-auditoría
 0. **~~La lentitud de la página~~ — DIAGNOSTICADA Y ARREGLADA el 29-07**
