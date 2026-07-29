@@ -1383,26 +1383,55 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .maos-defensa p{margin:0 0 .5rem;font-size:.82rem;line-height:1.55;text-align:justify}
 
 /* ── Malla contractual ──────────────────────────────────────────────── */
-.malla-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
+/* .panel es overflow:hidden (lo exige el layout del shell): cada pantalla
+   trae su PROPIO scroll. Sin estas tres propiedades el área quedaba estática
+   y lo que no cabía en la ventana no existía para el usuario. */
+.malla-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.malla-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .malla-titulo{margin:0;font-size:1.15rem;font-weight:700}
 .malla-sub{margin:.3rem 0 0;color:var(--text-2);font-size:.88rem}
+.malla-buscar{display:flex;align-items:center;gap:.45rem;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;padding:.4rem .8rem;min-width:280px;transition:border-color .15s}
+.malla-buscar:focus-within{border-color:var(--c-teal2)}
+.malla-buscar input{border:0;background:transparent;color:inherit;font-size:.86rem;outline:none;flex:1}
+.malla-buscar .i{width:15px;height:15px;stroke:var(--text-3);fill:none;stroke-width:2}
 .malla-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem}
-.malla-card{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--m-color,var(--border));border-radius:var(--r-lg);padding:.8rem .95rem}
+/* Las tarjetas son FILTROS: clic para ver solo ese grupo, clic de nuevo para
+   soltar. El estado activo se nota sin leer nada. */
+.malla-card{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--m-color,var(--border));border-radius:var(--r-lg);padding:.8rem .95rem;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:transform .12s,box-shadow .12s,border-color .12s}
+.malla-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.08);border-color:var(--m-color)}
+.malla-card.activa{border-color:var(--m-color);box-shadow:0 0 0 2px var(--m-color) inset;transform:translateY(-2px)}
 .malla-card-n{font-size:1.7rem;font-weight:700;line-height:1;color:var(--m-color,inherit)}
 .malla-card-t{font-size:.86rem;font-weight:600;margin-top:.25rem}
 .malla-card-nota{font-size:.74rem;color:var(--text-3);margin-top:.15rem;line-height:1.35}
 .malla-grupo{margin:1.2rem 0 .2rem;font-size:.92rem;font-weight:650;color:var(--m-color,inherit)}
 .malla-grupo-nota{margin:0 0 .5rem;font-size:.8rem;color:var(--text-3);line-height:1.45}
-.malla-excl td{font-size:.76rem;color:var(--text-3);background:var(--bg-2,rgba(0,0,0,.02));padding-top:.2rem!important;padding-bottom:.35rem!important}
+/* Filas expandibles: la cabecera dice lo esencial; el clic abre el detalle. */
+.malla-filas{display:flex;flex-direction:column;gap:.45rem}
+.malla-fila{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;transition:border-color .12s}
+.malla-fila:hover{border-color:var(--c-teal2)}
+.malla-fila-cab{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(150px,1fr) auto 18px;gap:.8rem;align-items:center;padding:.65rem .9rem}
+.malla-fila-quien{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.malla-fila-quien b{font-size:.9rem}
+.malla-fila-quien small{color:var(--text-3);font-size:.74rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.malla-fila-vig{font-size:.8rem;color:var(--text-2);white-space:nowrap}
+.malla-pill{justify-self:end;font-size:.74rem;font-weight:650;color:var(--m-color);background:color-mix(in srgb,var(--m-color) 12%,transparent);border-radius:999px;padding:.22rem .6rem;white-space:nowrap}
+.malla-flecha{width:16px;height:16px;stroke:var(--text-3);fill:none;stroke-width:2;transition:transform .18s}
+.malla-fila.abierta .malla-flecha{transform:rotate(180deg)}
+.malla-fila-det{display:none;border-top:1px dashed var(--border);padding:.7rem .95rem;cursor:default;animation:fade-in .18s var(--ease)}
+.malla-fila.abierta .malla-fila-det{display:flex;flex-direction:column;gap:.5rem}
+.malla-det-g{font-size:.82rem;line-height:1.5}
+.malla-det-g>span{display:block;font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:.1rem}
+.malla-det-excl em{display:inline-block;font-style:normal;background:color-mix(in srgb,var(--c-rojo,#dc2626) 10%,transparent);color:var(--c-rojo,#dc2626);border-radius:var(--r-sm);padding:.15rem .5rem;margin:.15rem .3rem .15rem 0;font-size:.76rem}
+.malla-factor{margin-left:.4rem;font-size:.76rem;color:var(--c-teal2)}
 .malla-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
+@media (max-width:760px){.malla-fila-cab{grid-template-columns:1fr auto 18px}.malla-fila-vig{display:none}}
 .m-rojo{--m-color:var(--c-rojo,#dc2626)}
 .m-amarillo{--m-color:var(--c-amarillo,#d97706)}
 .m-verde{--m-color:var(--c-verde,#16a34a)}
 .m-gris{--m-color:var(--text-3)}
-td.m-rojo,td.m-amarillo,td.m-verde{color:var(--m-color);font-weight:600}
 
 /* ── Centro de Automatización ───────────────────────────────────────── */
-.auto-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
+.auto-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
 .auto-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .auto-titulo{margin:0;font-size:1.15rem;font-weight:700}
 .auto-sub{margin:.3rem 0 0;color:var(--text-2);font-size:.88rem;max-width:62ch}
@@ -1418,9 +1447,31 @@ td.m-rojo,td.m-amarillo,td.m-verde{color:var(--m-color);font-weight:600}
 .auto-param span{color:var(--text-2);font-weight:550}
 .auto-param input{padding:.4rem .55rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input,transparent);color:inherit;font-size:.85rem}
 .auto-param small{color:var(--text-3);font-size:.74rem;line-height:1.35}
-.auto-archivo{display:flex;flex-direction:column;gap:.25rem;margin-top:.2rem}
-.auto-archivo input[type=file]{font-size:.8rem}
-.auto-archivo small{color:var(--text-3);font-size:.74rem}
+/* Pestañas por grupo + búsqueda: con 7 herramientas ordenan, con 30 salvan. */
+.auto-chips{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin-bottom:.4rem}
+.auto-chip{border:1px solid var(--border);background:var(--bg-card);color:inherit;font:inherit;font-size:.8rem;font-weight:550;border-radius:999px;padding:.32rem .8rem;cursor:pointer;transition:all .12s}
+.auto-chip:hover{border-color:var(--c-teal2)}
+.auto-chip.activo{background:var(--c-teal2);border-color:var(--c-teal2);color:#fff}
+.auto-chip span{opacity:.65;font-weight:400;margin-left:.15rem}
+.auto-buscar{display:flex;align-items:center;gap:.4rem;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;padding:.32rem .7rem;margin-left:auto;min-width:200px;transition:border-color .15s}
+.auto-buscar:focus-within{border-color:var(--c-teal2)}
+.auto-buscar input{border:0;background:transparent;color:inherit;font-size:.82rem;outline:none;flex:1}
+.auto-buscar .i{width:14px;height:14px;stroke:var(--text-3);fill:none;stroke-width:2}
+/* La zona de arrastre reemplaza al input de archivo nativo: se ve qué se
+   eligió, cuánto pesa, y se puede soltar el archivo encima. */
+.auto-drop{display:flex;align-items:center;gap:.7rem;border:1.5px dashed var(--border);border-radius:var(--r-lg);padding:.7rem .85rem;cursor:pointer;transition:all .15s;margin-top:.2rem}
+.auto-drop:hover{border-color:var(--c-teal2);background:color-mix(in srgb,var(--c-teal2) 4%,transparent)}
+.auto-drop.sobre{border-color:var(--c-teal2);border-style:solid;background:color-mix(in srgb,var(--c-teal2) 9%,transparent);transform:scale(1.01)}
+.auto-drop.con-archivo{border-style:solid;border-color:var(--c-verde,#16a34a)}
+.auto-drop .i{width:20px;height:20px;stroke:var(--text-3);fill:none;stroke-width:1.8;flex-shrink:0}
+.auto-drop.con-archivo .i{stroke:var(--c-verde,#16a34a)}
+.auto-drop-txt{font-size:.82rem;line-height:1.35;min-width:0}
+.auto-drop-txt b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.auto-drop-txt small{display:block;color:var(--text-3);font-size:.72rem;margin-top:.1rem}
+.auto-opciones{margin-top:.1rem}
+.auto-opciones summary{font-size:.78rem;color:var(--text-2);cursor:pointer;user-select:none;padding:.15rem 0}
+.auto-opciones summary:hover{color:var(--c-teal2)}
+.auto-opciones[open] summary{margin-bottom:.35rem}
 .auto-estado{font-size:.82rem;min-height:1.1em;line-height:1.4}
 .auto-ok{color:var(--c-verde,#16a34a)}
 .auto-error{color:var(--c-rojo,#dc2626)}
@@ -1429,7 +1480,7 @@ td.m-rojo,td.m-amarillo,td.m-verde{color:var(--m-color);font-weight:600}
 .auto-resumen{background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.55rem .7rem;font-size:.84rem;line-height:1.5}
 .auto-resumen small{display:block;margin-top:.3rem;color:var(--text-3);font-size:.75rem}
 .auto-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
-.venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
+.venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
 .venc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .venc-title{margin:0;font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .venc-sub{margin:.2rem 0 0;font-size:.82rem;color:var(--text3)}
@@ -3281,6 +3332,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <div>
             <h2 class="malla-titulo">Malla contractual</h2>
             <p class="malla-sub" id="malla-sub">Qué contrato rige con cada pagador y hasta cuándo.</p>
+          </div>
+          <div class="malla-buscar">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="malla-q" placeholder="Buscar pagador, contrato o tarifa…" oninput="mallaBuscarEnVivo()">
           </div>
         </div>
         <div class="maos-buscador">
@@ -20141,7 +20196,13 @@ function maosCopiar(){
 // Facturar contra un contrato vencido es una glosa segura. La malla vivía en
 // un PDF que el área miraba cuando se acordaba.
 
+// La pantalla es INTERACTIVA, no un informe: las tarjetas de arriba son
+// filtros (clic para ver solo ese grupo, clic de nuevo para soltar), hay
+// búsqueda en vivo por pagador o número, y cada fila se expande al clic con
+// el detalle completo — exclusiones, tecnologías, observaciones — en vez de
+// obligar a leer una tabla kilométrica.
 var MALLA = null;
+var MALLA_UI = {filtro: '', q: ''};
 
 async function mallaCargar(){
   var cont = document.getElementById('malla-listas');
@@ -20157,26 +20218,68 @@ async function mallaCargar(){
   }
 }
 
+function mallaFiltrar(grupo){
+  // La misma tarjeta dos veces = soltar el filtro. Así se explora sin botones extra.
+  MALLA_UI.filtro = (MALLA_UI.filtro === grupo) ? '' : grupo;
+  mallaPintar();
+}
+
+function mallaBuscarEnVivo(){
+  var el = document.getElementById('malla-q');
+  MALLA_UI.q = (el && el.value || '').trim().toUpperCase();
+  mallaPintar();
+}
+
+function _mallaCoincide(c){
+  if(!MALLA_UI.q) return true;
+  return (c.pagador + ' ' + c.nombre_malla + ' ' + (c.numero||'') + ' ' + (c.tarifa_texto||''))
+    .toUpperCase().indexOf(MALLA_UI.q) >= 0;
+}
+
 function mallaPintar(){
-  var d = MALLA, sub = document.getElementById('malla-sub');
-  if(sub) sub.textContent = 'Malla al ' + d.fecha_malla + ' · ' + d.total
+  var d = MALLA;
+  if(!d) return;
+  var sub = document.getElementById('malla-sub');
+  if(sub) sub.textContent = 'Malla oficial al ' + d.fecha_malla + ' · ' + d.total
     + ' contratos · revisada el ' + d.evaluado_en + '.';
 
+  var grupos = [
+    {k:'vencidos',       t:'Vencidos',        c:'rojo',    filas:d.vencidos,
+     nota:'Una factura de hoy contra estos contratos no tiene marco que la respalde.'},
+    {k:'por_vencer',     t:'Se acaban pronto', c:'amarillo', filas:d.por_vencer,
+     nota:'Renegociar toma semanas: el aviso es ahora, no el día que se vence.'},
+    {k:'vigentes',       t:'Vigentes',        c:'verde',   filas:d.vigentes, nota:''},
+    {k:'indeterminados', t:'Indeterminados',  c:'gris',    filas:d.indeterminados,
+     nota:'Continúan hasta que se formalice o se sustituya el contrato.'}
+  ];
+
   var cards = document.getElementById('malla-cards');
-  cards.innerHTML =
-      mallaCard('Vencidos', d.vencidos.length, 'rojo', 'ya no protegen la facturación')
-    + mallaCard('Por vencer', d.por_vencer.length, 'amarillo', 'en ' + d.dias_aviso + ' días o menos')
-    + mallaCard('Vigentes', d.vigentes.length, 'verde', 'con plazo por delante')
-    + mallaCard('Indeterminados', d.indeterminados.length, 'gris', 'sin fecha de terminación');
+  cards.innerHTML = grupos.map(function(g){
+    var activa = MALLA_UI.filtro === g.k ? ' activa' : '';
+    var sub2 = g.k==='vencidos' ? 'ya no protegen la facturación'
+             : g.k==='por_vencer' ? ('en ' + d.dias_aviso + ' días o menos')
+             : g.k==='vigentes' ? 'con plazo por delante' : 'sin fecha de terminación';
+    return '<button class="malla-card m-' + g.c + activa + '" onclick="mallaFiltrar(\'' + g.k + '\')" '
+      + 'title="Clic para ver solo este grupo">'
+      + '<div class="malla-card-n">' + g.filas.length + '</div>'
+      + '<div class="malla-card-t">' + escHtml(g.t) + '</div>'
+      + '<div class="malla-card-nota">' + escHtml(sub2) + '</div>'
+      + '</button>';
+  }).join('');
 
   var html = '';
-  if(d.vencidos.length)   html += mallaLista('Vencidos', d.vencidos, 'rojo',
-      'Una factura de hoy contra estos contratos no tiene marco contractual que la respalde.');
-  if(d.por_vencer.length) html += mallaLista('Se acaban pronto', d.por_vencer, 'amarillo',
-      'Renegociar toma semanas: el aviso es ahora, no el día que se vence.');
-  if(d.vigentes.length)   html += mallaLista('Vigentes', d.vigentes, 'verde', '');
-  if(d.indeterminados.length) html += mallaLista('Sin fecha de terminación', d.indeterminados, 'gris',
-      'Continúan hasta que se formalice o se sustituya el contrato.');
+  var visibles = 0;
+  grupos.forEach(function(g){
+    if(MALLA_UI.filtro && MALLA_UI.filtro !== g.k) return;
+    var filas = g.filas.filter(_mallaCoincide);
+    visibles += filas.length;
+    if(filas.length) html += mallaLista(g, filas);
+  });
+  if(!visibles){
+    html = '<div class="malla-vacio">Nada coincide con la búsqueda'
+      + (MALLA_UI.filtro ? ' en este grupo. <a href="#" onclick="mallaFiltrar(\'\');return false">Ver todos</a>' : '.')
+      + '</div>';
+  }
   document.getElementById('malla-listas').innerHTML = html;
 
   var badge = document.getElementById('malla-badge-side');
@@ -20187,40 +20290,48 @@ function mallaPintar(){
   }
 }
 
-function mallaCard(titulo, n, color, nota){
-  return '<div class="malla-card m-' + color + '">'
-    + '<div class="malla-card-n">' + n + '</div>'
-    + '<div class="malla-card-t">' + escHtml(titulo) + '</div>'
-    + '<div class="malla-card-nota">' + escHtml(nota) + '</div>'
-    + '</div>';
-}
-
-function mallaLista(titulo, filas, color, nota){
-  var h = '<h3 class="malla-grupo m-' + color + '">' + escHtml(titulo) + ' · ' + filas.length + '</h3>';
-  if(nota) h += '<p class="malla-grupo-nota">' + escHtml(nota) + '</p>';
-  h += '<div class="tbl-wrap"><table class="tbl-modern"><thead><tr>'
-     + '<th>Pagador</th><th>N° de contrato</th><th>Vigencia</th><th>Tarifa</th><th>Plazo</th>'
-     + '</tr></thead><tbody>';
-  filas.forEach(function(c){
-    var plazo = '—';
+function mallaLista(g, filas){
+  var h = '<h3 class="malla-grupo m-' + g.c + '">' + escHtml(g.t) + ' · ' + filas.length + '</h3>';
+  if(g.nota) h += '<p class="malla-grupo-nota">' + escHtml(g.nota) + '</p>';
+  h += '<div class="malla-filas">';
+  filas.forEach(function(c, i){
+    var id = 'mf-' + g.k + '-' + i;
+    var plazo = '';
     if(typeof c.dias === 'number'){
       plazo = c.dias < 0 ? ('venció hace ' + (-c.dias) + ' días')
-                         : ('quedan ' + c.dias + ' días');
-    }
-    if(c.hasta_agotar_recurso) plazo += ' · o hasta agotar recurso';
-    h += '<tr>'
-      + '<td><b>' + escHtml(c.pagador) + '</b><br><small>' + escHtml(c.nombre_malla) + '</small></td>'
-      + '<td>' + escHtml(c.numero || '—') + '</td>'
-      + '<td>' + escHtml(c.desde) + ' → ' + escHtml(c.hasta || 'indeterminado') + '</td>'
-      + '<td><small>' + escHtml(c.tarifa_texto) + '</small></td>'
-      + '<td class="m-' + color + '">' + escHtml(plazo) + '</td>'
-      + '</tr>';
-    if(c.exclusiones && c.exclusiones.length){
-      h += '<tr class="malla-excl"><td colspan="5"><b>No se contrata:</b> '
-         + c.exclusiones.map(escHtml).join(' · ') + '</td></tr>';
-    }
+            : c.dias === 0 ? 'vence HOY'
+            : ('quedan ' + c.dias + ' días');
+    } else if(!c.hasta){ plazo = 'sin fecha de terminación'; }
+    h += '<div class="malla-fila" onclick="mallaExpandir(\'' + id + '\')">'
+      + '<div class="malla-fila-cab">'
+      +   '<div class="malla-fila-quien"><b>' + escHtml(c.pagador) + '</b>'
+      +     '<small>' + escHtml(c.numero || 'sin número en la malla') + '</small></div>'
+      +   '<div class="malla-fila-vig">' + escHtml(c.desde) + ' → ' + escHtml(c.hasta || '∞') + '</div>'
+      +   '<span class="malla-pill m-' + g.c + '">' + escHtml(plazo || '—')
+      +     (c.hasta_agotar_recurso ? ' · o al agotar recurso' : '') + '</span>'
+      +   '<svg class="malla-flecha" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>'
+      + '</div>'
+      + '<div class="malla-fila-det" id="' + id + '">'
+      +   '<div class="malla-det-g"><span>Nombre en la malla</span>' + escHtml(c.nombre_malla) + '</div>'
+      +   '<div class="malla-det-g"><span>Tarifa pactada</span>' + escHtml(c.tarifa_texto)
+      +     (c.factor ? ' <b class="malla-factor">factor ' + c.factor + '</b>' : '') + '</div>'
+      +   (c.tecnologias ? '<div class="malla-det-g"><span>Qué cubre</span>' + escHtml(c.tecnologias) + '</div>' : '')
+      +   (c.exclusiones && c.exclusiones.length
+          ? '<div class="malla-det-g malla-det-excl"><span>No se contrata</span>'
+            + c.exclusiones.map(function(x){ return '<em>' + escHtml(x) + '</em>'; }).join('') + '</div>' : '')
+      +   (c.observacion ? '<div class="malla-det-g"><span>Observación</span>' + escHtml(c.observacion) + '</div>' : '')
+      + '</div>'
+      + '</div>';
   });
-  return h + '</tbody></table></div>';
+  return h + '</div>';
+}
+
+function mallaExpandir(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  var fila = el.closest('.malla-fila');
+  var abierta = fila.classList.contains('abierta');
+  fila.classList.toggle('abierta', !abierta);
 }
 
 // ─── Centro de Automatización ──────────────────────────────────────────
@@ -20248,16 +20359,56 @@ async function autoCargar(){
   }
 }
 
+// La pantalla es INTERACTIVA: pestañas por grupo, búsqueda en vivo, y el
+// archivo se ARRASTRA a la ficha (o clic para elegirlo). Los parámetros van
+// plegados detrás de "Opciones": el caso normal es subir y ejecutar, y el
+// formulario abierto de entrada era ruido.
+var AUTO_UI = {grupo: '', q: ''};
+
 function autoPintar(){
   var cont = document.getElementById('auto-catalogo');
   if(!AUTO.grupos.length){ cont.innerHTML = '<div class="auto-vacio">No hay automatizaciones disponibles.</div>'; return; }
-  var html = '';
+
+  var chips = '<div class="auto-chips">'
+    + '<button class="auto-chip' + (AUTO_UI.grupo ? '' : ' activo') + '" onclick="autoGrupo(\'\')">Todas</button>'
+    + AUTO.grupos.map(function(g){
+        return '<button class="auto-chip' + (AUTO_UI.grupo === g.nombre ? ' activo' : '')
+          + '" onclick="autoGrupo(\'' + escHtml(g.nombre) + '\')">' + escHtml(g.nombre)
+          + ' <span>' + (g.automatizaciones||[]).length + '</span></button>';
+      }).join('')
+    + '<div class="auto-buscar"><svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+    + '<input id="auto-q" placeholder="Buscar herramienta…" value="' + escHtml(AUTO_UI.q) + '" oninput="autoBuscarEnVivo()"></div>'
+    + '</div>';
+
+  var q = AUTO_UI.q.toUpperCase();
+  var html = '', visibles = 0;
   AUTO.grupos.forEach(function(g){
+    if(AUTO_UI.grupo && AUTO_UI.grupo !== g.nombre) return;
+    var fichas = (g.automatizaciones || []).filter(function(a){
+      if(!q) return true;
+      return (a.nombre + ' ' + a.que_hace + ' ' + a.cuando_usarla).toUpperCase().indexOf(q) >= 0;
+    });
+    if(!fichas.length) return;
+    visibles += fichas.length;
     html += '<h3 class="auto-grupo">' + escHtml(g.nombre) + '</h3><div class="auto-fichas">';
-    (g.automatizaciones || []).forEach(function(a){ html += autoFicha(a); });
+    fichas.forEach(function(a){ html += autoFicha(a); });
     html += '</div>';
   });
-  cont.innerHTML = html;
+  if(!visibles) html = '<div class="auto-vacio">Ninguna herramienta coincide con la búsqueda.</div>';
+  cont.innerHTML = chips + html;
+
+  // El foco vuelve al buscador tras repintar, para seguir tecleando.
+  if(AUTO_UI.q){
+    var qEl = document.getElementById('auto-q');
+    if(qEl){ qEl.focus(); qEl.setSelectionRange(qEl.value.length, qEl.value.length); }
+  }
+}
+
+function autoGrupo(g){ AUTO_UI.grupo = g; autoPintar(); }
+function autoBuscarEnVivo(){
+  var el = document.getElementById('auto-q');
+  AUTO_UI.q = (el && el.value) || '';
+  autoPintar();
 }
 
 function autoFicha(a){
@@ -20271,18 +20422,58 @@ function autoFicha(a){
       + (p.ayuda ? '<small>' + escHtml(p.ayuda) + '</small>' : '')
       + '</label>';
   }).join('');
+  var ext = (a.extensiones || []).join(', ');
   return '<div class="auto-ficha" id="auto-f-' + a.id + '">'
     + '<div class="auto-ficha-nombre">' + escHtml(a.nombre) + '</div>'
     + '<div class="auto-ficha-que">' + escHtml(a.que_hace) + '</div>'
     + '<div class="auto-ficha-cuando">' + escHtml(a.cuando_usarla) + '</div>'
-    + (params ? '<div class="auto-params">' + params + '</div>' : '')
-    + '<div class="auto-archivo">'
-    +   '<input type="file" id="auto-file-' + a.id + '" accept="' + (a.extensiones || []).join(',') + '">'
-    +   '<small>Acepta ' + (a.extensiones || []).join(' o ') + ' · máximo ' + AUTO.limiteMb + ' MB</small>'
+    // Zona de arrastre: clic o soltar el archivo encima. El input nativo
+    // queda oculto pero sigue siendo el dueño del archivo elegido.
+    + '<div class="auto-drop" id="auto-drop-' + a.id + '" '
+    +   'onclick="document.getElementById(\'auto-file-' + a.id + '\').click()" '
+    +   'ondragover="event.preventDefault();this.classList.add(\'sobre\')" '
+    +   'ondragleave="this.classList.remove(\'sobre\')" '
+    +   'ondrop="autoSoltar(event,\'' + a.id + '\')">'
+    +   '<svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+    +   '<div class="auto-drop-txt" id="auto-drop-txt-' + a.id + '">Arrastrá el archivo acá o hacé clic'
+    +     '<small>' + escHtml(ext) + ' · máximo ' + AUTO.limiteMb + ' MB</small></div>'
+    +   '<input type="file" id="auto-file-' + a.id + '" accept="' + (a.extensiones || []).join(',') + '" '
+    +     'onchange="autoArchivoElegido(\'' + a.id + '\')" hidden>'
     + '</div>'
-    + '<button class="btn btn-primary btn-sm" onclick="autoEjecutar(\'' + a.id + '\')" id="auto-btn-' + a.id + '">Ejecutar</button>'
+    + (params
+        ? '<details class="auto-opciones"><summary>Opciones</summary>'
+          + '<div class="auto-params">' + params + '</div></details>'
+        : '')
+    + '<div class="auto-acciones">'
+    +   '<button class="btn btn-ghost btn-sm" onclick="autoPrevisualizar(\'' + a.id + '\')" id="auto-prev-' + a.id + '">Ver qué sale</button>'
+    +   '<button class="btn btn-primary btn-sm" onclick="autoEjecutar(\'' + a.id + '\')" id="auto-btn-' + a.id + '">Descargar resultado</button>'
+    + '</div>'
     + '<div class="auto-estado" id="auto-estado-' + a.id + '"></div>'
     + '</div>';
+}
+
+function autoSoltar(ev, id){
+  ev.preventDefault();
+  var drop = document.getElementById('auto-drop-' + id);
+  if(drop) drop.classList.remove('sobre');
+  var archivos = ev.dataTransfer && ev.dataTransfer.files;
+  if(!archivos || !archivos.length) return;
+  var input = document.getElementById('auto-file-' + id);
+  input.files = archivos;
+  autoArchivoElegido(id);
+}
+
+function autoArchivoElegido(id){
+  var input = document.getElementById('auto-file-' + id);
+  var txt = document.getElementById('auto-drop-txt-' + id);
+  var drop = document.getElementById('auto-drop-' + id);
+  if(!input || !input.files.length || !txt) return;
+  var f = input.files[0];
+  var mb = (f.size / 1048576).toFixed(1);
+  txt.innerHTML = '<b>' + escHtml(f.name) + '</b><small>' + mb + ' MB · listo para ejecutar</small>';
+  if(drop) drop.classList.add('con-archivo');
+  var estado = document.getElementById('auto-estado-' + id);
+  if(estado) estado.innerHTML = '';
 }
 
 function _autoDatos(id){
@@ -20333,13 +20524,15 @@ async function autoEjecutar(id){
   var estado = document.getElementById('auto-estado-' + id);
   var boton = document.getElementById('auto-btn-' + id);
   if(!input || !input.files.length){
-    estado.innerHTML = '<span class="auto-error">Elegí primero el archivo.</span>';
+    estado.innerHTML = '<span class="auto-error">Elegí primero el archivo — arrastralo a la zona de arriba.</span>';
     return;
   }
   var fd = _autoDatos(id);
 
+  var textoOriginal = boton.textContent;
   boton.disabled = true;
-  estado.innerHTML = '<span class="auto-corriendo">Procesando…</span>';
+  boton.textContent = 'Procesando…';
+  estado.innerHTML = '<span class="auto-corriendo">Convirtiendo el archivo…</span>';
   try{
     var r = await fetch('/automatizaciones/' + id + '/ejecutar', {
       method: 'POST', headers: authH(), body: fd
@@ -20366,6 +20559,7 @@ async function autoEjecutar(id){
     estado.innerHTML = '<span class="auto-error">Conexión: ' + escHtml(e.message) + '</span>';
   }finally{
     boton.disabled = false;
+    boton.textContent = textoOriginal;
   }
 }
 

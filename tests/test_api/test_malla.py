@@ -107,3 +107,16 @@ class TestLaPantallaExiste:
         """El globo del menú suma vencidos y por vencer: el auditor lo ve sin
         entrar a la pantalla."""
         assert "malla-badge-side" in self._html()
+
+    def test_la_pantalla_es_interactiva(self):
+        """Las tarjetas filtran al clic, hay búsqueda en vivo y cada contrato
+        se expande con su detalle. Y el scroll, que no existía: .panel es
+        overflow:hidden y el área debe traer el suyo."""
+        import re
+
+        html = self._html()
+        assert "mallaFiltrar" in html, "las tarjetas no filtran"
+        assert 'id="malla-q"' in html, "no hay búsqueda"
+        assert "mallaExpandir" in html, "las filas no se expanden"
+        area = re.search(r"\.malla-area\{[^}]*\}", html).group(0)
+        assert "overflow-y:auto" in area, "la pantalla queda estática: no scrollea"
