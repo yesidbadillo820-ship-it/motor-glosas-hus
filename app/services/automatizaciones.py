@@ -25,6 +25,7 @@ devuelven otro.
 from __future__ import annotations
 
 import importlib
+import io
 import shutil
 import sys
 import tempfile
@@ -83,6 +84,13 @@ class Automatizacion:
     salida: str = "carpeta"  # carpeta (varios archivos → zip) | archivo
     parametros: tuple[Parametro, ...] = ()
     grupo: str = "Conversión"
+    # Varias herramientas de `tools/` reciben una CARPETA y escriben el
+    # resultado al lado de cada archivo que encuentran —así se usan por doble
+    # clic en el PC del auditor—. Para esas, el archivo subido se deja dentro
+    # de la carpeta de salida y se recoge todo lo que aparezca ahí menos el
+    # original. Lo demás sería pedirles que cambien su forma de trabajar solo
+    # para poder correrlas desde la aplicación.
+    trabaja_en_carpeta: bool = False
     # Cómo se arma la orden. Recibe (entrada, salida, opciones) y devuelve la
     # lista de argumentos que la herramienta espera.
     argumentos: Callable[[Path, Path, dict[str, str]], list[str]] = field(repr=False, default=None)
@@ -180,6 +188,66 @@ CATALOGO: tuple[Automatizacion, ...] = (
         ),
     ),
     Automatizacion(
+        id="indice-soportes",
+        nombre="Índice de soportes (TXT) → Excel",
+        que_hace=(
+            "Convierte el índice de soportes que exporta el share —un TXT con "
+            "miles de líneas— a un Excel donde se puede filtrar y buscar."
+        ),
+        cuando_usarla="Cuando hay que revisar qué soportes existen para un lote de facturas.",
+        modulo="txt_a_excel",
+        extensiones=(".txt",),
+        salida="archivo",
+        grupo="Soportes",
+        trabaja_en_carpeta=True,
+        parametros=(
+            Parametro(
+                "delimitador",
+                "Separador de columnas",
+                "Se detecta solo. Escribilo solo si el archivo sale mal partido: ; o TAB.",
+            ),
+        ),
+        argumentos=lambda e, s, o: (
+            [str(s), "--sin-recursion"] + _opt(o, "delimitador", "--delimitador")
+        ),
+    ),
+    Automatizacion(
+        id="excel-a-csv",
+        nombre="Excel → CSV",
+        que_hace="Convierte un Excel a CSV, que es lo que piden varios portales de EPS.",
+        cuando_usarla="Cuando el portal rechaza el .xlsx y pide .csv.",
+        modulo="excel_a_csv",
+        salida="archivo",
+        grupo="Conversión",
+        trabaja_en_carpeta=True,
+        parametros=(
+            Parametro(
+                "todas",
+                "Convertir todas las hojas",
+                "Escribí 1 para convertir todas; vacío convierte solo la hoja activa.",
+            ),
+        ),
+        argumentos=lambda e, s, o: (
+            [str(s), "--sin-recursion", "--forzar"]
+            + (["--todas"] if (o.get("todas") or "").strip() in {"1", "si", "sí", "true"} else [])
+        ),
+    ),
+    Automatizacion(
+        id="revisar-xml",
+        nombre="Revisar el XML de las facturas",
+        que_hace=(
+            "Abre los XML de factura electrónica y arma un Excel con lo que trae "
+            "cada uno: CUFE, NIT, valor y fecha."
+        ),
+        cuando_usarla="Antes de radicar, para confirmar que los XML están completos y coinciden.",
+        modulo="revisar_xml_facturas",
+        extensiones=(".xml", ".zip"),
+        salida="archivo",
+        grupo="Radicación",
+        trabaja_en_carpeta=True,
+        argumentos=lambda e, s, o: [str(s), "--salida", str(s / "REVISION_XML.xlsx")],
+    ),
+    Automatizacion(
         id="tramite-masivo",
         nombre="Trámite masivo → Excel de cargue",
         que_hace="Convierte el archivo de trámites al Excel que acepta el ERP.",
@@ -204,6 +272,84 @@ def obtener(id_automatizacion: str) -> Automatizacion | None:
 
 class ErrorAutomatizacion(RuntimeError):
     """Falla previsible que se le puede explicar al auditor."""
+
+
+# ─── Resumen de lo que salió ──────────────────────────────────────────────
+# El archivo que produce una conversión se carga al ERP con plata adentro. La
+# regla del área es no hacer un cargue masivo sin haber mirado antes qué
+# salió, y hasta ahora "mirar" significaba abrir el Excel a mano.
+#
+# Estas funciones leen el resultado y lo resumen en tres números que el
+# auditor reconoce: cuántas facturas, cuántas objeciones y cuánta plata. Si
+# el total no se parece al del archivo que mandó la EPS, hay algo mal y se
+# ve antes de cargarlo, no después.
+
+# Nombres de columna de valor y de factura en los formatos que produce el
+# repositorio. `CROVALOBJ` y `CRNCXC` son los del layout de 16 columnas.
+_COL_VALOR = {"CROVALOBJ", "VALOR_GLOSA", "VALOR OBJETADO", "VALOR", "VALOR_OBJETADO"}
+_COL_FACTURA = {"CRNCXC", "NUMERO_FACTURA", "FACTURA", "NUMERO FACTURA"}
+
+
+def _resumir_excel(datos: bytes) -> dict[str, Any] | None:
+    """Facturas, filas y total en pesos de un Excel generado. None si no aplica."""
+    try:
+        import openpyxl
+    except ImportError:  # pragma: no cover - openpyxl es dependencia del repo
+        return None
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(datos), read_only=True, data_only=True)
+    except Exception:
+        return None
+    try:
+        hoja = wb["OBJECIONES"] if "OBJECIONES" in wb.sheetnames else wb[wb.sheetnames[0]]
+        filas = hoja.iter_rows(values_only=True)
+        try:
+            encabezados = [str(c or "").strip().upper() for c in next(filas)]
+        except StopIteration:
+            return None
+        i_valor = next((i for i, h in enumerate(encabezados) if h in _COL_VALOR), None)
+        i_fact = next((i for i, h in enumerate(encabezados) if h in _COL_FACTURA), None)
+        total, cuenta, facturas = 0.0, 0, set()
+        for fila in filas:
+            if not fila or all(c is None or str(c).strip() == "" for c in fila):
+                continue
+            cuenta += 1
+            if i_valor is not None and i_valor < len(fila):
+                try:
+                    total += float(fila[i_valor] or 0)
+                except (TypeError, ValueError):
+                    pass
+            if i_fact is not None and i_fact < len(fila) and fila[i_fact]:
+                facturas.add(str(fila[i_fact]).strip())
+        return {"filas": cuenta, "facturas": len(facturas), "valor_total": round(total, 2)}
+    finally:
+        wb.close()
+
+
+def resumir(archivos: list[tuple[str, bytes]]) -> dict[str, Any]:
+    """Suma los resúmenes de todos los archivos generados."""
+    detalle, filas, facturas, total = [], 0, set(), 0.0
+    for nombre, datos in archivos:
+        if not nombre.lower().endswith((".xlsx", ".xlsm")):
+            detalle.append({"archivo": nombre, "bytes": len(datos)})
+            continue
+        r = _resumir_excel(datos)
+        if r is None:
+            detalle.append({"archivo": nombre, "bytes": len(datos)})
+            continue
+        filas += r["filas"]
+        total += r["valor_total"]
+        # Cada archivo suele ser una factura; se cuentan por archivo para no
+        # perder las que el propio archivo no nombra en una columna.
+        facturas.add(nombre)
+        detalle.append({"archivo": nombre, "bytes": len(datos), **r})
+    return {
+        "archivos": len(archivos),
+        "facturas": len(facturas) or None,
+        "filas": filas or None,
+        "valor_total": round(total, 2) if total else None,
+        "detalle": detalle,
+    }
 
 
 @dataclass
@@ -286,10 +432,13 @@ def ejecutar(
     inicio = time.monotonic()
     trabajo = Path(tempfile.mkdtemp(prefix="sinac_auto_"))
     try:
-        entrada = trabajo / (Path(nombre_archivo).name or "entrada")
-        entrada.write_bytes(contenido)
         salida = trabajo / "salida"
         salida.mkdir()
+        # Las que trabajan sobre una carpeta escriben al lado de su entrada,
+        # así que la entrada va DENTRO de la carpeta de salida.
+        destino = salida if auto.trabaja_en_carpeta else trabajo
+        entrada = destino / (Path(nombre_archivo).name or "entrada")
+        entrada.write_bytes(contenido)
 
         argv = auto.argumentos(entrada, salida, opciones or {})
         import contextlib
@@ -310,7 +459,9 @@ def ejecutar(
                 f"La corrida tardó {segundos:.0f} s, más del límite de {LIMITE_SEGUNDOS} s"
             )
 
-        generados = sorted(p for p in salida.rglob("*") if p.is_file())
+        generados = sorted(
+            p for p in salida.rglob("*") if p.is_file() and p.resolve() != entrada.resolve()
+        )
         if codigo not in (0, None) and not generados:
             raise ErrorAutomatizacion(
                 buffer.getvalue().strip()[-500:] or "La herramienta terminó con error"

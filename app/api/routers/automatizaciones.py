@@ -26,6 +26,17 @@ from app.services import automatizaciones as svc
 router = APIRouter(prefix="/automatizaciones", tags=["automatizaciones"])
 
 
+def _opciones(crudo: str) -> dict[str, str]:
+    """Los parámetros que eligió el auditor, validados."""
+    try:
+        opts = json.loads(crudo or "{}")
+        if not isinstance(opts, dict):
+            raise ValueError
+        return {str(k): str(v) for k, v in opts.items()}
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(400, "Las opciones deben ser un objeto JSON")
+
+
 @router.get("")
 def listar_automatizaciones(
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
@@ -43,6 +54,39 @@ def listar_automatizaciones(
         "total": len(fichas),
         "grupos": [{"nombre": g, "automatizaciones": items} for g, items in grupos.items()],
         "limite_mb": svc.MAX_BYTES // 1048576,
+    }
+
+
+@router.post("/{id_automatizacion}/previsualizar")
+async def previsualizar_automatizacion(
+    id_automatizacion: str,
+    archivo: UploadFile = File(...),
+    opciones: str = Form("{}"),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Corre la automatización y devuelve **qué salió**, sin el archivo.
+
+    La regla del área es no hacer un cargue masivo sin mirar antes lo que se
+    va a cargar, y hasta ahora "mirar" era abrir el Excel a mano. Acá el
+    auditor ve cuántas facturas, cuántas objeciones y cuánta plata trae el
+    resultado; si el total no se parece al del archivo que mandó la EPS, hay
+    algo mal y se ve **antes** de cargarlo al ERP.
+
+    No se guarda nada: la corrida vuelve a hacerse al descargar.
+    """
+    opts = _opciones(opciones)
+    contenido = await archivo.read()
+    try:
+        resultado = svc.ejecutar(id_automatizacion, contenido, archivo.filename or "", opts)
+    except svc.ErrorAutomatizacion as e:
+        raise HTTPException(400, str(e))
+
+    return {
+        "ok": True,
+        "segundos": round(resultado.segundos, 2),
+        "archivos": resultado.nombres,
+        "resumen": svc.resumir(resultado.archivos),
+        "salida_texto": resultado.salida_texto[-800:],
     }
 
 
@@ -67,14 +111,7 @@ async def ejecutar_automatizacion(
     if auto is None:
         raise HTTPException(404, f"No existe la automatización '{id_automatizacion}'")
 
-    try:
-        opts = json.loads(opciones or "{}")
-        if not isinstance(opts, dict):
-            raise ValueError
-        opts = {str(k): str(v) for k, v in opts.items()}
-    except (json.JSONDecodeError, ValueError):
-        raise HTTPException(400, "Las opciones deben ser un objeto JSON")
-
+    opts = _opciones(opciones)
     contenido = await archivo.read()
     try:
         resultado = svc.ejecutar(id_automatizacion, contenido, archivo.filename or "", opts)

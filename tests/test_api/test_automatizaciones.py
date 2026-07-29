@@ -255,3 +255,119 @@ class TestLaPantallaExiste:
         html = self._html()
         assert "'/automatizaciones'" in html
         assert "'/automatizaciones/' + id + '/ejecutar'" in html
+
+
+class TestHerramientasQueTrabajanSobreCarpeta:
+    """Varias herramientas de `tools/` reciben una carpeta, no un archivo.
+
+    Así se usan por doble clic en el PC del auditor: se sueltan en la carpeta
+    y procesan todo lo que encuentran. Para correrlas desde la aplicación, el
+    archivo subido se deja dentro de la carpeta de trabajo y se recoge lo que
+    aparezca ahí — menos el original, que si no volvería como resultado.
+    """
+
+    def test_el_indice_de_soportes_sale_en_excel(self, cliente):
+        txt = "\n".join(
+            [
+                "HUS0000443697|RIPS|2026-01-15|ruta/uno.json",
+                "HUS0000443697|FEV|2026-01-15|ruta/dos.xml",
+                "HUS0000503425|RIPS|2026-01-16|ruta/tres.json",
+            ]
+        ).encode("utf-8")
+        r = cliente.post(
+            "/automatizaciones/indice-soportes/ejecutar",
+            files={"archivo": ("indice_facturas_HUS.txt", txt, "text/plain")},
+            data={"opciones": json.dumps({"delimitador": "|"})},
+        )
+        assert r.status_code == 200, r.text
+        # La herramienta entrega el Excel y además el CSV: los dos van en un ZIP.
+        assert r.headers["X-Archivos-Generados"] == "2"
+        nombres = zipfile.ZipFile(io.BytesIO(r.content)).namelist()
+        assert any(n.endswith(".xlsx") for n in nombres), nombres
+        assert any(n.endswith(".csv") for n in nombres), nombres
+
+    def test_no_devuelve_el_archivo_que_se_subio(self, cliente):
+        """Si el original volviera como resultado, el auditor descargaría lo
+        mismo que subió y creería que la herramienta no hizo nada."""
+        txt = b"HUS0000443697|RIPS|2026-01-15|ruta/uno.json\n"
+        r = cliente.post(
+            "/automatizaciones/indice-soportes/ejecutar",
+            files={"archivo": ("indice.txt", txt, "text/plain")},
+            data={"opciones": json.dumps({"delimitador": "|"})},
+        )
+        assert r.status_code == 200
+        nombres = zipfile.ZipFile(io.BytesIO(r.content)).namelist()
+        assert "indice.txt" not in nombres, nombres
+
+
+class TestCatalogoCompleto:
+    def test_estan_las_siete_herramientas(self, cliente):
+        d = cliente.get("/automatizaciones").json()
+        ids = {a["id"] for g in d["grupos"] for a in g["automatizaciones"]}
+        assert {
+            "objeciones-savia",
+            "objeciones-vco",
+            "objeciones-emssanar",
+            "indice-soportes",
+            "excel-a-csv",
+            "revisar-xml",
+            "tramite-masivo",
+        } <= ids
+
+    def test_los_grupos_ordenan_el_catalogo(self, cliente):
+        """Con siete herramientas ya hace falta agrupar; con veinte, más."""
+        d = cliente.get("/automatizaciones").json()
+        nombres = {g["nombre"] for g in d["grupos"]}
+        assert {"Conversión", "Soportes", "Radicación", "Cargue"} <= nombres
+
+
+class TestVerQueSaleAntesDeCargarlo:
+    """La regla del área: no hacer un cargue masivo sin mirar antes qué sale.
+
+    Hasta ahora "mirar" era abrir el Excel a mano. Acá el auditor ve cuántas
+    facturas, cuántas objeciones y cuánta plata trae el resultado. Si el total
+    no se parece al del archivo que mandó la EPS, hay algo mal — y se ve antes
+    de cargarlo al ERP, no después.
+    """
+
+    def _previsualizar(self, cliente):
+        return cliente.post(
+            "/automatizaciones/objeciones-savia/previsualizar",
+            files={"archivo": ("SAVIA.xlsx", _excel_savia(), "application/vnd.ms-excel")},
+            data={"opciones": "{}"},
+        )
+
+    def test_dice_cuantas_facturas_y_cuantas_objeciones(self, cliente):
+        d = self._previsualizar(cliente).json()
+        assert d["ok"] is True
+        assert d["resumen"]["facturas"] == 2
+        assert d["resumen"]["filas"] == 3
+
+    def test_dice_cuanta_plata(self, cliente):
+        """1.365,50 + 60.000 + 950.000 = 1.011.365 en pesos enteros."""
+        d = self._previsualizar(cliente).json()
+        assert d["resumen"]["valor_total"] == pytest.approx(1_011_365, abs=2)
+
+    def test_el_total_delata_un_valor_inflado(self, cliente):
+        """Si el ×100 volviera, el total saltaría a la vista: 1,1 millones
+        contra 136 millones. Es justamente para eso que se muestra."""
+        d = self._previsualizar(cliente).json()
+        assert d["resumen"]["valor_total"] < 2_000_000
+
+    def test_no_devuelve_el_archivo(self, cliente):
+        """Previsualizar es mirar, no descargar."""
+        r = self._previsualizar(cliente)
+        assert r.headers["content-type"].startswith("application/json")
+
+    def test_el_viewer_no_previsualiza(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        assert self._previsualizar(cliente).status_code == 403
+
+    def test_la_pantalla_tiene_el_boton(self):
+        from pathlib import Path
+
+        html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        assert "autoPrevisualizar" in html
+        assert "/previsualizar" in html
