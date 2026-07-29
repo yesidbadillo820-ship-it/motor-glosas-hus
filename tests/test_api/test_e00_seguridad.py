@@ -463,3 +463,32 @@ class TestContratosNoLosBorraCualquiera:
         cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
         r = cliente.post("/contratos/upsert", json={"eps": "COOSALUD", "contenido": "x"})
         assert r.status_code == 403
+
+
+class TestPreauditoriaNoLaEscribeUnViewer:
+    """Las siete rutas que escriben en Pre-auditoría son del flujo del auditor.
+
+    La más delicada es la última: el oficio de devolución es un documento que
+    **sale del hospital** con un consecutivo. Bastaba con estar autenticado.
+    Leer el consolidado sigue abierto: leer no cambia nada.
+    """
+
+    def test_viewer_no_registra_un_oficio(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/preauditoria/oficios", json={"numero": "FHUS-1"})
+        assert r.status_code == 403
+
+    def test_viewer_no_audita_una_factura(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.patch("/preauditoria/facturas/1/auditar", json={"resultado": "RADICADA"})
+        assert r.status_code == 403
+
+    def test_viewer_no_emite_oficio_de_devolucion(self, cliente):
+        cliente.estado["usuario"] = _usuario(rol=ROL_VIEWER)
+        r = cliente.post("/preauditoria/oficios/1/oficio-devolucion", json={})
+        assert r.status_code == 403
+
+    def test_el_auditor_conserva_su_trabajo(self, cliente):
+        """No se cierra de más: registrar el oficio es su tarea diaria."""
+        r = cliente.post("/preauditoria/oficios", json={"numero": "FHUS-1"})
+        assert r.status_code != 403
