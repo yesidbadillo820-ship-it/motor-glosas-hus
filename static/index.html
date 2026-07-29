@@ -1491,6 +1491,28 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .auto-resumen{background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.55rem .7rem;font-size:.84rem;line-height:1.5}
 .auto-resumen small{display:block;margin-top:.3rem;color:var(--text-3);font-size:.75rem}
 .auto-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
+/* Expediente: la historia completa de una glosa como pantalla de primera
+   clase (antes era un popup aparte). Misma receta de scroll que las demás. */
+.exp-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.exp-ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.15rem;max-width:980px}
+.exp-dato{min-width:0}
+.exp-dato b{display:block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:.15rem;font-weight:600}
+.exp-dato span{font-size:.9rem;font-weight:600;overflow-wrap:anywhere}
+.exp-contrato{border:1px solid var(--border);border-left:4px solid var(--exp-c,#94a3b8);border-radius:var(--r-sm);background:var(--bg-card);max-width:980px;font-size:.85rem;padding:.65rem .9rem;line-height:1.45}
+.exp-sec{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);border-bottom:1px solid var(--border);padding-bottom:.3rem;max-width:980px;margin:.4rem 0 .1rem}
+.exp-chips{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center}
+.exp-tl{position:relative;padding-left:26px;max-width:980px}
+.exp-tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.exp-ev{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.6rem .85rem;margin-bottom:.6rem}
+.exp-ev::before{content:"";position:absolute;left:-22px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--exp-c,#94a3b8)}
+.exp-ev-tipo{font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.exp-ev-meta{font-size:.72rem;color:var(--text-3);margin-top:.1rem}
+.exp-ev-det{font-size:.83rem;margin-top:.25rem;line-height:1.45;overflow-wrap:anywhere}
+.exp-lista{display:flex;flex-direction:column;gap:.45rem;max-width:980px}
+.exp-item{display:flex;justify-content:space-between;gap:1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:.5rem .8rem;font-size:.83rem;align-items:center;flex-wrap:wrap}
+.exp-res{display:flex;flex-direction:column;gap:.4rem;max-width:980px}
+.exp-res button{text-align:left;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:.55rem .85rem;font:inherit;font-size:.84rem;color:inherit;cursor:pointer}
+.exp-res button:hover{border-color:var(--c-teal2)}
 .venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
 .venc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .venc-title{margin:0;font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
@@ -2214,6 +2236,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <button class="sn-item" data-tip="Historial" onclick="sidebarTab(this,'historial')">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span class="sn-item-label">Historial</span>
+        </button>
+        <button class="sn-item" data-tip="Expediente" onclick="sidebarTab(this,'expediente')" id="sn-expediente">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="sn-item-label">Expediente</span>
         </button>
         <button class="sn-item" data-tip="Vencimientos" onclick="sidebarTab(this,'vencimientos')" id="sn-vencimientos">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
@@ -3337,6 +3363,25 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
          actualiza contratación y que el área de glosas miraba cuando se
          acordaba; el sistema tenía las vigencias como texto libre y nunca las
          leía. -->
+    <!-- Expediente: todo lo que ha pasado con una glosa, en una pantalla.
+         Reemplaza al popup de timeline que se abría en otra ventana. -->
+    <div class="panel" id="p-expediente">
+      <div class="exp-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Expediente</h2>
+            <p class="malla-sub">Quién es, con qué contrato se defiende, qué ha pasado y qué soportes hay — sin abrir cuatro pantallas.</p>
+          </div>
+          <div class="malla-buscar">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="exp-q" placeholder="ID de glosa o factura HUS000…" onkeydown="if(event.key==='Enter') expBuscar()">
+          </div>
+        </div>
+        <div id="exp-resultados"></div>
+        <div id="exp-cuerpo"><div class="malla-vacio">Buscá por ID de glosa o número de factura para abrir el expediente.</div></div>
+      </div>
+    </div>
+
     <div class="panel" id="p-malla">
       <div class="malla-area">
         <div class="malla-head">
@@ -3883,6 +3928,28 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             📄 Generar Acta SINAC (multi-glosa)
           </button>
           <span style="font-size:.75rem;color:var(--text3);align-self:center">Formato oficial idéntico al ACTA_SINAC_N_XXX. Acepta N facturas en una sola acta.</span>
+        </div>
+
+        <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
+             vuelve optimizada y sale el acta firmable. -->
+        <div class="form-card" style="margin-bottom:1rem">
+          <h3 style="margin:0 0 .3rem">🧮 Acta de la mesa (Excel)</h3>
+          <p style="margin:0 0 .6rem;font-size:.8rem;color:var(--text3)">Subí el mismo Excel que se diligencia en la audiencia (formato ACTA SINAC). El sistema cuadra las cifras, calcula el resultado de cada línea y arma el acta lista para imprimir y firmar.</p>
+          <div class="auto-drop" id="actax-drop" onclick="document.getElementById('actax-file').click()"
+               ondragover="event.preventDefault();this.classList.add('sobre')"
+               ondragleave="this.classList.remove('sobre')"
+               ondrop="actaxSoltar(event)">
+            <svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="auto-drop-txt" id="actax-drop-txt">Arrastrá el acta acá o hacé clic<small>.xlsm o .xlsx · máximo 30 MB</small></div>
+            <input type="file" id="actax-file" accept=".xlsm,.xlsx" onchange="actaxElegido()" hidden>
+          </div>
+          <div id="actax-resumen" style="display:none;margin-top:.6rem"></div>
+          <div class="auto-acciones" style="margin-top:.6rem">
+            <button class="btn btn-ghost btn-sm" id="actax-btn-rev" onclick="actaxRevisar()">Revisar cuadre</button>
+            <button class="btn btn-primary btn-sm" id="actax-btn-exc" onclick="actaxOptimizar()">Descargar Excel optimizado</button>
+            <button class="btn btn-sm" style="background:#059669;color:#fff" id="actax-btn-pdf" onclick="actaxPdf()">Acta firmable (PDF)</button>
+          </div>
+          <div class="auto-estado" id="actax-estado" style="margin-top:.4rem"></div>
         </div>
 
         <div class="concil-grid">
@@ -8034,6 +8101,7 @@ function tab(btn,id){
   if(id==='vencimientos') vencCargar();
   if(id==='automatizacion') autoCargar();
   if(id==='malla') mallaCargar();
+  if(id==='expediente'){ var _eq=document.getElementById('exp-q'); if(_eq && !EXP.datos) setTimeout(function(){_eq.focus()},60); }
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
@@ -9083,86 +9151,173 @@ async function descargarDictamenMd(){
   } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
-// R67 P3: muestra timeline consolidado de la glosa en una popup
-async function verTimelineGlosa(){
-  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+// ══ EXPEDIENTE: la historia completa de una glosa como pantalla ══
+// Reemplaza al popup de timeline (window.open + document.write): la misma
+// información, dentro de la aplicación, con búsqueda y filtros.
+
+function expColorTipo(e){
+  var t = e.tipo || '';
+  // La verificación contractual se colorea por su veredicto: verde = había
+  // contrato ese día; ámbar = no regía ninguno; rojo = fuera de la malla.
+  if(t === 'AUDIT_VERIFICACION_CONTRACTUAL' && e.metadata && e.metadata.campo){
+    return e.metadata.campo === 'VIGENTE' ? '#16a34a'
+         : (e.metadata.campo === 'SIN_CONTRATO_VIGENTE' ? '#b45309' : '#dc2626');
+  }
+  var fijos = {CREAR_GLOSA:'#1e40af', AI_CALL:'#7c3aed', COMENTARIO:'#0d9488', COMENTARIO_RESUELTO:'#16a34a'};
+  if(fijos[t]) return fijos[t];
+  if(t.indexOf('VERSION_') === 0) return '#0891b2';
+  if(t.indexOf('AUDIT_') === 0) return '#475569';
+  return '#64748b';
+}
+function expIconoTipo(t){
+  if(t === 'CREAR_GLOSA') return '✨';
+  if(t === 'AI_CALL') return '🤖';
+  if(t === 'COMENTARIO') return '💬';
+  if(t === 'COMENTARIO_RESUELTO') return '✅';
+  if(t === 'AUDIT_VERIFICACION_CONTRACTUAL') return '⚖️';
+  if(t.indexOf('VERSION_') === 0) return '📝';
+  if(t.indexOf('AUDIT_') === 0) return '🛡️';
+  return '•';
+}
+function expNombreTipo(t){
+  return String(t||'').replace(/^AUDIT_/,'').replace(/_/g,' ');
+}
+function expGrupoTipo(t){
+  if(t === 'AI_CALL') return 'ia';
+  if((t||'').indexOf('AUDIT_') === 0) return 'auditoria';
+  if((t||'').indexOf('VERSION_') === 0) return 'dictamen';
+  if((t||'').indexOf('COMENTARIO') === 0) return 'comentarios';
+  return 'estado';
+}
+
+var EXP = {datos: null, filtro: ''};
+
+async function expBuscar(){
+  var q = (document.getElementById('exp-q').value || '').trim();
+  if(q.length < 2){ toast('Buscar','Escribí un ID de glosa o un número de factura','warning'); return; }
+  var res = document.getElementById('exp-resultados');
+  res.innerHTML = '<div class="malla-vacio">Buscando…</div>';
   try{
-    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/timeline', {headers: authH()});
-    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var r = await fetch('/glosas/expediente/buscar?q=' + encodeURIComponent(q), {headers: authH()});
+    if(!r.ok){ res.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
     var d = await r.json();
-    var w = window.open('', '_blank', 'width=860,height=720');
-    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-    // Color por tipo de evento
-    var colorTipo = {
-      'CREAR_GLOSA': '#1e40af',
-      'AI_CALL': '#7c3aed',
-      'COMENTARIO': '#0d9488',
-      'COMENTARIO_RESUELTO': '#16a34a',
-    };
-    var colorPorTipo = function(t){
-      if(colorTipo[t]) return colorTipo[t];
-      if(t.indexOf('VERSION_') === 0) return '#0891b2';
-      if(t.indexOf('AUDIT_') === 0) return '#475569';
-      return '#64748b';
-    };
-    var iconoPorTipo = function(t){
-      if(t === 'CREAR_GLOSA') return '✨';
-      if(t === 'AI_CALL') return '🤖';
-      if(t === 'COMENTARIO') return '💬';
-      if(t === 'COMENTARIO_RESUELTO') return '✅';
-      if(t === 'AUDIT_VERIFICACION_CONTRACTUAL') return '⚖️';
-      if(t.indexOf('VERSION_') === 0) return '📝';
-      if(t.indexOf('AUDIT_') === 0) return '🛡️';
-      return '•';
-    };
-    // "AUDIT_VERIFICACION_CONTRACTUAL" se lee mal; "VERIFICACION CONTRACTUAL" se lee bien
-    var nombreTipo = function(t){
-      return String(t||'').replace(/^AUDIT_/,'').replace(/_/g,' ');
-    };
-    var html = '<html><head><meta charset="utf-8"><title>Timeline Glosa #' + CURRENT_GLOSA_ID + '</title>'
-             + '<style>body{font-family:Segoe UI,Arial;padding:20px;background:#f8fafc;color:#1f2937;line-height:1.5}'
-             + 'h1{color:#0b5d8a;border-bottom:2px solid #0b5d8a;padding-bottom:8px;font-size:1.1rem;}'
-             + '.intro{font-size:.85rem;color:#64748b;margin-bottom:1rem;}'
-             + '.tl{position:relative;padding-left:32px;}'
-             + '.tl::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;background:#cbd5e1;}'
-             + '.ev{position:relative;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;}'
-             + '.ev::before{content:attr(data-icon);position:absolute;left:-32px;top:8px;background:white;width:24px;height:24px;border-radius:50%;border:2px solid var(--c);text-align:center;line-height:20px;font-size:.85rem;}'
-             + '.tipo{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}'
-             + '.actor{font-size:.75rem;color:#64748b;margin-top:.2rem;}'
-             + '.detalle{font-size:.85rem;color:#1f2937;margin-top:.4rem;}'
-             + '.fecha{font-size:.7rem;color:#94a3b8;}'
-             + '</style></head><body>'
-             + '<h1>📜 Timeline · Glosa #' + CURRENT_GLOSA_ID + '</h1>'
-             + '<p class="intro">' + d.total_eventos + ' evento(s) registrado(s) · más reciente primero</p>'
-             + '<div class="tl">';
-    d.eventos.forEach(function(e){
-      var color = colorPorTipo(e.tipo || '');
-      var icon = iconoPorTipo(e.tipo || '');
-      // La verificación contractual se colorea por su veredicto, no por su tipo:
-      // verde = había contrato ese día; ámbar = ese día no regía ninguno;
-      // rojo = el pagador ni aparece en la malla.
-      if(e.tipo === 'AUDIT_VERIFICACION_CONTRACTUAL' && e.metadata && e.metadata.campo){
-        color = e.metadata.campo === 'VIGENTE' ? '#16a34a'
-              : (e.metadata.campo === 'SIN_CONTRATO_VIGENTE' ? '#b45309' : '#dc2626');
-      }
-      var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
-      html += '<div class="ev" data-icon="' + icon + '" style="--c:' + color + ';border-left:4px solid ' + color + ';">'
-            + '<div class="tipo" style="color:' + color + '">' + esc(nombreTipo(e.tipo)) + '</div>'
-            + '<div class="actor">' + esc(e.actor || '—') + ' · <span class="fecha">' + fecha + '</span></div>'
-            + '<div class="detalle">' + esc(e.detalle || '—') + '</div>';
-      if(e.metadata && Object.keys(e.metadata).length > 0){
-        html += '<details style="margin-top:.4rem;font-size:.72rem;color:#64748b;cursor:pointer;">'
-              + '<summary>metadata</summary>'
-              + '<pre style="background:#f1f5f9;padding:6px;border-radius:4px;overflow-x:auto;font-size:.7rem;">'
-              + esc(JSON.stringify(e.metadata, null, 2))
-              + '</pre></details>';
-      }
-      html += '</div>';
+    if(!d.resultados.length){ res.innerHTML = '<div class="malla-vacio">Nada con «' + escHtml(q) + '». Probá con el número completo de la factura.</div>'; return; }
+    if(d.resultados.length === 1){ res.innerHTML = ''; expAbrir(d.resultados[0].glosa_id); return; }
+    var html = '<div class="exp-res">';
+    d.resultados.forEach(function(g){
+      html += '<button onclick="expAbrir(' + g.glosa_id + ')"><b>#' + g.glosa_id + '</b> · '
+            + escHtml(g.factura || 'sin factura') + ' · ' + escHtml(g.eps || '') + ' · '
+            + escHtml(g.codigo_glosa || '') + ' · ' + escHtml(g.estado || '')
+            + ' · $' + Math.round(g.valor_objetado||0).toLocaleString('es-CO') + '</button>';
     });
-    html += '</div></body></html>';
-    w.document.write(html);
-    w.document.close();
-  } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+    res.innerHTML = html + '</div>';
+  }catch(e){ res.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+async function expAbrir(glosaId){
+  var cuerpo = document.getElementById('exp-cuerpo');
+  document.getElementById('exp-resultados').innerHTML = '';
+  cuerpo.innerHTML = '<div class="malla-vacio">Abriendo expediente…</div>';
+  try{
+    var r = await fetch('/glosas/' + glosaId + '/expediente', {headers: authH()});
+    if(r.status === 404){ cuerpo.innerHTML = '<div class="malla-vacio">No existe la glosa #' + glosaId + '.</div>'; return; }
+    if(!r.ok){ cuerpo.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    EXP.datos = await r.json();
+    EXP.filtro = '';
+    expPintar();
+  }catch(e){ cuerpo.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function expFiltrar(g){ EXP.filtro = (EXP.filtro === g) ? '' : g; expPintar(); }
+
+function expPintar(){
+  var d = EXP.datos; if(!d) return;
+  var f = d.ficha;
+  var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+  var html = '';
+
+  // La ficha: quién es este expediente
+  html += '<div class="exp-ficha">'
+    + '<div class="exp-dato"><b>Glosa</b><span>#' + d.glosa_id + ' · ' + escHtml(f.codigo_glosa||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Factura</b><span>' + escHtml(f.factura||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Pagador</b><span>' + escHtml(f.eps||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Estado</b><span>' + escHtml(f.estado||'—') + ' · ' + escHtml(f.etapa||'') + '</span></div>'
+    + '<div class="exp-dato"><b>Objetado</b><span>' + cop(f.valor_objetado) + '</span></div>'
+    + '<div class="exp-dato"><b>Aceptado</b><span>' + cop(f.valor_aceptado) + '</span></div>'
+    + '<div class="exp-dato"><b>Auditor</b><span>' + escHtml(f.auditor||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Versiones del dictamen</b><span>' + d.versiones_dictamen + '</span></div>'
+    + '</div>';
+
+  // El contrato que rige, con el color del veredicto registrado
+  var c = d.constancia_contractual, ct = d.contrato;
+  var vcolor = '#94a3b8', vtxt = 'Sin verificación contractual registrada todavía: analizá la glosa y quedará acá.';
+  if(c && c.veredicto){
+    vcolor = c.veredicto === 'VIGENTE' ? '#16a34a' : (c.veredicto === 'SIN_CONTRATO_VIGENTE' ? '#b45309' : '#dc2626');
+    vtxt = escHtml(c.resumen || c.veredicto);
+    if(c.fecha_es_del_formulario === false) vtxt += ' <em>(fecha tomada del día del análisis, no del formulario)</em>';
+  } else if(ct){
+    vcolor = '#16a34a';
+    vtxt = 'Contrato ' + escHtml(ct.numero || 'sin número') + ' vigente al ' + escHtml(ct.fecha_evaluada||'') + ' (factor ' + (ct.factor!=null?ct.factor:1) + ').';
+  }
+  html += '<div class="exp-contrato" style="--exp-c:' + vcolor + '"><b>⚖️ Contrato:</b> ' + vtxt + '</div>';
+
+  // Conciliaciones y soportes, si hay
+  if(d.conciliaciones.length){
+    html += '<div class="exp-sec">Conciliaciones (' + d.conciliaciones.length + ')</div><div class="exp-lista">';
+    d.conciliaciones.forEach(function(x){
+      html += '<div class="exp-item"><span>Acta ' + escHtml(x.acta_numero||'—') + ' · ' + (x.fecha_audiencia ? new Date(x.fecha_audiencia).toLocaleDateString('es-CO') : 'sin fecha') + '</span>'
+            + '<span>' + escHtml(x.resultado||'PROGRAMADA') + ' · ' + cop(x.valor_conciliado) + '</span></div>';
+    });
+    html += '</div>';
+  }
+  if(d.soportes.length){
+    html += '<div class="exp-sec">Soportes conocidos (' + d.soportes.length + ')</div><div class="exp-lista">';
+    d.soportes.forEach(function(s){
+      html += '<div class="exp-item"><span>' + escHtml(s.tipo||'—') + ' · ' + escHtml(s.nombre||'') + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // La línea de tiempo, con filtros de un clic
+  var grupos = [['','Todos'],['ia','IA'],['auditoria','Auditoría'],['dictamen','Dictamen'],['comentarios','Comentarios'],['estado','Estado']];
+  html += '<div class="exp-sec">Línea de tiempo · ' + d.total_eventos + ' evento(s)</div>';
+  html += '<div class="exp-chips">';
+  grupos.forEach(function(g){
+    html += '<button class="auto-chip' + (EXP.filtro === g[0] ? ' activo' : '') + '" onclick="expFiltrar(\'' + g[0] + '\')">' + g[1] + '</button>';
+  });
+  html += '</div><div class="exp-tl">';
+  var visibles = 0;
+  d.timeline.forEach(function(e){
+    if(EXP.filtro && expGrupoTipo(e.tipo) !== EXP.filtro) return;
+    visibles++;
+    var color = expColorTipo(e);
+    var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
+    html += '<div class="exp-ev" style="--exp-c:' + color + ';border-left:4px solid ' + color + '">'
+      + '<div class="exp-ev-tipo" style="color:' + color + '">' + expIconoTipo(e.tipo) + ' ' + escHtml(expNombreTipo(e.tipo)) + '</div>'
+      + '<div class="exp-ev-meta">' + escHtml(e.actor||'—') + ' · ' + fecha + '</div>'
+      + (e.detalle ? '<div class="exp-ev-det">' + escHtml(e.detalle) + '</div>' : '');
+    if(e.metadata && Object.keys(e.metadata).length > 0){
+      html += '<details style="margin-top:.3rem;font-size:.72rem;color:var(--text-3);cursor:pointer"><summary>detalle técnico</summary>'
+            + '<pre style="background:var(--bg-2,rgba(148,163,184,.12));padding:6px;border-radius:4px;overflow-x:auto;font-size:.68rem">'
+            + escHtml(JSON.stringify(e.metadata, null, 2)) + '</pre></details>';
+    }
+    html += '</div>';
+  });
+  if(!visibles) html += '<div class="malla-vacio">Sin eventos de ese tipo.</div>';
+  html += '</div>';
+
+  document.getElementById('exp-cuerpo').innerHTML = html;
+}
+
+// El botón «Timeline» de las glosas ahora abre la pantalla Expediente
+// (antes abría un popup aparte con document.write).
+function verTimelineGlosa(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  var id = CURRENT_GLOSA_ID;
+  if(typeof cerrarModal === 'function'){ try{ cerrarModal(); }catch(_e){} }
+  var btn = document.getElementById('sn-expediente');
+  if(btn){ sidebarTab(btn, 'expediente'); }
+  expAbrir(id);
 }
 
 // R65 P2: clona la glosa actual y abre el modal de la nueva
@@ -21734,6 +21889,101 @@ async function registrarResultadoConciliacion(id){
 
 // ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
 var AS_FILAS = [];
+
+// ── Acta de la mesa (Excel): revisar cuadre, optimizar e imprimir ──
+function actaxArchivo(){
+  var i = document.getElementById('actax-file');
+  return (i && i.files && i.files[0]) || null;
+}
+function actaxSoltar(ev){
+  ev.preventDefault();
+  var drop = document.getElementById('actax-drop');
+  if(drop) drop.classList.remove('sobre');
+  var fs = ev.dataTransfer && ev.dataTransfer.files;
+  if(!fs || !fs.length) return;
+  document.getElementById('actax-file').files = fs;
+  actaxElegido();
+}
+function actaxElegido(){
+  var f = actaxArchivo(); if(!f) return;
+  var txt = document.getElementById('actax-drop-txt');
+  var mb = (f.size/1048576).toFixed(1);
+  txt.innerHTML = '<b>' + escHtml(f.name) + '</b><small>' + mb + ' MB · listo</small>';
+  document.getElementById('actax-drop').classList.add('con-archivo');
+  actaxEstado('','');
+  var res = document.getElementById('actax-resumen');
+  if(res){ res.style.display = 'none'; }
+}
+function actaxEstado(msg, clase){
+  var e = document.getElementById('actax-estado');
+  if(!e) return;
+  e.className = 'auto-estado ' + (clase||'');
+  e.innerHTML = msg;
+}
+async function actaxRevisar(){
+  var f = actaxArchivo(); if(!f){ toast('Falta el archivo','Subí primero el Excel del acta','warning'); return; }
+  actaxEstado('Cuadrando el acta…','auto-corriendo');
+  try{
+    var fd = new FormData(); fd.append('archivo', f);
+    var r = await fetch('/conciliaciones/acta-excel/revisar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var d = await r.json();
+    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+    var html = '<div class="auto-resumen"><b>' + escHtml(d.entidad||'Acta') + '</b> · ' + d.facturas + ' facturas · ' + d.lineas + ' líneas de glosa'
+      + '<br>Glosado ' + cop(d.glosado) + ' · Levanta entidad ' + cop(d.levanta_entidad) + ' · Acepta IPS ' + cop(d.acepta_ips)
+      + ' · Ratificado ' + cop(d.ratificado) + ' · Pendiente ' + cop(d.pendiente_calculado);
+    if(d.hallazgos && d.hallazgos.length){
+      html += '<br><b style="color:var(--c-red,#dc2626)">' + d.hallazgos.length + ' hallazgo(s) por corregir:</b>';
+      d.hallazgos.slice(0,8).forEach(function(h){
+        html += '<br>· fila ' + (h.fila_excel||'—') + ' ' + escHtml(h.factura||'') + ': ' + escHtml(h.problema);
+      });
+      if(d.hallazgos.length>8) html += '<br>· … y ' + (d.hallazgos.length-8) + ' más (hoja REVISION del Excel optimizado)';
+    } else {
+      html += '<br><b style="color:var(--c-verde,#16a34a)">El acta cuadra completa: lista para firmar.</b>';
+    }
+    html += '</div>';
+    var res = document.getElementById('actax-resumen');
+    res.innerHTML = html; res.style.display = 'block';
+    actaxEstado('','');
+  }catch(e){ actaxEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+async function actaxOptimizar(){
+  var f = actaxArchivo(); if(!f){ toast('Falta el archivo','Subí primero el Excel del acta','warning'); return; }
+  var btn = document.getElementById('actax-btn-exc'); var t0 = btn.textContent;
+  btn.textContent = 'Procesando…'; btn.disabled = true;
+  try{
+    var fd = new FormData(); fd.append('archivo', f);
+    var r = await fetch('/conciliaciones/acta-excel/optimizar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var blob = await r.blob();
+    var m = (r.headers.get('content-disposition')||'').match(/filename="([^"]+)"/);
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = m ? m[1] : 'ACTA_OPTIMIZADA.xlsm';
+    document.body.appendChild(a); a.click(); a.remove();
+    var hz = r.headers.get('X-Hallazgos') || '0';
+    actaxEstado(hz==='0'
+      ? 'Excel optimizado descargado: el acta cuadra completa.'
+      : 'Excel descargado con ' + hz + ' hallazgo(s) listados en la hoja REVISION.',
+      hz==='0' ? 'auto-ok' : '');
+  }catch(e){ actaxEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+  finally{ btn.textContent = t0; btn.disabled = false; }
+}
+async function actaxPdf(){
+  var f = actaxArchivo(); if(!f){ toast('Falta el archivo','Subí primero el Excel del acta','warning'); return; }
+  actaxEstado('Armando el acta…','auto-corriendo');
+  try{
+    var fd = new FormData(); fd.append('archivo', f);
+    var r = await fetch('/conciliaciones/acta-excel/pdf', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var html = await r.text();
+    var w = window.open('', '_blank');
+    w.document.write(html); w.document.close();
+    actaxEstado('Acta abierta en otra pestaña: imprimila con Ctrl+P → Guardar como PDF.','auto-ok');
+  }catch(e){ actaxEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
 
 function abrirActaSinac(){
   AS_FILAS = [];

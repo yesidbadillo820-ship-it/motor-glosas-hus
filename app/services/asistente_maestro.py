@@ -206,6 +206,26 @@ TOOLS_ASISTENTE = [
             },
         },
     },
+    {
+        "name": "consultar_expediente",
+        "description": (
+            "El expediente completo de una glosa: ficha, contrato que rige, "
+            "constancia contractual, línea de tiempo de TODO lo que ha pasado "
+            "(análisis, versiones, cambios de estado, comentarios, actas), "
+            "conciliaciones y soportes conocidos. Úsalo cuando pregunten "
+            "'¿qué ha pasado con…?' o antes de recomendar el siguiente paso."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "glosa_id": {"type": "integer", "description": "ID interno de la glosa"},
+                "factura": {
+                    "type": "string",
+                    "description": "Número de factura (HUS000…) si no se conoce el ID",
+                },
+            },
+        },
+    },
 ]
 
 
@@ -371,6 +391,31 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
                 },
                 ensure_ascii=False,
             )
+
+        if name == "consultar_expediente":
+            from app.api.routers.glosas import construir_expediente
+            from app.models.db import GlosaRecord
+
+            glosa_id = args.get("glosa_id")
+            factura = (args.get("factura") or "").strip()
+            if not glosa_id and factura:
+                g = (
+                    db.query(GlosaRecord)
+                    .filter(GlosaRecord.factura.ilike(f"%{factura}%"))
+                    .order_by(GlosaRecord.id.desc())
+                    .first()
+                )
+                glosa_id = g.id if g else None
+            if not glosa_id:
+                return json.dumps(
+                    {"error": "No encontré esa glosa: dame el ID o el número de factura."},
+                    ensure_ascii=False,
+                )
+            exp = construir_expediente(int(glosa_id), db)
+            # La línea de tiempo completa puede ser enorme: al chat van los
+            # últimos 15 eventos; el resto queda en la pantalla Expediente.
+            exp["timeline"] = exp["timeline"][:15]
+            return json.dumps(exp, ensure_ascii=False)
 
         if name == "estadisticas_sistema":
             from app.models.db import GlosaRecord
