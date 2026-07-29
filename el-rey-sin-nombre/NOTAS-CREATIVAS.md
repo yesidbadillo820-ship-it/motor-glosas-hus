@@ -118,6 +118,28 @@ pensamientos internos y para el motivo-frase recurrente.
   capital para presentar a la infanta Elvira y anunciar el compromiso, usando como ocasión las
   quejas de los pueblos fronterizos por el cierre del paso de Renglar).
 
+## Hechos plantados en el Libro II (no contradecir)
+
+- Rodrigo adelantó la asamblea; en ella se anunció a la vez la presentación de Elvira Y el
+  compromiso formal — doble golpe para Daniela (descubre que es el rey Y que se va a casar con
+  otra en el mismo instante).
+- Daniela y Tomás huyeron de la capital; Yazid los alcanzó en una posada a medio camino; ella
+  se negó a verlo, solo habló a través de la puerta. Él prometió no volver hasta que ella
+  estuviera lista.
+- Personaje nuevo: **Íñigo**, capitán de la guardia de Elvira, su amor secreto desde que ella
+  tenía 14 años. Elvira e Íñigo quedan libres y felices al final del libro (ningún personaje
+  pierde su final feliz — regla del encargo).
+- El conflicto político se resuelve con un **tratado comercial** (no matrimonio): escolta
+  compartida para el paso de Renglar, tarifas revisadas cada 5 años, arbitraje previo a
+  cualquier bloqueo futuro. Rodrigo lo negoció personalmente con el rey de Aurión (padre de
+  Elvira) y volvió a finales de febrero con la firma. El compromiso Yazid-Elvira quedó disuelto
+  "por mutuo acuerdo, sin deshonor para ninguna casa".
+- Rodrigo pasó de antagonista a aliado: Yazid lo convenció con argumentos en consejo pleno
+  (cap. II.7); el duque reconoció el cambio ("Empiezo a notarlo").
+- Han pasado ~4 meses desde la asamblea hasta el cierre del Libro II (asamblea en otoño →
+  tratado firmado a finales de febrero). Libro III abre con Yazid partiendo hacia Ferrol de
+  Abajo, esta vez sin disfraz, con su nombre y su corona, dispuesto a decir toda la verdad.
+
 ## Progreso
 
 | Libro | Capítulo | Título | Estado |
@@ -131,5 +153,13 @@ pensamientos internos y para el motivo-frase recurrente.
 | I | 7 | El Beso | ✅ |
 | I | 8 | Lo Que No Se Dice | ✅ |
 | I | 9 | Treinta Días | ✅ (cierra Libro I) |
-| II | 1-9 | — | ⏳ |
+| II | 1 | La Asamblea | ✅ |
+| II | 2 | El Camino a la Capital | ✅ |
+| II | 3 | El Rostro del Rey | ✅ |
+| II | 4 | La Búsqueda | ✅ |
+| II | 5 | Lo Que Se Rompe | ✅ |
+| II | 6 | La Verdad de Elvira | ✅ |
+| II | 7 | El Duque Se Opone | ✅ |
+| II | 8 | El Tratado | ✅ |
+| II | 9 | La Infanta Libre | ✅ (cierra Libro II) |
 | III | 1-9 + Epílogo | — | ⏳ |
