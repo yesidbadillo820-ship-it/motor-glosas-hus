@@ -41,7 +41,28 @@ from pathlib import Path
 logger = logging.getLogger("agente_lotes")
 
 TOOLS_DIR = Path(__file__).resolve().parent
-BOTS_POR_TIPO = {"RESPONDER_COOSALUD": TOOLS_DIR / "responder_glosas_coosalud.py"}
+
+
+# Qué bot atiende cada tipo de tarea sale del registro de perfiles de la
+# aplicación, no de un diccionario escrito acá. Antes eran dos listas que
+# había que acordarse de mantener iguales: la aplicación podía ofrecer un
+# pagador que el agente no sabía atender, y la tarea se quedaba en la cola.
+def _bots_por_tipo() -> dict:
+    try:
+        sys.path.insert(0, str(TOOLS_DIR.parent))
+        from app.services.perfiles_lote import bots_por_tarea
+
+        return {tarea: TOOLS_DIR / bot for tarea, bot in bots_por_tarea().items()}
+    except Exception:
+        # El agente corre en el PC del auditor, donde puede no estar el
+        # paquete `app`. Se cae al mapa mínimo conocido en vez de no arrancar.
+        return {
+            "RESPONDER_COOSALUD": TOOLS_DIR / "responder_glosas_coosalud.py",
+            "RESPONDER_SIMED": TOOLS_DIR / "responder_glosas_simed.py",
+        }
+
+
+BOTS_POR_TIPO = _bots_por_tipo()
 # Cada cuántos segundos se relee el CSV del bot para reportar progreso
 # incremental (el bot escribe append-as-you-go).
 INTERVALO_PROGRESO = 30
