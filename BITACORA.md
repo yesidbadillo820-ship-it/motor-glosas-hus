@@ -162,6 +162,15 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   `tools/verificar_detallado_ajustado.py`, que relee el Excel ajustado y lo
   contrasta contra el original, el consolidado y el reporte del ADRES: los 5
   archivos pasan sin fallas.
+  Además nacen dos herramientas más, encadenadas con el ajustador:
+  **`tools/dividir_detallado_por_factura.py`** (separa el detallado en un Excel
+  por factura, con el formato intacto y el área de impresión ya fijada) y
+  **`tools/excel_a_pdf.py`** (convierte en masa a PDF con el Excel del equipo o
+  con LibreOffice, uno por archivo, con opción de carpeta por factura).
+  Se generaron los **320 Excel y los 320 PDF** del paquete 31068 y se
+  comprobó, leyendo el texto de cada PDF, que traiga su número de factura y que
+  su total cuadre con la bitácora: los 320 cuadran ($714.332.224 contra
+  $714.332.225, 1 peso de redondeo).
 
 ---
 
@@ -236,8 +245,11 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    corrigió algún CUV (pendiente #6) y descargar los 2 PDF del DIAN
    (pendiente #7).
 6. **Revisar los Excel ajustados del paquete 31068** que quedaron generados y
-   los pendientes #11 a #15. Guía completa en
-   `tools/README_ajustar_detallado_glosas.md`.
+   los pendientes #11 a #15. Guías en `tools/README_ajustar_detallado_glosas.md`
+   y `tools/README_por_factura_y_pdf.md`.
+7. **Repetir el PDF con el Excel del equipo** (`--motor excel`): los PDF que se
+   entregaron salieron con LibreOffice, que puede tener mínimas diferencias de
+   maquetación frente al Excel del hospital.
 
 ---
 
