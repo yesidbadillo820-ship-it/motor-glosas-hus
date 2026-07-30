@@ -940,6 +940,21 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   vuelve a contestar «Error 500» pelado: ahora explican qué pasó.
 - Guía corta en `docs/CENTRO_INTELIGENCIA.md`.
 
+### 29-07 (quinta parte) — Épica: el Centro Documental
+
+- **La carpeta de cada expediente se arma sola.** Dentro de la pantalla
+  Expediente aparece «📁 Centro Documental»: el PDF radicable del
+  dictamen, el dictamen en texto, el historial de versiones, el acta de
+  cada mesa de conciliación, el paquete de evidencia para jurídica y los
+  soportes de la factura que el indexador encontró en el share — cada
+  uno con su botón de descarga o su ruta. Se acabó buscar «todo lo de
+  esta factura» a mano.
+- Los soportes del share NO se sirven por la web (son historia clínica):
+  se muestra la ruta para abrirlos desde el equipo del hospital, como
+  siempre.
+- La misma carpeta la entrega la API y el chat IA («¿qué documentos hay
+  de la factura…?»). Guía corta en `docs/CENTRO_DOCUMENTAL.md`.
+
 ---
 
 ## 3) PENDIENTE
