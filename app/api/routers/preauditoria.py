@@ -751,7 +751,11 @@ def anotar_observacion(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    """Agrega o corrige la observación sin tocar la decisión ya tomada."""
+    """Agrega o corrige la observación sin tocar la decisión ya tomada.
+
+    En una factura DEVUELTA la observación es el motivo que imprime el oficio
+    de devolución: si ya salió en uno, la corrección también corrige el PDF.
+    """
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
         raise HTTPException(404, "Factura no encontrada")
@@ -761,7 +765,7 @@ def anotar_observacion(
             res.get("codigo", 400), res.get("mensaje", "No se pudo guardar la observación")
         )
     db.refresh(f)
-    return _factura_dict(db, f)
+    return {**_factura_dict(db, f), "oficio_actualizado": bool(res.get("oficio_actualizado"))}
 
 
 # ------------------------------------------------------------------

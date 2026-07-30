@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 29-07-2026
+**Última actualización:** 30-07-2026
 
 ---
 
@@ -798,6 +798,31 @@ sudo docker compose ps
 free -m | head -2
 '
 ```
+
+### 30-07 — Pre-auditoría: una sola observación, corregible aunque el oficio ya exista
+
+**1. La pantalla explica qué pasa con cada devuelta (PR #232).** El caso de las
+3 facturas que "no salieron" en el oficio DEV-PRE-AUD-0099: sí habían salido,
+pero en el oficio anterior (0097), y la pantalla no lo decía. Ahora el contador
+de la ventana del oficio distingue cuántas devueltas **ya salieron** en un
+oficio y cuántas **faltan por incluir**, el botón dice cuántas facturas saldrán
+en el oficio nuevo, y cada factura muestra en cuál oficio salió. (Una factura
+no se repite en dos oficios: la entidad recibiría el mismo cobro dos veces.)
+
+**2. Un solo recuadro de observación (mismo PR #232).** La ventana de auditar
+tenía dos recuadros —"Observaciones" y "Motivo de la devolución"— y seguían
+prestándose a confusión: un texto de devolución del FURIPS quedó escrito en el
+recuadro que NO sale en el oficio. A pedido del auditor quedaron en **uno
+solo**: lo que se escriba ahí se guarda siempre y, si la factura se devuelve,
+ese mismo texto es el que imprime el oficio de devolución.
+
+**3. La observación se corrige aunque el oficio ya se haya generado.** Si el
+oficio salió con un error en el texto, el auditor abre la factura con el botón
+"👁 Ver", corrige la observación y la guarda. Si la factura ya salió en un
+oficio de devolución, la corrección **también corrige el oficio**: el PDF se
+arma cada vez que se abre, así que basta volver a abrirlo para verlo al día.
+Los oficios de rondas anteriores no se tocan (esos ya se entregaron tal como
+estaban) y cada corrección queda en el historial con quién la hizo y cuándo.
 
 ---
 

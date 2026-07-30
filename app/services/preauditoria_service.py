@@ -1009,7 +1009,14 @@ def auditar_factura(
             }
     elif resultado == RESULTADO_DEVUELTA:
         if not (motivo or "").strip():
-            return {"ok": False, "codigo": 400, "mensaje": "Para devolver debe escribir el motivo."}
+            return {
+                "ok": False,
+                "codigo": 400,
+                "mensaje": (
+                    "Para devolver debe escribir la observación: es el texto "
+                    "que sale en el oficio de devolución."
+                ),
+            }
         if canon.num_devoluciones >= MAX_DEVOLUCIONES:
             return {
                 "ok": False,
@@ -1163,10 +1170,14 @@ def anotar_observacion(
 ) -> dict:
     """Agrega o corrige la observación sin cambiar la decisión de la factura.
 
-    Sirve para las facturas que ya se radicaron sin observación (o cuya
-    observación se perdió por el error del recuadro equivocado): se anota
-    ahora, sin tener que revertir y volver a radicar. Queda como un evento
-    más del historial, con quién la escribió y cuándo.
+    Sirve para las facturas que ya se decidieron: se corrige el texto ahora,
+    sin tener que revertir y volver a auditar. Queda como un evento más del
+    historial, con quién la escribió y cuándo.
+
+    Si la factura está DEVUELTA, la observación ES el motivo que sale en el
+    oficio de devolución, así que la corrección también actualiza el evento
+    de devolución de esta ronda — esté o no ya sellado en un oficio. Como el
+    PDF se arma al abrirlo, el oficio queda corregido de inmediato.
     """
     texto = (observaciones or "").strip()
     if not texto:
@@ -1177,6 +1188,32 @@ def anotar_observacion(
     )
     fuente = datos_fuente(db, canon.factura)
     canon.observaciones = texto
+    motivo_evento = None
+    oficio_corregido = False
+    if canon.resultado_actual == RESULTADO_DEVUELTA:
+        canon.motivo_ultima_devolucion = texto
+        motivo_evento = texto
+        # El evento de devolución de ESTA ronda: si la factura ya salió en un
+        # oficio, es el evento sellado con ese oficio (corregirlo corrige el
+        # PDF); si aún no ha salido, es el que se sellará cuando se genere.
+        # Los eventos de rondas anteriores (sellados en oficios viejos) no se
+        # tocan: esos documentos ya se entregaron tal como estaban.
+        consulta = db.query(FacturaEventoRecord).filter(
+            FacturaEventoRecord.factura_id == canon.id,
+            FacturaEventoRecord.tipo_evento.in_(["DEVUELTA", "NUEVAMENTE_DEVUELTA"]),
+        )
+        if canon.oficio_devolucion_id:
+            consulta = consulta.filter(
+                FacturaEventoRecord.oficio_devolucion_id == canon.oficio_devolucion_id
+            )
+        else:
+            consulta = consulta.filter(FacturaEventoRecord.oficio_devolucion_id.is_(None))
+        evt = consulta.order_by(
+            FacturaEventoRecord.creado_en.desc(), FacturaEventoRecord.id.desc()
+        ).first()
+        if evt:
+            evt.motivo = texto
+            oficio_corregido = bool(evt.oficio_devolucion_id)
     db.flush()
     db.add(
         _nuevo_evento(
@@ -1185,13 +1222,14 @@ def anotar_observacion(
             oficio=oficio,
             fuente=fuente,
             usuario=usuario,
+            motivo=motivo_evento,
             observaciones=texto,
             # No cambia la decisión: el evento conserva la que ya tenía.
             resultado=canon.resultado_actual,
         )
     )
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "oficio_actualizado": oficio_corregido}
 
 
 # ==================================================================
