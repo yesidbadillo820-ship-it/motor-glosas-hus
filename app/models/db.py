@@ -1339,3 +1339,30 @@ class AgenteRecord(Base):
     creado_por = Column(String(200))
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
     activo = Column(Integer, default=1, index=True)
+
+
+class TrabajoBotRecord(Base):
+    """Cola universal de trabajos para los bots del PC del HUS.
+
+    La plataforma encola (quién pidió qué bot con qué parámetros); el
+    agente del PC reclama, corre y reporta. Es la generalización de
+    TareaLoteRecord para TODOS los bots, no solo los de lotes.
+    """
+
+    __tablename__ = "trabajos_bot"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bot_id = Column(String(80), index=True, nullable=False)
+    estado = Column(
+        String(30), default="PENDIENTE", index=True
+    )  # PENDIENTE/RECLAMADO/TERMINADO/ERROR
+    parametros = Column(Text)  # JSON con lo que el auditor escribió
+    pedido_por = Column(String(200))
+    equipo = Column(String(200))  # hostname del PC que lo reclamó
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    reclamado_en = Column(DateTime(timezone=True))
+    terminado_en = Column(DateTime(timezone=True))
+    error = Column(Text)
+    registro = Column(Text)  # salida/resumen que reportó el agente
+    progreso = Column(Text)  # último avance reportado ("factura 12 de 40…")
+    cancelado_por = Column(String(200))

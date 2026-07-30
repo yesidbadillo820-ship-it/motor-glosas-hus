@@ -3478,6 +3478,13 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <p class="auto-sub">Subí el archivo que te mandó el pagador y descargá el que acepta el ERP. Sin instalar nada.</p>
           </div>
         </div>
+        <!-- Bots del hospital: TODOS administrados desde acá — los de la
+             nube, los de la cola del PC del HUS y los de Lotes. -->
+        <div class="exp-sec" style="margin-top:.4rem">🤖 Bots del hospital</div>
+        <p class="malla-sub" style="margin:0 0 .4rem">Cada bot con su estado real: cola, en qué equipo corrió, resultado y su historial. «Ejecutar» encola el trabajo y el agente del PC del HUS lo corre y reporta.</p>
+        <div id="bots-tablero"><div class="malla-vacio">Cargando bots…</div></div>
+
+        <div class="exp-sec" style="margin-top:.4rem">📄 Conversores de archivos (corren en la nube)</div>
         <div id="auto-catalogo" class="auto-grid">
           <div class="auto-vacio">Cargando…</div>
         </div>
@@ -8163,7 +8170,7 @@ function tab(btn,id){
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
   if(id==='vencimientos') vencCargar();
-  if(id==='automatizacion') autoCargar();
+  if(id==='automatizacion'){ autoCargar(); botsCargar(); }
   if(id==='malla') mallaCargar();
   if(id==='inteligencia') intelCargar();
   if(id==='agentes') agCargar();
@@ -20820,6 +20827,164 @@ async function mallaCapacidades(id){
     caja.innerHTML = '<span>El sistema con este pagador</span>'
       + caps.map(function(c){ return '🤖 ' + escHtml(c); }).join('<br>');
   }catch(e){ caja.style.display = 'none'; }
+}
+
+// ── Bots del hospital: el tablero vivo dentro de Automatización ──
+var BOTS = {datos: null};
+
+async function botsCargar(){
+  var cont = document.getElementById('bots-tablero');
+  if(!cont) return;
+  try{
+    var r = await fetch('/bots', {headers: authH()});
+    if(!r.ok){ cont.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    BOTS.datos = await r.json();
+    botsPintar();
+  }catch(e){ cont.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function botsColorEstado(e){
+  return e === 'CORRIENDO' ? '#7c3aed' : (e === 'EN COLA' ? '#b45309' : (e === 'ERROR' ? '#dc2626' : '#16a34a'));
+}
+
+function botsSeg(s){
+  if(s == null) return '—';
+  return s < 90 ? (s + ' s') : (Math.round(s/60) + ' min');
+}
+
+function botsPintar(){
+  var d = BOTS.datos; if(!d) return;
+  var html = '<div class="intel-resumen" style="margin-bottom:.4rem">'
+    + '<div class="intel-kpi"><b>' + d.total_bots + '</b><span>bots administrados</span></div>'
+    + '<div class="intel-kpi"><b style="color:' + (d.trabajos_abiertos ? '#b45309' : '#16a34a') + '">' + d.trabajos_abiertos + '</b><span>trabajos en cola o corriendo</span></div>'
+    + '</div>';
+  d.grupos.forEach(function(g){
+    html += '<div class="exp-doc-grupo">' + escHtml(g.nombre) + '</div><div class="intel-acciones">';
+    g.bots.forEach(function(b){
+      var c = botsColorEstado(b.estado);
+      var ult = b.ultima_ejecucion;
+      var corr = b.trabajo_corriendo;
+      var ultTxt = ult
+        ? ((ult.terminado_en ? new Date(ult.terminado_en).toLocaleString('es-CO') : '—')
+           + (ult.equipo ? ' · equipo <b>' + escHtml(ult.equipo) + '</b>' : '')
+           + (ult.pedido_por ? ' · pidió ' + escHtml(ult.pedido_por) : '')
+           + (ult.estado === 'ERROR' ? ' · ❌ falló' : (ult.estado === 'CANCELADO' ? ' · ⛔ cancelado' : ' · ✓')))
+        : 'nunca ha corrido desde la plataforma';
+      var donde = b.donde_corre === 'nube' ? '☁ corre en la nube'
+                : (b.disparo === 'lotes' ? '🖥 PC del HUS · vía pantalla Lotes' : '🖥 PC del HUS · por la cola');
+      html += '<div class="intel-card" style="--intel-c:' + c + '">'
+        + '<div class="ico">🤖</div>'
+        + '<div class="cuerpo">'
+        +   '<div class="titulo">' + escHtml(b.nombre)
+        +     ' <span class="malla-pill" style="background:' + c + '22;color:' + c + ';font-size:.68rem">' + escHtml(b.estado) + (b.pendientes ? ' · ' + b.pendientes + ' en cola' : '') + '</span></div>'
+        +   '<div class="porque">' + escHtml(b.que_hace) + ' <em style="color:var(--text-3)">' + donde + '</em></div>'
+        +   (b.riesgo ? '<div class="porque" style="color:#b45309">⚠ ' + escHtml(b.riesgo) + '</div>' : '')
+        +   (corr ? '<div class="porque" style="color:#7c3aed"><b>▶ ' + escHtml(corr.progreso || 'Corriendo') + '</b>'
+                  + (corr.equipo ? ' en ' + escHtml(corr.equipo) : '') + '</div>' : '')
+        +   '<div class="porque" style="margin-top:.2rem"><b>Última:</b> ' + ultTxt + '</div>'
+        +   '<div class="porque"><b>Corridas:</b> ' + b.total_corridas
+        +     ' · <b>Hoy:</b> ' + (b.ejecutadas_hoy || 0)
+        +     ' · <b>Duración prom.:</b> ' + botsSeg(b.duracion_promedio_seg)
+        +     ' · <b>Espera prom.:</b> ' + botsSeg(b.espera_promedio_seg) + '</div>'
+        +   (b.ultimo_error ? '<div class="porque" style="color:#dc2626"><b>Último error:</b> ' + escHtml((b.ultimo_error.error || '').slice(0,160)) + '</div>' : '')
+        +   '<div style="display:flex;gap:.4rem;margin-top:.45rem;flex-wrap:wrap">'
+        +     '<button class="btn btn-primary btn-sm" onclick="botEjecutar(\'' + b.id + '\')">Ejecutar</button>'
+        +     (b.pendientes || corr ? '<button class="btn btn-ghost btn-sm" style="color:#dc2626" onclick="botCancelar(\'' + b.id + '\')">Cancelar</button>' : '')
+        +     (b.estado === 'ERROR' || (ult && ult.estado === 'CANCELADO') ? '<button class="btn btn-ghost btn-sm" onclick="botReintentar(\'' + b.id + '\')">Reintentar</button>' : '')
+        +     '<button class="btn btn-ghost btn-sm" onclick="botHistorial(\'' + b.id + '\')">Historial</button>'
+        +     (ult && (ult.registro || ult.error) ? '<button class="btn btn-ghost btn-sm" onclick="botRegistros(\'' + b.id + '\')">Ver registros</button>' : '')
+        +     (b.parametros_ayuda ? '<button class="btn btn-ghost btn-sm" onclick="botConfigurar(\'' + b.id + '\')">Configurar</button>' : '')
+        +   '</div>'
+        +   (b.parametros_ayuda ? '<div id="bot-cfg-' + b.id + '" style="display:none;margin-top:.4rem"><input type="text" id="bot-params-' + b.id + '" placeholder="' + escHtml(b.parametros_ayuda) + '" style="width:100%;padding:.45rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.8rem"></div>' : '')
+        +   '<div id="bot-det-' + b.id + '" style="display:none;margin-top:.5rem" class="auto-resumen"></div>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('bots-tablero').innerHTML = html;
+}
+
+function botConfigurar(id){
+  var caja = document.getElementById('bot-cfg-' + id);
+  if(caja) caja.style.display = caja.style.display === 'block' ? 'none' : 'block';
+}
+
+async function botCancelar(id){
+  if(!confirm('¿Cancelar lo que este bot tiene en cola o corriendo?')) return;
+  try{
+    var r = await fetch('/bots/' + id + '/cancelar', {method:'POST', headers: authH()});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ toast('Bot', d.detail || ('Error ' + r.status), 'error'); return; }
+    toast('Cancelado', d.cancelados + ' trabajo(s) cancelado(s)', 'success');
+    botsCargar();
+  }catch(e){ toast('Bot','Conexión: ' + e.message,'error'); }
+}
+
+async function botReintentar(id){
+  try{
+    var r = await fetch('/bots/' + id + '/reintentar', {method:'POST', headers: authH()});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ toast('Bot', d.detail || ('Error ' + r.status), 'error'); return; }
+    toast('Reintentando', 'Trabajo #' + d.trabajo_id + ' encolado de nuevo', 'success');
+    botsCargar();
+  }catch(e){ toast('Bot','Conexión: ' + e.message,'error'); }
+}
+
+async function botEjecutar(id){
+  var params = {};
+  var inp = document.getElementById('bot-params-' + id);
+  if(inp && inp.value.trim()){
+    // "clave: valor" simple, o texto libre que va como parametro "texto"
+    var v = inp.value.trim();
+    var m = v.match(/^([a-zA-Z_]+)\s*[:=]\s*(.+)$/);
+    if(m) params[m[1]] = m[2]; else params['texto'] = v;
+  }
+  try{
+    var r = await fetch('/bots/' + id + '/ejecutar', {method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()), body: JSON.stringify({parametros: params})});
+    var d = await r.json().catch(function(){ return {}; });
+    if(r.status === 403){ toast('Permiso','Se necesita auditor o superior','warning'); return; }
+    if(!r.ok){ toast('Bot', d.detail || ('Error ' + r.status), 'error'); return; }
+    if(d.encolado){
+      toast('Encolado', d.bot + ': el agente del PC del HUS lo corre y reporta acá.', 'success');
+      botsCargar();
+    } else if(d.motivo === 'nube'){
+      toast('Corre en la nube', d.mensaje, 'info');
+      var ficha = document.getElementById('auto-f-' + d.automatizacion_id);
+      if(ficha) ficha.scrollIntoView({behavior:'smooth', block:'center'});
+    } else {
+      toast('Va por Lotes', d.mensaje, 'info');
+    }
+  }catch(e){ toast('Bot','Conexión: ' + e.message,'error'); }
+}
+
+async function botHistorial(id){
+  var caja = document.getElementById('bot-det-' + id);
+  if(caja.style.display === 'block'){ caja.style.display = 'none'; return; }
+  caja.style.display = 'block'; caja.innerHTML = 'Cargando…';
+  try{
+    var r = await fetch('/bots/' + id + '/historial', {headers: authH()});
+    var d = await r.json();
+    if(!d.trabajos || !d.trabajos.length){ caja.innerHTML = 'Sin corridas registradas todavía.'; return; }
+    caja.innerHTML = d.trabajos.map(function(t){
+      return '#' + t.id + ' · ' + escHtml(t.estado) + ' · ' + (t.creado_en ? new Date(t.creado_en).toLocaleString('es-CO') : '')
+        + (t.equipo ? ' · ' + escHtml(t.equipo) : '') + (t.pedido_por ? ' · ' + escHtml(t.pedido_por) : '')
+        + (t.error ? '<br><span style="color:#dc2626">' + escHtml(t.error) + '</span>' : '');
+    }).join('<br>');
+  }catch(e){ caja.innerHTML = 'Conexión: ' + escHtml(e.message); }
+}
+
+function botRegistros(id){
+  var d = BOTS.datos; if(!d) return;
+  var bot = null;
+  d.grupos.forEach(function(g){ g.bots.forEach(function(b){ if(b.id === id) bot = b; }); });
+  var caja = document.getElementById('bot-det-' + id);
+  if(!bot || !bot.ultima_ejecucion){ return; }
+  var u = bot.ultima_ejecucion;
+  caja.style.display = 'block';
+  caja.innerHTML = '<b>Última corrida #' + u.id + ' (' + escHtml(u.estado) + ')</b><br>'
+    + (u.error ? '<span style="color:#dc2626">' + escHtml(u.error) + '</span><br>' : '')
+    + '<pre style="white-space:pre-wrap;font-size:.72rem;margin-top:.3rem">' + escHtml(u.registro || '(sin registro)') + '</pre>';
 }
 
 // ─── Centro de Automatización ──────────────────────────────────────────
