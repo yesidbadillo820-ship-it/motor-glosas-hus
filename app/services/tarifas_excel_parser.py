@@ -27,6 +27,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from app.utils.moneda import parse_valor_cop
+
 
 # ─── Normalización ──────────────────────────────────────────────────────────
 
@@ -42,29 +44,16 @@ def _normalizar_texto(s: Any) -> str:
 
 
 def _normalizar_valor(v: Any) -> float:
-    """Parsea valores COP desde celda Excel (puede venir número o string)."""
-    if v is None:
-        return 0.0
-    if isinstance(v, (int, float)):
-        return float(v)
-    s = str(v).strip().replace("$", "").replace(" ", "")
-    if not s or s.upper() in ("N/A", "NA", "-"):
-        return 0.0
-    if "," in s and "." in s:
-        if s.rfind(",") > s.rfind("."):
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            s = s.replace(",", "")
-    else:
-        m = re.match(r"^(\d+)[\.,](\d{1,2})$", s)
-        if m:
-            s = f"{m.group(1)}.{m.group(2)}"
-        else:
-            s = s.replace(".", "").replace(",", "")
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+    """Parsea valores COP desde celda Excel (puede venir número o string).
+
+    E01 — Principio N.º 1 (SINAC CORE primero): delega en el parser único del
+    núcleo (`app.utils.moneda.parse_valor_cop`) en vez de mantener una copia.
+    Esta función tenía la misma lógica escrita a mano y leía como CERO dos
+    formatos que el auditor teclea a diario: el separador de miles con apóstrofo
+    (`1'500.000`) y las cifras en palabras (`850 millones`). Una tarifa leída
+    como cero se propaga a todo el dictamen.
+    """
+    return parse_valor_cop(v)
 
 
 def _parsear_fecha(v: Any) -> datetime | None:

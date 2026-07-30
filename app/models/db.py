@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    Text,
+    ForeignKey,
+    Index,
+    LargeBinary,
+)
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -955,3 +965,404 @@ class CredencialAccesoLog(Base):
     accion = Column(String(20), nullable=False)  # REVELAR | IMPORTAR | LISTAR
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     motivo = Column(Text, nullable=True)
+
+
+# ============================================================
+# PRE-AUDITORÍA SINAC — recepción de oficios de Facturación,
+# auditoría de soportes y oficios de devolución (DEV-PRE-AUD).
+# ============================================================
+
+
+class OficioRecepcionRecord(Base):
+    """Oficio radicado por Facturación que entrega facturas a pre-auditoría.
+
+    El plazo para auditar es de 3 días hábiles, contados a partir del día
+    siguiente al recibo del oficio (semáforo verde/amarillo/rojo/vencido).
+    """
+
+    __tablename__ = "preaud_oficios_recepcion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero_radicado = Column(String(60), nullable=False)  # ej. FHUS-AS-I00768-26
+    fecha_recibido = Column(DateTime(timezone=True), nullable=False, index=True)  # con hora
+    observaciones = Column(Text, nullable=True)
+    archivo_dgh = Column(String(300), nullable=True)  # Excel del consecutivo DGH importado
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    creado_por = Column(String(200), nullable=True)
+
+    __table_args__ = (Index("ix_preaud_oficio_radicado", "numero_radicado", unique=True),)
+
+
+# ---------- FUENTES: las alimenta el auditor subiendo Excel (upsert) ----------
+
+
+class RadicacionCuentaRecord(Base):
+    """FUENTE 1 — RADICACIÓN DE CUENTAS (reporte de DGH).
+
+    Dice, por factura, en qué ENVÍO (consecutivo de radicación) va, cuándo se
+    recibió el documento, el valor, el NIT y la entidad. El auditor la alimenta
+    subiendo el Excel; al re-subir se ACTUALIZA fila por fila (upsert por
+    factura) y nunca se duplica: la última carga es la verdad vigente. El
+    consolidado toma de aquí F_RECIBIDO, F_FACTURA, VALOR, NIT y ENTIDAD.
+    """
+
+    __tablename__ = "preaud_fuente_radicacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura = Column(String(30), nullable=False)  # identidad de la fuente
+    envio = Column(String(30), nullable=False, index=True)
+    f_recibido = Column(DateTime(timezone=True), nullable=True)  # Radicacion.FechaDocumento
+    f_factura = Column(DateTime(timezone=True), nullable=True)  # CxC.Fecha
+    valor = Column(Float, default=0.0, nullable=False)  # CxC.Valor
+    nit = Column(String(30), nullable=True, index=True)  # Tercero.Documento
+    entidad = Column(String(300), nullable=True)  # Tercero.NombreCompletoNA
+    estado_radicacion = Column(String(40), nullable=True)  # Radicado_Entidad, etc.
+    fuente_archivo = Column(String(300), nullable=True)
+    importado_por = Column(String(200), nullable=True)
+    importado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        # DEDUP / upsert: una sola fila vigente por factura.
+        Index("ix_preaud_rad_factura", "factura", unique=True),
+        # Cruce: traer todas las facturas de un envío.
+        Index("ix_preaud_rad_envio", "envio"),
+    )
+
+
+class DgReportRecord(Base):
+    """FUENTE 2 — DGREPORT (facturas con correo de factura electrónica).
+
+    Dice, por factura, si salió el correo de F.E. Se alimenta subiendo el
+    DGReport. Upsert por factura. El consolidado marca CORREO F.E. = SI si la
+    factura está aquí, NO si no está.
+    """
+
+    __tablename__ = "preaud_fuente_dgreport"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura = Column(String(30), nullable=False)
+    correo_fe = Column(String(2), default="SI", nullable=False)  # SI | NO
+    fecha_correo = Column(DateTime(timezone=True), nullable=True)
+    numero_fe = Column(String(80), nullable=True)  # CUFE / nº de F.E. si viene
+    fuente_archivo = Column(String(300), nullable=True)
+    importado_por = Column(String(200), nullable=True)
+    importado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (Index("ix_preaud_dgreport_factura", "factura", unique=True),)
+
+
+class EnvioCargadoRecord(Base):
+    """Ledger de cada ENVÍO ya volcado al consolidado (dedup del punto 3).
+
+    Al escribir un envío se inserta aquí; si ya existe (único por envío), se
+    responde "El envío ya fue cargado" y NO se recrean facturas.
+    """
+
+    __tablename__ = "preaud_envios_cargados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    envio = Column(String(30), nullable=False)
+    oficio_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    total_facturas = Column(Integer, default=0, nullable=False)
+    nuevas = Column(Integer, default=0, nullable=False)
+    reingresos = Column(Integer, default=0, nullable=False)
+    cargado_por = Column(String(200), nullable=True)
+    cargado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_preaud_envio_cargado", "envio", unique=True),)
+
+
+# ---------- CONSOLIDADO: la factura canónica (una sola fila por factura) ------
+
+
+class FacturaPreauditoriaRecord(Base):
+    """La FACTURA como entidad CANÓNICA: UNA sola fila por número de factura,
+    aunque reingrese varias veces (subsanaciones).
+
+    Guarda solo el ESTADO del proceso de pre-auditoría. Los datos descriptivos
+    (F_FACTURA, VALOR, NIT, ENTIDAD, CORREO F.E.) NO se copian aquí: se resuelven
+    por JOIN a las fuentes al leer, de modo que corregir un Excel se refleja solo
+    (auto-sync, punto 5). F_RECIBIDO se toma del oficio actual.
+
+    num_devoluciones / num_subsanacion son un caché del historial de eventos,
+    mantenido en la misma transacción del evento.
+    """
+
+    __tablename__ = "preaud_facturas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura = Column(String(30), nullable=False)  # identidad canónica
+
+    # Posición actual dentro del proceso (cambian al reingresar)
+    envio_actual = Column(String(30), index=True, nullable=True)
+    oficio_actual_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    oficio_fhus = Column(String(60), index=True, nullable=True)  # radicado FHUS actual
+    f_recibido = Column(DateTime(timezone=True), nullable=True)  # del oficio actual
+
+    # Estado del proceso
+    estado = Column(String(25), default="NUEVA", nullable=False, index=True)
+    # NUEVA | RADICADA | DEVUELTA_PEND_SUBSANACION | EN_SUBSANACION | SUBSANADA
+    # | NUEVAMENTE_DEVUELTA | BLOQUEADA_LIMITE
+    resultado_actual = Column(
+        String(15), default="PENDIENTE", index=True
+    )  # PENDIENTE | RADICAR | DEVUELTA
+    ronda_actual = Column(Integer, default=1, nullable=False)  # 1=primera; 2+=subsanación
+    num_subsanacion = Column(Integer, default=0, nullable=False)  # 0,1,2,3 = ronda_actual-1
+    num_devoluciones = Column(Integer, default=0, nullable=False)  # veces devuelta (tope 3)
+    pendiente_subsanacion = Column(Integer, default=0, nullable=False)  # 0/1
+
+    # Última auditoría
+    auditor = Column(String(120), index=True, nullable=True)
+    fecha_auditoria = Column(DateTime(timezone=True), nullable=True)
+    motivo_ultima_devolucion = Column(Text, nullable=True)
+    observaciones = Column(Text, nullable=True)
+    oficio_devolucion_id = Column(
+        Integer, ForeignKey("preaud_oficios_devolucion.id"), index=True, nullable=True
+    )
+
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    creado_por = Column(String(200), nullable=True)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        # DEDUP canónico (punto 4): una sola factura por número.
+        Index("ix_preaud_fact_canonica", "factura", unique=True),
+        Index("ix_preaud_fact_envio", "envio_actual"),
+        Index("ix_preaud_fact_estado_auditor", "estado", "auditor"),
+    )
+
+
+class FacturaEventoRecord(Base):
+    """Historial INMUTABLE de la vida de una factura en pre-auditoría (punto 5).
+
+    Una fila por transición; nunca se actualiza, solo se inserta. Conserva un
+    SNAPSHOT de los valores de la fuente EN EL MOMENTO del evento (fidelidad
+    legal: el oficio de devolución muestra el valor de ese día).
+    """
+
+    __tablename__ = "preaud_factura_eventos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    factura_id = Column(
+        Integer,
+        ForeignKey("preaud_facturas.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    factura = Column(String(30), index=True, nullable=False)  # denormalizado
+
+    tipo_evento = Column(String(30), index=True, nullable=False)
+    # ESCRITA | RADICADA | DEVUELTA | REINGRESO | SUBSANADA
+    # | NUEVAMENTE_DEVUELTA | REVERTIDA
+    subsanacion_num = Column(Integer, default=0, nullable=False)  # ronda del evento
+    ronda = Column(Integer, default=1, nullable=False)
+    estado_resultante = Column(String(25), nullable=True)
+
+    envio = Column(String(30), nullable=True)
+    oficio_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    oficio_fhus = Column(String(60), nullable=True)
+    f_recibido = Column(DateTime(timezone=True), nullable=True)
+    resultado = Column(String(15), nullable=True)
+    auditor = Column(String(120), index=True, nullable=True)
+    motivo = Column(Text, nullable=True)
+    # Lo que escribió el auditor al decidir. A diferencia del motivo (que solo
+    # aplica a las devoluciones), la observación se guarda también cuando la
+    # factura se radica, y queda visible en el historial.
+    observaciones = Column(Text, nullable=True)
+    oficio_devolucion_id = Column(
+        Integer, ForeignKey("preaud_oficios_devolucion.id"), index=True, nullable=True
+    )
+
+    # Snapshot de la fuente al momento del evento
+    valor_snapshot = Column(Float, default=0.0)
+    nit_snapshot = Column(String(30), nullable=True)
+    entidad_snapshot = Column(String(300), nullable=True)
+    correo_fe_snapshot = Column(String(2), nullable=True)
+    fecha_factura_snapshot = Column(DateTime(timezone=True), nullable=True)
+
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    creado_por = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("ix_preaud_evt_factura_ts", "factura_id", "creado_en"),
+        Index("ix_preaud_evt_tipo", "tipo_evento"),
+        Index("ix_preaud_evt_oficio_dev", "oficio_devolucion_id"),
+    )
+
+
+class OficioDevolucionRecord(Base):
+    """Oficio de devolución con consecutivo SINAC (DEV-PRE-AUD-####-AAAA).
+
+    Agrupa las facturas devueltas de un oficio de recepción; el PDF se
+    genera con logo y bloque de firmas para entregar a Facturación.
+    """
+
+    __tablename__ = "preaud_oficios_devolucion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    consecutivo = Column(String(40), nullable=False)  # DEV-PRE-AUD-0007-2026
+    anio = Column(Integer, index=True, nullable=False)
+    numero = Column(Integer, nullable=False)  # parte numérica del consecutivo
+    oficio_recepcion_id = Column(
+        Integer, ForeignKey("preaud_oficios_recepcion.id"), index=True, nullable=True
+    )
+    fecha_generado = Column(DateTime(timezone=True), server_default=func.now())
+    generado_por = Column(String(200), nullable=True)
+    total_facturas = Column(Integer, default=0, nullable=False)
+    total_valor = Column(Float, default=0.0, nullable=False)
+
+    __table_args__ = (
+        Index("ix_preaud_dev_consecutivo", "consecutivo", unique=True),
+        Index("ix_preaud_dev_anio_numero", "anio", "numero", unique=True),
+    )
+
+
+# ─── Lotes de portal (Fase 1 de la app unificada, jul-2026) ──────────────────
+# Un "lote" es un Excel consolidado de glosas de un pagador (COOSALUD por
+# ahora) que el auditor sube a la app. La app lo parsea, crea una fila por
+# factura y encola una tarea que el agente local (tools/agente_lotes.py,
+# corriendo en el PC del hospital con acceso a los portales) reclama,
+# ejecuta con el bot Playwright y reporta de vuelta factura por factura.
+
+LOTE_ESTADO_EN_COLA = "EN_COLA"
+LOTE_ESTADO_EN_PROCESO = "EN_PROCESO"
+LOTE_ESTADO_COMPLETADO = "COMPLETADO"
+LOTE_ESTADO_COMPLETADO_CON_PENDIENTES = "COMPLETADO_CON_PENDIENTES"
+LOTE_ESTADO_ERROR = "ERROR"
+
+TAREA_ESTADO_PENDIENTE = "PENDIENTE"
+TAREA_ESTADO_RECLAMADA = "RECLAMADA"
+TAREA_ESTADO_COMPLETADA = "COMPLETADA"
+TAREA_ESTADO_ERROR = "ERROR"
+
+FACTURA_LOTE_ESTADO_PENDIENTE = "PENDIENTE"
+# Estados terminales de éxito que reporta el bot COOSALUD en su CSV
+# (columna "estado" de --reporte). Cualquier otro valor cuenta como
+# pendiente/fallo al calcular el estado final del lote.
+FACTURA_LOTE_ESTADOS_EXITO = {
+    "OK",
+    "OK_CALIDAD_ABIERTA",
+    "OK_SIN_DIALOGO",
+    "YA_PROCESADA",
+    "SOLO_CALIDAD",
+    "TERMINADA_SIN_CARTEL",
+}
+
+
+class LoteRecord(Base):
+    """Un Excel consolidado subido para respuesta masiva en un portal."""
+
+    __tablename__ = "lotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    creado_por = Column(String(200), nullable=False)
+    pagador = Column(String(50), nullable=False, index=True)  # COOSALUD, SIMED, ...
+    nombre_archivo = Column(String(300), nullable=False)
+    hoja = Column(String(100), default="BASE")
+    incluir_calidad = Column(Integer, default=0)
+    estado = Column(String(50), default=LOTE_ESTADO_EN_COLA, index=True)
+    total_facturas = Column(Integer, default=0)
+    total_glosas = Column(Integer, default=0)
+    total_calidad = Column(Integer, default=0)  # glosas CALIDAD excluidas
+    # El Excel original tal como se subió: el agente local lo descarga de
+    # aquí para correr el bot — el PC del hospital no comparte disco con
+    # el servidor de la app.
+    excel_archivo = Column(LargeBinary, nullable=False)
+    resumen = Column(Text, nullable=True)  # JSON: conteo de estados al cierre
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FacturaLoteRecord(Base):
+    """Estado por factura dentro de un lote (el semáforo de la UI)."""
+
+    __tablename__ = "facturas_lote"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    factura = Column(String(50), nullable=False, index=True)
+    grupos = Column(Integer, default=0)  # grupos de respuesta (cod+obs)
+    glosas = Column(Integer, default=0)  # ids de glosa a responder
+    calidad = Column(Integer, default=0)  # glosas CALIDAD excluidas
+    requiere_soporte = Column(Integer, default=0)
+    estado = Column(String(50), default=FACTURA_LOTE_ESTADO_PENDIENTE, index=True)
+    detalle = Column(Text, nullable=True)  # motivo textual del bot (RECHAZADA: ...)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (Index("ix_facturas_lote_lote_factura", "lote_id", "factura", unique=True),)
+
+
+class TareaLoteRecord(Base):
+    """Cola de trabajos para el agente local (una tarea por corrida de bot)."""
+
+    __tablename__ = "tareas_lote"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    tipo = Column(String(50), default="RESPONDER_COOSALUD", nullable=False)
+    estado = Column(String(50), default=TAREA_ESTADO_PENDIENTE, index=True)
+    agente = Column(String(200), nullable=True)  # hostname del PC que la reclamó
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    reclamada_en = Column(DateTime(timezone=True), nullable=True)
+    terminada_en = Column(DateTime(timezone=True), nullable=True)
+    error = Column(Text, nullable=True)
+    resultado = Column(Text, nullable=True)  # JSON: resumen que reportó el agente
+
+
+class AgenteRecord(Base):
+    """Constructor de Agentes: un agente es una FICHA, no código.
+
+    Nombre, misión, instrucciones propias y la lista de herramientas del
+    asistente que tiene permitidas. El runner es el mismo del asistente
+    maestro con esa ficha encima — crear un agente nuevo no toca código.
+    """
+
+    __tablename__ = "agentes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(120), nullable=False)
+    mision = Column(Text, nullable=False)
+    instrucciones = Column(Text)
+    herramientas = Column(Text)  # JSON: nombres de tools permitidas
+    creado_por = Column(String(200))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    activo = Column(Integer, default=1, index=True)
+
+
+class TrabajoBotRecord(Base):
+    """Cola universal de trabajos para los bots del PC del HUS.
+
+    La plataforma encola (quién pidió qué bot con qué parámetros); el
+    agente del PC reclama, corre y reporta. Es la generalización de
+    TareaLoteRecord para TODOS los bots, no solo los de lotes.
+    """
+
+    __tablename__ = "trabajos_bot"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bot_id = Column(String(80), index=True, nullable=False)
+    estado = Column(
+        String(30), default="PENDIENTE", index=True
+    )  # PENDIENTE/RECLAMADO/TERMINADO/ERROR
+    parametros = Column(Text)  # JSON con lo que el auditor escribió
+    pedido_por = Column(String(200))
+    equipo = Column(String(200))  # hostname del PC que lo reclamó
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    reclamado_en = Column(DateTime(timezone=True))
+    terminado_en = Column(DateTime(timezone=True))
+    error = Column(Text)
+    registro = Column(Text)  # salida/resumen que reportó el agente
+    progreso = Column(Text)  # último avance reportado ("factura 12 de 40…")
+    cancelado_por = Column(String(200))

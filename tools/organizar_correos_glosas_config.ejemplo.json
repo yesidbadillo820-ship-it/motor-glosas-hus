@@ -1,0 +1,362 @@
+{
+  "etiqueta_gmail": "Archivado-Glosas",
+  "categoria_revision": "0-REVISAR",
+  "revisar_si_glosa_y_devolucion": true,
+  "min_bytes_imagen_inline": 15000,
+  "ignorar_asuntos": [
+    "CARGUE EXITOSO",
+    "ERRORES EN EL PROCESAMIENTO DEL ZIP",
+    "NOTIFICACION RADICACION FACTRAMED",
+    "SOPORTES EXITOSOS",
+    "PROCESO EN REVISION RADICADO",
+    "CONFIRMACION DE RADICACION APROBADA",
+    "RADICACION PARCIALMENTE APROBADA",
+    "RADICACION APROBADA",
+    "MODULO MIPRES",
+    "POLITICA ANTITRAMITES",
+    "SOCIALIZACION DE MEMORANDO",
+    "\\bSIIFA\\b",
+    "CARGUE CON INCONSISTENCIA",
+    "CODIGO UNICO DE VALIDACION",
+    "INVITACION A RADICAR",
+    "VERIFICACION EN DOS PASOS",
+    "ALERTA DE SEGURIDAD",
+    "CONOCE MAS SOBRE",
+    "NOTIFICACION DE PAGO"
+  ],
+  "ignorar_remitentes": [
+    "ACCOUNTS\\.GOOGLE\\.COM",
+    "MAILER-DAEMON",
+    "POSTMASTER@",
+    "CREDICORPCAPITAL"
+  ],
+  "categorias_por_asunto": [
+    {
+      "patron": "^REPORTE GLOSAS Y DEVOLUCIONES",
+      "categoria": "INICIAL"
+    },
+    {
+      "patron": "^LIQ-\\d",
+      "categoria": "INICIAL"
+    }
+  ],
+  "categorias": [
+    {
+      "nombre": "CONCILIACIONES",
+      "patrones": [
+        "CONCILIACION"
+      ]
+    },
+    {
+      "nombre": "RATIFICADA",
+      "patrones": [
+        "RATIFICA"
+      ]
+    },
+    {
+      "nombre": "DEVOLUCIONES",
+      "patrones": [
+        "DEVOLUCION",
+        "DEVUELTA",
+        "\\bDEV[O0]?\\d"
+      ]
+    },
+    {
+      "nombre": "INICIAL",
+      "patrones": [
+        "GLOSA",
+        "OBJECION",
+        "OBJETAD",
+        "AUDITORIA"
+      ]
+    }
+  ],
+  "entidades": [
+    {
+      "carpeta": "DISPENSARIO",
+      "remitente": [
+        "@TOOL\\.COM\\.CO",
+        "AUDITOOL"
+      ],
+      "asunto": [
+        "AUDITOOL",
+        "SANIDAD MILITAR",
+        "DISPENSARIO"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "AXA",
+      "remitente": [
+        "GRUPOMOK",
+        "COLPATRIA",
+        "\\bAXA\\b",
+        "CLAIMONLINE"
+      ],
+      "asunto": [
+        "\\bAXA\\b",
+        "COLPATRIA"
+      ],
+      "adjuntos": [
+        "^OBJECION_\\d+"
+      ]
+    },
+    {
+      "carpeta": "LA PREVISORA",
+      "remitente": [
+        "PREVISORA"
+      ],
+      "asunto": [
+        "LA PREVISORA"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SEGUROS BOLIVAR",
+      "remitente": [
+        "SEGUROSBOLIVAR",
+        "@BOLIVAR",
+        "RGC\\.COM\\.CO"
+      ],
+      "asunto": [
+        "SEGUROS\\s+BOLIVAR"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "HDI SEGUROS",
+      "remitente": [
+        "HDISEGUROS",
+        "\\bHDI\\b"
+      ],
+      "asunto": [
+        "HDI SEGUROS",
+        "\\bHDI\\b"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "COLMENA",
+      "remitente": [
+        "COLMENASEGUROS",
+        "COLMENA"
+      ],
+      "asunto": [
+        "COLMENA SEGUROS"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "ASEGURADORA SOLIDARIA",
+      "remitente": [
+        "SOLIDARIA"
+      ],
+      "asunto": [
+        "ASEGURADORA SOLIDARIA"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SALUD TOTAL",
+      "remitente": [
+        "SALUDTOTAL"
+      ],
+      "asunto": [
+        "SALUD TOTAL"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "ASMET",
+      "remitente": [
+        "ASMET"
+      ],
+      "asunto": [
+        "ASMET"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "ANASWAYUU",
+      "remitente": [
+        "ANASWAYUU",
+        "ANAS WAYUU"
+      ],
+      "asunto": [
+        "ANASWAYUU",
+        "ANAS WAYUU"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "AURORA",
+      "remitente": [
+        "@AURORA",
+        "EPSAURORA"
+      ],
+      "asunto": [
+        "EPS AURORA",
+        "\\bAURORA\\b"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "ADRES",
+      "remitente": [
+        "ADRES\\.GOV\\.CO"
+      ],
+      "asunto": [
+        "EMITIDA POR ADRES",
+        "\\bADRES\\b"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SALUD MIA",
+      "remitente": [
+        "SALUDMIA"
+      ],
+      "asunto": [
+        "SALUD MIA"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "FACTRAMED",
+      "remitente": [
+        "FACTRAMED"
+      ],
+      "asunto": [
+        "FACTRAMED"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "COOSALUD",
+      "remitente": [
+        "COOSALUD"
+      ],
+      "asunto": [
+        "COOSALUD"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SAVIA SALUD",
+      "remitente": [
+        "SAVIASALUD",
+        "SAVIA"
+      ],
+      "asunto": [
+        "SAVIA\\s+SALUD"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "POSITIVA",
+      "remitente": [
+        "POSITIVA"
+      ],
+      "asunto": [
+        "POSITIVA COMPAÑIA",
+        "POSITIVA SEGUROS"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "FOMAG",
+      "remitente": [
+        "FOMAG",
+        "FIDUPREVISORA"
+      ],
+      "asunto": [
+        "FOMAG",
+        "MAGISTERIO"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "MUTUAL",
+      "remitente": [
+        "MUTUALSER",
+        "\\bMUTUAL\\b"
+      ],
+      "asunto": [
+        "MUTUAL SER",
+        "ASOCIACION MUTUAL"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "POLICIA",
+      "remitente": [
+        "POLICIA\\.GOV\\.CO",
+        "DISAN"
+      ],
+      "asunto": [
+        "POLICIA NACIONAL",
+        "SANIDAD POLICIA"
+      ],
+      "adjuntos": [
+        "^GLOSA A RAD"
+      ]
+    },
+    {
+      "carpeta": "SANITAS",
+      "remitente": [
+        "SANITAS"
+      ],
+      "asunto": [
+        "SANITAS"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "SURA",
+      "remitente": [
+        "EPSSURA",
+        "SURAMERICANA",
+        "@SURA",
+        "\\bSURA\\b"
+      ],
+      "asunto": [
+        "EPS SURA",
+        "\\bSURA\\b"
+      ],
+      "adjuntos": []
+    },
+    {
+      "carpeta": "FAMISANAR",
+      "remitente": [
+        "FAMISANAR"
+      ],
+      "asunto": [
+        "FAMISANAR"
+      ],
+      "adjuntos": [
+        "^DEVYGLOSAS"
+      ]
+    },
+    {
+      "carpeta": "SEGUROS MUNDIAL",
+      "remitente": [
+        "SEGUROSMUNDIAL",
+        "MUNDIAL DE SEGUROS"
+      ],
+      "asunto": [
+        "SEGUROS MUNDIAL",
+        "MUNDIAL DE SEGUROS",
+        "SEGUROSMUNDIAL"
+      ],
+      "adjuntos": []
+    }
+  ],
+  "plantillas": {
+    "carpeta_entidad": "{entidad}",
+    "pdf_correo": {
+      "DEVOLUCIONES": "{asunto}",
+      "*": "{entidad} {hora}"
+    }
+  },
+  "renombrar_adjuntos": true
+}

@@ -55,6 +55,16 @@ if ! git pull --ff-only origin "$BRANCH"; then
     exit 1
 fi
 
+# Ronda 30: guarda de memoria. Este script corre por cron en la e2-micro
+# (1GB) y `up -d --build` rebuildea la imagen CON el motor corriendo — si
+# hay poca RAM libre, el build estrangula la VM (colapso observado 8-jul).
+# Si no hay al menos 500MB libres, posponemos: el próximo cron reintenta.
+MEM_LIBRE=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
+if (( MEM_LIBRE < 500 )); then
+    log "SKIP: solo ${MEM_LIBRE}MB libres — build pospuesto al próximo ciclo"
+    exit 0
+fi
+
 # Rebuild + redeploy. up -d --build hace el rebuild de la imagen Y reinicia
 # el contenedor solo si la imagen cambió (no toca el motor si solo cambió
 # un archivo .md, por ejemplo).
@@ -64,3 +74,10 @@ if ! docker compose up -d --build 2>&1; then
 fi
 
 log "redeploy OK — motor corriendo en $(git rev-parse --short HEAD)"
+
+# Limpieza post-deploy: cada rebuild deja la imagen anterior dangling y el
+# cache de BuildKit crece sin límite — en el disco de la e2-micro termina
+# llenando el filesystem. Solo toca imágenes SIN tag y cache de build; nunca
+# la imagen corriendo, la de cloudflared, ni volúmenes/datos.
+docker image prune -f >/dev/null || log "WARN: docker image prune falló (no fatal)"
+docker builder prune -f --keep-storage 1GB >/dev/null || log "WARN: docker builder prune falló (no fatal)"

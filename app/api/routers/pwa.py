@@ -132,6 +132,13 @@ def importar_recepcion_page():
     return FileResponse("static/importar-recepcion.html", headers=_NO_STORE_HEADERS)
 
 
+@router.get("/preauditoria")
+def preauditoria_page():
+    """Módulo de Pre-auditoría SINAC: oficios recibidos, semáforo de plazo,
+    auditoría de facturas, oficios de devolución en PDF y estadísticas."""
+    return FileResponse("static/preauditoria.html", headers=_NO_STORE_HEADERS)
+
+
 @router.get("/reset-sw.html")
 def reset_sw():
     """Página de emergencia que desregistra cualquier service worker viejo y

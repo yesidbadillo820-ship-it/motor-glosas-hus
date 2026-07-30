@@ -1,0 +1,150 @@
+════════════════════════════════════════════════════════════════════
+  SUITE CARTERA HUS · v1.0
+  Menú único de radicación, glosas y cruces masivos
+  ESE Hospital Universitario de Santander — Cartera / Auditoría
+════════════════════════════════════════════════════════════════════
+
+CÓMO SE ABRE
+------------
+Doble clic en INICIAR_SUITE.bat. La primera vez (con internet) instala
+solo lo que falta. Después funciona sin internet, salvo abrir portales.
+
+CÓMO SE USA (3 pasos)
+---------------------
+ 1. ENTIDAD   Escriba el nombre o NIT en el buscador y elija la EPS.
+              La ficha muestra el portal, usuario, correo y contacto,
+              con su semáforo:
+                🟢 Operativa   → tiene plataforma de radicación definida
+                🟡 Por armar   → solo hay correo; falta armar el proceso
+                🔴 Sin datos   → no hay información de radicación
+ 2. ARCHIVO   Cargue el archivo base: el ZIP del portal (aunque traiga
+              ZIPs adentro), un Excel, un CSV o un PDF (incluso si viene
+              renombrado como .cmd — la Suite detecta el tipo REAL).
+ 3. ACCIÓN    Elija el botón:
+   📦 Organizar masivo      ZIP → clasifica DETALLE/GLOSAS/FACTURA y
+                            arma LOTES de máx. 300 facturas alineadas.
+                            Lo no clasificable queda en SIN_CLASIFICAR
+                            y las facturas incompletas en un CSV.
+   🔗 Consolidar + cruzar   Lee TODOS los Excel con Pandas (sin abrir
+                            Excel ni Power Query), arma la OBSERVACIÓN
+                            FINAL por servicio y, si usted elige la base
+                            DGH, cruza valores de servicio/saldo/copago.
+   📋 Generar OBJECIONES    Produce OBJECIONES_LOTE_XX.xlsx con las 16
+                            columnas del mapeo, aplicando ANTES de subir
+                            las mismas reglas de DGH: guardián de
+                            valores, exclusión de ya objetadas,
+                            duplicados y aviso de copago.
+   🖼️ Compilar evidencias   Une los pantallazos de una carpeta en un
+                            Word (una imagen por página).
+   🤖 Ejecutar bot          Lanza los bots que YA existen (COOSALUD,
+                            Mutual Ser, FOMAG, SIMED…) desde el menú.
+   ➕ Registrar bot          Apunta un .bat/.py/.exe existente a la
+                            entidad, sin moverlo de su carpeta.
+
+DÓNDE QUEDA TODO (estándar único de evidencia)
+----------------------------------------------
+SALIDAS/<ENTIDAD>/<fecha_hora>_<proceso>/
+   CONTROL.csv     una fila por factura con su estado (para tableros)
+   EVIDENCIAS.docx pantallazos compilados (si aplica)
+   REVISAR.csv     todo lo excluido, con su motivo — nada se pierde
+   RESUMEN.txt     cifras del cierre, listas para el informe
+
+Columnas fijas de CONTROL.csv (no cambiarlas: los tableros las leen):
+   fecha_hora | entidad | proceso | factura | estado | detalle | valor | evidencia
+
+ANTES DEL PRIMER CARGUE REAL A DGH  ⚠  (importante)
+---------------------------------------------------
+Abra config/mapeo_dgh.json y pegue los 16 encabezados EXACTOS de su
+archivo OBJECIONES actual (los que trae por defecto son de referencia).
+Valide el primer lote con un cargue piloto pequeño, como se hizo con
+COOSALUD (100 facturas), antes de correr el masivo completo.
+
+ARCHIVOS DE CONFIGURACIÓN
+-------------------------
+config/entidades.json        143 entidades del Excel maestro, con su
+                             estado (53 🟢 · 82 🟡 · 8 🔴 al corte).
+                             Portal, usuario, correo y contacto. NO trae
+                             contraseñas (van aparte, ver abajo).
+config/entidades.credenciales.json
+                             ⚠ CONTRASEÑAS de los portales. Es un archivo
+                             LOCAL: vive solo en su equipo y NUNCA se sube
+                             al repositorio. La Suite lo une con
+                             entidades.json al abrir. Trátelo como
+                             confidencial y no lo saque del área.
+config/mapeo_dgh.json        Columnas del OBJECIONES y sinónimos con los
+                             que el motor reconoce los encabezados de
+                             cada EPS. Se edita con Bloc de notas.
+config/bots_registrados.json Rutas de los bots existentes por entidad
+                             (reemplace las rutas "C:\RUTA\PENDIENTE\...").
+
+CONTRASEÑAS SEPARADAS DEL RESTO (importante)
+--------------------------------------------
+Para poder versionar/compartir entidades.json sin exponer claves, las
+contraseñas viven en config/entidades.credenciales.json (LOCAL, ignorado
+por git). Si le entregan un entidades.json nuevo con contraseñas dentro,
+sáquelas con:
+    python herramientas/separar_credenciales.py
+Eso deja entidades.json limpio y crea/actualiza el archivo local de
+claves. La Suite vuelve a unir ambas partes en memoria al abrir, así que
+usted sigue viendo todo completo. La plantilla de referencia (sin claves
+reales) es config/entidades.credenciales.example.json.
+
+PARA ACTUALIZAR LAS ENTIDADES
+-----------------------------
+El registro nace del Excel RADICAR_FACTURAS_ENTIDADES.xlsx. Cuando el
+Excel cambie, se vuelve a generar el entidades.json (pídale al área de
+Programación e Innovación correr el generador, o solicítelo de nuevo).
+Después de regenerarlo, corra otra vez separar_credenciales.py.
+
+MODO LÍNEA DE COMANDOS (sin ventana)
+------------------------------------
+Lo mismo que los botones, pero automatizable (tareas programadas,
+equipos sin pantalla). Todo cae en el mismo estándar SALIDAS/…:
+    python suite_cli.py entidades --buscar coosalud
+    python suite_cli.py organizar PORTAL.zip --entidad COOSALUD
+    python suite_cli.py consolidar CARPETA/ --entidad COOSALUD --base-dgh BASE.xlsx
+    python suite_cli.py objeciones CONSOLIDADO_GLOSAS.xlsx --entidad COOSALUD
+    python suite_cli.py evidencias carpeta_pantallazos/ --entidad COOSALUD
+    python suite_cli.py todo PORTAL.zip --entidad COOSALUD   (encadena las 3)
+Vea el detalle con:  python suite_cli.py --help
+
+HERRAMIENTAS PDF (botón «🧰 Herramientas PDF»)
+---------------------------------------------
+Caja de utilidades PDF que corre en el mismo PC, sin internet ni Acrobat.
+Sirve para el papeleo diario de facturas, glosas y soportes:
+    Ordenar ....... unir · dividir · eliminar/extraer/reordenar páginas · rotar
+    Optimizar ..... comprimir · reparar · info del PDF
+    Imágenes ...... imágenes → PDF · PDF → imágenes (pantallazos)
+    Editar ........ marca de agua · números de página · recortar
+    Seguridad ..... proteger con clave · desbloquear · censurar (tachar datos)
+    Convertir ..... Office->PDF · PDF->Word · PDF->Excel · PDF->PowerPoint · PDF->PDF/A
+    IA ............ resumir · traducir · PDF->Markdown · OCR (extraer texto)
+    HUS ........... renombrar PDF ↔ .cmd
+El resultado queda en SALIDAS/HERRAMIENTAS_PDF/. También por consola:
+    python suite_cli.py pdf unir a.pdf b.pdf -o UNIDO.pdf
+    python suite_cli.py pdf comprimir factura.pdf
+    python suite_cli.py pdf pdf2excel glosas.pdf   (tablas del PDF a Excel)
+    python suite_cli.py pdf office2pdf carta.docx  (Word/Excel/PPT -> PDF)
+    python suite_cli.py pdf --help   (todas las operaciones)
+
+Nota sobre conversiones Office:
+    · PDF -> Word/Excel/PowerPoint funciona sin internet ni programas extra.
+    · Office -> PDF y PDF -> PDF/A necesitan LibreOffice instalado (gratis:
+      https://es.libreoffice.org/descarga/). Si no está, la Suite lo avisa.
+
+Nota sobre las funciones de IA (grupo "PDF INTELLIGENCE"):
+    Resumir, traducir, PDF->Markdown y OCR usan Google Gemini (el MISMO del
+    motor de glosas). Necesitan INTERNET y la variable de entorno
+    GEMINI_API_KEY. Sin ella, la Suite lo avisa y el resto sigue funcionando.
+    El OCR lee hasta escaneos (sin capa de texto), página por página.
+        set GEMINI_API_KEY=su_clave      (Windows, en la sesión)
+        python suite_cli.py pdf resumir informe.pdf
+        python suite_cli.py pdf traducir carta.pdf --idioma inglés
+        python suite_cli.py pdf ocr escaneo.pdf
+
+REQUISITOS
+----------
+Windows con Python 3.8+ · pandas · openpyxl · python-docx · pymupdf ·
+pdf2docx · pdfplumber · python-pptx (el .bat los instala solos). LibreOffice
+es opcional, solo para Office->PDF. La interfaz es Tkinter puro.
+════════════════════════════════════════════════════════════════════
