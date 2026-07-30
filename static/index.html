@@ -2359,6 +2359,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
           <span class="sn-item-label">Auditor Forense</span>
         </button>
+        <button class="sn-item" data-tip="Constructor de Agentes" onclick="sidebarTab(this,'agentes')" id="sn-agentes">
+          <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+          <span class="sn-item-label">Agentes</span>
+        </button>
         <button class="sn-item" data-tip="Diagnóstico del sistema (admin)" onclick="sidebarTab(this,'diagnostico')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span class="sn-item-label">Diagnóstico</span>
@@ -3383,6 +3387,29 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
          actualiza contratación y que el área de glosas miraba cuando se
          acordaba; el sistema tenía las vigencias como texto libre y nunca las
          leía. -->
+    <!-- Constructor de Agentes: el sistema los arma, nadie los programa. -->
+    <div class="panel" id="p-agentes">
+      <div class="intel-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Constructor de Agentes</h2>
+            <p class="malla-sub">Un agente es una ficha: misión, instrucciones y herramientas permitidas. Se crea acá, sin programar, y corre con todo lo que el sistema ya sabe.</p>
+          </div>
+        </div>
+        <div id="ag-lista"><div class="malla-vacio">Cargando…</div></div>
+        <div class="exp-sec">Construir un agente</div>
+        <div class="form-card" style="max-width:980px">
+          <div id="ag-plantillas" style="display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:.6rem"></div>
+          <div class="field"><label>Nombre</label><input type="text" id="ag-nombre" placeholder="Vigilante de vencimientos"/></div>
+          <div class="field"><label>Misión (qué hace y para qué)</label><textarea id="ag-mision" rows="2"></textarea></div>
+          <div class="field"><label>Instrucciones (cómo debe trabajar)</label><textarea id="ag-instr" rows="2"></textarea></div>
+          <div class="field"><label>Herramientas permitidas</label><div id="ag-tools" style="display:flex;gap:.4rem;flex-wrap:wrap"></div></div>
+          <button class="btn btn-primary" style="margin-top:.5rem" onclick="agCrear()">Construir agente</button>
+          <div class="auto-estado" id="ag-estado" style="margin-top:.4rem"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Centro de Inteligencia: el sistema dice qué hacer hoy. -->
     <div class="panel" id="p-inteligencia">
       <div class="intel-area">
@@ -8139,6 +8166,7 @@ function tab(btn,id){
   if(id==='automatizacion') autoCargar();
   if(id==='malla') mallaCargar();
   if(id==='inteligencia') intelCargar();
+  if(id==='agentes') agCargar();
   if(id==='expediente'){ var _eq=document.getElementById('exp-q'); if(_eq && !EXP.datos) setTimeout(function(){_eq.focus()},60); }
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
@@ -9187,6 +9215,126 @@ async function descargarDictamenMd(){
     document.body.appendChild(a); a.click(); a.remove();
     toast('Descargado', fname, 'success');
   } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ══ CONSTRUCTOR DE AGENTES: el sistema los arma, nadie los programa ══
+
+var AG = {datos: null, sel: {}};
+
+async function agCargar(){
+  try{
+    var r = await fetch('/agentes', {headers: authH()});
+    if(!r.ok){ document.getElementById('ag-lista').innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    AG.datos = await r.json();
+    agPintar();
+  }catch(e){ document.getElementById('ag-lista').innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function agPintar(){
+  var d = AG.datos; if(!d) return;
+  var html = '';
+  if(!d.agentes.length){
+    html = '<div class="malla-vacio">Todavía no hay agentes construidos. Arrancá con una plantilla de abajo.</div>';
+  } else {
+    html = '<div class="intel-acciones">';
+    d.agentes.forEach(function(a){
+      html += '<div class="intel-card" style="--intel-c:#0e7490">'
+        + '<div class="ico">🤖</div>'
+        + '<div class="cuerpo">'
+        +   '<div class="titulo">' + escHtml(a.nombre) + '</div>'
+        +   '<div class="porque">' + escHtml(a.mision) + '</div>'
+        +   '<div class="porque" style="margin-top:.25rem"><b>Herramientas:</b> ' + a.herramientas.map(escHtml).join(', ') + '</div>'
+        +   '<div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap">'
+        +     '<input type="text" id="ag-preg-' + a.id + '" placeholder="Pedile algo dentro de su misión…" style="flex:1;min-width:220px;padding:.45rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.82rem" onkeydown="if(event.key===\'Enter\') agCorrer(' + a.id + ')">'
+        +     '<button class="btn btn-primary btn-sm" id="ag-btn-' + a.id + '" onclick="agCorrer(' + a.id + ')">Correr</button>'
+        +     '<button class="btn btn-ghost btn-sm" onclick="agRetirar(' + a.id + ')">Retirar</button>'
+        +   '</div>'
+        +   '<div id="ag-res-' + a.id + '" style="display:none;margin-top:.5rem" class="auto-resumen"></div>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  document.getElementById('ag-lista').innerHTML = html;
+
+  var pl = document.getElementById('ag-plantillas');
+  pl.innerHTML = '<span style="font-size:.78rem;color:var(--text-3);align-self:center">Plantillas:</span>'
+    + d.plantillas.map(function(p, i){
+        return '<button class="auto-chip" onclick="agPlantilla(' + i + ')">' + escHtml(p.nombre) + '</button>';
+      }).join('');
+
+  var tools = document.getElementById('ag-tools');
+  tools.innerHTML = Object.keys(d.herramientas_disponibles).map(function(n){
+    return '<button class="auto-chip' + (AG.sel[n] ? ' activo' : '') + '" title="' + escHtml(d.herramientas_disponibles[n]) + '" onclick="agTool(\'' + n + '\')">' + escHtml(n) + '</button>';
+  }).join('');
+}
+
+function agTool(n){ AG.sel[n] = !AG.sel[n]; agPintar(); }
+
+function agPlantilla(i){
+  var p = AG.datos.plantillas[i]; if(!p) return;
+  document.getElementById('ag-nombre').value = p.nombre;
+  document.getElementById('ag-mision').value = p.mision;
+  document.getElementById('ag-instr').value = p.instrucciones;
+  AG.sel = {};
+  p.herramientas.forEach(function(h){ AG.sel[h] = true; });
+  agPintar();
+}
+
+function agEstado(msg, clase){
+  var e = document.getElementById('ag-estado');
+  e.className = 'auto-estado ' + (clase || '');
+  e.innerHTML = msg;
+}
+
+async function agCrear(){
+  var herramientas = Object.keys(AG.sel).filter(function(n){ return AG.sel[n]; });
+  var cuerpo = {
+    nombre: document.getElementById('ag-nombre').value.trim(),
+    mision: document.getElementById('ag-mision').value.trim(),
+    instrucciones: document.getElementById('ag-instr').value.trim(),
+    herramientas: herramientas,
+  };
+  if(!cuerpo.nombre || cuerpo.mision.length < 10){ agEstado('Falta el nombre o la misión (mínimo una frase).', 'auto-error'); return; }
+  if(!herramientas.length){ agEstado('Elegí al menos una herramienta.', 'auto-error'); return; }
+  try{
+    var r = await fetch('/agentes', {method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()), body: JSON.stringify(cuerpo)});
+    var d = await r.json().catch(function(){ return {}; });
+    if(r.status === 403){ agEstado('Se necesita rol de auditor o superior.', 'auto-error'); return; }
+    if(!r.ok){ agEstado(escHtml(d.detail || ('Error ' + r.status)), 'auto-error'); return; }
+    agEstado('Agente «' + escHtml(d.nombre) + '» construido.', 'auto-ok');
+    document.getElementById('ag-nombre').value = ''; document.getElementById('ag-mision').value = ''; document.getElementById('ag-instr').value = '';
+    AG.sel = {};
+    agCargar();
+  }catch(e){ agEstado('Conexión: ' + escHtml(e.message), 'auto-error'); }
+}
+
+async function agCorrer(id){
+  var preg = (document.getElementById('ag-preg-' + id).value || '').trim();
+  if(preg.length < 3){ toast('Agente','Escribile qué necesitás','warning'); return; }
+  var btn = document.getElementById('ag-btn-' + id); var t0 = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Corriendo…';
+  var caja = document.getElementById('ag-res-' + id);
+  caja.style.display = 'block'; caja.innerHTML = 'El agente está trabajando…';
+  try{
+    var r = await fetch('/agentes/' + id + '/correr', {method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()), body: JSON.stringify({pregunta: preg})});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ caja.innerHTML = '<b style="color:var(--c-rojo,#dc2626)">' + escHtml(d.detail || ('Error ' + r.status)) + '</b>'; return; }
+    var tools = (d.tools_llamadas || []).map(function(t){ return t.name; }).join(', ');
+    caja.innerHTML = (tools ? '<small style="color:var(--text-3)">Usó: ' + escHtml(tools) + '</small><br>' : '')
+      + escHtml(d.respuesta || '(sin respuesta)').replace(/\n/g, '<br>');
+  }catch(e){ caja.innerHTML = 'Conexión: ' + escHtml(e.message); }
+  finally{ btn.disabled = false; btn.textContent = t0; }
+}
+
+async function agRetirar(id){
+  if(!confirm('¿Retirar este agente? La ficha queda en la trazabilidad.')) return;
+  try{
+    var r = await fetch('/agentes/' + id, {method:'DELETE', headers: authH()});
+    if(r.status === 403){ toast('Permiso','Se necesita coordinador o administrador','warning'); return; }
+    if(!r.ok){ toast('Error','HTTP ' + r.status,'error'); return; }
+    agCargar();
+  }catch(e){ toast('Error','Conexión: ' + e.message,'error'); }
 }
 
 // ══ CENTRO DE INTELIGENCIA: el sistema dice qué hacer hoy ══

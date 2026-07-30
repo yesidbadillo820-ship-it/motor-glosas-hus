@@ -557,6 +557,8 @@ async def chat_con_asistente(
     api_key: str = None,
     modelo: str = None,
     max_turns: int = 6,
+    system_extra: str = "",
+    tools_permitidas: list[str] | None = None,
 ) -> dict:
     """Loop multi-turn del asistente. Recibe historial de mensajes,
     devuelve la respuesta final + tools que usó.
@@ -614,6 +616,17 @@ async def chat_con_asistente(
     tools_usadas = []
     tokens_total = {"input": 0, "output": 0}
 
+    # Constructor de Agentes: un agente corre con SU misión encima del
+    # sistema base y SOLO con las herramientas que su ficha le permite.
+    system_final = SYSTEM_ASISTENTE_MAESTRO + (
+        ("\n\n" + system_extra.strip()) if system_extra and system_extra.strip() else ""
+    )
+    if tools_permitidas is not None:
+        permitidas = set(tools_permitidas)
+        tools_finales = [t for t in TOOLS_ASISTENTE if t["name"] in permitidas]
+    else:
+        tools_finales = TOOLS_ASISTENTE
+
     async with httpx.AsyncClient(timeout=timeout) as client:
         for turno in range(max_turns):
             try:
@@ -624,8 +637,8 @@ async def chat_con_asistente(
                         "model": modelo,
                         "max_tokens": 4000,
                         "temperature": 0.2,
-                        "system": SYSTEM_ASISTENTE_MAESTRO,
-                        "tools": TOOLS_ASISTENTE,
+                        "system": system_final,
+                        "tools": tools_finales,
                         "messages": msgs_anthropic,
                     },
                 )
