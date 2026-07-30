@@ -462,7 +462,10 @@ async function abrirOficio(id){
     document.getElementById('mo-titulo').textContent='Oficio '+o.numero_radicado;
     var filas=(o.facturas||[]).map(function(f){
       return '<tr><td class="mono">'+esc(f.factura)+'</td><td>'+esc(f.envio||'—')+'</td><td>'+cop(f.valor)+'</td>'+
-        '<td>'+esc(f.correo_fe||'')+'</td><td>'+estadoChip(f.estado)+(f.num_devoluciones?' <span class="chip chip-ronda">'+f.num_devoluciones+'/'+f.max_devoluciones+'</span>':'')+'</td>'+
+        '<td>'+esc(f.correo_fe||'')+'</td><td>'+estadoChip(f.estado)+(f.num_devoluciones?' <span class="chip chip-ronda">'+f.num_devoluciones+'/'+f.max_devoluciones+'</span>':'')+
+        // Si ya salió en un oficio de devolución se dice cuál: así se entiende
+        // por qué no vuelve a entrar en el próximo.
+        (f.consecutivo_devolucion?'<br><span class="leyenda">📄 ya salió en '+esc(f.consecutivo_devolucion)+'</span>':'')+'</td>'+
         '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
         '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button></td></tr>';
     }).join('');
@@ -482,13 +485,19 @@ async function abrirOficio(id){
         '<button class="btn btn-azul btn-chico" onclick="commitEnvio('+o.id+')">Cargar envío</button>'+
         '<div id="env-msg"></div></div>'+
       (o.total_facturas?
-        '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+'</p>'+
+        '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+
+          (o.devueltas && o.devueltas_sin_oficio < o.devueltas
+            ? ' <span class="leyenda">('+(o.devueltas-o.devueltas_sin_oficio)+' ya salieron en un oficio · '+
+              o.devueltas_sin_oficio+' por incluir)</span>'
+            : '')+'</p>'+
         '<div class="tbl-scroll" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Factura</th><th>Envío</th><th>Valor</th><th>F.E.</th><th>Estado</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
         '<div style="margin-top:12px"><button class="btn btn-rojo" '+
-          (o.devueltas?'':'disabled title="Este oficio no tiene facturas devueltas"')+
-          ' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución</button>'+
+          (o.devueltas_sin_oficio?'':'disabled title="No hay facturas devueltas pendientes de salir en un oficio"')+
+          ' onclick="generarDev('+o.id+')">📄 Generar oficio de devolución'+
+          (o.devueltas_sin_oficio?' ('+o.devueltas_sin_oficio+' factura'+(o.devueltas_sin_oficio==1?'':'s')+')':'')+'</button>'+
         (o.tiene_adres ? ' <button class="btn btn-verde" title="Excel con la información completa que exige ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ Excel ADRES</button>' : '')+
         (o.devueltas?'':'<p class="leyenda">El oficio de devolución solo se puede generar cuando hay al menos una factura <b>devuelta</b>: es la carta con la que se le regresan las facturas a la entidad. Este oficio tiene '+o.radicar+' radicada(s) y '+o.pendientes+' pendiente(s), ninguna devuelta.</p>')+
+        (o.devueltas && !o.devueltas_sin_oficio?'<p class="leyenda">Las '+o.devueltas+' factura(s) devuelta(s) de este oficio <b>ya salieron</b> en un oficio de devolución. Una factura no se repite en dos oficios: la entidad recibiría el mismo cobro dos veces. Si necesita rehacerlo, elimine el oficio anterior desde la pestaña <b>Oficios de devolución</b>.</p>':'')+
         '</div>'
         : '<p class="leyenda">Aún no ha cargado envíos en este oficio.</p>');
     abrirModal('m-oficio');
@@ -612,9 +621,11 @@ async function abrirAuditar(id){
       '<p>'+esc(f.entidad||'')+' · '+estadoChip(f.estado)+' · Correo F.E.: <b>'+esc(f.correo_fe||'NO')+'</b> · Devoluciones <b>'+f.num_devoluciones+' de '+f.max_devoluciones+'</b>'+(f.num_subsanacion?' · Subsanación '+f.num_subsanacion:'')+'</p>'+
       (limite?'<div class="aviso aviso-err">⚠️ Agotó las '+f.max_devoluciones+' devoluciones: debe radicarse o escalarse.</div>':'')+
       (sinFE?'<div class="aviso aviso-err">🚫 Sin soporte de <b>facturación electrónica</b> (Correo F.E. = NO): solo puede DEVOLVERSE. Si el soporte ya existe, suba el Formato Facturación Electrónica actualizado en Fuentes.</div>':'')+
-      (f.motivo_devolucion?'<p class="leyenda">Motivo actual: '+esc(f.motivo_devolucion)+'</p>':'')+
-      '<label class="campo" style="margin:10px 0">Observaciones — escriba aquí si va a RADICAR (se guardan siempre)<textarea id="au-obs" rows="3" style="width:100%">'+esc(f.observaciones||'')+'</textarea></label>'+
-      '<label class="campo" style="margin:10px 0">Motivo de la devolución — solo si DEVUELVE<textarea id="au-motivo" rows="3" style="width:100%">'+esc(f.motivo_devolucion||'')+'</textarea></label>'+
+      // UN solo recuadro (antes eran dos y se prestaba a confusión): lo que
+      // se escriba aquí se guarda siempre y, si la factura se DEVUELVE, es el
+      // texto que sale en el oficio de devolución.
+      '<label class="campo" style="margin:10px 0">Observación — se guarda siempre; si devuelve, este texto sale en el oficio de devolución'+
+        '<textarea id="au-obs" rows="4" style="width:100%">'+esc(f.motivo_devolucion||f.observaciones||'')+'</textarea></label>'+
       '<div id="au-msg"></div>'+
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
@@ -634,12 +645,15 @@ async function auditar(id,resultado){
   botones.forEach(function(b){ b.dataset.bloqueado = b.disabled ? '1' : ''; b.disabled = true; });
   var msg = document.getElementById('au-msg');
   if(msg) msg.innerHTML = '<div class="aviso aviso-warn">Guardando… no cierre esta ventana.</div>';
+  // El único recuadro viaja como observación Y como motivo: al radicar queda
+  // de observación; al devolver es además el texto que imprime el oficio.
+  var texto = ((document.getElementById('au-obs')||{}).value || '').trim() || null;
   try{
     await api('/preauditoria/facturas/'+id+'/auditar',{method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         resultado: resultado,
-        motivo_devolucion: (document.getElementById('au-motivo')||{}).value || null,
-        observaciones: (document.getElementById('au-obs')||{}).value || null
+        motivo_devolucion: texto,
+        observaciones: texto
       })});
     if(msg) msg.innerHTML = '<div class="aviso aviso-ok">Guardado.</div>';
     cerrarModal('m-auditar');
@@ -667,11 +681,19 @@ async function verHist(numero){
         '<td style="max-width:220px">'+esc(e.motivo||'—')+'</td>'+
         '<td style="max-width:220px">'+esc(e.observaciones||'—')+'</td></tr>';
     }).join('');
+    // En una devuelta, la observación que manda es el motivo (lo que salió o
+    // saldrá en el oficio de devolución); en las demás, la observación normal.
+    var obsActual = d.actual.motivo_devolucion || d.actual.observaciones || '';
+    var enOficio = d.actual.resultado==='DEVUELTA' && d.actual.oficio_devolucion_id;
     document.getElementById('mh-cuerpo').innerHTML='<p>'+estadoChip(d.actual.estado)+' · Devoluciones <b>'+d.actual.num_devoluciones+'</b> · Subsanación '+d.actual.num_subsanacion+'</p>'+
-      (d.actual.observaciones?'<div class="aviso aviso-ok"><b>Observación actual:</b> '+esc(d.actual.observaciones)+'</div>':'')+
-      // Permite anotar la observación en facturas ya decididas, sin revertirlas.
-      '<label class="campo" style="margin:10px 0">'+(d.actual.observaciones?'Corregir la observación':'Anotar la observación que falta')+
-        '<textarea id="mh-obs" rows="2" style="width:100%" placeholder="Ej.: OKAY SOPORTES">'+esc(d.actual.observaciones||'')+'</textarea></label>'+
+      (obsActual?'<div class="aviso aviso-ok"><b>Observación actual:</b> '+esc(obsActual)+'</div>':'')+
+      // Permite corregir la observación en facturas ya decididas, sin
+      // revertirlas. Si la factura ya salió en un oficio de devolución, la
+      // corrección también corrige el texto del oficio (el PDF se arma al
+      // abrirlo, así que queda al día de inmediato).
+      '<label class="campo" style="margin:10px 0">'+(obsActual?'Corregir la observación':'Anotar la observación que falta')+
+        (enOficio?' — la corrección también actualiza el oficio de devolución':'')+
+        '<textarea id="mh-obs" rows="3" style="width:100%" placeholder="Ej.: OKAY SOPORTES">'+esc(obsActual)+'</textarea></label>'+
       '<div id="mh-msg"></div>'+
       '<button class="btn btn-borde btn-chico" onclick="guardarObservacion('+d.actual.id+',\''+esc(numero)+'\')">✎ Guardar observación</button>'+
       '<div class="tbl-scroll" style="margin-top:12px"><table><thead><tr><th>Ronda</th><th>Evento</th><th>Oficio</th><th>Envío</th><th>Auditor</th><th>Fecha</th><th>Motivo</th><th>Observaciones</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
@@ -690,10 +712,15 @@ async function guardarObservacion(id, numero){
   _guardandoObs = true;
   if(msg) msg.innerHTML='<div class="aviso aviso-warn">Guardando…</div>';
   try{
-    await api('/preauditoria/facturas/'+id+'/observacion',{method:'PATCH',
+    var r = await api('/preauditoria/facturas/'+id+'/observacion',{method:'PATCH',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({observaciones: texto})});
     await verHist(numero);            // repinta el historial con el evento nuevo
+    // verHist repinta todo el cuerpo (incluido mh-msg): el aviso va después.
+    var msg2 = document.getElementById('mh-msg');
+    if(msg2) msg2.innerHTML = (r && r.oficio_actualizado)
+      ? '<div class="aviso aviso-ok">Observación guardada. El oficio de devolución quedó corregido: vuelva a abrir su PDF para verlo.</div>'
+      : '<div class="aviso aviso-ok">Observación guardada.</div>';
     await cargarConsolidado();
   }catch(e){
     if(msg) msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>';
