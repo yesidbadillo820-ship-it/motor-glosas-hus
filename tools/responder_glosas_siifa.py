@@ -116,7 +116,9 @@ def leer_excel(ruta: Path, hoja: str | None) -> list[dict]:
                 idx[clave] = i
                 break
         if clave not in idx and clave in ("id", "codigo"):
-            raise ValueError(f"Falta la columna '{clave}' (acepto {sorted(opciones)}). Headers: {headers}")
+            raise ValueError(
+                f"Falta la columna '{clave}' (acepto {sorted(opciones)}). Headers: {headers}"
+            )
 
     filas = []
     for r in rows:
@@ -128,7 +130,9 @@ def leer_excel(ruta: Path, hoja: str | None) -> list[dict]:
         try:
             id_seguimiento = int(id_raw)
         except (TypeError, ValueError):
-            logger.warning("Fila con id_seguimiento_factura_glosa no numérico, se omite: %r", id_raw)
+            logger.warning(
+                "Fila con id_seguimiento_factura_glosa no numérico, se omite: %r", id_raw
+            )
             continue
         codigo = str(r[idx["codigo"]] or "").strip() if idx.get("codigo") is not None else ""
         if not codigo:
@@ -137,9 +141,13 @@ def leer_excel(ruta: Path, hoja: str | None) -> list[dict]:
         filas.append(
             {
                 "id": id_seguimiento,
-                "factura": str(r[idx["factura"]] or "").strip() if idx.get("factura") is not None else "",
+                "factura": str(r[idx["factura"]] or "").strip()
+                if idx.get("factura") is not None
+                else "",
                 "codigo": codigo,
-                "observacion": str(r[idx["observacion"]] or "").strip() if idx.get("observacion") is not None else "",
+                "observacion": str(r[idx["observacion"]] or "").strip()
+                if idx.get("observacion") is not None
+                else "",
                 "fecha": _fecha_iso(r[idx["fecha"]]) if idx.get("fecha") is not None else None,
             }
         )
@@ -184,7 +192,9 @@ def listar_catalogo(cliente: SiifaClient, grupo: str) -> None:
     print()
 
 
-def procesar(cliente: SiifaClient, filas: list[dict], accion: str, ya_ok: set[int], reporte_writer) -> tuple[int, int]:
+def procesar(
+    cliente: SiifaClient, filas: list[dict], accion: str, ya_ok: set[int], reporte_writer
+) -> tuple[int, int]:
     ok = 0
     err = 0
     for fila in filas:
@@ -204,7 +214,9 @@ def procesar(cliente: SiifaClient, filas: list[dict], accion: str, ya_ok: set[in
             if accion == "respuesta":
                 cliente.responder_glosa(id_seg, fila["codigo"], fila["observacion"], fila["fecha"])
             else:
-                cliente.responder_reiteracion_glosa(id_seg, fila["codigo"], fila["observacion"], fila["fecha"])
+                cliente.responder_reiteracion_glosa(
+                    id_seg, fila["codigo"], fila["observacion"], fila["fecha"]
+                )
             estado, detalle = "OK", ""
             ok += 1
             logger.info("Glosa %s (factura %s): OK", id_seg, fila["factura"])
@@ -225,7 +237,9 @@ def procesar(cliente: SiifaClient, filas: list[dict], accion: str, ya_ok: set[in
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--excel", help="Excel con las respuestas tipificadas.")
     ap.add_argument("--hoja", help="Nombre de la hoja (default: la primera).")
     ap.add_argument(
@@ -235,12 +249,25 @@ def main() -> None:
         help="'respuesta' = responder la glosa formulada (default). "
         "'reiteracion-respuesta' = subsanación de una glosa que la EPS reiteró.",
     )
-    ap.add_argument("--solo-id", type=int, help="Piloto: procesa solo esta glosa (id_seguimiento_factura_glosa).")
-    ap.add_argument("--piloto", type=int, metavar="N", help="Procesa solo las primeras N filas del Excel.")
+    ap.add_argument(
+        "--solo-id",
+        type=int,
+        help="Piloto: procesa solo esta glosa (id_seguimiento_factura_glosa).",
+    )
+    ap.add_argument(
+        "--piloto", type=int, metavar="N", help="Procesa solo las primeras N filas del Excel."
+    )
     ap.add_argument("--reporte", help="CSV de salida con el resultado de cada fila.")
-    ap.add_argument("--saltar-csv", action="append", default=[], help="Reporte(s) previos: se saltan los ya OK.")
-    ap.add_argument("--listar-catalogo", metavar="GRUPO", nargs="?", const="RESPUESTA",
-                     help="Solo imprime el catálogo oficial de códigos (default: RESPUESTA) y termina. No necesita --excel.")
+    ap.add_argument(
+        "--saltar-csv", action="append", default=[], help="Reporte(s) previos: se saltan los ya OK."
+    )
+    ap.add_argument(
+        "--listar-catalogo",
+        metavar="GRUPO",
+        nargs="?",
+        const="RESPUESTA",
+        help="Solo imprime el catálogo oficial de códigos (default: RESPUESTA) y termina. No necesita --excel.",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -262,7 +289,9 @@ def main() -> None:
             return
 
         if not args.excel:
-            raise SystemExit("ERROR: falta --excel (o usar --listar-catalogo para solo consultar códigos).")
+            raise SystemExit(
+                "ERROR: falta --excel (o usar --listar-catalogo para solo consultar códigos)."
+            )
         if not args.reporte:
             raise SystemExit("ERROR: falta --reporte (ruta del CSV de salida).")
 
@@ -276,20 +305,34 @@ def main() -> None:
             return
 
         ya_ok = ids_ya_procesados(args.saltar_csv)
-        logger.info("%d fila(s) a procesar (acción: %s, %d ya OK en corridas previas).", len(filas), args.accion, len(ya_ok))
+        logger.info(
+            "%d fila(s) a procesar (acción: %s, %d ya OK en corridas previas).",
+            len(filas),
+            args.accion,
+            len(ya_ok),
+        )
 
         ruta_reporte = Path(args.reporte)
         ruta_reporte.parent.mkdir(parents=True, exist_ok=True)
         with open(ruta_reporte, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["id_seguimiento_factura_glosa", "numero_factura", "estado", "detalle", "fecha_hora"]
+                f,
+                fieldnames=[
+                    "id_seguimiento_factura_glosa",
+                    "numero_factura",
+                    "estado",
+                    "detalle",
+                    "fecha_hora",
+                ],
             )
             writer.writeheader()
             ok, err = procesar(cliente, filas, args.accion, ya_ok, writer)
 
     logger.info("Terminado: %d OK, %d con error. Reporte: %s", ok, err, ruta_reporte)
     if err:
-        logger.warning("Hubo errores — revisar el CSV y reintentar con --saltar-csv %s", ruta_reporte)
+        logger.warning(
+            "Hubo errores — revisar el CSV y reintentar con --saltar-csv %s", ruta_reporte
+        )
 
 
 if __name__ == "__main__":

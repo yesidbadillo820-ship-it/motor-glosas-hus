@@ -80,7 +80,9 @@ def _fila_reporte(fila: dict) -> dict:
     emisor = factura.get("emisor") or {}
     tiene_respuesta = bool(_get(fila, "idSeguimientoTipoCodigoRespuesta"))
     return {
-        "id_seguimiento_factura_glosa": _get(fila, "idSeguimientoFactura", "idSeguimientoFacturaGlosa"),
+        "id_seguimiento_factura_glosa": _get(
+            fila, "idSeguimientoFactura", "idSeguimientoFacturaGlosa"
+        ),
         "tipo_seguimiento": _get(fila, "tipoSeguimiento"),
         "numero_factura": _get(factura, "numeroFactura"),
         "nit_emisor": _get(emisor, "nitEmisor"),
@@ -88,7 +90,9 @@ def _fila_reporte(fila: dict) -> dict:
         "valor_bruto_factura": _get(factura, "valorBruto", default=None),
         "valor_glosa": _get(fila, "valor", "valorGlosa", default=None),
         "codigo_glosa": _get(fila, "idSeguimientoTipoCodigo", "idSeguimientoTipoCodigoGlosa"),
-        "descripcion_glosa": _get(fila, "descripcionSeguimientoTipoCodigo", "descripcionSeguimientoTipoCodigoGlosa"),
+        "descripcion_glosa": _get(
+            fila, "descripcionSeguimientoTipoCodigo", "descripcionSeguimientoTipoCodigoGlosa"
+        ),
         "observacion_glosa": _get(fila, "observacion"),
         "fecha_formulacion": _get(fila, "fechaFormulacion"),
         "fecha_reporte": _get(fila, "fechaReporte"),
@@ -97,10 +101,24 @@ def _fila_reporte(fila: dict) -> dict:
         "descripcion_respuesta": _get(fila, "descripcionSeguimientoTipoCodigoRespuesta"),
         "observacion_respuesta": _get(fila, "observacionRespuesta"),
         "fecha_respuesta": _get(fila, "fechaRespuesta"),
-        "codigo_reiteracion": _get(fila, "idSeguimientoTipoCodigoReiteracion", "idSeguimientoTipoCodigoGlosaReiteracion"),
-        "descripcion_reiteracion": _get(fila, "descripcionSeguimientoTipoCodigoReiteracion", "descripcionSeguimientoTipoCodigoGlosaReiteracion"),
-        "codigo_reiteracion_respuesta": _get(fila, "idSeguimientoTipoCodigoReiteracionRespuesta", "idSeguimientoTipoCodigoGlosaReiteracionRespuesta"),
-        "descripcion_reiteracion_respuesta": _get(fila, "descripcionSeguimientoTipoCodigoReiteracionRespuesta", "descripcionSeguimientoTipoCodigoGlosaReiteracionRespuesta"),
+        "codigo_reiteracion": _get(
+            fila, "idSeguimientoTipoCodigoReiteracion", "idSeguimientoTipoCodigoGlosaReiteracion"
+        ),
+        "descripcion_reiteracion": _get(
+            fila,
+            "descripcionSeguimientoTipoCodigoReiteracion",
+            "descripcionSeguimientoTipoCodigoGlosaReiteracion",
+        ),
+        "codigo_reiteracion_respuesta": _get(
+            fila,
+            "idSeguimientoTipoCodigoReiteracionRespuesta",
+            "idSeguimientoTipoCodigoGlosaReiteracionRespuesta",
+        ),
+        "descripcion_reiteracion_respuesta": _get(
+            fila,
+            "descripcionSeguimientoTipoCodigoReiteracionRespuesta",
+            "descripcionSeguimientoTipoCodigoGlosaReiteracionRespuesta",
+        ),
         "anexo": _get(fila, "anexo"),
     }
 
@@ -108,7 +126,10 @@ def _fila_reporte(fila: dict) -> dict:
 def _resumen(filas: list[dict]) -> list[tuple]:
     agg: dict[tuple, dict] = defaultdict(lambda: {"cant": 0, "valor": 0.0, "sin_respuesta": 0})
     for f in filas:
-        clave = (f["razon_social_emisor"] or f["nit_emisor"] or "SIN EMISOR", f["tipo_seguimiento"] or "?")
+        clave = (
+            f["razon_social_emisor"] or f["nit_emisor"] or "SIN EMISOR",
+            f["tipo_seguimiento"] or "?",
+        )
         agg[clave]["cant"] += 1
         try:
             agg[clave]["valor"] += float(f["valor_glosa"] or 0)
@@ -145,7 +166,10 @@ def escribir_xlsx(filas: list[dict], ruta: Path) -> None:
     for r, fila in enumerate(filas, start=2):
         for c, h in enumerate(COLUMNAS, 1):
             cell = ws.cell(row=r, column=c, value=fila.get(h))
-            cell.alignment = Alignment(vertical="top", wrap_text=h in ("observacion_glosa", "observacion_respuesta", "descripcion_glosa"))
+            cell.alignment = Alignment(
+                vertical="top",
+                wrap_text=h in ("observacion_glosa", "observacion_respuesta", "descripcion_glosa"),
+            )
         if fila["tiene_respuesta"] == "NO":
             ws.cell(row=r, column=i_tiene_respuesta + 1).fill = sin_respuesta_fill
 
@@ -178,10 +202,20 @@ def escribir_xlsx(filas: list[dict], ruta: Path) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--salida", required=True, help="Ruta del Excel de salida.")
-    ap.add_argument("--tipo", choices=["GLOSA", "DEVOLUCION"], help="Filtrar por tipo de seguimiento (default: ambos).")
-    ap.add_argument("--sin-respuesta", action="store_true", help="Solo seguimientos que todavía no tienen respuesta del HUS.")
+    ap.add_argument(
+        "--tipo",
+        choices=["GLOSA", "DEVOLUCION"],
+        help="Filtrar por tipo de seguimiento (default: ambos).",
+    )
+    ap.add_argument(
+        "--sin-respuesta",
+        action="store_true",
+        help="Solo seguimientos que todavía no tienen respuesta del HUS.",
+    )
     ap.add_argument("--factura", help="Filtrar por número de factura (ej. HUS532426).")
     ap.add_argument("--desde", help="Fecha de creación desde (AAAA-MM-DD).")
     ap.add_argument("--hasta", help="Fecha de creación hasta (AAAA-MM-DD).")

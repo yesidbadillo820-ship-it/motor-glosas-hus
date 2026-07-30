@@ -55,8 +55,12 @@ class SiifaApiError(RuntimeError):
 
 @dataclass
 class SiifaClient:
-    base_url: str = field(default_factory=lambda: os.environ.get("SIIFA_BASE_URL", BASE_URL_FACTURA_PROD))
-    auth_url: str = field(default_factory=lambda: os.environ.get("SIIFA_AUTH_URL", AUTH_URL_HIPOTESIS))
+    base_url: str = field(
+        default_factory=lambda: os.environ.get("SIIFA_BASE_URL", BASE_URL_FACTURA_PROD)
+    )
+    auth_url: str = field(
+        default_factory=lambda: os.environ.get("SIIFA_AUTH_URL", AUTH_URL_HIPOTESIS)
+    )
     timeout: float = 30.0
     max_reintentos: int = 3
 
@@ -122,12 +126,20 @@ class SiifaClient:
                 resp = self._client.request(method, url, headers=self._headers(), **kwargs)
             except httpx.RequestError as exc:
                 last_exc = exc
-                logger.warning("Error de red (%s), intento %d/%d: %s", path, intento, self.max_reintentos, exc)
+                logger.warning(
+                    "Error de red (%s), intento %d/%d: %s", path, intento, self.max_reintentos, exc
+                )
                 time.sleep(2 * intento)
                 continue
 
             if resp.status_code in (429, 500, 502, 503, 504) and intento < self.max_reintentos:
-                logger.warning("HTTP %d en %s, reintentando (%d/%d)", resp.status_code, path, intento, self.max_reintentos)
+                logger.warning(
+                    "HTTP %d en %s, reintentando (%d/%d)",
+                    resp.status_code,
+                    path,
+                    intento,
+                    self.max_reintentos,
+                )
                 time.sleep(2 * intento)
                 continue
 
@@ -171,7 +183,9 @@ class SiifaClient:
                 yield fila
 
             total_paginas = data.get("totalPaginas") or 1
-            logger.info("Página %d/%d de seguimientos (%d registros)", pagina, total_paginas, len(resultado))
+            logger.info(
+                "Página %d/%d de seguimientos (%d registros)", pagina, total_paginas, len(resultado)
+            )
             if pagina >= total_paginas or not resultado:
                 break
             pagina += 1
@@ -185,7 +199,9 @@ class SiifaClient:
         return data.get("resultado") or [data]
 
     def resumen_glosas_factura(self, id_factura: int) -> dict:
-        return self._request("GET", f"/api/SeguimientoFacturaGlosa/Resumen/ByIdFactura/{id_factura}")
+        return self._request(
+            "GET", f"/api/SeguimientoFacturaGlosa/Resumen/ByIdFactura/{id_factura}"
+        )
 
     # ------------------------------------------------------------ escritura
 
@@ -219,7 +235,8 @@ class SiifaClient:
         body = {
             "idSeguimientoFacturaGlosa": id_seguimiento_factura_glosa,
             "idSeguimientoTipoCodigoGlosaReiteracionRespuesta": id_seguimiento_tipo_codigo_reiteracion_respuesta,
-            "fechaFormulacionGlosaReiteracionRespuesta": fecha_reiteracion_respuesta or _ahora_iso(),
+            "fechaFormulacionGlosaReiteracionRespuesta": fecha_reiteracion_respuesta
+            or _ahora_iso(),
         }
         if observacion_reiteracion_respuesta:
             body["observacionReiteracionRespuesta"] = observacion_reiteracion_respuesta
