@@ -1521,7 +1521,11 @@ class TestDevueltasYaSalidas:
     def _tres_devueltas(self, client):
         _subir_radicacion(
             client,
-            [_rad_fila(ENV, F1, 175500), _rad_fila(ENV, F2, 13781171), _rad_fila(ENV, F3, 13229822)],
+            [
+                _rad_fila(ENV, F1, 175500),
+                _rad_fila(ENV, F2, 13781171),
+                _rad_fila(ENV, F3, 13229822),
+            ],
         )
         o = _crear_oficio(client)
         _escribir(client, o["id"], ENV)
@@ -1555,7 +1559,12 @@ class TestDevueltasYaSalidas:
         """La secuencia exacta del auditor: genera un oficio con 2, después
         devuelve una tercera y genera otro. El segundo lleva SOLO esa."""
         _subir_radicacion(
-            client, [_rad_fila(ENV, F1, 175500), _rad_fila(ENV, F2, 13781171), _rad_fila(ENV, F3, 13229822)]
+            client,
+            [
+                _rad_fila(ENV, F1, 175500),
+                _rad_fila(ENV, F2, 13781171),
+                _rad_fila(ENV, F3, 13229822),
+            ],
         )
         o = _crear_oficio(client)
         _escribir(client, o["id"], ENV)
@@ -1572,8 +1581,10 @@ class TestDevueltasYaSalidas:
         assert segundo["total_facturas"] == 1
         assert segundo["consecutivo"] != primero["consecutivo"]
         # y cada una quedó sellada con SU oficio
-        porf = {f["factura"]: f["consecutivo_devolucion"] for f in
-                client.get(f"/preauditoria/oficios/{o['id']}").json()["facturas"]}
+        porf = {
+            f["factura"]: f["consecutivo_devolucion"]
+            for f in client.get(f"/preauditoria/oficios/{o['id']}").json()["facturas"]
+        }
         assert porf[F1] == porf[F2] == primero["consecutivo"]
         assert porf[F3] == segundo["consecutivo"]
 
