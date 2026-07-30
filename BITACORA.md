@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 29-07-2026
+**Última actualización:** 30-07-2026
 
 ---
 
@@ -20,6 +20,9 @@
    - `tools/responder_glosas_coosalud.py` — portal de COOSALUD (vco.ctamedicas.com).
    - `tools/responder_glosas_simed.py` y `tools/cargar_soportes_simed.py` — SIMED (Dispensario Médico).
    - `tools/responder_glosas_dgh.py` — Dinámica Gerencial (programa de escritorio del hospital).
+   - `tools/responder_glosas_siifa.py` — **SIIFA** (Ministerio de Salud, plataforma
+     nacional, no es un portal de una EPS): a diferencia de los otros, no es un
+     bot de navegador, habla directo con la API oficial de interoperabilidad.
    - Otros: Mutual Ser, FOMAG, radicador de facturación.
 3. **Plataforma de conciliación del Dispensario** (`tools/`):
    índice de soportes → expediente por factura → motor de evidencia → hechos
@@ -27,7 +30,8 @@
 4. **Herramientas de apoyo:** armar el Word/PDF de evidencias
    (`tools/evidencias_a_word.py`, `evidencias_a_pdf.py`), notas crédito del
    Dispensario (renombrar, organizar, verificar CUV), tablero de cartera
-   (`tools/tablero_cartera.py`).
+   (`tools/tablero_cartera.py`), informe masivo de seguimientos SIIFA
+   (`tools/siifa_reporte_seguimientos.py`).
 5. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
    - `tools/adres/validar_furips.py` + `VALIDAR_FURIPS.cmd` — validador masivo
      FURIPS 1/2 contra la Circular 022/2023 + cruce con soportes (RIPS, CUV,
@@ -44,6 +48,7 @@
 
 Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 `CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`,
+`CONTEXTO_SIIFA.md`,
 `ENTREGA_MODULO_ADRES_FURIPS.md` (entrega técnica del módulo ADRES).
 
 ---
@@ -136,6 +141,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   **CONSOLIDADO_PERTINENCIA_6JULIO_FUSIONADO.xlsx** (37 facturas, 5.736
   glosas, cero sin respuesta, todas RE9901). Quedó listo el comando para
   correrlo. Se creó esta bitácora (fusionando el trabajo de dos chats).
+  Además se escribió la **documentación técnica de entrega del módulo de
+  diagnóstico del Lote V2** (`docs/diagnostico_lote_v2_pendientes/DOCUMENTACION_MODULO.md`)
+  para consolidarlo en el proyecto principal sin perder conocimiento.
+- **27-07:** se generó el **informe técnico completo** de todo el trabajo
+  realizado (bot + evidencias + mejoras + lotes): 1.075 facturas procesadas,
+  45.134+ glosas respondidas, 7 mejoras al bot, 8 lotes cerrados o en proceso.
+  Publicado como artifact para socializar ante gerencia. Se generó también el
+  cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
+  consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
+- **30-07:** **nace el proyecto SIIFA** (plataforma del Ministerio de Salud,
+  distinta de COOSALUD/SIMED/DGH — la portalidad nacional de seguimiento de
+  facturas). El auditor mostró la pantalla `Listar seguimientos` (2.579
+  registros, sin botón de exportar) y subió los manuales oficiales y la
+  documentación técnica de la API (swagger, colección Postman, manual de
+  interoperabilidad). Hallazgo clave: **SIIFA sí tiene API REST oficial** de
+  interoperabilidad (a diferencia de COOSALUD/SIMED), documentada y con
+  endpoints específicos para listar y responder glosas — así que las dos
+  herramientas nuevas hablan HTTP directo, sin navegador:
+  - `docs/CONTEXTO_SIIFA.md`: plataforma, roles (IPS/ERP/FITS), autenticación
+    JWT, catálogo de endpoints usados, y los plazos del trámite de glosa
+    (Res. 1962/2025, Ley 1438/2011 Art. 57: 15 días hábiles para responder,
+    7 para subsanar una glosa reiterada).
+  - `tools/siifa_client.py`: cliente compartido (login, paginación automática,
+    respuesta de glosas).
+  - `tools/siifa_reporte_seguimientos.py`: trae TODOS los seguimientos del HUS
+    (paginando solo) y arma el Excel masivo que pedía el auditor, con hoja de
+    resumen por EPS.
+  - `tools/responder_glosas_siifa.py`: el "bot tipo COOSALUD" pedido — lee un
+    Excel tipificado y carga cada respuesta por API, con el mismo patrón de
+    piloto/reporte CSV/`--saltar-csv` que el bot de COOSALUD.
+  - Las tres piezas se probaron de punta a punta contra un servidor SIIFA de
+    prueba (simulado, no el real) para validar el flujo completo: login →
+    paginación → export a Excel → piloto de 1 glosa → cargue masivo con un
+    error simulado → reintento sin duplicar. Todo funcionó como se diseñó.
 
 ### Julio 2026 — Frente Dispensario: respuesta masiva de glosas en SIMED
 (trabajo del chat del bot Dispensario, fusionado a esta bitácora el 23-07)
@@ -1129,6 +1168,20 @@ Sprint de construcción del día (varios PR fusionados en cadena):
     (el importador ya entiende ese formato de columnas, se puede subir por
     oficio) para que las estadísticas y el control de 3 devoluciones
     arranquen con la historia real.
+
+### SIIFA (nuevo, ver `docs/CONTEXTO_SIIFA.md`)
+11. **Confirmar la URL del servicio de Auth** (`SIIFA_AUTH_URL`) — no está en
+    los manuales que tenemos, el script trae una hipótesis
+    (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
+    mesa de ayuda SIIFA / soporte MinSalud.
+12. **Primera corrida real** de `tools/siifa_reporte_seguimientos.py` (sin
+    filtros) para tener el Excel maestro de los 2.579 seguimientos y
+    verificar que las columnas coincidan con lo que el auditor espera.
+13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
+    una sola glosa antes de cualquier cargue masivo (regla del repo).
+14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
+    falta automatizar también la subsanación (`ReiteracionRespuesta`) desde
+    el arranque, o si eso se deja para cuando llegue el primer lote real.
 
 ## 4) PARA MAÑANA
 
