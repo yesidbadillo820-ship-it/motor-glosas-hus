@@ -969,6 +969,22 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 30-07 — Todos los bots del hospital, administrados desde la plataforma
+
+- **Se acabó el doble clic a ciegas.** El Centro de Automatización ahora
+  muestra los **35 bots del hospital** (COOSALUD, SIMED, FOMAG, MUTUAL SER,
+  DGH, ADRES, NUEVA EPS, radicador, notas crédito, PDFs, informes…) con su
+  estado en vivo: disponible, en cola, corriendo (con avance y en qué
+  equipo), o en error (con el motivo). Cada tarjeta trae Ejecutar,
+  Cancelar, Reintentar, Historial, Ver registros y Configurar.
+- **Cola universal**: «Ejecutar» encola el trabajo; el **agente de bots**
+  del PC del HUS (doble clic en `AGENTE_BOTS.cmd`, usa la misma URL y
+  token del agente de lotes) lo reclama, lo corre y reporta — la tarjeta
+  se actualiza sola. El agente no conoce ningún bot por nombre: el
+  comando viaja desde el catálogo.
+- Quién pidió qué bot, en qué equipo corrió, cuánto tardó y por qué falló:
+  todo queda en la auditoría y en el historial de cada tarjeta.
+
 ### 29-07 (séptima parte) — Épica: el Constructor de Agentes
 
 - **El sistema ya arma sus propios agentes.** Menú → Herramientas →

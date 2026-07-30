@@ -300,7 +300,10 @@ class TestLaPantallaExiste:
         assert 'id="p-automatizacion"' in self._html()
 
     def test_el_panel_se_carga_al_abrir_la_pestana(self):
-        assert "if(id==='automatizacion') autoCargar();" in self._html()
+        html = self._html()
+        assert "if(id==='automatizacion')" in html and "autoCargar()" in html
+        # Y ahora también carga el tablero de bots del hospital
+        assert "botsCargar()" in html
 
     def test_la_pantalla_llama_a_los_dos_endpoints(self):
         html = self._html()
