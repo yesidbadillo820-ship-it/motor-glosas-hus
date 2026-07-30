@@ -78,26 +78,39 @@ def crear_lote(db, **kwargs):
 
 
 class TestParsearExcel:
+    """El parser sale ahora del perfil del pagador, no de una función por EPS.
+
+    La forma que devuelve está normalizada —cuántos grupos, cuántas glosas,
+    cuántas de calidad, si exige soporte— para que el servicio de lotes deje
+    de saber cómo lee su Excel cada pagador.
+    """
+
+    @property
+    def _coosalud(self):
+        from app.services import perfiles_lote
+
+        return perfiles_lote.obtener("COOSALUD")
+
     def test_agrupa_por_factura_con_reglas_del_bot(self):
-        facturas = lotes_service.parsear_excel_coosalud(excel_bytes(), "BASE", False)
+        facturas = lotes_service.parsear_excel(self._coosalud, excel_bytes(), "BASE", False)
         assert set(facturas) == {"HUS100", "HUS200"}
-        hus100 = facturas["HUS100"]
-        assert len(hus100["grupos"]) == 2
-        assert any(g["es_soporte"] for g in hus100["grupos"])
+        assert facturas["HUS100"].grupos == 2
+        assert facturas["HUS100"].requiere_soporte
         # RE9502 (extemporánea) NO exige soporte aunque el tipo sea SOPORTES,
         # y la glosa CALIDAD queda excluida del conteo de grupos.
-        hus200 = facturas["HUS200"]
-        assert len(hus200["grupos"]) == 2
-        assert not any(g["es_soporte"] for g in hus200["grupos"])
-        assert hus200["calidad"] == 1
+        assert facturas["HUS200"].grupos == 2
+        assert not facturas["HUS200"].requiere_soporte
+        assert facturas["HUS200"].calidad == 1
 
     def test_hoja_tolerante_a_espacios(self):
-        facturas = lotes_service.parsear_excel_coosalud(excel_bytes(hoja="BASE "), "base", False)
+        facturas = lotes_service.parsear_excel(
+            self._coosalud, excel_bytes(hoja="BASE "), "base", False
+        )
         assert set(facturas) == {"HUS100", "HUS200"}
 
     def test_hoja_inexistente_lanza_valueerror(self):
         with pytest.raises(ValueError, match="no tiene la hoja"):
-            lotes_service.parsear_excel_coosalud(excel_bytes(), "OTRA", False)
+            lotes_service.parsear_excel(self._coosalud, excel_bytes(), "OTRA", False)
 
 
 class TestCrearLote:
@@ -122,8 +135,23 @@ class TestCrearLote:
         assert tarea.estado == "PENDIENTE"
 
     def test_pagador_no_soportado(self, db):
+        """SANITAS todavía no tiene bot; el mensaje dice cuáles sí."""
         with pytest.raises(ValueError, match="no soportado"):
-            crear_lote(db, pagador="SIMED")
+            crear_lote(db, pagador="SANITAS")
+
+    def test_simed_ya_es_encolable(self, db):
+        """Era el ejemplo de "no soportado" y ahora tiene perfil.
+
+        El bot del Dispensario existía en `tools/` desde hace semanas; lo que
+        faltaba era que la aplicación supiera encolarlo. Habilitarlo fue
+        agregar una ficha al registro de perfiles.
+        """
+        from app.services import perfiles_lote
+
+        assert "SIMED" in perfiles_lote.pagadores()
+        perfil = perfiles_lote.obtener("SIMED")
+        assert perfil.tarea == "RESPONDER_SIMED"
+        assert perfil.bot == "responder_glosas_simed.py"
 
     def test_excel_sin_facturas(self, db):
         with pytest.raises(ValueError, match="no tiene facturas"):

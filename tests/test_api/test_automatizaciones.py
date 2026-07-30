@@ -209,6 +209,57 @@ class TestErroresQueSeExplican:
         )
         assert r.status_code == 403
 
+    def test_un_tropiezo_interno_no_es_un_500(self, cliente, monkeypatch):
+        """Lo que vio el auditor en producción: «Error 500» pelado. Cualquier
+        excepción inesperada del motor debe volver como 400 con explicación."""
+        import dataclasses
+
+        from app.services import automatizaciones as svc
+
+        roto = dataclasses.replace(svc.obtener("objeciones-savia"), argumentos=_revienta)
+        monkeypatch.setattr(svc, "obtener", lambda _id: roto)
+
+        r = cliente.post(
+            "/automatizaciones/objeciones-savia/ejecutar",
+            files={"archivo": ("SAVIA.xlsx", _excel_savia(), "application/vnd.ms-excel")},
+            data={"opciones": "{}"},
+        )
+        assert r.status_code == 400, r.text
+        assert "inesperada" in r.json()["detail"]
+        assert "KeyError" in r.json()["detail"]
+
+    def test_un_resumen_roto_no_tumba_la_previsualizacion(self, cliente, monkeypatch):
+        """El resumen es cortesía: si no se deja calcular, el «ver qué sale»
+        igual responde qué archivos salieron."""
+        from app.services import automatizaciones as svc
+
+        def _explota(archivos):
+            raise RuntimeError("resumen roto a propósito")
+
+        monkeypatch.setattr(svc, "resumir", _explota)
+        r = cliente.post(
+            "/automatizaciones/objeciones-savia/previsualizar",
+            files={"archivo": ("SAVIA.xlsx", _excel_savia(), "application/vnd.ms-excel")},
+            data={"opciones": "{}"},
+        )
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["ok"] is True
+        assert d["archivos"]
+        assert d["resumen"] == {}
+
+    def test_nombre_de_archivo_raro_no_tumba_la_descarga(self):
+        """Un «→» o un emoji en el nombre rompía el encabezado HTTP."""
+        from app.api.routers.automatizaciones import _nombre_para_header
+
+        assert _nombre_para_header("OBJECIONES → ERP 🧾.xlsx") == "OBJECIONES _ ERP _.xlsx"
+        assert _nombre_para_header("ñandú á.xlsx") == "ñandú á.xlsx"  # latin-1 vale
+        assert _nombre_para_header("") == "archivo"
+
+
+def _revienta(entrada, salida, opciones):
+    raise KeyError("argumento que no existe")
+
 
 class TestQuedaEnAuditoria:
     def test_se_registra_quien_corrio_que(self, cliente, db_session):
@@ -249,7 +300,10 @@ class TestLaPantallaExiste:
         assert 'id="p-automatizacion"' in self._html()
 
     def test_el_panel_se_carga_al_abrir_la_pestana(self):
-        assert "if(id==='automatizacion') autoCargar();" in self._html()
+        html = self._html()
+        assert "if(id==='automatizacion')" in html and "autoCargar()" in html
+        # Y ahora también carga el tablero de bots del hospital
+        assert "botsCargar()" in html
 
     def test_la_pantalla_llama_a_los_dos_endpoints(self):
         html = self._html()
@@ -364,6 +418,14 @@ class TestVerQueSaleAntesDeCargarlo:
         assert self._previsualizar(cliente).status_code == 403
 
     def test_la_pantalla_tiene_el_boton(self):
+        """El botón EN LA FICHA, no solo la función.
+
+        La versión anterior verificaba que existiera la función
+        `autoPrevisualizar` — y pasaba mientras el botón que la llama nunca
+        llegó a la ficha (un reemplazo con escapes falló en silencio). El
+        auditor lo vio en producción: solo aparecía "Ejecutar". Ahora se exige
+        el botón dentro del generador de fichas.
+        """
         from pathlib import Path
 
         html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
@@ -371,3 +433,21 @@ class TestVerQueSaleAntesDeCargarlo:
         )
         assert "autoPrevisualizar" in html
         assert "/previsualizar" in html
+        assert "Ver qué sale" in html, "el botón de previsualizar no está en la ficha"
+        assert "auto-prev-" in html, "falta el id del botón en la ficha"
+
+    def test_la_pantalla_es_interactiva(self):
+        """Lo que el área pidió con nombre propio: arrastrar el archivo,
+        filtrar por grupo, buscar en vivo. Y el scroll, que no existía."""
+        import re
+        from pathlib import Path
+
+        html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        assert "autoSoltar" in html, "no se puede arrastrar el archivo"
+        assert "auto-chip" in html, "no hay pestañas por grupo"
+        assert "autoBuscarEnVivo" in html, "no hay búsqueda en vivo"
+        # El scroll: .panel es overflow:hidden, el área DEBE traer el suyo.
+        area = re.search(r"\.auto-area\{[^}]*\}", html).group(0)
+        assert "overflow-y:auto" in area, "la pantalla queda estática: no scrollea"

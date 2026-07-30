@@ -20,6 +20,9 @@
    - `tools/responder_glosas_coosalud.py` — portal de COOSALUD (vco.ctamedicas.com).
    - `tools/responder_glosas_simed.py` y `tools/cargar_soportes_simed.py` — SIMED (Dispensario Médico).
    - `tools/responder_glosas_dgh.py` — Dinámica Gerencial (programa de escritorio del hospital).
+   - `tools/responder_glosas_siifa.py` — **SIIFA** (Ministerio de Salud, plataforma
+     nacional, no es un portal de una EPS): a diferencia de los otros, no es un
+     bot de navegador, habla directo con la API oficial de interoperabilidad.
    - Otros: Mutual Ser, FOMAG, radicador de facturación.
 3. **Plataforma de conciliación del Dispensario** (`tools/`):
    índice de soportes → expediente por factura → motor de evidencia → hechos
@@ -27,7 +30,8 @@
 4. **Herramientas de apoyo:** armar el Word/PDF de evidencias
    (`tools/evidencias_a_word.py`, `evidencias_a_pdf.py`), notas crédito del
    Dispensario (renombrar, organizar, verificar CUV), tablero de cartera
-   (`tools/tablero_cartera.py`).
+   (`tools/tablero_cartera.py`), informe masivo de seguimientos SIIFA
+   (`tools/siifa_reporte_seguimientos.py`).
 5. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
    - `tools/adres/validar_furips.py` + `VALIDAR_FURIPS.cmd` — validador masivo
      FURIPS 1/2 contra la Circular 022/2023 + cruce con soportes (RIPS, CUV,
@@ -44,6 +48,7 @@
 
 Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 `CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`,
+`CONTEXTO_SIIFA.md`,
 `ENTREGA_MODULO_ADRES_FURIPS.md` (entrega técnica del módulo ADRES).
 
 ---
@@ -136,6 +141,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   **CONSOLIDADO_PERTINENCIA_6JULIO_FUSIONADO.xlsx** (37 facturas, 5.736
   glosas, cero sin respuesta, todas RE9901). Quedó listo el comando para
   correrlo. Se creó esta bitácora (fusionando el trabajo de dos chats).
+  Además se escribió la **documentación técnica de entrega del módulo de
+  diagnóstico del Lote V2** (`docs/diagnostico_lote_v2_pendientes/DOCUMENTACION_MODULO.md`)
+  para consolidarlo en el proyecto principal sin perder conocimiento.
+- **27-07:** se generó el **informe técnico completo** de todo el trabajo
+  realizado (bot + evidencias + mejoras + lotes): 1.075 facturas procesadas,
+  45.134+ glosas respondidas, 7 mejoras al bot, 8 lotes cerrados o en proceso.
+  Publicado como artifact para socializar ante gerencia. Se generó también el
+  cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
+  consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
+- **30-07:** **nace el proyecto SIIFA** (plataforma del Ministerio de Salud,
+  distinta de COOSALUD/SIMED/DGH — la portalidad nacional de seguimiento de
+  facturas). El auditor mostró la pantalla `Listar seguimientos` (2.579
+  registros, sin botón de exportar) y subió los manuales oficiales y la
+  documentación técnica de la API (swagger, colección Postman, manual de
+  interoperabilidad). Hallazgo clave: **SIIFA sí tiene API REST oficial** de
+  interoperabilidad (a diferencia de COOSALUD/SIMED), documentada y con
+  endpoints específicos para listar y responder glosas — así que las dos
+  herramientas nuevas hablan HTTP directo, sin navegador:
+  - `docs/CONTEXTO_SIIFA.md`: plataforma, roles (IPS/ERP/FITS), autenticación
+    JWT, catálogo de endpoints usados, y los plazos del trámite de glosa
+    (Res. 1962/2025, Ley 1438/2011 Art. 57: 15 días hábiles para responder,
+    7 para subsanar una glosa reiterada).
+  - `tools/siifa_client.py`: cliente compartido (login, paginación automática,
+    respuesta de glosas).
+  - `tools/siifa_reporte_seguimientos.py`: trae TODOS los seguimientos del HUS
+    (paginando solo) y arma el Excel masivo que pedía el auditor, con hoja de
+    resumen por EPS.
+  - `tools/responder_glosas_siifa.py`: el "bot tipo COOSALUD" pedido — lee un
+    Excel tipificado y carga cada respuesta por API, con el mismo patrón de
+    piloto/reporte CSV/`--saltar-csv` que el bot de COOSALUD.
+  - Las tres piezas se probaron de punta a punta contra un servidor SIIFA de
+    prueba (simulado, no el real) para validar el flujo completo: login →
+    paginación → export a Excel → piloto de 1 glosa → cargue masivo con un
+    error simulado → reintento sin duplicar. Todo funcionó como se diseñó.
 
 ### Julio 2026 — Frente Dispensario: respuesta masiva de glosas en SIMED
 (trabajo del chat del bot Dispensario, fusionado a esta bitácora el 23-07)
@@ -195,6 +234,84 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 | 17 de julio | 58 | 115 | $87.605.050 | Excel listo — confirmar subida |
 | Pendientes junio | 3 | 38 | $20.054.751 | Excel listo — subir YA (plazos vencidos) |
 
+### 24 de julio de 2026 — Expediente Inteligente de Conciliación (Hoja Maestra)
+- **Nueva herramienta `tools/hoja_maestra_conciliacion.py`:** arma en un solo
+  Excel el **expediente de conciliación** del Dispensario con **un único
+  registro maestro por factura** (nada duplicado). Cruza las tres bases que ya
+  existen (no transcribe ni inventa):
+  - **CARTERA** (corte 30/06/2026) como columna vertebral: 5.571 facturas, con
+    su valor, saldo, estado de glosa, edades y lo levantado/aceptado/ratificado
+    en actas.
+  - **RECEPCIÓN DE OBJECIONES** (la glosa que puso la EPS): trae el **motivo
+    exacto de la EPS** en texto (ej. *"SE RECONOCE A TARIFA SOAT... SIN
+    CONTRATO"*), el concepto, el CUPS y el servicio.
+  - **TRÁMITE DE OBJECIÓN** (nuestra respuesta): el valor objetado, el valor
+    aceptado y el **argumento del ESE HUS** (ej. *"ESE HUS NO ACEPTA GLOSA..."*).
+    Se une a la recepción por el consecutivo (4.063 de 4.066 cruzan).
+- **El libro entregado tiene 5 hojas:** `00_DASHBOARD` (tablero con 15
+  indicadores + cartera por vigencia/estado/edades), `01_MAESTRA` (una fila por
+  factura, con resultado final a color), `02_GLOSAS` (una fila por glosa con el
+  **motivo de la EPS y nuestra respuesta lado a lado**), `03_ACTAS` (una fila
+  por factura+acta) y `04_CRUCES` (los 11 controles de consistencia).
+- **Cifras que cuadran con lo ya verificado:** glosado $7.000.506.193; aceptado
+  por IPS $1.122.029.872; **levantado a favor del HUS $707.499.754**;
+  **ratificado (pdte. conciliar) $980.141.374**; saldo pendiente DGH
+  $13.621.817.613. Total: 5.571 facturas (3.935 con glosa), 18.378 glosas (179
+  aún sin respuesta). Se excluye el acta AC000639 por ser **duplicada** de la
+  SINAC 720.
+- **Lo que ninguna base trae queda marcado PENDIENTE** (no en blanco): la
+  bandera de factura electrónica (CUFE), la normatividad citada por respuesta,
+  el valor pagado real, y las **raíces exactas Y:/X:** de los soportes (por
+  ahora se deja la ruta derivada por mes AAAAMM + la de factura electrónica
+  `\\172.16.32.83\factura_electronica_net22\AAAAMM`). Con pruebas.
+
+### 27 de julio de 2026 — Acta de conciliación de las 147 facturas (formato SINAC)
+- **Cambio de enfoque pedido por el auditor.** El expediente del 24-jul cubría
+  las 5.571 facturas de toda la cartera. El auditor lo devolvió: *"el universo
+  de trabajo son únicamente las 147 facturas que actualmente están pendientes
+  por conciliar"*. Ahora todo gira alrededor de esas 147.
+- **Identificación del universo (antes de construir nada).** Las 147 salen del
+  `HUS.xlsx` que envió el Dispensario (el mismo lote del `CONCILIACION.xlsx`):
+  **147 facturas / 444 glosas**. Se cruzaron contra el estado de cartera: **146
+  de 147 cruzan**; la única que no aparece en cartera es **HUS0000443525**. El
+  estado de glosa de las 147 confirma que todas están pendientes (98
+  ratificadas pdte. conciliar, 25 parte levantada/parte ratificada, 23 en
+  trámite DGH). Se entregó el listado `LISTADO_147_PARA_APROBAR.xlsx` para
+  revisión previa.
+- **Nueva herramienta `tools/generar_acta_conciliacion_dispensario.py`:** arma
+  el acta **sobre el archivo real del ACTA SINAC N.º 720** (no una imitación):
+  conserva logos, encabezado oficial, celdas combinadas, zona de firmas y
+  macros. Solo cambia el contenido. La tabla se expande de 11 a **444 filas**
+  sin romper el formato.
+- **Lo que quedó en el acta:** una fila por glosa, **agrupadas por factura** y
+  ordenadas de mayor a menor valor glosado (al abrir una factura se ven todas
+  sus glosas seguidas — la HUS0000452150 con sus 62). Cada fila trae el
+  **motivo exacto de la EPS** y, al lado, **nuestra respuesta completa**, más
+  código, tipificación, valores, fechas, radicados, resultado en actas
+  previas, rutas de soportes y de factura electrónica (con hipervínculo).
+- **Hoja DASHBOARD** (la primera del libro) con los 12 indicadores pedidos,
+  todos como **fórmulas vivas**: al diligenciar la mesa el tablero se
+  actualiza solo.
+- **Cifras verificadas:** 147 facturas · 444 glosas · facturado
+  **$1.267.976.805** (sin duplicar por factura) · glosado y pendiente por
+  conciliar **$317.640.524** · aceptado en trámite **$1.758.956** ·
+  recuperable **$315.881.568**. 471 fórmulas, **0 errores**.
+- **Columnas completadas con el estado de cartera** (a solicitud del auditor):
+  *VALOR ACEPTADO EN TRÁMITE* (8 facturas, $1.758.956), *CENTRO DE COSTO*
+  (444 de 444 líneas, del export de recepción) y *ABOGADO ASIGNADO* (115
+  facturas). La *CUENTA CONTABLE* quedó en **PENDIENTE**: no existe en
+  ninguna base disponible (ni en el acta 720 original).
+- **Tres hallazgos para llevar a la mesa:** (1) la entidad **no ha confirmado
+  el recibo de ninguna de las 444 respuestas**, aunque todas tienen radicado
+  de entrega; (2) **29 facturas** tienen diferencia entre el valor glosado del
+  lote y el de la cartera; (3) el lote dice que **no aceptamos nada** (RE9901)
+  pero la cartera registra **$1.758.956 aceptados** en 8 facturas — hay que
+  aclararlo antes de firmar.
+- **Documentación de entrega:** `docs/MODULO_CONCILIACION_DISPENSARIO.md`, con
+  todo el módulo (objetivo, arquitectura, funciones, flujo, riesgos,
+  pendientes y cómo fusionarlo al proyecto principal).
+
+---
 ### Julio 2026 — Frente ADRES/FURIPS (chat "VALIDADOR ADRES", PR #173-#176)
 - **17-07:** nace el **bot validador FURIPS**: valida masivamente los TXT
   FURIPS 1 y 2 contra la Circular 022 de 2023 de la ADRES (102 + 9 campos,
@@ -799,6 +916,127 @@ free -m | head -2
 '
 ```
 
+### 29-07 (segunda parte) — El contrato correcto, en todas las pantallas
+
+Sprint de construcción del día (varios PR fusionados en cadena):
+
+- **Al analizar una glosa, manda la fecha del hecho.** El dictamen cita el
+  contrato que regía el día de la atención, no el de hoy. Si ese día no regía
+  ninguno (ej.: COMPENSAR después del 3 de abril de 2026), la IA recibe la
+  alerta y defiende a tarifa SOAT plena en vez de citar un contrato muerto.
+- **Cada análisis deja constancia en el expediente.** En la línea de tiempo de
+  la glosa queda escrito qué contrato se usó, si estaba vigente ese día y con
+  qué factor, en una frase clara y con color según el veredicto: verde
+  (vigente), ámbar (sin contrato ese día), rojo (pagador fuera de la malla).
+  Cuando la EPS discuta la tarifa meses después, la respuesta está escrita en
+  el expediente, no en la memoria de nadie.
+- **El asistente del chat ya consulta la malla.** Preguntas como «¿qué
+  contrato de COMPENSAR regía en septiembre?» se responden con la malla
+  oficial, y el asistente tiene prohibido citar un contrato sin verificar
+  primero que regía el día del hecho.
+- Pantallas nuevas de los días previos, ya fusionadas y desplegadas:
+  **Contratos** (malla completa con buscador, filtros de un clic y semáforo de
+  vencimientos, más el buscador de material de osteosíntesis con la defensa
+  lista para pegar) y **Automatización** (robots de cartera desde el
+  navegador, arrastrando el archivo).
+
+### 29-07 (tercera parte) — Épica: el Expediente Inteligente
+
+- **Pantalla nueva «Expediente»** en el menú: se busca por ID de glosa o por
+  factura y aparece TODO en un solo lugar — la ficha, el contrato que rige
+  con su color (verde/ámbar/rojo), las conciliaciones, los soportes y la
+  línea de tiempo completa con filtros de un clic. El popup viejo de
+  timeline (ventana aparte) se eliminó: el botón 📜 ahora entra acá.
+- **El acta de la mesa se cuadra sola.** En la pantalla Conciliación se sube
+  el mismo Excel que se diligencia en la audiencia (el de las 147 del
+  Dispensario, por ejemplo) y el sistema: dice qué no cuadra (fila por
+  fila), devuelve el libro optimizado con el resultado de cada línea y una
+  hoja REVISION, y arma el acta lista para imprimir y firmar con la cláusula
+  de mérito ejecutivo y las firmas leídas del propio libro. Probado con el
+  acta real: 444 líneas, 147 facturas, $317.640.524 glosados y los
+  $11.836.399 levantados, cuadre exacto.
+- **La IA ya consulta expedientes**: en el chat se puede preguntar «¿qué ha
+  pasado con la factura HUS…?» y responde con la misma información de la
+  pantalla. Cada uso del acta queda registrado en la auditoría del sistema.
+- Guía corta en `docs/EXPEDIENTE_INTELIGENTE.md`.
+
+### 29-07 (cuarta parte) — Épica: el Centro de Inteligencia + arreglo de producción
+
+- **El sistema ahora dice qué hacer hoy.** Nueva primera opción del menú:
+  **Inteligencia**. Barre toda la operación —glosas vencidas y por vencer
+  con su plata, contratos caídos o por caer, análisis defendidos sin
+  contrato, audiencias encima sin acta, actas a medio cuadrar— y entrega
+  la lista de acciones ordenada por urgencia y valor, cada una con el
+  botón que lleva a la pantalla donde se resuelve. El número rojo del
+  menú (frentes urgentes) se actualiza solo.
+- **La IA pasó de asistente a directora**: al preguntarle «¿qué hago
+  hoy?» corre el mismo barrido y dirige — empieza por lo rojo, dice la
+  plata en juego y qué abrir primero.
+- **Se arregló la causa raíz del «Error 500» de Automatización en el
+  servidor**: la imagen de producción no llevaba la carpeta de
+  herramientas (regla vieja del empaque). Quedó la lista blanca, una
+  guardia en la suite para que no vuelva a pasar, y además ningún robot
+  vuelve a contestar «Error 500» pelado: ahora explican qué pasó.
+- Guía corta en `docs/CENTRO_INTELIGENCIA.md`.
+
+### 29-07 (quinta parte) — Épica: el Centro Documental
+
+- **La carpeta de cada expediente se arma sola.** Dentro de la pantalla
+  Expediente aparece «📁 Centro Documental»: el PDF radicable del
+  dictamen, el dictamen en texto, el historial de versiones, el acta de
+  cada mesa de conciliación, el paquete de evidencia para jurídica y los
+  soportes de la factura que el indexador encontró en el share — cada
+  uno con su botón de descarga o su ruta. Se acabó buscar «todo lo de
+  esta factura» a mano.
+- Los soportes del share NO se sirven por la web (son historia clínica):
+  se muestra la ruta para abrirlos desde el equipo del hospital, como
+  siempre.
+- La misma carpeta la entrega la API y el chat IA («¿qué documentos hay
+  de la factura…?»). Guía corta en `docs/CENTRO_DOCUMENTAL.md`.
+
+### 29-07 (sexta parte) — Épica: el Motor Universal
+
+- **Un perfil único por pagador.** En la pantalla Contratos, al expandir
+  cualquier pagador aparece «El sistema con este pagador»: si el análisis
+  cita su contrato por fecha, si hay respuesta masiva por lotes y con qué
+  bot, qué conversores de Automatización le aplican y si hay contacto de
+  radicación. Lo mismo responde el chat («¿qué se puede hacer con
+  COOSALUD?») y la API.
+- **La regla que queda sellada**: agregar un pagador o una capacidad
+  nunca vuelve a ser tocar código repartido — es agregar una ficha en el
+  registro que corresponde (malla, perfil de lote o catálogo de
+  automatización) y el perfil la muestra solo en las tres superficies.
+- Guía corta en `docs/MOTOR_UNIVERSAL.md`.
+
+### 30-07 — Todos los bots del hospital, administrados desde la plataforma
+
+- **Se acabó el doble clic a ciegas.** El Centro de Automatización ahora
+  muestra los **35 bots del hospital** (COOSALUD, SIMED, FOMAG, MUTUAL SER,
+  DGH, ADRES, NUEVA EPS, radicador, notas crédito, PDFs, informes…) con su
+  estado en vivo: disponible, en cola, corriendo (con avance y en qué
+  equipo), o en error (con el motivo). Cada tarjeta trae Ejecutar,
+  Cancelar, Reintentar, Historial, Ver registros y Configurar.
+- **Cola universal**: «Ejecutar» encola el trabajo; el **agente de bots**
+  del PC del HUS (doble clic en `AGENTE_BOTS.cmd`, usa la misma URL y
+  token del agente de lotes) lo reclama, lo corre y reporta — la tarjeta
+  se actualiza sola. El agente no conoce ningún bot por nombre: el
+  comando viaja desde el catálogo.
+- Quién pidió qué bot, en qué equipo corrió, cuánto tardó y por qué falló:
+  todo queda en la auditoría y en el historial de cada tarjeta.
+
+### 29-07 (séptima parte) — Épica: el Constructor de Agentes
+
+- **El sistema ya arma sus propios agentes.** Menú → Herramientas →
+  **Agentes**: se escribe la misión, las instrucciones y se marcan las
+  herramientas permitidas — y el agente queda corriendo con todo lo que
+  el sistema sabe (expediente, malla, diagnóstico, soportes), pero SOLO
+  dentro de su misión y sus herramientas. Sin programar nada.
+- Dos plantillas de fábrica para arrancar con un clic: **Vigilante de
+  vencimientos** y **Preparador de mesa**.
+- Cada construcción, corrida y retiro queda en la auditoría (quién, qué
+  agente, qué preguntó, qué herramientas usó).
+- Guía corta en `docs/CONSTRUCTOR_AGENTES.md`.
+
 ### 30-07 — Pre-auditoría: una sola observación, corregible aunque el oficio ya exista
 
 **1. La pantalla explica qué pasa con cada devuelta (PR #232).** El caso de las
@@ -827,6 +1065,24 @@ estaban) y cada corrección queda en el historial con quién la hizo y cuándo.
 ---
 
 ## 3) PENDIENTE
+
+### Conciliación Dispensario (147 facturas objeto de mesa)
+
+1. **Revisar y aprobar el listado de las 147** (`LISTADO_147_PARA_APROBAR.xlsx`)
+   y decidir qué se hace con **HUS0000443525**, que está en el lote de glosas
+   pero **no aparece en el estado de cartera**: ¿se incluye (147) o se excluye
+   (146)? Hoy está incluida.
+2. **Aclarar la discrepancia del aceptado:** el lote dice $0 (RE9901) pero la
+   cartera registra **$1.758.956** aceptados en 8 facturas. Debe resolverse
+   antes de firmar el acta.
+3. **Revisar las 29 facturas con diferencia** entre el valor glosado del lote y
+   el de la cartera.
+4. **Confirmar las raíces exactas `Y:` / `X:`** de los soportes para cerrar la
+   columna de ubicación (hoy queda la ruta derivada por mes + PENDIENTE).
+5. **Conseguir la CUENTA CONTABLE** con contabilidad/DGH: es el único campo del
+   acta que no existe en ninguna base disponible.
+6. Plantear en la mesa que la entidad **no ha confirmado el recibo de ninguna
+   de las 444 respuestas**, pese a que todas tienen radicado de entrega.
 
 ### Pre-auditoría
 0. **~~La lentitud de la página~~ — DIAGNOSTICADA Y ARREGLADA el 29-07**
@@ -938,6 +1194,20 @@ estaban) y cada corrección queda en el historial con quién la hizo y cuándo.
     oficio) para que las estadísticas y el control de 3 devoluciones
     arranquen con la historia real.
 
+### SIIFA (nuevo, ver `docs/CONTEXTO_SIIFA.md`)
+11. **Confirmar la URL del servicio de Auth** (`SIIFA_AUTH_URL`) — no está en
+    los manuales que tenemos, el script trae una hipótesis
+    (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
+    mesa de ayuda SIIFA / soporte MinSalud.
+12. **Primera corrida real** de `tools/siifa_reporte_seguimientos.py` (sin
+    filtros) para tener el Excel maestro de los 2.579 seguimientos y
+    verificar que las columnas coincidan con lo que el auditor espera.
+13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
+    una sola glosa antes de cualquier cargue masivo (regla del repo).
+14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
+    falta automatizar también la subsanación (`ReiteracionRespuesta`) desde
+    el arranque, o si eso se deja para cuando llegue el primer lote real.
+
 ## 4) PARA MAÑANA
 
 1. **Dispensario prioridad 1:** subir a SIMED el Excel de las 3 facturas de
@@ -986,6 +1256,12 @@ estaban) y cada corrección queda en el historial con quién la hizo y cuándo.
 12. **Siguiente paso de construcción**, según el plan: terminar la limpieza de
     módulos sin uso y arrancar la **Fase 2 — modelo real del dominio**
     (Factura → Glosa → Soporte → Conciliación → Acta).
+13. **Preguntar a contratación por las prórrogas.** Según la malla del 28-07,
+    los contratos de COMPENSAR y COOSALUD subsidiado ya vencieron y los de
+    NUEVA EPS y SALUD MIA están al límite. Si hay prórroga u otrosí firmado,
+    avisar para actualizar la malla del sistema; mientras tanto, el sistema
+    defiende esas atenciones a tarifa SOAT plena, que es lo correcto sin
+    contrato vigente.
 
 ### Contrato de Construcción — decisiones que dependen de Yesid (28-07 noche)
 

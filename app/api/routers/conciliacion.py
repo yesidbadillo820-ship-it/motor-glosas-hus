@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -607,3 +607,178 @@ def pdf_acta_sinac(
 
 </body></html>"""
     return HTMLResponse(content=html)
+
+
+# ─── El acta que se trabaja en Excel: revisar, optimizar e imprimir ──────
+# La mesa diligencia un Excel (formato ACTA SINAC). Estos tres endpoints lo
+# reciben tal cual: «revisar» dice qué no cuadra, «optimizar» devuelve el
+# mismo libro con resultado por línea + hoja REVISION + indicadores, y
+# «pdf» arma el acta firmable. Lo escrito por el auditor nunca se toca.
+
+_MAX_BYTES_ACTA = 30_000_000
+
+
+async def _leer_upload_acta(archivo: UploadFile) -> tuple[bytes, bool]:
+    nombre = (archivo.filename or "").lower()
+    if not nombre.endswith((".xlsm", ".xlsx")):
+        raise HTTPException(400, "El acta debe ser el Excel de la mesa (.xlsm o .xlsx)")
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(400, "El archivo llegó vacío")
+    if len(contenido) > _MAX_BYTES_ACTA:
+        raise HTTPException(413, "El archivo supera los 30 MB")
+    return contenido, nombre.endswith(".xlsm")
+
+
+def _acta_o_400(contenido: bytes):
+    from app.services import acta_conciliacion_excel as acta_x
+
+    try:
+        return acta_x.leer_acta(contenido)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, "No se pudo leer el Excel: ¿es el formato del acta de la mesa?")
+
+
+@router.post("/acta-excel/revisar")
+async def acta_excel_revisar(
+    archivo: UploadFile = File(...),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Cuadra el acta sin producir archivos: qué reparte de más, qué
+    pendiente no coincide, qué línea quedó conciliada sin texto. Es el
+    «ver qué sale» antes de descargar nada."""
+    from app.services import acta_conciliacion_excel as acta_x
+
+    contenido, _ = await _leer_upload_acta(archivo)
+    acta = _acta_o_400(contenido)
+    resumen = acta_x.revisar(acta)
+    return {
+        "entidad": acta.razon_social,
+        "nit": acta.nit,
+        "periodo": acta.periodo,
+        **resumen,
+        # Los primeros hallazgos alcanzan para saber por dónde empezar;
+        # el detalle completo va en la hoja REVISION del Excel optimizado.
+        "hallazgos": resumen["hallazgos"][:60],
+    }
+
+
+@router.post("/acta-excel/optimizar")
+async def acta_excel_optimizar(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Devuelve el MISMO libro (macros, logos y hojas intactas) con el
+    resultado de cada línea, la hoja REVISION con los hallazgos y los
+    indicadores recalculados."""
+    import io as _io
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services import acta_conciliacion_excel as acta_x
+
+    contenido, es_xlsm = await _leer_upload_acta(archivo)
+    _acta_o_400(contenido)  # valida formato antes de trabajar
+    try:
+        salida, resumen = acta_x.optimizar(contenido, es_xlsm=es_xlsm)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "No se pudo optimizar el acta: revisar el formato del libro.")
+
+    # Expediente: queda constancia de quién pasó el acta y cómo cuadró.
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="ACTA_EXCEL_OPTIMIZADA",
+            tabla="conciliaciones",
+            campo="LISTA" if resumen["lista_para_firmar"] else "CON_HALLAZGOS",
+            valor_nuevo=(archivo.filename or "acta")[:200],
+            detalle=_json.dumps(
+                {
+                    "resumen": {
+                        "facturas": resumen["facturas"],
+                        "lineas": resumen["lineas"],
+                        "glosado": resumen["glosado"],
+                        "levanta_entidad": resumen["levanta_entidad"],
+                        "ratificado": resumen["ratificado"],
+                        "pendiente": resumen["pendiente_calculado"],
+                        "hallazgos": len(resumen["hallazgos"]),
+                    }
+                },
+                ensure_ascii=False,
+            )[:1900],
+        )
+        db.commit()
+    except Exception:
+        pass
+
+    ext = "xlsm" if es_xlsm else "xlsx"
+    media = (
+        "application/vnd.ms-excel.sheet.macroEnabled.12"
+        if es_xlsm
+        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    from app.api.routers.automatizaciones import _nombre_para_header
+
+    base = _nombre_para_header((archivo.filename or "acta").rsplit(".", 1)[0][:80])
+    return StreamingResponse(
+        _io.BytesIO(salida),
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="{base}_OPTIMIZADA.{ext}"',
+            "X-Hallazgos": str(len(resumen["hallazgos"])),
+            "X-Lista-Para-Firmar": "1" if resumen["lista_para_firmar"] else "0",
+        },
+    )
+
+
+@router.post("/acta-excel/pdf")
+async def acta_excel_pdf(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """El acta firmable, armada desde el Excel de la mesa: encabezado de la
+    entidad, las líneas con su resultado, totales, cláusula de mérito
+    ejecutivo y las firmas leídas del propio libro. El navegador la imprime
+    a PDF con Ctrl+P."""
+    import json as _json
+
+    from fastapi.responses import HTMLResponse
+
+    from app.services import acta_conciliacion_excel as acta_x
+
+    contenido, _ = await _leer_upload_acta(archivo)
+    acta = _acta_o_400(contenido)
+    resumen = acta_x.revisar(acta)
+    html_impreso = acta_x.html_acta(acta, resumen)
+
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="ACTA_EXCEL_PDF",
+            tabla="conciliaciones",
+            campo="LISTA" if resumen["lista_para_firmar"] else "CON_HALLAZGOS",
+            valor_nuevo=(archivo.filename or "acta")[:200],
+            detalle=_json.dumps(
+                {
+                    "entidad": acta.razon_social,
+                    "facturas": resumen["facturas"],
+                    "glosado": resumen["glosado"],
+                    "hallazgos": len(resumen["hallazgos"]),
+                },
+                ensure_ascii=False,
+            )[:1900],
+        )
+        db.commit()
+    except Exception:
+        pass
+
+    return HTMLResponse(content=html_impreso)

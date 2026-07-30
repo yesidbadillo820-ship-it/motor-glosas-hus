@@ -1319,3 +1319,50 @@ class TareaLoteRecord(Base):
     terminada_en = Column(DateTime(timezone=True), nullable=True)
     error = Column(Text, nullable=True)
     resultado = Column(Text, nullable=True)  # JSON: resumen que reportó el agente
+
+
+class AgenteRecord(Base):
+    """Constructor de Agentes: un agente es una FICHA, no código.
+
+    Nombre, misión, instrucciones propias y la lista de herramientas del
+    asistente que tiene permitidas. El runner es el mismo del asistente
+    maestro con esa ficha encima — crear un agente nuevo no toca código.
+    """
+
+    __tablename__ = "agentes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(120), nullable=False)
+    mision = Column(Text, nullable=False)
+    instrucciones = Column(Text)
+    herramientas = Column(Text)  # JSON: nombres de tools permitidas
+    creado_por = Column(String(200))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    activo = Column(Integer, default=1, index=True)
+
+
+class TrabajoBotRecord(Base):
+    """Cola universal de trabajos para los bots del PC del HUS.
+
+    La plataforma encola (quién pidió qué bot con qué parámetros); el
+    agente del PC reclama, corre y reporta. Es la generalización de
+    TareaLoteRecord para TODOS los bots, no solo los de lotes.
+    """
+
+    __tablename__ = "trabajos_bot"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bot_id = Column(String(80), index=True, nullable=False)
+    estado = Column(
+        String(30), default="PENDIENTE", index=True
+    )  # PENDIENTE/RECLAMADO/TERMINADO/ERROR
+    parametros = Column(Text)  # JSON con lo que el auditor escribió
+    pedido_por = Column(String(200))
+    equipo = Column(String(200))  # hostname del PC que lo reclamó
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    reclamado_en = Column(DateTime(timezone=True))
+    terminado_en = Column(DateTime(timezone=True))
+    error = Column(Text)
+    registro = Column(Text)  # salida/resumen que reportó el agente
+    progreso = Column(Text)  # último avance reportado ("factura 12 de 40…")
+    cancelado_por = Column(String(200))

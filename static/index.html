@@ -1369,15 +1369,87 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
    vencida. El color se usa en la tarjeta del tablero, en los chips de la
    tabla y en el borde izquierdo de cada fila, para que la prioridad se lea
    sin tener que leer. */
+/* ── Material de osteosíntesis ──────────────────────────────────────── */
+.maos-buscador{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.9rem 1rem;display:flex;flex-direction:column;gap:.4rem}
+.maos-lbl{font-size:.86rem;font-weight:650}
+.maos-fila{display:flex;gap:.5rem;flex-wrap:wrap}
+.maos-fila input{flex:1;min-width:220px;padding:.45rem .6rem;border:1px solid var(--border);border-radius:var(--r-sm);background:transparent;color:inherit;font-size:.86rem}
+.maos-nota{color:var(--text-3);font-size:.74rem}
+.maos-cargando,.maos-nada{padding:.7rem 0;color:var(--text-3);font-size:.84rem}
+.maos-tbl{margin-top:.6rem}
+.maos-precio{font-weight:650;white-space:nowrap}
+.maos-defensa{margin-top:.7rem;background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.7rem .85rem}
+.maos-defensa-t{font-size:.78rem;font-weight:650;color:var(--text-2);margin-bottom:.35rem}
+.maos-defensa p{margin:0 0 .5rem;font-size:.82rem;line-height:1.55;text-align:justify}
+
+/* ── Malla contractual ──────────────────────────────────────────────── */
+/* .panel es overflow:hidden (lo exige el layout del shell): cada pantalla
+   trae su PROPIO scroll. Sin estas tres propiedades el área quedaba estática
+   y lo que no cabía en la ventana no existía para el usuario. */
+.malla-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.malla-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+.malla-titulo{margin:0;font-size:1.15rem;font-weight:700}
+.malla-sub{margin:.3rem 0 0;color:var(--text-2);font-size:.88rem}
+.malla-buscar{display:flex;align-items:center;gap:.45rem;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;padding:.4rem .8rem;min-width:280px;transition:border-color .15s}
+.malla-buscar:focus-within{border-color:var(--c-teal2)}
+.malla-buscar input{border:0;background:transparent;color:inherit;font-size:.86rem;outline:none;flex:1}
+.malla-buscar .i{width:15px;height:15px;stroke:var(--text-3);fill:none;stroke-width:2}
+.malla-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem}
+/* Las tarjetas son FILTROS: clic para ver solo ese grupo, clic de nuevo para
+   soltar. El estado activo se nota sin leer nada. */
+.malla-card{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--m-color,var(--border));border-radius:var(--r-lg);padding:.8rem .95rem;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:transform .12s,box-shadow .12s,border-color .12s}
+.malla-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.08);border-color:var(--m-color)}
+.malla-card.activa{border-color:var(--m-color);box-shadow:0 0 0 2px var(--m-color) inset;transform:translateY(-2px)}
+.malla-card-n{font-size:1.7rem;font-weight:700;line-height:1;color:var(--m-color,inherit)}
+.malla-card-t{font-size:.86rem;font-weight:600;margin-top:.25rem}
+.malla-card-nota{font-size:.74rem;color:var(--text-3);margin-top:.15rem;line-height:1.35}
+.malla-grupo{margin:1.2rem 0 .2rem;font-size:.92rem;font-weight:650;color:var(--m-color,inherit)}
+.malla-grupo-nota{margin:0 0 .5rem;font-size:.8rem;color:var(--text-3);line-height:1.45}
+/* Filas expandibles: la cabecera dice lo esencial; el clic abre el detalle. */
+.malla-filas{display:flex;flex-direction:column;gap:.45rem}
+.malla-fila{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;transition:border-color .12s}
+.malla-fila:hover{border-color:var(--c-teal2)}
+.malla-fila-cab{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(150px,1fr) auto 18px;gap:.8rem;align-items:center;padding:.65rem .9rem}
+.malla-fila-quien{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.malla-fila-quien b{font-size:.9rem}
+.malla-fila-quien small{color:var(--text-3);font-size:.74rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.malla-fila-vig{font-size:.8rem;color:var(--text-2);white-space:nowrap}
+.malla-pill{justify-self:end;font-size:.74rem;font-weight:650;color:var(--m-color);background:color-mix(in srgb,var(--m-color) 12%,transparent);border-radius:999px;padding:.22rem .6rem;white-space:nowrap}
+.malla-flecha{width:16px;height:16px;stroke:var(--text-3);fill:none;stroke-width:2;transition:transform .18s}
+.malla-fila.abierta .malla-flecha{transform:rotate(180deg)}
+.malla-fila-det{display:none;border-top:1px dashed var(--border);padding:.7rem .95rem;cursor:default;animation:fade-in .18s var(--ease)}
+.malla-fila.abierta .malla-fila-det{display:flex;flex-direction:column;gap:.5rem}
+.malla-det-g{font-size:.82rem;line-height:1.5}
+.malla-det-g>span{display:block;font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:.1rem}
+.malla-det-excl em{display:inline-block;font-style:normal;background:color-mix(in srgb,var(--c-rojo,#dc2626) 10%,transparent);color:var(--c-rojo,#dc2626);border-radius:var(--r-sm);padding:.15rem .5rem;margin:.15rem .3rem .15rem 0;font-size:.76rem}
+.malla-factor{margin-left:.4rem;font-size:.76rem;color:var(--c-teal2)}
+.malla-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
+@media (max-width:760px){.malla-fila-cab{grid-template-columns:1fr auto 18px}.malla-fila-vig{display:none}}
+.m-rojo{--m-color:var(--c-rojo,#dc2626)}
+.m-amarillo{--m-color:var(--c-amarillo,#d97706)}
+.m-verde{--m-color:var(--c-verde,#16a34a)}
+.m-gris{--m-color:var(--text-3)}
+
 /* ── Centro de Automatización ───────────────────────────────────────── */
-.auto-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
+.auto-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
 .auto-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .auto-titulo{margin:0;font-size:1.15rem;font-weight:700}
 .auto-sub{margin:.3rem 0 0;color:var(--text-2);font-size:.88rem;max-width:62ch}
-.auto-grupo{margin:.6rem 0 .1rem;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2)}
-.auto-fichas{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:.9rem}
-.auto-ficha{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.95rem 1rem;display:flex;flex-direction:column;gap:.55rem}
-.auto-ficha:hover{border-color:var(--c-teal2)}
+/* Lista VERTICAL: una herramienta por fila, a lo ancho. La cuadrícula
+   anterior dejaba filas cojas (4 tarjetas, luego 1 sola) y alturas
+   disparejas; en columna todo queda alineado y se lee de arriba abajo. */
+.auto-grupo{margin:.6rem 0 .1rem;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);max-width:980px;border-bottom:1px solid var(--border);padding-bottom:.35rem}
+.auto-fichas{display:flex;flex-direction:column;gap:.85rem;max-width:980px}
+.auto-ficha{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.15rem;display:flex;gap:1.35rem;align-items:stretch}
+.auto-ficha:hover{border-color:var(--c-teal2);box-shadow:0 1px 6px color-mix(in srgb,var(--c-teal2) 12%,transparent)}
+/* Dos zonas: a la izquierda qué es y para qué sirve; a la derecha el
+   archivo, las opciones y los botones. */
+.auto-ficha-info{flex:1 1 44%;min-width:0;display:flex;flex-direction:column;gap:.45rem}
+.auto-ficha-accion{flex:1 1 56%;min-width:0;display:flex;flex-direction:column;gap:.55rem;border-left:1px solid var(--border);padding-left:1.35rem;justify-content:center}
+@media(max-width:860px){
+  .auto-ficha{flex-direction:column;gap:.6rem}
+  .auto-ficha-accion{border-left:0;padding-left:0}
+}
 .auto-ficha-nombre{font-weight:650;font-size:.95rem;line-height:1.3}
 .auto-ficha-que{font-size:.84rem;color:var(--text-2);line-height:1.45}
 .auto-ficha-cuando{font-size:.8rem;color:var(--text-3);font-style:italic;line-height:1.4}
@@ -1386,9 +1458,31 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .auto-param span{color:var(--text-2);font-weight:550}
 .auto-param input{padding:.4rem .55rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input,transparent);color:inherit;font-size:.85rem}
 .auto-param small{color:var(--text-3);font-size:.74rem;line-height:1.35}
-.auto-archivo{display:flex;flex-direction:column;gap:.25rem;margin-top:.2rem}
-.auto-archivo input[type=file]{font-size:.8rem}
-.auto-archivo small{color:var(--text-3);font-size:.74rem}
+/* Pestañas por grupo + búsqueda: con 7 herramientas ordenan, con 30 salvan. */
+.auto-chips{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin-bottom:.4rem}
+.auto-chip{border:1px solid var(--border);background:var(--bg-card);color:inherit;font:inherit;font-size:.8rem;font-weight:550;border-radius:999px;padding:.32rem .8rem;cursor:pointer;transition:all .12s}
+.auto-chip:hover{border-color:var(--c-teal2)}
+.auto-chip.activo{background:var(--c-teal2);border-color:var(--c-teal2);color:#fff}
+.auto-chip span{opacity:.65;font-weight:400;margin-left:.15rem}
+.auto-buscar{display:flex;align-items:center;gap:.4rem;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;padding:.32rem .7rem;margin-left:auto;min-width:200px;transition:border-color .15s}
+.auto-buscar:focus-within{border-color:var(--c-teal2)}
+.auto-buscar input{border:0;background:transparent;color:inherit;font-size:.82rem;outline:none;flex:1}
+.auto-buscar .i{width:14px;height:14px;stroke:var(--text-3);fill:none;stroke-width:2}
+/* La zona de arrastre reemplaza al input de archivo nativo: se ve qué se
+   eligió, cuánto pesa, y se puede soltar el archivo encima. */
+.auto-drop{display:flex;align-items:center;gap:.7rem;border:1.5px dashed var(--border);border-radius:var(--r-lg);padding:.7rem .85rem;cursor:pointer;transition:all .15s;margin-top:.2rem}
+.auto-drop:hover{border-color:var(--c-teal2);background:color-mix(in srgb,var(--c-teal2) 4%,transparent)}
+.auto-drop.sobre{border-color:var(--c-teal2);border-style:solid;background:color-mix(in srgb,var(--c-teal2) 9%,transparent);transform:scale(1.01)}
+.auto-drop.con-archivo{border-style:solid;border-color:var(--c-verde,#16a34a)}
+.auto-drop .i{width:20px;height:20px;stroke:var(--text-3);fill:none;stroke-width:1.8;flex-shrink:0}
+.auto-drop.con-archivo .i{stroke:var(--c-verde,#16a34a)}
+.auto-drop-txt{font-size:.82rem;line-height:1.35;min-width:0}
+.auto-drop-txt b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.auto-drop-txt small{display:block;color:var(--text-3);font-size:.72rem;margin-top:.1rem}
+.auto-opciones{margin-top:.1rem}
+.auto-opciones summary{font-size:.78rem;color:var(--text-2);cursor:pointer;user-select:none;padding:.15rem 0}
+.auto-opciones summary:hover{color:var(--c-teal2)}
+.auto-opciones[open] summary{margin-bottom:.35rem}
 .auto-estado{font-size:.82rem;min-height:1.1em;line-height:1.4}
 .auto-ok{color:var(--c-verde,#16a34a)}
 .auto-error{color:var(--c-rojo,#dc2626)}
@@ -1397,7 +1491,44 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .auto-resumen{background:var(--bg-2,rgba(20,184,166,.07));border-left:3px solid var(--c-teal2);border-radius:var(--r-sm);padding:.55rem .7rem;font-size:.84rem;line-height:1.5}
 .auto-resumen small{display:block;margin-top:.3rem;color:var(--text-3);font-size:.75rem}
 .auto-vacio{padding:2rem 1rem;text-align:center;color:var(--text-3);font-size:.9rem}
-.venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem}
+/* Centro de Inteligencia: la lista de qué hacer hoy, por prioridad. */
+.intel-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.intel-resumen{display:flex;gap:.7rem;flex-wrap:wrap;max-width:980px}
+.intel-kpi{flex:1 1 180px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.8rem 1rem}
+.intel-kpi b{display:block;font-size:1.35rem;font-weight:750}
+.intel-kpi span{font-size:.75rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em}
+.intel-acciones{display:flex;flex-direction:column;gap:.7rem;max-width:980px}
+.intel-card{display:flex;gap:1rem;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--intel-c,#94a3b8);border-radius:var(--r-lg);padding:.85rem 1rem}
+.intel-card .ico{font-size:1.3rem;line-height:1;margin-top:.1rem}
+.intel-card .cuerpo{flex:1;min-width:0}
+.intel-card .titulo{font-weight:650;font-size:.93rem;line-height:1.35}
+.intel-card .porque{font-size:.83rem;color:var(--text-2);line-height:1.45;margin-top:.25rem}
+.intel-card .plata{font-size:.8rem;font-weight:700;margin-top:.3rem;color:var(--intel-c,#94a3b8)}
+.intel-card .btn{flex-shrink:0;align-self:center}
+/* Expediente: la historia completa de una glosa como pantalla de primera
+   clase (antes era un popup aparte). Misma receta de scroll que las demás. */
+.exp-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.exp-ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.15rem;max-width:980px}
+.exp-dato{min-width:0}
+.exp-dato b{display:block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:.15rem;font-weight:600}
+.exp-dato span{font-size:.9rem;font-weight:600;overflow-wrap:anywhere}
+.exp-contrato{border:1px solid var(--border);border-left:4px solid var(--exp-c,#94a3b8);border-radius:var(--r-sm);background:var(--bg-card);max-width:980px;font-size:.85rem;padding:.65rem .9rem;line-height:1.45}
+.exp-sec{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);border-bottom:1px solid var(--border);padding-bottom:.3rem;max-width:980px;margin:.4rem 0 .1rem}
+.exp-chips{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center}
+.exp-tl{position:relative;padding-left:26px;max-width:980px}
+.exp-tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.exp-ev{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.6rem .85rem;margin-bottom:.6rem}
+.exp-ev::before{content:"";position:absolute;left:-22px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--exp-c,#94a3b8)}
+.exp-ev-tipo{font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.exp-ev-meta{font-size:.72rem;color:var(--text-3);margin-top:.1rem}
+.exp-ev-det{font-size:.83rem;margin-top:.25rem;line-height:1.45;overflow-wrap:anywhere}
+.exp-doc-grupo{font-size:.75rem;font-weight:700;color:var(--text-2);margin:.35rem 0 .1rem;max-width:980px}
+.exp-lista{display:flex;flex-direction:column;gap:.45rem;max-width:980px}
+.exp-item{display:flex;justify-content:space-between;gap:1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:.5rem .8rem;font-size:.83rem;align-items:center;flex-wrap:wrap}
+.exp-res{display:flex;flex-direction:column;gap:.4rem;max-width:980px}
+.exp-res button{text-align:left;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:.55rem .85rem;font:inherit;font-size:.84rem;color:inherit;cursor:pointer}
+.exp-res button:hover{border-color:var(--c-teal2)}
+.venc-area{display:flex;flex-direction:column;gap:1rem;padding:1.1rem 1.25rem;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
 .venc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
 .venc-title{margin:0;font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .venc-sub{margin:.2rem 0 0;font-size:.82rem;color:var(--text3)}
@@ -2104,6 +2235,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
       <div class="sn-group">
         <div class="sn-label">Análisis</div>
+        <button class="sn-item" data-tip="Inteligencia" onclick="sidebarTab(this,'inteligencia')" id="sn-inteligencia">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+          <span class="sn-item-label">Inteligencia</span>
+          <span class="sn-badge" id="intel-badge-side" style="display:none">0</span>
+        </button>
         <button class="sn-item active" data-tip="Analizar" onclick="sidebarTab(this,'analizar')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
@@ -2121,10 +2257,19 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span class="sn-item-label">Historial</span>
         </button>
+        <button class="sn-item" data-tip="Expediente" onclick="sidebarTab(this,'expediente')" id="sn-expediente">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="sn-item-label">Expediente</span>
+        </button>
         <button class="sn-item" data-tip="Vencimientos" onclick="sidebarTab(this,'vencimientos')" id="sn-vencimientos">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
           <span class="sn-item-label">Vencimientos</span>
           <span class="sn-badge" id="venc-badge-side" style="display:none">0</span>
+        </button>
+        <button class="sn-item" data-tip="Malla contractual" onclick="sidebarTab(this,'malla')" id="sn-malla">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <span class="sn-item-label">Contratos</span>
+          <span class="sn-badge" id="malla-badge-side" style="display:none">0</span>
         </button>
         <button class="sn-item" data-tip="Automatización" onclick="sidebarTab(this,'automatizacion')" id="sn-automatizacion">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2213,6 +2358,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <button class="sn-item" data-tip="Auditor Forense IA" onclick="sidebarTab(this,'auditor-forense')">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
           <span class="sn-item-label">Auditor Forense</span>
+        </button>
+        <button class="sn-item" data-tip="Constructor de Agentes" onclick="sidebarTab(this,'agentes')" id="sn-agentes">
+          <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+          <span class="sn-item-label">Agentes</span>
         </button>
         <button class="sn-item" data-tip="Diagnóstico del sistema (admin)" onclick="sidebarTab(this,'diagnostico')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -3233,6 +3382,94 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
          copiarlo a un PC con Python y abrir una consola: en la práctica los
          usaba una sola persona. Acá el auditor sube el archivo y descarga el
          resultado. -->
+    <!-- MALLA CONTRACTUAL — facturar contra un contrato vencido es una glosa
+         segura, y renegociar uno toma semanas. La malla vivía en un PDF que
+         actualiza contratación y que el área de glosas miraba cuando se
+         acordaba; el sistema tenía las vigencias como texto libre y nunca las
+         leía. -->
+    <!-- Constructor de Agentes: el sistema los arma, nadie los programa. -->
+    <div class="panel" id="p-agentes">
+      <div class="intel-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Constructor de Agentes</h2>
+            <p class="malla-sub">Un agente es una ficha: misión, instrucciones y herramientas permitidas. Se crea acá, sin programar, y corre con todo lo que el sistema ya sabe.</p>
+          </div>
+        </div>
+        <div id="ag-lista"><div class="malla-vacio">Cargando…</div></div>
+        <div class="exp-sec">Construir un agente</div>
+        <div class="form-card" style="max-width:980px">
+          <div id="ag-plantillas" style="display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:.6rem"></div>
+          <div class="field"><label>Nombre</label><input type="text" id="ag-nombre" placeholder="Vigilante de vencimientos"/></div>
+          <div class="field"><label>Misión (qué hace y para qué)</label><textarea id="ag-mision" rows="2"></textarea></div>
+          <div class="field"><label>Instrucciones (cómo debe trabajar)</label><textarea id="ag-instr" rows="2"></textarea></div>
+          <div class="field"><label>Herramientas permitidas</label><div id="ag-tools" style="display:flex;gap:.4rem;flex-wrap:wrap"></div></div>
+          <button class="btn btn-primary" style="margin-top:.5rem" onclick="agCrear()">Construir agente</button>
+          <div class="auto-estado" id="ag-estado" style="margin-top:.4rem"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Centro de Inteligencia: el sistema dice qué hacer hoy. -->
+    <div class="panel" id="p-inteligencia">
+      <div class="intel-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Centro de Inteligencia</h2>
+            <p class="malla-sub" id="intel-titular">El barrido de toda la operación: qué hacer hoy, por cuánta plata y en qué pantalla.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="intelCargar(true)">Actualizar</button>
+        </div>
+        <div id="intel-cuerpo"><div class="malla-vacio">Barriendo la operación…</div></div>
+      </div>
+    </div>
+
+    <!-- Expediente: todo lo que ha pasado con una glosa, en una pantalla.
+         Reemplaza al popup de timeline que se abría en otra ventana. -->
+    <div class="panel" id="p-expediente">
+      <div class="exp-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Expediente</h2>
+            <p class="malla-sub">Quién es, con qué contrato se defiende, qué ha pasado y qué soportes hay — sin abrir cuatro pantallas.</p>
+          </div>
+          <div class="malla-buscar">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="exp-q" placeholder="ID de glosa o factura HUS000…" onkeydown="if(event.key==='Enter') expBuscar()">
+          </div>
+        </div>
+        <div id="exp-resultados"></div>
+        <div id="exp-cuerpo"><div class="malla-vacio">Buscá por ID de glosa o número de factura para abrir el expediente.</div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-malla">
+      <div class="malla-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Malla contractual</h2>
+            <p class="malla-sub" id="malla-sub">Qué contrato rige con cada pagador y hasta cuándo.</p>
+          </div>
+          <div class="malla-buscar">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="malla-q" placeholder="Buscar pagador, contrato o tarifa…" oninput="mallaBuscarEnVivo()">
+          </div>
+        </div>
+        <div class="maos-buscador">
+          <label class="maos-lbl">Material de osteosíntesis — precio institucional</label>
+          <div class="maos-fila">
+            <input id="maos-q" placeholder="Código FMO o descripción: tornillo cortical 3.5"
+                   onkeydown="if(event.key==='Enter') maosBuscar()">
+            <button class="btn btn-primary btn-sm" onclick="maosBuscar()">Buscar</button>
+          </div>
+          <small class="maos-nota">Anexo 09 de la Resolución 194 de 2025 · 1.216 códigos con su precio.</small>
+          <div id="maos-resultado"></div>
+        </div>
+        <div class="malla-cards" id="malla-cards"></div>
+        <div id="malla-listas"><div class="malla-vacio">Cargando…</div></div>
+      </div>
+    </div>
+
     <div class="panel" id="p-automatizacion">
       <div class="auto-area">
         <div class="auto-head">
@@ -3241,6 +3478,13 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <p class="auto-sub">Subí el archivo que te mandó el pagador y descargá el que acepta el ERP. Sin instalar nada.</p>
           </div>
         </div>
+        <!-- Bots del hospital: TODOS administrados desde acá — los de la
+             nube, los de la cola del PC del HUS y los de Lotes. -->
+        <div class="exp-sec" style="margin-top:.4rem">🤖 Bots del hospital</div>
+        <p class="malla-sub" style="margin:0 0 .4rem">Cada bot con su estado real: cola, en qué equipo corrió, resultado y su historial. «Ejecutar» encola el trabajo y el agente del PC del HUS lo corre y reporta.</p>
+        <div id="bots-tablero"><div class="malla-vacio">Cargando bots…</div></div>
+
+        <div class="exp-sec" style="margin-top:.4rem">📄 Conversores de archivos (corren en la nube)</div>
         <div id="auto-catalogo" class="auto-grid">
           <div class="auto-vacio">Cargando…</div>
         </div>
@@ -3752,6 +3996,28 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             📄 Generar Acta SINAC (multi-glosa)
           </button>
           <span style="font-size:.75rem;color:var(--text3);align-self:center">Formato oficial idéntico al ACTA_SINAC_N_XXX. Acepta N facturas en una sola acta.</span>
+        </div>
+
+        <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
+             vuelve optimizada y sale el acta firmable. -->
+        <div class="form-card" style="margin-bottom:1rem">
+          <h3 style="margin:0 0 .3rem">🧮 Acta de la mesa (Excel)</h3>
+          <p style="margin:0 0 .6rem;font-size:.8rem;color:var(--text3)">Subí el mismo Excel que se diligencia en la audiencia (formato ACTA SINAC). El sistema cuadra las cifras, calcula el resultado de cada línea y arma el acta lista para imprimir y firmar.</p>
+          <div class="auto-drop" id="actax-drop" onclick="document.getElementById('actax-file').click()"
+               ondragover="event.preventDefault();this.classList.add('sobre')"
+               ondragleave="this.classList.remove('sobre')"
+               ondrop="actaxSoltar(event)">
+            <svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="auto-drop-txt" id="actax-drop-txt">Arrastrá el acta acá o hacé clic<small>.xlsm o .xlsx · máximo 30 MB</small></div>
+            <input type="file" id="actax-file" accept=".xlsm,.xlsx" onchange="actaxElegido()" hidden>
+          </div>
+          <div id="actax-resumen" style="display:none;margin-top:.6rem"></div>
+          <div class="auto-acciones" style="margin-top:.6rem">
+            <button class="btn btn-ghost btn-sm" id="actax-btn-rev" onclick="actaxRevisar()">Revisar cuadre</button>
+            <button class="btn btn-primary btn-sm" id="actax-btn-exc" onclick="actaxOptimizar()">Descargar Excel optimizado</button>
+            <button class="btn btn-sm" style="background:#059669;color:#fff" id="actax-btn-pdf" onclick="actaxPdf()">Acta firmable (PDF)</button>
+          </div>
+          <div class="auto-estado" id="actax-estado" style="margin-top:.4rem"></div>
         </div>
 
         <div class="concil-grid">
@@ -6994,6 +7260,9 @@ async function initApp(){
     syncSidebarBadge('mis-badge','mis-badge-side');
     syncSidebarBadge('alert-badge','alert-badge-side');
   }, 800);
+  // Centro de Inteligencia: el badge de urgencias se entera solo
+  setTimeout(intelBadge, 2500);
+  setInterval(intelBadge, 300000);
   // B.2: live channel — polling de eventos recientes y refresco automatico
   setTimeout(iniciarLiveChannel, 2000);
   // Smart digest: que paso desde la ultima visita
@@ -7901,7 +8170,11 @@ function tab(btn,id){
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
   if(id==='vencimientos') vencCargar();
-  if(id==='automatizacion') autoCargar();
+  if(id==='automatizacion'){ autoCargar(); botsCargar(); }
+  if(id==='malla') mallaCargar();
+  if(id==='inteligencia') intelCargar();
+  if(id==='agentes') agCargar();
+  if(id==='expediente'){ var _eq=document.getElementById('exp-q'); if(_eq && !EXP.datos) setTimeout(function(){_eq.focus()},60); }
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
@@ -8951,74 +9224,397 @@ async function descargarDictamenMd(){
   } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
-// R67 P3: muestra timeline consolidado de la glosa en una popup
-async function verTimelineGlosa(){
-  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+// ══ CONSTRUCTOR DE AGENTES: el sistema los arma, nadie los programa ══
+
+var AG = {datos: null, sel: {}};
+
+async function agCargar(){
   try{
-    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/timeline', {headers: authH()});
-    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var r = await fetch('/agentes', {headers: authH()});
+    if(!r.ok){ document.getElementById('ag-lista').innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    AG.datos = await r.json();
+    agPintar();
+  }catch(e){ document.getElementById('ag-lista').innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function agPintar(){
+  var d = AG.datos; if(!d) return;
+  var html = '';
+  if(!d.agentes.length){
+    html = '<div class="malla-vacio">Todavía no hay agentes construidos. Arrancá con una plantilla de abajo.</div>';
+  } else {
+    html = '<div class="intel-acciones">';
+    d.agentes.forEach(function(a){
+      html += '<div class="intel-card" style="--intel-c:#0e7490">'
+        + '<div class="ico">🤖</div>'
+        + '<div class="cuerpo">'
+        +   '<div class="titulo">' + escHtml(a.nombre) + '</div>'
+        +   '<div class="porque">' + escHtml(a.mision) + '</div>'
+        +   '<div class="porque" style="margin-top:.25rem"><b>Herramientas:</b> ' + a.herramientas.map(escHtml).join(', ') + '</div>'
+        +   '<div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap">'
+        +     '<input type="text" id="ag-preg-' + a.id + '" placeholder="Pedile algo dentro de su misión…" style="flex:1;min-width:220px;padding:.45rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.82rem" onkeydown="if(event.key===\'Enter\') agCorrer(' + a.id + ')">'
+        +     '<button class="btn btn-primary btn-sm" id="ag-btn-' + a.id + '" onclick="agCorrer(' + a.id + ')">Correr</button>'
+        +     '<button class="btn btn-ghost btn-sm" onclick="agRetirar(' + a.id + ')">Retirar</button>'
+        +   '</div>'
+        +   '<div id="ag-res-' + a.id + '" style="display:none;margin-top:.5rem" class="auto-resumen"></div>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  document.getElementById('ag-lista').innerHTML = html;
+
+  var pl = document.getElementById('ag-plantillas');
+  pl.innerHTML = '<span style="font-size:.78rem;color:var(--text-3);align-self:center">Plantillas:</span>'
+    + d.plantillas.map(function(p, i){
+        return '<button class="auto-chip" onclick="agPlantilla(' + i + ')">' + escHtml(p.nombre) + '</button>';
+      }).join('');
+
+  var tools = document.getElementById('ag-tools');
+  tools.innerHTML = Object.keys(d.herramientas_disponibles).map(function(n){
+    return '<button class="auto-chip' + (AG.sel[n] ? ' activo' : '') + '" title="' + escHtml(d.herramientas_disponibles[n]) + '" onclick="agTool(\'' + n + '\')">' + escHtml(n) + '</button>';
+  }).join('');
+}
+
+function agTool(n){ AG.sel[n] = !AG.sel[n]; agPintar(); }
+
+function agPlantilla(i){
+  var p = AG.datos.plantillas[i]; if(!p) return;
+  document.getElementById('ag-nombre').value = p.nombre;
+  document.getElementById('ag-mision').value = p.mision;
+  document.getElementById('ag-instr').value = p.instrucciones;
+  AG.sel = {};
+  p.herramientas.forEach(function(h){ AG.sel[h] = true; });
+  agPintar();
+}
+
+function agEstado(msg, clase){
+  var e = document.getElementById('ag-estado');
+  e.className = 'auto-estado ' + (clase || '');
+  e.innerHTML = msg;
+}
+
+async function agCrear(){
+  var herramientas = Object.keys(AG.sel).filter(function(n){ return AG.sel[n]; });
+  var cuerpo = {
+    nombre: document.getElementById('ag-nombre').value.trim(),
+    mision: document.getElementById('ag-mision').value.trim(),
+    instrucciones: document.getElementById('ag-instr').value.trim(),
+    herramientas: herramientas,
+  };
+  if(!cuerpo.nombre || cuerpo.mision.length < 10){ agEstado('Falta el nombre o la misión (mínimo una frase).', 'auto-error'); return; }
+  if(!herramientas.length){ agEstado('Elegí al menos una herramienta.', 'auto-error'); return; }
+  try{
+    var r = await fetch('/agentes', {method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()), body: JSON.stringify(cuerpo)});
+    var d = await r.json().catch(function(){ return {}; });
+    if(r.status === 403){ agEstado('Se necesita rol de auditor o superior.', 'auto-error'); return; }
+    if(!r.ok){ agEstado(escHtml(d.detail || ('Error ' + r.status)), 'auto-error'); return; }
+    agEstado('Agente «' + escHtml(d.nombre) + '» construido.', 'auto-ok');
+    document.getElementById('ag-nombre').value = ''; document.getElementById('ag-mision').value = ''; document.getElementById('ag-instr').value = '';
+    AG.sel = {};
+    agCargar();
+  }catch(e){ agEstado('Conexión: ' + escHtml(e.message), 'auto-error'); }
+}
+
+async function agCorrer(id){
+  var preg = (document.getElementById('ag-preg-' + id).value || '').trim();
+  if(preg.length < 3){ toast('Agente','Escribile qué necesitás','warning'); return; }
+  var btn = document.getElementById('ag-btn-' + id); var t0 = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Corriendo…';
+  var caja = document.getElementById('ag-res-' + id);
+  caja.style.display = 'block'; caja.innerHTML = 'El agente está trabajando…';
+  try{
+    var r = await fetch('/agentes/' + id + '/correr', {method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()), body: JSON.stringify({pregunta: preg})});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ caja.innerHTML = '<b style="color:var(--c-rojo,#dc2626)">' + escHtml(d.detail || ('Error ' + r.status)) + '</b>'; return; }
+    var tools = (d.tools_llamadas || []).map(function(t){ return t.name; }).join(', ');
+    caja.innerHTML = (tools ? '<small style="color:var(--text-3)">Usó: ' + escHtml(tools) + '</small><br>' : '')
+      + escHtml(d.respuesta || '(sin respuesta)').replace(/\n/g, '<br>');
+  }catch(e){ caja.innerHTML = 'Conexión: ' + escHtml(e.message); }
+  finally{ btn.disabled = false; btn.textContent = t0; }
+}
+
+async function agRetirar(id){
+  if(!confirm('¿Retirar este agente? La ficha queda en la trazabilidad.')) return;
+  try{
+    var r = await fetch('/agentes/' + id, {method:'DELETE', headers: authH()});
+    if(r.status === 403){ toast('Permiso','Se necesita coordinador o administrador','warning'); return; }
+    if(!r.ok){ toast('Error','HTTP ' + r.status,'error'); return; }
+    agCargar();
+  }catch(e){ toast('Error','Conexión: ' + e.message,'error'); }
+}
+
+// ══ CENTRO DE INTELIGENCIA: el sistema dice qué hacer hoy ══
+
+var INTEL = {datos: null};
+
+function intelColor(p){ return p === 1 ? '#dc2626' : (p === 2 ? '#b45309' : '#475569'); }
+
+function intelIrA(pantalla){
+  var btn = document.querySelector('.sn-item[onclick*="\'' + pantalla + '\'"]');
+  if(btn) sidebarTab(btn, pantalla);
+}
+
+function intelBadgeAplicar(d){
+  var b = document.getElementById('intel-badge-side');
+  if(!b) return;
+  var n = d.urgentes || 0;
+  b.textContent = n;
+  b.style.display = n > 0 ? '' : 'none';
+}
+
+async function intelCargar(forzar){
+  var cuerpo = document.getElementById('intel-cuerpo');
+  if(INTEL.datos && !forzar){ intelPintar(); return; }
+  if(cuerpo) cuerpo.innerHTML = '<div class="malla-vacio">Barriendo la operación…</div>';
+  try{
+    var r = await fetch('/inteligencia/diagnostico', {headers: authH()});
+    if(!r.ok){ if(cuerpo) cuerpo.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    INTEL.datos = await r.json();
+    intelBadgeAplicar(INTEL.datos);
+    intelPintar();
+  }catch(e){ if(cuerpo) cuerpo.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+// Solo el badge, para el arranque: si el panel está abierto, repinta.
+async function intelBadge(){
+  try{
+    var r = await fetch('/inteligencia/diagnostico', {headers: authH()});
+    if(!r.ok) return;
+    INTEL.datos = await r.json();
+    intelBadgeAplicar(INTEL.datos);
+    var panel = document.getElementById('p-inteligencia');
+    if(panel && panel.classList.contains('active')) intelPintar();
+  }catch(e){ /* el badge es cortesía: sin red, sin ruido */ }
+}
+
+function intelPintar(){
+  var d = INTEL.datos; if(!d) return;
+  var titular = document.getElementById('intel-titular');
+  if(titular) titular.textContent = d.titular;
+  var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+
+  var html = '<div class="intel-resumen">'
+    + '<div class="intel-kpi"><b style="color:' + (d.urgentes ? '#dc2626' : '#16a34a') + '">' + d.urgentes + '</b><span>frentes urgentes</span></div>'
+    + '<div class="intel-kpi"><b>' + d.acciones.length + '</b><span>acciones sugeridas</span></div>'
+    + '<div class="intel-kpi"><b>' + cop(d.valor_en_juego) + '</b><span>plata en juego</span></div>'
+    + '</div>';
+
+  if(!d.acciones.length){
+    html += '<div class="malla-vacio">✅ ' + escHtml(d.titular) + '</div>';
+  } else {
+    html += '<div class="intel-acciones">';
+    d.acciones.forEach(function(a){
+      var c = intelColor(a.prioridad);
+      html += '<div class="intel-card" style="--intel-c:' + c + '">'
+        + '<div class="ico">' + a.icono + '</div>'
+        + '<div class="cuerpo">'
+        +   '<div class="titulo">' + escHtml(a.titulo) + '</div>'
+        +   '<div class="porque">' + escHtml(a.por_que) + '</div>'
+        +   (a.valor_en_juego ? '<div class="plata">' + cop(a.valor_en_juego) + ' en juego</div>' : '')
+        + '</div>'
+        + '<button class="btn btn-primary btn-sm" onclick="intelIrA(\'' + escHtml(a.pantalla) + '\')">' + escHtml(a.etiqueta_boton) + '</button>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  if(d.fuentes_caidas && d.fuentes_caidas.length){
+    html += '<div class="malla-vacio">⚠ No se pudo revisar: ' + escHtml(d.fuentes_caidas.join(', ')) + '.</div>';
+  }
+  document.getElementById('intel-cuerpo').innerHTML = html;
+}
+
+// ══ EXPEDIENTE: la historia completa de una glosa como pantalla ══
+// Reemplaza al popup de timeline (window.open + document.write): la misma
+// información, dentro de la aplicación, con búsqueda y filtros.
+
+function expColorTipo(e){
+  var t = e.tipo || '';
+  // La verificación contractual se colorea por su veredicto: verde = había
+  // contrato ese día; ámbar = no regía ninguno; rojo = fuera de la malla.
+  if(t === 'AUDIT_VERIFICACION_CONTRACTUAL' && e.metadata && e.metadata.campo){
+    return e.metadata.campo === 'VIGENTE' ? '#16a34a'
+         : (e.metadata.campo === 'SIN_CONTRATO_VIGENTE' ? '#b45309' : '#dc2626');
+  }
+  var fijos = {CREAR_GLOSA:'#1e40af', AI_CALL:'#7c3aed', COMENTARIO:'#0d9488', COMENTARIO_RESUELTO:'#16a34a'};
+  if(fijos[t]) return fijos[t];
+  if(t.indexOf('VERSION_') === 0) return '#0891b2';
+  if(t.indexOf('AUDIT_') === 0) return '#475569';
+  return '#64748b';
+}
+function expIconoTipo(t){
+  if(t === 'CREAR_GLOSA') return '✨';
+  if(t === 'AI_CALL') return '🤖';
+  if(t === 'COMENTARIO') return '💬';
+  if(t === 'COMENTARIO_RESUELTO') return '✅';
+  if(t === 'AUDIT_VERIFICACION_CONTRACTUAL') return '⚖️';
+  if(t.indexOf('VERSION_') === 0) return '📝';
+  if(t.indexOf('AUDIT_') === 0) return '🛡️';
+  return '•';
+}
+function expNombreTipo(t){
+  return String(t||'').replace(/^AUDIT_/,'').replace(/_/g,' ');
+}
+function expGrupoTipo(t){
+  if(t === 'AI_CALL') return 'ia';
+  if((t||'').indexOf('AUDIT_') === 0) return 'auditoria';
+  if((t||'').indexOf('VERSION_') === 0) return 'dictamen';
+  if((t||'').indexOf('COMENTARIO') === 0) return 'comentarios';
+  return 'estado';
+}
+
+var EXP = {datos: null, filtro: ''};
+
+async function expBuscar(){
+  var q = (document.getElementById('exp-q').value || '').trim();
+  if(q.length < 2){ toast('Buscar','Escribí un ID de glosa o un número de factura','warning'); return; }
+  var res = document.getElementById('exp-resultados');
+  res.innerHTML = '<div class="malla-vacio">Buscando…</div>';
+  try{
+    var r = await fetch('/glosas/expediente/buscar?q=' + encodeURIComponent(q), {headers: authH()});
+    if(!r.ok){ res.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
     var d = await r.json();
-    var w = window.open('', '_blank', 'width=860,height=720');
-    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-    // Color por tipo de evento
-    var colorTipo = {
-      'CREAR_GLOSA': '#1e40af',
-      'AI_CALL': '#7c3aed',
-      'COMENTARIO': '#0d9488',
-      'COMENTARIO_RESUELTO': '#16a34a',
-    };
-    var colorPorTipo = function(t){
-      if(colorTipo[t]) return colorTipo[t];
-      if(t.indexOf('VERSION_') === 0) return '#0891b2';
-      if(t.indexOf('AUDIT_') === 0) return '#475569';
-      return '#64748b';
-    };
-    var iconoPorTipo = function(t){
-      if(t === 'CREAR_GLOSA') return '✨';
-      if(t === 'AI_CALL') return '🤖';
-      if(t === 'COMENTARIO') return '💬';
-      if(t === 'COMENTARIO_RESUELTO') return '✅';
-      if(t.indexOf('VERSION_') === 0) return '📝';
-      if(t.indexOf('AUDIT_') === 0) return '🛡️';
-      return '•';
-    };
-    var html = '<html><head><meta charset="utf-8"><title>Timeline Glosa #' + CURRENT_GLOSA_ID + '</title>'
-             + '<style>body{font-family:Segoe UI,Arial;padding:20px;background:#f8fafc;color:#1f2937;line-height:1.5}'
-             + 'h1{color:#0b5d8a;border-bottom:2px solid #0b5d8a;padding-bottom:8px;font-size:1.1rem;}'
-             + '.intro{font-size:.85rem;color:#64748b;margin-bottom:1rem;}'
-             + '.tl{position:relative;padding-left:32px;}'
-             + '.tl::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;background:#cbd5e1;}'
-             + '.ev{position:relative;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;}'
-             + '.ev::before{content:attr(data-icon);position:absolute;left:-32px;top:8px;background:white;width:24px;height:24px;border-radius:50%;border:2px solid var(--c);text-align:center;line-height:20px;font-size:.85rem;}'
-             + '.tipo{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}'
-             + '.actor{font-size:.75rem;color:#64748b;margin-top:.2rem;}'
-             + '.detalle{font-size:.85rem;color:#1f2937;margin-top:.4rem;}'
-             + '.fecha{font-size:.7rem;color:#94a3b8;}'
-             + '</style></head><body>'
-             + '<h1>📜 Timeline · Glosa #' + CURRENT_GLOSA_ID + '</h1>'
-             + '<p class="intro">' + d.total_eventos + ' evento(s) registrado(s) · más reciente primero</p>'
-             + '<div class="tl">';
-    d.eventos.forEach(function(e){
-      var color = colorPorTipo(e.tipo || '');
-      var icon = iconoPorTipo(e.tipo || '');
-      var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
-      html += '<div class="ev" data-icon="' + icon + '" style="--c:' + color + ';border-left:4px solid ' + color + ';">'
-            + '<div class="tipo" style="color:' + color + '">' + esc(e.tipo) + '</div>'
-            + '<div class="actor">' + esc(e.actor || '—') + ' · <span class="fecha">' + fecha + '</span></div>'
-            + '<div class="detalle">' + esc(e.detalle || '—') + '</div>';
-      if(e.metadata && Object.keys(e.metadata).length > 0){
-        html += '<details style="margin-top:.4rem;font-size:.72rem;color:#64748b;cursor:pointer;">'
-              + '<summary>metadata</summary>'
-              + '<pre style="background:#f1f5f9;padding:6px;border-radius:4px;overflow-x:auto;font-size:.7rem;">'
-              + esc(JSON.stringify(e.metadata, null, 2))
-              + '</pre></details>';
-      }
+    if(!d.resultados.length){ res.innerHTML = '<div class="malla-vacio">Nada con «' + escHtml(q) + '». Probá con el número completo de la factura.</div>'; return; }
+    if(d.resultados.length === 1){ res.innerHTML = ''; expAbrir(d.resultados[0].glosa_id); return; }
+    var html = '<div class="exp-res">';
+    d.resultados.forEach(function(g){
+      html += '<button onclick="expAbrir(' + g.glosa_id + ')"><b>#' + g.glosa_id + '</b> · '
+            + escHtml(g.factura || 'sin factura') + ' · ' + escHtml(g.eps || '') + ' · '
+            + escHtml(g.codigo_glosa || '') + ' · ' + escHtml(g.estado || '')
+            + ' · $' + Math.round(g.valor_objetado||0).toLocaleString('es-CO') + '</button>';
+    });
+    res.innerHTML = html + '</div>';
+  }catch(e){ res.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+async function expAbrir(glosaId){
+  var cuerpo = document.getElementById('exp-cuerpo');
+  document.getElementById('exp-resultados').innerHTML = '';
+  cuerpo.innerHTML = '<div class="malla-vacio">Abriendo expediente…</div>';
+  try{
+    var r = await fetch('/glosas/' + glosaId + '/expediente', {headers: authH()});
+    if(r.status === 404){ cuerpo.innerHTML = '<div class="malla-vacio">No existe la glosa #' + glosaId + '.</div>'; return; }
+    if(!r.ok){ cuerpo.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    EXP.datos = await r.json();
+    EXP.filtro = '';
+    expPintar();
+  }catch(e){ cuerpo.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function expFiltrar(g){ EXP.filtro = (EXP.filtro === g) ? '' : g; expPintar(); }
+
+// Descarga autenticada de un documento del expediente (los <a> planos no
+// llevan el token; esto hace fetch con la sesión y dispara la descarga).
+async function expDescargar(url, nombre){
+  try{
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){ toast('Documento', 'HTTP ' + r.status, 'error'); return; }
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nombre || 'documento';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){ toast('Documento', 'Conexión: ' + e.message, 'error'); }
+}
+
+function expPintar(){
+  var d = EXP.datos; if(!d) return;
+  var f = d.ficha;
+  var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+  var html = '';
+
+  // La ficha: quién es este expediente
+  html += '<div class="exp-ficha">'
+    + '<div class="exp-dato"><b>Glosa</b><span>#' + d.glosa_id + ' · ' + escHtml(f.codigo_glosa||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Factura</b><span>' + escHtml(f.factura||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Pagador</b><span>' + escHtml(f.eps||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Estado</b><span>' + escHtml(f.estado||'—') + ' · ' + escHtml(f.etapa||'') + '</span></div>'
+    + '<div class="exp-dato"><b>Objetado</b><span>' + cop(f.valor_objetado) + '</span></div>'
+    + '<div class="exp-dato"><b>Aceptado</b><span>' + cop(f.valor_aceptado) + '</span></div>'
+    + '<div class="exp-dato"><b>Auditor</b><span>' + escHtml(f.auditor||'—') + '</span></div>'
+    + '<div class="exp-dato"><b>Versiones del dictamen</b><span>' + d.versiones_dictamen + '</span></div>'
+    + '</div>';
+
+  // El contrato que rige, con el color del veredicto registrado
+  var c = d.constancia_contractual, ct = d.contrato;
+  var vcolor = '#94a3b8', vtxt = 'Sin verificación contractual registrada todavía: analizá la glosa y quedará acá.';
+  if(c && c.veredicto){
+    vcolor = c.veredicto === 'VIGENTE' ? '#16a34a' : (c.veredicto === 'SIN_CONTRATO_VIGENTE' ? '#b45309' : '#dc2626');
+    vtxt = escHtml(c.resumen || c.veredicto);
+    if(c.fecha_es_del_formulario === false) vtxt += ' <em>(fecha tomada del día del análisis, no del formulario)</em>';
+  } else if(ct){
+    vcolor = '#16a34a';
+    vtxt = 'Contrato ' + escHtml(ct.numero || 'sin número') + ' vigente al ' + escHtml(ct.fecha_evaluada||'') + ' (factor ' + (ct.factor!=null?ct.factor:1) + ').';
+  }
+  html += '<div class="exp-contrato" style="--exp-c:' + vcolor + '"><b>⚖️ Contrato:</b> ' + vtxt + '</div>';
+
+  // Conciliaciones y soportes, si hay
+  if(d.conciliaciones.length){
+    html += '<div class="exp-sec">Conciliaciones (' + d.conciliaciones.length + ')</div><div class="exp-lista">';
+    d.conciliaciones.forEach(function(x){
+      html += '<div class="exp-item"><span>Acta ' + escHtml(x.acta_numero||'—') + ' · ' + (x.fecha_audiencia ? new Date(x.fecha_audiencia).toLocaleDateString('es-CO') : 'sin fecha') + '</span>'
+            + '<span>' + escHtml(x.resultado||'PROGRAMADA') + ' · ' + cop(x.valor_conciliado) + '</span></div>';
+    });
+    html += '</div>';
+  }
+  // 📁 Centro Documental: la carpeta del expediente, armada sola.
+  var docs = d.documentos || {total_documentos: 0, grupos: []};
+  if(docs.total_documentos){
+    html += '<div class="exp-sec">📁 Centro Documental · ' + docs.total_documentos + ' documento(s)</div>';
+    docs.grupos.forEach(function(g){
+      html += '<div class="exp-doc-grupo">' + escHtml(g.nombre) + '</div><div class="exp-lista">';
+      g.documentos.forEach(function(x){
+        html += '<div class="exp-item"><span><b>' + escHtml(x.tipo) + '</b> · ' + escHtml(x.nombre||'')
+              + (x.nota ? '<br><small style="color:var(--text-3)">' + escHtml(x.nota) + '</small>' : '')
+              + '</span>'
+              + (x.url
+                  ? '<button class="btn btn-ghost btn-sm" onclick="expDescargar(\'' + escHtml(x.url) + '\',\'' + escHtml(x.nombre||'documento') + '\')">Abrir</button>'
+                  : (x.ruta ? '<code style="font-size:.7rem;overflow-wrap:anywhere;color:var(--text-3)">' + escHtml(x.ruta) + '</code>' : ''))
+              + '</div>';
+      });
       html += '</div>';
     });
-    html += '</div></body></html>';
-    w.document.write(html);
-    w.document.close();
-  } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+  }
+
+  // La línea de tiempo, con filtros de un clic
+  var grupos = [['','Todos'],['ia','IA'],['auditoria','Auditoría'],['dictamen','Dictamen'],['comentarios','Comentarios'],['estado','Estado']];
+  html += '<div class="exp-sec">Línea de tiempo · ' + d.total_eventos + ' evento(s)</div>';
+  html += '<div class="exp-chips">';
+  grupos.forEach(function(g){
+    html += '<button class="auto-chip' + (EXP.filtro === g[0] ? ' activo' : '') + '" onclick="expFiltrar(\'' + g[0] + '\')">' + g[1] + '</button>';
+  });
+  html += '</div><div class="exp-tl">';
+  var visibles = 0;
+  d.timeline.forEach(function(e){
+    if(EXP.filtro && expGrupoTipo(e.tipo) !== EXP.filtro) return;
+    visibles++;
+    var color = expColorTipo(e);
+    var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
+    html += '<div class="exp-ev" style="--exp-c:' + color + ';border-left:4px solid ' + color + '">'
+      + '<div class="exp-ev-tipo" style="color:' + color + '">' + expIconoTipo(e.tipo) + ' ' + escHtml(expNombreTipo(e.tipo)) + '</div>'
+      + '<div class="exp-ev-meta">' + escHtml(e.actor||'—') + ' · ' + fecha + '</div>'
+      + (e.detalle ? '<div class="exp-ev-det">' + escHtml(e.detalle) + '</div>' : '');
+    if(e.metadata && Object.keys(e.metadata).length > 0){
+      html += '<details style="margin-top:.3rem;font-size:.72rem;color:var(--text-3);cursor:pointer"><summary>detalle técnico</summary>'
+            + '<pre style="background:var(--bg-2,rgba(148,163,184,.12));padding:6px;border-radius:4px;overflow-x:auto;font-size:.68rem">'
+            + escHtml(JSON.stringify(e.metadata, null, 2)) + '</pre></details>';
+    }
+    html += '</div>';
+  });
+  if(!visibles) html += '<div class="malla-vacio">Sin eventos de ese tipo.</div>';
+  html += '</div>';
+
+  document.getElementById('exp-cuerpo').innerHTML = html;
+}
+
+// El botón «Timeline» de las glosas ahora abre la pantalla Expediente
+// (antes abría un popup aparte con document.write).
+function verTimelineGlosa(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  var id = CURRENT_GLOSA_ID;
+  if(typeof cerrarModal === 'function'){ try{ cerrarModal(); }catch(_e){} }
+  var btn = document.getElementById('sn-expediente');
+  if(btn){ sidebarTab(btn, 'expediente'); }
+  expAbrir(id);
 }
 
 // R65 P2: clona la glosa actual y abre el modal de la nueva
@@ -20012,6 +20608,385 @@ function vencClase(u){
   return n ? n.cls : '';
 }
 
+// ─── Material de osteosíntesis (Anexo 09, Resolución 194 de 2025) ──────
+// La EPS objeta el valor diciendo que "no está pactado". La respuesta está en
+// un PDF de 18 páginas y 1.216 códigos que había que revisar a ojo.
+
+async function maosBuscar(){
+  var q = (document.getElementById('maos-q') || {}).value || '';
+  var cont = document.getElementById('maos-resultado');
+  if(!q.trim()){ cont.innerHTML=''; return; }
+  cont.innerHTML = '<div class="maos-cargando">Buscando…</div>';
+  try{
+    var r = await fetch('/maos/buscar?q=' + encodeURIComponent(q.trim()), {headers: authH()});
+    var d = await r.json();
+    if(!d.encontrado){
+      cont.innerHTML = '<div class="maos-nada">' + escHtml(d.mensaje || 'Sin resultados.') + '</div>';
+      return;
+    }
+    var h = '<table class="tbl-modern maos-tbl"><thead><tr><th>Código</th><th>Descripción</th>'
+          + '<th>Precio</th><th></th></tr></thead><tbody>';
+    d.resultados.forEach(function(x){
+      h += '<tr><td><b>' + escHtml(x.codigo) + '</b></td>'
+        + '<td><small>' + escHtml(x.descripcion) + '</small></td>'
+        + '<td class="maos-precio">' + fmtCOP(x.precio) + '</td>'
+        + '<td><button class="btn btn-ghost btn-sm" onclick="maosDefensa(\'' + x.codigo + '\')">Defensa</button></td>'
+        + '</tr>';
+    });
+    cont.innerHTML = h + '</tbody></table><div id="maos-defensa"></div>';
+    if(d.defensa) maosPintarDefensa(d.defensa);
+  }catch(e){
+    cont.innerHTML = '<div class="maos-nada">No se pudo consultar: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function maosDefensa(codigo){
+  try{
+    var r = await fetch('/maos/defensa/' + encodeURIComponent(codigo), {headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('No disponible', d.detail || '', 'warning'); return; }
+    maosPintarDefensa(d.defensa);
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+function maosPintarDefensa(texto){
+  var cont = document.getElementById('maos-defensa');
+  if(!cont) return;
+  cont.innerHTML = '<div class="maos-defensa">'
+    + '<div class="maos-defensa-t">Párrafo para el dictamen</div>'
+    + '<p id="maos-defensa-txt">' + escHtml(texto) + '</p>'
+    + '<button class="btn btn-ghost btn-sm" onclick="maosCopiar()">Copiar</button>'
+    + '</div>';
+}
+
+function maosCopiar(){
+  var el = document.getElementById('maos-defensa-txt');
+  if(!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function(){
+    toast('Copiado', 'Pegalo en el dictamen', 'success');
+  }).catch(function(){ toast('No se pudo copiar','Seleccionalo a mano','warning'); });
+}
+
+// ─── Malla contractual ─────────────────────────────────────────────────
+// Facturar contra un contrato vencido es una glosa segura. La malla vivía en
+// un PDF que el área miraba cuando se acordaba.
+
+// La pantalla es INTERACTIVA, no un informe: las tarjetas de arriba son
+// filtros (clic para ver solo ese grupo, clic de nuevo para soltar), hay
+// búsqueda en vivo por pagador o número, y cada fila se expande al clic con
+// el detalle completo — exclusiones, tecnologías, observaciones — en vez de
+// obligar a leer una tabla kilométrica.
+var MALLA = null;
+var MALLA_UI = {filtro: '', q: ''};
+
+async function mallaCargar(){
+  var cont = document.getElementById('malla-listas');
+  if(!cont) return;
+  cont.innerHTML = '<div class="malla-vacio">Cargando…</div>';
+  try{
+    var r = await fetch('/malla', {headers: authH()});
+    if(!r.ok){ cont.innerHTML = '<div class="malla-vacio">No se pudo cargar.</div>'; return; }
+    MALLA = await r.json();
+    mallaPintar();
+  }catch(e){
+    cont.innerHTML = '<div class="malla-vacio">No se pudo cargar: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function mallaFiltrar(grupo){
+  // La misma tarjeta dos veces = soltar el filtro. Así se explora sin botones extra.
+  MALLA_UI.filtro = (MALLA_UI.filtro === grupo) ? '' : grupo;
+  mallaPintar();
+}
+
+function mallaBuscarEnVivo(){
+  var el = document.getElementById('malla-q');
+  MALLA_UI.q = (el && el.value || '').trim().toUpperCase();
+  mallaPintar();
+}
+
+function _mallaCoincide(c){
+  if(!MALLA_UI.q) return true;
+  return (c.pagador + ' ' + c.nombre_malla + ' ' + (c.numero||'') + ' ' + (c.tarifa_texto||''))
+    .toUpperCase().indexOf(MALLA_UI.q) >= 0;
+}
+
+function mallaPintar(){
+  var d = MALLA;
+  if(!d) return;
+  var sub = document.getElementById('malla-sub');
+  if(sub) sub.textContent = 'Malla oficial al ' + d.fecha_malla + ' · ' + d.total
+    + ' contratos · revisada el ' + d.evaluado_en + '.';
+
+  var grupos = [
+    {k:'vencidos',       t:'Vencidos',        c:'rojo',    filas:d.vencidos,
+     nota:'Una factura de hoy contra estos contratos no tiene marco que la respalde.'},
+    {k:'por_vencer',     t:'Se acaban pronto', c:'amarillo', filas:d.por_vencer,
+     nota:'Renegociar toma semanas: el aviso es ahora, no el día que se vence.'},
+    {k:'vigentes',       t:'Vigentes',        c:'verde',   filas:d.vigentes, nota:''},
+    {k:'indeterminados', t:'Indeterminados',  c:'gris',    filas:d.indeterminados,
+     nota:'Continúan hasta que se formalice o se sustituya el contrato.'}
+  ];
+
+  var cards = document.getElementById('malla-cards');
+  cards.innerHTML = grupos.map(function(g){
+    var activa = MALLA_UI.filtro === g.k ? ' activa' : '';
+    var sub2 = g.k==='vencidos' ? 'ya no protegen la facturación'
+             : g.k==='por_vencer' ? ('en ' + d.dias_aviso + ' días o menos')
+             : g.k==='vigentes' ? 'con plazo por delante' : 'sin fecha de terminación';
+    return '<button class="malla-card m-' + g.c + activa + '" onclick="mallaFiltrar(\'' + g.k + '\')" '
+      + 'title="Clic para ver solo este grupo">'
+      + '<div class="malla-card-n">' + g.filas.length + '</div>'
+      + '<div class="malla-card-t">' + escHtml(g.t) + '</div>'
+      + '<div class="malla-card-nota">' + escHtml(sub2) + '</div>'
+      + '</button>';
+  }).join('');
+
+  var html = '';
+  var visibles = 0;
+  grupos.forEach(function(g){
+    if(MALLA_UI.filtro && MALLA_UI.filtro !== g.k) return;
+    var filas = g.filas.filter(_mallaCoincide);
+    visibles += filas.length;
+    if(filas.length) html += mallaLista(g, filas);
+  });
+  if(!visibles){
+    html = '<div class="malla-vacio">Nada coincide con la búsqueda'
+      + (MALLA_UI.filtro ? ' en este grupo. <a href="#" onclick="mallaFiltrar(\'\');return false">Ver todos</a>' : '.')
+      + '</div>';
+  }
+  document.getElementById('malla-listas').innerHTML = html;
+
+  var badge = document.getElementById('malla-badge-side');
+  var urgentes = d.vencidos.length + d.por_vencer.length;
+  if(badge){
+    badge.textContent = urgentes;
+    badge.style.display = urgentes > 0 ? '' : 'none';
+  }
+}
+
+function mallaLista(g, filas){
+  var h = '<h3 class="malla-grupo m-' + g.c + '">' + escHtml(g.t) + ' · ' + filas.length + '</h3>';
+  if(g.nota) h += '<p class="malla-grupo-nota">' + escHtml(g.nota) + '</p>';
+  h += '<div class="malla-filas">';
+  filas.forEach(function(c, i){
+    var id = 'mf-' + g.k + '-' + i;
+    var plazo = '';
+    if(typeof c.dias === 'number'){
+      plazo = c.dias < 0 ? ('venció hace ' + (-c.dias) + ' días')
+            : c.dias === 0 ? 'vence HOY'
+            : ('quedan ' + c.dias + ' días');
+    } else if(!c.hasta){ plazo = 'sin fecha de terminación'; }
+    h += '<div class="malla-fila" onclick="mallaExpandir(\'' + id + '\')">'
+      + '<div class="malla-fila-cab">'
+      +   '<div class="malla-fila-quien"><b>' + escHtml(c.pagador) + '</b>'
+      +     '<small>' + escHtml(c.numero || 'sin número en la malla') + '</small></div>'
+      +   '<div class="malla-fila-vig">' + escHtml(c.desde) + ' → ' + escHtml(c.hasta || '∞') + '</div>'
+      +   '<span class="malla-pill m-' + g.c + '">' + escHtml(plazo || '—')
+      +     (c.hasta_agotar_recurso ? ' · o al agotar recurso' : '') + '</span>'
+      +   '<svg class="malla-flecha" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>'
+      + '</div>'
+      + '<div class="malla-fila-det" id="' + id + '">'
+      +   '<div class="malla-det-g"><span>Nombre en la malla</span>' + escHtml(c.nombre_malla) + '</div>'
+      +   '<div class="malla-det-g"><span>Tarifa pactada</span>' + escHtml(c.tarifa_texto)
+      +     (c.factor ? ' <b class="malla-factor">factor ' + c.factor + '</b>' : '') + '</div>'
+      +   (c.tecnologias ? '<div class="malla-det-g"><span>Qué cubre</span>' + escHtml(c.tecnologias) + '</div>' : '')
+      +   (c.exclusiones && c.exclusiones.length
+          ? '<div class="malla-det-g malla-det-excl"><span>No se contrata</span>'
+            + c.exclusiones.map(function(x){ return '<em>' + escHtml(x) + '</em>'; }).join('') + '</div>' : '')
+      +   (c.observacion ? '<div class="malla-det-g"><span>Observación</span>' + escHtml(c.observacion) + '</div>' : '')
+      // Motor Universal: qué sabe hacer el sistema con este pagador,
+      // cargado la primera vez que se abre la fila.
+      +   '<div class="malla-det-g malla-cap" id="cap-' + id + '" data-pagador="' + escHtml(c.pagador) + '"><span>El sistema con este pagador</span><em style="color:var(--text-3)">…</em></div>'
+      + '</div>'
+      + '</div>';
+  });
+  return h + '</div>';
+}
+
+function mallaExpandir(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  var fila = el.closest('.malla-fila');
+  var abierta = fila.classList.contains('abierta');
+  fila.classList.toggle('abierta', !abierta);
+  if(!abierta) mallaCapacidades(id);
+}
+
+// Motor Universal: el perfil del pagador se pide una sola vez por fila.
+async function mallaCapacidades(id){
+  var caja = document.getElementById('cap-' + id);
+  if(!caja || caja.dataset.listo) return;
+  caja.dataset.listo = '1';
+  try{
+    var r = await fetch('/malla/perfil?pagador=' + encodeURIComponent(caja.dataset.pagador || ''), {headers: authH()});
+    if(!r.ok){ caja.style.display = 'none'; return; }
+    var p = await r.json();
+    var caps = p.capacidades || [];
+    if(!caps.length){ caja.style.display = 'none'; return; }
+    caja.innerHTML = '<span>El sistema con este pagador</span>'
+      + caps.map(function(c){ return '🤖 ' + escHtml(c); }).join('<br>');
+  }catch(e){ caja.style.display = 'none'; }
+}
+
+// ── Bots del hospital: el tablero vivo dentro de Automatización ──
+var BOTS = {datos: null};
+
+async function botsCargar(){
+  var cont = document.getElementById('bots-tablero');
+  if(!cont) return;
+  try{
+    var r = await fetch('/bots', {headers: authH()});
+    if(!r.ok){ cont.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    BOTS.datos = await r.json();
+    botsPintar();
+  }catch(e){ cont.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function botsColorEstado(e){
+  return e === 'CORRIENDO' ? '#7c3aed' : (e === 'EN COLA' ? '#b45309' : (e === 'ERROR' ? '#dc2626' : '#16a34a'));
+}
+
+function botsSeg(s){
+  if(s == null) return '—';
+  return s < 90 ? (s + ' s') : (Math.round(s/60) + ' min');
+}
+
+function botsPintar(){
+  var d = BOTS.datos; if(!d) return;
+  var html = '<div class="intel-resumen" style="margin-bottom:.4rem">'
+    + '<div class="intel-kpi"><b>' + d.total_bots + '</b><span>bots administrados</span></div>'
+    + '<div class="intel-kpi"><b style="color:' + (d.trabajos_abiertos ? '#b45309' : '#16a34a') + '">' + d.trabajos_abiertos + '</b><span>trabajos en cola o corriendo</span></div>'
+    + '</div>';
+  d.grupos.forEach(function(g){
+    html += '<div class="exp-doc-grupo">' + escHtml(g.nombre) + '</div><div class="intel-acciones">';
+    g.bots.forEach(function(b){
+      var c = botsColorEstado(b.estado);
+      var ult = b.ultima_ejecucion;
+      var corr = b.trabajo_corriendo;
+      var ultTxt = ult
+        ? ((ult.terminado_en ? new Date(ult.terminado_en).toLocaleString('es-CO') : '—')
+           + (ult.equipo ? ' · equipo <b>' + escHtml(ult.equipo) + '</b>' : '')
+           + (ult.pedido_por ? ' · pidió ' + escHtml(ult.pedido_por) : '')
+           + (ult.estado === 'ERROR' ? ' · ❌ falló' : (ult.estado === 'CANCELADO' ? ' · ⛔ cancelado' : ' · ✓')))
+        : 'nunca ha corrido desde la plataforma';
+      var donde = b.donde_corre === 'nube' ? '☁ corre en la nube'
+                : (b.disparo === 'lotes' ? '🖥 PC del HUS · vía pantalla Lotes' : '🖥 PC del HUS · por la cola');
+      html += '<div class="intel-card" style="--intel-c:' + c + '">'
+        + '<div class="ico">🤖</div>'
+        + '<div class="cuerpo">'
+        +   '<div class="titulo">' + escHtml(b.nombre)
+        +     ' <span class="malla-pill" style="background:' + c + '22;color:' + c + ';font-size:.68rem">' + escHtml(b.estado) + (b.pendientes ? ' · ' + b.pendientes + ' en cola' : '') + '</span></div>'
+        +   '<div class="porque">' + escHtml(b.que_hace) + ' <em style="color:var(--text-3)">' + donde + '</em></div>'
+        +   (b.riesgo ? '<div class="porque" style="color:#b45309">⚠ ' + escHtml(b.riesgo) + '</div>' : '')
+        +   (corr ? '<div class="porque" style="color:#7c3aed"><b>▶ ' + escHtml(corr.progreso || 'Corriendo') + '</b>'
+                  + (corr.equipo ? ' en ' + escHtml(corr.equipo) : '') + '</div>' : '')
+        +   '<div class="porque" style="margin-top:.2rem"><b>Última:</b> ' + ultTxt + '</div>'
+        +   '<div class="porque"><b>Corridas:</b> ' + b.total_corridas
+        +     ' · <b>Hoy:</b> ' + (b.ejecutadas_hoy || 0)
+        +     ' · <b>Duración prom.:</b> ' + botsSeg(b.duracion_promedio_seg)
+        +     ' · <b>Espera prom.:</b> ' + botsSeg(b.espera_promedio_seg) + '</div>'
+        +   (b.ultimo_error ? '<div class="porque" style="color:#dc2626"><b>Último error:</b> ' + escHtml((b.ultimo_error.error || '').slice(0,160)) + '</div>' : '')
+        +   '<div style="display:flex;gap:.4rem;margin-top:.45rem;flex-wrap:wrap">'
+        +     '<button class="btn btn-primary btn-sm" onclick="botEjecutar(\'' + b.id + '\')">Ejecutar</button>'
+        +     (b.pendientes || corr ? '<button class="btn btn-ghost btn-sm" style="color:#dc2626" onclick="botCancelar(\'' + b.id + '\')">Cancelar</button>' : '')
+        +     (b.estado === 'ERROR' || (ult && ult.estado === 'CANCELADO') ? '<button class="btn btn-ghost btn-sm" onclick="botReintentar(\'' + b.id + '\')">Reintentar</button>' : '')
+        +     '<button class="btn btn-ghost btn-sm" onclick="botHistorial(\'' + b.id + '\')">Historial</button>'
+        +     (ult && (ult.registro || ult.error) ? '<button class="btn btn-ghost btn-sm" onclick="botRegistros(\'' + b.id + '\')">Ver registros</button>' : '')
+        +     (b.parametros_ayuda ? '<button class="btn btn-ghost btn-sm" onclick="botConfigurar(\'' + b.id + '\')">Configurar</button>' : '')
+        +   '</div>'
+        +   (b.parametros_ayuda ? '<div id="bot-cfg-' + b.id + '" style="display:none;margin-top:.4rem"><input type="text" id="bot-params-' + b.id + '" placeholder="' + escHtml(b.parametros_ayuda) + '" style="width:100%;padding:.45rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.8rem"></div>' : '')
+        +   '<div id="bot-det-' + b.id + '" style="display:none;margin-top:.5rem" class="auto-resumen"></div>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('bots-tablero').innerHTML = html;
+}
+
+function botConfigurar(id){
+  var caja = document.getElementById('bot-cfg-' + id);
+  if(caja) caja.style.display = caja.style.display === 'block' ? 'none' : 'block';
+}
+
+async function botCancelar(id){
+  if(!confirm('¿Cancelar lo que este bot tiene en cola o corriendo?')) return;
+  try{
+    var r = await fetch('/bots/' + id + '/cancelar', {method:'POST', headers: authH()});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ toast('Bot', d.detail || ('Error ' + r.status), 'error'); return; }
+    toast('Cancelado', d.cancelados + ' trabajo(s) cancelado(s)', 'success');
+    botsCargar();
+  }catch(e){ toast('Bot','Conexión: ' + e.message,'error'); }
+}
+
+async function botReintentar(id){
+  try{
+    var r = await fetch('/bots/' + id + '/reintentar', {method:'POST', headers: authH()});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ toast('Bot', d.detail || ('Error ' + r.status), 'error'); return; }
+    toast('Reintentando', 'Trabajo #' + d.trabajo_id + ' encolado de nuevo', 'success');
+    botsCargar();
+  }catch(e){ toast('Bot','Conexión: ' + e.message,'error'); }
+}
+
+async function botEjecutar(id){
+  var params = {};
+  var inp = document.getElementById('bot-params-' + id);
+  if(inp && inp.value.trim()){
+    // "clave: valor" simple, o texto libre que va como parametro "texto"
+    var v = inp.value.trim();
+    var m = v.match(/^([a-zA-Z_]+)\s*[:=]\s*(.+)$/);
+    if(m) params[m[1]] = m[2]; else params['texto'] = v;
+  }
+  try{
+    var r = await fetch('/bots/' + id + '/ejecutar', {method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()), body: JSON.stringify({parametros: params})});
+    var d = await r.json().catch(function(){ return {}; });
+    if(r.status === 403){ toast('Permiso','Se necesita auditor o superior','warning'); return; }
+    if(!r.ok){ toast('Bot', d.detail || ('Error ' + r.status), 'error'); return; }
+    if(d.encolado){
+      toast('Encolado', d.bot + ': el agente del PC del HUS lo corre y reporta acá.', 'success');
+      botsCargar();
+    } else if(d.motivo === 'nube'){
+      toast('Corre en la nube', d.mensaje, 'info');
+      var ficha = document.getElementById('auto-f-' + d.automatizacion_id);
+      if(ficha) ficha.scrollIntoView({behavior:'smooth', block:'center'});
+    } else {
+      toast('Va por Lotes', d.mensaje, 'info');
+    }
+  }catch(e){ toast('Bot','Conexión: ' + e.message,'error'); }
+}
+
+async function botHistorial(id){
+  var caja = document.getElementById('bot-det-' + id);
+  if(caja.style.display === 'block'){ caja.style.display = 'none'; return; }
+  caja.style.display = 'block'; caja.innerHTML = 'Cargando…';
+  try{
+    var r = await fetch('/bots/' + id + '/historial', {headers: authH()});
+    var d = await r.json();
+    if(!d.trabajos || !d.trabajos.length){ caja.innerHTML = 'Sin corridas registradas todavía.'; return; }
+    caja.innerHTML = d.trabajos.map(function(t){
+      return '#' + t.id + ' · ' + escHtml(t.estado) + ' · ' + (t.creado_en ? new Date(t.creado_en).toLocaleString('es-CO') : '')
+        + (t.equipo ? ' · ' + escHtml(t.equipo) : '') + (t.pedido_por ? ' · ' + escHtml(t.pedido_por) : '')
+        + (t.error ? '<br><span style="color:#dc2626">' + escHtml(t.error) + '</span>' : '');
+    }).join('<br>');
+  }catch(e){ caja.innerHTML = 'Conexión: ' + escHtml(e.message); }
+}
+
+function botRegistros(id){
+  var d = BOTS.datos; if(!d) return;
+  var bot = null;
+  d.grupos.forEach(function(g){ g.bots.forEach(function(b){ if(b.id === id) bot = b; }); });
+  var caja = document.getElementById('bot-det-' + id);
+  if(!bot || !bot.ultima_ejecucion){ return; }
+  var u = bot.ultima_ejecucion;
+  caja.style.display = 'block';
+  caja.innerHTML = '<b>Última corrida #' + u.id + ' (' + escHtml(u.estado) + ')</b><br>'
+    + (u.error ? '<span style="color:#dc2626">' + escHtml(u.error) + '</span><br>' : '')
+    + '<pre style="white-space:pre-wrap;font-size:.72rem;margin-top:.3rem">' + escHtml(u.registro || '(sin registro)') + '</pre>';
+}
+
 // ─── Centro de Automatización ──────────────────────────────────────────
 // Las 34 herramientas de tools/ vivían en un PC con Python. Acá el auditor
 // sube el archivo, elige la herramienta y descarga el resultado.
@@ -20037,16 +21012,56 @@ async function autoCargar(){
   }
 }
 
+// La pantalla es INTERACTIVA: pestañas por grupo, búsqueda en vivo, y el
+// archivo se ARRASTRA a la ficha (o clic para elegirlo). Los parámetros van
+// plegados detrás de "Opciones": el caso normal es subir y ejecutar, y el
+// formulario abierto de entrada era ruido.
+var AUTO_UI = {grupo: '', q: ''};
+
 function autoPintar(){
   var cont = document.getElementById('auto-catalogo');
   if(!AUTO.grupos.length){ cont.innerHTML = '<div class="auto-vacio">No hay automatizaciones disponibles.</div>'; return; }
-  var html = '';
+
+  var chips = '<div class="auto-chips">'
+    + '<button class="auto-chip' + (AUTO_UI.grupo ? '' : ' activo') + '" onclick="autoGrupo(\'\')">Todas</button>'
+    + AUTO.grupos.map(function(g){
+        return '<button class="auto-chip' + (AUTO_UI.grupo === g.nombre ? ' activo' : '')
+          + '" onclick="autoGrupo(\'' + escHtml(g.nombre) + '\')">' + escHtml(g.nombre)
+          + ' <span>' + (g.automatizaciones||[]).length + '</span></button>';
+      }).join('')
+    + '<div class="auto-buscar"><svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+    + '<input id="auto-q" placeholder="Buscar herramienta…" value="' + escHtml(AUTO_UI.q) + '" oninput="autoBuscarEnVivo()"></div>'
+    + '</div>';
+
+  var q = AUTO_UI.q.toUpperCase();
+  var html = '', visibles = 0;
   AUTO.grupos.forEach(function(g){
+    if(AUTO_UI.grupo && AUTO_UI.grupo !== g.nombre) return;
+    var fichas = (g.automatizaciones || []).filter(function(a){
+      if(!q) return true;
+      return (a.nombre + ' ' + a.que_hace + ' ' + a.cuando_usarla).toUpperCase().indexOf(q) >= 0;
+    });
+    if(!fichas.length) return;
+    visibles += fichas.length;
     html += '<h3 class="auto-grupo">' + escHtml(g.nombre) + '</h3><div class="auto-fichas">';
-    (g.automatizaciones || []).forEach(function(a){ html += autoFicha(a); });
+    fichas.forEach(function(a){ html += autoFicha(a); });
     html += '</div>';
   });
-  cont.innerHTML = html;
+  if(!visibles) html = '<div class="auto-vacio">Ninguna herramienta coincide con la búsqueda.</div>';
+  cont.innerHTML = chips + html;
+
+  // El foco vuelve al buscador tras repintar, para seguir tecleando.
+  if(AUTO_UI.q){
+    var qEl = document.getElementById('auto-q');
+    if(qEl){ qEl.focus(); qEl.setSelectionRange(qEl.value.length, qEl.value.length); }
+  }
+}
+
+function autoGrupo(g){ AUTO_UI.grupo = g; autoPintar(); }
+function autoBuscarEnVivo(){
+  var el = document.getElementById('auto-q');
+  AUTO_UI.q = (el && el.value) || '';
+  autoPintar();
 }
 
 function autoFicha(a){
@@ -20060,18 +21075,64 @@ function autoFicha(a){
       + (p.ayuda ? '<small>' + escHtml(p.ayuda) + '</small>' : '')
       + '</label>';
   }).join('');
+  var ext = (a.extensiones || []).join(', ');
   return '<div class="auto-ficha" id="auto-f-' + a.id + '">'
+    // Zona izquierda: qué es la herramienta y cuándo se usa.
+    + '<div class="auto-ficha-info">'
     + '<div class="auto-ficha-nombre">' + escHtml(a.nombre) + '</div>'
     + '<div class="auto-ficha-que">' + escHtml(a.que_hace) + '</div>'
     + '<div class="auto-ficha-cuando">' + escHtml(a.cuando_usarla) + '</div>'
-    + (params ? '<div class="auto-params">' + params + '</div>' : '')
-    + '<div class="auto-archivo">'
-    +   '<input type="file" id="auto-file-' + a.id + '" accept="' + (a.extensiones || []).join(',') + '">'
-    +   '<small>Acepta ' + (a.extensiones || []).join(' o ') + ' · máximo ' + AUTO.limiteMb + ' MB</small>'
     + '</div>'
-    + '<button class="btn btn-primary btn-sm" onclick="autoEjecutar(\'' + a.id + '\')" id="auto-btn-' + a.id + '">Ejecutar</button>'
+    // Zona derecha: el archivo, las opciones y los botones.
+    + '<div class="auto-ficha-accion">'
+    // Zona de arrastre: clic o soltar el archivo encima. El input nativo
+    // queda oculto pero sigue siendo el dueño del archivo elegido.
+    + '<div class="auto-drop" id="auto-drop-' + a.id + '" '
+    +   'onclick="document.getElementById(\'auto-file-' + a.id + '\').click()" '
+    +   'ondragover="event.preventDefault();this.classList.add(\'sobre\')" '
+    +   'ondragleave="this.classList.remove(\'sobre\')" '
+    +   'ondrop="autoSoltar(event,\'' + a.id + '\')">'
+    +   '<svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+    +   '<div class="auto-drop-txt" id="auto-drop-txt-' + a.id + '">Arrastrá el archivo acá o hacé clic'
+    +     '<small>' + escHtml(ext) + ' · máximo ' + AUTO.limiteMb + ' MB</small></div>'
+    +   '<input type="file" id="auto-file-' + a.id + '" accept="' + (a.extensiones || []).join(',') + '" '
+    +     'onchange="autoArchivoElegido(\'' + a.id + '\')" hidden>'
+    + '</div>'
+    + (params
+        ? '<details class="auto-opciones"><summary>Opciones</summary>'
+          + '<div class="auto-params">' + params + '</div></details>'
+        : '')
+    + '<div class="auto-acciones">'
+    +   '<button class="btn btn-ghost btn-sm" onclick="autoPrevisualizar(\'' + a.id + '\')" id="auto-prev-' + a.id + '">Ver qué sale</button>'
+    +   '<button class="btn btn-primary btn-sm" onclick="autoEjecutar(\'' + a.id + '\')" id="auto-btn-' + a.id + '">Descargar resultado</button>'
+    + '</div>'
     + '<div class="auto-estado" id="auto-estado-' + a.id + '"></div>'
+    + '</div>'   // cierra auto-ficha-accion
     + '</div>';
+}
+
+function autoSoltar(ev, id){
+  ev.preventDefault();
+  var drop = document.getElementById('auto-drop-' + id);
+  if(drop) drop.classList.remove('sobre');
+  var archivos = ev.dataTransfer && ev.dataTransfer.files;
+  if(!archivos || !archivos.length) return;
+  var input = document.getElementById('auto-file-' + id);
+  input.files = archivos;
+  autoArchivoElegido(id);
+}
+
+function autoArchivoElegido(id){
+  var input = document.getElementById('auto-file-' + id);
+  var txt = document.getElementById('auto-drop-txt-' + id);
+  var drop = document.getElementById('auto-drop-' + id);
+  if(!input || !input.files.length || !txt) return;
+  var f = input.files[0];
+  var mb = (f.size / 1048576).toFixed(1);
+  txt.innerHTML = '<b>' + escHtml(f.name) + '</b><small>' + mb + ' MB · listo para ejecutar</small>';
+  if(drop) drop.classList.add('con-archivo');
+  var estado = document.getElementById('auto-estado-' + id);
+  if(estado) estado.innerHTML = '';
 }
 
 function _autoDatos(id){
@@ -20122,13 +21183,15 @@ async function autoEjecutar(id){
   var estado = document.getElementById('auto-estado-' + id);
   var boton = document.getElementById('auto-btn-' + id);
   if(!input || !input.files.length){
-    estado.innerHTML = '<span class="auto-error">Elegí primero el archivo.</span>';
+    estado.innerHTML = '<span class="auto-error">Elegí primero el archivo — arrastralo a la zona de arriba.</span>';
     return;
   }
   var fd = _autoDatos(id);
 
+  var textoOriginal = boton.textContent;
   boton.disabled = true;
-  estado.innerHTML = '<span class="auto-corriendo">Procesando…</span>';
+  boton.textContent = 'Procesando…';
+  estado.innerHTML = '<span class="auto-corriendo">Convirtiendo el archivo…</span>';
   try{
     var r = await fetch('/automatizaciones/' + id + '/ejecutar', {
       method: 'POST', headers: authH(), body: fd
@@ -20155,6 +21218,7 @@ async function autoEjecutar(id){
     estado.innerHTML = '<span class="auto-error">Conexión: ' + escHtml(e.message) + '</span>';
   }finally{
     boton.disabled = false;
+    boton.textContent = textoOriginal;
   }
 }
 
@@ -21300,6 +22364,101 @@ async function registrarResultadoConciliacion(id){
 
 // ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
 var AS_FILAS = [];
+
+// ── Acta de la mesa (Excel): revisar cuadre, optimizar e imprimir ──
+function actaxArchivo(){
+  var i = document.getElementById('actax-file');
+  return (i && i.files && i.files[0]) || null;
+}
+function actaxSoltar(ev){
+  ev.preventDefault();
+  var drop = document.getElementById('actax-drop');
+  if(drop) drop.classList.remove('sobre');
+  var fs = ev.dataTransfer && ev.dataTransfer.files;
+  if(!fs || !fs.length) return;
+  document.getElementById('actax-file').files = fs;
+  actaxElegido();
+}
+function actaxElegido(){
+  var f = actaxArchivo(); if(!f) return;
+  var txt = document.getElementById('actax-drop-txt');
+  var mb = (f.size/1048576).toFixed(1);
+  txt.innerHTML = '<b>' + escHtml(f.name) + '</b><small>' + mb + ' MB · listo</small>';
+  document.getElementById('actax-drop').classList.add('con-archivo');
+  actaxEstado('','');
+  var res = document.getElementById('actax-resumen');
+  if(res){ res.style.display = 'none'; }
+}
+function actaxEstado(msg, clase){
+  var e = document.getElementById('actax-estado');
+  if(!e) return;
+  e.className = 'auto-estado ' + (clase||'');
+  e.innerHTML = msg;
+}
+async function actaxRevisar(){
+  var f = actaxArchivo(); if(!f){ toast('Falta el archivo','Subí primero el Excel del acta','warning'); return; }
+  actaxEstado('Cuadrando el acta…','auto-corriendo');
+  try{
+    var fd = new FormData(); fd.append('archivo', f);
+    var r = await fetch('/conciliaciones/acta-excel/revisar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var d = await r.json();
+    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+    var html = '<div class="auto-resumen"><b>' + escHtml(d.entidad||'Acta') + '</b> · ' + d.facturas + ' facturas · ' + d.lineas + ' líneas de glosa'
+      + '<br>Glosado ' + cop(d.glosado) + ' · Levanta entidad ' + cop(d.levanta_entidad) + ' · Acepta IPS ' + cop(d.acepta_ips)
+      + ' · Ratificado ' + cop(d.ratificado) + ' · Pendiente ' + cop(d.pendiente_calculado);
+    if(d.hallazgos && d.hallazgos.length){
+      html += '<br><b style="color:var(--c-red,#dc2626)">' + d.hallazgos.length + ' hallazgo(s) por corregir:</b>';
+      d.hallazgos.slice(0,8).forEach(function(h){
+        html += '<br>· fila ' + (h.fila_excel||'—') + ' ' + escHtml(h.factura||'') + ': ' + escHtml(h.problema);
+      });
+      if(d.hallazgos.length>8) html += '<br>· … y ' + (d.hallazgos.length-8) + ' más (hoja REVISION del Excel optimizado)';
+    } else {
+      html += '<br><b style="color:var(--c-verde,#16a34a)">El acta cuadra completa: lista para firmar.</b>';
+    }
+    html += '</div>';
+    var res = document.getElementById('actax-resumen');
+    res.innerHTML = html; res.style.display = 'block';
+    actaxEstado('','');
+  }catch(e){ actaxEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+async function actaxOptimizar(){
+  var f = actaxArchivo(); if(!f){ toast('Falta el archivo','Subí primero el Excel del acta','warning'); return; }
+  var btn = document.getElementById('actax-btn-exc'); var t0 = btn.textContent;
+  btn.textContent = 'Procesando…'; btn.disabled = true;
+  try{
+    var fd = new FormData(); fd.append('archivo', f);
+    var r = await fetch('/conciliaciones/acta-excel/optimizar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var blob = await r.blob();
+    var m = (r.headers.get('content-disposition')||'').match(/filename="([^"]+)"/);
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = m ? m[1] : 'ACTA_OPTIMIZADA.xlsm';
+    document.body.appendChild(a); a.click(); a.remove();
+    var hz = r.headers.get('X-Hallazgos') || '0';
+    actaxEstado(hz==='0'
+      ? 'Excel optimizado descargado: el acta cuadra completa.'
+      : 'Excel descargado con ' + hz + ' hallazgo(s) listados en la hoja REVISION.',
+      hz==='0' ? 'auto-ok' : '');
+  }catch(e){ actaxEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+  finally{ btn.textContent = t0; btn.disabled = false; }
+}
+async function actaxPdf(){
+  var f = actaxArchivo(); if(!f){ toast('Falta el archivo','Subí primero el Excel del acta','warning'); return; }
+  actaxEstado('Armando el acta…','auto-corriendo');
+  try{
+    var fd = new FormData(); fd.append('archivo', f);
+    var r = await fetch('/conciliaciones/acta-excel/pdf', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var html = await r.text();
+    var w = window.open('', '_blank');
+    w.document.write(html); w.document.close();
+    actaxEstado('Acta abierta en otra pestaña: imprimila con Ctrl+P → Guardar como PDF.','auto-ok');
+  }catch(e){ actaxEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
 
 function abrirActaSinac(){
   AS_FILAS = [];
