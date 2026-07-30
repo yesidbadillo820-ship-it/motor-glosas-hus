@@ -1522,6 +1522,7 @@ body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 .exp-ev-tipo{font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .exp-ev-meta{font-size:.72rem;color:var(--text-3);margin-top:.1rem}
 .exp-ev-det{font-size:.83rem;margin-top:.25rem;line-height:1.45;overflow-wrap:anywhere}
+.exp-doc-grupo{font-size:.75rem;font-weight:700;color:var(--text-2);margin:.35rem 0 .1rem;max-width:980px}
 .exp-lista{display:flex;flex-direction:column;gap:.45rem;max-width:980px}
 .exp-item{display:flex;justify-content:space-between;gap:1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:.5rem .8rem;font-size:.83rem;align-items:center;flex-wrap:wrap}
 .exp-res{display:flex;flex-direction:column;gap:.4rem;max-width:980px}
@@ -9347,6 +9348,19 @@ async function expAbrir(glosaId){
 
 function expFiltrar(g){ EXP.filtro = (EXP.filtro === g) ? '' : g; expPintar(); }
 
+// Descarga autenticada de un documento del expediente (los <a> planos no
+// llevan el token; esto hace fetch con la sesión y dispara la descarga).
+async function expDescargar(url, nombre){
+  try{
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){ toast('Documento', 'HTTP ' + r.status, 'error'); return; }
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nombre || 'documento';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){ toast('Documento', 'Conexión: ' + e.message, 'error'); }
+}
+
 function expPintar(){
   var d = EXP.datos; if(!d) return;
   var f = d.ficha;
@@ -9387,12 +9401,23 @@ function expPintar(){
     });
     html += '</div>';
   }
-  if(d.soportes.length){
-    html += '<div class="exp-sec">Soportes conocidos (' + d.soportes.length + ')</div><div class="exp-lista">';
-    d.soportes.forEach(function(s){
-      html += '<div class="exp-item"><span>' + escHtml(s.tipo||'—') + ' · ' + escHtml(s.nombre||'') + '</span></div>';
+  // 📁 Centro Documental: la carpeta del expediente, armada sola.
+  var docs = d.documentos || {total_documentos: 0, grupos: []};
+  if(docs.total_documentos){
+    html += '<div class="exp-sec">📁 Centro Documental · ' + docs.total_documentos + ' documento(s)</div>';
+    docs.grupos.forEach(function(g){
+      html += '<div class="exp-doc-grupo">' + escHtml(g.nombre) + '</div><div class="exp-lista">';
+      g.documentos.forEach(function(x){
+        html += '<div class="exp-item"><span><b>' + escHtml(x.tipo) + '</b> · ' + escHtml(x.nombre||'')
+              + (x.nota ? '<br><small style="color:var(--text-3)">' + escHtml(x.nota) + '</small>' : '')
+              + '</span>'
+              + (x.url
+                  ? '<button class="btn btn-ghost btn-sm" onclick="expDescargar(\'' + escHtml(x.url) + '\',\'' + escHtml(x.nombre||'documento') + '\')">Abrir</button>'
+                  : (x.ruta ? '<code style="font-size:.7rem;overflow-wrap:anywhere;color:var(--text-3)">' + escHtml(x.ruta) + '</code>' : ''))
+              + '</div>';
+      });
+      html += '</div>';
     });
-    html += '</div>';
   }
 
   // La línea de tiempo, con filtros de un clic
@@ -20615,6 +20640,9 @@ function mallaLista(g, filas){
           ? '<div class="malla-det-g malla-det-excl"><span>No se contrata</span>'
             + c.exclusiones.map(function(x){ return '<em>' + escHtml(x) + '</em>'; }).join('') + '</div>' : '')
       +   (c.observacion ? '<div class="malla-det-g"><span>Observación</span>' + escHtml(c.observacion) + '</div>' : '')
+      // Motor Universal: qué sabe hacer el sistema con este pagador,
+      // cargado la primera vez que se abre la fila.
+      +   '<div class="malla-det-g malla-cap" id="cap-' + id + '" data-pagador="' + escHtml(c.pagador) + '"><span>El sistema con este pagador</span><em style="color:var(--text-3)">…</em></div>'
       + '</div>'
       + '</div>';
   });
@@ -20627,6 +20655,23 @@ function mallaExpandir(id){
   var fila = el.closest('.malla-fila');
   var abierta = fila.classList.contains('abierta');
   fila.classList.toggle('abierta', !abierta);
+  if(!abierta) mallaCapacidades(id);
+}
+
+// Motor Universal: el perfil del pagador se pide una sola vez por fila.
+async function mallaCapacidades(id){
+  var caja = document.getElementById('cap-' + id);
+  if(!caja || caja.dataset.listo) return;
+  caja.dataset.listo = '1';
+  try{
+    var r = await fetch('/malla/perfil?pagador=' + encodeURIComponent(caja.dataset.pagador || ''), {headers: authH()});
+    if(!r.ok){ caja.style.display = 'none'; return; }
+    var p = await r.json();
+    var caps = p.capacidades || [];
+    if(!caps.length){ caja.style.display = 'none'; return; }
+    caja.innerHTML = '<span>El sistema con este pagador</span>'
+      + caps.map(function(c){ return '🤖 ' + escHtml(c); }).join('<br>');
+  }catch(e){ caja.style.display = 'none'; }
 }
 
 // ─── Centro de Automatización ──────────────────────────────────────────

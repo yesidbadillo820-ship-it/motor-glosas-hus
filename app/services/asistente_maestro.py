@@ -208,6 +208,21 @@ TOOLS_ASISTENTE = [
         },
     },
     {
+        "name": "perfil_pagador",
+        "description": (
+            "El Motor Universal: TODO lo que el sistema sabe hacer con un "
+            "pagador — contrato vigente por fecha, respuesta masiva por "
+            "lotes y su bot, conversores de Automatización, contacto de "
+            "radicación. Úsalo cuando pregunten '¿qué se puede hacer con "
+            "X EPS?' o al planear cómo atacar la cartera de un pagador."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"pagador": {"type": "string"}},
+            "required": ["pagador"],
+        },
+    },
+    {
         "name": "diagnostico_operacion",
         "description": (
             "El barrido completo de la operación HOY: glosas vencidas y por "
@@ -225,8 +240,10 @@ TOOLS_ASISTENTE = [
             "El expediente completo de una glosa: ficha, contrato que rige, "
             "constancia contractual, línea de tiempo de TODO lo que ha pasado "
             "(análisis, versiones, cambios de estado, comentarios, actas), "
-            "conciliaciones y soportes conocidos. Úsalo cuando pregunten "
-            "'¿qué ha pasado con…?' o antes de recomendar el siguiente paso."
+            "conciliaciones y el CENTRO DOCUMENTAL (dictamen PDF, actas, "
+            "paquete de evidencia, soportes del share con su ruta). Úsalo "
+            "cuando pregunten '¿qué ha pasado con…?', '¿qué documentos hay?' "
+            "o antes de recomendar el siguiente paso."
         ),
         "input_schema": {
             "type": "object",
@@ -404,6 +421,11 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
                 },
                 ensure_ascii=False,
             )
+
+        if name == "perfil_pagador":
+            from app.services import perfil_pagador as _pp
+
+            return json.dumps(_pp.perfil(args.get("pagador") or ""), ensure_ascii=False)
 
         if name == "diagnostico_operacion":
             from app.services import centro_inteligencia

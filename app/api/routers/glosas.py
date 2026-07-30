@@ -10324,8 +10324,17 @@ def construir_expediente(glosa_id: int, db: Session) -> dict:
         db.query(DictamenVersionRecord).filter(DictamenVersionRecord.glosa_id == glosa_id).count()
     )
 
+    # El Centro Documental del expediente: la carpeta se arma sola.
+    try:
+        from app.services import centro_documental
+
+        documentos = centro_documental.documentos_de(glosa, db)
+    except Exception:
+        documentos = {"glosa_id": glosa.id, "total_documentos": 0, "grupos": []}
+
     return {
         "glosa_id": glosa.id,
+        "documentos": documentos,
         "ficha": {
             "eps": glosa.eps,
             "factura": glosa.factura,
@@ -10362,6 +10371,23 @@ def expediente_glosa(
     estado y qué soportes existen. Lo que antes exigía abrir cuatro
     pantallas y un popup."""
     return construir_expediente(glosa_id, db)
+
+
+@router.get("/{glosa_id}/documentos")
+def documentos_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El Centro Documental del expediente, solo: todos los documentos de
+    la glosa organizados por grupo, cada uno con su enlace del sistema o
+    su ruta en el share del hospital. Sin búsquedas manuales."""
+    from app.services import centro_documental
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    return centro_documental.documentos_de(glosa, db)
 
 
 @router.get("/expediente/buscar")
