@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 27-07-2026
+**Última actualización:** 30-07-2026
 
 ---
 
@@ -18,14 +18,19 @@
    - `tools/responder_glosas_coosalud.py` — portal de COOSALUD (vco.ctamedicas.com).
    - `tools/responder_glosas_simed.py` y `tools/cargar_soportes_simed.py` — SIMED (Dispensario Médico).
    - `tools/responder_glosas_dgh.py` — Dinámica Gerencial (programa de escritorio del hospital).
+   - `tools/responder_glosas_siifa.py` — **SIIFA** (Ministerio de Salud, plataforma
+     nacional, no es un portal de una EPS): a diferencia de los otros, no es un
+     bot de navegador, habla directo con la API oficial de interoperabilidad.
    - Otros: Mutual Ser, FOMAG, radicador de facturación.
 3. **Herramientas de apoyo:** armar el Word/PDF de evidencias
    (`tools/evidencias_a_word.py`, `evidencias_a_pdf.py`), notas crédito del
    Dispensario (renombrar, organizar, verificar CUV), tablero de cartera
-   (`tools/tablero_cartera.py`).
+   (`tools/tablero_cartera.py`), informe masivo de seguimientos SIIFA
+   (`tools/siifa_reporte_seguimientos.py`).
 
 Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
-`CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`.
+`CONTEXTO_DISPENSARIO_GLOSAS.md`, `CONTEXTO_DISPENSARIO_NOTAS.md`,
+`CONTEXTO_SIIFA.md`.
 
 ---
 
@@ -121,6 +126,31 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   Publicado como artifact para socializar ante gerencia. Se generó también el
   cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
   consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
+- **30-07:** **nace el proyecto SIIFA** (plataforma del Ministerio de Salud,
+  distinta de COOSALUD/SIMED/DGH — la portalidad nacional de seguimiento de
+  facturas). El auditor mostró la pantalla `Listar seguimientos` (2.579
+  registros, sin botón de exportar) y subió los manuales oficiales y la
+  documentación técnica de la API (swagger, colección Postman, manual de
+  interoperabilidad). Hallazgo clave: **SIIFA sí tiene API REST oficial** de
+  interoperabilidad (a diferencia de COOSALUD/SIMED), documentada y con
+  endpoints específicos para listar y responder glosas — así que las dos
+  herramientas nuevas hablan HTTP directo, sin navegador:
+  - `docs/CONTEXTO_SIIFA.md`: plataforma, roles (IPS/ERP/FITS), autenticación
+    JWT, catálogo de endpoints usados, y los plazos del trámite de glosa
+    (Res. 1962/2025, Ley 1438/2011 Art. 57: 15 días hábiles para responder,
+    7 para subsanar una glosa reiterada).
+  - `tools/siifa_client.py`: cliente compartido (login, paginación automática,
+    respuesta de glosas).
+  - `tools/siifa_reporte_seguimientos.py`: trae TODOS los seguimientos del HUS
+    (paginando solo) y arma el Excel masivo que pedía el auditor, con hoja de
+    resumen por EPS.
+  - `tools/responder_glosas_siifa.py`: el "bot tipo COOSALUD" pedido — lee un
+    Excel tipificado y carga cada respuesta por API, con el mismo patrón de
+    piloto/reporte CSV/`--saltar-csv` que el bot de COOSALUD.
+  - Las tres piezas se probaron de punta a punta contra un servidor SIIFA de
+    prueba (simulado, no el real) para validar el flujo completo: login →
+    paginación → export a Excel → piloto de 1 glosa → cargue masivo con un
+    error simulado → reintento sin duplicar. Todo funcionó como se diseñó.
 
 ---
 
@@ -162,6 +192,20 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ### Informes
 10. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
     proceso manual y cuántas personas) para poner el multiplicador exacto.
+
+### SIIFA (nuevo, ver `docs/CONTEXTO_SIIFA.md`)
+11. **Confirmar la URL del servicio de Auth** (`SIIFA_AUTH_URL`) — no está en
+    los manuales que tenemos, el script trae una hipótesis
+    (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
+    mesa de ayuda SIIFA / soporte MinSalud.
+12. **Primera corrida real** de `tools/siifa_reporte_seguimientos.py` (sin
+    filtros) para tener el Excel maestro de los 2.579 seguimientos y
+    verificar que las columnas coincidan con lo que el auditor espera.
+13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
+    una sola glosa antes de cualquier cargue masivo (regla del repo).
+14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
+    falta automatizar también la subsanación (`ReiteracionRespuesta`) desde
+    el arranque, o si eso se deja para cuando llegue el primer lote real.
 
 ## 4) PARA MAÑANA
 
