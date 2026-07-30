@@ -969,6 +969,19 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 29-07 (séptima parte) — Épica: el Constructor de Agentes
+
+- **El sistema ya arma sus propios agentes.** Menú → Herramientas →
+  **Agentes**: se escribe la misión, las instrucciones y se marcan las
+  herramientas permitidas — y el agente queda corriendo con todo lo que
+  el sistema sabe (expediente, malla, diagnóstico, soportes), pero SOLO
+  dentro de su misión y sus herramientas. Sin programar nada.
+- Dos plantillas de fábrica para arrancar con un clic: **Vigilante de
+  vencimientos** y **Preparador de mesa**.
+- Cada construcción, corrida y retiro queda en la auditoría (quién, qué
+  agente, qué preguntó, qué herramientas usó).
+- Guía corta en `docs/CONSTRUCTOR_AGENTES.md`.
+
 ---
 
 ## 3) PENDIENTE
