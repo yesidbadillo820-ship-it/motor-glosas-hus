@@ -1073,7 +1073,7 @@ class EnvioCargadoRecord(Base):
     cargado_por = Column(String(200), nullable=True)
     cargado_en = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (Index("ix_preaud_envio_cargado", "envio", unique=True),)
+    __table_args__ = (Index("ix_preaud_envio_cargado", "envio", "oficio_id", unique=True),)
 
 
 # ---------- CONSOLIDADO: la factura canónica (una sola fila por factura) ------

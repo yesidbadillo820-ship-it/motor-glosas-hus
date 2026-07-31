@@ -832,13 +832,34 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
       nueva + evento REINGRESO.
     """
     envio = str(envio).strip()
-    ya = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).one_or_none()
-    if ya:
+
+    # Chequeo dedup: el mismo envío NO puede cargarse 2 veces en el MISMO oficio
+    ya_en_este = (
+        db.query(EnvioCargadoRecord)
+        .filter(EnvioCargadoRecord.envio == envio, EnvioCargadoRecord.oficio_id == oficio.id)
+        .one_or_none()
+    )
+    if ya_en_este:
         return {
             "ya_cargado": True,
-            "mensaje": "El envío ya fue cargado.",
+            "mensaje": "El envío ya fue cargado en este oficio.",
             "envio": envio,
-            "cargado_en": a_utc(ya.cargado_en).isoformat() if ya.cargado_en else None,
+            "cargado_en": a_utc(ya_en_este.cargado_en).isoformat() if ya_en_este.cargado_en else None,
+        }
+
+    # Límite: máximo 3 oficios por envío
+    veces = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).count()
+    if veces >= 3:
+        oficios = (
+            db.query(EnvioCargadoRecord)
+            .filter(EnvioCargadoRecord.envio == envio)
+            .all()
+        )
+        lista = ", ".join(str(o.oficio_id) for o in oficios)
+        return {
+            "ya_cargado": True,
+            "mensaje": f"El envío {envio} ya fue cargado en 3 oficios ({lista}). Límite alcanzado.",
+            "envio": envio,
         }
 
     src = facturas_de_envio(db, envio)
