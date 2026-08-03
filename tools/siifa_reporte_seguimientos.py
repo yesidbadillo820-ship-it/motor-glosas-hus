@@ -324,6 +324,22 @@ def _sin_repetidos(filas: list[dict]) -> list[dict]:
     return unicas
 
 
+def ruta_para_informe_incompleto(destino: Path) -> Path:
+    """Devuelve un nombre alterno, con «_PARCIAL», para un informe a medias.
+
+    Un informe incompleto NUNCA debe pisar al bueno. Si el archivo pedido ya
+    existe —por ejemplo, el informe completo de una corrida anterior— se
+    perdería sin aviso. Se guarda al lado, con el nombre marcado, y el
+    anterior queda intacto.
+    """
+    alterna = destino.with_name(f"{destino.stem}_PARCIAL{destino.suffix}")
+    for n in range(2, 100):
+        if not alterna.exists():
+            break
+        alterna = destino.with_name(f"{destino.stem}_PARCIAL_{n}{destino.suffix}")
+    return alterna
+
+
 def correr_diagnostico(cliente: SiifaClient) -> int:
     print("\nRevisión del sistema SIIFA — paso a paso\n" + "=" * 46)
     pasos = cliente.diagnostico()
@@ -390,6 +406,7 @@ def main() -> None:
     usuario, password = credenciales_desde_env()
     filas: list[dict] = []
     interrumpido = False
+    corte_parcial = False
 
     with SiifaClient() as cliente:
         if args.diagnostico:
@@ -440,15 +457,22 @@ def main() -> None:
             # el servidor no puede con la consulta completa. Si sólo se
             # contemplara el 500, una corrida donde los tres intentos se agotan
             # por tiempo terminaría sin informe en vez de pasar a meses.
-            if (
-                (exc.status_code >= 500 or exc.status_code == 0)
-                and not args.por_meses
-                and not filas
-            ):
-                logger.warning(
-                    "SIIFA no aguanta la consulta completa. Lo intento mes por mes, "
-                    "que es mucho más liviano para su servidor..."
-                )
+            if (exc.status_code >= 500 or exc.status_code == 0) and not args.por_meses:
+                if filas:
+                    # Haber alcanzado a bajar un pedazo NO es razón para
+                    # rendirse: un informe con un pedazo no le sirve a nadie.
+                    # Se sigue mes por mes y al final se quitan los repetidos
+                    # por id de seguimiento, así que lo ya bajado no estorba.
+                    logger.warning(
+                        "La consulta completa se cortó con %d registros bajados. "
+                        "Sigo mes por mes para completar el informe...",
+                        len(filas),
+                    )
+                else:
+                    logger.warning(
+                        "SIIFA no aguanta la consulta completa. Lo intento mes por mes, "
+                        "que es mucho más liviano para su servidor..."
+                    )
                 ini = _fecha(args.desde) or date(2025, 1, 1)
                 fin = _fecha(args.hasta) or (date.today() + timedelta(days=1))
                 try:
@@ -459,6 +483,9 @@ def main() -> None:
                     logger.warning("Cancelado por el usuario — guardo lo bajado.")
             elif filas:
                 # Guardar lo bajado igual: mejor un informe parcial que nada.
+                # Pero queda marcado como incompleto, para que se guarde con
+                # otro nombre y no pise un informe bueno anterior.
+                corte_parcial = True
                 logger.error(
                     "Se cortó la consulta (%s). Guardo las %d filas bajadas.", exc, len(filas)
                 )
@@ -481,13 +508,24 @@ def main() -> None:
         )
         return
 
-    escribir_xlsx(filas, Path(args.salida))
+    pedido = Path(args.salida)
+    incompleto = interrumpido or corte_parcial or bool(periodos_fallidos)
+    destino = ruta_para_informe_incompleto(pedido) if incompleto else pedido
+    if incompleto and destino != pedido:
+        logger.warning(
+            "El informe quedó INCOMPLETO. Lo guardo aparte, como «%s», y NO toco «%s»: "
+            "así un informe a medias nunca pisa uno bueno.",
+            destino.name,
+            pedido.name,
+        )
+
+    escribir_xlsx(filas, destino)
     sin_respuesta = sum(1 for f in filas if f["tiene_respuesta"] == "NO")
     logger.info(
         "Listo: %d seguimientos (%d sin respuesta del HUS).%s",
         len(filas),
         sin_respuesta,
-        " ATENCIÓN: informe PARCIAL, la bajada se interrumpió." if interrumpido else "",
+        " ATENCIÓN: informe PARCIAL — está incompleto, hay que repetirlo." if incompleto else "",
     )
 
 
