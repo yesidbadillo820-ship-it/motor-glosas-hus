@@ -354,6 +354,29 @@ def correr_diagnostico(cliente: SiifaClient) -> int:
     return 0
 
 
+def verificar_se_puede_guardar(ruta: Path) -> None:
+    """Comprueba que el informe se va a poder guardar ANTES de bajarlo.
+
+    Bajar los 2.600 seguimientos toma varios minutos. Descubrir al final que
+    la carpeta no existe, que la unidad de red no está conectada o que se
+    escribió cualquier cosa en vez de una ruta es perder todo ese trabajo
+    —pasó el 03-08-2026— y encima con el servidor del Ministerio ya cargado.
+    """
+    try:
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        prueba = ruta.parent / ".prueba_escritura_hus.tmp"
+        prueba.write_text("ok", encoding="utf-8")
+        prueba.unlink()
+    except OSError as exc:
+        raise SystemExit(
+            f"\nERROR: el informe no se va a poder guardar en:\n"
+            f"  {ruta}\n"
+            f"  ({getattr(exc, 'strerror', None) or exc})\n\n"
+            "Revisá que sea la ruta de una CARPETA válida y que la unidad esté\n"
+            "conectada. No bajo nada hasta que la ruta sirva.\n"
+        )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -402,6 +425,9 @@ def main() -> None:
 
     if not args.diagnostico and not args.salida:
         raise SystemExit("ERROR: falta --salida (o usar --diagnostico para revisar el sistema).")
+
+    if args.salida:
+        verificar_se_puede_guardar(Path(args.salida))
 
     usuario, password = credenciales_desde_env()
     filas: list[dict] = []

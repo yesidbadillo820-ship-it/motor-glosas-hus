@@ -1425,6 +1425,24 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   tarifas/facturación/pertinencia (se sostienen con el contrato), y de últimas
   soportes y DE5601 (esas exigen el papel y el acuse).
 
+### 03-08 (novena parte) — Primera corrida real del bot de SIIFA: dos correcciones
+
+- Yesid corrió `CARGAR_SIIFA.cmd` por primera vez. En la pregunta de la
+  carpeta de trabajo quedó pegado un comando en vez de una ruta; el bot lo
+  aceptó, bajó los **2.598 seguimientos** (7 minutos, con el servidor del
+  Ministerio en mal día) y **todo se perdió al momento de guardar**.
+- **Corregido en dos partes**, para que no vuelva a pasar por ningún camino:
+  1. El bot valida la carpeta ANTES de empezar: si la ruta no sirve o no deja
+     guardar (unidad de red desconectada, por ejemplo), lo dice de una y
+     vuelve a preguntar. Se agregó la opción **[8] Cambiar la carpeta**.
+  2. El propio informe (`siifa_reporte_seguimientos.py`) revisa que va a
+     poder guardar antes de bajar nada — así también queda protegido quien
+     corra el comando a mano.
+- De la misma corrida quedó confirmado que el modo **mes por mes** funciona:
+  la consulta completa se cayó (el servidor respondió 500 y hubo que bajar de
+  50 a 10 registros por tanda), el bot cambió solo de estrategia y completó
+  el informe.
+
 ---
 
 ## 3) PENDIENTE

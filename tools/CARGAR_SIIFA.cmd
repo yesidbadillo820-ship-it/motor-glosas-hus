@@ -53,10 +53,12 @@ echo   [OK] Guardados. La proxima vez ya no los pide.
 echo.
 
 :carpeta
-REM --- 4) Carpeta de trabajo ------------------------------------------
+REM --- 4) Carpeta de trabajo (se valida ANTES de bajar nada) ----------
+echo.
 set "DEFCARP=D:\USUARIO CARTERA\Documents\SIIFA"
 echo   Carpeta de trabajo de SIIFA (Enter para la de por defecto):
 echo   [%DEFCARP%]
+echo   Es una CARPETA, no un comando: algo como D:\...\SIIFA
 set "CARPETA="
 set /p "CARPETA=  Ruta: "
 set "CARPETA=%CARPETA:"=%"
@@ -64,6 +66,12 @@ if not defined CARPETA set "CARPETA=%DEFCARP%"
 :quitarbs
 if "%CARPETA:~-1%"=="\" ( set "CARPETA=%CARPETA:~0,-1%" & goto quitarbs )
 if not exist "%CARPETA%" mkdir "%CARPETA%" >nul 2>&1
+if not exist "%CARPETA%" goto carpetamala
+REM Que se pueda ESCRIBIR: de nada sirve bajar el informe y no poder guardarlo.
+echo prueba> "%CARPETA%\_prueba_hus.tmp" 2>nul
+if not exist "%CARPETA%\_prueba_hus.tmp" goto carpetasinpermiso
+del "%CARPETA%\_prueba_hus.tmp" >nul 2>&1
+echo   [OK] Carpeta lista: %CARPETA%
 
 set "INFORME=%CARPETA%\informe_seguimientos.xlsx"
 set "GLOSAS=%CARPETA%\respuestas_GLOSAS.xlsx"
@@ -81,6 +89,7 @@ echo   [4] Cargar TODAS las glosas
 echo   [5] Cargar TODAS las devoluciones
 echo   [6] Reintentar lo que quedo con error
 echo   [7] Ver los codigos de respuesta que acepta SIIFA
+echo   [8] Cambiar la carpeta de trabajo
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -92,6 +101,7 @@ if "%OPCION%"=="4" goto cargarglosas
 if "%OPCION%"=="5" goto cargardevol
 if "%OPCION%"=="6" goto reintentar
 if "%OPCION%"=="7" goto catalogo
+if "%OPCION%"=="8" goto carpeta
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -209,6 +219,23 @@ goto menu
 echo   [ERROR] No se encontro el export de DGH en esa ruta.
 pause
 goto menu
+
+:carpetamala
+echo.
+echo   [ERROR] Esa ruta no sirve como carpeta:
+echo           %CARPETA%
+echo           Escribe SOLO la ruta de una carpeta (ej. D:\USUARIO CARTERA\Documents\SIIFA),
+echo           sin comandos ni nombres de archivo. Enter usa la de por defecto.
+echo.
+goto carpeta
+
+:carpetasinpermiso
+echo.
+echo   [ERROR] La carpeta existe pero no deja guardar archivos:
+echo           %CARPETA%
+echo           Elige otra (o revisa si la unidad de red esta conectada).
+echo.
+goto carpeta
 
 :sincredenciales
 echo   [ERROR] Sin usuario y clave no se puede entrar a SIIFA.
