@@ -1008,6 +1008,20 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 30-07 (segunda parte) — Las tarjetas de COOSALUD y SIMED cuentan su lote
+
+- Los dos bots que trabajan por Lotes ya muestran **su cola real en la
+  propia tarjeta**: qué lote va (archivo, cuántas facturas, quién lo
+  subió), en qué equipo corre, y si terminó con facturas pendientes la
+  tarjeta queda en ámbar «CON PENDIENTES» — nunca más un verde engañoso.
+  El botón lleva directo a la pantalla de Lotes.
+- Una revisión automática con verificadores independientes encontró
+  cuatro defectos antes de publicar (botones que no aplicaban a lotes,
+  el estado «completado con pendientes» invisible, y una consulta que
+  cargaba el Excel completo de cada lote a la memoria del servidor —
+  el mismo error que ya había tumbado la instancia una vez). Los cuatro
+  quedaron corregidos y sellados con pruebas.
+
 ### 30-07 — Todos los bots del hospital, administrados desde la plataforma
 
 - **Se acabó el doble clic a ciegas.** El Centro de Automatización ahora
