@@ -1008,6 +1008,16 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 03-08 (tercera parte) — El Centro de Inteligencia vigila los bots y los lotes
+
+- El barrido del día ganó dos ojos nuevos: **los trabajos de bots que
+  fallaron** esta semana (con qué bot y a dónde ir a reintentarlos) y los
+  que llevan **más de una hora en cola sin que ningún PC los reclame**
+  (señal de que el agente de bots no está abierto), y **los lotes de
+  respuesta masiva que quedaron a medias** (completados con facturas
+  pendientes o en error). Todo aparece en la pantalla Inteligencia y en
+  el chat, con su botón directo a Automatización.
+
 ### 03-08 (segunda parte) — Ronda 35: el formato de respuesta que aprobó Yesid
 
 - La respuesta del caso de la citología quedó como **modelo oficial del

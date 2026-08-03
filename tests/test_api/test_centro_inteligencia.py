@@ -163,3 +163,58 @@ class TestPantalla:
 
         area = re.search(r"\.intel-area\{[^}]*\}", html).group(0)
         assert "overflow-y:auto" in area
+
+
+class TestFuentesBotsYLotes:
+    """El barrido también vigila la cola de bots y los lotes a medias."""
+
+    def test_trabajo_de_bot_fallido_entra_al_diagnostico(self, db_session):
+        from app.models.db import TrabajoBotRecord
+
+        db_session.add(
+            TrabajoBotRecord(
+                bot_id="dgh-responder",
+                estado="ERROR",
+                error="DGH cerró la sesión",
+                pedido_por="a@hus.gov.co",
+            )
+        )
+        db_session.commit()
+        d = ci.diagnostico(db_session)
+        bots = [a for a in d["acciones"] if "bots FALLARON" in a["titulo"]]
+        assert bots and bots[0]["pantalla"] == "automatizacion"
+        assert "dgh-responder" in bots[0]["por_que"]
+
+    def test_trabajo_estancado_sin_agente_avisa(self, db_session):
+        from datetime import datetime, timedelta, timezone
+
+        from app.models.db import TrabajoBotRecord
+
+        db_session.add(
+            TrabajoBotRecord(
+                bot_id="radicador",
+                estado="PENDIENTE",
+                creado_en=datetime.now(timezone.utc) - timedelta(hours=3),
+            )
+        )
+        db_session.commit()
+        d = ci.diagnostico(db_session)
+        assert any("sin agente" in a["titulo"] for a in d["acciones"])
+
+    def test_lote_a_medias_entra_al_diagnostico(self, db_session):
+        from app.models.db import LoteRecord
+
+        db_session.add(
+            LoteRecord(
+                creado_por="a@hus.gov.co",
+                pagador="COOSALUD",
+                nombre_archivo="L.xlsx",
+                estado="COMPLETADO_CON_PENDIENTES",
+                total_facturas=45,
+                excel_archivo=b"x",
+            )
+        )
+        db_session.commit()
+        d = ci.diagnostico(db_session)
+        lotes = [a for a in d["acciones"] if "a medias" in a["titulo"]]
+        assert lotes and "COOSALUD" in lotes[0]["por_que"]
