@@ -34,6 +34,9 @@ tools/
 !tools/excel_a_csv.py
 !tools/revisar_xml_facturas.py
 !tools/convertir_tramite_masivo.py
+# Recuperación del registro de envíos de pre-auditoría (incidente 31-07):
+# se corre DENTRO del contenedor con docker exec, así que debe viajar.
+!tools/preauditoria_reconstruir_envios.py
 
 # Python
 __pycache__/
