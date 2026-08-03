@@ -295,11 +295,106 @@ def _actas_con_hallazgos(db) -> list[dict]:
     ]
 
 
+def _bots_con_problemas(db) -> list[dict]:
+    """Los trabajos de bots del PC del HUS que fallaron o llevan mucho en
+    cola sin que ningún agente los reclame."""
+    from app.models.db import TrabajoBotRecord
+
+    desde = datetime.now(timezone.utc) - timedelta(days=7)
+    filas = (
+        db.query(TrabajoBotRecord)
+        .filter(TrabajoBotRecord.creado_en >= desde)
+        .order_by(TrabajoBotRecord.id.desc())
+        .limit(200)
+        .all()
+    )
+    acciones = []
+    errores = [t for t in filas if t.estado == "ERROR"]
+    if errores:
+        bots = ", ".join(sorted({t.bot_id for t in errores})[:4])
+        acciones.append(
+            _accion(
+                2,
+                "🤖",
+                f"{len(errores)} trabajo(s) de bots FALLARON esta semana",
+                f"Bots con error: {bots}. El motivo exacto está en «Ver registros» "
+                "de cada tarjeta; se reintenta con un clic.",
+                "automatizacion",
+                "Ir a Automatización",
+                cantidad=len(errores),
+                ids=[t.id for t in errores],
+            )
+        )
+    from app.core.tz import a_utc
+
+    ahora = datetime.now(timezone.utc)
+    estancados = [
+        t
+        for t in filas
+        if t.estado == "PENDIENTE"
+        and t.creado_en
+        and (ahora - a_utc(t.creado_en)).total_seconds() > 3600
+    ]
+    if estancados:
+        acciones.append(
+            _accion(
+                2,
+                "⏸",
+                f"{len(estancados)} trabajo(s) llevan más de una hora en cola sin agente",
+                "Ningún PC del HUS los ha reclamado: revisar que el agente de bots "
+                "(AGENTE_BOTS.cmd) esté abierto en algún equipo.",
+                "automatizacion",
+                "Ir a Automatización",
+                cantidad=len(estancados),
+                ids=[t.id for t in estancados],
+            )
+        )
+    return acciones
+
+
+def _lotes_a_medias(db) -> list[dict]:
+    """Lotes que terminaron con facturas sin responder o fallaron."""
+    from app.models.db import LoteRecord
+
+    desde = datetime.now(timezone.utc) - timedelta(days=14)
+    filas = (
+        db.query(LoteRecord)
+        .filter(
+            LoteRecord.estado.in_(("COMPLETADO_CON_PENDIENTES", "ERROR")),
+            LoteRecord.creado_en >= desde,
+        )
+        .order_by(LoteRecord.id.desc())
+        .limit(20)
+        .all()
+    )
+    if not filas:
+        return []
+    detalle = "; ".join(
+        f"{lote.pagador} #{lote.id} ({lote.total_facturas} facturas, {lote.estado.replace('_', ' ').lower()})"
+        for lote in filas[:3]
+    )
+    return [
+        _accion(
+            2,
+            "📦",
+            f"{len(filas)} lote(s) de respuesta masiva quedaron a medias",
+            f"{detalle}. Las facturas que no entraron al portal siguen sin "
+            "responder: revisar el semáforo del lote y relanzar lo pendiente.",
+            "automatizacion",
+            "Ir a Automatización",
+            cantidad=len(filas),
+            ids=[lote.id for lote in filas],
+        )
+    ]
+
+
 _FUENTES = (
     ("vencimientos", _vencimientos),
     ("malla", _malla),
     ("verificaciones", _verificaciones_sin_contrato),
     ("conciliaciones", _conciliaciones_proximas),
+    ("bots", _bots_con_problemas),
+    ("lotes", _lotes_a_medias),
     ("actas", _actas_con_hallazgos),
 )
 
