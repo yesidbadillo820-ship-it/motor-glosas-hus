@@ -1496,7 +1496,17 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
    de pre-auditoría.
 7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
    COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
-8. **SIIFA — revisar la hoja de respuestas y hacer el piloto.** El informe
+8. **SIIFA — revisar los dos archivos de respuestas y hacer el piloto.**
+   Ya están generados `respuestas_GLOSAS.xlsx` (1.238) y
+   `respuestas_DEVOLUCIONES.xlsx` (1.341), con respuesta en TODAS las filas:
+   1.082 son la respuesta real que el hospital ya había dado en DGH y 1.497
+   las redactó el motor nuevo (`tools/siifa_redactar_respuestas.py`). Cada
+   fila dice en la columna REVISAR qué hay que verificar antes de subirla.
+   Lo urgente de revisar: las de soportes (SO*), que no se sostienen sin
+   anexar el papel, y las 674 devoluciones DE5601, donde hay que confirmar
+   el acuse de radicación. Después, piloto de 1 glosa y cargue.
+
+9. **SIIFA — lo que quedó del trabajo anterior.** El informe
    maestro ya está rebajado (2.597) y la hoja de trabajo ya salió cruzada
    con DGH: de las 272 respuestas, **162 vienen puestas** y **110 hay que
    escribirlas**. El orden del trabajo es:
