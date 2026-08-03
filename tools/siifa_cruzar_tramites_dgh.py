@@ -45,6 +45,7 @@ import logging
 import re
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -85,6 +86,30 @@ def _entero(valor) -> int | None:
         return int(float(valor))
     except (TypeError, ValueError):
         return None
+
+
+def fecha_dia(valor) -> str:
+    """La fecha en que el hospital respondió, como AAAA-MM-DD.
+
+    Es la fecha que hay que digitar en SIIFA: la del día en que el HUS
+    contestó de verdad, no la de hoy. Si se sube con la fecha de hoy, en el
+    histórico de SIIFA la respuesta queda registrada meses después de la
+    glosa —es decir, fuera del término— y eso es lo primero que mira la EPS
+    en una conciliación.
+    """
+    if valor in (None, ""):
+        return ""
+    if isinstance(valor, datetime):
+        return valor.strftime("%Y-%m-%d")
+    texto = str(valor).strip()
+    for trozo in (texto, texto[:10]):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(trozo, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+    logger.warning("Fecha de respuesta de DGH no reconocida: %r", texto)
+    return ""
 
 
 def _ubicar_columnas(columnas: list[str]) -> dict[str, int]:
@@ -140,7 +165,7 @@ def leer_tramites(ruta: Path, facturas: set[str], hoja: str = "BD TRAMITE") -> l
                 "observacion_respuesta": str(f[pos["observacion_respuesta"]] or "").strip()
                 if "observacion_respuesta" in pos
                 else "",
-                "fecha_respuesta": str(f[pos["fecha_respuesta"]] or "")
+                "fecha_respuesta": fecha_dia(f[pos["fecha_respuesta"]])
                 if "fecha_respuesta" in pos
                 else "",
                 "estado": str(f[pos["estado"]] or "") if "estado" in pos else "",
@@ -200,9 +225,12 @@ def respuesta_para_grupo(lineas: list[dict], fino: dict, grueso: dict) -> dict |
         avisos.append("DGH tiene más de una respuesta para esta glosa: quedó la más reciente")
     if origen == "POR_CODIGO":
         avisos.append("el valor objetado no calza con el de DGH")
+    if not elegida["fecha_respuesta"]:
+        avisos.append("DGH no trae la fecha en que se respondió: revisar antes de subirla")
     return {
         "CODIGO_RESPUESTA": elegida["codigo_respuesta"],
         "OBSERVACION_RESPUESTA": elegida["observacion_respuesta"],
+        "FECHA_RESPUESTA": elegida["fecha_respuesta"],
         "ORIGEN": origen,
         "REVISAR": "; ".join(avisos) or None,
     }

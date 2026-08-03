@@ -9,6 +9,7 @@ perdido y, peor, dejaría dos respuestas distintas para la misma glosa.
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -223,6 +224,42 @@ def test_lo_cruzado_llega_completo_hasta_el_excel_del_bot(tmp_path):
     assert not sin_responder
     assert {f["ID_SEGUIMIENTO_FACTURA_GLOSA"] for f in filas} == {101, 102}
     assert all(f["CODIGO_RESPUESTA"] == "RE9901" for f in filas)
+    assert all(f["FECHA_RESPUESTA"] == "2026-01-06" for f in filas)
+
+
+@pytest.mark.parametrize(
+    "en_dgh, esperada",
+    [
+        ("2026-05-11 12:17:44", "2026-05-11"),  # el caso real del export
+        ("2026-05-11", "2026-05-11"),
+        ("11/05/2026", "2026-05-11"),
+        (datetime(2026, 5, 11, 12, 17, 44), "2026-05-11"),
+        ("", ""),
+    ],
+)
+def test_la_fecha_en_que_se_respondio_llega_al_excel_del_bot(tmp_path, en_dgh, esperada):
+    """Es la fecha que se digita en SIIFA, y no puede ser la de hoy.
+
+    Si la respuesta que el hospital dio en mayo se sube con la fecha de hoy,
+    en el histórico de SIIFA queda respondida meses después de la glosa —es
+    decir, fuera del término— y eso es lo primero que mira la EPS.
+    """
+    informe = _informe_siifa(tmp_path, [_glosa(101, "HUS497119", "TA2301", valor=308905)])
+    tramites = _tramites_dgh(tmp_path, [_tramite("HUS0000497119", "TA2301", 308905, fecha=en_dgh)])
+
+    _, previas = _cruzar(informe, tramites)
+
+    assert next(iter(previas.values()))["FECHA_RESPUESTA"] == esperada
+
+
+def test_si_dgh_no_dice_cuando_se_respondio_la_fila_queda_marcada(tmp_path):
+    """Sin fecha el bot pondría la de hoy: el auditor tiene que verlo."""
+    informe = _informe_siifa(tmp_path, [_glosa(101, "HUS497119", "TA2301", valor=308905)])
+    tramites = _tramites_dgh(tmp_path, [_tramite("HUS0000497119", "TA2301", 308905, fecha="")])
+
+    _, previas = _cruzar(informe, tramites)
+
+    assert "fecha" in next(iter(previas.values()))["REVISAR"]
 
 
 def test_avisa_si_el_archivo_de_tramites_no_es_el_de_dgh(tmp_path):

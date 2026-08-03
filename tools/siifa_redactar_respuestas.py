@@ -36,6 +36,11 @@ revisarlas y subirlas después. OJO con el término del artículo 57 de la Ley
 Los dos archivos salen listos para tools/responder_glosas_siifa.py, con una
 fila por glosa y su id de SIIFA. Antes del cargue masivo: piloto de 1 glosa.
 
+La columna FECHA_RESPUESTA lleva la fecha en que el hospital respondió en DGH
+—que es la que se digita en SIIFA— y va vacía en lo redactado, que se está
+respondiendo hoy. Subir una respuesta vieja con la fecha de hoy la deja
+registrada fuera del término del artículo 57 de la Ley 1438 de 2011.
+
 INSTALACIÓN (una vez):
     py -m pip install openpyxl
 """
@@ -332,6 +337,7 @@ def escribir(filas: list[dict], ruta: Path, titulo: str) -> None:
         "ORIGEN_RESPUESTA",
         "REVISAR",
         "CODIGO_RESPUESTA",
+        "FECHA_RESPUESTA",
         "OBSERVACION_RESPUESTA",
     ]
     wb = Workbook()
@@ -356,7 +362,7 @@ def escribir(filas: list[dict], ruta: Path, titulo: str) -> None:
                 c.fill = del_hus if fila.get(h) != "REDACTADA" else redactada
             if h == "VALOR_GLOSA":
                 c.number_format = '"$"#,##0'
-    anchos = [16, 14, 12, 12, 45, 45, 14, 10, 16, 45, 14, 120]
+    anchos = [16, 14, 12, 12, 45, 45, 14, 10, 16, 45, 14, 14, 120]
     for i, a in enumerate(anchos, 1):
         ws.column_dimensions[get_column_letter(i)].width = a
     ws.freeze_panes = "A2"
@@ -384,14 +390,20 @@ def armar(informe: Path, tramites: Path | None) -> list[dict]:
         previa = previas.get(clave)
         for linea in lineas:
             if previa:
+                # La fecha es la del día en que el HUS respondió en DGH, no la
+                # de hoy: si sube con la de hoy, en SIIFA la respuesta queda
+                # registrada fuera del término.
                 resp = {
                     "CODIGO_RESPUESTA": previa["CODIGO_RESPUESTA"],
                     "OBSERVACION_RESPUESTA": previa["OBSERVACION_RESPUESTA"],
+                    "FECHA_RESPUESTA": previa.get("FECHA_RESPUESTA"),
                     "REVISAR": previa.get("REVISAR"),
                 }
                 origen = previa["ORIGEN"]
             else:
-                resp = redactar(linea)
+                # Lo redactado se está respondiendo hoy: sin fecha, el bot
+                # pone la de hoy, que es la que corresponde.
+                resp = {**redactar(linea), "FECHA_RESPUESTA": None}
                 origen = "REDACTADA"
             filas.append(
                 {
