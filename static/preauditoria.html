@@ -508,8 +508,22 @@ async function previewEnvio(id){
   if(!env){ msg.innerHTML='<div class="aviso aviso-err">Escriba el envío.</div>'; return; }
   try{ var p=await api('/preauditoria/oficios/'+id+'/envios/'+encodeURIComponent(env)+'/preview');
     if(!p.existe_en_fuente){ msg.innerHTML='<div class="aviso aviso-err">El envío '+esc(env)+' no está en la Radicación cargada.</div>'; return; }
-    var h='<div class="aviso '+(p.ya_cargado?'aviso-warn':'aviso-ok')+'">'+(p.ya_cargado?'⚠️ Este envío YA fue cargado. ':'')+
-      'Trae <b>'+p.total_en_fuente+'</b> factura(s): '+p.nuevas+' nuevas, '+p.reingresos+' subsanaciones, '+p.ya_radicadas+' ya radicadas.</div>';
+    // Cuatro situaciones: ya cargado AQUÍ (no se repite), tope de oficios
+    // alcanzado, ya salió en OTRO oficio (la recarga reingresa solo las
+    // devueltas — la subsanación que facturación reenvía con el mismo número
+    // de envío), o envío nuevo.
+    var h='';
+    var enOtros=(p.oficios_donde_cargado||[]).join(', ');
+    if(p.ya_cargado){
+      h+='<div class="aviso aviso-warn">⚠️ Este envío YA fue cargado en este oficio.</div>';
+    }else if(p.veces_cargado>=p.max_cargas_envio){
+      h+='<div class="aviso aviso-err">Este envío ya fue cargado en '+p.veces_cargado+' oficios ('+esc(enOtros)+'): el proceso acepta máximo '+p.max_cargas_envio+'.</div>';
+    }else if(p.veces_cargado>0 && p.reingresos>0){
+      h+='<div class="aviso aviso-warn">Este envío ya salió en <b>'+esc(enOtros)+'</b>. Al cargarlo aquí reingresarán sus <b>'+p.reingresos+'</b> devuelta(s) como subsanación (carga '+(p.veces_cargado+1)+' de '+p.max_cargas_envio+'); las demás se quedan donde están.</div>';
+    }else if(p.veces_cargado>0){
+      h+='<div class="aviso aviso-warn">Este envío ya salió en <b>'+esc(enOtros)+'</b> y ninguna de sus facturas está devuelta: cargarlo aquí no moverá ninguna factura.</div>';
+    }
+    h+='<div class="aviso aviso-ok">Trae <b>'+p.total_en_fuente+'</b> factura(s): '+p.nuevas+' nuevas, '+p.reingresos+' subsanaciones, '+p.ya_radicadas+' ya radicadas.</div>';
     (p.alertas_limite_devoluciones||[]).forEach(function(a){ h+='<div class="aviso aviso-err">⚠️ '+esc(a)+'</div>'; });
     msg.innerHTML=h;
   }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }

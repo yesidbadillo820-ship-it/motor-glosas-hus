@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 30-07-2026
+**Última actualización:** 03-08-2026
 
 ---
 
@@ -1061,6 +1061,48 @@ oficio de devolución, la corrección **también corrige el oficio**: el PDF se
 arma cada vez que se abre, así que basta volver a abrirlo para verlo al día.
 Los oficios de rondas anteriores no se tocan (esos ya se entregaron tal como
 estaban) y cada corrección queda en el historial con quién la hizo y cuándo.
+
+### 03-08 — Pre-auditoría: el registro de envíos "borrado" y la regla de los 3 oficios
+
+**Qué se vio en pantalla.** La columna Envíos de casi todos los oficios
+apareció vacía ("se borró toda la información") y al cargar un envío repetido
+seguía saliendo "El envío ya fue cargado", aunque el viernes se había subido
+un cambio para permitir el mismo envío en hasta 3 oficios.
+
+**Qué pasó de verdad (nada de las decisiones se perdió).** El cambio del
+viernes 31-07 modificó la regla en el código pero **no cambió el candado
+dentro de la base de datos** que ya estaba en producción: la base seguía
+exigiendo "un envío una sola vez en todo el sistema". Por eso siguió
+bloqueando, y en el afán de destrabarlo el REGISTRO de envíos (qué envío
+entró en qué oficio, quién y cuándo) quedó vacío. Importante: ese registro
+es solo la "tabla de contenido" — los oficios, las facturas, las decisiones
+de los auditores y el historial completo quedaron intactos (por eso las
+columnas Facturas/Pend/OK/Dev siguen con sus números).
+
+**Qué se hizo hoy:**
+1. **La migración que faltaba**: al arrancar, el sistema ahora corrige solo
+   el candado de la base — pasa de "un envío una sola vez" a "un envío una
+   sola vez POR OFICIO". Con eso la regla de los 3 oficios funciona de
+   verdad, sin tocar nada a mano.
+2. **La regla completa de recarga**: el mismo envío se acepta en hasta
+   **3 oficios distintos** (el original + las subsanaciones que facturación
+   reenvía con el mismo número). Al recargar solo se mueven las facturas
+   devueltas; las radicadas y pendientes se quedan donde están, con su
+   aviso. El 4.º intento se bloquea nombrando los radicados. "Ver antes"
+   avisa en qué oficios ya salió el envío y qué va a pasar si se carga.
+3. **Recuperación del registro borrado**: el historial de cada factura es
+   inmutable y guarda envío + oficio + auditor + fecha, así que se armó un
+   comando (3 pasos: mirar → aplicar → aplicar todo) que reconstruye el
+   registro de envíos desde ese historial, sin borrar ni modificar nada de
+   lo existente. Probado contra una réplica local con el mismo escenario.
+4. De paso se confirmó que el sistema **hace una copia de seguridad
+   automática todos los días a las 3:00 a. m.** (guarda las últimas 14, en
+   `/data/backups` de la VM).
+
+**Lección para todos los chats:** cambiar un candado/índice en el código
+SIN su migración deja producción con la regla vieja; y destrabar borrando
+registros a mano borra la trazabilidad. Siempre: migración en el código +
+piloto + PR, nunca DELETE a mano contra la base de producción.
 
 ---
 

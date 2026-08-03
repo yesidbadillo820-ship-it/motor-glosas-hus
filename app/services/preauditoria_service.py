@@ -43,6 +43,10 @@ from app.models.db import (
 
 # Regla del proceso: una misma factura se acepta devuelta máximo 3 veces.
 MAX_DEVOLUCIONES = 3
+# Un mismo envío puede cargarse en hasta 3 oficios distintos: el original y
+# las recargas de subsanación (facturación reenvía las devueltas con el
+# MISMO número de envío dentro de un oficio nuevo — caso real 30-07-2026).
+MAX_OFICIOS_POR_ENVIO = 3
 
 # Plazo para auditar un oficio: 3 días hábiles (lunes a viernes),
 # contados a partir del día siguiente al recibo.
@@ -770,7 +774,19 @@ def _nuevo_evento(
 def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dict:
     """Simula escribir un envío sin tocar la BD (para confirmar antes)."""
     envio = str(envio).strip()
-    ya = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).one_or_none()
+    cargas = (
+        db.query(EnvioCargadoRecord)
+        .filter(EnvioCargadoRecord.envio == envio)
+        .order_by(EnvioCargadoRecord.cargado_en.desc(), EnvioCargadoRecord.id.desc())
+        .all()
+    )
+    ya = next((c for c in cargas if c.oficio_id == oficio.id), None)
+    # Si el envío salió antes en OTRO oficio, la pantalla avisa en cuál: la
+    # recarga aquí solo reingresará las devueltas (subsanación).
+    otro = next((c for c in cargas if c.oficio_id != oficio.id), None)
+    oficio_anterior = (
+        db.get(OficioRecepcionRecord, otro.oficio_id) if otro and otro.oficio_id else None
+    )
     src = facturas_de_envio(db, envio)
     facturas = []
     nuevas = reingresos = radicadas = pendientes_otro = 0
@@ -813,6 +829,14 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
         "envio": envio,
         "existe_en_fuente": bool(src),
         "ya_cargado": bool(ya),
+        "cargado_en_otro_oficio": (
+            oficio_anterior.numero_radicado
+            if oficio_anterior
+            else ("otro oficio" if otro else None)
+        ),
+        "veces_cargado": len(cargas),
+        "max_cargas_envio": MAX_OFICIOS_POR_ENVIO,
+        "oficios_donde_cargado": _radicados_de_cargas(db, cargas),
         "total_en_fuente": len(src),
         "nuevas": nuevas,
         "reingresos": reingresos,
@@ -823,42 +847,52 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
     }
 
 
+def _radicados_de_cargas(db: Session, cargas: list) -> list[str]:
+    """Números de radicado de los oficios donde ya se cargó un envío (para
+    mensajes que el auditor pueda entender, en vez de ids internos)."""
+    nombres = []
+    for c in cargas:
+        o = db.get(OficioRecepcionRecord, c.oficio_id) if c.oficio_id else None
+        nombres.append(o.numero_radicado if o else "un oficio ya eliminado")
+    return nombres
+
+
 def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuario: str) -> dict:
     """Vuelca al consolidado todas las facturas de un envío.
 
-    - Dedup (punto 3): si el envío ya fue cargado → no recrea.
+    - Dedup (punto 3): si el envío ya fue cargado EN ESTE OFICIO → no recrea.
     - Primera vez: crea la factura canónica + evento ESCRITA.
     - Reingreso (factura ya DEVUELTA): incrementa subsanación, no crea factura
       nueva + evento REINGRESO.
+    - Recarga en un oficio posterior (facturación reenvía las subsanaciones
+      con el MISMO número de envío): permitida hasta completar
+      MAX_OFICIOS_POR_ENVIO oficios distintos. Al recargar, reingresan las
+      facturas devueltas; las radicadas y las aún pendientes se omiten con
+      su advertencia.
     """
     envio = str(envio).strip()
-
-    # Chequeo dedup: el mismo envío NO puede cargarse 2 veces en el MISMO oficio
-    ya_en_este = (
+    cargas = (
         db.query(EnvioCargadoRecord)
-        .filter(EnvioCargadoRecord.envio == envio, EnvioCargadoRecord.oficio_id == oficio.id)
-        .one_or_none()
+        .filter(EnvioCargadoRecord.envio == envio)
+        .order_by(EnvioCargadoRecord.cargado_en.desc(), EnvioCargadoRecord.id.desc())
+        .all()
     )
-    if ya_en_este:
+    aqui = next((c for c in cargas if c.oficio_id == oficio.id), None)
+    if aqui:
         return {
             "ya_cargado": True,
             "mensaje": "El envío ya fue cargado en este oficio.",
             "envio": envio,
-            "cargado_en": a_utc(ya_en_este.cargado_en).isoformat() if ya_en_este.cargado_en else None,
+            "cargado_en": a_utc(aqui.cargado_en).isoformat() if aqui.cargado_en else None,
         }
-
-    # Límite: máximo 3 oficios por envío
-    veces = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).count()
-    if veces >= 3:
-        oficios = (
-            db.query(EnvioCargadoRecord)
-            .filter(EnvioCargadoRecord.envio == envio)
-            .all()
-        )
-        lista = ", ".join(str(o.oficio_id) for o in oficios)
+    if len(cargas) >= MAX_OFICIOS_POR_ENVIO:
+        radicados = ", ".join(_radicados_de_cargas(db, cargas))
         return {
             "ya_cargado": True,
-            "mensaje": f"El envío {envio} ya fue cargado en 3 oficios ({lista}). Límite alcanzado.",
+            "mensaje": (
+                f"El envío {envio} ya fue cargado en {len(cargas)} oficios ({radicados}): "
+                f"el proceso acepta máximo {MAX_OFICIOS_POR_ENVIO}."
+            ),
             "envio": envio,
         }
 
@@ -942,6 +976,13 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
                 "resuélvala primero."
             )
 
+    if cargas and not nuevas and not reingresos:
+        # Recarga que no trajo nada: ninguna factura del envío estaba devuelta.
+        # Se permite (la regla es hasta 3 oficios) pero se avisa con claridad.
+        advertencias.append(
+            f"La recarga no movió ninguna factura: ninguna del envío {envio} estaba "
+            "devuelta (las radicadas y las pendientes se quedan donde están)."
+        )
     db.add(
         EnvioCargadoRecord(
             envio=envio,
@@ -955,9 +996,10 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
     try:
         db.commit()
     except IntegrityError:
-        # Carrera: otra petición cargó el mismo envío entre el chequeo y el commit.
+        # Carrera: otra petición cargó el mismo envío EN ESTE OFICIO entre el
+        # chequeo y el commit (doble clic). El candado compuesto la detiene.
         db.rollback()
-        return {"ya_cargado": True, "mensaje": "El envío ya fue cargado.", "envio": envio}
+        return {"ya_cargado": True, "mensaje": "El envío ya fue cargado en este oficio.", "envio": envio}
     return {
         "ya_cargado": False,
         "existe_en_fuente": True,
