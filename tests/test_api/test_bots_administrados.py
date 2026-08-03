@@ -246,3 +246,113 @@ class TestPantalla:
             "botConfigurar",
         ):
             assert fn in html, f"falta {fn} en la pantalla"
+
+
+class TestLotesEnLaTarjeta:
+    """Los bots de COOSALUD/SIMED muestran SU cola real de Lotes."""
+
+    def _lote(self, db, pagador, estado, tarea_estado=None, agente=None, error=None):
+        from app.models.db import LoteRecord, TareaLoteRecord
+
+        lote = LoteRecord(
+            creado_por="ana@hus.gov.co",
+            pagador=pagador,
+            nombre_archivo=f"LOTE_{pagador}.xlsx",
+            estado=estado,
+            total_facturas=45,
+            total_glosas=120,
+            excel_archivo=b"xlsx",
+        )
+        db.add(lote)
+        db.commit()
+        if tarea_estado:
+            db.add(
+                TareaLoteRecord(lote_id=lote.id, estado=tarea_estado, agente=agente, error=error)
+            )
+            db.commit()
+        return lote
+
+    def test_lote_en_proceso_pone_la_tarjeta_corriendo(self, cliente, db_session):
+        self._lote(
+            db_session, "COOSALUD", "EN_PROCESO", tarea_estado="RECLAMADA", agente="PC-CARTERA-02"
+        )
+        d = cliente.get("/bots").json()
+        coo = next(b for g in d["grupos"] for b in g["bots"] if b["id"] == "coosalud-responder")
+        assert coo["estado"] == "CORRIENDO"
+        assert coo["lotes"][0]["archivo"] == "LOTE_COOSALUD.xlsx"
+        assert coo["lotes"][0]["total_facturas"] == 45
+        assert coo["lotes"][0]["equipo"] == "PC-CARTERA-02"
+        assert coo["lotes"][0]["creado_por"] == "ana@hus.gov.co"
+
+    def test_lote_con_error_pone_la_tarjeta_en_error(self, cliente, db_session):
+        self._lote(
+            db_session,
+            "SIMED",
+            "ERROR",
+            tarea_estado="ERROR",
+            agente="PC-01",
+            error="SIMED rechazó el usuario",
+        )
+        d = cliente.get("/bots/simed-responder").json()
+        assert d["estado"] == "ERROR"
+        assert "SIMED rechazó" in d["lotes"][0]["tarea_error"]
+
+    def test_sin_lotes_la_tarjeta_queda_disponible(self, cliente):
+        d = cliente.get("/bots/simed-responder").json()
+        assert d["estado"] == "DISPONIBLE" and d["lotes"] == []
+
+
+class TestHallazgosDeLaRevision:
+    """Los cuatro defectos que encontró la revisión adversarial, sellados."""
+
+    def test_completado_con_pendientes_no_es_tarjeta_verde(self, cliente, db_session):
+        from app.models.db import LoteRecord, TareaLoteRecord
+
+        lote = LoteRecord(
+            creado_por="ana@hus.gov.co",
+            pagador="COOSALUD",
+            nombre_archivo="LOTE.xlsx",
+            estado="COMPLETADO_CON_PENDIENTES",
+            total_facturas=45,
+            excel_archivo=b"x",
+        )
+        db_session.add(lote)
+        db_session.commit()
+        db_session.add(TareaLoteRecord(lote_id=lote.id, estado="COMPLETADA", agente="PC-1"))
+        db_session.commit()
+
+        d = cliente.get("/bots/coosalud-responder").json()
+        assert d["estado"] == "CON PENDIENTES"  # ámbar, no DISPONIBLE verde
+
+    def test_lote_en_cola_no_infla_pendientes_de_la_cola_universal(self, cliente, db_session):
+        from app.models.db import LoteRecord
+
+        db_session.add(
+            LoteRecord(
+                creado_por="a@hus.gov.co",
+                pagador="COOSALUD",
+                nombre_archivo="L.xlsx",
+                estado="EN_COLA",
+                excel_archivo=b"x",
+            )
+        )
+        db_session.commit()
+        d = cliente.get("/bots/coosalud-responder").json()
+        assert d["estado"] == "EN COLA"
+        assert d["pendientes"] == 0  # sin botón Cancelar fantasma
+
+    def test_los_botones_de_cola_no_aplican_a_bots_de_lotes(self):
+        html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        assert html.count("b.disparo !== 'lotes' && (b.pendientes || corr)") == 1
+        assert html.count("b.disparo !== 'lotes' && (b.estado === 'ERROR'") == 1
+
+    def test_la_consulta_de_lotes_no_arrastra_el_excel_binario(self):
+        """Ronda 31: el defer del BLOB debe estar también acá."""
+        import inspect
+
+        from app.api.routers import bots
+
+        fuente = inspect.getsource(bots._enriquecer_con_lotes)
+        assert "defer(LoteRecord.excel_archivo)" in fuente

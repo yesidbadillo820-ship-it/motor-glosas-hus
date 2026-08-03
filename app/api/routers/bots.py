@@ -131,6 +131,68 @@ def _ficha_viva(b, trabajos: list[TrabajoBotRecord]) -> dict:
     return ficha
 
 
+def _lote_dict(lote, tarea) -> dict:
+    return {
+        "id": lote.id,
+        "archivo": lote.nombre_archivo,
+        "estado": lote.estado,
+        "total_facturas": lote.total_facturas,
+        "total_glosas": lote.total_glosas,
+        "creado_por": lote.creado_por,
+        "creado_en": lote.creado_en.isoformat() if lote.creado_en else None,
+        "equipo": tarea.agente if tarea else None,
+        "tarea_estado": tarea.estado if tarea else None,
+        "tarea_error": (tarea.error or "")[:300] if tarea and tarea.error else None,
+    }
+
+
+def _enriquecer_con_lotes(db, b, ficha: dict) -> dict:
+    """Los bots que van por Lotes muestran SU cola real en la tarjeta:
+    el lote en curso (o el último), sus facturas y en qué equipo corre.
+    El estado de la tarjeta sale del lote, no de la cola universal."""
+    from sqlalchemy.orm import defer
+
+    from app.models.db import LoteRecord, TareaLoteRecord
+
+    lotes = (
+        db.query(LoteRecord)
+        # Ronda 31: sin defer, cada lote arrastra su Excel binario (hasta
+        # 20 MB) a RAM en cada carga del tablero — reventaba la instancia.
+        .options(defer(LoteRecord.excel_archivo))
+        .filter(LoteRecord.pagador == b.sistema)
+        .order_by(LoteRecord.id.desc())
+        .limit(3)
+        .all()
+    )
+    if not lotes:
+        ficha["lotes"] = []
+        return ficha
+    detallados = []
+    for lote in lotes:
+        tarea = (
+            db.query(TareaLoteRecord)
+            .filter(TareaLoteRecord.lote_id == lote.id)
+            .order_by(TareaLoteRecord.id.desc())
+            .first()
+        )
+        detallados.append(_lote_dict(lote, tarea))
+    ficha["lotes"] = detallados
+    ultimo = detallados[0]
+    if ultimo["estado"] == "EN_PROCESO" or ultimo["tarea_estado"] == "RECLAMADA":
+        ficha["estado"] = "CORRIENDO"
+    elif ultimo["estado"] == "EN_COLA" or ultimo["tarea_estado"] == "PENDIENTE":
+        # Solo el estado: los pendientes de la cola universal no se tocan,
+        # porque Cancelar/Reintentar de esa cola no aplican a los lotes.
+        ficha["estado"] = "EN COLA"
+    elif ultimo["estado"] == "ERROR" or ultimo["tarea_estado"] == "ERROR":
+        ficha["estado"] = "ERROR"
+    elif ultimo["estado"] == "COMPLETADO_CON_PENDIENTES":
+        # El bot terminó pero quedaron facturas sin responder en el portal:
+        # eso NO es una tarjeta verde.
+        ficha["estado"] = "CON PENDIENTES"
+    return ficha
+
+
 def _trabajos_por_bot(db) -> dict[str, list[TrabajoBotRecord]]:
     filas = db.query(TrabajoBotRecord).order_by(TrabajoBotRecord.id.desc()).limit(1000).all()
     por_bot: dict[str, list[TrabajoBotRecord]] = {}
@@ -258,7 +320,10 @@ def tablero_de_bots(
     por_bot = _trabajos_por_bot(db)
     grupos: dict[str, list[dict]] = {}
     for b in bots_hus.catalogo():
-        grupos.setdefault(b.grupo, []).append(_ficha_viva(b, por_bot.get(b.id, [])))
+        ficha = _ficha_viva(b, por_bot.get(b.id, []))
+        if b.disparo == "lotes":
+            ficha = _enriquecer_con_lotes(db, b, ficha)
+        grupos.setdefault(b.grupo, []).append(ficha)
     abiertos = sum(1 for ts in por_bot.values() for t in ts if t.estado in ESTADOS_ABIERTOS)
     return {
         "total_bots": len(bots_hus.catalogo()),
@@ -285,6 +350,8 @@ def detalle_bot(
         .all()
     )
     ficha = _ficha_viva(b, trabajos)
+    if b.disparo == "lotes":
+        ficha = _enriquecer_con_lotes(db, b, ficha)
     ficha["historial"] = [_trabajo_dict(t) for t in trabajos]
     return ficha
 

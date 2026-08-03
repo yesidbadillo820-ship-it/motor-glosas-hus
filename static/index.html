@@ -20844,7 +20844,7 @@ async function botsCargar(){
 }
 
 function botsColorEstado(e){
-  return e === 'CORRIENDO' ? '#7c3aed' : (e === 'EN COLA' ? '#b45309' : (e === 'ERROR' ? '#dc2626' : '#16a34a'));
+  return e === 'CORRIENDO' ? '#7c3aed' : (e === 'EN COLA' || e === 'CON PENDIENTES' ? '#b45309' : (e === 'ERROR' ? '#dc2626' : '#16a34a'));
 }
 
 function botsSeg(s){
@@ -20881,6 +20881,15 @@ function botsPintar(){
         +   (b.riesgo ? '<div class="porque" style="color:#b45309">⚠ ' + escHtml(b.riesgo) + '</div>' : '')
         +   (corr ? '<div class="porque" style="color:#7c3aed"><b>▶ ' + escHtml(corr.progreso || 'Corriendo') + '</b>'
                   + (corr.equipo ? ' en ' + escHtml(corr.equipo) : '') + '</div>' : '')
+        +   (b.lotes && b.lotes.length ? (function(){
+              var l = b.lotes[0];
+              return '<div class="porque"><b>Último lote:</b> #' + l.id + ' ' + escHtml(l.archivo || '')
+                + ' · ' + (l.total_facturas || 0) + ' facturas · ' + escHtml(l.estado === 'COMPLETADO_CON_PENDIENTES' ? 'COMPLETADO CON PENDIENTES' : (l.tarea_estado || l.estado))
+                + (l.equipo ? ' · equipo <b>' + escHtml(l.equipo) + '</b>' : '')
+                + (l.creado_por ? ' · subió ' + escHtml(l.creado_por) : '')
+                + (l.tarea_error ? '<br><span style="color:#dc2626">' + escHtml(l.tarea_error) + '</span>' : '')
+                + '</div>';
+            })() : '')
         +   '<div class="porque" style="margin-top:.2rem"><b>Última:</b> ' + ultTxt + '</div>'
         +   '<div class="porque"><b>Corridas:</b> ' + b.total_corridas
         +     ' · <b>Hoy:</b> ' + (b.ejecutadas_hoy || 0)
@@ -20888,9 +20897,11 @@ function botsPintar(){
         +     ' · <b>Espera prom.:</b> ' + botsSeg(b.espera_promedio_seg) + '</div>'
         +   (b.ultimo_error ? '<div class="porque" style="color:#dc2626"><b>Último error:</b> ' + escHtml((b.ultimo_error.error || '').slice(0,160)) + '</div>' : '')
         +   '<div style="display:flex;gap:.4rem;margin-top:.45rem;flex-wrap:wrap">'
-        +     '<button class="btn btn-primary btn-sm" onclick="botEjecutar(\'' + b.id + '\')">Ejecutar</button>'
-        +     (b.pendientes || corr ? '<button class="btn btn-ghost btn-sm" style="color:#dc2626" onclick="botCancelar(\'' + b.id + '\')">Cancelar</button>' : '')
-        +     (b.estado === 'ERROR' || (ult && ult.estado === 'CANCELADO') ? '<button class="btn btn-ghost btn-sm" onclick="botReintentar(\'' + b.id + '\')">Reintentar</button>' : '')
+        +     (b.disparo === 'lotes'
+                ? '<button class="btn btn-primary btn-sm" onclick="intelIrA(\'importacion-masiva\')">Ir a Lotes</button>'
+                : '<button class="btn btn-primary btn-sm" onclick="botEjecutar(\'' + b.id + '\')">Ejecutar</button>')
+        +     (b.disparo !== 'lotes' && (b.pendientes || corr) ? '<button class="btn btn-ghost btn-sm" style="color:#dc2626" onclick="botCancelar(\'' + b.id + '\')">Cancelar</button>' : '')
+        +     (b.disparo !== 'lotes' && (b.estado === 'ERROR' || (ult && ult.estado === 'CANCELADO')) ? '<button class="btn btn-ghost btn-sm" onclick="botReintentar(\'' + b.id + '\')">Reintentar</button>' : '')
         +     '<button class="btn btn-ghost btn-sm" onclick="botHistorial(\'' + b.id + '\')">Historial</button>'
         +     (ult && (ult.registro || ult.error) ? '<button class="btn btn-ghost btn-sm" onclick="botRegistros(\'' + b.id + '\')">Ver registros</button>' : '')
         +     (b.parametros_ayuda ? '<button class="btn btn-ghost btn-sm" onclick="botConfigurar(\'' + b.id + '\')">Configurar</button>' : '')
