@@ -1375,6 +1375,40 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   (sección 5.ter), incluido el pantallazo de **Ver Histórico** como evidencia
   para el PDF de soportes.
 
+### 03-08 (octava parte) — Cuentas médicas: el CUV que no salía
+
+- Cuentas médicas reportó que el validador del Ministerio no le generaba el
+  **CUV** de la factura **MED737** (Medical Center Especialistas, NIT
+  900299334). El validador mostraba un solo rechazo: `RVG01 | Dato requerido`
+  en `usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal`.
+- **Al revisar el paquete completo (XML + JSON) aparecieron cuatro problemas,
+  no uno.** Los otros tres no los ve la pre-validación de escritorio: se
+  descubren cuando el paquete ya se envió y el CUV no llega.
+  1. `modalidadGrupoServicioTecSal` en `null` → va `01` (Intramural), porque
+     fue consulta presencial en la sede.
+  2. `numFactura` sin el prefijo: decía `737` y en la DIAN esa factura quedó
+     radicada como **`MED737`**. Si no coincide, el Ministerio no la encuentra.
+  3. `numNota: "2"` con `tipoNota: null` → en una factura de venta los dos
+     campos van en `null`. Lo está exportando mal el software de facturación.
+  4. **La atención quedó fechada el 27-07 y la factura cubre el período del
+     31-07.** Esa la decide facturación: o la fecha del servicio está mal, o
+     hay que reexpedir la factura. No se cambia una fecha clínica para que el
+     validador pase.
+- **Se creó `tools/validar_json_rips.py`** para no repetir el ida y vuelta
+  factura por factura. Revisa las dos cosas antes de subir nada: la estructura
+  del JSON (campos obligatorios en `null` por tipo de servicio, formato de
+  fechas, tablas de referencia de la Res. 2275/2023, coherencia
+  `tipoNota`/`numNota`) **y el cruce contra el XML** (número con prefijo, NIT,
+  fecha de atención dentro del período de facturación, suma de valores).
+  Desempaqueta la factura tanto si el XML es un `Invoice` suelto como si es el
+  `AttachedDocument` que la trae en CDATA, que es como la entrega el
+  facturador. Corre sobre una carpeta o sobre un mes con `--recursivo`, deja
+  reporte CSV y separa ERROR (bloquea el CUV) de AVISO (no bloquea, pero suele
+  terminar en glosa). 29 pruebas automáticas.
+- Guía para el auditor en `docs/CONTEXTO_FEV_RIPS_CUV.md`: qué revisa cada
+  pasada del validador, la tabla de modalidades, los errores más frecuentes y
+  la plantilla de PowerShell para corregir el JSON sin dañarlo.
+
 ---
 
 ## 3) PENDIENTE
@@ -1524,6 +1558,17 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
     falta automatizar también la subsanación (`ReiteracionRespuesta`) desde
     el arranque, o si eso se deja para cuando llegue el primer lote real.
 
+### Cuentas médicas — CUV de facturas nuevas (nuevo, 03-08)
+15. **Factura MED737:** aplicar las tres correcciones del JSON (modalidad `01`,
+    `numFactura` = `MED737`, `numNota` en `null`) y **preguntar a facturación**
+    por el conflicto de fechas: la atención es del 27-07 y la factura cubre el
+    período del 31-07. Sin resolver eso el Ministerio no entrega el CUV.
+16. **Revisar el resto de facturas de agosto** con `validar_json_rips.py
+    --recursivo` antes de subirlas. Si el facturador viene exportando el
+    `numFactura` sin prefijo y la modalidad en `null`, el problema es de todas,
+    no solo de la 737: ahí lo que toca es pedirle el ajuste al proveedor del
+    software, no corregir a mano cada archivo.
+
 ## 4) PARA MAÑANA
 
 0. **PRIORIDAD CERO — revivir la página (mudanza al PC del hospital).** La
@@ -1586,6 +1631,12 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
    trámite distinto al de una glosa;
    (d) expandir con `siifa_preparar_respuestas.py --expandir` y hacer el
    **piloto de 1 glosa** antes del cargue masivo (pendiente #13).
+
+10. **Cerrar la MED737 (cuentas médicas):** corregir el JSON con el comando de
+    PowerShell de `docs/CONTEXTO_FEV_RIPS_CUV.md`, resolver con facturación el
+    conflicto de fechas y confirmar que el Ministerio entregue el CUV
+    (pendiente #15). Después pasar `validar_json_rips.py --recursivo` a todas
+    las facturas de agosto (pendiente #16).
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 
