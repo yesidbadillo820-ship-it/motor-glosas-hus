@@ -35,6 +35,12 @@ Dice en qué paso exacto falla: conexión, credenciales o consulta.
 
 ---
 
+> **La carpeta de trabajo es una CARPETA**, algo como
+> `D:\USUARIO CARTERA\Documents\SIIFA`. Enter usa esa misma por defecto. Si
+> se escribe otra cosa, el bot lo dice de una y vuelve a preguntar — antes
+> se daba cuenta al final, después de siete minutos bajando el informe. Con
+> la opción [8] se puede cambiar sin cerrar el bot.
+
 ## 1) Bajar de SIIFA el informe de seguimientos
 
 ```powershell

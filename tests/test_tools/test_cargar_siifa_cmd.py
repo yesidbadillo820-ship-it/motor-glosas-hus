@@ -58,6 +58,26 @@ def test_el_piloto_va_antes_del_cargue_masivo():
     assert "goto sinpiloto" in texto, "el bot debe frenar el cargue masivo sin piloto"
 
 
+def test_la_carpeta_se_valida_antes_de_llegar_al_menu():
+    """Si la ruta no sirve, hay que decirlo YA, no siete minutos después.
+
+    Pasó de verdad: se pegó un comando en vez de una carpeta, el bot bajó
+    los 2.598 seguimientos y se perdieron al intentar guardarlos.
+    """
+    texto = CMD.read_text(encoding="utf-8")
+
+    assert "goto carpetamala" in texto, "debe rechazar una ruta que no es carpeta"
+    assert "goto carpetasinpermiso" in texto, "debe rechazar una carpeta donde no puede escribir"
+    assert texto.index("goto carpetamala") < texto.index(":menu"), "se valida antes del menú"
+
+
+def test_se_puede_corregir_la_carpeta_sin_cerrar_el_bot():
+    texto = CMD.read_text(encoding="utf-8")
+
+    assert "[8] Cambiar la carpeta de trabajo" in texto
+    assert 'if "%OPCION%"=="8" goto carpeta' in texto
+
+
 def test_la_clave_solo_viaja_en_la_variable_de_entorno():
     """Regla del repo: nunca un usuario ni una clave escritos en el código."""
     texto = CMD.read_text(encoding="utf-8")

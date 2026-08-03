@@ -209,3 +209,27 @@ def test_los_meses_del_rango_se_recorren_completos():
         (date(2026, 2, 1), date(2026, 2, 28)),
         (date(2026, 3, 1), date(2026, 3, 31)),
     ]
+
+
+def test_una_ruta_de_salida_que_no_sirve_se_avisa_antes_de_bajar_nada(tmp_path):
+    """Bajar el informe toma minutos: la ruta se revisa primero.
+
+    Pasó de verdad: se escribió un comando en vez de una carpeta, se bajaron
+    los 2.598 seguimientos y todo se perdió al intentar guardarlos.
+    """
+    un_archivo = tmp_path / "no_soy_carpeta.txt"
+    un_archivo.write_text("x", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        rep.verificar_se_puede_guardar(un_archivo / "informe.xlsx")
+
+    assert "no se va a poder guardar" in str(exc.value)
+
+
+def test_una_ruta_buena_pasa_y_deja_la_carpeta_creada(tmp_path):
+    destino = tmp_path / "SIIFA" / "informe_seguimientos.xlsx"
+
+    rep.verificar_se_puede_guardar(destino)
+
+    assert destino.parent.is_dir()
+    assert not list(destino.parent.iterdir()), "no debe dejar basura"
