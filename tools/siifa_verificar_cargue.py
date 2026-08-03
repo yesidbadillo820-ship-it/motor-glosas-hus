@@ -45,6 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from _dinero import a_entero  # noqa: E402
 from siifa_client import (  # noqa: E402
     SiifaApiError,
     SiifaClient,
@@ -76,6 +77,18 @@ COLUMNAS = [
 
 def _texto(valor) -> str:
     return "" if valor is None else str(valor).strip()
+
+
+def _pesos(valor) -> str:
+    """El valor en pesos para la constancia que se anexa a soportes.
+
+    La lectura la hace a_entero, el único lector de pesos del repo: acá sólo
+    se le pone el formato. Del Excel puede venir como número o como texto
+    con separadores de miles.
+    """
+    if valor in (None, ""):
+        return ""
+    return f"${a_entero(valor):,}".replace(",", ".")
 
 
 def _dia(valor) -> str:
@@ -301,12 +314,11 @@ def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
             ]
         ]
         for g in sorted(glosas, key=lambda x: str(x["ID_SEGUIMIENTO_FACTURA_GLOSA"])):
-            valor = g.get("VALOR_GLOSA")
             datos.append(
                 [
                     Paragraph(str(g["ID_SEGUIMIENTO_FACTURA_GLOSA"]), chico),
                     Paragraph(str(g["CODIGO_GLOSA"] or ""), chico),
-                    Paragraph(f"${int(valor):,}".replace(",", ".") if valor else "", chico),
+                    Paragraph(_pesos(g.get("VALOR_GLOSA")), chico),
                     Paragraph(str(g["CODIGO_EN_SIIFA"] or ""), chico),
                     Paragraph(str(g["FECHA_EN_SIIFA"] or ""), chico),
                     Paragraph(str(g["RESULTADO"]), chico),

@@ -12,6 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
 from openpyxl import Workbook, load_workbook
 
 TOOLS = Path(__file__).resolve().parents[2] / "tools"
@@ -236,3 +237,22 @@ def test_la_constancia_sale_una_por_factura(tmp_path):
     assert hechas == 2
     assert (carpeta / "CONSTANCIA_SIIFA_HUS454747.pdf").is_file()
     assert (carpeta / "CONSTANCIA_SIIFA_HUS497119.pdf").is_file()
+
+
+@pytest.mark.parametrize(
+    "valor, esperado",
+    [
+        (1479360, "$1.479.360"),
+        ("1.479.360", "$1.479.360"),  # como viene de un Excel con formato
+        ("$ 1.479.360", "$1.479.360"),
+        (22200.0, "$22.200"),
+        (None, ""),
+    ],
+)
+def test_el_valor_de_la_constancia_se_lee_venga_como_venga(valor, esperado):
+    """La constancia se anexa a soportes: el valor no puede salir mal.
+
+    Se lee con a_entero, el único lector de pesos del repo. Leerlo aparte es
+    justo lo que produjo cifras multiplicadas por cien en otros módulos.
+    """
+    assert ver._pesos(valor) == esperado
