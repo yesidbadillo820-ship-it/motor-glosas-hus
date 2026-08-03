@@ -1008,6 +1008,18 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 03-08 (segunda parte) — Ronda 35: el formato de respuesta que aprobó Yesid
+
+- La respuesta del caso de la citología quedó como **modelo oficial del
+  motor**: primera línea de referencia («RESPUESTA GLOSA … – FACTURA … –
+  CUPS …»), postura seca, y **un punto numerado por cada reclamo de la
+  glosa** — si la entidad reclama tres cosas, se contestan las tres, cada
+  una con su norma. Ni reclamos sin contestar (eso es conceder), ni
+  puntos de relleno.
+- La respuesta completa entró además al banco de plantillas del motor
+  (TA-G11) para el patrón «SOAT UVB sin contrato»: la próxima glosa así
+  sale con esa misma factura de estilo.
+
 ### 03-08 — Ronda 34: dos reglas del caso TA0801/citología
 
 - Del caso real que trajo Yesid (factura 1344527, citología 898015H,
