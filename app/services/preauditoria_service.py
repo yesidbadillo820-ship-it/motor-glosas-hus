@@ -910,96 +910,131 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
     nuevas = reingresos = omitidas = 0
     alertas = []
     advertencias = []
-    for r in src:
-        dg = db.query(DgReportRecord).filter(DgReportRecord.factura == r.factura).one_or_none()
-        fuente = {
-            "valor": r.valor,
-            "nit": r.nit,
-            "entidad": r.entidad,
-            "correo_fe": dg.correo_fe if dg else "NO",
-            "f_factura": r.f_factura,
-        }
-        canon = (
-            db.query(FacturaPreauditoriaRecord)
-            .filter(FacturaPreauditoriaRecord.factura == r.factura)
-            .one_or_none()
-        )
-        if canon is None:
-            # PRIMERA VEZ
-            canon = FacturaPreauditoriaRecord(
-                factura=r.factura,
-                envio_actual=envio,
-                oficio_actual_id=oficio.id,
-                oficio_fhus=oficio.numero_radicado,
-                f_recibido=oficio.fecha_recibido,
-                estado=ESTADO_NUEVA,
-                resultado_actual=RESULTADO_PENDIENTE,
-                ronda_actual=1,
-                num_subsanacion=0,
-                num_devoluciones=0,
-                pendiente_subsanacion=0,
-                creado_por=usuario,
-            )
-            db.add(canon)
-            db.flush()
-            db.add(_nuevo_evento(canon, "ESCRITA", oficio=oficio, fuente=fuente, usuario=usuario))
-            nuevas += 1
-        elif canon.resultado_actual == RESULTADO_DEVUELTA:
-            # REINGRESO / SUBSANACIÓN (no se crea factura nueva)
-            canon.ronda_actual += 1
-            canon.num_subsanacion = canon.ronda_actual - 1
-            canon.envio_actual = envio
-            canon.oficio_actual_id = oficio.id
-            canon.oficio_fhus = oficio.numero_radicado
-            canon.f_recibido = oficio.fecha_recibido
-            canon.resultado_actual = RESULTADO_PENDIENTE
-            canon.estado = ESTADO_EN_SUBSANACION
-            canon.pendiente_subsanacion = 0
-            canon.auditor = None
-            canon.fecha_auditoria = None
-            canon.oficio_devolucion_id = None
-            db.flush()
-            db.add(_nuevo_evento(canon, "REINGRESO", oficio=oficio, fuente=fuente, usuario=usuario))
-            reingresos += 1
-            if canon.num_devoluciones >= MAX_DEVOLUCIONES:
-                alertas.append(
-                    f"{r.factura} ya lleva {canon.num_devoluciones} devoluciones: "
-                    "solo debería radicarse o escalarse."
-                )
-        elif canon.resultado_actual == RESULTADO_RADICAR:
-            omitidas += 1
-            advertencias.append(f"{r.factura} ya estaba radicada: no se reingresó.")
-        else:  # PENDIENTE ya abierta
-            omitidas += 1
-            advertencias.append(
-                f"{r.factura} sigue pendiente en {canon.oficio_fhus or 'otro oficio'}: "
-                "resuélvala primero."
-            )
-
-    if cargas and not nuevas and not reingresos:
-        # Recarga que no trajo nada: ninguna factura del envío estaba devuelta.
-        # Se permite (la regla es hasta 3 oficios) pero se avisa con claridad.
-        advertencias.append(
-            f"La recarga no movió ninguna factura: ninguna del envío {envio} estaba "
-            "devuelta (las radicadas y las pendientes se quedan donde están)."
-        )
-    db.add(
-        EnvioCargadoRecord(
-            envio=envio,
-            oficio_id=oficio.id,
-            total_facturas=len(src),
-            nuevas=nuevas,
-            reingresos=reingresos,
-            cargado_por=usuario,
-        )
-    )
+    # TODO el volcado va dentro del try: si otra petición simultánea escribe
+    # el mismo envío (doble clic aquí, o el mismo envío desde otro oficio con
+    # una factura nueva), el conflicto puede saltar en un flush del bucle, no
+    # solo en el commit — y debe responderse con un mensaje claro, no un 500.
     try:
+        for r in src:
+            dg = db.query(DgReportRecord).filter(DgReportRecord.factura == r.factura).one_or_none()
+            fuente = {
+                "valor": r.valor,
+                "nit": r.nit,
+                "entidad": r.entidad,
+                "correo_fe": dg.correo_fe if dg else "NO",
+                "f_factura": r.f_factura,
+            }
+            canon = (
+                db.query(FacturaPreauditoriaRecord)
+                .filter(FacturaPreauditoriaRecord.factura == r.factura)
+                .one_or_none()
+            )
+            if canon is None:
+                # PRIMERA VEZ
+                canon = FacturaPreauditoriaRecord(
+                    factura=r.factura,
+                    envio_actual=envio,
+                    oficio_actual_id=oficio.id,
+                    oficio_fhus=oficio.numero_radicado,
+                    f_recibido=oficio.fecha_recibido,
+                    estado=ESTADO_NUEVA,
+                    resultado_actual=RESULTADO_PENDIENTE,
+                    ronda_actual=1,
+                    num_subsanacion=0,
+                    num_devoluciones=0,
+                    pendiente_subsanacion=0,
+                    creado_por=usuario,
+                )
+                db.add(canon)
+                db.flush()
+                db.add(
+                    _nuevo_evento(canon, "ESCRITA", oficio=oficio, fuente=fuente, usuario=usuario)
+                )
+                nuevas += 1
+            elif canon.resultado_actual == RESULTADO_DEVUELTA:
+                # REINGRESO / SUBSANACIÓN (no se crea factura nueva)
+                canon.ronda_actual += 1
+                canon.num_subsanacion = canon.ronda_actual - 1
+                canon.envio_actual = envio
+                canon.oficio_actual_id = oficio.id
+                canon.oficio_fhus = oficio.numero_radicado
+                canon.f_recibido = oficio.fecha_recibido
+                canon.resultado_actual = RESULTADO_PENDIENTE
+                canon.estado = ESTADO_EN_SUBSANACION
+                canon.pendiente_subsanacion = 0
+                canon.auditor = None
+                canon.fecha_auditoria = None
+                canon.oficio_devolucion_id = None
+                db.flush()
+                db.add(
+                    _nuevo_evento(canon, "REINGRESO", oficio=oficio, fuente=fuente, usuario=usuario)
+                )
+                reingresos += 1
+                if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+                    alertas.append(
+                        f"{r.factura} ya lleva {canon.num_devoluciones} devoluciones: "
+                        "solo debería radicarse o escalarse."
+                    )
+            elif canon.resultado_actual == RESULTADO_RADICAR:
+                omitidas += 1
+                advertencias.append(f"{r.factura} ya estaba radicada: no se reingresó.")
+            else:  # PENDIENTE ya abierta
+                omitidas += 1
+                advertencias.append(
+                    f"{r.factura} sigue pendiente en {canon.oficio_fhus or 'otro oficio'}: "
+                    "resuélvala primero."
+                )
+
+        if cargas and not nuevas and not reingresos:
+            # Recarga que no trajo nada: ninguna factura del envío estaba devuelta.
+            # Se permite (la regla es hasta 3 oficios) pero se avisa con claridad.
+            advertencias.append(
+                f"La recarga no movió ninguna factura: ninguna del envío {envio} estaba "
+                "devuelta (las radicadas y las pendientes se quedan donde están)."
+            )
+        db.add(
+            EnvioCargadoRecord(
+                envio=envio,
+                oficio_id=oficio.id,
+                total_facturas=len(src),
+                nuevas=nuevas,
+                reingresos=reingresos,
+                cargado_por=usuario,
+            )
+        )
+        # Recuento del tope DENTRO de la transacción, con la fila propia ya
+        # insertada: dos peticiones simultáneas sobre DOS oficios distintos
+        # pasan ambas el chequeo de arriba (el candado compuesto no las choca
+        # porque son filas distintas). Este recuento detiene a la que llegue
+        # de segunda antes de confirmar.
+        db.flush()
+        total_cargas = (
+            db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).count()
+        )
+        if total_cargas > MAX_OFICIOS_POR_ENVIO:
+            db.rollback()
+            return {
+                "ya_cargado": True,
+                "mensaje": (
+                    f"El envío {envio} ya alcanzó el máximo de {MAX_OFICIOS_POR_ENVIO} "
+                    "oficios (otra carga entró al mismo tiempo). Actualice la página."
+                ),
+                "envio": envio,
+            }
         db.commit()
     except IntegrityError:
-        # Carrera: otra petición cargó el mismo envío EN ESTE OFICIO entre el
-        # chequeo y el commit (doble clic). El candado compuesto la detiene.
+        # Carrera: otra petición escribió el mismo envío al mismo tiempo (doble
+        # clic en este oficio, o el mismo envío con una factura nueva desde otro
+        # oficio). Nada quedó a medias: se deshace todo y se avisa claro.
         db.rollback()
-        return {"ya_cargado": True, "mensaje": "El envío ya fue cargado en este oficio.", "envio": envio}
+        return {
+            "ya_cargado": True,
+            "mensaje": (
+                "Otra persona estaba cargando este envío en este mismo momento. "
+                "Actualice la página y revise los envíos del oficio antes de reintentar."
+            ),
+            "envio": envio,
+        }
     return {
         "ya_cargado": False,
         "existe_en_fuente": True,
@@ -1379,11 +1414,31 @@ def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int
     return borradas, revertidas
 
 
+def _facturas_migradas_con_historial(
+    db: Session, oficio_id: int, ids_locales: set, envio: str = None
+) -> list[str]:
+    """Facturas cuyo historial referencia este oficio (o este envío en este
+    oficio) pero que YA pertenecen a otro oficio (subsanaron con la recarga).
+
+    Mientras existan, ni el oficio ni el envío se pueden deshacer: sus eventos
+    son la historia de esas facturas — borrarlos rompería la trazabilidad, y
+    borrar el oficio dejaría eventos apuntando a un oficio inexistente (la
+    base lo rechaza con un error de integridad que antes salía como error 500).
+    """
+    q = db.query(FacturaEventoRecord.factura).filter(FacturaEventoRecord.oficio_id == oficio_id)
+    if envio is not None:
+        q = q.filter(FacturaEventoRecord.envio == envio)
+    if ids_locales:
+        q = q.filter(~FacturaEventoRecord.factura_id.in_(ids_locales))
+    return sorted({f for (f,) in q.distinct().all() if f})
+
+
 def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
     """Elimina un oficio de recepción mal registrado, con salvaguardas.
 
-    Si alguna de sus facturas ya salió en un oficio de devolución emitido, no
-    se elimina. Los envíos quedan libres para volver a escribirse.
+    Si alguna de sus facturas ya salió en un oficio de devolución emitido, o
+    ya subsanó hacia otro oficio (recarga del envío), no se elimina. Los
+    envíos quedan libres para volver a escribirse.
     """
     facturas = (
         db.query(FacturaPreauditoriaRecord)
@@ -1399,6 +1454,18 @@ def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
                 f"El oficio {oficio.numero_radicado} tiene factura(s) en un oficio de "
                 f"devolución ya emitido ({', '.join(con_pdf[:5])}...): "
                 "no se puede eliminar."
+            ),
+        }
+    migradas = _facturas_migradas_con_historial(db, oficio.id, {f.id for f in facturas})
+    if migradas:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El oficio {oficio.numero_radicado} no se puede eliminar: "
+                f"{len(migradas)} factura(s) que pasaron por él ya subsanaron hacia "
+                f"otro oficio ({', '.join(migradas[:5])}{'…' if len(migradas) > 5 else ''}) "
+                "y su historial referencia este oficio."
             ),
         }
 
@@ -1498,6 +1565,22 @@ def eliminar_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> di
             "mensaje": (
                 f"El envío {envio} tiene factura(s) en un oficio de devolución ya "
                 f"emitido ({', '.join(con_pdf[:5])}...): no se puede eliminar."
+            ),
+        }
+    migradas = _facturas_migradas_con_historial(
+        db, oficio.id, {f.id for f in facturas}, envio=envio
+    )
+    if migradas:
+        # Si se dejara quitar, el envío recuperaría un cupo del tope de 3 y el
+        # registro dejaría de contar la historia real de por dónde anduvo.
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"El envío {envio} no se puede quitar de {oficio.numero_radicado}: "
+                f"sus facturas ({', '.join(migradas[:5])}"
+                f"{'…' if len(migradas) > 5 else ''}) ya subsanaron hacia otro oficio "
+                "y este registro es parte de su historial."
             ),
         }
 

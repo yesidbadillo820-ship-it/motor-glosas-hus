@@ -508,11 +508,34 @@ async def lifespan(app: FastAPI):
                 ),
                 None,
             )
-            if _idx_envio and list(_idx_envio.get("column_names") or []) == ["envio"]:
+            _cols = list((_idx_envio or {}).get("column_names") or [])
+            _es_correcto = (
+                _idx_envio is not None
+                and _cols == ["envio", "oficio_id"]
+                and bool(_idx_envio.get("unique"))
+            )
+            # Se repara SIEMPRE que el candado no sea el correcto: ausente
+            # (p. ej. un arranque anterior murió entre el DROP y el CREATE —
+            # en SQLite el DDL no es transaccional), con la forma vieja
+            # (solo envio), o recreado a mano sin UNIQUE. Así la migración
+            # se auto-repara en el siguiente arranque en vez de dejar la
+            # tabla sin candado para siempre.
+            if not _es_correcto:
                 logger.warning(
                     "MIGRACIÓN pre-auditoría: candado de envíos por oficio (envio, oficio_id)"
                 )
-                db.execute(text("DROP INDEX ix_preaud_envio_cargado"))
+                if _idx_envio is not None:
+                    db.execute(text("DROP INDEX ix_preaud_envio_cargado"))
+                # Si la tabla estuvo un tiempo sin candado pudieron colarse
+                # duplicados exactos (doble clic): se retiran conservando la
+                # fila más antigua, o el índice único no se podría crear.
+                db.execute(
+                    text(
+                        "DELETE FROM preaud_envios_cargados WHERE id NOT IN "
+                        "(SELECT MIN(id) FROM preaud_envios_cargados "
+                        "GROUP BY envio, oficio_id)"
+                    )
+                )
                 db.execute(
                     text(
                         "CREATE UNIQUE INDEX ix_preaud_envio_cargado "

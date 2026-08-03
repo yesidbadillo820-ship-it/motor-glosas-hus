@@ -312,6 +312,62 @@ class TestEscribirEnvio:
         assert r.json()["ya_cargado"] is True
         assert "este oficio" in r.json()["mensaje"]
 
+    def _como_admin(self, db_session):
+        # El borrado exige COORDINADOR/SUPER_ADMIN; el cliente base es AUDITOR.
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        admin = UsuarioRecord(
+            id=7,
+            nombre="ADMIN GUARD",
+            email="admin-guard@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(admin)
+        db_session.commit()
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+
+    def test_eliminar_el_oficio_original_tras_la_recarga_se_bloquea_claro(self, client, db_session):
+        """Tras recargar el envío en otro oficio, el oficio original guarda el
+        historial de facturas que ya migraron: eliminarlo debe responder un
+        mensaje claro (antes era un error 500 por integridad de la base)."""
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-DEL-1", "2026-07-27T14:46")
+        _escribir(client, o1["id"], ENV)
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o2 = _crear_oficio(client, "FHUS-DEL-2", "2026-07-30T14:02")
+        assert _escribir(client, o2["id"], ENV).json()["reingresos"] == 1
+        r = client.delete(f"/preauditoria/oficios/{o1['id']}")
+        assert r.status_code == 409, r.text
+        assert "subsanaron hacia otro oficio" in r.json()["detail"]
+        assert F1 in r.json()["detail"]
+        # el oficio nuevo (con la factura viva) tampoco pierde nada por esto
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert h["oficio_fhus"] == "FHUS-DEL-2"
+
+    def test_quitar_el_envio_del_oficio_original_tras_la_recarga_se_bloquea(
+        self, client, db_session
+    ):
+        """Quitar el envío del oficio original tras la recarga era un no-op que
+        respondía ok y le devolvía un cupo del tope de 3 al envío: ahora se
+        bloquea explicando por qué."""
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-QUI-1", "2026-07-27T14:46")
+        _escribir(client, o1["id"], ENV)
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o2 = _crear_oficio(client, "FHUS-QUI-2", "2026-07-30T14:02")
+        assert _escribir(client, o2["id"], ENV).json()["reingresos"] == 1
+        r = client.delete(f"/preauditoria/oficios/{o1['id']}/envios/{ENV}")
+        assert r.status_code == 409, r.text
+        assert "subsanaron hacia otro oficio" in r.json()["detail"]
+        # el registro del oficio original sigue contando para el tope
+        p = client.get(f"/preauditoria/oficios/{o2['id']}/envios/{ENV}/preview").json()
+        assert p["veces_cargado"] == 2
+
     def test_preview_de_la_recarga_avisa_el_oficio_anterior(self, client):
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
         o1 = _crear_oficio(client, "FHUS-REC-1", "2026-07-27T14:46")
