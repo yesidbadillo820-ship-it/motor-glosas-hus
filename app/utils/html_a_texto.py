@@ -31,7 +31,10 @@ __all__ = [
 PAT_TABLE = re.compile(r"<table[^>]*>.*?</table>", re.IGNORECASE | re.DOTALL)
 _PAT_TR = re.compile(r"<tr[^>]*>(.*?)</tr>", re.IGNORECASE | re.DOTALL)
 _PAT_CELDA = re.compile(r"<(td|th)[^>]*>(.*?)</\1>", re.IGNORECASE | re.DOTALL)
-_PAT_TAG = re.compile(r"<[^>]+>")
+# Ronda 30: solo tags reales (</?letra...>) y comentarios. Antes r"<[^>]+>"
+# borraba "es < 5% del total y la estancia fue > 20 dias" (todo lo que
+# quedaba entre un '<' y un '>' de comparadores) del dictamen.
+_PAT_TAG = re.compile(r"</?[A-Za-z][^>]*>|<!--.*?-->", re.DOTALL)
 
 
 def _texto_celda(html_celda: str) -> str:

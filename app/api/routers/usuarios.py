@@ -3631,9 +3631,9 @@ def _garantizar_al_menos_un_super_admin_activo(db: Session, excluir_id: int = No
 def crear_usuario(
     data: UsuarioCreate,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_admin),
 ):
-    """Crea un nuevo usuario."""
+    """Crea un nuevo usuario (solo SUPER_ADMIN)."""
     email = data.email.strip().lower()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Email inválido")
@@ -3756,9 +3756,15 @@ def cambiar_password(
     usuario_id: int,
     data: PasswordChange,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_admin),
 ):
-    """Cambia la contraseña de un usuario."""
+    """Resetea la contraseña de un usuario (solo SUPER_ADMIN).
+
+    Ronda 30: antes dependía de get_usuario_actual — cualquier usuario
+    autenticado podía sobreescribir el password de otro (incluido el
+    SUPER_ADMIN) y tomar la cuenta. El auto-servicio legítimo vive en
+    POST /auth/cambiar-password, que exige la contraseña actual.
+    """
     if len(data.nueva_password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener mínimo 6 caracteres")
 
@@ -3767,6 +3773,10 @@ def cambiar_password(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     usuario.password_hash = get_password_hash(data.nueva_password)
+    # Reset administrativo: forzar rotación en el próximo login del usuario
+    # afectado (coherente con /auth/cambiar-password, que lo limpia).
+    if hasattr(usuario, "must_change_password"):
+        usuario.must_change_password = 1
     db.commit()
 
     AuditRepository(db).registrar(

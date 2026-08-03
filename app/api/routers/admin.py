@@ -178,6 +178,12 @@ class ResetDatosRequest(BaseModel):
     confirmar: str  # debe ser exactamente CONFIRMACION_REQUERIDA
     borrar_historial: bool = True
     borrar_conciliaciones: bool = True
+    # E00: el campo se conserva por compatibilidad con clientes existentes,
+    # pero ya NO borra nada. El audit_log es la única fuente legal de quién
+    # hizo qué: un endpoint que lo destruye deja al hospital sin cómo
+    # sostener su propia trazabilidad ante una auditoría o la SuperSalud.
+    # Depurarlo, si algún día hace falta, es una tarea de retención con
+    # respaldo previo, no un efecto colateral de limpiar datos de prueba.
     borrar_audit_log: bool = False
 
 
@@ -230,15 +236,8 @@ def reset_datos(
             ),
         )
 
-        if data.borrar_audit_log:
-            # Borramos TODO el audit_log excepto el registro recién creado (el del reset)
-            # para mantener al menos la trazabilidad de este mismo reset.
-            ultimo = db.query(AuditLogRecord).order_by(AuditLogRecord.id.desc()).first()
-            q = db.query(AuditLogRecord)
-            if ultimo:
-                q = q.filter(AuditLogRecord.id != ultimo.id)
-            resumen["audit_log"] = q.delete(synchronize_session=False)
-            db.commit()
+        # El audit_log NO se borra nunca desde acá (E00): resumen["audit_log"]
+        # queda en 0 y la respuesta lo declara entre lo preservado.
 
     except Exception as e:
         db.rollback()
@@ -250,8 +249,14 @@ def reset_datos(
     return {
         "message": "Datos transaccionales eliminados correctamente",
         "registros_borrados": resumen,
-        "preservado": ["usuarios", "contratos", "plantillas"],
+        "preservado": ["usuarios", "contratos", "plantillas", "audit_log"],
         "ejecutado_por": current_user.email,
+        "nota_audit_log": (
+            "El registro de auditoría es la fuente legal de trazabilidad y no se "
+            "borra desde este endpoint, aunque se solicite."
+        )
+        if data.borrar_audit_log
+        else None,
     }
 
 

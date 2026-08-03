@@ -88,9 +88,17 @@ async def sse_importar(
     _COLAS_IMPORTACION[str(rec_id)] = cola
 
     async def cleanup() -> AsyncGenerator[str, None]:
-        async for chunk in _generar_sse(cola):
-            yield chunk
-        _COLAS_IMPORTACION.pop(str(rec_id), None)
+        try:
+            async for chunk in _generar_sse(cola):
+                yield chunk
+        finally:
+            # Ronda 30: solo borrar la cola si sigue siendo LA NUESTRA. Si un
+            # segundo suscriptor del mismo rec_id la reemplazó, al desconectar
+            # el primero borraba la cola del segundo (patrón ya usado en
+            # sse_analizar). El finally garantiza limpieza aun si el cliente
+            # corta la conexión.
+            if _COLAS_IMPORTACION.get(str(rec_id)) is cola:
+                _COLAS_IMPORTACION.pop(str(rec_id), None)
 
     return StreamingResponse(
         cleanup(),

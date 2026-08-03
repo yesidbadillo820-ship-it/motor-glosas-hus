@@ -9,6 +9,7 @@ correr **desde cualquier PC**: rutas por parámetro, sin nada hardcodeado.
 | Script | Fase | Qué hace | Dependencia |
 |---|---|---|---|
 | `inspeccionar_soportes.py` | ✅ | Inventaría una carpeta de factura, clasifica cada soporte al código ADRES y lee el RIPS/CUV/FEV | stdlib |
+| `validar_furips.py` | ✅ | **Bot de validación FURIPS**: malla Circular 022/2023 + cruce contra soportes (RIPS, CUV, FEV, factura PDF, epicrisis) + informe Excel masivo. Ver `README_validar_furips.md` | openpyxl, pypdf/pdfplumber |
 | `rips_lectura.py` | ✅ | Módulo compartido: parseo y normalización del RIPS | stdlib |
 | `generar_fur_servicios.py` | ✅ | Excel **FUR SERVICIOS** pre-rellenado desde el RIPS | openpyxl |
 | `generar_fur.py` | ⬜ | Excel **FUR** (autollena víctima desde RIPS+aviso; resto manual/IPAT) | openpyxl |

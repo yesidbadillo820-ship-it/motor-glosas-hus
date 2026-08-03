@@ -144,18 +144,29 @@ def extraer_de_texto(texto: str) -> dict:
         "campos_faltantes": [],
     }
 
-    # Número de factura
-    m = _FACTURA_RE.search(t_upper)
-    if m:
+    # Número de factura. Ronda 30: iterar y quedarse con el PRIMER candidato
+    # con dígitos que no sea una fecha — un .search único devolvía el primer
+    # match espurio (p.ej. un prefijo "FE"/"HUS" sin número) y dejaba vacío
+    # el número real más adelante en el texto.
+    for m in _FACTURA_RE.finditer(t_upper):
         cand = m.group(1).strip()
-        # Evitar capturas espurias como "No." "DE" "CON"
-        if len(cand) >= 4 and not cand.isalpha():
+        if (
+            len(cand) >= 4
+            and any(c.isdigit() for c in cand)
+            and not re.match(
+                r"^(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})$", cand
+            )
+        ):
             resultado["numero_factura"] = cand
+            break
 
-    # Número de radicado
-    m = _RADICADO_RE.search(t_upper)
-    if m:
-        resultado["numero_radicado"] = m.group(1).strip()
+    # Número de radicado. Ronda 30: descartar capturas sin dígitos — la
+    # alternativa "RAD\.?" del regex matcheaba "RADIOGRAFIA" → "IOGRAFIA".
+    for m in _RADICADO_RE.finditer(t_upper):
+        cand = m.group(1).strip()
+        if any(c.isdigit() for c in cand):
+            resultado["numero_radicado"] = cand
+            break
 
     # EPS — buscar nombres conocidos
     for eps in _EPS_CONOCIDAS:

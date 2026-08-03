@@ -318,7 +318,7 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
 
     <p style="margin-top:30px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
         <b>Acción requerida:</b> ingresa al sistema para revisar las glosas asignadas y responderlas antes de su vencimiento.<br>
-        🔗 <a href="https://motor-glosas-hus.onrender.com/" style="color:#1e40af">Abrir Motor Glosas HUS</a>
+        🔗 <a href="{get_settings().app_base_url}" style="color:#1e40af">Abrir Motor Glosas HUS</a>
     </p>
     """
 
@@ -458,7 +458,7 @@ async def enviar_alertas_vencimiento_masivo(db) -> dict:
     contenido += """
     <p style="margin-top:30px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
         <b>Acción requerida:</b> ingresa al sistema, revisa las glosas asignadas a ti y responde.<br>
-        🔗 <a href="https://motor-glosas-hus.onrender.com/" style="color:#1e40af">Abrir Motor Glosas HUS</a>
+        🔗 <a href="{get_settings().app_base_url}" style="color:#1e40af">Abrir Motor Glosas HUS</a>
     </p>
     """
 
@@ -746,7 +746,7 @@ async def enviar_excel_recepcion_con_respuestas(
             "Re-analizar" en la app antes de radicar.
         </p>
         <p style="margin-top:25px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
-            🔗 <a href="https://motor-glosas-hus.fly.dev/" style="color:#92400e;font-weight:600">Abrir Motor Glosas HUS</a>
+            🔗 <a href="{get_settings().app_base_url}" style="color:#92400e;font-weight:600">Abrir Motor Glosas HUS</a>
             — revisá los borradores y radicá los que estén OK.
         </p>
         """

@@ -1,0 +1,110 @@
+{
+  "por_defecto": "POR ASIGNAR",
+  "entidades": {
+    "DISPENSARIO": {
+      "empresa": "DISPENSARIO MEDICO BUCARAMANGA",
+      "INICIAL": "FANNY BARAJAS",
+      "RATIFICADA": "POR ASIGNAR",
+      "DEVOLUCIONES": "JOHANNA MORENO"
+    },
+    "AXA": {
+      "empresa": "AXA COLPATRIA SEGUROS S.A.",
+      "INICIAL": "SEBASTIAN ACUÑA",
+      "RATIFICADA": "JORGE GUARIN",
+      "DEVOLUCIONES": "SEBASTIAN ACUÑA"
+    },
+    "SEGUROS BOLIVAR": {
+      "empresa": "SEGUROS COMERCIALES BOLIVAR",
+      "INICIAL": "SEBASTIAN ACUÑA",
+      "RATIFICADA": "JORGE GUARIN",
+      "DEVOLUCIONES": "SEBASTIAN ACUÑA"
+    },
+    "SEGUROS MUNDIAL": {
+      "empresa": "COMPAÑIA MUNDIAL DE SEGUROS S.A.",
+      "INICIAL": "SEBASTIAN ACUÑA",
+      "RATIFICADA": "JORGE GUARIN",
+      "DEVOLUCIONES": "SEBASTIAN ACUÑA"
+    },
+    "SANITAS": {
+      "empresa": "ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S",
+      "INICIAL": "POR ASIGNAR",
+      "RATIFICADA": "JORGE GUARIN",
+      "DEVOLUCIONES": "SEBASTIAN ACUÑA"
+    },
+    "NUEVA EPS": {
+      "empresa": "NUEVA EMPRESA PROMOTORA DE SALUD S.A.",
+      "INICIAL": "DIANEYDA QUINTERO",
+      "RATIFICADA": "JORGE GUARIN",
+      "DEVOLUCIONES": "DIANEYDA QUINTERO"
+    },
+    "COOSALUD": {
+      "empresa": "COOSALUD ENTIDAD PROMOTORA DE SALUD S.A.",
+      "INICIAL": "DIANEYDA QUINTERO",
+      "RATIFICADA": "JORGE GUARIN",
+      "DEVOLUCIONES": "ALBA PEREZ"
+    },
+    "ADRES": {
+      "empresa": "ADRES - ACCIDENTES DE TRANSITO",
+      "INICIAL": "MARICELA ROJAS",
+      "RATIFICADA": "EQUIPO ADRES",
+      "DEVOLUCIONES": "MARICELA ROJAS"
+    },
+    "FAMISANAR": {
+      "empresa": "EPS FAMISANAR"
+    },
+    "SURA": {
+      "empresa": "EPS SURA"
+    },
+    "POLICIA": {
+      "empresa": "DIRECCION DE SANIDAD POLICIA NACIONAL"
+    },
+    "SALUD MIA": {
+      "empresa": "SALUD MIA EPS"
+    },
+    "FACTRAMED": {
+      "empresa": "NUEVA EMPRESA PROMOTORA DE SALUD S.A."
+    },
+    "LA PREVISORA": {
+      "empresa": "LA PREVISORA S A COMPAÑIA DE SEGUROS"
+    },
+    "PREVISORA": {
+      "empresa": "LA PREVISORA S A COMPAÑIA DE SEGUROS"
+    },
+    "SAVIA SALUD": {
+      "empresa": "SAVIA SALUD EPS"
+    },
+    "POSITIVA": {
+      "empresa": "POSITIVA COMPAÑIA DE SEGUROS"
+    },
+    "MUTUAL": {
+      "empresa": "ASOCIACION MUTUAL SER"
+    },
+    "FOMAG": {
+      "empresa": "FOMAG - FIDUPREVISORA"
+    },
+    "ASEGURADORA SOLIDARIA": {
+      "empresa": "ASEGURADORA SOLIDARIA DE COLOMBIA"
+    },
+    "SALUD TOTAL": {
+      "empresa": "SALUD TOTAL EPS"
+    },
+    "ASMET": {
+      "empresa": "ASMET SALUD EPS"
+    },
+    "ANASWAYUU": {
+      "empresa": "EPS INDIGENA ANAS WAYUU"
+    },
+    "AURORA": {
+      "empresa": "EPS AURORA"
+    },
+    "HDI": {
+      "empresa": "HDI SEGUROS COLOMBIA"
+    },
+    "HDI SEGUROS": {
+      "empresa": "HDI SEGUROS COLOMBIA"
+    },
+    "COLMENA": {
+      "empresa": "COLMENA SEGUROS"
+    }
+  }
+}
