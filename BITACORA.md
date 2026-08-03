@@ -1008,6 +1008,19 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 03-08 — Ronda 34: dos reglas del caso TA0801/citología
+
+- Del caso real que trajo Yesid (factura 1344527, citología 898015H,
+  ajuste de $1.700 «SOAT UVB»): el motor aprendió que **«se reconoce SOAT
+  UVB» + «sin acuerdo de voluntades» NO significa accidente de tránsito**
+  — significa que la entidad liquida a SOAT por falta de contrato. La
+  defensa correcta: SOAT PLENO sin descuentos, UVB vigente a la fecha de
+  atención (2026 = $12.110), y exigir el desglose del ajuste (los ajustes
+  chicos suelen ser UVB del año anterior o descuentos que nadie pactó).
+- Y que **«ayuda diagnóstica no interpretada» no existe en patología**:
+  en citologías y estudios anatomopatológicos la interpretación ES el
+  servicio — el producto es el informe del patólogo, que se anexa.
+
 ### 03-08 — El expediente entiende de facturas y lleva al trabajo
 
 - **Buscar una factura en Expediente ahora muestra EL CASO completo**: una
