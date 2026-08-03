@@ -223,6 +223,16 @@ TOOLS_ASISTENTE = [
         },
     },
     {
+        "name": "gobierno_ia",
+        "description": (
+            "El gasto de IA del sistema (últimos 30 días): cuánto va hoy, en "
+            "la semana y el mes, por modelo y por usuario, el porcentaje de "
+            "caché y las glosas más caras de defender. Úsalo cuando pregunten "
+            "por el costo/consumo de la IA."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "diagnostico_operacion",
         "description": (
             "El barrido completo de la operación HOY: glosas vencidas y por "
@@ -426,6 +436,11 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
             from app.services import perfil_pagador as _pp
 
             return json.dumps(_pp.perfil(args.get("pagador") or ""), ensure_ascii=False)
+
+        if name == "gobierno_ia":
+            from app.api.routers.gobierno_ia import resumen_gobierno_ia
+
+            return json.dumps(resumen_gobierno_ia(db=db, current_user=None), ensure_ascii=False)
 
         if name == "diagnostico_operacion":
             from app.services import centro_inteligencia

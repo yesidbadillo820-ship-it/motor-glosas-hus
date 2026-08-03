@@ -1270,6 +1270,17 @@ períodos perdidos.
 
 ---
 
+### 03-08 (cuarta parte) — Gobierno de IA: el gasto se ve
+
+- Pantalla nueva **Gobierno IA** (Reportes, solo coordinación y
+  administración): cuánto va gastado en IA hoy, en la semana y en el mes;
+  qué modelos consumen y con qué demora; qué usuarios la usan; **cuánto
+  ahorra el caché** de instrucciones; y las **glosas más caras de
+  defender**, con enlace directo a su expediente.
+- El chat también lo responde («¿cuánto hemos gastado en IA este mes?»).
+  Los datos existían llamada por llamada desde hace meses — faltaba la
+  vista que los cuenta.
+
 ### 03-08 (tercera parte) — Google apagó el servidor: mudanza al PC del hospital
 
 **Qué pasó.** La página <https://iaglosassinac.help> dejó de cargar (error

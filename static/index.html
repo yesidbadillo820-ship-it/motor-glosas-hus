@@ -2334,6 +2334,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M9 12L11 14L15 10"/></svg>
           <span class="sn-item-label">Auditoría</span>
         </button>
+        <button class="sn-item" data-tip="Gobierno de IA (coordinación)" onclick="sidebarTab(this,'gobierno-ia')" id="sn-gobierno-ia">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span class="sn-item-label">Gobierno IA</span>
+        </button>
         <button class="sn-item" data-tip="Sugerencias / Bug Reports (admin)" onclick="sidebarTab(this,'admin-sugerencias')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11h6M9 15h4M21 12c0 4.97-4.03 9-9 9-1.49 0-2.9-.36-4.14-1L3 21l1-4.86C3.36 14.9 3 13.49 3 12c0-4.97 4.03-9 9-9s9 4.03 9 9z"/></svg>
           <span class="sn-item-label">Sugerencias</span>
@@ -3387,6 +3391,20 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
          actualiza contratación y que el área de glosas miraba cuando se
          acordaba; el sistema tenía las vigencias como texto libre y nunca las
          leía. -->
+    <!-- Gobierno de IA: cuánto gasta, en qué, quién la usa. -->
+    <div class="panel" id="p-gobierno-ia">
+      <div class="intel-area">
+        <div class="malla-head">
+          <div>
+            <h2 class="malla-titulo">Gobierno de IA</h2>
+            <p class="malla-sub">Cuánto gasta la IA, en qué modelos, quién la usa y cuánto ahorra el caché — últimos 30 días.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+        </div>
+        <div id="gob-cuerpo"><div class="malla-vacio">Cargando…</div></div>
+      </div>
+    </div>
+
     <!-- Constructor de Agentes: el sistema los arma, nadie los programa. -->
     <div class="panel" id="p-agentes">
       <div class="intel-area">
@@ -8174,6 +8192,7 @@ function tab(btn,id){
   if(id==='malla') mallaCargar();
   if(id==='inteligencia') intelCargar();
   if(id==='agentes') agCargar();
+  if(id==='gobierno-ia') gobCargar();
   if(id==='expediente'){ var _eq=document.getElementById('exp-q'); if(_eq && !EXP.datos) setTimeout(function(){_eq.focus()},60); }
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
@@ -9222,6 +9241,61 @@ async function descargarDictamenMd(){
     document.body.appendChild(a); a.click(); a.remove();
     toast('Descargado', fname, 'success');
   } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ══ GOBIERNO DE IA: gasto, modelos, usuarios y caché ══
+
+async function gobCargar(){
+  var cuerpo = document.getElementById('gob-cuerpo');
+  if(!cuerpo) return;
+  cuerpo.innerHTML = '<div class="malla-vacio">Cargando…</div>';
+  try{
+    var r = await fetch('/gobierno-ia/resumen', {headers: authH()});
+    if(r.status === 403){ cuerpo.innerHTML = '<div class="malla-vacio">Solo coordinación y administración ven el gasto de IA.</div>'; return; }
+    if(!r.ok){ cuerpo.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
+    gobPintar(await r.json());
+  }catch(e){ cuerpo.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+function gobPintar(d){
+  var usd = function(v){ return '$' + (v||0).toFixed(2) + ' USD'; };
+  var html = '<div class="intel-resumen">'
+    + '<div class="intel-kpi"><b>' + usd(d.gasto.hoy.costo_usd) + '</b><span>hoy · ' + d.gasto.hoy.llamadas + ' llamadas</span></div>'
+    + '<div class="intel-kpi"><b>' + usd(d.gasto.semana.costo_usd) + '</b><span>7 días · ' + d.gasto.semana.llamadas + ' llamadas</span></div>'
+    + '<div class="intel-kpi"><b>' + usd(d.gasto.mes.costo_usd) + '</b><span>30 días · ' + d.gasto.mes.llamadas + ' llamadas</span></div>'
+    + '<div class="intel-kpi"><b style="color:#16a34a">' + d.cache.porcentaje_cacheado + '%</b><span>de la entrada vino del caché</span></div>'
+    + '</div>';
+
+  html += '<div class="exp-sec">Por modelo (30 días)</div><div class="exp-lista">';
+  (d.por_modelo || []).forEach(function(m){
+    html += '<div class="exp-item"><span><b>' + escHtml(m.modelo) + '</b> · ' + escHtml(m.proveedor)
+      + ' · ' + m.llamadas + ' llamadas · ' + Math.round(m.latencia_promedio_ms) + ' ms prom.</span>'
+      + '<span><b>' + usd(m.costo_usd) + '</b></span></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="exp-sec">Por usuario (30 días)</div><div class="exp-lista">';
+  (d.por_usuario || []).forEach(function(u){
+    html += '<div class="exp-item"><span>' + escHtml(u.usuario) + ' · ' + u.llamadas + ' llamadas</span>'
+      + '<span>' + usd(u.costo_usd) + '</span></div>';
+  });
+  html += '</div>';
+
+  if((d.glosas_mas_caras || []).length){
+    html += '<div class="exp-sec">Glosas más caras de defender</div><div class="exp-lista">';
+    d.glosas_mas_caras.forEach(function(g){
+      html += '<div class="exp-item"><span>Glosa #' + g.glosa_id + ' · ' + g.llamadas + ' llamadas IA</span>'
+        + '<span>' + usd(g.costo_usd) + ' · <a href="#" onclick="expAbrirDesdeGob(' + g.glosa_id + ');return false">ver expediente</a></span></div>';
+    });
+    html += '</div>';
+  }
+  document.getElementById('gob-cuerpo').innerHTML = html;
+}
+
+function expAbrirDesdeGob(id){
+  var btn = document.getElementById('sn-expediente');
+  if(btn) sidebarTab(btn, 'expediente');
+  expAbrir(id);
 }
 
 // ══ CONSTRUCTOR DE AGENTES: el sistema los arma, nadie los programa ══
