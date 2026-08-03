@@ -1134,6 +1134,34 @@ A pedido del auditor:
 
 ---
 
+### 03-08 (SIIFA) — el informe masivo por fin se baja completo
+
+Día de corridas reales contra SIIFA con las credenciales del auditor. Cada
+falla que apareció en pantalla quedó corregida el mismo día:
+
+1. **El bot se colgaba a mitad de camino** (PR #249). Dos causas: el permiso
+   de entrada (token) se vencía durante una descarga larga y nadie lo
+   renovaba, y ante un error definitivo del servidor el bot volvía a
+   intentar lo mismo una y otra vez. Ahora renueva el permiso solo y deja de
+   insistir cuando el error no tiene remedio.
+2. **No entraba con el usuario del auditor** (PR #252). El script pedía la
+   variable con un nombre y el auditor tenía otro: ahora acepta
+   `SIIFA_USERNAME` además del nombre anterior, y la prueba de conexión dice
+   con claridad si el problema es de usuario, de clave o de red.
+3. **El servidor del Ministerio no aguantaba la consulta completa**
+   (PR #254). Cuando la consulta de todo el período se cae, el bot ya no se
+   rinde: baja el informe **mes por mes** y lo une, sin registros repetidos.
+4. **Dos remates** (PR #255): se recuperó un ajuste que se había perdido al
+   rehacer la rama (tandas de 50 registros en vez de 200, que bajan solas si
+   el servidor se queja) y se cubrió el caso real en que la consulta **no
+   responde nunca** (se queda esperando) — antes ese camino terminaba sin
+   informe; ahora también dispara el rescate mes por mes.
+
+Todo probado con un servidor de prueba que imita las fallas reales.
+Falta la corrida real definitiva del auditor para confirmar el Excel maestro.
+
+---
+
 ## 3) PENDIENTE
 
 ### Conciliación Dispensario (147 facturas objeto de mesa)
@@ -1272,6 +1300,9 @@ A pedido del auditor:
 12. **Primera corrida real** de `tools/siifa_reporte_seguimientos.py` (sin
     filtros) para tener el Excel maestro de los 2.579 seguimientos y
     verificar que las columnas coincidan con lo que el auditor espera.
+    *(03-08: se hicieron varias corridas y se corrigieron las fallas que
+    salieron —cuelgue, usuario, servidor que no aguanta la consulta—; falta
+    la corrida que termine y entregue el Excel completo.)*
 13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
     una sola glosa antes de cualquier cargue masivo (regla del repo).
 14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
@@ -1301,6 +1332,10 @@ A pedido del auditor:
    de pre-auditoría.
 7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
    COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
+8. **SIIFA:** volver a correr el informe masivo de seguimientos con las
+   correcciones del 03-08 (PR #255). Debe terminar y dejar el Excel maestro;
+   si el servidor del Ministerio vuelve a ahogarse, ya baja mes por mes solo.
+   Con ese Excel en mano, hacer el piloto de 1 glosa (pendiente #13).
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 
