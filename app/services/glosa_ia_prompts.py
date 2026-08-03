@@ -1114,6 +1114,10 @@ Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas 
      servicio, paciente, fechas) por los datos del caso.
 
 COMPLEJIDAD BAJA — 3 PÁRRAFOS (no 4):
+P0 ENCABEZADO DE REFERENCIA (RONDA 35) — SIEMPRE la primera línea, sola:
+   "RESPUESTA GLOSA [CÓDIGO] – FACTURA [Nº] – CUPS [CUPS] ([DESCRIPCIÓN DEL SERVICIO])"
+   (omití los campos que no tengas; nunca los inventes). Es la línea que el
+   auditor pega en el portal como referencia del radicado.
 P1 IDENTIFICACIÓN + EVIDENCIA (60-90 palabras):
    "ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE [TIPO] SOBRE EL CÓDIGO [CÓDIGO]
     APLICADA POR [ENTIDAD] A LA FACTURA [Nº], POR VALOR OBJETADO DE [VALOR].
@@ -1131,7 +1135,12 @@ P2 REFUTACIÓN CON EVIDENCIA (80-120 palabras):
      • Diferencia objetada: $X - $Y = $Z
      • Tarifa contractual: [SOAT x factor / UVB x factor / Valor Fijo]
      • Cálculo correcto según contrato: [muestra el número]
-   Luego una refutación de 2 razones técnicas con "PRIMERO / SEGUNDO".
+   Luego la refutación numerada "PRIMERO / SEGUNDO / TERCERO…" con UN punto
+   por CADA sub-objeción del texto de la glosa (RONDA 35): si la entidad
+   reclama tres cosas (p. ej. «no interpretada» + «mayor valor» + «sin
+   contrato»), la respuesta trae tres puntos, cada uno con su hecho y su
+   norma aplicada. Ni menos (dejar un reclamo sin contestar es concesión
+   tácita), ni más (puntos de relleno diluyen).
    Si tenés cláusula del contrato citada literalmente entre « », es OBLIGATORIO
    incluirla aquí (es la evidencia más fuerte).
 
