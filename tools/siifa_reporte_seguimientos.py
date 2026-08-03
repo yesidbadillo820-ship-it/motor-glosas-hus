@@ -39,6 +39,7 @@ import argparse
 import logging
 import sys
 from collections import defaultdict
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -230,6 +231,96 @@ def escribir_xlsx(filas: list[dict], ruta: Path) -> None:
     logger.info("Informe guardado: %s (%d filas)", ruta, len(filas))
 
 
+def _fecha(texto: str | None) -> date | None:
+    if not texto:
+        return None
+    try:
+        return datetime.strptime(texto.strip()[:10], "%Y-%m-%d").date()
+    except ValueError:
+        raise SystemExit(f"Fecha inválida: '{texto}'. Se escribe así: 2026-07-01") from None
+
+
+def _meses(ini: date, fin: date) -> list[tuple[date, date]]:
+    """Parte el rango en tramos de un mes calendario."""
+    tramos = []
+    actual = ini.replace(day=1)
+    while actual <= fin:
+        if actual.month == 12:
+            siguiente = actual.replace(year=actual.year + 1, month=1)
+        else:
+            siguiente = actual.replace(month=actual.month + 1)
+        tramos.append((max(actual, ini), min(siguiente - timedelta(days=1), fin)))
+        actual = siguiente
+    return tramos
+
+
+def _bajar_rango(
+    cliente: SiifaClient,
+    filtros: dict,
+    ini: date,
+    fin: date,
+    filas: list[dict],
+    fallidos: list[str],
+    profundidad: int = 0,
+) -> None:
+    """Baja un período. Si el servidor no aguanta, lo parte en dos y reintenta.
+
+    Lo bajado se acumula aparte y sólo se suma al informe si el período salió
+    completo: así, al partir y reintentar, ningún registro queda duplicado.
+    """
+    etiqueta = f"{ini} a {fin}"
+    parcial: list[dict] = []
+    try:
+        for cruda in cliente.listar_seguimientos(
+            fecha_creacion_inicio=ini.isoformat(),
+            fecha_creacion_final=fin.isoformat(),
+            **filtros,
+        ):
+            parcial.append(_fila_reporte(cruda))
+    except SiifaApiError as exc:
+        if exc.status_code >= 500 and profundidad < 4 and (fin - ini).days >= 1:
+            medio = ini + (fin - ini) / 2
+            logger.warning("El período %s es muy pesado para SIIFA; lo parto en dos.", etiqueta)
+            _bajar_rango(cliente, filtros, ini, medio, filas, fallidos, profundidad + 1)
+            _bajar_rango(
+                cliente,
+                filtros,
+                medio + timedelta(days=1),
+                fin,
+                filas,
+                fallidos,
+                profundidad + 1,
+            )
+            return
+        logger.error("No se pudo traer el período %s: %s", etiqueta, exc)
+        fallidos.append(etiqueta)
+        return
+
+    filas.extend(parcial)
+    if parcial:
+        logger.info(
+            "Período %s: %d registros (total acumulado: %d).", etiqueta, len(parcial), len(filas)
+        )
+
+
+def _sin_repetidos(filas: list[dict]) -> list[dict]:
+    """Quita repetidos por id de seguimiento, por si algún período se solapó."""
+    vistos: set = set()
+    unicas = []
+    for f in filas:
+        clave = f.get("id_seguimiento_factura_glosa")
+        if clave in (None, ""):
+            unicas.append(f)
+            continue
+        if clave not in vistos:
+            vistos.add(clave)
+            unicas.append(f)
+    quitadas = len(filas) - len(unicas)
+    if quitadas:
+        logger.info("Se quitaron %d registro(s) repetido(s).", quitadas)
+    return unicas
+
+
 def correr_diagnostico(cliente: SiifaClient) -> int:
     print("\nRevisión del sistema SIIFA — paso a paso\n" + "=" * 46)
     pasos = cliente.diagnostico()
@@ -270,6 +361,12 @@ def main() -> None:
         help=f"Registros por consulta (default: {REGISTROS_POR_PAGINA_DEFECTO}). "
         "Bajarlo si el servidor va lento.",
     )
+    ap.add_argument(
+        "--por-meses",
+        action="store_true",
+        help="Baja mes por mes. Cada consulta es mucho más liviana para el servidor "
+        "del Ministerio. Se activa solo si la consulta completa no responde.",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -301,27 +398,66 @@ def main() -> None:
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
 
+        filtros = {
+            "tipo_seguimiento": args.tipo,
+            "tiene_respuesta": False if args.sin_respuesta else None,
+            "numero_factura": args.factura,
+            "registros_por_pagina": args.pagina_tam,
+        }
+        periodos_fallidos: list[str] = []
+
         try:
-            for cruda in cliente.listar_seguimientos(
-                tipo_seguimiento=args.tipo,
-                tiene_respuesta=False if args.sin_respuesta else None,
-                numero_factura=args.factura,
-                fecha_creacion_inicio=args.desde,
-                fecha_creacion_final=args.hasta,
-                registros_por_pagina=args.pagina_tam,
-            ):
-                filas.append(_fila_reporte(cruda))
+            if args.por_meses:
+                ini = _fecha(args.desde) or date(2025, 1, 1)
+                fin = _fecha(args.hasta) or date.today()
+                logger.info(
+                    "Bajando por meses, de %s a %s (cada mes es una consulta liviana).", ini, fin
+                )
+                for mes_ini, mes_fin in _meses(ini, fin):
+                    _bajar_rango(cliente, filtros, mes_ini, mes_fin, filas, periodos_fallidos)
+            else:
+                for cruda in cliente.listar_seguimientos(
+                    fecha_creacion_inicio=args.desde,
+                    fecha_creacion_final=args.hasta,
+                    **filtros,
+                ):
+                    filas.append(_fila_reporte(cruda))
         except KeyboardInterrupt:
             interrumpido = True
             logger.warning("Cancelado por el usuario — guardo lo que alcancé a bajar.")
         except SiifaApiError as exc:
-            # Guardar lo bajado igual: mejor un informe parcial que nada.
-            if filas:
+            # El servidor del Ministerio no aguanta la consulta completa.
+            # En vez de rendirse, se reintenta mes por mes: cada consulta es
+            # mucho más liviana y sí responde.
+            if exc.status_code >= 500 and not args.por_meses and not filas:
+                logger.warning(
+                    "SIIFA no aguanta la consulta completa. Lo intento mes por mes, "
+                    "que es mucho más liviano para su servidor..."
+                )
+                ini = _fecha(args.desde) or date(2025, 1, 1)
+                fin = _fecha(args.hasta) or date.today()
+                try:
+                    for mes_ini, mes_fin in _meses(ini, fin):
+                        _bajar_rango(cliente, filtros, mes_ini, mes_fin, filas, periodos_fallidos)
+                except KeyboardInterrupt:
+                    interrumpido = True
+                    logger.warning("Cancelado por el usuario — guardo lo bajado.")
+            elif filas:
+                # Guardar lo bajado igual: mejor un informe parcial que nada.
                 logger.error(
                     "Se cortó la consulta (%s). Guardo las %d filas bajadas.", exc, len(filas)
                 )
             else:
                 raise SystemExit(f"\nNo se pudo consultar SIIFA: {exc}\n")
+
+    filas = _sin_repetidos(filas)
+    if periodos_fallidos:
+        logger.warning(
+            "OJO: no se pudo traer %d período(s): %s. "
+            "El informe está incompleto en esas fechas; volvé a intentarlo más tarde.",
+            len(periodos_fallidos),
+            ", ".join(periodos_fallidos),
+        )
 
     if not filas:
         logger.warning(
