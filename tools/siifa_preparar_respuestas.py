@@ -42,6 +42,7 @@ INSTALACIÓN (una vez):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import sys
 from datetime import datetime
@@ -62,6 +63,8 @@ COLUMNAS_PLANTILLA = [
     "VALOR_TOTAL",
     "FECHA_REPORTE_MAS_ANTIGUA",
     "DIAS_DESDE_EL_REPORTE",
+    "ORIGEN_RESPUESTA",
+    "REVISAR",
     "CODIGO_RESPUESTA",
     "OBSERVACION_RESPUESTA",
 ]
@@ -89,14 +92,20 @@ def clave_de_grupo(fila: dict) -> str:
     y la misma observación de la EPS: en ese caso la respuesta del hospital
     es necesariamente la misma. La clave se calcula igual al armar la
     plantilla y al expandirla, que es lo que permite volver a juntarlas.
+
+    Se devuelve una huella corta y no el texto: las observaciones de la EPS
+    traen espacios al final, saltos de línea y caracteres raros, y al pasar
+    por Excel el texto vuelve cambiado — con lo cual la fila ya no calzaba
+    con su grupo y la respuesta se perdía sin aviso.
     """
-    return "|".join(
+    crudo = "|".join(
         (
             _texto(fila.get("numero_factura")),
             _texto(fila.get("codigo_glosa")),
             _texto(fila.get("observacion_glosa"))[:200],
         )
     )
+    return hashlib.sha1(crudo.encode("utf-8")).hexdigest()[:12]
 
 
 def leer_informe(ruta: Path, hoja: str = "SEGUIMIENTOS") -> list[dict]:
@@ -143,17 +152,30 @@ def agrupar(
     return grupos
 
 
-def escribir_plantilla(grupos: dict[str, list[dict]], ruta: Path) -> None:
+def escribir_plantilla(
+    grupos: dict[str, list[dict]],
+    ruta: Path,
+    ya_respondidas: dict[str, dict] | None = None,
+) -> None:
+    """Arma la hoja de trabajo.
+
+    `ya_respondidas` trae, por grupo, la respuesta que el hospital ya dio en
+    otra parte (por ejemplo la base de trámites de DGH). Esas filas llegan
+    llenas y marcadas con su origen: el auditor sólo revisa, en vez de
+    escribir de cero.
+    """
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
+    ya_respondidas = ya_respondidas or {}
     wb = Workbook()
     ws = wb.active
     ws.title = "RESPUESTAS"
 
     encabezado = PatternFill("solid", fgColor="1F4E78")
     a_llenar = PatternFill("solid", fgColor="FFF2CC")
+    ojo = PatternFill("solid", fgColor="FFC7CE")
     for c, h in enumerate(COLUMNAS_PLANTILLA, 1):
         cell = ws.cell(row=1, column=c, value=h)
         cell.fill = encabezado
@@ -169,6 +191,7 @@ def escribir_plantilla(grupos: dict[str, list[dict]], ruta: Path) -> None:
         primera = lineas[0]
         fechas = [x.get("fecha_reporte") for x in lineas if x.get("fecha_reporte")]
         mas_antigua = min((str(x) for x in fechas), default="")
+        previa = ya_respondidas.get(clave) or {}
         valores = {
             "GRUPO": clave,
             "TIPO": primera.get("tipo_seguimiento"),
@@ -180,8 +203,10 @@ def escribir_plantilla(grupos: dict[str, list[dict]], ruta: Path) -> None:
             "VALOR_TOTAL": sum(x.get("valor_glosa") or 0 for x in lineas),
             "FECHA_REPORTE_MAS_ANTIGUA": mas_antigua[:10],
             "DIAS_DESDE_EL_REPORTE": _dias_desde(mas_antigua),
-            "CODIGO_RESPUESTA": None,
-            "OBSERVACION_RESPUESTA": None,
+            "ORIGEN_RESPUESTA": previa.get("ORIGEN", "ESCRIBIR"),
+            "REVISAR": previa.get("REVISAR"),
+            "CODIGO_RESPUESTA": previa.get("CODIGO_RESPUESTA"),
+            "OBSERVACION_RESPUESTA": previa.get("OBSERVACION_RESPUESTA"),
         }
         for c, h in enumerate(COLUMNAS_PLANTILLA, 1):
             cell = ws.cell(row=r, column=c, value=valores[h])
@@ -191,6 +216,8 @@ def escribir_plantilla(grupos: dict[str, list[dict]], ruta: Path) -> None:
             )
             if h in ("CODIGO_RESPUESTA", "OBSERVACION_RESPUESTA"):
                 cell.fill = a_llenar
+            if h == "REVISAR" and valores["REVISAR"]:
+                cell.fill = ojo
             if h == "VALOR_TOTAL":
                 cell.number_format = '"$"#,##0'
 
@@ -205,6 +232,8 @@ def escribir_plantilla(grupos: dict[str, list[dict]], ruta: Path) -> None:
         "VALOR_TOTAL": 16,
         "FECHA_REPORTE_MAS_ANTIGUA": 13,
         "DIAS_DESDE_EL_REPORTE": 10,
+        "ORIGEN_RESPUESTA": 16,
+        "REVISAR": 30,
         "CODIGO_RESPUESTA": 16,
         "OBSERVACION_RESPUESTA": 60,
     }
