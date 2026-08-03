@@ -1104,6 +1104,15 @@ SIN su migración deja producción con la regla vieja; y destrabar borrando
 registros a mano borra la trazabilidad. Siempre: migración en el código +
 piloto + PR, nunca DELETE a mano contra la base de producción.
 
+**Endurecimiento posterior (mismo día, revisión adversarial):** se detectó
+y corrigió que (1) eliminar el oficio original después de recargar su envío
+en otro daba error 500 — ahora explica que las facturas ya subsanaron y no
+se puede; (2) quitar el envío del oficio original tras la recarga devolvía
+un cupo del tope de 3 en silencio — ahora se bloquea con su porqué; (3) dos
+cargas simultáneas del mismo envío podían pasarse del tope o terminar en
+error 500 — ahora la segunda recibe un aviso claro; y (4) la migración del
+candado se auto-repara si un arranque muere a mitad de camino.
+
 ---
 
 ## 3) PENDIENTE

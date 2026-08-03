@@ -331,12 +331,20 @@ class TestFix3ContratoCruzado:
         assert get_contrato("SA")["numero"] == "SIN CONTRATO PACTADO"
 
     def test_get_contrato_matches_legitimos_siguen(self):
+        """Con fecha del hecho FIJA: sin fecha, get_contrato usa "hoy" y la
+        prueba se volvía bomba de tiempo — reventó el 01-08-2026 cuando venció
+        la vigencia del contrato DMBUG (Dic 2025 – Jul 2026), sin que ningún
+        código hubiera cambiado. Lo que se prueba aquí es el MATCH del nombre,
+        no la vigencia, así que se ancla a un día en que todos regían."""
+        import datetime
+
         from app.services.glosa_ia_prompts import get_contrato
 
-        assert "S-13-1-03-1-04958" in get_contrato("FAMISANAR EPS")["numero"]
-        assert "DMBUG" in get_contrato("DISPENSARIO MEDICO BUCARAMANGA")["numero"]
-        assert "12076-359-2025" in get_contrato("FOMAG")["numero"]
-        assert "IPS-001B-2022" in get_contrato("PPL")["numero"]
+        dia = datetime.date(2026, 6, 15)
+        assert "S-13-1-03-1-04958" in get_contrato("FAMISANAR EPS", fecha_hecho=dia)["numero"]
+        assert "DMBUG" in get_contrato("DISPENSARIO MEDICO BUCARAMANGA", fecha_hecho=dia)["numero"]
+        assert "12076-359-2025" in get_contrato("FOMAG", fecha_hecho=dia)["numero"]
+        assert "IPS-001B-2022" in get_contrato("PPL", fecha_hecho=dia)["numero"]
 
     def test_catalogo_contrato_eps_duena(self):
         from app.services.glosa_ia_prompts import catalogo_contratos_eps
