@@ -233,6 +233,101 @@ class TestEscribirEnvio:
         assert r.status_code == 404
         assert "no existe" in r.json()["detail"].lower()
 
+    def test_recarga_en_otro_oficio_reingresa_las_devueltas(self, client):
+        """Caso real 30-07: facturación reenvía las subsanaciones con el MISMO
+        número de envío dentro de un oficio nuevo. Antes el sistema bloqueaba
+        con 'El envío ya fue cargado'; ahora la recarga reingresa las
+        devueltas y omite las demás."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 100)])
+        _subir_dgreport(client, [F1, F2])
+        o1 = _crear_oficio(client, "FHUS-REC-1", "2026-07-27T14:46")
+        _escribir(client, o1["id"], ENV)
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        assert _radicar(client, _factura_id(client, F2)).status_code == 200
+
+        o2 = _crear_oficio(client, "FHUS-REC-2", "2026-07-30T14:02")
+        r = _escribir(client, o2["id"], ENV)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert not d.get("ya_cargado")
+        assert d["reingresos"] == 1 and d["nuevas"] == 0 and d["omitidas"] == 1
+        # la devuelta quedó en subsanación, colgada del oficio NUEVO
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert h["ronda"] == 2 and h["estado"] == "EN_SUBSANACION"
+        assert h["oficio_fhus"] == "FHUS-REC-2"
+        # la radicada no se tocó y ninguna factura se duplicó
+        h2 = client.get(f"/preauditoria/facturas/{F2}/historial").json()["actual"]
+        assert h2["estado"] == "RADICADA"
+        assert client.get("/preauditoria/consolidado").json()["total"] == 2
+
+    def test_recarga_sin_devueltas_se_permite_pero_no_mueve_nada(self, client):
+        """La regla es hasta 3 oficios por envío: la recarga se permite aunque
+        no haya devueltas, pero avisa que ninguna factura se movió."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        o1 = _crear_oficio(client, "FHUS-REC-1", "2026-07-27T14:46")
+        _escribir(client, o1["id"], ENV)
+        assert _radicar(client, _factura_id(client, F1)).status_code == 200
+        o2 = _crear_oficio(client, "FHUS-REC-2", "2026-07-30T14:02")
+        r = _escribir(client, o2["id"], ENV)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert not d.get("ya_cargado")
+        assert d["nuevas"] == 0 and d["reingresos"] == 0 and d["omitidas"] == 1
+        assert any("no movió ninguna factura" in a for a in d["advertencias"])
+        # la radicada sigue intacta y en su oficio original
+        h = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert h["estado"] == "RADICADA" and h["oficio_fhus"] == "FHUS-REC-1"
+        assert client.get("/preauditoria/consolidado").json()["total"] == 1
+
+    def test_tope_de_3_oficios_por_envio(self, client):
+        """El mismo envío se acepta en máximo 3 oficios; el 4.º se bloquea
+        nombrando los radicados (no los ids internos)."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-TOP-1", "2026-07-25T08:00")
+        _escribir(client, o1["id"], ENV)
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o2 = _crear_oficio(client, "FHUS-TOP-2", "2026-07-27T08:00")
+        assert _escribir(client, o2["id"], ENV).json()["reingresos"] == 1
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o3 = _crear_oficio(client, "FHUS-TOP-3", "2026-07-29T08:00")
+        assert _escribir(client, o3["id"], ENV).json()["reingresos"] == 1
+        o4 = _crear_oficio(client, "FHUS-TOP-4", "2026-07-31T08:00")
+        r = _escribir(client, o4["id"], ENV)
+        assert r.json()["ya_cargado"] is True
+        assert "máximo 3" in r.json()["mensaje"]
+        for radicado in ("FHUS-TOP-1", "FHUS-TOP-2", "FHUS-TOP-3"):
+            assert radicado in r.json()["mensaje"]
+
+    def test_recarga_doble_en_el_mismo_oficio_sigue_bloqueada(self, client):
+        """El candado del doble clic no se pierde con la recarga permitida."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-REC-1", "2026-07-27T14:46")
+        _escribir(client, o1["id"], ENV)
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o2 = _crear_oficio(client, "FHUS-REC-2", "2026-07-30T14:02")
+        assert _escribir(client, o2["id"], ENV).json()["reingresos"] == 1
+        # segunda vez en el MISMO oficio nuevo → bloqueada
+        r = _escribir(client, o2["id"], ENV)
+        assert r.json()["ya_cargado"] is True
+        assert "este oficio" in r.json()["mensaje"]
+
+    def test_preview_de_la_recarga_avisa_el_oficio_anterior(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client, "FHUS-REC-1", "2026-07-27T14:46")
+        _escribir(client, o1["id"], ENV)
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o2 = _crear_oficio(client, "FHUS-REC-2", "2026-07-30T14:02")
+        p = client.get(f"/preauditoria/oficios/{o2['id']}/envios/{ENV}/preview").json()
+        assert p["ya_cargado"] is False  # en ESTE oficio no se ha cargado
+        assert p["cargado_en_otro_oficio"] == "FHUS-REC-1"
+        assert p["reingresos"] == 1
+        assert p["veces_cargado"] == 1 and p["max_cargas_envio"] == 3
+        assert p["oficios_donde_cargado"] == ["FHUS-REC-1"]
+        # y desde el oficio original sí dice que ya está cargado
+        p1 = client.get(f"/preauditoria/oficios/{o1['id']}/envios/{ENV}/preview").json()
+        assert p1["ya_cargado"] is True
+
     def test_preview_no_escribe(self, client):
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 100)])
         o = _crear_oficio(client)

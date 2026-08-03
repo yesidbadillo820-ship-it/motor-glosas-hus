@@ -492,6 +492,41 @@ async def lifespan(app: FastAPI):
             pass
         logger.warning(f"MIGRACIÓN pre-auditoría observaciones: {e}")
 
+    # Pre-auditoría: el mismo envío puede volver en un oficio posterior —
+    # facturación reenvía las subsanaciones con el MISMO número de envío
+    # (caso real 30-07-2026). El candado único pasa de (envio) a
+    # (envio, oficio_id): sigue bloqueando el doble clic en el mismo oficio.
+    try:
+        if _tiene_tabla("preaud_envios_cargados"):
+            from sqlalchemy import inspect as _sa_inspect
+
+            _idx_envio = next(
+                (
+                    i
+                    for i in _sa_inspect(engine).get_indexes("preaud_envios_cargados")
+                    if i.get("name") == "ix_preaud_envio_cargado"
+                ),
+                None,
+            )
+            if _idx_envio and list(_idx_envio.get("column_names") or []) == ["envio"]:
+                logger.warning(
+                    "MIGRACIÓN pre-auditoría: candado de envíos por oficio (envio, oficio_id)"
+                )
+                db.execute(text("DROP INDEX ix_preaud_envio_cargado"))
+                db.execute(
+                    text(
+                        "CREATE UNIQUE INDEX ix_preaud_envio_cargado "
+                        "ON preaud_envios_cargados (envio, oficio_id)"
+                    )
+                )
+                db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría envíos por oficio: {e}")
+
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
     # "value too long for type character varying(50)" en EPS oficial

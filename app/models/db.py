@@ -1056,8 +1056,12 @@ class DgReportRecord(Base):
 class EnvioCargadoRecord(Base):
     """Ledger de cada ENVÍO ya volcado al consolidado (dedup del punto 3).
 
-    Al escribir un envío se inserta aquí; si ya existe (único por envío), se
-    responde "El envío ya fue cargado" y NO se recrean facturas.
+    Al escribir un envío se inserta aquí; si ya existe PARA ESE OFICIO
+    (único por envío + oficio), se responde "El envío ya fue cargado" y NO
+    se recrean facturas. El mismo envío SÍ puede cargarse en oficios
+    posteriores — hasta MAX_OFICIOS_POR_ENVIO en total — porque facturación
+    reenvía las subsanaciones con el mismo número de envío (caso real
+    30-07-2026); la recarga solo reingresa las facturas devueltas.
     """
 
     __tablename__ = "preaud_envios_cargados"
