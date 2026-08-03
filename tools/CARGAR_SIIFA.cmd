@@ -61,8 +61,11 @@ echo   [%DEFCARP%]
 echo   Es una CARPETA, no un comando: algo como D:\...\SIIFA
 set "CARPETA="
 set /p "CARPETA=  Ruta: "
-set "CARPETA=%CARPETA:"=%"
+REM Primero la de por defecto y DESPUES quitar comillas: al reves, un Enter
+REM (variable vacia) dejaba de carpeta la basura «"=» y todo fallaba luego.
 if not defined CARPETA set "CARPETA=%DEFCARP%"
+set "CARPETA=%CARPETA:"=%"
+if not defined CARPETA goto carpetamala
 :quitarbs
 if "%CARPETA:~-1%"=="\" ( set "CARPETA=%CARPETA:~0,-1%" & goto quitarbs )
 if not exist "%CARPETA%" mkdir "%CARPETA%" >nul 2>&1
@@ -78,13 +81,20 @@ set "GLOSAS=%CARPETA%\respuestas_GLOSAS.xlsx"
 set "DEVOL=%CARPETA%\respuestas_DEVOLUCIONES.xlsx"
 
 :menu
+REM Marcar lo que ya esta hecho: asi se ve de un vistazo por donde va.
+set "HAYINF=falta"
+set "HAYRES=faltan"
+set "HAYPIL=falta"
+if exist "%INFORME%" set "HAYINF=listo"
+if exist "%GLOSAS%" set "HAYRES=listos"
+if exist "%CARPETA%\piloto_siifa.csv" set "HAYPIL=hecho"
 echo.
 echo ============================================================
 echo   Carpeta: %CARPETA%
 echo ============================================================
-echo   [1] Bajar de SIIFA el informe de seguimientos
-echo   [2] Armar los archivos de respuestas (solo lo ya respondido)
-echo   [3] PILOTO - subir 1 sola glosa (obligatorio antes del [4])
+echo   [1] Bajar de SIIFA el informe de seguimientos      (%HAYINF%)
+echo   [2] Armar los archivos de respuestas               (%HAYRES%)
+echo   [3] PILOTO - subir 1 sola glosa                    (%HAYPIL%)
 echo   [4] Cargar TODAS las glosas
 echo   [5] Cargar TODAS las devoluciones
 echo   [6] Reintentar lo que quedo con error
@@ -118,6 +128,8 @@ echo   Export de tramites de DGH (el Excel grande, hoja BD TRAMITE).
 echo   Es el que trae lo que el hospital YA respondio.
 set "DGH="
 set /p "DGH=  Ruta: "
+REM Igual que con la carpeta: comprobar que escribio algo ANTES de tocarlo.
+if not defined DGH goto sindgh
 set "DGH=%DGH:"=%"
 if not defined DGH goto sindgh
 if not exist "%DGH%" goto sindgh
