@@ -1443,6 +1443,24 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   50 a 10 registros por tanda), el bot cambió solo de estrategia y completó
   el informe.
 
+### 03-08 (décima parte) — El Enter que dejaba el bot inservible
+
+- Segunda corrida del bot de SIIFA: al dar **Enter** para aceptar la carpeta
+  por defecto, el menú quedó mostrando `Carpeta: "=` y ninguna opción sirvió.
+- **La causa:** el bot le quitaba las comillas a lo escrito ANTES de aplicar
+  la carpeta por defecto. Con Enter no se escribe nada, y quitarle las
+  comillas a algo vacío dejaba de carpeta la basura `"=`. Corregido el orden
+  (primero la de por defecto, después limpiar), y lo mismo en la ruta del
+  export de DGH. Queda una prueba que vigila ese orden.
+- De paso, el menú ahora **muestra por dónde va el trabajo**: al lado de cada
+  opción dice si el informe ya está bajado, si los archivos de respuestas ya
+  están armados y si el piloto ya se hizo.
+- **Pendiente relacionado:** otros bots de doble clic (`CRUZAR_GLOSAS`,
+  `SEMAFORO_GLOSAS`, `AUDITAR_DEV_EPS`, `BUSCAR_FACTURA`, `EXCEL_A_CSV`,
+  `TXT_A_EXCEL`, `VERIFICAR_RADICACION`, `VIGILANTE_NOCTURNO`) tienen el
+  mismo patrón. Ahí sólo falla cuando la ruta queda vacía, pero conviene
+  corregirlo antes de que le pase a alguien en mitad de un trabajo.
+
 ---
 
 ## 3) PENDIENTE

@@ -71,6 +71,31 @@ def test_la_carpeta_se_valida_antes_de_llegar_al_menu():
     assert texto.index("goto carpetamala") < texto.index(":menu"), "se valida antes del menú"
 
 
+def test_el_enter_toma_la_carpeta_de_por_defecto():
+    """El orden importa y ya rompió una corrida real.
+
+    Al dar Enter la variable queda vacía. Si primero se le quitan las
+    comillas y después se aplica la carpeta por defecto, `%CARPETA:"=%`
+    sobre una variable vacía deja de carpeta la basura «"=» — que fue lo
+    que pasó: el menú mostró `Carpeta: "=` y ninguna opción funcionó.
+    """
+    texto = CMD.read_text(encoding="utf-8")
+    bloque = texto[texto.index(":carpeta") : texto.index(":menu")]
+
+    defecto = bloque.index('if not defined CARPETA set "CARPETA=%DEFCARP%"')
+    sin_comillas = bloque.index('set "CARPETA=%CARPETA:"=%"')
+
+    assert defecto < sin_comillas, "la carpeta por defecto se aplica ANTES de quitar comillas"
+
+
+def test_lo_que_se_escribe_se_comprueba_antes_de_tocarlo():
+    """Misma trampa en la ruta del export de DGH."""
+    texto = CMD.read_text(encoding="utf-8")
+    bloque = texto[texto.index(":armar") : texto.index(":piloto")]
+
+    assert bloque.index("if not defined DGH goto sindgh") < bloque.index('set "DGH=%DGH:"=%"')
+
+
 def test_se_puede_corregir_la_carpeta_sin_cerrar_el_bot():
     texto = CMD.read_text(encoding="utf-8")
 
