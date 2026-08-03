@@ -319,9 +319,7 @@ def datos_factura(ruta_xml: Path) -> dict:
         "periodo_inicio": _texto(
             periodo.find("cbc:StartDate", NS) if periodo is not None else None
         ),
-        "periodo_fin": _texto(
-            periodo.find("cbc:EndDate", NS) if periodo is not None else None
-        ),
+        "periodo_fin": _texto(periodo.find("cbc:EndDate", NS) if periodo is not None else None),
         "valor_bruto": _texto(
             totales.find("cbc:LineExtensionAmount", NS) if totales is not None else None
         ),
@@ -387,9 +385,7 @@ def revisar_codigos(servicio: dict, ubicacion: str) -> list[Hallazgo]:
     return hallazgos
 
 
-def revisar_servicio(
-    tipo: str, servicio: dict, ubicacion: str
-) -> list[Hallazgo]:
+def revisar_servicio(tipo: str, servicio: dict, ubicacion: str) -> list[Hallazgo]:
     hallazgos: list[Hallazgo] = []
     for campo in OBLIGATORIOS_SERVICIO.get(tipo, []):
         if _falta(servicio.get(campo)):
@@ -476,9 +472,7 @@ def revisar_estructura(data: dict) -> list[Hallazgo]:
 
     usuarios = data.get("usuarios")
     if not isinstance(usuarios, list) or not usuarios:
-        hallazgos.append(
-            Hallazgo("ERROR", "usuarios", "El JSON no trae ningun usuario.")
-        )
+        hallazgos.append(Hallazgo("ERROR", "usuarios", "El JSON no trae ningun usuario."))
         return hallazgos
 
     for i, usuario in enumerate(usuarios):
@@ -492,9 +486,7 @@ def revisar_estructura(data: dict) -> list[Hallazgo]:
                         "Campo obligatorio del usuario que viene vacio (null).",
                     )
                 )
-        hallazgos.extend(
-            revisar_fecha("fechaNacimiento", usuario.get("fechaNacimiento"), ubic_u)
-        )
+        hallazgos.extend(revisar_fecha("fechaNacimiento", usuario.get("fechaNacimiento"), ubic_u))
 
         servicios = usuario.get("servicios") or {}
         if not servicios:
@@ -528,8 +520,11 @@ def _fechas_atencion(data: dict) -> Iterable[tuple[str, str]]:
             if not isinstance(registros, list):
                 continue
             for j, servicio in enumerate(registros):
-                for campo in ("fechaInicioAtencion", "fechaDispensAdmon",
-                              "fechaSuministroTecnologia"):
+                for campo in (
+                    "fechaInicioAtencion",
+                    "fechaDispensAdmon",
+                    "fechaSuministroTecnologia",
+                ):
                     valor = servicio.get(campo)
                     if isinstance(valor, str) and valor.strip():
                         yield (f"usuarios[{i}].servicios.{tipo}[{j}].{campo}", valor)
@@ -550,8 +545,7 @@ def revisar_cruce(data: dict, factura: dict) -> list[Hallazgo]:
     num_xml = factura["num_factura"]
     if num_json and num_xml and num_json != num_xml:
         detalle = (
-            f"El JSON dice numero de factura '{num_json}' y la factura "
-            f"electronica es '{num_xml}'."
+            f"El JSON dice numero de factura '{num_json}' y la factura electronica es '{num_xml}'."
         )
         if num_xml.endswith(num_json):
             detalle += " Le falta el prefijo de la resolucion de facturacion."
@@ -571,8 +565,7 @@ def revisar_cruce(data: dict, factura: dict) -> list[Hallazgo]:
             Hallazgo(
                 "ERROR",
                 "numDocumentoIdObligado",
-                f"El NIT del JSON ('{nit_json}') no es el mismo de la factura "
-                f"('{nit_xml}').",
+                f"El NIT del JSON ('{nit_json}') no es el mismo de la factura ('{nit_xml}').",
             )
         )
 
@@ -647,9 +640,7 @@ def buscar_paquetes(raiz: Path, recursivo: bool) -> list[tuple[Path, Path | None
     return paquetes
 
 
-def validar_paquete(
-    ruta_json: Path, ruta_xml: Path | None
-) -> tuple[list[Hallazgo], dict]:
+def validar_paquete(ruta_json: Path, ruta_xml: Path | None) -> tuple[list[Hallazgo], dict]:
     try:
         data = json.loads(ruta_json.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -708,9 +699,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.ruta_json:
-        paquetes = [
-            (Path(args.ruta_json), Path(args.ruta_xml) if args.ruta_xml else None)
-        ]
+        paquetes = [(Path(args.ruta_json), Path(args.ruta_xml) if args.ruta_xml else None)]
     elif args.carpeta:
         raiz = Path(args.carpeta)
         if not raiz.exists():

@@ -126,9 +126,7 @@ def _rips(consultas=None, **cambios) -> dict:
                 "codPaisOrigen": "170",
                 "registroSIRAS": None,
                 "consecutivo": 1,
-                "servicios": {
-                    "consultas": consultas if consultas is not None else [_consulta()]
-                },
+                "servicios": {"consultas": consultas if consultas is not None else [_consulta()]},
             }
         ],
     }
@@ -188,18 +186,14 @@ def test_modalidad_en_null_es_error(tmp_path):
     hallazgos, _ = val.validar_paquete(_json(tmp_path, data), _xml(tmp_path))
     campos = _errores(hallazgos)
     assert "usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal" in campos
-    ayuda = next(
-        h.solucion for h in hallazgos if h.campo.endswith("modalidadGrupoServicioTecSal")
-    )
+    ayuda = next(h.solucion for h in hallazgos if h.campo.endswith("modalidadGrupoServicioTecSal"))
     assert "01" in ayuda
 
 
 def test_modalidad_fuera_de_tabla_es_error(tmp_path):
     data = _rips(consultas=[_consulta(modalidadGrupoServicioTecSal="99")])
     hallazgos, _ = val.validar_paquete(_json(tmp_path, data), _xml(tmp_path))
-    assert "usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal" in _errores(
-        hallazgos
-    )
+    assert "usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal" in _errores(hallazgos)
 
 
 @pytest.mark.parametrize(
@@ -256,9 +250,7 @@ def test_pago_moderador_incoherente_es_aviso(tmp_path):
 
 
 def test_factura_sin_prefijo_es_error_y_sugiere_el_numero_real(tmp_path):
-    hallazgos, _ = val.validar_paquete(
-        _json(tmp_path, _rips(numFactura="737")), _xml(tmp_path)
-    )
+    hallazgos, _ = val.validar_paquete(_json(tmp_path, _rips(numFactura="737")), _xml(tmp_path))
     assert "numFactura" in _errores(hallazgos)
     hallazgo = next(h for h in hallazgos if h.campo == "numFactura")
     assert "prefijo" in hallazgo.detalle
@@ -297,9 +289,7 @@ def test_sin_xml_avisa_pero_revisa_estructura(tmp_path):
     data = _rips(consultas=[_consulta(modalidadGrupoServicioTecSal=None)])
     hallazgos, _ = val.validar_paquete(_json(tmp_path, data), None)
     assert "xml" in [h.campo for h in hallazgos if h.nivel == "AVISO"]
-    assert "usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal" in _errores(
-        hallazgos
-    )
+    assert "usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal" in _errores(hallazgos)
 
 
 def test_json_ilegible_reporta_error_claro(tmp_path):
