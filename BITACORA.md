@@ -1333,6 +1333,26 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   repositorio (esa prueba existe porque llegaron a convivir diez copias y
   cuatro estaban malas: una multiplicaba por cien y tres dividían por mil).
 
+### 03-08 (sexta parte) — SIIFA: cargar primero solo lo que el hospital ya respondió
+
+- **La duda de Yesid:** la factura HUS532384 no aparece en el Excel de lotes
+  de DGH, ¿de dónde salió entonces su respuesta? De la base de SIIFA, no de
+  la de DGH. El informe de seguimientos de SIIFA es la lista de trabajo (trae
+  factura, código, causal, valor y lo que escribió la EPS); el Excel de DGH es
+  solo un atajo para no volver a escribir lo que el hospital ya contestó. Si
+  la factura no está en DGH, la respuesta la redactó el motor y la fila queda
+  marcada **REDACTADA** (amarilla); las que sí estaban salen **EXACTO** o
+  **POR_CODIGO** (verdes).
+- **Decisión:** cargar primero solo las verdes. El redactor tiene ahora la
+  opción `--solo-lo-ya-respondido`: los dos archivos de cargue quedan
+  únicamente con las respuestas reales del hospital, y las redactadas **no se
+  botan** — salen en archivos aparte terminados en `_REDACTADAS`, para
+  revisarlas y subirlas después.
+- **Advertencia que quedó anotada:** la glosa que no se contesta dentro del
+  término se entiende ACEPTADA (art. 57 Ley 1438/2011). Las redactadas no
+  pueden quedarse guardadas indefinidamente: hay que revisarlas por tandas
+  (empezando por las de mayor valor) y subirlas.
+
 ---
 
 ## 3) PENDIENTE
@@ -1523,6 +1543,14 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
    Lo urgente de revisar: las de soportes (SO*), que no se sostienen sin
    anexar el papel, y las 674 devoluciones DE5601, donde hay que confirmar
    el acuse de radicación. Después, piloto de 1 glosa y cargue.
+
+   **Decisión del 03-08:** primero se cargan SOLO las 1.082 respuestas reales
+   del hospital. Volver a generar los archivos agregando al final del comando
+   `--solo-lo-ya-respondido`: los de cargue quedan con las verdes y las
+   redactadas se van a los archivos `_REDACTADAS`. Esas 1.497 quedan
+   pendientes de revisar por tandas (empezando por las de mayor valor) —
+   no se pueden dejar vencer: sin respuesta a tiempo, la glosa se entiende
+   aceptada.
 
 9. **SIIFA — lo que quedó del trabajo anterior.** El informe
    maestro ya está rebajado (2.597) y la hoja de trabajo ya salió cruzada

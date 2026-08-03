@@ -27,6 +27,12 @@ USO:
 en DGH salen con ESA respuesta (la real, no una redactada), y sólo se redacta
 lo que no tiene antecedente.
 
+`--solo-lo-ya-respondido` deja en los archivos de cargue ÚNICAMENTE las
+respuestas reales del hospital (las verdes). Las redactadas por el motor no
+se botan: salen en archivos aparte con el sufijo `_REDACTADAS`, para
+revisarlas y subirlas después. OJO con el término del artículo 57 de la Ley
+1438 de 2011: la glosa que no se contesta a tiempo se entiende ACEPTADA.
+
 Los dos archivos salen listos para tools/responder_glosas_siifa.py, con una
 fila por glosa y su id de SIIFA. Antes del cargue masivo: piloto de 1 glosa.
 
@@ -404,6 +410,16 @@ def armar(informe: Path, tramites: Path | None) -> list[dict]:
     return filas
 
 
+def es_respuesta_real(fila: dict) -> bool:
+    """La respuesta la dio el hospital en DGH (verde), no la redactó el motor."""
+    return str(fila.get("ORIGEN_RESPUESTA") or "").upper() != "REDACTADA"
+
+
+def con_sufijo(ruta: Path, sufijo: str) -> Path:
+    """respuestas_GLOSAS.xlsx -> respuestas_GLOSAS_REDACTADAS.xlsx"""
+    return ruta.with_name(f"{ruta.stem}_{sufijo}{ruta.suffix}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -413,6 +429,15 @@ def main() -> None:
     ap.add_argument("--salida-glosas", required=True, help="Excel de salida de las GLOSAS.")
     ap.add_argument(
         "--salida-devoluciones", required=True, help="Excel de salida de las DEVOLUCIONES."
+    )
+    ap.add_argument(
+        "--solo-lo-ya-respondido",
+        action="store_true",
+        help=(
+            "En los archivos de cargue deja SÓLO las respuestas reales del hospital "
+            "(las verdes). Las redactadas por el motor salen aparte, con el sufijo "
+            "_REDACTADAS, para revisarlas y subirlas después."
+        ),
     )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
@@ -431,8 +456,33 @@ def main() -> None:
     def orden(f):
         return (str(f["NUMERO_FACTURA"]), str(f["CODIGO_GLOSA"]))
 
-    escribir(sorted(glosas, key=orden), Path(args.salida_glosas), "Glosas")
-    escribir(sorted(devoluciones, key=orden), Path(args.salida_devoluciones), "Devoluciones")
+    ruta_glosas = Path(args.salida_glosas)
+    ruta_devoluciones = Path(args.salida_devoluciones)
+    aparte = ""
+
+    if args.solo_lo_ya_respondido:
+        for nombre, todas, ruta in (
+            ("Glosas", glosas, ruta_glosas),
+            ("Devoluciones", devoluciones, ruta_devoluciones),
+        ):
+            reales = [f for f in todas if es_respuesta_real(f)]
+            redactadas = [f for f in todas if not es_respuesta_real(f)]
+            escribir(sorted(reales, key=orden), ruta, nombre)
+            escribir(
+                sorted(redactadas, key=orden),
+                con_sufijo(ruta, "REDACTADAS"),
+                f"{nombre} redactadas (aparte)",
+            )
+        aparte = (
+            "\nSe cargan SÓLO las respuestas reales del hospital. Las redactadas\n"
+            "quedaron en los archivos _REDACTADAS: no se botaron, quedan para\n"
+            "revisar y subir después. RECUERDE el artículo 57 de la Ley 1438 de\n"
+            "2011: la glosa que no se contesta dentro del término se entiende\n"
+            "ACEPTADA, así que esas no pueden quedarse guardadas indefinidamente.\n"
+        )
+    else:
+        escribir(sorted(glosas, key=orden), ruta_glosas, "Glosas")
+        escribir(sorted(devoluciones, key=orden), ruta_devoluciones, "Devoluciones")
 
     origen = Counter(f["ORIGEN_RESPUESTA"] for f in filas)
     print(
@@ -443,6 +493,7 @@ def main() -> None:
         f"{origen['EXACTO'] + origen['POR_CODIGO']}\n"
         f"  redactadas por el motor (revisar antes de subir)            : "
         f"{origen['REDACTADA']}\n"
+        f"{aparte}"
         f"\nCada fila trae en REVISAR qué hay que verificar antes de subirla.\n"
         f"Antes del cargue masivo, PILOTO DE 1 GLOSA (regla del repo):\n"
         f'   py tools\\responder_glosas_siifa.py --excel "{args.salida_glosas}" '
