@@ -1158,7 +1158,15 @@ falla que apareció en pantalla quedó corregida el mismo día:
    informe; ahora también dispara el rescate mes por mes.
 
 Todo probado con un servidor de prueba que imita las fallas reales.
-Falta la corrida real definitiva del auditor para confirmar el Excel maestro.
+
+**Y la corrida real salió bien: el Excel maestro ya está bajado.** El
+informe quedó en `D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx`
+con **2.597 seguimientos, 2.579 sin respuesta del HUS** — el mismo 2.579 que
+se ve en la pantalla de SIIFA, así que cuadra con el portal. Duró 16 minutos.
+Por meses: enero 487, febrero 559 (partido en dos quincenas porque el servidor
+no aguantó el mes entero), marzo 600, abril 432, mayo 181, junio 224 (también
+partido), julio 114. De 2025 no hay nada. Sin registros repetidos y sin
+períodos perdidos.
 
 ---
 
@@ -1297,12 +1305,11 @@ Falta la corrida real definitiva del auditor para confirmar el Excel maestro.
     los manuales que tenemos, el script trae una hipótesis
     (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
     mesa de ayuda SIIFA / soporte MinSalud.
-12. **Primera corrida real** de `tools/siifa_reporte_seguimientos.py` (sin
-    filtros) para tener el Excel maestro de los 2.579 seguimientos y
-    verificar que las columnas coincidan con lo que el auditor espera.
-    *(03-08: se hicieron varias corridas y se corrigieron las fallas que
-    salieron —cuelgue, usuario, servidor que no aguanta la consulta—; falta
-    la corrida que termine y entregue el Excel completo.)*
+12. **~~Primera corrida real~~ — HECHA el 03-08.** El Excel maestro está en
+    `D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx`
+    (2.597 seguimientos, 2.579 sin respuesta). Queda una sola cosa por
+    mirar: **revisar que las columnas del Excel sean las que el auditor
+    necesita** para tipificar las respuestas.
 13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
     una sola glosa antes de cualquier cargue masivo (regla del repo).
 14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
@@ -1332,10 +1339,16 @@ Falta la corrida real definitiva del auditor para confirmar el Excel maestro.
    de pre-auditoría.
 7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
    COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
-8. **SIIFA:** volver a correr el informe masivo de seguimientos con las
-   correcciones del 03-08 (PR #255). Debe terminar y dejar el Excel maestro;
-   si el servidor del Ministerio vuelve a ahogarse, ya baja mes por mes solo.
-   Con ese Excel en mano, hacer el piloto de 1 glosa (pendiente #13).
+8. **SIIFA:** el Excel maestro ya está bajado (2.597 seguimientos). Ahora:
+   (a) **actualizar la carpeta del bot** en el equipo del auditor —
+   `cd C:\temp-notas` y `git pull` —, porque la corrida del 03-08 todavía
+   usaba la versión vieja de tandas de 200 y por eso tardó 16 minutos con
+   muchos reintentos; con la versión nueva usa tandas de 50 y sufre menos.
+   (b) **Revisar el Excel** con el auditor: si las columnas sirven para
+   tipificar las respuestas. (c) **Piloto de 1 glosa** con
+   `--solo-id <id>` antes de cualquier cargue masivo (pendiente #13).
+   Truco: agregando `--desde 2026-01-01` se ahorra minuto y medio de barrer
+   los meses vacíos de 2025.
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 
