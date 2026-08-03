@@ -1315,6 +1315,24 @@ solos cada 5 minutos, igual que en la VM.
 facturación 2" pagando el saldo (~$11 mil pesos, una sola vez) y correr los
 comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
 
+### 03-08 (quinta parte) — SIIFA: el motor redactó las respuestas que faltaban
+
+- Se construyó `tools/siifa_redactar_respuestas.py`: para los seguimientos de
+  SIIFA que **no tenían respuesta escrita en DGH**, el motor la redacta solo,
+  y separa el trabajo en dos archivos, **glosas** y **devoluciones**, porque
+  no se contestan igual. Quedaron `respuestas_GLOSAS.xlsx` (1.238 filas) y
+  `respuestas_DEVOLUCIONES.xlsx` (1.341), todas con texto y con una columna
+  REVISAR que dice qué verificar antes de subirla (PR #268).
+- **Corrección del mismo día (PR #269):** el redactor traía su propia forma de
+  leer los pesos, y esa es la copia número once de algo que ya existe una sola
+  vez en el repositorio. Se le puso el lector único (`tools/_dinero.py`). Antes,
+  un valor que viniera del Excel con puntos de miles o con `$` (por ejemplo
+  `$ 1.479.360`) hacía que la respuesta dijera "SIN VALOR REGISTRADO" en una
+  glosa que sí tiene valor; ahora se lee bien. Con esto vuelve a quedar en
+  verde la prueba que vigila que haya **un solo lector de pesos** en todo el
+  repositorio (esa prueba existe porque llegaron a convivir diez copias y
+  cuatro estaban malas: una multiplicaba por cien y tres dividían por mil).
+
 ---
 
 ## 3) PENDIENTE

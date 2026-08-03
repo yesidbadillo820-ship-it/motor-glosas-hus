@@ -69,6 +69,27 @@ def test_la_respuesta_nombra_la_factura_el_codigo_y_el_valor():
     assert r["CODIGO_RESPUESTA"] == "RE9901"
 
 
+@pytest.mark.parametrize(
+    "valor, esperado",
+    [
+        (1479360, "$1.479.360"),
+        ("1.479.360", "$1.479.360"),  # como viene de un Excel con formato
+        ("$ 1.479.360", "$1.479.360"),
+        (22200.0, "$22.200"),
+        (None, "SIN VALOR REGISTRADO"),
+    ],
+)
+def test_el_valor_se_escribe_bien_venga_como_venga(valor, esperado):
+    """El valor va escrito en una respuesta que se le manda a la EPS.
+
+    Se lee con a_entero, el único lector de pesos del repo: leerlo aparte es
+    justo lo que produjo cifras multiplicadas por cien en otros módulos.
+    """
+    texto = red.redactar(_linea("TA0801", valor=valor))["OBSERVACION_RESPUESTA"]
+
+    assert esperado in texto
+
+
 def test_la_respuesta_cita_lo_que_dijo_la_eps():
     """Responder sin recoger el argumento de la entidad es responder al aire."""
     r = red.redactar(

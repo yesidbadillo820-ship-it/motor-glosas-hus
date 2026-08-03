@@ -44,6 +44,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from _dinero import a_entero  # noqa: E402
 from siifa_preparar_respuestas import agrupar, leer_informe  # noqa: E402
 
 logger = logging.getLogger("siifa_redactar")
@@ -249,10 +250,15 @@ def argumento_para(codigo: str) -> dict[str, str]:
 
 
 def _pesos(valor) -> str:
-    try:
-        return f"${int(float(valor)):,}".replace(",", ".")
-    except (TypeError, ValueError):
+    """Escribe el valor en pesos para el texto de la respuesta.
+
+    La lectura la hace a_entero, que es el único lector de pesos del repo:
+    acá sólo se le pone el formato. Un valor mal leído acabaría escrito en
+    una respuesta que se le manda a la EPS.
+    """
+    if valor in (None, ""):
         return "SIN VALOR REGISTRADO"
+    return f"${a_entero(valor):,}".replace(",", ".")
 
 
 def _limpiar(texto) -> str:
