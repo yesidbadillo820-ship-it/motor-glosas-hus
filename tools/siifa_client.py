@@ -51,10 +51,12 @@ BASE_URL_FACTURA_PROD = "https://siifa.sispro.gov.co/siifa-factura"
 AUTH_URL_PROD = "https://siifa.sispro.gov.co/siifa-seguridad"
 BASE_URL_CONTRATO_PROD = "https://siifa.sispro.gov.co/siifa-contrato"
 
-# El endpoint permite hasta 1500, pero pedir tandas grandes hace que el
-# servidor tarde mucho y el proceso parezca colgado. 200 es un punto sano:
-# 2.579 registros salen en 13 llamadas rápidas en vez de 2 lentísimas.
-REGISTROS_POR_PAGINA_DEFECTO = 200
+# El endpoint admite hasta 1500, pero la base de datos de SIIFA no aguanta
+# tandas grandes: devuelve "Execution Timeout Expired" a los ~45 segundos.
+# 50 es el tamaño que se comprobó estable contra el servidor real. Si aun así
+# el servidor no da abasto, el cliente baja solo hasta el mínimo.
+REGISTROS_POR_PAGINA_DEFECTO = 50
+REGISTROS_POR_PAGINA_MINIMO = 10
 REGISTROS_POR_PAGINA_MAX = 1500
 
 # Tope de seguridad: si la API ignorara el número de página, el recorrido
@@ -235,6 +237,13 @@ class SiifaClient:
                 self._autenticar()
                 continue
 
+            # Timeout de la BASE DE DATOS de SIIFA: la consulta pedida es
+            # demasiado pesada para el servidor. Reintentar lo mismo no cambia
+            # nada (y cada intento cuesta ~45s); hay que pedir MENOS registros.
+            # Se corta de una para que quien llama pueda achicar la tanda.
+            if resp.status_code >= 500 and _es_timeout_del_servidor(resp):
+                raise SiifaApiError(resp.status_code, _error_detail(resp), _safe_json(resp))
+
             if resp.status_code in REINTENTABLES and intento < self.max_reintentos:
                 espera = 2 * intento
                 logger.warning(
@@ -273,13 +282,18 @@ class SiifaClient:
     ) -> Iterator[dict]:
         """Recorre TODAS las páginas de GET /api/SeguimientoFactura/List y va
         entregando cada seguimiento (glosa o devolución) uno por uno."""
-        registros_por_pagina = max(1, min(registros_por_pagina, REGISTROS_POR_PAGINA_MAX))
-        pagina = 1
+        tam = max(1, min(registros_por_pagina, REGISTROS_POR_PAGINA_MAX))
         entregados = 0
+        consultas = 0
         huellas_vistas: set = set()
 
-        while pagina <= MAX_PAGINAS:
-            params = {"NumeroPagina": pagina, "RegistrosPorPagina": registros_por_pagina}
+        while consultas <= MAX_PAGINAS:
+            consultas += 1
+            # La página se calcula desde lo ya entregado, no con un contador
+            # suelto: así, si hay que achicar la tanda a mitad de camino, se
+            # sigue exactamente donde se venía, sin saltear ni repetir.
+            pagina = entregados // tam + 1
+            params = {"NumeroPagina": pagina, "RegistrosPorPagina": tam}
             if tipo_seguimiento:
                 params["TipoSeguimiento"] = tipo_seguimiento
             if tiene_respuesta is not None:
@@ -292,14 +306,37 @@ class SiifaClient:
                 params["FechaCreacionFinal"] = fecha_creacion_final
 
             # Avisar ANTES de pedir: si la consulta tarda, el usuario ve en qué anda.
-            logger.info(
-                "Consultando página %d (de a %d registros)...", pagina, registros_por_pagina
-            )
-            data = self._request("GET", "/api/SeguimientoFactura/List", params=params)
+            logger.info("Consultando página %d (de a %d registros)...", pagina, tam)
+            try:
+                data = self._request("GET", "/api/SeguimientoFactura/List", params=params)
+            except SiifaApiError as exc:
+                # La base de datos de SIIFA no alcanzó a resolver la consulta.
+                # Insistir con lo mismo no sirve: hay que pedirle MENOS de una vez.
+                if exc.status_code >= 500 and tam > REGISTROS_POR_PAGINA_MINIMO:
+                    nuevo = max(REGISTROS_POR_PAGINA_MINIMO, tam // 2)
+                    logger.warning(
+                        "SIIFA no alcanzó a responder con tandas de %d. "
+                        "Bajo a %d registros y sigo desde donde iba.",
+                        tam,
+                        nuevo,
+                    )
+                    tam = nuevo
+                    continue
+                if exc.status_code >= 500:
+                    raise SiifaApiError(
+                        exc.status_code,
+                        "El servidor de SIIFA no alcanza a responder ni con tandas de "
+                        f"{tam} registros. Está sobrecargado. Probá más tarde, o pedí "
+                        "el informe por partes usando --desde y --hasta (por ejemplo, "
+                        "un mes por vez).",
+                        exc.raw,
+                    ) from exc
+                raise
 
             resultado = buscar_clave(data, "resultado", "Resultado", default=[]) or []
             total_registros = buscar_clave(data, "totalRegistros", "TotalRegistros", default=None)
             total_paginas = buscar_clave(data, "totalPaginas", "TotalPaginas", default=1) or 1
+            recibidos = len(resultado)
 
             if not resultado:
                 logger.info("La página %d vino vacía — fin del recorrido.", pagina)
@@ -317,6 +354,14 @@ class SiifaClient:
                 break
             huellas_vistas.add(huella)
 
+            # Si hubo que achicar la tanda, la página puede arrancar ANTES de
+            # donde veníamos. Se descarta esa parte ya entregada: así no se
+            # repite ningún registro ni se saltea ninguno.
+            offset = (pagina - 1) * tam
+            ya_vistos = entregados - offset
+            if ya_vistos > 0:
+                resultado = resultado[ya_vistos:]
+
             for fila in resultado:
                 yield fila
             entregados += len(resultado)
@@ -329,11 +374,14 @@ class SiifaClient:
                 f" de {total_registros}" if total_registros else "",
             )
 
-            if pagina >= total_paginas:
+            # Fin del recorrido: ya se trajo todo, o la última página vino
+            # incompleta (menos registros de los pedidos).
+            if total_registros and entregados >= int(total_registros):
                 break
-            pagina += 1
+            if recibidos < tam:
+                break
         else:
-            logger.warning("Se alcanzó el tope de %d páginas — corto por seguridad.", MAX_PAGINAS)
+            logger.warning("Se alcanzó el tope de %d consultas — corto por seguridad.", MAX_PAGINAS)
 
     def catalogo_tipo_codigo(self, grupo: str) -> list[dict]:
         """GET /api/SeguimientoTipoCodigo/ByGrupo — catálogo oficial de códigos
@@ -443,6 +491,17 @@ class SiifaClient:
             pasos.append(("Consulta de seguimientos", False, str(exc)))
 
         return pasos
+
+
+def _es_timeout_del_servidor(resp: "httpx.Response") -> bool:
+    """¿El 500 es porque la consulta fue demasiado pesada para la base de datos?
+
+    SIIFA devuelve "Execution Timeout Expired..." cuando la consulta pedida
+    excede el tiempo máximo de su base de datos. Reintentar lo mismo no puede
+    funcionar: hay que pedir menos registros por tanda.
+    """
+    texto = (resp.text or "").lower()
+    return "timeout expired" in texto or "timeout period elapsed" in texto
 
 
 def _huella_pagina(resultado: list) -> str:

@@ -278,7 +278,10 @@ def _bajar_rango(
         ):
             parcial.append(_fila_reporte(cruda))
     except SiifaApiError as exc:
-        if exc.status_code >= 500 and profundidad < 4 and (fin - ini).days >= 1:
+        # Igual que arriba: quedarse sin respuesta (status 0) significa lo mismo
+        # que un 500 — el tramo pedido es demasiado pesado y hay que partirlo.
+        pesado = exc.status_code >= 500 or exc.status_code == 0
+        if pesado and profundidad < 4 and (fin - ini).days >= 1:
             medio = ini + (fin - ini) / 2
             logger.warning("El período %s es muy pesado para SIIFA; lo parto en dos.", etiqueta)
             _bajar_rango(cliente, filtros, ini, medio, filas, fallidos, profundidad + 1)
@@ -409,7 +412,10 @@ def main() -> None:
         try:
             if args.por_meses:
                 ini = _fecha(args.desde) or date(2025, 1, 1)
-                fin = _fecha(args.hasta) or date.today()
+                fin = _fecha(args.hasta) or (date.today() + timedelta(days=1))
+                # +1 día de margen: si el servidor del Ministerio va con otro
+                # horario, un registro de hoy podría quedar fechado 'mañana'
+                # y se perdería del informe.
                 logger.info(
                     "Bajando por meses, de %s a %s (cada mes es una consulta liviana).", ini, fin
                 )
@@ -429,13 +435,22 @@ def main() -> None:
             # El servidor del Ministerio no aguanta la consulta completa.
             # En vez de rendirse, se reintenta mes por mes: cada consulta es
             # mucho más liviana y sí responde.
-            if exc.status_code >= 500 and not args.por_meses and not filas:
+            # status_code 0 = la consulta se quedó sin respuesta (timeout de
+            # lectura). Para el caso que nos ocupa significa lo mismo que un 500:
+            # el servidor no puede con la consulta completa. Si sólo se
+            # contemplara el 500, una corrida donde los tres intentos se agotan
+            # por tiempo terminaría sin informe en vez de pasar a meses.
+            if (
+                (exc.status_code >= 500 or exc.status_code == 0)
+                and not args.por_meses
+                and not filas
+            ):
                 logger.warning(
                     "SIIFA no aguanta la consulta completa. Lo intento mes por mes, "
                     "que es mucho más liviano para su servidor..."
                 )
                 ini = _fecha(args.desde) or date(2025, 1, 1)
-                fin = _fecha(args.hasta) or date.today()
+                fin = _fecha(args.hasta) or (date.today() + timedelta(days=1))
                 try:
                     for mes_ini, mes_fin in _meses(ini, fin):
                         _bajar_rango(cliente, filtros, mes_ini, mes_fin, filas, periodos_fallidos)
