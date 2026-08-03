@@ -1276,6 +1276,7 @@ from app.api.routers.automatizaciones import router as automatizaciones_router
 from app.api.routers.inteligencia import router as inteligencia_router
 from app.api.routers.agentes import router as agentes_router
 from app.api.routers.bots import router as bots_router
+from app.api.routers.gobierno_ia import router as gobierno_ia_router
 from app.api.routers.malla import router as malla_router
 from app.api.routers.maos import router as maos_router
 from app.api.routers.contratos import router as contratos_router
@@ -1343,6 +1344,7 @@ app.include_router(automatizaciones_router)
 app.include_router(inteligencia_router)
 app.include_router(agentes_router)
 app.include_router(bots_router)
+app.include_router(gobierno_ia_router)
 app.include_router(malla_router)
 app.include_router(maos_router)
 app.include_router(contratos_router)
