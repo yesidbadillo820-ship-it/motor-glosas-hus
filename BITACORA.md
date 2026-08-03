@@ -1353,6 +1353,28 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   pueden quedarse guardadas indefinidamente: hay que revisarlas por tandas
   (empezando por las de mayor valor) y subirlas.
 
+### 03-08 (séptima parte) — La fecha de la respuesta: el detalle que salvaba o hundía el cargue
+
+- Yesid pasó la **guía de cargue manual de SIIFA** (con pantallazos del piloto
+  de la factura HUS497119). Ahí quedó claro que el portal pide **tres** datos
+  para responder: código, observación y **fecha de respuesta** — y que la
+  fecha que se digita es **la del día en que el hospital respondió de verdad**
+  (la de DGH: 11/05/2026), no la de hoy.
+- **El problema que eso destapó:** los archivos de cargue no llevaban esa
+  fecha. El bot, sin fecha, pone la de hoy. Es decir: las 1.082 respuestas que
+  el hospital dio en su momento se habrían subido fechadas hoy, y en el
+  histórico de SIIFA aparecerían contestadas **meses después de la glosa, o
+  sea fuera del término** (art. 57 Ley 1438/2011). Es lo primero que mira la
+  EPS en una conciliación: habría sido regalarle el argumento.
+- **Corregido:** la fecha de DGH ahora viaja desde el cruce hasta el archivo
+  que lee el bot, en la columna `FECHA_RESPUESTA` (normalizada a AAAA-MM-DD
+  venga como venga del export). Las redactadas van sin fecha —se están
+  respondiendo hoy, y hoy es la fecha correcta para ellas—. Si DGH no trae la
+  fecha, la fila queda marcada en REVISAR.
+- El paso a paso manual del portal quedó escrito en `docs/CONTEXTO_SIIFA.md`
+  (sección 5.ter), incluido el pantallazo de **Ver Histórico** como evidencia
+  para el PDF de soportes.
+
 ---
 
 ## 3) PENDIENTE

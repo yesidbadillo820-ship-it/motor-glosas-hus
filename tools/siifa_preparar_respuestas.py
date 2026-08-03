@@ -67,6 +67,7 @@ COLUMNAS_PLANTILLA = [
     "REVISAR",
     "CODIGO_RESPUESTA",
     "OBSERVACION_RESPUESTA",
+    "FECHA_RESPUESTA",
 ]
 
 # Columnas del Excel final, el que lee responder_glosas_siifa.py.
@@ -78,6 +79,7 @@ COLUMNAS_SALIDA = [
     "VALOR_GLOSA",
     "CODIGO_RESPUESTA",
     "OBSERVACION_RESPUESTA",
+    "FECHA_RESPUESTA",
 ]
 
 
@@ -207,6 +209,7 @@ def escribir_plantilla(
             "REVISAR": previa.get("REVISAR"),
             "CODIGO_RESPUESTA": previa.get("CODIGO_RESPUESTA"),
             "OBSERVACION_RESPUESTA": previa.get("OBSERVACION_RESPUESTA"),
+            "FECHA_RESPUESTA": previa.get("FECHA_RESPUESTA"),
         }
         for c, h in enumerate(COLUMNAS_PLANTILLA, 1):
             cell = ws.cell(row=r, column=c, value=valores[h])
@@ -236,6 +239,7 @@ def escribir_plantilla(
         "REVISAR": 30,
         "CODIGO_RESPUESTA": 16,
         "OBSERVACION_RESPUESTA": 60,
+        "FECHA_RESPUESTA": 14,
     }
     for c, h in enumerate(COLUMNAS_PLANTILLA, 1):
         ws.column_dimensions[get_column_letter(c)].width = anchos[h]
@@ -271,6 +275,7 @@ def leer_plantilla_llena(ruta: Path) -> dict[str, dict]:
         respuestas[clave] = {
             "CODIGO_RESPUESTA": _texto(fila.get("CODIGO_RESPUESTA")),
             "OBSERVACION_RESPUESTA": _texto(fila.get("OBSERVACION_RESPUESTA")),
+            "FECHA_RESPUESTA": _texto(fila.get("FECHA_RESPUESTA")),
         }
     return respuestas
 
@@ -300,6 +305,7 @@ def expandir(
                     "VALOR_GLOSA": linea.get("valor_glosa"),
                     "CODIGO_RESPUESTA": resp["CODIGO_RESPUESTA"],
                     "OBSERVACION_RESPUESTA": resp["OBSERVACION_RESPUESTA"],
+                    "FECHA_RESPUESTA": resp.get("FECHA_RESPUESTA"),
                 }
             )
     return filas, sin_responder

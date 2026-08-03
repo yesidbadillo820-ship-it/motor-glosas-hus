@@ -219,6 +219,41 @@ def test_lo_que_el_hospital_ya_respondio_manda_sobre_lo_redactado(tmp_path):
     assert filas[0]["ORIGEN_RESPUESTA"] == "EXACTO"
 
 
+def test_la_respuesta_de_dgh_viaja_con_la_fecha_en_que_se_dio(tmp_path):
+    """La fecha que se digita en SIIFA es la del día en que el HUS respondió.
+
+    Si va con la fecha de hoy, en el histórico de SIIFA la respuesta queda
+    registrada fuera del término y la EPS se agarra de ahí.
+    """
+    informe = _informe(tmp_path, [_linea("TA0801", valor=22200)])
+    tramites = _tramites(
+        tmp_path,
+        [
+            [
+                "HUS0000454747",
+                "TA0801",
+                22200,
+                "RE9602",
+                "RESPUESTA REAL DEL HUS.",
+                "2026-05-11 12:17:44",
+                "Confirmado",
+            ]
+        ],
+    )
+
+    filas = red.armar(informe, tramites)
+
+    assert filas[0]["FECHA_RESPUESTA"] == "2026-05-11"
+
+
+def test_lo_redactado_va_sin_fecha_porque_se_responde_hoy(tmp_path):
+    informe = _informe(tmp_path, [_linea("TA0801")])
+
+    filas = red.armar(informe, None)
+
+    assert filas[0]["FECHA_RESPUESTA"] is None
+
+
 def test_sin_base_de_tramites_se_redacta_todo(tmp_path):
     informe = _informe(tmp_path, [_linea("TA0801"), _linea("DE5601", tipo="DEVOLUCION")])
 

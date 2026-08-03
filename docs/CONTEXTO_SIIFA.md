@@ -160,6 +160,42 @@ por el mecanismo único de validación FEV-RIPS — no se responde en SIIFA como
 - Ver `tools/README_siifa.md` para los comandos PowerShell listos para
   copiar/pegar.
 
+## 5.ter) Cómo se responde A MANO en el portal (guía del auditor, 03-08-2026)
+
+Es el procedimiento que el bot replica por API. Sirve para el piloto, para
+reponer una glosa suelta y para entender qué campos exige la plataforma.
+
+1. Entrar a <https://siifa.sispro.gov.co/auth/login> con usuario y contraseña.
+2. Menú **Seguimiento → Listar seguimientos**.
+3. En **Filtros**, escribir el número de factura y dar **Filtrar**.
+4. Revisar que los datos de la fila (factura, valor, tipo) sean los de la
+   glosa que se va a responder. Todo lo que se digite debe concordar.
+5. En los **tres puntos** de la fila → **Responder**.
+6. Se llenan **tres** campos y se da **Guardar**:
+   - **Código de respuesta** (lista desplegable),
+   - **Observación** (el texto de la respuesta),
+   - **Fecha de respuesta**.
+7. Sale el aviso «Se guardó exitosamente» — esa es la evidencia de que quedó.
+8. Otra vez los tres puntos → **Ver Histórico**: muestra la formulación de la
+   glosa y debajo la respuesta con su código y su fecha. Pantallazo de esa
+   pantalla: es la evidencia que se anexa al PDF de soportes.
+
+**La fecha de respuesta es la del día en que el hospital respondió de verdad
+(la que trae DGH), NO la de hoy.** Es el punto más delicado de todo el cargue:
+si una respuesta que el HUS dio en mayo se sube con la fecha de hoy, en el
+histórico de SIIFA queda registrada meses después de la glosa —es decir, fuera
+del término del artículo 57 de la Ley 1438 de 2011— y eso es lo primero que
+mira la EPS en la conciliación. Por eso los archivos de cargue llevan la
+columna `FECHA_RESPUESTA`, que el bot manda tal cual: viene llena con la fecha
+de DGH en las respuestas que el hospital ya había dado, y vacía en las que se
+están respondiendo hoy (ahí el bot pone la de hoy, que es la correcta).
+
+Del piloto manual del 03-08-2026 (factura HUS497119, seguimiento 3852611,
+glosa TA2301 por $308.905): quedó registrada con código **RE9702** y fecha
+**11/05/2026**, que es la que traía DGH. Al digitar la hora a mano quedó
+23:17 en vez de 12:17 — la fecha del día, que es lo que cuenta para el
+término, quedó bien.
+
 ## 5.bis) Si "se queda pensando" y no saca la información
 
 Corré primero el diagnóstico, que revisa paso a paso conexión, credenciales y
