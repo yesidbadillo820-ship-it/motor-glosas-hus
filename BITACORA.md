@@ -1008,6 +1008,15 @@ Sprint de construcción del día (varios PR fusionados en cadena):
   automatización) y el perfil la muestra solo en las tres superficies.
 - Guía corta en `docs/MOTOR_UNIVERSAL.md`.
 
+### 03-08 — El expediente entiende de facturas y lleva al trabajo
+
+- **Buscar una factura en Expediente ahora muestra EL CASO completo**: una
+  cabecera con el pagador, cuántas glosas tiene (y cuántas siguen
+  abiertas), el total objetado y el aceptado — y cada glosa como una
+  ficha de un clic para saltar entre ellas sin volver a buscar.
+- **Del expediente al trabajo en un clic**: la ficha trae «Abrir en
+  Analizar» (directo a trabajar la glosa) y «Ver toda la factura».
+
 ### 30-07 (segunda parte) — Las tarjetas de COOSALUD y SIMED cuentan su lote
 
 - Los dos bots que trabajan por Lotes ya muestran **su cola real en la

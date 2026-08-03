@@ -10390,6 +10390,54 @@ def documentos_glosa(
     return centro_documental.documentos_de(glosa, db)
 
 
+@router.get("/expediente/factura")
+def expediente_de_factura(
+    numero: str = Query(..., min_length=3, description="Número de factura (HUS000…)"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El expediente consolidado de UNA factura: todas sus glosas con sus
+    estados y valores, y los totales. Una factura con cuatro glosas es UN
+    caso, no cuatro búsquedas."""
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.ilike(f"%{numero.strip()}%"))
+        .order_by(GlosaRecord.id)
+        .all()
+    )
+    if not glosas:
+        raise HTTPException(404, f"Ninguna glosa registrada para la factura '{numero}'")
+
+    from app.services.motor_vencimientos import ESTADOS_CERRADOS
+
+    fichas = [
+        {
+            "glosa_id": g.id,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "etapa": g.etapa,
+            "eps": g.eps,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "valor_aceptado": float(g.valor_aceptado or 0),
+            "dias_restantes": g.dias_restantes,
+            "auditor": g.auditor_email,
+            "cerrada": g.estado in ESTADOS_CERRADOS,
+        }
+        for g in glosas
+    ]
+    return {
+        "factura": glosas[0].factura,
+        "eps": glosas[0].eps,
+        "glosas": fichas,
+        "totales": {
+            "glosas": len(fichas),
+            "abiertas": sum(1 for f in fichas if not f["cerrada"]),
+            "valor_objetado": sum(f["valor_objetado"] for f in fichas),
+            "valor_aceptado": sum(f["valor_aceptado"] for f in fichas),
+        },
+    }
+
+
 @router.get("/expediente/buscar")
 def expediente_buscar(
     q: str = Query(..., min_length=1, description="ID de glosa o número de factura"),

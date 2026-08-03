@@ -206,3 +206,51 @@ class TestPantalla:
 
         area = re.search(r"\.exp-area\{[^}]*\}", html).group(0)
         assert "overflow-y:auto" in area
+
+
+class TestExpedientePorFactura:
+    """Una factura con varias glosas es UN caso, no varias búsquedas."""
+
+    def test_consolida_todas_las_glosas_con_totales(self, client, db_session):
+        from app.models.db import GlosaRecord
+
+        _analizar(client, factura="HUS0000600100")
+        # Segunda glosa de la MISMA factura con otro código (el anti-dup
+        # actualiza si coinciden factura+código+etapa, y acá queremos dos).
+        db_session.add(
+            GlosaRecord(
+                eps="COMPENSAR",
+                factura="HUS0000600100",
+                codigo_glosa="SO3401",
+                etapa="RESPUESTA",
+                estado="RADICADA",
+                valor_objetado=90_000,
+            )
+        )
+        db_session.commit()
+
+        r = client.get("/glosas/expediente/factura", params={"numero": "HUS0000600100"})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["factura"] == "HUS0000600100"
+        assert d["totales"]["glosas"] == 2
+        assert d["totales"]["valor_objetado"] > 0
+        assert len(d["glosas"]) == 2
+        assert all("cerrada" in g for g in d["glosas"])
+
+    def test_factura_sin_glosas_da_404(self, client):
+        assert (
+            client.get(
+                "/glosas/expediente/factura", params={"numero": "HUS999NOEXISTE"}
+            ).status_code
+            == 404
+        )
+
+    def test_la_pantalla_consolida_y_accede(self):
+        html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        assert "function expFactura" in html
+        assert "/glosas/expediente/factura" in html
+        assert "Abrir en Analizar" in html  # del expediente al trabajo, un clic
+        assert "Ver toda la factura" in html
