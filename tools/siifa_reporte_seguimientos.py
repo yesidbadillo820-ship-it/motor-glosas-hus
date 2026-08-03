@@ -5,15 +5,20 @@
 El portal SIIFA (Seguimiento → Listar seguimientos) pagina de a 25 registros
 y no tiene botón de exportar. Este script llama a la API oficial
 (GET /api/SeguimientoFactura/List, ver docs/CONTEXTO_SIIFA.md) y trae TODO
-paginando solo (hasta 1.500 registros por página), sin importar si son 2.579
-o 20.000, y arma un Excel con una fila por seguimiento más una hoja resumen.
+paginando solo, sin importar si son 2.579 o 20.000, y arma un Excel con una
+fila por seguimiento más una hoja resumen.
+
+SI ALGO FALLA: correr primero con --diagnostico. Revisa, paso a paso, si hay
+conexión, si el usuario y la contraseña sirven, y si la consulta responde.
 
 CREDENCIALES (variables de entorno, NUNCA en el código):
     setx SIIFA_USER <usuario_sispro>
     setx SIIFA_PASSWORD <password>
-    setx SIIFA_AUTH_URL <url del servicio de Auth>   (ver docs/CONTEXTO_SIIFA.md — no confirmada)
 
 USO:
+    REM Revisar que todo esté en orden (no baja nada)
+    py siifa_reporte_seguimientos.py --diagnostico
+
     REM Todo lo que haya (glosas + devoluciones)
     py siifa_reporte_seguimientos.py --salida "D:\\...\\SIIFA\\informe_seguimientos.xlsx"
 
@@ -38,7 +43,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from siifa_client import SiifaApiError, SiifaClient, credenciales_desde_env  # noqa: E402
+from siifa_client import (  # noqa: E402
+    REGISTROS_POR_PAGINA_DEFECTO,
+    SiifaApiError,
+    SiifaClient,
+    buscar_clave,
+    credenciales_desde_env,
+)
 
 logger = logging.getLogger("siifa_reporte")
 
@@ -48,6 +59,8 @@ COLUMNAS = [
     "numero_factura",
     "nit_emisor",
     "razon_social_emisor",
+    "nit_eps",
+    "razon_social_eps",
     "valor_bruto_factura",
     "valor_glosa",
     "codigo_glosa",
@@ -68,66 +81,81 @@ COLUMNAS = [
 ]
 
 
-def _get(fila: dict, *claves, default=""):
-    for clave in claves:
-        if clave in fila and fila[clave] not in (None, ""):
-            return fila[clave]
-    return default
-
-
 def _fila_reporte(fila: dict) -> dict:
-    factura = fila.get("factura") or {}
-    emisor = factura.get("emisor") or {}
-    tiene_respuesta = bool(_get(fila, "idSeguimientoTipoCodigoRespuesta"))
+    """Arma la fila del Excel. Usa buscar_clave para que dé igual si la API
+    devuelve los campos en camelCase o en PascalCase."""
+    factura = buscar_clave(fila, "factura", "Factura", default={}) or {}
+    # OJO: el EMISOR de la factura es el HUS (siempre el mismo). La EPS que
+    # glosa es el ADQUIRIENTE — es la que sirve para agrupar y priorizar.
+    emisor = buscar_clave(factura, "emisor", "Emisor", default={}) or {}
+    adquiriente = buscar_clave(factura, "adquiriente", "Adquiriente", default={}) or {}
+    tiene_respuesta = bool(buscar_clave(fila, "idSeguimientoTipoCodigoRespuesta"))
     return {
-        "id_seguimiento_factura_glosa": _get(
-            fila, "idSeguimientoFactura", "idSeguimientoFacturaGlosa"
+        "id_seguimiento_factura_glosa": buscar_clave(
+            fila, "idSeguimientoFactura", "idSeguimientoFacturaGlosa", default=""
         ),
-        "tipo_seguimiento": _get(fila, "tipoSeguimiento"),
-        "numero_factura": _get(factura, "numeroFactura"),
-        "nit_emisor": _get(emisor, "nitEmisor"),
-        "razon_social_emisor": _get(emisor, "razonSocial"),
-        "valor_bruto_factura": _get(factura, "valorBruto", default=None),
-        "valor_glosa": _get(fila, "valor", "valorGlosa", default=None),
-        "codigo_glosa": _get(fila, "idSeguimientoTipoCodigo", "idSeguimientoTipoCodigoGlosa"),
-        "descripcion_glosa": _get(
-            fila, "descripcionSeguimientoTipoCodigo", "descripcionSeguimientoTipoCodigoGlosa"
+        "tipo_seguimiento": buscar_clave(fila, "tipoSeguimiento", default=""),
+        "numero_factura": buscar_clave(factura, "numeroFactura", default=""),
+        "nit_emisor": buscar_clave(emisor, "nitEmisor", default=""),
+        "razon_social_emisor": buscar_clave(emisor, "razonSocial", default=""),
+        "nit_eps": buscar_clave(adquiriente, "nitAdquiriente", default=""),
+        "razon_social_eps": buscar_clave(adquiriente, "razonSocial", default=""),
+        "valor_bruto_factura": buscar_clave(factura, "valorBruto"),
+        "valor_glosa": buscar_clave(fila, "valor", "valorGlosa"),
+        "codigo_glosa": buscar_clave(
+            fila, "idSeguimientoTipoCodigo", "idSeguimientoTipoCodigoGlosa", default=""
         ),
-        "observacion_glosa": _get(fila, "observacion"),
-        "fecha_formulacion": _get(fila, "fechaFormulacion"),
-        "fecha_reporte": _get(fila, "fechaReporte"),
+        "descripcion_glosa": buscar_clave(
+            fila,
+            "descripcionSeguimientoTipoCodigo",
+            "descripcionSeguimientoTipoCodigoGlosa",
+            default="",
+        ),
+        "observacion_glosa": buscar_clave(fila, "observacion", default=""),
+        "fecha_formulacion": buscar_clave(fila, "fechaFormulacion", default=""),
+        "fecha_reporte": buscar_clave(fila, "fechaReporte", default=""),
         "tiene_respuesta": "SI" if tiene_respuesta else "NO",
-        "codigo_respuesta": _get(fila, "idSeguimientoTipoCodigoRespuesta"),
-        "descripcion_respuesta": _get(fila, "descripcionSeguimientoTipoCodigoRespuesta"),
-        "observacion_respuesta": _get(fila, "observacionRespuesta"),
-        "fecha_respuesta": _get(fila, "fechaRespuesta"),
-        "codigo_reiteracion": _get(
-            fila, "idSeguimientoTipoCodigoReiteracion", "idSeguimientoTipoCodigoGlosaReiteracion"
+        "codigo_respuesta": buscar_clave(fila, "idSeguimientoTipoCodigoRespuesta", default=""),
+        "descripcion_respuesta": buscar_clave(
+            fila, "descripcionSeguimientoTipoCodigoRespuesta", default=""
         ),
-        "descripcion_reiteracion": _get(
+        "observacion_respuesta": buscar_clave(fila, "observacionRespuesta", default=""),
+        "fecha_respuesta": buscar_clave(fila, "fechaRespuesta", default=""),
+        "codigo_reiteracion": buscar_clave(
+            fila,
+            "idSeguimientoTipoCodigoReiteracion",
+            "idSeguimientoTipoCodigoGlosaReiteracion",
+            default="",
+        ),
+        "descripcion_reiteracion": buscar_clave(
             fila,
             "descripcionSeguimientoTipoCodigoReiteracion",
             "descripcionSeguimientoTipoCodigoGlosaReiteracion",
+            default="",
         ),
-        "codigo_reiteracion_respuesta": _get(
+        "codigo_reiteracion_respuesta": buscar_clave(
             fila,
             "idSeguimientoTipoCodigoReiteracionRespuesta",
             "idSeguimientoTipoCodigoGlosaReiteracionRespuesta",
+            default="",
         ),
-        "descripcion_reiteracion_respuesta": _get(
+        "descripcion_reiteracion_respuesta": buscar_clave(
             fila,
             "descripcionSeguimientoTipoCodigoReiteracionRespuesta",
             "descripcionSeguimientoTipoCodigoGlosaReiteracionRespuesta",
+            default="",
         ),
-        "anexo": _get(fila, "anexo"),
+        "anexo": buscar_clave(fila, "anexo", default=""),
     }
 
 
 def _resumen(filas: list[dict]) -> list[tuple]:
     agg: dict[tuple, dict] = defaultdict(lambda: {"cant": 0, "valor": 0.0, "sin_respuesta": 0})
     for f in filas:
+        # Agrupado por EPS (adquiriente): es lo que el auditor necesita para
+        # saber a quién reclamarle y por cuánto.
         clave = (
-            f["razon_social_emisor"] or f["nit_emisor"] or "SIN EMISOR",
+            f["razon_social_eps"] or f["nit_eps"] or "SIN EPS IDENTIFICADA",
             f["tipo_seguimiento"] or "?",
         )
         agg[clave]["cant"] += 1
@@ -175,6 +203,7 @@ def escribir_xlsx(filas: list[dict], ruta: Path) -> None:
 
     anchos = {
         "razon_social_emisor": 30,
+        "razon_social_eps": 30,
         "descripcion_glosa": 30,
         "observacion_glosa": 45,
         "descripcion_respuesta": 30,
@@ -186,7 +215,7 @@ def escribir_xlsx(filas: list[dict], ruta: Path) -> None:
     ws.freeze_panes = "A2"
 
     ws2 = wb.create_sheet("RESUMEN")
-    encabezado = ["EPS / Emisor", "Tipo", "Cantidad", "Sin respuesta", "Valor total glosado"]
+    encabezado = ["EPS (adquiriente)", "Tipo", "Cantidad", "Sin respuesta", "Valor total glosado"]
     ws2.append(encabezado)
     for c in range(1, len(encabezado) + 1):
         ws2.cell(row=1, column=c).fill = header_fill
@@ -198,43 +227,79 @@ def escribir_xlsx(filas: list[dict], ruta: Path) -> None:
 
     ruta.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(ruta))
-    logger.info("Informe XLSX: %s (%d filas)", ruta, len(filas))
+    logger.info("Informe guardado: %s (%d filas)", ruta, len(filas))
+
+
+def correr_diagnostico(cliente: SiifaClient) -> int:
+    print("\nRevisión del sistema SIIFA — paso a paso\n" + "=" * 46)
+    pasos = cliente.diagnostico()
+    for nombre, ok, detalle in pasos:
+        marca = "OK  " if ok else "FALLA"
+        print(f"  [{marca}] {nombre}: {detalle}")
+    fallo = [p for p in pasos if not p[1]]
+    if fallo:
+        print("\nHay que resolver lo marcado como FALLA antes de bajar el informe.\n")
+        return 1
+    print("\nTodo en orden: ya se puede correr el informe.\n")
+    return 0
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--salida", required=True, help="Ruta del Excel de salida.")
+    ap.add_argument("--salida", help="Ruta del Excel de salida.")
     ap.add_argument(
-        "--tipo",
-        choices=["GLOSA", "DEVOLUCION"],
-        help="Filtrar por tipo de seguimiento (default: ambos).",
+        "--diagnostico",
+        action="store_true",
+        help="Revisa conexión, credenciales y consulta. No baja información.",
     )
     ap.add_argument(
-        "--sin-respuesta",
-        action="store_true",
-        help="Solo seguimientos que todavía no tienen respuesta del HUS.",
+        "--tipo", choices=["GLOSA", "DEVOLUCION"], help="Filtrar por tipo (default: ambos)."
+    )
+    ap.add_argument(
+        "--sin-respuesta", action="store_true", help="Solo lo que todavía no respondió el HUS."
     )
     ap.add_argument("--factura", help="Filtrar por número de factura (ej. HUS532426).")
     ap.add_argument("--desde", help="Fecha de creación desde (AAAA-MM-DD).")
     ap.add_argument("--hasta", help="Fecha de creación hasta (AAAA-MM-DD).")
+    ap.add_argument(
+        "--pagina-tam",
+        type=int,
+        default=REGISTROS_POR_PAGINA_DEFECTO,
+        help=f"Registros por consulta (default: {REGISTROS_POR_PAGINA_DEFECTO}). "
+        "Bajarlo si el servidor va lento.",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
+        format="%(asctime)s  %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
     )
+    if not args.verbose:
+        # httpx habla en inglés y con detalle técnico: sólo con --verbose.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+    if not args.diagnostico and not args.salida:
+        raise SystemExit("ERROR: falta --salida (o usar --diagnostico para revisar el sistema).")
 
     usuario, password = credenciales_desde_env()
     filas: list[dict] = []
+    interrumpido = False
 
     with SiifaClient() as cliente:
+        if args.diagnostico:
+            cliente.guardar_credenciales(usuario, password)
+            raise SystemExit(correr_diagnostico(cliente))
+
         try:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
-            raise SystemExit(f"ERROR de autenticación: {exc}")
+            raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
 
         try:
             for cruda in cliente.listar_seguimientos(
@@ -243,18 +308,36 @@ def main() -> None:
                 numero_factura=args.factura,
                 fecha_creacion_inicio=args.desde,
                 fecha_creacion_final=args.hasta,
+                registros_por_pagina=args.pagina_tam,
             ):
                 filas.append(_fila_reporte(cruda))
+        except KeyboardInterrupt:
+            interrumpido = True
+            logger.warning("Cancelado por el usuario — guardo lo que alcancé a bajar.")
         except SiifaApiError as exc:
-            raise SystemExit(f"ERROR consultando SIIFA: {exc}")
+            # Guardar lo bajado igual: mejor un informe parcial que nada.
+            if filas:
+                logger.error(
+                    "Se cortó la consulta (%s). Guardo las %d filas bajadas.", exc, len(filas)
+                )
+            else:
+                raise SystemExit(f"\nNo se pudo consultar SIIFA: {exc}\n")
 
     if not filas:
-        logger.warning("No se encontró ningún seguimiento con esos filtros.")
+        logger.warning(
+            "SIIFA no devolvió ningún registro con esos filtros. "
+            "Probá sin filtros, o corré con --diagnostico para verificar el acceso."
+        )
         return
 
     escribir_xlsx(filas, Path(args.salida))
     sin_respuesta = sum(1 for f in filas if f["tiene_respuesta"] == "NO")
-    logger.info("Total: %d seguimientos (%d sin respuesta del HUS).", len(filas), sin_respuesta)
+    logger.info(
+        "Listo: %d seguimientos (%d sin respuesta del HUS).%s",
+        len(filas),
+        sin_respuesta,
+        " ATENCIÓN: informe PARCIAL, la bajada se interrumpió." if interrumpido else "",
+    )
 
 
 if __name__ == "__main__":
