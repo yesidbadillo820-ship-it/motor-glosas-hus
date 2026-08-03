@@ -1159,6 +1159,23 @@ falla que apareció en pantalla quedó corregida el mismo día:
 
 Todo probado con un servidor de prueba que imita las fallas reales.
 
+**OJO — la segunda corrida borró el informe bueno.** Después de actualizar
+la carpeta, el auditor volvió a correr el informe y el servidor del
+Ministerio estaba sobrecargado: alcanzó a bajar 50 registros y se cayó. El
+bot, en vez de completar el informe mes por mes, se conformó con esas 50
+filas **y las guardó encima del Excel bueno de 2.597**, que se perdió. Se
+corrigieron las dos cosas el mismo día:
+
+- Si la consulta completa se corta a medias, ahora **sigue mes por mes**
+  igual (antes solo lo hacía si no había bajado nada). Los repetidos se
+  quitan al final por número de seguimiento.
+- **Un informe incompleto ya no puede pisar a uno bueno.** Se guarda al lado
+  con `_PARCIAL` en el nombre y el anterior queda intacto. Vale para las
+  tres formas de quedar incompleto: cancelado con Ctrl-C, consulta cortada,
+  o algún mes que no se pudo traer.
+- Seis pruebas nuevas que reproducen exactamente lo que pasó (se verificó
+  que fallan con el código anterior).
+
 **Y la corrida real salió bien: el Excel maestro ya está bajado.** El
 informe quedó en `D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx`
 con **2.597 seguimientos, 2.579 sin respuesta del HUS** — el mismo 2.579 que
@@ -1305,11 +1322,12 @@ períodos perdidos.
     los manuales que tenemos, el script trae una hipótesis
     (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
     mesa de ayuda SIIFA / soporte MinSalud.
-12. **~~Primera corrida real~~ — HECHA el 03-08.** El Excel maestro está en
-    `D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx`
-    (2.597 seguimientos, 2.579 sin respuesta). Queda una sola cosa por
-    mirar: **revisar que las columnas del Excel sean las que el auditor
-    necesita** para tipificar las respuestas.
+12. **Primera corrida real — salió bien, pero hay que repetirla.** El
+    03-08 bajó completo (2.597 seguimientos, 2.579 sin respuesta), pero una
+    segunda corrida fallida pisó el archivo y se perdió. Ya está corregido
+    el bot para que un informe a medias no vuelva a pisar uno bueno; falta
+    **volver a bajarlo** y **revisar con el auditor que las columnas sean
+    las que necesita** para tipificar las respuestas.
 13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
     una sola glosa antes de cualquier cargue masivo (regla del repo).
 14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
@@ -1339,16 +1357,16 @@ períodos perdidos.
    de pre-auditoría.
 7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
    COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
-8. **SIIFA:** el Excel maestro ya está bajado (2.597 seguimientos). Ahora:
-   (a) **actualizar la carpeta del bot** en el equipo del auditor —
-   `cd C:\temp-notas` y `git pull` —, porque la corrida del 03-08 todavía
-   usaba la versión vieja de tandas de 200 y por eso tardó 16 minutos con
-   muchos reintentos; con la versión nueva usa tandas de 50 y sufre menos.
-   (b) **Revisar el Excel** con el auditor: si las columnas sirven para
-   tipificar las respuestas. (c) **Piloto de 1 glosa** con
+8. **SIIFA — rebajar el informe maestro.** El Excel de 2.597 seguimientos se
+   perdió (lo pisó una corrida fallida; ya está corregido para que no vuelva
+   a pasar). Hay que volver a bajarlo, **con `git pull` primero** y pidiendo
+   directamente el camino que sabemos que aguanta:
+   `py tools\siifa_reporte_seguimientos.py --por-meses --desde 2026-01-01
+   --salida "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx"`.
+   Si el servidor del Ministerio sigue sobrecargado, esperar un rato: no es
+   falla del bot. Después: (b) **revisar con el auditor** si las columnas del
+   Excel sirven para tipificar respuestas; (c) **piloto de 1 glosa** con
    `--solo-id <id>` antes de cualquier cargue masivo (pendiente #13).
-   Truco: agregando `--desde 2026-01-01` se ahorra minuto y medio de barrer
-   los meses vacíos de 2025.
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 
