@@ -69,6 +69,7 @@ def clasificar(code, obs):
         or "INCLUIDO EN D.SALA" in o
         or "MATERIAL DE SUTURA Y CURACION" in o
         or "SUTURA Y CURACION PARA SALA" in o
+        or ("INCLUIDO EN EL CODIGO" in o and "INSUMO" in o)
     ):
         return "MATERIALES"
     # 3. Estancia por palabras clave (nivel / pertinencia de internación; no MVC).
@@ -97,7 +98,12 @@ def clasificar(code, obs):
         or "YESO E INMOVIL" in o
         or "REMITIDA DE PRIMER NIVEL" in o
         or "INGRESA REMITID" in o
-        or ("NO PERTINENTE" in o and "PROCEDIMIENTO QUIRURGICO" not in o and "ESTANCIA" not in o)
+        or (
+            "NO PERTINENTE" in o
+            and "PROCEDIMIENTO QUIRURGICO" not in o
+            and "ESTANCIA" not in o
+            and "INHERENTE" not in o
+        )
     ):
         return "PERTINENCIA"
     # 6. Procedimiento inherente / incluido / subsumido / cubierto en honorarios.
