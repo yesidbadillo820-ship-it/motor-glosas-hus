@@ -408,6 +408,30 @@ def _radicar(client, fid):
     return client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "RADICAR"})
 
 
+def _actuar_como_admin(db_session):
+    """Cambia el usuario del cliente a SUPER_ADMIN.
+
+    Modificar una auditoría YA DECIDIDA (revertirla o corregir su observación,
+    que también corrige el oficio de devolución) es solo de coordinación o
+    administración; el cliente base es AUDITOR.
+    """
+    from app.api.deps import get_usuario_actual
+    from app.main import app
+
+    admin = UsuarioRecord(
+        id=9,
+        nombre="YUDY ADMIN",
+        email="yudy-admin@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
+        password_hash=get_password_hash("xxxx"),
+    )
+    db_session.add(admin)
+    db_session.commit()
+    app.dependency_overrides[get_usuario_actual] = lambda: admin
+    return admin
+
+
 def _texto_pdf(pdf: bytes) -> str:
     """Texto plano del PDF (espacios normalizados, como en los tests del PDF)."""
     import re
@@ -587,12 +611,13 @@ class TestAuditoria:
         dev = [e for e in h["eventos"] if e["tipo"] == "DEVUELTA"][0]
         assert dev["motivo"] == "Falta epicrisis"
 
-    def test_anotar_la_observacion_de_una_factura_ya_radicada(self, client):
+    def test_anotar_la_observacion_de_una_factura_ya_radicada(self, client, db_session):
         """Las facturas que ya se radicaron sin observación se pueden anotar
-        ahora, sin revertirlas ni volverlas a radicar."""
+        ahora (por administración), sin revertirlas ni volverlas a radicar."""
         self._setup(client)
         fid = _factura_id(client, F1)
         assert _radicar(client, fid).status_code == 200
+        _actuar_como_admin(db_session)
         r = client.patch(
             f"/preauditoria/facturas/{fid}/observacion",
             json={"observaciones": "OKAY SOPORTES"},
@@ -609,20 +634,22 @@ class TestAuditoria:
         # y la RADICADA original sigue intacta (historial inmutable)
         assert len([e for e in h["eventos"] if e["tipo"] == "RADICADA"]) == 1
 
-    def test_no_se_puede_anotar_una_observacion_vacia(self, client):
+    def test_no_se_puede_anotar_una_observacion_vacia(self, client, db_session):
         self._setup(client)
         fid = _factura_id(client, F1)
         _radicar(client, fid)
+        _actuar_como_admin(db_session)
         r = client.patch(f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "   "})
         assert r.status_code == 400
 
-    def test_corregir_la_observacion_de_una_devuelta_corrige_el_motivo(self, client):
+    def test_corregir_la_observacion_de_una_devuelta_corrige_el_motivo(self, client, db_session):
         """En una devuelta, la observación ES el motivo que saldrá en el
         oficio: corregirla antes de generar el oficio corrige lo que este
         imprimirá."""
         self._setup(client)
         fid = _factura_id(client, F1)
         assert _devolver(client, fid, motivo="Falta FURIPS").status_code == 200
+        _actuar_como_admin(db_session)
         r = client.patch(
             f"/preauditoria/facturas/{fid}/observacion",
             json={"observaciones": "Falta FURIPS y epicrisis"},
@@ -636,14 +663,15 @@ class TestAuditoria:
         dev = [e for e in h["eventos"] if e["tipo"] == "DEVUELTA"][0]
         assert dev["motivo"] == "Falta FURIPS y epicrisis"
 
-    def test_corregir_la_observacion_despues_del_oficio_corrige_el_pdf(self, client):
-        """Caso real: se generó el oficio y el texto salió con un error. El
-        auditor corrige la observación y el PDF (que se arma al abrirlo)
-        queda corregido de inmediato."""
+    def test_corregir_la_observacion_despues_del_oficio_corrige_el_pdf(self, client, db_session):
+        """Caso real: se generó el oficio y el texto salió con un error.
+        Administración corrige la observación y el PDF (que se arma al
+        abrirlo) queda corregido de inmediato."""
         o, fid = self._setup(client)
         assert _devolver(client, fid, motivo="NOMBRE ERRADO EN FURIPS").status_code == 200
         dev = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion").json()
         pdf1 = client.get(dev["pdf_url"]).content
+        _actuar_como_admin(db_session)
         r = client.patch(
             f"/preauditoria/facturas/{fid}/observacion",
             json={"observaciones": "VERIFICAR Y CORREGIR LOS CAMPOS DEL FURIPS"},
@@ -663,9 +691,9 @@ class TestAuditoria:
         # la decisión no cambió y la corrección quedó en el historial
         assert r.json()["resultado"] == "DEVUELTA"
         anot = [e for e in h["eventos"] if e["tipo"] == "OBSERVACION"]
-        assert len(anot) == 1 and anot[0]["auditor"] == "CLAUDIA"
+        assert len(anot) == 1 and anot[0]["auditor"] == "YUDY ADMIN"
 
-    def test_la_correccion_no_toca_los_oficios_de_rondas_anteriores(self, client):
+    def test_la_correccion_no_toca_los_oficios_de_rondas_anteriores(self, client, db_session):
         """Si la factura ya reingresó, corregir la observación corrige la
         devolución de ESTA ronda; el oficio viejo (ya entregado) no se toca."""
         _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
@@ -679,6 +707,7 @@ class TestAuditoria:
         _escribir(client, o2["id"], "229994")
         fid = _factura_id(client, F1)
         assert _devolver(client, fid, motivo="Motivo ronda 2").status_code == 200
+        _actuar_como_admin(db_session)
         r = client.patch(
             f"/preauditoria/facturas/{fid}/observacion",
             json={"observaciones": "Motivo ronda 2 corregido"},
@@ -692,7 +721,7 @@ class TestAuditoria:
         r2 = [e for e in h["eventos"] if e["tipo"] == "NUEVAMENTE_DEVUELTA"][0]
         assert r2["motivo"] == "Motivo ronda 2 corregido"
 
-    def test_la_fila_revertida_muestra_la_observacion(self, client):
+    def test_la_fila_revertida_muestra_la_observacion(self, client, db_session):
         """Antes la fila REVERTIDA salía siempre vacía en el historial."""
         self._setup(client)
         fid = _factura_id(client, F1)
@@ -700,6 +729,7 @@ class TestAuditoria:
             f"/preauditoria/facturas/{fid}/auditar",
             json={"resultado": "RADICAR", "observaciones": "OKAY SOPORTES"},
         )
+        _actuar_como_admin(db_session)  # revertir una decidida es de administración
         r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
         assert r.status_code == 200, r.text
         h = client.get(f"/preauditoria/facturas/{F1}/historial").json()
@@ -1065,6 +1095,7 @@ class TestEliminarOficioDevolucion:
         app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
         _o, dev = self._con_devolucion(client)
         fid = _factura_id(client, F1)
+        _actuar_como_admin(db_session)  # revertir una decidida es de administración
         bloqueada = client.patch(
             f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"}
         )
@@ -1757,3 +1788,109 @@ class TestDevueltasYaSalidas:
         r = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
         assert r.status_code == 400
         assert "primero marque" in r.json()["detail"]
+
+
+# ------------------------------------------------------------------
+# Solo administración modifica auditorías ya decididas + informe de gestión
+# ------------------------------------------------------------------
+
+
+class TestSoloAdminModificaDecididas:
+    def _setup(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        o = _crear_oficio(client, "FHUS-ROL-1", "2026-07-20T08:00")
+        _escribir(client, o["id"], ENV)
+        return o, _factura_id(client, F1)
+
+    def test_auditor_no_corrige_observacion_de_radicada(self, client):
+        _o, fid = self._setup(client)
+        assert _radicar(client, fid).status_code == 200
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "CAMBIO"}
+        )
+        assert r.status_code == 403, r.text
+        assert "coordinación o administración" in r.json()["detail"]
+
+    def test_auditor_no_corrige_observacion_de_devuelta(self, client):
+        _o, fid = self._setup(client)
+        assert _devolver(client, fid).status_code == 200
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "CAMBIO"}
+        )
+        assert r.status_code == 403, r.text
+
+    def test_auditor_no_revierte_una_decidida(self, client):
+        _o, fid = self._setup(client)
+        assert _radicar(client, fid).status_code == 200
+        r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r.status_code == 403, r.text
+        assert "revertir" in r.json()["detail"]
+        # la decisión no cambió
+        assert client.get(f"/preauditoria/facturas/{fid}").json()["resultado"] == "RADICAR"
+
+    def test_auditor_si_anota_mientras_este_pendiente(self, client):
+        """La regla es sobre auditorías DECIDIDAS: mientras la factura siga
+        pendiente, el auditor anota su observación con normalidad."""
+        _o, fid = self._setup(client)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "NOTA PREVIA"}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["observaciones"] == "NOTA PREVIA"
+
+    def test_admin_corrige_y_revierte(self, client, db_session):
+        _o, fid = self._setup(client)
+        assert _devolver(client, fid, motivo="Falta FURIPS").status_code == 200
+        _actuar_como_admin(db_session)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/observacion", json={"observaciones": "CORREGIDO"}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["motivo_devolucion"] == "CORREGIDO"
+        r2 = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r2.status_code == 200, r2.text
+
+
+class TestInformeGestion:
+    def test_informe_descargable_con_sus_hojas(self, client):
+        from openpyxl import load_workbook
+
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 100)])
+        _subir_dgreport(client, [F1, F2])
+        o = _crear_oficio(client, "FHUS-INF-1", "2026-07-20T08:00")
+        _escribir(client, o["id"], ENV)
+        assert _radicar(client, _factura_id(client, F1)).status_code == 200
+        assert (
+            _devolver(client, _factura_id(client, F2), motivo="Falta epicrisis").status_code == 200
+        )
+        client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+
+        r = client.get("/preauditoria/estadisticas/informe.xlsx")
+        assert r.status_code == 200, r.text
+        assert "spreadsheetml" in r.headers["content-type"]
+        wb = load_workbook(BytesIO(r.content))
+        assert wb.sheetnames == [
+            "RESUMEN",
+            "POR AUDITOR",
+            "POR OFICIO",
+            "DEVOLUCIONES",
+            "HISTORIAL",
+        ]
+
+        resumen = {f[0]: f[1] for f in wb["RESUMEN"].iter_rows(min_row=2, values_only=True)}
+        assert resumen["Facturas en el consolidado"] == 2
+        assert resumen["Radicadas / subsanadas"] == 1
+        assert resumen["Devueltas (estado actual)"] == 1
+        assert resumen["Oficios de devolución emitidos"] == 1
+        assert resumen["Valor radicado"] == 250700
+
+        auditores = list(wb["POR AUDITOR"].iter_rows(min_row=2, values_only=True))
+        assert auditores[0][0] == "CLAUDIA" and auditores[0][1] == 2
+
+        oficios = list(wb["POR OFICIO"].iter_rows(min_row=2, values_only=True))
+        assert oficios[0][0] == "FHUS-INF-1" and oficios[0][3] == 2
+
+        eventos = list(wb["HISTORIAL"].iter_rows(min_row=2, values_only=True))
+        tipos = [e[4] for e in eventos]
+        assert "ESCRITA" in tipos and "RADICADA" in tipos and "DEVUELTA" in tipos
