@@ -27,12 +27,18 @@ if not defined PYEXE goto instalarpython
 
 :deps
 REM --- 2) Asegurar los componentes (Excel y conexion) -----------------
-%PYEXE% -c "import openpyxl, httpx" >nul 2>&1 && goto credenciales
+%PYEXE% -c "import openpyxl, httpx" >nul 2>&1 && goto deps_pdf
 echo [i] Instalando los componentes por unica vez, espera...
 %PYEXE% -m pip install --quiet --user openpyxl httpx >nul 2>&1
-%PYEXE% -c "import openpyxl, httpx" >nul 2>&1 && goto credenciales
+%PYEXE% -c "import openpyxl, httpx" >nul 2>&1 && goto deps_pdf
 echo [ATENCION] No quedaron instalados (revisa el internet del equipo).
 echo.
+
+:deps_pdf
+REM Para las constancias en PDF de la verificacion. Si no queda, el resto
+REM funciona igual: solo no salen los PDF.
+%PYEXE% -c "import reportlab" >nul 2>&1 && goto credenciales
+%PYEXE% -m pip install --quiet --user reportlab >nul 2>&1
 
 :credenciales
 REM --- 3) Usuario y clave de SIIFA (nunca se escriben en el codigo) ---
@@ -100,6 +106,7 @@ echo   [5] Cargar TODAS las devoluciones
 echo   [6] Reintentar lo que quedo con error
 echo   [7] Ver los codigos de respuesta que acepta SIIFA
 echo   [8] Cambiar la carpeta de trabajo
+echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -112,6 +119,7 @@ if "%OPCION%"=="5" goto cargardevol
 if "%OPCION%"=="6" goto reintentar
 if "%OPCION%"=="7" goto catalogo
 if "%OPCION%"=="8" goto carpeta
+if "%OPCION%"=="9" goto verificar
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -186,6 +194,37 @@ goto hecho
 :reintentard
 if not exist "%CARPETA%\reporte_DEVOLUCIONES.csv" goto sinreporte
 %PYEXE% tools\responder_glosas_siifa.py --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES_2.csv" --saltar-csv "%CARPETA%\reporte_DEVOLUCIONES.csv"
+goto hecho
+
+:verificar
+echo.
+echo   Le pregunta a SIIFA que quedo registrado de verdad y saca la hoja de
+echo   verificacion mas una constancia PDF por factura (carpeta EVIDENCIAS).
+echo.
+echo   [G] las glosas    [D] las devoluciones
+set "QUE="
+set /p "QUE=  Cual verificar: "
+if /i "%QUE%"=="G" goto verificarg
+if /i "%QUE%"=="D" goto verificard
+echo   [!] Escribe G o D.
+goto menu
+
+:verificarg
+if not exist "%GLOSAS%" goto singlosas
+if not exist "%CARPETA%\reporte_GLOSAS.csv" goto verificarg_todo
+%PYEXE% tools\siifa_verificar_cargue.py --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+:verificarg_todo
+%PYEXE% tools\siifa_verificar_cargue.py --excel "%GLOSAS%" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+
+:verificard
+if not exist "%DEVOL%" goto sindevol
+if not exist "%CARPETA%\reporte_DEVOLUCIONES.csv" goto verificard_todo
+%PYEXE% tools\siifa_verificar_cargue.py --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+:verificard_todo
+%PYEXE% tools\siifa_verificar_cargue.py --excel "%DEVOL%" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
 goto hecho
 
 :catalogo

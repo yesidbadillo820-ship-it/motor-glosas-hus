@@ -145,7 +145,41 @@ de la corrida anterior.
 
 ---
 
-## 7) Lo que queda pendiente después de esto
+## 7) Comprobar que SÍ quedó subido (y sacar la evidencia)
+
+Que el bot diga OK significa que la API contestó bien. Lo que vale en una
+conciliación es lo que SIIFA tiene guardado, y con 1.082 respuestas no se
+pueden tomar 1.082 pantallazos. Esto se lo pregunta a la plataforma:
+
+```powershell
+py tools\siifa_verificar_cargue.py `
+  --excel        "D:\USUARIO CARTERA\Documents\SIIFA\respuestas_GLOSAS.xlsx" `
+  --reporte      "D:\USUARIO CARTERA\Documents\SIIFA\reporte_GLOSAS.csv" `
+  --salida       "D:\USUARIO CARTERA\Documents\SIIFA\verificacion_GLOSAS.xlsx" `
+  --constancias  "D:\USUARIO CARTERA\Documents\SIIFA\EVIDENCIAS"
+```
+
+Salen dos cosas:
+
+- **`verificacion_GLOSAS.xlsx`** — una fila por glosa, con la columna
+  RESULTADO:
+
+  | RESULTADO | Qué significa |
+  |---|---|
+  | `REGISTRADA` (verde) | Quedó en SIIFA con el mismo código y la misma fecha |
+  | `REGISTRADA CON DIFERENCIAS` (amarillo) | Quedó, pero el código o **la fecha** no son los que se mandaron |
+  | `NO APARECE RESPONDIDA` (rojo) | SIIFA la sigue mostrando sin respuesta: hay que volver a subirla |
+  | `NO SE ENCONTRO EN SIIFA` (rojo) | La plataforma no devuelve esa glosa |
+
+- **Una constancia en PDF por factura** en la carpeta `EVIDENCIAS`, con el
+  membrete del hospital, la fecha y hora de la consulta, y por cada glosa su
+  código, su valor, la respuesta registrada y su fecha. Eso es lo que se
+  anexa a los soportes — reemplaza al pantallazo del portal y dice lo mismo,
+  pero consultado a la API oficial del Ministerio.
+
+En el bot de doble clic es la opción **[9]**.
+
+## 8) Lo que queda pendiente después de esto
 
 Las respuestas **redactadas por el motor** (los archivos `_REDACTADAS`) no
 se han subido. Son las que no tenían antecedente en DGH. Hay que revisarlas

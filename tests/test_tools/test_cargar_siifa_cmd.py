@@ -27,13 +27,14 @@ def _llamadas() -> list[tuple[str, list[str]]]:
     return llamadas
 
 
-def test_el_bot_llama_a_los_tres_scripts_del_flujo():
+def test_el_bot_llama_a_los_scripts_del_flujo():
     scripts = {s for s, _ in _llamadas()}
 
     assert scripts == {
         "siifa_reporte_seguimientos.py",
         "siifa_redactar_respuestas.py",
         "responder_glosas_siifa.py",
+        "siifa_verificar_cargue.py",
     }
 
 

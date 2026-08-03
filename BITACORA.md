@@ -1461,6 +1461,27 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   mismo patrón. Ahí sólo falla cuando la ruta queda vacía, pero conviene
   corregirlo antes de que le pase a alguien en mitad de un trabajo.
 
+### 03-08 (undécima parte) — La prueba de que sí quedó subido
+
+- **Piloto de SIIFA hecho y bueno:** la glosa 15110544 de la factura
+  HUS454747 se subió por el bot, con OK, y el reporte quedó en
+  `piloto_siifa.csv`.
+- La pregunta de Yesid fue la correcta: *«¿y cómo sé que efectivamente se
+  subió, si necesito un pantallazo?»*. Con 1.082 respuestas, tomar 1.082
+  pantallazos no es viable.
+- **`tools/siifa_verificar_cargue.py`** (opción **[9]** del bot): le pregunta
+  a SIIFA, factura por factura, qué quedó registrado de verdad y lo compara
+  con lo que se mandó. Saca dos cosas:
+  1. La **hoja de verificación**: verde lo que quedó igual; amarillo lo que
+     quedó con el código o **la fecha** distintos; rojo lo que sigue sin
+     respuesta y hay que volver a subir.
+  2. Una **constancia en PDF por factura** (carpeta `EVIDENCIAS`), con
+     membrete del hospital, fecha y hora de la consulta, y por cada glosa su
+     código, valor, respuesta registrada y fecha. Eso es lo que se anexa a
+     soportes: reemplaza al pantallazo y sale de la API oficial del
+     Ministerio.
+- Se consulta **por factura y no por glosa**: 17 consultas en vez de 1.082.
+
 ---
 
 ## 3) PENDIENTE
