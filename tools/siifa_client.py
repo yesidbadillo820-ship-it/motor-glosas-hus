@@ -402,8 +402,15 @@ class SiifaClient:
         """
         pasos: list[tuple[str, bool, str]] = []
 
+        # Se consulta el endpoint REAL de login: cualquier respuesta HTTP (incluso
+        # un 404 o un 405) ya demuestra que hay conexión con el servidor. Sólo un
+        # fallo de red significa que no se llega. Consultar la raíz del sitio era
+        # frágil: si esa ruta puntual fallaba, se reportaba "sin conexión" aunque
+        # el login funcionara perfecto.
         try:
-            resp = self._client.get(f"{self.auth_url}/", timeout=httpx.Timeout(15.0, connect=8.0))
+            resp = self._client.get(
+                f"{self.auth_url}/api/Auth/login", timeout=httpx.Timeout(15.0, connect=8.0)
+            )
             pasos.append(
                 ("Conexión con el sitio de SIIFA", True, f"responde (HTTP {resp.status_code})")
             )
@@ -483,12 +490,21 @@ def _error_detail(resp: "httpx.Response") -> str:
 
 
 def credenciales_desde_env() -> tuple[str, str]:
-    usuario = os.environ.get("SIIFA_USER")
+    """Lee usuario y contraseña de las variables de entorno.
+
+    Acepta SIIFA_USER y también SIIFA_USERNAME, que es el nombre que usa el
+    SDK propio del auditor — así las credenciales se configuran UNA sola vez
+    y sirven para las dos herramientas, sin repetir la contraseña en dos lados.
+    """
+    usuario = os.environ.get("SIIFA_USER") or os.environ.get("SIIFA_USERNAME")
     password = os.environ.get("SIIFA_PASSWORD")
     if not usuario or not password:
         raise SystemExit(
-            "ERROR: faltan las credenciales. Definir SIIFA_USER y SIIFA_PASSWORD "
-            "como variables de entorno (setx SIIFA_USER ...; setx SIIFA_PASSWORD ...) "
-            "y reabrir la terminal. Nunca se escriben en el código."
+            "\nFaltan las credenciales de SIIFA.\n\n"
+            "Definilas una sola vez en PowerShell (y después cerrá y volvé a\n"
+            "abrir la ventana para que las tome):\n\n"
+            '    setx SIIFA_USER "tu_usuario_de_sispro"\n'
+            '    setx SIIFA_PASSWORD "tu_contraseña"\n\n'
+            "Nunca se escriben dentro del código ni se suben al repositorio.\n"
         )
     return usuario, password
