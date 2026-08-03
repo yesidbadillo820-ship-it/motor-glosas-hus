@@ -1409,6 +1409,22 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   pasada del validador, la tabla de modalidades, los errores más frecuentes y
   la plantilla de PowerShell para corregir el JSON sin dañarlo.
 
+### 03-08 (octava parte) — Todo listo para empezar a subir a SIIFA
+
+- **`tools\CARGAR_SIIFA.cmd`** — bot de doble clic con menú, para no escribir
+  comandos: [1] baja el informe de SIIFA, [2] arma los archivos de respuestas
+  (solo lo que el hospital ya había respondido), [3] piloto de UNA glosa,
+  [4] y [5] cargue de glosas y de devoluciones, [6] reintento de lo que falló,
+  [7] catálogo de códigos. Instala solo lo que falte y guarda el usuario y la
+  clave del portal la primera vez (nunca quedan escritos en un archivo). El
+  menú **no deja hacer el cargue masivo sin haber corrido el piloto**.
+- **`docs/CARGUE_SIIFA_PASO_A_PASO.md`** — la misma secuencia escrita, con los
+  comandos sueltos por si hay que correr uno aparte, qué verificar en el
+  portal después del piloto (Ver Histórico + pantallazo) y el orden sugerido
+  para revisar después las redactadas: primero las de mayor valor, luego
+  tarifas/facturación/pertinencia (se sostienen con el contrato), y de últimas
+  soportes y DE5601 (esas exigen el papel y el acuse).
+
 ---
 
 ## 3) PENDIENTE
