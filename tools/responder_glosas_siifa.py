@@ -273,8 +273,14 @@ def main() -> None:
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
+        format="%(asctime)s  %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
     )
+    if not args.verbose:
+        # httpx habla en inglés y con detalle técnico: sólo con --verbose.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     usuario, password = credenciales_desde_env()
 

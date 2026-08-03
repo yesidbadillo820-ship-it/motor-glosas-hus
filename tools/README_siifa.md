@@ -33,23 +33,26 @@ setx SIIFA_PASSWORD <tu_password>
 
 Cerrar y volver a abrir PowerShell para que las tome.
 
-### ⚠️ La URL del servicio de autenticación NO está confirmada
+### Direcciones de SIIFA (ya vienen configuradas, no hay que tocar nada)
 
-Los manuales que tenemos documentan bien la API de Factura/Seguimiento
-(`https://siifa.sispro.gov.co/siifa-factura`, confirmada), pero **no traen la
-URL del servicio de login** (`POST /api/Auth/login`). El script usa por
-default una hipótesis razonable
-(`https://siifa.sispro.gov.co/siifa-seguridad`) basada en el mismo patrón de
-nombres, pero **hay que verificarla** — si el primer comando (el piloto de
-abajo) falla con un error de conexión, ese es el primer sospechoso, no las
-credenciales. Si hace falta corregirla:
+| Servicio | URL |
+|---|---|
+| Seguridad (login) | `https://siifa.sispro.gov.co/siifa-seguridad` |
+| Factura / Seguimiento | `https://siifa.sispro.gov.co/siifa-factura` |
+
+Están confirmadas contra el servidor real de SIIFA. Sólo si algún día el
+Ministerio las cambia habría que sobrescribirlas con `setx SIIFA_AUTH_URL ...`
+y `setx SIIFA_BASE_URL ...`.
+
+### Si algo no funciona: primero el diagnóstico
 
 ```powershell
-setx SIIFA_AUTH_URL https://<url-correcta-que-confirme-mesa-de-ayuda-SIIFA>
+py tools\siifa_reporte_seguimientos.py --diagnostico
 ```
 
-Cómo confirmarla: mesa de ayuda SIIFA / soporte MinSalud, o el enlace de
-autenticación del micrositio https://www.minsalud.gov.co/SIIFA.
+Revisa en orden: (1) si hay conexión con SIIFA, (2) si el usuario y la
+contraseña sirven, (3) si la consulta responde y cuántos registros hay. Dice
+exactamente en qué paso está el problema, sin bajar nada.
 
 ### Ir a la carpeta del repo
 
@@ -169,6 +172,22 @@ según el manual funcional del módulo 3, cada actuación debe quedar en SIIFA
 "preferiblemente por interoperabilidad o a más tardar durante las siguientes
 48 horas hábiles". Ver los plazos completos del trámite de glosa en
 `docs/CONTEXTO_SIIFA.md` §4.
+
+## 3.bis) Si "se queda pensando" y no saca la información
+
+| Lo que se ve | Qué pasa realmente | Estado |
+|---|---|---|
+| Arranca bien y de golpe **fallan todas** las páginas | El token de SIIFA venció (dura pocos minutos) | **Resuelto**: el cliente se re-autentica solo y sigue |
+| Tarda muchísimo sin mostrar nada | Se reintentaba, con esperas largas, un error que nunca se iba a arreglar | **Resuelto**: sólo se reintenta lo reintentable |
+| Trae filas pero **todas vacías** | La API devolvió los campos con otra capitalización | **Resuelto**: se aceptan las dos formas |
+| Nunca termina | La API ignoraba el número de página → daba vueltas para siempre | **Resuelto**: se detecta y se corta |
+| Falla al instante | Sin internet o el proxy del hospital bloquea | Revisar la red — el mensaje ahora lo dice claro |
+
+**El error de eficiencia más caro:** `SeguimientoFactura/List` **ya trae** el
+número de factura, el valor y la EPS de cada glosa. Pedir además
+`/api/Factura/{id}` por cada seguimiento convierte 13 llamadas en más de
+2.500 — es lo que hace que un proceso tarde horas en vez de un minuto. Estas
+herramientas no lo hacen.
 
 ## 4) Estados del reporte CSV
 

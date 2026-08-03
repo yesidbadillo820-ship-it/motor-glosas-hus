@@ -53,22 +53,24 @@ glosa).
 
 ### 3.1 URL base y autenticación
 
-- **Base de la API de Factura/Seguimiento (confirmada, producción):**
-  `https://siifa.sispro.gov.co/siifa-factura`
-- **Login:** `POST /api/Auth/login` con body `{"userName": "...", "password": "..."}`
-  devuelve `{"success": true, "token": "<JWT>", "errors": [...]}`. Ese JWT se
-  manda en cada llamado como `Authorization: Bearer <token>`.
-- **⚠️ URL base del servicio de Auth/Seguridad: NO está confirmada en los
-  manuales que tenemos.** Los scripts la piden por variable de entorno
-  `SIIFA_AUTH_URL` — si no se conoce, hay que pedirla a la mesa de ayuda SIIFA
-  o revisar el enlace de "Autenticación" del micrositio
-  (https://www.minsalud.gov.co/SIIFA). Con la misma convención de nombres que
-  usa `siifa-factura`, lo más probable es que sea `https://siifa.sispro.gov.co/siifa-seguridad`,
-  pero **eso es una hipótesis, no un dato confirmado — probar primero con
-  `--piloto` de una sola glosa antes de confiar en el resultado.**
+Las tres URLs están **CONFIRMADAS** (verificadas contra la propia configuración
+de la aplicación web de SIIFA, que declara `apiSeguridad`, `apiFactura` y
+`apiContrato`, y comprobadas contra el servidor real):
+
+| Servicio | URL base |
+|---|---|
+| Seguridad (login) | `https://siifa.sispro.gov.co/siifa-seguridad` |
+| Factura / Seguimiento | `https://siifa.sispro.gov.co/siifa-factura` |
+| Contratación | `https://siifa.sispro.gov.co/siifa-contrato` |
+
+- **Login:** `POST {seguridad}/api/Auth/login` con body
+  `{"userName": "...", "password": "..."}` devuelve
+  `{"success": true, "token": "<JWT>", "errors": [...]}`. Ese JWT se manda en
+  cada llamado como `Authorization: Bearer <token>`.
+- Se pueden sobrescribir con `SIIFA_AUTH_URL` y `SIIFA_BASE_URL`, pero en
+  condiciones normales **no hace falta tocar nada**.
 - El **usuario y contraseña son los mismos con los que el auditor entra al
-  portal SIIFA** (cuenta registrada en Mi Seguridad Social / SISPRO), según
-  el flujo de autenticación descrito en el manual de interoperabilidad. Nunca
+  portal SIIFA** (cuenta registrada en Mi Seguridad Social / SISPRO). Nunca
   se escriben en el código: siempre variables de entorno.
 
   ```powershell
@@ -76,6 +78,19 @@ glosa).
   setx SIIFA_PASSWORD <password>
   ```
   (cerrar y reabrir PowerShell para que las tome).
+
+### ⚠️ El token VENCE — y ese es el error que más tiempo cuesta
+
+El JWT dura pocos minutos. Un programa que pida el token **una sola vez al
+arrancar** funciona las primeras páginas y después falla TODO con 401, sin
+recuperarse nunca. El síntoma es inconfundible: *"las primeras 7 páginas bien,
+de la 8 en adelante todas mal"*.
+
+Reintentar no arregla nada (el token ya está muerto) y encima hace perder
+muchísimo tiempo si el programa duerme entre reintentos. `tools/siifa_client.py`
+**detecta el 401 y se vuelve a autenticar solo**, y sólo reintenta lo que tiene
+sentido reintentar (caídas de red, 429, 5xx); un error definitivo lo informa de
+una, sin dormir.
 
 ### 3.2 Roles y alcance de los datos
 
@@ -145,6 +160,31 @@ por el mecanismo único de validación FEV-RIPS — no se responde en SIIFA como
 - Ver `tools/README_siifa.md` para los comandos PowerShell listos para
   copiar/pegar.
 
+## 5.bis) Si "se queda pensando" y no saca la información
+
+Corré primero el diagnóstico, que revisa paso a paso conexión, credenciales y
+consulta:
+
+```powershell
+py tools\siifa_reporte_seguimientos.py --diagnostico
+```
+
+Causas conocidas, en orden de frecuencia:
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| Anda un rato y después **fallan todas** las páginas | El token venció | Ya resuelto: el cliente se re-autentica solo. Si usás otro programa, hacelo re-autenticar ante un 401. |
+| Tarda muchísimo y no muestra nada | Reintentos con esperas largas sobre un error permanente | Ya resuelto: sólo se reintenta lo reintentable. |
+| Trae filas pero **todas vacías** | La API devolvió los campos con otra capitalización | Ya resuelto: `buscar_clave()` acepta ambas formas. |
+| Nunca termina | La API ignora el número de página → bucle infinito | Ya resuelto: se detecta la página repetida y se corta. |
+| Falla al instante sin conectar | Sin internet / proxy del hospital bloqueando | Revisar red; el error ahora lo dice explícito. |
+
+**Regla de eficiencia importante:** `GET /api/SeguimientoFactura/List` ya trae
+anidados el número de factura, el valor y los datos de emisor y adquiriente
+(la EPS). **No hace falta consultar `/api/Factura/{id}` por cada seguimiento** —
+eso convierte 13 llamadas en más de 2.500 y es la causa típica de que un
+proceso tarde horas. Todo lo que necesita el informe ya viene en el listado.
+
 ## 6) Reglas que el asistente NO debe romper
 
 1. **Nunca confundir SIIFA con COOSALUD/SIMED/DGH.** SIIFA es del Ministerio,
@@ -156,9 +196,8 @@ por el mecanismo único de validación FEV-RIPS — no se responde en SIIFA como
 4. **Antes de un cargue masivo, correr `--piloto` (1 sola glosa)** — la
    regla general del repo aplica también acá, y con más razón porque la URL
    del servicio de Auth no está 100% confirmada.
-5. **La URL de autenticación (`SIIFA_AUTH_URL`) es una hipótesis, no un
-   dato verificado** — si el login falla, lo primero es confirmar esa URL
-   antes de sospechar de las credenciales.
+5. **Antes de dar por roto el acceso, correr `--diagnostico`** — dice en qué
+   paso exacto falla (conexión, credenciales o consulta).
 6. **Claude Code no tiene acceso al portal SIIFA ni a la red del HUS:** para
    correr estos scripts, entregar el comando PowerShell listo y pedir la
    salida al auditor (igual que con los demás bots).
