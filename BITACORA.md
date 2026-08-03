@@ -1223,6 +1223,42 @@ períodos perdidos.
 
 ---
 
+### 03-08 (tercera parte) — Google apagó el servidor: mudanza al PC del hospital
+
+**Qué pasó.** La página <https://iaglosassinac.help> dejó de cargar (error
+1033). La causa no fue el sistema: la **cuenta de facturación de Google Cloud
+quedó cerrada** (saldo pendiente ~$11.278 COP) y Google apaga la máquina
+virtual cuando eso pasa. **Los datos NO se perdieron**: siguen en el disco de
+la máquina apagada, junto con las copias diarias de las 3 a. m.
+
+**Decisión (Yesid):** en vez de seguir pagando servidor, el sistema se muda al
+**PC de cartera del hospital**, que permanece siempre encendido. Misma página,
+mismos usuarios, mismos datos, y los cambios de código se siguen aplicando
+solos cada 5 minutos, igual que en la VM.
+
+**Lo que quedó construido hoy (el paquete de mudanza):**
+
+1. `docs/MIGRACION_PC_HOSPITAL.md` — la guía completa en 4 fases: (0) reabrir
+   la cuenta de facturación, (1) rescatar de la VM la base de datos, las
+   llaves y la llave del túnel con comandos listos para pegar en Cloud Shell,
+   (2) preparar el PC (Docker Desktop + Git), (3) instalar con doble clic,
+   (4) apagar la VM cuando todo funcione.
+2. `tools/MONTAR_SERVIDOR_MOTOR_GLOSAS.cmd` — el instalador de doble clic:
+   verifica requisitos, trae el código, restaura el rescate, levanta el
+   sistema y deja programadas las dos tareas de Windows. Se puede correr las
+   veces que sea sin dañar nada.
+3. `tools/autodeploy_motor_glosas.cmd` — el deploy automático cada 5 minutos
+   (igual al de la VM), con su registro en `data\autodeploy.log`.
+4. `tools/copiar_backup_motor_glosas.cmd` — la copia de seguridad diaria
+   (9:00 a. m.) hacia el share del hospital o una carpeta de Drive/OneDrive,
+   para que la base y su copia no vivan en el mismo disco.
+
+**El paso que sigue depende de Yesid (fase 0 y 1):** reabrir "Mi cuenta de
+facturación 2" pagando el saldo (~$11 mil pesos, una sola vez) y correr los
+comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
+
+---
+
 ## 3) PENDIENTE
 
 ### Conciliación Dispensario (147 facturas objeto de mesa)
@@ -1372,6 +1408,15 @@ períodos perdidos.
 
 ## 4) PARA MAÑANA
 
+0. **PRIORIDAD CERO — revivir la página (mudanza al PC del hospital).** La
+   página está caída porque Google apagó la VM por facturación. Pasos, en
+   orden, según `docs/MIGRACION_PC_HOSPITAL.md`: (a) Yesid reabre "Mi cuenta
+   de facturación 2" (~$11 mil pesos); (b) correr en Cloud Shell los comandos
+   de rescate de la fase 1 y descargar `rescate-motor-glosas.tgz`;
+   (c) en el PC de cartera: instalar Docker Desktop y Git, y doble clic a
+   `tools\MONTAR_SERVIDOR_MOTOR_GLOSAS.cmd`; (d) verificar que la página
+   cargue con los datos y apagar la VM. Hasta completar (a) y (b) no se puede
+   avanzar: solo Yesid puede reabrir la cuenta.
 1. **Dispensario prioridad 1:** subir a SIMED el Excel de las 3 facturas de
    junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
    14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
