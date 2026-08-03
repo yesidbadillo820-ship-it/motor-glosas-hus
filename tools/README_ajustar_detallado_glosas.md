@@ -278,3 +278,11 @@ combinadas desalineadas, membrete al principio y pie legal al final) con la
 factura `HUS352890` del ejemplo, y verifican que quede exactamente el "DESPUÉS":
 membrete fuera, título cambiado, los 6 ítems pagados quitados, la venda de gasa
 ajustada a 5 unidades y los totales recalculados.
+
+---
+
+## Paso siguiente: la macro de respuesta
+
+Con el detallado ya ajustado, `tools/preauditar_glosas_adres.py` llena lo
+mecánico de la macro de respuesta al ADRES y propone el resto. Ver
+[`README_preauditar_glosas_adres.md`](README_preauditar_glosas_adres.md).

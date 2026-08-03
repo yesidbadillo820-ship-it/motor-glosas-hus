@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 28-07-2026 (noche)
+**Última actualización:** 03-08-2026
 
 ---
 
@@ -172,6 +172,27 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   su total cuadre con la bitácora: los 320 cuadran ($714.332.224 contra
   $714.332.225, 1 peso de redondeo).
 
+### Agosto 2026 — Pre-auditoría del paquete ADRES
+- **03-08:** llegó la macro `NUEVO MODELO MACRO PARA DAR RESPUESTA A GLOSA ADRES
+  31068`. Es el reporte del ADRES (16 columnas) **más 10 que el equipo llena a
+  mano** sobre 4.619 filas glosadas. Se analizó y se descubrió que **siete de esas
+  diez son mecánicas**: el código numérico sale de la causal (verificado contra
+  las 2.989 que llenaron a mano: **cero discrepancias**) y la clasificación
+  también (determinística en 47 de 48 causales).
+  Nace **`tools/preauditar_glosas_adres.py`**: llena lo mecánico, propone el
+  resto con el motivo escrito y **respeta lo que el equipo ya escribió**.
+  Reproduce la macro renglón por renglón: 4.619 de 4.619 filas, y la columna
+  RTA GLOSA COMPLETA sale **carácter por carácter idéntica**. El centro de
+  costos pasó de 0 a 4.248 de 4.619 propuestos. Replica también el Word de
+  respuesta por factura del VBA, sin depender de Word.
+  El bot **no decide**: las 4.604 decisiones de aceptar/objetar/subsanar siguen
+  siendo del auditor; la sugerencia va en columnas aparte (27 en adelante) para
+  no correr nada de lo que usan las macros. A medida que el equipo decida, el
+  bot aprende **su** criterio por causal y lo propone citando en cuántos casos
+  se basa.
+  **Hallazgo:** la causal **4506** está clasificada de dos formas distintas
+  (231 veces FACTURACION y 24 PERTINENCIA) — hay que unificar el criterio.
+
 ---
 
 ## 3) PENDIENTE
@@ -208,6 +229,18 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 9. **Verificar el resto del Lote V2:** las que estaban "COMPLETA" sin subir
    (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
    437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
+
+### Pre-auditoría ADRES (`tools/preauditar_glosas_adres.py`)
+16. **Unificar el criterio de la causal 4506**: hoy está clasificada como
+    FACTURACION en 231 filas y como PERTINENCIA en 24.
+17. **Revisar las 371 filas sin centro de costos propuesto** (habitación, sala
+    especial, atención diaria: no se puede saber el área sin más contexto).
+18. **Fase 2 — llevarlo al motor web como preauditoría.** El patrón ya existe
+    en `app/services/ia_auditora_proactiva.py` (pre-análisis nocturno que deja
+    el dictamen listo antes de que el gestor abra la glosa). Las 10 columnas de
+    la macro mapean a campos que ya tiene `GlosaRecord` (`codigo_respuesta`,
+    `tipo_glosa_excel`, `observacion_tecnico`, `dictamen`, `valor_aceptado`,
+    `gestor_nombre`, `profesional_medico`); falta agregar centro de costos.
 
 ### Ajustador de detallados (`tools/ajustar_detallado_glosas.py`)
 11. **Las 4 facturas que no aparecen en ningún detallado:** HUS0000311371,
