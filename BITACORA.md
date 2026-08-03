@@ -1224,6 +1224,31 @@ corrigieron las dos cosas el mismo día:
 - Seis pruebas nuevas que reproducen exactamente lo que pasó (se verificó
   que fallan con el código anterior).
 
+**Lo que salió del informe, ya cruzado con lo que el hospital respondió.**
+Con el informe en la mano se armó el camino completo para cargar las
+respuestas, y aparecieron tres cosas que importan más que el bot:
+
+- **El valor de las devoluciones que muestra el informe está inflado.** La
+  hoja RESUMEN dice $24.921 millones, pero SIIFA registra cada devolución
+  repitiendo el valor completo de la factura: HUS475438 aparece 340 veces,
+  cada una por sus $51 millones. **El valor real de las 10 facturas
+  devueltas es $115.051.312.** Ese es el número que va a un informe.
+- **El trabajo es mucho menor de lo que parece.** Las 2.579 líneas
+  pendientes se responden con **272 textos distintos**, y son apenas 58
+  facturas con glosa y 10 con devolución.
+- **Casi todo está vencido:** 85 glosas con más de 90 días y 685 entre 61 y
+  90, contra un plazo de ley de 15 días hábiles.
+
+Y el hallazgo que ahorra el trabajo: **1.082 de las 2.579 líneas YA fueron
+respondidas por el hospital**, con la respuesta escrita en la base de
+trámites de Dinámica Gerencial, sólo que nunca se cargó al portal del
+Ministerio. Se hicieron dos herramientas nuevas:
+`tools/siifa_preparar_respuestas.py` (agrupa las líneas repetidas y después
+reparte la respuesta a cada una) y `tools/siifa_cruzar_tramites_dgh.py`
+(busca en DGH la respuesta ya dada y deja la hoja de trabajo pre-llenada,
+marcando de dónde salió cada una). De las 272 respuestas, 162 salieron de
+DGH y 110 hay que escribirlas.
+
 **Y la corrida real salió bien: el Excel maestro ya está bajado.** El
 informe quedó en `D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx`
 con **2.597 seguimientos, 2.579 sin respuesta del HUS** — el mismo 2.579 que
@@ -1450,16 +1475,18 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
    de pre-auditoría.
 7. **ADRES:** (PR #176 ya fusionado el 29-07) copiar al servidor el PAQUETE
    COMPLETO (ZIP del 27-07) y correr la v2.1 del bot DE4401 (pendiente #21).
-8. **SIIFA — rebajar el informe maestro.** El Excel de 2.597 seguimientos se
-   perdió (lo pisó una corrida fallida; ya está corregido para que no vuelva
-   a pasar). Hay que volver a bajarlo, **con `git pull` primero** y pidiendo
-   directamente el camino que sabemos que aguanta:
-   `py tools\siifa_reporte_seguimientos.py --por-meses --desde 2026-01-01
-   --salida "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx"`.
-   Si el servidor del Ministerio sigue sobrecargado, esperar un rato: no es
-   falla del bot. Después: (b) **revisar con el auditor** si las columnas del
-   Excel sirven para tipificar respuestas; (c) **piloto de 1 glosa** con
-   `--solo-id <id>` antes de cualquier cargue masivo (pendiente #13).
+8. **SIIFA — revisar la hoja de respuestas y hacer el piloto.** El informe
+   maestro ya está rebajado (2.597) y la hoja de trabajo ya salió cruzada
+   con DGH: de las 272 respuestas, **162 vienen puestas** y **110 hay que
+   escribirlas**. El orden del trabajo es:
+   (a) mirar las **93 filas marcadas en REVISAR** (las de origen POR_CODIGO
+   y las que en DGH tenían más de una respuesta);
+   (b) escribir las 110 que dicen ESCRIBIR — ahí están las 482 glosas de
+   HUS454747 y las devoluciones, que no tienen trámite en DGH;
+   (c) **decidir qué se hace con las 1.169 devoluciones DE5601**, que es un
+   trámite distinto al de una glosa;
+   (d) expandir con `siifa_preparar_respuestas.py --expandir` y hacer el
+   **piloto de 1 glosa** antes del cargue masivo (pendiente #13).
 
 ### SINAC OS — decisiones que dependen de Yesid (28-07)
 

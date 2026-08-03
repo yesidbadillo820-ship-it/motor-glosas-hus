@@ -207,6 +207,51 @@ def test_avisa_claro_si_el_archivo_no_es_el_informe(tmp_path):
     assert "SEGUIMIENTOS" in str(e.value)
 
 
+@pytest.mark.parametrize(
+    "observacion",
+    [
+        "Glosa Calculada Afiliado - Validacion: (CODIGO DEL ",  # termina en espacio
+        "Primera línea\nSegunda línea",  # salto de línea
+        "  Con espacios al principio y al final  ",
+        "Observación con tabulación\ty más texto",
+    ],
+)
+def test_una_observacion_rara_no_hace_perder_la_respuesta(tmp_path, observacion):
+    """Regresión: en el caso real se perdían 27 respuestas en silencio.
+
+    Las observaciones de la EPS traen espacios al final, saltos de línea y
+    caracteres raros. Cuando el grupo se identificaba con ese mismo texto,
+    Excel se lo devolvía cambiado y la fila ya no calzaba con su grupo: la
+    respuesta se caía sin decir nada. Ahora el grupo se identifica con una
+    huella, que sobrevive el viaje.
+    """
+    filas = [_linea(11, "HUS454747", "TA5701", obs=observacion)]
+    informe = _informe(tmp_path, filas)
+    grupos = prep.agrupar(prep.leer_informe(informe))
+
+    plantilla = tmp_path / "para_llenar.xlsx"
+    prep.escribir_plantilla(grupos, plantilla)
+    _llenar(plantilla, {("HUS454747", "TA5701"): ("RE9901", "No acepta.")})
+
+    resultado, sin_responder = prep.expandir(grupos, prep.leer_plantilla_llena(plantilla))
+
+    assert not sin_responder, "la respuesta se perdió al pasar por Excel"
+    assert len(resultado) == 1
+    assert resultado[0]["CODIGO_RESPUESTA"] == "RE9901"
+
+
+def test_dos_glosas_que_solo_se_diferencian_al_final_no_se_confunden(tmp_path):
+    """Las observaciones largas de Sanitas comparten los primeros 180 caracteres."""
+    base = "Glosa Calculada Afiliado - Tipo y Numero de Identificacion: (CC, 12345678, PEPITO PEREZ), Fecha Atencion: (14/04/2025), "
+    filas = [
+        _linea(11, "HUS527098", "CO2301", obs=base + "Procedimiento: (890208)"),
+        _linea(12, "HUS527098", "CO2301", obs=base + "Procedimiento: (903437)"),
+    ]
+    grupos = prep.agrupar(prep.leer_informe(_informe(tmp_path, filas)))
+
+    assert len(grupos) == 2, "son dos glosas distintas, no una"
+
+
 def test_la_hoja_de_trabajo_arranca_por_lo_mas_viejo(tmp_path):
     """Lo vencido primero: es lo que puede costarle plata al hospital."""
     viejo = _linea(1, "HUS400000", "CO2301")
