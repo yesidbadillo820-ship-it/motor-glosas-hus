@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 27-07-2026
+**Última actualización:** 03-08-2026
 
 ---
 
@@ -122,6 +122,24 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
   consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
 
+### Agosto 2026 — Validación de RIPS para el CUV
+- **03-08:** cuentas médicas reportó que el validador del Ministerio no le
+  generaba el **CUV** de la factura **MED737** (Medical Center Especialistas,
+  NIT 900299334): salía `RVG01 | Dato requerido` en
+  `usuarios[0].servicios.consultas[0].modalidadGrupoServicioTecSal`.
+  Al revisar el paquete completo (XML + JSON) aparecieron **4 problemas**, no
+  uno: el campo de modalidad en `null`, el `numFactura` sin el prefijo (`737`
+  en vez de `MED737`), un `numNota` diligenciado con el `tipoNota` vacío, y la
+  atención fechada el **27-07** cuando la factura cubre el período **31-07**
+  (esa última la tiene que decidir facturación: o la fecha del servicio está
+  mal, o hay que reexpedir la factura).
+  Para no repetir el ida y vuelta se creó **`tools/validar_json_rips.py`**:
+  revisa estructura del JSON (campos obligatorios, formatos de fecha, tablas
+  de referencia) **y** el cruce contra el XML de la factura (número con
+  prefijo, NIT, período de facturación, valores). Corre sobre una carpeta o
+  sobre todo un mes con `--recursivo` y deja reporte CSV. 29 pruebas
+  automáticas. Guía para el auditor en `docs/CONTEXTO_FEV_RIPS_CUV.md`.
+
 ---
 
 ## 3) PENDIENTE
@@ -159,6 +177,16 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
    437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
 
+### Cuentas médicas — CUV de facturas nuevas
+11. **Factura MED737:** aplicar las tres correcciones del JSON (modalidad `01`,
+    `numFactura` = `MED737`, `numNota` en `null`) y **preguntar a facturación**
+    por el conflicto de fechas: la atención es del 27-07 y la factura cubre el
+    período del 31-07. Sin resolver eso el Ministerio no entrega el CUV.
+12. **Revisar el resto de facturas de agosto** con `validar_json_rips.py
+    --recursivo` antes de subirlas: si el facturador viene exportando el
+    `numFactura` sin prefijo y la modalidad en `null`, el problema es de todas,
+    no solo de la 737. Si se confirma, pedir el ajuste al proveedor del software.
+
 ### Informes
 10. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
     proceso manual y cuántas personas) para poner el multiplicador exacto.
@@ -176,6 +204,9 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 5. Si hay tiempo, avanzar el frente Dispensario: verificar si SISTEMAS ya
    corrigió algún CUV (pendiente #6) y descargar los 2 PDF del DIAN
    (pendiente #7).
+6. **Cerrar la MED737:** corregir el JSON, resolver el tema de las fechas con
+   facturación y confirmar que el Ministerio entregue el CUV (pendiente #11).
+   Luego pasar el revisor a todo agosto (pendiente #12).
 
 ---
 
