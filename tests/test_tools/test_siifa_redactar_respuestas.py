@@ -229,6 +229,148 @@ def test_sin_base_de_tramites_se_redacta_todo(tmp_path):
     assert all(f["CODIGO_RESPUESTA"] == "RE9901" for f in filas)
 
 
+def _tramites(tmp_path: Path, filas: list[list]) -> Path:
+    """Base de DGH: una fila por respuesta que el hospital ya dio."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "BD TRAMITE"
+    ws.append(
+        [
+            "FACTURA",
+            "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Codigo",
+            "ListadoConceptos.DetalleRecepcionObjecion.ValorObjecion",
+            "codigo_respuesta",
+            "observacion_respuesta",
+            "fecha_respuesta",
+            "EstadoActual",
+        ]
+    )
+    for f in filas:
+        ws.append(f)
+    ruta = tmp_path / "tramites.xlsx"
+    wb.save(ruta)
+    return ruta
+
+
+def _correr(monkeypatch, tmp_path, informe, tramites, extra=()):
+    glosas = tmp_path / "respuestas_GLOSAS.xlsx"
+    devoluciones = tmp_path / "respuestas_DEVOLUCIONES.xlsx"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "siifa_redactar_respuestas.py",
+            "--informe",
+            str(informe),
+            "--tramites",
+            str(tramites),
+            "--salida-glosas",
+            str(glosas),
+            "--salida-devoluciones",
+            str(devoluciones),
+            *extra,
+        ],
+    )
+    red.main()
+    return glosas, devoluciones
+
+
+def _facturas(ruta: Path) -> list[str]:
+    ws = load_workbook(ruta).active
+    col = [c.value for c in ws[1]].index("NUMERO_FACTURA") + 1
+    return [ws.cell(row=r, column=col).value for r in range(2, ws.max_row + 1)]
+
+
+def test_solo_lo_ya_respondido_deja_fuera_del_cargue_lo_redactado(monkeypatch, tmp_path):
+    """El archivo de cargue lleva sólo la respuesta real del hospital."""
+    informe = _informe(
+        tmp_path,
+        [
+            _linea("TA0801", factura="HUS454747", valor=22200),
+            _linea("SO0101", factura="HUS532384", valor=51000),
+        ],
+    )
+    tramites = _tramites(
+        tmp_path,
+        [
+            [
+                "HUS0000454747",
+                "TA0801",
+                22200,
+                "RE9602",
+                "RESPUESTA REAL DEL HUS.",
+                "2026-01-06",
+                "Confirmado",
+            ]
+        ],
+    )
+
+    glosas, _ = _correr(monkeypatch, tmp_path, informe, tramites, ["--solo-lo-ya-respondido"])
+
+    assert _facturas(glosas) == ["HUS454747"]
+
+
+def test_lo_redactado_no_se_bota_queda_en_su_propio_archivo(monkeypatch, tmp_path):
+    """Sacarlo del cargue no es perderlo: hay que poder revisarlo y subirlo."""
+    informe = _informe(
+        tmp_path,
+        [
+            _linea("TA0801", factura="HUS454747", valor=22200),
+            _linea("SO0101", factura="HUS532384", valor=51000),
+        ],
+    )
+    tramites = _tramites(
+        tmp_path,
+        [
+            [
+                "HUS0000454747",
+                "TA0801",
+                22200,
+                "RE9602",
+                "RESPUESTA REAL DEL HUS.",
+                "2026-01-06",
+                "Confirmado",
+            ]
+        ],
+    )
+
+    glosas, _ = _correr(monkeypatch, tmp_path, informe, tramites, ["--solo-lo-ya-respondido"])
+
+    aparte = red.con_sufijo(glosas, "REDACTADAS")
+    assert aparte.exists()
+    assert _facturas(aparte) == ["HUS532384"]
+
+
+def test_sin_la_opcion_el_cargue_sigue_llevando_todo(monkeypatch, tmp_path):
+    """Lo de siempre no cambia: sin la opción, van las dos en un solo archivo."""
+    informe = _informe(
+        tmp_path,
+        [
+            _linea("TA0801", factura="HUS454747", valor=22200),
+            _linea("SO0101", factura="HUS532384", valor=51000),
+        ],
+    )
+    tramites = _tramites(
+        tmp_path,
+        [
+            [
+                "HUS0000454747",
+                "TA0801",
+                22200,
+                "RE9602",
+                "RESPUESTA REAL DEL HUS.",
+                "2026-01-06",
+                "Confirmado",
+            ]
+        ],
+    )
+
+    glosas, _ = _correr(monkeypatch, tmp_path, informe, tramites)
+
+    assert sorted(_facturas(glosas)) == ["HUS454747", "HUS532384"]
+    assert not red.con_sufijo(glosas, "REDACTADAS").exists()
+
+
 def test_el_archivo_que_sale_lo_puede_leer_el_bot_de_cargue(tmp_path):
     """Las columnas que exige responder_glosas_siifa.py tienen que estar."""
     informe = _informe(tmp_path, [_linea("TA0801")])
