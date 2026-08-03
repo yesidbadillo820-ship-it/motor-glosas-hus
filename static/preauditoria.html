@@ -219,7 +219,7 @@
 <!-- ============ ESTADÍSTICAS ============ -->
 <section class="vista" id="v-stats">
   <div class="card">
-    <h2>Estadísticas</h2>
+    <h2>Estadísticas <button class="btn btn-borde btn-chico" onclick="descargarInforme()" title="Excel con resumen, por auditor, por oficio, devoluciones y el historial completo">⬇ Informe de gestión (Excel)</button></h2>
     <div class="kpis" id="st-kpis"></div>
   </div>
 
@@ -623,6 +623,7 @@ async function cargarConsolidado(page){
   }catch(e){ errorTabla('tb-consolidado', 11, e); }
 }
 function exportarConsolidado(){ verPdf('/preauditoria/consolidado/export.xlsx', true); }
+function descargarInforme(){ verPdf('/preauditoria/estadisticas/informe.xlsx', true); }
 
 async function abrirAuditar(id){
   var cont=document.getElementById('ma-cuerpo');
@@ -644,7 +645,9 @@ async function abrirAuditar(id){
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
         '<button class="btn btn-rojo" '+(limite?'disabled':'')+' onclick="auditar('+f.id+',\'DEVUELTA\')">✖ Devolver</button>'+
-        '<button class="btn btn-borde" onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
+        // Revertir una auditoría YA DECIDIDA es solo de coordinación/admin:
+        // cambia lo que ya se reportó. El backend lo exige igual (403).
+        '<button class="btn btn-borde" '+((f.resultado!=='PENDIENTE' && !ES_ADMIN)?'disabled title="Solo coordinación o administración puede revertir una auditoría ya decidida"':'')+' onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
   }catch(e){ document.getElementById('ma-cuerpo').innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
 // Evita que un doble clic (o clics repetidos porque el servidor va lento)
@@ -699,17 +702,22 @@ async function verHist(numero){
     // saldrá en el oficio de devolución); en las demás, la observación normal.
     var obsActual = d.actual.motivo_devolucion || d.actual.observaciones || '';
     var enOficio = d.actual.resultado==='DEVUELTA' && d.actual.oficio_devolucion_id;
+    // Corregir una auditoría YA DECIDIDA (y con ella el oficio de devolución,
+    // porque el PDF se arma al abrirlo) es solo de coordinación/administración.
+    // El backend lo exige igual (403); aquí se explica en vez de dejar el
+    // botón para que rebote.
+    var puedeCorregir = d.actual.resultado==='PENDIENTE' || ES_ADMIN;
+    var cajaObs = puedeCorregir
+      ? '<label class="campo" style="margin:10px 0">'+(obsActual?'Corregir la observación':'Anotar la observación que falta')+
+          (enOficio?' — la corrección también actualiza el oficio de devolución':'')+
+          '<textarea id="mh-obs" rows="3" style="width:100%" placeholder="Ej.: OKAY SOPORTES">'+esc(obsActual)+'</textarea></label>'+
+        '<div id="mh-msg"></div>'+
+        '<button class="btn btn-borde btn-chico" onclick="guardarObservacion('+d.actual.id+',\''+esc(numero)+'\')">✎ Guardar observación</button>'
+      : '<p class="leyenda">🔒 Esta auditoría ya está '+(d.actual.resultado==='RADICAR'?'radicada':'devuelta')+
+        ': solo coordinación o administración puede corregir su observación'+(enOficio?' (la corrección también cambia el oficio de devolución)':'')+'.</p>';
     document.getElementById('mh-cuerpo').innerHTML='<p>'+estadoChip(d.actual.estado)+' · Devoluciones <b>'+d.actual.num_devoluciones+'</b> · Subsanación '+d.actual.num_subsanacion+'</p>'+
       (obsActual?'<div class="aviso aviso-ok"><b>Observación actual:</b> '+esc(obsActual)+'</div>':'')+
-      // Permite corregir la observación en facturas ya decididas, sin
-      // revertirlas. Si la factura ya salió en un oficio de devolución, la
-      // corrección también corrige el texto del oficio (el PDF se arma al
-      // abrirlo, así que queda al día de inmediato).
-      '<label class="campo" style="margin:10px 0">'+(obsActual?'Corregir la observación':'Anotar la observación que falta')+
-        (enOficio?' — la corrección también actualiza el oficio de devolución':'')+
-        '<textarea id="mh-obs" rows="3" style="width:100%" placeholder="Ej.: OKAY SOPORTES">'+esc(obsActual)+'</textarea></label>'+
-      '<div id="mh-msg"></div>'+
-      '<button class="btn btn-borde btn-chico" onclick="guardarObservacion('+d.actual.id+',\''+esc(numero)+'\')">✎ Guardar observación</button>'+
+      cajaObs+
       '<div class="tbl-scroll" style="margin-top:12px"><table><thead><tr><th>Ronda</th><th>Evento</th><th>Oficio</th><th>Envío</th><th>Auditor</th><th>Fecha</th><th>Motivo</th><th>Observaciones</th></tr></thead><tbody>'+filas+'</tbody></table></div>';
     abrirModal('m-hist');
   }catch(e){ alert(e.message); }

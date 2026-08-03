@@ -1113,6 +1113,25 @@ cargas simultáneas del mismo envío podían pasarse del tope o terminar en
 error 500 — ahora la segunda recibe un aviso claro; y (4) la migración del
 candado se auto-repara si un arranque muere a mitad de camino.
 
+### 03-08 (segunda parte) — Solo administración corrige auditorías decididas + informe de gestión
+
+A pedido del auditor:
+
+1. **Las auditorías ya decididas quedan protegidas.** Revertir una factura
+   radicada o devuelta, o corregir su observación (que también corrige el
+   PDF del oficio de devolución, porque el PDF se arma al abrirlo), ahora
+   es SOLO de coordinación o administración. El auditor sigue escribiendo
+   su observación con normalidad al decidir, y mientras la factura esté
+   pendiente. En la pantalla, quien no es administrador ve el botón
+   bloqueado con la explicación, y el servidor lo exige de todos modos.
+2. **Informe de gestión descargable.** En la pestaña Estadísticas quedó el
+   botón "⬇ Informe de gestión (Excel)": un libro con 5 hojas — RESUMEN
+   (totales y valores), POR AUDITOR, POR OFICIO, DEVOLUCIONES e HISTORIAL
+   (el registro completo de eventos: qué se hizo, quién, cuándo, con motivo
+   y observación de cada movimiento).
+
+105 pruebas del módulo en verde.
+
 ---
 
 ## 3) PENDIENTE
