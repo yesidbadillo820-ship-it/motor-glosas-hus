@@ -23,7 +23,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.models.db import ROL_COORDINADOR, UsuarioRecord
+from app.models.db import ROL_COORDINADOR, ROL_SUPER_ADMIN, UsuarioRecord
 
 openpyxl = pytest.importorskip("openpyxl")
 
@@ -71,6 +71,24 @@ FILAS = [
         "OMEPRAZOL CAPSULAS",
         31800,
         "3106- Soporte de material  ausente o incompleto",
+    ),
+    # Causal 4506: la trabajan dos áreas. Ésta es corriente → gestores.
+    (
+        "HUS352890",
+        "Insumo",
+        "INS-100",
+        "GASA ESTERIL 10X10",
+        5000,
+        "4506- El material hace parte de otro servicio",
+    ),
+    # Ésta es material de osteosíntesis → médicas.
+    (
+        "HUS352890",
+        "Material de Osteosintesis",
+        "OST-200",
+        "TORNILLO CORTICAL 3.5MM",
+        450000,
+        "4506- El material hace parte de otro servicio",
     ),
 ]
 
@@ -153,6 +171,13 @@ def gestor():
 
 
 @pytest.fixture()
+def admin():
+    return UsuarioRecord(
+        id=3, email="admin@hus.gov.co", rol=ROL_SUPER_ADMIN, activo=1, nombre="Super Admin"
+    )
+
+
+@pytest.fixture()
 def client(db_session, coordinador):
     """Cliente autenticado como coordinador (puede cargar y decidir)."""
     from app.api.deps import get_coordinador_o_admin, get_usuario_actual
@@ -186,9 +211,9 @@ class TestCargue:
         d = r.json()
         assert d["ok"] is True
         assert d["numero_paquete"] == "31068"
-        assert d["filas"] == 3
+        assert d["filas"] == 5
         assert d["facturas"] == 2
-        assert d["valor_glosado"] == pytest.approx(37600 + 85800 + 31800)
+        assert d["valor_glosado"] == pytest.approx(37600 + 85800 + 31800 + 5000 + 450000)
 
     def test_archivo_vacio_da_400(self, client):
         r = client.post("/glosas-adres/importar", files={"archivo": ("vacio.xlsx", b"")})
@@ -242,9 +267,9 @@ class TestConsulta:
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["encontrada"] is True
-        assert d["resumen"]["glosas"] == 2
-        assert d["resumen"]["pendientes"] == 2
-        assert d["resumen"]["valor_glosado"] == pytest.approx(37600 + 85800)
+        assert d["resumen"]["glosas"] == 4
+        assert d["resumen"]["pendientes"] == 4
+        assert d["resumen"]["valor_glosado"] == pytest.approx(37600 + 85800 + 5000 + 450000)
 
     def test_el_bot_clasifica_y_sugiere_con_su_motivo(self, client, paquete):
         d = client.get("/glosas-adres/factura/HUS0000352890").json()
@@ -292,14 +317,16 @@ class TestDecision:
             json={
                 "decision": "SE SUBSANA",
                 "observacion_tecnico": "SE ANEXA SOPORTE DE ENTREGA.",
-                "centro_costos": "SERVICIO FARMACEUTICO",
+                "centro_costos": "SERVICIO FARMACEUTICO",  # sin código: se normaliza
             },
         )
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["decision"] == "SE SUBSANA"
         assert d["observacion_tecnico"] == "SE ANEXA SOPORTE DE ENTREGA."
-        assert d["centro_costos"] == "SERVICIO FARMACEUTICO"
+        # Se guarda en la forma oficial del catálogo, aunque lo manden sin código.
+        assert d["centro_costos"] == "580501-SERVICIO FARMACEUTICO"
+        assert d["centro_costos_por"] == "coordinador@hus.gov.co"
         assert d["decidido_por"] == "coordinador@hus.gov.co"
 
     def test_glosa_inexistente_da_404(self, client, paquete):
@@ -338,6 +365,136 @@ class TestDecision:
 
         otra = client.get("/glosas-adres/factura/HUS0000311371").json()
         assert not otra["glosas"][0]["decision"]
+
+
+class TestRepartoDeAreas:
+    """La causal 4506 la trabajan gestores (FACTURACION) y médicas (PERTINENCIA).
+
+    Quién la toma depende de qué se glosó, así que la reparte un SUPER ADMIN.
+    """
+
+    def test_la_4506_llega_marcada_para_repartir(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        cuatro = [g for g in d["glosas"] if g["causal_codigo"] == "4506"]
+        assert len(cuatro) == 2
+        assert all(g["requiere_asignacion"] for g in cuatro)
+        assert d["resumen"]["por_asignar"] == 2
+
+    def test_sugiere_medicas_para_osteosintesis_y_gestores_para_lo_demas(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        por_codigo = {g["codigo"]: g for g in d["glosas"]}
+        assert por_codigo["OST-200"]["area_sugerida"] == "PERTINENCIA"
+        assert por_codigo["INS-100"]["area_sugerida"] == "FACTURACION"
+        # Siempre con el motivo escrito, nunca a secas.
+        assert por_codigo["OST-200"]["motivo_area"]
+        assert por_codigo["INS-100"]["motivo_area"]
+
+    def test_por_asignar_lista_las_pendientes(self, client, paquete):
+        r = client.get("/glosas-adres/por-asignar", params={"paquete_id": paquete})
+        assert r.status_code == 200
+        assert {g["codigo"] for g in r.json()} == {"INS-100", "OST-200"}
+
+    def test_un_gestor_no_puede_repartir(self, db_session, coordinador, gestor):
+        from app.api.deps import get_admin, get_coordinador_o_admin, get_usuario_actual
+        from app.main import app
+
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
+        app.dependency_overrides[get_usuario_actual] = lambda: coordinador
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: coordinador
+        try:
+            c = TestClient(app)
+            c.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+            gid = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["causal_codigo"] == "4506"
+            )
+            # El gestor (AUDITOR) no pasa el filtro de SUPER_ADMIN.
+            app.dependency_overrides[get_usuario_actual] = lambda: gestor
+            app.dependency_overrides.pop(get_admin, None)
+            r = c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"})
+            assert r.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_el_super_admin_reparte_y_se_recalcula_la_sugerencia(self, db_session, admin):
+        from app.api.deps import get_admin, get_coordinador_o_admin, get_usuario_actual
+        from app.main import app
+
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
+        app.dependency_overrides[get_usuario_actual] = lambda: admin
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+        app.dependency_overrides[get_admin] = lambda: admin
+        try:
+            c = TestClient(app)
+            c.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+            gid = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["codigo"] == "OST-200"
+            )
+            r = c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"})
+            assert r.status_code == 200, r.text
+            d = r.json()
+            assert d["clasificacion"] == "PERTINENCIA"
+            assert d["requiere_asignacion"] is False
+            assert d["area_asignada_por"] == "admin@hus.gov.co"
+            # Al pasar a pertinencia, el bot deja de sugerir: la firma un médico.
+            assert not d["sugerencia"]
+            assert "médico" in (d["motivo"] or "")
+
+            # Área inválida y causal que no se reparte, ambas rechazadas.
+            assert c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "X"}).status_code == 400
+            otra = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["causal_codigo"] == "3106"
+            )
+            assert (
+                c.post(f"/glosas-adres/glosa/{otra}/area", json={"area": "FACTURACION"}).status_code
+                == 400
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestCentrosDeCostos:
+    def test_el_catalogo_oficial_llega_a_la_pantalla(self, client, paquete):
+        r = client.get("/glosas-adres/centros-costos", params={"paquete_id": paquete})
+        assert r.status_code == 200
+        catalogo = r.json()
+        assert len(catalogo) == 45
+        assert "733001-QUIROFANOS" in catalogo
+        assert "510406-DIREC SUBGCIA DE ALTO COSTO" in catalogo
+
+    def test_la_factura_trae_el_catalogo_para_el_desplegable(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert "733001-QUIROFANOS" in d["catalogo_centros"]
+
+    def test_los_centros_propuestos_salen_con_su_codigo(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["glosas"][0]["centro_costos"] == "580501-SERVICIO FARMACEUTICO"
+
+
+class TestSinDetallado:
+    def test_avisa_y_muestra_igual_lo_que_se_tiene(self, client, paquete):
+        """Las 4 facturas sin detallado no pueden dejar al gestor sin nada."""
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["resumen"]["items_detallado"] == 0
+        assert "no tiene detallado" in d["aviso_detallado"]
+        # Y aun así trae todo lo del reporte del ADRES.
+        assert d["resumen"]["glosas"] == 1
+        assert d["glosas"][0]["valor_glosado"] == pytest.approx(31800)
+        assert d["glosas"][0]["causal_codigo"] == "3106"
+
+    def test_con_detallado_no_hay_aviso(self, client, paquete):
+        client.post(
+            "/glosas-adres/importar-bitacora",
+            data={"paquete_id": str(paquete)},
+            files={"archivo": ("b.csv", BITACORA_CSV)},
+        )
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["aviso_detallado"] == ""
 
 
 class TestRecargarNoBorraTrabajo:

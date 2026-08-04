@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import get_admin, get_coordinador_o_admin, get_usuario_actual
 from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import GlosaAdresRecord, PaqueteAdresRecord, UsuarioRecord
@@ -204,6 +204,64 @@ def decidir(
             centro_costos=cuerpo.centro_costos,
             medico=cuerpo.medico,
             usuario=usuario.email,
+        )
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return svc.glosa_dict(glosa)
+
+
+# ─── Reparto de áreas (solo SUPER ADMIN) ─────────────────────────────────────
+
+
+@router.get("/centros-costos")
+def centros_costos(
+    paquete_id: int | None = None,
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El catálogo oficial de centros de costos del hospital, para el desplegable."""
+    return svc.catalogo_centros(db, paquete_id)
+
+
+@router.get("/por-asignar")
+def por_asignar(
+    paquete_id: int | None = None,
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Glosas esperando que un super admin les reparta el área."""
+    return svc.pendientes_de_asignar(db, paquete_id=paquete_id)
+
+
+class AreaIn(BaseModel):
+    area: str  # FACTURACION (gestores) | PERTINENCIA (médicas)
+    centro_costos: str | None = None
+    medico: str | None = None
+
+
+@router.post("/glosa/{glosa_id}/area")
+def asignar_area(
+    glosa_id: int,
+    cuerpo: AreaIn,
+    db: Session = Depends(get_db),
+    usuario: UsuarioRecord = Depends(get_admin),
+):
+    """Reparte una glosa de causal compartida entre gestores y médicas.
+
+    Solo **SUPER ADMIN**: la causal 4506 la trabajan las dos áreas y quién la
+    toma depende del procedimiento y de lo que se glosó (el material de
+    osteosíntesis y el de alto costo lo revisa el médico auditor).
+    """
+    try:
+        glosa = svc.asignar_area(
+            db,
+            glosa_id,
+            area=cuerpo.area,
+            usuario=usuario.email,
+            centro_costos=cuerpo.centro_costos,
+            medico=cuerpo.medico,
         )
     except LookupError as e:
         raise HTTPException(404, str(e)) from e

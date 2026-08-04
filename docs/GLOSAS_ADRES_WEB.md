@@ -74,6 +74,7 @@ texto consolidado para pegarlo en el Word del ADRES.
 - **Pertinencia médica.** Las causales de pertinencia no traen sugerencia:
   dicen «requiere concepto del médico auditor». Eso lo firma un médico, no un
   bot.
+- **Las causales que trabajan dos áreas** (hoy la **4506**). Ver el punto 4.
 - **Nada queda en firme sin gestor.** El campo `decidido_por` guarda quién
   confirmó cada glosa y cuándo.
 - **Recargar el paquete no borra trabajo.** Si el coordinador vuelve a subir
@@ -83,7 +84,76 @@ texto consolidado para pegarlo en el Word del ADRES.
 
 ---
 
-## 4. De dónde salen las sugerencias
+## 4. La causal 4506: la trabajan dos áreas
+
+La 4506 («el material hace parte de otro servicio») **no está mal clasificada**
+en la macro: la ven **dos áreas distintas**.
+
+- Los **gestores** la trabajan por **FACTURACION**.
+- Las **médicas** la trabajan por **PERTINENCIA**, cuando lo glosado es
+  **material de osteosíntesis o insumos de alto costo** (curación avanzada e
+  instrumental de quirófano).
+
+Como quién la toma depende del procedimiento y de lo que se glosó, **el sistema
+no la clasifica solo**. La marca como `POR ASIGNAR` y **solo un SUPER ADMIN**
+puede repartirla, desde la misma pantalla.
+
+El bot propone el área con su motivo escrito, para ahorrar el 90 % del trabajo:
+
+| Lo glosado | Área que se propone |
+|---|---|
+| Osteosíntesis, prótesis, stent, injerto, cemento óseo | PERTINENCIA (médicas) |
+| Curación avanzada: hidrofibra con plata, hidrocoloide, gasa de parafina, hemostático | PERTINENCIA (médicas) |
+| Instrumental de quirófano: fresas, perforador craneal, dermatomo, cuchilla de corte de hueso | PERTINENCIA (médicas) |
+| Insumo corriente: gasa, apósito de gasa, aguja, bisturí, sutura corriente | FACTURACION (gestores) |
+
+Los patrones son **específicos a propósito**: el apósito de hidrofibra con
+plata es curación avanzada, pero el apósito de gasa no; la cuchilla para corte
+de hueso es de quirófano, pero la de bisturí no.
+
+**Qué tan acertada es la propuesta:** se midió contra las 255 filas de causal
+4506 que el equipo clasificó a mano en el paquete 31068 — coincide en **249
+(97,6 %)**. Las 6 en que no coincide son casos donde el propio equipo repartió
+distinto la misma descripción. De todos modos el super admin confirma.
+
+Cuando el super admin asigna el área, **la sugerencia de respuesta se
+recalcula**: si queda en PERTINENCIA, el bot deja de proponer, porque esa la
+firma un médico auditor.
+
+---
+
+## 5. Los centros de costos salen del catálogo del hospital
+
+No se escriben a mano. La pantalla muestra un **desplegable con los 45 centros
+oficiales** (`510204-COSTOS`, `733001-QUIROFANOS`, `510406-DIREC SUBGCIA DE
+ALTO COSTO`, …) — la misma lista del botón que tiene la macro.
+
+- El bot propone el centro según el servicio glosado, siempre en la forma
+  oficial `código-NOMBRE`.
+- Si el hospital cambia el plan de cuentas, **manda el catálogo que traiga la
+  macro** que se cargue; el del bot es solo el respaldo.
+- Lo que un gestor escoja a mano queda marcado (`centro_costos_por`) y **no se
+  vuelve a pisar** cuando se recarga el paquete.
+- Los que el bot no puede deducir quedan en blanco a propósito, resaltados en
+  la pantalla, para que alguien los complete. En el 31068 son 371 de 4.619.
+
+---
+
+## 6. Facturas sin detallado
+
+Algunas facturas del paquete no tienen detallado (en el 31068 son cuatro:
+311371, 367368, 380246 y 394817). **No es un fallo:** esas facturas no venían
+en los lotes de detallados que se importaron — se verificó archivo por archivo
+en los siete lotes.
+
+La pantalla **no deja al gestor sin nada**: muestra el aviso explicando por qué
+no hay detallado y **abajo trae igual todo lo del reporte del ADRES** — las
+glosas, sus causales, los valores y las sugerencias. Si después aparece el
+detallado, basta volver a cargar la bitácora y el aviso desaparece.
+
+---
+
+## 7. De dónde salen las sugerencias
 
 Hay dos niveles, y la pantalla siempre dice cuál es:
 
@@ -98,7 +168,7 @@ Cada sugerencia trae su **motivo** escrito. Nunca se sugiere sin explicar.
 
 ---
 
-## 5. Endpoints
+## 8. Endpoints
 
 | Método | Ruta | Quién | Para qué |
 |---|---|---|---|
@@ -110,6 +180,9 @@ Cada sugerencia trae su **motivo** escrito. Nunca se sugiere sin explicar.
 | GET | `/glosas-adres/factura/{numero}/respuesta` | cualquiera | el texto consolidado |
 | POST | `/glosas-adres/glosa/{id}` | cualquiera | guarda la decisión del gestor |
 | POST | `/glosas-adres/aplicar-sugerencias` | cualquiera | aplica las sugerencias en bloque |
+| GET | `/glosas-adres/centros-costos` | cualquiera | el catálogo oficial, para el desplegable |
+| GET | `/glosas-adres/por-asignar` | cualquiera | glosas 4506 esperando reparto |
+| POST | `/glosas-adres/glosa/{id}/area` | **super admin** | reparte la glosa entre gestores y médicas |
 
 `aplicar-sugerencias` acepta `factura` para limitarlo a una sola, y
 `solo_confianza: "APRENDIDA"` para aplicar únicamente lo que salió del
@@ -117,19 +190,21 @@ criterio del propio equipo (lo más conservador).
 
 ---
 
-## 6. Tablas
+## 9. Tablas
 
 Tres tablas nuevas, se crean solas al arrancar:
 
-- `paquetes_adres` — un renglón por cargue (archivo, quién, cuándo, totales).
+- `paquetes_adres` — un renglón por cargue (archivo, quién, cuándo, totales) y
+  el catálogo de centros de costos que traía esa macro.
 - `glosas_adres` — un renglón por glosa del reporte. Acá viven la
-  clasificación, el centro de costos, la sugerencia con su motivo y la
-  decisión del gestor.
+  clasificación, el centro de costos (y quién lo puso), la sugerencia con su
+  motivo, el reparto de área (`requiere_asignacion`, `area_sugerida`,
+  `area_asignada_por`) y la decisión del gestor.
 - `items_detallado_adres` — el detallado cruzado, renglón por renglón.
 
 ---
 
-## 7. Relación con los bots de `tools/`
+## 10. Relación con los bots de `tools/`
 
 El módulo web y los bots de línea de comandos comparten **las mismas reglas**:
 el servicio importa las funciones de `tools/preauditar_glosas_adres.py`, no

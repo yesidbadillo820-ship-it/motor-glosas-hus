@@ -18510,6 +18510,16 @@ function gaPintar(d){
        '<div class="kpi"><div class="kpi-lbl">Sigue glosado</div><div class="kpi-num">'+fmtCOP(r.sigue_glosado_detallado)+'</div><div class="kpi-sub">en el detallado</div></div>'+
        '</div>';
 
+  if(d.aviso_detallado){
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.10);font-size:.8rem">'+
+         '<b>Sin detallado.</b> '+escHtml(d.aviso_detallado)+'</div>';
+  }
+  if(r.por_asignar){
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
+         '<b>'+r.por_asignar+' glosa(s) por repartir.</b> Esta causal la trabajan dos áreas: los gestores por FACTURACION y las médicas por PERTINENCIA. '+
+         'Solo un super admin puede asignarla.</div>';
+  }
+
   if((d.por_clasificacion||[]).length){
     h += '<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin:1rem 0">';
     d.por_clasificacion.forEach(function(c){
@@ -18532,8 +18542,8 @@ function gaPintar(d){
          '<td style="padding:.45rem;white-space:nowrap"><b>'+escHtml(g.causal_codigo||'—')+'</b><div style="color:var(--text3);max-width:230px">'+escHtml((g.causal_texto||'').slice(0,70))+'</div></td>'+
          '<td style="max-width:250px"><b>'+escHtml(g.codigo||'')+'</b><div style="color:var(--text3)">'+escHtml((g.descripcion||'').slice(0,70))+'</div></td>'+
          '<td style="text-align:right;white-space:nowrap">'+fmtCOP(g.valor_glosado)+'</td>'+
-         '<td>'+escHtml(g.clasificacion||'—')+'</td>'+
-         '<td style="max-width:150px">'+escHtml(g.centro_costos||'—')+'</td>'+
+         '<td style="max-width:170px">'+gaCeldaArea(g)+'</td>'+
+         '<td style="max-width:210px">'+gaCeldaCentro(g, d.catalogo_centros||[])+'</td>'+
          '<td style="max-width:210px;color:'+color+'"><b>'+escHtml(g.sugerencia||'—')+'</b>'+
              (g.confianza?' <span style="font-size:.66rem;opacity:.75">['+escHtml(g.confianza)+']</span>':'')+
              '<div style="color:var(--text3);font-size:.7rem">'+escHtml((g.motivo||'').slice(0,90))+'</div></td>'+
@@ -18565,6 +18575,69 @@ function gaPintar(d){
     h += '</tbody></table></div></div>';
   }
   document.getElementById('ga-resultado').innerHTML = h;
+}
+
+// La causal 4506 la trabajan dos areas: los gestores por FACTURACION y las
+// medicas por PERTINENCIA. Quien la toma depende del procedimiento y de lo
+// glosado, asi que la reparte un super admin. El bot solo sugiere, con motivo.
+function gaCeldaArea(g){
+  if(!g.requiere_asignacion) return escHtml(g.clasificacion||'—');
+  var opciones = (g.areas_posibles||[]).map(function(a){
+    return '<option value="'+escHtml(a)+'"'+(g.area_sugerida===a?' selected':'')+'>'+escHtml(a)+'</option>';
+  }).join('');
+  var puedo = (window.USER_ROL === 'SUPER_ADMIN');
+  var h = '<span style="font-size:.66rem;padding:.15rem .4rem;border-radius:999px;background:rgba(124,58,237,.15);color:#7c3aed;font-weight:700">POR ASIGNAR</span>';
+  if(puedo){
+    h += '<select onchange="gaAsignarArea('+g.id+',this.value)" style="margin-top:.25rem;width:100%;font-size:.72rem;padding:.2rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">'+
+         '<option value="">— escoja el área —</option>'+opciones+'</select>';
+  }else{
+    h += '<div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">sugerido: <b>'+escHtml(g.area_sugerida||'—')+'</b> · lo asigna un super admin</div>';
+  }
+  if(g.motivo_area) h += '<div style="font-size:.66rem;color:var(--text3);margin-top:.2rem">'+escHtml(g.motivo_area)+'</div>';
+  return h;
+}
+
+// El centro de costos sale del catalogo oficial del hospital (el mismo boton
+// que tiene la macro), no se escribe a mano para que no queden variantes.
+function gaCeldaCentro(g, catalogo){
+  var actual = g.centro_costos || '';
+  var opciones = '<option value="">— sin asignar —</option>';
+  var esta = false;
+  catalogo.forEach(function(c){
+    if(c === actual) esta = true;
+    opciones += '<option value="'+escHtml(c)+'"'+(c===actual?' selected':'')+'>'+escHtml(c)+'</option>';
+  });
+  if(actual && !esta){
+    opciones += '<option value="'+escHtml(actual)+'" selected>'+escHtml(actual)+' (fuera del catálogo)</option>';
+  }
+  return '<select onchange="gaCentro('+g.id+',this.value)" style="width:100%;font-size:.72rem;padding:.2rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)'+
+         (actual?'':';border-color:#f59e0b')+'">'+opciones+'</select>';
+}
+
+async function gaAsignarArea(id, area){
+  if(!area) return;
+  try{
+    var r = await fetch('/glosas-adres/glosa/'+id+'/area', {method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({area: area})});
+    if(!r.ok){
+      var e = await r.json().catch(function(){ return {}; });
+      toast('No se pudo asignar', e.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast('Área asignada', 'Esta glosa la trabaja '+area, 'success');
+    gaBuscar();
+  }catch(e){ toast('No se pudo asignar', e.message, 'error'); }
+}
+
+async function gaCentro(id, valor){
+  try{
+    var r = await fetch('/glosas-adres/glosa/'+id, {method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({centro_costos: valor})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    toast('Guardado', valor ? ('Centro de costos: '+valor) : 'Centro de costos borrado', 'success');
+  }catch(e){ toast('No se pudo guardar', e.message, 'error'); }
 }
 
 async function gaDecidir(id, valor){

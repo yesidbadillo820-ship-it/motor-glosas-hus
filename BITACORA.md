@@ -214,6 +214,30 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   bloque tampoco pisa lo que un gestor escribió a mano.
   La pertinencia médica **sigue sin sugerencia**: la firma un médico auditor.
   Guía para el equipo en `docs/GLOSAS_ADRES_WEB.md`.
+- **04-08 (tarde):** se cerraron los tres pendientes que había dejado abiertos
+  el módulo web, con lo que explicó el auditor:
+  - **La causal 4506 no estaba mal clasificada.** La trabajan **dos áreas**:
+    los gestores por FACTURACION y las médicas por PERTINENCIA, y esta última
+    cuando lo glosado es material de osteosíntesis o insumos de alto costo.
+    Ahora el sistema **no la clasifica solo**: la marca `POR ASIGNAR` y **solo
+    un SUPER ADMIN** la reparte desde la pantalla. El bot propone el área con
+    su motivo escrito; se midió contra las 255 filas de 4506 que el equipo
+    clasificó a mano y **coincide en 249 (97,6 %)**. Al asignar el área se
+    recalcula la sugerencia: si queda en PERTINENCIA, el bot se calla.
+  - **Los centros de costos ya no se adivinan.** La macro tenía el catálogo
+    oficial en una **hoja oculta** (el botón que usa el equipo): **45 centros
+    con su código** (`733001-QUIROFANOS`, `510406-DIREC SUBGCIA DE ALTO
+    COSTO`, …). Se metió al bot y a la pantalla como **desplegable**, para que
+    no queden variantes escritas a mano. Los 4.248 propuestos ahora salen en
+    la forma oficial `código-NOMBRE`. Si el hospital cambia el plan de
+    cuentas, manda el catálogo de la macro que se cargue.
+  - **Las 4 facturas sin detallado** (311371, 367368, 380246, 394817): se
+    revisaron **los siete lotes archivo por archivo** y no están en ninguno —
+    el detallado nunca se exportó, no es un fallo del bot. La pantalla ahora
+    **avisa por qué** y **trae igual todo lo del reporte del ADRES** (150, 1,
+    2 y 12 glosas respectivamente, $43.518.600 en total). Si aparece el
+    detallado, basta recargar la bitácora.
+  200 tests pasando.
 
 ---
 
@@ -309,11 +333,16 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
    cargar el paquete 31068 (reporte + macro + `BITACORA_31068.csv`) y que el
    gestor pruebe con 5 facturas antes de soltarlo a todo el equipo.
    Guía: `docs/GLOSAS_ADRES_WEB.md`.
-9. **Unificar el criterio de la causal 4506** (hoy 231 FACTURACION vs 24
-   PERTINENCIA). Mientras esté dividida, el bot no sugiere nada para ella.
+9. **Repartir las 255 glosas de causal 4506** desde la pantalla (lo hace un
+   super admin). El bot ya propone: 229 para los gestores y 26 para las
+   médicas, cada una con su motivo. Solo hay que confirmar o corregir.
 10. **Completar los 371 renglones sin centro de costos**: son los que el nombre
-    del servicio no alcanza a identificar. Se pueden llenar desde la misma
-    pantalla y el sistema los recuerda para el siguiente paquete.
+    del servicio no alcanza a identificar. Se escogen del desplegable oficial
+    (45 centros) y el sistema los recuerda para el siguiente paquete.
+11. **Preguntar a facturación por las 4 facturas sin detallado** (311371,
+    367368, 380246, 394817 — $43.518.600 glosados): no vinieron en ninguno de
+    los siete lotes. Hay que pedir esa impresión y volver a correr el
+    ajustador.
 
 ---
 

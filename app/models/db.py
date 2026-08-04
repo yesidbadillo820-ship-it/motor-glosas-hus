@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Index
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -979,6 +989,9 @@ class PaqueteAdresRecord(Base):
     total_facturas = Column(Integer, default=0)
     valor_glosado = Column(Float, default=0.0)
     nota = Column(Text)
+    # Catálogo de centros de costos del hospital (JSON). Sale de la hoja oculta
+    # de la macro; si no mandan macro, se guarda el catálogo que trae el bot.
+    catalogo_centros = Column(Text)
 
 
 class GlosaAdresRecord(Base):
@@ -1014,12 +1027,23 @@ class GlosaAdresRecord(Base):
     # Lo que dedujo el bot
     clasificacion = Column(String(60), index=True)
     centro_costos = Column(String(80))
+    # Quién puso el centro de costos a mano (vacío = lo propuso el bot). Sirve
+    # para no volver a pisarlo cuando se recarga el paquete.
+    centro_costos_por = Column(String(200))
     gestor = Column(String(120), index=True)
     medico = Column(String(120))
     sugerencia = Column(String(20))
     confianza = Column(String(20))
     motivo = Column(Text)
     estado_detallado = Column(String(30))
+    # Causales que trabajan dos áreas (hoy la 4506): los gestores por
+    # FACTURACION y las médicas por PERTINENCIA. Quién la toma depende de qué
+    # se glosó, así que la reparte un SUPER ADMIN — el bot solo sugiere.
+    requiere_asignacion = Column(Boolean, default=False, index=True)
+    area_sugerida = Column(String(60))
+    motivo_area = Column(Text)
+    area_asignada_por = Column(String(200))
+    area_asignada_en = Column(DateTime(timezone=True))
     # Lo que decide el gestor
     decision = Column(String(20), index=True)  # SE ACEPTA | SE OBJETA | SE SUBSANA
     observacion_tecnico = Column(Text)

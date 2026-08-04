@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,27 +33,37 @@ if str(_TOOLS) not in sys.path:
 
 from ajustar_detallado_glosas import normalizar_factura  # noqa: E402
 from preauditar_glosas_adres import (  # noqa: E402
+    CATALOGO_CENTROS_COSTOS,
+    CAUSALES_DE_DOS_AREAS,
     DECISIONES,
     TEXTO_EXTEMPORANEA,
     FilaMacro,
     aprender_decisiones,
     armar_texto_respuesta,
     centro_de_costos,
+    centro_oficial,
     clasificar,
     codigo_numerico,
     leer_macro,
     leer_reporte,
+    necesita_asignacion,
     preauditar,
+    reparto_de_area,
     sugerir,
     trabajo_ya_hecho,
 )
 
 __all__ = [
+    "CATALOGO_CENTROS_COSTOS",
+    "CAUSALES_DE_DOS_AREAS",
     "DECISIONES",
     "TEXTO_EXTEMPORANEA",
     "aprender_decisiones",
     "armar_texto_respuesta",
+    "asignar_area",
+    "catalogo_centros",
     "centro_de_costos",
+    "centro_oficial",
     "clasificar",
     "codigo_numerico",
     "consultar_factura",
@@ -100,10 +111,12 @@ def importar_reporte(
     tabla_clasificacion = None
     reparto: dict[str, tuple[str, str]] = {}
     hecho: dict[tuple, list[dict]] = {}
+    catalogo: list[str] = list(CATALOGO_CENTROS_COSTOS)
     if macro:
-        aprendida_clasif, reparto, _centros, filas_macro = _leer_temporal(
-            macro, ".xlsm", leer_macro
-        )
+        aprendida_clasif, reparto, centros, filas_macro = _leer_temporal(macro, ".xlsm", leer_macro)
+        # El catálogo de la macro manda: puede haber cambiado el plan de cuentas.
+        if centros:
+            catalogo = centros
         tabla_clasificacion = aprendida_clasif or None
         hecho = trabajo_ya_hecho(filas_macro)
         de_la_macro = aprender_decisiones(filas_macro)
@@ -127,6 +140,7 @@ def importar_reporte(
         total_filas=len(resumen.filas),
         total_facturas=resumen.facturas,
         valor_glosado=sum(f.valor_glosado for f in resumen.filas),
+        catalogo_centros=json.dumps(catalogo, ensure_ascii=False),
     )
     db.add(registro)
     db.flush()
@@ -155,7 +169,7 @@ def importar_reporte(
             valor_aprobado=f.valor_aprobado,
             valor_glosado=f.valor_glosado,
             clasificacion=f.clasificacion,
-            centro_costos=f.centro_costos,
+            centro_costos=centro_oficial(f.centro_costos, catalogo),
             gestor=f.gestor,
             medico=f.medico,
             sugerencia=f.sugerencia,
@@ -166,6 +180,13 @@ def importar_reporte(
             cantidad_aceptada=f.cantidad_aceptada or None,
             valor_aceptado=f.valor_aceptado or 0,
         )
+        # Causales que trabajan dos áreas (la 4506): el bot no las clasifica
+        # solo, las marca para que un SUPER ADMIN las reparta.
+        if necesita_asignacion(f.codigo_numerico):
+            area, motivo_area = reparto_de_area(f.codigo_numerico, f.tipo_elemento, f.descripcion)
+            fila.requiere_asignacion = True
+            fila.area_sugerida = area
+            fila.motivo_area = motivo_area
         if fila.decision:
             fila.decidido_por = "(venía en la macro)"
             rescatadas += 1
@@ -176,16 +197,27 @@ def importar_reporte(
             n = consumidas.get(clave, 0)
             consumidas[clave] = n + 1
             previa = previas[n] if n < len(previas) else previas[-1]
-            fila.decision = previa["decision"]
-            fila.observacion_tecnico = previa["observacion_tecnico"]
-            fila.cantidad_aceptada = previa["cantidad_aceptada"]
-            fila.valor_aceptado = previa["valor_aceptado"]
-            fila.decidido_por = previa["decidido_por"]
-            fila.decidido_en = previa["decidido_en"]
+            if previa["decision"]:
+                fila.decision = previa["decision"]
+                fila.observacion_tecnico = previa["observacion_tecnico"]
+                fila.cantidad_aceptada = previa["cantidad_aceptada"]
+                fila.valor_aceptado = previa["valor_aceptado"]
+                fila.decidido_por = previa["decidido_por"]
+                fila.decidido_en = previa["decidido_en"]
             if previa["gestor"]:
                 fila.gestor = previa["gestor"]
             if previa["medico"]:
                 fila.medico = previa["medico"]
+            # El área que repartió el super admin queda firme.
+            if previa["area_asignada_por"]:
+                fila.clasificacion = previa["clasificacion"]
+                fila.area_asignada_por = previa["area_asignada_por"]
+                fila.area_asignada_en = previa["area_asignada_en"]
+                fila.requiere_asignacion = False
+            # El centro de costos escrito a mano también.
+            if previa["centro_costos_por"]:
+                fila.centro_costos = previa["centro_costos"]
+                fila.centro_costos_por = previa["centro_costos_por"]
             rescatadas += 1
         db.add(fila)
 
@@ -226,10 +258,17 @@ def _decisiones_previas(db: Session, numero_paquete: str) -> dict[tuple, list[di
     if not ids:
         return {}
     salida: dict[tuple, list[dict]] = {}
+    # Se rescata todo lo que tenga trabajo humano encima: la decisión del
+    # gestor, el área que repartió el super admin o el centro de costos que
+    # alguien corrigió a mano. Nada de eso se puede perder al recargar.
     filas = (
         db.query(GlosaAdresRecord)
         .filter(GlosaAdresRecord.paquete_id.in_(ids))
-        .filter(GlosaAdresRecord.decision.isnot(None))
+        .filter(
+            GlosaAdresRecord.decision.isnot(None)
+            | GlosaAdresRecord.area_asignada_por.isnot(None)
+            | GlosaAdresRecord.centro_costos_por.isnot(None)
+        )
         .all()
     )
     for f in filas:
@@ -245,6 +284,11 @@ def _decisiones_previas(db: Session, numero_paquete: str) -> dict[tuple, list[di
                 "gestor": f.gestor,
                 "medico": f.medico,
                 "causal": f.causal_codigo,
+                "clasificacion": f.clasificacion,
+                "area_asignada_por": f.area_asignada_por,
+                "area_asignada_en": f.area_asignada_en,
+                "centro_costos": f.centro_costos,
+                "centro_costos_por": f.centro_costos_por,
             }
         )
     return salida
@@ -380,7 +424,21 @@ def consultar_factura(db: Session, numero: str, *, paquete_id: int | None = None
             "valor_reclamado": sum(g.valor_reclamado for g in glosas),
             "items_detallado": len(items),
             "sigue_glosado_detallado": sigue_glosado,
+            "por_asignar": sum(1 for g in glosas if g.requiere_asignacion),
+            "sin_centro_costos": sum(1 for g in glosas if not (g.centro_costos or "").strip()),
         },
+        # Si no hay detallado, se dice por qué y se sigue mostrando todo lo que
+        # sí se tiene del reporte del ADRES. No se deja al gestor sin nada.
+        "aviso_detallado": (
+            ""
+            if items
+            else (
+                "Esta factura no tiene detallado cargado. Puede ser que no viniera en los "
+                "lotes que se importaron, o que aún no se haya subido la bitácora del "
+                "ajustador de detallados. Abajo está todo lo que sí trae el reporte del ADRES."
+            )
+        ),
+        "catalogo_centros": catalogo_centros(db, primera.paquete_id),
         "glosas": [glosa_dict(g) for g in glosas],
         "items": [_item_dict(i) for i in items],
         "por_clasificacion": _agrupar(glosas),
@@ -402,6 +460,12 @@ def glosa_dict(g: GlosaAdresRecord) -> dict:
         "valor_glosado": g.valor_glosado,
         "clasificacion": g.clasificacion,
         "centro_costos": g.centro_costos,
+        "centro_costos_por": g.centro_costos_por,
+        "requiere_asignacion": bool(g.requiere_asignacion),
+        "area_sugerida": g.area_sugerida,
+        "motivo_area": g.motivo_area,
+        "areas_posibles": list(CAUSALES_DE_DOS_AREAS.get(g.causal_codigo or "", ())),
+        "area_asignada_por": g.area_asignada_por,
         "gestor": g.gestor,
         "medico": g.medico,
         "sugerencia": g.sugerencia,
@@ -509,7 +573,77 @@ def guardar_decision(
     if valor_aceptado is not None:
         glosa.valor_aceptado = valor_aceptado
     if centro_costos is not None:
-        glosa.centro_costos = centro_costos
+        glosa.centro_costos = centro_oficial(centro_costos, catalogo_centros(db, glosa.paquete_id))
+        glosa.centro_costos_por = usuario
+    if medico is not None:
+        glosa.medico = medico
+    db.commit()
+    db.refresh(glosa)
+    return glosa
+
+
+# ─── Reparto de las causales que trabajan dos áreas (la 4506) ────────────────
+
+
+def catalogo_centros(db: Session, paquete_id: int | None = None) -> list[str]:
+    """El catálogo oficial de centros de costos, para el desplegable."""
+    if paquete_id:
+        paquete = db.get(PaqueteAdresRecord, paquete_id)
+        if paquete and paquete.catalogo_centros:
+            try:
+                guardado = json.loads(paquete.catalogo_centros)
+                if guardado:
+                    return list(guardado)
+            except (TypeError, ValueError):
+                logger.warning("Catálogo de centros ilegible en el paquete %s", paquete_id)
+    return list(CATALOGO_CENTROS_COSTOS)
+
+
+def pendientes_de_asignar(
+    db: Session, *, paquete_id: int | None = None, limite: int = 500
+) -> list[dict]:
+    """Las glosas que esperan a que un super admin les reparta el área."""
+    q = db.query(GlosaAdresRecord).filter(GlosaAdresRecord.requiere_asignacion.is_(True))
+    if paquete_id:
+        q = q.filter(GlosaAdresRecord.paquete_id == paquete_id)
+    return [glosa_dict(g) for g in q.order_by(GlosaAdresRecord.id).limit(limite).all()]
+
+
+def asignar_area(
+    db: Session,
+    glosa_id: int,
+    *,
+    area: str,
+    usuario: str = "",
+    centro_costos: str | None = None,
+    medico: str | None = None,
+) -> GlosaAdresRecord:
+    """Un SUPER ADMIN decide qué área trabaja esta glosa.
+
+    Hoy aplica a la causal 4506: la misma causal la ven los gestores por
+    FACTURACION y las médicas por PERTINENCIA, y quién la toma depende del
+    procedimiento y de lo que se glosó.
+    """
+    glosa = db.get(GlosaAdresRecord, glosa_id)
+    if glosa is None:
+        raise LookupError(f"No existe la glosa {glosa_id}")
+    opciones = CAUSALES_DE_DOS_AREAS.get(glosa.causal_codigo or "")
+    if not opciones:
+        raise ValueError(
+            f"La causal {glosa.causal_codigo or '(sin causal)'} no se reparte entre áreas."
+        )
+    limpia = (area or "").strip().upper()
+    if limpia not in opciones:
+        raise ValueError(f"Área no válida: {area!r}. Use una de {list(opciones)}.")
+    glosa.clasificacion = limpia
+    glosa.requiere_asignacion = False
+    glosa.area_asignada_por = usuario
+    glosa.area_asignada_en = datetime.now(UTC)
+    # Al cambiar de área cambia lo que se propone: se recalcula la sugerencia.
+    glosa.sugerencia, glosa.confianza, glosa.motivo = sugerir(limpia, glosa.causal_codigo or "")
+    if centro_costos is not None:
+        glosa.centro_costos = centro_oficial(centro_costos, catalogo_centros(db, glosa.paquete_id))
+        glosa.centro_costos_por = usuario
     if medico is not None:
         glosa.medico = medico
     db.commit()
