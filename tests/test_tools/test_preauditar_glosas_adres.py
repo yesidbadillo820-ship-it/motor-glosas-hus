@@ -7,6 +7,7 @@ no le pise al equipo nada de lo que ya escribió.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -181,10 +182,40 @@ class TestReglas:
         assert pa.clasificar("3106", {"3106": "OTRA COSA"}) == "OTRA COSA"
 
     def test_centro_de_costos(self):
-        assert pa.centro_de_costos("Procedimientos", "Cuadro hemático") == "LABORATORIO CLINICO"
-        assert pa.centro_de_costos("Procedimientos", "Brazo, pierna, rodilla") == "RADIOLOGIA"
-        assert pa.centro_de_costos("Medicamentos", "OMEPRAZOL") == "SERVICIO FARMACEUTICO"
-        assert pa.centro_de_costos("Procedimientos", "Derechos de sala de cirugía") == "QUIROFANOS"
+        # Sale siempre en la forma oficial del catálogo del hospital.
+        assert (
+            pa.centro_de_costos("Procedimientos", "Cuadro hemático") == "734001-LABORATORIO CLINICO"
+        )
+        assert (
+            pa.centro_de_costos("Procedimientos", "Brazo, pierna, rodilla") == "734101-RADIOLOGIA"
+        )
+        assert pa.centro_de_costos("Medicamentos", "OMEPRAZOL") == "580501-SERVICIO FARMACEUTICO"
+        assert (
+            pa.centro_de_costos("Procedimientos", "Derechos de sala de cirugía")
+            == "733001-QUIROFANOS"
+        )
+
+    def test_el_catalogo_es_el_oficial_del_hospital(self):
+        """Los 45 centros de la hoja oculta de la macro, con su código."""
+        assert len(pa.CATALOGO_CENTROS_COSTOS) == 45
+        assert all(re.match(r"^\d{6}-", c) for c in pa.CATALOGO_CENTROS_COSTOS)
+        assert "510406-DIREC SUBGCIA DE ALTO COSTO" in pa.CATALOGO_CENTROS_COSTOS
+        assert "733001-QUIROFANOS" in pa.CATALOGO_CENTROS_COSTOS
+
+    def test_centro_oficial_normaliza_lo_que_le_manden(self):
+        # Nombre solo → forma oficial.
+        assert pa.centro_oficial("QUIROFANOS") == "733001-QUIROFANOS"
+        # Ya oficial → se queda igual.
+        assert pa.centro_oficial("733001-QUIROFANOS") == "733001-QUIROFANOS"
+        # Vacío → vacío, no inventa.
+        assert pa.centro_oficial("") == ""
+        # Algo que no está en el catálogo se respeta: es lo que alguien escribió.
+        assert pa.centro_oficial("AREA NUEVA SIN CODIGO") == "AREA NUEVA SIN CODIGO"
+
+    def test_centro_oficial_acepta_un_catalogo_distinto(self):
+        """Si el hospital cambia el plan de cuentas, manda el de la macro."""
+        otro = ["999999-QUIROFANOS"]
+        assert pa.centro_oficial("QUIROFANOS", otro) == "999999-QUIROFANOS"
 
     def test_no_inventa_centro_cuando_no_se_puede_saber(self):
         """La habitación no dice de qué especialidad es."""
@@ -205,6 +236,72 @@ class TestReglas:
         decision, confianza, motivo = pa.sugerir("SOPORTES", "3106", {"3106": ("SE OBJETA", 9, 10)})
         assert (decision, confianza) == ("SE OBJETA", "APRENDIDA")
         assert "9 de 10" in motivo
+
+
+class TestCausalesDeDosAreas:
+    """La 4506 la trabajan dos áreas: gestores (facturación) y médicas (pertinencia).
+
+    No es un error de criterio del equipo: quién la toma depende de QUÉ se
+    glosó. El material de osteosíntesis y el de alto costo lo revisa el médico
+    auditor; lo demás, el gestor. El bot solo sugiere — reparte un super admin.
+    """
+
+    def test_la_4506_se_marca_para_repartir(self):
+        assert pa.necesita_asignacion("4506")
+        assert pa.CAUSALES_DE_DOS_AREAS["4506"] == ("FACTURACION", "PERTINENCIA")
+
+    def test_las_demas_causales_no_se_reparten(self):
+        assert not pa.necesita_asignacion("3106")
+        assert not pa.necesita_asignacion("")
+        assert pa.reparto_de_area("3106", "Medicamentos", "OMEPRAZOL") == ("", "")
+
+    def test_osteosintesis_va_a_las_medicas(self):
+        area, motivo = pa.reparto_de_area(
+            "4506", "Material de Osteosintesis", "TORNILLO CORTICAL 3.5MM"
+        )
+        assert area == "PERTINENCIA"
+        assert "osteosíntesis" in motivo or "alto costo" in motivo
+
+    def test_alto_costo_por_la_descripcion_tambien_va_a_las_medicas(self):
+        for desc in (
+            "PROTESIS TOTAL DE CADERA",
+            "STENT CORONARIO LIBERADOR",
+            "APOSITO DE HIDROFIBRA CON PLATA EXTRA 15 X15 CM -AQUACEL AG",
+            "HEMOSTATICO DE CELULOSA OXIDADA REGENERADA 7.1CMX10CM",
+            "FRESA FINA DIAMANTADA 5.0MM REF 5820-010-250",
+            "CUCHILLA PARA CORTE DE HUESO ADULTA 8 CM",
+            "PERFORADOR CRANEAL 14/11 MM",
+            "Materiales de sutura y curación GRUPOS 04 - 05 - 06",
+        ):
+            assert pa.reparto_de_area("4506", "Dispositivos Médicos", desc)[0] == "PERTINENCIA", (
+                desc
+            )
+
+    def test_lo_corriente_va_a_los_gestores(self):
+        area, motivo = pa.reparto_de_area("4506", "Insumo", "GASA ESTERIL 10X10")
+        assert area == "FACTURACION"
+        assert "gestor" in motivo
+
+    def test_no_confunde_lo_corriente_con_lo_de_alto_costo(self):
+        """El apósito de gasa no es curación avanzada, ni el bisturí instrumental."""
+        for desc in (
+            "APOSITO DE GAS 45CMX90CM PARA ESPALDA X 3",
+            "APOSITO ADHESIVO DE POLIURETANO TRANSPARENTE ESTERIL",
+            "APOSITO TRANSPARENTE PARA CVC ADULTOS",
+            "CUCHILLA BISTURI NO. 15 EN ACERO AL CARBONO",
+            "AGUJA DESECHABLE NO. 18 X 1 PULGADA",
+        ):
+            assert pa.reparto_de_area("4506", "Dispositivos Médicos", desc)[0] == "FACTURACION", (
+                desc
+            )
+
+    def test_siempre_da_un_motivo_escrito(self):
+        for tipo, desc in (
+            ("Material de Osteosintesis", "PLACA DE TITANIO"),
+            ("Insumo", "JERINGA 10ML"),
+        ):
+            _, motivo = pa.reparto_de_area("4506", tipo, desc)
+            assert motivo, "nunca se sugiere un área sin explicar por qué"
 
 
 class TestTextoDeRespuesta:
@@ -312,7 +409,7 @@ class TestPreauditar:
         assert por_codigo["2016DM-315"].codigo_numerico == "3106"
         assert por_codigo["2016DM-315"].clasificacion == "SOPORTES"
         assert por_codigo["29117"].clasificacion == pa.CLASIFICACION_SIN_CAUSAL
-        assert por_codigo["19942122-09"].centro_costos == "SERVICIO FARMACEUTICO"
+        assert por_codigo["19942122-09"].centro_costos == "580501-SERVICIO FARMACEUTICO"
         assert resumen.facturas == 2
 
     def test_no_toca_la_decision_por_defecto(self, reporte):

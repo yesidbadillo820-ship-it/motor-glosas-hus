@@ -23,7 +23,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.models.db import ROL_COORDINADOR, UsuarioRecord
+from app.models.db import ROL_COORDINADOR, ROL_SUPER_ADMIN, UsuarioRecord
 
 openpyxl = pytest.importorskip("openpyxl")
 
@@ -72,6 +72,28 @@ FILAS = [
         31800,
         "3106- Soporte de material  ausente o incompleto",
     ),
+    # Causal 4506: la trabajan dos áreas. Ésta es corriente → gestores.
+    (
+        "HUS352890",
+        "Insumo",
+        "INS-100",
+        "GASA ESTERIL 10X10",
+        5000,
+        "4506- El material hace parte de otro servicio",
+    ),
+    # Ésta es material de osteosíntesis → médicas.
+    (
+        "HUS352890",
+        "Material de Osteosintesis",
+        "OST-200",
+        "TORNILLO CORTICAL 3.5MM",
+        450000,
+        "4506- El material hace parte de otro servicio",
+    ),
+    # Sin causal: es el desglose de una GLOSA TOTAL. No se responde ítem por
+    # ítem, así que la pantalla no lo muestra.
+    ("HUS352890", "Procedimientos", "TOT-1", "Terapia respiratoria: sesión", 12000, ""),
+    ("HUS311371", "Medicamentos", "TOT-2", "DIPIRONA 1 G", 3400, ""),
 ]
 
 
@@ -153,6 +175,13 @@ def gestor():
 
 
 @pytest.fixture()
+def admin():
+    return UsuarioRecord(
+        id=3, email="admin@hus.gov.co", rol=ROL_SUPER_ADMIN, activo=1, nombre="Super Admin"
+    )
+
+
+@pytest.fixture()
 def client(db_session, coordinador):
     """Cliente autenticado como coordinador (puede cargar y decidir)."""
     from app.api.deps import get_coordinador_o_admin, get_usuario_actual
@@ -186,9 +215,13 @@ class TestCargue:
         d = r.json()
         assert d["ok"] is True
         assert d["numero_paquete"] == "31068"
-        assert d["filas"] == 3
+        # Las 7 filas se guardan (incluidas las 2 de glosa total): la pantalla
+        # las oculta, pero el paquete conserva el reporte completo.
+        assert d["filas"] == 7
         assert d["facturas"] == 2
-        assert d["valor_glosado"] == pytest.approx(37600 + 85800 + 31800)
+        assert d["valor_glosado"] == pytest.approx(
+            37600 + 85800 + 31800 + 5000 + 450000 + 12000 + 3400
+        )
 
     def test_archivo_vacio_da_400(self, client):
         r = client.post("/glosas-adres/importar", files={"archivo": ("vacio.xlsx", b"")})
@@ -242,9 +275,9 @@ class TestConsulta:
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["encontrada"] is True
-        assert d["resumen"]["glosas"] == 2
-        assert d["resumen"]["pendientes"] == 2
-        assert d["resumen"]["valor_glosado"] == pytest.approx(37600 + 85800)
+        assert d["resumen"]["glosas"] == 4
+        assert d["resumen"]["pendientes"] == 4
+        assert d["resumen"]["valor_glosado"] == pytest.approx(37600 + 85800 + 5000 + 450000)
 
     def test_el_bot_clasifica_y_sugiere_con_su_motivo(self, client, paquete):
         d = client.get("/glosas-adres/factura/HUS0000352890").json()
@@ -292,14 +325,16 @@ class TestDecision:
             json={
                 "decision": "SE SUBSANA",
                 "observacion_tecnico": "SE ANEXA SOPORTE DE ENTREGA.",
-                "centro_costos": "SERVICIO FARMACEUTICO",
+                "centro_costos": "SERVICIO FARMACEUTICO",  # sin código: se normaliza
             },
         )
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["decision"] == "SE SUBSANA"
         assert d["observacion_tecnico"] == "SE ANEXA SOPORTE DE ENTREGA."
-        assert d["centro_costos"] == "SERVICIO FARMACEUTICO"
+        # Se guarda en la forma oficial del catálogo, aunque lo manden sin código.
+        assert d["centro_costos"] == "580501-SERVICIO FARMACEUTICO"
+        assert d["centro_costos_por"] == "coordinador@hus.gov.co"
         assert d["decidido_por"] == "coordinador@hus.gov.co"
 
     def test_glosa_inexistente_da_404(self, client, paquete):
@@ -334,10 +369,287 @@ class TestDecision:
             "/glosas-adres/aplicar-sugerencias",
             json={"paquete_id": paquete, "factura": "HUS0000352890"},
         )
-        assert r.json()["aplicadas"] == 1  # solo la de SOPORTES de esa factura
+        # Solo las de esa factura que traen sugerencia: la de SOPORTES y la de
+        # glosa total (que se subsana corrigiendo el FURIPS).
+        assert r.json()["aplicadas"] == 2
 
         otra = client.get("/glosas-adres/factura/HUS0000311371").json()
         assert not otra["glosas"][0]["decision"]
+
+
+class TestGlosasTotales:
+    """Las filas sin causal son el desglose de una reclamación glosada entera.
+
+    El ADRES glosó todo por el FURIPS; esas líneas no traen causal propia y no
+    se responden una por una, así que la pantalla no las muestra. Pero se
+    cuentan y se dicen: nada desaparece en silencio.
+    """
+
+    def test_no_se_muestran_pero_se_cuentan(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["resumen"]["glosas"] == 4  # las 4 con causal
+        assert d["resumen"]["glosas_totales_ocultas"] == 1
+        assert d["resumen"]["valor_glosas_totales"] == pytest.approx(12000)
+        assert "GLOSA TOTAL" in d["aviso_glosas_totales"]
+        assert all(not g["glosa_total"] for g in d["glosas"])
+
+    def test_el_valor_glosado_del_resumen_no_incluye_las_totales(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["resumen"]["valor_glosado"] == pytest.approx(37600 + 85800 + 5000 + 450000)
+
+    def test_todas_las_visibles_traen_la_descripcion_de_la_glosa(self, client, paquete):
+        """Lo que faltaba: la descripción no salía porque esas filas venían vacías."""
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert all((g["causal_texto"] or "").strip() for g in d["glosas"])
+
+    def test_se_pueden_ver_si_el_auditor_las_pide(self, client, paquete):
+        d = client.get(
+            "/glosas-adres/factura/HUS0000352890", params={"incluir_totales": "true"}
+        ).json()
+        assert d["resumen"]["glosas"] == 5
+        assert any(g["glosa_total"] for g in d["glosas"])
+
+
+class TestListaDeFacturas:
+    """Al cargar el archivo del ADRES salen de una vez las facturas a auditar."""
+
+    def test_lista_las_facturas_con_su_avance(self, client, paquete):
+        r = client.get("/glosas-adres/facturas", params={"paquete_id": paquete})
+        assert r.status_code == 200, r.text
+        por_factura = {f["factura"]: f for f in r.json()}
+        assert set(por_factura) == {"HUS352890", "HUS311371"}
+
+        una = por_factura["HUS352890"]
+        assert una["estado"] == "PENDIENTE"
+        assert una["glosas"] == 4  # sin contar la de glosa total
+        assert una["glosas_totales_ocultas"] == 1
+        assert una["pendientes"] == 4
+        assert una["avance"] == 0
+        assert una["por_asignar"] == 2  # las dos de causal 4506
+
+    def test_al_decidir_una_glosa_la_factura_avanza_sola(self, client, paquete):
+        gid = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]["id"]
+        client.post(f"/glosas-adres/glosa/{gid}", json={"decision": "SE SUBSANA"})
+        una = next(
+            f
+            for f in client.get("/glosas-adres/facturas", params={"paquete_id": paquete}).json()
+            if f["factura"] == "HUS352890"
+        )
+        assert una["estado"] == "EN PROCESO"
+        assert una["decididas"] == 1
+        assert una["avance"] == 25
+
+    def test_se_puede_filtrar_por_estado(self, client, paquete):
+        r = client.get(
+            "/glosas-adres/facturas", params={"paquete_id": paquete, "estado": "CERRADA"}
+        )
+        assert r.json() == []
+        r = client.get(
+            "/glosas-adres/facturas", params={"paquete_id": paquete, "estado": "PENDIENTE"}
+        )
+        assert len(r.json()) == 2
+
+    def test_se_puede_buscar_por_numero(self, client, paquete):
+        r = client.get("/glosas-adres/facturas", params={"paquete_id": paquete, "buscar": "35289"})
+        assert [f["factura"] for f in r.json()] == ["HUS352890"]
+
+    def test_sin_paquetes_devuelve_lista_vacia(self, client):
+        assert client.get("/glosas-adres/facturas").json() == []
+
+
+class TestCerrarYReabrir:
+    def test_cerrar_y_volver_a_abrir_deja_constancia(self, client, paquete):
+        r = client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "CERRADA"})
+        assert r.status_code == 200, r.text
+        assert r.json()["estado"] == "CERRADA"
+        assert r.json()["cerrada_por"] == "coordinador@hus.gov.co"
+
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["estado"] == "CERRADA"
+
+        r = client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "EN PROCESO"})
+        assert r.json()["estado"] == "EN PROCESO"
+        assert r.json()["reabierta_por"] == "coordinador@hus.gov.co"
+        assert r.json()["cerrada_por"] == "coordinador@hus.gov.co"  # queda el rastro
+
+    def test_una_factura_cerrada_no_se_reabre_sola_al_editar(self, client, paquete):
+        client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "CERRADA"})
+        gid = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]["id"]
+        client.post(f"/glosas-adres/glosa/{gid}", json={"observacion_tecnico": "otra cosa"})
+        assert client.get("/glosas-adres/factura/HUS0000352890").json()["estado"] == "CERRADA"
+
+    def test_estado_invalido_da_400(self, client, paquete):
+        r = client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "LO QUE SEA"})
+        assert r.status_code == 400
+
+    def test_factura_inexistente_da_404(self, client, paquete):
+        r = client.post("/glosas-adres/factura/HUS0000000009/estado", json={"estado": "CERRADA"})
+        assert r.status_code == 404
+
+    def test_recargar_el_paquete_conserva_el_cierre(self, client, paquete):
+        client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "CERRADA"})
+        r = client.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+        assert r.status_code == 200, r.text
+        assert client.get("/glosas-adres/factura/HUS0000352890").json()["estado"] == "CERRADA"
+
+
+class TestEvidenciaPDF:
+    def test_genera_un_pdf_descargable(self, client, paquete):
+        pytest.importorskip("reportlab")
+        r = client.get("/glosas-adres/factura/HUS0000352890/evidencia.pdf")
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"] == "application/pdf"
+        assert "RTA_ADRES_HUS352890.pdf" in r.headers["content-disposition"]
+        assert r.content.startswith(b"%PDF")
+        assert len(r.content) > 1500
+
+    def test_el_pdf_no_lista_las_glosas_totales(self, client, paquete):
+        pytest.importorskip("reportlab")
+        pdfplumber = pytest.importorskip("pdfplumber")
+        import io as _io
+
+        r = client.get("/glosas-adres/factura/HUS0000352890/evidencia.pdf")
+        with pdfplumber.open(_io.BytesIO(r.content)) as pdf:
+            texto = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        assert "REPORTE RTA ADRES" in texto
+        assert "HUS352890" in texto
+        assert "RTA GLOSA COMPLETA" in texto
+        # El renglón de glosa total no va en la tabla, pero sí se dice al pie.
+        assert "Terapia respiratoria" not in texto
+        assert "GLOSA TOTAL" in texto
+
+    def test_factura_inexistente_da_404(self, client, paquete):
+        assert client.get("/glosas-adres/factura/NO-EXISTE/evidencia.pdf").status_code == 404
+
+
+class TestRepartoDeAreas:
+    """La causal 4506 la trabajan gestores (FACTURACION) y médicas (PERTINENCIA).
+
+    Quién la toma depende de qué se glosó, así que la reparte un SUPER ADMIN.
+    """
+
+    def test_la_4506_llega_marcada_para_repartir(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        cuatro = [g for g in d["glosas"] if g["causal_codigo"] == "4506"]
+        assert len(cuatro) == 2
+        assert all(g["requiere_asignacion"] for g in cuatro)
+        assert d["resumen"]["por_asignar"] == 2
+
+    def test_sugiere_medicas_para_osteosintesis_y_gestores_para_lo_demas(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        por_codigo = {g["codigo"]: g for g in d["glosas"]}
+        assert por_codigo["OST-200"]["area_sugerida"] == "PERTINENCIA"
+        assert por_codigo["INS-100"]["area_sugerida"] == "FACTURACION"
+        # Siempre con el motivo escrito, nunca a secas.
+        assert por_codigo["OST-200"]["motivo_area"]
+        assert por_codigo["INS-100"]["motivo_area"]
+
+    def test_por_asignar_lista_las_pendientes(self, client, paquete):
+        r = client.get("/glosas-adres/por-asignar", params={"paquete_id": paquete})
+        assert r.status_code == 200
+        assert {g["codigo"] for g in r.json()} == {"INS-100", "OST-200"}
+
+    def test_un_gestor_no_puede_repartir(self, db_session, coordinador, gestor):
+        from app.api.deps import get_admin, get_coordinador_o_admin, get_usuario_actual
+        from app.main import app
+
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
+        app.dependency_overrides[get_usuario_actual] = lambda: coordinador
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: coordinador
+        try:
+            c = TestClient(app)
+            c.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+            gid = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["causal_codigo"] == "4506"
+            )
+            # El gestor (AUDITOR) no pasa el filtro de SUPER_ADMIN.
+            app.dependency_overrides[get_usuario_actual] = lambda: gestor
+            app.dependency_overrides.pop(get_admin, None)
+            r = c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"})
+            assert r.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_el_super_admin_reparte_y_se_recalcula_la_sugerencia(self, db_session, admin):
+        from app.api.deps import get_admin, get_coordinador_o_admin, get_usuario_actual
+        from app.main import app
+
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
+        app.dependency_overrides[get_usuario_actual] = lambda: admin
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+        app.dependency_overrides[get_admin] = lambda: admin
+        try:
+            c = TestClient(app)
+            c.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+            gid = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["codigo"] == "OST-200"
+            )
+            r = c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"})
+            assert r.status_code == 200, r.text
+            d = r.json()
+            assert d["clasificacion"] == "PERTINENCIA"
+            assert d["requiere_asignacion"] is False
+            assert d["area_asignada_por"] == "admin@hus.gov.co"
+            # Al pasar a pertinencia, el bot deja de sugerir: la firma un médico.
+            assert not d["sugerencia"]
+            assert "médico" in (d["motivo"] or "")
+
+            # Área inválida y causal que no se reparte, ambas rechazadas.
+            assert c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "X"}).status_code == 400
+            otra = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["causal_codigo"] == "3106"
+            )
+            assert (
+                c.post(f"/glosas-adres/glosa/{otra}/area", json={"area": "FACTURACION"}).status_code
+                == 400
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestCentrosDeCostos:
+    def test_el_catalogo_oficial_llega_a_la_pantalla(self, client, paquete):
+        r = client.get("/glosas-adres/centros-costos", params={"paquete_id": paquete})
+        assert r.status_code == 200
+        catalogo = r.json()
+        assert len(catalogo) == 45
+        assert "733001-QUIROFANOS" in catalogo
+        assert "510406-DIREC SUBGCIA DE ALTO COSTO" in catalogo
+
+    def test_la_factura_trae_el_catalogo_para_el_desplegable(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert "733001-QUIROFANOS" in d["catalogo_centros"]
+
+    def test_los_centros_propuestos_salen_con_su_codigo(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["glosas"][0]["centro_costos"] == "580501-SERVICIO FARMACEUTICO"
+
+
+class TestSinDetallado:
+    def test_avisa_y_muestra_igual_lo_que_se_tiene(self, client, paquete):
+        """Las 4 facturas sin detallado no pueden dejar al gestor sin nada."""
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["resumen"]["items_detallado"] == 0
+        assert "no tiene detallado" in d["aviso_detallado"]
+        # Y aun así trae todo lo del reporte del ADRES.
+        assert d["resumen"]["glosas"] == 1
+        assert d["glosas"][0]["valor_glosado"] == pytest.approx(31800)
+        assert d["glosas"][0]["causal_codigo"] == "3106"
+
+    def test_con_detallado_no_hay_aviso(self, client, paquete):
+        client.post(
+            "/glosas-adres/importar-bitacora",
+            data={"paquete_id": str(paquete)},
+            files={"archivo": ("b.csv", BITACORA_CSV)},
+        )
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["aviso_detallado"] == ""
 
 
 class TestRecargarNoBorraTrabajo:
@@ -417,17 +729,23 @@ def test_el_router_esta_montado_en_la_app():
     assert "/glosas-adres/factura/{numero}" in rutas
 
 
-def test_glosas_adres_convive_con_cobranza_live():
-    """Las dos pantallas conviven en el menú.
+def test_glosas_adres_reemplaza_a_cobranza_live_en_el_menu():
+    """Glosas ADRES entra al menú y Cobranza Live sale, como pidió el auditor.
 
-    El plan original (28-07) era que Glosas ADRES reemplazara a Cobranza
-    Live, pero al rescatar este PR (04-08) Cobranza Live seguía viva en
-    producción y en uso: quitarle una pantalla al equipo no es decisión
-    de una fusión. Si algún día se decide retirarla, se cambia aquí.
+    Una fusión anterior las había dejado conviviendo, por prudencia. El auditor
+    lo pidió de nuevo de forma explícita, así que Cobranza Live se retira del
+    menú. **Solo del menú**: `loadDashCobranza()` y el endpoint
+    `/glosas/stats/dashboard-cobranza` siguen vivos, para que devolver la
+    pantalla sea volver a poner el botón.
     """
     html = Path(__file__).resolve().parents[2] / "static" / "index.html"
     if not html.exists():  # pragma: no cover - en algunos despliegues no se copia
         pytest.skip("static/index.html no está en este entorno")
     texto = html.read_text(encoding="utf-8", errors="ignore")
-    assert "Cobranza Live" in texto
     assert "Glosas ADRES" in texto
+    # Nada que la lleve al menú: ni botón, ni panel, ni pestaña, ni alias.
+    assert "p-cobranza-live" not in texto
+    assert "sidebarTab(this,'cobranza-live')" not in texto
+    assert "tabs.push(['cobranza-live'" not in texto
+    # Pero el código que la pintaba sigue ahí, para poder devolverla.
+    assert "function loadDashCobranza" in texto

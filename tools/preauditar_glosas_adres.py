@@ -167,6 +167,40 @@ CLASIFICACION_POR_CAUSAL: dict[str, str] = {
 # Sin causal, el ADRES glosó toda la reclamación por el FURIPS.
 CLASIFICACION_SIN_CAUSAL = "GLOSADA TOTAL POR  FURIPS"
 
+# Causales que trabajan DOS áreas a la vez. No es un error de criterio del
+# equipo: los gestores las ven por FACTURACION y las médicas por PERTINENCIA, y
+# quién la toma depende de QUÉ fue lo glosado. Por eso el sistema no las
+# clasifica solo — las marca para que un SUPER ADMIN reparta.
+CAUSALES_DE_DOS_AREAS: dict[str, tuple[str, str]] = {
+    # 4506 — el material hace parte de otro servicio. En el paquete 31068 el
+    # equipo la usó 231 veces como FACTURACION (gestores) y 24 como
+    # PERTINENCIA (médicas).
+    "4506": ("FACTURACION", "PERTINENCIA"),
+}
+
+# Lo que hace que una de estas glosas sea de las médicas y no de los gestores:
+# material de osteosíntesis y, en general, insumos de alto costo — curación
+# avanzada e instrumental de quirófano. Todo lo demás lo revisa el gestor por
+# facturación.
+#
+# Los patrones son **específicos a propósito**: el apósito de hidrofibra con
+# plata es curación avanzada, pero el apósito de gasa corriente no; la cuchilla
+# para corte de hueso es de quirófano, pero la cuchilla de bisturí no. Medido
+# contra las 255 filas de causal 4506 que el equipo clasificó a mano en el
+# paquete 31068: coincide en 249 (97,6 %).
+PISTAS_ALTO_COSTO = (
+    # Implantes y osteosíntesis
+    "OSTEOSINTESIS|OSTESINTESIS|PROTESIS|ENDOPROTESIS|CEMENTO OSEO|INJERTO|STENT|MARCAPASO"
+    "|VALVULA CARDIACA|NEUROESTIMULADOR|DERIVACION VENTRICULO|CLIP DE ANEURISMA|ESPACIADOR"
+    "|COPA ACETABULAR|SISTEMA DE FIJACION|FIJADOR EXTERNO|ALTO COSTO"
+    # Curación avanzada (no la gasa ni el apósito corriente)
+    "|HIDROFIBRA|HIDROCOLOIDE|AQUACEL|DUODERM|CUTICELL|GASA DE PARAFINA|CON PLATA|DE PLATA"
+    "|HEMOSTATICO|CELULOSA OXIDADA|RIGENASE|FITOSTIMOLINE"
+    # Instrumental de quirófano (no el bisturí corriente)
+    "|FRESA|PERFORADOR CRANEAL|DERMATOMO|ARTROSCOPIA|CORTE DE HUESO|SIERRA OSCILANTE"
+    "|MATERIALES DE SUTURA Y CURACION|MATERIAL DE SUTURA Y CURACION"
+)
+
 # Qué proponer según la familia de la glosa. Nada de esto se da por decidido:
 # es una propuesta con su motivo, para que el auditor la confirme o la cambie.
 SUGERENCIA_POR_CLASIFICACION: dict[str, tuple[str, str]] = {
@@ -200,6 +234,86 @@ SIN_SUGERENCIA: dict[str, str] = {
     "FACOSTE": "requiere revisar el costo del ítem",
     "HABILITACION REPS": "requiere verificar la habilitación en el REPS",
 }
+
+# Catálogo oficial de centros de costos del hospital, tal como está en la hoja
+# oculta de la macro (el botón que usa el equipo). Es la lista buena: el bot no
+# se inventa centros, solo escoge de acá. Si la macro que se cargue trae una
+# lista distinta, esa manda (puede haber cambiado el plan de cuentas).
+CATALOGO_CENTROS_COSTOS: tuple[str, ...] = (
+    "510204-COSTOS",
+    "510205-FACTURACION Y LIQUIDACION",
+    "510401-DIREC SUBGERENCIA MUJER E INFANCIA",
+    "510402-DIREC SUBGCIA SS AMBULATORIOS Y APOYO TERAPEUTICO",
+    "510403-DIREC SUBGCIA MEDICAS",
+    "510404-DIREC SUBGIA DE APOYO DIAGNOSTICO",
+    "510405-DIREC SUBGCIA QUIRURGICA",
+    "510406-DIREC SUBGCIA DE ALTO COSTO",
+    "510407-DIREC SUBGCIA DE ENFERMERÍA",
+    "580302-AUXILIATURA DE ENFERMERÍA",
+    "580501-SERVICIO FARMACEUTICO",
+    "730101-URGENCIAS PEDIATRICAS",
+    "730102-URGENCIAS ADULTOS",
+    "730104-URGENCIAS HOSPITALIZACION",
+    "731101-CONSULTA EXTERNA ESPECIALIZADA",
+    "732001-HOSPITALIZACION GINECOOBSTETRICIA",
+    "732002-HOSPITALIZACION PEDIATRIA",
+    "732003-HOSPITALIZACION MEDICINA INTERNA",
+    "732005-HOSPITALIZACION ESPECIALIDADES QUIRURGICAS",
+    "732006-HOSPITALIZACION HEMATOLOGIA",
+    "732007-HOSPITALIZACION CIRUGIA GENERAL",
+    "732101-UCI ADULTOS - MEDICAS P-1",
+    "732102-UCI PEDIATRICA",
+    "732104-UCI NEONATAL P4",
+    "732107-UCI ADULTOS ALTO COSTO",
+    "732108-UCI ADULTOS ALTO COSTO P-4",
+    "732109-UCI ADULTOS - MEDICAS",
+    "732301-RECIEN NACIDOS",
+    "732501-QUEMADOS",
+    "733001-QUIROFANOS",
+    "733101-URGENCIAS GINECOBSTETRICAS",
+    "734001-LABORATORIO CLINICO",
+    "734101-RADIOLOGIA",
+    "734102-ECOGRAFIA APOYO DIAGNOSTICO",
+    "734103-ESCANOGRAFIA",
+    "734106-ANGIOGRAFIA",
+    "734107-EQUIPO PORTATIL IMAGENES",
+    "734201-PATOLOGIA",
+    "734301-ECOGRAFIA GINECOBSTETRICA",
+    "734302-GASTROENTEROLOGIA",
+    "734303-CARDIOLOGIA Y HERMODINAMIA",
+    "734304-ACCESOS VASCULARES",
+    "734901-FISIOTERAPIA Y REHABILITACION",
+    "735101-BANCO DE SANGRE",
+    "735201-UNIDAD RENAL",
+)
+
+# Índice por nombre (sin el código) para poder devolver siempre la forma
+# oficial "código-NOMBRE" aunque internamente se razone con el nombre.
+_CENTRO_POR_NOMBRE: dict[str, str] = {
+    entrada.split("-", 1)[1].strip().upper(): entrada for entrada in CATALOGO_CENTROS_COSTOS
+}
+
+
+def centro_oficial(nombre: str, catalogo: tuple[str, ...] | list[str] | None = None) -> str:
+    """Devuelve el centro en su forma oficial `código-NOMBRE`.
+
+    Acepta que le pasen el nombre solo ("QUIROFANOS"), la forma completa o algo
+    que no está en el catálogo — en ese último caso devuelve lo que le dieron,
+    para no perder lo que el equipo escribió a mano.
+    """
+    texto = (nombre or "").strip()
+    if not texto:
+        return ""
+    indice = (
+        {e.split("-", 1)[1].strip().upper(): e for e in catalogo if "-" in e}
+        if catalogo
+        else _CENTRO_POR_NOMBRE
+    )
+    if texto.upper() in {e.upper() for e in (catalogo or CATALOGO_CENTROS_COSTOS)}:
+        return texto
+    sin_codigo = texto.split("-", 1)[1].strip() if re.match(r"^\d{6}-", texto) else texto
+    return indice.get(sin_codigo.upper(), texto)
+
 
 # Palabras del servicio glosado → área del hospital. Se recorre en orden.
 PISTAS_CENTRO_COSTOS: tuple[tuple[str, str], ...] = (
@@ -342,15 +456,46 @@ def clasificar(causal: str, tabla: dict[str, str] | None = None) -> str:
     return tabla.get(causal, CLASIFICACION_POR_CAUSAL.get(causal, ""))
 
 
-def centro_de_costos(tipo_elemento: str, descripcion: str) -> str:
-    """Área del hospital que corresponde al servicio glosado (propuesta)."""
+def necesita_asignacion(causal: str) -> bool:
+    """¿Esta causal la trabajan dos áreas y hay que repartirla a mano?"""
+    return causal in CAUSALES_DE_DOS_AREAS
+
+
+def reparto_de_area(causal: str, tipo_elemento: str, descripcion: str) -> tuple[str, str]:
+    """Para las causales de dos áreas, a quién le debería tocar.
+
+    Devuelve (área sugerida, motivo). **No decide**: el SUPER ADMIN confirma,
+    porque depende del procedimiento y de lo que se glosó.
+    """
+    opciones = CAUSALES_DE_DOS_AREAS.get(causal)
+    if not opciones:
+        return "", ""
+    facturacion, pertinencia = opciones
+    texto = _norm_desc(descripcion)
+    if _norm(tipo_elemento) == "MATERIAL DE OSTEOSINTESIS" or re.search(PISTAS_ALTO_COSTO, texto):
+        return pertinencia, (
+            "material de osteosíntesis o de alto costo: la revisa el médico auditor"
+        )
+    return facturacion, (
+        "no parece material de osteosíntesis ni de alto costo: la revisa el gestor por facturación"
+    )
+
+
+def centro_de_costos(
+    tipo_elemento: str, descripcion: str, catalogo: tuple[str, ...] | list[str] | None = None
+) -> str:
+    """Área del hospital que corresponde al servicio glosado (propuesta).
+
+    Sale siempre en la forma oficial `código-NOMBRE` del catálogo del hospital.
+    """
     texto = _norm_desc(descripcion)
     if not texto or re.search(SIN_CENTRO_CLARO, texto):
         return ""
     for area, patron in PISTAS_CENTRO_COSTOS:
         if re.search(patron, texto):
-            return area
-    return CENTRO_POR_TIPO_ELEMENTO.get(_norm(tipo_elemento), "")
+            return centro_oficial(area, catalogo)
+    respaldo = CENTRO_POR_TIPO_ELEMENTO.get(_norm(tipo_elemento), "")
+    return centro_oficial(respaldo, catalogo) if respaldo else ""
 
 
 def sugerir(

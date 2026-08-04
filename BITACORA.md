@@ -1911,6 +1911,63 @@ entorno y varias partes del código las leen así (`os.getenv`); el
 vigilante del servidor ahora carga TODO el `.env` como variables de
 verdad antes de arrancar, para que el modo sin Docker sea idéntico al
 de Docker.
+- **04-08 (tarde):** se cerraron los tres pendientes que había dejado abiertos
+  el módulo web, con lo que explicó el auditor:
+  - **La causal 4506 no estaba mal clasificada.** La trabajan **dos áreas**:
+    los gestores por FACTURACION y las médicas por PERTINENCIA, y esta última
+    cuando lo glosado es material de osteosíntesis o insumos de alto costo.
+    Ahora el sistema **no la clasifica solo**: la marca `POR ASIGNAR` y **solo
+    un SUPER ADMIN** la reparte desde la pantalla. El bot propone el área con
+    su motivo escrito; se midió contra las 255 filas de 4506 que el equipo
+    clasificó a mano y **coincide en 249 (97,6 %)**. Al asignar el área se
+    recalcula la sugerencia: si queda en PERTINENCIA, el bot se calla.
+  - **Los centros de costos ya no se adivinan.** La macro tenía el catálogo
+    oficial en una **hoja oculta** (el botón que usa el equipo): **45 centros
+    con su código** (`733001-QUIROFANOS`, `510406-DIREC SUBGCIA DE ALTO
+    COSTO`, …). Se metió al bot y a la pantalla como **desplegable**, para que
+    no queden variantes escritas a mano. Los 4.248 propuestos ahora salen en
+    la forma oficial `código-NOMBRE`. Si el hospital cambia el plan de
+    cuentas, manda el catálogo de la macro que se cargue.
+  - **Las 4 facturas sin detallado** (311371, 367368, 380246, 394817): se
+    revisaron **los siete lotes archivo por archivo** y no están en ninguno —
+    el detallado nunca se exportó, no es un fallo del bot. La pantalla ahora
+    **avisa por qué** y **trae igual todo lo del reporte del ADRES** (150, 1,
+    2 y 12 glosas respectivamente, $43.518.600 en total). Si aparece el
+    detallado, basta recargar la bitácora.
+  200 tests pasando.
+- **04-08 (noche):** el auditor mandó la guía de cargue y un PDF de ejemplo
+  (`RTA_ADRES_HUS311371.pdf`), y con eso la pantalla quedó como él la quiere:
+  - **Las glosas totales ya no se muestran.** En el reporte del ADRES hay
+    filas con la columna «Descripción Glosa» **vacía**: son el desglose de una
+    reclamación glosada entera por el FURIPS y **no se responden una por una**.
+    Son **1.630 de 4.619 ($236.217.091)**. Ocultarlas resolvió de paso lo de
+    «no sale la descripción de la glosa»: era eso, esas filas venían en blanco.
+    La factura 311371 pasa de 150 renglones a **21 que sí hay que trabajar**.
+    No desaparecen en silencio: sale un aviso con cuántas son y cuánto valen,
+    y un enlace para verlas.
+  - **La descripción de la glosa es ahora una columna propia** en la tabla,
+    completa (antes iba cortada debajo del código de la causal).
+  - **Al cargar el archivo salen de una vez las facturas a auditar**, con el
+    avance de cada una y filtros por Pendientes / En proceso / Cerradas. Se
+    hace **clic en una** y se despliega por qué y qué le glosan.
+  - **Se guarda solo** mientras el gestor escribe la observación, y también
+    con un botón **Guardar**. Al terminar, **Terminar factura**; si hay que
+    corregir, **Reabrir factura**, y queda registrado quién la reabrió. Una
+    factura cerrada **no se reabre sola** al editar una glosa.
+  - **Botón de PDF de evidencia por factura**, con el mismo formato del
+    ejemplo: encabezado con factura, radicación y documento del paciente, y la
+    tabla de seis columnas (incluida RTA GLOSA COMPLETA con la fórmula de la
+    macro). Los renglones de glosa total no van en la tabla pero sí se dicen
+    al pie, junto con las glosas que quedaron sin decidir.
+  Tabla nueva `facturas_adres` para el estado. 50 tests del módulo web.
+  **Nota sobre Cobranza Live:** otra sesión, al fusionar, había vuelto a
+  dejarla en el menú por prudencia ("quitarle una pantalla al equipo no es
+  decisión de una fusión"). El auditor lo pidió de nuevo de forma explícita,
+  así que **se retiró del menú**. Se quitó solo el botón, el panel, la pestaña
+  y el alias: `loadDashCobranza()` y el endpoint
+  `/glosas/stats/dashboard-cobranza` **siguen vivos**, de modo que devolver la
+  pantalla es volver a poner el botón (un minuto de trabajo). Si el equipo la
+  estaba usando de verdad, se avisa y se devuelve.
 
 ---
 
@@ -2161,8 +2218,9 @@ de Docker.
    cargar el paquete 31068 (reporte + macro + `BITACORA_31068.csv`) y que el
    gestor pruebe con 5 facturas antes de soltarlo a todo el equipo.
    Guía: `docs/GLOSAS_ADRES_WEB.md`.
-9. **Unificar el criterio de la causal 4506** (hoy 231 FACTURACION vs 24
-   PERTINENCIA). Mientras esté dividida, el bot no sugiere nada para ella.
+9. **Repartir las 255 glosas de causal 4506** desde la pantalla (lo hace un
+   super admin). El bot ya propone: 229 para los gestores y 26 para las
+   médicas, cada una con su motivo. Solo hay que confirmar o corregir.
 10. **Completar los 371 renglones sin centro de costos**: son los que el nombre
     del servicio no alcanza a identificar. Se pueden llenar desde la misma
     pantalla y el sistema los recuerda para el siguiente paquete.
@@ -2261,6 +2319,12 @@ de Docker.
     perfiles de pagador a YAML, la pantalla de Perfiles, y las pruebas de
     arquitectura bloqueantes). Hay que decidir cuál capítulo conserva cada una
     antes de que dos personas las construyan por separado.
+    del servicio no alcanza a identificar. Se escogen del desplegable oficial
+    (45 centros) y el sistema los recuerda para el siguiente paquete.
+11. **Preguntar a facturación por las 4 facturas sin detallado** (311371,
+    367368, 380246, 394817 — $43.518.600 glosados): no vinieron en ninguno de
+    los siete lotes. Hay que pedir esa impresión y volver a correr el
+    ajustador.
 
 ---
 
