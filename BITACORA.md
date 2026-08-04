@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 03-08-2026
+**Última actualización:** 04-08-2026
 
 ---
 
@@ -1482,6 +1482,40 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
      Ministerio.
 - Se consulta **por factura y no por glosa**: 17 consultas en vez de 1.082.
 
+### 04-08 — La deuda quedó paga, Google se demora, y nace el arranque exprés
+
+**El pago.** Se descubrió que la deuda era en **pesos** (once mil, no once
+mil dólares). Google no dejó pagar menos de $30.000: se pagaron con la
+Visa nueva y el perfil quedó **sin saldo pendiente** y con $18.080 a favor.
+La Mastercard vieja (la que rebotó y causó todo) debe dejar de ser la
+principal.
+
+**El nuevo tranque.** Aun con la deuda paga, el botón "Reabrir cuenta de
+facturación" quedó bloqueado: Google exige que lo haga su equipo de
+soporte. Se abrió el **caso #74044918** (chat con soporte, escalado al
+equipo especializado) y prometieron respuesta **en 24-48 horas por correo**.
+Crear cuentas nuevas no sirve: mientras el perfil estuvo en deuda, Google
+las cerraba al nacer (pasó con la cuenta 3).
+
+**La decisión para no parar al equipo:** revivir la página YA desde el PC
+de cartera con una **base nueva provisional**, sin esperar el rescate:
+
+1. `tools/REVIVIR_EXPRESS_SIN_RESCATE.cmd` — instalador de doble clic:
+   crea las llaves nuevas del sistema, configura el túnel de Cloudflare
+   por **token** (sin necesitar la llave vieja encerrada en la VM),
+   levanta todo y deja las mismas dos tareas programadas.
+2. La guía `docs/MIGRACION_PC_HOSPITAL.md` ganó la sección **"Arranque
+   exprés SIN rescate"**: cómo sacar el token del túnel en Cloudflare
+   (5 minutos), cómo entra el equipo (los 25 usuarios se siembran solos;
+   contraseña inicial = la parte del correo antes del arroba, y el
+   sistema obliga a cambiarla), y qué hacer cuando Google reabra.
+3. **ELIAS CARVAJAL quedó en el sembrado como administrador** (antes solo
+   existía en la base de la VM; en una base nueva no aparecía).
+
+**OJO — cuando Google reabra la cuenta:** hacer el rescate de la fase 1 y
+**avisar al chat ANTES de restaurar la base vieja**, para sacar copia de la
+provisional y fusionar lo trabajado en estos días.
+
 ---
 
 ## 3) PENDIENTE
@@ -1644,15 +1678,16 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
 
 ## 4) PARA MAÑANA
 
-0. **PRIORIDAD CERO — revivir la página (mudanza al PC del hospital).** La
-   página está caída porque Google apagó la VM por facturación. Pasos, en
-   orden, según `docs/MIGRACION_PC_HOSPITAL.md`: (a) Yesid reabre "Mi cuenta
-   de facturación 2" (~$11 mil pesos); (b) correr en Cloud Shell los comandos
-   de rescate de la fase 1 y descargar `rescate-motor-glosas.tgz`;
-   (c) en el PC de cartera: instalar Docker Desktop y Git, y doble clic a
-   `tools\MONTAR_SERVIDOR_MOTOR_GLOSAS.cmd`; (d) verificar que la página
-   cargue con los datos y apagar la VM. Hasta completar (a) y (b) no se puede
-   avanzar: solo Yesid puede reabrir la cuenta.
+0. **PRIORIDAD CERO — revivir la página YA (arranque exprés) y luego
+   restaurar la historia.** Actualizado 04-08: la deuda ya se pagó; Google
+   reabre la cuenta por soporte (caso #74044918, 24-48 h). Mientras tanto:
+   (a) en el PC de cartera instalar Docker Desktop y Git; (b) sacar el token
+   del túnel en Cloudflare y doble clic a
+   `tools\REVIVIR_EXPRESS_SIN_RESCATE.cmd` (guía: sección "Arranque exprés"
+   de `docs/MIGRACION_PC_HOSPITAL.md`) — con eso el equipo trabaja hoy con
+   base provisional. (c) Cuando llegue el correo de Google: rescate de la
+   fase 1 (`rescate-motor-glosas.tgz`) y **avisar al chat antes de restaurar**
+   la base histórica; (d) verificar y apagar la VM (fase 4).
 1. **Dispensario prioridad 1:** subir a SIMED el Excel de las 3 facturas de
    junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
    14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →

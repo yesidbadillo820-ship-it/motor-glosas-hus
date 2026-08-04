@@ -874,6 +874,8 @@ async def lifespan(app: FastAPI):
             ("devoluciones03@sinacsc.com", "AUDITOR", "JOHANNA MORENO"),
             ("devoluciones1@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
             ("glosashus03@sinacsc.com", "AUDITOR", "OSCAR VILLAMIZAR"),
+            # Pedido 03-08-2026: ELIAS con todos los permisos de admin.
+            ("glosashus15@sinacsc.com", "SUPER_ADMIN", "ELIAS CARVAJAL"),
         ]
         # POLÍTICA DE PASSWORD INICIAL: cada usuario corporativo recibe como
         # contraseña el prefijo de su correo (ej. glosashus04@sinacsc.com →

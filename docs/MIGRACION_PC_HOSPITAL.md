@@ -106,6 +106,61 @@ Una sola vez, con permisos de administrador del PC:
 > Si algo falla, el instalador dice en pantalla exactamente qué faltó.
 > Se puede volver a ejecutar las veces que sea: no daña nada.
 
+## Arranque exprés SIN rescate (mientras Google desbloquea la cuenta)
+
+> **Cuándo usar esto (04-08-2026):** la deuda ya se pagó pero Google exige
+> que su equipo de soporte reabra la cuenta (caso #74044918, 24-48 horas).
+> Para no tener al equipo parado, el sistema se levanta YA en el PC con una
+> **base de datos nueva provisional**. La página, los usuarios y todas las
+> pantallas funcionan de inmediato; la historia (oficios, envíos,
+> dictámenes, soportes) vuelve cuando Google entregue el disco y se haga el
+> rescate de la fase 1.
+
+### A. Sacar el token del túnel de Cloudflare (5 minutos, una vez)
+
+1. Entrar a <https://one.dash.cloudflare.com> con la cuenta de Cloudflare
+   del dominio iaglosassinac.help.
+2. Menú izquierdo: **Networks → Tunnels** (Redes → Túneles) → botón
+   **Create a tunnel** → tipo **Cloudflared** → nombre `motor-glosas-pc` →
+   **Save tunnel**.
+3. Aparece la pantalla "Install and run a connector" con un comando largo
+   que incluye una tira que empieza por `eyJ…` — ese es el token. Copiar
+   el comando completo (el instalador saca el token solo).
+4. Botón **Next** → pestaña **Public hostname** → **Add a public
+   hostname**: Subdomain: *vacío*; Domain: `iaglosassinac.help`; Type:
+   `HTTP`; URL: `motor:8080` → **Save**.
+5. **Si sale un error de que ya existe un registro DNS con ese nombre**
+   (es el del túnel viejo de la VM): ir a <https://dash.cloudflare.com> →
+   dominio `iaglosassinac.help` → **DNS → Records** → borrar el registro
+   **CNAME** llamado `iaglosassinac.help` cuyo destino termina en
+   `.cfargotunnel.com` → repetir el paso 4.
+
+### B. Instalar con doble clic
+
+1. Verificar la fase 2 (Docker Desktop corriendo + Git instalados).
+2. Doble clic a `tools\REVIVIR_EXPRESS_SIN_RESCATE.cmd`. El instalador
+   pide: la contraseña que tendrá `admin@hus.gov.co`, las llaves de IA
+   (opcionales — la de Groq es gratis en <https://console.groq.com/keys>;
+   Enter para saltarlas y ponerlas después) y el token del túnel.
+3. Esperar 1-2 minutos y abrir <https://iaglosassinac.help>.
+
+### C. Cómo entra el equipo (base provisional)
+
+- **Administrador:** `admin@hus.gov.co` con la contraseña inventada en el
+  instalador.
+- **Cada auditor:** su correo de siempre; contraseña inicial = la parte
+  del correo antes del arroba (ej. `glosashus04`). El sistema obliga a
+  cambiarla en el primer ingreso. Se siembran solos los 25 usuarios del
+  equipo (incluidos YESID y ELIAS como administradores).
+
+### D. Cuando Google reabra la cuenta
+
+1. Hacer el rescate de la **fase 1** (los 3 bloques de Cloud Shell).
+2. **Avisar al chat ANTES de restaurar nada:** se saca copia de la base
+   provisional y se pasa la historia vieja al PC, fusionando lo que se
+   haya trabajado en estos días donde sea posible.
+3. Seguir con la **fase 4** (apagar la VM).
+
 ## Fase 4 — Apagar la VM (cuando la página ya funcione desde el PC)
 
 **Importante:** primero verificar que la página carga y que los datos están
