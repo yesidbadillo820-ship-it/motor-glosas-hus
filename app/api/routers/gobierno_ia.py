@@ -157,20 +157,21 @@ async def probar_proveedores(
     usuario = "Prueba de conexión."
 
     proveedores = []
-    for nombre, configurado, fn in (
-        ("groq", bool(cfg.groq_api_key), lambda: svc._llamar_groq_con_retry(sistema, usuario)),
-        (
-            "anthropic",
-            bool(cfg.anthropic_api_key),
-            lambda: svc._llamar_anthropic(sistema, usuario),
-        ),
+    for nombre, clave, fn in (
+        ("groq", cfg.groq_api_key, lambda: svc._llamar_groq_con_retry(sistema, usuario)),
+        ("anthropic", cfg.anthropic_api_key, lambda: svc._llamar_anthropic(sistema, usuario)),
     ):
-        if not configurado:
+        # El prefijo de la clave probada (10 caracteres, no revela nada) es
+        # lo que permite comparar contra el log de arranque: si no coinciden,
+        # hay otro motor vivo respondiendo con la clave anterior.
+        pref = (clave or "")[:10]
+        if not clave:
             proveedores.append(
                 {
                     "proveedor": nombre,
                     "estado": "SIN CLAVE",
                     "detalle": "no hay clave configurada para este proveedor",
+                    "clave_probada": "",
                     "es_principal": cfg.primary_ai == nombre,
                 }
             )
@@ -182,6 +183,7 @@ async def probar_proveedores(
                     "proveedor": nombre,
                     "estado": "OK",
                     "detalle": f"respondió con {modelo}",
+                    "clave_probada": pref,
                     "es_principal": cfg.primary_ai == nombre,
                 }
             )
@@ -191,6 +193,7 @@ async def probar_proveedores(
                     "proveedor": nombre,
                     "estado": "FALLA",
                     "detalle": _causa_corta(e),
+                    "clave_probada": pref,
                     "es_principal": cfg.primary_ai == nombre,
                 }
             )
@@ -211,9 +214,27 @@ async def probar_proveedores(
             "hasta corregir al menos una clave."
         )
 
+    # Esta prueba la contesta EL motor que atendió la petición. Si hay más de
+    # uno vivo, el próximo análisis puede caer en otro con otra clave: decirlo
+    # aquí evita el «pero si la prueba salió verde».
+    motores = []
+    try:
+        from app.services.motor_proceso import motores_vivos
+
+        motores = motores_vivos()
+    except Exception:
+        motores = []
+    if len(motores) > 1:
+        veredicto = (
+            f"OJO: hay {len(motores)} motores corriendo al mismo tiempo. Esta prueba "
+            f"la contestó uno solo; el análisis puede caer en otro con la clave "
+            f"anterior. Cerrá los sobrantes (tools\\REINICIAR_MOTOR.cmd). " + veredicto
+        )
+
     return {
         "principal_configurado": cfg.primary_ai,
         "funciona": hay_alguno,
         "veredicto": veredicto,
         "proveedores": proveedores,
+        "motores_vivos": len(motores),
     }

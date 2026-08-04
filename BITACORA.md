@@ -1363,6 +1363,44 @@ períodos perdidos.
 
 ---
 
+### 04-08 (séptima parte) — Había DOS motores prendidos al mismo tiempo
+
+Este fue el verdadero culpable de toda la tarde. Yesid cambió la clave de
+Groq, reinició y el arranque escribió **`groq=OK gsk_vn06EE…`**; pero la
+pantalla de Diagnóstico —que lee exactamente el mismo dato— mostraba
+**`gsk_5CxaRq…`** (la clave vieja) y el análisis seguía fallando con «clave
+inválida». Dos respuestas distintas para el mismo dato solo tienen una
+explicación: **no era un solo programa contestando, eran dos**.
+
+En Windows, si uno abre otra ventana y arranca el motor sin cerrar el
+anterior, los dos se quedan con el mismo puerto y las peticiones caen en
+cualquiera de los dos. El viejo responde con la clave vieja y con el
+programa viejo. Nada en pantalla lo decía.
+
+Lo que se construyó para que no vuelva a pasar:
+
+- **`tools/REINICIAR_MOTOR.cmd`** (doble clic): cierra TODO lo que esté
+  usando el puerto y deja **uno solo** recién arrancado. Es la forma
+  correcta de reiniciar después de tocar el archivo de claves.
+- **El Diagnóstico avisa primero**: la primera tarjeta del panel ahora es
+  **«Motor (quién está atendiendo)»**. Si hay más de uno, se pone en ROJO,
+  nombra los procesos y dice cómo cerrarlos. Y si hay uno solo, muestra con
+  qué clave está trabajando.
+- **El arranque también lo dice**: junto a `[IA-PROVIDERS]` aparece
+  `[MOTOR] Un solo motor atendiendo…` o `[MOTOR-DUPLICADO] …`.
+- **El aviso de error dice CUÁL clave usó**: «GROQ: su clave está inválida o
+  vencida (la que usó: gsk_5CxaRq…)». Con eso se compara de un vistazo
+  contra la del arranque y se sabe si contestó el motor viejo.
+- **El botón «Probar proveedores de IA»** muestra la clave que probó y
+  advierte si hay más de un motor encendido (si no, uno ve verde y el
+  análisis igual falla).
+
+De paso apareció otro defecto real: cuando la clave estaba vencida, el motor
+**apagaba el «razonador» de uno de los modelos de Groq para el resto del
+día** (confundía el error de clave con un rechazo de ese ajuste). Los
+dictámenes salían más pobres y nada lo decía. Corregido: solo se apaga si el
+error nombra de verdad a ese ajuste.
+
 ### 04-08 (sexta parte) — Botón para probar la clave de IA
 
 - En **Gobierno IA** hay un botón **«Probar proveedores de IA»**: hace una
@@ -1912,6 +1950,15 @@ de Docker.
 
 ## 4) PARA MAÑANA
 
+00. **Antes de cualquier prueba de IA: reiniciar con
+    `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos
+    que quedaron prendidos y deja uno solo. Después, en **Gobierno IA →
+    «Probar proveedores de IA»**, verificar que la clave que aparece ahí sea
+    la misma que muestra el arranque. Si el Diagnóstico marca en rojo la
+    tarjeta «Motor (quién está atendiendo)», hay más de uno: cerrar y
+    repetir. Con eso queda lista la prueba de fuego pendiente: **pasar la
+    glosa de PPL por Analizar** y confirmar que sale con el formato
+    aprobado.
 0. **PRIORIDAD CERO — revivir la página YA (arranque exprés) y luego
    restaurar la historia.** Actualizado 04-08: la deuda ya se pagó; Google
    reabre la cuenta por soporte (caso #74044918, 24-48 h). Mientras tanto:

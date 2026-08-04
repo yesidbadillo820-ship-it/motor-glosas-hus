@@ -9336,9 +9336,15 @@ async function gobProbar(){
     d.proveedores.forEach(function(p){
       var ic = p.estado === 'OK' ? '✓' : (p.estado === 'FALLA' ? '✗' : '—');
       var c = p.estado === 'OK' ? '#16a34a' : (p.estado === 'FALLA' ? '#dc2626' : '#b45309');
+      // La clave probada (10 caracteres) se muestra para poder compararla
+      // con la del log de arranque: si no coinciden, hay otro motor vivo.
+      var clave = p.clave_probada ? ' <span style="opacity:.6">· clave ' + escHtml(p.clave_probada) + '…</span>' : '';
       html += '<div class="porque"><b style="color:' + c + '">' + ic + ' ' + escHtml(p.proveedor.toUpperCase()) + '</b>'
-        + (p.es_principal ? ' <em>(principal)</em>' : '') + ' — ' + escHtml(p.detalle) + '</div>';
+        + (p.es_principal ? ' <em>(principal)</em>' : '') + ' — ' + escHtml(p.detalle) + clave + '</div>';
     });
+    if(d.motores_vivos > 1){
+      html += '<div class="porque" style="color:#dc2626;font-weight:600">⚠ ' + d.motores_vivos + ' motores encendidos al mismo tiempo: cerrá los sobrantes con tools\\REINICIAR_MOTOR.cmd, si no el análisis puede caer en el viejo.</div>';
+    }
     html += '</div></div>';
     caja.innerHTML = html;
   }catch(e){ caja.innerHTML = '<div class="auto-resumen">Conexión: ' + escHtml(e.message) + '</div>'; }
@@ -17065,6 +17071,7 @@ async function cargarDiagnostico(){
       // "volumen_fly" del periodo Fly.io) pero el panel ya está corriendo
       // en self-hosted Google Cloud. Mostramos el nombre actual.
       var LABEL_OVERRIDES = {
+        'motor': 'Motor (quién está atendiendo)',
         'volumen_fly': 'Volumen de Datos',
         'base_de_datos': 'Base de Datos',
         'soportes_indexer': 'Soportes Indexer',
