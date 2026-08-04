@@ -150,6 +150,99 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   Publicado como artifact para socializar ante gerencia. Se generó también el
   cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
   consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
+- **28-07 (hoy):** nace el **ajustador de detallados de factura**
+  (`tools/ajustar_detallado_glosas.py` + README + 36 tests). Automatiza el
+  trabajo manual de dejar el detallado **solo con lo que la entidad sigue
+  glosando**: quita duplicados del consolidado, borra del Excel las hojas de las
+  facturas que no se van a trabajar, quita el encabezado institucional (logo,
+  NIT, QR, CUFE), cambia el título a **"DETALLADO DE FACTURA"**, cruza cada ítem
+  contra el `ReporteGlosasReclamPAQUETE` (quita lo aprobado, ajusta lo aprobado
+  a medias, deja lo glosado), borra los grupos que quedan vacíos y recalcula
+  subtotal, total y **total en letras**. Deja bitácora CSV ítem por ítem y tiene
+  modo `--diagnostico` para ver qué haría antes de escribir nada.
+  **Hallazgo:** el reporte de glosas trae **el mismo ítem repartido en varias
+  filas** (la venda de gasa de la HUS352890 viene en dos: 4 y 2 unidades). El
+  bot las suma → siguen glosados **$47.000**, no $9.400 como quedó en el ejemplo
+  hecho a mano. Falta que el auditor confirme ese criterio (ver PENDIENTE #11).
+  **Validado contra el reporte real del paquete 31068** (19.256 filas, 581
+  facturas): las **324 facturas del lote están todas** en el reporte y se
+  reconocen sin ajustes. Del total reclamado **$2.870.214.655**, el ADRES aprobó
+  **$1.835.864.089 (64%)** y **sigue glosado $1.034.350.566 (36%)**. De 9.616
+  ítems: 6.805 se quitan, 472 se ajustan y 2.712 se dejan. El **32% de los ítems
+  viene repartido en más de una fila** del reporte (el peor: 38 filas para la
+  terapia respiratoria de HUS311371) y en el 1,1% de las filas la columna
+  "Cantidad Aprobada" no cuadra con el valor — por eso el bot suma y calcula la
+  cantidad desde el valor glosado.
+  **Llegaron los 7 archivos de detallados y se corrió el paquete 31068 completo.**
+  El formato real resultó distinto del supuesto: **una sola hoja con todas las
+  facturas apiladas** (no una hoja por factura) y cada dato dentro de una celda
+  combinada cuyos límites NO coinciden con los del encabezado. Se reescribió el
+  núcleo del bot: segmentación de facturas dentro de la hoja, mapeo de columnas
+  por solapamiento de rangos, borrado masivo de filas re-indexando en sitio
+  (0,3 s en vez de minutos) y emparejamiento por rondas con unicidad mutua.
+  **Resultado: 320 de las 324 facturas procesadas** (150.919 filas de entrada),
+  $2.464.092.099 facturados de los cuales **siguen glosados $714.332.225 (29,0%)**.
+  Se generaron 5 Excel ajustados + bitácora ítem por ítem + resumen por factura.
+  Un análisis en paralelo sobre los 4 primeros archivos (1.306 facturas) destapó
+  que **los procedimientos quirúrgicos traen renglones de DESGLOSE sin
+  consecutivo** cuyo valor ya está incluido en el renglón de arriba: son 3.794
+  renglones en 302 facturas y sumarlos inflaba el valor de la factura en
+  $628.947.541. Ya se descuentan. Nace también
+  `tools/verificar_detallado_ajustado.py`, que relee el Excel ajustado y lo
+  contrasta contra el original, el consolidado y el reporte del ADRES: los 5
+  archivos pasan sin fallas.
+  Además nacen dos herramientas más, encadenadas con el ajustador:
+  **`tools/dividir_detallado_por_factura.py`** (separa el detallado en un Excel
+  por factura, con el formato intacto y el área de impresión ya fijada) y
+  **`tools/excel_a_pdf.py`** (convierte en masa a PDF con el Excel del equipo o
+  con LibreOffice, uno por archivo, con opción de carpeta por factura).
+  Se generaron los **320 Excel y los 320 PDF** del paquete 31068 y se
+  comprobó, leyendo el texto de cada PDF, que traiga su número de factura y que
+  su total cuadre con la bitácora: los 320 cuadran ($714.332.224 contra
+  $714.332.225, 1 peso de redondeo).
+
+### Agosto 2026 — Pre-auditoría del paquete ADRES
+- **03-08:** llegó la macro `NUEVO MODELO MACRO PARA DAR RESPUESTA A GLOSA ADRES
+  31068`. Es el reporte del ADRES (16 columnas) **más 10 que el equipo llena a
+  mano** sobre 4.619 filas glosadas. Se analizó y se descubrió que **siete de esas
+  diez son mecánicas**: el código numérico sale de la causal (verificado contra
+  las 2.989 que llenaron a mano: **cero discrepancias**) y la clasificación
+  también (determinística en 47 de 48 causales).
+  Nace **`tools/preauditar_glosas_adres.py`**: llena lo mecánico, propone el
+  resto con el motivo escrito y **respeta lo que el equipo ya escribió**.
+  Reproduce la macro renglón por renglón: 4.619 de 4.619 filas, y la columna
+  RTA GLOSA COMPLETA sale **carácter por carácter idéntica**. El centro de
+  costos pasó de 0 a 4.248 de 4.619 propuestos. Replica también el Word de
+  respuesta por factura del VBA, sin depender de Word.
+  El bot **no decide**: las 4.604 decisiones de aceptar/objetar/subsanar siguen
+  siendo del auditor; la sugerencia va en columnas aparte (27 en adelante) para
+  no correr nada de lo que usan las macros. A medida que el equipo decida, el
+  bot aprende **su** criterio por causal y lo propone citando en cuántos casos
+  se basa.
+  **Hallazgo:** la causal **4506** está clasificada de dos formas distintas
+  (231 veces FACTURACION y 24 PERTINENCIA) — hay que unificar el criterio.
+- **04-08:** todo ese trabajo **se llevó a la página**. En el menú se quitó
+  **Cobranza Live** (no se usaba) y en su lugar quedó **📄 Glosas ADRES**.
+  Ahora el coordinador carga el `ReporteGlosasReclamPAQUETE` una sola vez
+  (opcionalmente también el Excel de la macro y la bitácora del ajustador de
+  detallados) y **el gestor solo escribe el número de factura**: la pantalla le
+  trae las glosas clasificadas, el centro de costos, el gestor y el médico, la
+  sugerencia de respuesta **con su motivo escrito**, el detallado cruzado
+  (qué le pagó ya el ADRES y qué sigue glosado) y el texto consolidado para el
+  Word.
+  Se agregaron 3 tablas (`paquetes_adres`, `glosas_adres`,
+  `items_detallado_adres`), el servicio `app/services/preauditoria_adres.py`
+  y el router `app/api/routers/glosas_adres.py` con 8 rutas.
+  El módulo web **no copia** las reglas: importa las mismas de
+  `tools/preauditar_glosas_adres.py`, así un cambio de criterio sirve para los
+  dos lados.
+  Probado de punta a punta con el paquete real: **4.619 glosas, 324 facturas,
+  $1.034.350.562 glosado** y 9.982 renglones de detallado, entrando por los
+  endpoints de verdad. Se verificó lo que más duele si falla: **volver a cargar
+  el paquete no borra las decisiones ya tomadas**, y aplicar las sugerencias en
+  bloque tampoco pisa lo que un gestor escribió a mano.
+  La pertinencia médica **sigue sin sugerencia**: la firma un médico auditor.
+  Guía para el equipo en `docs/GLOSAS_ADRES_WEB.md`.
 - **30-07:** **nace el proyecto SIIFA** (plataforma del Ministerio de Salud,
   distinta de COOSALUD/SIMED/DGH — la portalidad nacional de seguimiento de
   facturas). El auditor mostró la pantalla `Listar seguimientos` (2.579
@@ -1643,6 +1736,35 @@ de Docker.
    (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
    437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
 
+### Pre-auditoría ADRES (`tools/preauditar_glosas_adres.py`)
+16. **Unificar el criterio de la causal 4506**: hoy está clasificada como
+    FACTURACION en 231 filas y como PERTINENCIA en 24.
+17. **Revisar las 371 filas sin centro de costos propuesto** (habitación, sala
+    especial, atención diaria: no se puede saber el área sin más contexto).
+18. **Fase 2 — llevarlo al motor web como preauditoría.** El patrón ya existe
+    en `app/services/ia_auditora_proactiva.py` (pre-análisis nocturno que deja
+    el dictamen listo antes de que el gestor abra la glosa). Las 10 columnas de
+    la macro mapean a campos que ya tiene `GlosaRecord` (`codigo_respuesta`,
+    `tipo_glosa_excel`, `observacion_tecnico`, `dictamen`, `valor_aceptado`,
+    `gestor_nombre`, `profesional_medico`); falta agregar centro de costos.
+
+### Ajustador de detallados (`tools/ajustar_detallado_glosas.py`)
+11. **Las 4 facturas que no aparecen en ningún detallado:** HUS0000311371,
+    HUS0000367368, HUS0000380246 y HUS0000394817. Pedir su impresión para
+    poder cerrarlas.
+12. **Revisar los 100 ítems marcados `SIN_CRUCE`** (73 facturas) y los 24
+    `GLOSA_SIN_ITEM` ($11.220.692): son renglones que no cruzaron entre la
+    factura impresa y el reporte del ADRES.
+13. **Glosas a toda la reclamación:** 46 filas por $335.585.041 con causales
+    como "2102- formulario de reclamación incompleto" y "3122- debe anexar el
+    informe de ambulancia". No corresponden a ningún ítem: se responden aparte.
+14. **Confirmar el criterio de los ítems aprobados a medias.** En el ejemplo
+    `HUS352890` la venda de gasa quedó a mano en **1 unidad / $9.400**, pero
+    sumando las **dos** filas del reporte siguen glosadas **5 unidades /
+    $47.000** (subtotal $132.800 en vez de $95.200). El bot hace la suma. Si el
+    criterio del auditor es otro, se cambia con `--modo-parcial`.
+15. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
+    aparecen en el reporte): hoy se conservan y se marcan.
 ### Dispensario — respuesta de glosas SIMED y conciliación
 10. **Subir a SIMED las 3 facturas de junio** (518186 / 515107 / 515773) con
     `respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`. **URGENTE: sus fechas
@@ -1767,6 +1889,21 @@ de Docker.
    carpetas por mes/día.
 5. Actualizar el **informe de gerencia** con el acumulado real de julio
    (facturas y glosas cerradas por lote).
+6. **Revisar los Excel ajustados del paquete 31068** que quedaron generados y
+   los pendientes #11 a #15. Guías en `tools/README_ajustar_detallado_glosas.md`
+   y `tools/README_por_factura_y_pdf.md`.
+7. **Repetir el PDF con el Excel del equipo** (`--motor excel`): los PDF que se
+   entregaron salieron con LibreOffice, que puede tener mínimas diferencias de
+   maquetación frente al Excel del hospital.
+8. **Estrenar en la página el módulo 📄 Glosas ADRES** con un gestor real:
+   cargar el paquete 31068 (reporte + macro + `BITACORA_31068.csv`) y que el
+   gestor pruebe con 5 facturas antes de soltarlo a todo el equipo.
+   Guía: `docs/GLOSAS_ADRES_WEB.md`.
+9. **Unificar el criterio de la causal 4506** (hoy 231 FACTURACION vs 24
+   PERTINENCIA). Mientras esté dividida, el bot no sugiere nada para ella.
+10. **Completar los 371 renglones sin centro de costos**: son los que el nombre
+    del servicio no alcanza a identificar. Se pueden llenar desde la misma
+    pantalla y el sistema los recuerda para el siguiente paquete.
 6. Si hay tiempo: verificar si SISTEMAS ya corrigió algún CUV (pendiente #6),
    descargar los 2 PDF del DIAN (pendiente #7) y revisar el PR #186 del módulo
    de pre-auditoría.
