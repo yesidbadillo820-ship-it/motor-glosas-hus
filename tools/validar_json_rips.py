@@ -98,6 +98,13 @@ TIPO_DIAGNOSTICO_PRINCIPAL = {
 
 TIPOS_NOTA = {"NC", "ND", "NA", "RS"}
 
+# El mismo prestador se identifica con dos largos distintos segun el archivo:
+#   - JSON de RIPS  -> 12 caracteres (codigo de habilitacion de la SEDE).
+#   - XML de la FEV -> 10 caracteres (codigo del PRESTADOR, tabla IPSCodHabilitacion).
+# Mezclarlos es la causa del rechazo RVC011.
+LARGO_COD_PRESTADOR_RIPS = 12
+LARGO_COD_PRESTADOR_FEV = 10
+
 # --------------------------------------------------------------------------
 # Campos obligatorios (no pueden venir en null) por tipo de registro
 # --------------------------------------------------------------------------
@@ -294,6 +301,29 @@ def extraer_invoice(ruta_xml: Path) -> ET.Element | None:
     return None
 
 
+def codigo_prestador_xml(invoice: ET.Element) -> str:
+    """Lee el CODIGO_PRESTADOR del bloque de interoperabilidad del sector salud.
+
+    Vive en ext:UBLExtensions > CustomTagGeneral > Interoperabilidad, como un
+    par <Name>CODIGO_PRESTADOR</Name> / <Value>...</Value>. Es el campo que el
+    Ministerio compara contra la tabla de habilitacion (rechazo RVC011).
+    """
+    for nodo in invoice.iter():
+        if not nodo.tag.endswith("AdditionalInformation"):
+            continue
+        nombre = ""
+        valor = ""
+        for hijo in nodo:
+            etiqueta = hijo.tag.split("}")[-1]
+            if etiqueta == "Name":
+                nombre = (hijo.text or "").strip()
+            elif etiqueta == "Value":
+                valor = (hijo.text or "").strip()
+        if nombre == "CODIGO_PRESTADOR":
+            return valor
+    return ""
+
+
 def datos_factura(ruta_xml: Path) -> dict:
     """Saca del XML los datos que el Ministerio cruza contra el JSON."""
     invoice = extraer_invoice(ruta_xml)
@@ -323,6 +353,7 @@ def datos_factura(ruta_xml: Path) -> dict:
         "valor_bruto": _texto(
             totales.find("cbc:LineExtensionAmount", NS) if totales is not None else None
         ),
+        "codigo_prestador": codigo_prestador_xml(invoice),
     }
 
 
@@ -410,6 +441,20 @@ def revisar_servicio(tipo: str, servicio: dict, ubicacion: str) -> list[Hallazgo
         if campo in servicio:
             hallazgos.extend(revisar_fecha(campo, servicio[campo], ubicacion))
     hallazgos.extend(revisar_codigos(servicio, ubicacion))
+
+    # En el JSON el codigo va completo: prestador (10) + sede (2) = 12.
+    cod = servicio.get("codPrestador")
+    if isinstance(cod, str) and cod.strip() and len(cod.strip()) != LARGO_COD_PRESTADOR_RIPS:
+        hallazgos.append(
+            Hallazgo(
+                "ERROR",
+                f"{ubicacion}.codPrestador",
+                f"El codigo tiene {len(cod.strip())} caracteres y en el RIPS debe tener "
+                f"{LARGO_COD_PRESTADOR_RIPS}.",
+                "Es el codigo de habilitacion de la SEDE: municipio (5) + prestador (5) + "
+                "sede (2). Se consulta en REPS con el NIT.",
+            )
+        )
 
     # El valor del pago moderador tiene que ser coherente con el concepto.
     concepto = servicio.get("conceptoRecaudo")
@@ -530,6 +575,21 @@ def _fechas_atencion(data: dict) -> Iterable[tuple[str, str]]:
                         yield (f"usuarios[{i}].servicios.{tipo}[{j}].{campo}", valor)
 
 
+def _codigos_prestador(data: dict) -> Iterable[tuple[str, str]]:
+    """Devuelve (ubicacion, codPrestador) de cada servicio del JSON."""
+    for i, usuario in enumerate(data.get("usuarios") or []):
+        for tipo, registros in (usuario.get("servicios") or {}).items():
+            if not isinstance(registros, list):
+                continue
+            for j, servicio in enumerate(registros):
+                valor = servicio.get("codPrestador")
+                if isinstance(valor, str) and valor.strip():
+                    yield (
+                        f"usuarios[{i}].servicios.{tipo}[{j}].codPrestador",
+                        valor.strip(),
+                    )
+
+
 def revisar_cruce(data: dict, factura: dict) -> list[Hallazgo]:
     hallazgos: list[Hallazgo] = []
     if not factura:
@@ -557,6 +617,38 @@ def revisar_cruce(data: dict, factura: dict) -> list[Hallazgo]:
                 f'Escribir "numFactura": "{num_xml}" tal como quedo radicada en la DIAN.',
             )
         )
+
+    # Codigo de prestador: el XML lo lleva a 10 y el RIPS a 12. Si el facturador
+    # puso el de 12 en el XML, el Ministerio rechaza con RVC011 y no hay nada que
+    # corregir en el JSON: hay que reexpedir la factura.
+    cod_xml = str(factura.get("codigo_prestador") or "").strip()
+    if cod_xml:
+        if len(cod_xml) != LARGO_COD_PRESTADOR_FEV:
+            hallazgos.append(
+                Hallazgo(
+                    "ERROR",
+                    "CODIGO_PRESTADOR (XML)",
+                    f"En la factura el codigo tiene {len(cod_xml)} caracteres "
+                    f"('{cod_xml}') y debe tener {LARGO_COD_PRESTADOR_FEV}. "
+                    "Es el rechazo RVC011 del Ministerio.",
+                    "El XML esta firmado y no se puede editar: facturacion debe reexpedir "
+                    f"la factura con el codigo de prestador a {LARGO_COD_PRESTADOR_FEV} "
+                    f"digitos ('{cod_xml[:LARGO_COD_PRESTADOR_FEV]}').",
+                )
+            )
+        for ubicacion, cod_json in _codigos_prestador(data):
+            if not cod_json or len(cod_json) < LARGO_COD_PRESTADOR_FEV:
+                continue
+            if cod_json[:LARGO_COD_PRESTADOR_FEV] != cod_xml[:LARGO_COD_PRESTADOR_FEV]:
+                hallazgos.append(
+                    Hallazgo(
+                        "ERROR",
+                        ubicacion,
+                        f"El prestador del RIPS ('{cod_json}') y el de la factura "
+                        f"('{cod_xml}') no son el mismo.",
+                        "Los dos deben salir del mismo registro de REPS.",
+                    )
+                )
 
     nit_json = str(data.get("numDocumentoIdObligado") or "").strip()
     nit_xml = factura["nit_prestador"]
