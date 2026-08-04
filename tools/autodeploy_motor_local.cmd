@@ -26,7 +26,9 @@ if "%LOCAL%"=="%REMOTO%" goto :asegurar
 
 echo [%date% %time%] codigo nuevo detectado: %REMOTO:~0,7% — aplicando... >> "%LOG%"
 git reset --hard origin/motor-glosas >> "%LOG%" 2>&1
-"%REPO%\venv\Scripts\python.exe" -m pip install -r requirements.txt -q >> "%LOG%" 2>&1
+rem psycopg2 es solo para PostgreSQL: aca la base es SQLite, se salta
+findstr /v /i "psycopg2" "%REPO%\requirements.txt" > "%REPO%\data\requirements_local.txt"
+"%REPO%\venv\Scripts\python.exe" -m pip install -r "%REPO%\data\requirements_local.txt" -q >> "%LOG%" 2>&1
 rem Reiniciar el servidor: se apaga y su vigilante lo revive renovado
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app'} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >> "%LOG%" 2>&1
 echo [%date% %time%] deploy aplicado; el servidor se reinicia solo >> "%LOG%"

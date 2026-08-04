@@ -29,14 +29,47 @@ echo.
 
 rem ---------- 1) Verificar requisitos --------------------------------
 echo [1/7] Verificando requisitos...
+rem Las dependencias fijadas del sistema tienen paquete listo para
+rem Python 3.11 a 3.13. Con 3.14+ Windows intentaria COMPILARLAS y
+rem falla. Por eso se prefiere un 3.13/3.12/3.11 si esta instalado.
 set "PYCMD="
-py -3 --version >nul 2>&1 && set "PYCMD=py -3"
+py -3.13 --version >nul 2>&1 && set "PYCMD=py -3.13"
+if not defined PYCMD py -3.12 --version >nul 2>&1 && set "PYCMD=py -3.12"
+if not defined PYCMD py -3.11 --version >nul 2>&1 && set "PYCMD=py -3.11"
+if not defined PYCMD py -3 --version >nul 2>&1 && set "PYCMD=py -3"
 if not defined PYCMD python --version >nul 2>&1 && set "PYCMD=python"
 if not defined PYCMD (
   echo.
-  echo   FALTA PYTHON. Instalelo de: https://www.python.org/downloads/
-  echo   IMPORTANTE: en la primera pantalla del instalador marque la
-  echo   casilla "Add python.exe to PATH". Luego vuelva a dar doble clic.
+  echo   FALTA PYTHON. Instalelo de: https://www.python.org/downloads/windows/
+  echo   Baje el "Windows installer ^(64-bit^)" de la serie 3.13 y marque
+  echo   la casilla "Add python.exe to PATH". Luego vuelva a dar doble clic.
+  pause & exit /b 1
+)
+!PYCMD! --version > "%TEMP%\pyver_motor.txt" 2>&1
+set /p PYVER=<"%TEMP%\pyver_motor.txt"
+set "PYMAJ=" & set "PYMIN="
+for /f "tokens=2,3 delims=. " %%a in ("!PYVER!") do (set "PYMAJ=%%a" & set "PYMIN=%%b")
+if not "!PYMAJ!"=="3" (
+  echo   No se pudo reconocer la version de Python ^(!PYVER!^). Pidale
+  echo   ayuda al chat con este mensaje.
+  pause & exit /b 1
+)
+if !PYMIN! GEQ 14 (
+  echo.
+  echo   Su Python es la version !PYMAJ!.!PYMIN! — demasiado NUEVA: varias
+  echo   piezas del sistema aun no publican paquete para ella y Windows
+  echo   intentaria compilarlas ^(falla^). La solucion es facil:
+  echo   instale ADEMAS Python 3.13 ^(convive con el actual sin pelear^):
+  echo     https://www.python.org/downloads/windows/
+  echo   Baje el "Windows installer ^(64-bit^)" mas reciente de la serie
+  echo   3.13, marque "Add python.exe to PATH", instale, y vuelva a
+  echo   correr este instalador: el solo escogera el 3.13.
+  pause & exit /b 1
+)
+if !PYMIN! LSS 11 (
+  echo.
+  echo   Su Python ^(!PYMAJ!.!PYMIN!^) es muy viejo. Instale la serie 3.13:
+  echo   https://www.python.org/downloads/windows/ y vuelva a correr.
   pause & exit /b 1
 )
 git --version >nul 2>&1
@@ -113,6 +146,18 @@ echo    Archivo .env creado.
 rem ---------- 4) Preparar el entorno de Python -----------------------
 echo [4/7] Preparando el entorno de Python ^(la primera vez tarda
 echo        varios minutos: descarga las dependencias^)...
+rem Si el entorno quedo de una corrida anterior con un Python 3.14+,
+rem se rehace con el Python bueno.
+if exist "%REPO%\venv\Scripts\python.exe" (
+  "%REPO%\venv\Scripts\python.exe" --version > "%TEMP%\pyver_motor.txt" 2>&1
+  set /p VENVVER=<"%TEMP%\pyver_motor.txt"
+  set "VMIN="
+  for /f "tokens=3 delims=. " %%a in ("!VENVVER!") do set "VMIN=%%a"
+  if defined VMIN if !VMIN! GEQ 14 (
+    echo    El entorno anterior quedo con Python !VENVVER:Python =!: se rehace.
+    rmdir /s /q "%REPO%\venv"
+  )
+)
 if not exist "%REPO%\venv\Scripts\python.exe" (
   !PYCMD! -m venv "%REPO%\venv"
   if errorlevel 1 (
@@ -121,8 +166,11 @@ if not exist "%REPO%\venv\Scripts\python.exe" (
     pause & exit /b 1
   )
 )
+rem psycopg2 es solo para PostgreSQL; en este PC la base es SQLite y
+rem ademas en Windows intentaria compilarse. Se salta.
+findstr /v /i "psycopg2" "%REPO%\requirements.txt" > "%REPO%\data\requirements_local.txt"
 "%REPO%\venv\Scripts\python.exe" -m pip install --upgrade pip -q
-"%REPO%\venv\Scripts\python.exe" -m pip install -r "%REPO%\requirements.txt"
+"%REPO%\venv\Scripts\python.exe" -m pip install -r "%REPO%\data\requirements_local.txt"
 if errorlevel 1 (
   echo   ERROR instalando dependencias. Copie lo de arriba y pidale
   echo   ayuda al chat.

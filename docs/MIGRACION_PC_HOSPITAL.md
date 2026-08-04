@@ -153,9 +153,14 @@ administrador, Windows sin virtualización, o bloqueado por sistemas).
 El sistema corre igual, directo con **Python** (el mismo que ya usan los
 otros bots del repositorio):
 
-1. Requisitos: **Python 3.11+** (de <https://www.python.org/downloads/>,
-   marcando la casilla **"Add python.exe to PATH"**) y **Git** — ninguno
-   necesita permisos de administrador.
+1. Requisitos: **Python 3.11 a 3.13** (de
+   <https://www.python.org/downloads/windows/>, el "Windows installer
+   (64-bit)" de la serie **3.13**, marcando la casilla **"Add python.exe
+   to PATH"**) y **Git** — ninguno necesita permisos de administrador.
+   Ojo: con Python **3.14 o más nuevo** varias dependencias fijadas aún
+   no publican paquete y la instalación falla intentando compilarlas; el
+   instalador lo detecta y lo dice. Un 3.13 puede convivir con un 3.14
+   ya instalado sin pelear: el instalador escoge solo el bueno.
 2. En Cloudflare (paso A), la URL del Public hostname es
    **`localhost:8080`** (no `motor:8080`).
 3. Doble clic a `tools\REVIVIR_EXPRESS_SIN_DOCKER.cmd`. Pide lo mismo
