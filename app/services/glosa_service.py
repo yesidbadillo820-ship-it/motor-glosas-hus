@@ -92,7 +92,20 @@ def _mensaje_ia_caida(error, fallos=None) -> str:
     —el auditor ve el error de un proveedor que ni siquiera es el suyo—.
     """
     if fallos:
-        detalle = " · ".join(f"{nombre.upper()}: {_causa_corta(err)}" for nombre, err in fallos)
+        partes = []
+        for item in fallos:
+            # (proveedor, error) o (proveedor, error, prefijo_de_clave)
+            nombre, err = item[0], item[1]
+            pref = item[2] if len(item) > 2 else ""
+            causa = _causa_corta(err)
+            # Incidente 04-08-2026: con DOS motores vivos, el que respondía
+            # tenía la clave anterior. Decir cuál clave se usó convierte un
+            # misterio ("pero si ya la cambié") en un dato comparable con el
+            # log de arranque y con el panel de Diagnóstico.
+            if pref and "clave" in causa:
+                causa = f"{causa} (la que usó: {pref}…)"
+            partes.append(f"{nombre.upper()}: {causa}")
+        detalle = " · ".join(partes)
         return (
             f"Ningún proveedor de IA respondió → {detalle}. "
             "El análisis NO se guardó. Revisá la configuración del proveedor "
@@ -282,6 +295,25 @@ _GROQ_MAX_TOKENS_GPT_OSS = max(_GROQ_MAX_TOKENS, 8000)
 # fallo y omite el kwarg desde la primera llamada en adelante. Ahorro:
 # ~8s por dictamen (logs Fly 18:01-18:03 UTC).
 _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
+
+# Marcas de que el rechazo fue POR EL PARÁMETRO `reasoning_effort`.
+# 04-08-2026: la lista ancha (la de abajo) incluye `invalid_request_error`,
+# que es el tipo que Groq devuelve TAMBIÉN cuando la clave está mal o el
+# contexto es muy largo. Con eso, una sola llamada con la clave vencida
+# apagaba el razonador de gpt-oss para TODO el proceso —hasta el próximo
+# reinicio— aunque el parámetro nunca hubiera sido el problema. El reintento
+# de esa llamada sigue usando la lista ancha (no cuesta nada); el apagado
+# permanente exige que el error NOMBRE al parámetro.
+_MARCAS_RECHAZO_DEL_PARAMETRO = (
+    "reasoning_effort",
+    "reasoning effort",
+    "unknown_argument",
+    "unknown_parameter",
+    "unrecognized",
+    "extra inputs are not permitted",
+    "unsupported_parameter",
+    "unsupported parameter",
+)
 
 # Versión del cache de IA (ronda 5, 16-jun-2026). Bumpear cuando cambien
 # el system prompt, redes finales (descomillar/contratos/CUPS/EPS/
@@ -4367,6 +4399,13 @@ class GlosaService:
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
+        # Prefijo (10 caracteres) de la clave que ESTE servicio va a usar.
+        # Identifica sin revelar y viaja al aviso de error cuando el
+        # proveedor rechaza la clave — ver _mensaje_ia_caida.
+        self.pref_clave = {
+            "groq": (groq_api_key or "")[:10],
+            "anthropic": (self.anthropic_key or "")[:10],
+        }
         # Jun-2026 (decisión Yesid): la cadena de DICTÁMENES queda en SOLO
         # Groq (primario, gratis/rápido) + Anthropic (calidad / casos
         # complejos). Gemini y OpenRouter salieron del dictamen — "no las
@@ -8404,17 +8443,7 @@ class GlosaService:
                         and not deshabilitar_reasoning
                         and any(
                             k in error_msg
-                            for k in (
-                                "reasoning_effort",
-                                "reasoning effort",
-                                "unknown_argument",
-                                "unknown_parameter",
-                                "unrecognized",
-                                "extra inputs are not permitted",
-                                "unsupported_parameter",
-                                "unsupported parameter",
-                                "invalid_request_error",
-                            )
+                            for k in _MARCAS_RECHAZO_DEL_PARAMETRO + ("invalid_request_error",)
                         )
                     ):
                         deshabilitar_reasoning = True
@@ -8423,12 +8452,16 @@ class GlosaService:
                         # en NINGUNA llamada futura de este proceso (los
                         # logs muestran el TypeError repetido en cada
                         # llamada cuando esto era local a la función).
-                        _GROQ_SDK_SOPORTA_REASONING_EFFORT = False
+                        # 04-08-2026: solo si el error NOMBRA al parámetro —
+                        # una clave vencida también es `invalid_request_error`
+                        # y dejaba a gpt-oss sin razonador todo el día.
+                        if any(k in error_msg for k in _MARCAS_RECHAZO_DEL_PARAMETRO):
+                            _GROQ_SDK_SOPORTA_REASONING_EFFORT = False
                         logger.warning(
                             f"[GROQ-RETRY-NO-REASONING] model={modelo} "
                             "(API rechazó reasoning_effort — reintentando "
                             "el mismo modelo sin ese parámetro; bandera de "
-                            "proceso ON para no repetirlo)"
+                            f"proceso={not _GROQ_SDK_SOPORTA_REASONING_EFFORT})"
                         )
                         continue  # mismo intento, sin sumar
                     es_rate_limit = any(k in error_msg for k in ("429", "rate_limit", "rate limit"))
@@ -8991,7 +9024,7 @@ class GlosaService:
         # Anthropic de respaldo, si fallaban los dos el mensaje solo nombraba
         # al ÚLTIMO (Anthropic) — el auditor veía «Invalid API Key» de un
         # proveedor que ni siquiera es el suyo y no sabía qué pasó con Groq.
-        fallos_por_proveedor: list[tuple[str, Exception]] = []
+        fallos_por_proveedor: list[tuple[str, Exception, str]] = []
         _causa_anthropic = ""
         for nombre, fn in intentos:
             try:
@@ -9030,7 +9063,9 @@ class GlosaService:
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
-                fallos_por_proveedor.append((nombre, e))
+                fallos_por_proveedor.append(
+                    (nombre, e, getattr(self, "pref_clave", {}).get(nombre, ""))
+                )
                 if nombre == "anthropic":
                     _causa_anthropic = str(e)[:200]
                 logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
