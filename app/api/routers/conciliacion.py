@@ -437,7 +437,7 @@ artículo 126 de la Ley 1438 de 2011.
 @router.post("/acta-sinac/pdf")
 def pdf_acta_sinac(
     payload: ActaSinacInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Genera el acta de conciliación en formato SINAC (multi-glosa) como
     HTML imprimible. Replica la estructura del Excel ACTA_SINAC_N_XXX que

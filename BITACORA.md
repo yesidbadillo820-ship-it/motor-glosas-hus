@@ -1363,6 +1363,37 @@ períodos perdidos.
 
 ---
 
+### 04-08 (novena parte) — Quién puede tocar qué: las 51 puertas abiertas
+
+El 28 de julio se encontraron cuatro «puertas de al lado»: rutas del
+sistema por las que se podía cambiar una glosa **sin comprobar el cargo**
+de quien lo pedía. Se cerraron una por una, pero quedaban **51 rutas** que
+solo pedían haber entrado con usuario y contraseña, sin que nadie hubiera
+decidido si eso estaba bien o era otro descuido esperando.
+
+Quedaron todas decididas y escritas:
+
+- **39 pasaron a exigir cargo de auditor o superior**: analizar una glosa,
+  importar en masa, comentar en el expediente, validar, restaurar una
+  versión del dictamen, decidir glosas ADRES, crear plantillas del equipo,
+  preguntarle a la IA, generar el PDF del acta.
+- **2 pasaron a coordinación**: subir el PDF de un contrato y mandar
+  alertas por correo a todo el equipo.
+- **12 se quedan como estaban** porque son del propio usuario: entrar y
+  salir, cambiar su contraseña, su segundo factor, sus tareas, sus
+  vacaciones y el buzón de sugerencias.
+- **9 ya comprobaban el cargo por dentro** (las que dependen del dato:
+  «esta glosa es de otro auditor»), y ahora una prueba verifica que ese
+  chequeo exista de verdad.
+
+El único que pierde algo es el perfil **VIEWER** (el que solo mira), que
+es exactamente para lo que existe. El auditor no perdió nada: hay pruebas
+que lo comprueban en las dos direcciones.
+
+Lo importante para el futuro: **una ruta nueva que modifique datos y no
+tenga decisión de permisos rompe las pruebas**. Ya no depende de que
+alguien se acuerde de revisarlo.
+
 ### 04-08 (octava parte) — Una librería ajena tapó la carpeta de los bots
 
 A las 18:20 (hora universal) se publicó **Mako 1.4.0**, una librería que
