@@ -1404,6 +1404,28 @@ Lo que quedó hecho:
   y **en un Windows en español nunca encontraba nada**, por eso decía «no
   había ningún motor encendido» cuando sí lo había—.
 
+**Cierre del día, con la máquina de Yesid como banco de pruebas.** Cada
+corrida real destapó algo más:
+
+- El bot mostró **dos motores en el puerto 8080** y parecía haber un
+  intruso. No lo había: en Windows el Python del proyecto es un lanzador
+  que arranca el intérprete de verdad como **proceso hijo**, y es el hijo
+  el que se queda con el puerto. Un solo motor. El bot ahora los cuenta
+  como uno —pero al cerrar se lleva padre e hijo, porque matar solo al
+  padre dejaría vivo justo al que tiene el puerto—.
+- **La página por internet no revivía sola si había un motor de pruebas
+  abierto.** El vigilante se negaba a arrancar cuando veía cualquier motor
+  de la aplicación, sin mirar el puerto. Con el 8000 encendido —que es lo
+  que el propio bot invita a hacer— la página pública se habría quedado
+  caída en el próximo corte. Corregido: mira el puerto.
+- Si algún día se arranca con la opción de recarga automática, el proceso
+  que de verdad atiende **se llama distinto** y el bot no lo veía: cerraba
+  al padre y dejaba al hijo con el puerto tomado. Ahora cierra el árbol
+  completo.
+- Y un detalle de presentación: un guion largo salía en la consola como
+  `â€`. Los mensajes del bot ahora usan solo caracteres que Windows
+  muestra bien, con una prueba que lo impide a futuro.
+
 ### 04-08 (novena parte) — Quién puede tocar qué: las 51 puertas abiertas
 
 El 28 de julio se encontraron cuatro «puertas de al lado»: rutas del
