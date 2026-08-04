@@ -22,6 +22,13 @@ pydantic[email]>=2.0.0,<3.0.0
 slowapi==0.1.9
 cachetools==5.5.0
 alembic==1.14.0
+# Mako llega con alembic. La versión 1.4.0 (publicada el 04-08-2026) se
+# empaquetó por error con una carpeta `tools/` propia que se instala junto
+# a las librerías y tapa la `tools/` del proyecto: el CI murió con
+# «No module named 'tools._dinero'». El repo ya se blindó (tools/__init__.py),
+# pero mientras el error siga arriba no vale la pena traer esa basura.
+# Cuando Mako publique el arreglo, quitar este tope.
+Mako>=1.3.0,<1.4.0
 pyotp==2.9.0
 qrcode[pil]==8.2
 cryptography>=42.0.0

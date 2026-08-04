@@ -3217,6 +3217,18 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <div class="kpi"><div class="kpi-lbl">Vencidas</div><div class="kpi-num" id="mando-venc" style="color:#dc2626">—</div><div class="kpi-sub">fuera de plazo</div></div>
         </div>
 
+        <!-- Panel operacional: dónde se atasca y quién lleva cuánto -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem;margin-bottom:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">🚧 Dónde se atasca el trabajo (glosas abiertas por estado)</div>
+            <div id="mando-cuellos" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">🎒 Carga por auditor (abiertas · vencidas · valor)</div>
+            <div id="mando-carga" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+        </div>
+
         <!-- Rankings lado a lado -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem">
           <div class="chart-card">
@@ -3424,8 +3436,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <h2 class="malla-titulo">Gobierno de IA</h2>
             <p class="malla-sub">Cuánto gasta la IA, en qué modelos, quién la usa y cuánto ahorra el caché — últimos 30 días.</p>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="gobProbar()">🔌 Probar proveedores de IA</button>
+            <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+          </div>
         </div>
+        <div id="gob-prueba" style="display:none"></div>
         <div id="gob-cuerpo"><div class="malla-vacio">Cargando…</div></div>
       </div>
     </div>
@@ -8209,7 +8225,7 @@ function tab(btn,id){
   if(id==='dashboard') loadDash();
   if(id==='glosas-adres') loadGlosasAdres();
   if(id==='resumen-mes') loadResumenMes();
-  if(id==='mando') loadMando();
+  if(id==='mando'){ loadMando(); loadOperacion(); }
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -9270,6 +9286,39 @@ async function descargarDictamenMd(){
 }
 
 // ══ GOBIERNO DE IA: gasto, modelos, usuarios y caché ══
+
+// Prueba de conexión: ¿sirve la clave? — sin gastar una glosa.
+async function gobProbar(){
+  var caja = document.getElementById('gob-prueba');
+  caja.style.display = 'block';
+  caja.innerHTML = '<div class="auto-resumen">Probando cada proveedor…</div>';
+  try{
+    var r = await fetch('/gobierno-ia/probar-proveedores', {headers: authH()});
+    if(r.status === 403){ caja.innerHTML = '<div class="auto-resumen">Solo coordinación y administración.</div>'; return; }
+    if(!r.ok){ caja.innerHTML = '<div class="auto-resumen">Error HTTP ' + r.status + '</div>'; return; }
+    var d = await r.json();
+    var color = d.funciona ? '#16a34a' : '#dc2626';
+    var html = '<div class="intel-card" style="--intel-c:' + color + '">'
+      + '<div class="ico">' + (d.funciona ? '✅' : '🔴') + '</div>'
+      + '<div class="cuerpo"><div class="titulo">' + escHtml(d.veredicto) + '</div>';
+    d.proveedores.forEach(function(p){
+      var ic = p.estado === 'OK' ? '✓' : (p.estado === 'FALLA' ? '✗' : '—');
+      var c = p.estado === 'OK' ? '#16a34a' : (p.estado === 'FALLA' ? '#dc2626' : '#b45309');
+      // La clave probada (10 caracteres) se muestra para poder compararla
+      // con la del log de arranque: si no coinciden, hay otro motor vivo.
+      var clave = p.clave_probada ? ' <span style="opacity:.6">· clave ' + escHtml(p.clave_probada) + '…</span>' : '';
+      html += '<div class="porque"><b style="color:' + c + '">' + ic + ' ' + escHtml(p.proveedor.toUpperCase()) + '</b>'
+        + (p.es_principal ? ' <em>(principal)</em>' : '') + ' — ' + escHtml(p.detalle) + clave + '</div>';
+    });
+    if(d.motores_vivos > 1){
+      // Aquí NO se manda a cerrar ningún motor: el 04-08-2026 el otro era el
+      // que sirve la página por internet, y cerrarlo la tumbó.
+      html += '<div class="porque" style="color:#b45309;font-weight:600">⚠ Hay ' + d.motores_vivos + ' motores encendidos en el servidor, cada uno con su propia copia de las claves. Esta prueba vale para el que te está atendiendo ahora.</div>';
+    }
+    html += '</div></div>';
+    caja.innerHTML = html;
+  }catch(e){ caja.innerHTML = '<div class="auto-resumen">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
 
 async function gobCargar(){
   var cuerpo = document.getElementById('gob-cuerpo');
@@ -16991,6 +17040,7 @@ async function cargarDiagnostico(){
       // "volumen_fly" del periodo Fly.io) pero el panel ya está corriendo
       // en self-hosted Google Cloud. Mostramos el nombre actual.
       var LABEL_OVERRIDES = {
+        'motor': 'Motor (quién está atendiendo)',
         'volumen_fly': 'Volumen de Datos',
         'base_de_datos': 'Base de Datos',
         'soportes_indexer': 'Soportes Indexer',
@@ -20342,6 +20392,47 @@ async function loadResumenMes(){
 
 // ─── B.1: Mando ejecutivo (single-pane-of-glass) ─────────────────────────
 var MANDO_TIMER = null;
+async function loadOperacion(){
+  var cu = document.getElementById('mando-cuellos');
+  var ca = document.getElementById('mando-carga');
+  if(!cu || !ca) return;
+  try{
+    var r = await fetch('/dashboard-ejecutivo/operacion', {headers: authH()});
+    if(!r.ok){ cu.textContent = 'Error ' + r.status; return; }
+    var d = await r.json();
+    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+
+    if(!d.cuellos_por_estado.length){
+      cu.innerHTML = '<span style="color:var(--text3)">No hay glosas abiertas.</span>';
+    } else {
+      var max = d.cuellos_por_estado[0].valor || 1;
+      cu.innerHTML = d.cuellos_por_estado.map(function(c){
+        var pct = Math.max(4, Math.round(100 * c.valor / max));
+        var viejo = c.mas_vieja_dias >= 30 ? '#dc2626' : (c.mas_vieja_dias >= 15 ? '#b45309' : 'var(--text3)');
+        return '<div style="margin-bottom:.55rem">'
+          + '<div style="display:flex;justify-content:space-between;gap:.5rem">'
+          +   '<b>' + escHtml(c.estado) + '</b>'
+          +   '<span>' + c.cantidad + ' · ' + cop(c.valor) + '</span></div>'
+          + '<div style="height:6px;background:var(--border);border-radius:3px;margin:.2rem 0"><div style="height:6px;width:' + pct + '%;background:#0369a1;border-radius:3px"></div></div>'
+          + '<div style="font-size:.72rem;color:' + viejo + '">la más vieja lleva ' + c.mas_vieja_dias + ' día(s) sin cerrarse</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    var totalSin = d.sin_asignar || 0;
+    ca.innerHTML = (totalSin ? '<div style="color:#b45309;margin-bottom:.4rem"><b>' + totalSin + ' glosa(s) sin asignar</b> — usá «Auto-balancear» arriba.</div>' : '')
+      + (d.carga_por_auditor.length
+          ? d.carga_por_auditor.map(function(a){
+              return '<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.25rem 0;border-bottom:1px solid var(--border)">'
+                + '<span>' + escHtml(a.auditor) + '</span>'
+                + '<span>' + a.abiertas + ' abiertas'
+                + (a.vencidas ? ' · <b style="color:#dc2626">' + a.vencidas + ' vencidas</b>' : '')
+                + ' · ' + cop(a.valor) + '</span></div>';
+            }).join('')
+          : '<span style="color:var(--text3)">Sin carga abierta.</span>');
+  }catch(e){ cu.textContent = 'Conexión: ' + e.message; }
+}
+
 async function loadMando(){
   var box = document.getElementById('p-mando');
   if(!box) return;

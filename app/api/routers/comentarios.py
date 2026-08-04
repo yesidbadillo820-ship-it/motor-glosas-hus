@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import ComentarioGlosaRecord, GlosaRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/glosas/{glosa_id}/comentarios", tags=["comentarios"])
@@ -56,7 +56,7 @@ def agregar(
     glosa_id: int,
     data: ComentarioInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Agrega un comentario al hilo. Detecta menciones @email automáticamente."""
     if not db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first():
@@ -103,7 +103,7 @@ def resolver(
     glosa_id: int,
     comentario_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Marca el comentario como resuelto."""
     c = (

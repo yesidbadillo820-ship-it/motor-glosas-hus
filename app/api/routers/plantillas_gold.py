@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual, get_auditor_o_superior
 from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import GlosaRecord, PlantillaGoldRecord, UsuarioRecord
@@ -80,7 +80,7 @@ def listar(
 def crear(
     data: PlantillaGoldInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Guarda una respuesta exitosa como plantilla gold."""
     if len(data.argumento.strip()) < 50:
@@ -117,7 +117,7 @@ def crear(
 def crear_desde_glosa(
     glosa_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Crea una plantilla gold a partir de una glosa que fue LEVANTADA o
     ACEPTADA por la EPS. Extrae el argumento del dictamen automáticamente."""

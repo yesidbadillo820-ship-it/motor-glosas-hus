@@ -23,7 +23,26 @@ import validar_json_rips as val  # noqa: E402
 INVOICE = """<?xml version="1.0" encoding="utf-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
- xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+ xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+ xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+  <ext:UBLExtensions>
+    <ext:UBLExtension>
+      <ext:ExtensionContent>
+        <CustomTagGeneral>
+          <Interoperabilidad>
+            <Group schemeName="Sector Salud">
+              <Collection schemeName="Usuario">
+                <AdditionalInformation>
+                  <Name>CODIGO_PRESTADOR</Name>
+                  <Value>{cod_prestador}</Value>
+                </AdditionalInformation>
+              </Collection>
+            </Group>
+          </Interoperabilidad>
+        </CustomTagGeneral>
+      </ext:ExtensionContent>
+    </ext:UBLExtension>
+  </ext:UBLExtensions>
   <cbc:ID>{num}</cbc:ID>
   <cbc:UUID schemeID="1" schemeName="CUFE-SHA384">abc123</cbc:UUID>
   <cbc:IssueDate>2026-08-01</cbc:IssueDate>
@@ -72,9 +91,12 @@ def _xml(
     nit: str = "900299334",
     valor: str = "180000.00",
     adjunto: bool = True,
+    cod_prestador: str = "6800103933",
 ) -> Path:
     """Escribe un XML de factura (por defecto, AttachedDocument como el real)."""
-    invoice = INVOICE.format(num=num, inicio=inicio, fin=fin, nit=nit, valor=valor)
+    invoice = INVOICE.format(
+        num=num, inicio=inicio, fin=fin, nit=nit, valor=valor, cod_prestador=cod_prestador
+    )
     contenido = ATTACHED.format(num=num, invoice=invoice) if adjunto else invoice
     ruta = tmp_path / "factura.xml"
     ruta.write_text(contenido, encoding="utf-8")
@@ -275,6 +297,51 @@ def test_atencion_dentro_de_un_periodo_amplio(tmp_path):
     data = _rips(consultas=[_consulta(fechaInicioAtencion="2026-07-27 16:00")])
     ruta_xml = _xml(tmp_path, inicio="2026-07-01", fin="2026-07-31")
     hallazgos, _ = val.validar_paquete(_json(tmp_path, data), ruta_xml)
+    assert _errores(hallazgos) == []
+
+
+def test_lee_el_codigo_prestador_del_bloque_de_interoperabilidad(tmp_path):
+    datos = val.datos_factura(_xml(tmp_path))
+    assert datos["codigo_prestador"] == "6800103933"
+
+
+def test_codigo_prestador_de_12_en_el_xml_es_el_rechazo_rvc011(tmp_path):
+    """El caso real de la MED737: el facturador puso el codigo de sede en la FEV."""
+    ruta_xml = _xml(tmp_path, cod_prestador="680010393301")
+    hallazgos, _ = val.validar_paquete(_json(tmp_path, _rips()), ruta_xml)
+    assert "CODIGO_PRESTADOR (XML)" in _errores(hallazgos)
+    hallazgo = next(h for h in hallazgos if h.campo == "CODIGO_PRESTADOR (XML)")
+    assert "RVC011" in hallazgo.detalle
+    # La salida tiene que decir el numero correcto y quien lo corrige.
+    assert "6800103933" in hallazgo.solucion
+    assert "reexpedir" in hallazgo.solucion
+
+
+def test_cod_prestador_del_rips_debe_tener_12(tmp_path):
+    """El RIPS lleva el codigo de la sede; con 10 el validador rechaza (RVG01)."""
+    data = _rips(consultas=[_consulta(codPrestador="6800103933")])
+    hallazgos, _ = val.validar_paquete(_json(tmp_path, data), _xml(tmp_path))
+    campo = "usuarios[0].servicios.consultas[0].codPrestador"
+    assert campo in _errores(hallazgos)
+    hallazgo = next(h for h in hallazgos if h.campo == campo)
+    assert "12" in hallazgo.detalle
+
+
+def test_prestador_del_rips_distinto_al_de_la_factura(tmp_path):
+    data = _rips(consultas=[_consulta(codPrestador="680019999901")])
+    hallazgos, _ = val.validar_paquete(_json(tmp_path, data), _xml(tmp_path))
+    assert "usuarios[0].servicios.consultas[0].codPrestador" in _errores(hallazgos)
+
+
+def test_prestador_coherente_no_genera_hallazgo(tmp_path):
+    """XML con 10 y RIPS con esos mismos 10 + la sede: correcto."""
+    hallazgos, _ = val.validar_paquete(_json(tmp_path, _rips()), _xml(tmp_path))
+    assert _errores(hallazgos) == []
+
+
+def test_xml_sin_bloque_de_interoperabilidad_no_revienta(tmp_path):
+    ruta_xml = _xml(tmp_path, cod_prestador="")
+    hallazgos, _ = val.validar_paquete(_json(tmp_path, _rips()), ruta_xml)
     assert _errores(hallazgos) == []
 
 

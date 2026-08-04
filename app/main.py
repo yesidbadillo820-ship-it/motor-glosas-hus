@@ -140,6 +140,11 @@ _INDICES_HISTORIAL = [
     ("ix_historial_workflow_state", "workflow_state"),
 ]
 
+# El chequeo de motores duplicados corre UNA vez por proceso: en las pruebas
+# el lifespan arranca cientos de veces y recorrer la tabla de procesos en
+# cada una sería puro peaje.
+_MOTOR_YA_CHEQUEADO = False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1088,6 +1093,26 @@ async def lifespan(app: FastAPI):
         )
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
+
+    # ¿Quedó otro motor vivo del arranque anterior? (04-08-2026)
+    # En Windows el uvicorn nuevo puede convivir con el viejo sobre el mismo
+    # puerto: las peticiones caen en cualquiera de los dos y el viejo
+    # responde con la clave y el código anteriores. Se avisa UNA vez por
+    # proceso, aquí, que es el momento en que todavía se puede cerrar el
+    # sobrante antes de trabajar.
+    global _MOTOR_YA_CHEQUEADO
+    if not _MOTOR_YA_CHEQUEADO:
+        _MOTOR_YA_CHEQUEADO = True
+        try:
+            from app.services.motor_proceso import estado_motor
+
+            _est = estado_motor()
+            if _est["estado"] == "ok":
+                logger.info(f"[MOTOR] {_est['mensaje']}")
+            else:
+                logger.warning(f"[MOTOR-DUPLICADO] {_est['mensaje']}")
+        except Exception as _e_motor:
+            logger.warning(f"[MOTOR] no se pudo inspeccionar el proceso: {_e_motor}")
 
     # Guard global: DISABLE_SCHEDULERS=1 salta TODOS los schedulers en background.
     # Útil en CI/tests donde múltiples TestClient arrancan lifespan y crean

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/consulta-normativa", tags=["consulta-normativa"])
@@ -1125,7 +1125,7 @@ def exportar_normas(
 @router.post("")
 def consultar_biblioteca(
     data: ConsultaNormativaInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Busca normas en la biblioteca por una pregunta en lenguaje natural.
 

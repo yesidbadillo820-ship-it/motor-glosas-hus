@@ -1363,6 +1363,183 @@ períodos perdidos.
 
 ---
 
+### 04-08 (novena parte) — Quién puede tocar qué: las 51 puertas abiertas
+
+El 28 de julio se encontraron cuatro «puertas de al lado»: rutas del
+sistema por las que se podía cambiar una glosa **sin comprobar el cargo**
+de quien lo pedía. Se cerraron una por una, pero quedaban **51 rutas** que
+solo pedían haber entrado con usuario y contraseña, sin que nadie hubiera
+decidido si eso estaba bien o era otro descuido esperando.
+
+Quedaron todas decididas y escritas:
+
+- **39 pasaron a exigir cargo de auditor o superior**: analizar una glosa,
+  importar en masa, comentar en el expediente, validar, restaurar una
+  versión del dictamen, decidir glosas ADRES, crear plantillas del equipo,
+  preguntarle a la IA, generar el PDF del acta.
+- **2 pasaron a coordinación**: subir el PDF de un contrato y mandar
+  alertas por correo a todo el equipo.
+- **12 se quedan como estaban** porque son del propio usuario: entrar y
+  salir, cambiar su contraseña, su segundo factor, sus tareas, sus
+  vacaciones y el buzón de sugerencias.
+- **9 ya comprobaban el cargo por dentro** (las que dependen del dato:
+  «esta glosa es de otro auditor»), y ahora una prueba verifica que ese
+  chequeo exista de verdad.
+
+El único que pierde algo es el perfil **VIEWER** (el que solo mira), que
+es exactamente para lo que existe. El auditor no perdió nada: hay pruebas
+que lo comprueban en las dos direcciones.
+
+Lo importante para el futuro: **una ruta nueva que modifique datos y no
+tenga decisión de permisos rompe las pruebas**. Ya no depende de que
+alguien se acuerde de revisarlo.
+
+### 04-08 (octava parte) — Una librería ajena tapó la carpeta de los bots
+
+A las 18:20 (hora universal) se publicó **Mako 1.4.0**, una librería que
+viene incluida con otra que usa el sistema. Esa versión salió con un error
+de empaquetado: trae **una carpeta llamada `tools/` propia** que se instala
+junto a las librerías y **tapa la carpeta `tools/` del proyecto** —donde
+viven todos los bots—. Cuarenta y cinco minutos después, las pruebas
+automáticas del repositorio empezaron a morir con «No module named
+'tools._dinero'». No fue nada que hubiéramos hecho: le pasa a cualquier
+proyecto que tenga su propia carpeta con ese nombre.
+
+Lo grave es lo que habría pasado en producción: es exactamente el mismo
+síntoma del incidente del 31 de julio (todas las tarjetas del Centro de
+Automatización contestando «ModuleNotFoundError»). Bastaba con reinstalar
+las librerías en el PC o volver a armar la imagen del servidor.
+
+Quedó blindado por partida doble:
+
+- La carpeta `tools/` del proyecto ahora es un **paquete de verdad**
+  (`tools/__init__.py`): con eso gana siempre la del repositorio, sin
+  importar qué librería se llame igual mañana. Y viaja a la imagen del
+  servidor (línea nueva en `.dockerignore`).
+- Se le puso **tope a esa librería** (`Mako` por debajo de 1.4) para no
+  traer esa basura mientras el error siga arriba.
+- Dos pruebas nuevas lo vigilan: que el paquete exista y que sea el del
+  repositorio el que se carga, y que viaje en la imagen.
+
+### 04-08 (séptima parte) — Había DOS motores prendidos al mismo tiempo
+
+Este fue el verdadero culpable de toda la tarde. Yesid cambió la clave de
+Groq, reinició y el arranque escribió **`groq=OK gsk_vn06EE…`**; pero la
+pantalla de Diagnóstico —que lee exactamente el mismo dato— mostraba
+**`gsk_5CxaRq…`** (la clave vieja) y el análisis seguía fallando con «clave
+inválida». Dos respuestas distintas para el mismo dato solo tienen una
+explicación: **no era un solo programa contestando, eran dos**.
+
+**La explicación de verdad (y no era la primera que se pensó).** En el PC
+del hospital corren **dos motores al mismo tiempo, en puertos distintos**:
+
+- el del **puerto 8080**, que lo mantiene vivo `tools/servidor_motor_local.cmd`
+  y es **el que alimenta la página por internet** (el túnel de Cloudflare);
+- el del **puerto 8000**, que es el que Yesid levanta a mano para probar.
+
+El del 8080 llevaba horas arriba, así que conservaba la clave vieja y el
+programa viejo — y **el navegador estaba hablando con ese**. Por eso el
+arranque del 8000 mostraba una clave y la pantalla mostraba la otra: no era
+una pantalla mintiendo, eran dos sistemas distintos.
+
+(La primera sospecha fue que los dos se peleaban el mismo puerto. Quedó
+descartada en vivo: al intentar levantar un segundo motor en el 8080,
+Windows respondió «solo se permite un uso de cada dirección de socket».)
+
+**La lección, que quedó escrita en el sistema:** si se cambia el archivo de
+claves, hay que **reiniciar los dos motores**. Reiniciar solo el de pruebas
+no toca la página por internet.
+
+Lo que se construyó para que no vuelva a pasar:
+
+- **`tools/REINICIAR_MOTOR.cmd`** (doble clic): cierra los motores **de su
+  propio puerto** —incluido el que quedó vivo sin estar atendiendo— y deja
+  uno solo recién arrancado. De los de otro puerto **avisa y no los toca**:
+  la primera versión los cerraba a todos y así se tumbó la página pública
+  por error.
+- **El Diagnóstico avisa primero**: la primera tarjeta del panel ahora es
+  **«Motor (quién está atendiendo)»**, con el puerto de cada uno. Si dos se
+  pelean el mismo puerto se pone en ROJO («cerrá el sobrante»); si están en
+  puertos distintos avisa en amarillo que son **dos instalaciones separadas**
+  y que hay que reiniciar las dos — sin mandar a cerrar ninguna.
+- **El arranque también lo dice**: junto a `[IA-PROVIDERS]` aparece
+  `[MOTOR] Un solo motor atendiendo…` o `[MOTOR-DUPLICADO] …`.
+- **El aviso de error dice CUÁL clave usó**: «GROQ: su clave está inválida o
+  vencida (la que usó: gsk_5CxaRq…)». Con eso se compara de un vistazo
+  contra la del arranque y se sabe si contestó el motor viejo.
+- **El botón «Probar proveedores de IA»** muestra la clave que probó y
+  advierte si hay más de un motor encendido (si no, uno ve verde y el
+  análisis igual falla).
+
+De paso apareció otro defecto real: cuando la clave estaba vencida, el motor
+**apagaba el «razonador» de uno de los modelos de Groq para el resto del
+día** (confundía el error de clave con un rechazo de ese ajuste). Los
+dictámenes salían más pobres y nada lo decía. Corregido: solo se apaga si el
+error nombra de verdad a ese ajuste.
+
+### 04-08 (sexta parte) — Botón para probar la clave de IA
+
+- En **Gobierno IA** hay un botón **«Probar proveedores de IA»**: hace una
+  llamada mínima a cada proveedor y dice en un renglón si la clave sirve
+  («✓ GROQ (principal) — respondió con llama-3.3-70b») o por qué no. Nació
+  del día de hoy: la única forma de saber si una clave nueva funcionaba
+  era analizar una glosa de verdad y ver si fallaba.
+- Y el aviso ya no deja causas en blanco: si un proveedor falla sin
+  explicar, dice «no respondió» en vez de dejar el renglón vacío.
+
+### 04-08 (quinta parte) — El .env correcto que el sistema no veía
+
+- Yesid montó el sistema en su equipo (ya no en el servidor de Google) y
+  el arranque decía **«groq=AUSENTE»** aunque el archivo de claves
+  estuviera bien puesto. No era su configuración: **el sistema leía las
+  claves en dos sitios distintos**. El motor de dictámenes las recibía
+  bien, pero el asistente, el auditor forense, el lector de cláusulas y
+  el propio mensaje de arranque las buscaban en otro lado y no las
+  encontraban nunca.
+- Quedó el puente: lo que está en el archivo de claves ahora también
+  queda disponible para todo el sistema. Si el arranque dice AUSENTE, de
+  verdad falta la clave — ya no es una falsa alarma. Lo que venga por
+  Docker o el servicio de Windows sigue mandando sobre el archivo.
+
+### 04-08 (cuarta parte) — El mensaje dice QUÉ proveedor falló y por qué
+
+- Con Groq como IA principal y Anthropic de respaldo, cuando fallaban
+  los dos el aviso solo nombraba al último: el auditor veía «clave
+  inválida» de Anthropic —que ni siquiera es su proveedor principal— y
+  no sabía qué había pasado con Groq.
+- Ahora el mensaje los nombra a todos con su causa en cristiano:
+  «GROQ: está en límite de uso · ANTHROPIC: su clave está inválida o
+  vencida». Las causas se traducen solas (sin saldo, saturado, no
+  respondió a tiempo, no se pudo conectar…).
+
+### 04-08 (tercera parte) — Una carátula vacía tampoco es un dictamen
+
+- Segundo hallazgo del mismo día: ya no salía el error de la IA en el
+  cuerpo, pero el dictamen salía **con la argumentación jurídica VACÍA**
+  y aun así con el sello «validado». Eso es peor que el error visible,
+  porque parece bueno.
+- Ahora el motor **se niega a armar la carátula** si la IA no devolvió
+  argumentación (tabla, sello y cierre no se generan), y el guardado la
+  rechaza también aunque llegara armada por otro camino. En pantalla:
+  mensaje claro de que no se guardó y que hay que reintentar.
+- Recordatorio: la causa de fondo sigue siendo la **clave de IA
+  inválida** en el servidor. Mientras no se renueve, el sistema no va a
+  inventar dictámenes — va a decir que no puede.
+
+### 04-08 (segunda parte) — Panel operacional y arreglo del CI
+
+- **El Mando ejecutivo ya muestra dónde se atasca el trabajo**: las
+  glosas abiertas agrupadas por estado, con cuánta plata hay parada en
+  cada uno y hace cuántos días no se mueve la más vieja (en rojo si pasa
+  de 30). Y al lado, **la carga real de cada auditor**: cuántas lleva
+  abiertas, cuántas ya vencidas y por qué valor — quien tiene vencidas
+  aparece de primero. Se decidió ampliar el Mando en vez de crear otra
+  pantalla, para no tener dos tableros que digan cosas parecidas.
+- **Arreglo del CI**: el cambio del incidente dejó tres pruebas viejas en
+  rojo porque validaban justamente el texto de error como si fuera
+  dictamen. Se corrigieron para probar lo que siempre quisieron probar,
+  con un dictamen de verdad.
+
 ### 04-08 — Incidente: un error de la IA quedó guardado como dictamen
 
 - Iván analizó una glosa de PPL y el «dictamen» salió con el error crudo
@@ -1484,7 +1661,7 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   (sección 5.ter), incluido el pantallazo de **Ver Histórico** como evidencia
   para el PDF de soportes.
 
-### 03-08 (octava parte) — Cuentas médicas: el CUV que no salía
+### 03-08 (CUV) — Cuentas médicas: el CUV que no salía
 
 - Cuentas médicas reportó que el validador del Ministerio no le generaba el
   **CUV** de la factura **MED737** (Medical Center Especialistas, NIT
@@ -1518,6 +1695,42 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   pasada del validador, la tabla de modalidades, los errores más frecuentes y
   la plantilla de PowerShell para corregir el JSON sin dañarlo.
 
+### 03-08 (CUV, parte 2) — El enredo del código de prestador
+
+Con las cuatro correcciones puestas, el Ministerio dejó de reclamar y salió un
+rechazo nuevo, **RVC011**, que costó tres intentos entender. Vale la pena
+dejarlo escrito porque le va a pasar a más facturas:
+
+- El mensaje dice que el código informado (`680010393301`) "no coincide con los
+  datos de autenticación" y muestra como habilitado `6800103933`. Parece que
+  sobraran dos dígitos en el RIPS. **No es así.**
+- **El mismo prestador se escribe con dos largos distintos según el archivo:**
+  en el **XML** de la factura va a **10 dígitos** (código del prestador) y en el
+  **JSON** de RIPS va a **12** (código de habilitación de la sede). Está en los
+  Documentos Técnicos 1 y 2 del Ministerio.
+- Se probó bajar el JSON a 10 y el validador contestó de una: *"El campo de
+  codPrestador debe tener 12 caracteres"*. Confirmado por descarte.
+- Se consultó el REPS (datos abiertos, dataset `c36g-9fc2`) con el NIT
+  900299334: prestador **6800103933**, sede **680010393301**. O sea que **el
+  JSON siempre estuvo bien** y la sede 01 es la correcta.
+- **Lo que está mal es el XML**, que lleva los 12 donde van 10. Y el XML está
+  firmado: no se toca. Le toca a **facturación reexpedir** la factura, y al
+  proveedor del software separar los dos parámetros — si usa uno solo para los
+  dos archivos, el error se repite en todas.
+- Las 3 notificaciones amarillas (RVC017/019/059) **no bloquean el CUV**: la
+  norma dice que son transitorias. Pero son cruces de CUPS contra diagnóstico,
+  cobertura y finalidad, o sea materia prima de glosa. Ojo con una: la factura
+  describe "CONSULTA ESPECIALIZADA POR PRIMERA VEZ" pero el RIPS reporta el
+  CUPS **890201**, que es consulta de primera vez **por medicina general**. Hay
+  que confirmar quién atendió antes de aprovechar la reexpedición.
+- **Cambio de norma importante:** la Resolución 2275 de 2023 fue **derogada por
+  la Resolución 948 de 2026**. Los anexos ya no van dentro de la resolución:
+  ahora son "Documento Técnico 1 y 2" y el Ministerio los actualiza en el
+  micrositio de SISPRO **sin expedir norma nueva**. Hay que mirarlos antes de
+  cada cargue grande.
+- `tools/validar_json_rips.py` ahora detecta este caso solo: lee el
+  `CODIGO_PRESTADOR` del bloque de interoperabilidad del XML, compara los largos
+  y dice cuál de los dos archivos tiene el error y quién lo corrige. 35 pruebas.
 ### 03-08 (octava parte) — Todo listo para empezar a subir a SIIFA
 
 - **`tools\CARGAR_SIIFA.cmd`** — bot de doble clic con menú, para no escribir
@@ -1894,18 +2107,40 @@ de Docker.
     el arranque, o si eso se deja para cuando llegue el primer lote real.
 
 ### Cuentas médicas — CUV de facturas nuevas (nuevo, 03-08)
-15. **Factura MED737:** aplicar las tres correcciones del JSON (modalidad `01`,
-    `numFactura` = `MED737`, `numNota` en `null`) y **preguntar a facturación**
-    por el conflicto de fechas: la atención es del 27-07 y la factura cubre el
-    período del 31-07. Sin resolver eso el Ministerio no entrega el CUV.
-16. **Revisar el resto de facturas de agosto** con `validar_json_rips.py
-    --recursivo` antes de subirlas. Si el facturador viene exportando el
-    `numFactura` sin prefijo y la modalidad en `null`, el problema es de todas,
-    no solo de la 737: ahí lo que toca es pedirle el ajuste al proveedor del
-    software, no corregir a mano cada archivo.
+15. **Factura MED737 — la pelota está en facturación.** El JSON ya quedó bien
+    (las 4 correcciones + `codPrestador` de 12 dígitos, que era el correcto).
+    Falta que **reexpidan la factura** con el `CODIGO_PRESTADOR` a **10 dígitos
+    (6800103933)** en el XML. Enviarles el pedido por escrito con los dos
+    valores explícitos: XML = `6800103933`, JSON = `680010393301`.
+16. **Avisar al proveedor del software de facturación** (el rastro apunta a
+    Siigo): si usa un solo parámetro para el XML y el RIPS, hay que separarlos.
+    Si no, el RVC011 se repite en todas las facturas.
+17. **Antes de reexpedir, confirmar quién atendió:** la factura dice "consulta
+    especializada" y el RIPS reporta CUPS 890201 (medicina general). Si atendió
+    un especialista, el CUPS y el `codServicio` también deben corregirse en la
+    misma reexpedición. Pedir el soporte de quién atendió.
+18. **Preguntar al Ministerio la vía correcta** (mesa de ayuda,
+    Soporte-fev-rips@minsalud.gov.co): si para corregir el `CODIGO_PRESTADOR` de
+    una FEV ya validada por la DIAN toca nota crédito de anulación total y
+    reexpedición, o si basta retransmitir. Ningún texto oficial lo ordena; la
+    vía de la anulación viene de mesas de ayuda de proveedores. Cuesta cero
+    preguntar y evita anular una factura sin necesidad.
+19. **Revisar el resto de facturas de agosto** con `validar_json_rips.py
+    --recursivo` antes de subirlas.
+20. **Revisar el número de factura si la reexpiden:** si sale con número nuevo,
+    el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
 
+00. **Antes de cualquier prueba de IA: reiniciar con
+    `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos
+    que quedaron prendidos y deja uno solo. Después, en **Gobierno IA →
+    «Probar proveedores de IA»**, verificar que la clave que aparece ahí sea
+    la misma que muestra el arranque. Si el Diagnóstico marca en rojo la
+    tarjeta «Motor (quién está atendiendo)», hay más de uno: cerrar y
+    repetir. Con eso queda lista la prueba de fuego pendiente: **pasar la
+    glosa de PPL por Analizar** y confirmar que sale con el formato
+    aprobado.
 0. **PRIORIDAD CERO — revivir la página YA (arranque exprés) y luego
    restaurar la historia.** Actualizado 04-08: la deuda ya se pagó; Google
    reabre la cuenta por soporte (caso #74044918, 24-48 h). Mientras tanto:

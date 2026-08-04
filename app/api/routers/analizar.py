@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.core.config import get_settings
 from app.core.logging_utils import logger, set_request_id
 from app.core.rate_limit import limiter
@@ -29,6 +29,7 @@ from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.glosa_ia_prompts import get_contrato
 from app.services.glosa_service import (
+    DictamenSinArgumentoError,
     GlosaService,
     IANoDisponibleError,
     texto_con_error_de_proveedor,
@@ -503,6 +504,19 @@ async def _persistir_y_responder(
     # Cinturón (incidente 04-08-2026): un texto con firma de error del
     # proveedor de IA jamás se persiste como dictamen, venga de donde venga
     # (caché envenenado, camino viejo, lo que sea).
+    _dictamen_txt = getattr(resultado, "dictamen", "") or ""
+    if "ARGUMENTACIÓN JURÍDICA" in _dictamen_txt:
+        _cuerpo = _dictamen_txt.split("ARGUMENTACIÓN JURÍDICA", 1)[1]
+        import re as _re
+
+        _visible = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", _cuerpo)).strip()
+        if len(_visible) < 60:
+            raise HTTPException(
+                503,
+                "El dictamen salió sin argumentación jurídica; NO se guardó. "
+                "Reintentá el análisis y si persiste avisá a administración.",
+            )
+
     if texto_con_error_de_proveedor(getattr(resultado, "dictamen", "") or "") or (
         texto_con_error_de_proveedor(getattr(resultado, "resumen", "") or "")
     ):
@@ -765,7 +779,7 @@ async def analizar(
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     from app.services.progreso_analisis import publicar as _publicar_progreso
 
@@ -1002,6 +1016,11 @@ async def analizar(
         return respuesta
     except HTTPException:
         raise
+    except DictamenSinArgumentoError as e:
+        # Carátula sin argumentación = no hay dictamen. 503 y nada guardado.
+        logger.error(f"[{req_id}] dictamen sin argumento: {e.mensaje}")
+        _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
+        raise HTTPException(status_code=503, detail=e.mensaje)
     except IANoDisponibleError as e:
         # Incidente 04-08-2026: la IA caída NO es un dictamen — es un 503
         # con causa legible, y no queda nada guardado.
@@ -1023,7 +1042,7 @@ async def analizar(
 async def preview_glosa(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
     db: Session = Depends(get_db),
 ):
     """Detecta automaticamente desde el texto crudo de la glosa:
@@ -1136,7 +1155,7 @@ async def preview_glosa(
 async def extraer_de_correo(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Recibe el texto crudo de un correo de EPS y extrae los campos
     estructurados (EPS, codigo, valor, factura, radicado, motivo).
@@ -1461,7 +1480,7 @@ def _fundir_extracciones(extraidos: list[dict]) -> dict:
 async def extraer_soportes(
     request: Request,
     archivos: list[UploadFile] = File(default=[]),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Auto-extrae metadata de los PDFs ANTES de "Analizar con IA".
 
