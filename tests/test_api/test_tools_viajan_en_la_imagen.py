@@ -48,6 +48,33 @@ def test_los_modulos_de_la_lista_blanca_existen():
             )
 
 
+def test_tools_es_un_paquete_de_verdad():
+    """04-08-2026: Mako 1.4.0 se publicó con una carpeta `tools/` propia que
+    se instala junto a las librerías. Un paquete de verdad le gana a una
+    carpeta suelta AUNQUE esté después en la ruta de búsqueda, así que el
+    sistema pasó a ver la `tools` de Mako: «No module named 'tools._dinero'».
+    Con `tools/__init__.py` gana el primero de la ruta — el del repo."""
+    import tools
+
+    assert (_RAIZ / "tools" / "__init__.py").exists(), (
+        "Falta tools/__init__.py: cualquier librería que traiga una carpeta "
+        "'tools' vuelve a tapar la del proyecto"
+    )
+    assert Path(tools.__file__).resolve().parent == (_RAIZ / "tools"), (
+        f"'import tools' está trayendo {tools.__file__} en vez del paquete del repo"
+    )
+
+
+def test_el_paquete_tools_viaja_en_la_imagen():
+    """Si `__init__.py` no viaja, dentro del contenedor vuelve a ser una
+    carpeta suelta y el Centro de Automatización se rompe en producción —
+    el mismo síntoma del incidente que originó esta guardia."""
+    lineas = _lineas_dockerignore()
+    if "tools/" not in lineas:
+        return
+    assert "!tools/__init__.py" in lineas
+
+
 def test_el_dockerfile_copia_tools():
     dockerfile = (_RAIZ / "Dockerfile").read_text(encoding="utf-8")
     assert re.search(r"^COPY tools/ ", dockerfile, re.M), (

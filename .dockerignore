@@ -24,6 +24,10 @@ CLAUDE*
 # lista la vigila un test: si el catálogo crece y acá falta el módulo,
 # la suite lo dice antes de que el auditor vea otro «ModuleNotFoundError».
 tools/
+# Sin este archivo `tools` sería una carpeta suelta dentro de la imagen y
+# la `tools/` que Mako 1.4.0 instala por error se la comería (04-08-2026,
+# ver tools/__init__.py). Debe viajar SIEMPRE.
+!tools/__init__.py
 !tools/scoreboard.py
 !tools/scoreboard_live.py
 !tools/_dinero.py

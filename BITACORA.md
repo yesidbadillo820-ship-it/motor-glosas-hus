@@ -1363,6 +1363,33 @@ períodos perdidos.
 
 ---
 
+### 04-08 (octava parte) — Una librería ajena tapó la carpeta de los bots
+
+A las 18:20 (hora universal) se publicó **Mako 1.4.0**, una librería que
+viene incluida con otra que usa el sistema. Esa versión salió con un error
+de empaquetado: trae **una carpeta llamada `tools/` propia** que se instala
+junto a las librerías y **tapa la carpeta `tools/` del proyecto** —donde
+viven todos los bots—. Cuarenta y cinco minutos después, las pruebas
+automáticas del repositorio empezaron a morir con «No module named
+'tools._dinero'». No fue nada que hubiéramos hecho: le pasa a cualquier
+proyecto que tenga su propia carpeta con ese nombre.
+
+Lo grave es lo que habría pasado en producción: es exactamente el mismo
+síntoma del incidente del 31 de julio (todas las tarjetas del Centro de
+Automatización contestando «ModuleNotFoundError»). Bastaba con reinstalar
+las librerías en el PC o volver a armar la imagen del servidor.
+
+Quedó blindado por partida doble:
+
+- La carpeta `tools/` del proyecto ahora es un **paquete de verdad**
+  (`tools/__init__.py`): con eso gana siempre la del repositorio, sin
+  importar qué librería se llame igual mañana. Y viaja a la imagen del
+  servidor (línea nueva en `.dockerignore`).
+- Se le puso **tope a esa librería** (`Mako` por debajo de 1.4) para no
+  traer esa basura mientras el error siga arriba.
+- Dos pruebas nuevas lo vigilan: que el paquete exista y que sea el del
+  repositorio el que se carga, y que viaje en la imagen.
+
 ### 04-08 (séptima parte) — Había DOS motores prendidos al mismo tiempo
 
 Este fue el verdadero culpable de toda la tarde. Yesid cambió la clave de
