@@ -11,8 +11,13 @@ title MotorGlosasServidor
 set "REPO=C:\motor-glosas\repo"
 if not exist "%REPO%\venv\Scripts\python.exe" exit /b 1
 
-rem Si ya hay un servidor corriendo, no duplicar
-powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app'}; if($p){exit 1}else{exit 0}"
+rem Si ya hay un servidor de PRODUCCION corriendo, no duplicar.
+rem El filtro mira el puerto desde el 04-08-2026: antes bastaba con que
+rem existiera cualquier uvicorn de la aplicacion, asi que mientras el
+rem auditor tuviera abierto su motor de pruebas (puerto 8000) este
+rem vigilante se negaba a arrancar — y si la pagina por internet se caia,
+rem NO volvia sola.
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
 if errorlevel 1 exit /b 0
 
 cd /d "%REPO%"

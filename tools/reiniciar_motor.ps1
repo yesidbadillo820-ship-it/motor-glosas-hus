@@ -76,12 +76,21 @@ foreach ($o in $otros) {
     Write-Host ("       - dejo VIVO el motor PID " + $o[0] + " del puerto " + $o[1] + $extra)
 }
 
-# --- Los del MISMO puerto: se cierran y se comprueba que murieron -----
+# --- Los del MISMO puerto: se cierra el ARBOL y se comprueba -----------
+# Con `uvicorn --reload` en Windows, el proceso que de verdad atiende NO
+# se llama uvicorn: el vigilante lo lanza con multiprocessing en modo
+# spawn y su linea de comando es
+#     python.exe -c "from multiprocessing.spawn import spawn_main; ..."
+# sin la palabra 'uvicorn' ni 'app.main'. El barrido de arriba no lo ve, y
+# cerrar solo al padre lo deja huerfano CON EL PUERTO TOMADO: el arranque
+# siguiente muere con «solo se permite un uso de cada direccion de
+# socket». Por eso se cierra el arbol (taskkill /T), no el PID suelto. El
+# /T es seguro aca: ese PID ya paso el filtro de puerto.
 $sobrevivientes = @()
 foreach ($m in $mios) {
-    Write-Host ("       - cerrando motor PID " + $m.ProcessId + " (puerto " + $Puerto + ")")
-    try { Stop-Process -Id $m.ProcessId -Force -ErrorAction Stop } catch { }
-    Start-Sleep -Milliseconds 400
+    Write-Host ("       - cerrando motor PID " + $m.ProcessId + " y sus hijos (puerto " + $Puerto + ")")
+    & taskkill.exe /PID $m.ProcessId /T /F 2>&1 | Out-Null
+    Start-Sleep -Milliseconds 600
     if (Get-Process -Id $m.ProcessId -ErrorAction SilentlyContinue) {
         $sobrevivientes += $m.ProcessId
     }
@@ -100,12 +109,25 @@ $ajenos = @()
 foreach ($pid_ in $duenos) {
     if ($pid_ -eq 0) { continue }
     $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$pid_" -ErrorAction SilentlyContinue
-    if (-not $proc) { continue }
-    $es_motor = $proc.CommandLine -and $proc.CommandLine -match 'uvicorn' -and $proc.CommandLine -match 'app\.main'
+    if (-not $proc) {
+        # El puerto figura tomado por un PID que ya no existe (o que no se
+        # deja consultar). Antes se seguia de largo en silencio y el .cmd
+        # arrancaba encima, para morir con el 10048 sin explicacion.
+        Write-Host ("       [!] El puerto " + $Puerto + " figura tomado por el PID " + $pid_ + ", que no puedo consultar.")
+        $ajenos += ("PID " + $pid_ + " (no se deja ver)")
+        continue
+    }
+    # El hijo de --reload cuenta como motor propio aunque su linea de
+    # comando no diga uvicorn: es el que hereda el socket.
+    $es_motor = $proc.CommandLine -and (
+        ($proc.CommandLine -match 'uvicorn' -and $proc.CommandLine -match 'app\.main') -or
+        $proc.CommandLine -match 'multiprocessing' -or
+        $proc.CommandLine -match 'multiprocessing-fork'
+    )
     if ($es_motor) {
         Write-Host ("       - cerrando motor PID " + $pid_ + " que seguia con el puerto " + $Puerto)
-        try { Stop-Process -Id $pid_ -Force -ErrorAction Stop } catch { }
-        Start-Sleep -Milliseconds 400
+        & taskkill.exe /PID $pid_ /T /F 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 600
         if (Get-Process -Id $pid_ -ErrorAction SilentlyContinue) { $sobrevivientes += $pid_ }
     }
     else {
