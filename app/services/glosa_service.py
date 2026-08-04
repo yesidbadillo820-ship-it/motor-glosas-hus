@@ -63,7 +63,38 @@ def texto_con_error_de_proveedor(texto: str) -> bool:
     return any(f in bajo for f in FIRMAS_ERROR_PROVEEDOR)
 
 
-def _mensaje_ia_caida(error) -> str:
+def _causa_corta(error) -> str:
+    """La causa de UN proveedor, en cristiano."""
+    s = str(error).lower()
+    if "invalid_api_key" in s or "invalid api key" in s or "authentication" in s or "401" in s:
+        return "su clave está inválida o vencida"
+    if "rate limit" in s or "429" in s:
+        return "está en límite de uso (demasiadas peticiones)"
+    if "overloaded" in s or "529" in s or "503" in s:
+        return "está saturado"
+    if "insufficient" in s or "credit" in s or "billing" in s or "quota" in s:
+        return "la cuenta no tiene saldo/cupo"
+    if "timeout" in s or "timed out" in s:
+        return "no respondió a tiempo"
+    if "connection" in s or "network" in s or "dns" in s:
+        return "no se pudo conectar (red)"
+    return str(error)[:90]
+
+
+def _mensaje_ia_caida(error, fallos=None) -> str:
+    """El mensaje que ve el auditor: qué proveedor falló y por qué.
+
+    Con varios proveedores en cadena (Groq principal + Anthropic de
+    respaldo) hay que nombrarlos a TODOS: decir solo el último confunde
+    —el auditor ve el error de un proveedor que ni siquiera es el suyo—.
+    """
+    if fallos:
+        detalle = " · ".join(f"{nombre.upper()}: {_causa_corta(err)}" for nombre, err in fallos)
+        return (
+            f"Ningún proveedor de IA respondió → {detalle}. "
+            "El análisis NO se guardó. Revisá la configuración del proveedor "
+            "principal o reintentá en unos minutos."
+        )
     s = str(error).lower()
     if "invalid_api_key" in s or "invalid api key" in s or "authentication" in s or "401" in s:
         return (
@@ -8953,6 +8984,11 @@ class GlosaService:
                 intentos.append(("anthropic", self._llamar_anthropic))
 
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
+        # Incidente 04-08-2026 (tercera parte): con Groq como principal y
+        # Anthropic de respaldo, si fallaban los dos el mensaje solo nombraba
+        # al ÚLTIMO (Anthropic) — el auditor veía «Invalid API Key» de un
+        # proveedor que ni siquiera es el suyo y no sabía qué pasó con Groq.
+        fallos_por_proveedor: list[tuple[str, Exception]] = []
         _causa_anthropic = ""
         for nombre, fn in intentos:
             try:
@@ -8991,6 +9027,7 @@ class GlosaService:
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
+                fallos_por_proveedor.append((nombre, e))
                 if nombre == "anthropic":
                     _causa_anthropic = str(e)[:200]
                 logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
@@ -9001,7 +9038,7 @@ class GlosaService:
         # crudo del proveedor como <argumento> y el 401 quedó GUARDADO como
         # argumentación jurídica con sello. Un fallo de proveedor ahora es
         # un fallo del análisis: causa legible y NADA se persiste.
-        raise IANoDisponibleError(_mensaje_ia_caida(ultimo_error))
+        raise IANoDisponibleError(_mensaje_ia_caida(ultimo_error, fallos_por_proveedor))
 
 
 # ─── Caché persistente en BD (optimización #1) ───────────────────────────────

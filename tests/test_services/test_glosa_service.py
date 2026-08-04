@@ -173,8 +173,11 @@ class TestDiasHabilesFechasInvalidas:
             system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
         ):
             return (
-                "<argumento>ESE HUS NO ACEPTA LA GLOSA. SE SOLICITA EL "
-                "LEVANTAMIENTO DE LA GLOSA.</argumento>",
+                "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE FALTA DE "
+                "SOPORTE DE ENTREGA SOBRE EL CODIGO FA0101, TODA VEZ QUE LA "
+                "FACTURA FUE RADICADA EN TERMINOS Y CONSTA EL ACUSE DE RECIBO "
+                "EN EL EXPEDIENTE. SE SOLICITA EL LEVANTAMIENTO DE LA "
+                "GLOSA.</argumento>",
                 "stub",
             )
 

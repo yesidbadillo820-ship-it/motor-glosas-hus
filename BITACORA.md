@@ -1363,6 +1363,17 @@ períodos perdidos.
 
 ---
 
+### 04-08 (cuarta parte) — El mensaje dice QUÉ proveedor falló y por qué
+
+- Con Groq como IA principal y Anthropic de respaldo, cuando fallaban
+  los dos el aviso solo nombraba al último: el auditor veía «clave
+  inválida» de Anthropic —que ni siquiera es su proveedor principal— y
+  no sabía qué había pasado con Groq.
+- Ahora el mensaje los nombra a todos con su causa en cristiano:
+  «GROQ: está en límite de uso · ANTHROPIC: su clave está inválida o
+  vencida». Las causas se traducen solas (sin saldo, saturado, no
+  respondió a tiempo, no se pudo conectar…).
+
 ### 04-08 (tercera parte) — Una carátula vacía tampoco es un dictamen
 
 - Segundo hallazgo del mismo día: ya no salía el error de la IA en el
