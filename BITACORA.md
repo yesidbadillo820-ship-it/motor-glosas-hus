@@ -1270,6 +1270,22 @@ períodos perdidos.
 
 ---
 
+### 04-08 — Incidente: un error de la IA quedó guardado como dictamen
+
+- Iván analizó una glosa de PPL y el «dictamen» salió con el error crudo
+  del proveedor («Invalid API Key») como argumentación jurídica, con
+  sello de calidad y todo. Dos causas, dos arreglos:
+  1. **La clave de Anthropic del servidor está inválida** — hay que
+     renovarla (instrucción abajo en el chat). Eso es configuración, no
+     código.
+  2. **El motor jamás debió guardar eso.** Ahora, si la IA se cae, el
+     análisis falla LIMPIO: mensaje claro de qué pasó y qué hacer («la
+     clave está vencida, avisá a administración» / «saturada, reintentá
+     en 2-3 minutos») y NO se guarda nada. Y aunque un texto con firma
+     de error llegara por cualquier otro camino, la persistencia lo
+     rechaza: no puede volver a existir un dictamen que diga «Invalid
+     API Key».
+
 ### 03-08 (cuarta parte) — Gobierno de IA: el gasto se ve
 
 - Pantalla nueva **Gobierno IA** (Reportes, solo coordinación y

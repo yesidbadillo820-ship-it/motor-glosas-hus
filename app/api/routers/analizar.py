@@ -28,7 +28,11 @@ from app.models.schemas import GlosaInput, GlosaResult
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.glosa_ia_prompts import get_contrato
-from app.services.glosa_service import GlosaService
+from app.services.glosa_service import (
+    GlosaService,
+    IANoDisponibleError,
+    texto_con_error_de_proveedor,
+)
 from app.utils.moneda import parse_valor_cop
 from app.utils.parsers_glosa import (
     _concepto_glosa,
@@ -496,6 +500,18 @@ async def _persistir_y_responder(
 ):
     """Cierra el flujo: aplica banner de tarifa, decide estado, construye
     dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
+    # Cinturón (incidente 04-08-2026): un texto con firma de error del
+    # proveedor de IA jamás se persiste como dictamen, venga de donde venga
+    # (caché envenenado, camino viejo, lo que sea).
+    if texto_con_error_de_proveedor(getattr(resultado, "dictamen", "") or "") or (
+        texto_con_error_de_proveedor(getattr(resultado, "resumen", "") or "")
+    ):
+        raise HTTPException(
+            503,
+            "El resultado traía un error del proveedor de IA en el cuerpo; NO se "
+            "guardó. Reintentá el análisis y si persiste avisá a administración.",
+        )
+
     glosa_repo = GlosaRepository(db)
     # parse_valor_cop entiende formato colombiano ("7.700,00" → 7700.0).
     # El patrón anterior float(re.sub(r"[^\d]","",x)) inflaba 100× los
@@ -986,6 +1002,12 @@ async def analizar(
         return respuesta
     except HTTPException:
         raise
+    except IANoDisponibleError as e:
+        # Incidente 04-08-2026: la IA caída NO es un dictamen — es un 503
+        # con causa legible, y no queda nada guardado.
+        logger.error(f"[{req_id}] IA no disponible: {e.mensaje}")
+        _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
+        raise HTTPException(status_code=503, detail=e.mensaje)
     except Exception as e:
         logger.error(f"[{req_id}] Error en análisis: {e}", exc_info=True)
         _publicar_progreso(_tid, "error", {"mensaje": str(e)[:200]})
