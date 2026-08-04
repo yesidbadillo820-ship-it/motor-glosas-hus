@@ -1363,6 +1363,20 @@ períodos perdidos.
 
 ---
 
+### 04-08 (quinta parte) — El .env correcto que el sistema no veía
+
+- Yesid montó el sistema en su equipo (ya no en el servidor de Google) y
+  el arranque decía **«groq=AUSENTE»** aunque el archivo de claves
+  estuviera bien puesto. No era su configuración: **el sistema leía las
+  claves en dos sitios distintos**. El motor de dictámenes las recibía
+  bien, pero el asistente, el auditor forense, el lector de cláusulas y
+  el propio mensaje de arranque las buscaban en otro lado y no las
+  encontraban nunca.
+- Quedó el puente: lo que está en el archivo de claves ahora también
+  queda disponible para todo el sistema. Si el arranque dice AUSENTE, de
+  verdad falta la clave — ya no es una falsa alarma. Lo que venga por
+  Docker o el servicio de Windows sigue mandando sobre el archivo.
+
 ### 04-08 (cuarta parte) — El mensaje dice QUÉ proveedor falló y por qué
 
 - Con Groq como IA principal y Anthropic de respaldo, cuando fallaban
