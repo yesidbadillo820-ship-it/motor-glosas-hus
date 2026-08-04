@@ -106,6 +106,100 @@ Una sola vez, con permisos de administrador del PC:
 > Si algo falla, el instalador dice en pantalla exactamente qué faltó.
 > Se puede volver a ejecutar las veces que sea: no daña nada.
 
+## Arranque exprés SIN rescate (mientras Google desbloquea la cuenta)
+
+> **Cuándo usar esto (04-08-2026):** la deuda ya se pagó pero Google exige
+> que su equipo de soporte reabra la cuenta (caso #74044918, 24-48 horas).
+> Para no tener al equipo parado, el sistema se levanta YA en el PC con una
+> **base de datos nueva provisional**. La página, los usuarios y todas las
+> pantallas funcionan de inmediato; la historia (oficios, envíos,
+> dictámenes, soportes) vuelve cuando Google entregue el disco y se haga el
+> rescate de la fase 1.
+
+### A. Sacar el token del túnel de Cloudflare (5 minutos, una vez)
+
+1. Entrar a <https://one.dash.cloudflare.com> con la cuenta de Cloudflare
+   del dominio iaglosassinac.help.
+2. Menú izquierdo: **Networks → Tunnels** (Redes → Túneles) → botón
+   **Create a tunnel** → tipo **Cloudflared** → nombre `motor-glosas-pc` →
+   **Save tunnel**.
+3. Aparece la pantalla "Install and run a connector" con un comando largo
+   que incluye una tira que empieza por `eyJ…` — ese es el token. Copiar
+   el comando completo (el instalador saca el token solo).
+4. Botón **Next** → pestaña **Public hostname** → **Add a public
+   hostname**: Subdomain: *vacío*; Domain: `iaglosassinac.help`; Type:
+   `HTTP`; URL: **`motor:8080` si se instala con Docker**, o
+   **`localhost:8080` si se instala en modo SIN Docker** (ver B-bis) →
+   **Save**.
+5. **Si sale un error de que ya existe un registro DNS con ese nombre**
+   (es el del túnel viejo de la VM): ir a <https://dash.cloudflare.com> →
+   dominio `iaglosassinac.help` → **DNS → Records** → borrar el registro
+   **CNAME** llamado `iaglosassinac.help` cuyo destino termina en
+   `.cfargotunnel.com` → repetir el paso 4.
+
+### B. Instalar con doble clic
+
+1. Verificar la fase 2 (Docker Desktop corriendo + Git instalados).
+2. Doble clic a `tools\REVIVIR_EXPRESS_SIN_RESCATE.cmd`. El instalador
+   pide: la contraseña que tendrá `admin@hus.gov.co`, las llaves de IA
+   (opcionales — la de Groq es gratis en <https://console.groq.com/keys>;
+   Enter para saltarlas y ponerlas después) y el token del túnel.
+3. Esperar 1-2 minutos y abrir <https://iaglosassinac.help>.
+
+### B-bis. Si Docker Desktop no se puede instalar: modo SIN Docker
+
+Para cuando el PC no permite Docker Desktop (sin permisos de
+administrador, Windows sin virtualización, o bloqueado por sistemas).
+El sistema corre igual, directo con **Python** (el mismo que ya usan los
+otros bots del repositorio):
+
+1. Requisitos: **Python 3.11 a 3.13** (de
+   <https://www.python.org/downloads/windows/>, el "Windows installer
+   (64-bit)" de la serie **3.13**, marcando la casilla **"Add python.exe
+   to PATH"**) y **Git** — ninguno necesita permisos de administrador.
+   Ojo: con Python **3.14 o más nuevo** varias dependencias fijadas aún
+   no publican paquete y la instalación falla intentando compilarlas; el
+   instalador lo detecta y lo dice. Un 3.13 puede convivir con un 3.14
+   ya instalado sin pelear: el instalador escoge solo el bueno.
+2. En Cloudflare (paso A), la URL del Public hostname es
+   **`localhost:8080`** (no `motor:8080`).
+3. Doble clic a `tools\REVIVIR_EXPRESS_SIN_DOCKER.cmd`. Pide lo mismo
+   que el modo Docker (contraseña de admin, llaves de IA opcionales y el
+   token del túnel) y además:
+   - prepara el entorno de Python e instala las dependencias solo,
+   - descarga `cloudflared.exe` (el programa oficial del túnel),
+   - deja el **servidor** y el **túnel** corriendo con vigilantes que
+     los reviven si se caen (`tools\servidor_motor_local.cmd` y
+     `tools\tunel_motor_local.cmd`, registros en `data\servidor.log` y
+     `data\tunel.log`),
+   - deja el arranque automático al iniciar sesión (carpeta Inicio de
+     Windows), el **autodeploy** cada 5 minutos
+     (`tools\autodeploy_motor_local.cmd`) y la **copia de seguridad**
+     diaria de las 9:00 a. m.
+4. Verificar: en el propio PC abre <http://localhost:8080> y desde
+   internet <https://iaglosassinac.help>.
+
+> Los dos modos son equivalentes para el día a día (misma página, mismo
+> autodeploy, mismas copias). Si algún día se instala Docker Desktop, se
+> puede pasar al modo Docker corriendo el otro instalador.
+
+### C. Cómo entra el equipo (base provisional)
+
+- **Administrador:** `admin@hus.gov.co` con la contraseña inventada en el
+  instalador.
+- **Cada auditor:** su correo de siempre; contraseña inicial = la parte
+  del correo antes del arroba (ej. `glosashus04`). El sistema obliga a
+  cambiarla en el primer ingreso. Se siembran solos los 25 usuarios del
+  equipo (incluidos YESID y ELIAS como administradores).
+
+### D. Cuando Google reabra la cuenta
+
+1. Hacer el rescate de la **fase 1** (los 3 bloques de Cloud Shell).
+2. **Avisar al chat ANTES de restaurar nada:** se saca copia de la base
+   provisional y se pasa la historia vieja al PC, fusionando lo que se
+   haya trabajado en estos días donde sea posible.
+3. Seguir con la **fase 4** (apagar la VM).
+
 ## Fase 4 — Apagar la VM (cuando la página ya funcione desde el PC)
 
 **Importante:** primero verificar que la página carga y que los datos están

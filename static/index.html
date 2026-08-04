@@ -2322,6 +2322,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="9"/></svg>
           <span class="sn-item-label">Dashboard</span>
         </button>
+        <button class="sn-item" data-tip="Glosas ADRES: escribí una factura y trae todo" onclick="sidebarTab(this,'glosas-adres')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 14l2 2 4-4"/></svg>
+          <span class="sn-item-label">Glosas ADRES</span>
+        </button>
         <button class="sn-item" data-tip="Cobranza Live (saldos y aging)" onclick="sidebarTab(this,'cobranza-live')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span class="sn-item-label">Cobranza Live</span>
@@ -3130,6 +3134,58 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       </div>
     </div>
 
+    <!-- Glosas ADRES: el gestor escribe una factura y trae todo -->
+    <div class="panel" id="p-glosas-adres">
+      <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="glosas-adres"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Glosas ADRES</div>
+            <div style="font-size:.78rem;color:var(--text3)">Escribí una factura y trae las glosas clasificadas, el detallado cruzado y la respuesta sugerida</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <select id="ga-paquete" onchange="gaCambiarPaquete()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:.8rem"></select>
+            <button class="btn btn-ghost" onclick="gaAbrirCargue()" style="font-size:.8rem">Cargar paquete</button>
+          </div>
+        </div>
+
+        <!-- Buscador -->
+        <div class="chart-card" style="padding:1rem;margin-bottom:1rem">
+          <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+            <input id="ga-factura" list="ga-sugerencias" placeholder="Número de factura (ej. HUS352890)"
+                   onkeydown="if(event.key==='Enter')gaBuscar()" oninput="gaAutocompletar(this.value)"
+                   style="flex:1;min-width:240px;padding:.6rem .8rem;border:1px solid var(--border);border-radius:10px;background:var(--bg2);color:var(--text);font-size:.95rem">
+            <datalist id="ga-sugerencias"></datalist>
+            <button class="btn btn-primary" onclick="gaBuscar()">Buscar</button>
+          </div>
+          <div id="ga-aviso" style="font-size:.78rem;color:var(--text3);margin-top:.5rem"></div>
+        </div>
+
+        <div id="ga-resultado"></div>
+      </div>
+    </div>
+
+    <!-- Cargue del paquete ADRES -->
+    <div id="ga-modal-cargue" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:1.4rem;max-width:560px;width:92%">
+        <div style="font-weight:700;font-size:1.05rem;margin-bottom:.3rem">Cargar paquete del ADRES</div>
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">
+          Volver a cargar el mismo paquete lo reemplaza, pero <b>conserva las decisiones ya tomadas</b>.
+        </div>
+        <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Reporte de glosas del ADRES (obligatorio)</label>
+        <input type="file" id="ga-file-reporte" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
+        <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Excel de la macro (opcional — trae el reparto y lo ya decidido)</label>
+        <input type="file" id="ga-file-macro" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
+        <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Bitácora del ajustador de detallados (opcional — CSV)</label>
+        <input type="file" id="ga-file-bitacora" accept=".csv" style="width:100%;margin-bottom:1rem;font-size:.8rem">
+        <div id="ga-cargue-estado" style="font-size:.8rem;color:var(--text3);margin-bottom:.8rem"></div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="document.getElementById('ga-modal-cargue').style.display='none'">Cancelar</button>
+          <button class="btn btn-primary" id="ga-btn-cargar" onclick="gaCargar()">Cargar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- R350: Resumen mensual ejecutivo -->
     <div class="panel" id="p-resumen-mes">
       <div class="dash-area">
@@ -3190,6 +3246,18 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <div class="kpi"><div class="kpi-lbl">Pendientes</div><div class="kpi-num" id="mando-pend" style="color:#0369a1">—</div><div class="kpi-sub">sin resolver</div></div>
           <div class="kpi"><div class="kpi-lbl">Crit. 48h</div><div class="kpi-num" id="mando-48h" style="color:#f59e0b">—</div><div class="kpi-sub">vencen pronto</div></div>
           <div class="kpi"><div class="kpi-lbl">Vencidas</div><div class="kpi-num" id="mando-venc" style="color:#dc2626">—</div><div class="kpi-sub">fuera de plazo</div></div>
+        </div>
+
+        <!-- Panel operacional: dónde se atasca y quién lleva cuánto -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem;margin-bottom:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">🚧 Dónde se atasca el trabajo (glosas abiertas por estado)</div>
+            <div id="mando-cuellos" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">🎒 Carga por auditor (abiertas · vencidas · valor)</div>
+            <div id="mando-carga" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
         </div>
 
         <!-- Rankings lado a lado -->
@@ -3399,8 +3467,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <h2 class="malla-titulo">Gobierno de IA</h2>
             <p class="malla-sub">Cuánto gasta la IA, en qué modelos, quién la usa y cuánto ahorra el caché — últimos 30 días.</p>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="gobProbar()">🔌 Probar proveedores de IA</button>
+            <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+          </div>
         </div>
+        <div id="gob-prueba" style="display:none"></div>
         <div id="gob-cuerpo"><div class="malla-vacio">Cargando…</div></div>
       </div>
     </div>
@@ -7758,7 +7830,8 @@ document.addEventListener('keydown', function(e){
       'p-mando': 'loadMando', 'p-dashboard': 'loadDash',
       'p-mis-glosas': 'loadMisGlosas', 'p-historial': 'loadHist',
       'p-alertas': 'loadAlertas', 'p-resumen-mes': 'loadResumenMes',
-      'p-cobranza-live': 'loadDashCobranza', 'p-usuarios': 'loadUsuarios',
+      'p-glosas-adres': 'loadGlosasAdres', 'p-cobranza-live': 'loadDashCobranza',
+      'p-usuarios': 'loadUsuarios',
       'p-conciliacion': 'loadConciliaciones', 'p-audit': 'loadAudit',
       'p-mi-desempeno': 'cargarMiDesempeno', 'p-papelera': 'cargarPapelera',
       'p-tarifas': 'cargarTarifas', 'p-soportes': 'cargarSoportesEstado',
@@ -8181,9 +8254,10 @@ function tab(btn,id){
     window.scrollTo({top: 0, behavior: 'smooth'});
   }
   if(id==='dashboard') loadDash();
+  if(id==='glosas-adres') loadGlosasAdres();
   if(id==='cobranza-live') loadDashCobranza();
   if(id==='resumen-mes') loadResumenMes();
-  if(id==='mando') loadMando();
+  if(id==='mando'){ loadMando(); loadOperacion(); }
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -9244,6 +9318,37 @@ async function descargarDictamenMd(){
 }
 
 // ══ GOBIERNO DE IA: gasto, modelos, usuarios y caché ══
+
+// Prueba de conexión: ¿sirve la clave? — sin gastar una glosa.
+async function gobProbar(){
+  var caja = document.getElementById('gob-prueba');
+  caja.style.display = 'block';
+  caja.innerHTML = '<div class="auto-resumen">Probando cada proveedor…</div>';
+  try{
+    var r = await fetch('/gobierno-ia/probar-proveedores', {headers: authH()});
+    if(r.status === 403){ caja.innerHTML = '<div class="auto-resumen">Solo coordinación y administración.</div>'; return; }
+    if(!r.ok){ caja.innerHTML = '<div class="auto-resumen">Error HTTP ' + r.status + '</div>'; return; }
+    var d = await r.json();
+    var color = d.funciona ? '#16a34a' : '#dc2626';
+    var html = '<div class="intel-card" style="--intel-c:' + color + '">'
+      + '<div class="ico">' + (d.funciona ? '✅' : '🔴') + '</div>'
+      + '<div class="cuerpo"><div class="titulo">' + escHtml(d.veredicto) + '</div>';
+    d.proveedores.forEach(function(p){
+      var ic = p.estado === 'OK' ? '✓' : (p.estado === 'FALLA' ? '✗' : '—');
+      var c = p.estado === 'OK' ? '#16a34a' : (p.estado === 'FALLA' ? '#dc2626' : '#b45309');
+      // La clave probada (10 caracteres) se muestra para poder compararla
+      // con la del log de arranque: si no coinciden, hay otro motor vivo.
+      var clave = p.clave_probada ? ' <span style="opacity:.6">· clave ' + escHtml(p.clave_probada) + '…</span>' : '';
+      html += '<div class="porque"><b style="color:' + c + '">' + ic + ' ' + escHtml(p.proveedor.toUpperCase()) + '</b>'
+        + (p.es_principal ? ' <em>(principal)</em>' : '') + ' — ' + escHtml(p.detalle) + clave + '</div>';
+    });
+    if(d.motores_vivos > 1){
+      html += '<div class="porque" style="color:#dc2626;font-weight:600">⚠ ' + d.motores_vivos + ' motores encendidos al mismo tiempo: cerrá los sobrantes con tools\\REINICIAR_MOTOR.cmd, si no el análisis puede caer en el viejo.</div>';
+    }
+    html += '</div></div>';
+    caja.innerHTML = html;
+  }catch(e){ caja.innerHTML = '<div class="auto-resumen">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
 
 async function gobCargar(){
   var cuerpo = document.getElementById('gob-cuerpo');
@@ -13365,7 +13470,8 @@ function sidebarTab(el, id){
 }
 
 // ─── Tab-bar consolidada de Reportes ───────────────────────────────────────
-// Consolida Mando · Dashboard · Cartera (Cobranza Live) · Resumen del mes en
+// Consolida Mando · Dashboard · Cartera (Cobranza Live) · Glosas ADRES ·
+// Resumen del mes en
 // una sola barra de pestañas que aparece arriba de los 4 paneles. Feedback
 // Yesid: "4 botones que sacan la misma info → consolidar en uno". El menú
 // lateral sigue teniendo los accesos, pero ahora dentro de cualquiera de los
@@ -13386,6 +13492,7 @@ function pintarRepTabbars(){
   if(verMando) tabs.push(['mando', '⚡ Mando']);
   tabs.push(['dashboard', '📊 Dashboard']);
   tabs.push(['cobranza-live', '💰 Cartera & Aging']);
+  tabs.push(['glosas-adres', '📄 Glosas ADRES']);
   tabs.push(['resumen-mes', '📅 Resumen del mes']);
   document.querySelectorAll('.rep-tabbar-host').forEach(function(host){
     var activo = host.getAttribute('data-activo');
@@ -16964,6 +17071,7 @@ async function cargarDiagnostico(){
       // "volumen_fly" del periodo Fly.io) pero el panel ya está corriendo
       // en self-hosted Google Cloud. Mostramos el nombre actual.
       var LABEL_OVERRIDES = {
+        'motor': 'Motor (quién está atendiendo)',
         'volumen_fly': 'Volumen de Datos',
         'base_de_datos': 'Base de Datos',
         'soportes_indexer': 'Soportes Indexer',
@@ -19766,6 +19874,226 @@ async function loadDashCobranza(){
   } catch(e){ console.error('Cobranza Live error', e); }
 }
 
+// ─── Glosas ADRES ─────────────────────────────────────────────────────────
+// El gestor escribe una factura y el sistema le trae todo: las glosas ya
+// clasificadas con su sugerencia, el detallado cruzado contra el reporte y el
+// texto de respuesta consolidado. Reemplaza el Excel con macro.
+var GA_PAQUETE = null;
+var GA_DATOS = null;
+
+async function loadGlosasAdres(){
+  var sel = document.getElementById('ga-paquete');
+  try{
+    var r = await fetch('/glosas-adres/paquetes', {headers: authH()});
+    var paquetes = r.ok ? await r.json() : [];
+    if(!paquetes.length){
+      sel.innerHTML = '<option value="">— sin paquetes cargados —</option>';
+      document.getElementById('ga-aviso').textContent =
+        'Todavía no hay ningún paquete cargado. Usá "Cargar paquete" con el reporte del ADRES.';
+      return;
+    }
+    sel.innerHTML = paquetes.map(function(p){
+      return '<option value="'+p.id+'">Paquete '+escHtml(p.numero||'?')+' · '+
+             p.facturas+' facturas · '+fmtCOP(p.valor_glosado)+'</option>';
+    }).join('');
+    GA_PAQUETE = GA_PAQUETE || paquetes[0].id;
+    sel.value = GA_PAQUETE;
+    document.getElementById('ga-aviso').textContent =
+      paquetes[0].filas + ' glosas cargadas · importado por ' + escHtml(paquetes[0].importado_por||'—');
+  }catch(e){ console.error('Glosas ADRES', e); }
+}
+
+function gaCambiarPaquete(){ GA_PAQUETE = document.getElementById('ga-paquete').value || null; }
+
+async function gaAutocompletar(texto){
+  if(!texto || texto.length < 3) return;
+  try{
+    var url = '/glosas-adres/buscar?q='+encodeURIComponent(texto)+(GA_PAQUETE?'&paquete_id='+GA_PAQUETE:'');
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok) return;
+    var facturas = await r.json();
+    document.getElementById('ga-sugerencias').innerHTML =
+      facturas.map(function(f){ return '<option value="'+escHtml(f)+'">'; }).join('');
+  }catch(e){ /* el autocompletado es de cortesía: si falla, se sigue escribiendo */ }
+}
+
+async function gaBuscar(){
+  var numero = (document.getElementById('ga-factura').value||'').trim();
+  var caja = document.getElementById('ga-resultado');
+  if(!numero){ caja.innerHTML=''; return; }
+  caja.innerHTML = '<div style="padding:1rem;color:var(--text3)">Buscando '+escHtml(numero)+'…</div>';
+  try{
+    var url = '/glosas-adres/factura/'+encodeURIComponent(numero)+(GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
+    var r = await fetch(url, {headers: authH()});
+    if(r.status === 404){
+      caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
+        'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+      return;
+    }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    GA_DATOS = await r.json();
+    gaPintar(GA_DATOS);
+  }catch(e){
+    caja.innerHTML = '<div style="color:#991b1b;padding:1rem">Error: '+escHtml(e.message)+'</div>';
+  }
+}
+
+function gaPintar(d){
+  var r = d.resumen;
+  var h = '';
+  h += '<div class="chart-card" style="padding:1rem;margin-bottom:1rem">'+
+       '<div style="display:flex;gap:1.4rem;flex-wrap:wrap;align-items:baseline">'+
+       '<div><div style="font-size:1.25rem;font-weight:800">'+escHtml(d.factura)+'</div>'+
+       '<div style="font-size:.75rem;color:var(--text3)">Radicación '+escHtml(d.radicacion||'—')+
+       ' · Paciente '+escHtml(d.documento_paciente||'—')+'</div></div>'+
+       '<div style="font-size:.8rem;color:var(--text2)">Gestor <b>'+escHtml(d.gestor||'—')+'</b>'+
+       ' · Médico <b>'+escHtml(d.medico||'—')+'</b>'+
+       ' · Paquete <b>'+escHtml(d.paquete.numero||'—')+'</b></div>'+
+       '<button class="btn btn-ghost" style="font-size:.78rem;margin-left:auto" onclick="gaVerRespuesta()">Ver respuesta para el ADRES</button>'+
+       '</div></div>';
+
+  h += '<div class="kpi-grid">'+
+       '<div class="kpi"><div class="kpi-lbl">Glosas</div><div class="kpi-num">'+r.glosas+'</div><div class="kpi-sub">'+r.pendientes+' sin decidir</div></div>'+
+       '<div class="kpi"><div class="kpi-lbl">Valor glosado</div><div class="kpi-num">'+fmtCOP(r.valor_glosado)+'</div><div class="kpi-sub">según el ADRES</div></div>'+
+       '<div class="kpi"><div class="kpi-lbl">Aceptado</div><div class="kpi-num">'+fmtCOP(r.valor_aceptado)+'</div><div class="kpi-sub">lo que se reconoce</div></div>'+
+       '<div class="kpi"><div class="kpi-lbl">Sigue glosado</div><div class="kpi-num">'+fmtCOP(r.sigue_glosado_detallado)+'</div><div class="kpi-sub">en el detallado</div></div>'+
+       '</div>';
+
+  if((d.por_clasificacion||[]).length){
+    h += '<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin:1rem 0">';
+    d.por_clasificacion.forEach(function(c){
+      h += '<span style="font-size:.72rem;padding:.28rem .6rem;border-radius:999px;background:var(--bg3);border:1px solid var(--border)">'+
+           escHtml(c.clasificacion)+' · '+c.glosas+' · '+fmtCOP(c.valor)+
+           (c.pendientes ? ' <b style="color:#b45309">('+c.pendientes+' pend.)</b>' : '')+'</span>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div class="chart-card" style="margin-bottom:1rem"><div class="chart-hdr">Glosas del ADRES · '+
+       'la decisión es suya, el sistema solo propone</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'+
+       '<thead><tr style="text-align:left;color:var(--text3)">'+
+       '<th style="padding:.45rem">Causal</th><th>Servicio</th><th style="text-align:right">Glosado</th>'+
+       '<th>Clasificación</th><th>Centro de costos</th><th>Propuesta</th><th>Decisión</th><th>Observación técnica</th>'+
+       '</tr></thead><tbody>';
+  (d.glosas||[]).forEach(function(g){
+    var color = g.decision ? '#15803d' : (g.sugerencia ? '#b45309' : 'var(--text3)');
+    h += '<tr style="border-top:1px solid var(--border)">'+
+         '<td style="padding:.45rem;white-space:nowrap"><b>'+escHtml(g.causal_codigo||'—')+'</b><div style="color:var(--text3);max-width:230px">'+escHtml((g.causal_texto||'').slice(0,70))+'</div></td>'+
+         '<td style="max-width:250px"><b>'+escHtml(g.codigo||'')+'</b><div style="color:var(--text3)">'+escHtml((g.descripcion||'').slice(0,70))+'</div></td>'+
+         '<td style="text-align:right;white-space:nowrap">'+fmtCOP(g.valor_glosado)+'</td>'+
+         '<td>'+escHtml(g.clasificacion||'—')+'</td>'+
+         '<td style="max-width:150px">'+escHtml(g.centro_costos||'—')+'</td>'+
+         '<td style="max-width:210px;color:'+color+'"><b>'+escHtml(g.sugerencia||'—')+'</b>'+
+             (g.confianza?' <span style="font-size:.66rem;opacity:.75">['+escHtml(g.confianza)+']</span>':'')+
+             '<div style="color:var(--text3);font-size:.7rem">'+escHtml((g.motivo||'').slice(0,90))+'</div></td>'+
+         '<td><select onchange="gaDecidir('+g.id+',this.value)" style="font-size:.74rem;padding:.25rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">'+
+             ['','SE ACEPTA','SE OBJETA','SE SUBSANA'].map(function(o){
+               return '<option value="'+o+'"'+(g.decision===o?' selected':'')+'>'+(o||'— sin decidir —')+'</option>'; }).join('')+
+             '</select></td>'+
+         '<td><input value="'+escHtml(g.observacion_tecnico||'')+'" placeholder="por qué"'+
+             ' onchange="gaObservacion('+g.id+',this.value)"'+
+             ' style="width:170px;font-size:.74rem;padding:.25rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)"></td>'+
+         '</tr>';
+  });
+  h += '</tbody></table></div></div>';
+
+  if((d.items||[]).length){
+    h += '<div class="chart-card"><div class="chart-hdr">Detallado de la factura · '+d.items.length+
+         ' renglones cruzados contra el reporte</div><div style="overflow-x:auto;max-height:420px"><table style="width:100%;border-collapse:collapse;font-size:.76rem">'+
+         '<thead><tr style="text-align:left;color:var(--text3)"><th style="padding:.4rem">Estado</th><th>Código</th><th>Servicio</th>'+
+         '<th style="text-align:right">Facturado</th><th style="text-align:right">Queda</th><th>Observación</th></tr></thead><tbody>';
+    d.items.forEach(function(i){
+      var col = i.accion==='QUITADO' ? 'var(--text3)' : (i.accion==='AJUSTADO' ? '#b45309' : '#15803d');
+      h += '<tr style="border-top:1px solid var(--border)'+(i.accion==='QUITADO'?';opacity:.55':'')+'">'+
+           '<td style="padding:.4rem;color:'+col+';white-space:nowrap"><b>'+escHtml(i.accion)+'</b></td>'+
+           '<td>'+escHtml(i.codigo||'')+'</td><td style="max-width:280px">'+escHtml((i.nombre||'').slice(0,80))+'</td>'+
+           '<td style="text-align:right;white-space:nowrap">'+fmtCOP(i.valor_facturado)+'</td>'+
+           '<td style="text-align:right;white-space:nowrap"><b>'+fmtCOP(i.valor_nuevo)+'</b></td>'+
+           '<td style="max-width:260px;color:var(--text3)">'+escHtml((i.observacion||'').slice(0,90))+'</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+  document.getElementById('ga-resultado').innerHTML = h;
+}
+
+async function gaDecidir(id, valor){
+  try{
+    var r = await fetch('/glosas-adres/glosa/'+id, {method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({decision: valor})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    toast('Guardado', valor ? ('Glosa marcada como '+valor) : 'Decisión borrada', 'success');
+    gaBuscar();
+  }catch(e){ toast('No se pudo guardar', e.message, 'error'); }
+}
+
+async function gaObservacion(id, texto){
+  try{
+    await fetch('/glosas-adres/glosa/'+id, {method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({observacion_tecnico: texto})});
+  }catch(e){ toast('No se pudo guardar la observación', e.message, 'error'); }
+}
+
+async function gaVerRespuesta(){
+  if(!GA_DATOS) return;
+  try{
+    var url = '/glosas-adres/factura/'+encodeURIComponent(GA_DATOS.factura)+'/respuesta'+
+              (GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
+    var r = await fetch(url, {headers: authH()});
+    var d = await r.json();
+    var caja = document.getElementById('ga-resultado');
+    var bloque = document.createElement('div');
+    bloque.className = 'chart-card';
+    bloque.style.marginBottom = '1rem';
+    bloque.innerHTML = '<div class="chart-hdr">Respuesta para el ADRES — '+escHtml(d.factura)+
+      ' <button class="btn btn-ghost" style="font-size:.72rem;float:right" onclick="navigator.clipboard.writeText(this.parentNode.nextSibling.textContent);toast(\'Copiado\',\'El texto quedó en el portapapeles\',\'success\')">Copiar</button></div>'+
+      '<pre style="white-space:pre-wrap;padding:1rem;margin:0;font-size:.76rem;line-height:1.5">'+escHtml(d.texto)+'</pre>';
+    caja.insertBefore(bloque, caja.firstChild);
+    bloque.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }catch(e){ toast('No se pudo armar la respuesta', e.message, 'error'); }
+}
+
+function gaAbrirCargue(){
+  document.getElementById('ga-cargue-estado').textContent = '';
+  document.getElementById('ga-modal-cargue').style.display = 'flex';
+}
+
+async function gaCargar(){
+  var reporte = document.getElementById('ga-file-reporte').files[0];
+  var macro = document.getElementById('ga-file-macro').files[0];
+  var bitacora = document.getElementById('ga-file-bitacora').files[0];
+  var estado = document.getElementById('ga-cargue-estado');
+  var boton = document.getElementById('ga-btn-cargar');
+  if(!reporte){ estado.textContent = 'Falta el reporte de glosas del ADRES.'; return; }
+  boton.disabled = true;
+  estado.textContent = 'Cargando el reporte…';
+  try{
+    var fd = new FormData();
+    fd.append('archivo', reporte);
+    if(macro) fd.append('macro', macro);
+    var r = await fetch('/glosas-adres/importar', {method:'POST', headers: authH(), body: fd});
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.detail || ('HTTP '+r.status));
+    estado.textContent = 'Paquete '+d.numero_paquete+': '+d.filas+' glosas en '+d.facturas+' facturas.';
+    if(bitacora){
+      estado.textContent += ' Cargando el detallado…';
+      var fd2 = new FormData();
+      fd2.append('paquete_id', d.paquete_id);
+      fd2.append('archivo', bitacora);
+      var r2 = await fetch('/glosas-adres/importar-bitacora', {method:'POST', headers: authH(), body: fd2});
+      var d2 = await r2.json();
+      if(r2.ok) estado.textContent += ' ' + d2.items + ' renglones del detallado.';
+    }
+    GA_PAQUETE = d.paquete_id;
+    await loadGlosasAdres();
+    toast('Paquete cargado', d.filas+' glosas listas para trabajar', 'success');
+    setTimeout(function(){ document.getElementById('ga-modal-cargue').style.display='none'; }, 1600);
+  }catch(e){
+    estado.textContent = 'Error: ' + e.message;
+  }finally{ boton.disabled = false; }
+}
+
 // ─── R350: Resumen mensual ejecutivo ──────────────────────────────────────
 async function loadResumenMes(){
   try{
@@ -19813,6 +20141,47 @@ async function loadResumenMes(){
 
 // ─── B.1: Mando ejecutivo (single-pane-of-glass) ─────────────────────────
 var MANDO_TIMER = null;
+async function loadOperacion(){
+  var cu = document.getElementById('mando-cuellos');
+  var ca = document.getElementById('mando-carga');
+  if(!cu || !ca) return;
+  try{
+    var r = await fetch('/dashboard-ejecutivo/operacion', {headers: authH()});
+    if(!r.ok){ cu.textContent = 'Error ' + r.status; return; }
+    var d = await r.json();
+    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+
+    if(!d.cuellos_por_estado.length){
+      cu.innerHTML = '<span style="color:var(--text3)">No hay glosas abiertas.</span>';
+    } else {
+      var max = d.cuellos_por_estado[0].valor || 1;
+      cu.innerHTML = d.cuellos_por_estado.map(function(c){
+        var pct = Math.max(4, Math.round(100 * c.valor / max));
+        var viejo = c.mas_vieja_dias >= 30 ? '#dc2626' : (c.mas_vieja_dias >= 15 ? '#b45309' : 'var(--text3)');
+        return '<div style="margin-bottom:.55rem">'
+          + '<div style="display:flex;justify-content:space-between;gap:.5rem">'
+          +   '<b>' + escHtml(c.estado) + '</b>'
+          +   '<span>' + c.cantidad + ' · ' + cop(c.valor) + '</span></div>'
+          + '<div style="height:6px;background:var(--border);border-radius:3px;margin:.2rem 0"><div style="height:6px;width:' + pct + '%;background:#0369a1;border-radius:3px"></div></div>'
+          + '<div style="font-size:.72rem;color:' + viejo + '">la más vieja lleva ' + c.mas_vieja_dias + ' día(s) sin cerrarse</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    var totalSin = d.sin_asignar || 0;
+    ca.innerHTML = (totalSin ? '<div style="color:#b45309;margin-bottom:.4rem"><b>' + totalSin + ' glosa(s) sin asignar</b> — usá «Auto-balancear» arriba.</div>' : '')
+      + (d.carga_por_auditor.length
+          ? d.carga_por_auditor.map(function(a){
+              return '<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.25rem 0;border-bottom:1px solid var(--border)">'
+                + '<span>' + escHtml(a.auditor) + '</span>'
+                + '<span>' + a.abiertas + ' abiertas'
+                + (a.vencidas ? ' · <b style="color:#dc2626">' + a.vencidas + ' vencidas</b>' : '')
+                + ' · ' + cop(a.valor) + '</span></div>';
+            }).join('')
+          : '<span style="color:var(--text3)">Sin carga abierta.</span>');
+  }catch(e){ cu.textContent = 'Conexión: ' + e.message; }
+}
+
 async function loadMando(){
   var box = document.getElementById('p-mando');
   if(!box) return;
@@ -23128,6 +23497,7 @@ function _spotComandos(query){
     'alertas':'alertas','vencidas':'alertas',
     'dashboard':'dashboard','tablero':'dashboard',
     'cobranza':'cobranza-live',
+    'adres':'glosas-adres','glosas adres':'glosas-adres','paquete':'glosas-adres',
     'resumen del mes':'resumen-mes','resumen mes':'resumen-mes','resumen':'resumen-mes',
     'auditoria':'audit','auditoría':'audit','audit log':'audit',
     'usuarios':'usuarios','equipo':'usuarios',

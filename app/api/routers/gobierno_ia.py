@@ -131,3 +131,110 @@ def resumen_gobierno_ia(
         "cache": cache,
         "glosas_mas_caras": glosas_caras,
     }
+
+
+@router.get("/probar-proveedores")
+async def probar_proveedores(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Prueba de conexión: ¿responde cada proveedor de IA configurado?
+
+    Una llamada mínima (dos palabras) a cada proveedor para saber si la
+    clave sirve, SIN gastar una glosa. Nació del 04-08-2026: la única
+    forma de saber si una clave nueva funcionaba era analizar una glosa
+    de verdad y ver si fallaba.
+    """
+    from app.core.config import get_settings
+    from app.services.glosa_service import GlosaService, _causa_corta
+
+    cfg = get_settings()
+    svc = GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+    )
+    sistema = "Responde solo la palabra LISTO."
+    usuario = "Prueba de conexión."
+
+    proveedores = []
+    for nombre, clave, fn in (
+        ("groq", cfg.groq_api_key, lambda: svc._llamar_groq_con_retry(sistema, usuario)),
+        ("anthropic", cfg.anthropic_api_key, lambda: svc._llamar_anthropic(sistema, usuario)),
+    ):
+        # El prefijo de la clave probada (10 caracteres, no revela nada) es
+        # lo que permite comparar contra el log de arranque: si no coinciden,
+        # hay otro motor vivo respondiendo con la clave anterior.
+        pref = (clave or "")[:10]
+        if not clave:
+            proveedores.append(
+                {
+                    "proveedor": nombre,
+                    "estado": "SIN CLAVE",
+                    "detalle": "no hay clave configurada para este proveedor",
+                    "clave_probada": "",
+                    "es_principal": cfg.primary_ai == nombre,
+                }
+            )
+            continue
+        try:
+            contenido, modelo = await fn()
+            proveedores.append(
+                {
+                    "proveedor": nombre,
+                    "estado": "OK",
+                    "detalle": f"respondió con {modelo}",
+                    "clave_probada": pref,
+                    "es_principal": cfg.primary_ai == nombre,
+                }
+            )
+        except Exception as e:
+            proveedores.append(
+                {
+                    "proveedor": nombre,
+                    "estado": "FALLA",
+                    "detalle": _causa_corta(e),
+                    "clave_probada": pref,
+                    "es_principal": cfg.primary_ai == nombre,
+                }
+            )
+
+    hay_alguno = any(p["estado"] == "OK" for p in proveedores)
+    principal = next((p for p in proveedores if p["es_principal"]), None)
+    if principal and principal["estado"] == "OK":
+        veredicto = f"Todo listo: {principal['proveedor'].upper()} (tu principal) responde."
+    elif hay_alguno:
+        ok = next(p for p in proveedores if p["estado"] == "OK")
+        veredicto = (
+            f"El sistema funciona con {ok['proveedor'].upper()}, pero tu proveedor "
+            f"principal no responde: revisá su clave."
+        )
+    else:
+        veredicto = (
+            "Ningún proveedor responde: el análisis de glosas no va a funcionar "
+            "hasta corregir al menos una clave."
+        )
+
+    # Esta prueba la contesta EL motor que atendió la petición. Si hay más de
+    # uno vivo, el próximo análisis puede caer en otro con otra clave: decirlo
+    # aquí evita el «pero si la prueba salió verde».
+    motores = []
+    try:
+        from app.services.motor_proceso import motores_vivos
+
+        motores = motores_vivos()
+    except Exception:
+        motores = []
+    if len(motores) > 1:
+        veredicto = (
+            f"OJO: hay {len(motores)} motores corriendo al mismo tiempo. Esta prueba "
+            f"la contestó uno solo; el análisis puede caer en otro con la clave "
+            f"anterior. Cerrá los sobrantes (tools\\REINICIAR_MOTOR.cmd). " + veredicto
+        )
+
+    return {
+        "principal_configurado": cfg.primary_ai,
+        "funciona": hay_alguno,
+        "veredicto": veredicto,
+        "proveedores": proveedores,
+        "motores_vivos": len(motores),
+    }

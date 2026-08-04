@@ -13,6 +13,127 @@ from fastapi import HTTPException
 from groq import AsyncGroq
 from app.models.schemas import GlosaInput, GlosaResult
 from app.core.logging_utils import logger
+
+
+class IANoDisponibleError(RuntimeError):
+    """Ningún proveedor de IA respondió: el análisis debe fallar limpio,
+    nunca guardarse con el error del proveedor como dictamen."""
+
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+
+
+# Mínimo de argumentación real para que un dictamen exista. Por debajo de
+# esto no hay defensa que radicar: es una carátula vacía.
+MIN_CHARS_ARGUMENTO = 120
+
+
+class DictamenSinArgumentoError(RuntimeError):
+    """La IA no produjo argumentación: no se arma carátula ni se guarda."""
+
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+
+
+def _solo_texto_argumento(argumento: str) -> str:
+    """El texto real del argumento, sin etiquetas ni espacios de relleno."""
+    limpio = re.sub(r"<[^>]+>", " ", argumento or "")
+    limpio = limpio.replace("&nbsp;", " ")
+    return re.sub(r"\s+", " ", limpio).strip()
+
+
+# Firmas que delatan un error de proveedor dentro de un texto que pretende
+# ser dictamen. Cinturón de persistencia: si aparecen, NO se guarda.
+FIRMAS_ERROR_PROVEEDOR = (
+    "error code:",
+    "invalid_api_key",
+    "invalid api key",
+    "invalid_request_error",
+    "authentication_error",
+    "rate_limit_error",
+    "overloaded_error",
+    "api key no configurada",
+)
+
+
+def texto_con_error_de_proveedor(texto: str) -> bool:
+    bajo = (texto or "").lower()
+    return any(f in bajo for f in FIRMAS_ERROR_PROVEEDOR)
+
+
+def _causa_corta(error) -> str:
+    """La causa de UN proveedor, en cristiano."""
+    s = str(error).lower()
+    if "invalid_api_key" in s or "invalid api key" in s or "authentication" in s or "401" in s:
+        return "su clave está inválida o vencida"
+    if "rate limit" in s or "429" in s:
+        return "está en límite de uso (demasiadas peticiones)"
+    if "overloaded" in s or "529" in s or "503" in s:
+        return "está saturado"
+    if "insufficient" in s or "credit" in s or "billing" in s or "quota" in s:
+        return "la cuenta no tiene saldo/cupo"
+    if "timeout" in s or "timed out" in s:
+        return "no respondió a tiempo"
+    if "connection" in s or "network" in s or "dns" in s:
+        return "no se pudo conectar (red)"
+    # Visto en producción 04-08: un proveedor puede fallar sin devolver
+    # texto y el aviso quedaba en «ANTHROPIC: .» — decir algo siempre.
+    detalle = str(error).strip()[:90]
+    return detalle or f"no respondió ({type(error).__name__})"
+
+
+def _mensaje_ia_caida(error, fallos=None) -> str:
+    """El mensaje que ve el auditor: qué proveedor falló y por qué.
+
+    Con varios proveedores en cadena (Groq principal + Anthropic de
+    respaldo) hay que nombrarlos a TODOS: decir solo el último confunde
+    —el auditor ve el error de un proveedor que ni siquiera es el suyo—.
+    """
+    if fallos:
+        partes = []
+        for item in fallos:
+            # (proveedor, error) o (proveedor, error, prefijo_de_clave)
+            nombre, err = item[0], item[1]
+            pref = item[2] if len(item) > 2 else ""
+            causa = _causa_corta(err)
+            # Incidente 04-08-2026: con DOS motores vivos, el que respondía
+            # tenía la clave anterior. Decir cuál clave se usó convierte un
+            # misterio ("pero si ya la cambié") en un dato comparable con el
+            # log de arranque y con el panel de Diagnóstico.
+            if pref and "clave" in causa:
+                causa = f"{causa} (la que usó: {pref}…)"
+            partes.append(f"{nombre.upper()}: {causa}")
+        detalle = " · ".join(partes)
+        return (
+            f"Ningún proveedor de IA respondió → {detalle}. "
+            "El análisis NO se guardó. Revisá la configuración del proveedor "
+            "principal o reintentá en unos minutos."
+        )
+    s = str(error).lower()
+    if "invalid_api_key" in s or "invalid api key" in s or "authentication" in s or "401" in s:
+        return (
+            "La IA no está disponible: la clave del proveedor está inválida o vencida. "
+            "El análisis NO se guardó. Administración debe renovar la clave "
+            "(ANTHROPIC_API_KEY / GROQ_API_KEY) en el servidor."
+        )
+    if "rate limit" in s or "429" in s or "overloaded" in s or "529" in s:
+        return (
+            "La IA está saturada en este momento. El análisis NO se guardó: "
+            "reintentá en 2-3 minutos."
+        )
+    if "insufficient" in s or "credit" in s or "billing" in s:
+        return (
+            "La cuenta del proveedor de IA no tiene saldo. El análisis NO se guardó. "
+            "Administración debe revisar la facturación del proveedor."
+        )
+    return (
+        f"La IA no está disponible ({str(error)[:120]}). "
+        "El análisis NO se guardó: reintentá o avisá a administración."
+    )
+
+
 from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
 _CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
@@ -174,6 +295,25 @@ _GROQ_MAX_TOKENS_GPT_OSS = max(_GROQ_MAX_TOKENS, 8000)
 # fallo y omite el kwarg desde la primera llamada en adelante. Ahorro:
 # ~8s por dictamen (logs Fly 18:01-18:03 UTC).
 _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
+
+# Marcas de que el rechazo fue POR EL PARÁMETRO `reasoning_effort`.
+# 04-08-2026: la lista ancha (la de abajo) incluye `invalid_request_error`,
+# que es el tipo que Groq devuelve TAMBIÉN cuando la clave está mal o el
+# contexto es muy largo. Con eso, una sola llamada con la clave vencida
+# apagaba el razonador de gpt-oss para TODO el proceso —hasta el próximo
+# reinicio— aunque el parámetro nunca hubiera sido el problema. El reintento
+# de esa llamada sigue usando la lista ancha (no cuesta nada); el apagado
+# permanente exige que el error NOMBRE al parámetro.
+_MARCAS_RECHAZO_DEL_PARAMETRO = (
+    "reasoning_effort",
+    "reasoning effort",
+    "unknown_argument",
+    "unknown_parameter",
+    "unrecognized",
+    "extra inputs are not permitted",
+    "unsupported_parameter",
+    "unsupported parameter",
+)
 
 # Versión del cache de IA (ronda 5, 16-jun-2026). Bumpear cuando cambien
 # el system prompt, redes finales (descomillar/contratos/CUPS/EPS/
@@ -4259,6 +4399,13 @@ class GlosaService:
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
+        # Prefijo (10 caracteres) de la clave que ESTE servicio va a usar.
+        # Identifica sin revelar y viaja al aviso de error cuando el
+        # proveedor rechaza la clave — ver _mensaje_ia_caida.
+        self.pref_clave = {
+            "groq": (groq_api_key or "")[:10],
+            "anthropic": (self.anthropic_key or "")[:10],
+        }
         # Jun-2026 (decisión Yesid): la cadena de DICTÁMENES queda en SOLO
         # Groq (primario, gratis/rápido) + Anthropic (calidad / casos
         # complejos). Gemini y OpenRouter salieron del dictamen — "no las
@@ -7543,6 +7690,16 @@ class GlosaService:
         contrato: Optional[str] = None,
         tarifa: Optional[str] = None,
     ) -> str:
+        # Incidente 04-08-2026 (segunda parte): con la IA caída el motor
+        # armaba la carátula completa —tabla, sello, cierre— con la
+        # ARGUMENTACIÓN JURÍDICA VACÍA, y eso se guardaba y se mostraba
+        # como validado. Una carátula sin argumento no es un dictamen.
+        if len(_solo_texto_argumento(argumento)) < MIN_CHARS_ARGUMENTO:
+            raise DictamenSinArgumentoError(
+                "La IA no devolvió argumentación jurídica (el cuerpo quedó vacío o "
+                "demasiado corto). El análisis NO se guardó: reintentá y si persiste "
+                "avisá a administración."
+            )
         colores = {
             "TA_TARIFA": "#1e40af",
             "SO_SOPORTES": "#7c3aed",
@@ -8286,17 +8443,7 @@ class GlosaService:
                         and not deshabilitar_reasoning
                         and any(
                             k in error_msg
-                            for k in (
-                                "reasoning_effort",
-                                "reasoning effort",
-                                "unknown_argument",
-                                "unknown_parameter",
-                                "unrecognized",
-                                "extra inputs are not permitted",
-                                "unsupported_parameter",
-                                "unsupported parameter",
-                                "invalid_request_error",
-                            )
+                            for k in _MARCAS_RECHAZO_DEL_PARAMETRO + ("invalid_request_error",)
                         )
                     ):
                         deshabilitar_reasoning = True
@@ -8305,12 +8452,16 @@ class GlosaService:
                         # en NINGUNA llamada futura de este proceso (los
                         # logs muestran el TypeError repetido en cada
                         # llamada cuando esto era local a la función).
-                        _GROQ_SDK_SOPORTA_REASONING_EFFORT = False
+                        # 04-08-2026: solo si el error NOMBRA al parámetro —
+                        # una clave vencida también es `invalid_request_error`
+                        # y dejaba a gpt-oss sin razonador todo el día.
+                        if any(k in error_msg for k in _MARCAS_RECHAZO_DEL_PARAMETRO):
+                            _GROQ_SDK_SOPORTA_REASONING_EFFORT = False
                         logger.warning(
                             f"[GROQ-RETRY-NO-REASONING] model={modelo} "
                             "(API rechazó reasoning_effort — reintentando "
                             "el mismo modelo sin ese parámetro; bandera de "
-                            "proceso ON para no repetirlo)"
+                            f"proceso={not _GROQ_SDK_SOPORTA_REASONING_EFFORT})"
                         )
                         continue  # mismo intento, sin sumar
                     es_rate_limit = any(k in error_msg for k in ("429", "rate_limit", "rate limit"))
@@ -8826,9 +8977,9 @@ class GlosaService:
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
         if not self.groq and not self.anthropic_key:
-            return (
-                "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>",
-                "error",
+            raise IANoDisponibleError(
+                "La IA no está configurada en este servidor (faltan GROQ_API_KEY y "
+                "ANTHROPIC_API_KEY). El análisis NO se guardó: avisá a administración."
             )
 
         # Orden de intento segun primary_ai configurado por el usuario.
@@ -8869,6 +9020,11 @@ class GlosaService:
                 intentos.append(("anthropic", self._llamar_anthropic))
 
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
+        # Incidente 04-08-2026 (tercera parte): con Groq como principal y
+        # Anthropic de respaldo, si fallaban los dos el mensaje solo nombraba
+        # al ÚLTIMO (Anthropic) — el auditor veía «Invalid API Key» de un
+        # proveedor que ni siquiera es el suyo y no sabía qué pasó con Groq.
+        fallos_por_proveedor: list[tuple[str, Exception, str]] = []
         _causa_anthropic = ""
         for nombre, fn in intentos:
             try:
@@ -8907,13 +9063,20 @@ class GlosaService:
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
+                fallos_por_proveedor.append(
+                    (nombre, e, getattr(self, "pref_clave", {}).get(nombre, ""))
+                )
                 if nombre == "anthropic":
                     _causa_anthropic = str(e)[:200]
                 logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
                 continue
 
         logger.error(f"Todos los proveedores IA fallaron: {ultimo_error}")
-        return f"<paciente>ERROR</paciente><argumento>{str(ultimo_error)}</argumento>", "error"
+        # Incidente 04-08-2026 (glosa PPL): este return devolvía el error
+        # crudo del proveedor como <argumento> y el 401 quedó GUARDADO como
+        # argumentación jurídica con sello. Un fallo de proveedor ahora es
+        # un fallo del análisis: causa legible y NADA se persiste.
+        raise IANoDisponibleError(_mensaje_ia_caida(ultimo_error, fallos_por_proveedor))
 
 
 # ─── Caché persistente en BD (optimización #1) ───────────────────────────────

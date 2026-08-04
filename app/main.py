@@ -140,6 +140,11 @@ _INDICES_HISTORIAL = [
     ("ix_historial_workflow_state", "workflow_state"),
 ]
 
+# El chequeo de motores duplicados corre UNA vez por proceso: en las pruebas
+# el lifespan arranca cientos de veces y recorrer la tabla de procesos en
+# cada una sería puro peaje.
+_MOTOR_YA_CHEQUEADO = False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -874,6 +879,8 @@ async def lifespan(app: FastAPI):
             ("devoluciones03@sinacsc.com", "AUDITOR", "JOHANNA MORENO"),
             ("devoluciones1@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
             ("glosashus03@sinacsc.com", "AUDITOR", "OSCAR VILLAMIZAR"),
+            # Pedido 03-08-2026: ELIAS con todos los permisos de admin.
+            ("glosashus15@sinacsc.com", "SUPER_ADMIN", "ELIAS CARVAJAL"),
         ]
         # POLÍTICA DE PASSWORD INICIAL: cada usuario corporativo recibe como
         # contraseña el prefijo de su correo (ej. glosashus04@sinacsc.com →
@@ -1087,6 +1094,26 @@ async def lifespan(app: FastAPI):
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
 
+    # ¿Quedó otro motor vivo del arranque anterior? (04-08-2026)
+    # En Windows el uvicorn nuevo puede convivir con el viejo sobre el mismo
+    # puerto: las peticiones caen en cualquiera de los dos y el viejo
+    # responde con la clave y el código anteriores. Se avisa UNA vez por
+    # proceso, aquí, que es el momento en que todavía se puede cerrar el
+    # sobrante antes de trabajar.
+    global _MOTOR_YA_CHEQUEADO
+    if not _MOTOR_YA_CHEQUEADO:
+        _MOTOR_YA_CHEQUEADO = True
+        try:
+            from app.services.motor_proceso import estado_motor
+
+            _est = estado_motor()
+            if _est["estado"] == "ok":
+                logger.info(f"[MOTOR] {_est['mensaje']}")
+            else:
+                logger.warning(f"[MOTOR-DUPLICADO] {_est['mensaje']}")
+        except Exception as _e_motor:
+            logger.warning(f"[MOTOR] no se pudo inspeccionar el proceso: {_e_motor}")
+
     # Guard global: DISABLE_SCHEDULERS=1 salta TODOS los schedulers en background.
     # Útil en CI/tests donde múltiples TestClient arrancan lifespan y crean
     # decenas de asyncio tasks que se acumulan hasta OOM.
@@ -1272,6 +1299,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from app.api.routers.auth_router import router as auth_router
 from app.api.routers.glosas import router as glosas_router
+from app.api.routers.glosas_adres import router as glosas_adres_router
 from app.api.routers.automatizaciones import router as automatizaciones_router
 from app.api.routers.inteligencia import router as inteligencia_router
 from app.api.routers.agentes import router as agentes_router
@@ -1340,6 +1368,7 @@ app.include_router(auth_router)
 app.include_router(asistente_predictivo_router)  # Ola 4: inteligencia ambiental
 app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
+app.include_router(glosas_adres_router)  # Paquetes de glosas del ADRES
 app.include_router(automatizaciones_router)
 app.include_router(inteligencia_router)
 app.include_router(agentes_router)

@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 03-08-2026
+**Última actualización:** 04-08-2026
 
 ---
 
@@ -150,6 +150,99 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   Publicado como artifact para socializar ante gerencia. Se generó también el
   cruce de **2.215 facturas vs. GI-33-5181-2026** (975 encontradas en los
   consolidados de este chat, 1.240 NA pendientes de lotes 03/04/05).
+- **28-07 (hoy):** nace el **ajustador de detallados de factura**
+  (`tools/ajustar_detallado_glosas.py` + README + 36 tests). Automatiza el
+  trabajo manual de dejar el detallado **solo con lo que la entidad sigue
+  glosando**: quita duplicados del consolidado, borra del Excel las hojas de las
+  facturas que no se van a trabajar, quita el encabezado institucional (logo,
+  NIT, QR, CUFE), cambia el título a **"DETALLADO DE FACTURA"**, cruza cada ítem
+  contra el `ReporteGlosasReclamPAQUETE` (quita lo aprobado, ajusta lo aprobado
+  a medias, deja lo glosado), borra los grupos que quedan vacíos y recalcula
+  subtotal, total y **total en letras**. Deja bitácora CSV ítem por ítem y tiene
+  modo `--diagnostico` para ver qué haría antes de escribir nada.
+  **Hallazgo:** el reporte de glosas trae **el mismo ítem repartido en varias
+  filas** (la venda de gasa de la HUS352890 viene en dos: 4 y 2 unidades). El
+  bot las suma → siguen glosados **$47.000**, no $9.400 como quedó en el ejemplo
+  hecho a mano. Falta que el auditor confirme ese criterio (ver PENDIENTE #11).
+  **Validado contra el reporte real del paquete 31068** (19.256 filas, 581
+  facturas): las **324 facturas del lote están todas** en el reporte y se
+  reconocen sin ajustes. Del total reclamado **$2.870.214.655**, el ADRES aprobó
+  **$1.835.864.089 (64%)** y **sigue glosado $1.034.350.566 (36%)**. De 9.616
+  ítems: 6.805 se quitan, 472 se ajustan y 2.712 se dejan. El **32% de los ítems
+  viene repartido en más de una fila** del reporte (el peor: 38 filas para la
+  terapia respiratoria de HUS311371) y en el 1,1% de las filas la columna
+  "Cantidad Aprobada" no cuadra con el valor — por eso el bot suma y calcula la
+  cantidad desde el valor glosado.
+  **Llegaron los 7 archivos de detallados y se corrió el paquete 31068 completo.**
+  El formato real resultó distinto del supuesto: **una sola hoja con todas las
+  facturas apiladas** (no una hoja por factura) y cada dato dentro de una celda
+  combinada cuyos límites NO coinciden con los del encabezado. Se reescribió el
+  núcleo del bot: segmentación de facturas dentro de la hoja, mapeo de columnas
+  por solapamiento de rangos, borrado masivo de filas re-indexando en sitio
+  (0,3 s en vez de minutos) y emparejamiento por rondas con unicidad mutua.
+  **Resultado: 320 de las 324 facturas procesadas** (150.919 filas de entrada),
+  $2.464.092.099 facturados de los cuales **siguen glosados $714.332.225 (29,0%)**.
+  Se generaron 5 Excel ajustados + bitácora ítem por ítem + resumen por factura.
+  Un análisis en paralelo sobre los 4 primeros archivos (1.306 facturas) destapó
+  que **los procedimientos quirúrgicos traen renglones de DESGLOSE sin
+  consecutivo** cuyo valor ya está incluido en el renglón de arriba: son 3.794
+  renglones en 302 facturas y sumarlos inflaba el valor de la factura en
+  $628.947.541. Ya se descuentan. Nace también
+  `tools/verificar_detallado_ajustado.py`, que relee el Excel ajustado y lo
+  contrasta contra el original, el consolidado y el reporte del ADRES: los 5
+  archivos pasan sin fallas.
+  Además nacen dos herramientas más, encadenadas con el ajustador:
+  **`tools/dividir_detallado_por_factura.py`** (separa el detallado en un Excel
+  por factura, con el formato intacto y el área de impresión ya fijada) y
+  **`tools/excel_a_pdf.py`** (convierte en masa a PDF con el Excel del equipo o
+  con LibreOffice, uno por archivo, con opción de carpeta por factura).
+  Se generaron los **320 Excel y los 320 PDF** del paquete 31068 y se
+  comprobó, leyendo el texto de cada PDF, que traiga su número de factura y que
+  su total cuadre con la bitácora: los 320 cuadran ($714.332.224 contra
+  $714.332.225, 1 peso de redondeo).
+
+### Agosto 2026 — Pre-auditoría del paquete ADRES
+- **03-08:** llegó la macro `NUEVO MODELO MACRO PARA DAR RESPUESTA A GLOSA ADRES
+  31068`. Es el reporte del ADRES (16 columnas) **más 10 que el equipo llena a
+  mano** sobre 4.619 filas glosadas. Se analizó y se descubrió que **siete de esas
+  diez son mecánicas**: el código numérico sale de la causal (verificado contra
+  las 2.989 que llenaron a mano: **cero discrepancias**) y la clasificación
+  también (determinística en 47 de 48 causales).
+  Nace **`tools/preauditar_glosas_adres.py`**: llena lo mecánico, propone el
+  resto con el motivo escrito y **respeta lo que el equipo ya escribió**.
+  Reproduce la macro renglón por renglón: 4.619 de 4.619 filas, y la columna
+  RTA GLOSA COMPLETA sale **carácter por carácter idéntica**. El centro de
+  costos pasó de 0 a 4.248 de 4.619 propuestos. Replica también el Word de
+  respuesta por factura del VBA, sin depender de Word.
+  El bot **no decide**: las 4.604 decisiones de aceptar/objetar/subsanar siguen
+  siendo del auditor; la sugerencia va en columnas aparte (27 en adelante) para
+  no correr nada de lo que usan las macros. A medida que el equipo decida, el
+  bot aprende **su** criterio por causal y lo propone citando en cuántos casos
+  se basa.
+  **Hallazgo:** la causal **4506** está clasificada de dos formas distintas
+  (231 veces FACTURACION y 24 PERTINENCIA) — hay que unificar el criterio.
+- **04-08:** todo ese trabajo **se llevó a la página**. En el menú se quitó
+  **Cobranza Live** (no se usaba) y en su lugar quedó **📄 Glosas ADRES**.
+  Ahora el coordinador carga el `ReporteGlosasReclamPAQUETE` una sola vez
+  (opcionalmente también el Excel de la macro y la bitácora del ajustador de
+  detallados) y **el gestor solo escribe el número de factura**: la pantalla le
+  trae las glosas clasificadas, el centro de costos, el gestor y el médico, la
+  sugerencia de respuesta **con su motivo escrito**, el detallado cruzado
+  (qué le pagó ya el ADRES y qué sigue glosado) y el texto consolidado para el
+  Word.
+  Se agregaron 3 tablas (`paquetes_adres`, `glosas_adres`,
+  `items_detallado_adres`), el servicio `app/services/preauditoria_adres.py`
+  y el router `app/api/routers/glosas_adres.py` con 8 rutas.
+  El módulo web **no copia** las reglas: importa las mismas de
+  `tools/preauditar_glosas_adres.py`, así un cambio de criterio sirve para los
+  dos lados.
+  Probado de punta a punta con el paquete real: **4.619 glosas, 324 facturas,
+  $1.034.350.562 glosado** y 9.982 renglones de detallado, entrando por los
+  endpoints de verdad. Se verificó lo que más duele si falla: **volver a cargar
+  el paquete no borra las decisiones ya tomadas**, y aplicar las sugerencias en
+  bloque tampoco pisa lo que un gestor escribió a mano.
+  La pertinencia médica **sigue sin sugerencia**: la firma un médico auditor.
+  Guía para el equipo en `docs/GLOSAS_ADRES_WEB.md`.
 - **30-07:** **nace el proyecto SIIFA** (plataforma del Ministerio de Salud,
   distinta de COOSALUD/SIMED/DGH — la portalidad nacional de seguimiento de
   facturas). El auditor mostró la pantalla `Listar seguimientos` (2.579
@@ -1270,6 +1363,150 @@ períodos perdidos.
 
 ---
 
+### 04-08 (octava parte) — Una librería ajena tapó la carpeta de los bots
+
+A las 18:20 (hora universal) se publicó **Mako 1.4.0**, una librería que
+viene incluida con otra que usa el sistema. Esa versión salió con un error
+de empaquetado: trae **una carpeta llamada `tools/` propia** que se instala
+junto a las librerías y **tapa la carpeta `tools/` del proyecto** —donde
+viven todos los bots—. Cuarenta y cinco minutos después, las pruebas
+automáticas del repositorio empezaron a morir con «No module named
+'tools._dinero'». No fue nada que hubiéramos hecho: le pasa a cualquier
+proyecto que tenga su propia carpeta con ese nombre.
+
+Lo grave es lo que habría pasado en producción: es exactamente el mismo
+síntoma del incidente del 31 de julio (todas las tarjetas del Centro de
+Automatización contestando «ModuleNotFoundError»). Bastaba con reinstalar
+las librerías en el PC o volver a armar la imagen del servidor.
+
+Quedó blindado por partida doble:
+
+- La carpeta `tools/` del proyecto ahora es un **paquete de verdad**
+  (`tools/__init__.py`): con eso gana siempre la del repositorio, sin
+  importar qué librería se llame igual mañana. Y viaja a la imagen del
+  servidor (línea nueva en `.dockerignore`).
+- Se le puso **tope a esa librería** (`Mako` por debajo de 1.4) para no
+  traer esa basura mientras el error siga arriba.
+- Dos pruebas nuevas lo vigilan: que el paquete exista y que sea el del
+  repositorio el que se carga, y que viaje en la imagen.
+
+### 04-08 (séptima parte) — Había DOS motores prendidos al mismo tiempo
+
+Este fue el verdadero culpable de toda la tarde. Yesid cambió la clave de
+Groq, reinició y el arranque escribió **`groq=OK gsk_vn06EE…`**; pero la
+pantalla de Diagnóstico —que lee exactamente el mismo dato— mostraba
+**`gsk_5CxaRq…`** (la clave vieja) y el análisis seguía fallando con «clave
+inválida». Dos respuestas distintas para el mismo dato solo tienen una
+explicación: **no era un solo programa contestando, eran dos**.
+
+En Windows, si uno abre otra ventana y arranca el motor sin cerrar el
+anterior, los dos se quedan con el mismo puerto y las peticiones caen en
+cualquiera de los dos. El viejo responde con la clave vieja y con el
+programa viejo. Nada en pantalla lo decía.
+
+Lo que se construyó para que no vuelva a pasar:
+
+- **`tools/REINICIAR_MOTOR.cmd`** (doble clic): cierra TODO lo que esté
+  usando el puerto y deja **uno solo** recién arrancado. Es la forma
+  correcta de reiniciar después de tocar el archivo de claves.
+- **El Diagnóstico avisa primero**: la primera tarjeta del panel ahora es
+  **«Motor (quién está atendiendo)»**. Si hay más de uno, se pone en ROJO,
+  nombra los procesos y dice cómo cerrarlos. Y si hay uno solo, muestra con
+  qué clave está trabajando.
+- **El arranque también lo dice**: junto a `[IA-PROVIDERS]` aparece
+  `[MOTOR] Un solo motor atendiendo…` o `[MOTOR-DUPLICADO] …`.
+- **El aviso de error dice CUÁL clave usó**: «GROQ: su clave está inválida o
+  vencida (la que usó: gsk_5CxaRq…)». Con eso se compara de un vistazo
+  contra la del arranque y se sabe si contestó el motor viejo.
+- **El botón «Probar proveedores de IA»** muestra la clave que probó y
+  advierte si hay más de un motor encendido (si no, uno ve verde y el
+  análisis igual falla).
+
+De paso apareció otro defecto real: cuando la clave estaba vencida, el motor
+**apagaba el «razonador» de uno de los modelos de Groq para el resto del
+día** (confundía el error de clave con un rechazo de ese ajuste). Los
+dictámenes salían más pobres y nada lo decía. Corregido: solo se apaga si el
+error nombra de verdad a ese ajuste.
+
+### 04-08 (sexta parte) — Botón para probar la clave de IA
+
+- En **Gobierno IA** hay un botón **«Probar proveedores de IA»**: hace una
+  llamada mínima a cada proveedor y dice en un renglón si la clave sirve
+  («✓ GROQ (principal) — respondió con llama-3.3-70b») o por qué no. Nació
+  del día de hoy: la única forma de saber si una clave nueva funcionaba
+  era analizar una glosa de verdad y ver si fallaba.
+- Y el aviso ya no deja causas en blanco: si un proveedor falla sin
+  explicar, dice «no respondió» en vez de dejar el renglón vacío.
+
+### 04-08 (quinta parte) — El .env correcto que el sistema no veía
+
+- Yesid montó el sistema en su equipo (ya no en el servidor de Google) y
+  el arranque decía **«groq=AUSENTE»** aunque el archivo de claves
+  estuviera bien puesto. No era su configuración: **el sistema leía las
+  claves en dos sitios distintos**. El motor de dictámenes las recibía
+  bien, pero el asistente, el auditor forense, el lector de cláusulas y
+  el propio mensaje de arranque las buscaban en otro lado y no las
+  encontraban nunca.
+- Quedó el puente: lo que está en el archivo de claves ahora también
+  queda disponible para todo el sistema. Si el arranque dice AUSENTE, de
+  verdad falta la clave — ya no es una falsa alarma. Lo que venga por
+  Docker o el servicio de Windows sigue mandando sobre el archivo.
+
+### 04-08 (cuarta parte) — El mensaje dice QUÉ proveedor falló y por qué
+
+- Con Groq como IA principal y Anthropic de respaldo, cuando fallaban
+  los dos el aviso solo nombraba al último: el auditor veía «clave
+  inválida» de Anthropic —que ni siquiera es su proveedor principal— y
+  no sabía qué había pasado con Groq.
+- Ahora el mensaje los nombra a todos con su causa en cristiano:
+  «GROQ: está en límite de uso · ANTHROPIC: su clave está inválida o
+  vencida». Las causas se traducen solas (sin saldo, saturado, no
+  respondió a tiempo, no se pudo conectar…).
+
+### 04-08 (tercera parte) — Una carátula vacía tampoco es un dictamen
+
+- Segundo hallazgo del mismo día: ya no salía el error de la IA en el
+  cuerpo, pero el dictamen salía **con la argumentación jurídica VACÍA**
+  y aun así con el sello «validado». Eso es peor que el error visible,
+  porque parece bueno.
+- Ahora el motor **se niega a armar la carátula** si la IA no devolvió
+  argumentación (tabla, sello y cierre no se generan), y el guardado la
+  rechaza también aunque llegara armada por otro camino. En pantalla:
+  mensaje claro de que no se guardó y que hay que reintentar.
+- Recordatorio: la causa de fondo sigue siendo la **clave de IA
+  inválida** en el servidor. Mientras no se renueve, el sistema no va a
+  inventar dictámenes — va a decir que no puede.
+
+### 04-08 (segunda parte) — Panel operacional y arreglo del CI
+
+- **El Mando ejecutivo ya muestra dónde se atasca el trabajo**: las
+  glosas abiertas agrupadas por estado, con cuánta plata hay parada en
+  cada uno y hace cuántos días no se mueve la más vieja (en rojo si pasa
+  de 30). Y al lado, **la carga real de cada auditor**: cuántas lleva
+  abiertas, cuántas ya vencidas y por qué valor — quien tiene vencidas
+  aparece de primero. Se decidió ampliar el Mando en vez de crear otra
+  pantalla, para no tener dos tableros que digan cosas parecidas.
+- **Arreglo del CI**: el cambio del incidente dejó tres pruebas viejas en
+  rojo porque validaban justamente el texto de error como si fuera
+  dictamen. Se corrigieron para probar lo que siempre quisieron probar,
+  con un dictamen de verdad.
+
+### 04-08 — Incidente: un error de la IA quedó guardado como dictamen
+
+- Iván analizó una glosa de PPL y el «dictamen» salió con el error crudo
+  del proveedor («Invalid API Key») como argumentación jurídica, con
+  sello de calidad y todo. Dos causas, dos arreglos:
+  1. **La clave de Anthropic del servidor está inválida** — hay que
+     renovarla (instrucción abajo en el chat). Eso es configuración, no
+     código.
+  2. **El motor jamás debió guardar eso.** Ahora, si la IA se cae, el
+     análisis falla LIMPIO: mensaje claro de qué pasó y qué hacer («la
+     clave está vencida, avisá a administración» / «saturada, reintentá
+     en 2-3 minutos») y NO se guarda nada. Y aunque un texto con firma
+     de error llegara por cualquier otro camino, la persistencia lo
+     rechaza: no puede volver a existir un dictamen que diga «Invalid
+     API Key».
+
 ### 03-08 (cuarta parte) — Gobierno de IA: el gasto se ve
 
 - Pantalla nueva **Gobierno IA** (Reportes, solo coordinación y
@@ -1375,7 +1612,7 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   (sección 5.ter), incluido el pantallazo de **Ver Histórico** como evidencia
   para el PDF de soportes.
 
-### 03-08 (octava parte) — Cuentas médicas: el CUV que no salía
+### 03-08 (CUV) — Cuentas médicas: el CUV que no salía
 
 - Cuentas médicas reportó que el validador del Ministerio no le generaba el
   **CUV** de la factura **MED737** (Medical Center Especialistas, NIT
@@ -1409,7 +1646,7 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   pasada del validador, la tabla de modalidades, los errores más frecuentes y
   la plantilla de PowerShell para corregir el JSON sin dañarlo.
 
-### 03-08 (novena parte) — El CUV de la MED737: el enredo del código de prestador
+### 03-08 (CUV, parte 2) — El enredo del código de prestador
 
 Con las cuatro correcciones puestas, el Ministerio dejó de reclamar y salió un
 rechazo nuevo, **RVC011**, que costó tres intentos entender. Vale la pena
@@ -1445,6 +1682,145 @@ dejarlo escrito porque le va a pasar a más facturas:
 - `tools/validar_json_rips.py` ahora detecta este caso solo: lee el
   `CODIGO_PRESTADOR` del bloque de interoperabilidad del XML, compara los largos
   y dice cuál de los dos archivos tiene el error y quién lo corrige. 35 pruebas.
+### 03-08 (octava parte) — Todo listo para empezar a subir a SIIFA
+
+- **`tools\CARGAR_SIIFA.cmd`** — bot de doble clic con menú, para no escribir
+  comandos: [1] baja el informe de SIIFA, [2] arma los archivos de respuestas
+  (solo lo que el hospital ya había respondido), [3] piloto de UNA glosa,
+  [4] y [5] cargue de glosas y de devoluciones, [6] reintento de lo que falló,
+  [7] catálogo de códigos. Instala solo lo que falte y guarda el usuario y la
+  clave del portal la primera vez (nunca quedan escritos en un archivo). El
+  menú **no deja hacer el cargue masivo sin haber corrido el piloto**.
+- **`docs/CARGUE_SIIFA_PASO_A_PASO.md`** — la misma secuencia escrita, con los
+  comandos sueltos por si hay que correr uno aparte, qué verificar en el
+  portal después del piloto (Ver Histórico + pantallazo) y el orden sugerido
+  para revisar después las redactadas: primero las de mayor valor, luego
+  tarifas/facturación/pertinencia (se sostienen con el contrato), y de últimas
+  soportes y DE5601 (esas exigen el papel y el acuse).
+
+### 03-08 (novena parte) — Primera corrida real del bot de SIIFA: dos correcciones
+
+- Yesid corrió `CARGAR_SIIFA.cmd` por primera vez. En la pregunta de la
+  carpeta de trabajo quedó pegado un comando en vez de una ruta; el bot lo
+  aceptó, bajó los **2.598 seguimientos** (7 minutos, con el servidor del
+  Ministerio en mal día) y **todo se perdió al momento de guardar**.
+- **Corregido en dos partes**, para que no vuelva a pasar por ningún camino:
+  1. El bot valida la carpeta ANTES de empezar: si la ruta no sirve o no deja
+     guardar (unidad de red desconectada, por ejemplo), lo dice de una y
+     vuelve a preguntar. Se agregó la opción **[8] Cambiar la carpeta**.
+  2. El propio informe (`siifa_reporte_seguimientos.py`) revisa que va a
+     poder guardar antes de bajar nada — así también queda protegido quien
+     corra el comando a mano.
+- De la misma corrida quedó confirmado que el modo **mes por mes** funciona:
+  la consulta completa se cayó (el servidor respondió 500 y hubo que bajar de
+  50 a 10 registros por tanda), el bot cambió solo de estrategia y completó
+  el informe.
+
+### 03-08 (décima parte) — El Enter que dejaba el bot inservible
+
+- Segunda corrida del bot de SIIFA: al dar **Enter** para aceptar la carpeta
+  por defecto, el menú quedó mostrando `Carpeta: "=` y ninguna opción sirvió.
+- **La causa:** el bot le quitaba las comillas a lo escrito ANTES de aplicar
+  la carpeta por defecto. Con Enter no se escribe nada, y quitarle las
+  comillas a algo vacío dejaba de carpeta la basura `"=`. Corregido el orden
+  (primero la de por defecto, después limpiar), y lo mismo en la ruta del
+  export de DGH. Queda una prueba que vigila ese orden.
+- De paso, el menú ahora **muestra por dónde va el trabajo**: al lado de cada
+  opción dice si el informe ya está bajado, si los archivos de respuestas ya
+  están armados y si el piloto ya se hizo.
+- **Pendiente relacionado:** otros bots de doble clic (`CRUZAR_GLOSAS`,
+  `SEMAFORO_GLOSAS`, `AUDITAR_DEV_EPS`, `BUSCAR_FACTURA`, `EXCEL_A_CSV`,
+  `TXT_A_EXCEL`, `VERIFICAR_RADICACION`, `VIGILANTE_NOCTURNO`) tienen el
+  mismo patrón. Ahí sólo falla cuando la ruta queda vacía, pero conviene
+  corregirlo antes de que le pase a alguien en mitad de un trabajo.
+
+### 03-08 (undécima parte) — La prueba de que sí quedó subido
+
+- **Piloto de SIIFA hecho y bueno:** la glosa 15110544 de la factura
+  HUS454747 se subió por el bot, con OK, y el reporte quedó en
+  `piloto_siifa.csv`.
+- La pregunta de Yesid fue la correcta: *«¿y cómo sé que efectivamente se
+  subió, si necesito un pantallazo?»*. Con 1.082 respuestas, tomar 1.082
+  pantallazos no es viable.
+- **`tools/siifa_verificar_cargue.py`** (opción **[9]** del bot): le pregunta
+  a SIIFA, factura por factura, qué quedó registrado de verdad y lo compara
+  con lo que se mandó. Saca dos cosas:
+  1. La **hoja de verificación**: verde lo que quedó igual; amarillo lo que
+     quedó con el código o **la fecha** distintos; rojo lo que sigue sin
+     respuesta y hay que volver a subir.
+  2. Una **constancia en PDF por factura** (carpeta `EVIDENCIAS`), con
+     membrete del hospital, fecha y hora de la consulta, y por cada glosa su
+     código, valor, respuesta registrada y fecha. Eso es lo que se anexa a
+     soportes: reemplaza al pantallazo y sale de la API oficial del
+     Ministerio.
+- Se consulta **por factura y no por glosa**: 17 consultas en vez de 1.082.
+
+### 04-08 — La deuda quedó paga, Google se demora, y nace el arranque exprés
+
+**El pago.** Se descubrió que la deuda era en **pesos** (once mil, no once
+mil dólares). Google no dejó pagar menos de $30.000: se pagaron con la
+Visa nueva y el perfil quedó **sin saldo pendiente** y con $18.080 a favor.
+La Mastercard vieja (la que rebotó y causó todo) debe dejar de ser la
+principal.
+
+**El nuevo tranque.** Aun con la deuda paga, el botón "Reabrir cuenta de
+facturación" quedó bloqueado: Google exige que lo haga su equipo de
+soporte. Se abrió el **caso #74044918** (chat con soporte, escalado al
+equipo especializado) y prometieron respuesta **en 24-48 horas por correo**.
+Crear cuentas nuevas no sirve: mientras el perfil estuvo en deuda, Google
+las cerraba al nacer (pasó con la cuenta 3).
+
+**La decisión para no parar al equipo:** revivir la página YA desde el PC
+de cartera con una **base nueva provisional**, sin esperar el rescate:
+
+1. `tools/REVIVIR_EXPRESS_SIN_RESCATE.cmd` — instalador de doble clic:
+   crea las llaves nuevas del sistema, configura el túnel de Cloudflare
+   por **token** (sin necesitar la llave vieja encerrada en la VM),
+   levanta todo y deja las mismas dos tareas programadas.
+2. La guía `docs/MIGRACION_PC_HOSPITAL.md` ganó la sección **"Arranque
+   exprés SIN rescate"**: cómo sacar el token del túnel en Cloudflare
+   (5 minutos), cómo entra el equipo (los 25 usuarios se siembran solos;
+   contraseña inicial = la parte del correo antes del arroba, y el
+   sistema obliga a cambiarla), y qué hacer cuando Google reabra.
+3. **ELIAS CARVAJAL quedó en el sembrado como administrador** (antes solo
+   existía en la base de la VM; en una base nueva no aparecía).
+
+**OJO — cuando Google reabra la cuenta:** hacer el rescate de la fase 1 y
+**avisar al chat ANTES de restaurar la base vieja**, para sacar copia de la
+provisional y fusionar lo trabajado en estos días.
+
+**Segunda parte del mismo día — modo SIN Docker.** Yesid preguntó si se
+podía sin Docker Desktop (los PC del hospital no siempre lo permiten). Se
+construyó el camino alterno: `tools/REVIVIR_EXPRESS_SIN_DOCKER.cmd` corre
+el sistema directo con Python (el mismo de los otros bots) y publica la
+página con el programa oficial de Cloudflare descargado solo. Deja
+vigilantes que reviven el servidor y el túnel si se caen, arranque
+automático al iniciar sesión, el mismo autodeploy cada 5 minutos y la
+misma copia diaria. Ojo al único detalle distinto: en Cloudflare la URL
+del Public hostname es `localhost:8080` en este modo (con Docker es
+`motor:8080`). Guía: sección "B-bis" de `docs/MIGRACION_PC_HOSPITAL.md`.
+
+**Tercera parte — ¡LA PÁGINA REVIVIÓ desde el PC de cartera!** La
+instalación real dejó tres tropiezos, corregidos el mismo día:
+
+1. El PC tenía Python 3.14 (demasiado nuevo) → el instalador ahora exige
+   3.11-3.13 y guía a instalar el 3.13 con `winget` (PR #279).
+2. `psycopg2` (conector de PostgreSQL, innecesario con SQLite) intentaba
+   compilarse y tumbaba la instalación → se salta en este modo (PR #279).
+3. Windows no trae la base de zonas horarias y `America/Bogota` reventaba
+   el arranque → paquete `tzdata` fijado en requirements (PR #280) — y el
+   **autodeploy de 5 minutos lo aplicó solo**, señal de que la maquinaria
+   automática quedó viva igual que en la VM.
+
+Con eso el sistema quedó arriba en el PC: túnel nuevo de Cloudflare por
+token (`motorglosas`), usuarios sembrados (27), 13 contratos, y las tres
+llaves de IA repuestas (Groq nueva, Gemini recuperada de AI Studio,
+Anthropic creada de nuevo — las viejas siguen en el `.env` de la VM).
+Último ajuste del día: en Docker las llaves llegaban como variables de
+entorno y varias partes del código las leen así (`os.getenv`); el
+vigilante del servidor ahora carga TODO el `.env` como variables de
+verdad antes de arrancar, para que el modo sin Docker sea idéntico al
+de Docker.
 
 ---
 
@@ -1510,6 +1886,35 @@ dejarlo escrito porque le va a pasar a más facturas:
    (HUS409574, 410979, 416671, 428425, 428523, 431722, 432292, 432884, 437357,
    437582) — confirmar si ya quedaron radicadas en SIMED o siguen pendientes.
 
+### Pre-auditoría ADRES (`tools/preauditar_glosas_adres.py`)
+16. **Unificar el criterio de la causal 4506**: hoy está clasificada como
+    FACTURACION en 231 filas y como PERTINENCIA en 24.
+17. **Revisar las 371 filas sin centro de costos propuesto** (habitación, sala
+    especial, atención diaria: no se puede saber el área sin más contexto).
+18. **Fase 2 — llevarlo al motor web como preauditoría.** El patrón ya existe
+    en `app/services/ia_auditora_proactiva.py` (pre-análisis nocturno que deja
+    el dictamen listo antes de que el gestor abra la glosa). Las 10 columnas de
+    la macro mapean a campos que ya tiene `GlosaRecord` (`codigo_respuesta`,
+    `tipo_glosa_excel`, `observacion_tecnico`, `dictamen`, `valor_aceptado`,
+    `gestor_nombre`, `profesional_medico`); falta agregar centro de costos.
+
+### Ajustador de detallados (`tools/ajustar_detallado_glosas.py`)
+11. **Las 4 facturas que no aparecen en ningún detallado:** HUS0000311371,
+    HUS0000367368, HUS0000380246 y HUS0000394817. Pedir su impresión para
+    poder cerrarlas.
+12. **Revisar los 100 ítems marcados `SIN_CRUCE`** (73 facturas) y los 24
+    `GLOSA_SIN_ITEM` ($11.220.692): son renglones que no cruzaron entre la
+    factura impresa y el reporte del ADRES.
+13. **Glosas a toda la reclamación:** 46 filas por $335.585.041 con causales
+    como "2102- formulario de reclamación incompleto" y "3122- debe anexar el
+    informe de ambulancia". No corresponden a ningún ítem: se responden aparte.
+14. **Confirmar el criterio de los ítems aprobados a medias.** En el ejemplo
+    `HUS352890` la venda de gasa quedó a mano en **1 unidad / $9.400**, pero
+    sumando las **dos** filas del reporte siguen glosadas **5 unidades /
+    $47.000** (subtotal $132.800 en vez de $95.200). El bot hace la suma. Si el
+    criterio del auditor es otro, se cambia con `--modo-parcial`.
+15. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
+    aparecen en el reporte): hoy se conservan y se marcan.
 ### Dispensario — respuesta de glosas SIMED y conciliación
 10. **Subir a SIMED las 3 facturas de junio** (518186 / 515107 / 515773) con
     `respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`. **URGENTE: sus fechas
@@ -1621,15 +2026,25 @@ dejarlo escrito porque le va a pasar a más facturas:
 
 ## 4) PARA MAÑANA
 
-0. **PRIORIDAD CERO — revivir la página (mudanza al PC del hospital).** La
-   página está caída porque Google apagó la VM por facturación. Pasos, en
-   orden, según `docs/MIGRACION_PC_HOSPITAL.md`: (a) Yesid reabre "Mi cuenta
-   de facturación 2" (~$11 mil pesos); (b) correr en Cloud Shell los comandos
-   de rescate de la fase 1 y descargar `rescate-motor-glosas.tgz`;
-   (c) en el PC de cartera: instalar Docker Desktop y Git, y doble clic a
-   `tools\MONTAR_SERVIDOR_MOTOR_GLOSAS.cmd`; (d) verificar que la página
-   cargue con los datos y apagar la VM. Hasta completar (a) y (b) no se puede
-   avanzar: solo Yesid puede reabrir la cuenta.
+00. **Antes de cualquier prueba de IA: reiniciar con
+    `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos
+    que quedaron prendidos y deja uno solo. Después, en **Gobierno IA →
+    «Probar proveedores de IA»**, verificar que la clave que aparece ahí sea
+    la misma que muestra el arranque. Si el Diagnóstico marca en rojo la
+    tarjeta «Motor (quién está atendiendo)», hay más de uno: cerrar y
+    repetir. Con eso queda lista la prueba de fuego pendiente: **pasar la
+    glosa de PPL por Analizar** y confirmar que sale con el formato
+    aprobado.
+0. **PRIORIDAD CERO — revivir la página YA (arranque exprés) y luego
+   restaurar la historia.** Actualizado 04-08: la deuda ya se pagó; Google
+   reabre la cuenta por soporte (caso #74044918, 24-48 h). Mientras tanto:
+   (a) en el PC de cartera instalar Docker Desktop y Git; (b) sacar el token
+   del túnel en Cloudflare y doble clic a
+   `tools\REVIVIR_EXPRESS_SIN_RESCATE.cmd` (guía: sección "Arranque exprés"
+   de `docs/MIGRACION_PC_HOSPITAL.md`) — con eso el equipo trabaja hoy con
+   base provisional. (c) Cuando llegue el correo de Google: rescate de la
+   fase 1 (`rescate-motor-glosas.tgz`) y **avisar al chat antes de restaurar**
+   la base histórica; (d) verificar y apagar la VM (fase 4).
 1. **Dispensario prioridad 1:** subir a SIMED el Excel de las 3 facturas de
    junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
    14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
@@ -1646,6 +2061,21 @@ dejarlo escrito porque le va a pasar a más facturas:
    carpetas por mes/día.
 5. Actualizar el **informe de gerencia** con el acumulado real de julio
    (facturas y glosas cerradas por lote).
+6. **Revisar los Excel ajustados del paquete 31068** que quedaron generados y
+   los pendientes #11 a #15. Guías en `tools/README_ajustar_detallado_glosas.md`
+   y `tools/README_por_factura_y_pdf.md`.
+7. **Repetir el PDF con el Excel del equipo** (`--motor excel`): los PDF que se
+   entregaron salieron con LibreOffice, que puede tener mínimas diferencias de
+   maquetación frente al Excel del hospital.
+8. **Estrenar en la página el módulo 📄 Glosas ADRES** con un gestor real:
+   cargar el paquete 31068 (reporte + macro + `BITACORA_31068.csv`) y que el
+   gestor pruebe con 5 facturas antes de soltarlo a todo el equipo.
+   Guía: `docs/GLOSAS_ADRES_WEB.md`.
+9. **Unificar el criterio de la causal 4506** (hoy 231 FACTURACION vs 24
+   PERTINENCIA). Mientras esté dividida, el bot no sugiere nada para ella.
+10. **Completar los 371 renglones sin centro de costos**: son los que el nombre
+    del servicio no alcanza a identificar. Se pueden llenar desde la misma
+    pantalla y el sistema los recuerda para el siguiente paquete.
 6. Si hay tiempo: verificar si SISTEMAS ya corrigió algún CUV (pendiente #6),
    descargar los 2 PDF del DIAN (pendiente #7) y revisar el PR #186 del módulo
    de pre-auditoría.

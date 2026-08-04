@@ -16,6 +16,12 @@ de que cambie un botón en la pantalla.
 
 ---
 
+> **La forma fácil, sin escribir comandos:** doble clic en
+> `tools\CARGAR_SIIFA.cmd`. Hace todo el flujo desde un menú (bajar el
+> informe, armar los archivos, piloto de 1 glosa, cargue y reintentos), e
+> instala solo lo que falte. El paso a paso escrito está en
+> `docs/CARGUE_SIIFA_PASO_A_PASO.md`. Lo de abajo son los comandos sueltos.
+
 ## 0) Antes de la primera corrida
 
 ### Instalar dependencias (una sola vez)
