@@ -955,3 +955,109 @@ class CredencialAccesoLog(Base):
     accion = Column(String(20), nullable=False)  # REVELAR | IMPORTAR | LISTAR
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     motivo = Column(Text, nullable=True)
+
+
+# ─── Paquetes de glosas del ADRES ────────────────────────────────────────────
+#
+# El ADRES glosa por "paquete": un lote de reclamaciones con su reporte de
+# glosas ítem por ítem. Antes eso vivía en un Excel con macro que el equipo
+# llenaba a mano; estas tres tablas lo traen al sistema para que el gestor
+# escriba un número de factura y tenga todo al frente.
+
+
+class PaqueteAdresRecord(Base):
+    """Un cargue del reporte de glosas del ADRES."""
+
+    __tablename__ = "paquetes_adres"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    numero_paquete = Column(String(30), index=True)
+    archivo = Column(String(300))
+    importado_en = Column(DateTime(timezone=True), server_default=func.now())
+    importado_por = Column(String(200))
+    total_filas = Column(Integer, default=0)
+    total_facturas = Column(Integer, default=0)
+    valor_glosado = Column(Float, default=0.0)
+    nota = Column(Text)
+
+
+class GlosaAdresRecord(Base):
+    """Una glosa del ADRES sobre un ítem de una factura.
+
+    Las 16 primeras columnas son el reporte tal cual; las que siguen son el
+    trabajo: lo que el bot dedujo (clasificación, centro de costos, sugerencia)
+    y lo que decide el gestor (aceptar/objetar/subsanar y su valor).
+    """
+
+    __tablename__ = "glosas_adres"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paquete_id = Column(Integer, index=True, nullable=False)
+    # Clave normalizada (sin el HUS ni los ceros) para buscar por factura.
+    factura_clave = Column(String(30), index=True, nullable=False)
+    factura = Column(String(50), nullable=False)
+    radicacion = Column(String(50))
+    cod_habilitacion = Column(String(30))
+    doc_victima = Column(String(50))
+    consecutivo = Column(String(20))
+    tipo_elemento = Column(String(60))
+    codigo = Column(String(60), index=True)
+    descripcion = Column(Text)
+    causal_codigo = Column(String(10), index=True)
+    causal_texto = Column(Text)
+    anotacion = Column(Text)
+    cant_reclamada = Column(Float, default=0.0)
+    valor_reclamado = Column(Float, default=0.0)
+    cant_aprobada = Column(Float, default=0.0)
+    valor_aprobado = Column(Float, default=0.0)
+    valor_glosado = Column(Float, default=0.0)
+    # Lo que dedujo el bot
+    clasificacion = Column(String(60), index=True)
+    centro_costos = Column(String(80))
+    gestor = Column(String(120), index=True)
+    medico = Column(String(120))
+    sugerencia = Column(String(20))
+    confianza = Column(String(20))
+    motivo = Column(Text)
+    estado_detallado = Column(String(30))
+    # Lo que decide el gestor
+    decision = Column(String(20), index=True)  # SE ACEPTA | SE OBJETA | SE SUBSANA
+    observacion_tecnico = Column(Text)
+    cantidad_aceptada = Column(String(20))
+    valor_aceptado = Column(Float, default=0.0)
+    decidido_por = Column(String(200))
+    decidido_en = Column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_glosas_adres_paq_factura", "paquete_id", "factura_clave"),)
+
+
+class ItemDetalladoAdresRecord(Base):
+    """Un renglón del detallado de la factura, ya cruzado con el reporte.
+
+    Sale de la bitácora del ajustador: dice de cada servicio si el ADRES lo
+    pagó, si sigue glosado o si quedó a medias.
+    """
+
+    __tablename__ = "items_detallado_adres"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paquete_id = Column(Integer, index=True, nullable=False)
+    factura_clave = Column(String(30), index=True, nullable=False)
+    factura = Column(String(50))
+    grupo = Column(String(120))
+    codigo = Column(String(60))
+    nombre = Column(Text)
+    cantidad = Column(Float, default=0.0)
+    valor_facturado = Column(Float, default=0.0)
+    valor_reclamado = Column(Float, default=0.0)
+    valor_aprobado = Column(Float, default=0.0)
+    valor_glosado = Column(Float, default=0.0)
+    accion = Column(String(30), index=True)  # QUITADO | AJUSTADO | CONSERVADO | SIN_CRUCE | …
+    cantidad_nueva = Column(Float, default=0.0)
+    valor_nuevo = Column(Float, default=0.0)
+    cruce_por = Column(String(30))
+    tipo_renglon = Column(String(20))  # ITEM | DESGLOSE
+    causales = Column(Text)
+    observacion = Column(Text)
+
+    __table_args__ = (Index("ix_items_det_adres_paq_factura", "paquete_id", "factura_clave"),)

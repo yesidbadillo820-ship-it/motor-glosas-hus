@@ -5,7 +5,7 @@
 > **Regla:** todo chat debe LEER este archivo al empezar y ACTUALIZARLO al terminar
 > (con fecha, lo hecho, lo pendiente y lo de mañana).
 
-**Última actualización:** 03-08-2026
+**Última actualización:** 04-08-2026
 
 ---
 
@@ -192,6 +192,28 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   se basa.
   **Hallazgo:** la causal **4506** está clasificada de dos formas distintas
   (231 veces FACTURACION y 24 PERTINENCIA) — hay que unificar el criterio.
+- **04-08:** todo ese trabajo **se llevó a la página**. En el menú se quitó
+  **Cobranza Live** (no se usaba) y en su lugar quedó **📄 Glosas ADRES**.
+  Ahora el coordinador carga el `ReporteGlosasReclamPAQUETE` una sola vez
+  (opcionalmente también el Excel de la macro y la bitácora del ajustador de
+  detallados) y **el gestor solo escribe el número de factura**: la pantalla le
+  trae las glosas clasificadas, el centro de costos, el gestor y el médico, la
+  sugerencia de respuesta **con su motivo escrito**, el detallado cruzado
+  (qué le pagó ya el ADRES y qué sigue glosado) y el texto consolidado para el
+  Word.
+  Se agregaron 3 tablas (`paquetes_adres`, `glosas_adres`,
+  `items_detallado_adres`), el servicio `app/services/preauditoria_adres.py`
+  y el router `app/api/routers/glosas_adres.py` con 8 rutas.
+  El módulo web **no copia** las reglas: importa las mismas de
+  `tools/preauditar_glosas_adres.py`, así un cambio de criterio sirve para los
+  dos lados.
+  Probado de punta a punta con el paquete real: **4.619 glosas, 324 facturas,
+  $1.034.350.562 glosado** y 9.982 renglones de detallado, entrando por los
+  endpoints de verdad. Se verificó lo que más duele si falla: **volver a cargar
+  el paquete no borra las decisiones ya tomadas**, y aplicar las sugerencias en
+  bloque tampoco pisa lo que un gestor escribió a mano.
+  La pertinencia médica **sigue sin sugerencia**: la firma un médico auditor.
+  Guía para el equipo en `docs/GLOSAS_ADRES_WEB.md`.
 
 ---
 
@@ -283,6 +305,15 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 7. **Repetir el PDF con el Excel del equipo** (`--motor excel`): los PDF que se
    entregaron salieron con LibreOffice, que puede tener mínimas diferencias de
    maquetación frente al Excel del hospital.
+8. **Estrenar en la página el módulo 📄 Glosas ADRES** con un gestor real:
+   cargar el paquete 31068 (reporte + macro + `BITACORA_31068.csv`) y que el
+   gestor pruebe con 5 facturas antes de soltarlo a todo el equipo.
+   Guía: `docs/GLOSAS_ADRES_WEB.md`.
+9. **Unificar el criterio de la causal 4506** (hoy 231 FACTURACION vs 24
+   PERTINENCIA). Mientras esté dividida, el bot no sugiere nada para ella.
+10. **Completar los 371 renglones sin centro de costos**: son los que el nombre
+    del servicio no alcanza a identificar. Se pueden llenar desde la misma
+    pantalla y el sistema los recuerda para el siguiente paquete.
 
 ---
 
