@@ -68,6 +68,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _dinero import a_numero  # noqa: E402  (lector único de pesos)
+
 try:  # pragma: no cover - camino normal
     from radicar_facturacion import normalizar_factura
 except Exception:  # pragma: no cover - fallback si se ejecuta aislado

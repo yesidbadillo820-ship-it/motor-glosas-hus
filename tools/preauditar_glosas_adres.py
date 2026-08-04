@@ -780,8 +780,7 @@ def armar_texto_respuesta(filas: list[FilaMacro], prefijo: str = "") -> str:
             aceptadas[texto] = aceptadas.get(texto, 0.0) + (f.valor_aceptado or 0)
 
     partes = [
-        prefijo
-        + ENCABEZADO_RESPUESTA.format(valor=_moneda(total_aceptado).lstrip("$")),
+        prefijo + ENCABEZADO_RESPUESTA.format(valor=_moneda(total_aceptado).lstrip("$")),
         "",
     ]
     partes += [t for t, _ in sorted(aceptadas.items(), key=lambda kv: -kv[1])]
