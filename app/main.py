@@ -411,6 +411,129 @@ async def lifespan(app: FastAPI):
                 pass
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
 
+    # Glosas ADRES: columnas que se agregaron después del primer cargue. Sin
+    # esto, un servidor que ya tenía el paquete 31068 cargado revienta con
+    # "no such column" apenas alguien abre la pantalla, porque create_all()
+    # crea tablas nuevas pero NO agrega columnas a las que ya existen.
+    _ADRES_MISSING_COLUMNS = [
+        # (tabla, columna, tipo)
+        ("glosas_adres", "glosa_total", "BOOLEAN DEFAULT 0"),
+        ("glosas_adres", "centro_costos_por", "VARCHAR(200)"),
+        ("glosas_adres", "requiere_asignacion", "BOOLEAN DEFAULT 0"),
+        ("glosas_adres", "area_sugerida", "VARCHAR(60)"),
+        ("glosas_adres", "motivo_area", "TEXT"),
+        ("glosas_adres", "area_asignada_por", "VARCHAR(200)"),
+        ("glosas_adres", "area_asignada_en", "TIMESTAMP WITH TIME ZONE"),
+        ("paquetes_adres", "catalogo_centros", "TEXT"),
+    ]
+    for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
+        try:
+            if _tiene_tabla(tabla) and not _tiene_columna(tabla, col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a {tabla}")
+                col_ddl_adapted = (
+                    col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
+                    if _is_sqlite
+                    else col_ddl
+                )
+                db.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {col_name} {col_ddl_adapted}"))
+                db.commit()
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.warning(f"MIGRACIÓN {tabla}.{col_name}: {e}")
+
+    # Las glosas que ya estaban cargadas no traen marcada la glosa total (la
+    # columna nació después). Se deduce igual que al importar: sin causal
+    # propia, es el desglose de una reclamación glosada entera por el FURIPS.
+    # Se corrige por el contenido, no por si la columna está en NULL: el ALTER
+    # la creó con DEFAULT 0, así que las filas viejas quedaron en 0 aunque sean
+    # glosa total. Es idempotente: la segunda vez no encuentra nada que hacer.
+    # OJO: acá NO se usa `_tiene_columna`, porque el inspector tiene cacheada la
+    # lista de columnas de ANTES del ALTER de arriba y diría que no existe. Si
+    # de verdad falta, la consulta falla y queda el aviso en el log.
+    try:
+        if _tiene_tabla("glosas_adres"):
+            sin_marcar = db.execute(
+                text(
+                    "SELECT COUNT(*) FROM glosas_adres "
+                    "WHERE (causal_codigo IS NULL OR TRIM(causal_codigo) = '') "
+                    "  AND (glosa_total IS NULL OR glosa_total = 0)"
+                )
+            ).scalar()
+            if sin_marcar:
+                logger.warning(f"MIGRACIÓN: marcando glosa_total en {sin_marcar} glosa(s) ADRES")
+                db.execute(
+                    text(
+                        "UPDATE glosas_adres SET glosa_total = 1 "
+                        "WHERE (causal_codigo IS NULL OR TRIM(causal_codigo) = '') "
+                        "  AND (glosa_total IS NULL OR glosa_total = 0)"
+                    )
+                )
+                db.execute(
+                    text(
+                        "UPDATE glosas_adres SET glosa_total = 0 "
+                        "WHERE causal_codigo IS NOT NULL AND TRIM(causal_codigo) <> '' "
+                        "  AND glosa_total IS NULL"
+                    )
+                )
+                db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN glosa_total (relleno): {e}")
+
+    # `facturas_adres` es tabla nueva: create_all() la crea vacía. Los paquetes
+    # que ya estaban cargados no tendrían ni una factura y la lista de trabajo
+    # saldría en blanco. Se rellena desde las glosas que ya hay.
+    try:
+        if _tiene_tabla("facturas_adres") and _tiene_tabla("glosas_adres"):
+            faltan = db.execute(
+                text(
+                    "SELECT COUNT(*) FROM (SELECT DISTINCT paquete_id, factura_clave "
+                    "FROM glosas_adres g WHERE NOT EXISTS (SELECT 1 FROM facturas_adres f "
+                    "WHERE f.paquete_id = g.paquete_id AND f.factura_clave = g.factura_clave)) x"
+                )
+            ).scalar()
+            if faltan:
+                logger.warning(f"MIGRACIÓN: creando {faltan} factura(s) ADRES para la lista")
+                db.execute(
+                    text(
+                        "INSERT INTO facturas_adres "
+                        "(paquete_id, factura_clave, factura, radicacion, doc_victima, "
+                        " gestor, medico, estado) "
+                        "SELECT g.paquete_id, g.factura_clave, MIN(g.factura), "
+                        "       MIN(g.radicacion), MIN(g.doc_victima), MIN(g.gestor), "
+                        "       MIN(g.medico), 'PENDIENTE' "
+                        "FROM glosas_adres g "
+                        "WHERE NOT EXISTS (SELECT 1 FROM facturas_adres f "
+                        "  WHERE f.paquete_id = g.paquete_id "
+                        "    AND f.factura_clave = g.factura_clave) "
+                        "GROUP BY g.paquete_id, g.factura_clave"
+                    )
+                )
+                # Las que ya traían alguna decisión no están «pendientes».
+                db.execute(
+                    text(
+                        "UPDATE facturas_adres SET estado = 'EN PROCESO' "
+                        "WHERE estado = 'PENDIENTE' AND EXISTS ("
+                        "  SELECT 1 FROM glosas_adres g "
+                        "  WHERE g.paquete_id = facturas_adres.paquete_id "
+                        "    AND g.factura_clave = facturas_adres.factura_clave "
+                        "    AND g.decision IS NOT NULL AND TRIM(g.decision) <> '')"
+                    )
+                )
+                db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN facturas_adres (relleno): {e}")
+
     # Índice idempotente sobre numero_nota_credito (declarado index=True en
     # el modelo). create_all() no lo agrega para tablas pre-existentes.
     try:
