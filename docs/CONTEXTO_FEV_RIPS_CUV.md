@@ -59,6 +59,32 @@ Lo que dice el resultado:
 - **AVISO** → no bloquea el CUV, pero suele terminar en glosa o en devolución
   de la EPS. Vale la pena revisarlo.
 
+### Rojo y amarillo en el validador del Ministerio
+
+En la pantalla de resultados hay dos clases y **no pesan igual**:
+
+- **RECHAZADO (rojo)** → bloquea. Sin corregirlo no hay CUV.
+- **NOTIFICACION (amarillo)** → **no bloquea**: el CUV se genera igual y la
+  factura se puede radicar.
+
+Pero los amarillos no son adorno. La norma dice que son transitorios y que
+"periódicamente se convertirán en reglas de rechazo" — ya pasó dos veces en
+2026. Además suelen ser cruces de CUPS contra diagnóstico, cobertura o
+finalidad: exactamente la materia prima de una glosa de pertinencia. Se revisan,
+pero no detienen la radicación.
+
+### La norma vigente
+
+La **Resolución 948 de 2026** (14 de mayo de 2026) derogó la Resolución 2275 de
+2023 y las Resoluciones 558 y 1884 de 2024. Cuidado con un cambio de fondo: los
+anexos ya no van dentro de la resolución, ahora son **Documento Técnico 1**
+(campos y reglas del RIPS) y **Documento Técnico 2** (campos del sector salud en
+el XML), y el Ministerio **los actualiza en el micrositio de SISPRO sin expedir
+norma nueva**.
+
+Antes de un cargue grande conviene mirar si cambiaron:
+https://www.sispro.gov.co/central-financiamiento/Pages/facturacion-electronica.aspx
+
 ---
 
 ## 3) Los errores que más se repiten
@@ -115,6 +141,53 @@ Si la atención fue el 27 de julio y la factura se expidió por el período del
   la DIAN: no se puede editar el XML.
 
 Nunca se cambia la fecha clínica solo para que el validador pase.
+
+### `RVC011` — el código de prestador (el más difícil de ver)
+
+Este es el que más tiempo cuesta, porque **el mismo prestador se escribe con dos
+largos distintos según el archivo**:
+
+| Archivo | Campo | Largo | Qué es |
+|---|---|---|---|
+| XML de la factura | `CODIGO_PRESTADOR` | **10 dígitos** | Código del **prestador** |
+| JSON de RIPS | `codPrestador` | **12 dígitos** | Código de habilitación de la **sede** |
+
+Los 12 se componen así:
+
+```
+68001  03933  01
+└─┬─┘  └─┬─┘  └┬┘
+municipio  prestador  sede
+```
+
+Si el software de facturación pone los **12** también en el XML, el Ministerio
+rechaza con `RVC011` y un mensaje que confunde, porque muestra el código de 10
+como "habilitado" y parece que sobraran dígitos en el RIPS:
+
+> El código de prestador en salud informado en el documento electrónico no
+> coincide con los datos de autenticación. Valor Reportado Xml: [680010393301]
+> → Código(s) de Prestador(es) Habilitado(s): [6800103933]
+
+**No se corrige en el JSON.** El JSON con 12 está bien; bajarlo a 10 produce un
+rechazo nuevo (`RVG01`: *el campo de codPrestador debe tener 12 caracteres*).
+Lo que está mal es el XML, y el XML está firmado: **facturación tiene que
+reexpedir la factura** con el código a 10 dígitos, y el proveedor del software
+debe separar los dos parámetros — si usa uno solo para ambos archivos, el
+problema se repite en todas las facturas.
+
+Los dos códigos se consultan gratis en REPS con el NIT:
+
+- Consulta oficial: https://prestadores.minsalud.gov.co/habilitacion/
+  (entra con el usuario invitado que ya viene escrito)
+- Respaldo por datos abiertos, si el portal está caído:
+
+```powershell
+Invoke-RestMethod "https://www.datos.gov.co/resource/c36g-9fc2.json?numeroidentificacion=<NIT>" |
+  Select-Object nombreprestador, codigoprestador, codigohabilitacionsede
+```
+
+`tools/validar_json_rips.py` ya detecta este caso: compara el código del XML con
+el del JSON y avisa cuál de los dos tiene el largo equivocado.
 
 ### Formato de las fechas
 

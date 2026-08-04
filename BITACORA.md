@@ -1612,7 +1612,7 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   (sección 5.ter), incluido el pantallazo de **Ver Histórico** como evidencia
   para el PDF de soportes.
 
-### 03-08 (octava parte) — Cuentas médicas: el CUV que no salía
+### 03-08 (CUV) — Cuentas médicas: el CUV que no salía
 
 - Cuentas médicas reportó que el validador del Ministerio no le generaba el
   **CUV** de la factura **MED737** (Medical Center Especialistas, NIT
@@ -1646,6 +1646,42 @@ comandos de rescate de la guía. Sin ese rescate el PC arrancaría vacío.
   pasada del validador, la tabla de modalidades, los errores más frecuentes y
   la plantilla de PowerShell para corregir el JSON sin dañarlo.
 
+### 03-08 (CUV, parte 2) — El enredo del código de prestador
+
+Con las cuatro correcciones puestas, el Ministerio dejó de reclamar y salió un
+rechazo nuevo, **RVC011**, que costó tres intentos entender. Vale la pena
+dejarlo escrito porque le va a pasar a más facturas:
+
+- El mensaje dice que el código informado (`680010393301`) "no coincide con los
+  datos de autenticación" y muestra como habilitado `6800103933`. Parece que
+  sobraran dos dígitos en el RIPS. **No es así.**
+- **El mismo prestador se escribe con dos largos distintos según el archivo:**
+  en el **XML** de la factura va a **10 dígitos** (código del prestador) y en el
+  **JSON** de RIPS va a **12** (código de habilitación de la sede). Está en los
+  Documentos Técnicos 1 y 2 del Ministerio.
+- Se probó bajar el JSON a 10 y el validador contestó de una: *"El campo de
+  codPrestador debe tener 12 caracteres"*. Confirmado por descarte.
+- Se consultó el REPS (datos abiertos, dataset `c36g-9fc2`) con el NIT
+  900299334: prestador **6800103933**, sede **680010393301**. O sea que **el
+  JSON siempre estuvo bien** y la sede 01 es la correcta.
+- **Lo que está mal es el XML**, que lleva los 12 donde van 10. Y el XML está
+  firmado: no se toca. Le toca a **facturación reexpedir** la factura, y al
+  proveedor del software separar los dos parámetros — si usa uno solo para los
+  dos archivos, el error se repite en todas.
+- Las 3 notificaciones amarillas (RVC017/019/059) **no bloquean el CUV**: la
+  norma dice que son transitorias. Pero son cruces de CUPS contra diagnóstico,
+  cobertura y finalidad, o sea materia prima de glosa. Ojo con una: la factura
+  describe "CONSULTA ESPECIALIZADA POR PRIMERA VEZ" pero el RIPS reporta el
+  CUPS **890201**, que es consulta de primera vez **por medicina general**. Hay
+  que confirmar quién atendió antes de aprovechar la reexpedición.
+- **Cambio de norma importante:** la Resolución 2275 de 2023 fue **derogada por
+  la Resolución 948 de 2026**. Los anexos ya no van dentro de la resolución:
+  ahora son "Documento Técnico 1 y 2" y el Ministerio los actualiza en el
+  micrositio de SISPRO **sin expedir norma nueva**. Hay que mirarlos antes de
+  cada cargue grande.
+- `tools/validar_json_rips.py` ahora detecta este caso solo: lee el
+  `CODIGO_PRESTADOR` del bloque de interoperabilidad del XML, compara los largos
+  y dice cuál de los dos archivos tiene el error y quién lo corrige. 35 pruebas.
 ### 03-08 (octava parte) — Todo listo para empezar a subir a SIIFA
 
 - **`tools\CARGAR_SIIFA.cmd`** — bot de doble clic con menú, para no escribir
@@ -1965,15 +2001,28 @@ de Docker.
     el arranque, o si eso se deja para cuando llegue el primer lote real.
 
 ### Cuentas médicas — CUV de facturas nuevas (nuevo, 03-08)
-15. **Factura MED737:** aplicar las tres correcciones del JSON (modalidad `01`,
-    `numFactura` = `MED737`, `numNota` en `null`) y **preguntar a facturación**
-    por el conflicto de fechas: la atención es del 27-07 y la factura cubre el
-    período del 31-07. Sin resolver eso el Ministerio no entrega el CUV.
-16. **Revisar el resto de facturas de agosto** con `validar_json_rips.py
-    --recursivo` antes de subirlas. Si el facturador viene exportando el
-    `numFactura` sin prefijo y la modalidad en `null`, el problema es de todas,
-    no solo de la 737: ahí lo que toca es pedirle el ajuste al proveedor del
-    software, no corregir a mano cada archivo.
+15. **Factura MED737 — la pelota está en facturación.** El JSON ya quedó bien
+    (las 4 correcciones + `codPrestador` de 12 dígitos, que era el correcto).
+    Falta que **reexpidan la factura** con el `CODIGO_PRESTADOR` a **10 dígitos
+    (6800103933)** en el XML. Enviarles el pedido por escrito con los dos
+    valores explícitos: XML = `6800103933`, JSON = `680010393301`.
+16. **Avisar al proveedor del software de facturación** (el rastro apunta a
+    Siigo): si usa un solo parámetro para el XML y el RIPS, hay que separarlos.
+    Si no, el RVC011 se repite en todas las facturas.
+17. **Antes de reexpedir, confirmar quién atendió:** la factura dice "consulta
+    especializada" y el RIPS reporta CUPS 890201 (medicina general). Si atendió
+    un especialista, el CUPS y el `codServicio` también deben corregirse en la
+    misma reexpedición. Pedir el soporte de quién atendió.
+18. **Preguntar al Ministerio la vía correcta** (mesa de ayuda,
+    Soporte-fev-rips@minsalud.gov.co): si para corregir el `CODIGO_PRESTADOR` de
+    una FEV ya validada por la DIAN toca nota crédito de anulación total y
+    reexpedición, o si basta retransmitir. Ningún texto oficial lo ordena; la
+    vía de la anulación viene de mesas de ayuda de proveedores. Cuesta cero
+    preguntar y evita anular una factura sin necesidad.
+19. **Revisar el resto de facturas de agosto** con `validar_json_rips.py
+    --recursivo` antes de subirlas.
+20. **Revisar el número de factura si la reexpiden:** si sale con número nuevo,
+    el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
 
