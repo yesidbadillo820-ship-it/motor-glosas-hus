@@ -49,6 +49,18 @@ class _Proc:
 
 UVICORN = ["uvicorn", "app.main:app", "--port", "8000"]
 UVICORN_RELOAD = ["uvicorn", "app.main:app", "--reload"]
+# El motor que sirve la página por internet en el PC del hospital: mismo
+# programa, otro puerto, otra instalación. Ver TestDosMotoresNoEsLoMismoQue…
+UVICORN_TUNEL = [
+    "C:\\motor-glosas\\repo\\venv\\Scripts\\python.exe",
+    "-m",
+    "uvicorn",
+    "app.main:app",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8080",
+]
 
 
 def _procesos(monkeypatch, lista):
@@ -118,6 +130,62 @@ class TestContarMotores:
 
         monkeypatch.setattr(builtins, "__import__", _falla)
         assert mp.motores_vivos() == []
+
+
+class TestElPuertoDeCadaMotor:
+    def test_lo_lee_de_la_linea_de_comando(self):
+        assert mp.puerto_de(UVICORN_TUNEL) == "8080"
+        assert mp.puerto_de(UVICORN) == "8000"
+
+    def test_tambien_con_igual(self):
+        assert mp.puerto_de(["uvicorn", "app.main:app", "--port=9000"]) == "9000"
+
+    def test_sin_puerto_es_el_de_siempre(self):
+        assert mp.puerto_de(UVICORN_RELOAD) == ""  # el valor por defecto lo pone quien pregunta
+        assert mp.motores_vivos.__doc__  # el default (8000) se aplica en motores_vivos
+
+    def test_no_revienta_sin_linea_de_comando(self):
+        assert mp.puerto_de(None) == ""
+        assert mp.puerto_de(["uvicorn", "app.main:app", "--port"]) == ""
+
+
+class TestDosMotoresNoEsLoMismoQueUnSobrante:
+    """04-08-2026, la lección cara del día.
+
+    El aviso decía «hay 2 motores, cerrá los sobrantes» y el auditor cerró
+    el del puerto 8080: el que sirve la página por internet. No sobraba —
+    era el OTRO sistema, con su propia copia de las claves, y era el que su
+    navegador estaba usando. De ahí venía el enredo entero: el arranque del
+    puerto 8000 mostraba la clave nueva y la pantalla, servida por el 8080,
+    mostraba la vieja.
+    """
+
+    def test_mismo_puerto_es_pelea_de_verdad(self, monkeypatch):
+        _procesos(monkeypatch, [_Proc(100, 1, UVICORN), _Proc(200, 1, UVICORN)])
+        est = mp.estado_motor()
+        assert est["estado"] == "error"
+        assert "mismo puerto" in est["mensaje"]
+        assert "Cerrá el sobrante" in est["mensaje"]
+
+    def test_puertos_distintos_no_es_error_y_no_manda_a_cerrar_nada(self, monkeypatch):
+        _procesos(monkeypatch, [_Proc(100, 1, UVICORN_TUNEL), _Proc(200, 1, UVICORN)])
+        est = mp.estado_motor()
+        assert est["estado"] == "warning"
+        assert "cerrá los sobrantes" not in est["mensaje"].lower()
+        assert "reiniciar TODAS" in est["mensaje"]
+
+    def test_avisa_que_el_8080_es_la_pagina_por_internet(self, monkeypatch):
+        _procesos(monkeypatch, [_Proc(100, 1, UVICORN_TUNEL), _Proc(200, 1, UVICORN)])
+        est = mp.estado_motor()
+        assert "8080" in est["mensaje"]
+        assert "internet" in est["mensaje"]
+        assert "NO lo cierres" in est["mensaje"]
+
+    def test_el_puerto_de_cada_uno_viaja_en_el_aviso(self, monkeypatch):
+        _procesos(monkeypatch, [_Proc(100, 1, UVICORN_TUNEL), _Proc(200, 1, UVICORN)])
+        est = mp.estado_motor()
+        assert "puerto 8080" in est["mensaje"] and "puerto 8000" in est["mensaje"]
+        assert {m["puerto"] for m in est["data"]["motores"]} == {"8080", "8000"}
 
 
 class TestEstadoDelMotor:
@@ -329,7 +397,10 @@ class TestPantalla:
         html = (RAIZ / "static" / "index.html").read_text(encoding="utf-8", errors="ignore")
         assert "p.clave_probada" in html
         assert "d.motores_vivos > 1" in html
-        assert "REINICIAR_MOTOR.cmd" in html
+        # Y NO manda a cerrar nada: el otro motor puede ser el de la página
+        # por internet (04-08-2026).
+        assert "cerrá los sobrantes" not in html
+        assert "su propia copia de las claves" in html
 
     def test_el_panel_de_diagnostico_nombra_la_tarjeta(self):
         html = (RAIZ / "static" / "index.html").read_text(encoding="utf-8", errors="ignore")
@@ -344,6 +415,21 @@ class TestElBotDeDobleClic:
         assert "uvicorn app.main:app" in cmd
         # Primero cerrar, después arrancar: al revés no sirve de nada.
         assert cmd.index("taskkill") < cmd.index("uvicorn app.main:app")
+
+    def test_solo_cierra_los_motores_de_su_propio_puerto(self):
+        """Lo que costó la página pública: el bot no puede cerrar el motor
+        del 8080 cuando lo que reinicia es el del 8000."""
+        cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
+        assert "$suyo -eq $puerto" in cmd  # compara puertos antes de matar
+        assert "dejo vivo el motor" in cmd  # y lo dice cuando no lo toca
+        assert "8080 sirve la pagina por internet" in cmd
+
+    def test_tambien_cierra_al_que_quedo_vivo_sin_escuchar(self):
+        """El de --reload que sobrevive sin el puerto: se busca por su línea
+        de comando, no solo por quién ocupa el puerto."""
+        cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
+        assert "Win32_Process" in cmd
+        assert "Stop-Process" in cmd
 
     def test_el_bot_avisa_si_falta_el_env(self):
         cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")

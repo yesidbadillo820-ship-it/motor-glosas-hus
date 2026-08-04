@@ -1430,20 +1430,38 @@ pantalla de Diagnóstico —que lee exactamente el mismo dato— mostraba
 inválida». Dos respuestas distintas para el mismo dato solo tienen una
 explicación: **no era un solo programa contestando, eran dos**.
 
-En Windows, si uno abre otra ventana y arranca el motor sin cerrar el
-anterior, los dos se quedan con el mismo puerto y las peticiones caen en
-cualquiera de los dos. El viejo responde con la clave vieja y con el
-programa viejo. Nada en pantalla lo decía.
+**La explicación de verdad (y no era la primera que se pensó).** En el PC
+del hospital corren **dos motores al mismo tiempo, en puertos distintos**:
+
+- el del **puerto 8080**, que lo mantiene vivo `tools/servidor_motor_local.cmd`
+  y es **el que alimenta la página por internet** (el túnel de Cloudflare);
+- el del **puerto 8000**, que es el que Yesid levanta a mano para probar.
+
+El del 8080 llevaba horas arriba, así que conservaba la clave vieja y el
+programa viejo — y **el navegador estaba hablando con ese**. Por eso el
+arranque del 8000 mostraba una clave y la pantalla mostraba la otra: no era
+una pantalla mintiendo, eran dos sistemas distintos.
+
+(La primera sospecha fue que los dos se peleaban el mismo puerto. Quedó
+descartada en vivo: al intentar levantar un segundo motor en el 8080,
+Windows respondió «solo se permite un uso de cada dirección de socket».)
+
+**La lección, que quedó escrita en el sistema:** si se cambia el archivo de
+claves, hay que **reiniciar los dos motores**. Reiniciar solo el de pruebas
+no toca la página por internet.
 
 Lo que se construyó para que no vuelva a pasar:
 
-- **`tools/REINICIAR_MOTOR.cmd`** (doble clic): cierra TODO lo que esté
-  usando el puerto y deja **uno solo** recién arrancado. Es la forma
-  correcta de reiniciar después de tocar el archivo de claves.
+- **`tools/REINICIAR_MOTOR.cmd`** (doble clic): cierra los motores **de su
+  propio puerto** —incluido el que quedó vivo sin estar atendiendo— y deja
+  uno solo recién arrancado. De los de otro puerto **avisa y no los toca**:
+  la primera versión los cerraba a todos y así se tumbó la página pública
+  por error.
 - **El Diagnóstico avisa primero**: la primera tarjeta del panel ahora es
-  **«Motor (quién está atendiendo)»**. Si hay más de uno, se pone en ROJO,
-  nombra los procesos y dice cómo cerrarlos. Y si hay uno solo, muestra con
-  qué clave está trabajando.
+  **«Motor (quién está atendiendo)»**, con el puerto de cada uno. Si dos se
+  pelean el mismo puerto se pone en ROJO («cerrá el sobrante»); si están en
+  puertos distintos avisa en amarillo que son **dos instalaciones separadas**
+  y que hay que reiniciar las dos — sin mandar a cerrar ninguna.
 - **El arranque también lo dice**: junto a `[IA-PROVIDERS]` aparece
   `[MOTOR] Un solo motor atendiendo…` o `[MOTOR-DUPLICADO] …`.
 - **El aviso de error dice CUÁL clave usó**: «GROQ: su clave está inválida o

@@ -32,20 +32,33 @@ echo.
 echo  Carpeta del proyecto: %CD%
 echo.
 
-REM --- 1. Cerrar lo que este escuchando el puerto ---------------------
+REM --- 1a. Cerrar SOLO los motores de ESTE puerto ----------------------
+REM 04-08-2026, segunda vuelta. La primera version cerraba unicamente lo
+REM que estuviera escuchando el puerto, y el propio motor detecto igual
+REM DOS motores vivos. El segundo NO era un sobrante: era el uvicorn del
+REM puerto 8080, el que sirve la pagina por internet (el tunel). El
+REM auditor lo cerro creyendo que estorbaba y tumbo la pagina publica.
+REM Por eso este paso cierra por linea de comando (asi agarra tambien al
+REM motor que quedo vivo sin escuchar, tipico de --reload) pero SOLO si
+REM sirve el mismo puerto que estamos por levantar. De los demas avisa y
+REM no los toca.
 echo  [1/3] Buscando motores encendidos...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$puerto = '%PUERTO%';" ^
+  "$todos = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine -match 'uvicorn' -and $_.CommandLine -match 'app\.main' });" ^
+  "foreach ($p in $todos) { $suyo = if ($p.CommandLine -match '--port[= ]+(\d+)') { $matches[1] } else { '8000' };" ^
+  "  if ($suyo -eq $puerto) { Write-Host ('       - cerrando motor PID ' + $p.ProcessId + ' (puerto ' + $suyo + ')'); Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }" ^
+  "  else { Write-Host ('       - OJO: dejo vivo el motor PID ' + $p.ProcessId + ' del puerto ' + $suyo + ' (no es este; el 8080 sirve la pagina por internet)') } }" ^
+  "if ($todos.Count -eq 0) { Write-Host '       No habia ningun motor de glosas encendido. Bien.' }"
+
+REM --- 1b. Y si algo AJENO se quedo con el puerto, tambien --------------
 set "HUBO=0"
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:"LISTENING" ^| findstr /C:":%PUERTO% "') do (
   if not "%%P"=="0" (
-    echo        - cerrando proceso %%P
+    echo        - el puerto %PUERTO% seguia ocupado por el proceso %%P: cerrandolo
     taskkill /PID %%P /T /F >nul 2>&1
     set "HUBO=1"
   )
-)
-if "%HUBO%"=="0" (
-  echo        No habia ningun motor encendido. Bien.
-) else (
-  echo        Motores anteriores cerrados.
 )
 
 REM --- 2. Aviso si el .env no esta donde debe -------------------------

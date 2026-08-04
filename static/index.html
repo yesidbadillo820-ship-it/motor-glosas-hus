@@ -9343,7 +9343,9 @@ async function gobProbar(){
         + (p.es_principal ? ' <em>(principal)</em>' : '') + ' — ' + escHtml(p.detalle) + clave + '</div>';
     });
     if(d.motores_vivos > 1){
-      html += '<div class="porque" style="color:#dc2626;font-weight:600">⚠ ' + d.motores_vivos + ' motores encendidos al mismo tiempo: cerrá los sobrantes con tools\\REINICIAR_MOTOR.cmd, si no el análisis puede caer en el viejo.</div>';
+      // Aquí NO se manda a cerrar ningún motor: el 04-08-2026 el otro era el
+      // que sirve la página por internet, y cerrarlo la tumbó.
+      html += '<div class="porque" style="color:#b45309;font-weight:600">⚠ Hay ' + d.motores_vivos + ' motores encendidos en el servidor, cada uno con su propia copia de las claves. Esta prueba vale para el que te está atendiendo ahora.</div>';
     }
     html += '</div></div>';
     caja.innerHTML = html;
