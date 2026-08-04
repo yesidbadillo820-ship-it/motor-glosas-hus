@@ -11,15 +11,6 @@ title MotorGlosasServidor
 set "REPO=C:\motor-glosas\repo"
 if not exist "%REPO%\venv\Scripts\python.exe" exit /b 1
 
-rem Si ya hay un servidor de PRODUCCION corriendo, no duplicar.
-rem El filtro mira el puerto desde el 04-08-2026: antes bastaba con que
-rem existiera cualquier uvicorn de la aplicacion, asi que mientras el
-rem auditor tuviera abierto su motor de pruebas (puerto 8000) este
-rem vigilante se negaba a arrancar — y si la pagina por internet se caia,
-rem NO volvia sola.
-powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
-if errorlevel 1 exit /b 0
-
 cd /d "%REPO%"
 set "SOPORTES_ROOT=%REPO%\data\soportes"
 set "SOPORTES_LOCAL_ROOT=%REPO%\data\soportes"
@@ -27,6 +18,29 @@ if not exist "%REPO%\data\soportes" mkdir "%REPO%\data\soportes"
 set "LOG=%REPO%\data\servidor.log"
 
 :loop
+rem ¿Ya hay un servidor de PRODUCCION arriba? Entonces este vigilante
+rem espera, NO arranca otro encima.
+rem
+rem Dos correcciones del 04-08-2026 en una sola linea:
+rem  1. El filtro mira el PUERTO. Antes bastaba con que existiera
+rem     cualquier uvicorn de la aplicacion, asi que mientras el auditor
+rem     tuviera abierto su motor de pruebas (8000), este vigilante se
+rem     negaba a arrancar — y si la pagina por internet se caia, NO
+rem     volvia sola.
+rem  2. La comprobacion va DENTRO del bucle. Estaba antes, una sola vez:
+rem     si quedaban dos ventanas de vigilancia abiertas (pasa facil: el
+rem     autodeploy vuelve a llamar al arrancador cada 5 minutos), la
+rem     segunda entraba al bucle igual y se pasaba el dia levantando un
+rem     servidor que moria al instante contra el puerto ocupado, un
+rem     proceso nuevo cada 5 segundos llenando el registro. Asi, el
+rem     vigilante de mas simplemente espera: si el otro se cae, este
+rem     toma el relevo.
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
+if errorlevel 1 (
+  timeout /t 5 /nobreak >nul
+  goto :loop
+)
+
 rem Cargar TODO el .env como variables de entorno de verdad. En Docker
 rem las inyectaba docker compose; aca muchas partes del codigo las leen
 rem con os.getenv (llaves de IA, toggles) y no basta con que Settings

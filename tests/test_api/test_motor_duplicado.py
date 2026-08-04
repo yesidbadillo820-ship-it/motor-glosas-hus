@@ -548,8 +548,20 @@ class TestElBotDeDobleClic:
         aplicación: con el motor de pruebas abierto, la página por internet
         no revivía sola si se caía."""
         cmd = (RAIZ / "tools" / "servidor_motor_local.cmd").read_text(encoding="utf-8")
-        guardia = cmd.split("no duplicar", 1)[1].split(":loop", 1)[0]
-        assert "8080" in guardia
+        cuerpo = cmd.split(":loop", 1)[1]
+        assert "--port\\s+8080" in cuerpo
+
+    def test_un_vigilante_de_mas_espera_en_vez_de_pelear(self):
+        """Visto en el PC del hospital: quedaron DOS ventanas de vigilancia
+        (el autodeploy vuelve a llamar al arrancador cada 5 minutos). Con la
+        comprobación fuera del bucle, la segunda levantaba un servidor que
+        moría al instante contra el puerto ocupado — uno nuevo cada 5
+        segundos, llenando el registro."""
+        cmd = (RAIZ / "tools" / "servidor_motor_local.cmd").read_text(encoding="utf-8")
+        cuerpo = cmd.split(":loop", 1)[1]
+        # la comprobación vive dentro del bucle y reintenta, no sale
+        assert "goto :loop" in cuerpo.split("errorlevel 1", 1)[1][:200]
+        assert cmd.count("goto :loop") >= 2
 
     def test_comprueba_que_de_verdad_murieron(self):
         """`-ErrorAction SilentlyContinue` se tragaba el «acceso denegado» y
