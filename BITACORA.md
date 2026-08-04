@@ -1270,6 +1270,20 @@ períodos perdidos.
 
 ---
 
+### 04-08 (segunda parte) — Panel operacional y arreglo del CI
+
+- **El Mando ejecutivo ya muestra dónde se atasca el trabajo**: las
+  glosas abiertas agrupadas por estado, con cuánta plata hay parada en
+  cada uno y hace cuántos días no se mueve la más vieja (en rojo si pasa
+  de 30). Y al lado, **la carga real de cada auditor**: cuántas lleva
+  abiertas, cuántas ya vencidas y por qué valor — quien tiene vencidas
+  aparece de primero. Se decidió ampliar el Mando en vez de crear otra
+  pantalla, para no tener dos tableros que digan cosas parecidas.
+- **Arreglo del CI**: el cambio del incidente dejó tres pruebas viejas en
+  rojo porque validaban justamente el texto de error como si fuera
+  dictamen. Se corrigieron para probar lo que siempre quisieron probar,
+  con un dictamen de verdad.
+
 ### 04-08 — Incidente: un error de la IA quedó guardado como dictamen
 
 - Iván analizó una glosa de PPL y el «dictamen» salió con el error crudo
