@@ -136,3 +136,78 @@ class TestElCinturonDePersistencia:
         assert r.status_code == 503
         assert "NO se" in r.json()["detail"]
         assert db_session.query(GlosaRecord).count() == 0
+
+
+class TestCaratulaSinArgumentoNoEsDictamen:
+    """Incidente 04-08-2026 (segunda parte): con la IA caída el motor armó
+    la carátula completa —tabla, sello «VALIDADO POR QUALITY GATE», cierre—
+    con la ARGUMENTACIÓN JURÍDICA VACÍA, y eso quedó guardado. Una carátula
+    sin argumento no es un dictamen."""
+
+    def test_el_constructor_se_niega_a_armar_caratula_vacia(self):
+        from app.services.glosa_service import DictamenSinArgumentoError, GlosaService
+
+        svc = GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
+        for vacio in ("", "   ", "<div></div>", "&nbsp; &nbsp;", "corto"):
+            with pytest.raises(DictamenSinArgumentoError):
+                svc._generar_dictamen_html(
+                    codigo="TA2901",
+                    valor="$ 42.800",
+                    cod_res="RE9901",
+                    desc_res="GLOSA NO ACEPTADA",
+                    argumento=vacio,
+                    eps="PPL",
+                    tipo="TA_TARIFA",
+                )
+
+    def test_con_argumento_real_sí_arma(self):
+        from app.services.glosa_service import GlosaService
+
+        svc = GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
+        html = svc._generar_dictamen_html(
+            codigo="TA2901",
+            valor="$ 42.800",
+            cod_res="RE9901",
+            desc_res="GLOSA NO ACEPTADA",
+            argumento=(
+                "LA E.S.E. HUS NO ACEPTA LA GLOSA. PRIMERO: EL EQUIPO DE BOMBA DE "
+                "INFUSIÓN CORRESPONDE A UN INSUMO FACTURADO CONFORME A LA TARIFA "
+                "INSTITUCIONAL VIGENTE. SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA."
+            ),
+            eps="PPL",
+            tipo="TA_TARIFA",
+        )
+        assert "ARGUMENTACIÓN JURÍDICA" in html and "BOMBA DE INFUSIÓN" in html
+
+    def test_el_endpoint_no_guarda_caratula_vacia(self, db_session):
+        """Aunque la carátula vacía llegara armada desde otro camino."""
+        from app.main import app
+
+        caratula_vacia = (
+            "<table><tr><td>TA2901</td></tr></table>"
+            '<h4>ARGUMENTACIÓN JURÍDICA</h4><div style="x">   </div>'
+            "<div>Nota: Generado con asistencia de IA.</div>"
+        )
+        svc = MagicMock()
+        svc.analizar = AsyncMock(
+            return_value=GlosaResult(
+                tipo="RESPUESTA RE9901",
+                resumen="ok",
+                dictamen=caratula_vacia,
+                codigo_glosa="TA2901",
+                valor_objetado="$ 42.800",
+                paciente="N/A",
+                mensaje_tiempo="EN TÉRMINOS",
+                color_tiempo="green",
+                score=43.0,
+                dias_restantes=10,
+                modelo_ia="mock/test",
+            )
+        )
+        with _cliente(db_session, svc) as c:
+            r = _analizar(c)
+        app.dependency_overrides.clear()
+
+        assert r.status_code == 503
+        assert "argumentación" in r.json()["detail"].lower()
+        assert db_session.query(GlosaRecord).count() == 0

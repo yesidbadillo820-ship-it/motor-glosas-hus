@@ -24,6 +24,26 @@ class IANoDisponibleError(RuntimeError):
         self.mensaje = mensaje
 
 
+# Mínimo de argumentación real para que un dictamen exista. Por debajo de
+# esto no hay defensa que radicar: es una carátula vacía.
+MIN_CHARS_ARGUMENTO = 120
+
+
+class DictamenSinArgumentoError(RuntimeError):
+    """La IA no produjo argumentación: no se arma carátula ni se guarda."""
+
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+
+
+def _solo_texto_argumento(argumento: str) -> str:
+    """El texto real del argumento, sin etiquetas ni espacios de relleno."""
+    limpio = re.sub(r"<[^>]+>", " ", argumento or "")
+    limpio = limpio.replace("&nbsp;", " ")
+    return re.sub(r"\s+", " ", limpio).strip()
+
+
 # Firmas que delatan un error de proveedor dentro de un texto que pretende
 # ser dictamen. Cinturón de persistencia: si aparecen, NO se guarda.
 FIRMAS_ERROR_PROVEEDOR = (
@@ -7597,6 +7617,16 @@ class GlosaService:
         contrato: Optional[str] = None,
         tarifa: Optional[str] = None,
     ) -> str:
+        # Incidente 04-08-2026 (segunda parte): con la IA caída el motor
+        # armaba la carátula completa —tabla, sello, cierre— con la
+        # ARGUMENTACIÓN JURÍDICA VACÍA, y eso se guardaba y se mostraba
+        # como validado. Una carátula sin argumento no es un dictamen.
+        if len(_solo_texto_argumento(argumento)) < MIN_CHARS_ARGUMENTO:
+            raise DictamenSinArgumentoError(
+                "La IA no devolvió argumentación jurídica (el cuerpo quedó vacío o "
+                "demasiado corto). El análisis NO se guardó: reintentá y si persiste "
+                "avisá a administración."
+            )
         colores = {
             "TA_TARIFA": "#1e40af",
             "SO_SOPORTES": "#7c3aed",
