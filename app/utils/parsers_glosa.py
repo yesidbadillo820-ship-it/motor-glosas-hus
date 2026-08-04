@@ -245,7 +245,7 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
 
     # Filtrar ceros ($0,00) y quedarnos con valores significativos.
     def _tof(s):
-        s = re.sub(r"[^\d,\.]", "", s)
+        s = re.sub(r"[^\d,\.]", "", s).strip(".,")  # ronda 30: recorta puntuación colgante
         if "," in s and "." in s:
             if s.rfind(",") > s.rfind("."):
                 s = s.replace(".", "").replace(",", ".")
@@ -296,6 +296,9 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
         if not raw:
             return 0.0
         s = re.sub(r"[^\d,\.]", "", raw)
+        # Ronda 30: puntuación pegada al monto ("$114.900,00,") dejaba una
+        # coma/punto colgando que rompía el parseo → 0. Se recorta.
+        s = s.strip(".,")
         if not s:
             return 0.0
         # Normalizar formato COP: si hay ambos . y , tratar como miles/decimal
@@ -329,7 +332,9 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
         r"FACTURAD[OA]S?\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
         r"VALOR\s+(?:UNITARIO\s+)?FACTURADO[:\s]+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
         r"COBRAD[OA]\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
-        r"FACTURA[:\s]+\$?\s*([\d][\d\.,]{3,})",
+        # Ronda 30: '$' OBLIGATORIO — sin él "FACTURA 90228637" capturaba el
+        # NÚMERO de factura como valor facturado ($90.228.637).
+        r"FACTURA[:\s]+\$\s*([\d][\d\.,]{3,})",
     ]
     patrones_rec = [
         # Patrón Famisanar/similar: "VALOR UNITARIO CONTRATADO PARA LA FECHA
@@ -508,7 +513,9 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
 """
 
 
-def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[str, str]:
+def _extraer_cups_servicio(
+    texto_glosa: str, contexto_pdf: str = "", montos_excluir=None
+) -> tuple[str, str]:
     """Extrae tupla (CUPS, descripción_servicio) desde el texto de la glosa/PDF.
 
     PRIORIDAD para el CUPS:
@@ -544,10 +551,25 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
         r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", texto_glosa or ""
     )
 
+    # Ronda 30: montos del formulario (valor objetado/aceptado) que NUNCA
+    # deben confundirse con un CUPS. En glosas sin CUPS explícito, un valor
+    # suelto entre guiones ("... - 149000 - ...") entraba como CUPS "149000".
+    _montos_norm = set()
+    for _m in montos_excluir or ():
+        try:
+            _mi = int(round(float(_m)))
+            if _mi > 0:
+                _montos_norm.add(str(_mi))
+        except (TypeError, ValueError):
+            pass
+
     def _es_cups_valido(token: str) -> bool:
         if not token or GLOSA_CODES.match(token):
             return False
         tu = token.upper()
+        # (0) coincide EXACTO con un valor monetario del caso → es plata, no CUPS
+        if tu in _montos_norm:
+            return False
         # (a) fecha "2026-04" / "2026-04-15" y (c) año suelto 19xx/20xx
         if FECHA_COMO_CUPS.match(tu) or ANIO_COMO_CUPS.match(tu):
             return False

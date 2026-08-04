@@ -19,8 +19,10 @@ Se usa desde:
   - app.services.multi_codigo (_generar_seccion_codigo — cada código
     adicional re-evalúa la complejidad).
 
-UMBRALES (idénticos a R-CEREBRO #5):
+UMBRALES (idénticos a R-CEREBRO #5, + ronda 32):
   - valor ≥ $50M → COMPLEJO
+  - valor ≥ $10M (solo, sin más señales) → COMPLEJO (ronda 32,
+    ajustable con ROUTING_VALOR_SOLO_MIN)
   - 2+ PDFs Y valor ≥ $5M → COMPLEJO
   - 3+ códigos de glosa → COMPLEJO
   - texto > 4000 chars → COMPLEJO
@@ -68,7 +70,10 @@ PALABRAS_CLAVE_COMPLEJIDAD_CRITICA: tuple[str, ...] = (
     # Groq en vez de escalar a Claude.
     "FACTOR VII",
     "EPTACOG",
-    "INHIBIDOR",
+    # Ronda 30: "INHIBIDOR" suelto escalaba cualquier glosa con IBP/IECA
+    # ("inhibidor de bomba de protones"). Exige contexto hematológico.
+    "INHIBIDOR DEL FACTOR",
+    "INHIBIDORES DEL FACTOR",
     "FEIBA",
     "APCC",
     "GAUCHER",
@@ -138,6 +143,27 @@ PALABRAS_CLAVE_COMPLEJIDAD_CRITICA: tuple[str, ...] = (
 )
 
 
+# Ronda 32 (22-jul-2026): umbral de escalación por VALOR SOLO (sin otras
+# señales). Los 4 casos de prueba del 22-jul mostraron glosas de $16.8M y
+# $18.6M respondidas por Groq (texto pegado, sin PDFs → la regla de $5M+2PDFs
+# no aplicaba y $50M quedaba lejos). Un dictamen de >$10M perdido por un
+# modelo débil cuesta muchísimo más que la llamada a Claude.
+# Ajustable sin redeploy: ROUTING_VALOR_SOLO_MIN (pesos, entero).
+_UMBRAL_VALOR_SOLO_DEFAULT = 10_000_000
+
+
+def _umbral_valor_solo() -> int:
+    """Umbral de escalación por valor sin otras señales (env-ajustable)."""
+    import os
+
+    raw = (os.getenv("ROUTING_VALOR_SOLO_MIN", "") or "").strip()
+    try:
+        v = int(raw)
+        return v if v > 0 else _UMBRAL_VALOR_SOLO_DEFAULT
+    except (TypeError, ValueError):
+        return _UMBRAL_VALOR_SOLO_DEFAULT
+
+
 @dataclass
 class ResultadoComplejidad:
     """Resultado del detector de complejidad crítica.
@@ -177,6 +203,7 @@ def detectar_complejidad_critica(
 
     Cualquier condición individual basta para tipificar COMPLEJO:
       • valor ≥ $50.000.000
+      • valor ≥ $10.000.000 solo (ronda 32 — ROUTING_VALOR_SOLO_MIN)
       • 2+ PDFs Y valor ≥ $5.000.000
       • 3+ códigos de glosa
       • texto_glosa > 4000 chars
@@ -193,6 +220,10 @@ def detectar_complejidad_critica(
 
     if valor_num >= 50_000_000:
         motivos.append(f"valor=${valor_num:,}")
+    elif valor_num >= _umbral_valor_solo():
+        # Ronda 32: alto valor escala SOLO, aunque no haya PDFs ni otras
+        # señales — evidencia: casos de $16.8M/$18.6M respondidos por Groq.
+        motivos.append(f"valor-alto=${valor_num:,}")
 
     if num_pdfs >= 2 and valor_num >= 5_000_000:
         motivos.append(f"pdfs={num_pdfs}+valor>=5M")

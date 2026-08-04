@@ -1,0 +1,114 @@
+@echo off
+REM ====================================================================
+REM  INFORME_BAJA_CARTERA.cmd  -  Bot de doble clic del Motor Glosas HUS.
+REM
+REM  Genera el INFORME WORD del area de facturacion con las facturas que
+REM  NO cumplen los parametros de la Resolucion 577 del 16/10/2019
+REM  (manual de cartera) para entregar a cartera, para su tramite de
+REM  depuracion / baja. Lee el PDF UNIDO (_UNIDO_*.pdf o su copia .cmd
+REM  que deja el bot UNIR_PDFS) de cada carpeta de factura, extrae el
+REM  valor y el INFORME DE TRABAJO SOCIAL, ordena de la mas cara a la
+REM  mas economica y concluye cada factura una a una. Entrega DOS
+REM  informes en la misma corrida: el WORD (documento para presentar)
+REM  y el EXCEL (relacion de facturas + extractos de trabajo social).
+REM
+REM  USO:
+REM   1) Corra primero UNIR_PDFS.cmd en la carpeta de las facturas.
+REM   2) Copie este .cmd JUNTO con generar_informe_baja_cartera.py a la
+REM      carpeta raiz de las facturas y dele doble clic. Tambien puede
+REM      ARRASTRAR una carpeta encima del .cmd.
+REM
+REM  Se instala solo python-docx, openpyxl y pypdf si faltan. Solo LEE
+REM  los PDF; no modifica nada. Salidas: INFORME_BAJA_CARTERA_*.docx
+REM  y INFORME_BAJA_CARTERA_*.xlsx.
+REM ====================================================================
+chcp 65001 >nul 2>&1
+setlocal EnableExtensions DisableDelayedExpansion
+title INFORME BAJA CARTERA - Motor Glosas HUS
+
+echo.
+echo ============================================================
+echo   INFORME BAJA CARTERA - Resolucion 577/2019 (Word)
+echo ============================================================
+echo.
+
+set "CARPETA=%~1"
+if not defined CARPETA set "CARPETA=%~dp0"
+if "%CARPETA:~-1%"=="\" set "CARPETA=%CARPETA:~0,-1%"
+echo [i] Carpeta a procesar: "%CARPETA%"
+echo.
+
+set "PYEXE="
+py -3 -c "import sys" >nul 2>&1 && set "PYEXE=py -3"
+if not defined PYEXE ( python -c "import sys" >nul 2>&1 && set "PYEXE=python" )
+if not defined PYEXE ( python3 -c "import sys" >nul 2>&1 && set "PYEXE=python3" )
+if not defined PYEXE (
+    echo [X] No se encontro Python. Instalelo desde https://www.python.org/downloads/
+    echo     marcando la casilla "Add Python to PATH" y vuelva a dar doble clic.
+    pause
+    exit /b 1
+)
+
+%PYEXE% -c "import docx" >nul 2>&1 || (
+    echo [i] Instalando el componente de Word ^(python-docx^), espere...
+    %PYEXE% -m pip install --quiet --user python-docx >nul 2>&1
+)
+%PYEXE% -c "import docx" >nul 2>&1 || (
+    echo [X] No se pudo instalar python-docx. Ejecute a mano:
+    echo     %PYEXE% -m pip install python-docx
+    pause
+    exit /b 1
+)
+%PYEXE% -c "import openpyxl" >nul 2>&1 || (
+    echo [i] Instalando el componente de Excel ^(openpyxl^), espere...
+    %PYEXE% -m pip install --quiet --user openpyxl >nul 2>&1
+)
+%PYEXE% -c "import pypdf" >nul 2>&1 || %PYEXE% -c "import pdfplumber" >nul 2>&1 || (
+    echo [i] Instalando el lector de PDF ^(pypdf^), espere...
+    %PYEXE% -m pip install --quiet --user pypdf >nul 2>&1
+)
+REM OCR para PDF escaneados (opcional pero recomendado): si no se puede
+REM instalar, el bot corre igual (los escaneados quedan SIN TEXTO).
+%PYEXE% -c "import pypdfium2" >nul 2>&1 || (
+    echo [i] Instalando el visor de paginas para OCR ^(pypdfium2^), espere...
+    %PYEXE% -m pip install --quiet --user pypdfium2 >nul 2>&1
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 || (
+    echo [i] Instalando el motor OCR ^(rapidocr-onnxruntime^) para leer PDF
+    echo     ESCANEADOS. Descarga ~200 MB SOLO la primera vez. NO cierre la
+    echo     ventana: abajo se ve el avance de la descarga...
+    %PYEXE% -m pip install --user rapidocr-onnxruntime
+)
+%PYEXE% -c "import rapidocr_onnxruntime" >nul 2>&1 && (
+    echo [i] Lector OCR listo.
+) || (
+    echo [!] OCR no disponible: se continua igual y los PDF escaneados
+    echo     quedaran marcados SIN TEXTO para revision manual.
+)
+
+if not exist "%~dp0generar_informe_baja_cartera.py" (
+    echo [X] No encuentro generar_informe_baja_cartera.py junto a este .cmd.
+    echo     Copie AMBOS archivos a la misma carpeta.
+    pause
+    exit /b 1
+)
+%PYEXE% "%~dp0generar_informe_baja_cartera.py" --raiz "%CARPETA%"
+set "RC=%ERRORLEVEL%"
+echo.
+if not "%RC%"=="0" (
+    echo ============================================================
+    echo   [X] La generacion FALLO ^(codigo %RC%^). NO se genero el informe.
+    echo   Revise los mensajes de arriba. NO presente nada de esta corrida.
+    echo ============================================================
+    pause
+    exit /b %RC%
+)
+echo ============================================================
+echo   Listo. Revise el Word INFORME_BAJA_CARTERA_*.docx y el
+echo   Excel INFORME_BAJA_CARTERA_*.xlsx que quedaron en:
+echo   "%CARPETA%"
+echo   OJO: las facturas SIN informe de trabajo social quedan con
+echo   NOTA DE REVISION dentro del documento - completelas antes
+echo   de presentar el informe.
+echo ============================================================
+pause

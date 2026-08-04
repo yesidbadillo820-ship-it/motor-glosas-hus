@@ -5,7 +5,11 @@ from typing import Optional
 
 from app.database import get_db
 from app.repositories.plantilla_repository import PlantillaRepository
-from app.api.deps import get_usuario_actual
+from app.api.deps import (
+    get_auditor_o_superior,
+    get_coordinador_o_admin,
+    get_usuario_actual,
+)
 from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/plantillas", tags=["plantillas"])
@@ -98,9 +102,13 @@ def listar_plantillas(
 def crear_plantilla(
     data: PlantillaCreate,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    """Crea una nueva plantilla"""
+    """Crea una nueva plantilla.
+
+    Acceso: AUDITOR o superior. Las plantillas son compartidas: la que escribe
+    un gestor la usan todos al responder. Antes bastaba con estar autenticado.
+    """
     repo = PlantillaRepository(db)
     plantilla = repo.crear(
         nombre=data.nombre,
@@ -139,7 +147,7 @@ def actualizar_plantilla(
     plantilla_id: int,
     data: PlantillaUpdate,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Actualiza una plantilla"""
     repo = PlantillaRepository(db)
@@ -158,9 +166,13 @@ def actualizar_plantilla(
 def eliminar_plantilla(
     plantilla_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
-    """Elimina (desactiva) una plantilla"""
+    """Elimina (desactiva) una plantilla.
+
+    Acceso: COORDINADOR o superior. Es compartida: desactivarla se la quita a
+    todo el equipo, no solo a quien la borró.
+    """
     repo = PlantillaRepository(db)
     resultado = repo.eliminar(plantilla_id)
     if not resultado:

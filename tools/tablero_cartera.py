@@ -38,6 +38,16 @@ from pathlib import Path
 # Reutilizamos la normalización de factura y el catálogo de entidades del
 # radicador (mismo tools/), para que el cruce por número de factura sea idéntico.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# E01 — Principio N.º 1: el parser de moneda vive UNA vez, en el núcleo. Si el
+# script corre suelto en el PC del hospital (sin `app/` disponible), cae al
+# respaldo local de `_parse_valor`.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+try:
+    from app.utils.moneda import parse_valor_cop as _MONEDA_CORE
+except Exception:  # pragma: no cover - ejecución aislada sin el paquete app
+    _MONEDA_CORE = None
+
 try:
     from radicar_facturacion import _norm, cargar_perfiles, normalizar_factura
 
@@ -212,22 +222,53 @@ def _leer_tabla(ruta: Path) -> list[list]:
 
 def _parse_valor(v) -> float:
     """Parsea un valor en pesos. Acepta número o texto en formato colombiano
-    ('$ 1.234.567,89', '1.234.567', '1234567')."""
+    ('$ 1.234.567,89', '1.234.567', '1234567').
+
+    E01 — Principio N.º 1: usa el parser único del núcleo cuando está
+    disponible. Este script también corre suelto en el PC del hospital, donde
+    `app/` puede no estar, así que conserva un respaldo local — corregido.
+
+    El defecto que tenía el respaldo: solo quitaba los puntos de miles cuando
+    había MÁS DE UNO, así que todo valor con un único punto se dividía por mil.
+    `950.000` se leía como **950 pesos** y viajaba así al informe de cartera
+    de gerencia.
+    """
     if v is None or v == "":
         return 0.0
     if isinstance(v, (int, float)):
         return float(v)
+    if _MONEDA_CORE is not None:
+        return float(_MONEDA_CORE(v))
     s = str(v).strip()
-    for ch in ("$", " ", " ", "COP", "cop"):
+    for ch in ("$", " ", "\u00a0", "COP", "cop"):
         s = s.replace(ch, "")
     if not s:
         return 0.0
-    if "," in s and "." in s:  # 1.234.567,89 → punto = miles, coma = decimal
-        s = s.replace(".", "").replace(",", ".")
-    elif "," in s:  # 1234567,89 → coma decimal
+    if "," in s and "." in s:
+        # El separador MAS A LA DERECHA es el decimal: "1.234,56" (colombiano)
+        # frente a "1,234,567.89" (US). El respaldo anterior asumia siempre
+        # colombiano y devolvia 0.0 ante el formato US.
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif "," in s:  # 1234567,89 -> coma decimal
         s = s.replace(",", ".")
-    elif s.count(".") > 1:  # 1.234.567 → puntos de miles
-        s = s.replace(".", "")
+    elif "." in s:
+        # Misma regla que el nucleo, o el informe cambiaria segun donde se
+        # ejecute el script: los puntos son separadores de miles ("950.000" ->
+        # 950000) SALVO que el ultimo grupo tenga 1 o 2 digitos, que delata un
+        # punto decimal ("20000.50", "0.99").
+        grupos = s.split(".")
+        if (
+            len(grupos) >= 2
+            and all(g.isdigit() for g in grupos)
+            and 1 <= len(grupos[-1]) <= 2
+            and all(len(g) == 3 for g in grupos[1:-1])
+        ):
+            s = "".join(grupos[:-1]) + "." + grupos[-1]
+        else:
+            s = s.replace(".", "")
     try:
         return float(s)
     except ValueError:

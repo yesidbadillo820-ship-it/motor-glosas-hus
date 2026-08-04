@@ -35,6 +35,7 @@ Funciona via:
 """
 
 from __future__ import annotations
+import asyncio
 import os
 import re
 import base64
@@ -347,7 +348,12 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
             from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
             from app.services.gemini_service import GeminiService
 
-            imagenes = pdfs_a_imagenes_combinadas(pdfs_raw, max_imagenes_total=20, dpi=130)
+            # Ronda 30: la conversión PDF→PNG (hasta 20 páginas) es CPU-bound
+            # y corría síncrona dentro de esta corrutina, bloqueando el event
+            # loop en 1 vCPU. Se ejecuta en un thread aparte.
+            imagenes = await asyncio.to_thread(
+                pdfs_a_imagenes_combinadas, pdfs_raw, max_imagenes_total=20, dpi=130
+            )
             if imagenes:
                 gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
                 user_text_vision = (

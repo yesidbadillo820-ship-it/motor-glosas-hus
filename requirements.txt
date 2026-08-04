@@ -34,4 +34,8 @@ feedparser==6.0.11
 pywebpush==2.0.0
 psutil==6.1.1
 pytz==2024.2
+# Base de datos de zonas horarias para zoneinfo. En Linux/Docker la trae
+# el sistema operativo; en Windows (modo sin Docker del PC del hospital)
+# no existe y ZoneInfo("America/Bogota") revienta sin este paquete.
+tzdata==2026.3
 

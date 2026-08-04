@@ -77,15 +77,18 @@ def _normalizar_cups(cups: str | None) -> list[str]:
     base = re.sub(r"-\d{1,3}$", "", base)  # quita "-18", "-16"
     base = base.strip()
     _add(base)
-    # Solo dígitos
-    solo_dig = re.sub(r"\D", "", c)
-    _add(solo_dig)
-    if solo_dig and len(solo_dig) <= 6:
-        _add(solo_dig.zfill(6))
-    # base solo dígitos con zfill
-    base_dig = re.sub(r"\D", "", base)
-    if base_dig and len(base_dig) <= 6:
-        _add(base_dig.zfill(6))
+    # Ronda 30: solo homologar por dígitos si el código EMPIEZA por dígito.
+    # Los CUPS oficiales son numéricos; una letra inicial marca código
+    # institucional HUS (S estancias, M materiales, FMQ/FMO quirúrgicos) que
+    # NO debe homologarse por colisión de dígitos con el manual SOAT.
+    if c and c[0].isdigit():
+        solo_dig = re.sub(r"\D", "", c)
+        _add(solo_dig)
+        if solo_dig and len(solo_dig) <= 6:
+            _add(solo_dig.zfill(6))
+        base_dig = re.sub(r"\D", "", base)
+        if base_dig and len(base_dig) <= 6:
+            _add(base_dig.zfill(6))
     return candidatos
 
 

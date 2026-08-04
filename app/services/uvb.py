@@ -87,10 +87,13 @@ def _redondear_a_centena(v: float) -> int:
 
     Ejemplos:
       71_812.3 → 71_800
-      71_850.0 → 71_900 (punto medio sube — regla bancaria estándar)
+      71_850.0 → 71_900 (punto medio sube — redondeo aritmético half-up)
       6_866.37 → 6_900
     """
-    return int(round(v / 100.0) * 100)
+    # Ronda 30: half-up real (v >= 0 garantizado por los callers). round()
+    # de Python usa redondeo bancario: 71_850 bajaba a 71_800 la mitad de
+    # las veces, contradiciendo la regla documentada.
+    return int((v + 50) // 100 * 100)
 
 
 def calcular_valor_pesos(tarifa_uvb: float, anio: int = 2026) -> int:
