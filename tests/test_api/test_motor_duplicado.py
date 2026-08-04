@@ -188,6 +188,91 @@ class TestDosMotoresNoEsLoMismoQueUnSobrante:
         assert {m["puerto"] for m in est["data"]["motores"]} == {"8080", "8000"}
 
 
+class TestElAmbienteViejoQueTapaLaClaveNueva:
+    """La causa de fondo del 04-08-2026, la que nadie podía ver.
+
+    `servidor_motor_local.cmd` volcaba el `.env` al ambiente UNA vez, antes
+    de su bucle de vigilancia. Cada vez que revivía el servidor le entregaba
+    el ambiente de horas antes; y como las variables de entorno le ganan al
+    archivo, el motor de la página por internet siguió respondiendo «su
+    clave está inválida» con la clave vieja (gsk_5CxaRq) mientras el archivo
+    ya tenía la nueva (gsk_vn06EE). Cada mitad decía la verdad por separado
+    y el conjunto mentía.
+    """
+
+    def test_detecta_que_el_ambiente_no_coincide_con_el_archivo(self, tmp_path, monkeypatch):
+        env = tmp_path / ".env"
+        env.write_text("GROQ_API_KEY=gsk_vn06EEnueva\n", encoding="utf-8")
+        monkeypatch.setenv("GROQ_API_KEY", "gsk_5CxaRqvieja")
+
+        d = mp.claves_desajustadas(str(env))
+        assert len(d) == 1
+        assert d[0]["clave"] == "GROQ_API_KEY"
+        assert d[0]["en_uso"] == "gsk_5CxaRq"
+        assert d[0]["en_el_archivo"] == "gsk_vn06EE"
+
+    def test_si_coinciden_no_dice_nada(self, tmp_path, monkeypatch):
+        env = tmp_path / ".env"
+        env.write_text("GROQ_API_KEY=gsk_igual\n", encoding="utf-8")
+        monkeypatch.setenv("GROQ_API_KEY", "gsk_igual")
+        assert mp.claves_desajustadas(str(env)) == []
+
+    def test_las_comillas_del_archivo_no_cuentan_como_diferencia(self, tmp_path, monkeypatch):
+        env = tmp_path / ".env"
+        env.write_text('GROQ_API_KEY="gsk_igual"\n', encoding="utf-8")
+        monkeypatch.setenv("GROQ_API_KEY", "gsk_igual")
+        assert mp.claves_desajustadas(str(env)) == []
+
+    def test_un_comentario_al_final_de_la_linea_no_es_desajuste(self, tmp_path, monkeypatch):
+        env = tmp_path / ".env"
+        env.write_text("GROQ_API_KEY=gsk_igual # la nueva del 04-08\n", encoding="utf-8")
+        monkeypatch.setenv("GROQ_API_KEY", "gsk_igual")
+        assert mp.claves_desajustadas(str(env)) == []
+
+    def test_sin_archivo_env_no_inventa_desajustes(self, tmp_path):
+        assert mp.claves_desajustadas(str(tmp_path / "no-existe.env")) == []
+
+    def test_lo_que_solo_esta_en_un_lado_no_es_desajuste(self, tmp_path, monkeypatch):
+        """Docker y systemd mandan claves que el archivo no tiene: eso es
+        normal, no un ambiente viejo."""
+        env = tmp_path / ".env"
+        env.write_text("GROQ_API_KEY=gsk_solo_archivo\n", encoding="utf-8")
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        assert mp.claves_desajustadas(str(env)) == []
+
+    def test_el_diagnostico_lo_pone_en_rojo_antes_que_nada(self, monkeypatch):
+        monkeypatch.setattr(
+            mp,
+            "claves_desajustadas",
+            lambda *a: [
+                {"clave": "GROQ_API_KEY", "en_uso": "gsk_5CxaRq", "en_el_archivo": "gsk_vn06EE"}
+            ],
+        )
+        _procesos(monkeypatch, [_Proc(100, 1, UVICORN)])
+        est = mp.estado_motor()
+        assert est["estado"] == "error"
+        assert "NO está usando las claves del archivo" in est["mensaje"]
+        assert "gsk_5CxaRq" in est["mensaje"] and "gsk_vn06EE" in est["mensaje"]
+        assert "MotorGlosasServidor" in est["mensaje"]
+
+
+class TestElVigilanteReleeLasClaves:
+    def test_el_env_se_carga_dentro_del_bucle(self):
+        """Si el volcado del .env queda ANTES del bucle, cada reinicio
+        automático revive el servidor con las claves de horas antes."""
+        cmd = (RAIZ / "tools" / "servidor_motor_local.cmd").read_text(encoding="utf-8")
+        assert ":loop" in cmd
+        cuerpo = cmd.split(":loop", 1)[1]
+        assert ".env" in cuerpo, "el .env ya no se relee en cada vuelta del vigilante"
+        assert "usebackq eol=#" in cuerpo
+
+    def test_el_autodeploy_solo_reinicia_el_de_produccion(self):
+        """Cerraba cualquier uvicorn de la aplicación cada 5 minutos: le
+        mataba el motor de pruebas al auditor sin explicación."""
+        cmd = (RAIZ / "tools" / "autodeploy_motor_local.cmd").read_text(encoding="utf-8")
+        assert "8080" in cmd.split("Stop-Process")[0].rsplit("powershell", 1)[-1]
+
+
 class TestEstadoDelMotor:
     def test_uno_solo_es_verde_y_dice_la_clave_en_uso(self, monkeypatch):
         _procesos(monkeypatch, [_Proc(100, 1, UVICORN)])
@@ -408,32 +493,89 @@ class TestPantalla:
 
 
 class TestElBotDeDobleClic:
+    def _ps(self):
+        return (RAIZ / "tools" / "reiniciar_motor.ps1").read_text(encoding="utf-8")
+
     def test_existe_y_cierra_antes_de_arrancar(self):
         cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
-        assert "taskkill" in cmd
-        assert "netstat" in cmd
+        assert "reiniciar_motor.ps1" in cmd
         assert "uvicorn app.main:app" in cmd
         # Primero cerrar, después arrancar: al revés no sirve de nada.
-        assert cmd.index("taskkill") < cmd.index("uvicorn app.main:app")
+        assert cmd.index("reiniciar_motor.ps1") < cmd.index("uvicorn app.main:app")
+
+    def test_si_no_pudo_dejar_libre_el_puerto_no_arranca(self):
+        """Arrancar encima de algo vivo es repetir el enredo."""
+        cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
+        assert "errorlevel 1" in cmd
+        assert cmd.index("errorlevel 1") < cmd.index("uvicorn app.main:app")
 
     def test_solo_cierra_los_motores_de_su_propio_puerto(self):
         """Lo que costó la página pública: el bot no puede cerrar el motor
         del 8080 cuando lo que reinicia es el del 8000."""
-        cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
-        assert "$suyo -eq $puerto" in cmd  # compara puertos antes de matar
-        assert "dejo vivo el motor" in cmd  # y lo dice cuando no lo toca
-        assert "8080 sirve la pagina por internet" in cmd
+        ps = self._ps()
+        assert "$suyo -eq $Puerto" in ps
+        assert "dejo VIVO el motor" in ps
+        assert "sirve la pagina por internet" in ps
 
     def test_tambien_cierra_al_que_quedo_vivo_sin_escuchar(self):
         """El de --reload que sobrevive sin el puerto: se busca por su línea
         de comando, no solo por quién ocupa el puerto."""
+        ps = self._ps()
+        assert "Win32_Process" in ps
+        assert "Stop-Process" in ps
+
+    def test_comprueba_que_de_verdad_murieron(self):
+        """`-ErrorAction SilentlyContinue` se tragaba el «acceso denegado» y
+        el bot informaba cerrado algo que seguía vivo."""
+        ps = self._ps()
+        assert "Get-Process -Id" in ps
+        assert "sobrevivientes" in ps
+        assert "exit 1" in ps
+
+    def test_el_puerto_se_consulta_sin_depender_del_idioma(self):
+        """En un Windows en español netstat dice ESCUCHANDO, no LISTENING:
+        el filtro viejo no encontraba nunca nada en el PC del hospital."""
+        ps = self._ps()
+        assert "Get-NetTCPConnection" in ps
+        codigo = "\n".join(ln for ln in ps.splitlines() if not ln.lstrip().startswith("#"))
+        assert "LISTENING" not in codigo
+        assert "netstat" not in codigo
+
+    def test_no_mata_al_dueno_del_puerto_si_no_es_el_motor(self):
+        ps = self._ps()
+        assert "NO es el motor de glosas" in ps
+        assert "no lo voy a cerrar" in ps
+
+    def test_nunca_se_cierra_a_si_mismo(self):
+        ps = self._ps()
+        assert "$p.ProcessId -eq $PID" in ps
+
+    def test_avisa_de_los_procesos_que_no_puede_ver(self):
+        """Sin permisos, Windows oculta la línea de comando: descartarlos en
+        silencio hacía que el bot dijera «no había ninguno» justo cuando sí."""
+        ps = self._ps()
+        assert "invisibles" in ps
+        assert "Ejecutar como administrador" in ps
+
+    def test_arranca_con_el_python_del_proyecto_y_con_las_claves(self):
         cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
-        assert "Win32_Process" in cmd
-        assert "Stop-Process" in cmd
+        assert "venv\\Scripts\\python.exe" in cmd
+        assert ".env" in cmd.split("[3/3]")[0]
+
+    def test_no_manda_a_repetir_a_ciegas(self):
+        """El consejo «cierra esta ventana y volvé a dar doble clic» era un
+        bucle infinito: el vigilante revive el otro motor cada 5 segundos."""
+        cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
+        assert "vuelve a dar doble clic" not in cmd
+        assert "[MOTORES]" in cmd
 
     def test_el_bot_avisa_si_falta_el_env(self):
         cmd = (RAIZ / "tools" / "REINICIAR_MOTOR.cmd").read_text(encoding="utf-8")
         assert ".env" in cmd
+
+    def test_el_ayudante_de_powershell_tambien_va_en_crlf(self):
+        ga = (RAIZ / ".gitattributes").read_text(encoding="utf-8")
+        assert "*.ps1 text eol=crlf" in ga
 
     def test_queda_en_crlf_como_todos_los_bots(self):
         ga = (RAIZ / ".gitattributes").read_text(encoding="utf-8")

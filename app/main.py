@@ -1109,8 +1109,16 @@ async def lifespan(app: FastAPI):
             _est = estado_motor()
             if _est["estado"] == "ok":
                 logger.info(f"[MOTOR] {_est['mensaje']}")
-            else:
+            elif _est["estado"] == "error":
+                # Dos en el MISMO puerto: eso sí es un problema.
                 logger.warning(f"[MOTOR-DUPLICADO] {_est['mensaje']}")
+            else:
+                # Puertos distintos: normal en el PC del hospital (el 8080
+                # sirve la página por internet). Etiqueta aparte para que el
+                # bot no mande a cerrar nada — la etiqueta anterior lo metía
+                # en un bucle de «cerrá y volvé a intentar» que nunca
+                # terminaba, porque el vigilante revive el otro motor.
+                logger.warning(f"[MOTORES] {_est['mensaje']}")
         except Exception as _e_motor:
             logger.warning(f"[MOTOR] no se pudo inspeccionar el proceso: {_e_motor}")
 

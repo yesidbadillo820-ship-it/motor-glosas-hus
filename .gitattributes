@@ -1,1 +1,4 @@
 *.cmd text eol=crlf
+# Los ayudantes de PowerShell viajan con los bots de doble clic y se
+# ejecutan en los PC del hospital: mismos finales de línea que los .cmd.
+*.ps1 text eol=crlf

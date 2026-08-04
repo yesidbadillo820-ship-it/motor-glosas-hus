@@ -29,8 +29,12 @@ git reset --hard origin/motor-glosas >> "%LOG%" 2>&1
 rem psycopg2 es solo para PostgreSQL: aca la base es SQLite, se salta
 findstr /v /i "psycopg2" "%REPO%\requirements.txt" > "%REPO%\data\requirements_local.txt"
 "%REPO%\venv\Scripts\python.exe" -m pip install -r "%REPO%\data\requirements_local.txt" -q >> "%LOG%" 2>&1
-rem Reiniciar el servidor: se apaga y su vigilante lo revive renovado
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app'} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >> "%LOG%" 2>&1
+rem Reiniciar el servidor: se apaga y su vigilante lo revive renovado.
+rem SOLO el de produccion (--port 8080). Antes cerraba cualquier uvicorn
+rem de la aplicacion y, como esta tarea corre cada 5 minutos, le mataba
+rem el motor de pruebas al auditor sin que entendiera por que se le
+rem apagaba solo (revision del 04-08-2026).
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >> "%LOG%" 2>&1
 echo [%date% %time%] deploy aplicado; el servidor se reinicia solo >> "%LOG%"
 
 :asegurar

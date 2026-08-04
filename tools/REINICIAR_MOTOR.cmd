@@ -32,33 +32,18 @@ echo.
 echo  Carpeta del proyecto: %CD%
 echo.
 
-REM --- 1a. Cerrar SOLO los motores de ESTE puerto ----------------------
-REM 04-08-2026, segunda vuelta. La primera version cerraba unicamente lo
-REM que estuviera escuchando el puerto, y el propio motor detecto igual
-REM DOS motores vivos. El segundo NO era un sobrante: era el uvicorn del
-REM puerto 8080, el que sirve la pagina por internet (el tunel). El
-REM auditor lo cerro creyendo que estorbaba y tumbo la pagina publica.
-REM Por eso este paso cierra por linea de comando (asi agarra tambien al
-REM motor que quedo vivo sin escuchar, tipico de --reload) pero SOLO si
-REM sirve el mismo puerto que estamos por levantar. De los demas avisa y
-REM no los toca.
+REM --- 1. Dejar libre el puerto, sin daños ----------------------------
+REM Todo el trabajo delicado vive en tools\reiniciar_motor.ps1 (ahi esta
+REM explicado por que cada cosa se hace asi). Si devuelve error, NO se
+REM arranca nada: quedo algo vivo que hay que mirar primero.
 echo  [1/3] Buscando motores encendidos...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$puerto = '%PUERTO%';" ^
-  "$todos = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine -match 'uvicorn' -and $_.CommandLine -match 'app\.main' });" ^
-  "foreach ($p in $todos) { $suyo = if ($p.CommandLine -match '--port[= ]+(\d+)') { $matches[1] } else { '8000' };" ^
-  "  if ($suyo -eq $puerto) { Write-Host ('       - cerrando motor PID ' + $p.ProcessId + ' (puerto ' + $suyo + ')'); Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }" ^
-  "  else { Write-Host ('       - OJO: dejo vivo el motor PID ' + $p.ProcessId + ' del puerto ' + $suyo + ' (no es este; el 8080 sirve la pagina por internet)') } }" ^
-  "if ($todos.Count -eq 0) { Write-Host '       No habia ningun motor de glosas encendido. Bien.' }"
-
-REM --- 1b. Y si algo AJENO se quedo con el puerto, tambien --------------
-set "HUBO=0"
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:"LISTENING" ^| findstr /C:":%PUERTO% "') do (
-  if not "%%P"=="0" (
-    echo        - el puerto %PUERTO% seguia ocupado por el proceso %%P: cerrandolo
-    taskkill /PID %%P /T /F >nul 2>&1
-    set "HUBO=1"
-  )
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0reiniciar_motor.ps1" -Puerto %PUERTO%
+if errorlevel 1 (
+  echo.
+  echo   No arranco el motor: lea el aviso de arriba.
+  echo.
+  pause
+  exit /b 1
 )
 
 REM --- 2. Aviso si el .env no esta donde debe -------------------------
@@ -72,26 +57,42 @@ if not exist "%CD%\.env" (
   pause
 )
 
+REM Cargar el .env como variables de entorno de verdad, igual que hace
+REM tools\servidor_motor_local.cmd: varias partes del codigo leen las
+REM llaves con os.getenv y asi los dos motores arrancan iguales.
+if exist "%CD%\.env" (
+  for /f "usebackq eol=# tokens=1* delims==" %%a in ("%CD%\.env") do set "%%a=%%b"
+)
+
 REM --- 3. Arrancar uno solo -------------------------------------------
 echo  [3/3] Arrancando el motor...
 echo.
 echo  ------------------------------------------------------------
-echo   Al arrancar fijate en estas dos lineas del log:
+echo   Al arrancar fijate en estas lineas del log:
 echo     [IA-PROVIDERS] ... groq=OK gsk_xxxxxx...
-echo     [MOTOR] Un solo motor atendiendo - PID ...
-echo   Si en vez de [MOTOR] aparece [MOTOR-DUPLICADO], quedo otro
-echo   motor vivo: cierra esta ventana y vuelve a dar doble clic.
+echo     [MOTOR] Un solo motor atendiendo - PID ... - puerto %PUERTO%
+echo.
+echo   Si aparece [MOTOR-DUPLICADO] hay DOS en el mismo puerto: eso si
+echo   es un problema, anota los PID y avisa.
+echo   Si aparece [MOTORES] con puertos distintos, es NORMAL en este
+echo   equipo: el del 8080 es la pagina por internet. No lo cierres.
 echo  ------------------------------------------------------------
 echo.
 echo   Para apagarlo: Ctrl + C  (o cierra esta ventana).
 echo   Direccion: http://127.0.0.1:%PUERTO%
 echo.
 
-where uvicorn >nul 2>&1
-if %ERRORLEVEL%==0 (
-  uvicorn app.main:app --port %PUERTO%
+REM El interprete del propio proyecto: el uvicorn del PATH puede ser otro
+REM (otra instalacion de Python, sin las librerias de este repo).
+if exist "%CD%\venv\Scripts\python.exe" (
+  "%CD%\venv\Scripts\python.exe" -m uvicorn app.main:app --port %PUERTO%
 ) else (
-  py -m uvicorn app.main:app --port %PUERTO%
+  where uvicorn >nul 2>&1
+  if %ERRORLEVEL%==0 (
+    uvicorn app.main:app --port %PUERTO%
+  ) else (
+    py -m uvicorn app.main:app --port %PUERTO%
+  )
 )
 
 echo.

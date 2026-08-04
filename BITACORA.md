@@ -1363,6 +1363,47 @@ períodos perdidos.
 
 ---
 
+### 04-08 (décima parte) — La causa de fondo: el vigilante entregaba claves viejas
+
+Aquí terminó el misterio del día. La página por internet seguía diciendo
+«su clave está inválida (la que usó: gsk_5CxaRq…)» a las 3 de la tarde,
+con el archivo de claves correcto desde el mediodía y el otro motor
+mostrando la clave nueva sin problema.
+
+**El porqué.** `tools/servidor_motor_local.cmd` es la ventana que mantiene
+vivo el servidor de la página pública: si se cae, lo vuelve a levantar a
+los 5 segundos. Pero **cargaba el archivo de claves una sola vez, antes de
+entrar a ese bucle**. Cada vez que revivía el servidor le entregaba el
+ambiente de cuando se abrió la ventana — y las variables de ambiente le
+ganan al archivo. Resultado: **ese motor se queda con las claves del día
+en que se abrió la ventana, para siempre**, por más que se cambie el
+archivo y por más veces que se reinicie solo.
+
+Por eso todo lo de hoy se veía contradictorio: el motor de pruebas (8000)
+mostraba la clave nueva y decía la verdad; el de la página (8080) usaba la
+vieja y también decía la verdad. Cada mitad tenía razón por separado.
+
+Lo que quedó hecho:
+
+- **El vigilante relee el archivo de claves en cada vuelta.** Un reinicio
+  ahora sí toma las claves de hoy.
+- **El motor avisa cuando no está usando las claves del archivo**: la
+  tarjeta «Motor» del Diagnóstico se pone en ROJO y dice, sin revelar las
+  claves, *«está usando gsk_5CxaRq… pero el archivo dice gsk_vn06EE…»* y
+  qué ventana hay que cerrar. Es lo que hoy no se podía ver de ninguna
+  manera.
+- **La tarea automática cada 5 minutos** cerraba cualquier motor de la
+  aplicación: ahora solo reinicia el de producción (puerto 8080), así que
+  ya no le apaga el de pruebas al auditor sin explicación.
+- **El bot de reinicio** pasó a un archivo aparte (`tools/reiniciar_motor.ps1`)
+  con cinco correcciones que salieron de una revisión adversarial: no cierra
+  motores de otro puerto, comprueba que de verdad murieron (antes se tragaba
+  el «acceso denegado» y decía «cerrado»), no mata al dueño del puerto si no
+  es el motor, avisa de los programas que Windows no lo deja ver, y consulta
+  el puerto sin depender del idioma —el filtro anterior buscaba «LISTENING»
+  y **en un Windows en español nunca encontraba nada**, por eso decía «no
+  había ningún motor encendido» cuando sí lo había—.
+
 ### 04-08 (novena parte) — Quién puede tocar qué: las 51 puertas abiertas
 
 El 28 de julio se encontraron cuatro «puertas de al lado»: rutas del
