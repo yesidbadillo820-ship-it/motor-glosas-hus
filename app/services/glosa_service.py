@@ -13,6 +13,60 @@ from fastapi import HTTPException
 from groq import AsyncGroq
 from app.models.schemas import GlosaInput, GlosaResult
 from app.core.logging_utils import logger
+
+
+class IANoDisponibleError(RuntimeError):
+    """Ningún proveedor de IA respondió: el análisis debe fallar limpio,
+    nunca guardarse con el error del proveedor como dictamen."""
+
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+
+
+# Firmas que delatan un error de proveedor dentro de un texto que pretende
+# ser dictamen. Cinturón de persistencia: si aparecen, NO se guarda.
+FIRMAS_ERROR_PROVEEDOR = (
+    "error code:",
+    "invalid_api_key",
+    "invalid api key",
+    "invalid_request_error",
+    "authentication_error",
+    "rate_limit_error",
+    "overloaded_error",
+    "api key no configurada",
+)
+
+
+def texto_con_error_de_proveedor(texto: str) -> bool:
+    bajo = (texto or "").lower()
+    return any(f in bajo for f in FIRMAS_ERROR_PROVEEDOR)
+
+
+def _mensaje_ia_caida(error) -> str:
+    s = str(error).lower()
+    if "invalid_api_key" in s or "invalid api key" in s or "authentication" in s or "401" in s:
+        return (
+            "La IA no está disponible: la clave del proveedor está inválida o vencida. "
+            "El análisis NO se guardó. Administración debe renovar la clave "
+            "(ANTHROPIC_API_KEY / GROQ_API_KEY) en el servidor."
+        )
+    if "rate limit" in s or "429" in s or "overloaded" in s or "529" in s:
+        return (
+            "La IA está saturada en este momento. El análisis NO se guardó: "
+            "reintentá en 2-3 minutos."
+        )
+    if "insufficient" in s or "credit" in s or "billing" in s:
+        return (
+            "La cuenta del proveedor de IA no tiene saldo. El análisis NO se guardó. "
+            "Administración debe revisar la facturación del proveedor."
+        )
+    return (
+        f"La IA no está disponible ({str(error)[:120]}). "
+        "El análisis NO se guardó: reintentá o avisá a administración."
+    )
+
+
 from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
 _CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
@@ -8826,9 +8880,9 @@ class GlosaService:
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
         if not self.groq and not self.anthropic_key:
-            return (
-                "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>",
-                "error",
+            raise IANoDisponibleError(
+                "La IA no está configurada en este servidor (faltan GROQ_API_KEY y "
+                "ANTHROPIC_API_KEY). El análisis NO se guardó: avisá a administración."
             )
 
         # Orden de intento segun primary_ai configurado por el usuario.
@@ -8913,7 +8967,11 @@ class GlosaService:
                 continue
 
         logger.error(f"Todos los proveedores IA fallaron: {ultimo_error}")
-        return f"<paciente>ERROR</paciente><argumento>{str(ultimo_error)}</argumento>", "error"
+        # Incidente 04-08-2026 (glosa PPL): este return devolvía el error
+        # crudo del proveedor como <argumento> y el 401 quedó GUARDADO como
+        # argumentación jurídica con sello. Un fallo de proveedor ahora es
+        # un fallo del análisis: causa legible y NADA se persiste.
+        raise IANoDisponibleError(_mensaje_ia_caida(ultimo_error))
 
 
 # ─── Caché persistente en BD (optimización #1) ───────────────────────────────
