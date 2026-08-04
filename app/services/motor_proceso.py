@@ -92,6 +92,67 @@ def claves_en_uso() -> dict:
     }
 
 
+_CLAVES_VIGILADAS = ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "PRIMARY_AI")
+
+
+def _leer_env_archivo(ruta: str = ".env") -> dict:
+    """Lo que dice el archivo .env, tal cual, sin pasar por Settings."""
+    valores: dict = {}
+    try:
+        with open(ruta, encoding="utf-8", errors="ignore") as f:
+            for linea in f:
+                linea = linea.strip()
+                if not linea or linea.startswith("#") or "=" not in linea:
+                    continue
+                nombre, _, valor = linea.partition("=")
+                valor = valor.strip()
+                # Comentario al final de la línea (solo si el valor no va
+                # entre comillas): así lo entiende también quien carga el
+                # archivo, y comparar sin quitarlo daría una falsa alarma.
+                if not valor.startswith(('"', "'")) and " #" in valor:
+                    valor = valor.split(" #", 1)[0].strip()
+                valores[nombre.strip()] = valor.strip('"').strip("'")
+    except OSError:
+        return {}
+    return valores
+
+
+def claves_desajustadas(ruta_env: str = ".env") -> list:
+    """Claves donde el ambiente del proceso NO coincide con el archivo .env.
+
+    El agujero que costó la tarde del 04-08-2026. `servidor_motor_local.cmd`
+    volcaba el `.env` al ambiente UNA sola vez, antes de su bucle de
+    vigilancia; cada vez que revivía el servidor le entregaba el ambiente
+    viejo. Y como las variables de entorno le ganan al archivo, el motor de
+    la página por internet siguió horas usando la clave anterior
+    —respondiendo «su clave está inválida»— mientras el archivo ya tenía la
+    nueva y el log de arranque del otro motor la mostraba bien.
+
+    Nada en el sistema podía verlo: cada mitad decía la verdad por
+    separado. Esto lo compara y lo dice.
+    """
+    import os as _os
+
+    archivo = _leer_env_archivo(ruta_env)
+    if not archivo:
+        return []
+    desajustes = []
+    for nombre in _CLAVES_VIGILADAS:
+        del_archivo = (archivo.get(nombre) or "").strip()
+        del_ambiente = (_os.environ.get(nombre) or "").strip()
+        if not del_archivo or not del_ambiente:
+            continue
+        if del_archivo != del_ambiente:
+            desajustes.append(
+                {
+                    "clave": nombre,
+                    "en_uso": prefijo(del_ambiente),
+                    "en_el_archivo": prefijo(del_archivo),
+                }
+            )
+    return desajustes
+
+
 def _hora_arranque(pid: int) -> str | None:
     try:
         import psutil
@@ -177,12 +238,37 @@ def estado_motor() -> dict:
     claves = claves_en_uso()
     yo = huella()
     vivos = motores_vivos()
+    desajustes = claves_desajustadas()
     data = {
         "pid": yo["pid"],
         "arrancado_en": yo["arrancado_en"],
         "claves_en_uso": claves,
         "motores": vivos,
+        "claves_desajustadas": desajustes,
     }
+
+    # Lo primero, porque es lo que arruina el trabajo en silencio: este
+    # motor está usando una clave que NO es la del archivo. Pasa cuando
+    # alguien le entrega el ambiente de antes (el vigilante que revive el
+    # servidor sin releer el .env, un servicio de Windows viejo, una
+    # ventana abierta hace horas). El archivo dice una cosa y el motor
+    # trabaja con otra, y las dos mitades parecen correctas por separado.
+    if desajustes:
+        detalle = " · ".join(
+            f"{d['clave']}: está usando {d['en_uso']}… pero el archivo dice {d['en_el_archivo']}…"
+            for d in desajustes
+        )
+        return {
+            "estado": "error",
+            "mensaje": (
+                f"Este motor NO está usando las claves del archivo .env → {detalle}. "
+                "Alguien le pasó el ambiente de antes: cerrá la ventana que lo "
+                "mantiene vivo (MotorGlosasServidor) y volvé a abrirla, o reiniciá "
+                "el motor desde cero. Hasta entonces va a seguir fallando aunque "
+                "el archivo esté bien."
+            ),
+            "data": data,
+        }
 
     if len(vivos) > 1:
         quienes = ", ".join(
