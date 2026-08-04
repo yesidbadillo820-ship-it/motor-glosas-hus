@@ -1363,6 +1363,20 @@ períodos perdidos.
 
 ---
 
+### 04-08 (tercera parte) — Una carátula vacía tampoco es un dictamen
+
+- Segundo hallazgo del mismo día: ya no salía el error de la IA en el
+  cuerpo, pero el dictamen salía **con la argumentación jurídica VACÍA**
+  y aun así con el sello «validado». Eso es peor que el error visible,
+  porque parece bueno.
+- Ahora el motor **se niega a armar la carátula** si la IA no devolvió
+  argumentación (tabla, sello y cierre no se generan), y el guardado la
+  rechaza también aunque llegara armada por otro camino. En pantalla:
+  mensaje claro de que no se guardó y que hay que reintentar.
+- Recordatorio: la causa de fondo sigue siendo la **clave de IA
+  inválida** en el servidor. Mientras no se renueve, el sistema no va a
+  inventar dictámenes — va a decir que no puede.
+
 ### 04-08 (segunda parte) — Panel operacional y arreglo del CI
 
 - **El Mando ejecutivo ya muestra dónde se atasca el trabajo**: las
