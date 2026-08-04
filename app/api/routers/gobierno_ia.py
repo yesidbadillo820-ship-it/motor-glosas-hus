@@ -225,10 +225,16 @@ async def probar_proveedores(
     except Exception:
         motores = []
     if len(motores) > 1:
+        # 04-08-2026: el aviso anterior mandaba a «cerrar los sobrantes» y el
+        # otro motor resultó ser el de la página por internet. Lo que hay que
+        # decir no es «cerrá», es «esta prueba vale para ESTE motor».
+        mio = next((m for m in motores if m.get("soy_yo")), None)
+        otros = ", ".join(f"puerto {m.get('puerto')}" for m in motores if not m.get("soy_yo"))
         veredicto = (
-            f"OJO: hay {len(motores)} motores corriendo al mismo tiempo. Esta prueba "
-            f"la contestó uno solo; el análisis puede caer en otro con la clave "
-            f"anterior. Cerrá los sobrantes (tools\\REINICIAR_MOTOR.cmd). " + veredicto
+            f"OJO: esta prueba la contestó el motor del puerto "
+            f"{(mio or {}).get('puerto', '?')}. En este equipo hay {len(motores)} "
+            f"motores ({otros} además de este) y cada uno tiene su propia copia de "
+            f"las claves: si trabajás desde la página por internet, probá desde ahí. " + veredicto
         )
 
     return {

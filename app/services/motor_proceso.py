@@ -10,15 +10,24 @@ mostraba `gsk_5CxaRq…`, y el análisis seguía fallando con «su clave está
 inválida o vencida». Dos valores distintos de la misma variable en el mismo
 servidor es imposible… dentro de UN proceso.
 
-La causa: había DOS motores vivos. En Windows un segundo `uvicorn` puede
-quedarse con un puerto ya ocupado (SO_REUSEADDR no es exclusivo como en
-Linux), así que las peticiones caían unas veces en el motor nuevo y otras en
-el viejo: clave vieja, código viejo, resultados contradictorios. Nada en la
-pantalla lo decía y el auditor perdió la tarde persiguiendo un archivo `.env`
-que estaba bien.
+La causa (confirmada esa misma tarde, y NO era la que se sospechó primero):
+en el PC del hospital corren **dos motores a la vez, en puertos distintos**.
+El del puerto 8080 lo mantiene vivo `tools/servidor_motor_local.cmd` y es el
+que alimenta la página por internet a través del túnel de Cloudflare; el del
+8000 es el que el auditor levanta a mano para probar. El del 8080 llevaba
+horas arriba, así que conservaba la clave y el código anteriores — y el
+navegador estaba hablando con **ese**. De ahí las dos verdades.
 
-Este módulo hace visible lo invisible: cuántos motores hay, desde cuándo, y
-con qué clave está trabajando el que responde.
+(La primera hipótesis fue que en Windows dos uvicorn podían compartir el
+mismo puerto. Quedó descartada en vivo: al intentar levantar un segundo
+motor en el 8080 salió «WinError 10048 — solo se permite un uso de cada
+dirección de socket». No comparten puerto; simplemente eran dos.)
+
+Este módulo hace visible lo invisible: cuántos motores hay, en qué puerto,
+desde cuándo, y con qué clave trabaja el que está respondiendo. Y distingue
+lo que es una pelea de verdad (dos en el mismo puerto) de lo que es normal
+en este equipo (dos instalaciones, cada una en lo suyo) — porque el aviso
+anterior no lo distinguía y el auditor terminó cerrando la página pública.
 """
 
 from __future__ import annotations
@@ -38,6 +47,26 @@ def _es_motor(cmdline) -> bool:
     if not any(a in texto for a in _APP):
         return False
     return any(s in texto for s in _SERVIDORES)
+
+
+def puerto_de(cmdline) -> str:
+    """El puerto que sirve ese motor, leído de su propia línea de comando.
+
+    Es el dato que faltaba el 04-08-2026 (segunda vuelta). El aviso decía
+    «hay dos motores, cerrá el sobrante» y el auditor cerró… el que sirve
+    la página por internet: `--port 8080`, el que mira el túnel de
+    Cloudflare. No era un sobrante, era el otro sistema. Con el puerto a la
+    vista, el aviso puede decir la verdad: si comparten puerto se pelean,
+    y si no, son dos instalaciones distintas —cada una con su propia copia
+    de las claves—.
+    """
+    partes = list(cmdline or [])
+    for i, p in enumerate(partes):
+        if p == "--port" and i + 1 < len(partes):
+            return str(partes[i + 1]).strip()
+        if str(p).startswith("--port="):
+            return str(p).split("=", 1)[1].strip()
+    return ""
 
 
 def prefijo(valor: str | None) -> str:
@@ -129,6 +158,9 @@ def motores_vivos() -> list[dict]:
                     datetime.fromtimestamp(creado, tz=timezone.utc).isoformat() if creado else None
                 ),
                 "soy_yo": info["pid"] in mia,
+                # Sin --port, uvicorn sirve en el 8000: se nombra así para que
+                # el aviso no tenga huecos.
+                "puerto": puerto_de(info.get("cmdline")) or "8000",
                 "comando": " ".join(info.get("cmdline") or [])[:160],
             }
         )
@@ -153,20 +185,53 @@ def estado_motor() -> dict:
     }
 
     if len(vivos) > 1:
-        pids = ", ".join(f"PID {m['pid']}{' (este)' if m['soy_yo'] else ''}" for m in vivos)
+        quienes = ", ".join(
+            f"PID {m['pid']} (puerto {m['puerto']}{', este' if m['soy_yo'] else ''})" for m in vivos
+        )
+        puertos = {m["puerto"] for m in vivos}
+
+        # Mismo puerto = se pelean de verdad: uno de los dos sobra.
+        if len(puertos) == 1:
+            return {
+                "estado": "error",
+                "mensaje": (
+                    f"Hay {len(vivos)} motores peleando por el mismo puerto ({quienes}). "
+                    "Las respuestas salen de cualquiera de ellos, y el más viejo "
+                    "puede tener la clave de IA o el código anteriores: por eso una "
+                    "pantalla muestra un dato y otra muestra otro. Cerrá el sobrante "
+                    "con doble clic en tools\\REINICIAR_MOTOR.cmd."
+                ),
+                "data": data,
+            }
+
+        # Puertos distintos: NO es un sobrante, son dos instalaciones. El
+        # 04-08-2026 el aviso anterior decía «cerrá los sobrantes» y el
+        # auditor cerró el motor del puerto 8080 — el que sirve la página
+        # por internet. No estaba de más: era el otro sistema, con su propia
+        # copia de las claves, y era justamente el que el navegador estaba
+        # usando.
+        nota = ""
+        if "8080" in puertos:
+            nota = (
+                " En este equipo el del puerto 8080 es el que sirve la página por "
+                "internet (el túnel), y el 8000 es el de pruebas locales: NO lo cierres "
+                "pensando que sobra."
+            )
         return {
-            "estado": "error",
+            "estado": "warning",
             "mensaje": (
-                f"Hay {len(vivos)} motores corriendo al mismo tiempo ({pids}). "
-                "Las respuestas salen de cualquiera de ellos, y el más viejo "
-                "puede tener la clave de IA o el código anteriores: por eso una "
-                "pantalla muestra un dato y otra muestra otro. Cerrá los "
-                "sobrantes con doble clic en tools\\REINICIAR_MOTOR.cmd."
+                f"Hay {len(vivos)} motores distintos corriendo en este equipo ({quienes}). "
+                "No se estorban —cada uno tiene su puerto— pero son copias separadas: "
+                "cada una leyó las claves y el código cuando arrancó, así que pueden "
+                "mostrar datos distintos. Si cambiás el archivo de claves, hay que "
+                "reiniciar TODAS." + nota
             ),
             "data": data,
         }
 
     detalle = f"Un solo motor atendiendo · PID {yo['pid']}"
+    if vivos and vivos[0].get("puerto"):
+        detalle += f" · puerto {vivos[0]['puerto']}"
     if claves.get("groq"):
         detalle += f" · clave Groq {claves['groq']}…"
     if claves.get("principal"):
