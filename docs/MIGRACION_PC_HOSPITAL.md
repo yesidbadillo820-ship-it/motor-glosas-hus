@@ -128,7 +128,9 @@ Una sola vez, con permisos de administrador del PC:
    el comando completo (el instalador saca el token solo).
 4. Botón **Next** → pestaña **Public hostname** → **Add a public
    hostname**: Subdomain: *vacío*; Domain: `iaglosassinac.help`; Type:
-   `HTTP`; URL: `motor:8080` → **Save**.
+   `HTTP`; URL: **`motor:8080` si se instala con Docker**, o
+   **`localhost:8080` si se instala en modo SIN Docker** (ver B-bis) →
+   **Save**.
 5. **Si sale un error de que ya existe un registro DNS con ese nombre**
    (es el del túnel viejo de la VM): ir a <https://dash.cloudflare.com> →
    dominio `iaglosassinac.help` → **DNS → Records** → borrar el registro
@@ -143,6 +145,38 @@ Una sola vez, con permisos de administrador del PC:
    (opcionales — la de Groq es gratis en <https://console.groq.com/keys>;
    Enter para saltarlas y ponerlas después) y el token del túnel.
 3. Esperar 1-2 minutos y abrir <https://iaglosassinac.help>.
+
+### B-bis. Si Docker Desktop no se puede instalar: modo SIN Docker
+
+Para cuando el PC no permite Docker Desktop (sin permisos de
+administrador, Windows sin virtualización, o bloqueado por sistemas).
+El sistema corre igual, directo con **Python** (el mismo que ya usan los
+otros bots del repositorio):
+
+1. Requisitos: **Python 3.11+** (de <https://www.python.org/downloads/>,
+   marcando la casilla **"Add python.exe to PATH"**) y **Git** — ninguno
+   necesita permisos de administrador.
+2. En Cloudflare (paso A), la URL del Public hostname es
+   **`localhost:8080`** (no `motor:8080`).
+3. Doble clic a `tools\REVIVIR_EXPRESS_SIN_DOCKER.cmd`. Pide lo mismo
+   que el modo Docker (contraseña de admin, llaves de IA opcionales y el
+   token del túnel) y además:
+   - prepara el entorno de Python e instala las dependencias solo,
+   - descarga `cloudflared.exe` (el programa oficial del túnel),
+   - deja el **servidor** y el **túnel** corriendo con vigilantes que
+     los reviven si se caen (`tools\servidor_motor_local.cmd` y
+     `tools\tunel_motor_local.cmd`, registros en `data\servidor.log` y
+     `data\tunel.log`),
+   - deja el arranque automático al iniciar sesión (carpeta Inicio de
+     Windows), el **autodeploy** cada 5 minutos
+     (`tools\autodeploy_motor_local.cmd`) y la **copia de seguridad**
+     diaria de las 9:00 a. m.
+4. Verificar: en el propio PC abre <http://localhost:8080> y desde
+   internet <https://iaglosassinac.help>.
+
+> Los dos modos son equivalentes para el día a día (misma página, mismo
+> autodeploy, mismas copias). Si algún día se instala Docker Desktop, se
+> puede pasar al modo Docker corriendo el otro instalador.
 
 ### C. Cómo entra el equipo (base provisional)
 
