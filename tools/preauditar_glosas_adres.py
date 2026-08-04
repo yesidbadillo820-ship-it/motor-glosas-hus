@@ -781,7 +781,7 @@ def armar_texto_respuesta(filas: list[FilaMacro], prefijo: str = "") -> str:
 
     partes = [
         prefijo
-        + ENCABEZADO_RESPUESTA.format(valor=f"{int(round(total_aceptado)):,}".replace(",", ".")),
+        + ENCABEZADO_RESPUESTA.format(valor=_moneda(total_aceptado).lstrip("$")),
         "",
     ]
     partes += [t for t, _ in sorted(aceptadas.items(), key=lambda kv: -kv[1])]

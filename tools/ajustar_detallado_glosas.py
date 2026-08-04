@@ -66,6 +66,8 @@ from pathlib import Path
 # Reutilizamos la normalización de factura del radicador (mismo tools/), para
 # que el cruce por número de factura sea idéntico en todo el proyecto.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _dinero import a_numero  # noqa: E402  (lector único de pesos)
 try:  # pragma: no cover - camino normal
     from radicar_facturacion import normalizar_factura
 except Exception:  # pragma: no cover - fallback si se ejecuta aislado
@@ -193,33 +195,12 @@ def _norm_codigo(s) -> str:
 
 
 def _parse_valor(v) -> float:
-    """'$ 85.800,00' → 85800.0. Vacío o basura → 0.0."""
-    if v is None:
-        return 0.0
-    if isinstance(v, (int, float)):
-        return float(v)
-    t = str(v).strip()
-    if not t:
-        return 0.0
-    t = t.replace("$", "").replace(" ", "").replace("\u00a0", "")
-    neg = t.startswith("(") and t.endswith(")")
-    t = t.strip("()")
-    if "," in t and "." in t:
-        t = t.replace(".", "").replace(",", ".")  # 1.234.567,89
-    elif "," in t:
-        ent, _, dec = t.partition(",")
-        t = f"{ent.replace('.', '')}.{dec}" if len(dec) in (1, 2) else t.replace(",", "")
-    elif t.count(".") > 1:
-        t = t.replace(".", "")  # 1.234.567
-    elif "." in t:
-        ent, _, dec = t.partition(".")
-        if len(dec) == 3:  # 56.400 son miles, no decimales
-            t = ent + dec
-    try:
-        n = float(t)
-    except ValueError:
-        return 0.0
-    return -n if neg else n
+    """'$ 85.800,00' → 85800.0. Vacío o basura → 0.0.
+
+    Delegado al lector único de pesos (`tools/_dinero.py`): la regla de
+    leer "$ 950.000" vive en un solo sitio en este repositorio.
+    """
+    return a_numero(v)
 
 
 # ─── Total en letras ─────────────────────────────────────────────────────────
