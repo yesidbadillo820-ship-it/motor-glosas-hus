@@ -260,6 +260,27 @@ class TestQGSaltaValidacionLegacy:
 
         return GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
 
+    def _servicio_con_ia_fingida(self, monkeypatch):
+        """Servicio cuyo camino legacy NO llama proveedores reales.
+
+        Desde el PR #282, _llamar_ia sin llaves configuradas levanta
+        IANoDisponibleError en vez de devolver un texto de error (un error
+        de proveedor jamás vuelve a guardarse como dictamen). Estas pruebas
+        no examinan la IA sino el cableado del Quality Gate / R-CEREBRO,
+        así que la IA se finge con un dictamen plausible.
+        """
+        svc = self._servicio()
+
+        async def ia_fingida(*args, **kwargs):
+            return (
+                "ESE HUS NO ACEPTA LA GLOSA POR FALTA DE SOPORTES. " * 4
+                + "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA.",
+                "ia-fingida",
+            )
+
+        monkeypatch.setattr(svc, "_llamar_ia", ia_fingida)
+        return svc
+
     @pytest.mark.asyncio
     async def test_dictamen_del_qg_no_corre_rcerebro(self, monkeypatch):
         monkeypatch.setenv("QUALITY_GATE_ENABLED", "1")
@@ -298,7 +319,7 @@ class TestQGSaltaValidacionLegacy:
         monkeypatch.delenv("TOOL_USE_HABILITADO", raising=False)
         calls = self._spy_validador(monkeypatch)
 
-        await self._servicio().analizar(
+        await self._servicio_con_ia_fingida(monkeypatch).analizar(
             self._data(), contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
         )
 
@@ -321,7 +342,7 @@ class TestQGSaltaValidacionLegacy:
         monkeypatch.setattr(qga, "ejecutar_con_quality_gate", fake_qg_vacio)
         calls = self._spy_validador(monkeypatch)
 
-        await self._servicio().analizar(
+        await self._servicio_con_ia_fingida(monkeypatch).analizar(
             self._data(), contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
         )
 

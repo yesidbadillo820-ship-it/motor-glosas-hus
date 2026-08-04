@@ -165,6 +165,18 @@ class TestDiasHabilesFechasInvalidas:
         from app.models.schemas import GlosaInput
 
         monkeypatch.setattr(glosa_service, "_calcular_dias_habiles", lambda f1, f2: None)
+
+        # Desde el PR #282, _llamar_ia sin llaves levanta IANoDisponibleError
+        # (un error de proveedor jamás se guarda como dictamen). Esta prueba
+        # examina el mensaje de tiempos, no la IA: se finge el dictamen.
+        async def ia_fingida(*args, **kwargs):
+            return (
+                "ESE HUS NO ACEPTA LA GLOSA POR FALTA DE SOPORTES. " * 4
+                + "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA.",
+                "ia-fingida",
+            )
+
+        monkeypatch.setattr(glosa_service, "_llamar_ia", ia_fingida)
         data = GlosaInput(
             eps="FAMISANAR EPS",
             etapa="RESPUESTA A GLOSA",
