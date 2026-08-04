@@ -477,6 +477,26 @@ class TestUnaClaveVencidaNoApagaElRazonador:
         assert sigue is False
 
 
+class TestElTunelSaleporDondeDejaLaRedDelHospital:
+    """04-08-2026, 4:17 p.m.: la página se cayó con «Error 1033».
+
+    El diagnóstico de cloudflared lo dejó escrito: «UDP Connectivity: QUIC
+    connection failed» / «TCP Connectivity: HTTP/2 connection successful».
+    La red del hospital bloquea el UDP saliente al puerto 7844, que es por
+    donde cloudflared sale por defecto. Con http2 sale por TCP.
+    """
+
+    def test_el_tunel_usa_http2(self):
+        cmd = (RAIZ / "tools" / "tunel_motor_local.cmd").read_text(encoding="utf-8")
+        assert "--protocol" in cmd
+        assert "PROTOCOLO=http2" in cmd
+
+    def test_se_puede_volver_a_quic_sin_tocar_el_bot(self):
+        """Si algún día abren el UDP, no hay que editar el archivo."""
+        cmd = (RAIZ / "tools" / "tunel_motor_local.cmd").read_text(encoding="utf-8")
+        assert "%CF_PROTOCOLO%" in cmd
+
+
 class TestElBotDeEstado:
     """«¿Está bien la página?» tenía que responderse con cinco órdenes de
     PowerShell pegadas a mano. Ahora es un doble clic."""
