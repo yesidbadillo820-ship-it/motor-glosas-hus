@@ -11,6 +11,9 @@ _UNCONFIGURED_ADMIN_PASSWORD = "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
 
 
 class Settings(BaseSettings):
+    # Ronda 30: URL pública para los enlaces de los correos (antes había
+    # hosts viejos y contradictorios: onrender.com y fly.dev).
+    app_base_url: str = "https://iaglosassinac.help"
     database_url: str = "sqlite:///./glosas.db"
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
@@ -101,6 +104,13 @@ class Settings(BaseSettings):
     # GLOSA_CAMPOS_ESTRUCTURADOS=true.
     glosa_campos_estructurados: bool = False
 
+    # Token compartido del agente local de lotes (tools/agente_lotes.py).
+    # El agente corre headless en el PC del hospital y no puede usar JWT
+    # de usuario (expiran a las 8h): se autentica con este token estático
+    # vía header X-Agente-Token. Vacío = endpoints del agente deshabilitados
+    # (devuelven 503), así un deploy sin configurar no expone la cola.
+    agente_lotes_token: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
@@ -111,8 +121,28 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
 
+class ConfiguracionInsegura(RuntimeError):
+    """El arranque se aborta: hay una configuración que rompe la seguridad."""
+
+
 def check_security_config() -> None:
     settings = get_settings()
+    # E00: docker-compose inyecta SECRET_KEY: ${SECRET_KEY}; si la variable no
+    # está en el .env, llega VACÍA y hasta ahora nadie lo detectaba — se
+    # firmaban los tokens de sesión con cadena vacía. Esto no es una
+    # advertencia: es motivo para no arrancar.
+    clave = (settings.secret_key or "").strip()
+    if not clave:
+        raise ConfiguracionInsegura(
+            "SECRET_KEY está vacía: los tokens de sesión se firmarían con una clave "
+            "nula y cualquiera podría falsificarlos. Definí SECRET_KEY en el .env "
+            "(mínimo 32 caracteres aleatorios) antes de arrancar."
+        )
+    if len(clave) < 32 and clave != _DEFAULT_SECRET:
+        warnings.warn(
+            "ADVERTENCIA DE SEGURIDAD: SECRET_KEY tiene menos de 32 caracteres.",
+            stacklevel=2,
+        )
     if settings.secret_key == _DEFAULT_SECRET:
         warnings.warn(
             "ADVERTENCIA DE SEGURIDAD: Se esta usando el SECRET_KEY por defecto. "

@@ -20,7 +20,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install ruff
+      # Versión FIJA a propósito: con `pip install ruff` a secas, cada release
+      # de ruff cambia el formateador y rompe el gate de todas las ramas a la
+      # vez, sin que nadie haya tocado el código. Ya pasó (0.16 empezó a
+      # formatear los bloques ```python de los .md). Para subir de versión:
+      # cambiar el pin acá, correr `ruff format .` y revisar el diff.
+      - run: pip install ruff==0.16.0
       # Sólo reglas de alta señal: F (pyflakes), W6xx (escape sequences)
       # Las reglas de estilo/formato se habilitan gradualmente en el plan.
       - run: ruff check . --select F,W6

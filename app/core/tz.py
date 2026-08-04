@@ -66,3 +66,27 @@ def a_utc(dt: datetime | None) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def dias_completos(desde: datetime | None, hasta: datetime | None) -> int | None:
+    """Días COMPLETOS transcurridos entre dos momentos.
+
+    Un día solo cuenta cuando ya pasaron **24 horas enteras**: de las 2:35 p.m.
+    del miércoles a las 11:23 a.m. del viernes hay **1 día** (43h 48m), no 2.
+    Así el número no depende de la hora a la que se registró el oficio: dos
+    oficios que estuvieron el mismo tiempo en pre-auditoría dan el mismo
+    resultado, sin importar si uno entró a primera hora y el otro al cierre.
+
+    - Si falta cualquiera de los dos momentos → None (no se inventa un cero).
+    - Si `hasta` es anterior a `desde` → 0 (no se cuentan días negativos).
+
+    Compara en UTC, así que no se descuadra por zona horaria.
+    """
+    d = a_utc(desde)
+    h = a_utc(hasta)
+    if d is None or h is None:
+        return None
+    segundos = (h - d).total_seconds()
+    if segundos <= 0:
+        return 0
+    return int(segundos // 86400)

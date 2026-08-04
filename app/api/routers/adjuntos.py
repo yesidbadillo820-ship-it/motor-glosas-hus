@@ -1,6 +1,7 @@
 """Adjuntos (screenshots, documentos) en conciliaciones."""
 
 import base64
+import re
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -100,10 +101,19 @@ def descargar(
         data = base64.b64decode(r.contenido_b64)
     except Exception:
         raise HTTPException(500, "Adjunto corrupto")
+    # Ronda 30: el nombre lo puso el usuario al subir el adjunto; sin sanear,
+    # unas comillas o un salto de línea rompen el header o inyectan otro
+    # (CRLF header injection). Nos quedamos con un nombre seguro para el
+    # atributo filature clásico y damos filename* (RFC 5987) para el original.
+    from urllib.parse import quote as _urlquote
+
+    _nombre = r.nombre or "adjunto"
+    _seguro = re.sub(r'[\r\n"\\]', "_", _nombre)[:200] or "adjunto"
+    _disp = f"attachment; filename=\"{_seguro}\"; filename*=UTF-8''{_urlquote(_nombre)}"
     return Response(
         content=data,
         media_type=r.mime_type or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{r.nombre}"'},
+        headers={"Content-Disposition": _disp},
     )
 
 

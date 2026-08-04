@@ -255,6 +255,22 @@ def _peor_estado(estados: list[str]) -> str:
     return "OK"
 
 
+def checar_salud_basico(db: Session) -> dict[str, Any]:
+    """Salud mínima para monitores externos: ¿responde la base de datos?
+
+    E00: `/sistema/salud/publico` es un endpoint SIN autenticación y llamaba a
+    `checar_salud()`, que recorre 30 días de glosas y corre la detección de
+    anomalías — para después devolver solo dos campos. En una VM de 1 vCPU eso
+    convierte un healthcheck en una palanca de saturación que cualquiera puede
+    accionar desde internet. Esta variante solo hace `SELECT 1`.
+    """
+    bd = _check_bd(db)
+    return {
+        "estado_general": bd.get("estado", "OK"),
+        "generado_en": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def checar_salud(db: Session) -> dict[str, Any]:
     """Consolida todos los componentes en un único reporte."""
     componentes = {

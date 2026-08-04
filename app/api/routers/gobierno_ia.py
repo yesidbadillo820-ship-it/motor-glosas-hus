@@ -1,0 +1,133 @@
+"""Gobierno de IA: cuánto gasta la IA, en qué, quién la usa y con qué caché.
+
+Cada llamada al LLM queda registrada (ai_calls) desde hace meses; lo que
+no existía era la vista que las cuenta. Este resumen responde las
+preguntas de gobierno: gasto de hoy/semana/mes, qué modelos consumen, qué
+usuarios la usan, cuánto ahorra el caché de prompts y qué glosas
+resultaron más caras de defender.
+
+Solo lectura. La ven coordinación y administración: el gasto de IA es
+información de gestión, no operativa.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_coordinador_o_admin
+from app.database import get_db
+from app.models.db import AICallRecord, UsuarioRecord
+
+router = APIRouter(prefix="/gobierno-ia", tags=["gobierno-ia"])
+
+
+def _resumen_desde(db: Session, desde: datetime) -> dict:
+    fila = (
+        db.query(
+            func.count(AICallRecord.id),
+            func.coalesce(func.sum(AICallRecord.cost_usd), 0.0),
+        )
+        .filter(AICallRecord.creado_en >= desde)
+        .first()
+    )
+    return {"llamadas": int(fila[0] or 0), "costo_usd": round(float(fila[1] or 0.0), 4)}
+
+
+@router.get("/resumen")
+def resumen_gobierno_ia(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """El tablero de gobierno completo en una llamada (ventana: 30 días)."""
+    ahora = datetime.now(timezone.utc)
+    desde_30 = ahora - timedelta(days=30)
+
+    gasto = {
+        "hoy": _resumen_desde(db, ahora - timedelta(days=1)),
+        "semana": _resumen_desde(db, ahora - timedelta(days=7)),
+        "mes": _resumen_desde(db, desde_30),
+    }
+
+    por_modelo = [
+        {
+            "proveedor": p,
+            "modelo": m,
+            "llamadas": int(n),
+            "costo_usd": round(float(c or 0), 4),
+            "tokens_entrada": int(ti or 0),
+            "tokens_salida": int(to or 0),
+            "latencia_promedio_ms": int(lat or 0),
+        }
+        for p, m, n, c, ti, to, lat in db.query(
+            AICallRecord.proveedor,
+            AICallRecord.modelo,
+            func.count(AICallRecord.id),
+            func.sum(AICallRecord.cost_usd),
+            func.sum(AICallRecord.input_tokens),
+            func.sum(AICallRecord.output_tokens),
+            func.avg(AICallRecord.latency_ms),
+        )
+        .filter(AICallRecord.creado_en >= desde_30)
+        .group_by(AICallRecord.proveedor, AICallRecord.modelo)
+        .order_by(func.sum(AICallRecord.cost_usd).desc())
+        .all()
+    ]
+
+    por_usuario = [
+        {"usuario": u or "(sistema)", "llamadas": int(n), "costo_usd": round(float(c or 0), 4)}
+        for u, n, c in db.query(
+            AICallRecord.user_email,
+            func.count(AICallRecord.id),
+            func.sum(AICallRecord.cost_usd),
+        )
+        .filter(AICallRecord.creado_en >= desde_30)
+        .group_by(AICallRecord.user_email)
+        .order_by(func.sum(AICallRecord.cost_usd).desc())
+        .limit(10)
+        .all()
+    ]
+
+    # Caché de prompts: cuánto de lo leído vino gratis (o casi) del caché
+    tot = (
+        db.query(
+            func.coalesce(func.sum(AICallRecord.input_tokens), 0),
+            func.coalesce(func.sum(AICallRecord.cache_read_input_tokens), 0),
+            func.coalesce(func.sum(AICallRecord.cache_creation_input_tokens), 0),
+        )
+        .filter(AICallRecord.creado_en >= desde_30)
+        .first()
+    )
+    entrada, leido_cache, creado_cache = int(tot[0]), int(tot[1]), int(tot[2])
+    base = entrada + leido_cache
+    cache = {
+        "tokens_leidos_de_cache": leido_cache,
+        "tokens_creacion_cache": creado_cache,
+        "porcentaje_cacheado": round(100.0 * leido_cache / base, 1) if base else 0.0,
+    }
+
+    glosas_caras = [
+        {"glosa_id": int(g), "llamadas": int(n), "costo_usd": round(float(c or 0), 4)}
+        for g, n, c in db.query(
+            AICallRecord.glosa_id,
+            func.count(AICallRecord.id),
+            func.sum(AICallRecord.cost_usd),
+        )
+        .filter(AICallRecord.creado_en >= desde_30, AICallRecord.glosa_id.isnot(None))
+        .group_by(AICallRecord.glosa_id)
+        .order_by(func.sum(AICallRecord.cost_usd).desc())
+        .limit(5)
+        .all()
+    ]
+
+    return {
+        "ventana_dias": 30,
+        "gasto": gasto,
+        "por_modelo": por_modelo,
+        "por_usuario": por_usuario,
+        "cache": cache,
+        "glosas_mas_caras": glosas_caras,
+    }

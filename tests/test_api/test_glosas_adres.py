@@ -574,11 +574,23 @@ def test_el_router_esta_montado_en_la_app():
     assert "/glosas-adres/factura/{numero}" in rutas
 
 
-def test_la_web_ya_no_ofrece_cobranza_live():
-    """El módulo que reemplazamos no debe quedar colgando en el menú."""
+def test_glosas_adres_reemplaza_a_cobranza_live_en_el_menu():
+    """Glosas ADRES entra al menú y Cobranza Live sale, como pidió el auditor.
+
+    Una fusión anterior las había dejado conviviendo, por prudencia. El auditor
+    lo pidió de nuevo de forma explícita, así que Cobranza Live se retira del
+    menú. **Solo del menú**: `loadDashCobranza()` y el endpoint
+    `/glosas/stats/dashboard-cobranza` siguen vivos, para que devolver la
+    pantalla sea volver a poner el botón.
+    """
     html = Path(__file__).resolve().parents[2] / "static" / "index.html"
     if not html.exists():  # pragma: no cover - en algunos despliegues no se copia
         pytest.skip("static/index.html no está en este entorno")
     texto = html.read_text(encoding="utf-8", errors="ignore")
-    assert "Cobranza Live" not in texto
     assert "Glosas ADRES" in texto
+    # Nada que la lleve al menú: ni botón, ni panel, ni pestaña, ni alias.
+    assert "p-cobranza-live" not in texto
+    assert "sidebarTab(this,'cobranza-live')" not in texto
+    assert "tabs.push(['cobranza-live'" not in texto
+    # Pero el código que la pintaba sigue ahí, para poder devolverla.
+    assert "function loadDashCobranza" in texto

@@ -22,6 +22,16 @@ class AuditRepository:
         detalle: Optional[str] = None,
         ip: Optional[str] = None,
     ) -> AuditLogRecord:
+        # E00: si quien llama no informa la IP (ninguno de los 68 sitios lo
+        # hacía), se toma la del request en curso. Así "quién hizo qué"
+        # incluye "desde dónde" sin tocar cada llamada.
+        if not ip:
+            try:
+                from app.core.logging_utils import client_ip_var
+
+                ip = client_ip_var.get() or None
+            except Exception:
+                ip = None
         try:
             log = AuditLogRecord(
                 usuario_email=usuario_email,

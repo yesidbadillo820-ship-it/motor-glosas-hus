@@ -13,6 +13,26 @@ from slowapi.util import get_remote_address
 from app.core.config import get_settings
 
 
+def get_client_ip(request) -> str:
+    """IP real del cliente detrás del Cloudflare Tunnel.
+
+    Ronda 30: el motor solo es alcanzable vía cloudflared (red interna
+    motor-net, sin `ports:`), así que request.client.host es SIEMPRE la IP
+    del túnel — el rate-limit por IP era un bucket global y la auditoría de
+    login registraba una IP inútil. `cf-connecting-ip` lo sobreescribe el
+    edge de Cloudflare y NO es spoofeable en esta topología (a diferencia
+    del leftmost de X-Forwarded-For, al que Cloudflare solo appendea). El
+    fallback a get_remote_address cubre el healthcheck local y los tests.
+    """
+    try:
+        cf = (request.headers.get("cf-connecting-ip") or "").strip()
+        if cf:
+            return cf
+    except Exception:
+        pass
+    return get_remote_address(request)
+
+
 def _limit_key_user_or_ip(request) -> str:
     """Key-func del rate limiter: prioriza el email del usuario autenticado
     (JWT) sobre la IP. Evita que un usuario abra varias pestañas/VPN y se
@@ -35,7 +55,7 @@ def _limit_key_user_or_ip(request) -> str:
                 return f"user:{email}"
     except Exception:
         pass
-    return get_remote_address(request)
+    return get_client_ip(request)
 
 
 # Instancia única — la importan main.py (para registrar handler y middleware)
