@@ -131,3 +131,89 @@ def resumen_gobierno_ia(
         "cache": cache,
         "glosas_mas_caras": glosas_caras,
     }
+
+
+@router.get("/probar-proveedores")
+async def probar_proveedores(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Prueba de conexión: ¿responde cada proveedor de IA configurado?
+
+    Una llamada mínima (dos palabras) a cada proveedor para saber si la
+    clave sirve, SIN gastar una glosa. Nació del 04-08-2026: la única
+    forma de saber si una clave nueva funcionaba era analizar una glosa
+    de verdad y ver si fallaba.
+    """
+    from app.core.config import get_settings
+    from app.services.glosa_service import GlosaService, _causa_corta
+
+    cfg = get_settings()
+    svc = GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+    )
+    sistema = "Responde solo la palabra LISTO."
+    usuario = "Prueba de conexión."
+
+    proveedores = []
+    for nombre, configurado, fn in (
+        ("groq", bool(cfg.groq_api_key), lambda: svc._llamar_groq_con_retry(sistema, usuario)),
+        (
+            "anthropic",
+            bool(cfg.anthropic_api_key),
+            lambda: svc._llamar_anthropic(sistema, usuario),
+        ),
+    ):
+        if not configurado:
+            proveedores.append(
+                {
+                    "proveedor": nombre,
+                    "estado": "SIN CLAVE",
+                    "detalle": "no hay clave configurada para este proveedor",
+                    "es_principal": cfg.primary_ai == nombre,
+                }
+            )
+            continue
+        try:
+            contenido, modelo = await fn()
+            proveedores.append(
+                {
+                    "proveedor": nombre,
+                    "estado": "OK",
+                    "detalle": f"respondió con {modelo}",
+                    "es_principal": cfg.primary_ai == nombre,
+                }
+            )
+        except Exception as e:
+            proveedores.append(
+                {
+                    "proveedor": nombre,
+                    "estado": "FALLA",
+                    "detalle": _causa_corta(e),
+                    "es_principal": cfg.primary_ai == nombre,
+                }
+            )
+
+    hay_alguno = any(p["estado"] == "OK" for p in proveedores)
+    principal = next((p for p in proveedores if p["es_principal"]), None)
+    if principal and principal["estado"] == "OK":
+        veredicto = f"Todo listo: {principal['proveedor'].upper()} (tu principal) responde."
+    elif hay_alguno:
+        ok = next(p for p in proveedores if p["estado"] == "OK")
+        veredicto = (
+            f"El sistema funciona con {ok['proveedor'].upper()}, pero tu proveedor "
+            f"principal no responde: revisá su clave."
+        )
+    else:
+        veredicto = (
+            "Ningún proveedor responde: el análisis de glosas no va a funcionar "
+            "hasta corregir al menos una clave."
+        )
+
+    return {
+        "principal_configurado": cfg.primary_ai,
+        "funciona": hay_alguno,
+        "veredicto": veredicto,
+        "proveedores": proveedores,
+    }

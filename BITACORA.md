@@ -1363,6 +1363,16 @@ períodos perdidos.
 
 ---
 
+### 04-08 (sexta parte) — Botón para probar la clave de IA
+
+- En **Gobierno IA** hay un botón **«Probar proveedores de IA»**: hace una
+  llamada mínima a cada proveedor y dice en un renglón si la clave sirve
+  («✓ GROQ (principal) — respondió con llama-3.3-70b») o por qué no. Nació
+  del día de hoy: la única forma de saber si una clave nueva funcionaba
+  era analizar una glosa de verdad y ver si fallaba.
+- Y el aviso ya no deja causas en blanco: si un proveedor falla sin
+  explicar, dice «no respondió» en vez de dejar el renglón vacío.
+
 ### 04-08 (quinta parte) — El .env correcto que el sistema no veía
 
 - Yesid montó el sistema en su equipo (ya no en el servidor de Google) y
