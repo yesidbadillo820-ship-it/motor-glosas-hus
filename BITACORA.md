@@ -1527,6 +1527,28 @@ misma copia diaria. Ojo al único detalle distinto: en Cloudflare la URL
 del Public hostname es `localhost:8080` en este modo (con Docker es
 `motor:8080`). Guía: sección "B-bis" de `docs/MIGRACION_PC_HOSPITAL.md`.
 
+**Tercera parte — ¡LA PÁGINA REVIVIÓ desde el PC de cartera!** La
+instalación real dejó tres tropiezos, corregidos el mismo día:
+
+1. El PC tenía Python 3.14 (demasiado nuevo) → el instalador ahora exige
+   3.11-3.13 y guía a instalar el 3.13 con `winget` (PR #279).
+2. `psycopg2` (conector de PostgreSQL, innecesario con SQLite) intentaba
+   compilarse y tumbaba la instalación → se salta en este modo (PR #279).
+3. Windows no trae la base de zonas horarias y `America/Bogota` reventaba
+   el arranque → paquete `tzdata` fijado en requirements (PR #280) — y el
+   **autodeploy de 5 minutos lo aplicó solo**, señal de que la maquinaria
+   automática quedó viva igual que en la VM.
+
+Con eso el sistema quedó arriba en el PC: túnel nuevo de Cloudflare por
+token (`motorglosas`), usuarios sembrados (27), 13 contratos, y las tres
+llaves de IA repuestas (Groq nueva, Gemini recuperada de AI Studio,
+Anthropic creada de nuevo — las viejas siguen en el `.env` de la VM).
+Último ajuste del día: en Docker las llaves llegaban como variables de
+entorno y varias partes del código las leen así (`os.getenv`); el
+vigilante del servidor ahora carga TODO el `.env` como variables de
+verdad antes de arrancar, para que el modo sin Docker sea idéntico al
+de Docker.
+
 ---
 
 ## 3) PENDIENTE
