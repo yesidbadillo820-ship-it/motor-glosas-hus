@@ -16,6 +16,13 @@ powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process -Filter \"Name=
 if errorlevel 1 exit /b 0
 
 cd /d "%REPO%"
+rem Cargar TODO el .env como variables de entorno de verdad. En Docker
+rem las inyectaba docker compose; aca muchas partes del codigo las leen
+rem con os.getenv (llaves de IA, toggles) y no basta con que Settings
+rem lea el archivo. Se saltan las lineas de comentario (#).
+if exist "%REPO%\.env" (
+  for /f "usebackq eol=# tokens=1* delims==" %%a in ("%REPO%\.env") do set "%%a=%%b"
+)
 set "SOPORTES_ROOT=%REPO%\data\soportes"
 set "SOPORTES_LOCAL_ROOT=%REPO%\data\soportes"
 if not exist "%REPO%\data\soportes" mkdir "%REPO%\data\soportes"
