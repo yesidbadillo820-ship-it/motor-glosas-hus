@@ -550,6 +550,15 @@ class TestElBotDeDobleClic:
         ps = self._ps()
         assert "$p.ProcessId -eq $PID" in ps
 
+    def test_lo_que_imprime_es_solo_ascii(self):
+        """Windows PowerShell 5.1 lee el archivo como ANSI: una raya larga
+        salió en la consola del auditor como «â€». Los comentarios pueden
+        llevar acentos; lo que se imprime, no."""
+        ps = self._ps()
+        codigo = [ln for ln in ps.splitlines() if not ln.lstrip().startswith("#")]
+        malas = [ln.strip()[:60] for ln in codigo if any(ord(c) > 127 for c in ln)]
+        assert not malas, f"caracteres que la consola no muestra bien: {malas}"
+
     def test_avisa_de_los_procesos_que_no_puede_ver(self):
         """Sin permisos, Windows oculta la línea de comando: descartarlos en
         silencio hacía que el bot dijera «no había ninguno» justo cuando sí."""

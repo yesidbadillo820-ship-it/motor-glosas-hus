@@ -33,7 +33,7 @@ $otros = @()
 $invisibles = 0
 
 foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
-    if ($p.ProcessId -eq $PID) { continue }   # nunca cerrarse a sí mismo
+    if ($p.ProcessId -eq $PID) { continue }   # nunca cerrarse a si mismo
     if (-not $p.CommandLine) {
         # Windows oculta la línea de comando de lo que no es nuestro.
         if ($p.Name -match 'python|uvicorn') { $invisibles++ }
@@ -47,7 +47,9 @@ foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
 
 # --- Los de OTRO puerto: se nombran y NO se tocan ---------------------
 foreach ($o in $otros) {
-    $extra = if ($o[1] -eq '8080') { ' — es el que sirve la pagina por internet' } else { '' }
+    # Solo ASCII en lo que se imprime: Windows PowerShell 5.1 lee este
+    # archivo como ANSI y una raya larga sale en pantalla como "â€".
+    $extra = if ($o[1] -eq '8080') { ' - es el que sirve la pagina por internet' } else { '' }
     Write-Host ("       - dejo VIVO el motor PID " + $o[0] + " del puerto " + $o[1] + $extra)
 }
 
