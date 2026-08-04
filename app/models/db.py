@@ -1071,6 +1071,8 @@ class ItemDetalladoAdresRecord(Base):
     observacion = Column(Text)
 
     __table_args__ = (Index("ix_items_det_adres_paq_factura", "paquete_id", "factura_clave"),)
+
+
 # ============================================================
 # PRE-AUDITORÍA SINAC — recepción de oficios de Facturación,
 # auditoría de soportes y oficios de devolución (DEV-PRE-AUD).

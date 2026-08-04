@@ -417,11 +417,17 @@ def test_el_router_esta_montado_en_la_app():
     assert "/glosas-adres/factura/{numero}" in rutas
 
 
-def test_la_web_ya_no_ofrece_cobranza_live():
-    """El módulo que reemplazamos no debe quedar colgando en el menú."""
+def test_glosas_adres_convive_con_cobranza_live():
+    """Las dos pantallas conviven en el menú.
+
+    El plan original (28-07) era que Glosas ADRES reemplazara a Cobranza
+    Live, pero al rescatar este PR (04-08) Cobranza Live seguía viva en
+    producción y en uso: quitarle una pantalla al equipo no es decisión
+    de una fusión. Si algún día se decide retirarla, se cambia aquí.
+    """
     html = Path(__file__).resolve().parents[2] / "static" / "index.html"
     if not html.exists():  # pragma: no cover - en algunos despliegues no se copia
         pytest.skip("static/index.html no está en este entorno")
     texto = html.read_text(encoding="utf-8", errors="ignore")
-    assert "Cobranza Live" not in texto
+    assert "Cobranza Live" in texto
     assert "Glosas ADRES" in texto
