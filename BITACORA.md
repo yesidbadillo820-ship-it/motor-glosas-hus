@@ -1516,6 +1516,17 @@ de cartera con una **base nueva provisional**, sin esperar el rescate:
 **avisar al chat ANTES de restaurar la base vieja**, para sacar copia de la
 provisional y fusionar lo trabajado en estos días.
 
+**Segunda parte del mismo día — modo SIN Docker.** Yesid preguntó si se
+podía sin Docker Desktop (los PC del hospital no siempre lo permiten). Se
+construyó el camino alterno: `tools/REVIVIR_EXPRESS_SIN_DOCKER.cmd` corre
+el sistema directo con Python (el mismo de los otros bots) y publica la
+página con el programa oficial de Cloudflare descargado solo. Deja
+vigilantes que reviven el servidor y el túnel si se caen, arranque
+automático al iniciar sesión, el mismo autodeploy cada 5 minutos y la
+misma copia diaria. Ojo al único detalle distinto: en Cloudflare la URL
+del Public hostname es `localhost:8080` en este modo (con Docker es
+`motor:8080`). Guía: sección "B-bis" de `docs/MIGRACION_PC_HOSPITAL.md`.
+
 ---
 
 ## 3) PENDIENTE
