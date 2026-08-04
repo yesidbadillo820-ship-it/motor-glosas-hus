@@ -513,7 +513,8 @@ class TestElBotDeDobleClic:
         """Lo que costó la página pública: el bot no puede cerrar el motor
         del 8080 cuando lo que reinicia es el del 8000."""
         ps = self._ps()
-        assert "$suyo -eq $Puerto" in ps
+        assert "(Puerto-De $p) -eq $Puerto" in ps  # compara puertos antes de matar
+        assert "$suyo -ne $Puerto" in ps  # y los de otro puerto solo se nombran
         assert "dejo VIVO el motor" in ps
         assert "sirve la pagina por internet" in ps
 
@@ -549,6 +550,19 @@ class TestElBotDeDobleClic:
     def test_nunca_se_cierra_a_si_mismo(self):
         ps = self._ps()
         assert "$p.ProcessId -eq $PID" in ps
+
+    def test_un_motor_de_dos_procesos_se_informa_una_sola_vez(self):
+        """04-08-2026, PC del hospital: el python del venv es un lanzador que
+        arranca el intérprete real como hijo (PID 3636 → PID 1820), y es el
+        hijo el que se queda con el puerto. El bot informaba «dos motores en
+        el 8080» y el auditor creyó tener un intruso."""
+        ps = self._ps()
+        assert "$pids -notcontains $_.ParentProcessId" in ps  # solo las raíces
+        assert "raices" in ps
+        # …pero al cerrar van padre E hijo: matar solo la raíz deja vivo al
+        # que tiene el puerto.
+        cuerpo = ps.split("$mios = @()", 1)[1]
+        assert "foreach ($p in $encontrados)" in cuerpo
 
     def test_lo_que_imprime_es_solo_ascii(self):
         """Windows PowerShell 5.1 lee el archivo como ANSI: una raya larga

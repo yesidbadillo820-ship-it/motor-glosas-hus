@@ -28,8 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$mios = @()
-$otros = @()
+$encontrados = @()
 $invisibles = 0
 
 foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
@@ -41,8 +40,32 @@ foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
     }
     if ($p.CommandLine -notmatch 'uvicorn') { continue }
     if ($p.CommandLine -notmatch 'app\.main') { continue }
-    $suyo = if ($p.CommandLine -match '--port[=\s]+(\d+)') { $matches[1] } else { '8000' }
-    if ($suyo -eq $Puerto) { $mios += $p } else { $otros += , @($p.ProcessId, $suyo) }
+    $encontrados += $p
+}
+
+# Un motor puede ser DOS procesos. En Windows el python.exe del entorno
+# del proyecto (venv) es un lanzador: arranca el interprete de verdad como
+# proceso hijo, con la misma linea de comando, y es el HIJO el que se
+# queda con el puerto. Visto el 04-08-2026 en el PC del hospital: PID 3636
+# (venv) con hijo PID 1820 (Python312) — un solo motor, pero el bot
+# informaba dos y el auditor creia tener un intruso. Lo mismo pasa con
+# `uvicorn --reload` (vigilante + servidor).
+$pids = @($encontrados | ForEach-Object { $_.ProcessId })
+$raices = @($encontrados | Where-Object { $pids -notcontains $_.ParentProcessId })
+
+function Puerto-De($proc) {
+    if ($proc.CommandLine -match '--port[=\s]+(\d+)') { return $matches[1] }
+    return '8000'
+}
+
+$mios = @()     # TODOS los procesos de este puerto: hay que cerrar padre e hijo
+$otros = @()    # solo las raices de otros puertos: una linea por motor
+foreach ($p in $encontrados) {
+    if ((Puerto-De $p) -eq $Puerto) { $mios += $p }
+}
+foreach ($r in $raices) {
+    $suyo = Puerto-De $r
+    if ($suyo -ne $Puerto) { $otros += , @($r.ProcessId, $suyo) }
 }
 
 # --- Los de OTRO puerto: se nombran y NO se tocan ---------------------
