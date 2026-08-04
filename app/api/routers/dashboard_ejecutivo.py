@@ -29,7 +29,7 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_coordinador_o_admin
-from app.core.tz import ahora_utc
+from app.core.tz import a_utc, ahora_utc
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -418,4 +418,58 @@ def detector_actividad(
             "glosas_estancadas": len(glosas_estancadas),
             "alto_valor_riesgo": len(alto_valor_riesgo),
         },
+    }
+
+
+@router.get("/operacion")
+def panel_operacional(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Dónde se atasca el trabajo y quién tiene cuánto encima.
+
+    Dos cosas que ninguna pantalla mostraba: los CUELLOS DE BOTELLA (en
+    qué estado están las glosas abiertas, cuánta plata hay ahí y hace
+    cuánto no se mueve lo más viejo) y la CARGA POR AUDITOR (cuántas
+    abiertas lleva cada quien, cuántas ya vencidas y por cuánto valor).
+
+    Un montón parado en un estado no se ve en los totales: se ve acá.
+    """
+    from app.services.motor_vencimientos import ESTADOS_CERRADOS
+
+    ahora = ahora_utc()
+    abiertas = db.query(GlosaRecord).filter(GlosaRecord.estado.notin_(ESTADOS_CERRADOS)).all()
+
+    por_estado: dict[str, dict] = {}
+    por_auditor: dict[str, dict] = {}
+    for g in abiertas:
+        estado = g.estado or "SIN ESTADO"
+        e = por_estado.setdefault(
+            estado, {"estado": estado, "cantidad": 0, "valor": 0.0, "mas_vieja_dias": 0}
+        )
+        e["cantidad"] += 1
+        e["valor"] += float(g.valor_objetado or 0)
+        if g.creado_en:
+            dias = (ahora - a_utc(g.creado_en)).days
+            e["mas_vieja_dias"] = max(e["mas_vieja_dias"], dias)
+
+        quien = g.auditor_email or "(sin asignar)"
+        a = por_auditor.setdefault(
+            quien, {"auditor": quien, "abiertas": 0, "vencidas": 0, "valor": 0.0}
+        )
+        a["abiertas"] += 1
+        a["valor"] += float(g.valor_objetado or 0)
+        if (g.dias_restantes or 0) <= 0 and g.dias_restantes is not None:
+            a["vencidas"] += 1
+
+    cuellos = sorted(por_estado.values(), key=lambda x: -x["valor"])
+    carga = sorted(por_auditor.values(), key=lambda x: (-x["vencidas"], -x["abiertas"]))
+
+    return {
+        "generado_en": ahora.isoformat(),
+        "total_abiertas": len(abiertas),
+        "valor_abierto": round(sum(c["valor"] for c in cuellos), 0),
+        "cuellos_por_estado": cuellos,
+        "carga_por_auditor": carga[:15],
+        "sin_asignar": next((a["abiertas"] for a in carga if a["auditor"] == "(sin asignar)"), 0),
     }

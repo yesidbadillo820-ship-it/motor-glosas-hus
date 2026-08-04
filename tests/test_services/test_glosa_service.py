@@ -165,6 +165,20 @@ class TestDiasHabilesFechasInvalidas:
         from app.models.schemas import GlosaInput
 
         monkeypatch.setattr(glosa_service, "_calcular_dias_habiles", lambda f1, f2: None)
+
+        # Desde el incidente 04-08-2026 la IA sin claves LANZA (un fallo de
+        # proveedor no es un dictamen), así que acá se stubea con un texto
+        # real: lo que este test verifica es el mensaje de tiempo, no la IA.
+        async def _ia_stub(
+            system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+        ):
+            return (
+                "<argumento>ESE HUS NO ACEPTA LA GLOSA. SE SOLICITA EL "
+                "LEVANTAMIENTO DE LA GLOSA.</argumento>",
+                "stub",
+            )
+
+        monkeypatch.setattr(glosa_service, "_llamar_ia", _ia_stub)
         data = GlosaInput(
             eps="FAMISANAR EPS",
             etapa="RESPUESTA A GLOSA",

@@ -3192,6 +3192,18 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <div class="kpi"><div class="kpi-lbl">Vencidas</div><div class="kpi-num" id="mando-venc" style="color:#dc2626">—</div><div class="kpi-sub">fuera de plazo</div></div>
         </div>
 
+        <!-- Panel operacional: dónde se atasca y quién lleva cuánto -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem;margin-bottom:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">🚧 Dónde se atasca el trabajo (glosas abiertas por estado)</div>
+            <div id="mando-cuellos" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">🎒 Carga por auditor (abiertas · vencidas · valor)</div>
+            <div id="mando-carga" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+        </div>
+
         <!-- Rankings lado a lado -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem">
           <div class="chart-card">
@@ -8183,7 +8195,7 @@ function tab(btn,id){
   if(id==='dashboard') loadDash();
   if(id==='cobranza-live') loadDashCobranza();
   if(id==='resumen-mes') loadResumenMes();
-  if(id==='mando') loadMando();
+  if(id==='mando'){ loadMando(); loadOperacion(); }
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -19813,6 +19825,47 @@ async function loadResumenMes(){
 
 // ─── B.1: Mando ejecutivo (single-pane-of-glass) ─────────────────────────
 var MANDO_TIMER = null;
+async function loadOperacion(){
+  var cu = document.getElementById('mando-cuellos');
+  var ca = document.getElementById('mando-carga');
+  if(!cu || !ca) return;
+  try{
+    var r = await fetch('/dashboard-ejecutivo/operacion', {headers: authH()});
+    if(!r.ok){ cu.textContent = 'Error ' + r.status; return; }
+    var d = await r.json();
+    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+
+    if(!d.cuellos_por_estado.length){
+      cu.innerHTML = '<span style="color:var(--text3)">No hay glosas abiertas.</span>';
+    } else {
+      var max = d.cuellos_por_estado[0].valor || 1;
+      cu.innerHTML = d.cuellos_por_estado.map(function(c){
+        var pct = Math.max(4, Math.round(100 * c.valor / max));
+        var viejo = c.mas_vieja_dias >= 30 ? '#dc2626' : (c.mas_vieja_dias >= 15 ? '#b45309' : 'var(--text3)');
+        return '<div style="margin-bottom:.55rem">'
+          + '<div style="display:flex;justify-content:space-between;gap:.5rem">'
+          +   '<b>' + escHtml(c.estado) + '</b>'
+          +   '<span>' + c.cantidad + ' · ' + cop(c.valor) + '</span></div>'
+          + '<div style="height:6px;background:var(--border);border-radius:3px;margin:.2rem 0"><div style="height:6px;width:' + pct + '%;background:#0369a1;border-radius:3px"></div></div>'
+          + '<div style="font-size:.72rem;color:' + viejo + '">la más vieja lleva ' + c.mas_vieja_dias + ' día(s) sin cerrarse</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    var totalSin = d.sin_asignar || 0;
+    ca.innerHTML = (totalSin ? '<div style="color:#b45309;margin-bottom:.4rem"><b>' + totalSin + ' glosa(s) sin asignar</b> — usá «Auto-balancear» arriba.</div>' : '')
+      + (d.carga_por_auditor.length
+          ? d.carga_por_auditor.map(function(a){
+              return '<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.25rem 0;border-bottom:1px solid var(--border)">'
+                + '<span>' + escHtml(a.auditor) + '</span>'
+                + '<span>' + a.abiertas + ' abiertas'
+                + (a.vencidas ? ' · <b style="color:#dc2626">' + a.vencidas + ' vencidas</b>' : '')
+                + ' · ' + cop(a.valor) + '</span></div>';
+            }).join('')
+          : '<span style="color:var(--text3)">Sin carga abierta.</span>');
+  }catch(e){ cu.textContent = 'Conexión: ' + e.message; }
+}
+
 async function loadMando(){
   var box = document.getElementById('p-mando');
   if(!box) return;
