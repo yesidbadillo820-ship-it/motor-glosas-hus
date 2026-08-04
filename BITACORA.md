@@ -1426,6 +1426,18 @@ corrida real destapó algo más:
   `â€`. Los mensajes del bot ahora usan solo caracteres que Windows
   muestra bien, con una prueba que lo impide a futuro.
 
+**Dos bots nuevos en el menú (`MOTOR_HUS.cmd`, opciones 16 y 17):**
+
+- **`ESTADO_MOTOR.cmd` — «¿está bien la página?»**. Doble clic y en una
+  pantalla sale todo: quién atiende la página por internet, con qué clave
+  de IA, si el túnel publica, si el vigilante está encendido, si arranca
+  solo al iniciar sesión, y las tareas automáticas. Al final una lista de
+  avisos con qué hacer si algo falta. **Solo mira: no cierra ni arranca
+  nada.** Antes eso eran cinco órdenes de PowerShell pegadas a mano y
+  había que saber interpretarlas.
+- **`REINICIAR_MOTOR.cmd`** — el de reiniciar el motor de pruebas, ahora
+  también desde el menú.
+
 ### 04-08 (novena parte) — Quién puede tocar qué: las 51 puertas abiertas
 
 El 28 de julio se encontraron cuatro «puertas de al lado»: rutas del

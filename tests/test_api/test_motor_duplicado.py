@@ -477,6 +477,75 @@ class TestUnaClaveVencidaNoApagaElRazonador:
         assert sigue is False
 
 
+class TestElTunelSaleporDondeDejaLaRedDelHospital:
+    """04-08-2026, 4:17 p.m.: la página se cayó con «Error 1033».
+
+    El diagnóstico de cloudflared lo dejó escrito: «UDP Connectivity: QUIC
+    connection failed» / «TCP Connectivity: HTTP/2 connection successful».
+    La red del hospital bloquea el UDP saliente al puerto 7844, que es por
+    donde cloudflared sale por defecto. Con http2 sale por TCP.
+    """
+
+    def test_el_tunel_usa_http2(self):
+        cmd = (RAIZ / "tools" / "tunel_motor_local.cmd").read_text(encoding="utf-8")
+        assert "--protocol" in cmd
+        assert "PROTOCOLO=http2" in cmd
+
+    def test_se_puede_volver_a_quic_sin_tocar_el_bot(self):
+        """Si algún día abren el UDP, no hay que editar el archivo."""
+        cmd = (RAIZ / "tools" / "tunel_motor_local.cmd").read_text(encoding="utf-8")
+        assert "%CF_PROTOCOLO%" in cmd
+
+
+class TestElBotDeEstado:
+    """«¿Está bien la página?» tenía que responderse con cinco órdenes de
+    PowerShell pegadas a mano. Ahora es un doble clic."""
+
+    def _ps(self):
+        return (RAIZ / "tools" / "estado_motor.ps1").read_text(encoding="utf-8")
+
+    def test_existe_y_se_llama_desde_el_doble_clic(self):
+        cmd = (RAIZ / "tools" / "ESTADO_MOTOR.cmd").read_text(encoding="utf-8")
+        assert "estado_motor.ps1" in cmd
+
+    def test_mira_todo_lo_que_hace_falta_para_estar_en_linea(self):
+        ps = self._ps()
+        for señal in (
+            "uvicorn",  # el servidor
+            "Get-NetTCPConnection",  # el puerto
+            "cloudflared",  # el túnel
+            "IA-PROVIDERS",  # la clave que cargó
+            "servidor_motor_local",  # el vigilante
+            "Startup",  # el arranque al iniciar sesión
+            "MotorGlosas_Autodeploy",  # las tareas
+        ):
+            assert señal in ps, f"el estado no revisa {señal}"
+
+    def test_no_cierra_ni_arranca_nada(self):
+        """Es un tablero, no una herramienta: si además tocara cosas, nadie
+        lo correría por miedo."""
+        ps = self._ps()
+        for peligro in ("Stop-Process", "taskkill", "Start-Process"):
+            assert peligro not in ps
+
+    def test_esta_en_el_menu_de_bots(self):
+        """Si no está en el menú, para el auditor no existe."""
+        menu = (RAIZ / "tools" / "MOTOR_HUS.cmd").read_text(encoding="utf-8", errors="ignore")
+        assert "ESTADO_MOTOR.cmd" in menu
+        assert "REINICIAR_MOTOR.cmd" in menu
+
+    def test_dice_que_hacer_cuando_algo_falta(self):
+        ps = self._ps()
+        assert "AVISOS" in ps
+        assert "arrancar_motor_glosas.cmd" in ps
+
+    def test_lo_que_imprime_es_solo_ascii(self):
+        ps = self._ps()
+        codigo = [ln for ln in ps.splitlines() if not ln.lstrip().startswith("#")]
+        malas = [ln.strip()[:60] for ln in codigo if any(ord(c) > 127 for c in ln)]
+        assert not malas, f"caracteres que la consola no muestra bien: {malas}"
+
+
 class TestPantalla:
     def test_la_prueba_de_proveedores_muestra_la_clave_y_el_duplicado(self):
         html = (RAIZ / "static" / "index.html").read_text(encoding="utf-8", errors="ignore")
@@ -548,8 +617,20 @@ class TestElBotDeDobleClic:
         aplicación: con el motor de pruebas abierto, la página por internet
         no revivía sola si se caía."""
         cmd = (RAIZ / "tools" / "servidor_motor_local.cmd").read_text(encoding="utf-8")
-        guardia = cmd.split("no duplicar", 1)[1].split(":loop", 1)[0]
-        assert "8080" in guardia
+        cuerpo = cmd.split(":loop", 1)[1]
+        assert "--port\\s+8080" in cuerpo
+
+    def test_un_vigilante_de_mas_espera_en_vez_de_pelear(self):
+        """Visto en el PC del hospital: quedaron DOS ventanas de vigilancia
+        (el autodeploy vuelve a llamar al arrancador cada 5 minutos). Con la
+        comprobación fuera del bucle, la segunda levantaba un servidor que
+        moría al instante contra el puerto ocupado — uno nuevo cada 5
+        segundos, llenando el registro."""
+        cmd = (RAIZ / "tools" / "servidor_motor_local.cmd").read_text(encoding="utf-8")
+        cuerpo = cmd.split(":loop", 1)[1]
+        # la comprobación vive dentro del bucle y reintenta, no sale
+        assert "goto :loop" in cuerpo.split("errorlevel 1", 1)[1][:200]
+        assert cmd.count("goto :loop") >= 2
 
     def test_comprueba_que_de_verdad_murieron(self):
         """`-ErrorAction SilentlyContinue` se tragaba el «acceso denegado» y

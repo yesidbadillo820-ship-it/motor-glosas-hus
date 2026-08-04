@@ -32,7 +32,7 @@ echo.
 echo  Carpeta del proyecto: %CD%
 echo.
 
-REM --- 1. Dejar libre el puerto, sin daños ----------------------------
+REM --- 1. Dejar libre el puerto, sin danos ----------------------------
 REM Todo el trabajo delicado vive en tools\reiniciar_motor.ps1 (ahi esta
 REM explicado por que cada cosa se hace asi). Si devuelve error, NO se
 REM arranca nada: quedo algo vivo que hay que mirar primero.

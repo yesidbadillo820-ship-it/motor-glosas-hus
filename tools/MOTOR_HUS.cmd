@@ -33,6 +33,9 @@ echo   13. Informe para gerencia (desde la bitacora)
 echo   14. Tarea nocturna: convierte los .txt solos
 echo   15. Audita devoluciones EPS (DGH vs RIPS vs soportes)
 echo.
+echo   16. Estado del sistema (esta bien la pagina?)
+echo   17. Reiniciar el motor de pruebas
+echo.
 echo    0. Salir
 echo.
 set "OP="
@@ -53,6 +56,8 @@ if "%OP%"=="12" ( call :lanzar BUSCAR_FACTURA.cmd & goto inicio )
 if "%OP%"=="13" ( call :lanzar INFORME_GERENCIA.cmd & goto inicio )
 if "%OP%"=="14" ( call :lanzar VIGILANTE_NOCTURNO.cmd & goto inicio )
 if "%OP%"=="15" ( call :lanzar AUDITAR_DEV_EPS.cmd & goto inicio )
+if "%OP%"=="16" ( call :lanzar ESTADO_MOTOR.cmd & goto inicio )
+if "%OP%"=="17" ( call :lanzar REINICIAR_MOTOR.cmd & goto inicio )
 echo.
 echo   [!] Opcion no valida. Intenta de nuevo...
 timeout /t 2 >nul
