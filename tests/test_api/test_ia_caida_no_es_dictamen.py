@@ -211,3 +211,36 @@ class TestCaratulaSinArgumentoNoEsDictamen:
         assert r.status_code == 503
         assert "argumentación" in r.json()["detail"].lower()
         assert db_session.query(GlosaRecord).count() == 0
+
+
+class TestElMensajeNombraATodosLosProveedores:
+    """Incidente 04-08 (tercera parte): con Groq como principal y Anthropic
+    de respaldo, si fallaban los dos el mensaje solo nombraba al último —
+    el auditor veía «Invalid API Key» de un proveedor que ni siquiera es el
+    suyo y no sabía qué había pasado con Groq."""
+
+    def test_nombra_cada_proveedor_con_su_causa(self):
+        from app.services.glosa_service import _mensaje_ia_caida
+
+        fallos = [
+            ("groq", Exception("rate limit exceeded (429)")),
+            ("anthropic", Exception(ERROR_401)),
+        ]
+        m = _mensaje_ia_caida(fallos[-1][1], fallos)
+        assert "GROQ" in m and "límite de uso" in m
+        assert "ANTHROPIC" in m and "inválida o vencida" in m
+        assert "NO se guardó" in m
+
+    def test_causas_traducidas(self):
+        from app.services.glosa_service import _causa_corta
+
+        assert "saldo" in _causa_corta(Exception("insufficient_quota: no credit"))
+        assert "saturado" in _causa_corta(Exception("overloaded_error 529"))
+        assert "a tiempo" in _causa_corta(Exception("Request timed out"))
+        assert "red" in _causa_corta(Exception("Connection refused"))
+
+    def test_sin_lista_sigue_funcionando(self):
+        """Compatibilidad: un solo error sin lista da el mensaje de antes."""
+        from app.services.glosa_service import _mensaje_ia_caida
+
+        assert "clave" in _mensaje_ia_caida(Exception(ERROR_401))
