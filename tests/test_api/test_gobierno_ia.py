@@ -144,3 +144,72 @@ class TestPantalla:
         assert 'id="sn-gobierno-ia"' in html
         assert "function gobCargar" in html
         assert "expAbrirDesdeGob" in html  # de la glosa cara al expediente
+
+
+class TestProbarProveedores:
+    """La prueba de conexión nació del 04-08-2026: la única forma de saber
+    si una clave nueva servía era analizar una glosa de verdad y ver si
+    fallaba. Ahora se prueba en un clic, sin gastar una glosa."""
+
+    def test_dice_cual_responde_y_cual_no(self, db_session, monkeypatch):
+        from app.core.config import get_settings
+        from app.main import app
+        from app.services import glosa_service as gs
+
+        cfg = get_settings()
+        monkeypatch.setattr(cfg, "groq_api_key", "gsk_prueba", raising=False)
+        monkeypatch.setattr(cfg, "anthropic_api_key", "sk-ant-prueba", raising=False)
+        monkeypatch.setattr(cfg, "primary_ai", "groq", raising=False)
+
+        async def _groq_ok(self, system, user, **kw):
+            return ("LISTO", "llama-3.3-70b")
+
+        async def _ant_falla(self, system, user, **kw):
+            raise RuntimeError("Error code: 401 - invalid_api_key")
+
+        monkeypatch.setattr(gs.GlosaService, "_llamar_groq_con_retry", _groq_ok)
+        monkeypatch.setattr(gs.GlosaService, "_llamar_anthropic", _ant_falla)
+
+        with _cliente(db_session, "COORDINADOR") as c:
+            d = c.get("/gobierno-ia/probar-proveedores").json()
+        app.dependency_overrides.clear()
+
+        assert d["funciona"] is True
+        assert "Todo listo" in d["veredicto"] and "GROQ" in d["veredicto"]
+        por = {p["proveedor"]: p for p in d["proveedores"]}
+        assert por["groq"]["estado"] == "OK" and por["groq"]["es_principal"] is True
+        assert por["anthropic"]["estado"] == "FALLA"
+        assert "inválida o vencida" in por["anthropic"]["detalle"]
+
+    def test_sin_ninguno_avisa_que_no_va_a_funcionar(self, db_session, monkeypatch):
+        from app.core.config import get_settings
+        from app.main import app
+
+        cfg = get_settings()
+        monkeypatch.setattr(cfg, "groq_api_key", "", raising=False)
+        monkeypatch.setattr(cfg, "anthropic_api_key", "", raising=False)
+
+        with _cliente(db_session, "COORDINADOR") as c:
+            d = c.get("/gobierno-ia/probar-proveedores").json()
+        app.dependency_overrides.clear()
+
+        assert d["funciona"] is False
+        assert "no va a funcionar" in d["veredicto"]
+        assert all(p["estado"] == "SIN CLAVE" for p in d["proveedores"])
+
+    def test_el_auditor_no_prueba(self, db_session):
+        from app.main import app
+
+        with _cliente(db_session, "AUDITOR") as c:
+            assert c.get("/gobierno-ia/probar-proveedores").status_code == 403
+        app.dependency_overrides.clear()
+
+    def test_el_boton_esta_en_la_pantalla(self):
+        from pathlib import Path
+
+        html = (Path(__file__).resolve().parent.parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        assert "Probar proveedores de IA" in html
+        assert "function gobProbar" in html
+        assert "/gobierno-ia/probar-proveedores" in html

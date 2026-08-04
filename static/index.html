@@ -3467,8 +3467,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <h2 class="malla-titulo">Gobierno de IA</h2>
             <p class="malla-sub">Cuánto gasta la IA, en qué modelos, quién la usa y cuánto ahorra el caché — últimos 30 días.</p>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="gobProbar()">🔌 Probar proveedores de IA</button>
+            <button class="btn btn-ghost btn-sm" onclick="gobCargar()">Actualizar</button>
+          </div>
         </div>
+        <div id="gob-prueba" style="display:none"></div>
         <div id="gob-cuerpo"><div class="malla-vacio">Cargando…</div></div>
       </div>
     </div>
@@ -9314,6 +9318,31 @@ async function descargarDictamenMd(){
 }
 
 // ══ GOBIERNO DE IA: gasto, modelos, usuarios y caché ══
+
+// Prueba de conexión: ¿sirve la clave? — sin gastar una glosa.
+async function gobProbar(){
+  var caja = document.getElementById('gob-prueba');
+  caja.style.display = 'block';
+  caja.innerHTML = '<div class="auto-resumen">Probando cada proveedor…</div>';
+  try{
+    var r = await fetch('/gobierno-ia/probar-proveedores', {headers: authH()});
+    if(r.status === 403){ caja.innerHTML = '<div class="auto-resumen">Solo coordinación y administración.</div>'; return; }
+    if(!r.ok){ caja.innerHTML = '<div class="auto-resumen">Error HTTP ' + r.status + '</div>'; return; }
+    var d = await r.json();
+    var color = d.funciona ? '#16a34a' : '#dc2626';
+    var html = '<div class="intel-card" style="--intel-c:' + color + '">'
+      + '<div class="ico">' + (d.funciona ? '✅' : '🔴') + '</div>'
+      + '<div class="cuerpo"><div class="titulo">' + escHtml(d.veredicto) + '</div>';
+    d.proveedores.forEach(function(p){
+      var ic = p.estado === 'OK' ? '✓' : (p.estado === 'FALLA' ? '✗' : '—');
+      var c = p.estado === 'OK' ? '#16a34a' : (p.estado === 'FALLA' ? '#dc2626' : '#b45309');
+      html += '<div class="porque"><b style="color:' + c + '">' + ic + ' ' + escHtml(p.proveedor.toUpperCase()) + '</b>'
+        + (p.es_principal ? ' <em>(principal)</em>' : '') + ' — ' + escHtml(p.detalle) + '</div>';
+    });
+    html += '</div></div>';
+    caja.innerHTML = html;
+  }catch(e){ caja.innerHTML = '<div class="auto-resumen">Conexión: ' + escHtml(e.message) + '</div>'; }
+}
 
 async function gobCargar(){
   var cuerpo = document.getElementById('gob-cuerpo');

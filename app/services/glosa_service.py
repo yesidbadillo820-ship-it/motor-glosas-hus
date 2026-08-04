@@ -78,7 +78,10 @@ def _causa_corta(error) -> str:
         return "no respondió a tiempo"
     if "connection" in s or "network" in s or "dns" in s:
         return "no se pudo conectar (red)"
-    return str(error)[:90]
+    # Visto en producción 04-08: un proveedor puede fallar sin devolver
+    # texto y el aviso quedaba en «ANTHROPIC: .» — decir algo siempre.
+    detalle = str(error).strip()[:90]
+    return detalle or f"no respondió ({type(error).__name__})"
 
 
 def _mensaje_ia_caida(error, fallos=None) -> str:
