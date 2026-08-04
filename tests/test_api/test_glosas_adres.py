@@ -90,6 +90,10 @@ FILAS = [
         450000,
         "4506- El material hace parte de otro servicio",
     ),
+    # Sin causal: es el desglose de una GLOSA TOTAL. No se responde ítem por
+    # ítem, así que la pantalla no lo muestra.
+    ("HUS352890", "Procedimientos", "TOT-1", "Terapia respiratoria: sesión", 12000, ""),
+    ("HUS311371", "Medicamentos", "TOT-2", "DIPIRONA 1 G", 3400, ""),
 ]
 
 
@@ -211,9 +215,13 @@ class TestCargue:
         d = r.json()
         assert d["ok"] is True
         assert d["numero_paquete"] == "31068"
-        assert d["filas"] == 5
+        # Las 7 filas se guardan (incluidas las 2 de glosa total): la pantalla
+        # las oculta, pero el paquete conserva el reporte completo.
+        assert d["filas"] == 7
         assert d["facturas"] == 2
-        assert d["valor_glosado"] == pytest.approx(37600 + 85800 + 31800 + 5000 + 450000)
+        assert d["valor_glosado"] == pytest.approx(
+            37600 + 85800 + 31800 + 5000 + 450000 + 12000 + 3400
+        )
 
     def test_archivo_vacio_da_400(self, client):
         r = client.post("/glosas-adres/importar", files={"archivo": ("vacio.xlsx", b"")})
@@ -361,10 +369,157 @@ class TestDecision:
             "/glosas-adres/aplicar-sugerencias",
             json={"paquete_id": paquete, "factura": "HUS0000352890"},
         )
-        assert r.json()["aplicadas"] == 1  # solo la de SOPORTES de esa factura
+        # Solo las de esa factura que traen sugerencia: la de SOPORTES y la de
+        # glosa total (que se subsana corrigiendo el FURIPS).
+        assert r.json()["aplicadas"] == 2
 
         otra = client.get("/glosas-adres/factura/HUS0000311371").json()
         assert not otra["glosas"][0]["decision"]
+
+
+class TestGlosasTotales:
+    """Las filas sin causal son el desglose de una reclamación glosada entera.
+
+    El ADRES glosó todo por el FURIPS; esas líneas no traen causal propia y no
+    se responden una por una, así que la pantalla no las muestra. Pero se
+    cuentan y se dicen: nada desaparece en silencio.
+    """
+
+    def test_no_se_muestran_pero_se_cuentan(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["resumen"]["glosas"] == 4  # las 4 con causal
+        assert d["resumen"]["glosas_totales_ocultas"] == 1
+        assert d["resumen"]["valor_glosas_totales"] == pytest.approx(12000)
+        assert "GLOSA TOTAL" in d["aviso_glosas_totales"]
+        assert all(not g["glosa_total"] for g in d["glosas"])
+
+    def test_el_valor_glosado_del_resumen_no_incluye_las_totales(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["resumen"]["valor_glosado"] == pytest.approx(37600 + 85800 + 5000 + 450000)
+
+    def test_todas_las_visibles_traen_la_descripcion_de_la_glosa(self, client, paquete):
+        """Lo que faltaba: la descripción no salía porque esas filas venían vacías."""
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert all((g["causal_texto"] or "").strip() for g in d["glosas"])
+
+    def test_se_pueden_ver_si_el_auditor_las_pide(self, client, paquete):
+        d = client.get(
+            "/glosas-adres/factura/HUS0000352890", params={"incluir_totales": "true"}
+        ).json()
+        assert d["resumen"]["glosas"] == 5
+        assert any(g["glosa_total"] for g in d["glosas"])
+
+
+class TestListaDeFacturas:
+    """Al cargar el archivo del ADRES salen de una vez las facturas a auditar."""
+
+    def test_lista_las_facturas_con_su_avance(self, client, paquete):
+        r = client.get("/glosas-adres/facturas", params={"paquete_id": paquete})
+        assert r.status_code == 200, r.text
+        por_factura = {f["factura"]: f for f in r.json()}
+        assert set(por_factura) == {"HUS352890", "HUS311371"}
+
+        una = por_factura["HUS352890"]
+        assert una["estado"] == "PENDIENTE"
+        assert una["glosas"] == 4  # sin contar la de glosa total
+        assert una["glosas_totales_ocultas"] == 1
+        assert una["pendientes"] == 4
+        assert una["avance"] == 0
+        assert una["por_asignar"] == 2  # las dos de causal 4506
+
+    def test_al_decidir_una_glosa_la_factura_avanza_sola(self, client, paquete):
+        gid = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]["id"]
+        client.post(f"/glosas-adres/glosa/{gid}", json={"decision": "SE SUBSANA"})
+        una = next(
+            f
+            for f in client.get("/glosas-adres/facturas", params={"paquete_id": paquete}).json()
+            if f["factura"] == "HUS352890"
+        )
+        assert una["estado"] == "EN PROCESO"
+        assert una["decididas"] == 1
+        assert una["avance"] == 25
+
+    def test_se_puede_filtrar_por_estado(self, client, paquete):
+        r = client.get(
+            "/glosas-adres/facturas", params={"paquete_id": paquete, "estado": "CERRADA"}
+        )
+        assert r.json() == []
+        r = client.get(
+            "/glosas-adres/facturas", params={"paquete_id": paquete, "estado": "PENDIENTE"}
+        )
+        assert len(r.json()) == 2
+
+    def test_se_puede_buscar_por_numero(self, client, paquete):
+        r = client.get("/glosas-adres/facturas", params={"paquete_id": paquete, "buscar": "35289"})
+        assert [f["factura"] for f in r.json()] == ["HUS352890"]
+
+    def test_sin_paquetes_devuelve_lista_vacia(self, client):
+        assert client.get("/glosas-adres/facturas").json() == []
+
+
+class TestCerrarYReabrir:
+    def test_cerrar_y_volver_a_abrir_deja_constancia(self, client, paquete):
+        r = client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "CERRADA"})
+        assert r.status_code == 200, r.text
+        assert r.json()["estado"] == "CERRADA"
+        assert r.json()["cerrada_por"] == "coordinador@hus.gov.co"
+
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["estado"] == "CERRADA"
+
+        r = client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "EN PROCESO"})
+        assert r.json()["estado"] == "EN PROCESO"
+        assert r.json()["reabierta_por"] == "coordinador@hus.gov.co"
+        assert r.json()["cerrada_por"] == "coordinador@hus.gov.co"  # queda el rastro
+
+    def test_una_factura_cerrada_no_se_reabre_sola_al_editar(self, client, paquete):
+        client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "CERRADA"})
+        gid = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]["id"]
+        client.post(f"/glosas-adres/glosa/{gid}", json={"observacion_tecnico": "otra cosa"})
+        assert client.get("/glosas-adres/factura/HUS0000352890").json()["estado"] == "CERRADA"
+
+    def test_estado_invalido_da_400(self, client, paquete):
+        r = client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "LO QUE SEA"})
+        assert r.status_code == 400
+
+    def test_factura_inexistente_da_404(self, client, paquete):
+        r = client.post("/glosas-adres/factura/HUS0000000009/estado", json={"estado": "CERRADA"})
+        assert r.status_code == 404
+
+    def test_recargar_el_paquete_conserva_el_cierre(self, client, paquete):
+        client.post("/glosas-adres/factura/HUS0000352890/estado", json={"estado": "CERRADA"})
+        r = client.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+        assert r.status_code == 200, r.text
+        assert client.get("/glosas-adres/factura/HUS0000352890").json()["estado"] == "CERRADA"
+
+
+class TestEvidenciaPDF:
+    def test_genera_un_pdf_descargable(self, client, paquete):
+        pytest.importorskip("reportlab")
+        r = client.get("/glosas-adres/factura/HUS0000352890/evidencia.pdf")
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"] == "application/pdf"
+        assert "RTA_ADRES_HUS352890.pdf" in r.headers["content-disposition"]
+        assert r.content.startswith(b"%PDF")
+        assert len(r.content) > 1500
+
+    def test_el_pdf_no_lista_las_glosas_totales(self, client, paquete):
+        pytest.importorskip("reportlab")
+        pdfplumber = pytest.importorskip("pdfplumber")
+        import io as _io
+
+        r = client.get("/glosas-adres/factura/HUS0000352890/evidencia.pdf")
+        with pdfplumber.open(_io.BytesIO(r.content)) as pdf:
+            texto = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        assert "REPORTE RTA ADRES" in texto
+        assert "HUS352890" in texto
+        assert "RTA GLOSA COMPLETA" in texto
+        # El renglón de glosa total no va en la tabla, pero sí se dice al pie.
+        assert "Terapia respiratoria" not in texto
+        assert "GLOSA TOTAL" in texto
+
+    def test_factura_inexistente_da_404(self, client, paquete):
+        assert client.get("/glosas-adres/factura/NO-EXISTE/evidencia.pdf").status_code == 404
 
 
 class TestRepartoDeAreas:

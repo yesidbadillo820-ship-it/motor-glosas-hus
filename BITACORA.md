@@ -1681,6 +1681,31 @@ de Docker.
     2 y 12 glosas respectivamente, $43.518.600 en total). Si aparece el
     detallado, basta recargar la bitácora.
   200 tests pasando.
+- **04-08 (noche):** el auditor mandó la guía de cargue y un PDF de ejemplo
+  (`RTA_ADRES_HUS311371.pdf`), y con eso la pantalla quedó como él la quiere:
+  - **Las glosas totales ya no se muestran.** En el reporte del ADRES hay
+    filas con la columna «Descripción Glosa» **vacía**: son el desglose de una
+    reclamación glosada entera por el FURIPS y **no se responden una por una**.
+    Son **1.630 de 4.619 ($236.217.091)**. Ocultarlas resolvió de paso lo de
+    «no sale la descripción de la glosa»: era eso, esas filas venían en blanco.
+    La factura 311371 pasa de 150 renglones a **21 que sí hay que trabajar**.
+    No desaparecen en silencio: sale un aviso con cuántas son y cuánto valen,
+    y un enlace para verlas.
+  - **La descripción de la glosa es ahora una columna propia** en la tabla,
+    completa (antes iba cortada debajo del código de la causal).
+  - **Al cargar el archivo salen de una vez las facturas a auditar**, con el
+    avance de cada una y filtros por Pendientes / En proceso / Cerradas. Se
+    hace **clic en una** y se despliega por qué y qué le glosan.
+  - **Se guarda solo** mientras el gestor escribe la observación, y también
+    con un botón **Guardar**. Al terminar, **Terminar factura**; si hay que
+    corregir, **Reabrir factura**, y queda registrado quién la reabrió. Una
+    factura cerrada **no se reabre sola** al editar una glosa.
+  - **Botón de PDF de evidencia por factura**, con el mismo formato del
+    ejemplo: encabezado con factura, radicación y documento del paciente, y la
+    tabla de seis columnas (incluida RTA GLOSA COMPLETA con la fórmula de la
+    macro). Los renglones de glosa total no van en la tabla pero sí se dicen
+    al pie, junto con las glosas que quedaron sin decidir.
+  Tabla nueva `facturas_adres` para el estado. 50 tests del módulo web.
   **Nota sobre Cobranza Live:** otra sesión, al fusionar, había vuelto a
   dejarla en el menú por prudencia ("quitarle una pantalla al equipo no es
   decisión de una fusión"). El auditor lo pidió de nuevo de forma explícita,

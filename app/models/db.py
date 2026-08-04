@@ -1037,6 +1037,10 @@ class GlosaAdresRecord(Base):
     confianza = Column(String(20))
     motivo = Column(Text)
     estado_detallado = Column(String(30))
+    # Renglón de una GLOSA TOTAL: el ADRES glosó la reclamación entera por el
+    # FURIPS y el reporte lista los ítems por debajo, pero sin causal propia.
+    # No se responden uno por uno, así que la pantalla no los muestra.
+    glosa_total = Column(Boolean, default=False, index=True)
     # Causales que trabajan dos áreas (hoy la 4506): los gestores por
     # FACTURACION y las médicas por PERTINENCIA. Quién la toma depende de qué
     # se glosó, así que la reparte un SUPER ADMIN — el bot solo sugiere.
@@ -1054,6 +1058,35 @@ class GlosaAdresRecord(Base):
     decidido_en = Column(DateTime(timezone=True))
 
     __table_args__ = (Index("ix_glosas_adres_paq_factura", "paquete_id", "factura_clave"),)
+
+
+class FacturaAdresRecord(Base):
+    """Estado de auditoría de una factura del paquete.
+
+    Sirve para la lista que ve el gestor al abrir la pantalla («qué me falta»)
+    y para poder **cerrar** una factura cuando termina y **reabrirla** si
+    después hay que corregir algo.
+    """
+
+    __tablename__ = "facturas_adres"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paquete_id = Column(Integer, index=True, nullable=False)
+    factura_clave = Column(String(30), index=True, nullable=False)
+    factura = Column(String(50), nullable=False)
+    radicacion = Column(String(50))
+    doc_victima = Column(String(50))
+    gestor = Column(String(120), index=True)
+    medico = Column(String(120))
+    # PENDIENTE | EN PROCESO | CERRADA
+    estado = Column(String(20), default="PENDIENTE", index=True)
+    cerrada_por = Column(String(200))
+    cerrada_en = Column(DateTime(timezone=True))
+    reabierta_por = Column(String(200))
+    reabierta_en = Column(DateTime(timezone=True))
+    nota = Column(Text)
+
+    __table_args__ = (Index("ix_facturas_adres_paq_clave", "paquete_id", "factura_clave"),)
 
 
 class ItemDetalladoAdresRecord(Base):

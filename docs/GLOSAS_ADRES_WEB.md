@@ -62,10 +62,21 @@ sigue glosado**.
 
 ### Paso 3 — El gestor trabaja
 
-Escribe la factura (con o sin ceros: `352890`, `HUS352890` y `HUS0000352890`
-llegan a la misma). Revisa cada glosa, confirma o cambia la sugerencia,
-escribe la observación del técnico y listo. Con **Ver respuesta** saca el
-texto consolidado para pegarlo en el Word del ADRES.
+**Apenas se carga el archivo salen las facturas a auditar**, con el avance de
+cada una. El gestor hace **clic en una** y se le despliega por qué y qué le
+glosan. También puede escribir el número directo (con o sin ceros: `352890`,
+`HUS352890` y `HUS0000352890` llegan a la misma).
+
+Por cada glosa: confirma o cambia la sugerencia y escribe la observación del
+técnico. **Se guarda solo** mientras escribe, y hay un botón **Guardar** para
+forzarlo. Cuando termina la factura pulsa **Terminar factura** — si después hay
+que corregir algo, **Reabrir factura**, y queda registrado quién la reabrió.
+
+Con **Ver respuesta** saca el texto consolidado para el Word del ADRES, y con
+**📄 PDF de evidencia** el reporte de la factura auditada.
+
+La lista se filtra por **Pendientes / En proceso / Cerradas**, para saber en
+todo momento qué falta.
 
 ---
 
@@ -139,7 +150,27 @@ ALTO COSTO`, …) — la misma lista del botón que tiene la macro.
 
 ---
 
-## 6. Facturas sin detallado
+## 6. Las glosas totales no se muestran
+
+En el reporte del ADRES hay filas **con la columna «Descripción Glosa» vacía**.
+Son el desglose de una **GLOSA TOTAL**: el ADRES glosó la reclamación entera
+por el FURIPS y lista los ítems por debajo, pero sin causal propia. **No se
+responden una por una**, así que la pantalla no las muestra — antes ensuciaban
+la tabla y hacían parecer que «no salía la descripción de la glosa».
+
+En el paquete 31068 son **1.630 de 4.619 filas ($236.217.091)**. Por ejemplo la
+factura 311371 pasa de 150 renglones a **21 que sí hay que trabajar**.
+
+**No desaparecen en silencio:** arriba de la tabla sale un aviso diciendo
+cuántas son y cuánto valen, con un enlace para verlas. En la base siguen
+guardadas todas (`glosa_total = true`), y el endpoint acepta
+`?incluir_totales=true`.
+
+En el PDF de evidencia tampoco van en la tabla, pero sí se dicen al pie.
+
+---
+
+## 7. Facturas sin detallado
 
 Algunas facturas del paquete no tienen detallado (en el 31068 son cuatro:
 311371, 367368, 380246 y 394817). **No es un fallo:** esas facturas no venían
@@ -153,7 +184,7 @@ detallado, basta volver a cargar la bitácora y el aviso desaparece.
 
 ---
 
-## 7. De dónde salen las sugerencias
+## 8. De dónde salen las sugerencias
 
 Hay dos niveles, y la pantalla siempre dice cuál es:
 
@@ -168,16 +199,19 @@ Cada sugerencia trae su **motivo** escrito. Nunca se sugiere sin explicar.
 
 ---
 
-## 8. Endpoints
+## 9. Endpoints
 
 | Método | Ruta | Quién | Para qué |
 |---|---|---|---|
 | POST | `/glosas-adres/importar` | coordinador | carga el reporte (+ la macro) |
 | POST | `/glosas-adres/importar-bitacora` | coordinador | carga el detallado cruzado |
 | GET | `/glosas-adres/paquetes` | cualquiera | qué paquetes hay cargados |
+| GET | `/glosas-adres/facturas` | cualquiera | **la lista de facturas a auditar**, con el avance |
 | GET | `/glosas-adres/buscar?q=` | cualquiera | autocompletado de facturas |
 | GET | `/glosas-adres/factura/{numero}` | cualquiera | **todo** lo de esa factura |
 | GET | `/glosas-adres/factura/{numero}/respuesta` | cualquiera | el texto consolidado |
+| POST | `/glosas-adres/factura/{numero}/estado` | cualquiera | cierra la factura o la reabre |
+| GET | `/glosas-adres/factura/{numero}/evidencia.pdf` | cualquiera | el PDF de evidencia |
 | POST | `/glosas-adres/glosa/{id}` | cualquiera | guarda la decisión del gestor |
 | POST | `/glosas-adres/aplicar-sugerencias` | cualquiera | aplica las sugerencias en bloque |
 | GET | `/glosas-adres/centros-costos` | cualquiera | el catálogo oficial, para el desplegable |
@@ -190,7 +224,7 @@ criterio del propio equipo (lo más conservador).
 
 ---
 
-## 9. Tablas
+## 10. Tablas
 
 Tres tablas nuevas, se crean solas al arrancar:
 
@@ -200,11 +234,13 @@ Tres tablas nuevas, se crean solas al arrancar:
   clasificación, el centro de costos (y quién lo puso), la sugerencia con su
   motivo, el reparto de área (`requiere_asignacion`, `area_sugerida`,
   `area_asignada_por`) y la decisión del gestor.
+- `facturas_adres` — el estado de cada factura (PENDIENTE / EN PROCESO /
+  CERRADA), con quién la cerró y quién la reabrió.
 - `items_detallado_adres` — el detallado cruzado, renglón por renglón.
 
 ---
 
-## 10. Relación con los bots de `tools/`
+## 11. Relación con los bots de `tools/`
 
 El módulo web y los bots de línea de comandos comparten **las mismas reglas**:
 el servicio importa las funciones de `tools/preauditar_glosas_adres.py`, no

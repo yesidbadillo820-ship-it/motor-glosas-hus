@@ -11,16 +11,19 @@ Rutas:
     POST /glosas-adres/importar            carga el reporte (coordinador/admin)
     POST /glosas-adres/importar-bitacora   agrega el detallado cruzado
     GET  /glosas-adres/paquetes            qué paquetes hay cargados
+    GET  /glosas-adres/facturas            la lista de facturas a auditar
     GET  /glosas-adres/buscar              autocompletado de facturas
     GET  /glosas-adres/factura/{numero}    TODO lo de esa factura
     GET  /glosas-adres/factura/{n}/respuesta  el texto consolidado
+    POST /glosas-adres/factura/{n}/estado  cierra la factura o la reabre
+    GET  /glosas-adres/factura/{n}/evidencia.pdf   el PDF de evidencia
     POST /glosas-adres/glosa/{id}          guarda la decisión del gestor
     POST /glosas-adres/aplicar-sugerencias aplica las sugerencias en bloque
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -29,6 +32,7 @@ from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import GlosaAdresRecord, PaqueteAdresRecord, UsuarioRecord
 from app.services import preauditoria_adres as svc
+from app.services.evidencia_adres_pdf import generar_pdf_evidencia, nombre_archivo_evidencia
 
 router = APIRouter(prefix="/glosas-adres", tags=["Glosas ADRES"])
 
@@ -147,18 +151,95 @@ def buscar(
     return [f[0] for f in consulta.order_by(GlosaAdresRecord.factura).limit(limite).all()]
 
 
+@router.get("/facturas")
+def facturas(
+    paquete_id: int | None = None,
+    estado: str | None = Query(None, description="PENDIENTE | EN PROCESO | CERRADA"),
+    gestor: str | None = None,
+    buscar: str = "",
+    limite: int = Query(400, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """La lista de facturas a auditar, con el avance de cada una.
+
+    Es lo primero que sale al cargar el archivo del ADRES: el gestor ve de una
+    vez qué facturas tiene por delante y hace clic en la que va a trabajar.
+    """
+    return svc.listar_facturas(
+        db, paquete_id=paquete_id, estado=estado, gestor=gestor, buscar=buscar, limite=limite
+    )
+
+
 @router.get("/factura/{numero}")
 def factura(
+    numero: str,
+    paquete_id: int | None = None,
+    incluir_totales: bool = Query(
+        False, description="Mostrar también los renglones de glosa total (normalmente se ocultan)"
+    ),
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Todo lo que el sistema sabe de esa factura, en una sola llamada."""
+    datos = svc.consultar_factura(
+        db, numero, paquete_id=paquete_id, incluir_totales=incluir_totales
+    )
+    if not datos["encontrada"]:
+        raise HTTPException(404, f"La factura {numero} no está en ningún paquete cargado.")
+    return datos
+
+
+class EstadoIn(BaseModel):
+    estado: str  # PENDIENTE | EN PROCESO | CERRADA
+    paquete_id: int | None = None
+    nota: str | None = None
+
+
+@router.post("/factura/{numero}/estado")
+def estado_factura(
+    numero: str,
+    cuerpo: EstadoIn,
+    db: Session = Depends(get_db),
+    usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Cierra la factura cuando el gestor termina, o la vuelve a abrir."""
+    try:
+        return svc.cambiar_estado_factura(
+            db,
+            numero,
+            estado=cuerpo.estado,
+            paquete_id=cuerpo.paquete_id,
+            usuario=usuario.email,
+            nota=cuerpo.nota,
+        )
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.get("/factura/{numero}/evidencia.pdf")
+def evidencia_pdf(
     numero: str,
     paquete_id: int | None = None,
     db: Session = Depends(get_db),
     _usuario: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Todo lo que el sistema sabe de esa factura, en una sola llamada."""
+    """El PDF de evidencia de la factura auditada, para archivar y enviar."""
     datos = svc.consultar_factura(db, numero, paquete_id=paquete_id)
     if not datos["encontrada"]:
         raise HTTPException(404, f"La factura {numero} no está en ningún paquete cargado.")
-    return datos
+    try:
+        pdf = generar_pdf_evidencia(datos)
+    except ImportError as e:  # pragma: no cover - reportlab va en requirements
+        raise HTTPException(500, "Falta la librería para generar PDF (reportlab).") from e
+    nombre = nombre_archivo_evidencia(datos.get("factura") or numero)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 @router.get("/factura/{numero}/respuesta")

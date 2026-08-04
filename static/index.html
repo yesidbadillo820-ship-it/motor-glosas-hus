@@ -3121,10 +3121,15 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                    style="flex:1;min-width:240px;padding:.6rem .8rem;border:1px solid var(--border);border-radius:10px;background:var(--bg2);color:var(--text);font-size:.95rem">
             <datalist id="ga-sugerencias"></datalist>
             <button class="btn btn-primary" onclick="gaBuscar()">Buscar</button>
+            <button class="btn btn-ghost" onclick="gaVolverALista()" style="font-size:.8rem">Ver todas las facturas</button>
           </div>
           <div id="ga-aviso" style="font-size:.78rem;color:var(--text3);margin-top:.5rem"></div>
         </div>
 
+        <!-- Lista de facturas a auditar: lo primero que se ve al cargar -->
+        <div id="ga-lista"></div>
+
+        <!-- Detalle de la factura en la que se hizo clic -->
         <div id="ga-resultado"></div>
       </div>
     </div>
@@ -19815,10 +19820,106 @@ async function loadGlosasAdres(){
     sel.value = GA_PAQUETE;
     document.getElementById('ga-aviso').textContent =
       paquetes[0].filas + ' glosas cargadas · importado por ' + escHtml(paquetes[0].importado_por||'—');
+    await gaCargarLista();
   }catch(e){ console.error('Glosas ADRES', e); }
 }
 
-function gaCambiarPaquete(){ GA_PAQUETE = document.getElementById('ga-paquete').value || null; }
+// Apenas se carga el archivo del ADRES salen las facturas a auditar. El gestor
+// hace clic en una y ahí se le desglosa por qué y qué le glosan.
+var GA_LISTA = [];
+var GA_FILTRO_ESTADO = '';
+
+async function gaCargarLista(){
+  var caja = document.getElementById('ga-lista');
+  if(!caja) return;
+  caja.innerHTML = '<div style="padding:1rem;color:var(--text3)">Cargando las facturas…</div>';
+  try{
+    var url = '/glosas-adres/facturas' + (GA_PAQUETE ? '?paquete_id='+GA_PAQUETE : '');
+    if(GA_FILTRO_ESTADO) url += (url.indexOf('?')>=0?'&':'?') + 'estado=' + encodeURIComponent(GA_FILTRO_ESTADO);
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    GA_LISTA = await r.json();
+    gaPintarLista();
+  }catch(e){
+    caja.innerHTML = '<div style="color:#991b1b;padding:1rem">No se pudo traer la lista: '+escHtml(e.message)+'</div>';
+  }
+}
+
+function gaPintarLista(){
+  var caja = document.getElementById('ga-lista');
+  if(!caja) return;
+  if(!GA_LISTA.length){
+    caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
+      (GA_FILTRO_ESTADO ? 'No hay facturas en estado '+escHtml(GA_FILTRO_ESTADO)+'.'
+                        : 'Todavía no hay facturas. Cargá el archivo del ADRES con «Cargar paquete».')+'</div>';
+    return;
+  }
+  var pend = GA_LISTA.filter(function(f){ return f.estado === 'PENDIENTE'; }).length;
+  var proc = GA_LISTA.filter(function(f){ return f.estado === 'EN PROCESO'; }).length;
+  var cerr = GA_LISTA.filter(function(f){ return f.estado === 'CERRADA'; }).length;
+  var totGlosas = GA_LISTA.reduce(function(a,f){ return a + f.glosas; }, 0);
+  var totValor  = GA_LISTA.reduce(function(a,f){ return a + f.valor_glosado; }, 0);
+
+  var h = '<div class="chart-card" style="margin-bottom:1rem">'+
+    '<div class="chart-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">'+
+      '<span>Facturas a auditar · '+GA_LISTA.length+' · '+totGlosas+' glosas · '+fmtCOP(totValor)+'</span>'+
+      '<span style="display:flex;gap:.35rem">'+
+        [['', 'Todas', GA_LISTA.length], ['PENDIENTE','Pendientes',pend],
+         ['EN PROCESO','En proceso',proc], ['CERRADA','Cerradas',cerr]].map(function(o){
+          var activo = GA_FILTRO_ESTADO === o[0];
+          return '<button class="btn '+(activo?'btn-primary':'btn-ghost')+'" style="font-size:.72rem;padding:.22rem .6rem" '+
+                 'onclick="gaFiltrarEstado(\''+o[0]+'\')">'+o[1]+' ('+o[2]+')</button>';
+        }).join('')+
+      '</span>'+
+    '</div>'+
+    '<div style="overflow-x:auto;max-height:460px"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'+
+    '<thead><tr style="text-align:left;color:var(--text3);position:sticky;top:0;background:var(--bg2)">'+
+      '<th style="padding:.45rem">Factura</th><th>Paciente</th><th>Gestor</th>'+
+      '<th style="text-align:right">Glosas</th><th style="text-align:right">Glosado</th>'+
+      '<th>Avance</th><th>Estado</th></tr></thead><tbody>';
+  GA_LISTA.forEach(function(f){
+    var col = f.estado==='CERRADA' ? '#15803d' : (f.estado==='EN PROCESO' ? '#b45309' : 'var(--text3)');
+    h += '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="gaAbrirFactura(\''+
+           escHtml(f.factura).replace(/'/g,"")+'\')" title="Clic para ver el detalle">'+
+      '<td style="padding:.45rem;white-space:nowrap"><b>'+escHtml(f.factura)+'</b>'+
+        (f.glosas_totales_ocultas ? '<div style="font-size:.66rem;color:var(--text3)">+'+f.glosas_totales_ocultas+' de glosa total</div>' : '')+'</td>'+
+      '<td style="white-space:nowrap;color:var(--text3)">'+escHtml(f.documento_paciente||'—')+'</td>'+
+      '<td style="white-space:nowrap">'+escHtml(f.gestor||'—')+'</td>'+
+      '<td style="text-align:right">'+f.glosas+(f.pendientes?' <b style="color:#b45309">('+f.pendientes+')</b>':'')+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+fmtCOP(f.valor_glosado)+'</td>'+
+      '<td style="min-width:110px"><div style="background:var(--bg3);border-radius:999px;height:7px;overflow:hidden">'+
+        '<div style="width:'+f.avance+'%;height:100%;background:'+(f.avance>=100?'#15803d':'#2563eb')+'"></div></div>'+
+        '<div style="font-size:.66rem;color:var(--text3)">'+f.avance+'%</div></td>'+
+      '<td style="white-space:nowrap;color:'+col+';font-weight:600">'+escHtml(f.estado)+'</td>'+
+      '</tr>';
+  });
+  h += '</tbody></table></div></div>';
+  caja.innerHTML = h;
+}
+
+function gaFiltrarEstado(estado){
+  GA_FILTRO_ESTADO = estado;
+  gaCargarLista();
+}
+
+function gaAbrirFactura(numero){
+  document.getElementById('ga-factura').value = numero;
+  gaBuscar();
+}
+
+function gaVolverALista(){
+  document.getElementById('ga-resultado').innerHTML = '';
+  document.getElementById('ga-factura').value = '';
+  gaCargarLista();
+  var caja = document.getElementById('ga-lista');
+  if(caja) caja.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function gaCambiarPaquete(){
+  GA_PAQUETE = document.getElementById('ga-paquete').value || null;
+  document.getElementById('ga-resultado').innerHTML = '';
+  gaCargarLista();
+}
 
 async function gaAutocompletar(texto){
   if(!texto || texto.length < 3) return;
@@ -19864,8 +19965,20 @@ function gaPintar(d){
        '<div style="font-size:.8rem;color:var(--text2)">Gestor <b>'+escHtml(d.gestor||'—')+'</b>'+
        ' · Médico <b>'+escHtml(d.medico||'—')+'</b>'+
        ' · Paquete <b>'+escHtml(d.paquete.numero||'—')+'</b></div>'+
-       '<button class="btn btn-ghost" style="font-size:.78rem;margin-left:auto" onclick="gaVerRespuesta()">Ver respuesta para el ADRES</button>'+
+       '<div style="margin-left:auto;display:flex;gap:.4rem;flex-wrap:wrap">'+
+         '<button class="btn btn-ghost" style="font-size:.78rem" onclick="gaVerRespuesta()">Ver respuesta para el ADRES</button>'+
+         '<button class="btn btn-ghost" style="font-size:.78rem" onclick="gaEvidenciaPDF()">📄 PDF de evidencia</button>'+
+         (d.estado === 'CERRADA'
+            ? '<button class="btn btn-ghost" style="font-size:.78rem;color:#b45309" onclick="gaCambiarEstado(\'EN PROCESO\')">Reabrir factura</button>'
+            : '<button class="btn btn-primary" style="font-size:.78rem" onclick="gaCambiarEstado(\'CERRADA\')">Terminar factura</button>')+
+       '</div>'+
        '</div></div>';
+
+  if(d.estado === 'CERRADA'){
+    h += '<div style="margin-bottom:1rem;padding:.7rem .9rem;border-radius:8px;border:1px solid #15803d;background:rgba(21,128,61,.10);font-size:.8rem">'+
+         '<b>Factura cerrada</b> por '+escHtml(d.cerrada_por||'—')+
+         '. Se puede reabrir si hay que corregir algo.</div>';
+  }
 
   h += '<div class="kpi-grid">'+
        '<div class="kpi"><div class="kpi-lbl">Glosas</div><div class="kpi-num">'+r.glosas+'</div><div class="kpi-sub">'+r.pendientes+' sin decidir</div></div>'+
@@ -19874,6 +19987,11 @@ function gaPintar(d){
        '<div class="kpi"><div class="kpi-lbl">Sigue glosado</div><div class="kpi-num">'+fmtCOP(r.sigue_glosado_detallado)+'</div><div class="kpi-sub">en el detallado</div></div>'+
        '</div>';
 
+  if(d.aviso_glosas_totales){
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid var(--border);background:var(--bg3);font-size:.8rem;color:var(--text2)">'+
+         escHtml(d.aviso_glosas_totales)+
+         ' <a href="#" onclick="gaVerTotales(event)" style="color:var(--text2);text-decoration:underline">Ver esos renglones</a></div>';
+  }
   if(d.aviso_detallado){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.10);font-size:.8rem">'+
          '<b>Sin detallado.</b> '+escHtml(d.aviso_detallado)+'</div>';
@@ -19897,14 +20015,16 @@ function gaPintar(d){
   h += '<div class="chart-card" style="margin-bottom:1rem"><div class="chart-hdr">Glosas del ADRES · '+
        'la decisión es suya, el sistema solo propone</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'+
        '<thead><tr style="text-align:left;color:var(--text3)">'+
-       '<th style="padding:.45rem">Causal</th><th>Servicio</th><th style="text-align:right">Glosado</th>'+
+       '<th style="padding:.45rem">Causal</th><th>Descripción de la glosa</th><th>Servicio</th><th style="text-align:right">Glosado</th>'+
        '<th>Clasificación</th><th>Centro de costos</th><th>Propuesta</th><th>Decisión</th><th>Observación técnica</th>'+
        '</tr></thead><tbody>';
   (d.glosas||[]).forEach(function(g){
     var color = g.decision ? '#15803d' : (g.sugerencia ? '#b45309' : 'var(--text3)');
     h += '<tr style="border-top:1px solid var(--border)">'+
-         '<td style="padding:.45rem;white-space:nowrap"><b>'+escHtml(g.causal_codigo||'—')+'</b><div style="color:var(--text3);max-width:230px">'+escHtml((g.causal_texto||'').slice(0,70))+'</div></td>'+
-         '<td style="max-width:250px"><b>'+escHtml(g.codigo||'')+'</b><div style="color:var(--text3)">'+escHtml((g.descripcion||'').slice(0,70))+'</div></td>'+
+         '<td style="padding:.45rem;white-space:nowrap"><b>'+escHtml(g.causal_codigo||'—')+'</b></td>'+
+         '<td style="max-width:270px">'+escHtml(g.causal_texto||'—')+
+             (g.anotacion ? '<div style="color:var(--text3);font-size:.7rem;margin-top:.2rem">'+escHtml(g.anotacion)+'</div>' : '')+'</td>'+
+         '<td style="max-width:230px"><b>'+escHtml(g.codigo||'')+'</b><div style="color:var(--text3)">'+escHtml(g.descripcion||'')+'</div></td>'+
          '<td style="text-align:right;white-space:nowrap">'+fmtCOP(g.valor_glosado)+'</td>'+
          '<td style="max-width:170px">'+gaCeldaArea(g)+'</td>'+
          '<td style="max-width:210px">'+gaCeldaCentro(g, d.catalogo_centros||[])+'</td>'+
@@ -19915,9 +20035,12 @@ function gaPintar(d){
              ['','SE ACEPTA','SE OBJETA','SE SUBSANA'].map(function(o){
                return '<option value="'+o+'"'+(g.decision===o?' selected':'')+'>'+(o||'— sin decidir —')+'</option>'; }).join('')+
              '</select></td>'+
-         '<td><input value="'+escHtml(g.observacion_tecnico||'')+'" placeholder="por qué"'+
-             ' onchange="gaObservacion('+g.id+',this.value)"'+
-             ' style="width:170px;font-size:.74rem;padding:.25rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)"></td>'+
+         '<td style="min-width:210px"><div style="display:flex;gap:.25rem;align-items:center">'+
+             '<input id="ga-obs-'+g.id+'" value="'+escHtml(g.observacion_tecnico||'')+'" placeholder="por qué"'+
+             ' oninput="gaObservacionAuto('+g.id+',this.value)" onchange="gaGuardarFila('+g.id+')"'+
+             ' style="flex:1;min-width:150px;font-size:.74rem;padding:.25rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">'+
+             '<button class="btn btn-ghost" style="font-size:.68rem;padding:.2rem .4rem" onclick="gaGuardarFila('+g.id+')" title="Guardar ahora">Guardar</button>'+
+           '</div><div id="ga-ok-'+g.id+'" style="font-size:.66rem;height:.9rem"></div></td>'+
          '</tr>';
   });
   h += '</tbody></table></div></div>';
@@ -20015,12 +20138,102 @@ async function gaDecidir(id, valor){
   }catch(e){ toast('No se pudo guardar', e.message, 'error'); }
 }
 
-async function gaObservacion(id, texto){
+async function gaObservacion(id, texto, silencioso){
   try{
-    await fetch('/glosas-adres/glosa/'+id, {method:'POST',
+    var r = await fetch('/glosas-adres/glosa/'+id, {method:'POST',
       headers: Object.assign({'Content-Type':'application/json'}, authH()),
       body: JSON.stringify({observacion_tecnico: texto})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    gaMarcarGuardado(id);
+    if(!silencioso) toast('Guardado', 'Observación guardada', 'success');
   }catch(e){ toast('No se pudo guardar la observación', e.message, 'error'); }
+}
+
+// Guardado automático: se espera a que el gestor deje de escribir para no
+// mandar una petición por tecla. El botón «Guardar» hace lo mismo de una.
+var GA_TEMPORIZADORES = {};
+function gaObservacionAuto(id, texto){
+  gaMarcarGuardado(id, 'escribiendo…');
+  clearTimeout(GA_TEMPORIZADORES[id]);
+  GA_TEMPORIZADORES[id] = setTimeout(function(){ gaObservacion(id, texto, true); }, 900);
+}
+
+function gaGuardarFila(id){
+  clearTimeout(GA_TEMPORIZADORES[id]);
+  var campo = document.getElementById('ga-obs-'+id);
+  gaObservacion(id, campo ? campo.value : '', false);
+}
+
+function gaMarcarGuardado(id, texto){
+  var marca = document.getElementById('ga-ok-'+id);
+  if(!marca) return;
+  marca.textContent = texto || '✓ guardado';
+  marca.style.color = texto ? 'var(--text3)' : '#15803d';
+  if(!texto){
+    clearTimeout(marca._t);
+    marca._t = setTimeout(function(){ marca.textContent = ''; }, 2500);
+  }
+}
+
+// Terminar la factura o volverla a abrir. Cerrar no bloquea nada: es la marca
+// de «esta ya la trabajé», y queda registrado quién la reabre.
+async function gaCambiarEstado(estado){
+  if(!GA_DATOS) return;
+  if(estado === 'CERRADA'){
+    var faltan = (GA_DATOS.resumen||{}).pendientes || 0;
+    if(faltan && !confirm('Quedan '+faltan+' glosa(s) sin decidir en esta factura.\n¿La cerrás igual?')) return;
+  }
+  try{
+    var r = await fetch('/glosas-adres/factura/'+encodeURIComponent(GA_DATOS.factura)+'/estado', {
+      method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({estado: estado, paquete_id: GA_PAQUETE || null})});
+    if(!r.ok){
+      var e = await r.json().catch(function(){ return {}; });
+      toast('No se pudo cambiar el estado', e.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast(estado === 'CERRADA' ? 'Factura cerrada' : 'Factura reabierta',
+          estado === 'CERRADA' ? 'Ya podés generar el PDF de evidencia' : 'Quedó lista para corregir',
+          'success');
+    gaBuscar();
+    gaCargarLista();
+  }catch(e){ toast('No se pudo cambiar el estado', e.message, 'error'); }
+}
+
+// El PDF de evidencia de la factura, con el mismo formato del reporte que
+// venía armando la macro.
+async function gaEvidenciaPDF(){
+  if(!GA_DATOS) return;
+  try{
+    var url = '/glosas-adres/factura/'+encodeURIComponent(GA_DATOS.factura)+'/evidencia.pdf'+
+              (GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'RTA_ADRES_' + String(GA_DATOS.factura||'FACTURA').replace(/[^A-Za-z0-9_-]/g,'') + '.pdf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    toast('PDF generado', 'Se descargó la evidencia de '+escHtml(GA_DATOS.factura), 'success');
+  }catch(e){ toast('No se pudo generar el PDF', e.message, 'error'); }
+}
+
+// Los renglones de glosa total normalmente no se muestran. Si el auditor los
+// quiere ver, se traen con todo.
+async function gaVerTotales(ev){
+  if(ev) ev.preventDefault();
+  if(!GA_DATOS) return;
+  try{
+    var url = '/glosas-adres/factura/'+encodeURIComponent(GA_DATOS.factura)+
+              '?incluir_totales=true'+(GA_PAQUETE?'&paquete_id='+GA_PAQUETE:'');
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var d = await r.json();
+    d.aviso_glosas_totales = '';
+    GA_DATOS = d;
+    gaPintar(d);
+  }catch(e){ toast('No se pudieron traer', e.message, 'error'); }
 }
 
 async function gaVerRespuesta(){
