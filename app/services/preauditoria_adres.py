@@ -486,7 +486,9 @@ def consultar_factura(
         .first()
     )
     decididas = [g for g in glosas if g.decision]
-    sigue_glosado = sum(i.valor_nuevo for i in items if i.accion in ("CONSERVADO", "AJUSTADO"))
+    sigue_glosado = sum(
+        (i.valor_nuevo or 0) for i in items if i.accion in ("CONSERVADO", "AJUSTADO")
+    )
 
     return {
         "encontrada": True,
@@ -507,9 +509,9 @@ def consultar_factura(
             "glosas": len(glosas),
             "decididas": len(decididas),
             "pendientes": len(glosas) - len(decididas),
-            "valor_glosado": sum(g.valor_glosado for g in glosas),
+            "valor_glosado": sum((g.valor_glosado or 0) for g in glosas),
             "valor_aceptado": sum(g.valor_aceptado or 0 for g in glosas),
-            "valor_reclamado": sum(g.valor_reclamado for g in glosas),
+            "valor_reclamado": sum((g.valor_reclamado or 0) for g in glosas),
             "items_detallado": len(items),
             "sigue_glosado_detallado": sigue_glosado,
             "por_asignar": sum(1 for g in glosas if g.requiere_asignacion),
@@ -517,7 +519,7 @@ def consultar_factura(
             # Las glosas totales no se muestran, pero se dicen: nada desaparece
             # en silencio.
             "glosas_totales_ocultas": len(totales),
-            "valor_glosas_totales": sum(g.valor_glosado for g in totales),
+            "valor_glosas_totales": sum((g.valor_glosado or 0) for g in totales),
         },
         "estado": ficha.estado if ficha else "PENDIENTE",
         "cerrada_por": ficha.cerrada_por if ficha else None,
@@ -529,7 +531,7 @@ def consultar_factura(
                 f"{len(totales)} renglón(es) de esta factura no se muestran porque "
                 f"corresponden a una GLOSA TOTAL: el ADRES glosó la reclamación entera por el "
                 f"FURIPS y esos renglones no traen causal propia, así que no se responden uno "
-                f"por uno (${sum(g.valor_glosado for g in totales):,.0f})."
+                f"por uno (${sum((g.valor_glosado or 0) for g in totales):,.0f})."
             ).replace(",", ".")
             if totales
             else ""
