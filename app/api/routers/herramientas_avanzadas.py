@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.database import get_db
 from app.models.db import UsuarioRecord, GlosaRecord
 from app.services.multi_concepto import (
@@ -23,7 +23,7 @@ class AnalisisTextoRequest(BaseModel):
 @router.post("/multi-concepto")
 def analizar_multi_concepto(
     req: AnalisisTextoRequest,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Detecta si una glosa tiene múltiples códigos y recomienda abordaje."""
     return detectar_caso_multi_concepto(req.texto)
@@ -69,7 +69,7 @@ class SimuladorRequest(BaseModel):
 @router.post("/simulador")
 def simulador_que_pasaria_si(
     req: SimuladorRequest,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Simula cómo cambiaría el riesgo de ratificación con distintos escenarios."""
     from app.services.riesgo_ratificacion import calcular_riesgo
@@ -264,7 +264,7 @@ class PredictorInput(BaseModel):
 def predecir_glosa_endpoint(
     data: PredictorInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Estima la probabilidad de que una factura sea glosada antes de radicar.
 
@@ -294,7 +294,7 @@ from fastapi import UploadFile, File  # noqa: E402
 @router.post("/extraer-factura")
 async def extraer_factura_endpoint(
     archivo: UploadFile = File(...),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Sube un PDF de glosa/factura y extrae automáticamente los campos
     clave (factura, CUPS, EPS, valores, códigos de glosa, paciente).
@@ -348,7 +348,7 @@ def buscar_normativa(
 @router.post("/normativa/validar-citas")
 def validar_citas(
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Recibe {"texto": "..."} con un dictamen y retorna qué citas
     normativas fueron verificadas contra nuestro índice vs cuáles son

@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.core.config import get_settings
 from app.core.logging_utils import logger, set_request_id
 from app.core.rate_limit import limiter
@@ -779,7 +779,7 @@ async def analizar(
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     from app.services.progreso_analisis import publicar as _publicar_progreso
 
@@ -1042,7 +1042,7 @@ async def analizar(
 async def preview_glosa(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
     db: Session = Depends(get_db),
 ):
     """Detecta automaticamente desde el texto crudo de la glosa:
@@ -1155,7 +1155,7 @@ async def preview_glosa(
 async def extraer_de_correo(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Recibe el texto crudo de un correo de EPS y extrae los campos
     estructurados (EPS, codigo, valor, factura, radicado, motivo).
@@ -1480,7 +1480,7 @@ def _fundir_extracciones(extraidos: list[dict]) -> dict:
 async def extraer_soportes(
     request: Request,
     archivos: list[UploadFile] = File(default=[]),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Auto-extrae metadata de los PDFs ANTES de "Analizar con IA".
 

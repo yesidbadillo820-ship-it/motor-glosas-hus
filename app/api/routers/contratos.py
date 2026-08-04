@@ -484,7 +484,7 @@ async def subir_pdf_contrato(
     eps: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Sube el PDF del contrato vigente para la EPS y extrae cláusulas.
 

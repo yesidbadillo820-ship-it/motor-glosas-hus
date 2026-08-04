@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual, get_auditor_o_superior
 from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import GlosaAdresRecord, PaqueteAdresRecord, UsuarioRecord
@@ -190,7 +190,7 @@ def decidir(
     glosa_id: int,
     cuerpo: DecisionIn,
     db: Session = Depends(get_db),
-    usuario: UsuarioRecord = Depends(get_usuario_actual),
+    usuario: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Guarda lo que el gestor decidió para una glosa."""
     try:
@@ -222,7 +222,7 @@ class AplicarIn(BaseModel):
 def aplicar(
     cuerpo: AplicarIn,
     db: Session = Depends(get_db),
-    usuario: UsuarioRecord = Depends(get_usuario_actual),
+    usuario: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Copia las sugerencias del bot a la decisión, sin pisar lo ya decidido."""
     n = svc.aplicar_sugerencias(

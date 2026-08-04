@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func as _f
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual, get_auditor_o_superior
 from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import (
@@ -3977,7 +3977,7 @@ def stats_comparativa_anio(
 def stats_tasas_pares_batch(
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """R382 P1: tasas par (eps, codigo_glosa) en batch.
 

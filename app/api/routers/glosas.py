@@ -1565,7 +1565,7 @@ class ValidarNormasInput(BaseModel):
 @router.post("/validar-normas")
 def validar_normas_texto(
     data: ValidarNormasInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Valida citas normativas en un texto libre (sin persistir).
     Útil para que el auditor chequee rápido un borrador."""
@@ -1578,7 +1578,7 @@ def validar_normas_texto(
 async def validar_pre_radicacion(
     glosa_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Valida el dictamen antes de radicarlo ante la EPS.
 
@@ -3452,7 +3452,7 @@ def preparar_conciliacion(
 def autopiloto_niveles_batch(
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Batch: clasifica un conjunto de glosas en niveles de auto-piloto.
 
@@ -4841,7 +4841,7 @@ async def _procesar_fila_en_background(
 async def preview_importar_masiva(
     request: ImportacionMasivaRequest,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """IM Fase 1.2: previsualiza el lote SIN procesar.
 
@@ -4980,7 +4980,7 @@ async def importar_glosas_masiva(
     request: ImportacionMasivaRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """
     Importa glosas masivamente desde texto pegado de Excel.
@@ -5423,7 +5423,7 @@ async def retry_fila_lote(
 def check_lote_duplicado(
     request: ImportacionMasivaRequest,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """IM F1.4: detecta si el texto pegado coincide con un lote
     procesado anteriormente (texto_hash matching). Permite advertir
@@ -5646,7 +5646,7 @@ async def importar_recepcion(
     background_tasks: BackgroundTasks,
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Sube el Excel de recepción y lo procesa EN SEGUNDO PLANO.
 
@@ -10486,7 +10486,7 @@ class _PreviewAuditoriaIn(BaseModel):
 def preview_auditoria(
     body: _PreviewAuditoriaIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Analiza el texto de una glosa sin generar dictamen: detecta patrones
     problemáticos, calcula score de defensibilidad y sugiere acción."""

@@ -7,7 +7,7 @@ Endpoints:
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_auditor_o_superior
 from app.models.db import UsuarioRecord
 from app.services.firma_digital import verificar_firma
 
@@ -31,7 +31,7 @@ class VerificarFirmaResponse(BaseModel):
 @router.post("/verificar", response_model=VerificarFirmaResponse)
 def verificar_firma_dictamen(
     payload: VerificarFirmaRequest,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """R85 P1: verifica la integridad y autenticidad de la firma de un dictamen.
 

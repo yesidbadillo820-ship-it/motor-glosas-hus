@@ -15,7 +15,7 @@ from datetime import timedelta, timezone
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.api.routers.mi_desempeno import _calcular_racha, _glosas_del_gestor
 from app.core.tz import ahora_bogota, ahora_utc
 from app.database import get_db
@@ -193,7 +193,7 @@ _PROMPT_OCR = (
 @router.post("/ocr-imagen")
 async def ocr_imagen(
     archivo: UploadFile = File(...),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Foto → texto: transcribe la glosa de una imagen (Gemini visión).
 

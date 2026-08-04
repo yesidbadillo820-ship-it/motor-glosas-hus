@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.db import DictamenVersionRecord, GlosaRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/glosas/{glosa_id}/versiones", tags=["versiones"])
@@ -182,7 +182,7 @@ def restaurar(
     glosa_id: int,
     version_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Restaura una versión anterior del dictamen como la versión vigente."""
     glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
