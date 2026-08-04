@@ -519,11 +519,37 @@ class TestElBotDeDobleClic:
         assert "sirve la pagina por internet" in ps
 
     def test_tambien_cierra_al_que_quedo_vivo_sin_escuchar(self):
-        """El de --reload que sobrevive sin el puerto: se busca por su línea
-        de comando, no solo por quién ocupa el puerto."""
+        """El motor que sobrevive sin el puerto: se busca por su línea de
+        comando, no solo por quién lo ocupa."""
         ps = self._ps()
         assert "Win32_Process" in ps
-        assert "Stop-Process" in ps
+        assert "taskkill.exe" in ps
+
+    def test_cierra_el_arbol_no_el_proceso_suelto(self):
+        """Revisión adversarial: con `uvicorn --reload` en Windows el proceso
+        que de verdad atiende se llama
+        `python -c "from multiprocessing.spawn import spawn_main..."` — sin la
+        palabra uvicorn ni app.main. Cerrar solo al padre lo deja huérfano
+        CON el puerto tomado, y el arranque siguiente muere con el 10048."""
+        ps = self._ps()
+        assert "/T /F" in ps or "'/T', '/F'" in ps
+        assert "multiprocessing" in ps  # el hijo cuenta como motor propio
+
+    def test_un_puerto_tomado_por_un_desconocido_frena_el_arranque(self):
+        """Antes se seguía de largo en silencio cuando el dueño del puerto no
+        se podía consultar, y el motor arrancaba encima para morir sin
+        explicación."""
+        ps = self._ps()
+        assert "no puedo consultar" in ps
+        assert "no se deja ver" in ps
+
+    def test_el_vigilante_no_se_bloquea_por_el_motor_de_pruebas(self):
+        """Se negaba a arrancar si existía CUALQUIER uvicorn de la
+        aplicación: con el motor de pruebas abierto, la página por internet
+        no revivía sola si se caía."""
+        cmd = (RAIZ / "tools" / "servidor_motor_local.cmd").read_text(encoding="utf-8")
+        guardia = cmd.split("no duplicar", 1)[1].split(":loop", 1)[0]
+        assert "8080" in guardia
 
     def test_comprueba_que_de_verdad_murieron(self):
         """`-ErrorAction SilentlyContinue` se tragaba el «acceso denegado» y
