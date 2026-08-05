@@ -2281,6 +2281,26 @@ de Docker.
    del cargue y no con la de DGH (los archivos se generaron antes de que
    existiera la columna FECHA_RESPUESTA).
 
+### 05-08 (sexta parte) — Nace `PROYECTO.md`, el tablero maestro
+
+Yesid pidió un tablero de trabajo, no una auditoría: un solo archivo corto
+donde se vea de un vistazo qué módulos existen, en qué estado están, cuál es
+el objetivo del proyecto en este momento y qué bloquea el avance.
+
+Quedó en la raíz como **`PROYECTO.md`**. Tiene 18 módulos (la aplicación web
+y sus pantallas, los bots de cada portal, el validador ADRES y el servidor
+local), cada uno con estado, prioridad, archivo de entrada, dependencias,
+próximo objetivo y riesgo. Al final: **un solo objetivo actual**, cinco
+próximas tareas en orden, los bloqueantes reales y diez reglas del proyecto.
+
+Los datos salieron del repositorio y de esta bitácora. Donde no había
+evidencia quedó escrito «PENDIENTE DE VALIDAR» en vez de suponer.
+
+Cómo se usa: se actualiza cuando cambia el estado de un módulo, cuando se
+cierra el objetivo actual o cuando aparece o se cae un bloqueante. La
+bitácora sigue siendo la memoria (qué pasó y cuándo); `PROYECTO.md` es el
+tablero (dónde estamos hoy).
+
 ---
 
 ## 3) PENDIENTE
