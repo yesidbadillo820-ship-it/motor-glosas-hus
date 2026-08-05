@@ -256,6 +256,20 @@ def _obtener_few_shots(
         tabla_excel.upper(),
     )
     cod_pref = codigo_match.group(0) if codigo_match else ""
+
+    # A una ARL no se le sirven respuestas ganadoras del régimen de salud.
+    # 05-08-2026: la glosa de POSITIVA por accidente de trabajo salió
+    # argumentada con Ley 1438, Resolución 2284 y «plan de beneficios» —
+    # marco del SGSSS— pese a que el motor tiene un bloque ARL correcto.
+    # Una de las razones era esta: cuando no hay plantilla de esa
+    # aseguradora, el banco cae a las genéricas, y esas están escritas para
+    # EPS (PBS, UPC). El modelo copia el ejemplo que tiene delante. Mejor
+    # sin ejemplo que con ejemplo del régimen equivocado.
+    from app.services.glosa_ia_prompts import _es_pagador_arl
+
+    if _es_pagador_arl(eps, tabla_excel):
+        return [], [], cod_pref
+
     plantillas_gold = (
         obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
     )
