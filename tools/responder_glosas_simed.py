@@ -171,7 +171,9 @@ def leer_excel_respuestas(ruta: Path) -> dict[str, list[dict]]:
     }
 
     wb = load_workbook(filename=str(ruta), data_only=True)
-    ws = wb.active
+    # Preferir la hoja por nombre: si el auditor revisó el Excel y guardó con
+    # otra pestaña activa (p. ej. "Control"), wb.active apuntaría a la equivocada.
+    ws = wb["Respuestas Glosa"] if "Respuestas Glosa" in wb.sheetnames else wb.active
     rows = ws.iter_rows(values_only=True)
     headers = ["" if h is None else str(h) for h in next(rows)]
     headers_norm = [norm(h) for h in headers]
@@ -1370,7 +1372,7 @@ def procesar_factura(
         filtrar_por_factura(page, factura_corta)
         abrir_factura(page, factura_corta)
 
-        for ob in a_procesar:
+        for idx, ob in enumerate(a_procesar):
             # Hasta 2 intentos por objeción: el portal a veces tarda/cuelga de
             # forma intermitente (no abre el modal o no cierra en 25s). Un
             # reintento recupera la mayoría sin dejar cleanup manual.
@@ -1417,6 +1419,18 @@ def procesar_factura(
                 _screenshot_debug(page, f"error_obj_{ob['num']}")
                 _cerrar_popup_forzado(page)
                 page.wait_for_timeout(600)
+            if no_en_portal:
+                # La numeración del portal es continua (1..N): si la #k no está
+                # en la grilla, las siguientes tampoco van a estar. Cortar aquí
+                # evita escanear la grilla completa por cada fila sobrante de un
+                # Excel sobre-aprovisionado.
+                sobrantes = len(a_procesar) - idx - 1
+                if sobrantes:
+                    logger.info(
+                        f"  descarto las {sobrantes} filas restantes del Excel "
+                        f"(la grilla no llega a la objecion #{ob['num']})."
+                    )
+                break
 
         if respondidas == 0:
             reg["estado"] = "SIN_PENDIENTES" if not fallidas else "ERROR"
