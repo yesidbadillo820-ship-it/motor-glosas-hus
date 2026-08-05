@@ -3326,6 +3326,66 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
     return resultado
 
 
+# ── Aritmética de la glosa: ¿objetan más de lo facturado? (OT-002) ──
+# Lector LOCAL y sólo para el aviso. No se tocó _extraer_valores_glosa
+# (app/utils/parsers_glosa.py) a propósito: esa función también llena los
+# campos de valor que ve el auditor en pantalla, y ampliarle los patrones
+# le cambiaría los montos precargados a todo el mundo. Aquí se leen las
+# etiquetas explícitas que usan las EPS y, lo que no aparezca, se le
+# pregunta al lector compartido.
+_ETIQUETAS_FACTURADO = (
+    r"VALOR\s+(?:TOTAL\s+|UNITARIO\s+|BRUTO\s+)?FACTURAD[OA]",
+    r"TOTAL\s+FACTURAD[OA]",
+    r"VALOR\s+DE\s+LA\s+FACTURA",
+    r"TOTAL\s+(?:DE\s+LA\s+)?FACTURA",
+    r"FACTURAD[OA]\s+POR",
+)
+_ETIQUETAS_OBJETADO = (
+    r"VALOR\s+(?:TOTAL\s+)?GLOSAD[OA]",
+    r"VALOR\s+(?:TOTAL\s+)?OBJETAD[OA]",
+    r"VALOR\s+DE\s+LA\s+GLOSA",
+    r"TOTAL\s+GLOSAD[OA]",
+    r"SE\s+GLOSA(?:N)?",
+    r"SE\s+OBJETA(?:N)?",
+)
+_MONTO_COP = r"[:\s]*\$?\s*([\d][\d\.,]{3,})"
+
+
+def _monto_por_etiqueta(texto: str, etiquetas: tuple) -> float:
+    """Primer monto que aparezca detrás de una de las etiquetas dadas."""
+    from app.utils.moneda import parse_valor_cop
+
+    for et in etiquetas:
+        m = re.search(et + _MONTO_COP, texto, re.IGNORECASE)
+        if m:
+            try:
+                v = parse_valor_cop(m.group(1))
+            except Exception:
+                v = 0.0
+            if v > 0:
+                return float(v)
+    return 0.0
+
+
+def _facturado_y_objetado(texto: str) -> tuple:
+    """(facturado, objetado) leídos del texto de la glosa. 0.0 lo que falte."""
+    if not texto:
+        return (0.0, 0.0)
+    fact = _monto_por_etiqueta(texto, _ETIQUETAS_FACTURADO)
+    obj = _monto_por_etiqueta(texto, _ETIQUETAS_OBJETADO)
+    if fact and obj:
+        return (fact, obj)
+    try:
+        from app.utils.parsers_glosa import _extraer_valores_glosa
+
+        vals = _extraer_valores_glosa(texto)
+        fact = fact or float(vals.get("facturado") or 0.0)
+        obj = obj or float(vals.get("objetado") or 0.0)
+    except Exception:
+        pass
+    return (fact, obj)
+
+
 # ── Red final: "CUPS <fecha/factura>" en el dictamen (16-jun-2026, ronda 3) ──
 # Evidencia caso 4 (COOSALUD): el texto traía "Verificar radicado 20260511 y
 # soporte 4710-2026" → la IA escribió "código CUPS 20260511" (20260511 es
@@ -7546,6 +7606,54 @@ class GlosaService:
                 )
         except Exception as _e_ap:
             logger.debug(f"[ACEPTACION-TEXTO] aviso no agregado: {_e_ap}")
+
+        # ── La glosa cobra más de lo que se facturó (05-08-2026, OT-002) ──
+        # Glosa de prueba SO0202 de SUMIMEDICAL: "VALOR FACTURADO $1.500.000
+        # ... VALOR GLOSADO $1.850.000". El motor armó toda la defensa
+        # jurídica y no dijo lo único que cerraba el caso solo: no se puede
+        # glosar plata que nunca se cobró. Los dos montos ya venían en el
+        # texto y nadie los restaba.
+        #
+        # Igual que los demás avisos: es una SEÑAL para el auditor, no una
+        # decisión. El dictamen no cambia; se le pone el dato al lado.
+        try:
+            from app.utils.moneda import parse_valor_cop as _pvc_ar
+
+            _fact_ar, _obj_texto_ar = _facturado_y_objetado(texto_base or "")
+            try:
+                _obj_ar = _pvc_ar(valor_raw)
+            except Exception:
+                _obj_ar = 0.0
+            # Manda lo que escribió el auditor en el campo de valor; si lo
+            # dejó vacío, lo que diga el texto de la glosa.
+            if not _obj_ar:
+                _obj_ar = _obj_texto_ar
+            # El margen del 1% evita el ruido de redondeo y de los IVA
+            # partidos; por debajo de eso no es un error aritmético.
+            if _fact_ar > 0 and _obj_ar > _fact_ar and (_obj_ar - _fact_ar) > (_fact_ar * 0.01):
+                _exceso_ar = _obj_ar - _fact_ar
+                _f_obj = f"${_obj_ar:,.0f}".replace(",", ".")
+                _f_fac = f"${_fact_ar:,.0f}".replace(",", ".")
+                _f_exc = f"${_exceso_ar:,.0f}".replace(",", ".")
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">LA GLOSA SUPERA EL '
+                    "VALOR FACTURADO</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    f"La entidad objeta <b>{_f_obj}</b> sobre una factura de "
+                    f"<b>{_f_fac}</b>: son <b>{_f_exc}</b> por encima de lo cobrado. "
+                    "No se puede glosar un valor que nunca se facturó. Verificá los dos "
+                    "montos en el detallado y, si se confirma, ese solo hecho tumba el "
+                    "exceso sin necesidad de discutir el fondo."
+                    "</p></div>"
+                )
+                logger.info(
+                    f"[GLOSA-MAYOR-QUE-FACTURA] objetado {_f_obj} > facturado "
+                    f"{_f_fac} (exceso {_f_exc}) — aviso agregado al dictamen"
+                )
+        except Exception as _e_ar:
+            logger.debug(f"[GLOSA-MAYOR-QUE-FACTURA] aviso no agregado: {_e_ar}")
 
         # ── Esto no es una glosa: es una DEVOLUCIÓN (05-08-2026) ─────────
         # «DE1601 FACTURA DEVUELTA POR NO CORRESPONDER A USUARIO» se
