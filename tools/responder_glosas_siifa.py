@@ -210,6 +210,11 @@ def ids_ya_procesados(rutas_csv: list[str]) -> set[int]:
 # cuál corresponde a cada frase del desplegable del portal —que muestra el
 # texto pero no el código—. Se prueban todos y se muestra lo que responda.
 GRUPOS_CANDIDATOS = [
+    # Los nombres los dijo la propia API en sus mensajes de validación:
+    # «no pertenece al grupo RESPUESTA» (glosas) y «no pertenece al grupo
+    # RESPUESTA_DEV_PTS_PSS» (devoluciones, 05-08-2026).
+    "RESPUESTA_DEV_PTS_PSS",
+    "RESPUESTA_GLOSA_PTS_PSS",
     "RESPUESTA",
     "RESPUESTA_GLOSA",
     "RESPUESTAGLOSA",
@@ -326,7 +331,13 @@ def procesar(
         except SiifaApiError as exc:
             estado, detalle = "ERROR", str(exc)
             err += 1
-            logger.error("Glosa %s (factura %s): ERROR — %s", id_seg, fila["factura"], exc)
+            logger.error(
+                "%s %s (factura %s): ERROR — %s",
+                "Devolución" if es_devolucion else "Glosa",
+                id_a_mandar,
+                fila["factura"],
+                exc,
+            )
         reporte_writer.writerow(
             {
                 "id_seguimiento_factura_glosa": id_seg,
