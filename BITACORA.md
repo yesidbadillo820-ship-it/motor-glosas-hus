@@ -2063,6 +2063,40 @@ de Docker.
   radican en agosto. Si existe prórroga 2026 del contrato, avisar al chat para
   citarla en los próximos textos (blinda la respuesta).
 
+### 05-08 — Por qué SIIFA rechazó 1.422 respuestas (y cómo se arregló)
+
+- **Lo que se subió el 4 y 5 de agosto:** de 2.579 respuestas quedaron
+  **1.157 registradas** (985 glosas por $227.803.973 y 172 líneas de
+  devolución) y **1.422 rechazadas**. Informe completo por factura en el
+  Excel que se le entregó a Yesid.
+- **Causa 1 — el texto pasaba de 1.500 caracteres (927 casos).** SIIFA no lo
+  dice: contesta «HTTP 500: error saving the entity changes», que parece una
+  falla del servidor. Los números no dejaron duda: entraron TODAS las de
+  hasta 1.499 caracteres y ninguna de 1.501 en adelante. El redactor estaba
+  recortando a 1.900, que era el límite equivocado. Corregido a **1.500**
+  (`LIMITE_OBSERVACION`).
+- **Causa 2 — el código RE9701 (495 casos).** Se usa en DGH pero SIIFA no lo
+  acepta: «el código no existe, no está activo o no pertenece al grupo
+  RESPUESTA». Son las devoluciones que el hospital ACEPTÓ con nota crédito.
+- **`tools/siifa_corregir_rechazadas.py`** (nuevo): lee el archivo que se
+  cargó y el reporte del cargue, se queda solo con lo que quedó en ERROR y lo
+  corrige: a lo que escribió el motor **se lo vuelve a redactar** para que
+  quepa (así el recorte se lo lleva la cita de la EPS y no el cierre del
+  hospital), a lo que vino de DGH se le recorta el final en un punto, y los
+  códigos que SIIFA no acepta se cambian por el que se indique. Todo queda
+  marcado en la columna CORRECCION.
+- **Ojo con dos cosas que quedaron pendientes de revisar:**
+  1. Lo ya subido quedó con **la fecha del día del cargue**, no con la de
+     DGH: los archivos se generaron el 03-08, antes de que existiera la
+     columna FECHA_RESPUESTA. Para la EPS, esas respuestas figuran dadas en
+     agosto.
+  2. El desplegable de SIIFA para devoluciones ofrece tres respuestas
+     («no procede por fuera de términos», «es injustificada al 100%»,
+     «ha sido aceptada al 100%»), pero el portal no muestra el código. Para
+     las 495 aceptadas con nota crédito hay que averiguar el código de «ha
+     sido aceptada al 100%»: se responde UNA a mano en el portal y se mira
+     el código en Ver Histórico.
+
 ---
 
 ## 3) PENDIENTE

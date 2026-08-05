@@ -278,7 +278,15 @@ def _limpiar(texto) -> str:
     return " ".join(s.split()).strip()
 
 
-def redactar(linea: dict, limite: int = 1900) -> dict[str, str]:
+# Lo que aguanta el campo Observación de SIIFA. Está medido contra la
+# plataforma, no supuesto: en el cargue del 05-08-2026 entraron todas las
+# respuestas de hasta 1.499 caracteres y SIIFA rechazó TODAS las de 1.501 en
+# adelante —927 en total— con un error que además engaña, porque llega como
+# «HTTP 500: error saving the entity changes», que parece falla del servidor.
+LIMITE_OBSERVACION = 1500
+
+
+def redactar(linea: dict, limite: int = LIMITE_OBSERVACION) -> dict[str, str]:
     """Arma la respuesta de UNA glosa o devolución.
 
     El texto sale con cuatro partes: el encabezado (qué se objeta y por
