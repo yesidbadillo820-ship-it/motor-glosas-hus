@@ -34,7 +34,9 @@ class TestDefaultsModelosGroq:
 
     def test_primario_es_gpt_oss(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model == "openai/gpt-oss-120b"  # llama-4-scout salió del catálogo (05-08-2026)
+        assert (
+            s.groq_model == "openai/gpt-oss-120b"
+        )  # llama-4-scout salió del catálogo (05-08-2026)
 
     def test_primario_ya_no_es_llama_33(self, monkeypatch):
         # llama-3.3 pasó a fallback 3 (último recurso).
