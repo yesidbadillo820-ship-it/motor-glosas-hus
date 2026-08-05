@@ -3204,6 +3204,128 @@ def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
     return resultado
 
 
+# ── Red final: cláusula de contrato sin respaldo (05-08-2026, OT-001) ──
+# Evidencia: glosa AU0401 de FAMISANAR. El dictamen afirmó "CLÁUSULA 4.2 DEL
+# CONTRATO S-13-1-03-1-04958". Las tres guardas que ya existían lo dejaron
+# pasar: check_contratos_no_fabricados mira el NÚMERO DE CONTRATO y ese es
+# real (está en el catálogo y se inyecta al prompt); check_contrato_de_otra_eps
+# mira a quién pertenece y es de FAMISANAR; _descomillar_citas_falsas solo
+# quita las comillas y deja la afirmación en pie. Nadie miraba el NÚMERO DE
+# CLÁUSULA — y el Diagnóstico del hospital reporta 0 cláusulas extraídas de 0
+# contratos con PDF subido, así que ese 4.2 no lo respalda nada.
+#
+# Alcance deliberadamente estrecho: SOLO cláusulas con número arábigo
+# ("4.2", "18", "4.2.1"). Las cláusulas escritas en palabras ("CLÁUSULA
+# OCTAVA") NO se tocan: esa es la forma que usan el banco de respuestas
+# aprobadas del HUS y el archivo semilla (data/clausulas_contrato_base.json
+# trae "Octava, numeral 3", "Primera, Parágrafo Cuarto"), y borrarlas sería
+# romper texto que los auditores ya validaron.
+_PAT_CLAUSULA_NUM_CON_CONTRATO = re.compile(
+    r"(?:(?:LA|EN\s+LA|DE\s+LA|A\s+LA|SEG[ÚU]N\s+LA|CONFORME\s+A\s+LA)\s+)?"
+    r"CL[ÁA]USULA\s+(?P<num>\d+(?:\.\d+)*)"
+    r"\s+DEL\s+(?:CONTRATO\s+)?(?P<contrato>[A-Z0-9][A-Z0-9./-]{4,})",
+    re.IGNORECASE,
+)
+_PAT_CLAUSULA_NUM_SOLA = re.compile(
+    r"(?:(?:LA|EN\s+LA|DE\s+LA|A\s+LA|SEG[ÚU]N\s+LA|CONFORME\s+A\s+LA)\s+)?"
+    r"CL[ÁA]USULA\s+(?P<num>\d+(?:\.\d+)*)",
+    re.IGNORECASE,
+)
+# Lo que deja colgando el descomillado de citas falsas cuando la cláusula
+# venía con verbo de atribución: "QUE INDICA: EN LOS TÉRMINOS DE ...".
+_PAT_ATRIBUCION_COLGADA = re.compile(
+    r"\s*(QUE\s+)?(INDICA|ESTABLECE|DISPONE|SE[ÑN]ALA|CONSAGRA|REZA|PRECEPT[ÚU]A)"
+    r"\s*(?:QUE\s*)?:?\s*EN\s+LOS\s+T[ÉE]RMINOS\s+DE\s+",
+    re.IGNORECASE,
+)
+
+
+def _clausulas_cargadas(eps: str = "") -> set[str]:
+    """Números de cláusula realmente extraídos del PDF del contrato firmado.
+
+    Sin EPS devuelve las de TODOS los contratos (criterio permisivo, igual
+    que citation_verifier._corpus_clausulas_contrato): más vale conservar
+    una cita dudosa que borrar una verdadera.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato
+
+        db = SessionLocal()
+        try:
+            q = db.query(ClausulaContrato.numero_clausula)
+            if eps:
+                q = q.filter(ClausulaContrato.eps == eps.upper())
+            return {str(n).strip().upper() for (n,) in q.all() if n}
+        finally:
+            db.close()
+    except Exception:
+        # Sin base disponible no se borra nada: la red se apaga sola.
+        return set()
+
+
+def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: str = "") -> str:
+    """Quita del dictamen las cláusulas numeradas que nada respalda.
+
+    Se conserva la cláusula cuando: (a) está cargada en la base para esa
+    EPS, o (b) la citó la propia EPS en el texto de su glosa — ahí el
+    número es dato del pagador, no invención del motor.
+    """
+    if not texto:
+        return texto
+    up = texto.upper()
+    if "CLÁUSULA" not in up and "CLAUSULA" not in up:
+        return texto
+
+    respaldadas = _clausulas_cargadas(eps)
+    glosa_up = (texto_glosa or "").upper()
+
+    def _sin_respaldo(num: str) -> bool:
+        n = num.strip().upper()
+        for cargada in respaldadas:
+            if n in cargada:
+                return False
+        # La EPS citó ese número en su propia glosa.
+        if glosa_up and re.search(r"CL[ÁA]USULA\s+" + re.escape(n) + r"\b", glosa_up):
+            return False
+        return True
+
+    n_sub = 0
+    quitadas: list[str] = []
+
+    def _sub_con_contrato(m: "re.Match[str]") -> str:
+        nonlocal n_sub
+        if not _sin_respaldo(m.group("num")):
+            return m.group(0)
+        n_sub += 1
+        quitadas.append(m.group("num"))
+        return "EL CONTRATO " + m.group("contrato")
+
+    def _sub_sola(m: "re.Match[str]") -> str:
+        nonlocal n_sub
+        if not _sin_respaldo(m.group("num")):
+            return m.group(0)
+        n_sub += 1
+        quitadas.append(m.group("num"))
+        return "EL CONTRATO VIGENTE ENTRE LAS PARTES"
+
+    resultado = _PAT_CLAUSULA_NUM_CON_CONTRATO.sub(_sub_con_contrato, texto)
+    resultado = _PAT_CLAUSULA_NUM_SOLA.sub(_sub_sola, resultado)
+    if not n_sub:
+        return texto
+
+    # Solo si se quitó una cláusula: reparar la atribución que queda rota
+    # ("...QUE INDICA: EN LOS TÉRMINOS DE el pagador reconocerá...").
+    resultado = _PAT_ATRIBUCION_COLGADA.sub(
+        lambda m: (" QUE " if m.group(1) else " ") + m.group(2) + " QUE ", resultado
+    )
+    logger.warning(
+        f"[CLAUSULA-SIN-RESPALDO] {n_sub} cláusula(s) numerada(s) sin respaldo "
+        f"retiradas del dictamen final (eps={eps}, números={quitadas[:3]})."
+    )
+    return resultado
+
+
 # ── Red final: "CUPS <fecha/factura>" en el dictamen (16-jun-2026, ronda 3) ──
 # Evidencia caso 4 (COOSALUD): el texto traía "Verificar radicado 20260511 y
 # soporte 4710-2026" → la IA escribió "código CUPS 20260511" (20260511 es
@@ -6874,6 +6996,23 @@ class GlosaService:
                     dictamen = _dictamen_sin_ajeno
             except Exception as _e_ca:
                 logger.debug(f"[CONTRATO-AJENO] red final no aplicada: {_e_ca}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  OT-001 (05-08-2026) — RED FINAL cláusula sin respaldo.
+            #  Evidencia AU0401 FAMISANAR: "CLÁUSULA 4.2 DEL CONTRATO
+            #  S-13-1-03-1-04958" con 0 cláusulas cargadas en la base.
+            #  El contrato es real y es de FAMISANAR, así que las dos
+            #  guardas de contratos lo dejan pasar; nadie miraba el
+            #  número de cláusula.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_clausula = _neutralizar_clausulas_sin_respaldo(
+                    dictamen, str(data.eps or ""), texto_base
+                )
+                if _dictamen_sin_clausula != dictamen:
+                    dictamen = _dictamen_sin_clausula
+            except Exception as _e_cl:
+                logger.debug(f"[CLAUSULA-SIN-RESPALDO] red final no aplicada: {_e_cl}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 3 (16-jun-2026) — RED FINAL CUPS falsos.
