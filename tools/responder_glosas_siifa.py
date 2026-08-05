@@ -295,29 +295,13 @@ def procesar(
             )
             continue
         es_devolucion = fila.get("tipo") == "DEVOLUCION"
-        if es_devolucion and accion == "respuesta" and not fila.get("id_devolucion"):
-            # Sin el id de devolución NO se manda nada: usar el de glosa
-            # escribiría la respuesta sobre otro registro de la plataforma.
-            reporte_writer.writerow(
-                {
-                    "id_seguimiento_factura_glosa": id_seg,
-                    "numero_factura": fila["factura"],
-                    "estado": "ERROR",
-                    "detalle": (
-                        "Es una DEVOLUCIÓN y falta la columna "
-                        "ID_SEGUIMIENTO_FACTURA_DEVOLUCION: volver a bajar el informe "
-                        "de seguimientos y regenerar el archivo."
-                    ),
-                    "fecha_hora": datetime.now().isoformat(timespec="seconds"),
-                }
-            )
-            err += 1
-            logger.error(
-                "Devolución %s (factura %s): falta el id de devolución, no se manda.",
-                id_seg,
-                fila["factura"],
-            )
-            continue
+        # El id de una devolución es EL MISMO id de seguimiento. Se confirmó
+        # con el volcado crudo de la API (05-08-2026, factura HUS494196): un
+        # seguimiento de tipo DEVOLUCION trae idSeguimientoFactura y nada más
+        # —no existe un idSeguimientoFacturaDevolucion aparte—. Lo que cambia
+        # entre glosa y devolución no es el id: es la puerta por la que se
+        # manda y la lista de códigos contra la que se valida.
+        id_a_mandar = fila.get("id_devolucion") or id_seg if es_devolucion else id_seg
         try:
             if accion != "respuesta":
                 cliente.responder_reiteracion_glosa(
@@ -327,7 +311,7 @@ def procesar(
                 # Una devolución es otra entidad en SIIFA: otra puerta, otro id
                 # y otra lista de códigos de respuesta.
                 cliente.responder_devolucion(
-                    fila["id_devolucion"], fila["codigo"], fila["observacion"], fila["fecha"]
+                    id_a_mandar, fila["codigo"], fila["observacion"], fila["fecha"]
                 )
             else:
                 cliente.responder_glosa(id_seg, fila["codigo"], fila["observacion"], fila["fecha"])
@@ -336,7 +320,7 @@ def procesar(
             logger.info(
                 "%s %s (factura %s): OK",
                 "Devolución" if es_devolucion else "Glosa",
-                fila.get("id_devolucion") if es_devolucion else id_seg,
+                id_a_mandar,
                 fila["factura"],
             )
         except SiifaApiError as exc:

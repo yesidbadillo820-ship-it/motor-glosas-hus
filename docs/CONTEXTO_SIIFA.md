@@ -160,6 +160,40 @@ por el mecanismo único de validación FEV-RIPS — no se responde en SIIFA como
 - Ver `tools/README_siifa.md` para los comandos PowerShell listos para
   copiar/pegar.
 
+## 5.quater) Glosas y devoluciones NO se responden por el mismo lado
+
+Confirmado contra la API el 05-08-2026, después de que SIIFA rechazara 495
+respuestas diciendo «el código no existe, no está activo o no pertenece al
+grupo RESPUESTA»:
+
+| | Glosa | Devolución |
+|---|---|---|
+| Endpoint | `PUT /api/SeguimientoFacturaGlosa/Respuesta` | `PUT /api/SeguimientoFacturaDevolucion/Respuesta` |
+| Campo del id en el cuerpo | `idSeguimientoFacturaGlosa` | `idSeguimientoFacturaDevolucion` |
+| Causales (catálogo) | grupo `GLOSA`, 339 códigos | grupo `DEVOLUCION`, 11 códigos (DE1601, DE5601…) |
+
+**El identificador es EL MISMO.** El listado devuelve un solo campo,
+`idSeguimientoFactura`, tanto para glosas como para devoluciones; cada
+controlador lo nombra a su manera en el cuerpo de la petición. Lo verificado
+en el volcado crudo de la factura HUS494196: un seguimiento tipo DEVOLUCION
+trae `idSeguimientoFactura`, `tipoSeguimiento` y `idSeguimientoTipoCodigo`
+(DE5601), y ningún `idSeguimientoFacturaDevolucion`.
+
+El bot elige la puerta por la columna TIPO del Excel de cargue. Para ver los
+campos tal cual los manda la plataforma:
+
+```powershell
+py tools\siifa_sondear_endpoints.py --factura HUS494196
+```
+
+El desplegable de **Responder Devolución** del portal ofrece tres respuestas
+(y no muestra sus códigos): «no procede por haber sido generada fuera de los
+términos (aceptación tácita de la factura)», «el PSS aporta la evidencia de
+que la devolución es injustificada al 100%» y «el PSS informa que la
+devolución ha sido aceptada al 100%». El catálogo de la API no expone el
+grupo de respuestas, así que el código de cada una se confirma respondiendo
+una a mano y mirándolo en Ver Histórico.
+
 ## 5.ter) Cómo se responde A MANO en el portal (guía del auditor, 03-08-2026)
 
 Es el procedimiento que el bot replica por API. Sirve para el piloto, para
