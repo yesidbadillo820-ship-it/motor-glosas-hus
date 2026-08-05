@@ -44,6 +44,30 @@ def _solo_texto_argumento(argumento: str) -> str:
     return re.sub(r"\s+", " ", limpio).strip()
 
 
+# Etiquetas HTML (<b>, <div style="...">) y entidades (&nbsp;): lo único
+# del texto que NO se puede tocar al pasar a mayúsculas.
+_ETIQUETA_O_ENTIDAD = re.compile(r"(<[^>]*>|&[a-zA-Z#0-9]+;)")
+
+
+def a_mayusculas_html(texto: str) -> str:
+    """MAYÚSCULAS en lo que se lee; intactas las etiquetas y las entidades.
+
+    Un dictamen se radica ante la EPS en mayúsculas — así lo escribe el
+    hospital desde siempre. Hasta el 05-08-2026 dependía de que el modelo
+    hiciera caso: unos salían enteros en mayúscula y otros en minúscula, y
+    aparecía el defecto «En ESE orden de ideas» —«ESE» es la sigla del
+    hospital (Empresa Social del Estado) y quedaba en mayúscula sola,
+    dentro de una frase en minúscula, como si fuera un error de tipeo—.
+    Esto lo decide el sistema, no el modelo.
+    """
+    if not texto:
+        return texto
+    return "".join(
+        parte if _ETIQUETA_O_ENTIDAD.fullmatch(parte) else parte.upper()
+        for parte in _ETIQUETA_O_ENTIDAD.split(texto)
+    )
+
+
 # Firmas que delatan un error de proveedor dentro de un texto que pretende
 # ser dictamen. Cinturón de persistencia: si aparecen, NO se guarda.
 FIRMAS_ERROR_PROVEEDOR = (
@@ -7700,6 +7724,17 @@ class GlosaService:
                 "demasiado corto). El análisis NO se guardó: reintentá y si persiste "
                 "avisá a administración."
             )
+
+        # El dictamen se radica en MAYÚSCULAS. Se decide acá —un solo
+        # punto, después de la guarda y antes de armar nada— para que valga
+        # por igual venga de donde venga: dictamen normal, plantilla fija o
+        # refinado. Antes dependía de que el modelo obedeciera y salía
+        # mezclado (05-08-2026, pedido de Yesid).
+        argumento = a_mayusculas_html(argumento)
+        servicio = a_mayusculas_html(servicio) if servicio else servicio
+        contrato = a_mayusculas_html(contrato) if contrato else contrato
+        tarifa = a_mayusculas_html(tarifa) if tarifa else tarifa
+        normas_clave = a_mayusculas_html(normas_clave) if normas_clave else normas_clave
         colores = {
             "TA_TARIFA": "#1e40af",
             "SO_SOPORTES": "#7c3aed",
