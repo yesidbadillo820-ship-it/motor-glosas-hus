@@ -2058,10 +2058,30 @@ de Docker.
   **GI-33-5251-2026**; el cargue del 23 de julio va aparte como
   **GI-33-5285-2026**. Los comandos de carpeta + PDF de ambos quedaron
   entregados en el chat.
-- **OJO jurídico para el auditor:** el texto dice que el contrato 440 se
-  encuentra "vigente ... con plazo hasta 30/07/2026", pero estas respuestas se
-  radican en agosto. Si existe prórroga 2026 del contrato, avisar al chat para
-  citarla en los próximos textos (blinda la respuesta).
+- **Verificación adversarial del texto (3 frentes: jurídico, operativo,
+  técnico) — correcciones aplicadas antes de entregar el Excel:** se quitó la
+  frase "vigente ... con plazo hasta 30/07/2026" (contradictoria al radicar en
+  agosto; ahora dice "vigente a la fecha de prestación de los servicios"); el
+  artículo de conciliación del cierre quedó bien citado (art. 23 del Decreto
+  4747, no el 20); se citaron las Resoluciones HUS 054 y 124 de 2026 como
+  respaldo de los servicios por fuera del Anexo No. 1; y la frase del
+  presupuesto (art. 71 del Decreto 111/1996) se redactó de forma que no se
+  pueda voltear en contra del hospital.
+- **Robot SIMED mejorado (mismo día):** (1) si el Excel trae más filas que
+  objeciones tiene la grilla, el robot corta en la primera que no exista (ya
+  no escanea página por página cada fila sobrante); (2) lee siempre la hoja
+  "Respuestas Glosa" aunque el archivo se haya guardado con otra pestaña
+  activa; (3) el cierre estándar del motor de glosas ahora cita el art. 23
+  del Decreto 4747 (antes decía art. 20, que no es el de conciliación).
+- **OJO jurídico para el auditor:** confirmar si existe **prórroga 2026 del
+  contrato 440**; con ella se refuerzan los próximos textos (el de hoy ya
+  quedó blindado sin necesitarla).
+- **Las 8 "sin evidencia" quedaron identificadas** con la tabla de
+  vencimientos que mandó el auditor: 6 están pendientes en SIMED y entran en
+  el cargue de hoy (519423 vencida el 23-07, 522160 vencida el 29-07, 533934
+  y 534507 vencen el 06-08, 524188 el 10-08 y 530112 el 13-08); las otras 2
+  (527406, vencía 03-08, y 525763, vence 10-08) NO figuran pendientes en el
+  portal: verificar que estén contestadas buscándolas una a una en SIMED.
 
 ### 05-08 — Por qué SIIFA rechazó 1.422 respuestas (y cómo se arregló)
 
