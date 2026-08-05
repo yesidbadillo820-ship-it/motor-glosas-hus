@@ -58,6 +58,30 @@ _MARCADORES_CONCEPTO_SUELTO = (
         "objeción de cobertura",
     ),
     (
+        # 05-08-2026: el conector se reconocía SOLO si lo seguía «SE OBJETA»
+        # o «SE GLOSA». La glosa real decía «ADICIONALMENTE SE COBRAN
+        # INSUMOS NO PACTADOS» y el motor la leyó como una sola objeción:
+        # respondió la primera y dejó mudas las otras tres. En auditoría,
+        # callar sobre un concepto equivale a aceptarlo.
+        re.compile(
+            r"\b(?:ADICIONALMENTE|AS[ÍI]\s+MISMO|ASIMISMO|DE\s+IGUAL\s+(?:FORMA|MANERA)|"
+            r"POR\s+OTRA\s+PARTE|TAMBI[ÉE]N|IGUALMENTE|AUNADO\s+A\s+LO\s+ANTERIOR|"
+            r"SUMADO\s+A\s+LO\s+ANTERIOR),?\s+(?:SE|NO|EL|LA|LOS|LAS)\b",
+            re.IGNORECASE,
+        ),
+        "concepto adicional objetado",
+    ),
+    (
+        # «Y NO SE EVIDENCIA AUTORIZACIÓN PARA LOS DÍAS 4 AL 7»: falta de
+        # soporte enunciada como objeción aparte, sin conector.
+        re.compile(
+            r"\bNO\s+SE\s+(?:EVIDENCIA|APORTA|ADJUNTA|ACREDITA|SOPORTA|ALLEGA|"
+            r"ANEXA|REGISTRA)\b",
+            re.IGNORECASE,
+        ),
+        "falta de soporte o evidencia",
+    ),
+    (
         re.compile(r"\bDEBI[ÓO]\s+SER\s+REMITID[OA]\b", re.IGNORECASE),
         "objeción de remisión a otra red",
     ),
@@ -83,7 +107,11 @@ _RE_PALABRAS_RESUMEN = re.compile(
     r"EVENTO\s+ADVERSO|PREVENIBLE|F[ÍI]STULA|SEPSIS|UCI|"
     r"REINTERVENCI[ÓO]N|COMPLICACI[ÓO]N|FALLA|T[ÉE]CNICA\s+QUIR[ÚU]RGICA|"
     # Liquidación / cartera de entidad intervenida
-    r"LIQUIDACI[ÓO]N|AGENTE\s+LIQUIDADORA|SALDOS|SUPERSALUD|INTERVENIDA)\b",
+    r"LIQUIDACI[ÓO]N|AGENTE\s+LIQUIDADORA|SALDOS|SUPERSALUD|INTERVENIDA|"
+    # Estancia y suministros — la glosa del 05-08-2026 objetaba habitación
+    # cobrada como suite, insumos no pactados y oxígeno por hora vs. día.
+    r"HABITACI[ÓO]N|SUITE|ESTANCIA|INSUMOS|OX[ÍI]GENO|UNIPERSONAL|"
+    r"UNIDAD\s+DE\s+MEDIDA|MATERIAL|DISPOSITIVO)\b",
     re.IGNORECASE,
 )
 
