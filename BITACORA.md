@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 04-08-2026
+**Última actualización:** 05-08-2026
 
 ---
 
@@ -2003,6 +2003,43 @@ de Docker.
   pantalla es volver a poner el botón (un minuto de trabajo). Si el equipo la
   estaba usando de verdad, se avisa y se devuelve.
 
+### 05-08 — Dispensario: se ubicó cada evidencia y quedó listo el cargue de las 23 que faltan
+
+- **¿Dónde y cuándo quedó lo subido? (base de 124 facturas).** Con un comando
+  de búsqueda en el PC se encontró que **116 de las 124 se subieron el jueves
+  23 de julio** (piloto 3:04 p. m., corrida completa 3:53–5:05 p. m., dos
+  sueltas 5:11 y 5:22 p. m.) y sus pantallazos quedaron en
+  `C:\temp-notas\evidencias_glosa` (esa corrida no indicó carpeta de
+  evidencias, así que el robot usó la suya por defecto). Se entregó el comando
+  del paquete **GI-33-5285-2026**: carpeta con las 116 evidencias + inventario
+  + PDF unificado.
+- **El pantallazo de "pendientes por cargar" del portal aclaró el resto:** en
+  SIMED solo quedan **23 facturas pendientes** (glosas fechadas entre enero y
+  agosto, **$21.083.565**). Eso confirma que los lotes del 14, 17, 28 y 31 de
+  julio **ya están subidos**, aunque a cada uno se le escaparon casos: la
+  522160 (17-jul), la 530112 (28-jul) y la 534953 (31-jul) figuran pendientes
+  y entran ahora. Las 3 de junio ya no aparecen en pendientes (verificar cómo
+  quedaron radicadas).
+- **Excel de cargue de las 23**
+  (`respuestas_glosa_DISPENSARIO_PENDIENTES_05AGO.xlsx`): usa el texto de
+  TARIFAS que definió el auditor (contrato 440-DIGSA/DMBUG-2025) con dos
+  ajustes: la cita de la **Resolución 3047 de 2008 (derogada)** se reemplazó
+  por la **Resolución 2284 de 2023**, y se agregó el cierre de conciliación
+  con los correos de cartera. Como no se conoce cuántas líneas tiene cada
+  glosa en el portal, el Excel trae filas de sobra por factura —el robot salta
+  sin problema los números que no existen y omite lo ya contestado—: 298 filas
+  en total. Antes de entregar se corrió verificación adversarial en 3 frentes
+  (jurídico, operativo del robot y técnico del script de paquete).
+- **Consecutivos confirmados por el auditor:** los lotes 17-jul, 28-jul y
+  31-jul (más esta corrida de pendientes) van juntos en el paquete
+  **GI-33-5251-2026**; el cargue del 23 de julio va aparte como
+  **GI-33-5285-2026**. Los comandos de carpeta + PDF de ambos quedaron
+  entregados en el chat.
+- **OJO jurídico para el auditor:** el texto dice que el contrato 440 se
+  encuentra "vigente ... con plazo hasta 30/07/2026", pero estas respuestas se
+  radican en agosto. Si existe prórroga 2026 del contrato, avisar al chat para
+  citarla en los próximos textos (blinda la respuesta).
+
 ---
 
 ## 3) PENDIENTE
@@ -2097,16 +2134,21 @@ de Docker.
 15. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
     aparecen en el reporte): hoy se conservan y se marcan.
 ### Dispensario — respuesta de glosas SIMED y conciliación
-10. **Subir a SIMED las 3 facturas de junio** (518186 / 515107 / 515773) con
-    `respuestas_glosa_DISPENSARIO_PENDIENTES_JUN.xlsx`. **URGENTE: sus fechas
-    de vencimiento (6 y 8 de julio) ya pasaron.** Si el portal ya no las deja
-    responder, radicar la respuesta por oficio/correo dejando constancia.
-11. **Confirmar la subida a SIMED de los lotes del 14 y 17 de julio** (los
-    Excel están listos; falta el log de la corrida y la pasada de verificación
-    que debe dar 0 pendientes).
+10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo
+    de pendientes del 05-08 **ya no figuran por cargar**. Verificar en el
+    portal cómo quedaron radicadas (¿respuesta cargada o cerradas por
+    vencimiento?); si el portal las cerró sin respuesta, radicar por
+    oficio/correo dejando constancia.
+11. **(05-08) Correr el cargue de las 23 pendientes** con
+    `respuestas_glosa_DISPENSARIO_PENDIENTES_05AGO.xlsx`: piloto con
+    HUS0000513796 → corrida completa → pegar el reporte al chat. En las de
+    valor alto (500031, 510793, 454563, 512742, 518923, 522160) revisar en el
+    reporte que ninguna quede "sin finalizar" por tener más líneas en el
+    portal que filas en el Excel (si pasa, avisar al chat y se amplía).
 12. **Generar los PDF de evidencias:** lote 14-07 → `GI-33-5182-2026.pdf`
-    (comando ya entregado); lote 17-07 → falta el consecutivo GI-33 (pedirlo
-    al auditor).
+    (comando ya entregado); lotes 17/28/31-jul + corrida de pendientes →
+    `GI-33-5251-2026.pdf`; cargue del 23-jul → `GI-33-5285-2026.pdf`
+    (los tres comandos quedaron entregados en el chat el 05-08).
 13. **Soportes por adjuntar del lote 17-07** (casos puntuales): notas de
     enfermería del 16-jun (529093), renglón tarifario de dispositivos (coils,
     AIRVO, material de osteosíntesis), descripción quirúrgica del vaciamiento
@@ -2117,13 +2159,11 @@ de Docker.
 15. **Conciliación:** confirmar el acta de inicio del contrato 287 y el mapeo
     de códigos internos de cartera (U22031/C26001…), y correr el asistente en
     piloto sobre 1-2 facturas reales contra `Y:\`.
-- **(28-07) Lote del 28-jul (97 objeciones): NO subir todavía.** Aplicar las
-  correcciones de texto de la verificación (3 grupos no calzan: FA0801,
-  SO5801, FA0101; y ajustes obligatorios en FA0201, FA2303 y TA) y completar
-  las verificaciones del auditor: nota operatoria del caso AMEU, desglose día
-  a día de los 34 días de estancia, horas/órdenes de los 2 rastreos de
-  anticuerpos y prórroga 2026 del contrato 440. Detalle en la sección
-  "28-07 (noche)".
+- ~~(28-07) Lote del 28-jul: NO subir todavía~~ — **Superado el 05-08:** el
+  portal muestra el lote ya subido (solo se escapó la 530112, que entra en el
+  cargue de las 23 pendientes). Sigue vigente de esa nota únicamente la
+  pregunta de la **prórroga 2026 del contrato 440** (ver "OJO jurídico" del
+  05-08).
 
 ### Informes
 16. **Informe de gerencia:** falta el dato real del "antes" (cuánto tardaba el
@@ -2226,14 +2266,13 @@ de Docker.
    base provisional. (c) Cuando llegue el correo de Google: rescate de la
    fase 1 (`rescate-motor-glosas.tgz`) y **avisar al chat antes de restaurar**
    la base histórica; (d) verificar y apagar la VM (fase 4).
-1. **Dispensario prioridad 1:** subir a SIMED el Excel de las 3 facturas de
-   junio y guardar el pantallazo de evidencia de cada una. Si los lotes del
-   14 y 17 aún no están subidos, subirlos (piloto de 1 factura → lote →
-   verificación) y generar sus PDF de evidencias.
-   **Lote del 28-jul: NO subir hasta corregir los textos** señalados por la
-   verificación (3 grupos no calzan) y resolver las verificaciones del
-   auditor (nota operatoria AMEU, desglose de los 34 días, horas de los 2
-   rastreos, prórroga 2026 del contrato 440).
+1. **Dispensario prioridad 1 (actualizado 05-08):** correr el cargue de las
+   **23 pendientes** (piloto con HUS0000513796 → corrida completa → pegar el
+   reporte al chat) y después armar los dos paquetes de evidencias:
+   **GI-33-5251-2026** (lotes 17/28/31-jul + pendientes) y
+   **GI-33-5285-2026** (cargue del 23-jul). Verificar cómo quedaron radicadas
+   las 3 de junio (ya no figuran pendientes) y averiguar si hay **prórroga
+   2026 del contrato 440** para blindar los próximos textos.
 2. Correr la **pertinencia fusionada** COOSALUD (pendiente #1) y verificar que
    las 37 facturas cierren con evidencia.
 3. Con los reportes en mano, **cerrar los flecos de los lotes 02/06/07/08**
