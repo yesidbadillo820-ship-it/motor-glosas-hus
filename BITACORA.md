@@ -2158,6 +2158,24 @@ de Docker.
 - Lección para el chat: cuando el auditor tiene el portal delante, su dato
   manda sobre cualquier deducción hecha desde los datos.
 
+### 05-08 (cuarta parte) — Resuelto: las devoluciones tienen su propia puerta
+
+- **Piloto en verde:** `Devolución 17876242 (factura HUS481923): OK`. Con esa
+  sola respuesta quedó confirmado todo: la puerta correcta, el id correcto y
+  que **RE9701 siempre fue el código bueno** —lo dijo Yesid mirando el portal,
+  contra la deducción del chat, y tenía razón—.
+- **Lo que estaba mal:** el bot mandaba glosas y devoluciones por la misma
+  puerta (`/api/SeguimientoFacturaGlosa/Respuesta`). Una devolución se
+  responde por `/api/SeguimientoFacturaDevolucion/Respuesta`, que valida
+  contra los códigos de devolución. Por eso SIIFA decía que RE9701 «no
+  pertenece al grupo RESPUESTA»: el código estaba bien, la puerta no.
+- **El id es el mismo** para los dos casos (`idSeguimientoFactura`): lo mostró
+  el volcado crudo de la API. Por eso los archivos de cargue ya generados
+  sirven tal cual, con solo actualizar el bot.
+- **Cómo se llegó:** `tools/siifa_sondear_endpoints.py`, que prueba rutas y
+  grupos del catálogo **sin escribir nada** en la plataforma, y el volcado de
+  los campos crudos de una factura (`--factura HUS494196`).
+
 ---
 
 ## 3) PENDIENTE
