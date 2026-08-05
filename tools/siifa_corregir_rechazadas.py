@@ -53,6 +53,18 @@ from siifa_redactar_respuestas import LIMITE_OBSERVACION, redactar  # noqa: E402
 
 logger = logging.getLogger("siifa_corregir")
 
+# Homologación de los códigos de DGH que SIIFA no acepta, por SIGNIFICADO y no
+# por parecido de número. Lo que se sabe hoy, con evidencia:
+#   RE9901 = «la glosa siendo justificable ha podido ser subsanada totalmente»
+#            (así lo devuelve el propio informe de SIIFA).
+#   RE9702 = «la glosa/devolución ha sido ACEPTADA AL 100%» (el piloto de la
+#            factura HUS497119 se guardó con esa frase en el desplegable y en
+#            Ver Histórico quedó RE9702).
+# En DGH, RE9701 se usó para las devoluciones que el hospital ACEPTÓ con nota
+# crédito —el texto dice «ESE HUS ACEPTA DEVOLUCION… SE APLICA NOTA CREDITO»—,
+# así que su equivalente en SIIFA es el de aceptación al 100%.
+HOMOLOGACION = {"RE9701": "RE9702"}
+
 # Columnas que necesita el bot de cargue, más las que ayudan a revisar.
 COLUMNAS = [
     "ID_SEGUIMIENTO_FACTURA_GLOSA",
@@ -227,6 +239,12 @@ def main() -> None:
         help=f"Máximo de caracteres de la observación (default: {LIMITE_OBSERVACION}).",
     )
     ap.add_argument(
+        "--homologar",
+        action="store_true",
+        help="Cambia los códigos de DGH que SIIFA no acepta por su equivalente "
+        f"({', '.join(f'{v}->{n}' for v, n in HOMOLOGACION.items())}).",
+    )
+    ap.add_argument(
         "--solo-codigo",
         metavar="CODIGO",
         help="Se queda SOLO con las respuestas que traen ese código de respuesta.",
@@ -252,7 +270,7 @@ def main() -> None:
         stream=sys.stdout,
     )
 
-    cambios = {}
+    cambios = dict(HOMOLOGACION) if args.homologar else {}
     for par in args.cambiar_codigo:
         if "=" not in par:
             raise SystemExit(f"\nERROR: --cambiar-codigo se escribe VIEJO=NUEVO, no '{par}'.\n")

@@ -70,7 +70,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from siifa_client import SiifaApiError, SiifaClient, credenciales_desde_env  # noqa: E402
+from siifa_client import (  # noqa: E402
+    SiifaApiError,
+    SiifaClient,
+    buscar_clave,
+    credenciales_desde_env,
+)
 
 logger = logging.getLogger("responder_glosas_siifa")
 
@@ -182,14 +187,75 @@ def ids_ya_procesados(rutas_csv: list[str]) -> set[int]:
     return vistos
 
 
-def listar_catalogo(cliente: SiifaClient, grupo: str) -> None:
-    codigos = cliente.catalogo_tipo_codigo(grupo)
-    print(f"\nCatálogo SIIFA — grupo {grupo} ({len(codigos)} códigos):\n")
-    for c in codigos:
-        cod = c.get("idSeguimientoTipoCodigo", "?")
-        desc = c.get("descripcion", "")
-        print(f"  {cod:<12} {desc}")
-    print()
+# Nombres de grupo que puede estar usando SIIFA. Con «RESPUESTA» a secas el
+# catálogo vino vacío el 05-08-2026, y sin la lista de códigos toca adivinar
+# cuál corresponde a cada frase del desplegable del portal —que muestra el
+# texto pero no el código—. Se prueban todos y se muestra lo que responda.
+GRUPOS_CANDIDATOS = [
+    "RESPUESTA",
+    "RESPUESTA_GLOSA",
+    "RESPUESTAGLOSA",
+    "RESPUESTA_DEVOLUCION",
+    "RESPUESTADEVOLUCION",
+    "RESPUESTA_REITERACION",
+    "GLOSA",
+    "DEVOLUCION",
+    "REITERACION",
+]
+
+
+def _codigo_y_descripcion(fila: dict) -> tuple[str, str]:
+    """La API no siempre nombra igual las columnas del catálogo."""
+    codigo = buscar_clave(
+        fila, "idSeguimientoTipoCodigo", "codigo", "id", "IdSeguimientoTipoCodigo", default="?"
+    )
+    desc = buscar_clave(fila, "descripcion", "Descripcion", "nombre", "detalle", default="")
+    return str(codigo), str(desc)
+
+
+def listar_catalogo(cliente: SiifaClient, grupo: str, guardar: str | None = None) -> None:
+    """Muestra los códigos que acepta SIIFA, con su significado.
+
+    Si el grupo que se pide viene vacío, se prueban los demás nombres
+    conocidos: lo que importa es salir con la tabla de códigos, porque el
+    portal muestra la frase («la devolución ha sido aceptada al 100%») pero
+    no el código que hay que mandarle a la API.
+    """
+    grupos = [grupo] + [g for g in GRUPOS_CANDIDATOS if g != grupo]
+    lineas: list[str] = []
+    encontrados = 0
+    for g in grupos:
+        try:
+            codigos = cliente.catalogo_tipo_codigo(g)
+        except SiifaApiError as exc:
+            lineas.append(f"\nGrupo {g}: no responde ({exc})")
+            continue
+        if not codigos:
+            lineas.append(f"\nGrupo {g}: vacío")
+            continue
+        encontrados += len(codigos)
+        lineas.append(f"\nGrupo {g} ({len(codigos)} códigos):")
+        for c in codigos:
+            cod, desc = _codigo_y_descripcion(c)
+            lineas.append(f"  {cod:<12} {desc}")
+        if g == grupo:
+            break  # el que se pidió sirvió: no hace falta probar los demás
+
+    texto = "\nCatálogo de códigos de SIIFA" + "\n".join(lineas) + "\n"
+    print(texto)
+    if not encontrados:
+        print(
+            "SIIFA no devolvió ningún código en ninguno de los grupos conocidos.\n"
+            "Para saber qué código corresponde a cada frase del desplegable:\n"
+            "  1. responder UNA glosa (o devolución) a mano en el portal,\n"
+            "  2. abrir los tres puntos → Ver Histórico,\n"
+            "  3. ahí aparece el código que quedó registrado.\n"
+        )
+    if guardar:
+        ruta = Path(guardar)
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(texto, encoding="utf-8")
+        print(f"Guardado en: {ruta}\n")
 
 
 def procesar(
@@ -268,6 +334,10 @@ def main() -> None:
         const="RESPUESTA",
         help="Solo imprime el catálogo oficial de códigos (default: RESPUESTA) y termina. No necesita --excel.",
     )
+    ap.add_argument(
+        "--guardar-catalogo",
+        help="Archivo de texto donde dejar el catálogo, para poder mandarlo.",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -291,7 +361,7 @@ def main() -> None:
             raise SystemExit(f"ERROR de autenticación: {exc}")
 
         if args.listar_catalogo is not None:
-            listar_catalogo(cliente, args.listar_catalogo)
+            listar_catalogo(cliente, args.listar_catalogo, args.guardar_catalogo)
             return
 
         if not args.excel:

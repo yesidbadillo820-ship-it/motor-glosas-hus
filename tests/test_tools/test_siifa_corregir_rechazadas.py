@@ -194,3 +194,22 @@ def test_se_pueden_apartar_las_respuestas_de_un_codigo(tmp_path):
 
     assert ids(resto) == [1]
     assert ids(aparte) == [2]
+
+
+def test_la_homologacion_manda_el_codigo_de_aceptacion(tmp_path):
+    """RE9701 en DGH es «el hospital acepta»: su equivalente no es RE9901.
+
+    RE9901 en SIIFA significa que la glosa «pudo ser subsanada totalmente»;
+    la aceptación al 100% es RE9702. Poner el código que dice lo contrario
+    del texto es lo que se cae en una conciliación.
+    """
+    excel = _excel(tmp_path, [_fila(1, codigo="RE9701", texto="ESE HUS ACEPTA DEVOLUCION.")])
+    reporte = _reporte(tmp_path, {1: "ERROR"})
+    salida = tmp_path / "homologadas.xlsx"
+
+    _correr(excel, [reporte], salida, extra=["--homologar"])
+
+    ws = load_workbook(salida).active
+    fila = dict(zip([c.value for c in ws[1]], [c.value for c in ws[2]]))
+    assert fila["CODIGO_RESPUESTA"] == "RE9702"
+    assert "REVISAR" in fila["CORRECCION"]
