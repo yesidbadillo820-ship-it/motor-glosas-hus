@@ -4316,6 +4316,56 @@ def _glosa_es_del_tema_dmbug(texto: str) -> bool:
     return any(_plegar(s) in t for s in _SENALES_TEMA_DMBUG)
 
 
+# ── ¿La EPS está discutiendo PERTINENCIA, no tarifa? (OT-003) ──
+# Glosa de prueba TA0601 de PPL: "TAC DE ABDOMEN NO PERTINENTE PARA EL
+# DIAGNÓSTICO REGISTRADO". El código empieza por TA, así que el motor
+# entregó el texto fijo de tarifas —SOAT, UVB, valores pactados— a una
+# pregunta que era clínica. Respondió otra cosa, y una glosa que no se
+# contesta se ratifica.
+#
+# La causal tampoco calza con el hecho: TA0601 del catálogo es
+# "dispositivos médicos: diferencias con valores pactados". Eso es
+# aplicación indebida de causal, y es un argumento a favor del hospital —
+# pero solo si el dictamen lo dice, y para decirlo hay que pasar por el
+# motor con su control de calidad, no por el texto fijo.
+_SENALES_PERTINENCIA = (
+    "NO PERTINENTE",
+    "NO ES PERTINENTE",
+    "FALTA DE PERTINENCIA",
+    "SIN PERTINENCIA",
+    "PERTINENCIA MEDICA",
+    "PERTINENCIA CLINICA",
+    "NO PERTINENCIA",
+    "SIN JUSTIFICACION CLINICA",
+    "SIN JUSTIFICACION MEDICA",
+    "NO SE JUSTIFICA CLINICAMENTE",
+    "NO JUSTIFICA CLINICAMENTE",
+    "SIN INDICACION MEDICA",
+    "SIN INDICACION CLINICA",
+    "NO CORRESPONDE AL DIAGNOSTICO",
+    "NO GUARDA RELACION CON EL DIAGNOSTICO",
+    "NO SE RELACIONA CON EL DIAGNOSTICO",
+    "NO ERA NECESARIO",
+    "NO ERAN NECESARIOS",
+    "SIN NECESIDAD MEDICA",
+    "NO REQUERIA",
+)
+
+
+def _glosa_es_de_pertinencia(texto: str) -> bool:
+    """¿El motivo escrito es clínico aunque el código sea de tarifas?"""
+    if not texto:
+        return False
+    import unicodedata as _ud
+
+    def _plegar(s: str) -> str:
+        n = _ud.normalize("NFKD", str(s or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    t = _plegar(texto)
+    return any(_plegar(s) in t for s in _SENALES_PERTINENCIA)
+
+
 def limpiar_cierre_extemporanea_indebido(
     texto: str,
     es_ratificacion: bool = False,
@@ -4952,7 +5002,16 @@ class GlosaService:
             # camino no pasa el Quality Gate, así que nadie lo detectó.
             argumento_fijo = TEXTO_DMBUG_TARIFAS
             tipo_glosa = "TA_DMBUG_FIJO"
-        elif es_tarifa and not tiene_contrato and not _es_dispensario_medico(eps_key):
+        elif (
+            es_tarifa
+            and not tiene_contrato
+            and not _es_dispensario_medico(eps_key)
+            # 05-08-2026 (OT-003): si el motivo escrito es clínico, el texto
+            # fijo de tarifas responde otra pregunta. Caso TA0601 de PPL:
+            # "TAC de abdomen no pertinente" contestado con SOAT y UVB. Esas
+            # van al motor, que sí lee el motivo y pasa por control de calidad.
+            and not _glosa_es_de_pertinencia(texto_base)
+        ):
             # La exclusión del Dispensario evita que una glosa TA suya que
             # no calzó con el tema caiga en el OTRO texto fijo ("no hay
             # contrato pactado"), que contradiría al RE9901 de más abajo:
