@@ -3240,6 +3240,24 @@ _PAT_ATRIBUCION_COLGADA = re.compile(
 )
 
 
+def _reparar_atribucion_colgada(texto: str) -> str:
+    """Deja legible «...QUE ESTABLECE: EN LOS TÉRMINOS DE X» → «...QUE
+    ESTABLECE QUE X». El verbo ya dice que es una atribución; el conector
+    neutro sobra y encima rompe la frase.
+
+    Respeta la caja del párrafo huésped (regla de la ronda 10): si el verbo
+    venía en minúscula, el «que» sale en minúscula.
+    """
+
+    def _sub(m: "re.Match[str]") -> str:
+        verbo = m.group(2)
+        que = "QUE" if verbo.isupper() else "que"
+        cabeza = f" {que} " if m.group(1) else " "
+        return f"{cabeza}{verbo} {que} "
+
+    return _PAT_ATRIBUCION_COLGADA.sub(_sub, texto)
+
+
 def _clausulas_cargadas(eps: str = "") -> set[str]:
     """Números de cláusula realmente extraídos del PDF del contrato firmado.
 
@@ -3316,9 +3334,7 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
 
     # Solo si se quitó una cláusula: reparar la atribución que queda rota
     # ("...QUE INDICA: EN LOS TÉRMINOS DE el pagador reconocerá...").
-    resultado = _PAT_ATRIBUCION_COLGADA.sub(
-        lambda m: (" QUE " if m.group(1) else " ") + m.group(2) + " QUE ", resultado
-    )
+    resultado = _reparar_atribucion_colgada(resultado)
     logger.warning(
         f"[CLAUSULA-SIN-RESPALDO] {n_sub} cláusula(s) numerada(s) sin respaldo "
         f"retiradas del dictamen final (eps={eps}, números={quitadas[:3]})."
@@ -3649,6 +3665,14 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
 
     resultado = _PAT_DESCOMILLAR_CHEVRON.sub(_sub_chevron, texto)
     resultado = _PAT_DESCOMILLAR_ATRIBUIDA.sub(_sub_atribuida, resultado)
+    if n_reemplazos:
+        # 05-08-2026 (OT-007) — cuando la cita venía con verbo de atribución
+        # ("EL CONTRATO ESTABLECE: «...»"), el conector neutro se sumaba al
+        # verbo y salía "ESTABLECE: EN LOS TÉRMINOS DE el pagador
+        # reconocerá...", que no se puede leer. Visto en producción el
+        # 05-08 en tres dictámenes seguidos (AURORA, COOSALUD y COMPENSAR).
+        # El verbo ya dice que es una atribución: sobra el conector.
+        resultado = _reparar_atribucion_colgada(resultado)
     if n_reemplazos:
         logger.warning(
             f"[DESCOMILLAR-CITAS] {n_reemplazos} cita(s) literal(es) FALSA(s) "

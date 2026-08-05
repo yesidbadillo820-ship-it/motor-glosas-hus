@@ -2258,6 +2258,76 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
         return []
 
 
+# ── El material del prompt se elegía solo por el prefijo del código (OT-007) ──
+# Visto en producción el 05-08-2026, dos dictámenes seguidos:
+#
+#   COMPENSAR AU0401 — "el procedimiento 895201 no corresponde con la
+#   descripción clínica registrada" → el dictamen contestó que "la atención
+#   de urgencias no requiere autorización previa".
+#
+#   COOSALUD AU0203 — "el RIPS no coincide con la evolución médica" → el
+#   dictamen contestó lo mismo.
+#
+# Ninguna de las dos preguntaba por autorización. Pero normas_relevantes_para_
+# codigo() mapea TODA glosa AU a Ley 100 + T-1025 + Decreto 4747, que es el
+# material de "urgencias sin autorización previa", y el modelo cita lo que
+# tiene delante — la misma lección de la corrección de ARL de esa mañana.
+#
+# No se toca el prompt: se le quita del contexto el material que no viene al
+# caso. Solo se QUITA; nunca se agrega nada que no estuviera.
+_NORMAS_DE_AUTORIZACION = {
+    "SENTENCIA T-1025 DE 2002",
+    "DECRETO 4747 DE 2007",
+}
+# Los artículos de la Ley 100 que hablan de urgencias sin orden previa y de
+# las obligaciones de la EPS. Se cuelan por la misma puerta: la norma se
+# conserva (es pertinente casi siempre) pero el bloque literal le pega el
+# texto de estos dos artículos, y de ahí salía «la atención de urgencias no
+# requiere autorización previa» en glosas que no preguntaban eso.
+_ARTICULOS_DE_AUTORIZACION = {"168", "177"}
+_SENALES_DE_AUTORIZACION = (
+    "AUTORIZACION",
+    "AUTORIZADO",
+    "AUTORIZADA",
+    "AUTORIZAR",
+    "PREAUTORIZACION",
+    "SIN AUTORIZAR",
+    "NUMERO DE AUTORIZACION",
+)
+
+
+def _glosa_au_sin_tema_de_autorizacion(codigo: str, texto_glosa: str) -> bool:
+    """¿Es una glosa AU cuyo motivo escrito no menciona autorización?"""
+    if not (codigo or "").upper().startswith("AU"):
+        return False
+    import unicodedata as _ud
+
+    n = _ud.normalize("NFKD", str(texto_glosa or ""))
+    t = "".join(c for c in n if not _ud.combining(c)).upper()
+    return not any(s in t for s in _SENALES_DE_AUTORIZACION)
+
+
+def _sin_normas_de_otro_tema(claves: list, codigo: str, texto_glosa: str) -> list:
+    """Quita del material del prompt las normas de un tema que la glosa no toca.
+
+    Hoy solo cubre el caso evidenciado: glosas AU cuyo motivo escrito no
+    menciona autorización. El resto de familias queda igual.
+    """
+    if not claves or not _glosa_au_sin_tema_de_autorizacion(codigo, texto_glosa):
+        return claves
+    filtradas = [c for c in claves if c.upper() not in _NORMAS_DE_AUTORIZACION]
+    # Nunca dejarlo sin material: si todo lo relevante era de autorización,
+    # se conserva la lista original.
+    return filtradas or claves
+
+
+def _articulos_fuera_de_tema(codigo: str, texto_glosa: str) -> set:
+    """Artículos cuyo texto literal NO debe entrar al prompt de esta glosa."""
+    if _glosa_au_sin_tema_de_autorizacion(codigo, texto_glosa):
+        return set(_ARTICULOS_DE_AUTORIZACION)
+    return set()
+
+
 def build_user_prompt(
     texto_glosa: str,
     contexto_pdf: str,
@@ -2647,6 +2717,7 @@ def build_user_prompt(
                 "RESOLUCIÓN 2641 DE 2024",
             }
             claves_relevantes = [c for c in claves_relevantes if c.upper() not in _FUERA_EN_ARL]
+        claves_relevantes = _sin_normas_de_otro_tema(claves_relevantes, codigo, texto_glosa)
         lineas = []
         for clave in claves_relevantes[:5]:
             n = _TODAS_LAS_NORMAS.get(clave)
@@ -2663,7 +2734,11 @@ def build_user_prompt(
             if n.get("extracto_judicial"):
                 lineas.append(f"      ↳ Extracto judicial citable: {n['extracto_judicial']}")
             # Artículos internos con texto literal
-            for art_num, art in list(n.get("articulos", {}).items())[:2]:
+            _fuera = _articulos_fuera_de_tema(codigo, texto_glosa)
+            _arts = [
+                (k, v) for k, v in n.get("articulos", {}).items() if str(k).strip() not in _fuera
+            ]
+            for art_num, art in _arts[:2]:
                 txt = art.get("texto", "")[:300]
                 lineas.append(f"  • Art. {art_num} {nombre}: «{txt}»")
         if lineas:
