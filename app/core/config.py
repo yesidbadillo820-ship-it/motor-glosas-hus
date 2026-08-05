@@ -63,10 +63,17 @@ class Settings(BaseSettings):
     # siguiente modelo Groq SIN saltar todavia a Anthropic. Overrideables
     # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2,
     # GROQ_MODEL_FALLBACK_3.
-    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
-    groq_model_fallback_1: str = "openai/gpt-oss-120b"
-    groq_model_fallback_2: str = "qwen/qwen3-32b"
-    groq_model_fallback_3: str = "llama-3.3-70b-versatile"
+    # 05-08-2026: llama-4-scout SALIÓ del catálogo de Groq. El diagnóstico
+    # del hospital devolvía «Error code: 404 — the model
+    # meta-llama/llama-4-scout-17b-16e-instruct does not exist or you do not
+    # have access to it», y el panel avisaba «ningún proveedor responde»
+    # aunque el motor SÍ funcionaba: cada análisis gastaba un intento
+    # muerto y caía al respaldo. Todos los dictámenes de ese día salieron
+    # por gpt-oss-120b. Se promueve el que ya estaba haciendo el trabajo.
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_model_fallback_1: str = "qwen/qwen3-32b"
+    groq_model_fallback_2: str = "llama-3.3-70b-versatile"
+    groq_model_fallback_3: str = "llama-3.1-8b-instant"
     anthropic_model: str = "claude-sonnet-4-5"
     # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
     # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando

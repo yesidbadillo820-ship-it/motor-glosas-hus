@@ -18075,9 +18075,20 @@ async function iaHealthCheck(){
         '<div style="font-size:.78rem">'+msg+'</div>'+
       '</div>';
     }).join('');
-    var headerColor = d.todos_ok ? '#15803d' : (d.alguno_ok ? '#d97706' : '#dc2626');
+    // El ping pregunta por el modelo PRIMARIO de cada proveedor. Si ese
+    // modelo salió del catálogo —pasó el 05-08-2026 con llama-4-scout de
+    // Groq— el panel gritaba «ningún proveedor responde» mientras el motor
+    // seguía trabajando por el respaldo. El aviso ahora distingue el
+    // problema real (nadie contesta) del que solo cuesta un intento.
+    var esModeloRetirado = ['anthropic','gemini','groq'].some(function(k){
+      var e = ((p[k]||{}).error || '').toLowerCase();
+      return e.indexOf('does not exist') >= 0 || e.indexOf('model_not_found') >= 0 ||
+             e.indexOf('404') >= 0 || e.indexOf('deprecat') >= 0;
+    });
+    var headerColor = d.todos_ok ? '#15803d' : (d.alguno_ok || esModeloRetirado ? '#d97706' : '#dc2626');
     var headerText = d.todos_ok ? '✓ Los 3 proveedores responden' :
                      d.alguno_ok ? '⚠ Algunos fallan, pero hay fallback' :
+                     esModeloRetirado ? '⚠ Un modelo salió del catálogo del proveedor — el motor sigue trabajando por el respaldo, pero conviene actualizar el modelo primario' :
                      '✕ Ningún proveedor responde';
     box.innerHTML = '<div style="font-weight:700;color:'+headerColor+';font-size:.85rem;margin-bottom:.4rem">'+headerText+'</div>'+rows;
   }catch(e){

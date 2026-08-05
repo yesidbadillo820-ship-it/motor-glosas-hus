@@ -671,7 +671,7 @@ def _limpiar_chain_of_thought(texto: str) -> str:
 # segundo es un agregado del valor objetado por concepto. Conservadora:
 # si el dictamen menciona una EPS conocida ≠ la del input, la sustituye
 # por la EPS del input. Si menciona algo que parece nombre de EPS pero
-# NO está en el catálogo, lo neutraliza a "la entidad pagadora".
+# NO está en el catálogo, lo neutraliza a "LA ENTIDAD PAGADORA".
 _PAT_NOMBRE_EPS_GENERICA = re.compile(
     # "EPS X", "la EPS XYZ", "entidad ABC EPS" — capturamos solo el sintagma
     # COMPLETO, no fragmentos sueltos. Conservador: exige conector EPS.
@@ -706,7 +706,7 @@ _EPS_KNOWN_TOKENS = {
 # nombre de EPS aunque sigan a "EPS" en una frase. Evidencia producción
 # 17-jun (FAMISANAR HUS0000506597): la IA escribió "LAS EPS RECONOCER LOS
 # SERVICIOS" — el regex matcheó "EPS RECONOCER", trató "RECONOCER" como
-# nombre inventado y lo reemplazó por "la entidad pagadora", dejando la
+# nombre inventado y lo reemplazó por "LA ENTIDAD PAGADORA", dejando la
 # sintaxis rota "LAS la entidad pagadora RECONOCER". Stop-list excluye
 # verbos/adverbios comunes que la IA puede dejar pegados a "EPS" tras
 # elidir el sujeto plural.
@@ -840,13 +840,13 @@ _EPS_PALABRAS_NO_NOMBRE: frozenset[str] = frozenset(
 
 
 def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
-    """Sustituye nombres de EPS distintos al del input por "la entidad pagadora".
+    """Sustituye nombres de EPS distintos al del input por "LA ENTIDAD PAGADORA".
 
     Caso 4 evidencia: con EPS=COOSALUD el dictamen inventó "EPS SaludCo".
     Estrategia:
       • Detecta menciones "EPS <NOMBRE>" en el dictamen.
       • Si <NOMBRE> NO coincide con la EPS del input ni con ninguna EPS
-        conocida del catálogo, lo neutraliza a "la entidad pagadora".
+        conocida del catálogo, lo neutraliza a "LA ENTIDAD PAGADORA".
       • Si <NOMBRE> ES una EPS conocida distinta de la del input → también
         neutraliza (caso de mezcla de EPS reales).
       • Si la EPS del input es "OTRA / SIN DEFINIR", no hace nada (no hay
@@ -887,10 +887,10 @@ def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
         # (e.g. "SaludCo"). Si es conocida pero ≠ input → contrato cruzado.
         if not es_conocida_otra and len(raiz_mencion) >= 3:
             n_sub += 1
-            return "la entidad pagadora"
+            return "LA ENTIDAD PAGADORA"
         if es_conocida_otra:
             n_sub += 1
-            return "la entidad pagadora"
+            return "LA ENTIDAD PAGADORA"
         return m.group(0)
 
     resultado = _PAT_NOMBRE_EPS_GENERICA.sub(_sub, texto)
@@ -980,7 +980,7 @@ _PATRONES_PLACEHOLDERS_TEMPLATE: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bCUPS\s+(?:ES\s+)?([XYZ][XYZN]?|N|NN|YX|YN|XN)\b(?![A-Z0-9])",
             re.IGNORECASE,
         ),
-        "el procedimiento facturado",
+        "EL PROCEDIMIENTO FACTURADO",
     ),
     # "paciente Z" / "paciente X" / "paciente Y" / "paciente N"
     (
@@ -1052,7 +1052,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
     # ejemplo de lo prohibido. La quitamos en cualquier forma.
     (
         re.compile(r"\b(?:LA\s+)?RESOLUCI[ÓO]N\s+2641\s+DE\s+2024\b", re.IGNORECASE),
-        "la normativa vigente del Ministerio de Salud",
+        "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD",
     ),
     (
         re.compile(r"\bRes\.?\s*2641/2024\b", re.IGNORECASE),
@@ -1101,7 +1101,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\b(?:BAJO\s+EL\s+|AL\s+|EL\s+)?CUPS\s+(?:N[°º\.]?\s*)?\d{3,4}\b(?![\d\-A-Z])",
             re.IGNORECASE,
         ),
-        "el procedimiento facturado según historia clínica",
+        "EL PROCEDIMIENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     (
         re.compile(
@@ -1189,7 +1189,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\b(?:BAJO\s+EL\s+|AL\s+|EL\s+)?CUPS\s+\d{7,10}\b(?![\d\-A-Z])",
             re.IGNORECASE,
         ),
-        "el procedimiento facturado según historia clínica",
+        "EL PROCEDIMIENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     (
         re.compile(
@@ -1218,7 +1218,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
     # ── Ronda 14: nuevos placeholders y dobles artículos ──
     # Evidencia (trasplante hepático, $487M): la IA escribió:
     #   "LA NUEVA la entidad pagadora LA GLOSA CON TRES CAUSALES"
-    # — el "la entidad pagadora" es residuo de un placeholder mal
+    # — el "LA ENTIDAD PAGADORA" es residuo de un placeholder mal
     # sustituido entre "LA NUEVA" (EPS) y el resto.
     (
         re.compile(
@@ -1251,7 +1251,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bla\s+entidad\s+pagadora\s+la\s+entidad\s+pagadora\b",
             re.IGNORECASE,
         ),
-        "la entidad pagadora",
+        "LA ENTIDAD PAGADORA",
     ),
     # ── Ronda 15 (25-jun-2026): placeholders persistentes ──
     # Casos del 25-jun:
@@ -1329,7 +1329,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"[\"«]los\s+servicios[^\"»]{0,250}[\"»]\.?",
             re.IGNORECASE,
         ),
-        "la normativa contractual aplicable",
+        "LA NORMATIVA CONTRACTUAL APLICABLE",
     ),
     # ── Ronda 16 — Bug Q v2: citas inventadas EN MAYÚSCULAS ──
     # Casos 26-jun (Quemado SURA $487M, Norwood NUEVA EPS $678M): la IA
@@ -1368,7 +1368,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"['\"«][^'\"»]{30,500}['\"»]\.?",
             re.IGNORECASE,
         ),
-        "la normativa vigente aplicable",
+        "LA NORMATIVA VIGENTE APLICABLE",
     ),
     # ── Ronda 16 — Bug B v5: "procedimiento facturado [frase neutra]" ──
     # Caso 26-jun (post Bug A v4): cuando A v4 sustituyó "CUPS 20235847-2"
@@ -1390,7 +1390,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bel\s+c[óo]digo\s+CUPS\s+de\s+la\s+factura\s+el\s+procedimiento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
             re.IGNORECASE,
         ),
-        "el procedimiento facturado según historia clínica",
+        "EL PROCEDIMIENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     (
         re.compile(
@@ -1398,7 +1398,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"el\s+procedimiento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
             re.IGNORECASE,
         ),
-        "el procedimiento facturado según historia clínica",
+        "EL PROCEDIMIENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     # "el medicamento facturado según historia clínica el medicamento
     # facturado según historia clínica" (duplicado por dobles matches A v4)
@@ -1509,7 +1509,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
     # ── Ronda 20 — Bug HH: "[EPS] la entidad pagadora" duplicado ──
     # Caso real 30-jun: "la sanción del 10% aplicada por salud total la
     # entidad pagadora el servicio". El nombre de la EPS quedó seguido de
-    # "la entidad pagadora" (residuo de placeholder elidido) + un sustantivo
+    # "LA ENTIDAD PAGADORA" (residuo de placeholder elidido) + un sustantivo
     # sin preposición. Reparamos los dos defectos.
     # Caso específico: "[EPS] la entidad pagadora el/la [sustantivo]" →
     # "[EPS] respecto del/de la [sustantivo]" (repara nombre + preposición).
@@ -1845,7 +1845,7 @@ def _neutralizar_art_168_fuera_de_contexto(
         re.IGNORECASE,
     )
     nuevo, n = pat_art168.subn(
-        "la normativa de continuidad y cobertura del Sistema General de Salud",
+        "LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD",
         dictamen,
     )
     # También frase suelta "atención inicial de urgencias" cuando no aplica
@@ -3248,7 +3248,7 @@ def _neutralizar_cups_falsos(texto: str) -> str:
         return texto
 
     def _sub(m):
-        return "el procedimiento facturado"
+        return "EL PROCEDIMIENTO FACTURADO"
 
     resultado, n = _PAT_CUPS_SOSPECHOSO.subn(_sub, texto)
     # Fix L: "GLOSA NNNNNN" (donde NNNNNN parece factura) → "la glosa
@@ -3281,7 +3281,7 @@ def _neutralizar_cups_igual_factura(texto: str, numero_factura: str | None) -> s
     no puede atraparlos: una factura de 6 dígitos es indistinguible de un
     CUPS real de 6 dígitos sin conocer la factura del expediente. Acá SÍ la
     conocemos: si el número citado como CUPS coincide con los dígitos de la
-    factura → "el procedimiento facturado".
+    factura → "EL PROCEDIMIENTO FACTURADO".
     """
     if not texto or not (numero_factura or "").strip():
         return texto
@@ -3308,7 +3308,7 @@ def _neutralizar_cups_igual_factura(texto: str, numero_factura: str | None) -> s
         + r")\b(?![\d\-])(?!\s*,\s*\d)",
         re.IGNORECASE,
     )
-    resultado, n = pat.subn("el procedimiento facturado", texto)
+    resultado, n = pat.subn("EL PROCEDIMIENTO FACTURADO", texto)
     if n:
         # Limpieza gramatical de residuos ("EL el ...", "del el ...").
         resultado = re.sub(r"\b(facturado|facturada)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
@@ -3933,7 +3933,7 @@ def generar_texto_tarifa_match(
     pact_fmt = f"$ {int(pact):,}".replace(",", ".")
     fact_fmt = f"$ {int(val_fact):,}".replace(",", ".") if val_fact > 0 else pact_fmt
     contrato = t.get("contrato_numero") or "contrato vigente entre las partes"
-    eps = t.get("eps") or "la entidad pagadora"
+    eps = t.get("eps") or "LA ENTIDAD PAGADORA"
     cups = t.get("codigo_cups") or "—"
     desc = (t.get("descripcion") or "el servicio facturado").upper()
     modalidad = t.get("modalidad") or "pactada"
@@ -6722,7 +6722,7 @@ class GlosaService:
         # antes de construir GlosaResult), DESPUÉS de todos los sanitizers
         # del dictamen. Antes (ronda 19) se inyectaba aquí y el sanitizer
         # _sustituir_eps_inventada confundía "EPS corregida" con un nombre
-        # de EPS inventado → lo reemplazaba por "la entidad pagadora",
+        # de EPS inventado → lo reemplazaba por "LA ENTIDAD PAGADORA",
         # rompiendo el banner ("⚠️ la entidad pagadora automáticamente").
 
         # ═══════════════════════════════════════════════════════════
@@ -6879,7 +6879,7 @@ class GlosaService:
             #  Ronda 3 (16-jun-2026) — RED FINAL CUPS falsos.
             #  Evidencia caso 4 (COOSALUD): "Verificar radicado 20260511"
             #  → la IA escribió "código CUPS 20260511" (es yyyymmdd, no
-            #  CUPS). Se sustituye por "el procedimiento facturado".
+            #  CUPS). Se sustituye por "EL PROCEDIMIENTO FACTURADO".
             # ═══════════════════════════════════════════════════════════
             try:
                 _dictamen_sin_cups_falso = _neutralizar_cups_falsos(dictamen)

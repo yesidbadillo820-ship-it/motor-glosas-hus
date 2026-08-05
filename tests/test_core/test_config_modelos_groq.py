@@ -3,8 +3,8 @@
 Decisión 16-jun-2026 ronda 8 (dueño + banco de respuestas HUS): la cadena
 de modelos Groq quedó en
 
-    meta-llama/llama-4-scout-17b-16e-instruct (primario)
-    → openai/gpt-oss-120b (fallback 1)
+    openai/gpt-oss-120b (primario desde el 05-08-2026)
+    → qwen/qwen3-32b (fallback 1)
     → qwen/qwen3-32b (fallback 2)
     → llama-3.3-70b-versatile (fallback 3)
 
@@ -32,26 +32,26 @@ def _settings_limpio(monkeypatch) -> Settings:
 class TestDefaultsModelosGroq:
     """Los 4 campos existen y traen la cadena de la ronda 8."""
 
-    def test_primario_es_llama_4_maverick(self, monkeypatch):
+    def test_primario_es_gpt_oss(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model == "meta-llama/llama-4-scout-17b-16e-instruct"
+        assert s.groq_model == "openai/gpt-oss-120b"  # llama-4-scout salió del catálogo (05-08-2026)
 
     def test_primario_ya_no_es_llama_33(self, monkeypatch):
         # llama-3.3 pasó a fallback 3 (último recurso).
         s = _settings_limpio(monkeypatch)
         assert s.groq_model != "llama-3.3-70b-versatile"
 
-    def test_fallback_1_es_gpt_oss(self, monkeypatch):
+    def test_fallback_1_es_qwen(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model_fallback_1 == "openai/gpt-oss-120b"
+        assert s.groq_model_fallback_1 == "qwen/qwen3-32b"
 
-    def test_fallback_2_es_qwen3_32b(self, monkeypatch):
+    def test_fallback_2_es_llama_33(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model_fallback_2 == "qwen/qwen3-32b"
+        assert s.groq_model_fallback_2 == "llama-3.3-70b-versatile"
 
-    def test_fallback_3_es_llama_33(self, monkeypatch):
+    def test_fallback_3_es_llama_31_instant(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model_fallback_3 == "llama-3.3-70b-versatile"
+        assert s.groq_model_fallback_3 == "llama-3.1-8b-instant"
 
     def test_cadena_sin_duplicados_por_default(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
