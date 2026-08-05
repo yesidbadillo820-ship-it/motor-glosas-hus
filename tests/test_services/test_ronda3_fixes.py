@@ -261,13 +261,13 @@ class TestCupsFalsos:
         out = _neutralizar_cups_falsos(mal)
         assert "20260511" not in out
         assert "facturado facturado" not in out.lower()
-        assert "el procedimiento facturado por COOSALUD" in out
+        assert "EL PROCEDIMIENTO FACTURADO POR COOSALUD" in out.upper()
 
     def test_fecha_con_guion_como_cups(self):
         mal = "El CUPS 2026-05-11 corresponde al servicio."
         out = _neutralizar_cups_falsos(mal)
         assert "2026-05-11" not in out
-        assert "el procedimiento facturado" in out
+        assert "EL PROCEDIMIENTO FACTURADO" in out.upper()
 
     def test_hus_como_cups(self):
         mal = "Servicio CUPS HUS00012345 detallado."
