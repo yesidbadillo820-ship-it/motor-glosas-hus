@@ -2117,6 +2117,28 @@ de Docker.
      sido aceptada al 100%»: se responde UNA a mano en el portal y se mira
      el código en Ver Histórico.
 
+### 05-08 (segunda parte) — La homologación de códigos DGH → SIIFA
+
+- El portal muestra la **frase** de cada respuesta pero no el código, y el
+  catálogo de la API vino vacío. Se armó la homologación por SIGNIFICADO con
+  la evidencia que hay:
+  - **RE9901** = «la glosa siendo justificable ha podido ser subsanada
+    totalmente» — así lo devuelve el propio informe de SIIFA. NO es
+    «no acepto».
+  - **RE9702** = «la glosa/devolución ha sido **aceptada al 100%**» — en el
+    piloto de la HUS497119 se escogió esa frase y en Ver Histórico quedó
+    RE9702.
+  - **RE9701** (DGH) = las devoluciones que el hospital **aceptó** con nota
+    crédito. SIIFA no lo acepta → se homologa a **RE9702**.
+- `siifa_corregir_rechazadas.py --homologar` aplica ese cambio y lo deja
+  marcado en la columna CORRECCION.
+- La opción **[7]** del bot ahora prueba todos los nombres de grupo conocidos
+  del catálogo y, si ninguno responde, explica cómo sacar el código a mano:
+  responder una a mano en el portal y mirarlo en Ver Histórico.
+- El desplegable de **devoluciones** ofrece tres respuestas: «no procede por
+  fuera de términos (aceptación tácita de la factura)», «la devolución es
+  injustificada al 100%» y «la devolución ha sido aceptada al 100%».
+
 ---
 
 ## 3) PENDIENTE
