@@ -419,6 +419,31 @@ class SiifaClient:
             body["observacionRespuesta"] = observacion_respuesta
         return self._request("PUT", "/api/SeguimientoFacturaGlosa/Respuesta", json=body)
 
+    def responder_devolucion(
+        self,
+        id_seguimiento_factura_devolucion: int,
+        id_seguimiento_tipo_codigo_respuesta: str,
+        observacion_respuesta: str | None = None,
+        fecha_respuesta: str | None = None,
+    ) -> dict:
+        """PUT /api/SeguimientoFacturaDevolucion/Respuesta — responde una
+        DEVOLUCIÓN, que en SIIFA es otra entidad, con su propio id y su propia
+        lista de códigos de respuesta.
+
+        Mandar una devolución por la puerta de las glosas es lo que hacía que
+        SIIFA contestara «el código no existe, no está activo o no pertenece
+        al grupo RESPUESTA»: el código de devolución (RE9701, por ejemplo) es
+        válido, pero se estaba validando contra los códigos de glosa.
+        """
+        body = {
+            "idSeguimientoFacturaDevolucion": id_seguimiento_factura_devolucion,
+            "idSeguimientoTipoCodigoRespuesta": id_seguimiento_tipo_codigo_respuesta,
+            "fechaRespuesta": fecha_respuesta or _ahora_iso(),
+        }
+        if observacion_respuesta:
+            body["observacionRespuesta"] = observacion_respuesta
+        return self._request("PUT", "/api/SeguimientoFacturaDevolucion/Respuesta", json=body)
+
     def responder_reiteracion_glosa(
         self,
         id_seguimiento_factura_glosa: int,

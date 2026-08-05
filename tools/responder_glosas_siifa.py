@@ -87,6 +87,11 @@ COLUMNAS = {
     "codigo": {"CODIGO_RESPUESTA", "CODIGO RESPUESTA", "COD_RESPUESTA", "COD RESPUESTA GLOSA"},
     "observacion": {"OBSERVACION_RESPUESTA", "OBSERVACION RESPUESTA", "OBSERVACION RTA GLOSA"},
     "fecha": {"FECHA_RESPUESTA", "FECHA RESPUESTA"},
+    "tipo": {"TIPO", "TIPO_SEGUIMIENTO", "TIPO SEGUIMIENTO"},
+    "id_devolucion": {
+        "ID_SEGUIMIENTO_FACTURA_DEVOLUCION",
+        "ID SEGUIMIENTO FACTURA DEVOLUCION",
+    },
 }
 
 
@@ -154,9 +159,22 @@ def leer_excel(ruta: Path, hoja: str | None) -> list[dict]:
                 if idx.get("observacion") is not None
                 else "",
                 "fecha": _fecha_iso(r[idx["fecha"]]) if idx.get("fecha") is not None else None,
+                "tipo": str(r[idx["tipo"]] or "").strip().upper()
+                if idx.get("tipo") is not None
+                else "",
+                "id_devolucion": _entero_o_none(r[idx["id_devolucion"]])
+                if idx.get("id_devolucion") is not None
+                else None,
             }
         )
     return filas
+
+
+def _entero_o_none(valor) -> int | None:
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
 
 
 def _fecha_iso(valor) -> str | None:
@@ -276,16 +294,51 @@ def procesar(
                 }
             )
             continue
+        es_devolucion = fila.get("tipo") == "DEVOLUCION"
+        if es_devolucion and accion == "respuesta" and not fila.get("id_devolucion"):
+            # Sin el id de devolución NO se manda nada: usar el de glosa
+            # escribiría la respuesta sobre otro registro de la plataforma.
+            reporte_writer.writerow(
+                {
+                    "id_seguimiento_factura_glosa": id_seg,
+                    "numero_factura": fila["factura"],
+                    "estado": "ERROR",
+                    "detalle": (
+                        "Es una DEVOLUCIÓN y falta la columna "
+                        "ID_SEGUIMIENTO_FACTURA_DEVOLUCION: volver a bajar el informe "
+                        "de seguimientos y regenerar el archivo."
+                    ),
+                    "fecha_hora": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            err += 1
+            logger.error(
+                "Devolución %s (factura %s): falta el id de devolución, no se manda.",
+                id_seg,
+                fila["factura"],
+            )
+            continue
         try:
-            if accion == "respuesta":
-                cliente.responder_glosa(id_seg, fila["codigo"], fila["observacion"], fila["fecha"])
-            else:
+            if accion != "respuesta":
                 cliente.responder_reiteracion_glosa(
                     id_seg, fila["codigo"], fila["observacion"], fila["fecha"]
                 )
+            elif es_devolucion:
+                # Una devolución es otra entidad en SIIFA: otra puerta, otro id
+                # y otra lista de códigos de respuesta.
+                cliente.responder_devolucion(
+                    fila["id_devolucion"], fila["codigo"], fila["observacion"], fila["fecha"]
+                )
+            else:
+                cliente.responder_glosa(id_seg, fila["codigo"], fila["observacion"], fila["fecha"])
             estado, detalle = "OK", ""
             ok += 1
-            logger.info("Glosa %s (factura %s): OK", id_seg, fila["factura"])
+            logger.info(
+                "%s %s (factura %s): OK",
+                "Devolución" if es_devolucion else "Glosa",
+                fila.get("id_devolucion") if es_devolucion else id_seg,
+                fila["factura"],
+            )
         except SiifaApiError as exc:
             estado, detalle = "ERROR", str(exc)
             err += 1
