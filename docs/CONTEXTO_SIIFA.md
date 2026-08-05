@@ -186,13 +186,34 @@ campos tal cual los manda la plataforma:
 py tools\siifa_sondear_endpoints.py --factura HUS494196
 ```
 
-El desplegable de **Responder Devolución** del portal ofrece tres respuestas
-(y no muestra sus códigos): «no procede por haber sido generada fuera de los
-términos (aceptación tácita de la factura)», «el PSS aporta la evidencia de
-que la devolución es injustificada al 100%» y «el PSS informa que la
-devolución ha sido aceptada al 100%». El catálogo de la API no expone el
-grupo de respuestas, así que el código de cada una se confirma respondiendo
-una a mano y mirándolo en Ver Histórico.
+### Los códigos de respuesta a una DEVOLUCIÓN
+
+El grupo del catálogo se llama **`RESPUESTA_DEV_PTS_PSS`** —lo dijo la propia
+API al rechazar una respuesta con un código de glosa—. Son tres:
+
+| Código | Qué dice |
+|---|---|
+| `RE9501` | La devolución **no procede** por haber sido generada fuera de los términos establecidos por la norma, configurándose la **aceptación tácita** de la factura de venta. |
+| `RE9601` | El PSS o PTS aporta a la ERP la evidencia que demuestra que la devolución es **injustificada al 100%**. |
+| `RE9701` | El PSS o PTS informa a la ERP que la devolución ha sido **aceptada al 100%**. |
+
+Para verlos:
+
+```powershell
+py tools\responder_glosas_siifa.py --listar-catalogo RESPUESTA_DEV_PTS_PSS
+```
+
+Cuál usar, según lo que diga el texto de la respuesta:
+
+- el hospital **acepta** la devolución (nota crédito) → `RE9701`;
+- el hospital **no acepta** y aporta la evidencia → `RE9601`;
+- la EPS devolvió **fuera de su propio plazo** → `RE9501`, que es el más
+  fuerte porque implica aceptación tácita de la factura. Exige comparar
+  fechas caso a caso, así que el motor no lo pone solo.
+
+**Un código de glosa NO sirve para una devolución.** RE9901 —el que usa el
+motor para no aceptar una glosa— hace que SIIFA rechace la respuesta con
+«no pertenece al grupo RESPUESTA_DEV_PTS_PSS».
 
 ## 5.ter) Cómo se responde A MANO en el portal (guía del auditor, 03-08-2026)
 
