@@ -62,28 +62,18 @@ class TestBugBv4Placeholders:
 
 
 class TestBugLv2UmbralMasBajo:
-    def test_umbral_45_pct_se_dispara(self):
-        # Texto con ~50% mayúsculas — antes ronda 14 no se disparaba
+    def test_el_umbral_ya_no_dispara_nada(self):
+        """05-08-2026: la normalización a sentence case quedó retirada — el
+        dictamen se radica en MAYÚSCULAS por decisión del dueño."""
         dictamen = "ESE HUS NO ACEPTA LA GLOSA. La EPS objeta el procedimiento."
-        resultado = _normalizar_mayusculas_sostenidas(dictamen)
-        assert resultado != dictamen
-        assert "HUS" in resultado
-        assert "EPS" in resultado
+        assert _normalizar_mayusculas_sostenidas(dictamen) == dictamen
 
-    def test_texto_50_pct_mayusculas_se_normaliza(self):
-        # Test del nuevo umbral 45% — caso real del Cart-T donde solo
-        # algunas oraciones estaban en MAYÚSCULAS
+    def test_el_texto_llega_intacto_al_dictamen(self):
         dictamen = (
             "ESE HUS NO ACEPTA LA GLOSA APLICADA POR SANITAS. "
             "ES OBJETO DE ESTE DICTAMEN EL VALOR FACTURADO."
         )
-        resultado = _normalizar_mayusculas_sostenidas(dictamen)
-        # El umbral de 45% sí se debería disparar
-        assert "ESE HUS" in resultado
-        # Siglas conocidas conservadas
-        assert "SANITAS" in resultado
-        # Y el texto debe haber cambiado (no quedó IDÉNTICO)
-        assert resultado != dictamen
+        assert _normalizar_mayusculas_sostenidas(dictamen) == dictamen
 
 
 class TestBugQCitasInventadas:

@@ -2832,6 +2832,29 @@ def _bloque_campos_a_confirmar(eps: str, contrato: str | None, subconceptos: lis
 
 
 def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:
+    """RETIRADO el 05-08-2026: devuelve el texto tal cual.
+
+    Bajaba a «sentence case» todo dictamen que viniera en mayúsculas
+    sostenidas. Era una decisión de estilo de la ronda 17, y el dueño del
+    sistema decidió lo contrario: **el dictamen se radica en MAYÚSCULAS**,
+    como lo escribe el hospital desde siempre. Eso ahora lo garantiza
+    a_mayusculas_html() dentro de _generar_dictamen_html.
+
+    Además hacía daño: al bajar el texto, un marcador crudo `[ENTIDAD]`
+    quedaba `[Entidad]`, y el relleno de marcadores —que solo reconoce
+    MAYÚSCULAS entre corchetes— dejaba de verlo. El marcador llegaba
+    entero al documento que sale a la EPS. Se descubrió el 05-08-2026 al
+    forzar las mayúsculas: el defecto llevaba meses tapado por el propio
+    lowercase.
+
+    Se conserva la función —no el comportamiento— porque la llaman tres
+    sitios y hay pruebas que la nombran. Cuando no quede ninguna
+    referencia, se borra.
+    """
+    return texto
+
+
+def _normalizar_mayusculas_sostenidas_legacy(texto: str, umbral_pct: float = 0.45) -> str:
     """Convierte texto en MAYÚSCULAS sostenidas a sentence case institucional.
 
     Estrategia:
@@ -6478,6 +6501,22 @@ class GlosaService:
                                     arg_ia, eps=str(data.eps or "")
                                 )
                                 arg_ia = truncar_despues_de_levantamiento(arg_ia)
+                                # El relleno de marcadores faltaba en esta
+                                # lista (05-08-2026). El texto refinado
+                                # vuelve a traer "[ENTIDAD]" / "[SERVICIO]"
+                                # —los copia de los ejemplos del prompt— y
+                                # como acá no se rellenaban, salían enteros
+                                # en el documento que va a la EPS. Estuvo
+                                # tapado meses porque el normalizador de
+                                # mayúsculas los dejaba como "[Entidad]" y
+                                # la prueba solo buscaba la forma en
+                                # mayúsculas.
+                                arg_ia = _rellenar_placeholders(
+                                    arg_ia,
+                                    eps=str(data.eps or ""),
+                                    codigo=codigo_det,
+                                    valor=valor_raw,
+                                )
                                 logger.info(
                                     f"[AUTO-CRITICA] score={_score_val}→refinado "
                                     f"({len(_defectos)} defectos corregidos) "
