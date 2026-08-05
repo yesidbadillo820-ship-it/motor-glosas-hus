@@ -31,6 +31,15 @@ _CIERRE_ANCLA = re.compile(
 # Ronda 21 (caso MEDIMÁS): marcadores de CODA PROCESAL que la IA encadena
 # tras el cierre con una CONJUNCIÓN (sin punto), por lo que el truncado por
 # "primer punto" no los recortaba ("...de la glosa Y, de persistir
+# Punto que de verdad cierra una oración. NO el separador de miles de
+# «$ 12.300.000», NO el de una sigla pegada («E.S.E.») y NO el de una
+# abreviatura seguida de número («ART. 87», «NO. 12345»). Los cuatro casos
+# salieron cortados en dictámenes reales.
+# El lookbehind cubre el punto FINAL de una sigla («E.S.E. HOSPITAL»): por
+# su forma es idéntico a un fin de oración, y solo se distingue por venir
+# detrás de otra letra abreviada.
+_RE_FIN_ORACION = re.compile(r"(?<!\.\w)\.(?!\w)(?!\s*\d)", re.UNICODE)
+
 # discrepancias, se invita a mesa de conciliación..."). Si un marcador
 # aparece ANTES del primer punto de la cola, se corta en el ancla.
 _MARCADORES_CODA = re.compile(
@@ -81,7 +90,15 @@ def truncar_despues_de_levantamiento(texto: str) -> str:
     # hasta 200 chars de continuación legítima ("Y EL RECONOCIMIENTO
     # ÍNTEGRO DEL VALOR PACTADO EN EL ANEXO N° 1 DEL CONTRATO 440...").
     cola = texto[m.end() : m.end() + 200]
-    rel = cola.find(".")
+    # El punto que cierra la oración, no cualquier punto. Buscar el primero
+    # a secas cortaba dentro de los separadores de miles: el 05-08-2026 un
+    # dictamen salió terminando en «…EL RECONOCIMIENTO ÍNTEGRO DEL VALOR
+    # $ 12.» — el punto de «12.300.000». No era el modelo truncando, era
+    # este corte. Con el mismo regex se arreglan tres hermanos del mismo
+    # defecto: «…A LA E.» (de E.S.E.), «…CONFORME AL ART.» (ART. 87) y
+    # «…FACTURA NO.» (NO. 12345).
+    _mp = _RE_FIN_ORACION.search(cola)
+    rel = _mp.start() if _mp else -1
     # Ronda 21: si una coda procesal arranca ANTES del primer punto (típico
     # cuando se une por conjunción: "...de la glosa Y, de persistir..."),
     # cortar en el ancla. La continuación legítima ("Y EL RECONOCIMIENTO
