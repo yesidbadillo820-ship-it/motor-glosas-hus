@@ -54,6 +54,9 @@ RUTAS = [
 # Nombres de grupo del catálogo de códigos. El portal muestra la frase pero no
 # el código, y con «RESPUESTA» a secas el catálogo vino vacío.
 GRUPOS = [
+    # Nombres que la propia API menciona en sus errores de validación.
+    "RESPUESTA_DEV_PTS_PSS",
+    "RESPUESTA_GLOSA_PTS_PSS",
     "RESPUESTA",
     "RESPUESTA_GLOSA",
     "RESPUESTAGLOSA",
