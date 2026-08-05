@@ -2176,6 +2176,39 @@ de Docker.
   grupos del catálogo **sin escribir nada** en la plataforma, y el volcado de
   los campos crudos de una factura (`--factura HUS494196`).
 
+### 05-08 (quinta parte) — SIIFA quedó al día: 2.579 de 2.579
+
+| | Subidas | Pendientes |
+|---|---|---|
+| Glosas | **1.238 de 1.238** — $310.614.081 defendidos | 0 |
+| Devoluciones | **1.341 de 1.341** líneas — 10 facturas por $115.051.312 | 0 |
+
+- **Todas las glosas y devoluciones que SIIFA tenía sin responder quedaron
+  respondidas.** El cargue de hoy fue en cuatro tandas y ninguna dejó errores.
+- **La tabla de códigos de respuesta a devolución** (grupo
+  `RESPUESTA_DEV_PTS_PSS`), que era lo que faltaba saber:
+  - `RE9501` — la devolución no procede, se generó fuera de términos →
+    aceptación tácita de la factura;
+  - `RE9601` — el hospital aporta evidencia de que es injustificada al 100%;
+  - `RE9701` — el hospital acepta la devolución al 100%.
+- Se usó `RE9701` en las 495 que el hospital había aceptado con nota crédito y
+  `RE9601` en las 674 que no acepta.
+
+**Lo que queda por revisar (no urgente, pero conviene):**
+
+1. **170 líneas de la factura HUS475438** se subieron el 4 y 5 de agosto por
+   la puerta de las glosas, con el código RE9901, antes de que se descubriera
+   el problema. Hay que mirar su histórico en el portal y decidir si se
+   vuelven a responder por la puerta correcta.
+2. **Las 674 devoluciones DE5601 podrían ganarse con `RE9501`.** Se subieron
+   con RE9601 («es injustificada»), que es lo que decía el texto. Pero si al
+   comparar fechas resulta que la EPS devolvió fuera de SU propio plazo,
+   RE9501 es más fuerte: implica aceptación tácita de la factura. Requiere
+   cruzar fecha de radicación contra fecha de devolución, caso por caso.
+3. **La fecha de las respuestas subidas el 4 y 5 de agosto** quedó con el día
+   del cargue y no con la de DGH (los archivos se generaron antes de que
+   existiera la columna FECHA_RESPUESTA).
+
 ---
 
 ## 3) PENDIENTE
