@@ -4415,6 +4415,39 @@ def _contradiccion_no_prestado_vs_tarifa(texto: str) -> bool:
     return hay_no_prestado and hay_tarifa
 
 
+# ── Hechos clínicos afirmados sin un solo soporte adjunto (OT-005) ──
+# Prueba real del 05-08-2026, glosa AU0401 de COMPENSAR, SIN PDF adjunto:
+#
+#   "EL HISTORIAL MÉDICO DETALLA SÍNTOMAS DE DOLOR ABDOMINAL AGUDO QUE
+#    REQUIEREN IMÁGENES DE ALTA RESOLUCIÓN. EL INFORME DE RADIOLOGÍA
+#    INDICA LA NECESIDAD DE CONTRASTE PARA DESCARTAR PATOLOGÍAS GRAVES."
+#
+# Nadie subió una historia clínica ni un informe de radiología. El motor
+# escribió lo que suele decir un caso así. Si la EPS pide ese informe, el
+# hospital queda afirmando algo que no puede probar — y eso pesa mucho más
+# que la glosa que se estaba discutiendo.
+#
+# La regla no aplica cuando SÍ hay soportes: ahí el motor los leyó.
+_PAT_AFIRMACION_CLINICA = re.compile(
+    r"(?:HISTORIA\s+CL[ÍI]NICA|HISTORIAL\s+M[ÉE]DICO|EPICRISIS|"
+    r"INFORME\s+DE\s+(?:RADIOLOG[ÍI]A|PATOLOG[ÍI]A|IMAGENOLOG[ÍI]A)|"
+    r"REPORTE\s+DE\s+(?:LABORATORIO|PATOLOG[ÍI]A|IM[ÁA]GENES)|"
+    r"NOTA\s+(?:OPERATORIA|DE\s+ENFERMER[ÍI]A)|DESCRIPCI[ÓO]N\s+QUIR[ÚU]RGICA)"
+    r"[^.<]{0,90}?"
+    r"\b(?:DETALLA|DETALLAN|DESCRIBE|DESCRIBEN|REGISTRA|REGISTRAN|CONSIGNA|"
+    r"CONSIGNAN|REPORTA|REPORTAN|INDICA|INDICAN|EVIDENCIA|EVIDENCIAN|"
+    r"DEMUESTRA|DEMUESTRAN)\b",
+    re.IGNORECASE,
+)
+
+
+def _afirma_hechos_clinicos_sin_soporte(dictamen: str, tiene_soportes: bool) -> bool:
+    """¿El dictamen dice qué contiene un documento que nadie adjuntó?"""
+    if tiene_soportes or not dictamen:
+        return False
+    return bool(_PAT_AFIRMACION_CLINICA.search(dictamen))
+
+
 def limpiar_cierre_extemporanea_indebido(
     texto: str,
     es_ratificacion: bool = False,
@@ -7790,6 +7823,34 @@ class GlosaService:
                 )
         except Exception as _e_ct:
             logger.debug(f"[GLOSA-CONTRADICTORIA] aviso no agregado: {_e_ct}")
+
+        # ── Hechos clínicos sin un solo soporte adjunto (05-08-2026, OT-005) ──
+        # Prueba real, glosa AU0401 de COMPENSAR sin PDF: "EL HISTORIAL MÉDICO
+        # DETALLA SÍNTOMAS DE DOLOR ABDOMINAL AGUDO... EL INFORME DE RADIOLOGÍA
+        # INDICA LA NECESIDAD DE CONTRASTE". Nadie subió esos documentos.
+        try:
+            if _afirma_hechos_clinicos_sin_soporte(dictamen, tiene_pdf):
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">EL DICTAMEN AFIRMA '
+                    "CONTENIDO DE DOCUMENTOS QUE NO SE ADJUNTARON</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    "Este dictamen dice qué contiene la historia clínica o un informe "
+                    "del paciente, y a este análisis <b>no se le adjuntó ningún "
+                    "soporte</b>. El motor escribió lo que suele decir un caso así, no "
+                    "lo que dice el expediente de este paciente. <b>Contrastá cada "
+                    "afirmación con la historia clínica real antes de radicar</b> y "
+                    "borrá la que no esté respaldada: si la entidad pide el documento, "
+                    "esa frase pesa más que la glosa que se estaba discutiendo."
+                    "</p></div>"
+                )
+                logger.warning(
+                    "[CLINICA-SIN-SOPORTE] el dictamen afirma contenido de documentos "
+                    "clínicos y no se adjuntó ningún soporte — aviso agregado"
+                )
+        except Exception as _e_cs:
+            logger.debug(f"[CLINICA-SIN-SOPORTE] aviso no agregado: {_e_cs}")
 
         # ── Esto no es una glosa: es una DEVOLUCIÓN (05-08-2026) ─────────
         # «DE1601 FACTURA DEVUELTA POR NO CORRESPONDER A USUARIO» se
