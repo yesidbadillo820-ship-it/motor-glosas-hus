@@ -3326,6 +3326,66 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
     return resultado
 
 
+# ── Aritmética de la glosa: ¿objetan más de lo facturado? (OT-002) ──
+# Lector LOCAL y sólo para el aviso. No se tocó _extraer_valores_glosa
+# (app/utils/parsers_glosa.py) a propósito: esa función también llena los
+# campos de valor que ve el auditor en pantalla, y ampliarle los patrones
+# le cambiaría los montos precargados a todo el mundo. Aquí se leen las
+# etiquetas explícitas que usan las EPS y, lo que no aparezca, se le
+# pregunta al lector compartido.
+_ETIQUETAS_FACTURADO = (
+    r"VALOR\s+(?:TOTAL\s+|UNITARIO\s+|BRUTO\s+)?FACTURAD[OA]",
+    r"TOTAL\s+FACTURAD[OA]",
+    r"VALOR\s+DE\s+LA\s+FACTURA",
+    r"TOTAL\s+(?:DE\s+LA\s+)?FACTURA",
+    r"FACTURAD[OA]\s+POR",
+)
+_ETIQUETAS_OBJETADO = (
+    r"VALOR\s+(?:TOTAL\s+)?GLOSAD[OA]",
+    r"VALOR\s+(?:TOTAL\s+)?OBJETAD[OA]",
+    r"VALOR\s+DE\s+LA\s+GLOSA",
+    r"TOTAL\s+GLOSAD[OA]",
+    r"SE\s+GLOSA(?:N)?",
+    r"SE\s+OBJETA(?:N)?",
+)
+_MONTO_COP = r"[:\s]*\$?\s*([\d][\d\.,]{3,})"
+
+
+def _monto_por_etiqueta(texto: str, etiquetas: tuple) -> float:
+    """Primer monto que aparezca detrás de una de las etiquetas dadas."""
+    from app.utils.moneda import parse_valor_cop
+
+    for et in etiquetas:
+        m = re.search(et + _MONTO_COP, texto, re.IGNORECASE)
+        if m:
+            try:
+                v = parse_valor_cop(m.group(1))
+            except Exception:
+                v = 0.0
+            if v > 0:
+                return float(v)
+    return 0.0
+
+
+def _facturado_y_objetado(texto: str) -> tuple:
+    """(facturado, objetado) leídos del texto de la glosa. 0.0 lo que falte."""
+    if not texto:
+        return (0.0, 0.0)
+    fact = _monto_por_etiqueta(texto, _ETIQUETAS_FACTURADO)
+    obj = _monto_por_etiqueta(texto, _ETIQUETAS_OBJETADO)
+    if fact and obj:
+        return (fact, obj)
+    try:
+        from app.utils.parsers_glosa import _extraer_valores_glosa
+
+        vals = _extraer_valores_glosa(texto)
+        fact = fact or float(vals.get("facturado") or 0.0)
+        obj = obj or float(vals.get("objetado") or 0.0)
+    except Exception:
+        pass
+    return (fact, obj)
+
+
 # ── Red final: "CUPS <fecha/factura>" en el dictamen (16-jun-2026, ronda 3) ──
 # Evidencia caso 4 (COOSALUD): el texto traía "Verificar radicado 20260511 y
 # soporte 4710-2026" → la IA escribió "código CUPS 20260511" (20260511 es
@@ -4256,6 +4316,105 @@ def _glosa_es_del_tema_dmbug(texto: str) -> bool:
     return any(_plegar(s) in t for s in _SENALES_TEMA_DMBUG)
 
 
+# ── ¿La EPS está discutiendo PERTINENCIA, no tarifa? (OT-003) ──
+# Glosa de prueba TA0601 de PPL: "TAC DE ABDOMEN NO PERTINENTE PARA EL
+# DIAGNÓSTICO REGISTRADO". El código empieza por TA, así que el motor
+# entregó el texto fijo de tarifas —SOAT, UVB, valores pactados— a una
+# pregunta que era clínica. Respondió otra cosa, y una glosa que no se
+# contesta se ratifica.
+#
+# La causal tampoco calza con el hecho: TA0601 del catálogo es
+# "dispositivos médicos: diferencias con valores pactados". Eso es
+# aplicación indebida de causal, y es un argumento a favor del hospital —
+# pero solo si el dictamen lo dice, y para decirlo hay que pasar por el
+# motor con su control de calidad, no por el texto fijo.
+_SENALES_PERTINENCIA = (
+    "NO PERTINENTE",
+    "NO ES PERTINENTE",
+    "FALTA DE PERTINENCIA",
+    "SIN PERTINENCIA",
+    "PERTINENCIA MEDICA",
+    "PERTINENCIA CLINICA",
+    "NO PERTINENCIA",
+    "SIN JUSTIFICACION CLINICA",
+    "SIN JUSTIFICACION MEDICA",
+    "NO SE JUSTIFICA CLINICAMENTE",
+    "NO JUSTIFICA CLINICAMENTE",
+    "SIN INDICACION MEDICA",
+    "SIN INDICACION CLINICA",
+    "NO CORRESPONDE AL DIAGNOSTICO",
+    "NO GUARDA RELACION CON EL DIAGNOSTICO",
+    "NO SE RELACIONA CON EL DIAGNOSTICO",
+    "NO ERA NECESARIO",
+    "NO ERAN NECESARIOS",
+    "SIN NECESIDAD MEDICA",
+    "NO REQUERIA",
+)
+
+
+def _glosa_es_de_pertinencia(texto: str) -> bool:
+    """¿El motivo escrito es clínico aunque el código sea de tarifas?"""
+    if not texto:
+        return False
+    import unicodedata as _ud
+
+    def _plegar(s: str) -> str:
+        n = _ud.normalize("NFKD", str(s or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    t = _plegar(texto)
+    return any(_plegar(s) in t for s in _SENALES_PERTINENCIA)
+
+
+# ── Dos objeciones que no pueden ser ciertas a la vez (OT-004) ──
+# Glosa de prueba de SALUD MIA: FA0302 "servicio no prestado" y TA0801
+# "tarifa superior a la pactada" sobre el MISMO ítem. Si el servicio no se
+# prestó no hay tarifa que discutir; si la tarifa está mal, el servicio se
+# prestó. La EPS se contradice, y esa contradicción sola tumba las dos
+# objeciones — pero el motor refutó cada una por separado y nunca lo dijo.
+_SENALES_NO_PRESTADO = (
+    "NO PRESTADO",
+    "NO PRESTADA",
+    "NO SE PRESTO",
+    "SERVICIO NO REALIZADO",
+    "PROCEDIMIENTO NO REALIZADO",
+    "NO SE REALIZO",
+    "NO EJECUTADO",
+    "NO SE EJECUTO",
+    "NO SUMINISTRADO",
+    "NO SE SUMINISTRO",
+    "SERVICIO INEXISTENTE",
+    "COBRO DE SERVICIO NO",
+)
+_SENALES_TARIFA_MAYOR = (
+    "TARIFA SUPERIOR",
+    "TARIFA MAYOR",
+    "VALOR SUPERIOR AL PACTADO",
+    "VALOR MAYOR AL PACTADO",
+    "MAYOR VALOR COBRADO",
+    "SOBRECOSTO",
+    "DIFERENCIA TARIFARIA",
+    "POR ENCIMA DE LA TARIFA",
+    "SUPERIOR A LA PACTADA",
+)
+
+
+def _contradiccion_no_prestado_vs_tarifa(texto: str) -> bool:
+    """¿La glosa dice a la vez que no se prestó y que se cobró de más?"""
+    if not texto:
+        return False
+    import unicodedata as _ud
+
+    def _plegar(s: str) -> str:
+        n = _ud.normalize("NFKD", str(s or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    t = _plegar(texto)
+    hay_no_prestado = any(_plegar(s) in t for s in _SENALES_NO_PRESTADO)
+    hay_tarifa = any(_plegar(s) in t for s in _SENALES_TARIFA_MAYOR)
+    return hay_no_prestado and hay_tarifa
+
+
 def limpiar_cierre_extemporanea_indebido(
     texto: str,
     es_ratificacion: bool = False,
@@ -4892,7 +5051,16 @@ class GlosaService:
             # camino no pasa el Quality Gate, así que nadie lo detectó.
             argumento_fijo = TEXTO_DMBUG_TARIFAS
             tipo_glosa = "TA_DMBUG_FIJO"
-        elif es_tarifa and not tiene_contrato and not _es_dispensario_medico(eps_key):
+        elif (
+            es_tarifa
+            and not tiene_contrato
+            and not _es_dispensario_medico(eps_key)
+            # 05-08-2026 (OT-003): si el motivo escrito es clínico, el texto
+            # fijo de tarifas responde otra pregunta. Caso TA0601 de PPL:
+            # "TAC de abdomen no pertinente" contestado con SOAT y UVB. Esas
+            # van al motor, que sí lee el motivo y pasa por control de calidad.
+            and not _glosa_es_de_pertinencia(texto_base)
+        ):
             # La exclusión del Dispensario evita que una glosa TA suya que
             # no calzó con el tema caiga en el OTRO texto fijo ("no hay
             # contrato pactado"), que contradiría al RE9901 de más abajo:
@@ -7546,6 +7714,82 @@ class GlosaService:
                 )
         except Exception as _e_ap:
             logger.debug(f"[ACEPTACION-TEXTO] aviso no agregado: {_e_ap}")
+
+        # ── La glosa cobra más de lo que se facturó (05-08-2026, OT-002) ──
+        # Glosa de prueba SO0202 de SUMIMEDICAL: "VALOR FACTURADO $1.500.000
+        # ... VALOR GLOSADO $1.850.000". El motor armó toda la defensa
+        # jurídica y no dijo lo único que cerraba el caso solo: no se puede
+        # glosar plata que nunca se cobró. Los dos montos ya venían en el
+        # texto y nadie los restaba.
+        #
+        # Igual que los demás avisos: es una SEÑAL para el auditor, no una
+        # decisión. El dictamen no cambia; se le pone el dato al lado.
+        try:
+            from app.utils.moneda import parse_valor_cop as _pvc_ar
+
+            _fact_ar, _obj_texto_ar = _facturado_y_objetado(texto_base or "")
+            try:
+                _obj_ar = _pvc_ar(valor_raw)
+            except Exception:
+                _obj_ar = 0.0
+            # Manda lo que escribió el auditor en el campo de valor; si lo
+            # dejó vacío, lo que diga el texto de la glosa.
+            if not _obj_ar:
+                _obj_ar = _obj_texto_ar
+            # El margen del 1% evita el ruido de redondeo y de los IVA
+            # partidos; por debajo de eso no es un error aritmético.
+            if _fact_ar > 0 and _obj_ar > _fact_ar and (_obj_ar - _fact_ar) > (_fact_ar * 0.01):
+                _exceso_ar = _obj_ar - _fact_ar
+                _f_obj = f"${_obj_ar:,.0f}".replace(",", ".")
+                _f_fac = f"${_fact_ar:,.0f}".replace(",", ".")
+                _f_exc = f"${_exceso_ar:,.0f}".replace(",", ".")
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">LA GLOSA SUPERA EL '
+                    "VALOR FACTURADO</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    f"La entidad objeta <b>{_f_obj}</b> sobre una factura de "
+                    f"<b>{_f_fac}</b>: son <b>{_f_exc}</b> por encima de lo cobrado. "
+                    "No se puede glosar un valor que nunca se facturó. Verificá los dos "
+                    "montos en el detallado y, si se confirma, ese solo hecho tumba el "
+                    "exceso sin necesidad de discutir el fondo."
+                    "</p></div>"
+                )
+                logger.info(
+                    f"[GLOSA-MAYOR-QUE-FACTURA] objetado {_f_obj} > facturado "
+                    f"{_f_fac} (exceso {_f_exc}) — aviso agregado al dictamen"
+                )
+        except Exception as _e_ar:
+            logger.debug(f"[GLOSA-MAYOR-QUE-FACTURA] aviso no agregado: {_e_ar}")
+
+        # ── La EPS se contradice a sí misma (05-08-2026, OT-004) ─────────
+        # Glosa de prueba de SALUD MIA: FA0302 "servicio no prestado" y
+        # TA0801 "tarifa superior a la pactada" sobre el mismo ítem. El
+        # motor refutó cada una por separado y nunca dijo lo evidente: no
+        # pueden ser ciertas las dos.
+        try:
+            if _contradiccion_no_prestado_vs_tarifa(texto_base or ""):
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">LA GLOSA SE '
+                    "CONTRADICE</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    "La entidad objeta al mismo tiempo que el servicio <b>no se prestó</b> "
+                    "y que la <b>tarifa cobrada es superior</b> a la pactada. Las dos no "
+                    "pueden ser ciertas: si no se prestó no hay tarifa que discutir, y si "
+                    "hay tarifa que discutir es porque se prestó. Señalá esa contradicción "
+                    "en la mesa: obliga a la entidad a escoger una sola causal y a "
+                    "sustentarla."
+                    "</p></div>"
+                )
+                logger.info(
+                    "[GLOSA-CONTRADICTORIA] «no prestado» + «tarifa superior» en la "
+                    "misma glosa — aviso agregado al dictamen"
+                )
+        except Exception as _e_ct:
+            logger.debug(f"[GLOSA-CONTRADICTORIA] aviso no agregado: {_e_ct}")
 
         # ── Esto no es una glosa: es una DEVOLUCIÓN (05-08-2026) ─────────
         # «DE1601 FACTURA DEVUELTA POR NO CORRESPONDER A USUARIO» se
