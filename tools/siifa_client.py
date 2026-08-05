@@ -441,6 +441,21 @@ class SiifaClient:
             body["observacionReiteracionRespuesta"] = observacion_reiteracion_respuesta
         return self._request("PUT", "/api/SeguimientoFacturaGlosa/ReiteracionRespuesta", json=body)
 
+    def sondear(self, path: str, method: str = "GET") -> tuple[int, str]:
+        """Toca una ruta para ver si existe. NO escribe nada en la plataforma.
+
+        Sirve para averiguar por dónde se responde una devolución sin tener
+        que mandar una respuesta de prueba. Lo que distingue una ruta de otra
+        es el código: 404 = no existe; 405 = existe pero con otro método;
+        400/401/500 = existe y contestó.
+        """
+        url = f"{self.base_url}{path}"
+        try:
+            resp = self._client.request(method, url, headers=self._headers())
+        except httpx.RequestError as exc:
+            return 0, f"no respondió: {exc}"
+        return resp.status_code, _error_detail(resp)[:200]
+
     # ----------------------------------------------------------- diagnóstico
 
     def diagnostico(self) -> list[tuple[str, bool, str]]:

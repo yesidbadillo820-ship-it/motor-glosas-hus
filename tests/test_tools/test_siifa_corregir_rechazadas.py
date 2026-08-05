@@ -196,12 +196,14 @@ def test_se_pueden_apartar_las_respuestas_de_un_codigo(tmp_path):
     assert ids(aparte) == [2]
 
 
-def test_la_homologacion_manda_el_codigo_de_aceptacion(tmp_path):
-    """RE9701 en DGH es «el hospital acepta»: su equivalente no es RE9901.
+def test_hoy_no_se_homologa_ningun_codigo_a_ciegas(tmp_path):
+    """RE9701 SÍ es el código bueno de una devolución aceptada.
 
-    RE9901 en SIIFA significa que la glosa «pudo ser subsanada totalmente»;
-    la aceptación al 100% es RE9702. Poner el código que dice lo contrario
-    del texto es lo que se cae en una conciliación.
+    El auditor lo confirmó contra el portal: el desplegable de «Responder
+    Devolución» ofrece esa respuesta. SIIFA lo rechaza porque el bot manda
+    las devoluciones por la puerta de las glosas, no porque el código esté
+    mal. Cambiárselo dejaría la respuesta diciendo algo que el hospital no
+    decidió, así que la tabla va vacía hasta saber la puerta correcta.
     """
     excel = _excel(tmp_path, [_fila(1, codigo="RE9701", texto="ESE HUS ACEPTA DEVOLUCION.")])
     reporte = _reporte(tmp_path, {1: "ERROR"})
@@ -211,5 +213,5 @@ def test_la_homologacion_manda_el_codigo_de_aceptacion(tmp_path):
 
     ws = load_workbook(salida).active
     fila = dict(zip([c.value for c in ws[1]], [c.value for c in ws[2]]))
-    assert fila["CODIGO_RESPUESTA"] == "RE9702"
-    assert "REVISAR" in fila["CORRECCION"]
+    assert cor.HOMOLOGACION == {}
+    assert fila["CODIGO_RESPUESTA"] == "RE9701", "el código no se toca sin saber"
