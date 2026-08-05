@@ -56,6 +56,7 @@ logger = logging.getLogger("siifa_reporte")
 
 COLUMNAS = [
     "id_seguimiento_factura_glosa",
+    "id_seguimiento_factura_devolucion",
     "tipo_seguimiento",
     "numero_factura",
     "nit_emisor",
@@ -94,6 +95,12 @@ def _fila_reporte(fila: dict) -> dict:
     return {
         "id_seguimiento_factura_glosa": buscar_clave(
             fila, "idSeguimientoFactura", "idSeguimientoFacturaGlosa", default=""
+        ),
+        # Una DEVOLUCIÓN es otra entidad en SIIFA, con su propio id y su
+        # propia puerta para responder. Sin este id no se puede contestar una
+        # devolución: mandarla con el id de glosa es escribir en otro lado.
+        "id_seguimiento_factura_devolucion": buscar_clave(
+            fila, "idSeguimientoFacturaDevolucion", default=""
         ),
         "tipo_seguimiento": buscar_clave(fila, "tipoSeguimiento", default=""),
         "numero_factura": buscar_clave(factura, "numeroFactura", default=""),

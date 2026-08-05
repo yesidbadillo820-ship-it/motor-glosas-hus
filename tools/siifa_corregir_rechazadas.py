@@ -74,6 +74,7 @@ HOMOLOGACION: dict[str, str] = {}
 # Columnas que necesita el bot de cargue, más las que ayudan a revisar.
 COLUMNAS = [
     "ID_SEGUIMIENTO_FACTURA_GLOSA",
+    "ID_SEGUIMIENTO_FACTURA_DEVOLUCION",
     "NUMERO_FACTURA",
     "TIPO",
     "CODIGO_GLOSA",
@@ -212,7 +213,7 @@ def escribir(filas: list[dict], ruta: Path) -> None:
                 c.number_format = '"$"#,##0'
             if h == "CORRECCION" and "REVISAR" in _texto(fila.get("CORRECCION")):
                 c.fill = ojo
-    for i, ancho in enumerate([16, 14, 12, 12, 14, 16, 52, 14, 14, 120], 1):
+    for i, ancho in enumerate([16, 18, 14, 12, 12, 14, 16, 52, 14, 14, 120], 1):
         ws.column_dimensions[get_column_letter(i)].width = ancho
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(len(COLUMNAS))}{ws.max_row}"

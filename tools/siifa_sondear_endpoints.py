@@ -108,11 +108,40 @@ def sondear(cliente: SiifaClient) -> list[str]:
     return lineas
 
 
+def ver_seguimiento_crudo(cliente: SiifaClient, factura: str) -> list[str]:
+    """Muestra los campos TAL CUAL los devuelve la API para una factura.
+
+    Es la única forma de saber con qué nombre viene el id de una devolución
+    —hay que responderla con ESE id, no con el de la glosa— sin adivinarlo.
+    """
+    lineas = [f"CAMPOS CRUDOS DE LA FACTURA {factura}", "-" * 70]
+    vistos = 0
+    for crudo in cliente.listar_seguimientos(numero_factura=factura):
+        tipo = str(crudo.get("tipoSeguimiento") or crudo.get("TipoSeguimiento") or "?")
+        lineas.append(f"\n  Seguimiento tipo {tipo}:")
+        for clave, valor in sorted(crudo.items()):
+            if isinstance(valor, (dict, list)):
+                valor = f"({type(valor).__name__})"
+            texto = str(valor)
+            lineas.append(f"    {clave:<48} {texto[:60]}")
+        vistos += 1
+        if vistos >= 2:  # con uno de cada tipo alcanza
+            break
+    if not vistos:
+        lineas.append("  (esa factura no devolvió seguimientos)")
+    return lineas
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--guardar", help="Archivo de texto donde dejar el resultado, para mandarlo.")
+    ap.add_argument(
+        "--factura",
+        help="Muestra además los campos crudos de esa factura (para ver con qué nombre "
+        "viene el id de una devolución). Ej: HUS494196",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -133,6 +162,8 @@ def main() -> None:
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
         lineas = sondear(cliente)
+        if args.factura:
+            lineas += ["", ""] + ver_seguimiento_crudo(cliente, args.factura)
 
     texto = (
         "\nSONDEO DE SIIFA — no se escribió nada en la plataforma\n"

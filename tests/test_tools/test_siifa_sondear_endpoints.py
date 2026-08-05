@@ -93,3 +93,36 @@ def test_los_codigos_se_leen_aunque_la_api_los_nombre_distinto():
 
     assert "RE9701" in lineas
     assert "aceptada" in lineas
+
+
+def test_los_campos_crudos_muestran_el_id_de_la_devolucion():
+    """Sin ver los campos tal cual, el nombre del id de devolución es una adivinanza.
+
+    Y con ese id se escribe en la plataforma: equivocarlo es dejar la
+    respuesta del hospital puesta sobre otro registro.
+    """
+
+    class ClienteConSeguimientos(ClienteFalso):
+        def listar_seguimientos(self, numero_factura=None):
+            yield {
+                "idSeguimientoFacturaDevolucion": 7788,
+                "tipoSeguimiento": "DEVOLUCION",
+                "factura": {"numeroFactura": numero_factura},
+            }
+
+    lineas = "\n".join(ver := son.ver_seguimiento_crudo(ClienteConSeguimientos({}), "HUS494196"))
+
+    assert "idSeguimientoFacturaDevolucion" in lineas
+    assert "7788" in lineas
+    assert "DEVOLUCION" in lineas
+    assert ver, "tiene que devolver algo que el auditor pueda mandar"
+
+
+def test_si_la_factura_no_trae_seguimientos_se_dice_claro():
+    class SinNada(ClienteFalso):
+        def listar_seguimientos(self, numero_factura=None):
+            return iter([])
+
+    lineas = "\n".join(son.ver_seguimiento_crudo(SinNada({}), "HUS000000"))
+
+    assert "no devolvió seguimientos" in lineas

@@ -335,6 +335,7 @@ def escribir(filas: list[dict], ruta: Path, titulo: str) -> None:
 
     COLS = [
         "ID_SEGUIMIENTO_FACTURA_GLOSA",
+        "ID_SEGUIMIENTO_FACTURA_DEVOLUCION",
         "NUMERO_FACTURA",
         "TIPO",
         "CODIGO_GLOSA",
@@ -370,7 +371,7 @@ def escribir(filas: list[dict], ruta: Path, titulo: str) -> None:
                 c.fill = del_hus if fila.get(h) != "REDACTADA" else redactada
             if h == "VALOR_GLOSA":
                 c.number_format = '"$"#,##0'
-    anchos = [16, 14, 12, 12, 45, 45, 14, 10, 16, 45, 14, 14, 120]
+    anchos = [16, 18, 14, 12, 12, 45, 45, 14, 10, 16, 45, 14, 14, 120]
     for i, a in enumerate(anchos, 1):
         ws.column_dimensions[get_column_letter(i)].width = a
     ws.freeze_panes = "A2"
@@ -416,6 +417,11 @@ def armar(informe: Path, tramites: Path | None) -> list[dict]:
             filas.append(
                 {
                     "ID_SEGUIMIENTO_FACTURA_GLOSA": linea.get("id_seguimiento_factura_glosa"),
+                    # Una devolución se responde por otra puerta y con este
+                    # id; sin él, el bot la deja sin mandar a propósito.
+                    "ID_SEGUIMIENTO_FACTURA_DEVOLUCION": linea.get(
+                        "id_seguimiento_factura_devolucion"
+                    ),
                     "NUMERO_FACTURA": linea.get("numero_factura"),
                     "TIPO": linea.get("tipo_seguimiento"),
                     "CODIGO_GLOSA": linea.get("codigo_glosa"),
