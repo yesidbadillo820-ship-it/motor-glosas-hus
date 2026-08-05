@@ -53,17 +53,23 @@ from siifa_redactar_respuestas import LIMITE_OBSERVACION, redactar  # noqa: E402
 
 logger = logging.getLogger("siifa_corregir")
 
-# Homologación de los códigos de DGH que SIIFA no acepta, por SIGNIFICADO y no
-# por parecido de número. Lo que se sabe hoy, con evidencia:
-#   RE9901 = «la glosa siendo justificable ha podido ser subsanada totalmente»
-#            (así lo devuelve el propio informe de SIIFA).
-#   RE9702 = «la glosa/devolución ha sido ACEPTADA AL 100%» (el piloto de la
-#            factura HUS497119 se guardó con esa frase en el desplegable y en
-#            Ver Histórico quedó RE9702).
-# En DGH, RE9701 se usó para las devoluciones que el hospital ACEPTÓ con nota
-# crédito —el texto dice «ESE HUS ACEPTA DEVOLUCION… SE APLICA NOTA CREDITO»—,
-# así que su equivalente en SIIFA es el de aceptación al 100%.
-HOMOLOGACION = {"RE9701": "RE9702"}
+# Homologación de códigos de DGH que SIIFA no acepta. HOY ESTÁ VACÍA, a
+# propósito, y conviene dejar por escrito por qué.
+#
+# Con las devoluciones que el hospital aceptó (RE9701) SIIFA contesta que el
+# código «no existe, no está activo o no pertenece al grupo RESPUESTA». Lo
+# primero que se pensó fue cambiarlo por el código de aceptación de las
+# glosas. Está mal: el auditor confirmó contra el portal que para una
+# devolución el código correcto ES RE9701 —el desplegable de «Responder
+# Devolución» lo ofrece—. Lo que falla es la PUERTA: el bot manda glosas y
+# devoluciones por PUT /api/SeguimientoFacturaGlosa/Respuesta, que valida
+# contra los códigos del grupo de GLOSA.
+#
+# Mientras no se sepa por dónde se responde una devolución
+# (tools/siifa_sondear_endpoints.py lo averigua sin escribir nada), cambiarle
+# el código a esas respuestas sería taparle la boca al error: quedarían
+# registradas diciendo algo distinto de lo que el hospital decidió.
+HOMOLOGACION: dict[str, str] = {}
 
 # Columnas que necesita el bot de cargue, más las que ayudan a revisar.
 COLUMNAS = [
@@ -241,8 +247,8 @@ def main() -> None:
     ap.add_argument(
         "--homologar",
         action="store_true",
-        help="Cambia los códigos de DGH que SIIFA no acepta por su equivalente "
-        f"({', '.join(f'{v}->{n}' for v, n in HOMOLOGACION.items())}).",
+        help="Aplica la tabla de homologación de códigos del repo (hoy está vacía: "
+        "ver el comentario de HOMOLOGACION en este archivo).",
     )
     ap.add_argument(
         "--solo-codigo",

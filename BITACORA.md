@@ -2139,6 +2139,25 @@ de Docker.
   fuera de términos (aceptación tácita de la factura)», «la devolución es
   injustificada al 100%» y «la devolución ha sido aceptada al 100%».
 
+### 05-08 (tercera parte) — No era el código: es la puerta
+
+- **Corrección de lo anterior:** se había homologado RE9701 → RE9702 pensando
+  que RE9701 no existía. **Yesid lo verificó contra el portal: RE9701 SÍ es el
+  código de la devolución que el hospital acepta** —el desplegable de
+  «Responder Devolución» ofrece esa respuesta—. La homologación quedó
+  deshecha: el código de esas 495 no se toca.
+- **Lo que en realidad falla:** el bot manda glosas Y devoluciones por la
+  misma puerta, `PUT /api/SeguimientoFacturaGlosa/Respuesta`, que valida
+  contra los códigos del grupo de GLOSA. Por eso el mensaje decía «no
+  pertenece al grupo RESPUESTA»: el código es de devolución y se está
+  entrando por la puerta de las glosas.
+- **`tools/siifa_sondear_endpoints.py`** (nuevo): prueba las rutas y los
+  grupos de catálogo candidatos y dice cuáles existen, **sin escribir nada**
+  en la plataforma (solo consulta; una ruta que existe contesta 405 y una que
+  no, 404). Con eso se sabe por dónde se responde una devolución.
+- Lección para el chat: cuando el auditor tiene el portal delante, su dato
+  manda sobre cualquier deducción hecha desde los datos.
+
 ---
 
 ## 3) PENDIENTE
