@@ -1514,6 +1514,11 @@ _REGLA_ARL_ESTRATEGICA = (
     " citarse, aplican a toda entidad responsable del pago). Si la glosa invoca"
     " 'Ley 100' o 'régimen contributivo', el dictamen DEBE señalar expresamente el"
     " error de encuadre y reconducir la defensa al régimen de riesgos laborales."
+    " SI EL MÓDULO DE ESTE PROMPT (COBERTURA, TARIFAS, SOPORTES…) O UN EJEMPLO"
+    " RAZONA EN CLAVE DE PLAN DE BENEFICIOS, PBS, UPC, Res. 5269/2017,"
+    " Res. 2641/2024 o 'Sistema General de Seguridad Social en Salud', ESE"
+    " ARGUMENTO CENTRAL NO APLICA: en riesgos laborales la cobertura es integral"
+    " y ajena al PBS. NO lo copies ni lo adaptes."
 )
 
 # Bloques de normativa especial por tipo de pagador

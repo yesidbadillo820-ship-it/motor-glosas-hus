@@ -5017,6 +5017,20 @@ class GlosaService:
                 )
             elif es_asegura_soat:
                 nombre_real = _extraer_nombre_entidad_real(texto_base) or str(data.eps)
+                # Una ARL no es una aseguradora SOAT: este aviso las mete en
+                # la misma bolsa y le ordenaba citar el Art. 177 de la Ley
+                # 100 — justo la norma que el bloque ARL prohíbe. El prompt
+                # se contradecía a sí mismo y ganaba la orden más concreta
+                # (05-08-2026, glosa de POSITIVA por accidente de trabajo).
+                from app.services.glosa_ia_prompts import _es_pagador_arl as _es_arl_pag
+
+                _es_arl_caso = _es_arl_pag(str(data.eps or ""), texto_base)
+                _punto_3 = (
+                    "3. Marco sustantivo: Decreto-Ley 1295/1994, Ley 1562/2012 y\n"
+                    "   Ley 776/2002 (riesgos laborales). NO cites Ley 100 ni PBS.\n"
+                    if _es_arl_caso
+                    else "3. Citar Art. 177 Ley 100/1993 (deber de reconocimiento).\n"
+                )
                 hint_aseguradora = (
                     "\n\n═══════════════════════════════════════════════════════\n"
                     "⚠ ALERTA CRÍTICA: ASEGURADORA SOAT / ARL / PÓLIZA SIN CONTRATO\n"
@@ -5027,7 +5041,7 @@ class GlosaService:
                     "   tarifas SOAT 2026) y el Decreto 2423 de 1996 (manual base).\n"
                     "2. Argumentar que NO HAY CONTRATO PACTADO, por lo que rige\n"
                     "   SOAT PLENO y no es admisible descontar UVB/UVT sin soporte.\n"
-                    "3. Citar Art. 177 Ley 100/1993 (deber de reconocimiento).\n"
+                    f"{_punto_3}"
                     "4. NO aceptar descuentos unilaterales — Art. 871 C.Comercio\n"
                     "   exige consentimiento mutuo para modificar tarifas.\n"
                     "5. Para régimen especial FF.MM./Policía: Decreto 1795/2000.\n"
