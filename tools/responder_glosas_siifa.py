@@ -307,6 +307,34 @@ def procesar(
         # entre glosa y devolución no es el id: es la puerta por la que se
         # manda y la lista de códigos contra la que se valida.
         id_a_mandar = fila.get("id_devolucion") or id_seg if es_devolucion else id_seg
+
+        # La subsanación (reiteración) sólo existe hoy para GLOSAS. Una
+        # devolución que entre por ahí se iría por la puerta de las glosas y
+        # quedaría escrita sobre otro registro de la plataforma —y peor: el
+        # reporte diría OK, así que --saltar-csv y la verificación la darían
+        # por buena—. Antes que eso, no se manda.
+        if es_devolucion and accion != "respuesta":
+            reporte_writer.writerow(
+                {
+                    "id_seguimiento_factura_glosa": id_seg,
+                    "numero_factura": fila["factura"],
+                    "estado": "ERROR",
+                    "detalle": (
+                        f"Es una DEVOLUCIÓN y la acción '{accion}' sólo existe para glosas: "
+                        "no se manda para no escribir sobre otro registro."
+                    ),
+                    "fecha_hora": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            err += 1
+            logger.error(
+                "Devolución %s (factura %s): la acción '%s' es sólo de glosas, no se manda.",
+                id_a_mandar,
+                fila["factura"],
+                accion,
+            )
+            continue
+
         try:
             if accion != "respuesta":
                 cliente.responder_reiteracion_glosa(

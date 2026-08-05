@@ -20,6 +20,7 @@ TOOLS = Path(__file__).resolve().parents[2] / "tools"
 sys.path.insert(0, str(TOOLS))
 
 import responder_glosas_siifa as bot  # noqa: E402
+from siifa_client import SiifaClient  # noqa: E402
 
 COLS = [
     "ID_SEGUIMIENTO_FACTURA_GLOSA",
@@ -170,3 +171,43 @@ def test_el_reporte_deja_la_devolucion_identificada(tmp_path):
     assert reporte[0]["estado"] == "OK"
     assert reporte[0]["id_seguimiento_factura_glosa"] == "15110544"
     assert reporte[0]["numero_factura"] == "HUS454747"
+
+
+def test_una_devolucion_nunca_entra_por_la_subsanacion(tmp_path):
+    """La subsanación sólo existe para glosas: una devolución ahí se iría por
+    la puerta equivocada, con el id equivocado, y el reporte diría OK.
+
+    Ese OK falso es lo peor del caso: --saltar-csv y la verificación darían
+    por buena una escritura puesta sobre otro registro de la plataforma.
+    """
+    cliente = ClienteFalso()
+    excel = _excel(tmp_path, [_fila(15110544, tipo="DEVOLUCION", id_dev=7788, codigo="RE9701")])
+
+    reporte = _procesar(tmp_path, excel, cliente, accion="reiteracion-respuesta")
+
+    assert cliente.reiteraciones == [], "una devolución no puede irse por la subsanación de glosas"
+    assert cliente.glosas == []
+    assert cliente.devoluciones == []
+    assert reporte[0]["estado"] == "ERROR"
+    assert "DEVOLUCIÓN" in reporte[0]["detalle"]
+
+
+def test_el_cliente_falso_calza_con_el_cliente_real():
+    """Si alguien renombra o reordena un método del cliente, esto lo detecta.
+
+    Sin esta prueba, renombrar responder_devolucion en siifa_client.py deja
+    toda la suite en verde y revienta en la primera devolución del cargue
+    —con las glosas ya subidas—, o peor: reordenar los parámetros mandaría la
+    observación en el campo de la fecha sin que nadie se entere.
+    """
+    import inspect
+
+    for metodo in ("responder_glosa", "responder_devolucion", "responder_reiteracion_glosa"):
+        real = getattr(SiifaClient, metodo, None)
+        assert real is not None, f"el cliente real ya no tiene {metodo}()"
+        falso = getattr(ClienteFalso, metodo)
+        params_reales = list(inspect.signature(real).parameters)[1:]  # sin self
+        params_falsos = list(inspect.signature(falso).parameters)[1:]
+        assert len(params_reales) == len(params_falsos), (
+            f"{metodo}(): el real recibe {params_reales} y el falso {params_falsos}"
+        )
