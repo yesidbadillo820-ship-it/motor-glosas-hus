@@ -4366,6 +4366,55 @@ def _glosa_es_de_pertinencia(texto: str) -> bool:
     return any(_plegar(s) in t for s in _SENALES_PERTINENCIA)
 
 
+# ── Dos objeciones que no pueden ser ciertas a la vez (OT-004) ──
+# Glosa de prueba de SALUD MIA: FA0302 "servicio no prestado" y TA0801
+# "tarifa superior a la pactada" sobre el MISMO ítem. Si el servicio no se
+# prestó no hay tarifa que discutir; si la tarifa está mal, el servicio se
+# prestó. La EPS se contradice, y esa contradicción sola tumba las dos
+# objeciones — pero el motor refutó cada una por separado y nunca lo dijo.
+_SENALES_NO_PRESTADO = (
+    "NO PRESTADO",
+    "NO PRESTADA",
+    "NO SE PRESTO",
+    "SERVICIO NO REALIZADO",
+    "PROCEDIMIENTO NO REALIZADO",
+    "NO SE REALIZO",
+    "NO EJECUTADO",
+    "NO SE EJECUTO",
+    "NO SUMINISTRADO",
+    "NO SE SUMINISTRO",
+    "SERVICIO INEXISTENTE",
+    "COBRO DE SERVICIO NO",
+)
+_SENALES_TARIFA_MAYOR = (
+    "TARIFA SUPERIOR",
+    "TARIFA MAYOR",
+    "VALOR SUPERIOR AL PACTADO",
+    "VALOR MAYOR AL PACTADO",
+    "MAYOR VALOR COBRADO",
+    "SOBRECOSTO",
+    "DIFERENCIA TARIFARIA",
+    "POR ENCIMA DE LA TARIFA",
+    "SUPERIOR A LA PACTADA",
+)
+
+
+def _contradiccion_no_prestado_vs_tarifa(texto: str) -> bool:
+    """¿La glosa dice a la vez que no se prestó y que se cobró de más?"""
+    if not texto:
+        return False
+    import unicodedata as _ud
+
+    def _plegar(s: str) -> str:
+        n = _ud.normalize("NFKD", str(s or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    t = _plegar(texto)
+    hay_no_prestado = any(_plegar(s) in t for s in _SENALES_NO_PRESTADO)
+    hay_tarifa = any(_plegar(s) in t for s in _SENALES_TARIFA_MAYOR)
+    return hay_no_prestado and hay_tarifa
+
+
 def limpiar_cierre_extemporanea_indebido(
     texto: str,
     es_ratificacion: bool = False,
@@ -7713,6 +7762,34 @@ class GlosaService:
                 )
         except Exception as _e_ar:
             logger.debug(f"[GLOSA-MAYOR-QUE-FACTURA] aviso no agregado: {_e_ar}")
+
+        # ── La EPS se contradice a sí misma (05-08-2026, OT-004) ─────────
+        # Glosa de prueba de SALUD MIA: FA0302 "servicio no prestado" y
+        # TA0801 "tarifa superior a la pactada" sobre el mismo ítem. El
+        # motor refutó cada una por separado y nunca dijo lo evidente: no
+        # pueden ser ciertas las dos.
+        try:
+            if _contradiccion_no_prestado_vs_tarifa(texto_base or ""):
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">LA GLOSA SE '
+                    "CONTRADICE</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    "La entidad objeta al mismo tiempo que el servicio <b>no se prestó</b> "
+                    "y que la <b>tarifa cobrada es superior</b> a la pactada. Las dos no "
+                    "pueden ser ciertas: si no se prestó no hay tarifa que discutir, y si "
+                    "hay tarifa que discutir es porque se prestó. Señalá esa contradicción "
+                    "en la mesa: obliga a la entidad a escoger una sola causal y a "
+                    "sustentarla."
+                    "</p></div>"
+                )
+                logger.info(
+                    "[GLOSA-CONTRADICTORIA] «no prestado» + «tarifa superior» en la "
+                    "misma glosa — aviso agregado al dictamen"
+                )
+        except Exception as _e_ct:
+            logger.debug(f"[GLOSA-CONTRADICTORIA] aviso no agregado: {_e_ct}")
 
         # ── Esto no es una glosa: es una DEVOLUCIÓN (05-08-2026) ─────────
         # «DE1601 FACTURA DEVUELTA POR NO CORRESPONDER A USUARIO» se
