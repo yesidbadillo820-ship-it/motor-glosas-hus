@@ -1515,11 +1515,17 @@ _REGLA_ARL_ESTRATEGICA = (
     " 'Ley 100' o 'régimen contributivo', el dictamen DEBE señalar expresamente el"
     " error de encuadre y reconducir la defensa al régimen de riesgos laborales."
     " SI EL MÓDULO DE ESTE PROMPT (COBERTURA, TARIFAS, SOPORTES…) O UN EJEMPLO"
-    " RAZONA EN CLAVE DE PLAN DE BENEFICIOS, PBS, UPC, Res. 5269/2017,"
-    " Res. 2641/2024 o 'Sistema General de Seguridad Social en Salud', ESE"
-    " ARGUMENTO CENTRAL NO APLICA: en riesgos laborales la cobertura es integral"
-    " y ajena al PBS. NO lo copies ni lo adaptes."
+    " RAZONA EN CLAVE DE PLAN DE BENEFICIOS, PBS, UPC o 'Sistema General de"
+    " Seguridad Social en Salud', ESE ARGUMENTO CENTRAL NO APLICA: en riesgos"
+    " laborales la cobertura es integral y ajena al plan de beneficios. NO lo"
+    " copies ni lo adaptes, y NO cites las resoluciones de ese plan."
 )
+# OJO al redactar esta regla: NO nombrar resoluciones concretas del plan de
+# beneficios, ni para prohibirlas. La primera versión (05-08-2026) decía
+# «no razones con la Res. 5269/2017 ni la Res. 2641/2024» — y el dictamen
+# de POSITIVA salió citando «Resolución 2641 de 2024», que el verificador
+# marcó como inexistente en el corpus. Se la habíamos puesto nosotros
+# delante. Una prohibición que enumera es una lista de sugerencias.
 
 # Bloques de normativa especial por tipo de pagador
 REGIMEN_ESPECIAL = {
@@ -2622,6 +2628,25 @@ def build_user_prompt(
         )
 
         claves_relevantes = normas_relevantes_para_codigo(codigo)
+        # A una ARL no se le sirven las normas del régimen de salud común.
+        # 05-08-2026, segunda vuelta: se le habían quitado los ejemplos
+        # malos (few-shots de EPS) y corregido el aviso de aseguradora, y
+        # la glosa de POSITIVA por accidente de trabajo SIGUIÓ saliendo con
+        # «plan de beneficios con cargo a la UPC», Ley 1751 y Ley 1438. La
+        # razón: acá, DESPUÉS del bloque ARL, el prompt le entrega el texto
+        # literal de esas mismas normas. El modelo cita lo que tiene a la
+        # vista. El bloque decía una cosa y el material decía otra.
+        if "RIESGOS LABORALES" in (bloque_regimen or "").upper():
+            _FUERA_EN_ARL = {
+                "LEY 1751 DE 2015",
+                "RESOLUCION 5269 DE 2017",
+                "RESOLUCIÓN 5269 DE 2017",
+                "SENTENCIA T-760 DE 2008",
+                "LEY 100 DE 1993",
+                "RESOLUCION 2641 DE 2024",
+                "RESOLUCIÓN 2641 DE 2024",
+            }
+            claves_relevantes = [c for c in claves_relevantes if c.upper() not in _FUERA_EN_ARL]
         lineas = []
         for clave in claves_relevantes[:5]:
             n = _TODAS_LAS_NORMAS.get(clave)
@@ -2680,7 +2705,15 @@ def build_user_prompt(
     try:
         from app.services.clausulas_anti_rebatimiento import clausulas_para_codigo
 
-        cls = clausulas_para_codigo(codigo, max_clausulas=2, texto_glosa=texto_glosa or "")
+        # Las cláusulas del módulo de cobertura razonan en clave de plan de
+        # beneficios: en riesgos laborales la cobertura es integral y ajena
+        # al PBS, así que darle esas frases es empujarlo al régimen errado.
+        _es_arl_prompt = "RIESGOS LABORALES" in (bloque_regimen or "").upper()
+        cls = (
+            []
+            if _es_arl_prompt
+            else clausulas_para_codigo(codigo, max_clausulas=2, texto_glosa=texto_glosa or "")
+        )
         if cls:
             lineas_cl = [f"  • {c}" for c in cls]
             bloque_antirebatimiento_str = (
