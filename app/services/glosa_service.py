@@ -4122,8 +4122,16 @@ def _glosa_es_del_tema_dmbug(texto: str) -> bool:
     """
     if not texto:
         return False
-    t = texto.upper()
-    return any(s in t for s in _SENALES_TEMA_DMBUG)
+    # Se comparan sin tildes: la EPS escribe «AGOTÓ» o «AGOTO» según quién
+    # redacte, y una señal que falla por una tilde falla en silencio.
+    import unicodedata as _ud
+
+    def _plegar(s: str) -> str:
+        n = _ud.normalize("NFKD", str(s or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    t = _plegar(texto)
+    return any(_plegar(s) in t for s in _SENALES_TEMA_DMBUG)
 
 
 def limpiar_cierre_extemporanea_indebido(
@@ -4594,6 +4602,28 @@ class GlosaService:
 
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
+
+        # Sub-conceptos de la glosa (varias objeciones bajo UN solo código).
+        # Se detectan ACÁ, antes de elegir el camino, y no dentro de la rama
+        # de IA como estaban hasta el 05-08-2026: por vivir allá, el aviso
+        # de «conceptos sin responder» nunca aparecía en los caminos de
+        # texto fijo — justo donde más falta hacía. La glosa que lo destapó
+        # traía cuatro objeciones (habitación cobrada como suite, insumos no
+        # pactados, oxígeno por hora en vez de por día, días sin
+        # autorización) y se respondió una sola.
+        self._subconceptos_actuales = []
+        try:
+            from app.services.subconceptos_glosa import detectar_subconceptos
+
+            _sc_det = detectar_subconceptos(texto_base)
+            if len(_sc_det) >= 2:
+                self._subconceptos_actuales = _sc_det
+                logger.info(
+                    f"[SUBCONCEPTOS] {len(_sc_det)} conceptos distintos bajo "
+                    f"{len(codigos_detectados) or 1} código(s)"
+                )
+        except Exception as _e_sc_pre:
+            logger.debug(f"[SUBCONCEPTOS] no detectados: {_e_sc_pre}")
         if len(codigos_detectados) > 1:
             # Multi-código (jun-2026): antes se procesaba SOLO el primero y
             # el dictamen mezclaba familias sin declararlas. Con el flag ON
@@ -4718,7 +4748,15 @@ class GlosaService:
         elif es_extemporanea:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
-        elif es_tarifa and _es_dispensario_medico(eps_key) and _glosa_es_del_tema_dmbug(texto_base):
+        elif (
+            es_tarifa
+            and _es_dispensario_medico(eps_key)
+            and _glosa_es_del_tema_dmbug(texto_base)
+            # Y una sola objeción. Con varias, el texto canónico refutaría
+            # una y dejaría mudas las demás — y en auditoría callar sobre un
+            # concepto equivale a aceptarlo: la EPS descuenta lo no refutado.
+            and len(self._subconceptos_actuales) < 2
+        ):
             # Override institucional (Yesid abr 2026): las glosas TA* del
             # Dispensario Médico Bucaramanga (DMBUG) responden con el texto
             # canónico que cita el contrato 440-DIGSA/DMBUG-2025. NO se
@@ -5170,16 +5208,14 @@ class GlosaService:
             # CADA uno por separado. En auditoría, callar sobre un concepto
             # equivale a aceptarlo → la EPS descuenta lo no refutado. Los
             # sub-conceptos detectados se guardan para post-validar al final.
-            self._subconceptos_actuales = []
             try:
                 from app.services.subconceptos_glosa import (
                     bloque_subconceptos_para_prompt,
-                    detectar_subconceptos,
                 )
 
-                _subconceptos = detectar_subconceptos(texto_base)
+                # Ya detectados arriba, antes de elegir el camino.
+                _subconceptos = self._subconceptos_actuales
                 if len(_subconceptos) >= 2:
-                    self._subconceptos_actuales = _subconceptos
                     _bloque_sc = bloque_subconceptos_para_prompt(_subconceptos)
                     if _bloque_sc:
                         user_prompt = user_prompt + _bloque_sc
