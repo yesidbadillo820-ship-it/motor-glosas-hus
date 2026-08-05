@@ -16227,22 +16227,33 @@ function renderAccionIA(d){
 }
 
 function aplicarRecomendacionIA(monto, accion){
-  // Pre-cargar el campo "Valor Aceptado (COP)" con el monto sugerido
-  // por la IA. El gestor confirma con un toast de éxito.
+  // Pre-cargar el campo "Valor aceptado" con el monto sugerido por la IA.
+  //
+  // 05-08-2026: este botón no hacía NADA. Buscaba tres identificadores que
+  // no existen ('valor-aceptado', 'valorAceptado', input[name=…]) mientras
+  // el campo real es 'f-valacp' — y aun sin encontrarlo mostraba
+  // «Recomendación aplicada». El auditor creía haber cargado el valor
+  // aceptado, reanalizaba, y el motor seguía defendiendo el 100%: la
+  // aceptación parcial nunca llegaba a la base y la nota crédito nunca se
+  // habilitaba. Ahora, si el campo no está, lo dice.
   try {
-    var inp = document.getElementById('valor-aceptado') ||
-              document.getElementById('valorAceptado') ||
-              document.querySelector('input[name="valor_aceptado"]');
-    if(inp){
-      inp.value = monto;
-      inp.dispatchEvent(new Event('change', { bubbles: true }));
-      inp.scrollIntoView({ behavior:'smooth', block:'center' });
+    var inp = document.getElementById('f-valacp');
+    if(!inp){
+      if(typeof toast === 'function'){
+        toast('No se pudo aplicar',
+          'No encuentro el campo «Valor aceptado» en esta pantalla. Cargalo a mano y reanalizá.',
+          'error');
+      }
+      return;
     }
+    inp.value = monto;
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    inp.scrollIntoView({ behavior:'smooth', block:'center' });
     if(typeof toast === 'function'){
       toast('Recomendación aplicada',
         accion + ' · valor a aceptar: $' +
         Number(monto).toLocaleString('es-CO',{maximumFractionDigits:0}) +
-        '. Verifica antes de marcar la glosa como respondida.',
+        '. Reanalizá para que quede como aceptación parcial, y verificá antes de responder.',
         'success');
     }
   } catch(e){

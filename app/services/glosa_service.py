@@ -4574,6 +4574,9 @@ class GlosaService:
 
         msg_tiempo, color_tiempo, dias = "Fechas no ingresadas", "bg-slate-500", 0
         _ext_texto_det = None  # Ronda 32: extemporaneidad INFERIDA del texto
+        # Aceptación parcial declarada por el propio hospital en el texto
+        # pegado (05-08-2026). Señal para avisar, nunca para mover plata.
+        _acept_ips_det = 0.0
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
                 dias_calc = self._calcular_dias_habiles(
@@ -4629,6 +4632,21 @@ class GlosaService:
                 )
             else:
                 _ext_texto_det = None  # dentro de términos o sin señal → nada
+
+        # Lo que el hospital declara aceptar dentro del propio texto de la
+        # glosa. Se lee SIEMPRE (no solo en el camino de la extemporaneidad).
+        try:
+            from app.utils.moneda import parse_valor_cop as _pvc_det
+            from app.utils.parsers_glosa import extraer_aceptacion_ips
+
+            _vobj_det = 0.0
+            try:
+                _vobj_det = _pvc_det(valor_raw)
+            except Exception:
+                _vobj_det = 0.0
+            _acept_ips_det = extraer_aceptacion_ips(texto_base, _vobj_det)
+        except Exception as _e_ap_det:
+            logger.debug(f"[ACEPTACION-TEXTO] detección no aplicada: {_e_ap_det}")
 
         # CORRECCIÓN: inicializar tipo_glosa antes de usarlo para evitar UnboundLocalError
         tipo_glosa = self._determinar_tipo_glosa(prefijo, texto_base)
@@ -7240,6 +7258,49 @@ class GlosaService:
                 dictamen = dictamen + _seccion_ext
         except Exception as _e_ext_sec:
             logger.debug(f"[EXT-TEXTO] sección adicional no agregada: {_e_ext_sec}")
+
+        # ── Aceptación parcial declarada en el TEXTO (05-08-2026) ────────
+        # «LA IPS ACEPTA $340.000 … Y CONTROVIERTE EL RESTO»: el motor
+        # recomendaba defender el 100% porque nadie leía esa frase. Misma
+        # regla que con la extemporaneidad inferida: es una SEÑAL, no una
+        # decisión. Quien mueve la plata es el auditor con el campo «Valor
+        # aceptado»; el sistema avisa con el monto ya calculado para que no
+        # tenga que hacer la resta.
+        try:
+            if (
+                _acept_ips_det > 0
+                and modo_resp == "defender"
+                and modelo_usado not in ("texto_fijo", "plantilla", "directo_auditor")
+            ):
+                from app.utils.moneda import parse_valor_cop as _pvc_ap
+
+                _obj_ap = 0.0
+                try:
+                    _obj_ap = _pvc_ap(valor_raw)
+                except Exception:
+                    _obj_ap = 0.0
+                _defender_ap = max(0.0, _obj_ap - _acept_ips_det) if _obj_ap else 0.0
+                _fmt_ap = f"${_acept_ips_det:,.0f}".replace(",", ".")
+                _fmt_def = f"${_defender_ap:,.0f}".replace(",", ".") if _defender_ap else "el resto"
+                dictamen = dictamen + (
+                    '<div style="background:#fef3c7;border-left:4px solid #d97706;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#92400e;margin:0 0 8px 0;">ACEPTACIÓN PARCIAL '
+                    "DECLARADA EN EL TEXTO DE LA GLOSA</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#78350f;margin:0;">'
+                    f"El texto pegado dice que el hospital ACEPTA <b>{_fmt_ap}</b> y "
+                    f"controvierte <b>{_fmt_def}</b>. Este dictamen defiende el total: "
+                    "verificá esa aceptación y, si se confirma, escribí el monto en el "
+                    "campo <b>«Valor aceptado»</b> y reanalizá. Así queda como aceptación "
+                    "parcial en el expediente y se habilita la nota crédito por ese valor."
+                    "</p></div>"
+                )
+                logger.info(
+                    f"[ACEPTACION-TEXTO] declarada en el texto: {_fmt_ap} "
+                    f"(objetado {valor_raw}) — aviso agregado, decisión del auditor"
+                )
+        except Exception as _e_ap:
+            logger.debug(f"[ACEPTACION-TEXTO] aviso no agregado: {_e_ap}")
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
