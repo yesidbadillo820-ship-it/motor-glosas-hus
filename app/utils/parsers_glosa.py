@@ -609,6 +609,16 @@ def _extraer_cups_servicio(
         r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", texto_glosa or ""
     )
 
+    # 05-08-2026 (OT-006): la glosa de AURORA no traía ningún CUPS y el
+    # dictamen salió con "CUPS 04958" — la cola del contrato que citaba la
+    # propia EPS, "S-13-1-03-1-04958". Un número que vive DENTRO de un código
+    # compuesto por guiones o barras (contratos, actas, radicados) es un
+    # pedazo de ese código, no un procedimiento.
+    CODIGOS_COMPUESTOS = re.compile(r"\b[A-Z0-9]+(?:[-/][A-Z0-9]+){2,}\b", re.IGNORECASE)
+    compuestos_en_texto = [
+        c.upper() for c in CODIGOS_COMPUESTOS.findall(f"{texto_glosa or ''} {contexto_pdf or ''}")
+    ]
+
     # Ronda 30: montos del formulario (valor objetado/aceptado) que NUNCA
     # deben confundirse con un CUPS. En glosas sin CUPS explícito, un valor
     # suelto entre guiones ("... - 149000 - ...") entraba como CUPS "149000".
@@ -641,6 +651,11 @@ def _extraer_cups_servicio(
                 return False
         # (d) fragmento de una fecha del texto ("2026-04" ⊂ "2026-04-15")
         if any(tu in f for f in fechas_en_texto):
+            return False
+        # (e) pedazo de un código compuesto: contrato, acta o radicado
+        # ("04958" ⊂ "S-13-1-03-1-04958"). El token completo sí puede serlo
+        # —hay CUPS con sufijo del HUS—, lo que se descarta es el fragmento.
+        if any(tu != c and tu in c for c in compuestos_en_texto):
             return False
         # Debe tener al menos 4 dígitos (CUPS reales son 4-8 dígitos)
         digitos = sum(1 for c in token if c.isdigit())
