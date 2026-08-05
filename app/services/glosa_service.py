@@ -7408,6 +7408,33 @@ class GlosaService:
         except Exception as _e_ap:
             logger.debug(f"[ACEPTACION-TEXTO] aviso no agregado: {_e_ap}")
 
+        # ── Esto no es una glosa: es una DEVOLUCIÓN (05-08-2026) ─────────
+        # «DE1601 FACTURA DEVUELTA POR NO CORRESPONDER A USUARIO» se
+        # respondió con el formato de glosa de facturación, porque el único
+        # sitio del sistema que nombraba los códigos DE los mapeaba a FA.
+        # Son trámites distintos: la factura vuelve COMPLETA y se radica de
+        # nuevo corregida; no se «controvierte» un valor.
+        try:
+            if str(codigo_det or "").upper().startswith("DE"):
+                dictamen = dictamen + (
+                    '<div style="background:#fef3c7;border-left:4px solid #b45309;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#92400e;margin:0 0 8px 0;">OJO: ESTO ES UNA '
+                    "DEVOLUCIÓN, NO UNA GLOSA</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#78350f;margin:0;">'
+                    f"El código <b>{codigo_det}</b> es de DEVOLUCIÓN (art. 57 de la Ley "
+                    "1438 de 2011 y anexo de devoluciones de la Resolución 2284 de 2023). "
+                    "El trámite es distinto al de una glosa: la factura vuelve COMPLETA y "
+                    "hay que <b>corregir la causa y radicarla de nuevo</b> dentro del "
+                    "término, no controvertir un valor. Esta respuesta sirve para "
+                    "sustentar que la devolución no procede; si la causa es real, lo que "
+                    "corresponde es corregir y volver a radicar."
+                    "</p></div>"
+                )
+                logger.info(f"[DEVOLUCION] {codigo_det}: aviso de trámite agregado")
+        except Exception as _e_dev:
+            logger.debug(f"[DEVOLUCION] aviso no agregado: {_e_dev}")
+
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
@@ -7552,6 +7579,14 @@ class GlosaService:
             return "CL_PERTINENCIA"
         elif prefijo == "PE":
             return "CL_PERTINENCIA"  # retrocompatibilidad: PE → CL
+        elif prefijo == "DE":
+            # Una DEVOLUCIÓN no es una glosa: la factura vuelve completa y
+            # se radica de nuevo corregida, con su propio trámite y plazos
+            # (art. 57 Ley 1438; anexo de devoluciones de la Res. 2284/2023).
+            # Hasta el 05-08-2026 el único lugar del sistema que nombraba
+            # los códigos DE los mapeaba a FA, así que una devolución se
+            # respondía con el formato de glosa de facturación.
+            return "DE_DEVOLUCION"
         elif prefijo == "FA":
             return "FA_FACTURACION"
         elif prefijo == "IN":
@@ -7724,12 +7759,12 @@ class GlosaService:
 
     def _extraer_codigo_glosa(self, texto: str) -> str:
         # Devuelve el primer código encontrado. Para detectar TODOS, usar _extraer_codigos_glosa.
-        m = re.search(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
+        m = re.search(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX|DE)\d{2,4}\b", texto)
         return m.group(0) if m else "N/A"
 
     def _extraer_codigos_glosa(self, texto: str) -> list[str]:
         """Devuelve TODOS los códigos de glosa detectados (sin duplicados, en orden)."""
-        encontrados = re.findall(r"\b(?:TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
+        encontrados = re.findall(r"\b(?:TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX|DE)\d{2,4}\b", texto)
         vistos: list[str] = []
         for c in encontrados:
             if c not in vistos:
@@ -7949,6 +7984,7 @@ class GlosaService:
             "CL_PERTINENCIA": "#d97706",
             "PE_PERTINENCIA": "#d97706",
             "FA_FACTURACION": "#0891b2",
+            "DE_DEVOLUCION": "#b45309",
             "IN_INSUMOS": "#e11d48",
             "ME_MEDICAMENTOS": "#4f46e5",
             "EXT_EXTEMPORANEA": "#991b1b",
