@@ -209,15 +209,14 @@ class TestBugKConstantesLegitimas:
 
 
 class TestBugLMayusculasSostenidas:
-    def test_todo_mayusculas_se_normaliza(self):
+    def test_las_mayusculas_ya_no_se_bajan(self):
+        """Política invertida el 05-08-2026 por decisión del dueño: el
+        dictamen se radica en MAYÚSCULAS, como lo escribe el hospital. Antes
+        esta función lo bajaba a sentence case, y de paso rompía el relleno
+        de marcadores: «[ENTIDAD]» quedaba «[Entidad]» y ya nadie lo
+        reconocía, así que el marcador crudo llegaba a la EPS."""
         dictamen = "ESE HUS NO ACEPTA LA GLOSA APLICADA POR SANITAS."
-        resultado = _normalizar_mayusculas_sostenidas(dictamen)
-        # Sentence case: primer letra mayúscula, resto minúscula
-        assert resultado != dictamen
-        # Siglas conocidas preservadas
-        assert "HUS" in resultado
-        assert "ESE" in resultado
-        assert "SANITAS" in resultado
+        assert _normalizar_mayusculas_sostenidas(dictamen) == dictamen
 
     def test_texto_mixto_no_se_toca(self):
         # Si el texto ya está bien formateado (sentence case), no se toca
