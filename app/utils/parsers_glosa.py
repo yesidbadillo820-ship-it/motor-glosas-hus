@@ -384,6 +384,49 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
     }
 
 
+def extraer_aceptacion_ips(texto: str, valor_objetado: float = 0.0) -> float:
+    """Lo que el propio hospital declara ACEPTAR dentro del texto de la glosa.
+
+    Prueba real del 05-08-2026. El texto decía: «SE OBJETA LA TOTALIDAD DE
+    $2.100.000 POR FALTA DE AUTORIZACIÓN. LA IPS ACEPTA $340.000
+    CORRESPONDIENTES A DOS INSUMOS NO SOPORTADOS Y CONTROVIERTE EL RESTO».
+    El motor recomendó DEFENDER EL 100%: nadie leía esa frase. La aceptación
+    parcial existía en el sistema, pero solo se activaba si el auditor
+    escribía el monto en el formulario.
+
+    Devuelve 0.0 cuando no hay señal, y también cuando el monto declarado
+    iguala o supera lo objetado —eso ya no es parcial, es aceptación total,
+    y esa decisión no se infiere de un texto—.
+
+    OJO: esto es una SEÑAL, no una decisión. Quien mueve la plata es el
+    auditor con el campo «Valor aceptado»; el sistema solo avisa. Mismo
+    criterio que la extemporaneidad inferida del texto.
+    """
+    if not texto:
+        return 0.0
+    t = texto.upper()
+    patrones = (
+        r"(?:LA\s+)?(?:IPS|E\.?S\.?E\.?|HUS|INSTITUCION|INSTITUCIÓN|PRESTADOR)\s+"
+        r"ACEPTA(?:MOS)?\b[^$\d]{0,60}\$?\s*([\d][\d\.,]{3,})",
+        r"SE\s+ACEPTA(?:N)?\s+PARCIALMENTE\b[^$\d]{0,60}\$?\s*([\d][\d\.,]{3,})",
+        r"ACEPTA(?:MOS)?\s+(?:EL\s+VALOR\s+DE|LA\s+SUMA\s+DE|PARCIALMENTE)\s*"
+        r"\$?\s*([\d][\d\.,]{3,})",
+    )
+    from app.utils.moneda import parse_valor_cop
+
+    for pat in patrones:
+        m = re.search(pat, t)
+        if not m:
+            continue
+        try:
+            valor = parse_valor_cop(m.group(1))
+        except Exception:
+            continue
+        if valor > 0 and (valor_objetado <= 0 or valor < valor_objetado):
+            return valor
+    return 0.0
+
+
 def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     """Construye un banner HTML con los datos de la tarifa pactada y
     la recomendación de acción para el auditor. Se prepend al dictamen.
