@@ -1096,6 +1096,7 @@ async def lifespan(app: FastAPI):
                 },
             ]
             gold_creadas = 0
+            gold_actualizadas = 0
             for p in _GOLD_CANONICAS:
                 existe = (
                     db.query(_PGR)
@@ -1107,6 +1108,15 @@ async def lifespan(app: FastAPI):
                     .first()
                 )
                 if existe:
+                    # Norma derogada en una plantilla ya sembrada: la
+                    # Resolución 3047 de 2008 la derogó la 2284 de 2023, y
+                    # el texto viejo sigue en la base alimentando los
+                    # ejemplos que ve la IA. Se corrige en su sitio (decisión
+                    # de Yesid, 05-08-2026); el resto de la plantilla queda
+                    # intacto porque lo aprobó él.
+                    if "3047" in (existe.argumento or "") and "3047" not in p["argumento"]:
+                        existe.argumento = p["argumento"]
+                        gold_actualizadas += 1
                     continue
                 db.add(
                     _PGR(
@@ -1124,9 +1134,12 @@ async def lifespan(app: FastAPI):
                     )
                 )
                 gold_creadas += 1
-            if gold_creadas:
+            if gold_creadas or gold_actualizadas:
                 db.commit()
-                logger.info(f"Seed Plantillas Gold canónicas: {gold_creadas} creadas.")
+                logger.info(
+                    f"Seed Plantillas Gold canónicas: {gold_creadas} creadas · "
+                    f"{gold_actualizadas} corregidas (norma derogada)."
+                )
         except Exception as _e:
             logger.warning(f"Seed Gold canónicas falló (no crítico): {_e}")
             db.rollback()

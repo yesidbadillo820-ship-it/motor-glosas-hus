@@ -4055,8 +4055,9 @@ TEXTO_DMBUG_TARIFAS = (
     "COMERCIO (BUENA FE CONTRACTUAL), 5 Y 27 DE LA LEY 80 DE 1993 (DERECHO A "
     "LA REMUNERACIÓN PACTADA Y ECUACIÓN CONTRACTUAL), DECRETO-LEY 1795 DE "
     "2000 (RÉGIMEN DEL SUBSISTEMA DE SALUD DE LAS FF.MM.), ACUERDO 002 DE "
-    "2001 DEL CSSMP, DECRETO 4747 DE 2007 Y RESOLUCIÓN 3047 DE 2008 (MANUAL "
-    "ÚNICO DE GLOSAS). EL EVENTUAL AGOTAMIENTO PRESUPUESTAL ES "
+    "2001 DEL CSSMP, DECRETO 4747 DE 2007 Y RESOLUCIÓN 2284 DE 2023 (MANUAL "
+    "ÚNICO DE DEVOLUCIONES, GLOSAS Y RESPUESTAS). EL EVENTUAL AGOTAMIENTO "
+    "PRESUPUESTAL ES "
     "RESPONSABILIDAD DEL DMBUG (ART. 71 DEL DECRETO 111/1996) Y NO PUEDE "
     "TRASLADARSE AL PRESTADOR. ASIMISMO, EL DECRETO 2423 DE 1996 OPERA EN "
     "AUSENCIA DE PACTO; HABIENDO CONTRATO VIGENTE, NO PROCEDE COMO CRITERIO "
@@ -4077,6 +4078,52 @@ def _es_dispensario_medico(eps: str) -> bool:
         return False
     e = eps.upper().strip()
     return "DISPENSARIO MEDICO" in e or "DMBUG" in e or "DIGSA" in e or "U220311" in e
+
+
+# Señales del TEMA que el texto canónico del Dispensario realmente refuta:
+# agotamiento presupuestal, inexistencia de contrato y sustitución de la
+# tarifa pactada por SOAT.
+_SENALES_TEMA_DMBUG = (
+    "AGOTAMIENTO PRESUPUESTAL",
+    "PRESUPUESTO AGOTADO",
+    "AGOTO EL PRESUPUESTO",
+    "AGOTÓ EL PRESUPUESTO",
+    "SIN DISPONIBILIDAD PRESUPUESTAL",
+    "DISPONIBILIDAD PRESUPUESTAL",
+    "NO EXISTE CONTRATO",
+    "INEXISTENCIA DE CONTRATO",
+    "NO HAY CONTRATO",
+    "SIN CONTRATO",
+    "NO SE ENCUENTRA CONTRATO",
+    "CONTRATO NO VIGENTE",
+    "TARIFA SOAT",
+    "TARIFAS SOAT",
+    "MANUAL SOAT",
+    "SE LIQUIDA POR SOAT",
+    "SE PAGA POR SOAT",
+    "DECRETO 2423",
+)
+
+
+def _glosa_es_del_tema_dmbug(texto: str) -> bool:
+    """¿La glosa habla de lo que el texto canónico del Dispensario refuta?
+
+    Hasta el 05-08-2026 el texto fijo respondía TODA glosa TA del
+    Dispensario, sin leer el motivo. Una glosa de habitación cobrada como
+    suite, insumos no pactados, oxígeno liquidado por hora y días sin
+    autorización recibió un texto sobre agotamiento presupuestal e
+    inexistencia de contrato: no le erró, ni la leyó. Y ese camino se
+    salta el control de calidad —el Quality Gate vive en la rama de IA—,
+    así que nadie detectó la incoherencia.
+
+    Decisión de Yesid ese día: el texto canónico sigue, pero solo cuando
+    el tema calce. Las demás glosas TA del Dispensario van al motor con
+    su control de calidad.
+    """
+    if not texto:
+        return False
+    t = texto.upper()
+    return any(s in t for s in _SENALES_TEMA_DMBUG)
 
 
 def limpiar_cierre_extemporanea_indebido(
@@ -4671,16 +4718,29 @@ class GlosaService:
         elif es_extemporanea:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
-        elif es_tarifa and _es_dispensario_medico(eps_key):
-            # Override institucional (Yesid abr 2026, hasta nueva orden):
-            # toda glosa TA* de Dispensario Médico Bucaramanga (DMBUG)
-            # responde con el texto canónico que cita el contrato
-            # 440-DIGSA/DMBUG-2025. NO se llama al motor IA — ahorra
-            # tokens y garantiza consistencia jurídica entre todas las
-            # glosas de este pagador.
+        elif (
+            es_tarifa
+            and _es_dispensario_medico(eps_key)
+            and _glosa_es_del_tema_dmbug(texto_base)
+        ):
+            # Override institucional (Yesid abr 2026): las glosas TA* del
+            # Dispensario Médico Bucaramanga (DMBUG) responden con el texto
+            # canónico que cita el contrato 440-DIGSA/DMBUG-2025. NO se
+            # llama al motor IA — ahorra tokens y garantiza consistencia
+            # jurídica entre todas las glosas de este pagador.
+            #
+            # 05-08-2026: se acota al TEMA. Antes bastaba con que el código
+            # empezara por TA, así que una glosa de habitación cobrada como
+            # suite, insumos no pactados y días sin autorización recibió un
+            # texto sobre agotamiento presupuestal — y encima por este
+            # camino no pasa el Quality Gate, así que nadie lo detectó.
             argumento_fijo = TEXTO_DMBUG_TARIFAS
             tipo_glosa = "TA_DMBUG_FIJO"
-        elif es_tarifa and not tiene_contrato:
+        elif es_tarifa and not tiene_contrato and not _es_dispensario_medico(eps_key):
+            # La exclusión del Dispensario evita que una glosa TA suya que
+            # no calzó con el tema caiga en el OTRO texto fijo ("no hay
+            # contrato pactado"), que contradiría al RE9901 de más abajo:
+            # con DMBUG el contrato 440 SÍ está vigente.
             # Pasamos texto_base como contexto — si eps_key es "OTRA / SIN DEFINIR",
             # la funcion extrae el nombre real del Excel (ej. COMPAÑIA MUNDIAL DE
             # SEGUROS S.A. SOAT UVB) y lo usa en el texto.
