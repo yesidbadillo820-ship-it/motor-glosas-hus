@@ -1363,6 +1363,27 @@ períodos perdidos.
 
 ---
 
+### 05-08 — El consolidado histórico de pre-auditoría entra por Excel
+
+La base provisional del PC arrancó vacía y el módulo de Pre-auditoría
+quedó sin su historia. Pero el equipo llevó SIEMPRE su consolidado a mano
+(`CONSOLIDADO_PRE_AUDITORIA_2026.xlsx`, una fila por pasada de factura,
+del 13-04 al 04-08): ese Excel ES la historia completa, más incluso que
+la base vieja de la VM. Se construyó
+`tools/preauditoria_importar_consolidado.py`:
+
+- **SOLO MIRAR** (sin argumento): muestra el plan completo sin escribir.
+  Con el Excel real: 1.324 pasadas → **959 facturas** (511 radicadas,
+  348 subsanadas, 83 devueltas/bloqueadas, 17 pendientes), 150 oficios
+  (143 FHUS reales + 7 históricos), 1.043 renglones de ledger de envíos,
+  3.058 eventos de historial con fechas y valores reales.
+- **aplicar**: escribe todo en una sola transacción. **El sistema manda**:
+  lo que el equipo ya registró en la página no se toca; correrlo dos veces
+  no duplica nada (probado con los datos reales).
+- Los nombres cortos del Excel se traducen al nombre completo del equipo
+  (OSCAR→OSCAR VILLAMIZAR, CAMILO→CAMILO CASTILLO, etc.). 7 pruebas
+  automáticas.
+
 ### 04-08 (décima parte) — La causa de fondo: el vigilante entregaba claves viejas
 
 Aquí terminó el misterio del día. La página por internet seguía diciendo

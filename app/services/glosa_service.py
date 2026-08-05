@@ -4718,11 +4718,7 @@ class GlosaService:
         elif es_extemporanea:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
-        elif (
-            es_tarifa
-            and _es_dispensario_medico(eps_key)
-            and _glosa_es_del_tema_dmbug(texto_base)
-        ):
+        elif es_tarifa and _es_dispensario_medico(eps_key) and _glosa_es_del_tema_dmbug(texto_base):
             # Override institucional (Yesid abr 2026): las glosas TA* del
             # Dispensario Médico Bucaramanga (DMBUG) responden con el texto
             # canónico que cita el contrato 440-DIGSA/DMBUG-2025. NO se
