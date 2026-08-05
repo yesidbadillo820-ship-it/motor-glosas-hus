@@ -3226,6 +3226,9 @@ _PAT_CLAUSULA_NUM_CON_CONTRATO = re.compile(
     r"\s+DEL\s+(?:CONTRATO\s+)?(?P<contrato>[A-Z0-9][A-Z0-9./-]{4,})",
     re.IGNORECASE,
 )
+# Número de contrato, acta o radicado: dos o más tramos unidos por guion o
+# barra ("S-13-1-03-1-04958", "GID-ARL-0090", "440-DIGSA/DMBUG-2025").
+_PAT_CODIGO_COMPUESTO = re.compile(r"\b[A-Z0-9]+(?:[-/][A-Z0-9]+){2,}\b", re.IGNORECASE)
 _PAT_CLAUSULA_NUM_SOLA = re.compile(
     r"(?:(?:LA|EN\s+LA|DE\s+LA|A\s+LA|SEG[ÚU]N\s+LA|CONFORME\s+A\s+LA)\s+)?"
     r"CL[ÁA]USULA\s+(?P<num>\d+(?:\.\d+)*)",
@@ -3298,14 +3301,23 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
     respaldadas = _clausulas_cargadas(eps)
     glosa_up = (texto_glosa or "").upper()
 
-    def _sin_respaldo(num: str) -> bool:
+    def _sin_respaldo(num: str, contrato: str = "") -> bool:
         n = num.strip().upper()
         for cargada in respaldadas:
             if n in cargada:
                 return False
         # La EPS citó ese número en su propia glosa.
+        #
+        # 05-08-2026, dictamen real de AURORA: la glosa decía "Contrato
+        # S-13-1-03-1-04958, cláusula 7.4" y la red de contratos ajenos
+        # —que corre justo antes— cambió ese número por el contrato de
+        # AURORA. La cláusula 7.4 se quedó, pero colgando de OTRO contrato:
+        # el dictamen terminó afirmando que el contrato de AURORA tiene una
+        # cláusula 7.4. El permiso solo vale si la cláusula sigue pegada al
+        # mismo contrato del que hablaba la EPS.
         if glosa_up and re.search(r"CL[ÁA]USULA\s+" + re.escape(n) + r"\b", glosa_up):
-            return False
+            if not contrato or contrato.strip().upper() in glosa_up:
+                return False
         return True
 
     n_sub = 0
@@ -3313,7 +3325,7 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
 
     def _sub_con_contrato(m: "re.Match[str]") -> str:
         nonlocal n_sub
-        if not _sin_respaldo(m.group("num")):
+        if not _sin_respaldo(m.group("num"), m.group("contrato")):
             return m.group(0)
         n_sub += 1
         quitadas.append(m.group("num"))
@@ -3321,10 +3333,29 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
 
     def _sub_sola(m: "re.Match[str]") -> str:
         nonlocal n_sub
-        if not _sin_respaldo(m.group("num")):
+        # El contrato puede ir ANTES de la cláusula ("EL CONTRATO
+        # GID-ARL-0090, CLÁUSULA 7.4"), que es como salió el dictamen de
+        # AURORA. Se mira hacia atrás para saber de qué contrato cuelga.
+        previo = m.string[max(0, m.start() - 120) : m.start()]
+        contrato_previo = ""
+        ultimo = None
+        for _mm in _PAT_CODIGO_COMPUESTO.finditer(previo):
+            ultimo = _mm
+        # Solo cuenta si el contrato viene pegado: entre él y la cláusula
+        # no puede haber más texto que puntuación. "CONTRATO X, CLÁUSULA
+        # 7.4" sí; "CLÁUSULA 4.2 DEL CONTRATO X Y TAMBIÉN LA CLÁUSULA 7" no
+        # —esa segunda cláusula no cuelga del contrato nombrado antes—.
+        if ultimo and re.fullmatch(r"[\s,;:.()\-]*", previo[ultimo.end() :]):
+            contrato_previo = ultimo.group(0)
+        if not _sin_respaldo(m.group("num"), contrato_previo):
             return m.group(0)
         n_sub += 1
         quitadas.append(m.group("num"))
+        # Si el contrato ya viene nombrado ahí mismo, nombrarlo otra vez
+        # sobra ("EN EL CONTRATO GID-ARL-0090, EL CONTRATO VIGENTE ENTRE
+        # LAS PARTES..."): basta con que se caiga la cláusula.
+        if contrato_previo:
+            return ""
         return "EL CONTRATO VIGENTE ENTRE LAS PARTES"
 
     resultado = _PAT_CLAUSULA_NUM_CON_CONTRATO.sub(_sub_con_contrato, texto)
@@ -3335,6 +3366,11 @@ def _neutralizar_clausulas_sin_respaldo(texto: str, eps: str = "", texto_glosa: 
     # Solo si se quitó una cláusula: reparar la atribución que queda rota
     # ("...QUE INDICA: EN LOS TÉRMINOS DE el pagador reconocerá...").
     resultado = _reparar_atribucion_colgada(resultado)
+    # Puntuación que queda suelta cuando la cláusula desaparece del medio
+    # de la frase ("CONTRATO GID-ARL-0090, , LA TARIFA...").
+    resultado = re.sub(r",(\s*,)+", ",", resultado)
+    resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+    resultado = re.sub(r"\s+([,;.])", r"\1", resultado)
     logger.warning(
         f"[CLAUSULA-SIN-RESPALDO] {n_sub} cláusula(s) numerada(s) sin respaldo "
         f"retiradas del dictamen final (eps={eps}, números={quitadas[:3]})."
