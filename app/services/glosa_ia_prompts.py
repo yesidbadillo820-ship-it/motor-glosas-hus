@@ -3125,6 +3125,10 @@ def build_user_prompt(
 • Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa{_nota_cups}
+  ⚠ DOS LETRAS + 4 DÍGITOS (TA, SO, FA, CO, CL, PE, AU, IN, ME, SE, EX, SA, RE
+    y DE de devoluciones — Res. 2284/2023) es SIEMPRE un código de glosa o de
+    devolución, NUNCA un CUPS. Si aparece en el texto, no lo escribas como CUPS
+    ni como nombre del servicio, ni inventes qué procedimiento sería.
 • Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
 • Valor facturado   : {valor_facturado or "—"}
 • Valor pactado     : {valor_pactado or "—"}

@@ -576,7 +576,22 @@ def _extraer_cups_servicio(
     cups = ""
     # Códigos de glosa (NO son CUPS) — TA0801, SO0101, FA0202, CO0301, etc.
     # Si el regex captura uno de estos, lo descartamos y seguimos buscando.
-    GLOSA_CODES = re.compile(r"^(TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX)\d{2,4}$")
+    #
+    # 05-08-2026: la tabla estaba incompleta y por ahí entraba el defecto.
+    # Faltaban DE (devoluciones), RE (códigos de respuesta) y SA (acuerdos),
+    # así que "DE1601 FACTURA DEVUELTA…" dejaba "DE1601" en la ranura del
+    # CUPS ANTES de que la IA escribiera una palabra: después el dictamen
+    # hablaba del «servicio facturado con CUPS DE1601». También entraba la
+    # variante mutilada de una sola letra —"O0201" es "SO0201" al que se le
+    # perdió la S al copiar y pegar—.
+    #
+    # Efecto en cadena, que vale la mitad del arreglo: al quedar el CUPS
+    # vacío, el servicio pasa a «NO IDENTIFICADO» y el prompt vuelve a
+    # encender solo el aviso que ya existía para ese caso.
+    GLOSA_CODES = re.compile(
+        r"^(?:TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX|DE|RE|SA)\d{2,4}$"
+        r"|^[A-Z]\d{4}$"
+    )
 
     # Ronda 2 (12-jun-2026): fechas y facturas se colaban como CUPS.
     # Evidencia real: "CUPS 2026-04" (el regex del paso 1 capturaba "2026"
