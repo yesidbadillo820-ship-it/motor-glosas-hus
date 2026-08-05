@@ -1363,6 +1363,57 @@ períodos perdidos.
 
 ---
 
+### 05-08 (tarde) — Doce glosas de trampa destaparon nueve fallas del motor
+
+Yesid pidió glosas difíciles para poner a prueba la IA. Se armaron doce,
+cada una diseñada para romper un punto distinto, y pasó seis por la
+página. **Falló en casi todas.** El día se fue en arreglarlas, una por una,
+con sus pruebas.
+
+Lo que salió mal y qué había detrás:
+
+1. **Mayúsculas.** Los dictámenes salían mezclados y aparecía «En **ESE**
+   orden de ideas». No era el modelo desobedeciendo: había un normalizador
+   que **bajaba a minúsculas a propósito** todo dictamen que viniera en
+   mayúsculas. Se retiró. Ahora lo decide el sistema, no la IA.
+2. **Aceptación parcial.** La glosa decía «LA IPS ACEPTA $340.000» y el
+   motor recomendó defender el 100%. Nadie leía esa frase. Peor: el botón
+   «Aplicar recomendación» **buscaba campos que no existen, no cargaba
+   nada, y aun así decía «aplicada»**. Cada vez que se usó, el valor
+   aceptado no quedó registrado ni habilitó la nota crédito.
+3. **Dictamen cortado** en «$ 12.». No era el modelo: el post-proceso
+   cortaba en el primer punto y en «12.300.000» ese punto es el separador
+   de miles. El mismo corte partía «E.S.E.», «ART. 87» y «FACTURA NO.».
+4. **Código de glosa usado como CUPS** («servicio con CUPS DE1601»). El
+   código entraba por la ranura del CUPS **antes** de que la IA escribiera
+   nada, y después ella inventaba qué procedimiento sería.
+5. **Dispensario.** El texto fijo respondía toda glosa TA de ese pagador
+   **sin leer de qué hablaba**, y ese camino se salta el control de
+   calidad. Decisión de Yesid: sigue, pero solo cuando el tema calce.
+6. **ARL (POSITIVA).** Se le respondió con normas del régimen de salud
+   común. La regla correcta existía desde abril; fallaba porque otras dos
+   partes del sistema le ordenaban lo contrario — entre ellas, servirle
+   como ejemplo respuestas escritas para EPS.
+7. **Sub-objeciones.** Una glosa con cuatro objeciones recibió una sola
+   respuesta. El detector no reconocía la forma en que estaba escrita, y
+   además vivía en una rama del código donde no siempre se ejecutaba.
+8. **Devolución tratada como glosa.** Para el motor, la familia DE **no
+   existía**: la convertía en glosa de facturación. Son trámites distintos
+   y confundirlos puede costar el término de radicación.
+9. **Norma derogada.** La Resolución 3047 de 2008 seguía citándose,
+   también en la plantilla guardada en la base que alimenta los ejemplos
+   de la IA. Corregida a la 2284 de 2023, y la plantilla vieja se corrige
+   sola al arrancar.
+
+**La lección del día:** en **cinco de las nueve**, la regla correcta ya
+estaba escrita y no podía funcionar — por una condición que no abría, por
+vivir en la rama equivocada, por vocabulario corto, o porque otra
+instrucción la contradecía. Escribir la regla no era el trabajo; el
+trabajo era comprobar que llegara.
+
+Quedaron 55 pruebas nuevas y la suite en 5.704. Las doce glosas de trampa
+sirven para repetir el ejercicio cuando se toque el motor.
+
 ### 05-08 — El consolidado histórico de pre-auditoría entra por Excel
 
 La base provisional del PC arrancó vacía y el módulo de Pre-auditoría
