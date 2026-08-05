@@ -1,10 +1,11 @@
 """Pruebas del bot que carga las respuestas en SIIFA.
 
 Lo que se cuida acá es lo más delicado de todo el flujo: que cada respuesta
-entre por la puerta que le corresponde y con el id que le corresponde. Una
-DEVOLUCIÓN es otra entidad en SIIFA —otro endpoint, otro id y otra lista de
-códigos—, y mandarla con el id de una glosa sería escribir la respuesta del
-hospital sobre un registro que no es.
+entre por la puerta que le corresponde. Una DEVOLUCIÓN se responde en otro
+endpoint y con otra lista de códigos que una glosa; el identificador, en
+cambio, es el mismo (idSeguimientoFactura). Meter una devolución por la
+puerta de las glosas es lo que hacía que SIIFA rechazara el código RE9701
+diciendo que «no pertenece al grupo RESPUESTA».
 """
 
 from __future__ import annotations
@@ -106,8 +107,8 @@ def test_una_glosa_va_por_la_puerta_de_las_glosas(tmp_path):
     assert cliente.devoluciones == []
 
 
-def test_una_devolucion_va_por_su_puerta_y_con_su_propio_id(tmp_path):
-    """El id de devolución NO es el de glosa: son entidades distintas."""
+def test_una_devolucion_va_por_su_puerta(tmp_path):
+    """Si el archivo trae un id de devolución explícito, ese manda."""
     cliente = ClienteFalso()
     excel = _excel(tmp_path, [_fila(15110544, tipo="DEVOLUCION", id_dev=7788, codigo="RE9701")])
 
@@ -117,22 +118,23 @@ def test_una_devolucion_va_por_su_puerta_y_con_su_propio_id(tmp_path):
     assert cliente.glosas == [], "una devolución nunca puede irse por la puerta de las glosas"
 
 
-def test_una_devolucion_sin_su_id_no_se_manda(tmp_path):
-    """Lo más importante: antes que escribir en el registro equivocado, no escribir.
+def test_una_devolucion_usa_el_id_del_seguimiento(tmp_path):
+    """No hay dos ids: hay uno solo.
 
-    Los archivos de cargue de agosto se armaron sin esa columna. Si el bot
-    usara el id de glosa, la respuesta del hospital quedaría puesta sobre
-    otro registro de la plataforma del Ministerio.
+    El volcado crudo de la API (factura HUS494196, 05-08-2026) mostró que un
+    seguimiento de tipo DEVOLUCION trae idSeguimientoFactura y nada más. Lo
+    que cambia entre glosa y devolución es la puerta y la lista de códigos,
+    no el identificador. Por eso los archivos ya generados sirven tal cual.
     """
     cliente = ClienteFalso()
-    excel = _excel(tmp_path, [_fila(15110544, tipo="DEVOLUCION", id_dev=None, codigo="RE9701")])
+    excel = _excel(tmp_path, [_fila(17888681, tipo="DEVOLUCION", id_dev=None, codigo="RE9701")])
 
-    reporte = _procesar(tmp_path, excel, cliente)
+    _procesar(tmp_path, excel, cliente)
 
-    assert cliente.devoluciones == []
-    assert cliente.glosas == []
-    assert reporte[0]["estado"] == "ERROR"
-    assert "ID_SEGUIMIENTO_FACTURA_DEVOLUCION" in reporte[0]["detalle"]
+    assert cliente.devoluciones == [
+        (17888681, "RE9701", "ESE HUS NO ACEPTA.", "2026-05-11T12:00:00Z")
+    ]
+    assert cliente.glosas == [], "una devolución nunca puede irse por la puerta de las glosas"
 
 
 def test_sin_columna_tipo_todo_sigue_yendo_como_glosa(tmp_path):
