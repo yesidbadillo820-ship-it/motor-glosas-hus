@@ -2002,6 +2002,29 @@ de Docker.
   `/glosas/stats/dashboard-cobranza` **siguen vivos**, de modo que devolver la
   pantalla es volver a poner el botón (un minuto de trabajo). Si el equipo la
   estaba usando de verdad, se avisa y se devuelve.
+- **04-08 (cierre del día):** el módulo **quedó andando en el servidor del
+  hospital**. Costó tres pasos que vale la pena dejar escritos:
+  - El PR #209 se había fusionado con la **primera versión** del módulo, así
+    que el servidor mostraba la pantalla vieja. Se abrió el PR #295 con lo que
+    faltaba.
+  - Al preparar el despliegue se descubrió que **eso solo habría roto la
+    pantalla**: las tablas `glosas_adres` y `paquetes_adres` ya existían con el
+    paquete cargado, y el sistema crea tablas nuevas pero **no agrega columnas
+    a las que ya están**. Además `facturas_adres` nacía vacía, así que la lista
+    habría salido en blanco otra vez. Se agregó la migración al arranque
+    (PR #298) y en el servidor corrió limpia: **1.630 glosas totales marcadas
+    y 324 facturas creadas para la lista**, sin borrar nada.
+  - Probando, el auditor encontró que al marcar **SE ACEPTA** el valor quedaba
+    en **$0**: la tabla no tenía dónde escribir cuánto se acepta. Se agregó la
+    columna **Aceptado** (valor y cantidad). Al escoger SE ACEPTA se propone
+    **todo lo glosado**, que es el caso normal, y el gestor lo baja si fue
+    parcial; si cambia de decisión, vuelve a cero para no reconocer plata por
+    descuido. Es lo que alimenta el «CANTIDAD ACEPTADA n . POR VALOR $x» de la
+    respuesta al ADRES y del PDF de evidencia.
+
+  **Para desplegar de aquí en adelante:** el autodeploy baja de `motor-glosas`
+  cada 5 minutos. Para forzarlo: `schtasks /Run /TN "MotorGlosas_Autodeploy"`,
+  y se verifica en `data\autodeploy.log` y `data\servidor.log`.
 
 ---
 

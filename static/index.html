@@ -20066,7 +20066,7 @@ function gaPintar(d){
        'la decisión es suya, el sistema solo propone</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'+
        '<thead><tr style="text-align:left;color:var(--text3)">'+
        '<th style="padding:.45rem">Causal</th><th>Descripción de la glosa</th><th>Servicio</th><th style="text-align:right">Glosado</th>'+
-       '<th>Clasificación</th><th>Centro de costos</th><th>Propuesta</th><th>Decisión</th><th>Observación técnica</th>'+
+       '<th>Clasificación</th><th>Centro de costos</th><th>Propuesta</th><th>Decisión</th><th style="text-align:right">Aceptado</th><th>Observación técnica</th>'+
        '</tr></thead><tbody>';
   (d.glosas||[]).forEach(function(g){
     var color = g.decision ? '#15803d' : (g.sugerencia ? '#b45309' : 'var(--text3)');
@@ -20085,6 +20085,7 @@ function gaPintar(d){
              ['','SE ACEPTA','SE OBJETA','SE SUBSANA'].map(function(o){
                return '<option value="'+o+'"'+(g.decision===o?' selected':'')+'>'+(o||'— sin decidir —')+'</option>'; }).join('')+
              '</select></td>'+
+         '<td style="min-width:150px">'+gaCeldaAceptado(g)+'</td>'+
          '<td style="min-width:210px"><div style="display:flex;gap:.25rem;align-items:center">'+
              '<input id="ga-obs-'+g.id+'" value="'+escHtml(g.observacion_tecnico||'')+'" placeholder="por qué"'+
              ' oninput="gaObservacionAuto('+g.id+',this.value)" onchange="gaGuardarFila('+g.id+')"'+
@@ -20177,13 +20178,76 @@ async function gaCentro(id, valor){
   }catch(e){ toast('No se pudo guardar', e.message, 'error'); }
 }
 
-async function gaDecidir(id, valor){
+// Cuando el gestor ACEPTA una glosa hay que decir CUÁNTO se acepta: es lo que
+// va en la respuesta al ADRES («CANTIDAD ACEPTADA n . POR VALOR $x»). Si no se
+// aceptó, los campos quedan apagados para no confundir.
+function gaCeldaAceptado(g){
+  var acepta = (g.decision === 'SE ACEPTA');
+  var valor = g.valor_aceptado || 0;
+  var cant = g.cantidad_aceptada || '';
+  if(!acepta){
+    return '<div style="text-align:right;color:var(--text3);font-size:.72rem">—</div>';
+  }
+  return '<div style="display:flex;flex-direction:column;gap:.2rem">'+
+    '<input id="ga-val-'+g.id+'" type="number" min="0" step="1" value="'+valor+'"'+
+      ' onchange="gaValorAceptado('+g.id+',this.value)" title="Valor aceptado"'+
+      ' style="width:100%;text-align:right;font-size:.74rem;padding:.25rem;border-radius:6px;'+
+      'border:1px solid '+(valor>0?'var(--border)':'#f59e0b')+';background:var(--bg2);color:var(--text)">'+
+    '<input id="ga-cant-'+g.id+'" value="'+escHtml(cant)+'" placeholder="cant."'+
+      ' onchange="gaCantidadAceptada('+g.id+',this.value)" title="Cantidad aceptada"'+
+      ' style="width:100%;text-align:right;font-size:.68rem;padding:.15rem .25rem;border-radius:6px;'+
+      'border:1px solid var(--border);background:var(--bg2);color:var(--text3)">'+
+    '</div>';
+}
+
+async function gaValorAceptado(id, valor){
+  var n = parseFloat(valor);
+  if(isNaN(n) || n < 0) n = 0;
   try{
     var r = await fetch('/glosas-adres/glosa/'+id, {method:'POST',
       headers: Object.assign({'Content-Type':'application/json'}, authH()),
-      body: JSON.stringify({decision: valor})});
+      body: JSON.stringify({valor_aceptado: n})});
     if(!r.ok) throw new Error('HTTP '+r.status);
-    toast('Guardado', valor ? ('Glosa marcada como '+valor) : 'Decisión borrada', 'success');
+    toast('Guardado', 'Valor aceptado: '+fmtCOP(n), 'success');
+    gaBuscar();
+  }catch(e){ toast('No se pudo guardar el valor', e.message, 'error'); }
+}
+
+async function gaCantidadAceptada(id, valor){
+  try{
+    var r = await fetch('/glosas-adres/glosa/'+id, {method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({cantidad_aceptada: String(valor||'')})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    gaMarcarGuardado(id);
+  }catch(e){ toast('No se pudo guardar la cantidad', e.message, 'error'); }
+}
+
+async function gaDecidir(id, valor){
+  // Aceptar una glosa es reconocer plata: por defecto se acepta TODO lo
+  // glosado, que es el caso normal, y el gestor lo baja si fue parcial. Si la
+  // decisión deja de ser SE ACEPTA, el valor vuelve a cero para no reconocer
+  // algo por descuido.
+  var cuerpo = {decision: valor};
+  var g = ((GA_DATOS && GA_DATOS.glosas) || []).filter(function(x){ return x.id === id; })[0];
+  if(valor === 'SE ACEPTA'){
+    if(g && !(g.valor_aceptado > 0)){
+      cuerpo.valor_aceptado = g.valor_glosado || 0;
+      cuerpo.cantidad_aceptada = String(g.cant_reclamada || 1);
+    }
+  } else if(g && (g.valor_aceptado > 0)){
+    cuerpo.valor_aceptado = 0;
+    cuerpo.cantidad_aceptada = '';
+  }
+  try{
+    var r = await fetch('/glosas-adres/glosa/'+id, {method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(cuerpo)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var extra = cuerpo.valor_aceptado > 0
+      ? ' · se acepta ' + fmtCOP(cuerpo.valor_aceptado) + ' (cambialo si fue parcial)'
+      : '';
+    toast('Guardado', valor ? ('Glosa marcada como ' + valor + extra) : 'Decisión borrada', 'success');
     gaBuscar();
   }catch(e){ toast('No se pudo guardar', e.message, 'error'); }
 }

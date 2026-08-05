@@ -317,6 +317,82 @@ class TestConsulta:
         assert "GLOSA EXTEMPORANEA" in texto
 
 
+class TestValorAceptado:
+    """Aceptar una glosa es reconocer plata: hay que poder decir CUÁNTO.
+
+    Es lo que va en la respuesta al ADRES («CANTIDAD ACEPTADA n . POR VALOR
+    $x»). Al principio la pantalla no tenía dónde escribirlo y todo quedaba en
+    $0 aunque el gestor marcara SE ACEPTA.
+    """
+
+    def test_se_guarda_el_valor_y_la_cantidad_aceptada(self, client, paquete):
+        g = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]
+        r = client.post(
+            f"/glosas-adres/glosa/{g['id']}",
+            json={"decision": "SE ACEPTA", "valor_aceptado": 37600, "cantidad_aceptada": "2"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["valor_aceptado"] == pytest.approx(37600)
+        assert r.json()["cantidad_aceptada"] == "2"
+
+    def test_el_resumen_de_la_factura_lo_suma(self, client, paquete):
+        g = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]
+        client.post(
+            f"/glosas-adres/glosa/{g['id']}",
+            json={"decision": "SE ACEPTA", "valor_aceptado": 30000},
+        )
+        d = client.get("/glosas-adres/factura/HUS0000352890").json()
+        assert d["resumen"]["valor_aceptado"] == pytest.approx(30000)
+
+    def test_la_lista_de_facturas_tambien_lo_suma(self, client, paquete):
+        g = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]
+        client.post(
+            f"/glosas-adres/glosa/{g['id']}",
+            json={"decision": "SE ACEPTA", "valor_aceptado": 30000},
+        )
+        una = next(
+            f
+            for f in client.get("/glosas-adres/facturas", params={"paquete_id": paquete}).json()
+            if f["factura"] == "HUS352890"
+        )
+        assert una["valor_aceptado"] == pytest.approx(30000)
+
+    def test_se_puede_volver_a_cero_al_cambiar_de_decision(self, client, paquete):
+        g = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]
+        client.post(
+            f"/glosas-adres/glosa/{g['id']}",
+            json={"decision": "SE ACEPTA", "valor_aceptado": 37600, "cantidad_aceptada": "1"},
+        )
+        r = client.post(
+            f"/glosas-adres/glosa/{g['id']}",
+            json={"decision": "SE OBJETA", "valor_aceptado": 0, "cantidad_aceptada": ""},
+        )
+        assert r.json()["valor_aceptado"] == 0
+        assert not r.json()["cantidad_aceptada"]
+
+    def test_el_pdf_muestra_el_valor_aceptado(self, client, paquete):
+        pytest.importorskip("reportlab")
+        pdfplumber = pytest.importorskip("pdfplumber")
+        import io as _io
+
+        g = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]
+        client.post(
+            f"/glosas-adres/glosa/{g['id']}",
+            json={
+                "decision": "SE ACEPTA",
+                "valor_aceptado": 37600,
+                "cantidad_aceptada": "1",
+                "observacion_tecnico": "SE RECONOCE EL VALOR.",
+            },
+        )
+        r = client.get("/glosas-adres/factura/HUS0000352890/evidencia.pdf")
+        with pdfplumber.open(_io.BytesIO(r.content)) as pdf:
+            texto = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        # La fórmula de la macro para el caso aceptado.
+        assert "CANTIDAD ACEPTADA" in texto
+        assert "$37.600" in texto
+
+
 class TestDecision:
     def test_el_gestor_guarda_su_decision(self, client, paquete):
         gid = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]["id"]
