@@ -100,3 +100,36 @@ class TestTodoElDictamenEnMayuscula:
             if m and m.group(1) != m.group(1).upper():
                 malas.append((i + 1, m.group(1)))
         assert not malas, f"literales de reemplazo en minúscula: {malas[:5]}"
+
+
+class TestLasRedesFinalesTambienEscribenEnMayuscula:
+    """Las redes finales corren DESPUÉS del paso a mayúsculas, así que lo
+    que ellas inyectan tiene que venir ya en caps desde el literal."""
+
+    def test_el_contrato_neutro(self):
+        from app.services.glosa_service import _neutralizar_contratos_ajenos
+
+        mal = "CONFORME AL CONTRATO S-13-1-03-1-04958 LOS SERVICIOS SE CANCELAN."
+        out = _neutralizar_contratos_ajenos(mal, eps="DISPENSARIO MEDICO")
+        assert "EL CONTRATO VIGENTE ENTRE LAS PARTES" in out
+        assert "el contrato vigente entre las partes" not in out
+
+    def test_el_reemplazo_del_articulo_177(self):
+        from app.services.glosa_service import _neutralizar_art_177_relleno
+
+        mal = "RIGE EL MANUAL TARIFARIO SOAT 2026 ART. 177 LEY 100."
+        out = _neutralizar_art_177_relleno(mal, texto_glosa="TA0801 TARIFA SUPERIOR")
+        assert "el régimen tarifario" not in out
+
+    def test_ninguna_red_final_deja_frases_en_minuscula(self):
+        """Barrido: un reemplazo nuevo en minúscula vuelve a partir el
+        documento en dos, y no se nota hasta que sale impreso."""
+        import re
+
+        src = io.open(RAIZ / "app" / "services" / "glosa_service.py", encoding="utf-8").read()
+        pat = re.compile(
+            r'(?:\.subn?\(|\.replace\()\s*\n?\s*"((?:el|la|los|las|un|una|en|de|por)\s[^"]{5,90})"',
+            re.I,
+        )
+        malas = {m.group(1) for m in pat.finditer(src) if m.group(1) != m.group(1).upper()}
+        assert not malas, f"reemplazos en minúscula: {sorted(malas)[:3]}"

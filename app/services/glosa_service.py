@@ -1917,8 +1917,8 @@ def _neutralizar_art_177_relleno(
         re.IGNORECASE,
     )
     nuevo, n_bare = pat_art177_bare.subn(
-        "el régimen tarifario y contractual aplicable (Pacta Sunt Servanda — "
-        "Art. 1602 C.C. y Art. 871 C.Co.)",
+        "EL RÉGIMEN TARIFARIO Y CONTRACTUAL APLICABLE (PACTA SUNT SERVANDA — "
+        "ART. 1602 C.C. Y ART. 871 C.CO.)",
         nuevo,
     )
     n += n_bare
@@ -3206,7 +3206,7 @@ def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
             r"(?:(?:CONTRATO|EL\s+CONTRATO)\s+(?:N[ÚU]MERO\s+)?)?" + re.escape(tok),
             re.IGNORECASE,
         )
-        nuevo, n = pat.subn("el contrato vigente entre las partes", resultado)
+        nuevo, n = pat.subn("EL CONTRATO VIGENTE ENTRE LAS PARTES", resultado)
         if n:
             resultado = nuevo
             n_sub += n

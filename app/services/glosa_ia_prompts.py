@@ -343,7 +343,7 @@ def _contrato_desde_bd(eps_upper: str) -> dict | None:
             if not numero:
                 # Hay relación contractual documentada pero sin número →
                 # referencia NEUTRA, nunca "SIN CONTRATO PACTADO".
-                numero = "el contrato vigente entre las partes"
+                numero = "EL CONTRATO VIGENTE ENTRE LAS PARTES"
             ficha = _contrato_sin_pacto()
             ficha["numero"] = numero
             ficha["tipo"] = "CONTRATO VIGENTE"

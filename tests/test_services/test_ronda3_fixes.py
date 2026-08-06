@@ -226,7 +226,8 @@ class TestContratosAjenos:
         )
         out = _neutralizar_contratos_ajenos(mal, eps="DISPENSARIO MEDICO")
         assert "S-13-1-03-1-04958" not in out
-        assert "el contrato vigente entre las partes" in out
+        # 06-08-2026: el sintagma va en MAYÚSCULA, como todo el dictamen.
+        assert "EL CONTRATO VIGENTE ENTRE LAS PARTES" in out.upper()
 
     def test_oncologico_caso_2_contratos_ajenos(self):
         """Caso 2 del usuario: EPS oncológico (NUEVA EPS) no es dueño de
