@@ -2083,7 +2083,21 @@ def _rechazar_sancion_eps_ilegal(
             "(Art. 884 C.Co.; Decreto 4747/2007 Art. 21)."
         )
         # Insertamos después de la primera oración terminada en ".".
-        idx_punto = nuevo.find(".")
+        #
+        # 06-08-2026 (OT-009): antes se buscaba el PRIMER punto del texto
+        # con find("."). En la glosa de sanción de COOSALUD ese primer
+        # punto era el separador de miles de "$ 1.750.000", así que el
+        # bloque quedó incrustado dentro del monto y el dictamen entregado
+        # mostraba "$ 1.[todo el párrafo]750.000" en la casilla del valor
+        # objetado. Se reusa el buscador de fin de oración del
+        # postprocesador, que ya descarta el punto seguido de dígitos
+        # (separadores de miles, "Art. 126", "Res. 2284").
+        try:
+            from app.services.dictamen_postprocesor import _RE_FIN_ORACION
+        except Exception:  # pragma: no cover - degradación defensiva
+            _RE_FIN_ORACION = re.compile(r"(?<!\.\w)\.(?!\w)(?!\s*\d)", re.UNICODE)
+        _mfin = _RE_FIN_ORACION.search(nuevo)
+        idx_punto = _mfin.start() if _mfin else -1
         if 0 < idx_punto < len(nuevo) - 1:
             nuevo = nuevo[: idx_punto + 1] + bloque_rechazo + nuevo[idx_punto + 1 :]
             n_reescritas += 1
