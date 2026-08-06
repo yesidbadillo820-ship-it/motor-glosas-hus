@@ -3485,6 +3485,141 @@ _PAT_FACTURA_COMO_GLOSA = re.compile(
 )
 
 
+# ── El servicio objetado inventado (OT-016) ──
+# Prueba real del 05-08-2026, glosa FA0101 de AURORA. El texto no nombraba
+# ningún servicio, no había CUPS ni PDF adjunto, y el dictamen salió
+# afirmando "Servicio objetado: ESTANCIA U OBSERVACIÓN DE URGENCIAS". El
+# modelo lo puso porque el campo lo pedía.
+#
+# Un servicio legítimo puede venir de tres sitios: la descripción del CUPS
+# del catálogo, el texto de la glosa, o el PDF de soportes. Si no hay
+# ninguno de los tres, se deja el texto neutro que ya existe.
+_VACIAS_SERVICIO = frozenset(
+    {
+        "EL",
+        "LA",
+        "LOS",
+        "LAS",
+        "DEL",
+        "DE",
+        "POR",
+        "CON",
+        "SIN",
+        "PARA",
+        "SEGUN",
+        "SOBRE",
+        "SERVICIO",
+        "SERVICIOS",
+        "PROCEDIMIENTO",
+        "PROCEDIMIENTOS",
+        "FACTURADO",
+        "FACTURADA",
+        "FACTURADOS",
+        "PRESTADO",
+        "PRESTADA",
+        "OBJETADO",
+        "OBJETADA",
+        "CUPS",
+        "CODIGO",
+        "DETALLADO",
+        "FACTURA",
+        "ELECTRONICA",
+        "EXPEDIENTE",
+        "PACIENTE",
+        "USUARIO",
+    }
+)
+
+
+def _servicio_con_respaldo(
+    servicio: str,
+    texto_glosa: str = "",
+    contexto_pdf: str = "",
+    cups: str = "",
+) -> str:
+    """Devuelve el servicio si algo lo respalda; "" si el motor lo inventó.
+
+    Con "" el dictamen usa el texto neutro que ya trae el sistema, que no
+    afirma nada. Es preferible a nombrar un servicio que nadie prestó.
+    """
+    s = (servicio or "").strip()
+    if not s:
+        return ""
+    # Hay CUPS o hay PDF: el nombre pudo salir del catálogo o del soporte.
+    if (cups or "").strip() or (contexto_pdf or "").strip():
+        return s
+    import unicodedata as _ud
+
+    def _plegar(t: str) -> str:
+        n = _ud.normalize("NFKD", str(t or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    glosa = _plegar(texto_glosa)
+    if not glosa:
+        return s
+    palabras = [p for p in re.findall(r"[A-ZÁÉÍÓÚÑ]{5,}", _plegar(s)) if p not in _VACIAS_SERVICIO]
+    if not palabras:
+        return s
+    if any(p in glosa for p in palabras):
+        return s
+    logger.warning(
+        f"[SERVICIO-INVENTADO] «{s[:60]}» no está en la glosa, no hay CUPS ni PDF "
+        "— se deja el texto neutro."
+    )
+    return ""
+
+
+# ── Red final: el periodo de atención inventado (OT-015) ──
+# Prueba real del 05-08-2026, glosa AU0401 de COMPENSAR. El texto de la
+# glosa no traía ninguna fecha, y el dictamen salió afirmando "...FACTURADO
+# POR EL VALOR FACTURADO EN EL EXPEDIENTE, EN EL PERIODO CORRESPONDIENTE AL
+# AÑO 2023". Ese año no existe en ninguna parte del caso: el modelo lo puso
+# porque una respuesta de glosa suele llevar un periodo.
+#
+# Un año equivocado en un documento que se radica es de lo peor que puede
+# pasar: la entidad revisa la factura, ve otra fecha y desacredita el
+# dictamen entero sin discutir el fondo.
+_PAT_PERIODO_AFIRMADO = re.compile(
+    r"(?:,\s*)?\b(?:EN|DURANTE|PARA|CORRESPONDIENTE\s+A|CORRESPONDEN?\s+A)"
+    r"\s*L?\s*(?:EL\s+|LA\s+)?"
+    r"(?:PERIODO|PER[ÍI]ODO|VIGENCIA|A[ÑN]O)\s+"
+    r"(?:CORRESPONDIENTE\s+AL?\s+)?(?:A[ÑN]O\s+)?"
+    r"((?:19|20)\d{2})\b",
+    re.IGNORECASE,
+)
+
+
+def _neutralizar_periodo_inventado(dictamen: str, texto_glosa: str = "") -> str:
+    """Quita del dictamen el periodo de atención que no está en el caso.
+
+    Solo toca el año cuando NO aparece en el texto de la glosa. Si el
+    gestor pegó la fecha, el año es dato del expediente y se conserva.
+    """
+    if not dictamen:
+        return dictamen
+    fuente = str(texto_glosa or "")
+    quitados: list[str] = []
+
+    def _sub(m: "re.Match[str]") -> str:
+        anio = m.group(1)
+        if anio in fuente:
+            return m.group(0)
+        quitados.append(anio)
+        return ""
+
+    resultado = _PAT_PERIODO_AFIRMADO.sub(_sub, dictamen)
+    if not quitados:
+        return dictamen
+    resultado = re.sub(r",(\s*,)+", ",", resultado)
+    resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+    resultado = re.sub(r"\s+([,;.])", r"\1", resultado)
+    logger.warning(
+        f"[PERIODO-INVENTADO] {len(quitados)} periodo(s) que no están en el caso "
+        f"retirados del dictamen final (años={quitados[:3]})."
+    )
+    return resultado
+
+
 def _neutralizar_cups_falsos(texto: str) -> str:
     """Sustituye 'CUPS <fecha>' o 'CUPS HUS00...' por 'el procedimiento facturado'.
 
@@ -6656,6 +6791,20 @@ class GlosaService:
                 _campos_saltar.add("servicio")
             else:
                 servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
+            # OT-016 (06-08-2026) — el servicio inventado. Glosa FA0101 de
+            # AURORA: el texto no nombraba ningún servicio, no había CUPS ni
+            # PDF, y el dictamen salió con "ESTANCIA U OBSERVACIÓN DE
+            # URGENCIAS". Si no hay de dónde sacarlo, se deja el texto
+            # neutro que ya existe en vez de nombrar un servicio falso.
+            try:
+                servicio_ia = _servicio_con_respaldo(
+                    servicio_ia,
+                    texto_glosa=texto_base,
+                    contexto_pdf=contexto_pdf,
+                    cups=str(locals().get("cups_verificado") or ""),
+                )
+            except Exception as _e_si:
+                logger.debug(f"[SERVICIO-INVENTADO] guarda no aplicada: {_e_si}")
             contrato_ia = self._xml("contrato", res_ia, "")
             tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
@@ -7377,6 +7526,19 @@ class GlosaService:
                     dictamen = _dictamen_sin_clausula
             except Exception as _e_cl:
                 logger.debug(f"[CLAUSULA-SIN-RESPALDO] red final no aplicada: {_e_cl}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  OT-015 (06-08-2026) — RED FINAL periodo inventado.
+            #  Evidencia AU0401 COMPENSAR: la glosa no traía fecha y el
+            #  dictamen salió con "EN EL PERIODO CORRESPONDIENTE AL AÑO
+            #  2023". Un año equivocado desacredita el documento entero.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_periodo = _neutralizar_periodo_inventado(dictamen, texto_base)
+                if _dictamen_sin_periodo != dictamen:
+                    dictamen = _dictamen_sin_periodo
+            except Exception as _e_pi:
+                logger.debug(f"[PERIODO-INVENTADO] red final no aplicada: {_e_pi}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 3 (16-jun-2026) — RED FINAL CUPS falsos.
