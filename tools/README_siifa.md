@@ -99,6 +99,39 @@ El Excel trae la hoja **SEGUIMIENTOS** (una fila por glosa, con
 respuestas más abajo) y una hoja **RESUMEN** con totales por EPS y valor
 glosado. Las filas sin respuesta quedan resaltadas.
 
+### Qué llegó NUEVO desde la última revisión (`siifa_novedades.py`)
+
+El portal muestra el total («Mostrando 2611 a 2620 de **2620** registros») pero
+no dice cuáles son nuevos: buscarlos a mano son 175 páginas de a diez. Esto lo
+responde de una: **qué entidad, qué factura, glosa o devolución, por cuánto y
+con qué causal.**
+
+```powershell
+# 1) Guardar el informe que ya se tenía y bajar el de hoy
+Move-Item "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+          "D:\USUARIO CARTERA\Documents\SIIFA\informe_ANTERIOR.xlsx" -Force
+
+py tools\siifa_reporte_seguimientos.py `
+  --salida "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx"
+
+# 2) Comparar los dos
+py tools\siifa_novedades.py `
+  --nuevo    "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+  --anterior "D:\USUARIO CARTERA\Documents\SIIFA\informe_ANTERIOR.xlsx"
+```
+
+Muestra el resumen en pantalla y deja `NOVEDADES_SIIFA.xlsx` al lado, con las
+devoluciones resaltadas (se responden por otra puerta). En el bot de doble
+clic es la **opción [N]**, que hace los dos pasos sola.
+
+Si no se tiene el informe anterior a la mano, se corre solo con `--nuevo`: en
+ese caso lista lo que está **sin responder**, que —estando el corte anterior
+cargado al 100%— es justamente lo que acaba de entrar.
+
+> **Ojo con el valor de las devoluciones:** SIIFA repite el valor de la
+> factura en cada línea de la devolución. Este informe lo cuenta **una sola
+> vez por factura**; sumarlas daría $24.917 millones donde hay $111 millones.
+
 ---
 
 ## 2) Bot de respuestas (`responder_glosas_siifa.py`)

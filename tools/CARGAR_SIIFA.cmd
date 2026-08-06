@@ -107,6 +107,7 @@ echo   [6] Reintentar lo que quedo con error
 echo   [7] Ver los codigos de respuesta que acepta SIIFA
 echo   [8] Cambiar la carpeta de trabajo
 echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
+echo   [N] Ver que llego NUEVO a SIIFA (entidad, factura, glosa/devolucion)
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -120,6 +121,7 @@ if "%OPCION%"=="6" goto reintentar
 if "%OPCION%"=="7" goto catalogo
 if "%OPCION%"=="8" goto carpeta
 if "%OPCION%"=="9" goto verificar
+if /i "%OPCION%"=="N" goto novedades
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -128,6 +130,27 @@ goto menu
 echo.
 echo --- Bajando de SIIFA todos los seguimientos (tarda varios minutos) ---
 %PYEXE% tools\siifa_reporte_seguimientos.py --salida "%INFORME%"
+goto hecho
+
+:novedades
+REM Guarda el informe que ya se tenia, baja el de hoy y compara los dos.
+REM Asi el auditor ve de una que llego nuevo sin buscar pagina por pagina.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Guardando el informe anterior y bajando el de hoy ---
+move /y "%INFORME%" "%CARPETA%\informe_ANTERIOR.xlsx" >nul
+%PYEXE% tools\siifa_reporte_seguimientos.py --salida "%INFORME%"
+if not exist "%INFORME%" goto novedadesfallo
+echo.
+echo --- Comparando: que llego nuevo ---
+%PYEXE% tools\siifa_novedades.py --nuevo "%INFORME%" --anterior "%CARPETA%\informe_ANTERIOR.xlsx"
+goto hecho
+
+:novedadesfallo
+REM Si la bajada fallo, se devuelve el informe anterior: no se pierde nada.
+move /y "%CARPETA%\informe_ANTERIOR.xlsx" "%INFORME%" >nul
+echo.
+echo   [ERROR] No se pudo bajar el informe de hoy. El anterior quedo intacto.
 goto hecho
 
 :armar

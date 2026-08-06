@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 05-08-2026
+**Última actualización:** 06-08-2026
 
 ---
 
@@ -2208,6 +2208,34 @@ de Docker.
 3. **La fecha de las respuestas subidas el 4 y 5 de agosto** quedó con el día
    del cargue y no con la de DGH (los archivos se generaron antes de que
    existiera la columna FECHA_RESPUESTA).
+
+### 06-08 — Informe por entidad en Word, y cómo ver qué llega nuevo a SIIFA
+
+**1. Informe para gerencia (`INFORME_SIIFA_POR_ENTIDAD.docx`).** Entrega en
+Word con las cuatro entidades que glosaron o devolvieron, sus facturas,
+valores y causales; el detalle de las 15 facturas de mayor valor; y una
+sección que muestra lo que se ganó automatizando: **1.419 respuestas en 4
+minutos y 58 segundos** (286 por minuto) frente a las ~86 horas —11 jornadas—
+que habría tomado a mano. Incluye los tres hallazgos que destrabaron el
+cargue y los tres puntos que quedan por revisar.
+
+**2. El portal ya marca 2.620 registros** (antes 2.597): llegaron 23 nuevos.
+El portal dice el total pero **no cuál es nuevo**, y buscarlos a mano son 175
+páginas de a 10. Se creó **`tools/siifa_novedades.py`**, que compara el
+informe de hoy contra el de la revisión pasada y responde, para cada novedad:
+qué entidad, qué factura, si es glosa o devolución, por cuánto y con qué
+causal. Queda como **opción [N]** del bot `CARGAR_SIIFA.cmd`: guarda el
+informe anterior, baja el de hoy y compara solo. Si la bajada falla, devuelve
+el informe anterior intacto.
+
+**3. Un error de cuentas que se corrigió a tiempo.** Al probar el resumen, las
+devoluciones daban **$24.917 millones**. La causa: SIIFA **repite el valor de
+la factura en cada línea** de la devolución, y sumarlas multiplica la plata
+(1.340 líneas de una factura de $111 millones). El valor real de esas 9
+facturas es **$111.420.812** —224 veces menos—. Ahora el valor de una
+devolución se cuenta **una sola vez por factura**, hay tres pruebas que lo
+vigilan y quedó anotado en `docs/CONTEXTO_SIIFA.md`. Es la clase de cifra que
+en un informe a gerencia no se puede sostener.
 
 ---
 

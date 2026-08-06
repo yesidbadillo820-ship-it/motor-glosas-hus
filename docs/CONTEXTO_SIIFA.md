@@ -157,8 +157,22 @@ por el mecanismo único de validación FEV-RIPS — no se responde en SIIFA como
   para registrar la respuesta de cada glosa. Genera un CSV de reporte
   (OK/ERROR por fila) para poder reintentar solo lo que falló, igual que el
   bot COOSALUD.
+- **`tools/siifa_novedades.py`** — compara el informe recién bajado contra el
+  de la revisión pasada y dice **qué llegó nuevo**: entidad, factura, si es
+  glosa o devolución, valor y causal. El portal muestra el total («2.620
+  registros») pero no cuáles son nuevos, y buscarlos a mano son 175 páginas.
+  Sin informe anterior a la mano, lista lo que está sin responder.
 - Ver `tools/README_siifa.md` para los comandos PowerShell listos para
   copiar/pegar.
+
+### El valor de una devolución NO se suma línea por línea
+
+Una **glosa** objeta un ítem y trae el valor de ese ítem: los ítems se suman.
+Una **devolución** rechaza la factura entera, y SIIFA **repite el valor de la
+factura en cada una de sus líneas**. Sumar esas líneas multiplica la plata:
+las 1.340 líneas de SANITAS dan **$24.917 millones** cuando esas 9 facturas
+valen **$111 millones** —224 veces más—. En cualquier informe, el valor de una
+devolución se cuenta **una sola vez por factura**.
 
 ## 5.quater) Glosas y devoluciones NO se responden por el mismo lado
 

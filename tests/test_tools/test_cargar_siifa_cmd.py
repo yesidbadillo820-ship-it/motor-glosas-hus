@@ -35,6 +35,7 @@ def test_el_bot_llama_a_los_scripts_del_flujo():
         "siifa_redactar_respuestas.py",
         "responder_glosas_siifa.py",
         "siifa_verificar_cargue.py",
+        "siifa_novedades.py",
     }
 
 
