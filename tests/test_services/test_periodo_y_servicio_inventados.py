@@ -129,9 +129,9 @@ class TestLasGuardasEstanEnchufadas:
         from app.services.glosa_service import GlosaService
 
         src = inspect.getsource(GlosaService.analizar)
-        assert "_neutralizar_periodo_inventado(dictamen, texto_base)" in src
-        i = src.index("_neutralizar_periodo_inventado(dictamen, texto_base)")
-        assert "PERIODO-INVENTADO" in src[i : i + 600]
+        assert "_neutralizar_periodo_inventado(" in src
+        i = src.index("_neutralizar_periodo_inventado(")
+        assert "PERIODO-INVENTADO" in src[i : i + 1200]
 
     def test_el_servicio_se_verifica_antes_de_armar_el_dictamen(self):
         import inspect
@@ -145,3 +145,51 @@ class TestLasGuardasEstanEnchufadas:
         assert "texto_glosa=texto_base" in bloque
         assert "contexto_pdf=contexto_pdf" in bloque
         assert "SERVICIO-INVENTADO" in bloque
+
+
+class TestElAñoPuedeVenirDeOtraParteDelExpediente:
+    """El primer arreglo solo miraba el texto pegado. Si el año está en los
+    soportes o en las fechas del formulario, el periodo es un hecho del caso
+    y borrarlo sería quitarle al dictamen algo cierto."""
+
+    DICTAMEN = "ESE HUS NO ACEPTA LA GLOSA, EN EL PERIODO CORRESPONDIENTE AL AÑO 2023."
+
+    def test_el_año_esta_en_los_soportes(self):
+        out = _neutralizar_periodo_inventado(
+            self.DICTAMEN,
+            GLOSA_COMPENSAR,
+            contexto_pdf="EPICRISIS — FECHA DE EGRESO 14/07/2023",
+        )
+        assert out == self.DICTAMEN
+
+    def test_el_año_esta_en_la_fecha_de_radicacion(self):
+        out = _neutralizar_periodo_inventado(
+            self.DICTAMEN, GLOSA_COMPENSAR, fechas_expediente="2023-11-30"
+        )
+        assert out == self.DICTAMEN
+
+    def test_sin_ninguna_fuente_se_sigue_quitando(self):
+        out = _neutralizar_periodo_inventado(
+            self.DICTAMEN,
+            GLOSA_COMPENSAR,
+            contexto_pdf="EPICRISIS SIN FECHAS",
+            fechas_expediente="",
+        )
+        assert "2023" not in out
+
+    def test_un_año_distinto_en_los_soportes_no_sirve_de_coartada(self):
+        out = _neutralizar_periodo_inventado(
+            self.DICTAMEN, GLOSA_COMPENSAR, contexto_pdf="EPICRISIS — EGRESO 14/07/2025"
+        )
+        assert "2023" not in out
+
+    def test_el_dictamen_recibe_las_tres_fuentes(self):
+        import inspect
+
+        from app.services.glosa_service import GlosaService
+
+        src = inspect.getsource(GlosaService.analizar)
+        i = src.index("_neutralizar_periodo_inventado(")
+        bloque = src[i : i + 700]
+        assert "contexto_pdf=contexto_pdf" in bloque
+        assert "fecha_radicacion" in bloque and "fecha_recepcion" in bloque

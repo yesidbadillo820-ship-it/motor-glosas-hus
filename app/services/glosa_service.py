@@ -3611,15 +3611,22 @@ def _quitar_signos_vacios(texto: str) -> str:
     return resultado
 
 
-def _neutralizar_periodo_inventado(dictamen: str, texto_glosa: str = "") -> str:
+def _neutralizar_periodo_inventado(
+    dictamen: str,
+    texto_glosa: str = "",
+    contexto_pdf: str = "",
+    fechas_expediente: str = "",
+) -> str:
     """Quita del dictamen el periodo de atención que no está en el caso.
 
-    Solo toca el año cuando NO aparece en el texto de la glosa. Si el
-    gestor pegó la fecha, el año es dato del expediente y se conserva.
+    Solo toca el año cuando no aparece en NINGUNA fuente del expediente:
+    el texto de la glosa, los soportes adjuntos o las fechas que escribió
+    el gestor en el formulario. Si el año está en cualquiera de las tres,
+    es dato del caso y se conserva — borrarlo sería quitar un hecho cierto.
     """
     if not dictamen:
         return dictamen
-    fuente = str(texto_glosa or "")
+    fuente = " ".join(str(x or "") for x in (texto_glosa, contexto_pdf, fechas_expediente))
     quitados: list[str] = []
 
     def _sub(m: "re.Match[str]") -> str:
@@ -7556,7 +7563,17 @@ class GlosaService:
             #  2023". Un año equivocado desacredita el documento entero.
             # ═══════════════════════════════════════════════════════════
             try:
-                _dictamen_sin_periodo = _neutralizar_periodo_inventado(dictamen, texto_base)
+                _dictamen_sin_periodo = _neutralizar_periodo_inventado(
+                    dictamen,
+                    texto_base,
+                    contexto_pdf=contexto_pdf,
+                    # Las fechas del formulario también son del expediente:
+                    # si el gestor las escribió, el año no es una invención.
+                    fechas_expediente=" ".join(
+                        str(getattr(data, campo, "") or "")
+                        for campo in ("fecha_radicacion", "fecha_recepcion")
+                    ),
+                )
                 if _dictamen_sin_periodo != dictamen:
                     dictamen = _dictamen_sin_periodo
             except Exception as _e_pi:
