@@ -145,6 +145,16 @@ _INDICES_HISTORIAL = [
 # cada una sería puro peaje.
 _MOTOR_YA_CHEQUEADO = False
 
+# Huella de la plantilla ya corregida: la que pone adelante la norma vigente
+# (Res. 2284/2023) y deja la 3047/2008 como antecedente. Sirve para saber si
+# una plantilla sembrada en la base todavía trae el texto viejo, sin
+# reescribir a ciegas las que el auditor ya aprobó.
+_MARCAS_NORMA_VIGENTE = (
+    "SUSTITUYÓ EL ANEXO",
+    "EN REEMPLAZO DEL ANEXO",
+    "(RESOLUCIÓN 2284 DE 2023).",
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1164,6 +1174,7 @@ async def lifespan(app: FastAPI):
                 _filas_hus = _data_hus.get("plantillas", [])
                 hus_creadas = 0
                 hus_existentes = 0
+                hus_actualizadas = 0
                 for fila in _filas_hus:
                     eps = (fila.get("eps") or "").upper().strip()
                     cod = (fila.get("codigo_glosa") or "").upper().strip()
@@ -1182,6 +1193,26 @@ async def lifespan(app: FastAPI):
                     )
                     if existe:
                         hus_existentes += 1
+                        # 06-08-2026 — la misma corrección en sitio que ya se
+                        # le hizo a las plantillas Gold. Seis plantillas del
+                        # banco fundaban la defensa en la Resolución 3047 de
+                        # 2008, que la 2284 de 2023 reemplazó; se vio en dos
+                        # dictámenes de prueba (SUMIMEDICAL SO0101 y MUTUAL
+                        # SER SO0201) citándola como norma propia y de
+                        # primera. Fundar en norma derogada le regala el
+                        # argumento a la entidad. Ahora va adelante la
+                        # vigente y la vieja queda como antecedente. Este
+                        # bloque solo toca las que traen el texto viejo: el
+                        # resto del banco queda intacto porque lo aprobó
+                        # Yesid.
+                        _arg_bd = existe.argumento or ""
+                        if (
+                            "3047" in _arg_bd
+                            and not any(m in _arg_bd for m in _MARCAS_NORMA_VIGENTE)
+                            and any(m in arg for m in _MARCAS_NORMA_VIGENTE)
+                        ):
+                            existe.argumento = arg
+                            hus_actualizadas += 1
                         continue
                     db.add(
                         _PGR(
@@ -1198,10 +1229,11 @@ async def lifespan(app: FastAPI):
                         )
                     )
                     hus_creadas += 1
-                if hus_creadas:
+                if hus_creadas or hus_actualizadas:
                     db.commit()
                 logger.info(
                     f"[SEED-HUS] {hus_creadas} creadas · {hus_existentes} ya existían · "
+                    f"{hus_actualizadas} actualizadas (norma derogada) · "
                     f"total filas en archivo: {len(_filas_hus)}"
                 )
         except Exception as _e:

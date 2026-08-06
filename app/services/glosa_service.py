@@ -4522,6 +4522,86 @@ def _afirma_hechos_clinicos_sin_soporte(dictamen: str, tiene_soportes: bool) -> 
     return bool(_PAT_AFIRMACION_CLINICA.search(dictamen))
 
 
+# ── Glosaron antes de que existiera la factura (OT-010) ──
+# Prueba real del 06-08-2026, glosa FA0201 de NUEVA EPS: "Factura radicada el
+# 15/09/2026. Glosa notificada el 03/08/2026". Es imposible objetar una
+# factura que todavía no se había radicado. El motor armó la defensa de fondo
+# y nunca miró las dos fechas que venían escritas una al lado de la otra.
+_PAT_FECHA_RADICACION = re.compile(
+    r"(?:FACTURA|RADICAD[AO]|RADICACI[ÓO]N|PRESENTAD[AO])[^.]{0,60}?"
+    r"(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{1,2}-\d{1,2})",
+    re.IGNORECASE,
+)
+_PAT_FECHA_GLOSA = re.compile(
+    r"(?:GLOSA|OBJECI[ÓO]N|NOTIFICAD[AO]|DEVOLUCI[ÓO]N)[^.]{0,60}?"
+    r"(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{1,2}-\d{1,2})",
+    re.IGNORECASE,
+)
+
+
+def _a_fecha(txt: str):
+    """dd/mm/aaaa, dd-mm-aaaa o aaaa-mm-dd → date. None si no se puede."""
+    from datetime import date
+
+    t = (txt or "").strip()
+    try:
+        if re.fullmatch(r"\d{4}-\d{1,2}-\d{1,2}", t):
+            a, m, d = (int(x) for x in t.split("-"))
+        else:
+            d, m, a = (int(x) for x in re.split(r"[/-]", t))
+        return date(a, m, d)
+    except (ValueError, TypeError):
+        return None
+
+
+def _glosa_anterior_a_la_factura(texto_glosa: str):
+    """(fecha_radicacion, fecha_glosa) si la objetaron antes de radicarla."""
+    if not texto_glosa:
+        return None
+    mr = _PAT_FECHA_RADICACION.search(texto_glosa)
+    mg = _PAT_FECHA_GLOSA.search(texto_glosa)
+    if not mr or not mg or mr.group(1) == mg.group(1):
+        return None
+    f_rad = _a_fecha(mr.group(1))
+    f_glo = _a_fecha(mg.group(1))
+    if not f_rad or not f_glo or f_glo >= f_rad:
+        return None
+    return (f_rad, f_glo)
+
+
+# ── La misma plata objetada dos veces (OT-011) ──
+# Prueba real del 06-08-2026: "CO0201 - Servicio no incluido en el plan de
+# beneficios, se objeta $600.000. FA0301 - Sobre el mismo ítem se objeta
+# nuevamente $600.000 por mayor valor cobrado. Valor total objetado
+# $1.200.000." El motor respondió cada código por separado y en los dos
+# imprimió $1.200.000 como valor objetado: el doble conteo quedó radicado.
+_SENALES_MISMO_ITEM = (
+    "SOBRE EL MISMO ITEM",
+    "SOBRE EL MISMO SERVICIO",
+    "SOBRE EL MISMO PROCEDIMIENTO",
+    "SOBRE EL MISMO RENGLON",
+    "SE OBJETA NUEVAMENTE",
+    "SE GLOSA NUEVAMENTE",
+    "NUEVAMENTE SE OBJETA",
+    "DOBLE GLOSA",
+    "POR SEGUNDA VEZ",
+)
+
+
+def _doble_glosa_sobre_el_mismo_item(texto_glosa: str) -> bool:
+    """¿La entidad objeta dos veces el mismo renglón?"""
+    if not texto_glosa:
+        return False
+    import unicodedata as _ud
+
+    n = _ud.normalize("NFKD", str(texto_glosa))
+    t = "".join(c for c in n if not _ud.combining(c)).upper()
+    if not any(s in t for s in _SENALES_MISMO_ITEM):
+        return False
+    # Y que de verdad haya más de un código de glosa en juego.
+    return len(set(re.findall(r"\b(?:TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX|DE)\d{4}\b", t))) >= 2
+
+
 def limpiar_cierre_extemporanea_indebido(
     texto: str,
     es_ratificacion: bool = False,
@@ -5293,7 +5373,16 @@ class GlosaService:
             cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
 
         plantilla = obtener_plantilla_por_codigo(codigo_det)
-        usa_plantilla = plantilla is not None
+        # 06-08-2026 (OT-012) — la plantilla del código corta el paso a la IA
+        # y responde sola. Con una sola objeción está bien: es texto aprobado.
+        # Con varias, contesta una y deja mudas las demás, y en auditoría
+        # callar sobre un concepto equivale a aceptarlo. Prueba real de
+        # MUTUAL SER: "no se evidencia epicrisis, no se aporta hoja de
+        # administración de medicamentos, la orden médica no tiene firma
+        # legible y el consentimiento informado está incompleto" recibió el
+        # texto genérico de soportes, sin contestar ninguna de las cuatro.
+        # Misma decisión que ya se tomó con el texto fijo del Dispensario.
+        usa_plantilla = plantilla is not None and len(self._subconceptos_actuales) < 2
         arg_limpio = ""
         normas_clave = ""
         modelo_usado = "desconocido"
@@ -7925,6 +8014,56 @@ class GlosaService:
                 )
         except Exception as _e_cs:
             logger.debug(f"[CLINICA-SIN-SOPORTE] aviso no agregado: {_e_cs}")
+
+        # ── Glosaron antes de radicar la factura (06-08-2026, OT-010) ────
+        try:
+            _fechas_imp = _glosa_anterior_a_la_factura(texto_base or "")
+            if _fechas_imp:
+                _f_rad, _f_glo = _fechas_imp
+                _fr = _f_rad.strftime("%d/%m/%Y")
+                _fg = _f_glo.strftime("%d/%m/%Y")
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">LA GLOSA ES ANTERIOR '
+                    "A LA FACTURA</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    f"El texto dice que la factura se radicó el <b>{_fr}</b> y que la "
+                    f"objeción se notificó el <b>{_fg}</b>. No se puede objetar una "
+                    "factura que todavía no se había radicado. Verificá las dos fechas "
+                    "en el expediente: si se confirman, la objeción es inválida de "
+                    "entrada y no hay que discutir el fondo."
+                    "</p></div>"
+                )
+                logger.info(
+                    f"[GLOSA-ANTES-DE-LA-FACTURA] radicación {_fr} · glosa {_fg} — "
+                    "aviso agregado al dictamen"
+                )
+        except Exception as _e_fi:
+            logger.debug(f"[GLOSA-ANTES-DE-LA-FACTURA] aviso no agregado: {_e_fi}")
+
+        # ── La misma plata objetada dos veces (06-08-2026, OT-011) ───────
+        try:
+            if _doble_glosa_sobre_el_mismo_item(texto_base or ""):
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">EL MISMO ÍTEM ESTÁ '
+                    "OBJETADO DOS VECES</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    "El texto de la glosa dice expresamente que se objeta <b>otra vez "
+                    "el mismo renglón</b>, con dos causales distintas. Eso descuenta "
+                    "dos veces la misma plata. Revisá el detallado: si se confirma, "
+                    "una de las dos causales sobra y se reclama ese valor completo, "
+                    "aparte de la discusión de fondo."
+                    "</p></div>"
+                )
+                logger.info(
+                    "[DOBLE-GLOSA-MISMO-ITEM] la entidad objeta dos veces el mismo "
+                    "renglón — aviso agregado al dictamen"
+                )
+        except Exception as _e_dg:
+            logger.debug(f"[DOBLE-GLOSA-MISMO-ITEM] aviso no agregado: {_e_dg}")
 
         # ── Esto no es una glosa: es una DEVOLUCIÓN (05-08-2026) ─────────
         # «DE1601 FACTURA DEVUELTA POR NO CORRESPONDER A USUARIO» se

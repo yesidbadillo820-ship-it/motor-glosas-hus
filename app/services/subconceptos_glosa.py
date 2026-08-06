@@ -82,6 +82,27 @@ _MARCADORES_CONCEPTO_SUELTO = (
         "falta de soporte o evidencia",
     ),
     (
+        # 06-08-2026: un soporte SÍ está, pero la entidad lo objeta por su
+        # estado. Prueba real de MUTUAL SER: "la orden médica no tiene firma
+        # legible". No es lo mismo que la falta del documento y necesita su
+        # propia respuesta.
+        re.compile(
+            r"\b(?:NO\s+TIENE\s+FIRMA|SIN\s+FIRMA|FIRMA\s+(?:ILEGIBLE|NO\s+LEGIBLE)|"
+            r"NO\s+(?:ES|SE\s+ENCUENTRA)\s+LEGIBLE|ILEGIBLE)\b",
+            re.IGNORECASE,
+        ),
+        "soporte ilegible o sin firma",
+    ),
+    (
+        # "el consentimiento informado está incompleto": el documento existe
+        # pero la entidad lo objeta por contenido.
+        re.compile(
+            r"\b(?:EST[ÁA]|SE\s+ENCUENTRA|QUEDA|VIENE)\s+INCOMPLET[OA]\b",
+            re.IGNORECASE,
+        ),
+        "soporte incompleto",
+    ),
+    (
         re.compile(r"\bDEBI[ÓO]\s+SER\s+REMITID[OA]\b", re.IGNORECASE),
         "objeción de remisión a otra red",
     ),
@@ -201,10 +222,25 @@ def detectar_subconceptos(texto_glosa: str | None) -> list[dict]:
         frag = txt[ini:fin].strip()
         if len(frag) < _MIN_CONCEPTO_CHARS:
             continue
-        if ident in ids_vistos:
+        # 06-08-2026 (OT-012) — antes se descartaba por ETIQUETA de concepto,
+        # y varias objeciones del mismo tipo comparten etiqueta. Prueba real
+        # de MUTUAL SER: "no se evidencia epicrisis, no se aporta hoja de
+        # administración de medicamentos, la orden médica no tiene firma
+        # legible y el consentimiento informado está incompleto" — las cuatro
+        # son "falta de soporte", así que se conservó UNA y se perdieron tres.
+        # El dictamen salió con la plantilla genérica sin contestar ninguna, y
+        # en auditoría callar sobre un concepto equivale a aceptarlo.
+        #
+        # Se descarta por CONTENIDO: dos marcas que apuntan al mismo texto son
+        # la misma objeción; dos documentos distintos son dos objeciones.
+        # Las marcas superpuestas ya las filtra el corte de proximidad de
+        # arriba (< 15 chars).
+        resumen = _resumen_concepto(frag)
+        huella = re.sub(r"\W+", "", resumen).upper()[:60]
+        if huella in ids_vistos:
             continue
-        ids_vistos.add(ident)
-        subconceptos.append({"id": ident, "resumen": _resumen_concepto(frag), "texto": frag})
+        ids_vistos.add(huella)
+        subconceptos.append({"id": ident, "resumen": resumen, "texto": frag})
 
     return subconceptos
 
