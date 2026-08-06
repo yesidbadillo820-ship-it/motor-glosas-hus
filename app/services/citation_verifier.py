@@ -84,9 +84,38 @@ PAT_CITA_LITERAL = re.compile(r"«([^«»]{15,800})»")
 # de atribución para no flaggear citas del texto de la glosa misma
 # ("LA AFIRMACIÓN DE QUE '...'" no es una cita normativa).
 PAT_CITA_ATRIBUIDA = re.compile(
-    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPTÚA|PRECEPTUA)"
+    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPT[ÚU]A|"
+    # 06-08-2026: faltaban los verbos con que el motor introduce una cita
+    # cuando no la atribuye a una norma concreta. Ver PAT_CITA_AUTOATRIBUIDA.
+    r"RECUERDA|PREV[ÉE]|CONTEMPLA|ORDENA|DETERMINA|ESTIPULA|PACTA)"
     r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*"
     r"[\"“‘']([^\"“”‘’']{15,800})[\"”’']",
+    re.IGNORECASE,
+)
+# Cita que se atribuye a sí misma: el sujeto normativo va DENTRO de las
+# comillas, así que no hay verbo de atribución delante y las dos redes
+# anteriores no la veían.
+#
+# Prueba real del 06-08-2026, glosa de sanción de COOSALUD:
+#
+#   SE RECUERDA QUE “EL CONTRATO ESTABLECE QUE LAS SANCIONES POR
+#   INCUMPLIMIENTO SOLO PODRÁN APLICARSE CUANDO EXISTAN DISPOSICIONES
+#   CONTRACTUALES ESPECÍFICAS”.
+#
+# Nadie había cargado ese contrato. El dictamen se entregó con el sello
+# «7 citas contra corpus · 0 hallazgos», que es peor que no revisar: le dice
+# al auditor que está verificado.
+#
+# Se exige que la cita ARRANQUE con el sujeto normativo y tenga cuerpo
+# (≥40 chars). Una cita del texto de la glosa ("no se evidencia epicrisis")
+# no empieza así y no se toca.
+PAT_CITA_AUTOATRIBUIDA = re.compile(
+    r"[\"“«‘']\s*("
+    r"(?:EL|LA|LOS|LAS)\s+"
+    r"(?:CONTRATO|CL[ÁA]USULA|LEY|RESOLUCI[ÓO]N|DECRETO|ART[ÍI]CULO|"
+    r"CIRCULAR|ACUERDO|MANUAL|ANEXO|SENTENCIA)\b"
+    r"[^\"“”«»‘’']{40,800})"
+    r"[\"”»’']",
     re.IGNORECASE,
 )
 # Limpia HTML para comparar texto plano
@@ -354,6 +383,9 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
     # corpus (normas + cláusulas reales del contrato en BD).
     citas_literales = PAT_CITA_LITERAL.findall(texto)
     citas_literales += PAT_CITA_ATRIBUIDA.findall(texto)
+    citas_literales += [
+        c for c in PAT_CITA_AUTOATRIBUIDA.findall(texto) if c not in citas_literales
+    ]
     if citas_literales:
         # Construir corpus completo de TODOS los textos normativos para búsqueda
         corpus_normas = " ".join(
