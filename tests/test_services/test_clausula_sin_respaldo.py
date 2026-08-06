@@ -93,7 +93,10 @@ class TestLoQueNoSeDebeTocar:
     def test_la_clausula_que_cita_la_propia_eps_se_conserva(self):
         """Si el número lo puso la EPS en su glosa, no es invención del
         motor: es el dato con el que hay que discutir."""
-        glosa = "AU0401 — SE INCUMPLE LA CLÁUSULA 4.2 DEL CONTRATO SUSCRITO."
+        glosa = (
+            "AU0401 — SE INCUMPLE LA CLÁUSULA 4.2 DEL CONTRATO "
+            "S-13-1-03-1-04958 SUSCRITO ENTRE LAS PARTES."
+        )
         out = _neutralizar_clausulas_sin_respaldo(
             DICTAMEN_AU0401, "FAMISANAR EPS", texto_glosa=glosa
         )
@@ -123,6 +126,44 @@ class TestLoQueNoSeDebeTocar:
         """El lector de la base nunca propaga un fallo: devuelve conjunto."""
         assert isinstance(_LECTOR_REAL("FAMISANAR EPS"), set)
         assert isinstance(_LECTOR_REAL(""), set)
+
+
+class TestElPermisoNoSobreviveAlCambioDeContrato:
+    """05-08-2026, dictamen real de AURORA. La glosa decía "Contrato
+    S-13-1-03-1-04958, cláusula 7.4". La red de contratos ajenos —que corre
+    justo antes— cambió ese número por el contrato de AURORA, y la cláusula
+    7.4 se quedó colgando de OTRO contrato: el dictamen terminó afirmando
+    que el contrato de AURORA tiene una cláusula 7.4."""
+
+    GLOSA_AURORA = (
+        "FA0101 - Se glosa el procedimiento por cuanto el valor facturado supera "
+        "la tarifa pactada en el Contrato S-13-1-03-1-04958, cláusula 7.4."
+    )
+
+    def test_si_le_cambiaron_el_contrato_la_clausula_se_cae(self):
+        d = "SEGUN LO ESTABLECIDO EN EL CONTRATO GID-ARL-0090, CLÁUSULA 7.4, LA TARIFA ES SOAT -3%."
+        out = _neutralizar_clausulas_sin_respaldo(d, "AURORA", texto_glosa=self.GLOSA_AURORA)
+        assert "CLÁUSULA 7.4" not in out.upper()
+        assert "GID-ARL-0090" in out
+
+    def test_no_queda_el_contrato_nombrado_dos_veces(self):
+        d = "SEGUN LO ESTABLECIDO EN EL CONTRATO GID-ARL-0090, CLÁUSULA 7.4, LA TARIFA ES SOAT -3%."
+        out = _neutralizar_clausulas_sin_respaldo(d, "AURORA", texto_glosa=self.GLOSA_AURORA)
+        assert "EL CONTRATO VIGENTE ENTRE LAS PARTES" not in out
+        assert ", ," not in out
+        assert out == "SEGUN LO ESTABLECIDO EN EL CONTRATO GID-ARL-0090, LA TARIFA ES SOAT -3%."
+
+    def test_si_sigue_en_el_mismo_contrato_se_conserva(self):
+        d = "SEGUN LA CLÁUSULA 7.4 DEL CONTRATO S-13-1-03-1-04958 LA TARIFA ES SOAT -3%."
+        assert _neutralizar_clausulas_sin_respaldo(d, "FAMISANAR EPS", self.GLOSA_AURORA) == d
+
+    def test_mismo_contrato_con_el_orden_invertido(self):
+        d = "EL CONTRATO S-13-1-03-1-04958, CLÁUSULA 7.4, FIJA LA TARIFA."
+        assert _neutralizar_clausulas_sin_respaldo(d, "FAMISANAR EPS", self.GLOSA_AURORA) == d
+
+    def test_sin_contrato_cerca_manda_lo_que_dijo_la_eps(self):
+        d = "SE INCUMPLE LA CLÁUSULA 7.4 SOBRE TARIFAS."
+        assert _neutralizar_clausulas_sin_respaldo(d, "FAMISANAR EPS", self.GLOSA_AURORA) == d
 
 
 class TestOtrasFormasDeCitarla:
