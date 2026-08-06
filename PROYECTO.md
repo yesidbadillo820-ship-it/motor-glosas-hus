@@ -1,6 +1,6 @@
 # PROYECTO — Tablero maestro
 
-**Última actualización:** 05-08-2026
+**Última actualización:** 06-08-2026
 **Uso:** este archivo es el centro de control. Se actualiza cuando cambia el
 estado de un módulo, el objetivo actual o las próximas tareas. No es
 documentación: es un tablero de trabajo.
@@ -22,8 +22,8 @@ documentación: es un tablero de trabajo.
 - **Entrada:** `app/services/glosa_service.py`
 - **Responsable:** Yesid (dueño)
 - **Dependencias:** `glosa_ia_prompts.py` · Groq (primario) · Anthropic (respaldo)
-- **Próximo objetivo:** cerrar los 5 defectos de la segunda ronda de pruebas
-- **Riesgo:** puede afirmar cosas falsas (cláusula de contrato inventada)
+- **Próximo objetivo:** validar en el motor del hospital las correcciones OT-001 a OT-022
+- **Riesgo:** ninguno conocido sin verificar; 22 redes deterministas vigilan lo que afirma
 
 ### 3. Quality Gate — verificación del dictamen
 - **Estado:** Experimental · **Prioridad:** Media
@@ -62,8 +62,8 @@ documentación: es un tablero de trabajo.
 - **Entrada:** `app/api/routers/contratos.py`
 - **Responsable:** Yesid (dueño)
 - **Dependencias:** `extractor_clausulas_contrato.py` · `tarifa_lookup_service.py` · base de datos
-- **Próximo objetivo:** cargar el PDF de al menos un contrato y extraer sus cláusulas
-- **Riesgo:** hay 0 cláusulas cargadas, así que ninguna cita de cláusula se puede verificar
+- **Próximo objetivo:** decidir si se carga la propuesta tarifaria 2026 de FAMISANAR (6.655 tarifas)
+- **Riesgo:** las 26 cláusulas base ya se siembran solas; faltan las de los contratos sin PDF
 
 ### 8. Gobierno de IA y Diagnóstico
 - **Estado:** Activo · **Prioridad:** Media
@@ -157,19 +157,17 @@ documentación: es un tablero de trabajo.
 
 ## OBJETIVO ACTUAL DEL PROYECTO
 
-✔ **Cerrar los 5 defectos del dictamen detectados en la segunda ronda de pruebas (05-08-2026).**
+✔ **Validar en el motor del hospital las 22 correcciones (OT-001 a OT-022) con la tanda de glosas de prueba.**
 
 ---
 
 ## PRÓXIMAS TAREAS
 
-1. **Cláusula de contrato inventada** — el dictamen cita "CLÁUSULA 4.2" de un contrato del que no hay ninguna cláusula cargada.
-2. **Resolución 3047/2008** — se cita como fundamento propio pese a que la propia base de normas del motor registra que la 2284/2023 la reemplazó.
-3. **Aritmética no detectada** — la EPS glosó $1.850.000 sobre una factura de $1.500.000 y el motor no lo señaló.
-4. **Pertinencia respondida como tarifa** — la glosa TA0601 preguntaba por pertinencia y se respondió con argumento tarifario.
-5. **Contradicción no señalada** — FA0302 ("servicio no prestado") y TA0801 ("tarifa superior") sobre el mismo ítem no pueden ser ciertas a la vez.
-
----
+1. **Reiniciar el motor y repetir las glosas de prueba** — confirmar que en el arranque aparece `[SEED-CLAUSULAS] 26 creadas` y que los dictámenes salen sin los hechos inventados.
+2. **Decidir si se carga la propuesta tarifaria 2026 de FAMISANAR** — 6.655 tarifas listas de leer; solo debe cargarse cuando el acuerdo esté en firme.
+3. **Cargar el PDF de los contratos que no tienen cláusulas** — hoy solo 11 pagadores tienen cláusulas base.
+4. **Revisar el umbral del auto-piloto (90%)** — con las cláusulas cargadas los puntajes suben; hay que ver si el umbral sigue teniendo sentido.
+5. **Cerrar los flecos de las glosas de prueba que aún no se han vuelto a correr** (PPL, FOMAG, SANITAS, POLICÍA NACIONAL).
 
 ## BLOQUEANTES
 
@@ -177,7 +175,7 @@ documentación: es un tablero de trabajo.
 2. **Discrepancia del aceptado** — el lote dice $0 y cartera registra $1.758.956 en 8 facturas. Sin resolverlo no se firma el acta.
 3. **CUV rechazados** — SISTEMAS no ha corregido el RIPS de las 3 facturas con RVC086 ni reejecutado la validación de las otras 6. Sin eso no se radican en SIMED.
 4. **Faltan 2 PDF del DIAN** — HUS413266 (radicado 492346) y HUS417459 (radicado 521665). Sin el PDF no se arman las carpetas.
-5. **0 cláusulas de contrato cargadas** — mientras la base esté vacía, ninguna cita de cláusula del dictamen se puede verificar contra el contrato firmado.
+5. **Propuesta tarifaria 2026 de FAMISANAR sin firmar** — el archivo se llama PROPUESTA. Cargarla como tarifa pactada haría que el motor defienda con valores que aún no rigen. Depende de que el acuerdo quede en firme.
 
 ---
 

@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 05-08-2026
+**Última actualización:** 06-08-2026
 
 ---
 
@@ -2300,6 +2300,62 @@ Cómo se usa: se actualiza cuando cambia el estado de un módulo, cuando se
 cierra el objetivo actual o cuando aparece o se cae un bloqueante. La
 bitácora sigue siendo la memoria (qué pasó y cuándo); `PROYECTO.md` es el
 tablero (dónde estamos hoy).
+
+---
+
+
+### 06-08 — 22 correcciones al motor, con las glosas de trampa como guía
+
+Yesid corrió dos tandas de glosas de prueba en el motor del hospital y pegó
+los dictámenes tal como salieron. De ahí salieron 22 correcciones, cada una
+con su prueba automática para que no vuelva a pasar. Lo que el motor
+afirmaba sin tener de dónde:
+
+- una **cláusula de contrato** que no existe (y que además sobrevivía cuando
+  la red anterior le cambiaba el contrato por el de otra entidad);
+- un **CUPS** sacado de la cola del número de contrato;
+- un **periodo de atención** ("año 2023") que no está en ninguna parte del caso;
+- un **servicio** ("estancia u observación de urgencias") sin CUPS ni soportes;
+- **hechos de la historia clínica** sin un solo PDF adjunto;
+- una **cita textual del contrato** que el verificador daba por buena y
+  entregaba con el sello «0 hallazgos» — que es peor que no revisar.
+
+Lo que el motor no veía y ahora avisa: que la entidad **glosa más de lo
+facturado**, que **objeta dos veces el mismo renglón**, que la **glosa es
+anterior a la factura**, y que se **contradice** (dice que el servicio no se
+prestó y a la vez que la tarifa está mal).
+
+Lo que respondía mal: contestaba de **urgencias y autorización previa** a
+glosas que preguntaban por otra cosa; contestaba con la **tabla de tarifas**
+una pregunta clínica; y respondía con **una sola plantilla** a glosas con
+cuatro objeciones distintas — lo que no se contesta, la entidad lo descuenta.
+
+Dos cosas que salían impresas y se leían como descuido: comillas vacías
+(«""») y medio dictamen en minúscula dentro de un documento en mayúscula
+sostenida.
+
+Y dos hallazgos de fondo:
+
+1. **Las 26 cláusulas reales nunca se habían cargado.** Estaban en el
+   repositorio desde julio, pero solo se cargaban corriendo un comando a
+   mano que nadie corrió. Por eso TODOS los dictámenes perdían puntos por
+   «falta cláusula del contrato», el motor no tenía ninguna que citar, y el
+   verificador no podía comprobar ninguna cita de contrato. Ahora se cargan
+   solas al arrancar. En el log vas a ver `[SEED-CLAUSULAS] 26 creadas`.
+
+2. **Seis plantillas fundaban la defensa en la Resolución 3047 de 2008**,
+   que la 2284 de 2023 reemplazó. Ahora va adelante la vigente y la vieja
+   queda como antecedente. Las que ya estaban en tu base se corrigen solas
+   al arrancar.
+
+Aparte: el lector de tarifas se saltaba **tres de las cinco hojas** de la
+propuesta 2026 de FAMISANAR. Entraban 1.625 tarifas de 6.655. Lo más
+delicado era la hoja UVB, que trae dos columnas de plata: si se cargaba la
+de referencia en vez de la pactada, el motor defendería con una tarifa 5%
+más alta y la entidad ratificaría la glosa cada vez.
+
+**Ojo con esa propuesta:** el archivo se llama PROPUESTA. Mientras el
+acuerdo con FAMISANAR no esté firmado, no la cargues como tarifa pactada.
 
 ---
 
