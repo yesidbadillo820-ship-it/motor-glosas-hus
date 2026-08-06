@@ -37,6 +37,10 @@ class TestPlantillaGoldSembrada:
         assert arg.startswith("RESPUESTA GLOSA [CÓDIGO]")
         assert "LA E.S.E. HUS NO ACEPTA LA GLOSA. PRIMERO:" in arg
         assert "SOAT PLENA" in arg and "UVB 2026 = $12.110" in arg
-        assert "LEVANTAMIENTO TOTAL DE LA GLOSA (RES. 3047/2008)" in arg
+        # 06-08-2026: cerraba citando la Resolución 3047 de 2008, que la
+        # 2284 de 2023 reemplazó. Pedir el levantamiento apoyándose en una
+        # norma derogada le da a la entidad la respuesta servida.
+        assert "LEVANTAMIENTO TOTAL DE LA GLOSA (RESOLUCIÓN 2284 DE 2023)" in arg
+        assert "3047" not in arg
         # Con placeholders, no con los datos del caso original
         assert "1344527" not in arg and "45.500" not in arg
