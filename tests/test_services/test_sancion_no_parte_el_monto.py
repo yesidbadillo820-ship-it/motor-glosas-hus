@@ -42,7 +42,7 @@ class TestElMontoNoSeParte:
         assert "$ 1.750.000" in out
 
     def test_no_se_mete_dentro_de_una_abreviatura(self):
-        """"ART. 126" y "RES. 2284" también traen punto y no son fin de
+        """ "ART. 126" y "RES. 2284" también traen punto y no son fin de
         oración: el bloque no puede quedar en la mitad de la cita."""
         d = "ESE HUS INVOCA EL ART. 126 DE LA LEY 1438 DE 2011. LA GLOSA NO PROCEDE."
         out = _rechazar_sancion_eps_ilegal(d, texto_glosa=GLOSA_SANCION)
