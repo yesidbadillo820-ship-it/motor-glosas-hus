@@ -1240,6 +1240,108 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Seed banco HUS falló (no crítico): {_e}")
             db.rollback()
 
+        # ── Cláusulas reales de contrato (06-08-2026) ────────────────────
+        # data/clausulas_contrato_base.json trae 26 cláusulas LITERALES de
+        # contratos firmados, pero solo se cargaban corriendo a mano
+        # scripts/seed_clausulas_contrato.py. Nadie lo corrió: el
+        # Diagnóstico del hospital reporta "0 cláusulas extraídas de 0
+        # contratos" y por eso TODOS los dictámenes pierden puntos por
+        # «falta cláusula del contrato vigente con esta EPS», el motor no
+        # tiene una cláusula real que citar, y el verificador de citas no
+        # puede validar ninguna cita contractual.
+        #
+        # Se siembra al arrancar, igual que el banco de plantillas.
+        # Idempotente por (eps, numero_clausula): si el texto cambió se
+        # actualiza; si es igual no se toca.
+        try:
+            from app.models.db import ClausulaContrato as _CCR
+
+            archivo_cl = (
+                _Path(__file__).resolve().parent.parent / "data" / "clausulas_contrato_base.json"
+            )
+            if not archivo_cl.exists():
+                logger.warning(f"[SEED-CLAUSULAS] archivo no encontrado en {archivo_cl}")
+            else:
+                with archivo_cl.open(encoding="utf-8") as _fh:
+                    _filas_cl = _json.load(_fh).get("clausulas", [])
+                # La cláusula cuelga del contrato (llave foránea) y el motor
+                # la busca por la MISMA clave de EPS que usa el auditor en
+                # pantalla. El archivo trae razones sociales largas —
+                # "SEGUROS DE VIDA AURORA S.A." por "AURORA", "COMPENSAR
+                # EPS" por "COMPENSAR", "FAMISANAR" por "FAMISANAR EPS"— así
+                # que sin traducir la clave las 26 cláusulas o no entran o
+                # entran donde nadie las va a encontrar. Se resuelve por
+                # contención y solo cuando la coincidencia es ÚNICA; lo que
+                # no resuelva se salta con aviso, sin inventar un contrato.
+                _eps_contratos = [c.eps for c in db.query(ContratoRecord).all() if c.eps]
+
+                def _clave_de_contrato(nombre: str) -> str:
+                    n = (nombre or "").upper().strip()
+                    if not n:
+                        return ""
+                    if n in _eps_contratos:
+                        return n
+                    candidatos = [k for k in _eps_contratos if k in n or n in k]
+                    return candidatos[0] if len(candidatos) == 1 else ""
+
+                cl_creadas = cl_actualizadas = cl_saltadas = 0
+                for fila in _filas_cl:
+                    eps_cl = _clave_de_contrato(fila.get("eps") or "")
+                    if not eps_cl:
+                        logger.warning(
+                            f"[SEED-CLAUSULAS] sin contrato registrado para "
+                            f"«{fila.get('eps')}» — cláusula no cargada"
+                        )
+                        cl_saltadas += 1
+                        continue
+                    texto_cl = (fila.get("texto_literal") or "").strip()
+                    # Un placeholder sin llenar es peor que nada: la IA lo
+                    # citaría como si fuera texto del contrato.
+                    if not eps_cl or not texto_cl:
+                        cl_saltadas += 1
+                        continue
+                    if texto_cl.startswith("[") and texto_cl.endswith("]"):
+                        cl_saltadas += 1
+                        continue
+                    tema_cl = (fila.get("tema") or "NN").upper().strip()
+                    if tema_cl not in {"TA", "SO", "AU", "CO", "FA", "NN"}:
+                        tema_cl = "NN"
+                    num_cl = (fila.get("numero_clausula") or "").strip()
+                    existe_cl = (
+                        db.query(_CCR)
+                        .filter(_CCR.eps == eps_cl, _CCR.numero_clausula == num_cl)
+                        .first()
+                    )
+                    if existe_cl:
+                        if (existe_cl.texto_literal or "").strip() != texto_cl:
+                            existe_cl.tema = tema_cl
+                            existe_cl.titulo = (fila.get("titulo") or "").strip()
+                            existe_cl.texto_literal = texto_cl
+                            existe_cl.pagina = fila.get("pagina")
+                            cl_actualizadas += 1
+                        continue
+                    db.add(
+                        _CCR(
+                            eps=eps_cl,
+                            numero_clausula=num_cl,
+                            tema=tema_cl,
+                            titulo=(fila.get("titulo") or "").strip(),
+                            texto_literal=texto_cl,
+                            pagina=fila.get("pagina"),
+                        )
+                    )
+                    cl_creadas += 1
+                if cl_creadas or cl_actualizadas:
+                    db.commit()
+                logger.info(
+                    f"[SEED-CLAUSULAS] {cl_creadas} creadas · {cl_actualizadas} actualizadas · "
+                    f"{cl_saltadas} saltadas (sin texto real) · "
+                    f"total en archivo: {len(_filas_cl)}"
+                )
+        except Exception as _e_cl:
+            logger.warning(f"Seed de cláusulas falló (no crítico): {_e_cl}")
+            db.rollback()
+
         db.commit()
         logger.info("Base de datos inicializada correctamente")
     except Exception as e:

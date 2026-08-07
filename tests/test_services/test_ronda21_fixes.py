@@ -242,7 +242,9 @@ class TestBug12Art177Pelado:
             d, texto_glosa="TARIFA: diferencia de SOAT pleno vs pactado", codigo_glosa="TA0201"
         )
         assert "177" not in out
-        assert "Pacta Sunt Servanda" in out
+        # 06-08-2026: el sintagma de reemplazo va en MAYÚSCULA, como todo
+        # el dictamen. Salía en minúscula dentro de un texto en caps.
+        assert "PACTA SUNT SERVANDA" in out.upper()
 
     def test_art177_cobertura_se_conserva(self):
         """En debate de COBERTURA (CO), Art. 177 es legítimo y NO se toca."""

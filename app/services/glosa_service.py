@@ -964,7 +964,7 @@ _PATRONES_PLACEHOLDERS_TEMPLATE: tuple[tuple[re.Pattern[str], str], ...] = (
     # template (con $ pegado a letra única o palabra clave).
     (
         re.compile(r"\$\s*([A-Z]{1,2}|VALOR|VAL|MONTO|NUM|N)\b(?![A-Z0-9])"),
-        "el valor objetado consignado en el expediente",
+        "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE",
     ),
     # "código YX" / "código X" / "código Y" — sin dígitos detrás
     (
@@ -972,7 +972,7 @@ _PATRONES_PLACEHOLDERS_TEMPLATE: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bC[ÓO]DIGO\s+(?:CUPS\s+)?(?:ES\s+)?([XYZ][XYZN]?|N|NN|YX|YN|XN)\b(?![A-Z0-9])",
             re.IGNORECASE,
         ),
-        "el código de la glosa aplicada",
+        "EL CÓDIGO DE LA GLOSA APLICADA",
     ),
     # "CUPS YX" / "CUPS X" / "CUPS N" — sin dígitos válidos
     (
@@ -985,7 +985,7 @@ _PATRONES_PLACEHOLDERS_TEMPLATE: tuple[tuple[re.Pattern[str], str], ...] = (
     # "paciente Z" / "paciente X" / "paciente Y" / "paciente N"
     (
         re.compile(r"\bPACIENTE\s+([XYZN]|NN)\b(?![A-Z0-9])", re.IGNORECASE),
-        "el paciente identificado en el expediente",
+        "EL PACIENTE IDENTIFICADO EN EL EXPEDIENTE",
     ),
     # "facturado por $X" / "facturado por VALOR" / "facturado por X PESOS"
     (
@@ -1022,31 +1022,31 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
     # neutralizamos los muy estandarizados que repite el modelo (no $1.234.567).
     (
         re.compile(r"\$\s*1[\.\,]?000[\.\,]?000\b"),
-        "el valor objetado consignado en el expediente",
+        "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE",
     ),
     (
         re.compile(r"\$\s*100[\.\,]000\b(?!\d)"),
-        "el valor objetado consignado en el expediente",
+        "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE",
     ),
     # "CUPS 1234" / "CUPS 12345" — números cortos de relleno. Los CUPS reales
     # tienen 5-7 dígitos con sufijo letra o son alfanuméricos (FMQ0113,
     # 19997313-6, 372301H). "1234" puro es siempre falso.
     (
         re.compile(r"\bC[ÓO]DIGO\s+CUPS\s+1234\d?\b", re.IGNORECASE),
-        "el código CUPS de la factura",
+        "EL CÓDIGO CUPS DE LA FACTURA",
     ),
     (
         re.compile(r"\bCUPS\s+1234\d?\b(?!-?\d)", re.IGNORECASE),
-        "el CUPS de la factura",
+        "EL CUPS DE LA FACTURA",
     ),
     # "GLOSA 12345" en cualquier contexto (incluido "levantamiento de la glosa 12345")
     (
         re.compile(r"\bLA\s+GLOSA\s+12345\b", re.IGNORECASE),
-        "la glosa aplicada",
+        "LA GLOSA APLICADA",
     ),
     (
         re.compile(r"\bGLOSA\s+12345\b", re.IGNORECASE),
-        "la glosa aplicada",
+        "LA GLOSA APLICADA",
     ),
     # "Resolución 2641 de 2024" — norma inventada que el prompt mencionaba como
     # ejemplo de lo prohibido. La quitamos en cualquier forma.
@@ -1064,7 +1064,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bhistoria\s+cl[íi]nica\s+N[°º\.]?\s*1234567\b",
             re.IGNORECASE,
         ),
-        "la historia clínica institucional adjunta",
+        "LA HISTORIA CLÍNICA INSTITUCIONAL ADJUNTA",
     ),
     # "10 DE ENERO DE 2023" — fecha que la IA inventa cuando no tiene la real.
     # Solo neutralizamos la combinación EXACTA, no todas las fechas con esos números.
@@ -1080,7 +1080,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\b10\s+DE\s+ENERO\s+DE\s+2023\b",
             re.IGNORECASE,
         ),
-        "la fecha consignada en el expediente",
+        "LA FECHA CONSIGNADA EN EL EXPEDIENTE",
     ),
     # ── Ronda 12 (23-jun-2026): la IA confunde números de NORMA con CUPS ──
     # Evidencia (6 casos consecutivos pegados por Yesid 23-jun):
@@ -1108,7 +1108,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bC[ÓO]DIGO\s+CUPS\s+\d{3,4}\b(?![\d\-A-Z])",
             re.IGNORECASE,
         ),
-        "el código CUPS consignado en la factura electrónica",
+        "EL CÓDIGO CUPS CONSIGNADO EN LA FACTURA ELECTRÓNICA",
     ),
     # Cola "/A" "/B" sobrante que el regex anterior dejaba — pasaba cuando
     # el modelo escribía "CÓDIGO YX/A" como placeholder de "código alternativo"
@@ -1136,7 +1136,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bEL\s+el\s+c[óo]digo\s+de\s+la\s+glosa\s+aplicada\b",
             re.IGNORECASE,
         ),
-        "el código de la glosa aplicada",
+        "EL CÓDIGO DE LA GLOSA APLICADA",
     ),
     (
         re.compile(
@@ -1196,7 +1196,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bC[ÓO]DIGO\s+CUPS\s+\d{7,10}\b(?![\d\-A-Z])",
             re.IGNORECASE,
         ),
-        "el código CUPS consignado en la factura electrónica",
+        "EL CÓDIGO CUPS CONSIGNADO EN LA FACTURA ELECTRÓNICA",
     ),
     # ── Ronda 15 (Bug A v4): CUM con sufijo "-X" ──
     # En ronda 14 lo dejé fuera por compat con ronda 11 (caso TRAMADOL
@@ -1213,7 +1213,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\b(?:BAJO\s+EL\s+|AL\s+|EL\s+)?CUPS\s+\d{7,9}-\d\b",
             re.IGNORECASE,
         ),
-        "el medicamento facturado según historia clínica",
+        "EL MEDICAMENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     # ── Ronda 14: nuevos placeholders y dobles artículos ──
     # Evidencia (trasplante hepático, $487M): la IA escribió:
@@ -1264,7 +1264,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bel\s+c[óo]digo\s+la\s+glosa\s+aplicada\s*/\s*[a-z]{1,2}\b",
             re.IGNORECASE,
         ),
-        "el código de la glosa aplicada",
+        "EL CÓDIGO DE LA GLOSA APLICADA",
     ),
     (
         re.compile(
@@ -1383,7 +1383,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"\bel\s+procedimiento\s+facturado\s+el\s+medicamento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
             re.IGNORECASE,
         ),
-        "el medicamento facturado según historia clínica",
+        "EL MEDICAMENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     (
         re.compile(
@@ -1408,7 +1408,7 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             r"el\s+medicamento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
             re.IGNORECASE,
         ),
-        "el medicamento facturado según historia clínica",
+        "EL MEDICAMENTO FACTURADO SEGÚN HISTORIA CLÍNICA",
     ),
     # ── Ronda 33 — costuras nuevas del placeholder (dictámenes PPL 22-jul) ──
     # "RESPECTO DEL PROCEDIMIENTO FACTURADO CON EL PROCEDIMIENTO FACTURADO
@@ -1917,8 +1917,8 @@ def _neutralizar_art_177_relleno(
         re.IGNORECASE,
     )
     nuevo, n_bare = pat_art177_bare.subn(
-        "el régimen tarifario y contractual aplicable (Pacta Sunt Servanda — "
-        "Art. 1602 C.C. y Art. 871 C.Co.)",
+        "EL RÉGIMEN TARIFARIO Y CONTRACTUAL APLICABLE (PACTA SUNT SERVANDA — "
+        "ART. 1602 C.C. Y ART. 871 C.CO.)",
         nuevo,
     )
     n += n_bare
@@ -2048,12 +2048,12 @@ def _rechazar_sancion_eps_ilegal(
         n_reescritas += 1
         return (
             "EL HUS RECHAZA EXPRESAMENTE LA SANCIÓN UNILATERAL APLICADA POR "
-            "VICIO DE COMPETENCIA: la entidad pagadora NO tiene facultad "
-            "sancionatoria sobre el prestador (función reservada a la "
-            "Superintendencia Nacional de Salud — Ley 1438/2011 Art. 126 — "
-            "y al Juez competente — Ley 1564/2012 Art. 33). Lo máximo "
-            "reclamable por demora son intereses moratorios DTF pactados o "
-            "tasa máxima legal (Art. 884 C.Co., Decreto 4747/2007 Art. 21)"
+            "VICIO DE COMPETENCIA: LA ENTIDAD PAGADORA NO TIENE FACULTAD "
+            "SANCIONATORIA SOBRE EL PRESTADOR (FUNCIÓN RESERVADA A LA "
+            "SUPERINTENDENCIA NACIONAL DE SALUD — LEY 1438/2011 ART. 126 — "
+            "Y AL JUEZ COMPETENTE — LEY 1564/2012 ART. 33). LO MÁXIMO "
+            "RECLAMABLE POR DEMORA SON INTERESES MORATORIOS DTF PACTADOS O "
+            "TASA MÁXIMA LEGAL (ART. 884 C.CO., DECRETO 4747/2007 ART. 21)"
         )
 
     nuevo, n1 = _RE_ACEPTA_SANCION_DICTAMEN.subn(_sub_rechazo, nuevo)
@@ -2075,12 +2075,12 @@ def _rechazar_sancion_eps_ilegal(
         bloque_rechazo = (
             " ADICIONALMENTE, EL HUS RECHAZA POR VICIO DE COMPETENCIA "
             "CUALQUIER SANCIÓN UNILATERAL APLICADA POR LA ENTIDAD PAGADORA: "
-            "la facultad sancionatoria sobre el prestador está reservada "
-            "constitucionalmente a la Superintendencia Nacional de Salud "
-            "(Ley 1438/2011 Art. 126) y al Juez competente (Ley 1564/2012 "
-            "Art. 33). Lo máximo que la EPS puede reclamar por demora son "
-            "intereses moratorios DTF pactados o la tasa máxima legal "
-            "(Art. 884 C.Co.; Decreto 4747/2007 Art. 21)."
+            "LA FACULTAD SANCIONATORIA SOBRE EL PRESTADOR ESTÁ RESERVADA "
+            "CONSTITUCIONALMENTE A LA SUPERINTENDENCIA NACIONAL DE SALUD "
+            "(LEY 1438/2011 ART. 126) Y AL JUEZ COMPETENTE (LEY 1564/2012 "
+            "ART. 33). LO MÁXIMO QUE LA ENTIDAD PUEDE RECLAMAR POR DEMORA SON "
+            "INTERESES MORATORIOS DTF PACTADOS O LA TASA MÁXIMA LEGAL "
+            "(ART. 884 C.CO.; DECRETO 4747/2007 ART. 21)."
         )
         # Insertamos después de la primera oración terminada en ".".
         #
@@ -3206,7 +3206,7 @@ def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
             r"(?:(?:CONTRATO|EL\s+CONTRATO)\s+(?:N[ÚU]MERO\s+)?)?" + re.escape(tok),
             re.IGNORECASE,
         )
-        nuevo, n = pat.subn("el contrato vigente entre las partes", resultado)
+        nuevo, n = pat.subn("EL CONTRATO VIGENTE ENTRE LAS PARTES", resultado)
         if n:
             resultado = nuevo
             n_sub += n
@@ -3483,6 +3483,170 @@ _PAT_FACTURA_COMO_GLOSA = re.compile(
     r"(?=[^A-Z0-9]|$)",
     re.IGNORECASE,
 )
+
+
+# ── El servicio objetado inventado (OT-016) ──
+# Prueba real del 05-08-2026, glosa FA0101 de AURORA. El texto no nombraba
+# ningún servicio, no había CUPS ni PDF adjunto, y el dictamen salió
+# afirmando "Servicio objetado: ESTANCIA U OBSERVACIÓN DE URGENCIAS". El
+# modelo lo puso porque el campo lo pedía.
+#
+# Un servicio legítimo puede venir de tres sitios: la descripción del CUPS
+# del catálogo, el texto de la glosa, o el PDF de soportes. Si no hay
+# ninguno de los tres, se deja el texto neutro que ya existe.
+_VACIAS_SERVICIO = frozenset(
+    {
+        "EL",
+        "LA",
+        "LOS",
+        "LAS",
+        "DEL",
+        "DE",
+        "POR",
+        "CON",
+        "SIN",
+        "PARA",
+        "SEGUN",
+        "SOBRE",
+        "SERVICIO",
+        "SERVICIOS",
+        "PROCEDIMIENTO",
+        "PROCEDIMIENTOS",
+        "FACTURADO",
+        "FACTURADA",
+        "FACTURADOS",
+        "PRESTADO",
+        "PRESTADA",
+        "OBJETADO",
+        "OBJETADA",
+        "CUPS",
+        "CODIGO",
+        "DETALLADO",
+        "FACTURA",
+        "ELECTRONICA",
+        "EXPEDIENTE",
+        "PACIENTE",
+        "USUARIO",
+    }
+)
+
+
+def _servicio_con_respaldo(
+    servicio: str,
+    texto_glosa: str = "",
+    contexto_pdf: str = "",
+    cups: str = "",
+) -> str:
+    """Devuelve el servicio si algo lo respalda; "" si el motor lo inventó.
+
+    Con "" el dictamen usa el texto neutro que ya trae el sistema, que no
+    afirma nada. Es preferible a nombrar un servicio que nadie prestó.
+    """
+    s = (servicio or "").strip()
+    if not s:
+        return ""
+    # Hay CUPS o hay PDF: el nombre pudo salir del catálogo o del soporte.
+    if (cups or "").strip() or (contexto_pdf or "").strip():
+        return s
+    import unicodedata as _ud
+
+    def _plegar(t: str) -> str:
+        n = _ud.normalize("NFKD", str(t or ""))
+        return "".join(c for c in n if not _ud.combining(c)).upper()
+
+    glosa = _plegar(texto_glosa)
+    if not glosa:
+        return s
+    palabras = [p for p in re.findall(r"[A-ZÁÉÍÓÚÑ]{5,}", _plegar(s)) if p not in _VACIAS_SERVICIO]
+    if not palabras:
+        return s
+    if any(p in glosa for p in palabras):
+        return s
+    logger.warning(
+        f"[SERVICIO-INVENTADO] «{s[:60]}» no está en la glosa, no hay CUPS ni PDF "
+        "— se deja el texto neutro."
+    )
+    return ""
+
+
+# ── Red final: el periodo de atención inventado (OT-015) ──
+# Prueba real del 05-08-2026, glosa AU0401 de COMPENSAR. El texto de la
+# glosa no traía ninguna fecha, y el dictamen salió afirmando "...FACTURADO
+# POR EL VALOR FACTURADO EN EL EXPEDIENTE, EN EL PERIODO CORRESPONDIENTE AL
+# AÑO 2023". Ese año no existe en ninguna parte del caso: el modelo lo puso
+# porque una respuesta de glosa suele llevar un periodo.
+#
+# Un año equivocado en un documento que se radica es de lo peor que puede
+# pasar: la entidad revisa la factura, ve otra fecha y desacredita el
+# dictamen entero sin discutir el fondo.
+_PAT_PERIODO_AFIRMADO = re.compile(
+    r"(?:,\s*)?\b(?:EN|DURANTE|PARA|CORRESPONDIENTE\s+A|CORRESPONDEN?\s+A)"
+    r"\s*L?\s*(?:EL\s+|LA\s+)?"
+    r"(?:PERIODO|PER[ÍI]ODO|VIGENCIA|A[ÑN]O)\s+"
+    r"(?:CORRESPONDIENTE\s+AL?\s+)?(?:A[ÑN]O\s+)?"
+    r"((?:19|20)\d{2})\b",
+    re.IGNORECASE,
+)
+
+
+# ── Comillas y paréntesis que quedaron vacíos (OT-017) ──
+# Prueba real del 06-08-2026, glosa FA0201 de NUEVA EPS: el dictamen salió
+# con «...SE RECHAZA LA GLOSA. "" SE SOLICITA EL LEVANTAMIENTO». Los
+# sanitizers vacían el contenido de una cita inventada y los signos quedan
+# huérfanos. No cambia el sentido, pero se imprime así en el documento que
+# se radica ante la entidad y se lee como un error de la IPS.
+_PAT_SIGNOS_VACIOS = re.compile(r"(?<!\w)(?:[«“\"']\s*[»”\"']|\(\s*\)|\[\s*\]|«\s*»|“\s*”)(?!\w)")
+
+
+def _quitar_signos_vacios(texto: str) -> str:
+    """Borra pares de comillas/paréntesis sin nada adentro."""
+    if not texto:
+        return texto
+    resultado = _PAT_SIGNOS_VACIOS.sub("", texto)
+    if resultado == texto:
+        return texto
+    resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+    resultado = re.sub(r"\s+([,;.])", r"\1", resultado)
+    resultado = re.sub(r",(\s*,)+", ",", resultado)
+    return resultado
+
+
+def _neutralizar_periodo_inventado(
+    dictamen: str,
+    texto_glosa: str = "",
+    contexto_pdf: str = "",
+    fechas_expediente: str = "",
+) -> str:
+    """Quita del dictamen el periodo de atención que no está en el caso.
+
+    Solo toca el año cuando no aparece en NINGUNA fuente del expediente:
+    el texto de la glosa, los soportes adjuntos o las fechas que escribió
+    el gestor en el formulario. Si el año está en cualquiera de las tres,
+    es dato del caso y se conserva — borrarlo sería quitar un hecho cierto.
+    """
+    if not dictamen:
+        return dictamen
+    fuente = " ".join(str(x or "") for x in (texto_glosa, contexto_pdf, fechas_expediente))
+    quitados: list[str] = []
+
+    def _sub(m: "re.Match[str]") -> str:
+        anio = m.group(1)
+        if anio in fuente:
+            return m.group(0)
+        quitados.append(anio)
+        return ""
+
+    resultado = _PAT_PERIODO_AFIRMADO.sub(_sub, dictamen)
+    if not quitados:
+        return dictamen
+    resultado = re.sub(r",(\s*,)+", ",", resultado)
+    resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+    resultado = re.sub(r"\s+([,;.])", r"\1", resultado)
+    logger.warning(
+        f"[PERIODO-INVENTADO] {len(quitados)} periodo(s) que no están en el caso "
+        f"retirados del dictamen final (años={quitados[:3]})."
+    )
+    return resultado
 
 
 def _neutralizar_cups_falsos(texto: str) -> str:
@@ -6656,6 +6820,20 @@ class GlosaService:
                 _campos_saltar.add("servicio")
             else:
                 servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
+            # OT-016 (06-08-2026) — el servicio inventado. Glosa FA0101 de
+            # AURORA: el texto no nombraba ningún servicio, no había CUPS ni
+            # PDF, y el dictamen salió con "ESTANCIA U OBSERVACIÓN DE
+            # URGENCIAS". Si no hay de dónde sacarlo, se deja el texto
+            # neutro que ya existe en vez de nombrar un servicio falso.
+            try:
+                servicio_ia = _servicio_con_respaldo(
+                    servicio_ia,
+                    texto_glosa=texto_base,
+                    contexto_pdf=contexto_pdf,
+                    cups=str(locals().get("cups_verificado") or ""),
+                )
+            except Exception as _e_si:
+                logger.debug(f"[SERVICIO-INVENTADO] guarda no aplicada: {_e_si}")
             contrato_ia = self._xml("contrato", res_ia, "")
             tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
@@ -7377,6 +7555,42 @@ class GlosaService:
                     dictamen = _dictamen_sin_clausula
             except Exception as _e_cl:
                 logger.debug(f"[CLAUSULA-SIN-RESPALDO] red final no aplicada: {_e_cl}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  OT-015 (06-08-2026) — RED FINAL periodo inventado.
+            #  Evidencia AU0401 COMPENSAR: la glosa no traía fecha y el
+            #  dictamen salió con "EN EL PERIODO CORRESPONDIENTE AL AÑO
+            #  2023". Un año equivocado desacredita el documento entero.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_periodo = _neutralizar_periodo_inventado(
+                    dictamen,
+                    texto_base,
+                    contexto_pdf=contexto_pdf,
+                    # Las fechas del formulario también son del expediente:
+                    # si el gestor las escribió, el año no es una invención.
+                    fechas_expediente=" ".join(
+                        str(getattr(data, campo, "") or "")
+                        for campo in ("fecha_radicacion", "fecha_recepcion")
+                    ),
+                )
+                if _dictamen_sin_periodo != dictamen:
+                    dictamen = _dictamen_sin_periodo
+            except Exception as _e_pi:
+                logger.debug(f"[PERIODO-INVENTADO] red final no aplicada: {_e_pi}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  OT-017 (06-08-2026) — comillas huérfanas. Evidencia FA0201
+            #  de NUEVA EPS: «...SE RECHAZA LA GLOSA. "" SE SOLICITA...».
+            #  Va de última: limpia lo que dejen las redes anteriores.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_signos = _quitar_signos_vacios(dictamen)
+                if _dictamen_sin_signos != dictamen:
+                    dictamen = _dictamen_sin_signos
+                    logger.info("[SIGNOS-VACIOS] comillas o paréntesis huérfanos removidos")
+            except Exception as _e_sv:
+                logger.debug(f"[SIGNOS-VACIOS] limpieza no aplicada: {_e_sv}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 3 (16-jun-2026) — RED FINAL CUPS falsos.
