@@ -35,13 +35,13 @@ logger = logging.getLogger("motor_glosas")
 # inventada salía con el sello «citas verificadas · 0 hallazgos».
 PAT_RESOLUCION = re.compile(
     r"\bResoluci[óo]n\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
-    r"|\bRes(?:oluci[óo]n)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"|\bRes(?:oluci[óo]n)?\.?\s*(\d{1,5})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 # La 2.ª alternativa acepta la abreviatura "Dec. 4747/2007" (antes solo
 # "Decreto NNN/YYYY" — la forma abreviada ni se contaba como cita).
 PAT_DECRETO = re.compile(
-    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 # El lookbehind excluye "DECRETO-LEY 1795 DE 2000" / "DECRETO LEY ...":

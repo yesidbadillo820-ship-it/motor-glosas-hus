@@ -86,3 +86,42 @@ class TestNoSeMarcaDeMas:
 
     def test_texto_vacio(self):
         assert _citas("") == 0
+
+
+class TestLasAbreviaturasConDe:
+    """Tercer punto ciego del mismo barrido: las abreviaturas solo aceptaban
+    barra o guion. "RES. 2284 DE 2023" y "DEC. 4747 DE 2007" son formas que
+    el propio prompt del motor usa."""
+
+    def test_resolucion_abreviada_inventada(self):
+        assert _inexistentes("SEGUN LA RES. 9999 DE 2030 DEL MINISTERIO.")
+
+    def test_resolucion_abreviada_real(self):
+        assert not _inexistentes("SEGUN LA RES. 2284 DE 2023 DEL MINISTERIO.")
+
+    def test_decreto_abreviado_inventado(self):
+        assert _inexistentes("SEGUN EL DEC. 8888 DE 2031.")
+
+    def test_decreto_abreviado_real(self):
+        assert not _inexistentes("SEGUN EL DEC. 4747 DE 2007.")
+
+    def test_la_forma_con_barra_sigue_funcionando(self):
+        assert not _inexistentes("SEGUN LA RES. 2284/2023 Y EL DEC. 4747/2007.")
+
+    def test_todas_las_formas_del_dia_a_dia_se_cuentan(self):
+        """Barrido: si mañana alguien angosta un patrón, esto lo dice."""
+        for forma in (
+            "LEY 1438 DE 2011",
+            "LEY 1438/2011",
+            "DECRETO 4747 DE 2007",
+            "DEC. 4747/2007",
+            "DEC. 4747 DE 2007",
+            "RESOLUCION 2284 DE 2023",
+            "RESOLUCIÓN 2284/2023",
+            "RES. 2284 DE 2023",
+            "CIRCULAR 030 DE 2013",
+            "ACUERDO 260 DE 2004",
+            "SENTENCIA T-760 DE 2008",
+            "SENTENCIA T-760/2008",
+        ):
+            assert _citas(forma) >= 1, f"forma no reconocida: {forma}"
