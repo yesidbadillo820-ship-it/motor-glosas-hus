@@ -839,6 +839,97 @@ _EPS_PALABRAS_NO_NOMBRE: frozenset[str] = frozenset(
 )
 
 
+# ── La tarifa pactada inventada (OT-026) ──
+# El dictamen imprime un campo «Tarifa pactada» que sale del modelo, y a
+# diferencia del servicio y del contrato nadie lo cruzaba contra nada. Es
+# justo el dato que la entidad verifica primero: le basta abrir el contrato
+# para desmentirlo, y de paso desacredita todo lo demás.
+#
+# Una tarifa legítima puede venir de tres sitios: el catálogo de contratos
+# (que es lo que el prompt le entrega al modelo), las cláusulas cargadas de
+# esa entidad, o el texto de la glosa. Sin ninguno de los tres, se deja el
+# texto neutro que ya trae el sistema en vez de afirmar un porcentaje.
+_PAT_PORCENTAJE_TARIFA = re.compile(r"[+-]?\s*\d{1,2}(?:[.,]\d{1,2})?\s*%")
+_TARIFAS_NEUTRAS = (
+    "SIN TARIFA",
+    "NO APLICA",
+    "TARIFA PACTADA EN EL CONTRATO",
+    "LA PACTADA",
+    "SEGUN CONTRATO",
+    "SEGÚN CONTRATO",
+)
+
+
+def _tarifa_con_respaldo(
+    tarifa: str,
+    eps: str = "",
+    texto_glosa: str = "",
+    detalles_contrato: str = "",
+) -> str:
+    """Devuelve la tarifa si algo la respalda; "" si el motor la inventó.
+
+    Solo se exige respaldo cuando la tarifa afirma un PORCENTAJE — que es
+    lo verificable y lo que la entidad revisa. Un texto genérico ("la
+    pactada en el contrato") no afirma nada y pasa.
+    """
+    t = (tarifa or "").strip()
+    if not t:
+        return ""
+    m = _PAT_PORCENTAJE_TARIFA.search(t)
+    if not m:
+        return t  # no afirma un porcentaje: nada que verificar
+    up = t.upper()
+    if any(n in up for n in _TARIFAS_NEUTRAS) and not m:
+        return t
+
+    def _porcentajes(s: str) -> set:
+        """Solo los números que de verdad son un porcentaje de tarifa.
+
+        Tomar cualquier número del texto no sirve: el catálogo trae
+        "GID-ARL-0090 — ARL + VIDA AP (2024)" y de ahí salían 00, 90, 20 y
+        24, así que un "-20%" inventado pasaba como respaldado.
+        """
+        crudos = re.findall(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*%", s or "")
+        crudos += re.findall(r"MENOS\s+(?:EL\s+)?(\d{1,2}(?:[.,]\d{1,2})?)", s or "", re.IGNORECASE)
+        return {x.replace(",", ".").rstrip("0").rstrip(".") for x in crudos}
+
+    pedidos = _porcentajes(m.group(0) + "%")
+    fuentes = f"{detalles_contrato or ''} {texto_glosa or ''}"
+    if not (detalles_contrato or "").strip():
+        try:
+            from app.services.glosa_ia_prompts import CONTRATOS_HUS
+
+            clave = (eps or "").upper().strip()
+            for k, v in (CONTRATOS_HUS or {}).items():
+                if k.upper() in clave or clave in k.upper():
+                    fuentes += " " + str(v)
+        except Exception:
+            pass
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato
+
+        db = SessionLocal()
+        try:
+            q = db.query(ClausulaContrato.texto_literal)
+            if eps:
+                q = q.filter(ClausulaContrato.eps == eps.upper())
+            fuentes += " " + " ".join(str(x or "") for (x,) in q.all())
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+    if pedidos & _porcentajes(fuentes):
+        return t
+    logger.warning(
+        f"[TARIFA-INVENTADA] «{t[:60]}» afirma un porcentaje que no está en el "
+        f"contrato, ni en sus cláusulas, ni en la glosa (eps={eps}) — se deja "
+        "el texto neutro."
+    )
+    return ""
+
+
 def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
     """Sustituye nombres de EPS distintos al del input por "LA ENTIDAD PAGADORA".
 
@@ -6856,6 +6947,19 @@ class GlosaService:
                 logger.debug(f"[SERVICIO-INVENTADO] guarda no aplicada: {_e_si}")
             contrato_ia = self._xml("contrato", res_ia, "")
             tarifa_ia = self._xml("tarifa", res_ia, "")
+            # OT-026 (06-08-2026) — la tarifa pactada inventada. Es el dato
+            # que la entidad verifica primero: le basta abrir el contrato
+            # para desmentirlo. A diferencia del servicio y del contrato,
+            # este campo no se cruzaba contra nada.
+            try:
+                tarifa_ia = _tarifa_con_respaldo(
+                    tarifa_ia,
+                    eps=str(data.eps or ""),
+                    texto_glosa=texto_base,
+                    detalles_contrato=str((contratos_db or {}).get(eps_key, "") or ""),
+                )
+            except Exception as _e_ti:
+                logger.debug(f"[TARIFA-INVENTADA] guarda no aplicada: {_e_ti}")
             arg_ia = self._xml("argumento", res_ia, "")
             normas_clave = self._xml("normas_clave", res_ia, "")
 
