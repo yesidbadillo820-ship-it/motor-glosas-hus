@@ -138,6 +138,61 @@ def _evaluar_caso_glosa(caso: dict) -> list[dict]:
                 f"esperado≈{crit['complejidad_motivo_contiene']} motivos={comp.motivos}",
             )
 
+    # ── Detectores nacidos de las tandas de prueba del 05 y 06-08-2026 ──
+    # Cada uno salió de un dictamen real que Yesid pegó al chat. Tenerlos
+    # acá convierte su ronda manual en una prueba que corre sola en CI.
+    if "glosa_mayor_que_facturado" in crit:
+        # Se llama a LA REGLA del motor, no a una copia del umbral: si
+        # alguien cambia el margen o invierte la comparación, este caso se
+        # pone rojo. Con el umbral repetido acá se quedaba en verde.
+        from app.services.glosa_service import _excede_lo_facturado, _facturado_y_objetado
+
+        fact, obj = _facturado_y_objetado(glosa)
+        excede = _excede_lo_facturado(fact, obj)
+        _check(
+            "glosa_mayor_que_facturado",
+            excede == crit["glosa_mayor_que_facturado"],
+            f"facturado={fact} objetado={obj}",
+        )
+
+    if "doble_glosa_mismo_item" in crit:
+        from app.services.glosa_service import _doble_glosa_sobre_el_mismo_item
+
+        v = _doble_glosa_sobre_el_mismo_item(glosa)
+        _check("doble_glosa_mismo_item", v == crit["doble_glosa_mismo_item"], f"obtenido={v}")
+
+    if "glosa_anterior_a_la_factura" in crit:
+        from app.services.glosa_service import _glosa_anterior_a_la_factura
+
+        r = _glosa_anterior_a_la_factura(glosa)
+        _check(
+            "glosa_anterior_a_la_factura",
+            bool(r) == crit["glosa_anterior_a_la_factura"],
+            f"fechas={r}",
+        )
+
+    if "glosa_contradictoria" in crit:
+        from app.services.glosa_service import _contradiccion_no_prestado_vs_tarifa
+
+        v = _contradiccion_no_prestado_vs_tarifa(glosa)
+        _check("glosa_contradictoria", v == crit["glosa_contradictoria"], f"obtenido={v}")
+
+    if "es_de_pertinencia" in crit:
+        from app.services.glosa_service import _glosa_es_de_pertinencia
+
+        v = _glosa_es_de_pertinencia(glosa)
+        _check("es_de_pertinencia", v == crit["es_de_pertinencia"], f"obtenido={v}")
+
+    if "cups_extraido" in crit:
+        from app.utils.parsers_glosa import _extraer_cups_servicio
+
+        cups, _serv = _extraer_cups_servicio(glosa)
+        _check(
+            "cups_extraido",
+            cups == crit["cups_extraido"],
+            f"esperado={crit['cups_extraido']!r} obtenido={cups!r}",
+        )
+
     # Defensa clínica (tecnología cara → literatura nivel 1A)
     if "defensa_clinica_titulo_contiene" in crit:
         from app.services.defensa_clinica import detectar_defensa_clinica
@@ -159,6 +214,9 @@ def _evaluar_dictamen_con_bugs(caso: dict) -> list[dict]:
     """
     from app.services.glosa_service import (
         _neutralizar_alucinaciones_prompt,
+        _neutralizar_clausulas_sin_respaldo,
+        _neutralizar_periodo_inventado,
+        _quitar_signos_vacios,
         _rechazar_sancion_eps_ilegal,
         _reescribir_negacion_contrato,
     )
@@ -166,6 +224,7 @@ def _evaluar_dictamen_con_bugs(caso: dict) -> list[dict]:
     sucio = caso["dictamen_sucio"]
     aplicar = caso["aplicar"]
     glosa_ctx = caso.get("glosa_contexto", "")
+    eps_ctx = caso.get("eps", "")
 
     if aplicar == "neutralizar_alucinaciones_prompt":
         limpio = _neutralizar_alucinaciones_prompt(sucio)
@@ -173,6 +232,27 @@ def _evaluar_dictamen_con_bugs(caso: dict) -> list[dict]:
         limpio = _reescribir_negacion_contrato(sucio, texto_glosa=glosa_ctx)
     elif aplicar == "rechazar_sancion_eps_ilegal":
         limpio = _rechazar_sancion_eps_ilegal(sucio, texto_glosa=glosa_ctx)
+    # ── Redes nacidas de las tandas del 05 y 06-08-2026 ──
+    elif aplicar == "neutralizar_clausulas_sin_respaldo":
+        # Esta red consulta la tabla de cláusulas. Sin aislarla, el caso
+        # dependería de qué haya en la base del momento: en CI arranca
+        # vacía —así que la rama "cláusula respaldada se conserva" nunca se
+        # ejercitaba— y en el PC del hospital, con las 26 sembradas,
+        # cualquier número que contuviera "4.2" volvía rojo el caso sin que
+        # nadie tocara código. El caso declara qué hay cargado.
+        import app.services.glosa_service as _gs
+
+        cargadas = set(caso.get("clausulas_cargadas") or [])
+        _original = _gs._clausulas_cargadas
+        _gs._clausulas_cargadas = lambda eps="": cargadas
+        try:
+            limpio = _neutralizar_clausulas_sin_respaldo(sucio, eps_ctx, texto_glosa=glosa_ctx)
+        finally:
+            _gs._clausulas_cargadas = _original
+    elif aplicar == "neutralizar_periodo_inventado":
+        limpio = _neutralizar_periodo_inventado(sucio, glosa_ctx)
+    elif aplicar == "quitar_signos_vacios":
+        limpio = _quitar_signos_vacios(sucio)
     else:
         return [{"criterio": "aplicar_desconocido", "ok": False, "detalle": aplicar}]
 

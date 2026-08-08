@@ -3433,6 +3433,26 @@ def _monto_por_etiqueta(texto: str, etiquetas: tuple) -> float:
     return 0.0
 
 
+# Margen por debajo del cual la diferencia es ruido —redondeos, IVA
+# partido— y no un error aritmético de la entidad.
+_MARGEN_EXCESO_FACTURADO = 0.01
+
+
+def _excede_lo_facturado(facturado: float, objetado: float) -> bool:
+    """¿La entidad está objetando más plata de la que se le cobró?
+
+    Vive acá y no suelta dentro del dictamen para que la prueba de
+    regresión pueda llamar A ESTA REGLA. Cuando estaba escrita en línea, el
+    golden set tenía que repetir el umbral y se quedaba en verde aunque
+    alguien cambiara el margen o invirtiera la comparación.
+    """
+    try:
+        f, o = float(facturado or 0), float(objetado or 0)
+    except (TypeError, ValueError):
+        return False
+    return f > 0 and o > f and (o - f) > (f * _MARGEN_EXCESO_FACTURADO)
+
+
 def _facturado_y_objetado(texto: str) -> tuple:
     """(facturado, objetado) leídos del texto de la glosa. 0.0 lo que falte."""
     if not texto:
@@ -8146,9 +8166,7 @@ class GlosaService:
             # dejó vacío, lo que diga el texto de la glosa.
             if not _obj_ar:
                 _obj_ar = _obj_texto_ar
-            # El margen del 1% evita el ruido de redondeo y de los IVA
-            # partidos; por debajo de eso no es un error aritmético.
-            if _fact_ar > 0 and _obj_ar > _fact_ar and (_obj_ar - _fact_ar) > (_fact_ar * 0.01):
+            if _excede_lo_facturado(_fact_ar, _obj_ar):
                 _exceso_ar = _obj_ar - _fact_ar
                 _f_obj = f"${_obj_ar:,.0f}".replace(",", ".")
                 _f_fac = f"${_fact_ar:,.0f}".replace(",", ".")

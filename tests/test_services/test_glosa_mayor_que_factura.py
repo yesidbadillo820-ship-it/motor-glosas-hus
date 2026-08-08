@@ -55,7 +55,12 @@ class TestLaResta:
     """La condición del aviso, tal como quedó en el dictamen."""
 
     def _dispara(self, fact: float, obj: float) -> bool:
-        return bool(fact > 0 and obj > fact and (obj - fact) > (fact * 0.01))
+        # 06-08-2026: se llama a LA REGLA del motor, no a una copia del
+        # umbral. Repetirlo acá dejaba estas pruebas en verde aunque
+        # alguien cambiara el margen en el dictamen.
+        from app.services.glosa_service import _excede_lo_facturado
+
+        return _excede_lo_facturado(fact, obj)
 
     def test_el_caso_real_dispara(self):
         assert self._dispara(1500000.0, 1850000.0)
@@ -108,3 +113,36 @@ class TestElAvisoEstaEnchufado:
 
         src = inspect.getsource(parsers_glosa._extraer_valores_glosa)
         assert "TOTAL\\s+FACTURAD" not in src
+
+
+class TestLaReglaViveEnElMotor:
+    """OT-024. El umbral estaba escrito en línea dentro del dictamen, así
+    que el golden set tenía que repetirlo y se quedaba en verde aunque
+    alguien cambiara el margen o invirtiera la comparación."""
+
+    def test_la_regla_es_una_funcion_del_motor(self):
+        from app.services.glosa_service import _excede_lo_facturado
+
+        assert _excede_lo_facturado(1500000, 1850000) is True
+        assert _excede_lo_facturado(2000000, 300000) is False
+
+    def test_el_borde_del_margen(self):
+        from app.services.glosa_service import _excede_lo_facturado
+
+        assert _excede_lo_facturado(1500000, 1505000) is False  # ruido de IVA
+        assert _excede_lo_facturado(1500000, 1516000) is True  # ya es error
+
+    def test_aguanta_basura(self):
+        from app.services.glosa_service import _excede_lo_facturado
+
+        for f, o in ((None, None), ("x", "y"), (0, 100), (-1, 5)):
+            assert _excede_lo_facturado(f, o) is False, (f, o)
+
+    def test_el_dictamen_llama_a_la_regla_y_no_repite_el_umbral(self):
+        import inspect
+
+        from app.services.glosa_service import GlosaService
+
+        src = inspect.getsource(GlosaService.analizar)
+        assert "_excede_lo_facturado(" in src
+        assert "* 0.01)" not in src, "el umbral volvió a quedar escrito en línea"
