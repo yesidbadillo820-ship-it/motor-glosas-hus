@@ -839,6 +839,97 @@ _EPS_PALABRAS_NO_NOMBRE: frozenset[str] = frozenset(
 )
 
 
+# ── El número de contrato inventado de cero (OT-027) ──
+# La red de contratos ajenos solo caza los números CONOCIDOS que pertenecen
+# a otra entidad. Un número que no existe en ninguna parte —ni en el
+# catálogo, ni en las cláusulas cargadas, ni en el texto de la glosa— pasaba
+# derecho hasta el documento radicado.
+#
+# Es el mismo riesgo que la cláusula inventada, y peor: la entidad busca ese
+# contrato en su sistema, no lo encuentra, y todo el dictamen queda bajo
+# sospecha sin haber discutido el fondo.
+#
+# Se ancla en la palabra CONTRATO o ACTA para no tocar CUPS con sufijo,
+# radicados, fechas ni citas de normas ("T-760/2008", "Res. 2284/2023").
+_PAT_CONTRATO_NOMBRADO = re.compile(
+    r"\b(CONTRATOS?|ACTAS?)\b[\s:]*(?:N[ÚU]MEROS?\.?|NO\.?|N[°º]\.?)?\s*"
+    r"([A-Z0-9]+(?:[-/][A-Z0-9]+){1,})",
+    re.IGNORECASE,
+)
+
+
+def _neutralizar_contratos_inventados(texto: str, eps: str = "", texto_glosa: str = "") -> str:
+    """Sustituye el número de contrato que no existe en ninguna fuente.
+
+    Se conserva cuando está en el catálogo (de quien sea: si es de otra
+    entidad, esa es tarea de _neutralizar_contratos_ajenos, que corre
+    antes), cuando lo citó la propia entidad en su glosa, o cuando aparece
+    en el contrato registrado de ese pagador.
+    """
+    if not texto:
+        return texto
+    up = texto.upper()
+    if "CONTRATO" not in up and "ACTA" not in up:
+        return texto
+
+    conocidos: set = set()
+    try:
+        from app.services.glosa_ia_prompts import catalogo_contratos_eps
+
+        conocidos = {k.upper() for k in (catalogo_contratos_eps() or {})}
+    except Exception:
+        return texto  # sin catálogo no se decide nada: se deja como está
+    if not conocidos:
+        return texto
+
+    fuentes = (texto_glosa or "").upper()
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato, ContratoRecord
+
+        db = SessionLocal()
+        try:
+            rec = db.query(ContratoRecord).filter(ContratoRecord.eps == (eps or "").upper()).first()
+            if rec:
+                fuentes += (
+                    " "
+                    + " ".join(
+                        str(getattr(rec, c, "") or "") for c in ("detalles", "numero_contrato")
+                    ).upper()
+                )
+            q = db.query(ClausulaContrato.texto_literal)
+            if eps:
+                q = q.filter(ClausulaContrato.eps == eps.upper())
+            fuentes += " " + " ".join(str(x or "") for (x,) in q.all()).upper()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+    inventados: list[str] = []
+
+    def _sub(m: "re.Match[str]") -> str:
+        tok = m.group(2).upper().rstrip(".,;:")
+        # Conocido, o citado por la entidad, o del contrato registrado.
+        if any(tok in k or k in tok for k in conocidos) or tok in fuentes:
+            return m.group(0)
+        # Un número de contrato real siempre trae dígitos.
+        if not any(c.isdigit() for c in tok):
+            return m.group(0)
+        inventados.append(tok)
+        return "EL CONTRATO VIGENTE ENTRE LAS PARTES"
+
+    resultado = _PAT_CONTRATO_NOMBRADO.sub(_sub, texto)
+    if not inventados:
+        return texto
+    logger.warning(
+        f"[CONTRATO-INVENTADO] {len(inventados)} número(s) de contrato que no "
+        f"existen en ninguna fuente retirados del dictamen (eps={eps}, "
+        f"tokens={inventados[:3]})."
+    )
+    return resultado
+
+
 # ── La tarifa pactada inventada (OT-026) ──
 # El dictamen imprime un campo «Tarifa pactada» que sale del modelo, y a
 # diferencia del servicio y del contrato nadie lo cruzaba contra nada. Es
@@ -7662,6 +7753,23 @@ class GlosaService:
                     dictamen = _dictamen_sin_ajeno
             except Exception as _e_ca:
                 logger.debug(f"[CONTRATO-AJENO] red final no aplicada: {_e_ca}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  OT-027 (06-08-2026) — RED FINAL contrato inventado de cero.
+            #  La red de arriba solo caza números CONOCIDOS de otra
+            #  entidad. Uno que no existe en ninguna parte pasaba derecho:
+            #  la entidad lo busca en su sistema, no lo encuentra, y el
+            #  dictamen entero queda bajo sospecha. Va DESPUÉS de la de
+            #  contratos ajenos, que es más específica.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_inventado = _neutralizar_contratos_inventados(
+                    dictamen, str(data.eps or ""), texto_glosa=texto_base
+                )
+                if _dictamen_sin_inventado != dictamen:
+                    dictamen = _dictamen_sin_inventado
+            except Exception as _e_ci:
+                logger.debug(f"[CONTRATO-INVENTADO] red final no aplicada: {_e_ci}")
 
             # ═══════════════════════════════════════════════════════════
             #  OT-001 (05-08-2026) — RED FINAL cláusula sin respaldo.
