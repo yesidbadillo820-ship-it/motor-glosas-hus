@@ -180,6 +180,15 @@
         "glosa_contradictoria": false,
         "doble_glosa_mismo_item": false
       }
+    },
+    {
+      "id": "diferencia_de_redondeo_no_es_error",
+      "descripcion": "Borde del margen: $1.500.000 facturado contra $1.505.000 objetado es ruido de IVA partido, no un error aritmetico. Fija el umbral por debajo, que el caso de SUMIMEDICAL no cubre.",
+      "eps_dropdown": "SUMIMEDICAL",
+      "glosa": "SO0202 - VALOR FACTURADO $1.500.000. VALOR GLOSADO $1.505.000.",
+      "criterios": {
+        "glosa_mayor_que_facturado": false
+      }
     }
   ],
   "dictamenes_con_bugs": [
@@ -250,7 +259,7 @@
     },
     {
       "id": "clausula_inventada_AU0401",
-      "descripcion": "OT-001. El dictamen afirmo 'CLAUSULA 4.2 DEL CONTRATO S-13-1-03-1-04958' sin ninguna clausula cargada. El contrato es real y de esa entidad, asi que las dos guardas de contratos lo dejaron pasar.",
+      "descripcion": "OT-001. El dictamen afirmo 'CLAUSULA 4.2 DEL CONTRATO S-13-1-03-1-04958' sin ninguna clausula cargada. El contrato es real y de esa entidad, asi que las dos guardas de contratos lo dejaron pasar. Se declara la base SIN clausulas: es el escenario del caso real.",
       "aplicar": "neutralizar_clausulas_sin_respaldo",
       "eps": "FAMISANAR EPS",
       "glosa_contexto": "AU0401 - Se glosa por cuanto el procedimiento no corresponde con la descripcion clinica.",
@@ -262,7 +271,8 @@
       "debe_contener": [
         "S-13-1-03-1-04958",
         "SE SOLICITA EL LEVANTAMIENTO"
-      ]
+      ],
+      "clausulas_cargadas": []
     },
     {
       "id": "periodo_inventado_AU0401",
@@ -309,6 +319,22 @@
       "dictamen_sucio": "EL ART. 57 DE LA LEY 1438 DE 2011 ESTABLECE: «LA CARGA DE LA PRUEBA CORRESPONDE AL PAGADOR».",
       "debe_contener": [
         "«LA CARGA DE LA PRUEBA CORRESPONDE AL PAGADOR»"
+      ]
+    },
+    {
+      "id": "clausula_respaldada_se_conserva",
+      "descripcion": "Rama que nunca se ejercitaba: con la clausula cargada en la base, el dictamen la conserva. Sin este caso, el sanitizer podria empezar a borrar clausulas REALES y el golden set seguiria verde.",
+      "aplicar": "neutralizar_clausulas_sin_respaldo",
+      "eps": "FAMISANAR EPS",
+      "clausulas_cargadas": [
+        "4.2",
+        "Octava, numeral 3"
+      ],
+      "glosa_contexto": "AU0401 - Se glosa por cuanto el procedimiento no corresponde con la descripcion clinica.",
+      "dictamen_sucio": "SE INCUMPLE LA CLAUSULA 4.2 DEL CONTRATO S-13-1-03-1-04958. SE SOLICITA EL LEVANTAMIENTO.",
+      "debe_contener": [
+        "CLAUSULA 4.2",
+        "S-13-1-03-1-04958"
       ]
     }
   ]

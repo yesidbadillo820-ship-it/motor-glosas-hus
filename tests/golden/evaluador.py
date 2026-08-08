@@ -142,10 +142,13 @@ def _evaluar_caso_glosa(caso: dict) -> list[dict]:
     # Cada uno salió de un dictamen real que Yesid pegó al chat. Tenerlos
     # acá convierte su ronda manual en una prueba que corre sola en CI.
     if "glosa_mayor_que_facturado" in crit:
-        from app.services.glosa_service import _facturado_y_objetado
+        # Se llama a LA REGLA del motor, no a una copia del umbral: si
+        # alguien cambia el margen o invierte la comparación, este caso se
+        # pone rojo. Con el umbral repetido acá se quedaba en verde.
+        from app.services.glosa_service import _excede_lo_facturado, _facturado_y_objetado
 
         fact, obj = _facturado_y_objetado(glosa)
-        excede = bool(fact > 0 and obj > fact and (obj - fact) > (fact * 0.01))
+        excede = _excede_lo_facturado(fact, obj)
         _check(
             "glosa_mayor_que_facturado",
             excede == crit["glosa_mayor_que_facturado"],
@@ -231,7 +234,21 @@ def _evaluar_dictamen_con_bugs(caso: dict) -> list[dict]:
         limpio = _rechazar_sancion_eps_ilegal(sucio, texto_glosa=glosa_ctx)
     # ── Redes nacidas de las tandas del 05 y 06-08-2026 ──
     elif aplicar == "neutralizar_clausulas_sin_respaldo":
-        limpio = _neutralizar_clausulas_sin_respaldo(sucio, eps_ctx, texto_glosa=glosa_ctx)
+        # Esta red consulta la tabla de cláusulas. Sin aislarla, el caso
+        # dependería de qué haya en la base del momento: en CI arranca
+        # vacía —así que la rama "cláusula respaldada se conserva" nunca se
+        # ejercitaba— y en el PC del hospital, con las 26 sembradas,
+        # cualquier número que contuviera "4.2" volvía rojo el caso sin que
+        # nadie tocara código. El caso declara qué hay cargado.
+        import app.services.glosa_service as _gs
+
+        cargadas = set(caso.get("clausulas_cargadas") or [])
+        _original = _gs._clausulas_cargadas
+        _gs._clausulas_cargadas = lambda eps="": cargadas
+        try:
+            limpio = _neutralizar_clausulas_sin_respaldo(sucio, eps_ctx, texto_glosa=glosa_ctx)
+        finally:
+            _gs._clausulas_cargadas = _original
     elif aplicar == "neutralizar_periodo_inventado":
         limpio = _neutralizar_periodo_inventado(sucio, glosa_ctx)
     elif aplicar == "quitar_signos_vacios":

@@ -35,7 +35,7 @@ def test_golden_set_cobertura_minima():
     (si baja mucho, alguien borró casos sin querer)."""
     # 06-08-2026: subió de 30 a 60 al entrar los casos reales de las dos
     # tandas de prueba del hospital. Si baja, alguien borró casos.
-    assert _REPORTE["total_criterios"] >= 60
+    assert _REPORTE["total_criterios"] >= 65
 
 
 def _ids_criterios():
