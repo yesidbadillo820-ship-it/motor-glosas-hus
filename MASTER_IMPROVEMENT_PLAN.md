@@ -161,6 +161,37 @@ acceso a datos bloquearía el bucle de eventos en vez de ayudar.
 
 ---
 
+### 2.5 Ocho pantallas rotas desde mayo, no una — la causa raíz de «Salud Total»
+
+**Medido en el historial del repositorio:**
+
+- **09-05-2026** (`8f91087` y siguientes): se borran **ocho routers** que el portal usaba, y `3ccefd9` los reemplaza por cáscaras con prefijo `/_removed/` «para no romper los imports». Desde ese día ocho pantallas responden 404 — pero el código se ve ordenado.
+- **07-07-2026** (`0c15a71`): se borran las cáscaras. El mensaje dice *«verificado cero callers, eliminación por AST»*. **La verificación por AST solo miró el código Python. El que llamaba era el JavaScript.**
+- **13-08-2026**: Yesid abre «Salud Total» y le sale «Not Found». Tres meses después.
+
+Las ocho: `salud_total`, `comentarios_thread`, `notas_privadas`,
+`preset_filtros`, `push`, `auditor_forense`, `autopilot`, `noticias`.
+
+**Los datos del auditor nunca se borraron:** `ComentarioThreadRecord`,
+`NotaPrivadaRecord`, `PresetFiltroRecord`, `PushSubscriptionRecord`,
+`NoticiaSaludRecord`, `ChatConversacionRecord` siguen en `app/models/db.py`.
+Solo se había ido la puerta.
+
+- [x] Rastrear la causa raíz con los commits que lo prueban.
+- [x] Verificar que los modelos de la base sobreviven (los comentarios y notas del auditor están ahí).
+- [x] **Prueba que compara las llamadas del JavaScript contra las rutas montadas** — la verificación que faltó. Con lista de pendientes que solo puede achicarse.
+- [x] Repuesta `salud_total` (OT-033).
+- [x] Repuestos `comentarios_thread`, `notas_privadas` y `preset_filtros`, desde su última versión funcional del historial.
+- [x] `push` (notificaciones al navegador).
+- [x] `auditor_forense` (Q&A sobre soportes) — con su hallazgo aparte: la limpieza lo confundió con `auditoria_forense`, que es otra cosa (busca por IP). Son dos funciones distintas.
+- [x] `autopilot` (piloto automático) — hubo que reponer además sus dos servicios, `autopilot_service` y `metricas_autopilot`, borrados en la misma limpieza.
+- [x] `noticias` (noticias del sector).
+- [x] `chat_history` (historial del chat).
+- [x] `eventos/heartbeat` y `eventos/recientes` — el polling que refresca los paneles solos. Se borró y después se creó otro `eventos_live.py` con el mismo prefijo pero con SSE, que es otro mecanismo. Ahora conviven.
+- [x] **Cero rutas fantasma.** La lista de pendientes de la prueba quedó vacía.
+
+---
+
 ## 3) Código interno y arquitectura
 
 ### 3.1 Solo 8 de 69 routers declaran el contrato de su respuesta
