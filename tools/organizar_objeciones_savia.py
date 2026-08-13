@@ -56,6 +56,11 @@ import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
+# Un solo lector de pesos para todos los bots: la copia que vivía aquí
+# multiplicaba por cien los valores con centavos.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _dinero import a_entero  # noqa: E402
+
 logger = logging.getLogger("organizar_savia")
 
 
@@ -153,18 +158,18 @@ def _cell(row: tuple, idx: dict[str, int], clave: str) -> object:
 
 
 def _num(v: object) -> int:
-    """Convierte a entero tolerando '$1.234', '1,234', floats, None."""
-    if v is None:
-        return 0
-    if isinstance(v, (int, float)):
-        return int(v)
-    s = re.sub(r"[^\d\-]", "", str(v))
-    if not s or s == "-":
-        return 0
-    try:
-        return int(s)
-    except ValueError:
-        return 0
+    """Pesos enteros, con el lector único de `tools/_dinero.py`.
+
+    Lo que hacía antes: `re.sub(r"[^\\d\\-]", "", str(v))` — borraba **todo**
+    lo que no fuera dígito, incluida la coma decimal. Así `"1.365,50"` se
+    volvía `136550`: **cien veces el valor real**, y ese número salía en el
+    Excel que se carga al ERP. La validación de suma no lo veía porque el
+    encabezado y los renglones se inflaban por igual.
+
+    El lector compartido aplica la regla colombiana: un separador de miles
+    lleva tres dígitos detrás; uno o dos son decimales.
+    """
+    return a_entero(v)
 
 
 # ─── Normalización de factura (corta → larga del Dispensario) ────────────────

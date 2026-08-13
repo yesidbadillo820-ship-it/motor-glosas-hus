@@ -11,6 +11,9 @@ _UNCONFIGURED_ADMIN_PASSWORD = "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
 
 
 class Settings(BaseSettings):
+    # Ronda 30: URL pública para los enlaces de los correos (antes había
+    # hosts viejos y contradictorios: onrender.com y fly.dev).
+    app_base_url: str = "https://iaglosassinac.help"
     database_url: str = "sqlite:///./glosas.db"
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
@@ -60,10 +63,17 @@ class Settings(BaseSettings):
     # siguiente modelo Groq SIN saltar todavia a Anthropic. Overrideables
     # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2,
     # GROQ_MODEL_FALLBACK_3.
-    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
-    groq_model_fallback_1: str = "openai/gpt-oss-120b"
-    groq_model_fallback_2: str = "qwen/qwen3-32b"
-    groq_model_fallback_3: str = "llama-3.3-70b-versatile"
+    # 05-08-2026: llama-4-scout SALIÓ del catálogo de Groq. El diagnóstico
+    # del hospital devolvía «Error code: 404 — the model
+    # meta-llama/llama-4-scout-17b-16e-instruct does not exist or you do not
+    # have access to it», y el panel avisaba «ningún proveedor responde»
+    # aunque el motor SÍ funcionaba: cada análisis gastaba un intento
+    # muerto y caía al respaldo. Todos los dictámenes de ese día salieron
+    # por gpt-oss-120b. Se promueve el que ya estaba haciendo el trabajo.
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_model_fallback_1: str = "qwen/qwen3-32b"
+    groq_model_fallback_2: str = "llama-3.3-70b-versatile"
+    groq_model_fallback_3: str = "llama-3.1-8b-instant"
     anthropic_model: str = "claude-sonnet-4-5"
     # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
     # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
@@ -101,6 +111,13 @@ class Settings(BaseSettings):
     # GLOSA_CAMPOS_ESTRUCTURADOS=true.
     glosa_campos_estructurados: bool = False
 
+    # Token compartido del agente local de lotes (tools/agente_lotes.py).
+    # El agente corre headless en el PC del hospital y no puede usar JWT
+    # de usuario (expiran a las 8h): se autentica con este token estático
+    # vía header X-Agente-Token. Vacío = endpoints del agente deshabilitados
+    # (devuelven 503), así un deploy sin configurar no expone la cola.
+    agente_lotes_token: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
@@ -111,8 +128,28 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
 
+class ConfiguracionInsegura(RuntimeError):
+    """El arranque se aborta: hay una configuración que rompe la seguridad."""
+
+
 def check_security_config() -> None:
     settings = get_settings()
+    # E00: docker-compose inyecta SECRET_KEY: ${SECRET_KEY}; si la variable no
+    # está en el .env, llega VACÍA y hasta ahora nadie lo detectaba — se
+    # firmaban los tokens de sesión con cadena vacía. Esto no es una
+    # advertencia: es motivo para no arrancar.
+    clave = (settings.secret_key or "").strip()
+    if not clave:
+        raise ConfiguracionInsegura(
+            "SECRET_KEY está vacía: los tokens de sesión se firmarían con una clave "
+            "nula y cualquiera podría falsificarlos. Definí SECRET_KEY en el .env "
+            "(mínimo 32 caracteres aleatorios) antes de arrancar."
+        )
+    if len(clave) < 32 and clave != _DEFAULT_SECRET:
+        warnings.warn(
+            "ADVERTENCIA DE SEGURIDAD: SECRET_KEY tiene menos de 32 caracteres.",
+            stacklevel=2,
+        )
     if settings.secret_key == _DEFAULT_SECRET:
         warnings.warn(
             "ADVERTENCIA DE SEGURIDAD: Se esta usando el SECRET_KEY por defecto. "
@@ -132,6 +169,43 @@ def check_security_config() -> None:
         )
 
 
+# Claves que el resto del sistema busca en el ENTORNO del proceso, no en
+# esta configuración. Sin este puente, un .env perfectamente válido dejaba
+# la mitad del sistema a ciegas.
+_CLAVES_AL_ENTORNO = (
+    ("GROQ_API_KEY", "groq_api_key"),
+    ("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    ("GEMINI_API_KEY", "gemini_api_key"),
+    ("PRIMARY_AI", "primary_ai"),
+)
+
+
+def _exportar_claves_al_entorno(settings: "Settings") -> None:
+    """Publica al entorno del proceso lo que vino del archivo .env.
+
+    Incidente 04-08-2026: pydantic-settings lee el .env hacia la
+    configuración pero NO lo exporta a os.environ. El motor de dictámenes
+    recibe las claves por inyección y funcionaba, pero el asistente, el
+    auditor forense, el extractor de cláusulas, los multi-agentes y el
+    diagnóstico de arranque leen os.getenv — y veían todo AUSENTE con un
+    .env correcto. El log llegó a decir «groq=AUSENTE» teniendo la clave
+    cargada, y eso mandó la búsqueda del problema por el camino errado.
+
+    Nunca pisa una variable que ya venga del entorno real (docker/systemd
+    mandan sobre el archivo).
+    """
+    import os as _os
+
+    for nombre_env, campo in _CLAVES_AL_ENTORNO:
+        if _os.environ.get(nombre_env):
+            continue
+        valor = getattr(settings, campo, "") or ""
+        if valor:
+            _os.environ[nombre_env] = valor
+
+
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    _exportar_claves_al_entorno(settings)
+    return settings

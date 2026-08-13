@@ -11,13 +11,14 @@ Extraído de app/main.py (era ~365 LOC). Maneja:
 
 import os
 import re
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.core.config import get_settings
 from app.core.logging_utils import logger, set_request_id
 from app.core.rate_limit import limiter
@@ -27,7 +28,12 @@ from app.models.schemas import GlosaInput, GlosaResult
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.glosa_ia_prompts import get_contrato
-from app.services.glosa_service import GlosaService
+from app.services.glosa_service import (
+    DictamenSinArgumentoError,
+    GlosaService,
+    IANoDisponibleError,
+    texto_con_error_de_proveedor,
+)
 from app.utils.moneda import parse_valor_cop
 from app.utils.parsers_glosa import (
     _concepto_glosa,
@@ -250,6 +256,20 @@ def _obtener_few_shots(
         tabla_excel.upper(),
     )
     cod_pref = codigo_match.group(0) if codigo_match else ""
+
+    # A una ARL no se le sirven respuestas ganadoras del régimen de salud.
+    # 05-08-2026: la glosa de POSITIVA por accidente de trabajo salió
+    # argumentada con Ley 1438, Resolución 2284 y «plan de beneficios» —
+    # marco del SGSSS— pese a que el motor tiene un bloque ARL correcto.
+    # Una de las razones era esta: cuando no hay plantilla de esa
+    # aseguradora, el banco cae a las genéricas, y esas están escritas para
+    # EPS (PBS, UPC). El modelo copia el ejemplo que tiene delante. Mejor
+    # sin ejemplo que con ejemplo del régimen equivocado.
+    from app.services.glosa_ia_prompts import _es_pagador_arl
+
+    if _es_pagador_arl(eps, tabla_excel):
+        return [], [], cod_pref
+
     plantillas_gold = (
         obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
     )
@@ -295,7 +315,9 @@ def _agregar_banner_tarifa_post(
     es_ta = (resultado.codigo_glosa or "").upper().startswith("TA")
     if not es_ta:
         return
-    cups_ext, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cups_ext, _ = _extraer_cups_servicio(
+        tabla_excel or "", contexto_pdf, montos_excluir=[val_obj, val_ac]
+    )
     if not cups_ext:
         return
     try:
@@ -493,6 +515,31 @@ async def _persistir_y_responder(
 ):
     """Cierra el flujo: aplica banner de tarifa, decide estado, construye
     dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
+    # Cinturón (incidente 04-08-2026): un texto con firma de error del
+    # proveedor de IA jamás se persiste como dictamen, venga de donde venga
+    # (caché envenenado, camino viejo, lo que sea).
+    _dictamen_txt = getattr(resultado, "dictamen", "") or ""
+    if "ARGUMENTACIÓN JURÍDICA" in _dictamen_txt:
+        _cuerpo = _dictamen_txt.split("ARGUMENTACIÓN JURÍDICA", 1)[1]
+        import re as _re
+
+        _visible = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", _cuerpo)).strip()
+        if len(_visible) < 60:
+            raise HTTPException(
+                503,
+                "El dictamen salió sin argumentación jurídica; NO se guardó. "
+                "Reintentá el análisis y si persiste avisá a administración.",
+            )
+
+    if texto_con_error_de_proveedor(getattr(resultado, "dictamen", "") or "") or (
+        texto_con_error_de_proveedor(getattr(resultado, "resumen", "") or "")
+    ):
+        raise HTTPException(
+            503,
+            "El resultado traía un error del proveedor de IA en el cuerpo; NO se "
+            "guardó. Reintentá el análisis y si persiste avisá a administración.",
+        )
+
     glosa_repo = GlosaRepository(db)
     # parse_valor_cop entiende formato colombiano ("7.700,00" → 7700.0).
     # El patrón anterior float(re.sub(r"[^\d]","",x)) inflaba 100× los
@@ -531,7 +578,9 @@ async def _persistir_y_responder(
         )
 
     tipo_final = f"RESPUESTA {cod_resp_acept}" if cod_resp_acept else resultado.tipo
-    cup_ext, servicio_ext = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cup_ext, servicio_ext = _extraer_cups_servicio(
+        tabla_excel or "", contexto_pdf, montos_excluir=[val_obj, val_ac]
+    )
     cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
     cod_resp = cod_resp_m.group(0) if cod_resp_m else (cod_resp_acept or "")
 
@@ -618,6 +667,66 @@ async def _persistir_y_responder(
         )
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
+
+    # ── Expediente: la verificación contractual queda REGISTRADA ─────────
+    # Regla del Contrato de Construcción: nada está terminado si no queda en
+    # el expediente. El dictamen ya se arma con el contrato del día del hecho;
+    # acá queda la constancia consultable —qué contrato se usó, si estaba
+    # vigente ese día y con qué factor— en la línea de tiempo de la glosa.
+    # Un fallo aquí no puede tumbar un análisis ya hecho.
+    try:
+        import json as _json
+
+        from app.repositories.audit_repository import AuditRepository
+        from app.services import malla_contractual as _mc
+
+        _fecha_hecho = getattr(data, "fecha_radicacion", None) or getattr(
+            data, "fecha_recepcion", None
+        )
+        _dia = _fecha_hecho or date.today()
+        _vig = _mc.vigente(eps, _dia)
+        _conocidos = _mc.contratos_de(eps)
+        if _vig is not None:
+            _veredicto = "VIGENTE"
+            _resumen_v = (
+                f"Contrato {_vig.numero or 'sin número'} vigente el {_dia.isoformat()} "
+                f"(factor {_vig.factor if _vig.factor is not None else 1.0})"
+            )
+        elif _conocidos:
+            _veredicto = "SIN_CONTRATO_VIGENTE"
+            _resumen_v = (
+                f"Ningún contrato de {eps} regía el {_dia.isoformat()}: se defendió a SOAT pleno"
+            )
+        else:
+            _veredicto = "PAGADOR_FUERA_DE_MALLA"
+            _resumen_v = f"{eps} no está en la malla contractual"
+        _constancia = {
+            "veredicto": _veredicto,
+            "resumen": _resumen_v,
+            "fecha_hecho": _dia.isoformat(),
+            "fecha_es_del_formulario": _fecha_hecho is not None,
+            "contrato": _vig.como_dict() if _vig else None,
+            "malla_al": _mc.FECHA_MALLA.isoformat(),
+        }
+        _detalle = _json.dumps(_constancia, ensure_ascii=False)
+        if len(_detalle) > 1900:
+            # Cortar a ciegas dejaría un JSON ilegible: mejor sin la ficha
+            # completa del contrato (el número ya va en valor_nuevo).
+            _constancia["contrato"] = None
+            _detalle = _json.dumps(_constancia, ensure_ascii=False)[:1900]
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="VERIFICACION_CONTRACTUAL",
+            tabla="historial",
+            registro_id=glosa.id,
+            campo=_veredicto,
+            valor_nuevo=(_vig.numero if _vig else "")[:200] or _veredicto,
+            detalle=_detalle,
+        )
+        db.commit()
+    except Exception:
+        logger.warning(f"[{req_id}] verificación contractual no registrada", exc_info=True)
     # R56 P1: ahora que la glosa existe en BD, los siguientes calls IA
     # de este request quedan trazados a su id (caso de glosas que disparen
     # un análisis adicional, ej. evaluación de riesgo).
@@ -684,7 +793,7 @@ async def analizar(
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     from app.services.progreso_analisis import publicar as _publicar_progreso
 
@@ -921,6 +1030,17 @@ async def analizar(
         return respuesta
     except HTTPException:
         raise
+    except DictamenSinArgumentoError as e:
+        # Carátula sin argumentación = no hay dictamen. 503 y nada guardado.
+        logger.error(f"[{req_id}] dictamen sin argumento: {e.mensaje}")
+        _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
+        raise HTTPException(status_code=503, detail=e.mensaje)
+    except IANoDisponibleError as e:
+        # Incidente 04-08-2026: la IA caída NO es un dictamen — es un 503
+        # con causa legible, y no queda nada guardado.
+        logger.error(f"[{req_id}] IA no disponible: {e.mensaje}")
+        _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
+        raise HTTPException(status_code=503, detail=e.mensaje)
     except Exception as e:
         logger.error(f"[{req_id}] Error en análisis: {e}", exc_info=True)
         _publicar_progreso(_tid, "error", {"mensaje": str(e)[:200]})
@@ -936,7 +1056,7 @@ async def analizar(
 async def preview_glosa(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
     db: Session = Depends(get_db),
 ):
     """Detecta automaticamente desde el texto crudo de la glosa:
@@ -1049,7 +1169,7 @@ async def preview_glosa(
 async def extraer_de_correo(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Recibe el texto crudo de un correo de EPS y extrae los campos
     estructurados (EPS, codigo, valor, factura, radicado, motivo).
@@ -1374,7 +1494,7 @@ def _fundir_extracciones(extraidos: list[dict]) -> dict:
 async def extraer_soportes(
     request: Request,
     archivos: list[UploadFile] = File(default=[]),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Auto-extrae metadata de los PDFs ANTES de "Analizar con IA".
 

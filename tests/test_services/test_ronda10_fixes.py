@@ -96,7 +96,7 @@ def test_fix_b_eps_inventada_real_si_se_neutraliza():
     d = "ESE HUS NO ACEPTA glosa interpuesta por la EPS SaludCo respecto del servicio."
     r = _neutralizar_eps_inventada(d, "FAMISANAR")
     assert "SaludCo" not in r
-    assert "la entidad pagadora" in r
+    assert "LA ENTIDAD PAGADORA" in r.upper()  # el dictamen va en mayúsculas (05-08-2026)
 
 
 def test_fix_b_eps_aplicar_no_se_neutraliza():
@@ -117,9 +117,13 @@ def test_fix_c_descomillar_en_parrafo_caps_usa_caps():
     )
     issues = [{"tipo": "CITA_LITERAL_FALSA", "cita": cita}]
     r = _descomillar_citas_falsas(contexto_caps, issues)
-    # En un párrafo CAPS el conector debe estar en CAPS también.
-    assert "EN LOS TÉRMINOS DE" in r
-    # No debe quedar la versión rota en minúsculas.
+    # 05-08-2026 (OT-007): cuando la cita venía con verbo de atribución
+    # ("QUE ESTABLECE:"), el conector se le sumaba encima y salía "QUE
+    # ESTABLECE: EN LOS TÉRMINOS DE Las partes...", que no se puede leer.
+    # El verbo ya dice que es una atribución. Lo de la ronda 10 sigue
+    # valiendo para la CAJA: párrafo en CAPS → el enlace en CAPS.
+    assert "QUE ESTABLECE QUE Las partes" in r
+    assert "EN LOS TÉRMINOS DE" not in r
     assert "en los términos de Las partes" not in r
 
 
@@ -132,8 +136,11 @@ def test_fix_c_descomillar_en_parrafo_normal_usa_minuscula():
     )
     issues = [{"tipo": "CITA_LITERAL_FALSA", "cita": cita}]
     r = _descomillar_citas_falsas(contexto_normal, issues)
-    assert "en los términos de" in r
-    assert "EN LOS TÉRMINOS DE" not in r
+    # OT-007: mismo caso con verbo de atribución en minúscula. El enlace
+    # sigue la caja del párrafo huésped, que es de lo que trataba la ronda 10.
+    assert "establece que Las partes" in r
+    assert "establece QUE" not in r
+    assert "en los términos de" not in r.lower()
 
 
 # ── Fix D: normalización EPS Syscafe → corto canónico ────────────────

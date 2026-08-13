@@ -213,7 +213,12 @@ class TestFix2DescomillarCitasFalsas:
         dictamen = f"EL CONTRATO DISPONE: «{cita_larga}». SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA."
         out = _descomillar_citas_falsas(dictamen, [self._issue(cita_larga)])
         assert "«" not in out
-        assert "EN LOS TÉRMINOS DE" in out
+        # 05-08-2026 (OT-007): el verbo de atribución ya dice que es una
+        # atribución, así que el conector neutro sobra. Antes salía "EL
+        # CONTRATO DISPONE: EN LOS TÉRMINOS DE el pagador...", que no se
+        # puede leer. Ahora: "EL CONTRATO DISPONE QUE EL PAGADOR...".
+        assert "DISPONE QUE" in out
+        assert "DISPONE: EN LOS TÉRMINOS DE" not in out
 
     def test_citas_validas_no_se_tocan(self):
         from app.services.glosa_service import _descomillar_citas_falsas
@@ -241,7 +246,9 @@ class TestFix2DescomillarCitasFalsas:
         )
         out = _descomillar_citas_falsas(dictamen, [self._issue(CITA_FALSA_OSTEOSINTESIS)])
         assert '"' not in out
-        assert "EN LOS TÉRMINOS DE" in out
+        # OT-007: "ESTABLECE QUE: EN LOS TÉRMINOS DE ..." era ilegible.
+        assert "ESTABLECE QUE EL PAGADOR" in out
+        assert "EN LOS TÉRMINOS DE" not in out
 
     def test_round_trip_con_verifier_real(self):
         """Integración con el corpus real: el verifier marca la cita
@@ -331,12 +338,20 @@ class TestFix3ContratoCruzado:
         assert get_contrato("SA")["numero"] == "SIN CONTRATO PACTADO"
 
     def test_get_contrato_matches_legitimos_siguen(self):
+        """Con fecha del hecho FIJA: sin fecha, get_contrato usa "hoy" y la
+        prueba se volvía bomba de tiempo — reventó el 01-08-2026 cuando venció
+        la vigencia del contrato DMBUG (Dic 2025 – Jul 2026), sin que ningún
+        código hubiera cambiado. Lo que se prueba aquí es el MATCH del nombre,
+        no la vigencia, así que se ancla a un día en que todos regían."""
+        import datetime
+
         from app.services.glosa_ia_prompts import get_contrato
 
-        assert "S-13-1-03-1-04958" in get_contrato("FAMISANAR EPS")["numero"]
-        assert "DMBUG" in get_contrato("DISPENSARIO MEDICO BUCARAMANGA")["numero"]
-        assert "12076-359-2025" in get_contrato("FOMAG")["numero"]
-        assert "IPS-001B-2022" in get_contrato("PPL")["numero"]
+        dia = datetime.date(2026, 6, 15)
+        assert "S-13-1-03-1-04958" in get_contrato("FAMISANAR EPS", fecha_hecho=dia)["numero"]
+        assert "DMBUG" in get_contrato("DISPENSARIO MEDICO BUCARAMANGA", fecha_hecho=dia)["numero"]
+        assert "12076-359-2025" in get_contrato("FOMAG", fecha_hecho=dia)["numero"]
+        assert "IPS-001B-2022" in get_contrato("PPL", fecha_hecho=dia)["numero"]
 
     def test_catalogo_contrato_eps_duena(self):
         from app.services.glosa_ia_prompts import catalogo_contratos_eps

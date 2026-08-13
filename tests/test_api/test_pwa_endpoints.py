@@ -35,9 +35,11 @@ def test_sw_js_no_store_headers():
 
     with TestClient(app) as c:
         r = c.get("/sw.js")
-        if r.status_code == 200:
-            cc = r.headers.get("cache-control", "")
-            assert "no-store" in cc.lower() or "no-cache" in cc.lower()
+        # Ronda 30: antes envuelto en `if r.status_code == 200:` — si /sw.js
+        # dejaba de responder 200, el test pasaba SIN verificar nada.
+        assert r.status_code == 200
+        cc = r.headers.get("cache-control", "")
+        assert "no-store" in cc.lower() or "no-cache" in cc.lower()
 
 
 def test_icon_192_devuelve_png():

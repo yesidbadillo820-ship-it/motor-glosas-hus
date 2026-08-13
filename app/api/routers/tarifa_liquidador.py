@@ -25,7 +25,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.models.db import UsuarioRecord
 from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
@@ -201,7 +201,7 @@ class LiquidarManualInput(BaseModel):
 @router.post("/liquidar-manual")
 def liquidar_manual(
     data: LiquidarManualInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Calcula directamente sin código — el usuario digita el factor.
 

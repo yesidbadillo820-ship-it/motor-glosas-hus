@@ -4,8 +4,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.alerta_service import AlertaService
-from app.api.deps import get_usuario_actual
-from app.models.db import UsuarioRecord
+from app.api.deps import (
+    get_auditor_o_superior,
+    get_coordinador_o_admin,
+    get_usuario_actual,
+)
+from app.models.db import ROL_COORDINADOR, ROL_SUPER_ADMIN, UsuarioRecord
 
 router = APIRouter(prefix="/alertas", tags=["alertas"])
 
@@ -49,7 +53,7 @@ def enviar_alertas_email(
     dias: int = Query(5, ge=1, le=30, description="Días de anticipación"),
     forzar: bool = Query(False, description="Enviar aunque no haya nuevas alertas"),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """
     Envía alerta por correo electrónico con las glosas próximas a vencer.
@@ -97,3 +101,123 @@ def obtener_config_alertas(
         else [],
         "umbral_default": 5,
     }
+
+
+# ─── Motor de Vencimientos ───────────────────────────────────────────────
+# El semáforo tenía estado NEGRO para lo vencido y no disparaba nada: tres
+# facturas de junio por $20.054.751 se descubrieron 45 días tarde. Estos dos
+# endpoints exponen la capacidad del núcleo (`motor_vencimientos`), que
+# clasifica por urgencia y resuelve a quién le toca cada glosa.
+
+
+@router.get("/vencimientos")
+def tablero_vencimientos(
+    incluir_cerradas: bool = Query(False, description="Incluir glosas ya resueltas"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Fotografía del riesgo por vencimiento: cuántas, de qué urgencia y cuánta plata.
+
+    Funciona SIEMPRE, esté o no configurado el correo: es preferible que el
+    área vea el listado en pantalla a que nadie se entere.
+
+    Acceso: AUDITOR o superior. El VIEWER queda fuera porque el tablero
+    concentra el mapa completo de plata en riesgo del hospital.
+    """
+    import os
+
+    from app.models.db import GlosaRecord
+    from app.services.motor_vencimientos import Destinatarios, Umbrales, evaluar
+
+    q = db.query(GlosaRecord)
+    if not incluir_cerradas:
+        q = q.filter(GlosaRecord.dias_restantes.isnot(None))
+    resumen = evaluar(q.all())
+
+    umbrales = Umbrales.desde_entorno()
+    destinatarios = Destinatarios.desde_entorno()
+    smtp_ok = bool((os.getenv("SMTP_USER") or "").strip() and (os.getenv("SMTP_PASSWORD") or ""))
+    return {
+        **resumen.como_dict(),
+        "umbrales": {
+            "preventivo": umbrales.preventivo,
+            "alta": umbrales.alta,
+            "critica": umbrales.critica,
+        },
+        "avisos_configurados": destinatarios.hay_alguno,
+        "escalamiento_configurado": destinatarios.hay_escalamiento,
+        # La interfaz avisa cuando el correo no está listo, en vez de dejar al
+        # área creyendo que los avisos salen.
+        "smtp_configurado": smtp_ok,
+        "puede_notificar": current_user.rol in (ROL_SUPER_ADMIN, ROL_COORDINADOR),
+    }
+
+
+@router.post("/vencimientos/notificar")
+def notificar_vencimientos(
+    simular: bool = Query(True, description="Solo mostrar a quién se avisaría, sin enviar"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Avisa a cada responsable de lo suyo: un correo por persona, no por glosa.
+
+    Por defecto SIMULA (`simular=true`): devuelve a quién le llegaría qué, sin
+    enviar nada. Es la forma segura de estrenar la configuración.
+
+    Acceso: COORDINADOR o superior. Disparar correos a dirección financiera y
+    auditoría interna es un acto de coordinación, no de gestión diaria.
+    """
+    from app.models.db import GlosaRecord
+    from app.services.motor_vencimientos import (
+        Destinatarios,
+        agrupar_por_destinatario,
+        evaluar,
+    )
+
+    destinatarios = Destinatarios.desde_entorno()
+    if not destinatarios.hay_alguno:
+        return {
+            "enviados": 0,
+            "simulado": simular,
+            "detalle": (
+                "No hay destinatarios configurados. Definí VENCIMIENTOS_CORREO_ALTA, "
+                "_CRITICA y _VENCIDA (o dejá VENCIMIENTOS_CORREO_GESTOR=1) antes de "
+                "activar los avisos."
+            ),
+            "bandejas": {},
+        }
+
+    resumen = evaluar(db.query(GlosaRecord).filter(GlosaRecord.dias_restantes.isnot(None)).all())
+    bandejas = agrupar_por_destinatario(resumen, destinatarios)
+
+    plan = {
+        correo: {
+            "total": len(items),
+            "por_urgencia": {
+                n: len([i for i in items if i.urgencia.value == n])
+                for n in ("VENCIDA", "CRITICA", "ALTA", "PREVENTIVO")
+            },
+        }
+        for correo, items in bandejas.items()
+    }
+
+    if simular:
+        return {"enviados": 0, "simulado": True, "bandejas": plan}
+
+    servicio = AlertaService()
+    enviados, fallidos = 0, []
+    for correo, items in bandejas.items():
+        try:
+            ok, msg = servicio.email_service.enviar_alerta_glosas(
+                [i.glosa for i in items],
+                dias_limite=max((i.dias_restantes or 0) for i in items),
+                destinatarios=[correo],
+            )
+            if ok:
+                enviados += 1
+            else:
+                fallidos.append({"correo": correo, "error": msg})
+        except Exception as e:  # el fallo de un correo no puede tumbar el resto
+            fallidos.append({"correo": correo, "error": str(e)[:200]})
+
+    return {"enviados": enviados, "simulado": False, "fallidos": fallidos, "bandejas": plan}

@@ -64,8 +64,11 @@ htmlcov/
 deploy/cloudflared/config.yml
 deploy/cloudflared/*.json
 
-# Carpeta de datos generada por install.sh (excepto los catálogos versionados)
-data/
+# Carpeta de datos generada por install.sh (excepto los catálogos versionados).
+# Va "data/*" y no "data/": con la barra sola, git no entra a la carpeta y las
+# tres excepciones de abajo nunca se aplicaban — al editar un catálogo había
+# que forzar el add, y era fácil dejarlo por fuera del commit sin notarlo.
+data/*
 !data/plantillas_hus_base.json
 !data/perfiles_radicacion.json
 !data/clausulas_contrato_base.json

@@ -27,6 +27,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from app.utils.moneda import parse_valor_cop
+
 
 # ─── Normalización ──────────────────────────────────────────────────────────
 
@@ -42,29 +44,16 @@ def _normalizar_texto(s: Any) -> str:
 
 
 def _normalizar_valor(v: Any) -> float:
-    """Parsea valores COP desde celda Excel (puede venir número o string)."""
-    if v is None:
-        return 0.0
-    if isinstance(v, (int, float)):
-        return float(v)
-    s = str(v).strip().replace("$", "").replace(" ", "")
-    if not s or s.upper() in ("N/A", "NA", "-"):
-        return 0.0
-    if "," in s and "." in s:
-        if s.rfind(",") > s.rfind("."):
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            s = s.replace(",", "")
-    else:
-        m = re.match(r"^(\d+)[\.,](\d{1,2})$", s)
-        if m:
-            s = f"{m.group(1)}.{m.group(2)}"
-        else:
-            s = s.replace(".", "").replace(",", "")
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+    """Parsea valores COP desde celda Excel (puede venir número o string).
+
+    E01 — Principio N.º 1 (SINAC CORE primero): delega en el parser único del
+    núcleo (`app.utils.moneda.parse_valor_cop`) en vez de mantener una copia.
+    Esta función tenía la misma lógica escrita a mano y leía como CERO dos
+    formatos que el auditor teclea a diario: el separador de miles con apóstrofo
+    (`1'500.000`) y las cifras en palabras (`850 millones`). Una tarifa leída
+    como cero se propaga a todo el dictamen.
+    """
+    return parse_valor_cop(v)
 
 
 def _parsear_fecha(v: Any) -> datetime | None:
@@ -196,6 +185,10 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
         "VALOR PACTADO",
         "VALOR UNITARIO",
         "PRECIO UNITARIO",
+        # 06-08-2026 — hoja UVB de la propuesta 2026 de FAMISANAR: el valor
+        # que se pacta viene en "PROPUESTA FINAL" (el UVB del año menos el
+        # 5% del contrato). Sin esta palabra la hoja no se reconocía.
+        "PROPUESTA FINAL",
     )
     has_value = any(k in hunion for k in value_keywords)
     if not has_value:
@@ -209,6 +202,20 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     if cups_like and has_value:
         return "SIMPLE_FIJO"
     return None
+
+
+# Columna de plata: "TARIFA 2026", "VALOR UVB 2026", "PROPUESTA FINAL",
+# "PRECIO UNITARIO". Sirve para reconocer una tabla de tarifas cuando el
+# encabezado no usa ninguna de las palabras clave conocidas.
+_COLUMNA_DE_VALOR = re.compile(
+    r"(?:^|\|\s*)(?:VALOR|TARIFA|PRECIO|PROPUESTA)\b[^|]*(?:$|\s*\|)", re.IGNORECASE
+)
+# Columna de código: "CUPS", "CUPS 2341/25", "CODIGO IPS", o el encabezado
+# que nombra la resolución que define esos códigos ("Res 2706/25"), que es
+# como viene la hoja AMBULATORIO de la propuesta 2026 de FAMISANAR.
+_COLUMNA_DE_CODIGO = re.compile(
+    r"^(?:CUPS|CODIGO|C[ÓO]DIGO|RES\.?\s*\d|RESOLUCION\s*\d)", re.IGNORECASE
+)
 
 
 def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[None, None]:
@@ -236,6 +243,10 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
         "OBSERVACION FOMAG",
         # FOMAG paquetes
         "VALOR PROPUESTO",
+        # 06-08-2026: propuesta 2026 de FAMISANAR. La hoja UVB trae el valor
+        # que de verdad se pacta en "PROPUESTA FINAL"; sin esta palabra la
+        # hoja no se reconocía y se perdían 4.586 tarifas.
+        "PROPUESTA FINAL",
     ]
     limite = min(200, len(rows))
     for idx, fila in enumerate(rows[:limite]):
@@ -244,6 +255,15 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
             continue
         fila_norm = [_normalizar_texto(c) for c in fila]
         matches = sum(1 for celda in fila_norm if any(kw in celda for kw in keywords_fuertes))
+        # 06-08-2026 — hojas ORTESIS Y PROTESIS y AMBULATORIO de la propuesta
+        # 2026 de FAMISANAR: encabezados cortos ("CUPS | DESCRIPCIÓN | CÓDIGO
+        # | DESCRIPCIÓN | TARIFA 2026") con UNA sola palabra fuerte, así que
+        # no llegaban a dos y la hoja entera se descartaba en silencio —452
+        # tarifas—. Un encabezado con columna de código Y columna de valor es
+        # una tabla de tarifas, aunque solo tenga una palabra de la lista.
+        if matches < 2 and _COLUMNA_DE_VALOR.search(" | ".join(fila_norm)):
+            if any(_COLUMNA_DE_CODIGO.match(c) for c in fila_norm if c):
+                matches += 1
         if matches >= 2:
             return idx, fila_norm
     return None, None
@@ -385,6 +405,24 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
     return filas
 
 
+_PALABRAS_DE_CIERRE = frozenset(
+    {
+        "TOTAL",
+        "TOTALES",
+        "SUBTOTAL",
+        "SUBTOTALES",
+        "SUMA",
+        "GRANTOTAL",
+        "TOTALGENERAL",
+        "PROMEDIO",
+        "OBSERVACIONES",
+        "OBSERVACION",
+        "NOTA",
+        "NOTAS",
+    }
+)
+
+
 def _es_codigo_cups_valido(cups: str) -> bool:
     """True si el string parece un código CUPS/CUM/MAPIISS/MIPRES real.
 
@@ -400,6 +438,11 @@ def _es_codigo_cups_valido(cups: str) -> bool:
     if " " in cups.strip():
         return False
     if not re.search(r"[A-Za-z0-9]", cups):
+        return False
+    # 06-08-2026 — un renglón de cierre entraba como si fuera un CUPS y su
+    # total quedaba cargado como tarifa. Lista cerrada y sin dígitos: ningún
+    # código real del catálogo (890202, FMQ6296, AGMO102T) cae acá.
+    if cups.strip().upper() in _PALABRAS_DE_CIERRE:
         return False
     return True
 
@@ -535,18 +578,66 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
     return filas
 
 
-def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
+def _modalidad_de_hoja(nombre_hoja: str) -> str:
+    """De qué manera quedó pactada la tarifa, según la hoja de donde salió.
+
+    13-08-2026. Antes, cualquier fila sin columna de modalidad se cargaba
+    como «TARIFA PROPIA». En la propuesta 2026 de FAMISANAR eso alcanzaba a
+    las 4.586 tarifas de la hoja UVB, que NO son tarifas propias: son la UVB
+    por grupos con el descuento del contrato. El dictamen citaba entonces una
+    forma de pactar que no era la del contrato, y eso lo lee la entidad.
+
+    Solo aplica cuando la fila no dice nada: si la hoja trae su propia
+    columna (ESPECIALIDAD, MODALIDAD…), manda esa.
+    """
+    h = (nombre_hoja or "").strip().upper()
+    if not h:
+        return "TARIFA PROPIA"
+    if "UVB" in h:
+        return "UVB POR GRUPOS"
+    if "PROPIA" in h:
+        return "TARIFA PROPIA"
+    if "PAQUETE" in h:
+        return "PAQUETE"
+    if "ORTESIS" in h or "PROTESIS" in h or "PRÓTESIS" in h:
+        return "ORTESIS Y PROTESIS"
+    if "AMBULATORIO" in h:
+        return "AMBULATORIO"
+    return nombre_hoja.strip()[:80]
+
+
+def _parsear_simple_fijo(
+    rows: list[tuple], hdr_idx: int, headers: list[str], nombre_hoja: str = ""
+) -> list[dict]:
     """Formato plano genérico: una sola hoja con CUPS + valor fijo.
 
     Cubre Dispensario (PRECIO DE REFERENCIA), Nueva EPS, Sanitas simple,
     Compensar, etc. La EPS y contrato normalmente se pasan por eps_override.
+
+    `nombre_hoja` se usa para decir de qué manera quedó pactada la tarifa
+    cuando la fila no trae una columna que lo diga. Ver `_modalidad_de_hoja`.
     """
     idx_cups = _indice_columna(headers, "CUPS")
+    if idx_cups is None:
+        # 06-08-2026 — hoja AMBULATORIO de la propuesta 2026 de FAMISANAR:
+        # la columna del CUPS se titula con la resolución que los define
+        # ("Res 2706/25"), no con la palabra CUPS. Se acepta ese encabezado
+        # SOLO si no hay una columna CUPS de verdad, para no pisarla.
+        for i, h in enumerate(headers):
+            if h and _COLUMNA_DE_CODIGO.match(h) and h.upper().startswith(("RES", "RESOLUCION")):
+                idx_cups = i
+                break
     idx_desc = _indice_columna(
         headers, "DESCRIPCION CUPS", "DESCRIPCION IPS", "DESCRIPCION", "DESCRIPCIÓN", "NOMBRE"
     )
     idx_valor = _indice_columna(
         headers,
+        # 06-08-2026 — va de PRIMERA: en la hoja UVB de FAMISANAR conviven
+        # "VALOR UVB 2026" (el de referencia) y "PROPUESTA FINAL" (ese mismo
+        # menos el 5% del contrato, que es el que se pacta). Si gana el de
+        # referencia, el motor defiende con una tarifa 5% más alta que la
+        # pactada y la glosa se ratifica.
+        "PROPUESTA FINAL",
         "PRECIO DE REFERENCIA",
         "TARIFA UNITARIA",
         "VALOR PACTADO",
@@ -592,6 +683,8 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
             _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
         )
         modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
+        if not modalidad:
+            modalidad = _modalidad_de_hoja(nombre_hoja)
         # Si hay código IPS propio, guardarlo en observación (útil para trazabilidad)
         cod_ips = str(_celda(fila, idx_cod_ips) or "").strip() if idx_cod_ips is not None else ""
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None
@@ -881,7 +974,7 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
                 elif tipo == "FOMAG_PAQUETES":
                     nuevas = _parsear_fomag_paquetes(rows, hdr_idx, headers)
                 elif tipo == "SIMPLE_FIJO":
-                    nuevas = _parsear_simple_fijo(rows, hdr_idx, headers)
+                    nuevas = _parsear_simple_fijo(rows, hdr_idx, headers, sheet_name)
                 else:
                     nuevas = []
                 filas_total.extend(nuevas)

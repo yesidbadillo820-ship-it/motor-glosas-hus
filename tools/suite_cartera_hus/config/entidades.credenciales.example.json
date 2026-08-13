@@ -1,0 +1,11 @@
+{
+ "_LEAME": "Contraseñas de los portales — ARCHIVO LOCAL, NO SE SUBE AL REPOSITORIO. La Suite lo une con entidades.json al abrir (emparejando por NIT/nombre). Si regenera entidades.json desde el Excel, vuelva a correr herramientas/separar_credenciales.py.",
+ "credenciales": [
+  {
+   "nit": "900006037",
+   "nombre": "EJEMPLO EPS S.A.S.",
+   "radicacion.contrasena": "PEGUE_AQUI_LA_CLAVE",
+   "devoluciones.credenciales": "USUARIO: xxxx\nCONTRASEÑA: xxxx"
+  }
+ ]
+}

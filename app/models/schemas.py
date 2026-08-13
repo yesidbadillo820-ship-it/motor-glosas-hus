@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 from datetime import date
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.utils.moneda import parse_valor_cop
 
@@ -225,3 +225,172 @@ class CambiarPasswordRequest(BaseModel):
         ..., min_length=8, max_length=200, description="Mínimo 8 caracteres"
     )
     password_nueva_confirmacion: str = Field(..., min_length=8, max_length=200)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Contratos de respuesta — Fase 2 del programa de mejora (13-08-2026)
+#
+# Por qué existen. De las 595 rutas del motor, solo 8 declaraban qué
+# devuelven. Las demás sueltan un diccionario y nada garantiza que el campo
+# que el JavaScript lee siga ahí mañana: cuando desaparece, la pantalla no da
+# error, se queda callada. Es la misma familia de fallo que dejó la pantalla
+# «Salud Total» tres meses devolviendo «Not Found».
+#
+# Estos esquemas describen lo que las rutas devuelven HOY, campo por campo,
+# leído del código. No se inventó ninguno ni se cambió ningún nombre: si un
+# campo se llama `creado_en` y viaja como texto ISO, así queda.
+#
+# Todos los campos que hoy pueden venir vacíos van Optional. Poner un tipo
+# estricto donde la base admite nulos haría que la ruta reventara con un 500
+# en vez de responder — el remedio sería peor que la enfermedad.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+class TarifaContratadaOut(BaseModel):
+    """Una tarifa pactada. Alimenta la tabla de Gestión → Tarifas."""
+
+    id: int
+    eps: str
+    contrato_numero: Optional[str] = None
+    codigo_cups: str
+    codigo_ips: Optional[str] = None
+    descripcion: Optional[str] = None
+    valor_pactado: float
+    modalidad: Optional[str] = None
+    tipo_tarifa: str = "VALOR_FIJO"
+    factor_ajuste: float = 0.0
+    fuente_archivo: Optional[str] = None
+    # Fechas en texto ISO: así las manda la ruta y así las lee la pantalla.
+    vigencia_desde: Optional[str] = None
+    vigencia_hasta: Optional[str] = None
+    creado_en: Optional[str] = None
+    creado_por: Optional[str] = None
+    activa: bool = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TarifasPorEps(BaseModel):
+    eps: str
+    cantidad: int
+
+
+class TarifasStatsOut(BaseModel):
+    """Resumen del catálogo de tarifas cargado."""
+
+    total_activas: int
+    por_eps: list[TarifasPorEps] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConciliacionOut(BaseModel):
+    """Un acta de conciliación. Alimenta la tabla de Conciliaciones."""
+
+    id: int
+    glosa_id: Optional[int] = None
+    creado_por: Optional[str] = None
+    creado_en: Optional[str] = None
+    fecha_audiencia: Optional[str] = None
+    lugar: Optional[str] = None
+    participantes_hus: Optional[str] = None
+    participantes_eps: Optional[str] = None
+    resultado: Optional[str] = None
+    valor_conciliado: Optional[float] = None
+    observaciones: Optional[str] = None
+    siguiente_paso: Optional[str] = None
+    acta_numero: Optional[str] = None
+    # Trámite bilateral (contra-respuesta de la EPS y postura del hospital).
+    contra_respuesta_eps: Optional[str] = None
+    fecha_contra_respuesta_eps: Optional[str] = None
+    postura_hus: Optional[str] = None
+    fecha_acta: Optional[str] = None
+    valor_ratificado_hus: float = 0.0
+    estado_bilateral: str = "PROGRAMADA"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConciliacionesPagina(BaseModel):
+    """Una página de conciliaciones. La pantalla lee estas cinco llaves."""
+
+    items: list[ConciliacionOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = 1
+    per_page: int = 50
+    pages: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SaludTotalGlosaOut(BaseModel):
+    """Una fila de la vista previa de Salud Total.
+
+    Los nombres NO son de estilo Python a propósito: son los de la
+    notificación de la entidad, y la pantalla los lee así.
+    """
+
+    NumeroRad: str = ""
+    PrefijoFac: str = ""
+    NumeroFac: str = ""
+    NUMREG: str = ""
+    NombreServicio: str = ""
+    ValorGlosaTotalxServ: float = 0.0
+    CodMotvGlosaGeneral: str = ""
+    CodMotvGlosaEspc: str = ""
+    ValorAceptadoIPS: float = 0.0
+    Codigo_Respuesta_a_glosas: str = ""
+    ConceptoRespuesta: str = ""
+    Observacion_IPS: str = ""
+    TipoRespuesta: Optional[str] = None
+    DiasTranscurridos: int = 0
+    SinFechaRecepcion: bool = False
+
+
+class SaludTotalPreviewOut(BaseModel):
+    """Lo que pinta la pantalla «Salud Total» antes de descargar."""
+
+    total_registros: int
+    total_glosado: float
+    total_aceptado: float
+    total_rechazado: float
+    # Avisa que no hay con qué contar el plazo del Art. 57 de la Ley
+    # 1438/2011: sin fecha de recepción no se alega extemporaneidad.
+    sin_fecha_recepcion: bool = False
+    glosas: list[SaludTotalGlosaOut] = Field(default_factory=list)
+
+
+class ValidacionAdresEstadoOut(BaseModel):
+    """Cómo va una validación FURIPS. La pantalla pregunta cada 3 segundos."""
+
+    estado: str
+    mensaje: str = ""
+    progreso: int = 0
+    total: int = 0
+    facturas: int = 0
+
+
+class ValidacionAdresIniciadaOut(BaseModel):
+    """Respuesta al subir los soportes: el identificador del trabajo."""
+
+    trabajo_id: str
+    archivos: int
+    estado: str = "EN_COLA"
+
+
+class ContratoOut(BaseModel):
+    """Un contrato del banco contractual.
+
+    Hoy la ruta declara `List[dict]`, que no dice nada: describir los campos
+    es lo que permite que una prueba note si uno desaparece.
+    """
+
+    id: int
+    eps: str
+    numero_contrato: Optional[str] = None
+    modalidad: Optional[str] = None
+    vigencia_desde: Optional[str] = None
+    vigencia_hasta: Optional[str] = None
+    activo: Optional[bool] = None
+
+    model_config = ConfigDict(from_attributes=True)

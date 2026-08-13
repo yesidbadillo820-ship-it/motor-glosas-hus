@@ -48,6 +48,15 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _lunes_reciente():
+    """Lunes de la semana pasada (7-13 días atrás): siempre en el pasado y
+    dentro de la ventana default de 90 días, sin importar la fecha de hoy."""
+    ahora = ahora_utc()
+    return (ahora - timedelta(days=ahora.weekday() + 7)).replace(
+        hour=10, minute=0, second=0, microsecond=0
+    )
+
+
 def _seed(db, fecha):
     db.add(
         GlosaRecord(
@@ -63,16 +72,6 @@ def _seed(db, fecha):
     db.commit()
 
 
-def _dia_semana_reciente(weekday, hora):
-    """El `weekday` (0=Lunes) más reciente de hace al menos 7 días. Siempre cae
-    dentro de la ventana default de 90 días del endpoint — con fechas fijas
-    (abril 2026) estos tests explotaban cuando la ventana móvil las dejaba
-    atrás (time-bomb detonada el 19-jul-2026)."""
-    base = ahora_utc() - timedelta(days=7)
-    d = base - timedelta(days=(base.weekday() - weekday) % 7)
-    return d.replace(hour=hora, minute=0, second=0, microsecond=0)
-
-
 class TestPorDiaSemana:
     def test_estructura(self, client):
         r = client.get("/glosas/stats/por-dia-semana")
@@ -84,11 +83,11 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # Lunes reciente (dentro de la ventana de 90 días)
-        _seed(db_session, _dia_semana_reciente(0, 10))
-        _seed(db_session, _dia_semana_reciente(0, 11))
-        # Miércoles reciente
-        _seed(db_session, _dia_semana_reciente(2, 10))
+        lunes = _lunes_reciente()
+        _seed(db_session, lunes)
+        _seed(db_session, lunes + timedelta(hours=1))
+        miercoles = lunes + timedelta(days=2)
+        _seed(db_session, miercoles)
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -98,11 +97,12 @@ class TestPorDiaSemana:
         assert d["total_glosas"] == 3
 
     def test_pct_del_total(self, client, db_session):
-        # 4 glosas un lunes reciente
+        lunes = _lunes_reciente()
+        # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session, _dia_semana_reciente(0, 10))
-        # 1 glosa el martes siguiente cercano
-        _seed(db_session, _dia_semana_reciente(1, 10))
+            _seed(db_session, lunes)
+        # 1 glosa el martes
+        _seed(db_session, lunes + timedelta(days=1))
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()

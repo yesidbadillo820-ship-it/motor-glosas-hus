@@ -24,6 +24,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Lector de pesos compartido (ver `tools/_dinero.py`): el que vivía aquí
+# leía cero cuando el valor venía en formato colombiano.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _dinero import a_entero  # noqa: E402
+
 logger = logging.getLogger("convertir_tramite")
 
 # Índices verificados del Excel de CRRP.
@@ -36,14 +41,20 @@ IDX_OBS = 32  # Observaciones del detalle (la RESPUESTA del HUS)
 
 
 def _num(v) -> int:
-    if v is None:
-        return 0
-    if isinstance(v, (int, float)):
-        return int(v)
-    try:
-        return int(float(str(v).replace(",", ".")))
-    except (TypeError, ValueError):
-        return 0
+    """Pesos enteros, con el lector único de `tools/_dinero.py`.
+
+    Lo que hacía antes: `int(float(str(v).replace(",", ".")))`. Cambiaba la
+    coma por punto y nada más, así que el formato colombiano lo destruía:
+
+        "1.234.567"  →  ValueError  →  0      un millón se volvía cero
+        "$114.900"   →  ValueError  →  0
+        "50.000"     →  50                    dividido por mil
+        "1.365,50"   →  ValueError  →  0
+
+    Décima copia de la misma regla en `tools/`, y la única que seguía viva en
+    producción cuando se encontró.
+    """
+    return a_entero(v)
 
 
 def convertir(ruta_tramite: Path, ruta_salida: Path) -> tuple[int, int]:

@@ -256,9 +256,31 @@ class TestQGSaltaValidacionLegacy:
         return calls
 
     def _servicio(self):
+        """Servicio con la llamada IA stubeada a un dictamen REAL.
+
+        Antes estos tests corrían sin claves y el motor devolvía el
+        centinela «API key no configurada» como dictamen — la validación
+        legacy terminaba validando un texto de error. Desde el incidente
+        del 04-08-2026 eso lanza IANoDisponibleError (correcto: un fallo
+        de proveedor no es un dictamen), así que acá se stubea la IA para
+        probar lo que el test siempre quiso probar: que con el flag OFF
+        la validación legacy corre sobre el dictamen del path legacy.
+        """
         from app.services.glosa_service import GlosaService
 
-        return GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
+        class _ServicioConIAStub(GlosaService):
+            async def _llamar_ia(
+                self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+            ):
+                texto = (
+                    "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE MAYOR VALOR "
+                    "COBRADO SOBRE EL CODIGO TA0601. "
+                    * 4
+                    + "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA.</argumento>"
+                )
+                return (texto, "groq")
+
+        return _ServicioConIAStub(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
 
     @pytest.mark.asyncio
     async def test_dictamen_del_qg_no_corre_rcerebro(self, monkeypatch):

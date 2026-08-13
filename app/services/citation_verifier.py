@@ -28,14 +28,20 @@ logger = logging.getLogger("motor_glosas")
 # producción 10-jun-2026: el dictamen citaba "MESA DE CONCILIACIÓN DE
 # AUDITORÍA (ART. 20 DEC. 4747/2007)" y el verifier reportaba la sentencia
 # fantasma "C-4747/2007" como NORMA_INEXISTENTE.
+# 06-08-2026 — la palabra iba con tilde obligatoria y es la ÚNICA de las
+# cinco que la lleva. El dictamen se radica en MAYÚSCULA SOSTENIDA y hay
+# rutas que pierden la tilde: escrito "RESOLUCION 9999 DE 2030", el
+# verificador ni siquiera lo contaba como cita, así que una resolución
+# inventada salía con el sello «citas verificadas · 0 hallazgos».
 PAT_RESOLUCION = re.compile(
-    r"\bResolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bRes(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bResoluci[óo]n\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
+    r"|\bRes(?:oluci[óo]n)?\.?\s*(\d{1,5})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 # La 2.ª alternativa acepta la abreviatura "Dec. 4747/2007" (antes solo
 # "Decreto NNN/YYYY" — la forma abreviada ni se contaba como cita).
 PAT_DECRETO = re.compile(
-    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 # El lookbehind excluye "DECRETO-LEY 1795 DE 2000" / "DECRETO LEY ...":
@@ -65,8 +71,12 @@ PAT_CIRCULAR = re.compile(
     r"\bCircular\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bCircular\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
+# 06-08-2026 — solo se reconocía la forma con barra o guion ("T-760/2008").
+# La forma que escribe el motor en prosa —"Sentencia T-994 de 2029"— no se
+# contaba como cita, así que una sentencia inventada pasaba sin revisar. Es
+# la trampa que Yesid puso en la glosa CL0301 de FAMISANAR.
 PAT_SENTENCIA = re.compile(
-    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
+    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 PAT_ARTICULO = re.compile(
@@ -84,9 +94,38 @@ PAT_CITA_LITERAL = re.compile(r"«([^«»]{15,800})»")
 # de atribución para no flaggear citas del texto de la glosa misma
 # ("LA AFIRMACIÓN DE QUE '...'" no es una cita normativa).
 PAT_CITA_ATRIBUIDA = re.compile(
-    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPTÚA|PRECEPTUA)"
+    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPT[ÚU]A|"
+    # 06-08-2026: faltaban los verbos con que el motor introduce una cita
+    # cuando no la atribuye a una norma concreta. Ver PAT_CITA_AUTOATRIBUIDA.
+    r"RECUERDA|PREV[ÉE]|CONTEMPLA|ORDENA|DETERMINA|ESTIPULA|PACTA)"
     r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*"
     r"[\"“‘']([^\"“”‘’']{15,800})[\"”’']",
+    re.IGNORECASE,
+)
+# Cita que se atribuye a sí misma: el sujeto normativo va DENTRO de las
+# comillas, así que no hay verbo de atribución delante y las dos redes
+# anteriores no la veían.
+#
+# Prueba real del 06-08-2026, glosa de sanción de COOSALUD:
+#
+#   SE RECUERDA QUE “EL CONTRATO ESTABLECE QUE LAS SANCIONES POR
+#   INCUMPLIMIENTO SOLO PODRÁN APLICARSE CUANDO EXISTAN DISPOSICIONES
+#   CONTRACTUALES ESPECÍFICAS”.
+#
+# Nadie había cargado ese contrato. El dictamen se entregó con el sello
+# «7 citas contra corpus · 0 hallazgos», que es peor que no revisar: le dice
+# al auditor que está verificado.
+#
+# Se exige que la cita ARRANQUE con el sujeto normativo y tenga cuerpo
+# (≥40 chars). Una cita del texto de la glosa ("no se evidencia epicrisis")
+# no empieza así y no se toca.
+PAT_CITA_AUTOATRIBUIDA = re.compile(
+    r"[\"“«‘']\s*("
+    r"(?:EL|LA|LOS|LAS)\s+"
+    r"(?:CONTRATO|CL[ÁA]USULA|LEY|RESOLUCI[ÓO]N|DECRETO|ART[ÍI]CULO|"
+    r"CIRCULAR|ACUERDO|MANUAL|ANEXO|SENTENCIA)\b"
+    r"[^\"“”«»‘’']{40,800})"
+    r"[\"”»’']",
     re.IGNORECASE,
 )
 # Limpia HTML para comparar texto plano
@@ -354,6 +393,9 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
     # corpus (normas + cláusulas reales del contrato en BD).
     citas_literales = PAT_CITA_LITERAL.findall(texto)
     citas_literales += PAT_CITA_ATRIBUIDA.findall(texto)
+    citas_literales += [
+        c for c in PAT_CITA_AUTOATRIBUIDA.findall(texto) if c not in citas_literales
+    ]
     if citas_literales:
         # Construir corpus completo de TODOS los textos normativos para búsqueda
         corpus_normas = " ".join(

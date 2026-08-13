@@ -49,8 +49,14 @@ def salud_detallada(
 @router.get("/salud/publico")
 def salud_publica(db: Session = Depends(get_db)):
     """Healthcheck sin autenticación para monitores externos.
-    Devuelve solo el estado_general y la hora, sin métricas internas."""
-    r = checar_salud(db)
+
+    Devuelve solo el estado_general y la hora, sin métricas internas. Usa la
+    variante BÁSICA a propósito (E00): al ser público y sin límite de tasa, no
+    puede disparar el recorrido de 30 días ni la detección de anomalías.
+    """
+    from app.services.health_monitor import checar_salud_basico
+
+    r = checar_salud_basico(db)
     return {
         "estado": r["estado_general"],
         "generado_en": r["generado_en"],
@@ -77,7 +83,12 @@ def observabilidad(
     anthropic_ok = bool(os.getenv("ANTHROPIC_API_KEY"))
     groq_ok = bool(os.getenv("GROQ_API_KEY"))
     firma_rsa_ok = bool(os.getenv("FIRMA_DIGITAL_PRIVATE_KEY"))
-    cifrado_ok = bool(os.getenv("GLOSAS_ENCRYPTION_KEY"))
+    # E00: la clave configurada NO es lo mismo que datos cifrados. Se reporta
+    # el estado REAL (hay clave + hay campos cableados), no la intención.
+    from app.services.cifrado import cifrado_activo, hay_clave
+
+    cifrado_ok = cifrado_activo()
+    cifrado_clave_ok = hay_clave()
     digest_dest_ok = bool(os.getenv("DIGEST_DESTINATARIOS"))
     whatsapp_ok = bool(os.getenv("WHATSAPP_META_TOKEN") and os.getenv("WHATSAPP_META_PHONE_ID"))
     telegram_ok = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
@@ -124,9 +135,17 @@ def observabilidad(
             "Configurar FIRMA_DIGITAL_PRIVATE_KEY para firmas asimétricas (más seguras que HMAC)."
         )
     if not cifrado_ok:
-        recomendaciones.append(
-            "Configurar GLOSAS_ENCRYPTION_KEY para cifrar datos sensibles del paciente."
-        )
+        if cifrado_clave_ok:
+            recomendaciones.append(
+                "GLOSAS_ENCRYPTION_KEY está configurada pero NINGÚN campo se cifra todavía: "
+                "los datos del paciente están en texto plano en la base."
+            )
+        else:
+            recomendaciones.append(
+                "Los datos del paciente NO están cifrados en reposo. Configurar "
+                "GLOSAS_ENCRYPTION_KEY es el primer paso, pero por sí sola no cifra nada: "
+                "falta cablear los campos (ver CAMPOS_CIFRADOS en app/services/cifrado.py)."
+            )
     if not digest_dest_ok:
         recomendaciones.append(
             "Configurar DIGEST_DESTINATARIOS para envío automático del resumen diario."
@@ -2819,6 +2838,12 @@ def info_feature_flags(
 
     cfg = get_settings()
 
+    # E00: el estado REAL del cifrado, no la mera presencia de la clave.
+    from app.services.cifrado import CAMPOS_CIFRADOS as _campos_cifrados
+    from app.services.cifrado import cifrado_activo as _cifrado_activo
+
+    _cifrado_real_activo = _cifrado_activo()
+
     flags = [
         {
             "nombre": "ia_anthropic",
@@ -2837,8 +2862,13 @@ def info_feature_flags(
         },
         {
             "nombre": "cifrado_simetrico",
-            "activo": bool(os.getenv("GLOSAS_ENCRYPTION_KEY")),
-            "descripcion": "Cifrado de campos sensibles",
+            "activo": _cifrado_real_activo,
+            "descripcion": (
+                f"Cifrado en reposo de campos sensibles "
+                f"({len(_campos_cifrados)} campo(s) cableado(s))"
+                if _cifrado_real_activo
+                else "Cifrado en reposo NO aplicado: ningún campo sensible está cifrado"
+            ),
         },
         {
             "nombre": "smtp_alertas",

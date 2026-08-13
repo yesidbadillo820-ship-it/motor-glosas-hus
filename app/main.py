@@ -140,6 +140,21 @@ _INDICES_HISTORIAL = [
     ("ix_historial_workflow_state", "workflow_state"),
 ]
 
+# El chequeo de motores duplicados corre UNA vez por proceso: en las pruebas
+# el lifespan arranca cientos de veces y recorrer la tabla de procesos en
+# cada una sería puro peaje.
+_MOTOR_YA_CHEQUEADO = False
+
+# Huella de la plantilla ya corregida: la que pone adelante la norma vigente
+# (Res. 2284/2023) y deja la 3047/2008 como antecedente. Sirve para saber si
+# una plantilla sembrada en la base todavía trae el texto viejo, sin
+# reescribir a ciegas las que el auditor ya aprobó.
+_MARCAS_NORMA_VIGENTE = (
+    "SUSTITUYÓ EL ANEXO",
+    "EN REEMPLAZO DEL ANEXO",
+    "(RESOLUCIÓN 2284 DE 2023).",
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -211,6 +226,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN creado_en: {e}")
 
     try:
@@ -219,6 +238,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN activo INTEGER DEFAULT 1"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN activo: {e}")
 
     try:
@@ -227,6 +250,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'AUDITOR'"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN rol: {e}")
 
     try:
@@ -235,6 +262,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN workload INTEGER DEFAULT 100"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN workload: {e}")
 
     try:
@@ -243,6 +274,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN nota_workflow TEXT"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN nota_workflow: {e}")
 
     # Campo must_change_password (forzar cambio en primer login)
@@ -256,6 +291,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN must_change_password: {e}")
 
     # Campo password_changed_at (timestamp último cambio)
@@ -265,6 +304,10 @@ async def lifespan(app: FastAPI):
             db.execute(text(f"ALTER TABLE usuarios ADD COLUMN password_changed_at {_TS_TIPO}"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN password_changed_at: {e}")
 
     # Campo equipo (agrupación de usuarios que comparten bandeja)
@@ -274,6 +317,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE usuarios ADD COLUMN equipo VARCHAR(50)"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN equipo: {e}")
 
     try:
@@ -282,6 +329,10 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE historial ADD COLUMN numero_radicado VARCHAR(50)"))
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
     try:
@@ -294,6 +345,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN historial: {e}")
 
     _HISTORIAL_MISSING_COLUMNS = [
@@ -360,7 +415,134 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE historial ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
+
+    # Glosas ADRES: columnas que se agregaron después del primer cargue. Sin
+    # esto, un servidor que ya tenía el paquete 31068 cargado revienta con
+    # "no such column" apenas alguien abre la pantalla, porque create_all()
+    # crea tablas nuevas pero NO agrega columnas a las que ya existen.
+    _ADRES_MISSING_COLUMNS = [
+        # (tabla, columna, tipo)
+        ("glosas_adres", "glosa_total", "BOOLEAN DEFAULT 0"),
+        ("glosas_adres", "centro_costos_por", "VARCHAR(200)"),
+        ("glosas_adres", "requiere_asignacion", "BOOLEAN DEFAULT 0"),
+        ("glosas_adres", "area_sugerida", "VARCHAR(60)"),
+        ("glosas_adres", "motivo_area", "TEXT"),
+        ("glosas_adres", "area_asignada_por", "VARCHAR(200)"),
+        ("glosas_adres", "area_asignada_en", "TIMESTAMP WITH TIME ZONE"),
+        ("paquetes_adres", "catalogo_centros", "TEXT"),
+    ]
+    for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
+        try:
+            if _tiene_tabla(tabla) and not _tiene_columna(tabla, col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a {tabla}")
+                col_ddl_adapted = (
+                    col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
+                    if _is_sqlite
+                    else col_ddl
+                )
+                db.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {col_name} {col_ddl_adapted}"))
+                db.commit()
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.warning(f"MIGRACIÓN {tabla}.{col_name}: {e}")
+
+    # Las glosas que ya estaban cargadas no traen marcada la glosa total (la
+    # columna nació después). Se deduce igual que al importar: sin causal
+    # propia, es el desglose de una reclamación glosada entera por el FURIPS.
+    # Se corrige por el contenido, no por si la columna está en NULL: el ALTER
+    # la creó con DEFAULT 0, así que las filas viejas quedaron en 0 aunque sean
+    # glosa total. Es idempotente: la segunda vez no encuentra nada que hacer.
+    # OJO: acá NO se usa `_tiene_columna`, porque el inspector tiene cacheada la
+    # lista de columnas de ANTES del ALTER de arriba y diría que no existe. Si
+    # de verdad falta, la consulta falla y queda el aviso en el log.
+    try:
+        if _tiene_tabla("glosas_adres"):
+            sin_marcar = db.execute(
+                text(
+                    "SELECT COUNT(*) FROM glosas_adres "
+                    "WHERE (causal_codigo IS NULL OR TRIM(causal_codigo) = '') "
+                    "  AND (glosa_total IS NULL OR glosa_total = 0)"
+                )
+            ).scalar()
+            if sin_marcar:
+                logger.warning(f"MIGRACIÓN: marcando glosa_total en {sin_marcar} glosa(s) ADRES")
+                db.execute(
+                    text(
+                        "UPDATE glosas_adres SET glosa_total = 1 "
+                        "WHERE (causal_codigo IS NULL OR TRIM(causal_codigo) = '') "
+                        "  AND (glosa_total IS NULL OR glosa_total = 0)"
+                    )
+                )
+                db.execute(
+                    text(
+                        "UPDATE glosas_adres SET glosa_total = 0 "
+                        "WHERE causal_codigo IS NOT NULL AND TRIM(causal_codigo) <> '' "
+                        "  AND glosa_total IS NULL"
+                    )
+                )
+                db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN glosa_total (relleno): {e}")
+
+    # `facturas_adres` es tabla nueva: create_all() la crea vacía. Los paquetes
+    # que ya estaban cargados no tendrían ni una factura y la lista de trabajo
+    # saldría en blanco. Se rellena desde las glosas que ya hay.
+    try:
+        if _tiene_tabla("facturas_adres") and _tiene_tabla("glosas_adres"):
+            faltan = db.execute(
+                text(
+                    "SELECT COUNT(*) FROM (SELECT DISTINCT paquete_id, factura_clave "
+                    "FROM glosas_adres g WHERE NOT EXISTS (SELECT 1 FROM facturas_adres f "
+                    "WHERE f.paquete_id = g.paquete_id AND f.factura_clave = g.factura_clave)) x"
+                )
+            ).scalar()
+            if faltan:
+                logger.warning(f"MIGRACIÓN: creando {faltan} factura(s) ADRES para la lista")
+                db.execute(
+                    text(
+                        "INSERT INTO facturas_adres "
+                        "(paquete_id, factura_clave, factura, radicacion, doc_victima, "
+                        " gestor, medico, estado) "
+                        "SELECT g.paquete_id, g.factura_clave, MIN(g.factura), "
+                        "       MIN(g.radicacion), MIN(g.doc_victima), MIN(g.gestor), "
+                        "       MIN(g.medico), 'PENDIENTE' "
+                        "FROM glosas_adres g "
+                        "WHERE NOT EXISTS (SELECT 1 FROM facturas_adres f "
+                        "  WHERE f.paquete_id = g.paquete_id "
+                        "    AND f.factura_clave = g.factura_clave) "
+                        "GROUP BY g.paquete_id, g.factura_clave"
+                    )
+                )
+                # Las que ya traían alguna decisión no están «pendientes».
+                db.execute(
+                    text(
+                        "UPDATE facturas_adres SET estado = 'EN PROCESO' "
+                        "WHERE estado = 'PENDIENTE' AND EXISTS ("
+                        "  SELECT 1 FROM glosas_adres g "
+                        "  WHERE g.paquete_id = facturas_adres.paquete_id "
+                        "    AND g.factura_clave = facturas_adres.factura_clave "
+                        "    AND g.decision IS NOT NULL AND TRIM(g.decision) <> '')"
+                    )
+                )
+                db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN facturas_adres (relleno): {e}")
 
     # Índice idempotente sobre numero_nota_credito (declarado index=True en
     # el modelo). create_all() no lo agrega para tablas pre-existentes.
@@ -374,6 +556,10 @@ async def lifespan(app: FastAPI):
             )
             db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
 
     # Índices idempotentes para caminos calientes de historial (auditoría
@@ -389,7 +575,118 @@ async def lifespan(app: FastAPI):
                 )
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
+
+    # Pre-auditoría v2: la tabla `preaud_facturas` cambió de forma
+    # oficio-céntrica (Modelo A, con `oficio_id`) a factura canónica (Modelo B,
+    # con `num_subsanacion`). create_all() NO altera una tabla existente, así
+    # que si quedó el esquema viejo Y está vacía, la recreamos con la forma
+    # nueva. Si tuviera datos, se avisa para migración manual (no se destruye).
+    try:
+        if (
+            _tiene_tabla("preaud_facturas")
+            and _tiene_columna("preaud_facturas", "oficio_id")
+            and not _tiene_columna("preaud_facturas", "num_subsanacion")
+        ):
+            _n_preaud = db.execute(text("SELECT COUNT(*) FROM preaud_facturas")).scalar() or 0
+            if _n_preaud == 0:
+                logger.warning(
+                    "MIGRACIÓN pre-auditoría: recreando preaud_facturas con el esquema v2"
+                )
+                db.execute(text("DROP TABLE preaud_facturas"))
+                db.commit()
+                from app.models.db import FacturaPreauditoriaRecord
+
+                FacturaPreauditoriaRecord.__table__.create(bind=engine)
+            else:
+                logger.warning(
+                    "preaud_facturas tiene datos con esquema v1; requiere migración manual a v2"
+                )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría v2: {e}")
+
+    # Pre-auditoría: la observación que escribe el auditor ahora también queda
+    # en el historial de la factura (antes solo se guardaba el motivo de las
+    # devoluciones y lo escrito al radicar se perdía).
+    try:
+        if _tiene_tabla("preaud_factura_eventos") and not _tiene_columna(
+            "preaud_factura_eventos", "observaciones"
+        ):
+            logger.warning("MIGRACIÓN pre-auditoría: agregando observaciones a los eventos")
+            db.execute(text("ALTER TABLE preaud_factura_eventos ADD COLUMN observaciones TEXT"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría observaciones: {e}")
+
+    # Pre-auditoría: el mismo envío puede volver en un oficio posterior —
+    # facturación reenvía las subsanaciones con el MISMO número de envío
+    # (caso real 30-07-2026). El candado único pasa de (envio) a
+    # (envio, oficio_id): sigue bloqueando el doble clic en el mismo oficio.
+    try:
+        if _tiene_tabla("preaud_envios_cargados"):
+            from sqlalchemy import inspect as _sa_inspect
+
+            _idx_envio = next(
+                (
+                    i
+                    for i in _sa_inspect(engine).get_indexes("preaud_envios_cargados")
+                    if i.get("name") == "ix_preaud_envio_cargado"
+                ),
+                None,
+            )
+            _cols = list((_idx_envio or {}).get("column_names") or [])
+            _es_correcto = (
+                _idx_envio is not None
+                and _cols == ["envio", "oficio_id"]
+                and bool(_idx_envio.get("unique"))
+            )
+            # Se repara SIEMPRE que el candado no sea el correcto: ausente
+            # (p. ej. un arranque anterior murió entre el DROP y el CREATE —
+            # en SQLite el DDL no es transaccional), con la forma vieja
+            # (solo envio), o recreado a mano sin UNIQUE. Así la migración
+            # se auto-repara en el siguiente arranque en vez de dejar la
+            # tabla sin candado para siempre.
+            if not _es_correcto:
+                logger.warning(
+                    "MIGRACIÓN pre-auditoría: candado de envíos por oficio (envio, oficio_id)"
+                )
+                if _idx_envio is not None:
+                    db.execute(text("DROP INDEX ix_preaud_envio_cargado"))
+                # Si la tabla estuvo un tiempo sin candado pudieron colarse
+                # duplicados exactos (doble clic): se retiran conservando la
+                # fila más antigua, o el índice único no se podría crear.
+                db.execute(
+                    text(
+                        "DELETE FROM preaud_envios_cargados WHERE id NOT IN "
+                        "(SELECT MIN(id) FROM preaud_envios_cargados "
+                        "GROUP BY envio, oficio_id)"
+                    )
+                )
+                db.execute(
+                    text(
+                        "CREATE UNIQUE INDEX ix_preaud_envio_cargado "
+                        "ON preaud_envios_cargados (envio, oficio_id)"
+                    )
+                )
+                db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN pre-auditoría envíos por oficio: {e}")
 
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
@@ -414,6 +711,10 @@ async def lifespan(app: FastAPI):
                     )
                     db.commit()
             except Exception as e:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
                 logger.warning(f"MIGRACIÓN resize {col_name}: {e}")
 
     # Migraciones para usuarios - 2FA TOTP
@@ -428,6 +729,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
     # Migraciones para conciliaciones - trazabilidad bilateral
@@ -453,6 +758,10 @@ async def lifespan(app: FastAPI):
                 )
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
 
     # Migraciones para tarifas_contratadas - soporte formulaic (SOAT %)
@@ -476,6 +785,10 @@ async def lifespan(app: FastAPI):
                 )
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN tarifas_contratadas {col_name}: {e}")
 
     # Migraciones para conceptos_glosa (Ronda 50 — bug #4 DGH)
@@ -492,6 +805,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE conceptos_glosa ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN conceptos_glosa {col_name}: {e}")
 
     # Migraciones para contratos (PDF + cláusulas extraídas con IA)
@@ -525,6 +842,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN contratos {col_name}: {e}")
 
     # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
@@ -545,6 +866,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
     # Vacaciones / delegacion temporal: 4 columnas opcionales
@@ -561,6 +886,10 @@ async def lifespan(app: FastAPI):
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
     db.close()
@@ -683,6 +1012,8 @@ async def lifespan(app: FastAPI):
             ("devoluciones03@sinacsc.com", "AUDITOR", "JOHANNA MORENO"),
             ("devoluciones1@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
             ("glosashus03@sinacsc.com", "AUDITOR", "OSCAR VILLAMIZAR"),
+            # Pedido 03-08-2026: ELIAS con todos los permisos de admin.
+            ("glosashus15@sinacsc.com", "SUPER_ADMIN", "ELIAS CARVAJAL"),
         ]
         # POLÍTICA DE PASSWORD INICIAL: cada usuario corporativo recibe como
         # contraseña el prefijo de su correo (ej. glosashus04@sinacsc.com →
@@ -775,6 +1106,7 @@ async def lifespan(app: FastAPI):
                 },
             ]
             gold_creadas = 0
+            gold_actualizadas = 0
             for p in _GOLD_CANONICAS:
                 existe = (
                     db.query(_PGR)
@@ -786,6 +1118,15 @@ async def lifespan(app: FastAPI):
                     .first()
                 )
                 if existe:
+                    # Norma derogada en una plantilla ya sembrada: la
+                    # Resolución 3047 de 2008 la derogó la 2284 de 2023, y
+                    # el texto viejo sigue en la base alimentando los
+                    # ejemplos que ve la IA. Se corrige en su sitio (decisión
+                    # de Yesid, 05-08-2026); el resto de la plantilla queda
+                    # intacto porque lo aprobó él.
+                    if "3047" in (existe.argumento or "") and "3047" not in p["argumento"]:
+                        existe.argumento = p["argumento"]
+                        gold_actualizadas += 1
                     continue
                 db.add(
                     _PGR(
@@ -803,9 +1144,12 @@ async def lifespan(app: FastAPI):
                     )
                 )
                 gold_creadas += 1
-            if gold_creadas:
+            if gold_creadas or gold_actualizadas:
                 db.commit()
-                logger.info(f"Seed Plantillas Gold canónicas: {gold_creadas} creadas.")
+                logger.info(
+                    f"Seed Plantillas Gold canónicas: {gold_creadas} creadas · "
+                    f"{gold_actualizadas} corregidas (norma derogada)."
+                )
         except Exception as _e:
             logger.warning(f"Seed Gold canónicas falló (no crítico): {_e}")
             db.rollback()
@@ -822,7 +1166,7 @@ async def lifespan(app: FastAPI):
             if not archivo_hus.exists():
                 logger.warning(
                     f"[SEED-HUS] archivo no encontrado en {archivo_hus} — "
-                    "el banco HUS NO se cargará. Verificar COPY data/ en Dockerfile."
+                    "el banco HUS NO se cargará. Verificar COPY data/*.json en Dockerfile."
                 )
             else:
                 with archivo_hus.open(encoding="utf-8") as _fh:
@@ -830,6 +1174,7 @@ async def lifespan(app: FastAPI):
                 _filas_hus = _data_hus.get("plantillas", [])
                 hus_creadas = 0
                 hus_existentes = 0
+                hus_actualizadas = 0
                 for fila in _filas_hus:
                     eps = (fila.get("eps") or "").upper().strip()
                     cod = (fila.get("codigo_glosa") or "").upper().strip()
@@ -848,6 +1193,26 @@ async def lifespan(app: FastAPI):
                     )
                     if existe:
                         hus_existentes += 1
+                        # 06-08-2026 — la misma corrección en sitio que ya se
+                        # le hizo a las plantillas Gold. Seis plantillas del
+                        # banco fundaban la defensa en la Resolución 3047 de
+                        # 2008, que la 2284 de 2023 reemplazó; se vio en dos
+                        # dictámenes de prueba (SUMIMEDICAL SO0101 y MUTUAL
+                        # SER SO0201) citándola como norma propia y de
+                        # primera. Fundar en norma derogada le regala el
+                        # argumento a la entidad. Ahora va adelante la
+                        # vigente y la vieja queda como antecedente. Este
+                        # bloque solo toca las que traen el texto viejo: el
+                        # resto del banco queda intacto porque lo aprobó
+                        # Yesid.
+                        _arg_bd = existe.argumento or ""
+                        if (
+                            "3047" in _arg_bd
+                            and not any(m in _arg_bd for m in _MARCAS_NORMA_VIGENTE)
+                            and any(m in arg for m in _MARCAS_NORMA_VIGENTE)
+                        ):
+                            existe.argumento = arg
+                            hus_actualizadas += 1
                         continue
                     db.add(
                         _PGR(
@@ -864,14 +1229,117 @@ async def lifespan(app: FastAPI):
                         )
                     )
                     hus_creadas += 1
-                if hus_creadas:
+                if hus_creadas or hus_actualizadas:
                     db.commit()
                 logger.info(
                     f"[SEED-HUS] {hus_creadas} creadas · {hus_existentes} ya existían · "
+                    f"{hus_actualizadas} actualizadas (norma derogada) · "
                     f"total filas en archivo: {len(_filas_hus)}"
                 )
         except Exception as _e:
             logger.warning(f"Seed banco HUS falló (no crítico): {_e}")
+            db.rollback()
+
+        # ── Cláusulas reales de contrato (06-08-2026) ────────────────────
+        # data/clausulas_contrato_base.json trae 26 cláusulas LITERALES de
+        # contratos firmados, pero solo se cargaban corriendo a mano
+        # scripts/seed_clausulas_contrato.py. Nadie lo corrió: el
+        # Diagnóstico del hospital reporta "0 cláusulas extraídas de 0
+        # contratos" y por eso TODOS los dictámenes pierden puntos por
+        # «falta cláusula del contrato vigente con esta EPS», el motor no
+        # tiene una cláusula real que citar, y el verificador de citas no
+        # puede validar ninguna cita contractual.
+        #
+        # Se siembra al arrancar, igual que el banco de plantillas.
+        # Idempotente por (eps, numero_clausula): si el texto cambió se
+        # actualiza; si es igual no se toca.
+        try:
+            from app.models.db import ClausulaContrato as _CCR
+
+            archivo_cl = (
+                _Path(__file__).resolve().parent.parent / "data" / "clausulas_contrato_base.json"
+            )
+            if not archivo_cl.exists():
+                logger.warning(f"[SEED-CLAUSULAS] archivo no encontrado en {archivo_cl}")
+            else:
+                with archivo_cl.open(encoding="utf-8") as _fh:
+                    _filas_cl = _json.load(_fh).get("clausulas", [])
+                # La cláusula cuelga del contrato (llave foránea) y el motor
+                # la busca por la MISMA clave de EPS que usa el auditor en
+                # pantalla. El archivo trae razones sociales largas —
+                # "SEGUROS DE VIDA AURORA S.A." por "AURORA", "COMPENSAR
+                # EPS" por "COMPENSAR", "FAMISANAR" por "FAMISANAR EPS"— así
+                # que sin traducir la clave las 26 cláusulas o no entran o
+                # entran donde nadie las va a encontrar. Se resuelve por
+                # contención y solo cuando la coincidencia es ÚNICA; lo que
+                # no resuelva se salta con aviso, sin inventar un contrato.
+                _eps_contratos = [c.eps for c in db.query(ContratoRecord).all() if c.eps]
+
+                def _clave_de_contrato(nombre: str) -> str:
+                    n = (nombre or "").upper().strip()
+                    if not n:
+                        return ""
+                    if n in _eps_contratos:
+                        return n
+                    candidatos = [k for k in _eps_contratos if k in n or n in k]
+                    return candidatos[0] if len(candidatos) == 1 else ""
+
+                cl_creadas = cl_actualizadas = cl_saltadas = 0
+                for fila in _filas_cl:
+                    eps_cl = _clave_de_contrato(fila.get("eps") or "")
+                    if not eps_cl:
+                        logger.warning(
+                            f"[SEED-CLAUSULAS] sin contrato registrado para "
+                            f"«{fila.get('eps')}» — cláusula no cargada"
+                        )
+                        cl_saltadas += 1
+                        continue
+                    texto_cl = (fila.get("texto_literal") or "").strip()
+                    # Un placeholder sin llenar es peor que nada: la IA lo
+                    # citaría como si fuera texto del contrato.
+                    if not eps_cl or not texto_cl:
+                        cl_saltadas += 1
+                        continue
+                    if texto_cl.startswith("[") and texto_cl.endswith("]"):
+                        cl_saltadas += 1
+                        continue
+                    tema_cl = (fila.get("tema") or "NN").upper().strip()
+                    if tema_cl not in {"TA", "SO", "AU", "CO", "FA", "NN"}:
+                        tema_cl = "NN"
+                    num_cl = (fila.get("numero_clausula") or "").strip()
+                    existe_cl = (
+                        db.query(_CCR)
+                        .filter(_CCR.eps == eps_cl, _CCR.numero_clausula == num_cl)
+                        .first()
+                    )
+                    if existe_cl:
+                        if (existe_cl.texto_literal or "").strip() != texto_cl:
+                            existe_cl.tema = tema_cl
+                            existe_cl.titulo = (fila.get("titulo") or "").strip()
+                            existe_cl.texto_literal = texto_cl
+                            existe_cl.pagina = fila.get("pagina")
+                            cl_actualizadas += 1
+                        continue
+                    db.add(
+                        _CCR(
+                            eps=eps_cl,
+                            numero_clausula=num_cl,
+                            tema=tema_cl,
+                            titulo=(fila.get("titulo") or "").strip(),
+                            texto_literal=texto_cl,
+                            pagina=fila.get("pagina"),
+                        )
+                    )
+                    cl_creadas += 1
+                if cl_creadas or cl_actualizadas:
+                    db.commit()
+                logger.info(
+                    f"[SEED-CLAUSULAS] {cl_creadas} creadas · {cl_actualizadas} actualizadas · "
+                    f"{cl_saltadas} saltadas (sin texto real) · "
+                    f"total en archivo: {len(_filas_cl)}"
+                )
+        except Exception as _e_cl:
+            logger.warning(f"Seed de cláusulas falló (no crítico): {_e_cl}")
             db.rollback()
 
         db.commit()
@@ -895,6 +1363,34 @@ async def lifespan(app: FastAPI):
         )
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
+
+    # ¿Quedó otro motor vivo del arranque anterior? (04-08-2026)
+    # En Windows el uvicorn nuevo puede convivir con el viejo sobre el mismo
+    # puerto: las peticiones caen en cualquiera de los dos y el viejo
+    # responde con la clave y el código anteriores. Se avisa UNA vez por
+    # proceso, aquí, que es el momento en que todavía se puede cerrar el
+    # sobrante antes de trabajar.
+    global _MOTOR_YA_CHEQUEADO
+    if not _MOTOR_YA_CHEQUEADO:
+        _MOTOR_YA_CHEQUEADO = True
+        try:
+            from app.services.motor_proceso import estado_motor
+
+            _est = estado_motor()
+            if _est["estado"] == "ok":
+                logger.info(f"[MOTOR] {_est['mensaje']}")
+            elif _est["estado"] == "error":
+                # Dos en el MISMO puerto: eso sí es un problema.
+                logger.warning(f"[MOTOR-DUPLICADO] {_est['mensaje']}")
+            else:
+                # Puertos distintos: normal en el PC del hospital (el 8080
+                # sirve la página por internet). Etiqueta aparte para que el
+                # bot no mande a cerrar nada — la etiqueta anterior lo metía
+                # en un bucle de «cerrá y volvé a intentar» que nunca
+                # terminaba, porque el vigilante revive el otro motor.
+                logger.warning(f"[MOTORES] {_est['mensaje']}")
+        except Exception as _e_motor:
+            logger.warning(f"[MOTOR] no se pudo inspeccionar el proceso: {_e_motor}")
 
     # Guard global: DISABLE_SCHEDULERS=1 salta TODOS los schedulers en background.
     # Útil en CI/tests donde múltiples TestClient arrancan lifespan y crean
@@ -1081,6 +1577,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from app.api.routers.auth_router import router as auth_router
 from app.api.routers.glosas import router as glosas_router
+from app.api.routers.glosas_adres import router as glosas_adres_router
+from app.api.routers.automatizaciones import router as automatizaciones_router
+from app.api.routers.inteligencia import router as inteligencia_router
+from app.api.routers.agentes import router as agentes_router
+from app.api.routers.bots import router as bots_router
+from app.api.routers.gobierno_ia import router as gobierno_ia_router
+from app.api.routers.malla import router as malla_router
+from app.api.routers.maos import router as maos_router
 from app.api.routers.contratos import router as contratos_router
 from app.api.routers.analytics import router as analytics_router
 from app.api.routers.plantillas import router as plantillas_router
@@ -1090,7 +1594,7 @@ from app.api.routers.usuarios import router as usuarios_router
 from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
 
-# salud_total: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.salud_total import router as salud_total_router
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
 from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
 from app.api.routers.credenciales import router as credenciales_router
@@ -1099,6 +1603,7 @@ from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.vida import router as vida_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
 from app.api.routers.asistente_predictivo import router as asistente_predictivo_router
@@ -1119,21 +1624,25 @@ from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 
-# autopilot: removido en la limpieza de ronda 29 (módulo sin uso real).
+from app.api.routers.autopilot import router as autopilot_router
+from app.api.routers.auditor_forense import router as auditor_forense_router
+from app.api.routers.push import router as push_router
+from app.api.routers.noticias import router as noticias_router
 
 # control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
 from app.api.routers.eventos_live import router as eventos_live_router
 
-# preset_filtros: stub removido — prefijo /_removed/ (mayo 2026)
-# notas_privadas: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.preset_filtros import router as preset_filtros_router
+from app.api.routers.notas_privadas import router as notas_privadas_router
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
 
-# chat_history: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.chat_history import router as chat_history_router
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
 
-# comentarios_thread: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.comentarios_thread import router as comentarios_thread_router
+
 # webhooks: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.ia_status import router as ia_status_router
 
@@ -1141,6 +1650,14 @@ app.include_router(auth_router)
 app.include_router(asistente_predictivo_router)  # Ola 4: inteligencia ambiental
 app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
+app.include_router(glosas_adres_router)  # Paquetes de glosas del ADRES
+app.include_router(automatizaciones_router)
+app.include_router(inteligencia_router)
+app.include_router(agentes_router)
+app.include_router(bots_router)
+app.include_router(gobierno_ia_router)
+app.include_router(malla_router)
+app.include_router(maos_router)
 app.include_router(contratos_router)
 app.include_router(analytics_router)
 app.include_router(plantillas_router)
@@ -1149,7 +1666,7 @@ app.include_router(alertas_router)
 app.include_router(usuarios_router)
 app.include_router(conciliacion_router)
 app.include_router(audit_router)
-# salud_total_router: stub removido
+app.include_router(salud_total_router)
 app.include_router(tarifas_contratadas_router)
 app.include_router(tarifa_liquidador_router)
 app.include_router(credenciales_router)  # Vault cifrado de credenciales EPS
@@ -1158,6 +1675,7 @@ app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
+app.include_router(vida_router)  # Capa de Vida (ronda 32): saludo + celebraciones
 app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)
 app.include_router(versiones_router)
@@ -1175,17 +1693,17 @@ app.include_router(dashboard_ejecutivo_router)
 app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
-# autopilot_router: stub removido
+app.include_router(autopilot_router)
 # control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
-# preset_filtros_router: stub removido
-# notas_privadas_router: stub removido
+app.include_router(preset_filtros_router)
+app.include_router(notas_privadas_router)
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
-# chat_history_router: stub removido
+app.include_router(chat_history_router)
 app.include_router(dictamen_pdf_router)
-# comentarios_thread_router: stub removido
+app.include_router(comentarios_thread_router)
 # webhooks_router: stub removido
 app.include_router(ia_status_router)
 from app.api.routers.cups import router as cups_router
@@ -1212,18 +1730,37 @@ app.include_router(sugerencias_router)
 from app.api.routers.tareas_diarias import router as tareas_diarias_router
 
 app.include_router(tareas_diarias_router)
-from app.api.routers.nota_credito import router as nota_credito_router
 
-app.include_router(nota_credito_router)
+from app.api.routers.preauditoria import router as preauditoria_router
+
+app.include_router(preauditoria_router)
 # auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 
+# 13-08-2026: el validador ADRES y el buscador de autorizaciones dejan de
+# ser programas aparte y entran al portal, con la sesión y los roles del
+# hospital. Por ahí suben soportes con historia clínica: auditor o superior.
+from app.api.routers.validador_adres import router as validador_adres_router
+
 app.include_router(soportes_auto_router)
+app.include_router(validador_adres_router)
 
 from app.api.routers.diagnostico import router as diagnostico_router
 
 app.include_router(diagnostico_router)
-# auditor_forense: stub removido — real: auditoria_forense.py (ya incluido arriba)
+# OJO: auditor_forense (analiza soportes) y auditoria_forense (busca por IP)
+# son DOS cosas distintas. La limpieza de mayo los confundió y dejó la
+# pantalla del Auditor Forense llamando a una ruta que no existía.
+app.include_router(auditor_forense_router)
+app.include_router(push_router)
+app.include_router(noticias_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)
+
+# Lotes de portal (Fase 1 app unificada): subida del Excel consolidado
+# + cola del agente local que corre los bots en el PC del hospital.
+from app.api.routers.lotes import router as lotes_router, agente_router as agente_lotes_router
+
+app.include_router(lotes_router)
+app.include_router(agente_lotes_router)

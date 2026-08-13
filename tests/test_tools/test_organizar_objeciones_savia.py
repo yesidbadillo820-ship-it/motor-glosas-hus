@@ -410,3 +410,29 @@ def test_por_factura_reinicia_cdconsec(tmp_path):
 def test_cli_entrada_inexistente(tmp_path):
     rc = org.main(["--entrada", str(tmp_path / "no.xlsx"), "--salida", str(tmp_path / "o")])
     assert rc == 1
+
+
+class TestValorConCentavosNoSeInfla:
+    """El bug del ×100, cazado a nivel del bot.
+
+    `_num` borraba todo lo que no fuera dígito, así que la coma decimal
+    desaparecía y `"1.365,50"` se volvía `136550`. Ese número salía en el
+    Excel que se carga al ERP, y la validación de suma no lo detectaba porque
+    encabezado y renglones se inflaban por igual.
+    """
+
+    def test_no_multiplica_por_cien(self):
+        assert org._num("1.365,50") == 1365
+        assert org._num("1.365,50") != 136550
+
+    def test_los_miles_siguen_leyendose_bien(self):
+        """El arreglo no puede romper el caso normal, que es el 99 %."""
+        assert org._num("$114.900") == 114900
+        assert org._num("2.177.341") == 2177341
+        assert org._num("1.365") == 1365
+
+    def test_la_fila_construida_lleva_el_valor_correcto(self):
+        """De punta a punta: lo que termina en la celda CROVALOBJ."""
+        assert org._num("42.800,90") == 42800
+        assert org._num(42800) == 42800
+        assert org._num("") == 0

@@ -43,6 +43,11 @@ user_email_var: ContextVar[str] = ContextVar("user_email", default="")
 # glosa_id se setea cuando se crea la glosa en BD; calls IA posteriores
 # del mismo request lo heredan automáticamente.
 glosa_id_var: ContextVar[Optional[int]] = ContextVar("glosa_id", default=None)
+# E00: IP de origen del request. La columna audit_log.ip existe desde siempre
+# y estaba SIEMPRE en NULL, porque ninguna de las 68 llamadas a
+# AuditRepository.registrar() la pasaba. Capturarla acá evita tocar 68 sitios
+# y hace que "quién hizo qué" incluya "desde dónde".
+client_ip_var: ContextVar[str] = ContextVar("client_ip", default="")
 
 
 class StructuredFormatter(logging.Formatter):
