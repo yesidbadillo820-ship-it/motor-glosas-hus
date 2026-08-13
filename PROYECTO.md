@@ -1,6 +1,6 @@
 # PROYECTO — Tablero maestro
 
-**Última actualización:** 06-08-2026
+**Última actualización:** 13-08-2026
 **Uso:** este archivo es el centro de control. Se actualiza cuando cambia el
 estado de un módulo, el objetivo actual o las próximas tareas. No es
 documentación: es un tablero de trabajo.
@@ -13,7 +13,7 @@ documentación: es un tablero de trabajo.
 - **Estado:** Activo · **Prioridad:** Crítica
 - **Entrada:** `app/main.py`
 - **Responsable:** Yesid (dueño)
-- **Dependencias:** FastAPI · SQLite (`glosas.db`) · `static/index.html`
+- **Dependencias:** FastAPI · SQLite (`data/motorglosas.db`) · `static/index.html`
 - **Próximo objetivo:** ninguno propio; sostiene el objetivo actual del proyecto
 - **Riesgo:** una sola pantalla (`static/index.html`) concentra toda la interfaz
 
@@ -62,8 +62,8 @@ documentación: es un tablero de trabajo.
 - **Entrada:** `app/api/routers/contratos.py`
 - **Responsable:** Yesid (dueño)
 - **Dependencias:** `extractor_clausulas_contrato.py` · `tarifa_lookup_service.py` · base de datos
-- **Próximo objetivo:** decidir si se carga la propuesta tarifaria 2026 de FAMISANAR (6.655 tarifas)
-- **Riesgo:** las 26 cláusulas base ya se siembran solas; faltan las de los contratos sin PDF
+- **Próximo objetivo:** cargar las cláusulas de los contratos que todavía no tienen PDF
+- **Riesgo:** ninguno conocido — 29 cláusulas y 6.655 tarifas de FAMISANAR cargadas y comprobadas en el motor (13-08)
 
 ### 8. Gobierno de IA y Diagnóstico
 - **Estado:** Activo · **Prioridad:** Media
@@ -165,7 +165,7 @@ documentación: es un tablero de trabajo.
 
 1. **Reiniciar el motor y repetir las glosas de prueba** — confirmar que en el arranque aparece `[SEED-CLAUSULAS]` y que los dictámenes salen sin los hechos inventados.
 2. **Regenerar la respuesta de Salud Total desde el portal** con la fecha de recepción de la factura, y comprobar radicado completo, valor glosado real y sigla del motivo. El `RTAGLOSA_..._13082026.csv` viejo no se radica.
-3. **Cargar las 6.655 tarifas de FAMISANAR como pactadas** — el motor ya quedó listo (modalidad por hoja + vigencia al cargar). Falta subirlas desde Gestión → Tarifas con EPS `FAMISANAR`, contrato `S-13-1-03-1-04958` y vigencia 15/04/2026 – 14/04/2027.
+3. ~~**Cargar las 6.655 tarifas de FAMISANAR**~~ — **HECHO y COMPROBADO el 13-08:** 6.655 cargadas, con las 4.586 de UVB bien rotuladas como «UVB POR GRUPOS». El motor ya defiende las glosas TA de FAMISANAR con el valor pactado y no con SOAT pleno.
 4. **Probar en el motor del hospital todo lo de OT-023 a OT-037** — está probado en el repositorio, pero solo la pantalla de Salud Total se ha visto correr allá.
 5. **Cargar el PDF de los contratos que no tienen cláusulas** — hoy solo 11 pagadores tienen cláusulas base.
 
