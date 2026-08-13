@@ -183,3 +183,44 @@ class TestLosContadoresDelMenu:
             f"{m.group(1)} no maneja el error: si se cae la consulta de alertas, "
             "se lleva por delante lo que venga después"
         )
+
+
+class TestLaPestanaActivaEsNaranja:
+    """13-08-2026. El auditor la pidió naranja, como en su pantalla de
+    referencia. Estaba azul con una barra verde.
+
+    Se prueba porque hay CUATRO reglas distintas que pintan la pestaña
+    activa —fondo, texto, icono y la barrita de la izquierda, cada una con
+    su variante en modo oscuro— y basta que una quede en azul para que el
+    menú se vea a medio pintar.
+    """
+
+    def test_el_fondo_y_el_texto_son_naranja(self):
+        texto = _html()
+        bloque = re.search(r"\.sn-item\.active\{([^}]*)\}", texto)
+        assert bloque, "no existe la regla de la pestaña activa"
+        assert "--c-amber" in bloque.group(1), bloque.group(1)
+
+    def test_la_barrita_de_la_izquierda_tambien(self):
+        texto = _html()
+        bloque = re.search(r"\.sn-item\.active::before\{([^}]*)\}", texto)
+        assert bloque
+        assert "--c-amber" in bloque.group(1), bloque.group(1)
+
+    def test_no_queda_ni_una_regla_en_azul(self):
+        """Si una sola se queda atrás, el icono sigue azul sobre fondo
+        naranja y se ve peor que antes."""
+        azules = [
+            ln
+            for ln in _html().splitlines()
+            if ".sn-item.active" in ln and ("sinac-blue" in ln or "#7dd3fc" in ln)
+        ]
+        assert not azules, "reglas que siguen en azul:\n" + "\n".join(azules)
+
+    def test_el_modo_oscuro_tambien_cambio(self):
+        texto = _html()
+        assert "body.dark .sn-item.active{background:rgba(230,81,0" in texto
+
+    def test_usa_el_token_de_la_paleta_y_no_un_color_suelto(self):
+        """Si mañana se ajusta la paleta, el menú va con ella."""
+        assert "--c-amber:#E65100" in _html(), "desapareció el token de naranja"
