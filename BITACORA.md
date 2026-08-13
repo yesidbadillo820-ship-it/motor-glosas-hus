@@ -2496,6 +2496,36 @@ por fuera del portal y trae tres errores en las 44 filas. **No lo radiques:**
 Genera el archivo de nuevo desde la pantalla del portal: los tres casos
 quedaron como pruebas para que no se repitan.
 
+### 13-08 — Frente SAVIA/FAMISANAR (PR #164): bot de FAMISANAR con homologación de códigos
+
+- **Nuevo bot `tools/organizar_objeciones_famisanar.py`** (hermano del de
+  SAVIA): FAMISANAR entrega solo 4 columnas SIN código de servicio — viene
+  escondido en el texto de la observación («… CÓDIGO 903867 …»). El bot lo
+  extrae y lo **homologa al código del HUS**: CUPS tal cual; a los
+  medicamentos se les quita la letra U/P de FAMISANAR (U20162259-04 →
+  20162259-04, verificado con METOCLOPRAMIDA en EMSSANAR); y los 4
+  dispositivos quedaron con su **código FMQ**, confirmados contra el LOTE_02
+  por nombre y valor: catéter IV 18 → FMQ0112 ($5.800 idéntico), llave 3 vías
+  → FMQ0182-1, electrodo ECG adulto → FMQ0952 (3×$800), bolsa recolectora de
+  orina → FMQ0159 ($18.100 idéntico). Un dispositivo nuevo sin equivalencia
+  avisa en el log y se agrega con `--mapa-servicios`.
+- **Revisión adversarial con agentes independientes** antes de entregar:
+  encontró que se borraba el valor unitario del texto en 18/37 filas (ahora
+  solo se quita un $monto final si es duplicado exacto del valor objetado) y
+  una mutación de datos al generar por-factura y consolidado en una misma
+  corrida. Ambos arreglos se aplicaron también al bot de SAVIA.
+- Lote **SAVIA 7.53** procesado y entregado (3 facturas, 392 objeciones,
+  $39.772.588).
+- **Fusión con la principal**: se integró el lector único de pesos
+  (`tools/_dinero.py`, el arreglo del ×100 con centavos) a los bots de SAVIA
+  **y de FAMISANAR**; se adoptaron las versiones de la principal de
+  `CLAUDE.md`, esta bitácora y los 2 tests de estadísticas; y se conservaron
+  los arreglos de la revisión adversarial que la principal no tenía.
+  Documento técnico del módulo en `docs/ENTREGA_TECNICA_BOT_SAVIA.md`.
+- **Pendiente de este frente:** confirmar la tabla de subíndices del código de
+  objeción de SAVIA (hoy TA08→TA0801 con «01»; en EMSSANAR se ven FA0205,
+  SO0603…) — si hay lista oficial, se fija con `--mapa-codigos`.
+
 ---
 
 ## 3) PENDIENTE
