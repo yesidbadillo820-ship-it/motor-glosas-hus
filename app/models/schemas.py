@@ -189,18 +189,51 @@ class GlosaResult(BaseModel):
 
 
 class GlosaHistorialItem(BaseModel):
-    id: int
-    eps: str
-    paciente: str
-    codigo_glosa: str
-    valor_objetado: float
-    valor_aceptado: float
-    etapa: str
-    estado: str
-    dias_restantes: int
-    creado_en: str
+    """Una fila de la tabla de Historial.
 
-    model_config = {"from_attributes": True}
+    13-08-2026. Este esquema existía desde hacía meses declarando DIEZ campos
+    mientras la ruta devolvía VEINTIUNO, y nunca se había enchufado. Si
+    alguien lo hubiera hecho —que es justo lo que pedía la Fase 2— la tabla
+    habría perdido once columnas de golpe: la factura, el dictamen, la
+    entidad, el CUPS, el servicio, la observación… y sin dar error, porque un
+    `response_model` filtra en silencio.
+
+    Ahora describe lo que la ruta devuelve de verdad, campo por campo. Las
+    diecinueve llaves que el JavaScript lee están todas, y hay una prueba que
+    lo comprueba.
+
+    Casi todo va Optional porque casi todo puede venir vacío: una glosa recién
+    creada no tiene dictamen, ni código de respuesta, ni fecha de entrega.
+    Declararlos estrictos haría que la fila reventara con un 500 en vez de
+    mostrarse.
+    """
+
+    id: int
+    fecha: Optional[str] = None
+    fecha_recepcion: Optional[str] = None
+    fecha_entrega: Optional[str] = None
+    # `entidad` es el pagador ya resuelto; `eps` es el valor crudo que se
+    # conserva por compatibilidad con lo que ya leía la pantalla.
+    entidad: Optional[str] = None
+    eps: Optional[str] = None
+    paciente: Optional[str] = None
+    factura: Optional[str] = None
+    codigo_glosa: Optional[str] = None
+    concepto_glosa: Optional[str] = None
+    cups: Optional[str] = None
+    servicio: Optional[str] = None
+    valor_objetado: Optional[float] = None
+    valor_aceptado: Optional[float] = None
+    glosa_original: Optional[str] = None
+    codigo_respuesta: Optional[str] = None
+    observacion: Optional[str] = None
+    etapa: Optional[str] = None
+    estado: Optional[str] = None
+    dictamen: Optional[str] = None
+    dias_restantes: Optional[int] = None
+    creado_en: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AnalyticsResult(BaseModel):

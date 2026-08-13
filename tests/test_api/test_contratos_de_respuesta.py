@@ -143,6 +143,78 @@ class TestElContratoNoLeQuitaNadaALaPantalla:
             assert llave in TarifasStatsOut.model_fields, llave
 
 
+class TestElHistorialNoPierdeColumnas:
+    """El caso más peligroso de todos, y por poco pasa.
+
+    `GlosaHistorialItem` existía desde hacía meses declarando DIEZ campos
+    mientras la ruta devolvía VEINTIUNO, y nunca se había enchufado.
+    Enchufarlo tal como estaba —que es exactamente lo que pedía la Fase 2—
+    le habría borrado once columnas a la tabla de Historial: la factura, el
+    dictamen, la entidad, el CUPS, el servicio, la observación… en silencio.
+    """
+
+    LLAVES_QUE_LEE_LA_PANTALLA = {
+        "id",
+        "eps",
+        "entidad",
+        "paciente",
+        "factura",
+        "codigo_glosa",
+        "concepto_glosa",
+        "cups",
+        "servicio",
+        "valor_objetado",
+        "valor_aceptado",
+        "glosa_original",
+        "codigo_respuesta",
+        "observacion",
+        "estado",
+        "dictamen",
+        "dias_restantes",
+        "creado_en",
+        "fecha_recepcion",
+    }
+
+    def test_el_contrato_tiene_todo_lo_que_la_pantalla_lee(self):
+        from app.models.schemas import GlosaHistorialItem
+
+        faltan = self.LLAVES_QUE_LEE_LA_PANTALLA - set(GlosaHistorialItem.model_fields)
+        assert not faltan, f"el contrato le borraría estas columnas al historial: {sorted(faltan)}"
+
+    def test_la_lista_de_llaves_es_la_que_de_verdad_usa_la_pantalla(self):
+        """Guardia de la guardia: si el JavaScript deja de leer una, esta
+        prueba avisa antes de que la lista se vuelva folclore."""
+        html = _html()
+        leidas = set(re.findall(r"\bg\.([a-z_]+)\b", html))
+        # Solo interesan las del historial; el resto del archivo usa `g.` para
+        # otras cosas. Se comprueba que las declaradas SÍ aparezcan.
+        no_aparecen = {k for k in self.LLAVES_QUE_LEE_LA_PANTALLA if k not in leidas}
+        assert not no_aparecen, f"declaradas pero la pantalla ya no las lee: {sorted(no_aparecen)}"
+
+    def test_la_ruta_declara_el_contrato_completo(self):
+        from app.main import app
+
+        for r in app.routes:
+            if getattr(r, "path", "") == "/glosas/historial":
+                modelo = getattr(r, "response_model", None)
+                assert modelo is not None
+                assert "GlosaHistorialItem" in repr(modelo), (
+                    f"declara {modelo}: `list` a secas no es un contrato, acepta cualquier cosa"
+                )
+                return
+        pytest.fail("no existe /glosas/historial")
+
+    def test_una_glosa_recien_creada_no_revienta(self):
+        """Sin dictamen, sin código de respuesta, sin fecha de entrega: la
+        fila tiene que mostrarse igual, no dar un 500."""
+        from app.models.schemas import GlosaHistorialItem
+
+        fila = GlosaHistorialItem(id=7)
+        assert fila.id == 7
+        assert fila.dictamen is None
+        assert fila.valor_objetado is None
+
+
 class TestElContratoSeCumpleConDatosDeVerdad:
     def test_salud_total_valida_la_notificacion_real(self):
         """Con las 44 glosas del archivo del auditor, no con un ejemplo."""
