@@ -31,6 +31,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from fastapi.responses import FileResponse
 
 from app.api.deps import get_auditor_o_superior
+from app.models.schemas import ValidacionAdresEstadoOut, ValidacionAdresIniciadaOut
 from app.models.db import UsuarioRecord
 from app.services import validador_adres_service as vas
 
@@ -63,7 +64,7 @@ def _guardar(archivo: UploadFile, destino: Path) -> Path:
     return ruta
 
 
-@router.post("/validar")
+@router.post("/validar", response_model=ValidacionAdresIniciadaOut)
 async def validar_soportes(
     tareas: BackgroundTasks,
     archivos: list[UploadFile] = File(...),
@@ -107,7 +108,7 @@ async def validar_soportes(
     return {"trabajo_id": trabajo_id, "archivos": guardados, "estado": "EN_COLA"}
 
 
-@router.get("/estado/{trabajo_id}")
+@router.get("/estado/{trabajo_id}", response_model=ValidacionAdresEstadoOut)
 def estado_validacion(
     trabajo_id: str,
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),

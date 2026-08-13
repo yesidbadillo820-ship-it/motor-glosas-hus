@@ -5,6 +5,7 @@ from typing import Optional
 from datetime import datetime
 
 from app.core.tz import a_utc, ahora_utc
+from app.models.schemas import ConciliacionesPagina
 from app.database import get_db
 from app.models.db import UsuarioRecord, GlosaRecord
 from app.repositories.conciliacion_repository import ConciliacionRepository
@@ -122,7 +123,7 @@ def crear_conciliacion(
     }
 
 
-@router.get("/")
+@router.get("/", response_model=ConciliacionesPagina)
 def listar_conciliaciones(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),

@@ -24,6 +24,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_auditor_o_superior
+from app.models.schemas import SaludTotalPreviewOut
 from app.database import get_db
 from app.models.db import UsuarioRecord
 from app.services.salud_total_service import (
@@ -84,7 +85,7 @@ def _respuestas(contenido: bytes, tipo: str, fecha: datetime | None) -> list[dic
     return respuestas
 
 
-@router.post("/preview")
+@router.post("/preview", response_model=SaludTotalPreviewOut)
 async def preview_glosas(
     file: UploadFile = File(...),
     tipo_respuesta: str = Form("extemporanea"),
