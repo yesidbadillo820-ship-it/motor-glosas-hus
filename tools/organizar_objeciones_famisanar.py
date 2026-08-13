@@ -21,8 +21,10 @@ MAPEO DE CAMPOS (FAMISANAR → 16 columnas):
     CRNCONOBJ    ← CODIGO_DEVOLUCION    (ya viene de 6: CL0801, CO0701, TA0801…)
     SLNSERPRO    ← extraído del texto ("CÓDIGO <x>") y HOMOLOGADO al código HUS:
                    CUPS tal cual; medicamentos U/P → se quita la letra
-                   (U20162259-04 → 20162259-04); dispositivos 9101xxxx → tal
-                   cual + aviso (completar con --mapa-servicios)
+                   (U20162259-04 → 20162259-04); dispositivos 9101xxxx → código
+                   FMQ del HUS (equivalencias fijas confirmadas, ver
+                   MAPA_SERVICIOS_DEFAULT); los no mapeados quedan tal cual +
+                   aviso (completar con --mapa-servicios)
     CROVALOBJ    ← VALOR DEVOLUCION
     CRDOBSERV    ← "<CRNCONOBJ> <OBSERVACION>$<valor>" (formato de trabajo)
     CDFECDOC / CROFECOBJ ← --fecha (default: hoy), en FECHA CORTA
@@ -239,16 +241,33 @@ def extraer_cod_servicio(observacion: str) -> str:
 #     hasta tener el maestro (cargarlo vía --mapa-servicios).
 _RE_MED_CON_LETRA = re.compile(r"^[A-Za-z](\d[\dA-Za-z.\-]*)$")
 
+# Equivalencias FIJAS dispositivo FAMISANAR → código FMQ del HUS, confirmadas
+# por la auditora contra el archivo de trabajo OBJECIONES_LOTE_02 (los insumos
+# del HUS van con código FMQ). Evidencia de cada una:
+#   91017235 → FMQ0112   CATETER INTRAVENOSO 18 — valor $5.800 idéntico
+#   91012136 → FMQ0182-1 LLAVES DE TRES VIAS — nombre exacto (único)
+#   91017424 → FMQ0952   ELECTRODO ECG ADULTO — 3×$800 = $2.400 idéntico
+#   91017278 → FMQ0159   BOLSA RECOLECTORA DE ORINA ADULTO — $18.100 idéntico
+# Un --mapa-servicios de la CLI puede AGREGAR equivalencias o PISAR estas.
+MAPA_SERVICIOS_DEFAULT: dict[str, str] = {
+    "91017235": "FMQ0112",
+    "91012136": "FMQ0182-1",
+    "91017424": "FMQ0952",
+    "91017278": "FMQ0159",
+}
+
 
 def homologar_cod_servicio(cod: str, mapa: dict[str, str] | None = None) -> tuple[str, str]:
     """Devuelve (codigo_homologado, regla_aplicada). Reglas, en orden:
-    'mapa' (equivalencia explícita de --mapa-servicios) → 'letra' (quita la
-    letra inicial de medicamentos) → 'igual' (CUPS y demás, tal cual)."""
+    'mapa' (equivalencias fijas + las de --mapa-servicios, que pisan a las
+    fijas) → 'letra' (quita la letra inicial de medicamentos) → 'igual'
+    (CUPS y demás, tal cual)."""
     c = (cod or "").strip()
     if not c:
         return "", "vacio"
-    if mapa and c in mapa:
-        return mapa[c], "mapa"
+    combinado = {**MAPA_SERVICIOS_DEFAULT, **(mapa or {})}
+    if c in combinado:
+        return combinado[c], "mapa"
     m = _RE_MED_CON_LETRA.match(c)
     if m:
         return m.group(1), "letra"

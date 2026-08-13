@@ -35,6 +35,18 @@ archivo completo de 16 columnas, un .xlsx por factura (o consolidado).
   `SLNSERPRO` queda **vacío** (igual que las estancias en los archivos del
   Dispensario). El bot avisa cuántas quedaron así en el log.
 
+### Homologación FAMISANAR → HUS (automática)
+
+Los códigos que FAMISANAR escribe NO son (todos) los del HUS. El bot los
+homologa solo (se desactiva con `--sin-homologar`):
+
+| Tipo | Regla | Ejemplo |
+|---|---|---|
+| CUPS (6 dígitos) | Tal cual — estándar nacional | `903867` → `903867` |
+| Medicamentos con letra U/P | Se quita la letra de FAMISANAR | `U20162259-04` → `20162259-04` (METOCLOPRAMIDA, verificado contra EMSSANAR) |
+| Dispositivos 9101xxxx | Equivalencia FMQ fija, confirmada contra el archivo de trabajo LOTE_02 | `91017235` → `FMQ0112` (catéter IV 18, $5.800 idéntico); `91012136` → `FMQ0182-1` (llave 3 vías); `91017424` → `FMQ0952` (electrodo ECG adulto, 3×$800); `91017278` → `FMQ0159` (bolsa recolectora orina, $18.100 idéntico) |
+| Dispositivos NUEVOS sin equivalencia | Quedan tal cual + WARNING en el log | agregarlos con `--mapa-servicios equivalencias.json` (`{"9101XXXX": "FMQNNNN", ...}`) — pisa/extiende las fijas |
+
 ## 3) Mapeo de campos (FAMISANAR → 16 columnas)
 
 | Salida | Origen | Cómo |

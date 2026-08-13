@@ -97,7 +97,13 @@ def test_extraer_cod_servicio(texto, esperado):
         ("U20162259-04", "20162259-04", "letra"),  # med: quitar letra FAMISANAR
         ("P32606-02", "32606-02", "letra"),
         ("U53560-05", "53560-05", "letra"),
-        ("91017235", "91017235", "igual"),  # dispositivo: sin regla, tal cual
+        # Dispositivos con equivalencia FMQ fija (confirmadas contra LOTE_02).
+        ("91017235", "FMQ0112", "mapa"),
+        ("91012136", "FMQ0182-1", "mapa"),
+        ("91017424", "FMQ0952", "mapa"),
+        ("91017278", "FMQ0159", "mapa"),
+        # Dispositivo desconocido: sin regla, tal cual.
+        ("91099999", "91099999", "igual"),
         ("", "", "vacio"),
     ],
 )
