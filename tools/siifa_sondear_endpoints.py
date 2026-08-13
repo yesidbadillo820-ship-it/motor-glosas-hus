@@ -88,6 +88,22 @@ GRUPOS = [
 ]
 
 
+def es_falso_positivo(ruta: str, detalle: str) -> bool:
+    """¿El 400 vino de otra ruta que se tragó el último trozo como si fuera un id?
+
+    SIIFA tiene rutas del tipo `/api/SeguimientoFacturaGlosa/{id}`. Al sondear
+    `/api/SeguimientoFacturaGlosa/LoQueSea`, ESA ruta responde y se queja de
+    que «LoQueSea» no es un número válido para IdSeguimientoFacturaGlosa. El
+    400 hace creer que la ruta inventada existe, y no existe.
+
+    Pasó de verdad el 13-08-2026: el sondeo dio por buenas seis rutas
+    inventadas, tres de ellas para subsanar devoluciones por $14 millones.
+    Mandar una escritura ahí habría ido a parar a otro registro.
+    """
+    ultimo = ruta.rstrip("/").rsplit("/", 1)[-1]
+    return f"El valor '{ultimo}' no es válido" in (detalle or "")
+
+
 def leer_estado(codigo: int) -> str:
     """Qué significa cada código para lo que estamos buscando."""
     if codigo == 0:
@@ -109,7 +125,11 @@ def sondear(cliente: SiifaClient) -> list[str]:
     lineas = ["RUTAS", "-" * 70]
     for ruta in RUTAS:
         codigo, detalle = cliente.sondear(ruta)
-        lineas.append(f"  {codigo:>3}  {leer_estado(codigo):<52} {ruta}")
+        if es_falso_positivo(ruta, detalle):
+            estado = "NO CONCLUYENTE (la tomó como id de otra ruta) - NO ESCRIBIR"
+        else:
+            estado = leer_estado(codigo)
+        lineas.append(f"  {codigo:>3}  {estado:<52} {ruta}")
         if detalle and codigo not in (404, 405):
             lineas.append(f"       {detalle[:120]}")
 

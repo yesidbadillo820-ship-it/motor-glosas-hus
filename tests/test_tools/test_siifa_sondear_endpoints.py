@@ -126,3 +126,35 @@ def test_si_la_factura_no_trae_seguimientos_se_dice_claro():
     lineas = "\n".join(son.ver_seguimiento_crudo(SinNada({}), "HUS000000"))
 
     assert "no devolvió seguimientos" in lineas
+
+
+def test_un_400_de_otra_ruta_no_se_toma_por_ruta_existente():
+    """SIIFA tiene rutas `/api/SeguimientoFacturaGlosa/{id}`. Sondear una ruta
+    inventada bajo ese prefijo hace que ESA responda 400 quejándose de que el
+    último trozo no es un número — y el sondeo lo leía como «existe».
+
+    Pasó el 13-08-2026 con tres rutas para subsanar devoluciones por $14
+    millones: mandar una escritura ahí habría escrito sobre otro registro.
+    """
+    detalle = (
+        "Se produjeron uno o más errores de validación. — {'IdSeguimientoFacturaDevolucion': "
+        "[\"El valor 'ReiteracionRespuesta' no es válido\"]}"
+    )
+
+    assert son.es_falso_positivo("/api/SeguimientoFacturaDevolucion/ReiteracionRespuesta", detalle)
+
+
+def test_una_ruta_que_de_verdad_existe_no_se_marca_como_falso_positivo():
+    """La de responder una glosa existe y se usa a diario: su error habla de
+    los campos del cuerpo, no del último trozo de la ruta."""
+    detalle = (
+        "Se produjeron uno o más errores de validación. — "
+        "{'IdSeguimientoTipoCodigoRespuesta': ['El campo es obligatorio']}"
+    )
+
+    assert not son.es_falso_positivo("/api/SeguimientoFacturaGlosa/Respuesta", detalle)
+
+
+def test_sin_detalle_no_se_descarta_nada():
+    assert not son.es_falso_positivo("/api/Loquesea/Respuesta", "")
+    assert not son.es_falso_positivo("/api/Loquesea/Respuesta", None)

@@ -2314,8 +2314,31 @@ hoja aparte, sin código ni texto, y el bot las bloquea. Se amplió
 `siifa_sondear_endpoints.py` con las rutas y grupos candidatos para
 averiguarlo **sin escribir nada** (sólo consulta).
 
-**Lo que hay que hacer:** correr el sondeo, ver si existe la puerta de
-subsanación de devoluciones, y con eso resolver los $14 millones.
+**La primera subsanación quedó cargada** (HUS465198, $1.396.804) — el
+trámite llegó por primera vez a la etapa 4.
+
+**El sondeo mintió, y por poco cuesta caro.** Dijo que existían seis rutas,
+entre ellas tres para subsanar devoluciones. Era falso: SIIFA tiene rutas del
+tipo `/api/SeguimientoFacturaGlosa/{id}`, así que al preguntar por
+`/api/SeguimientoFacturaDevolucion/ReiteracionRespuesta` responde ESA otra
+ruta, quejándose de que «ReiteracionRespuesta» no es un número válido para el
+id. El 400 se leía como «la ruta existe». Mandar una escritura ahí habría ido
+a parar a otro registro, con OK falso en el reporte —exactamente el daño que
+la hoja aparte quería evitar—.
+
+Ya está corregido: cuando el error menciona el último trozo de la ruta como
+si fuera un id, el sondeo lo marca **NO CONCLUYENTE - NO ESCRIBIR** en vez de
+«existe». Tres pruebas lo vigilan.
+
+**Los grupos de códigos de la subsanación salieron todos vacíos**
+(`REITERACION_*`, `SUBSANACION`, `RESPUESTA_GLOSA_PTS_PSS`). La subsanación de
+glosa funcionó igual con RE9901, así que para glosas no hace falta.
+
+**Las 4 devoluciones reiteradas ($14.049.088) siguen sin vía por API.** Lo que
+falta es mirar en el portal qué ofrece el menú de una devolución reiterada: el
+nombre que aparezca ahí es la pista del endpoint, igual que en agosto el
+propio mensaje de error reveló el grupo `RESPUESTA_DEV_PTS_PSS`. Mientras
+tanto, se pueden subsanar **a mano** en el portal: son cuatro.
 
 ---
 
