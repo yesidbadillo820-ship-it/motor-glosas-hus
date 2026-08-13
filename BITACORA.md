@@ -2383,6 +2383,29 @@ acuerdo con FAMISANAR no esté firmado, no la cargues como tarifa pactada.
   veces no duplica), la base vieja se abre solo-lectura, y aguanta que la
   vieja tenga tablas o columnas más antiguas. 5 pruebas automáticas.
 
+### 13-08 (segunda parte) — La fusión quedó hecha y la VM apagada
+
+El mismo día se terminó el rescate completo, con Yesid corriendo los pasos:
+
+- Se empacaron y **bajaron los dos paquetes** al PC de cartera
+  (`C:\motor-glosas\rescate`) y la **VM quedó apagada** (ya no cobra por
+  cómputo; solo centavos por el disco mientras se decide borrarla).
+- La fusión se corrió primero en SOLO MIRAR, se revisó el plan, y con el
+  visto bueno se aplicó: llegaron **27 glosas con sus 27 dictámenes**,
+  **6 precedentes ganados** y el contrato de **PRECIMED**. Los 27 usuarios
+  ya existían en el PC (nadie perdió su clave) y la base vieja no traía
+  credenciales, tarifas ni rutas que faltaran. Antes de escribir quedó la
+  copia de seguridad `data\backups\motorglosas-antes-fusion-20260813-094858.db`.
+- Se copiaron además los archivos de soportes de recepción del rescate
+  (6 archivos). La VM no tenía carpeta de PDF de contratos ni de recepción,
+  así que no había nada más que copiar.
+- El paquete de rescate queda guardado en `C:\motor-glosas\rescate`.
+  **Contiene llaves y la base vieja: no compartirlo ni mandarlo por correo.**
+
+Con esto la mudanza al PC de cartera queda COMPLETA: página viva, historia
+de pre-auditoría (del Excel del equipo), historia de glosas (de la VM) y
+respaldos diarios. De la VM solo falta borrarla cuando pasen unos días.
+
 ---
 
 ## 3) PENDIENTE
@@ -2599,18 +2622,12 @@ acuerdo con FAMISANAR no esté firmado, no la cargues como tarifa pactada.
     repetir. Con eso queda lista la prueba de fuego pendiente: **pasar la
     glosa de PPL por Analizar** y confirmar que sale con el formato
     aprobado.
-0. **PRIORIDAD CERO — terminar el rescate de la VM (13-08 quedó a mitad).**
-   La página vive en el PC de cartera y Google ya reabrió la cuenta. Falta:
-   (a) en Cloud Shell, empacar soportes/contratos y **bajar los DOS paquetes**
-   (`rescate-motor-glosas.tgz` y `rescate-soportes.tgz`) — guardarlos con
-   cuidado, llevan llaves; (b) **apagar la VM** para que no cobre:
-   `gcloud compute instances stop motor-glosas --zone=us-west1-a`;
-   (c) en el PC: descomprimir el rescate en `C:\motor-glosas\rescate` y correr
-   `tools\fusionar_base_vieja.py` — primero SOLO MIRAR, pegar el resultado al
-   chat, y con el visto bueno correr `aplicar`; (d) copiar los PDF de
-   contratos del rescate a `data\contratos`, y la línea `CRED_VAULT_KEY` del
-   .env viejo al .env del PC si la fusión lo pide; (e) cuando todo quede
-   verificado, borrar la VM (fase 4) para que no vuelva a cobrar nunca.
+0. **~~PRIORIDAD CERO — rescate de la VM~~ — YA HECHO el 13-08.** La fusión
+   se aplicó (27 glosas, 6 precedentes, contrato PRECIMED), la VM quedó
+   APAGADA y los paquetes de rescate guardados en `C:\motor-glosas\rescate`.
+   Lo único que queda: **en unos días, con todo verificado, BORRAR la VM**
+   (fase 4 de `docs/MIGRACION_PC_HOSPITAL.md`) para que no cobre ni el disco:
+   `gcloud compute instances delete motor-glosas --zone=us-west1-a`.
 1. **Dispensario prioridad 1 (actualizado 05-08):** correr el cargue de las
    **23 pendientes** (piloto con HUS0000513796 → corrida completa → pegar el
    reporte al chat) y después armar los dos paquetes de evidencias:
