@@ -145,6 +145,15 @@ tres frentes:
   valor de la objeción) y se blindó también el bot de SAVIA con el mismo
   arreglo preventivo. Probado: 37/37 filas fieles a la fuente, 64 pruebas en
   verde entre los dos bots.
+- **Homologación de códigos FAMISANAR → HUS** (los códigos de FAMISANAR no
+  son los del hospital): CUPS quedan igual; a los medicamentos se les quita
+  la letra U/P de FAMISANAR (verificado: U20162259-04 = 20162259-04
+  METOCLOPRAMIDA en EMSSANAR); y los 4 dispositivos quedaron mapeados a su
+  **código FMQ** del HUS, confirmados contra el archivo LOTE_02 por nombre y
+  valor: catéter IV 18 → FMQ0112, llave 3 vías → FMQ0182-1, electrodo ECG
+  adulto → FMQ0952, bolsa recolectora orina → FMQ0159. Tabla de homologación
+  entregada con los 19 códigos verificados, 0 pendientes. 128 pruebas en
+  verde.
 
 ---
 
