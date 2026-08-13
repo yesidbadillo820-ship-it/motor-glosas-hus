@@ -132,6 +132,32 @@ cargado al 100%— es justamente lo que acaba de entrar.
 > factura en cada línea de la devolución. Este informe lo cuenta **una sola
 > vez por factura**; sumarlas daría $24.917 millones donde hay $111 millones.
 
+### En qué va cada glosa y qué se vence (`siifa_estado_tramite.py`)
+
+El panel «Avance de auditoría» del portal muestra las cinco etapas del trámite
+para **una** factura. Esto las muestra para todas, y sobre todo dice **qué
+tiene que hacer el hospital y cuándo se vence**.
+
+```powershell
+py tools\siifa_estado_tramite.py `
+  --informe "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+  --salida  "D:\USUARIO CARTERA\Documents\SIIFA\ESTADO_TRAMITE.xlsx"
+```
+
+En el bot de doble clic es la **opción [E]**. Muestra en pantalla:
+
+- el conteo y el valor de cada etapa,
+- **lo que le toca al hospital**, de mayor a menor valor, con su vencimiento,
+- **las glosas levantadas** (lo que la EPS le dio al hospital: plata recuperada),
+- **la EPS en mora**, cuando respondimos y no ha decidido dentro de su plazo.
+
+> **Lo más importante: la etapa 4.** Cuando la EPS reitera una glosa, al
+> hospital le quedan **7 días hábiles** para subsanar y nadie avisa. Una
+> glosa reiterada que no se subsana queda en firme.
+
+Los días hábiles se cuentan de lunes a viernes sin descontar festivos, así que
+el aviso llega un poco antes de lo estricto — nunca después.
+
 ---
 
 ## 2) Bot de respuestas (`responder_glosas_siifa.py`)

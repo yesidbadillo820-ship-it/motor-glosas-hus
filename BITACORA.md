@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 06-08-2026
+**Última actualización:** 13-08-2026
 
 ---
 
@@ -2236,6 +2236,55 @@ facturas es **$111.420.812** —224 veces menos—. Ahora el valor de una
 devolución se cuenta **una sola vez por factura**, hay tres pruebas que lo
 vigilan y quedó anotado en `docs/CONTEXTO_SIIFA.md`. Es la clase de cifra que
 en un informe a gerencia no se puede sostener.
+
+### 13-08 — 68 glosas nuevas respondidas, y el semáforo del trámite
+
+**1. Llegaron 68 glosas nuevas y quedaron todas respondidas.** El portal pasó
+de 2.597 a 2.665 seguimientos. Casi todas de **FAMISANAR** (67 de 68;
+$30.013.228), más una de SANITAS. Total defendido: **$30.038.128** sobre 34
+facturas. De esas, 27 salieron con la respuesta real que el hospital ya había
+dado en Dinámica Gerencial y 41 las redactó el motor.
+
+**28 de las 68 ya estaban vencidas** ($15.345.553). Se respondieron igual: una
+respuesta tardía se discute, una glosa sin respuesta se pierde.
+
+El cargue tomó **58 segundos de máquina** (17 de escritura efectiva, unas 240
+respuestas por minuto) contra las 2 horas y media que habría tomado a mano.
+Seis rebotaron por el límite de 1.500 caracteres —el mismo error de siempre— y
+entraron a la primera después de recortarlas. Entre ellas la más grande del
+lote, HUS521868 por $3.399.053.
+
+**2. FAMISANAR reformula glosas — y eso puede dañar un cargue.** Al comparar
+los informes del 6 y el 13 de agosto, una glosa desapareció: la de HUS517950
+(CL0801, $665.200, del 30 de junio). No se perdió: la EPS la borró y la volvió
+a crear el 9 de julio con otra causal (SO0801) y **número de seguimiento
+nuevo**. Lección: **las respuestas se arman contra el informe bajado el mismo
+día del cargue**, nunca contra uno de días atrás, porque el id viejo puede ya
+no existir. El comparador avisa cuando algo desaparece; así se detectó.
+
+**3. Nueva herramienta: `siifa_estado_tramite.py` (opción [E] del bot).** El
+panel «Avance de auditoría» del portal muestra las cinco etapas del trámite
+para UNA factura; esto lo hace para las 2.600 de una vez y dice **a quién le
+toca mover**. Lo primero que muestra es lo que le toca al hospital, con su
+fecha de vencimiento.
+
+Con esa herramienta aparecieron cosas que nadie estaba mirando:
+
+- **3 glosas LEVANTADAS: $1.418.479 que SANITAS le dio la razón al hospital.**
+  Nadie lo sabía porque hay que entrar factura por factura a verlo.
+- **5 reiteradas ($15.445.892) con el plazo de subsanación corriendo.** Cuando
+  la EPS reitera, al hospital le quedan **7 días hábiles** —menos de la mitad
+  que los 15 de la primera respuesta— y **nadie avisa**. Cuatro son
+  devoluciones de SANITAS por $14 millones.
+- **16 glosas donde la EPS está en mora**: respondimos y no ha decidido dentro
+  de sus 10 días hábiles.
+
+**4. Otro error de cuentas atajado a tiempo.** El semáforo repetía el error de
+sumar las devoluciones línea por línea: mostraba $25.221 millones donde hay
+$428 millones. La regla quedó ahora en **una sola función** (`valor_total()`
+en `siifa_novedades.py`) que usan las dos herramientas, en vez de copiada en
+cada una — igual que el lector de pesos. Es el mismo error, cometido dos veces
+en dos semanas: por eso ahora vive en un solo sitio y con pruebas.
 
 ---
 

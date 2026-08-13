@@ -108,6 +108,7 @@ echo   [7] Ver los codigos de respuesta que acepta SIIFA
 echo   [8] Cambiar la carpeta de trabajo
 echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
 echo   [N] Ver que llego NUEVO a SIIFA (entidad, factura, glosa/devolucion)
+echo   [E] ESTADO del tramite: que gano, que falta subsanar, que se vence
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -122,6 +123,7 @@ if "%OPCION%"=="7" goto catalogo
 if "%OPCION%"=="8" goto carpeta
 if "%OPCION%"=="9" goto verificar
 if /i "%OPCION%"=="N" goto novedades
+if /i "%OPCION%"=="E" goto estado
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -144,6 +146,15 @@ if not exist "%INFORME%" goto novedadesfallo
 echo.
 echo --- Comparando: que llego nuevo ---
 %PYEXE% tools\siifa_novedades.py --nuevo "%INFORME%" --anterior "%CARPETA%\informe_ANTERIOR.xlsx"
+goto hecho
+
+:estado
+REM Semaforo de las cinco etapas del tramite. Lo que le toca al hospital
+REM sale de primero: una glosa reiterada solo da 7 dias habiles.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Estado del tramite de cada glosa ---
+%PYEXE% tools\siifa_estado_tramite.py --informe "%INFORME%" --salida "%CARPETA%\ESTADO_TRAMITE.xlsx"
 goto hecho
 
 :novedadesfallo

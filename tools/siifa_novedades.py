@@ -143,6 +143,26 @@ def es_devolucion(fila: dict) -> bool:
     return str(fila.get("tipo_seguimiento", "")).strip().upper().startswith("DEVOL")
 
 
+def valor_total(filas: list[dict]) -> int:
+    """Cuánto vale un grupo de seguimientos, contando bien las devoluciones.
+
+    ÚSESE ESTA FUNCIÓN SIEMPRE que haya que sumar valores de seguimientos de
+    SIIFA. Sumar `valor_glosa` a secas está mal en cuanto haya una devolución
+    de por medio, y el error no se nota: da una cifra grande y creíble. Ver la
+    explicación en resumen_por_entidad().
+    """
+    total = 0
+    facturas_devueltas: dict[str, int] = {}
+    for f in filas:
+        valor = a_entero(f.get("valor_glosa"))
+        if es_devolucion(f):
+            factura = str(f.get("numero_factura") or "")
+            facturas_devueltas[factura] = max(facturas_devueltas.get(factura, 0), valor)
+        else:
+            total += valor
+    return total + sum(facturas_devueltas.values())
+
+
 def resumen_por_entidad(filas: list[dict]) -> list[tuple]:
     """Agrupa por entidad y tipo: cuántos ítems, cuántas facturas y cuánto vale.
 
@@ -154,36 +174,24 @@ def resumen_por_entidad(filas: list[dict]) -> list[tuple]:
     $111 millones —224 veces más—. Por eso en devoluciones el valor se cuenta
     una sola vez por factura.
     """
-    agg: dict[tuple, dict] = defaultdict(
-        lambda: {"items": 0, "facturas": set(), "valor": 0, "por_factura": {}}
-    )
+    agg: dict[tuple, list] = defaultdict(list)
     for f in filas:
         clave = (
             str(f.get("razon_social_eps") or f.get("nit_eps") or "SIN ENTIDAD IDENTIFICADA"),
             str(f.get("tipo_seguimiento") or "?"),
         )
-        factura = str(f.get("numero_factura") or "")
-        valor = a_entero(f.get("valor_glosa"))
-        agg[clave]["items"] += 1
-        agg[clave]["facturas"].add(factura)
-        if es_devolucion(f):
-            # Una vez por factura, y el mayor de los valores vistos para ella.
-            anterior = agg[clave]["por_factura"].get(factura, 0)
-            agg[clave]["por_factura"][factura] = max(anterior, valor)
-        else:
-            agg[clave]["valor"] += valor
-    return [
+        agg[clave].append(f)
+    resumen = [
         (
             entidad,
             tipo,
-            d["items"],
-            len(d["facturas"]),
-            d["valor"] + sum(d["por_factura"].values()),
+            len(grupo),
+            len({str(f.get("numero_factura") or "") for f in grupo}),
+            valor_total(grupo),
         )
-        for (entidad, tipo), d in sorted(
-            agg.items(), key=lambda kv: -(kv[1]["valor"] + sum(kv[1]["por_factura"].values()))
-        )
+        for (entidad, tipo), grupo in agg.items()
     ]
+    return sorted(resumen, key=lambda r: -r[4])
 
 
 def _pesos(valor: object) -> str:
