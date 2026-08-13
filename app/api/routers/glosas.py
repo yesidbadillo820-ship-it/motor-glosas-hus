@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.tz import a_utc, ahora_utc
-from app.models.schemas import GlosaHistorialItem
+from app.models.schemas import GlosaExpedienteOut, GlosaHistorialItem
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
@@ -3367,7 +3367,7 @@ def detectar_glosas_similares_en_bloque(
     }
 
 
-@router.get("/{glosa_id}")
+@router.get("/{glosa_id}", response_model=GlosaExpedienteOut)
 def obtener_glosa(
     glosa_id: int,
     db: Session = Depends(get_db),

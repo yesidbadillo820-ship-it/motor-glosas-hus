@@ -2526,6 +2526,69 @@ quedaron como pruebas para que no se repitan.
   objeción de SAVIA (hoy TA08→TA0801 con «01»; en EMSSANAR se ven FA0205,
   SO0603…) — si hay lista oficial, se fija con `--mapa-codigos`.
 
+### 13-08 (segunda parte) — El programa de mejora, y ocho pantallas que llevaban tres meses rotas sin que nadie lo supiera
+
+Yesid pidió auditar el proyecto entero y arrancar un programa de mejora en
+cuatro frentes: lo visual, lo interno, el rendimiento y lo funcional. Quedó
+el tablero en **`MASTER_IMPROVEMENT_PLAN.md`**, con cada hallazgo medido
+sobre el código —no supuesto— y con su número al lado.
+
+**Lo más importante que salió de ahí no estaba en el plan.**
+
+Rastreando por qué la pantalla de Salud Total daba «Not Found» apareció que
+**no era un caso aislado**. El 9 de mayo se borraron **ocho** partes del
+motor que el portal usaba, y se reemplazaron por cáscaras «para no romper
+nada». Dos meses después se borraron las cáscaras, con la nota de que
+«nadie las llamaba» — porque la revisión miró solo el código del servidor.
+**El que las llamaba era la pantalla.**
+
+Desde ese día y hasta hoy, ocho cosas del portal no funcionaban:
+
+- los **comentarios** sobre una glosa,
+- las **notas privadas** de cada gestor,
+- los **filtros guardados** de Mis Glosas,
+- el **historial del chat**,
+- las **notificaciones** al navegador,
+- el **Auditor Forense** (el que analiza los soportes),
+- el **piloto automático**,
+- las **noticias del sector**,
+- y el refresco solo de los paneles.
+
+**Sus datos nunca se borraron.** Los comentarios, las notas y los filtros
+siguen en la base: lo único que faltaba era la puerta. Se repusieron los
+nueve, tal como estaban.
+
+**Y ahora hay una prueba que impide que vuelva a pasar.** Cada vez que se
+corre la suite, se compara lo que la pantalla pide contra lo que el motor
+tiene. Si alguien vuelve a borrar algo que el portal usa, se sabe **ese
+mismo día**, no tres meses después.
+
+**Lo demás que se hizo:**
+
+- **Una sola forma de escribir la plata.** Había 74 maneras distintas para la
+  misma cifra («$ 1.234.567», «$1.234.567», «1234567») según la pantalla.
+  Usted concilia contra Dinámica Gerencial mirando esos números, así que eso
+  cuesta tiempo y hace dudar de la cifra. Ahora es una sola, en las seis
+  páginas.
+- **Ninguna pantalla se queda muda.** Siete no decían nada cuando fallaba la
+  red. Las cuatro que guardan eran las graves: usted creía que su decisión
+  había quedado registrada y no había quedado. Ahora lo dicen con todas las
+  letras.
+- **Cuatro puertas apretadas.** Al reponer lo anterior se destapó que cuatro
+  acciones estaban abiertas a cualquiera con sesión: crear y resolver
+  comentarios, el auditor forense (que manda documentos a la IA y cuesta
+  plata por consulta) y aprobar glosas en lote, que mueve dinero.
+- **Once columnas del Historial que por poco se pierden.** Al ponerle
+  «contrato» a la tabla de Historial se descubrió que el contrato escrito
+  meses atrás declaraba diez columnas cuando la tabla tiene veintiuna.
+  Aplicarlo tal cual habría borrado la factura, el dictamen, el CUPS y el
+  servicio de la pantalla — sin dar error.
+
+**El patrón que se repitió tres veces en el mismo día:** cosas que se ven
+ordenadas en el código y que en la pantalla se quedan calladas. El sistema no
+fallaba: **se callaba**, que para un auditor es peor. Por eso cada arreglo va
+con su prueba, y varias pruebas llevan otra que las vigila a ellas.
+
 ---
 
 ## 3) PENDIENTE

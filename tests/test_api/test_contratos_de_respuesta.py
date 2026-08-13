@@ -215,6 +215,82 @@ class TestElHistorialNoPierdeColumnas:
         assert fila.valor_objetado is None
 
 
+class TestElExpedienteNoPierdeCampos:
+    """`GET /glosas/{id}` devuelve 36 campos y no declaraba ninguno."""
+
+    LLAVES_QUE_LEE_LA_PANTALLA = {
+        "id",
+        "eps",
+        "paciente",
+        "codigo_glosa",
+        "valor_objetado",
+        "valor_aceptado",
+        "estado",
+        "factura",
+        "creado_en",
+        "dias_restantes",
+        "dictamen",
+        "dictamen_stale",
+        "dictamen_stale_motivo",
+        "numero_radicado",
+        "consecutivo_dgh",
+        "gestor_nombre",
+        "fecha_radicacion_factura",
+        "fecha_recepcion",
+        "fecha_vencimiento",
+        "referencia",
+        "observacion_tecnico",
+        "tipo_glosa_excel",
+        "profesional_medico",
+        "observacion_eps",
+        "valor_recuperado",
+        "numero_nota_credito",
+    }
+
+    def test_el_contrato_tiene_todo_lo_que_la_pantalla_lee(self):
+        from app.models.schemas import GlosaExpedienteOut
+
+        faltan = self.LLAVES_QUE_LEE_LA_PANTALLA - set(GlosaExpedienteOut.model_fields)
+        assert not faltan, f"el contrato le borraría al expediente: {sorted(faltan)}"
+
+    def test_declara_los_36_campos_que_devuelve_la_ruta(self):
+        from app.models.schemas import GlosaExpedienteOut
+
+        assert len(GlosaExpedienteOut.model_fields) == 36
+
+    def test_la_ruta_declara_su_contrato(self):
+        from app.main import app
+
+        for r in app.routes:
+            if getattr(r, "path", "") == "/glosas/{glosa_id}" and "GET" in (
+                getattr(r, "methods", set()) or set()
+            ):
+                modelo = getattr(r, "response_model", None)
+                assert modelo is not None and "GlosaExpedienteOut" in repr(modelo)
+                return
+        pytest.fail("no existe GET /glosas/{glosa_id}")
+
+    def test_una_glosa_recien_importada_se_muestra(self):
+        """Sin dictamen, sin radicado, sin decisión de la EPS, sin nota
+        crédito: el expediente tiene que abrirse desde el primer día."""
+        from app.models.schemas import GlosaExpedienteOut
+
+        e = GlosaExpedienteOut(id=1)
+        assert e.dictamen is None
+        assert e.numero_radicado is None
+        assert e.decision_eps is None
+
+    def test_el_aviso_de_dictamen_desactualizado_sobrevive(self):
+        """`dictamen_stale` avisa que la glosa cambió después de generar el
+        dictamen. Si el contrato lo borrara, el auditor radicaría un dictamen
+        viejo creyendo que está al día."""
+        from app.models.schemas import GlosaExpedienteOut
+
+        e = GlosaExpedienteOut(id=1, dictamen_stale=True, dictamen_stale_motivo="cambió el valor")
+        assert e.dictamen_stale is True
+        assert e.dictamen_stale_motivo == "cambió el valor"
+
+
 class TestElContratoSeCumpleConDatosDeVerdad:
     def test_salud_total_valida_la_notificacion_real(self):
         """Con las 44 glosas del archivo del auditor, no con un ejemplo."""
