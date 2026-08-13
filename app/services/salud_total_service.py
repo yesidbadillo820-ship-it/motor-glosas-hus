@@ -165,12 +165,29 @@ class GlosaSaludTotal:
             return 0
         return float(valor.replace(",", ""))
 
+    @property
+    def sin_fecha_recepcion(self) -> bool:
+        """No hay con qué contar el plazo del Art. 57 de la Ley 1438/2011.
+
+        El plazo corre desde que la EPS RECIBE la factura hasta que radica
+        la glosa. Sin la fecha de recepción no existe el punto de partida.
+        """
+        return not (self.fecha_recepcion and self.fecha_rad)
+
     def dias_transcurridos(self) -> int:
-        if self.fecha_recepcion and self.fecha_rad:
-            return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
-        if not self.fecha_rad:
+        """Días hábiles entre la recepción de la factura y la radicación.
+
+        Si falta la fecha de recepción devuelve 0 y NO se alega
+        extemporaneidad. Antes se contaba desde la radicación de la glosa
+        hasta HOY, que es un intervalo que no mide ningún plazo legal: una
+        notificación de julio respondida en agosto daba «han transcurrido
+        X días hábiles» y con eso se afirmaba en un documento radicable un
+        hecho que nadie había comprobado. Cuando no hay evidencia, no se
+        afirma: se responde de fondo.
+        """
+        if self.sin_fecha_recepcion:
             return 0
-        return calcular_dias_habiles(self.fecha_rad, datetime.now())
+        return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
 
     def es_extemporanea(self) -> bool:
         return self.dias_transcurridos() > DIAS_LIMITE
@@ -397,6 +414,9 @@ class GlosaSaludTotal:
             "Observacion_IPS": observacion,
             "TipoRespuesta": self.tipo_respuesta,
             "DiasTranscurridos": dias,
+            # Para que la pantalla avise: sin este dato no se puede alegar
+            # extemporaneidad, y la respuesta salió argumentada de fondo.
+            "SinFechaRecepcion": self.sin_fecha_recepcion,
         }
 
 
@@ -464,6 +484,28 @@ def procesar_glosas_salud_total(
     return respuestas
 
 
+def _pesos(valor: Any) -> str:
+    """Escribe un valor de peso como lo escribe la entidad: sin el «.0».
+
+    La notificación trae «93340» y Python venía escribiendo «93340.0» por ser
+    float. Se mantiene el decimal solo cuando el valor de verdad lo tiene.
+    """
+    try:
+        n = float(valor or 0)
+    except (TypeError, ValueError):
+        return str(valor or "")
+    return str(int(n)) if n == int(n) else f"{n:.2f}"
+
+
+def _una_linea(texto: Any) -> str:
+    """Aplana el texto a una sola línea.
+
+    Un salto de línea dentro de la Observación parte la fila en dos y la
+    entidad recibe un archivo con más filas que glosas.
+    """
+    return " ".join(str(texto or "").split())
+
+
 def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
     if not respuestas:
         return ""
@@ -478,14 +520,14 @@ def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
                 str(r.get("PrefijoFac", "")),
                 str(r.get("NumeroFac", "")),
                 str(r.get("NUMREG", "")),
-                str(r.get("NombreServicio", "")),
-                str(r.get("ValorGlosaTotalxServ", "")),
+                _una_linea(r.get("NombreServicio", "")),
+                _pesos(r.get("ValorGlosaTotalxServ", "")),
                 str(r.get("CodMotvGlosaGeneral", "")),
                 str(r.get("CodMotvGlosaEspc", "")),
-                str(r.get("ValorAceptadoIPS", "")),
+                _pesos(r.get("ValorAceptadoIPS", "")),
                 str(r.get("Codigo_Respuesta_a_glosas", "")),
-                str(r.get("ConceptoRespuesta", "")),
-                str(r.get("Observacion_IPS", "")),
+                _una_linea(r.get("ConceptoRespuesta", "")),
+                _una_linea(r.get("Observacion_IPS", "")),
             ]
         )
         lineas.append(linea)

@@ -23564,7 +23564,10 @@ function cambiarTipoRespuestaST(){
   var tipo=document.getElementById('st-tipo-respuesta').value;
   var fieldFecha=document.getElementById('st-field-fecha');
   // El archivo TXT siempre es requerido (no se oculta).
-  fieldFecha.style.display = (tipo==='ia') ? 'block' : 'none';
+  // La fecha de recepción también se pide para EXTEMPORÁNEA: el plazo del
+  // Art. 57 de la Ley 1438/2011 corre desde que la EPS recibe la factura,
+  // así que sin esa fecha no hay cómo sustentar que la glosa llegó tarde.
+  fieldFecha.style.display = (tipo==='ia'||tipo==='extemporanea') ? 'block' : 'none';
 }
 
 async function previewSaludTotal(){
@@ -23579,6 +23582,8 @@ async function previewSaludTotal(){
   var fd=new FormData();
   fd.append('file',file);
   fd.append('tipo_respuesta',tipo);
+  var fechaRecPrev=document.getElementById('st-fecha-recepcion').value;
+  if(fechaRecPrev) fd.append('fecha_recepcion',fechaRecPrev);
   showLoading('Procesando...');
   try{
     var r=await fetch('/api/salud-total/preview',{method:'POST',headers:authH(),body:fd});
@@ -23594,7 +23599,13 @@ async function previewSaludTotal(){
       return '<tr><td style="font-size:.75rem">'+escHtml(g.NumeroRad||'')+'</td><td style="font-size:.75rem">'+escHtml(g.NUMREG||'')+'</td><td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.NombreServicio||'')+'</td><td style="font-size:.75rem;text-align:right">'+fmtCOP(g.ValorGlosaTotalxServ)+'</td><td style="text-align:center"><code style="font-size:.7rem;background:var(--bg);padding:2px 6px;border-radius:4px">'+escHtml(g.Codigo_Respuesta_a_glosas||'')+'</code></td><td style="font-size:.7rem;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.ConceptoRespuesta||'')+'</td></tr>';
     }).join('');
     hideLoading();
-    toast('Vista previa cargada','success');
+    if(d.sin_fecha_recepcion){
+      // Sin fecha de recepción no se puede sustentar que la glosa llegó
+      // tarde, así que la respuesta salió argumentada de fondo.
+      toast('Sin fecha de recepción','No se alegó extemporaneidad: ingrese la fecha en que la EPS recibió la factura para contar el plazo.','error');
+    }else{
+      toast('Vista previa cargada','success');
+    }
   }catch(e){hideLoading();toast('Error: '+e.message,'error');}
 }
 
@@ -23613,6 +23624,10 @@ async function procesarSaludTotal(){
   }else{
     if(!file){toast('Seleccione un archivo','error');return;}
     fd.append('file',file);
+    // Para extemporánea la fecha es la que sustenta el plazo. Si no está,
+    // el motor responde de fondo en vez de alegar un plazo sin evidencia.
+    var fechaRec2=document.getElementById('st-fecha-recepcion').value;
+    if(fechaRec2) fd.append('fecha_recepcion',fechaRec2);
   }
   showLoading(tipo==='ia'?'Analizando con IA...':'Generando respuesta...');
   try{
