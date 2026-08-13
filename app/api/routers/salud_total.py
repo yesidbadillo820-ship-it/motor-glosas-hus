@@ -17,6 +17,7 @@ Se repone la puerta tal como estaba, con dos cambios mínimos:
 """
 
 import io
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -32,6 +33,8 @@ from app.services.salud_total_service import (
     generar_txt_respuesta,
     procesar_glosas_salud_total,
 )
+
+logger = logging.getLogger("motor_glosas")
 
 router = APIRouter(prefix="/api/salud-total", tags=["Salud Total"])
 
@@ -119,6 +122,52 @@ async def preview_glosas(
     }
 
 
+@router.post("/analizar-ia")
+async def analizar_con_ia(
+    file: UploadFile = File(...),
+    fecha_recepcion: str | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Analiza la notificación con el motor de IA y devuelve el dictamen.
+
+    OT-045. El botón «Analizar con IA» de la pantalla prometía esto y no lo
+    hacía: caía en las mismas plantillas que las otras dos opciones.
+
+    Cada glosa pasa por `GlosaService.analizar`, el MISMO camino que usa el
+    portal, así que hereda las cláusulas del contrato, las tarifas pactadas,
+    la homologación CUPS → SOAT y las redes que revisan lo que el dictamen
+    afirma. Las que la IA no logre responder caen a la plantilla: el archivo
+    sale completo siempre, porque una glosa sin responder se da por aceptada.
+    """
+    if not (file.filename or "").lower().endswith(".txt"):
+        raise HTTPException(status_code=400, detail="El archivo debe ser .txt")
+
+    from app.services.salud_total_ia import analizar_notificacion
+    from app.services.salud_total_service import leer_notificacion_dict
+
+    glosas, avisos = leer_notificacion_dict(await file.read())
+    if not glosas:
+        raise HTTPException(
+            status_code=400,
+            detail=(avisos or ["No se encontraron glosas en el archivo."])[0],
+        )
+
+    respuestas, resumen = await analizar_notificacion(
+        glosas, fecha_recepcion=_fecha_recepcion(fecha_recepcion)
+    )
+
+    logger.info(
+        f"[SALUD-TOTAL-IA] {current_user.email} analizó {resumen['total']} glosas: "
+        f"{resumen['analizadas_con_ia']} con IA, {resumen['por_plantilla']} por plantilla"
+    )
+    return {
+        **resumen,
+        "avisos": avisos,
+        "glosas": respuestas[:MAX_FILAS_PREVIEW],
+    }
+
+
 @router.post("/procesar")
 async def procesar_glosas(
     file: UploadFile = File(None),
@@ -131,7 +180,25 @@ async def procesar_glosas(
     if not file or not (file.filename or "").lower().endswith(".txt"):
         raise HTTPException(status_code=400, detail="Debe subir el archivo TXT de la notificación")
 
-    respuestas = _respuestas(await file.read(), tipo_respuesta, _fecha_recepcion(fecha_recepcion))
+    contenido = await file.read()
+    fecha = _fecha_recepcion(fecha_recepcion)
+
+    if tipo_respuesta == "ia":
+        # El archivo lo arma la IA glosa por glosa. Lo que no logre responder
+        # cae a la plantilla dentro de `analizar_notificacion`.
+        from app.services.salud_total_ia import analizar_notificacion
+        from app.services.salud_total_service import leer_notificacion_dict
+
+        glosas, _avisos = leer_notificacion_dict(contenido)
+        if not glosas:
+            raise HTTPException(status_code=400, detail="No se encontraron glosas en el archivo.")
+        respuestas, resumen = await analizar_notificacion(glosas, fecha_recepcion=fecha)
+        logger.info(
+            f"[SALUD-TOTAL-IA] archivo generado por {current_user.email}: "
+            f"{resumen['analizadas_con_ia']} de {resumen['total']} con IA"
+        )
+    else:
+        respuestas = _respuestas(contenido, tipo_respuesta, fecha)
 
     txt = generar_txt_respuesta(respuestas)
     nombre = generar_nombre_archivo(tipo_respuesta)

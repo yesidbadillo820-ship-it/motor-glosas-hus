@@ -547,3 +547,88 @@ def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
         "1" if tipo_respuesta == "extemporanea" else "2" if tipo_respuesta == "ratificada" else "3"
     )
     return f"RTAGLOSA_{NIT_HUS}_{fecha_str}_{sufijo}.txt"
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Lectura de la notificación a diccionarios (OT-045)
+#
+# El camino por plantilla lee el TXT por posición y va directo a la
+# respuesta. El camino por IA necesita algo distinto: cada glosa como un
+# diccionario con nombre y apellido, para armar con ella el texto que el
+# motor analiza. Se lee UNA vez y se reparte, en vez de abrir el archivo dos
+# veces con dos lectores que podrían separarse.
+# ─────────────────────────────────────────────────────────────────────────
+
+CABECERA_ESPERADA = ("NumeroRad_", "Numreg")
+
+
+def leer_notificacion_dict(contenido: bytes) -> tuple[List[Dict[str, Any]], List[str]]:
+    """Lee el TXT de la notificación y devuelve (glosas, avisos).
+
+    Las notificaciones de Salud Total vienen en latin-1: leerlas como UTF-8
+    parte las tildes de los nombres y de los motivos.
+
+    El radicado y el registro viajan como TEXTO de principio a fin.
+    Convertirlos a número fue lo que produjo «3,5E+14» en el archivo del
+    13-08 y lo dejó inservible: la entidad no puede casar ninguna respuesta
+    con su glosa.
+    """
+    avisos: List[str] = []
+    texto = None
+    for enc in ("utf-8-sig", "latin-1"):
+        try:
+            texto = contenido.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        return [], ["El archivo no se pudo leer: no está en UTF-8 ni en latin-1."]
+
+    lineas = [ln for ln in texto.splitlines() if ln.strip()]
+    if len(lineas) < 2:
+        return [], ["El archivo no tiene filas de glosa debajo del encabezado."]
+
+    sep = _detectar_separador(lineas[0])
+    cabecera = [c.strip() for c in lineas[0].split(sep)]
+    if not all(c in cabecera for c in CABECERA_ESPERADA):
+        return [], [
+            "El encabezado no corresponde a una notificación de Salud Total "
+            "(faltan NumeroRad_ o Numreg)."
+        ]
+
+    def _num(v) -> float:
+        try:
+            return float(str(v or "0").replace(",", "").strip() or 0)
+        except ValueError:
+            return 0.0
+
+    glosas: List[Dict[str, Any]] = []
+    for n, linea in enumerate(lineas[1:], start=2):
+        campos = linea.split(sep)
+        if len(campos) < 14:
+            avisos.append(f"Línea {n}: tiene {len(campos)} campos y se esperaban 14 o más.")
+            continue
+        f = dict(zip(cabecera, campos))
+        glosas.append(
+            {
+                "FechaRad": (f.get("FechaRad_") or "").strip(),
+                "NumeroRad": (f.get("NumeroRad_") or "").strip(),
+                "PrefijoFac": (f.get("PrefijoFac_") or "").strip(),
+                "NumeroFac": (f.get("NumeroFac_") or "").strip(),
+                "NUMREG": (f.get("Numreg") or "").strip(),
+                "NumeroDocAfl": (f.get("NumeroDocAfl_") or "").strip(),
+                "NombreServicio": (f.get("NombreServicio") or "").strip(),
+                "ValorTotalServ": _num(f.get("ValorTotalServ")),
+                # El valor de la glosa es ValorGlosaTotalxServ, NO el valor
+                # total del servicio, y NO se reescala.
+                "ValorGlosaTotalxServ": _num(f.get("ValorGlosaTotalxServ")),
+                "ValorBrutoFactura": _num(f.get("ValorBrutoFactura")),
+                # El código es la sigla (TA), no la descripción (Tarifas).
+                "CodMotvGlosaGeneral": (f.get("CodMotvGlosaGeneral") or "").strip(),
+                "MotvGlosaGeneral": (f.get("MotvGlosaGeneral") or "").strip(),
+                "CodMotvGlosaEspc": (f.get("CodMotvGlosaEspc") or "").strip(),
+                "MotvGlosaEspc": (f.get("MotvGlosaEspc") or "").strip(),
+                "DescripcionMotivo": (f.get("DescripcionMotivo") or "").strip(),
+            }
+        )
+    return glosas, avisos
