@@ -89,14 +89,58 @@ def _texto_de_la_glosa(fila: dict) -> str:
     return "\n".join(partes)
 
 
+def _a_texto_plano(html: str) -> str:
+    """Saca el argumento en texto plano del dictamen.
+
+    13-08-2026, corrección en caliente. El dictamen del motor viene en HTML
+    —está hecho para verse en pantalla y en el PDF— y la primera versión de
+    esto lo recortaba sin quitarle las etiquetas. El archivo que se generó
+    traía en la casilla de la entidad esto:
+
+        <table border="1" style="width:100%;border-collapse:collapse;…
+
+    cortado a mitad de un atributo de estilo. Ilegible, y con el argumento
+    en ninguna parte.
+
+    Se reutiliza el extractor que ya existe en el motor
+    (`_extraer_argumento_del_dictamen`), que busca la «ARGUMENTACIÓN
+    JURÍDICA» y descarta las tablas de encabezado y el pie de página. Si no
+    encuentra ese marcador, se limpian las etiquetas a mano antes que
+    devolver HTML.
+    """
+    if not html:
+        return ""
+    try:
+        from app.services.aprendizaje_feedback import _extraer_argumento_del_dictamen
+
+        texto = _extraer_argumento_del_dictamen(html)
+        if texto and len(texto) > 40:
+            return texto
+    except Exception:  # pragma: no cover - el respaldo de abajo siempre sirve
+        pass
+
+    import re
+
+    t = re.sub(r"<(script|style)[\s\S]*?</\1>", " ", html, flags=re.IGNORECASE)
+    t = re.sub(r"<[^>]+>", " ", t)
+    t = (
+        t.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+    )
+    return " ".join(t.split())
+
+
 def _condensar(dictamen: str, limite: int = OBS_MAX_CARACTERES) -> str:
-    """Deja el dictamen dentro de lo que admite la casilla de la entidad.
+    """Deja el argumento dentro de lo que admite la casilla de la entidad.
 
     Corta en el último punto que quepa para que el texto cierre. Recortar a
     la brava dejaría la defensa a mitad de frase — y esa frase la lee un
     auditor de la EPS que busca cualquier motivo para ratificar.
     """
-    texto = " ".join((dictamen or "").split())
+    texto = _a_texto_plano(dictamen or "")
     if not texto:
         return ""
     if len(texto) <= limite:
@@ -141,9 +185,29 @@ async def _analizar_una(servicio, fila: dict, eps: str = "SALUD TOTAL") -> dict 
     dictamen = getattr(resultado, "dictamen", "") or ""
     if not dictamen.strip():
         return None
+
+    observacion = _condensar(dictamen)
+
+    # Guarda dura. Lo que va a la casilla de la entidad tiene que ser texto
+    # y nada más: si se cuela una etiqueta, el archivo llega ilegible y la
+    # glosa queda sin argumento. Antes que mandar eso, se prefiere la
+    # plantilla, que es texto probado.
+    if not observacion or "<" in observacion or ">" in observacion:
+        logger.warning(
+            f"[SALUD-TOTAL-IA] fila {fila.get('NUMREG')}: el dictamen no dejó texto "
+            f"limpio; esa glosa sale por plantilla"
+        )
+        return None
+    if len(observacion) < 60:
+        logger.warning(
+            f"[SALUD-TOTAL-IA] fila {fila.get('NUMREG')}: el argumento quedó en "
+            f"{len(observacion)} caracteres, muy corto para defender; sale por plantilla"
+        )
+        return None
+
     return {
         "dictamen": dictamen,
-        "observacion": _condensar(dictamen),
+        "observacion": observacion,
         "modelo_ia": getattr(resultado, "modelo_ia", None),
         "score": getattr(resultado, "score", 0.0),
     }
