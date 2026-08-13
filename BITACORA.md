@@ -2749,8 +2749,25 @@ quedaron como pruebas para que no se repitan.
   Sigue vigente el cuidado de siempre con la hoja UVB: se carga la columna
   **pactada** («PROPUESTA FINAL»), no la de referencia («VALOR UVB 2026»),
   que es un 5% más alta.
-- **E) Homologador CUPS → SOAT 2026:** sin empezar (archivo del homologador +
-  Circular 047/2025).
+- **E) ~~Homologador CUPS → SOAT 2026: sin empezar.~~** **Cargado el mismo
+  13-08.** Entró la versión Gold Standard 2026: 10.024 códigos CUPS —la
+  misma cobertura de antes, no se perdió ninguno— y ahora **8.783 traen
+  además el artículo del Manual SOAT** donde está escrito el código. Es la
+  diferencia entre que el dictamen diga «el CUPS 012403 corresponde al SOAT
+  1101» y que diga «corresponde al SOAT 1101, Artículo 03: Neurocirugía».
+
+  **Y al cargarlo apareció un defecto grave que llevaba meses adentro.** La
+  tabla marca 2.966 códigos como «NO TIENE HOMOLOGACION DIRECTA», y esa
+  frase estaba escrita en la casilla del código SOAT. El motor la leía como
+  si fuera el código y le decía a la IA, con estas palabras: *«el CUPS
+  013205 corresponde oficialmente al código SOAT NO TIENE HOMOLOGACION
+  DIRECTA — usa este dato oficial para fundamentar la tarifa»*. Un código
+  inventado, metido en la defensa de la tarifa, con la orden de usarlo.
+  Entre esos 2.966 hay tarifas del propio contrato de FAMISANAR.
+
+  Ahora el motor dice lo que es, y resulta que juega a favor: **si el manual
+  no le asigna código SOAT a ese procedimiento, la entidad no puede objetar
+  la tarifa citando un código SOAT que no existe.**
 - **F) Todo lo de las OT-023 a OT-034 está probado en el repositorio, pero
   salvo la pantalla de Salud Total nadie lo ha visto correr en el motor del
   hospital.** Falta esa pasada.
