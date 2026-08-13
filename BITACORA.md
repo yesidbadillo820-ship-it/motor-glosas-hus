@@ -2408,6 +2408,96 @@ respaldos diarios. De la VM solo falta borrarla cuando pasen unos días.
 
 ---
 
+### 13-08 — Once trabajos: las trampas quedan como prueba, el validador ADRES entra al portal y vuelve la pantalla de Salud Total
+
+Día largo. Se cerraron once órdenes de trabajo (OT-023 a OT-033). En orden
+de lo que más pesa:
+
+**Lo que el motor afirmaba sin poder probarlo (y ya no puede).**
+
+- **Las glosas de trampa ahora corren solas.** Las que Yesid usó para
+  destapar las 22 fallas del 06-08 quedaron guardadas como examen
+  automático: 27 casos y 69 criterios que se revisan en cada cambio. Si
+  alguien vuelve a romper una corrección vieja, se entera el mismo día y no
+  tres semanas después con un dictamen ya radicado.
+- **La tarifa pactada era el único dato duro que nadie verificaba.** El
+  dictamen podía escribir un porcentaje de descuento o una tarifa que no
+  estaba en ninguna parte del caso. Ahora se comprueba contra lo cargado.
+- **Un número de contrato inventado de cero pasaba derecho**, y **dos formas
+  corrientes de citar una norma** («Res. 2284/2023», «Resolución No. 2284 de
+  2023») el verificador no las veía — o sea que las daba por buenas sin
+  mirarlas. Ya las ve.
+- **Nadie vigilaba que las redes de seguridad siguieran enchufadas.** Las 18
+  revisiones que corren sobre el dictamen antes de entregarlo estaban sin
+  vigilancia: si una se desconectaba, el motor seguía trabajando como si
+  nada. Ahora hay una prueba que lo detecta.
+
+**Herramientas que estaban por fuera y entraron al portal.**
+
+- **El validador ADRES ya no es un programa aparte.** Antes tocaba levantar
+  otra aplicación en el puerto 8010 con un doble clic. Ahora se suben los
+  soportes desde la misma página, valida la malla de la Circular 022/2023 y
+  descarga el informe en Excel. Solo entra quien tenga sesión con rol de
+  auditor: por ahí pasan historias clínicas.
+- **El buscador de números de autorización de los RIPS.** Recorre las
+  carpetas de facturación **y sus subcarpetas**, entra a los ZIP, y saca el
+  listado diciendo cuáles vienen vacíos, cuáles nulos y cuáles con la
+  palabra «null» escrita como texto. Queda como bot de doble clic
+  (`AUTORIZACIONES_RIPS.cmd`) y también dentro del portal.
+  *Falta la pantalla en el portal: el motor ya está, el botón todavía no.*
+
+**El contrato de FAMISANAR ya está firmado.**
+
+Con las 219 páginas del contrato firmado a la vista se cargaron las tres
+cláusulas que sirven para contestar glosas (Cuarta de tarifas, Quinta de
+soportes y pago, Sexta del trámite de glosas), con su texto literal —no un
+resumen, porque un resumen el verificador lo marca como cita falsa, y con
+razón. Y se corrigió la cláusula del anexo tarifario, que seguía diciendo
+«Propuesta Base Final»: eso era cierto mientras fue propuesta; ahora nombra
+los anexos 3.0/3.1/3.2 y la vigencia del 15/04/2026 al 14/04/2027.
+
+**La pantalla de Salud Total volvió a funcionar.**
+
+Yesid la abrió con una notificación real y le salió «Not Found». La causa:
+en una limpieza de mayo se borró la parte del programa que atiende esa
+pantalla, porque no se le encontraron usuarios en el código. Sí tenía uno:
+la pantalla misma. Al motor no le faltaba nada — le faltaba la puerta. Ya
+está repuesta y ahora pide rol de auditor, porque de ahí sale un archivo que
+se radica ante la entidad.
+
+Al reponerla se corrigieron dos cosas del propio motor:
+
+1. **No se alega un plazo que nadie puede probar.** El término del Art. 57 de
+   la Ley 1438/2011 se cuenta desde que la EPS *recibe la factura* hasta que
+   radica la glosa. Cuando faltaba esa fecha, el motor contaba desde la
+   radicación de la glosa hasta *hoy* —que no mide ningún plazo legal— y
+   escribía «han transcurrido N días hábiles» en el archivo que se radica.
+   Ahora, sin esa fecha, no se alega extemporaneidad: se contesta de fondo y
+   la pantalla avisa que falta el dato. **Por eso la pantalla ahora te pide
+   la fecha de recepción también cuando eliges «Extemporánea»** — antes solo
+   la pedía para el análisis con IA.
+2. **Los valores salen escritos como los escribe la entidad**, sin el «.0» de
+   más, y las observaciones ya no pueden llevar saltos de línea adentro (un
+   salto parte la fila en dos y la entidad recibe un archivo con más filas
+   que glosas).
+
+**Ojo con el archivo `RTAGLOSA_900006037_13082026.csv`.** Ese archivo se armó
+por fuera del portal y trae tres errores en las 44 filas. **No lo radiques:**
+
+- el **radicado** salió como `3,5E+14` en vez de `350000214021421` — así
+  Salud Total no puede casar ninguna respuesta con su glosa y el archivo no
+  sirve para nada;
+- el **valor glosado** no es el glosado sino el valor total del servicio
+  multiplicado por cien: en la radiografía de tórax la glosa real es de
+  **$93.340** y el archivo dice **$28.000.000**;
+- el **código del motivo** trae la descripción («Tarifas») donde va la sigla
+  («TA»).
+
+Genera el archivo de nuevo desde la pantalla del portal: los tres casos
+quedaron como pruebas para que no se repitan.
+
+---
+
 ## 3) PENDIENTE
 
 ### Conciliación Dispensario (147 facturas objeto de mesa)
@@ -2612,6 +2702,30 @@ respaldos diarios. De la VM solo falta borrarla cuando pasen unos días.
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+### Lo más fresco (del 13-08)
+
+- **A) Regenerar la respuesta de Salud Total desde el portal.** Entrar a la
+  pantalla «Salud Total», subir `NotificacionGLS_Crt01July2026_1469Detalle.txt`,
+  poner la **fecha en que la EPS recibió la factura** y descargar. Comparar
+  contra el archivo viejo: el radicado debe salir completo
+  (`350000214021421`), la radiografía de tórax en **$93.340** y el código del
+  motivo como **`TA`**. **El `RTAGLOSA_..._13082026.csv` que ya existe no se
+  radica.**
+- **B) Probar el validador ADRES dentro del portal** con un paquete real de
+  FURIPS y verificar que el Excel del informe salga igual que el de la
+  aplicación aparte del puerto 8010. Si sale igual, ya no hay que levantar
+  esa aplicación.
+- **C) Falta la pantalla del buscador de autorizaciones.** El motor y el bot
+  de doble clic están; el botón dentro del portal todavía no.
+- **D) Cargar las 6.655 tarifas de FAMISANAR como pactadas.** Ya se puede: el
+  contrato está firmado y sus cláusulas quedaron cargadas. Ojo con la hoja
+  UVB, que trae dos columnas de plata (va la **pactada**, no la de
+  referencia).
+- **E) Homologador CUPS → SOAT 2026:** sin empezar (archivo del homologador +
+  Circular 047/2025).
+- **F) Todo lo de las OT-023 a OT-033 está probado en el repositorio, pero
+  nadie lo ha visto correr en el motor del hospital.** Falta esa pasada.
 
 00. **Antes de cualquier prueba de IA: reiniciar con
     `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos
