@@ -129,13 +129,13 @@ documentación: es un tablero de trabajo.
 - **Próximo objetivo:** copiar el paquete completo al servidor y correr la v2.1 del bot DE4401
 - **Riesgo:** ninguno conocido
 
-### 16. Validador ADRES (web)
+### 16. Validador ADRES (web) — ahora también dentro del portal
 - **Estado:** Activo · **Prioridad:** Media
-- **Entrada:** `validador-adres/app.py`
-- **Responsable:** PENDIENTE DE VALIDAR
-- **Dependencias:** módulo 15 · puerto 8010 · `VALIDADOR_ADRES_WEB.cmd`
-- **Próximo objetivo:** PENDIENTE DE VALIDAR
-- **Riesgo:** ninguno conocido
+- **Entrada:** `app/api/routers/validador_adres.py` (portal) · `validador-adres/app.py` (aparte)
+- **Responsable:** Yesid (dueño)
+- **Dependencias:** módulo 15 · `app/services/validador_adres_service.py` (código común) · rol AUDITOR
+- **Próximo objetivo:** probarlo en el portal con un paquete real y comparar el Excel contra el de la app del puerto 8010
+- **Riesgo:** la pantalla del portal todavía no existe; hoy solo responden las rutas
 
 ### 17. Conciliación del Dispensario (cadena de escritorio)
 - **Estado:** Activo · **Prioridad:** Alta
@@ -157,17 +157,17 @@ documentación: es un tablero de trabajo.
 
 ## OBJETIVO ACTUAL DEL PROYECTO
 
-✔ **Validar en el motor del hospital las 22 correcciones (OT-001 a OT-022) con la tanda de glosas de prueba.**
+✔ **Validar en el motor del hospital las 33 correcciones (OT-001 a OT-033) con la tanda de glosas de prueba y con la notificación real de Salud Total.**
 
 ---
 
 ## PRÓXIMAS TAREAS
 
-1. **Reiniciar el motor y repetir las glosas de prueba** — confirmar que en el arranque aparece `[SEED-CLAUSULAS] 26 creadas` y que los dictámenes salen sin los hechos inventados.
-2. **Decidir si se carga la propuesta tarifaria 2026 de FAMISANAR** — 6.655 tarifas listas de leer; solo debe cargarse cuando el acuerdo esté en firme.
-3. **Cargar el PDF de los contratos que no tienen cláusulas** — hoy solo 11 pagadores tienen cláusulas base.
-4. **Revisar el umbral del auto-piloto (90%)** — con las cláusulas cargadas los puntajes suben; hay que ver si el umbral sigue teniendo sentido.
-5. **Cerrar los flecos de las glosas de prueba que aún no se han vuelto a correr** (PPL, FOMAG, SANITAS, POLICÍA NACIONAL).
+1. **Reiniciar el motor y repetir las glosas de prueba** — confirmar que en el arranque aparece `[SEED-CLAUSULAS]` y que los dictámenes salen sin los hechos inventados.
+2. **Regenerar la respuesta de Salud Total desde el portal** con la fecha de recepción de la factura, y comprobar radicado completo, valor glosado real y sigla del motivo. El `RTAGLOSA_..._13082026.csv` viejo no se radica.
+3. **Cargar las 6.655 tarifas de FAMISANAR como pactadas** — ya se puede: el contrato está firmado. Ojo con la hoja UVB (va la columna pactada, no la de referencia).
+4. **Armar la pantalla del portal** para el validador ADRES y el buscador de autorizaciones — las rutas ya responden, falta el botón.
+5. **Cargar el PDF de los contratos que no tienen cláusulas** — hoy solo 11 pagadores tienen cláusulas base.
 
 ## BLOQUEANTES
 
@@ -175,7 +175,7 @@ documentación: es un tablero de trabajo.
 2. **Discrepancia del aceptado** — el lote dice $0 y cartera registra $1.758.956 en 8 facturas. Sin resolverlo no se firma el acta.
 3. **CUV rechazados** — SISTEMAS no ha corregido el RIPS de las 3 facturas con RVC086 ni reejecutado la validación de las otras 6. Sin eso no se radican en SIMED.
 4. **Faltan 2 PDF del DIAN** — HUS413266 (radicado 492346) y HUS417459 (radicado 521665). Sin el PDF no se arman las carpetas.
-5. **Propuesta tarifaria 2026 de FAMISANAR sin firmar** — el archivo se llama PROPUESTA. Cargarla como tarifa pactada haría que el motor defienda con valores que aún no rigen. Depende de que el acuerdo quede en firme.
+5. ~~**Propuesta tarifaria 2026 de FAMISANAR sin firmar**~~ — **resuelto el 13-08:** Yesid subió el contrato firmado (219 páginas, vigencia 15/04/2026 a 14/04/2027) con sus anexos 3.0/3.1/3.2. Sus cláusulas ya están cargadas; falta cargar las 6.655 tarifas como pactadas (tarea 3).
 
 ---
 
