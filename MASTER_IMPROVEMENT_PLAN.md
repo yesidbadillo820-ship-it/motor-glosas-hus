@@ -203,9 +203,11 @@ lee siga existiendo mañana.
 Es la misma familia de fallo que dejó la pantalla de Salud Total en «Not
 Found» tres meses: el frontend depende de nombres que nadie verifica.
 
-- [x] Contar routers con y sin `response_model`.
-- [ ] Esquema Pydantic de respuesta en las rutas que alimentan las pantallas críticas (glosas, historial, expediente, tarifas).
-- [ ] Prueba que compara las llaves que lee el JavaScript contra las que devuelve la ruta (como la de OT-035 para el validador ADRES).
+- [x] Contar routers con y sin `response_model`. **Corrección al enunciado inicial:** no son «8 rutas sin contrato», son 8 *routers* que sí lo tienen de 69; sin contrato están **587 de 595 rutas**. Ponerle esquema a 587 de una sentada es el cambio gigante que las reglas prohíben.
+- [x] Ocho esquemas Pydantic para las rutas que alimentan las pantallas donde un cambio silencioso duele, descritos sobre lo que devuelven **hoy** (campo por campo, leído del código; ninguno inventado ni renombrado).
+- [x] Enchufados en seis rutas: tarifas (lista y stats), conciliaciones, Salud Total y el validador ADRES (estado e inicio).
+- [x] **Prueba que compara las llaves que lee el JavaScript contra las del esquema.** Es lo que de verdad importa: un `response_model` **filtra**, y todo campo fuera del esquema se cae de la respuesta. Si la pantalla lee uno que quedó por fuera, se queda en blanco sin dar error — el mismo mal que este trabajo vino a evitar. Comprobado quitando un campo a propósito: la prueba lo caza.
+- [ ] Las rutas de glosas e historial. **PENDIENTE** — son las más grandes y las que más pantallas alimentan; van en su propio commit para poder revisarlas por separado.
 
 ### 3.2 Lógica de datos dentro de los routers
 

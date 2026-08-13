@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.models.schemas import TarifaContratadaOut, TarifasStatsOut
 from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import TarifaContratadaRecord, UsuarioRecord
@@ -59,7 +60,7 @@ def _parsear_fecha_opcional(v: str) -> Optional[datetime]:
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 
-@router.get("")
+@router.get("", response_model=list[TarifaContratadaOut])
 def listar_tarifas(
     eps: Optional[str] = Query(None, description="Filtrar por EPS (contains, case-insensitive)"),
     cups: Optional[str] = Query(None, description="Filtrar por código CUPS exacto"),
@@ -601,7 +602,7 @@ def cobertura_eps(
     }
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=TarifasStatsOut)
 def stats_tarifas(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
