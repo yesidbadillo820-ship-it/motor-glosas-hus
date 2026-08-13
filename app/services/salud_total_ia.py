@@ -52,6 +52,21 @@ MAX_EN_PARALELO = 3
 SEGUNDOS_LIMITE_POR_GLOSA = 120
 
 
+def _pesos(valor) -> str:
+    """Escribe un valor de peso como se escribe en Colombia.
+
+    13-08-2026. La primera versión le pasaba a la IA el número tal cual salía
+    del archivo —`93340.0`— y la IA lo copiaba al dictamen: en el documento
+    que se radica quedaba «FACTURADA POR $ 93340.0». Un decimal en un valor
+    en pesos, en un documento legal, se lee como descuido.
+    """
+    try:
+        n = float(valor or 0)
+    except (TypeError, ValueError):
+        return str(valor or "0")
+    return f"${n:,.0f}".replace(",", ".")
+
+
 def _texto_de_la_glosa(fila: dict) -> str:
     """Arma el texto que lee el motor, con lo que la entidad mandó.
 
@@ -64,8 +79,8 @@ def _texto_de_la_glosa(fila: dict) -> str:
         f"RADICADO DE LA GLOSA: {fila.get('NumeroRad') or ''}",
         f"REGISTRO: {fila.get('NUMREG') or ''}",
         f"SERVICIO: {fila.get('NombreServicio') or ''}",
-        f"VALOR FACTURADO DEL SERVICIO: {fila.get('ValorTotalServ') or 0}",
-        f"VALOR OBJETADO: {fila.get('ValorGlosaTotalxServ') or 0}",
+        f"VALOR FACTURADO DEL SERVICIO: {_pesos(fila.get('ValorTotalServ'))}",
+        f"VALOR OBJETADO POR LA ENTIDAD: {_pesos(fila.get('ValorGlosaTotalxServ'))}",
     ]
     # Los dos códigos van SEPARADOS. Pegados daban «TATA23», que no es
     # ningún código y confunde al motor: el general es TA y el específico
