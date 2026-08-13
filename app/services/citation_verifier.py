@@ -28,14 +28,20 @@ logger = logging.getLogger("motor_glosas")
 # producción 10-jun-2026: el dictamen citaba "MESA DE CONCILIACIÓN DE
 # AUDITORÍA (ART. 20 DEC. 4747/2007)" y el verifier reportaba la sentencia
 # fantasma "C-4747/2007" como NORMA_INEXISTENTE.
+# 06-08-2026 — la palabra iba con tilde obligatoria y es la ÚNICA de las
+# cinco que la lleva. El dictamen se radica en MAYÚSCULA SOSTENIDA y hay
+# rutas que pierden la tilde: escrito "RESOLUCION 9999 DE 2030", el
+# verificador ni siquiera lo contaba como cita, así que una resolución
+# inventada salía con el sello «citas verificadas · 0 hallazgos».
 PAT_RESOLUCION = re.compile(
-    r"\bResolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bRes(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bResoluci[óo]n\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
+    r"|\bRes(?:oluci[óo]n)?\.?\s*(\d{1,5})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 # La 2.ª alternativa acepta la abreviatura "Dec. 4747/2007" (antes solo
 # "Decreto NNN/YYYY" — la forma abreviada ni se contaba como cita).
 PAT_DECRETO = re.compile(
-    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 # El lookbehind excluye "DECRETO-LEY 1795 DE 2000" / "DECRETO LEY ...":
@@ -65,8 +71,12 @@ PAT_CIRCULAR = re.compile(
     r"\bCircular\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bCircular\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
+# 06-08-2026 — solo se reconocía la forma con barra o guion ("T-760/2008").
+# La forma que escribe el motor en prosa —"Sentencia T-994 de 2029"— no se
+# contaba como cita, así que una sentencia inventada pasaba sin revisar. Es
+# la trampa que Yesid puso en la glosa CL0301 de FAMISANAR.
 PAT_SENTENCIA = re.compile(
-    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
+    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
 PAT_ARTICULO = re.compile(
