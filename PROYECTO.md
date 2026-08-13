@@ -135,7 +135,7 @@ documentación: es un tablero de trabajo.
 - **Responsable:** Yesid (dueño)
 - **Dependencias:** módulo 15 · `app/services/validador_adres_service.py` (código común) · rol AUDITOR
 - **Próximo objetivo:** probarlo en el portal con un paquete real y comparar el Excel contra el de la app del puerto 8010
-- **Riesgo:** la pantalla del portal todavía no existe; hoy solo responden las rutas
+- **Riesgo:** ninguno conocido — la pantalla quedó el 13-08; falta probarla con un paquete real
 
 ### 17. Conciliación del Dispensario (cadena de escritorio)
 - **Estado:** Activo · **Prioridad:** Alta
@@ -166,7 +166,7 @@ documentación: es un tablero de trabajo.
 1. **Reiniciar el motor y repetir las glosas de prueba** — confirmar que en el arranque aparece `[SEED-CLAUSULAS]` y que los dictámenes salen sin los hechos inventados.
 2. **Regenerar la respuesta de Salud Total desde el portal** con la fecha de recepción de la factura, y comprobar radicado completo, valor glosado real y sigla del motivo. El `RTAGLOSA_..._13082026.csv` viejo no se radica.
 3. **Cargar las 6.655 tarifas de FAMISANAR como pactadas** — ya se puede: el contrato está firmado. Ojo con la hoja UVB (va la columna pactada, no la de referencia).
-4. **Armar la pantalla del portal** para el validador ADRES y el buscador de autorizaciones — las rutas ya responden, falta el botón.
+4. **Homologador CUPS → SOAT 2026** — el que hay en el motor es del 30-06-2025 (10.024 CUPS). Falta cargar el archivo 2026 que subió Yesid y la Circular 047/2025.
 5. **Cargar el PDF de los contratos que no tienen cláusulas** — hoy solo 11 pagadores tienen cláusulas base.
 
 ## BLOQUEANTES

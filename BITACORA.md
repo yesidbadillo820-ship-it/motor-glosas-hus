@@ -2716,8 +2716,14 @@ quedaron como pruebas para que no se repitan.
   FURIPS y verificar que el Excel del informe salga igual que el de la
   aplicación aparte del puerto 8010. Si sale igual, ya no hay que levantar
   esa aplicación.
-- **C) Falta la pantalla del buscador de autorizaciones.** El motor y el bot
-  de doble clic están; el botón dentro del portal todavía no.
+- **C) ~~Falta la pantalla del buscador de autorizaciones.~~** **Hecha el
+  mismo 13-08.** En el menú, bajo Herramientas, aparece **«Validador
+  ADRES»**, y esa pantalla trae las dos cosas: arriba la validación de los
+  soportes del ADRES (FURIPS 1 y 2, con su Excel), abajo el buscador de
+  números de autorización de los RIPS. El buscador deja escoger **una
+  carpeta completa de facturación**, con sus subcarpetas: de todo lo que hay
+  adentro solo viajan los `.json`, el resto se descarta en el mismo equipo
+  para que la subida no se vuelva eterna.
 - **D) Cargar las 6.655 tarifas de FAMISANAR como pactadas.** Ya se puede: el
   contrato está firmado y sus cláusulas quedaron cargadas. Ojo con la hoja
   UVB, que trae dos columnas de plata (va la **pactada**, no la de
