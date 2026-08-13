@@ -48,6 +48,52 @@ existente (hechos por fecha, PENDIENTE, PARA MAÑANA).
   portales: para tocar esos recursos, entregar el comando PowerShell listo
   para copiar/pegar y pedir la salida al auditor.
 
+## Trabajo holístico y calidad total
+
+### Principio de impacto sistémico
+
+- **Prohibido el trabajo aislado.** Al modificar una ruta o un modelo del
+  backend (`app/`), hay que revisar y actualizar en el mismo cambio el
+  frontend que la consume (`static/`), sus pruebas (`tests/`) y su
+  documentación (`docs/`). El caso que lo enseñó: la pantalla «Salud Total»
+  estuvo tres meses devolviendo «Not Found» porque se borró su router sin
+  mirar que el JavaScript seguía llamándolo.
+- **Visibilidad.** Cada cambio debe notarse: o el auditor lo ve en pantalla,
+  o el sistema queda demostrablemente más robusto (con la prueba que lo
+  demuestra).
+
+### Los cuatro pilares de cada intervención
+
+1. **Diseño y experiencia.** Usar las variables y componentes de
+   `static/sinac-ds.css` (tokens `--sds-*`) y `static/sinac-ux.js`
+   (`window.SDS_UX`). Toda pantalla necesita estado de carga, error visible
+   y entendible, estado vacío, y moneda y fechas con el formato único
+   (`fmtCOP`, no `toLocaleString` suelto).
+2. **Arquitectura y código.** Tipado estricto (Pydantic en las respuestas,
+   *type hints* en Python), sin lógica duplicada, y la lógica de negocio en
+   `app/services/` — los routers de `app/api/routers/` solo reciben, validan
+   y responden.
+3. **Rendimiento.** Sin consultas dentro de bucles (N+1), índices en los
+   campos por los que de verdad se busca, y sin llamadas repetidas a la IA
+   por lo mismo.
+4. **Funcionalidad y pruebas.** Toda mejora va con su prueba de `pytest` y
+   sus casos borde: glosa extemporánea, factura en cero, archivo vacío,
+   fecha al revés, red caída.
+
+### Lo que estas reglas NO autorizan
+
+Estas reglas se subordinan a las de arriba y a las tres del proyecto:
+
+- **No reescribir lo que funciona.** Un pilar no es permiso para refactorizar
+  código estable: hace falta una razón técnica demostrable y una prueba que
+  muestre el defecto antes de tocarlo.
+- **Cambio mínimo.** Cien cambios pequeños y reversibles, no uno gigante.
+- **No inventar.** Ni datos, ni contratos, ni artículos, ni CUPS, ni tarifas.
+  Sin evidencia, el dictamen dice «no existe evidencia suficiente».
+
+El tablero de este programa es `MASTER_IMPROVEMENT_PLAN.md`: sus casillas se
+marcan solo cuando el trabajo está hecho **y probado**, nunca por adelantado.
+
 Contexto adicional por flujo de trabajo (léelos cuando el tema aplique):
 - `docs/CONTEXTO_DISPENSARIO_GLOSAS.md` — respuesta de glosas del Dispensario en SIMED.
 - `docs/CONTEXTO_DISPENSARIO_NOTAS.md` — cargue de notas crédito en SIMED.

@@ -6913,9 +6913,19 @@ var loadMsgIdx = 0;
 var loadInterval = null;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────
+// El formato de la plata y de las fechas vive en sinac-ux.js (window.SDS_FMT)
+// para que TODAS las páginas del portal escriban la misma cifra igual: el
+// auditor concilia contra Dinámica Gerencial mirando esos números. Acá solo
+// quedan los nombres de siempre, delegando, para no tocar los cientos de
+// sitios que ya los llaman.
 var fmt = new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0});
-function cop(v){return fmt.format(v)}
-function fmtCOP(v){return v?fmt.format(v):'$0'}
+function cop(v){return (window.SDS_FMT ? window.SDS_FMT.cop(v) : fmt.format(v||0))}
+function fmtCOP(v){return (window.SDS_FMT ? window.SDS_FMT.cop(v) : (v?fmt.format(v):'$0'))}
+function fmtNum(v){return (window.SDS_FMT ? window.SDS_FMT.num(v) : String(v==null?0:v))}
+// El respaldo NO puede volver a llamarse a sí mismo: si sinac-ux.js no cargó,
+// la recursión tumba la pantalla entera en vez de degradarse.
+function fmtFecha(v){if(window.SDS_FMT) return window.SDS_FMT.fecha(v); if(!v) return '—'; var d=new Date(v); return isNaN(d.getTime())?'—':d.toLocaleString('es-CO');}
+function fmtFechaCorta(v){if(window.SDS_FMT) return window.SDS_FMT.fechaCorta(v); if(!v) return '—'; var d=new Date(v); return isNaN(d.getTime())?'—':d.toLocaleDateString('es-CO');}
 function authH(){return {'Authorization':'Bearer '+TOKEN}}
 function H(obj){return Object.assign({'Authorization':'Bearer '+TOKEN},obj||{})}
 
@@ -7090,7 +7100,7 @@ async function iniciarCapaDeVida(){
           var partes = [];
           if(s.nuevas_hoy) partes.push(s.nuevas_hoy + ' glosa(s) nueva(s) hoy');
           if(s.por_vencer) partes.push('⏰ ' + s.por_vencer + ' por vencer');
-          if(s.recuperado_semana) partes.push('💰 $' + Number(s.recuperado_semana).toLocaleString('es-CO') + ' recuperados esta semana');
+          if(s.recuperado_semana) partes.push('💰 ' + fmtCOP(Number(s.recuperado_semana)) + ' recuperados esta semana');
           if(s.racha_dias >= 3) partes.push('🔥 racha de ' + s.racha_dias + ' días');
           var cuerpo = partes.length ? partes.join(' · ') : (s.mensaje_pendientes || s.frase);
           if(typeof toast === 'function'){
@@ -7594,7 +7604,7 @@ async function mostrarDigestUltimaVisita(){
         '<button onclick="document.getElementById(\'digest-banner\').remove()" style="background:transparent;border:0;color:var(--text3);cursor:pointer;font-size:1.1rem;line-height:1">×</button>'+
       '</div>'+
       '<div style="font-size:.78rem;color:var(--text2);line-height:1.7">'+
-        'Desde tu última visita ('+(lastVisit ? new Date(lastVisit).toLocaleString('es-CO') : 'hace 24h')+'):<br>'+
+        'Desde tu última visita ('+(lastVisit ? fmtFecha(lastVisit) : 'hace 24h')+'):<br>'+
         '<ul style="margin:.4rem 0 .4rem 1.2rem;padding:0">'+
           lineas.map(function(l){return '<li>'+l+'</li>';}).join('')+
         '</ul>'+
@@ -7744,7 +7754,7 @@ async function refrescarKpisHeader(){
       if(span) span.textContent = valor;
       else el.textContent = valor;  // fallback si la estructura cambia
     }
-    _setKpi($('hdr-kpi-glosas'), (a.glosas_mes || 0).toLocaleString('es-CO') + ' glosas');
+    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas');
     var rec = a.valor_recuperado_mes || 0;
     _setKpi($('hdr-kpi-recuperado'), (rec > 0 ? cop(rec) : '$0'));
     // Pendientes: glosas con fecha_vencimiento próxima
@@ -8441,8 +8451,8 @@ async function cargarTarifas(){
         celdaValor = '<span style="color:#0369a1;"><b>SOAT ' + signo + factor + '%</b></span>';
         celdaTipo = '<span style="background:#dbeafe;color:#1e40af;padding:.15rem .4rem;border-radius:4px;font-size:.7rem;">SOAT%</span>';
       } else {
-        var valor = (t.valor_pactado || 0).toLocaleString('es-CO', {minimumFractionDigits: 0, maximumFractionDigits: 2});
-        celdaValor = '<b>$' + valor + '</b>';
+        var valor = fmtCOP(t.valor_pactado || 0);
+        celdaValor = '<b>' + valor + '</b>';
         celdaTipo = '<span style="background:#dcfce7;color:#166534;padding:.15rem .4rem;border-radius:4px;font-size:.7rem;">FIJO</span>';
       }
       return '<tr>' +
@@ -8580,7 +8590,7 @@ async function cargarClausulasContrato(){
     });
     var html = '<details style="background:#fafafa;border:1px solid var(--line);border-radius:8px;padding:.7rem 1rem;margin-top:.6rem;" open>' +
       '<summary style="cursor:pointer;font-weight:600;">📑 ' + data.total_clausulas + ' cláusulas extraídas de ' + escHtml(eps) + ' · subido ' +
-      (data.pdf_subido_en ? new Date(data.pdf_subido_en).toLocaleString('es-CO') : 'fecha desconocida') + '</summary>';
+      (data.pdf_subido_en ? fmtFecha(data.pdf_subido_en) : 'fecha desconocida') + '</summary>';
     Object.keys(porTema).sort().forEach(function(t){
       html += '<div style="margin-top:.7rem;"><div style="font-weight:600;font-size:.85rem;color:#5b21b6;margin-bottom:.3rem;">' + (TEMAS[t] || t) + ' (' + porTema[t].length + ')</div>';
       porTema[t].forEach(function(c){
@@ -8876,7 +8886,7 @@ function _imRenderPreviewModal(data){
   var dedupBanner = '';
   if(data.lote_duplicado){
     var d = data.lote_duplicado;
-    var fechaDup = d.iniciado_en ? new Date(d.iniciado_en).toLocaleString('es-CO') : '?';
+    var fechaDup = d.iniciado_en ? fmtFecha(d.iniciado_en) : '?';
     dedupBanner = '<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem;font-size:.85rem;color:#7c2d12;">'
       + '<div style="display:flex;align-items:center;gap:.6rem;"><span style="font-size:1.4rem;">⚠️</span>'
       + '<div style="flex:1;"><b>Este texto YA fue procesado antes</b><br>'
@@ -9063,7 +9073,7 @@ async function cargarHistorialLotesMasiva(page){
     var rows = data.items.map(function(l){
       var col = l.estado === 'COMPLETO' ? '#16a34a' : (l.estado === 'ERROR' ? '#dc2626' : (l.estado === 'CANCELADO' ? '#6b7280' : '#0369a1'));
       var pct = Math.round(100 * (l.procesadas||0) / Math.max(l.total_filas, 1));
-      var fechaIni = l.iniciado_en ? new Date(l.iniciado_en).toLocaleString('es-CO') : '—';
+      var fechaIni = l.iniciado_en ? fmtFecha(l.iniciado_en) : '—';
       var btnCancelar = l.estado === 'PROCESANDO' ? '<button class="btn-sm" onclick="cancelarLote('+l.id+')" style="font-size:.65rem;color:#b91c1c;border-color:#fca5a5;background:#fef2f2;">🛑 Cancelar</button>' : '';
       var btnExportar = '<a href="/glosas/importar-masiva/lote/'+l.id+'/exportar" class="btn-sm" target="_blank" style="font-size:.65rem;text-decoration:none;display:inline-block;">📥 CSV</a>';
       return '<tr>'
@@ -9324,7 +9334,7 @@ async function verHistorialVersiones(){
       return txt.length > 450 ? txt.substring(0,450) : txt;
     };
     versiones.forEach(function(v, i){
-      var fecha = v.creado_en ? new Date(v.creado_en).toLocaleString('es-CO') : '—';
+      var fecha = v.creado_en ? fmtFecha(v.creado_en) : '—';
       var previewTexto = stripHtml(v.preview || '');
       // R63 P2: botón "Diff vs anterior" si hay versión cronológicamente
       // anterior (versiones vienen en orden DESC, la siguiente del array
@@ -9630,7 +9640,7 @@ function intelPintar(){
   var d = INTEL.datos; if(!d) return;
   var titular = document.getElementById('intel-titular');
   if(titular) titular.textContent = d.titular;
-  var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+  var cop = function(v){ return fmtCOP(v||0); };
 
   var html = '<div class="intel-resumen">'
     + '<div class="intel-kpi"><b style="color:' + (d.urgentes ? '#dc2626' : '#16a34a') + '">' + d.urgentes + '</b><span>frentes urgentes</span></div>'
@@ -9724,7 +9734,7 @@ async function expBuscar(){
       html += '<button onclick="expAbrir(' + g.glosa_id + ')"><b>#' + g.glosa_id + '</b> · '
             + escHtml(g.factura || 'sin factura') + ' · ' + escHtml(g.eps || '') + ' · '
             + escHtml(g.codigo_glosa || '') + ' · ' + escHtml(g.estado || '')
-            + ' · $' + Math.round(g.valor_objetado||0).toLocaleString('es-CO') + '</button>';
+            + ' · ' + fmtCOP(Math.round(g.valor_objetado||0)) + '</button>';
     });
     res.innerHTML = html + '</div>';
   }catch(e){ res.innerHTML = '<div class="malla-vacio">Conexión: ' + escHtml(e.message) + '</div>'; }
@@ -9754,7 +9764,7 @@ async function expFactura(numero){
     var r = await fetch('/glosas/expediente/factura?numero=' + encodeURIComponent(numero), {headers: authH()});
     if(!r.ok){ res.innerHTML = '<div class="malla-vacio">Error HTTP ' + r.status + '</div>'; return; }
     var d = await r.json();
-    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+    var cop = function(v){ return fmtCOP(v||0); };
     var html = '<div class="exp-ficha" style="margin-bottom:.5rem">'
       + '<div class="exp-dato"><b>Factura</b><span>' + escHtml(d.factura) + '</span></div>'
       + '<div class="exp-dato"><b>Pagador</b><span>' + escHtml(d.eps||'—') + '</span></div>'
@@ -9790,7 +9800,7 @@ async function expDescargar(url, nombre){
 function expPintar(){
   var d = EXP.datos; if(!d) return;
   var f = d.ficha;
-  var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+  var cop = function(v){ return fmtCOP(v||0); };
   var html = '';
 
   // La ficha: quién es este expediente
@@ -9864,7 +9874,7 @@ function expPintar(){
     if(EXP.filtro && expGrupoTipo(e.tipo) !== EXP.filtro) return;
     visibles++;
     var color = expColorTipo(e);
-    var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
+    var fecha = e.timestamp ? fmtFecha(e.timestamp) : '—';
     html += '<div class="exp-ev" style="--exp-c:' + color + ';border-left:4px solid ' + color + '">'
       + '<div class="exp-ev-tipo" style="color:' + color + '">' + expIconoTipo(e.tipo) + ' ' + escHtml(expNombreTipo(e.tipo)) + '</div>'
       + '<div class="exp-ev-meta">' + escHtml(e.actor||'—') + ' · ' + fecha + '</div>'
@@ -9953,8 +9963,8 @@ async function verDiffVersiones(glosaId, v1Id, v2Id){
              + '</style></head><body>'
              + '<h1>🔍 Diff: v' + v1Id + ' (' + esc(d.v1.accion || '—') + ') ↔ v' + v2Id + ' (' + esc(d.v2.accion || '—') + ')</h1>'
              + '<div class="meta">Glosa #' + glosaId + ' · '
-             + 'v' + v1Id + ' ' + (d.v1.creado_en ? new Date(d.v1.creado_en).toLocaleString('es-CO') : '—')
-             + ' → v' + v2Id + ' ' + (d.v2.creado_en ? new Date(d.v2.creado_en).toLocaleString('es-CO') : '—')
+             + 'v' + v1Id + ' ' + (d.v1.creado_en ? fmtFecha(d.v1.creado_en) : '—')
+             + ' → v' + v2Id + ' ' + (d.v2.creado_en ? fmtFecha(d.v2.creado_en) : '—')
              + '</div>'
              + resumen
              + '<div style="background:#1e293b;border-radius:8px;padding:14px;margin-top:1rem;">'
@@ -10029,7 +10039,7 @@ async function liquidarTarifa(preset){
         + _liquidadorManualHtml(modalidad, pct, anio);
       return;
     }
-    var fmt = function(n){ return n == null ? '—' : '$' + (n||0).toLocaleString('es-CO'); };
+    var fmt = function(n){ return n == null ? '—' : fmtCOP(n||0); };
     var head = '<tr style="border-bottom:2px solid var(--border);background:var(--bg-subtle)">'
       + '<th style="text-align:left;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Código</th>'
       + '<th style="text-align:left;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Descripción</th>'
@@ -10104,7 +10114,7 @@ async function liquidarManual(modalidad, pct, anio){
     var d = await r.json();
     if(!r.ok){ toast('Error', d.detail || 'No se pudo calcular', 'error'); return; }
     var resEl = document.getElementById('liq-manual-result');
-    if(resEl) resEl.textContent = '= $' + (d.valor_pesos||0).toLocaleString('es-CO') + ' (' + d.formula + ')';
+    if(resEl) resEl.textContent = '= ' + fmtCOP((d.valor_pesos||0)) + ' (' + d.formula + ')';
   }catch(e){ toast('Error', e.message, 'error'); }
 }
 
@@ -10932,7 +10942,7 @@ function cargarConceptoDeFactura(keyOrId){
     if(g.servicio) partes.push(g.servicio);
     // Agregar valor objetado antes de la observación
     if(g.valor_objetado && g.valor_objetado > 0){
-      partes.push('Valor objetado: $' + g.valor_objetado.toLocaleString('es-CO'));
+      partes.push('Valor objetado: ' + fmtCOP(g.valor_objetado));
     }
     if(g.observacion_eps) partes.push(g.observacion_eps);
     var textoFinal = partes.filter(function(p){ return p && String(p).trim(); }).join(' - ');
@@ -10942,7 +10952,7 @@ function cargarConceptoDeFactura(keyOrId){
       if(g.codigo_glosa) legacy.push(g.codigo_glosa);
       if(g.servicio) legacy.push(g.servicio);
       if(g.cups) legacy.push('CUPS ' + g.cups);
-      if(g.valor_objetado) legacy.push('$' + g.valor_objetado.toLocaleString('es-CO'));
+      if(g.valor_objetado) legacy.push(fmtCOP(g.valor_objetado));
       if(g.concepto_glosa) legacy.push('Motivo: ' + g.concepto_glosa);
       textoFinal = legacy.join(' - ');
       if(textoFinal.length < 15){
@@ -11018,7 +11028,7 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
           // Snapshot del lastResult: dictamen HTML + texto limpio + metadata
           snap: lastResult ? {
             codigo_glosa: lastResult.codigo_glosa || g.codigo_glosa || '—',
-            valor_objetado: lastResult.valor_objetado || ('$ ' + (g.valor_objetado||0).toLocaleString('es-CO')),
+            valor_objetado: lastResult.valor_objetado || (fmtCOP(g.valor_objetado||0)),
             dictamen: lastResult.dictamen || '',
             paciente: lastResult.paciente || '',
             tipo: lastResult.tipo || '',
@@ -11067,7 +11077,7 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
     out += '</div>';
     for(var j = 0; j < resultadosHtml.length; j++){
       var r = resultadosHtml[j];
-      var valorFmt = '$' + (r.valor || 0).toLocaleString('es-CO');
+      var valorFmt = fmtCOP(r.valor || 0);
       var colOpen = (j === resultadosHtml.length - 1) ? 'open' : '';  // último abierto por defecto
       out += '<details ' + colOpen + ' style="margin-bottom:14px;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;">';
       out += '<summary style="padding:12px 16px;background:linear-gradient(90deg,#1e3a8a,#0369a1);color:#fff;cursor:pointer;font-weight:600;font-size:.95rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;">';
@@ -11571,7 +11581,7 @@ async function poblarLandingKPIs(){
 
   // ─── KPIs principales ───
   if(a){
-    if($('land-total')) $('land-total').textContent = (a.glosas_mes||0).toLocaleString('es-CO');
+    if($('land-total')) $('land-total').textContent = fmtNum(a.glosas_mes||0);
     if($('land-valor')) $('land-valor').textContent = cop(a.valor_objetado_mes||0);
     if($('land-tasa')){
       var tasa = a.tasa_exito_pct||0;
@@ -11675,7 +11685,7 @@ function poblarLandingInsights(metrics){
     }
   }
   var elTot = $('land-top-eps-total');
-  if(elTot && totalGlosas > 0) elTot.textContent = '· ' + totalGlosas.toLocaleString('es-CO') + ' glosas';
+  if(elTot && totalGlosas > 0) elTot.textContent = '· ' + fmtNum(totalGlosas) + ' glosas';
 
   // Top causales por tipo (chips coloreados)
   byTipo.sort(function(a,b){ return (b.count||0) - (a.count||0); });
@@ -11921,7 +11931,7 @@ function renderPrefillSoportes(d){
   chips.push(chip('CUPS',     d.cups,              'cups',     'f-cups'));
   chips.push(chip('Paciente', d.paciente,          'paciente', null));
   if(d.valor_objetado){
-    chips.push(chip('Valor objetado','$ '+(d.valor_objetado).toLocaleString('es-CO'),'valor_objetado','f-valacp'));
+    chips.push(chip('Valor objetado',fmtCOP(d.valor_objetado),'valor_objetado','f-valacp'));
   }
   if(d.fecha_radicacion){
     chips.push(chip('F. Radicación', d.fecha_radicacion, 'fecha_rad', 'f-rad'));
@@ -12451,7 +12461,7 @@ async function cargarMiDesempeno(){
     }
     var d = await r.json();
     document.getElementById('md-saludo').textContent = 'Hola ' + (d.usuario.nombre||'') + ' · Últimos ' + d.ventana_dias + ' días';
-    document.getElementById('mk-total').textContent = d.kpis.total_glosas.toLocaleString('es-CO');
+    document.getElementById('mk-total').textContent = fmtNum(d.kpis.total_glosas);
     document.getElementById('mk-rec').textContent = cop(d.kpis.valor_recuperado);
     document.getElementById('mk-tasa').textContent = d.kpis.tasa_exito + '%';
     document.getElementById('mk-racha').textContent = d.racha_dias;
@@ -13844,8 +13854,7 @@ function abrirModalNotaCredito(glosaId, factura, valorAceptado, numeroExistente)
   var sub = document.getElementById('nc-subtitulo');
   if(sub){
     sub.textContent = 'Factura ' + (factura || '#' + glosaId) +
-      ' · valor aceptado: $' +
-      Number(valorAceptado || 0).toLocaleString('es-CO', {maximumFractionDigits:0});
+      ' · valor aceptado: ' + fmtCOP(Number(valorAceptado || 0));
   }
   var inpNum = document.getElementById('nc-numero');
   if(inpNum) inpNum.value = numeroExistente || '';
@@ -13864,8 +13873,7 @@ function abrirModalNotaCredito(glosaId, factura, valorAceptado, numeroExistente)
   var info = document.getElementById('nc-info');
   if(info){
     info.innerHTML = 'Se registrará la nota crédito asociada a esta aceptación. ' +
-      'Si dejas el valor vacío, se tomará el valor aceptado (<b>$' +
-      Number(valorAceptado || 0).toLocaleString('es-CO', {maximumFractionDigits:0}) +
+      'Si dejas el valor vacío, se tomará el valor aceptado (<b> ' + fmtCOP(Number(valorAceptado || 0)) +
       '</b>).';
   }
   modal.style.display = 'flex';
@@ -14384,7 +14392,7 @@ function _renderMisGlosas(dataRaw){
 
     body.innerHTML = data.map(function(g){
       var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : '—';
-      var valor = (g.valor_objetado || 0).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0});
+      var valor = fmtCOP(g.valor_objetado || 0);
       // Indicador de soportes auto-detectados (PDFs en servidor del HUS)
       var soportesIcon = '';
       if(g.soportes_disponibles && g.soportes_disponibles > 0){
@@ -14677,7 +14685,7 @@ async function decisionEpsLote(decision){
     if(!r.ok){ toast('Error', d.detail || 'Error en lote', 'error'); return; }
     var msg = '✓ ' + d.procesadas + ' glosa(s) marcadas como ' + decision;
     if(decision === 'LEVANTADA' && d.valor_recuperado_total > 0){
-      msg += '\n\n💰 Total recuperado: $' + (d.valor_recuperado_total||0).toLocaleString('es-CO');
+      msg += '\n\n💰 Total recuperado: ' + fmtCOP((d.valor_recuperado_total||0));
     }
     if(d.fallidas && d.fallidas.length){
       msg += '\n\n⚠ ' + d.fallidas.length + ' fallaron (ya estaban en ese estado o no encontradas)';
@@ -14707,7 +14715,7 @@ async function cargarBannerVencen24h(){
     if(!r.ok){ box.style.display = 'none'; return; }
     var d = await r.json();
     if(!d.total){ box.style.display = 'none'; return; }
-    var valor = (d.valor_total_riesgo || 0).toLocaleString('es-CO');
+    var valor = fmtCOP(d.valor_total_riesgo || 0);
     box.style.display = 'block';
     box.innerHTML =
       '<div style="background:linear-gradient(135deg,#fee2e2,#fecaca);border:2px solid #dc2626;border-radius:10px;padding:.9rem 1.2rem;color:#991b1b">' +
@@ -15283,7 +15291,7 @@ async function verGlosa(id){
     var w = window.open('', '_blank', 'width=900,height=700');
     w.document.write('<html><head><title>Glosa ' + id + '</title><meta charset="utf-8"><style>body{font-family:Segoe UI,Arial;padding:20px;background:#f3f4f6}</style></head><body>' +
       '<h2>Glosa #' + id + ' — ' + (g.eps || '') + '</h2>' +
-      '<p><b>Factura:</b> ' + (g.factura || '-') + ' | <b>Código:</b> ' + (g.codigo_glosa || '-') + ' | <b>Valor objetado:</b> $' + (g.valor_objetado || 0).toLocaleString('es-CO') + '</p>' +
+      '<p><b>Factura:</b> ' + (g.factura || '-') + ' | <b>Código:</b> ' + (g.codigo_glosa || '-') + ' | <b>Valor objetado:</b> ' + fmtCOP((g.valor_objetado || 0)) + '</p>' +
       '<hr>' +
       (g.dictamen || '<p>Sin dictamen</p>') +
       '</body></html>');
@@ -15517,7 +15525,7 @@ async function responderGlosa(id){
         if(lista.length === 0 && tablaInput && !tablaInput.value){
           var partes = [];
           if(g.consecutivo_dgh) partes.push('CONSECUTIVO DGH: ' + g.consecutivo_dgh);
-          if(g.valor_objetado) partes.push('VALOR: $' + g.valor_objetado.toLocaleString('es-CO'));
+          if(g.valor_objetado) partes.push('VALOR: ' + fmtCOP(g.valor_objetado));
           if(g.tipo_glosa_excel) partes.push('TIPO GLOSA: ' + g.tipo_glosa_excel);
           if(g.profesional_medico) partes.push('PROFESIONAL MÉDICO: ' + g.profesional_medico);
           if(g.observacion_tecnico) partes.push('OBSERVACIÓN: ' + g.observacion_tecnico);
@@ -16054,7 +16062,7 @@ function renderPreviewAuditoria(data){
   var color = score >= 60 ? '#16a34a' : (score >= 30 ? '#d97706' : '#dc2626');
   var bg = score >= 60 ? '#dcfce7' : (score >= 30 ? '#fef3c7' : '#fee2e2');
   var hallazgos = data.hallazgos || [];
-  var fmt = function(v){ return '$' + Number(v||0).toLocaleString('es-CO',{maximumFractionDigits:0}); };
+  var fmt = function(v){ return fmtCOP(Number(v||0)); };
   var html = '<div class="card-premium" style="margin:1rem 1.5rem;padding:1.4rem;">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">';
   html += '<div>';
@@ -16263,7 +16271,7 @@ function renderAccionIA(d){
   var accion = String(d.accion_ia).toUpperCase();
   var aceptar = Number(d.valor_aceptar_ia || 0);
   var defender = Number(d.valor_defender_ia || 0);
-  var fmt = function(v){ return '$' + Number(v||0).toLocaleString('es-CO', {maximumFractionDigits:0}); };
+  var fmt = function(v){ return fmtCOP(Number(v||0)); };
   var meta = {
     'DEFENDER_TOTAL': {
       bg: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
@@ -16341,8 +16349,7 @@ function aplicarRecomendacionIA(monto, accion){
     inp.scrollIntoView({ behavior:'smooth', block:'center' });
     if(typeof toast === 'function'){
       toast('Recomendación aplicada',
-        accion + ' · valor a aceptar: $' +
-        Number(monto).toLocaleString('es-CO',{maximumFractionDigits:0}) +
+        accion + ' · valor a aceptar: ' + fmtCOP(Number(monto)) +
         '. Reanalizá para que quede como aceptación parcial, y verificá antes de responder.',
         'success');
     }
@@ -16981,7 +16988,7 @@ async function auditorForenseDesdeServidorLocal(){
       + (dU.cache_hit
           ? '⚡ <b>Respuesta cacheada</b>' + cacheBadge + ' · 0 tokens · '
           : '✅ <b>'+blobs.length+' PDFs leídos del servidor local</b> · '
-            + 'Tokens: '+(dU.input_tokens||0).toLocaleString()+' in / '+(dU.output_tokens||0).toLocaleString()+' out · '
+            + 'Tokens: '+fmtNum(dU.input_tokens||0)+' in / '+fmtNum(dU.output_tokens||0)+' out · '
             + (dU.bytes_recibidos ? Math.round(dU.bytes_recibidos/1024)+' KB · ' : ''))
       + 'Modelo: ' + escHtml(dU.modelo||'?')
       + '</div>';
@@ -17051,7 +17058,7 @@ async function auditorForenseStandalone(forzarRefresco){
       + (data.cache_hit
           ? '⚡ <b>Respuesta cacheada</b>' + cacheBadge + ' · 0 tokens consumidos · '
           : '✅ <b>' + (data.soportes_usados||[]).length + ' soportes leídos</b> · '
-            + 'Tokens: ' + (data.input_tokens||0).toLocaleString() + ' in / ' + (data.output_tokens||0).toLocaleString() + ' out · ')
+            + 'Tokens: ' + fmtNum(data.input_tokens||0) + ' in / ' + fmtNum(data.output_tokens||0) + ' out · ')
       + 'Modelo: ' + escHtml(data.modelo||'?') + ' · '
       + 'Modo: ' + escHtml(data.modo||'pdf_nativo')
       + '</div>';
@@ -17088,7 +17095,7 @@ function descargarAFOut(factura){
   var inner = out.querySelector('div[style*="Georgia"]') || out;
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Auditoria Forense ' + factura + '</title>'
     + '<style>body{font-family:Georgia,serif;max-width:900px;margin:2rem auto;padding:0 1.5rem;line-height:1.6;color:#1c1917;}h3{color:#5b21b6;margin-top:1.6rem;border-bottom:1px solid #ddd;padding-bottom:.3rem;}table{border-collapse:collapse;width:100%;margin-bottom:1rem;}td{padding:.4rem .7rem;border-bottom:1px solid #e5e7eb;}ul{margin:.5rem 0 1rem 1.5rem;}</style>'
-    + '</head><body>' + inner.innerHTML + '<hr><p style="font-size:.7rem;color:#666;margin-top:2rem;">Generado por IA GLOSAS SINAC SC — ' + new Date().toLocaleString('es-CO') + '</p></body></html>';
+    + '</head><body>' + inner.innerHTML + '<hr><p style="font-size:.7rem;color:#666;margin-top:2rem;">Generado por IA GLOSAS SINAC SC — ' + fmtFecha() + '</p></body></html>';
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -17125,7 +17132,7 @@ async function cargarDiagnostico(){
       + '<span style="font-size:2rem;">'+globalIco+'</span>'
       + '<div style="flex:1;">'
       + '<div style="font-weight:700;font-size:1.05rem;color:'+globalColor+';">Estado global: '+(data.estado_global||'?').toUpperCase()+'</div>'
-      + '<div style="font-size:.74rem;color:var(--text3);">v'+escHtml(data.version||'?')+' · generado '+new Date(data.generado_en).toLocaleString('es-CO')+'</div>'
+      + '<div style="font-size:.74rem;color:var(--text3);">v'+escHtml(data.version||'?')+' · generado '+fmtFecha(data.generado_en)+'</div>'
       + '</div>'
       + '</div>';
 
@@ -17237,7 +17244,7 @@ async function cargarGanadoresHistoricos(eps, codigo){
       if(card) card.style.display = 'none';
       return;
     }
-    var fmtCop = function(n){ return '$ ' + Math.round(Number(n)||0).toLocaleString('es-CO'); };
+    var fmtCop = function(n){ return fmtCOP(Number(n)||0); };
     var fmtFecha = function(iso){
       if(!iso) return '—';
       try{ return new Date(iso).toLocaleDateString('es-CO', {year:'numeric', month:'short', day:'numeric'}); }
@@ -17393,7 +17400,7 @@ function renderAutoPilotPanel(ap){
   }
   var valorStr = '';
   if(ap.diagnostico_caso_dificil && ap.diagnostico_caso_dificil.valor_cop){
-    valorStr = ' · Valor: $' + Math.round(ap.diagnostico_caso_dificil.valor_cop).toLocaleString('es-CO');
+    valorStr = ' · Valor: ' + fmtCOP(Math.round(ap.diagnostico_caso_dificil.valor_cop));
   }
   var html =
     '<div style="background:'+bg+';border:1.5px solid '+border+';border-radius:10px;padding:.85rem 1rem;margin-top:.6rem;font-size:.83rem;">'
@@ -17839,7 +17846,7 @@ function imprimirLoteConsolidado(){
     +   '<div><b>Etapa:</b> ' + esc(etapa) + '</div>'
     +   '<div><b>Fecha de emisión:</b> ' + esc(fecha) + ' · ' + esc(hora) + '</div>'
     +   '<div><b>Conceptos:</b> ' + lote.length + '</div>'
-    +   '<div><b>Valor total objetado:</b> $' + totalObj.toLocaleString('es-CO') + '</div>'
+    +   '<div><b>Valor total objetado:</b> ' + fmtCOP(totalObj) + '</div>'
     +   '<div><b>Elaboró:</b> ' + esc(elaborado) + '</div>'
     + '</div>'
     + '<div class="resumen">'
@@ -17848,7 +17855,7 @@ function imprimirLoteConsolidado(){
     +     '<tbody>';
   for(var i = 0; i < lote.length; i++){
     var rc = lote[i];
-    cover += '<tr><td>' + rc.n + '</td><td>' + esc(rc.codigo) + '</td><td>' + esc(rc.cups||'—') + '</td><td style="text-align:right">$' + (rc.valor||0).toLocaleString('es-CO') + '</td></tr>';
+    cover += '<tr><td>' + rc.n + '</td><td>' + esc(rc.codigo) + '</td><td>' + esc(rc.cups||'—') + '</td><td style="text-align:right"> ' + fmtCOP((rc.valor||0)) + '</td></tr>';
   }
   cover += '</tbody></table></div></div>';
 
@@ -17860,7 +17867,7 @@ function imprimirLoteConsolidado(){
     var rr = lote[k];
     var s = rr.snap || {};
     var codigoGlosa = s.codigo_glosa || rr.codigo || '—';
-    var valorObj = s.valor_objetado || ('$ ' + (rr.valor||0).toLocaleString('es-CO'));
+    var valorObj = s.valor_objetado || (fmtCOP(rr.valor||0));
     var tipoRes = s.tipo || '';
     var codResp = tipoRes.replace(/RESPUESTA\s*/i,'').trim() || '—';
     var resumen = s.codigo_glosa ? ('RESPUESTA A GLOSA ' + s.codigo_glosa) : '';
@@ -18212,7 +18219,7 @@ async function cargarBillingForense(){
     }).join('');
 
     var topRows = (d.top_calls_caras||[]).slice(0, 10).map(function(c){
-      var fecha = c.creado_en ? new Date(c.creado_en).toLocaleString('es-CO') : '—';
+      var fecha = c.creado_en ? fmtFecha(c.creado_en) : '—';
       return '<tr><td>'+escHtml(fecha)+'</td>'+
         '<td><code>'+escHtml(c.modelo||'?')+'</code></td>'+
         '<td>'+(c.glosa_id ? '#'+c.glosa_id : '<span style="color:var(--text3)">sistema</span>')+'</td>'+
@@ -18504,13 +18511,19 @@ async function _postComentario(glosaId, seccion){
   }catch(e){ toast('Error', String(e), 'error'); }
 }
 async function _resolverComentario(id, glosaId){
-  await fetch('/comentarios-thread/'+id+'/resolver', {method:'POST', headers:authH()});
-  await _renderComentarios(glosaId);
+  try{
+    var r = await fetch('/comentarios-thread/'+id+'/resolver', {method:'POST', headers:authH()});
+    if(!r.ok){ toast('No se pudo resolver','El servidor respondió '+r.status,'error'); return; }
+    await _renderComentarios(glosaId);
+  }catch(e){ toast('Sin conexión','No se pudo resolver el comentario: '+e.message,'error'); }
 }
 async function _borrarComentario(id, glosaId){
   if(!confirm('¿Borrar este comentario?')) return;
-  var r = await fetch('/comentarios-thread/'+id, {method:'DELETE', headers:authH()});
-  if(r.ok) await _renderComentarios(glosaId);
+  try{
+    var r = await fetch('/comentarios-thread/'+id, {method:'DELETE', headers:authH()});
+    if(!r.ok){ toast('No se pudo borrar','El servidor respondió '+r.status,'error'); return; }
+    await _renderComentarios(glosaId);
+  }catch(e){ toast('Sin conexión','No se pudo borrar el comentario: '+e.message,'error'); }
 }
 
 // Coaching IA y predicción ratificación: eliminados porque consumían
@@ -19426,7 +19439,7 @@ async function loadDash(){
   try{
     var r=await fetch('/analytics/',{headers:authH()});
     var a=await r.json();
-    document.getElementById('k-total').textContent=a.glosas_mes.toLocaleString('es-CO');
+    document.getElementById('k-total').textContent=fmtNum(a.glosas_mes);
     document.getElementById('k-obj').textContent=cop(a.valor_objetado_mes);
     document.getElementById('k-rec').textContent=cop(a.valor_recuperado_mes);
     document.getElementById('k-exito').textContent=a.tasa_exito_pct+'%';
@@ -19488,7 +19501,7 @@ async function cargarWinRateDetalle(){
       body.innerHTML = '<span style="color:var(--text3)">Sin glosas decididas en esta ventana.</span>';
       return;
     }
-    var fmtCop = function(n){ return '$ ' + Math.round(Number(n)||0).toLocaleString('es-CO'); };
+    var fmtCop = function(n){ return fmtCOP(Number(n)||0); };
     var fmtTasa = function(t){
       var color = t >= 75 ? '#15803d' : t >= 50 ? '#d97706' : '#b91c1c';
       return '<b style="color:' + color + '">' + t.toFixed(1) + '%</b>';
@@ -19536,7 +19549,7 @@ async function cargarPlataRecuperada(){
     if(!r.ok) return;
     var d = await r.json();
     var t = d.totales || {};
-    var fmt = function(n){ return '$' + (n||0).toLocaleString('es-CO',{maximumFractionDigits:0}); };
+    var fmt = function(n){ return fmtCOP(n||0); };
 
     var totBox = document.getElementById('plata-recuperada-totales');
     if(totBox){
@@ -19635,11 +19648,11 @@ async function cargarSoportesEstado(){
       + '</div>'
       + '<div style="background:#dbeafe;border:1px solid #2563eb;border-radius:8px;padding:.7rem 1rem">'
       +   '<div style="font-size:.68rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:.05em">Facturas indexadas</div>'
-      +   '<div style="font-size:1.4rem;font-weight:800;color:#1e3a8a;margin-top:.15rem">' + (s.facturas_indexadas || 0).toLocaleString('es-CO') + '</div>'
+      +   '<div style="font-size:1.4rem;font-weight:800;color:#1e3a8a;margin-top:.15rem">' + fmtNum(s.facturas_indexadas || 0) + '</div>'
       + '</div>'
       + '<div style="background:#f3e8ff;border:1px solid #7c3aed;border-radius:8px;padding:.7rem 1rem">'
       +   '<div style="font-size:.68rem;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.05em">Archivos indexados</div>'
-      +   '<div style="font-size:1.4rem;font-weight:800;color:#5b21b6;margin-top:.15rem">' + (s.archivos_indexados || 0).toLocaleString('es-CO') + '</div>'
+      +   '<div style="font-size:1.4rem;font-weight:800;color:#5b21b6;margin-top:.15rem">' + fmtNum(s.archivos_indexados || 0) + '</div>'
       + '</div>'
       + '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.7rem 1rem">'
       +   '<div style="font-size:.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em">Último build</div>'
@@ -19899,7 +19912,7 @@ async function loadDashCobranza(){
     if(!r.ok) return;
     var d = await r.json();
     var k = d.kpis || {};
-    document.getElementById('cv-count').textContent = (k.count_abiertas||0).toLocaleString('es-CO');
+    document.getElementById('cv-count').textContent = fmtNum(k.count_abiertas||0);
     document.getElementById('cv-saldo').textContent = cop(k.saldo_total||0);
     document.getElementById('cv-valor').textContent = cop(k.valor_factura_total||0);
 
@@ -20048,7 +20061,7 @@ function gaPintarLista(){
       '<td style="white-space:nowrap;color:var(--text3)">'+escHtml(f.documento_paciente||'—')+'</td>'+
       '<td style="white-space:nowrap">'+escHtml(f.gestor||'—')+'</td>'+
       '<td style="text-align:right">'+f.glosas+(f.pendientes?' <b style="color:#b45309">('+f.pendientes+')</b>':'')+'</td>'+
-      '<td style="text-align:right;white-space:nowrap">'+fmtCOP(f.valor_glosado)+'</td>'+
+      '<td style="text-align:right;white-space:nowrap"> ' + fmtCOP(f.valor_glosado)+'</td>'+
       '<td style="min-width:110px"><div style="background:var(--bg3);border-radius:999px;height:7px;overflow:hidden">'+
         '<div style="width:'+f.avance+'%;height:100%;background:'+(f.avance>=100?'#15803d':'#2563eb')+'"></div></div>'+
         '<div style="font-size:.66rem;color:var(--text3)">'+f.avance+'%</div></td>'+
@@ -20144,9 +20157,9 @@ function gaPintar(d){
 
   h += '<div class="kpi-grid">'+
        '<div class="kpi"><div class="kpi-lbl">Glosas</div><div class="kpi-num">'+r.glosas+'</div><div class="kpi-sub">'+r.pendientes+' sin decidir</div></div>'+
-       '<div class="kpi"><div class="kpi-lbl">Valor glosado</div><div class="kpi-num">'+fmtCOP(r.valor_glosado)+'</div><div class="kpi-sub">según el ADRES</div></div>'+
-       '<div class="kpi"><div class="kpi-lbl">Aceptado</div><div class="kpi-num">'+fmtCOP(r.valor_aceptado)+'</div><div class="kpi-sub">lo que se reconoce</div></div>'+
-       '<div class="kpi"><div class="kpi-lbl">Sigue glosado</div><div class="kpi-num">'+fmtCOP(r.sigue_glosado_detallado)+'</div><div class="kpi-sub">en el detallado</div></div>'+
+       '<div class="kpi"><div class="kpi-lbl">Valor glosado</div><div class="kpi-num"> ' + fmtCOP(r.valor_glosado)+'</div><div class="kpi-sub">según el ADRES</div></div>'+
+       '<div class="kpi"><div class="kpi-lbl">Aceptado</div><div class="kpi-num"> ' + fmtCOP(r.valor_aceptado)+'</div><div class="kpi-sub">lo que se reconoce</div></div>'+
+       '<div class="kpi"><div class="kpi-lbl">Sigue glosado</div><div class="kpi-num"> ' + fmtCOP(r.sigue_glosado_detallado)+'</div><div class="kpi-sub">en el detallado</div></div>'+
        '</div>';
 
   if(d.aviso_glosas_totales){
@@ -20187,7 +20200,7 @@ function gaPintar(d){
          '<td style="max-width:270px">'+escHtml(g.causal_texto||'—')+
              (g.anotacion ? '<div style="color:var(--text3);font-size:.7rem;margin-top:.2rem">'+escHtml(g.anotacion)+'</div>' : '')+'</td>'+
          '<td style="max-width:230px"><b>'+escHtml(g.codigo||'')+'</b><div style="color:var(--text3)">'+escHtml(g.descripcion||'')+'</div></td>'+
-         '<td style="text-align:right;white-space:nowrap">'+fmtCOP(g.valor_glosado)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap"> ' + fmtCOP(g.valor_glosado)+'</td>'+
          '<td style="max-width:170px">'+gaCeldaArea(g)+'</td>'+
          '<td style="max-width:210px">'+gaCeldaCentro(g, d.catalogo_centros||[])+'</td>'+
          '<td style="max-width:210px;color:'+color+'"><b>'+escHtml(g.sugerencia||'—')+'</b>'+
@@ -20218,8 +20231,8 @@ function gaPintar(d){
       h += '<tr style="border-top:1px solid var(--border)'+(i.accion==='QUITADO'?';opacity:.55':'')+'">'+
            '<td style="padding:.4rem;color:'+col+';white-space:nowrap"><b>'+escHtml(i.accion)+'</b></td>'+
            '<td>'+escHtml(i.codigo||'')+'</td><td style="max-width:280px">'+escHtml((i.nombre||'').slice(0,80))+'</td>'+
-           '<td style="text-align:right;white-space:nowrap">'+fmtCOP(i.valor_facturado)+'</td>'+
-           '<td style="text-align:right;white-space:nowrap"><b>'+fmtCOP(i.valor_nuevo)+'</b></td>'+
+           '<td style="text-align:right;white-space:nowrap"> ' + fmtCOP(i.valor_facturado)+'</td>'+
+           '<td style="text-align:right;white-space:nowrap"><b> ' + fmtCOP(i.valor_nuevo)+'</b></td>'+
            '<td style="max-width:260px;color:var(--text3)">'+escHtml((i.observacion||'').slice(0,90))+'</td></tr>';
     });
     h += '</tbody></table></div></div>';
@@ -20531,9 +20544,9 @@ async function loadResumenMes(){
     var kc = d.kpis_creacion || {};
     var kd = d.kpis_decisiones || {};
     var ks = d.kpis_sla || {};
-    document.getElementById('rm-creadas').textContent = (kc.creadas||0).toLocaleString('es-CO');
-    document.getElementById('rm-dec').textContent = (kd.decididas||0).toLocaleString('es-CO');
-    document.getElementById('rm-lev').textContent = (kd.levantadas||0).toLocaleString('es-CO');
+    document.getElementById('rm-creadas').textContent = fmtNum(kc.creadas||0);
+    document.getElementById('rm-dec').textContent = fmtNum(kd.decididas||0);
+    document.getElementById('rm-lev').textContent = fmtNum(kd.levantadas||0);
     document.getElementById('rm-tasa').textContent = (d.tasa_levantamiento_pct||0).toFixed(1)+'%';
     document.getElementById('rm-rec').textContent = cop(kd.valor_recuperado_total||0);
     document.getElementById('rm-sla').textContent = (ks.pct_sla||0).toFixed(1)+'%';
@@ -20576,7 +20589,7 @@ async function loadOperacion(){
     var r = await fetch('/dashboard-ejecutivo/operacion', {headers: authH()});
     if(!r.ok){ cu.textContent = 'Error ' + r.status; return; }
     var d = await r.json();
-    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+    var cop = function(v){ return fmtCOP(v||0); };
 
     if(!d.cuellos_por_estado.length){
       cu.innerHTML = '<span style="color:var(--text3)">No hay glosas abiertas.</span>';
@@ -20631,10 +20644,10 @@ async function loadMando(){
     document.getElementById('mando-rec-sub').textContent =
       'de ' + cop(d.valor_objetado_mes||0) + ' objetados';
     document.getElementById('mando-tasa').textContent = (d.tasa_recuperacion_pct||0).toFixed(1)+'%';
-    document.getElementById('mando-hoy').textContent = (d.glosas_analizadas_hoy||0).toLocaleString('es-CO');
-    document.getElementById('mando-pend').textContent = (d.glosas_pendientes||0).toLocaleString('es-CO');
-    document.getElementById('mando-48h').textContent = (d.glosas_criticas_48h||0).toLocaleString('es-CO');
-    document.getElementById('mando-venc').textContent = (d.glosas_vencidas||0).toLocaleString('es-CO');
+    document.getElementById('mando-hoy').textContent = fmtNum(d.glosas_analizadas_hoy||0);
+    document.getElementById('mando-pend').textContent = fmtNum(d.glosas_pendientes||0);
+    document.getElementById('mando-48h').textContent = fmtNum(d.glosas_criticas_48h||0);
+    document.getElementById('mando-venc').textContent = fmtNum(d.glosas_vencidas||0);
 
     // Alertas proactivas
     var alertasBox = document.getElementById('mando-alertas');
@@ -20732,7 +20745,7 @@ async function loadMandoIAPorUsuario(){
     box.innerHTML =
       '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:2px solid var(--border);font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px">'+
         '<span>Total: '+ranking.length+' gestores</span>'+
-        '<span>$'+totalCost.toFixed(2)+' · '+totalCalls.toLocaleString('es-CO')+' calls · '+(totalTokens/1000).toFixed(1)+'K tokens</span>'+
+        '<span>$'+totalCost.toFixed(2)+' · '+fmtNum(totalCalls)+' calls · '+(totalTokens/1000).toFixed(1)+'K tokens</span>'+
       '</div>'+
       ranking.slice(0, 10).map(function(u, i){
         var pctCost = totalCost ? (u.cost_usd / totalCost * 100) : 0;
@@ -20758,7 +20771,7 @@ async function loadMandoIAPorUsuario(){
 function imprimirMando(){
   document.body.classList.add('printing-mando');
   var p = document.getElementById('p-mando');
-  if(p) p.setAttribute('data-print-ts', new Date().toLocaleString('es-CO'));
+  if(p) p.setAttribute('data-print-ts', fmtFecha());
   setTimeout(function(){
     window.print();
     setTimeout(function(){
@@ -21537,7 +21550,7 @@ async function maosBuscar(){
     d.resultados.forEach(function(x){
       h += '<tr><td><b>' + escHtml(x.codigo) + '</b></td>'
         + '<td><small>' + escHtml(x.descripcion) + '</small></td>'
-        + '<td class="maos-precio">' + fmtCOP(x.precio) + '</td>'
+        + '<td class="maos-precio"> ' + fmtCOP(x.precio) + '</td>'
         + '<td><button class="btn btn-ghost btn-sm" onclick="maosDefensa(\'' + x.codigo + '\')">Defensa</button></td>'
         + '</tr>';
     });
@@ -21773,7 +21786,7 @@ function botsPintar(){
       var ult = b.ultima_ejecucion;
       var corr = b.trabajo_corriendo;
       var ultTxt = ult
-        ? ((ult.terminado_en ? new Date(ult.terminado_en).toLocaleString('es-CO') : '—')
+        ? ((ult.terminado_en ? fmtFecha(ult.terminado_en) : '—')
            + (ult.equipo ? ' · equipo <b>' + escHtml(ult.equipo) + '</b>' : '')
            + (ult.pedido_por ? ' · pidió ' + escHtml(ult.pedido_por) : '')
            + (ult.estado === 'ERROR' ? ' · ❌ falló' : (ult.estado === 'CANCELADO' ? ' · ⛔ cancelado' : ' · ✓')))
@@ -21886,7 +21899,7 @@ async function botHistorial(id){
     var d = await r.json();
     if(!d.trabajos || !d.trabajos.length){ caja.innerHTML = 'Sin corridas registradas todavía.'; return; }
     caja.innerHTML = d.trabajos.map(function(t){
-      return '#' + t.id + ' · ' + escHtml(t.estado) + ' · ' + (t.creado_en ? new Date(t.creado_en).toLocaleString('es-CO') : '')
+      return '#' + t.id + ' · ' + escHtml(t.estado) + ' · ' + (t.creado_en ? fmtFecha(t.creado_en) : '')
         + (t.equipo ? ' · ' + escHtml(t.equipo) : '') + (t.pedido_por ? ' · ' + escHtml(t.pedido_por) : '')
         + (t.error ? '<br><span style="color:#dc2626">' + escHtml(t.error) + '</span>' : '');
     }).join('<br>');
@@ -22088,7 +22101,7 @@ async function autoPrevisualizar(id){
     var partes = [];
     if(res.facturas) partes.push('<b>' + res.facturas + '</b> factura(s)');
     if(res.filas) partes.push('<b>' + res.filas + '</b> objecion(es)');
-    if(res.valor_total) partes.push('<b>' + fmtCOP(res.valor_total) + '</b> glosado');
+    if(res.valor_total) partes.push('<b> ' + fmtCOP(res.valor_total) + '</b> glosado');
     if(!partes.length) partes.push('<b>' + (res.archivos||0) + '</b> archivo(s)');
     estado.innerHTML = '<div class="auto-resumen">' + partes.join(' · ')
       + '<small>Revisá que el total coincida con el del archivo que mandó la EPS antes de cargarlo.</small></div>';
@@ -22185,7 +22198,7 @@ function vencPintarCards(){
       +'title="Ver solo estas">'
       +'<div class="vc-l">'+n.lbl+'</div>'
       +'<div class="vc-n">'+(c[n.k]||0)+'</div>'
-      +'<div class="vc-v">'+fmtCOP(valor)+'</div>'
+      +'<div class="vc-v"> ' + fmtCOP(valor)+'</div>'
       +'<div class="vc-d">'+n.nota+'</div>'
       +'</div>';
   }).join('');
@@ -22204,7 +22217,7 @@ function vencPintarTarjetaInicio(){
     return '<div class="venc-card '+n.cls+'">'
       +'<div class="vc-l">'+n.lbl+'</div>'
       +'<div class="vc-n">'+(c[n.k]||0)+'</div>'
-      +'<div class="vc-v">'+fmtCOP(valor)+'</div>'
+      +'<div class="vc-v"> ' + fmtCOP(valor)+'</div>'
       +'</div>';
   }).join('');
   var pie=document.getElementById('venc-tarjeta-pie');
@@ -22343,7 +22356,7 @@ function vencPintarTabla(){
       +'<td class="mono">'+escHtml(g.codigo_glosa||'—')+'</td>'
       +'<td>'+escHtml(g.responsable||g.gestor||'sin asignar')+'</td>'
       +'<td>'+escHtml(g.estado||'—')+'</td>'
-      +'<td class="num">'+fmtCOP(g.valor_objetado)+'</td>'
+      +'<td class="num"> ' + fmtCOP(g.valor_objetado)+'</td>'
       +'</tr>';
   }).join('');
 }
@@ -22582,10 +22595,12 @@ async function configurarMiRustdesk(){
 async function cambiarRol(id,rolActual){
   var nuevo=prompt('Rol actual: '+rolActual+'\nNuevo rol (SUPER_ADMIN/COORDINADOR/AUDITOR/VIEWER):');
   if(!nuevo)return;
-  var r=await fetch('/usuarios/'+id+'/rol',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({rol:nuevo.toUpperCase()})});
-  var d=await r.json();
-  toast(r.ok?'Rol actualizado':'Error',d.message||d.detail,r.ok?'success':'error');
-  if(r.ok)loadUsuarios();
+  try{
+    var r=await fetch('/usuarios/'+id+'/rol',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({rol:nuevo.toUpperCase()})});
+    var d=await r.json().catch(function(){return{};});
+    toast(r.ok?'Rol actualizado':'Error',d.message||d.detail||('El servidor respondió '+r.status),r.ok?'success':'error');
+    if(r.ok)loadUsuarios();
+  }catch(e){ toast('Sin conexión','El rol NO se cambió: '+e.message,'error'); }
 }
 
 async function editarUsuario(id, nombreActual, emailActual){
@@ -22765,7 +22780,7 @@ function imprimirDictamenModal(){
     +   '<div><b>Código glosa:</b> ' + _h(codigo) + '</div>'
     +   '<div><b>CUPS:</b> ' + _h(cups) + '</div>'
     +   '<div><b>Paciente:</b> ' + _h(paciente) + '</div>'
-    +   '<div><b>Valor objetado:</b> $' + (valorObj||0).toLocaleString('es-CO') + '</div>'
+    +   '<div><b>Valor objetado:</b> ' + fmtCOP((valorObj||0)) + '</div>'
     + '</div>'
     + '<div class="dict">' + dictamenHtml + '</div>'
     + '<div class="firma">Firma autorizada ESE HUS — Área de Cartera</div>'
@@ -22945,7 +22960,7 @@ async function cargarPlantillasGold(){
     }
     grid.innerHTML = data.map(function(p){
       var argEsc = escHtml(p.argumento || '');
-      var recup = p.valor_recuperado ? '$' + Number(p.valor_recuperado).toLocaleString('es-CO',{maximumFractionDigits:0}) : '—';
+      var recup = p.valor_recuperado ? fmtCOP(Number(p.valor_recuperado)) : '—';
       var creado = p.creado_en ? new Date(p.creado_en).toLocaleDateString('es-CO') : '—';
       return '<div class="gold-card">' +
         '<div class="gold-badges">' +
@@ -23074,14 +23089,17 @@ async function registrarDecisionEPS(id){
   var decision=prompt('Decisión de la EPS:\nLEVANTADA (ganamos)\nACEPTADA (perdimos)\nRATIFICADA (va a conciliación)\nPENDIENTE');
   if(!decision)return;
   var valor=parseFloat(prompt('Valor recuperado ($):')||'0')||0;
-  var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({decision_eps:decision.toUpperCase(),valor_recuperado:valor})});
-  var d=await r.json();
-  toast(r.ok?'Decisión registrada':'Error',d.message||d.detail,r.ok?'success':'error');
-  if(r.ok)loadHist(1);
+  try{
+    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({decision_eps:decision.toUpperCase(),valor_recuperado:valor})});
+    var d=await r.json().catch(function(){return{};});
+    toast(r.ok?'Decisión registrada':'Error',d.message||d.detail||('El servidor respondió '+r.status),r.ok?'success':'error');
+    if(r.ok)loadHist(1);
+  }catch(e){ toast('Sin conexión','La decisión NO quedó registrada: '+e.message,'error'); }
 }
 
 // ─── CONCILIACIONES ───────────────────────────────────────────────────────
 async function loadConciliaciones(){
+  try{
   var r=await fetch('/conciliaciones/?per_page=50',{headers:authH()});
   if(r.status===401){logout();return;}
   var d=await r.json();
@@ -23117,11 +23135,12 @@ async function loadConciliaciones(){
       '<td><span class="'+cls+'">'+(c.resultado||'PENDIENTE')+'</span><br/>' +
         '<span class="chip" style="background:transparent;color:'+colorEst+';border:1px solid '+colorEst+';font-size:.65rem;margin-top:3px;display:inline-block">'+estadoBilateral.replace('_',' ')+'</span>' +
       '</td>' +
-      '<td>'+(c.valor_conciliado?'$'+c.valor_conciliado.toLocaleString():'—')+'</td>' +
+      '<td>'+(c.valor_conciliado?fmtCOP(c.valor_conciliado):'—')+'</td>' +
       '<td>'+acciones+'</td>' +
     '</tr>';
   }).join('');
-}
+
+  }catch(e){ toast('Sin conexión','No se pudieron cargar las conciliaciones: '+e.message,'error'); }}
 
 function _cachedConcil(id){ return (window._concilCache||{})[id] || {}; }
 
@@ -23246,7 +23265,7 @@ async function crearConciliacion(){
     } else {
       // Varios resultados: pedir al usuario que elija
       var opciones=matches.map(function(g,i){
-        return (i+1)+') ID '+g.id+' — '+escHtml(g.eps||'—')+' — fac '+escHtml(g.factura||'—')+' — $'+(g.valor_objetado||0).toLocaleString('es-CO');
+        return (i+1)+') ID '+g.id+' — '+escHtml(g.eps||'—')+' — fac '+escHtml(g.factura||'—')+' — ' + fmtCOP((g.valor_objetado||0));
       }).join('\n');
       var sel=prompt('Varias coincidencias. Elige el número:\n\n'+opciones,'1');
       var idx=parseInt(sel)-1;
@@ -23278,10 +23297,12 @@ async function registrarResultadoConciliacion(id){
   var resultado=prompt('Resultado:\nACUERDO_TOTAL\nACUERDO_PARCIAL\nSIN_ACUERDO');
   if(!resultado)return;
   var valor=parseFloat(prompt('Valor conciliado ($):')||'0')||0;
-  var r=await fetch('/conciliaciones/'+id+'/resultado',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({resultado:resultado.toUpperCase(),valor_conciliado:valor})});
-  var d=await r.json();
-  toast(r.ok?'Resultado registrado':'Error',d.message||d.detail,r.ok?'success':'error');
-  if(r.ok)loadConciliaciones();
+  try{
+    var r=await fetch('/conciliaciones/'+id+'/resultado',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({resultado:resultado.toUpperCase(),valor_conciliado:valor})});
+    var d=await r.json().catch(function(){return{};});
+    toast(r.ok?'Resultado registrado':'Error',d.message||d.detail||('El servidor respondió '+r.status),r.ok?'success':'error');
+    if(r.ok)loadConciliaciones();
+  }catch(e){ toast('Sin conexión','El resultado NO quedó registrado: '+e.message,'error'); }
 }
 
 // ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
@@ -23326,7 +23347,7 @@ async function actaxRevisar(){
     if(r.status===403){ actaxEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
     if(!r.ok){ var e = await r.json().catch(function(){return {}}); actaxEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
     var d = await r.json();
-    var cop = function(v){ return '$' + Math.round(v||0).toLocaleString('es-CO'); };
+    var cop = function(v){ return fmtCOP(v||0); };
     var html = '<div class="auto-resumen"><b>' + escHtml(d.entidad||'Acta') + '</b> · ' + d.facturas + ' facturas · ' + d.lineas + ' líneas de glosa'
       + '<br>Glosado ' + cop(d.glosado) + ' · Levanta entidad ' + cop(d.levanta_entidad) + ' · Acepta IPS ' + cop(d.acepta_ips)
       + ' · Ratificado ' + cop(d.ratificado) + ' · Pendiente ' + cop(d.pendiente_calculado);
@@ -23592,6 +23613,7 @@ async function loadAudit(page){
   if(accion)url+='&accion='+encodeURIComponent(accion);
   if(tabla)url+='&tabla='+encodeURIComponent(tabla);
   if(usuario)url+='&usuario_email='+encodeURIComponent(usuario);
+  try{
   var r=await fetch(url,{headers:authH()});
   if(r.status===401){logout();return;}
   var d=await r.json();
@@ -23603,7 +23625,8 @@ async function loadAudit(page){
   }).join('');
   var pg=document.getElementById('audit-pager');
   pg.innerHTML=d.pages>1?'<button class="btn btn-ghost" '+(d.page<=1?'disabled':'')+' onclick="loadAudit('+(d.page-1)+')">← Anterior</button><span style="padding:.5rem">Página '+d.page+' de '+d.pages+'</span><button class="btn btn-ghost" '+(d.page>=d.pages?'disabled':'')+' onclick="loadAudit('+(d.page+1)+')">Siguiente →</button>':'';
-}
+
+  }catch(e){ toast('Sin conexión','No se pudo cargar la auditoría: '+e.message,'error'); }}
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
@@ -23829,7 +23852,7 @@ async function previewSaludTotal(){
     document.getElementById('st-rechazado').textContent=fmtCOP(d.total_rechazado);
     var tbody=document.getElementById('st-body');
     tbody.innerHTML=d.glosas.map(function(g){
-      return '<tr><td style="font-size:.75rem">'+escHtml(g.NumeroRad||'')+'</td><td style="font-size:.75rem">'+escHtml(g.NUMREG||'')+'</td><td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.NombreServicio||'')+'</td><td style="font-size:.75rem;text-align:right">'+fmtCOP(g.ValorGlosaTotalxServ)+'</td><td style="text-align:center"><code style="font-size:.7rem;background:var(--bg);padding:2px 6px;border-radius:4px">'+escHtml(g.Codigo_Respuesta_a_glosas||'')+'</code></td><td style="font-size:.7rem;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.ConceptoRespuesta||'')+'</td></tr>';
+      return '<tr><td style="font-size:.75rem">'+escHtml(g.NumeroRad||'')+'</td><td style="font-size:.75rem">'+escHtml(g.NUMREG||'')+'</td><td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.NombreServicio||'')+'</td><td style="font-size:.75rem;text-align:right"> ' + fmtCOP(g.ValorGlosaTotalxServ)+'</td><td style="text-align:center"><code style="font-size:.7rem;background:var(--bg);padding:2px 6px;border-radius:4px">'+escHtml(g.Codigo_Respuesta_a_glosas||'')+'</code></td><td style="font-size:.7rem;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.ConceptoRespuesta||'')+'</td></tr>';
     }).join('');
     hideLoading();
     if(d.sin_fecha_recepcion){
@@ -23974,7 +23997,7 @@ function abrirNotaPrivada(){
   document.getElementById('nota-glosa-id').textContent = '#'+glosaId;
   var st = document.getElementById('nota-status');
   if(window._notaActual && window._notaActual.actualizado_en){
-    st.textContent = 'última edición: ' + new Date(window._notaActual.actualizado_en).toLocaleString('es-CO');
+    st.textContent = 'última edición: ' + fmtFecha(window._notaActual.actualizado_en);
   } else {
     st.textContent = 'nota nueva';
   }
@@ -24361,7 +24384,7 @@ function renderSpotlightResults(query){
             '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
             '<div class="spot-item-main">' +
               '<div class="spot-item-title">'+escHtml(g.factura||'#'+g.id)+' · '+escHtml(g.eps||'—')+'</div>' +
-              '<div class="spot-item-sub">'+escHtml(g.codigo_glosa||'—')+' · $'+(g.valor_objetado||0).toLocaleString('es-CO')+' · visto '+haceTxt+'</div>' +
+              '<div class="spot-item-sub">'+escHtml(g.codigo_glosa||'—')+' · ' + fmtCOP((g.valor_objetado||0))+' · visto '+haceTxt+'</div>' +
             '</div>' +
             '<span class="spot-item-meta">ID '+g.id+'</span>' +
           '</div>';
@@ -24431,7 +24454,7 @@ function renderSpotlightResults(query){
         '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
         '<div class="spot-item-main">' +
           '<div class="spot-item-title">' + escHtml(g.codigo_glosa || '—') + ' · ' + escHtml(g.entidad||g.eps||'—') + '</div>' +
-          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · $' + (g.valor_objetado||0).toLocaleString('es-CO') + ' · ' + escHtml(g.estado||'') + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · ' + fmtCOP((g.valor_objetado||0)) + ' · ' + escHtml(g.estado||'') + '</div>' +
         '</div>' +
         '<span class="spot-item-meta">ID ' + g.id + '</span>' +
       '</div>';
@@ -24585,7 +24608,7 @@ async function busquedaSemanticaSpot(query){
         '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
         '<div class="spot-item-main">' +
           '<div class="spot-item-title">' + escHtml(g.codigo_glosa||'—') + ' · ' + escHtml(g.eps||'—') + '</div>' +
-          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · $' + (g.valor_objetado||0).toLocaleString('es-CO') + ' · ' + escHtml((g.servicio||'').substring(0,60)) + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · ' + fmtCOP((g.valor_objetado||0)) + ' · ' + escHtml((g.servicio||'').substring(0,60)) + '</div>' +
         '</div>' +
         '<span class="spot-item-meta">ID ' + g.id + '</span>' +
       '</div>';
@@ -24800,7 +24823,7 @@ async function paPreviewLive(){
 
 function paFmtCOP(v){
   if(!v || v <= 0) return '';
-  return '$' + Number(v).toLocaleString('es-CO', {maximumFractionDigits:0});
+  return fmtCOP(Number(v));
 }
 
 function paRenderPreview(d){
@@ -25615,7 +25638,7 @@ function paGenerarSugerencia(presence, analytics){
 
 function paFmtCOP(v){
   if(!v || v <= 0) return '$0';
-  return '$' + Number(v).toLocaleString('es-CO', {maximumFractionDigits:0});
+  return fmtCOP(Number(v));
 }
 
 function paAbrirGlosa(id){
