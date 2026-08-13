@@ -154,6 +154,28 @@ def test_la_eps_tambien_se_vence():
     assert ev["situacion"].startswith("VENCIDA")
 
 
+def test_una_subsanacion_recien_cargada_no_sale_vencida():
+    """El plazo de la decisión final corre desde la SUBSANACIÓN, no desde la
+    primera respuesta —y esa fecha no viene en el informe—.
+
+    Contándolo mal, la subsanación cargada el 13-08 salía «VENCIDA» ese mismo
+    día porque la respuesta original era del 5 de agosto. Una mora inventada
+    de la EPS es un reclamo que no se puede sostener.
+    """
+    f = _fila(
+        codigo_reiteracion="GRE003",
+        descripcion_reiteracion="Glosa Reiterada",
+        codigo_reiteracion_respuesta="RE9901",
+        fecha_respuesta="2026-08-05T14:07:00",
+    )
+
+    ev = et.evaluar([f], date(2026, 8, 13))[0]
+
+    assert ev["etapa"] == et.SUBSANADA
+    assert not ev["situacion"].startswith("VENCIDA")
+    assert "subsanación" in ev["situacion"]
+
+
 def test_una_glosa_cerrada_no_tiene_plazo_corriendo():
     f = _fila(
         codigo_reiteracion="GTL002",

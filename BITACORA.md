@@ -2340,6 +2340,35 @@ nombre que aparezca ahí es la pista del endpoint, igual que en agosto el
 propio mensaje de error reveló el grupo `RESPUESTA_DEV_PTS_PSS`. Mientras
 tanto, se pueden subsanar **a mano** en el portal: son cuatro.
 
+### 13-08 (tercera parte) — SIIFA al día: 2.665 de 2.665, y la EPS en mora
+
+Verificado contra la plataforma después del cargue:
+
+| Etapa | Le toca a | Ítems | Valor |
+|---|---|---|---|
+| 2. Respondida, esperando decisión | EPS | 2.657 | $458.717.238 |
+| 3. **Levantada — ganada** | — | **3** | **$1.418.479** |
+| 4. Reiterada — falta subsanar | HOSPITAL | 4 | $14.049.088 |
+| 5. Subsanada, esperando decisión final | EPS | 1 | $1.396.804 |
+
+**No queda ni un seguimiento sin responder.** Lo único pendiente del hospital
+son las 4 devoluciones reiteradas de SANITAS, que hay que hacer a mano.
+
+**Dato nuevo y aprovechable: las EPS están en mora.** Tienen 10 días hábiles
+para decidir si levantan o reiteran una glosa ya respondida, y **43 se
+pasaron**: FAMISANAR 27 por $14.680.353 y SANITAS 16 por $1.030.100. Es
+incumplimiento de ellas y sirve para la mesa de trabajo.
+
+**Otro cálculo corregido.** El semáforo marcaba «VENCIDA» la subsanación
+cargada esa misma mañana. La causa: los 5 días de la decisión final corren
+desde la SUBSANACIÓN, y esa fecha no viene en el informe; se estaba contando
+desde la respuesta original del 5 de agosto. Una mora inventada de la EPS es
+un reclamo que no se puede sostener, así que ahora esa etapa no calcula
+vencimiento y lo dice. (Con eso SANITAS pasó de 17 a 16 en mora.)
+
+Entregado el informe en Word `INFORME_CARGUE_SIIFA_13AGO.docx` con las ocho
+secciones, incluida la del estado verificado contra la API.
+
 ---
 
 ## 3) PENDIENTE

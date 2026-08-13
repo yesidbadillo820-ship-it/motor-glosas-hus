@@ -168,9 +168,15 @@ def fecha_base(fila: dict, etapa: str) -> date | None:
     """Desde cuándo corre el plazo de la etapa en que está la glosa."""
     if etapa == SIN_RESPONDER:
         return _fecha(fila.get("fecha_formulacion"))
-    # De la decisión de la EPS no viene fecha propia en el informe, así que se
-    # cuenta desde la respuesta del hospital: es lo más tarde que pudo haber
-    # ocurrido, y por tanto la cuenta más conservadora para el hospital.
+    if etapa == SUBSANADA:
+        # Los 5 días de la decisión final corren desde la SUBSANACIÓN, y esa
+        # fecha no viene en el informe. Usar la de la primera respuesta daba
+        # «VENCIDA» sobre una subsanación cargada esa misma mañana —y una mora
+        # inventada de la EPS es un reclamo que no se puede sostener—.
+        return None
+    # De la decisión inicial de la EPS tampoco viene fecha propia, pero ahí sí
+    # se puede contar desde la respuesta del hospital: es lo más tarde que
+    # pudo haber ocurrido, y por tanto la cuenta más conservadora.
     return _fecha(fila.get("fecha_respuesta"))
 
 
@@ -187,6 +193,8 @@ def evaluar(filas: list[dict], hoy: date) -> list[dict]:
             vence = sumar_habiles(base, plazo)
         if plazo is None:
             situacion = "Cerrada"
+        elif etapa == SUBSANADA:
+            situacion = "Esperando a la EPS (5 días hábiles desde la subsanación)"
         elif corridos is None:
             situacion = "Sin fecha para calcular"
         elif corridos > plazo:
