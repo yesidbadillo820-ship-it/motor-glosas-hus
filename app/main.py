@@ -1733,7 +1733,13 @@ app.include_router(preauditoria_router)
 # auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 
+# 13-08-2026: el validador ADRES y el buscador de autorizaciones dejan de
+# ser programas aparte y entran al portal, con la sesión y los roles del
+# hospital. Por ahí suben soportes con historia clínica: auditor o superior.
+from app.api.routers.validador_adres import router as validador_adres_router
+
 app.include_router(soportes_auto_router)
+app.include_router(validador_adres_router)
 
 from app.api.routers.diagnostico import router as diagnostico_router
 
