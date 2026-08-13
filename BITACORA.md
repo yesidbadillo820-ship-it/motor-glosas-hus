@@ -2724,8 +2724,33 @@ quedaron como pruebas para que no se repitan.
   referencia).
 - **E) Homologador CUPS → SOAT 2026:** sin empezar (archivo del homologador +
   Circular 047/2025).
-- **F) Todo lo de las OT-023 a OT-033 está probado en el repositorio, pero
-  nadie lo ha visto correr en el motor del hospital.** Falta esa pasada.
+- **F) Todo lo de las OT-023 a OT-034 está probado en el repositorio, pero
+  salvo la pantalla de Salud Total nadie lo ha visto correr en el motor del
+  hospital.** Falta esa pasada.
+
+**Ya desplegado y comprobado el mismo 13-08:** el PR #341 quedó fusionado y
+el motor del hospital corriendo con ese código. La pantalla responde.
+
+Dos cosas aprendidas en el camino, para no repetirlas:
+
+1. **Para saber si el motor tiene un cambio cargado, no sirve `git log`.**
+   Eso dice qué hay en el **disco**; el motor puede llevar horas corriendo
+   con el código anterior en memoria. Lo que sirve es pedirle al motor su
+   propia lista de rutas:
+   `Invoke-RestMethod -Uri "http://localhost:8080/openapi.json"`.
+
+2. **La tarea de autodeploy corre sola cada 5 minutos y puede aplicar el
+   código en mitad de una revisión.** Ese día una comprobación dio un
+   resultado que no cuadraba con lo que mostraba la carpeta segundos antes;
+   la explicación más probable es esa, aunque no quedó demostrada. Si algo
+   no cuadra, volver a mirar las rutas del motor antes de sacar
+   conclusiones.
+
+Queda **por revisar**: en el puerto 8080 aparecen dos procesos de Python,
+creados en el mismo segundo. Como nacieron juntos llevan el mismo código,
+así que no están dando respuestas distintas. Falta confirmar si uno es hijo
+del otro (normal) o si son dos motores independientes (el problema del
+04-08), mirando el `ParentProcessId`.
 
 00. **Antes de cualquier prueba de IA: reiniciar con
     `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos
