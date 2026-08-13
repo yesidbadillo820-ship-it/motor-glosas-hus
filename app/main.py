@@ -1624,21 +1624,25 @@ from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 
-# autopilot: removido en la limpieza de ronda 29 (módulo sin uso real).
+from app.api.routers.autopilot import router as autopilot_router
+from app.api.routers.auditor_forense import router as auditor_forense_router
+from app.api.routers.push import router as push_router
+from app.api.routers.noticias import router as noticias_router
 
 # control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
 from app.api.routers.eventos_live import router as eventos_live_router
 
-# preset_filtros: stub removido — prefijo /_removed/ (mayo 2026)
-# notas_privadas: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.preset_filtros import router as preset_filtros_router
+from app.api.routers.notas_privadas import router as notas_privadas_router
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
 
-# chat_history: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.chat_history import router as chat_history_router
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
 
-# comentarios_thread: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.comentarios_thread import router as comentarios_thread_router
+
 # webhooks: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.ia_status import router as ia_status_router
 
@@ -1689,17 +1693,17 @@ app.include_router(dashboard_ejecutivo_router)
 app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
-# autopilot_router: stub removido
+app.include_router(autopilot_router)
 # control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
-# preset_filtros_router: stub removido
-# notas_privadas_router: stub removido
+app.include_router(preset_filtros_router)
+app.include_router(notas_privadas_router)
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
-# chat_history_router: stub removido
+app.include_router(chat_history_router)
 app.include_router(dictamen_pdf_router)
-# comentarios_thread_router: stub removido
+app.include_router(comentarios_thread_router)
 # webhooks_router: stub removido
 app.include_router(ia_status_router)
 from app.api.routers.cups import router as cups_router
@@ -1744,7 +1748,12 @@ app.include_router(validador_adres_router)
 from app.api.routers.diagnostico import router as diagnostico_router
 
 app.include_router(diagnostico_router)
-# auditor_forense: stub removido — real: auditoria_forense.py (ya incluido arriba)
+# OJO: auditor_forense (analiza soportes) y auditoria_forense (busca por IP)
+# son DOS cosas distintas. La limpieza de mayo los confundió y dejó la
+# pantalla del Auditor Forense llamando a una ruta que no existía.
+app.include_router(auditor_forense_router)
+app.include_router(push_router)
+app.include_router(noticias_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)
