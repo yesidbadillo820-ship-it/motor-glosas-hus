@@ -578,11 +578,44 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
     return filas
 
 
-def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
+def _modalidad_de_hoja(nombre_hoja: str) -> str:
+    """De qué manera quedó pactada la tarifa, según la hoja de donde salió.
+
+    13-08-2026. Antes, cualquier fila sin columna de modalidad se cargaba
+    como «TARIFA PROPIA». En la propuesta 2026 de FAMISANAR eso alcanzaba a
+    las 4.586 tarifas de la hoja UVB, que NO son tarifas propias: son la UVB
+    por grupos con el descuento del contrato. El dictamen citaba entonces una
+    forma de pactar que no era la del contrato, y eso lo lee la entidad.
+
+    Solo aplica cuando la fila no dice nada: si la hoja trae su propia
+    columna (ESPECIALIDAD, MODALIDAD…), manda esa.
+    """
+    h = (nombre_hoja or "").strip().upper()
+    if not h:
+        return "TARIFA PROPIA"
+    if "UVB" in h:
+        return "UVB POR GRUPOS"
+    if "PROPIA" in h:
+        return "TARIFA PROPIA"
+    if "PAQUETE" in h:
+        return "PAQUETE"
+    if "ORTESIS" in h or "PROTESIS" in h or "PRÓTESIS" in h:
+        return "ORTESIS Y PROTESIS"
+    if "AMBULATORIO" in h:
+        return "AMBULATORIO"
+    return nombre_hoja.strip()[:80]
+
+
+def _parsear_simple_fijo(
+    rows: list[tuple], hdr_idx: int, headers: list[str], nombre_hoja: str = ""
+) -> list[dict]:
     """Formato plano genérico: una sola hoja con CUPS + valor fijo.
 
     Cubre Dispensario (PRECIO DE REFERENCIA), Nueva EPS, Sanitas simple,
     Compensar, etc. La EPS y contrato normalmente se pasan por eps_override.
+
+    `nombre_hoja` se usa para decir de qué manera quedó pactada la tarifa
+    cuando la fila no trae una columna que lo diga. Ver `_modalidad_de_hoja`.
     """
     idx_cups = _indice_columna(headers, "CUPS")
     if idx_cups is None:
@@ -650,6 +683,8 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
             _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
         )
         modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
+        if not modalidad:
+            modalidad = _modalidad_de_hoja(nombre_hoja)
         # Si hay código IPS propio, guardarlo en observación (útil para trazabilidad)
         cod_ips = str(_celda(fila, idx_cod_ips) or "").strip() if idx_cod_ips is not None else ""
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None
@@ -939,7 +974,7 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
                 elif tipo == "FOMAG_PAQUETES":
                     nuevas = _parsear_fomag_paquetes(rows, hdr_idx, headers)
                 elif tipo == "SIMPLE_FIJO":
-                    nuevas = _parsear_simple_fijo(rows, hdr_idx, headers)
+                    nuevas = _parsear_simple_fijo(rows, hdr_idx, headers, sheet_name)
                 else:
                     nuevas = []
                 filas_total.extend(nuevas)

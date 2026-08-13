@@ -3779,6 +3779,27 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <label>Archivo Excel (.xlsx)</label>
             <input type="file" id="tar-xlsx-file" accept=".xlsx,.xlsm"/>
           </div>
+          <!-- Hay anexos tarifarios que son solo códigos y valores, sin decir a
+               qué contrato pertenecen ni desde cuándo rigen. Cargados así, una
+               tarifa de 2026 sirve para defender una factura de 2024. -->
+          <div class="field">
+            <label>Número del contrato (opcional, si el Excel no lo trae)</label>
+            <input type="text" id="tar-xlsx-contrato" placeholder="Ej: S-13-1-03-1-04958"/>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+            <div class="field">
+              <label>Rigen desde</label>
+              <input type="date" id="tar-xlsx-desde"/>
+            </div>
+            <div class="field">
+              <label>Rigen hasta</label>
+              <input type="date" id="tar-xlsx-hasta"/>
+            </div>
+          </div>
+          <p style="font-size:.72rem;color:var(--text3);margin:-.3rem 0 .6rem">
+            Sin estas fechas, el motor no puede saber si la tarifa aplicaba el día
+            en que se prestó el servicio. Si el Excel las trae, mandan las del Excel.
+          </p>
           <div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;margin-top:.8rem;display:flex;gap:.7rem;align-items:flex-start;">
             <input type="checkbox" id="tar-xlsx-reemplazar" style="margin-top:.25rem;flex-shrink:0;width:16px;height:16px;cursor:pointer;"/>
             <label for="tar-xlsx-reemplazar" style="flex:1;cursor:pointer;font-size:.82rem;line-height:1.45;color:#7c2d12;text-transform:none;letter-spacing:0;font-weight:400;margin:0;">
@@ -9153,6 +9174,12 @@ async function subirTarifasExcel(){
   var params = [];
   if(epsOverride.trim()) params.push('eps_override=' + encodeURIComponent(epsOverride.trim()));
   if(reemplazar) params.push('reemplazar=true');
+  var contratoTar = ((document.getElementById('tar-xlsx-contrato')||{}).value || '').trim();
+  var desdeTar = ((document.getElementById('tar-xlsx-desde')||{}).value || '').trim();
+  var hastaTar = ((document.getElementById('tar-xlsx-hasta')||{}).value || '').trim();
+  if(contratoTar) params.push('contrato_override=' + encodeURIComponent(contratoTar));
+  if(desdeTar) params.push('vigencia_desde_override=' + encodeURIComponent(desdeTar));
+  if(hastaTar) params.push('vigencia_hasta_override=' + encodeURIComponent(hastaTar));
   var url = '/tarifas-contratadas/import-excel' + (params.length ? '?' + params.join('&') : '');
   if(resultDiv) resultDiv.innerHTML = '<div style="color:var(--text3);">⏳ ' +
     (reemplazar ? 'Borrando existentes y cargando nuevas…' : 'Leyendo hojas y parseando filas…') + '</div>';
