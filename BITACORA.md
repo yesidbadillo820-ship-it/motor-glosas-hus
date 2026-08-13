@@ -2286,6 +2286,37 @@ en `siifa_novedades.py`) que usan las dos herramientas, en vez de copiada en
 cada una — igual que el lector de pesos. Es el mismo error, cometido dos veces
 en dos semanas: por eso ahora vive en un solo sitio y con pruebas.
 
+### 13-08 (segunda parte) — La subsanación: la etapa que nadie estaba mirando
+
+Con el semáforo del trámite apareció lo que seguía: **la EPS ya respondió**
+algunas glosas, y eso abre la etapa 4.
+
+**Lo que se encontró (informe del 6 de agosto):**
+
+- **3 glosas LEVANTADAS — $1.418.479 recuperados.** SANITAS le dio la razón al
+  hospital en HUS467326 ($1.396.804), HUS464765 y HUS463797. Nadie lo sabía
+  porque hay que entrar factura por factura al portal a verlo.
+- **1 glosa REITERADA** (HUS465198, $1.396.804): hay que subsanar.
+- **4 DEVOLUCIONES REITERADAS** ($14.049.088), todas de SANITAS.
+
+**Nueva herramienta: `siifa_armar_subsanacion.py` (opción [S] del bot).** Arma
+el archivo para insistir ante lo reiterado. El escrito **no repite** la
+primera respuesta —la EPS ya la leyó y no la aceptó—: deja constancia de que
+el hospital contestó y en qué fecha, señala que la reiteración no aporta
+elemento nuevo, y conserva el argumento de fondo de la causal.
+
+**Las 4 devoluciones reiteradas NO se cargan todavía, y es a propósito.** La
+puerta de subsanación está confirmada sólo para glosas
+(`PUT /api/SeguimientoFacturaGlosa/ReiteracionRespuesta`); para devoluciones
+no se conoce. Mandarlas por la de glosas escribiría sobre otro registro y el
+reporte diría OK — el mismo daño que costó descubrir en agosto. Salen en una
+hoja aparte, sin código ni texto, y el bot las bloquea. Se amplió
+`siifa_sondear_endpoints.py` con las rutas y grupos candidatos para
+averiguarlo **sin escribir nada** (sólo consulta).
+
+**Lo que hay que hacer:** correr el sondeo, ver si existe la puerta de
+subsanación de devoluciones, y con eso resolver los $14 millones.
+
 ---
 
 ## 3) PENDIENTE

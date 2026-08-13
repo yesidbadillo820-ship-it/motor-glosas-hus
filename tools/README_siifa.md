@@ -158,6 +158,37 @@ En el bot de doble clic es la **opción [E]**. Muestra en pantalla:
 Los días hábiles se cuentan de lunes a viernes sin descontar festivos, así que
 el aviso llega un poco antes de lo estricto — nunca después.
 
+### Subsanar lo que la EPS reiteró (`siifa_armar_subsanacion.py`)
+
+**Etapa 4 del trámite, y la que más rápido se vence: 7 días hábiles.** La EPS
+miró la respuesta del hospital y no levantó la glosa. Hay que insistir, y
+nadie avisa que el reloj arrancó.
+
+```powershell
+py tools\siifa_armar_subsanacion.py `
+  --informe "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+  --salida  "D:\USUARIO CARTERA\Documents\SIIFA\SUBSANACION.xlsx"
+
+# Piloto de 1 (regla del repo) — OJO con --accion
+py tools\responder_glosas_siifa.py `
+  --excel "D:\USUARIO CARTERA\Documents\SIIFA\SUBSANACION.xlsx" `
+  --accion reiteracion-respuesta --piloto 1 `
+  --reporte "D:\USUARIO CARTERA\Documents\SIIFA\piloto_subsanacion.csv"
+```
+
+En el bot de doble clic es la **opción [S]**.
+
+El escrito **no repite** la primera respuesta —la EPS ya la leyó y no la
+aceptó—: deja constancia de que el hospital contestó y en qué fecha, señala
+que la reiteración no aporta elemento nuevo, y conserva el argumento de fondo
+de la causal.
+
+> **Las devoluciones reiteradas salen aparte, en la hoja
+> `DEVOLUCIONES_NO_CARGAR`, sin código ni texto.** Su puerta de subsanación no
+> está confirmada; mandarlas por la de glosas escribiría sobre otro registro y
+> el reporte diría OK. Para averiguar si esa puerta existe:
+> `py tools\siifa_sondear_endpoints.py` (sólo consulta, no escribe nada).
+
 ---
 
 ## 2) Bot de respuestas (`responder_glosas_siifa.py`)

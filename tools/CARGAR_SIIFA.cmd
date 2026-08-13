@@ -109,6 +109,7 @@ echo   [8] Cambiar la carpeta de trabajo
 echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
 echo   [N] Ver que llego NUEVO a SIIFA (entidad, factura, glosa/devolucion)
 echo   [E] ESTADO del tramite: que gano, que falta subsanar, que se vence
+echo   [S] SUBSANAR lo que la EPS reitero (etapa 4 - solo 7 dias habiles)
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -124,6 +125,7 @@ if "%OPCION%"=="8" goto carpeta
 if "%OPCION%"=="9" goto verificar
 if /i "%OPCION%"=="N" goto novedades
 if /i "%OPCION%"=="E" goto estado
+if /i "%OPCION%"=="S" goto subsanar
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -155,6 +157,19 @@ echo.
 if not exist "%INFORME%" goto sininforme
 echo --- Estado del tramite de cada glosa ---
 %PYEXE% tools\siifa_estado_tramite.py --informe "%INFORME%" --salida "%CARPETA%\ESTADO_TRAMITE.xlsx"
+goto hecho
+
+:subsanar
+REM Etapa 4: la EPS reitero y al hospital le quedan 7 dias habiles.
+REM Se arma el archivo y se hace el piloto de 1 antes del cargue.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Armando la subsanacion de lo reiterado ---
+%PYEXE% tools\siifa_armar_subsanacion.py --informe "%INFORME%" --salida "%CARPETA%\SUBSANACION.xlsx"
+if not exist "%CARPETA%\SUBSANACION.xlsx" goto hecho
+echo.
+echo   REVISA el archivo antes de subirlo. Para cargar el piloto de 1:
+echo     %PYEXE% tools\responder_glosas_siifa.py --excel "%CARPETA%\SUBSANACION.xlsx" --accion reiteracion-respuesta --piloto 1 --reporte "%CARPETA%\piloto_subsanacion.csv"
 goto hecho
 
 :novedadesfallo

@@ -49,6 +49,15 @@ RUTAS = [
     "/api/SeguimientoFactura/Devolucion/Respuesta",
     "/api/SeguimientoFacturaDevolucion",
     "/api/SeguimientoFacturaGlosa/DevolucionRespuesta",
+    # Subsanación (etapa 4): la de glosa está confirmada; la de devolución no
+    # se conoce. Es el mismo problema que en agosto con las respuestas, y se
+    # resuelve igual: preguntando, no adivinando.
+    "/api/SeguimientoFacturaGlosa/ReiteracionRespuesta",
+    "/api/SeguimientoFacturaGlosa/Reiteracion",
+    "/api/SeguimientoFacturaDevolucion/ReiteracionRespuesta",
+    "/api/SeguimientoFacturaDevolucion/Reiteracion",
+    "/api/SeguimientoFacturaDevolucion/SubsanacionRespuesta",
+    "/api/SeguimientoFacturaGlosa/SubsanacionRespuesta",
 ]
 
 # Nombres de grupo del catálogo de códigos. El portal muestra la frase pero no
@@ -65,6 +74,17 @@ GRUPOS = [
     "DEVOLUCION",
     "RESPUESTA_DEVOLUCIONES",
     "GLOSA",
+    # Códigos de la SUBSANACIÓN (lo que el hospital contesta cuando la EPS
+    # reitera). El patrón que funcionó fue «..._PTS_PSS», así que se prueban
+    # las variantes de ese mismo molde.
+    "REITERACION_RESPUESTA_GLOSA_PTS_PSS",
+    "RESPUESTA_REITERACION_GLOSA_PTS_PSS",
+    "REITERACION_GLOSA_PTS_PSS",
+    "REITERACION_RESPUESTA_DEV_PTS_PSS",
+    "REITERACION_DEV_PTS_PSS",
+    "REITERACION_RESPUESTA",
+    "REITERACION",
+    "SUBSANACION",
 ]
 
 
