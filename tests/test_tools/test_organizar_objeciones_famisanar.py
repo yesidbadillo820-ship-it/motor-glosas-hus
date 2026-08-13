@@ -86,6 +86,79 @@ def test_extraer_cod_servicio(texto, esperado):
     assert org.extraer_cod_servicio(texto) == esperado
 
 
+# ─── homologar_cod_servicio (FAMISANAR → HUS) ────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "cod,esperado,regla",
+    [
+        ("903867", "903867", "igual"),  # CUPS: tal cual
+        ("890202", "890202", "igual"),
+        ("U20162259-04", "20162259-04", "letra"),  # med: quitar letra FAMISANAR
+        ("P32606-02", "32606-02", "letra"),
+        ("U53560-05", "53560-05", "letra"),
+        ("91017235", "91017235", "igual"),  # dispositivo: sin regla, tal cual
+        ("", "", "vacio"),
+    ],
+)
+def test_homologar_cod_servicio(cod, esperado, regla):
+    assert org.homologar_cod_servicio(cod) == (esperado, regla)
+
+
+def test_homologar_mapa_gana_a_la_regla():
+    mapa = {"91017235": "19945678-01", "U53560-05": "OTRO-99"}
+    assert org.homologar_cod_servicio("91017235", mapa) == ("19945678-01", "mapa")
+    # El mapa también le gana a la regla de la letra.
+    assert org.homologar_cod_servicio("U53560-05", mapa) == ("OTRO-99", "mapa")
+
+
+def test_construir_registros_homologa_por_default(tmp_path):
+    ruta = _crear_famisanar(
+        tmp_path / "F.xlsx",
+        [
+            ["HUS532670", "CO0701", 33600, "… METOCLOPRAMIDA CÓDIGO   U20162259-04 VALOR …"],
+            ["HUS532670", "TA0801", 207100, OBS_TARIFA],
+        ],
+    )
+    regs = org.construir_registros(
+        ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
+    )
+    assert regs[0]["SLNSERPRO"] == "20162259-04"  # letra U quitada
+    assert regs[1]["SLNSERPRO"] == "903867"  # CUPS intacto
+
+
+def test_construir_registros_sin_homologar(tmp_path):
+    ruta = _crear_famisanar(
+        tmp_path / "F.xlsx",
+        [["HUS532670", "CO0701", 33600, "… CÓDIGO   U20162259-04 VALOR …"]],
+    )
+    regs = org.construir_registros(
+        ruta,
+        fecha=_FECHA,
+        consecutivo=1,
+        codigo_sufijo="01",
+        mapa_codigos=None,
+        homologar=False,
+    )
+    assert regs[0]["SLNSERPRO"] == "U20162259-04"  # tal cual FAMISANAR
+
+
+def test_construir_registros_mapa_servicios(tmp_path):
+    ruta = _crear_famisanar(
+        tmp_path / "F.xlsx",
+        [["HUS532670", "CO0601", 5800, "… CATETER CÓDIGO   91017235 VALOR …"]],
+    )
+    regs = org.construir_registros(
+        ruta,
+        fecha=_FECHA,
+        consecutivo=1,
+        codigo_sufijo="01",
+        mapa_codigos=None,
+        mapa_servicios={"91017235": "19999999-01"},
+    )
+    assert regs[0]["SLNSERPRO"] == "19999999-01"
+
+
 # ─── factura_larga ───────────────────────────────────────────────────────────
 
 
@@ -187,8 +260,8 @@ def test_construir_registros_extrae_y_mapea(tmp_path):
     assert regs[0]["CRNCONOBJ"] == "CL0801"
     assert regs[0]["CRDOBSERV"] == f"CL0801 {OBS_AUD_EXTRA}$279900"
 
-    # Cobertura: código extraído del texto.
-    assert regs[1]["SLNSERPRO"] == "U19965499-11"
+    # Cobertura: código extraído del texto y homologado (letra U quitada).
+    assert regs[1]["SLNSERPRO"] == "19965499-11"
     assert regs[1]["CROVALOBJ"] == 200
 
     # Tarifa: código CUPS extraído.

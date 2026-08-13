@@ -19,7 +19,10 @@ SLNSERPRO vacío (igual que las estancias en los archivos del Dispensario).
 MAPEO DE CAMPOS (FAMISANAR → 16 columnas):
     CRNCXC       ← NRO_FACTURA          (HUS532670 → HUS0000532670, 10 dígitos)
     CRNCONOBJ    ← CODIGO_DEVOLUCION    (ya viene de 6: CL0801, CO0701, TA0801…)
-    SLNSERPRO    ← extraído del texto   ("CÓDIGO   <valor>"; vacío si no hay)
+    SLNSERPRO    ← extraído del texto ("CÓDIGO <x>") y HOMOLOGADO al código HUS:
+                   CUPS tal cual; medicamentos U/P → se quita la letra
+                   (U20162259-04 → 20162259-04); dispositivos 9101xxxx → tal
+                   cual + aviso (completar con --mapa-servicios)
     CROVALOBJ    ← VALOR DEVOLUCION
     CRDOBSERV    ← "<CRNCONOBJ> <OBSERVACION>$<valor>" (formato de trabajo)
     CDFECDOC / CROFECOBJ ← --fecha (default: hoy), en FECHA CORTA
@@ -222,6 +225,36 @@ def extraer_cod_servicio(observacion: str) -> str:
     return m.group(1).strip(".-") if m else ""
 
 
+# ─── Homologación: código FAMISANAR → código HUS ─────────────────────────────
+
+# Los códigos que FAMISANAR escribe en sus textos NO son (todos) los del HUS:
+#   - CUPS de 6 dígitos (890202, 903867, 735301…): son el estándar nacional,
+#     los mismos que usa el HUS → tal cual.
+#   - Medicamentos con LETRA adelante (U20162259-04, P32606-02…): la letra es
+#     de FAMISANAR; sin ella queda el código del HUS. Verificado contra los
+#     archivos de trabajo: U20162259-04 → 20162259-04 (METOCLOPRAMIDA, match
+#     exacto en OBJECIONES_EMSSANAR) y P32606-02 → raíz 32606 (SODIO LACTATO).
+#   - Dispositivos 9101xxxx (catéteres, llaves, electrodos…): catálogo propio
+#     de FAMISANAR sin equivalencia conocida → se dejan tal cual y se reportan,
+#     hasta tener el maestro (cargarlo vía --mapa-servicios).
+_RE_MED_CON_LETRA = re.compile(r"^[A-Za-z](\d[\dA-Za-z.\-]*)$")
+
+
+def homologar_cod_servicio(cod: str, mapa: dict[str, str] | None = None) -> tuple[str, str]:
+    """Devuelve (codigo_homologado, regla_aplicada). Reglas, en orden:
+    'mapa' (equivalencia explícita de --mapa-servicios) → 'letra' (quita la
+    letra inicial de medicamentos) → 'igual' (CUPS y demás, tal cual)."""
+    c = (cod or "").strip()
+    if not c:
+        return "", "vacio"
+    if mapa and c in mapa:
+        return mapa[c], "mapa"
+    m = _RE_MED_CON_LETRA.match(c)
+    if m:
+        return m.group(1), "letra"
+    return c, "igual"
+
+
 # ─── CROTIPOBJ: tipo de objeción por factura ─────────────────────────────────
 
 GRUPO_CLINICO = "CL"
@@ -274,9 +307,14 @@ def construir_registros(
     consecutivo: int,
     codigo_sufijo: str,
     mapa_codigos: dict[str, str] | None,
+    mapa_servicios: dict[str, str] | None = None,
+    homologar: bool = True,
 ) -> list[dict]:
     """Lee el Excel de FAMISANAR y devuelve una lista de dicts, uno por
-    objeción, con las 16 columnas del formato de trabajo."""
+    objeción, con las 16 columnas del formato de trabajo. Con `homologar`
+    (default), el código de servicio extraído del texto se convierte al del
+    HUS (ver homologar_cod_servicio); `mapa_servicios` agrega equivalencias
+    explícitas (p. ej. los dispositivos 9101xxxx)."""
     try:
         from openpyxl import load_workbook
     except ImportError:
@@ -295,6 +333,8 @@ def construir_registros(
 
     consec_por_factura: dict[str, int] = {}
     sin_codigo = 0
+    homologados: dict[str, int] = defaultdict(int)
+    sin_regla: dict[str, str] = {}
 
     registros: list[dict] = []
     for r in filas:
@@ -314,6 +354,14 @@ def construir_registros(
         cod_servicio = extraer_cod_servicio(observacion)
         if not cod_servicio:
             sin_codigo += 1
+        elif homologar:
+            cod_famisanar = cod_servicio
+            cod_servicio, regla = homologar_cod_servicio(cod_famisanar, mapa_servicios)
+            homologados[regla] += 1
+            # Dispositivos FAMISANAR (9101xxxx…) sin equivalencia: quedan tal
+            # cual pero se reportan para completar el mapa con el maestro HUS.
+            if regla == "igual" and not re.fullmatch(r"\d{6}", cod_famisanar):
+                sin_regla[cod_famisanar] = observacion[:60]
 
         registros.append(
             {
@@ -349,6 +397,22 @@ def construir_registros(
             f"  ⚠ {sin_codigo} objeciones sin código de servicio en el texto "
             "(filas 'AUD EXTRA'): SLNSERPRO queda vacío."
         )
+    if homologar and homologados:
+        partes = []
+        if homologados.get("igual"):
+            partes.append(f"{homologados['igual']} tal cual (CUPS/otros)")
+        if homologados.get("letra"):
+            partes.append(f"{homologados['letra']} con letra FAMISANAR quitada (U/P…)")
+        if homologados.get("mapa"):
+            partes.append(f"{homologados['mapa']} por mapa de equivalencias")
+        logger.info(f"  Homologación de códigos de servicio: {', '.join(partes)}.")
+    if sin_regla:
+        logger.warning(
+            f"  ⚠ {len(sin_regla)} códigos de FAMISANAR SIN equivalencia HUS conocida "
+            "(dispositivos): quedan tal cual. Completalos con --mapa-servicios:"
+        )
+        for cod, desc in sorted(sin_regla.items()):
+            logger.warning(f"      {cod}  ← {desc}…")
     return registros
 
 
@@ -505,6 +569,19 @@ def main(argv: list[str] | None = None) -> int:
         help='JSON opcional para forzar códigos de objeción: {"CO0701": "CO0702", ...}.',
     )
     parser.add_argument(
+        "--mapa-servicios",
+        type=Path,
+        default=None,
+        help="JSON con equivalencias FAMISANAR→HUS para códigos de SERVICIO sin regla "
+        '(los dispositivos 9101xxxx): {"91017235": "<código HUS>", ...}.',
+    )
+    parser.add_argument(
+        "--sin-homologar",
+        action="store_true",
+        help="Deja en SLNSERPRO el código tal cual viene de FAMISANAR (sin quitar la "
+        "letra de medicamentos ni aplicar el mapa de servicios).",
+    )
+    parser.add_argument(
         "--consecutivo",
         type=int,
         default=CDCONSEC_DEFAULT,
@@ -527,6 +604,7 @@ def main(argv: list[str] | None = None) -> int:
 
     fecha = _parse_fecha(args.fecha)
     mapa = _cargar_mapa(args.mapa_codigos)
+    mapa_servicios = _cargar_mapa(args.mapa_servicios)
 
     logger.info(f"Leyendo glosas de FAMISANAR: {args.entrada.name}")
     registros = construir_registros(
@@ -535,6 +613,8 @@ def main(argv: list[str] | None = None) -> int:
         consecutivo=args.consecutivo,
         codigo_sufijo=args.codigo_sufijo,
         mapa_codigos=mapa,
+        mapa_servicios=mapa_servicios,
+        homologar=not args.sin_homologar,
     )
     if not registros:
         logger.error("No se encontró ninguna objeción en el archivo de entrada.")
