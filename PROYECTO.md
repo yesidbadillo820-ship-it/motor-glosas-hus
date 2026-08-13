@@ -165,7 +165,7 @@ documentación: es un tablero de trabajo.
 
 1. **Reiniciar el motor y repetir las glosas de prueba** — confirmar que en el arranque aparece `[SEED-CLAUSULAS]` y que los dictámenes salen sin los hechos inventados.
 2. **Regenerar la respuesta de Salud Total desde el portal** con la fecha de recepción de la factura, y comprobar radicado completo, valor glosado real y sigla del motivo. El `RTAGLOSA_..._13082026.csv` viejo no se radica.
-3. **Cargar las 6.655 tarifas de FAMISANAR como pactadas** — ya se puede: el contrato está firmado. Ojo con la hoja UVB (va la columna pactada, no la de referencia).
+3. **Cargar las 6.655 tarifas de FAMISANAR como pactadas** — el motor ya quedó listo (modalidad por hoja + vigencia al cargar). Falta subirlas desde Gestión → Tarifas con EPS `FAMISANAR`, contrato `S-13-1-03-1-04958` y vigencia 15/04/2026 – 14/04/2027.
 4. **Homologador CUPS → SOAT 2026** — el que hay en el motor es del 30-06-2025 (10.024 CUPS). Falta cargar el archivo 2026 que subió Yesid y la Circular 047/2025.
 5. **Cargar el PDF de los contratos que no tienen cláusulas** — hoy solo 11 pagadores tienen cláusulas base.
 

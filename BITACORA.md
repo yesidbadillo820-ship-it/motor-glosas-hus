@@ -2724,10 +2724,31 @@ quedaron como pruebas para que no se repitan.
   carpeta completa de facturación**, con sus subcarpetas: de todo lo que hay
   adentro solo viajan los `.json`, el resto se descarta en el mismo equipo
   para que la subida no se vuelva eterna.
-- **D) Cargar las 6.655 tarifas de FAMISANAR como pactadas.** Ya se puede: el
-  contrato está firmado y sus cláusulas quedaron cargadas. Ojo con la hoja
-  UVB, que trae dos columnas de plata (va la **pactada**, no la de
-  referencia).
+- **D) Cargar las 6.655 tarifas de FAMISANAR como pactadas.** El motor ya
+  quedó listo para recibirlas (ver abajo); falta que usted las suba desde
+  **Gestión → Tarifas → Importar Excel**, con estos datos:
+  - EPS: `FAMISANAR`
+  - Número del contrato: `S-13-1-03-1-04958`
+  - Rigen desde `15/04/2026` y hasta `14/04/2027`
+  - Archivo: `PROPUESTA_2026_BASE_FINAL_FAMISANAR.xlsx`
+
+  Al terminar debe decir **6.655 filas leídas** y cinco hojas. Si dice
+  1.625, quedó con el lector viejo y hay que revisar.
+
+  **Dos cosas que se arreglaron antes de dejarlo cargar:**
+
+  1. Las 4.586 tarifas de la hoja UVB entraban rotuladas como **«tarifa
+     propia»**, y no lo son: son la UVB por grupos con el descuento del
+     contrato. El dictamen habría citado una forma de pactar distinta a la
+     del contrato, y eso lo lee la entidad.
+  2. El archivo no dice a qué contrato pertenece ni desde cuándo rige. Así
+     cargado, una tarifa de 2026 servía para defender una factura de 2024.
+     Por eso ahora la pantalla pide el número del contrato y las dos fechas.
+     Si el Excel las trae, mandan las del Excel.
+
+  Sigue vigente el cuidado de siempre con la hoja UVB: se carga la columna
+  **pactada** («PROPUESTA FINAL»), no la de referencia («VALOR UVB 2026»),
+  que es un 5% más alta.
 - **E) Homologador CUPS → SOAT 2026:** sin empezar (archivo del homologador +
   Circular 047/2025).
 - **F) Todo lo de las OT-023 a OT-034 está probado en el repositorio, pero
