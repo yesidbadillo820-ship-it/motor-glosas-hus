@@ -320,6 +320,57 @@
     init();
   }
 
+  // ── Formato único de plata y de fechas ────────────────────────────────
+  // 13-08-2026. La misma cifra salía escrita de tres maneras según la
+  // pantalla: "$ 1.234.567", "$1.234.567" y "1234567". El auditor concilia
+  // contra Dinámica Gerencial mirando esos números, así que la diferencia no
+  // es cosmética: cuesta tiempo y hace dudar de la cifra.
+  //
+  // Vive acá, y no dentro de index.html, porque las otras cinco páginas del
+  // portal también muestran plata y no podían usar el formateador.
+  var _COP = new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+
+  function formatoCOP(v) {
+    var n = Number(v);
+    if (v === null || v === undefined || v === '' || isNaN(n)) return '$0';
+    return _COP.format(Math.round(n));
+  }
+
+  function formatoNumero(v) {
+    var n = Number(v);
+    if (v === null || v === undefined || v === '' || isNaN(n)) return '0';
+    return n.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+  }
+
+  function formatoFecha(v) {
+    if (!v) return '—';
+    var d = v instanceof Date ? v : new Date(v);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function formatoFechaCorta(v) {
+    if (!v) return '—';
+    var d = v instanceof Date ? v : new Date(v);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
   // Exponer API mínima para debugging
   window.SDS_UX = {
     abrir: abrirPalette,
@@ -327,5 +378,13 @@
     focus: activarModoEnfocado,
     unfocus: desactivarModoEnfocado,
     ayuda: mostrarAtajos,
+  };
+
+  // Formato compartido por TODAS las páginas del portal.
+  window.SDS_FMT = {
+    cop: formatoCOP,
+    num: formatoNumero,
+    fecha: formatoFecha,
+    fechaCorta: formatoFechaCorta,
   };
 })();
