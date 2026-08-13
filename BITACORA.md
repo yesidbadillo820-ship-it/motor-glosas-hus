@@ -2589,6 +2589,40 @@ ordenadas en el código y que en la pantalla se quedan calladas. El sistema no
 fallaba: **se callaba**, que para un auditor es peor. Por eso cada arreglo va
 con su prueba, y varias pruebas llevan otra que las vigila a ellas.
 
+### 13-08 (tercera parte) — Lo que dijo la base del hospital
+
+Con los conteos reales de `motorglosas.db` quedaron aclaradas tres cosas que
+no se podían saber desde el repositorio:
+
+**1. Las 29 cláusulas SÍ están cargadas en el motor del hospital.** Es la
+primera confirmación de que el trabajo de las cláusulas —incluidas las tres
+del contrato firmado de FAMISANAR— está funcionando allá, no solo probado
+acá.
+
+**2. Las tarifas de FAMISANAR todavía NO se han subido.** La tabla
+`tarifas_contratadas` está en **cero**. Mientras siga así, el motor no puede
+defender una glosa de tarifas con el valor pactado: sigue pendiente subir el
+Excel desde Gestión → Tarifas.
+
+**3. Los 22 posibles cuellos de botella NO hay que tocarlos.** Hoy hay **74
+glosas** en la base. Veinte de esos veintidós recorren justamente esa tabla,
+así que cuestan milisegundos; y las dos tablas de verdad grandes —206.365 y
+193.025 filas de las fuentes de pre-auditoría— no se consultan dentro de
+ningún ciclo. Corregirlos habría sido cambiar código que funciona por si
+acaso. Queda anotado para revisar de nuevo si las glosas pasan de unos miles.
+
+**Dos cosas para tener en el radar:**
+
+- **Hay un archivo `glosas.db` de 0 bytes** al lado de la base buena. El
+  motor usa `motorglosas.db` (bien), pero si algún script llega a apuntar al
+  archivo vacío, el portal aparecería **sin ninguna glosa**. No se perdería
+  nada —estarían en la otra—, pero el susto sería grande. Conviene borrarlo o
+  renombrarlo cuando haya calma.
+- **Las tablas de comentarios, notas privadas y filtros guardados están en
+  cero.** No es que se hayan borrado con los routers: esta base arrancó
+  vacía en el rescate del 4 de agosto. Las tablas están sanas y las pantallas
+  ya funcionan otra vez; simplemente todavía no hay nada escrito en ellas.
+
 ---
 
 ## 3) PENDIENTE
