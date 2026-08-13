@@ -320,3 +320,89 @@ class TestArchivosQueNoSirven:
         r = client.post("/api/salud-total/analizar-ia", files=_archivo(CABECERA + "\r\n"))
         assert r.status_code == 400
         assert r.json()["detail"]
+
+
+class TestNuncaSaleHtmlALaEntidad:
+    """13-08-2026, corrección en caliente.
+
+    La primera versión de esto recortaba el dictamen sin quitarle las
+    etiquetas, y el archivo que se generó traía en la casilla de la entidad:
+
+        <table border="1" style="width:100%;border-collapse:collapse;…
+
+    cortado a mitad de un atributo de estilo. Ilegible, con el argumento en
+    ninguna parte, y con 44 filas así. El dictamen del motor viene en HTML
+    porque está hecho para verse en pantalla y en el PDF.
+    """
+
+    HTML_REAL = (
+        '<table border="1" style="width:100%;border-collapse:collapse;font-size:11px;'
+        'margin-bottom:15px;background:white;"> <tr style="background-color:#1e40af;'
+        'color:white;"><th style="padding:10px;text-align:center;">CÓDIGO GLOSA</th>'
+        "</tr></table><h3>ARGUMENTACIÓN JURÍDICA</h3>"
+        "<p>ESE HUS NO ACEPTA LA GLOSA POR TARIFAS. El valor cobrado corresponde a la "
+        "tarifa pactada en el contrato S-13-1-03-1-04958, anexo de servicios y tarifas. "
+        "La entidad no puede aplicar descuentos unilaterales sin soporte contractual. "
+        "Se solicita el levantamiento inmediato de la objeción.</p>"
+        "<div>Nota: Generado con asistencia de IA</div>"
+    )
+
+    def test_el_html_del_dictamen_no_llega_a_la_casilla(self):
+        from app.services.salud_total_ia import _condensar
+
+        salida = _condensar(self.HTML_REAL)
+        assert "<" not in salida and ">" not in salida, salida[:120]
+        assert "border-collapse" not in salida
+        assert "padding:10px" not in salida
+
+    def test_lo_que_queda_es_el_argumento(self):
+        from app.services.salud_total_ia import _condensar
+
+        salida = _condensar(self.HTML_REAL)
+        assert "S-13-1-03-1-04958" in salida, "se perdió el argumento"
+        assert salida.startswith("ESE HUS NO ACEPTA"), salida[:60]
+
+    def test_no_arrastra_el_pie_de_pagina(self):
+        """«Generado con asistencia de IA» no tiene por qué viajar a la EPS."""
+        from app.services.salud_total_ia import _condensar
+
+        assert "asistencia de IA" not in _condensar(self.HTML_REAL)
+
+    def test_si_el_dictamen_es_puro_html_esa_fila_cae_a_plantilla(self, client, monkeypatch):
+        """Guarda dura: antes que mandar etiquetas a la entidad, se prefiere
+        la plantilla, que es texto probado."""
+        import app.services.glosa_service as gs
+
+        solo_tabla = '<table style="width:100%"><tr><td>x</td></tr></table>'
+        monkeypatch.setattr(gs, "GlosaService", lambda *a, **k: _IAFalsa(dictamen=solo_tabla))
+        d = client.post("/api/salud-total/analizar-ia", files=_archivo()).json()
+        assert d["analizadas_con_ia"] == 0
+        assert d["por_plantilla"] == 2
+        for g in d["glosas"]:
+            assert "<" not in g["Observacion_IPS"]
+            assert g["Observacion_IPS"].strip()
+
+    def test_ninguna_fila_del_archivo_lleva_etiquetas(self, client, monkeypatch):
+        """La comprobación de punta a punta, sobre el archivo que se radica."""
+        import app.services.glosa_service as gs
+
+        monkeypatch.setattr(gs, "GlosaService", lambda *a, **k: _IAFalsa(dictamen=self.HTML_REAL))
+        r = client.post(
+            "/api/salud-total/procesar", files=_archivo(), data={"tipo_respuesta": "ia"}
+        )
+        assert r.status_code == 200
+        assert "<table" not in r.text and "border-collapse" not in r.text
+        for fila in r.text.strip().split("\n")[1:]:
+            obs = fila.split("|")[-1]
+            assert "<" not in obs and ">" not in obs, obs[:100]
+            assert "S-13-1-03-1-04958" in obs, "se perdió el argumento en el archivo"
+
+    def test_un_argumento_demasiado_corto_no_pasa_por_defensa(self, client, monkeypatch):
+        """Tres palabras no defienden nada: mejor la plantilla completa."""
+        import app.services.glosa_service as gs
+
+        monkeypatch.setattr(
+            gs, "GlosaService", lambda *a, **k: _IAFalsa(dictamen="<p>No aplica.</p>")
+        )
+        d = client.post("/api/salud-total/analizar-ia", files=_archivo()).json()
+        assert d["analizadas_con_ia"] == 0
