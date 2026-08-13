@@ -822,6 +822,7 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
 .panel.active#p-detector-masa,
 .panel.active#p-simulador,
 .panel.active#p-salud-total,
+.panel.active#p-validador-adres,
 .panel.active#p-soportes,
 .panel.active#p-historial,
 .panel.active#p-mis-glosas,
@@ -2354,6 +2355,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <button class="sn-item" data-tip="Salud Total" onclick="sidebarTab(this,'salud-total')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61A5.5 5.5 0 0 0 13.06 4.61L12 5.67L10.94 4.61A5.5 5.5 0 0 0 3.16 12.39L12 21.23L20.84 12.39A5.5 5.5 0 0 0 20.84 4.61Z"/></svg>
           <span class="sn-item-label">Salud Total</span>
+        </button>
+        <button class="sn-item" data-tip="Validador ADRES" onclick="sidebarTab(this,'validador-adres')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 12"/></svg>
+          <span class="sn-item-label">Validador ADRES</span>
         </button>
         <button class="sn-item" data-tip="Soportes" onclick="sidebarTab(this,'soportes')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -4606,6 +4611,63 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
         </div>
       </div>
+      </div>
+    </div>
+
+    <!-- VALIDADOR ADRES / FURIPS + BUSCADOR DE AUTORIZACIONES EN LOS RIPS -->
+    <div class="panel" id="p-validador-adres">
+      <div style="flex:1 1 auto;overflow-y:auto;width:100%;padding:1.5rem 2rem;min-height:0;">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">🧾 Validador ADRES</h2>
+            <p class="page-sub">Valida las reclamaciones FURIPS contra la Circular 022/2023 y cruza los soportes. Antes había que levantar la aplicación aparte del puerto 8010.</p>
+          </div>
+        </div>
+
+        <!-- 1. Validación FURIPS -->
+        <div class="form-card" style="margin-bottom:1rem">
+          <h3>Validar soportes del ADRES <span>FURIPS 1 y 2</span></h3>
+          <p style="font-size:.8rem;color:var(--text3);margin-bottom:1rem;line-height:1.55">
+            Suba los <code>FURIPS1*.txt</code> y <code>FURIPS2*.txt</code>, o el ZIP completo de la
+            carpeta con los soportes adentro (RIPS, CUV, XML DIAN, factura, epicrisis).
+            Al terminar se descarga el informe en Excel.
+          </p>
+          <div class="field">
+            <label>Archivos o ZIP</label>
+            <input type="file" id="va-files" multiple accept=".txt,.zip,.json,.xml,.pdf" style="padding:.4rem .6rem;font-size:.75rem"/>
+            <p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">Máximo 500 MB por archivo.</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="validarAdres()" id="va-btn">Validar</button>
+            <button class="btn btn-ghost" onclick="descargarExcelAdres()" id="va-btn-excel" disabled>Descargar Excel</button>
+          </div>
+          <div id="va-estado" style="margin-top:1rem;font-size:.8rem"></div>
+        </div>
+
+        <!-- 2. Autorizaciones en los RIPS -->
+        <div class="form-card">
+          <h3>Buscar números de autorización <span>RIPS en JSON</span></h3>
+          <p style="font-size:.8rem;color:var(--text3);margin-bottom:1rem;line-height:1.55">
+            Recorre las carpetas de facturación <b>y sus subcarpetas</b> y saca el listado de
+            números de autorización, marcando cuáles vienen vacíos, cuáles nulos y cuáles
+            con la palabra «null» escrita como texto. Sale en Excel.
+          </p>
+          <div class="field">
+            <label>Opción A — archivos sueltos o ZIP</label>
+            <input type="file" id="va-rips-files" multiple accept=".json,.zip" style="padding:.4rem .6rem;font-size:.75rem"/>
+          </div>
+          <div class="field">
+            <label>Opción B — una carpeta completa (con sus subcarpetas)</label>
+            <input type="file" id="va-rips-dir" webkitdirectory directory multiple style="padding:.4rem .6rem;font-size:.75rem"/>
+            <p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">
+              Solo se suben los <code>.json</code> de la carpeta; el resto se descarta en su equipo, no viaja.
+            </p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="buscarAutorizacionesRips()" id="va-rips-btn">Buscar y descargar Excel</button>
+          </div>
+          <div id="va-rips-estado" style="margin-top:1rem;font-size:.8rem"></div>
+        </div>
       </div>
     </div>
 
@@ -11893,6 +11955,7 @@ var CP_ACCIONES = [
   {seccion:"Herramientas", icono:"🔲", titulo:"Detector en masa", hint:"Glosas duplicadas", tab:"detector-masa"},
   {seccion:"Herramientas", icono:"⏱️", titulo:"Simulador", hint:"¿Qué pasaría si…?", tab:"simulador"},
   {seccion:"Herramientas", icono:"💚", titulo:"Salud Total", hint:"Procesar TXT", tab:"salud-total"},
+  {seccion:"Herramientas", icono:"🧾", titulo:"Validador ADRES", hint:"FURIPS y autorizaciones", tab:"validador-adres"},
   // Acciones rápidas
   {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", accion:function(){window.location.href='/importar-recepcion'}},
   {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
@@ -22327,6 +22390,9 @@ var AUDITOR_TABS_PERMITIDAS = {
   // Herramientas
   'consulta-normativa': true,
   'salud-total': true,
+  // El validador ADRES y el buscador de autorizaciones son trabajo diario
+  // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
+  'validador-adres': true,
 };
 function aplicarRestriccionesRol(){
   if(USER_ROL !== 'AUDITOR') return;
@@ -23557,6 +23623,146 @@ async function instalarPWA(){
   DEFERRED_INSTALL = null;
   var btn = document.getElementById('btn-install-pwa');
   if(btn) btn.style.display = 'none';
+}
+
+// ─── VALIDADOR ADRES / FURIPS + AUTORIZACIONES EN LOS RIPS ─────────────────
+// Las dos herramientas vivían fuera del portal: el validador como una
+// aplicación aparte en el puerto 8010 y el buscador como bot de escritorio.
+// Esta pantalla las trae adentro. El trabajo pesado corre en el servidor: la
+// subida responde de una con un identificador y acá se pregunta por él.
+var VA_TRABAJO = null;
+var VA_TIMER = null;
+
+function _vaMsg(id, texto, color){
+  var caja = document.getElementById(id);
+  if(caja) caja.innerHTML = '<span style="color:'+(color||'var(--text3)')+'">'+escHtml(texto)+'</span>';
+}
+
+async function validarAdres(){
+  var input = document.getElementById('va-files');
+  var archivos = input.files;
+  if(!archivos || !archivos.length){ toast('Falta el archivo','Suba los TXT del FURIPS o el ZIP de la carpeta','error'); return; }
+
+  var fd = new FormData();
+  for(var i=0;i<archivos.length;i++) fd.append('archivos', archivos[i]);
+
+  document.getElementById('va-btn').disabled = true;
+  document.getElementById('va-btn-excel').disabled = true;
+  VA_TRABAJO = null;
+  if(VA_TIMER){ clearInterval(VA_TIMER); VA_TIMER = null; }
+  _vaMsg('va-estado','Subiendo los archivos…');
+
+  try{
+    var r = await fetch('/validador-adres/validar',{method:'POST',headers:authH(),body:fd});
+    if(r.status===401){ logout(); return; }
+    var d = await r.json();
+    if(!r.ok){
+      document.getElementById('va-btn').disabled = false;
+      _vaMsg('va-estado', d.detail || 'No se pudo iniciar la validación', 'var(--danger,#ef4444)');
+      return;
+    }
+    VA_TRABAJO = d.trabajo_id;
+    _vaMsg('va-estado','Se recibieron '+d.archivos+' archivo(s). Validando…');
+    VA_TIMER = setInterval(_vaConsultarEstado, 3000);
+    _vaConsultarEstado();
+  }catch(e){
+    document.getElementById('va-btn').disabled = false;
+    _vaMsg('va-estado','Error de conexión: '+e.message,'var(--danger,#ef4444)');
+  }
+}
+
+async function _vaConsultarEstado(){
+  if(!VA_TRABAJO) return;
+  try{
+    var r = await fetch('/validador-adres/estado/'+encodeURIComponent(VA_TRABAJO),{headers:authH()});
+    if(r.status===401){ logout(); return; }
+    if(!r.ok){
+      clearInterval(VA_TIMER); VA_TIMER = null;
+      document.getElementById('va-btn').disabled = false;
+      _vaMsg('va-estado','La validación ya no está disponible. Vuelva a subir los archivos.','var(--danger,#ef4444)');
+      return;
+    }
+    var d = await r.json();
+    if(d.estado==='LISTO'){
+      clearInterval(VA_TIMER); VA_TIMER = null;
+      document.getElementById('va-btn').disabled = false;
+      document.getElementById('va-btn-excel').disabled = false;
+      _vaMsg('va-estado','Listo: '+d.facturas+' factura(s) validadas. Ya puede descargar el Excel.','var(--success,#10b981)');
+      toast('Validación terminada', d.facturas+' factura(s)', 'success');
+    }else if(d.estado==='ERROR'){
+      clearInterval(VA_TIMER); VA_TIMER = null;
+      document.getElementById('va-btn').disabled = false;
+      _vaMsg('va-estado', d.mensaje || 'La validación falló.', 'var(--danger,#ef4444)');
+    }else{
+      var avance = d.total ? ' ('+d.progreso+' de '+d.total+')' : '';
+      _vaMsg('va-estado', (d.mensaje||'Validando…') + avance);
+    }
+  }catch(e){ /* si se cae la red, el siguiente intento reintenta solo */ }
+}
+
+async function descargarExcelAdres(){
+  if(!VA_TRABAJO){ toast('Nada que descargar','Primero corra una validación','error'); return; }
+  try{
+    var r = await fetch('/validador-adres/excel/'+encodeURIComponent(VA_TRABAJO),{headers:authH()});
+    if(r.status===401){ logout(); return; }
+    if(!r.ok){
+      var d = await r.json().catch(function(){return {}});
+      toast('No se pudo descargar', d.detail || 'Error', 'error');
+      return;
+    }
+    await _vaGuardarBlob(r, 'INFORME_VALIDACION_FURIPS.xlsx');
+    toast('Informe descargado','','success');
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function buscarAutorizacionesRips(){
+  // Dos formas de entrar: archivos/ZIP sueltos, o una carpeta completa. De la
+  // carpeta se filtran los .json ACÁ, en el navegador: una carpeta de
+  // facturación trae PDF y XML que no se necesitan y que harían la subida
+  // eterna.
+  var sueltos = document.getElementById('va-rips-files').files;
+  var carpeta = document.getElementById('va-rips-dir').files;
+  var fd = new FormData();
+  var n = 0;
+  var i;
+  for(i=0;i<sueltos.length;i++){ fd.append('archivos', sueltos[i]); n++; }
+  for(i=0;i<carpeta.length;i++){
+    if(/\.json$/i.test(carpeta[i].name)){ fd.append('archivos', carpeta[i]); n++; }
+  }
+  if(!n){ toast('Falta el archivo','Suba los RIPS en .json, el ZIP, o escoja la carpeta de facturación','error'); return; }
+
+  document.getElementById('va-rips-btn').disabled = true;
+  _vaMsg('va-rips-estado','Subiendo '+n+' archivo(s) y buscando…');
+  try{
+    var r = await fetch('/validador-adres/autorizaciones',{method:'POST',headers:authH(),body:fd});
+    if(r.status===401){ logout(); return; }
+    if(!r.ok){
+      var d = await r.json().catch(function(){return {}});
+      _vaMsg('va-rips-estado', d.detail || 'No se pudo generar el informe', 'var(--danger,#ef4444)');
+      return;
+    }
+    await _vaGuardarBlob(r, 'INFORME_AUTORIZACIONES_RIPS.xlsx');
+    _vaMsg('va-rips-estado','Informe descargado. Se revisaron '+n+' archivo(s).','var(--success,#10b981)');
+    toast('Informe descargado','','success');
+  }catch(e){
+    _vaMsg('va-rips-estado','Error de conexión: '+e.message,'var(--danger,#ef4444)');
+  }finally{
+    document.getElementById('va-rips-btn').disabled = false;
+  }
+}
+
+async function _vaGuardarBlob(respuesta, nombrePorDefecto){
+  var blob = await respuesta.blob();
+  var cd = respuesta.headers.get('Content-Disposition') || '';
+  var m = cd.match(/filename="?([^";]+)"?/);
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (m && m[1]) ? m[1] : nombrePorDefecto;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ─── SALUD TOTAL ───────────────────────────────────────────────────────────
