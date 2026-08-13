@@ -2656,6 +2656,40 @@ prestado justo ese día de 2027. Si se quiere exacto, se vuelve a subir el
 mismo Excel con la fecha correcta y **marcando «Reemplazar tarifas
 existentes»**, para que no queden duplicadas.
 
+### 13-08 (último) — El botón «Analizar con IA» de Salud Total ahora sí llama a la IA
+
+Ese botón existía desde antes y **no llamaba a la IA**: hacía lo mismo que las
+otras dos opciones, responder con las plantillas por código de glosa. Yesid
+pidió que hiciera lo que promete.
+
+**Ahora cada glosa de la notificación pasa por el mismo motor que usa el
+resto del portal.** O sea que responde con las 29 cláusulas del contrato, las
+6.655 tarifas pactadas y el homologador CUPS → SOAT, igual que cuando usted
+analiza una glosa desde «Analizar glosa».
+
+**Cómo se usa:** en la pantalla de Salud Total escoja «Analizar con IA», suba
+el TXT y dele a **Vista Previa**. Aparece un girador y la tabla se va
+llenando. **Tarda varios minutos** —son 44 glosas, una por una— así que no
+cierre la pantalla.
+
+**Lo que hay que mirar en el resultado:** cada fila queda marcada con una
+etiqueta.
+
+- **IA** — la respondió el motor con todo el contexto del contrato.
+- **PLANTILLA** — la IA no pudo con esa (se cayó el proveedor, se demoró
+  demasiado) y salió con la respuesta de siempre. **Esas son las que conviene
+  revisar a mano** antes de radicar.
+
+**Ninguna fila queda vacía nunca.** Aunque se caiga el proveedor de IA
+entero, el archivo sale completo con las plantillas. Se hizo así a propósito:
+una fila en blanco en el archivo que se radica es una glosa sin responder, y
+una glosa sin responder la entidad la da por aceptada.
+
+**Dos cosas que todavía no se saben** y que solo se ven al usarlo con las 44
+glosas reales: **cuánto tarda** y **cuánto cuesta**. Cada glosa es una
+consulta a la IA, así que este botón sí gasta plata — a diferencia de las
+otras dos opciones, que son gratis. Conviene medirlo la primera vez.
+
 ---
 
 ## 3) PENDIENTE
@@ -2928,6 +2962,9 @@ existentes»**, para que no queden duplicadas.
   Ahora el motor dice lo que es, y resulta que juega a favor: **si el manual
   no le asigna código SOAT a ese procedimiento, la entidad no puede objetar
   la tarifa citando un código SOAT que no existe.**
+- **G) Estrenar «Analizar con IA» de Salud Total** con la notificación de 44
+  glosas, y anotar cuánto tardó y cuántas salieron marcadas como PLANTILLA.
+  Es lo único que falta por medir de todo lo del 13-08.
 - **F) Todo lo de las OT-023 a OT-034 está probado en el repositorio, pero
   salvo la pantalla de Salud Total nadie lo ha visto correr en el motor del
   hospital.** Falta esa pasada.
