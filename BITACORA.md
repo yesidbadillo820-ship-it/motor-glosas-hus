@@ -130,6 +130,22 @@ tres frentes:
   decisiones, descartes, riesgos, pendientes y pasos para fusionarlo al
   proyecto principal.
 
+**13 de agosto — Bot de FAMISANAR + lote SAVIA 7.53**
+- Se procesó el lote **SAVIA 7.53** (3 facturas, 392 objeciones, $39.772.588):
+  archivos por factura + unificado entregados. Aparecieron códigos nuevos
+  (SO02, TA57, TA29, FA02, SO07, SO42, FA06, CO07) completados con "01".
+- Se creó el **bot de FAMISANAR** (`tools/organizar_objeciones_famisanar.py`):
+  FAMISANAR entrega solo 4 columnas SIN código de servicio — el bot lo
+  **extrae del texto** de la observación ("… CÓDIGO 903867 …") y arma el
+  archivo de 16 columnas con las mismas reglas de SAVIA. Las filas "AUD
+  EXTRA" no traen código y quedan con la casilla vacía (avisa cuántas).
+- Una **revisión adversarial con agentes independientes** encontró, antes de
+  entregar, un error que borraba el valor unitario del texto en 18 de 37
+  filas: se corrigió (ahora solo se quita el $monto final si es el mismo
+  valor de la objeción) y se blindó también el bot de SAVIA con el mismo
+  arreglo preventivo. Probado: 37/37 filas fieles a la fuente, 64 pruebas en
+  verde entre los dos bots.
+
 ---
 
 ## PENDIENTE
@@ -158,5 +174,5 @@ tres frentes:
 
 ---
 
-*Última actualización: 22 de julio de 2026 — creación de la bitácora y arreglo
+*Última actualización: 13 de agosto de 2026 — bot de FAMISANAR + lote SAVIA 7.53.*
 de las 3 pruebas con fechas vencidas.*
