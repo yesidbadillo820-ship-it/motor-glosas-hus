@@ -999,6 +999,18 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .st-upload-col,.st-result-col{min-width:0}
 @media (max-width:900px){.st-area{grid-template-columns:1fr}}
 .st-stats{display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+/* Girador del análisis con IA de Salud Total (OT-045). Analizar 44 glosas
+   tarda minutos: sin una señal de que algo está pasando, el auditor cree
+   que se congeló y recarga la pantalla a mitad del trabajo. */
+.st-spinner{
+  display:block;width:22px;height:22px;margin:0 auto .6rem;
+  border:3px solid var(--sinac-gray-200,#e2e8f0);
+  border-top-color:var(--c-amber,#E65100);
+  border-radius:50%;
+  animation:stGirar .8s linear infinite;
+}
+@keyframes stGirar{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.st-spinner{animation-duration:2.4s}}
 .st-stats .stat-mini{flex:1 1 150px;min-width:0}
 .btn-row{display:flex;gap:.5rem;margin-top:1rem}
 .btn-row .btn{flex:1}
@@ -23829,15 +23841,80 @@ function cambiarTipoRespuestaST(){
   fieldFecha.style.display = (tipo==='ia'||tipo==='extemporanea') ? 'block' : 'none';
 }
 
+// OT-045. «Analizar con IA» ahora sí llama a la IA. Cada glosa pasa por el
+// mismo motor que el resto del portal, así que puede tardar: 44 glosas son
+// varios minutos. Por eso la pantalla avisa cuántas van y no se queda muda.
+async function analizarSaludTotalConIA(){
+  var file=document.getElementById('st-file').files[0];
+  if(!file){toast('Falta el archivo','Seleccione el TXT de la notificación','error');return;}
+  var fd=new FormData();
+  fd.append('file',file);
+  var fechaIA=document.getElementById('st-fecha-recepcion').value;
+  if(fechaIA) fd.append('fecha_recepcion',fechaIA);
+
+  var cuerpo=document.getElementById('st-body');
+  if(cuerpo) cuerpo.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text3)">'+
+    '<div class="st-spinner"></div>Analizando cada glosa con el motor de IA. '+
+    'Puede tardar varios minutos: no cierre esta pantalla.</td></tr>';
+  showLoading('Analizando con IA…');
+  try{
+    var r=await fetch('/api/salud-total/analizar-ia',{method:'POST',headers:authH(),body:fd});
+    if(r.status===401){logout();return;}
+    var d=await r.json().catch(function(){return{};});
+    if(!r.ok){
+      hideLoading();
+      if(cuerpo) cuerpo.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#b91c1c">'+
+        escHtml(d.detail||('El servidor respondió '+r.status))+'</td></tr>';
+      toast('No se pudo analizar', d.detail||'Error','error');
+      return;
+    }
+    _pintarSaludTotal(d.glosas||[]);
+    hideLoading();
+    if(d.por_plantilla>0){
+      toast('Análisis terminado',
+        d.analizadas_con_ia+' de '+d.total+' con IA. Las otras '+d.por_plantilla+
+        ' salieron con la respuesta por plantilla.','warning');
+    }else{
+      toast('Análisis terminado', d.analizadas_con_ia+' glosas analizadas con IA','success');
+    }
+  }catch(e){
+    hideLoading();
+    if(cuerpo) cuerpo.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#b91c1c">'+
+      'Sin conexión con el motor: '+escHtml(e.message)+'</td></tr>';
+    toast('Sin conexión','No se pudo analizar: '+e.message,'error');
+  }
+}
+
+// Pinta la tabla. La usan la vista previa y el análisis con IA, para que la
+// pantalla se vea igual venga por donde venga.
+function _pintarSaludTotal(glosas){
+  var tbody=document.getElementById('st-body');
+  if(!tbody) return;
+  if(!glosas.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text3)">Sin glosas en el archivo.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=glosas.map(function(g){
+    var marca = g.AnalizadaPorIA
+      ? '<span title="Respondida por el motor de IA" style="background:#ecfdf5;color:#047857;font-size:.62rem;font-weight:700;padding:1px 5px;border-radius:4px;margin-right:.3rem">IA</span>'
+      : (g.AnalizadaPorIA===false
+          ? '<span title="La IA no pudo con esta; salió por plantilla" style="background:#fffbeb;color:#b45309;font-size:.62rem;font-weight:700;padding:1px 5px;border-radius:4px;margin-right:.3rem">PLANTILLA</span>'
+          : '');
+    return '<tr><td style="font-size:.75rem">'+marca+escHtml(g.NumeroRad||'')+'</td>'
+      +'<td style="font-size:.75rem">'+escHtml(g.NUMREG||'')+'</td>'
+      +'<td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.NombreServicio||'')+'</td>'
+      +'<td style="font-size:.75rem;text-align:right">'+fmtCOP(g.ValorGlosaTotalxServ)+'</td>'
+      +'<td style="text-align:center"><code style="font-size:.7rem;background:var(--bg);padding:2px 6px;border-radius:4px">'+escHtml(g.Codigo_Respuesta_a_glosas||'')+'</code></td>'
+      +'<td style="font-size:.7rem;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="'+escHtml(g.Observacion_IPS||'')+'">'+escHtml(g.Observacion_IPS||g.ConceptoRespuesta||'')+'</td></tr>';
+  }).join('');
+}
+
 async function previewSaludTotal(){
   var tipo=document.getElementById('st-tipo-respuesta').value;
   var fileInput=document.getElementById('st-file');
   var file=fileInput.files[0];
   if(!file){toast('Seleccione un archivo TXT primero','error');return;}
-  if(tipo==='ia'){
-    toast('La vista previa no está disponible para IA. Use Descargar Respuesta.','error');
-    return;
-  }
+  if(tipo==='ia'){ return analizarSaludTotalConIA(); }
   var fd=new FormData();
   fd.append('file',file);
   fd.append('tipo_respuesta',tipo);
@@ -23853,10 +23930,7 @@ async function previewSaludTotal(){
     document.getElementById('st-glosado').textContent=fmtCOP(d.total_glosado);
     document.getElementById('st-aceptado').textContent=fmtCOP(d.total_aceptado);
     document.getElementById('st-rechazado').textContent=fmtCOP(d.total_rechazado);
-    var tbody=document.getElementById('st-body');
-    tbody.innerHTML=d.glosas.map(function(g){
-      return '<tr><td style="font-size:.75rem">'+escHtml(g.NumeroRad||'')+'</td><td style="font-size:.75rem">'+escHtml(g.NUMREG||'')+'</td><td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.NombreServicio||'')+'</td><td style="font-size:.75rem;text-align:right"> ' + fmtCOP(g.ValorGlosaTotalxServ)+'</td><td style="text-align:center"><code style="font-size:.7rem;background:var(--bg);padding:2px 6px;border-radius:4px">'+escHtml(g.Codigo_Respuesta_a_glosas||'')+'</code></td><td style="font-size:.7rem;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.ConceptoRespuesta||'')+'</td></tr>';
-    }).join('');
+    _pintarSaludTotal(d.glosas||[]);
     hideLoading();
     if(d.sin_fecha_recepcion){
       // Sin fecha de recepción no se puede sustentar que la glosa llegó
