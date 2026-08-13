@@ -208,7 +208,8 @@ Found» tres meses: el frontend depende de nombres que nadie verifica.
 - [x] Enchufados en seis rutas: tarifas (lista y stats), conciliaciones, Salud Total y el validador ADRES (estado e inicio).
 - [x] **Prueba que compara las llaves que lee el JavaScript contra las del esquema.** Es lo que de verdad importa: un `response_model` **filtra**, y todo campo fuera del esquema se cae de la respuesta. Si la pantalla lee uno que quedó por fuera, se queda en blanco sin dar error — el mismo mal que este trabajo vino a evitar. Comprobado quitando un campo a propósito: la prueba lo caza.
 - [x] **`GET /glosas/historial`** — y con él, el caso más peligroso de todos. Declaraba `response_model=list` a secas, que no es un contrato: acepta cualquier cosa. Y existía desde hacía meses un `GlosaHistorialItem` con **diez** campos mientras la ruta devuelve **veintiuno**, sin enchufar. Enchufarlo tal como estaba —que es exactamente lo que pedía esta fase— le habría borrado **once columnas** a la tabla de Historial (la factura, el dictamen, la entidad, el CUPS, el servicio, la observación…) y sin dar error. Reescrito sobre lo que la ruta devuelve de verdad, con las 19 llaves que el JavaScript lee y su prueba.
-- [ ] `GET /glosas/{id}` y el resto de rutas del expediente. **PENDIENTE**.
+- [x] **`GET /glosas/{id}`** — el expediente. Devuelve 36 campos y no declaraba ninguno. Contrato completo, con las 26 llaves que la pantalla lee. Incluye `dictamen_stale`, el aviso de que la glosa cambió después de generar el dictamen: si el contrato lo borrara, el auditor radicaría un dictamen viejo creyendo que está al día.
+- [ ] El resto de rutas del expediente (soportes, comentarios, historial de versiones). **PENDIENTE**.
 
 ### 3.2 Lógica de datos dentro de los routers
 

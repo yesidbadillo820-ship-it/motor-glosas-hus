@@ -427,3 +427,64 @@ class ContratoOut(BaseModel):
     activo: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GlosaExpedienteOut(BaseModel):
+    """El expediente de una glosa: lo que se ve al abrirla.
+
+    13-08-2026. La ruta devuelve 36 campos y no declaraba ninguno. Acá van
+    todos, con el mismo nombre y el mismo tipo con que salen hoy.
+
+    Casi todo Optional, y no por descuido: una glosa recién importada no
+    tiene dictamen, ni radicado, ni decisión de la EPS, ni nota crédito. Esos
+    campos se llenan a medida que avanza el trámite, y el expediente tiene
+    que poder mostrarse desde el primer día.
+    """
+
+    id: int
+    eps: Optional[str] = None
+    paciente: Optional[str] = None
+    codigo_glosa: Optional[str] = None
+    valor_objetado: Optional[float] = None
+    valor_aceptado: Optional[float] = None
+    etapa: Optional[str] = None
+    estado: Optional[str] = None
+    factura: Optional[str] = None
+    creado_en: Optional[str] = None
+    dias_restantes: Optional[int] = None
+
+    # Dictamen y su frescura: `stale` avisa que la glosa cambió después de
+    # generarlo, y el motivo dice qué cambió.
+    dictamen: Optional[str] = None
+    dictamen_generado_en: Optional[str] = None
+    dictamen_stale: Optional[bool] = None
+    dictamen_stale_motivo: Optional[str] = None
+
+    # Radicación y trazabilidad con Dinámica Gerencial.
+    numero_radicado: Optional[str] = None
+    consecutivo_dgh: Optional[str] = None
+    gestor_nombre: Optional[str] = None
+    fecha_radicacion_factura: Optional[str] = None
+    fecha_documento_dgh: Optional[str] = None
+    fecha_recepcion: Optional[str] = None
+    fecha_entrega: Optional[str] = None
+    fecha_vencimiento: Optional[str] = None
+    radicado_info: Optional[dict] = None
+    referencia: Optional[str] = None
+    observacion_tecnico: Optional[str] = None
+    tipo_glosa_excel: Optional[str] = None
+    profesional_medico: Optional[str] = None
+
+    # Qué decidió la EPS y cuánto se recuperó.
+    decision_eps: Optional[str] = None
+    fecha_decision_eps: Optional[str] = None
+    valor_recuperado: Optional[float] = None
+    observacion_eps: Optional[str] = None
+
+    # Nota crédito, cuando la glosa se acepta.
+    numero_nota_credito: Optional[str] = None
+    fecha_nota_credito: Optional[str] = None
+    valor_nota_credito: Optional[float] = None
+    nota_credito_observacion: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
