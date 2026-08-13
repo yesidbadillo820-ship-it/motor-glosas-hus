@@ -2623,6 +2623,39 @@ acaso. Queda anotado para revisar de nuevo si las glosas pasan de unos miles.
   vacía en el rescate del 4 de agosto. Las tablas están sanas y las pantallas
   ya funcionan otra vez; simplemente todavía no hay nada escrito en ellas.
 
+### 13-08 (cierre) — Las tarifas de FAMISANAR quedaron cargadas y COMPROBADAS
+
+Yesid subió el Excel desde la pantalla y el motor respondió: **6.655 creadas,
+0 actualizadas, 6.655 filas leídas**, las cinco hojas, contrato
+`S-13-1-03-1-04958`.
+
+Comprobado contra la base del hospital, tarifa por tipo:
+
+| Cómo quedó pactada | Cuántas |
+|---|---|
+| UVB por grupos | 4.586 |
+| Tarifa propia | 1.557 |
+| Ambulatorio | 413 |
+| Órtesis y prótesis | 31 |
+| Paquetes (urología, rehabilitación, gastro, columna…) | 68 |
+
+**Las 4.586 de UVB quedaron rotuladas como «UVB POR GRUPOS» y no como
+«tarifa propia»**, que era el defecto corregido esa misma mañana. Si hubieran
+entrado mal, el dictamen le habría dicho a FAMISANAR que esas tarifas son
+propias del hospital cuando en realidad son la UVB con el descuento del
+contrato — y la entidad ratifica la glosa sin discutir el valor.
+
+**Con esto el motor ya defiende las glosas de tarifas de FAMISANAR con el
+valor pactado del contrato firmado, y no con SOAT pleno.** Es el círculo
+completo: las cláusulas, las tarifas y el homologador CUPS → SOAT, los tres
+cargados y comprobados en el motor del hospital.
+
+**Un detalle de un día, anotado:** en «rigen hasta» quedó el **15/04/2027** y
+el contrato dice hasta el **14/04/2027**. Solo importaría con un servicio
+prestado justo ese día de 2027. Si se quiere exacto, se vuelve a subir el
+mismo Excel con la fecha correcta y **marcando «Reemplazar tarifas
+existentes»**, para que no queden duplicadas.
+
 ---
 
 ## 3) PENDIENTE
