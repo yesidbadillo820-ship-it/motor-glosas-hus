@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 06-08-2026
+**Última actualización:** 13-08-2026
 
 ---
 
@@ -2357,6 +2357,32 @@ más alta y la entidad ratificaría la glosa cada vez.
 **Ojo con esa propuesta:** el archivo se llama PROPUESTA. Mientras el
 acuerdo con FAMISANAR no esté firmado, no la cargues como tarifa pactada.
 
+### 13-08 — Google reabrió la cuenta: rescate de la VM y herramienta de fusión
+
+- **Google resolvió el caso #74044918**: la facturación quedó activa y la VM
+  volvió a prender. La página NO depende de ella (sigue viva desde el PC de
+  cartera); la VM solo se prendió para sacar lo que quedó encerrado el 03-08.
+- **Se empacó el rescate en la VM**: `rescate-motor-glosas.tgz` (28 MB) con la
+  base vieja congelada del 03-08, el `.env` con las llaves y la llave del
+  túnel. Los soportes y los PDF de contratos (son poquitos, 288 KB) van en un
+  segundo paquete `rescate-soportes.tgz`.
+- **Decisión importante: NO se restaura la base vieja encima de la del PC.**
+  El PC lleva más de una semana siendo el sistema real y su pre-auditoría
+  (importada del Excel del equipo el 05-08) es MÁS completa que la vieja.
+  Lo que se hace es **fusionar**: traer solo lo que al PC le falta.
+- **Nació `tools/fusionar_base_vieja.py`** para esa fusión. Trae de la base
+  vieja: las glosas con sus dictámenes y toda su historia (conceptos,
+  versiones del dictamen, comentarios, conciliaciones con sus adjuntos, notas
+  privadas e hilos), los precedentes ganados, las plantillas, los usuarios que
+  falten (a los que ya están en el PC NO les toca la clave), los contratos con
+  sus cláusulas, las tarifas contratadas, las credenciales de entidades (solo
+  si el vault del PC está vacío), las rutas de soportes y los atajos de los
+  gestores. No toca NADA de pre-auditoría ni ninguna fila que ya exista.
+  Estilo seguro de siempre: **SOLO MIRAR / aplicar**, copia de seguridad
+  automática de la base del PC antes de escribir, idempotente (correrlo dos
+  veces no duplica), la base vieja se abre solo-lectura, y aguanta que la
+  vieja tenga tablas o columnas más antiguas. 5 pruebas automáticas.
+
 ---
 
 ## 3) PENDIENTE
@@ -2573,16 +2599,18 @@ acuerdo con FAMISANAR no esté firmado, no la cargues como tarifa pactada.
     repetir. Con eso queda lista la prueba de fuego pendiente: **pasar la
     glosa de PPL por Analizar** y confirmar que sale con el formato
     aprobado.
-0. **PRIORIDAD CERO — revivir la página YA (arranque exprés) y luego
-   restaurar la historia.** Actualizado 04-08: la deuda ya se pagó; Google
-   reabre la cuenta por soporte (caso #74044918, 24-48 h). Mientras tanto:
-   (a) en el PC de cartera instalar Docker Desktop y Git; (b) sacar el token
-   del túnel en Cloudflare y doble clic a
-   `tools\REVIVIR_EXPRESS_SIN_RESCATE.cmd` (guía: sección "Arranque exprés"
-   de `docs/MIGRACION_PC_HOSPITAL.md`) — con eso el equipo trabaja hoy con
-   base provisional. (c) Cuando llegue el correo de Google: rescate de la
-   fase 1 (`rescate-motor-glosas.tgz`) y **avisar al chat antes de restaurar**
-   la base histórica; (d) verificar y apagar la VM (fase 4).
+0. **PRIORIDAD CERO — terminar el rescate de la VM (13-08 quedó a mitad).**
+   La página vive en el PC de cartera y Google ya reabrió la cuenta. Falta:
+   (a) en Cloud Shell, empacar soportes/contratos y **bajar los DOS paquetes**
+   (`rescate-motor-glosas.tgz` y `rescate-soportes.tgz`) — guardarlos con
+   cuidado, llevan llaves; (b) **apagar la VM** para que no cobre:
+   `gcloud compute instances stop motor-glosas --zone=us-west1-a`;
+   (c) en el PC: descomprimir el rescate en `C:\motor-glosas\rescate` y correr
+   `tools\fusionar_base_vieja.py` — primero SOLO MIRAR, pegar el resultado al
+   chat, y con el visto bueno correr `aplicar`; (d) copiar los PDF de
+   contratos del rescate a `data\contratos`, y la línea `CRED_VAULT_KEY` del
+   .env viejo al .env del PC si la fusión lo pide; (e) cuando todo quede
+   verificado, borrar la VM (fase 4) para que no vuelva a cobrar nunca.
 1. **Dispensario prioridad 1 (actualizado 05-08):** correr el cargue de las
    **23 pendientes** (piloto con HUS0000513796 → corrida completa → pegar el
    reporte al chat) y después armar los dos paquetes de evidencias:
