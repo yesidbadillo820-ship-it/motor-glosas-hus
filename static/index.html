@@ -709,20 +709,23 @@ header::after{
 }
 .sn-item:hover{background:var(--sinac-gray-50);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(11,61,145,.06)}
 .sn-item:hover svg{color:var(--sinac-blue-700)}
+/* 13-08-2026. La pestaña activa pasa de azul a NARANJA, como la pidió el
+   auditor. Se usa el token que ya existe (--c-amber / --c-amber-light), no
+   un color suelto: si mañana se ajusta la paleta, esto va con ella. */
 .sn-item.active{
-  background:var(--sinac-blue-50);
-  color:var(--sinac-blue-700);font-weight:600;
+  background:var(--c-amber-light);
+  color:var(--c-amber);font-weight:600;
 }
 .sn-item.active::before{
   content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
-  background:var(--sinac-green-600);
+  background:var(--c-amber);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 8px rgba(56,142,60,.35);
+  box-shadow:0 0 8px rgba(230,81,0,.35);
   animation:snActivePulse 2.4s ease-in-out infinite;
 }
 @keyframes snActivePulse{
-  0%,100%{box-shadow:0 0 8px rgba(56,142,60,.30)}
-  50%{box-shadow:0 0 13px rgba(56,142,60,.55)}
+  0%,100%{box-shadow:0 0 8px rgba(230,81,0,.30)}
+  50%{box-shadow:0 0 13px rgba(230,81,0,.55)}
 }
 /* Cascade slide-in al cargar el sidebar */
 .sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
@@ -741,11 +744,11 @@ header::after{
   .sn-group .sn-item{opacity:1;animation:none}
   .sn-item.active::before{animation:none}
 }
-body.dark .sn-item.active{background:rgba(30,136,229,.16);color:#7dd3fc}
+body.dark .sn-item.active{background:rgba(230,81,0,.18);color:#fdba74}
 body.dark .sn-item:hover{background:rgba(255,255,255,.05)}
 .sn-item svg{flex-shrink:0;color:var(--text3)}
-.sn-item.active svg{color:var(--sinac-blue-700)}
-body.dark .sn-item.active svg{color:#7dd3fc}
+.sn-item.active svg{color:var(--c-amber)}
+body.dark .sn-item.active svg{color:#fdba74}
 .sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-nav.collapsed .sn-item-label{display:none}
 .sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
