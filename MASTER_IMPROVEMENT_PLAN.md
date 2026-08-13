@@ -127,9 +127,23 @@ creía que su decisión había quedado registrada y no había quedado.
 | `app/api/routers/tarifas_contratadas.py` | 453 |
 
 - [x] Localizar los 22 casos con archivo y línea.
-- [ ] Medir cuáles pesan de verdad (cuántas vueltas da el bucle con los datos del hospital). **PENDIENTE DE VALIDAR** — sin la base real no se sabe si un bucle da 3 vueltas o 3.000; corregir los 22 a ciegas sería reescribir código estable sin razón demostrable.
-- [ ] Corregir los que la medición señale, uno por commit.
-- [ ] Prueba de regresión por cada uno (mismo resultado, menos consultas).
+- [x] **Medido con la base real del hospital (13-08-2026).** Conteos de `motorglosas.db`:
+
+| Tabla | Filas |
+|---|---|
+| `preaud_fuente_dgreport` | 206.365 |
+| `preaud_fuente_radicacion` | 193.025 |
+| `glosas_adres` | 4.619 |
+| `preaud_factura_eventos` | 3.061 |
+| `preaud_facturas` | 959 |
+| **`historial` (las glosas)** | **74** |
+| `audit_log` | 57 |
+| `clausulas_contrato` | 29 |
+| `tarifas_contratadas` | **0** |
+
+- [x] **VEREDICTO: ninguno de los 22 vale la pena corregir.** Veinte consultan `GlosaRecord` (**74 filas**), `TarifaContratadaRecord` (0) o `FacturaPreauditoriaRecord` (959) — a esa escala un bucle con consulta adentro cuesta milisegundos. Dos tocan `FacturaEventoRecord` (3.061), y son operaciones manuales de una vez (generar un oficio de devolución), no una pantalla que se abre cien veces al día.
+- [x] **Y las dos tablas de verdad grandes —206.365 y 193.025 filas— no se consultan dentro de ningún bucle.** Cero coincidencias. Eso ya estaba bien resuelto.
+- [ ] ~~Corregir los 22~~ — **no se hace.** Sería reescribir código estable sin defecto que lo justifique, contra la regla 1 del proyecto. Se revisa de nuevo si `historial` pasa de unos miles de filas.
 
 ### 2.2 Caché de IA — **ya existe y funciona**
 
