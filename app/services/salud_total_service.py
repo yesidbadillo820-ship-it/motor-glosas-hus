@@ -172,7 +172,12 @@ class GlosaSaludTotal:
         El plazo corre desde que la EPS RECIBE la factura hasta que radica
         la glosa. Sin la fecha de recepción no existe el punto de partida.
         """
-        return not (self.fecha_recepcion and self.fecha_rad)
+        if not (self.fecha_recepcion and self.fecha_rad):
+            return True
+        # La EPS no puede glosar una factura antes de recibirla. Si las dos
+        # fechas vienen al revés, el dato está mal digitado y no sirve para
+        # contar el plazo: se trata igual que si no estuviera.
+        return self.fecha_recepcion > self.fecha_rad
 
     def dias_transcurridos(self) -> int:
         """Días hábiles entre la recepción de la factura y la radicación.

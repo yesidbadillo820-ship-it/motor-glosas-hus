@@ -250,6 +250,17 @@ class TestNoSeAlegaUnPlazoQueNadiePuedeProbar:
         )
         assert "RE9502" not in r.text
 
+    def test_una_fecha_posterior_a_la_glosa_no_cuenta_como_plazo(self, client):
+        """Yesid digitó 30/07/2026 en una glosa radicada el 03/07/2026. La
+        EPS no puede glosar una factura antes de recibirla: el dato está mal
+        y no sirve para contar el plazo. Antes salía «0 días» en silencio."""
+        datos = {"tipo_respuesta": "extemporanea", "fecha_recepcion": "2026-07-30"}
+        prev = client.post("/api/salud-total/preview", files=_archivo(), data=datos).json()
+        assert prev["sin_fecha_recepcion"] is True, "la fecha invertida se dio por buena"
+        arch = client.post("/api/salud-total/procesar", files=_archivo(), data=datos).text
+        assert "RE9502" not in arch
+        assert "DÍAS HÁBILES" not in arch.upper()
+
     def test_la_vista_previa_y_el_archivo_dicen_lo_mismo(self, client):
         """Si la vista previa calculara sin la fecha, mostraría un código y
         el archivo descargado traería otro."""
