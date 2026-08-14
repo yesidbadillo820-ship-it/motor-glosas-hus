@@ -2688,7 +2688,36 @@ una glosa sin responder la entidad la da por aceptada.
 **Dos cosas que todavía no se saben** y que solo se ven al usarlo con las 44
 glosas reales: **cuánto tarda** y **cuánto cuesta**. Cada glosa es una
 consulta a la IA, así que este botón sí gasta plata — a diferencia de las
-otras dos opciones, que son gratis. Conviene medirlo la primera vez.
+otras dos opciones, que son gratis.
+
+**Lo que enseñó la primera corrida de verdad (esa misma tarde):**
+
+Yesid lo estrenó con la notificación de 44 glosas y salieron **dos defectos
+míos**, los dos ya corregidos:
+
+1. **El archivo llegó con código de programación adentro.** En la casilla de
+   la observación, las 44 filas traían `<table border="1" style=…` cortado a
+   la mitad. La causa: el dictamen del motor viene en formato de página web
+   porque está hecho para verse en pantalla y en el PDF, y yo lo recorté sin
+   quitarle ese formato. Ahora se extrae solo el argumento, y si por lo que
+   sea saliera con código, esa fila se manda por plantilla antes que
+   entregarle eso a la entidad.
+2. **Los valores salían con decimal:** «FACTURADA POR $ 93340.0». Le estaba
+   pasando a la IA el número crudo del archivo. Ahora recibe **$93.340** y
+   **$280.000**, como se escribe acá.
+
+**Y un hallazgo que no es un defecto pero conviene tener presente:** las 44
+respuestas salieron con **el mismo argumento**, cambiando solo el código y el
+valor. Y está bien que así sea: con Salud Total el hospital **no tiene
+contrato**, así que no hay cláusula que citar ni tarifa pactada que invocar,
+y el motor llega siempre al mismo sitio — el mismo que ya daba la plantilla,
+gratis.
+
+**En plata:** para **Salud Total**, «Extemporánea» o «Ratificada» dan
+prácticamente lo mismo sin costo. **Donde el análisis con IA sí paga** es en
+las entidades con contrato cargado —hoy **FAMISANAR**, con sus 29 cláusulas y
+sus 6.655 tarifas—, porque ahí el dictamen puede citar la cláusula y el valor
+exacto pactado, y eso la plantilla no lo hace.
 
 ---
 
@@ -2962,9 +2991,14 @@ otras dos opciones, que son gratis. Conviene medirlo la primera vez.
   Ahora el motor dice lo que es, y resulta que juega a favor: **si el manual
   no le asigna código SOAT a ese procedimiento, la entidad no puede objetar
   la tarifa citando un código SOAT que no existe.**
-- **G) Estrenar «Analizar con IA» de Salud Total** con la notificación de 44
-  glosas, y anotar cuánto tardó y cuántas salieron marcadas como PLANTILLA.
-  Es lo único que falta por medir de todo lo del 13-08.
+- **G) ~~Estrenar «Analizar con IA»~~ — HECHO el 13-08.** Salieron dos
+  defectos (código de programación en la observación y valores con decimal),
+  los dos corregidos el mismo día. Falta todavía **medir cuánto tarda y
+  cuánto cuesta**: en las dos corridas nadie tomó el tiempo.
+- **H) Probar el análisis con IA en una glosa de FAMISANAR**, que es donde
+  de verdad aporta: con contrato cargado el dictamen puede citar la cláusula
+  y el valor pactado. Con Salud Total no hay contrato y la IA llega al mismo
+  argumento que la plantilla, que es gratis.
 - **F) Todo lo de las OT-023 a OT-034 está probado en el repositorio, pero
   salvo la pantalla de Salud Total nadie lo ha visto correr en el motor del
   hospital.** Falta esa pasada.
