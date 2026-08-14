@@ -142,9 +142,47 @@ Nota sobre las funciones de IA (grupo "PDF INTELLIGENCE"):
         python suite_cli.py pdf traducir carta.pdf --idioma inglés
         python suite_cli.py pdf ocr escaneo.pdf
 
+CORREOS DE PAGOS → EXCEL (botón «📧 Correos de Pagos → Excel»)
+----------------------------------------------------------------
+Las entidades pagadoras mandan la "relación de pagos del día" como un
+correo de Outlook (.msg) con el detalle en un Excel adjunto. Este botón
+junta varios correos .msg (uno por día) en UN SOLO Excel consolidado,
+sin perder calidad del dato:
+    · Fechas quedan como fechas y montos como números (nunca como texto),
+      así se pueden sumar y filtrar directo, sin arreglar nada a mano.
+    · Si la misma factura+comprobante+valor aparece en más de un correo,
+      la fila se MARCA como posible duplicado (columna _POSIBLE_DUPLICADO)
+      pero no se borra — la decisión de qué hacer la toma el analista.
+    · Si un correo no traía el Excel adjunto, queda avisado aparte en la
+      hoja RESUMEN, para revisarlo a mano.
+    · Acepta correos .msg sueltos, una carpeta con varios, o un .zip que
+      los contenga (como el que manda el portal).
+El resultado queda en SALIDAS/CORREOS_PAGOS/. También por consola:
+    python suite_cli.py correos correo1.msg correo2.msg -o CONSOLIDADO.xlsx
+    python suite_cli.py correos CARPETA_CON_MSG/ -o CONSOLIDADO.xlsx
+    python suite_cli.py correos RELACION_PAGOS.zip -o CONSOLIDADO.xlsx
+
+UNIR EXCELES (botón «📊 Unir Exceles»)
+--------------------------------------
+Une varios archivos Excel (.xlsx/.xlsm) en UNO, sin perder calidad del
+dato (fechas como fechas, montos como números — nunca texto). Acepta
+archivos sueltos, una carpeta o un .zip. Dos modos:
+    APILAR .... archivos con las MISMAS columnas (cortes mensuales,
+                exportes del portal): todas las filas en una sola tabla.
+                Si un archivo trae columnas nuevas, se agregan al final;
+                ninguna fila ni columna se pierde. Cada fila queda
+                marcada con su archivo de origen y hay hoja RESUMEN.
+    HOJAS ..... cada archivo queda como una hoja aparte del mismo libro.
+Se lee la PRIMERA hoja de cada archivo; si hay un título encima del
+encabezado, el bot lo salta solo. El resultado queda en
+SALIDAS/EXCELES_UNIDOS/. También por consola:
+    python suite_cli.py exceles enero.xlsx febrero.xlsx -o UNIDO.xlsx
+    python suite_cli.py exceles CARPETA/ -o UNIDO.xlsx --modo hojas
+
 REQUISITOS
 ----------
 Windows con Python 3.8+ · pandas · openpyxl · python-docx · pymupdf ·
-pdf2docx · pdfplumber · python-pptx (el .bat los instala solos). LibreOffice
-es opcional, solo para Office->PDF. La interfaz es Tkinter puro.
+pdf2docx · pdfplumber · python-pptx · extract-msg (el .bat los instala
+solos). LibreOffice es opcional, solo para Office->PDF. La interfaz es
+Tkinter puro.
 ════════════════════════════════════════════════════════════════════

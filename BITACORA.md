@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 13-08-2026
+**Última actualización:** 14-08-2026
 
 ---
 
@@ -32,7 +32,15 @@
    Dispensario (renombrar, organizar, verificar CUV), tablero de cartera
    (`tools/tablero_cartera.py`), informe masivo de seguimientos SIIFA
    (`tools/siifa_reporte_seguimientos.py`).
-5. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
+5. **Suite Cartera HUS** (`tools/suite_cartera_hus/`, PR #160): programa de
+   escritorio del analista de Cartera — organiza el ZIP del portal en lotes,
+   consolida las glosas, cruza contra la base DGH y arma las OBJECIONES listas
+   para cargar. Incluye una **caja de Herramientas PDF** (26 utilidades: unir/
+   dividir/rotar páginas, proteger/censurar, conversión Office↔PDF, resumir/
+   traducir/OCR con IA), el bot de **correos de pagos (.msg) → Excel** y el
+   bot de **unir Exceles** (apilar filas u hoja por archivo).
+   Versión de ventana (`suite_cartera_hus.py`) y de consola (`suite_cli.py`).
+6. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
    - `tools/adres/validar_furips.py` + `VALIDAR_FURIPS.cmd` — validador masivo
      FURIPS 1/2 contra la Circular 022/2023 + cruce con soportes (RIPS, CUV,
      XML DIAN, factura PDF, epicrisis) con OCR para PDF escaneados.
@@ -327,6 +335,55 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 | 17 de julio | 58 | 115 | $87.605.050 | Excel listo — confirmar subida |
 | Pendientes junio | 3 | 38 | $20.054.751 | Excel listo — subir YA (plazos vencidos) |
 
+### 22 al 28-07-2026 — Frente Suite Cartera HUS: consolidados, actas y bot de correos de pagos
+(trabajo de la rama `claude/bot-multifunctional-improvements-zhj4nw`, PR #160, fusionado a esta bitácora el 28-07)
+- **22-07:** control central de este frente: nace esta sección (reconstruyendo
+  la historia desde Git) y se corrige un fallo de CI heredado, ajeno a
+  Cartera/PDF — dos pruebas del Motor usaban fechas fijas de abril que se
+  salieron de la ventana de 90 días y empezaron a fallar solas el 19-07; se
+  anclaron a "la semana pasada" para que no vuelvan a caducar (la
+  funcionalidad real nunca estuvo mal).
+- **23-07:** **5 informes consolidados de estado de cartera** (formato
+  FAMISANAR: CARTERA detalle por factura · RESUMEN por vigencia · CARTERA POR
+  EDADES · RAD VS REC mensual · ACTAS DE GLOSAS), corte 30-06-2026, a partir de
+  los 6 cortes mensuales DGH (enero a junio 2026): **DISPENSARIO MÉDICO**
+  (Sanidad Ejército, 5.571 facturas, saldo $13.621.817.612, con actas SINAC
+  709/720 y el giro directo real de mayo/junio del libro de pagos SAP),
+  **PROTEGER EPS** (antes Cajacopi EPS, 532 facturas, $4.268.767.084),
+  **CAJACOPI Caja de Compensación** (115 facturas, $302.274.693, sin
+  movimiento en los 6 meses), **COMPENSAR** (39 facturas, $193.065.583) y
+  **MESSER** (sin cartera al corte). Fórmulas recalculadas sin errores y 30 de
+  30 totales cuadrados. Después se generó la **serie mensual completa**: 30
+  informes (5 entidades × 6 cortes, 31-01 a 30-06-2026), también 30/30 sin
+  errores y 150/150 totales cuadrados.
+- **23-07 (cruce de actas):** **cruce factura por factura de las 13 actas del
+  Dispensario** (2 SINAC en Excel + 11 en PDF, ~1.900 páginas leídas): el
+  informe corte 30-06 ahora dice, por cada factura, si su glosa está
+  LEVANTADA, ACEPTADA por la IPS, RATIFICADA (pendiente de conciliar) o EN
+  TRÁMITE, con hoja de actas anclada a los totales oficiales y hoja de
+  auditoría factura×acta (1.710 filas). Resultado: **$523,1 millones
+  levantados en conciliación** a favor del HUS (+$173,2M levantados en
+  respuestas AR) y **$1.013 millones aún ratificados** en actas de respuesta
+  pendientes de conciliar (el mayor: AR003215 con $399,5M). Las 5 actas de
+  conciliación validaron 100% al centavo; en las de respuesta (AR) el detalle
+  por factura quedó al 95-98% (el resto documentado en el propio informe).
+- **28-07:** **bot de correos de pagos**: la Suite gana el botón **"📧 Correos
+  de Pagos → Excel"** — junta varios correos de Outlook (.msg) de "relación de
+  pagos del día" en un solo Excel, leyendo el detalle del adjunto de cada
+  correo y preservando fechas y montos con su tipo real (nunca como texto);
+  las filas repetidas en más de un correo quedan marcadas, no se borran solas.
+  Probado con los 13 correos reales del analista: **237 filas, $2.207.118.593
+  pagados**, cuadrado al peso contra los 13 archivos originales. Se entregó
+  también como **bot suelto** (ZIP de doble clic) para uso inmediato sin
+  esperar a actualizar toda la Suite. Nota técnica: el lector de correos
+  (`extract-msg`) trae una dependencia accesoria (`red-black-tree-mod`) que no
+  instala en Windows/Python moderno; solo serviría para RE-ESCRIBIR un .msg
+  (este bot solo LEE), así que se resolvió sin necesitarla.
+
+**Pendiente de este frente:** no existe corte de cartera de julio 2026 (la
+columna de recaudo de julio de los 5 consolidados y la serie mensual queda en
+0 hasta que el analista lo entregue); revisar y fusionar el PR #160.
+
 ### 24 de julio de 2026 — Expediente Inteligente de Conciliación (Hoja Maestra)
 - **Nueva herramienta `tools/hoja_maestra_conciliacion.py`:** arma en un solo
   Excel el **expediente de conciliación** del Dispensario con **un único
@@ -404,7 +461,6 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   todo el módulo (objetivo, arquitectura, funciones, flujo, riesgos,
   pendientes y cómo fusionarlo al proyecto principal).
 
----
 ### Julio 2026 — Frente ADRES/FURIPS (chat "VALIDADOR ADRES", PR #173-#176)
 - **17-07:** nace el **bot validador FURIPS**: valida masivamente los TXT
   FURIPS 1 y 2 contra la Circular 022 de 2023 de la ADRES (102 + 9 campos,
@@ -930,6 +986,41 @@ buena decide el tamaño de medio Contrato, y esa decisión es del área.
 
 Todo esto es **documentación y plan**. No se tocó una línea del código que
 corre en producción: la suite de 4.533 pruebas pasa igual que antes.
+
+### 29-07 — Se juntaron las dos memorias del proyecto + bot de Unir Exceles
+- **Se fusionó la rama principal en el PR #160** (la Suite Cartera HUS). Al
+  hacerlo se descubrió que había **dos bitácoras paralelas** — una en la rama
+  principal (todo el frente del Motor/Pre-auditoría/Dispensario) y otra en la
+  rama de la Suite (consolidados de cartera, actas, herramientas PDF, bot de
+  correos) — porque dos chats trabajaron cada uno con la suya sin saberlo.
+  **Se combinaron en esta sola bitácora sin perder ninguna entrada** de
+  ningún lado, y lo mismo con las instrucciones del repo (CLAUDE.md). El PR
+  #160 quedó **sin conflictos y con las 3 verificaciones en verde** (4.611
+  pruebas), listo para revisar y fusionar.
+- **Bot nuevo: «📊 Unir Exceles»** (en la Suite y también entregado como ZIP
+  suelto de doble clic): une varios archivos Excel en UNO, sin dañar el dato
+  (fechas como fechas, montos como números — nunca texto). Dos modos:
+  **APILAR** (todas las filas en una sola tabla — para cortes mensuales o
+  exportes con las mismas columnas; si un archivo trae columnas nuevas se
+  agregan al final y nada se pierde; cada fila queda marcada con su archivo
+  de origen y hay hoja RESUMEN) y **HOJAS** (cada archivo queda como una
+  hoja aparte del mismo libro). Acepta archivos sueltos, una carpeta o un
+  .zip, y salta solo los títulos que vienen encima de los encabezados.
+  Por consola: `python suite_cli.py exceles archivo1.xlsx archivo2.xlsx -o
+  UNIDO.xlsx` (o `--modo hojas`). Con 9 pruebas automáticas nuevas.
+- **Nota del mismo día:** la rama principal volvió a avanzar (PRs #208-#213:
+  consecutivo manual del oficio de devolución, bots de pagadores, vencidas
+  visibles y el Contrato de Construcción de SINAC OS) y se volvió a fusionar
+  aquí, combinando otra vez las dos bitácoras con la misma regla de no
+  perder nada.
+- **Nota (tarde):** otro chat hizo un "rescate" de la Suite copiando sus
+  archivos directo a la rama principal (commit del 29-07 15:26), pero desde
+  una foto VIEJA — sin los bots de correos de pagos ni de unir Exceles. Al
+  fusionar aquí se reconciliaron las dos copias: quedó la versión completa
+  (con los dos bots nuevos) más la mejora que traía el rescate (el lector
+  de pesos de `cruces_dgh` ahora usa el lector único `tools/_dinero.py`,
+  el mismo de toda la casa). El PR #160 ahora solo aporta lo que la rama
+  principal no tiene: los dos bots, sus pruebas y esta bitácora combinada.
 
 ### 29-07 — Pre-auditoría: lo que escribía el auditor se perdía
 
@@ -2719,6 +2810,48 @@ las entidades con contrato cargado —hoy **FAMISANAR**, con sus 29 cláusulas y
 sus 6.655 tarifas—, porque ahí el dictamen puede citar la cláusula y el valor
 exacto pactado, y eso la plantilla no lo hace.
 
+### 30-07 al 14-08-2026 — Caja de bots del auditor (entregados por chat) y análisis PROTEGER EPS
+
+Trabajo de este frente (rama `claude/bot-multifunctional-improvements-zhj4nw`,
+PR #160). Los bots de esta quincena se entregaron **por el chat, en ZIP**, para
+copiar al PC del auditor (no van en el repositorio porque procesan archivos
+reales de las entidades):
+
+- **Bot PARTIR/UNIR archivos grandes:** parte cualquier archivo (ej. un Excel
+  de 72 MB) en piezas de 25 MB que sí pasan por el chat, y las vuelve a unir
+  en el otro lado verificando que no se dañó ni un byte.
+- **Bot OCR a PDF:** convierte PDF escaneados en PDF "buscables" (se les puede
+  seleccionar y buscar texto). Además se hizo una **versión para celular** que
+  funciona abriendo un archivo HTML en el navegador del teléfono, sin instalar
+  nada y sin subir los documentos a ninguna página.
+- **Bot de autorizaciones en RIPS (JSON):** busca los números de autorización
+  dentro de los RIPS, en carpetas o rutas específicas, e informa cuando el
+  campo viene vacío, en null o con un número distinto.
+- **Bot DE1601 (NUEVA EPS):** completa el informe DE1601 celda por celda:
+  saca la autorización del RIPS JSON (ruta de facturación electrónica), lee el
+  PDF de la factura (fv) para tipo/documento/nombre del paciente, y verifica
+  contra el soporte PDE/OPF de la carpeta de radicación (Y:), con OCR para los
+  PDE escaneados. Llegó a la versión 7 afinando con 4 facturas reales; ninguna
+  celda queda en blanco y trae hoja DIAGNOSTICO para los casos raros.
+- **Bot de herramientas de imágenes (12 en 1):** quitar marca de agua (solo de
+  imágenes propias), quitar fondo, fondo blanco, difuminar, mejorar, ampliar,
+  comprimir, convertir, sacar texto (OCR), borrar texto sensible, recorte de
+  cara y foto tipo documento.
+
+**14-08 — Análisis del acta de conciliación PROTEGER EPS (NIT 901.543.211,
+antes Cajacopi EPS):** primer trabajo de glosas con esta entidad (antes solo
+aparecía en los consolidados de cartera del 23-07). Del archivo del acta salió
+un **informe en Word** entregado por el chat: 70 facturas en el acta — **44
+glosadas por $379.250.778** (sobre $464.426.624 facturados; 36 glosadas al
+100%) y 26 marcadas "SIN GLOSA NI DEVOL". El 93,2% del valor glosado es tema
+de **autorización frente al RIPS** (códigos SO2101, AU2103, SO2103, SO6101 y
+afines) — glosa documental, defendible con los mismos bots de RIPS/DE1601. La
+EPS ratificó $262.182.096 en 31 facturas; ya existen 44 notas crédito del
+28-07-2026 por $70.084.248 (saneamiento de cartera, Acuerdo 020/2026), así que
+lo aún en discusión ronda los $309 millones. El acta está sin fecha de
+conciliación y con las casillas de resultado en cero. El informe cuadró al
+centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
+
 ---
 
 ## 3) PENDIENTE
@@ -2882,6 +3015,24 @@ exacto pactado, y eso la plantilla no lo hace.
     (el importador ya entiende ese formato de columnas, se puede subir por
     oficio) para que las estadísticas y el control de 3 devoluciones
     arranquen con la historia real.
+
+### Suite Cartera HUS (PR #160)
+20. **Revisar y fusionar el PR #160** (Suite Cartera HUS: organizar/consolidar/
+    objeciones, caja de Herramientas PDF de 26 utilidades, y el nuevo bot de
+    correos de pagos .msg → Excel). Hoy en borrador.
+21. **4 herramientas PDF avanzadas** aún no hechas: editar texto libre,
+    formularios, firma digital y comparar dos PDF (serían una "fase 4").
+22. **Validar el mapeo DGH** (los 16 encabezados del archivo de OBJECIONES)
+    contra un cargue piloto pequeño antes del primer cargue masivo real de
+    la Suite.
+23. **Depurar la lista de entidades de la Suite**: agregar un campo de estado
+    de vigencia (vigente / en liquidación / liquidada / deshabilitada).
+24. **Verificar los links de plataformas** marcados "sin respuesta": muchos
+    podrían funcionar solo desde la red/VPN del HUS; validarlos allá.
+25. **Configurar en el equipo del analista**: LibreOffice (para Office→PDF) y
+    la clave `GEMINI_API_KEY` (para las funciones de IA de Herramientas PDF).
+26. **Corte de cartera de julio 2026**: en cuanto el analista lo entregue,
+    actualizar los 5 consolidados FAMISANAR y la serie mensual de 30 informes.
 
 ### SIIFA (nuevo, ver `docs/CONTEXTO_SIIFA.md`)
 11. **Confirmar la URL del servicio de Auth** (`SIIFA_AUTH_URL`) — no está en
@@ -3175,6 +3326,12 @@ del otro (normal) o si son dos motores independientes (el problema del
     los siete lotes. Hay que pedir esa impresión y volver a correr el
     ajustador.
 
+### Suite Cartera HUS
+18. **Revisar y fusionar el PR #160** (Suite Cartera HUS + Herramientas PDF +
+    bots de correos de pagos y de unir Exceles). Decidir si se arranca la
+    "fase 4" de Herramientas PDF (editar texto, formularios, firma digital,
+    comparar PDF) o se prioriza otro pendiente de Cartera.
+
 ---
 
 ## 5) Datos fijos que siempre se necesitan
@@ -3195,6 +3352,10 @@ del otro (normal) o si son dos motores independientes (el problema del
 - **Regla de soportes:** las glosas extemporáneas (RE9502) NO llevan PDF de
   soporte. Las demás (ej. RE9901 en glosas de soportes) sí, y salen del share
   vía el índice.
+- **Suite Cartera HUS:** vive en `tools/suite_cartera_hus/` (README propio en
+  `LEEME.txt`). Las contraseñas de los portales van en
+  `config/entidades.credenciales.json` (local, no versionado; la Suite las une
+  con `entidades.json` en memoria al abrir).
 - **ADRES/FURIPS:** repositorio de XML de facturación
   `\\172.16.32.83\factura_electronica_net22\<AAAAMM>\FACTURAS_SALUD\` (una
   subcarpeta por factura; la ruta se edita en la línea RUTA_FACTURAS de

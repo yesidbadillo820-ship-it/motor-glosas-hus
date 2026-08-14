@@ -1,5 +1,42 @@
 # Registro de cambios
 
+## Sesión 10-jul-2026 — Suite Cartera HUS: herramienta multifuncional (GUI + CLI)
+
+Integra en `tools/suite_cartera_hus/` la Suite de Cartera/Auditoría (menú
+único de radicación, glosas y cruces masivos: reemplaza Power Query +
+BUSCARV) con correcciones de fondo, endurecimiento y pruebas.
+
+### Correcciones (verificadas con pruebas)
+- **`a_numero`**: `'50.000'` se leía como `50` y no `50000` — corrompía
+  TODOS los importes (glosado/servicio/saldo/copago y el guardián de
+  valores). Ahora resuelve miles/decimales en formato colombiano, UE y US.
+- **`generar_objeciones`**: `KeyError` si el Excel elegido no traía
+  `valor_servicio/saldo/copago`; ahora da un error claro o tolera la falta.
+- **`consolidar`**: renglones sin factura (celda vacía y sin factura en el
+  nombre) se perdían en silencio en el `groupby`; ahora sobreviven visibles.
+- **`consolidar`**: si no hay columna propia de código de servicio ya no se
+  confunde con la de glosa (evita agrupar/sumar por la clave equivocada);
+  además depura renglones byte-idénticos (duplicados de exportación).
+- **`extraer_factura`**: reconoce facturas numéricas pegadas a `_` y da
+  prioridad al formato HUS aunque una fecha aparezca antes en el nombre.
+- **`leer_tabla`**: acepta listas de una sola columna (facturas ya
+  objetadas) y CSV en latin-1 (Windows), que antes reventaban.
+- **`extraer_zip_recursivo`**: los ZIP anidados ya no se pisan entre sí, y
+  una entrada insegura (`../`) se omite sin abortar todo el ZIP.
+
+### Seguridad
+- Las contraseñas de los portales salen de `entidades.json` a un archivo
+  **local no versionado** (`entidades.credenciales.json`, en `.gitignore`).
+  La Suite las vuelve a unir en memoria al abrir. Incluye
+  `herramientas/separar_credenciales.py` y una plantilla `.example`.
+
+### Nuevo
+- **`suite_cli.py`**: la misma Suite por línea de comandos (`entidades`,
+  `organizar`, `consolidar`, `objeciones`, `evidencias`, `todo`) para
+  automatizar sin ventana.
+- **`tests/test_tools/test_suite_cartera_hus.py`**: 40 pruebas del núcleo
+  (las que requieren pandas se saltan si no está, como el resto de tools).
+
 ## Sesión 1–2-jul-2026 — El expediente: contratos + soportes + precedentes
 
 Diagnóstico que disparó la sesión (del usuario): *"la IA se rehúsa a
