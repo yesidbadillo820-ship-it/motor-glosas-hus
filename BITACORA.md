@@ -2889,6 +2889,20 @@ EPS ratificó $262.182.096 en 31 facturas; ya existen 44 notas crédito del
 lo aún en discusión ronda los $309 millones. El acta está sin fecha de
 conciliación y con las casillas de resultado en cero. El informe cuadró al
 centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
+- **14-08 (tarde):** se arregló en el **módulo web** lo mismo que se había
+  arreglado en el bot: **ya no cuenta dos veces la misma plata**. El reporte
+  del ADRES abre una fila por cada causal del mismo ítem; ahora la pantalla las
+  **sigue mostrando todas** (el gestor decide causal por causal) pero **solo
+  una cuenta** para el total.
+  Además el cargue acepta un archivo más — el `FACTURAS PAQUETE NNNNN_NN
+  FACTURAS.xlsx` — que trae la **cifra oficial por factura**. Con él, el módulo
+  muestra el valor bueno y **avisa en rojo** cuando el detalle no cuadra, en la
+  factura y en la lista.
+  Probado con el 31078 entrando por los endpoints: sin ese archivo mostraba
+  **$585.139.605**; con él muestra **$297.117.349,73**, exacto, y marca las 27
+  facturas que no cuadran ($247.617.689, el 83 % del paquete).
+  De paso se corrigió un defecto de redacción: los avisos convertían la coma de
+  la frase en punto («glosado $34.942.962. pero el detalle...»).
 
 ---
 

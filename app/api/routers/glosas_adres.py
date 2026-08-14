@@ -54,6 +54,13 @@ async def importar(
     macro: UploadFile | None = File(
         None, description="Excel de la macro con la que venía trabajando el equipo (opcional)"
     ),
+    facturas: UploadFile | None = File(
+        None,
+        description=(
+            "FACTURAS PAQUETE NNNNN_NN FACTURAS.xlsx — trae la cifra oficial de glosa por "
+            "factura, que es la única buena: el reporte por ítem repite renglones"
+        ),
+    ),
     db: Session = Depends(get_db),
     usuario: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
@@ -70,6 +77,9 @@ async def importar(
     contenido_macro = await macro.read() if macro is not None else None
     if contenido_macro and len(contenido_macro) > MAX_BYTES:
         raise HTTPException(413, "El Excel de la macro supera el tamaño máximo permitido.")
+    contenido_facturas = await facturas.read() if facturas is not None else None
+    if contenido_facturas and len(contenido_facturas) > MAX_BYTES:
+        raise HTTPException(413, "El archivo de facturas supera el tamaño máximo permitido.")
     try:
         registro = svc.importar_reporte(
             db,
@@ -78,6 +88,7 @@ async def importar(
             importado_por=usuario.email,
             paquete=paquete,
             macro=contenido_macro,
+            facturas=contenido_facturas,
         )
     except ValueError as e:
         raise HTTPException(400, str(e)) from e

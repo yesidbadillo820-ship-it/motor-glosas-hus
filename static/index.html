@@ -3163,6 +3163,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         </div>
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Reporte de glosas del ADRES (obligatorio)</label>
         <input type="file" id="ga-file-reporte" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
+        <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Archivo de facturas del paquete (muy recomendado)</label>
+        <div style="font-size:.72rem;color:var(--text3);margin-bottom:.25rem">
+          <code>FACTURAS PAQUETE NNNNN_NN FACTURAS.xlsx</code> — trae la cifra oficial de glosa por factura.
+          Sin él, los totales salen inflados: el reporte del ADRES repite renglones.
+        </div>
+        <input type="file" id="ga-file-facturas" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Excel de la macro (opcional — trae el reparto y lo ya decidido)</label>
         <input type="file" id="ga-file-macro" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Bitácora del ajustador de detallados (opcional — CSV)</label>
@@ -20076,7 +20082,8 @@ function gaPintarLista(){
       '<td style="white-space:nowrap;color:var(--text3)">'+escHtml(f.documento_paciente||'—')+'</td>'+
       '<td style="white-space:nowrap">'+escHtml(f.gestor||'—')+'</td>'+
       '<td style="text-align:right">'+f.glosas+(f.pendientes?' <b style="color:#b45309">('+f.pendientes+')</b>':'')+'</td>'+
-      '<td style="text-align:right;white-space:nowrap"> ' + fmtCOP(f.valor_glosado)+'</td>'+
+      '<td style="text-align:right;white-space:nowrap"> ' + fmtCOP(f.valor_glosado)+
+        (f.cuadra === false ? '<div style="font-size:.64rem;color:#991b1b;font-weight:700">no cuadra · ADRES '+fmtCOP(f.valor_glosado_oficial)+'</div>' : '')+'</td>'+
       '<td style="min-width:110px"><div style="background:var(--bg3);border-radius:999px;height:7px;overflow:hidden">'+
         '<div style="width:'+f.avance+'%;height:100%;background:'+(f.avance>=100?'#15803d':'#2563eb')+'"></div></div>'+
         '<div style="font-size:.66rem;color:var(--text3)">'+f.avance+'%</div></td>'+
@@ -20177,6 +20184,10 @@ function gaPintar(d){
        '<div class="kpi"><div class="kpi-lbl">Sigue glosado</div><div class="kpi-num"> ' + fmtCOP(r.sigue_glosado_detallado)+'</div><div class="kpi-sub">en el detallado</div></div>'+
        '</div>';
 
+  if(d.aviso_descuadre){
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #991b1b;background:rgba(153,27,27,.10);font-size:.8rem">'+
+         '<b>OJO — el detalle no cuadra con el ADRES.</b> '+escHtml(d.aviso_descuadre)+'</div>';
+  }
   if(d.aviso_glosas_totales){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid var(--border);background:var(--bg3);font-size:.8rem;color:var(--text2)">'+
          escHtml(d.aviso_glosas_totales)+
@@ -20517,6 +20528,7 @@ function gaAbrirCargue(){
 async function gaCargar(){
   var reporte = document.getElementById('ga-file-reporte').files[0];
   var macro = document.getElementById('ga-file-macro').files[0];
+  var listaFacturas = document.getElementById('ga-file-facturas').files[0];
   var bitacora = document.getElementById('ga-file-bitacora').files[0];
   var estado = document.getElementById('ga-cargue-estado');
   var boton = document.getElementById('ga-btn-cargar');
@@ -20527,6 +20539,7 @@ async function gaCargar(){
     var fd = new FormData();
     fd.append('archivo', reporte);
     if(macro) fd.append('macro', macro);
+    if(listaFacturas) fd.append('facturas', listaFacturas);
     var r = await fetch('/glosas-adres/importar', {method:'POST', headers: authH(), body: fd});
     var d = await r.json();
     if(!r.ok) throw new Error(d.detail || ('HTTP '+r.status));

@@ -1041,6 +1041,11 @@ class GlosaAdresRecord(Base):
     # FURIPS y el reporte lista los ítems por debajo, pero sin causal propia.
     # No se responden uno por uno, así que la pantalla no los muestra.
     glosa_total = Column(Boolean, default=False, index=True)
+    # El reporte del ADRES abre UNA FILA POR CADA CAUSAL del mismo ítem. Las
+    # filas se conservan todas (el gestor decide causal por causal), pero solo
+    # una de cada ítem cuenta para la plata: si no, la glosa sale al doble o al
+    # triple. En el paquete 31078 la suma cruda daba $585M contra $297M reales.
+    cuenta_valor = Column(Boolean, default=True, index=True)
     # Causales que trabajan dos áreas (hoy la 4506): los gestores por
     # FACTURACION y las médicas por PERTINENCIA. Quién la toma depende de qué
     # se glosó, así que la reparte un SUPER ADMIN — el bot solo sugiere.
@@ -1080,6 +1085,10 @@ class FacturaAdresRecord(Base):
     medico = Column(String(120))
     # PENDIENTE | EN PROCESO | CERRADA
     estado = Column(String(20), default="PENDIENTE", index=True)
+    # Lo que el ADRES dice que tiene glosado esta factura, del archivo de
+    # facturas del paquete. Es la única cifra oficial: el reporte por ítem
+    # repite renglones. Vacío = no se cargó ese archivo.
+    valor_glosado_oficial = Column(Float)
     cerrada_por = Column(String(200))
     cerrada_en = Column(DateTime(timezone=True))
     reabierta_por = Column(String(200))

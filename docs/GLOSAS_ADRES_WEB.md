@@ -46,6 +46,9 @@ En la pantalla **📄 Glosas ADRES** → botón **Cargar paquete**:
 
 - **Archivo obligatorio:** el `ReporteGlosasReclamPAQUETE NNNNN.xlsx` que baja
   del ADRES.
+- **Archivo muy recomendado:** el `FACTURAS PAQUETE NNNNN_NN FACTURAS.xlsx`.
+  Trae la **cifra oficial de glosa por factura**, que es la única buena — ver
+  el punto 7. Sin él los totales salen inflados.
 - **Archivo opcional:** el Excel de la macro con la que venía trabajando el
   equipo. Si se sube, el sistema **aprende** de él: se trae el gestor, el
   médico, el centro de costos y las respuestas ya escritas, y usa esas
@@ -170,7 +173,40 @@ En el PDF de evidencia tampoco van en la tabla, pero sí se dicen al pie.
 
 ---
 
-## 7. Facturas sin detallado
+## 7. El reporte del ADRES repite renglones
+
+El reporte abre **una fila por cada causal** del mismo ítem. Un ítem con tres
+causales sale tres veces, con su valor completo en las tres. Si se suma esa
+columna en bruto, **la glosa sale inflada al doble o al triple**.
+
+En el paquete 31078 la suma cruda daba **$585.838.246** cuando la glosa real
+era **$297.117.349,73**.
+
+Qué hace el sistema:
+
+1. **Conserva todas las filas** — el gestor decide causal por causal, así que
+   las necesita todas en pantalla.
+2. **Pero solo una cuenta para la plata.** Las demás quedan marcadas como
+   «ya contada» y no se suman.
+3. **Compara contra la cifra oficial** del archivo de facturas del paquete. Si
+   no cuadra, lo dice en rojo arriba de la factura y marca la fila en la lista:
+
+   > **OJO — el detalle no cuadra con el ADRES.** El ADRES dice que esta factura
+   > tiene glosado $34.942.962, pero el detalle del reporte suma $104.828.886…
+
+Eso último importa porque **juntar las filas no siempre alcanza**: hay facturas
+donde el reporte repite sin que haya causales distintas que lo expliquen. En el
+31078 pasó en **27 de las 81 facturas**, que además concentran el **83 % de la
+plata**. Esas se responden con el detalle bajado del portal del ADRES
+(Reclamaciones → **Reportes Lupa al giro**).
+
+**Por eso conviene siempre cargar el archivo de facturas del paquete**: sin él
+el sistema no tiene contra qué verificar y muestra la cifra que puede deducir,
+que en esas 27 facturas es más alta que la real.
+
+---
+
+## 8. Facturas sin detallado
 
 Algunas facturas del paquete no tienen detallado (en el 31068 son cuatro:
 311371, 367368, 380246 y 394817). **No es un fallo:** esas facturas no venían
@@ -184,7 +220,7 @@ detallado, basta volver a cargar la bitácora y el aviso desaparece.
 
 ---
 
-## 8. De dónde salen las sugerencias
+## 9. De dónde salen las sugerencias
 
 Hay dos niveles, y la pantalla siempre dice cuál es:
 
@@ -199,7 +235,7 @@ Cada sugerencia trae su **motivo** escrito. Nunca se sugiere sin explicar.
 
 ---
 
-## 9. Endpoints
+## 10. Endpoints
 
 | Método | Ruta | Quién | Para qué |
 |---|---|---|---|
@@ -224,7 +260,7 @@ criterio del propio equipo (lo más conservador).
 
 ---
 
-## 10. Tablas
+## 11. Tablas
 
 Tres tablas nuevas, se crean solas al arrancar:
 
@@ -240,7 +276,7 @@ Tres tablas nuevas, se crean solas al arrancar:
 
 ---
 
-## 11. Relación con los bots de `tools/`
+## 12. Relación con los bots de `tools/`
 
 El módulo web y los bots de línea de comandos comparten **las mismas reglas**:
 el servicio importa las funciones de `tools/preauditar_glosas_adres.py`, no

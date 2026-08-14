@@ -435,6 +435,8 @@ async def lifespan(app: FastAPI):
         ("glosas_adres", "area_asignada_por", "VARCHAR(200)"),
         ("glosas_adres", "area_asignada_en", "TIMESTAMP WITH TIME ZONE"),
         ("paquetes_adres", "catalogo_centros", "TEXT"),
+        ("glosas_adres", "cuenta_valor", "BOOLEAN DEFAULT 1"),
+        ("facturas_adres", "valor_glosado_oficial", "DOUBLE PRECISION"),
     ]
     for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
         try:
@@ -444,6 +446,11 @@ async def lifespan(app: FastAPI):
                     col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
                     if _is_sqlite
                     else col_ddl
+                )
+                col_ddl_adapted = (
+                    col_ddl_adapted.replace("DOUBLE PRECISION", "REAL")
+                    if _is_sqlite
+                    else col_ddl_adapted
                 )
                 db.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
