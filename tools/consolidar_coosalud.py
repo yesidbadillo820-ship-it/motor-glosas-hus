@@ -44,9 +44,10 @@ Automatiza los pasos manuales que siguen después de organizar el ZIP con
                      un archivo aparte "REVISAR (no van en el cargue).xlsx".
          CROVALOBJ   valor_glosado del servicio (número)
          CRDOBSERV   OBSERVACION FINAL combinada (una línea por glosa)
-         CROTIPOBJ   por FACTURA completa: 0=administrativa (sin CL) ·
-                     1=médica (solo CL) · 2=mixta (CL + otros) — si la factura
-                     es mixta, TODAS sus filas llevan 2
+         CROTIPOBJ   por FACTURA, según el CRNCONOBJ escrito (no las glosas
+                     crudas): 0=administrativa (ningún CRNCONOBJ es CL) ·
+                     1=médica (todos los CRNCONOBJ son CL) · 2=mixta (unos CL y
+                     otros no). TODAS las filas de la factura llevan el mismo tipo.
   6. CONSOLIDADO RESPUESTAS GLOSAS.xlsx  (respuestas predeterminadas del área)
        - Una fila por glosa con: numero_factura2 (HUS0000...), FECHA RADICACION
          (de la cabecera de factura), FECHA GLOSA (= --fecha), FECHA DE
@@ -1163,13 +1164,8 @@ def generar_objeciones(
     consecutivo = 0
     factura_actual: str | None = None
 
-    # CROTIPOBJ se clasifica por FACTURA completa: si la factura tiene glosas
-    # CL y de otros conceptos, TODAS sus filas van con 2 (mixta); solo CL -> 1
-    # en todas; sin CL -> 0 en todas.
-    conceptos_factura: dict[str, set] = {}
-    for srv in glosados:
-        conceptos_factura.setdefault(norm_factura(srv["factura"]), set()).update(srv["conceptos"])
-
+    # CROTIPOBJ se fija por FACTURA más abajo, según el CRNCONOBJ realmente
+    # escrito en cada fila (no según las glosas crudas). Ver el bloque al final.
     for srv in glosados:
         fact = srv["factura"]
         if _num_factura(fact) is None:
@@ -1272,11 +1268,6 @@ def generar_objeciones(
             consecutivo += 1
             factura_actual = fact
 
-        conceptos = conceptos_factura[norm_factura(fact)]
-        tiene_cl = "CL" in conceptos
-        otros = bool(conceptos - {"CL"})
-        tipo = 2 if (tiene_cl and otros) else (1 if tiene_cl else 0)
-
         filas.append(
             [
                 str(consecutivo),  # CDCONSEC (texto, como en la plantilla)
@@ -1294,9 +1285,29 @@ def generar_objeciones(
                 None,  # CTNCENCOS
                 valor_final,  # CROVALOBJ (número; capado al tope DGH si aplicaba)
                 srv["observacion"],  # CRDOBSERV
-                tipo,  # CROTIPOBJ
+                0,  # CROTIPOBJ (se fija por factura más abajo, según CRNCONOBJ)
             ]
         )
+
+    # --- CROTIPOBJ definitivo: según el CRNCONOBJ realmente escrito ---
+    # DGH clasifica cada objeción por su CONCEPTO PRINCIPAL (CRNCONOBJ), no por
+    # las glosas que solo quedan en la observación. Como una glosa CL hace que el
+    # CRNCONOBJ de ese servicio salga CL, el tipo de la factura sigue esos códigos
+    # escritos: si TODOS son CL -> médica (1); si NINGUNO es CL -> administrativa
+    # (0); si de verdad hay mezcla de CL y no-CL -> mixta (2).
+    # (Antes se miraban las glosas crudas: una factura toda-CL salía mixta por las
+    #  TA que solo van en la observación, y una factura cuyas CL no cruzaron a DGH
+    #  salía mixta aunque en el archivo solo queden filas administrativas.)
+    cl_por_factura: dict[str, set] = {}
+    for fila in filas:
+        es_cl = str(fila[9] or "").upper()[:2] == "CL"
+        cl_por_factura.setdefault(fila[2], set()).add(es_cl)
+    tipo_por_factura = {
+        f: (1 if flags == {True} else 0 if flags == {False} else 2)
+        for f, flags in cl_por_factura.items()
+    }
+    for fila in filas:
+        fila[15] = tipo_por_factura[fila[2]]
 
     if por_respaldo:
         logger.info(
