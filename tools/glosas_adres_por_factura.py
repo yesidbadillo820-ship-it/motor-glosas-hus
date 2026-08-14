@@ -134,39 +134,60 @@ def _contenido(f: FilaMacro) -> tuple:
     )
 
 
-def agrupar_items(filas: list[FilaMacro]) -> list[ItemGlosado]:
-    """Junta los renglones que son el MISMO ítem con causales distintas.
+def bloques_de_item(filas: list[FilaMacro]):
+    """Recorre el reporte agrupando los renglones que son el MISMO ítem.
 
-    El reporte del ADRES abre una fila por causal. Renglones **seguidos** con el
-    mismo contenido pero causal distinta son un solo ítem; si repiten la misma
-    causal son ítems de verdad (una factura puede traer el mismo medicamento
-    cargado varias veces) y se respetan.
+    El reporte del ADRES abre **una fila por cada causal**. Renglones seguidos
+    con el mismo contenido pero causal distinta son un solo ítem; si repiten la
+    misma causal son ítems de verdad (una factura puede traer el mismo
+    medicamento cargado varias veces) y se respetan.
+
+    Devuelve, por cada bloque: `(filas del bloque, cuántos ítems reales son,
+    causales distintas, anotaciones distintas)`.
     """
-    salida: list[ItemGlosado] = []
     i = 0
     while i < len(filas):
         j = i
         while j < len(filas) and _contenido(filas[j]) == _contenido(filas[i]):
             j += 1
         bloque = filas[i:j]
-        causales = []
+        causales: list[str] = []
+        anotaciones: list[str] = []
         for f in bloque:
             texto = (f.descripcion_glosa or "").strip()
             if texto and texto not in causales:
                 causales.append(texto)
-        distintas = len(causales) or 1
-        # Tantos ítems reales como veces se repite el ciclo completo de causales.
-        reales = len(bloque) // distintas if len(bloque) % distintas == 0 else len(bloque)
-        anotaciones = []
-        for f in bloque:
             nota = (f.anotacion or "").strip()
             if nota and nota not in anotaciones:
                 anotaciones.append(nota)
-        for _ in range(max(reales, 1)):
+        distintas = len(causales) or 1
+        # Tantos ítems reales como veces se repite el ciclo completo de causales.
+        reales = len(bloque) // distintas if len(bloque) % distintas == 0 else len(bloque)
+        yield bloque, max(reales, 1), causales, anotaciones
+        i = j
+
+
+def marcar_conteo(filas: list[FilaMacro]) -> list[bool]:
+    """Para cada renglón, si su valor **cuenta** o ya lo contó otro.
+
+    Sirve para quien necesita conservar todos los renglones (la pantalla los
+    muestra uno por causal, porque el gestor decide causal por causal) pero
+    **no puede sumar dos veces la misma plata**.
+    """
+    marcas: list[bool] = []
+    for bloque, reales, _causales, _anotaciones in bloques_de_item(filas):
+        marcas.extend([True] * reales + [False] * (len(bloque) - reales))
+    return marcas
+
+
+def agrupar_items(filas: list[FilaMacro]) -> list[ItemGlosado]:
+    """Los ítems de la factura, ya sin los renglones repetidos por causal."""
+    salida: list[ItemGlosado] = []
+    for bloque, reales, causales, anotaciones in bloques_de_item(filas):
+        for _ in range(reales):
             salida.append(
                 ItemGlosado(fila=bloque[0], causales=list(causales), anotaciones=list(anotaciones))
             )
-        i = j
     return salida
 
 
