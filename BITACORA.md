@@ -2904,6 +2904,53 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 14-08 — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
+
+Yesid mandó TRES Excel para dejar la página al día: el consolidado 2026
+con corte al 13-08, los oficios de devolución hasta el DEV-PRE-AUD-0113 y
+el **consolidado ADRES/SINAC 2025** (un formato hermano, con la columna
+Oficio adelante y 26 columnas). Comparados con lo cargado el 05-08:
+**56 facturas nuevas** del consolidado, **32 ya cargadas que avanzaron**
+(radicadas/devueltas/subsanadas después de la primera carga), **62
+facturas ADRES** que no estaban en ninguna parte, y **8 oficios de
+devolución nuevos** (0106 a 0113).
+
+El importador del consolidado antes SALTABA toda factura que ya existiera;
+con eso las 32 que avanzaron se habrían quedado congeladas. Se le enseñó a
+**ponerlas al día sin tocar nada de lo guardado**, y la primera versión de
+ese cambio pasó por una revisión adversarial de tres frentes que confirmó
+**15 defectos reales** — todos corregidos antes de publicar:
+
+- Solo toca facturas que ESTE MISMO importador creó y que la página nunca
+  ha tocado; la historia guardada debe encajar como el COMIENZO de la del
+  Excel, y entonces agrega SOLO los eventos que faltan al final. Si no
+  encaja, conflicto reportado y no se toca (con la pista de que escribir
+  la F_DEV que faltó suele destrabar).
+- Al reingresar limpia el amarre al oficio de devolución (como la página),
+  refresca la fecha de recibido, no borra el envío si la fila viene vacía,
+  y deja el motivo de devolución en blanco al quedar radicada.
+- El estado ya no retrocede a NUEVA cuando hay reenvío sin decidir
+  (queda EN_SUBSANACION), y si un encabezado quedó mal de una corrida
+  vieja se sana solo (sin duplicar eventos).
+- Revalida cada factura DENTRO de la transacción por si la página escribe
+  en ese mismo instante, avisa de fechas dañadas (una celda con hora
+  «00:00» en vez de fecha) y de filas repetidas idénticas.
+- Reconoce solo el formato ADRES: lo traduce al mismo modelo, normaliza
+  los números de oficio (FHUS- AS-101139-26 → FHUS-AS-I01139-26) y
+  traduce las iniciales de los auditores (EC, ES, DI).
+- 10 pruebas nuevas (21 en total entre los dos importadores).
+
+**Ensayo con los datos reales** (copia, no la base del PC): quedó en
+**1.077 facturas, 3.372 eventos, 164 oficios de recepción y 11 oficios de
+devolución** — incluido el **0111 con sus 28 facturas ADRES** y el 00103
+con 3, que antes no se podían armar porque esas facturas no existían.
+Cero conflictos, los amarres del 0104/0105 intactos, y correr el trío dos
+veces no cambia nada. Los PDF del 0109 y el 0111 salieron de muestra.
+
+**Lo único que queda por fuera:** el oficio 0099 (su única factura,
+HUS0000533242, no aparece en ningún Excel) — cuando el equipo la escriba
+en el consolidado, entra sola en la siguiente corrida.
+
 ---
 
 ## 3) PENDIENTE
