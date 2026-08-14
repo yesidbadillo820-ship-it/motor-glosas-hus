@@ -255,6 +255,7 @@ def main() -> None:
     from siifa_novedades import leer_informe
 
     filas = leer_informe(Path(args.informe))
+    perfiles.verificar_informe(ips, filas)
     hoy = args.fecha or datetime.now().strftime("%Y-%m-%d")
     glosas, devoluciones = armar(filas, hoy, ips=ips)
 

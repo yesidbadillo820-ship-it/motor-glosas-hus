@@ -2399,6 +2399,32 @@ dirección cargados, la frase se omite** en vez de poner los de otra.
 **Falta:** el correo y la dirección de Socorro, Girón y Guane, para que sus
 respuestas cierren con sus propios datos de contacto.
 
+**Cuatro huecos más, encontrados revisando a fondo** (tres los halló una
+revisión adversarial del diseño; el cuarto salió en la primera corrida real):
+
+1. **La guarda del ARCHIVO, no sólo de las credenciales.** Comprobar el token
+   protege lo que se escribe; faltaba proteger lo que se lee. Con cuatro
+   carpetas parecidas y archivos que se llaman igual en todas, pasarle el
+   informe de otra IPS era facilísimo —y de ahí salen las respuestas—.
+   Comparar el informe de una contra el de otra, además, habría reportado
+   todos sus registros como «novedades». Ahora se compara el NIT del emisor.
+2. **Las constancias PDF salían a nombre del HUS.** Se anexan a la EPS como
+   evidencia: una constancia de la Clínica Girón encabezada «Hospital
+   Universitario de Santander» no prueba nada. Y el nombre del archivo no
+   distinguía la IPS, así que una pisaba a la otra.
+3. **Dos IPS bajando a la vez se borraban el archivo de prueba de escritura**
+   (se llamaba igual en las dos), y una concluía «no puedo guardar acá»
+   cuando sí podía. Pasó de verdad con tres corridas en paralelo.
+4. **Al pasar a «mes por mes» seguía pidiendo tandas de 1.000.** Si la
+   consulta completa falló por peso, partirla en meses pero conservar la
+   tanda gigante es repetir el error a pedazos. Girón y Guane se atoraron
+   así, mes tras mes. Ahora la tanda baja a 200 al pasar a meses.
+
+**Lo que se aprendió del primer día con las cuatro:** Socorro tiene **60.568
+seguimientos** (23 veces el HUS). Y el servidor del Ministerio **no aguanta
+tres consultas pesadas a la vez**: con las tres corriendo, Socorro degradó de
+1.000 a 62 registros por página. Conviene bajarlas de a una.
+
 ---
 
 ## 3) PENDIENTE

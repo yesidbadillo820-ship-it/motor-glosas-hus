@@ -36,6 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _dinero import a_entero  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 
 # Las que el auditor necesita ver de una novedad, en el orden en que las lee.
 COLUMNAS_VISTA = [
@@ -333,11 +334,17 @@ def main() -> None:
     ap.add_argument(
         "--limite", type=int, default=40, help="Cuántas novedades mostrar en pantalla (default 40)."
     )
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
 
     nuevo = Path(args.nuevo)
     nuevas = leer_informe(nuevo)
+    perfiles.verificar_informe(ips, nuevas, "el informe nuevo")
     anteriores = leer_informe(Path(args.anterior)) if args.anterior else None
+    if anteriores:
+        perfiles.verificar_informe(ips, anteriores, "el informe anterior")
 
     res = comparar(nuevas, anteriores)
     mostrar(res, args.limite)

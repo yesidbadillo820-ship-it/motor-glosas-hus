@@ -295,3 +295,81 @@ def test_una_ips_sin_contacto_omite_la_frase_en_vez_de_inventarla():
 
     assert "CUALQUIER INFORMACIÓN AL" not in cierre
     assert "ARTÍCULO 57 DE LA LEY 1438" in cierre, "el sustento normativo no se pierde"
+
+
+# ------------------- la otra mitad: que el ARCHIVO sea de esa IPS
+
+
+def _fila_informe(nit_emisor="900006037"):
+    return {"nit_emisor": nit_emisor, "id_seguimiento_factura_glosa": 1}
+
+
+def test_un_informe_de_otra_ips_se_rechaza():
+    """La guarda del token protege lo que se ESCRIBE; esta, lo que se LEE.
+
+    Con cuatro carpetas parecidas y archivos que se llaman igual en todas,
+    pasarle el informe de otra IPS es facilísimo — y de ahí salen las
+    respuestas que después se cargan.
+    """
+    with pytest.raises(SystemExit) as exc:
+        perfiles.verificar_informe(perfiles.buscar("SOCORRO"), [_fila_informe("900006037")])
+
+    mensaje = str(exc.value)
+    assert "ALTO" in mensaje
+    assert "Hospital Universitario" in mensaje, "debe decir de quién ES el archivo"
+    assert "se llaman igual en las cuatro" in mensaje
+
+
+def test_el_informe_de_la_ips_correcta_pasa():
+    perfiles.verificar_informe(perfiles.buscar("GUANE"), [_fila_informe("804006936")] * 50)
+
+
+def test_un_informe_viejo_sin_la_columna_no_bloquea():
+    """Los informes bajados antes de este cambio no traen nit_emisor."""
+    perfiles.verificar_informe(perfiles.buscar("GIRON"), [{"id_seguimiento_factura_glosa": 1}])
+    perfiles.verificar_informe(perfiles.buscar("GIRON"), [])
+
+
+def test_el_nit_del_informe_tambien_admite_digito_de_verificacion():
+    perfiles.verificar_informe(perfiles.buscar("HUS"), [_fila_informe("900006037-4")])
+
+
+def test_un_informe_mezclado_se_rechaza_por_la_fila_ajena():
+    """Basta una fila de otra entidad: el archivo no es confiable."""
+    filas = [_fila_informe("890203242")] * 99 + [_fila_informe("804006936")]
+
+    with pytest.raises(SystemExit, match="Guane"):
+        perfiles.verificar_informe(perfiles.buscar("GIRON"), filas)
+
+
+@pytest.mark.parametrize(
+    "script",
+    ["siifa_novedades.py", "siifa_estado_tramite.py", "siifa_armar_subsanacion.py"],
+)
+def test_las_herramientas_que_leen_informes_comprueban_de_quien_son(script):
+    fuente = (TOOLS / script).read_text(encoding="utf-8")
+
+    assert "perfiles.verificar_informe(" in fuente, (
+        f"{script} lee un informe sin comprobar que sea de la IPS elegida"
+    )
+
+
+def test_la_constancia_pdf_no_sale_a_nombre_del_hus():
+    """Se anexa a la EPS como evidencia: una constancia de la Clínica Girón
+    encabezada «Hospital Universitario de Santander» no prueba nada."""
+    fuente = (TOOLS / "siifa_verificar_cargue.py").read_text(encoding="utf-8")
+
+    assert 'Paragraph("E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER"' not in fuente
+    assert "ips.nombre_legal" in fuente
+    assert "CONSTANCIA_SIIFA_{ips.clave}_{factura}.pdf" in fuente, (
+        "el nombre del PDF debe distinguir la IPS: si no, una pisa a la otra"
+    )
+
+
+def test_dos_ips_bajando_a_la_vez_no_se_borran_el_archivo_de_prueba():
+    """Pasó de verdad con tres corridas en paralelo: el nombre era fijo, una
+    borraba el de la otra y la otra concluía «no puedo guardar acá»."""
+    fuente = (TOOLS / "siifa_reporte_seguimientos.py").read_text(encoding="utf-8")
+
+    assert ".prueba_escritura_hus.tmp" not in fuente
+    assert "os.getpid()" in fuente

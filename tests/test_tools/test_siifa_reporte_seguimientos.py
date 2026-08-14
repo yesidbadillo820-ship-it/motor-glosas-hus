@@ -12,6 +12,7 @@ Cubren las dos fallas que aparecieron en la corrida real del auditor del
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from datetime import date
 from pathlib import Path
@@ -243,3 +244,49 @@ def test_una_ruta_buena_pasa_y_deja_la_carpeta_creada(tmp_path):
 
     assert destino.parent.is_dir()
     assert not list(destino.parent.iterdir()), "no debe dejar basura"
+
+
+def test_al_pasar_a_meses_tambien_se_achica_la_tanda(monkeypatch, entorno):
+    """Si la consulta completa falló por peso, partirla en meses pero seguir
+    pidiendo tandas de 1.000 es repetir el error a pedazos.
+
+    Pasó el 13-08-2026 con Girón y Guane: la consulta completa se agotó por
+    tiempo, el script pasó a meses conservando las tandas grandes y se atoró
+    igual, mes tras mes.
+    """
+    tamanos: list[int] = []
+
+    class ClienteQueSeAtora:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def nit_entidad(self):
+            return "900006037"
+
+        def login(self, *a):
+            return "token"
+
+        def listar_seguimientos(self, **kw):
+            tamanos.append(kw.get("registros_por_pagina"))
+            if kw.get("fecha_creacion_inicio") is None:
+                raise SiifaApiError(0, "The read operation timed out")
+            yield from ()
+
+    salida = entorno / "informe.xlsx"
+    monkeypatch.setattr(rep, "SiifaClient", lambda *a, **k: ClienteQueSeAtora())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["x", "--salida", str(salida), "--pagina-tam", "1000", "--desde", "2026-01-01",
+         "--hasta", "2026-02-28"],
+    )
+    with contextlib.suppress(SystemExit):
+        rep.main()
+
+    assert tamanos[0] == 1000, "la primera consulta va con lo que pidió el auditor"
+    assert all(t <= 200 for t in tamanos[1:]), (
+        f"al pasar a meses siguió pidiendo tandas de {tamanos[1:]}"
+    )

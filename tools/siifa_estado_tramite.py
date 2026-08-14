@@ -48,6 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _dinero import a_entero  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 from siifa_novedades import valor_total  # noqa: E402
 
 # Plazos en días hábiles. Cambiarlos acá si cambia la norma.
@@ -398,13 +399,17 @@ def main() -> None:
         help="Deja sólo lo que está esperando al hospital.",
     )
     ap.add_argument("--hoy", help="Fecha de corte (2026-08-13). Por defecto, hoy.")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
 
     # Se reutiliza el lector del comparador: un solo sitio que sabe leer el
     # informe de seguimientos, para que no se dupliquen las columnas.
     from siifa_novedades import leer_informe
 
     filas = leer_informe(Path(args.informe))
+    perfiles.verificar_informe(ips, filas)
     hoy = date.fromisoformat(args.hoy) if args.hoy else date.today()
     evaluadas = evaluar(filas, hoy)
     if args.solo_accion_hus:

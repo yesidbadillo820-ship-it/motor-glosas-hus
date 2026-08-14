@@ -235,8 +235,8 @@ def test_la_constancia_sale_una_por_factura(tmp_path):
     hechas = ver.constancias(filas, carpeta, "03/08/2026 17:00")
 
     assert hechas == 2
-    assert (carpeta / "CONSTANCIA_SIIFA_HUS454747.pdf").is_file()
-    assert (carpeta / "CONSTANCIA_SIIFA_HUS497119.pdf").is_file()
+    assert (carpeta / "CONSTANCIA_SIIFA_HUS_HUS454747.pdf").is_file()
+    assert (carpeta / "CONSTANCIA_SIIFA_HUS_HUS497119.pdf").is_file()
 
 
 @pytest.mark.parametrize(

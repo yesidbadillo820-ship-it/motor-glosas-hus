@@ -174,6 +174,39 @@ def verificar_identidad(ips: Ips, nit_del_token: str | None) -> None:
     )
 
 
+def verificar_informe(ips: Ips, filas: list[dict], de_donde: str = "el informe") -> None:
+    """Frena si el archivo no es de la IPS con la que se está trabajando.
+
+    LA OTRA MITAD DE LA GUARDA. Comprobar el token protege lo que se ESCRIBE;
+    esto protege lo que se LEE. Con cuatro carpetas de nombres parecidos y
+    archivos que se llaman igual en todas, pasarle a la herramienta el informe
+    de otra IPS es fácil — y lo que sale de ahí son las respuestas que después
+    se cargan. Comparar el informe de una contra el de otra, además, reportaría
+    todos sus registros como «novedades».
+
+    El informe trae el NIT del emisor de cada factura, que es la IPS. Si no
+    trae la columna (informes viejos), se sigue sin bloquear.
+    """
+    nits = {solo_digitos(f.get("nit_emisor")) for f in filas if f.get("nit_emisor")}
+    nits.discard("")
+    if not nits:
+        return
+    ajenos = nits - {solo_digitos(ips.nit)}
+    if not ajenos:
+        return
+
+    de_quien = [f"{o.nombre} (NIT {o.nit})" if (o := por_nit(n)) else f"NIT {n}" for n in ajenos]
+    raise IdentidadEquivocada(
+        f"\n{'=' * 70}\n"
+        f"  ALTO: {de_donde.upper()} NO ES DE LA IPS QUE PEDISTE\n"
+        f"{'=' * 70}\n\n"
+        f"  Estás trabajando con : {ips.nombre} (NIT {ips.nit})\n"
+        f"  Pero el archivo es de: {', '.join(de_quien)}\n\n"
+        f"  No se hizo nada. Revisá que la ruta sea la de la carpeta de\n"
+        f"  {ips.clave}: los archivos se llaman igual en las cuatro.\n"
+    )
+
+
 def carpeta_de(ips: Ips, ruta_pedida: str | None) -> Path:
     """La carpeta donde trabaja esa IPS. Lo que pida el auditor manda."""
     return Path(ruta_pedida) if ruta_pedida else ips.carpeta

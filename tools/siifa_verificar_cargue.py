@@ -249,13 +249,19 @@ def escribir(filas: list[dict], ruta: Path) -> None:
     logger.info("Hoja de verificación: %s (%d glosas)", ruta, len(filas))
 
 
-def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
+def constancias(filas: list[dict], carpeta: Path, cuando: str, ips=None) -> int:
     """Una constancia PDF por factura, para anexar a los soportes.
+
+    OJO CON EL NOMBRE DE LA ENTIDAD. Esto se le anexa a la EPS como evidencia:
+    una constancia de la Clínica Girón encabezada «E.S.E. Hospital
+    Universitario de Santander» no prueba nada y desacredita el soporte.
 
     Reemplaza al pantallazo del portal: dice lo mismo —qué respondió el
     hospital, con qué código y con qué fecha— pero consultado a la API
     oficial del Ministerio y con la fecha y hora de la consulta.
     """
+    if ips is None:
+        ips = perfiles.IPS["HUS"]
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
@@ -280,7 +286,7 @@ def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
 
     hechas = 0
     for factura, glosas in sorted(por_factura.items()):
-        ruta = carpeta / f"CONSTANCIA_SIIFA_{factura}.pdf"
+        ruta = carpeta / f"CONSTANCIA_SIIFA_{ips.clave}_{factura}.pdf"
         doc = SimpleDocTemplate(
             str(ruta),
             pagesize=letter,
@@ -291,7 +297,7 @@ def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
             title=f"Constancia SIIFA {factura}",
         )
         cuerpo = [
-            Paragraph("E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER", titulo),
+            Paragraph(ips.nombre_legal, titulo),
             Paragraph(
                 "CONSTANCIA DE RESPUESTA REGISTRADA EN SIIFA<br/>"
                 "(Sistema de Información de Facturación — Ministerio de Salud y "
@@ -413,7 +419,7 @@ def main() -> None:
 
     cuando = datetime.now().strftime("%d/%m/%Y %H:%M")
     if args.constancias:
-        constancias(filas, Path(args.constancias), cuando)
+        constancias(filas, Path(args.constancias), cuando, ips=ips)
 
     cuenta = Counter(f["RESULTADO"] for f in filas)
     print(

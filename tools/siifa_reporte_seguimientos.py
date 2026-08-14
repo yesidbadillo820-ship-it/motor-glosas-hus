@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -371,7 +372,10 @@ def verificar_se_puede_guardar(ruta: Path) -> None:
     """
     try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        prueba = ruta.parent / ".prueba_escritura_hus.tmp"
+        # El nombre lleva el número del proceso: con cuatro IPS bajando a la
+        # vez, un nombre fijo hace que una borre el archivo de prueba de otra
+        # y la otra concluya «no puedo guardar acá» cuando sí puede.
+        prueba = ruta.parent / f".prueba_escritura_{os.getpid()}.tmp"
         prueba.write_text("ok", encoding="utf-8")
         prueba.unlink()
     except OSError as exc:
@@ -516,6 +520,15 @@ def main() -> None:
                     )
                 ini = _fecha(args.desde) or date(2025, 1, 1)
                 fin = _fecha(args.hasta) or (date.today() + timedelta(days=1))
+                # Se pasa a meses PORQUE la consulta pesaba demasiado. Seguir
+                # pidiéndole tandas del mismo tamaño es repetir el error a
+                # pedazos: se achica también la tanda. Visto el 13-08-2026 con
+                # Girón y Guane, que pasaron a meses conservando las de 1.000
+                # y se atoraron igual.
+                tam = filtros.get("registros_por_pagina") or REGISTROS_POR_PAGINA_DEFECTO
+                if tam > 200:
+                    logger.info("Y bajo la tanda de %d a 200 registros, que es lo liviano.", tam)
+                    filtros["registros_por_pagina"] = 200
                 try:
                     for mes_ini, mes_fin in _meses(ini, fin):
                         _bajar_rango(cliente, filtros, mes_ini, mes_fin, filas, periodos_fallidos)
