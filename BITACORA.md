@@ -2025,6 +2025,44 @@ de Docker.
   **Para desplegar de aquí en adelante:** el autodeploy baja de `motor-glosas`
   cada 5 minutos. Para forzarlo: `schtasks /Run /TN "MotorGlosas_Autodeploy"`,
   y se verifica en `data\autodeploy.log` y `data\servidor.log`.
+- **14-08:** llegó el **paquete 31078** (81 facturas) con el oficio Orfeo
+  **20264300142071**. Tres cosas que hay que tener presentes:
+  - **PLAZO: 23 de septiembre de 2026.** Son 2 meses desde la notificación
+    certificada del 23-07. Si no se responde, la glosa se acepta tácitamente
+    **ítem por ítem** (Res. 1236/2023 art. 8 num. 8.5) y **es una sola
+    oportunidad**: no se puede radicar algo ahora y completarlo después.
+  - **La plata del paquete es $297.117.349,73, NO $585 millones.** El reporte
+    del ADRES **repite renglones** (abre una fila por cada causal del mismo
+    ítem, y en las facturas grandes repite sin explicación). Sumar esa columna
+    en bruto infla la glosa. La cifra buena está en
+    `FACTURAS PAQUETE 31078_81 FACTURAS.xlsx` y en la TRAZABILIDAD, que
+    coinciden peso a peso con el oficio.
+  - **Solo 54 de las 81 facturas cuadran** con la cifra oficial ($49.499.660).
+    Las otras **27 concentran el 83 % de la plata** ($247.617.689) y traen
+    **1.174 renglones sin causal escrita**. Para esas hay que bajar el detalle
+    del portal (Reclamaciones → **Reportes Lupa al giro**, con el usuario de
+    Radicación).
+
+  Nace **`tools/glosas_adres_por_factura.py`**: saca un Excel por factura con
+  solo lo que sigue glosado, **sin necesitar el detallado impreso del
+  hospital** — trabaja directo del reporte del ADRES. Junta los renglones
+  repetidos por causal y **verifica cada factura contra la cifra oficial**,
+  dejando el veredicto escrito dentro del propio archivo («VERIFICADO» o «OJO —
+  NO CUADRA» con la diferencia exacta). Guía en
+  `tools/README_glosas_adres_por_factura.md`.
+
+  **Causales nuevas del 31078:** aparecieron 2010, 4301, 4302 y 4005. Se
+  propusieron y después se intentó refutarlas: solo sobrevivió la **4302
+  (mayor valor en consulta) → TARIFAS**. Las otras tres quedan **sin
+  clasificar** a propósito. Ojo con la **2010** (HUS406456, $17.464.478,
+  "presentación fuera de términos"): parece glosa total del FURIPS pero **no lo
+  es** — si se clasificara ahí, el bot escribiría "SE SUBSANA anexando el
+  formulario", que es falso porque un FURIPS corregido no revive un término
+  vencido. Esa la deciden cartera y jurídica.
+
+  **Otros hallazgos:** 16 facturas del paquete tienen glosa $0 (aprobadas
+  completas, $22.599.644) y no hay que auditarlas; el archivo
+  `BASE DE DATOS ADRES.xlsx` vino **truncado** y hay que volver a bajarlo.
 
 ---
 
