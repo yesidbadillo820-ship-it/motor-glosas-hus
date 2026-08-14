@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 29-07-2026
+**Última actualización:** 14-08-2026
 
 ---
 
@@ -967,6 +967,48 @@ sudo docker compose ps
 free -m | head -2
 '
 ```
+
+### 30-07 al 14-08-2026 — Caja de bots del auditor (entregados por chat) y análisis PROTEGER EPS
+
+Trabajo de este frente (rama `claude/bot-multifunctional-improvements-zhj4nw`,
+PR #160). Los bots de esta quincena se entregaron **por el chat, en ZIP**, para
+copiar al PC del auditor (no van en el repositorio porque procesan archivos
+reales de las entidades):
+
+- **Bot PARTIR/UNIR archivos grandes:** parte cualquier archivo (ej. un Excel
+  de 72 MB) en piezas de 25 MB que sí pasan por el chat, y las vuelve a unir
+  en el otro lado verificando que no se dañó ni un byte.
+- **Bot OCR a PDF:** convierte PDF escaneados en PDF "buscables" (se les puede
+  seleccionar y buscar texto). Además se hizo una **versión para celular** que
+  funciona abriendo un archivo HTML en el navegador del teléfono, sin instalar
+  nada y sin subir los documentos a ninguna página.
+- **Bot de autorizaciones en RIPS (JSON):** busca los números de autorización
+  dentro de los RIPS, en carpetas o rutas específicas, e informa cuando el
+  campo viene vacío, en null o con un número distinto.
+- **Bot DE1601 (NUEVA EPS):** completa el informe DE1601 celda por celda:
+  saca la autorización del RIPS JSON (ruta de facturación electrónica), lee el
+  PDF de la factura (fv) para tipo/documento/nombre del paciente, y verifica
+  contra el soporte PDE/OPF de la carpeta de radicación (Y:), con OCR para los
+  PDE escaneados. Llegó a la versión 7 afinando con 4 facturas reales; ninguna
+  celda queda en blanco y trae hoja DIAGNOSTICO para los casos raros.
+- **Bot de herramientas de imágenes (12 en 1):** quitar marca de agua (solo de
+  imágenes propias), quitar fondo, fondo blanco, difuminar, mejorar, ampliar,
+  comprimir, convertir, sacar texto (OCR), borrar texto sensible, recorte de
+  cara y foto tipo documento.
+
+**14-08 — Análisis del acta de conciliación PROTEGER EPS (NIT 901.543.211,
+antes Cajacopi EPS):** primer trabajo de glosas con esta entidad (antes solo
+aparecía en los consolidados de cartera del 23-07). Del archivo del acta salió
+un **informe en Word** entregado por el chat: 70 facturas en el acta — **44
+glosadas por $379.250.778** (sobre $464.426.624 facturados; 36 glosadas al
+100%) y 26 marcadas "SIN GLOSA NI DEVOL". El 93,2% del valor glosado es tema
+de **autorización frente al RIPS** (códigos SO2101, AU2103, SO2103, SO6101 y
+afines) — glosa documental, defendible con los mismos bots de RIPS/DE1601. La
+EPS ratificó $262.182.096 en 31 facturas; ya existen 44 notas crédito del
+28-07-2026 por $70.084.248 (saneamiento de cartera, Acuerdo 020/2026), así que
+lo aún en discusión ronda los $309 millones. El acta está sin fecha de
+conciliación y con las casillas de resultado en cero. El informe cuadró al
+centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
 
 ---
 
