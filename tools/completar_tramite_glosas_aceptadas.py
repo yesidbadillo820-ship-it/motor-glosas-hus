@@ -17,14 +17,21 @@ del encabezado, nunca por posicion fija. Los meses vistos hasta hoy:
 Reglas de resolucion, por fila a completar:
   1. Se busca la factura en GENERAL. Si la fila ya trae numero de acta, se usa
      ese; si no, el que se pueda leer en la observacion de la nota credito.
-  2. Si un subconjunto de las glosas del acta suma exactamente el valor de la
-     nota, la respuesta son esos conceptos unificados (separados por " | ").
-  3. Si no cuadra la suma, o la factura no esta en la circularizacion (p.ej.
-     actas de vigencia anterior), la respuesta se toma del texto de la propia
-     observacion de la nota credito (la parte posterior a "DONDE"/"EN LA CUAL"),
-     que es el mismo concepto del acta con el valor efectivamente acreditado.
+  2. Se escribe UN PARRAFO POR CADA GLOSA ACEPTADA del acta (valor aceptado > 0),
+     separados por una linea en blanco. NO se agrupan los que repiten texto:
+     dos renglones iguales son dos glosas distintas y agruparlos escondería la
+     plata de uno de ellos. Las glosas de valor 0 (las que la entidad levanto,
+     las ratificadas y las que la ESE no acepto) NO entran: no pintan en una
+     nota credito y su texto dice lo contrario de lo que la nota documenta.
+  3. Si el acta no registra nada aceptado para esa factura, o la factura no esta
+     en la circularizacion (p.ej. actas de vigencia anterior), la respuesta se
+     toma del texto de la propia observacion de la nota credito (la parte
+     posterior a "DONDE"/"EN LA CUAL").
   4. Numero y fecha solo se escriben si la celda venia vacia: nunca se pisa un
-     dato que ya puso el auditor. Toda diferencia queda en el reporte CSV.
+     dato que ya puso el auditor.
+  5. Cuando lo aceptado en el acta no coincide con lo que acredito la nota, se
+     escribe el aviso en una columna nueva al final ("NOVEDAD ACEPTADO VS NOTA
+     CREDITO") y tambien queda en el reporte CSV.
 
 Uso:
     python tools/completar_tramite_glosas_aceptadas.py ACEPTADAS.xlsx CIRCULARIZACION.xlsx SALIDA.xlsx [REPORTE.csv]
@@ -113,6 +120,11 @@ def a_fecha(v):
         except ValueError:
             continue
     return None
+
+
+def pesos(n):
+    """Formato colombiano: 1234567 -> $1.234.567"""
+    return "$" + f"{round(n):,}".replace(",", ".")
 
 
 def numero_de_acta(v):
@@ -285,50 +297,50 @@ def resolver_fila(factura, valor, obs, acta_fila, general):
 
     if grupo:
         acta, fecha = grupo[0]["acta"], grupo[0]["fecha"]
-        subconjunto = buscar_subconjunto([c["val"] for c in grupo], valor)
-        if subconjunto is not None:
-            # Plata aceptada en el acta que esta nota credito NO acredito: el
-            # subconjunto cuadra, pero quedaron renglones aceptados por fuera.
-            aceptado_acta = sum(c["val"] for c in grupo if c["val"] > 0)
-            if aceptado_acta > valor:
+        # Solo lo ACEPTADO. Las glosas de valor 0 son las que la entidad levanto,
+        # las que se ratificaron o las que la ESE no acepto: no pintan en una nota
+        # credito. Se escribe un parrafo por cada renglon aceptado, SIN agrupar los
+        # que repiten texto, porque dos renglones iguales son dos glosas y agrupar
+        # los esconderia la plata de uno de ellos.
+        aceptadas = [c for c in grupo if c["val"] > 0]
+        if aceptadas:
+            conceptos = [c["concepto"] for c in aceptadas if c["concepto"]]
+            sin_aceptar = [c for c in aceptadas if "ACEPTA" not in c["concepto"].upper()]
+            if sin_aceptar:
                 notas.append(
-                    f"el acta acepta {aceptado_acta:,} y la nota solo acredita {valor:,}: "
-                    f"quedan {aceptado_acta - valor:,} de glosa aceptada sin nota credito"
+                    f"{len(sin_aceptar)} renglon(es) tienen valor aceptado pero su texto "
+                    f"no dice que la ESE acepte: revisar redaccion en la circularizacion"
                 )
-            # Dedupe por texto normalizado (dos renglones que solo difieren en
-            # espacios son el mismo concepto), pero se escribe el texto original.
-            conceptos, vistos = [], set()
-            repetidos = 0
-            for i in subconjunto:
-                txt = grupo[i]["concepto"]
-                if not txt:
-                    continue
-                clave = " ".join(txt.split()).upper()
-                if clave in vistos:
-                    repetidos += 1
-                    continue
-                vistos.add(clave)
-                conceptos.append(txt)
-            if repetidos:
-                notas.append(
-                    f"{repetidos} renglon(es) del acta comparten el mismo concepto y se "
-                    f"escribieron una sola vez: el texto no deja ver cuantas glosas fueron"
+            total = sum(c["val"] for c in aceptadas)
+            novedad = ""
+            if total != valor:
+                dif = total - valor
+                sobra = "de mas en el acta" if dif > 0 else "de mas en la nota"
+                cuadra = buscar_subconjunto([c["val"] for c in aceptadas], valor)
+                pista = (
+                    " (la nota corresponde a algunos renglones del acta, no a todos)"
+                    if cuadra
+                    else " (ningun grupo de renglones del acta da el valor de la nota)"
                 )
-            return " | ".join(conceptos), acta, fecha, notas
-        total = sum(c["val"] for c in grupo)
-        notas.append(
-            f"valor de la nota {valor:,} no cuadra con el acta ({total:,}); "
-            f"respuesta tomada de la observacion de la NC"
+                novedad = (
+                    f"El acta acepta {pesos(total)} y la nota credito acredita "
+                    f"{pesos(valor)}: diferencia {pesos(abs(dif))} {sobra}.{pista}"
+                )
+                notas.append(novedad)
+            return "\n\n".join(conceptos), acta, fecha, novedad, notas
+        novedad = (
+            f"El acta no registra ningun valor aceptado para esta factura y la nota "
+            f"credito acredita {pesos(valor)}. Respuesta tomada de la observacion de la nota."
         )
-        if resp_obs:
-            return resp_obs, acta, fecha, notas
-        notas.append(
-            "sin texto extraible en la observacion; se unifican todos los conceptos del acta"
-        )
-        return " | ".join(c["concepto"] for c in grupo if c["concepto"]), acta, fecha, notas
+        notas.append(novedad)
+        return resp_obs, acta, fecha, novedad, notas
 
-    notas.append("factura no esta en la circularizacion; datos tomados de la observacion de la NC")
-    return resp_obs, acta_ref, fecha_obs, notas
+    novedad = (
+        "La factura no aparece en la circularizacion bajo esa acta. "
+        "Respuesta y datos tomados de la observacion de la nota credito."
+    )
+    notas.append(novedad)
+    return resp_obs, acta_ref, fecha_obs, novedad, notas
 
 
 def main():
@@ -347,6 +359,16 @@ def main():
         + ", ".join(f"{c}={letra(i + 1)}" for c, i in sorted(col.items(), key=lambda x: x[1]))
     )
 
+    # Columna nueva al final para avisar diferencias entre lo aceptado en el acta
+    # y lo que realmente acredito la nota credito.
+    col_novedad = max(i for c, i in col.items()) + 1
+    while ws.cell(row=fila_enc, column=col_novedad + 1).value not in (None, ""):
+        col_novedad += 1
+    celda_enc = ws.cell(row=fila_enc, column=col_novedad + 1)
+    if not limpiar(celda_enc.value):
+        celda_enc.value = "NOVEDAD ACEPTADO VS NOTA CREDITO"
+    print(f"Novedades se escriben en la columna {letra(col_novedad + 1)}")
+
     reporte, llenas, solo_respuesta = [], 0, 0
     for fila in ws.iter_rows(min_row=fila_enc + 1):
         factura = limpiar(fila[col["factura"]].value)
@@ -358,11 +380,15 @@ def main():
             continue
         valor = a_numero(fila[col["valor"]].value)
         acta_fila = numero_de_acta(fila[col["num"]].value)
-        respuesta, acta, fecha, notas = resolver_fila(
+        respuesta, acta, fecha, novedad, notas = resolver_fila(
             factura, valor, fila[col["obs"]].value, acta_fila, general
         )
         if respuesta:
-            fila[col["respuesta"]].value = respuesta
+            celda = fila[col["respuesta"]]
+            celda.value = respuesta
+            celda.alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="top")
+        if novedad:
+            ws.cell(row=fila[0].row, column=col_novedad + 1).value = novedad
         # Nunca se pisa un numero o una fecha que ya estaban escritos.
         if acta and fila[col["num"]].value is None:
             fila[col["num"]].value = acta
