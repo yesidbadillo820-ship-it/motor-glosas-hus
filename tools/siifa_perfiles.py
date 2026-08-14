@@ -73,11 +73,27 @@ IPS: dict[str, Ips] = {
         "CORREO ELECTRÓNICO INSTITUCIONAL CARTERA@HUS.GOV.CO, VENTANILLA ÚNICA DE LA "
         "ESE HUS, CARRERA 30 NO. 31-10, BUCARAMANGA, SANTANDER",
     ),
+    # `nombre_legal` es la razón social EXACTA con la que cada una está
+    # registrada en SIIFA, tomada de la columna razon_social_emisor de su
+    # propio informe (13-08-2026). No se inventa: es la que la EPS ve.
+    # Ojo con Socorro: el auditor la llama «Clínica Socorro», pero ante el
+    # Ministerio es el Hospital Regional Manuela Beltrán.
+    #
     # Falta el correo y la dirección de estas tres: hasta tenerlos, sus
     # respuestas salen sin la frase de contacto (ver `contacto` arriba).
-    "SOCORRO": Ips("SOCORRO", "Clínica Socorro", "CLÍNICA SOCORRO", "900190045"),
-    "GIRON": Ips("GIRON", "Clínica Girón", "CLÍNICA GIRÓN", "890203242"),
-    "GUANE": Ips("GUANE", "Clínica Guane", "CLÍNICA GUANE", "804006936"),
+    "SOCORRO": Ips(
+        "SOCORRO",
+        "Clínica Socorro (Hospital Regional Manuela Beltrán)",
+        "E.S.E. HOSPITAL REGIONAL MANUELA BELTRAN",
+        "900190045",
+    ),
+    "GIRON": Ips("GIRON", "Clínica Girón", "CLINICA GIRON E.S.E", "890203242"),
+    "GUANE": Ips(
+        "GUANE",
+        "Clínica Guane",
+        "ESE CLINICA GUANE Y SU RED INTEGRAL DE SALUD",
+        "804006936",
+    ),
 }
 
 
