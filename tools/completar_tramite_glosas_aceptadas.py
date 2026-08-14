@@ -1,24 +1,30 @@
 """Completa RESPUESTA/NO/FECHA DE TRAMITE Y/O ACTA en el consolidado de glosas aceptadas.
 
-Cruza el archivo mensual de glosas aceptadas (hoja BD) contra la hoja GENERAL de la
-CIRCULARIZACION DE GLOSAS para llenar, en las filas de tipo ACTA que estan pendientes:
+Cruza el archivo mensual de glosas aceptadas contra la hoja GENERAL de la
+CIRCULARIZACION DE GLOSAS y llena, en las filas que les falte la respuesta:
 
-  - col W  RESPUESTA TRAMITE GLOSA Y/O ACTA  (conceptos de conciliacion unificados)
-  - col X  NO DE TRAMITE Y/O ACTA            (numero de acta)
-  - col Y  FECHA DE TRAMITE Y/O ACTA         (fecha de firma del acta)
+  - RESPUESTA TRAMITE GLOSA Y/O ACTA  (conceptos de conciliacion unificados)
+  - NO DE TRAMITE Y/O ACTA            (numero de acta; solo si viene vacio)
+  - FECHA DE TRAMITE Y/O ACTA         (fecha de firma; solo si viene vacio)
 
-Reglas de resolucion, por fila pendiente:
-  1. Se busca la factura en GENERAL, restringida al acta citada en OBSERVC NOTA
-     CREDITO (col I) cuando esa acta existe alli para la factura.
-  2. Si un subconjunto de las glosas del acta suma exactamente el VALOR ACEPTADO de
-     la nota, la respuesta son esos conceptos unificados (separados por " | ").
-  3. Si no cuadra la suma, o la factura no esta en la circularizacion (p.ej. actas de
-     vigencia 2025), la respuesta se toma del texto de la propia observacion de la
-     nota credito (la parte posterior a "DONDE"/"EN LA CUAL"/nro de acta), que es el
-     mismo concepto del acta con el valor efectivamente acreditado.
-  4. Numero y fecha de acta salen de GENERAL cuando la factura esta alli; si no, de
-     la observacion de la nota credito. Diferencias (valor o numero de acta citado
-     vs registrado) quedan en el reporte de revision.
+El formato del consolidado cambia de un mes a otro (nombre de la hoja, fila de
+encabezados y posicion de las columnas), asi que TODO se detecta por el texto
+del encabezado, nunca por posicion fija. Los meses vistos hasta hoy:
+
+  jun-2026  hoja "BD"              encabezados fila 4   respuesta en col W
+  jul-2026  hoja "BD VLR ACEPTADO" encabezados fila 3   respuesta en col X
+
+Reglas de resolucion, por fila a completar:
+  1. Se busca la factura en GENERAL. Si la fila ya trae numero de acta, se usa
+     ese; si no, el que se pueda leer en la observacion de la nota credito.
+  2. Si un subconjunto de las glosas del acta suma exactamente el valor de la
+     nota, la respuesta son esos conceptos unificados (separados por " | ").
+  3. Si no cuadra la suma, o la factura no esta en la circularizacion (p.ej.
+     actas de vigencia anterior), la respuesta se toma del texto de la propia
+     observacion de la nota credito (la parte posterior a "DONDE"/"EN LA CUAL"),
+     que es el mismo concepto del acta con el valor efectivamente acreditado.
+  4. Numero y fecha solo se escriben si la celda venia vacia: nunca se pisa un
+     dato que ya puso el auditor. Toda diferencia queda en el reporte CSV.
 
 Uso:
     python tools/completar_tramite_glosas_aceptadas.py ACEPTADAS.xlsx CIRCULARIZACION.xlsx SALIDA.xlsx [REPORTE.csv]
@@ -33,15 +39,29 @@ from datetime import datetime
 
 import openpyxl
 
-# Columnas (0-based) de la hoja BD del archivo de glosas aceptadas
-BD_FACTURA, BD_OBS, BD_VALOR = 2, 8, 9
-BD_RESPUESTA, BD_NUM, BD_FECHA, BD_TIPO_TRAMITE = 22, 23, 24, 26
-BD_HEADER_ROW = 4
+# Encabezados que identifican cada columna del consolidado. Se compara por
+# "contiene", sobre el texto normalizado (mayusculas y sin tildes), asi que
+# basta con un fragmento distintivo. El orden importa: gana el primero que
+# aparezca en la fila de encabezados.
+COLUMNAS_BD = {
+    "factura": ["FACTURA"],
+    "obs": ["OBSERVC NOTA CREDITO", "OBSERVC NTA", "OBSERVACION NOTA", "OBSERVC"],
+    "valor": ["VALOR ACEPTADO", "VLR NOTA", "VALOR NOTA"],
+    "respuesta": ["RESPUESTA TRAMITE"],
+    "num": ["NO DE TRAMITE", "N DE TRAMITE", "NRO DE TRAMITE"],
+    "fecha": ["FECHA DE TRAMITE"],
+    "tipo_tramite": ["TRAMITE Y/O ACTA"],
+}
+# Columnas cuyo nombre esta contenido en el de otra ("FACTURA" dentro de "VALOR
+# FACTURA"; "TRAMITE Y/O ACTA" dentro de "NO DE TRAMITE Y/O ACTA"): para estas
+# se exige que el encabezado sea exactamente el alias, no que lo contenga.
+EXACTAS = {"factura", "tipo_tramite"}
 
-# Columnas (0-based) de la hoja GENERAL de la circularizacion
+# Columnas (0-based) de la hoja GENERAL de la circularizacion (estable)
 GEN_FACTURA, GEN_VAL_ACEPTADO, GEN_ACTA, GEN_FECHA, GEN_CONCEPTO = 1, 5, 11, 12, 13
 
-RE_ACTA = re.compile(r"ACTA\s*(?:DE\s+CONCILIACI\w+\s*)?(?:N\s*[°º\.]?\s*)?(\d{3,4})", re.I)
+RE_ACTA = re.compile(r"ACTA\s*(?:DE\s+CONCILIACI\w+\s*)?(?:N[O°ºRo\.\s]{0,4})?\s*(\d{3,4})", re.I)
+RE_SOLO_NUM = re.compile(r"(\d{3,4})")
 RE_FECHA_DMA = re.compile(r"(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})")
 MESES = {
     "ENERO": 1,
@@ -66,6 +86,12 @@ def limpiar(texto):
     return str(texto).replace("_x000D_", "").replace("\r", "").strip()
 
 
+def normalizar(v):
+    """Mayusculas y sin tildes, para comparar encabezados entre meses."""
+    s = unicodedata.normalize("NFD", limpiar(v).upper())
+    return " ".join("".join(ch for ch in s if not unicodedata.combining(ch)).split())
+
+
 def a_numero(v):
     if v is None:
         return 0
@@ -87,6 +113,15 @@ def a_fecha(v):
         except ValueError:
             continue
     return None
+
+
+def numero_de_acta(v):
+    """Lee el numero de una celda de acta: 862, '862', 'Acta No. 828'."""
+    s = limpiar(v)
+    if not s:
+        return None
+    m = RE_ACTA.search(s) or RE_SOLO_NUM.search(s)
+    return int(m.group(1)) if m else None
 
 
 def parsear_obs(obs):
@@ -158,11 +193,10 @@ def cargar_general(ruta):
         factura = limpiar(fila[GEN_FACTURA])
         if not factura.upper().startswith("HUS"):
             continue
-        acta = a_numero(fila[GEN_ACTA])
         por_factura[factura.upper()].append(
             {
                 "val": a_numero(fila[GEN_VAL_ACEPTADO]),
-                "acta": acta or None,
+                "acta": numero_de_acta(fila[GEN_ACTA]),
                 "fecha": a_fecha(fila[GEN_FECHA]),
                 "concepto": limpiar(fila[GEN_CONCEPTO]),
             }
@@ -171,10 +205,57 @@ def cargar_general(ruta):
     return por_factura
 
 
-def resolver_fila(factura, valor, obs, general):
-    """Devuelve (respuesta, acta, fecha, notas_de_revision)."""
+def localizar_hoja_y_encabezados(wb, hoja_pedida=None):
+    """Devuelve (worksheet, fila_encabezados, {campo: indice_0based}).
+
+    Busca en cada hoja la fila (entre las 15 primeras) que contenga el
+    encabezado de RESPUESTA TRAMITE, que es la columna que da sentido al
+    archivo. Sobre esa fila mapea el resto de columnas por nombre.
+    """
+    hojas = [wb[hoja_pedida]] if hoja_pedida else wb.worksheets
+    for ws in hojas:
+        for nfila, fila in enumerate(ws.iter_rows(min_row=1, max_row=15), 1):
+            encabezados = [normalizar(c.value) for c in fila]
+            if not any("RESPUESTA TRAMITE" in h for h in encabezados):
+                continue
+            mapa = {}
+            for campo, alias in COLUMNAS_BD.items():
+                for idx, h in enumerate(encabezados):
+                    if not h:
+                        continue
+                    hit = (
+                        any(h == a for a in alias)
+                        if campo in EXACTAS
+                        else any(a in h for a in alias)
+                    )
+                    if hit:
+                        mapa[campo] = idx
+                        break
+            faltan = {"factura", "obs", "valor", "respuesta", "num", "fecha"} - set(mapa)
+            if faltan:
+                raise SystemExit(
+                    f"En la hoja '{ws.title}' fila {nfila} no se hallaron las columnas: "
+                    f"{sorted(faltan)}. Encabezados leidos: "
+                    f"{[h for h in encabezados if h][:30]}"
+                )
+            return ws, nfila, mapa
+    raise SystemExit(
+        "No se encontro ninguna hoja con la columna 'RESPUESTA TRAMITE GLOSA Y/O ACTA'. "
+        f"Hojas del archivo: {wb.sheetnames}"
+    )
+
+
+def resolver_fila(factura, valor, obs, acta_fila, general):
+    """Devuelve (respuesta, acta, fecha, notas_de_revision).
+
+    `acta_fila` es el numero de acta que ya trae la fila (o None). Cuando
+    existe manda sobre el que se lea en la observacion: lo puso el auditor.
+    """
     acta_obs, fecha_obs, resp_obs = parsear_obs(obs)
+    acta_ref = acta_fila or acta_obs
     notas = []
+    if acta_fila and acta_obs and acta_fila != acta_obs:
+        notas.append(f"la fila dice acta {acta_fila} y la observacion dice acta {acta_obs}")
     candidatas = general.get(factura.upper(), [])
 
     grupo = []
@@ -182,17 +263,17 @@ def resolver_fila(factura, valor, obs, general):
         por_acta = defaultdict(list)
         for c in candidatas:
             por_acta[c["acta"]].append(c)
-        if acta_obs in por_acta:
-            grupo = por_acta[acta_obs]
+        if acta_ref in por_acta:
+            grupo = por_acta[acta_ref]
         else:
             con_cuadre = [
                 g for g in por_acta.values() if buscar_subconjunto([c["val"] for c in g], valor)
             ]
             candidatos = con_cuadre or list(por_acta.values())
             grupo = max(candidatos, key=lambda g: g[0]["fecha"] or datetime.min)
-            if acta_obs and grupo:
+            if acta_ref and grupo:
                 notas.append(
-                    f"NC cita acta {acta_obs}; circularizacion la registra en acta {grupo[0]['acta']}"
+                    f"la NC cita acta {acta_ref}; circularizacion la registra en acta {grupo[0]['acta']}"
                 )
 
     if grupo:
@@ -205,7 +286,8 @@ def resolver_fila(factura, valor, obs, general):
             return " | ".join(conceptos), acta, fecha, notas
         total = sum(c["val"] for c in grupo)
         notas.append(
-            f"valor aceptado {valor:,} no cuadra con el acta ({total:,}); respuesta tomada de la observacion de la NC"
+            f"valor de la nota {valor:,} no cuadra con el acta ({total:,}); "
+            f"respuesta tomada de la observacion de la NC"
         )
         if resp_obs:
             return resp_obs, acta, fecha, notas
@@ -215,12 +297,7 @@ def resolver_fila(factura, valor, obs, general):
         return " | ".join(c["concepto"] for c in grupo if c["concepto"]), acta, fecha, notas
 
     notas.append("factura no esta en la circularizacion; datos tomados de la observacion de la NC")
-    return resp_obs, acta_obs, fecha_obs, notas
-
-
-def normalizar_encabezado(v):
-    s = unicodedata.normalize("NFD", limpiar(v).upper())
-    return "".join(ch for ch in s if not unicodedata.combining(ch))
+    return resp_obs, acta_ref, fecha_obs, notas
 
 
 def main():
@@ -232,52 +309,57 @@ def main():
 
     general = cargar_general(ruta_circ)
     wb = openpyxl.load_workbook(ruta_bd)
-    ws = wb["BD"]
+    ws, fila_enc, col = localizar_hoja_y_encabezados(wb)
+    letra = openpyxl.utils.get_column_letter
+    print(
+        f"Hoja '{ws.title}', encabezados en la fila {fila_enc}. Columnas detectadas: "
+        + ", ".join(f"{c}={letra(i + 1)}" for c, i in sorted(col.items(), key=lambda x: x[1]))
+    )
 
-    encabezado = [normalizar_encabezado(c.value) for c in ws[BD_HEADER_ROW]]
-    assert "RESPUESTA TRAMITE" in encabezado[BD_RESPUESTA], encabezado[BD_RESPUESTA]
-
-    reporte, llenas = [], 0
-    for fila in ws.iter_rows(min_row=BD_HEADER_ROW + 1):
-        factura = limpiar(fila[BD_FACTURA].value)
+    reporte, llenas, solo_respuesta = [], 0, 0
+    for fila in ws.iter_rows(min_row=fila_enc + 1):
+        factura = limpiar(fila[col["factura"]].value)
         if not factura:
             continue
-        pendiente = (
-            not limpiar(fila[BD_RESPUESTA].value)
-            and fila[BD_NUM].value is None
-            and fila[BD_FECHA].value is None
-        )
-        if not pendiente:
+        # Se trabaja la fila cuando le falta la respuesta, que es la columna
+        # que da sentido al registro. Numero y fecha pueden venir ya puestos.
+        if limpiar(fila[col["respuesta"]].value):
             continue
-        valor = a_numero(fila[BD_VALOR].value)
-        respuesta, acta, fecha, notas = resolver_fila(factura, valor, fila[BD_OBS].value, general)
+        valor = a_numero(fila[col["valor"]].value)
+        acta_fila = numero_de_acta(fila[col["num"]].value)
+        respuesta, acta, fecha, notas = resolver_fila(
+            factura, valor, fila[col["obs"]].value, acta_fila, general
+        )
         if respuesta:
-            fila[BD_RESPUESTA].value = respuesta
-        if acta:
-            fila[BD_NUM].value = acta
-        if fecha:
-            fila[BD_FECHA].value = fecha
-            fila[BD_FECHA].number_format = "dd/mm/yyyy"
+            fila[col["respuesta"]].value = respuesta
+        # Nunca se pisa un numero o una fecha que ya estaban escritos.
+        if acta and fila[col["num"]].value is None:
+            fila[col["num"]].value = acta
+        if fecha and fila[col["fecha"]].value is None:
+            fila[col["fecha"]].value = fecha
+            fila[col["fecha"]].number_format = "dd/mm/yyyy"
         llenas += 1
-        if not (respuesta and acta and fecha):
-            notas.append("INCOMPLETA: revisar manualmente")
+        if acta_fila and fila[col["fecha"]].value is not None:
+            solo_respuesta += 1
+        if not respuesta:
+            notas.append("SIN RESPUESTA: revisar manualmente")
         for n in notas:
             reporte.append(
                 {
                     "fila": fila[0].row,
                     "factura": factura,
-                    "valor_aceptado": valor,
+                    "valor_nota": valor,
                     "acta": acta,
                     "nota": n,
                 }
             )
 
     wb.save(ruta_salida)
-    print(f"Filas diligenciadas: {llenas}")
+    print(f"Filas diligenciadas: {llenas} (de ellas {solo_respuesta} ya traian numero y fecha)")
     print(f"Archivo generado: {ruta_salida}")
     if ruta_reporte:
         with open(ruta_reporte, "w", newline="", encoding="utf-8-sig") as f:
-            w = csv.DictWriter(f, fieldnames=["fila", "factura", "valor_aceptado", "acta", "nota"])
+            w = csv.DictWriter(f, fieldnames=["fila", "factura", "valor_nota", "acta", "nota"])
             w.writeheader()
             w.writerows(reporte)
         print(f"Reporte de revision ({len(reporte)} notas): {ruta_reporte}")

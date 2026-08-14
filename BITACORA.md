@@ -5,7 +5,7 @@
 > en qué va todo. Al terminar cada sesión, debe actualizarse con: lo que se hizo
 > hoy, lo que quedó pendiente y lo que sigue mañana, siempre con la fecha.
 
-**Última actualización:** 27 de julio de 2026
+**Última actualización:** 27 de julio de 2026 (segunda sesión del día)
 
 ---
 
@@ -217,6 +217,23 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
   corrigió el formato y quedó anotado el pendiente de fijar la versión de
   esa herramienta para que no vuelva a pasar.
 
+- **27 julio (tarde):** Se diligenció el **consolidado de julio 2026**. El
+  archivo venía con otro formato (la hoja se llama distinto, los encabezados
+  están una fila más arriba y las columnas están corridas una posición), y
+  además el trabajo del mes era otro: las 229 filas de tipo Acta ya traían el
+  número y la fecha del acta, **solo faltaba el texto de la respuesta**. En
+  vez de arreglar la herramienta a la medida de este mes, se la hizo
+  **capaz de reconocer el formato sola**: ahora busca la hoja, la fila de
+  encabezados y cada columna por su nombre, así que sirve para cualquier mes
+  aunque cambien de sitio. También se le enseñó a **no pisar** un número o
+  una fecha que ya haya escrito el auditor. Resultado: **229 respuestas
+  diligenciadas**, ninguna otra celda del archivo tocada, y **228 de 229
+  cuadran al peso** con el valor de la nota crédito. La única excepción es la
+  factura HUS0000470403 (acta 825, Seguros del Estado), donde el acta detalla
+  $4.557.800 y la nota es por $4.557.805: **5 pesos de diferencia**. Se
+  comprobó además que la herramienta sigue produciendo exactamente el mismo
+  resultado de junio que ya se había entregado.
+
 ---
 
 ## PENDIENTE
@@ -271,6 +288,14 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
 
 ## PARA MAÑANA (28 de julio de 2026)
 
+0. **Julio 2026:** confirmar contra el acta física los **5 pesos** de
+   diferencia de la factura HUS0000470403 (acta 825). Y decidir dos cosas de
+   presentación: (a) la factura HUS0000467123 quedó con una respuesta muy
+   larga porque su acta tiene 421 glosas — decir si se deja completa o se
+   resume; (b) 42 respuestas incluyen frases de glosas que la ESE **no**
+   aceptó o que la entidad levantó, porque el acta recoge todo el acuerdo —
+   decir si se dejan o si solo deben aparecer los conceptos con valor
+   acreditado.
 1. Revisar con el auditor los **casos marcados del Excel de junio**
    (acta 786 vs 879/862 y los 19 valores parciales) y, si hay correcciones,
    re-generar el archivo con la herramienta (es un solo comando).
@@ -291,4 +316,5 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
 | Fecha | Quién | Qué se actualizó |
 |---|---|---|
 | 22-jul-2026 | Claude Code | Creación de la bitácora con la reconstrucción completa del historial (abril–julio 2026). |
+| 27-jul-2026 (tarde) | Claude Code | Diligenciamiento del consolidado de julio 2026 (229 respuestas) y herramienta capaz de reconocer sola el formato de cada mes. |
 | 27-jul-2026 | Claude Code | Se agregó el arreglo de las pruebas caducas (22-jul), el llenado de los dos archivos con #N/D y el documento técnico de entrega del módulo. Se ampliaron los pendientes (revisión de pruebas con fechas fijas, pruebas de la herramienta, entorno de desarrollo, consolidación) y se reescribió "Para mañana". |
