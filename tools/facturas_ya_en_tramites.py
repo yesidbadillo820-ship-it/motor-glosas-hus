@@ -30,6 +30,10 @@ except ImportError:
     sys.exit(2)
 
 COL_FACTURA = "FacturaCartera.Factura"
+COL_ENTIDAD = "FacturaCartera.PlanBeneficio.Contrato.Entidad.NombreEntidad"
+# Columna de respuesta que solo tienen los masivos YA diligenciados (ojo al
+# espacio final: así viene en el formato real de DGH).
+COLS_RESPUESTA = ("CODIGO RESPUESTA ", "CODIGO RESPUESTA")
 PATRON = "*.xlsx"
 
 
@@ -39,27 +43,60 @@ def norm_factura(v: object) -> str | None:
     return d or None
 
 
-def facturas_de_archivo(path: Path) -> set[str]:
-    """Facturas de un MASIVO de trámites; set vacío si no es uno."""
+def facturas_de_archivo(path: Path, entidad: str | None) -> tuple[set[str], str]:
+    """Facturas de un MASIVO de trámites YA diligenciado.
+
+    Devuelve (facturas, motivo_si_se_descarta). Un export crudo de DGH, la
+    plantilla base o un archivo de otra EPS NO cuentan como enviados:
+      - debe traer la columna de CODIGO RESPUESTA **con datos** (si está vacía,
+        el archivo todavía no se ha respondido, luego no se ha enviado);
+      - si se pide --entidad, la entidad de la factura debe coincidir (evita
+        mezclar Dispensario/SIMED con COOSALUD).
+    """
     try:
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     except Exception as exc:  # xlsx corrupto o protegido
-        print(f"  (ilegible, se salta) {path.name}: {exc}")
-        return set()
+        return set(), f"ilegible ({exc})"
     try:
         ws = wb[wb.sheetnames[0]]
         filas = ws.iter_rows(values_only=True)
         headers = list(next(filas, []) or [])
         if COL_FACTURA not in headers:
-            return set()
+            return set(), "no es un archivo de trámites"
         idx = headers.index(COL_FACTURA)
-        facturas = set()
+
+        idx_rta = None
+        for col in COLS_RESPUESTA:
+            if col in headers:
+                idx_rta = headers.index(col)
+                break
+        if idx_rta is None:
+            return set(), "sin columna CODIGO RESPUESTA (export crudo / plantilla)"
+
+        idx_ent = headers.index(COL_ENTIDAD) if COL_ENTIDAD in headers else None
+        objetivo = entidad.upper() if entidad else None
+
+        facturas: set[str] = set()
+        con_respuesta = 0
+        de_otra_entidad = 0
         for row in filas:
+            if idx_rta >= len(row) or not str(row[idx_rta] or "").strip():
+                continue  # fila sin respuesta diligenciada
+            con_respuesta += 1
+            if objetivo and idx_ent is not None:
+                ent = str(row[idx_ent] or "").upper()
+                if ent and objetivo not in ent:
+                    de_otra_entidad += 1
+                    continue
             if idx < len(row):
                 f = norm_factura(row[idx])
                 if f:
                     facturas.add(f)
-        return facturas
+        if not con_respuesta:
+            return set(), "CODIGO RESPUESTA vacío (aún no se ha enviado)"
+        if not facturas and de_otra_entidad:
+            return set(), f"es de otra entidad (no {entidad})"
+        return facturas, ""
     finally:
         wb.close()
 
@@ -74,10 +111,23 @@ def main(argv: list[str] | None = None) -> int:
         default="FACTURAS YA EN TRAMITES.txt",
         help='TXT de salida. Def: "FACTURAS YA EN TRAMITES.txt"',
     )
+    p.add_argument(
+        "--entidad",
+        default="COOSALUD",
+        help="Solo cuenta las facturas de esta EPS (para no mezclar Dispensario "
+        'con COOSALUD). Def: COOSALUD. Usa "" para no filtrar.',
+    )
+    p.add_argument(
+        "--ver-descartados",
+        action="store_true",
+        help="Muestra también los archivos que NO se contaron y por qué.",
+    )
     args = p.parse_args(argv)
+    entidad = args.entidad.strip() or None
 
     todas: set[str] = set()
     por_archivo: list[tuple[str, int]] = []
+    descartados: list[tuple[str, str]] = []
     revisados = 0
     for carpeta in args.carpetas:
         base = Path(carpeta.strip().strip('"'))
@@ -89,18 +139,25 @@ def main(argv: list[str] | None = None) -> int:
             if arch.name.startswith("~$"):
                 continue
             revisados += 1
-            facturas = facturas_de_archivo(arch)
+            facturas, motivo = facturas_de_archivo(arch, entidad)
             if facturas:
                 nuevas = facturas - todas
                 todas |= facturas
                 por_archivo.append((arch.name, len(facturas)))
                 print(f"  {arch.name:60} {len(facturas):>5} facturas ({len(nuevas)} nuevas)")
+            elif motivo:
+                descartados.append((arch.name, motivo))
+
+    if descartados and args.ver_descartados:
+        print(f"\n  --- No contados ({len(descartados)}) ---")
+        for nombre, motivo in descartados:
+            print(f"  {nombre:60} {motivo}")
 
     if not por_archivo:
         print(
-            f"\nNo encontré ningún MASIVO de trámites en lo revisado "
+            f"\nNo encontré ningún MASIVO de trámites ya enviado en lo revisado "
             f"({revisados} archivo(s) mirados).\n"
-            f"Los MASIVO tienen la columna '{COL_FACTURA}'."
+            f"Un masivo enviado trae '{COL_FACTURA}' y 'CODIGO RESPUESTA' con datos."
         )
         return 1
 
@@ -108,7 +165,11 @@ def main(argv: list[str] | None = None) -> int:
     salida.write_text("\n".join(f"HUS{f}" for f in sorted(todas, key=int)) + "\n", encoding="utf-8")
 
     print("\n===== LISTO =====")
-    print(f"  Archivos de trámites encontrados: {len(por_archivo)}")
+    print(f"  Masivos ya enviados encontrados:  {len(por_archivo)}")
+    if entidad:
+        print(f"  Entidad contada:                  {entidad}")
+    if descartados:
+        print(f"  Archivos no contados:             {len(descartados)} (usa --ver-descartados)")
     print(f"  Facturas distintas ya enviadas:   {len(todas)}")
     print(f"  Lista guardada en: {salida.resolve()}")
     print(
