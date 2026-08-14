@@ -233,6 +233,21 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
   $4.557.800 y la nota es por $4.557.805: **5 pesos de diferencia**. Se
   comprobó además que la herramienta sigue produciendo exactamente el mismo
   resultado de junio que ya se había entregado.
+  Después se sometió el resultado a una **revisión independiente** (seis
+  revisiones automáticas mirando el archivo desde ángulos distintos), y
+  apareció un defecto serio que la comprobación de valores **no podía
+  detectar**: en las actas hay glosas que la entidad levantó o que la ESE no
+  aceptó, y que valen $0. Como sumar cero no cambia el total, esos párrafos se
+  colaban en la respuesta sin que la validación se diera cuenta: había notas
+  crédito cuyo texto empezaba diciendo "ESE HUS NO ACEPTA GLOSA", justo lo
+  contrario de lo que la nota documenta. Se corrigió (ahora solo entran los
+  conceptos con valor acreditado) y se rehicieron los archivos de julio **y de
+  junio**, que tenía el mismo defecto en 7 celdas. La misma revisión encontró
+  además que en la factura **HUS0000470388 (acta 832) el acta reconoce
+  $491.700 aceptados pero la nota crédito solo acredita $479.700: quedan
+  $12.000 aceptados en acta firmada sin nota crédito**. Y confirmó dos cosas
+  tranquilizadoras que nadie había comprobado: no falta ninguna factura por
+  acreditar de esas 9 actas, y las 98 filas de trámite ya venían correctas.
 
 ---
 
@@ -288,14 +303,18 @@ Hospital Universitario de Santander (ESE HUS, operado con SINAC SC SAS):
 
 ## PARA MAÑANA (28 de julio de 2026)
 
-0. **Julio 2026:** confirmar contra el acta física los **5 pesos** de
-   diferencia de la factura HUS0000470403 (acta 825). Y decidir dos cosas de
-   presentación: (a) la factura HUS0000467123 quedó con una respuesta muy
-   larga porque su acta tiene 421 glosas — decir si se deja completa o se
-   resume; (b) 42 respuestas incluyen frases de glosas que la ESE **no**
-   aceptó o que la entidad levantó, porque el acta recoge todo el acuerdo —
-   decir si se dejan o si solo deben aparecer los conceptos con valor
-   acreditado.
+0. **Julio 2026 — cuatro casos que necesitan decisión del auditor:**
+   (a) **HUS0000470388, acta 832: faltan $12.000.** El acta acepta $491.700 y
+   la nota crédito solo acredita $479.700. Definir si falta emitir nota por la
+   diferencia o si se acreditó en otro periodo.
+   (b) **HUS0000470403, acta 825: 5 pesos.** El acta detalla $4.557.800 y la
+   nota es por $4.557.805.
+   (c) **HUS0000508277, acta 828: 100 pesos.** El texto del acta dice $198.100
+   pero su propio valor registrado y la nota dicen $198.200. El error viene de
+   la circularización, no de la nota.
+   (d) **HUS0000467123 y HUS0000420585:** dos renglones del acta comparten el
+   mismo texto de concepto, así que se escribió una sola vez y el lector no
+   alcanza a ver que fueron dos glosas.
 1. Revisar con el auditor los **casos marcados del Excel de junio**
    (acta 786 vs 879/862 y los 19 valores parciales) y, si hay correcciones,
    re-generar el archivo con la herramienta (es un solo comando).

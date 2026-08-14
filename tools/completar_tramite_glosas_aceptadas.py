@@ -165,10 +165,17 @@ def parsear_obs(obs):
 
 
 def buscar_subconjunto(vals, objetivo):
-    """Indices cuyo valor suma exactamente `objetivo`; None si no existe."""
+    """Indices cuyo valor suma exactamente `objetivo`; None si no existe.
+
+    Solo se devuelven glosas con valor aceptado > 0. Las de valor 0 son las
+    que la entidad levanto o que la ESE no acepto: sumar cero no altera el
+    total, asi que si se incluyeran la comprobacion de "cuadra exacto" las
+    dejaria pasar y el texto de una nota credito terminaria diciendo "ESE HUS
+    NO ACEPTA GLOSA", que es lo contrario de lo que la nota documenta.
+    """
     no_cero = [(i, v) for i, v in enumerate(vals) if v > 0]
     if objetivo == sum(v for _, v in no_cero):
-        return list(range(len(vals)))  # todas las filas, incluidas las de valor 0
+        return [i for i, _ in no_cero]
     for i, v in no_cero:
         if v == objetivo:
             return [i]
@@ -280,9 +287,33 @@ def resolver_fila(factura, valor, obs, acta_fila, general):
         acta, fecha = grupo[0]["acta"], grupo[0]["fecha"]
         subconjunto = buscar_subconjunto([c["val"] for c in grupo], valor)
         if subconjunto is not None:
-            conceptos = list(
-                dict.fromkeys(grupo[i]["concepto"] for i in subconjunto if grupo[i]["concepto"])
-            )
+            # Plata aceptada en el acta que esta nota credito NO acredito: el
+            # subconjunto cuadra, pero quedaron renglones aceptados por fuera.
+            aceptado_acta = sum(c["val"] for c in grupo if c["val"] > 0)
+            if aceptado_acta > valor:
+                notas.append(
+                    f"el acta acepta {aceptado_acta:,} y la nota solo acredita {valor:,}: "
+                    f"quedan {aceptado_acta - valor:,} de glosa aceptada sin nota credito"
+                )
+            # Dedupe por texto normalizado (dos renglones que solo difieren en
+            # espacios son el mismo concepto), pero se escribe el texto original.
+            conceptos, vistos = [], set()
+            repetidos = 0
+            for i in subconjunto:
+                txt = grupo[i]["concepto"]
+                if not txt:
+                    continue
+                clave = " ".join(txt.split()).upper()
+                if clave in vistos:
+                    repetidos += 1
+                    continue
+                vistos.add(clave)
+                conceptos.append(txt)
+            if repetidos:
+                notas.append(
+                    f"{repetidos} renglon(es) del acta comparten el mismo concepto y se "
+                    f"escribieron una sola vez: el texto no deja ver cuantas glosas fueron"
+                )
             return " | ".join(conceptos), acta, fecha, notas
         total = sum(c["val"] for c in grupo)
         notas.append(
