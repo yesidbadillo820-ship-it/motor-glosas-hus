@@ -25,6 +25,34 @@ responderlas — además de lo que se responda en el portal propio de cada EPS.
 
 El HUS entra como rol **IPS** (NIT 900006037-4).
 
+### Desde el 13-08-2026: CUATRO IPS, no una
+
+El auditor administra la facturación de cuatro prestadores, cada uno con su
+propio usuario del portal, y los trabaja **al mismo tiempo**:
+
+| Nombre corto | Entidad | NIT |
+|---|---|---|
+| `HUS` | E.S.E. Hospital Universitario de Santander | 900006037 |
+| `SOCORRO` | Clínica Socorro | 900190045 |
+| `GIRON` | Clínica Girón | 890203242 |
+| `GUANE` | Clínica Guane | 804006936 |
+
+Están en `tools/siifa_perfiles.py` (sin credenciales: sólo el NIT, la carpeta
+y el NOMBRE de las variables de entorno). Todas las herramientas reciben
+`--ips`, y cada IPS tiene su carpeta —los archivos se llaman igual en todas,
+así que compartir carpeta haría que una pisara a la otra—.
+
+**La guarda que no se puede quitar.** El JWT trae el NIT de la entidad. Antes
+de bajar o escribir nada se compara con el de la IPS pedida; si no coinciden,
+el trabajo se detiene sin tocar la plataforma. Una prueba recorre los scripts
+que entran a SIIFA y falla si alguno no llama a `verificar_identidad()`.
+
+**El texto de la respuesta también cambia por IPS.** Estaba escrito «ESE
+HOSPITAL UNIVERSITARIO DE SANTANDER NO ACEPTA…» a mano, con el correo y la
+dirección del HUS. El banco de argumentos usa ahora `{IPS}` como marcador. Si
+una IPS no tiene datos de contacto cargados, **se omite la frase** — un correo
+ajeno en un escrito con efectos jurídicos es peor que ningún correo.
+
 ## 2) La pantalla de la que parte este proyecto
 
 `Seguimiento → Listar seguimientos` muestra una tabla paginada (25/página) de

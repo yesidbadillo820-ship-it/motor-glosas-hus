@@ -49,8 +49,8 @@ from siifa_client import (  # noqa: E402
     SiifaApiError,
     SiifaClient,
     buscar_clave,
-    credenciales_desde_env,
 )
+import siifa_perfiles as perfiles  # noqa: E402
 
 logger = logging.getLogger("siifa_reporte")
 
@@ -417,6 +417,7 @@ def main() -> None:
         "del Ministerio. Se activa solo si la consulta completa no responde.",
     )
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -436,7 +437,9 @@ def main() -> None:
     if args.salida:
         verificar_se_puede_guardar(Path(args.salida))
 
-    usuario, password = credenciales_desde_env()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
+    usuario, password = perfiles.credenciales(ips)
     filas: list[dict] = []
     interrumpido = False
     corte_parcial = False
@@ -450,6 +453,11 @@ def main() -> None:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
+        # Que el token sea de la IPS que se pidió. Acá no se escribe nada, pero
+        # bajar el informe de otra entidad y guardarlo con el nombre de esta
+        # contamina todo lo que venga después: las respuestas se arman a partir
+        # de este archivo.
+        perfiles.verificar_identidad(ips, cliente.nit_entidad())
 
         filtros = {
             "tipo_seguimiento": args.tipo,

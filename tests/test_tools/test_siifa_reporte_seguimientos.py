@@ -55,6 +55,11 @@ class ClienteFalso:
     def __exit__(self, *_):
         return False
 
+    def nit_entidad(self):
+        # El del HUS: el script comprueba que el token sea de la IPS pedida
+        # antes de bajar nada, y por defecto se trabaja con el HUS.
+        return "900006037"
+
     def login(self, usuario, password):
         return "token-de-prueba"
 
@@ -67,8 +72,13 @@ class ClienteFalso:
 
 @pytest.fixture
 def entorno(monkeypatch, tmp_path):
-    """Deja listo el script para correr sin red ni credenciales reales."""
-    monkeypatch.setattr(rep, "credenciales_desde_env", lambda: ("USUARIO", "CLAVE"))
+    """Deja listo el script para correr sin red ni credenciales reales.
+
+    Las credenciales van por IPS (SIIFA_USER_HUS y compañía) desde que el
+    auditor trabaja cuatro prestadores a la vez.
+    """
+    monkeypatch.setenv("SIIFA_USER_HUS", "USUARIO")
+    monkeypatch.setenv("SIIFA_PASSWORD_HUS", "CLAVE")
     return tmp_path
 
 

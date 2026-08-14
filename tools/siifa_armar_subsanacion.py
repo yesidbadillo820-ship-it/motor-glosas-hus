@@ -47,6 +47,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _dinero import a_entero  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 from siifa_estado_tramite import POR_SUBSANAR, clasificar  # noqa: E402
 from siifa_redactar_respuestas import LIMITE_OBSERVACION, argumento_para  # noqa: E402
 
@@ -55,10 +56,14 @@ from siifa_redactar_respuestas import LIMITE_OBSERVACION, argumento_para  # noqa
 # camino no es este sino la nota crédito (ver docs/CONTEXTO_SIIFA.md).
 CODIGO_SUBSANACION = "RE9901"
 
-CIERRE = (
-    "POR LO ANTERIOR, LA ESE HOSPITAL UNIVERSITARIO DE SANTANDER SUBSANA LA "
-    "GLOSA REITERADA Y SOLICITA SU LEVANTAMIENTO Y EL PAGO DEL VALOR OBJETADO"
-)
+
+def cierre_de(ips=None) -> str:
+    quien = getattr(ips, "nombre_legal", None) or "ESE HOSPITAL UNIVERSITARIO DE SANTANDER"
+    return (
+        f"POR LO ANTERIOR, {quien} SUBSANA LA GLOSA REITERADA Y SOLICITA SU "
+        "LEVANTAMIENTO Y EL PAGO DEL VALOR OBJETADO"
+    )
+
 
 COLS = [
     "ID_SEGUIMIENTO_FACTURA_GLOSA",
@@ -94,14 +99,16 @@ def _fecha_corta(valor: object) -> str:
         return texto
 
 
-def redactar_subsanacion(linea: dict, limite: int = LIMITE_OBSERVACION) -> dict[str, str]:
+def redactar_subsanacion(linea: dict, limite: int = LIMITE_OBSERVACION, ips=None) -> dict[str, str]:
     """El escrito de subsanación de UNA glosa reiterada."""
     codigo = _limpiar(linea.get("codigo_glosa")).upper()
     banco = argumento_para(codigo)
     fecha_anterior = _fecha_corta(linea.get("fecha_respuesta"))
+    quien = getattr(ips, "nombre_legal", None) or "ESE HOSPITAL UNIVERSITARIO DE SANTANDER"
+    CIERRE = cierre_de(ips)
 
     encabezado = (
-        f"ESE HOSPITAL UNIVERSITARIO DE SANTANDER SUBSANA LA GLOSA REITERADA SOBRE LA "
+        f"{quien} SUBSANA LA GLOSA REITERADA SOBRE LA "
         f"FACTURA {_limpiar(linea.get('numero_factura')).upper()} POR VALOR DE "
         f"{_pesos(linea.get('valor_glosa'))} BAJO EL CÓDIGO {codigo}"
     )
@@ -124,15 +131,15 @@ def redactar_subsanacion(linea: dict, limite: int = LIMITE_OBSERVACION) -> dict[
         "INSTITUCIONAL"
     )
 
-    texto = f"{encabezado}{constancia}{insistencia}. {banco['argumento']}. {CIERRE}"
+    argumento = banco["argumento"].replace("{IPS}", quien)
+    texto = f"{encabezado}{constancia}{insistencia}. {argumento}. {CIERRE}"
     if len(texto) > limite:
         # Se recorta la cita de la EPS: el sustento propio y el cierre no se
         # pueden perder, que es lo mismo que hace la primera respuesta.
         sobra = len(texto) - limite
         recorte = max(0, len(constancia) - sobra - 5)
         texto = (
-            f"{encabezado}{constancia[:recorte].rstrip()}...{insistencia}. "
-            f"{banco['argumento']}. {CIERRE}"
+            f"{encabezado}{constancia[:recorte].rstrip()}...{insistencia}. {argumento}. {CIERRE}"
         )
     return {
         "CODIGO_RESPUESTA": CODIGO_SUBSANACION,
@@ -145,7 +152,7 @@ def es_devolucion(fila: dict) -> bool:
     return _limpiar(fila.get("tipo_seguimiento")).upper().startswith("DEVOL")
 
 
-def armar(filas: list[dict], hoy: str) -> tuple[list[dict], list[dict]]:
+def armar(filas: list[dict], hoy: str, ips=None) -> tuple[list[dict], list[dict]]:
     """Separa lo que se puede subsanar por API de lo que no.
 
     Las devoluciones reiteradas van aparte a propósito: su puerta de
@@ -177,7 +184,7 @@ def armar(filas: list[dict], hoy: str) -> tuple[list[dict], list[dict]]:
             )
             devoluciones.append(fila)
         else:
-            fila.update(redactar_subsanacion(f))
+            fila.update(redactar_subsanacion(f, ips=ips))
             glosas.append(fila)
     return glosas, devoluciones
 
@@ -240,13 +247,16 @@ def main() -> None:
     ap.add_argument("--informe", required=True, help="Informe de siifa_reporte_seguimientos.py.")
     ap.add_argument("--salida", required=True, help="Excel de subsanación a generar.")
     ap.add_argument("--fecha", help="Fecha de la subsanación (AAAA-MM-DD). Por defecto, hoy.")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
 
     from siifa_novedades import leer_informe
 
     filas = leer_informe(Path(args.informe))
     hoy = args.fecha or datetime.now().strftime("%Y-%m-%d")
-    glosas, devoluciones = armar(filas, hoy)
+    glosas, devoluciones = armar(filas, hoy, ips=ips)
 
     if not glosas and not devoluciones:
         print("\nNo hay nada reiterado pendiente de subsanar. Nada que hacer.\n")

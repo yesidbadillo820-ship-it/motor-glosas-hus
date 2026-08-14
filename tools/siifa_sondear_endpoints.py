@@ -35,7 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from siifa_client import SiifaApiError, SiifaClient, credenciales_desde_env  # noqa: E402
+from siifa_client import SiifaApiError, SiifaClient  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 
 logger = logging.getLogger("siifa_sondeo")
 
@@ -186,6 +187,7 @@ def main() -> None:
         "viene el id de una devolución). Ej: HUS494196",
     )
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -198,12 +200,15 @@ def main() -> None:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    usuario, password = credenciales_desde_env()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
+    usuario, password = perfiles.credenciales(ips)
     with SiifaClient() as cliente:
         try:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
+        perfiles.verificar_identidad(ips, cliente.nit_entidad())
         lineas = sondear(cliente)
         if args.factura:
             lineas += ["", ""] + ver_seguimiento_crudo(cliente, args.factura)

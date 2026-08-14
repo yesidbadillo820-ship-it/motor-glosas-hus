@@ -24,6 +24,36 @@ de que cambie un botón en la pantalla.
 
 ## 0) Antes de la primera corrida
 
+### Las CUATRO IPS
+
+El auditor administra cuatro prestadores, cada uno con su propio usuario del
+portal. Cada uno tiene su carpeta y sus credenciales, y **se pueden trabajar
+los cuatro al mismo tiempo** en ventanas distintas.
+
+| Nombre corto | Entidad | NIT | Carpeta |
+|---|---|---|---|
+| `HUS` | E.S.E. Hospital Universitario de Santander | 900006037 | `...\SIIFA\HUS` |
+| `SOCORRO` | Clínica Socorro | 900190045 | `...\SIIFA\SOCORRO` |
+| `GIRON` | Clínica Girón | 890203242 | `...\SIIFA\GIRON` |
+| `GUANE` | Clínica Guane | 804006936 | `...\SIIFA\GUANE` |
+
+Todas las herramientas reciben `--ips`:
+
+```powershell
+py tools\siifa_reporte_seguimientos.py --ips SOCORRO `
+  --salida "D:\USUARIO CARTERA\Documents\SIIFA\SOCORRO\informe_seguimientos.xlsx"
+```
+
+> **La guarda que protege el trabajo.** Antes de bajar o escribir nada, la
+> herramienta le pregunta al token de SIIFA a qué NIT pertenece y lo compara
+> con la IPS que se pidió. Si no coinciden **se detiene sin hacer nada** y
+> dice de quién son las credenciales que encontró. Con cuatro ventanas
+> abiertas, esto es lo que impide cargar las respuestas de una entidad en
+> otra — un error que no se puede deshacer.
+
+Para agregar una IPS nueva se añade en `tools/siifa_perfiles.py` (ahí no hay
+ni un usuario ni una clave: sólo el NIT y el NOMBRE de las variables).
+
 ### Instalar dependencias (una sola vez)
 
 ```powershell
@@ -32,9 +62,13 @@ py -m pip install httpx openpyxl
 
 ### Credenciales — SIEMPRE por variable de entorno, nunca en el código
 
+**Una pareja por IPS**, porque cada una tiene su usuario en el portal:
+
 ```powershell
-setx SIIFA_USER <tu_usuario_sispro>
-setx SIIFA_PASSWORD <tu_password>
+setx SIIFA_USER_HUS "..."        ;  setx SIIFA_PASSWORD_HUS "..."
+setx SIIFA_USER_SOCORRO "..."    ;  setx SIIFA_PASSWORD_SOCORRO "..."
+setx SIIFA_USER_GIRON "..."      ;  setx SIIFA_PASSWORD_GIRON "..."
+setx SIIFA_USER_GUANE "..."      ;  setx SIIFA_PASSWORD_GUANE "..."
 ```
 
 Cerrar y volver a abrir PowerShell para que las tome.

@@ -47,11 +47,48 @@ def test_ningun_script_que_llama_el_bot_se_quedo_sin_existir():
 
 
 def test_todas_las_opciones_que_usa_el_bot_siguen_existiendo():
-    """Si alguien renombra una opción, el bot falla en pleno cargue."""
+    """Si alguien renombra una opción, el bot falla en pleno cargue.
+
+    `--ips` no se declara en cada script sino una sola vez, en
+    siifa_perfiles.agregar_argumento(), así que se busca también ahí.
+    """
+    comunes = (RAIZ / "tools" / "siifa_perfiles.py").read_text(encoding="utf-8")
     for script, opciones in _llamadas():
         fuente = (RAIZ / "tools" / script).read_text(encoding="utf-8")
         for opcion in opciones:
-            assert f'"{opcion}"' in fuente, f"{script} ya no acepta {opcion}"
+            assert f'"{opcion}"' in fuente or f'"{opcion}"' in comunes, (
+                f"{script} ya no acepta {opcion}"
+            )
+
+
+def test_el_bot_le_dice_a_cada_script_con_que_ips_trabaja():
+    """El auditor maneja cuatro IPS. Un script que se llame sin --ips
+    trabajaría con el HUS por defecto: la entidad equivocada, en silencio."""
+    for script, opciones in _llamadas():
+        if script in (
+            "siifa_reporte_seguimientos.py",
+            "responder_glosas_siifa.py",
+            "siifa_verificar_cargue.py",
+        ):
+            assert "--ips" in opciones, f"el bot llama a {script} sin decirle la IPS"
+
+
+def test_elegir_la_ips_es_lo_primero_que_hace_el_bot():
+    """De la IPS salen las credenciales, la carpeta y el título de la ventana:
+    si se eligiera después, esas tres cosas quedarían de la IPS anterior."""
+    texto = CMD.read_text(encoding="utf-8")
+
+    assert texto.index(":elegirips") < texto.index(":credenciales")
+    assert texto.index(":elegirips") < texto.index(":carpeta")
+    assert "title SIIFA - %IPS%" in texto, "el título distingue una ventana de otra"
+
+
+def test_cada_ips_trabaja_en_su_propia_carpeta():
+    """Compartir carpeta haría que el informe de una pisara al de otra: todos
+    los archivos se llaman igual."""
+    texto = CMD.read_text(encoding="utf-8")
+
+    assert "%IPS%" in texto[texto.index('set "DEFCARP=') : texto.index('set "DEFCARP=') + 80]
 
 
 def test_el_piloto_va_antes_del_cargue_masivo():
@@ -103,13 +140,17 @@ def test_lo_que_se_escribe_se_comprueba_antes_de_tocarlo():
 def test_se_puede_corregir_la_carpeta_sin_cerrar_el_bot():
     texto = CMD.read_text(encoding="utf-8")
 
-    assert "[8] Cambiar la carpeta de trabajo" in texto
-    assert 'if "%OPCION%"=="8" goto carpeta' in texto
+    assert "[8] Cambiar de IPS o de carpeta" in texto
+    assert 'if "%OPCION%"=="8" goto elegirips' in texto
 
 
 def test_la_clave_solo_viaja_en_la_variable_de_entorno():
     """Regla del repo: nunca un usuario ni una clave escritos en el código."""
     texto = CMD.read_text(encoding="utf-8")
 
-    assert 'setx SIIFA_USER "%SIIFA_USER%"' in texto
-    assert 'setx SIIFA_PASSWORD "%SIIFA_PASSWORD%"' in texto
+    # Una variable por IPS: SIIFA_USER_HUS, SIIFA_USER_SOCORRO, etc.
+    assert 'setx %UVAR% "%UVAL%"' in texto
+    assert 'setx %PVAR% "%PVAL%"' in texto
+    assert "SIIFA_USER_%IPS%" in texto
+    # Y nunca una clave escrita en el propio archivo.
+    assert not re.search(r'set "(SIIFA_)?PASSWORD\w*=[^%"\r\n]{3,}"', texto)

@@ -49,9 +49,9 @@ from _dinero import a_entero  # noqa: E402
 from siifa_client import (  # noqa: E402
     SiifaApiError,
     SiifaClient,
-    credenciales_desde_env,
 )
 from siifa_reporte_seguimientos import _fila_reporte  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 
 logger = logging.getLogger("siifa_verificar")
 
@@ -373,6 +373,7 @@ def main() -> None:
     ap.add_argument("--salida", required=True, help="Excel de verificación que se va a escribir.")
     ap.add_argument("--constancias", help="Carpeta donde dejar una constancia PDF por factura.")
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -396,12 +397,15 @@ def main() -> None:
     facturas = sorted({c["factura"] for c in cargado if c["factura"]})
     logger.info("A verificar: %d glosas de %d factura(s).", len(cargado), len(facturas))
 
-    usuario, password = credenciales_desde_env()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
+    usuario, password = perfiles.credenciales(ips)
     with SiifaClient() as cliente:
         try:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
+        perfiles.verificar_identidad(ips, cliente.nit_entidad())
         en_siifa = consultar(cliente, facturas)
 
     filas = [comparar(c, en_siifa.get(c["id"])) for c in cargado]

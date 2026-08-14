@@ -2369,6 +2369,36 @@ vencimiento y lo dice. (Con eso SANITAS pasó de 17 a 16 en mora.)
 Entregado el informe en Word `INFORME_CARGUE_SIIFA_13AGO.docx` con las ocho
 secciones, incluida la del estado verificado contra la API.
 
+### 13-08 (cuarta parte) — De un hospital a cuatro IPS
+
+El auditor ahora administra **cuatro prestadores** y quiere trabajarlos a la
+vez: HUS (900006037), Clínica Socorro (900190045), Clínica Girón (890203242)
+y Clínica Guane (804006936).
+
+**Cada IPS tiene lo suyo:** su carpeta (`...\SIIFA\HUS`, `...\SIIFA\SOCORRO`,
+etc.), sus credenciales (`SIIFA_USER_HUS`, `SIIFA_USER_SOCORRO`…) y su nombre
+en el título de la ventana. Todas las herramientas reciben `--ips`, y el bot
+de doble clic pregunta con cuál se trabaja **antes que nada**.
+
+**La guarda que evita el error caro.** Antes de bajar o escribir, la
+herramienta le pregunta al token de SIIFA a qué NIT pertenece y lo compara
+con la IPS elegida. Si no coinciden, se detiene **sin tocar la plataforma** y
+dice de quién son las credenciales que encontró. Con cuatro ventanas
+abiertas, confundirse es cuestión de tiempo, y una respuesta cargada en la
+entidad equivocada no se puede deshacer. Una prueba recorre los scripts que
+entran a SIIFA y falla si alguno se salta la comprobación.
+
+**Un problema que apareció al revisar, y era grave.** El texto de las
+respuestas decía «ESE HOSPITAL UNIVERSITARIO DE SANTANDER NO ACEPTA…» escrito
+a mano, con el correo `CARTERA@HUS.GOV.CO` y la dirección de la Carrera 30.
+Las respuestas de la Clínica Socorro habrían salido **firmadas por el HUS y
+con los datos del HUS** — en un escrito con efectos jurídicos ante la EPS. Ya
+está parametrizado: cada IPS pone su nombre, y **si no tiene correo y
+dirección cargados, la frase se omite** en vez de poner los de otra.
+
+**Falta:** el correo y la dirección de Socorro, Girón y Guane, para que sus
+respuestas cierren con sus propios datos de contacto.
+
 ---
 
 ## 3) PENDIENTE
