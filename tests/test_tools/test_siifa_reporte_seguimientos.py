@@ -280,8 +280,17 @@ def test_al_pasar_a_meses_tambien_se_achica_la_tanda(monkeypatch, entorno):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["x", "--salida", str(salida), "--pagina-tam", "1000", "--desde", "2026-01-01",
-         "--hasta", "2026-02-28"],
+        [
+            "x",
+            "--salida",
+            str(salida),
+            "--pagina-tam",
+            "1000",
+            "--desde",
+            "2026-01-01",
+            "--hasta",
+            "2026-02-28",
+        ],
     )
     with contextlib.suppress(SystemExit):
         rep.main()
