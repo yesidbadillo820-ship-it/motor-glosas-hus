@@ -55,7 +55,7 @@ def test_fix_c_eps_inventada_neutralizada():
     d = "ESE HUS NO ACEPTA glosa interpuesta por la EPS SaludCo respecto del servicio"
     r = _neutralizar_eps_inventada(d, "COOSALUD")
     assert "SaludCo" not in r
-    assert "la entidad pagadora" in r
+    assert "LA ENTIDAD PAGADORA" in r.upper()  # el dictamen va en mayúsculas (05-08-2026)
 
 
 def test_fix_c_eps_correcta_se_respeta():

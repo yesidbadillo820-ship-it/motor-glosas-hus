@@ -37,6 +37,8 @@ from app.api.deps import (
 from app.core.tz import TZ_BOGOTA, a_utc
 from app.database import get_db
 from app.models.db import (
+    ROL_COORDINADOR,
+    ROL_SUPER_ADMIN,
     DgReportRecord,
     EnvioCargadoRecord,
     FacturaEventoRecord,
@@ -177,6 +179,15 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
     pendientes = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_PENDIENTE)
     radicar = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_RADICAR)
     devueltas = sum(1 for f in facturas if f.resultado_actual == svc.RESULTADO_DEVUELTA)
+    # Cuántas devueltas entrarían REALMENTE en el próximo oficio de devolución:
+    # las que ya salieron en uno emitido no se repiten (la entidad recibiría el
+    # mismo cobro dos veces). Sin este dato la pantalla decía "Dev 3" y el PDF
+    # salía con 1, sin explicar por qué.
+    devueltas_sin_oficio = sum(
+        1
+        for f in facturas
+        if f.resultado_actual == svc.RESULTADO_DEVUELTA and f.oficio_devolucion_id is None
+    )
     completado = bool(facturas) and pendientes == 0
     envios = (
         db.query(EnvioCargadoRecord)
@@ -213,6 +224,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         "pendientes": pendientes,
         "radicar": radicar,
         "devueltas": devueltas,
+        "devueltas_sin_oficio": devueltas_sin_oficio,
         "semaforo": svc.calcular_semaforo(o.fecha_recibido, completado=completado),
         "envios_escritos": [
             {"envio": e.envio, "total_facturas": e.total_facturas, "reingresos": e.reingresos}
@@ -220,7 +232,26 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         ],
     }
     if con_facturas:
-        d["facturas"] = [_factura_dict(db, f) for f in facturas]
+        # Consecutivo del oficio en que salió cada devuelta, para que la fila
+        # lo muestre y se entienda por qué no entra en el próximo.
+        ids_dev = {f.oficio_devolucion_id for f in facturas if f.oficio_devolucion_id}
+        consecutivos = (
+            {
+                dv.id: dv.consecutivo
+                for dv in db.query(OficioDevolucionRecord)
+                .filter(OficioDevolucionRecord.id.in_(ids_dev))
+                .all()
+            }
+            if ids_dev
+            else {}
+        )
+        d["facturas"] = [
+            {
+                **_factura_dict(db, f),
+                "consecutivo_devolucion": consecutivos.get(f.oficio_devolucion_id),
+            }
+            for f in facturas
+        ]
     return d
 
 
@@ -691,6 +722,10 @@ _MAP_RESULTADO = {
 }
 
 
+def _es_admin_o_coordinador(u: UsuarioRecord) -> bool:
+    return u.rol in (ROL_SUPER_ADMIN, ROL_COORDINADOR)
+
+
 @router.patch("/facturas/{factura_id}/auditar")
 def auditar_factura(
     factura_id: int,
@@ -701,6 +736,18 @@ def auditar_factura(
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
         raise HTTPException(404, "Factura no encontrada")
+    # Una auditoría YA DECIDIDA (radicada o devuelta) solo la modifica
+    # coordinación/administración: revertirla cambia lo que se reportó.
+    if (
+        body.resultado == "PENDIENTE"
+        and f.resultado_actual != svc.RESULTADO_PENDIENTE
+        and not _es_admin_o_coordinador(current_user)
+    ):
+        raise HTTPException(
+            403,
+            "Solo coordinación o administración puede revertir una auditoría "
+            "ya radicada o devuelta.",
+        )
     res = svc.auditar_factura(
         db,
         f,
@@ -722,17 +769,31 @@ def anotar_observacion(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    """Agrega o corrige la observación sin tocar la decisión ya tomada."""
+    """Agrega o corrige la observación sin tocar la decisión ya tomada.
+
+    En una factura DEVUELTA la observación es el motivo que imprime el oficio
+    de devolución: si ya salió en uno, la corrección también corrige el PDF.
+    Por eso mismo, corregir una auditoría YA DECIDIDA es solo de
+    coordinación/administración (el auditor sí escribe su observación al
+    decidir, y puede anotarla mientras la factura siga pendiente).
+    """
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
         raise HTTPException(404, "Factura no encontrada")
+    if f.resultado_actual != svc.RESULTADO_PENDIENTE and not _es_admin_o_coordinador(current_user):
+        raise HTTPException(
+            403,
+            "Solo coordinación o administración puede corregir la observación de "
+            "una auditoría ya radicada o devuelta (la corrección también cambia "
+            "el oficio de devolución).",
+        )
     res = svc.anotar_observacion(db, f, body.observaciones, _nombre_auditor(current_user))
     if not res.get("ok"):
         raise HTTPException(
             res.get("codigo", 400), res.get("mensaje", "No se pudo guardar la observación")
         )
     db.refresh(f)
-    return _factura_dict(db, f)
+    return {**_factura_dict(db, f), "oficio_actualizado": bool(res.get("oficio_actualizado"))}
 
 
 # ------------------------------------------------------------------
@@ -992,6 +1053,24 @@ def generar_oficio_devolucion(
         .all()
     )
     if not devueltas:
+        # Dos situaciones muy distintas, y antes se explicaban con el mismo
+        # mensaje: que no haya devoluciones, o que YA hayan salido todas.
+        ya_salieron = (
+            db.query(FacturaPreauditoriaRecord)
+            .filter(
+                FacturaPreauditoriaRecord.oficio_actual_id == oficio_id,
+                FacturaPreauditoriaRecord.resultado_actual == svc.RESULTADO_DEVUELTA,
+            )
+            .count()
+        )
+        if ya_salieron:
+            raise HTTPException(
+                400,
+                f"Las {ya_salieron} factura(s) devuelta(s) de este radicado ya salieron en un "
+                "oficio de devolución. Una factura no se repite en dos oficios: la entidad "
+                "recibiría el mismo cobro dos veces. Si necesita rehacerlo, elimine el oficio "
+                "anterior desde la pestaña Oficios de devolución.",
+            )
         raise HTTPException(
             400,
             "No hay facturas devueltas sin oficio en este radicado: "
@@ -1156,6 +1235,220 @@ def descargar_pdf_oficio_devolucion(
 # ------------------------------------------------------------------
 # Estadísticas
 # ------------------------------------------------------------------
+
+
+@router.get("/estadisticas/informe.xlsx")
+def informe_gestion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Informe de gestión descargable: qué se ha hecho, quién y cuándo.
+
+    Cinco hojas: RESUMEN (totales y valores), POR AUDITOR, POR OFICIO,
+    DEVOLUCIONES (oficios emitidos) e HISTORIAL (el registro completo de
+    eventos — la trazabilidad del módulo, factura por factura).
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    facturas = db.query(FacturaPreauditoriaRecord).all()
+    valores = {
+        fac: (val or 0)
+        for fac, val in db.query(
+            FacturaPreauditoriaRecord.factura, RadicacionCuentaRecord.valor
+        ).outerjoin(
+            RadicacionCuentaRecord,
+            RadicacionCuentaRecord.factura == FacturaPreauditoriaRecord.factura,
+        )
+    }
+
+    def _f(dt):
+        loc = a_utc(dt)
+        return loc.astimezone(TZ_BOGOTA).strftime("%d/%m/%Y %H:%M") if loc else ""
+
+    wb = Workbook()
+    azul = PatternFill("solid", fgColor="1F4E79")
+    blanco = Font(bold=True, color="FFFFFF", size=10)
+
+    def _hoja(nombre, encabezados, filas, anchos=None):
+        ws = (
+            wb.active
+            if wb.active.max_row == 1 and wb.active.title == "Sheet"
+            else wb.create_sheet()
+        )
+        ws.title = nombre
+        ws.append(encabezados)
+        for c in range(1, len(encabezados) + 1):
+            celda = ws.cell(row=1, column=c)
+            celda.fill = azul
+            celda.font = blanco
+        for fila in filas:
+            ws.append(fila)
+        for c, ancho in enumerate(anchos or [], start=1):
+            ws.column_dimensions[get_column_letter(c)].width = ancho
+        ws.freeze_panes = "A2"
+        return ws
+
+    # --- RESUMEN -----------------------------------------------------
+    radicar = [f for f in facturas if f.resultado_actual == svc.RESULTADO_RADICAR]
+    devueltas = [f for f in facturas if f.resultado_actual == svc.RESULTADO_DEVUELTA]
+    pendientes = [f for f in facturas if f.resultado_actual == svc.RESULTADO_PENDIENTE]
+    devs = db.query(OficioDevolucionRecord).all()
+    ahora = datetime.now(TZ_BOGOTA)
+    _hoja(
+        "RESUMEN",
+        ["Concepto", "Valor"],
+        [
+            ["Informe generado", ahora.strftime("%d/%m/%Y %H:%M")],
+            ["Generado por", _nombre_auditor(current_user)],
+            ["Oficios de recepción", db.query(OficioRecepcionRecord).count()],
+            ["Facturas en el consolidado", len(facturas)],
+            ["Radicadas / subsanadas", len(radicar)],
+            ["Devueltas (estado actual)", len(devueltas)],
+            ["Pendientes por auditar", len(pendientes)],
+            ["Oficios de devolución emitidos", len(devs)],
+            ["Valor radicado", sum(valores.get(f.factura, 0) for f in radicar)],
+            ["Valor devuelto", sum(valores.get(f.factura, 0) for f in devueltas)],
+            ["Valor pendiente", sum(valores.get(f.factura, 0) for f in pendientes)],
+        ],
+        anchos=[34, 24],
+    )
+
+    # --- POR AUDITOR -------------------------------------------------
+    por_auditor: dict[str, dict] = {}
+    for f in facturas:
+        if not f.auditor:
+            continue
+        a = por_auditor.setdefault(
+            f.auditor, {"auditadas": 0, "radicar": 0, "devueltas": 0, "valor": 0.0}
+        )
+        a["auditadas"] += 1
+        a["valor"] += valores.get(f.factura, 0)
+        if f.resultado_actual == svc.RESULTADO_RADICAR:
+            a["radicar"] += 1
+        elif f.resultado_actual == svc.RESULTADO_DEVUELTA:
+            a["devueltas"] += 1
+    _hoja(
+        "POR AUDITOR",
+        ["Auditor", "Auditadas", "Radicadas", "Devueltas", "Valor auditado"],
+        [
+            [nombre, a["auditadas"], a["radicar"], a["devueltas"], a["valor"]]
+            for nombre, a in sorted(
+                por_auditor.items(), key=lambda kv: kv[1]["auditadas"], reverse=True
+            )
+        ],
+        anchos=[28, 12, 12, 12, 18],
+    )
+
+    # --- POR OFICIO --------------------------------------------------
+    conteo_oficio: dict[int, dict] = {}
+    for f in facturas:
+        c = conteo_oficio.setdefault(
+            f.oficio_actual_id, {"total": 0, "pend": 0, "rad": 0, "dev": 0}
+        )
+        c["total"] += 1
+        if f.resultado_actual == svc.RESULTADO_RADICAR:
+            c["rad"] += 1
+        elif f.resultado_actual == svc.RESULTADO_DEVUELTA:
+            c["dev"] += 1
+        else:
+            c["pend"] += 1
+    _hoja(
+        "POR OFICIO",
+        ["Radicado", "Recibido", "Recepcionó", "Facturas", "Pendientes", "Radicadas", "Devueltas"],
+        [
+            [
+                o.numero_radicado,
+                _f(o.fecha_recibido),
+                o.creado_por or "",
+                conteo_oficio.get(o.id, {}).get("total", 0),
+                conteo_oficio.get(o.id, {}).get("pend", 0),
+                conteo_oficio.get(o.id, {}).get("rad", 0),
+                conteo_oficio.get(o.id, {}).get("dev", 0),
+            ]
+            for o in db.query(OficioRecepcionRecord)
+            .order_by(OficioRecepcionRecord.fecha_recibido)
+            .all()
+        ],
+        anchos=[24, 18, 22, 10, 12, 12, 12],
+    )
+
+    # --- DEVOLUCIONES ------------------------------------------------
+    recepciones = {
+        o.id: o.numero_radicado
+        for o in db.query(OficioRecepcionRecord)
+        .filter(
+            OficioRecepcionRecord.id.in_(
+                {d.oficio_recepcion_id for d in devs if d.oficio_recepcion_id}
+            )
+        )
+        .all()
+    }
+    _hoja(
+        "DEVOLUCIONES",
+        ["Consecutivo", "Generado", "Generado por", "Oficio origen", "Facturas", "Valor"],
+        [
+            [
+                d.consecutivo,
+                _f(d.fecha_generado),
+                d.generado_por or "",
+                recepciones.get(d.oficio_recepcion_id, ""),
+                d.total_facturas,
+                d.total_valor,
+            ]
+            for d in sorted(devs, key=lambda d: (d.anio, d.numero))
+        ],
+        anchos=[26, 18, 22, 24, 10, 18],
+    )
+
+    # --- HISTORIAL (trazabilidad completa) ---------------------------
+    eventos = (
+        db.query(FacturaEventoRecord)
+        .order_by(FacturaEventoRecord.creado_en, FacturaEventoRecord.id)
+        .all()
+    )
+    _hoja(
+        "HISTORIAL",
+        [
+            "Fecha",
+            "Factura",
+            "Envío",
+            "Oficio",
+            "Evento",
+            "Resultado",
+            "Auditor",
+            "Motivo",
+            "Observaciones",
+            "Valor",
+        ],
+        [
+            [
+                _f(e.creado_en),
+                e.factura,
+                e.envio or "",
+                e.oficio_fhus or "",
+                e.tipo_evento,
+                e.estado_resultante or "",
+                e.auditor or e.creado_por or "",
+                e.motivo or "",
+                e.observaciones or "",
+                e.valor_snapshot or 0,
+            ]
+            for e in eventos
+        ],
+        anchos=[17, 16, 10, 22, 20, 16, 22, 40, 40, 14],
+    )
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    nombre = f"informe-preauditoria-{ahora.strftime('%Y%m%d-%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 @router.get("/estadisticas")

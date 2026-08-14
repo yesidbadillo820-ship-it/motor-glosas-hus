@@ -53,7 +53,7 @@ def enviar_alertas_email(
     dias: int = Query(5, ge=1, le=30, description="Días de anticipación"),
     forzar: bool = Query(False, description="Enviar aunque no haya nuevas alertas"),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """
     Envía alerta por correo electrónico con las glosas próximas a vencer.

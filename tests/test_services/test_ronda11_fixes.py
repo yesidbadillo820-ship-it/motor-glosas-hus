@@ -48,21 +48,30 @@ def test_neutraliza_valor_100000_falso():
     d = "ESE HUS NO ACEPTA LA GLOSA. SERVICIO FACTURADO POR $100.000."
     r = _neutralizar_alucinaciones_prompt(d)
     assert "$100.000" not in r
-    assert "el valor objetado consignado en el expediente" in r
+    # 06-08-2026: el sintagma neutro pasó a MAYÚSCULA sostenida, como todo
+    # el dictamen. Antes salía en minúscula dentro de un texto en caps y el
+    # documento se veía pegado de dos pedazos.
+    assert "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE" in r.upper()
 
 
 def test_neutraliza_valor_1000000_falso():
     d = "FACTURADO POR $1.000.000 EN ATENCIÓN MÉDICA."
     r = _neutralizar_alucinaciones_prompt(d)
     assert "$1.000.000" not in r
-    assert "el valor objetado consignado en el expediente" in r
+    # 06-08-2026: el sintagma neutro pasó a MAYÚSCULA sostenida, como todo
+    # el dictamen. Antes salía en minúscula dentro de un texto en caps y el
+    # documento se veía pegado de dos pedazos.
+    assert "EL VALOR OBJETADO CONSIGNADO EN EL EXPEDIENTE" in r.upper()
 
 
 def test_neutraliza_cups_1234():
     d = "EL PROCEDIMIENTO QUIRÚRGICO CON CUPS 1234 REALIZADO EN URGENCIAS."
     r = _neutralizar_alucinaciones_prompt(d)
     assert "CUPS 1234" not in r
-    assert "el CUPS de la factura" in r
+    # 06-08-2026: el sintagma neutro pasó a MAYÚSCULA sostenida, como todo
+    # el dictamen. Antes salía en minúscula dentro de un texto en caps y el
+    # documento se veía pegado de dos pedazos.
+    assert "EL CUPS DE LA FACTURA" in r.upper()
 
 
 def test_neutraliza_codigo_cups_1234():

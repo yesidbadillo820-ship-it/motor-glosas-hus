@@ -81,6 +81,22 @@ def diagnostico_completo(
         "secciones": {},
     }
 
+    # ─── Quién está atendiendo (va primero: manda sobre todo lo demás) ──
+    # 04-08-2026: dos uvicorn vivos sobre el mismo puerto hicieron que el
+    # arranque dijera `groq=OK gsk_vn06EE…` y esta misma pantalla dijera
+    # `gsk_5CxaRq…`. Si hay más de un motor, ningún otro dato de este panel
+    # es confiable: puede venir del motor viejo.
+    try:
+        from app.services.motor_proceso import estado_motor
+
+        out["secciones"]["motor"] = estado_motor()
+    except Exception as e:  # nunca tumbar el diagnóstico por el diagnóstico
+        out["secciones"]["motor"] = {
+            "estado": "warning",
+            "mensaje": f"No se pudo inspeccionar el proceso: {e}",
+            "data": {},
+        }
+
     # ─── Base de datos (SQLite local en VM HUS o Postgres remoto) ──
     # Detecta el tipo desde DATABASE_URL: SQLite (self-hosted, default
     # desde 23-jun-2026) o Postgres (Neon antiguo). Mostrar correctamente

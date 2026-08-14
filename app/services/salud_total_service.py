@@ -165,12 +165,34 @@ class GlosaSaludTotal:
             return 0
         return float(valor.replace(",", ""))
 
+    @property
+    def sin_fecha_recepcion(self) -> bool:
+        """No hay con qué contar el plazo del Art. 57 de la Ley 1438/2011.
+
+        El plazo corre desde que la EPS RECIBE la factura hasta que radica
+        la glosa. Sin la fecha de recepción no existe el punto de partida.
+        """
+        if not (self.fecha_recepcion and self.fecha_rad):
+            return True
+        # La EPS no puede glosar una factura antes de recibirla. Si las dos
+        # fechas vienen al revés, el dato está mal digitado y no sirve para
+        # contar el plazo: se trata igual que si no estuviera.
+        return self.fecha_recepcion > self.fecha_rad
+
     def dias_transcurridos(self) -> int:
-        if self.fecha_recepcion and self.fecha_rad:
-            return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
-        if not self.fecha_rad:
+        """Días hábiles entre la recepción de la factura y la radicación.
+
+        Si falta la fecha de recepción devuelve 0 y NO se alega
+        extemporaneidad. Antes se contaba desde la radicación de la glosa
+        hasta HOY, que es un intervalo que no mide ningún plazo legal: una
+        notificación de julio respondida en agosto daba «han transcurrido
+        X días hábiles» y con eso se afirmaba en un documento radicable un
+        hecho que nadie había comprobado. Cuando no hay evidencia, no se
+        afirma: se responde de fondo.
+        """
+        if self.sin_fecha_recepcion:
             return 0
-        return calcular_dias_habiles(self.fecha_rad, datetime.now())
+        return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
 
     def es_extemporanea(self) -> bool:
         return self.dias_transcurridos() > DIAS_LIMITE
@@ -397,6 +419,9 @@ class GlosaSaludTotal:
             "Observacion_IPS": observacion,
             "TipoRespuesta": self.tipo_respuesta,
             "DiasTranscurridos": dias,
+            # Para que la pantalla avise: sin este dato no se puede alegar
+            # extemporaneidad, y la respuesta salió argumentada de fondo.
+            "SinFechaRecepcion": self.sin_fecha_recepcion,
         }
 
 
@@ -464,6 +489,28 @@ def procesar_glosas_salud_total(
     return respuestas
 
 
+def _pesos(valor: Any) -> str:
+    """Escribe un valor de peso como lo escribe la entidad: sin el «.0».
+
+    La notificación trae «93340» y Python venía escribiendo «93340.0» por ser
+    float. Se mantiene el decimal solo cuando el valor de verdad lo tiene.
+    """
+    try:
+        n = float(valor or 0)
+    except (TypeError, ValueError):
+        return str(valor or "")
+    return str(int(n)) if n == int(n) else f"{n:.2f}"
+
+
+def _una_linea(texto: Any) -> str:
+    """Aplana el texto a una sola línea.
+
+    Un salto de línea dentro de la Observación parte la fila en dos y la
+    entidad recibe un archivo con más filas que glosas.
+    """
+    return " ".join(str(texto or "").split())
+
+
 def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
     if not respuestas:
         return ""
@@ -478,14 +525,14 @@ def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
                 str(r.get("PrefijoFac", "")),
                 str(r.get("NumeroFac", "")),
                 str(r.get("NUMREG", "")),
-                str(r.get("NombreServicio", "")),
-                str(r.get("ValorGlosaTotalxServ", "")),
+                _una_linea(r.get("NombreServicio", "")),
+                _pesos(r.get("ValorGlosaTotalxServ", "")),
                 str(r.get("CodMotvGlosaGeneral", "")),
                 str(r.get("CodMotvGlosaEspc", "")),
-                str(r.get("ValorAceptadoIPS", "")),
+                _pesos(r.get("ValorAceptadoIPS", "")),
                 str(r.get("Codigo_Respuesta_a_glosas", "")),
-                str(r.get("ConceptoRespuesta", "")),
-                str(r.get("Observacion_IPS", "")),
+                _una_linea(r.get("ConceptoRespuesta", "")),
+                _una_linea(r.get("Observacion_IPS", "")),
             ]
         )
         lineas.append(linea)
@@ -500,3 +547,88 @@ def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
         "1" if tipo_respuesta == "extemporanea" else "2" if tipo_respuesta == "ratificada" else "3"
     )
     return f"RTAGLOSA_{NIT_HUS}_{fecha_str}_{sufijo}.txt"
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Lectura de la notificación a diccionarios (OT-045)
+#
+# El camino por plantilla lee el TXT por posición y va directo a la
+# respuesta. El camino por IA necesita algo distinto: cada glosa como un
+# diccionario con nombre y apellido, para armar con ella el texto que el
+# motor analiza. Se lee UNA vez y se reparte, en vez de abrir el archivo dos
+# veces con dos lectores que podrían separarse.
+# ─────────────────────────────────────────────────────────────────────────
+
+CABECERA_ESPERADA = ("NumeroRad_", "Numreg")
+
+
+def leer_notificacion_dict(contenido: bytes) -> tuple[List[Dict[str, Any]], List[str]]:
+    """Lee el TXT de la notificación y devuelve (glosas, avisos).
+
+    Las notificaciones de Salud Total vienen en latin-1: leerlas como UTF-8
+    parte las tildes de los nombres y de los motivos.
+
+    El radicado y el registro viajan como TEXTO de principio a fin.
+    Convertirlos a número fue lo que produjo «3,5E+14» en el archivo del
+    13-08 y lo dejó inservible: la entidad no puede casar ninguna respuesta
+    con su glosa.
+    """
+    avisos: List[str] = []
+    texto = None
+    for enc in ("utf-8-sig", "latin-1"):
+        try:
+            texto = contenido.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        return [], ["El archivo no se pudo leer: no está en UTF-8 ni en latin-1."]
+
+    lineas = [ln for ln in texto.splitlines() if ln.strip()]
+    if len(lineas) < 2:
+        return [], ["El archivo no tiene filas de glosa debajo del encabezado."]
+
+    sep = _detectar_separador(lineas[0])
+    cabecera = [c.strip() for c in lineas[0].split(sep)]
+    if not all(c in cabecera for c in CABECERA_ESPERADA):
+        return [], [
+            "El encabezado no corresponde a una notificación de Salud Total "
+            "(faltan NumeroRad_ o Numreg)."
+        ]
+
+    def _num(v) -> float:
+        try:
+            return float(str(v or "0").replace(",", "").strip() or 0)
+        except ValueError:
+            return 0.0
+
+    glosas: List[Dict[str, Any]] = []
+    for n, linea in enumerate(lineas[1:], start=2):
+        campos = linea.split(sep)
+        if len(campos) < 14:
+            avisos.append(f"Línea {n}: tiene {len(campos)} campos y se esperaban 14 o más.")
+            continue
+        f = dict(zip(cabecera, campos))
+        glosas.append(
+            {
+                "FechaRad": (f.get("FechaRad_") or "").strip(),
+                "NumeroRad": (f.get("NumeroRad_") or "").strip(),
+                "PrefijoFac": (f.get("PrefijoFac_") or "").strip(),
+                "NumeroFac": (f.get("NumeroFac_") or "").strip(),
+                "NUMREG": (f.get("Numreg") or "").strip(),
+                "NumeroDocAfl": (f.get("NumeroDocAfl_") or "").strip(),
+                "NombreServicio": (f.get("NombreServicio") or "").strip(),
+                "ValorTotalServ": _num(f.get("ValorTotalServ")),
+                # El valor de la glosa es ValorGlosaTotalxServ, NO el valor
+                # total del servicio, y NO se reescala.
+                "ValorGlosaTotalxServ": _num(f.get("ValorGlosaTotalxServ")),
+                "ValorBrutoFactura": _num(f.get("ValorBrutoFactura")),
+                # El código es la sigla (TA), no la descripción (Tarifas).
+                "CodMotvGlosaGeneral": (f.get("CodMotvGlosaGeneral") or "").strip(),
+                "MotvGlosaGeneral": (f.get("MotvGlosaGeneral") or "").strip(),
+                "CodMotvGlosaEspc": (f.get("CodMotvGlosaEspc") or "").strip(),
+                "MotvGlosaEspc": (f.get("MotvGlosaEspc") or "").strip(),
+                "DescripcionMotivo": (f.get("DescripcionMotivo") or "").strip(),
+            }
+        )
+    return glosas, avisos

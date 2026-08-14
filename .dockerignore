@@ -19,10 +19,28 @@ README*
 CLAUDE*
 
 # Tools (jump-box agent corre en la PC del HUS, no en el contenedor)
-# EXCEPTO los scoreboards (tablero de calidad), que sí van a la imagen.
+# EXCEPTO los scoreboards (tablero de calidad) y las herramientas del
+# Centro de Automatización, que el motor importa en producción. Esta
+# lista la vigila un test: si el catálogo crece y acá falta el módulo,
+# la suite lo dice antes de que el auditor vea otro «ModuleNotFoundError».
 tools/
+# Sin este archivo `tools` sería una carpeta suelta dentro de la imagen y
+# la `tools/` que Mako 1.4.0 instala por error se la comería (04-08-2026,
+# ver tools/__init__.py). Debe viajar SIEMPRE.
+!tools/__init__.py
 !tools/scoreboard.py
 !tools/scoreboard_live.py
+!tools/_dinero.py
+!tools/organizar_objeciones_savia.py
+!tools/organizar_objeciones_vco.py
+!tools/organizar_objeciones_emssanar.py
+!tools/txt_a_excel.py
+!tools/excel_a_csv.py
+!tools/revisar_xml_facturas.py
+!tools/convertir_tramite_masivo.py
+# Recuperación del registro de envíos de pre-auditoría (incidente 31-07):
+# se corre DENTRO del contenedor con docker exec, así que debe viajar.
+!tools/preauditoria_reconstruir_envios.py
 
 # Python
 __pycache__/

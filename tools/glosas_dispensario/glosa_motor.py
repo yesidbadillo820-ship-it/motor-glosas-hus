@@ -31,7 +31,7 @@ disp = lambda e: any(k in e.upper() for k in ("DISPENSARIO", "EJERCITO", "MEBUG"
 CIERRE = (
     "Por lo expuesto, se solicita el levantamiento total de la glosa y el pago íntegro de lo facturado. "
     "De persistir diferencias, la ESE HUS manifiesta su disposición a mesa de conciliación de glosas "
-    "(art. 20, Decreto 4747 de 2007; Ley 1438 de 2011, art. 57). Comunicaciones: cartera@hus.gov.co, "
+    "(art. 23, Decreto 4747 de 2007; Ley 1438 de 2011, art. 57). Comunicaciones: cartera@hus.gov.co, "
     "glosasydevoluciones@hus.gov.co."
 )
 
@@ -69,6 +69,7 @@ def clasificar(code, obs):
         or "INCLUIDO EN D.SALA" in o
         or "MATERIAL DE SUTURA Y CURACION" in o
         or "SUTURA Y CURACION PARA SALA" in o
+        or ("INCLUIDO EN EL CODIGO" in o and "INSUMO" in o)
     ):
         return "MATERIALES"
     # 3. Estancia por palabras clave (nivel / pertinencia de internación; no MVC).
@@ -97,7 +98,12 @@ def clasificar(code, obs):
         or "YESO E INMOVIL" in o
         or "REMITIDA DE PRIMER NIVEL" in o
         or "INGRESA REMITID" in o
-        or ("NO PERTINENTE" in o and "PROCEDIMIENTO QUIRURGICO" not in o and "ESTANCIA" not in o)
+        or (
+            "NO PERTINENTE" in o
+            and "PROCEDIMIENTO QUIRURGICO" not in o
+            and "ESTANCIA" not in o
+            and "INHERENTE" not in o
+        )
     ):
         return "PERTINENCIA"
     # 6. Procedimiento inherente / incluido / subsumido / cubierto en honorarios.
@@ -256,7 +262,7 @@ def arg(t):
             "liquidación separada en la estructura de la tarifa institucional, según consta en la descripción "
             "quirúrgica que se aporta. En consecuencia, no procede el descuento y se solicita el reconocimiento "
             "íntegro del valor facturado, con conciliación de la glosa de contenido tarifario conforme al Decreto "
-            "4747 de 2007, arts. 20 y 23."
+            "4747 de 2007, art. 23."
         )
     if t == "RE_ENCUADRE":
         return (
@@ -354,7 +360,7 @@ def arg(t):
             "que no cabe alegar 'sobrecosto', 'sin contrato' ni 'sin autorización'. El dispositivo es de un solo "
             "uso y no fue reprocesado, de modo que las políticas de reúso no le son aplicables. La retención del "
             "30% 'en espera de conciliación' no corresponde a una causal presente y taxativa de glosa (Resolución "
-            "2284 de 2023): la conciliación (Decreto 4747 de 2007, arts. 20 y 23) es una vía posterior que no "
+            "2284 de 2023): la conciliación (Decreto 4747 de 2007, art. 23) es una vía posterior que no "
             "autoriza retener el pago, por lo que procede el reconocimiento íntegro del valor facturado."
         )
     if t == "MATERIALES":

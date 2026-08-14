@@ -232,9 +232,12 @@ class TestAutoCriticaReusaOverride:
         # incluye el call _llamar_ia que la precede.
         idx_refinado_log = src.find("→refinado")
         assert idx_refinado_log > 0, "marker '→refinado' not found"
-        # Ventana amplia: 2500 chars hacia atrás (donde está _res_refinado
-        # = await self._llamar_ia(...)) y 500 hacia adelante.
-        ventana = src[max(0, idx_refinado_log - 2500) : idx_refinado_log + 500]
+        # Ventana amplia hacia atrás (donde está _res_refinado
+        # = await self._llamar_ia(...)) y 500 hacia adelante. Se amplió el
+        # 05-08-2026: al sumar el relleno de marcadores post-refinamiento,
+        # la llamada quedó más lejos del log y la ventana de 2500 ya no la
+        # alcanzaba. La prueba mide vecindad de código, no distancia exacta.
+        ventana = src[max(0, idx_refinado_log - 4000) : idx_refinado_log + 500]
         assert "modelo_override=_modelo_override" in ventana
 
 
@@ -305,20 +308,16 @@ class TestNormalizarMayusculasProtegeHTMLyCodigosHifenados:
         # Específicamente: el header CÓDIGO GLOSA debe seguir uppercase
         assert "<th>CÓDIGO GLOSA</th>" in res
 
-    def test_texto_plano_se_normaliza(self):
-        # Garantiza que el sanitizer aún normaliza texto plano (no es no-op)
+    def test_el_texto_plano_ya_no_se_baja_a_minusculas(self):
+        """05-08-2026: se retiró la normalización a sentence case. El
+        dictamen se radica en MAYÚSCULAS por decisión del dueño, y ahora lo
+        garantiza a_mayusculas_html() al armar la carátula."""
         from app.services.glosa_service import _normalizar_mayusculas_sostenidas
 
         texto = (
             "ESE HUS NO ACEPTA LA GLOSA APLICADA POR FAMISANAR EPS. SE SOLICITA EL LEVANTAMIENTO."
         )
-        res = _normalizar_mayusculas_sostenidas(texto)
-        # Debe normalizar a sentence case
-        assert res != texto
-        # Pero conserva siglas conocidas
-        assert "HUS" in res
-        assert "EPS" in res
-        assert "FAMISANAR" in res
+        assert _normalizar_mayusculas_sostenidas(texto) == texto
 
 
 class TestRegresionRonda16:

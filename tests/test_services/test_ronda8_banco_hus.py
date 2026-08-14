@@ -91,20 +91,20 @@ def test_bloque_max_ejemplos_respeta_limite():
 
 
 # ── Llama 4 Maverick como modelo primario Groq ───────────────────────
-def test_llama_4_maverick_como_primario():
+def test_gpt_oss_como_primario():
     """ronda 8: el modelo primario Groq es Llama 4 Maverick."""
     from app.core.config import Settings
 
     s = Settings()
-    assert s.groq_model == "meta-llama/llama-4-scout-17b-16e-instruct"
+    assert s.groq_model == "openai/gpt-oss-120b"  # llama-4-scout salió del catálogo
 
 
-def test_gpt_oss_baja_a_fallback_1():
-    """gpt-oss-120b (el primario anterior) queda de fallback inmediato."""
+def test_qwen_queda_de_fallback_1():
+    """qwen3-32b queda de respaldo inmediato del nuevo primario."""
     from app.core.config import Settings
 
     s = Settings()
-    assert s.groq_model_fallback_1 == "openai/gpt-oss-120b"
+    assert s.groq_model_fallback_1 == "qwen/qwen3-32b"
 
 
 def test_cadena_groq_tiene_4_modelos():
@@ -113,4 +113,4 @@ def test_cadena_groq_tiene_4_modelos():
 
     s = Settings()
     assert hasattr(s, "groq_model_fallback_3")
-    assert s.groq_model_fallback_3 == "llama-3.3-70b-versatile"
+    assert s.groq_model_fallback_3 == "llama-3.1-8b-instant"

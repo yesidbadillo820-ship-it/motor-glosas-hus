@@ -63,10 +63,17 @@ class Settings(BaseSettings):
     # siguiente modelo Groq SIN saltar todavia a Anthropic. Overrideables
     # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2,
     # GROQ_MODEL_FALLBACK_3.
-    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
-    groq_model_fallback_1: str = "openai/gpt-oss-120b"
-    groq_model_fallback_2: str = "qwen/qwen3-32b"
-    groq_model_fallback_3: str = "llama-3.3-70b-versatile"
+    # 05-08-2026: llama-4-scout SALIÓ del catálogo de Groq. El diagnóstico
+    # del hospital devolvía «Error code: 404 — the model
+    # meta-llama/llama-4-scout-17b-16e-instruct does not exist or you do not
+    # have access to it», y el panel avisaba «ningún proveedor responde»
+    # aunque el motor SÍ funcionaba: cada análisis gastaba un intento
+    # muerto y caía al respaldo. Todos los dictámenes de ese día salieron
+    # por gpt-oss-120b. Se promueve el que ya estaba haciendo el trabajo.
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_model_fallback_1: str = "qwen/qwen3-32b"
+    groq_model_fallback_2: str = "llama-3.3-70b-versatile"
+    groq_model_fallback_3: str = "llama-3.1-8b-instant"
     anthropic_model: str = "claude-sonnet-4-5"
     # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
     # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
@@ -162,6 +169,43 @@ def check_security_config() -> None:
         )
 
 
+# Claves que el resto del sistema busca en el ENTORNO del proceso, no en
+# esta configuración. Sin este puente, un .env perfectamente válido dejaba
+# la mitad del sistema a ciegas.
+_CLAVES_AL_ENTORNO = (
+    ("GROQ_API_KEY", "groq_api_key"),
+    ("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    ("GEMINI_API_KEY", "gemini_api_key"),
+    ("PRIMARY_AI", "primary_ai"),
+)
+
+
+def _exportar_claves_al_entorno(settings: "Settings") -> None:
+    """Publica al entorno del proceso lo que vino del archivo .env.
+
+    Incidente 04-08-2026: pydantic-settings lee el .env hacia la
+    configuración pero NO lo exporta a os.environ. El motor de dictámenes
+    recibe las claves por inyección y funcionaba, pero el asistente, el
+    auditor forense, el extractor de cláusulas, los multi-agentes y el
+    diagnóstico de arranque leen os.getenv — y veían todo AUSENTE con un
+    .env correcto. El log llegó a decir «groq=AUSENTE» teniendo la clave
+    cargada, y eso mandó la búsqueda del problema por el camino errado.
+
+    Nunca pisa una variable que ya venga del entorno real (docker/systemd
+    mandan sobre el archivo).
+    """
+    import os as _os
+
+    for nombre_env, campo in _CLAVES_AL_ENTORNO:
+        if _os.environ.get(nombre_env):
+            continue
+        valor = getattr(settings, campo, "") or ""
+        if valor:
+            _os.environ[nombre_env] = valor
+
+
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    _exportar_claves_al_entorno(settings)
+    return settings

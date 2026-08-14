@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_auditor_o_superior
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 from app.services.ia_router import enrutar
@@ -57,7 +57,7 @@ class PrediccionResponse(BaseModel):
 def predecir_dictamen(
     payload: TextoEntrada,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ) -> PrediccionResponse:
     """Análisis predictivo en tiempo real del texto que escribe el gestor.
 

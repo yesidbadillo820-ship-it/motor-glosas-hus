@@ -77,6 +77,9 @@ _PERMITIDAS: dict[str, str] = {
     "tools/glosas_dispensario/glosa_motor.py::money": (
         "formatea un número como '$1.234.567' para el texto de la respuesta"
     ),
+    "tools/preauditar_glosas_adres.py::_moneda": (
+        "réplica del TEXT($#.##0) de la macro: formatea para mostrar; no lee"
+    ),
     "tools/suite_cartera_hus/suite_cartera_hus.py::_fmt_pesos_compacto": (
         "formatea para mostrar en pantalla; no lee"
     ),
