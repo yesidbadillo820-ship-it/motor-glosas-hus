@@ -200,7 +200,7 @@ class TestElBotonYaLlamaALaIA:
                 "DescripcionMotivo": "Diferencias con los valores pactados",
             }
         )
-        assert "93340" in texto
+        assert "$93.340" in texto
         assert "HUS523938" in texto
         assert "TA23" in texto
         # Los dos códigos NO se pegan: «TATA23» no es ningún código.
@@ -406,3 +406,40 @@ class TestNuncaSaleHtmlALaEntidad:
         )
         d = client.post("/api/salud-total/analizar-ia", files=_archivo()).json()
         assert d["analizadas_con_ia"] == 0
+
+
+class TestLosPesosSeEscribenComoPesos:
+    """13-08-2026. La primera versión le pasaba a la IA el número tal cual
+    salía del archivo —`93340.0`— y la IA lo copiaba al dictamen. En el
+    documento que se radica quedaba «FACTURADA POR $ 93340.0». Un decimal en
+    un valor en pesos, en un documento legal, se lee como descuido."""
+
+    def test_el_valor_va_con_puntos_de_mil_y_sin_decimales(self):
+        from app.services.salud_total_ia import _pesos
+
+        assert _pesos(93340.0) == "$93.340"
+        assert _pesos(1589100) == "$1.589.100"
+        assert _pesos(729.0) == "$729"
+
+    def test_un_valor_vacio_no_revienta(self):
+        from app.services.salud_total_ia import _pesos
+
+        assert _pesos(None) == "$0"
+        assert _pesos("") == "$0"
+
+    def test_el_texto_que_lee_la_ia_no_lleva_decimales(self):
+        from app.services.salud_total_ia import _texto_de_la_glosa
+
+        texto = _texto_de_la_glosa({"ValorTotalServ": 280000.0, "ValorGlosaTotalxServ": 93340.0})
+        assert "$93.340" in texto
+        assert "$280.000" in texto
+        assert "93340.0" not in texto, "el decimal se le está pasando a la IA"
+
+    def test_se_distingue_lo_facturado_de_lo_objetado(self):
+        """Son dos cifras distintas y el dictamen no las puede confundir: el
+        servicio se facturó por $280.000 y la entidad objetó $93.340."""
+        from app.services.salud_total_ia import _texto_de_la_glosa
+
+        texto = _texto_de_la_glosa({"ValorTotalServ": 280000.0, "ValorGlosaTotalxServ": 93340.0})
+        assert "VALOR FACTURADO DEL SERVICIO: $280.000" in texto
+        assert "VALOR OBJETADO POR LA ENTIDAD: $93.340" in texto
