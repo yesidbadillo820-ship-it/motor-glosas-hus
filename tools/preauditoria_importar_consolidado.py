@@ -30,9 +30,15 @@ QUÉ ESCRIBE (mismas tablas que usa la página):
     SUBSANADA/RADICADA/NUEVAMENTE_DEVUELTA) con fechas y snapshots reales.
 
 REGLAS DE SEGURIDAD:
-  - NUNCA borra ni modifica lo que ya está en la base: si una factura ya
-    existe (p. ej. las que el equipo registró hoy en la página), se salta
+  - NUNCA borra ni modifica lo que la PÁGINA creó o tocó: si una factura fue
+    creada por la página, o alguno de sus eventos vino de la página, se salta
     completa — el sistema manda. Fuentes/oficios/ledger: solo INSERT si falta.
+  - Las facturas que ESTE MISMO importador creó sí se pueden PONER AL DÍA
+    cuando el Excel avanza (el equipo la radicó/devolvió/subsanó después de
+    la última corrida): se agregan SOLO los eventos que faltan al final y se
+    actualiza el estado. La historia ya guardada jamás se modifica; si la
+    historia nueva no encaja como continuación de la guardada, la factura se
+    reporta como conflicto y no se toca.
   - Idempotente: correrlo dos veces no duplica nada.
   - Sin argumento de modo: SOLO MIRAR (no escribe; muestra qué haría).
     Con "aplicar": escribe, en una sola transacción.
@@ -44,10 +50,11 @@ USO EN EL PC DE CARTERA (PowerShell o cmd, desde C:\\motor-glosas\\repo):
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 
 try:
@@ -72,7 +79,8 @@ ESTADO_BLOQUEADA = "BLOQUEADA_LIMITE"
 
 MARCA_IMPORT = "importacion-historica-excel"
 
-# El Excel trae el primer nombre; la página usa el nombre completo del equipo.
+# El Excel trae el primer nombre (o las iniciales, en el consolidado ADRES);
+# la página usa el nombre completo del equipo.
 AUDITORES = {
     "OSCAR": "OSCAR VILLAMIZAR",
     "CAROLINA": "CAROLINA CIFUENTES",
@@ -82,6 +90,9 @@ AUDITORES = {
     "ELIAS": "ELIAS CARVAJAL",
     "EDGAR": "EDGAR SILVA",
     "VANESSA": "VANESSA OSPINA",
+    "DI": "DIANEYDA QUINTERO",
+    "EC": "ELIAS CARVAJAL",
+    "ES": "EDGAR SILVA",
 }
 
 
@@ -170,34 +181,160 @@ class Pasada:
         return RESULTADO_PENDIENTE
 
     @property
+    def hubo_devolucion(self) -> bool:
+        """Si esta pasada dejó una devolución ANTES de su desenlace final.
+
+        Con F_DEV escrita la devolución es explícita. Sin F_DEV, un NO en
+        RADICAR_1/RADICAR_2 también registra que la factura fue devuelta —
+        pero solo mientras no haya reinspección: cuando la hay, la única
+        prueba de la devolución inicial es la F_DEV (así se cargó toda la
+        historia del 05-08 y así se mantiene la compatibilidad). Esto cubre
+        la práctica del equipo de anotar después la radicación final en
+        RADICAR_2 sin que se borre la devolución del pasado.
+        """
+        if self.f_dev is not None:
+            return True
+        return self.f_reinsp is None and (
+            self.radicar_1 == "NO"
+            or self.radicar_2 == "NO"
+            or self.resultado_final == RESULTADO_DEVUELTA
+        )
+
+    @property
     def motivo(self) -> str:
         partes = [p for p in (self.obs_preaud, self.obs_adic, self.obs_2) if p]
         return " · ".join(partes)
 
 
-def leer_excel(ruta: str) -> list[Pasada]:
+def _oficio_limpio(texto: str) -> str:
+    """Normaliza el número de oficio: sin espacios y con la I del formato.
+
+    El consolidado ADRES trae variantes como 'FHUS- AS-101139-26' donde la
+    'I' quedó digitada como '1'. La forma canónica es FHUS-AS-I01139-26.
+    """
+    t = re.sub(r"\s+", "", texto or "")
+    return re.sub(r"^(FHUS-[A-Z]+-)1(\d{5}-\d{2})$", r"\g<1>I\g<2>", t)
+
+
+def _fila_desde_adres(row: tuple) -> tuple:
+    """Traduce una fila del consolidado ADRES (26 columnas) al orden clásico.
+
+    Columnas ADRES: Oficio | Item | Fecha_Recibido | Envío | AUD | HUS |
+    Fecha_Factura | Valor | NIT | Entidad | Correo F.E. | Obs Preauditoría |
+    Radicar_1 | Obs Adicionales | Fecha_Entrega_Fact | Obs_FACTURACIÓN |
+    Fecha_Dev_CARTERA | Fecha_Segunda_Revisión | Segunda_Obs_SINAC |
+    Fecha_Dev_FACTURACIÓN | Segunda_Obs_FACTURACIÓN | Fecha_Dev_CARTERA |
+    Radicar_2 | Fecha_Radicación | Número_Radicado | INFOPOL
+    """
+    f_dev = next((row[i] for i in (16, 19, 21) if _fecha(row[i]) is not None), None)
+    obs_2 = " · ".join(p for p in (_txt(row[15]), _txt(row[18]), _txt(row[20])) if p)
+    radicado = _txt(row[24])
+    if radicado:
+        obs_2 = f"{obs_2} · Radicado ADRES: {radicado}" if obs_2 else f"Radicado ADRES: {radicado}"
+    radicar_2 = row[22] if _txt(row[22]) else row[23]  # la fecha de radicación vale como SI
+    return (
+        row[1],  # ITEM
+        row[2],  # F_RECIBIDO
+        row[3],  # ENVIO
+        row[4],  # AUDITOR (iniciales)
+        row[5],  # FACTURA
+        row[6],  # F_FACTURA
+        row[7],  # VALOR
+        row[8],  # NIT
+        row[9],  # ENTIDAD
+        row[10],  # CORREO F.E.
+        row[11],  # obs preauditoría
+        row[12],  # RADICAR_1
+        row[13],  # obs adicionales
+        f_dev,  # F_DEV (la primera fecha de devolución que aparezca)
+        row[17],  # F_REINSPECCIÓN (Fecha_Segunda_Revisión)
+        obs_2,  # OBSERVACIONES segunda vuelta
+        radicar_2,  # RADICAR_2
+        _oficio_limpio(_txt(row[0])),  # OFICIO
+    )
+
+
+def leer_excel(ruta: str) -> tuple[list[Pasada], list[str]]:
+    """Lee el Excel (formato clásico del equipo o consolidado ADRES).
+
+    Devuelve (pasadas, avisos). Los avisos son problemas de datos que el
+    auditor debe conocer: fechas dañadas, filas repetidas idénticas.
+    """
     wb = openpyxl.load_workbook(ruta, data_only=True, read_only=True)
-    ws = wb["Hoja1"] if "Hoja1" in wb.sheetnames else wb.worksheets[0]
-    pasadas = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    if "Hoja1" in wb.sheetnames:
+        ws = wb["Hoja1"]
+    elif "CONSOLIDADO" in wb.sheetnames:
+        ws = wb["CONSOLIDADO"]
+    else:
+        ws = wb.worksheets[0]
+    filas = list(ws.iter_rows(min_row=1, values_only=True))
+    wb.close()
+    encabezado = [_txt(c).upper() for c in (filas[0] if filas else [])]
+    es_adres = bool(encabezado) and encabezado[0] == "OFICIO"
+
+    avisos: list[str] = []
+    pasadas: list[Pasada] = []
+    vistas: set[tuple] = set()
+    ancho = 26 if es_adres else 18
+    col_factura = 5 if es_adres else 4
+    for numero, row in enumerate(filas[1:], 2):
         if row is None:
             continue
         # En modo read_only openpyxl recorta las columnas vacías del final:
-        # se rellena a 18 para no perder filas válidas.
-        if len(row) < 18:
-            row = tuple(row) + (None,) * (18 - len(row))
-        if not _txt(row[4]):
+        # se rellena para no perder filas válidas.
+        if len(row) < ancho:
+            row = tuple(row) + (None,) * (ancho - len(row))
+        if not _txt(row[col_factura]).upper().startswith("HUS"):
             continue
+        if es_adres:
+            row = _fila_desde_adres(row)
+        llave = tuple(str(v) for v in row)
+        if llave in vistas:
+            avisos.append(f"Fila {numero}: repetida idéntica a otra ya leída — se ignora")
+            continue
+        vistas.add(llave)
+        if isinstance(row[13], time):
+            avisos.append(
+                f"Fila {numero} ({_txt(row[4])}): F_DEV trae una hora suelta "
+                f"('{row[13]}') en vez de una fecha — se lee como sin fecha; "
+                f"corrija esa celda en el Excel"
+            )
         pasadas.append(Pasada(row))
-    wb.close()
     # Orden cronológico por factura: fecha de recibido y, de empate, ITEM.
     pasadas.sort(key=lambda p: (p.factura, p.f_recibido, p.item or 0))
-    return pasadas
+    return pasadas, avisos
 
 
 def _radicado_oficio(p: Pasada) -> str:
     """El FHUS real si la fila lo trae; si no, uno sintético por fecha."""
     return p.oficio or f"HIST-{p.f_recibido.strftime('%Y-%m-%d')}"
+
+
+def _estado_en_base(cur, factura: str) -> dict | None:
+    """Lo que la base ya sabe de la factura, para clasificar y revalidar."""
+    fila = cur.execute(
+        "SELECT id, creado_por, estado, resultado_actual, ronda_actual, "
+        "num_devoluciones, envio_actual, oficio_fhus FROM preaud_facturas WHERE factura=?",
+        (factura,),
+    ).fetchone()
+    if fila is None:
+        return None
+    eventos = cur.execute(
+        "SELECT tipo_evento, creado_por FROM preaud_factura_eventos WHERE factura_id=? ORDER BY id",
+        (fila[0],),
+    ).fetchall()
+    return {
+        "id": fila[0],
+        "creado_por": fila[1],
+        "estado": fila[2],
+        "resultado": fila[3],
+        "ronda": fila[4],
+        "num_dev": fila[5],
+        "envio": fila[6],
+        "oficio": fila[7],
+        "tipos": [e[0] for e in eventos],
+        "ajeno": any(e[1] != MARCA_IMPORT for e in eventos),
+    }
 
 
 def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
@@ -220,7 +357,11 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
 
     plan = {
         "facturas_nuevas": {},  # factura -> (estado, resultado, eventos[...])
-        "facturas_saltadas": sorted(f for f in por_factura if f in existentes),
+        "facturas_saltadas": [],  # de la página (creadas o tocadas por ella)
+        "facturas_al_dia": [],  # del import, sin nada nuevo en el Excel
+        "facturas_actualizar": {},  # factura -> info con cola de eventos nueva
+        "facturas_encabezado": {},  # historia igual, encabezado por sanar
+        "facturas_conflicto": {},  # factura -> (historia en base, historia Excel)
         "oficios_nuevos": {},  # radicado -> fecha_recibido mínima
         "oficios_existentes": set(),
         "fuentes_rad_nuevas": {},  # factura -> última pasada (datos descriptivos)
@@ -252,16 +393,8 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
                     continue
                 plan["ledger_nuevo"].add(clave)
 
-        if factura in existentes:
-            continue  # el sistema manda: no se toca lo ya registrado en la página
-
-        # Fuentes (datos descriptivos de la última pasada)
-        if factura not in fuentes_rad:
-            plan["fuentes_rad_nuevas"][factura] = ultima
-        if factura not in fuentes_dg and ultima.correo_fe == "SI":
-            plan["fuentes_dg_nuevas"][factura] = ultima
-
-        # Estado final + historial de eventos
+        # Estado final + historial de eventos (se calcula SIEMPRE: sirve tanto
+        # para crear la factura como para ponerla al día si ya existe)
         eventos = []
         num_dev = 0
         ronda = 0
@@ -289,9 +422,7 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
                     "estado": None,
                 }
             )
-            if p.f_dev is not None or (
-                p.resultado_final == RESULTADO_DEVUELTA and p.f_reinsp is None
-            ):
+            if p.hubo_devolucion:
                 num_dev += 1
                 eventos.append(
                     {
@@ -355,10 +486,13 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
             else:
                 estado = ESTADO_DEVUELTA_PEND
         else:
-            estado = ESTADO_EN_SUBSANACION if ultima.f_reinsp is not None else ESTADO_NUEVA
+            # Pendiente de decidir: si ya hubo reingreso (por reinspección en
+            # la misma fila o por una fila nueva de reenvío), la factura está
+            # EN_SUBSANACION — NUEVA solo existe en la primera ronda.
+            hubo_reingreso = ultima.f_reinsp is not None or ronda > 1
+            estado = ESTADO_EN_SUBSANACION if hubo_reingreso else ESTADO_NUEVA
 
-        plan["resumen_estados"][f"{estado} / {resultado}"] += 1
-        plan["facturas_nuevas"][factura] = {
+        info = {
             "ultima": ultima,
             "eventos": eventos,
             "estado": estado,
@@ -367,16 +501,111 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
             "ronda": max(e["ronda"] for e in eventos),
         }
 
+        if factura not in existentes:
+            plan["resumen_estados"][f"{estado} / {resultado}"] += 1
+            plan["facturas_nuevas"][factura] = info
+            if factura not in fuentes_rad:
+                plan["fuentes_rad_nuevas"][factura] = ultima
+            if factura not in fuentes_dg and ultima.correo_fe == "SI":
+                plan["fuentes_dg_nuevas"][factura] = ultima
+            continue
+
+        # La factura ya está en la base: decidir si es de la página (no se
+        # toca), si ya está al día, si solo hay que agregarle la cola nueva
+        # de eventos, si el encabezado quedó desalineado, o si las historias
+        # no encajan (conflicto).
+        db = _estado_en_base(cur, factura)
+        tipos_excel = [e["tipo"] for e in eventos]
+        rad_final = _radicado_oficio(ultima)
+        encabezado_igual = (
+            db["estado"] == estado
+            and db["resultado"] == resultado
+            and db["ronda"] == info["ronda"]
+            and db["num_dev"] == num_dev
+            and (db["envio"] == (ultima.envio or db["envio"]))
+            and db["oficio"] == rad_final
+        )
+        if db["creado_por"] != MARCA_IMPORT or db["ajeno"]:
+            plan["facturas_saltadas"].append(factura)
+        elif db["tipos"] == tipos_excel:
+            if encabezado_igual:
+                plan["facturas_al_dia"].append(factura)
+            else:
+                info.update(id=db["id"], cola=[], estado_antes=db["estado"], tipos_db=db["tipos"])
+                plan["facturas_encabezado"][factura] = info
+        elif db["tipos"] == tipos_excel[: len(db["tipos"])]:
+            info.update(
+                id=db["id"],
+                cola=eventos[len(db["tipos"]) :],
+                estado_antes=db["estado"],
+                tipos_db=db["tipos"],
+            )
+            plan["facturas_actualizar"][factura] = info
+            if factura not in fuentes_rad:
+                plan["fuentes_rad_nuevas"][factura] = ultima
+            if factura not in fuentes_dg and ultima.correo_fe == "SI":
+                plan["fuentes_dg_nuevas"][factura] = ultima
+        else:
+            plan["facturas_conflicto"][factura] = (db["tipos"], tipos_excel)
+
+    plan["facturas_saltadas"].sort()
+    plan["facturas_al_dia"].sort()
+
     plan["envios_con_mas_de_3_oficios"] = sorted(
         e for e, ofs in envio_oficios.items() if len(ofs) > 3
     )
     return plan
 
 
+def _insertar_evento(cur, factura_id: int, factura: str, ev: dict, oficios_db: dict) -> None:
+    cur.execute(
+        "INSERT INTO preaud_factura_eventos "
+        "(factura_id, factura, tipo_evento, subsanacion_num, ronda, "
+        " estado_resultante, envio, oficio_id, oficio_fhus, f_recibido, "
+        " resultado, auditor, motivo, observaciones, valor_snapshot, "
+        " nit_snapshot, entidad_snapshot, correo_fe_snapshot, "
+        " fecha_factura_snapshot, creado_en, creado_por) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            factura_id,
+            factura,
+            ev["tipo"],
+            max(ev["ronda"] - 1, 0),
+            ev["ronda"],
+            ev["estado"],
+            ev["envio"] or None,
+            oficios_db[ev["radicado"]],
+            ev["radicado"],
+            _iso(ev["fecha"]),
+            ev["resultado"],
+            ev["auditor"],
+            ev["motivo"] or None,
+            ev["motivo"] or None,
+            ev["valor"],
+            ev["nit"] or None,
+            ev["entidad"] or None,
+            ev["correo"],
+            _iso(ev["f_factura"]),
+            _iso(ev["fecha"]),
+            MARCA_IMPORT,
+        ),
+    )
+
+
 def aplicar(plan: dict, con: sqlite3.Connection) -> dict:
     cur = con.cursor()
     cur.execute("BEGIN IMMEDIATE")
-    hechos = {"oficios": 0, "fuentes": 0, "dgreport": 0, "ledger": 0, "facturas": 0, "eventos": 0}
+    hechos = {
+        "oficios": 0,
+        "fuentes": 0,
+        "dgreport": 0,
+        "ledger": 0,
+        "facturas": 0,
+        "facturas_actualizadas": 0,
+        "encabezados_sanados": 0,
+        "cambiaron_mientras_tanto": 0,
+        "eventos": 0,
+    }
     try:
         oficios_db = {
             r[1]: r[0]
@@ -421,7 +650,7 @@ def aplicar(plan: dict, con: sqlite3.Connection) -> dict:
                     p.valor,
                     p.nit or None,
                     p.entidad or None,
-                    "CONSOLIDADO_PRE_AUDITORIA_2026.xlsx",
+                    plan.get("fuente_archivo", "CONSOLIDADO_PRE_AUDITORIA_2026.xlsx"),
                     MARCA_IMPORT,
                     _iso(datetime.now()),
                     _iso(datetime.now()),
@@ -436,7 +665,7 @@ def aplicar(plan: dict, con: sqlite3.Connection) -> dict:
                 "VALUES (?, 'SI', ?, ?, ?, ?)",
                 (
                     factura,
-                    "CONSOLIDADO_PRE_AUDITORIA_2026.xlsx",
+                    plan.get("fuente_archivo", "CONSOLIDADO_PRE_AUDITORIA_2026.xlsx"),
                     MARCA_IMPORT,
                     _iso(datetime.now()),
                     _iso(datetime.now()),
@@ -469,7 +698,7 @@ def aplicar(plan: dict, con: sqlite3.Connection) -> dict:
                     1 if info["resultado"] == RESULTADO_DEVUELTA else 0,
                     u.auditor,
                     _iso(ult_evento["fecha"]) if info["resultado"] != RESULTADO_PENDIENTE else None,
-                    u.motivo if info["num_dev"] else None,
+                    u.motivo if info["resultado"] == RESULTADO_DEVUELTA else None,
                     u.motivo or None,
                     _iso(datetime.now()),
                     MARCA_IMPORT,
@@ -481,39 +710,70 @@ def aplicar(plan: dict, con: sqlite3.Connection) -> dict:
             factura_id = cur.lastrowid
             hechos["facturas"] += 1
             for ev in info["eventos"]:
-                cur.execute(
-                    "INSERT INTO preaud_factura_eventos "
-                    "(factura_id, factura, tipo_evento, subsanacion_num, ronda, "
-                    " estado_resultante, envio, oficio_id, oficio_fhus, f_recibido, "
-                    " resultado, auditor, motivo, observaciones, valor_snapshot, "
-                    " nit_snapshot, entidad_snapshot, correo_fe_snapshot, "
-                    " fecha_factura_snapshot, creado_en, creado_por) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        factura_id,
-                        factura,
-                        ev["tipo"],
-                        max(ev["ronda"] - 1, 0),
-                        ev["ronda"],
-                        ev["estado"],
-                        ev["envio"] or None,
-                        oficios_db[ev["radicado"]],
-                        ev["radicado"],
-                        _iso(ev["fecha"]),
-                        ev["resultado"],
-                        ev["auditor"],
-                        ev["motivo"] or None,
-                        ev["motivo"] or None,
-                        ev["valor"],
-                        ev["nit"] or None,
-                        ev["entidad"] or None,
-                        ev["correo"],
-                        _iso(ev["f_factura"]),
-                        _iso(ev["fecha"]),
-                        MARCA_IMPORT,
-                    ),
-                )
+                _insertar_evento(cur, factura_id, factura, ev, oficios_db)
                 hechos["eventos"] += 1
+
+        # Facturas del propio import que avanzaron (o cuyo encabezado quedó
+        # desalineado): solo se AGREGA la cola de eventos nueva y se pone al
+        # día el encabezado. Nada existente se toca. Antes de escribir cada
+        # una se REVALIDA contra la base dentro de la transacción, por si la
+        # página escribió algo entre el plan y este momento.
+        pendientes = list(plan["facturas_actualizar"].items()) + list(
+            plan["facturas_encabezado"].items()
+        )
+        for factura, info in pendientes:
+            db = _estado_en_base(cur, factura)
+            if (
+                db is None
+                or db["id"] != info["id"]
+                or db["creado_por"] != MARCA_IMPORT
+                or db["ajeno"]
+                or db["tipos"] != info["tipos_db"]
+            ):
+                hechos["cambiaron_mientras_tanto"] += 1
+                continue
+            u: Pasada = info["ultima"]
+            rad_final = _radicado_oficio(u)
+            ult_evento = info["eventos"][-1]
+            for ev in info["cola"]:
+                _insertar_evento(cur, info["id"], factura, ev, oficios_db)
+                hechos["eventos"] += 1
+            # Al reingresar, la página limpia el amarre al oficio de
+            # devolución del ciclo anterior — aquí se imita ese comportamiento.
+            hubo_reingreso = any(ev["tipo"] == "REINGRESO" for ev in info["cola"])
+            cur.execute(
+                "UPDATE preaud_facturas SET envio_actual=COALESCE(?, envio_actual), "
+                "oficio_actual_id=?, oficio_fhus=?, f_recibido=?, estado=?, "
+                "resultado_actual=?, ronda_actual=?, num_subsanacion=?, "
+                "num_devoluciones=?, pendiente_subsanacion=?, "
+                "auditor=COALESCE(?, auditor), fecha_auditoria=?, "
+                "motivo_ultima_devolucion=?, observaciones=?, "
+                "oficio_devolucion_id=CASE WHEN ? THEN NULL ELSE oficio_devolucion_id END, "
+                "actualizado_en=? WHERE id=?",
+                (
+                    u.envio or None,
+                    oficios_db[rad_final],
+                    rad_final,
+                    _iso(u.f_recibido),
+                    info["estado"],
+                    info["resultado"],
+                    info["ronda"],
+                    max(info["ronda"] - 1, 0),
+                    info["num_dev"],
+                    1 if info["resultado"] == RESULTADO_DEVUELTA else 0,
+                    u.auditor,
+                    _iso(ult_evento["fecha"]) if info["resultado"] != RESULTADO_PENDIENTE else None,
+                    u.motivo if info["resultado"] == RESULTADO_DEVUELTA else None,
+                    u.motivo or None,
+                    1 if hubo_reingreso else 0,
+                    _iso(datetime.now()),
+                    info["id"],
+                ),
+            )
+            if info["cola"]:
+                hechos["facturas_actualizadas"] += 1
+            else:
+                hechos["encabezados_sanados"] += 1
 
         con.commit()
     except Exception:
@@ -550,8 +810,10 @@ def main() -> int:
     print(f"  Modo:  {'APLICAR (escribe)' if modo_aplicar else 'SOLO MIRAR (no escribe nada)'}")
     print("=" * 70)
 
-    pasadas = leer_excel(ruta_excel)
+    pasadas, avisos = leer_excel(ruta_excel)
     print(f"\nFilas leídas del Excel (pasadas): {len(pasadas)}")
+    for aviso in avisos:
+        print(f"   OJO: {aviso}")
 
     if modo_aplicar:
         con = sqlite3.connect(ruta_db, timeout=30)
@@ -560,11 +822,39 @@ def main() -> int:
     con.execute("PRAGMA busy_timeout=15000")
 
     plan = planear(pasadas, con)
+    plan["fuente_archivo"] = Path(ruta_excel).name
 
     print(f"\nFacturas nuevas a crear:      {len(plan['facturas_nuevas'])}")
-    print(f"Facturas que YA están (se saltan, el sistema manda): {len(plan['facturas_saltadas'])}")
+    print(f"Facturas del import ya al día (sin cambios): {len(plan['facturas_al_dia'])}")
+    n_eventos_cola = sum(len(i["cola"]) for i in plan["facturas_actualizar"].values())
+    print(
+        f"Facturas del import que AVANZARON y se ponen al día: "
+        f"{len(plan['facturas_actualizar'])} (+{n_eventos_cola} eventos nuevos)"
+    )
+    for f, i in sorted(plan["facturas_actualizar"].items())[:12]:
+        print(f"   {f}: {i['estado_antes']} → {i['estado']} (+{len(i['cola'])} eventos)")
+    if len(plan["facturas_actualizar"]) > 12:
+        print(f"   ... y {len(plan['facturas_actualizar']) - 12} más")
+    if plan["facturas_encabezado"]:
+        print(
+            f"Facturas con la historia igual pero el encabezado por sanar: "
+            f"{len(plan['facturas_encabezado'])}"
+        )
+        for f, i in sorted(plan["facturas_encabezado"].items())[:8]:
+            print(f"   {f}: {i['estado_antes']} → {i['estado']}")
+    print(
+        f"Facturas de la página (no se tocan, el sistema manda): {len(plan['facturas_saltadas'])}"
+    )
     if plan["facturas_saltadas"][:8]:
         print(f"   p. ej.: {', '.join(plan['facturas_saltadas'][:8])}")
+    if plan["facturas_conflicto"]:
+        print(
+            f"\nOJO — {len(plan['facturas_conflicto'])} facturas con historia que NO encaja "
+            f"(no se tocan; revisar esas filas del Excel a mano — si a la fila le "
+            f"falta la F_DEV de una devolución que sí pasó, escribirla suele destrabarla):"
+        )
+        for f, (en_base, en_excel) in sorted(plan["facturas_conflicto"].items())[:10]:
+            print(f"   {f}: base={'→'.join(en_base)}  excel={'→'.join(en_excel)}")
     print(
         f"Oficios nuevos:               {len(plan['oficios_nuevos'])} "
         f"(reales FHUS: {sum(1 for r in plan['oficios_nuevos'] if not r.startswith('HIST-'))}, "
