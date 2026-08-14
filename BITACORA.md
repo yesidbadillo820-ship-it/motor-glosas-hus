@@ -2904,7 +2904,7 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
-### 13-08 (tercera parte) — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
+### 14-08 — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
 
 Yesid mandó TRES Excel para dejar la página al día: el consolidado 2026
 con corte al 13-08, los oficios de devolución hasta el DEV-PRE-AUD-0113 y
