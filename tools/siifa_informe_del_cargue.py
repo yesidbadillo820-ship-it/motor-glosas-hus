@@ -105,7 +105,14 @@ def cruzar(reportes: dict[int, dict], informe: list[dict]) -> list[dict]:
     for ident, rep in reportes.items():
         siifa = en_siifa.get(ident, {})
         respondida = str(siifa.get("tiene_respuesta", "")).strip().upper() == "SI"
-        if not rep["ok"]:
+        if not rep["ok"] and respondida:
+            # El intento dio error pero SIIFA SÍ la tiene. Pasa de dos formas:
+            # un timeout donde la escritura entró y la confirmación se perdió
+            # (el reintento recibe «ya tiene un registro previo»), o una fila
+            # repetida. Lo que manda es el estado de la plataforma.
+            estado = REGISTRADA
+            detalle = "El intento dio error, pero SIIFA la tiene registrada"
+        elif not rep["ok"]:
             estado, detalle = CON_ERROR, rep["detalle"]
         elif respondida:
             estado, detalle = REGISTRADA, ""

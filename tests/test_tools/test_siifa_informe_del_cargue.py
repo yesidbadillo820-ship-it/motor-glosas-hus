@@ -201,3 +201,17 @@ def test_lo_que_no_quedo_sale_de_primero_en_el_detalle(tmp_path):
     estados = [c.value for c in load_workbook(ruta)["DETALLE"]["A"][1:]]
     assert estados[0] == inf.NO_QUEDO
     assert estados[-1] == inf.REGISTRADA
+
+
+def test_un_error_de_ya_respondida_cuenta_como_registrada(tmp_path):
+    """Pasó con 756 filas de Socorro: el timeout cortó la confirmación, la
+    escritura sí entró, y el reintento recibió «ya tiene un registro previo».
+    Lo que manda es el estado de la plataforma, no el error del intento."""
+    reportes = inf.leer_reportes(
+        [_csv(tmp_path, [(1, "ERROR", "ya tiene un registro previo de respuesta")])]
+    )
+
+    cruzadas = inf.cruzar(reportes, [_seg(1, "SI")])
+
+    assert cruzadas[0]["estado"] == inf.REGISTRADA
+    assert "SIIFA la tiene registrada" in cruzadas[0]["detalle"]
