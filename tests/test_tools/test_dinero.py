@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from app.utils.moneda import parse_valor_cop
-from tools._dinero import _respaldo, a_entero, a_numero
+from tools._dinero import _respaldo, a_entero, a_numero, a_texto
 
 # (entrada, pesos esperados) — formatos que llegan de verdad en los archivos
 # de los pagadores.
@@ -90,3 +90,35 @@ class TestNegativoContable:
         """Solo cuenta si abre y cierra: un texto a medias no cambia el signo."""
         assert a_numero("1.234)") == pytest.approx(1234.0)
         assert a_numero("(1.234") == pytest.approx(1234.0)
+
+
+class TestATexto:
+    """El camino de vuelta: mostrar el número como lo escribe la macro."""
+
+    @pytest.mark.parametrize(
+        "valor,esperado",
+        [
+            (0, "$0"),
+            (None, "$0"),
+            (2400, "$2.400"),
+            (130400, "$130.400"),
+            (627442242, "$627.442.242"),
+        ],
+    )
+    def test_punto_de_miles_sin_centavos(self, valor, esperado):
+        assert a_texto(valor) == esperado
+
+    def test_redondea_como_excel_no_como_python(self):
+        """`round(1364.5)` en Python da 1364 (redondeo bancario). Excel da 1365,
+        y el total del lote tiene que cuadrar con el de la macro."""
+        assert a_texto(1364.5) == "$1.365"
+        assert a_texto(1365.5) == "$1.366"
+        assert a_texto(1364.4) == "$1.364"
+
+    def test_lee_lo_que_le_llegue(self):
+        """Si le entra texto, lo lee con la misma regla del resto del módulo."""
+        assert a_texto("$ 1.234.567") == "$1.234.567"
+        assert a_texto("(1.234)") == "$-1.234"
+
+    def test_ida_y_vuelta(self):
+        assert a_numero(a_texto(627442242).replace("$", "")) == 627442242

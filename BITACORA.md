@@ -2904,6 +2904,58 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 18-08-2026 — Se le quita al detallado lo que la EPS ya aceptó (paquete 31068)
+
+**Lo que pidió el auditor:** cruzar los Excel por factura del paquete 31068
+(los del ZIP `EXCEL_POR_FACTURA_31068`) contra la macro de respuesta
+`RTA GLOSA ADRES PAQ 31068`, **quitarle a cada servicio el VALOR ACEPTADO** y
+sacar la **suma final** de lo que el hospital sigue reclamando.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/descontar_aceptado_detallado.py`.
+Lee la macro, se queda **solo** con las filas que tienen VALOR ACEPTADO mayor
+que cero (las SE OBJETA y las SE SUBSANA se siguen reclamando completas), las
+cruza contra el detallado y le baja la plata al renglón que corresponde.
+Recalcula el VR UNIT, el subtotal, el total de la orden y el total en letras.
+El formato no se toca: celdas combinadas, anchos, bordes y moneda quedan igual.
+
+**El cruce no es por código a secas.** El detallado usa el código del hospital
+(`FMQ0046`) y la macro el del ADRES (`2016DM-0000315-R2`), así que se reusó el
+mismo motor de rondas del ajustador: código → descripción → cantidad+valor →
+valor, con emparejamiento único. Lo que no cruza **se informa, no se adivina**.
+
+**Resultado sobre las 320 facturas:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$86.889.982** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$627.442.242** |
+
+El ejemplo que mandó el auditor (HUS352890) sale igualito: la consulta de
+urgencias baja de $85.800 a $83.400 por los $2.400 aceptados, y la factura
+queda en $130.400 en vez de $132.800.
+
+**Un susto que se atajó a tiempo.** La primera corrida daba $607 millones,
+$106 millones de menos. La causa: en 50 de las 320 facturas los honorarios de
+cirujano y de ayudantía vienen **sin número de consecutivo** —el lector los
+tomaba como "desglose" que no suma— pero en esas facturas **sí están sumados**
+en el subtotal. La solución fue dejar de recalcular el subtotal desde cero:
+ahora se toma **el subtotal que ya trae el archivo** (que es el bueno) y solo
+se le resta lo descontado. Cuando hay renglones sin consecutivo, el bot mira
+cuál de las dos sumas se parece al subtotal del archivo y decide factura por
+factura. Las 320 salidas quedaron con subtotal = total y con el total en
+letras recalculado.
+
+El bot deja además una **bitácora en CSV** con una línea por servicio
+descontado: factura, servicio, valor antes, aceptado, valor después, por dónde
+cruzó, las causales y una columna **CUADRA** que dice SI o NO comparando lo
+descontado contra lo que dice la macro. Ahí se ven las 14 facturas que no
+cuadran ($4.727.685) para que el auditor las revise a mano.
+
+Se cubrió con **29 pruebas automáticas** (`tests/test_tools/test_descontar_aceptado_detallado.py`),
+incluidas las dos trampas del formato (el desglose que suma y el que no) y los
+avisos: aceptado mayor que el servicio, aceptado sin ítem en el detallado y
+Excel dañado que no puede tumbar el lote.
 ### 14-08 — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
 
 Yesid mandó TRES Excel para dejar la página al día: el consolidado 2026
@@ -3699,6 +3751,16 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     criterio del auditor es otro, se cambia con `--modo-parcial`.
 15. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
     aparecen en el reporte): hoy se conservan y se marcan.
+
+### Descuento de lo aceptado (`tools/descontar_aceptado_detallado.py`, 18-08)
+16. **Revisar a mano las 14 facturas donde lo descontado NO cuadra con la
+    macro** ($4.727.685 en total). Están marcadas con **CUADRA = NO** en la
+    bitácora CSV del bot. Son casos donde el servicio aceptado no se pudo
+    cruzar con ningún renglón del detallado, o donde el aceptado es mayor que
+    el valor del servicio.
+17. **Confirmar el TOTAL FINAL de $627.442.242** antes de radicar: es la suma
+    de las 320 facturas después de quitarles lo aceptado.
+
 ### Dispensario — respuesta de glosas SIMED y conciliación
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo
     de pendientes del 05-08 **ya no figuran por cargar**. Verificar en el
