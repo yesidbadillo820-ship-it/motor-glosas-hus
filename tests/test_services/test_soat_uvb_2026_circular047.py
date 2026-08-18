@@ -32,8 +32,10 @@ from app.services.uvb import calcular_valor_pesos
 def _catalogo_limpio():
     """Cada prueba arranca sin caché, para que ninguna se apoye en otra."""
     TO._CACHE_SOAT_2026 = None
+    TO._CACHE_INTEGRALES = None
     yield
     TO._CACHE_SOAT_2026 = None
+    TO._CACHE_INTEGRALES = None
 
 
 class TestCatalogo:
@@ -197,3 +199,30 @@ class TestBuscarCupsPorDescripcion:
 
         r = buscar_cups("902210")
         assert r[0]["cups"] == "902210"
+
+
+class TestAtencionIntegral:
+    """Los 69 paquetes quirúrgicos todo-incluido, distintos del pago por grupo."""
+
+    def test_el_meta_los_cuenta(self):
+        import gzip
+        import json
+
+        from app.services import tarifas_oficiales as TO
+
+        with gzip.open(TO._RUTA_SOAT_2026, "rt", encoding="utf-8") as f:
+            meta = json.load(f)["_meta"]
+        assert meta["codigos_atencion_integral"] == 69
+        assert meta["header_integral_encontrado"] is True
+
+    @pytest.mark.parametrize("codigo", ["502001", "512001", "518003"])
+    def test_los_de_cirugia_integral_se_marcan(self, codigo):
+        from app.services.tarifas_oficiales import es_atencion_integral
+
+        assert es_atencion_integral(codigo) is True
+
+    @pytest.mark.parametrize("codigo", ["19001", "21102", "39209"])
+    def test_un_examen_no_es_integral(self, codigo):
+        from app.services.tarifas_oficiales import es_atencion_integral
+
+        assert es_atencion_integral(codigo) is False

@@ -118,3 +118,30 @@ class TestElAnioSinUvbAvisa:
         aviso = _buscar(client, "873420", anio=2024)["advertencia"]
         assert "12,110" not in aviso
         assert "58,375" not in aviso
+
+
+class TestCirugiasEnElLiquidador:
+    """El liquidador ya desglosa las cirugías por grupo — 18-08-2026."""
+
+    def test_una_cirugia_sale_con_desglose(self, client):
+        d = _buscar(client, "471102", pct=-5)
+        cir = next(r for r in d["resultados"] if r["catalogo"] == "CIRUGIA_POR_GRUPO")
+        assert cir["codigo_cups"] == "471102"
+        assert cir["grupo"] == "7"
+        assert len(cir["desglose"]) == 5
+        assert cir["valor_pesos"] == 1_885_200  # método directo; BD = 1.885.300
+
+    def test_el_paquete_integral_se_distingue_del_grupo(self, client):
+        """La cesárea aparece de dos formas y NO se confunden:
+        por grupo ($2.072.200) y como paquete integral ($4.298.200)."""
+        d = _buscar(client, "cesarea segmentaria", pct=-5)
+        grupo = [r for r in d["resultados"] if r["catalogo"] == "CIRUGIA_POR_GRUPO"]
+        integral = [r for r in d["resultados"] if r.get("atencion_integral")]
+        assert grupo and integral
+        assert grupo[0]["valor_pesos"] == 2_072_200
+        assert integral[0]["valor_pesos"] != grupo[0]["valor_pesos"]
+
+    def test_un_examen_no_trae_desglose_de_cirugia(self, client):
+        d = _buscar(client, "902210")
+        for r in d["resultados"]:
+            assert r["catalogo"] != "CIRUGIA_POR_GRUPO"

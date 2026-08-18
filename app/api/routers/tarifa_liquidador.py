@@ -31,9 +31,11 @@ from pydantic import BaseModel, Field
 from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.models.db import UsuarioRecord
 from app.services.cups_soat_service import buscar_cups
+from app.services.liquidador_cirugias import liquidar_cirugia
 from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
+    es_atencion_integral,
     tarifas_soat_2026_completas,
 )
 from app.services.uvb import (
@@ -129,12 +131,19 @@ def buscar_codigo(
         for cod, (factor_uvb, valor_pesos, desc, norma) in tarifas_soat_2026_completas().items():
             if _matchea(q, cod, desc):
                 liquidacion = _liquidar_soat(factor_uvb, pct, anio)
+                # Los códigos de "atención integral" (paquete todo-incluido) se
+                # marcan aparte: no son lo mismo que un examen suelto, y para
+                # una cirugía compiten con el pago por grupo. Distinguirlos
+                # evita que el auditor sume dos veces o elija la modalidad que
+                # el contrato no pactó.
+                integral = es_atencion_integral(cod)
                 matches.append(
                     {
                         "codigo": cod,
                         "descripcion": desc,
                         "norma": norma,
-                        "catalogo": "SOAT_2026",
+                        "catalogo": "SOAT_INTEGRAL" if integral else "SOAT_2026",
+                        "atencion_integral": integral,
                         **liquidacion,
                     }
                 )
@@ -165,6 +174,37 @@ def buscar_codigo(
         ya_listados = {m["codigo"] for m in matches}
         catalogo_soat = tarifas_soat_2026_completas()
         for hallazgo in buscar_cups(q, limite=limite):
+            # ── Cirugía: no tiene "un" código, tiene un grupo quirúrgico ──
+            # Se liquida sumando sala + cirujano + ayudantía + anestesiólogo
+            # + materiales. Se muestra con el desglose completo, porque es lo
+            # que el auditor le tiene que enseñar a la EPS.
+            cir = liquidar_cirugia(hallazgo["cups"], pct, anio)
+            if cir is not None:
+                clave = f"CIR {hallazgo['cups']}"
+                if clave not in ya_listados:
+                    ya_listados.add(clave)
+                    matches.append(
+                        {
+                            "codigo": hallazgo["cups"],
+                            "descripcion": hallazgo["descripcion"],
+                            "norma": f"Manual SOAT 2026 · grupo quirúrgico {cir['grupo']}",
+                            "catalogo": "CIRUGIA_POR_GRUPO",
+                            "modalidad": "CIRUGIA_GRUPO",
+                            "codigo_cups": hallazgo["cups"],
+                            "descripcion_cups": hallazgo["descripcion"],
+                            "factor_uvb": cir["total_uvb"],
+                            "factor_smdlv": None,
+                            "valor_pesos": cir["total_pesos"],
+                            "uvb_vigente": cir["uvb_vigente"],
+                            "porcentaje_aplicado": pct,
+                            "grupo": cir["grupo"],
+                            "desglose": cir["lineas"],
+                            "componentes_faltantes": cir["componentes_faltantes"],
+                            "formula": cir["nota"],
+                        }
+                    )
+                # Una cirugía no lista además su código SOAT crudo.
+                continue
             for mapeo in hallazgo["homologaciones"]:
                 cod_soat = str(mapeo.get("soat") or "").strip()
                 fila = catalogo_soat.get(cod_soat)

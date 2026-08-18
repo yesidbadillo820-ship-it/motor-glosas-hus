@@ -4318,7 +4318,9 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             completo</b>: los 1.507 códigos de la Circular Externa 047 de 2025
             (UVB $12.110). Escribí el <b>CUPS de la factura</b> (873420), el código
             SOAT (21102) o el nombre del procedimiento: los 10.024 CUPS
-            homologados hacen el puente. Podés escribir sin tildes.
+            homologados hacen el puente. Podés escribir sin tildes. Las
+            <b>cirugías</b> salen con su desglose por grupo quirúrgico (sala +
+            cirujano + ayudantía + anestesiólogo + materiales).
           </p>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem;margin-bottom:.8rem">
@@ -10077,14 +10079,23 @@ async function liquidarTarifa(preset){
       // búsqueda: es un hecho a favor del hospital y se muestra como tal.
       var sinHomol = r.modalidad === 'SIN_HOMOLOGACION_SOAT';
       var viaCups  = r.catalogo === 'CUPS_HOMOLOGADO_SOAT';
+      // Cirugía por grupo (5 componentes) vs. paquete "atención integral"
+      // (todo incluido en un solo valor): son dos modalidades distintas del
+      // mismo procedimiento, y el contrato dice cuál aplica.
+      var esCirugia  = r.catalogo === 'CIRUGIA_POR_GRUPO';
+      var esIntegral = r.atencion_integral === true || r.catalogo === 'SOAT_INTEGRAL';
       var factor = (sinTarifa || sinHomol)
         ? '<span style="color:var(--text3);font-size:.7rem">' + (sinHomol ? 'sin código SOAT' : 'sin factor local') + '</span>'
-        : (r.factor_uvb != null
-            ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
-            : (r.factor_smdlv + ' SMDLV'));
+        : (esCirugia
+            ? (r.factor_uvb + ' UVB (suma)' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
+            : (r.factor_uvb != null
+                ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
+                : (r.factor_smdlv + ' SMDLV')));
       var bgCat, fgCat, labelCat;
       if(sinTarifa){       bgCat = '#f3f4f6'; fgCat = '#6b7280'; labelCat = 'CUPS · sin tarifa'; }
       else if(sinHomol){   bgCat = '#ede9fe'; fgCat = '#5b21b6'; labelCat = 'sin código SOAT'; }
+      else if(esCirugia){  bgCat = '#dcfce7'; fgCat = '#065f46'; labelCat = 'CIRUGÍA · grupo ' + escHtml(r.grupo || ''); }
+      else if(esIntegral){ bgCat = '#fce7f3'; fgCat = '#9d174d'; labelCat = 'PAQUETE INTEGRAL'; }
       else if(viaCups){    bgCat = '#dcfce7'; fgCat = '#065f46'; labelCat = 'CUPS → SOAT'; }
       else if(r.catalogo === 'PROPIA_HUS'){ bgCat = '#fef3c7'; fgCat = '#92400e'; labelCat = 'PROPIA HUS'; }
       else {               bgCat = '#dbeafe'; fgCat = '#1e40af'; labelCat = 'SOAT 2026'; }
@@ -10098,13 +10109,37 @@ async function liquidarTarifa(preset){
       var origen = (r.codigo_cups && !sinHomol)
         ? '<div style="font-size:.65rem;color:#065f46;margin-top:2px;font-weight:600">CUPS ' + escHtml(r.codigo_cups) + ' · ' + escHtml(r.descripcion_cups || '') + '</div>'
         : '';
-      return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);' + ((sinTarifa || sinHomol) ? 'background:#fafafa' : '') + '">'
+      // Desglose de la cirugía: las cinco líneas del grupo quirúrgico, para
+      // que el auditor le enseñe a la EPS de qué se compone el valor.
+      var desglose = '';
+      if(esCirugia && r.desglose && r.desglose.length){
+        var lineas = r.desglose.map(function(l){
+          var val = l.disponible
+            ? '<span style="font-weight:600">' + fmt(l.valor_pesos) + '</span>'
+            : '<span style="color:#9d174d;font-style:italic;font-size:.7rem">no tarifado en la Circular</span>';
+          var uvb = l.disponible ? (l.uvb + ' UVB') : '—';
+          return '<tr>'
+            + '<td style="padding:.25rem .6rem;font-size:.72rem;color:var(--text2)">— ' + escHtml(l.concepto) + '</td>'
+            + '<td style="padding:.25rem .6rem;font-family:var(--font-mono);font-size:.7rem;color:var(--text3)">' + escHtml(String(l.codigo_soat || '—')) + '</td>'
+            + '<td style="padding:.25rem .6rem;text-align:right;font-size:.72rem;color:var(--text3)">' + uvb + '</td>'
+            + '<td style="padding:.25rem .6rem;text-align:right;font-size:.75rem">' + val + '</td>'
+            + '</tr>';
+        }).join('');
+        desglose = '<tr><td colspan="5" style="padding:0 .7rem .7rem 1.4rem;background:#f0fdf4">'
+          + '<div style="font-size:.68rem;color:#065f46;font-weight:700;margin:.4rem 0 .3rem">Desglose del grupo quirúrgico ' + escHtml(r.grupo || '') + (pct ? ' (con ' + (pct>0?'+':'') + pct + '%)' : '') + ':</div>'
+          + '<table style="width:100%;border-collapse:collapse"><tbody>' + lineas + '</tbody></table>'
+          + (r.componentes_faltantes && r.componentes_faltantes.length
+              ? '<div style="font-size:.66rem;color:#9d174d;margin-top:.35rem">Sin tarifa en la Circular para este grupo: ' + escHtml(r.componentes_faltantes.join(', ')) + '. Debe soportarse aparte.</div>'
+              : '')
+          + '</td></tr>';
+      }
+      return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);' + ((sinTarifa || sinHomol) ? 'background:#fafafa' : (esCirugia ? 'background:#f7fdf9' : '')) + '">'
         + '<td style="padding:.5rem .7rem;font-family:var(--font-mono);font-weight:600;color:' + ((sinTarifa || sinHomol) ? '#6b7280' : 'var(--c-teal2)') + '">' + r.codigo + '</td>'
         + '<td style="padding:.5rem .7rem;font-size:.78rem">' + escHtml(r.descripcion) + origen + '<div style="font-size:.65rem;color:var(--text3);margin-top:2px">' + escHtml(r.norma || '') + '</div></td>'
         + '<td style="padding:.5rem .7rem;text-align:right;font-size:.78rem">' + factor + '</td>'
         + '<td style="padding:.5rem .7rem;text-align:right"><span style="background:' + bgCat + ';color:' + fgCat + ';padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:700">' + labelCat + '</span></td>'
         + '<td style="padding:.5rem .7rem;text-align:right">' + valorCol + '</td>'
-        + '</tr>';
+        + '</tr>' + desglose;
     }).join('');
     var formula = d.resultados[0] && d.resultados[0].formula
       ? '<div style="margin-top:.5rem;font-size:.7rem;color:var(--text3);font-family:var(--font-mono)">Fórmula: ' + escHtml(d.resultados[0].formula) + '</div>'

@@ -3210,6 +3210,59 @@ aviso amarillo diciendo con qué unidades se calculó.
 
 ---
 
+### 18-08 (tarde) — Consulta Normativa: el liquidador ya hace CIRUGÍAS
+
+Seguimos con el mismo botón. Faltaba lo más grande: **liquidar cirugías**, que
+es donde está la plata. Ya quedó.
+
+**Primero averigüé cómo factura el HUS las cirugías** (era la duda que dejamos
+abierta). Yesid corrió una consulta contra la base del PC de cartera y el
+contrato de FAMISANAR lo dejó claro:
+
+- Una cirugía se paga por **grupo quirúrgico**: se suman cinco cosas —derechos
+  de sala + honorarios del cirujano + ayudantía + anestesiólogo + materiales—,
+  cada una con su tarifa. El «UVB POR GRUPOS» que está cargado en la base **es
+  ese paquete** con el −5% del contrato ya aplicado.
+- Algunos procedimientos (p. ej. la **colecistectomía**) no van por grupo: van
+  por **TARIFA PROPIA del HUS** ($6.296.900), que es más del doble del valor
+  SOAT. El contrato manda pagarlos así, y así están cargados.
+
+**Lo comprobé antes de construir nada.** Calculé el paquete de tres cirugías y
+lo comparé con lo que está pactado en la base:
+
+| Cirugía | Grupo | Lo que calcula el motor | Lo pactado (base) |
+|---|---|---|---|
+| Cesárea | 8 | $2.072.200 | $2.072.200 ✅ exacto |
+| Apendicectomía | 7 | $1.885.200 | $1.885.300 (±$100 redondeo) |
+
+Es decir: el desglose que ahora muestra la pantalla **reconstruye el valor
+real pactado**, casi al peso.
+
+**Qué se ve ahora:** escriba el CUPS de una cirugía (por ejemplo `471102`,
+apendicectomía) y la pantalla muestra el **total** y, debajo, las **cinco
+líneas** que lo componen, cada una con su código y su valor. Eso es lo que hay
+que enseñarle a la EPS.
+
+**Y se resolvió una confusión peligrosa.** El Manual SOAT trae la misma cesárea
+de **dos formas**: por grupo ($2.072.200) y como **«paquete integral» todo
+incluido** ($4.298.200, otra modalidad). Antes salían las dos sin distinción y
+uno no sabía cuál radicar. Ahora cada una sale con su etiqueta —«CIRUGÍA ·
+grupo 8» y «PAQUETE INTEGRAL»— para que usted use la que su contrato pactó (con
+FAMISANAR, la de grupo).
+
+**Lo honesto de siempre:** para los grupos especiales 20 al 23 (las cirugías
+más grandes) el Manual no publica código de materiales, así que esa línea sale
+marcada «no tarifado en la Circular» y hay que soportarla aparte. Nunca se
+inventa el valor.
+
+**Lo que le sigue faltando a este botón:** que lea las **tarifas pactadas de la
+base de datos** (los 6.655 de FAMISANAR) para mostrar, al lado del cálculo
+SOAT, el valor exacto del contrato — incluida la TARIFA PROPIA de la
+colecistectomía, que el cálculo por grupo no alcanza a ver. Ese es el próximo
+paso de Consulta Normativa.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
