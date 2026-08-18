@@ -574,6 +574,42 @@ def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
     return "\n".join(lineas)
 
 
+# Signos Unicode que NO existen en Windows-1252 y que la IA suele meter
+# (guiones largos, comillas curvas, puntos suspensivos). Se transliteran para
+# no perder el signo cuando se pasa a ANSI.
+_TRANSLIT_PORTAL = {
+    "\u2014": "-",
+    "\u2013": "-",
+    "\u2012": "-",
+    "\u2011": "-",
+    "\u2010": "-",
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2026": "...",
+    "\u2022": "-",
+    "\u00a0": " ",
+}
+
+
+def a_bytes_portal(texto: str) -> bytes:
+    """Codifica la respuesta como la espera el portal de Salud Total.
+
+    18-08-2026. El portal lee el TXT en ANSI (Windows-1252): el archivo que el
+    HUS sube y que SÍ funciona está en ese formato. El sistema venía enviando
+    UTF-8, así que en el portal los acentos salían rotos: «clínica» se veía
+    «clÃ­nica» y «CÓDIGO» «CÃDIGO», en un documento que se radica.
+
+    Se transliteran primero los signos Unicode que no existen en 1252 (los que
+    mete la IA: guiones largos, comillas curvas) y lo que aún no encaje se
+    reemplaza en vez de reventar la descarga.
+    """
+    for uni, ascii_ in _TRANSLIT_PORTAL.items():
+        texto = texto.replace(uni, ascii_)
+    return texto.encode("cp1252", errors="replace")
+
+
 def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
     now = datetime.now()
     fecha_str = now.strftime("%d%m%Y")

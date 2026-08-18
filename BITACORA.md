@@ -3455,6 +3455,29 @@ entiende el formato colombiano (antes «280.000» lo leía como $280).
 
 ---
 
+### 18-08 (más tarde) — Salud Total: los acentos ya no salen rotos en el portal
+
+Yesid probó el botón «Analizar con IA» con la notificación real y mandó el
+archivo que salió. La IA quedó bien (códigos correctos por familia, sin código
+HTML, argumentos reales), pero se vio un error que afectaba **todos** los
+archivos de Salud Total, no solo la IA.
+
+**Los acentos salían rotos.** «Clínica» se veía «clÃ­nica», «CÓDIGO» «CÃDIGO».
+La causa: el portal de Salud Total lee el archivo en **ANSI (Windows-1252)**
+—el archivo del HUS que sí funcionó está en ese formato— y el sistema lo
+generaba en **UTF-8**. Al subir un UTF-8 a un portal que espera ANSI, los
+acentos se dañan, en un documento que se radica.
+
+Ahora el archivo se descarga en ANSI, igual que el que funcionó. Los guiones
+largos y las comillas curvas que mete la IA se convierten a signos normales
+para que ningún carácter raro dañe la descarga.
+
+Con esto, «Salud Total» queda cerrado: lector de valores robusto, texto de
+tarifas sin contrato falso, códigos correctos por familia, salida idéntica al
+archivo real, y ahora la codificación correcta para el portal.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

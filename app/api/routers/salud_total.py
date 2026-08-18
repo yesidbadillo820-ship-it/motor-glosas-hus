@@ -29,6 +29,7 @@ from app.models.schemas import SaludTotalPreviewOut
 from app.database import get_db
 from app.models.db import UsuarioRecord
 from app.services.salud_total_service import (
+    a_bytes_portal,
     generar_nombre_archivo,
     generar_txt_respuesta,
     procesar_glosas_salud_total,
@@ -204,7 +205,9 @@ async def procesar_glosas(
     nombre = generar_nombre_archivo(tipo_respuesta)
 
     return StreamingResponse(
-        io.BytesIO(txt.encode("utf-8")),
-        media_type="text/plain",
+        # ANSI (Windows-1252), como lo espera el portal de Salud Total. Con
+        # UTF-8 los acentos salían rotos («clínica» → «clÃ­nica») en el portal.
+        io.BytesIO(a_bytes_portal(txt)),
+        media_type="text/plain; charset=windows-1252",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
