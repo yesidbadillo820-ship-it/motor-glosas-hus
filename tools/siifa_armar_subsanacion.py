@@ -152,13 +152,24 @@ def es_devolucion(fila: dict) -> bool:
     return _limpiar(fila.get("tipo_seguimiento")).upper().startswith("DEVOL")
 
 
-def armar(filas: list[dict], hoy: str, ips=None) -> tuple[list[dict], list[dict]]:
+def armar(
+    filas: list[dict], hoy: str, ips=None, texto_fijo: str | None = None
+) -> tuple[list[dict], list[dict]]:
     """Separa lo que se puede subsanar por API de lo que no.
 
     Las devoluciones reiteradas van aparte a propósito: su puerta de
     subsanación no está confirmada y mandarlas por la de glosas escribiría
     sobre otro registro de la plataforma, con un OK falso en el reporte.
+
+    Con `texto_fijo`, todas las glosas salen con ESE texto —la plantilla
+    institucional del prestador— en vez del que redacta el motor. Es lo que
+    el HUS radica ante la glosa ratificada, igual para todas.
     """
+    if texto_fijo and len(texto_fijo) > LIMITE_OBSERVACION:
+        raise SystemExit(
+            f"\nEl texto de la plantilla tiene {len(texto_fijo)} caracteres y SIIFA "
+            f"acepta máximo {LIMITE_OBSERVACION}.\nHay que acortarlo.\n"
+        )
     glosas, devoluciones = [], []
     for f in filas:
         if clasificar(f) != POR_SUBSANAR:
@@ -183,6 +194,11 @@ def armar(filas: list[dict], hoy: str, ips=None) -> tuple[list[dict], list[dict]
                 "confirmada. NO cargar por la de glosas. Sondear primero."
             )
             devoluciones.append(fila)
+        elif texto_fijo:
+            fila["CODIGO_RESPUESTA"] = CODIGO_SUBSANACION
+            fila["OBSERVACION_RESPUESTA"] = texto_fijo
+            fila["REVISAR"] = "Texto de la plantilla institucional, igual para todas."
+            glosas.append(fila)
         else:
             fila.update(redactar_subsanacion(f, ips=ips))
             glosas.append(fila)
@@ -247,6 +263,12 @@ def main() -> None:
     ap.add_argument("--informe", required=True, help="Informe de siifa_reporte_seguimientos.py.")
     ap.add_argument("--salida", required=True, help="Excel de subsanación a generar.")
     ap.add_argument("--fecha", help="Fecha de la subsanación (AAAA-MM-DD). Por defecto, hoy.")
+    ap.add_argument(
+        "--texto",
+        help="Archivo .txt con el texto institucional que llevan TODAS las "
+        "subsanaciones (ej. tools/plantillas/subsanacion_HUS.txt). Sin esta "
+        "opción, el motor redacta una por una.",
+    )
     perfiles.agregar_argumento(ap)
     args = ap.parse_args()
     ips = perfiles.buscar(args.ips)
@@ -257,7 +279,13 @@ def main() -> None:
     filas = leer_informe(Path(args.informe))
     perfiles.verificar_informe(ips, filas)
     hoy = args.fecha or datetime.now().strftime("%Y-%m-%d")
-    glosas, devoluciones = armar(filas, hoy, ips=ips)
+    texto_fijo = None
+    if args.texto:
+        ruta_texto = Path(args.texto)
+        if not ruta_texto.exists():
+            raise SystemExit(f"\nNo encuentro el archivo de la plantilla:\n  {ruta_texto}\n")
+        texto_fijo = " ".join(ruta_texto.read_text(encoding="utf-8").split())
+    glosas, devoluciones = armar(filas, hoy, ips=ips, texto_fijo=texto_fijo)
 
     if not glosas and not devoluciones:
         print("\nNo hay nada reiterado pendiente de subsanar. Nada que hacer.\n")

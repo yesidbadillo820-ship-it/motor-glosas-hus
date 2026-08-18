@@ -182,3 +182,47 @@ def test_el_valor_se_lee_con_el_lector_unico():
     glosas, _ = sub.armar([_fila(valor_glosa="$1.396.804")], "2026-08-13")
 
     assert glosas[0]["VALOR_GLOSA"] == 1_396_804
+
+
+def test_la_plantilla_institucional_reemplaza_al_texto_del_motor():
+    """El HUS radica un texto fijo ante la glosa ratificada (18-08-2026):
+    RE9901, se mantiene la respuesta inicial, se pide conciliación."""
+    plantilla = "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA."
+
+    glosas, _ = sub.armar([_fila()], "2026-08-18", texto_fijo=plantilla)
+
+    assert glosas[0]["OBSERVACION_RESPUESTA"] == plantilla
+    assert glosas[0]["CODIGO_RESPUESTA"] == "RE9901"
+
+
+def test_la_plantilla_no_desbloquea_las_devoluciones():
+    """La puerta de subsanación de devoluciones sigue sin confirmarse: la
+    plantilla no cambia eso."""
+    filas = [_fila(tipo_seguimiento="DEVOLUCION", descripcion_reiteracion="Devolución Reiterada")]
+
+    glosas, devoluciones = sub.armar(filas, "2026-08-18", texto_fijo="TEXTO")
+
+    assert glosas == []
+    assert devoluciones[0]["OBSERVACION_RESPUESTA"] == ""
+
+
+def test_una_plantilla_pasada_de_1500_se_rechaza_antes_de_armar_nada():
+    import pytest
+
+    with pytest.raises(SystemExit, match="1500"):
+        sub.armar([_fila()], "2026-08-18", texto_fijo="X" * 1501)
+
+
+def test_la_plantilla_del_hus_del_repo_cabe_y_dice_lo_que_debe():
+    from pathlib import Path
+
+    texto = " ".join(
+        (Path(sub.__file__).parent / "plantillas" / "subsanacion_HUS.txt")
+        .read_text(encoding="utf-8")
+        .split()
+    )
+
+    assert len(texto) <= sub.LIMITE_OBSERVACION
+    assert "NO ACEPTA GLOSA RATIFICADA" in texto
+    assert "ARTÍCULO 57 DE LA LEY 1438 DE 2011" in texto
+    assert "CONCILIACIÓN" in texto
