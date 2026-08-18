@@ -10084,15 +10084,22 @@ async function liquidarTarifa(preset){
       // mismo procedimiento, y el contrato dice cuál aplica.
       var esCirugia  = r.catalogo === 'CIRUGIA_POR_GRUPO';
       var esIntegral = r.atencion_integral === true || r.catalogo === 'SOAT_INTEGRAL';
+      // Tarifa REALMENTE pactada en el contrato (base de datos). Es la cifra
+      // autoritativa: lo que el hospital tiene derecho a cobrar. Se resalta y
+      // va de primero; el cálculo SOAT queda como referencia del Manual.
+      var esPactado  = r.catalogo === 'PACTADO';
       var factor = (sinTarifa || sinHomol)
         ? '<span style="color:var(--text3);font-size:.7rem">' + (sinHomol ? 'sin código SOAT' : 'sin factor local') + '</span>'
-        : (esCirugia
-            ? (r.factor_uvb + ' UVB (suma)' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
-            : (r.factor_uvb != null
-                ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
-                : (r.factor_smdlv + ' SMDLV')));
+        : (esPactado
+            ? '<span style="font-size:.7rem;color:#7c2d12">' + escHtml(r.tipo_tarifa || 'pactado') + '</span>'
+            : (esCirugia
+                ? (r.factor_uvb + ' UVB (suma)' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
+                : (r.factor_uvb != null
+                    ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
+                    : (r.factor_smdlv + ' SMDLV'))));
       var bgCat, fgCat, labelCat;
       if(sinTarifa){       bgCat = '#f3f4f6'; fgCat = '#6b7280'; labelCat = 'CUPS · sin tarifa'; }
+      else if(esPactado){  bgCat = '#fed7aa'; fgCat = '#7c2d12'; labelCat = 'PACTADO' + (r.eps ? ' · ' + escHtml(r.eps) : ''); }
       else if(sinHomol){   bgCat = '#ede9fe'; fgCat = '#5b21b6'; labelCat = 'sin código SOAT'; }
       else if(esCirugia){  bgCat = '#dcfce7'; fgCat = '#065f46'; labelCat = 'CIRUGÍA · grupo ' + escHtml(r.grupo || ''); }
       else if(esIntegral){ bgCat = '#fce7f3'; fgCat = '#9d174d'; labelCat = 'PAQUETE INTEGRAL'; }
@@ -10103,7 +10110,7 @@ async function liquidarTarifa(preset){
         ? '<span style="font-size:.68rem;color:var(--text3);font-style:italic">consulta Manual SOAT oficial</span>'
         : (sinHomol
             ? '<span style="font-size:.68rem;color:#5b21b6;font-style:italic">el Manual SOAT no lo tarifa</span>'
-            : '<span style="font-weight:800;color:#065f46;font-size:.92rem">' + fmt(r.valor_pesos) + '</span>');
+            : '<span style="font-weight:800;color:' + (esPactado ? '#7c2d12' : '#065f46') + ';font-size:' + (esPactado ? '1rem' : '.92rem') + '">' + fmt(r.valor_pesos) + '</span>');
       // Cuando se llegó por el CUPS, se muestra el camino completo: el
       // auditor tiene que poder explicarle a la EPS de dónde salió la cifra.
       var origen = (r.codigo_cups && !sinHomol)
@@ -10148,6 +10155,10 @@ async function liquidarTarifa(preset){
     var fbTxt = fbCount > 0
       ? ' · <span style="color:#92400e">+' + fbCount + ' coincidencias en CUPS sin tarifa local</span>'
       : '';
+    // Cuántas tarifas PACTADAS (contrato) se encontraron para lo buscado.
+    var pactTxt = (d.total_pactadas || 0) > 0
+      ? ' · <b style="color:#7c2d12">' + d.total_pactadas + ' pactada(s) en contrato</b>'
+      : '';
     // El backend avisa cuando el año pedido no tiene UVB propia y se liquidó
     // con la del último año conocido. Una cifra así no se puede radicar.
     var aviso = d.advertencia
@@ -10157,6 +10168,7 @@ async function liquidarTarifa(preset){
       + '<div style="font-size:.8rem;color:var(--text2);margin-bottom:.5rem">'
       + '<b>' + d.total_resultados + '</b> resultado(s) con tarifa para "<b>' + escHtml(q) + '</b>" · '
       + 'modalidad <b>' + d.modalidad + '</b>' + (pct ? ' · <b>' + (pct>0?'+':'') + pct + '%</b>' : '')
+      + pactTxt
       + fbTxt
       + '</div>'
       + '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse">'

@@ -3263,6 +3263,49 @@ paso de Consulta Normativa.
 
 ---
 
+### 18-08 (cierre) — Consulta Normativa al 100%: el liquidador ya lee la tarifa PACTADA
+
+Último punto del botón. El liquidador daba lo que el **Manual** dice que vale
+un código, pero no lo que el hospital **pactó** en el contrato. Y esas dos
+cosas pueden ser muy distintas. Ya lo lee de la base.
+
+**El ejemplo que lo explica:** la **colecistectomía** (CUPS 512101). El
+cálculo por grupo SOAT da $3.157.500. Pero el contrato de FAMISANAR la pactó
+por **TARIFA PROPIA a $6.296.900** —más del doble—. Antes esa cifra no
+aparecía por ningún lado del liquidador. Ahora sale **de primera**, resaltada,
+con la etiqueta «PACTADO · FAMISANAR EPS», y debajo queda el cálculo SOAT como
+referencia del Manual.
+
+**Cómo funciona:** cuando usted busca un código, el liquidador ahora también
+mira las **tarifas contratadas cargadas** (las 6.655 de FAMISANAR y las que se
+suban después) y, si el código está pactado, muestra el valor exacto del
+contrato. La regla es clara: **manda lo pactado**; el SOAT es solo el soporte
+del porqué.
+
+**Detalles que quedaron bien cuidados:**
+- Solo muestra contratos **activos** (uno vencido no aparece).
+- Se puede filtrar por EPS.
+- Si el código no está en ningún contrato, el liquidador funciona igual que
+  antes (no estorba).
+
+**Con esto, el botón «Consulta Normativa» queda terminado:**
+
+| Función | Estado |
+|---|---|
+| Biblioteca de 131 normas | ✅ |
+| Buscar por código SOAT | ✅ |
+| Buscar por **CUPS de la factura** o por nombre | ✅ |
+| **Liquidar cirugías** con desglose por grupo | ✅ |
+| Distinguir «paquete integral» del pago por grupo | ✅ |
+| Aviso cuando el año no tiene UVB propia | ✅ |
+| **Tarifa PACTADA del contrato** (la que de verdad se cobra) | ✅ |
+
+**Lo único que queda por fuera, y es porque falta el archivo:** el manual
+**ISS 2001**, con el que se pactan algunos contratos. Cuando Yesid lo consiga,
+se carga igual que se cargó el SOAT.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
