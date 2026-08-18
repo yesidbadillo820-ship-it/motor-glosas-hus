@@ -3478,6 +3478,29 @@ archivo real, y ahora la codificación correcta para el portal.
 
 ---
 
+### 18-08 (noche) — Validador ADRES: la búsqueda de autorizaciones ya no llena el disco
+
+Tercer botón de la revisión. El Validador ADRES está bien armado —la malla
+completa de la Circular 022/2023 (FURIPS 1 de 102 campos y FURIPS 2), el cruce
+con RIPS/CUV/XML/factura/epicrisis con OCR, y 29 pruebas que pasan—.
+
+**El defecto que salió: una fuga de disco.** El buscador de números de
+autorización guardaba lo que uno sube en una carpeta temporal y, **cuando
+terminaba bien, no la borraba** (solo la borraba si había un error). Cada
+búsqueda dejaba en el disco los JSON subidos y el Excel generado. En el PC de
+cartera, usándolo seguido, eso termina llenando el disco. Ahora la carpeta se
+borra sola apenas se envía el archivo.
+
+**Una cosa para tener presente (no es un defecto, es cómo está hecho):** la
+validación FURIPS grande corre en segundo plano y su estado vive en la memoria
+del programa. Si justo mientras corre se actualiza el sistema (deploy), esa
+validación se pierde y hay que volver a subir los archivos —la pantalla lo
+avisa con un mensaje claro—. Pasa rara vez (solo cuando hay una actualización
+en ese momento); dejarlo a prueba de eso sería un cambio grande y de poca
+ganancia, así que queda anotado, no cambiado.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

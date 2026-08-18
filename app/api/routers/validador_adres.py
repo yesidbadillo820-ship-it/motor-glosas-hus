@@ -29,6 +29,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app.api.deps import get_auditor_o_superior
 from app.models.schemas import ValidacionAdresEstadoOut, ValidacionAdresIniciadaOut
@@ -193,12 +194,15 @@ async def buscar_autorizaciones(
             f"desde {entradas} entrada(s)"
         )
         fecha = datetime.now().strftime("%Y%m%d")
-        # El archivo vive en una carpeta temporal; FileResponse lo lee antes
-        # de que se limpie en el siguiente arranque del sistema.
+        # La carpeta temporal se borra DESPUÉS de enviar el archivo (tarea de
+        # fondo de la respuesta). Antes no se borraba en el camino de éxito:
+        # cada búsqueda dejaba en el disco los JSON subidos y el Excel, y en
+        # el PC de cartera eso terminaba llenando el disco.
         return FileResponse(
             salida,
             filename=f"INFORME_AUTORIZACIONES_RIPS_{fecha}.xlsx",
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            background=BackgroundTask(shutil.rmtree, carpeta, ignore_errors=True),
         )
     except HTTPException:
         shutil.rmtree(carpeta, ignore_errors=True)
