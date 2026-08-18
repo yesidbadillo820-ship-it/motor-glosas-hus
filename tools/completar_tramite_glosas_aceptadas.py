@@ -34,7 +34,11 @@ Reglas de resolucion, por fila a completar:
      CREDITO") y tambien queda en el reporte CSV.
 
 Uso:
-    python tools/completar_tramite_glosas_aceptadas.py ACEPTADAS.xlsx CIRCULARIZACION.xlsx SALIDA.xlsx [REPORTE.csv]
+    python tools/completar_tramite_glosas_aceptadas.py ACEPTADAS.xlsx CIRCULARIZACION.xlsx SALIDA.xlsx [REPORTE.csv] [--rehacer]
+
+    --rehacer  reescribe tambien las filas de tipo ACTA que ya tienen respuesta
+               (para volver a correr sobre un archivo ya diligenciado). Las de
+               tipo TRAMITE nunca se tocan.
 """
 
 import csv
@@ -122,16 +126,26 @@ def a_fecha(v):
     return None
 
 
-RE_CIFRA = re.compile(r"\$\s*(\d[\d.]*\d|\d)")
+RE_CIFRA = re.compile(r"\$\s*(\d[\d.,]*\d|\d)")
 
 
 def cifra_encabezado(texto):
-    """Primera cifra en pesos que aparece en el texto de un renglon del acta."""
+    """Primera cifra en pesos que aparece en el texto de un renglon del acta.
+
+    La circularizacion mezcla separadores de miles: unas filas escriben
+    $163.325 y otras $163,325. Se aceptan los dos. Si al final hay un
+    separador seguido de exactamente dos digitos Y antes venia otro
+    separador, esos dos digitos son centavos y se descartan ($1.234,50).
+    """
     m = RE_CIFRA.search(texto or "")
     if not m:
         return None
+    s = m.group(1)
+    dec = re.search(r"[.,](\d{2})$", s)
+    if dec and re.search(r"[.,]", s[: dec.start()]):
+        s = s[: dec.start()]
     try:
-        return int(m.group(1).replace(".", ""))
+        return int(re.sub(r"[.,]", "", s))
     except ValueError:
         return None
 
@@ -388,11 +402,13 @@ def resolver_fila(factura, valor, obs, acta_fila, general):
 
 
 def main():
-    if len(sys.argv) < 4:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    rehacer = "--rehacer" in sys.argv
+    if len(args) < 3:
         print(__doc__)
         sys.exit(1)
-    ruta_bd, ruta_circ, ruta_salida = sys.argv[1:4]
-    ruta_reporte = sys.argv[4] if len(sys.argv) > 4 else None
+    ruta_bd, ruta_circ, ruta_salida = args[:3]
+    ruta_reporte = args[3] if len(args) > 3 else None
 
     general = cargar_general(ruta_circ)
     wb = openpyxl.load_workbook(ruta_bd)
@@ -405,12 +421,17 @@ def main():
 
     # Columna nueva al final para avisar diferencias entre lo aceptado en el acta
     # y lo que realmente acredito la nota credito.
-    col_novedad = max(i for c, i in col.items()) + 1
-    while ws.cell(row=fila_enc, column=col_novedad + 1).value not in (None, ""):
-        col_novedad += 1
-    celda_enc = ws.cell(row=fila_enc, column=col_novedad + 1)
-    if not limpiar(celda_enc.value):
-        celda_enc.value = "NOVEDAD ACEPTADO VS NOTA CREDITO"
+    ENC_NOVEDAD = "NOVEDAD ACEPTADO VS NOTA CREDITO"
+    col_novedad = None
+    for c in ws[fila_enc]:  # reutilizar la columna si el archivo ya la trae
+        if normalizar(c.value) == ENC_NOVEDAD:
+            col_novedad = c.column - 1
+            break
+    if col_novedad is None:
+        col_novedad = max(i for c, i in col.items()) + 1
+        while ws.cell(row=fila_enc, column=col_novedad + 1).value not in (None, ""):
+            col_novedad += 1
+        ws.cell(row=fila_enc, column=col_novedad + 1).value = ENC_NOVEDAD
     print(f"Novedades se escriben en la columna {letra(col_novedad + 1)}")
 
     reporte, llenas, solo_respuesta = [], 0, 0
@@ -418,9 +439,18 @@ def main():
         factura = limpiar(fila[col["factura"]].value)
         if not factura:
             continue
-        # Se trabaja la fila cuando le falta la respuesta, que es la columna
-        # que da sentido al registro. Numero y fecha pueden venir ya puestos.
-        if limpiar(fila[col["respuesta"]].value):
+        # Se trabaja la fila cuando le falta la respuesta, que es la columna que
+        # da sentido al registro. Numero y fecha pueden venir ya puestos.
+        # Con --rehacer se reescriben ademas las filas de tipo ACTA que ya
+        # tienen respuesta, para poder volver a correr sobre un archivo ya
+        # diligenciado cuando cambian las reglas o se corrige la circularizacion.
+        # Las de tipo TRAMITE nunca se tocan: ese texto no sale del acta.
+        es_acta = (
+            normalizar(fila[col["tipo_tramite"]].value) == "ACTA"
+            if "tipo_tramite" in col
+            else False
+        )
+        if limpiar(fila[col["respuesta"]].value) and not (rehacer and es_acta):
             continue
         valor = a_numero(fila[col["valor"]].value)
         acta_fila = numero_de_acta(fila[col["num"]].value)
@@ -431,8 +461,7 @@ def main():
             celda = fila[col["respuesta"]]
             celda.value = respuesta
             celda.alignment = openpyxl.styles.Alignment(wrap_text=True, vertical="top")
-        if novedad:
-            ws.cell(row=fila[0].row, column=col_novedad + 1).value = novedad
+        ws.cell(row=fila[0].row, column=col_novedad + 1).value = novedad or None
         # Nunca se pisa un numero o una fecha que ya estaban escritos.
         if acta and fila[col["num"]].value is None:
             fila[col["num"]].value = acta
