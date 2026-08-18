@@ -23,13 +23,17 @@ Modalidades soportadas:
 from __future__ import annotations
 
 import unicodedata
+from typing import Optional
 
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual, get_auditor_o_superior
-from app.models.db import UsuarioRecord
+from app.database import get_db
+from app.models.db import TarifaContratadaRecord, UsuarioRecord
 from app.services.cups_soat_service import buscar_cups
 from app.services.liquidador_cirugias import liquidar_cirugia
 from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
@@ -116,6 +120,8 @@ def buscar_codigo(
     pct: float = Query(0.0, ge=-100, le=200, description="% contractual"),
     anio: int = Query(2026, ge=2020, le=2030),
     limite: int = Query(20, ge=1, le=100),
+    eps: Optional[str] = Query(None, description="Filtrar el pactado por EPS"),
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Busca códigos en SOAT 2026 + Propias HUS y devuelve el cálculo.
@@ -252,6 +258,60 @@ def buscar_codigo(
                     }
                 )
 
+    # ── La tarifa REALMENTE pactada (base de datos) ──────────────────────
+    # 18-08-2026. Los catálogos de arriba (SOAT, Propias, homologación) dan lo
+    # que el Manual dice que vale un código. Pero lo que el hospital cobra es
+    # lo que quedó PACTADO en el contrato, y eso vive en la BD (las 6.655
+    # tarifas de FAMISANAR, etc.). El liquidador nunca la miraba. Sin esto, la
+    # colecistectomía salía a su valor SOAT por grupo y no a los $6.296.900
+    # que de verdad se pactaron por TARIFA PROPIA.
+    codigos_para_pactado = {q.strip().upper()}
+    for m in matches:
+        cc = str(m.get("codigo_cups") or "").strip().upper()
+        if cc:
+            codigos_para_pactado.add(cc)
+    codigos_para_pactado.discard("")
+
+    pactadas: list[dict] = []
+    if codigos_para_pactado:
+        consulta = db.query(TarifaContratadaRecord).filter(
+            TarifaContratadaRecord.activa == 1,
+            or_(
+                TarifaContratadaRecord.codigo_cups.in_(codigos_para_pactado),
+                TarifaContratadaRecord.codigo_ips.in_(codigos_para_pactado),
+            ),
+        )
+        if eps:
+            consulta = consulta.filter(TarifaContratadaRecord.eps.ilike(f"%{eps.strip()}%"))
+        for fila in consulta.limit(limite).all():
+            valor = int(round(fila.valor_pactado)) if fila.valor_pactado is not None else None
+            pactadas.append(
+                {
+                    "codigo": fila.codigo_cups or fila.codigo_ips or "",
+                    "descripcion": fila.descripcion or "",
+                    "norma": (
+                        f"Contrato {fila.contrato_numero or 's/n'} · {fila.eps or ''}".strip(" ·")
+                    ),
+                    "catalogo": "PACTADO",
+                    "modalidad": "PACTADO",
+                    "eps": fila.eps,
+                    "contrato_numero": fila.contrato_numero,
+                    "tipo_tarifa": fila.tipo_tarifa,
+                    "codigo_cups": fila.codigo_cups,
+                    "factor_uvb": None,
+                    "factor_smdlv": None,
+                    "valor_pesos": valor,
+                    "uvb_vigente": valor_uvb_vigente(anio),
+                    "porcentaje_aplicado": pct,
+                    "formula": (
+                        f"Valor pactado en el contrato {fila.contrato_numero or 's/n'} con "
+                        f"{fila.eps or 'la EPS'} (modalidad {fila.modalidad or 'no indicada'}). "
+                        "Es lo que el hospital tiene derecho a cobrar por este código; los "
+                        "valores SOAT de abajo son la referencia del Manual, no lo pactado."
+                    ),
+                }
+            )
+
     # Orden: matches por código exacto primero, luego por descripción
     q_up = q.upper().strip()
     matches.sort(
@@ -269,7 +329,7 @@ def buscar_codigo(
     # en el catálogo CUPS curado, devolverlo como "sin tarifa local". El
     # gestor al menos confirma que el código existe y la descripción.
     fallback_cups = []
-    if not matches and q:
+    if not matches and not pactadas and q:
         for cod, desc in DESCRIPCIONES_CUPS_2025.items():
             if _matchea(q, cod, desc):
                 fallback_cups.append(
@@ -295,7 +355,7 @@ def buscar_codigo(
         # Limitar fallback a 30 para no saturar
         fallback_cups = fallback_cups[:30]
 
-    todos = matches[:limite] + fallback_cups
+    todos = pactadas + matches[:limite] + fallback_cups
     # Si piden un año del que no se conoce la UVB, se calcula con la del
     # último año conocido. Eso hay que decirlo: una factura de 2024
     # liquidada con la unidad de 2026 da una cifra que no se puede radicar.
@@ -317,6 +377,7 @@ def buscar_codigo(
         "uvb_vigente": valor_uvb_vigente(anio),
         "smdlv_vigente": valor_smdlv_vigente(anio),
         "total_resultados": len(matches),
+        "total_pactadas": len(pactadas),
         "total_fallback_cups": len(fallback_cups),
         "resultados": todos,
     }
