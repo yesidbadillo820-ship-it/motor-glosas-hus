@@ -7,8 +7,14 @@ pesos calculado a la centena más próxima — equivalente local a sitios
 como miscuentasmedicas.com pero usando los catálogos del HUS.
 
 Catálogos consultados:
-  • TARIFAS_PROPIAS_HUS  — Res. 054/2026 + 124/2026 ESE HUS
-  • TARIFAS_SOAT_2026    — Circular 047/2025 MinSalud (UVB $12.110)
+  • TARIFAS PROPIAS HUS  — catálogo institucional completo del HUS
+                           (~1.900 códigos: propias, paquetes, ambulatorio,
+                           órtesis) + las 84 con factor SMDLV. Valor FIJO.
+  • SOAT 2026            — Circular Externa 047/2025 MinSalud, tabla
+                           completa (1.507 códigos, UVB $12.110)
+  • Cirugías por grupo   — se suman sala + cirujano + ayudantía +
+                           anestesiólogo + materiales del grupo quirúrgico
+  • Tarifa PACTADA       — lo que el contrato de cada EPS pactó (base de datos)
   • DESCRIPCIONES_CUPS_2025 — fallback informativo (~150 códigos sin
     factor; cuando aparece acá pero no en los anteriores, se devuelve
     como "sin tarifa local — consulte el Manual SOAT 2026 oficial").
@@ -21,18 +27,29 @@ Modalidades soportadas:
 
 from __future__ import annotations
 
+import unicodedata
+from typing import Optional
+
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual, get_auditor_o_superior
-from app.models.db import UsuarioRecord
+from app.database import get_db
+from app.models.db import TarifaContratadaRecord, UsuarioRecord
+from app.services.cups_soat_service import buscar_cups
+from app.services.liquidador_cirugias import liquidar_cirugia
 from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
-    TARIFAS_SOAT_2026,
+    es_atencion_integral,
+    tarifas_propias_hus_completas,
+    tarifas_soat_2026_completas,
 )
 from app.services.uvb import (
+    anio_con_unidad_propia,
     calcular_soat_con_factor,
     calcular_propia_hus,
     valor_smdlv_vigente,
@@ -45,17 +62,27 @@ router = APIRouter(prefix="/tarifa-liquidador", tags=["Tarifa Liquidador"])
 # ─── Helpers ────────────────────────────────────────────────────────────
 
 
+def _sin_tildes(texto: str) -> str:
+    """'Osteosíntesis' → 'OSTEOSINTESIS'.
+
+    El auditor escribe sin tildes. Con las 1.507 descripciones de la Circular
+    047/2025 —llenas de tildes— buscar 'osteosintesis' no devolvía nada y el
+    liquidador parecía vacío."""
+    t = unicodedata.normalize("NFKD", str(texto or ""))
+    return "".join(c for c in t if not unicodedata.combining(c)).upper()
+
+
 def _matchea(texto_buscado: str, codigo: str, descripcion: str) -> bool:
-    q = (texto_buscado or "").upper().strip()
+    q = _sin_tildes(texto_buscado).strip()
     if not q:
         return True
-    if q in (codigo or "").upper():
+    if q in _sin_tildes(codigo):
         return True
-    if q in (descripcion or "").upper():
+    desc_up = _sin_tildes(descripcion)
+    if q in desc_up:
         return True
     # Match parcial token-a-token (cualquier palabra del query)
     tokens = [t for t in q.split() if len(t) >= 3]
-    desc_up = (descripcion or "").upper()
     return all(t in desc_up for t in tokens) if tokens else False
 
 
@@ -99,6 +126,8 @@ def buscar_codigo(
     pct: float = Query(0.0, ge=-100, le=200, description="% contractual"),
     anio: int = Query(2026, ge=2020, le=2030),
     limite: int = Query(20, ge=1, le=100),
+    eps: Optional[str] = Query(None, description="Filtrar el pactado por EPS"),
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Busca códigos en SOAT 2026 + Propias HUS y devuelve el cálculo.
@@ -111,15 +140,22 @@ def buscar_codigo(
     matches = []
 
     if mod in ("SOAT", "SOAT_PLENO", "SOAT_PCT", "AMBOS", ""):
-        for cod, (factor_uvb, valor_pesos, desc, norma) in TARIFAS_SOAT_2026.items():
+        for cod, (factor_uvb, valor_pesos, desc, norma) in tarifas_soat_2026_completas().items():
             if _matchea(q, cod, desc):
                 liquidacion = _liquidar_soat(factor_uvb, pct, anio)
+                # Los códigos de "atención integral" (paquete todo-incluido) se
+                # marcan aparte: no son lo mismo que un examen suelto, y para
+                # una cirugía compiten con el pago por grupo. Distinguirlos
+                # evita que el auditor sume dos veces o elija la modalidad que
+                # el contrato no pactó.
+                integral = es_atencion_integral(cod)
                 matches.append(
                     {
                         "codigo": cod,
                         "descripcion": desc,
                         "norma": norma,
-                        "catalogo": "SOAT_2026",
+                        "catalogo": "SOAT_INTEGRAL" if integral else "SOAT_2026",
+                        "atencion_integral": integral,
                         **liquidacion,
                     }
                 )
@@ -137,12 +173,196 @@ def buscar_codigo(
                         **liquidacion,
                     }
                 )
+        # ── Catálogo institucional completo del HUS (TARIFAS_HUS.xlsx) ────────
+        # 18-08-2026. Antes solo se conocían 84 tarifas propias. Estas ~1.900
+        # NO son de FAMISANAR: son del HUS, y las usan todos los contratos que
+        # pactan "tarifas propias/institucionales" (COOSALUD, COMPENSAR, SALUD
+        # MÍA, AURORA, PPL, FAMISANAR). Son valor FIJO en pesos: NO se les
+        # aplica el porcentaje SOAT del contrato.
+        ya_propia = {m["codigo"].upper() for m in matches if m.get("catalogo") == "PROPIA_HUS"}
+        agregadas = 0
+        for cups_p, fila_p in tarifas_propias_hus_completas().items():
+            if agregadas >= 60:
+                break
+            if cups_p.upper() in ya_propia:
+                continue
+            if _matchea(q, cups_p, fila_p.get("descripcion", "")):
+                tipo_p = fila_p.get("tipo", "PROPIA")
+                matches.append(
+                    {
+                        "codigo": cups_p,
+                        "descripcion": fila_p.get("descripcion", ""),
+                        "norma": f"Tarifa propia HUS 2026 ({tipo_p})",
+                        "catalogo": "PROPIA_HUS",
+                        "modalidad": "PROPIA_HUS_FIJA",
+                        "codigo_cups": cups_p,
+                        "codigo_ips": fila_p.get("codigo_ips"),
+                        "factor_uvb": None,
+                        "factor_smdlv": None,
+                        "valor_pesos": int(fila_p["valor"]),
+                        "uvb_vigente": valor_uvb_vigente(anio),
+                        "porcentaje_aplicado": 0,
+                        "formula": (
+                            f"Tarifa institucional propia del HUS ({tipo_p}). Es un valor "
+                            "fijo en pesos: no se le aplica el porcentaje SOAT del contrato."
+                        ),
+                    }
+                )
+                agregadas += 1
+
+    # ── El puente CUPS → SOAT ───────────────────────────────────────────
+    # 18-08-2026. Hasta hoy esta pantalla solo entendía el código SOAT
+    # (21102, 19001…). El auditor no tiene ese código: tiene el CUPS que
+    # sale en la factura (873420) o el nombre del procedimiento
+    # («radiografía de rodilla»). Escribiendo cualquiera de los dos, la
+    # pantalla devolvía CERO — y es justo lo que uno escribe cuando la EPS
+    # objeta la tarifa. La tabla de homologación (10.024 CUPS) ya estaba
+    # cargada; solo faltaba que la búsqueda la usara.
+    if mod in ("SOAT", "SOAT_PLENO", "SOAT_PCT", "AMBOS", ""):
+        ya_listados = {m["codigo"] for m in matches}
+        catalogo_soat = tarifas_soat_2026_completas()
+        for hallazgo in buscar_cups(q, limite=limite):
+            # ── Cirugía: no tiene "un" código, tiene un grupo quirúrgico ──
+            # Se liquida sumando sala + cirujano + ayudantía + anestesiólogo
+            # + materiales. Se muestra con el desglose completo, porque es lo
+            # que el auditor le tiene que enseñar a la EPS.
+            cir = liquidar_cirugia(hallazgo["cups"], pct, anio)
+            if cir is not None:
+                clave = f"CIR {hallazgo['cups']}"
+                if clave not in ya_listados:
+                    ya_listados.add(clave)
+                    matches.append(
+                        {
+                            "codigo": hallazgo["cups"],
+                            "descripcion": hallazgo["descripcion"],
+                            "norma": f"Manual SOAT 2026 · grupo quirúrgico {cir['grupo']}",
+                            "catalogo": "CIRUGIA_POR_GRUPO",
+                            "modalidad": "CIRUGIA_GRUPO",
+                            "codigo_cups": hallazgo["cups"],
+                            "descripcion_cups": hallazgo["descripcion"],
+                            "factor_uvb": cir["total_uvb"],
+                            "factor_smdlv": None,
+                            "valor_pesos": cir["total_pesos"],
+                            "uvb_vigente": cir["uvb_vigente"],
+                            "porcentaje_aplicado": pct,
+                            "grupo": cir["grupo"],
+                            "desglose": cir["lineas"],
+                            "componentes_faltantes": cir["componentes_faltantes"],
+                            "formula": cir["nota"],
+                        }
+                    )
+                # Una cirugía no lista además su código SOAT crudo.
+                continue
+            for mapeo in hallazgo["homologaciones"]:
+                cod_soat = str(mapeo.get("soat") or "").strip()
+                fila = catalogo_soat.get(cod_soat)
+                if not fila or cod_soat in ya_listados:
+                    continue
+                ya_listados.add(cod_soat)
+                factor_uvb, _v, desc_soat, norma = fila
+                matches.append(
+                    {
+                        "codigo": cod_soat,
+                        "descripcion": desc_soat,
+                        "norma": norma,
+                        "catalogo": "CUPS_HOMOLOGADO_SOAT",
+                        "codigo_cups": hallazgo["cups"],
+                        "descripcion_cups": hallazgo["descripcion"],
+                        **_liquidar_soat(factor_uvb, pct, anio),
+                    }
+                )
+            # Un CUPS que el manual declara SIN homologación no lleva tarifa
+            # inventada: se informa el hecho, que además favorece al hospital.
+            if hallazgo["sin_homologacion"] and not hallazgo["homologaciones"]:
+                clave = f"CUPS {hallazgo['cups']}"
+                if clave in ya_listados:
+                    continue
+                ya_listados.add(clave)
+                matches.append(
+                    {
+                        "codigo": hallazgo["cups"],
+                        "descripcion": hallazgo["descripcion"],
+                        "norma": "Tabla oficial de homologación CUPS → SOAT",
+                        "catalogo": "CUPS_SIN_HOMOLOGACION",
+                        "modalidad": "SIN_HOMOLOGACION_SOAT",
+                        "codigo_cups": hallazgo["cups"],
+                        "descripcion_cups": hallazgo["descripcion"],
+                        "factor_uvb": None,
+                        "factor_smdlv": None,
+                        "valor_pesos": None,
+                        "uvb_vigente": valor_uvb_vigente(anio),
+                        "porcentaje_aplicado": pct,
+                        "formula": (
+                            "El Manual Tarifario SOAT NO le asigna código a este CUPS. "
+                            "La entidad no puede objetar la tarifa citando un código SOAT "
+                            "que para este procedimiento no existe."
+                        ),
+                    }
+                )
+
+    # ── La tarifa REALMENTE pactada (base de datos) ──────────────────────
+    # 18-08-2026. Los catálogos de arriba (SOAT, Propias, homologación) dan lo
+    # que el Manual dice que vale un código. Pero lo que el hospital cobra es
+    # lo que quedó PACTADO en el contrato, y eso vive en la BD (las 6.655
+    # tarifas de FAMISANAR, etc.). El liquidador nunca la miraba. Sin esto, la
+    # colecistectomía salía a su valor SOAT por grupo y no a los $6.296.900
+    # que de verdad se pactaron por TARIFA PROPIA.
+    codigos_para_pactado = {q.strip().upper()}
+    for m in matches:
+        cc = str(m.get("codigo_cups") or "").strip().upper()
+        if cc:
+            codigos_para_pactado.add(cc)
+    codigos_para_pactado.discard("")
+
+    pactadas: list[dict] = []
+    if codigos_para_pactado:
+        consulta = db.query(TarifaContratadaRecord).filter(
+            TarifaContratadaRecord.activa == 1,
+            or_(
+                TarifaContratadaRecord.codigo_cups.in_(codigos_para_pactado),
+                TarifaContratadaRecord.codigo_ips.in_(codigos_para_pactado),
+            ),
+        )
+        if eps:
+            consulta = consulta.filter(TarifaContratadaRecord.eps.ilike(f"%{eps.strip()}%"))
+        for fila in consulta.limit(limite).all():
+            valor = int(round(fila.valor_pactado)) if fila.valor_pactado is not None else None
+            pactadas.append(
+                {
+                    "codigo": fila.codigo_cups or fila.codigo_ips or "",
+                    "descripcion": fila.descripcion or "",
+                    "norma": (
+                        f"Contrato {fila.contrato_numero or 's/n'} · {fila.eps or ''}".strip(" ·")
+                    ),
+                    "catalogo": "PACTADO",
+                    "modalidad": "PACTADO",
+                    "eps": fila.eps,
+                    "contrato_numero": fila.contrato_numero,
+                    "tipo_tarifa": fila.tipo_tarifa,
+                    "codigo_cups": fila.codigo_cups,
+                    "factor_uvb": None,
+                    "factor_smdlv": None,
+                    "valor_pesos": valor,
+                    "uvb_vigente": valor_uvb_vigente(anio),
+                    "porcentaje_aplicado": pct,
+                    "formula": (
+                        f"Valor pactado en el contrato {fila.contrato_numero or 's/n'} con "
+                        f"{fila.eps or 'la EPS'} (modalidad {fila.modalidad or 'no indicada'}). "
+                        "Es lo que el hospital tiene derecho a cobrar por este código; los "
+                        "valores SOAT de abajo son la referencia del Manual, no lo pactado."
+                    ),
+                }
+            )
 
     # Orden: matches por código exacto primero, luego por descripción
     q_up = q.upper().strip()
     matches.sort(
         key=lambda x: (
-            0 if x["codigo"].upper() == q_up else 1 if q_up in x["codigo"].upper() else 2,
+            0
+            if x["codigo"].upper() == q_up or str(x.get("codigo_cups", "")).upper() == q_up
+            else 1
+            if q_up in x["codigo"].upper() or q_up in str(x.get("codigo_cups", "")).upper()
+            else 2,
             x["descripcion"],
         )
     )
@@ -151,7 +371,7 @@ def buscar_codigo(
     # en el catálogo CUPS curado, devolverlo como "sin tarifa local". El
     # gestor al menos confirma que el código existe y la descripción.
     fallback_cups = []
-    if not matches and q:
+    if not matches and not pactadas and q:
         for cod, desc in DESCRIPCIONES_CUPS_2025.items():
             if _matchea(q, cod, desc):
                 fallback_cups.append(
@@ -177,8 +397,21 @@ def buscar_codigo(
         # Limitar fallback a 30 para no saturar
         fallback_cups = fallback_cups[:30]
 
-    todos = matches[:limite] + fallback_cups
+    todos = pactadas + matches[:limite] + fallback_cups
+    # Si piden un año del que no se conoce la UVB, se calcula con la del
+    # último año conocido. Eso hay que decirlo: una factura de 2024
+    # liquidada con la unidad de 2026 da una cifra que no se puede radicar.
+    advertencia = None
+    if not anio_con_unidad_propia(anio):
+        _uvb = f"{valor_uvb_vigente(anio):,}".replace(",", ".")
+        _smdlv = f"{valor_smdlv_vigente(anio):,}".replace(",", ".")
+        advertencia = (
+            f"No se conoce la UVB ni el SMDLV de {anio}: los valores se calcularon "
+            f"con ${_uvb} (UVB) y ${_smdlv} (SMDLV), que son los del último año "
+            "cargado. Verifique la resolución de ese año antes de usar la cifra."
+        )
     return {
+        "advertencia": advertencia,
         "query": q,
         "modalidad": mod or "AMBOS",
         "porcentaje_aplicado": pct,
@@ -186,6 +419,7 @@ def buscar_codigo(
         "uvb_vigente": valor_uvb_vigente(anio),
         "smdlv_vigente": valor_smdlv_vigente(anio),
         "total_resultados": len(matches),
+        "total_pactadas": len(pactadas),
         "total_fallback_cups": len(fallback_cups),
         "resultados": todos,
     }
@@ -234,5 +468,5 @@ def info_unidades(
             f"y modificaciones). SMDLV {anio} ≈ ${valor_smdlv_vigente(anio):,}"
         ).replace(",", "."),
         "total_codigos_propios": len(TARIFAS_PROPIAS_HUS),
-        "total_codigos_soat": len(TARIFAS_SOAT_2026),
+        "total_codigos_soat": len(tarifas_soat_2026_completas()),
     }

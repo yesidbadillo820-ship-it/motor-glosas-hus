@@ -32,6 +32,7 @@ import gzip
 import json
 import re
 from functools import lru_cache
+import unicodedata
 from pathlib import Path
 
 _DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "cups_soat_homologacion.json.gz"
@@ -167,6 +168,84 @@ def descripcion_cups(cups: str | None) -> str:
     """
     crudos = _crudos(cups)
     return crudos[0].get("desc_cups", "") if crudos else ""
+
+
+# ─── Búsqueda por descripción ───────────────────────────────────────────────
+#
+# 18-08-2026. El liquidador de tarifas solo sabía buscar por CÓDIGO SOAT
+# (21102, 19001…). El auditor no tiene ese código: tiene el CUPS que sale en
+# la factura (873420) o el nombre del procedimiento («radiografía de
+# rodilla»). Escribiendo cualquiera de los dos, la pantalla devolvía cero.
+#
+# El puente ya estaba cargado —10.024 CUPS homologados— pero nadie lo usaba
+# para buscar. Esto lo expone.
+
+_INDICE_DESC: list[tuple[str, str, str]] | None = None
+
+
+def _sin_tildes(texto: str) -> str:
+    t = unicodedata.normalize("NFKD", str(texto or ""))
+    return "".join(c for c in t if not unicodedata.combining(c)).upper()
+
+
+def _indice() -> list[tuple[str, str, str]]:
+    """[(cups, descripcion, descripcion_normalizada)] — se arma una sola vez."""
+    global _INDICE_DESC
+    if _INDICE_DESC is not None:
+        return _INDICE_DESC
+    salida: list[tuple[str, str, str]] = []
+    for cups, mapeos in (_cargar().get("cups_a_soat", {}) or {}).items():
+        desc = ""
+        for m in mapeos or []:
+            desc = str(m.get("desc_cups") or "").strip()
+            if desc:
+                break
+        salida.append((cups, desc, _sin_tildes(desc)))
+    _INDICE_DESC = salida
+    return salida
+
+
+def buscar_cups(texto: str, limite: int = 25) -> list[dict]:
+    """Busca en los 10.024 CUPS por código o por descripción.
+
+    Devuelve, por cada CUPS encontrado, su descripción y los códigos SOAT a
+    los que homologa. Si el manual no le asigna ninguno, lo dice —no se
+    inventa un código.
+
+    El orden pone primero el código exacto, luego los que empiezan por lo
+    escrito, y de último las coincidencias por descripción.
+    """
+    q = _sin_tildes(texto).strip()
+    if len(q) < 3:
+        return []
+
+    tokens = [t for t in q.split() if len(t) >= 3]
+    encontrados: list[tuple[int, str, str]] = []
+    for cups, desc, desc_norm in _indice():
+        if cups == q:
+            prioridad = 0
+        elif q.isdigit() and cups.startswith(q):
+            prioridad = 1
+        elif q in desc_norm:
+            prioridad = 2
+        elif tokens and all(t in desc_norm for t in tokens):
+            prioridad = 3
+        else:
+            continue
+        encontrados.append((prioridad, cups, desc))
+
+    encontrados.sort(key=lambda x: (x[0], len(x[2]), x[1]))
+    salida = []
+    for _prio, cups, desc in encontrados[:limite]:
+        salida.append(
+            {
+                "cups": cups,
+                "descripcion": desc,
+                "homologaciones": homologar_cups_a_soat(cups),
+                "sin_homologacion": sin_homologacion_directa(cups),
+            }
+        )
+    return salida
 
 
 def resumen_homologacion() -> dict:

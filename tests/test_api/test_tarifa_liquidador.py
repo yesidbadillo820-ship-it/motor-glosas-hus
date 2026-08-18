@@ -70,19 +70,31 @@ class TestBuscar:
         assert r.status_code == 422  # q es requerido
 
     def test_fallback_cups_cuando_no_hay_tarifa_local(self, client):
-        # 890402 está en DESCRIPCIONES_CUPS_2025 pero NO en TARIFAS_SOAT_2026.
-        # Sin embargo está en PROPIAS_HUS como 890402H1 — buscar SOLO SOAT
-        # debería devolver 0 con tarifa pero mostrar fallback.
-        r = client.get("/tarifa-liquidador/buscar?q=890402&modalidad=SOAT")
+        """Queda fallback solo para lo que NO tiene tarifa por ningún camino.
+
+        18-08-2026: este caso usaba el CUPS 890402 y comprobaba que
+        devolviera CERO. Desde que el liquidador cruza la tabla de
+        homologación, 890402 sí resuelve (→ SOAT 39140), así que el ejemplo
+        dejó de servir: comprobaba el defecto, no la función. Se cambió por
+        un CUPS que está en el catálogo descriptivo y que ni el Manual SOAT
+        ni las tarifas propias tarifan — ahí el fallback sigue siendo la
+        respuesta honesta.
+        """
+        r = client.get("/tarifa-liquidador/buscar?q=901040&modalidad=SOAT")
         assert r.status_code == 200
         d = r.json()
-        # Sin tarifa SOAT pero el CUPS existe en catálogo descriptivo
         assert d["total_resultados"] == 0
         assert d["total_fallback_cups"] >= 1
-        # Cada item de fallback marca SIN_TARIFA_LOCAL
-        for r in d["resultados"]:
-            assert r["modalidad"] == "SIN_TARIFA_LOCAL"
-            assert r["valor_pesos"] is None
+        for fila in d["resultados"]:
+            assert fila["modalidad"] == "SIN_TARIFA_LOCAL"
+            assert fila["valor_pesos"] is None
+
+    def test_el_cups_de_consulta_ya_no_cae_al_fallback(self, client):
+        """890402 antes devolvía «sin tarifa local»; ahora liquida."""
+        d = client.get("/tarifa-liquidador/buscar?q=890402&modalidad=SOAT").json()
+        assert d["total_resultados"] >= 1
+        assert d["resultados"][0]["codigo_cups"] == "890402"
+        assert d["resultados"][0]["valor_pesos"] > 0
 
 
 class TestLiquidarManual:
@@ -130,3 +142,53 @@ class TestInfoUnidades:
         assert d["smdlv"] == 58_375
         assert d["total_codigos_propios"] > 0
         assert d["total_codigos_soat"] > 0
+
+
+class TestManualSoatCompleto:
+    """El liquidador dejó de conocer solo 4 tarifas SOAT.
+
+    Antes traía cuatro códigos «de ejemplo» y para todo lo demás contestaba
+    «sin tarifa local». Ahora lee la tabla completa de la Circular Externa
+    047 de 2025 — 1.507 códigos. Esto importa en los contratos pactados
+    contra el SOAT: FAMISANAR («SOAT UVB vigente −5%») y Policía Nacional
+    («UVB −8%»).
+    """
+
+    def test_el_catalogo_ya_no_son_cuatro_codigos(self, client):
+        r = client.get("/tarifa-liquidador/info-unidades")
+        assert r.status_code == 200
+        assert r.json()["total_codigos_soat"] >= 1_500
+
+    def test_una_cirugia_grande_ya_tiene_tarifa(self, client):
+        """513014 — reemplazo de cadera: 1.223,71 UVB × $12.110 = $14.819.100."""
+        r = client.get("/tarifa-liquidador/buscar?q=513014&modalidad=SOAT")
+        d = r.json()
+        assert d["total_resultados"] == 1
+        fila = d["resultados"][0]
+        assert fila["factor_uvb"] == 1223.71
+        assert fila["valor_pesos"] == 14_819_100
+        assert fila["norma"] == "CIRCULAR_047_2025"
+
+    def test_el_menos_cinco_de_famisanar_sobre_una_cirugia(self, client):
+        """SOAT −5%: 1.223,71 × $12.110 × 0,95 = $14.078.171,7 → $14.078.200.
+
+        El porcentaje se aplica sobre el producto exacto, no sobre el valor
+        ya redondeado: por eso no da $14.078.100."""
+        r = client.get("/tarifa-liquidador/buscar?q=513014&modalidad=SOAT&pct=-5")
+        fila = r.json()["resultados"][0]
+        assert fila["valor_pesos"] == 14_078_200
+        assert fila["porcentaje_aplicado"] == -5
+
+    def test_busca_por_descripcion_aunque_se_escriba_sin_tildes(self, client):
+        """El auditor escribe 'osteosintesis'; la Circular dice
+        'Osteosíntesis'. Tienen que encontrarse igual."""
+        con = client.get("/tarifa-liquidador/buscar?q=osteosíntesis&modalidad=SOAT").json()
+        sin = client.get("/tarifa-liquidador/buscar?q=osteosintesis&modalidad=SOAT").json()
+        assert sin["total_resultados"] >= 20
+        assert sin["total_resultados"] == con["total_resultados"]
+
+    def test_un_codigo_que_no_existe_sigue_sin_tarifa(self, client):
+        """No inventar: lo que no está en la Circular no tiene tarifa."""
+        r = client.get("/tarifa-liquidador/buscar?q=999999&modalidad=SOAT")
+        d = r.json()
+        assert d["total_resultados"] == 0
