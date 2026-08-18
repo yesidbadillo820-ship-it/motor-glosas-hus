@@ -3384,6 +3384,77 @@ voluntades vigente", "sin cotización", "sin lista de precios").
 
 ---
 
+### 18-08 (noche) — Empieza «Salud Total»: el lector de valores ya no lee de menos
+
+Segundo botón de la revisión. Salud Total ya tenía mucho trabajo hecho (se
+había restaurado y se le conectó el análisis con IA), así que el diagnóstico
+fue corto.
+
+**Lo que ya funcionaba bien:** las tres opciones (Extemporánea, Ratificada,
+Analizar con IA) responden; la pantalla tiene girador, error, estado vacío,
+moneda con formato y las etiquetas IA/PLANTILLA; y no inventa «días
+transcurridos» si falta la fecha.
+
+**El defecto que se arregló — el lector de valores era frágil.** Leía solo el
+formato gringo (280000.00). Si el portal mandaba el valor a la colombiana:
+- «280.000» lo leía como **$280** (mil veces menos),
+- «280.000,00» **reventaba** el proceso.
+
+Y esos valores van en el archivo que se radica y en los totales de la
+pantalla. Ahora usa el lector único del repo, que entiende los dos formatos
+y deja el actual igual. 11 pruebas nuevas.
+
+**Lo que quedó como DECISIÓN del dueño (no se tocó):** el código de respuesta
+RE9901 que el modo rápido le pone a las glosas que no son de tarifa ni
+extemporáneas (soportes, autorización, cobertura…). Ese código, según el
+Manual Único, ADMITE que la glosa era justificada y que se subsanó. Si lo que
+se quiere es rechazarla de fondo, el código sería RE9602 («injustificada al
+100%»). Falta que Cartera confirme cuál usa el HUS en el portal de Salud Total
+antes de cambiarlo.
+
+---
+
+### 18-08 (noche) — Salud Total: la respuesta ahora es la que el HUS radica de verdad
+
+Yesid mandó el archivo REAL: cómo llega la glosa (el TXT «Detalle» de 24
+columnas) y cómo se sube la respuesta (el RTAGLOSA con RE9602/RE9901). Con eso
+en la mano se corrigieron tres cosas que estaban mal en el modo por plantilla.
+
+**1) El texto de TARIFAS afirmaba un contrato que NO existe.** Decía «...LA
+LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE...». Con Salud Total el
+HUS **no tiene contrato**. Afirmar lo contrario en un documento que se radica
+le regala a la entidad el argumento de que sí lo había. Ahora dice la verdad,
+palabra por palabra como en el archivo real: «...ENTIDAD SALUD TOTAL SIN
+CONTRATO VIGENTE... SE FACTURA A SOAT VIGENTE Y LOS INSUMOS A TARIFAS
+INSTITUCIONALES...».
+
+**2) El código de respuesta por familia estaba cruzado.** El archivo real usa:
+- Tarifas (TA) y Facturación (FA) → **RE9602** (injustificada al 100%).
+- Soportes (SO) y Pertinencia (CL) → **RE9901** (subsanada, soportes adjuntos).
+
+El sistema le ponía a Facturación el RE9901 y a Soportes el RE9602. Quedó
+alineado con la realidad.
+
+**3) La respuesta ya no le pega el nombre del servicio al final.** El archivo
+real no lo lleva, y así se respeta mejor el tope de 500 caracteres.
+
+**Comprobado con el archivo real:** se tomó el TXT «Detalle» que mandó Yesid,
+se pasó por el motor, y la salida quedó **idéntica** a su archivo OK en las
+familias que se pueden hacer por plantilla (TA y SO, que son el 84% del
+archivo).
+
+**Lo honesto:** en el archivo real, las glosas de Facturación y de Pertinencia
+venían con un texto **escrito a mano** para ese caso puntual (dotación de UCI,
+jeringas de 20 cc). Eso NO se puede volver plantilla sin inventar: para esas
+glosas específicas está el botón «Analizar con IA», que arma el argumento con
+todo el contexto. La plantilla cubre la mayoría (tarifas y soportes) y las
+demás quedan con una respuesta genérica correcta que el auditor ajusta.
+
+**Y un arreglo previo del mismo día:** el lector de valores del TXT ahora
+entiende el formato colombiano (antes «280.000» lo leía como $280).
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

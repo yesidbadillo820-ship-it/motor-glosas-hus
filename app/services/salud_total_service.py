@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from app.services.glosa_service import _suavizar_tono
+from app.utils.moneda import parse_valor_cop
 
 NIT_HUS = "900006037"
 DIAS_LIMITE = 20
@@ -22,8 +23,15 @@ CONCEPTOS = {
 OBS_MAX_CARACTERES = 500
 
 MOTIVOS_SALUD_TOTAL = {
-    "TARIFA": "ESE HUS RECHAZA LA GLOSA POR TARIFAS. LA LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE Y AL MANUAL TARIFARIO SOAT 2026 (CIRCULAR EXTERNA 047 DE 2025 MINSALUD — UVB 2026 $12.110). LA EPS NO PUEDE APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
-    "SOPORTE": "ESE HUS RECHAZA LA GLOSA POR SOPORTES. LOS DOCUMENTOS EXIGIDOS POR LA RES. 3047/2008 OBRAN EN LA HISTORIA CLÍNICA (RES. 1995/1999), PLENA PRUEBA MÉDICO-LEGAL. LOS ERRORES FORMALES SON SUBSANABLES (CIRCULAR 030/2013). SE EXIGE EL LEVANTAMIENTO INMEDIATO. CARTERA@HUS.GOV.CO",
+    # Texto REAL que radica el HUS para Salud Total (archivo OK del 10-08-2026).
+    # ANTES decía "CONFORME AL CONTRATO VIGENTE": era falso — con Salud Total
+    # NO hay contrato, y afirmarlo en un documento que se radica le regala a la
+    # entidad el argumento de que sí lo había. Ahora dice la verdad: sin
+    # contrato, se factura a SOAT vigente y los insumos a tarifas institucionales.
+    "TARIFA": "ESE HUS NO ACEPTA GLOSA INJUSTIFICADA POR MVC EN TARIFAS, ENTIDAD SALUD TOTAL SIN CONTRATO VIGENTE ENTRE LAS PARTES AL MOMENTO DE LA ATENCION, POR LO TANTO, SE FACTURA A SOAT VIGENTE Y LOS INSUMOS Y O MEDICAMENTOS SE FACTURAN A TARIFAS INSTITUCIONALES. NOTA: SEGÚN NORMATIVIDAD VIGENTE DE NO OBTENERSE RATIFICACIÓN DE LA GLOSA EN LOS TÉRMINOS LEGALES, SE DARÁ POR LEVANTADA LA OBJECIÓN DE ACUERDO ARTÍCULO 57 DE LA LEY 1438 DE 2011",
+    # Texto REAL del HUS para soportes (archivo OK). Postura de subsanación:
+    # los soportes van adjuntos a la factura, se soportan de nuevo → RE9901.
+    "SOPORTE": "ESE HUS NO ACEPTA GLOSA SE REVISA Y SE EVIDENCIA SOPORTES ADJUNTOS A LA FACTURA RADICADA A LA ENTIDAD SE SOPORTA NUEVAMENTE PARA LA SUBSANACION DE LA GLOSA. NOTA: DE ACUERDO AL ARTÍCULO 57 DE LA LEY 1438 DE 2011, DE NO OBTENERSE RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN",
     "AUTORIZACION": "ESE HUS RECHAZA LA GLOSA POR AUTORIZACIÓN. LA ATENCIÓN PRESTADA CUMPLIÓ CON LOS PROTOCOLOS ESTABLECIDOS. ART. 168 LEY 100/1993 Y T-1025/2002. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
     "PERTINENCIA": "ESE HUS RECHAZA LA GLOSA POR PERTINENCIA. EL CRITERIO MÉDICO ES AUTÓNOMO (ART. 17 LEY 1751/2015 - T-478/1995). LA HISTORIA CLÍNICA DOCUMENTA LA INDICACIÓN. EL AUDITOR DE LA EPS NO REEMPLAZA AL MÉDICO TRATANTE. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
     "COBERTURA": "ESE HUS RECHAZA LA GLOSA POR COBERTURA. EL SERVICIO ESTÁ INCLUIDO EN EL PLAN DE BENEFICIOS (RES. 5269/2017). LAS EXCLUSIONES SON TAXATIVAS. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
@@ -161,9 +169,17 @@ class GlosaSaludTotal:
         self.valor_bruto_factura = self._parse_float(campos[23]) if len(campos) > 23 else 0
 
     def _parse_float(self, valor: str) -> float:
-        if not valor:
-            return 0
-        return float(valor.replace(",", ""))
+        """Lee un valor en pesos del TXT con el lector único del repo.
+
+        18-08-2026. Antes hacía `float(valor.replace(",", ""))`. Eso solo
+        sirve para el formato gringo (280000.00). Si el portal manda el valor
+        a la colombiana leía mal o se caía:
+            "280.000"      -> 280.0        (mil veces menos)
+            "1.589.100,00" -> se reventaba
+        Y esos valores alimentan los totales de la pantalla y el archivo que
+        se radica. `parse_valor_cop` entiende los dos formatos y deja el
+        actual igual (280000.00 -> 280000.0)."""
+        return parse_valor_cop(valor)
 
     @property
     def sin_fecha_recepcion(self) -> bool:
@@ -357,38 +373,56 @@ class GlosaSaludTotal:
         }
         return plantillas.get(mapeo.get(tipo_detectado, "FA"), plantillas["FA"])
 
+    def _familia(self) -> str:
+        """Familia del motivo de glosa: TA, FA, SO, CL, AU, CO (Res. 2284/2023).
+        Se toma del código general, y si no viene, del específico."""
+        cg = (self.cod_motv_glosa_general or "").upper().strip()
+        ce = (self.cod_motv_glosa_espc or "").upper().strip()
+        return cg[:2] or ce[:2] or "FA"
+
+    def _respuesta_de_fondo(self) -> tuple[str, str]:
+        """La respuesta de fondo de Salud Total (entidad SIN contrato), por
+        familia de motivo. Reproduce lo que el HUS radica de verdad
+        (archivo OK del 10-08-2026):
+
+          • TA (tarifas) y FA (facturación) → RE9602 «injustificada al 100%»:
+            sin contrato, se factura a SOAT vigente / tarifas institucionales.
+          • SO (soportes) y CL (pertinencia) → RE9901 «subsanada»: los soportes
+            van adjuntos, se soporta de nuevo.
+          • AU/CO: sin ejemplo real; se mantienen como subsanables (RE9901).
+
+        El texto sale por familia de MOTIVOS_SALUD_TOTAL, SIN pegarle el nombre
+        del servicio: el archivo real no lo lleva y el campo tiene tope de 500.
+        """
+        fam = self._familia()
+        codigo = "RE9602" if fam in ("TA", "FA") else "RE9901"
+        clave_texto = {
+            "TA": "TARIFA",
+            "FA": "FACTURACION",
+            "SO": "SOPORTE",
+            "CL": "PERTINENCIA",
+            "AU": "AUTORIZACION",
+            "CO": "COBERTURA",
+        }.get(fam, "FACTURACION")
+        observacion = MOTIVOS_SALUD_TOTAL.get(clave_texto, MOTIVOS_SALUD_TOTAL["FACTURACION"])
+        return codigo, observacion
+
     def generar_respuesta(self) -> Dict[str, Any]:
         dias = self.dias_transcurridos()
+        valor_aceptado = 0
 
-        # REGLA SALUD TOTAL: NO hay contrato vigente con Salud Total EPS, por lo
-        # que las glosas por TARIFAS (TA*) son INJUSTIFICADAS al 100% → RE9602.
-        cod_general = (self.cod_motv_glosa_general or "").upper().strip()
-        cod_espc = (self.cod_motv_glosa_espc or "").upper().strip()
-        es_tarifa = cod_general.startswith("TA") or cod_espc.startswith("TA")
-
-        if self.tipo_respuesta == "extemporanea":
-            if dias > DIAS_LIMITE:
-                codigo_respuesta = "RE9502"
-                observacion = self.obtener_observacion()
-                valor_aceptado = 0
-            else:
-                codigo_respuesta = "RE9602"
-                observacion = self.obtener_observacion()
-                valor_aceptado = 0
+        if self.tipo_respuesta == "extemporanea" and dias > DIAS_LIMITE:
+            # Solo cuando hay evidencia del plazo vencido se alega extemporaneidad.
+            codigo_respuesta = "RE9502"
+            observacion = self.obtener_observacion()
         elif self.tipo_respuesta == "ratificada":
             codigo_respuesta = "RE9602"
             observacion = self.obtener_observacion()
-            valor_aceptado = 0
-        elif es_tarifa:
-            # Tarifas sin contrato → injustificada al 100%
-            codigo_respuesta = "RE9602"
-            observacion = self._argumento_tecnico_por_codigo(codigo_respuesta)
-            valor_aceptado = 0
         else:
-            # Otros tipos → glosa subsanada en su totalidad con argumento
-            codigo_respuesta = "RE9901"
-            observacion = self._argumento_tecnico_por_codigo(codigo_respuesta)
-            valor_aceptado = 0
+            # Respuesta de fondo por familia: es lo que el HUS radica de verdad
+            # para Salud Total. Cubre la opción "extemporánea" cuando no se puede
+            # sustentar el plazo (sin fecha o dentro de términos).
+            codigo_respuesta, observacion = self._respuesta_de_fondo()
 
         concepto = CONCEPTOS[codigo_respuesta]
         observacion = _suavizar_tono(observacion)

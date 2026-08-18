@@ -4618,8 +4618,13 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <div class="st-upload-col">
           <div class="form-card">
             <h3>Procesar Glosas <span>Salud Total EPS</span></h3>
-            <p style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">
-              Seleccione un archivo TXT de Salud Total para generar respuestas automáticas.
+            <p style="font-size:.8rem;color:var(--text3);margin-bottom:1rem;line-height:1.5">
+              Suba el TXT de la notificación (Detalle) para generar la respuesta.
+              <b>Extemporánea</b>: si pone la fecha de recepción y está fuera de
+              los 20 días, alega extemporaneidad (RE9502); si no, sale la
+              <b>respuesta de fondo</b> que radica el HUS con Salud Total (sin
+              contrato): tarifas → RE9602, soportes → RE9901.
+              <b>Analizar con IA</b> arma cada respuesta con el motor completo.
             </p>
             <div class="field">
               <label>Tipo de Respuesta</label>
