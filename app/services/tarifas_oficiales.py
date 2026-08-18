@@ -393,6 +393,7 @@ _RUTA_SOAT_2026 = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "data", "soat_uvb_2026.json.gz"
 )
 _CACHE_SOAT_2026: dict[str, tuple[float, int, str, str]] | None = None
+_CACHE_INTEGRALES: set[str] | None = None
 
 
 def tarifas_soat_2026_completas() -> dict[str, tuple[float, int, str, str]]:
@@ -402,24 +403,28 @@ def tarifas_soat_2026_completas() -> dict[str, tuple[float, int, str, str]]:
     Se lee una sola vez y se deja en memoria. Si el archivo no está, devuelve
     los cuatro códigos transcritos a mano y el sistema sigue funcionando.
     """
-    global _CACHE_SOAT_2026
+    global _CACHE_SOAT_2026, _CACHE_INTEGRALES
     if _CACHE_SOAT_2026 is not None:
         return _CACHE_SOAT_2026
 
     from app.services.uvb import calcular_valor_pesos
 
     catalogo: dict[str, tuple[float, int, str, str]] = {}
+    integrales: set[str] = set()
     try:
         with gzip.open(_RUTA_SOAT_2026, "rt", encoding="utf-8") as f:
             datos = json.load(f)
         for codigo, fila in (datos.get("tarifas") or {}).items():
+            cod = str(codigo).strip().upper()
             uvb = float(fila["uvb"])
-            catalogo[str(codigo).strip().upper()] = (
+            catalogo[cod] = (
                 uvb,
                 calcular_valor_pesos(uvb, 2026),
                 str(fila.get("descripcion") or "").strip(),
                 "CIRCULAR_047_2025",
             )
+            if fila.get("integral"):
+                integrales.add(cod)
     except (OSError, EOFError, ValueError, KeyError, TypeError):
         # Catálogo ausente o dañado: se sigue con lo transcrito a mano. Nunca
         # se inventa una tarifa para rellenar.
@@ -428,7 +433,18 @@ def tarifas_soat_2026_completas() -> dict[str, tuple[float, int, str, str]]:
     # Lo transcrito a mano manda sobre lo leído del escaneo.
     catalogo.update(TARIFAS_SOAT_2026)
     _CACHE_SOAT_2026 = catalogo
+    _CACHE_INTEGRALES = integrales
     return catalogo
+
+
+def es_atencion_integral(codigo: str) -> bool:
+    """True si el código SOAT es un PAQUETE quirúrgico todo-incluido (sala,
+    honorarios, anestesia, materiales y estancia en un solo valor), bajo el
+    título 'Atención integral... de intervenciones quirúrgicas' de la Circular
+    047/2025. Es otra modalidad, distinta del pago por grupo quirúrgico."""
+    if _CACHE_INTEGRALES is None:
+        tarifas_soat_2026_completas()
+    return str(codigo).strip().upper() in (_CACHE_INTEGRALES or set())
 
 
 def buscar_tarifa_soat_2026(cups: str) -> dict | None:

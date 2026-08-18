@@ -190,20 +190,41 @@ def _leer_pagina(pagina) -> list[tuple[str, float, str]]:
     return salida
 
 
+# Bajo el encabezado "ATENCIÓN INTEGRAL AMBULATORIA U HOSPITALIZADA DE
+# INTERVENCIONES QUIRÚRGICAS Y PROCEDIMIENTOS", la Circular publica 69 códigos
+# (502001–518003) que son el PAQUETE todo-incluido de una cirugía: sala,
+# honorarios, anestesia, materiales y estancia en un solo valor. Es otra
+# modalidad, distinta del pago por grupo quirúrgico (series 39xxx). El
+# contrato dice cuál aplica; hay que poder distinguirlas en pantalla para no
+# mostrar dos cifras del mismo procedimiento sin explicar la diferencia.
+# En este documento el bloque es exactamente el rango >= 500000; ningún otro
+# código llega tan alto (lo más cercano por debajo es 119547, de laboratorio).
+_HEADER_INTEGRAL = "INTERVENCIONES QUIR"
+
+
+def _es_integral(codigo: str) -> bool:
+    return codigo.isdigit() and int(codigo) >= 500000
+
+
 def generar(src_pdf: str, out_path: str = _OUT, version: str = "") -> dict:
     import pdfplumber  # dependencia ya declarada en requirements.txt
 
     tarifas: dict[str, dict] = {}
     repetidos_en_conflicto: list[str] = []
     paginas = 0
+    vio_header_integral = False
 
     with pdfplumber.open(src_pdf) as pdf:
         paginas = len(pdf.pages)
         for pagina in pdf.pages:
+            if _HEADER_INTEGRAL in (pagina.extract_text() or "").upper():
+                vio_header_integral = True
             for codigo, uvb, desc in _leer_pagina(pagina):
                 previo = tarifas.get(codigo)
                 if previo is None:
                     tarifas[codigo] = {"uvb": uvb, "descripcion": desc}
+                    if _es_integral(codigo):
+                        tarifas[codigo]["integral"] = True
                 elif abs(previo["uvb"] - uvb) >= 0.0005:
                     # El mismo código con dos tarifas distintas: no se elige
                     # una a dedo, se deja la primera y se reporta.
@@ -226,6 +247,8 @@ def generar(src_pdf: str, out_path: str = _OUT, version: str = "") -> dict:
             "norma": "CIRCULAR_047_2025",
             "paginas_leidas": paginas,
             "codigos": len(tarifas),
+            "codigos_atencion_integral": sum(1 for c in tarifas if _es_integral(c)),
+            "header_integral_encontrado": vio_header_integral,
             "codigos_en_conflicto": sorted(set(repetidos_en_conflicto)),
             "version": version or "2026-CIRCULAR-047-2025",
         },
