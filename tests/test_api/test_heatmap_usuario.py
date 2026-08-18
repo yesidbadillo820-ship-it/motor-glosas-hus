@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth import get_password_hash
+from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import AuditLogRecord, UsuarioRecord
 
@@ -69,6 +70,17 @@ def _seed(db, usuario, ts):
     db.commit()
 
 
+def _fecha_reciente(weekday, hora, minuto=0):
+    """Fecha del `weekday` (0=Lunes) mas reciente hace 7-13 dias.
+
+    El endpoint solo mira una ventana movil de dias; una fecha fija caduca
+    cuando el calendario avanza (estos tests pasaban y luego fallaban solos).
+    """
+    base = ahora_utc() - timedelta(days=7)
+    base -= timedelta(days=(base.weekday() - weekday) % 7)
+    return base.replace(hour=hora, minute=minuto, second=0, microsecond=0)
+
+
 class TestHeatmapUsuario:
     def test_usuario_corto_400(self, client):
         r = client.get("/admin/heatmap-usuario?usuario_email=A")
@@ -80,8 +92,8 @@ class TestHeatmapUsuario:
         assert d["total_eventos"] == 0
 
     def test_filtra_por_usuario(self, client, db_session):
-        _seed(db_session, "alice@x", datetime(2026, 4, 20, 10, tzinfo=timezone.utc))
-        _seed(db_session, "bob@x", datetime(2026, 4, 20, 10, tzinfo=timezone.utc))
+        _seed(db_session, "alice@x", _fecha_reciente(0, 10))
+        _seed(db_session, "bob@x", _fecha_reciente(0, 10))
 
         r = client.get("/admin/heatmap-usuario?usuario_email=alice@x&dias=120")
         d = r.json()
