@@ -160,3 +160,31 @@ class TestSoportesIndexer:
         assert s["facturas_indexadas"] == 2  # HUS487523 y HUS0000495050
         assert s["archivos_indexados"] >= 8
         assert s["construido_en_epoch"] > 0
+
+
+class TestFVSSeReconoce:
+    """FVS = Factura de Venta en Salud (código ADRES) — 18-08-2026.
+
+    El servidor de radicación del HUS nombra la factura FVS_900006037_HUSxxx.pdf
+    (así lo documenta la propia pantalla). Antes esos PDF se indexaban por
+    número pero quedaban etiquetados «otro» en vez de la factura.
+    """
+
+    def test_fvs_es_la_factura_electronica(self):
+        from app.services.soportes_autodiscovery_service import _clasificar_archivo
+
+        for nombre in (
+            "FVS_900006037_HUS0000487175.pdf",
+            "FVS 900006037 HUS487175.pdf",
+        ):
+            tipo = _clasificar_archivo(nombre)
+            assert tipo is not None
+            assert tipo[0] == "FVS"
+            assert tipo[1] == "factura_electronica"
+
+    def test_no_se_confunde_con_otros(self):
+        from app.services.soportes_autodiscovery_service import _clasificar_archivo
+
+        # No es que ahora cualquier cosa con 'FV' pase: exige el delimitador.
+        assert _clasificar_archivo("FVSABC.pdf") is None
+        assert _clasificar_archivo("HEV_900006037_HUS487175.pdf")[0] == "HEV"

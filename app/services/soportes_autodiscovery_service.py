@@ -45,6 +45,11 @@ logger = logging.getLogger("motor_glosas.soportes")
 # patrones más específicos primero.
 TIPOS_SOPORTE = {
     "FEV": "factura_electronica",
+    # FVS = Factura de Venta en Salud (código ADRES). El servidor de
+    # radicación del HUS nombra la factura así: FVS_900006037_HUSxxxx.pdf.
+    # Sin esta entrada esos PDF quedaban etiquetados «otro» en vez de la
+    # factura, aunque sí se encontraban por número. 18-08-2026.
+    "FVS": "factura_electronica",
     "HEV": "historia_clinica",
     "CRC": "comprobante_recibido_cobro",
     "OPF": "otros_procedimientos",

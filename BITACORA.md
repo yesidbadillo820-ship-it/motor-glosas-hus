@@ -3528,6 +3528,29 @@ antes (la fuga de disco de autorizaciones) eran de plomería, no del motor.
 
 ---
 
+### 18-08 (noche) — Soportes: el indexador reconoce «FVS» (la factura)
+
+Quinto botón de la revisión. El indexador de soportes está bien armado (44
+pruebas, dos pasadas, comparte los soportes de carpeta entre facturas, y saca
+la factura del nombre exigiendo el prefijo «HUS» —lo que evita confundirla con
+el NIT del hospital 900006037, que va primero en el nombre—).
+
+**Lo que se arregló:** los archivos de la factura electrónica que el servidor
+nombra «FVS_900006037_HUSxxxx.pdf» quedaban etiquetados «otro», porque el
+clasificador no conocía el código **FVS** (Factura de Venta en Salud) —aunque
+la propia pantalla lo documenta—. Se encontraban por número, pero salían mal
+etiquetados. Ahora se etiquetan como la factura.
+
+**Lo que falta CONFIRMAR con un nombre real (para no adivinar):** el
+indexador saca la factura del nombre solo si trae el prefijo «HUS» (ej.
+FVS_900006037_**HUS**0000487175.pdf). Si algún archivo del servidor nombra la
+factura con dígitos pelados (FVS_900006037_487175.pdf, sin «HUS»), NO se
+indexaría por factura y no se encontraría. Hay que ver un nombre de archivo
+real del servidor de radicación para saber si eso pasa; si pasa, se amplía el
+patrón con cuidado de no volver a agarrar el NIT.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
