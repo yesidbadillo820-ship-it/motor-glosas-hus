@@ -8,7 +8,8 @@ como miscuentasmedicas.com pero usando los catálogos del HUS.
 
 Catálogos consultados:
   • TARIFAS_PROPIAS_HUS  — Res. 054/2026 + 124/2026 ESE HUS
-  • TARIFAS_SOAT_2026    — Circular 047/2025 MinSalud (UVB $12.110)
+  • SOAT 2026            — Circular Externa 047/2025 MinSalud, tabla
+                           completa (1.507 códigos, UVB $12.110)
   • DESCRIPCIONES_CUPS_2025 — fallback informativo (~150 códigos sin
     factor; cuando aparece acá pero no en los anteriores, se devuelve
     como "sin tarifa local — consulte el Manual SOAT 2026 oficial").
@@ -21,6 +22,8 @@ Modalidades soportadas:
 
 from __future__ import annotations
 
+import unicodedata
+
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -30,7 +33,7 @@ from app.models.db import UsuarioRecord
 from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
-    TARIFAS_SOAT_2026,
+    tarifas_soat_2026_completas,
 )
 from app.services.uvb import (
     calcular_soat_con_factor,
@@ -45,17 +48,27 @@ router = APIRouter(prefix="/tarifa-liquidador", tags=["Tarifa Liquidador"])
 # ─── Helpers ────────────────────────────────────────────────────────────
 
 
+def _sin_tildes(texto: str) -> str:
+    """'Osteosíntesis' → 'OSTEOSINTESIS'.
+
+    El auditor escribe sin tildes. Con las 1.507 descripciones de la Circular
+    047/2025 —llenas de tildes— buscar 'osteosintesis' no devolvía nada y el
+    liquidador parecía vacío."""
+    t = unicodedata.normalize("NFKD", str(texto or ""))
+    return "".join(c for c in t if not unicodedata.combining(c)).upper()
+
+
 def _matchea(texto_buscado: str, codigo: str, descripcion: str) -> bool:
-    q = (texto_buscado or "").upper().strip()
+    q = _sin_tildes(texto_buscado).strip()
     if not q:
         return True
-    if q in (codigo or "").upper():
+    if q in _sin_tildes(codigo):
         return True
-    if q in (descripcion or "").upper():
+    desc_up = _sin_tildes(descripcion)
+    if q in desc_up:
         return True
     # Match parcial token-a-token (cualquier palabra del query)
     tokens = [t for t in q.split() if len(t) >= 3]
-    desc_up = (descripcion or "").upper()
     return all(t in desc_up for t in tokens) if tokens else False
 
 
@@ -111,7 +124,7 @@ def buscar_codigo(
     matches = []
 
     if mod in ("SOAT", "SOAT_PLENO", "SOAT_PCT", "AMBOS", ""):
-        for cod, (factor_uvb, valor_pesos, desc, norma) in TARIFAS_SOAT_2026.items():
+        for cod, (factor_uvb, valor_pesos, desc, norma) in tarifas_soat_2026_completas().items():
             if _matchea(q, cod, desc):
                 liquidacion = _liquidar_soat(factor_uvb, pct, anio)
                 matches.append(
@@ -234,5 +247,5 @@ def info_unidades(
             f"y modificaciones). SMDLV {anio} ≈ ${valor_smdlv_vigente(anio):,}"
         ).replace(",", "."),
         "total_codigos_propios": len(TARIFAS_PROPIAS_HUS),
-        "total_codigos_soat": len(TARIFAS_SOAT_2026),
+        "total_codigos_soat": len(tarifas_soat_2026_completas()),
     }

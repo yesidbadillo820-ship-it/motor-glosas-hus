@@ -3000,6 +3000,107 @@ la celda F_DEV dañada de la fila 1271 (factura 542017).
 
 ---
 
+### 18-08 — Cómo comprobar que el SOAT 2026 quedó bien, y las 1.503 tarifas que faltaban
+
+Yesid preguntó dos cosas: **cómo quedó el homologador de CUPS a SOAT 2026** y,
+sobre todo, **cómo saber que quedó bien instalado en el sistema**. Y mandó los
+dos PDF que faltaban del paquete de agosto.
+
+**1) Ahora hay un botón para comprobarlo, sin depender de nadie.**
+
+Doble clic en `tools\VERIFICAR_CATALOGOS_SOAT.cmd`. Abre una pantalla, revisa
+las dos tablas del SOAT y termina diciendo **VERIFICADO** o **FALLA**. Solo
+mira: no cambia nada. Si falla, dice qué falta y qué hacer.
+
+Comprueba que el homologador instalado sea el del 2026, que ningún CUPS haya
+vuelto a guardar una frase como si fuera código SOAT, que el Manual SOAT traiga
+más de 1.500 códigos, y cinco tarifas escogidas a mano contra el PDF oficial.
+
+**2) El sistema conocía CUATRO tarifas SOAT. Ahora conoce 1.507.**
+
+Ese fue el hallazgo del día, y salió del PDF que mandó Yesid (la **Circular
+Externa 047 del 30 de diciembre de 2025**, la que fija las tarifas del Manual
+Tarifario para 2026). El liquidador de tarifas del portal decía en su
+documentación que usaba esa Circular, pero por dentro solo tenía **cuatro
+códigos** transcritos a mano como «ejemplos». Para todos los demás contestaba
+«sin tarifa local — consulte el Manual SOAT 2026 oficial», que es exactamente
+lo que uno necesita **cuando la EPS objeta la tarifa**.
+
+Se cargaron las 1.507 de la Circular. Eso alimenta tres sitios a la vez: el
+liquidador de tarifas, el letrero de tarifa que sale al analizar una glosa, y
+el bloque de datos que se le entrega a la IA para redactar el dictamen.
+
+**En plata:** el reemplazo de cadera (código 513014) vale 1.223,71 UVB ×
+$12.110 = **$14.819.100** a tarifa SOAT plena, y **$14.078.200** con el −5% de
+FAMISANAR. Antes de hoy, ese código no tenía tarifa en el sistema. Esto pesa
+sobre todo en los contratos pactados contra el SOAT: **FAMISANAR** («SOAT UVB
+vigente −5%») y **Policía Nacional** («UVB −8%»).
+
+**Por qué se puede confiar en cifras sacadas de un escaneo.** La Circular es un
+PDF escaneado: el computador tuvo que reconocer los números. Se comprobó de
+tres maneras distintas y las tres dieron lo mismo: dos lecturas independientes
+del mismo PDF (cero diferencias en 1.498 tarifas), los cuatro códigos que un
+humano había transcrito antes a mano (coinciden los cuatro), y el Excel Gold
+Standard con su propia columna de UVB (1.048 iguales de 1.250, y las 202
+restantes difieren en **una centésima de UVB** —unos $121— y ninguna en más:
+es redondeo, no error de lectura; manda la Circular, que es la norma).
+
+**3) Dos errores de cien pesos, corregidos.**
+
+- El código SOAT 19007 tenía escrito **$771.800** y son **$771.900**: se había
+  redondeado hacia abajo en vez de a la centena más próxima, como manda el
+  Decreto 780/2016. Cien pesos, pero era una cifra que el sistema le entregaba
+  a la IA como «valor oficial».
+- Al prompt de la IA los pesos le llegaban escritos a la gringa
+  («$14,819,100»). Ahora van **$14.819.100**, como se escribe acá. Es el mismo
+  defecto que salió el 13-08 con «$ 93340.0», en otro sitio del código.
+
+**4) Buscar en el liquidador ya no exige poner las tildes.** Escribir
+«osteosintesis» no encontraba nada porque la Circular dice «Osteosíntesis».
+Ahora encuentra los 27 códigos de osteosíntesis igual, con tilde o sin ella.
+
+**Lo que NO se cargó, para que no quede la impresión de que sí:**
+
+- El **«Proyecto Manual SOAT — Tabla de servicios»**, el otro PDF. Es un
+  **proyecto**, no norma vigente, y sus valores están en **puntos de SMLVD**,
+  la unidad que la Ley 2294 de 2023 reemplazó por la UVB. Cargarlo daría
+  cifras que no corresponden a lo que hoy se puede cobrar. Queda de consulta.
+- El archivo **`Trazabilidad años anteriores.xlsx`**. Serviría para responder
+  glosas de **facturas viejas**, donde aplica la tarifa vigente el día de la
+  atención y no la de 2026. Sigue pendiente.
+
+Todo lo anterior está explicado con detalle en
+`docs/CATALOGOS_TARIFARIOS_SOAT_2026.md`.
+
+**5) OJO CON ESTO — la Policía Nacional quedó SIN CONTRATO VIGENTE.**
+
+Salió de rebote, revisando por qué fallaban cuatro pruebas que no tenían
+nada que ver con el SOAT. **No es un error del sistema: es la realidad según
+la malla contractual cargada.** Los dos contratos de la Policía ya se
+vencieron:
+
+| Contrato | Rigió hasta |
+|---|---|
+| 068-5-200004-26 (mediana y alta) | **15-08-2026** — hace 3 días |
+| 068-5-200006-26 (oncología) | **31-07-2026** — hace 18 días |
+
+Desde el 16 de agosto, si usted analiza una glosa de la Policía Nacional, el
+dictamen dice **«SIN CONTRATO PACTADO»** y aplica **tarifa SOAT plena**. Eso
+está bien hecho si de verdad no hay contrato; está mal si ya se renovó y
+nadie ha cargado el nuevo.
+
+**Lo que hay que decidir (esto no lo puede resolver el sistema):** ¿se
+renovó el contrato con la Dirección de Sanidad de la Policía Nacional? Si
+sí, hay que cargar el nuevo número y su vigencia en la malla contractual.
+La malla que hoy tiene el sistema está fechada **28-07-2026**.
+
+Mientras tanto, las cuatro pruebas quedaron amarradas a una fecha dentro de
+la vigencia —igual que ya se había hecho con COMPENSAR—, porque lo que
+comprueban es que el nombre resuelva al contrato correcto, no si el contrato
+sigue vivo hoy.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
@@ -3010,6 +3111,27 @@ la celda F_DEV dañada de la fila 1271 (factura 542017).
   probarlo por su cuenta.
 - Si algún bot nuevo se agrega más adelante (o cambia de nombre), avisar
   para sumarlo al script y que el organizador lo incluya la próxima vez.
+
+### DECISIÓN DEL DUEÑO — contrato de la Policía Nacional (18-08)
+
+**¿Se renovó el contrato con la Dirección de Sanidad de la Policía Nacional?**
+Los dos que están cargados se vencieron: el 068-5-200004-26 (mediana y alta)
+el **15-08-2026**, y el 068-5-200006-26 (oncología) el **31-07-2026**. Desde
+el 16 de agosto el motor contesta «SIN CONTRATO PACTADO» y aplica tarifa SOAT
+plena para esa entidad. Si ya hay contrato nuevo, hay que cargar su número y
+su vigencia en la malla contractual (hoy fechada 28-07-2026).
+
+### Tarifas SOAT — lo que falta cargar (18-08)
+
+1. **`Trazabilidad años anteriores.xlsx`** (13 hojas, resoluciones de años
+   previos). Hoy el sistema solo sabe la tarifa **2026**. Cuando la glosa es
+   de una factura vieja, la tarifa que aplica es la que estaba vigente **el
+   día de la atención**, no la de hoy. Sin ese archivo cargado, ese tipo de
+   glosa hay que responderla a mano.
+2. **Descripciones con ruido en el Manual SOAT.** En un puñado de renglones de
+   la Circular 047/2025 la descripción quedó con un pedazo de la nota al pie
+   pegado (por ejemplo el código 38274). La **tarifa** está bien; solo el texto
+   quedó sucio. No es urgente, pero se ve feo en pantalla.
 
 ### Conciliación Dispensario (147 facturas objeto de mesa)
 
