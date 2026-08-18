@@ -3528,6 +3528,56 @@ antes (la fuga de disco de autorizaciones) eran de plomería, no del motor.
 
 ---
 
+### 18-08 (noche) — Soportes: el indexador reconoce «FVS» (la factura)
+
+Quinto botón de la revisión. El indexador de soportes está bien armado (44
+pruebas, dos pasadas, comparte los soportes de carpeta entre facturas, y saca
+la factura del nombre exigiendo el prefijo «HUS» —lo que evita confundirla con
+el NIT del hospital 900006037, que va primero en el nombre—).
+
+**Lo que se arregló:** los archivos de la factura electrónica que el servidor
+nombra «FVS_900006037_HUSxxxx.pdf» quedaban etiquetados «otro», porque el
+clasificador no conocía el código **FVS** (Factura de Venta en Salud) —aunque
+la propia pantalla lo documenta—. Se encontraban por número, pero salían mal
+etiquetados. Ahora se etiquetan como la factura.
+
+**Lo que falta CONFIRMAR con un nombre real (para no adivinar):** el
+indexador saca la factura del nombre solo si trae el prefijo «HUS» (ej.
+FVS_900006037_**HUS**0000487175.pdf). Si algún archivo del servidor nombra la
+factura con dígitos pelados (FVS_900006037_487175.pdf, sin «HUS»), NO se
+indexaría por factura y no se encontraría. Hay que ver un nombre de archivo
+real del servidor de radicación para saber si eso pasa; si pasa, se amplía el
+patrón con cuidado de no volver a agarrar el NIT.
+
+---
+
+### 18-08 (cierre) — Soportes: con los nombres REALES salió el defecto de verdad
+
+Yesid mandó rutas reales del servidor (\\Prime\radicacion_2026). Dos cosas:
+
+**1) El prefijo real es FEV, no «FVS».** La pantalla lo tenía mal documentado.
+FEV ya lo conocía el clasificador, así que la factura electrónica se
+detectaba bien. (Se dejó igual el soporte para «FVS» por si acaso, y se
+corrigió el texto de la pantalla.)
+
+**2) El defecto de verdad — la EPS salía vacía.** Las carpetas del 2026 llevan
+un ORDINAL delante: «**8.** AGOSTO 2026 - SOPORTES RADICACION». El indexador
+buscaba «AGOSTO 2026 - ...» sin ese «8. », así que no reconocía la carpeta del
+mes y, con ella, se perdían el mes, el año y —lo que importa— **la EPS de cada
+soporte** (NUEVA EPS, SANITAS, PPL, POSITIVA, SURA, SEGUROS BOLIVAR). Con eso
+arreglado, cada soporte ya sabe de qué EPS es.
+
+**Lo que quedó comprobado con los nombres reales:** la factura se saca perfecto
+del nombre en los 90 archivos de ejemplo —incluido uno con el NIT mal escrito
+(«9000006037» con un cero de más)—, porque el patrón se ancla en el prefijo
+HUS de la factura, no en el NIT. Mi duda del «dígito pelado» NO se da: todos
+traen HUS.
+
+Se agregaron pruebas que arman la estructura real de carpetas (con el ordinal)
+y comprueban que se encuentra la factura y se sabe la EPS.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

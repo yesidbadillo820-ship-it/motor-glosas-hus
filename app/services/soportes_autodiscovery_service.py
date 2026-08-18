@@ -45,6 +45,11 @@ logger = logging.getLogger("motor_glosas.soportes")
 # patrones más específicos primero.
 TIPOS_SOPORTE = {
     "FEV": "factura_electronica",
+    # FVS = Factura de Venta en Salud (código ADRES). El servidor de
+    # radicación del HUS nombra la factura así: FVS_900006037_HUSxxxx.pdf.
+    # Sin esta entrada esos PDF quedaban etiquetados «otro» en vez de la
+    # factura, aunque sí se encontraban por número. 18-08-2026.
+    "FVS": "factura_electronica",
     "HEV": "historia_clinica",
     "CRC": "comprobante_recibido_cobro",
     "OPF": "otros_procedimientos",
@@ -75,8 +80,11 @@ _MESES = (
     "NOVIEMBRE",
     "DICIEMBRE",
 )
+# Las carpetas reales del 2026 llevan un ordinal delante: "8. AGOSTO 2026 -
+# SOPORTES RADICACION". Sin tolerar ese "8. " (o "12. ") el mes, el año y —lo
+# que de verdad importa— la EPS de cada soporte salían vacíos. 18-08-2026.
 _RE_MES_RAIZ = re.compile(
-    r"^\s*(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
+    r"^\s*(?:\d{1,2}\.?\s*)?(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
     re.IGNORECASE,
 )
 

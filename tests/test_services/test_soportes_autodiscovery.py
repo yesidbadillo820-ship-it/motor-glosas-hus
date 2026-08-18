@@ -160,3 +160,93 @@ class TestSoportesIndexer:
         assert s["facturas_indexadas"] == 2  # HUS487523 y HUS0000495050
         assert s["archivos_indexados"] >= 8
         assert s["construido_en_epoch"] > 0
+
+
+class TestFVSSeReconoce:
+    """FVS = Factura de Venta en Salud (código ADRES) — 18-08-2026.
+
+    El servidor de radicación del HUS nombra la factura FVS_900006037_HUSxxx.pdf
+    (así lo documenta la propia pantalla). Antes esos PDF se indexaban por
+    número pero quedaban etiquetados «otro» en vez de la factura.
+    """
+
+    def test_fvs_es_la_factura_electronica(self):
+        from app.services.soportes_autodiscovery_service import _clasificar_archivo
+
+        for nombre in (
+            "FVS_900006037_HUS0000487175.pdf",
+            "FVS 900006037 HUS487175.pdf",
+        ):
+            tipo = _clasificar_archivo(nombre)
+            assert tipo is not None
+            assert tipo[0] == "FVS"
+            assert tipo[1] == "factura_electronica"
+
+    def test_no_se_confunde_con_otros(self):
+        from app.services.soportes_autodiscovery_service import _clasificar_archivo
+
+        # No es que ahora cualquier cosa con 'FV' pase: exige el delimitador.
+        assert _clasificar_archivo("FVSABC.pdf") is None
+        assert _clasificar_archivo("HEV_900006037_HUS487175.pdf")[0] == "HEV"
+
+
+class TestEstructuraRealDeRadicacion2026:
+    """Con los nombres y carpetas REALES del servidor (18-08-2026).
+
+    Yesid mandó rutas reales de \\\\Prime\\radicacion_2026. Traían dos cosas
+    que el indexador no manejaba: la carpeta del mes lleva un ordinal delante
+    ("8. AGOSTO 2026 - SOPORTES RADICACION") y la factura siempre viene con el
+    prefijo HUS en el nombre (FEV_900006037_HUS548170.pdf). Por el ordinal, la
+    EPS, el mes y el año salían vacíos.
+    """
+
+    def _armar(self, tmp_path, eps, factura, tipo="FEV"):
+        carpeta = (
+            tmp_path
+            / "8. AGOSTO 2026 - SOPORTES RADICACION"
+            / eps
+            / "SOFIA"
+            / "ENV-232984-okdgh"
+            / "SOPORTES"
+            / f"HUS{factura}"
+        )
+        carpeta.mkdir(parents=True, exist_ok=True)
+        archivo = carpeta / f"{tipo}_900006037_HUS{factura}.pdf"
+        archivo.write_bytes(b"%PDF-1.4 test")
+        return archivo
+
+    def test_encuentra_la_factura_y_sabe_la_eps(self, tmp_path):
+        from app.services.soportes_autodiscovery_service import SoportesIndexer
+
+        self._armar(tmp_path, "NUEVA EPS", "548170", "FEV")
+        self._armar(tmp_path, "SANITAS", "545510", "HEV")
+        idx = SoportesIndexer(raiz=str(tmp_path))
+        idx.rebuild()
+
+        r = idx.lookup("HUS0000548170")
+        assert r, "no encontró la factura por su número"
+        assert r[0]["eps"] == "NUEVA EPS"
+        assert r[0]["tipo_codigo"] == "FEV"
+        assert r[0]["factura_norm"] == "548170"
+
+    def test_el_ordinal_del_mes_no_esconde_la_eps(self, tmp_path):
+        from app.services.soportes_autodiscovery_service import SoportesIndexer
+
+        self._armar(tmp_path, "PPL", "546938", "FEV")
+        idx = SoportesIndexer(raiz=str(tmp_path))
+        idx.rebuild()
+        r = idx.lookup("546938")
+        assert r and r[0]["eps"] == "PPL"
+        assert r[0]["mes"] and "AGOSTO" in r[0]["mes"]
+
+    def test_el_nit_con_cero_de_mas_no_rompe_la_factura(self, tmp_path):
+        """Un nombre real venía con el NIT mal escrito (9000006037): igual
+        tiene que sacar bien la factura por el prefijo HUS."""
+        from app.services.soportes_autodiscovery_service import SoportesIndexer
+
+        carpeta = tmp_path / "8. AGOSTO 2026 - SOPORTES RADICACION" / "PPL" / "HUS548740"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        (carpeta / "HEV_9000006037_HUS548740.pdf").write_bytes(b"%PDF-1.4")
+        idx = SoportesIndexer(raiz=str(tmp_path))
+        idx.rebuild()
+        assert idx.lookup("548740")
