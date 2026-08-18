@@ -1,4 +1,5 @@
 """El validador ADRES y el buscador de autorizaciones, dentro del portal.
+from pathlib import Path
 
 OT-031 · 13-08-2026. Las dos herramientas vivían fuera de la página: el
 validador como una aplicación aparte en el puerto 8010 que hay que levantar
@@ -219,3 +220,33 @@ class TestLasRutasEstanMontadas:
         src = inspect.getsource(validador_adres)
         assert "validador_adres_service" in src
         assert "def correr_validacion" not in src, "la orquestación se duplicó en el router"
+
+
+class TestNoDejaBasuraEnDisco:
+    """La búsqueda de autorizaciones no puede llenar el disco del PC de cartera."""
+
+    def test_la_carpeta_temporal_se_borra_al_terminar_bien(self, monkeypatch):
+        import glob
+        import os
+        import tempfile as _tf
+
+        from app.api.deps import get_auditor_o_superior
+        from app.models.db import UsuarioRecord
+
+        usuario = UsuarioRecord(id=1, email="a@b.c", rol="SUPER_ADMIN", activo=1)
+        app.dependency_overrides[get_auditor_o_superior] = lambda: usuario
+        patron = os.path.join(_tf.gettempdir(), "autoriz_rips_*")
+        try:
+            antes = set(glob.glob(patron))
+            cliente = TestClient(app)
+            r = cliente.post(
+                "/validador-adres/autorizaciones",
+                files={"archivos": ("rips.json", _rips_json(), "application/json")},
+            )
+            assert r.status_code == 200, r.text
+            # El TestClient corre la tarea de fondo antes de devolver: al volver,
+            # la carpeta temporal ya no debe existir.
+            nuevas = set(glob.glob(patron)) - antes
+            assert nuevas == set(), f"quedaron carpetas temporales sin borrar: {nuevas}"
+        finally:
+            app.dependency_overrides.clear()
