@@ -93,6 +93,20 @@ _PERMITIDAS: dict[str, str] = {
     "tools/suite_cartera_hus/suite_cli.py::cmd_pdf": (
         "recibe rangos de páginas por línea de comandos"
     ),
+    # ── Tarifas en UVB: la regla de los pesos aquí está MAL ──────────────
+    # La Circular 047/2025 escribe las tarifas menores a 1 UVB con TRES
+    # decimales (Ley 2294/2023, art. 313, parágrafo primero): el hematocrito
+    # vale 0,567 UVB. Con la regla de los pesos —tres dígitos detrás = miles—
+    # `a_numero("0,567")` devuelve 567.0, mil veces más. Comprobado:
+    #     a_numero("0,602") -> 602.0   y   a_numero("0,567") -> 567.0
+    # Serían $6.866.400 en vez de $6.900. Por eso este lector es propio, y
+    # además devuelve None —no 0— cuando el texto no es un número: su trabajo
+    # es decidir si una palabra del PDF escaneado ES una tarifa.
+    "tools/generar_soat_uvb_2026_json.py::_a_float": (
+        "lee tarifas en UVB de un PDF escaneado, no pesos: con tres decimales "
+        "la regla de los pesos multiplica por mil"
+    ),
+    "tools/verificar_catalogos_soat.py::_pesos": ("formatea para mostrar en pantalla; no lee"),
     # ── main(): arman la salida, el valor ya viene leído ─────────────────
     "tools/consolidar_coosalud.py::main": "arma la salida; el valor ya viene leído",
     "tools/responder_glosas_coosalud.py::main": "arma la salida; el valor ya viene leído",

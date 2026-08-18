@@ -21,6 +21,10 @@ Donde:
 
 from __future__ import annotations
 
+import gzip
+import json
+import os
+
 
 # ─── TARIFAS PROPIAS HUS — Resolución 124 de marzo 25 de 2026 ───────────────
 # Datos textuales extraídos directamente del documento oficial.
@@ -326,7 +330,12 @@ TARIFAS_SOAT_2026: dict[str, tuple[float, int, str, str]] = {
     "19001": (5.93, 71_800, "Acetaminofén", "CIRCULAR_047_2025"),
     "19007": (
         63.74,
-        771_800,
+        # 63,74 UVB × $12.110 = $771.891,40 → centena más próxima = $771.900.
+        # Estaba escrito $771.800: se redondeó hacia abajo en vez de a la
+        # centena más próxima, como manda el numeral 87 del Anexo técnico 1
+        # del Decreto 780/2016. Cien pesos, pero era una cifra que el sistema
+        # le entregaba a la IA como «valor oficial».
+        771_900,
         "Ácidos grasos de cadena muy larga cuantificación",
         "CIRCULAR_047_2025",
     ),
@@ -367,13 +376,69 @@ def buscar_tarifa_propia_hus(cups_o_codigo_ips: str) -> dict | None:
     return None
 
 
+# ─── Manual SOAT 2026 completo — Circular Externa 047 de 2025 ───────────────
+#
+# Los cuatro códigos de TARIFAS_SOAT_2026 se transcribieron a mano del PDF
+# oficial. La tabla completa —1.507 códigos— se lee del catálogo comprimido
+# que genera tools/generar_soat_uvb_2026_json.py leyendo ese mismo PDF. Los
+# dos coinciden exactamente en los cuatro: esa es la prueba de que la lectura
+# automática del escaneo no inventó cifras.
+#
+# Sin esta tabla el sistema respondía «sin tarifa local — consulte el Manual
+# SOAT 2026 oficial» para 1.503 de los 1.507 códigos, justo cuando la EPS
+# objeta la tarifa. Importa especialmente en los contratos pactados contra
+# el SOAT (FAMISANAR: «SOAT UVB vigente −5%»; Policía Nacional: «UVB −8%»).
+
+_RUTA_SOAT_2026 = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "data", "soat_uvb_2026.json.gz"
+)
+_CACHE_SOAT_2026: dict[str, tuple[float, int, str, str]] | None = None
+
+
+def tarifas_soat_2026_completas() -> dict[str, tuple[float, int, str, str]]:
+    """Catálogo completo de la Circular 047/2025, con la misma forma que
+    TARIFAS_SOAT_2026: {codigo: (factor_uvb, valor_pesos, descripcion, norma)}.
+
+    Se lee una sola vez y se deja en memoria. Si el archivo no está, devuelve
+    los cuatro códigos transcritos a mano y el sistema sigue funcionando.
+    """
+    global _CACHE_SOAT_2026
+    if _CACHE_SOAT_2026 is not None:
+        return _CACHE_SOAT_2026
+
+    from app.services.uvb import calcular_valor_pesos
+
+    catalogo: dict[str, tuple[float, int, str, str]] = {}
+    try:
+        with gzip.open(_RUTA_SOAT_2026, "rt", encoding="utf-8") as f:
+            datos = json.load(f)
+        for codigo, fila in (datos.get("tarifas") or {}).items():
+            uvb = float(fila["uvb"])
+            catalogo[str(codigo).strip().upper()] = (
+                uvb,
+                calcular_valor_pesos(uvb, 2026),
+                str(fila.get("descripcion") or "").strip(),
+                "CIRCULAR_047_2025",
+            )
+    except (OSError, EOFError, ValueError, KeyError, TypeError):
+        # Catálogo ausente o dañado: se sigue con lo transcrito a mano. Nunca
+        # se inventa una tarifa para rellenar.
+        catalogo = {}
+
+    # Lo transcrito a mano manda sobre lo leído del escaneo.
+    catalogo.update(TARIFAS_SOAT_2026)
+    _CACHE_SOAT_2026 = catalogo
+    return catalogo
+
+
 def buscar_tarifa_soat_2026(cups: str) -> dict | None:
     """Busca en el catálogo de tarifas SOAT 2026 (Circular 047/2025)."""
     if not cups:
         return None
     k = cups.strip().upper()
-    if k in TARIFAS_SOAT_2026:
-        f, v, d, n = TARIFAS_SOAT_2026[k]
+    fila = tarifas_soat_2026_completas().get(k)
+    if fila:
+        f, v, d, n = fila
         return {
             "codigo_cups": k,
             "factor_uvb": f,
@@ -382,6 +447,15 @@ def buscar_tarifa_soat_2026(cups: str) -> dict | None:
             "norma": n,
         }
     return None
+
+
+def _pesos(valor: float) -> str:
+    """$14.819.100 — punto de miles, como se escribe en Colombia.
+
+    El bloque de abajo va al prompt de la IA: si le llega '$14,819,100'
+    la IA lo copia así al dictamen y el auditor recibe una cifra escrita
+    a la gringa en un documento que va radicado a la EPS."""
+    return "$" + f"{int(round(valor)):,}".replace(",", ".")
 
 
 def contexto_tarifa_oficial(cups: str) -> str:
@@ -407,9 +481,9 @@ def contexto_tarifa_oficial(cups: str) -> str:
         bloques.append(
             f"[TARIFA SOAT 2026 - Circular 047/2025 · CUPS {soat['codigo_cups']}]\n"
             f"Descripción: {soat['descripcion']}\n"
-            f"Factor: {soat['factor_uvb']} UVB × $12.110 = ${soat['valor_pesos_2026']:,.0f}\n"
+            f"Factor: {soat['factor_uvb']} UVB × $12.110 = {_pesos(soat['valor_pesos_2026'])}\n"
             "Este es el valor SOAT pleno vigente 2026. Si el contrato pactó "
-            f"'SOAT -X%', aplicar: ${soat['valor_pesos_2026']:,.0f} × (1 - X/100)."
+            f"'SOAT -X%', aplicar: {_pesos(soat['valor_pesos_2026'])} × (1 - X/100)."
         )
 
     return "\n\n".join(bloques)
