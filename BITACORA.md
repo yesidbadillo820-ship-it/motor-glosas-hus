@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 14-08-2026
+**Última actualización:** 18-08-2026
 
 ---
 
@@ -2964,7 +2964,52 @@ la celda F_DEV dañada de la fila 1271 (factura 542017).
 
 ---
 
+### 18-08 — Carpeta de trabajo organizada: nace `D:\TRABAJOS BOTS`
+- **Pedido del auditor:** con tantos frentes abiertos (SIIFA, COOSALUD,
+  SIMED, DGH, ADRES, Suite Cartera...) cuesta acordarse "¿en qué carpeta
+  estaba el bot de tal cosa?" y cada vez toca buscar. Pidió una carpeta
+  única en `D:\TRABAJOS BOTS`, organizada por tema, con todo lo de cada
+  frente junto y de forma intuitiva: que al pedir algo se sepa de una a
+  qué carpeta ir y qué bot correr, sin perder tiempo.
+- **Solución entregada:** un bot nuevo de doble clic,
+  `tools\ORGANIZAR_TRABAJOS_BOTS.cmd`, que arma (o pone al día) la
+  carpeta `D:\TRABAJOS BOTS` con **12 carpetas por frente** — 1.COOSALUD,
+  2.SIMED-Dispensario, 3.DGH, 4.SIIFA, 5.ADRES-FURIPS, 6.Glosas ADRES y
+  detallados, 7.Pre-auditoría SINAC, 8.Suite Cartera HUS, 9.Otras EPS
+  (Mutual Ser/FOMAG/SAVIA/EMSSANAR/Famisanar), 10.Herramientas generales
+  (PDF/Excel/ZIP), 11.Motor de Glosas-servidor web y 12.Documentación —
+  más un **índice maestro** en la raíz ("0. LEEME PRIMERO - INDICE.txt")
+  con la tabla *"si te piden esto → ve a esta carpeta"*.
+- **Qué deja en cada carpeta:** accesos directos (doble clic) a los bots
+  que ya lo permiten (MOTOR_HUS, CARGAR_SIIFA, VALIDAR_FURIPS, INICIAR
+  SUITE CARTERA, ESTADO_MOTOR, etc.), accesos a las guías (`docs/...`)
+  abiertas con Notepad, y un `LEEME.txt` en español sencillo por carpeta:
+  cuándo venir ahí, qué bot usar y — para los robots que aún no tienen
+  doble clic (COOSALUD, SIMED, DGH, Mutual Ser, FOMAG) — el **comando de
+  PowerShell listo para copiar y pegar**, con la regla del piloto de 1
+  factura siempre recordada.
+- **No copia ni mueve nada del repositorio**, solo crea accesos directos:
+  si el bot cambia, el acceso directo lo sigue viendo sin volver a correr
+  el organizador. Es seguro correrlo las veces que haga falta (no borra
+  nada que el auditor haya puesto a mano en `D:\TRABAJOS BOTS`) — así que
+  cuando se agregue un bot nuevo, basta con volver a darle doble clic a
+  `ORGANIZAR_TRABAJOS_BOTS.cmd` para que la carpeta quede al día sola.
+- **Cómo usarlo:** copiar la carpeta `tools\` actualizada al PC (o
+  `git pull` en `C:\temp-notas`) y dar doble clic en
+  `tools\ORGANIZAR_TRABAJOS_BOTS.cmd`.
+
+---
+
 ## 3) PENDIENTE
+
+### Organización de trabajos (nuevo, 18-08)
+- **Correr `ORGANIZAR_TRABAJOS_BOTS.cmd` en un PC real del hospital** y
+  confirmar que la carpeta `D:\TRABAJOS BOTS` queda como se espera (los
+  12 temas, los accesos directos abren el bot correcto, y los LEEME.txt
+  se leen bien en español). Claude Code no tiene acceso al disco D: para
+  probarlo por su cuenta.
+- Si algún bot nuevo se agrega más adelante (o cambia de nombre), avisar
+  para sumarlo al script y que el organizador lo incluya la próxima vez.
 
 ### Conciliación Dispensario (147 facturas objeto de mesa)
 
@@ -3186,6 +3231,15 @@ la celda F_DEV dañada de la fila 1271 (factura 542017).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+### Lo más fresco (del 18-08)
+
+- **Probar `ORGANIZAR_TRABAJOS_BOTS.cmd` en un PC real** (doble clic,
+  carpeta `tools\`) y confirmar que `D:\TRABAJOS BOTS` queda como se
+  espera: las 12 carpetas por tema, los accesos directos abriendo el bot
+  correcto y los `LEEME.txt` claros. Avisar en el chat cualquier ajuste
+  (nombre de carpeta, bot que falte, texto que no quede claro) para
+  corregir el script.
 
 ### Lo más fresco (del 13-08)
 
