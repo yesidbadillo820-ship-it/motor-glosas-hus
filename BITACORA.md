@@ -2951,6 +2951,17 @@ veces no cambia nada. Los PDF del 0109 y el 0111 salieron de muestra.
 HUS0000533242, no aparece en ningún Excel) — cuando el equipo la escriba
 en el consolidado, entra sola en la siguiente corrida.
 
+**Y LA CORRIDA REAL EN EL PC SALIÓ BIEN (mismo 14-08):** Yesid corrió el
+trío con los archivos nuevos. Consolidado 2026: 56 facturas nuevas + 29
+puestas al día (las otras 3 que avanzaron —540518, 543271, 545425— el
+equipo ya las había trabajado en la página, así que el sistema las
+respetó, como debe ser). ADRES 2025: las 62 completas. Oficios de
+devolución: 9 nuevos (00103 con 3 facturas y 0106 a 0113, incluido el
+0111 con sus 28), 57 eventos amarrados, cada uno con su botón PDF.
+Cero conflictos, cero choques con la página. El informe ya sale con la
+información de los tres Excel. Pendiente de datos: la factura del 0099 y
+la celda F_DEV dañada de la fila 1271 (factura 542017).
+
 ---
 
 ## 3) PENDIENTE
