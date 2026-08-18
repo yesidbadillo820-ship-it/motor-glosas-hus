@@ -344,6 +344,36 @@ TARIFAS_SOAT_2026: dict[str, tuple[float, int, str, str]] = {
 }
 
 
+def tarifas_propias_hus_completas() -> dict[str, dict]:
+    """Catálogo institucional completo del HUS (TARIFAS_HUS.xlsx): ~1.900
+    procedimientos, paquetes, exámenes ambulatorios y órtesis con su valor
+    propio en pesos 2026, indexados por CUPS.
+
+    Se lee una sola vez. Si el archivo no está, devuelve {} y el sistema sigue
+    con las 84 tarifas transcritas a mano — nunca inventa una tarifa.
+    """
+    global _CACHE_PROPIAS
+    if _CACHE_PROPIAS is not None:
+        return _CACHE_PROPIAS
+    catalogo: dict[str, dict] = {}
+    try:
+        with gzip.open(_RUTA_PROPIAS, "rt", encoding="utf-8") as f:
+            catalogo = json.load(f).get("tarifas", {}) or {}
+    except (OSError, EOFError, ValueError, KeyError, TypeError):
+        catalogo = {}
+    _CACHE_PROPIAS = catalogo
+    return catalogo
+
+
+def _cups_base(codigo: str) -> str:
+    """De un código IPS a su CUPS: '512101H' → '512101'. Los alfanuméricos
+    (órtesis 'AGMO102T') se dejan igual."""
+    k = str(codigo or "").strip().upper()
+    if k[:6].isdigit() and len(k) > 6:
+        return k[:6]
+    return k
+
+
 def buscar_tarifa_propia_hus(cups_o_codigo_ips: str) -> dict | None:
     """Busca en el catálogo de tarifas propias HUS (Res. 054/2026 + 124/2026).
 
@@ -373,6 +403,17 @@ def buscar_tarifa_propia_hus(cups_o_codigo_ips: str) -> dict | None:
                 "descripcion": d,
                 "norma": n,
             }
+    # Catálogo institucional completo (TARIFAS_HUS.xlsx). Se busca por CUPS.
+    catalogo = tarifas_propias_hus_completas()
+    fila = catalogo.get(k) or catalogo.get(_cups_base(k))
+    if fila:
+        return {
+            "codigo_ips": fila.get("codigo_ips") or k,
+            "factor_smdlv": None,
+            "valor_pesos_2026": int(fila["valor"]),
+            "descripcion": fila.get("descripcion", ""),
+            "norma": f"Tarifa propia HUS 2026 ({fila.get('tipo', 'PROPIA')})",
+        }
     return None
 
 
@@ -394,6 +435,11 @@ _RUTA_SOAT_2026 = os.path.join(
 )
 _CACHE_SOAT_2026: dict[str, tuple[float, int, str, str]] | None = None
 _CACHE_INTEGRALES: set[str] | None = None
+
+_RUTA_PROPIAS = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "data", "tarifas_propias_hus.json.gz"
+)
+_CACHE_PROPIAS: dict[str, dict] | None = None
 
 
 def tarifas_soat_2026_completas() -> dict[str, tuple[float, int, str, str]]:

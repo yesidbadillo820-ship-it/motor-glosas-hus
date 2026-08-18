@@ -3306,6 +3306,49 @@ se carga igual que se cargó el SOAT.
 
 ---
 
+### 18-08 (noche) — «No es solo FAMISANAR»: cargadas las 1.900 tarifas propias del HUS
+
+Yesid mandó tres archivos con una instrucción clara: **tener en cuenta todas
+las tarifas, no solo FAMISANAR**. Tenía toda la razón, y salió un hueco
+grande: el liquidador solo conocía **84** tarifas propias del hospital.
+
+**Qué se cargó — `TARIFAS_HUS.xlsx`.** El catálogo institucional completo del
+HUS: **1.932 tarifas propias** en pesos (1.480 procedimientos + 47 paquetes +
+374 exámenes ambulatorios + 31 órtesis/prótesis). Estas tarifas **no son de
+FAMISANAR**: son del HUS, y las usan **todos** los contratos que pactan
+«tarifas propias/institucionales».
+
+**Por qué importa para todas las EPS.** La malla que mandó Yesid lo confirma
+—casi todos pagan «SOAT −X% + TARIFAS PROPIAS»—:
+
+| EPS / Pagador | Modalidad |
+|---|---|
+| COOSALUD (subsidiado y contributivo) | SOAT −15% + tarifas institucionales |
+| COMPENSAR | SOAT −15% + tarifas propias |
+| SALUD MÍA (Plan Canguro/IVE) | SOAT −15% + tarifas propias |
+| CONSORCIO PPL (Fiduciaria Central) | SOAT −15% + tarifas institucionales |
+| SEGUROS AURORA / ARL | SOAT −3% + tarifas institucionales |
+| FAMISANAR | SOAT UVB −5% + tarifas institucionales |
+| PREVISORA FOMAG | SOAT (condiciones iniciales) |
+
+**Qué se ve ahora.** Busque `512101` (colecistectomía) y sale la **TARIFA
+PROPIA del HUS $6.296.900** —el valor real que se cobra— **para cualquier
+EPS**, sin depender de que esté cargada en la base. Antes ese número solo
+aparecía si estaba pactado en la base de FAMISANAR.
+
+**Un cuidado importante:** a las tarifas propias **NO se les aplica el −X%
+del SOAT** —son valor fijo—. La pantalla lo dice: «tarifa fija · sin % SOAT».
+Aplicarle el descuento sería cobrar de menos.
+
+**Lo que NO se tocó, a propósito:** la **malla de contratación** del sistema.
+El sistema ya tiene una malla más reciente (28-07-2026) que la que mandó Yesid
+(2 de marzo). Meter la de marzo encima **borraría** contratos más nuevos. Si
+hay que actualizar las vigencias o los porcentajes por EPS, se hace con
+cuidado y revisando contra la malla vigente — queda como decisión para
+confirmar, no se cambió a ciegas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

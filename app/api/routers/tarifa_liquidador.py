@@ -7,9 +7,14 @@ pesos calculado a la centena más próxima — equivalente local a sitios
 como miscuentasmedicas.com pero usando los catálogos del HUS.
 
 Catálogos consultados:
-  • TARIFAS_PROPIAS_HUS  — Res. 054/2026 + 124/2026 ESE HUS
+  • TARIFAS PROPIAS HUS  — catálogo institucional completo del HUS
+                           (~1.900 códigos: propias, paquetes, ambulatorio,
+                           órtesis) + las 84 con factor SMDLV. Valor FIJO.
   • SOAT 2026            — Circular Externa 047/2025 MinSalud, tabla
                            completa (1.507 códigos, UVB $12.110)
+  • Cirugías por grupo   — se suman sala + cirujano + ayudantía +
+                           anestesiólogo + materiales del grupo quirúrgico
+  • Tarifa PACTADA       — lo que el contrato de cada EPS pactó (base de datos)
   • DESCRIPCIONES_CUPS_2025 — fallback informativo (~150 códigos sin
     factor; cuando aparece acá pero no en los anteriores, se devuelve
     como "sin tarifa local — consulte el Manual SOAT 2026 oficial").
@@ -40,6 +45,7 @@ from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
     es_atencion_integral,
+    tarifas_propias_hus_completas,
     tarifas_soat_2026_completas,
 )
 from app.services.uvb import (
@@ -167,6 +173,42 @@ def buscar_codigo(
                         **liquidacion,
                     }
                 )
+        # ── Catálogo institucional completo del HUS (TARIFAS_HUS.xlsx) ────────
+        # 18-08-2026. Antes solo se conocían 84 tarifas propias. Estas ~1.900
+        # NO son de FAMISANAR: son del HUS, y las usan todos los contratos que
+        # pactan "tarifas propias/institucionales" (COOSALUD, COMPENSAR, SALUD
+        # MÍA, AURORA, PPL, FAMISANAR). Son valor FIJO en pesos: NO se les
+        # aplica el porcentaje SOAT del contrato.
+        ya_propia = {m["codigo"].upper() for m in matches if m.get("catalogo") == "PROPIA_HUS"}
+        agregadas = 0
+        for cups_p, fila_p in tarifas_propias_hus_completas().items():
+            if agregadas >= 60:
+                break
+            if cups_p.upper() in ya_propia:
+                continue
+            if _matchea(q, cups_p, fila_p.get("descripcion", "")):
+                tipo_p = fila_p.get("tipo", "PROPIA")
+                matches.append(
+                    {
+                        "codigo": cups_p,
+                        "descripcion": fila_p.get("descripcion", ""),
+                        "norma": f"Tarifa propia HUS 2026 ({tipo_p})",
+                        "catalogo": "PROPIA_HUS",
+                        "modalidad": "PROPIA_HUS_FIJA",
+                        "codigo_cups": cups_p,
+                        "codigo_ips": fila_p.get("codigo_ips"),
+                        "factor_uvb": None,
+                        "factor_smdlv": None,
+                        "valor_pesos": int(fila_p["valor"]),
+                        "uvb_vigente": valor_uvb_vigente(anio),
+                        "porcentaje_aplicado": 0,
+                        "formula": (
+                            f"Tarifa institucional propia del HUS ({tipo_p}). Es un valor "
+                            "fijo en pesos: no se le aplica el porcentaje SOAT del contrato."
+                        ),
+                    }
+                )
+                agregadas += 1
 
     # ── El puente CUPS → SOAT ───────────────────────────────────────────
     # 18-08-2026. Hasta hoy esta pantalla solo entendía el código SOAT
