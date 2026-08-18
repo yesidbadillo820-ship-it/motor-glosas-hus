@@ -3349,6 +3349,36 @@ confirmar, no se cambió a ciegas.
 
 ---
 
+### 18-08 (noche) — Empieza «Salud Total»: el lector de valores ya no lee de menos
+
+Segundo botón de la revisión. Salud Total ya tenía mucho trabajo hecho (se
+había restaurado y se le conectó el análisis con IA), así que el diagnóstico
+fue corto.
+
+**Lo que ya funcionaba bien:** las tres opciones (Extemporánea, Ratificada,
+Analizar con IA) responden; la pantalla tiene girador, error, estado vacío,
+moneda con formato y las etiquetas IA/PLANTILLA; y no inventa «días
+transcurridos» si falta la fecha.
+
+**El defecto que se arregló — el lector de valores era frágil.** Leía solo el
+formato gringo (280000.00). Si el portal mandaba el valor a la colombiana:
+- «280.000» lo leía como **$280** (mil veces menos),
+- «280.000,00» **reventaba** el proceso.
+
+Y esos valores van en el archivo que se radica y en los totales de la
+pantalla. Ahora usa el lector único del repo, que entiende los dos formatos
+y deja el actual igual. 11 pruebas nuevas.
+
+**Lo que quedó como DECISIÓN del dueño (no se tocó):** el código de respuesta
+RE9901 que el modo rápido le pone a las glosas que no son de tarifa ni
+extemporáneas (soportes, autorización, cobertura…). Ese código, según el
+Manual Único, ADMITE que la glosa era justificada y que se subsanó. Si lo que
+se quiere es rechazarla de fondo, el código sería RE9602 («injustificada al
+100%»). Falta que Cartera confirme cuál usa el HUS en el portal de Salud Total
+antes de cambiarlo.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

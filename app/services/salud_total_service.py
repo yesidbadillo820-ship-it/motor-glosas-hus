@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from app.services.glosa_service import _suavizar_tono
+from app.utils.moneda import parse_valor_cop
 
 NIT_HUS = "900006037"
 DIAS_LIMITE = 20
@@ -161,9 +162,17 @@ class GlosaSaludTotal:
         self.valor_bruto_factura = self._parse_float(campos[23]) if len(campos) > 23 else 0
 
     def _parse_float(self, valor: str) -> float:
-        if not valor:
-            return 0
-        return float(valor.replace(",", ""))
+        """Lee un valor en pesos del TXT con el lector único del repo.
+
+        18-08-2026. Antes hacía `float(valor.replace(",", ""))`. Eso solo
+        sirve para el formato gringo (280000.00). Si el portal manda el valor
+        a la colombiana leía mal o se caía:
+            "280.000"      -> 280.0        (mil veces menos)
+            "1.589.100,00" -> se reventaba
+        Y esos valores alimentan los totales de la pantalla y el archivo que
+        se radica. `parse_valor_cop` entiende los dos formatos y deja el
+        actual igual (280000.00 -> 280000.0)."""
+        return parse_valor_cop(valor)
 
     @property
     def sin_fecha_recepcion(self) -> bool:
