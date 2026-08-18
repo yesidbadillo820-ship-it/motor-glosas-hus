@@ -215,3 +215,25 @@ def test_un_error_de_ya_respondida_cuenta_como_registrada(tmp_path):
 
     assert cruzadas[0]["estado"] == inf.REGISTRADA
     assert "SIIFA la tiene registrada" in cruzadas[0]["detalle"]
+
+
+def test_sin_reportes_sale_el_censo_completo():
+    """Para cuando el CSV del cargue se perdió (pasó: una corrida
+    interrumpida lo sobreescribió): el censo dice cuánto de lo que SIIFA
+    tiene está respondido —lo del bot y lo cargado antes— y qué falta."""
+    cruzadas = inf.censar([_seg(1, "SI"), _seg(2, "SI"), _seg(3, "NO")])
+
+    estados = [c["estado"] for c in cruzadas]
+    assert estados.count(inf.REGISTRADA) == 2
+    assert estados.count(inf.SIN_RESPONDER) == 1
+
+
+def test_el_censo_tambien_se_escribe_en_excel(tmp_path):
+    cruzadas = inf.censar([_seg(1, "SI"), _seg(2, "NO")])
+    ruta = tmp_path / "CENSO.xlsx"
+
+    inf.escribir(cruzadas, ruta, GIRON)
+
+    estados = [c.value for c in load_workbook(ruta)["DETALLE"]["A"][1:]]
+    assert estados[0] == inf.SIN_RESPONDER, "lo pendiente sale de primero"
+    assert estados[-1] == inf.REGISTRADA

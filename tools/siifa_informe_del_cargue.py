@@ -46,10 +46,12 @@ from _dinero import a_entero  # noqa: E402
 import siifa_perfiles as perfiles  # noqa: E402
 from siifa_novedades import leer_informe, valor_total  # noqa: E402
 
-# Los tres estados en que puede quedar una respuesta mandada.
+# Los estados en que puede quedar una respuesta mandada.
 REGISTRADA = "REGISTRADA EN SIIFA"
 NO_QUEDO = "EL BOT DIJO OK PERO SIIFA NO LA TIENE"
 CON_ERROR = "NO SE PUDO CARGAR"
+# Y el del modo censo (sin reportes del bot): lo que sigue sin respuesta.
+SIN_RESPONDER = "SIN RESPUESTA EN SIIFA (pendiente)"
 
 COLUMNAS = [
     "estado",
@@ -142,6 +144,34 @@ def cruzar(reportes: dict[int, dict], informe: list[dict]) -> list[dict]:
     return salida
 
 
+def censar(informe: list[dict]) -> list[dict]:
+    """El estado de TODO lo que hay en SIIFA, sin reportes del bot.
+
+    Para cuando el CSV del cargue se perdió (pasó: una corrida interrumpida
+    lo sobreescribió) o cuando se quiere el censo completo: cuánto de lo que
+    la plataforma tiene está respondido —da igual si lo cargó el bot hoy o
+    quedó cargado antes— y cuánto sigue pendiente.
+    """
+    salida = []
+    for fila in informe:
+        respondida = str(fila.get("tiene_respuesta", "")).strip().upper() == "SI"
+        salida.append(
+            {
+                "estado": REGISTRADA if respondida else SIN_RESPONDER,
+                "detalle": "",
+                "id_seguimiento_factura_glosa": fila.get("id_seguimiento_factura_glosa", ""),
+                "numero_factura": fila.get("numero_factura", ""),
+                "tipo_seguimiento": fila.get("tipo_seguimiento", ""),
+                "razon_social_eps": fila.get("razon_social_eps", ""),
+                "valor_glosa": a_entero(fila.get("valor_glosa")),
+                "codigo_glosa": fila.get("codigo_glosa", ""),
+                "codigo_respuesta": fila.get("codigo_respuesta", ""),
+                "fecha_respuesta": str(fila.get("fecha_respuesta", ""))[:10],
+            }
+        )
+    return salida
+
+
 def _pesos(valor: object) -> str:
     return f"${a_entero(valor):,}".replace(",", ".")
 
@@ -171,7 +201,7 @@ def mostrar(cruzadas: list[dict], ips) -> None:
     print(f"\n  Respuestas mandadas: {len(cruzadas)}\n")
     print(f"  {'Estado':<42}{'Ítems':>9}{'Valor':>18}")
     print("-" * 82)
-    for estado in (REGISTRADA, NO_QUEDO, CON_ERROR):
+    for estado in (REGISTRADA, NO_QUEDO, CON_ERROR, SIN_RESPONDER):
         grupo = por_estado.get(estado, [])
         if grupo:
             print(f"  {estado:<42}{len(grupo):>9}{_pesos(valor_total(grupo)):>18}")
@@ -217,7 +247,7 @@ def escribir(cruzadas: list[dict], ruta: Path, ips) -> None:
     verde = PatternFill("solid", fgColor="C6EFCE")
     rojo = PatternFill("solid", fgColor="FFC7CE")
     ambar = PatternFill("solid", fgColor="FFF2CC")
-    colores = {REGISTRADA: verde, CON_ERROR: rojo, NO_QUEDO: ambar}
+    colores = {REGISTRADA: verde, CON_ERROR: rojo, NO_QUEDO: ambar, SIN_RESPONDER: ambar}
 
     wb = Workbook()
     ws = wb.active
@@ -233,7 +263,7 @@ def escribir(cruzadas: list[dict], ruta: Path, ips) -> None:
     por_estado: dict[str, list] = defaultdict(list)
     for f in cruzadas:
         por_estado[f["estado"]].append(f)
-    for estado in (REGISTRADA, NO_QUEDO, CON_ERROR):
+    for estado in (REGISTRADA, NO_QUEDO, CON_ERROR, SIN_RESPONDER):
         grupo = por_estado.get(estado, [])
         if grupo:
             ws.append(
@@ -271,7 +301,7 @@ def escribir(cruzadas: list[dict], ruta: Path, ips) -> None:
     for i, h in enumerate(COLUMNAS, 1):
         c = ws2.cell(row=1, column=i, value=h)
         c.fill, c.font = azul, blanco
-    orden = {REGISTRADA: 2, NO_QUEDO: 0, CON_ERROR: 1}
+    orden = {REGISTRADA: 2, NO_QUEDO: 0, CON_ERROR: 1, SIN_RESPONDER: 0}
     for r, f in enumerate(
         sorted(cruzadas, key=lambda x: (orden[x["estado"]], -x["valor_glosa"])), 2
     ):
@@ -296,7 +326,11 @@ def main() -> None:
     )
     ap.add_argument("--informe", required=True, help="Informe de SIIFA bajado DESPUÉS del cargue.")
     ap.add_argument(
-        "--reporte", action="append", required=True, help="CSV del cargue (se puede repetir)."
+        "--reporte",
+        action="append",
+        help="CSV del cargue (se puede repetir). SIN esta opción, el informe "
+        "es el censo completo: todo lo respondido en la plataforma —lo del "
+        "bot y lo anterior— contra lo que sigue pendiente.",
     )
     ap.add_argument("--salida", required=True, help="Excel del informe a generar.")
     perfiles.agregar_argumento(ap)
@@ -306,11 +340,13 @@ def main() -> None:
 
     informe = leer_informe(Path(args.informe))
     perfiles.verificar_informe(ips, informe)
-    reportes = leer_reportes([Path(r) for r in args.reporte])
-    if not reportes:
-        raise SystemExit("\nLos reportes del cargue no traen ninguna fila con id.\n")
-
-    cruzadas = cruzar(reportes, informe)
+    if args.reporte:
+        reportes = leer_reportes([Path(r) for r in args.reporte])
+        if not reportes:
+            raise SystemExit("\nLos reportes del cargue no traen ninguna fila con id.\n")
+        cruzadas = cruzar(reportes, informe)
+    else:
+        cruzadas = censar(informe)
     mostrar(cruzadas, ips)
     escribir(cruzadas, Path(args.salida), ips)
     print(f"  Informe guardado: {args.salida}\n")
