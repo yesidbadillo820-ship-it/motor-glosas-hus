@@ -35,8 +35,15 @@ Requiere una sola vez: `py -m pip install openpyxl`
 ## Qué hace exactamente
 
 1. **De la macro se queda solo con lo aceptado.** Únicamente las filas con
-   VALOR ACEPTADO mayor que cero. Las **SE OBJETA** y las **SE SUBSANA** se
-   siguen reclamando completas, así que no tocan el detallado.
+   VALOR ACEPTADO mayor que cero. Y descarta —avisando— dos clases de fila que
+   no se pueden usar:
+   - las que dicen **SE OBJETA** o **SE SUBSANA** en la observación: ese
+     servicio se sigue reclamando completo, así que no puede tocar el
+     detallado. Si además trae valor aceptado, la macro se está contradiciendo
+     y el auditor tiene que verlo;
+   - aquellas donde el **valor aceptado es mayor que el valor reclamado** de la
+     misma fila. Eso es imposible —no se puede aceptar más de lo que se cobró—
+     y pasa cuando la columna del Excel quedó corrida un renglón.
 2. **Cruza contra el detallado.** No por código a secas: el detallado usa el
    código del hospital (`FMQ0046`) y la macro el del ADRES
    (`2016DM-0000315-R2`). Se usa el mismo motor de rondas del ajustador —
@@ -130,6 +137,10 @@ valores negativos, y lo avisa).
 
 Un Excel dañado no tumba el lote: esa factura queda en ERROR y las demás siguen.
 
+Y si la macro le acepta plata a una factura que **no tiene detallado** en la
+carpeta, esa factura igual sale en la bitácora con estado **SIN_DETALLADO** y
+su valor: esa plata se seguiría reclamando sin que nadie se entere.
+
 ---
 
 ## Resultado del paquete 31068 (18-08-2026)
@@ -137,8 +148,20 @@ Un Excel dañado no tumba el lote: esa factura queda en ERROR y las demás sigue
 | | |
 |---|---|
 | 320 facturas, valor antes | **$714.332.224** |
-| Menos lo aceptado | **$88.290.032** |
-| **TOTAL FINAL que sigue reclamando el hospital** | **$626.042.192** |
+| Menos lo aceptado | **$88.216.532** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.115.692** |
 
-Quedaron **14 facturas con CUADRA = NO** ($3.327.635) y **2 con REVISAR A MANO**
-(HUS384132 y HUS392442) para mirar antes de radicar.
+Para mirar antes de radicar: **14 facturas con CUADRA = NO** ($3.401.135),
+**2 con REVISAR A MANO** (HUS384132 y HUS392442), **1 con OJO CON LA MACRO**
+(HUS396996, la fila corrida) y **2 SIN_DETALLADO** (HUS367368 y HUS394817, por
+$12.800).
+
+### La fila corrida de la HUS396996
+
+Una fila de la macro —una sola en 4.619— dice **SE OBJETA** y aun así trae
+**$758.700 aceptados** sobre un servicio de **$73.500**. La columna VALOR
+ACEPTADO quedó corrida un renglón: ese valor es el del tórax de la fila
+siguiente. Sin las dos guardas, el bot borraba del detallado una radiografía de
+mano que el hospital **sigue reclamando**. Ahora la salta y avisa. **Esa factura
+hay que revisarla completa**: por el mismo corrimiento, al tórax se le descontó
+$7.800 cuando el equipo lo aceptó por $758.700.

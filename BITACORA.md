@@ -2904,6 +2904,43 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 18-08-2026 (cierre) — Una fila corrida de la macro casi borra una radiografía
+
+Siguiendo la revisión, apareció **una segunda factura con problema**: la
+**HUS396996**. El bot le había dejado en **cero** una radiografía de mano de
+$73.500 que el hospital **sigue reclamando**.
+
+**Por qué.** En la macro hay **una sola fila** (de 4.619) donde la columna
+VALOR ACEPTADO quedó **corrida un renglón**: la fila de la radiografía de mano
+—que además dice **SE OBJETA**— trae $758.700 aceptados, que en realidad son
+del tórax de la fila de abajo. El bot se lo tragó tal cual.
+
+**Lo que faltaba en el bot.** El programa prometía en su documentación que las
+**SE OBJETA** y las **SE SUBSANA** no tocan el detallado… pero **nunca leía esa
+columna**. Ahora sí, y además rechaza cualquier fila donde el valor aceptado sea
+**mayor que el valor reclamado** de esa misma fila: eso es imposible, no se
+puede aceptar más de lo que se cobró. Cualquiera de las dos guardas atrapa el
+caso; están las dos.
+
+**Otro hueco que se tapó.** Si la macro le acepta plata a una factura que **no
+tiene detallado** en la carpeta, antes esa plata desaparecía del control. Ahora
+la factura sale igual en la bitácora con estado **SIN_DETALLADO**: son
+**HUS367368** ($10.400) y **HUS394817** ($2.400).
+
+**Cifras definitivas del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.216.532** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.115.692** |
+
+**Ojo con la HUS396996:** por el mismo corrimiento de la macro, al tórax se le
+descontaron $7.800 cuando el equipo lo aceptó por $758.700. **Esa factura hay
+que revisarla completa antes de radicar**, y de paso corregir la macro.
+
+---
+
 ### 18-08-2026 (noche) — Una factura salió mal y se corrigió: la HUS388262
 
 **Lo que pasó.** Después de entregar los 320 Excel, una revisión independiente
@@ -3801,18 +3838,21 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ### Descuento de lo aceptado (`tools/descontar_aceptado_detallado.py`, 18-08)
 16. **Revisar a mano las 14 facturas donde lo descontado NO cuadra con la
-    macro** ($3.327.635 en total). Están marcadas con **CUADRA = NO** en la
+    macro** ($3.401.135 en total). Están marcadas con **CUADRA = NO** en la
     bitácora CSV del bot. Son casos donde el servicio aceptado no se pudo
     cruzar con ningún renglón del detallado, o donde el aceptado es mayor que
     el valor del servicio.
-17. **Confirmar el TOTAL FINAL de $626.042.192** antes de radicar: es la suma
+17. **Confirmar el TOTAL FINAL de $626.115.692** antes de radicar: es la suma
     de las 320 facturas después de quitarles lo aceptado.
 18. **Revisar a mano HUS384132 y HUS392442**: el bot no logró reproducir el
     subtotal que traen esos dos archivos, así que solo descontó los servicios
     numerados. Quedaron marcadas con **REVISAR A MANO** en la bitácora.
 19. **Pedir los detallados de HUS367368 y HUS394817** ($12.800): están en la
-    macro con valor aceptado pero no están entre los 320 archivos, así que esa
-    plata sigue reclamándose sin respaldo.
+    macro con valor aceptado pero no están entre los 320 archivos. Ya salen en
+    la bitácora con estado **SIN_DETALLADO**.
+20. **Corregir la macro en la HUS396996 y revisar esa factura completa:** la
+    columna VALOR ACEPTADO está corrida un renglón (filas 3961-3963). Por eso
+    al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo

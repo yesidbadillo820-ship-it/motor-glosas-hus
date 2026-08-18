@@ -257,7 +257,7 @@ def caso_hus352890(tmp_path: Path):
 class TestLeerAceptados:
     def test_solo_las_filas_con_valor_aceptado(self, caso_hus352890):
         _, macro = caso_hus352890
-        aceptados = des.leer_aceptados(macro)
+        aceptados, _ = des.leer_aceptados(macro)
         assert list(aceptados) == ["352890"]  # la clave va sin el HUS ni los ceros
         assert len(aceptados["352890"]) == 1
         fila = aceptados["352890"][0]
@@ -273,7 +273,7 @@ class TestLeerAceptados:
                 fila_macro("HUS400001", "39145", "Consulta", aceptado=1000),
             ],
         )
-        assert list(des.leer_aceptados(macro)) == ["400001"]
+        assert list(des.leer_aceptados(macro)[0]) == ["400001"]
 
     def test_suma_las_filas_repetidas_del_mismo_item(self, tmp_path):
         """El reporte del ADRES abre una fila por causal: 2 causales, un ítem."""
@@ -284,10 +284,115 @@ class TestLeerAceptados:
                 fila_macro("HUS1", "39145", "Consulta", aceptado=500, glosa="4506- Causal B"),
             ],
         )
-        items = des._agrupar(des.leer_aceptados(macro)["1"])
+        items = des._agrupar(des.leer_aceptados(macro)[0]["1"])
         assert len(items) == 1
         assert items[0].valor_glosado == 1500
         assert items[0].causales == "3202- Causal A | 4506- Causal B"
+
+
+class TestLoQueNoSeDescuenta:
+    """Dos filas de la macro que NO se pueden usar, por más que traigan valor."""
+
+    def test_una_fila_se_objeta_no_toca_el_detallado(self, tmp_path):
+        """El equipo la objetó: ese servicio se sigue reclamando completo."""
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [
+                fila_macro(
+                    "HUS1",
+                    "21101",
+                    "Mano, dedos, puño",
+                    reclamado=73500,
+                    aceptado=10000,
+                    observacion="SE OBJETA",
+                )
+            ],
+        )
+        aceptados, descartes = des.leer_aceptados(macro)
+        assert aceptados == {}
+        assert "SE OBJETA" in descartes["1"][0]
+        assert "se sigue reclamando" in descartes["1"][0]
+
+    def test_una_fila_se_subsana_tampoco(self, tmp_path):
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [
+                fila_macro(
+                    "HUS1",
+                    "39145",
+                    "Consulta",
+                    reclamado=85800,
+                    aceptado=800,
+                    observacion="SE SUBSANA CON SOPORTE",
+                )
+            ],
+        )
+        assert des.leer_aceptados(macro)[0] == {}
+
+    def test_no_se_puede_aceptar_mas_de_lo_reclamado(self, tmp_path):
+        """La columna del Excel quedó corrida: el valor es de otra fila.
+
+        Es lo que pasó en la HUS396996 del paquete 31068."""
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [fila_macro("HUS1", "21101", "Mano, dedos, puño", reclamado=73500, aceptado=758700)],
+        )
+        aceptados, descartes = des.leer_aceptados(macro)
+        assert aceptados == {}
+        assert "no se puede aceptar más de lo cobrado" in descartes["1"][0].lower()
+
+    def test_sin_valor_reclamado_no_se_puede_juzgar_y_pasa(self, tmp_path):
+        """Sin con qué comparar, la fila se usa: el bot no adivina."""
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [fila_macro("HUS1", "39145", "Consulta", reclamado=0, aceptado=2400)],
+        )
+        assert des.leer_aceptados(macro)[0]["1"][0].valor_glosado == 2400
+
+    def test_el_aviso_llega_a_la_factura_y_a_la_bitacora(self, tmp_path):
+        carpeta = tmp_path / "in"
+        escribir_detallado(carpeta / "HUS400010.xlsx", "HUS400010")
+        macro = escribir_macro(
+            tmp_path / "macro.xlsx",
+            [
+                fila_macro(
+                    "HUS400010",
+                    "39145",
+                    "Consulta de urgencias",
+                    reclamado=85800,
+                    aceptado=2400,
+                    observacion="SE OBJETA",
+                )
+            ],
+        )
+        bitacora = tmp_path / "b.csv"
+        salida = tmp_path / "out"
+        res = _correr(carpeta, macro, salida, bitacora)[0]
+        assert res.descontado == 0
+        assert any("OJO CON LA MACRO" in a for a in res.sin_cruzar)
+        assert "OJO CON LA MACRO" in bitacora.read_text(encoding="utf-8-sig")
+        # El servicio queda intacto: el hospital lo sigue reclamando.
+        ws = openpyxl.load_workbook(salida / "HUS400010.xlsx")["Sheet"]
+        fila = _fila_de(salida / "HUS400010.xlsx", "CONSULTA DE URGENCIAS")
+        assert ws.cell(row=fila, column=ITEM["vr_ent"][0]).value == 85800
+
+    def test_la_factura_sin_detallado_no_desaparece(self, tmp_path):
+        """Si la macro le acepta plata a una factura que no está en la carpeta,
+        esa plata tiene que quedar anotada: si no, se sigue reclamando sin que
+        nadie se entere."""
+        carpeta = tmp_path / "in"
+        escribir_detallado(carpeta / "HUS400011.xlsx", "HUS400011")
+        macro = escribir_macro(
+            tmp_path / "macro.xlsx",
+            [fila_macro("HUS999888", "39145", "Consulta", reclamado=85800, aceptado=10400)],
+        )
+        bitacora = tmp_path / "b.csv"
+        resultados = _correr(carpeta, macro, tmp_path / "out", bitacora)
+        sin = [r for r in resultados if r.estado == "SIN_DETALLADO"]
+        assert len(sin) == 1
+        assert sin[0].factura == "HUS999888"
+        assert sin[0].aceptado_macro == 10400
+        assert "HUS999888" in bitacora.read_text(encoding="utf-8-sig")
 
 
 # ─── El subtotal del archivo manda ───────────────────────────────────────────

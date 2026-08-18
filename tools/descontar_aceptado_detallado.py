@@ -115,17 +115,35 @@ class ResultadoFactura:
         return round(self.subtotal_antes - self.subtotal_despues, 2)
 
 
-def leer_aceptados(ruta: Path) -> dict[str, list[FilaGlosa]]:
-    """Las filas de la macro que quedaron con VALOR ACEPTADO > 0, por factura.
+# Lo que el equipo escribe en la columna OBSERVACION cuando NO acepta.
+RESPUESTAS_QUE_NO_ACEPTAN = ("OBJETA", "SUBSANA")
 
-    Solo esas: son las que el hospital dejó de reclamar. Las SE OBJETA y las
-    SE SUBSANA se siguen reclamando completas, así que no tocan el detallado.
+
+def leer_aceptados(ruta: Path) -> tuple[dict[str, list[FilaGlosa]], dict[str, list[str]]]:
+    """(filas con VALOR ACEPTADO por factura, filas descartadas por factura).
+
+    Solo se descuentan las filas que el hospital de verdad dejó de reclamar.
+    Se descarta —y se avisa— una fila cuando:
+
+    * dice **SE OBJETA** o **SE SUBSANA** en la observación. Esas se siguen
+      reclamando completas, así que no pueden tocar el detallado. Si además
+      trae un valor aceptado, la macro se está contradiciendo y el auditor
+      tiene que verlo.
+    * el valor aceptado es **mayor que el valor reclamado** de esa misma fila.
+      Eso es imposible: no se puede aceptar más de lo que se cobró. Pasa cuando
+      la columna del Excel quedó corrida y el valor pertenece a otra fila.
+
+    El caso que lo enseñó es la HUS396996 del paquete 31068: una fila marcada
+    SE OBJETA traía $758.700 aceptados sobre un servicio de $73.500 —la columna
+    estaba corrida un renglón— y el bot borró del detallado una radiografía que
+    el hospital sigue reclamando.
     """
     wb = _abrir_libro(ruta, solo_datos=True, solo_lectura=True)
     try:
         ws = wb.worksheets[0]
         salida: dict[str, list[FilaGlosa]] = {}
-        for fila in ws.iter_rows(min_row=2, values_only=True):
+        descartes: dict[str, list[str]] = {}
+        for n_fila, fila in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if len(fila) < COL_VALOR_ACEPTADO:
                 continue
             factura = str(fila[COL_FACTURA - 1] or "").strip()
@@ -134,14 +152,35 @@ def leer_aceptados(ruta: Path) -> dict[str, list[FilaGlosa]]:
             aceptado = _parse_valor(fila[COL_VALOR_ACEPTADO - 1])
             if aceptado <= 0:
                 continue
-            salida.setdefault(normalizar_factura(factura), []).append(
+            clave = normalizar_factura(factura)
+            codigo = str(fila[COL_COD_ELEMENTO - 1] or "").strip()
+            descripcion = str(fila[COL_DESC_ELEMENTO - 1] or "").strip()
+            reclamado = _parse_valor(fila[COL_VALOR_RECLAMADO - 1])
+            observacion = _norm(str(fila[COL_OBSERVACION - 1] or ""))
+
+            if any(m in observacion for m in RESPUESTAS_QUE_NO_ACEPTAN):
+                descartes.setdefault(clave, []).append(
+                    f"OJO CON LA MACRO (fila {n_fila}): {codigo} {descripcion[:40]} dice "
+                    f'"{observacion[:20]}" y aun así trae ${aceptado:,.0f} aceptados. '
+                    f"No se descontó: ese servicio se sigue reclamando."
+                )
+                continue
+            if reclamado > 0 and aceptado > reclamado + 0.01:
+                descartes.setdefault(clave, []).append(
+                    f"OJO CON LA MACRO (fila {n_fila}): {codigo} {descripcion[:40]} tiene "
+                    f"${aceptado:,.0f} aceptados sobre ${reclamado:,.0f} reclamados. "
+                    f"No se puede aceptar más de lo cobrado; no se descontó."
+                )
+                continue
+
+            salida.setdefault(clave, []).append(
                 FilaGlosa(
                     factura=factura,
-                    codigo=str(fila[COL_COD_ELEMENTO - 1] or "").strip(),
-                    descripcion=str(fila[COL_DESC_ELEMENTO - 1] or "").strip(),
+                    codigo=codigo,
+                    descripcion=descripcion,
                     tipo_elemento=str(fila[COL_TIPO_ELEMENTO - 1] or "").strip(),
                     cant_reclamada=_parse_valor(fila[COL_CANT_RECLAMADA - 1]),
-                    valor_reclamado=_parse_valor(fila[COL_VALOR_RECLAMADO - 1]),
+                    valor_reclamado=reclamado,
                     cant_aprobada=_parse_valor(fila[COL_CANT_APROBADA - 1]),
                     valor_aprobado=_parse_valor(fila[COL_VALOR_APROBADO - 1]),
                     # Acá va el ACEPTADO, no el glosado: es lo que se descuenta.
@@ -149,7 +188,7 @@ def leer_aceptados(ruta: Path) -> dict[str, list[FilaGlosa]]:
                     descripcion_glosa=str(fila[COL_DESC_GLOSA - 1] or "").strip(),
                 )
             )
-        return salida
+        return salida, descartes
     finally:
         wb.close()
 
@@ -251,7 +290,10 @@ def _agrupar(glosas: list[FilaGlosa]) -> list[ItemReporte]:
 
 
 def procesar_archivo(
-    ruta: Path, aceptados: dict[str, list[FilaGlosa]], destino: Path
+    ruta: Path,
+    aceptados: dict[str, list[FilaGlosa]],
+    destino: Path,
+    descartes: dict[str, list[str]] | None = None,
 ) -> ResultadoFactura:
     """Descuenta lo aceptado en un detallado de una sola factura."""
     wb = _abrir_libro(ruta, solo_datos=False)
@@ -296,6 +338,7 @@ def procesar_archivo(
         n_items_original = _contador_de_items(idx, est)
 
         filas_macro = aceptados.get(clave, [])
+        avisos_macro = (descartes or {}).get(clave, [])
         res = ResultadoFactura(
             factura=numero,
             archivo=ruta.name,
@@ -304,8 +347,13 @@ def procesar_archivo(
             subtotal_despues=subtotal_antes,
             aceptado_macro=round(sum(f.valor_glosado for f in filas_macro), 2),
         )
+        res.sin_cruzar.extend(avisos_macro)
         if not filas_macro:
-            res.observacion = "La macro no trae ningún VALOR ACEPTADO para esta factura."
+            res.observacion = (
+                "La macro no trae ningún VALOR ACEPTADO utilizable para esta factura."
+                if avisos_macro
+                else "La macro no trae ningún VALOR ACEPTADO para esta factura."
+            )
             destino.parent.mkdir(parents=True, exist_ok=True)
             wb.save(destino)
             return res
@@ -469,24 +517,50 @@ def procesar(
     archivos = _archivos(detallados)
     if not archivos:
         raise ValueError(f"No se encontró ningún Excel en {detallados!r}")
-    aceptados = leer_aceptados(macro)
+    aceptados, descartes = leer_aceptados(macro)
     logger.info(
         "Macro: %d factura(s) con VALOR ACEPTADO, por $%s",
         len(aceptados),
         f"{sum(f.valor_glosado for v in aceptados.values() for f in v):,.0f}".replace(",", "."),
     )
+    if descartes:
+        logger.warning(
+            "  OJO: %d fila(s) de la macro no se pudieron usar (ver la bitácora).",
+            sum(len(v) for v in descartes.values()),
+        )
     resultados = []
+    vistas: set[str] = set()
     for n, ruta in enumerate(archivos, 1):
         try:
-            res = procesar_archivo(ruta, aceptados, salida / ruta.name)
+            res = procesar_archivo(ruta, aceptados, salida / ruta.name, descartes)
         except Exception as e:  # noqa: BLE001 - una factura mala no tumba el lote
             logger.warning("  %s: %s", ruta.name, e)
             res = ResultadoFactura(
                 factura=ruta.stem, archivo=ruta.name, estado="ERROR", observacion=str(e)
             )
         resultados.append(res)
+        vistas.add(normalizar_factura(res.factura))
         if n % 50 == 0:
             logger.info("  %d/%d…", n, len(archivos))
+
+    # Una factura que la macro aceptó pero que no tiene detallado en la carpeta
+    # no puede desaparecer del control: esa plata se seguiría reclamando sin que
+    # nadie se entere. Queda en la bitácora con su valor y su motivo.
+    for clave, filas in sorted(aceptados.items()):
+        if clave in vistas:
+            continue
+        resultados.append(
+            ResultadoFactura(
+                factura=filas[0].factura,
+                archivo="",
+                estado="SIN_DETALLADO",
+                aceptado_macro=round(sum(f.valor_glosado for f in filas), 2),
+                observacion=(
+                    "La macro le acepta plata a esta factura, pero no hay ningún "
+                    "detallado suyo en la carpeta: no se pudo descontar de ninguna parte."
+                ),
+            )
+        )
     if bitacora:
         escribir_bitacora(bitacora, resultados)
     return resultados
