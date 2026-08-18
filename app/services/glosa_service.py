@@ -1729,6 +1729,33 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         r"\1 carece de facultad \2",
     ),
+    # ── Cita normativa VACÍA: «.» ────────────────────────────────────────
+    # Caso real 18-08-2026 (NUEVA EPS, glosa de tarifa de $12.000, motor
+    # groq/gpt-oss-120b). El dictamen decía, textual:
+    #
+    #   «EN VIRTUD DE ART. 168 LA LEY 100 DE 1993, QUE DISPONE «.», Y …»
+    #
+    # La IA abrió comillas para citar el artículo y no escribió nada: dejó
+    # un punto. Eso es peor que una cita inventada — en un documento que se
+    # radica ante la EPS es una cita normativa que dice NADA, y le regala a
+    # la entidad el argumento de que el prestador no sustentó su defensa.
+    # Se borra la cláusula entera («, QUE DISPONE «.»») y queda la norma
+    # citada sin la comilla vacía.
+    (
+        re.compile(
+            r"[,;]?\s*(?:(?:QUE|EL\s+CUAL|LA\s+CUAL)\s+)?"
+            r"(?:DISPONE|ESTABLECE|SE[ÑN]ALA|REZA|INDICA|CONSAGRA|REAFIRMA|"
+            r"PRECEPT[ÚU]A|ORDENA|PRESCRIBE)\s*:?\s*"
+            r"[«\"\u201c\'][\s.,;:·\-\u2013\u2014]*[»\"\u201d\']",
+            re.IGNORECASE,
+        ),
+        "",
+    ),
+    # Comilla vacía suelta, sin verbo que la introduzca: «» / "" / «  ».
+    (
+        re.compile(r"[«\u201c][\s.,;:·\-\u2013\u2014]*[»\u201d]"),
+        "",
+    ),
 )
 
 
@@ -8756,6 +8783,24 @@ class GlosaService:
                 "diferencia en valor",
                 "descuento unilateral",
                 "uvb",
+                # 18-08-2026 — así es como la EPS escribe de verdad una glosa
+                # de tarifa, y ninguna de estas tres formas caía en TA:
+                #   "se glosa servicio por MAYOR VALOR COBRADO según contrato"
+                #   "se cobra POR ENCIMA DE LO PACTADO"
+                #   "VALOR SUPERIOR AL CONTRATADO"
+                # Caían en FA (facturación) porque no dicen la palabra
+                # "tarifa". El costo de esa confusión: la defensa se arma como
+                # un problema de facturación y nunca se invoca la tarifa
+                # pactada, la homologación CUPS→SOAT ni el Manual Tarifario,
+                # que es justo lo que tumba este tipo de glosa. Res. 2284/2023
+                # clasifica el mayor valor cobrado en la familia TA.
+                "mayor valor",
+                "por encima de lo pactado",
+                "superior a lo pactado",
+                "superior al contratado",
+                "superior al pactado",
+                "no corresponde al valor pactado",
+                "sobrepasa lo pactado",
             ]
         ):
             return "TA_TARIFA"

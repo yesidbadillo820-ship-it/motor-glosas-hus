@@ -70,19 +70,31 @@ class TestBuscar:
         assert r.status_code == 422  # q es requerido
 
     def test_fallback_cups_cuando_no_hay_tarifa_local(self, client):
-        # 890402 está en DESCRIPCIONES_CUPS_2025 pero NO en TARIFAS_SOAT_2026.
-        # Sin embargo está en PROPIAS_HUS como 890402H1 — buscar SOLO SOAT
-        # debería devolver 0 con tarifa pero mostrar fallback.
-        r = client.get("/tarifa-liquidador/buscar?q=890402&modalidad=SOAT")
+        """Queda fallback solo para lo que NO tiene tarifa por ningún camino.
+
+        18-08-2026: este caso usaba el CUPS 890402 y comprobaba que
+        devolviera CERO. Desde que el liquidador cruza la tabla de
+        homologación, 890402 sí resuelve (→ SOAT 39140), así que el ejemplo
+        dejó de servir: comprobaba el defecto, no la función. Se cambió por
+        un CUPS que está en el catálogo descriptivo y que ni el Manual SOAT
+        ni las tarifas propias tarifan — ahí el fallback sigue siendo la
+        respuesta honesta.
+        """
+        r = client.get("/tarifa-liquidador/buscar?q=901040&modalidad=SOAT")
         assert r.status_code == 200
         d = r.json()
-        # Sin tarifa SOAT pero el CUPS existe en catálogo descriptivo
         assert d["total_resultados"] == 0
         assert d["total_fallback_cups"] >= 1
-        # Cada item de fallback marca SIN_TARIFA_LOCAL
-        for r in d["resultados"]:
-            assert r["modalidad"] == "SIN_TARIFA_LOCAL"
-            assert r["valor_pesos"] is None
+        for fila in d["resultados"]:
+            assert fila["modalidad"] == "SIN_TARIFA_LOCAL"
+            assert fila["valor_pesos"] is None
+
+    def test_el_cups_de_consulta_ya_no_cae_al_fallback(self, client):
+        """890402 antes devolvía «sin tarifa local»; ahora liquida."""
+        d = client.get("/tarifa-liquidador/buscar?q=890402&modalidad=SOAT").json()
+        assert d["total_resultados"] >= 1
+        assert d["resultados"][0]["codigo_cups"] == "890402"
+        assert d["resultados"][0]["valor_pesos"] > 0
 
 
 class TestLiquidarManual:

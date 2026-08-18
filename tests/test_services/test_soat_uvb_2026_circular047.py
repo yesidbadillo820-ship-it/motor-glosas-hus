@@ -152,3 +152,48 @@ class TestMetaDelCatalogo:
         assert meta["paginas_leidas"] == 49
         assert meta["codigos"] >= 1500
         assert meta["codigos_en_conflicto"] == []
+
+
+class TestBuscarCupsPorDescripcion:
+    """El puente que le faltaba al liquidador — 18-08-2026."""
+
+    def test_encuentra_por_codigo_exacto(self):
+        from app.services.cups_soat_service import buscar_cups
+
+        r = buscar_cups("873420")
+        assert r and r[0]["cups"] == "873420"
+        assert "RODILLA" in r[0]["descripcion"].upper()
+        assert r[0]["homologaciones"][0]["soat"] == "21102"
+
+    def test_encuentra_por_descripcion_sin_tildes(self):
+        from app.services.cups_soat_service import buscar_cups
+
+        con = {x["cups"] for x in buscar_cups("radiografía de rodilla")}
+        sin = {x["cups"] for x in buscar_cups("radiografia de rodilla")}
+        assert "873420" in sin
+        assert con == sin
+
+    def test_marca_los_que_el_manual_no_tarifa(self):
+        from app.services.cups_soat_service import buscar_cups
+
+        r = buscar_cups("013205")
+        assert r[0]["sin_homologacion"] is True
+        assert r[0]["homologaciones"] == []
+
+    def test_no_busca_con_menos_de_tres_letras(self):
+        """Con 'de' devolvería medio catálogo."""
+        from app.services.cups_soat_service import buscar_cups
+
+        assert buscar_cups("de") == []
+        assert buscar_cups("") == []
+
+    def test_respeta_el_limite(self):
+        from app.services.cups_soat_service import buscar_cups
+
+        assert len(buscar_cups("radiografia", limite=5)) <= 5
+
+    def test_el_codigo_exacto_va_de_primero(self):
+        from app.services.cups_soat_service import buscar_cups
+
+        r = buscar_cups("902210")
+        assert r[0]["cups"] == "902210"

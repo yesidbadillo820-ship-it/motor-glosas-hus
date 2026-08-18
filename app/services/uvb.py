@@ -82,6 +82,18 @@ def valor_smdlv_vigente(anio: int = 2026) -> int:
     return SMDLV_POR_VIGENCIA[max(SMDLV_POR_VIGENCIA.keys())]
 
 
+def anio_con_unidad_propia(anio: int) -> bool:
+    """True si para ese año se conoce la UVB y el SMDLV de verdad.
+
+    18-08-2026. `valor_uvb_vigente` y `valor_smdlv_vigente` caen al último
+    año conocido cuando les piden otro, y lo hacen en silencio: pedir 2024
+    devolvía la UVB de 2026 sin decir nada. Liquidar una factura vieja con
+    la unidad de este año da una cifra equivocada presentada como oficial.
+    Quien consulte por un año sin dato tiene que enterarse.
+    """
+    return anio in UVB_POR_VIGENCIA and anio in SMDLV_POR_VIGENCIA
+
+
 def _redondear_a_centena(v: float) -> int:
     """Redondea a la centena más próxima (reglas Anexo Técnico 1, Dec. 780/2016).
 
