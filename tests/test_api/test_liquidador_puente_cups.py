@@ -145,3 +145,39 @@ class TestCirugiasEnElLiquidador:
         d = _buscar(client, "902210")
         for r in d["resultados"]:
             assert r["catalogo"] != "CIRUGIA_POR_GRUPO"
+
+
+class TestTarifasPropiasParaTodaEps:
+    """El catálogo propio del HUS en el liquidador — no solo FAMISANAR."""
+
+    def test_la_colecistectomia_muestra_la_tarifa_propia(self, client):
+        d = _buscar(client, "512101", modalidad="AMBOS", pct=-5)
+        propia = next(r for r in d["resultados"] if r["catalogo"] == "PROPIA_HUS")
+        assert propia["valor_pesos"] == 6_296_900
+
+    def test_a_la_propia_no_se_le_aplica_el_porcentaje(self, client):
+        """Es valor fijo: con −5% o con 0% da lo mismo."""
+        con = _buscar(client, "512101", modalidad="AMBOS", pct=-5)
+        sin = _buscar(client, "512101", modalidad="AMBOS", pct=0)
+
+        def propia(d):
+            return next(r for r in d["resultados"] if r["catalogo"] == "PROPIA_HUS")
+
+        assert propia(con)["valor_pesos"] == propia(sin)["valor_pesos"] == 6_296_900
+        assert propia(con)["porcentaje_aplicado"] == 0
+
+    def test_un_examen_ambulatorio_propio(self, client):
+        d = _buscar(client, "902210", modalidad="AMBOS")
+        assert any(
+            r["catalogo"] == "PROPIA_HUS" and r["valor_pesos"] == 19_700 for r in d["resultados"]
+        )
+
+    def test_una_ortesis_alfanumerica(self, client):
+        d = _buscar(client, "AGMO102T", modalidad="PROPIA")
+        assert d["resultados"][0]["catalogo"] == "PROPIA_HUS"
+        assert d["resultados"][0]["valor_pesos"] == 2_786_700
+
+    def test_solo_soat_no_trae_propias(self, client):
+        """Si el auditor pide Solo SOAT, no se mezclan las propias."""
+        d = _buscar(client, "512101", modalidad="SOAT")
+        assert not any(r["catalogo"] == "PROPIA_HUS" for r in d["resultados"])

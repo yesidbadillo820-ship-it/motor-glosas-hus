@@ -4320,7 +4320,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             SOAT (21102) o el nombre del procedimiento: los 10.024 CUPS
             homologados hacen el puente. Podés escribir sin tildes. Las
             <b>cirugías</b> salen con su desglose por grupo quirúrgico (sala +
-            cirujano + ayudantía + anestesiólogo + materiales).
+            cirujano + ayudantía + anestesiólogo + materiales). Incluye las
+            <b>tarifas propias del HUS</b> (~1.900, valor fijo, aplican a
+            <b>todas las EPS</b> con «tarifas propias»: COOSALUD, COMPENSAR,
+            SALUD MÍA, AURORA, PPL, FAMISANAR…) y la <b>tarifa pactada</b> de
+            cada contrato.
           </p>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem;margin-bottom:.8rem">
@@ -10088,10 +10092,14 @@ async function liquidarTarifa(preset){
       // autoritativa: lo que el hospital tiene derecho a cobrar. Se resalta y
       // va de primero; el cálculo SOAT queda como referencia del Manual.
       var esPactado  = r.catalogo === 'PACTADO';
+      // Tarifa propia del HUS: valor FIJO en pesos, sin porcentaje SOAT.
+      var esPropiaFija = r.modalidad === 'PROPIA_HUS_FIJA';
       var factor = (sinTarifa || sinHomol)
         ? '<span style="color:var(--text3);font-size:.7rem">' + (sinHomol ? 'sin código SOAT' : 'sin factor local') + '</span>'
         : (esPactado
             ? '<span style="font-size:.7rem;color:#7c2d12">' + escHtml(r.tipo_tarifa || 'pactado') + '</span>'
+            : esPropiaFija
+            ? '<span style="font-size:.7rem;color:#92400e">tarifa fija · sin % SOAT</span>'
             : (esCirugia
                 ? (r.factor_uvb + ' UVB (suma)' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
                 : (r.factor_uvb != null
