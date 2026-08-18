@@ -30,12 +30,14 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.models.db import UsuarioRecord
+from app.services.cups_soat_service import buscar_cups
 from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
     tarifas_soat_2026_completas,
 )
 from app.services.uvb import (
+    anio_con_unidad_propia,
     calcular_soat_con_factor,
     calcular_propia_hus,
     valor_smdlv_vigente,
@@ -151,11 +153,74 @@ def buscar_codigo(
                     }
                 )
 
+    # ── El puente CUPS → SOAT ───────────────────────────────────────────
+    # 18-08-2026. Hasta hoy esta pantalla solo entendía el código SOAT
+    # (21102, 19001…). El auditor no tiene ese código: tiene el CUPS que
+    # sale en la factura (873420) o el nombre del procedimiento
+    # («radiografía de rodilla»). Escribiendo cualquiera de los dos, la
+    # pantalla devolvía CERO — y es justo lo que uno escribe cuando la EPS
+    # objeta la tarifa. La tabla de homologación (10.024 CUPS) ya estaba
+    # cargada; solo faltaba que la búsqueda la usara.
+    if mod in ("SOAT", "SOAT_PLENO", "SOAT_PCT", "AMBOS", ""):
+        ya_listados = {m["codigo"] for m in matches}
+        catalogo_soat = tarifas_soat_2026_completas()
+        for hallazgo in buscar_cups(q, limite=limite):
+            for mapeo in hallazgo["homologaciones"]:
+                cod_soat = str(mapeo.get("soat") or "").strip()
+                fila = catalogo_soat.get(cod_soat)
+                if not fila or cod_soat in ya_listados:
+                    continue
+                ya_listados.add(cod_soat)
+                factor_uvb, _v, desc_soat, norma = fila
+                matches.append(
+                    {
+                        "codigo": cod_soat,
+                        "descripcion": desc_soat,
+                        "norma": norma,
+                        "catalogo": "CUPS_HOMOLOGADO_SOAT",
+                        "codigo_cups": hallazgo["cups"],
+                        "descripcion_cups": hallazgo["descripcion"],
+                        **_liquidar_soat(factor_uvb, pct, anio),
+                    }
+                )
+            # Un CUPS que el manual declara SIN homologación no lleva tarifa
+            # inventada: se informa el hecho, que además favorece al hospital.
+            if hallazgo["sin_homologacion"] and not hallazgo["homologaciones"]:
+                clave = f"CUPS {hallazgo['cups']}"
+                if clave in ya_listados:
+                    continue
+                ya_listados.add(clave)
+                matches.append(
+                    {
+                        "codigo": hallazgo["cups"],
+                        "descripcion": hallazgo["descripcion"],
+                        "norma": "Tabla oficial de homologación CUPS → SOAT",
+                        "catalogo": "CUPS_SIN_HOMOLOGACION",
+                        "modalidad": "SIN_HOMOLOGACION_SOAT",
+                        "codigo_cups": hallazgo["cups"],
+                        "descripcion_cups": hallazgo["descripcion"],
+                        "factor_uvb": None,
+                        "factor_smdlv": None,
+                        "valor_pesos": None,
+                        "uvb_vigente": valor_uvb_vigente(anio),
+                        "porcentaje_aplicado": pct,
+                        "formula": (
+                            "El Manual Tarifario SOAT NO le asigna código a este CUPS. "
+                            "La entidad no puede objetar la tarifa citando un código SOAT "
+                            "que para este procedimiento no existe."
+                        ),
+                    }
+                )
+
     # Orden: matches por código exacto primero, luego por descripción
     q_up = q.upper().strip()
     matches.sort(
         key=lambda x: (
-            0 if x["codigo"].upper() == q_up else 1 if q_up in x["codigo"].upper() else 2,
+            0
+            if x["codigo"].upper() == q_up or str(x.get("codigo_cups", "")).upper() == q_up
+            else 1
+            if q_up in x["codigo"].upper() or q_up in str(x.get("codigo_cups", "")).upper()
+            else 2,
             x["descripcion"],
         )
     )
@@ -191,7 +256,20 @@ def buscar_codigo(
         fallback_cups = fallback_cups[:30]
 
     todos = matches[:limite] + fallback_cups
+    # Si piden un año del que no se conoce la UVB, se calcula con la del
+    # último año conocido. Eso hay que decirlo: una factura de 2024
+    # liquidada con la unidad de 2026 da una cifra que no se puede radicar.
+    advertencia = None
+    if not anio_con_unidad_propia(anio):
+        _uvb = f"{valor_uvb_vigente(anio):,}".replace(",", ".")
+        _smdlv = f"{valor_smdlv_vigente(anio):,}".replace(",", ".")
+        advertencia = (
+            f"No se conoce la UVB ni el SMDLV de {anio}: los valores se calcularon "
+            f"con ${_uvb} (UVB) y ${_smdlv} (SMDLV), que son los del último año "
+            "cargado. Verifique la resolución de ese año antes de usar la cifra."
+        )
     return {
+        "advertencia": advertencia,
         "query": q,
         "modalidad": mod or "AMBOS",
         "porcentaje_aplicado": pct,

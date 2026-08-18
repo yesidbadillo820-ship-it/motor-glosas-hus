@@ -3152,6 +3152,64 @@ manual no se sostiene. Antes de hoy el sistema no tenía ese número.
 
 ---
 
+### 18-08 — Empieza la revisión botón por botón: «Consulta Normativa»
+
+Yesid decidió que esta semana se revisa el motor **botón por botón**, dejando
+cada uno al 100%. Se arrancó por HERRAMIENTAS → **Consulta Normativa**, que
+nació queriendo ser el equivalente de *miscuentasmedicas.com*.
+
+**Lo que YA funcionaba bien:** la biblioteca legal. Las 131 normas están
+indexadas de verdad y las ocho preguntas de ejemplo del panel devuelven la
+norma correcta. Eso no se tocó.
+
+**El defecto grande: la pantalla no entendía el código de la factura.**
+
+El liquidador solo sabía buscar por **código SOAT** (21102, 19001…). El
+auditor no tiene ese código: tiene el **CUPS de la factura** (873420) o el
+nombre del procedimiento («radiografía de rodilla»). Escribiendo cualquiera
+de los dos, la pantalla devolvía **cero** — y es justo lo que uno escribe
+cuando la EPS objeta la tarifa.
+
+La tabla que hace el puente (10.024 CUPS homologados) ya estaba cargada. Solo
+faltaba que la búsqueda la usara. **Ya la usa:**
+
+> Escribe **873420** → sale **SOAT 21102 · 8,25 UVB · $99.900**, y debajo dice
+> de dónde salió: «CUPS 873420 · RADIOGRAFÍA DE RODILLA (AP - LATERAL)».
+
+Con eso, **2.365 códigos CUPS** que antes no daban nada ahora liquidan en
+pesos escribiendo el número que sale en la factura. Y los **2.966** que el
+Manual SOAT no tarifa ya no salen como «no encontrado»: sale el hecho —que
+además favorece al hospital— de que **la EPS no puede objetar la tarifa
+citando un código SOAT que para ese procedimiento no existe**.
+
+**Segundo defecto: el año mentía en silencio.** Si se pedía liquidar al año
+2024, el sistema usaba la UVB de 2026 sin avisar. Una factura vieja liquidada
+con la unidad de este año da una cifra que no se puede radicar. Ahora sale un
+aviso amarillo diciendo con qué unidades se calculó.
+
+**Lo que le sigue faltando a este botón (medido, no supuesto):**
+
+1. **No liquida cirugías.** Son **5.832 mapeos** —los procedimientos
+   quirúrgicos—. Su tarifa en el manual no es un valor directo: es un **grupo
+   quirúrgico** (02 al 13, y especiales 20 al 23). Para dar el valor hay que
+   sumar derechos de sala + honorarios del cirujano + ayudantía +
+   anestesiólogo + materiales, cada uno con su propio código. **La Circular
+   047/2025 ya trae todas esas tarifas por grupo** (39204 a 39219, 39100 a
+   39128, 39301 a 39305): falta cruzarlas. Es la página
+   «liquidación de cirugías SOAT» de miscuentasmedicas, y es donde está la
+   plata grande.
+2. **No consulta las tarifas contratadas.** Los **6.655 códigos de FAMISANAR**
+   que se cargaron el 13-08 están en la base de datos, pero el liquidador
+   nunca la mira: solo mira los catálogos fijos. O sea que la tarifa
+   **realmente pactada** con la EPS no aparece en la pantalla.
+3. **No tiene ISS 2001.** miscuentasmedicas lo tiene de primero porque muchos
+   contratos se pactan «ISS 2001 + X%». El sistema no lo conoce.
+4. **Tarifas propias del HUS: solo 84 códigos** de las Res. 054 y 124 de 2026.
+   Falta cargar el resto.
+5. **El índice de normas dice «0 artículos»** en las 131. Cosmético.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
