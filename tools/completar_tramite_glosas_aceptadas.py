@@ -122,6 +122,20 @@ def a_fecha(v):
     return None
 
 
+RE_CIFRA = re.compile(r"\$\s*(\d[\d.]*\d|\d)")
+
+
+def cifra_encabezado(texto):
+    """Primera cifra en pesos que aparece en el texto de un renglon del acta."""
+    m = RE_CIFRA.search(texto or "")
+    if not m:
+        return None
+    try:
+        return int(m.group(1).replace(".", ""))
+    except ValueError:
+        return None
+
+
 def pesos(n):
     """Formato colombiano: 1234567 -> $1.234.567"""
     return "$" + f"{round(n):,}".replace(",", ".")
@@ -311,6 +325,35 @@ def resolver_fila(factura, valor, obs, acta_fila, general):
                     f"{len(sin_aceptar)} renglon(es) tienen valor aceptado pero su texto "
                     f"no dice que la ESE acepte: revisar redaccion en la circularizacion"
                 )
+            # El valor registrado del renglon y la cifra que su texto anuncia
+            # pueden no coincidir: el acta se digita a mano. Se comparan uno a
+            # uno. Ojo con el patron habitual de que el PRIMER renglon encabeza
+            # con el total de la nota y despues desglosa los servicios: eso no
+            # es un error de plata, solo de redaccion, y se avisa aparte.
+            descuadres, encabeza_total = [], 0
+            for c in aceptadas:
+                cifra = cifra_encabezado(c["concepto"])
+                if cifra is None or cifra == c["val"]:
+                    continue
+                if cifra == valor:
+                    encabeza_total += 1
+                else:
+                    descuadres.append((cifra, c["val"]))
+            avisos = []
+            if descuadres:
+                detalle = "; ".join(
+                    f"el texto dice {pesos(x)} pero el valor aceptado es {pesos(y)}"
+                    for x, y in descuadres[:3]
+                )
+                mas = f" (y {len(descuadres) - 3} mas)" if len(descuadres) > 3 else ""
+                avisos.append(f"Texto del acta descuadrado con su propio valor: {detalle}{mas}")
+                notas.append(avisos[-1])
+            if encabeza_total:
+                notas.append(
+                    f"{encabeza_total} renglon(es) encabezan con el total de la nota "
+                    f"({pesos(valor)}) y luego lo desglosan: no es diferencia de plata"
+                )
+
             total = sum(c["val"] for c in aceptadas)
             novedad = ""
             if total != valor:
@@ -327,6 +370,7 @@ def resolver_fila(factura, valor, obs, acta_fila, general):
                     f"{pesos(valor)}: diferencia {pesos(abs(dif))} {sobra}.{pista}"
                 )
                 notas.append(novedad)
+            novedad = " · ".join([n for n in ([novedad] if novedad else []) + avisos])
             return "\n\n".join(conceptos), acta, fecha, novedad, notas
         novedad = (
             f"El acta no registra ningun valor aceptado para esta factura y la nota "
