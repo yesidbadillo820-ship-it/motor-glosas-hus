@@ -2,10 +2,12 @@
 citation_verifier.py — Valida que las normas y citas legales en el dictamen
 correspondan al texto real del corpus normativa_completa.
 
-Detecta 3 problemas comunes que la EPS usa para ratificar glosas:
+Detecta 4 problemas comunes que la EPS usa para ratificar glosas:
   1. NORMA_INEXISTENTE — dictamen cita "Res. 9999/2099" que no existe
   2. ARTICULO_FUERA_DE_NORMA — cita Art. 47 de norma que no tiene Art. 47
   3. CITA_LITERAL_FALSA — texto entrecomillado «...» que no aparece literal
+  4. CITA_VACIA — comillas atribuidas a una norma pero sin texto adentro
+     («.»), que hasta el 18-08-2026 salían selladas como «cita verificada»
 
 Salida: lista de issues con severidad. La UI los muestra como warnings
 debajo del dictamen y sugiere reformulación.
@@ -85,6 +87,25 @@ PAT_ARTICULO = re.compile(
 )
 # Texto entrecomillado — chevrones franceses « » preferidos en el motor
 PAT_CITA_LITERAL = re.compile(r"«([^«»]{15,800})»")
+# 18-08-2026 — LA COMILLA VACÍA NO LA VEÍA NADIE.
+# El patrón de arriba exige 15 caracteres adentro. «.» tiene uno, así que ni
+# siquiera se contaba como cita: pasaba invisible por las cuatro revisiones.
+# Caso real de ese día (NUEVA EPS, glosa de tarifa de $12.000): el dictamen
+# salió con «EN VIRTUD DE ART. 168 LA LEY 100 DE 1993, QUE DISPONE «.»» y con
+# el sello «7 citas verificadas · 0 hallazgos» debajo. La IA abrió comillas
+# para citar el artículo y no escribió nada.
+# Los chevrones en este repositorio solo se usan para citar, así que cualquiera
+# vacío es sospechoso. Con comillas rectas o curvas se exige además el verbo
+# normativo delante, para no confundirse con una comilla suelta del texto.
+PAT_CITA_VACIA_CHEVRON = re.compile(r"«([^«»]{0,14})»")
+PAT_CITA_VACIA_ATRIBUIDA = re.compile(
+    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPT[ÚU]A|"
+    r"RECUERDA|PREV[ÉE]|CONTEMPLA|ORDENA|DETERMINA|ESTIPULA|PACTA|REAFIRMA|"
+    r"PRESCRIBE)"
+    r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*"
+    r"[\"“‘']([^\"“”‘’']{0,14})[\"”’']",
+    re.IGNORECASE,
+)
 # Citas "textuales" con comillas dobles/simples ATRIBUIDAS a una norma o
 # cláusula (ESTABLECE/DISPONE/SEÑALA/...). Auditoría 10-jun-2026 P0-1:
 # la red solo cubría chevrones, así que "CLÁUSULA 12 DEL CONTRATO QUE
@@ -290,7 +311,8 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
           "ok": int,
           "issues": [
             {
-              "tipo": "NORMA_INEXISTENTE" | "ARTICULO_FUERA_DE_NORMA" | "CITA_LITERAL_FALSA",
+              "tipo": "NORMA_INEXISTENTE" | "ARTICULO_FUERA_DE_NORMA"
+                      | "CITA_LITERAL_FALSA" | "CITA_VACIA",
               "severidad": "ALTA" | "MEDIA" | "BAJA",
               "cita": str,      # lo que aparece en el dictamen
               "detalle": str,   # explicación
@@ -387,7 +409,37 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                     }
                 )
 
-    # 4. Verificar citas literales: entre chevrones «» Y entre comillas
+    # 4. Citas VACÍAS: comillas abiertas para citar la norma, sin texto adentro.
+    # Van antes de las citas literales porque no hay nada que contrastar contra
+    # el corpus: el defecto es que la cita no dice nada.
+    vacias_vistas: set[str] = set()
+    for pat_vacia in (PAT_CITA_VACIA_CHEVRON, PAT_CITA_VACIA_ATRIBUIDA):
+        for cruda in pat_vacia.findall(texto):
+            if any(c.isalnum() for c in cruda):
+                continue  # tiene contenido: no es una cita vacía
+            clave = cruda.strip()
+            if clave in vacias_vistas:
+                continue
+            vacias_vistas.add(clave)
+            total_citas += 1
+            issues.append(
+                {
+                    "tipo": "CITA_VACIA",
+                    "severidad": "ALTA",
+                    "cita": "«" + clave + "»",
+                    "detalle": (
+                        "El dictamen abre comillas para citar la norma y no escribe el "
+                        "texto: la cita queda vacía. Radicado así, la entidad puede "
+                        "alegar que el prestador no sustentó su defensa."
+                    ),
+                    "sugerencia": (
+                        "Escribe el texto literal del artículo citado, o quita las "
+                        "comillas y deja solo la referencia a la norma."
+                    ),
+                }
+            )
+
+    # 5. Verificar citas literales: entre chevrones «» Y entre comillas
     # dobles/simples cuando van atribuidas a una norma o cláusula
     # (ESTABLECE/DISPONE/...). Ambas se contrastan contra el mismo
     # corpus (normas + cláusulas reales del contrato en BD).
@@ -417,6 +469,36 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
         for cita in citas_literales:
             total_citas += 1
             cita_norm = _normalizar(cita)
+            # ── Cita VACÍA ────────────────────────────────────────────────
+            # Caso real 18-08-2026 (NUEVA EPS, glosa de tarifa $12.000): el
+            # dictamen decía «EN VIRTUD DE ART. 168 LA LEY 100 DE 1993, QUE
+            # DISPONE «.»». La IA abrió comillas para citar el artículo y
+            # escribió un punto. El corte de abajo —"menos de 30 caracteres
+            # no se alcanza a verificar"— la dejaba pasar SIN revisar y
+            # además la contaba como cita buena: el dictamen salía sellado
+            # con «7 citas verificadas · 0 hallazgos». Una comilla sin texto
+            # atribuida a una norma no es una cita corta: es una cita que no
+            # dice nada, y en un documento radicado le entrega a la EPS el
+            # argumento de que el prestador no sustentó su defensa.
+            contenido = "".join(c for c in cita_norm if c.isalnum())
+            if len(contenido) < 3:
+                issues.append(
+                    {
+                        "tipo": "CITA_VACIA",
+                        "severidad": "ALTA",
+                        "cita": "«" + cita.strip() + "»",
+                        "detalle": (
+                            "El dictamen abre comillas para citar la norma y no escribe "
+                            "el texto: la cita queda vacía. Así radicado, la entidad puede "
+                            "alegar que la defensa no fue sustentada."
+                        ),
+                        "sugerencia": (
+                            "Escribe el texto literal del artículo citado, o quita las "
+                            "comillas y deja solo la referencia a la norma."
+                        ),
+                    }
+                )
+                continue
             # Tomamos un fragmento mid de 30 chars como "huella" para buscar
             if len(cita_norm) < 30:
                 continue

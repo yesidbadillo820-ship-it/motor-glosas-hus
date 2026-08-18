@@ -3101,6 +3101,57 @@ sigue vivo hoy.
 
 ---
 
+### 18-08 (tarde) — Un dictamen real destapó dos defectos: la cita vacía y el «mayor valor»
+
+Yesid analizó una glosa de NUEVA EPS —«se glosa servicio por mayor valor
+cobrado según contrato, rx de rodilla, por valor de $12.000»— y mandó el
+dictamen que salió. Traía dos cosas mal.
+
+**1) El dictamen citaba una norma y NO escribía nada adentro de las comillas.**
+
+Decía, textual:
+
+> EN VIRTUD DE ART. 168 LA LEY 100 DE 1993, **QUE DISPONE «.»**, Y ART. 177…
+
+La IA abrió comillas para citar el artículo y escribió un punto. Y debajo, el
+sello: **«7 citas verificadas · 0 hallazgos»**. El revisor de citas no la vio
+porque solo miraba las comillas con **15 caracteres o más** adentro: una
+comilla vacía le pasaba por debajo y encima se contaba como cita buena.
+
+Eso, radicado ante la EPS, le entrega el argumento de que el prestador no
+sustentó su defensa. Ahora pasan dos cosas: **la comilla vacía se borra del
+dictamen** (queda la norma citada, sin la comilla), y si aparece, **el
+revisor la marca en rojo como hallazgo GRAVE**.
+
+**2) La glosa se clasificó como FACTURACIÓN, cuando es de TARIFA.**
+
+«Mayor valor cobrado según contrato» es la familia **TA (tarifas)** de la
+Res. 2284/2023. El motor la mandó a **FA (facturación)** por una razón boba:
+el texto no dice la palabra «tarifa». Lo mismo pasaba con «se cobra por
+encima de lo pactado» y «valor superior al contratado» —las tres formas más
+comunes en que una EPS escribe una glosa de tarifa—.
+
+**Por qué importa:** clasificada como facturación, la defensa se arma como un
+problema de papeles y **nunca se invoca la tarifa pactada, la homologación
+CUPS → SOAT ni el Manual Tarifario**, que es justo lo que tumba este tipo de
+glosa. Ya quedan las tres en TA.
+
+**3) Y de paso, la respuesta que gana esa glosa.** Con la tabla del Manual
+SOAT cargada hoy, el motor ya puede decirlo con número:
+
+| Dato | Valor |
+|---|---|
+| CUPS 873420 — RADIOGRAFÍA DE RODILLA (AP-LATERAL) | homologa a **SOAT 21102** |
+| SOAT 21102 — «Brazo, pierna, rodilla, fémur, hombro, omóplato» | 8,25 UVB |
+| Tarifa oficial 2026 (Circular 047/2025) | **$99.900** |
+| Lo que cobró el hospital | **$12.000** |
+
+El hospital cobró **la octava parte** de la tarifa del Manual Tarifario. Una
+glosa por «mayor valor cobrado» sobre un cobro ocho veces por debajo del
+manual no se sostiene. Antes de hoy el sistema no tenía ese número.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
