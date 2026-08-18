@@ -21,8 +21,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 _ADRES = str(Path(__file__).resolve().parent.parent.parent / "tools" / "adres")
 if _ADRES not in sys.path:
     sys.path.insert(0, _ADRES)
