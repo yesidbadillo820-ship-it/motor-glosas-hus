@@ -3501,6 +3501,33 @@ ganancia, así que queda anotado, no cambiado.
 
 ---
 
+### 18-08 (noche) — Validador ADRES: probado con datos reales, SÍ sirve
+
+Yesid lo puso a prueba en producción con tres facturas reales y mandó los
+informes. Los revisé y la herramienta **funciona de verdad**:
+
+**Informe FURIPS (3 facturas).** Los hallazgos son correctos y precisos, cada
+uno citando la regla exacta de la Circular 022/2023: un dispositivo médico sin
+registro INVIMA (código vacío), descripciones pasadas de 100 caracteres,
+líneas idénticas que la Circular obliga a agrupar, y una dirección de
+propietario que era solo el nombre de un municipio («CHARTA SANTANDER») sin
+nomenclatura. Cero falsos positivos. Además trae el detalle campo por campo
+(307 filas de FURIPS1, 263 de FURIPS2).
+
+**Informe de autorizaciones.** El RIPS traía una autorización mal escrita
+(«Código  71539» en vez de un número) y el informe la marcó exacto: «1 con
+otro número», y la puso en ALERTAS. Correcto.
+
+**Se agregó una prueba de punta a punta del motor** (no existía): arma un
+paquete FURIPS desde la propia malla del validador, lo pasa por `procesar`, y
+comprueba que corre, que caza un valor inválido plantado a propósito (sexo
+fuera de F/M/O), que NO lo marca cuando es válido, y que genera el Excel.
+
+Con esto queda claro que el botón funciona; los defectos que se corrigieron
+antes (la fuga de disco de autorizaciones) eran de plomería, no del motor.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
