@@ -80,8 +80,11 @@ _MESES = (
     "NOVIEMBRE",
     "DICIEMBRE",
 )
+# Las carpetas reales del 2026 llevan un ordinal delante: "8. AGOSTO 2026 -
+# SOPORTES RADICACION". Sin tolerar ese "8. " (o "12. ") el mes, el año y —lo
+# que de verdad importa— la EPS de cada soporte salían vacíos. 18-08-2026.
 _RE_MES_RAIZ = re.compile(
-    r"^\s*(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
+    r"^\s*(?:\d{1,2}\.?\s*)?(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
     re.IGNORECASE,
 )
 
