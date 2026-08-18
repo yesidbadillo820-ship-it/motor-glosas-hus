@@ -3379,6 +3379,47 @@ antes de cambiarlo.
 
 ---
 
+### 18-08 (noche) — Salud Total: la respuesta ahora es la que el HUS radica de verdad
+
+Yesid mandó el archivo REAL: cómo llega la glosa (el TXT «Detalle» de 24
+columnas) y cómo se sube la respuesta (el RTAGLOSA con RE9602/RE9901). Con eso
+en la mano se corrigieron tres cosas que estaban mal en el modo por plantilla.
+
+**1) El texto de TARIFAS afirmaba un contrato que NO existe.** Decía «...LA
+LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE...». Con Salud Total el
+HUS **no tiene contrato**. Afirmar lo contrario en un documento que se radica
+le regala a la entidad el argumento de que sí lo había. Ahora dice la verdad,
+palabra por palabra como en el archivo real: «...ENTIDAD SALUD TOTAL SIN
+CONTRATO VIGENTE... SE FACTURA A SOAT VIGENTE Y LOS INSUMOS A TARIFAS
+INSTITUCIONALES...».
+
+**2) El código de respuesta por familia estaba cruzado.** El archivo real usa:
+- Tarifas (TA) y Facturación (FA) → **RE9602** (injustificada al 100%).
+- Soportes (SO) y Pertinencia (CL) → **RE9901** (subsanada, soportes adjuntos).
+
+El sistema le ponía a Facturación el RE9901 y a Soportes el RE9602. Quedó
+alineado con la realidad.
+
+**3) La respuesta ya no le pega el nombre del servicio al final.** El archivo
+real no lo lleva, y así se respeta mejor el tope de 500 caracteres.
+
+**Comprobado con el archivo real:** se tomó el TXT «Detalle» que mandó Yesid,
+se pasó por el motor, y la salida quedó **idéntica** a su archivo OK en las
+familias que se pueden hacer por plantilla (TA y SO, que son el 84% del
+archivo).
+
+**Lo honesto:** en el archivo real, las glosas de Facturación y de Pertinencia
+venían con un texto **escrito a mano** para ese caso puntual (dotación de UCI,
+jeringas de 20 cc). Eso NO se puede volver plantilla sin inventar: para esas
+glosas específicas está el botón «Analizar con IA», que arma el argumento con
+todo el contexto. La plantilla cubre la mayoría (tarifas y soportes) y las
+demás quedan con una respuesta genérica correcta que el auditor ajusta.
+
+**Y un arreglo previo del mismo día:** el lector de valores del TXT ahora
+entiende el formato colombiano (antes «280.000» lo leía como $280).
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
