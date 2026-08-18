@@ -223,6 +223,54 @@ de la causal.
 > el reporte diría OK. Para averiguar si esa puerta existe:
 > `py tools\siifa_sondear_endpoints.py` (sólo consulta, no escribe nada).
 
+### Revisar el archivo ANTES de cargar (`siifa_revisar_antes_de_cargar.py`)
+
+**Obligatorio cuando el archivo de respuestas lo llenó el auditor.** Un cargue
+de 60.000 respuestas no se corrige sobre la marcha: lo que entra mal, entra
+mal para siempre.
+
+```powershell
+py tools\siifa_revisar_antes_de_cargar.py --ips SOCORRO `
+  --archivo "D:\USUARIO CARTERA\Documents\SIIFA\SOCORRO\respuestas.xlsx" `
+  --salida  "D:\USUARIO CARTERA\Documents\SIIFA\SOCORRO\LISTO_PARA_CARGAR.xlsx"
+```
+
+Deja dos archivos: el de cargue (sólo lo que sube sin problemas) y
+`..._REVISAR.xlsx` con lo que quedó fuera y **por qué**. Revisa:
+
+| Qué mira | Por qué |
+|---|---|
+| Que el archivo sea de esa IPS | Cargarlo con las credenciales de otra no se deshace |
+| Lo ya respondido en SIIFA | Volver a cargarlo **pisa** la respuesta y su fecha |
+| Textos de más de 1.500 caracteres | SIIFA los rechaza; se recortan y quedan marcados |
+| Respuestas sin texto | Un código sin sustento no defiende nada |
+| Código contra tipo | RE99xx es de glosa, RE95/96/97xx de devolución |
+| Fecha anterior a la formulación | SIIFA la rechaza |
+
+### El informe final del cargue (`siifa_informe_del_cargue.py`)
+
+Después de cargar, se baja el informe otra vez y se cruza con los reportes:
+
+```powershell
+py tools\siifa_reporte_seguimientos.py --ips SOCORRO `
+  --salida "D:\...\SOCORRO\informe_DESPUES.xlsx"
+
+py tools\siifa_informe_del_cargue.py --ips SOCORRO `
+  --informe "D:\...\SOCORRO\informe_DESPUES.xlsx" `
+  --reporte "D:\...\SOCORRO\reporte_cargue.csv" `
+  --salida  "D:\...\SOCORRO\INFORME_DEL_CARGUE.xlsx"
+```
+
+Dice cuántas quedaron **registradas de verdad en SIIFA**, con desglose por
+entidad pagadora, tipo y causal — y sobre todo señala **las que el bot dio por
+buenas pero SIIFA no tiene**, que son las peligrosas: se darían por
+respondidas y su plazo sigue corriendo. `--reporte` se repite para juntar
+varias tandas.
+
+> Es distinto de `siifa_verificar_cargue.py`, que consulta **factura por
+> factura** y saca constancias PDF: eso sirve para 17 facturas, no para
+> 12.255. Este parte del informe masivo, una sola bajada.
+
 ---
 
 ## 2) Bot de respuestas (`responder_glosas_siifa.py`)
