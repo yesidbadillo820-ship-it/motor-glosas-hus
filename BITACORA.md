@@ -3347,6 +3347,41 @@ hay que actualizar las vigencias o los porcentajes por EPS, se hace con
 cuidado y revisando contra la malla vigente — queda como decisión para
 confirmar, no se cambió a ciegas.
 
+### 18-08 — Dispensario: lote del 14 de agosto (24 facturas, puras tarifas)
+
+Llegó el export `GLOSAS_14_AGOSTO.xlsx` (636 glosas; 612 son de COOSALUD y se
+omitieron por instrucción del auditor). Lo del **Dispensario: 24 facturas, 36
+objeciones, $2.511.222**, vencimientos entre el 24-08 y el 01-09. Todas las
+observaciones son de **tarifas** (reconocen SOAT UVB alegando "sin acuerdo de
+voluntades vigente", "sin cotización", "sin lista de precios").
+
+- **Verificación de "¿ya se subieron?":** 20 facturas son glosas nuevas
+  (nunca trabajadas). Las otras 4 (531237, 531815, 531331, 532571) son
+  exactamente las mismas glosas que se cargaron el 05-08 con las 23
+  pendientes (mismos valores al peso) — van incluidas igual por seguridad:
+  si ya están contestadas, el robot las salta (NO_PENDIENTE).
+- **Punto jurídico clave:** las 24 facturas tienen fecha de servicio entre el
+  24-jun y el 22-jul de 2026 — todas DENTRO del plazo del contrato 440 (hasta
+  30-07-2026). El ataque "sin acuerdo de voluntades VIGENTE" se responde con
+  la tarifa pactada "vigente a la fecha de cada prestación" (así ya lo dice
+  la plantilla del motor).
+- **Excel generado** (`respuestas_glosa_DISPENSARIO_14AGO.xlsx`) con el motor
+  del repo + 4 refuerzos a la medida: (1) la glosa TOTAL de la 535749 discute
+  la FECHA del soporte (la firma del radiólogo es la fecha de lectura, no de
+  la toma) y se contestó como soporte con taxatividad de causales; (2) a las
+  que citan el Decreto 780 art. 2.6.1.4.2.4 y la Circular 047/2025 se les
+  responde que esas normas operan a falta de acuerdo; (3) homologación SOAT y
+  (4) cotización previa: no aplican cuando hay tarifa contractual propia.
+  Hoja "Control" con consecutivo DGH, vencimiento y cuadre al peso contra la
+  hoja INICIAL (las 24 cuadran).
+- Comandos de piloto (535452) y corrida completa entregados; evidencias a
+  `D:\USUARIO CARTERA\Documents\DISPENSARIO MEDICO 14-08-2026\EVIDENCIAS`.
+- **Para verificar por el auditor antes de subir:** en la 535749, confirmar
+  en historia clínica/RIPS la fecha real de la toma de la radiografía (la
+  respuesta afirma que la fecha del RIPS es la de la atención).
+- **Falta el consecutivo GI-33 de este lote** para la carpeta y el PDF de
+  evidencias (preguntado al auditor).
+
 ---
 
 ## 3) PENDIENTE
@@ -3476,6 +3511,14 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     portal cómo quedaron radicadas (¿respuesta cargada o cerradas por
     vencimiento?); si el portal las cerró sin respuesta, radicar por
     oficio/correo dejando constancia.
+11-bis. **(18-08) Correr el lote del 14 de agosto** con
+    `respuestas_glosa_DISPENSARIO_14AGO.xlsx` (24 facturas / 36 objeciones /
+    $2.511.222; vencen del 24-08 al 01-09): piloto con HUS0000535452 →
+    corrida completa → pegar el reporte al chat. Antes de subir: confirmar la
+    fecha real de la toma de la radiografía de la 535749 en HC/RIPS. Falta el
+    consecutivo GI-33 de este lote para carpeta+PDF de evidencias. Del cargue
+    del 05-08 sigue pendiente **pegar el reporte** al chat (nunca llegó), y
+    verificar en SIMED las 2 que no figuraban pendientes (527406 y 525763).
 11. **(05-08) Correr el cargue de las 23 pendientes** con
     `respuestas_glosa_DISPENSARIO_PENDIENTES_05AGO.xlsx`: piloto con
     HUS0000513796 → corrida completa → pegar el reporte al chat. En las de
