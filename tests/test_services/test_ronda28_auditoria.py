@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 import re
 
 
@@ -21,24 +23,33 @@ def test_aurora_factor_y_tarifa_del_contrato_firmado():
 # ─── POLICÍA: la entrada de oncología ya es alcanzable ───────────────
 
 
+# La fecha va fija dentro de la vigencia, igual que en COMPENSAR más abajo.
+# Lo que se comprueba acá es que el NOMBRE resuelva al contrato correcto —que
+# "POLICIA NACIONAL" no eclipse a "POLICIA NACIONAL ONCOLOGIA"—, no si el
+# contrato sigue vigente hoy. Según la malla al 28-07-2026 el 068-5-200004-26
+# rigió hasta el 15-08-2026 y el de oncología hasta el 31-07-2026: sin fecha
+# fija, estas pruebas empezaron a fallar solas al vencerse los contratos.
+_DIA_POLICIA = dt.date(2026, 6, 1)
+
+
 def test_policia_oncologia_resuelve_su_contrato():
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("POLICIA NACIONAL ONCOLOGIA")
+    ficha = get_contrato("POLICIA NACIONAL ONCOLOGIA", _DIA_POLICIA)
     assert "068-5-200006-26" in ficha["numero"]
 
 
 def test_policia_oncologia_con_razon_social_larga():
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("DIRECCION DE SANIDAD POLICIA NACIONAL - SERVICIO ONCOLOGIA")
+    ficha = get_contrato("DIRECCION DE SANIDAD POLICIA NACIONAL - SERVICIO ONCOLOGIA", _DIA_POLICIA)
     assert "068-5-200006-26" in ficha["numero"]
 
 
 def test_policia_mediana_alta_no_regresa():
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("POLICIA NACIONAL")
+    ficha = get_contrato("POLICIA NACIONAL", _DIA_POLICIA)
     assert "068-5-200004-26" in ficha["numero"]
 
 

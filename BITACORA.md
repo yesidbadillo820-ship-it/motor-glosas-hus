@@ -3072,6 +3072,33 @@ Ahora encuentra los 27 códigos de osteosíntesis igual, con tilde o sin ella.
 Todo lo anterior está explicado con detalle en
 `docs/CATALOGOS_TARIFARIOS_SOAT_2026.md`.
 
+**5) OJO CON ESTO — la Policía Nacional quedó SIN CONTRATO VIGENTE.**
+
+Salió de rebote, revisando por qué fallaban cuatro pruebas que no tenían
+nada que ver con el SOAT. **No es un error del sistema: es la realidad según
+la malla contractual cargada.** Los dos contratos de la Policía ya se
+vencieron:
+
+| Contrato | Rigió hasta |
+|---|---|
+| 068-5-200004-26 (mediana y alta) | **15-08-2026** — hace 3 días |
+| 068-5-200006-26 (oncología) | **31-07-2026** — hace 18 días |
+
+Desde el 16 de agosto, si usted analiza una glosa de la Policía Nacional, el
+dictamen dice **«SIN CONTRATO PACTADO»** y aplica **tarifa SOAT plena**. Eso
+está bien hecho si de verdad no hay contrato; está mal si ya se renovó y
+nadie ha cargado el nuevo.
+
+**Lo que hay que decidir (esto no lo puede resolver el sistema):** ¿se
+renovó el contrato con la Dirección de Sanidad de la Policía Nacional? Si
+sí, hay que cargar el nuevo número y su vigencia en la malla contractual.
+La malla que hoy tiene el sistema está fechada **28-07-2026**.
+
+Mientras tanto, las cuatro pruebas quedaron amarradas a una fecha dentro de
+la vigencia —igual que ya se había hecho con COMPENSAR—, porque lo que
+comprueban es que el nombre resuelva al contrato correcto, no si el contrato
+sigue vivo hoy.
+
 ---
 
 ## 3) PENDIENTE
@@ -3084,6 +3111,15 @@ Todo lo anterior está explicado con detalle en
   probarlo por su cuenta.
 - Si algún bot nuevo se agrega más adelante (o cambia de nombre), avisar
   para sumarlo al script y que el organizador lo incluya la próxima vez.
+
+### DECISIÓN DEL DUEÑO — contrato de la Policía Nacional (18-08)
+
+**¿Se renovó el contrato con la Dirección de Sanidad de la Policía Nacional?**
+Los dos que están cargados se vencieron: el 068-5-200004-26 (mediana y alta)
+el **15-08-2026**, y el 068-5-200006-26 (oncología) el **31-07-2026**. Desde
+el 16 de agosto el motor contesta «SIN CONTRATO PACTADO» y aplica tarifa SOAT
+plena para esa entidad. Si ya hay contrato nuevo, hay que cargar su número y
+su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ### Tarifas SOAT — lo que falta cargar (18-08)
 

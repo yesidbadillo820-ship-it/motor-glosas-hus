@@ -175,10 +175,20 @@ class TestExtraerValorRonda29:
 
 class TestGetContratoRonda29:
     def test_tilde_en_eps_matchea_catalogo(self):
+        """La tilde no puede cambiar el resultado.
+
+        La fecha va fija dentro de la vigencia del contrato de la Policía
+        (hasta el 15-08-2026 según la malla): lo que se comprueba es que
+        "POLICÍA" y "POLICIA" den lo mismo, no si el contrato sigue vigente
+        hoy. Sin fecha fija, esta prueba se cayó sola al vencerse el contrato.
+        """
+        import datetime as dt
+
         from app.services.glosa_ia_prompts import get_contrato
 
-        con_tilde = get_contrato("POLICÍA NACIONAL")
-        sin_tilde = get_contrato("POLICIA NACIONAL")
+        dia = dt.date(2026, 6, 1)
+        con_tilde = get_contrato("POLICÍA NACIONAL", dia)
+        sin_tilde = get_contrato("POLICIA NACIONAL", dia)
         assert con_tilde == sin_tilde
         assert "SIN CONTRATO" not in str(con_tilde.get("numero", "")).upper()
 
