@@ -410,6 +410,20 @@ def main():
     ruta_bd, ruta_circ, ruta_salida = args[:3]
     ruta_reporte = args[3] if len(args) > 3 else None
 
+    # El orden de los dos archivos no importa: la circularizacion es la que
+    # trae la hoja GENERAL. Asi el lanzador puede recibirlos arrastrados en
+    # cualquier orden sin que el auditor tenga que acordarse de cual va primero.
+    def tiene_general(ruta):
+        wb = openpyxl.load_workbook(ruta, read_only=True)
+        try:
+            return "GENERAL" in wb.sheetnames
+        finally:
+            wb.close()
+
+    if tiene_general(ruta_bd) and not tiene_general(ruta_circ):
+        ruta_bd, ruta_circ = ruta_circ, ruta_bd
+        print("(los archivos venian al reves; se corrigio el orden solo)")
+
     general = cargar_general(ruta_circ)
     wb = openpyxl.load_workbook(ruta_bd)
     ws, fila_enc, col = localizar_hoja_y_encabezados(wb)
