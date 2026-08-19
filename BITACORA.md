@@ -3560,6 +3560,62 @@ voluntades vigente", "sin cotización", "sin lista de precios").
 - **Falta el consecutivo GI-33 de este lote** para la carpeta y el PDF de
   evidencias (preguntado al auditor).
 
+### 18-08 (conciliación) — Acta 879 armada y las 3 objeciones de pertinencia justificadas
+
+Jornada de apoyo a la mesa de conciliación con el Dispensario (chat GLOSAS
+DISPENSARIO — SIMED):
+
+- **Las 2 facturas perdidas aparecieron.** El auditor no encontraba la hoja
+  de trabajo con las facturas 487285 y 481515. Se rastreó: sus carpetas de
+  soportes están en los LOTES de mayo (LOTE 3 y LOTE 8 — la de LOTE 8 estaba
+  mal nombrada "HUS87285" y se renombró); sus radicados de respuesta de abril
+  son **GI-23-4699-2026 y GI-23-4700-2026** (en el share Z: de SERVIDOR
+  GLOSAS); y la hoja de trabajo buena resultó ser
+  **HOJA_TRABAJO_GLOSAS_DMBUG_CON_OBSERVACIONES**, recuperada del respaldo de
+  WhatsApp en `D:\BackupCelular` (la "v2 - JOHAN" que buscaba ya no existe:
+  solo quedaron sus huellas temporales de Excel en Descargas).
+- **Las 3 objeciones de pertinencia médica quedaron justificadas al peso**
+  (486873, 487285, 481515): en las tres, el valor aceptado en el acta es
+  correcto y cuadra exacto (glosa = aceptado + levantado); lo que falla es la
+  **observación de la nota crédito**, que el armador construye concatenando
+  textos por línea y **duplica unos y omite otros**. Se entregaron los tres
+  textos de respuesta para pertinencia con el desglose peso por peso
+  (486873: $27.901 + $139.505 = $167.406, NC 310232; 487285: glosa $1.259.426
+  = aceptado $953.680 + levantado $305.746, NC 310123; 481515: glosa
+  $16.188.629 = aceptado $4.606.885 + levantado $11.581.744, NC 310166).
+  **Hallazgo de fondo:** ese defecto del concatenador de notas va a repetirse
+  en otras facturas del acta — se ofreció hacer un bot que arme la
+  observación correcta (todos los ítems aceptados con su valor).
+- **Se armó el ACTA SINAC N.º 879** (`ACTA_SINAC_N_879_ESE_HUS_DISPENSARIO_MEDICO.xlsx`)
+  con el formato del acta 720 de ejemplo: hoja ACTA con encabezado, tabla de
+  **1.493 glosas / 630 facturas** (radicado AC000879/AR003215, tipificación,
+  código, motivo, valores, descripción de conciliación y observación de NC
+  por glosa), totales **glosado $401.179.634 · acepta IPS $122.715.506 ·
+  levanta entidad $276.758.183**, observaciones, mérito ejecutivo y firmas;
+  hoja GLOSAS (detalle completo de la hoja de trabajo) y hoja NOTAS (las 10
+  NC del Dispensario en la BD de julio). Fuentes: la hoja CON_OBSERVACIONES
+  (el cruce de decisiones casó 1.493/1.493) y la BD de glosas aceptadas de
+  julio.
+- **(19-08) Acta 879 en limpio:** el auditor pasó el acta a su formato .xlsm
+  definitivo y quedaban 27 filas con la descripción genérica "IPS ACEPTA
+  GLOSA". Se corrigieron **26 en el sitio** (mismo archivo, macros y formato
+  intactos: solo cambiaron 52 celdas, verificado con comparación celda a
+  celda) tomando el CONCEPTO CONCILIACIÓN de la circularización de glosas
+  2026 — 22 con el texto textual y 4 de la factura 487285 con texto compuesto
+  porque la circularización traía el texto trocado (decía "levanta" con
+  valores de aceptación). Quedó **1 sin tocar para decisión del auditor**: la
+  487096 CL0101 por $1.248.511, que el acta tiene ACEPTADA al 100% y la
+  circularización tiene LEVANTADA. Ojo adicional: en la 487285 la
+  circularización reporta las terapias levantadas y un aceptado total de
+  $920.064 vs $953.680 del acta de la entidad ($33.616 de diferencia) —
+  aclarar con el técnico antes de firmar.
+- **Para cerrar el acta:** (1) confirmar fecha y número contra el **PDF
+  firmado ACTA_AC_AC000879** (se dejó 07/05/2026 según las NC; el PDF no se
+  ha compartido al chat); (2) revisar **3 líneas que no cierran**: 478141
+  (diferencia de $1: glosa 16.210 vs aceptado 16.209), 487192 (diferencia de
+  $20: 18.886 vs 18.866 — dígitos trocados) y **481589 (quedan $1.705.924 sin
+  decidir**: glosa $2.985.367, aceptado $426.481, levantado $852.962).
+
 ---
 
 ### 18-08 (noche) — Empieza «Salud Total»: el lector de valores ya no lee de menos
