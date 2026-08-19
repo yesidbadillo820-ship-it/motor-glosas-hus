@@ -141,6 +141,126 @@ class TestUnaFactura:
         assert "No se encontró" in res.observacion
 
 
+class TestQuitarElPieLegal:
+    """El bloque legal del final —autorización DIAN, letra de cambio, «Nombre
+    reporte», «LICENCIADO A»— no es parte de la factura."""
+
+    PIE = [
+        "AUTORIZACIÓN FACTURA ELECTRÓNICA DE VENTA RESOLUCIÓN Nº 18764098334481 DEL 08 sept 2025",
+        "LA PRESENTE FACTURA SE ASIMILA EN SUS EFECTOS A UNA LETRA DE CAMBIO",
+        "UNA VEZ VENCIDO EL PLAZO PARA CANCELAR A QUE SE REFIERE LA LEY 1122 DE 2007",
+        "POR LA SUPERINTENDENCIA BANCARIA .  SOMOS ENTIDAD SIN ANIMO DE LUCRO.",
+        "",
+        "Nombre reporte : FCRPFacturaEntidad",
+        "LICENCIADO A: [E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER] NIT [900006037-4]",
+    ]
+
+    def _con_pie(self, tmp_path):
+        origen = tmp_path / "in"
+        ruta = escribir_detallado(origen / "HUS352890.xlsx", "HUS352890")
+        wb = openpyxl.load_workbook(ruta)
+        ws = wb["Sheet"]
+        # La firma va DESPUÉS del total y ANTES del pie: es el límite exacto que
+        # el bot tiene que respetar.
+        fila = ws.max_row + 1
+        _poner(ws, fila, (6, 14), "NOTAS FINALES:")
+        _poner(ws, fila + 1, (6, 20), "LUDY YADIRA HERNANDEZ CARDENAS")
+        _poner(ws, fila + 2, (6, 20), "ELABORO")
+        _poner(ws, fila + 2, (30, 45), "LIQUIDACION Y CARTERA")
+        _poner(ws, fila + 2, (59, 66), "AUDITOR")
+        fila += 5
+        for texto in self.PIE:
+            if texto:
+                _poner(ws, fila, (5, 60), texto)
+            fila += 1
+        wb.save(ruta)
+        return origen
+
+    def _textos(self, ruta):
+        ws = openpyxl.load_workbook(ruta)["Sheet"]
+        return [str(c.value) for f in ws.iter_rows() for c in f if c.value is not None]
+
+    def test_sin_la_opcion_el_pie_se_queda(self, tmp_path):
+        origen = self._con_pie(tmp_path)
+        salida = tmp_path / "out"
+        res = ql.procesar([origen], salida)[0]
+        assert res.filas_de_pie == 0
+        assert any("LICENCIADO A" in t for t in self._textos(salida / "HUS352890.xlsx"))
+
+    def test_con_la_opcion_el_pie_desaparece(self, tmp_path):
+        origen = self._con_pie(tmp_path)
+        salida = tmp_path / "out"
+        res = ql.procesar([origen], salida, quitar_pie=True)[0]
+        assert res.estado == "LIMPIADO"
+        assert res.filas_de_pie == len(self.PIE)
+        textos = self._textos(salida / "HUS352890.xlsx")
+        for fuera in ("AUTORIZACIÓN", "LETRA DE CAMBIO", "Nombre reporte", "LICENCIADO A"):
+            assert not any(fuera in t for t in textos)
+
+    def test_la_factura_queda_completa_hasta_la_firma(self, tmp_path):
+        origen = self._con_pie(tmp_path)
+        salida = tmp_path / "out"
+        ql.procesar([origen], salida, quitar_pie=True)
+        textos = self._textos(salida / "HUS352890.xlsx")
+        for dentro in (aj.MARCA_SUBTOTAL, aj.MARCA_TOTAL_ORDEN, "AUDITOR", "ELABORO"):
+            assert any(dentro in t for t in textos)
+
+    def test_los_numeros_y_los_servicios_no_se_mueven(self, tmp_path):
+        origen = self._con_pie(tmp_path)
+        salida = tmp_path / "out"
+        ql.procesar([origen], salida, quitar_pie=True)
+        idx = aj.IndiceHoja(openpyxl.load_workbook(salida / "HUS352890.xlsx")["Sheet"])
+        fac = aj.segmentar_facturas(idx)[0]
+        est = aj.detectar_estructura(idx, fac)
+        items = [i for b in aj.leer_bloques(idx, est) for i in b.items]
+        assert [(i.codigo, i.vr_ent) for i in items] == [("39145", 85800.0), ("FMQ0046", 47000.0)]
+        numeros = [
+            c.valor for c in idx.celdas(est.fila_subtotal) if isinstance(c.valor, (int, float))
+        ]
+        assert numeros[-1] == 132800
+
+    def test_un_archivo_sin_pie_no_pierde_nada(self, tmp_path):
+        origen = tmp_path / "in"
+        escribir_detallado(origen / "HUS352890.xlsx", "HUS352890")
+        antes = len(self._textos(origen / "HUS352890.xlsx"))
+        salida = tmp_path / "out"
+        res = ql.procesar([origen], salida, quitar_pie=True)[0]
+        assert res.filas_de_pie == 0
+        assert len(self._textos(salida / "HUS352890.xlsx")) == antes - 1  # solo las letras
+
+    def test_pasarlo_dos_veces_no_borra_de_mas(self, tmp_path):
+        origen = self._con_pie(tmp_path)
+        una = tmp_path / "una"
+        ql.procesar([origen], una, quitar_pie=True)
+        dos = tmp_path / "dos"
+        res = ql.procesar([una], dos, quitar_pie=True)[0]
+        assert res.filas_de_pie == 0
+        assert self._textos(dos / "HUS352890.xlsx") == self._textos(una / "HUS352890.xlsx")
+
+    def test_por_linea_de_comandos(self, tmp_path, capsys):
+        origen = self._con_pie(tmp_path)
+        salida = tmp_path / "out"
+        reporte = tmp_path / "r.csv"
+        assert (
+            ql.main(
+                [
+                    "--origen",
+                    str(origen),
+                    "--salida",
+                    str(salida),
+                    "--quitar-pie",
+                    "--reporte-csv",
+                    str(reporte),
+                ]
+            )
+            == 0
+        )
+        assert "con el pie legal quitado       : 1" in capsys.readouterr().out
+        lineas = reporte.read_text(encoding="utf-8-sig").splitlines()
+        assert lineas[0].startswith("ARCHIVO;ESTADO;CUANTOS;FILAS_DE_PIE")
+        assert lineas[1].split(";")[3] == str(len(self.PIE))
+
+
 class TestCasosBorde:
     def test_una_hoja_con_varias_facturas_apiladas(self, tmp_path):
         """El formato del sistema apila facturas: hay que vaciarlas todas."""

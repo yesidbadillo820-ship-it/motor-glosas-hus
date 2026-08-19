@@ -2926,6 +2926,15 @@ los PDF ya generados: **ninguno** muestra un importe en palabras, **todos**
 conservan el VALOR TOTAL ORDEN DE SERVICIO en número, y la suma de los
 subtotales sigue siendo **$625.461.616,95**, la misma de antes.
 
+**Después el auditor pidió una cosa más:** quitar también el **pie legal del
+final** —la autorización de la DIAN, el aviso de la letra de cambio, los
+intereses moratorios, «Nombre reporte» y «LICENCIADO A»—, de modo que la hoja
+**termine en la firma del auditor**. Se agregó la opción `--quitar-pie` al mismo
+bot. El pie se busca de abajo hacia arriba y se corta en el primer renglón que
+no sea del pie, así que la firma, las notas finales y los totales nunca se
+tocan. Se volvieron a generar los 320 PDF: quedaron en **340 páginas** (11 menos)
+y ninguno trae ya nada del pie ni del total en letras; el dinero no se movió.
+
 **Un detalle importante:** el auditor mandó para este trabajo el ZIP de la
 **primera** entrega, la que todavía traía los tres errores (total
 $627.442.241,95). El trabajo se hizo sobre la **versión corregida**, para no
