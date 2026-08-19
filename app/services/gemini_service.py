@@ -28,7 +28,8 @@ import httpx
 
 logger = logging.getLogger("motor_glosas")
 
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+# El decisor vive en app/core/config.py — acá NO se escribe el nombre.
+from app.core.config import GEMINI_VIVO as DEFAULT_GEMINI_MODEL  # noqa: E402
 
 
 class GeminiService:

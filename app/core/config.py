@@ -213,6 +213,52 @@ def _exportar_claves_al_entorno(settings: "Settings") -> None:
             _os.environ[nombre_env] = valor
 
 
+# Modelos que el proveedor ya retiró: responden 404 y dejan el OCR muerto en
+# silencio. Se ignoran aunque el .env los mande, porque un archivo de
+# configuración viejo en un PC no puede tumbar una herramienta.
+#
+# 19-08-2026. El .env del PC de cartera traía `gemini-2.0-flash`, retirado por
+# Google. Con Anthropic además bloqueada por la red del hospital, eso dejaba al
+# Auditor Forense sin ningún camino: su cadena de respaldo es Anthropic →
+# Gemini PDF → Gemini Vision, y los tres estaban caídos. Corregir el .env a
+# mano en cada máquina no es una solución; esto sí.
+MODELOS_GEMINI_RETIRADOS = frozenset(
+    {
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+    }
+)
+
+# El alias que Google mantiene apuntando al Flash vigente.
+GEMINI_VIVO = "gemini-flash-latest"
+
+
+def modelo_gemini_vigente(pedido: str | None = None) -> str:
+    """El modelo de Gemini que se va a usar de verdad, garantizado vivo.
+
+    Recibe lo que diga la configuración (o None para tomarla) y devuelve eso
+    mismo, SALVO que sea un modelo retirado — ahí devuelve el alias vigente y
+    lo deja anotado en el registro, para que se vea por qué no se obedeció.
+    """
+    import logging
+
+    valor = (pedido if pedido is not None else get_settings().gemini_model) or ""
+    valor = valor.strip()
+    if not valor:
+        return GEMINI_VIVO
+    if valor in MODELOS_GEMINI_RETIRADOS:
+        logging.getLogger("motor_glosas").warning(
+            "GEMINI_MODEL pide «%s», que el proveedor ya retiró (404). Se usa «%s». "
+            "Corrija la línea GEMINI_MODEL del .env para quitar este aviso.",
+            valor,
+            GEMINI_VIVO,
+        )
+        return GEMINI_VIVO
+    return valor
+
+
 @lru_cache()
 def get_settings() -> Settings:
     settings = Settings()

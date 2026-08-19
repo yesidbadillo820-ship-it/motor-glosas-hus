@@ -565,6 +565,38 @@ def _sanear_content(content):
     return str(content) if str(content).strip() else None
 
 
+def _explicar_fallo_de_red(e: Exception) -> str:
+    """Traduce el fallo de red a algo que el auditor pueda accionar.
+
+    19-08-2026. Decía «Error red: [WinError 10054] Se ha forzado la
+    interrupción de una conexión existente por el host remoto». El auditor no
+    sabe qué es un WinError, y menos que eso significa que la red del hospital
+    está tumbando la conexión con el proveedor de IA — que es lo que pasa en el
+    PC de cartera: el Diagnóstico marca Anthropic en ámbar por lo mismo.
+    """
+    texto = str(e)
+    caido = any(
+        marca in texto
+        for marca in ("10054", "10060", "ConnectError", "ConnectTimeout", "getaddrinfo")
+    )
+    if caido:
+        return (
+            "No se pudo conectar con el proveedor de IA (Anthropic). Es un "
+            "bloqueo de red, no un problema del dato: la red del hospital está "
+            "cortando la salida hacia api.anthropic.com. Revíselo en "
+            "Diagnóstico → Anthropic, y pídale a Sistemas que permita la salida "
+            "HTTPS hacia api.anthropic.com. Mientras tanto, los dictámenes "
+            f"siguen saliendo por Groq. (detalle técnico: {texto[:120]})"
+        )
+    if "ReadTimeout" in texto or "TimeoutException" in texto:
+        return (
+            "El asistente se demoró más de lo que el portal puede esperar. "
+            "Vuelva a intentarlo con una pregunta más concreta; si sigue "
+            "pasando, avísele al chat."
+        )
+    return f"No se pudo hablar con el proveedor de IA: {texto[:200]}"
+
+
 async def chat_con_asistente(
     mensajes: list[dict],
     db,
@@ -595,7 +627,17 @@ async def chat_con_asistente(
     if not mensajes:
         return {"respuesta": "", "error": "Sin mensajes"}
 
-    timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+    # 19-08-2026. Era read=180. El portal se sirve por un túnel que corta la
+    # petición alrededor de los 100 segundos, así que el motor SIEMPRE perdía
+    # esa carrera: cuando el asistente se demoraba, el auditor no veía el
+    # motivo sino un «Error 502» del túnel, sin una palabra que le dijera qué
+    # pasó. Yesid lo vio corriendo sus dos agentes.
+    #
+    # Con 75 segundos el motor contesta primero y puede explicar el problema
+    # —que es lo que ocurre acá: la red del hospital tumba la conexión con
+    # api.anthropic.com—. Más vale un mensaje claro en 75 segundos que un 502
+    # mudo en 100.
+    timeout = httpx.Timeout(connect=10.0, read=75.0, write=30.0, pool=10.0)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -658,7 +700,11 @@ async def chat_con_asistente(
                     },
                 )
             except Exception as e:
-                return {"respuesta": "", "error": f"Error red: {e}", "tools_llamadas": tools_usadas}
+                return {
+                    "respuesta": "",
+                    "error": _explicar_fallo_de_red(e),
+                    "tools_llamadas": tools_usadas,
+                }
 
             if resp.status_code != 200:
                 # Detectar específicamente errores de billing de Anthropic
