@@ -24,6 +24,36 @@ de que cambie un botón en la pantalla.
 
 ## 0) Antes de la primera corrida
 
+### Las CUATRO IPS
+
+El auditor administra cuatro prestadores, cada uno con su propio usuario del
+portal. Cada uno tiene su carpeta y sus credenciales, y **se pueden trabajar
+los cuatro al mismo tiempo** en ventanas distintas.
+
+| Nombre corto | Entidad | NIT | Carpeta |
+|---|---|---|---|
+| `HUS` | E.S.E. Hospital Universitario de Santander | 900006037 | `...\SIIFA\HUS` |
+| `SOCORRO` | Clínica Socorro | 900190045 | `...\SIIFA\SOCORRO` |
+| `GIRON` | Clínica Girón | 890203242 | `...\SIIFA\GIRON` |
+| `GUANE` | Clínica Guane | 804006936 | `...\SIIFA\GUANE` |
+
+Todas las herramientas reciben `--ips`:
+
+```powershell
+py tools\siifa_reporte_seguimientos.py --ips SOCORRO `
+  --salida "D:\USUARIO CARTERA\Documents\SIIFA\SOCORRO\informe_seguimientos.xlsx"
+```
+
+> **La guarda que protege el trabajo.** Antes de bajar o escribir nada, la
+> herramienta le pregunta al token de SIIFA a qué NIT pertenece y lo compara
+> con la IPS que se pidió. Si no coinciden **se detiene sin hacer nada** y
+> dice de quién son las credenciales que encontró. Con cuatro ventanas
+> abiertas, esto es lo que impide cargar las respuestas de una entidad en
+> otra — un error que no se puede deshacer.
+
+Para agregar una IPS nueva se añade en `tools/siifa_perfiles.py` (ahí no hay
+ni un usuario ni una clave: sólo el NIT y el NOMBRE de las variables).
+
 ### Instalar dependencias (una sola vez)
 
 ```powershell
@@ -32,9 +62,13 @@ py -m pip install httpx openpyxl
 
 ### Credenciales — SIEMPRE por variable de entorno, nunca en el código
 
+**Una pareja por IPS**, porque cada una tiene su usuario en el portal:
+
 ```powershell
-setx SIIFA_USER <tu_usuario_sispro>
-setx SIIFA_PASSWORD <tu_password>
+setx SIIFA_USER_HUS "..."        ;  setx SIIFA_PASSWORD_HUS "..."
+setx SIIFA_USER_SOCORRO "..."    ;  setx SIIFA_PASSWORD_SOCORRO "..."
+setx SIIFA_USER_GIRON "..."      ;  setx SIIFA_PASSWORD_GIRON "..."
+setx SIIFA_USER_GUANE "..."      ;  setx SIIFA_PASSWORD_GUANE "..."
 ```
 
 Cerrar y volver a abrir PowerShell para que las tome.
@@ -98,6 +132,164 @@ El Excel trae la hoja **SEGUIMIENTOS** (una fila por glosa, con
 `id_seguimiento_factura_glosa` — ese id es el que necesita el bot de
 respuestas más abajo) y una hoja **RESUMEN** con totales por EPS y valor
 glosado. Las filas sin respuesta quedan resaltadas.
+
+### Qué llegó NUEVO desde la última revisión (`siifa_novedades.py`)
+
+El portal muestra el total («Mostrando 2611 a 2620 de **2620** registros») pero
+no dice cuáles son nuevos: buscarlos a mano son 175 páginas de a diez. Esto lo
+responde de una: **qué entidad, qué factura, glosa o devolución, por cuánto y
+con qué causal.**
+
+```powershell
+# 1) Guardar el informe que ya se tenía y bajar el de hoy
+Move-Item "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+          "D:\USUARIO CARTERA\Documents\SIIFA\informe_ANTERIOR.xlsx" -Force
+
+py tools\siifa_reporte_seguimientos.py `
+  --salida "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx"
+
+# 2) Comparar los dos
+py tools\siifa_novedades.py `
+  --nuevo    "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+  --anterior "D:\USUARIO CARTERA\Documents\SIIFA\informe_ANTERIOR.xlsx"
+```
+
+Muestra el resumen en pantalla y deja `NOVEDADES_SIIFA.xlsx` al lado, con las
+devoluciones resaltadas (se responden por otra puerta). En el bot de doble
+clic es la **opción [N]**, que hace los dos pasos sola.
+
+Si no se tiene el informe anterior a la mano, se corre solo con `--nuevo`: en
+ese caso lista lo que está **sin responder**, que —estando el corte anterior
+cargado al 100%— es justamente lo que acaba de entrar.
+
+> **Ojo con el valor de las devoluciones:** SIIFA repite el valor de la
+> factura en cada línea de la devolución. Este informe lo cuenta **una sola
+> vez por factura**; sumarlas daría $24.917 millones donde hay $111 millones.
+
+### En qué va cada glosa y qué se vence (`siifa_estado_tramite.py`)
+
+El panel «Avance de auditoría» del portal muestra las cinco etapas del trámite
+para **una** factura. Esto las muestra para todas, y sobre todo dice **qué
+tiene que hacer el hospital y cuándo se vence**.
+
+```powershell
+py tools\siifa_estado_tramite.py `
+  --informe "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+  --salida  "D:\USUARIO CARTERA\Documents\SIIFA\ESTADO_TRAMITE.xlsx"
+```
+
+En el bot de doble clic es la **opción [E]**. Muestra en pantalla:
+
+- el conteo y el valor de cada etapa,
+- **lo que le toca al hospital**, de mayor a menor valor, con su vencimiento,
+- **las glosas levantadas** (lo que la EPS le dio al hospital: plata recuperada),
+- **la EPS en mora**, cuando respondimos y no ha decidido dentro de su plazo.
+
+> **Lo más importante: la etapa 4.** Cuando la EPS reitera una glosa, al
+> hospital le quedan **7 días hábiles** para subsanar y nadie avisa. Una
+> glosa reiterada que no se subsana queda en firme.
+
+Los días hábiles se cuentan de lunes a viernes sin descontar festivos, así que
+el aviso llega un poco antes de lo estricto — nunca después.
+
+### Subsanar lo que la EPS reiteró (`siifa_armar_subsanacion.py`)
+
+**Etapa 4 del trámite, y la que más rápido se vence: 7 días hábiles.** La EPS
+miró la respuesta del hospital y no levantó la glosa. Hay que insistir, y
+nadie avisa que el reloj arrancó.
+
+```powershell
+py tools\siifa_armar_subsanacion.py `
+  --informe "D:\USUARIO CARTERA\Documents\SIIFA\informe_seguimientos.xlsx" `
+  --salida  "D:\USUARIO CARTERA\Documents\SIIFA\SUBSANACION.xlsx"
+
+# Piloto de 1 (regla del repo) — OJO con --accion
+py tools\responder_glosas_siifa.py `
+  --excel "D:\USUARIO CARTERA\Documents\SIIFA\SUBSANACION.xlsx" `
+  --accion reiteracion-respuesta --piloto 1 `
+  --reporte "D:\USUARIO CARTERA\Documents\SIIFA\piloto_subsanacion.csv"
+```
+
+En el bot de doble clic es la **opción [S]**.
+
+El escrito **no repite** la primera respuesta —la EPS ya la leyó y no la
+aceptó—: deja constancia de que el hospital contestó y en qué fecha, señala
+que la reiteración no aporta elemento nuevo, y conserva el argumento de fondo
+de la causal.
+
+> **Las devoluciones reiteradas salen aparte, en la hoja
+> `DEVOLUCIONES_NO_CARGAR`, sin código ni texto.** Su puerta de subsanación no
+> está confirmada; mandarlas por la de glosas escribiría sobre otro registro y
+> el reporte diría OK. Para averiguar si esa puerta existe:
+> `py tools\siifa_sondear_endpoints.py` (sólo consulta, no escribe nada).
+
+### Revisar el archivo ANTES de cargar (`siifa_revisar_antes_de_cargar.py`)
+
+**Obligatorio cuando el archivo de respuestas lo llenó el auditor.** Un cargue
+de 60.000 respuestas no se corrige sobre la marcha: lo que entra mal, entra
+mal para siempre.
+
+```powershell
+py tools\siifa_revisar_antes_de_cargar.py --ips SOCORRO `
+  --archivo "D:\USUARIO CARTERA\Documents\SIIFA\SOCORRO\respuestas.xlsx" `
+  --salida  "D:\USUARIO CARTERA\Documents\SIIFA\SOCORRO\LISTO_PARA_CARGAR.xlsx"
+```
+
+Deja dos archivos: el de cargue (sólo lo que sube sin problemas) y
+`..._REVISAR.xlsx` con lo que quedó fuera y **por qué**. Revisa:
+
+| Qué mira | Por qué |
+|---|---|
+| Que el archivo sea de esa IPS | Cargarlo con las credenciales de otra no se deshace |
+| Lo ya respondido en SIIFA | Volver a cargarlo **pisa** la respuesta y su fecha |
+| Textos de más de 1.500 caracteres | SIIFA los rechaza; se recortan y quedan marcados |
+| Respuestas sin texto | Un código sin sustento no defiende nada |
+| Código contra tipo | RE99xx es de glosa, RE95/96/97xx de devolución |
+| Fecha anterior a la formulación | SIIFA la rechaza |
+
+### El informe final del cargue (`siifa_informe_del_cargue.py`)
+
+Después de cargar, se baja el informe otra vez y se cruza con los reportes:
+
+```powershell
+py tools\siifa_reporte_seguimientos.py --ips SOCORRO `
+  --salida "D:\...\SOCORRO\informe_DESPUES.xlsx"
+
+py tools\siifa_informe_del_cargue.py --ips SOCORRO `
+  --informe "D:\...\SOCORRO\informe_DESPUES.xlsx" `
+  --reporte "D:\...\SOCORRO\reporte_cargue.csv" `
+  --salida  "D:\...\SOCORRO\INFORME_DEL_CARGUE.xlsx"
+```
+
+Dice cuántas quedaron **registradas de verdad en SIIFA**, con desglose por
+entidad pagadora, tipo y causal — y sobre todo señala **las que el bot dio por
+buenas pero SIIFA no tiene**, que son las peligrosas: se darían por
+respondidas y su plazo sigue corriendo. `--reporte` se repite para juntar
+varias tandas.
+
+> Es distinto de `siifa_verificar_cargue.py`, que consulta **factura por
+> factura** y saca constancias PDF: eso sirve para 17 facturas, no para
+> 12.255. Este parte del informe masivo, una sola bajada.
+
+### El balance de un corte (`siifa_balance.py`) — opción [B] del bot
+
+Cierra el ciclo de un cargue respondiendo las cuatro preguntas de una vez:
+qué estaba glosado **al corte** (la fecha del archivo con el que se armaron
+las respuestas), qué de eso quedó **respondido** (separando lo que ya venía
+respondido de antes), qué **sigue sin responder** (el plazo corre) y qué
+**nuevo** ha glosado la EPS desde entonces.
+
+```powershell
+py tools\siifa_balance.py --ips SOCORRO `
+  --corte "D:\...\SOCORRO\SIIFA_informe_seguimientos_SOCORRO.xlsx" `
+  --hoy   "D:\...\SOCORRO\informe_DESPUES.xlsx"
+```
+
+Deja `BALANCE_SIIFA_<IPS>.xlsx` con el resumen (lo sin responder en rojo) y
+tres hojas de detalle: `PENDIENTES` (viejo + nuevo sin responder), `NUEVAS`
+y `YA_NO_ESTAN` (lo del corte que desapareció del informe: posible
+reformulación de la EPS). Verifica que los dos archivos sean de la IPS
+indicada antes de cruzar nada.
 
 ---
 

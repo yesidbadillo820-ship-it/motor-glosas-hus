@@ -49,9 +49,9 @@ from _dinero import a_entero  # noqa: E402
 from siifa_client import (  # noqa: E402
     SiifaApiError,
     SiifaClient,
-    credenciales_desde_env,
 )
 from siifa_reporte_seguimientos import _fila_reporte  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 
 logger = logging.getLogger("siifa_verificar")
 
@@ -249,13 +249,19 @@ def escribir(filas: list[dict], ruta: Path) -> None:
     logger.info("Hoja de verificación: %s (%d glosas)", ruta, len(filas))
 
 
-def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
+def constancias(filas: list[dict], carpeta: Path, cuando: str, ips=None) -> int:
     """Una constancia PDF por factura, para anexar a los soportes.
+
+    OJO CON EL NOMBRE DE LA ENTIDAD. Esto se le anexa a la EPS como evidencia:
+    una constancia de la Clínica Girón encabezada «E.S.E. Hospital
+    Universitario de Santander» no prueba nada y desacredita el soporte.
 
     Reemplaza al pantallazo del portal: dice lo mismo —qué respondió el
     hospital, con qué código y con qué fecha— pero consultado a la API
     oficial del Ministerio y con la fecha y hora de la consulta.
     """
+    if ips is None:
+        ips = perfiles.IPS["HUS"]
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
@@ -280,7 +286,7 @@ def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
 
     hechas = 0
     for factura, glosas in sorted(por_factura.items()):
-        ruta = carpeta / f"CONSTANCIA_SIIFA_{factura}.pdf"
+        ruta = carpeta / f"CONSTANCIA_SIIFA_{ips.clave}_{factura}.pdf"
         doc = SimpleDocTemplate(
             str(ruta),
             pagesize=letter,
@@ -291,7 +297,7 @@ def constancias(filas: list[dict], carpeta: Path, cuando: str) -> int:
             title=f"Constancia SIIFA {factura}",
         )
         cuerpo = [
-            Paragraph("E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER", titulo),
+            Paragraph(ips.nombre_legal, titulo),
             Paragraph(
                 "CONSTANCIA DE RESPUESTA REGISTRADA EN SIIFA<br/>"
                 "(Sistema de Información de Facturación — Ministerio de Salud y "
@@ -373,6 +379,7 @@ def main() -> None:
     ap.add_argument("--salida", required=True, help="Excel de verificación que se va a escribir.")
     ap.add_argument("--constancias", help="Carpeta donde dejar una constancia PDF por factura.")
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -396,12 +403,15 @@ def main() -> None:
     facturas = sorted({c["factura"] for c in cargado if c["factura"]})
     logger.info("A verificar: %d glosas de %d factura(s).", len(cargado), len(facturas))
 
-    usuario, password = credenciales_desde_env()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
+    usuario, password = perfiles.credenciales(ips)
     with SiifaClient() as cliente:
         try:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
+        perfiles.verificar_identidad(ips, cliente.nit_entidad())
         en_siifa = consultar(cliente, facturas)
 
     filas = [comparar(c, en_siifa.get(c["id"])) for c in cargado]
@@ -409,7 +419,7 @@ def main() -> None:
 
     cuando = datetime.now().strftime("%d/%m/%Y %H:%M")
     if args.constancias:
-        constancias(filas, Path(args.constancias), cuando)
+        constancias(filas, Path(args.constancias), cuando, ips=ips)
 
     cuenta = Counter(f["RESULTADO"] for f in filas)
     print(

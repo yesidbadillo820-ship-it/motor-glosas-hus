@@ -194,6 +194,22 @@ class SiifaClient:
         logger.info("Ingreso a SIIFA correcto.")
         return self._token
 
+    def nit_entidad(self) -> str | None:
+        """De qué entidad es el token que tenemos, según el propio token.
+
+        El JWT trae el NIT de la entidad (ver docs/CONTEXTO_SIIFA.md 3.2), y la
+        API filtra por él. Leerlo permite comprobar, ANTES de escribir nada,
+        que las credenciales son las de la IPS con la que se dijo trabajar —el
+        auditor maneja cuatro a la vez, en cuatro ventanas iguales—.
+
+        Devuelve None si no se puede leer. No revienta nunca: esto es una
+        comprobación de seguridad, y si falla la comprobación el trabajo se
+        avisa, no se cae.
+        """
+        if not self._token:
+            return None
+        return _nit_del_jwt(self._token)
+
     def _headers(self) -> dict:
         if not self._token:
             raise RuntimeError("Llamar login() antes de usar el cliente.")
@@ -586,6 +602,45 @@ def _error_detail(resp: "httpx.Response") -> str:
             "(probablemente la dirección configurada no es la de la API)"
         )
     return texto[:300] or "sin detalle"
+
+
+_CLAVES_NIT = ("nitentidad", "nit", "nitips", "nitprestador", "nit_entidad")
+
+
+def _nit_del_jwt(token: str) -> str | None:
+    """El NIT que viene adentro del token, sin librerías de terceros.
+
+    Un JWT son tres partes separadas por punto; la del medio es el contenido,
+    en base64url. Se lee a mano porque el repo no agrega dependencias para
+    esto (y una librería de JWT traería verificación de firma, que acá no hace
+    falta: el token nos lo acaba de dar SIIFA).
+
+    Cualquier problema devuelve None. Nunca lanza: si esto reventara, dejaría
+    sin herramienta al auditor por un campo que la API cambió de nombre.
+    """
+    import base64
+    import json
+
+    try:
+        partes = token.split(".")
+        if len(partes) < 2:
+            return None
+        cuerpo = partes[1]
+        # base64url sin relleno: hay que devolvérselo para poder decodificar.
+        cuerpo += "=" * (-len(cuerpo) % 4)
+        datos = json.loads(base64.urlsafe_b64decode(cuerpo).decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+    if not isinstance(datos, dict):
+        return None
+    for clave, valor in datos.items():
+        # Los claims de .NET vienen con URL adelante
+        # (http://schemas.../nitentidad), así que se compara el final.
+        nombre = str(clave).rsplit("/", 1)[-1].lower().replace("_", "")
+        if nombre in _CLAVES_NIT and valor:
+            return str(valor)
+    return None
 
 
 def credenciales_desde_env() -> tuple[str, str]:

@@ -25,6 +25,34 @@ responderlas — además de lo que se responda en el portal propio de cada EPS.
 
 El HUS entra como rol **IPS** (NIT 900006037-4).
 
+### Desde el 13-08-2026: CUATRO IPS, no una
+
+El auditor administra la facturación de cuatro prestadores, cada uno con su
+propio usuario del portal, y los trabaja **al mismo tiempo**:
+
+| Nombre corto | Entidad | NIT |
+|---|---|---|
+| `HUS` | E.S.E. Hospital Universitario de Santander | 900006037 |
+| `SOCORRO` | Clínica Socorro | 900190045 |
+| `GIRON` | Clínica Girón | 890203242 |
+| `GUANE` | Clínica Guane | 804006936 |
+
+Están en `tools/siifa_perfiles.py` (sin credenciales: sólo el NIT, la carpeta
+y el NOMBRE de las variables de entorno). Todas las herramientas reciben
+`--ips`, y cada IPS tiene su carpeta —los archivos se llaman igual en todas,
+así que compartir carpeta haría que una pisara a la otra—.
+
+**La guarda que no se puede quitar.** El JWT trae el NIT de la entidad. Antes
+de bajar o escribir nada se compara con el de la IPS pedida; si no coinciden,
+el trabajo se detiene sin tocar la plataforma. Una prueba recorre los scripts
+que entran a SIIFA y falla si alguno no llama a `verificar_identidad()`.
+
+**El texto de la respuesta también cambia por IPS.** Estaba escrito «ESE
+HOSPITAL UNIVERSITARIO DE SANTANDER NO ACEPTA…» a mano, con el correo y la
+dirección del HUS. El banco de argumentos usa ahora `{IPS}` como marcador. Si
+una IPS no tiene datos de contacto cargados, **se omite la frase** — un correo
+ajeno en un escrito con efectos jurídicos es peor que ningún correo.
+
 ## 2) La pantalla de la que parte este proyecto
 
 `Seguimiento → Listar seguimientos` muestra una tabla paginada (25/página) de
@@ -157,8 +185,48 @@ por el mecanismo único de validación FEV-RIPS — no se responde en SIIFA como
   para registrar la respuesta de cada glosa. Genera un CSV de reporte
   (OK/ERROR por fila) para poder reintentar solo lo que falló, igual que el
   bot COOSALUD.
+- **`tools/siifa_novedades.py`** — compara el informe recién bajado contra el
+  de la revisión pasada y dice **qué llegó nuevo**: entidad, factura, si es
+  glosa o devolución, valor y causal. El portal muestra el total («2.620
+  registros») pero no cuáles son nuevos, y buscarlos a mano son 175 páginas.
+  Sin informe anterior a la mano, lista lo que está sin responder.
+- **`tools/siifa_estado_tramite.py`** — en qué etapa va cada glosa de las
+  cinco del panel «Avance de auditoría», y **a quién le toca mover**. Separa
+  lo ganado (glosa levantada), lo que espera a la EPS, lo que espera al
+  hospital y lo que ya se venció. El portal muestra ese panel de a una
+  factura; esto lo hace para las 2.600 de una vez.
 - Ver `tools/README_siifa.md` para los comandos PowerShell listos para
   copiar/pegar.
+
+### La etapa 4 es la trampa: 7 días hábiles para subsanar
+
+Cuando la EPS **reitera** una glosa (no la levanta), al hospital le quedan
+**7 días hábiles** para subsanar — menos de la mitad que los 15 de la primera
+respuesta— y **nadie avisa**: hay que ir a mirar el portal. Una glosa
+reiterada que no se subsana queda en firme. Por eso `siifa_estado_tramite.py`
+saca de primero lo que le toca al hospital, con su fecha de vencimiento.
+
+Los códigos de decisión vistos en la API (05 y 13-08-2026):
+
+| Código | Significa | Quién sigue |
+|---|---|---|
+| `GTL002` | Glosa totalmente levantada | nadie — **ganada** |
+| `GRE003` | Glosa reiterada | **el hospital**, 7 días hábiles |
+| `DRE003` | Devolución reiterada | **el hospital**, 7 días hábiles |
+
+La clasificación se hace por la **descripción** («levantada» / «reiterada»),
+no por el código: esa lista puede crecer y el texto es lo estable. Una glosa
+levantada **parcialmente** no se da por ganada — el resto sigue vivo y hay que
+subsanarlo.
+
+### El valor de una devolución NO se suma línea por línea
+
+Una **glosa** objeta un ítem y trae el valor de ese ítem: los ítems se suman.
+Una **devolución** rechaza la factura entera, y SIIFA **repite el valor de la
+factura en cada una de sus líneas**. Sumar esas líneas multiplica la plata:
+las 1.340 líneas de SANITAS dan **$24.917 millones** cuando esas 9 facturas
+valen **$111 millones** —224 veces más—. En cualquier informe, el valor de una
+devolución se cuenta **una sola vez por factura**.
 
 ## 5.quater) Glosas y devoluciones NO se responden por el mismo lado
 
