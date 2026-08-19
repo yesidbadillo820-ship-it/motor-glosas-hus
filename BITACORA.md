@@ -3837,6 +3837,26 @@ colgada: arranca el trabajo y devuelve el control enseguida.
 
 ---
 
+### 19-08 — Soportes indexando el servidor de verdad, y el mensaje que confundía
+
+Con los arreglos de anoche, el indexador ya está recorriendo
+`\\Prime\radicacion_2026` de verdad: **11.367 facturas y 102.729 archivos** y
+subiendo, con la pantalla mostrando «⏳ Indexando…» y actualizándose sola. La
+búsqueda ya **no da Error 524**: responde de una.
+
+**Pero el mensaje engañaba.** Al buscar una factura de agosto mientras el
+indexador iba por la mitad, la pantalla decía «Sin soportes para la factura» y
+listaba causas que no incluían la verdadera: **todavía no había llegado a
+agosto**. Las carpetas se recorren por orden (FEBRERO, MARZO…), así que los
+meses recientes salen de últimos. Un auditor podía creer que la factura no
+tenía soportes cuando sí los tiene.
+
+Ahora, si el índice está a medias, el mensaje lo dice claro: cuántas facturas
+lleva, que las carpetas van por orden y que espere a que termine. Y se corrigió
+un «hace en curso» que había quedado mal redactado.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
