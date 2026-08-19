@@ -58,6 +58,55 @@ MAX_CHARS_POR_SOPORTE = 5_000
 PRIORIDAD_TIPOS_SOPORTE = ["HEV", "RIPS", "FEV", "OPF", "PDE", "PDX", "CRC", "AD"]
 
 
+async def _pdfs_del_servidor_para_forense(
+    numero_factura: Optional[str],
+    req_id: str,
+) -> list[tuple[str, bytes]]:
+    """Los PDF del expediente de la factura, en crudo, para el auditor forense.
+
+    19-08-2026. Yesid: «que el auditor forense esté anclado en analizar glosa,
+    porque es exactamente lo que se le pide que haga».
+
+    El pre-pass forense ya existía, pero solo miraba los PDF que el auditor
+    subía a mano. Los soportes que el indexador encuentra en el servidor de
+    radicación se leían como TEXTO plano y nunca llegaban al forense — que es
+    justo el que sabe citar folios. Con esto, responder una glosa de una
+    factura radicada ya no depende de que alguien busque los PDF y los adjunte.
+
+    Devuelve lista vacía —nunca revienta— si no hay factura, no hay índice o
+    no hay ningún PDF legible.
+    """
+    if not numero_factura:
+        return []
+    try:
+        from app.services.auditor_forense import escoger_soportes_para_forense
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        soportes = get_indexer().lookup(numero_factura) or []
+    except Exception as e:  # noqa: BLE001 - sin soportes se sigue, solo sin folios
+        logger.warning(f"[{req_id}] Indexador soportes no disponible para forense: {e}")
+        return []
+    if not soportes:
+        return []
+
+    elegidos, omitidos = escoger_soportes_para_forense(soportes)
+    crudos: list[tuple[str, bytes]] = []
+    for sop in elegidos:
+        try:
+            if os.path.getsize(sop["ruta"]) > MAX_BYTES_PDF:
+                continue
+            with open(sop["ruta"], "rb") as fh:
+                crudos.append((sop.get("nombre_archivo") or "soporte.pdf", fh.read()))
+        except OSError as e:
+            logger.warning(f"[{req_id}] No se pudo leer {sop.get('ruta')}: {e}")
+    if crudos:
+        logger.info(
+            f"[{req_id}] Forense: {len(crudos)} PDF del servidor "
+            f"({len(omitidos)} sin abrir de {len(soportes)} soportes)"
+        )
+    return crudos
+
+
 async def _extraer_soportes_del_servidor(
     numero_factura: Optional[str],
     contexto_pdf_existente: str,
@@ -928,26 +977,39 @@ async def analizar(
             # que hay soportes disponibles y referencie en el dictamen.
             archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
 
-        # Fase 2b Soportes (jul-2026): PRE-PASS del Auditor Forense (OPT-IN).
-        # Lee los PDFs nativos y antepone al contexto un MAPA DE FOLIOS
-        # (folios + fechas + hallazgos) para que el dictamen cite folios
-        # REALES en vez de argumentar a ciegas. Es una llamada Claude extra
-        # (cacheada 14 días) → default OFF; corre solo en casos que ya
-        # escalan a Claude (mismo criterio que capturar_raw), para no
-        # convertir cada glosa en doble costo.
-        if (
-            os.getenv("GLOSA_AUDITOR_FORENSE_PREPASS", "0").strip().lower()
-            not in ("0", "false", "no")
-            and pdfs_raw
-            and _capturar_raw
-        ):
+        # PRE-PASS del Auditor Forense. Lee los PDF del expediente y antepone
+        # al contexto un MAPA DE FOLIOS (folios + fechas + hallazgos) para que
+        # el dictamen cite folios REALES en vez de argumentar a ciegas.
+        #
+        # 19-08-2026. Antes venía APAGADO y, aun prendido, solo miraba los PDF
+        # que el auditor subía a mano: los soportes que el indexador ya tiene
+        # del servidor de radicación nunca llegaban al forense. Yesid pidió que
+        # esto sea parte de responder la glosa, no un botón aparte —«es
+        # exactamente lo que se le pide que haga»—, así que ahora:
+        #   · viene PRENDIDO (se puede apagar con GLOSA_AUDITOR_FORENSE_PREPASS=0);
+        #   · si el auditor no adjuntó PDF, los saca del servidor de radicación.
+        # Es una llamada extra a la IA, cacheada 14 días: la misma factura con
+        # la misma glosa no se vuelve a cobrar.
+        _forense_on = os.getenv("GLOSA_AUDITOR_FORENSE_PREPASS", "1").strip().lower() not in (
+            "0",
+            "false",
+            "no",
+        )
+        _pdfs_forense = pdfs_raw or []
+        if _forense_on and not _pdfs_forense:
+            _pdfs_forense = await _pdfs_del_servidor_para_forense(numero_factura, req_id)
+        if _forense_on and _pdfs_forense:
             try:
                 from app.services.auditor_forense import evidencia_para_dictamen
 
+                # Leer los folios tarda 1-2 minutos. Sin avisar ANTES, el
+                # auditor se queda mirando una pantalla quieta y cree que se
+                # colgó. El aviso de «listo» va después, con el resultado.
+                _publicar_progreso(_tid, "auditor_forense_inicio", {"pdfs": len(_pdfs_forense)})
                 _ev = await evidencia_para_dictamen(
                     factura=numero_factura or "s/n",
                     texto_glosa=tabla_excel or "",
-                    pdfs_raw=pdfs_raw,
+                    pdfs_raw=_pdfs_forense,
                     contexto_pdf_texto=contexto_pdf or "",
                 )
                 if _ev.get("evidencia"):

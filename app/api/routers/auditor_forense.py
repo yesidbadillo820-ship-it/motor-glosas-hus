@@ -72,7 +72,7 @@ async def auditar_factura(
     clínicas es sensible).
     """
     from app.services.soportes_autodiscovery_service import get_indexer
-    from app.services.auditor_forense import auditar_forense
+    from app.services.auditor_forense import auditar_forense, escoger_soportes_para_forense
 
     factura = payload.factura.strip().upper()
     pregunta = payload.pregunta.strip()
@@ -86,22 +86,23 @@ async def auditar_factura(
             f"Verificá que el jump-box haya subido los archivos.",
         )
 
-    # Cap: max 5 PDFs (Claude PDF nativo) o ~30k chars de texto
+    # Solo caben 5 documentos por consulta: los escoge `escoger_soportes_para_forense`
+    # priorizando la evidencia clínica y descartando lo que no sea un PDF de verdad.
+    # Lo que quede por fuera se le devuelve al gestor: un «no encontré evidencia»
+    # sobre un expediente leído a medias es un dictamen falso.
+    elegidos, omitidos = escoger_soportes_para_forense(soportes)
     pdfs_raw: list[tuple[str, bytes]] = []
     contexto_texto = ""
     soportes_usados: list[str] = []
 
     if payload.usar_pdf_nativo:
-        for s in soportes[:5]:
+        for s in elegidos:
             ruta = s.get("ruta")
-            if not ruta:
-                continue
             try:
-                if not os.path.exists(ruta):
-                    continue
                 size = os.path.getsize(ruta)
                 if size > 30 * 1024 * 1024:
                     logger.warning(f"[AUDITOR-FORENSE] {ruta} >30MB, saltado")
+                    omitidos.append({**s, "motivo": "pesa más de 30 MB"})
                     continue
                 with open(ruta, "rb") as f:
                     data = f.read()
@@ -109,16 +110,15 @@ async def auditar_factura(
                 soportes_usados.append(s.get("nombre_archivo", ""))
             except Exception as e:
                 logger.warning(f"[AUDITOR-FORENSE] No se pudo leer {ruta}: {e}")
+                omitidos.append({**s, "motivo": "no se pudo leer del servidor"})
 
     if not pdfs_raw:
         # Fallback: extraer texto con pdf_service
         from app.services.pdf_service import PdfService
 
         pdf_svc = PdfService()
-        for s in soportes[:5]:
+        for s in elegidos:
             ruta = s.get("ruta")
-            if not ruta or not os.path.exists(ruta):
-                continue
             try:
                 with open(ruta, "rb") as f:
                     data = f.read()
@@ -134,7 +134,12 @@ async def auditar_factura(
                 break
 
     if not pdfs_raw and not contexto_texto:
-        raise HTTPException(500, "No se pudo leer ningún soporte de esta factura")
+        raise HTTPException(
+            422,
+            f"La factura {factura} tiene {len(soportes)} soporte(s) indexado(s), pero "
+            "ninguno es un PDF que se pueda leer. Revise la carpeta de la factura en "
+            "el servidor de radicación.",
+        )
 
     # Llamar al auditor forense (con cache TTL 14d, key: factura+pregunta+pdfs+modelo)
     resultado = await auditar_forense(
@@ -172,6 +177,14 @@ async def auditar_factura(
         "input_tokens": resultado.get("input_tokens", 0),
         "output_tokens": resultado.get("output_tokens", 0),
         "soportes_usados": soportes_usados,
+        # Los que NO se leyeron, con el motivo. La pantalla los muestra: si la
+        # IA dice «no hay evidencia», el gestor tiene que poder ver qué
+        # documentos quedaron sin abrir antes de aceptar la glosa.
+        "soportes_omitidos": [
+            {"nombre_archivo": s.get("nombre_archivo", ""), "motivo": s.get("motivo", "")}
+            for s in omitidos
+        ],
+        "soportes_indexados": len(soportes),
         "modo": "pdf_nativo" if pdfs_raw else "texto_extraido",
         "cache_hit": bool(resultado.get("cache_hit")),
     }
@@ -222,6 +235,10 @@ async def auditar_factura_con_uploads(
 
     pdfs_raw: list[tuple[str, bytes]] = []
     soportes_usados: list[str] = []
+    # Lo que no se pudo mandar, con el motivo. Antes se descartaba en
+    # silencio: el gestor subía 5 archivos, la IA leía 2 y la pantalla no
+    # decía nada. Un «no encontré evidencia» así no se puede creer.
+    omitidos: list[dict] = []
     total_bytes = 0
     MAX_PDF = 30 * 1024 * 1024
     MAX_TOTAL = 100 * 1024 * 1024
@@ -229,16 +246,23 @@ async def auditar_factura_con_uploads(
     for f in files:
         nombre = f.filename or "soporte.pdf"
         if not nombre.lower().endswith(".pdf"):
-            continue  # ignora no-PDFs silenciosamente
+            omitidos.append({"nombre_archivo": nombre, "motivo": "no es un PDF"})
+            continue
         data = await f.read(MAX_PDF + 1)
         if len(data) > MAX_PDF:
             logger.warning(f"[FORENSE-UPLOAD] {nombre} >30MB, saltado")
+            omitidos.append({"nombre_archivo": nombre, "motivo": "pesa más de 30 MB"})
             continue
         if len(data) < 1024:
-            continue  # vacío o corrupto
+            omitidos.append({"nombre_archivo": nombre, "motivo": "llegó vacío o dañado"})
+            continue
+        if not data.startswith(b"%PDF"):
+            omitidos.append({"nombre_archivo": nombre, "motivo": "no es un PDF válido"})
+            continue
         total_bytes += len(data)
         if total_bytes > MAX_TOTAL:
             logger.warning(f"[FORENSE-UPLOAD] total >100MB, corte en {nombre}")
+            omitidos.append({"nombre_archivo": nombre, "motivo": "se pasó el tope de 100 MB"})
             break
         pdfs_raw.append((nombre, data))
         soportes_usados.append(nombre)
@@ -278,6 +302,8 @@ async def auditar_factura_con_uploads(
         "input_tokens": resultado.get("input_tokens", 0),
         "output_tokens": resultado.get("output_tokens", 0),
         "soportes_usados": soportes_usados,
+        "soportes_omitidos": omitidos,
+        "soportes_indexados": len(files),
         "modo": "pdf_nativo_upload",
         "cache_hit": bool(resultado.get("cache_hit")),
         "bytes_recibidos": total_bytes,
