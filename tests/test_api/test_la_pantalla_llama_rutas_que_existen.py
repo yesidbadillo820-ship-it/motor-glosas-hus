@@ -16,7 +16,10 @@ Total» devolvía «Not Found», y de descubrir que no era un caso aislado.
     meses después.
 
 Las ocho eran: salud_total, comentarios_thread, notas_privadas,
-preset_filtros, push, auditor_forense, autopilot y noticias.
+preset_filtros, push, auditor_forense y autopilot.
+
+(«noticias» salió de esta lista el 19-08-2026: el ticker se quitó entero
+porque su motor ya se había removido en mayo y solo quedaba la carcasa.)
 
 **Lo que esta prueba hace:** lee las llamadas del JavaScript y comprueba que
 cada una tenga su ruta montada. Es la verificación que faltó — la que mira el
@@ -126,7 +129,6 @@ class TestLoQueSeRepuso:
             "/presets-filtros",
             "/api/salud-total/preview",
             "/push/public-key",
-            "/noticias/recientes",
             "/chat-history/conversaciones",
             "/autopilot/preparar-dia",
             "/auditor-forense/upload",
@@ -144,7 +146,6 @@ class TestLoQueSeRepuso:
             "NotaPrivadaRecord",
             "PresetFiltroRecord",
             "PushSubscriptionRecord",
-            "NoticiaSaludRecord",
             "ChatConversacionRecord",
         ],
     )
@@ -167,7 +168,6 @@ class TestLoQueSeRepuso:
                 "/comentarios-thread/glosa/1",
                 "/notas-privadas/1",
                 "/presets-filtros",
-                "/noticias/recientes",
                 "/chat-history/conversaciones",
                 "/eventos/heartbeat",
                 "/eventos/recientes",

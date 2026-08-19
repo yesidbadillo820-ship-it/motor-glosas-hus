@@ -1,10 +1,8 @@
 """Cadena de fallback INTERNA de Groq (decisión 12-jun-2026).
 
 GlosaService._llamar_groq_con_retry debe agotar la cadena de modelos Groq
-
-    openai/gpt-oss-120b → qwen/qwen3-32b → llama-3.3-70b-versatile
-
-antes de propagar la excepción (y que recién ahí _llamar_ia caiga a
+—la que diga `app/core/config.py`, no una escrita a mano acá— antes de
+propagar la excepción (y que recién ahí _llamar_ia caiga a
 Anthropic). Reglas:
   - 429/rate-limit con modelos pendientes → saltar de inmediato al
     siguiente modelo (buckets de rate limit por modelo, sin backoff).
@@ -20,10 +18,22 @@ import pytest
 
 from app.services.glosa_service import GlosaService
 
-PRIMARIO = "meta-llama/llama-4-scout-17b-16e-instruct"
-FALLBACK_1 = "openai/gpt-oss-120b"
-FALLBACK_2 = "qwen/qwen3-32b"
-FALLBACK_3 = "llama-3.3-70b-versatile"
+# 19-08-2026. Estos nombres estaban escritos a mano y fijaban
+# `meta-llama/llama-4-scout-17b-16e-instruct` como primario esperado — un
+# modelo que Groq retiró el 05-08-2026. O sea que la prueba estaba
+# CERTIFICANDO EL DEFECTO: cuando `config.py` se corrigió, la prueba habría
+# fallado por tener razón el código.
+#
+# Ahora se leen de la configuración. Lo que esta prueba verifica es el
+# COMPORTAMIENTO —el orden de la cadena, cuándo salta y cuándo reintenta—, no
+# qué modelo esté de moda. Así no vuelve a envejecer.
+from app.core.config import get_settings as _get_settings  # noqa: E402
+
+_CFG = _get_settings()
+PRIMARIO = _CFG.groq_model
+FALLBACK_1 = _CFG.groq_model_fallback_1
+FALLBACK_2 = _CFG.groq_model_fallback_2
+FALLBACK_3 = _CFG.groq_model_fallback_3
 
 RESPUESTA_OK = "<paciente>JUAN PEREZ</paciente><argumento>NO SE ACEPTA LA GLOSA</argumento>"
 
