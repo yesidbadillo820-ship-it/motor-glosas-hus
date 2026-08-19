@@ -719,15 +719,13 @@ def _es_titulo(texto: str) -> bool:
     return t.startswith(TITULO_ORIGINAL) or t.startswith(TITULO_NUEVO)
 
 
-def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
-    """Parte la hoja en facturas. Sirve igual si la hoja trae una sola."""
-    inicios: list[tuple[int, Celda]] = []
-    for fila in sorted(idx.por_fila):
-        for celda in idx.celdas(fila):
-            if _es_titulo(celda.texto):
-                inicios.append((fila, celda))
-                break
+def ultima_fila_util(idx: IndiceHoja) -> int:
+    """La última fila de la factura, sin el pie legal del archivo.
 
+    Al final de la hoja el sistema imprime el pie de página —la autorización de
+    la DIAN, el aviso de la letra de cambio, «Nombre reporte» y «LICENCIADO A»—
+    que no es parte de ninguna factura. Se busca de abajo hacia arriba.
+    """
     fin_util = idx.max_fila
     for fila in range(idx.max_fila, 0, -1):
         texto = _norm(idx.texto_fila(fila))
@@ -737,6 +735,19 @@ def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
             fin_util = fila - 1
         else:
             break
+    return fin_util
+
+
+def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
+    """Parte la hoja en facturas. Sirve igual si la hoja trae una sola."""
+    inicios: list[tuple[int, Celda]] = []
+    for fila in sorted(idx.por_fila):
+        for celda in idx.celdas(fila):
+            if _es_titulo(celda.texto):
+                inicios.append((fila, celda))
+                break
+
+    fin_util = ultima_fila_util(idx)
 
     facturas = []
     for i, (fila, celda) in enumerate(inicios):
