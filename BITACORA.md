@@ -3857,6 +3857,29 @@ un «hace en curso» que había quedado mal redactado.
 
 ---
 
+### 19-08 — Soportes ENCONTRÓ los expedientes, y la EPS que mostraba estaba mal
+
+Yesid buscó una factura real de febrero (HUS468334) y salieron **los 12
+soportes**: FEV, HEV, CRC, epicrisis, hoja de administración de medicamentos,
+RIPS en JSON, XML, CUV, OPF, PDE, PDX. El indexador está haciendo su trabajo
+sobre el servidor real.
+
+**Pero la columna EPS decía «1.DD FACTURACION»**, que no es una EPS: es una
+carpeta del archivado. La EPS de verdad era **ALIANZA MEDELLÍN**.
+
+La causa, otra vez de las que solo se ven con datos reales: la lista de
+carpetas que el sistema debe saltarse decía «1. **DD** FACTURACION» **con
+espacio** después del punto, y en el servidor la carpeta se llama «1.DD
+FACTURACION» **sin espacio**. Como no coincidía, la tomaba como si fuera el
+nombre de la EPS. Ahora la comparación ignora el ordinal y los espacios, así
+que da igual cómo esté escrita.
+
+Comprobado con las tres formas de carpeta que hay en el servidor: la de
+febrero (con ESCANEO en el medio) da ALIANZA MEDELLÍN, la de marzo da SANITAS
+y la de agosto da NUEVA EPS.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
