@@ -106,3 +106,112 @@ class TestElBotDeDobleClic:
         )
         assert "verificar_trabajo_hoy.py" in texto
         assert GUION.exists()
+
+
+# ─── La busqueda de los soportes de una factura ──────────────────────────────
+
+
+class TestBuscarLosSoportesDeUnaFactura:
+    """19-08-2026. Yesid corrió el verificador con HUS468334 y la pantalla se
+    quedó en «Buscando los soportes... en el servidor».
+
+    La causa: se llamaba a `get_indexer().lookup()`, que en un proceso aparte
+    encuentra el índice frío y se pone a indexar el servidor ENTERO — 11.367
+    facturas y 102.729 archivos por red. Minutos sin imprimir nada, y todo ese
+    trabajo se botaba al cerrar el programa. Y el encabezado decía «esto solo
+    mira, no cuesta».
+
+    Ahora se busca solo esa factura y se para al encontrar su carpeta.
+    """
+
+    def _servidor(self, tmp_path: Path, ruido: int = 40) -> Path:
+        base = (
+            tmp_path
+            / "2. FEBRERO 2026 - SOPORTES RADICACION CARPETA 2"
+            / "ALIANZA MEDELLIN"
+            / "SOFIA"
+            / "ENV-232984-okdgh"
+            / "SOPORTES"
+        )
+        for n in range(ruido):
+            d = base / f"HUS4{n:05d}"
+            d.mkdir(parents=True, exist_ok=True)
+            (d / f"FEV_900006037_HUS4{n:05d}.pdf").write_bytes(b"%PDF-1.4\n" + b"0" * 2048)
+        d = base / "HUS468334"
+        d.mkdir(parents=True, exist_ok=True)
+        for n in (
+            "FEV_900006037_HUS468334.pdf",
+            "HEV_900006037_HUS468334.pdf",
+            "EPICRISIS HUS468334.pdf",
+            "HOJA DE ADMINISTRACION DE MEDICAMENTOS HUS468334.pdf",
+        ):
+            (d / n).write_bytes(b"%PDF-1.4\n" + b"0" * 2048)
+        (d / "RIPS_900006037_HUS468334.json").write_bytes(b"{}" + b"0" * 2000)
+        return tmp_path
+
+    def _buscar(self, monkeypatch, raiz: Path, factura: str):
+        import sys
+
+        sys.path.insert(0, str(RAIZ / "tools"))
+        import verificar_trabajo_hoy as v
+        from app.services import soportes_autodiscovery_service as svc
+
+        class _Idx:
+            def __init__(self):
+                self.raiz = raiz
+
+        monkeypatch.setattr(svc, "get_indexer", lambda: _Idx())
+        return v.buscar_soportes_de_una_factura(factura)
+
+    def test_encuentra_los_soportes_de_la_factura(self, monkeypatch, tmp_path):
+        sop = self._buscar(monkeypatch, self._servidor(tmp_path), "HUS468334")
+        nombres = {s["nombre_archivo"] for s in sop}
+        assert "HEV_900006037_HUS468334.pdf" in nombres
+        assert "HOJA DE ADMINISTRACION DE MEDICAMENTOS HUS468334.pdf" in nombres
+
+    def test_no_se_trae_los_soportes_de_otras_facturas(self, monkeypatch, tmp_path):
+        sop = self._buscar(monkeypatch, self._servidor(tmp_path), "HUS468334")
+        assert all("468334" in s["nombre_archivo"] for s in sop), [s["nombre_archivo"] for s in sop]
+
+    def test_clasifica_con_las_reglas_del_indexador(self, monkeypatch, tmp_path):
+        """No puede haber dos verdades sobre qué es una historia clínica."""
+        sop = self._buscar(monkeypatch, self._servidor(tmp_path), "HUS468334")
+        tipos = {s["nombre_archivo"]: s["tipo"] for s in sop}
+        assert tipos["HEV_900006037_HUS468334.pdf"] == "historia_clinica"
+        assert tipos["RIPS_900006037_HUS468334.json"] == "rips"
+
+    def test_es_rapido_aunque_haya_ruido_alrededor(self, monkeypatch, tmp_path):
+        import time
+
+        raiz = self._servidor(tmp_path, ruido=300)
+        arranque = time.time()
+        sop = self._buscar(monkeypatch, raiz, "HUS468334")
+        assert sop
+        assert time.time() - arranque < 10, "se está recorriendo el servidor entero"
+
+    def test_sin_servidor_avisa_en_vez_de_reventar(self, monkeypatch, tmp_path):
+        assert self._buscar(monkeypatch, tmp_path / "no_existe", "HUS468334") is None
+
+    def test_un_numero_que_no_es_factura_avisa(self, monkeypatch, tmp_path):
+        assert self._buscar(monkeypatch, self._servidor(tmp_path), "no-es-factura") is None
+
+    def test_factura_que_no_esta_devuelve_lista_vacia(self, monkeypatch, tmp_path):
+        assert self._buscar(monkeypatch, self._servidor(tmp_path), "HUS999999") == []
+
+    def test_ya_no_dispara_el_indexado_completo(self):
+        """La regresión concreta: `lookup()` reconstruye el índice entero.
+
+        Se mira el CÓDIGO, no los comentarios — este archivo explica la falla
+        y nombrarla no puede hacer fallar la prueba.
+        """
+        import ast
+
+        arbol = ast.parse((RAIZ / "tools" / "verificar_trabajo_hoy.py").read_text(encoding="utf-8"))
+        llamadas = [
+            n.func.attr
+            for n in ast.walk(arbol)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+        ]
+        assert "lookup" not in llamadas, (
+            "el verificador volvió a indexar el servidor entero para mirar una factura"
+        )
