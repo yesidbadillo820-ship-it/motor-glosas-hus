@@ -141,10 +141,12 @@ def diagnostico_completo(
         if stats.get("facturas_indexadas", 0) == 0:
             estado = "warning"
             mensaje = (
-                "Indexer sin archivos en /data/soportes. Subí los PDFs vía la "
-                "tab 'Soportes' del panel admin, o copialos manualmente al "
-                "volumen montado en la VM (/opt/motor-glosas/data/soportes/) "
-                "y andá a la tab Diagnóstico → 'Reindexar soportes'."
+                "El índice de soportes está vacío. Si el motor debe leer el "
+                "servidor de radicación, la carpeta se escribe en "
+                "«C:\\motor-glosas\\repo\\config\\soportes_root.txt» (una sola "
+                "línea, por ejemplo \\\\Prime\\radicacion_2026). Si no, suba los "
+                "PDF desde la pantalla «Soportes». Después, botón «Reindexar "
+                "soportes» acá mismo."
             )
         else:
             ultima = stats.get("construido_hace_seg")
@@ -173,8 +175,12 @@ def diagnostico_completo(
         out["secciones"]["anthropic"] = {
             "estado": "error",
             "mensaje": (
-                "ANTHROPIC_API_KEY no configurada en /opt/motor-glosas/.env. "
-                "Editá el .env de la VM con sudo nano y agregá la clave."
+                "Falta la clave de Anthropic. Sin ella el Auditor Forense no "
+                "lee los soportes y el dictamen sale sin citar folios — no da "
+                "error, simplemente no mejora. Para ponerla: abra "
+                "«notepad C:\\motor-glosas\\repo\\.env», agregue la línea "
+                "«ANTHROPIC_API_KEY=» con la clave, guarde, y reinicie con "
+                "«C:\\motor-glosas\\repo\\tools\\autodeploy_motor_local.cmd»."
             ),
             "data": {},
         }
@@ -338,29 +344,23 @@ def diagnostico_completo(
             },
         }
 
-    # ─── Sentry (error tracking) ──────────────────────────────────
+    # ─── Sentry (registro de errores) ─────────────────────────────
+    #
+    # 19-08-2026. Esta seccion mostraba un aviso ambar PERMANENTE diciendo que
+    # los errores se pierden si no se configura Sentry. Yesid intento crear la
+    # cuenta y se topo con que sentry.io le exige entrar por Fly.io -su correo
+    # quedo amarrado a ese inicio de sesion-, asi que no puede activarlo.
+    #
+    # Un aviso que el auditor no puede resolver, dia tras dia, enseña a
+    # ignorar los avisos. Es la misma leccion del ticker de noticias, que
+    # llevaba tres meses en ambar sin que nadie pudiera hacer nada.
+    #
+    # Asi que el aviso solo sale cuando Sentry SI esta configurado, para
+    # confirmar que quedo funcionando. Si no lo esta, esta pantalla se queda
+    # callada: la integracion sigue montada y basta con poner SENTRY_DSN en el
+    # .env para que se active y vuelva a aparecer acá en verde.
     sentry_dsn = os.getenv("SENTRY_DSN", "")
-    if not sentry_dsn:
-        out["secciones"]["sentry"] = {
-            "estado": "warning",
-            # 19-08-2026. Este mensaje mandaba al auditor a correr
-            # `sudo nano /opt/motor-glosas/.env` y `docker compose restart`
-            # —instrucciones de un servidor Linux con Docker—. El motor
-            # corre en el PC de cartera, en Windows. Nadie podía seguirlas.
-            "mensaje": (
-                "Los errores del motor no quedan registrados en ninguna parte: "
-                "si algo falla, se pierde y toca adivinar. Para activarlo: "
-                "1) cree una cuenta gratis en sentry.io (5.000 errores al mes); "
-                "2) al crear el proyecto, escoja «FastAPI» y copie el DSN que "
-                "le muestra; 3) abra el archivo de configuración del motor con "
-                "«notepad C:\\motor-glosas\\repo\\.env», agregue al final la "
-                "línea «SENTRY_DSN=» seguida del DSN, y guarde; 4) reinicie el "
-                "motor con «C:\\motor-glosas\\repo\\tools\\autodeploy_motor_local.cmd». "
-                "Vuelva a esta pantalla para confirmar que quedó activo."
-            ),
-            "data": {},
-        }
-    else:
+    if sentry_dsn:
         # Verificación liviana: ¿el SDK quedó inicializado con un cliente activo?
         sentry_activo = False
         cliente_info = ""
@@ -393,21 +393,15 @@ def diagnostico_completo(
         }
 
     # ─── PostHog (product analytics) ──────────────────────────────
+    #
+    # 19-08-2026. Mismo caso que Sentry: aviso ambar permanente con
+    # instrucciones de un servidor Linux (`sudo nano /opt/motor-glosas/.env`,
+    # `docker compose restart`) que en el PC de cartera —Windows— nadie puede
+    # seguir. Y ademas PostHog manda datos de uso a un tercero, cosa que en un
+    # hospital hay que decidir a conciencia, no dejar como un pendiente que
+    # parpadea. Solo se reporta si esta configurado.
     posthog_key = os.getenv("POSTHOG_API_KEY", "")
-    if not posthog_key:
-        out["secciones"]["posthog"] = {
-            "estado": "warning",
-            "mensaje": (
-                "POSTHOG_API_KEY no configurada — no estamos midiendo "
-                "qué gestores usan qué features ni dónde se traban. "
-                "Setup en 3 min: posthog.com (free 1M eventos/mes), "
-                "Project Settings → API Key → agregalo al .env de la VM: "
-                "`sudo nano /opt/motor-glosas/.env` → POSTHOG_API_KEY=phc_... "
-                "→ `sudo docker compose restart motor`."
-            ),
-            "data": {},
-        }
-    else:
+    if posthog_key:
         try:
             from app.services.posthog_service import disponible as ph_disponible
 
@@ -489,9 +483,10 @@ def diagnostico_completo(
                 f"Volumen de datos montado en {soportes_root}, {mb_disponible} MB disponibles"
                 if existe
                 else (
-                    f"Volumen de datos NO montado en {soportes_root}. "
-                    "Verificá `sudo docker compose ps` en la VM y que el "
-                    "bind mount ./data:/data esté en docker-compose.yml."
+                    f"No se llega a la carpeta de datos ({soportes_root}). "
+                    "Si es una carpeta de red, revise que el PC tenga acceso; "
+                    "si es local, que exista. La ruta se configura en "
+                    "«C:\\motor-glosas\\repo\\config\\soportes_root.txt»."
                 )
             ),
             "data": {"path": soportes_root, "existe": existe, "mb_disponibles": mb_disponible},
