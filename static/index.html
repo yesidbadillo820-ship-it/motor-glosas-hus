@@ -16817,7 +16817,21 @@ function copiarGanadorHistorico(glosaId){
 function renderAuditorForensePanel(d){
   // Mostrar siempre que haya factura — el gestor puede preguntar lo
   // que quiera sobre los soportes de esa factura.
-  var factura = (d && (d.factura || d.numero_factura)) || '';
+  //
+  // 19-08-2026. Salía «Auditor Forense IA · N/A» y el botón quedaba
+  // inservible: preguntaba por una factura llamada «N/A». El esquema del
+  // dictamen trae `factura` con valor de fábrica «N/A» —un texto, no un
+  // vacío—, así que esta línea lo tomaba por bueno y lo pintaba.
+  //
+  // Ahora «N/A» se trata como lo que es: falta de dato. Y si el motor no la
+  // manda, se toma del formulario, que es donde el auditor la escribió: el
+  // recuadro no puede depender de que el servidor esté al día.
+  var factura = '';
+  [d && d.factura, d && d.numero_factura,
+   (document.getElementById('f-factura') || {}).value].forEach(function(v){
+    v = String(v == null ? '' : v).trim();
+    if(!factura && v && v.toUpperCase() !== 'N/A') factura = v;
+  });
   if(!factura) return '';
   var rndId = 'auditor-fnse-' + Math.random().toString(36).slice(2,8);
   return '<div style="background:#fff;border:1.5px dashed #8b5cf6;border-radius:10px;padding:.85rem 1rem;margin-top:.6rem;font-size:.85rem;">'

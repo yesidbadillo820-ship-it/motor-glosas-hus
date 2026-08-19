@@ -12,6 +12,8 @@ Endpoints:
 
 from __future__ import annotations
 
+import time
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -863,6 +865,39 @@ def ia_presence_publica():
     }
 
 
+def _commit_del_repo() -> str:
+    """El commit que hay en disco, leído del `.git` del repositorio.
+
+    Se leen los archivos directamente en vez de llamar a `git`: no depende de
+    que git esté en el PATH del servicio y no lanza un proceso por consulta.
+    Devuelve "" si no se puede determinar — nunca revienta.
+    """
+    from pathlib import Path as _Path
+
+    try:
+        raiz = _Path(__file__).resolve().parents[3] / ".git"
+        cabeza = (raiz / "HEAD").read_text(encoding="utf-8").strip()
+        if cabeza.startswith("ref:"):
+            ref = cabeza.split(" ", 1)[1].strip()
+            destino = raiz / ref
+            if destino.exists():
+                return destino.read_text(encoding="utf-8").strip()
+            # Referencia empaquetada (packed-refs)
+            for linea in (raiz / "packed-refs").read_text(encoding="utf-8").splitlines():
+                if linea.endswith(" " + ref):
+                    return linea.split(" ", 1)[0].strip()
+            return ""
+        return cabeza  # HEAD suelto (detached)
+    except OSError:
+        return ""
+
+
+# Cuándo arrancó este proceso. Se sella al importar el módulo, que es lo más
+# cerca del arranque que se puede estar sin tocar el ciclo de vida.
+_ARRANQUE_EPOCH = time.localtime()
+_ARRANQUE_DEL_PROCESO = time.strftime("%Y-%m-%d %H:%M:%S", _ARRANQUE_EPOCH)
+
+
 @router.get("/version")
 def info_version():
     """R64 P1: información de versión PÚBLICA (sin auth).
@@ -892,9 +927,17 @@ def info_version():
 
     cfg = get_settings()
 
-    # Render expone RENDER_GIT_COMMIT con el hash del commit deployado.
-    # Localmente usamos "dev" como fallback.
-    commit_full = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "dev"
+    # Render expone RENDER_GIT_COMMIT con el hash del commit deployado. En el
+    # PC de cartera esa variable NO existe —no es Render—, así que esto
+    # respondía «dev» siempre y nadie podía saber qué versión estaba viva.
+    #
+    # 19-08-2026. Se perdieron horas por eso: el archivo en disco tenía un
+    # arreglo, el motor se comportaba como si no, y no había forma de saber si
+    # el proceso había recogido el código nuevo. Ahora se lee el commit del
+    # propio `.git` del repositorio, que es la verdad de lo que hay en disco.
+    commit_full = (
+        os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or _commit_del_repo() or "dev"
+    )
     commit_short = commit_full[:7] if len(commit_full) >= 7 else commit_full
 
     # Build time: lo más cercano disponible — Render no expone el timestamp
@@ -910,6 +953,15 @@ def info_version():
         "build_time": build_time,
         "python": sys.version.split()[0],
         "env": os.getenv("ENV", "development"),
+        # Cuándo arrancó ESTE proceso. Puesto al lado del commit responde la
+        # pregunta que hoy no se podía responder: «¿el motor que está
+        # respondiendo ya tiene el arreglo, o sigue con el código viejo en
+        # memoria?». Si el commit es nuevo pero el proceso es más viejo que
+        # él, falta reiniciar.
+        "proceso_arrancado_en": _ARRANQUE_DEL_PROCESO,
+        "proceso_lleva_segundos": round(time.time() - time.mktime(_ARRANQUE_EPOCH), 0)
+        if _ARRANQUE_EPOCH
+        else None,
     }
 
 
