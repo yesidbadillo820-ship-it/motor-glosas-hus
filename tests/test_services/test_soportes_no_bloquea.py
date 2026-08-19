@@ -118,16 +118,24 @@ class TestLaRespuestaAvisaQueSigueIndexando:
     """
 
     def test_el_estado_viaja_en_la_respuesta_de_la_ruta(self, tmp_path):
+        # Se monta SOLO el router de soportes, no la aplicación entera: el
+        # arranque de `app.main` dispara el reindexado inicial, que termina el
+        # build y apaga la bandera «construyendo» que esta prueba necesita
+        # encendida. Con el router suelto no hay carrera que valga.
+        from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
         from app.api.deps import get_usuario_actual
-        from app.main import app
+        from app.api.routers.soportes import router
         from app.models.db import UsuarioRecord
         from app.services import soportes_autodiscovery_service as svc
 
         idx = SoportesIndexer(raiz=str(_paquete(tmp_path)))
         idx.rebuild()
         idx._construyendo = True  # simula indexación en curso
+
+        app = FastAPI()
+        app.include_router(router)
         usuario = UsuarioRecord(id=1, email="a@b.c", rol="SUPER_ADMIN", activo=1)
         app.dependency_overrides[get_usuario_actual] = lambda: usuario
         original = svc._indexer_singleton
@@ -140,7 +148,6 @@ class TestLaRespuestaAvisaQueSigueIndexando:
             assert d["facturas_indexadas"] >= 1
         finally:
             svc._indexer_singleton = original
-            app.dependency_overrides.clear()
 
     def test_cuando_termina_ya_no_dice_que_esta_indexando(self, tmp_path):
         idx = SoportesIndexer(raiz=str(_paquete(tmp_path)))
