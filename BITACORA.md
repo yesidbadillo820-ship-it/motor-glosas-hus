@@ -2904,6 +2904,35 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 19-08-2026 (tarde) — Las 320 facturas sin el total en letras, y en PDF
+
+**Lo que pidió el auditor:** que a las facturas se les quite el total escrito en
+palabras —que ese espacio quede vacío, dejando solo los valores en número— y que
+después todas se conviertan a PDF.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/quitar_total_en_letras.py`. Borra el
+renglón en letras y deja el espacio vacío; la etiqueta `TOTAL:` se queda. Los
+números, el formato, las celdas combinadas y los anchos no se tocan, y los
+archivos de origen tampoco: escribe copias nuevas.
+
+No borra a ciegas: solo vacía las celdas que de verdad traen un importe escrito
+en palabras (las que dicen PESOS y CTVS), y solo en el renglón del `TOTAL:`. Si
+en algún archivo no encuentra ese renglón, lo dice en vez de callarlo.
+
+Después se pasaron a PDF con el bot que ya existía (`tools/excel_a_pdf.py`).
+
+**Resultado:** 320 Excel sin letras y **320 PDF** (351 páginas). Comprobado sobre
+los PDF ya generados: **ninguno** muestra un importe en palabras, **todos**
+conservan el VALOR TOTAL ORDEN DE SERVICIO en número, y la suma de los
+subtotales sigue siendo **$625.461.616,95**, la misma de antes.
+
+**Un detalle importante:** el auditor mandó para este trabajo el ZIP de la
+**primera** entrega, la que todavía traía los tres errores (total
+$627.442.241,95). El trabajo se hizo sobre la **versión corregida**, para no
+volver a poner en circulación las facturas malas.
+
+---
+
 ### 19-08-2026 — Se recuperaron $654.075 más: el servicio partido en dos renglones
 
 Una medición sobre las 320 facturas mostró por qué faltaba tanta plata por
