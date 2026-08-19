@@ -4244,6 +4244,64 @@ aprobado 1 / $4.600, glosado 2 / $9.200.
 
 ---
 
+---
+
+### 19-08 (tarde) — El Auditor Forense se muda adentro de «Analizar glosa»
+
+**Qué es el Auditor Forense.** Es el buscador con IA dentro de los soportes de
+una factura: usted pregunta en español corriente («¿está la baciloscopia?»,
+«¿qué medicamentos se le administraron entre el 28-02 y el 02-03?», «¿la pinza
+Enseal tiene justificación quirúrgica?») y la IA abre los PDF del expediente y
+contesta **citando folio y fecha**. Sirve para cuando la EPS glosa diciendo «no
+hay soporte de X» y hay que probar que sí lo hay.
+
+**Estaba escogiendo mal los documentos.** Solo caben 5 por consulta, y los
+escogía con el orden con que la pantalla de Soportes *lista* los archivos. Con
+los 12 soportes reales de la factura HUS468334 eso daba:
+
+| Se le mandaba a la IA | Quedaba sin abrir |
+|---|---|
+| FEV (la factura) | EPICRISIS |
+| HEV (historia clínica) | HOJA DE ADMINISTRACIÓN DE MEDICAMENTOS |
+| **RIPS `.json`** ← no es un PDF | OPF (otros procedimientos) |
+| CRC (comprobante de recibido de cobro) | PDE |
+| RESULTADOSMSPS | PDX |
+
+Dos daños. Uno de los cinco cupos se gastaba en un archivo `.json` que la IA no
+puede abrir. Y los documentos donde de verdad está la respuesta no se abrían
+nunca: a la pregunta «¿qué medicamentos se administraron?» contestaba **«no
+encontré evidencia»** sin haber mirado la hoja de administración de
+medicamentos. **Con esa respuesta se acepta una glosa que había que objetar.**
+
+Ahora se abren primero la historia clínica, la factura, la epicrisis, la hoja
+de medicamentos y los otros procedimientos; lo que no sea PDF de verdad no se
+manda; y —lo más importante— **la pantalla dice qué documentos quedaron sin
+leer y por qué**. Antes decía «✅ 5 soportes leídos» y nada más.
+
+**Y ahora trabaja solo, dentro de «Analizar glosa».** Yesid: «me gustaría que
+este auditor forense estuviera anclado en analizar glosa, porque es exactamente
+lo que se le pide que haga». Había un mecanismo para eso desde julio, pero
+venía **apagado**, y aun prendido solo miraba los PDF que el auditor subiera a
+mano — los soportes que el indexador ya tiene del servidor de radicación nunca
+le llegaban. Se corrigieron las dos cosas: viene prendido y, si nadie adjuntó
+nada, saca los PDF del servidor él mismo. El dictamen se arma citando folios
+reales del expediente en vez de argumentar a ciegas.
+
+**Se quitó el botón «Auditor Forense» de HERRAMIENTAS.** Yesid: «no tendría
+sentido tener dos cosas que hacen exactamente lo mismo». El recuadro que
+aparece al final del dictamen hace lo mismo y ya sabe de qué factura se trata,
+sin tener que teclear el número. Con el apartado se fue también la
+configuración del «servidor de archivos local», que era de cuando el motor
+vivía en la nube y no veía las carpetas del hospital: hoy el motor corre en el
+PC de cartera y lee `\\Prime\radicacion_2026` directo.
+
+Se borró todo lo del apartado (botón del menú, pantalla y las 14 funciones de
+JavaScript), con pruebas que vigilan que no quede nada suelto — la lección de
+«Salud Total», que estuvo tres meses dando «Not Found» porque se borró el
+router y el JavaScript siguió llamándolo.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
@@ -4526,6 +4584,21 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 ## 4) PARA MAÑANA
 
 ### Lo más fresco (del 19-08)
+
+**Auditor Forense (probar en el PC de cartera):**
+
+- **Responder una glosa de una factura que YA esté radicada** (con sus soportes
+  en `\\Prime\radicacion_2026`) y mirar si el dictamen cita folios concretos
+  de la historia clínica. Eso es lo nuevo: antes argumentaba a ciegas.
+- **Confirmar que el motor tenga la clave de Anthropic.** Sin ella el forense
+  no corre y el dictamen sale como antes, sin folios — no da error, pero
+  tampoco mejora. Si hace falta, se pide a Sistemas.
+- **Si el costo se siente alto**, se puede apagar sin tocar código poniendo
+  `GLOSA_AUDITOR_FORENSE_PREPASS=0` en el vigilante
+  (`tools\servidor_motor_local.cmd`). Avisar y se hace.
+- **El botón «Auditor Forense» ya no está en HERRAMIENTAS.** Ahora el recuadro
+  sale al final del dictamen, con la factura ya puesta. Si lo echa de menos,
+  dígalo y se devuelve.
 
 **SIIFA (lo primero, 19-08):** (a) tramitar a mano en el portal las 4
 devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);

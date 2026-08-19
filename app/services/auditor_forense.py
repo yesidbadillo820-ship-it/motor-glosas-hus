@@ -93,6 +93,87 @@ Si en los soportes NO encuentras la información que pregunta el gestor, sé hon
 Devuelve SOLO el HTML, sin texto adicional ni markdown."""
 
 
+# ─── Qué soportes se le mandan a la IA ───────────────────────────────────────
+
+# Solo caben 5 documentos por consulta, así que el orden decide qué lee la IA
+# y qué no. Este orden NO es el mismo con el que la pantalla de Soportes lista
+# los archivos: allá manda la factura, acá manda la historia clínica, porque
+# las preguntas del gestor son clínicas («¿está la baciloscopia?», «¿qué
+# medicamentos se administraron?») y esas respuestas viven en la historia, la
+# epicrisis y los anexos escaneados — no en el comprobante de recibido de cobro.
+#
+# 19-08-2026. Antes se tomaban los 5 primeros del orden de pantalla. Con los
+# soportes reales de la factura HUS468334 eso mandaba el comprobante de
+# recibido de cobro y dejaba SIN ABRIR la epicrisis, la hoja de administración
+# de medicamentos, los otros procedimientos, el PDE y el PDX. La IA contestaba
+# «no encontré evidencia» sin haber mirado el documento donde estaba.
+_ORDEN_FORENSE = {
+    "historia_clinica": 0,  # HEV — el corazón del expediente
+    "factura_electronica": 1,  # FEV — qué se cobró, para contrastar
+    # 2 = «otro»: epicrisis, hoja de administración de medicamentos y demás
+    #     anexos escaneados. Es donde más veces está la respuesta.
+    "otros_procedimientos": 3,  # OPF
+    "pde": 3,
+    "pdx": 3,
+    "resultados_msps": 4,
+    "furips": 5,
+    "comprobante_recibido_cobro": 6,  # solo dice que se radicó, no qué se hizo
+}
+_ORDEN_FORENSE_ANEXOS = 2
+
+# Documentos que NUNCA pueden ir en un bloque PDF de la IA. El RIPS es .json y
+# el CUFE es .xml: mandarlos declarados como «application/pdf» gasta un cupo en
+# un archivo que la IA no puede abrir.
+_TIPOS_NO_PDF = {"rips", "xml_cufe"}
+
+
+def _es_pdf(ruta: str) -> bool:
+    """True si el archivo es un PDF de verdad, no solo de nombre.
+
+    Se mira la firma `%PDF` del principio: un archivo renombrado a `.pdf` o
+    un PDF truncado a la mitad de una copia por red rompe la consulta entera.
+    """
+    try:
+        with open(ruta, "rb") as fh:
+            return fh.read(5).startswith(b"%PDF")
+    except OSError:
+        return False
+
+
+def escoger_soportes_para_forense(
+    soportes: list[dict], maximo: int = 5
+) -> tuple[list[dict], list[dict]]:
+    """Reparte los soportes de una factura en (los que se leen, los que no).
+
+    Devuelve siempre las dos listas: lo que se dejó por fuera hay que
+    decírselo al gestor. Un «no encontré evidencia» sobre un expediente que se
+    leyó a medias es un dictamen falso, y con eso se acepta una glosa que
+    había que objetar.
+    """
+    candidatos: list[dict] = []
+    omitidos: list[dict] = []
+
+    for s in soportes:
+        ruta = s.get("ruta") or ""
+        tipo = s.get("tipo") or "otro"
+        if tipo in _TIPOS_NO_PDF or not str(ruta).lower().endswith(".pdf"):
+            omitidos.append({**s, "motivo": "no es un PDF"})
+        elif not _es_pdf(ruta):
+            omitidos.append({**s, "motivo": "no se pudo abrir o no es un PDF válido"})
+        else:
+            candidatos.append(s)
+
+    candidatos.sort(
+        key=lambda s: (
+            _ORDEN_FORENSE.get(s.get("tipo") or "otro", _ORDEN_FORENSE_ANEXOS),
+            s.get("nombre_archivo") or "",
+        )
+    )
+    for s in candidatos[maximo:]:
+        omitidos.append({**s, "motivo": f"solo caben {maximo} documentos por consulta"})
+    return candidatos[:maximo], omitidos
+
+
 _CACHE_TTL_DIAS_FORENSE = 14
 
 
