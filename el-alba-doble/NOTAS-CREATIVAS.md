@@ -122,6 +122,34 @@ matrimonio. Cursiva para pensamientos internos y para el voto-conjuro. Raya espa
 
 ## Progreso
 
-| Parte | Capítulo | Título | Estado |
+**NOVELA COMPLETA — 26 capítulos + epílogo, ~23.500 palabras.**
+
+| Parte | Cap. | Título | Estado |
 |---|---|---|---|
-| I | 1 | El Taller de Almagre | ✅ |
+| I — La Hora Grana | I | El Taller de Almagre | ✅ |
+| I | II | Los Faroles Vivos | ✅ |
+| I | III | El Mercader Que No Era Mercader | ✅ |
+| I | IV | Las Polillas de Ceniza | ✅ |
+| I | V | El Silencio Después | ✅ |
+| II — La Marea Gris | VI | El Camino Sin Verde | ✅ |
+| II | VII | La Flor de Ceniza | ✅ |
+| II | VIII | Alizar | ✅ |
+| II | IX | El Primer Peaje | ✅ |
+| II | X | Nébrisa | ✅ |
+| II | XI | El Peaje Doloroso | ✅ |
+| II | XII | El Guardia Que Miraba Hacia Otro Lado | ✅ |
+| II | XIII | Fresia | ✅ |
+| II | XIV | La Tormenta | ✅ |
+| II | XV | El Día Más Difícil | ✅ |
+| II | XVI | Mientras Tanto, en Almagre | ✅ |
+| II | XVII | La Morada Compartida | ✅ |
+| III — El Alba Doble | XVIII | La Infiltración | ✅ |
+| III | XIX | La Luna sin Color | ✅ |
+| III | XX | El Rescate desde Adentro | ✅ |
+| III | XXI | El Estallido del Alba Doble | ✅ |
+| III | XXII | El Duelo de Nébrisa | ✅ |
+| III | XXIII | Petrán | ✅ |
+| III | XXIV | El Regreso a Almagre | ✅ |
+| III | XXV | La Víspera | ✅ |
+| III | XXVI | La Renovación en Alizar | ✅ |
+| — | — | Epílogo: El Color que Queda | ✅ |
