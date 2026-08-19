@@ -84,6 +84,37 @@ def diagnostico_completo(
     # arranque dijera `groq=OK gsk_vn06EE…` y esta misma pantalla dijera
     # `gsk_5CxaRq…`. Si hay más de un motor, ningún otro dato de este panel
     # es confiable: puede venir del motor viejo.
+    # ─── Qué versión está sirviendo ───────────────────────────────
+    #
+    # 19-08-2026. Es la primera sección a propósito. Hoy se perdieron horas
+    # persiguiendo un defecto que ya estaba corregido en disco, porque no
+    # había forma de saber si el motor que respondía tenía el código nuevo o
+    # seguía con el viejo en memoria. Con el commit y la hora de arranque
+    # juntos, esa pregunta se responde de un vistazo.
+    try:
+        from app.api.routers.sistema import info_version
+
+        _v = info_version()
+        out["secciones"]["version"] = {
+            "estado": "ok",
+            "mensaje": (
+                f"Motor {_v['version']} · código {_v['commit']} · "
+                f"arrancó el {_v['proceso_arrancado_en']}"
+            ),
+            "data": {
+                "commit": _v["commit"],
+                "commit_completo": _v["commit_full"],
+                "proceso_arrancado_en": _v["proceso_arrancado_en"],
+                "version": _v["version"],
+            },
+        }
+    except Exception as e:  # noqa: BLE001 - el diagnóstico nunca se tumba
+        out["secciones"]["version"] = {
+            "estado": "warning",
+            "mensaje": f"No se pudo leer la versión: {e}",
+            "data": {},
+        }
+
     try:
         from app.services.motor_proceso import estado_motor
 
