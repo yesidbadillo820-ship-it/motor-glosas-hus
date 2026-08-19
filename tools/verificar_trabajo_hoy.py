@@ -262,13 +262,13 @@ def revisar_forense(factura: str | None) -> None:
         return
 
     from app.services.auditor_forense import escoger_soportes_para_forense
-    from app.services.soportes_autodiscovery_service import get_indexer
 
-    print(f"\n  Buscando los soportes de {factura} en el servidor...")
-    soportes = get_indexer().lookup(factura) or []
+    soportes = buscar_soportes_de_una_factura(factura)
+    if soportes is None:
+        return
     if not soportes:
-        print(f"  No hay soportes indexados para {factura}.")
-        print("  Revise en la pantalla «Soportes» que el indexado haya terminado.")
+        print(f"\n  No se encontraron soportes de {factura} en el servidor.")
+        print("  Revise el numero de la factura, o mirela en la pantalla «Soportes».")
         return
 
     elegidos, omitidos = escoger_soportes_para_forense(soportes)
@@ -286,6 +286,76 @@ def revisar_forense(factura: str | None) -> None:
         "No manda archivos que no sean PDF",
         all((s.get("nombre_archivo") or "").lower().endswith(".pdf") for s in elegidos),
     )
+
+
+def buscar_soportes_de_una_factura(factura: str):
+    """Los soportes de UNA factura, buscados directo en el servidor.
+
+    19-08-2026. Antes esto llamaba a `get_indexer().lookup()`, que al correr en
+    un proceso aparte encuentra el indice frio y se pone a INDEXAR EL SERVIDOR
+    ENTERO: 11.367 facturas y 102.729 archivos por red. Varios minutos sin
+    imprimir una sola linea — parecia colgado — y todo ese trabajo se botaba al
+    cerrar el programa. Ademas contradecia el «esto solo mira, no cuesta» del
+    encabezado.
+
+    Ahora se busca solo esa factura y se para apenas se encuentra su carpeta.
+    Se reutiliza la clasificacion del indexador para no tener dos verdades.
+
+    Devuelve None si el auditor corta la busqueda o si no hay servidor.
+    """
+    import os
+    import time
+
+    from app.services.soportes_autodiscovery_service import (
+        _clasificar_archivo,
+        get_indexer,
+        normalizar_factura,
+    )
+
+    raiz = Path(str(getattr(get_indexer(), "raiz", "") or ""))
+    if not str(raiz) or not raiz.exists():
+        print(f"\n  No se llega al servidor de radicacion ({raiz or 'sin configurar'}).")
+        print("  Esto se revisa desde la pantalla «Soportes» del portal.")
+        return None
+
+    objetivo = normalizar_factura(factura)
+    if not objetivo:
+        print(f"\n  «{factura}» no parece un numero de factura.")
+        return None
+
+    print(f"\n  Buscando los soportes de {factura} en {raiz}")
+    print("  (busca SOLO esa factura, no indexa el servidor entero)")
+
+    encontrados: list[dict] = []
+    carpetas = 0
+    arranque = time.time()
+    LIMITE_SEG = 180
+
+    for actual, _subcarpetas, archivos in os.walk(raiz):
+        carpetas += 1
+        if carpetas % 400 == 0:
+            print(f"     ... {carpetas} carpetas revisadas ({int(time.time() - arranque)}s)")
+        for nombre in archivos:
+            if normalizar_factura(nombre) != objetivo and objetivo not in nombre:
+                continue
+            clase = _clasificar_archivo(nombre)
+            encontrados.append(
+                {
+                    "nombre_archivo": nombre,
+                    "tipo": clase[1] if clase else "otro",
+                    "ruta": os.path.join(actual, nombre),
+                }
+            )
+        # Su carpeta se llama como la factura: al hallarla, ya esta todo.
+        if encontrados and objetivo in Path(actual).name:
+            break
+        if time.time() - arranque > LIMITE_SEG:
+            print(f"\n  Se corto la busqueda a los {LIMITE_SEG // 60} minutos: el servidor")
+            print("  esta lento o la factura no esta en las carpetas recorridas.")
+            print("  Puede mirarla en la pantalla «Soportes» del portal.")
+            return None
+
+    return encontrados
 
 
 def main() -> int:
