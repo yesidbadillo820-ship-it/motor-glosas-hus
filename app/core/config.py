@@ -75,10 +75,19 @@ class Settings(BaseSettings):
     groq_model_fallback_2: str = "llama-3.3-70b-versatile"
     groq_model_fallback_3: str = "llama-3.1-8b-instant"
     anthropic_model: str = "claude-sonnet-4-5"
-    # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
-    # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
-    # 2.0-flash paso a GA.
-    gemini_model: str = "gemini-2.0-flash"
+    # Modelo Gemini para OCR de PDF escaneados (no escribe dictamenes).
+    #
+    # 19-08-2026. Tercer modelo que se muere en este archivo: primero
+    # gemini-2.0-flash-exp, despues gemini-2.0-flash («404 - is no longer
+    # available. Please update»), igual que llama-4-scout en la cadena de
+    # Groq. Cada vez, el OCR deja de funcionar en silencio y nadie se entera
+    # hasta que un PDF escaneado no se lee.
+    #
+    # Se usa el ALIAS `gemini-flash-latest`, que Google mantiene apuntando al
+    # Flash vigente. Para OCR el modelo exacto da igual; lo que importa es que
+    # no se muera. Si alguna vez se necesita fijar uno, poner GEMINI_MODEL en
+    # el .env con un nombre de la lista de `?key=...&models`.
+    gemini_model: str = "gemini-flash-latest"
 
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
     smtp_host: str = "smtp.gmail.com"
