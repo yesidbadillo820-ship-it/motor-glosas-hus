@@ -95,3 +95,15 @@ class TestSaleEnElDiagnostico:
         ).read_text(encoding="utf-8")
         assert '"version"' in fuente
         assert "proceso_arrancado_en" in fuente
+
+
+def test_el_encabezado_del_diagnostico_no_lleva_la_version_a_mano():
+    """19-08-2026. El encabezado decía «v5.4.0» y la sección de abajo «5.5.0»,
+    en la misma pantalla. Tercer valor copiado a mano que se desfasa hoy."""
+    from pathlib import Path as _P
+
+    fuente = (
+        _P(__file__).resolve().parents[2] / "app" / "api" / "routers" / "diagnostico.py"
+    ).read_text(encoding="utf-8")
+    assert '"version": "5.' not in fuente, "la versión volvió a quedar escrita a mano"
+    assert "app_version" in fuente
