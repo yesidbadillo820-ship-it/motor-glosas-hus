@@ -4460,6 +4460,53 @@ contenido de las peticiones se tacha antes de salir.
 
 ---
 
+---
+
+### 19-08 (noche) — El dictamen decía haber mandado papeles que no existen
+
+Yesid volvió a responder la glosa **SO0201 de la factura HUS468334** —«ausencia
+de soportes que evidencian la CONSULTA DE URGENCIAS»— y salió bien casi todo:
+el recuadro del Auditor Forense ya trae el número de factura, la relación de
+soportes lista los doce documentos reales con su nombre propio (incluida la
+**hoja de atención de urgencias**, que es la que prueba esa glosa), y el CUPS
+inventado sale marcado en rojo.
+
+**Pero el texto del dictamen seguía inventando.** La argumentación decía:
+
+> «LA FACTURA HUS468334 INCLUYE LA FACTURA ELECTRÓNICA, **AUTORIZACIÓN
+> PREVIA**, EPICRISIS, HOJA DE ADMINISTRACIÓN DE MEDICAMENTOS, APOYO
+> DIAGNÓSTICO, **DESCRIPCIÓN QUIRÚRGICA**, RIPS JSON Y CUV»
+
+Ni la autorización previa ni la descripción quirúrgica estaban en ese
+expediente. Y era una **consulta de urgencias**: no hubo cirugía. O sea que el
+dictamen se contradecía **con su propia tabla, en la misma hoja**. Si la EPS lo
+revisa, ratifica la glosa y de paso el hospital queda mal parado.
+
+Se arregló por los dos lados:
+
+1. **Al motor de IA se le entrega ahora el inventario verificado** de la
+   factura —los documentos que de verdad están, con nombre de archivo— y la
+   instrucción de no nombrar ningún otro.
+2. **Se agregó una regla de fondo al motor**: «prohibido inventar soportes»,
+   al mismo nivel que las que ya existían contra inventar normas, valores y
+   tarifas. Hacía falta: el inventario solo existe cuando la factura está
+   indexada, y sin la regla, en cualquier otra factura la IA volvía a
+   completar de memoria. Si no recibe el inventario, ahora la salida correcta
+   es no enumerar documentos.
+
+**Y el puntaje castigaba de más.** El desglose de confianza decía «No se
+anexaron soportes. La defensa documental es débil» sobre una factura **con doce
+soportes en el expediente**: el contador solo miraba los PDF que el auditor
+sube a mano, no los que el motor encuentra solo en el servidor de radicación.
+Le restaba puntos por algo que el sistema ya había resuelto.
+
+**Cambio de criterio de Yesid, que queda anotado:** «si dicho prompt interfiere
+en futuras correcciones tocará modificarlo». Hasta hoy el prompt del motor era
+intocable. De aquí en adelante se toca cuando estorbe una corrección de fondo
+— con caso real que lo justifique, con prueba, y sin reescribirlo entero.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
