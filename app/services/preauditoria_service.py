@@ -607,6 +607,12 @@ def upsert_radicacion(db: Session, filas: list[dict], archivo: str, usuario: str
 
     def aplicar(bloque: list[dict]) -> dict:
         nuevas = actualizadas = sin_cambio = 0
+        # Facturas que VINIERON en este Excel y no cambiaron ningún dato: hay
+        # que sellarles igual la fecha. `actualizado_en` no significa "se le
+        # cambió algo", significa "el último cargue del Excel la traía" — es
+        # lo que permite reconocer después las filas que el Excel ya NO trae
+        # porque facturación las sacó del envío (ver facturas_de_fuente_rezagada).
+        vistas_sin_cambio: list[int] = []
         indice = _indice_existentes(db, RadicacionCuentaRecord, [r["factura"] for r in bloque])
         for r in bloque:
             existente = indice.get(r["factura"])
@@ -649,6 +655,14 @@ def upsert_radicacion(db: Session, filas: list[dict], archivo: str, usuario: str
                     actualizadas += 1
                 else:
                     sin_cambio += 1
+                    if existente.id is not None:
+                        vistas_sin_cambio.append(existente.id)
+        # Una sola sentencia por tanda: 22.000 filas no se pueden sellar una
+        # por una sin volver lento el cargue.
+        for i in range(0, len(vistas_sin_cambio), 900):
+            db.query(RadicacionCuentaRecord).filter(
+                RadicacionCuentaRecord.id.in_(vistas_sin_cambio[i : i + 900])
+            ).update({"actualizado_en": ahora}, synchronize_session=False)
         _guardar_bloque(db, indice.values())
         return {"nuevas": nuevas, "actualizadas": actualizadas, "sin_cambio": sin_cambio}
 
@@ -1469,6 +1483,14 @@ def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int
                 f.auditor = evento_dev.auditor
                 f.motivo_ultima_devolucion = evento_dev.motivo
                 f.fecha_auditoria = evento_dev.creado_en
+                # Si esa devolución ya había salido en un oficio con
+                # consecutivo emitido, la factura vuelve amarrada a él. Sin
+                # esto quedaba "devuelta sin oficio" y el sistema dejaba
+                # emitir un SEGUNDO oficio de devolución por la misma
+                # factura: el PDF salía diciendo "1 factura" con la tabla
+                # vacía, porque su único evento ya estaba sellado en el
+                # primero.
+                f.oficio_devolucion_id = evento_dev.oficio_devolucion_id
             revertidas += 1
     return borradas, revertidas
 

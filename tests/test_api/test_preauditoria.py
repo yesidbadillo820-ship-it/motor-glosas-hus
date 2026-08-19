@@ -2052,3 +2052,139 @@ class TestFuenteRezagada:
         o = _crear_oficio(client)
         p = client.get(f"/preauditoria/oficios/{o['id']}/envios/{ENV}/preview").json()
         assert p["facturas_rezagadas"] == [] and p["avisos_fuente"] == []
+
+
+class TestFuenteRezagadaEscenariosReales:
+    """El aviso tiene que acertar en el flujo real de la Radicación.
+
+    Lo probó el caso del 19-08-2026: la fuente llevaba 15 días sin
+    re-subirse, así que las 13 facturas del envío 232047 (incluida la que
+    facturación ya había sacado) tenían la MISMA fecha y el aviso no podía
+    distinguirlas. Y al re-subir el Excel, si solo se sellaran las filas que
+    cambian, las que siguen igual quedarían señaladas por error.
+    """
+
+    def _envejecer_todo(self, db_session, dias=30):
+        from datetime import timedelta as _td
+
+        from app.core.tz import ahora_utc
+
+        for fila in db_session.query(RadicacionCuentaRecord).all():
+            fila.importado_en = ahora_utc() - _td(days=dias)
+            fila.actualizado_en = fila.importado_en
+        db_session.commit()
+
+    def _rezagadas(self, client, oficio_id, envio=ENV):
+        return client.get(f"/preauditoria/oficios/{oficio_id}/envios/{envio}/preview").json()[
+            "facturas_rezagadas"
+        ]
+
+    def test_resubir_el_excel_senala_solo_la_que_ya_no_viene(self, client, db_session):
+        """El caso real: se re-sube el Excel y una factura ya no aparece."""
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000), _rad_fila(ENV, F3, 55000)],
+        )
+        self._envejecer_todo(db_session)
+        # Excel de hoy: facturación ya sacó F3 del envío, así que no viene.
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        o = _crear_oficio(client)
+        assert self._rezagadas(client, o["id"]) == [F3]
+
+    def test_resubir_el_mismo_excel_con_una_correccion_no_acusa_a_las_demas(
+        self, client, db_session
+    ):
+        """Sellar solo lo que cambia dejaría 2 falsos positivos por cada
+        corrección de facturación."""
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000), _rad_fila(ENV, F3, 55000)],
+        )
+        self._envejecer_todo(db_session)
+        # mismo archivo completo, con el valor de F1 corregido
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250800), _rad_fila(ENV, F2, 98000), _rad_fila(ENV, F3, 55000)],
+        )
+        o = _crear_oficio(client)
+        assert self._rezagadas(client, o["id"]) == []
+
+    def test_agregar_una_factura_al_envio_no_acusa_a_las_viejas(self, client, db_session):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        self._envejecer_todo(db_session)
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000), _rad_fila(ENV, F3, 55000)],
+        )
+        o = _crear_oficio(client)
+        assert self._rezagadas(client, o["id"]) == []
+
+    def test_fuente_vieja_sin_resubir_no_acusa_a_nadie(self, client, db_session):
+        """Como el 19-08: la fuente lleva días sin re-subirse. Todas las filas
+        son igual de viejas y el sistema NO puede señalar a ninguna."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        self._envejecer_todo(db_session)
+        o = _crear_oficio(client)
+        assert self._rezagadas(client, o["id"]) == []
+
+
+class TestRevertirReingresoConservaSuOficioEmitido:
+    """Al deshacer un reingreso, la factura vuelve amarrada al oficio de
+    devolución que ya se le emitió — si no, el sistema dejaba emitir un
+    segundo oficio con la tabla del PDF vacía."""
+
+    def _como_admin(self, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        u = UsuarioRecord(
+            id=11,
+            nombre="ADMIN REV",
+            email="admin11@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: u
+
+    def _escenario(self, client, db_session):
+        """Factura devuelta con oficio emitido y reenviada a un oficio B."""
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        oA = _crear_oficio(client, radicado="FHUS-AS-I00001-26")
+        _escribir(client, oA["id"], ENV)
+        fid = _factura_id(client, F1)
+        _devolver(client, fid)
+        dev = client.post(f"/preauditoria/oficios/{oA['id']}/oficio-devolucion").json()
+        oB = _crear_oficio(client, radicado="FHUS-AS-I00002-26")
+        _escribir(client, oB["id"], ENV)  # reingreso para subsanar
+        return oA, oB, fid, dev
+
+    def test_al_quitar_la_factura_vuelve_a_su_oficio_de_devolucion(self, client, db_session):
+        oA, oB, fid, dev = self._escenario(client, db_session)
+        r = client.delete(f"/preauditoria/oficios/{oB['id']}/facturas/{fid}")
+        assert r.status_code == 200, r.text
+
+        fichaA = client.get(f"/preauditoria/oficios/{oA['id']}").json()
+        suya = [f for f in fichaA["facturas"] if f["factura"] == F1][0]
+        assert suya["estado"] in ("DEVUELTA_PEND_SUBSANACION", "NUEVAMENTE_DEVUELTA")
+        assert suya["consecutivo_devolucion"] == dev["consecutivo"]
+        # …y el oficio A no vuelve a ofrecerla para un segundo oficio.
+        assert fichaA["devueltas_sin_oficio"] == 0
+
+    def test_al_quitar_el_envio_pasa_lo_mismo(self, client, db_session):
+        oA, oB, fid, dev = self._escenario(client, db_session)
+        r = client.delete(f"/preauditoria/oficios/{oB['id']}/envios/{ENV}")
+        assert r.status_code == 200, r.text
+        fichaA = client.get(f"/preauditoria/oficios/{oA['id']}").json()
+        suya = [f for f in fichaA["facturas"] if f["factura"] == F1][0]
+        assert suya["consecutivo_devolucion"] == dev["consecutivo"]
+
+    def test_no_deja_emitir_un_segundo_oficio_por_la_misma_factura(self, client, db_session):
+        oA, oB, fid, dev = self._escenario(client, db_session)
+        client.delete(f"/preauditoria/oficios/{oB['id']}/facturas/{fid}")
+        r2 = client.post(f"/preauditoria/oficios/{oA['id']}/oficio-devolucion")
+        assert r2.status_code != 200 or r2.json().get("total_facturas", 0) == 0
