@@ -9085,6 +9085,83 @@ class GlosaService:
 </div>
 """
 
+    # Qué documento acredita cada tipo de soporte del expediente, con la
+    # norma que lo respalda. Solo tipos que el indexador reconoce de verdad.
+    _MARCO_LEGAL_SOPORTE = {
+        "factura_electronica": ("Factura electrónica de venta", "Res. 2275/2023 (FEV)"),
+        "historia_clinica": ("Historia clínica / epicrisis", "Res. 1995/1999"),
+        "rips": ("RIPS radicados", "Res. 2275/2023"),
+        "comprobante_recibido_cobro": ("Comprobante de recibido de cobro", "Res. 2284/2023"),
+        "furips": ("FURIPS", "Circular 022/2023"),
+        "resultados_msps": ("Resultados de apoyo diagnóstico", "Res. 3047/2008 Anexo 5"),
+        "otros_procedimientos": ("Soporte de procedimientos", "Res. 3047/2008 Anexo 5"),
+        "pde": ("Soporte de estancia", "Res. 3047/2008 Anexo 5"),
+        "pdx": ("Soporte de diagnóstico", "Res. 3047/2008 Anexo 5"),
+        "xml_cufe": ("XML CUFE de la factura", "Res. 2275/2023"),
+    }
+
+    def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:
+        """La relación de soportes de la factura, leída del expediente real.
+
+        19-08-2026. Devuelve `(filas_html, cuantos, aviso_si_no_hay)`.
+
+        La tabla «RELACIÓN DE SOPORTES APORTADOS» era una plantilla fija que
+        salía por el solo hecho de haber escrito un número de factura. En una
+        glosa SO (falta de soporte) esa lista ES el argumento que se radica: si
+        la EPS verifica y los documentos no están, la glosa se ratifica.
+
+        Acá se leen del indexador del servidor de radicación. Si la factura no
+        está indexada se devuelve un AVISO —no una lista— porque el dictamen no
+        puede afirmar que se aportó algo que nadie miró.
+        """
+        vacio_sin_factura = ([], 0, "")
+        if not numero_factura:
+            return vacio_sin_factura
+        try:
+            from app.services.soportes_autodiscovery_service import get_indexer
+
+            soportes = get_indexer().lookup(numero_factura) or []
+        except Exception as e:  # noqa: BLE001 - sin índice se avisa, no se inventa
+            logger.warning(f"[SOPORTES-DICTAMEN] no se pudo consultar el índice: {e}")
+            soportes = []
+
+        if not soportes:
+            return (
+                [],
+                0,
+                '<div style="background:#fffbeb;border:2px solid #d97706;border-radius:8px;'
+                'padding:12px;margin-top:10px;">'
+                '<div style="font-weight:bold;color:#92400e;margin-bottom:6px;">'
+                "⚠ RELACIÓN DE SOPORTES — POR VERIFICAR</div>"
+                '<div style="color:#7c2d12;font-size:11px;line-height:1.6;">'
+                f"No se encontró el expediente de la factura {numero_factura} en el "
+                "servidor de radicación, así que este dictamen <b>no relaciona "
+                "soportes</b>. Antes de radicarlo, anexe la relación real de lo "
+                "aportado. No se afirma haber remitido documentos que no se "
+                "verificaron.</div></div>",
+            )
+
+        filas = []
+        vistos: set[str] = set()
+        for sop in soportes:
+            tipo = sop.get("tipo") or "otro"
+            nombre_archivo = sop.get("nombre_archivo") or ""
+            documento, norma = self._MARCO_LEGAL_SOPORTE.get(
+                tipo, (nombre_archivo or "Soporte anexo", "Res. 3047/2008 Anexo 5")
+            )
+            if documento in vistos:
+                continue
+            vistos.add(documento)
+            n = len(filas) + 1
+            celda = 'style="padding:6px 10px;border-bottom:1px solid #e2e8f0;"'
+            filas.append(
+                f"<tr><td {celda}>{n}</td>"
+                f"<td {celda}>{documento}"
+                f'<div style="color:#64748b;font-size:10px">{nombre_archivo}</div></td>'
+                f"<td {celda}>{norma}</td></tr>"
+            )
+        return filas, len(soportes), ""
+
     def _generar_dictamen_html(
         self,
         codigo: str,
@@ -9169,23 +9246,27 @@ class GlosaService:
                 <div style="color:#1e3a8a;line-height:1.8;">{normas_html}</div>
             </div>"""
 
-        # Relación de soportes aportados (tabla) — solo si hay trazabilidad
+        # Relación de soportes aportados — SOLO los que están de verdad.
+        #
+        # 19-08-2026. Esta tabla era una plantilla fija: listaba «Historia
+        # clínica institucional», «RIPS radicados» y la factura por el solo
+        # hecho de que el auditor hubiera escrito un número de factura. Nadie
+        # miraba si esos documentos existían.
+        #
+        # En una glosa SO (falta de soporte) esa lista ES el argumento: va
+        # firmada, bajo el título «RELACIÓN DE SOPORTES APORTADOS» y con su
+        # marco legal al lado. Si la EPS verifica y no están, la glosa se
+        # ratifica y el hospital pierde credibilidad.
+        #
+        # Ahora se leen del expediente real (el indexador del servidor de
+        # radicación). Si la factura no está indexada NO se afirma nada: se
+        # dice que la relación está por verificar. Sin evidencia, no se afirma.
         bloque_adjuntos = ""
-        if numero_factura or numero_radicado:
-            filas_adj = [
-                '<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">1</td>'
-                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Historia clínica institucional</td>'
-                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Res. 1995/1999</td></tr>',
-                '<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">2</td>'
-                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">RIPS radicados</td>'
-                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Res. 866/2021</td></tr>',
-            ]
-            if numero_factura:
-                filas_adj.append(
-                    f'<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">3</td>'
-                    f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Factura electrónica No. {numero_factura}</td>'
-                    f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Res. 2275/2023 (FEV)</td></tr>'
-                )
+        filas_adj, soportes_reales, aviso_adj = self._soportes_reales(numero_factura)
+        if not soportes_reales:
+            # Sin expediente que respalde, no se firma una relación de soportes.
+            bloque_adjuntos = aviso_adj
+        elif filas_adj:
             bloque_adjuntos = f"""
             <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-top:10px;">
                 <div style="font-weight:bold;color:#15803d;margin-bottom:8px;">📎 RELACIÓN DE SOPORTES APORTADOS</div>
