@@ -195,6 +195,27 @@ def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
     return meta
 
 
+def _raiz_configurada() -> Optional[str]:
+    """Lee la carpeta de soportes de `config/soportes_root.txt`, si existe.
+
+    Un archivo local (no versionado) con una sola línea, por ejemplo:
+        \\\\Prime\\radicacion_2026
+    Así el auditor cambia el servidor sin tocar código y sin que el autodeploy
+    se lo borre. Si no está, devuelve None y se usan las variables de entorno.
+    """
+    try:
+        ruta = Path(__file__).resolve().parent.parent.parent / "config" / "soportes_root.txt"
+        if not ruta.is_file():
+            return None
+        for linea in ruta.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            valor = linea.strip().strip('"').strip("'")
+            if valor and not valor.startswith("#"):
+                return valor
+    except OSError:
+        return None
+    return None
+
+
 class SoportesIndexer:
     """Indexador on-demand del share de soportes.
 
@@ -212,8 +233,14 @@ class SoportesIndexer:
         #   4. default /tmp/motor-soportes (Plan B sin config — coincide
         #      con el default de _local_root en el router de upload, así
         #      que el motor lee exactamente lo que el agente subió).
+        #   1.b config/soportes_root.txt — la carpeta que escogió el hospital.
+        #      Va ANTES de las variables de entorno a propósito: el vigilante
+        #      que revive el motor guarda las variables de cuando ÉL arrancó,
+        #      así que cambiar el .cmd no servía de nada hasta reiniciar el
+        #      vigilante entero. Leyendo el archivo acá, el motor toma la
+        #      carpeta correcta arranque como arranque. 18-08-2026.
         if raiz is None:
-            raiz = (
+            raiz = _raiz_configurada() or (
                 os.getenv("SOPORTES_ROOT")
                 or os.getenv("SOPORTES_LOCAL_ROOT")
                 or "/tmp/motor-soportes"
@@ -233,6 +260,7 @@ class SoportesIndexer:
         self._ultimo_error: Optional[str] = None
         self._archivos_escaneados: int = 0
         self._archivos_indexados: int = 0
+        self._construyendo: bool = False
 
     def _esta_caliente(self) -> bool:
         if not self._indice:
@@ -287,7 +315,17 @@ class SoportesIndexer:
            a TODAS las facturas detectadas en esa carpeta. Esto cubre
            FURIPS, XML CUFE y ResultadosMSPS que vienen a nivel de lote.
         """
-        with self._lock:
+        # 18-08-2026 — El candado se pedía bloqueando. Con el servidor real
+        # (miles de archivos por red) el recorrido dura minutos, y CUALQUIER
+        # otra petición que tocara el índice —una búsqueda, por ejemplo— se
+        # quedaba esperando su turno hasta que el proxy la cortaba con un
+        # «Error 524». Ahora, si ya hay una reconstrucción en curso, esta se
+        # devuelve de inmediato en vez de hacer cola.
+        if not self._lock.acquire(blocking=False):
+            logger.info("Ya hay una reconstrucción de soportes en curso; no se arranca otra.")
+            return self.stats()
+        try:
+            self._construyendo = True
             inicio = time.time()
             self._indice = {}
             self._archivos_escaneados = 0
@@ -349,6 +387,9 @@ class SoportesIndexer:
                 f"{len(self._indice)} facturas únicas en {duracion}s"
             )
             return self.stats()
+        finally:
+            self._construyendo = False
+            self._lock.release()
 
     def lookup(self, factura: str, auto_rebuild: bool = True) -> list[dict]:
         """Devuelve los soportes detectados para una factura.
@@ -356,7 +397,9 @@ class SoportesIndexer:
         Acepta cualquier formato (`HUS0000495050`, `495050`, etc.) y
         reconstruye el índice si está frío y `auto_rebuild=True`.
         """
-        if auto_rebuild and not self._esta_caliente():
+        # Si hay una reconstrucción en curso se responde con lo que ya haya
+        # en el índice: esperar a que termine deja la pantalla colgada.
+        if auto_rebuild and not self._construyendo and not self._esta_caliente():
             self.rebuild()
         norm = normalizar_factura(factura)
         if not norm:
@@ -387,6 +430,7 @@ class SoportesIndexer:
                 round(time.time() - self._construido_en, 1) if self._construido_en else None
             ),
             "ttl_segundos": self.ttl_segundos,
+            "construyendo": self._construyendo,
             "ultimo_error": self._ultimo_error,
         }
 
@@ -419,7 +463,9 @@ class SoportesIndexer:
               ...
             ]
         """
-        if auto_rebuild and not self._esta_caliente():
+        # Igual que en lookup: con una reconstrucción en curso se responde con
+        # lo que ya hay, nunca se hace esperar a la pantalla.
+        if auto_rebuild and not self._construyendo and not self._esta_caliente():
             self.rebuild()
         if not query or len(query.strip()) < 2:
             return []

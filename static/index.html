@@ -19743,6 +19743,14 @@ async function cargarSoportesEstado(){
       : hace < 60 ? Math.round(hace) + 's'
       : hace < 3600 ? Math.round(hace/60) + 'm'
       : Math.round(hace/3600) + 'h';
+    // Mientras el indexador recorre el servidor, los números van subiendo y
+    // «último build» sigue en «nunca». Sin decirlo, uno no sabe si terminó.
+    var indexando = s.construyendo === true;
+    if(indexando){
+      bgEst = '#eff6ff'; fgEst = '#1e40af';
+      labelEst = '⏳ Indexando…';
+      haceTxt = 'en curso';
+    }
     box.innerHTML =
         '<div style="background:' + bgEst + ';border:1px solid ' + fgEst + ';border-radius:8px;padding:.7rem 1rem">'
       +   '<div style="font-size:.68rem;font-weight:700;color:' + fgEst + ';text-transform:uppercase;letter-spacing:.05em">Estado</div>'
@@ -19761,7 +19769,19 @@ async function cargarSoportesEstado(){
       +   '<div style="font-size:.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em">Último build</div>'
       +   '<div style="font-size:1rem;font-weight:800;color:#92400e;margin-top:.2rem">hace ' + haceTxt + '</div>'
       +   (s.ultimo_error ? '<div style="font-size:.65rem;color:#991b1b;margin-top:.2rem">Último error: ' + escHtml(s.ultimo_error) + '</div>' : '')
-      + '</div>';
+      + '</div>'
+      + (indexando
+          ? '<div style="grid-column:1/-1;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:.6rem .9rem;color:#1e40af;font-size:.78rem">'
+            + 'Recorriendo el servidor de archivos. Puede tardar varios minutos la primera vez. '
+            + 'Esta pantalla se actualiza sola; no hace falta volver a dar «Reindexar».</div>'
+          : '');
+    // Mientras indexa, se vuelve a consultar solo (sin recargar la página).
+    if(indexando){
+      clearTimeout(window._soportesTimer);
+      window._soportesTimer = setTimeout(cargarSoportesEstado, 5000);
+    }else{
+      clearTimeout(window._soportesTimer);
+    }
   }catch(e){
     box.innerHTML = '<div style="color:#991b1b;grid-column:1/-1">Error: ' + escHtml(e.message) + '</div>';
   }
@@ -19777,9 +19797,13 @@ async function reindexarSoportes(){
       toast('Error', d.detail || 'No se pudo reindexar', 'error');
       return;
     }
-    toast('Reindexado ✓',
-      d.archivos_indexados + ' archivos / ' + d.facturas_indexadas + ' facturas en ' + d.duracion_segundos + 's',
-      'success');
+    // El reindexado corre en segundo plano: la respuesta llega enseguida y
+    // el avance se ve en la tarjeta de estado, que se refresca sola.
+    if(d.arrancado === false){
+      toast('Ya está indexando', d.mensaje || 'Hay una indexación en curso', 'warning');
+    }else{
+      toast('Indexación arrancada', d.mensaje || 'Mire el avance en «Estado del indexador»', 'success');
+    }
     cargarSoportesEstado();
   }catch(e){ toast('Error', e.message, 'error'); }
 }

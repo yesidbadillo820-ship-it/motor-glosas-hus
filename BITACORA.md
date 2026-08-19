@@ -3756,6 +3756,31 @@ y comprueban que se encuentra la factura y se sabe la EPS.
 
 ---
 
+### 18-08 (noche) — Soportes conectado al servidor real: dos trabas que aparecieron al usarlo
+
+Se apuntó el motor a `\\Prime\radicacion_2026` y empezó a indexar de verdad
+(iba en 2.522 facturas y 17.087 archivos). Al usarlo salieron dos trabas:
+
+**1) La búsqueda daba «Error 524».** Buscar una factura MIENTRAS el indexador
+recorría el servidor dejaba la pantalla esperando hasta que el proxy la
+cortaba. La causa: la búsqueda y el reindexado se peleaban por el mismo
+candado, y recorrer miles de archivos por red dura minutos. Ahora la búsqueda
+**responde con lo que ya haya indexado** y nunca hace cola. Además, si se pide
+un reindexado y ya hay uno corriendo, no se arranca otro encima.
+
+**2) Se volvía sola a la carpeta local.** El «vigilante» que revive el motor
+guarda la configuración de cuando ÉL arrancó, así que matar solo el motor lo
+revivía apuntando otra vez a `C:\motor-glosas\repo\data\soportes`. Ahora el
+motor **lee la carpeta directamente del archivo** `config\soportes_root.txt`
+al arrancar, sin depender de quién lo levante. Se configura una vez y queda.
+
+**Y la pantalla ahora dice qué está pasando:** mientras indexa muestra
+«⏳ Indexando…», explica que puede tardar varios minutos la primera vez, y se
+actualiza sola cada 5 segundos. El botón de reindexar ya no deja la pantalla
+colgada: arranca el trabajo y devuelve el control enseguida.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
