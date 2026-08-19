@@ -56,20 +56,41 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _dinero import a_entero  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 from siifa_preparar_respuestas import agrupar, leer_informe  # noqa: E402
 
 logger = logging.getLogger("siifa_redactar")
 
 CODIGO_NO_ACEPTA = "RE9901"
 
-CIERRE = (
+_CIERRE_COMUN = (
     "SE SOLICITA EL LEVANTAMIENTO DE LA OBJECIÓN Y, EN CASO DE PERSISTIR, LA "
     "PROGRAMACIÓN DE MESA DE CONCILIACIÓN DE AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE "
     "LAS PARTES, CONFORME AL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y A LA RESOLUCIÓN "
-    "2284 DE 2023. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL "
-    "CARTERA@HUS.GOV.CO, VENTANILLA ÚNICA DE LA ESE HUS, CARRERA 30 NO. 31-10, "
-    "BUCARAMANGA, SANTANDER."
+    "2284 DE 2023"
 )
+
+
+def cierre_de(ips=None) -> str:
+    """El cierre de la respuesta, con los datos de contacto de ESA IPS.
+
+    Sin IPS se usa el HUS, que es como funcionó siempre: hay código que llama
+    a redactar() sin decir la entidad y no puede cambiar de comportamiento.
+
+    Si la IPS no tiene contacto cargado, la frase se omite. Poner el correo y
+    la dirección del HUS en la respuesta de otra clínica sería mandarle a la
+    EPS un dato falso en un escrito con efectos jurídicos.
+    """
+    if ips is None:
+        ips = perfiles.IPS["HUS"]
+    contacto = getattr(ips, "contacto", "")
+    if contacto:
+        return f"{_CIERRE_COMUN}. CUALQUIER INFORMACIÓN AL {contacto}."
+    return f"{_CIERRE_COMUN}."
+
+
+# Compatibilidad con lo ya escrito: el cierre del HUS, que es el de siempre.
+CIERRE = cierre_de(None)
 
 # Banco de argumentos. La llave es el código de glosa de la Res. 2284/2023
 # (Anexo Técnico 2); si el código exacto no está, se usa el de su familia
@@ -85,7 +106,7 @@ ARGUMENTOS: dict[str, dict[str, str]] = {
     "TA": {
         "argumento": (
             "EL VALOR FACTURADO CORRESPONDE A LA TARIFA INSTITUCIONAL VIGENTE DE LA "
-            "ESE HOSPITAL UNIVERSITARIO DE SANTANDER, ADOPTADA MEDIANTE ACTO "
+            "{IPS}, ADOPTADA MEDIANTE ACTO "
             "ADMINISTRATIVO Y APLICABLE AL ACUERDO DE VOLUNTADES SUSCRITO CON LA "
             "ENTIDAD RESPONSABLE DE PAGO. LA OBJECIÓN POR MAYOR VALOR NO INDICA LA "
             "CLÁUSULA CONTRACTUAL NI EL MANUAL TARIFARIO CONCRETO DEL CUAL SE "
@@ -109,7 +130,7 @@ ARGUMENTOS: dict[str, dict[str, str]] = {
             "HABILITA EL NO PAGO: EL ARTÍCULO 17 DE LA LEY 1751 DE 2015 PROTEGE LA "
             "AUTONOMÍA DEL PROFESIONAL TRATANTE, Y EL DECRETO 4747 DE 2007 PROHÍBE "
             "SUPEDITAR LA ATENCIÓN A REQUISITOS ADMINISTRATIVOS CUANDO ESTÁ DE POR "
-            "MEDIO LA SALUD DEL PACIENTE. LA ESE HUS PONE A DISPOSICIÓN DE LA "
+            "MEDIO LA SALUD DEL PACIENTE. LA {IPS} PONE A DISPOSICIÓN DE LA "
             "ENTIDAD RESPONSABLE DE PAGO LOS SOPORTES DEL TRÁMITE DE NOTIFICACIÓN "
             "ADELANTADO PARA SU VERIFICACIÓN. POR LO ANTERIOR NO SE ACEPTA LA "
             "OBJECIÓN"
@@ -189,7 +210,7 @@ ARGUMENTOS: dict[str, dict[str, str]] = {
     # --- DEVOLUCIÓN por radicación fuera de los 22 días hábiles -----------
     "DE5601": {
         "argumento": (
-            "LA ESE HOSPITAL UNIVERSITARIO DE SANTANDER RADICÓ LA FACTURA "
+            "LA {IPS} RADICÓ LA FACTURA "
             "ELECTRÓNICA DE VENTA CON VALIDACIÓN PREVIA Y SUS SOPORTES POR EL CANAL "
             "ACORDADO CON LA ENTIDAD RESPONSABLE DE PAGO, Y PONE A DISPOSICIÓN DE LA "
             "ENTIDAD LA CONSTANCIA DE RADICACIÓN Y EL ACUSE CORRESPONDIENTE PARA "
@@ -210,7 +231,7 @@ ARGUMENTOS: dict[str, dict[str, str]] = {
     "DE1601": {
         "argumento": (
             "LA ATENCIÓN SE PRESTÓ AL USUARIO EN CONDICIONES QUE NO ADMITÍAN "
-            "DIFERIMIENTO, Y LA ESE HUS PONE A DISPOSICIÓN DE LA ENTIDAD LA CONSULTA "
+            "DIFERIMIENTO, Y LA {IPS} PONE A DISPOSICIÓN DE LA ENTIDAD LA CONSULTA "
             "DE DERECHOS EN LA BASE DE DATOS ÚNICA DE AFILIADOS EFECTUADA PARA ESTA "
             "ATENCIÓN. SE SOLICITA A LA ENTIDAD "
             "VALIDAR NUEVAMENTE LA AFILIACIÓN A LA FECHA DE PRESTACIÓN DEL SERVICIO "
@@ -227,7 +248,7 @@ ARGUMENTOS: dict[str, dict[str, str]] = {
     # --- Cualquier otra devolución ---------------------------------------
     "DE": {
         "argumento": (
-            "LA ESE HOSPITAL UNIVERSITARIO DE SANTANDER NO ACEPTA LA CAUSAL DE "
+            "LA {IPS} NO ACEPTA LA CAUSAL DE "
             "DEVOLUCIÓN INVOCADA. LOS SERVICIOS FACTURADOS FUERON EFECTIVAMENTE "
             "PRESTADOS AL USUARIO Y LA CUENTA SE RADICÓ CON EL LLENO DE LOS "
             "REQUISITOS EXIGIDOS EN EL ANEXO TÉCNICO 1 DE LA RESOLUCIÓN 2284 DE "
@@ -286,7 +307,7 @@ def _limpiar(texto) -> str:
 LIMITE_OBSERVACION = 1500
 
 
-def redactar(linea: dict, limite: int = LIMITE_OBSERVACION) -> dict[str, str]:
+def redactar(linea: dict, limite: int = LIMITE_OBSERVACION, ips=None) -> dict[str, str]:
     """Arma la respuesta de UNA glosa o devolución.
 
     El texto sale con cuatro partes: el encabezado (qué se objeta y por
@@ -296,9 +317,11 @@ def redactar(linea: dict, limite: int = LIMITE_OBSERVACION) -> dict[str, str]:
     es_devolucion = str(linea.get("tipo_seguimiento") or "").upper() == "DEVOLUCION"
     codigo = str(linea.get("codigo_glosa") or "").strip().upper()
     banco = argumento_para(codigo)
+    quien = getattr(ips, "nombre_legal", None) or "ESE HOSPITAL UNIVERSITARIO DE SANTANDER"
+    cierre = cierre_de(ips)
 
     encabezado = (
-        f"ESE HOSPITAL UNIVERSITARIO DE SANTANDER NO ACEPTA LA "
+        f"{quien} NO ACEPTA LA "
         f"{'DEVOLUCIÓN APLICADA' if es_devolucion else 'GLOSA APLICADA'} A LA FACTURA "
         f"{_limpiar(linea.get('numero_factura')).upper()} POR VALOR DE "
         f"{_pesos(linea.get('valor_glosa'))} BAJO EL CÓDIGO {codigo}, "
@@ -314,13 +337,16 @@ def redactar(linea: dict, limite: int = LIMITE_OBSERVACION) -> dict[str, str]:
             "LO QUE POR SÍ SOLO IMPIDE EJERCER EL DERECHO DE CONTRADICCIÓN"
         )
 
-    texto = f"{encabezado}{detalle}. {banco['argumento']}. {CIERRE}"
+    # El banco de argumentos escribe {IPS} donde va el nombre del prestador:
+    # el mismo sustento sirve para las cuatro, cambiando quién lo firma.
+    argumento = banco["argumento"].replace("{IPS}", quien)
+    texto = f"{encabezado}{detalle}. {argumento}. {cierre}"
     if len(texto) > limite:
         # Lo primero que se recorta es la cita de la EPS: el sustento propio
         # y el cierre no se pueden perder.
         sobra = len(texto) - limite
         recorte = max(0, len(detalle) - sobra - 5)
-        texto = f"{encabezado}{detalle[:recorte].rstrip()}... {banco['argumento']}. {CIERRE}"
+        texto = f"{encabezado}{detalle[:recorte].rstrip()}... {argumento}. {cierre}"
     return {
         "CODIGO_RESPUESTA": CODIGO_NO_ACEPTA,
         "OBSERVACION_RESPUESTA": texto,
@@ -381,7 +407,7 @@ def escribir(filas: list[dict], ruta: Path, titulo: str) -> None:
     logger.info("%s: %s (%d respuestas)", titulo, ruta, len(filas))
 
 
-def armar(informe: Path, tramites: Path | None) -> list[dict]:
+def armar(informe: Path, tramites: Path | None, ips=None) -> list[dict]:
     """Devuelve una fila por glosa pendiente, con su respuesta puesta."""
     datos = leer_informe(informe)
     grupos = agrupar(datos)
@@ -412,7 +438,7 @@ def armar(informe: Path, tramites: Path | None) -> list[dict]:
             else:
                 # Lo redactado se está respondiendo hoy: sin fecha, el bot
                 # pone la de hoy, que es la que corresponde.
-                resp = {**redactar(linea), "FECHA_RESPUESTA": None}
+                resp = {**redactar(linea, ips=ips), "FECHA_RESPUESTA": None}
                 origen = "REDACTADA"
             filas.append(
                 {
@@ -466,7 +492,10 @@ def main() -> None:
         ),
     )
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -475,7 +504,7 @@ def main() -> None:
         stream=sys.stdout,
     )
 
-    filas = armar(Path(args.informe), Path(args.tramites) if args.tramites else None)
+    filas = armar(Path(args.informe), Path(args.tramites) if args.tramites else None, ips=ips)
     glosas = [f for f in filas if str(f["TIPO"]).upper() == "GLOSA"]
     devoluciones = [f for f in filas if str(f["TIPO"]).upper() == "DEVOLUCION"]
 

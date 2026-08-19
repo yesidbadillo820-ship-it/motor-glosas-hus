@@ -74,8 +74,8 @@ from siifa_client import (  # noqa: E402
     SiifaApiError,
     SiifaClient,
     buscar_clave,
-    credenciales_desde_env,
 )
+import siifa_perfiles as perfiles  # noqa: E402
 
 logger = logging.getLogger("responder_glosas_siifa")
 
@@ -415,6 +415,7 @@ def main() -> None:
         help="Archivo de texto donde dejar el catálogo, para poder mandarlo.",
     )
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -428,13 +429,17 @@ def main() -> None:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    usuario, password = credenciales_desde_env()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
+    usuario, password = perfiles.credenciales(ips)
 
     with SiifaClient() as cliente:
         try:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
             raise SystemExit(f"ERROR de autenticación: {exc}")
+        # Antes de escribir NADA: que el token sea de la IPS que se pidió.
+        perfiles.verificar_identidad(ips, cliente.nit_entidad())
 
         if args.listar_catalogo is not None:
             listar_catalogo(cliente, args.listar_catalogo, args.guardar_catalogo)

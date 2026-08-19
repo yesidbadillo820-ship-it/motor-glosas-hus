@@ -35,7 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from siifa_client import SiifaApiError, SiifaClient, credenciales_desde_env  # noqa: E402
+from siifa_client import SiifaApiError, SiifaClient  # noqa: E402
+import siifa_perfiles as perfiles  # noqa: E402
 
 logger = logging.getLogger("siifa_sondeo")
 
@@ -49,6 +50,15 @@ RUTAS = [
     "/api/SeguimientoFactura/Devolucion/Respuesta",
     "/api/SeguimientoFacturaDevolucion",
     "/api/SeguimientoFacturaGlosa/DevolucionRespuesta",
+    # Subsanación (etapa 4): la de glosa está confirmada; la de devolución no
+    # se conoce. Es el mismo problema que en agosto con las respuestas, y se
+    # resuelve igual: preguntando, no adivinando.
+    "/api/SeguimientoFacturaGlosa/ReiteracionRespuesta",
+    "/api/SeguimientoFacturaGlosa/Reiteracion",
+    "/api/SeguimientoFacturaDevolucion/ReiteracionRespuesta",
+    "/api/SeguimientoFacturaDevolucion/Reiteracion",
+    "/api/SeguimientoFacturaDevolucion/SubsanacionRespuesta",
+    "/api/SeguimientoFacturaGlosa/SubsanacionRespuesta",
 ]
 
 # Nombres de grupo del catálogo de códigos. El portal muestra la frase pero no
@@ -65,7 +75,34 @@ GRUPOS = [
     "DEVOLUCION",
     "RESPUESTA_DEVOLUCIONES",
     "GLOSA",
+    # Códigos de la SUBSANACIÓN (lo que el hospital contesta cuando la EPS
+    # reitera). El patrón que funcionó fue «..._PTS_PSS», así que se prueban
+    # las variantes de ese mismo molde.
+    "REITERACION_RESPUESTA_GLOSA_PTS_PSS",
+    "RESPUESTA_REITERACION_GLOSA_PTS_PSS",
+    "REITERACION_GLOSA_PTS_PSS",
+    "REITERACION_RESPUESTA_DEV_PTS_PSS",
+    "REITERACION_DEV_PTS_PSS",
+    "REITERACION_RESPUESTA",
+    "REITERACION",
+    "SUBSANACION",
 ]
+
+
+def es_falso_positivo(ruta: str, detalle: str) -> bool:
+    """¿El 400 vino de otra ruta que se tragó el último trozo como si fuera un id?
+
+    SIIFA tiene rutas del tipo `/api/SeguimientoFacturaGlosa/{id}`. Al sondear
+    `/api/SeguimientoFacturaGlosa/LoQueSea`, ESA ruta responde y se queja de
+    que «LoQueSea» no es un número válido para IdSeguimientoFacturaGlosa. El
+    400 hace creer que la ruta inventada existe, y no existe.
+
+    Pasó de verdad el 13-08-2026: el sondeo dio por buenas seis rutas
+    inventadas, tres de ellas para subsanar devoluciones por $14 millones.
+    Mandar una escritura ahí habría ido a parar a otro registro.
+    """
+    ultimo = ruta.rstrip("/").rsplit("/", 1)[-1]
+    return f"El valor '{ultimo}' no es válido" in (detalle or "")
 
 
 def leer_estado(codigo: int) -> str:
@@ -89,7 +126,11 @@ def sondear(cliente: SiifaClient) -> list[str]:
     lineas = ["RUTAS", "-" * 70]
     for ruta in RUTAS:
         codigo, detalle = cliente.sondear(ruta)
-        lineas.append(f"  {codigo:>3}  {leer_estado(codigo):<52} {ruta}")
+        if es_falso_positivo(ruta, detalle):
+            estado = "NO CONCLUYENTE (la tomó como id de otra ruta) - NO ESCRIBIR"
+        else:
+            estado = leer_estado(codigo)
+        lineas.append(f"  {codigo:>3}  {estado:<52} {ruta}")
         if detalle and codigo not in (404, 405):
             lineas.append(f"       {detalle[:120]}")
 
@@ -146,6 +187,7 @@ def main() -> None:
         "viene el id de una devolución). Ej: HUS494196",
     )
     ap.add_argument("--verbose", action="store_true")
+    perfiles.agregar_argumento(ap)
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -158,12 +200,15 @@ def main() -> None:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    usuario, password = credenciales_desde_env()
+    ips = perfiles.buscar(args.ips)
+    perfiles.anunciar(ips)
+    usuario, password = perfiles.credenciales(ips)
     with SiifaClient() as cliente:
         try:
             cliente.login(usuario, password)
         except SiifaApiError as exc:
             raise SystemExit(f"\nNo se pudo entrar a SIIFA: {exc}\n")
+        perfiles.verificar_identidad(ips, cliente.nit_entidad())
         lineas = sondear(cliente)
         if args.factura:
             lineas += ["", ""] + ver_seguimiento_crudo(cliente, args.factura)

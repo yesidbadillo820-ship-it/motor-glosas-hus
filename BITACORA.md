@@ -3597,6 +3597,17 @@ voluntades vigente", "sin cotización", "sin lista de precios").
   respuesta afirma que la fecha del RIPS es la de la atención).
 - **Falta el consecutivo GI-33 de este lote** para la carpeta y el PDF de
   evidencias (preguntado al auditor).
+- **(19-08) LOTE SUBIDO:** la corrida completa procesó las 24 facturas en
+  9,6 minutos — 19 cargadas (OK) y 5 NO_PENDIENTE (las repetidas del cargue
+  del 05-08, lo que confirma que esa corrida también quedó bien). Cero
+  errores. Consecutivo del lote: **GI-33-5335-2026** (carpeta + PDF de
+  evidencias con comandos entregados). Queda la segunda pasada de
+  verificación (debe dar 0 pendientes).
+- **(19-08) Acta 879 — médicas:** con la conciliación de pertinencia de la
+  doctora (13-mayo) se corrigieron 5 observaciones médicas flojas del acta
+  (la 487096 de $1.248.511 quedó confirmada ACEPTADA por estancia inactiva,
+  y las 4 de la 487285 con su justificación clínica completa). Quedan 2
+  líneas de la 474268 (CL0801, $6.093 c/u) sin texto de la doctora.
 
 ### 18-08 (conciliación) — Acta 879 armada y las 3 objeciones de pertinencia justificadas
 
@@ -3916,6 +3927,270 @@ Comprobado con las tres formas de carpeta que hay en el servidor: la de
 febrero (con ESCANEO en el medio) da ALIANZA MEDELLÍN, la de marzo da SANITAS
 y la de agosto da NUEVA EPS.
 
+### 06-08 — Informe por entidad en Word, y cómo ver qué llega nuevo a SIIFA
+
+**1. Informe para gerencia (`INFORME_SIIFA_POR_ENTIDAD.docx`).** Entrega en
+Word con las cuatro entidades que glosaron o devolvieron, sus facturas,
+valores y causales; el detalle de las 15 facturas de mayor valor; y una
+sección que muestra lo que se ganó automatizando: **1.419 respuestas en 4
+minutos y 58 segundos** (286 por minuto) frente a las ~86 horas —11 jornadas—
+que habría tomado a mano. Incluye los tres hallazgos que destrabaron el
+cargue y los tres puntos que quedan por revisar.
+
+**2. El portal ya marca 2.620 registros** (antes 2.597): llegaron 23 nuevos.
+El portal dice el total pero **no cuál es nuevo**, y buscarlos a mano son 175
+páginas de a 10. Se creó **`tools/siifa_novedades.py`**, que compara el
+informe de hoy contra el de la revisión pasada y responde, para cada novedad:
+qué entidad, qué factura, si es glosa o devolución, por cuánto y con qué
+causal. Queda como **opción [N]** del bot `CARGAR_SIIFA.cmd`: guarda el
+informe anterior, baja el de hoy y compara solo. Si la bajada falla, devuelve
+el informe anterior intacto.
+
+**3. Un error de cuentas que se corrigió a tiempo.** Al probar el resumen, las
+devoluciones daban **$24.917 millones**. La causa: SIIFA **repite el valor de
+la factura en cada línea** de la devolución, y sumarlas multiplica la plata
+(1.340 líneas de una factura de $111 millones). El valor real de esas 9
+facturas es **$111.420.812** —224 veces menos—. Ahora el valor de una
+devolución se cuenta **una sola vez por factura**, hay tres pruebas que lo
+vigilan y quedó anotado en `docs/CONTEXTO_SIIFA.md`. Es la clase de cifra que
+en un informe a gerencia no se puede sostener.
+
+### 13-08 — 68 glosas nuevas respondidas, y el semáforo del trámite
+
+**1. Llegaron 68 glosas nuevas y quedaron todas respondidas.** El portal pasó
+de 2.597 a 2.665 seguimientos. Casi todas de **FAMISANAR** (67 de 68;
+$30.013.228), más una de SANITAS. Total defendido: **$30.038.128** sobre 34
+facturas. De esas, 27 salieron con la respuesta real que el hospital ya había
+dado en Dinámica Gerencial y 41 las redactó el motor.
+
+**28 de las 68 ya estaban vencidas** ($15.345.553). Se respondieron igual: una
+respuesta tardía se discute, una glosa sin respuesta se pierde.
+
+El cargue tomó **58 segundos de máquina** (17 de escritura efectiva, unas 240
+respuestas por minuto) contra las 2 horas y media que habría tomado a mano.
+Seis rebotaron por el límite de 1.500 caracteres —el mismo error de siempre— y
+entraron a la primera después de recortarlas. Entre ellas la más grande del
+lote, HUS521868 por $3.399.053.
+
+**2. FAMISANAR reformula glosas — y eso puede dañar un cargue.** Al comparar
+los informes del 6 y el 13 de agosto, una glosa desapareció: la de HUS517950
+(CL0801, $665.200, del 30 de junio). No se perdió: la EPS la borró y la volvió
+a crear el 9 de julio con otra causal (SO0801) y **número de seguimiento
+nuevo**. Lección: **las respuestas se arman contra el informe bajado el mismo
+día del cargue**, nunca contra uno de días atrás, porque el id viejo puede ya
+no existir. El comparador avisa cuando algo desaparece; así se detectó.
+
+**3. Nueva herramienta: `siifa_estado_tramite.py` (opción [E] del bot).** El
+panel «Avance de auditoría» del portal muestra las cinco etapas del trámite
+para UNA factura; esto lo hace para las 2.600 de una vez y dice **a quién le
+toca mover**. Lo primero que muestra es lo que le toca al hospital, con su
+fecha de vencimiento.
+
+Con esa herramienta aparecieron cosas que nadie estaba mirando:
+
+- **3 glosas LEVANTADAS: $1.418.479 que SANITAS le dio la razón al hospital.**
+  Nadie lo sabía porque hay que entrar factura por factura a verlo.
+- **5 reiteradas ($15.445.892) con el plazo de subsanación corriendo.** Cuando
+  la EPS reitera, al hospital le quedan **7 días hábiles** —menos de la mitad
+  que los 15 de la primera respuesta— y **nadie avisa**. Cuatro son
+  devoluciones de SANITAS por $14 millones.
+- **16 glosas donde la EPS está en mora**: respondimos y no ha decidido dentro
+  de sus 10 días hábiles.
+
+**4. Otro error de cuentas atajado a tiempo.** El semáforo repetía el error de
+sumar las devoluciones línea por línea: mostraba $25.221 millones donde hay
+$428 millones. La regla quedó ahora en **una sola función** (`valor_total()`
+en `siifa_novedades.py`) que usan las dos herramientas, en vez de copiada en
+cada una — igual que el lector de pesos. Es el mismo error, cometido dos veces
+en dos semanas: por eso ahora vive en un solo sitio y con pruebas.
+
+### 13-08 (segunda parte) — La subsanación: la etapa que nadie estaba mirando
+
+Con el semáforo del trámite apareció lo que seguía: **la EPS ya respondió**
+algunas glosas, y eso abre la etapa 4.
+
+**Lo que se encontró (informe del 6 de agosto):**
+
+- **3 glosas LEVANTADAS — $1.418.479 recuperados.** SANITAS le dio la razón al
+  hospital en HUS467326 ($1.396.804), HUS464765 y HUS463797. Nadie lo sabía
+  porque hay que entrar factura por factura al portal a verlo.
+- **1 glosa REITERADA** (HUS465198, $1.396.804): hay que subsanar.
+- **4 DEVOLUCIONES REITERADAS** ($14.049.088), todas de SANITAS.
+
+**Nueva herramienta: `siifa_armar_subsanacion.py` (opción [S] del bot).** Arma
+el archivo para insistir ante lo reiterado. El escrito **no repite** la
+primera respuesta —la EPS ya la leyó y no la aceptó—: deja constancia de que
+el hospital contestó y en qué fecha, señala que la reiteración no aporta
+elemento nuevo, y conserva el argumento de fondo de la causal.
+
+**Las 4 devoluciones reiteradas NO se cargan todavía, y es a propósito.** La
+puerta de subsanación está confirmada sólo para glosas
+(`PUT /api/SeguimientoFacturaGlosa/ReiteracionRespuesta`); para devoluciones
+no se conoce. Mandarlas por la de glosas escribiría sobre otro registro y el
+reporte diría OK — el mismo daño que costó descubrir en agosto. Salen en una
+hoja aparte, sin código ni texto, y el bot las bloquea. Se amplió
+`siifa_sondear_endpoints.py` con las rutas y grupos candidatos para
+averiguarlo **sin escribir nada** (sólo consulta).
+
+**La primera subsanación quedó cargada** (HUS465198, $1.396.804) — el
+trámite llegó por primera vez a la etapa 4.
+
+**El sondeo mintió, y por poco cuesta caro.** Dijo que existían seis rutas,
+entre ellas tres para subsanar devoluciones. Era falso: SIIFA tiene rutas del
+tipo `/api/SeguimientoFacturaGlosa/{id}`, así que al preguntar por
+`/api/SeguimientoFacturaDevolucion/ReiteracionRespuesta` responde ESA otra
+ruta, quejándose de que «ReiteracionRespuesta» no es un número válido para el
+id. El 400 se leía como «la ruta existe». Mandar una escritura ahí habría ido
+a parar a otro registro, con OK falso en el reporte —exactamente el daño que
+la hoja aparte quería evitar—.
+
+Ya está corregido: cuando el error menciona el último trozo de la ruta como
+si fuera un id, el sondeo lo marca **NO CONCLUYENTE - NO ESCRIBIR** en vez de
+«existe». Tres pruebas lo vigilan.
+
+**Los grupos de códigos de la subsanación salieron todos vacíos**
+(`REITERACION_*`, `SUBSANACION`, `RESPUESTA_GLOSA_PTS_PSS`). La subsanación de
+glosa funcionó igual con RE9901, así que para glosas no hace falta.
+
+**Las 4 devoluciones reiteradas ($14.049.088) siguen sin vía por API.** Lo que
+falta es mirar en el portal qué ofrece el menú de una devolución reiterada: el
+nombre que aparezca ahí es la pista del endpoint, igual que en agosto el
+propio mensaje de error reveló el grupo `RESPUESTA_DEV_PTS_PSS`. Mientras
+tanto, se pueden subsanar **a mano** en el portal: son cuatro.
+
+### 13-08 (tercera parte) — SIIFA al día: 2.665 de 2.665, y la EPS en mora
+
+Verificado contra la plataforma después del cargue:
+
+| Etapa | Le toca a | Ítems | Valor |
+|---|---|---|---|
+| 2. Respondida, esperando decisión | EPS | 2.657 | $458.717.238 |
+| 3. **Levantada — ganada** | — | **3** | **$1.418.479** |
+| 4. Reiterada — falta subsanar | HOSPITAL | 4 | $14.049.088 |
+| 5. Subsanada, esperando decisión final | EPS | 1 | $1.396.804 |
+
+**No queda ni un seguimiento sin responder.** Lo único pendiente del hospital
+son las 4 devoluciones reiteradas de SANITAS, que hay que hacer a mano.
+
+**Dato nuevo y aprovechable: las EPS están en mora.** Tienen 10 días hábiles
+para decidir si levantan o reiteran una glosa ya respondida, y **43 se
+pasaron**: FAMISANAR 27 por $14.680.353 y SANITAS 16 por $1.030.100. Es
+incumplimiento de ellas y sirve para la mesa de trabajo.
+
+**Otro cálculo corregido.** El semáforo marcaba «VENCIDA» la subsanación
+cargada esa misma mañana. La causa: los 5 días de la decisión final corren
+desde la SUBSANACIÓN, y esa fecha no viene en el informe; se estaba contando
+desde la respuesta original del 5 de agosto. Una mora inventada de la EPS es
+un reclamo que no se puede sostener, así que ahora esa etapa no calcula
+vencimiento y lo dice. (Con eso SANITAS pasó de 17 a 16 en mora.)
+
+Entregado el informe en Word `INFORME_CARGUE_SIIFA_13AGO.docx` con las ocho
+secciones, incluida la del estado verificado contra la API.
+
+### 13-08 (cuarta parte) — De un hospital a cuatro IPS
+
+El auditor ahora administra **cuatro prestadores** y quiere trabajarlos a la
+vez: HUS (900006037), Clínica Socorro (900190045), Clínica Girón (890203242)
+y Clínica Guane (804006936).
+
+**Cada IPS tiene lo suyo:** su carpeta (`...\SIIFA\HUS`, `...\SIIFA\SOCORRO`,
+etc.), sus credenciales (`SIIFA_USER_HUS`, `SIIFA_USER_SOCORRO`…) y su nombre
+en el título de la ventana. Todas las herramientas reciben `--ips`, y el bot
+de doble clic pregunta con cuál se trabaja **antes que nada**.
+
+**La guarda que evita el error caro.** Antes de bajar o escribir, la
+herramienta le pregunta al token de SIIFA a qué NIT pertenece y lo compara
+con la IPS elegida. Si no coinciden, se detiene **sin tocar la plataforma** y
+dice de quién son las credenciales que encontró. Con cuatro ventanas
+abiertas, confundirse es cuestión de tiempo, y una respuesta cargada en la
+entidad equivocada no se puede deshacer. Una prueba recorre los scripts que
+entran a SIIFA y falla si alguno se salta la comprobación.
+
+**Un problema que apareció al revisar, y era grave.** El texto de las
+respuestas decía «ESE HOSPITAL UNIVERSITARIO DE SANTANDER NO ACEPTA…» escrito
+a mano, con el correo `CARTERA@HUS.GOV.CO` y la dirección de la Carrera 30.
+Las respuestas de la Clínica Socorro habrían salido **firmadas por el HUS y
+con los datos del HUS** — en un escrito con efectos jurídicos ante la EPS. Ya
+está parametrizado: cada IPS pone su nombre, y **si no tiene correo y
+dirección cargados, la frase se omite** en vez de poner los de otra.
+
+**Falta:** el correo y la dirección de Socorro, Girón y Guane, para que sus
+respuestas cierren con sus propios datos de contacto.
+
+**Cuatro huecos más, encontrados revisando a fondo** (tres los halló una
+revisión adversarial del diseño; el cuarto salió en la primera corrida real):
+
+1. **La guarda del ARCHIVO, no sólo de las credenciales.** Comprobar el token
+   protege lo que se escribe; faltaba proteger lo que se lee. Con cuatro
+   carpetas parecidas y archivos que se llaman igual en todas, pasarle el
+   informe de otra IPS era facilísimo —y de ahí salen las respuestas—.
+   Comparar el informe de una contra el de otra, además, habría reportado
+   todos sus registros como «novedades». Ahora se compara el NIT del emisor.
+2. **Las constancias PDF salían a nombre del HUS.** Se anexan a la EPS como
+   evidencia: una constancia de la Clínica Girón encabezada «Hospital
+   Universitario de Santander» no prueba nada. Y el nombre del archivo no
+   distinguía la IPS, así que una pisaba a la otra.
+3. **Dos IPS bajando a la vez se borraban el archivo de prueba de escritura**
+   (se llamaba igual en las dos), y una concluía «no puedo guardar acá»
+   cuando sí podía. Pasó de verdad con tres corridas en paralelo.
+4. **Al pasar a «mes por mes» seguía pidiendo tandas de 1.000.** Si la
+   consulta completa falló por peso, partirla en meses pero conservar la
+   tanda gigante es repetir el error a pedazos. Girón y Guane se atoraron
+   así, mes tras mes. Ahora la tanda baja a 200 al pasar a meses.
+
+**Lo que se aprendió del primer día con las cuatro:** Socorro tiene **60.568
+seguimientos** (23 veces el HUS). Y el servidor del Ministerio **no aguanta
+tres consultas pesadas a la vez**: con las tres corriendo, Socorro degradó de
+1.000 a 62 registros por página. Conviene bajarlas de a una.
+
+### 18 y 19-08-2026 — Los cargues masivos de las cuatro IPS en SIIFA
+
+**Socorro: 48.766 respuestas cargadas** (unas 3 horas y media de robot).
+El revisor previo (`siifa_revisar_antes_de_cargar.py`, nuevo) apartó antes
+del cargue lo que iba a fallar: ya respondidas, textos pasados de 1.500
+caracteres, códigos de devolución en glosas, 16 sin texto. De la corrida,
+48.009 entraron a la primera y 756 dieron «error» de tiempo de espera —
+pero al verificar contra la plataforma **la escritura sí había entrado**:
+SIIFA las tenía todas. De ahí salió una regla nueva del informe:
+un error de «ya tiene un registro previo» cuenta como REGISTRADA.
+
+**El informe final ahora funciona sin los CSV del robot (modo censo).**
+Una corrida interrumpida pisó el reporte del cargue grande y el informe
+solo veía 1.271 filas. Ahora `siifa_informe_del_cargue.py` puede partir
+del informe masivo solo: dice cuánto de lo que SIIFA tiene está respondido
+(lo del robot y lo cargado antes) y qué falta. Con eso salió el informe de
+Socorro completo: **59.732 de 60.567 respondidas ($2.224 millones
+defendidos)**; quedan ~835 nuevas que llegaron después del corte.
+
+**Las 16 de Socorro que faltaban por texto: alguien ya las había respondido
+a mano.** Al cargarlas, las 16 rechazaron con «ya tiene un registro previo».
+No hubo daño, pero conviene **coordinar con quien responde manualmente en la
+clínica** para no duplicar trabajo.
+
+**Girón: 1.085 respuestas cargadas.** Falta correr su informe final (censo).
+
+**Guane: 1.530 respuestas** (522 glosas y 1.008 devoluciones con RE9701 =
+aceptar la devolución al 100%, confirmado con el archivo del auditor);
+el cargue y su informe final quedaron corriendo en el equipo de cartera.
+
+**HUS: la subsanación con el texto institucional.** El auditor entregó la
+plantilla oficial del HUS para glosas ratificadas (RE9901: se mantiene la
+respuesta, se pide conciliación, art. 57 Ley 1438/2011). Quedó en
+`tools/plantillas/subsanacion_HUS.txt` y el armador de subsanación la usa
+con `--texto`. La única glosa ratificada pendiente ya estaba subsanada.
+**Ojo:** el botón «Crear decisión» del portal es una etapa del PAGADOR;
+el hospital no debe usarlo.
+
+**Herramienta nueva: el BALANCE de un corte** (`siifa_balance.py`, opción
+[B] del bot). Después de un cargue responde las cuatro preguntas de una vez,
+por IPS: qué estaba glosado al corte, qué de eso quedó respondido (separando
+lo que ya venía respondido de antes), qué **sigue sin responder** y qué
+**nuevo** ha glosado la EPS desde entonces. Deja un Excel con lo pendiente
+de primero y avisa si algo del corte desapareció del informe (posible
+reformulación de la EPS). Con pruebas que cuidan las dos confusiones caras:
+contar como logro lo que ya venía respondido, e inflar el valor de las
+devoluciones.
+
 ---
 
 ---
@@ -4206,22 +4481,23 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 26. **Corte de cartera de julio 2026**: en cuanto el analista lo entregue,
     actualizar los 5 consolidados FAMISANAR y la serie mensual de 30 informes.
 
-### SIIFA (nuevo, ver `docs/CONTEXTO_SIIFA.md`)
-11. **Confirmar la URL del servicio de Auth** (`SIIFA_AUTH_URL`) — no está en
-    los manuales que tenemos, el script trae una hipótesis
-    (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
-    mesa de ayuda SIIFA / soporte MinSalud.
-12. **Primera corrida real — salió bien, pero hay que repetirla.** El
-    03-08 bajó completo (2.597 seguimientos, 2.579 sin respuesta), pero una
-    segunda corrida fallida pisó el archivo y se perdió. Ya está corregido
-    el bot para que un informe a medias no vuelva a pisar uno bueno; falta
-    **volver a bajarlo** y **revisar con el auditor que las columnas sean
-    las que necesita** para tipificar las respuestas.
-13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
-    una sola glosa antes de cualquier cargue masivo (regla del repo).
-14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
-    falta automatizar también la subsanación (`ReiteracionRespuesta`) desde
-    el arranque, o si eso se deja para cuando llegue el primer lote real.
+### SIIFA (actualizado 19-08, ver `docs/CONTEXTO_SIIFA.md`)
+11. **HUS — 4 devoluciones ratificadas de SANITAS ($14.049.088), trámite
+    MANUAL en el portal y ya vencidas o al borde** (HUS482639, HUS479521,
+    HUS479457, HUS481923). La puerta de subsanación de devoluciones por API
+    no está confirmada; el texto sirve el de la plantilla del HUS ajustando
+    factura y valor. **Es lo más urgente de SIIFA.**
+12. **Cerrar el ciclo con el BALANCE de las cuatro IPS** (opción [B] o
+    `siifa_balance.py`): corte contra informe fresco de HUS, Socorro, Girón
+    y Guane — qué se respondió, qué falta y qué hay nuevo. Con eso salen
+    también las ~835 nuevas de Socorro y las 2 nuevas del HUS.
+13. **Girón y Guane:** correr el informe final del cargue (censo) de Girón;
+    recibir la salida del cargue de Guane (1.530) y su informe.
+14. **Datos de contacto de Socorro, Girón y Guane** (correo y dirección de
+    ventanilla) para que sus respuestas cierren con sus propios datos; hoy
+    la frase se omite. Y **coordinar con quien responde a mano en Socorro**
+    para no duplicar trabajo. Queda también por definir RE9501 vs RE9601 en
+    las 674 devoluciones DE5601 del HUS (~$111 millones).
 
 ### Cuentas médicas — CUV de facturas nuevas (nuevo, 03-08)
 15. **Factura MED737 — la pelota está en facturación.** El JSON ya quedó bien
@@ -4250,6 +4526,14 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 ## 4) PARA MAÑANA
 
 ### Lo más fresco (del 19-08)
+
+**SIIFA (lo primero, 19-08):** (a) tramitar a mano en el portal las 4
+devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);
+(b) cerrar Guane (salida del cargue + informe); (c) correr el **balance**
+de las cuatro IPS con la opción [B] del bot — de ahí sale qué quedó sin
+responder y qué nuevo hay que trabajar.
+
+**Glosas ADRES (mismo día, otro frente):**
 
 - **Mirar la pantalla de Glosas ADRES con un paquete cargado** y confirmar que
   las tres cantidades se leen bien (Reclamado / Aprobado por el ADRES /

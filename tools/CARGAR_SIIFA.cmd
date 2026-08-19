@@ -40,29 +40,73 @@ REM funciona igual: solo no salen los PDF.
 %PYEXE% -c "import reportlab" >nul 2>&1 && goto credenciales
 %PYEXE% -m pip install --quiet --user reportlab >nul 2>&1
 
+:elegirips
+REM --- 3) CON CUAL IPS se trabaja. Va primero que todo: de aca salen las
+REM credenciales, la carpeta y el nombre de la ventana. Con cuatro ventanas
+REM abiertas, saber en cual esta parado es lo que evita el error caro.
+echo.
+echo   Con cual IPS vas a trabajar?
+echo.
+echo     [1] HUS      - E.S.E. Hospital Universitario de Santander
+echo     [2] SOCORRO  - Clinica Socorro
+echo     [3] GIRON    - Clinica Giron
+echo     [4] GUANE    - Clinica Guane
+echo.
+set "IPS="
+set /p "IPS=  Numero (o el nombre corto): "
+set "IPS=%IPS:"=%"
+if "%IPS%"=="1" set "IPS=HUS"
+if "%IPS%"=="2" set "IPS=SOCORRO"
+if "%IPS%"=="3" set "IPS=GIRON"
+if "%IPS%"=="4" set "IPS=GUANE"
+if /i "%IPS%"=="HUS" goto ipsok
+if /i "%IPS%"=="SOCORRO" goto ipsok
+if /i "%IPS%"=="GIRON" goto ipsok
+if /i "%IPS%"=="GUANE" goto ipsok
+echo.
+echo   [!] Elegi 1, 2, 3 o 4 (o escribi HUS, SOCORRO, GIRON o GUANE).
+goto elegirips
+
+:ipsok
+REM El nombre de la IPS en el titulo de la ventana: es lo unico que distingue
+REM una ventana de otra cuando hay cuatro abiertas.
+title SIIFA - %IPS% - Motor Glosas
+echo.
+echo   [OK] Trabajando con: %IPS%
+echo.
+
 :credenciales
-REM --- 3) Usuario y clave de SIIFA (nunca se escriben en el codigo) ---
-if defined SIIFA_USER if defined SIIFA_PASSWORD goto carpeta
-echo   Falta el usuario y la clave de SIIFA (los del portal del Ministerio).
+REM --- 4) Usuario y clave DE ESA IPS (nunca se escriben en el codigo) ---
+REM Cada IPS tiene su propio usuario en el portal, asi que sus credenciales
+REM viven en variables distintas: SIIFA_USER_HUS, SIIFA_USER_SOCORRO, etc.
+call set "UVAR=SIIFA_USER_%IPS%"
+call set "PVAR=SIIFA_PASSWORD_%IPS%"
+call set "UVAL=%%%UVAR%%%"
+call set "PVAL=%%%PVAR%%%"
+if defined UVAL if defined PVAL goto carpeta
+echo   Faltan el usuario y la clave de %IPS% (los del portal del Ministerio).
 echo   Quedan guardados en este equipo, no se escriben en ningun archivo.
 echo.
-set /p "SIIFA_USER=  Usuario SIIFA: "
+set "UVAL="
+set /p "UVAL=  Usuario SIIFA de %IPS%: "
 REM La clave se pide oculta (no queda escrita en la pantalla).
-for /f "delims=" %%P in ('powershell -NoProfile -Command "$s=Read-Host -AsSecureString '  Clave SIIFA'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"') do set "SIIFA_PASSWORD=%%P"
-if not defined SIIFA_PASSWORD set /p "SIIFA_PASSWORD=  Clave SIIFA:   "
-if not defined SIIFA_USER goto sincredenciales
-if not defined SIIFA_PASSWORD goto sincredenciales
-setx SIIFA_USER "%SIIFA_USER%" >nul
-setx SIIFA_PASSWORD "%SIIFA_PASSWORD%" >nul
+for /f "delims=" %%P in ('powershell -NoProfile -Command "$s=Read-Host -AsSecureString '  Clave SIIFA'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"') do set "PVAL=%%P"
+if not defined PVAL set /p "PVAL=  Clave SIIFA:   "
+if not defined UVAL goto sincredenciales
+if not defined PVAL goto sincredenciales
+setx %UVAR% "%UVAL%" >nul
+setx %PVAR% "%PVAL%" >nul
+set "%UVAR%=%UVAL%"
+set "%PVAR%=%PVAL%"
 echo.
-echo   [OK] Guardados. La proxima vez ya no los pide.
+echo   [OK] Guardadas las de %IPS%. La proxima vez ya no las pide.
 echo.
 
 :carpeta
 REM --- 4) Carpeta de trabajo (se valida ANTES de bajar nada) ----------
 echo.
-set "DEFCARP=D:\USUARIO CARTERA\Documents\SIIFA"
-echo   Carpeta de trabajo de SIIFA (Enter para la de por defecto):
+set "DEFCARP=D:\USUARIO CARTERA\Documents\SIIFA\%IPS%"
+echo   Carpeta de trabajo de %IPS% (Enter para la de por defecto):
 echo   [%DEFCARP%]
 echo   Es una CARPETA, no un comando: algo como D:\...\SIIFA
 set "CARPETA="
@@ -96,6 +140,7 @@ if exist "%GLOSAS%" set "HAYRES=listos"
 if exist "%CARPETA%\piloto_siifa.csv" set "HAYPIL=hecho"
 echo.
 echo ============================================================
+echo   IPS: %IPS%
 echo   Carpeta: %CARPETA%
 echo ============================================================
 echo   [1] Bajar de SIIFA el informe de seguimientos      (%HAYINF%)
@@ -105,8 +150,12 @@ echo   [4] Cargar TODAS las glosas
 echo   [5] Cargar TODAS las devoluciones
 echo   [6] Reintentar lo que quedo con error
 echo   [7] Ver los codigos de respuesta que acepta SIIFA
-echo   [8] Cambiar la carpeta de trabajo
+echo   [8] Cambiar de IPS o de carpeta
 echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
+echo   [N] Ver que llego NUEVO a SIIFA (entidad, factura, glosa/devolucion)
+echo   [E] ESTADO del tramite: que gano, que falta subsanar, que se vence
+echo   [S] SUBSANAR lo que la EPS reitero (etapa 4 - solo 7 dias habiles)
+echo   [B] BALANCE de un corte: que se respondio, que falta, que hay nuevo
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -118,8 +167,12 @@ if "%OPCION%"=="4" goto cargarglosas
 if "%OPCION%"=="5" goto cargardevol
 if "%OPCION%"=="6" goto reintentar
 if "%OPCION%"=="7" goto catalogo
-if "%OPCION%"=="8" goto carpeta
+if "%OPCION%"=="8" goto elegirips
 if "%OPCION%"=="9" goto verificar
+if /i "%OPCION%"=="N" goto novedades
+if /i "%OPCION%"=="E" goto estado
+if /i "%OPCION%"=="S" goto subsanar
+if /i "%OPCION%"=="B" goto balance
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -127,7 +180,69 @@ goto menu
 :informe
 echo.
 echo --- Bajando de SIIFA todos los seguimientos (tarda varios minutos) ---
-%PYEXE% tools\siifa_reporte_seguimientos.py --salida "%INFORME%"
+%PYEXE% tools\siifa_reporte_seguimientos.py --ips %IPS% --salida "%INFORME%"
+goto hecho
+
+:novedades
+REM Guarda el informe que ya se tenia, baja el de hoy y compara los dos.
+REM Asi el auditor ve de una que llego nuevo sin buscar pagina por pagina.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Guardando el informe anterior y bajando el de hoy ---
+move /y "%INFORME%" "%CARPETA%\informe_ANTERIOR.xlsx" >nul
+%PYEXE% tools\siifa_reporte_seguimientos.py --ips %IPS% --salida "%INFORME%"
+if not exist "%INFORME%" goto novedadesfallo
+echo.
+echo --- Comparando: que llego nuevo ---
+%PYEXE% tools\siifa_novedades.py --nuevo "%INFORME%" --anterior "%CARPETA%\informe_ANTERIOR.xlsx"
+goto hecho
+
+:estado
+REM Semaforo de las cinco etapas del tramite. Lo que le toca al hospital
+REM sale de primero: una glosa reiterada solo da 7 dias habiles.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Estado del tramite de cada glosa ---
+%PYEXE% tools\siifa_estado_tramite.py --informe "%INFORME%" --salida "%CARPETA%\ESTADO_TRAMITE.xlsx"
+goto hecho
+
+:subsanar
+REM Etapa 4: la EPS reitero y al hospital le quedan 7 dias habiles.
+REM Se arma el archivo y se hace el piloto de 1 antes del cargue.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Armando la subsanacion de lo reiterado ---
+%PYEXE% tools\siifa_armar_subsanacion.py --informe "%INFORME%" --salida "%CARPETA%\SUBSANACION.xlsx"
+if not exist "%CARPETA%\SUBSANACION.xlsx" goto hecho
+echo.
+echo   REVISA el archivo antes de subirlo. Para cargar el piloto de 1:
+echo     %PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%CARPETA%\SUBSANACION.xlsx" --accion reiteracion-respuesta --piloto 1 --reporte "%CARPETA%\piloto_subsanacion.csv"
+goto hecho
+
+:balance
+REM Las cuatro cuentas de despues de un cargue: que estaba glosado al corte,
+REM que de eso quedo respondido, que sigue sin responder y que llego nuevo.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo   Archivo del CORTE: el informe con el que se armaron las respuestas
+echo   (el de antes del cargue). El de HOY es %INFORME%.
+set "CORTE="
+set /p "CORTE=  Ruta del corte: "
+REM Igual que con la carpeta: comprobar que escribio algo ANTES de tocarlo.
+if not defined CORTE goto sincorte
+set "CORTE=%CORTE:"=%"
+if not defined CORTE goto sincorte
+if not exist "%CORTE%" goto sincorte
+echo.
+echo --- Balance: el corte contra lo que SIIFA tiene hoy ---
+%PYEXE% tools\siifa_balance.py --ips %IPS% --corte "%CORTE%" --hoy "%INFORME%" --salida "%CARPETA%\BALANCE_SIIFA_%IPS%.xlsx"
+goto hecho
+
+:novedadesfallo
+REM Si la bajada fallo, se devuelve el informe anterior: no se pierde nada.
+move /y "%CARPETA%\informe_ANTERIOR.xlsx" "%INFORME%" >nul
+echo.
+echo   [ERROR] No se pudo bajar el informe de hoy. El anterior quedo intacto.
 goto hecho
 
 :armar
@@ -154,7 +269,7 @@ goto hecho
 if not exist "%GLOSAS%" goto singlosas
 echo.
 echo --- PILOTO: se sube UNA sola glosa, la primera del archivo ---
-%PYEXE% tools\responder_glosas_siifa.py --excel "%GLOSAS%" --piloto 1 --reporte "%CARPETA%\piloto_siifa.csv"
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%GLOSAS%" --piloto 1 --reporte "%CARPETA%\piloto_siifa.csv"
 echo.
 echo   AHORA, ANTES DE SEGUIR: entra al portal, filtra esa factura,
 echo   abre los tres puntos - Ver Historico y confirma que la respuesta
@@ -166,14 +281,14 @@ if not exist "%GLOSAS%" goto singlosas
 if not exist "%CARPETA%\piloto_siifa.csv" goto sinpiloto
 echo.
 echo --- Cargando TODAS las glosas ---
-%PYEXE% tools\responder_glosas_siifa.py --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --saltar-csv "%CARPETA%\piloto_siifa.csv"
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --saltar-csv "%CARPETA%\piloto_siifa.csv"
 goto hecho
 
 :cargardevol
 if not exist "%DEVOL%" goto sindevol
 echo.
 echo --- Cargando TODAS las devoluciones ---
-%PYEXE% tools\responder_glosas_siifa.py --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv"
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv"
 goto hecho
 
 :reintentar
@@ -188,12 +303,12 @@ goto menu
 
 :reintentarg
 if not exist "%CARPETA%\reporte_GLOSAS.csv" goto sinreporte
-%PYEXE% tools\responder_glosas_siifa.py --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS_2.csv" --saltar-csv "%CARPETA%\reporte_GLOSAS.csv"
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS_2.csv" --saltar-csv "%CARPETA%\reporte_GLOSAS.csv"
 goto hecho
 
 :reintentard
 if not exist "%CARPETA%\reporte_DEVOLUCIONES.csv" goto sinreporte
-%PYEXE% tools\responder_glosas_siifa.py --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES_2.csv" --saltar-csv "%CARPETA%\reporte_DEVOLUCIONES.csv"
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES_2.csv" --saltar-csv "%CARPETA%\reporte_DEVOLUCIONES.csv"
 goto hecho
 
 :verificar
@@ -212,24 +327,24 @@ goto menu
 :verificarg
 if not exist "%GLOSAS%" goto singlosas
 if not exist "%CARPETA%\reporte_GLOSAS.csv" goto verificarg_todo
-%PYEXE% tools\siifa_verificar_cargue.py --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
 goto hecho
 :verificarg_todo
-%PYEXE% tools\siifa_verificar_cargue.py --excel "%GLOSAS%" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%GLOSAS%" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
 goto hecho
 
 :verificard
 if not exist "%DEVOL%" goto sindevol
 if not exist "%CARPETA%\reporte_DEVOLUCIONES.csv" goto verificard_todo
-%PYEXE% tools\siifa_verificar_cargue.py --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
 goto hecho
 :verificard_todo
-%PYEXE% tools\siifa_verificar_cargue.py --excel "%DEVOL%" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%DEVOL%" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
 goto hecho
 
 :catalogo
 echo.
-%PYEXE% tools\responder_glosas_siifa.py --listar-catalogo
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --listar-catalogo
 goto hecho
 
 :hecho
@@ -268,6 +383,11 @@ goto menu
 
 :sindgh
 echo   [ERROR] No se encontro el export de DGH en esa ruta.
+pause
+goto menu
+
+:sincorte
+echo   [ERROR] No se encontro el archivo del corte en esa ruta.
 pause
 goto menu
 
