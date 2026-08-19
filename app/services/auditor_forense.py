@@ -279,7 +279,9 @@ async def auditar_forense(
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
     modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
     gemini_key = os.getenv("GEMINI_API_KEY", "")
-    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    from app.core.config import modelo_gemini_vigente
+
+    gemini_model = modelo_gemini_vigente(os.getenv("GEMINI_MODEL"))
 
     if not api_key and not gemini_key:
         return {

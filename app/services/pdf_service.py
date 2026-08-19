@@ -97,7 +97,7 @@ class PdfService:
         anthropic_api_key: str = "",
         anthropic_model: str = "claude-sonnet-4-5",
         gemini_api_key: str = "",
-        gemini_model: str = "gemini-2.0-flash",
+        gemini_model: str = None,
     ) -> tuple[str, str]:
         """Intenta extracción nativa; si el texto es pobre intenta OCR via
         Anthropic, y si Anthropic falla (sin créditos, 401, etc.) hace
@@ -130,7 +130,11 @@ class PdfService:
 
         if gemini_api_key:
             try:
-                texto_ocr = await self._ocr_gemini(file_content, gemini_api_key, gemini_model)
+                from app.core.config import modelo_gemini_vigente
+
+                texto_ocr = await self._ocr_gemini(
+                    file_content, gemini_api_key, modelo_gemini_vigente(gemini_model)
+                )
                 if texto_ocr and len(texto_ocr.strip()) > len(texto_real):
                     return texto_ocr, "gemini-pdf"
             except Exception as e:

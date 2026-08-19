@@ -1460,26 +1460,6 @@ class TareaLoteRecord(Base):
     resultado = Column(Text, nullable=True)  # JSON: resumen que reportó el agente
 
 
-class AgenteRecord(Base):
-    """Constructor de Agentes: un agente es una FICHA, no código.
-
-    Nombre, misión, instrucciones propias y la lista de herramientas del
-    asistente que tiene permitidas. El runner es el mismo del asistente
-    maestro con esa ficha encima — crear un agente nuevo no toca código.
-    """
-
-    __tablename__ = "agentes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(120), nullable=False)
-    mision = Column(Text, nullable=False)
-    instrucciones = Column(Text)
-    herramientas = Column(Text)  # JSON: nombres de tools permitidas
-    creado_por = Column(String(200))
-    creado_en = Column(DateTime(timezone=True), server_default=func.now())
-    activo = Column(Integer, default=1, index=True)
-
-
 class TrabajoBotRecord(Base):
     """Cola universal de trabajos para los bots del PC del HUS.
 
