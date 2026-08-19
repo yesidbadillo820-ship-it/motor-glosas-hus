@@ -3597,6 +3597,17 @@ voluntades vigente", "sin cotización", "sin lista de precios").
   respuesta afirma que la fecha del RIPS es la de la atención).
 - **Falta el consecutivo GI-33 de este lote** para la carpeta y el PDF de
   evidencias (preguntado al auditor).
+- **(19-08) LOTE SUBIDO:** la corrida completa procesó las 24 facturas en
+  9,6 minutos — 19 cargadas (OK) y 5 NO_PENDIENTE (las repetidas del cargue
+  del 05-08, lo que confirma que esa corrida también quedó bien). Cero
+  errores. Consecutivo del lote: **GI-33-5335-2026** (carpeta + PDF de
+  evidencias con comandos entregados). Queda la segunda pasada de
+  verificación (debe dar 0 pendientes).
+- **(19-08) Acta 879 — médicas:** con la conciliación de pertinencia de la
+  doctora (13-mayo) se corrigieron 5 observaciones médicas flojas del acta
+  (la 487096 de $1.248.511 quedó confirmada ACEPTADA por estancia inactiva,
+  y las 4 de la 487285 con su justificación clínica completa). Quedan 2
+  líneas de la 474268 (CL0801, $6.093 c/u) sin texto de la doctora.
 
 ### 18-08 (conciliación) — Acta 879 armada y las 3 objeciones de pertinencia justificadas
 
