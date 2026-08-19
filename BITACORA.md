@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 13-08-2026
+**Última actualización:** 19-08-2026
 
 ---
 
@@ -2425,6 +2425,54 @@ seguimientos** (23 veces el HUS). Y el servidor del Ministerio **no aguanta
 tres consultas pesadas a la vez**: con las tres corriendo, Socorro degradó de
 1.000 a 62 registros por página. Conviene bajarlas de a una.
 
+### 18 y 19-08-2026 — Los cargues masivos de las cuatro IPS en SIIFA
+
+**Socorro: 48.766 respuestas cargadas** (unas 3 horas y media de robot).
+El revisor previo (`siifa_revisar_antes_de_cargar.py`, nuevo) apartó antes
+del cargue lo que iba a fallar: ya respondidas, textos pasados de 1.500
+caracteres, códigos de devolución en glosas, 16 sin texto. De la corrida,
+48.009 entraron a la primera y 756 dieron «error» de tiempo de espera —
+pero al verificar contra la plataforma **la escritura sí había entrado**:
+SIIFA las tenía todas. De ahí salió una regla nueva del informe:
+un error de «ya tiene un registro previo» cuenta como REGISTRADA.
+
+**El informe final ahora funciona sin los CSV del robot (modo censo).**
+Una corrida interrumpida pisó el reporte del cargue grande y el informe
+solo veía 1.271 filas. Ahora `siifa_informe_del_cargue.py` puede partir
+del informe masivo solo: dice cuánto de lo que SIIFA tiene está respondido
+(lo del robot y lo cargado antes) y qué falta. Con eso salió el informe de
+Socorro completo: **59.732 de 60.567 respondidas ($2.224 millones
+defendidos)**; quedan ~835 nuevas que llegaron después del corte.
+
+**Las 16 de Socorro que faltaban por texto: alguien ya las había respondido
+a mano.** Al cargarlas, las 16 rechazaron con «ya tiene un registro previo».
+No hubo daño, pero conviene **coordinar con quien responde manualmente en la
+clínica** para no duplicar trabajo.
+
+**Girón: 1.085 respuestas cargadas.** Falta correr su informe final (censo).
+
+**Guane: 1.530 respuestas** (522 glosas y 1.008 devoluciones con RE9701 =
+aceptar la devolución al 100%, confirmado con el archivo del auditor);
+el cargue y su informe final quedaron corriendo en el equipo de cartera.
+
+**HUS: la subsanación con el texto institucional.** El auditor entregó la
+plantilla oficial del HUS para glosas ratificadas (RE9901: se mantiene la
+respuesta, se pide conciliación, art. 57 Ley 1438/2011). Quedó en
+`tools/plantillas/subsanacion_HUS.txt` y el armador de subsanación la usa
+con `--texto`. La única glosa ratificada pendiente ya estaba subsanada.
+**Ojo:** el botón «Crear decisión» del portal es una etapa del PAGADOR;
+el hospital no debe usarlo.
+
+**Herramienta nueva: el BALANCE de un corte** (`siifa_balance.py`, opción
+[B] del bot). Después de un cargue responde las cuatro preguntas de una vez,
+por IPS: qué estaba glosado al corte, qué de eso quedó respondido (separando
+lo que ya venía respondido de antes), qué **sigue sin responder** y qué
+**nuevo** ha glosado la EPS desde entonces. Deja un Excel con lo pendiente
+de primero y avisa si algo del corte desapareció del informe (posible
+reformulación de la EPS). Con pruebas que cuidan las dos confusiones caras:
+contar como logro lo que ya venía respondido, e inflar el valor de las
+devoluciones.
+
 ---
 
 ## 3) PENDIENTE
@@ -2589,22 +2637,23 @@ tres consultas pesadas a la vez**: con las tres corriendo, Socorro degradó de
     oficio) para que las estadísticas y el control de 3 devoluciones
     arranquen con la historia real.
 
-### SIIFA (nuevo, ver `docs/CONTEXTO_SIIFA.md`)
-11. **Confirmar la URL del servicio de Auth** (`SIIFA_AUTH_URL`) — no está en
-    los manuales que tenemos, el script trae una hipótesis
-    (`https://siifa.sispro.gov.co/siifa-seguridad`) sin confirmar. Preguntar a
-    mesa de ayuda SIIFA / soporte MinSalud.
-12. **Primera corrida real — salió bien, pero hay que repetirla.** El
-    03-08 bajó completo (2.597 seguimientos, 2.579 sin respuesta), pero una
-    segunda corrida fallida pisó el archivo y se perdió. Ya está corregido
-    el bot para que un informe a medias no vuelva a pisar uno bueno; falta
-    **volver a bajarlo** y **revisar con el auditor que las columnas sean
-    las que necesita** para tipificar las respuestas.
-13. **Piloto real** de `tools/responder_glosas_siifa.py --solo-id <id>` con
-    una sola glosa antes de cualquier cargue masivo (regla del repo).
-14. Definir con el auditor si además de responder glosas (`Respuesta`) hace
-    falta automatizar también la subsanación (`ReiteracionRespuesta`) desde
-    el arranque, o si eso se deja para cuando llegue el primer lote real.
+### SIIFA (actualizado 19-08, ver `docs/CONTEXTO_SIIFA.md`)
+11. **HUS — 4 devoluciones ratificadas de SANITAS ($14.049.088), trámite
+    MANUAL en el portal y ya vencidas o al borde** (HUS482639, HUS479521,
+    HUS479457, HUS481923). La puerta de subsanación de devoluciones por API
+    no está confirmada; el texto sirve el de la plantilla del HUS ajustando
+    factura y valor. **Es lo más urgente de SIIFA.**
+12. **Cerrar el ciclo con el BALANCE de las cuatro IPS** (opción [B] o
+    `siifa_balance.py`): corte contra informe fresco de HUS, Socorro, Girón
+    y Guane — qué se respondió, qué falta y qué hay nuevo. Con eso salen
+    también las ~835 nuevas de Socorro y las 2 nuevas del HUS.
+13. **Girón y Guane:** correr el informe final del cargue (censo) de Girón;
+    recibir la salida del cargue de Guane (1.530) y su informe.
+14. **Datos de contacto de Socorro, Girón y Guane** (correo y dirección de
+    ventanilla) para que sus respuestas cierren con sus propios datos; hoy
+    la frase se omite. Y **coordinar con quien responde a mano en Socorro**
+    para no duplicar trabajo. Queda también por definir RE9501 vs RE9601 en
+    las 674 devoluciones DE5601 del HUS (~$111 millones).
 
 ### Cuentas médicas — CUV de facturas nuevas (nuevo, 03-08)
 15. **Factura MED737 — la pelota está en facturación.** El JSON ya quedó bien
@@ -2631,6 +2680,12 @@ tres consultas pesadas a la vez**: con las tres corriendo, Socorro degradó de
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**SIIFA (lo primero, 19-08):** (a) tramitar a mano en el portal las 4
+devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);
+(b) cerrar Guane (salida del cargue + informe); (c) correr el **balance**
+de las cuatro IPS con la opción [B] del bot — de ahí sale qué quedó sin
+responder y qué nuevo hay que trabajar.
 
 00. **Antes de cualquier prueba de IA: reiniciar con
     `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos

@@ -155,6 +155,7 @@ echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
 echo   [N] Ver que llego NUEVO a SIIFA (entidad, factura, glosa/devolucion)
 echo   [E] ESTADO del tramite: que gano, que falta subsanar, que se vence
 echo   [S] SUBSANAR lo que la EPS reitero (etapa 4 - solo 7 dias habiles)
+echo   [B] BALANCE de un corte: que se respondio, que falta, que hay nuevo
 echo   [0] Salir
 echo.
 set "OPCION="
@@ -171,6 +172,7 @@ if "%OPCION%"=="9" goto verificar
 if /i "%OPCION%"=="N" goto novedades
 if /i "%OPCION%"=="E" goto estado
 if /i "%OPCION%"=="S" goto subsanar
+if /i "%OPCION%"=="B" goto balance
 if "%OPCION%"=="0" goto fin
 echo   [!] Escribe un numero del menu.
 goto menu
@@ -215,6 +217,25 @@ if not exist "%CARPETA%\SUBSANACION.xlsx" goto hecho
 echo.
 echo   REVISA el archivo antes de subirlo. Para cargar el piloto de 1:
 echo     %PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%CARPETA%\SUBSANACION.xlsx" --accion reiteracion-respuesta --piloto 1 --reporte "%CARPETA%\piloto_subsanacion.csv"
+goto hecho
+
+:balance
+REM Las cuatro cuentas de despues de un cargue: que estaba glosado al corte,
+REM que de eso quedo respondido, que sigue sin responder y que llego nuevo.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo   Archivo del CORTE: el informe con el que se armaron las respuestas
+echo   (el de antes del cargue). El de HOY es %INFORME%.
+set "CORTE="
+set /p "CORTE=  Ruta del corte: "
+REM Igual que con la carpeta: comprobar que escribio algo ANTES de tocarlo.
+if not defined CORTE goto sincorte
+set "CORTE=%CORTE:"=%"
+if not defined CORTE goto sincorte
+if not exist "%CORTE%" goto sincorte
+echo.
+echo --- Balance: el corte contra lo que SIIFA tiene hoy ---
+%PYEXE% tools\siifa_balance.py --ips %IPS% --corte "%CORTE%" --hoy "%INFORME%" --salida "%CARPETA%\BALANCE_SIIFA_%IPS%.xlsx"
 goto hecho
 
 :novedadesfallo
@@ -362,6 +383,11 @@ goto menu
 
 :sindgh
 echo   [ERROR] No se encontro el export de DGH en esa ruta.
+pause
+goto menu
+
+:sincorte
+echo   [ERROR] No se encontro el archivo del corte en esa ruta.
 pause
 goto menu
 

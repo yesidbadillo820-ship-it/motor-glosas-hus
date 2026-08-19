@@ -271,6 +271,26 @@ varias tandas.
 > factura** y saca constancias PDF: eso sirve para 17 facturas, no para
 > 12.255. Este parte del informe masivo, una sola bajada.
 
+### El balance de un corte (`siifa_balance.py`) — opción [B] del bot
+
+Cierra el ciclo de un cargue respondiendo las cuatro preguntas de una vez:
+qué estaba glosado **al corte** (la fecha del archivo con el que se armaron
+las respuestas), qué de eso quedó **respondido** (separando lo que ya venía
+respondido de antes), qué **sigue sin responder** (el plazo corre) y qué
+**nuevo** ha glosado la EPS desde entonces.
+
+```powershell
+py tools\siifa_balance.py --ips SOCORRO `
+  --corte "D:\...\SOCORRO\SIIFA_informe_seguimientos_SOCORRO.xlsx" `
+  --hoy   "D:\...\SOCORRO\informe_DESPUES.xlsx"
+```
+
+Deja `BALANCE_SIIFA_<IPS>.xlsx` con el resumen (lo sin responder en rojo) y
+tres hojas de detalle: `PENDIENTES` (viejo + nuevo sin responder), `NUEVAS`
+y `YA_NO_ESTAN` (lo del corte que desapareció del informe: posible
+reformulación de la EPS). Verifica que los dos archivos sean de la IPS
+indicada antes de cruzar nada.
+
 ---
 
 ## 2) Bot de respuestas (`responder_glosas_siifa.py`)
