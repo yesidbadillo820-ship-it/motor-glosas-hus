@@ -180,11 +180,38 @@ def diagnostico_completo(
                 "PDF desde la pantalla «Soportes». Después, botón «Reindexar "
                 "soportes» acá mismo."
             )
+        elif stats.get("construyendo"):
+            # 19-08-2026. Con el servidor real esto pasa de verdad: 432.314
+            # archivos tardan un buen rato en recorrerse la primera vez. El
+            # panel decía «la última build es vieja (>24h)» —porque no había
+            # ninguna todavía— y eso invita a apretar «Reindexar soportes» y
+            # empezar de cero un trabajo de horas. Está trabajando: hay que
+            # decirlo y dejarlo en paz.
+            estado = "ok"
+            mensaje = (
+                f"Indexando el servidor de radicación… lleva "
+                f"{stats['facturas_indexadas']} facturas y "
+                f"{stats.get('archivos_indexados', 0)} archivos. "
+                "NO le dé «Reindexar soportes»: eso lo haría empezar de nuevo. "
+                "Mientras tanto se puede buscar, pero puede que una factura "
+                "reciente todavía no aparezca."
+            )
         else:
             ultima = stats.get("construido_hace_seg")
-            if ultima is None or ultima > 24 * 3600:
+            if ultima is None:
                 estado = "warning"
-                mensaje = f"{stats['facturas_indexadas']} facturas indexadas pero la última build es vieja (>24h)"
+                mensaje = (
+                    f"{stats['facturas_indexadas']} facturas en el índice, pero "
+                    "todavía no ha terminado ninguna revisión completa del "
+                    "servidor. Use «Reindexar soportes» para arrancarla."
+                )
+            elif ultima > 24 * 3600:
+                estado = "warning"
+                mensaje = (
+                    f"{stats['facturas_indexadas']} facturas indexadas, pero la "
+                    "última revisión del servidor fue hace más de un día: las "
+                    "facturas radicadas desde entonces pueden no aparecer."
+                )
             else:
                 estado = "ok"
                 horas = ultima / 3600 if ultima else 0
