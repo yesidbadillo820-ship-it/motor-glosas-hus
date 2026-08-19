@@ -278,9 +278,13 @@ def calcular_confianza(
             "puntos_obtenidos": pts,
             "ok": tiene_soportes,
             "explicacion": (
-                f"{soportes_count} PDFs/soportes anexados al expediente."
+                f"{soportes_count} soporte(s) del expediente leídos por el motor."
                 if tiene_soportes
-                else "No se anexaron soportes. La defensa documental es débil — la EPS puede ratificar pidiendo los anexos."
+                else (
+                    "No hay soportes: ni adjuntos ni encontrados en el servidor de "
+                    "radicación. La defensa documental es débil — la EPS puede "
+                    "ratificar pidiendo los anexos."
+                )
             ),
         }
     )

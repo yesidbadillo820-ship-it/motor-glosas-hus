@@ -8114,6 +8114,15 @@ class GlosaService:
                 txt = contexto_pdf or ""
                 # Si tiene el separador ═══ DOCUMENTO: → un PDF por aparición
                 soportes_n = max(soportes_n, txt.count("═══ DOCUMENTO:"))
+                # 19-08-2026. Los soportes que el motor encuentra SOLO en el
+                # servidor de radicación se marcan «═══ SOPORTE AUTO», y nadie
+                # los contaba. Resultado: la factura HUS468334 tenía DOCE
+                # soportes en el expediente y el desglose de confianza decía
+                # «No se anexaron soportes. La defensa documental es débil»,
+                # descontando puntos por algo que el sistema ya había resuelto.
+                # El auditor no tiene por qué bajar y volver a subir a mano
+                # unos PDF que el motor ya está leyendo.
+                soportes_n = max(soportes_n, txt.count("═══ SOPORTE AUTO"))
                 # Fallback al formato viejo "--- ARCHIVO " por si algún call site
                 # aún lo usa (no se ha encontrado, pero defensivo).
                 soportes_n = max(soportes_n, len(txt.split("\n--- ARCHIVO ")) - 1)

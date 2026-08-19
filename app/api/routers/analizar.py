@@ -58,6 +58,70 @@ MAX_CHARS_POR_SOPORTE = 5_000
 PRIORIDAD_TIPOS_SOPORTE = ["HEV", "RIPS", "FEV", "OPF", "PDE", "PDX", "CRC", "AD"]
 
 
+def _inventario_de_soportes(numero_factura: Optional[str], req_id: str) -> str:
+    """La lista EXACTA de soportes del expediente, para el prompt del dictamen.
+
+    19-08-2026, segunda vuelta. La tabla «RELACIÓN DE SOPORTES APORTADOS» ya
+    sale del expediente real, pero la ARGUMENTACIÓN —que es el texto que se
+    radica— seguía inventando. En la factura HUS468334, respondiendo una glosa
+    por «ausencia de soportes de la CONSULTA DE URGENCIAS», la IA escribió:
+
+        «LA FACTURA HUS468334 INCLUYE LA FACTURA ELECTRÓNICA, AUTORIZACIÓN
+         PREVIA, EPICRISIS, ..., DESCRIPCIÓN QUIRÚRGICA, RIPS JSON Y CUV»
+
+    Ni la autorización previa ni la descripción quirúrgica están en ese
+    expediente — y era una consulta de urgencias, no hubo cirugía. El propio
+    dictamen se contradecía: el texto afirmaba documentos que su tabla no
+    listaba. Si la EPS lo revisa, la glosa se ratifica.
+
+    El prompt ya prohíbe inventar normas y estimar tarifas, pero no decía nada
+    de los soportes. En vez de tocar el prompt global, se le pasa el inventario
+    verificado como DATO DEL CASO, que es lo que es.
+
+    Devuelve "" si no hay factura o no hay expediente indexado — y ahí el
+    dictamen no puede afirmar nada, que es lo correcto.
+    """
+    if not numero_factura:
+        return ""
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        soportes = get_indexer().lookup(numero_factura) or []
+    except Exception as e:  # noqa: BLE001 - sin índice se sigue, solo sin lista
+        logger.warning(f"[{req_id}] No se pudo listar soportes para el prompt: {e}")
+        return ""
+    if not soportes:
+        return ""
+
+    from app.services.glosa_service import GlosaService
+
+    nombres: list[str] = []
+    for sop in soportes:
+        documento = GlosaService._MARCO_LEGAL_SOPORTE.get(sop.get("tipo") or "", (None,))[0]
+        etiqueta = (
+            f"{documento} ({sop.get('nombre_archivo')})"
+            if documento
+            else str(sop.get("nombre_archivo") or "")
+        )
+        if etiqueta and etiqueta not in nombres:
+            nombres.append(etiqueta)
+
+    listado = "\n".join(f"  {i}. {n}" for i, n in enumerate(nombres, 1))
+    return (
+        "═══ SOPORTES QUE DE VERDAD OBRAN EN EL EXPEDIENTE ═══\n"
+        f"Verificado en el servidor de radicación para la factura {numero_factura}. "
+        f"Son estos {len(nombres)}, ni uno más:\n"
+        f"{listado}\n\n"
+        "REGLA DE ESTE CASO: cuando enumeres los soportes aportados, nombra "
+        "ÚNICAMENTE los de esta lista, con estas palabras. NO menciones ningún "
+        "otro documento —ni autorización previa, ni descripción quirúrgica, ni "
+        "registro anestésico, ni ningún otro— porque NO se aportó. Afirmar que "
+        "se remitió un documento que no está es lo que hace que la EPS ratifique "
+        "la glosa.\n"
+        "═══ FIN DEL INVENTARIO ═══\n"
+    )
+
+
 async def _pdfs_del_servidor_para_forense(
     numero_factura: Optional[str],
     req_id: str,
@@ -986,6 +1050,12 @@ async def analizar(
             # Contar como "archivos procesados" para que el motor IA detecte
             # que hay soportes disponibles y referencie en el dictamen.
             archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
+
+        # El inventario verificado de soportes, para que la argumentación no
+        # nombre documentos que no están (ver `_inventario_de_soportes`).
+        _inventario = _inventario_de_soportes(numero_factura, req_id)
+        if _inventario:
+            contexto_pdf = _inventario + "\n" + (contexto_pdf or "")
 
         # PRE-PASS del Auditor Forense. Lee los PDF del expediente y antepone
         # al contexto un MAPA DE FOLIOS (folios + fechas + hallazgos) para que
