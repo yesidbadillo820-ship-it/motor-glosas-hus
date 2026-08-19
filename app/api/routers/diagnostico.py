@@ -5,16 +5,15 @@ Endpoint admin que devuelve health de TODO el sistema en un solo
 JSON:
   - Conexión a la BD (SQLite local en la VM del HUS o Postgres remoto)
   - Estado del indexer de soportes (cuántos archivos, última build)
-  - Estado de noticias (cuántas indexadas, última fetch)
   - Estados de los schedulers (mantenimiento, soportes-reindex,
-    pre-análisis, noticias)
+    pre-análisis)
   - Disponibilidad de Anthropic + Groq (test ping rápido)
   - Estadísticas de glosas / lotes / usuarios
   - Últimos errores en logs
 
 Uso: el admin entra a /admin/diagnostico (tab del SPA) y ve un panel
 verde-amarillo-rojo con cada componente. Si algo está rojo, tiene
-botones "Reindexar ahora" / "Refrescar noticias" para auto-fix.
+botón "Reindexar ahora" para auto-fix.
 
 Nota histórica: este motor migró el 23-jun-2026 de Fly.io + Neon Postgres
 a self-hosted en VM Google Cloud + SQLite en volumen local + cloudflared
@@ -28,7 +27,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func
 
 from app.database import get_db
 from app.api.deps import get_admin
@@ -36,7 +35,6 @@ from app.core.config import get_settings
 from app.models.db import (
     UsuarioRecord,
     GlosaRecord,
-    NoticiaSaludRecord,
     LoteImportacionRecord,
     ContratoRecord,
     ClausulaContrato,
@@ -166,54 +164,6 @@ def diagnostico_completo(
         out["secciones"]["soportes_indexer"] = {
             "estado": "error",
             "mensaje": f"Indexer falló: {e}",
-            "data": {},
-        }
-
-    # ─── Noticias salud Colombia ──────────────────────────────────
-    try:
-        n_activas = (
-            db.query(func.count(NoticiaSaludRecord.id))
-            .filter(NoticiaSaludRecord.activa == 1)
-            .scalar()
-            or 0
-        )
-        ultima_noticia = (
-            db.query(NoticiaSaludRecord.indexada_en)
-            .order_by(desc(NoticiaSaludRecord.indexada_en))
-            .first()
-        )
-        ultima_fecha = ultima_noticia[0] if ultima_noticia else None
-        por_fuente = dict(
-            db.query(NoticiaSaludRecord.fuente, func.count(NoticiaSaludRecord.id))
-            .filter(NoticiaSaludRecord.activa == 1)
-            .group_by(NoticiaSaludRecord.fuente)
-            .all()
-        )
-        if n_activas == 0:
-            estado = "warning"
-            mensaje = (
-                "0 noticias indexadas. El scheduler corre cada 4h. "
-                'Click "Refrescar ahora" para forzar fetch.'
-            )
-        elif ultima_fecha and (datetime.now(timezone.utc) - ultima_fecha) > timedelta(hours=12):
-            estado = "warning"
-            mensaje = f"{n_activas} noticias activas pero la última fetch fue hace >12h"
-        else:
-            estado = "ok"
-            mensaje = f"{n_activas} noticias activas, fuentes: {', '.join(por_fuente.keys()) or 'ninguna'}"
-        out["secciones"]["noticias"] = {
-            "estado": estado,
-            "mensaje": mensaje,
-            "data": {
-                "total_activas": n_activas,
-                "por_fuente": por_fuente,
-                "ultima_indexada": ultima_fecha.isoformat() if ultima_fecha else None,
-            },
-        }
-    except Exception as e:
-        out["secciones"]["noticias"] = {
-            "estado": "error",
-            "mensaje": f"Query falló: {e}",
             "data": {},
         }
 
@@ -393,13 +343,20 @@ def diagnostico_completo(
     if not sentry_dsn:
         out["secciones"]["sentry"] = {
             "estado": "warning",
+            # 19-08-2026. Este mensaje mandaba al auditor a correr
+            # `sudo nano /opt/motor-glosas/.env` y `docker compose restart`
+            # —instrucciones de un servidor Linux con Docker—. El motor
+            # corre en el PC de cartera, en Windows. Nadie podía seguirlas.
             "mensaje": (
-                "SENTRY_DSN no configurado — los errores en producción "
-                "se pierden silenciosamente. Setup en 5 min: crear cuenta "
-                "en sentry.io (free 5K events/mes), copiar DSN del "
-                "proyecto y agregarlo al .env de la VM: "
-                "`sudo nano /opt/motor-glosas/.env` → SENTRY_DSN=https://... "
-                "→ `sudo docker compose restart motor`."
+                "Los errores del motor no quedan registrados en ninguna parte: "
+                "si algo falla, se pierde y toca adivinar. Para activarlo: "
+                "1) cree una cuenta gratis en sentry.io (5.000 errores al mes); "
+                "2) al crear el proyecto, escoja «FastAPI» y copie el DSN que "
+                "le muestra; 3) abra el archivo de configuración del motor con "
+                "«notepad C:\\motor-glosas\\repo\\.env», agregue al final la "
+                "línea «SENTRY_DSN=» seguida del DSN, y guarde; 4) reinicie el "
+                "motor con «C:\\motor-glosas\\repo\\tools\\autodeploy_motor_local.cmd». "
+                "Vuelva a esta pantalla para confirmar que quedó activo."
             ),
             "data": {},
         }

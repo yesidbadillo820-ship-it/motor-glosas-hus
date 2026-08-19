@@ -4391,6 +4391,75 @@ servidor. Solo mira: no cambia nada, no llama a la IA y no cuesta un peso.
 
 ---
 
+---
+
+### 19-08 (noche) — Probamos «Analizar glosa» de verdad y salieron cinco cosas
+
+Yesid analizó la factura **HUS468334** con una glosa **SO0201 — falta de
+soporte**. De esa sola corrida salieron cinco fallas. Vale la pena leerlas
+porque ninguna se habría visto sin probar con datos reales.
+
+**1. El dictamen decía haber mandado soportes que nadie miró.** En una glosa
+SO, la lista de soportes ES el argumento. El dictamen contestó:
+
+> 📎 RELACIÓN DE SOPORTES APORTADOS
+> 1. Historia clínica institucional — Res. 1995/1999
+> 2. RIPS radicados — Res. 866/2021
+> 3. Factura electrónica No. HUS468334 — Res. 2275/2023
+
+Esa lista **era una plantilla fija**, escrita a mano, que salía por el solo
+hecho de haber escrito un número de factura. Y la argumentación afirmaba haber
+aportado «DESCRIPCIÓN QUIRÚRGICA Y REGISTRO ANESTÉSICO» — para una radiografía
+de rodilla, donde no hubo cirugía. Si la EPS verifica y no están, la glosa se
+ratifica. Ahora se leen del expediente real, y si la factura no está indexada
+**no se afirma nada**: sale un aviso de que la relación está por verificar.
+
+**2. Un CUPS inventado pasaba el sello de calidad.** El dictamen citaba
+«RADIOGRAFÍA DE RODILLA **CUPS 348240**» y ese código no existe. El documento
+salía sellado con «11 citas verificadas · 0 hallazgos» porque el verificador
+revisaba normas y sentencias pero **ningún CUPS**. Un CUPS es de lo primero que
+la EPS cruza contra su sistema. Ya se validan contra el catálogo.
+
+**3. El motor pedía un modelo de IA que ya no existe.** El panel decía
+«Primario: llama-4-scout», un modelo que Groq retiró el 05-08. Cada dictamen
+gastaba una llamada muerta antes de caer al de respaldo. La causa: **la lista
+de modelos estaba escrita a mano en cuatro archivos distintos** y la corrección
+del 05-08 tocó uno solo. Ahora todos leen del mismo sitio.
+
+**4. Lo mismo con Gemini**, el que lee los PDF escaneados: `gemini-2.0-flash`
+también se retiró, y ahí es peor porque no hay respaldo — **el OCR dejó de
+funcionar en silencio**. Se cambió por un nombre que Google mantiene siempre
+vigente.
+
+**5. El recuadro del Auditor Forense decía «N/A»** en vez del número de
+factura, así que ese botón no servía. El dato estaba desde el principio; solo
+faltaba devolverlo.
+
+---
+
+### 19-08 (noche) — Se quitó el ticker de noticias, y por qué nunca sirvió
+
+Yesid pidió quitarlo: «nunca sirvió para nada». Tenía razón, y por un motivo
+que no podía saber: **el motor de las noticias ya se había borrado en la
+limpieza de mayo**. Lo que quedaba era la cáscara, así que llevaba tres meses
+diciendo «0 noticias indexadas, el programador corre cada 4 horas». Nunca iba a
+traer nada.
+
+Un aviso amarillo permanente que nadie puede resolver enseña a ignorar los
+avisos amarillos. Por eso se quitó completo, no solo el botón.
+
+**Y se arreglaron las instrucciones de Sentry**, que mandaban al auditor a
+escribir comandos de un servidor Linux con Docker cuando el motor corre en
+Windows. Nadie podía seguirlas. Sentry es un buzón de errores: cuando algo
+falla, en vez de perderse queda anotado con el detalle. Yesid pidió activarlo;
+falta que cree la cuenta gratis en sentry.io y pegue el código en el archivo de
+configuración (los pasos quedaron en la pantalla de Diagnóstico).
+
+Se verificó antes de recomendarlo que **no se mandan datos de pacientes**: el
+contenido de las peticiones se tacha antes de salir.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
@@ -4685,6 +4754,19 @@ correcto (una sola vez), pero el **cuerpo sigue enumerando las dos causales**
 con el valor del ítem en cada una. Es defendible —el hospital está respondiendo
 cada causal— pero si prefiere que el cuerpo también junte las causales en un
 solo renglón, dígalo y se hace.
+
+**Lo más urgente (19-08, noche):**
+
+- **Revocar la clave de Gemini.** Se pegó en el chat y quedó expuesta. Crear
+  una nueva en Google AI Studio y ponerla en `C:\motor-glosas\repo\.env`,
+  en la línea `GEMINI_API_KEY=`. **No mandarla por chat.**
+- **Activar Sentry**, que ya se pidió: cuenta gratis en sentry.io, escoger
+  «FastAPI», copiar el DSN y pegarlo en el mismo `.env` como
+  `SENTRY_DSN=...`. Los pasos completos salen en la pantalla de Diagnóstico.
+- **Volver a responder una glosa de HUS468334** y mirar dos cosas: que la
+  relación de soportes traiga los documentos de verdad, y que si el dictamen
+  cita un folio, ese folio diga lo que la IA afirma. **Si inventa un folio,
+  avisar de inmediato** — es lo más grave que puede pasar.
 
 **Auditor Forense (probar en el PC de cartera):**
 

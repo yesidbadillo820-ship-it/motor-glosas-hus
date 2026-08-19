@@ -857,9 +857,6 @@ async def lifespan(app: FastAPI):
 
     # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
     # .create_all automaticamente si no existe. No requiere ALTER TABLE.
-    # NoticiaSaludRecord (tabla `noticias_salud`) tampoco requiere
-    # migracion porque es nueva. Las dos tablas se crean en el primer
-    # arranque despues de este deploy.
 
     # RustDesk: 2 columnas opcionales en usuarios para acceso remoto
     _USUARIOS_RUSTDESK = [
@@ -1453,17 +1450,6 @@ async def lifespan(app: FastAPI):
         except Exception as _e:
             logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
 
-    # Scheduler noticias salud Colombia (cada 4h fetch RSS + scraping)
-    if not _SKIP_SCHEDULERS:
-        try:
-            from app.services.noticias_scheduler import (
-                iniciar_scheduler as iniciar_noticias_scheduler,
-            )
-
-            iniciar_noticias_scheduler()
-        except Exception as _e:
-            logger.warning(f"No se pudo iniciar scheduler de noticias: {_e}")
-
     yield
 
     # Shutdown: detener schedulers limpiamente
@@ -1489,12 +1475,6 @@ async def lifespan(app: FastAPI):
         from app.services.soportes_reindex_scheduler import detener_scheduler as detener_soportes
 
         detener_soportes()
-    except Exception:
-        pass
-    try:
-        from app.services.noticias_scheduler import detener_scheduler as detener_noticias
-
-        detener_noticias()
     except Exception:
         pass
     logger.info("=== APLICACIÓN CERRADA ===")
@@ -1634,7 +1614,6 @@ from app.api.routers.sistema import router as sistema_router
 from app.api.routers.autopilot import router as autopilot_router
 from app.api.routers.auditor_forense import router as auditor_forense_router
 from app.api.routers.push import router as push_router
-from app.api.routers.noticias import router as noticias_router
 
 # control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
@@ -1760,7 +1739,6 @@ app.include_router(diagnostico_router)
 # pantalla del Auditor Forense llamando a una ruta que no existía.
 app.include_router(auditor_forense_router)
 app.include_router(push_router)
-app.include_router(noticias_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)

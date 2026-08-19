@@ -302,6 +302,59 @@ def _corpus_clausulas_contrato(eps: Optional[str] = None) -> str:
         return ""
 
 
+# «CUPS 348240», «código CUPS: 871121», «CUPS890201». Se piden 6 dígitos, que
+# es como son los CUPS del Ministerio; con menos se confundiría con valores.
+PAT_CUPS = re.compile(r"\bCUPS\s*:?\s*(\d{6})\b", re.IGNORECASE)
+
+
+def _verificar_cups(texto: str, issues: list[dict]) -> None:
+    """Marca los CUPS que el dictamen cita y no existen en el catálogo.
+
+    Caso real 19-08-2026, factura HUS468334: el dictamen decía «Servicio
+    objetado: RADIOGRAFÍA DE RODILLA CUPS 348240» y ese código NO EXISTE. El
+    verificador revisaba resoluciones, decretos, leyes y sentencias — pero
+    ningún CUPS —, así que el documento salía sellado con «11 citas contra
+    corpus · 0 hallazgos» llevando un código inventado.
+
+    Un CUPS es de lo primero que la EPS cruza contra su sistema. Uno inventado
+    en un documento radicado tumba la defensa entera, aunque el argumento
+    jurídico sea correcto.
+    """
+    try:
+        from app.services.cups_soat_service import buscar_cups, descripcion_cups
+    except Exception:  # pragma: no cover - sin catálogo no se inventa un fallo
+        return
+
+    revisados: set[str] = set()
+    for cups in PAT_CUPS.findall(texto or ""):
+        if cups in revisados:
+            continue
+        revisados.add(cups)
+        try:
+            existe = bool(descripcion_cups(cups)) or bool(buscar_cups(cups, limite=1))
+        except Exception:  # pragma: no cover
+            continue
+        if existe:
+            continue
+        issues.append(
+            {
+                "tipo": "CUPS_INEXISTENTE",
+                "severidad": "ALTA",
+                "cita": f"CUPS {cups}",
+                "detalle": (
+                    f"El código CUPS {cups} no existe en el catálogo oficial. La EPS "
+                    "cruza los CUPS contra su sistema: un código inventado tumba la "
+                    "defensa completa, así el argumento jurídico esté bien."
+                ),
+                "sugerencia": (
+                    "Busque el CUPS real del servicio en «Consulta Normativa» y "
+                    "corríjalo, o quite la mención del código y deje solo el nombre "
+                    "del procedimiento."
+                ),
+            }
+        )
+
+
 def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
     """Escanea el dictamen y devuelve un reporte de validación.
 
@@ -523,6 +576,10 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                             ),
                         }
                     )
+
+    # 6. Códigos CUPS que no existen en el catálogo oficial.
+    _verificar_cups(texto, issues)
+    total_citas += len(PAT_CUPS.findall(texto))
 
     ok = max(0, total_citas - len(issues))
     tiene_graves = any(i["severidad"] == "ALTA" for i in issues)
