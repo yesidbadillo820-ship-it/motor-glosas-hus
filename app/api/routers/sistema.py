@@ -124,8 +124,10 @@ def observabilidad(
 
     # Recomendaciones según lo que falte configurar
     recomendaciones = []
-    if not sentry_ok:
-        recomendaciones.append("Configurar SENTRY_DSN para tracking de errores en producción.")
+    # Sentry ya no se recomienda desde acá: el hospital no logro crear la
+    # cuenta (sentry.io le exige entrar por Fly.io) y repetir la recomendacion
+    # cada vez solo hace ruido. La integracion sigue montada: basta poner
+    # SENTRY_DSN en el .env para que se active. 19-08-2026.
     if not (anthropic_ok or groq_ok):
         recomendaciones.append(
             "CRÍTICO: configurar ANTHROPIC_API_KEY o GROQ_API_KEY (sin IA, no hay análisis)."

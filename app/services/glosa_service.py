@@ -9099,8 +9099,15 @@ class GlosaService:
     # norma que lo respalda. Solo tipos que el indexador reconoce de verdad.
     _MARCO_LEGAL_SOPORTE = {
         "factura_electronica": ("Factura electrónica de venta", "Res. 2275/2023 (FEV)"),
-        "historia_clinica": ("Historia clínica / epicrisis", "Res. 1995/1999"),
+        "historia_clinica": ("Historia clínica", "Res. 1995/1999"),
+        "epicrisis": ("Epicrisis", "Res. 1995/1999"),
+        "hoja_atencion_urgencias": ("Hoja de atención de urgencias", "Res. 1995/1999"),
+        "hoja_administracion_medicamentos": (
+            "Hoja de administración de medicamentos",
+            "Res. 1995/1999",
+        ),
         "rips": ("RIPS radicados", "Res. 2275/2023"),
+        "cuv": ("CUV — constancia de validación del Ministerio", "Res. 2275/2023"),
         "comprobante_recibido_cobro": ("Comprobante de recibido de cobro", "Res. 2284/2023"),
         "furips": ("FURIPS", "Circular 022/2023"),
         "resultados_msps": ("Resultados de apoyo diagnóstico", "Res. 3047/2008 Anexo 5"),
