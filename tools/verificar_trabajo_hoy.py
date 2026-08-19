@@ -27,6 +27,8 @@ sys.path.insert(0, str(RAIZ / "tools"))
 OK = "  [OK]  "
 MAL = "  [FALLA]"
 fallas: list[str] = []
+# Revisiones que no se pudieron hacer porque el PC no tiene el codigo nuevo.
+desactualizado: list[str] = []
 
 
 def titulo(texto: str) -> None:
@@ -42,6 +44,36 @@ def revisar(nombre: str, condicion: bool, detalle: str = "") -> None:
         print(f"          {detalle}")
     if not condicion:
         fallas.append(nombre)
+
+
+def correr_revision(funcion, *args) -> None:
+    """Corre una revisión sin que nada pueda tumbar el programa.
+
+    19-08-2026. La primera vez que Yesid corrió esto, su PC tenía el
+    verificador NUEVO contra el código VIEJO —el autodeploy había bajado los
+    archivos a medias— y el programa se cerró escupiendo un traceback de
+    Python. Un bot de doble clic para el área de cartera nunca puede hacer
+    eso: hay que decir en castellano qué pasó y qué hacer.
+    """
+    try:
+        funcion(*args)
+    except (ImportError, AttributeError) as e:
+        print()
+        print(f"{MAL} Esta revision no se pudo hacer: a este PC todavia no le")
+        print("          ha llegado el codigo nuevo.")
+        print(f"          (detalle tecnico: {e})")
+        print()
+        print("          QUE HACER: espere 5 minutos a que el motor se")
+        print("          actualice solo, o de doble clic a:")
+        print("             C:\\motor-glosas\\repo\\tools\\autodeploy_motor_local.cmd")
+        print("          y vuelva a correr esta verificacion.")
+        desactualizado.append(funcion.__name__)
+    except Exception as e:  # noqa: BLE001 - el verificador nunca puede tumbarse
+        print()
+        print(f"{MAL} Esta revision fallo por algo inesperado:")
+        print(f"          {type(e).__name__}: {e}")
+        print("          Copie esta pantalla y mandela al chat.")
+        fallas.append(funcion.__name__)
 
 
 # ─── 1. Las cantidades en la pantalla de Glosas ADRES ────────────────────────
@@ -271,12 +303,24 @@ def main() -> int:
         except (EOFError, KeyboardInterrupt):
             factura = ""
 
-    revisar_cantidades()
-    revisar_aceptado_doble()
-    revisar_aceptado_en_cero()
-    revisar_forense(factura or None)
+    correr_revision(revisar_cantidades)
+    correr_revision(revisar_aceptado_doble)
+    correr_revision(revisar_aceptado_en_cero)
+    correr_revision(revisar_forense, factura or None)
 
     titulo("RESULTADO")
+    if desactualizado:
+        print(f"  ESTE PC ESTA DESACTUALIZADO - {len(desactualizado)} revision(es)")
+        print("  no se pudieron hacer porque falta bajar el codigo nuevo.")
+        print()
+        print("  QUE HACER, en orden:")
+        print("    1. De doble clic a tools\\autodeploy_motor_local.cmd")
+        print("    2. Espere a que termine (unos segundos)")
+        print("    3. Vuelva a correr esta verificacion")
+        print()
+        print("  Si despues de eso sigue igual, copie esta pantalla y mandela")
+        print("  al chat: quiere decir que el cambio todavia no se ha subido.")
+        return 2
     if fallas:
         print(f"  FALLA - {len(fallas)} revision(es) no pasaron:")
         for f in fallas:
