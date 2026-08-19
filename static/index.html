@@ -7105,7 +7105,11 @@ function iniciarNarracion(traceId){
       try{ ctrl.abort(); }catch(e){}
       setTimeout(function(){ if(panel && panel.parentNode) panel.parentNode.removeChild(panel); }, 900);
     }
-    setTimeout(cerrar, 180000);
+    // 19-08-2026. Eran 3 minutos, y alcanzaban cuando el analisis no leia el
+    // expediente. Ahora el auditor forense se toma 1-2 minutos ANTES de que
+    // empiece a redactarse el dictamen, asi que el panel se cerraba con el
+    // trabajo a medias y parecia que se habia caido. 6 minutos.
+    setTimeout(cerrar, 360000);
     (async function(){
       try {
         var resp = await fetch('/eventos/analizar/'+encodeURIComponent(traceId), {headers: authH(), signal: ctrl.signal});
