@@ -148,10 +148,10 @@ su valor: esa plata se seguiría reclamando sin que nadie se entere.
 | | |
 |---|---|
 | 320 facturas, valor antes | **$714.332.224** |
-| Menos lo aceptado | **$88.216.532** |
-| **TOTAL FINAL que sigue reclamando el hospital** | **$626.115.692** |
+| Menos lo aceptado | **$88.870.607** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$625.461.617** |
 
-Para mirar antes de radicar: **14 facturas con CUADRA = NO** ($3.401.135),
+Para mirar antes de radicar: **12 facturas con CUADRA = NO** ($2.747.060),
 **2 con REVISAR A MANO** (HUS384132 y HUS392442), **1 con OJO CON LA MACRO**
 (HUS396996, la fila corrida) y **2 SIN_DETALLADO** (HUS367368 y HUS394817, por
 $12.800).

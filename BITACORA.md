@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 18-08-2026
+**Última actualización:** 19-08-2026
 
 ---
 
@@ -2904,6 +2904,48 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 19-08-2026 — Se recuperaron $654.075 más: el servicio partido en dos renglones
+
+Una medición sobre las 320 facturas mostró por qué faltaba tanta plata por
+descontar en la **HUS383283**: el detallado trae los **honorarios del cirujano
+partidos en dos renglones** de $320.600 —porque la cirugía se hizo dos veces— y
+la macro los reclama en **una sola fila** de $641.200. Los dos renglones suman
+exactamente esa cifra, pero el bot exigía que además cuadrara la **cantidad**
+(2 renglones contra 1 unidad) y por eso no los emparejaba.
+
+Ahora, cuando el **código** o la **descripción completa** coinciden y el valor
+suma exacto, se emparejan y el descuento se reparte a prorrata. **Por prefijo de
+descripción se sigue exigiendo la cantidad**: ahí a la descripción del reporte le
+basta con ser el comienzo de la del detallado, y sin ese segundo candado un
+nombre genérico podría llevarse el grupo equivocado.
+
+Recupera **$654.075** en dos facturas (HUS383283 y HUS397556). Antes de tocar
+nada se midió el efecto sobre las 320 facturas y sobre el otro flujo que usa el
+mismo motor de cruce: **ningún emparejamiento existente se pierde ni cambia de
+pareja**; solo se agregan 8 nuevos.
+
+**Cifras del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.870.607** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$625.461.617** |
+
+**Tres mejoras más quedaron medidas pero NO se aplicaron**, porque la revisión
+adversarial las marcó riesgosas y valen poco ($40.900 entre las tres):
+
+- bajar de 12 a 10 letras el cruce por comienzo de descripción ($34.500): dejaría
+  que un nombre genérico como «Hemocultivo» se lleve el renglón equivocado **en
+  silencio**;
+- desempatar por precio unitario ($5.000) y limpiar los caracteres dañados de la
+  macro ($1.400): mismo tipo de riesgo.
+
+Son decisión del área: recuperan poco y el motor de cruce lo comparten los otros
+bots del hospital.
+
+---
+
 ### 18-08-2026 (cierre) — Una fila corrida de la macro casi borra una radiografía
 
 Siguiendo la revisión, apareció **una segunda factura con problema**: la
@@ -3838,11 +3880,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ### Descuento de lo aceptado (`tools/descontar_aceptado_detallado.py`, 18-08)
 16. **Revisar a mano las 14 facturas donde lo descontado NO cuadra con la
-    macro** ($3.401.135 en total). Están marcadas con **CUADRA = NO** en la
+    macro** ($2.747.060 en total). Están marcadas con **CUADRA = NO** en la
     bitácora CSV del bot. Son casos donde el servicio aceptado no se pudo
     cruzar con ningún renglón del detallado, o donde el aceptado es mayor que
     el valor del servicio.
-17. **Confirmar el TOTAL FINAL de $626.115.692** antes de radicar: es la suma
+17. **Confirmar el TOTAL FINAL de $625.461.617** antes de radicar: es la suma
     de las 320 facturas después de quitarles lo aceptado.
 18. **Revisar a mano HUS384132 y HUS392442**: el bot no logró reproducir el
     subtotal que traen esos dos archivos, así que solo descontó los servicios

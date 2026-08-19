@@ -693,6 +693,31 @@ class TestEmparejar:
         assert len(pares) == 2 and not sin
         assert all(c == "varios-a-uno" for _, c in pares.values())
 
+    def test_varios_a_uno_por_codigo_aunque_la_cantidad_no_cuadre(self):
+        """Una cirugía hecha dos veces: el detallado parte los honorarios del
+        cirujano en dos renglones de $320.600 que suman exactamente los $641.200
+        que reclama la única fila del reporte. Son 2 renglones contra 1 unidad,
+        y aun así es el mismo concepto (caso HUS383283)."""
+        d1 = _det("39010", "SERVICIOS PROFESIONALES DEL CIRUJANO", 1, 320600)
+        d2 = _det("39010", "SERVICIOS PROFESIONALES DEL CIRUJANO", 1, 320600)
+        r = _rep("39010", "Servicios profesionales del cirujano", 1, 641200, 293775, 347425)
+        pares, sin = aj.emparejar([d1, d2], [r])
+        assert len(pares) == 2 and not sin
+        assert all(c == "varios-a-uno" for _, c in pares.values())
+
+    def test_varios_a_uno_por_prefijo_sigue_exigiendo_la_cantidad(self):
+        """Por prefijo NO alcanza con que el valor cuadre: a la descripción del
+        reporte le basta con ser el COMIENZO de la del detallado, y un nombre
+        genérico podría llevarse el grupo equivocado. Acá 'HEMOCULTIVO AEROBIO'
+        es el principio de dos renglones que suman los $468.800 reclamados,
+        pero son 2 renglones contra 5 unidades: no se empareja, se informa."""
+        d1 = _det("FMQ1", "HEMOCULTIVO AEROBIO AUTOMATIZADO CADA MUESTRA", 1, 234400)
+        d2 = _det("FMQ2", "HEMOCULTIVO AEROBIO AUTOMATIZADO CADA MUESTRA", 1, 234400)
+        r = _rep("19514", "HEMOCULTIVO AEROBIO", 5, 468800, 468800, 0)
+        assert aj._prefijo("HEMOCULTIVO AEROBIO AUTOMATIZADO CADA MUESTRA", "HEMOCULTIVO AEROBIO")
+        pares, sin = aj.emparejar([d1, d2], [r])
+        assert pares == {} and sin == [r]
+
     def test_desempata_por_cantidad_y_valor(self):
         d = _det("20084685-6", "HEPARINA ENOXAPARINA AMP X 40", 4, 12935)
         r1 = _rep("20084685-18", "ENOXAPARINA SODICA 40 MG", 1, 12935, 12935, 0)
