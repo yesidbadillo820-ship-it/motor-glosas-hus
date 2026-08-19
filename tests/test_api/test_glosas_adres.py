@@ -94,6 +94,25 @@ FILAS = [
     # ítem, así que la pantalla no lo muestra.
     ("HUS352890", "Procedimientos", "TOT-1", "Terapia respiratoria: sesión", 12000, ""),
     ("HUS311371", "Medicamentos", "TOT-2", "DIPIRONA 1 G", 3400, ""),
+    # El MISMO ítem con DOS causales: el reporte del ADRES abre una fila por
+    # cada una, pero la plata es una sola. Si se cuenta dos veces, la glosa de
+    # la factura sale inflada.
+    (
+        "HUS311371",
+        "Procedimientos",
+        "DOS-1",
+        "TAC DE CRANEO SIMPLE",
+        700000,
+        "3209- La ayuda diagnóstica no tiene justificación",
+    ),
+    (
+        "HUS311371",
+        "Procedimientos",
+        "DOS-1",
+        "TAC DE CRANEO SIMPLE",
+        700000,
+        "3106- Soporte de material  ausente o incompleto",
+    ),
 ]
 
 
@@ -215,12 +234,14 @@ class TestCargue:
         d = r.json()
         assert d["ok"] is True
         assert d["numero_paquete"] == "31068"
-        # Las 7 filas se guardan (incluidas las 2 de glosa total): la pantalla
-        # las oculta, pero el paquete conserva el reporte completo.
-        assert d["filas"] == 7
+        # Las 9 filas se guardan (incluidas las 2 de glosa total y las 2 del
+        # mismo ítem con dos causales): la pantalla las oculta o las junta, pero
+        # el paquete conserva el reporte completo.
+        assert d["filas"] == 9
         assert d["facturas"] == 2
+        # El ítem de las dos causales cuenta UNA sola vez: 700.000, no 1.400.000.
         assert d["valor_glosado"] == pytest.approx(
-            37600 + 85800 + 31800 + 5000 + 450000 + 12000 + 3400
+            37600 + 85800 + 31800 + 5000 + 450000 + 12000 + 3400 + 700000
         )
 
     def test_archivo_vacio_da_400(self, client):
@@ -486,6 +507,140 @@ class TestGlosasTotales:
         assert any(g["glosa_total"] for g in d["glosas"])
 
 
+def _archivo_facturas(valores: dict[str, float]) -> bytes:
+    """El `FACTURAS PAQUETE NNNNN_NN FACTURAS.xlsx`, con su pinta real."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "FACTURAS"
+    ws.append(
+        ["", "No.", "Etiquetas de fila", "Suma de Valor Reclamado", "", "Suma de Valor Glosado"]
+    )
+    for n, (factura, glosado) in enumerate(valores.items(), start=1):
+        ws.append(["", n, factura, 0, 0, glosado])
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+class TestNoContarDosVecesLaMismaPlata:
+    """El reporte del ADRES abre UNA FILA POR CADA CAUSAL del mismo ítem.
+
+    Las filas se conservan todas (el gestor decide causal por causal) pero la
+    plata de un ítem es una sola. En el paquete 31078 sumar en bruto daba
+    $585 millones contra $297 millones reales.
+    """
+
+    def test_las_dos_filas_del_mismo_item_se_muestran(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        tac = [g for g in d["glosas"] if g["codigo"] == "DOS-1"]
+        assert len(tac) == 2  # una por causal, para poder decidir cada una
+        assert {g["causal_codigo"] for g in tac} == {"3209", "3106"}
+
+    def test_pero_su_plata_cuenta_una_sola_vez(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        tac = [g for g in d["glosas"] if g["codigo"] == "DOS-1"]
+        assert sum(1 for g in tac if g["cuenta_valor"]) == 1
+        # 31.800 del omeprazol + 700.000 del TAC (no 1.400.000)
+        assert d["resumen"]["valor_glosado"] == pytest.approx(731800)
+
+    def test_la_lista_de_facturas_tampoco_la_cuenta_dos_veces(self, client, paquete):
+        una = next(
+            f
+            for f in client.get("/glosas-adres/facturas", params={"paquete_id": paquete}).json()
+            if f["factura"] == "HUS311371"
+        )
+        # En la lista la plata es TODA la que glosó el ADRES (la que hay que
+        # defender): 31.800 + 700.000 del TAC contado una vez + 3.400 de la
+        # glosa total. Lo que NO cuenta dos veces es el TAC.
+        assert una["valor_glosado"] == pytest.approx(735200)
+        assert una["glosas"] == 3  # las que se responden renglón por renglón
+        assert una["glosas_totales_ocultas"] == 1
+
+
+class TestVerificarContraElAdres:
+    """Juntar las filas no alcanza: hay facturas donde el reporte repite sin
+    explicación. Ahí el sistema lo dice en vez de mostrar una cifra falsa."""
+
+    def test_sin_el_archivo_de_facturas_no_hay_con_que_verificar(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["valor_glosado_oficial"] is None
+        assert d["aviso_descuadre"] == ""
+
+    def test_con_el_archivo_la_cifra_del_paquete_es_la_oficial(self, client):
+        oficial = _archivo_facturas({"HUS352890": 500000, "HUS311371": 731800})
+        r = client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": ("reporte.xlsx", _reporte_bytes()),
+                "facturas": ("FACTURAS PAQUETE 31068_2 FACTURAS.xlsx", oficial),
+            },
+        )
+        assert r.status_code == 200, r.text
+        # Manda la cifra oficial, no la suma del reporte.
+        assert r.json()["valor_glosado"] == pytest.approx(1231800)
+
+    def test_avisa_cuando_el_detalle_no_cuadra_con_el_adres(self, client):
+        # El ADRES dice que la 311371 tiene glosado 400.000, no 731.800.
+        oficial = _archivo_facturas({"HUS352890": 590400, "HUS311371": 400000})
+        client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": ("reporte.xlsx", _reporte_bytes()),
+                "facturas": ("f.xlsx", oficial),
+            },
+        )
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["valor_glosado_oficial"] == pytest.approx(400000)
+        assert "no cuadra" in d["aviso_descuadre"].lower() or "ADRES dice" in d["aviso_descuadre"]
+        assert "$400.000" in d["aviso_descuadre"]
+        assert "portal" in d["aviso_descuadre"]
+
+    def test_no_avisa_cuando_si_cuadra(self, client):
+        # 31.800 del omeprazol + 700.000 del TAC + 3.400 de la glosa total.
+        oficial = _archivo_facturas({"HUS352890": 590400, "HUS311371": 735200})
+        client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": ("reporte.xlsx", _reporte_bytes()),
+                "facturas": ("f.xlsx", oficial),
+            },
+        )
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["aviso_descuadre"] == ""
+
+    def test_la_lista_marca_cuales_cuadran_y_cuales_no(self, client):
+        # La 352890 cuadra; a la 311371 el ADRES le dice 400.000 y no cuadra.
+        oficial = _archivo_facturas({"HUS352890": 590400, "HUS311371": 400000})
+        r = client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": ("reporte.xlsx", _reporte_bytes()),
+                "facturas": ("f.xlsx", oficial),
+            },
+        )
+        paq = r.json()["paquete_id"]
+        por_factura = {
+            f["factura"]: f
+            for f in client.get("/glosas-adres/facturas", params={"paquete_id": paq}).json()
+        }
+        assert por_factura["HUS352890"]["cuadra"] is True
+        assert por_factura["HUS311371"]["cuadra"] is False
+        assert por_factura["HUS311371"]["valor_glosado_oficial"] == pytest.approx(400000)
+
+    def test_un_archivo_de_facturas_ilegible_no_tumba_el_cargue(self, client):
+        """Mejor cargar sin verificar que no cargar."""
+        r = client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": ("reporte.xlsx", _reporte_bytes()),
+                "facturas": ("f.xlsx", b"esto no es un excel"),
+            },
+        )
+        assert r.status_code == 200, r.text
+        d = client.get("/glosas-adres/factura/HUS0000311371").json()
+        assert d["valor_glosado_oficial"] is None
+
+
 class TestListaDeFacturas:
     """Al cargar el archivo del ADRES salen de una vez las facturas a auditar."""
 
@@ -714,7 +869,7 @@ class TestSinDetallado:
         assert d["resumen"]["items_detallado"] == 0
         assert "no tiene detallado" in d["aviso_detallado"]
         # Y aun así trae todo lo del reporte del ADRES.
-        assert d["resumen"]["glosas"] == 1
+        assert d["resumen"]["glosas"] == 3  # el omeprazol + las 2 filas del TAC
         assert d["glosas"][0]["valor_glosado"] == pytest.approx(31800)
         assert d["glosas"][0]["causal_codigo"] == "3106"
 

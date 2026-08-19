@@ -33,7 +33,9 @@ def test_golden_set_sin_fallos():
 def test_golden_set_cobertura_minima():
     """Sanity: el golden set debe evaluar una cantidad mínima de criterios
     (si baja mucho, alguien borró casos sin querer)."""
-    assert _REPORTE["total_criterios"] >= 30
+    # 06-08-2026: subió de 30 a 60 al entrar los casos reales de las dos
+    # tandas de prueba del hospital. Si baja, alguien borró casos.
+    assert _REPORTE["total_criterios"] >= 65
 
 
 def _ids_criterios():

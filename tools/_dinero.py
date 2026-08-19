@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 import sys
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -100,3 +101,18 @@ def a_entero(valor: object) -> int:
     redondear hacia arriba cambiaría el total declarado del lote.
     """
     return int(a_numero(valor))
+
+
+def a_texto(valor: object) -> str:
+    """El camino de vuelta: un número se muestra como `$1.234.567`.
+
+    Mismo resultado que el `TEXT(valor,"$#.##0")` de las macros del auditor:
+    punto de miles y sin centavos. Los medios pesos se redondean **hacia
+    arriba** —igual que Excel—, no con el redondeo bancario de Python, que
+    dejaría `1.364,50` en 1.364 y el total del lote no cuadraría con la macro.
+
+    Vive acá por la misma razón que el lector: para que no vuelva a haber diez
+    copias, cada una escribiendo el total del lote de una manera distinta.
+    """
+    pesos = Decimal(str(a_numero(valor))).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    return "$" + f"{int(pesos):,}".replace(",", ".")

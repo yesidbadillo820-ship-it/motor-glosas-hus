@@ -68,6 +68,26 @@ SERVICIO_PROPIO = {
     ("DELETE", "/usuarios/yo/tareas/{tarea_id}"),
     # El buzón de sugerencias: cualquiera del hospital puede proponer algo.
     ("POST", "/sugerencias"),
+    # 13-08-2026 — las pantallas repuestas. Todas filtran por el correo del
+    # usuario DENTRO de la consulta (verificado en el código), así que un
+    # auditor no puede tocar lo de otro aunque adivine el identificador:
+    #   · sus notas privadas sobre una glosa (autor_email),
+    #   · sus filtros guardados (usuario_email),
+    #   · su historial de chat (usuario_email),
+    #   · las notificaciones a SU propio navegador.
+    ("PUT", "/notas-privadas/{glosa_id}"),
+    ("DELETE", "/notas-privadas/{glosa_id}"),
+    ("POST", "/presets-filtros"),
+    ("PUT", "/presets-filtros/{preset_id}"),
+    ("DELETE", "/presets-filtros/{preset_id}"),
+    ("POST", "/presets-filtros/{preset_id}/usar"),
+    ("POST", "/chat-history/conversaciones"),
+    ("POST", "/chat-history/conversaciones/{conv_id}/mensajes"),
+    ("POST", "/chat-history/conversaciones/{conv_id}/archivar"),
+    ("DELETE", "/chat-history/conversaciones/{conv_id}"),
+    ("POST", "/push/subscribe"),
+    ("DELETE", "/push/unsubscribe"),
+    ("POST", "/push/enviar"),
 }
 
 # Cajón 3 — la regla depende del dato, no solo del rol: «la glosa es de
@@ -83,6 +103,9 @@ CHEQUEO_INTERNO = {
     ("POST", "/workflow/{glosa_id}/transicionar"),
     ("POST", "/workflow/transicionar-lote"),
     ("POST", "/workflow/reabrir-para-corregir"),
+    # Borrar un comentario: solo su autor, o un coordinador. La regla depende
+    # de quién escribió el comentario, no del rol de quien lo borra.
+    ("DELETE", "/comentarios-thread/{comentario_id}"),
 }
 
 # Señales de que el handler comprueba rol o propiedad por dentro.
@@ -165,9 +188,18 @@ class TestLaMatrizEstaCompleta:
         )
 
     def test_el_barrido_dejo_la_mayoria_cerrada_en_la_puerta(self):
-        """Constancia del estado: si alguien afloja permisos en masa, se ve."""
+        """Constancia del estado: si alguien afloja permisos en masa, se ve.
+
+        La proporción se mide sobre las rutas que SÍ deben cerrarse en la
+        puerta. Las de servicio propio no pueden: un VIEWER tiene que poder
+        guardar su nota y su filtro, y cerrarle eso lo dejaría sin trabajar.
+        Contarlas como «sin rol» ensuciaría la señal y, peor, invitaría a
+        aflojar el umbral la próxima vez.
+        """
         total = con_rol = 0
-        for _, _, deps, _ in _rutas_que_mutan():
+        for metodo, path, deps, _ in _rutas_que_mutan():
+            if (metodo, path) in SERVICIO_PROPIO:
+                continue
             total += 1
             if deps & GUARDIAS_DE_ROL:
                 con_rol += 1

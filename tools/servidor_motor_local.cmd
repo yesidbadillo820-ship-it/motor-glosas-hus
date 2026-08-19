@@ -12,7 +12,20 @@ set "REPO=C:\motor-glosas\repo"
 if not exist "%REPO%\venv\Scripts\python.exe" exit /b 1
 
 cd /d "%REPO%"
+rem Carpeta donde el motor busca los soportes.
+rem
+rem Por defecto usa la carpeta local del repo (a donde suben los ZIP desde
+rem la pantalla). Si el PC tiene acceso al servidor de archivos del HUS, se
+rem escribe la ruta en config\soportes_root.txt (una sola linea, por ejemplo
+rem \\Prime\radicacion_2026) y el motor indexa el servidor directo.
+rem Ese archivo NO va al repositorio: asi el autodeploy no lo borra.
+rem 18-08-2026.
 set "SOPORTES_ROOT=%REPO%\data\soportes"
+if exist "%REPO%\config\soportes_root.txt" (
+  for /f "usebackq delims=" %%R in ("%REPO%\config\soportes_root.txt") do (
+    if not "%%R"=="" set "SOPORTES_ROOT=%%R"
+  )
+)
 set "SOPORTES_LOCAL_ROOT=%REPO%\data\soportes"
 if not exist "%REPO%\data\soportes" mkdir "%REPO%\data\soportes"
 set "LOG=%REPO%\data\servidor.log"

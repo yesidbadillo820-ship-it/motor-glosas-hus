@@ -226,7 +226,8 @@ class TestContratosAjenos:
         )
         out = _neutralizar_contratos_ajenos(mal, eps="DISPENSARIO MEDICO")
         assert "S-13-1-03-1-04958" not in out
-        assert "el contrato vigente entre las partes" in out
+        # 06-08-2026: el sintagma va en MAYÚSCULA, como todo el dictamen.
+        assert "EL CONTRATO VIGENTE ENTRE LAS PARTES" in out.upper()
 
     def test_oncologico_caso_2_contratos_ajenos(self):
         """Caso 2 del usuario: EPS oncológico (NUEVA EPS) no es dueño de
@@ -261,13 +262,13 @@ class TestCupsFalsos:
         out = _neutralizar_cups_falsos(mal)
         assert "20260511" not in out
         assert "facturado facturado" not in out.lower()
-        assert "el procedimiento facturado por COOSALUD" in out
+        assert "EL PROCEDIMIENTO FACTURADO POR COOSALUD" in out.upper()
 
     def test_fecha_con_guion_como_cups(self):
         mal = "El CUPS 2026-05-11 corresponde al servicio."
         out = _neutralizar_cups_falsos(mal)
         assert "2026-05-11" not in out
-        assert "el procedimiento facturado" in out
+        assert "EL PROCEDIMIENTO FACTURADO" in out.upper()
 
     def test_hus_como_cups(self):
         mal = "Servicio CUPS HUS00012345 detallado."

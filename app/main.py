@@ -145,6 +145,16 @@ _INDICES_HISTORIAL = [
 # cada una sería puro peaje.
 _MOTOR_YA_CHEQUEADO = False
 
+# Huella de la plantilla ya corregida: la que pone adelante la norma vigente
+# (Res. 2284/2023) y deja la 3047/2008 como antecedente. Sirve para saber si
+# una plantilla sembrada en la base todavía trae el texto viejo, sin
+# reescribir a ciegas las que el auditor ya aprobó.
+_MARCAS_NORMA_VIGENTE = (
+    "SUSTITUYÓ EL ANEXO",
+    "EN REEMPLAZO DEL ANEXO",
+    "(RESOLUCIÓN 2284 DE 2023).",
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -425,6 +435,8 @@ async def lifespan(app: FastAPI):
         ("glosas_adres", "area_asignada_por", "VARCHAR(200)"),
         ("glosas_adres", "area_asignada_en", "TIMESTAMP WITH TIME ZONE"),
         ("paquetes_adres", "catalogo_centros", "TEXT"),
+        ("glosas_adres", "cuenta_valor", "BOOLEAN DEFAULT 1"),
+        ("facturas_adres", "valor_glosado_oficial", "DOUBLE PRECISION"),
     ]
     for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
         try:
@@ -434,6 +446,11 @@ async def lifespan(app: FastAPI):
                     col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
                     if _is_sqlite
                     else col_ddl
+                )
+                col_ddl_adapted = (
+                    col_ddl_adapted.replace("DOUBLE PRECISION", "REAL")
+                    if _is_sqlite
+                    else col_ddl_adapted
                 )
                 db.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
@@ -1164,6 +1181,7 @@ async def lifespan(app: FastAPI):
                 _filas_hus = _data_hus.get("plantillas", [])
                 hus_creadas = 0
                 hus_existentes = 0
+                hus_actualizadas = 0
                 for fila in _filas_hus:
                     eps = (fila.get("eps") or "").upper().strip()
                     cod = (fila.get("codigo_glosa") or "").upper().strip()
@@ -1182,6 +1200,26 @@ async def lifespan(app: FastAPI):
                     )
                     if existe:
                         hus_existentes += 1
+                        # 06-08-2026 — la misma corrección en sitio que ya se
+                        # le hizo a las plantillas Gold. Seis plantillas del
+                        # banco fundaban la defensa en la Resolución 3047 de
+                        # 2008, que la 2284 de 2023 reemplazó; se vio en dos
+                        # dictámenes de prueba (SUMIMEDICAL SO0101 y MUTUAL
+                        # SER SO0201) citándola como norma propia y de
+                        # primera. Fundar en norma derogada le regala el
+                        # argumento a la entidad. Ahora va adelante la
+                        # vigente y la vieja queda como antecedente. Este
+                        # bloque solo toca las que traen el texto viejo: el
+                        # resto del banco queda intacto porque lo aprobó
+                        # Yesid.
+                        _arg_bd = existe.argumento or ""
+                        if (
+                            "3047" in _arg_bd
+                            and not any(m in _arg_bd for m in _MARCAS_NORMA_VIGENTE)
+                            and any(m in arg for m in _MARCAS_NORMA_VIGENTE)
+                        ):
+                            existe.argumento = arg
+                            hus_actualizadas += 1
                         continue
                     db.add(
                         _PGR(
@@ -1198,14 +1236,117 @@ async def lifespan(app: FastAPI):
                         )
                     )
                     hus_creadas += 1
-                if hus_creadas:
+                if hus_creadas or hus_actualizadas:
                     db.commit()
                 logger.info(
                     f"[SEED-HUS] {hus_creadas} creadas · {hus_existentes} ya existían · "
+                    f"{hus_actualizadas} actualizadas (norma derogada) · "
                     f"total filas en archivo: {len(_filas_hus)}"
                 )
         except Exception as _e:
             logger.warning(f"Seed banco HUS falló (no crítico): {_e}")
+            db.rollback()
+
+        # ── Cláusulas reales de contrato (06-08-2026) ────────────────────
+        # data/clausulas_contrato_base.json trae 26 cláusulas LITERALES de
+        # contratos firmados, pero solo se cargaban corriendo a mano
+        # scripts/seed_clausulas_contrato.py. Nadie lo corrió: el
+        # Diagnóstico del hospital reporta "0 cláusulas extraídas de 0
+        # contratos" y por eso TODOS los dictámenes pierden puntos por
+        # «falta cláusula del contrato vigente con esta EPS», el motor no
+        # tiene una cláusula real que citar, y el verificador de citas no
+        # puede validar ninguna cita contractual.
+        #
+        # Se siembra al arrancar, igual que el banco de plantillas.
+        # Idempotente por (eps, numero_clausula): si el texto cambió se
+        # actualiza; si es igual no se toca.
+        try:
+            from app.models.db import ClausulaContrato as _CCR
+
+            archivo_cl = (
+                _Path(__file__).resolve().parent.parent / "data" / "clausulas_contrato_base.json"
+            )
+            if not archivo_cl.exists():
+                logger.warning(f"[SEED-CLAUSULAS] archivo no encontrado en {archivo_cl}")
+            else:
+                with archivo_cl.open(encoding="utf-8") as _fh:
+                    _filas_cl = _json.load(_fh).get("clausulas", [])
+                # La cláusula cuelga del contrato (llave foránea) y el motor
+                # la busca por la MISMA clave de EPS que usa el auditor en
+                # pantalla. El archivo trae razones sociales largas —
+                # "SEGUROS DE VIDA AURORA S.A." por "AURORA", "COMPENSAR
+                # EPS" por "COMPENSAR", "FAMISANAR" por "FAMISANAR EPS"— así
+                # que sin traducir la clave las 26 cláusulas o no entran o
+                # entran donde nadie las va a encontrar. Se resuelve por
+                # contención y solo cuando la coincidencia es ÚNICA; lo que
+                # no resuelva se salta con aviso, sin inventar un contrato.
+                _eps_contratos = [c.eps for c in db.query(ContratoRecord).all() if c.eps]
+
+                def _clave_de_contrato(nombre: str) -> str:
+                    n = (nombre or "").upper().strip()
+                    if not n:
+                        return ""
+                    if n in _eps_contratos:
+                        return n
+                    candidatos = [k for k in _eps_contratos if k in n or n in k]
+                    return candidatos[0] if len(candidatos) == 1 else ""
+
+                cl_creadas = cl_actualizadas = cl_saltadas = 0
+                for fila in _filas_cl:
+                    eps_cl = _clave_de_contrato(fila.get("eps") or "")
+                    if not eps_cl:
+                        logger.warning(
+                            f"[SEED-CLAUSULAS] sin contrato registrado para "
+                            f"«{fila.get('eps')}» — cláusula no cargada"
+                        )
+                        cl_saltadas += 1
+                        continue
+                    texto_cl = (fila.get("texto_literal") or "").strip()
+                    # Un placeholder sin llenar es peor que nada: la IA lo
+                    # citaría como si fuera texto del contrato.
+                    if not eps_cl or not texto_cl:
+                        cl_saltadas += 1
+                        continue
+                    if texto_cl.startswith("[") and texto_cl.endswith("]"):
+                        cl_saltadas += 1
+                        continue
+                    tema_cl = (fila.get("tema") or "NN").upper().strip()
+                    if tema_cl not in {"TA", "SO", "AU", "CO", "FA", "NN"}:
+                        tema_cl = "NN"
+                    num_cl = (fila.get("numero_clausula") or "").strip()
+                    existe_cl = (
+                        db.query(_CCR)
+                        .filter(_CCR.eps == eps_cl, _CCR.numero_clausula == num_cl)
+                        .first()
+                    )
+                    if existe_cl:
+                        if (existe_cl.texto_literal or "").strip() != texto_cl:
+                            existe_cl.tema = tema_cl
+                            existe_cl.titulo = (fila.get("titulo") or "").strip()
+                            existe_cl.texto_literal = texto_cl
+                            existe_cl.pagina = fila.get("pagina")
+                            cl_actualizadas += 1
+                        continue
+                    db.add(
+                        _CCR(
+                            eps=eps_cl,
+                            numero_clausula=num_cl,
+                            tema=tema_cl,
+                            titulo=(fila.get("titulo") or "").strip(),
+                            texto_literal=texto_cl,
+                            pagina=fila.get("pagina"),
+                        )
+                    )
+                    cl_creadas += 1
+                if cl_creadas or cl_actualizadas:
+                    db.commit()
+                logger.info(
+                    f"[SEED-CLAUSULAS] {cl_creadas} creadas · {cl_actualizadas} actualizadas · "
+                    f"{cl_saltadas} saltadas (sin texto real) · "
+                    f"total en archivo: {len(_filas_cl)}"
+                )
+        except Exception as _e_cl:
+            logger.warning(f"Seed de cláusulas falló (no crítico): {_e_cl}")
             db.rollback()
 
         db.commit()
@@ -1460,7 +1601,7 @@ from app.api.routers.usuarios import router as usuarios_router
 from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
 
-# salud_total: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.salud_total import router as salud_total_router
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
 from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
 from app.api.routers.credenciales import router as credenciales_router
@@ -1490,21 +1631,25 @@ from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 
-# autopilot: removido en la limpieza de ronda 29 (módulo sin uso real).
+from app.api.routers.autopilot import router as autopilot_router
+from app.api.routers.auditor_forense import router as auditor_forense_router
+from app.api.routers.push import router as push_router
+from app.api.routers.noticias import router as noticias_router
 
 # control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
 from app.api.routers.eventos_live import router as eventos_live_router
 
-# preset_filtros: stub removido — prefijo /_removed/ (mayo 2026)
-# notas_privadas: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.preset_filtros import router as preset_filtros_router
+from app.api.routers.notas_privadas import router as notas_privadas_router
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
 
-# chat_history: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.chat_history import router as chat_history_router
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
 
-# comentarios_thread: stub removido — prefijo /_removed/ (mayo 2026)
+from app.api.routers.comentarios_thread import router as comentarios_thread_router
+
 # webhooks: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.ia_status import router as ia_status_router
 
@@ -1528,7 +1673,7 @@ app.include_router(alertas_router)
 app.include_router(usuarios_router)
 app.include_router(conciliacion_router)
 app.include_router(audit_router)
-# salud_total_router: stub removido
+app.include_router(salud_total_router)
 app.include_router(tarifas_contratadas_router)
 app.include_router(tarifa_liquidador_router)
 app.include_router(credenciales_router)  # Vault cifrado de credenciales EPS
@@ -1555,17 +1700,17 @@ app.include_router(dashboard_ejecutivo_router)
 app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
-# autopilot_router: stub removido
+app.include_router(autopilot_router)
 # control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
-# preset_filtros_router: stub removido
-# notas_privadas_router: stub removido
+app.include_router(preset_filtros_router)
+app.include_router(notas_privadas_router)
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
-# chat_history_router: stub removido
+app.include_router(chat_history_router)
 app.include_router(dictamen_pdf_router)
-# comentarios_thread_router: stub removido
+app.include_router(comentarios_thread_router)
 # webhooks_router: stub removido
 app.include_router(ia_status_router)
 from app.api.routers.cups import router as cups_router
@@ -1599,12 +1744,23 @@ app.include_router(preauditoria_router)
 # auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 
+# 13-08-2026: el validador ADRES y el buscador de autorizaciones dejan de
+# ser programas aparte y entran al portal, con la sesión y los roles del
+# hospital. Por ahí suben soportes con historia clínica: auditor o superior.
+from app.api.routers.validador_adres import router as validador_adres_router
+
 app.include_router(soportes_auto_router)
+app.include_router(validador_adres_router)
 
 from app.api.routers.diagnostico import router as diagnostico_router
 
 app.include_router(diagnostico_router)
-# auditor_forense: stub removido — real: auditoria_forense.py (ya incluido arriba)
+# OJO: auditor_forense (analiza soportes) y auditoria_forense (busca por IP)
+# son DOS cosas distintas. La limpieza de mayo los confundió y dejó la
+# pantalla del Auditor Forense llamando a una ruta que no existía.
+app.include_router(auditor_forense_router)
+app.include_router(push_router)
+app.include_router(noticias_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)

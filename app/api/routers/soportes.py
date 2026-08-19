@@ -25,7 +25,16 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
+from fastapi import (
+    BackgroundTasks,
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    UploadFile,
+    File,
+    Form,
+)
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual, get_auditor_o_superior
@@ -122,11 +131,17 @@ def soportes_de_factura(
     except Exception:
         pass  # nunca tumbar la respuesta por fallo de audit
 
+    # Si el índice se está construyendo, la pantalla tiene que poder decirlo:
+    # «no encontré nada» y «todavía no he terminado de mirar» son cosas muy
+    # distintas para el auditor. 18-08-2026.
+    estado_idx = indexer.stats()
     return {
         "factura": numero,
         "soportes": soportes,
         "total": len(soportes),
         "tipos_detectados": sorted({s["tipo_codigo"] for s in soportes}),
+        "construyendo": bool(estado_idx.get("construyendo")),
+        "facturas_indexadas": estado_idx.get("facturas_indexadas", 0),
     }
 
 
@@ -184,20 +199,18 @@ def buscar_soportes(
     }
 
 
-@router.post("/reindex")
-def reindex(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
-):
-    """Fuerza una reconstrucción del índice. Auditor+ por costo de I/O."""
+def _reindexar_y_registrar(usuario_email: str, usuario_rol: str, ip: str | None) -> None:
+    """Reconstruye el índice y deja constancia. Corre en segundo plano."""
+    from app.database import SessionLocal
+
     inicio = time.time()
     stats_resultado = get_indexer().rebuild()
     duracion = round(time.time() - inicio, 2)
+    db = SessionLocal()
     try:
         AuditRepository(db).registrar(
-            usuario_email=current_user.email,
-            usuario_rol=getattr(current_user, "rol", "") or "",
+            usuario_email=usuario_email,
+            usuario_rol=usuario_rol,
             accion="REINDEX_SOPORTES",
             tabla="soportes_share",
             detalle=(
@@ -206,11 +219,42 @@ def reindex(
                 f"duracion_s={duracion} "
                 f"error={stats_resultado.get('ultimo_error') or 'ninguno'}"
             ),
-            ip=request.client.host if request.client else None,
+            ip=ip,
         )
     except Exception:
         pass
-    return {"duracion_segundos": duracion, **stats_resultado}
+    finally:
+        db.close()
+
+
+@router.post("/reindex")
+def reindex(
+    request: Request,
+    tareas: BackgroundTasks,
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Arranca la reconstrucción del índice. Auditor+ por costo de I/O.
+
+    18-08-2026 — Antes reconstruía DENTRO de la petición. Con el servidor
+    real (miles de archivos por red) eso dura minutos: el navegador se
+    quedaba colgado y el proxy cortaba con «Error 524», aunque el trabajo
+    siguiera corriendo por dentro. Ahora se arranca en segundo plano y la
+    pantalla consulta el avance con «Actualizar».
+    """
+    indexer = get_indexer()
+    if indexer.stats().get("construyendo"):
+        return {"arrancado": False, "mensaje": "Ya hay una indexación en curso.", **indexer.stats()}
+    tareas.add_task(
+        _reindexar_y_registrar,
+        current_user.email,
+        getattr(current_user, "rol", "") or "",
+        request.client.host if request.client else None,
+    )
+    return {
+        "arrancado": True,
+        "mensaje": "Indexación arrancada. Use «Actualizar» para ver el avance.",
+        **indexer.stats(),
+    }
 
 
 # ─── Jump-box agent (Plan B sin mount CIFS) ──────────────────────────

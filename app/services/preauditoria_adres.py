@@ -23,6 +23,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.logging_utils import logger
+from app.utils.moneda import parse_valor_cop
 from app.models.db import (
     FacturaAdresRecord,
     GlosaAdresRecord,
@@ -37,6 +38,7 @@ if str(_TOOLS) not in sys.path:
     sys.path.insert(0, str(_TOOLS))
 
 from ajustar_detallado_glosas import normalizar_factura  # noqa: E402
+from glosas_adres_por_factura import leer_oficiales, marcar_conteo  # noqa: E402
 from preauditar_glosas_adres import (  # noqa: E402
     CATALOGO_CENTROS_COSTOS,
     CAUSALES_DE_DOS_AREAS,
@@ -94,6 +96,7 @@ def importar_reporte(
     importado_por: str,
     paquete: str | None = None,
     macro: bytes | None = None,
+    facturas: bytes | None = None,
     reemplazar: bool = True,
 ) -> PaqueteAdresRecord:
     """Carga el `ReporteGlosasReclamPAQUETE` y lo deja pre-auditado en la base.
@@ -104,6 +107,10 @@ def importar_reporte(
 
     `macro` es el Excel con el que el equipo venía trabajando: de ahí salen el
     reparto gestor/médico, la clasificación afinada y lo que ya habían escrito.
+
+    `facturas` es el archivo `FACTURAS PAQUETE NNNNN_NN FACTURAS.xlsx`. Conviene
+    mandarlo: trae la **cifra oficial** de glosa por factura, que es la única
+    buena — el reporte por ítem repite renglones y suma de más.
     """
     filas = _leer_temporal(contenido, ".xlsx", lambda p: leer_reporte(p, paquete=paquete))
     if not filas:
@@ -139,6 +146,24 @@ def importar_reporte(
         hecho=hecho,
     )
 
+    # El reporte abre una fila por causal del mismo ítem. Se conservan todas
+    # (el gestor decide causal por causal) pero solo una cuenta para la plata.
+    por_factura_filas: dict[str, list] = {}
+    for f in resumen.filas:
+        por_factura_filas.setdefault(normalizar_factura(f.factura), []).append(f)
+    cuenta: dict[int, bool] = {}
+    for grupo in por_factura_filas.values():
+        for f, marca in zip(grupo, marcar_conteo(grupo), strict=True):
+            cuenta[id(f)] = marca
+
+    # La cifra oficial por factura, si mandaron el archivo de facturas.
+    oficiales: dict[str, float] = {}
+    if facturas:
+        try:
+            oficiales = _leer_temporal(facturas, ".xlsx", leer_oficiales)
+        except Exception as e:  # noqa: BLE001 - sin esto se sigue, solo sin verificar
+            logger.warning("No se pudo leer el archivo de facturas del paquete: %s", e)
+
     if reemplazar:
         _borrar_paquete(db, numero)
 
@@ -148,7 +173,13 @@ def importar_reporte(
         importado_por=importado_por,
         total_filas=len(resumen.filas),
         total_facturas=resumen.facturas,
-        valor_glosado=sum(f.valor_glosado for f in resumen.filas),
+        # La plata del paquete: sin contar dos veces el mismo ítem, y si vino
+        # el archivo oficial, la de ese archivo, que es la que manda.
+        valor_glosado=(
+            round(sum(oficiales.values()), 2)
+            if oficiales
+            else sum(f.valor_glosado for f in resumen.filas if cuenta.get(id(f), True))
+        ),
         catalogo_centros=json.dumps(catalogo, ensure_ascii=False),
     )
     db.add(registro)
@@ -193,6 +224,7 @@ def importar_reporte(
         # ADRES glosó la reclamación entera por el FURIPS. No se responde ítem
         # por ítem, así que la pantalla no la muestra.
         fila.glosa_total = not f.codigo_numerico
+        fila.cuenta_valor = cuenta.get(id(f), True)
         # Causales que trabajan dos áreas (la 4506): el bot no las clasifica
         # solo, las marca para que un SUPER ADMIN las reparta.
         if necesita_asignacion(f.codigo_numerico):
@@ -252,6 +284,7 @@ def importar_reporte(
                 doc_victima=f.doc_victima,
                 gestor=f.gestor,
                 medico=f.medico,
+                valor_glosado_oficial=oficiales.get(clave),
                 estado=antes.get("estado") or "PENDIENTE",
                 cerrada_por=antes.get("cerrada_por"),
                 cerrada_en=antes.get("cerrada_en"),
@@ -406,10 +439,18 @@ def importar_bitacora(db: Session, contenido: bytes, *, paquete_id: int) -> int:
     ).delete(synchronize_session=False)
 
     def num(v):
-        try:
-            return float(str(v).replace(",", ".")) if str(v).strip() else 0.0
-        except ValueError:
-            return 0.0
+        """Lee un valor en pesos de la bitácora con el lector único del repo.
+
+        19-08-2026. Antes hacía `float(str(v).replace(",", "."))`. Eso sirve
+        para el CSV tal como lo escribe el ajustador (93340.00), pero si el
+        auditor abre esa bitácora en Excel y la guarda, Excel la reescribe al
+        formato colombiano y entonces:
+            "93.340"       ->    93.34   (mil veces menos)
+            "1.589.100,00" ->     0.0    (¡en silencio!, por el except)
+        Y esos valores son el glosado/reclamado/aprobado de cada ítem del
+        detallado. `parse_valor_cop` entiende los dos formatos y deja igual el
+        que ya funcionaba."""
+        return parse_valor_cop(v)
 
     n = 0
     for fila in csv.DictReader(io.StringIO(texto), delimiter=";"):
@@ -509,9 +550,11 @@ def consultar_factura(
             "glosas": len(glosas),
             "decididas": len(decididas),
             "pendientes": len(glosas) - len(decididas),
-            "valor_glosado": sum((g.valor_glosado or 0) for g in glosas),
+            # Solo los renglones que cuentan: el mismo ítem con varias causales
+            # sale varias veces y su plata es una sola.
+            "valor_glosado": sum((g.valor_glosado or 0) for g in glosas if g.cuenta_valor),
             "valor_aceptado": sum(g.valor_aceptado or 0 for g in glosas),
-            "valor_reclamado": sum((g.valor_reclamado or 0) for g in glosas),
+            "valor_reclamado": sum((g.valor_reclamado or 0) for g in glosas if g.cuenta_valor),
             "items_detallado": len(items),
             "sigue_glosado_detallado": sigue_glosado,
             "por_asignar": sum(1 for g in glosas if g.requiere_asignacion),
@@ -519,8 +562,10 @@ def consultar_factura(
             # Las glosas totales no se muestran, pero se dicen: nada desaparece
             # en silencio.
             "glosas_totales_ocultas": len(totales),
-            "valor_glosas_totales": sum((g.valor_glosado or 0) for g in totales),
+            "valor_glosas_totales": sum((g.valor_glosado or 0) for g in totales if g.cuenta_valor),
         },
+        "valor_glosado_oficial": ficha.valor_glosado_oficial if ficha else None,
+        "aviso_descuadre": _aviso_descuadre(ficha, todas),
         "estado": ficha.estado if ficha else "PENDIENTE",
         "cerrada_por": ficha.cerrada_por if ficha else None,
         "cerrada_en": ficha.cerrada_en.isoformat() if ficha and ficha.cerrada_en else None,
@@ -531,8 +576,9 @@ def consultar_factura(
                 f"{len(totales)} renglón(es) de esta factura no se muestran porque "
                 f"corresponden a una GLOSA TOTAL: el ADRES glosó la reclamación entera por el "
                 f"FURIPS y esos renglones no traen causal propia, así que no se responden uno "
-                f"por uno (${sum((g.valor_glosado or 0) for g in totales):,.0f})."
-            ).replace(",", ".")
+                f"por uno ("
+                f"{_pesos(sum((g.valor_glosado or 0) for g in totales if g.cuenta_valor))})."
+            )
             if totales
             else ""
         ),
@@ -552,6 +598,33 @@ def consultar_factura(
         "items": [_item_dict(i) for i in items],
         "por_clasificacion": _agrupar(glosas),
     }
+
+
+def _pesos(valor) -> str:
+    """`$297.117.350` — con punto de miles, como se escribe en Colombia."""
+    return "$" + f"{int(round(valor or 0)):,}".replace(",", ".")
+
+
+def _aviso_descuadre(ficha, todas) -> str:
+    """Si el detalle no cuadra con lo que dice el ADRES, se dice.
+
+    En el paquete 31078 pasó en 27 de las 81 facturas: el reporte repite
+    renglones sin que haya causales distintas que lo expliquen, y son justo las
+    de más plata. Responder con esas cifras es responder con valores dobles o
+    triples, que el ADRES puede rechazar por inconsistente.
+    """
+    if ficha is None or ficha.valor_glosado_oficial is None:
+        return ""
+    detalle = round(sum((g.valor_glosado or 0) for g in todas if g.cuenta_valor), 2)
+    oficial = round(ficha.valor_glosado_oficial, 2)
+    if abs(detalle - oficial) < 1:
+        return ""
+    return (
+        f"El ADRES dice que esta factura tiene glosado {_pesos(oficial)}, pero el detalle del "
+        f"reporte suma {_pesos(detalle)}. El reporte del ADRES repite renglones. Antes de "
+        f"responder esta factura, baje el detalle del portal (Reclamaciones → Reportes Lupa "
+        f"al giro)."
+    )
 
 
 def glosa_dict(g: GlosaAdresRecord) -> dict:
@@ -582,6 +655,7 @@ def glosa_dict(g: GlosaAdresRecord) -> dict:
         "motivo": g.motivo,
         "estado_detallado": g.estado_detallado,
         "glosa_total": bool(g.glosa_total),
+        "cuenta_valor": bool(g.cuenta_valor),
         "decision": g.decision,
         "observacion_tecnico": g.observacion_tecnico,
         "cantidad_aceptada": g.cantidad_aceptada,
@@ -754,11 +828,12 @@ def listar_facturas(
             GlosaAdresRecord.valor_glosado,
             GlosaAdresRecord.valor_aceptado,
             GlosaAdresRecord.requiere_asignacion,
+            GlosaAdresRecord.cuenta_valor,
         )
         .filter(GlosaAdresRecord.paquete_id == paquete_id)
         .all()
     )
-    for clave, total, decision, glosado, aceptado, por_asignar in filas:
+    for clave, total, decision, glosado, aceptado, por_asignar, cuenta in filas:
         a = avance.setdefault(
             clave,
             {
@@ -770,11 +845,16 @@ def listar_facturas(
                 "ocultas": 0,
             },
         )
-        if total:  # las glosas totales no se auditan una por una
+        # La plata es TODA la que el ADRES glosó en la factura, incluidas las
+        # glosas totales: es la cifra que hay que defender y la que se compara
+        # con la oficial. Lo que cambia con las totales es que no se responden
+        # renglón por renglón, así que no cuentan como glosas a trabajar.
+        if cuenta:  # el mismo ítem con varias causales cuenta una sola vez
+            a["valor_glosado"] += glosado or 0
+        if total:
             a["ocultas"] += 1
             continue
         a["glosas"] += 1
-        a["valor_glosado"] += glosado or 0
         a["valor_aceptado"] += aceptado or 0
         if decision:
             a["decididas"] += 1
@@ -803,6 +883,12 @@ def listar_facturas(
                 "por_asignar": a.get("por_asignar", 0),
                 "glosas_totales_ocultas": a.get("ocultas", 0),
                 "valor_glosado": a.get("valor_glosado", 0.0),
+                "valor_glosado_oficial": f.valor_glosado_oficial,
+                "cuadra": (
+                    None
+                    if f.valor_glosado_oficial is None
+                    else abs(a.get("valor_glosado", 0.0) - f.valor_glosado_oficial) < 1
+                ),
                 "valor_aceptado": a.get("valor_aceptado", 0.0),
                 "avance": round(decididas / glosas * 100) if glosas else 100,
             }

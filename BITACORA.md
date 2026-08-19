@@ -32,7 +32,15 @@
    Dispensario (renombrar, organizar, verificar CUV), tablero de cartera
    (`tools/tablero_cartera.py`), informe masivo de seguimientos SIIFA
    (`tools/siifa_reporte_seguimientos.py`).
-5. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
+5. **Suite Cartera HUS** (`tools/suite_cartera_hus/`, PR #160): programa de
+   escritorio del analista de Cartera — organiza el ZIP del portal en lotes,
+   consolida las glosas, cruza contra la base DGH y arma las OBJECIONES listas
+   para cargar. Incluye una **caja de Herramientas PDF** (26 utilidades: unir/
+   dividir/rotar páginas, proteger/censurar, conversión Office↔PDF, resumir/
+   traducir/OCR con IA), el bot de **correos de pagos (.msg) → Excel** y el
+   bot de **unir Exceles** (apilar filas u hoja por archivo).
+   Versión de ventana (`suite_cartera_hus.py`) y de consola (`suite_cli.py`).
+6. **Módulo ADRES/FURIPS** (chat "VALIDADOR ADRES"):
    - `tools/adres/validar_furips.py` + `VALIDAR_FURIPS.cmd` — validador masivo
      FURIPS 1/2 contra la Circular 022/2023 + cruce con soportes (RIPS, CUV,
      XML DIAN, factura PDF, epicrisis) con OCR para PDF escaneados.
@@ -327,6 +335,55 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 | 17 de julio | 58 | 115 | $87.605.050 | Excel listo — confirmar subida |
 | Pendientes junio | 3 | 38 | $20.054.751 | Excel listo — subir YA (plazos vencidos) |
 
+### 22 al 28-07-2026 — Frente Suite Cartera HUS: consolidados, actas y bot de correos de pagos
+(trabajo de la rama `claude/bot-multifunctional-improvements-zhj4nw`, PR #160, fusionado a esta bitácora el 28-07)
+- **22-07:** control central de este frente: nace esta sección (reconstruyendo
+  la historia desde Git) y se corrige un fallo de CI heredado, ajeno a
+  Cartera/PDF — dos pruebas del Motor usaban fechas fijas de abril que se
+  salieron de la ventana de 90 días y empezaron a fallar solas el 19-07; se
+  anclaron a "la semana pasada" para que no vuelvan a caducar (la
+  funcionalidad real nunca estuvo mal).
+- **23-07:** **5 informes consolidados de estado de cartera** (formato
+  FAMISANAR: CARTERA detalle por factura · RESUMEN por vigencia · CARTERA POR
+  EDADES · RAD VS REC mensual · ACTAS DE GLOSAS), corte 30-06-2026, a partir de
+  los 6 cortes mensuales DGH (enero a junio 2026): **DISPENSARIO MÉDICO**
+  (Sanidad Ejército, 5.571 facturas, saldo $13.621.817.612, con actas SINAC
+  709/720 y el giro directo real de mayo/junio del libro de pagos SAP),
+  **PROTEGER EPS** (antes Cajacopi EPS, 532 facturas, $4.268.767.084),
+  **CAJACOPI Caja de Compensación** (115 facturas, $302.274.693, sin
+  movimiento en los 6 meses), **COMPENSAR** (39 facturas, $193.065.583) y
+  **MESSER** (sin cartera al corte). Fórmulas recalculadas sin errores y 30 de
+  30 totales cuadrados. Después se generó la **serie mensual completa**: 30
+  informes (5 entidades × 6 cortes, 31-01 a 30-06-2026), también 30/30 sin
+  errores y 150/150 totales cuadrados.
+- **23-07 (cruce de actas):** **cruce factura por factura de las 13 actas del
+  Dispensario** (2 SINAC en Excel + 11 en PDF, ~1.900 páginas leídas): el
+  informe corte 30-06 ahora dice, por cada factura, si su glosa está
+  LEVANTADA, ACEPTADA por la IPS, RATIFICADA (pendiente de conciliar) o EN
+  TRÁMITE, con hoja de actas anclada a los totales oficiales y hoja de
+  auditoría factura×acta (1.710 filas). Resultado: **$523,1 millones
+  levantados en conciliación** a favor del HUS (+$173,2M levantados en
+  respuestas AR) y **$1.013 millones aún ratificados** en actas de respuesta
+  pendientes de conciliar (el mayor: AR003215 con $399,5M). Las 5 actas de
+  conciliación validaron 100% al centavo; en las de respuesta (AR) el detalle
+  por factura quedó al 95-98% (el resto documentado en el propio informe).
+- **28-07:** **bot de correos de pagos**: la Suite gana el botón **"📧 Correos
+  de Pagos → Excel"** — junta varios correos de Outlook (.msg) de "relación de
+  pagos del día" en un solo Excel, leyendo el detalle del adjunto de cada
+  correo y preservando fechas y montos con su tipo real (nunca como texto);
+  las filas repetidas en más de un correo quedan marcadas, no se borran solas.
+  Probado con los 13 correos reales del analista: **237 filas, $2.207.118.593
+  pagados**, cuadrado al peso contra los 13 archivos originales. Se entregó
+  también como **bot suelto** (ZIP de doble clic) para uso inmediato sin
+  esperar a actualizar toda la Suite. Nota técnica: el lector de correos
+  (`extract-msg`) trae una dependencia accesoria (`red-black-tree-mod`) que no
+  instala en Windows/Python moderno; solo serviría para RE-ESCRIBIR un .msg
+  (este bot solo LEE), así que se resolvió sin necesitarla.
+
+**Pendiente de este frente:** no existe corte de cartera de julio 2026 (la
+columna de recaudo de julio de los 5 consolidados y la serie mensual queda en
+0 hasta que el analista lo entregue); revisar y fusionar el PR #160.
+
 ### 24 de julio de 2026 — Expediente Inteligente de Conciliación (Hoja Maestra)
 - **Nueva herramienta `tools/hoja_maestra_conciliacion.py`:** arma en un solo
   Excel el **expediente de conciliación** del Dispensario con **un único
@@ -404,7 +461,6 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
   todo el módulo (objetivo, arquitectura, funciones, flujo, riesgos,
   pendientes y cómo fusionarlo al proyecto principal).
 
----
 ### Julio 2026 — Frente ADRES/FURIPS (chat "VALIDADOR ADRES", PR #173-#176)
 - **17-07:** nace el **bot validador FURIPS**: valida masivamente los TXT
   FURIPS 1 y 2 contra la Circular 022 de 2023 de la ADRES (102 + 9 campos,
@@ -931,6 +987,41 @@ buena decide el tamaño de medio Contrato, y esa decisión es del área.
 Todo esto es **documentación y plan**. No se tocó una línea del código que
 corre en producción: la suite de 4.533 pruebas pasa igual que antes.
 
+### 29-07 — Se juntaron las dos memorias del proyecto + bot de Unir Exceles
+- **Se fusionó la rama principal en el PR #160** (la Suite Cartera HUS). Al
+  hacerlo se descubrió que había **dos bitácoras paralelas** — una en la rama
+  principal (todo el frente del Motor/Pre-auditoría/Dispensario) y otra en la
+  rama de la Suite (consolidados de cartera, actas, herramientas PDF, bot de
+  correos) — porque dos chats trabajaron cada uno con la suya sin saberlo.
+  **Se combinaron en esta sola bitácora sin perder ninguna entrada** de
+  ningún lado, y lo mismo con las instrucciones del repo (CLAUDE.md). El PR
+  #160 quedó **sin conflictos y con las 3 verificaciones en verde** (4.611
+  pruebas), listo para revisar y fusionar.
+- **Bot nuevo: «📊 Unir Exceles»** (en la Suite y también entregado como ZIP
+  suelto de doble clic): une varios archivos Excel en UNO, sin dañar el dato
+  (fechas como fechas, montos como números — nunca texto). Dos modos:
+  **APILAR** (todas las filas en una sola tabla — para cortes mensuales o
+  exportes con las mismas columnas; si un archivo trae columnas nuevas se
+  agregan al final y nada se pierde; cada fila queda marcada con su archivo
+  de origen y hay hoja RESUMEN) y **HOJAS** (cada archivo queda como una
+  hoja aparte del mismo libro). Acepta archivos sueltos, una carpeta o un
+  .zip, y salta solo los títulos que vienen encima de los encabezados.
+  Por consola: `python suite_cli.py exceles archivo1.xlsx archivo2.xlsx -o
+  UNIDO.xlsx` (o `--modo hojas`). Con 9 pruebas automáticas nuevas.
+- **Nota del mismo día:** la rama principal volvió a avanzar (PRs #208-#213:
+  consecutivo manual del oficio de devolución, bots de pagadores, vencidas
+  visibles y el Contrato de Construcción de SINAC OS) y se volvió a fusionar
+  aquí, combinando otra vez las dos bitácoras con la misma regla de no
+  perder nada.
+- **Nota (tarde):** otro chat hizo un "rescate" de la Suite copiando sus
+  archivos directo a la rama principal (commit del 29-07 15:26), pero desde
+  una foto VIEJA — sin los bots de correos de pagos ni de unir Exceles. Al
+  fusionar aquí se reconciliaron las dos copias: quedó la versión completa
+  (con los dos bots nuevos) más la mejora que traía el rescate (el lector
+  de pesos de `cruces_dgh` ahora usa el lector único `tools/_dinero.py`,
+  el mismo de toda la casa). El PR #160 ahora solo aporta lo que la rama
+  principal no tiene: los dos bots, sus pruebas y esta bitácora combinada.
+
 ### 29-07 — Pre-auditoría: lo que escribía el auditor se perdía
 
 Día de uso real con cuatro auditores trabajando (Vanessa, Camilo, Edgar y
@@ -1362,6 +1453,78 @@ partido), julio 114. De 2025 no hay nada. Sin registros repetidos y sin
 períodos perdidos.
 
 ---
+
+### 05-08 (tarde) — Doce glosas de trampa destaparon nueve fallas del motor
+
+Yesid pidió glosas difíciles para poner a prueba la IA. Se armaron doce,
+cada una diseñada para romper un punto distinto, y pasó seis por la
+página. **Falló en casi todas.** El día se fue en arreglarlas, una por una,
+con sus pruebas.
+
+Lo que salió mal y qué había detrás:
+
+1. **Mayúsculas.** Los dictámenes salían mezclados y aparecía «En **ESE**
+   orden de ideas». No era el modelo desobedeciendo: había un normalizador
+   que **bajaba a minúsculas a propósito** todo dictamen que viniera en
+   mayúsculas. Se retiró. Ahora lo decide el sistema, no la IA.
+2. **Aceptación parcial.** La glosa decía «LA IPS ACEPTA $340.000» y el
+   motor recomendó defender el 100%. Nadie leía esa frase. Peor: el botón
+   «Aplicar recomendación» **buscaba campos que no existen, no cargaba
+   nada, y aun así decía «aplicada»**. Cada vez que se usó, el valor
+   aceptado no quedó registrado ni habilitó la nota crédito.
+3. **Dictamen cortado** en «$ 12.». No era el modelo: el post-proceso
+   cortaba en el primer punto y en «12.300.000» ese punto es el separador
+   de miles. El mismo corte partía «E.S.E.», «ART. 87» y «FACTURA NO.».
+4. **Código de glosa usado como CUPS** («servicio con CUPS DE1601»). El
+   código entraba por la ranura del CUPS **antes** de que la IA escribiera
+   nada, y después ella inventaba qué procedimiento sería.
+5. **Dispensario.** El texto fijo respondía toda glosa TA de ese pagador
+   **sin leer de qué hablaba**, y ese camino se salta el control de
+   calidad. Decisión de Yesid: sigue, pero solo cuando el tema calce.
+6. **ARL (POSITIVA).** Se le respondió con normas del régimen de salud
+   común. La regla correcta existía desde abril; fallaba porque otras dos
+   partes del sistema le ordenaban lo contrario — entre ellas, servirle
+   como ejemplo respuestas escritas para EPS.
+7. **Sub-objeciones.** Una glosa con cuatro objeciones recibió una sola
+   respuesta. El detector no reconocía la forma en que estaba escrita, y
+   además vivía en una rama del código donde no siempre se ejecutaba.
+8. **Devolución tratada como glosa.** Para el motor, la familia DE **no
+   existía**: la convertía en glosa de facturación. Son trámites distintos
+   y confundirlos puede costar el término de radicación.
+9. **Norma derogada.** La Resolución 3047 de 2008 seguía citándose,
+   también en la plantilla guardada en la base que alimenta los ejemplos
+   de la IA. Corregida a la 2284 de 2023, y la plantilla vieja se corrige
+   sola al arrancar.
+
+**La lección del día:** en **cinco de las nueve**, la regla correcta ya
+estaba escrita y no podía funcionar — por una condición que no abría, por
+vivir en la rama equivocada, por vocabulario corto, o porque otra
+instrucción la contradecía. Escribir la regla no era el trabajo; el
+trabajo era comprobar que llegara.
+
+Quedaron 55 pruebas nuevas y la suite en 5.704. Las doce glosas de trampa
+sirven para repetir el ejercicio cuando se toque el motor.
+
+### 05-08 — El consolidado histórico de pre-auditoría entra por Excel
+
+La base provisional del PC arrancó vacía y el módulo de Pre-auditoría
+quedó sin su historia. Pero el equipo llevó SIEMPRE su consolidado a mano
+(`CONSOLIDADO_PRE_AUDITORIA_2026.xlsx`, una fila por pasada de factura,
+del 13-04 al 04-08): ese Excel ES la historia completa, más incluso que
+la base vieja de la VM. Se construyó
+`tools/preauditoria_importar_consolidado.py`:
+
+- **SOLO MIRAR** (sin argumento): muestra el plan completo sin escribir.
+  Con el Excel real: 1.324 pasadas → **959 facturas** (511 radicadas,
+  348 subsanadas, 83 devueltas/bloqueadas, 17 pendientes), 150 oficios
+  (143 FHUS reales + 7 históricos), 1.043 renglones de ledger de envíos,
+  3.058 eventos de historial con fechas y valores reales.
+- **aplicar**: escribe todo en una sola transacción. **El sistema manda**:
+  lo que el equipo ya registró en la página no se toca; correrlo dos veces
+  no duplica nada (probado con los datos reales).
+- Los nombres cortos del Excel se traducen al nombre completo del equipo
+  (OSCAR→OSCAR VILLAMIZAR, CAMILO→CAMILO CASTILLO, etc.). 7 pruebas
+  automáticas.
 
 ### 04-08 (décima parte) — La causa de fondo: el vigilante entregaba claves viejas
 
@@ -2025,6 +2188,44 @@ de Docker.
   **Para desplegar de aquí en adelante:** el autodeploy baja de `motor-glosas`
   cada 5 minutos. Para forzarlo: `schtasks /Run /TN "MotorGlosas_Autodeploy"`,
   y se verifica en `data\autodeploy.log` y `data\servidor.log`.
+- **14-08:** llegó el **paquete 31078** (81 facturas) con el oficio Orfeo
+  **20264300142071**. Tres cosas que hay que tener presentes:
+  - **PLAZO: 23 de septiembre de 2026.** Son 2 meses desde la notificación
+    certificada del 23-07. Si no se responde, la glosa se acepta tácitamente
+    **ítem por ítem** (Res. 1236/2023 art. 8 num. 8.5) y **es una sola
+    oportunidad**: no se puede radicar algo ahora y completarlo después.
+  - **La plata del paquete es $297.117.349,73, NO $585 millones.** El reporte
+    del ADRES **repite renglones** (abre una fila por cada causal del mismo
+    ítem, y en las facturas grandes repite sin explicación). Sumar esa columna
+    en bruto infla la glosa. La cifra buena está en
+    `FACTURAS PAQUETE 31078_81 FACTURAS.xlsx` y en la TRAZABILIDAD, que
+    coinciden peso a peso con el oficio.
+  - **Solo 54 de las 81 facturas cuadran** con la cifra oficial ($49.499.660).
+    Las otras **27 concentran el 83 % de la plata** ($247.617.689) y traen
+    **1.174 renglones sin causal escrita**. Para esas hay que bajar el detalle
+    del portal (Reclamaciones → **Reportes Lupa al giro**, con el usuario de
+    Radicación).
+
+  Nace **`tools/glosas_adres_por_factura.py`**: saca un Excel por factura con
+  solo lo que sigue glosado, **sin necesitar el detallado impreso del
+  hospital** — trabaja directo del reporte del ADRES. Junta los renglones
+  repetidos por causal y **verifica cada factura contra la cifra oficial**,
+  dejando el veredicto escrito dentro del propio archivo («VERIFICADO» o «OJO —
+  NO CUADRA» con la diferencia exacta). Guía en
+  `tools/README_glosas_adres_por_factura.md`.
+
+  **Causales nuevas del 31078:** aparecieron 2010, 4301, 4302 y 4005. Se
+  propusieron y después se intentó refutarlas: solo sobrevivió la **4302
+  (mayor valor en consulta) → TARIFAS**. Las otras tres quedan **sin
+  clasificar** a propósito. Ojo con la **2010** (HUS406456, $17.464.478,
+  "presentación fuera de términos"): parece glosa total del FURIPS pero **no lo
+  es** — si se clasificara ahí, el bot escribiría "SE SUBSANA anexando el
+  formulario", que es falso porque un FURIPS corregido no revive un término
+  vencido. Esa la deciden cartera y jurídica.
+
+  **Otros hallazgos:** 16 facturas del paquete tienen glosa $0 (aprobadas
+  completas, $22.599.644) y no hay que auditarlas; el archivo
+  `BASE DE DATOS ADRES.xlsx` vino **truncado** y hay que volver a bajarlo.
 
 ### 05-08 — Dispensario: se ubicó cada evidencia y quedó listo el cargue de las 23 que faltan
 
@@ -2208,6 +2409,1512 @@ de Docker.
 3. **La fecha de las respuestas subidas el 4 y 5 de agosto** quedó con el día
    del cargue y no con la de DGH (los archivos se generaron antes de que
    existiera la columna FECHA_RESPUESTA).
+
+### 05-08 (sexta parte) — Nace `PROYECTO.md`, el tablero maestro
+
+Yesid pidió un tablero de trabajo, no una auditoría: un solo archivo corto
+donde se vea de un vistazo qué módulos existen, en qué estado están, cuál es
+el objetivo del proyecto en este momento y qué bloquea el avance.
+
+Quedó en la raíz como **`PROYECTO.md`**. Tiene 18 módulos (la aplicación web
+y sus pantallas, los bots de cada portal, el validador ADRES y el servidor
+local), cada uno con estado, prioridad, archivo de entrada, dependencias,
+próximo objetivo y riesgo. Al final: **un solo objetivo actual**, cinco
+próximas tareas en orden, los bloqueantes reales y diez reglas del proyecto.
+
+Los datos salieron del repositorio y de esta bitácora. Donde no había
+evidencia quedó escrito «PENDIENTE DE VALIDAR» en vez de suponer.
+
+Cómo se usa: se actualiza cuando cambia el estado de un módulo, cuando se
+cierra el objetivo actual o cuando aparece o se cae un bloqueante. La
+bitácora sigue siendo la memoria (qué pasó y cuándo); `PROYECTO.md` es el
+tablero (dónde estamos hoy).
+
+---
+
+
+### 06-08 — 22 correcciones al motor, con las glosas de trampa como guía
+
+Yesid corrió dos tandas de glosas de prueba en el motor del hospital y pegó
+los dictámenes tal como salieron. De ahí salieron 22 correcciones, cada una
+con su prueba automática para que no vuelva a pasar. Lo que el motor
+afirmaba sin tener de dónde:
+
+- una **cláusula de contrato** que no existe (y que además sobrevivía cuando
+  la red anterior le cambiaba el contrato por el de otra entidad);
+- un **CUPS** sacado de la cola del número de contrato;
+- un **periodo de atención** ("año 2023") que no está en ninguna parte del caso;
+- un **servicio** ("estancia u observación de urgencias") sin CUPS ni soportes;
+- **hechos de la historia clínica** sin un solo PDF adjunto;
+- una **cita textual del contrato** que el verificador daba por buena y
+  entregaba con el sello «0 hallazgos» — que es peor que no revisar.
+
+Lo que el motor no veía y ahora avisa: que la entidad **glosa más de lo
+facturado**, que **objeta dos veces el mismo renglón**, que la **glosa es
+anterior a la factura**, y que se **contradice** (dice que el servicio no se
+prestó y a la vez que la tarifa está mal).
+
+Lo que respondía mal: contestaba de **urgencias y autorización previa** a
+glosas que preguntaban por otra cosa; contestaba con la **tabla de tarifas**
+una pregunta clínica; y respondía con **una sola plantilla** a glosas con
+cuatro objeciones distintas — lo que no se contesta, la entidad lo descuenta.
+
+Dos cosas que salían impresas y se leían como descuido: comillas vacías
+(«""») y medio dictamen en minúscula dentro de un documento en mayúscula
+sostenida.
+
+Y dos hallazgos de fondo:
+
+1. **Las 26 cláusulas reales nunca se habían cargado.** Estaban en el
+   repositorio desde julio, pero solo se cargaban corriendo un comando a
+   mano que nadie corrió. Por eso TODOS los dictámenes perdían puntos por
+   «falta cláusula del contrato», el motor no tenía ninguna que citar, y el
+   verificador no podía comprobar ninguna cita de contrato. Ahora se cargan
+   solas al arrancar. En el log vas a ver `[SEED-CLAUSULAS] 26 creadas`.
+
+2. **Seis plantillas fundaban la defensa en la Resolución 3047 de 2008**,
+   que la 2284 de 2023 reemplazó. Ahora va adelante la vigente y la vieja
+   queda como antecedente. Las que ya estaban en tu base se corrigen solas
+   al arrancar.
+
+Aparte: el lector de tarifas se saltaba **tres de las cinco hojas** de la
+propuesta 2026 de FAMISANAR. Entraban 1.625 tarifas de 6.655. Lo más
+delicado era la hoja UVB, que trae dos columnas de plata: si se cargaba la
+de referencia en vez de la pactada, el motor defendería con una tarifa 5%
+más alta y la entidad ratificaría la glosa cada vez.
+
+**Ojo con esa propuesta:** el archivo se llama PROPUESTA. Mientras el
+acuerdo con FAMISANAR no esté firmado, no la cargues como tarifa pactada.
+
+### 13-08 — Google reabrió la cuenta: rescate de la VM y herramienta de fusión
+
+- **Google resolvió el caso #74044918**: la facturación quedó activa y la VM
+  volvió a prender. La página NO depende de ella (sigue viva desde el PC de
+  cartera); la VM solo se prendió para sacar lo que quedó encerrado el 03-08.
+- **Se empacó el rescate en la VM**: `rescate-motor-glosas.tgz` (28 MB) con la
+  base vieja congelada del 03-08, el `.env` con las llaves y la llave del
+  túnel. Los soportes y los PDF de contratos (son poquitos, 288 KB) van en un
+  segundo paquete `rescate-soportes.tgz`.
+- **Decisión importante: NO se restaura la base vieja encima de la del PC.**
+  El PC lleva más de una semana siendo el sistema real y su pre-auditoría
+  (importada del Excel del equipo el 05-08) es MÁS completa que la vieja.
+  Lo que se hace es **fusionar**: traer solo lo que al PC le falta.
+- **Nació `tools/fusionar_base_vieja.py`** para esa fusión. Trae de la base
+  vieja: las glosas con sus dictámenes y toda su historia (conceptos,
+  versiones del dictamen, comentarios, conciliaciones con sus adjuntos, notas
+  privadas e hilos), los precedentes ganados, las plantillas, los usuarios que
+  falten (a los que ya están en el PC NO les toca la clave), los contratos con
+  sus cláusulas, las tarifas contratadas, las credenciales de entidades (solo
+  si el vault del PC está vacío), las rutas de soportes y los atajos de los
+  gestores. No toca NADA de pre-auditoría ni ninguna fila que ya exista.
+  Estilo seguro de siempre: **SOLO MIRAR / aplicar**, copia de seguridad
+  automática de la base del PC antes de escribir, idempotente (correrlo dos
+  veces no duplica), la base vieja se abre solo-lectura, y aguanta que la
+  vieja tenga tablas o columnas más antiguas. 5 pruebas automáticas.
+
+### 13-08 (segunda parte) — La fusión quedó hecha y la VM apagada
+
+El mismo día se terminó el rescate completo, con Yesid corriendo los pasos:
+
+- Se empacaron y **bajaron los dos paquetes** al PC de cartera
+  (`C:\motor-glosas\rescate`) y la **VM quedó apagada** (ya no cobra por
+  cómputo; solo centavos por el disco mientras se decide borrarla).
+- La fusión se corrió primero en SOLO MIRAR, se revisó el plan, y con el
+  visto bueno se aplicó: llegaron **27 glosas con sus 27 dictámenes**,
+  **6 precedentes ganados** y el contrato de **PRECIMED**. Los 27 usuarios
+  ya existían en el PC (nadie perdió su clave) y la base vieja no traía
+  credenciales, tarifas ni rutas que faltaran. Antes de escribir quedó la
+  copia de seguridad `data\backups\motorglosas-antes-fusion-20260813-094858.db`.
+- Se copiaron además los archivos de soportes de recepción del rescate
+  (6 archivos). La VM no tenía carpeta de PDF de contratos ni de recepción,
+  así que no había nada más que copiar.
+- El paquete de rescate queda guardado en `C:\motor-glosas\rescate`.
+  **Contiene llaves y la base vieja: no compartirlo ni mandarlo por correo.**
+
+Con esto la mudanza al PC de cartera queda COMPLETA: página viva, historia
+de pre-auditoría (del Excel del equipo), historia de glosas (de la VM) y
+respaldos diarios. De la VM solo falta borrarla cuando pasen unos días.
+
+---
+
+### 13-08 — Once trabajos: las trampas quedan como prueba, el validador ADRES entra al portal y vuelve la pantalla de Salud Total
+
+Día largo. Se cerraron once órdenes de trabajo (OT-023 a OT-033). En orden
+de lo que más pesa:
+
+**Lo que el motor afirmaba sin poder probarlo (y ya no puede).**
+
+- **Las glosas de trampa ahora corren solas.** Las que Yesid usó para
+  destapar las 22 fallas del 06-08 quedaron guardadas como examen
+  automático: 27 casos y 69 criterios que se revisan en cada cambio. Si
+  alguien vuelve a romper una corrección vieja, se entera el mismo día y no
+  tres semanas después con un dictamen ya radicado.
+- **La tarifa pactada era el único dato duro que nadie verificaba.** El
+  dictamen podía escribir un porcentaje de descuento o una tarifa que no
+  estaba en ninguna parte del caso. Ahora se comprueba contra lo cargado.
+- **Un número de contrato inventado de cero pasaba derecho**, y **dos formas
+  corrientes de citar una norma** («Res. 2284/2023», «Resolución No. 2284 de
+  2023») el verificador no las veía — o sea que las daba por buenas sin
+  mirarlas. Ya las ve.
+- **Nadie vigilaba que las redes de seguridad siguieran enchufadas.** Las 18
+  revisiones que corren sobre el dictamen antes de entregarlo estaban sin
+  vigilancia: si una se desconectaba, el motor seguía trabajando como si
+  nada. Ahora hay una prueba que lo detecta.
+
+**Herramientas que estaban por fuera y entraron al portal.**
+
+- **El validador ADRES ya no es un programa aparte.** Antes tocaba levantar
+  otra aplicación en el puerto 8010 con un doble clic. Ahora se suben los
+  soportes desde la misma página, valida la malla de la Circular 022/2023 y
+  descarga el informe en Excel. Solo entra quien tenga sesión con rol de
+  auditor: por ahí pasan historias clínicas.
+- **El buscador de números de autorización de los RIPS.** Recorre las
+  carpetas de facturación **y sus subcarpetas**, entra a los ZIP, y saca el
+  listado diciendo cuáles vienen vacíos, cuáles nulos y cuáles con la
+  palabra «null» escrita como texto. Queda como bot de doble clic
+  (`AUTORIZACIONES_RIPS.cmd`) y también dentro del portal.
+  *Falta la pantalla en el portal: el motor ya está, el botón todavía no.*
+
+**El contrato de FAMISANAR ya está firmado.**
+
+Con las 219 páginas del contrato firmado a la vista se cargaron las tres
+cláusulas que sirven para contestar glosas (Cuarta de tarifas, Quinta de
+soportes y pago, Sexta del trámite de glosas), con su texto literal —no un
+resumen, porque un resumen el verificador lo marca como cita falsa, y con
+razón. Y se corrigió la cláusula del anexo tarifario, que seguía diciendo
+«Propuesta Base Final»: eso era cierto mientras fue propuesta; ahora nombra
+los anexos 3.0/3.1/3.2 y la vigencia del 15/04/2026 al 14/04/2027.
+
+**La pantalla de Salud Total volvió a funcionar.**
+
+Yesid la abrió con una notificación real y le salió «Not Found». La causa:
+en una limpieza de mayo se borró la parte del programa que atiende esa
+pantalla, porque no se le encontraron usuarios en el código. Sí tenía uno:
+la pantalla misma. Al motor no le faltaba nada — le faltaba la puerta. Ya
+está repuesta y ahora pide rol de auditor, porque de ahí sale un archivo que
+se radica ante la entidad.
+
+Al reponerla se corrigieron dos cosas del propio motor:
+
+1. **No se alega un plazo que nadie puede probar.** El término del Art. 57 de
+   la Ley 1438/2011 se cuenta desde que la EPS *recibe la factura* hasta que
+   radica la glosa. Cuando faltaba esa fecha, el motor contaba desde la
+   radicación de la glosa hasta *hoy* —que no mide ningún plazo legal— y
+   escribía «han transcurrido N días hábiles» en el archivo que se radica.
+   Ahora, sin esa fecha, no se alega extemporaneidad: se contesta de fondo y
+   la pantalla avisa que falta el dato. **Por eso la pantalla ahora te pide
+   la fecha de recepción también cuando eliges «Extemporánea»** — antes solo
+   la pedía para el análisis con IA.
+2. **Los valores salen escritos como los escribe la entidad**, sin el «.0» de
+   más, y las observaciones ya no pueden llevar saltos de línea adentro (un
+   salto parte la fila en dos y la entidad recibe un archivo con más filas
+   que glosas).
+
+**Ojo con el archivo `RTAGLOSA_900006037_13082026.csv`.** Ese archivo se armó
+por fuera del portal y trae tres errores en las 44 filas. **No lo radiques:**
+
+- el **radicado** salió como `3,5E+14` en vez de `350000214021421` — así
+  Salud Total no puede casar ninguna respuesta con su glosa y el archivo no
+  sirve para nada;
+- el **valor glosado** no es el glosado sino el valor total del servicio
+  multiplicado por cien: en la radiografía de tórax la glosa real es de
+  **$93.340** y el archivo dice **$28.000.000**;
+- el **código del motivo** trae la descripción («Tarifas») donde va la sigla
+  («TA»).
+
+Genera el archivo de nuevo desde la pantalla del portal: los tres casos
+quedaron como pruebas para que no se repitan.
+
+### 13-08 — Frente SAVIA/FAMISANAR (PR #164): bot de FAMISANAR con homologación de códigos
+
+- **Nuevo bot `tools/organizar_objeciones_famisanar.py`** (hermano del de
+  SAVIA): FAMISANAR entrega solo 4 columnas SIN código de servicio — viene
+  escondido en el texto de la observación («… CÓDIGO 903867 …»). El bot lo
+  extrae y lo **homologa al código del HUS**: CUPS tal cual; a los
+  medicamentos se les quita la letra U/P de FAMISANAR (U20162259-04 →
+  20162259-04, verificado con METOCLOPRAMIDA en EMSSANAR); y los 4
+  dispositivos quedaron con su **código FMQ**, confirmados contra el LOTE_02
+  por nombre y valor: catéter IV 18 → FMQ0112 ($5.800 idéntico), llave 3 vías
+  → FMQ0182-1, electrodo ECG adulto → FMQ0952 (3×$800), bolsa recolectora de
+  orina → FMQ0159 ($18.100 idéntico). Un dispositivo nuevo sin equivalencia
+  avisa en el log y se agrega con `--mapa-servicios`.
+- **Revisión adversarial con agentes independientes** antes de entregar:
+  encontró que se borraba el valor unitario del texto en 18/37 filas (ahora
+  solo se quita un $monto final si es duplicado exacto del valor objetado) y
+  una mutación de datos al generar por-factura y consolidado en una misma
+  corrida. Ambos arreglos se aplicaron también al bot de SAVIA.
+- Lote **SAVIA 7.53** procesado y entregado (3 facturas, 392 objeciones,
+  $39.772.588).
+- **Fusión con la principal**: se integró el lector único de pesos
+  (`tools/_dinero.py`, el arreglo del ×100 con centavos) a los bots de SAVIA
+  **y de FAMISANAR**; se adoptaron las versiones de la principal de
+  `CLAUDE.md`, esta bitácora y los 2 tests de estadísticas; y se conservaron
+  los arreglos de la revisión adversarial que la principal no tenía.
+  Documento técnico del módulo en `docs/ENTREGA_TECNICA_BOT_SAVIA.md`.
+- **Pendiente de este frente:** confirmar la tabla de subíndices del código de
+  objeción de SAVIA (hoy TA08→TA0801 con «01»; en EMSSANAR se ven FA0205,
+  SO0603…) — si hay lista oficial, se fija con `--mapa-codigos`.
+
+### 13-08 (segunda parte) — El programa de mejora, y ocho pantallas que llevaban tres meses rotas sin que nadie lo supiera
+
+Yesid pidió auditar el proyecto entero y arrancar un programa de mejora en
+cuatro frentes: lo visual, lo interno, el rendimiento y lo funcional. Quedó
+el tablero en **`MASTER_IMPROVEMENT_PLAN.md`**, con cada hallazgo medido
+sobre el código —no supuesto— y con su número al lado.
+
+**Lo más importante que salió de ahí no estaba en el plan.**
+
+Rastreando por qué la pantalla de Salud Total daba «Not Found» apareció que
+**no era un caso aislado**. El 9 de mayo se borraron **ocho** partes del
+motor que el portal usaba, y se reemplazaron por cáscaras «para no romper
+nada». Dos meses después se borraron las cáscaras, con la nota de que
+«nadie las llamaba» — porque la revisión miró solo el código del servidor.
+**El que las llamaba era la pantalla.**
+
+Desde ese día y hasta hoy, ocho cosas del portal no funcionaban:
+
+- los **comentarios** sobre una glosa,
+- las **notas privadas** de cada gestor,
+- los **filtros guardados** de Mis Glosas,
+- el **historial del chat**,
+- las **notificaciones** al navegador,
+- el **Auditor Forense** (el que analiza los soportes),
+- el **piloto automático**,
+- las **noticias del sector**,
+- y el refresco solo de los paneles.
+
+**Sus datos nunca se borraron.** Los comentarios, las notas y los filtros
+siguen en la base: lo único que faltaba era la puerta. Se repusieron los
+nueve, tal como estaban.
+
+**Y ahora hay una prueba que impide que vuelva a pasar.** Cada vez que se
+corre la suite, se compara lo que la pantalla pide contra lo que el motor
+tiene. Si alguien vuelve a borrar algo que el portal usa, se sabe **ese
+mismo día**, no tres meses después.
+
+**Lo demás que se hizo:**
+
+- **Una sola forma de escribir la plata.** Había 74 maneras distintas para la
+  misma cifra («$ 1.234.567», «$1.234.567», «1234567») según la pantalla.
+  Usted concilia contra Dinámica Gerencial mirando esos números, así que eso
+  cuesta tiempo y hace dudar de la cifra. Ahora es una sola, en las seis
+  páginas.
+- **Ninguna pantalla se queda muda.** Siete no decían nada cuando fallaba la
+  red. Las cuatro que guardan eran las graves: usted creía que su decisión
+  había quedado registrada y no había quedado. Ahora lo dicen con todas las
+  letras.
+- **Cuatro puertas apretadas.** Al reponer lo anterior se destapó que cuatro
+  acciones estaban abiertas a cualquiera con sesión: crear y resolver
+  comentarios, el auditor forense (que manda documentos a la IA y cuesta
+  plata por consulta) y aprobar glosas en lote, que mueve dinero.
+- **Once columnas del Historial que por poco se pierden.** Al ponerle
+  «contrato» a la tabla de Historial se descubrió que el contrato escrito
+  meses atrás declaraba diez columnas cuando la tabla tiene veintiuna.
+  Aplicarlo tal cual habría borrado la factura, el dictamen, el CUPS y el
+  servicio de la pantalla — sin dar error.
+
+**El patrón que se repitió tres veces en el mismo día:** cosas que se ven
+ordenadas en el código y que en la pantalla se quedan calladas. El sistema no
+fallaba: **se callaba**, que para un auditor es peor. Por eso cada arreglo va
+con su prueba, y varias pruebas llevan otra que las vigila a ellas.
+
+### 13-08 (tercera parte) — Lo que dijo la base del hospital
+
+Con los conteos reales de `motorglosas.db` quedaron aclaradas tres cosas que
+no se podían saber desde el repositorio:
+
+**1. Las 29 cláusulas SÍ están cargadas en el motor del hospital.** Es la
+primera confirmación de que el trabajo de las cláusulas —incluidas las tres
+del contrato firmado de FAMISANAR— está funcionando allá, no solo probado
+acá.
+
+**2. Las tarifas de FAMISANAR todavía NO se han subido.** La tabla
+`tarifas_contratadas` está en **cero**. Mientras siga así, el motor no puede
+defender una glosa de tarifas con el valor pactado: sigue pendiente subir el
+Excel desde Gestión → Tarifas.
+
+**3. Los 22 posibles cuellos de botella NO hay que tocarlos.** Hoy hay **74
+glosas** en la base. Veinte de esos veintidós recorren justamente esa tabla,
+así que cuestan milisegundos; y las dos tablas de verdad grandes —206.365 y
+193.025 filas de las fuentes de pre-auditoría— no se consultan dentro de
+ningún ciclo. Corregirlos habría sido cambiar código que funciona por si
+acaso. Queda anotado para revisar de nuevo si las glosas pasan de unos miles.
+
+**Dos cosas para tener en el radar:**
+
+- **Hay un archivo `glosas.db` de 0 bytes** al lado de la base buena. El
+  motor usa `motorglosas.db` (bien), pero si algún script llega a apuntar al
+  archivo vacío, el portal aparecería **sin ninguna glosa**. No se perdería
+  nada —estarían en la otra—, pero el susto sería grande. Conviene borrarlo o
+  renombrarlo cuando haya calma.
+- **Las tablas de comentarios, notas privadas y filtros guardados están en
+  cero.** No es que se hayan borrado con los routers: esta base arrancó
+  vacía en el rescate del 4 de agosto. Las tablas están sanas y las pantallas
+  ya funcionan otra vez; simplemente todavía no hay nada escrito en ellas.
+
+### 13-08 (cierre) — Las tarifas de FAMISANAR quedaron cargadas y COMPROBADAS
+
+Yesid subió el Excel desde la pantalla y el motor respondió: **6.655 creadas,
+0 actualizadas, 6.655 filas leídas**, las cinco hojas, contrato
+`S-13-1-03-1-04958`.
+
+Comprobado contra la base del hospital, tarifa por tipo:
+
+| Cómo quedó pactada | Cuántas |
+|---|---|
+| UVB por grupos | 4.586 |
+| Tarifa propia | 1.557 |
+| Ambulatorio | 413 |
+| Órtesis y prótesis | 31 |
+| Paquetes (urología, rehabilitación, gastro, columna…) | 68 |
+
+**Las 4.586 de UVB quedaron rotuladas como «UVB POR GRUPOS» y no como
+«tarifa propia»**, que era el defecto corregido esa misma mañana. Si hubieran
+entrado mal, el dictamen le habría dicho a FAMISANAR que esas tarifas son
+propias del hospital cuando en realidad son la UVB con el descuento del
+contrato — y la entidad ratifica la glosa sin discutir el valor.
+
+**Con esto el motor ya defiende las glosas de tarifas de FAMISANAR con el
+valor pactado del contrato firmado, y no con SOAT pleno.** Es el círculo
+completo: las cláusulas, las tarifas y el homologador CUPS → SOAT, los tres
+cargados y comprobados en el motor del hospital.
+
+**Un detalle de un día, anotado:** en «rigen hasta» quedó el **15/04/2027** y
+el contrato dice hasta el **14/04/2027**. Solo importaría con un servicio
+prestado justo ese día de 2027. Si se quiere exacto, se vuelve a subir el
+mismo Excel con la fecha correcta y **marcando «Reemplazar tarifas
+existentes»**, para que no queden duplicadas.
+
+### 13-08 (último) — El botón «Analizar con IA» de Salud Total ahora sí llama a la IA
+
+Ese botón existía desde antes y **no llamaba a la IA**: hacía lo mismo que las
+otras dos opciones, responder con las plantillas por código de glosa. Yesid
+pidió que hiciera lo que promete.
+
+**Ahora cada glosa de la notificación pasa por el mismo motor que usa el
+resto del portal.** O sea que responde con las 29 cláusulas del contrato, las
+6.655 tarifas pactadas y el homologador CUPS → SOAT, igual que cuando usted
+analiza una glosa desde «Analizar glosa».
+
+**Cómo se usa:** en la pantalla de Salud Total escoja «Analizar con IA», suba
+el TXT y dele a **Vista Previa**. Aparece un girador y la tabla se va
+llenando. **Tarda varios minutos** —son 44 glosas, una por una— así que no
+cierre la pantalla.
+
+**Lo que hay que mirar en el resultado:** cada fila queda marcada con una
+etiqueta.
+
+- **IA** — la respondió el motor con todo el contexto del contrato.
+- **PLANTILLA** — la IA no pudo con esa (se cayó el proveedor, se demoró
+  demasiado) y salió con la respuesta de siempre. **Esas son las que conviene
+  revisar a mano** antes de radicar.
+
+**Ninguna fila queda vacía nunca.** Aunque se caiga el proveedor de IA
+entero, el archivo sale completo con las plantillas. Se hizo así a propósito:
+una fila en blanco en el archivo que se radica es una glosa sin responder, y
+una glosa sin responder la entidad la da por aceptada.
+
+**Dos cosas que todavía no se saben** y que solo se ven al usarlo con las 44
+glosas reales: **cuánto tarda** y **cuánto cuesta**. Cada glosa es una
+consulta a la IA, así que este botón sí gasta plata — a diferencia de las
+otras dos opciones, que son gratis.
+
+**Lo que enseñó la primera corrida de verdad (esa misma tarde):**
+
+Yesid lo estrenó con la notificación de 44 glosas y salieron **dos defectos
+míos**, los dos ya corregidos:
+
+1. **El archivo llegó con código de programación adentro.** En la casilla de
+   la observación, las 44 filas traían `<table border="1" style=…` cortado a
+   la mitad. La causa: el dictamen del motor viene en formato de página web
+   porque está hecho para verse en pantalla y en el PDF, y yo lo recorté sin
+   quitarle ese formato. Ahora se extrae solo el argumento, y si por lo que
+   sea saliera con código, esa fila se manda por plantilla antes que
+   entregarle eso a la entidad.
+2. **Los valores salían con decimal:** «FACTURADA POR $ 93340.0». Le estaba
+   pasando a la IA el número crudo del archivo. Ahora recibe **$93.340** y
+   **$280.000**, como se escribe acá.
+
+**Y un hallazgo que no es un defecto pero conviene tener presente:** las 44
+respuestas salieron con **el mismo argumento**, cambiando solo el código y el
+valor. Y está bien que así sea: con Salud Total el hospital **no tiene
+contrato**, así que no hay cláusula que citar ni tarifa pactada que invocar,
+y el motor llega siempre al mismo sitio — el mismo que ya daba la plantilla,
+gratis.
+
+**En plata:** para **Salud Total**, «Extemporánea» o «Ratificada» dan
+prácticamente lo mismo sin costo. **Donde el análisis con IA sí paga** es en
+las entidades con contrato cargado —hoy **FAMISANAR**, con sus 29 cláusulas y
+sus 6.655 tarifas—, porque ahí el dictamen puede citar la cláusula y el valor
+exacto pactado, y eso la plantilla no lo hace.
+
+### 30-07 al 14-08-2026 — Caja de bots del auditor (entregados por chat) y análisis PROTEGER EPS
+
+Trabajo de este frente (rama `claude/bot-multifunctional-improvements-zhj4nw`,
+PR #160). Los bots de esta quincena se entregaron **por el chat, en ZIP**, para
+copiar al PC del auditor (no van en el repositorio porque procesan archivos
+reales de las entidades):
+
+- **Bot PARTIR/UNIR archivos grandes:** parte cualquier archivo (ej. un Excel
+  de 72 MB) en piezas de 25 MB que sí pasan por el chat, y las vuelve a unir
+  en el otro lado verificando que no se dañó ni un byte.
+- **Bot OCR a PDF:** convierte PDF escaneados en PDF "buscables" (se les puede
+  seleccionar y buscar texto). Además se hizo una **versión para celular** que
+  funciona abriendo un archivo HTML en el navegador del teléfono, sin instalar
+  nada y sin subir los documentos a ninguna página.
+- **Bot de autorizaciones en RIPS (JSON):** busca los números de autorización
+  dentro de los RIPS, en carpetas o rutas específicas, e informa cuando el
+  campo viene vacío, en null o con un número distinto.
+- **Bot DE1601 (NUEVA EPS):** completa el informe DE1601 celda por celda:
+  saca la autorización del RIPS JSON (ruta de facturación electrónica), lee el
+  PDF de la factura (fv) para tipo/documento/nombre del paciente, y verifica
+  contra el soporte PDE/OPF de la carpeta de radicación (Y:), con OCR para los
+  PDE escaneados. Llegó a la versión 7 afinando con 4 facturas reales; ninguna
+  celda queda en blanco y trae hoja DIAGNOSTICO para los casos raros.
+- **Bot de herramientas de imágenes (12 en 1):** quitar marca de agua (solo de
+  imágenes propias), quitar fondo, fondo blanco, difuminar, mejorar, ampliar,
+  comprimir, convertir, sacar texto (OCR), borrar texto sensible, recorte de
+  cara y foto tipo documento.
+
+**14-08 — Análisis del acta de conciliación PROTEGER EPS (NIT 901.543.211,
+antes Cajacopi EPS):** primer trabajo de glosas con esta entidad (antes solo
+aparecía en los consolidados de cartera del 23-07). Del archivo del acta salió
+un **informe en Word** entregado por el chat: 70 facturas en el acta — **44
+glosadas por $379.250.778** (sobre $464.426.624 facturados; 36 glosadas al
+100%) y 26 marcadas "SIN GLOSA NI DEVOL". El 93,2% del valor glosado es tema
+de **autorización frente al RIPS** (códigos SO2101, AU2103, SO2103, SO6101 y
+afines) — glosa documental, defendible con los mismos bots de RIPS/DE1601. La
+EPS ratificó $262.182.096 en 31 facturas; ya existen 44 notas crédito del
+28-07-2026 por $70.084.248 (saneamiento de cartera, Acuerdo 020/2026), así que
+lo aún en discusión ronda los $309 millones. El acta está sin fecha de
+conciliación y con las casillas de resultado en cero. El informe cuadró al
+centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
+- **14-08 (tarde):** se arregló en el **módulo web** lo mismo que se había
+  arreglado en el bot: **ya no cuenta dos veces la misma plata**. El reporte
+  del ADRES abre una fila por cada causal del mismo ítem; ahora la pantalla las
+  **sigue mostrando todas** (el gestor decide causal por causal) pero **solo
+  una cuenta** para el total.
+  Además el cargue acepta un archivo más — el `FACTURAS PAQUETE NNNNN_NN
+  FACTURAS.xlsx` — que trae la **cifra oficial por factura**. Con él, el módulo
+  muestra el valor bueno y **avisa en rojo** cuando el detalle no cuadra, en la
+  factura y en la lista.
+  Probado con el 31078 entrando por los endpoints: sin ese archivo mostraba
+  **$585.139.605**; con él muestra **$297.117.349,73**, exacto, y marca las 27
+  facturas que no cuadran ($247.617.689, el 83 % del paquete).
+  De paso se corrigió un defecto de redacción: los avisos convertían la coma de
+  la frase en punto («glosado $34.942.962. pero el detalle...»).
+
+### 19-08-2026 (tarde) — Las 320 facturas sin el total en letras, y en PDF
+
+**Lo que pidió el auditor:** que a las facturas se les quite el total escrito en
+palabras —que ese espacio quede vacío, dejando solo los valores en número— y que
+después todas se conviertan a PDF.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/quitar_total_en_letras.py`. Borra el
+renglón en letras y deja el espacio vacío; la etiqueta `TOTAL:` se queda. Los
+números, el formato, las celdas combinadas y los anchos no se tocan, y los
+archivos de origen tampoco: escribe copias nuevas.
+
+No borra a ciegas: solo vacía las celdas que de verdad traen un importe escrito
+en palabras (las que dicen PESOS y CTVS), y solo en el renglón del `TOTAL:`. Si
+en algún archivo no encuentra ese renglón, lo dice en vez de callarlo.
+
+Después se pasaron a PDF con el bot que ya existía (`tools/excel_a_pdf.py`).
+
+**Resultado:** 320 Excel sin letras y **320 PDF** (351 páginas). Comprobado sobre
+los PDF ya generados: **ninguno** muestra un importe en palabras, **todos**
+conservan el VALOR TOTAL ORDEN DE SERVICIO en número, y la suma de los
+subtotales sigue siendo **$625.461.616,95**, la misma de antes.
+
+**Después el auditor pidió una cosa más:** quitar también el **pie legal del
+final** —la autorización de la DIAN, el aviso de la letra de cambio, los
+intereses moratorios, «Nombre reporte» y «LICENCIADO A»—, de modo que la hoja
+**termine en la firma del auditor**. Se agregó la opción `--quitar-pie` al mismo
+bot. El pie se busca de abajo hacia arriba y se corta en el primer renglón que
+no sea del pie, así que la firma, las notas finales y los totales nunca se
+tocan. Se volvieron a generar los 320 PDF: quedaron en **340 páginas** (11 menos)
+y ninguno trae ya nada del pie ni del total en letras; el dinero no se movió.
+
+**Un detalle importante:** el auditor mandó para este trabajo el ZIP de la
+**primera** entrega, la que todavía traía los tres errores (total
+$627.442.241,95). El trabajo se hizo sobre la **versión corregida**, para no
+volver a poner en circulación las facturas malas.
+
+---
+
+### 19-08-2026 — Se recuperaron $654.075 más: el servicio partido en dos renglones
+
+Una medición sobre las 320 facturas mostró por qué faltaba tanta plata por
+descontar en la **HUS383283**: el detallado trae los **honorarios del cirujano
+partidos en dos renglones** de $320.600 —porque la cirugía se hizo dos veces— y
+la macro los reclama en **una sola fila** de $641.200. Los dos renglones suman
+exactamente esa cifra, pero el bot exigía que además cuadrara la **cantidad**
+(2 renglones contra 1 unidad) y por eso no los emparejaba.
+
+Ahora, cuando el **código** o la **descripción completa** coinciden y el valor
+suma exacto, se emparejan y el descuento se reparte a prorrata. **Por prefijo de
+descripción se sigue exigiendo la cantidad**: ahí a la descripción del reporte le
+basta con ser el comienzo de la del detallado, y sin ese segundo candado un
+nombre genérico podría llevarse el grupo equivocado.
+
+Recupera **$654.075** en dos facturas (HUS383283 y HUS397556). Antes de tocar
+nada se midió el efecto sobre las 320 facturas y sobre el otro flujo que usa el
+mismo motor de cruce: **ningún emparejamiento existente se pierde ni cambia de
+pareja**; solo se agregan 8 nuevos.
+
+**Cifras del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.870.607** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$625.461.617** |
+
+**Tres mejoras más quedaron medidas pero NO se aplicaron**, porque la revisión
+adversarial las marcó riesgosas y valen poco ($40.900 entre las tres):
+
+- bajar de 12 a 10 letras el cruce por comienzo de descripción ($34.500): dejaría
+  que un nombre genérico como «Hemocultivo» se lleve el renglón equivocado **en
+  silencio**;
+- desempatar por precio unitario ($5.000) y limpiar los caracteres dañados de la
+  macro ($1.400): mismo tipo de riesgo.
+
+Son decisión del área: recuperan poco y el motor de cruce lo comparten los otros
+bots del hospital.
+
+---
+
+### 18-08-2026 (cierre) — Una fila corrida de la macro casi borra una radiografía
+
+Siguiendo la revisión, apareció **una segunda factura con problema**: la
+**HUS396996**. El bot le había dejado en **cero** una radiografía de mano de
+$73.500 que el hospital **sigue reclamando**.
+
+**Por qué.** En la macro hay **una sola fila** (de 4.619) donde la columna
+VALOR ACEPTADO quedó **corrida un renglón**: la fila de la radiografía de mano
+—que además dice **SE OBJETA**— trae $758.700 aceptados, que en realidad son
+del tórax de la fila de abajo. El bot se lo tragó tal cual.
+
+**Lo que faltaba en el bot.** El programa prometía en su documentación que las
+**SE OBJETA** y las **SE SUBSANA** no tocan el detallado… pero **nunca leía esa
+columna**. Ahora sí, y además rechaza cualquier fila donde el valor aceptado sea
+**mayor que el valor reclamado** de esa misma fila: eso es imposible, no se
+puede aceptar más de lo que se cobró. Cualquiera de las dos guardas atrapa el
+caso; están las dos.
+
+**Otro hueco que se tapó.** Si la macro le acepta plata a una factura que **no
+tiene detallado** en la carpeta, antes esa plata desaparecía del control. Ahora
+la factura sale igual en la bitácora con estado **SIN_DETALLADO**: son
+**HUS367368** ($10.400) y **HUS394817** ($2.400).
+
+**Cifras definitivas del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.216.532** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.115.692** |
+
+**Ojo con la HUS396996:** por el mismo corrimiento de la macro, al tórax se le
+descontaron $7.800 cuando el equipo lo aceptó por $758.700. **Esa factura hay
+que revisarla completa antes de radicar**, y de paso corregir la macro.
+
+---
+
+### 18-08-2026 (noche) — Una factura salió mal y se corrigió: la HUS388262
+
+**Lo que pasó.** Después de entregar los 320 Excel, una revisión independiente
+encontró que **una factura quedó mal**: la **HUS388262**. Su total seguía
+$1.400.050 por encima de lo que corresponde, o sea que ese archivo le estaba
+reclamando al ADRES una plata que el hospital ya había aceptado. Las otras 319
+estaban bien.
+
+**Por qué pasó.** Esa factura tiene **dos cirugías**. En el detallado, debajo
+del procedimiento se imprimen los honorarios —cirujano, anestesiólogo,
+ayudantía, derechos de sala—. Los de la primera cirugía **ya están dentro** del
+valor del procedimiento y no vuelven a sumar; los de la segunda **sí suman**,
+porque no están dentro de ningún renglón. El bot decidía «suman todos» o «no
+suma ninguno» **para la factura entera**, y en esta se equivocó.
+
+**Cómo quedó arreglado.** Ahora el bot decide **bloque por bloque**: va sumando
+los renglones sin número hasta completar exactamente el valor del procedimiento
+que tienen encima —ese es su desglose, no cuenta— y lo que siga después es
+cirugía aparte, que sí cuenta.
+
+**Y se le puso un candado.** Antes de guardar cada archivo, el bot se pregunta:
+«la suma de los renglones que doy por buenos, ¿reproduce el subtotal que trae el
+archivo?». Si no lo reproduce, **no inventa el subtotal**: descuenta solo los
+servicios numerados y escribe **REVISAR A MANO** en la bitácora. De las 320
+facturas, el bot entiende 318; las dos que no —**HUS384132** y **HUS392442**—
+quedaron avisadas (y en las dos el descuento sí cuadró con la macro).
+
+**Las cifras corregidas del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.290.032** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.042.192** |
+
+De paso, el bot ya **no toca el contador de servicios** de la fila del subtotal:
+como nunca borra renglones, ese número debe quedar tal como lo dejó el sistema
+del hospital (en la entrega anterior lo había movido en 4 archivos).
+
+Se agregaron pruebas automáticas del caso de las dos cirugías y del candado, y
+se comprobó que si se le quita cualquiera de las dos cosas, las pruebas fallan.
+La verificación final se hizo sumando los subtotales de los 320 archivos de
+salida con un lector independiente: da **$626.042.191,95**, y en las 320 el
+TOTAL DE LA ORDEN coincide con el subtotal.
+
+---
+
+### 18-08-2026 — Se le quita al detallado lo que la EPS ya aceptó (paquete 31068)
+
+**Lo que pidió el auditor:** cruzar los Excel por factura del paquete 31068
+(los del ZIP `EXCEL_POR_FACTURA_31068`) contra la macro de respuesta
+`RTA GLOSA ADRES PAQ 31068`, **quitarle a cada servicio el VALOR ACEPTADO** y
+sacar la **suma final** de lo que el hospital sigue reclamando.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/descontar_aceptado_detallado.py`.
+Lee la macro, se queda **solo** con las filas que tienen VALOR ACEPTADO mayor
+que cero (las SE OBJETA y las SE SUBSANA se siguen reclamando completas), las
+cruza contra el detallado y le baja la plata al renglón que corresponde.
+Recalcula el VR UNIT, el subtotal, el total de la orden y el total en letras.
+El formato no se toca: celdas combinadas, anchos, bordes y moneda quedan igual.
+
+**El cruce no es por código a secas.** El detallado usa el código del hospital
+(`FMQ0046`) y la macro el del ADRES (`2016DM-0000315-R2`), así que se reusó el
+mismo motor de rondas del ajustador: código → descripción → cantidad+valor →
+valor, con emparejamiento único. Lo que no cruza **se informa, no se adivina**.
+
+**Resultado sobre las 320 facturas:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.290.032** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.042.192** |
+
+El ejemplo que mandó el auditor (HUS352890) sale igualito: la consulta de
+urgencias baja de $85.800 a $83.400 por los $2.400 aceptados, y la factura
+queda en $130.400 en vez de $132.800.
+
+**Un susto que se atajó a tiempo.** La primera corrida daba $607 millones,
+$106 millones de menos. La causa: en 50 de las 320 facturas los honorarios de
+cirujano y de ayudantía vienen **sin número de consecutivo** —el lector los
+tomaba como "desglose" que no suma— pero en esas facturas **sí están sumados**
+en el subtotal. La solución fue dejar de recalcular el subtotal desde cero:
+ahora se toma **el subtotal que ya trae el archivo** (que es el bueno) y solo
+se le resta lo descontado. Cuando hay renglones sin consecutivo, el bot mira
+cuál de las dos sumas se parece al subtotal del archivo y decide factura por
+factura. Las 320 salidas quedaron con subtotal = total y con el total en
+letras recalculado.
+
+El bot deja además una **bitácora en CSV** con una línea por servicio
+descontado: factura, servicio, valor antes, aceptado, valor después, por dónde
+cruzó, las causales y una columna **CUADRA** que dice SI o NO comparando lo
+descontado contra lo que dice la macro. Ahí se ven las 14 facturas que no
+cuadran ($3.327.635) para que el auditor las revise a mano.
+
+Se cubrió con **29 pruebas automáticas** (`tests/test_tools/test_descontar_aceptado_detallado.py`),
+incluidas las dos trampas del formato (el desglose que suma y el que no) y los
+avisos: aceptado mayor que el servicio, aceptado sin ítem en el detallado y
+Excel dañado que no puede tumbar el lote.
+### 14-08 — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
+
+Yesid mandó TRES Excel para dejar la página al día: el consolidado 2026
+con corte al 13-08, los oficios de devolución hasta el DEV-PRE-AUD-0113 y
+el **consolidado ADRES/SINAC 2025** (un formato hermano, con la columna
+Oficio adelante y 26 columnas). Comparados con lo cargado el 05-08:
+**56 facturas nuevas** del consolidado, **32 ya cargadas que avanzaron**
+(radicadas/devueltas/subsanadas después de la primera carga), **62
+facturas ADRES** que no estaban en ninguna parte, y **8 oficios de
+devolución nuevos** (0106 a 0113).
+
+El importador del consolidado antes SALTABA toda factura que ya existiera;
+con eso las 32 que avanzaron se habrían quedado congeladas. Se le enseñó a
+**ponerlas al día sin tocar nada de lo guardado**, y la primera versión de
+ese cambio pasó por una revisión adversarial de tres frentes que confirmó
+**15 defectos reales** — todos corregidos antes de publicar:
+
+- Solo toca facturas que ESTE MISMO importador creó y que la página nunca
+  ha tocado; la historia guardada debe encajar como el COMIENZO de la del
+  Excel, y entonces agrega SOLO los eventos que faltan al final. Si no
+  encaja, conflicto reportado y no se toca (con la pista de que escribir
+  la F_DEV que faltó suele destrabar).
+- Al reingresar limpia el amarre al oficio de devolución (como la página),
+  refresca la fecha de recibido, no borra el envío si la fila viene vacía,
+  y deja el motivo de devolución en blanco al quedar radicada.
+- El estado ya no retrocede a NUEVA cuando hay reenvío sin decidir
+  (queda EN_SUBSANACION), y si un encabezado quedó mal de una corrida
+  vieja se sana solo (sin duplicar eventos).
+- Revalida cada factura DENTRO de la transacción por si la página escribe
+  en ese mismo instante, avisa de fechas dañadas (una celda con hora
+  «00:00» en vez de fecha) y de filas repetidas idénticas.
+- Reconoce solo el formato ADRES: lo traduce al mismo modelo, normaliza
+  los números de oficio (FHUS- AS-101139-26 → FHUS-AS-I01139-26) y
+  traduce las iniciales de los auditores (EC, ES, DI).
+- 10 pruebas nuevas (21 en total entre los dos importadores).
+
+**Ensayo con los datos reales** (copia, no la base del PC): quedó en
+**1.077 facturas, 3.372 eventos, 164 oficios de recepción y 11 oficios de
+devolución** — incluido el **0111 con sus 28 facturas ADRES** y el 00103
+con 3, que antes no se podían armar porque esas facturas no existían.
+Cero conflictos, los amarres del 0104/0105 intactos, y correr el trío dos
+veces no cambia nada. Los PDF del 0109 y el 0111 salieron de muestra.
+
+**Lo único que queda por fuera:** el oficio 0099 (su única factura,
+HUS0000533242, no aparece en ningún Excel) — cuando el equipo la escriba
+en el consolidado, entra sola en la siguiente corrida.
+
+**Y LA CORRIDA REAL EN EL PC SALIÓ BIEN (mismo 14-08):** Yesid corrió el
+trío con los archivos nuevos. Consolidado 2026: 56 facturas nuevas + 29
+puestas al día (las otras 3 que avanzaron —540518, 543271, 545425— el
+equipo ya las había trabajado en la página, así que el sistema las
+respetó, como debe ser). ADRES 2025: las 62 completas. Oficios de
+devolución: 9 nuevos (00103 con 3 facturas y 0106 a 0113, incluido el
+0111 con sus 28), 57 eventos amarrados, cada uno con su botón PDF.
+Cero conflictos, cero choques con la página. El informe ya sale con la
+información de los tres Excel. Pendiente de datos: la factura del 0099 y
+la celda F_DEV dañada de la fila 1271 (factura 542017).
+
+---
+
+### 18-08 — Carpeta de trabajo organizada: nace `D:\TRABAJOS BOTS`
+- **Pedido del auditor:** con tantos frentes abiertos (SIIFA, COOSALUD,
+  SIMED, DGH, ADRES, Suite Cartera...) cuesta acordarse "¿en qué carpeta
+  estaba el bot de tal cosa?" y cada vez toca buscar. Pidió una carpeta
+  única en `D:\TRABAJOS BOTS`, organizada por tema, con todo lo de cada
+  frente junto y de forma intuitiva: que al pedir algo se sepa de una a
+  qué carpeta ir y qué bot correr, sin perder tiempo.
+- **Solución entregada:** un bot nuevo de doble clic,
+  `tools\ORGANIZAR_TRABAJOS_BOTS.cmd`, que arma (o pone al día) la
+  carpeta `D:\TRABAJOS BOTS` con **12 carpetas por frente** — 1.COOSALUD,
+  2.SIMED-Dispensario, 3.DGH, 4.SIIFA, 5.ADRES-FURIPS, 6.Glosas ADRES y
+  detallados, 7.Pre-auditoría SINAC, 8.Suite Cartera HUS, 9.Otras EPS
+  (Mutual Ser/FOMAG/SAVIA/EMSSANAR/Famisanar), 10.Herramientas generales
+  (PDF/Excel/ZIP), 11.Motor de Glosas-servidor web y 12.Documentación —
+  más un **índice maestro** en la raíz ("0. LEEME PRIMERO - INDICE.txt")
+  con la tabla *"si te piden esto → ve a esta carpeta"*.
+- **Qué deja en cada carpeta:** accesos directos (doble clic) a los bots
+  que ya lo permiten (MOTOR_HUS, CARGAR_SIIFA, VALIDAR_FURIPS, INICIAR
+  SUITE CARTERA, ESTADO_MOTOR, etc.), accesos a las guías (`docs/...`)
+  abiertas con Notepad, y un `LEEME.txt` en español sencillo por carpeta:
+  cuándo venir ahí, qué bot usar y — para los robots que aún no tienen
+  doble clic (COOSALUD, SIMED, DGH, Mutual Ser, FOMAG) — el **comando de
+  PowerShell listo para copiar y pegar**, con la regla del piloto de 1
+  factura siempre recordada.
+- **No copia ni mueve nada del repositorio**, solo crea accesos directos:
+  si el bot cambia, el acceso directo lo sigue viendo sin volver a correr
+  el organizador. Es seguro correrlo las veces que haga falta (no borra
+  nada que el auditor haya puesto a mano en `D:\TRABAJOS BOTS`) — así que
+  cuando se agregue un bot nuevo, basta con volver a darle doble clic a
+  `ORGANIZAR_TRABAJOS_BOTS.cmd` para que la carpeta quede al día sola.
+- **Cómo usarlo:** copiar la carpeta `tools\` actualizada al PC (o
+  `git pull` en `C:\temp-notas`) y dar doble clic en
+  `tools\ORGANIZAR_TRABAJOS_BOTS.cmd`.
+
+---
+
+### 18-08 — Cómo comprobar que el SOAT 2026 quedó bien, y las 1.503 tarifas que faltaban
+
+Yesid preguntó dos cosas: **cómo quedó el homologador de CUPS a SOAT 2026** y,
+sobre todo, **cómo saber que quedó bien instalado en el sistema**. Y mandó los
+dos PDF que faltaban del paquete de agosto.
+
+**1) Ahora hay un botón para comprobarlo, sin depender de nadie.**
+
+Doble clic en `tools\VERIFICAR_CATALOGOS_SOAT.cmd`. Abre una pantalla, revisa
+las dos tablas del SOAT y termina diciendo **VERIFICADO** o **FALLA**. Solo
+mira: no cambia nada. Si falla, dice qué falta y qué hacer.
+
+Comprueba que el homologador instalado sea el del 2026, que ningún CUPS haya
+vuelto a guardar una frase como si fuera código SOAT, que el Manual SOAT traiga
+más de 1.500 códigos, y cinco tarifas escogidas a mano contra el PDF oficial.
+
+**2) El sistema conocía CUATRO tarifas SOAT. Ahora conoce 1.507.**
+
+Ese fue el hallazgo del día, y salió del PDF que mandó Yesid (la **Circular
+Externa 047 del 30 de diciembre de 2025**, la que fija las tarifas del Manual
+Tarifario para 2026). El liquidador de tarifas del portal decía en su
+documentación que usaba esa Circular, pero por dentro solo tenía **cuatro
+códigos** transcritos a mano como «ejemplos». Para todos los demás contestaba
+«sin tarifa local — consulte el Manual SOAT 2026 oficial», que es exactamente
+lo que uno necesita **cuando la EPS objeta la tarifa**.
+
+Se cargaron las 1.507 de la Circular. Eso alimenta tres sitios a la vez: el
+liquidador de tarifas, el letrero de tarifa que sale al analizar una glosa, y
+el bloque de datos que se le entrega a la IA para redactar el dictamen.
+
+**En plata:** el reemplazo de cadera (código 513014) vale 1.223,71 UVB ×
+$12.110 = **$14.819.100** a tarifa SOAT plena, y **$14.078.200** con el −5% de
+FAMISANAR. Antes de hoy, ese código no tenía tarifa en el sistema. Esto pesa
+sobre todo en los contratos pactados contra el SOAT: **FAMISANAR** («SOAT UVB
+vigente −5%») y **Policía Nacional** («UVB −8%»).
+
+**Por qué se puede confiar en cifras sacadas de un escaneo.** La Circular es un
+PDF escaneado: el computador tuvo que reconocer los números. Se comprobó de
+tres maneras distintas y las tres dieron lo mismo: dos lecturas independientes
+del mismo PDF (cero diferencias en 1.498 tarifas), los cuatro códigos que un
+humano había transcrito antes a mano (coinciden los cuatro), y el Excel Gold
+Standard con su propia columna de UVB (1.048 iguales de 1.250, y las 202
+restantes difieren en **una centésima de UVB** —unos $121— y ninguna en más:
+es redondeo, no error de lectura; manda la Circular, que es la norma).
+
+**3) Dos errores de cien pesos, corregidos.**
+
+- El código SOAT 19007 tenía escrito **$771.800** y son **$771.900**: se había
+  redondeado hacia abajo en vez de a la centena más próxima, como manda el
+  Decreto 780/2016. Cien pesos, pero era una cifra que el sistema le entregaba
+  a la IA como «valor oficial».
+- Al prompt de la IA los pesos le llegaban escritos a la gringa
+  («$14,819,100»). Ahora van **$14.819.100**, como se escribe acá. Es el mismo
+  defecto que salió el 13-08 con «$ 93340.0», en otro sitio del código.
+
+**4) Buscar en el liquidador ya no exige poner las tildes.** Escribir
+«osteosintesis» no encontraba nada porque la Circular dice «Osteosíntesis».
+Ahora encuentra los 27 códigos de osteosíntesis igual, con tilde o sin ella.
+
+**Lo que NO se cargó, para que no quede la impresión de que sí:**
+
+- El **«Proyecto Manual SOAT — Tabla de servicios»**, el otro PDF. Es un
+  **proyecto**, no norma vigente, y sus valores están en **puntos de SMLVD**,
+  la unidad que la Ley 2294 de 2023 reemplazó por la UVB. Cargarlo daría
+  cifras que no corresponden a lo que hoy se puede cobrar. Queda de consulta.
+- El archivo **`Trazabilidad años anteriores.xlsx`**. Serviría para responder
+  glosas de **facturas viejas**, donde aplica la tarifa vigente el día de la
+  atención y no la de 2026. Sigue pendiente.
+
+Todo lo anterior está explicado con detalle en
+`docs/CATALOGOS_TARIFARIOS_SOAT_2026.md`.
+
+**5) OJO CON ESTO — la Policía Nacional quedó SIN CONTRATO VIGENTE.**
+
+Salió de rebote, revisando por qué fallaban cuatro pruebas que no tenían
+nada que ver con el SOAT. **No es un error del sistema: es la realidad según
+la malla contractual cargada.** Los dos contratos de la Policía ya se
+vencieron:
+
+| Contrato | Rigió hasta |
+|---|---|
+| 068-5-200004-26 (mediana y alta) | **15-08-2026** — hace 3 días |
+| 068-5-200006-26 (oncología) | **31-07-2026** — hace 18 días |
+
+Desde el 16 de agosto, si usted analiza una glosa de la Policía Nacional, el
+dictamen dice **«SIN CONTRATO PACTADO»** y aplica **tarifa SOAT plena**. Eso
+está bien hecho si de verdad no hay contrato; está mal si ya se renovó y
+nadie ha cargado el nuevo.
+
+**Lo que hay que decidir (esto no lo puede resolver el sistema):** ¿se
+renovó el contrato con la Dirección de Sanidad de la Policía Nacional? Si
+sí, hay que cargar el nuevo número y su vigencia en la malla contractual.
+La malla que hoy tiene el sistema está fechada **28-07-2026**.
+
+Mientras tanto, las cuatro pruebas quedaron amarradas a una fecha dentro de
+la vigencia —igual que ya se había hecho con COMPENSAR—, porque lo que
+comprueban es que el nombre resuelva al contrato correcto, no si el contrato
+sigue vivo hoy.
+
+---
+
+### 18-08 (tarde) — Un dictamen real destapó dos defectos: la cita vacía y el «mayor valor»
+
+Yesid analizó una glosa de NUEVA EPS —«se glosa servicio por mayor valor
+cobrado según contrato, rx de rodilla, por valor de $12.000»— y mandó el
+dictamen que salió. Traía dos cosas mal.
+
+**1) El dictamen citaba una norma y NO escribía nada adentro de las comillas.**
+
+Decía, textual:
+
+> EN VIRTUD DE ART. 168 LA LEY 100 DE 1993, **QUE DISPONE «.»**, Y ART. 177…
+
+La IA abrió comillas para citar el artículo y escribió un punto. Y debajo, el
+sello: **«7 citas verificadas · 0 hallazgos»**. El revisor de citas no la vio
+porque solo miraba las comillas con **15 caracteres o más** adentro: una
+comilla vacía le pasaba por debajo y encima se contaba como cita buena.
+
+Eso, radicado ante la EPS, le entrega el argumento de que el prestador no
+sustentó su defensa. Ahora pasan dos cosas: **la comilla vacía se borra del
+dictamen** (queda la norma citada, sin la comilla), y si aparece, **el
+revisor la marca en rojo como hallazgo GRAVE**.
+
+**2) La glosa se clasificó como FACTURACIÓN, cuando es de TARIFA.**
+
+«Mayor valor cobrado según contrato» es la familia **TA (tarifas)** de la
+Res. 2284/2023. El motor la mandó a **FA (facturación)** por una razón boba:
+el texto no dice la palabra «tarifa». Lo mismo pasaba con «se cobra por
+encima de lo pactado» y «valor superior al contratado» —las tres formas más
+comunes en que una EPS escribe una glosa de tarifa—.
+
+**Por qué importa:** clasificada como facturación, la defensa se arma como un
+problema de papeles y **nunca se invoca la tarifa pactada, la homologación
+CUPS → SOAT ni el Manual Tarifario**, que es justo lo que tumba este tipo de
+glosa. Ya quedan las tres en TA.
+
+**3) Y de paso, la respuesta que gana esa glosa.** Con la tabla del Manual
+SOAT cargada hoy, el motor ya puede decirlo con número:
+
+| Dato | Valor |
+|---|---|
+| CUPS 873420 — RADIOGRAFÍA DE RODILLA (AP-LATERAL) | homologa a **SOAT 21102** |
+| SOAT 21102 — «Brazo, pierna, rodilla, fémur, hombro, omóplato» | 8,25 UVB |
+| Tarifa oficial 2026 (Circular 047/2025) | **$99.900** |
+| Lo que cobró el hospital | **$12.000** |
+
+El hospital cobró **la octava parte** de la tarifa del Manual Tarifario. Una
+glosa por «mayor valor cobrado» sobre un cobro ocho veces por debajo del
+manual no se sostiene. Antes de hoy el sistema no tenía ese número.
+
+---
+
+### 18-08 — Empieza la revisión botón por botón: «Consulta Normativa»
+
+Yesid decidió que esta semana se revisa el motor **botón por botón**, dejando
+cada uno al 100%. Se arrancó por HERRAMIENTAS → **Consulta Normativa**, que
+nació queriendo ser el equivalente de *miscuentasmedicas.com*.
+
+**Lo que YA funcionaba bien:** la biblioteca legal. Las 131 normas están
+indexadas de verdad y las ocho preguntas de ejemplo del panel devuelven la
+norma correcta. Eso no se tocó.
+
+**El defecto grande: la pantalla no entendía el código de la factura.**
+
+El liquidador solo sabía buscar por **código SOAT** (21102, 19001…). El
+auditor no tiene ese código: tiene el **CUPS de la factura** (873420) o el
+nombre del procedimiento («radiografía de rodilla»). Escribiendo cualquiera
+de los dos, la pantalla devolvía **cero** — y es justo lo que uno escribe
+cuando la EPS objeta la tarifa.
+
+La tabla que hace el puente (10.024 CUPS homologados) ya estaba cargada. Solo
+faltaba que la búsqueda la usara. **Ya la usa:**
+
+> Escribe **873420** → sale **SOAT 21102 · 8,25 UVB · $99.900**, y debajo dice
+> de dónde salió: «CUPS 873420 · RADIOGRAFÍA DE RODILLA (AP - LATERAL)».
+
+Con eso, **2.365 códigos CUPS** que antes no daban nada ahora liquidan en
+pesos escribiendo el número que sale en la factura. Y los **2.966** que el
+Manual SOAT no tarifa ya no salen como «no encontrado»: sale el hecho —que
+además favorece al hospital— de que **la EPS no puede objetar la tarifa
+citando un código SOAT que para ese procedimiento no existe**.
+
+**Segundo defecto: el año mentía en silencio.** Si se pedía liquidar al año
+2024, el sistema usaba la UVB de 2026 sin avisar. Una factura vieja liquidada
+con la unidad de este año da una cifra que no se puede radicar. Ahora sale un
+aviso amarillo diciendo con qué unidades se calculó.
+
+**Lo que le sigue faltando a este botón (medido, no supuesto):**
+
+1. **No liquida cirugías.** Son **5.832 mapeos** —los procedimientos
+   quirúrgicos—. Su tarifa en el manual no es un valor directo: es un **grupo
+   quirúrgico** (02 al 13, y especiales 20 al 23). Para dar el valor hay que
+   sumar derechos de sala + honorarios del cirujano + ayudantía +
+   anestesiólogo + materiales, cada uno con su propio código. **La Circular
+   047/2025 ya trae todas esas tarifas por grupo** (39204 a 39219, 39100 a
+   39128, 39301 a 39305): falta cruzarlas. Es la página
+   «liquidación de cirugías SOAT» de miscuentasmedicas, y es donde está la
+   plata grande.
+2. **No consulta las tarifas contratadas.** Los **6.655 códigos de FAMISANAR**
+   que se cargaron el 13-08 están en la base de datos, pero el liquidador
+   nunca la mira: solo mira los catálogos fijos. O sea que la tarifa
+   **realmente pactada** con la EPS no aparece en la pantalla.
+3. **No tiene ISS 2001.** miscuentasmedicas lo tiene de primero porque muchos
+   contratos se pactan «ISS 2001 + X%». El sistema no lo conoce.
+4. **Tarifas propias del HUS: solo 84 códigos** de las Res. 054 y 124 de 2026.
+   Falta cargar el resto.
+5. **El índice de normas dice «0 artículos»** en las 131. Cosmético.
+
+---
+
+### 18-08 (tarde) — Consulta Normativa: el liquidador ya hace CIRUGÍAS
+
+Seguimos con el mismo botón. Faltaba lo más grande: **liquidar cirugías**, que
+es donde está la plata. Ya quedó.
+
+**Primero averigüé cómo factura el HUS las cirugías** (era la duda que dejamos
+abierta). Yesid corrió una consulta contra la base del PC de cartera y el
+contrato de FAMISANAR lo dejó claro:
+
+- Una cirugía se paga por **grupo quirúrgico**: se suman cinco cosas —derechos
+  de sala + honorarios del cirujano + ayudantía + anestesiólogo + materiales—,
+  cada una con su tarifa. El «UVB POR GRUPOS» que está cargado en la base **es
+  ese paquete** con el −5% del contrato ya aplicado.
+- Algunos procedimientos (p. ej. la **colecistectomía**) no van por grupo: van
+  por **TARIFA PROPIA del HUS** ($6.296.900), que es más del doble del valor
+  SOAT. El contrato manda pagarlos así, y así están cargados.
+
+**Lo comprobé antes de construir nada.** Calculé el paquete de tres cirugías y
+lo comparé con lo que está pactado en la base:
+
+| Cirugía | Grupo | Lo que calcula el motor | Lo pactado (base) |
+|---|---|---|---|
+| Cesárea | 8 | $2.072.200 | $2.072.200 ✅ exacto |
+| Apendicectomía | 7 | $1.885.200 | $1.885.300 (±$100 redondeo) |
+
+Es decir: el desglose que ahora muestra la pantalla **reconstruye el valor
+real pactado**, casi al peso.
+
+**Qué se ve ahora:** escriba el CUPS de una cirugía (por ejemplo `471102`,
+apendicectomía) y la pantalla muestra el **total** y, debajo, las **cinco
+líneas** que lo componen, cada una con su código y su valor. Eso es lo que hay
+que enseñarle a la EPS.
+
+**Y se resolvió una confusión peligrosa.** El Manual SOAT trae la misma cesárea
+de **dos formas**: por grupo ($2.072.200) y como **«paquete integral» todo
+incluido** ($4.298.200, otra modalidad). Antes salían las dos sin distinción y
+uno no sabía cuál radicar. Ahora cada una sale con su etiqueta —«CIRUGÍA ·
+grupo 8» y «PAQUETE INTEGRAL»— para que usted use la que su contrato pactó (con
+FAMISANAR, la de grupo).
+
+**Lo honesto de siempre:** para los grupos especiales 20 al 23 (las cirugías
+más grandes) el Manual no publica código de materiales, así que esa línea sale
+marcada «no tarifado en la Circular» y hay que soportarla aparte. Nunca se
+inventa el valor.
+
+**Lo que le sigue faltando a este botón:** que lea las **tarifas pactadas de la
+base de datos** (los 6.655 de FAMISANAR) para mostrar, al lado del cálculo
+SOAT, el valor exacto del contrato — incluida la TARIFA PROPIA de la
+colecistectomía, que el cálculo por grupo no alcanza a ver. Ese es el próximo
+paso de Consulta Normativa.
+
+---
+
+### 18-08 (cierre) — Consulta Normativa al 100%: el liquidador ya lee la tarifa PACTADA
+
+Último punto del botón. El liquidador daba lo que el **Manual** dice que vale
+un código, pero no lo que el hospital **pactó** en el contrato. Y esas dos
+cosas pueden ser muy distintas. Ya lo lee de la base.
+
+**El ejemplo que lo explica:** la **colecistectomía** (CUPS 512101). El
+cálculo por grupo SOAT da $3.157.500. Pero el contrato de FAMISANAR la pactó
+por **TARIFA PROPIA a $6.296.900** —más del doble—. Antes esa cifra no
+aparecía por ningún lado del liquidador. Ahora sale **de primera**, resaltada,
+con la etiqueta «PACTADO · FAMISANAR EPS», y debajo queda el cálculo SOAT como
+referencia del Manual.
+
+**Cómo funciona:** cuando usted busca un código, el liquidador ahora también
+mira las **tarifas contratadas cargadas** (las 6.655 de FAMISANAR y las que se
+suban después) y, si el código está pactado, muestra el valor exacto del
+contrato. La regla es clara: **manda lo pactado**; el SOAT es solo el soporte
+del porqué.
+
+**Detalles que quedaron bien cuidados:**
+- Solo muestra contratos **activos** (uno vencido no aparece).
+- Se puede filtrar por EPS.
+- Si el código no está en ningún contrato, el liquidador funciona igual que
+  antes (no estorba).
+
+**Con esto, el botón «Consulta Normativa» queda terminado:**
+
+| Función | Estado |
+|---|---|
+| Biblioteca de 131 normas | ✅ |
+| Buscar por código SOAT | ✅ |
+| Buscar por **CUPS de la factura** o por nombre | ✅ |
+| **Liquidar cirugías** con desglose por grupo | ✅ |
+| Distinguir «paquete integral» del pago por grupo | ✅ |
+| Aviso cuando el año no tiene UVB propia | ✅ |
+| **Tarifa PACTADA del contrato** (la que de verdad se cobra) | ✅ |
+
+**Lo único que queda por fuera, y es porque falta el archivo:** el manual
+**ISS 2001**, con el que se pactan algunos contratos. Cuando Yesid lo consiga,
+se carga igual que se cargó el SOAT.
+
+---
+
+### 18-08 (noche) — «No es solo FAMISANAR»: cargadas las 1.900 tarifas propias del HUS
+
+Yesid mandó tres archivos con una instrucción clara: **tener en cuenta todas
+las tarifas, no solo FAMISANAR**. Tenía toda la razón, y salió un hueco
+grande: el liquidador solo conocía **84** tarifas propias del hospital.
+
+**Qué se cargó — `TARIFAS_HUS.xlsx`.** El catálogo institucional completo del
+HUS: **1.932 tarifas propias** en pesos (1.480 procedimientos + 47 paquetes +
+374 exámenes ambulatorios + 31 órtesis/prótesis). Estas tarifas **no son de
+FAMISANAR**: son del HUS, y las usan **todos** los contratos que pactan
+«tarifas propias/institucionales».
+
+**Por qué importa para todas las EPS.** La malla que mandó Yesid lo confirma
+—casi todos pagan «SOAT −X% + TARIFAS PROPIAS»—:
+
+| EPS / Pagador | Modalidad |
+|---|---|
+| COOSALUD (subsidiado y contributivo) | SOAT −15% + tarifas institucionales |
+| COMPENSAR | SOAT −15% + tarifas propias |
+| SALUD MÍA (Plan Canguro/IVE) | SOAT −15% + tarifas propias |
+| CONSORCIO PPL (Fiduciaria Central) | SOAT −15% + tarifas institucionales |
+| SEGUROS AURORA / ARL | SOAT −3% + tarifas institucionales |
+| FAMISANAR | SOAT UVB −5% + tarifas institucionales |
+| PREVISORA FOMAG | SOAT (condiciones iniciales) |
+
+**Qué se ve ahora.** Busque `512101` (colecistectomía) y sale la **TARIFA
+PROPIA del HUS $6.296.900** —el valor real que se cobra— **para cualquier
+EPS**, sin depender de que esté cargada en la base. Antes ese número solo
+aparecía si estaba pactado en la base de FAMISANAR.
+
+**Un cuidado importante:** a las tarifas propias **NO se les aplica el −X%
+del SOAT** —son valor fijo—. La pantalla lo dice: «tarifa fija · sin % SOAT».
+Aplicarle el descuento sería cobrar de menos.
+
+**Lo que NO se tocó, a propósito:** la **malla de contratación** del sistema.
+El sistema ya tiene una malla más reciente (28-07-2026) que la que mandó Yesid
+(2 de marzo). Meter la de marzo encima **borraría** contratos más nuevos. Si
+hay que actualizar las vigencias o los porcentajes por EPS, se hace con
+cuidado y revisando contra la malla vigente — queda como decisión para
+confirmar, no se cambió a ciegas.
+
+### 18-08 — Dispensario: lote del 14 de agosto (24 facturas, puras tarifas)
+
+Llegó el export `GLOSAS_14_AGOSTO.xlsx` (636 glosas; 612 son de COOSALUD y se
+omitieron por instrucción del auditor). Lo del **Dispensario: 24 facturas, 36
+objeciones, $2.511.222**, vencimientos entre el 24-08 y el 01-09. Todas las
+observaciones son de **tarifas** (reconocen SOAT UVB alegando "sin acuerdo de
+voluntades vigente", "sin cotización", "sin lista de precios").
+
+- **Verificación de "¿ya se subieron?":** 20 facturas son glosas nuevas
+  (nunca trabajadas). Las otras 4 (531237, 531815, 531331, 532571) son
+  exactamente las mismas glosas que se cargaron el 05-08 con las 23
+  pendientes (mismos valores al peso) — van incluidas igual por seguridad:
+  si ya están contestadas, el robot las salta (NO_PENDIENTE).
+- **Punto jurídico clave:** las 24 facturas tienen fecha de servicio entre el
+  24-jun y el 22-jul de 2026 — todas DENTRO del plazo del contrato 440 (hasta
+  30-07-2026). El ataque "sin acuerdo de voluntades VIGENTE" se responde con
+  la tarifa pactada "vigente a la fecha de cada prestación" (así ya lo dice
+  la plantilla del motor).
+- **Excel generado** (`respuestas_glosa_DISPENSARIO_14AGO.xlsx`) con el motor
+  del repo + 4 refuerzos a la medida: (1) la glosa TOTAL de la 535749 discute
+  la FECHA del soporte (la firma del radiólogo es la fecha de lectura, no de
+  la toma) y se contestó como soporte con taxatividad de causales; (2) a las
+  que citan el Decreto 780 art. 2.6.1.4.2.4 y la Circular 047/2025 se les
+  responde que esas normas operan a falta de acuerdo; (3) homologación SOAT y
+  (4) cotización previa: no aplican cuando hay tarifa contractual propia.
+  Hoja "Control" con consecutivo DGH, vencimiento y cuadre al peso contra la
+  hoja INICIAL (las 24 cuadran).
+- Comandos de piloto (535452) y corrida completa entregados; evidencias a
+  `D:\USUARIO CARTERA\Documents\DISPENSARIO MEDICO 14-08-2026\EVIDENCIAS`.
+- **Para verificar por el auditor antes de subir:** en la 535749, confirmar
+  en historia clínica/RIPS la fecha real de la toma de la radiografía (la
+  respuesta afirma que la fecha del RIPS es la de la atención).
+- **Falta el consecutivo GI-33 de este lote** para la carpeta y el PDF de
+  evidencias (preguntado al auditor).
+
+### 18-08 (conciliación) — Acta 879 armada y las 3 objeciones de pertinencia justificadas
+
+Jornada de apoyo a la mesa de conciliación con el Dispensario (chat GLOSAS
+DISPENSARIO — SIMED):
+
+- **Las 2 facturas perdidas aparecieron.** El auditor no encontraba la hoja
+  de trabajo con las facturas 487285 y 481515. Se rastreó: sus carpetas de
+  soportes están en los LOTES de mayo (LOTE 3 y LOTE 8 — la de LOTE 8 estaba
+  mal nombrada "HUS87285" y se renombró); sus radicados de respuesta de abril
+  son **GI-23-4699-2026 y GI-23-4700-2026** (en el share Z: de SERVIDOR
+  GLOSAS); y la hoja de trabajo buena resultó ser
+  **HOJA_TRABAJO_GLOSAS_DMBUG_CON_OBSERVACIONES**, recuperada del respaldo de
+  WhatsApp en `D:\BackupCelular` (la "v2 - JOHAN" que buscaba ya no existe:
+  solo quedaron sus huellas temporales de Excel en Descargas).
+- **Las 3 objeciones de pertinencia médica quedaron justificadas al peso**
+  (486873, 487285, 481515): en las tres, el valor aceptado en el acta es
+  correcto y cuadra exacto (glosa = aceptado + levantado); lo que falla es la
+  **observación de la nota crédito**, que el armador construye concatenando
+  textos por línea y **duplica unos y omite otros**. Se entregaron los tres
+  textos de respuesta para pertinencia con el desglose peso por peso
+  (486873: $27.901 + $139.505 = $167.406, NC 310232; 487285: glosa $1.259.426
+  = aceptado $953.680 + levantado $305.746, NC 310123; 481515: glosa
+  $16.188.629 = aceptado $4.606.885 + levantado $11.581.744, NC 310166).
+  **Hallazgo de fondo:** ese defecto del concatenador de notas va a repetirse
+  en otras facturas del acta — se ofreció hacer un bot que arme la
+  observación correcta (todos los ítems aceptados con su valor).
+- **Se armó el ACTA SINAC N.º 879** (`ACTA_SINAC_N_879_ESE_HUS_DISPENSARIO_MEDICO.xlsx`)
+  con el formato del acta 720 de ejemplo: hoja ACTA con encabezado, tabla de
+  **1.493 glosas / 630 facturas** (radicado AC000879/AR003215, tipificación,
+  código, motivo, valores, descripción de conciliación y observación de NC
+  por glosa), totales **glosado $401.179.634 · acepta IPS $122.715.506 ·
+  levanta entidad $276.758.183**, observaciones, mérito ejecutivo y firmas;
+  hoja GLOSAS (detalle completo de la hoja de trabajo) y hoja NOTAS (las 10
+  NC del Dispensario en la BD de julio). Fuentes: la hoja CON_OBSERVACIONES
+  (el cruce de decisiones casó 1.493/1.493) y la BD de glosas aceptadas de
+  julio.
+- **(19-08) Acta 879 en limpio:** el auditor pasó el acta a su formato .xlsm
+  definitivo y quedaban 27 filas con la descripción genérica "IPS ACEPTA
+  GLOSA". Se corrigieron **26 en el sitio** (mismo archivo, macros y formato
+  intactos: solo cambiaron 52 celdas, verificado con comparación celda a
+  celda) tomando el CONCEPTO CONCILIACIÓN de la circularización de glosas
+  2026 — 22 con el texto textual y 4 de la factura 487285 con texto compuesto
+  porque la circularización traía el texto trocado (decía "levanta" con
+  valores de aceptación). Quedó **1 sin tocar para decisión del auditor**: la
+  487096 CL0101 por $1.248.511, que el acta tiene ACEPTADA al 100% y la
+  circularización tiene LEVANTADA. Ojo adicional: en la 487285 la
+  circularización reporta las terapias levantadas y un aceptado total de
+  $920.064 vs $953.680 del acta de la entidad ($33.616 de diferencia) —
+  aclarar con el técnico antes de firmar.
+- **Para cerrar el acta:** (1) confirmar fecha y número contra el **PDF
+  firmado ACTA_AC_AC000879** (se dejó 07/05/2026 según las NC; el PDF no se
+  ha compartido al chat); (2) revisar **3 líneas que no cierran**: 478141
+  (diferencia de $1: glosa 16.210 vs aceptado 16.209), 487192 (diferencia de
+  $20: 18.886 vs 18.866 — dígitos trocados) y **481589 (quedan $1.705.924 sin
+  decidir**: glosa $2.985.367, aceptado $426.481, levantado $852.962).
+
+---
+
+### 18-08 (noche) — Empieza «Salud Total»: el lector de valores ya no lee de menos
+
+Segundo botón de la revisión. Salud Total ya tenía mucho trabajo hecho (se
+había restaurado y se le conectó el análisis con IA), así que el diagnóstico
+fue corto.
+
+**Lo que ya funcionaba bien:** las tres opciones (Extemporánea, Ratificada,
+Analizar con IA) responden; la pantalla tiene girador, error, estado vacío,
+moneda con formato y las etiquetas IA/PLANTILLA; y no inventa «días
+transcurridos» si falta la fecha.
+
+**El defecto que se arregló — el lector de valores era frágil.** Leía solo el
+formato gringo (280000.00). Si el portal mandaba el valor a la colombiana:
+- «280.000» lo leía como **$280** (mil veces menos),
+- «280.000,00» **reventaba** el proceso.
+
+Y esos valores van en el archivo que se radica y en los totales de la
+pantalla. Ahora usa el lector único del repo, que entiende los dos formatos
+y deja el actual igual. 11 pruebas nuevas.
+
+**Lo que quedó como DECISIÓN del dueño (no se tocó):** el código de respuesta
+RE9901 que el modo rápido le pone a las glosas que no son de tarifa ni
+extemporáneas (soportes, autorización, cobertura…). Ese código, según el
+Manual Único, ADMITE que la glosa era justificada y que se subsanó. Si lo que
+se quiere es rechazarla de fondo, el código sería RE9602 («injustificada al
+100%»). Falta que Cartera confirme cuál usa el HUS en el portal de Salud Total
+antes de cambiarlo.
+
+---
+
+### 18-08 (noche) — Salud Total: la respuesta ahora es la que el HUS radica de verdad
+
+Yesid mandó el archivo REAL: cómo llega la glosa (el TXT «Detalle» de 24
+columnas) y cómo se sube la respuesta (el RTAGLOSA con RE9602/RE9901). Con eso
+en la mano se corrigieron tres cosas que estaban mal en el modo por plantilla.
+
+**1) El texto de TARIFAS afirmaba un contrato que NO existe.** Decía «...LA
+LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE...». Con Salud Total el
+HUS **no tiene contrato**. Afirmar lo contrario en un documento que se radica
+le regala a la entidad el argumento de que sí lo había. Ahora dice la verdad,
+palabra por palabra como en el archivo real: «...ENTIDAD SALUD TOTAL SIN
+CONTRATO VIGENTE... SE FACTURA A SOAT VIGENTE Y LOS INSUMOS A TARIFAS
+INSTITUCIONALES...».
+
+**2) El código de respuesta por familia estaba cruzado.** El archivo real usa:
+- Tarifas (TA) y Facturación (FA) → **RE9602** (injustificada al 100%).
+- Soportes (SO) y Pertinencia (CL) → **RE9901** (subsanada, soportes adjuntos).
+
+El sistema le ponía a Facturación el RE9901 y a Soportes el RE9602. Quedó
+alineado con la realidad.
+
+**3) La respuesta ya no le pega el nombre del servicio al final.** El archivo
+real no lo lleva, y así se respeta mejor el tope de 500 caracteres.
+
+**Comprobado con el archivo real:** se tomó el TXT «Detalle» que mandó Yesid,
+se pasó por el motor, y la salida quedó **idéntica** a su archivo OK en las
+familias que se pueden hacer por plantilla (TA y SO, que son el 84% del
+archivo).
+
+**Lo honesto:** en el archivo real, las glosas de Facturación y de Pertinencia
+venían con un texto **escrito a mano** para ese caso puntual (dotación de UCI,
+jeringas de 20 cc). Eso NO se puede volver plantilla sin inventar: para esas
+glosas específicas está el botón «Analizar con IA», que arma el argumento con
+todo el contexto. La plantilla cubre la mayoría (tarifas y soportes) y las
+demás quedan con una respuesta genérica correcta que el auditor ajusta.
+
+**Y un arreglo previo del mismo día:** el lector de valores del TXT ahora
+entiende el formato colombiano (antes «280.000» lo leía como $280).
+
+---
+
+### 18-08 (más tarde) — Salud Total: los acentos ya no salen rotos en el portal
+
+Yesid probó el botón «Analizar con IA» con la notificación real y mandó el
+archivo que salió. La IA quedó bien (códigos correctos por familia, sin código
+HTML, argumentos reales), pero se vio un error que afectaba **todos** los
+archivos de Salud Total, no solo la IA.
+
+**Los acentos salían rotos.** «Clínica» se veía «clÃ­nica», «CÓDIGO» «CÃDIGO».
+La causa: el portal de Salud Total lee el archivo en **ANSI (Windows-1252)**
+—el archivo del HUS que sí funcionó está en ese formato— y el sistema lo
+generaba en **UTF-8**. Al subir un UTF-8 a un portal que espera ANSI, los
+acentos se dañan, en un documento que se radica.
+
+Ahora el archivo se descarga en ANSI, igual que el que funcionó. Los guiones
+largos y las comillas curvas que mete la IA se convierten a signos normales
+para que ningún carácter raro dañe la descarga.
+
+Con esto, «Salud Total» queda cerrado: lector de valores robusto, texto de
+tarifas sin contrato falso, códigos correctos por familia, salida idéntica al
+archivo real, y ahora la codificación correcta para el portal.
+
+---
+
+### 18-08 (noche) — Validador ADRES: la búsqueda de autorizaciones ya no llena el disco
+
+Tercer botón de la revisión. El Validador ADRES está bien armado —la malla
+completa de la Circular 022/2023 (FURIPS 1 de 102 campos y FURIPS 2), el cruce
+con RIPS/CUV/XML/factura/epicrisis con OCR, y 29 pruebas que pasan—.
+
+**El defecto que salió: una fuga de disco.** El buscador de números de
+autorización guardaba lo que uno sube en una carpeta temporal y, **cuando
+terminaba bien, no la borraba** (solo la borraba si había un error). Cada
+búsqueda dejaba en el disco los JSON subidos y el Excel generado. En el PC de
+cartera, usándolo seguido, eso termina llenando el disco. Ahora la carpeta se
+borra sola apenas se envía el archivo.
+
+**Una cosa para tener presente (no es un defecto, es cómo está hecho):** la
+validación FURIPS grande corre en segundo plano y su estado vive en la memoria
+del programa. Si justo mientras corre se actualiza el sistema (deploy), esa
+validación se pierde y hay que volver a subir los archivos —la pantalla lo
+avisa con un mensaje claro—. Pasa rara vez (solo cuando hay una actualización
+en ese momento); dejarlo a prueba de eso sería un cambio grande y de poca
+ganancia, así que queda anotado, no cambiado.
+
+---
+
+### 18-08 (noche) — Validador ADRES: probado con datos reales, SÍ sirve
+
+Yesid lo puso a prueba en producción con tres facturas reales y mandó los
+informes. Los revisé y la herramienta **funciona de verdad**:
+
+**Informe FURIPS (3 facturas).** Los hallazgos son correctos y precisos, cada
+uno citando la regla exacta de la Circular 022/2023: un dispositivo médico sin
+registro INVIMA (código vacío), descripciones pasadas de 100 caracteres,
+líneas idénticas que la Circular obliga a agrupar, y una dirección de
+propietario que era solo el nombre de un municipio («CHARTA SANTANDER») sin
+nomenclatura. Cero falsos positivos. Además trae el detalle campo por campo
+(307 filas de FURIPS1, 263 de FURIPS2).
+
+**Informe de autorizaciones.** El RIPS traía una autorización mal escrita
+(«Código  71539» en vez de un número) y el informe la marcó exacto: «1 con
+otro número», y la puso en ALERTAS. Correcto.
+
+**Se agregó una prueba de punta a punta del motor** (no existía): arma un
+paquete FURIPS desde la propia malla del validador, lo pasa por `procesar`, y
+comprueba que corre, que caza un valor inválido plantado a propósito (sexo
+fuera de F/M/O), que NO lo marca cuando es válido, y que genera el Excel.
+
+Con esto queda claro que el botón funciona; los defectos que se corrigieron
+antes (la fuga de disco de autorizaciones) eran de plomería, no del motor.
+
+---
+
+### 18-08 (noche) — Soportes: el indexador reconoce «FVS» (la factura)
+
+Quinto botón de la revisión. El indexador de soportes está bien armado (44
+pruebas, dos pasadas, comparte los soportes de carpeta entre facturas, y saca
+la factura del nombre exigiendo el prefijo «HUS» —lo que evita confundirla con
+el NIT del hospital 900006037, que va primero en el nombre—).
+
+**Lo que se arregló:** los archivos de la factura electrónica que el servidor
+nombra «FVS_900006037_HUSxxxx.pdf» quedaban etiquetados «otro», porque el
+clasificador no conocía el código **FVS** (Factura de Venta en Salud) —aunque
+la propia pantalla lo documenta—. Se encontraban por número, pero salían mal
+etiquetados. Ahora se etiquetan como la factura.
+
+**Lo que falta CONFIRMAR con un nombre real (para no adivinar):** el
+indexador saca la factura del nombre solo si trae el prefijo «HUS» (ej.
+FVS_900006037_**HUS**0000487175.pdf). Si algún archivo del servidor nombra la
+factura con dígitos pelados (FVS_900006037_487175.pdf, sin «HUS»), NO se
+indexaría por factura y no se encontraría. Hay que ver un nombre de archivo
+real del servidor de radicación para saber si eso pasa; si pasa, se amplía el
+patrón con cuidado de no volver a agarrar el NIT.
+
+---
+
+### 18-08 (cierre) — Soportes: con los nombres REALES salió el defecto de verdad
+
+Yesid mandó rutas reales del servidor (\\Prime\radicacion_2026). Dos cosas:
+
+**1) El prefijo real es FEV, no «FVS».** La pantalla lo tenía mal documentado.
+FEV ya lo conocía el clasificador, así que la factura electrónica se
+detectaba bien. (Se dejó igual el soporte para «FVS» por si acaso, y se
+corrigió el texto de la pantalla.)
+
+**2) El defecto de verdad — la EPS salía vacía.** Las carpetas del 2026 llevan
+un ORDINAL delante: «**8.** AGOSTO 2026 - SOPORTES RADICACION». El indexador
+buscaba «AGOSTO 2026 - ...» sin ese «8. », así que no reconocía la carpeta del
+mes y, con ella, se perdían el mes, el año y —lo que importa— **la EPS de cada
+soporte** (NUEVA EPS, SANITAS, PPL, POSITIVA, SURA, SEGUROS BOLIVAR). Con eso
+arreglado, cada soporte ya sabe de qué EPS es.
+
+**Lo que quedó comprobado con los nombres reales:** la factura se saca perfecto
+del nombre en los 90 archivos de ejemplo —incluido uno con el NIT mal escrito
+(«9000006037» con un cero de más)—, porque el patrón se ancla en el prefijo
+HUS de la factura, no en el NIT. Mi duda del «dígito pelado» NO se da: todos
+traen HUS.
+
+Se agregaron pruebas que arman la estructura real de carpetas (con el ordinal)
+y comprueban que se encuentra la factura y se sabe la EPS.
+
+---
+
+### 18-08 (noche) — Soportes conectado al servidor real: dos trabas que aparecieron al usarlo
+
+Se apuntó el motor a `\\Prime\radicacion_2026` y empezó a indexar de verdad
+(iba en 2.522 facturas y 17.087 archivos). Al usarlo salieron dos trabas:
+
+**1) La búsqueda daba «Error 524».** Buscar una factura MIENTRAS el indexador
+recorría el servidor dejaba la pantalla esperando hasta que el proxy la
+cortaba. La causa: la búsqueda y el reindexado se peleaban por el mismo
+candado, y recorrer miles de archivos por red dura minutos. Ahora la búsqueda
+**responde con lo que ya haya indexado** y nunca hace cola. Además, si se pide
+un reindexado y ya hay uno corriendo, no se arranca otro encima.
+
+**2) Se volvía sola a la carpeta local.** El «vigilante» que revive el motor
+guarda la configuración de cuando ÉL arrancó, así que matar solo el motor lo
+revivía apuntando otra vez a `C:\motor-glosas\repo\data\soportes`. Ahora el
+motor **lee la carpeta directamente del archivo** `config\soportes_root.txt`
+al arrancar, sin depender de quién lo levante. Se configura una vez y queda.
+
+**Y la pantalla ahora dice qué está pasando:** mientras indexa muestra
+«⏳ Indexando…», explica que puede tardar varios minutos la primera vez, y se
+actualiza sola cada 5 segundos. El botón de reindexar ya no deja la pantalla
+colgada: arranca el trabajo y devuelve el control enseguida.
+
+---
+
+### 19-08 — Soportes indexando el servidor de verdad, y el mensaje que confundía
+
+Con los arreglos de anoche, el indexador ya está recorriendo
+`\\Prime\radicacion_2026` de verdad: **11.367 facturas y 102.729 archivos** y
+subiendo, con la pantalla mostrando «⏳ Indexando…» y actualizándose sola. La
+búsqueda ya **no da Error 524**: responde de una.
+
+**Pero el mensaje engañaba.** Al buscar una factura de agosto mientras el
+indexador iba por la mitad, la pantalla decía «Sin soportes para la factura» y
+listaba causas que no incluían la verdadera: **todavía no había llegado a
+agosto**. Las carpetas se recorren por orden (FEBRERO, MARZO…), así que los
+meses recientes salen de últimos. Un auditor podía creer que la factura no
+tenía soportes cuando sí los tiene.
+
+Ahora, si el índice está a medias, el mensaje lo dice claro: cuántas facturas
+lleva, que las carpetas van por orden y que espere a que termine. Y se corrigió
+un «hace en curso» que había quedado mal redactado.
+
+---
+
+### 19-08 — Soportes ENCONTRÓ los expedientes, y la EPS que mostraba estaba mal
+
+Yesid buscó una factura real de febrero (HUS468334) y salieron **los 12
+soportes**: FEV, HEV, CRC, epicrisis, hoja de administración de medicamentos,
+RIPS en JSON, XML, CUV, OPF, PDE, PDX. El indexador está haciendo su trabajo
+sobre el servidor real.
+
+**Pero la columna EPS decía «1.DD FACTURACION»**, que no es una EPS: es una
+carpeta del archivado. La EPS de verdad era **ALIANZA MEDELLÍN**.
+
+La causa, otra vez de las que solo se ven con datos reales: la lista de
+carpetas que el sistema debe saltarse decía «1. **DD** FACTURACION» **con
+espacio** después del punto, y en el servidor la carpeta se llama «1.DD
+FACTURACION» **sin espacio**. Como no coincidía, la tomaba como si fuera el
+nombre de la EPS. Ahora la comparación ignora el ordinal y los espacios, así
+que da igual cómo esté escrita.
+
+Comprobado con las tres formas de carpeta que hay en el servidor: la de
+febrero (con ESCANEO en el medio) da ALIANZA MEDELLÍN, la de marzo da SANITAS
+y la de agosto da NUEVA EPS.
 
 ### 06-08 — Informe por entidad en Word, y cómo ver qué llega nuevo a SIIFA
 
@@ -2477,6 +4184,36 @@ devoluciones.
 
 ## 3) PENDIENTE
 
+### Organización de trabajos (nuevo, 18-08)
+- **Correr `ORGANIZAR_TRABAJOS_BOTS.cmd` en un PC real del hospital** y
+  confirmar que la carpeta `D:\TRABAJOS BOTS` queda como se espera (los
+  12 temas, los accesos directos abren el bot correcto, y los LEEME.txt
+  se leen bien en español). Claude Code no tiene acceso al disco D: para
+  probarlo por su cuenta.
+- Si algún bot nuevo se agrega más adelante (o cambia de nombre), avisar
+  para sumarlo al script y que el organizador lo incluya la próxima vez.
+
+### DECISIÓN DEL DUEÑO — contrato de la Policía Nacional (18-08)
+
+**¿Se renovó el contrato con la Dirección de Sanidad de la Policía Nacional?**
+Los dos que están cargados se vencieron: el 068-5-200004-26 (mediana y alta)
+el **15-08-2026**, y el 068-5-200006-26 (oncología) el **31-07-2026**. Desde
+el 16 de agosto el motor contesta «SIN CONTRATO PACTADO» y aplica tarifa SOAT
+plena para esa entidad. Si ya hay contrato nuevo, hay que cargar su número y
+su vigencia en la malla contractual (hoy fechada 28-07-2026).
+
+### Tarifas SOAT — lo que falta cargar (18-08)
+
+1. **`Trazabilidad años anteriores.xlsx`** (13 hojas, resoluciones de años
+   previos). Hoy el sistema solo sabe la tarifa **2026**. Cuando la glosa es
+   de una factura vieja, la tarifa que aplica es la que estaba vigente **el
+   día de la atención**, no la de hoy. Sin ese archivo cargado, ese tipo de
+   glosa hay que responderla a mano.
+2. **Descripciones con ruido en el Manual SOAT.** En un puñado de renglones de
+   la Circular 047/2025 la descripción quedó con un pedazo de la nota al pie
+   pegado (por ejemplo el código 38274). La **tarifa** está bien; solo el texto
+   quedó sucio. No es urgente, pero se ve feo en pantalla.
+
 ### Conciliación Dispensario (147 facturas objeto de mesa)
 
 1. **Revisar y aprobar el listado de las 147** (`LISTADO_147_PARA_APROBAR.xlsx`)
@@ -2566,12 +4303,39 @@ devoluciones.
     criterio del auditor es otro, se cambia con `--modo-parcial`.
 15. **Definir qué hacer con los ítems `SIN_CRUCE`** (los de la factura que no
     aparecen en el reporte): hoy se conservan y se marcan.
+
+### Descuento de lo aceptado (`tools/descontar_aceptado_detallado.py`, 18-08)
+16. **Revisar a mano las 14 facturas donde lo descontado NO cuadra con la
+    macro** ($2.747.060 en total). Están marcadas con **CUADRA = NO** en la
+    bitácora CSV del bot. Son casos donde el servicio aceptado no se pudo
+    cruzar con ningún renglón del detallado, o donde el aceptado es mayor que
+    el valor del servicio.
+17. **Confirmar el TOTAL FINAL de $625.461.617** antes de radicar: es la suma
+    de las 320 facturas después de quitarles lo aceptado.
+18. **Revisar a mano HUS384132 y HUS392442**: el bot no logró reproducir el
+    subtotal que traen esos dos archivos, así que solo descontó los servicios
+    numerados. Quedaron marcadas con **REVISAR A MANO** en la bitácora.
+19. **Pedir los detallados de HUS367368 y HUS394817** ($12.800): están en la
+    macro con valor aceptado pero no están entre los 320 archivos. Ya salen en
+    la bitácora con estado **SIN_DETALLADO**.
+20. **Corregir la macro en la HUS396996 y revisar esa factura completa:** la
+    columna VALOR ACEPTADO está corrida un renglón (filas 3961-3963). Por eso
+    al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
+
 ### Dispensario — respuesta de glosas SIMED y conciliación
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo
     de pendientes del 05-08 **ya no figuran por cargar**. Verificar en el
     portal cómo quedaron radicadas (¿respuesta cargada o cerradas por
     vencimiento?); si el portal las cerró sin respuesta, radicar por
     oficio/correo dejando constancia.
+11-bis. **(18-08) Correr el lote del 14 de agosto** con
+    `respuestas_glosa_DISPENSARIO_14AGO.xlsx` (24 facturas / 36 objeciones /
+    $2.511.222; vencen del 24-08 al 01-09): piloto con HUS0000535452 →
+    corrida completa → pegar el reporte al chat. Antes de subir: confirmar la
+    fecha real de la toma de la radiografía de la 535749 en HC/RIPS. Falta el
+    consecutivo GI-33 de este lote para carpeta+PDF de evidencias. Del cargue
+    del 05-08 sigue pendiente **pegar el reporte** al chat (nunca llegó), y
+    verificar en SIMED las 2 que no figuraban pendientes (527406 y 525763).
 11. **(05-08) Correr el cargue de las 23 pendientes** con
     `respuestas_glosa_DISPENSARIO_PENDIENTES_05AGO.xlsx`: piloto con
     HUS0000513796 → corrida completa → pegar el reporte al chat. En las de
@@ -2637,6 +4401,24 @@ devoluciones.
     oficio) para que las estadísticas y el control de 3 devoluciones
     arranquen con la historia real.
 
+### Suite Cartera HUS (PR #160)
+20. **Revisar y fusionar el PR #160** (Suite Cartera HUS: organizar/consolidar/
+    objeciones, caja de Herramientas PDF de 26 utilidades, y el nuevo bot de
+    correos de pagos .msg → Excel). Hoy en borrador.
+21. **4 herramientas PDF avanzadas** aún no hechas: editar texto libre,
+    formularios, firma digital y comparar dos PDF (serían una "fase 4").
+22. **Validar el mapeo DGH** (los 16 encabezados del archivo de OBJECIONES)
+    contra un cargue piloto pequeño antes del primer cargue masivo real de
+    la Suite.
+23. **Depurar la lista de entidades de la Suite**: agregar un campo de estado
+    de vigencia (vigente / en liquidación / liquidada / deshabilitada).
+24. **Verificar los links de plataformas** marcados "sin respuesta": muchos
+    podrían funcionar solo desde la red/VPN del HUS; validarlos allá.
+25. **Configurar en el equipo del analista**: LibreOffice (para Office→PDF) y
+    la clave `GEMINI_API_KEY` (para las funciones de IA de Herramientas PDF).
+26. **Corte de cartera de julio 2026**: en cuanto el analista lo entregue,
+    actualizar los 5 consolidados FAMISANAR y la serie mensual de 30 informes.
+
 ### SIIFA (actualizado 19-08, ver `docs/CONTEXTO_SIIFA.md`)
 11. **HUS — 4 devoluciones ratificadas de SANITAS ($14.049.088), trámite
     MANUAL en el portal y ya vencidas o al borde** (HUS482639, HUS479521,
@@ -2687,6 +4469,116 @@ devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);
 de las cuatro IPS con la opción [B] del bot — de ahí sale qué quedó sin
 responder y qué nuevo hay que trabajar.
 
+### Lo más fresco (del 18-08)
+
+- **Probar `ORGANIZAR_TRABAJOS_BOTS.cmd` en un PC real** (doble clic,
+  carpeta `tools\`) y confirmar que `D:\TRABAJOS BOTS` queda como se
+  espera: las 12 carpetas por tema, los accesos directos abriendo el bot
+  correcto y los `LEEME.txt` claros. Avisar en el chat cualquier ajuste
+  (nombre de carpeta, bot que falte, texto que no quede claro) para
+  corregir el script.
+
+### Lo más fresco (del 13-08)
+
+- **A) Regenerar la respuesta de Salud Total desde el portal.** Entrar a la
+  pantalla «Salud Total», subir `NotificacionGLS_Crt01July2026_1469Detalle.txt`,
+  poner la **fecha en que la EPS recibió la factura** y descargar. Comparar
+  contra el archivo viejo: el radicado debe salir completo
+  (`350000214021421`), la radiografía de tórax en **$93.340** y el código del
+  motivo como **`TA`**. **El `RTAGLOSA_..._13082026.csv` que ya existe no se
+  radica.**
+- **B) Probar el validador ADRES dentro del portal** con un paquete real de
+  FURIPS y verificar que el Excel del informe salga igual que el de la
+  aplicación aparte del puerto 8010. Si sale igual, ya no hay que levantar
+  esa aplicación.
+- **C) ~~Falta la pantalla del buscador de autorizaciones.~~** **Hecha el
+  mismo 13-08.** En el menú, bajo Herramientas, aparece **«Validador
+  ADRES»**, y esa pantalla trae las dos cosas: arriba la validación de los
+  soportes del ADRES (FURIPS 1 y 2, con su Excel), abajo el buscador de
+  números de autorización de los RIPS. El buscador deja escoger **una
+  carpeta completa de facturación**, con sus subcarpetas: de todo lo que hay
+  adentro solo viajan los `.json`, el resto se descarta en el mismo equipo
+  para que la subida no se vuelva eterna.
+- **D) Cargar las 6.655 tarifas de FAMISANAR como pactadas.** El motor ya
+  quedó listo para recibirlas (ver abajo); falta que usted las suba desde
+  **Gestión → Tarifas → Importar Excel**, con estos datos:
+  - EPS: `FAMISANAR`
+  - Número del contrato: `S-13-1-03-1-04958`
+  - Rigen desde `15/04/2026` y hasta `14/04/2027`
+  - Archivo: `PROPUESTA_2026_BASE_FINAL_FAMISANAR.xlsx`
+
+  Al terminar debe decir **6.655 filas leídas** y cinco hojas. Si dice
+  1.625, quedó con el lector viejo y hay que revisar.
+
+  **Dos cosas que se arreglaron antes de dejarlo cargar:**
+
+  1. Las 4.586 tarifas de la hoja UVB entraban rotuladas como **«tarifa
+     propia»**, y no lo son: son la UVB por grupos con el descuento del
+     contrato. El dictamen habría citado una forma de pactar distinta a la
+     del contrato, y eso lo lee la entidad.
+  2. El archivo no dice a qué contrato pertenece ni desde cuándo rige. Así
+     cargado, una tarifa de 2026 servía para defender una factura de 2024.
+     Por eso ahora la pantalla pide el número del contrato y las dos fechas.
+     Si el Excel las trae, mandan las del Excel.
+
+  Sigue vigente el cuidado de siempre con la hoja UVB: se carga la columna
+  **pactada** («PROPUESTA FINAL»), no la de referencia («VALOR UVB 2026»),
+  que es un 5% más alta.
+- **E) ~~Homologador CUPS → SOAT 2026: sin empezar.~~** **Cargado el mismo
+  13-08.** Entró la versión Gold Standard 2026: 10.024 códigos CUPS —la
+  misma cobertura de antes, no se perdió ninguno— y ahora **8.783 traen
+  además el artículo del Manual SOAT** donde está escrito el código. Es la
+  diferencia entre que el dictamen diga «el CUPS 012403 corresponde al SOAT
+  1101» y que diga «corresponde al SOAT 1101, Artículo 03: Neurocirugía».
+
+  **Y al cargarlo apareció un defecto grave que llevaba meses adentro.** La
+  tabla marca 2.966 códigos como «NO TIENE HOMOLOGACION DIRECTA», y esa
+  frase estaba escrita en la casilla del código SOAT. El motor la leía como
+  si fuera el código y le decía a la IA, con estas palabras: *«el CUPS
+  013205 corresponde oficialmente al código SOAT NO TIENE HOMOLOGACION
+  DIRECTA — usa este dato oficial para fundamentar la tarifa»*. Un código
+  inventado, metido en la defensa de la tarifa, con la orden de usarlo.
+  Entre esos 2.966 hay tarifas del propio contrato de FAMISANAR.
+
+  Ahora el motor dice lo que es, y resulta que juega a favor: **si el manual
+  no le asigna código SOAT a ese procedimiento, la entidad no puede objetar
+  la tarifa citando un código SOAT que no existe.**
+- **G) ~~Estrenar «Analizar con IA»~~ — HECHO el 13-08.** Salieron dos
+  defectos (código de programación en la observación y valores con decimal),
+  los dos corregidos el mismo día. Falta todavía **medir cuánto tarda y
+  cuánto cuesta**: en las dos corridas nadie tomó el tiempo.
+- **H) Probar el análisis con IA en una glosa de FAMISANAR**, que es donde
+  de verdad aporta: con contrato cargado el dictamen puede citar la cláusula
+  y el valor pactado. Con Salud Total no hay contrato y la IA llega al mismo
+  argumento que la plantilla, que es gratis.
+- **F) Todo lo de las OT-023 a OT-034 está probado en el repositorio, pero
+  salvo la pantalla de Salud Total nadie lo ha visto correr en el motor del
+  hospital.** Falta esa pasada.
+
+**Ya desplegado y comprobado el mismo 13-08:** el PR #341 quedó fusionado y
+el motor del hospital corriendo con ese código. La pantalla responde.
+
+Dos cosas aprendidas en el camino, para no repetirlas:
+
+1. **Para saber si el motor tiene un cambio cargado, no sirve `git log`.**
+   Eso dice qué hay en el **disco**; el motor puede llevar horas corriendo
+   con el código anterior en memoria. Lo que sirve es pedirle al motor su
+   propia lista de rutas:
+   `Invoke-RestMethod -Uri "http://localhost:8080/openapi.json"`.
+
+2. **La tarea de autodeploy corre sola cada 5 minutos y puede aplicar el
+   código en mitad de una revisión.** Ese día una comprobación dio un
+   resultado que no cuadraba con lo que mostraba la carpeta segundos antes;
+   la explicación más probable es esa, aunque no quedó demostrada. Si algo
+   no cuadra, volver a mirar las rutas del motor antes de sacar
+   conclusiones.
+
+Queda **por revisar**: en el puerto 8080 aparecen dos procesos de Python,
+creados en el mismo segundo. Como nacieron juntos llevan el mismo código,
+así que no están dando respuestas distintas. Falta confirmar si uno es hijo
+del otro (normal) o si son dos motores independientes (el problema del
+04-08), mirando el `ParentProcessId`.
+
 00. **Antes de cualquier prueba de IA: reiniciar con
     `tools\REINICIAR_MOTOR.cmd`** (doble clic). Cierra los motores viejos
     que quedaron prendidos y deja uno solo. Después, en **Gobierno IA →
@@ -2696,16 +4588,12 @@ responder y qué nuevo hay que trabajar.
     repetir. Con eso queda lista la prueba de fuego pendiente: **pasar la
     glosa de PPL por Analizar** y confirmar que sale con el formato
     aprobado.
-0. **PRIORIDAD CERO — revivir la página YA (arranque exprés) y luego
-   restaurar la historia.** Actualizado 04-08: la deuda ya se pagó; Google
-   reabre la cuenta por soporte (caso #74044918, 24-48 h). Mientras tanto:
-   (a) en el PC de cartera instalar Docker Desktop y Git; (b) sacar el token
-   del túnel en Cloudflare y doble clic a
-   `tools\REVIVIR_EXPRESS_SIN_RESCATE.cmd` (guía: sección "Arranque exprés"
-   de `docs/MIGRACION_PC_HOSPITAL.md`) — con eso el equipo trabaja hoy con
-   base provisional. (c) Cuando llegue el correo de Google: rescate de la
-   fase 1 (`rescate-motor-glosas.tgz`) y **avisar al chat antes de restaurar**
-   la base histórica; (d) verificar y apagar la VM (fase 4).
+0. **~~PRIORIDAD CERO — rescate de la VM~~ — YA HECHO el 13-08.** La fusión
+   se aplicó (27 glosas, 6 precedentes, contrato PRECIMED), la VM quedó
+   APAGADA y los paquetes de rescate guardados en `C:\motor-glosas\rescate`.
+   Lo único que queda: **en unos días, con todo verificado, BORRAR la VM**
+   (fase 4 de `docs/MIGRACION_PC_HOSPITAL.md`) para que no cobre ni el disco:
+   `gcloud compute instances delete motor-glosas --zone=us-west1-a`.
 1. **Dispensario prioridad 1 (actualizado 05-08):** correr el cargue de las
    **23 pendientes** (piloto con HUS0000513796 → corrida completa → pegar el
    reporte al chat) y después armar los dos paquetes de evidencias:
@@ -2839,6 +4727,12 @@ responder y qué nuevo hay que trabajar.
     los siete lotes. Hay que pedir esa impresión y volver a correr el
     ajustador.
 
+### Suite Cartera HUS
+18. **Revisar y fusionar el PR #160** (Suite Cartera HUS + Herramientas PDF +
+    bots de correos de pagos y de unir Exceles). Decidir si se arranca la
+    "fase 4" de Herramientas PDF (editar texto, formularios, firma digital,
+    comparar PDF) o se prioriza otro pendiente de Cartera.
+
 ---
 
 ## 5) Datos fijos que siempre se necesitan
@@ -2859,6 +4753,10 @@ responder y qué nuevo hay que trabajar.
 - **Regla de soportes:** las glosas extemporáneas (RE9502) NO llevan PDF de
   soporte. Las demás (ej. RE9901 en glosas de soportes) sí, y salen del share
   vía el índice.
+- **Suite Cartera HUS:** vive en `tools/suite_cartera_hus/` (README propio en
+  `LEEME.txt`). Las contraseñas de los portales van en
+  `config/entidades.credenciales.json` (local, no versionado; la Suite las une
+  con `entidades.json` en memoria al abrir).
 - **ADRES/FURIPS:** repositorio de XML de facturación
   `\\172.16.32.83\factura_electronica_net22\<AAAAMM>\FACTURAS_SALUD\` (una
   subcarpeta por factura; la ruta se edita en la línea RUTA_FACTURAS de

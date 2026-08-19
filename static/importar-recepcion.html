@@ -64,6 +64,11 @@
     .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:sp 1s linear infinite;margin-right:8px;vertical-align:middle}
     @keyframes sp{to{transform:rotate(360deg)}}
   </style>
+<!-- Sistema de diseño SINAC: tokens (--sds-*) y formato único de plata,
+     números y fechas (window.SDS_FMT). Antes esta página no lo cargaba y la
+     misma cifra salía escrita distinto que en el portal. -->
+<link rel="stylesheet" href="/static/sinac-ds.css"/>
+<script src="/static/sinac-ux.js" defer></script>
 </head>
 <body>
 <div class="sinac-band">

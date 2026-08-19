@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.models.schemas import TarifaContratadaOut, TarifasStatsOut
 from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import TarifaContratadaRecord, UsuarioRecord
@@ -59,7 +60,7 @@ def _parsear_fecha_opcional(v: str) -> Optional[datetime]:
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 
-@router.get("")
+@router.get("", response_model=list[TarifaContratadaOut])
 def listar_tarifas(
     eps: Optional[str] = Query(None, description="Filtrar por EPS (contains, case-insensitive)"),
     cups: Optional[str] = Query(None, description="Filtrar por código CUPS exacto"),
@@ -339,6 +340,15 @@ async def importar_excel(
             "de contrato o cuando el Excel anterior quedó mal."
         ),
     ),
+    contrato_override: Optional[str] = Query(
+        None, description="Número del contrato, si el Excel no lo trae (ej. S-13-1-03-1-04958)"
+    ),
+    vigencia_desde_override: Optional[str] = Query(
+        None, description="Desde cuándo rigen estas tarifas (AAAA-MM-DD o DD/MM/AAAA)"
+    ),
+    vigencia_hasta_override: Optional[str] = Query(
+        None, description="Hasta cuándo rigen estas tarifas (AAAA-MM-DD o DD/MM/AAAA)"
+    ),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
@@ -392,9 +402,24 @@ async def importar_excel(
             "No se pudo identificar la EPS en el Excel. Pase eps_override=NOMBRE como query param.",
         )
 
-    contrato_val = resultado.get("contrato") or None
-    vig_desde = resultado.get("vigencia_desde")
-    vig_hasta = resultado.get("vigencia_hasta")
+    # 13-08-2026. Hay anexos tarifarios que no dicen a qué contrato pertenecen
+    # ni desde cuándo rigen: la propuesta 2026 de FAMISANAR, sin ir más lejos,
+    # son cinco hojas de códigos y valores y nada más. Cargadas así quedaban
+    # sin vigencia, y una tarifa de 2026 sirve entonces para defender una
+    # factura de 2024. Por eso el que carga puede escribir el número del
+    # contrato y las fechas; lo que venga en el archivo manda sobre esto.
+    contrato_val = resultado.get("contrato") or (contrato_override or "").strip() or None
+    vig_desde = resultado.get("vigencia_desde") or _parsear_fecha_opcional(
+        vigencia_desde_override or ""
+    )
+    vig_hasta = resultado.get("vigencia_hasta") or _parsear_fecha_opcional(
+        vigencia_hasta_override or ""
+    )
+    if vig_desde and vig_hasta and vig_hasta < vig_desde:
+        raise HTTPException(
+            400,
+            "La vigencia queda al revés: la fecha final es anterior a la inicial.",
+        )
     fuente = (archivo.filename or "famisanar.xlsx")[:300]
 
     # Reemplazar: hard-delete de todas las tarifas de la EPS antes de insertar.
@@ -577,7 +602,7 @@ def cobertura_eps(
     }
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=TarifasStatsOut)
 def stats_tarifas(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),

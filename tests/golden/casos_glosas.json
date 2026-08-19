@@ -16,7 +16,9 @@
         "min_subconceptos": 5,
         "detecta_sancion_ilegal": true,
         "contrato_citado": "CTR-2024-SALUDTOTAL-HUS",
-        "clausulas_citadas": [18],
+        "clausulas_citadas": [
+          18
+        ],
         "es_complejo": true,
         "complejidad_motivo_contiene": "TMS",
         "defensa_clinica_titulo_contiene": "TMS"
@@ -32,7 +34,9 @@
         "eps_efectiva_contiene": "ECOOPSOS",
         "min_subconceptos": 3,
         "contrato_citado": "CTR-2025-ECOOPSOS-HUS",
-        "clausulas_citadas": [24],
+        "clausulas_citadas": [
+          24
+        ],
         "es_complejo": true,
         "complejidad_motivo_contiene": "IMPLANTE COCLEAR",
         "defensa_clinica_titulo_contiene": "coclear"
@@ -48,7 +52,9 @@
         "eps_efectiva_contiene": "MEDIM",
         "min_subconceptos": 4,
         "contrato_citado": "CTR-2024-MEDIMAS-HUS",
-        "clausulas_citadas": [31],
+        "clausulas_citadas": [
+          31
+        ],
         "es_complejo": true,
         "complejidad_motivo_contiene": "EVENTO ADVERSO",
         "defensa_clinica_titulo_contiene": "robótica"
@@ -91,6 +97,98 @@
         "max_subconceptos": 1,
         "detecta_sancion_ilegal": false
       }
+    },
+    {
+      "id": "sumimedical_so0202_glosa_mayor_que_factura",
+      "descripcion": "Tanda 05-08-2026. La entidad objeta $1.850.000 sobre una factura de $1.500.000: $350.000 mas de lo cobrado. El motor armo toda la defensa juridica y no dijo lo unico que cerraba el caso solo.",
+      "eps_dropdown": "SUMIMEDICAL",
+      "glosa": "SO0202 - Falta de soporte. VALOR FACTURADO $1.500.000. VALOR GLOSADO $1.850.000.",
+      "criterios": {
+        "glosa_mayor_que_facturado": true
+      }
+    },
+    {
+      "id": "salud_mia_glosa_contradictoria",
+      "descripcion": "Tanda 05-08-2026. FA0302 'servicio no prestado' y TA0801 'tarifa superior' sobre el MISMO item. Si no se presto no hay tarifa que discutir.",
+      "eps_dropdown": "SALUD MIA",
+      "glosa": "SALUD MIA - FA0302: COBRO DE SERVICIO NO PRESTADO. TA0801: TARIFA SUPERIOR A LA PACTADA EN EL CONTRATO. VALOR $4.200.000.",
+      "criterios": {
+        "glosa_contradictoria": true
+      }
+    },
+    {
+      "id": "ppl_ta0601_pertinencia_no_tarifa",
+      "descripcion": "Tanda 05-08-2026. Codigo de tarifas pero motivo clinico: el motor entrego el texto fijo de tarifas (SOAT, UVB) a una pregunta de pertinencia. Una glosa que no se contesta se ratifica.",
+      "eps_dropdown": "PPL",
+      "glosa": "TA0601 - TAC DE ABDOMEN NO PERTINENTE PARA EL DIAGNOSTICO REGISTRADO.",
+      "criterios": {
+        "es_de_pertinencia": true
+      }
+    },
+    {
+      "id": "nueva_eps_fa0201_glosa_antes_de_la_factura",
+      "descripcion": "Tanda 06-08-2026. Factura radicada el 15/09/2026 y glosa notificada el 03/08/2026: objetaron una factura que todavia no se habia radicado.",
+      "eps_dropdown": "NUEVA EPS",
+      "glosa": "FA0201 - Factura radicada el 15/09/2026. Glosa notificada el 03/08/2026 por diferencia en el valor total. Valor objetado $890.000.",
+      "criterios": {
+        "glosa_anterior_a_la_factura": true
+      }
+    },
+    {
+      "id": "doble_glosa_mismo_item",
+      "descripcion": "Tanda 06-08-2026. CO0201 y FA0301 objetan $600.000 cada una sobre el mismo renglon: la misma plata descontada dos veces, y cada respuesta imprimia $1.200.000.",
+      "eps_dropdown": "OTRA / SIN DEFINIR",
+      "glosa": "CO0201 - Servicio no incluido en el plan de beneficios, se objeta $600.000. FA0301 - Sobre el mismo item se objeta nuevamente $600.000 por mayor valor cobrado. Valor total objetado $1.200.000.",
+      "criterios": {
+        "doble_glosa_mismo_item": true
+      }
+    },
+    {
+      "id": "mutual_ser_so0201_cuatro_objeciones",
+      "descripcion": "Tanda 06-08-2026. Cuatro objeciones distintas en una frase; el detector las descartaba por etiqueta y sobrevivia una, asi que el dictamen salio con la plantilla generica. Lo que no se contesta, la entidad lo descuenta.",
+      "eps_dropdown": "MUTUAL SER",
+      "glosa": "SO0201 - Se glosa porque no se evidencia epicrisis, no se aporta hoja de administracion de medicamentos, la orden medica no tiene firma legible y el consentimiento informado esta incompleto. Valor objetado $3.150.000.",
+      "criterios": {
+        "min_subconceptos": 4
+      }
+    },
+    {
+      "id": "aurora_fa0101_cups_del_contrato",
+      "descripcion": "Tanda 06-08-2026. La glosa no traia ningun CUPS y el dictamen salio con 'CUPS 04958': la cola del numero de contrato que citaba la propia entidad.",
+      "eps_dropdown": "AURORA",
+      "glosa": "FA0101 - Se glosa el procedimiento por cuanto el valor facturado supera la tarifa pactada en el Contrato S-13-1-03-1-04958, clausula 7.4, que establece como tarifa maxima SOAT menos el 12%.",
+      "criterios": {
+        "cups_extraido": ""
+      }
+    },
+    {
+      "id": "sanitas_au0102_si_es_de_autorizacion",
+      "descripcion": "Control de que no se cerro de mas: esta SI pregunta por autorizacion previa y debe conservar su marco.",
+      "eps_dropdown": "SANITAS",
+      "glosa": "AU0102 - Procedimiento realizado SIN AUTORIZACION previa de la EPS. El paciente ingreso por urgencias con cuadro de abdomen agudo. Valor objetado $12.900.000.",
+      "criterios": {
+        "es_de_pertinencia": false
+      }
+    },
+    {
+      "id": "tarifa_pura_no_es_pertinencia",
+      "descripcion": "Control: una glosa de tarifa de verdad no debe leerse como pertinencia ni como contradictoria.",
+      "eps_dropdown": "FAMISANAR EPS",
+      "glosa": "TA0801 - Tarifa superior a la pactada. SOAT UVB vigente menos 5% segun el Anexo 3.",
+      "criterios": {
+        "es_de_pertinencia": false,
+        "glosa_contradictoria": false,
+        "doble_glosa_mismo_item": false
+      }
+    },
+    {
+      "id": "diferencia_de_redondeo_no_es_error",
+      "descripcion": "Borde del margen: $1.500.000 facturado contra $1.505.000 objetado es ruido de IVA partido, no un error aritmetico. Fija el umbral por debajo, que el caso de SUMIMEDICAL no cubre.",
+      "eps_dropdown": "SUMIMEDICAL",
+      "glosa": "SO0202 - VALOR FACTURADO $1.500.000. VALOR GLOSADO $1.505.000.",
+      "criterios": {
+        "glosa_mayor_que_facturado": false
+      }
     }
   ],
   "dictamenes_con_bugs": [
@@ -100,32 +198,49 @@
       "glosa_contexto": "conforme a la Cláusula 18 del contrato CTR-2024-SALUDTOTAL-HUS",
       "dictamen_sucio": "Contrato: SIN CONTRATO PACTADO. El servicio fue prestado.",
       "aplicar": "reescribir_negacion_contrato",
-      "no_debe_contener": ["SIN CONTRATO PACTADO", "contrato contrato"],
-      "debe_contener": ["CTR-2024-SALUDTOTAL-HUS"]
+      "no_debe_contener": [
+        "SIN CONTRATO PACTADO",
+        "contrato contrato"
+      ],
+      "debe_contener": [
+        "CTR-2024-SALUDTOTAL-HUS"
+      ]
     },
     {
       "id": "placeholder_servicio_GG",
       "descripcion": "Bug GG (ronda 20): placeholder pegado al servicio",
       "dictamen_sucio": "<div>HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS, el procedimiento facturado según historia clínica</div>",
       "aplicar": "neutralizar_alucinaciones_prompt",
-      "no_debe_contener": ["procedimiento facturado según historia clínica"],
-      "debe_contener": ["HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS"]
+      "no_debe_contener": [
+        "procedimiento facturado según historia clínica"
+      ],
+      "debe_contener": [
+        "HOSPITALIZACIÓN PSIQUIÁTRICA CON TMS"
+      ]
     },
     {
       "id": "carece_facultad",
       "descripcion": "Bug CARECE (concepto-x-concepto): verbo elidido",
       "dictamen_sucio": "la entidad pagadora de facultad sancionatoria sobre el prestador",
       "aplicar": "neutralizar_alucinaciones_prompt",
-      "no_debe_contener": ["pagadora de facultad"],
-      "debe_contener": ["carece de facultad sancionatoria"]
+      "no_debe_contener": [
+        "pagadora de facultad"
+      ],
+      "debe_contener": [
+        "carece de facultad sancionatoria"
+      ]
     },
     {
       "id": "eps_entidad_pagadora_HH",
       "descripcion": "Bug HH (ronda 20): EPS + la entidad pagadora roto",
       "dictamen_sucio": "la sanción aplicada por salud total la entidad pagadora el servicio prestado",
       "aplicar": "neutralizar_alucinaciones_prompt",
-      "no_debe_contener": ["salud total la entidad pagadora"],
-      "debe_contener": ["respecto del servicio"]
+      "no_debe_contener": [
+        "salud total la entidad pagadora"
+      ],
+      "debe_contener": [
+        "respecto del servicio"
+      ]
     },
     {
       "id": "sancion_aceptada_U",
@@ -133,8 +248,94 @@
       "glosa_contexto": "SE APLICA SANCIÓN DEL 10% AL VALOR FACTURADO",
       "dictamen_sucio": "EL HUS SE AJUSTA A LA SANCIÓN APLICADA POR LA EPS.",
       "aplicar": "rechazar_sancion_eps_ilegal",
-      "no_debe_contener": ["SE AJUSTA A LA SANCIÓN"],
-      "debe_contener_alguno": ["rechaza", "vicio de competencia", "Ley 1438"]
+      "no_debe_contener": [
+        "SE AJUSTA A LA SANCIÓN"
+      ],
+      "debe_contener_alguno": [
+        "rechaza",
+        "vicio de competencia",
+        "Ley 1438"
+      ]
+    },
+    {
+      "id": "clausula_inventada_AU0401",
+      "descripcion": "OT-001. El dictamen afirmo 'CLAUSULA 4.2 DEL CONTRATO S-13-1-03-1-04958' sin ninguna clausula cargada. El contrato es real y de esa entidad, asi que las dos guardas de contratos lo dejaron pasar. Se declara la base SIN clausulas: es el escenario del caso real.",
+      "aplicar": "neutralizar_clausulas_sin_respaldo",
+      "eps": "FAMISANAR EPS",
+      "glosa_contexto": "AU0401 - Se glosa por cuanto el procedimiento no corresponde con la descripcion clinica.",
+      "dictamen_sucio": "SE INCUMPLE LA CLAUSULA 4.2 DEL CONTRATO S-13-1-03-1-04958. SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA.",
+      "no_debe_contener": [
+        "CLAUSULA 4.2",
+        "CLÁUSULA 4.2"
+      ],
+      "debe_contener": [
+        "S-13-1-03-1-04958",
+        "SE SOLICITA EL LEVANTAMIENTO"
+      ],
+      "clausulas_cargadas": []
+    },
+    {
+      "id": "periodo_inventado_AU0401",
+      "descripcion": "OT-015. La glosa no traia ninguna fecha y el dictamen salio con 'EN EL PERIODO CORRESPONDIENTE AL AÑO 2023'.",
+      "aplicar": "neutralizar_periodo_inventado",
+      "glosa_contexto": "AU0401 - Se glosa por cuanto el procedimiento 895201 no corresponde con la descripcion clinica registrada.",
+      "dictamen_sucio": "ESE HUS NO ACEPTA LA GLOSA AU0401, EN EL PERIODO CORRESPONDIENTE AL AÑO 2023. SE SOLICITA EL LEVANTAMIENTO.",
+      "no_debe_contener": [
+        "2023",
+        "PERIODO"
+      ],
+      "debe_contener": [
+        "SE SOLICITA EL LEVANTAMIENTO"
+      ]
+    },
+    {
+      "id": "periodo_real_no_se_borra",
+      "descripcion": "OT-022. Si el año esta en la glosa es dato del expediente: borrarlo le quita al dictamen algo cierto.",
+      "aplicar": "neutralizar_periodo_inventado",
+      "glosa_contexto": "AU0401 - Atencion del 12/03/2023. El procedimiento no corresponde con la descripcion.",
+      "dictamen_sucio": "ESE HUS NO ACEPTA LA GLOSA, EN EL PERIODO CORRESPONDIENTE AL AÑO 2023.",
+      "debe_contener": [
+        "2023",
+        "PERIODO"
+      ]
+    },
+    {
+      "id": "comillas_vacias_FA0201",
+      "descripcion": "OT-017. El dictamen de NUEVA EPS salio con un par de comillas vacio en la mitad de la frase.",
+      "aplicar": "quitar_signos_vacios",
+      "dictamen_sucio": "SE RECHAZA LA GLOSA. \"\" SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA.",
+      "no_debe_contener": [
+        "\"\""
+      ],
+      "debe_contener": [
+        "SE RECHAZA LA GLOSA.",
+        "SE SOLICITA EL LEVANTAMIENTO"
+      ]
+    },
+    {
+      "id": "cita_con_contenido_no_se_toca",
+      "descripcion": "Control de OT-017: una cita de verdad no puede perder sus comillas.",
+      "aplicar": "quitar_signos_vacios",
+      "dictamen_sucio": "EL ART. 57 DE LA LEY 1438 DE 2011 ESTABLECE: «LA CARGA DE LA PRUEBA CORRESPONDE AL PAGADOR».",
+      "debe_contener": [
+        "«LA CARGA DE LA PRUEBA CORRESPONDE AL PAGADOR»"
+      ]
+    },
+    {
+      "id": "clausula_respaldada_se_conserva",
+      "descripcion": "Rama que nunca se ejercitaba: con la clausula cargada en la base, el dictamen la conserva. Sin este caso, el sanitizer podria empezar a borrar clausulas REALES y el golden set seguiria verde.",
+      "aplicar": "neutralizar_clausulas_sin_respaldo",
+      "eps": "FAMISANAR EPS",
+      "clausulas_cargadas": [
+        "4.2",
+        "Octava, numeral 3"
+      ],
+      "glosa_contexto": "AU0401 - Se glosa por cuanto el procedimiento no corresponde con la descripcion clinica.",
+      "dictamen_sucio": "SE INCUMPLE LA CLAUSULA 4.2 DEL CONTRATO S-13-1-03-1-04958. SE SOLICITA EL LEVANTAMIENTO.",
+      "debe_contener": [
+        "CLAUSULA 4.2",
+        "S-13-1-03-1-04958"
+      ]
     }
   ]
 }

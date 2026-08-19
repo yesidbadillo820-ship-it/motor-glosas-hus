@@ -90,8 +90,15 @@
       chips.push(
         chip(
           'Valor',
-          new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
-            .format(data.valor_principal)
+          // Formato único del portal (sinac-ux.js): la misma cifra tiene que
+          // salir escrita igual acá y en la tabla de al lado.
+          window.SDS_FMT
+            ? window.SDS_FMT.cop(data.valor_principal)
+            : new Intl.NumberFormat('es-CO', {
+                style: 'currency',
+                currency: 'COP',
+                maximumFractionDigits: 0,
+              }).format(data.valor_principal)
         )
       );
     }

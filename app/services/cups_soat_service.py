@@ -32,6 +32,7 @@ import gzip
 import json
 import re
 from functools import lru_cache
+import unicodedata
 from pathlib import Path
 
 _DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "cups_soat_homologacion.json.gz"
@@ -92,13 +93,25 @@ def _normalizar_cups(cups: str | None) -> list[str]:
     return candidatos
 
 
-def homologar_cups_a_soat(cups: str | None) -> list[dict]:
-    """Devuelve la lista de mapeos SOAT para un CUPS, o [] si no existe.
+# 13-08-2026. En la tabla hay CUPS que NO tienen equivalente en el Manual
+# SOAT, y la tabla lo dice escribiendo esta frase en la casilla del código.
+# No es un código: es la ausencia de código. Devolverla como si lo fuera
+# hacía que el motor le dijera a la IA, textualmente, que «el CUPS 013205
+# corresponde oficialmente al código SOAT NO TIENE HOMOLOGACION DIRECTA», y
+# encima le ordenaba usar ese dato para fundamentar la tarifa. Son 2.966
+# códigos, y entre ellos hay tarifas del propio contrato de FAMISANAR.
+_SIN_HOMOLOGACION = "NO TIENE HOMOLOGACION DIRECTA"
 
-    Cada mapeo: {"soat": "1101", "desc_soat": "...", "desc_cups": "..."}.
-    Un CUPS puede tener varios SOAT (multi-mapeo). Prueba variantes
-    normalizadas del CUPS (sin sufijos, con zfill).
-    """
+
+def _es_marca_sin_homologacion(mapeo: dict) -> bool:
+    if mapeo.get("sin_homologacion"):
+        return True
+    soat = str(mapeo.get("soat") or "").strip().upper()
+    return not soat or soat.replace("Ó", "O") == _SIN_HOMOLOGACION
+
+
+def _crudos(cups: str | None) -> list[dict]:
+    """Lo que la tabla tiene para ese CUPS, marcas incluidas."""
     tabla = _cargar().get("cups_a_soat", {})
     if not tabla:
         return []
@@ -106,6 +119,30 @@ def homologar_cups_a_soat(cups: str | None) -> list[dict]:
         if cand in tabla:
             return list(tabla[cand])
     return []
+
+
+def homologar_cups_a_soat(cups: str | None) -> list[dict]:
+    """Devuelve la lista de mapeos SOAT para un CUPS, o [] si no existe.
+
+    Cada mapeo: {"soat": "1101", "desc_soat": "...", "desc_cups": "..."}.
+    Un CUPS puede tener varios SOAT (multi-mapeo). Prueba variantes
+    normalizadas del CUPS (sin sufijos, con zfill).
+
+    Solo devuelve códigos SOAT de verdad. Un CUPS registrado como sin
+    homologación directa devuelve [] — ver `sin_homologacion_directa`.
+    """
+    return [m for m in _crudos(cups) if not _es_marca_sin_homologacion(m)]
+
+
+def sin_homologacion_directa(cups: str | None) -> bool:
+    """True si la tabla dice expresamente que ese CUPS no tiene código SOAT.
+
+    No es lo mismo que no estar en la tabla. Que el manual oficial no le
+    asigne código es un hecho a favor del hospital: la entidad no puede
+    objetar la tarifa citando un SOAT que no existe para ese procedimiento.
+    """
+    crudos = _crudos(cups)
+    return bool(crudos) and all(_es_marca_sin_homologacion(m) for m in crudos)
 
 
 def validar_soat_para_cups(cups: str | None, soat: str | None) -> bool:
@@ -124,9 +161,91 @@ def validar_soat_para_cups(cups: str | None, soat: str | None) -> bool:
 
 
 def descripcion_cups(cups: str | None) -> str:
-    """Devuelve la descripción del procedimiento CUPS (la del primer mapeo)."""
-    mapeos = homologar_cups_a_soat(cups)
-    return mapeos[0]["desc_cups"] if mapeos else ""
+    """Devuelve la descripción del procedimiento CUPS (la del primer mapeo).
+
+    Sirve también para los CUPS sin homologación: la tabla trae su
+    descripción aunque no le asigne código SOAT.
+    """
+    crudos = _crudos(cups)
+    return crudos[0].get("desc_cups", "") if crudos else ""
+
+
+# ─── Búsqueda por descripción ───────────────────────────────────────────────
+#
+# 18-08-2026. El liquidador de tarifas solo sabía buscar por CÓDIGO SOAT
+# (21102, 19001…). El auditor no tiene ese código: tiene el CUPS que sale en
+# la factura (873420) o el nombre del procedimiento («radiografía de
+# rodilla»). Escribiendo cualquiera de los dos, la pantalla devolvía cero.
+#
+# El puente ya estaba cargado —10.024 CUPS homologados— pero nadie lo usaba
+# para buscar. Esto lo expone.
+
+_INDICE_DESC: list[tuple[str, str, str]] | None = None
+
+
+def _sin_tildes(texto: str) -> str:
+    t = unicodedata.normalize("NFKD", str(texto or ""))
+    return "".join(c for c in t if not unicodedata.combining(c)).upper()
+
+
+def _indice() -> list[tuple[str, str, str]]:
+    """[(cups, descripcion, descripcion_normalizada)] — se arma una sola vez."""
+    global _INDICE_DESC
+    if _INDICE_DESC is not None:
+        return _INDICE_DESC
+    salida: list[tuple[str, str, str]] = []
+    for cups, mapeos in (_cargar().get("cups_a_soat", {}) or {}).items():
+        desc = ""
+        for m in mapeos or []:
+            desc = str(m.get("desc_cups") or "").strip()
+            if desc:
+                break
+        salida.append((cups, desc, _sin_tildes(desc)))
+    _INDICE_DESC = salida
+    return salida
+
+
+def buscar_cups(texto: str, limite: int = 25) -> list[dict]:
+    """Busca en los 10.024 CUPS por código o por descripción.
+
+    Devuelve, por cada CUPS encontrado, su descripción y los códigos SOAT a
+    los que homologa. Si el manual no le asigna ninguno, lo dice —no se
+    inventa un código.
+
+    El orden pone primero el código exacto, luego los que empiezan por lo
+    escrito, y de último las coincidencias por descripción.
+    """
+    q = _sin_tildes(texto).strip()
+    if len(q) < 3:
+        return []
+
+    tokens = [t for t in q.split() if len(t) >= 3]
+    encontrados: list[tuple[int, str, str]] = []
+    for cups, desc, desc_norm in _indice():
+        if cups == q:
+            prioridad = 0
+        elif q.isdigit() and cups.startswith(q):
+            prioridad = 1
+        elif q in desc_norm:
+            prioridad = 2
+        elif tokens and all(t in desc_norm for t in tokens):
+            prioridad = 3
+        else:
+            continue
+        encontrados.append((prioridad, cups, desc))
+
+    encontrados.sort(key=lambda x: (x[0], len(x[2]), x[1]))
+    salida = []
+    for _prio, cups, desc in encontrados[:limite]:
+        salida.append(
+            {
+                "cups": cups,
+                "descripcion": desc,
+                "homologaciones": homologar_cups_a_soat(cups),
+                "sin_homologacion": sin_homologacion_directa(cups),
+            }
+        )
+    return salida
 
 
 def resumen_homologacion() -> dict:
@@ -143,10 +262,30 @@ def bloque_homologacion_para_prompt(cups: str | None, max_soat: int = 4) -> str:
 
     Devuelve "" si el CUPS no está en la tabla (no inventa nada).
     """
+    cups_norm = str(cups or "").strip()
     mapeos = homologar_cups_a_soat(cups)
+
     if not mapeos:
-        return ""
-    cups_norm = str(cups).strip()
+        if not sin_homologacion_directa(cups):
+            return ""
+        # Que el manual no le asigne código es un HECHO, y juega a favor: la
+        # entidad no puede objetar la tarifa citando un SOAT que para ese
+        # procedimiento no existe. Callarlo dejaba el dictamen sin ese
+        # argumento; escribir la frase en la casilla del código, que es lo
+        # que pasaba antes, era peor: afirmaba un código falso.
+        desc = descripcion_cups(cups)
+        return "\n".join(
+            [
+                "\n\n═══ HOMOLOGACIÓN OFICIAL CUPS → SOAT ═══",
+                f"El CUPS {cups_norm} ({desc}) NO tiene homologación directa en el "
+                "Manual Tarifario SOAT, según la tabla oficial de homologación.",
+                "USA ESTE DATO ASÍ: no existe código SOAT equivalente, luego la "
+                "entidad NO puede objetar la tarifa citando un código SOAT para "
+                "este procedimiento. PROHIBIDO afirmar que corresponde a algún "
+                "código SOAT: la tabla oficial dice que no lo hay.",
+            ]
+        )
+
     desc_cups = mapeos[0].get("desc_cups", "")
     lineas = [
         "\n\n═══ HOMOLOGACIÓN OFICIAL CUPS → SOAT (Manual Único Res. 2775) ═══",
@@ -154,7 +293,13 @@ def bloque_homologacion_para_prompt(cups: str | None, max_soat: int = 4) -> str:
         "siguientes código(s) SOAT del Manual Tarifario:",
     ]
     for m in mapeos[:max_soat]:
-        lineas.append(f"  • SOAT {m['soat']} — {m['desc_soat']}")
+        linea = f"  • SOAT {m['soat']} — {m['desc_soat']}"
+        # El homologador 2026 trae el artículo del manual donde está el
+        # código. Poder citarlo es la diferencia entre «corresponde al SOAT
+        # 1101» y «corresponde al SOAT 1101, Artículo 03: Neurocirugía».
+        if m.get("articulo"):
+            linea += f" ({m['articulo']})"
+        lineas.append(linea)
     if len(mapeos) > max_soat:
         lineas.append(f"  • (… y {len(mapeos) - max_soat} código(s) SOAT más)")
     lineas.append(

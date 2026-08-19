@@ -119,6 +119,34 @@ def test_construir_crdobserv_sin_codigo():
     assert org.construir_crdobserv("", "texto", 500) == "texto$500"
 
 
+def test_construir_crdobserv_conserva_monto_final_distinto():
+    # Un $monto final DISTINTO al valor de la objeción (p. ej. un valor
+    # unitario) NO es duplicado: se conserva (hallazgo de la revisión
+    # adversarial del tool hermano de FAMISANAR).
+    assert org.construir_crdobserv("TA0801", "texto $ 500", 300) == "TA0801 texto $ 500$300"
+
+
+def test_escribir_por_factura_no_muta_los_registros(tmp_path):
+    # Por-factura y luego consolidado desde la MISMA lista debe conservar el
+    # 1,2,3… por factura (antes escribir_por_factura pisaba los dicts).
+    ruta = _crear_savia(
+        tmp_path / "SAVIA.xlsx",
+        [
+            ["HUS443697", "890701", "CONSULTA", 1, 93400, 7603, "TA02", "a"],
+            ["HUS503425", "902210", "HEMOGRAMA", 1, 39400, 3199, "TA08", "b"],
+        ],
+    )
+    regs = org.construir_registros(
+        ruta, fecha=_FECHA, consecutivo=1, codigo_sufijo="01", mapa_codigos=None
+    )
+    org.escribir_por_factura(regs, tmp_path / "out")
+    assert [r["CDCONSEC"] for r in regs] == ["1", "2"]  # intactos
+    salida = tmp_path / "todo.xlsx"
+    org.escribir_consolidado(regs, salida)
+    ws = openpyxl.load_workbook(str(salida), data_only=True).active
+    assert [f[0] for f in list(ws.iter_rows(values_only=True))[1:]] == ["1", "2"]
+
+
 # ─── _num ────────────────────────────────────────────────────────────────────
 
 

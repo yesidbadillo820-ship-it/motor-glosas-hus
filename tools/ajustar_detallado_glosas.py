@@ -719,15 +719,13 @@ def _es_titulo(texto: str) -> bool:
     return t.startswith(TITULO_ORIGINAL) or t.startswith(TITULO_NUEVO)
 
 
-def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
-    """Parte la hoja en facturas. Sirve igual si la hoja trae una sola."""
-    inicios: list[tuple[int, Celda]] = []
-    for fila in sorted(idx.por_fila):
-        for celda in idx.celdas(fila):
-            if _es_titulo(celda.texto):
-                inicios.append((fila, celda))
-                break
+def ultima_fila_util(idx: IndiceHoja) -> int:
+    """La última fila de la factura, sin el pie legal del archivo.
 
+    Al final de la hoja el sistema imprime el pie de página —la autorización de
+    la DIAN, el aviso de la letra de cambio, «Nombre reporte» y «LICENCIADO A»—
+    que no es parte de ninguna factura. Se busca de abajo hacia arriba.
+    """
     fin_util = idx.max_fila
     for fila in range(idx.max_fila, 0, -1):
         texto = _norm(idx.texto_fila(fila))
@@ -737,6 +735,19 @@ def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
             fin_util = fila - 1
         else:
             break
+    return fin_util
+
+
+def segmentar_facturas(idx: IndiceHoja) -> list[FacturaEnHoja]:
+    """Parte la hoja en facturas. Sirve igual si la hoja trae una sola."""
+    inicios: list[tuple[int, Celda]] = []
+    for fila in sorted(idx.por_fila):
+        for celda in idx.celdas(fila):
+            if _es_titulo(celda.texto):
+                inicios.append((fila, celda))
+                break
+
+    fin_util = ultima_fila_util(idx)
 
     facturas = []
     for i, (fila, celda) in enumerate(inicios):
@@ -1110,7 +1121,18 @@ def _agrupar_varios_a_uno(
             rep = cand[0]
             cuadra_valor = abs(sum(d.vr_ent for d in grupo) - rep.valor_reclamado) <= len(grupo)
             cuadra_cant = abs(sum(d.cantidad for d in grupo) - rep.cant_reclamada) <= 0.01
-            if cuadra_valor and cuadra_cant:
+            # Cuando el CÓDIGO o la DESCRIPCIÓN COMPLETA coinciden, que el valor
+            # cuadre exacto ya es señal firme: no hace falta que además cuadre la
+            # cantidad. El caso que lo enseñó: el detallado trae los honorarios
+            # del cirujano partidos en dos renglones de $320.600 —porque una
+            # cirugía se hizo dos veces— y suman exactamente los $641.200 que
+            # reclama la única fila del reporte; exigir 2 renglones = 1 unidad
+            # dejaba $654.075 sin descontar en el paquete 31068.
+            # Por PREFIJO sí se sigue exigiendo la cantidad: ahí a la descripción
+            # del reporte le basta con ser el comienzo de la del detallado, y sin
+            # ese segundo candado un nombre genérico corto podría llevarse el
+            # grupo equivocado.
+            if cuadra_valor and (cuadra_cant or not prefijo):
                 salida.append((grupo, rep))
                 usados_det.update(id(d) for d in grupo)
                 usados_rep.add(id(rep))

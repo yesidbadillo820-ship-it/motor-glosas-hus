@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.tz import a_utc, ahora_utc
+from app.models.schemas import GlosaExpedienteOut, GlosaHistorialItem
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
@@ -232,7 +233,7 @@ def _paciente_visible(usuario: UsuarioRecord, glosa) -> Optional[str]:
     return " ".join(f"{p[0]}." for p in nombre.split() if p)[:60] or None
 
 
-@router.get("/historial", response_model=list)
+@router.get("/historial", response_model=list[GlosaHistorialItem])
 def historial(
     # le=500: sin tope, un limit=10_000_000 serializa la tabla completa
     # (dictamenes HTML incluidos) en una sola respuesta — DoS trivial
@@ -3366,7 +3367,7 @@ def detectar_glosas_similares_en_bloque(
     }
 
 
-@router.get("/{glosa_id}")
+@router.get("/{glosa_id}", response_model=GlosaExpedienteOut)
 def obtener_glosa(
     glosa_id: int,
     db: Session = Depends(get_db),

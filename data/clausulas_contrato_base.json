@@ -121,8 +121,8 @@
       "eps": "FAMISANAR",
       "numero_clausula": "Anexo Tarifario 2026",
       "tema": "TA",
-      "titulo": "Tarifa pactada FAMISANAR 2026 (UVB − 5% / tarifas propias)",
-      "texto_literal": "Conforme al anexo tarifario del contrato FAMISANAR (Propuesta Base Final vigencia 2026), los servicios se liquidan de la siguiente manera: los CUPS homologados a la UVB se pagan a la UVB vigente menos cinco por ciento (UVB − 5%); los procedimientos y paquetes con código propio se pagan a las TARIFAS PROPIAS de la E.S.E. HUS; los exámenes ambulatorios conforme a la Resolución 2706 de 2025; y las órtesis y prótesis a la tarifa institucional 2026. El anexo tarifario forma parte integral del contrato No. S-13-1-03-1-04958 suscrito con FAMISANAR.",
+      "titulo": "Anexo tarifario 2026 del contrato firmado — UVB menos 5% y tarifas propias",
+      "texto_literal": "Conforme al anexo tarifario del contrato FAMISANAR (anexos 3.0 Servicios y Tarifas, 3.1 Medicamentos y 3.2 Suministros, vigencia 15/04/2026 a 14/04/2027), los servicios se liquidan de la siguiente manera: los CUPS homologados a la UVB se pagan a la UVB vigente menos cinco por ciento (UVB − 5%); los procedimientos y paquetes con código propio se pagan a las TARIFAS PROPIAS de la E.S.E. HUS; los exámenes ambulatorios conforme a la Resolución 2706 de 2025; y las órtesis y prótesis a la tarifa institucional 2026. El anexo tarifario forma parte integral del contrato No. S-13-1-03-1-04958 suscrito con FAMISANAR.",
       "pagina": 1
     },
     {
@@ -220,6 +220,30 @@
       "titulo": "Tarifa pactada FOMAG (SOAT SMDLV − 20% / propias, sujeta a techos)",
       "texto_literal": "Conforme al Acta de Negociación Tarifaria No. 012 entre la E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER y el FOMAG (Fiduprevisora S.A.), la modalidad de contratación es por tarifas SOAT 'SMDLV' menos veinte por ciento (SOAT SMDLV − 20%) para los CUPS homologados de la Resolución 2641, y tarifas propias/institucionales para los servicios sin homólogo SOAT, sujetas a los techos (topes) definidos por el FOMAG por SMDLV. En el anexo tarifario aceptado por el FOMAG los servicios objeto de este contrato figuran con la observación 'SE ACEPTA TARIFA PROPUESTA'; los servicios cuya tarifa supera el techo FOMAG quedaron excluidos del anexo.",
       "pagina": 1
+    },
+    {
+      "eps": "FAMISANAR",
+      "numero_clausula": "Cuarta",
+      "tema": "TA",
+      "titulo": "Tarifas — remiten al Anexo Servicios y Tarifas y al Anexo Tarifas Medicamentos",
+      "texto_literal": "El valor por pagar al PRESTADOR por concepto de los servicios aquí establecidos corresponde a lo definido en el Anexo - Tarifas y Servicios y en el Anexo Tarifas Medicamentos , los cuales hacen parte integral de este contrato para todos sus efectos . PARÁGRAFO : Al inicio de cada una de las prórrogas del presente contrato, las PARTES se obligan a actualizar de mutuo acuerdo las tarifas descritas en el Anexo – Servicios y Tarifas y en el Anexo Tarifas Medicamentos . La modificación del Anexo será formalizada mediante la suscripción del Otrosí contractual correspondiente.",
+      "pagina": null
+    },
+    {
+      "eps": "FAMISANAR",
+      "numero_clausula": "Sexta",
+      "tema": "NN",
+      "titulo": "Trámite de facturación, glosas, pago y devoluciones",
+      "texto_literal": "La facturación, pago, glosas y devoluciones se realizarán de conformidad con lo establecido en las leyes vigentes, en especial la Ley 1438 de 2011, el Decreto 441 de 2022, la Resolución 3047 de 2008 adicionada y modificada parcialmente por la Resolución 4331 de 2012 , la Resolución 2275 de 2023 y la Resolución 2284 de 2023 del Ministerio de Salud y Protección Social , y demás normas que las adicionen, modifiquen o reemplacen. Así mismo, se regirán por lo dispuesto en el Anexo - Manual de Cuentas Médicas , el cual hace parte integral del presente Contrato. PARÁGRAFO : El reporte de las glosas y devolución se debe realizar al siguiente correo institucional : glosasydevoluciones@hus.gov.co .",
+      "pagina": null
+    },
+    {
+      "eps": "FAMISANAR",
+      "numero_clausula": "Quinta",
+      "tema": "SO",
+      "titulo": "Mecanismos y forma de pago — requisitos y Manual de Cuentas Médicas",
+      "texto_literal": "FAMISANAR reconocerá y pagará el valor pactado al PRESTADOR en los términos establecidos en la Ley 1122 de 2007, el Decreto 441 de 2022, la Resolución 3047 de 2008 , y las Resoluciones 4331 de 2012 , 2275 de 2023, 2284 de 2023 , y demás normas que las adicionen, aclaren, modifiquen o sustituyan. Para efectos de control, gestión y cumplimiento fiscal, el PRESTADOR deberá presentar la documentación requerida de conformidad con los procedimientos administrativos y con los requisitos contenidos en el Anexo – Manual de Cuentas Médicas , el cual hace parte integral del prese nte Contrato . En todo caso , las facturas deberán contener todos los requisitos señalados en la norma vigente, con inclusión de todos sus anexos , y deberán cumplir con lo establecido en las siguientes disposiciones (o las normas que las modifiquen, sustituyan o deroguen): Artículo 617 del Estatuto Tributario: Sobre los",
+      "pagina": null
     }
   ]
 }

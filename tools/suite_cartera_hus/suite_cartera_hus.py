@@ -33,6 +33,8 @@ from nucleo import (  # noqa: E402
     ai_tools,
     archivos,
     cruces_dgh,
+    excel_tools,
+    msg_tools,
     office_tools,
     pdf_tools,
     registro,
@@ -361,6 +363,18 @@ class Suite(tk.Tk):
             text="🧰 Herramientas PDF",
             style="Primary.TButton",
             command=self.abrir_herramientas_pdf,
+        ).pack(side="left", padx=8)
+        ttk.Button(
+            barra_inf,
+            text="📧 Correos de Pagos → Excel",
+            style="Primary.TButton",
+            command=self.consolidar_correos_pagos,
+        ).pack(side="left", padx=8)
+        ttk.Button(
+            barra_inf,
+            text="📊 Unir Exceles",
+            style="Primary.TButton",
+            command=self.unir_exceles,
         ).pack(side="left", padx=8)
         self.progreso = ttk.Progressbar(barra_inf, mode="indeterminate", length=180)
         self.progreso.pack(side="right")
@@ -1401,6 +1415,49 @@ class Suite(tk.Tk):
         self._pdf_run(
             "OCR (extraer texto)",
             lambda: ai_tools.ocr(ruta, self._of_salida(ruta, "_texto.txt"), log=self.log),
+        )
+
+    # -- correos de pagos (.msg) -> Excel --
+
+    def consolidar_correos_pagos(self):
+        rutas = filedialog.askopenfilenames(
+            title="Elegir correo(s) .msg o un .zip que los contenga",
+            filetypes=[("Correos y ZIP", "*.msg *.zip"), ("Todos", "*.*")],
+        )
+        if not rutas:
+            return
+        carpeta = os.path.join(CARPETA_SALIDAS, "CORREOS_PAGOS")
+        os.makedirs(carpeta, exist_ok=True)
+        self._ultima_carpeta = carpeta
+        salida = os.path.join(carpeta, "CONSOLIDADO_RELACION_PAGOS.xlsx")
+        self._correr(
+            "Correos de pagos → Excel",
+            lambda: msg_tools.consolidar(list(rutas), salida, log=self.log),
+        )
+
+    # -- unir exceles --
+
+    def unir_exceles(self):
+        rutas = filedialog.askopenfilenames(
+            title="Elegir Excel(es) o un .zip que los contenga",
+            filetypes=[("Excel y ZIP", "*.xlsx *.xlsm *.zip"), ("Todos", "*.*")],
+        )
+        if not rutas:
+            return
+        apilar = messagebox.askyesno(
+            "Modo de unión",
+            "¿APILAR las filas en una sola tabla?\n\n"
+            "Sí  = apilar (archivos con las mismas columnas, una tabla)\n"
+            "No = cada archivo queda como una hoja aparte del mismo libro",
+        )
+        carpeta = os.path.join(CARPETA_SALIDAS, "EXCELES_UNIDOS")
+        os.makedirs(carpeta, exist_ok=True)
+        self._ultima_carpeta = carpeta
+        salida = os.path.join(carpeta, "EXCELES_UNIDOS.xlsx")
+        modo = "apilar" if apilar else "hojas"
+        self._correr(
+            "Unir Exceles",
+            lambda: excel_tools.unir(list(rutas), salida, modo=modo, log=self.log),
         )
 
 

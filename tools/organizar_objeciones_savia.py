@@ -236,7 +236,7 @@ def crotipobj_factura(grupos: set[str]) -> int:
 
 # ─── Texto de la observación en el formato del Dispensario ───────────────────
 
-_RE_VALOR_FINAL = re.compile(r"\$\s*[\d.,]+\s*$")
+_RE_VALOR_FINAL = re.compile(r"\$\s*([\d.,]+)\s*$")
 
 
 def construir_crdobserv(codigo: str, observacion: str, valor: int) -> str:
@@ -244,13 +244,18 @@ def construir_crdobserv(codigo: str, observacion: str, valor: int) -> str:
 
     Verificado contra los archivos reales (OBJECIONES_DISPENSARIO / EMSSANAR):
     el texto SIEMPRE empieza con el código de objeción y termina pegado a
-    ``$<valor objetado>``. Evita duplicar el código o el ``$valor`` si el texto
-    de SAVIA ya los trajera."""
+    ``$<valor objetado>``. Anti-duplicado con cuidado: quita el código del
+    inicio si ya viene, y un ``$<monto>`` final SOLO si es el MISMO valor de
+    la objeción — si el texto terminara con OTRO monto (p. ej. un valor
+    unitario), se conserva porque es información real, no un duplicado
+    (hallazgo de la revisión adversarial del tool hermano de FAMISANAR)."""
     t = (observacion or "").strip()
     cod = (codigo or "").strip()
     if cod and t.upper().startswith(cod.upper()):
         t = t[len(cod) :].strip()
-    t = _RE_VALOR_FINAL.sub("", t).strip()
+    m = _RE_VALOR_FINAL.search(t)
+    if m and _num(m.group(1)) == valor:
+        t = t[: m.start()].strip()
     prefijo = f"{cod} " if cod else ""
     return f"{prefijo}{t}${valor}"
 
@@ -418,10 +423,11 @@ def escribir_por_factura(
     generados: list[Path] = []
     for crncxc, regs in sorted(por_factura.items()):
         # Archivo standalone: su única factura es el consecutivo 1 (como TEXTO).
-        for reg in regs:
-            reg["CDCONSEC"] = str(consecutivo)
+        # Copia por registro: NO se muta la lista original — un consolidado
+        # posterior sobre los mismos registros perdería el 1,2,3… por factura.
+        regs_out = [{**reg, "CDCONSEC": str(consecutivo)} for reg in regs]
         destino = carpeta / f"{prefijo}_{crncxc}.xlsx"
-        _escribir_hoja(regs, destino)
+        _escribir_hoja(regs_out, destino)
         generados.append(destino)
         logger.info(f"  {destino.name}: {len(regs)} objeciones")
     return generados

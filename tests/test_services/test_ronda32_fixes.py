@@ -119,7 +119,7 @@ class TestCupsIgualFactura:
             "SOBRE EL CUPS 224871 SE APLICÓ TARIFA INCORRECTA", "224871"
         )
         assert "224871" not in r
-        assert "procedimiento facturado" in r
+        assert "PROCEDIMIENTO FACTURADO" in r.upper()
 
     def test_neutraliza_codigo_cups_con_prefijo_hus(self):
         r = _neutralizar_cups_igual_factura(
