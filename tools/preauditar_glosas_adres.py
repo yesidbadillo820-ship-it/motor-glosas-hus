@@ -911,9 +911,30 @@ def armar_texto_respuesta(filas: list[FilaMacro], prefijo: str = "") -> str:
     valor de mayor a menor, después las objetadas o subsanadas, y cierra con el
     párrafo de glosa extemporánea.
     """
+    # Import acá adentro: `glosas_adres_por_factura` importa `FilaMacro` de
+    # este módulo, así que arriba haría un círculo.
+    from glosas_adres_por_factura import aceptado_sin_duplicar, marcar_conteo
+
     aceptadas: dict[str, float] = {}
     otras: list[str] = []
-    total_aceptado = sum(f.valor_aceptado or 0 for f in filas)
+    # El total que se le declara al ADRES no puede contar dos veces el mismo
+    # ítem. El reporte abre un renglón por causal y el gestor decide renglón
+    # por renglón: aceptando en las dos causales de un TAC glosado $700.000,
+    # el encabezado decía $1.400.000. 19-08-2026.
+    marcas = marcar_conteo(filas)
+    total_aceptado = aceptado_sin_duplicar(
+        (
+            (
+                (f.factura or "").strip().upper(),
+                (f.codigo or "").strip().upper(),
+                round(f.valor_glosado or 0, 2),
+            ),
+            f.valor_glosado or 0,
+            f.valor_aceptado or 0,
+            marca,
+        )
+        for f, marca in zip(filas, marcas, strict=True)
+    )
 
     for f in filas:
         texto = f.rta_glosa_completa

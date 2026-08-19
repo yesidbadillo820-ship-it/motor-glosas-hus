@@ -4339,6 +4339,54 @@ router y el JavaScript siguió llamándolo.
 
 ---
 
+---
+
+### 19-08 (noche) — Al ADRES ya no se le declara dos veces la misma plata
+
+Una revisión de fondo del módulo Glosas ADRES (35 revisores automáticos, cada
+hallazgo verificado por otros que intentaban tumbarlo) encontró **dos fallas de
+plata**, las dos reproducidas con el reporte real.
+
+**1. El valor aceptado se declaraba DOBLE.** El reporte del ADRES abre un
+renglón por cada causal del mismo ítem, y la pantalla pide una decisión por
+renglón — así trabaja el gestor. El GLOSADO ya sabía no contar dos veces; el
+ACEPTADO no.
+
+Caso real, factura **HUS311371**, **TAC DE CRÁNEO SIMPLE** glosado $700.000 con
+dos causales (3209 y 3106). Aceptando en las dos:
+
+| | Antes | Ahora |
+|---|---|---|
+| KPI Valor glosado | $700.000 | $700.000 |
+| KPI Aceptado | **$1.400.000** | **$700.000** |
+| Carta al ADRES | «ACEPTADA PARCIAL POR VALOR DE **$1.400.000**» | «...POR VALOR DE **$700.000**» |
+
+El hospital le declaraba al ADRES que aceptaba **el doble de lo que le habían
+glosado** en ese ítem. En el paquete 31078 el reporte repite renglones en **27
+de 81 facturas**, y son las de más plata.
+
+El arreglo fácil —contar solo los renglones marcados— habría sido otro error al
+revés: si el gestor objeta el renglón que cuenta y acepta el repetido, el
+aceptado saldría **$0**. Ahora se consolida por ítem con tope en lo glosado, y
+da bien en los cinco casos: aceptar en las dos causales, repartir la aceptación
+entre ellas, aceptar solo en el renglón repetido, aceptar parcial, y dos ítems
+iguales de verdad.
+
+**2. «Aplicar sugerencias» aceptaba glosas por $0.** Al usar el botón en bloque,
+las glosas quedaban «SE ACEPTA» con valor cero. La carta salía diciendo
+«ACEPTADA PARCIAL POR VALOR DE **$0**» mientras enumeraba ítem por ítem lo que
+sí aceptaba. Por el camino de a una glosa el valor sí se llenaba; por el camino
+en bloque, nadie lo llenaba. Ahora se llena igual que a mano: todo lo glosado
+del renglón y la cantidad **glosada** (no la reclamada).
+
+**Verificador de doble clic.** Se entrega `tools\VERIFICAR_TRABAJO_HOY.cmd`:
+doble clic en el PC de cartera y en una pantalla dice si las cuatro cosas de hoy
+quedaron bien instaladas. Si le da el número de una factura radicada, además le
+muestra **qué documentos abriría la IA y cuáles no** con los soportes reales del
+servidor. Solo mira: no cambia nada, no llama a la IA y no cuesta un peso.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
@@ -4621,6 +4669,18 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 ## 4) PARA MAÑANA
 
 ### Lo más fresco (del 19-08)
+
+**Lo primero: correr `tools\VERIFICAR_TRABAJO_HOY.cmd`** en el PC de cartera
+(doble clic). Cuando pregunte, escriba una factura radicada — por ejemplo
+`HUS468334` — y mande la pantalla al chat. Ahí se ve de una si todo lo de hoy
+quedó bien.
+
+**Un punto que queda a decisión de cartera:** en la carta al ADRES, cuando un
+mismo ítem se acepta en dos causales, el **total del encabezado** ya sale
+correcto (una sola vez), pero el **cuerpo sigue enumerando las dos causales**
+con el valor del ítem en cada una. Es defendible —el hospital está respondiendo
+cada causal— pero si prefiere que el cuerpo también junte las causales en un
+solo renglón, dígalo y se hace.
 
 **Auditor Forense (probar en el PC de cartera):**
 

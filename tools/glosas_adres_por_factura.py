@@ -180,6 +180,37 @@ def marcar_conteo(filas: list[FilaMacro]) -> list[bool]:
     return marcas
 
 
+def aceptado_sin_duplicar(renglones) -> float:
+    """La plata aceptada, sin contar dos veces el mismo ítem — 19-08-2026.
+
+    `renglones` son cuádruples `(clave_item, valor_glosado, valor_aceptado,
+    cuenta_valor)`. La `clave_item` junta los renglones que el reporte del
+    ADRES abre por causal sobre un mismo servicio.
+
+    Se suma lo aceptado de cada ítem y se le pone tope en lo que ese ítem
+    tiene GLOSADO de verdad (la suma de sus renglones que cuentan). Con eso:
+
+      · aceptar todo en las dos causales   → el valor del ítem, una sola vez;
+      · repartir 300 y 400 entre causales  → 700, la suma;
+      · aceptar solo en la que no cuenta   → 700, y no cero;
+      · dos ítems iguales de verdad        → los dos, y no uno.
+
+    Vive acá porque este módulo ya es el que sabe qué renglones se repiten
+    (`marcar_conteo`), y lo usan tanto la pantalla como el texto que se radica.
+    """
+    grupos: dict = {}
+    for clave, glosado, aceptado, cuenta in renglones:
+        grupos.setdefault(clave, []).append((glosado or 0, aceptado or 0, bool(cuenta)))
+    total = 0.0
+    for filas in grupos.values():
+        aceptado = sum(a for _g, a, _c in filas)
+        tope = sum(g for g, _a, c in filas if c)
+        if tope <= 0:  # ningún renglón marcado: no se castiga al gestor
+            tope = max(g for g, _a, _c in filas)
+        total += min(aceptado, tope)
+    return round(total, 2)
+
+
 def agrupar_items(filas: list[FilaMacro]) -> list[ItemGlosado]:
     """Los ítems de la factura, ya sin los renglones repetidos por causal."""
     salida: list[ItemGlosado] = []
