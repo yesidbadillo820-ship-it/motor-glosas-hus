@@ -77,6 +77,19 @@ def _poner(ws, fila, span, valor, alto=1):
         )
 
 
+def _poner_desglose(ws, fila: int, filas) -> int:
+    """Renglones SIN consecutivo. Devuelve la fila siguiente libre."""
+    for codigo, nombre, cant, unit in filas:
+        _poner(ws, fila, DESGLOSE["codigo"], codigo)
+        _poner(ws, fila, DESGLOSE["nombre"], nombre)
+        _poner(ws, fila, DESGLOSE["cantidad"], float(cant))
+        _poner(ws, fila, DESGLOSE["vr_unit"], float(unit))
+        _poner(ws, fila, DESGLOSE["vr_pac"], 0.0)
+        _poner(ws, fila, DESGLOSE["vr_ent"], float(cant * unit))
+        fila += 1
+    return fila
+
+
 def escribir_detallado(
     ruta: Path,
     factura: str,
@@ -109,7 +122,7 @@ def escribir_detallado(
         fila += 1
         _poner(ws, fila, (2, 67), titulo)
         fila += 2  # el renglón en blanco que trae el formato
-        for codigo, nombre, cant, unit in items:
+        for codigo, nombre, cant, unit, *resto in items:
             n += 1
             _poner(ws, fila, ITEM["consecutivo"], n)
             _poner(ws, fila, ITEM["codigo"], codigo)
@@ -119,17 +132,12 @@ def escribir_detallado(
             _poner(ws, fila, ITEM["vr_pac"], 0.0)
             _poner(ws, fila, ITEM["vr_ent"], float(cant * unit))
             fila += 1
-    for codigo, nombre, cant, unit in desglose:
-        _poner(ws, fila, DESGLOSE["codigo"], codigo)
-        _poner(ws, fila, DESGLOSE["nombre"], nombre)
-        _poner(ws, fila, DESGLOSE["cantidad"], float(cant))
-        _poner(ws, fila, DESGLOSE["vr_unit"], float(unit))
-        _poner(ws, fila, DESGLOSE["vr_pac"], 0.0)
-        _poner(ws, fila, DESGLOSE["vr_ent"], float(cant * unit))
-        fila += 1
+            # Un procedimiento quirúrgico puede traer su desglose colgando.
+            fila = _poner_desglose(ws, fila, resto[0] if resto else ())
+    fila = _poner_desglose(ws, fila, desglose)
 
     if subtotal is None:
-        subtotal = sum(c * u for _, items in grupos for _, _, c, u in items)
+        subtotal = sum(it[2] * it[3] for _, items in grupos for it in items)
     fila += 2
     for etiqueta, valor in (
         (aj.MARCA_SUBTOTAL, float(subtotal)),
@@ -249,7 +257,7 @@ def caso_hus352890(tmp_path: Path):
 class TestLeerAceptados:
     def test_solo_las_filas_con_valor_aceptado(self, caso_hus352890):
         _, macro = caso_hus352890
-        aceptados = des.leer_aceptados(macro)
+        aceptados, _ = des.leer_aceptados(macro)
         assert list(aceptados) == ["352890"]  # la clave va sin el HUS ni los ceros
         assert len(aceptados["352890"]) == 1
         fila = aceptados["352890"][0]
@@ -265,7 +273,7 @@ class TestLeerAceptados:
                 fila_macro("HUS400001", "39145", "Consulta", aceptado=1000),
             ],
         )
-        assert list(des.leer_aceptados(macro)) == ["400001"]
+        assert list(des.leer_aceptados(macro)[0]) == ["400001"]
 
     def test_suma_las_filas_repetidas_del_mismo_item(self, tmp_path):
         """El reporte del ADRES abre una fila por causal: 2 causales, un ítem."""
@@ -276,36 +284,172 @@ class TestLeerAceptados:
                 fila_macro("HUS1", "39145", "Consulta", aceptado=500, glosa="4506- Causal B"),
             ],
         )
-        items = des._agrupar(des.leer_aceptados(macro)["1"])
+        items = des._agrupar(des.leer_aceptados(macro)[0]["1"])
         assert len(items) == 1
         assert items[0].valor_glosado == 1500
         assert items[0].causales == "3202- Causal A | 4506- Causal B"
 
 
+class TestLoQueNoSeDescuenta:
+    """Dos filas de la macro que NO se pueden usar, por más que traigan valor."""
+
+    def test_una_fila_se_objeta_no_toca_el_detallado(self, tmp_path):
+        """El equipo la objetó: ese servicio se sigue reclamando completo."""
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [
+                fila_macro(
+                    "HUS1",
+                    "21101",
+                    "Mano, dedos, puño",
+                    reclamado=73500,
+                    aceptado=10000,
+                    observacion="SE OBJETA",
+                )
+            ],
+        )
+        aceptados, descartes = des.leer_aceptados(macro)
+        assert aceptados == {}
+        assert "SE OBJETA" in descartes["1"][0]
+        assert "se sigue reclamando" in descartes["1"][0]
+
+    def test_una_fila_se_subsana_tampoco(self, tmp_path):
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [
+                fila_macro(
+                    "HUS1",
+                    "39145",
+                    "Consulta",
+                    reclamado=85800,
+                    aceptado=800,
+                    observacion="SE SUBSANA CON SOPORTE",
+                )
+            ],
+        )
+        assert des.leer_aceptados(macro)[0] == {}
+
+    def test_no_se_puede_aceptar_mas_de_lo_reclamado(self, tmp_path):
+        """La columna del Excel quedó corrida: el valor es de otra fila.
+
+        Es lo que pasó en la HUS396996 del paquete 31068."""
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [fila_macro("HUS1", "21101", "Mano, dedos, puño", reclamado=73500, aceptado=758700)],
+        )
+        aceptados, descartes = des.leer_aceptados(macro)
+        assert aceptados == {}
+        assert "no se puede aceptar más de lo cobrado" in descartes["1"][0].lower()
+
+    def test_sin_valor_reclamado_no_se_puede_juzgar_y_pasa(self, tmp_path):
+        """Sin con qué comparar, la fila se usa: el bot no adivina."""
+        macro = escribir_macro(
+            tmp_path / "m.xlsx",
+            [fila_macro("HUS1", "39145", "Consulta", reclamado=0, aceptado=2400)],
+        )
+        assert des.leer_aceptados(macro)[0]["1"][0].valor_glosado == 2400
+
+    def test_el_aviso_llega_a_la_factura_y_a_la_bitacora(self, tmp_path):
+        carpeta = tmp_path / "in"
+        escribir_detallado(carpeta / "HUS400010.xlsx", "HUS400010")
+        macro = escribir_macro(
+            tmp_path / "macro.xlsx",
+            [
+                fila_macro(
+                    "HUS400010",
+                    "39145",
+                    "Consulta de urgencias",
+                    reclamado=85800,
+                    aceptado=2400,
+                    observacion="SE OBJETA",
+                )
+            ],
+        )
+        bitacora = tmp_path / "b.csv"
+        salida = tmp_path / "out"
+        res = _correr(carpeta, macro, salida, bitacora)[0]
+        assert res.descontado == 0
+        assert any("OJO CON LA MACRO" in a for a in res.sin_cruzar)
+        assert "OJO CON LA MACRO" in bitacora.read_text(encoding="utf-8-sig")
+        # El servicio queda intacto: el hospital lo sigue reclamando.
+        ws = openpyxl.load_workbook(salida / "HUS400010.xlsx")["Sheet"]
+        fila = _fila_de(salida / "HUS400010.xlsx", "CONSULTA DE URGENCIAS")
+        assert ws.cell(row=fila, column=ITEM["vr_ent"][0]).value == 85800
+
+    def test_la_factura_sin_detallado_no_desaparece(self, tmp_path):
+        """Si la macro le acepta plata a una factura que no está en la carpeta,
+        esa plata tiene que quedar anotada: si no, se sigue reclamando sin que
+        nadie se entere."""
+        carpeta = tmp_path / "in"
+        escribir_detallado(carpeta / "HUS400011.xlsx", "HUS400011")
+        macro = escribir_macro(
+            tmp_path / "macro.xlsx",
+            [fila_macro("HUS999888", "39145", "Consulta", reclamado=85800, aceptado=10400)],
+        )
+        bitacora = tmp_path / "b.csv"
+        resultados = _correr(carpeta, macro, tmp_path / "out", bitacora)
+        sin = [r for r in resultados if r.estado == "SIN_DETALLADO"]
+        assert len(sin) == 1
+        assert sin[0].factura == "HUS999888"
+        assert sin[0].aceptado_macro == 10400
+        assert "HUS999888" in bitacora.read_text(encoding="utf-8-sig")
+
+
 # ─── El subtotal del archivo manda ───────────────────────────────────────────
 
 
-class TestDesgloseCuenta:
-    """Los renglones sin consecutivo a veces YA están sumados en el subtotal y a
-    veces no. Se decide con el subtotal que trae el archivo, no con una regla
-    fija: en 50 de las 320 facturas del paquete 31068 sí cuentan."""
+class TestQueRenglonesSuman:
+    """Los renglones sin consecutivo a veces ya están dentro del procedimiento
+    que tienen encima y a veces son una cirugía aparte. Se decide acumulando."""
 
     class _It:
         def __init__(self, vr_ent, desglose):
             self.vr_ent = vr_ent
             self.desglose = desglose
 
-    def test_cuando_el_desglose_repite_el_valor_del_padre(self):
-        items = [self._It(1_000_000, False), self._It(600_000, True), self._It(400_000, True)]
-        assert des._desglose_cuenta(1_000_000, items) is False
+    def _items(self, *pares):
+        return [self._It(v, d) for v, d in pares]
 
-    def test_cuando_el_desglose_suma_de_verdad(self):
-        items = [self._It(1_000_000, False), self._It(600_000, True), self._It(400_000, True)]
-        assert des._desglose_cuenta(2_000_000, items) is True
+    def test_el_desglose_que_completa_el_procedimiento_no_suma(self):
+        items = self._items((1_000_000, False), (600_000, True), (400_000, True))
+        cuenta, cuadra = des.filas_que_cuentan(items, 1_000_000)
+        assert cuenta == [True, False, False] and cuadra
 
-    def test_sin_renglones_de_desglose_da_lo_mismo(self):
-        items = [self._It(500, False), self._It(300, False)]
-        assert des._desglose_cuenta(800, items) is True
+    def test_la_segunda_cirugia_si_suma(self):
+        """El caso HUS388262: bajo el procedimiento van los honorarios de ESA
+        cirugía (que no suman) y enseguida los de otra (que sí)."""
+        items = self._items(
+            (1_000_000, False),  # el procedimiento
+            (600_000, True),  # su desglose…
+            (400_000, True),  # …que acá completa el millón
+            (300_000, True),  # otra cirugía: no está dentro de nadie
+            (200_000, True),
+        )
+        cuenta, cuadra = des.filas_que_cuentan(items, 1_500_000)
+        assert cuenta == [True, False, False, True, True] and cuadra
+
+    def test_un_desglose_sin_procedimiento_encima_suma(self):
+        items = self._items((300_000, True), (200_000, True), (50_000, False))
+        cuenta, cuadra = des.filas_que_cuentan(items, 550_000)
+        assert cuenta == [True, True, True] and cuadra
+
+    def test_si_nunca_cuadra_con_el_padre_los_renglones_cuentan(self):
+        items = self._items((1_000_000, False), (300_000, True), (200_000, True))
+        cuenta, cuadra = des.filas_que_cuentan(items, 1_500_000)
+        assert cuenta == [True, True, True] and cuadra
+
+    def test_sin_renglones_de_desglose_cuentan_todos(self):
+        items = self._items((500, False), (300, False))
+        cuenta, cuadra = des.filas_que_cuentan(items, 800)
+        assert cuenta == [True, True] and cuadra
+
+    def test_cuando_el_modelo_no_reproduce_el_subtotal_avisa(self):
+        """La comprobación de cierre: si no se puede explicar el subtotal del
+        archivo, solo se dan por seguros los renglones numerados."""
+        items = self._items((1_000_000, False), (600_000, True), (400_000, True))
+        cuenta, cuadra = des.filas_que_cuentan(items, 1_234_567)
+        assert cuenta == [True, False, False]
+        assert not cuadra
 
 
 # ─── Descuento sobre una factura ─────────────────────────────────────────────
@@ -521,19 +665,84 @@ class TestDesgloseEnUnaFacturaReal:
         fila = _fila_de(ruta, "HONORARIOS CIRUJANO")
         assert ws.cell(row=fila, column=DESGLOSE["vr_ent"][0]).value == 500000
 
-    def test_cuando_el_desglose_si_suma_el_subtotal_baja(self, tmp_path):
-        """Subtotal $2.000.000: acá los honorarios sí están sumados aparte."""
+    # La forma de la HUS388262: dos cirugías. Bajo el segundo procedimiento van
+    # PRIMERO los honorarios de esa cirugía —que completan su valor y por eso no
+    # suman— y ENSEGUIDA los de una cirugía aparte, que sí suman.
+    DOS_CIRUGIAS = [
+        (
+            "PROCEDIMIENTOS QUIRURGICOS",
+            [
+                ("13580", "OSTEOSINTESIS EN TIBIA", 1, 1000000, HONORARIOS),
+                (
+                    "13580",
+                    "OSTEOSINTESIS EN PERONE",
+                    1,
+                    2000000,
+                    [
+                        ("39005", "HONORARIOS CIRUJANO", 1, 1200000),
+                        ("39209", "AYUDANTIA", 1, 800000),
+                        ("39008", "HONORARIOS CIRUJANO 2", 1, 300000),
+                        ("39212", "DERECHOS DE SALA 2", 1, 200000),
+                    ],
+                ),
+            ],
+        )
+    ]
+
+    def test_la_segunda_cirugia_si_baja_el_subtotal(self, tmp_path):
+        """Los $500.000 de la cirugía aparte SÍ están sumados en el subtotal, así
+        que aceptarle plata a ese renglón tiene que bajarlo.
+
+        Es el defecto que traía la HUS388262: quedó $1.400.050 de más."""
         carpeta = tmp_path / "in"
         escribir_detallado(
             carpeta / "HUS500002.xlsx",
             "HUS500002",
+            grupos=self.DOS_CIRUGIAS,
+            subtotal=3_500_000,  # 1.000.000 + 2.000.000 + los 500.000 de la otra
+        )
+        macro = escribir_macro(
+            tmp_path / "macro.xlsx",
+            [fila_macro("HUS500002", "39008", "HONORARIOS CIRUJANO 2", cant=1, aceptado=100000)],
+        )
+        salida = tmp_path / "out"
+        res = _correr(carpeta, macro, salida)[0]
+        assert res.subtotal_antes == 3_500_000
+        assert res.subtotal_despues == 3_400_000
+        assert not res.sin_cruzar
+        assert _valores(salida / "HUS500002.xlsx")[aj.MARCA_TOTAL_ORDEN] == [3_400_000]
+
+    def test_los_honorarios_del_procedimiento_siguen_sin_bajar_el_subtotal(self, tmp_path):
+        """En la misma factura, el otro renglón: aceptarle plata al cirujano de
+        la PRIMERA cirugía no mueve el subtotal, porque ya está dentro."""
+        carpeta = tmp_path / "in"
+        escribir_detallado(
+            carpeta / "HUS500004.xlsx",
+            "HUS500004",
+            grupos=self.DOS_CIRUGIAS,
+            subtotal=3_500_000,
+        )
+        macro = escribir_macro(
+            tmp_path / "macro.xlsx",
+            [fila_macro("HUS500004", "39209", "AYUDANTIA", cant=1, aceptado=50000)],
+        )
+        res = _correr(carpeta, macro, tmp_path / "out")[0]
+        assert res.subtotal_despues == 3_500_000
+
+    def test_si_no_se_puede_explicar_el_subtotal_avisa_y_no_lo_inventa(self, tmp_path):
+        """La comprobación de cierre: con un subtotal que no cuadra con ningún
+        modelo, solo se descuentan los servicios numerados y queda el aviso."""
+        carpeta = tmp_path / "in"
+        escribir_detallado(
+            carpeta / "HUS500005.xlsx",
+            "HUS500005",
             grupos=self.GRUPOS,
             desglose=self.HONORARIOS,
-            subtotal=2_000_000,
+            subtotal=1_234_567,
         )
-        res = _correr(carpeta, self._macro(tmp_path, "HUS500002"), tmp_path / "out")[0]
-        assert res.subtotal_antes == 2_000_000
-        assert res.subtotal_despues == 1_900_000
+        res = _correr(carpeta, self._macro(tmp_path, "HUS500005"), tmp_path / "out")[0]
+        assert res.subtotal_despues == 1_234_567
+        assert any("REVISAR A MANO" in a for a in res.sin_cruzar)
 
     def test_el_subtotal_nunca_se_recalcula_desde_cero(self, tmp_path):
         """Si el archivo trae un subtotal que no es la suma de los renglones, se

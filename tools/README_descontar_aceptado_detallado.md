@@ -35,8 +35,15 @@ Requiere una sola vez: `py -m pip install openpyxl`
 ## Qué hace exactamente
 
 1. **De la macro se queda solo con lo aceptado.** Únicamente las filas con
-   VALOR ACEPTADO mayor que cero. Las **SE OBJETA** y las **SE SUBSANA** se
-   siguen reclamando completas, así que no tocan el detallado.
+   VALOR ACEPTADO mayor que cero. Y descarta —avisando— dos clases de fila que
+   no se pueden usar:
+   - las que dicen **SE OBJETA** o **SE SUBSANA** en la observación: ese
+     servicio se sigue reclamando completo, así que no puede tocar el
+     detallado. Si además trae valor aceptado, la macro se está contradiciendo
+     y el auditor tiene que verlo;
+   - aquellas donde el **valor aceptado es mayor que el valor reclamado** de la
+     misma fila. Eso es imposible —no se puede aceptar más de lo que se cobró—
+     y pasa cuando la columna del Excel quedó corrida un renglón.
 2. **Cruza contra el detallado.** No por código a secas: el detallado usa el
    código del hospital (`FMQ0046`) y la macro el del ADRES
    (`2016DM-0000315-R2`). Se usa el mismo motor de rondas del ajustador —
@@ -66,21 +73,42 @@ DESPUÉS  39145 CONSULTA DE URGENCIAS   1,00   $83.400  →  VR ENT  $83.400
 
 ---
 
-## El detalle que casi hace perder $106 millones
+## Lo más delicado: los renglones sin número
 
-Algunos procedimientos quirúrgicos abren renglones **sin número de
-consecutivo** (honorarios de cirujano, ayudantía, derechos de sala). En la
-mayoría de las facturas ese desglose **ya está incluido** en el renglón que lo
-encabeza y no vuelve a sumar. Pero en **50 de las 320 facturas del paquete
-31068 sí suma aparte**.
+Una cirugía se imprime así: un renglón **con número de consecutivo** (el
+procedimiento, con su valor total) y debajo, **sin número**, el desglose de ese
+valor — cirujano, anestesiólogo, ayudantía, derechos de sala, materiales. Ese
+desglose **no vuelve a sumar**: ya está dentro del procedimiento.
 
-Si el bot recalculara el subtotal desde cero, en esas 50 facturas descontaría
-de más: la primera corrida daba **$607 millones** en vez de **$714 millones**.
+Pero cuando al paciente le hicieron **varias cirugías**, debajo del mismo
+procedimiento se imprimen los honorarios de todas, y **los de la segunda en
+adelante sí suman**, porque no están dentro de ningún renglón.
 
-Por eso el bot **nunca recalcula el subtotal desde cero**. Toma el que ya trae
-el archivo —que es el bueno— y solo le resta lo que descontó. Cuando hay
-renglones sin consecutivo, mira cuál de las dos sumas se parece al subtotal del
-archivo y decide **factura por factura**.
+El bot lo resuelve acumulando: los primeros renglones sin número se van sumando
+hasta completar exactamente el valor del procedimiento que tienen encima —ese
+es su desglose y no cuenta—; **lo que siga después es cirugía aparte y sí
+cuenta**. Y el subtotal **nunca se recalcula desde cero**: se toma el que ya
+trae el archivo, que es el bueno, y solo se le resta lo descontado.
+
+**La comprobación de cierre.** Antes de guardar, el bot se pregunta: «la suma de
+los renglones que doy por buenos, ¿reproduce el subtotal que trae el archivo?».
+Si no lo reproduce, es que esa factura no se entendió: entonces solo descuenta
+los servicios **numerados** —que siempre suman— y deja el aviso
+**REVISAR A MANO** en la bitácora. Nunca escribe un subtotal que no pueda
+justificar. En el paquete 31068 el modelo cuadra en **318 de las 320** facturas.
+
+### Los dos errores que enseñaron esta regla
+
+- **Recalcular el subtotal desde cero** daba **$106 millones de menos**, porque
+  en 50 facturas los honorarios sí suman aparte.
+- **Decidir de una sola vez para toda la factura** dejó la **HUS388262** con el
+  subtotal **$1.400.050 por encima** de lo que correspondía: tenía dos
+  osteosíntesis, y el bot dio por «informativos» los honorarios de la segunda,
+  que sí sumaban. Esa factura alcanzó a entregarse mal antes de detectarse.
+
+El contador de servicios de la fila del subtotal **se conserva tal como venía**:
+este bot cambia valores, nunca borra renglones, así que no tiene por qué
+moverlo.
 
 ---
 
@@ -109,6 +137,10 @@ valores negativos, y lo avisa).
 
 Un Excel dañado no tumba el lote: esa factura queda en ERROR y las demás siguen.
 
+Y si la macro le acepta plata a una factura que **no tiene detallado** en la
+carpeta, esa factura igual sale en la bitácora con estado **SIN_DETALLADO** y
+su valor: esa plata se seguiría reclamando sin que nadie se entere.
+
 ---
 
 ## Resultado del paquete 31068 (18-08-2026)
@@ -116,7 +148,20 @@ Un Excel dañado no tumba el lote: esa factura queda en ERROR y las demás sigue
 | | |
 |---|---|
 | 320 facturas, valor antes | **$714.332.224** |
-| Menos lo aceptado | **$86.889.982** |
-| **TOTAL FINAL que sigue reclamando el hospital** | **$627.442.242** |
+| Menos lo aceptado | **$88.870.607** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$625.461.617** |
 
-Quedaron **14 facturas con CUADRA = NO** ($4.727.685) para revisar a mano.
+Para mirar antes de radicar: **12 facturas con CUADRA = NO** ($2.747.060),
+**2 con REVISAR A MANO** (HUS384132 y HUS392442), **1 con OJO CON LA MACRO**
+(HUS396996, la fila corrida) y **2 SIN_DETALLADO** (HUS367368 y HUS394817, por
+$12.800).
+
+### La fila corrida de la HUS396996
+
+Una fila de la macro —una sola en 4.619— dice **SE OBJETA** y aun así trae
+**$758.700 aceptados** sobre un servicio de **$73.500**. La columna VALOR
+ACEPTADO quedó corrida un renglón: ese valor es el del tórax de la fila
+siguiente. Sin las dos guardas, el bot borraba del detallado una radiografía de
+mano que el hospital **sigue reclamando**. Ahora la salta y avisa. **Esa factura
+hay que revisarla completa**: por el mismo corrimiento, al tórax se le descontó
+$7.800 cuando el equipo lo aceptó por $758.700.

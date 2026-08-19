@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 18-08-2026
+**Última actualización:** 19-08-2026
 
 ---
 
@@ -2904,6 +2904,132 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 19-08-2026 — Se recuperaron $654.075 más: el servicio partido en dos renglones
+
+Una medición sobre las 320 facturas mostró por qué faltaba tanta plata por
+descontar en la **HUS383283**: el detallado trae los **honorarios del cirujano
+partidos en dos renglones** de $320.600 —porque la cirugía se hizo dos veces— y
+la macro los reclama en **una sola fila** de $641.200. Los dos renglones suman
+exactamente esa cifra, pero el bot exigía que además cuadrara la **cantidad**
+(2 renglones contra 1 unidad) y por eso no los emparejaba.
+
+Ahora, cuando el **código** o la **descripción completa** coinciden y el valor
+suma exacto, se emparejan y el descuento se reparte a prorrata. **Por prefijo de
+descripción se sigue exigiendo la cantidad**: ahí a la descripción del reporte le
+basta con ser el comienzo de la del detallado, y sin ese segundo candado un
+nombre genérico podría llevarse el grupo equivocado.
+
+Recupera **$654.075** en dos facturas (HUS383283 y HUS397556). Antes de tocar
+nada se midió el efecto sobre las 320 facturas y sobre el otro flujo que usa el
+mismo motor de cruce: **ningún emparejamiento existente se pierde ni cambia de
+pareja**; solo se agregan 8 nuevos.
+
+**Cifras del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.870.607** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$625.461.617** |
+
+**Tres mejoras más quedaron medidas pero NO se aplicaron**, porque la revisión
+adversarial las marcó riesgosas y valen poco ($40.900 entre las tres):
+
+- bajar de 12 a 10 letras el cruce por comienzo de descripción ($34.500): dejaría
+  que un nombre genérico como «Hemocultivo» se lleve el renglón equivocado **en
+  silencio**;
+- desempatar por precio unitario ($5.000) y limpiar los caracteres dañados de la
+  macro ($1.400): mismo tipo de riesgo.
+
+Son decisión del área: recuperan poco y el motor de cruce lo comparten los otros
+bots del hospital.
+
+---
+
+### 18-08-2026 (cierre) — Una fila corrida de la macro casi borra una radiografía
+
+Siguiendo la revisión, apareció **una segunda factura con problema**: la
+**HUS396996**. El bot le había dejado en **cero** una radiografía de mano de
+$73.500 que el hospital **sigue reclamando**.
+
+**Por qué.** En la macro hay **una sola fila** (de 4.619) donde la columna
+VALOR ACEPTADO quedó **corrida un renglón**: la fila de la radiografía de mano
+—que además dice **SE OBJETA**— trae $758.700 aceptados, que en realidad son
+del tórax de la fila de abajo. El bot se lo tragó tal cual.
+
+**Lo que faltaba en el bot.** El programa prometía en su documentación que las
+**SE OBJETA** y las **SE SUBSANA** no tocan el detallado… pero **nunca leía esa
+columna**. Ahora sí, y además rechaza cualquier fila donde el valor aceptado sea
+**mayor que el valor reclamado** de esa misma fila: eso es imposible, no se
+puede aceptar más de lo que se cobró. Cualquiera de las dos guardas atrapa el
+caso; están las dos.
+
+**Otro hueco que se tapó.** Si la macro le acepta plata a una factura que **no
+tiene detallado** en la carpeta, antes esa plata desaparecía del control. Ahora
+la factura sale igual en la bitácora con estado **SIN_DETALLADO**: son
+**HUS367368** ($10.400) y **HUS394817** ($2.400).
+
+**Cifras definitivas del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.216.532** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.115.692** |
+
+**Ojo con la HUS396996:** por el mismo corrimiento de la macro, al tórax se le
+descontaron $7.800 cuando el equipo lo aceptó por $758.700. **Esa factura hay
+que revisarla completa antes de radicar**, y de paso corregir la macro.
+
+---
+
+### 18-08-2026 (noche) — Una factura salió mal y se corrigió: la HUS388262
+
+**Lo que pasó.** Después de entregar los 320 Excel, una revisión independiente
+encontró que **una factura quedó mal**: la **HUS388262**. Su total seguía
+$1.400.050 por encima de lo que corresponde, o sea que ese archivo le estaba
+reclamando al ADRES una plata que el hospital ya había aceptado. Las otras 319
+estaban bien.
+
+**Por qué pasó.** Esa factura tiene **dos cirugías**. En el detallado, debajo
+del procedimiento se imprimen los honorarios —cirujano, anestesiólogo,
+ayudantía, derechos de sala—. Los de la primera cirugía **ya están dentro** del
+valor del procedimiento y no vuelven a sumar; los de la segunda **sí suman**,
+porque no están dentro de ningún renglón. El bot decidía «suman todos» o «no
+suma ninguno» **para la factura entera**, y en esta se equivocó.
+
+**Cómo quedó arreglado.** Ahora el bot decide **bloque por bloque**: va sumando
+los renglones sin número hasta completar exactamente el valor del procedimiento
+que tienen encima —ese es su desglose, no cuenta— y lo que siga después es
+cirugía aparte, que sí cuenta.
+
+**Y se le puso un candado.** Antes de guardar cada archivo, el bot se pregunta:
+«la suma de los renglones que doy por buenos, ¿reproduce el subtotal que trae el
+archivo?». Si no lo reproduce, **no inventa el subtotal**: descuenta solo los
+servicios numerados y escribe **REVISAR A MANO** en la bitácora. De las 320
+facturas, el bot entiende 318; las dos que no —**HUS384132** y **HUS392442**—
+quedaron avisadas (y en las dos el descuento sí cuadró con la macro).
+
+**Las cifras corregidas del paquete 31068:**
+
+| | |
+|---|---|
+| Valor de las facturas antes | **$714.332.224** |
+| Menos lo que ya se aceptó | **$88.290.032** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.042.192** |
+
+De paso, el bot ya **no toca el contador de servicios** de la fila del subtotal:
+como nunca borra renglones, ese número debe quedar tal como lo dejó el sistema
+del hospital (en la entrega anterior lo había movido en 4 archivos).
+
+Se agregaron pruebas automáticas del caso de las dos cirugías y del candado, y
+se comprobó que si se le quita cualquiera de las dos cosas, las pruebas fallan.
+La verificación final se hizo sumando los subtotales de los 320 archivos de
+salida con un lector independiente: da **$626.042.191,95**, y en las 320 el
+TOTAL DE LA ORDEN coincide con el subtotal.
+
+---
+
 ### 18-08-2026 — Se le quita al detallado lo que la EPS ya aceptó (paquete 31068)
 
 **Lo que pidió el auditor:** cruzar los Excel por factura del paquete 31068
@@ -2928,8 +3054,8 @@ valor, con emparejamiento único. Lo que no cruza **se informa, no se adivina**.
 | | |
 |---|---|
 | Valor de las facturas antes | **$714.332.224** |
-| Menos lo que ya se aceptó | **$86.889.982** |
-| **TOTAL FINAL que sigue reclamando el hospital** | **$627.442.242** |
+| Menos lo que ya se aceptó | **$88.290.032** |
+| **TOTAL FINAL que sigue reclamando el hospital** | **$626.042.192** |
 
 El ejemplo que mandó el auditor (HUS352890) sale igualito: la consulta de
 urgencias baja de $85.800 a $83.400 por los $2.400 aceptados, y la factura
@@ -2950,7 +3076,7 @@ El bot deja además una **bitácora en CSV** con una línea por servicio
 descontado: factura, servicio, valor antes, aceptado, valor después, por dónde
 cruzó, las causales y una columna **CUADRA** que dice SI o NO comparando lo
 descontado contra lo que dice la macro. Ahí se ven las 14 facturas que no
-cuadran ($4.727.685) para que el auditor las revise a mano.
+cuadran ($3.327.635) para que el auditor las revise a mano.
 
 Se cubrió con **29 pruebas automáticas** (`tests/test_tools/test_descontar_aceptado_detallado.py`),
 incluidas las dos trampas del formato (el desglose que suma y el que no) y los
@@ -3754,12 +3880,21 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ### Descuento de lo aceptado (`tools/descontar_aceptado_detallado.py`, 18-08)
 16. **Revisar a mano las 14 facturas donde lo descontado NO cuadra con la
-    macro** ($4.727.685 en total). Están marcadas con **CUADRA = NO** en la
+    macro** ($2.747.060 en total). Están marcadas con **CUADRA = NO** en la
     bitácora CSV del bot. Son casos donde el servicio aceptado no se pudo
     cruzar con ningún renglón del detallado, o donde el aceptado es mayor que
     el valor del servicio.
-17. **Confirmar el TOTAL FINAL de $627.442.242** antes de radicar: es la suma
+17. **Confirmar el TOTAL FINAL de $625.461.617** antes de radicar: es la suma
     de las 320 facturas después de quitarles lo aceptado.
+18. **Revisar a mano HUS384132 y HUS392442**: el bot no logró reproducir el
+    subtotal que traen esos dos archivos, así que solo descontó los servicios
+    numerados. Quedaron marcadas con **REVISAR A MANO** en la bitácora.
+19. **Pedir los detallados de HUS367368 y HUS394817** ($12.800): están en la
+    macro con valor aceptado pero no están entre los 320 archivos. Ya salen en
+    la bitácora con estado **SIN_DETALLADO**.
+20. **Corregir la macro en la HUS396996 y revisar esa factura completa:** la
+    columna VALOR ACEPTADO está corrida un renglón (filas 3961-3963). Por eso
+    al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo

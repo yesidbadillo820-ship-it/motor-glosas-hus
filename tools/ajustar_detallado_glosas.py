@@ -1110,7 +1110,18 @@ def _agrupar_varios_a_uno(
             rep = cand[0]
             cuadra_valor = abs(sum(d.vr_ent for d in grupo) - rep.valor_reclamado) <= len(grupo)
             cuadra_cant = abs(sum(d.cantidad for d in grupo) - rep.cant_reclamada) <= 0.01
-            if cuadra_valor and cuadra_cant:
+            # Cuando el CÓDIGO o la DESCRIPCIÓN COMPLETA coinciden, que el valor
+            # cuadre exacto ya es señal firme: no hace falta que además cuadre la
+            # cantidad. El caso que lo enseñó: el detallado trae los honorarios
+            # del cirujano partidos en dos renglones de $320.600 —porque una
+            # cirugía se hizo dos veces— y suman exactamente los $641.200 que
+            # reclama la única fila del reporte; exigir 2 renglones = 1 unidad
+            # dejaba $654.075 sin descontar en el paquete 31068.
+            # Por PREFIJO sí se sigue exigiendo la cantidad: ahí a la descripción
+            # del reporte le basta con ser el comienzo de la del detallado, y sin
+            # ese segundo candado un nombre genérico corto podría llevarse el
+            # grupo equivocado.
+            if cuadra_valor and (cuadra_cant or not prefijo):
                 salida.append((grupo, rep))
                 usados_det.update(id(d) for d in grupo)
                 usados_rep.add(id(rep))

@@ -115,17 +115,35 @@ class ResultadoFactura:
         return round(self.subtotal_antes - self.subtotal_despues, 2)
 
 
-def leer_aceptados(ruta: Path) -> dict[str, list[FilaGlosa]]:
-    """Las filas de la macro que quedaron con VALOR ACEPTADO > 0, por factura.
+# Lo que el equipo escribe en la columna OBSERVACION cuando NO acepta.
+RESPUESTAS_QUE_NO_ACEPTAN = ("OBJETA", "SUBSANA")
 
-    Solo esas: son las que el hospital dejó de reclamar. Las SE OBJETA y las
-    SE SUBSANA se siguen reclamando completas, así que no tocan el detallado.
+
+def leer_aceptados(ruta: Path) -> tuple[dict[str, list[FilaGlosa]], dict[str, list[str]]]:
+    """(filas con VALOR ACEPTADO por factura, filas descartadas por factura).
+
+    Solo se descuentan las filas que el hospital de verdad dejó de reclamar.
+    Se descarta —y se avisa— una fila cuando:
+
+    * dice **SE OBJETA** o **SE SUBSANA** en la observación. Esas se siguen
+      reclamando completas, así que no pueden tocar el detallado. Si además
+      trae un valor aceptado, la macro se está contradiciendo y el auditor
+      tiene que verlo.
+    * el valor aceptado es **mayor que el valor reclamado** de esa misma fila.
+      Eso es imposible: no se puede aceptar más de lo que se cobró. Pasa cuando
+      la columna del Excel quedó corrida y el valor pertenece a otra fila.
+
+    El caso que lo enseñó es la HUS396996 del paquete 31068: una fila marcada
+    SE OBJETA traía $758.700 aceptados sobre un servicio de $73.500 —la columna
+    estaba corrida un renglón— y el bot borró del detallado una radiografía que
+    el hospital sigue reclamando.
     """
     wb = _abrir_libro(ruta, solo_datos=True, solo_lectura=True)
     try:
         ws = wb.worksheets[0]
         salida: dict[str, list[FilaGlosa]] = {}
-        for fila in ws.iter_rows(min_row=2, values_only=True):
+        descartes: dict[str, list[str]] = {}
+        for n_fila, fila in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if len(fila) < COL_VALOR_ACEPTADO:
                 continue
             factura = str(fila[COL_FACTURA - 1] or "").strip()
@@ -134,14 +152,35 @@ def leer_aceptados(ruta: Path) -> dict[str, list[FilaGlosa]]:
             aceptado = _parse_valor(fila[COL_VALOR_ACEPTADO - 1])
             if aceptado <= 0:
                 continue
-            salida.setdefault(normalizar_factura(factura), []).append(
+            clave = normalizar_factura(factura)
+            codigo = str(fila[COL_COD_ELEMENTO - 1] or "").strip()
+            descripcion = str(fila[COL_DESC_ELEMENTO - 1] or "").strip()
+            reclamado = _parse_valor(fila[COL_VALOR_RECLAMADO - 1])
+            observacion = _norm(str(fila[COL_OBSERVACION - 1] or ""))
+
+            if any(m in observacion for m in RESPUESTAS_QUE_NO_ACEPTAN):
+                descartes.setdefault(clave, []).append(
+                    f"OJO CON LA MACRO (fila {n_fila}): {codigo} {descripcion[:40]} dice "
+                    f'"{observacion[:20]}" y aun así trae ${aceptado:,.0f} aceptados. '
+                    f"No se descontó: ese servicio se sigue reclamando."
+                )
+                continue
+            if reclamado > 0 and aceptado > reclamado + 0.01:
+                descartes.setdefault(clave, []).append(
+                    f"OJO CON LA MACRO (fila {n_fila}): {codigo} {descripcion[:40]} tiene "
+                    f"${aceptado:,.0f} aceptados sobre ${reclamado:,.0f} reclamados. "
+                    f"No se puede aceptar más de lo cobrado; no se descontó."
+                )
+                continue
+
+            salida.setdefault(clave, []).append(
                 FilaGlosa(
                     factura=factura,
-                    codigo=str(fila[COL_COD_ELEMENTO - 1] or "").strip(),
-                    descripcion=str(fila[COL_DESC_ELEMENTO - 1] or "").strip(),
+                    codigo=codigo,
+                    descripcion=descripcion,
                     tipo_elemento=str(fila[COL_TIPO_ELEMENTO - 1] or "").strip(),
                     cant_reclamada=_parse_valor(fila[COL_CANT_RECLAMADA - 1]),
-                    valor_reclamado=_parse_valor(fila[COL_VALOR_RECLAMADO - 1]),
+                    valor_reclamado=reclamado,
                     cant_aprobada=_parse_valor(fila[COL_CANT_APROBADA - 1]),
                     valor_aprobado=_parse_valor(fila[COL_VALOR_APROBADO - 1]),
                     # Acá va el ACEPTADO, no el glosado: es lo que se descuenta.
@@ -149,7 +188,7 @@ def leer_aceptados(ruta: Path) -> dict[str, list[FilaGlosa]]:
                     descripcion_glosa=str(fila[COL_DESC_GLOSA - 1] or "").strip(),
                 )
             )
-        return salida
+        return salida, descartes
     finally:
         wb.close()
 
@@ -160,17 +199,81 @@ def _subtotal_de_la_hoja(idx: IndiceHoja, est) -> float:
     return round(_parse_valor(numeros[-1].valor), 2) if numeros else 0.0
 
 
-def _desglose_cuenta(subtotal: float, items: list) -> bool:
-    """¿Los renglones sin consecutivo suman en el subtotal de ESTA factura?
+def _contador_de_items(idx: IndiceHoja, est) -> int | None:
+    """La casilla de 'cuántos servicios' de la fila del subtotal, si existe.
 
-    No siempre. En 50 de las 320 facturas del paquete 31068 los honorarios de
-    cirujano y de ayudantía vienen sin consecutivo —el lector los marca como
-    desglose— pero sí están sumados en el subtotal. Se decide comparando: gana
-    la suma que más se parezca al subtotal que trae el archivo.
+    En esa fila hay dos números: la cantidad de ítems y el importe. El importe
+    es el último. Se devuelve el otro tal cual, para volver a escribirlo igual.
     """
-    con = round(sum(i.vr_ent for i in items), 2)
-    sin = round(sum(i.vr_ent for i in items if not i.desglose), 2)
-    return abs(subtotal - con) <= abs(subtotal - sin)
+    numeros = _celdas_numericas(idx.celdas(est.fila_subtotal))
+    return int(_parse_valor(numeros[-2].valor)) if len(numeros) > 1 else None
+
+
+def _cuentan_por_bloque(items: list) -> list[bool]:
+    """Qué renglones suman al subtotal, decidido bloque por bloque.
+
+    Una cirugía se imprime así: un renglón CON consecutivo (el procedimiento,
+    con su valor total) y debajo, SIN consecutivo, el desglose de ese valor —
+    cirujano, anestesiólogo, ayudantía, derechos de sala, materiales—. Ese
+    desglose **no vuelve a sumar**: ya está dentro del procedimiento.
+
+    Pero cuando al paciente le hicieron VARIAS cirugías, debajo del mismo
+    procedimiento se imprimen los honorarios de todas, y los de la segunda en
+    adelante **sí suman**, porque no están dentro de ningún renglón.
+
+    Se resuelve acumulando: los primeros renglones sin consecutivo se van
+    sumando hasta completar exactamente el valor del procedimiento que tienen
+    encima —ese es su desglose y no cuenta—; lo que siga después es cirugía
+    aparte y sí cuenta.
+
+    El caso que lo enseñó es la HUS388262: dos osteosíntesis y cuatro tandas de
+    honorarios. La regla anterior decidía de una sola vez para toda la factura
+    y dejó el subtotal $1.400.050 por encima de lo que correspondía.
+    """
+    cuenta = [True] * len(items)
+    i = 0
+    while i < len(items):
+        if not items[i].desglose:
+            i += 1
+            continue
+        fin = i
+        while fin < len(items) and items[fin].desglose:
+            fin += 1
+        padre = items[i - 1] if i > 0 and not items[i - 1].desglose else None
+        if padre is not None:
+            acumulado = 0.0
+            for k in range(i, fin):
+                acumulado = round(acumulado + items[k].vr_ent, 2)
+                cuenta[k] = False
+                if abs(acumulado - padre.vr_ent) < 0.01:
+                    break  # acá se completó el desglose del procedimiento
+            else:
+                # Nunca cuadró con el padre: no es su desglose, sí cuenta.
+                for k in range(i, fin):
+                    cuenta[k] = True
+        i = fin
+    return cuenta
+
+
+def filas_que_cuentan(items: list, subtotal: float) -> tuple[list[bool], bool]:
+    """(qué renglones suman, ¿el modelo cuadra con el subtotal del archivo?)
+
+    La comprobación de cierre del bot: si la suma de los renglones que el
+    modelo da por buenos **no** reproduce el subtotal que trae el archivo, es
+    que esta factura no se entendió. En ese caso solo se dan por seguros los
+    renglones con consecutivo —que siempre suman— y la factura queda marcada
+    para que el auditor la revise: nunca se escribe un subtotal que no se pueda
+    justificar.
+
+    En el paquete 31068 el modelo cuadra en 318 de las 320 facturas.
+    """
+    cuenta = _cuentan_por_bloque(items)
+    if (
+        abs(round(sum(i.vr_ent for i, c in zip(items, cuenta, strict=True) if c), 2) - subtotal)
+        < 0.01
+    ):
+        return cuenta, True
+    return [not i.desglose for i in items], False
 
 
 def _agrupar(glosas: list[FilaGlosa]) -> list[ItemReporte]:
@@ -187,7 +290,10 @@ def _agrupar(glosas: list[FilaGlosa]) -> list[ItemReporte]:
 
 
 def procesar_archivo(
-    ruta: Path, aceptados: dict[str, list[FilaGlosa]], destino: Path
+    ruta: Path,
+    aceptados: dict[str, list[FilaGlosa]],
+    destino: Path,
+    descartes: dict[str, list[str]] | None = None,
 ) -> ResultadoFactura:
     """Descuenta lo aceptado en un detallado de una sola factura."""
     wb = _abrir_libro(ruta, solo_datos=False)
@@ -224,9 +330,15 @@ def procesar_archivo(
         # que este bot descuente. Recalcularlo daba $106 millones de menos en
         # 50 facturas, porque en ellas los renglones de desglose SÍ cuentan.
         subtotal_antes = _subtotal_de_la_hoja(idx, est)
-        cuentan_desglose = _desglose_cuenta(subtotal_antes, items)
+        cuenta_fila, cuadra = filas_que_cuentan(items, subtotal_antes)
+        cuentan = {id(it): c for it, c in zip(items, cuenta_fila, strict=True)}
+        # El contador de ítems de la fila del subtotal se conserva tal como lo
+        # dejó el sistema del hospital: este bot cambia valores, nunca borra
+        # servicios, así que no tiene por qué moverlo.
+        n_items_original = _contador_de_items(idx, est)
 
         filas_macro = aceptados.get(clave, [])
+        avisos_macro = (descartes or {}).get(clave, [])
         res = ResultadoFactura(
             factura=numero,
             archivo=ruta.name,
@@ -235,8 +347,13 @@ def procesar_archivo(
             subtotal_despues=subtotal_antes,
             aceptado_macro=round(sum(f.valor_glosado for f in filas_macro), 2),
         )
+        res.sin_cruzar.extend(avisos_macro)
         if not filas_macro:
-            res.observacion = "La macro no trae ningún VALOR ACEPTADO para esta factura."
+            res.observacion = (
+                "La macro no trae ningún VALOR ACEPTADO utilizable para esta factura."
+                if avisos_macro
+                else "La macro no trae ningún VALOR ACEPTADO para esta factura."
+            )
             destino.parent.mkdir(parents=True, exist_ok=True)
             wb.save(destino)
             return res
@@ -295,16 +412,21 @@ def procesar_archivo(
             sum(
                 d.vr_ent_antes - d.vr_ent_despues
                 for d, it in zip(res.descuentos, res.items_tocados, strict=True)
-                if cuentan_desglose or not it.desglose
+                if cuentan[id(it)]
             ),
             2,
         )
         subtotal_despues = round(subtotal_antes - descontado, 2)
         res.subtotal_despues = subtotal_despues
         res.estado = "AJUSTADA" if res.descuentos else "SIN_ACEPTADO"
+        if not cuadra:
+            res.sin_cruzar.append(
+                "REVISAR A MANO: no se pudo reproducir el subtotal del archivo "
+                f"(${subtotal_antes:,.0f}) con los renglones de la factura, así que "
+                "solo se descontaron los servicios numerados"
+            )
         if res.descuentos:
-            n_items = sum(1 for it in items if cuentan_desglose or not it.desglose)
-            recalcular_totales(idx, fac, est, subtotal_despues, n_items)
+            recalcular_totales(idx, fac, est, subtotal_despues, n_items_original)
 
         destino.parent.mkdir(parents=True, exist_ok=True)
         wb.save(destino)
@@ -395,24 +517,50 @@ def procesar(
     archivos = _archivos(detallados)
     if not archivos:
         raise ValueError(f"No se encontró ningún Excel en {detallados!r}")
-    aceptados = leer_aceptados(macro)
+    aceptados, descartes = leer_aceptados(macro)
     logger.info(
         "Macro: %d factura(s) con VALOR ACEPTADO, por $%s",
         len(aceptados),
         f"{sum(f.valor_glosado for v in aceptados.values() for f in v):,.0f}".replace(",", "."),
     )
+    if descartes:
+        logger.warning(
+            "  OJO: %d fila(s) de la macro no se pudieron usar (ver la bitácora).",
+            sum(len(v) for v in descartes.values()),
+        )
     resultados = []
+    vistas: set[str] = set()
     for n, ruta in enumerate(archivos, 1):
         try:
-            res = procesar_archivo(ruta, aceptados, salida / ruta.name)
+            res = procesar_archivo(ruta, aceptados, salida / ruta.name, descartes)
         except Exception as e:  # noqa: BLE001 - una factura mala no tumba el lote
             logger.warning("  %s: %s", ruta.name, e)
             res = ResultadoFactura(
                 factura=ruta.stem, archivo=ruta.name, estado="ERROR", observacion=str(e)
             )
         resultados.append(res)
+        vistas.add(normalizar_factura(res.factura))
         if n % 50 == 0:
             logger.info("  %d/%d…", n, len(archivos))
+
+    # Una factura que la macro aceptó pero que no tiene detallado en la carpeta
+    # no puede desaparecer del control: esa plata se seguiría reclamando sin que
+    # nadie se entere. Queda en la bitácora con su valor y su motivo.
+    for clave, filas in sorted(aceptados.items()):
+        if clave in vistas:
+            continue
+        resultados.append(
+            ResultadoFactura(
+                factura=filas[0].factura,
+                archivo="",
+                estado="SIN_DETALLADO",
+                aceptado_macro=round(sum(f.valor_glosado for f in filas), 2),
+                observacion=(
+                    "La macro le acepta plata a esta factura, pero no hay ningún "
+                    "detallado suyo en la carpeta: no se pudo descontar de ninguna parte."
+                ),
+            )
+        )
     if bitacora:
         escribir_bitacora(bitacora, resultados)
     return resultados
