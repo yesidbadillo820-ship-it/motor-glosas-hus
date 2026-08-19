@@ -1,3 +1,4 @@
+from app.core.config import espera_maxima
 import os
 import re
 import json
@@ -9890,7 +9891,7 @@ class GlosaService:
                         # repita palabras/frases (anti-runaway degenerativo).
                         frequency_penalty=0.3,
                         presence_penalty=0.2,
-                        timeout=120.0,
+                        timeout=espera_maxima(120.0),
                         **kwargs_razonador,
                     )
                     choice = resp.choices[0]
@@ -10047,7 +10048,9 @@ class GlosaService:
         # 'Stream idle timeout' en respuestas que rondaban los 100s.
         # Subimos a 180s para dar margen y activamos keepalive / retries
         # implícitos del cliente.
-        _timeout_anthropic = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+        _timeout_anthropic = httpx.Timeout(
+            connect=15.0, read=espera_maxima(180.0), write=30.0, pool=10.0
+        )
 
         # Decidir si usar caching: el mínimo cacheable de Anthropic es
         # 1024 tokens. Con la heurística "1 token ≈ 3 chars en español"
@@ -10227,7 +10230,7 @@ class GlosaService:
         if not self.anthropic_key:
             raise RuntimeError("Anthropic API key no configurada (tool use)")
 
-        timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+        timeout = httpx.Timeout(connect=15.0, read=espera_maxima(180.0), write=30.0, pool=10.0)
         headers = {
             "x-api-key": self.anthropic_key,
             "anthropic-version": "2023-06-01",
@@ -10362,7 +10365,7 @@ class GlosaService:
         # El texto del prompt va al final, después de los documentos
         content_blocks.append({"type": "text", "text": user})
 
-        timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
+        timeout = httpx.Timeout(connect=15.0, read=espera_maxima(240.0), write=60.0, pool=10.0)
         headers = {
             "x-api-key": self.anthropic_key,
             "anthropic-version": "2023-06-01",

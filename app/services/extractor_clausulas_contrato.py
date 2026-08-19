@@ -21,6 +21,7 @@ por formato raro o fonts no estándar) y entiende layout/tablas. Más
 robusto que pdfplumber → texto plano → Claude.
 """
 
+from app.core.config import espera_maxima
 import os
 import json
 import base64
@@ -109,7 +110,7 @@ async def extraer_clausulas_desde_texto(
         f"--- FIN TEXTO CONTRATO ---"
     )
 
-    timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+    timeout = httpx.Timeout(connect=15.0, read=espera_maxima(180.0), write=30.0, pool=10.0)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -223,7 +224,7 @@ async def extraer_clausulas_desde_pdf_bytes(
         "para responder glosas, según las reglas del system prompt."
     )
 
-    timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
+    timeout = httpx.Timeout(connect=15.0, read=espera_maxima(240.0), write=60.0, pool=10.0)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",

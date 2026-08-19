@@ -380,13 +380,40 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
     issues: list[dict] = []
     total_citas = 0
 
+    # 19-08-2026. Estos dos caminos devolvían lo MISMO que «revisé y está
+    # limpio»: cero citas, cero problemas. Y con eso el dictamen se llevaba el
+    # sello verde «✓ VALIDADO POR QUALITY GATE» sin que nadie lo hubiera
+    # revisado — un sello de calidad sobre un documento que se radica ante la
+    # EPS, puesto sin haber mirado nada.
+    #
+    # `verificado` distingue las dos cosas. La pantalla solo estampa el sello
+    # cuando es True.
     try:
         from app.services.normativa_completa import _TODAS_LAS_NORMAS as normas
-    except Exception:
-        return {"total_citas": 0, "ok": 0, "issues": [], "tiene_problemas_graves": False}
+    except Exception as e:  # noqa: BLE001 - se avisa, no se finge
+        logger.warning("[CITAS] no se pudo cargar el corpus de normas: %s", e)
+        return {
+            "total_citas": 0,
+            "ok": 0,
+            "issues": [],
+            "tiene_problemas_graves": False,
+            "verificado": False,
+            "motivo_no_verificado": (
+                "No se pudo cargar el corpus de normas del sistema, así que las "
+                "citas de este dictamen NO se revisaron. Verifíquelas a mano "
+                "antes de radicar."
+            ),
+        }
 
     if not dictamen_html:
-        return {"total_citas": 0, "ok": 0, "issues": [], "tiene_problemas_graves": False}
+        return {
+            "total_citas": 0,
+            "ok": 0,
+            "issues": [],
+            "tiene_problemas_graves": False,
+            "verificado": False,
+            "motivo_no_verificado": "El dictamen llegó vacío: no había qué revisar.",
+        }
 
     texto = _quitar_html(dictamen_html)
 
@@ -595,4 +622,6 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
         "ok": ok,
         "issues": issues,
         "tiene_problemas_graves": tiene_graves,
+        # Sí se revisó de verdad: la pantalla puede estampar el sello.
+        "verificado": True,
     }
