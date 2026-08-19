@@ -105,3 +105,44 @@ class TestNoSeEncolanReconstrucciones:
             h.join(timeout=20)
         assert not any(h.is_alive() for h in hilos), "un hilo quedó colgado"
         assert errores == []
+
+
+class TestLaRespuestaAvisaQueSigueIndexando:
+    """«No encontré nada» y «no he terminado de mirar» son cosas distintas.
+
+    19-08-2026. Yesid buscó HUS548170 mientras el indexador iba por 11.367
+    facturas y la pantalla contestó «Sin soportes», con causas que no incluían
+    la verdadera: las carpetas se recorren por orden (FEBRERO, MARZO, …) y
+    AGOSTO sale de últimas. El auditor podía creer que la factura no tenía
+    soportes.
+    """
+
+    def test_el_estado_viaja_en_la_respuesta_de_la_ruta(self, tmp_path):
+        from fastapi.testclient import TestClient
+
+        from app.api.deps import get_usuario_actual
+        from app.main import app
+        from app.models.db import UsuarioRecord
+        from app.services import soportes_autodiscovery_service as svc
+
+        idx = SoportesIndexer(raiz=str(_paquete(tmp_path)))
+        idx.rebuild()
+        idx._construyendo = True  # simula indexación en curso
+        usuario = UsuarioRecord(id=1, email="a@b.c", rol="SUPER_ADMIN", activo=1)
+        app.dependency_overrides[get_usuario_actual] = lambda: usuario
+        original = svc._indexer_singleton
+        svc._indexer_singleton = idx
+        try:
+            with TestClient(app) as c:
+                d = c.get("/soportes-auto/factura/HUS999999").json()
+            assert d["total"] == 0
+            assert d["construyendo"] is True
+            assert d["facturas_indexadas"] >= 1
+        finally:
+            svc._indexer_singleton = original
+            app.dependency_overrides.clear()
+
+    def test_cuando_termina_ya_no_dice_que_esta_indexando(self, tmp_path):
+        idx = SoportesIndexer(raiz=str(_paquete(tmp_path)))
+        idx.rebuild()
+        assert idx.stats()["construyendo"] is False

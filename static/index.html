@@ -19767,7 +19767,7 @@ async function cargarSoportesEstado(){
       + '</div>'
       + '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.7rem 1rem">'
       +   '<div style="font-size:.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em">Último build</div>'
-      +   '<div style="font-size:1rem;font-weight:800;color:#92400e;margin-top:.2rem">hace ' + haceTxt + '</div>'
+      +   '<div style="font-size:1rem;font-weight:800;color:#92400e;margin-top:.2rem">' + (indexando ? 'en curso' : 'hace ' + haceTxt) + '</div>'
       +   (s.ultimo_error ? '<div style="font-size:.65rem;color:#991b1b;margin-top:.2rem">Último error: ' + escHtml(s.ultimo_error) + '</div>' : '')
       + '</div>'
       + (indexando
@@ -19986,12 +19986,25 @@ async function buscarSoportesFactura(){
     }
     var d = await r.json();
     if(!d.total){
+      // «No encontré nada» y «todavía no he terminado de mirar» son cosas muy
+      // distintas. Mientras el indexador recorre el servidor hay que decirlo,
+      // o el auditor cree que la factura no tiene soportes.
+      if(d.construyendo){
+        box.innerHTML = '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:.9rem 1.1rem;color:#1e40af;font-size:.85rem">'
+          + '<b>Todavía estoy indexando el servidor.</b><br>'
+          + 'Aún no aparece la factura ' + escHtml(d.factura) + ', pero el índice no está completo '
+          + '(van ' + fmtNum(d.facturas_indexadas || 0) + ' facturas). Las carpetas se recorren por orden '
+          + '(FEBRERO, MARZO, …), así que los meses recientes salen de últimos.<br>'
+          + 'Espere a que el estado de arriba deje de decir «Indexando…» y vuelva a buscar.'
+          + '</div>';
+        return;
+      }
       box.innerHTML = '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.9rem 1.1rem;color:#92400e;font-size:.85rem">'
         + '<b>Sin soportes para la factura ' + escHtml(d.factura) + '.</b><br>'
         + 'Causas posibles:<br>'
-        + '• El servidor de archivos no está indexado (si recién se conectó, presioná "🔄 Reindexar ahora").<br>'
         + '• La factura aún no fue radicada (los soportes se generan al radicar).<br>'
-        + '• El número de factura no coincide con el patrón <code>HUS{dígitos}</code>.'
+        + '• El número de factura no coincide con el patrón <code>HUS{dígitos}</code>.<br>'
+        + '• El servidor de archivos no está indexado (presioná "🔄 Reindexar ahora").'
         + '</div>';
       return;
     }

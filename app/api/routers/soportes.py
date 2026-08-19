@@ -131,11 +131,17 @@ def soportes_de_factura(
     except Exception:
         pass  # nunca tumbar la respuesta por fallo de audit
 
+    # Si el índice se está construyendo, la pantalla tiene que poder decirlo:
+    # «no encontré nada» y «todavía no he terminado de mirar» son cosas muy
+    # distintas para el auditor. 18-08-2026.
+    estado_idx = indexer.stats()
     return {
         "factura": numero,
         "soportes": soportes,
         "total": len(soportes),
         "tipos_detectados": sorted({s["tipo_codigo"] for s in soportes}),
+        "construyendo": bool(estado_idx.get("construyendo")),
+        "facturas_indexadas": estado_idx.get("facturas_indexadas", 0),
     }
 
 
