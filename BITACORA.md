@@ -3596,6 +3596,19 @@ DISPENSARIO — SIMED):
   NC del Dispensario en la BD de julio). Fuentes: la hoja CON_OBSERVACIONES
   (el cruce de decisiones casó 1.493/1.493) y la BD de glosas aceptadas de
   julio.
+- **(19-08) Acta 879 en limpio:** el auditor pasó el acta a su formato .xlsm
+  definitivo y quedaban 27 filas con la descripción genérica "IPS ACEPTA
+  GLOSA". Se corrigieron **26 en el sitio** (mismo archivo, macros y formato
+  intactos: solo cambiaron 52 celdas, verificado con comparación celda a
+  celda) tomando el CONCEPTO CONCILIACIÓN de la circularización de glosas
+  2026 — 22 con el texto textual y 4 de la factura 487285 con texto compuesto
+  porque la circularización traía el texto trocado (decía "levanta" con
+  valores de aceptación). Quedó **1 sin tocar para decisión del auditor**: la
+  487096 CL0101 por $1.248.511, que el acta tiene ACEPTADA al 100% y la
+  circularización tiene LEVANTADA. Ojo adicional: en la 487285 la
+  circularización reporta las terapias levantadas y un aceptado total de
+  $920.064 vs $953.680 del acta de la entidad ($33.616 de diferencia) —
+  aclarar con el técnico antes de firmar.
 - **Para cerrar el acta:** (1) confirmar fecha y número contra el **PDF
   firmado ACTA_AC_AC000879** (se dejó 07/05/2026 según las NC; el PDF no se
   ha compartido al chat); (2) revisar **3 líneas que no cierran**: 478141
