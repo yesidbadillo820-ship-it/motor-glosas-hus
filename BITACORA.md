@@ -4242,6 +4242,43 @@ que describía Yesid: «se facturan 6 ítems pero pagan 2 y los 4 los glosan».
 facturas) y la pantalla devuelve para HUS353885: reclamado 3 / $13.800,
 aprobado 1 / $4.600, glosado 2 / $9.200.
 
+### 19-08 — La factura fantasma del envío 232047 y el botón para quitarla
+
+Elias escribió el envío **232047** y la página trajo **13 facturas**, cuando
+el DGH y el Excel de radicación mostraban **12**. La de más era
+**HUS0000538528 ($442.900)**, que no aparece en ninguna parte del Excel
+(se revisaron las 22.363 filas del archivo, una por una).
+
+**Por qué pasó.** La fuente de Radicación se actualiza factura por factura:
+cuando facturación saca una factura de un envío, esa factura simplemente
+deja de venir en el Excel nuevo — pero su fila vieja se queda guardada con
+el envío anterior, y al escribir el envío la página la sigue trayendo. No es
+que la página invente facturas: está leyendo un dato que se quedó viejo.
+
+**Tres cosas quedaron para que no vuelva a doler:**
+
+1. **Aviso antes de cargar.** «Ver antes» y «Cargar envío» ahora comparan de
+   qué cargue del Excel viene cada factura del envío. Si una quedó de un
+   cargue anterior mientras el resto se actualizó en el último, sale el
+   aviso: «HUS…528 quedó de un cargue anterior de la Radicación (actualizada
+   el 28/07); el resto del envío se actualizó el 19/08. Puede que facturación
+   ya la haya sacado de este envío: verifíquela en el DGH antes de
+   auditarla.»
+2. **Botón 🗑 para quitar UNA factura** (lo que pidió Elias). En la ventana
+   del oficio, cada fila tiene ahora su papelera: quita esa factura sola sin
+   tocar el resto del oficio ni el envío. Si la factura nació ahí, se borra;
+   si venía reingresada de una devolución, vuelve a su estado devuelto
+   anterior con su historial intacto. **No** deja quitar una factura que ya
+   salió en un oficio de devolución entregado (ese PDF ya está en manos de la
+   entidad). Solo administración y coordinación, igual que la ✕ de los
+   envíos.
+3. **Comando de revisión** `tools\preauditoria_revisar_envio.py 232047`:
+   muestra factura por factura de qué cargue viene y dónde quedó cargada, y
+   marca con «OJO» las rezagadas. No cambia nada, solo mira.
+
+12 pruebas nuevas. La fila vieja de la fuente se corrige sola la próxima vez
+que esa factura venga en el Excel con su envío nuevo.
+
 ---
 
 ## 3) PENDIENTE

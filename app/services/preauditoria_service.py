@@ -729,6 +729,59 @@ def facturas_de_envio(db: Session, envio: str) -> list[RadicacionCuentaRecord]:
     )
 
 
+# Dos filas de la fuente que se tocaron con menos de esta diferencia se toman
+# como parte del MISMO cargue del Excel de Radicación (un cargue grande tarda
+# minutos, no horas).
+MARGEN_MISMO_CARGUE = timedelta(hours=6)
+
+
+def facturas_de_fuente_rezagada(src: list) -> list[dict]:
+    """Facturas del envío que quedaron de un cargue ANTERIOR de la Radicación.
+
+    POR QUÉ EXISTE (caso real 19-08-2026, envío 232047): la fuente de
+    Radicación se actualiza factura por factura (upsert). Cuando facturación
+    saca una factura de un envío, esa factura simplemente deja de venir en el
+    Excel nuevo — pero su fila vieja se queda en el sistema con el envío
+    anterior, y al escribir el envío la arrastra como si todavía perteneciera.
+    En ese caso el sistema traía 13 facturas donde el DGH mostraba 12.
+
+    No se puede borrar sola (el Excel puede ser parcial y borraríamos filas
+    buenas), pero SÍ se puede señalar: si el resto del envío se actualizó en
+    el último cargue y una fila quedó con fecha vieja, esa es la sospechosa.
+    """
+    fechas = [a_utc(r.actualizado_en or r.importado_en) for r in src]
+    conocidas = [f for f in fechas if f is not None]
+    if len(conocidas) < 2:
+        return []
+    ultima = max(conocidas)
+    corte = ultima - MARGEN_MISMO_CARGUE
+    rezagadas = []
+    for r, f in zip(src, fechas):
+        if f is None or f >= corte:
+            continue
+        rezagadas.append(
+            {
+                "factura": r.factura,
+                "valor": r.valor,
+                "actualizada_en": f.astimezone(TZ_BOGOTA).strftime("%d/%m/%Y"),
+                "resto_actualizado_en": ultima.astimezone(TZ_BOGOTA).strftime("%d/%m/%Y"),
+                "fuente_archivo": r.fuente_archivo,
+            }
+        )
+    return rezagadas
+
+
+def _avisos_de_fuente_rezagada(src: list) -> list[str]:
+    """Los mismos hallazgos, redactados para que el auditor los entienda."""
+    return [
+        f"{r['factura']} quedó de un cargue anterior de la Radicación "
+        f"(actualizada el {r['actualizada_en']}); el resto del envío se actualizó el "
+        f"{r['resto_actualizado_en']}. Puede que facturación ya la haya sacado de este "
+        "envío: verifíquela en el DGH antes de auditarla."
+        for r in facturas_de_fuente_rezagada(src)
+    ]
+
+
 # ==================================================================
 # Escribir un envío (el corazón del automatismo)
 # ==================================================================
@@ -843,6 +896,8 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
         "ya_radicadas": radicadas,
         "ya_abiertas": pendientes_otro,
         "alertas_limite_devoluciones": alertas,
+        "avisos_fuente": _avisos_de_fuente_rezagada(src),
+        "facturas_rezagadas": [r["factura"] for r in facturas_de_fuente_rezagada(src)],
         "facturas": facturas,
     }
 
@@ -992,6 +1047,10 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
                 f"La recarga no movió ninguna factura: ninguna del envío {envio} estaba "
                 "devuelta (las radicadas y las pendientes se quedan donde están)."
             )
+        # Facturas que la fuente arrastró de un cargue viejo: puede que ya no
+        # pertenezcan al envío. Se cargan igual (la fuente manda) pero el
+        # auditor queda avisado y puede quitarlas con el botón 🗑.
+        advertencias += _avisos_de_fuente_rezagada(src)
         db.add(
             EnvioCargadoRecord(
                 envio=envio,
@@ -1594,6 +1653,81 @@ def eliminar_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> di
         "radicado": oficio.numero_radicado,
         "facturas_borradas": borradas,
         "subsanaciones_revertidas": revertidas,
+    }
+
+
+def quitar_factura(
+    db: Session, oficio: OficioRecepcionRecord, factura_row: FacturaPreauditoriaRecord
+) -> dict:
+    """Quita UNA factura que entró por error a un oficio, sin tocar el resto.
+
+    POR QUÉ EXISTE (caso real 19-08-2026): al escribir un envío el sistema
+    trae TODAS las facturas que la fuente de Radicación tenga con ese número.
+    Si facturación ya sacó una factura del envío, su fila vieja se queda en la
+    fuente y la factura entra igual — el oficio queda con una factura que no
+    le corresponde. Antes tocaba quitar el envío entero y volverlo a escribir.
+
+    Se comporta igual que quitar un envío, pero para una sola factura:
+      - Si nació aquí (ronda 1): se borra con sus eventos.
+      - Si venía reingresada de una devolución: NO se borra; se revierte el
+        reingreso y vuelve a su estado devuelto anterior, con su historial.
+    El registro del envío se queda (es la historia de por dónde anduvo) pero
+    se le descuenta esta factura del conteo.
+
+    No se puede quitar si ya salió en un oficio de devolución emitido: ese PDF
+    ya se entregó a la entidad y el sistema debe seguir cuadrando con él.
+    """
+    if factura_row.oficio_actual_id != oficio.id:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"La factura {factura_row.factura} ya no pertenece a "
+                f"{oficio.numero_radicado} (está en "
+                f"{factura_row.oficio_fhus or 'otro oficio'}): quítela desde allá."
+            ),
+        }
+    con_pdf = _facturas_en_pdf_emitido(db, [factura_row], oficio.id)
+    if con_pdf:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"La factura {factura_row.factura} ya salió en un oficio de devolución "
+                "emitido: no se puede quitar. Si el oficio se generó por error, "
+                "elimínelo primero desde la pestaña «Oficios de devolución»."
+            ),
+        }
+
+    factura = factura_row.factura
+    envio = factura_row.envio_actual
+    borradas, revertidas = _deshacer_facturas(db, [factura_row], oficio.id)
+    # El envío sigue cargado (con una factura menos): así el registro conserva
+    # por dónde anduvo y el tope de 3 oficios no se altera.
+    cargado = (
+        db.query(EnvioCargadoRecord)
+        .filter(
+            EnvioCargadoRecord.oficio_id == oficio.id,
+            EnvioCargadoRecord.envio == envio,
+        )
+        .first()
+        if envio
+        else None
+    )
+    if cargado is not None:
+        cargado.total_facturas = max(0, (cargado.total_facturas or 0) - 1)
+        if borradas:
+            cargado.nuevas = max(0, (cargado.nuevas or 0) - 1)
+        else:
+            cargado.reingresos = max(0, (cargado.reingresos or 0) - 1)
+    db.commit()
+    return {
+        "ok": True,
+        "factura": factura,
+        "envio": envio,
+        "radicado": oficio.numero_radicado,
+        "borrada": bool(borradas),
+        "reingreso_revertido": bool(revertidas),
     }
 
 
