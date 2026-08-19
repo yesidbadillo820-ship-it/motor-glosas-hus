@@ -474,7 +474,9 @@ async function abrirOficio(id){
         // por qué no vuelve a entrar en el próximo.
         (f.consecutivo_devolucion?'<br><span class="leyenda">📄 ya salió en '+esc(f.consecutivo_devolucion)+'</span>':'')+'</td>'+
         '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
-        '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button></td></tr>';
+        '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button>'+
+        (ES_ADMIN?' <button class="btn btn-rojo btn-chico" title="Quitar esta factura del oficio (entró por error)" onclick="quitarFactura('+o.id+','+f.id+',\''+esc(f.factura)+'\')">🗑</button>':'')+
+        '</td></tr>';
     }).join('');
     var envios=(o.envios_escritos||[]).map(function(e){
       return '<span class="chip" style="margin:2px 4px 2px 0">'+esc(e.envio)+' ('+e.total_facturas+')'+
@@ -483,7 +485,7 @@ async function abrirOficio(id){
     }).join('');
     document.getElementById('mo-cuerpo').innerHTML=
       '<p>Recibido: <b>'+fBog(o.fecha_recibido)+'</b> &nbsp;'+semHtml(o.semaforo)+'</p>'+
-      (envios?'<p class="leyenda">Envíos cargados: '+envios+(ES_ADMIN?'<br>La ✕ quita un envío cargado por error (solo administradores).':'')+'</p>':'')+
+      (envios?'<p class="leyenda">Envíos cargados: '+envios+(ES_ADMIN?'<br>La ✕ quita un envío cargado por error y la 🗑 de cada fila quita una sola factura (solo administradores).':'')+'</p>':'')+
       '<div style="margin:12px 0;padding:12px;background:var(--azul-claro);border-radius:8px;">'+
         '<b><span class="paso">4</span> Escribir un número de envío</b><br>'+
         '<p class="leyenda">El sistema traerá TODAS las facturas de ese envío desde las fuentes.</p>'+
@@ -531,6 +533,9 @@ async function previewEnvio(id){
       h+='<div class="aviso aviso-warn">Este envío ya salió en <b>'+esc(enOtros)+'</b> y ninguna de sus facturas está devuelta: cargarlo aquí no moverá ninguna factura.</div>';
     }
     h+='<div class="aviso aviso-ok">Trae <b>'+p.total_en_fuente+'</b> factura(s): '+p.nuevas+' nuevas, '+p.reingresos+' subsanaciones, '+p.ya_radicadas+' ya radicadas.</div>';
+    // Facturas que la fuente arrastra de un cargue anterior: puede que
+    // facturación ya las haya sacado del envío (el DGH mostraría una menos).
+    (p.avisos_fuente||[]).forEach(function(a){ h+='<div class="aviso aviso-warn">🕵️ '+esc(a)+'</div>'; });
     (p.alertas_limite_devoluciones||[]).forEach(function(a){ h+='<div class="aviso aviso-err">⚠️ '+esc(a)+'</div>'; });
     msg.innerHTML=h;
   }catch(e){ msg.innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
@@ -558,6 +563,15 @@ async function eliminarEnvio(oficioId, envio){
     var d=await api('/preauditoria/oficios/'+oficioId+'/envios/'+encodeURIComponent(envio),{method:'DELETE'});
     alert('Envío '+d.envio+' eliminado ('+d.facturas_borradas+' factura(s) borradas'+
       (d.subsanaciones_revertidas?', '+d.subsanaciones_revertidas+' subsanación(es) revertida(s)':'')+').');
+    await Promise.all([cargarOficios(), cargarConsolidado()]);
+    abrirOficio(oficioId);
+  }catch(e){ alert(e.message); }
+}
+async function quitarFactura(oficioId, facturaId, factura){
+  if(!confirm('¿Quitar la factura '+factura+' de este oficio?\n\nÚselo cuando la factura entró por error (por ejemplo, si facturación ya la sacó del envío pero la fuente todavía la traía).\n\nSi nació en este oficio se borra con su historial; si venía reingresada de una devolución, vuelve a su estado devuelto anterior.\n\nPara recuperarla habría que quitar el envío completo (✕) y volver a escribirlo.')) return;
+  try{
+    var d=await api('/preauditoria/oficios/'+oficioId+'/facturas/'+facturaId,{method:'DELETE'});
+    alert('Factura '+d.factura+' quitada del oficio'+(d.reingreso_revertido?' (volvió a su estado devuelto anterior)':'')+'.');
     await Promise.all([cargarOficios(), cargarConsolidado()]);
     abrirOficio(oficioId);
   }catch(e){ alert(e.message); }

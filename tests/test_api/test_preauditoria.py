@@ -1894,3 +1894,161 @@ class TestInformeGestion:
         eventos = list(wb["HISTORIAL"].iter_rows(min_row=2, values_only=True))
         tipos = [e[4] for e in eventos]
         assert "ESCRITA" in tipos and "RADICADA" in tipos and "DEVUELTA" in tipos
+
+
+# ------------------------------------------------------------------
+# Quitar UNA factura del oficio (entró por error) — solo admin/coordinador
+#
+# Caso real 19-08-2026, envío 232047: la fuente de Radicación arrastró la
+# factura HUS0000538528 de un cargue anterior; el DGH mostraba 12 facturas y
+# el sistema traía 13. Antes tocaba quitar el envío entero y reescribirlo.
+# ------------------------------------------------------------------
+
+
+class TestQuitarFactura:
+    def _admin(self, db_session):
+        u = UsuarioRecord(
+            id=7,
+            nombre="ADMIN QF",
+            email="admin7@hus.gov.co",
+            rol="SUPER_ADMIN",
+            activo=1,
+            password_hash=get_password_hash("xxxx"),
+        )
+        db_session.add(u)
+        db_session.commit()
+        return u
+
+    def _como_admin(self, db_session):
+        from app.api.deps import get_coordinador_o_admin
+        from app.main import app
+
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: self._admin(db_session)
+
+    def test_auditor_no_puede(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        fid = _factura_id(client, F1)
+        assert client.delete(f"/preauditoria/oficios/{o['id']}/facturas/{fid}").status_code == 403
+
+    def test_quita_solo_esa_factura_y_deja_el_resto(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        fid = _factura_id(client, F2)
+
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/facturas/{fid}")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["factura"] == F2 and d["borrada"] is True
+
+        # La otra factura del mismo envío sigue intacta…
+        cons = client.get("/preauditoria/consolidado").json()
+        assert cons["total"] == 1 and cons["items"][0]["factura"] == F1
+        # …el envío sigue cargado (con una factura menos en el conteo)…
+        envios = {e["envio"]: e["total_facturas"] for e in d["oficio"]["envios_escritos"]}
+        assert envios == {ENV: 1}
+        # …y el oficio ya no la cuenta.
+        assert d["oficio"]["total_facturas"] == 1
+
+    def test_no_quita_una_factura_de_otro_oficio(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila("229999", F3, 55000)])
+        o1 = _crear_oficio(client)
+        o2 = _crear_oficio(client, radicado="FHUS-AS-I00999-26")
+        _escribir(client, o1["id"], ENV)
+        _escribir(client, o2["id"], "229999")
+
+        r = client.delete(f"/preauditoria/oficios/{o1['id']}/facturas/{_factura_id(client, F3)}")
+        assert r.status_code == 409
+        assert "ya no pertenece" in r.json()["detail"]
+        assert client.get("/preauditoria/consolidado").json()["total"] == 2
+
+    def test_no_quita_si_ya_salio_en_un_oficio_de_devolucion(self, client, db_session):
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        fid = _factura_id(client, F1)
+        _devolver(client, fid)
+        client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+
+        r = client.delete(f"/preauditoria/oficios/{o['id']}/facturas/{fid}")
+        assert r.status_code == 409
+        assert "oficio de devolución" in r.json()["detail"]
+        assert client.get("/preauditoria/consolidado").json()["total"] == 1
+
+    def test_reingresada_vuelve_a_su_devolucion_anterior(self, client, db_session):
+        """Si la factura venía reingresada para subsanar, no se borra su
+        historial: se revierte el reingreso y vuelve a quedar devuelta."""
+        self._como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        o1 = _crear_oficio(client)
+        _escribir(client, o1["id"], ENV)
+        fid = _factura_id(client, F1)
+        _devolver(client, fid, motivo="Falta epicrisis")
+        o2 = _crear_oficio(client, radicado="FHUS-AS-I00888-26")
+        _escribir(client, o2["id"], ENV)  # reingreso para subsanar
+
+        r = client.delete(f"/preauditoria/oficios/{o2['id']}/facturas/{fid}")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["borrada"] is False and d["reingreso_revertido"] is True
+
+        hist = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert hist["actual"]["resultado"] == "DEVUELTA"
+        assert hist["actual"]["oficio_fhus"] == o1["numero_radicado"]
+        assert hist["actual"]["motivo_devolucion"] == "Falta epicrisis"
+        # El historial de la devolución NO se perdió.
+        assert "DEVUELTA" in [e["tipo"] for e in hist["eventos"]]
+
+
+# ------------------------------------------------------------------
+# Facturas que la fuente arrastra de un cargue anterior (la "fantasma")
+# ------------------------------------------------------------------
+
+
+class TestFuenteRezagada:
+    def _envejecer(self, db_session, factura, dias=30):
+        from datetime import timedelta as _td
+
+        from app.core.tz import ahora_utc
+
+        fila = (
+            db_session.query(RadicacionCuentaRecord)
+            .filter(RadicacionCuentaRecord.factura == factura)
+            .one()
+        )
+        fila.actualizado_en = ahora_utc() - _td(days=dias)
+        fila.importado_en = fila.actualizado_en
+        db_session.commit()
+
+    def test_preview_avisa_de_la_factura_vieja(self, client, db_session):
+        _subir_radicacion(
+            client,
+            [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000), _rad_fila(ENV, F3, 55000)],
+        )
+        self._envejecer(db_session, F3)
+        o = _crear_oficio(client)
+
+        p = client.get(f"/preauditoria/oficios/{o['id']}/envios/{ENV}/preview").json()
+        assert p["facturas_rezagadas"] == [F3]
+        assert len(p["avisos_fuente"]) == 1
+        assert F3 in p["avisos_fuente"][0] and "DGH" in p["avisos_fuente"][0]
+
+    def test_al_cargar_el_envio_queda_la_advertencia(self, client, db_session):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F3, 55000)])
+        self._envejecer(db_session, F3)
+        o = _crear_oficio(client)
+
+        d = _escribir(client, o["id"], ENV).json()
+        assert d["nuevas"] == 2  # se carga igual: la fuente manda
+        assert any(F3 in a for a in d["advertencias"])
+
+    def test_sin_diferencia_de_fechas_no_avisa_nada(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 98000)])
+        o = _crear_oficio(client)
+        p = client.get(f"/preauditoria/oficios/{o['id']}/envios/{ENV}/preview").json()
+        assert p["facturas_rezagadas"] == [] and p["avisos_fuente"] == []

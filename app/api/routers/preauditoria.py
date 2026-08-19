@@ -693,6 +693,31 @@ def eliminar_envio(
     return {**res, "oficio": _oficio_dict(db, o)}
 
 
+@router.delete("/oficios/{oficio_id}/facturas/{factura_id}")
+def quitar_factura_del_oficio(
+    oficio_id: int,
+    factura_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Quita UNA factura que entró por error al oficio (SUPER_ADMIN/COORDINADOR).
+
+    Para el caso en que la fuente de Radicación arrastra una factura que
+    facturación ya sacó del envío: en vez de quitar el envío entero y volver
+    a escribirlo, se quita solo esa factura. El resto del oficio no se toca.
+    """
+    o = db.get(OficioRecepcionRecord, oficio_id)
+    if not o:
+        raise HTTPException(404, "Oficio no encontrado")
+    f = db.get(FacturaPreauditoriaRecord, factura_id)
+    if not f:
+        raise HTTPException(404, "Factura no encontrada")
+    res = svc.quitar_factura(db, o, f)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 409), res.get("mensaje", "No se pudo quitar"))
+    return {**res, "oficio": _oficio_dict(db, o)}
+
+
 @router.post("/oficios/{oficio_id}/envios")
 def escribir_envio(
     oficio_id: int,
