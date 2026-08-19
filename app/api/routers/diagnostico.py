@@ -73,9 +73,17 @@ def diagnostico_completo(
       - mensaje: descripción humana
       - data: detalles técnicos
     """
+    # 19-08-2026. Este número estaba escrito a mano y se quedó en 5.4.0
+    # mientras la aplicación iba en 5.5.0: el encabezado del panel decía una
+    # versión y la sección de abajo otra, en la misma pantalla. Es la tercera
+    # vez hoy que un valor copiado a mano se desfasa de su fuente —pasó con la
+    # cadena de modelos y con el ejemplo del .env—, así que se lee de donde
+    # vive de verdad.
+    from app.core.config import get_settings as _get_settings
+
     out: dict = {
         "generado_en": datetime.now(timezone.utc).isoformat(),
-        "version": "5.4.0",
+        "version": _get_settings().app_version,
         "secciones": {},
     }
 
@@ -356,7 +364,15 @@ def diagnostico_completo(
             "data": {},
         }
     else:
-        gemini_modelo = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        # 19-08-2026. Acá estaba el CUARTO modelo escrito a mano que se
+        # desfasa: `os.getenv("GEMINI_MODEL", "gemini-2.0-flash")`. Como el
+        # .env del hospital no define esa variable, el panel usaba el valor de
+        # respaldo —un modelo que Google retiró— e ignoraba la configuración,
+        # que ya decía `gemini-flash-latest`. Resultado: el panel reportaba un
+        # 404 permanente de un modelo que el motor ya no usa.
+        from app.core.config import get_settings as _cfg_gemini
+
+        gemini_modelo = os.getenv("GEMINI_MODEL") or _cfg_gemini().gemini_model
 
         def _do_ping_gemini():
             try:

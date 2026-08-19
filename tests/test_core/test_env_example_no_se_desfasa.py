@@ -148,3 +148,27 @@ class TestNadieRepiteLaCadenaPorSuCuenta:
 
         cadena = _cadena_groq()
         assert len(cadena) == len(set(cadena)), cadena
+
+
+def test_ningun_archivo_usa_un_modelo_retirado_como_valor_de_respaldo():
+    """19-08-2026. El panel de Diagnóstico tenía
+    `os.getenv("GEMINI_MODEL", "gemini-2.0-flash")`. Como el .env del hospital
+    no define esa variable, usaba el respaldo —un modelo retirado— e ignoraba
+    la configuración. Cuarto valor copiado a mano que se desfasa el mismo día.
+    """
+    import ast
+
+    for ruta in (
+        RAIZ / "app" / "api" / "routers" / "diagnostico.py",
+        RAIZ / "app" / "api" / "routers" / "ia_status.py",
+        RAIZ / "app" / "api" / "routers" / "sistema.py",
+        RAIZ / "app" / "services" / "glosa_service.py",
+    ):
+        arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+        textos = {
+            n.value
+            for n in ast.walk(arbol)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str)
+        }
+        malos = textos & RETIRADOS
+        assert not malos, f"{ruta.name} usa como valor un modelo retirado: {malos}"
