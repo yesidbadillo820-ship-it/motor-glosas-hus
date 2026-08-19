@@ -4193,6 +4193,57 @@ devoluciones.
 
 ---
 
+---
+
+### 19-08 (tarde) — Glosas ADRES ahora muestra las CANTIDADES, no solo la plata
+
+Yesid: «los gestores necesitan saber las cantidades porque si son 6 ítems pero
+ellos van a aceptar algo pues no sabrían qué aceptar porque no sale las
+cantidades de los ítems glosados».
+
+**Qué pasaba.** El reporte del ADRES trae cinco columnas por renglón —
+*Cantidad Reclamado, Valor Reclamado, Cantidad Aprobada, Valor Aprobado y Valor
+Glosado*. El sistema las guardaba todas, pero a la pantalla solo le mandaba
+cuatro: **la cantidad aprobada se quedaba en la base de datos**. El gestor veía
+«$9.200 glosados» y ninguna cantidad, así que no tenía cómo saber cuántos
+ítems estaban en discusión.
+
+**No es un caso raro.** Se revisaron los dos paquetes reales que mandó Yesid:
+
+| Paquete | Renglones glosados | Con aprobación parcial |
+|---|---|---|
+| 31068 | 4.638 | **277** |
+| 31078 | 2.272 | **94** |
+
+Un caso de verdad, factura **HUS353885**, dispositivo `2022DM-0008875-R1`: el
+ADRES reclamó **3**, aprobó **1** y glosó **2** por $9.200. Es exactamente lo
+que describía Yesid: «se facturan 6 ítems pero pagan 2 y los 4 los glosan».
+
+**Qué se hizo.**
+
+1. La tabla de la pantalla ahora trae las cinco columnas del reporte, agrupadas
+   en tres bloques para que se lean de un vistazo:
+   **Reclamado** (cantidad y valor) · **Aprobado por el ADRES** (cantidad y
+   valor) · **Glosado** (cantidad y valor).
+2. Se agregó la **cantidad glosada** = reclamados − aprobados. Es el número que
+   el gestor necesita y que antes no existía en ninguna parte.
+3. **Se corrigió lo que se le declaraba al ADRES.** Al marcar «SE ACEPTA», el
+   sistema prellenaba la cantidad **reclamada**: en HUS353885 declaraba
+   «cantidad aceptada 3» donde solo hay **2** ítems en discusión. Ahora
+   prellena la glosada, y debajo de la casilla dice «de 2 glosado(s)» para que
+   se vea el techo.
+4. Cuando la cantidad glosada da **cero pero sí hay plata glosada**, la
+   pantalla avisa **«solo valor»**: ahí no le quitaron ítems, le bajaron la
+   tarifa (factura HUS354131, procedimiento 21706: 1 reclamado, 1 aprobado,
+   $100 glosados). Un «0» pelado se leería como dato faltante.
+
+**Comprobado con el archivo real de Yesid.** Se cargó el
+`ReporteGlosasReclamPAQUETE_31068.xlsx` completo (4.619 renglones, 324
+facturas) y la pantalla devuelve para HUS353885: reclamado 3 / $13.800,
+aprobado 1 / $4.600, glosado 2 / $9.200.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
@@ -4474,11 +4525,26 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
+### Lo más fresco (del 19-08)
+
 **SIIFA (lo primero, 19-08):** (a) tramitar a mano en el portal las 4
 devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);
 (b) cerrar Guane (salida del cargue + informe); (c) correr el **balance**
 de las cuatro IPS con la opción [B] del bot — de ahí sale qué quedó sin
 responder y qué nuevo hay que trabajar.
+
+**Glosas ADRES (mismo día, otro frente):**
+
+- **Mirar la pantalla de Glosas ADRES con un paquete cargado** y confirmar que
+  las tres cantidades se leen bien (Reclamado / Aprobado por el ADRES /
+  Glosado). Si la tabla queda muy ancha para la pantalla del PC de cartera,
+  avisar y se recorta lo que menos se use.
+- **Decisión que solo puede tomar cartera (sigue pendiente):** cuando un mismo
+  ítem viene glosado por **dos causales** y el gestor acepta en las dos, hoy el
+  sistema le declara al ADRES la plata **dos veces**. Lo correcto es contarla
+  **una sola vez**, pero hay que definir cuál de los dos renglones manda,
+  porque la regla automática puede quedarse **corta** si el gestor acepta justo
+  en el renglón que no cuenta. Sin esa definición no se toca.
 
 ### Lo más fresco (del 18-08)
 

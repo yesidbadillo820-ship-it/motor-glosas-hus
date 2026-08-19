@@ -627,6 +627,22 @@ def _aviso_descuadre(ficha, todas) -> str:
     )
 
 
+def cantidad_glosada(cant_reclamada: float | None, cant_aprobada: float | None) -> float:
+    """Cuántos ítems del renglón quedaron glosados: reclamados menos aprobados.
+
+    19-08-2026. El gestor decide sobre CANTIDADES, no solo sobre plata: en el
+    paquete 31068 hay 277 renglones donde el ADRES reclamó 3 ítems, aprobó 1 y
+    glosó 2 (ej. HUS353885, dispositivo 2022DM-0008875-R1: 3 reclamados, 1
+    aprobado, $9.200 glosados). Sin este número el gestor no sabe cuántos
+    aceptar y termina declarando la cantidad completa.
+
+    Puede dar CERO con valor glosado mayor que cero: ahí no le glosaron
+    cantidad sino tarifa (ej. HUS354131, CUPS 21706: 1 reclamado, 1 aprobado,
+    $100 glosados). Cero es la respuesta correcta y la pantalla lo explica.
+    """
+    return max(0.0, round((cant_reclamada or 0) - (cant_aprobada or 0), 4))
+
+
 def glosa_dict(g: GlosaAdresRecord) -> dict:
     return {
         "id": g.id,
@@ -638,7 +654,9 @@ def glosa_dict(g: GlosaAdresRecord) -> dict:
         "anotacion": g.anotacion,
         "cant_reclamada": g.cant_reclamada,
         "valor_reclamado": g.valor_reclamado,
+        "cant_aprobada": g.cant_aprobada,
         "valor_aprobado": g.valor_aprobado,
+        "cant_glosada": cantidad_glosada(g.cant_reclamada, g.cant_aprobada),
         "valor_glosado": g.valor_glosado,
         "clasificacion": g.clasificacion,
         "centro_costos": g.centro_costos,

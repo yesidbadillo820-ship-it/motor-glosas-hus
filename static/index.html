@@ -20334,9 +20334,23 @@ function gaPintar(d){
 
   h += '<div class="chart-card" style="margin-bottom:1rem"><div class="chart-hdr">Glosas del ADRES · '+
        'la decisión es suya, el sistema solo propone</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'+
-       '<thead><tr style="text-align:left;color:var(--text3)">'+
-       '<th style="padding:.45rem">Causal</th><th>Descripción de la glosa</th><th>Servicio</th><th style="text-align:right">Glosado</th>'+
-       '<th>Clasificación</th><th>Centro de costos</th><th>Propuesta</th><th>Decisión</th><th style="text-align:right">Aceptado</th><th>Observación técnica</th>'+
+       '<thead>'+
+       // Dos renglones de encabezado: arriba el grupo, abajo la columna. Así
+       // caben las cantidades sin que el gestor tenga que adivinar a qué
+       // corresponde cada número.
+       '<tr style="text-align:center;color:var(--text3);font-size:.7rem">'+
+       '<th colspan="3"></th>'+
+       '<th colspan="2" style="border-left:1px solid var(--border)">Reclamado</th>'+
+       '<th colspan="2" style="border-left:1px solid var(--border)">Aprobado por el ADRES</th>'+
+       '<th colspan="2" style="border-left:1px solid var(--border)">Glosado</th>'+
+       '<th colspan="6" style="border-left:1px solid var(--border)"></th>'+
+       '</tr>'+
+       '<tr style="text-align:left;color:var(--text3)">'+
+       '<th style="padding:.45rem">Causal</th><th>Descripción de la glosa</th><th>Servicio</th>'+
+       '<th style="text-align:right;border-left:1px solid var(--border)">Cant.</th><th style="text-align:right">Valor</th>'+
+       '<th style="text-align:right;border-left:1px solid var(--border)">Cant.</th><th style="text-align:right">Valor</th>'+
+       '<th style="text-align:right;border-left:1px solid var(--border)">Cant.</th><th style="text-align:right">Valor</th>'+
+       '<th style="border-left:1px solid var(--border)">Clasificación</th><th>Centro de costos</th><th>Propuesta</th><th>Decisión</th><th style="text-align:right">Aceptado</th><th>Observación técnica</th>'+
        '</tr></thead><tbody>';
   (d.glosas||[]).forEach(function(g){
     var color = g.decision ? '#15803d' : (g.sugerencia ? '#b45309' : 'var(--text3)');
@@ -20345,8 +20359,13 @@ function gaPintar(d){
          '<td style="max-width:270px">'+escHtml(g.causal_texto||'—')+
              (g.anotacion ? '<div style="color:var(--text3);font-size:.7rem;margin-top:.2rem">'+escHtml(g.anotacion)+'</div>' : '')+'</td>'+
          '<td style="max-width:230px"><b>'+escHtml(g.codigo||'')+'</b><div style="color:var(--text3)">'+escHtml(g.descripcion||'')+'</div></td>'+
-         '<td style="text-align:right;white-space:nowrap"> ' + fmtCOP(g.valor_glosado)+'</td>'+
-         '<td style="max-width:170px">'+gaCeldaArea(g)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap;border-left:1px solid var(--border)">'+gaCant(g.cant_reclamada)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap;color:var(--text3)"> ' + fmtCOP(g.valor_reclamado)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap;border-left:1px solid var(--border)">'+gaCant(g.cant_aprobada)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap;color:var(--text3)"> ' + fmtCOP(g.valor_aprobado)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap;border-left:1px solid var(--border)">'+gaCantGlosada(g)+'</td>'+
+         '<td style="text-align:right;white-space:nowrap"><b> ' + fmtCOP(g.valor_glosado)+'</b></td>'+
+         '<td style="max-width:170px;border-left:1px solid var(--border)">'+gaCeldaArea(g)+'</td>'+
          '<td style="max-width:210px">'+gaCeldaCentro(g, d.catalogo_centros||[])+'</td>'+
          '<td style="max-width:210px;color:'+color+'"><b>'+escHtml(g.sugerencia||'—')+'</b>'+
              (g.confianza?' <span style="font-size:.66rem;opacity:.75">['+escHtml(g.confianza)+']</span>':'')+
@@ -20448,6 +20467,29 @@ async function gaCentro(id, valor){
   }catch(e){ toast('No se pudo guardar', e.message, 'error'); }
 }
 
+// Las cantidades del reporte del ADRES vienen como número: 1, 3, 0,5. Se
+// escriben sin decimales cuando son enteras, que es lo normal.
+function gaCant(n){
+  var v = Number(n || 0);
+  if(!isFinite(v)) return '0';
+  return (Math.abs(v - Math.round(v)) < 0.0001) ? String(Math.round(v)) : String(v);
+}
+
+// Cuántos ítems quedaron glosados = reclamados − aprobados. Es el número que
+// el gestor necesita para saber cuántos aceptar. Cuando da cero pero sí hay
+// plata glosada, no le glosaron cantidad sino tarifa, y hay que decirlo.
+function gaCantGlosada(g){
+  var c = (g.cant_glosada != null)
+    ? Number(g.cant_glosada)
+    : Math.max(0, Number(g.cant_reclamada||0) - Number(g.cant_aprobada||0));
+  if(c > 0) return '<b>'+gaCant(c)+'</b>';
+  if((g.valor_glosado||0) > 0){
+    return '<b>0</b><div style="font-size:.62rem;color:#b45309;font-weight:600;line-height:1.1">'+
+           'solo valor</div>';
+  }
+  return '<b>0</b>';
+}
+
 // Cuando el gestor ACEPTA una glosa hay que decir CUÁNTO se acepta: es lo que
 // va en la respuesta al ADRES («CANTIDAD ACEPTADA n . POR VALOR $x»). Si no se
 // aceptó, los campos quedan apagados para no confundir.
@@ -20467,6 +20509,11 @@ function gaCeldaAceptado(g){
       ' onchange="gaCantidadAceptada('+g.id+',this.value)" title="Cantidad aceptada"'+
       ' style="width:100%;text-align:right;font-size:.68rem;padding:.15rem .25rem;border-radius:6px;'+
       'border:1px solid var(--border);background:var(--bg2);color:var(--text3)">'+
+    // El techo: no se le puede aceptar al ADRES más ítems de los que glosó.
+    '<div style="font-size:.62rem;color:var(--text3);text-align:right">de '+
+      gaCant(g.cant_glosada != null ? g.cant_glosada
+             : Math.max(0, Number(g.cant_reclamada||0) - Number(g.cant_aprobada||0)))+
+      ' glosado(s)</div>'+
     '</div>';
 }
 
@@ -20498,12 +20545,23 @@ async function gaDecidir(id, valor){
   // glosado, que es el caso normal, y el gestor lo baja si fue parcial. Si la
   // decisión deja de ser SE ACEPTA, el valor vuelve a cero para no reconocer
   // algo por descuido.
+  //
+  // 19-08-2026. La cantidad que se declara al ADRES es la GLOSADA, no la
+  // reclamada. Antes se ponía la reclamada: en HUS353885 el ADRES reclamó 3
+  // dispositivos, aprobó 1 y glosó 2 — y el sistema declaraba «cantidad
+  // aceptada 3», tres ítems donde solo hay dos en discusión.
   var cuerpo = {decision: valor};
   var g = ((GA_DATOS && GA_DATOS.glosas) || []).filter(function(x){ return x.id === id; })[0];
   if(valor === 'SE ACEPTA'){
     if(g && !(g.valor_aceptado > 0)){
+      var cg = (g.cant_glosada != null)
+        ? Number(g.cant_glosada)
+        : Math.max(0, Number(g.cant_reclamada||0) - Number(g.cant_aprobada||0));
+      // Cero glosado en cantidad = glosa de tarifa sobre lo reclamado: ahí la
+      // cantidad en discusión es la reclamada, no cero.
+      if(!(cg > 0)) cg = Number(g.cant_reclamada || 0);
       cuerpo.valor_aceptado = g.valor_glosado || 0;
-      cuerpo.cantidad_aceptada = String(g.cant_reclamada || 1);
+      cuerpo.cantidad_aceptada = String(cg || 1);
     }
   } else if(g && (g.valor_aceptado > 0)){
     cuerpo.valor_aceptado = 0;
