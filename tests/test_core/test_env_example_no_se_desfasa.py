@@ -84,3 +84,67 @@ def test_la_cadena_de_groq_no_repite_modelos():
     """Un fallback igual al primario no es respaldo: es el mismo error dos veces."""
     groq = [_defecto(campo) for _clave, campo in CLAVES if _clave.startswith("GROQ")]
     assert len(groq) == len(set(groq)), groq
+
+
+# ─── Una sola fuente de verdad ───────────────────────────────────────────────
+
+
+class TestNadieRepiteLaCadenaPorSuCuenta:
+    """19-08-2026. Yesid vio en el panel «Primario: meta-llama/llama-4-scout»
+    cuando `config.py` decía `openai/gpt-oss-120b` desde el 05-08.
+
+    La causa: la cadena estaba escrita a mano en CUATRO sitios. El arreglo del
+    05-08 tocó `config.py` y dejó los otros tres:
+
+      · `.env.example`                  → los PC nuevos nacían mal
+      · `GlosaService.__init__`         → construirlo sin pasar modelo
+                                          resucitaba el muerto
+      · `ia_status.PROVEEDORES_INFO`    → el panel mostraba la cadena vieja
+
+    Un panel de diagnóstico que miente sobre la configuración es peor que no
+    tener panel: mandó a buscar el problema donde no estaba.
+    """
+
+    def _fuentes(self):
+        return {
+            "app/services/glosa_service.py": RAIZ / "app" / "services" / "glosa_service.py",
+            "app/api/routers/ia_status.py": RAIZ / "app" / "api" / "routers" / "ia_status.py",
+        }
+
+    def test_ningun_archivo_escribe_un_modelo_retirado_como_valor(self):
+        """Nombrarlo en un comentario está bien; usarlo como valor, no."""
+        import ast
+
+        for nombre, ruta in self._fuentes().items():
+            arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+            textos = {
+                n.value
+                for n in ast.walk(arbol)
+                if isinstance(n, ast.Constant) and isinstance(n.value, str)
+            }
+            malos = textos & RETIRADOS
+            assert not malos, f"{nombre} usa como valor un modelo retirado: {malos}"
+
+    def test_el_servicio_toma_el_modelo_de_la_configuracion(self):
+        from app.core.config import get_settings
+        from app.services.glosa_service import GlosaService
+
+        servicio = GlosaService(groq_api_key="x")
+        cfg = get_settings()
+        assert servicio.groq_model == cfg.groq_model
+        assert servicio.groq_model_fallback_1 == cfg.groq_model_fallback_1
+        assert servicio.gemini_model == cfg.gemini_model
+
+    def test_el_panel_reporta_la_cadena_de_la_configuracion(self):
+        from app.api.routers.ia_status import _cadena_groq
+        from app.core.config import get_settings
+
+        cfg = get_settings()
+        assert _cadena_groq()[0] == cfg.groq_model, "el panel no muestra el primario real"
+        assert not set(_cadena_groq()) & RETIRADOS
+
+    def test_el_panel_no_repite_modelos(self):
+        from app.api.routers.ia_status import _cadena_groq
+
+        cadena = _cadena_groq()
+        assert len(cadena) == len(set(cadena)), cadena

@@ -593,6 +593,16 @@ async def _persistir_y_responder(
     # parse_valor_cop entiende formato colombiano ("7.700,00" → 7700.0).
     # El patrón anterior float(re.sub(r"[^\d]","",x)) inflaba 100× los
     # valores con decimales (auditoría jun-2026, P0 #1).
+    # La factura que digitó el auditor viaja de vuelta con el dictamen.
+    #
+    # 19-08-2026. El esquema traía `factura: Optional[str] = "N/A"` y NADIE lo
+    # llenaba nunca. En pantalla, el recuadro del Auditor Forense salía como
+    # «Auditor Forense IA · N/A» y su botón quedaba inservible: preguntaba por
+    # una factura llamada «N/A». El dato estaba ahí desde el principio — el
+    # auditor lo había escrito en el formulario.
+    if numero_factura and (not resultado.factura or resultado.factura == "N/A"):
+        resultado.factura = numero_factura
+
     val_obj = parse_valor_cop(resultado.valor_objetado)
     val_ac = parse_valor_cop(valor_aceptado)
 

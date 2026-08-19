@@ -5352,12 +5352,18 @@ class GlosaService:
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
         anthropic_model: str = "claude-sonnet-4-5",
-        groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
+        # 19-08-2026. Estos parámetros NO llevan el nombre del modelo escrito
+        # a mano: se resuelven contra `app/core/config.py`, que es la única
+        # fuente de verdad. Antes cada uno traía su copia, y cuando el 05-08 se
+        # corrigió la cadena en config.py estas coplas se quedaron con
+        # `llama-4-scout` — un modelo que Groq ya había retirado. Construir el
+        # servicio sin pasar el modelo resucitaba el muerto.
+        groq_model: str = None,
         gemini_api_key: str = None,
-        gemini_model: str = "gemini-2.0-flash",
-        groq_model_fallback_1: str = "openai/gpt-oss-120b",
-        groq_model_fallback_2: str = "qwen/qwen3-32b",
-        groq_model_fallback_3: str = "llama-3.3-70b-versatile",
+        gemini_model: str = None,
+        groq_model_fallback_1: str = None,
+        groq_model_fallback_2: str = None,
+        groq_model_fallback_3: str = None,
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
@@ -5385,14 +5391,18 @@ class GlosaService:
             self.primary_ai = "groq"
         self.anthropic_model = anthropic_model or "claude-sonnet-4-5"
         # Cadena de modelos DENTRO de Groq (decision 16-jun-2026 ronda 8,
-        # ver app/core/config.py): llama-4-maverick → gpt-oss-120b →
-        # qwen3-32b → llama-3.3-70b. Si el primario falla (429/transitorio/
-        # deprecado) se prueba el siguiente modelo Groq ANTES de saltar a
-        # Anthropic — ver _modelos_groq() y _llamar_groq_con_retry().
-        self.groq_model = groq_model or "meta-llama/llama-4-scout-17b-16e-instruct"
-        self.groq_model_fallback_1 = groq_model_fallback_1 or "openai/gpt-oss-120b"
-        self.groq_model_fallback_2 = groq_model_fallback_2 or "qwen/qwen3-32b"
-        self.groq_model_fallback_3 = groq_model_fallback_3 or "llama-3.3-70b-versatile"
+        # La cadena vigente vive en app/core/config.py — acá NO se repite,
+        # porque repetirla fue justo lo que dejó el modelo muerto vivo dos
+        # semanas. Si el primario falla (429 / transitorio / retirado) se
+        # prueba el siguiente modelo Groq ANTES de saltar a Anthropic — ver
+        # _modelos_groq() y _llamar_groq_con_retry().
+        from app.core.config import get_settings
+
+        _cfg = get_settings()
+        self.groq_model = groq_model or _cfg.groq_model
+        self.groq_model_fallback_1 = groq_model_fallback_1 or _cfg.groq_model_fallback_1
+        self.groq_model_fallback_2 = groq_model_fallback_2 or _cfg.groq_model_fallback_2
+        self.groq_model_fallback_3 = groq_model_fallback_3 or _cfg.groq_model_fallback_3
         # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
         # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
         # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
@@ -5404,7 +5414,7 @@ class GlosaService:
         self.gemini = (
             GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
         )
-        self.gemini_model = gemini_model
+        self.gemini_model = gemini_model or _cfg.gemini_model
 
     async def analizar(
         self,
