@@ -146,6 +146,27 @@ def _clasificar_archivo(nombre: str) -> Optional[tuple[str, str]]:
     return None
 
 
+# Carpetas del servidor que NO son una EPS: son pasos del archivado.
+_CARPETAS_ESTRUCTURALES = {
+    "DD FACTURACION",
+    "ESCANEO",
+    "RIPS",
+    "SOPORTES",
+    "CORRESPONDENCIA",
+}
+
+
+def _nombre_estructural(nombre: str) -> bool:
+    """True si la carpeta es un paso del archivado y no el nombre de una EPS.
+
+    Tolera el ordinal delante y los espacios: «1. DD FACTURACION»,
+    «1.DD FACTURACION» y «DD  FACTURACION» son la misma carpeta.
+    """
+    limpio = re.sub(r"^\s*\d{1,2}\s*\.\s*", "", str(nombre or "").upper())
+    limpio = re.sub(r"\s+", " ", limpio).strip()
+    return limpio in _CARPETAS_ESTRUCTURALES
+
+
 def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
     """Extrae mes, año, EPS y ENV recorriendo el path desde la raíz.
 
@@ -172,19 +193,26 @@ def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
                 meta["anio"] = int(m.group(2))
             except ValueError:
                 pass
-            # La EPS es lo que viene DESPUÉS del mes, salvo que sea
-            # "1. DD FACTURACION" / "ESCANEO" / "RIPS" (carpetas
-            # estructurales que no representan EPS).
+            # La EPS es lo que viene DESPUÉS del mes, salvo que sea una
+            # carpeta estructural (DD FACTURACION, ESCANEO, RIPS…).
+            #
+            # 19-08-2026 — La lista se comparaba tal cual y decía
+            # "1. DD FACTURACION" CON espacio; en el servidor real la carpeta
+            # se llama "1.DD FACTURACION" SIN espacio, así que no coincidía y
+            # se tomaba como si fuera la EPS: los soportes de ALIANZA MEDELLIN
+            # salían con EPS = "1.DD FACTURACION". Ahora se compara sin el
+            # ordinal y sin espacios de sobra, para que dé igual cómo esté
+            # escrito.
             for j in range(i + 1, len(partes)):
                 pj_up = upper_parts[j]
                 if (
-                    pj_up
-                    not in {"1. DD FACTURACION", "ESCANEO", "RIPS", "SOPORTES", "CORRESPONDENCIA"}
-                    and "SOPORTES RADICACION" not in pj_up
-                    and not pj_up.startswith("ENV-")
+                    _nombre_estructural(pj_up)
+                    or "SOPORTES RADICACION" in pj_up
+                    or pj_up.startswith("ENV-")
                 ):
-                    meta["eps"] = partes[j]
-                    break
+                    continue
+                meta["eps"] = partes[j]
+                break
             break
 
     # ENV (carpeta de envío/lote)

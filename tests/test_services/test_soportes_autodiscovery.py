@@ -250,3 +250,54 @@ class TestEstructuraRealDeRadicacion2026:
         idx = SoportesIndexer(raiz=str(tmp_path))
         idx.rebuild()
         assert idx.lookup("548740")
+
+
+class TestLaEpsNoEsUnaCarpetaDeArchivado:
+    """La EPS que se muestra tiene que ser la EPS — 19-08-2026.
+
+    Al buscar la factura HUS468334 (febrero) en el servidor real, los 12
+    soportes salieron con EPS = «1.DD FACTURACION», que no es una EPS sino un
+    paso del archivado. La EPS de verdad, según la ruta, era ALIANZA MEDELLIN.
+
+    La causa: la lista de carpetas a saltar decía «1. DD FACTURACION» CON
+    espacio y en el servidor la carpeta es «1.DD FACTURACION» SIN espacio.
+    """
+
+    def _eps(self, ruta: str) -> str | None:
+        from pathlib import PurePosixPath
+
+        from app.services.soportes_autodiscovery_service import _extraer_metadata_path
+
+        raiz = PurePosixPath("/Prime/radicacion_2026")
+        return _extraer_metadata_path(PurePosixPath(ruta), raiz).get("eps")
+
+    def test_la_ruta_real_de_febrero_da_la_eps_correcta(self):
+        ruta = (
+            "/Prime/radicacion_2026/2. FEBRERO 2026 - SOPORTES RADICACION CARPETA 2/"
+            "1.DD FACTURACION/ESCANEO/ALIANZA MEDELLIN/ENV-222821/HUS468334/"
+            "FEV_900006037_HUS468334.pdf"
+        )
+        assert self._eps(ruta) == "ALIANZA MEDELLIN"
+
+    def test_tambien_con_el_ordinal_separado(self):
+        """«1. DD FACTURACION» con espacio tiene que seguir saltándose."""
+        ruta = (
+            "/Prime/radicacion_2026/3. MARZO 2026 - SOPORTES RADICACION/"
+            "1. DD FACTURACION/ESCANEO/SANITAS/ENV-1/HUS1/FEV_900006037_HUS1.pdf"
+        )
+        assert self._eps(ruta) == "SANITAS"
+
+    def test_la_estructura_sin_escaneo_sigue_bien(self):
+        ruta = (
+            "/Prime/radicacion_2026/8. AGOSTO 2026 - SOPORTES RADICACION/NUEVA EPS/"
+            "SOFIA/ENV-232984-okdgh/SOPORTES/HUS548170/FEV_900006037_HUS548170.pdf"
+        )
+        assert self._eps(ruta) == "NUEVA EPS"
+
+    def test_una_eps_de_verdad_no_se_confunde_con_carpeta_estructural(self):
+        from app.services.soportes_autodiscovery_service import _nombre_estructural
+
+        for estructural in ("1.DD FACTURACION", "1. DD FACTURACION", "ESCANEO", "RIPS"):
+            assert _nombre_estructural(estructural) is True
+        for eps in ("ALIANZA MEDELLIN", "NUEVA EPS", "SANITAS", "SEGUROS BOLIVAR"):
+            assert _nombre_estructural(eps) is False
