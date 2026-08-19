@@ -23,6 +23,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.logging_utils import logger
+from app.utils.moneda import parse_valor_cop
 from app.models.db import (
     FacturaAdresRecord,
     GlosaAdresRecord,
@@ -438,10 +439,18 @@ def importar_bitacora(db: Session, contenido: bytes, *, paquete_id: int) -> int:
     ).delete(synchronize_session=False)
 
     def num(v):
-        try:
-            return float(str(v).replace(",", ".")) if str(v).strip() else 0.0
-        except ValueError:
-            return 0.0
+        """Lee un valor en pesos de la bitácora con el lector único del repo.
+
+        19-08-2026. Antes hacía `float(str(v).replace(",", "."))`. Eso sirve
+        para el CSV tal como lo escribe el ajustador (93340.00), pero si el
+        auditor abre esa bitácora en Excel y la guarda, Excel la reescribe al
+        formato colombiano y entonces:
+            "93.340"       ->    93.34   (mil veces menos)
+            "1.589.100,00" ->     0.0    (¡en silencio!, por el except)
+        Y esos valores son el glosado/reclamado/aprobado de cada ítem del
+        detallado. `parse_valor_cop` entiende los dos formatos y deja igual el
+        que ya funcionaba."""
+        return parse_valor_cop(v)
 
     n = 0
     for fila in csv.DictReader(io.StringIO(texto), delimiter=";"):
