@@ -84,9 +84,21 @@ def diagnostico_completo(
     # arranque dijera `groq=OK gsk_vn06EE…` y esta misma pantalla dijera
     # `gsk_5CxaRq…`. Si hay más de un motor, ningún otro dato de este panel
     # es confiable: puede venir del motor viejo.
+    try:
+        from app.services.motor_proceso import estado_motor
+
+        out["secciones"]["motor"] = estado_motor()
+    except Exception as e:  # nunca tumbar el diagnóstico por el diagnóstico
+        out["secciones"]["motor"] = {
+            "estado": "warning",
+            "mensaje": f"No se pudo inspeccionar el proceso: {e}",
+            "data": {},
+        }
+
     # ─── Qué versión está sirviendo ───────────────────────────────
     #
-    # 19-08-2026. Es la primera sección a propósito. Hoy se perdieron horas
+    # 19-08-2026. Va justo detrás del motor —que manda, porque si hay dos
+    # motores corriendo ningún otro dato del panel es confiable—. Hoy se perdieron horas
     # persiguiendo un defecto que ya estaba corregido en disco, porque no
     # había forma de saber si el motor que respondía tenía el código nuevo o
     # seguía con el viejo en memoria. Con el commit y la hora de arranque
@@ -112,17 +124,6 @@ def diagnostico_completo(
         out["secciones"]["version"] = {
             "estado": "warning",
             "mensaje": f"No se pudo leer la versión: {e}",
-            "data": {},
-        }
-
-    try:
-        from app.services.motor_proceso import estado_motor
-
-        out["secciones"]["motor"] = estado_motor()
-    except Exception as e:  # nunca tumbar el diagnóstico por el diagnóstico
-        out["secciones"]["motor"] = {
-            "estado": "warning",
-            "mensaje": f"No se pudo inspeccionar el proceso: {e}",
             "data": {},
         }
 

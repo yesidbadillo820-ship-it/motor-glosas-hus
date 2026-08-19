@@ -71,6 +71,22 @@ class TestNoRevientaNunca:
 
 
 class TestSaleEnElDiagnostico:
+    def test_va_detras_del_motor_y_antes_que_lo_demas(self):
+        """El motor manda: si hay DOS motores corriendo, ningún otro dato del
+        panel es confiable y eso tiene que verse primero. La versión va justo
+        detrás, que es lo segundo que uno necesita saber cuando algo falla."""
+        from pathlib import Path as _P
+
+        fuente = (
+            _P(__file__).resolve().parents[2] / "app" / "api" / "routers" / "diagnostico.py"
+        ).read_text(encoding="utf-8")
+        orden = []
+        for m in re.finditer(r'out\["secciones"\]\["(\w+)"\]', fuente):
+            if m.group(1) not in orden:
+                orden.append(m.group(1))
+        assert orden[0] == "motor", orden[:4]
+        assert orden[1] == "version", orden[:4]
+
     def test_la_pantalla_de_diagnostico_lo_reporta(self):
         from pathlib import Path
 
