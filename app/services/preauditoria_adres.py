@@ -38,7 +38,11 @@ if str(_TOOLS) not in sys.path:
     sys.path.insert(0, str(_TOOLS))
 
 from ajustar_detallado_glosas import normalizar_factura  # noqa: E402
-from glosas_adres_por_factura import leer_oficiales, marcar_conteo  # noqa: E402
+from glosas_adres_por_factura import (  # noqa: E402
+    aceptado_sin_duplicar,
+    leer_oficiales,
+    marcar_conteo,
+)
 from preauditar_glosas_adres import (  # noqa: E402
     CATALOGO_CENTROS_COSTOS,
     CAUSALES_DE_DOS_AREAS,
@@ -553,7 +557,7 @@ def consultar_factura(
             # Solo los renglones que cuentan: el mismo ítem con varias causales
             # sale varias veces y su plata es una sola.
             "valor_glosado": sum((g.valor_glosado or 0) for g in glosas if g.cuenta_valor),
-            "valor_aceptado": sum(g.valor_aceptado or 0 for g in glosas),
+            "valor_aceptado": aceptado_consolidado(glosas),
             "valor_reclamado": sum((g.valor_reclamado or 0) for g in glosas if g.cuenta_valor),
             "items_detallado": len(items),
             "sigue_glosado_detallado": sigue_glosado,
@@ -624,6 +628,55 @@ def _aviso_descuadre(ficha, todas) -> str:
         f"reporte suma {_pesos(detalle)}. El reporte del ADRES repite renglones. Antes de "
         f"responder esta factura, baje el detalle del portal (Reclamaciones → Reportes Lupa "
         f"al giro)."
+    )
+
+
+def _cantidad_texto(cant: float) -> str:
+    """`3` y no `3.0`: la cantidad que se le declara al ADRES es de ítems."""
+    return str(int(cant)) if abs(cant - round(cant)) < 0.0001 else str(cant)
+
+
+def _clave_item(factura_clave: str, codigo: str | None, valor_glosado: float | None) -> tuple:
+    """Los renglones del MISMO ítem: misma factura, mismo código, mismo glosado.
+
+    Es la misma clave con la que el importador devuelve las decisiones previas
+    (línea 239), y agrupa los renglones que el reporte del ADRES abre por
+    causal sobre un solo servicio.
+    """
+    return (factura_clave, (codigo or "").strip().upper(), round(valor_glosado or 0, 2))
+
+
+def aceptado_consolidado(glosas) -> float:
+    """La plata aceptada de una factura, sin declararla dos veces al ADRES.
+
+    19-08-2026. El reporte del ADRES abre un renglón por cada causal del mismo
+    ítem, y la pantalla pide una decisión por renglón —así trabaja el gestor—.
+    El GLOSADO ya sabía no contar dos veces (`cuenta_valor`); el ACEPTADO no:
+    se sumaban todos los renglones.
+
+    Pasaba de verdad. Factura HUS311371, TAC DE CRÁNEO SIMPLE glosado $700.000
+    con dos causales (3209 y 3106): aceptando en las dos, el hospital le
+    declaraba al ADRES **$1.400.000 aceptados sobre un ítem glosado $700.000**,
+    y el KPI de la factura quedaba con el aceptado por encima del glosado.
+
+    El arreglo NO es copiar el filtro `cuenta_valor`: si el gestor objeta el
+    renglón que cuenta y acepta el que no cuenta, el aceptado saldría cero —
+    otro dictamen falso, al revés. Se consolida por ítem y se pone tope en lo
+    glosado, que da bien en los cuatro casos:
+
+      · acepta todo en las dos causales   → el valor del ítem, una vez;
+      · reparte 300 y 400 entre causales  → 700, la suma;
+      · acepta solo en la que no cuenta   → 700, no cero;
+      · dos ítems iguales de verdad       → 1.400, no 700.
+    """
+    return aceptado_sin_duplicar(
+        (
+            _clave_item(g.factura_clave, g.codigo, g.valor_glosado),
+            g.valor_glosado or 0,
+            g.valor_aceptado or 0,
+            bool(g.cuenta_valor),
+        )
+        for g in glosas
     )
 
 
@@ -847,11 +900,15 @@ def listar_facturas(
             GlosaAdresRecord.valor_aceptado,
             GlosaAdresRecord.requiere_asignacion,
             GlosaAdresRecord.cuenta_valor,
+            GlosaAdresRecord.codigo,
         )
         .filter(GlosaAdresRecord.paquete_id == paquete_id)
         .all()
     )
-    for clave, total, decision, glosado, aceptado, por_asignar, cuenta in filas:
+    # Los renglones aceptados se guardan agrupados por ítem para consolidarlos
+    # después: el mismo servicio sale una vez por causal y su plata es una sola.
+    aceptados_por_item: dict[str, list] = {}
+    for clave, total, decision, glosado, aceptado, por_asignar, cuenta, codigo in filas:
         a = avance.setdefault(
             clave,
             {
@@ -873,11 +930,16 @@ def listar_facturas(
             a["ocultas"] += 1
             continue
         a["glosas"] += 1
-        a["valor_aceptado"] += aceptado or 0
+        aceptados_por_item.setdefault(clave, []).append(
+            (_clave_item(clave, codigo, glosado), glosado or 0, aceptado or 0, bool(cuenta))
+        )
         if decision:
             a["decididas"] += 1
         if por_asignar:
             a["por_asignar"] += 1
+
+    for clave, renglones in aceptados_por_item.items():
+        avance[clave]["valor_aceptado"] = aceptado_sin_duplicar(renglones)
 
     salida = []
     for f in fichas:
@@ -1054,6 +1116,19 @@ def aplicar_sugerencias(
     ahora = datetime.now(UTC)
     for glosa in q.all():
         glosa.decision = glosa.sugerencia
+        # Aceptar es reconocer plata: hay que decir CUÁNTA. Este camino solo
+        # copiaba la decisión y dejaba el valor en cero, así que la carta al
+        # ADRES salía «GLOSA ACEPTADA PARCIAL POR VALOR DE $0» mientras el
+        # cuerpo enumeraba las glosas aceptadas por su valor completo. Se llena
+        # igual que cuando el gestor acepta de a una desde la pantalla: todo lo
+        # glosado del renglón, y la cantidad glosada (no la reclamada).
+        if glosa.decision == "SE ACEPTA" and not (glosa.valor_aceptado or 0):
+            glosa.valor_aceptado = glosa.valor_glosado or 0
+            if not (glosa.cantidad_aceptada or "").strip():
+                cant = cantidad_glosada(glosa.cant_reclamada, glosa.cant_aprobada)
+                if cant <= 0:  # glosa de tarifa: la cantidad en discusión es la reclamada
+                    cant = glosa.cant_reclamada or 0
+                glosa.cantidad_aceptada = _cantidad_texto(cant or 1)
         glosa.decidido_por = usuario
         glosa.decidido_en = ahora
         n += 1
