@@ -109,6 +109,14 @@ Devuelve SOLO el HTML, sin texto adicional ni markdown."""
 # «no encontré evidencia» sin haber mirado el documento donde estaba.
 _ORDEN_FORENSE = {
     "historia_clinica": 0,  # HEV — el corazón del expediente
+    # 19-08-2026. Estos tres se veían como «otro» porque el indexador no
+    # conocía sus códigos, así que competían de últimas con cualquier archivo
+    # suelto. Son documentos clínicos de primera línea: en una glosa por
+    # «ausencia de soporte de la consulta de urgencias», el que la prueba es
+    # la HAU.
+    "hoja_atencion_urgencias": 0,  # HAU
+    "epicrisis": 1,  # EPI
+    "hoja_administracion_medicamentos": 1,  # HAM
     "factura_electronica": 1,  # FEV — qué se cobró, para contrastar
     # 2 = «otro»: epicrisis, hoja de administración de medicamentos y demás
     #     anexos escaneados. Es donde más veces está la respuesta.
@@ -124,7 +132,7 @@ _ORDEN_FORENSE_ANEXOS = 2
 # Documentos que NUNCA pueden ir en un bloque PDF de la IA. El RIPS es .json y
 # el CUFE es .xml: mandarlos declarados como «application/pdf» gasta un cupo en
 # un archivo que la IA no puede abrir.
-_TIPOS_NO_PDF = {"rips", "xml_cufe"}
+_TIPOS_NO_PDF = {"rips", "xml_cufe", "cuv"}
 
 
 def _es_pdf(ruta: str) -> bool:

@@ -47,8 +47,15 @@ class TestNoQuedaNadaEnElBackend:
         assert "NoticiaSaludRecord" not in fuente
 
     def test_el_diagnostico_ya_no_lo_revisa(self):
+        """Se mira el CÓDIGO, no los comentarios: explicar por qué se quitó una
+        cosa no puede hacer fallar la prueba de que se quitó."""
         fuente = (RAIZ / "app" / "api" / "routers" / "diagnostico.py").read_text(encoding="utf-8")
-        assert "oticia" not in fuente
+        vivas = [
+            ln
+            for ln in fuente.splitlines()
+            if "oticia" in ln.lower() and not ln.strip().startswith("#")
+        ]
+        assert not vivas, vivas
 
     def test_la_aplicacion_arranca_sin_ello(self):
         """La prueba de fondo: importar la app entera no puede reventar."""

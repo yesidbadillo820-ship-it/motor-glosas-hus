@@ -51,6 +51,16 @@ TIPOS_SOPORTE = {
     # factura, aunque sí se encontraban por número. 18-08-2026.
     "FVS": "factura_electronica",
     "HEV": "historia_clinica",
+    # Códigos del anexo técnico que el servidor de radicación sí usa y que el
+    # indexador no reconocía. Se vieron el 19-08-2026 en la factura HUS468334,
+    # respondiendo una glosa SO0201 por «ausencia de soportes de la CONSULTA DE
+    # URGENCIAS»: el documento que prueba esa consulta es justamente la HAU, y
+    # el sistema la tenía como archivo suelto. De doce soportes, seis quedaban
+    # sin clasificar — y como el Auditor Forense escoge por tipo, la epicrisis
+    # y la hoja de medicamentos competían de últimas.
+    "EPI": "epicrisis",
+    "HAM": "hoja_administracion_medicamentos",
+    "HAU": "hoja_atencion_urgencias",
     "CRC": "comprobante_recibido_cobro",
     "OPF": "otros_procedimientos",
     "PDE": "pde",
@@ -143,6 +153,15 @@ def _clasificar_archivo(nombre: str) -> Optional[tuple[str, str]]:
     # XML CUFE: típicamente `ad{19}numeros{...}.xml`
     if n.startswith("AD") and n.endswith(".XML"):
         return ("AD", TIPOS_SOPORTE["AD"])
+    # El servidor de radicación nombra estos tres SOLO con el número de
+    # factura —`HUS468334.json`, `HUS468334.xml`, `HUS468334_CUV.json`—, sin
+    # prefijo que los delate. Se reconocen por la extensión. 19-08-2026.
+    if n.endswith(".XML"):
+        return ("AD", TIPOS_SOPORTE["AD"])
+    if n.endswith(".JSON"):
+        if "CUV" in n:
+            return ("CUV", "cuv")
+        return ("RIPS", TIPOS_SOPORTE["RIPS"])
     return None
 
 
