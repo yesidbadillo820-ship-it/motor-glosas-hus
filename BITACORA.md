@@ -4279,7 +4279,11 @@ que la página invente facturas: está leyendo un dato que se quedó viejo.
 12 pruebas nuevas. La fila vieja de la fuente se corrige sola la próxima vez
 que esa factura venga en el Excel con su envío nuevo.
 
----
+**Dos defectos de la primera versión, encontrados en la revisión y corregidos
+el mismo día:** el aviso de factura rezagada no aparecía nunca (la fuente
+sellaba todas las filas con la misma hora aunque el cargue fuera de otro día),
+y al revertir un reingreso la factura se quedaba sin el amarre a su oficio de
+devolución. Ambos con su prueba.
 
 ---
 
