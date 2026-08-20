@@ -33,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _dinero import a_numero  # noqa: E402
+from _dinero import a_numero, a_texto  # noqa: E402
 from ajustar_detallado_glosas import (  # noqa: E402
     IndiceHoja,
     _abrir_libro,
@@ -359,22 +359,19 @@ def main(argv: list[str] | None = None) -> int:
     sin = [c for c in cruces if c.estado == ESTADO_SIN_DETALLADO]
     sobra = [c for c in cruces if c.estado == ESTADO_SOBRA]
 
-    def pesos(v: float) -> str:
-        return "$" + f"{int(round(v)):,}".replace(",", ".")
-
     print(f"\nFacturas en la macro     : {len(macro)}")
     print(f"Detallados en la carpeta : {len(detallados)}")
     print(f"\n  están en los dos lados : {len(con)}")
     if sin:
         plata = sum(c.macro.valor_glosado for c in sin if c.macro)
-        print(f"  SIN detallado          : {len(sin)}  (glosado {pesos(plata)})")
+        print(f"  SIN detallado          : {len(sin)}  (glosado {a_texto(plata)})")
         for c in sin:
             m = c.macro
             assert m is not None
             print(
                 f"     {c.factura:<12} radicado {' / '.join(sorted(m.radicados)):<10} "
-                f"{m.filas:>3} glosas   glosado {pesos(m.valor_glosado):>14}   "
-                f"aceptado {pesos(m.valor_aceptado):>12}"
+                f"{m.filas:>3} glosas   glosado {a_texto(m.valor_glosado):>14}   "
+                f"aceptado {a_texto(m.valor_aceptado):>12}"
             )
     if sobra:
         print(f"  con detallado pero sin glosas en la macro : {len(sobra)}")
