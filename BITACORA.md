@@ -2904,6 +2904,37 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 19-08-2026 (cierre) — El consolidado: cuántas facturas hay de cada lado
+
+**Lo que pidió el auditor:** confirmar si las facturas del ZIP de detallados son
+las mismas de la macro, y si no, **por qué no están**.
+
+**La respuesta:** en la macro hay **324** facturas y en el ZIP hay **320**
+detallados. **Faltan 4**, por **$43.518.600** glosados:
+
+| Factura | Radicado | Glosas | Valor glosado | Ya aceptado |
+|---|---|---:|---:|---:|
+| HUS311371 | 14345108 | 150 (21 por responder) | $39.722.100 | $0 |
+| HUS394817 | 14383060 | 12 | $3.646.700 | $2.400 |
+| HUS380246 | 14351110 | 2 | $139.400 | $0 |
+| HUS367368 | 14344771 | 1 | $10.400 | $10.400 |
+
+**No sobra ninguna** del otro lado: los 320 detallados están todos en la macro,
+y el número de factura de adentro de cada archivo coincide con su nombre.
+
+**Por qué faltan:** son **las mismas cuatro** que ya venían señaladas desde el
+04-08. El sistema del hospital **nunca exportó** su detallado — se buscaron
+archivo por archivo en los siete lotes y no están en ninguno. Hay que pedirle a
+facturación esa impresión.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/cruzar_detallados_con_macro.py`,
+que arma el consolidado en un Excel de tres hojas: RESUMEN, FACTURAS (todas, con
+su estado y sus cifras) y SIN DETALLADO (solo las que faltan, con **el radicado**
+que hay que llevarle a facturación y cómo quedó respondida cada glosa). Sirve
+para cualquier paquete, no solo el 31068.
+
+---
+
 ### 19-08-2026 (tarde) — Las 320 facturas sin el total en letras, y en PDF
 
 **Lo que pidió el auditor:** que a las facturas se les quite el total escrito en
@@ -3899,9 +3930,12 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     `gestor_nombre`, `profesional_medico`); falta agregar centro de costos.
 
 ### Ajustador de detallados (`tools/ajustar_detallado_glosas.py`)
-11. **Las 4 facturas que no aparecen en ningún detallado:** HUS0000311371,
-    HUS0000367368, HUS0000380246 y HUS0000394817. Pedir su impresión para
-    poder cerrarlas.
+11. **Las 4 facturas que no aparecen en ningún detallado:** HUS311371
+    (radicado 14345108, $39.722.100), HUS394817 (14383060, $3.646.700),
+    HUS380246 (14351110, $139.400) y HUS367368 (14344771, $10.400) —
+    **$43.518.600 en total**. Confirmado otra vez el 19-08 con el consolidado:
+    la macro trae 324 facturas y solo hay 320 detallados. Pedirle a facturación
+    esa impresión para poder cerrarlas.
 12. **Revisar los 100 ítems marcados `SIN_CRUCE`** (73 facturas) y los 24
     `GLOSA_SIN_ITEM` ($11.220.692): son renglones que no cruzaron entre la
     factura impresa y el reporte del ADRES.
