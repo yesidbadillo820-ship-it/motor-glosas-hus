@@ -59,6 +59,7 @@
   .e-DEVUELTA_PEND_SUBSANACION,.e-NUEVAMENTE_DEVUELTA{background:#fde8e6; color:var(--rojo);}
   .e-BLOQUEADA_LIMITE{background:var(--rojo); color:#fff;}
   .chip-ronda{background:var(--azul-claro); color:var(--azul);}
+  .chip-incompleto{background:#fdf3d7; color:#8a6d00;}
   .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px;}
   .kpi{background:#fff; border:1px solid var(--borde); border-radius:var(--radio); padding:12px 14px;}
   .kpi .v{font-size:1.5rem; font-weight:700; color:var(--azul);}
@@ -440,7 +441,12 @@ async function cargarOficios(page){
   try{ var d=await api(url); var tb=document.getElementById('tb-oficios');
     if(!d.items.length){ tb.innerHTML='<tr><td colspan="'+cols+'" style="text-align:center;color:var(--gris)">Sin oficios</td></tr>'; }
     else tb.innerHTML=d.items.map(function(o){
-      var envs=o.envios_escritos.map(function(e){return esc(e.envio)+'('+e.total_facturas+')';}).join(' ');
+      // Si el envío no dejó todas sus facturas aquí se muestra "quedaron/traía"
+      // (0/1), para que no cuadre a la fuerza 5 envíos con 4 facturas.
+      var envs=o.envios_escritos.map(function(e){
+        var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
+        return esc(e.envio)+'('+(hay===e.total_facturas?e.total_facturas:hay+'/'+e.total_facturas)+')';
+      }).join(' ');
       var auds=(o.auditores||[]).join(', ');
       return '<tr>'+
         (ES_ADMIN ? '<td><input type="checkbox" class="sel-oficio" value="'+o.id+'"></td>' : '')+
@@ -478,14 +484,28 @@ async function abrirOficio(id){
         (ES_ADMIN?' <button class="btn btn-rojo btn-chico" title="Quitar esta factura del oficio (entró por error)" onclick="quitarFactura('+o.id+','+f.id+',\''+esc(f.factura)+'\')">🗑</button>':'')+
         '</td></tr>';
     }).join('');
+    // Cada chip dice cuántas facturas del envío quedaron DE VERDAD en el
+    // oficio. Antes decía siempre cuántas traía la fuente, y por eso se veían
+    // 5 envíos con 4 facturas sin ninguna explicación.
+    var faltantes=[];
     var envios=(o.envios_escritos||[]).map(function(e){
-      return '<span class="chip" style="margin:2px 4px 2px 0">'+esc(e.envio)+' ('+e.total_facturas+')'+
+      var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
+      var completo=(hay===e.total_facturas);
+      (e.faltantes||[]).forEach(function(f){ faltantes.push({envio:e.envio, det:f}); });
+      return '<span class="chip'+(completo?'':' chip-incompleto')+'" style="margin:2px 4px 2px 0"'+
+        (completo?'':' title="Este envío traía '+e.total_facturas+' factura(s) y solo '+hay+' quedaron en este oficio"')+'>'+
+        esc(e.envio)+' ('+(completo?e.total_facturas:hay+' de '+e.total_facturas)+')'+
         (ES_ADMIN?' <a href="javascript:eliminarEnvio('+o.id+',\''+esc(e.envio)+'\')" title="Quitar este envío del oficio" style="color:var(--rojo);font-weight:700">✕</a>':'')+
         '</span>';
+    }).join('');
+    var explica=faltantes.map(function(x){
+      return '<div class="aviso aviso-warn">🔎 Del envío <b>'+esc(x.envio)+'</b> falta la factura <b>'+
+        esc(x.det.factura)+'</b>: '+esc(x.det.motivo)+'</div>';
     }).join('');
     document.getElementById('mo-cuerpo').innerHTML=
       '<p>Recibido: <b>'+fBog(o.fecha_recibido)+'</b> &nbsp;'+semHtml(o.semaforo)+'</p>'+
       (envios?'<p class="leyenda">Envíos cargados: '+envios+(ES_ADMIN?'<br>La ✕ quita un envío cargado por error y la 🗑 de cada fila quita una sola factura (solo administradores).':'')+'</p>':'')+
+      explica+
       '<div style="margin:12px 0;padding:12px;background:var(--azul-claro);border-radius:8px;">'+
         '<b><span class="paso">4</span> Escribir un número de envío</b><br>'+
         '<p class="leyenda">El sistema traerá TODAS las facturas de ese envío desde las fuentes.</p>'+

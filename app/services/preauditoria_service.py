@@ -797,6 +797,117 @@ def _avisos_de_fuente_rezagada(src: list) -> list[str]:
 
 
 # ==================================================================
+# ¿Por qué el oficio muestra más envíos que facturas?
+# ==================================================================
+
+
+def _donde_quedo(factura: str, ubicada, oficio_id: int) -> dict:
+    """Explica, en una frase, por qué una factura del envío no está en el oficio."""
+    if ubicada is None:
+        return {
+            "factura": factura,
+            "oficio": None,
+            "estado": None,
+            "motivo": (
+                "la fuente la trae en este envío pero no quedó registrada en el "
+                "sistema: vuelva a escribir el envío para que entre."
+            ),
+        }
+    canon, radicado = ubicada
+    donde = radicado or canon.oficio_fhus or "otro oficio"
+    if canon.oficio_actual_id == oficio_id:
+        motivo = (
+            f"sí está en este oficio, pero entró con el envío {canon.envio_actual}: "
+            "la fuente la cambió de envío."
+        )
+    elif canon.resultado_actual == RESULTADO_PENDIENTE:
+        motivo = (
+            f"sigue pendiente de auditar en el oficio {donde}: resuélvala allá "
+            "(radicar o devolver) y después vuelva a escribir el envío aquí."
+        )
+    elif canon.resultado_actual == RESULTADO_RADICAR:
+        motivo = f"ya estaba radicada en el oficio {donde}: no vuelve a entrar."
+    elif canon.resultado_actual == RESULTADO_DEVUELTA:
+        motivo = (
+            f"está devuelta en el oficio {donde}: vuelve a entrar cuando la entidad "
+            "la reingrese y usted escriba otra vez el envío."
+        )
+    else:
+        motivo = f"quedó en el oficio {donde}."
+    return {
+        "factura": factura,
+        "oficio": radicado or canon.oficio_fhus,
+        "estado": canon.estado,
+        "motivo": motivo,
+    }
+
+
+def faltantes_por_envio(db: Session, oficio_id: int, facturas: list) -> dict:
+    """Por cada envío escrito en el oficio, qué facturas suyas NO están aquí.
+
+    POR QUÉ EXISTE (caso real 20-08-2026, oficio FHUS-AS-I01190-26): la
+    pantalla mostraba 5 envíos cargados y solo 4 facturas. El chip del envío
+    dice cuántas facturas traía la fuente, pero el sistema OMITE las que ya
+    venían abiertas (o ya radicadas) en otro oficio — esas nunca entran aquí.
+    El aviso salía una sola vez, al cargar, y después no quedaba ni rastro: el
+    auditor contaba 5 y 4 sin ninguna explicación en pantalla.
+
+    Recibe las facturas que YA están en el oficio (para no consultarlas dos
+    veces) y devuelve {envio: [ {factura, oficio, estado, motivo}, ... ]} solo
+    con los envíos que dejaron algún faltante.
+    """
+    cargados = db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.oficio_id == oficio_id).all()
+    if not cargados:
+        return {}
+    aqui: dict = {}
+    for f in facturas:
+        aqui.setdefault(f.envio_actual, set()).add(f.factura)
+    # Solo se revisan los envíos que PROMETIERON más facturas de las que hay:
+    # si el auditor quitó una con la 🗑 el registro ya bajó su cuenta y el
+    # sistema no debe insistirle en volver a subirla.
+    prometidas: dict = {}
+    for c in cargados:
+        if c.envio:
+            prometidas[c.envio] = prometidas.get(c.envio, 0) + (c.total_facturas or 0)
+    envios = sorted(e for e, n in prometidas.items() if len(aqui.get(e, ())) < n)
+    if not envios:
+        return {}
+    en_fuente: dict = {}
+    for envio, factura in (
+        db.query(RadicacionCuentaRecord.envio, RadicacionCuentaRecord.factura)
+        .filter(RadicacionCuentaRecord.envio.in_(envios))
+        .all()
+    ):
+        en_fuente.setdefault(envio, set()).add(factura)
+    faltan = sorted({f for e in envios for f in en_fuente.get(e, set()) - aqui.get(e, set())})
+    if not faltan:
+        return {}
+    # Dónde quedó cada una: una sola consulta (por bloques, por el tope de
+    # parámetros de SQLite), nunca una consulta por factura.
+    ubicacion = {}
+    for i in range(0, len(faltan), 400):
+        for canon, radicado in (
+            db.query(FacturaPreauditoriaRecord, OficioRecepcionRecord.numero_radicado)
+            .outerjoin(
+                OficioRecepcionRecord,
+                FacturaPreauditoriaRecord.oficio_actual_id == OficioRecepcionRecord.id,
+            )
+            .filter(FacturaPreauditoriaRecord.factura.in_(faltan[i : i + 400]))
+            .all()
+        ):
+            ubicacion[canon.factura] = (canon, radicado)
+    salida = {}
+    for envio in envios:
+        detalle = [
+            _donde_quedo(f, ubicacion.get(f), oficio_id)
+            for f in sorted(en_fuente.get(envio, set()) - aqui.get(envio, set()))
+        ]
+        if detalle:
+            salida[envio] = detalle
+    return salida
+
+
+# ==================================================================
 # Escribir un envío (el corazón del automatismo)
 # ==================================================================
 

@@ -195,6 +195,29 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         .order_by(EnvioCargadoRecord.envio)
         .all()
     )
+    # Cuántas facturas de cada envío quedaron DE VERDAD en este oficio. El chip
+    # decía "(1)" aunque esa factura nunca entrara (venía abierta en otro
+    # oficio y el sistema la omite): el auditor contaba 5 envíos y 4 facturas
+    # sin ninguna explicación en pantalla. Se cuenta en memoria, sin consultas
+    # extra, para que la lista de oficios no se vuelva lenta.
+    por_envio: dict = {}
+    for f in facturas:
+        por_envio[f.envio_actual] = por_envio.get(f.envio_actual, 0) + 1
+    escritos = [
+        {
+            "envio": e.envio,
+            "total_facturas": e.total_facturas,
+            "en_este_oficio": por_envio.get(e.envio, 0),
+            "reingresos": e.reingresos,
+        }
+        for e in envios
+    ]
+    # En la ventana del oficio (una sola) sí se averigua dónde quedó cada
+    # factura que falta, para poder decirlo con nombre propio.
+    if con_facturas:
+        faltantes = svc.faltantes_por_envio(db, o.id, facturas)
+        for e in escritos:
+            e["faltantes"] = faltantes.get(e["envio"], [])
     auditores = sorted({f.auditor for f in facturas if f.auditor})
     # ¿El oficio tiene facturas de ADRES? (habilita el Excel especial que esa
     # entidad exige). Se resuelve contra la fuente con una sola consulta.
@@ -226,10 +249,7 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         "devueltas": devueltas,
         "devueltas_sin_oficio": devueltas_sin_oficio,
         "semaforo": svc.calcular_semaforo(o.fecha_recibido, completado=completado),
-        "envios_escritos": [
-            {"envio": e.envio, "total_facturas": e.total_facturas, "reingresos": e.reingresos}
-            for e in envios
-        ],
+        "envios_escritos": escritos,
     }
     if con_facturas:
         # Consecutivo del oficio en que salió cada devuelta, para que la fila
