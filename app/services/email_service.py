@@ -199,6 +199,110 @@ def _buscar_emails_por_gestor(gestores_nombres: list, db=None) -> list:
         return []
 
 
+_COLOR_URGENCIA = {
+    "VENCIDA": "#111827",
+    "HOY": "#b91c1c",
+    "URGENTE": "#dc2626",
+    "PRONTO": "#d97706",
+    "NORMAL": "#16a34a",
+}
+
+
+def _tarjeta_de_glosa(g: dict) -> str:
+    """Una glosa con su plan de trabajo, no un renglón suelto."""
+    plan = g.get("plan") or {}
+    urgencia = plan.get("urgencia", "NORMAL")
+    color = _COLOR_URGENCIA.get(urgencia, "#6b7280")
+    try:
+        valor = f"${float(g.get('valor') or 0):,.0f}".replace(",", ".")
+    except (TypeError, ValueError):
+        valor = "$0"
+
+    avisos = "".join(
+        f'<div style="background:#fffbeb;border-left:3px solid #d97706;padding:6px 9px;'
+        f'margin-top:5px;font-size:11.5px;color:#7c2d12;line-height:1.5">⚠ {a}</div>'
+        for a in (plan.get("avisos") or [])
+    )
+
+    medico = ""
+    if plan.get("con_medico"):
+        medico = (
+            '<div style="background:#eef2ff;border-left:3px solid #4f46e5;padding:6px 9px;'
+            'margin-top:5px;font-size:11.5px;color:#3730a3;line-height:1.5">'
+            f"🩺 {plan.get('ruta', '')}</div>"
+        )
+
+    texto_listo = ""
+    if plan.get("texto_listo"):
+        texto_listo = (
+            '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11.5px;'
+            'color:#5b21b6;font-weight:600">📋 Texto de la ratificada — listo para copiar'
+            '</summary><div style="background:#faf5ff;border:1px solid #d8b4fe;border-radius:6px;'
+            "padding:9px;margin-top:5px;font-size:11px;color:#4c1d95;line-height:1.6;"
+            f'white-space:pre-wrap">{plan["texto_listo"]}</div></details>'
+        )
+
+    return f"""
+    <div style="border:1px solid #e5e7eb;border-left:4px solid {color};border-radius:8px;
+                padding:10px 12px;margin:9px 0;background:white">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <div style="font-weight:700;color:#111827;font-size:13px">{g.get("factura", "")}</div>
+        <div><span style="background:{color};color:white;border-radius:4px;padding:2px 7px;
+             font-size:10px;font-weight:700">{urgencia}</span></div>
+      </div>
+      <div style="color:#4b5563;font-size:12px;margin-top:2px">{g.get("eps", "")}</div>
+      <div style="color:#111827;font-size:12px;margin-top:3px">
+        <b>{valor}</b> · vence {g.get("vence", "")}
+        {"· causal <b>" + g["causal"] + "</b>" if g.get("causal") else ""}
+      </div>
+      <div style="color:#1e40af;font-size:11.5px;margin-top:5px;font-weight:600">
+        {plan.get("titular", "")}</div>
+      <div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:6px 9px;margin-top:5px;
+                  font-size:11.5px;color:#14532d;line-height:1.5">
+        ✔ <b>Qué responder:</b> {plan.get("respuesta_sugerida", "")}</div>
+      {medico}{avisos}{texto_listo}
+    </div>"""
+
+
+def _bloque_del_gestor(gestor: str, glosas: list) -> str:
+    """Las glosas de un gestor, ordenadas por lo que no puede esperar."""
+    ordenadas = sorted(
+        glosas,
+        key=lambda g: (
+            (g.get("plan") or {}).get("prioridad", 3),
+            -float((g.get("valor") or 0) if isinstance(g.get("valor"), (int, float)) else 0),
+        ),
+    )
+    urgentes = sum(1 for g in ordenadas if (g.get("plan") or {}).get("prioridad", 3) <= 1)
+    medicas = sum(1 for g in ordenadas if (g.get("plan") or {}).get("con_medico"))
+
+    # «Prioritarias», no «para hoy»: la prioridad sube por extemporaneidad,
+    # por ratificación o por monto, no solo porque venza pronto. Decir «para
+    # hoy» sobre una glosa etiquetada NORMAL se contradice en la misma línea.
+    resumen_linea = f"{len(ordenadas)} glosa{'s' if len(ordenadas) != 1 else ''}"
+    if urgentes:
+        resumen_linea += f" · <b style='color:#b91c1c'>{urgentes} de atención prioritaria</b>"
+    if medicas:
+        resumen_linea += f" · {medicas} con médico auditor"
+
+    tarjetas = "".join(_tarjeta_de_glosa(g) for g in ordenadas[:20])
+    extra = (
+        f'<div style="font-size:11.5px;color:#6b7280;padding:6px">…y {len(ordenadas) - 20} '
+        "más. Están todas en el portal, en «Mis glosas».</div>"
+        if len(ordenadas) > 20
+        else ""
+    )
+    return f"""
+    <div style="margin:18px 0;padding:12px;background:#f9fafb;border-radius:10px;
+                border-left:4px solid #3b82f6">
+      <div style="font-weight:bold;color:#1e40af;margin-bottom:4px;font-size:14px">👤 {gestor}</div>
+      <div style="color:#6b7280;font-size:12px;margin-bottom:8px">{resumen_linea}</div>
+      <div style="color:#6b7280;font-size:11px;margin-bottom:8px">
+        Van en orden: lo de arriba es lo que no puede esperar.</div>
+      {tarjetas}{extra}
+    </div>"""
+
+
 async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     """Envía un correo broadcast a todos los gestores listando las glosas importadas.
 
@@ -261,24 +365,14 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     """
 
     # Tabla por gestor
-    filas_gestor = []
-    for gestor, glosas in sorted(por_gestor.items()):
-        lista_facturas = "".join(
-            f"<li>{g['factura']} — {g['eps']} — ${g['valor']:,.0f} — vence {g['vence']}"
-            f" <span style='padding:2px 6px;border-radius:4px;font-size:10px;background:{_color_semaforo(g['semaforo'])};color:white'>{g['semaforo']}</span></li>"
-            for g in glosas[:15]
-        )
-        extra = f"<li><i>...y {len(glosas) - 15} más</i></li>" if len(glosas) > 15 else ""
-        filas_gestor.append(f"""
-        <div style="margin:15px 0;padding:12px;background:#f9fafb;border-radius:8px;border-left:3px solid #3b82f6">
-            <div style="font-weight:bold;color:#1e40af;margin-bottom:8px">
-                👤 {gestor} <span style="color:#6b7280;font-weight:normal">({len(glosas)} glosa{"s" if len(glosas) != 1 else ""})</span>
-            </div>
-            <ul style="margin:0;padding-left:20px;font-size:12px;color:#374151">
-                {lista_facturas}{extra}
-            </ul>
-        </div>
-        """)
+    #
+    # 20-08-2026. Yesid: «está muy plana, no explica muy bien». Antes cada
+    # glosa era un renglón con factura, EPS, valor y vencimiento — el gestor
+    # abría el correo y seguía sin saber por dónde empezar ni qué responder.
+    # Ahora cada una trae su plan: por qué es urgente, cómo se trabaja, qué se
+    # responde, y los avisos que pueden costar plata. Y van ORDENADAS: primero
+    # lo que no puede esperar.
+    filas_gestor = [_bloque_del_gestor(g, gs) for g, gs in sorted(por_gestor.items())]
 
     asunto = f"📥 Motor Glosas HUS — {total} glosas importadas desde recepción"
     contenido = f"""

@@ -140,6 +140,29 @@ def listar_proveedores(
     }
 
 
+def _explicar_ping(e: Exception, proveedor: str) -> str:
+    """Traduce el fallo del ping a algo accionable para el auditor.
+
+    20-08-2026. Decía «The read operation timed out» y «[WinError 10054] Se ha
+    forzado la interrupción de una conexión existente por el host remoto». El
+    auditor no sabe qué es un WinError ni qué hacer con eso.
+    """
+    texto = str(e)
+    if any(m in texto for m in ("10054", "10060", "ConnectError", "getaddrinfo")):
+        return (
+            f"La red del hospital no deja salir hacia {proveedor}. No es un "
+            "problema del motor ni de la clave."
+        )
+    if "timed out" in texto.lower() or "Timeout" in texto:
+        return (
+            f"{proveedor} no contestó en 15 segundos. Puede ser lentitud "
+            "momentánea: vuelva a darle «Ping en vivo a los 3»."
+        )
+    if "401" in texto or "403" in texto or "API key" in texto:
+        return f"{proveedor} rechazó la clave. Revise la línea correspondiente del .env."
+    return texto[:150]
+
+
 def _calcular_fallback_chain(cfg, primary: str) -> list[str]:
     """Construye la cadena real de fallback de DICTAMENES que usa
     GlosaService (espejo de la logica en glosa_service.py `_llamar_ia`).
@@ -211,7 +234,13 @@ async def health_check(
             return {"ok": False, "error": "sin API key"}
         from app.services.gemini_service import GeminiService
 
-        gs = GeminiService(api_key=cfg.gemini_api_key, default_model=cfg.gemini_model)
+        # 20-08-2026. El ping usaba los 90 segundos por defecto del servicio.
+        # Un «ping» que tarda minuto y medio no sirve de diagnóstico: el panel
+        # se queda colgado y termina diciendo «The read operation timed out»,
+        # que no le dice nada al auditor. Para esta pantalla, un proveedor que
+        # no contesta cuatro palabras en 15 segundos está caído a efectos
+        # prácticos, y eso es lo que hay que reportar.
+        gs = GeminiService(api_key=cfg.gemini_api_key, default_model=cfg.gemini_model, timeout=15.0)
         import time
 
         t0 = time.time()
@@ -221,7 +250,7 @@ async def health_check(
             res["latency_ms"] = ms
             return res
         except Exception as e:
-            return {"ok": False, "error": str(e)[:150]}
+            return {"ok": False, "error": _explicar_ping(e, "Gemini")}
 
     async def _ping_groq():
         if not cfg.groq_api_key:
@@ -247,7 +276,7 @@ async def health_check(
                 "respuesta": (r.choices[0].message.content or "")[:50],
             }
         except Exception as e:
-            return {"ok": False, "error": str(e)[:200]}
+            return {"ok": False, "error": _explicar_ping(e, "Groq")}
 
     pings = await asyncio.gather(
         _ping_anthropic(),

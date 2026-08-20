@@ -168,6 +168,60 @@ def _fmt_cop(valor) -> str:
         return "$0"
 
 
+def _plan_de(
+    *,
+    codigo_glosa,
+    tipo_glosa,
+    dias_restantes,
+    dias_radicacion,
+    estado,
+    valor,
+    profesional_medico,
+) -> dict:
+    """El plan de trabajo de una glosa, en forma de diccionario simple.
+
+    Se devuelve como dict —no como objeto— porque este resumen viaja al correo
+    y a la pantalla tal cual, sin pasar por la base de datos.
+    """
+    from app.services.glosa_service import TEXTO_RATIFICADA
+    from app.services.plan_de_trabajo import construir_plan
+
+    p = construir_plan(
+        codigo_glosa=codigo_glosa,
+        tipo_glosa=tipo_glosa,
+        dias_restantes=dias_restantes,
+        dias_radicacion=dias_radicacion,
+        ratificada=(estado == "RATIFICADA"),
+        extemporanea=(estado == "EXTEMPORANEA"),
+        valor_objetado=valor,
+        profesional_medico=profesional_medico,
+        texto_ratificada=TEXTO_RATIFICADA,
+    )
+    return {
+        "prioridad": p.prioridad,
+        "urgencia": p.urgencia,
+        "titular": p.titular,
+        "ruta": p.ruta,
+        "respuesta_sugerida": p.respuesta_sugerida,
+        "avisos": p.avisos,
+        "con_medico": p.con_medico,
+        "texto_listo": p.texto_listo,
+    }
+
+
+def _dias_desde_texto(vence: str | None):
+    """«03/09/2026» → días que faltan. None si no se puede leer."""
+    from datetime import date, datetime
+
+    if not vence or vence == "N/A":
+        return None
+    try:
+        d = datetime.strptime(str(vence), "%d/%m/%Y").date()
+    except ValueError:
+        return None
+    return (d - date.today()).days
+
+
 def componer_texto_desde_conceptos(db, glosa) -> str:
     """Compila el texto de la glosa desde sus ConceptoGlosaRecord.
 
@@ -946,7 +1000,71 @@ class RecepcionService:
                 "Ninguna hoja tiene columnas reconocibles. El parser busca hojas "
                 "tipo RECEPCION (con FACTURA+VENCE) o CONCEPTOS (con ListadoConceptos.*)."
             )
+
+        # Las hojas de resumen (INICIAL/RATIFICADA) no traen la causal: esa vive
+        # en las hojas de detalle, que se leen después. Acá, ya con todo dentro,
+        # se completa el plan de cada glosa con su causal real — que es lo que
+        # convierte «causal por clasificar» en «Soportes: relacione los que SÍ
+        # están en el expediente». 20-08-2026.
+        try:
+            self._completar_planes_con_causal(resumen)
+        except Exception as e:  # noqa: BLE001 - el resumen vale igual sin esto
+            logger.warning(f"No se pudo completar el plan con las causales: {e}")
         return resumen
+
+    def _completar_planes_con_causal(self, resumen) -> None:
+        """Rellena la causal en el plan de cada glosa del resumen.
+
+        Se toma la causal del concepto de MÁS VALOR: si una factura viene
+        glosada por soportes y por tarifa, la que manda para saber cómo
+        trabajarla es la que tiene más plata detrás.
+        """
+        from app.models.db import ConceptoGlosaRecord, GlosaRecord
+
+        ids = list(resumen.glosas_ids_todas or [])
+        if not ids:
+            return
+        conceptos = (
+            self.db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id.in_(ids)).all()
+        )
+        # glosa_id -> causal del concepto de más valor
+        mayor: dict[int, tuple[float, str]] = {}
+        for c in conceptos:
+            cod = (getattr(c, "codigo_glosa", "") or "").strip()
+            if not cod:
+                continue
+            val = float(getattr(c, "valor_objetado", 0) or 0)
+            if val >= mayor.get(c.glosa_id, (-1.0, ""))[0]:
+                mayor[c.glosa_id] = (val, cod)
+
+        # factura -> causal, para encontrarlas desde `por_gestor`
+        por_factura: dict[str, str] = {}
+        for g in self.db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all():
+            dato = mayor.get(g.id)
+            if dato and g.factura:
+                por_factura[str(g.factura).strip().upper()] = dato[1]
+
+        for glosas in (resumen.por_gestor or {}).values():
+            for item in glosas:
+                cod = por_factura.get(str(item.get("factura") or "").strip().upper())
+                if not cod:
+                    continue
+                item["causal"] = cod
+                item["plan"] = _plan_de(
+                    codigo_glosa=cod,
+                    tipo_glosa=item.get("tipo_glosa"),
+                    dias_restantes=_dias_desde_texto(item.get("vence")),
+                    dias_radicacion=None,
+                    estado=item.get("estado"),
+                    valor=item.get("valor"),
+                    profesional_medico=None,
+                )
+                # No se pierden los avisos que ya se habían calculado con los
+                # datos de la hoja de resumen (días de radicación, médico).
+                previos = [a for a in (item.get("_avisos_previos") or [])]
+                for a in previos:
+                    if a not in item["plan"]["avisos"]:
+                        item["plan"]["avisos"].append(a)
 
     def _procesar_filas_hoja(
         self,
@@ -1189,6 +1307,19 @@ class RecepcionService:
                         "estado": estado,
                         "tipo_glosa": tipo_glosa_excel or "-",
                         "radicado": numero_radicado_real or "-",
+                        # 20-08-2026. El correo al gestor decía QUÉ llegó pero
+                        # no QUÉ HACER. El plan sale de datos que este mismo
+                        # archivo ya trae: causal, tipo de glosa, médico y los
+                        # días entre radicación y notificación.
+                        "plan": _plan_de(
+                            codigo_glosa=None,
+                            tipo_glosa=tipo_glosa_excel,
+                            dias_restantes=dias_restantes,
+                            dias_radicacion=dias_transcurridos,
+                            estado=estado,
+                            valor=valor,
+                            profesional_medico=profesional_medico,
+                        ),
                     }
                 )
 

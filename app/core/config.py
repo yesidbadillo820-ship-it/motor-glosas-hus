@@ -291,8 +291,43 @@ def modelo_gemini_vigente(pedido: str | None = None) -> str:
     return valor
 
 
+def _leer_configuracion() -> "Settings":
+    """Construye la configuración sin que un acento pueda tumbar el portal.
+
+    20-08-2026. El `.env` del PC de cartera quedó con un acento mal codificado
+    —en un COMENTARIO, ni siquiera en una clave— y el motor no volvió a
+    arrancar. Cloudflare mostraba «Bad gateway · Host Error» y el hospital se
+    quedó sin portal, sin una pista de por qué.
+
+    pydantic-settings lee el archivo como UTF-8; un byte de Windows-1252 revienta
+    la decodificación y con ella el arranque entero. Un archivo de texto mal
+    guardado en una máquina no puede dejar sin trabajar al área de cartera, así
+    que si falla se reintenta con la codificación de Windows y, en último caso,
+    se arranca solo con las variables del entorno.
+    """
+    import logging
+
+    try:
+        return Settings()
+    except UnicodeDecodeError as e:
+        logging.getLogger("motor_glosas").warning(
+            "El .env tiene caracteres que no son UTF-8 (%s). Se reintenta con la "
+            "codificación de Windows. Conviene volver a guardarlo como UTF-8.",
+            e,
+        )
+    try:
+        return Settings(_env_file=".env", _env_file_encoding="cp1252")
+    except Exception as e:  # noqa: BLE001 - el portal arranca igual
+        logging.getLogger("motor_glosas").error(
+            "No se pudo leer el .env (%s). El motor arranca SOLO con las variables "
+            "del entorno: puede faltarle claves. Revise el archivo.",
+            e,
+        )
+        return Settings(_env_file=None)
+
+
 @lru_cache()
 def get_settings() -> Settings:
-    settings = Settings()
+    settings = _leer_configuracion()
     _exportar_claves_al_entorno(settings)
     return settings
