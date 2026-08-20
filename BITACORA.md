@@ -2929,10 +2929,24 @@ en su carpeta.
 Al terminar dice **qué carpetas creó**, para que se vea de una si alguien
 escribió mal un número.
 
-**En la carpeta de CAROLINA:** 35 PDF sueltos de **23 facturas distintas**;
-cinco ya tenían carpeta y **18 se crean**. Probado con los nombres reales, que
-traen comas, espacios dobles y hasta «- copia» — 37 pruebas, con los dos
-candados comprobados por mutación.
+**En la carpeta de CAROLINA (hecho el 20-08):** 35 PDF sueltos de **23 facturas
+distintas**; cinco ya tenían carpeta y se crearon **18**. Antes de mover se
+cruzaron las 23 contra las 324 facturas de la macro: **todas son del paquete**,
+ninguna con el número mal escrito.
+
+Después de mover quedó **1 solo PDF suelto**, el `REPS.pdf`, y está bien que así
+sea: no es de una factura sino la habilitación del hospital, que se copia a las
+facturas que la necesitan. Ningún archivo chocó de nombre, así que no hubo que
+renombrar nada. En la carpeta quedaron 102 PDF archivados (los 35 movidos más
+los 67 que ya estaban), y el listado de qué se movió está en
+`SOPORTES_ORGANIZADOS.csv`, dentro de la misma carpeta.
+
+Probado con los nombres reales, que traen comas, espacios dobles y hasta
+«- copia» — 37 pruebas, con los dos candados comprobados por mutación.
+
+**Nota para el próximo paquete:** el bot vive en `C:\motor-glosas\repo`, que es
+la copia que el autodeploy mantiene al día. La de `C:\temp-notas` está vieja
+(quedó en el 5 de agosto) y no conviene usarla.
 
 ---
 
