@@ -1,3 +1,4 @@
+import re
 import smtplib
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
@@ -46,6 +47,28 @@ def _build_html_base(titulo: str, contenido: str) -> str:
 </body>
 </html>
 """
+
+
+# Google muestra la contraseña de aplicación en cuatro grupos de cuatro
+# —«abcd efgh ijkl mnop»— y uno la pega tal cual, que es lo natural. Los
+# espacios son solo para leerla: no son parte de la clave. Algunos servidores
+# la aceptan igual y otros la rechazan, y el error que devuelven es el mismo
+# «Username and Password not accepted» que sale cuando la clave está de verdad
+# equivocada — así que uno se pone a generar claves nuevas sin necesidad.
+#
+# 20-08-2026. Se quitan los espacios SOLO cuando la clave tiene la forma exacta
+# de una contraseña de aplicación de Google (16 letras o números en 4 grupos de
+# 4). Cualquier otra clave se manda tal cual: hay servidores de correo donde un
+# espacio sí es parte de la contraseña, y tocarla ahí sería romperla.
+_APP_PASSWORD_GOOGLE = re.compile(r"^[A-Za-z0-9]{4}(?: [A-Za-z0-9]{4}){3}$")
+
+
+def clave_para_el_servidor(clave: str) -> str:
+    """La contraseña como la espera el servidor de correo."""
+    limpia = (clave or "").strip()
+    if _APP_PASSWORD_GOOGLE.match(limpia):
+        return limpia.replace(" ", "")
+    return limpia
 
 
 def _anotar(destinatario: str, asunto: str, aceptado: bool, error: str = "") -> None:
@@ -152,7 +175,7 @@ def _enviar_sync(
 
         with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port, timeout=30) as server:
             server.starttls()
-            server.login(cfg.smtp_user, cfg.smtp_password)
+            server.login(cfg.smtp_user, clave_para_el_servidor(cfg.smtp_password))
             server.send_message(msg)
 
         logger.info(
