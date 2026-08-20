@@ -320,7 +320,23 @@ function mostrarResultado(d){
   document.getElementById('sn').textContent = sem.NEGRO || 0;
 
   document.getElementById('e-num').textContent = d.correos_enviados || 0;
-  pintarDetalleDelCorreo(d.correo);
+  // 20-08-2026. Cuando el archivo no trae nada nuevo, no hay a quién
+  // avisarle: el «Correos enviados: 0» es correcto, pero a secas se lee como
+  // una falla. Yesid reimportó varias veces mirando ese cero sin saber si era
+  // un problema del correo o la consecuencia de que no hubiera novedades.
+  if(totalNum === 0 && duplicadas > 0){
+    var cajaMail = document.getElementById('email-detalle');
+    if(cajaMail){
+      cajaMail.innerHTML = '<div style="background:#f8fafc;border:1px solid var(--border);'
+        + 'padding:12px 14px;border-radius:8px;font-size:.9em">'
+        + 'No se envió ningún correo <b>porque no había nada nuevo que avisar</b>. '
+        + 'No es una falla del correo.<br>'
+        + 'Para comprobar que el correo funciona, use <b>Diagnóstico → 📧 Probar correo</b>.'
+        + '</div>';
+    }
+  } else {
+    pintarDetalleDelCorreo(d.correo);
+  }
 
   // 🤖 Indicador prominente de auto-procesamiento IA en background
   if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){

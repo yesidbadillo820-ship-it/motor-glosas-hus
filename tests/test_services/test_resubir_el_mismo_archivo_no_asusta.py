@@ -100,6 +100,15 @@ class TestLaPantallaNoAsusta:
         assert "No se leyó ninguna fila del archivo" in html
         assert "no tiene la hoja correcta" in html
 
+    def test_el_cero_de_correos_se_explica(self):
+        """Sin glosas nuevas no hay a quién avisarle: ese «0» es correcto, pero
+        a secas se lee como una falla del correo. Yesid reimportó varias veces
+        mirando ese cero sin saber cuál de las dos cosas era."""
+        html = self._html()
+        assert "no había nada nuevo que avisar" in html
+        assert "No es una falla del correo" in html
+        assert "Probar correo" in html
+
     def test_se_muestra_cuantas_ya_estaban(self):
         """Antes el número de duplicadas no se veía en ninguna parte, así que
         el auditor no tenía cómo saber qué había pasado."""
