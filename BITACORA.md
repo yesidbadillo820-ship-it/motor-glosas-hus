@@ -4687,8 +4687,17 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
   acentos a entidades XML (`&#243;`), el archivo queda 100 % ASCII, el
   contenido y las firmas DIAN internas quedan idénticos (verificado
   canónicamente antes de escribir). Sirve por archivo o carpeta completa
-  (quedan ~124 notas por subir al portal). La NC332660 corregida se entregó
-  y quedó lista para re-subir.
+  (quedan ~124 notas por subir al portal). La NC332660 corregida se entregó,
+  se re-subió al portal y PASÓ. Con el mismo arreglo se entregaron las 4 del
+  primer ZIP (332657, 332658, 332659 listas; la 332865 con CUV rechazado).
+- **Diagnóstico del CUV rechazado de la NC 332865 (factura HUS363950):** el
+  rechazo RVG01 trae adentro la causa real: «Execution Timeout Expired» — el
+  VALIDADOR del Ministerio (el Docker local) se quedó sin tiempo, dos veces el
+  19-08. El RIPS está BIEN: estructura idéntica clave por clave a la NC332660
+  aceptada, y es la nota más simple posible (1 consulta, $7.600). Es el mismo
+  cuadro del Lote V2 de junio (dockerrips caído): NO se corrige nada en los
+  archivos — se reintenta la validación y, si repite, se reinicia el
+  contenedor del validador. No subir la nota hasta tener ResultState=true.
 
 ## 3) PENDIENTE
 
