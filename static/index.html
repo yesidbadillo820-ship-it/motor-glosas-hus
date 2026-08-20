@@ -4709,8 +4709,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <button class="btn-sm" onclick="diagReindexarSoportes()" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;">Reindexar soportes</button>
             <button class="btn-sm" onclick="cargarBillingForense()" style="background:#fef2f2;color:#991b1b;border-color:#fecaca;">Billing forense IA</button>
             <button class="btn-sm" onclick="cargarIAStatus()" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0;">Estado de IAs</button>
+            <button class="btn-sm" onclick="probarCorreo(this)" style="background:#fefce8;color:#854d0e;border-color:#fde68a;">📧 Probar correo</button>
           </div>
         </div>
+        <div id="diag-correo" style="margin-bottom:1rem;"></div>
         <div id="diag-resumen" style="margin-bottom:1rem;"></div>
         <div id="diag-ia-status" style="margin-bottom:1rem;"></div>
         <div id="diag-billing" style="margin-bottom:1rem;"></div>
@@ -16505,6 +16507,44 @@ function afAvisoOmitidos(data){
 }
 
 // ─── DIAGNÓSTICO DEL SISTEMA (panel admin) ───────────────────────────
+
+// 📧 Probar correo (20-08-2026). Yesid importó dos veces sin que saliera un
+// solo correo: el .env del servidor no tenía NADA de correo. Comprobarlo
+// costaba volver a importar el archivo entero y mirar el resultado — cinco
+// minutos por intento, para algo que se responde en dos segundos.
+// Este botón manda un mensaje al buzón de quien lo aprieta y dice qué pasó.
+async function probarCorreo(btn){
+  var caja = document.getElementById('diag-correo');
+  if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+  if(caja) caja.innerHTML = '';
+  try{
+    var r = await fetch('/admin/probar-correo', {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(!caja) return;
+    var ok = d && d.ok;
+    var fondo = ok ? '#f0fdf4' : '#fef2f2';
+    var borde = ok ? '#16a34a' : '#dc2626';
+    var color = ok ? '#15803d' : '#991b1b';
+    var h = '<div style="background:'+fondo+';border-left:4px solid '+borde+';padding:14px 16px;border-radius:8px;color:'+color+'">'
+          + '<div style="font-weight:800;margin-bottom:.35rem">'+(ok?'✅ ':'⚠️ ')+escHtml((d&&d.titulo)||'Sin respuesta')+'</div>'
+          + '<div style="font-size:.9rem;line-height:1.5">'+escHtml((d&&d.detalle)||'')+'</div>';
+    if(d && d.destinatario){
+      h += '<div style="font-size:.82rem;margin-top:.5rem;opacity:.85">Buzón: <b>'+escHtml(d.destinatario)+'</b></div>';
+    }
+    if(d && d.config){
+      h += '<div style="font-size:.78rem;margin-top:.5rem;font-family:monospace;opacity:.8">'
+         + Object.keys(d.config).map(function(k){ return escHtml(k)+' = '+escHtml(String(d.config[k])); }).join('<br>')
+         + '</div>';
+    }
+    h += '</div>';
+    caja.innerHTML = h;
+  }catch(e){
+    if(caja) caja.innerHTML = '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:14px 16px;border-radius:8px;color:#991b1b">No se pudo consultar: '+escHtml(String(e))+'</div>';
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '📧 Probar correo'; }
+  }
+}
+
 async function cargarDiagnostico(){
   var resumen = document.getElementById('diag-resumen');
   var secciones = document.getElementById('diag-secciones');

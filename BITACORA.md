@@ -5170,6 +5170,40 @@ coincide con ningún usuario, la pantalla lo dice con el nombre exacto.
 - 37 pruebas en `tests/test_services/test_a_quien_le_llega_el_correo.py`, con
   los nombres **tal como vienen en el Excel del 19 de agosto**.
 
+### 20-08 (noche) — Botón «Probar correo»: por qué no salía ninguno
+
+**El diagnóstico quedó cerrado.** Yesid corrió la consulta en el PC de cartera
+y el `.env` **no tiene absolutamente nada de correo**: ni `SMTP_USER`, ni
+`SMTP_PASSWORD`, ni `SMTP_HOST`, ni `ALERTAS_EMAIL`. Por eso salieron cero
+correos — no era problema de los gestores ni de los nombres.
+
+Lo importante: **mientras eso falte, NINGÚN correo del motor sale.** Ni el
+resumen de recepción, ni las alertas de vencimiento.
+
+**El problema de fondo era otro:** comprobarlo costaba volver a importar el
+archivo entero y mirar el resultado. Cinco minutos por intento, para algo que
+se responde en dos segundos. Por eso Yesid importó dos veces.
+
+**Ahora hay un botón «📧 Probar correo»** en el panel de Diagnóstico. Manda un
+mensaje al buzón de quien lo aprieta y dice qué pasó — sin tocar ninguna
+glosa. Y traduce los errores del servidor de correo, que son crípticos:
+
+| Lo que responde el servidor | Lo que sale en pantalla |
+|---|---|
+| `535 Username and Password not accepted` | «Con Gmail no sirve la contraseña normal: hay que generar una **contraseña de aplicación** de 16 letras» |
+| `Connection timed out` | «Suele ser el firewall del hospital bloqueando la salida» |
+| `Name or service not known` | «Revise SMTP_HOST» |
+
+La contraseña **nunca se muestra**, ni siquiera cuando está puesta: dice
+«(configurada)» y ya.
+
+**Lo que falta para que el correo funcione** (lo tiene que hacer el hospital,
+no se puede desde acá): agregar al `.env` del servidor la cuenta desde la que
+saldrán los correos y su contraseña de aplicación.
+
+- 10 pruebas en `tests/test_api/test_probar_correo.py`, incluida la que
+  verifica que la contraseña no se filtre en la respuesta.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
