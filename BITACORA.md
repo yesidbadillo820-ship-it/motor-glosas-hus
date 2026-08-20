@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 19-08-2026
+**Última actualización:** 20-08-2026
 
 ---
 
@@ -2903,6 +2903,38 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   facturas que no cuadran ($247.617.689, el 83 % del paquete).
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
+
+### 20-08-2026 — Cada soporte, en la carpeta de su factura
+
+**Lo que pidió el auditor:** en la carpeta del gestor (CAROLINA, del paquete
+31068) hay PDF sueltos, mezclados con las carpetas de las facturas ya armadas.
+Que cada uno se meta en la carpeta de su factura, y que la carpeta se cree si no
+existe.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/organizar_soportes_por_factura.py`,
+con su botón de doble clic `ORGANIZAR_SOPORTES.cmd`. Toma el número de factura
+del comienzo del nombre del archivo —que es como los nombra el equipo— y lo mete
+en su carpeta.
+
+**Mover archivos no se deshace**, así que el bot va con tres candados:
+
+1. **Simula por defecto.** Muestra el listado de lo que haría y no toca nada
+   mientras no se le diga `--aplicar` (el botón lo pide escribiendo «SI»).
+2. **Nunca pisa un archivo.** Si en la carpeta destino ya hay uno con el mismo
+   nombre, al que llega le pone « (2)» y lo avisa. Lo que ya estaba archivado no
+   se pierde.
+3. **Solo toca lo suelto.** Lo que ya está dentro de una carpeta se queda
+   quieto, y lo que no dice de qué factura es también: sale listado al final.
+
+Al terminar dice **qué carpetas creó**, para que se vea de una si alguien
+escribió mal un número.
+
+**En la carpeta de CAROLINA:** 35 PDF sueltos de **23 facturas distintas**;
+cinco ya tenían carpeta y **18 se crean**. Probado con los nombres reales, que
+traen comas, espacios dobles y hasta «- copia» — 37 pruebas, con los dos
+candados comprobados por mutación.
+
+---
 
 ### 19-08-2026 (cierre) — El consolidado: cuántas facturas hay de cada lado
 
