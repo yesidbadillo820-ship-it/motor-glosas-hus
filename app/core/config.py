@@ -335,6 +335,60 @@ def modelo_gemini_vigente(pedido: str | None = None) -> str:
     return valor
 
 
+def diagnostico_del_env() -> dict:
+    """¿Se encontró el archivo de configuración? (20-08-2026)
+
+    La otra mitad del arreglo de la ruta. Anclar bien el `.env` evita que se
+    pierda, pero no sirve de nada si cuando falta el motor se calla: «no
+    encontré el archivo» y «el archivo está vacío» se ven exactamente igual
+    desde afuera, y el auditor termina buscando el problema donde no está.
+
+    Acá queda el dato para que la pantalla de Diagnóstico lo diga.
+    """
+    ruta = Path(_ruta_del_env())
+    existe = ruta.is_file()
+    # El descuido clásico: el Bloc de notas guarda «.env» como «.env.txt» y
+    # Windows esconde la extensión, así que en el explorador se ve bien.
+    # `.env.example` y compañía son archivos del repositorio, no descuidos:
+    # señalarlos sería ruido, y un aviso que grita por algo normal enseña a
+    # ignorar los avisos.
+    _PLANTILLAS = {".env", ".env.example", ".env.sample", ".env.template", ".env.dist"}
+    sospechosos = []
+    try:
+        carpeta = ruta.parent
+        if carpeta.is_dir():
+            sospechosos = sorted(
+                f.name
+                for f in carpeta.iterdir()
+                if f.is_file()
+                and f.name.lower().startswith(".env")
+                and f.name.lower() not in _PLANTILLAS
+            )
+    except OSError:
+        sospechosos = []
+    return {
+        "ruta": str(ruta),
+        "existe": existe,
+        "archivos_parecidos": sospechosos,
+        "aviso": (
+            ""
+            if existe
+            else (
+                f"No existe {ruta}. El motor está funcionando SOLO con las variables "
+                "del entorno: puede faltarle las claves de IA, el correo y más, sin "
+                "que nada lo diga."
+                + (
+                    f" Ojo: en esa carpeta hay {', '.join(sospechosos)} — el Bloc de "
+                    "notas suele guardar «.env» como «.env.txt» y Windows esconde la "
+                    "extensión."
+                    if sospechosos
+                    else ""
+                )
+            )
+        ),
+    }
+
+
 def _leer_configuracion() -> "Settings":
     """Construye la configuración sin que un acento pueda tumbar el portal.
 
@@ -350,6 +404,10 @@ def _leer_configuracion() -> "Settings":
     se arranca solo con las variables del entorno.
     """
     import logging
+
+    _diag = diagnostico_del_env()
+    if not _diag["existe"]:
+        logging.getLogger("motor_glosas").warning("[CONFIG] %s", _diag["aviso"])
 
     try:
         return Settings()

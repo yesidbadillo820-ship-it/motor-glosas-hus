@@ -5409,6 +5409,33 @@ Yesid vio en Gmail salieron de otra configuración o de otro momento.
 `C:\motor-glosas\repo\.env` y reiniciar el motor. Ojo con el Bloc de notas:
 suele guardar como `.env.txt`, y así el motor nunca lo lee.
 
+### 20-08 (noche) — Si falta el .env, ahora el motor lo dice
+
+La otra mitad del arreglo anterior. Anclar bien la ruta evita que el archivo se
+pierda, pero no sirve de nada si cuando falta **el motor se calla**: desde
+afuera, «no encontré el archivo» y «el archivo está vacío» se ven exactamente
+igual, y uno termina buscando el problema donde no está. Que es justo lo que
+nos pasó con el correo.
+
+**Ahora avisa en dos sitios:** en el registro al arrancar, y como una sección
+propia en la pantalla de **Diagnóstico**, marcada en rojo — porque sin `.env`
+el motor corre sin claves de IA y sin correo, y eso no es un detalle.
+
+Y detecta el descuido clásico de Windows: **el Bloc de notas guarda «.env» como
+«.env.txt»** y el explorador esconde la extensión, así que el archivo se ve
+bien. Si encuentra uno de esos al lado, lo nombra.
+
+> **No grita por lo normal:** `.env.example` y las demás plantillas del
+> repositorio no se señalan. Un aviso que salta por algo corriente enseña a
+> ignorar los avisos.
+
+> **Nota de honestidad:** puse la sección de primera y dos pruebas se pusieron
+> rojas. Tenían razón, y por un buen motivo: la sección del **motor** va
+> primero porque si hay dos motores corriendo ningún otro dato del panel es
+> confiable, y la **versión** va segunda. La mía quedó tercera.
+
+- 9 pruebas en `tests/test_core/test_si_falta_el_env_se_avisa.py`.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
