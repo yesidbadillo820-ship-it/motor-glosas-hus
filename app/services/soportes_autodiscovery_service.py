@@ -263,6 +263,36 @@ def _raiz_configurada() -> Optional[str]:
     return None
 
 
+def raiz_de_soportes() -> str:
+    """La carpeta de soportes del hospital. UNA sola respuesta para todos.
+
+    20-08-2026. El indexador resolvía la carpeta acá y el router de subida la
+    resolvía por su cuenta, en otro orden — y sin leer `config/soportes_root.txt`,
+    que es justamente donde el hospital dejó escrita la suya. El auditor subía
+    un .zip, el motor decía «subido», y los PDFs quedaban en una carpeta que el
+    índice nunca recorre: buscaba la factura, no aparecía, y no había manera de
+    entender por qué.
+
+    Dos lugares decidiendo lo mismo con reglas distintas es un defecto
+    esperando el momento. Acá queda uno solo.
+
+    Orden:
+      1. `config/soportes_root.txt` — la carpeta que escogió el hospital. Va
+         primero a propósito: el vigilante que revive el motor conserva las
+         variables de cuando ÉL arrancó, así que cambiar el .cmd no servía de
+         nada hasta reiniciar el vigilante entero.
+      2. `SOPORTES_ROOT` — mount directo del share.
+      3. `SOPORTES_LOCAL_ROOT` — el agente sube por HTTP y el motor escribe acá.
+      4. `/tmp/motor-soportes` — sin configurar nada.
+    """
+    return (
+        _raiz_configurada()
+        or os.getenv("SOPORTES_ROOT")
+        or os.getenv("SOPORTES_LOCAL_ROOT")
+        or "/tmp/motor-soportes"
+    )
+
+
 class SoportesIndexer:
     """Indexador on-demand del share de soportes.
 
@@ -287,11 +317,7 @@ class SoportesIndexer:
         #      vigilante entero. Leyendo el archivo acá, el motor toma la
         #      carpeta correcta arranque como arranque. 18-08-2026.
         if raiz is None:
-            raiz = _raiz_configurada() or (
-                os.getenv("SOPORTES_ROOT")
-                or os.getenv("SOPORTES_LOCAL_ROOT")
-                or "/tmp/motor-soportes"
-            )
+            raiz = raiz_de_soportes()
         self.raiz = Path(raiz)
         # Crear si no existe — el agente puede subir antes del primer
         # rebuild. Sin esto el indexador reporta "raíz no existe" aunque

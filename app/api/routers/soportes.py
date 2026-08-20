@@ -283,8 +283,21 @@ def _local_root() -> Path:
     el agente re-sincroniza en cada pasada cada 30 min, así que es
     aceptable).
     """
-    raiz = os.getenv("SOPORTES_LOCAL_ROOT") or os.getenv("SOPORTES_ROOT", "/tmp/motor-soportes")
-    p = Path(raiz)
+    # 20-08-2026. Acá se resolvía la carpeta por cuenta propia, en un ORDEN
+    # DISTINTO al del indexador. El indexador mira primero
+    # `config/soportes_root.txt` —la carpeta que escogió el hospital,
+    # «\\Prime\radicacion_2026»— y esto ni siquiera leía ese archivo.
+    #
+    # Resultado: el auditor subía un .zip de soportes, el motor decía «subido»,
+    # y los PDFs quedaban en una carpeta que el índice NUNCA recorre. Después
+    # buscaba la factura, no aparecía, y no había forma de saber por qué: el
+    # archivo estaba, pero en otro lado.
+    #
+    # Ahora la carpeta la resuelve UNA sola función, la misma que usa el
+    # indexador. Si mañana cambia el criterio, cambia para los dos a la vez.
+    from app.services.soportes_autodiscovery_service import raiz_de_soportes
+
+    p = Path(raiz_de_soportes())
     # Crear si no existe (idempotente). Sin esto el primer upload
     # falla con FileNotFoundError.
     try:

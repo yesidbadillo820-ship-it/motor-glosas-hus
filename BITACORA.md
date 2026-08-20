@@ -5308,6 +5308,33 @@ motor las intente.
   correo que ya iba a salir**. El registro es secundario y jamás puede costar
   un envío: ahora está protegido también en el punto de llamada.
 
+### 20-08 (noche) — Los soportes del .zip caían donde el índice nunca mira
+
+Último pendiente de la lista, y era real. La carpeta de soportes se resolvía
+en **dos lugares con reglas distintas**:
+
+| | El índice mira | El .zip se guarda en |
+|---|---|---|
+| 1º | **`config/soportes_root.txt`** | `SOPORTES_LOCAL_ROOT` |
+| 2º | `SOPORTES_ROOT` | `SOPORTES_ROOT` |
+| 3º | `SOPORTES_LOCAL_ROOT` | `/tmp/motor-soportes` |
+
+La subida **ni siquiera leía** `config/soportes_root.txt`, que es justamente
+donde el hospital dejó escrita la suya (`\\Prime\radicacion_2026`).
+
+**Qué pasaba:** el auditor subía un .zip de soportes, el motor decía «subido»,
+y los PDFs quedaban en una carpeta que **el índice nunca recorre**. Después
+buscaba la factura, no aparecía, y **no había forma de entender por qué** — el
+archivo estaba, pero en otro lado.
+
+**Cómo queda.** Una sola función responde «dónde viven los soportes», y la
+usan las dos: el índice y la subida. Si mañana cambia el criterio, cambia para
+las dos a la vez.
+
+- 8 pruebas en `tests/test_services/test_el_zip_cae_donde_el_indice_busca.py`,
+  incluida una que se pone roja si alguien vuelve a resolver la carpeta a mano
+  en el router — que es exactamente como nació el defecto.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
