@@ -189,14 +189,49 @@ def _buscar_emails_por_gestor(gestores_nombres: list, db=None) -> list:
             nombre_upper = u.nombre.strip().upper()
             for g in gestores_norm:
                 # Match exacto O contains (para manejar prefijos tipo
-                # "A_A_A_A (EQUIPO ASEGURADORAS)" vs "EQUIPO ASEGURADORAS")
-                if nombre_upper == g or g in nombre_upper or nombre_upper in g:
+                # "A_A_A_A (EQUIPO ASEGURADORAS)" vs "EQUIPO ASEGURADORAS").
+                #
+                # 20-08-2026: el "contains" exige 4 caracteres. Sin ese piso,
+                # una celda de gestor con una letra suelta —una «A» por un
+                # dedazo en el Excel— le mandaba el correo a 22 de los 24
+                # usuarios, porque casi todo nombre contiene una A. Cada quien
+                # recibía un plan de trabajo que no era el suyo, y el dueño de
+                # verdad podía no aparecer. Una «S» alcanzaba a 17.
+                #
+                # El match EXACTO sigue valiendo para cualquier longitud: si
+                # alguien se llama literalmente así, es esa persona.
+                if nombre_upper == g:
+                    emails.add(u.email.strip().lower())
+                    break
+                if len(g) >= 4 and (g in nombre_upper or nombre_upper in g):
                     emails.add(u.email.strip().lower())
                     break
         return sorted(emails)
     except Exception as e:
         logger.warning(f"Error buscando usuarios por gestor: {e}")
         return []
+
+
+def emails_por_gestor(gestores_nombres: list, db=None) -> dict[str, list[str]]:
+    """A qué correo concreto le llega lo de cada gestor. `{}` si no hay BD.
+
+    20-08-2026. `_buscar_emails_por_gestor` devuelve la lista de correos toda
+    junta, y con eso el resumen solo podía decir «se enviaron 3 correos». El
+    auditor no tenía cómo saber que CAROLINA se quedó por fuera, porque su
+    nombre en el Excel no coincide con ningún usuario del portal — que es la
+    falla que de verdad ocurre, no que se caiga el SMTP.
+
+    Acá se devuelve el cruce abierto: gestor → correos. El que no cruza queda
+    con lista vacía y sale nombrado en pantalla.
+    """
+    if db is None:
+        return {}
+    salida: dict[str, list[str]] = {}
+    for nombre in gestores_nombres or []:
+        if not nombre or not str(nombre).strip():
+            continue
+        salida[str(nombre)] = _buscar_emails_por_gestor([nombre], db=db)
+    return salida
 
 
 _COLOR_URGENCIA = {
@@ -328,6 +363,18 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     destinatarios = sorted({*(e.lower() for e in destinatarios_base), *emails_gestores})
     if not destinatarios:
         logger.warning("Sin destinatarios: ni ALERTAS_EMAIL ni usuarios-gestor matcheados")
+        # Este es el peor caso y el más silencioso: NADIE recibió nada. Se
+        # deja escrito en el resumen para que salga en pantalla, en vez de un
+        # «0 correos» que se lee como si no hubiera nada que enviar.
+        resumen["correo"] = {
+            "smtp_configurado": bool(cfg.smtp_user and cfg.smtp_password),
+            "enviados": 0,
+            "intentados": 0,
+            "destinatarios": [],
+            "por_gestor": emails_por_gestor(gestores, db=db),
+            "gestores_sin_correo": sorted(g for g in gestores if g),
+            "difusion_general": sorted(destinatarios_base),
+        }
         return 0
     logger.info(
         f"Destinatarios importación recepción: {len(destinatarios)} "
@@ -418,10 +465,28 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
 
     html = _build_html_base(asunto, contenido)
     exitos = 0
+    # 20-08-2026: se anota QUÉ pasó con cada correo, uno por uno. Antes solo
+    # se devolvía el total, y un «3 de 5» no dice cuáles dos fallaron.
+    detalle: list[dict] = []
     for destinatario in destinatarios:
-        if await enviar_email(destinatario, asunto, html):
+        ok = await enviar_email(destinatario, asunto, html)
+        if ok:
             exitos += 1
+        detalle.append({"email": destinatario, "ok": bool(ok)})
     logger.info(f"Resumen de importación enviado a {exitos}/{len(destinatarios)} destinatarios")
+
+    cruce = emails_por_gestor(gestores, db=db)
+    resumen["correo"] = {
+        "smtp_configurado": bool(cfg.smtp_user and cfg.smtp_password),
+        "enviados": exitos,
+        "intentados": len(destinatarios),
+        "destinatarios": detalle,
+        "por_gestor": cruce,
+        # Los que el motor NO sabe a quién mandarle: su nombre en el Excel no
+        # coincide con ningún usuario activo del portal.
+        "gestores_sin_correo": sorted(g for g, correos in cruce.items() if not correos),
+        "difusion_general": sorted(destinatarios_base),
+    }
     return exitos
 
 
