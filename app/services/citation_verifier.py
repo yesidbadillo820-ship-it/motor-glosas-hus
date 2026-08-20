@@ -415,9 +415,74 @@ def _verificar_folios(texto: str, issues: list[dict], evidencia: Optional[str]) 
             )
             + " La EPS pide ese folio, no lo encuentra y ratifica la glosa completa.",
             "sugerencia": (
-                "Quite el número de folio y deje la referencia al documento "
-                "(«LA HISTORIA CLÍNICA ACREDITA...»), o adjunte el soporte donde "
-                "sí conste ese folio y vuelva a analizar."
+                (
+                    # Sin un solo soporte leído no sirve mandarlo a escribir
+                    # «LA HISTORIA CLÍNICA ACREDITA…»: sería cambiar una
+                    # afirmación sin respaldo por otra.
+                    "Adjunte el soporte y vuelva a analizar, o quite la referencia "
+                    "documental: sin soportes a la vista el dictamen no puede afirmar "
+                    "qué dice la historia clínica, ni con folio ni sin él."
+                )
+                if sin_soportes
+                else (
+                    "Quite el número de folio y deje la referencia al documento "
+                    "(«LA HISTORIA CLÍNICA ACREDITA...»), o adjunte el soporte donde "
+                    "sí conste ese folio y vuelva a analizar."
+                )
+            ),
+        }
+    )
+
+
+def _verificar_afirmaciones_documentales(
+    texto: str, issues: list[dict], evidencia: Optional[str]
+) -> None:
+    """Marca lo que el dictamen afirma que dice un documento que nadie leyó.
+
+    Caso real 20-08-2026 (CL0801, AXA COLPATRIA). Yesid analizó una glosa de
+    pertinencia SIN adjuntar un solo soporte y el dictamen salió diciendo:
+
+        «…CUMPLE CON LOS CRITERIOS CLÍNICOS DEL MÉDICO TRATANTE, QUIEN
+         DOCUMENTÓ LA INDICACIÓN EN LA HISTORIA CLÍNICA INTEGRAL.»
+
+    Sin citar folio, así que la verificación de folios lo dejaba pasar y salía
+    con «7 citas contra corpus · 0 hallazgos» y el sello del Quality Gate.
+
+    Es la misma mentira sin el número. En una glosa de pertinencia, lo que
+    dice la historia clínica ES el punto en disputa: la EPS la pide, ve que la
+    afirmación no sale de ahí, y ratifica.
+
+    Solo se revisa cuando NO se leyó expediente. Con soportes a la vista haría
+    falta leerlos de verdad para saber si la frase es fiel, y marcar por las
+    dudas enseñaría al auditor a ignorar los avisos.
+    """
+    if evidencia is None:
+        return
+    try:
+        from app.services.extractor_folios import afirmaciones_documentales_sin_respaldo
+    except Exception:  # pragma: no cover - sin el extractor no se inventa un fallo
+        return
+
+    afirmaciones = afirmaciones_documentales_sin_respaldo(texto or "", evidencia)
+    if not afirmaciones:
+        return
+
+    plural = len(afirmaciones) > 1
+    issues.append(
+        {
+            "tipo": "AFIRMACION_SIN_SOPORTE",
+            "severidad": "ALTA",
+            "cita": afirmaciones[0][:160],
+            "detalle": (
+                f"El dictamen afirma lo que dice{'n' if plural else ''} un documento "
+                "clínico, pero en este análisis NO se leyó ningún soporte. El hospital "
+                "estaría certificando ante la EPS el contenido de una historia clínica "
+                "que nadie abrió" + (f" ({len(afirmaciones)} frases)." if plural else ".")
+            ),
+            "sugerencia": (
+                "Adjunte el soporte y vuelva a analizar —así la afirmación queda "
+                "respaldada—, o redacte sin afirmar contenido: pida a la EPS que "
+                "precise qué echa de menos y ofrezca el documento, sin decir qué dice."
             ),
         }
     )
@@ -687,6 +752,7 @@ def verificar_citas(
 
     # 7. Folios que el dictamen afirma y que no están en el expediente leído.
     _verificar_folios(texto, issues, evidencia)
+    _verificar_afirmaciones_documentales(texto, issues, evidencia)
     if evidencia is not None:
         from app.services.extractor_folios import folios_citados as _fc
 

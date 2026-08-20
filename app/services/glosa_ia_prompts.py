@@ -560,6 +560,51 @@ def get_contrato(eps: str, fecha_hecho=None) -> dict:
                 "Se aplica tarifa SOAT plena (Circular Externa 047 de 2025 del "
                 "MinSalud, Manual SOAT 2026 indexado a UVB) y Decreto 780 de 2016."
             )
+            # 20-08-2026 (caso real de Yesid, TA0201 del DISPENSARIO MEDICO).
+            # El dictamen salía con «Contrato: SIN CONTRATO PACTADO / Tarifa
+            # pactada: SOAT PLENO» y en el cuerpo citaba, textual, el Parágrafo
+            # 3 del contrato que decía SOAT-20 %. Dos cosas malas a la vez:
+            #
+            #   · el hospital NIEGA ante la entidad un contrato que sí existió
+            #     —el 440-DIGSA/DMBUG-2025 corrió hasta el 30/07/2026—, y
+            #   · al declarar SOAT PLENO frente a un pactado de SOAT-20 %, le
+            #     está concediendo a la EPS justo lo que glosó: que cobró de
+            #     más. En una glosa de TARIFA eso es perder por escrito.
+            #
+            # Por qué pasa: sin fecha del servicio en el formulario se usa la de
+            # HOY, y una glosa SIEMPRE es de un servicio pasado. El contrato
+            # llevaba 21 días vencido; el servicio es de cuando sí regía.
+            #
+            # Ojo con el alcance: cuando el formulario SÍ trae la fecha, decir
+            # «SIN CONTRATO PACTADO» es correcto y está decidido a propósito.
+            # Esto corrige únicamente el caso en que la fecha no se conoce.
+            #
+            # No se adivina la fecha del servicio —eso sería inventar—. Lo que
+            # se corrige es la afirmación falsa: el contrato se nombra, se dice
+            # que su vigencia terminó y se pide verificar la fecha del servicio.
+            # La tarifa sigue siendo SOAT pleno: sin saber la fecha no se puede
+            # aplicar un descuento pactado, y aplicarlo de más también es un
+            # error. Lo que se elimina es el «no teníamos contrato».
+            # SOLO cuando nadie dijo la fecha. Si el formulario SÍ la trajo y
+            # ningún contrato la cubría, «SIN CONTRATO PACTADO» es un hecho
+            # verificado y así debe quedar: es una decisión tomada a
+            # propósito —SOAT pleno es además más favorable al hospital que el
+            # descuento pactado— y tiene sus pruebas. Lo que no se vale es
+            # afirmarlo cuando la fecha se la inventó el sistema poniendo hoy.
+            if fecha_hecho is not None:
+                ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
+                return ficha
+
+            _vencidos = " · ".join(
+                f"{c.numero or 'sin número'} (venció "
+                f"{c.hasta.isoformat() if c.hasta else 'sin fecha de cierre'})"
+                for c in otros
+            )
+            ficha["numero"] = (
+                f"CONTRATO CON VIGENCIA TERMINADA: {_vencidos}. "
+                "VERIFICAR LA FECHA DEL SERVICIO ANTES DE RADICAR."
+            )
+            ficha["_vigencia_vencida"] = True
             ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
             return ficha
     except Exception:  # la malla nunca puede tumbar un dictamen

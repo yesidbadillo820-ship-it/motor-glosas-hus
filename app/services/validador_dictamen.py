@@ -263,6 +263,13 @@ def check_contrato_mencionado(texto: str, eps: str) -> dict:
 
         contrato = get_contrato(eps)
         numero = contrato.get("numero", "")
+        # 20-08-2026: cuando el contrato existió pero su vigencia terminó, la
+        # ficha nombra el contrato vencido en vez de mentir con «SIN CONTRATO
+        # PACTADO». Acá NO se puede exigir que el dictamen lo cite: no se sabe
+        # si el servicio cae dentro de la vigencia, y obligar a citarlo sería
+        # empujar a afirmar una cobertura que nadie verificó.
+        if contrato.get("_vigencia_vencida"):
+            numero = ""
     except Exception:
         numero = ""
     if numero and numero != "SIN CONTRATO PACTADO":
@@ -941,10 +948,61 @@ def detectar_defectos_criticos(
                         )
                     ),
                     "sugerencia": (
-                        "NO cites números de folio. Refiérete al documento por su "
-                        "nombre ('LA HISTORIA CLÍNICA ACREDITA...', 'LA EPICRISIS "
-                        "REGISTRA...') sin inventar en qué folio consta. Un folio "
-                        "que la EPS busca y no encuentra ratifica la glosa completa."
+                        (
+                            "NO cites números de folio. Refiérete al documento por su "
+                            "nombre ('LA HISTORIA CLÍNICA ACREDITA...', 'LA EPICRISIS "
+                            "REGISTRA...') sin inventar en qué folio consta. Un folio "
+                            "que la EPS busca y no encuentra ratifica la glosa completa."
+                        )
+                        if (evidencia or "").strip()
+                        # 20-08-2026: sin un solo soporte leído, mandar a escribir
+                        # «LA HISTORIA CLÍNICA ACREDITA…» es cambiar una afirmación
+                        # sin respaldo por otra. Acá la salida es no afirmar.
+                        else (
+                            "NO cites números de folio NI afirmes qué dice la "
+                            "historia clínica: en este caso no se leyó ningún "
+                            "soporte. Fundamenta en el "
+                            "contrato, la normativa y la carga de la prueba, y exige a "
+                            "la EPS que precise qué documento echa de menos."
+                        )
+                    ),
+                }
+            )
+
+    # 12. Afirmaciones documentales sin respaldo (20-08-2026). Hermano del
+    #     check 11, para la mentira que va SIN número. Caso real de Yesid
+    #     (CL0801, AXA COLPATRIA), analizada sin adjuntar un solo soporte:
+    #
+    #         «…CUMPLE CON LOS CRITERIOS CLÍNICOS DEL MÉDICO TRATANTE, QUIEN
+    #          DOCUMENTÓ LA INDICACIÓN EN LA HISTORIA CLÍNICA INTEGRAL.»
+    #
+    #     Sin folio que verificar, el check 11 la deja pasar. Pero el hospital
+    #     está certificando el contenido de una historia clínica que nadie
+    #     abrió, y en una glosa de pertinencia eso ES el punto en disputa.
+    #     Solo se mira cuando no se leyó expediente: con soportes a la vista
+    #     haría falta leerlos para saber si la frase es fiel.
+    if evidencia is not None:
+        try:
+            from app.services.extractor_folios import afirmaciones_documentales_sin_respaldo
+
+            _sin_respaldo = afirmaciones_documentales_sin_respaldo(arg, evidencia)
+        except Exception:  # pragma: no cover - sin extractor no se inventa un fallo
+            _sin_respaldo = []
+        if _sin_respaldo:
+            defectos.append(
+                {
+                    "regla": "afirmacion_sin_soporte",
+                    "mensaje": (
+                        "El dictamen afirma qué dice un documento clínico, pero en "
+                        "este caso NO se leyó ningún soporte. Frase: "
+                        f"«{_sin_respaldo[0][:160]}»"
+                    ),
+                    "sugerencia": (
+                        "NO afirmes qué dice la historia clínica, la epicrisis ni "
+                        "ningún otro documento: no se leyó ninguno. Fundamenta en el "
+                        "contrato, la normativa y la carga de la prueba; ofrece el "
+                        "soporte y exige a la EPS que precise qué echa de menos, "
+                        "pero sin decir qué contiene."
                     ),
                 }
             )

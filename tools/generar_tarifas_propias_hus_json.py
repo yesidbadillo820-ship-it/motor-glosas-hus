@@ -158,10 +158,160 @@ def generar(src_xlsx: str, out_path: str = _OUT, version: str = "") -> dict:
     return data["_meta"]
 
 
+# ─────────────────────────────────────────────────────────────────────────
+#  RESOLUCIÓN 283 DE 2026 — 20-08-2026
+#
+#  Yesid mandó "TARIFAS_INSTITUCIONALES_RES_283.xlsx", una resolución nueva
+#  del HUS con una sola hoja ("ENCABEZADO NO UVB") de 695 tarifas. Comparada
+#  con lo que ya estaba cargado (Res. 054/2026 + 124/2026, 1.932 códigos):
+#
+#      · 673 códigos NUEVOS que el motor no tenía — sin ellos, el dictamen no
+#        podía dar el valor propio de esos procedimientos;
+#      · 22 códigos que ya existían y CAMBIARON de valor (p. ej. HIERRO TOTAL
+#        $50.000 → $66.500; TROPONINA T $90.900 → $109.100). El hospital
+#        estaba defendiendo tarifas viejas;
+#      · ninguno igual.
+#
+#  Decisión del auditor (20-08-2026): la 283 SE SUMA a las anteriores, no las
+#  reemplaza. Donde pisan, manda la 283 por ser más reciente. Así no se da de
+#  baja ninguna de las 1.910 tarifas que hoy se usan para defender —entre
+#  ellas casi todo el laboratorio—.
+#
+#  Esta función NO regenera el catálogo desde cero: parte del .json.gz que ya
+#  existe y le suma. El Excel original de las resoluciones anteriores vive en
+#  el PC de cartera, no en el repositorio.
+# ─────────────────────────────────────────────────────────────────────────
+
+_HOJA_RES283 = "ENCABEZADO NO UVB"
+
+
+def _filas_res283(src_xlsx: str) -> list[tuple[str, str, str, int]]:
+    """(CUPS, descripción, código IPS, valor) de la hoja de la Res. 283."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(src_xlsx, read_only=True, data_only=True)
+    ws = _hoja_por_nombre(wb, _HOJA_RES283)
+    if ws is None:
+        raise SystemExit(f"El archivo no trae la hoja «{_HOJA_RES283}».")
+    filas = list(ws.iter_rows(values_only=True))
+    if not filas:
+        return []
+    # Encabezado: GRUPO | CUPS | DESCRIPCION CUPS | CODIGO IPS | DESCRIPCION IPS
+    #             | FACTOR SMDLV | TARIFA 2026
+    i_cups, i_desc, i_ips, i_val = _indices(list(filas[0]))
+    salida: list[tuple[str, str, str, int]] = []
+    for fila in filas[1:]:
+        if not fila:
+            continue
+        cups = _norm(fila[i_cups]).upper() if i_cups < len(fila) else ""
+        if not cups or cups in ("CUPS", "NONE"):
+            continue
+        valor = _a_pesos(fila[i_val]) if i_val < len(fila) else None
+        if valor is None:
+            continue
+        salida.append(
+            (
+                cups,
+                _norm(fila[i_desc]) if 0 <= i_desc < len(fila) else "",
+                _norm(fila[i_ips]) if 0 <= i_ips < len(fila) else "",
+                valor,
+            )
+        )
+    return salida
+
+
+def agregar_res283(src_xlsx: str, out_path: str = _OUT) -> dict:
+    """Suma la Res. 283/2026 al catálogo ya generado, sin borrar nada.
+
+    Los CUPS que aparecen varias veces en la resolución CON VALORES DISTINTOS
+    quedan FUERA del catálogo a propósito: son tarifas por niveles (p. ej.
+    399802 HEMOFILTRACIÓN a $5.450.000 / $7.260.000 / $9.075.000) y el archivo
+    no dice cuál aplica a cada caso. Elegir una sería inventarle al dictamen
+    una cifra que puede no ser la del paciente. Se devuelven aparte para que
+    el motor avise en vez de afirmar.
+    """
+    with gzip.open(out_path, "rt", encoding="utf-8") as f:
+        data = json.load(f)
+    tarifas: dict[str, dict] = data.get("tarifas", {})
+    antes = len(tarifas)
+
+    filas = _filas_res283(src_xlsx)
+
+    # Un CUPS con más de un valor distinto en la misma resolución = por niveles.
+    valores_por_cups: dict[str, set] = {}
+    for cups, _d, _i, valor in filas:
+        valores_por_cups.setdefault(cups, set()).add(valor)
+    por_niveles = {c: sorted(v) for c, v in valores_por_cups.items() if len(v) > 1}
+
+    nuevos = actualizados = 0
+    cambios: list[dict] = []
+    for cups, desc, ips, valor in filas:
+        if cups in por_niveles:
+            continue
+        anterior = tarifas.get(cups)
+        if anterior is None:
+            nuevos += 1
+        elif anterior.get("valor") != valor:
+            actualizados += 1
+            cambios.append(
+                {
+                    "cups": cups,
+                    "descripcion": desc,
+                    "antes": anterior.get("valor"),
+                    "ahora": valor,
+                }
+            )
+        else:
+            continue
+        tarifas[cups] = {
+            "valor": valor,
+            "descripcion": desc,
+            "codigo_ips": ips,
+            "tipo": "PROPIA",
+            "norma": "RES_283_2026",
+        }
+
+    meta = data.setdefault("_meta", {})
+    meta["fuente"] = (
+        "Catálogo de TARIFAS PROPIAS de la ESE Hospital Universitario de "
+        "Santander (Res. 054/2026 + 124/2026 + Res. 283/2026 y anexos), "
+        "vigencia 2026."
+    )
+    meta["codigos"] = len(tarifas)
+    meta["res_283_2026"] = {
+        "filas_leidas": len(filas),
+        "nuevos": nuevos,
+        "actualizados": actualizados,
+        "por_niveles_excluidos": por_niveles,
+        "cambios_de_valor": cambios,
+    }
+    data["tarifas"] = dict(sorted(tarifas.items()))
+
+    with gzip.open(out_path, "wt", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+    return {
+        "antes": antes,
+        "despues": len(tarifas),
+        "nuevos": nuevos,
+        "actualizados": actualizados,
+        "por_niveles_excluidos": por_niveles,
+        "cambios_de_valor": cambios,
+    }
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Uso: python tools/generar_tarifas_propias_hus_json.py /ruta/TARIFAS_HUS.xlsx")
+        print("     python tools/generar_tarifas_propias_hus_json.py --res283 /ruta/RES_283.xlsx")
         sys.exit(1)
+    if sys.argv[1] == "--res283":
+        if len(sys.argv) < 3:
+            print("Falta la ruta del Excel de la Res. 283.")
+            sys.exit(1)
+        resumen = agregar_res283(sys.argv[2])
+        print(f"Res. 283/2026 sumada al catálogo en {_OUT}")
+        print(json.dumps(resumen, ensure_ascii=False, indent=2))
+        sys.exit(0)
     meta = generar(sys.argv[1], version=sys.argv[2] if len(sys.argv) > 2 else "")
     print(f"JSON.gz generado en {_OUT}")
     print(json.dumps(meta, ensure_ascii=False, indent=2))

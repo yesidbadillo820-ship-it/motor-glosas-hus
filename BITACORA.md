@@ -4774,6 +4774,179 @@ dictamen bien fundamentado.
   (quedan ~124 notas por subir al portal). La NC332660 corregida se entregó
   y quedó lista para re-subir.
 
+### 20-08 (noche) — Probamos 5 dictámenes de verdad: 3 defectos que se radicaban
+
+Yesid corrió cinco glosas de prueba en «Analizar glosa» y pegó los dictámenes
+completos. Salieron tres cosas que se estaban radicando ante las EPS:
+
+**1. Cien mil pesos convertidos en un código de procedimiento.**
+La glosa decía *«SO5801 — ausencia total de soporte de la curacion, VALOR
+GLOSADO 100000»* y el dictamen salió afirmando «SERVICIO FACTURADO **CUPS
+100000**». La causa: había DOS lectores de CUPS en el mismo archivo. Uno
+endurecido durante meses —descarta fechas, números de factura, colas de
+contrato, montos— y otro de una sola línea, que tomaba cualquier número de 5 o
+6 dígitos. **El dictamen que se radica usaba el de una línea.** Se borró el
+duplicado y se apuntó al bueno, más un filtro nuevo: si la propia glosa dice
+que ese número es plata («valor glosado», «monto», «cuantía»), es plata.
+
+*El verificador de citas sí lo atrapó* —medalla C, «CUPS 100000 no existe en el
+catálogo»— así que el aviso funcionó. Pero es mejor que el error no se escriba.
+
+**2. El dictamen se contradecía en el mismo renglón.**
+«ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE $200, CORRESPONDIENTE AL **SERVICIO
+CUBIERTO**. SE ACEPTA POR CORRESPONDER A UN **SERVICIO NO CUBIERTO**…».
+Cubierto y no cubierto a la vez. Pasaba igual en autorizaciones («AL
+PROCEDIMIENTO AUTORIZADO… SE ACEPTA POR NO ACREDITARSE LA AUTORIZACIÓN») y en
+soportes. Cuando el hospital está aceptando que algo falta, no puede afirmar en
+la misma frase que ese algo está. Se quitaron los adjetivos que califican justo
+lo que está en discusión; se conservaron los que son un hecho (el cargo se
+facturó, el procedimiento se prestó, el medicamento se dispensó).
+
+**3. Una glosa parcial radicada como «ACEPTADA AL 100%» — se regalaban $60.000.**
+La EPS objetó $100.000 y el gestor aceptó $40.000. El dictamen salió con
+**RE9702 «GLOSA ACEPTADA AL 100%»** y valor objetado $40.000. Radicado así, el
+hospital renuncia a los $60.000 que sí estaba defendiendo, y encima lo
+certifica. Pasaba porque la IA no extrajo el valor objetado, quedaba en cero, y
+un respaldo lo daba por aceptación total igualando objetado a aceptado. **El
+dato estaba escrito en la propia glosa** y el lector de valores ya sabía
+leerlo; nadie le preguntaba. Ahora se le pregunta cuando la IA no trae el
+valor. Sale correctamente **RE9801, parcial, con $60.000 en disputa**.
+
+- 17 pruebas nuevas en `tests/test_api/test_el_dictamen_no_se_contradice.py`,
+  con el texto exacto de las glosas de Yesid. Incluye las dos mitades del
+  arreglo del CUPS: que la plata ya no entre, y que un CUPS de verdad (890201,
+  898040) siga detectándose.
+- La prueba del cableado se comprobó **quitando el arreglo a propósito** para
+  ver que se pone roja; si no, no sirve de nada.
+
+### 20-08 (noche) — Y la mentira que va SIN número de folio
+
+En la misma tanda de pruebas apareció el defecto más grave de los cinco.
+Yesid analizó una glosa de pertinencia (**CL0801, AXA COLPATRIA**) **sin
+adjuntar un solo soporte**, y el dictamen salió diciendo:
+
+> «EL SERVICIO DE APOYO DIAGNÓSTICO FACTURADO CUMPLE CON LOS CRITERIOS
+> CLÍNICOS DEL MÉDICO TRATANTE, **QUIEN DOCUMENTÓ LA INDICACIÓN EN LA
+> HISTORIA CLÍNICA INTEGRAL**.»
+
+Nadie abrió una historia clínica. Y salió con medalla verde: «7 citas contra
+corpus · 0 hallazgos» y el sello «VALIDADO POR QUALITY GATE».
+
+El control de folios que se había puesto esa misma mañana **no la ve**, porque
+no cita ningún folio. Es la misma mentira sin el número: el hospital certifica
+ante la EPS lo que dice un documento que no leyó. Y en una glosa de pertinencia
+eso es justo el punto en disputa — la EPS pide la historia, ve que la
+afirmación no sale de ahí, y ratifica.
+
+**Cómo queda.** Cuando no se leyó ningún soporte, el dictamen no puede afirmar
+qué dice un documento clínico. Primero se le devuelve a la IA para que lo
+reescriba (fundamentando en contrato, normativa y carga de la prueba, y
+exigiendo a la EPS que precise qué echa de menos); si insiste, el auditor lo ve
+en pantalla como hallazgo grave, con la frase exacta que sobra.
+
+**Un detalle que salió de paso:** el consejo del control de folios decía «quite
+el folio y escriba *LA HISTORIA CLÍNICA ACREDITA…*». Sin soportes leídos, eso
+es cambiar una invención por otra. Ahora ese consejo solo aparece cuando sí hay
+expediente; sin él, el consejo es no afirmar contenido.
+
+**Regla a propósito estrecha:** solo se marca cuando **no se leyó ningún**
+soporte. Con documentos a la vista haría falta leerlos de verdad para saber si
+la frase es fiel, y un aviso equivocado es peor que ninguno — enseña al auditor
+a ignorar los avisos. Media verificación honesta vale más que una completa que
+se inventa la mitad.
+
+- 18 pruebas nuevas en
+  `tests/test_services/test_el_dictamen_no_afirma_lo_que_no_leyo.py`. Seis
+  formas de inventar quedan marcadas; y **seis frases legítimas siguen
+  pasando limpias**: «se anexa la historia clínica», «está a disposición de la
+  EPS», «obra en el expediente», «la historia clínica es el soporte exigido por
+  la Resolución 2284», «la EPS no precisó qué soporte echa de menos» y «se
+  aporta el documento de la historia clínica» (ahí «documento» es sustantivo,
+  no verbo).
+
+### 20-08 (noche) — El dictamen que le daba la razón a la EPS
+
+Tercer defecto de la misma tanda, y el que **cuesta plata**. La glosa era
+`TA0201` del **DISPENSARIO MEDICO** —mayor valor cobrado en electrodo ECG— y
+el dictamen salió diciendo, en el encabezado:
+
+> Contrato: **SIN CONTRATO PACTADO** · Tarifa pactada: **SOAT PLENO**
+
+…y en el cuerpo citaba, palabra por palabra, el **Parágrafo 3 del contrato**
+que dice **SOAT −20 %**. Dos cosas malas a la vez:
+
+1. El hospital **niega ante la entidad un contrato que sí existió** — el
+   `440-DIGSA/DMBUG-2025`, que corrió del 30/12/2025 al 30/07/2026.
+2. Al declarar SOAT pleno frente a un pactado de SOAT −20 %, **le está
+   concediendo a la EPS justo lo que glosó**: que cobró de más. En una glosa
+   de tarifa, eso es perder por escrito.
+
+**Por qué pasaba.** El formulario no traía fecha del servicio, y sin fecha el
+sistema usa **la de hoy**. Una glosa siempre es de un servicio pasado; ese
+contrato llevaba 21 días vencido, pero el servicio es de cuando sí regía.
+
+**Cómo queda.** Cuando nadie dijo la fecha, el dictamen ya no afirma que no
+había contrato: lo nombra, dice que su vigencia terminó y pide **verificar la
+fecha del servicio antes de radicar**. La tarifa sigue siendo SOAT pleno — sin
+saber la fecha no se puede aplicar un descuento pactado, y aplicarlo de menos
+también sería un error. Lo que se elimina es el «no teníamos contrato».
+
+**Lo que NO se tocó, a propósito.** Cuando la fecha **sí** se conoce y ningún
+contrato la cubría, «SIN CONTRATO PACTADO» se mantiene: es un hecho verificado
+y además SOAT pleno es más favorable al hospital que el descuento pactado. Esa
+decisión ya estaba tomada y tenía sus pruebas.
+
+> **Nota de honestidad:** el primer intento de este arreglo fue demasiado
+> amplio y puso en rojo tres pruebas que llevaban meses cuidando justamente esa
+> decisión. Las pruebas tenían razón. Se estrechó el cambio al único caso que
+> de verdad está mal —cuando la fecha se la inventa el sistema poniendo hoy—.
+
+- 7 pruebas nuevas en `tests/test_services/test_verificacion_contractual.py`,
+  al lado de las que ya cuidaban el tema.
+
+### 20-08 (noche) — Cargadas las tarifas de la Resolución 283 de 2026
+
+Yesid mandó **`TARIFAS_INSTITUCIONALES_RES_283.xlsx`**, la resolución nueva de
+tarifas institucionales del HUS. Al compararla con lo que el motor ya tenía
+cargado (Res. 054/2026 + 124/2026) salió que:
+
+- **662 procedimientos NUEVOS** que el motor no conocía. Sin ellos, cuando la
+  EPS glosaba uno de esos códigos el dictamen no podía dar el valor propio del
+  hospital. Ahí está buena parte del laboratorio: baciloscopia ($96.800),
+  troponina I ($172.700), dengue IgM ($104.000), leishmania, mycobacterium…
+- **22 tarifas que YA estaban y cambiaron de valor.** El hospital venía
+  defendiendo cifras viejas: **HIERRO TOTAL a $50.000 cuando la resolución
+  dice $66.500**; TROPONINA T a $90.900 cuando dice $109.100; renina a
+  $108.400 cuando dice $131.300. En esas glosas se estaba pidiendo de menos.
+- Ninguna igual.
+
+**Cómo quedó.** El catálogo pasó de **1.932 a 2.594 tarifas**. La 283 **se
+suma**, no reemplaza: no se dio de baja ninguna de las que hoy se usan para
+defender. Donde los dos catálogos pisan el mismo código, manda la 283 por ser
+más reciente.
+
+**Cada tarifa cita su propia resolución.** Una tarifa de la 283 cita la 283;
+una de las anteriores sigue citando la 054 + 124. La EPS verifica la norma
+citada: citar una resolución que no contiene esa tarifa es regalarle el
+argumento.
+
+**Cuatro códigos quedaron FUERA a propósito.** La resolución los publica
+repetidos con valores distintos —`399802` HEMOFILTRACIÓN VENOVENOSA sale a
+$5.450.000, $7.260.000 y $9.075.000— y no dice cuál aplica a cada caso.
+Elegir uno sería inventarle una cifra al dictamen. Cuando aparezca uno de
+esos, el motor **avisa que la tarifa está publicada por niveles y que hay que
+verificarla contra el nivel prestado**, en vez de afirmar la que no es.
+
+> **Pendiente para Yesid:** decirnos qué distingue los niveles de esos cuatro
+> códigos (399802 hemofiltración, 399502 hemoperfusión, 399601 perfusión de
+> cuerpo entero, 908338 aminoácidos/metabolitos). Con esa regla entran al
+> catálogo automático.
+
+- Para volver a cargar una resolución futura:
+  `python tools/generar_tarifas_propias_hus_json.py --res283 RUTA.xlsx`
+- 18 pruebas nuevas en `tests/test_services/test_tarifas_res_283_2026.py`,
+  incluidas las que vigilan que **no se haya perdido** ninguna tarifa vieja.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
