@@ -6951,6 +6951,27 @@ async function doLogin(){
     var r=await fetch('/token',{method:'POST',body:fd});
     if(!r.ok){
       var d=await r.json().catch(function(){return{}});
+      // 20-08-2026. El login admite 5 intentos por minuto. Cuando se pasaba,
+      // el servidor contestaba 429 y esta pantalla mostraba «Credenciales
+      // incorrectas»: el auditor creía que su clave estaba mal, volvía a
+      // intentar, y se quedaba encerrado en ese círculo sin entender nada.
+      // Le pasó a Yesid reintentando mientras el portal estaba caído.
+      if(r.status === 429){
+        var espera = parseInt(r.headers.get('Retry-After') || '60', 10);
+        if(!(espera > 0)) espera = 60;
+        err.textContent = 'Demasiados intentos seguidos. Su clave puede estar bien: '
+          + 'el sistema bloquea un momento para protegerlo. Espere ' + espera
+          + ' segundos SIN intentar y pruebe una sola vez.';
+        err.style.display='block';
+        btn.disabled=true;
+        var quedan = espera;
+        var reloj = setInterval(function(){
+          quedan--;
+          btn.textContent = quedan > 0 ? ('Espere ' + quedan + 's…') : 'Ingresar';
+          if(quedan <= 0){ clearInterval(reloj); btn.disabled=false; err.style.display='none'; }
+        }, 1000);
+        return;
+      }
       // Si el servidor pide 2FA y el campo no estaba visible, mostrarlo
       if(r.headers.get('X-2FA-Required') === 'true' || (d.detail||'').indexOf('2FA') > -1){
         var field = document.getElementById('login-totp-field');
