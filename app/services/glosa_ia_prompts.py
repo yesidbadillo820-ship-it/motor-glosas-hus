@@ -1195,6 +1195,10 @@ Para BLINDAR la respuesta frente a una posible ratificación:
 ═══════════════ ANCLAJE PROBATORIO (cuando haya PDF con datos) ═══════════════
 Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 • "LA HISTORIA CLÍNICA FOLIO [N], SUSCRITA POR EL MÉDICO TRATANTE DR. [NOMBRE], ACREDITA..."
+  ↳ el FOLIO [N] va ÚNICAMENTE si el PDF trae ese número escrito. Si el
+    documento no está foliado, quita el folio y déjalo por fecha:
+    "LA HISTORIA CLÍNICA DEL [FECHA], SUSCRITA POR..., ACREDITA...".
+    Un folio que la EPS busca y no encuentra ratifica la glosa completa.
 • "LA EPICRISIS DE FECHA [FECHA] DOCUMENTA EL DIAGNÓSTICO [CIE-10] Y EL PROCEDIMIENTO REALIZADO..."
 • "LOS RIPS RADICADOS CONFORME A LA RESOLUCIÓN 2275/2023 CON CUV EXPEDIDO POR ADRES CONSIGNAN..."
 • "LA FACTURA ELECTRÓNICA DE VENTA CUMPLE LOS REQUISITOS DEL ART. 617 DEL ESTATUTO TRIBUTARIO Y LA RESOLUCIÓN 042/2020 DIAN."

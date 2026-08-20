@@ -4661,6 +4661,76 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
 
 6 pruebas nuevas.
 
+### 20-08 (noche) — El dictamen ya no puede citar un folio que nadie leyó
+
+Era el último hueco grande de la familia «la IA se lo inventa». Los **CUPS**
+ya se verificaban contra el catálogo, y los **soportes** contra el expediente
+real del servidor. Los **folios** no los revisaba nadie.
+
+**Qué pasaba.** Un dictamen podía salir con la medalla verde «citas
+verificadas · 0 hallazgos» diciendo:
+
+> «SEGÚN CONSTA EN EL FOLIO 25 DE LA HISTORIA CLÍNICA…»
+
+sin que nadie hubiera abierto una historia clínica. Es la afirmación **más
+fácil de tumbar que existe**: la EPS pide el folio 25, no lo encuentra y
+ratifica la glosa completa — y además queda en el expediente una afirmación
+documental falsa firmada por el hospital.
+
+**Por qué ahora sí se puede revisar.** La clave es simple: *la IA y el
+revisor leen exactamente el mismo texto*. Si el folio no aparece en lo que la
+IA tuvo a la vista, la IA no lo leyó: se lo inventó. Y cuando no se adjuntó
+ningún soporte, cualquier folio citado está inventado, porque no había de
+dónde sacarlo.
+
+**Qué hace el sistema ahora, en orden:**
+
+1. **Se lo devuelve a la IA para que lo corrija.** El folio inventado entra
+   como defecto crítico y dispara el reintento que ya existía, con la
+   instrucción exacta: *«no cites números de folio; refiérete al documento
+   por su nombre — LA HISTORIA CLÍNICA ACREDITA…»*. La redacción jurídica la
+   rehace la IA; el sistema **no** reescribe el texto legal a mano.
+2. **Si aun así queda, el auditor lo ve antes de radicar.** El aviso sale en
+   el recuadro rojo bajo el dictamen, la medalla de Evidencia baja a **C
+   («corregir antes de radicar»)** y **se cae el sello «VALIDADO POR QUALITY
+   GATE»**. En español claro: dice cuál es el folio, que no está en los
+   soportes leídos, y qué escribir en su lugar.
+
+**Cuidado con los falsos avisos.** Un aviso equivocado en cada dictamen
+enseña al auditor a ignorar los avisos, y ahí se pierde también el
+verdadero. Por eso quedaron probados los casos que *no* son un folio: «HOJA
+DE ADMINISTRACIÓN DE MEDICAMENTOS», «HISTORIA CLÍNICA DE 25 FOLIOS»
+(contar folios no es citar uno), «PORTAFOLIO 5» y las normas con números
+(«RESOLUCIÓN 2284 DE 2023»). Y un folio real pero poco repetido en el
+expediente tampoco se marca.
+
+**Y se corrigió la causa, no solo el síntoma.** Buscando de dónde salía el
+número apareció la razón: la instrucción que se le da al Auditor Forense
+decía, en la misma lista, dos cosas que no se pueden cumplir a la vez:
+
+> «2. Cita **SIEMPRE** el folio o página específica (ej: **"FOLIO 25"**)»
+> «5. NO inventes folios»
+
+Cuando el documento **no viene foliado** —y muchos no vienen— no hay manera
+de obedecer las dos. La IA obedece la que le manda hacer algo y se inventa
+el número. Peor: el ejemplo traía un número copiable, «FOLIO 25», que es
+**exactamente** el que salía en los dictámenes inventados.
+
+Ahora la regla dice: cite el folio **solo si el documento lo trae escrito**;
+si no está foliado, nombre el documento por su tipo y su fecha («LA HOJA DE
+ATENCIÓN DE URGENCIAS DEL 28/02/2026 REGISTRA…»). El mismo ajuste se hizo en
+el molde del dictamen, que ofrecía «LA HISTORIA CLÍNICA FOLIO [N]…» sin
+decir cuándo no usarlo.
+
+**33 pruebas nuevas**, cuatro de ellas vigilando que el cableado no se
+suelte: si mañana alguien agrega otra ruta que llame al revisor sin pasarle
+lo que leyó la IA, la prueba se pone roja.
+
+Y una salvaguarda al revés: los folios que **sí** leyó el Auditor Forense
+—el que abre los soportes antes de redactar— cuentan como leídos y no se
+marcan. Sería el peor aviso equivocado posible: castigar justamente al
+dictamen bien fundamentado.
+
 ---
 
 ## 3) PENDIENTE
@@ -4971,8 +5041,12 @@ solo renglón, dígalo y se hace.
   `SENTRY_DSN=...`. Los pasos completos salen en la pantalla de Diagnóstico.
 - **Volver a responder una glosa de HUS468334** y mirar dos cosas: que la
   relación de soportes traiga los documentos de verdad, y que si el dictamen
-  cita un folio, ese folio diga lo que la IA afirma. **Si inventa un folio,
-  avisar de inmediato** — es lo más grave que puede pasar.
+  cita un folio, ese folio diga lo que la IA afirma.
+  *(20-08, noche: el folio inventado ya lo detecta el sistema solo — lo
+  devuelve a la IA para que lo corrija y, si insiste, lo avisa en rojo y
+  quita el sello «VALIDADO». Lo que falta es verlo funcionar con una glosa
+  de verdad: si sale un aviso de folio que usted sabe que SÍ estaba en los
+  papeles, avise, porque sería un aviso equivocado.)*
 
 **Auditor Forense (probar en el PC de cartera):**
 

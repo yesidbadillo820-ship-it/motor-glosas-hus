@@ -490,6 +490,7 @@ def detectar_defectos_criticos(
     codigo_respuesta: str = "",
     texto_glosa: str = "",
     codigos_validos_extra: Optional[list] = None,
+    evidencia: Optional[str] = None,
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -505,6 +506,11 @@ def detectar_defectos_criticos(
       - resultado vacío [] significa que el dictamen es usable
       - email_contacto NO se exige en defensas normales (directiva
         Yesid mayo 2026): solo para RATIFICADAS / EXTEMPORÁNEAS.
+
+    `evidencia` (20-08-2026) es el texto que la IA tuvo a la vista para
+    redactar: contexto de los PDF más el texto de la glosa. Sirve para el
+    check 11 (folios inventados). Si no se pasa, ese check no corre — sin
+    saber qué leyó la IA no se puede afirmar que inventó nada.
     """
     defectos: list[dict] = []
     if not dictamen_xml or not dictamen_xml.strip():
@@ -902,6 +908,46 @@ def detectar_defectos_criticos(
                 ),
             }
         )
+
+    # 11. Folios inventados (20-08-2026). El dictamen no puede afirmar
+    #     «SEGÚN CONSTA EN EL FOLIO 25» si en el expediente que se leyó no
+    #     hay ningún folio 25 — y menos aún si no se leyó ningún soporte.
+    #     Es la afirmación que la EPS verifica primero y la que tumba la
+    #     defensa entera. La revisión es confiable porque la IA y este
+    #     validador leen EL MISMO texto: lo que no esté ahí, la IA no lo
+    #     leyó. Se corrige por reintento —no reescribiendo el dictamen a
+    #     mano— para que la redacción jurídica la rehaga la IA.
+    if evidencia is not None:
+        try:
+            from app.services.extractor_folios import folios_inventados
+
+            _inventados = folios_inventados(arg, evidencia)
+        except Exception:  # pragma: no cover - sin extractor no se inventa un fallo
+            _inventados = []
+        if _inventados:
+            _lista = ", ".join(str(f) for f in _inventados[:8])
+            _plural = "s" if len(_inventados) > 1 else ""
+            defectos.append(
+                {
+                    "regla": "folio_inventado",
+                    "mensaje": (
+                        f"El dictamen cita el{'os' if _plural else ''} folio{_plural} "
+                        f"{_lista}, que no aparece{'n' if _plural else ''} en los "
+                        "soportes leídos."
+                        if (evidencia or "").strip()
+                        else (
+                            f"El dictamen cita el{'os' if _plural else ''} folio{_plural} "
+                            f"{_lista} y en este caso NO se leyó ningún soporte."
+                        )
+                    ),
+                    "sugerencia": (
+                        "NO cites números de folio. Refiérete al documento por su "
+                        "nombre ('LA HISTORIA CLÍNICA ACREDITA...', 'LA EPICRISIS "
+                        "REGISTRA...') sin inventar en qué folio consta. Un folio "
+                        "que la EPS busca y no encuentra ratifica la glosa completa."
+                    ),
+                }
+            )
 
     return defectos
 

@@ -5436,6 +5436,14 @@ class GlosaService:
             few_shots = list(few_shots) + [hint_gestor]
         texto_base = str(data.tabla_excel).strip().upper()
 
+        # 20-08-2026 — lo que la IA TIENE A LA VISTA para redactar: el
+        # contexto de los PDF más el texto de la glosa. Con esto se revisa
+        # que el dictamen no cite folios inventados: la IA y el validador
+        # leen EXACTAMENTE el mismo texto, así que un folio que no esté
+        # aquí, la IA no lo leyó — se lo inventó. Si no hay soportes queda
+        # solo el texto de la glosa, que es justo lo que se pudo leer.
+        _evidencia_leida = (contexto_pdf or "") + "\n" + texto_base
+
         # ── Ronda 19 (Bug BB, 30-jun-2026): resolver EPS efectiva ──
         # Si el dropdown de EPS contradice la EPS nombrada en el texto de la
         # glosa (caso real: dropdown="DISPENSARIO MEDICO" militar pero la
@@ -6899,6 +6907,7 @@ class GlosaService:
                         codigo_respuesta=cod_res,
                         texto_glosa=texto_base,
                         codigos_validos_extra=_codigos_extra_val,
+                        evidencia=_evidencia_leida,
                     )
                     # Mejora #7: chequear si el dictamen es copia textual
                     # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -6985,6 +6994,7 @@ class GlosaService:
                                 codigo_respuesta=cod_res,
                                 texto_glosa=texto_base,
                                 codigos_validos_extra=_codigos_extra_val,
+                                evidencia=_evidencia_leida,
                             )
                             if len(_defectos_retry) < len(_defectos):
                                 logger.info(
@@ -7748,7 +7758,7 @@ class GlosaService:
         try:
             from app.services.citation_verifier import verificar_citas as _vc
 
-            verif_citas = _vc(dictamen, eps=str(data.eps or ""))
+            verif_citas = _vc(dictamen, eps=str(data.eps or ""), evidencia=_evidencia_leida)
 
             # ═══════════════════════════════════════════════════════════
             #  RED FINAL ronda 2 (12-jun-2026, fix #2): NUNCA radicar una
@@ -7771,7 +7781,11 @@ class GlosaService:
                     )
                     if _dictamen_descomillado != dictamen:
                         dictamen = _dictamen_descomillado
-                        verif_citas = _vc(dictamen, eps=str(data.eps or ""))
+                        verif_citas = _vc(
+                            dictamen,
+                            eps=str(data.eps or ""),
+                            evidencia=_evidencia_leida,
+                        )
             except Exception as _e_desc:
                 # Un fallo del descomillado jamás invalida la verificación
                 # ya calculada — se entrega el dictamen original con badge.
