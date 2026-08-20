@@ -46,10 +46,35 @@ from app.services.salud_total_service import (  # noqa: E402
 # paralelo satura al proveedor de IA y empiezan los rechazos por cuota.
 MAX_EN_PARALELO = 3
 
+
 # Cuánto se espera por una glosa antes de darla por perdida y pasar a la
 # plantilla. Sin esto, una llamada colgada deja la pantalla girando para
 # siempre.
-SEGUNDOS_LIMITE_POR_GLOSA = 120
+#
+# 20-08-2026. Acá decía 120 segundos fijos, y el túnel por el que entra el
+# portal corta a los ~100. O sea: la espera de UNA SOLA glosa ya era más larga
+# que lo que aguanta la conexión. Con 44 glosas de tres en tres, la petición se
+# caía con un 502 y se perdía TODO el trabajo que la IA ya había hecho —los
+# tokens gastados incluidos—. `espera_maxima` la recorta para que el motor
+# alcance a contestar antes de que lo atropellen.
+def _limite_por_glosa() -> float:
+    from app.core.config import espera_maxima
+
+    return espera_maxima(120)
+
+
+# Presupuesto de tiempo para TODA la notificación. Cuando se acaba, las glosas
+# que falten salen por plantilla —que es una respuesta válida y radicable— en
+# vez de arriesgar que la petición entera se caiga y no salga ninguna.
+#
+# Una fila vacía en el archivo que se radica es una glosa sin responder, y una
+# glosa sin responder se da por aceptada: la plata se regala. Entre «todas con
+# plantilla» y «ninguna», la plantilla gana sin discusión.
+def _presupuesto_del_lote() -> float:
+    from app.core.config import espera_maxima
+
+    # Margen amplio: al motor le queda armar el Excel y devolverlo.
+    return espera_maxima(120, margen=30.0)
 
 
 def _pesos(valor) -> str:
@@ -187,9 +212,7 @@ async def _analizar_una(servicio, fila: dict, eps: str = "SALUD TOTAL") -> dict 
         return None
 
     try:
-        resultado = await asyncio.wait_for(
-            servicio.analizar(entrada), timeout=SEGUNDOS_LIMITE_POR_GLOSA
-        )
+        resultado = await asyncio.wait_for(servicio.analizar(entrada), timeout=_limite_por_glosa())
     except asyncio.TimeoutError:
         logger.warning(f"[SALUD-TOTAL-IA] fila {fila.get('NUMREG')}: la IA no respondió a tiempo")
         return None
@@ -249,9 +272,19 @@ async def analizar_notificacion(
         servicio = GlosaService()
 
     semaforo = asyncio.Semaphore(MAX_EN_PARALELO)
+    presupuesto = _presupuesto_del_lote()
+    arranque = asyncio.get_event_loop().time()
+    sin_tiempo = 0
 
     async def _con_turno(fila: dict):
+        nonlocal sin_tiempo
         async with semaforo:
+            # Si ya no queda tiempo, esta glosa NO se le pide a la IA: sale por
+            # plantilla. Preguntar igual haría que la petición se pase del
+            # corte del túnel y no salga NINGUNA respuesta.
+            if asyncio.get_event_loop().time() - arranque >= presupuesto:
+                sin_tiempo += 1
+                return None
             return await _analizar_una(servicio, fila)
 
     analisis = await asyncio.gather(*[_con_turno(f) for f in filas], return_exceptions=True)
@@ -286,10 +319,16 @@ async def analizar_notificacion(
         "total": len(filas),
         "analizadas_con_ia": con_ia,
         "por_plantilla": len(filas) - con_ia,
+        # Cuántas salieron por plantilla porque se acabó el tiempo del lote y
+        # no porque la IA fallara. Se separa para que el auditor sepa que
+        # volviendo a correrlo esas SÍ pueden mejorar.
+        "sin_tiempo": sin_tiempo,
+        "presupuesto_segundos": round(presupuesto),
     }
     logger.info(
         f"[SALUD-TOTAL-IA] {con_ia} de {len(filas)} respondidas por la IA; "
         f"{resumen['por_plantilla']} por plantilla"
+        + (f" ({sin_tiempo} por falta de tiempo del lote)" if sin_tiempo else "")
     )
     return respuestas, resumen
 

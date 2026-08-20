@@ -5204,6 +5204,43 @@ saldrán los correos y su contraseña de aplicación.
 - 10 pruebas en `tests/test_api/test_probar_correo.py`, incluida la que
   verifica que la contraseña no se filtre en la respuesta.
 
+### 20-08 (noche) — Salud Total: 44 glosas ya no tumban la petición
+
+Una notificación de SALUD TOTAL trae **44 glosas**. Se analizaban de tres en
+tres, esperando hasta **120 segundos por cada una**… y el túnel por el que
+entra el portal **corta a los ~100 segundos**.
+
+O sea: **la espera de UNA SOLA glosa ya era más larga que lo que aguanta la
+conexión.** La petición se caía con un 502 y se perdía todo el trabajo que la
+IA ya había hecho —los tokens gastados incluidos—, sin que saliera ni un
+archivo.
+
+**Cómo queda.** Ahora hay un presupuesto de tiempo para todo el lote, sacado
+del corte real del túnel y no de un número inventado. Cuando se acaba, las
+glosas que falten **salen por plantilla** —que es una respuesta válida y
+radicable— en vez de arriesgar que la petición entera se caiga y no salga
+ninguna. Entre «todas con plantilla» y «ninguna», la plantilla gana sin
+discusión.
+
+| | Antes | Ahora |
+|---|---|---|
+| Espera por glosa | 120 s (fijos) | 85 s |
+| Presupuesto del lote | ninguno | 70 s |
+| Corte del túnel | ~100 s | ~100 s |
+
+El resumen ahora dice **cuántas quedaron por falta de tiempo**, aparte de las
+que fallaron: no es lo mismo, porque volviendo a correrlo esas sí pueden
+mejorar.
+
+**Lo que NO se tocó, y por eso conviene saberlo:** cada fila sale SIEMPRE con
+respuesta por plantilla aunque la IA falle. Eso ya estaba bien resuelto de
+antes, y es lo que impide el desastre de verdad — una fila vacía en el archivo
+que se radica es una glosa sin responder, y **una glosa sin responder se da
+por aceptada**: la plata se regala.
+
+- 10 pruebas en `tests/test_services/test_salud_total_no_se_pasa_del_tunel.py`,
+  incluida la que vigila que no vuelva el 120 fijo escrito a mano.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
