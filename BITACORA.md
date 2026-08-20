@@ -5370,6 +5370,45 @@ parte: el auditor no tenía cómo saber qué había pasado.
 
 - 8 pruebas en `tests/test_services/test_resubir_el_mismo_archivo_no_asusta.py`.
 
+### 20-08 (noche) — El .env podía no encontrarse, y nadie se enteraba
+
+Buscando por qué el motor decía «el correo no está configurado», apareció algo
+más grande. La configuración se leía de `".env"` — una ruta **relativa**, que
+se resuelve contra **la carpeta desde la que se arrancó el motor**, no contra
+la del repositorio.
+
+Si el motor arranca desde otra carpeta, el `.env` **no se encuentra** y toda la
+configuración cae a sus valores por defecto **en silencio**: sin claves de IA,
+sin correo, sin nada. Y no hay ningún aviso, porque «no encontré el archivo» y
+«el archivo está vacío» se ven exactamente igual.
+
+Que en este repositorio ya exista `config/soportes_root.txt` —leído por ruta
+absoluta, con un comentario explicando que las variables de entorno no
+sobrevivían al vigilante que revive el motor— dice que esta clase de problema
+**ya había mordido antes por otro lado**.
+
+**Cómo queda.** Manda el `.env` de la carpeta actual si lo hay —arrancar desde
+una carpeta con su propio `.env` es legítimo, así corren las pruebas—, y si
+no hay ninguno se usa el de la raíz del repositorio, que es el caso que estaba
+roto.
+
+> **Nota de honestidad:** el primer intento fue absoluto a secas y puso en rojo
+> dos pruebas del `.env` con acentos, que arrancan el motor desde una carpeta
+> temporal con su propio archivo. **Las pruebas tenían razón**: ese caso es
+> legítimo. Se corrigió para respetar los dos.
+
+- 8 pruebas en `tests/test_api/test_el_env_se_encuentra_siempre.py`.
+
+### Y lo del correo, con el dato en la mano
+
+La consulta al `.env` del PC de cartera salió **vacía las dos veces**:
+`SMTP_USER` y `SMTP_PASSWORD` **no están en el archivo**. Los correos que
+Yesid vio en Gmail salieron de otra configuración o de otro momento.
+
+**Lo que falta hacer en el PC de cartera:** agregar esas dos líneas al
+`C:\motor-glosas\repo\.env` y reiniciar el motor. Ojo con el Bloc de notas:
+suele guardar como `.env.txt`, y así el motor nunca lo lee.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
