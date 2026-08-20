@@ -109,6 +109,7 @@
     </div>
 
     <div id="email-box" class="ok" style="margin:15px 0">📧 Correos enviados: <b id="e-num">0</b></div>
+    <div id="email-detalle"></div>
 
     <h3 style="margin:20px 0 10px">Asignaciones por gestor</h3>
     <div id="gestores"></div>
@@ -296,6 +297,7 @@ function mostrarResultado(d){
   document.getElementById('sn').textContent = sem.NEGRO || 0;
 
   document.getElementById('e-num').textContent = d.correos_enviados || 0;
+  pintarDetalleDelCorreo(d.correo);
 
   // 🤖 Indicador prominente de auto-procesamiento IA en background
   if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){
@@ -447,6 +449,67 @@ function pesos(v){
   if (window.SDS_FMT && window.SDS_FMT.cop) return window.SDS_FMT.cop(v);
   var n = Math.round(Number(v || 0)) || 0;              // respaldo si aún no cargó
   return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// ── A quién le llegó el correo, y a quién NO ──────────────────────────────
+// 20-08-2026. La pantalla decía «Correos enviados: 3» y nada más. Con eso el
+// auditor no tenía cómo saber que a CAROLINA no le llegó nada porque su
+// nombre en el Excel no coincide con ningún usuario del portal — que es la
+// falla que de verdad ocurre, no que se caiga el servidor de correo.
+//
+// Se muestra lo que el motor SÍ puede afirmar: a qué buzón salió cada correo
+// y quién quedó sin destinatario. Que el gestor lo haya ABIERTO no lo sabe
+// nadie, y por eso no se insinúa.
+function pintarDetalleDelCorreo(c){
+  var caja = document.getElementById('email-detalle');
+  if(!caja) return;
+  caja.innerHTML = '';
+  if(!c) return;
+
+  var h = '';
+
+  if(!c.smtp_configurado){
+    h += '<div class="err" style="margin:10px 0"><b>El correo no está configurado en este servidor.</b>'
+       + ' No salió ningún mensaje. Las glosas SÍ quedaron importadas: avise a los gestores por otro medio'
+       + ' y pida que configuren SMTP_USER y SMTP_PASSWORD.</div>';
+    caja.innerHTML = h;
+    return;
+  }
+
+  var sin = c.gestores_sin_correo || [];
+  if(sin.length){
+    h += '<div class="err" style="margin:10px 0"><b>' + sin.length + ' gestor(es) NO recibieron el correo</b>'
+       + ' — su nombre en el Excel no coincide con ningún usuario activo del portal:<br>'
+       + sin.map(esc).join(' · ')
+       + '<br><span style="font-size:.85em">Arréglelo creando el usuario, o poniendo en el Excel el mismo nombre'
+       + ' con el que está registrado en Usuarios.</span></div>';
+  }
+
+  var fallidos = (c.destinatarios || []).filter(function(x){ return !x.ok; });
+  if(fallidos.length){
+    h += '<div class="err" style="margin:10px 0"><b>' + fallidos.length + ' correo(s) rebotaron</b> al intentar salir:<br>'
+       + fallidos.map(function(x){ return esc(x.email); }).join(' · ') + '</div>';
+  }
+
+  var ok = (c.destinatarios || []).filter(function(x){ return x.ok; });
+  if(ok.length){
+    var filas = Object.keys(c.por_gestor || {}).sort().map(function(g){
+      var correos = (c.por_gestor[g] || []);
+      var val = correos.length
+        ? '<span style="color:#15803d">' + correos.map(esc).join(', ') + '</span>'
+        : '<span style="color:#b91c1c">sin usuario en el portal</span>';
+      return '<tr><td style="padding:3px 10px 3px 0;font-weight:600">' + esc(g) + '</td><td style="padding:3px 0">' + val + '</td></tr>';
+    }).join('');
+    h += '<details style="margin:10px 0"><summary style="cursor:pointer">'
+       + 'Ver a qué buzón salió cada uno (' + ok.length + ')</summary>'
+       + '<table style="margin-top:8px;font-size:.9em;border-collapse:collapse">' + filas + '</table>'
+       + '<div style="margin-top:8px;font-size:.85em;color:#555">'
+       + 'Esto confirma que el mensaje salió del servidor sin error. Si el gestor lo ABRIÓ o no,'
+       + ' eso no lo sabe ningún sistema de correo: pídale que le confirme.</div>'
+       + '</details>';
+  }
+
+  caja.innerHTML = h;
 }
 
 function pintarPlanDeTrabajo(d){

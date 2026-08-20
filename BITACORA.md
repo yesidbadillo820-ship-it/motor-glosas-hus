@@ -5028,6 +5028,58 @@ roja.
   `tests/test_frontend/test_el_portal_no_llama_rutas_que_no_existen.py` y
   `tests/test_services/test_snippets_service.py`.
 
+### 20-08 (noche) — «¿Cómo compruebo que el correo le llegó a los gestores?»
+
+Pregunta de Yesid al subir el archivo de recepción. La pantalla decía **«📧
+Correos enviados: 3»** y nada más — con eso no hay forma de saber a quién le
+llegó y a quién no.
+
+**Primero, lo que hay que tener claro.** Son tres cosas distintas:
+
+1. **se armó** el correo — se ve en pantalla;
+2. **salió** del servidor sin error — ahora también se ve en pantalla;
+3. **llegó** al buzón del gestor — **esto no lo sabe ningún sistema de correo**,
+   ni el nuestro ni ninguno, salvo que el mensaje rebote.
+
+Lo que se podía mejorar era el nivel 2, y era mucho.
+
+**Ahora la pantalla dice, después de subir:**
+
+- **a qué buzón concreto salió** el correo de cada gestor (`IRMA RIOS →
+  carterahus01@sinacsc.com`);
+- **qué gestores del Excel se quedaron sin correo** porque su nombre no
+  coincide con ningún usuario del portal — con la explicación de cómo
+  arreglarlo (crear el usuario, o poner en el Excel el mismo nombre con el
+  que está registrado);
+- **cuáles rebotaron** al salir;
+- y si el servidor **no tiene correo configurado**, lo dice de frente en vez
+  de mostrar un «0» que se lee como si no hubiera nada que enviar.
+
+**La comprobación con datos reales.** Se cruzaron los 6 gestores del archivo
+del 19 de agosto (85 glosas) contra los 23 usuarios del portal:
+
+| Gestor | Glosas | Le llega a |
+|---|---|---|
+| YESID PEREZ | 35 | glosashus09 |
+| IVAN ARCINIEGAS | 26 | glosashus13 |
+| IRMA RIOS | 7 | carterahus01 |
+| MARICELA ROJAS | 7 | glosashus05 |
+| EQUIPO ASEGURADORAS | 6 | **los 4 buzones del equipo** |
+| KAREN ORTIZ | 4 | radicadevoluciones |
+
+**Los seis tienen correo.** Ese archivo sale completo.
+
+**Y de paso apareció un defecto feo.** El cruce de nombres aceptaba
+«contiene» sin exigir un mínimo de letras. Si en la casilla del gestor
+quedaba **una sola letra** —una «A» por un dedazo en el Excel— el correo le
+llegaba a **22 de los 23 usuarios**, porque casi todo nombre lleva una A. Cada
+quien habría recibido un plan de trabajo que no es el suyo, y el dueño de
+verdad podía no aparecer. Una «S» alcanzaba a 17. Ahora el «contiene» exige 4
+letras; el nombre exacto sigue valiendo para cualquier largo.
+
+- 17 pruebas nuevas en `tests/test_services/test_a_quien_le_llega_el_correo.py`,
+  **con los usuarios y los gestores reales**.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
