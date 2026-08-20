@@ -5335,6 +5335,41 @@ las dos a la vez.
   incluida una que se pone roja si alguien vuelve a resolver la carpeta a mano
   en el router — que es exactamente como nació el defecto.
 
+### 20-08 (noche) — Resubir el mismo archivo no es un error
+
+Yesid volvió a subir `GLOSAS 19 AGOSTO.xlsx` —el mismo que ya había entrado
+bien— y la pantalla le mostró:
+
+> ⚠ **Importación procesada — 0 glosas detectadas**
+> TOTAL 0 · NUEVAS 0 · ACTUALIZADAS 0 · RATIFICADAS 0 · **EXTEMPORÁNEAS 29**
+> *Posibles causas: el Excel no tiene la hoja correcta… los headers no
+> matchean…*
+
+**Dos problemas de golpe.**
+
+**1. «0 detectadas» junto a «29 extemporáneas» no pueden ser ciertas a la
+vez.** Los contadores de ratificadas y extemporáneas se sumaban al CLASIFICAR
+la fila, antes de saber si la fila iba a entrar. Una fila que después resultaba
+duplicada se saltaba el total, pero su extemporaneidad ya estaba contada. Ahora
+se cuentan cuando la fila **sí** entra.
+
+**2. El aviso lo mandaba a buscar un problema que no existía.** El archivo
+estaba perfecto: **las 35 glosas ya estaban importadas**, que es lo normal al
+volver a subir el mismo archivo. Pero la pantalla le decía que revisara la hoja
+y los encabezados.
+
+**Ahora son dos mensajes distintos, porque son dos situaciones distintas:**
+
+| Lo que pasó | Lo que sale |
+|---|---|
+| Todas ya estaban | ✅ verde: «**nada nuevo que registrar** — las 35 glosas del archivo YA estaban importadas. No se creó ninguna nueva y no se perdió nada, el archivo está bien» |
+| No se leyó ninguna fila | ⚠ ámbar: el aviso de la hoja y los encabezados, que ahí **sí** aplica |
+
+Y se agregó el contador **«YA ESTABAN»**, que antes no se veía en ninguna
+parte: el auditor no tenía cómo saber qué había pasado.
+
+- 8 pruebas en `tests/test_services/test_resubir_el_mismo_archivo_no_asusta.py`.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
