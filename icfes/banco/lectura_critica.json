@@ -1,0 +1,367 @@
+{
+  "area": "lectura_critica",
+  "version": 1,
+  "nota": "Preguntas de práctica escritas para este sistema siguiendo la estructura del Saber 11. Los fragmentos literarios son de obras colombianas en dominio público (Isaacs 1867, Silva 1894, Rivera 1924). No son preguntas del ICFES.",
+  "preguntas": [
+    {
+      "id": "LC-001",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Comprensión literal de una narración",
+      "dificultad": 2,
+      "contexto": "Lea el siguiente fragmento de la novela «María» (1867), de Jorge Isaacs.\n\n«Era yo niño aún cuando me alejaron de la casa paterna para que diera principio a mis estudios en el colegio del doctor Lorenzo María Lleras, establecido en Bogotá hacía poco tiempo, y famoso en toda la República por aquella época.\nEn la noche víspera de mi viaje, después de la velada, entró a mi cuarto una de mis hermanas, y sin decirme una sola palabra cariñosa, porque los sollozos le embargaban la voz, cortó de mi cabeza unos cabellos: cuando ella salió, habían rodado por mi cuello algunas lágrimas suyas.»",
+      "enunciado": "Según el texto, ¿por qué la hermana no le dijo al narrador ninguna palabra cariñosa?",
+      "opciones": [
+        "Porque el llanto no la dejaba hablar.",
+        "Porque estaba molesta con él por irse a Bogotá.",
+        "Porque en esa familia no se acostumbraban las despedidas.",
+        "Porque prefirió despedirse cortándole un mechón de cabello."
+      ],
+      "correcta": 0,
+      "explicacion": "El texto lo dice de forma explícita: «sin decirme una sola palabra cariñosa, porque los sollozos le embargaban la voz». Un sollozo que «embarga la voz» es el llanto que impide hablar. La respuesta está literalmente escrita; no hay que deducir nada.",
+      "trampa": "El distractor más peligroso es «prefirió despedirse cortándole un mechón de cabello»: el mechón sí aparece en el texto, pero es lo que ella hizo, no la razón de su silencio. En Lectura Crítica una opción puede ser verdadera y aun así no responder lo que preguntan."
+    },
+    {
+      "id": "LC-002",
+      "competencia": "Comprender cómo se articulan las partes del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Función de un detalle en el relato",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente fragmento de la novela «María» (1867), de Jorge Isaacs.\n\n«Era yo niño aún cuando me alejaron de la casa paterna para que diera principio a mis estudios en el colegio del doctor Lorenzo María Lleras, establecido en Bogotá hacía poco tiempo, y famoso en toda la República por aquella época.\nEn la noche víspera de mi viaje, después de la velada, entró a mi cuarto una de mis hermanas, y sin decirme una sola palabra cariñosa, porque los sollozos le embargaban la voz, cortó de mi cabeza unos cabellos: cuando ella salió, habían rodado por mi cuello algunas lágrimas suyas.»",
+      "enunciado": "La frase final «habían rodado por mi cuello algunas lágrimas suyas» cumple en el fragmento la función de",
+      "opciones": [
+        "explicar por qué el narrador decidió estudiar en Bogotá.",
+        "mostrar el dolor de la hermana sin necesidad de nombrarlo.",
+        "anunciar que el narrador no volverá nunca a su casa.",
+        "describir el clima frío de la noche anterior al viaje."
+      ],
+      "correcta": 1,
+      "explicacion": "El narrador nunca dice «mi hermana estaba muy triste». Lo muestra con un detalle físico: las lágrimas de ella que él siente en su propio cuello. Es la diferencia entre contar un sentimiento y mostrarlo, y es lo que se pregunta cuando el examen pide la «función» de una frase.",
+      "trampa": "El distractor más peligroso es «anunciar que el narrador no volverá nunca a su casa»: suena a interpretación literaria profunda, pero el texto no dice ni sugiere eso. Interpretar no es inventar: toda interpretación válida tiene que poder señalarse en el texto."
+    },
+    {
+      "id": "LC-003",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Evaluación del punto de vista narrativo",
+      "dificultad": 4,
+      "contexto": "Lea el siguiente fragmento de la novela «María» (1867), de Jorge Isaacs.\n\n«Era yo niño aún cuando me alejaron de la casa paterna para que diera principio a mis estudios en el colegio del doctor Lorenzo María Lleras, establecido en Bogotá hacía poco tiempo, y famoso en toda la República por aquella época.\nEn la noche víspera de mi viaje, después de la velada, entró a mi cuarto una de mis hermanas, y sin decirme una sola palabra cariñosa, porque los sollozos le embargaban la voz, cortó de mi cabeza unos cabellos: cuando ella salió, habían rodado por mi cuello algunas lágrimas suyas.»",
+      "enunciado": "Un lector afirma: «El fragmento describe con exactitud lo que sintió la hermana». Frente al texto, esa afirmación es",
+      "opciones": [
+        "correcta, porque el narrador estuvo presente en la escena.",
+        "correcta, porque las lágrimas prueban lo que ella sentía.",
+        "discutible, porque todo se cuenta desde lo que el narrador percibió.",
+        "discutible, porque el fragmento está escrito muchos años después."
+      ],
+      "correcta": 2,
+      "explicacion": "El relato está en primera persona: el lector solo tiene acceso a lo que el narrador vio y sintió. Del silencio y las lágrimas se puede inferir tristeza, pero «lo que sintió la hermana» nunca se dice desde ella. Evaluar un texto incluye reconocer los límites de quien lo cuenta.",
+      "trampa": "El distractor más peligroso es «está escrito muchos años después»: suena razonable y hasta puede ser cierto, pero no es la razón que hace discutible la afirmación. Cuando dos opciones llegan a la misma conclusión, gana la que da el motivo correcto."
+    },
+    {
+      "id": "LC-004",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Vocabulario por contexto",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente fragmento de la novela «María» (1867), de Jorge Isaacs.\n\n«Era yo niño aún cuando me alejaron de la casa paterna para que diera principio a mis estudios en el colegio del doctor Lorenzo María Lleras, establecido en Bogotá hacía poco tiempo, y famoso en toda la República por aquella época.\nEn la noche víspera de mi viaje, después de la velada, entró a mi cuarto una de mis hermanas, y sin decirme una sola palabra cariñosa, porque los sollozos le embargaban la voz, cortó de mi cabeza unos cabellos: cuando ella salió, habían rodado por mi cuello algunas lágrimas suyas.»",
+      "enunciado": "En el texto, la expresión «me alejaron de la casa paterna» indica que el narrador",
+      "opciones": [
+        "se fue de su casa por decisión propia.",
+        "perdió su casa y tuvo que buscar dónde vivir.",
+        "fue expulsado de su casa como castigo.",
+        "fue enviado lejos por decisión de otros."
+      ],
+      "correcta": 3,
+      "explicacion": "El verbo está en tercera persona del plural con sujeto tácito («me alejaron»): la acción la hicieron otros sobre él. El texto agrega el propósito, «para que diera principio a mis estudios», que descarta el castigo. La forma del verbo es la pista.",
+      "trampa": "El distractor más peligroso es «fue expulsado como castigo»: confunde «alejar» con «expulsar». Fíjate siempre en la finalidad que da el propio texto: estudiar no es un castigo."
+    },
+    {
+      "id": "LC-005",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto continuo informativo",
+      "tema": "Idea principal de un texto informativo",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente texto informativo.\n\n«La deforestación en la Amazonía colombiana no avanza de forma pareja. Los estudios de seguimiento muestran que la pérdida de bosque se concentra en unos pocos municipios y sigue el trazado de las vías nuevas: primero llega el camino, después la tala, y solo al final el cultivo o el potrero. Por eso, medir la deforestación únicamente por hectáreas perdidas al año oculta lo esencial. Dos regiones pueden perder la misma cantidad de bosque y estar en situaciones opuestas: en una, la pérdida ocurre en el borde de un área ya intervenida; en la otra, ocurre en el corazón de una selva continua, donde abre una herida que se ensancha sola durante años. La segunda es mucho más grave, aunque la cifra anual sea idéntica.\nQuienes proponen resolver el problema solo con más vigilancia satelital olvidan que el satélite no siembra árboles ni da de comer a nadie. Ver la tala en tiempo real no sirve de mucho si la familia que tumba el monte no tiene otra manera de sostenerse. La tecnología dice dónde está el fuego; no dice por qué se prendió.»",
+      "enunciado": "¿Cuál es la idea central del primer párrafo?",
+      "opciones": [
+        "La deforestación en la Amazonía colombiana aumenta cada año.",
+        "Las vías nuevas son la única causa de la deforestación.",
+        "Contar hectáreas perdidas no basta: importa dónde se pierden.",
+        "El cultivo y el potrero son la primera causa de la tala."
+      ],
+      "correcta": 2,
+      "explicacion": "El párrafo entero está construido para sostener una tesis: «medir la deforestación únicamente por hectáreas perdidas al año oculta lo esencial». El ejemplo de las dos regiones que pierden lo mismo pero no están igual es la prueba de esa tesis.",
+      "trampa": "El distractor más peligroso es «la deforestación aumenta cada año»: es el tipo de frase que uno espera en un texto sobre deforestación, y por eso se marca sin leer. El texto nunca dice que aumente; dice que no se distribuye pareja."
+    },
+    {
+      "id": "LC-006",
+      "competencia": "Comprender cómo se articulan las partes del texto",
+      "componente": "Texto continuo informativo",
+      "tema": "Relación entre párrafos",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente texto informativo.\n\n«La deforestación en la Amazonía colombiana no avanza de forma pareja. Los estudios de seguimiento muestran que la pérdida de bosque se concentra en unos pocos municipios y sigue el trazado de las vías nuevas: primero llega el camino, después la tala, y solo al final el cultivo o el potrero. Por eso, medir la deforestación únicamente por hectáreas perdidas al año oculta lo esencial. Dos regiones pueden perder la misma cantidad de bosque y estar en situaciones opuestas: en una, la pérdida ocurre en el borde de un área ya intervenida; en la otra, ocurre en el corazón de una selva continua, donde abre una herida que se ensancha sola durante años. La segunda es mucho más grave, aunque la cifra anual sea idéntica.\nQuienes proponen resolver el problema solo con más vigilancia satelital olvidan que el satélite no siembra árboles ni da de comer a nadie. Ver la tala en tiempo real no sirve de mucho si la familia que tumba el monte no tiene otra manera de sostenerse. La tecnología dice dónde está el fuego; no dice por qué se prendió.»",
+      "enunciado": "¿Qué relación hay entre el segundo párrafo y el primero?",
+      "opciones": [
+        "El segundo repite con otras palabras lo dicho en el primero.",
+        "El segundo contradice la tesis que sostuvo el primero.",
+        "El segundo abandona el tema del primero para hablar de tecnología.",
+        "El segundo extiende la crítica del primero a otra forma de medir mal."
+      ],
+      "correcta": 3,
+      "explicacion": "El primer párrafo critica una forma de mirar el problema (contar hectáreas); el segundo critica otra (creer que el satélite lo resuelve). Son dos golpes al mismo blanco: quedarse en la medición y no ir a la causa. Por eso extiende, no repite ni contradice.",
+      "trampa": "El distractor más peligroso es «abandona el tema para hablar de tecnología»: confunde «cambiar de ejemplo» con «cambiar de tema». La tecnología aparece como ejemplo nuevo, pero el asunto sigue siendo el mismo."
+    },
+    {
+      "id": "LC-007",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto continuo informativo",
+      "tema": "Evaluación de un argumento",
+      "dificultad": 4,
+      "contexto": "Lea el siguiente texto informativo.\n\n«La deforestación en la Amazonía colombiana no avanza de forma pareja. Los estudios de seguimiento muestran que la pérdida de bosque se concentra en unos pocos municipios y sigue el trazado de las vías nuevas: primero llega el camino, después la tala, y solo al final el cultivo o el potrero. Por eso, medir la deforestación únicamente por hectáreas perdidas al año oculta lo esencial. Dos regiones pueden perder la misma cantidad de bosque y estar en situaciones opuestas: en una, la pérdida ocurre en el borde de un área ya intervenida; en la otra, ocurre en el corazón de una selva continua, donde abre una herida que se ensancha sola durante años. La segunda es mucho más grave, aunque la cifra anual sea idéntica.\nQuienes proponen resolver el problema solo con más vigilancia satelital olvidan que el satélite no siembra árboles ni da de comer a nadie. Ver la tala en tiempo real no sirve de mucho si la familia que tumba el monte no tiene otra manera de sostenerse. La tecnología dice dónde está el fuego; no dice por qué se prendió.»",
+      "enunciado": "La frase «La tecnología dice dónde está el fuego; no dice por qué se prendió» sirve al autor para",
+      "opciones": [
+        "proponer que se deje de usar el monitoreo satelital.",
+        "señalar que la vigilancia sola no ataca la causa del problema.",
+        "demostrar que los incendios amazónicos son intencionales.",
+        "explicar cómo funcionan técnicamente los satélites."
+      ],
+      "correcta": 1,
+      "explicacion": "Es una metáfora que cierra el argumento del párrafo: el satélite detecta, pero detectar no es resolver. El autor no pide eliminar el monitoreo; pide no confundirlo con una solución.",
+      "trampa": "El distractor más peligroso es «propone que se deje de usar el monitoreo satelital»: es la exageración típica, que convierte «no basta con X» en «hay que eliminar X». Cuando una opción radicaliza al autor, casi siempre es falsa."
+    },
+    {
+      "id": "LC-008",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto continuo informativo",
+      "tema": "Debilitar una tesis",
+      "dificultad": 5,
+      "contexto": "Lea el siguiente texto informativo.\n\n«La deforestación en la Amazonía colombiana no avanza de forma pareja. Los estudios de seguimiento muestran que la pérdida de bosque se concentra en unos pocos municipios y sigue el trazado de las vías nuevas: primero llega el camino, después la tala, y solo al final el cultivo o el potrero. Por eso, medir la deforestación únicamente por hectáreas perdidas al año oculta lo esencial. Dos regiones pueden perder la misma cantidad de bosque y estar en situaciones opuestas: en una, la pérdida ocurre en el borde de un área ya intervenida; en la otra, ocurre en el corazón de una selva continua, donde abre una herida que se ensancha sola durante años. La segunda es mucho más grave, aunque la cifra anual sea idéntica.\nQuienes proponen resolver el problema solo con más vigilancia satelital olvidan que el satélite no siembra árboles ni da de comer a nadie. Ver la tala en tiempo real no sirve de mucho si la familia que tumba el monte no tiene otra manera de sostenerse. La tecnología dice dónde está el fuego; no dice por qué se prendió.»",
+      "enunciado": "¿Cuál de los siguientes hallazgos debilitaría MÁS la tesis del texto?",
+      "opciones": [
+        "Que la sola alerta satelital, sin más medidas, haya frenado la tala.",
+        "Que la mayoría de la tala ocurra en bordes ya intervenidos.",
+        "Que la deforestación se concentre en pocos municipios.",
+        "Que las vías nuevas se construyan después de la tala y no antes."
+      ],
+      "correcta": 0,
+      "explicacion": "La tesis del segundo párrafo es que ver la tala en tiempo real no resuelve nada si no se atiende la causa económica. Un caso donde la pura alerta satelital sí frenó la tala golpea directamente esa afirmación.",
+      "trampa": "El distractor más peligroso es «las vías se construyen después de la tala»: también contradice algo del texto, pero es un detalle del primer párrafo, no la tesis principal. Para debilitar hay que apuntar a lo que el texto más defiende, no a un dato de paso."
+    },
+    {
+      "id": "LC-009",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto continuo filosófico",
+      "tema": "Tesis de un texto argumentativo",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente texto.\n\n«Se repite que la libertad consiste en poder elegir. Pero esa definición es demasiado cómoda: quien elige entre dos males que otro le impuso también está eligiendo, y nadie diría que es libre. Elegir es apenas el gesto final de la libertad, no su contenido. Lo que decide si una elección es libre no es el momento de escoger, sino todo lo que ocurrió antes: si la persona tuvo información verdadera, si tuvo alternativas reales y si podía negarse sin ser destruida.\nDe ahí que ampliar la libertad casi nunca consista en multiplicar las opciones. Un mercado que ofrece cuarenta marcas del mismo producto no ha hecho más libre a quien no puede comprar ninguna. La libertad crece cuando crecen las condiciones que hacen posible una elección con sentido, y esas condiciones —conocimiento, recursos, tiempo, la posibilidad de decir que no— no se reparten solas.»",
+      "enunciado": "La tesis que defiende el autor es que la libertad",
+      "opciones": [
+        "consiste en poder elegir entre varias opciones.",
+        "es imposible en las sociedades actuales.",
+        "aumenta cuando el mercado ofrece más productos.",
+        "depende de las condiciones que hacen posible la elección."
+      ],
+      "correcta": 3,
+      "explicacion": "El autor rechaza en la primera línea la definición de libertad como «poder elegir» y propone otra: lo que decide si una elección es libre es «todo lo que ocurrió antes» —información verdadera, alternativas reales y poder negarse—. Esa es la opción que habla de las condiciones que hacen posible la elección.",
+      "trampa": "El distractor más peligroso es «consiste en poder elegir»: es la definición que el texto menciona… para refutarla. Es el error más común de Lectura Crítica: marcar la idea que el autor cita para atacarla."
+    },
+    {
+      "id": "LC-010",
+      "competencia": "Comprender cómo se articulan las partes del texto",
+      "componente": "Texto continuo filosófico",
+      "tema": "Función del ejemplo",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente texto.\n\n«Se repite que la libertad consiste en poder elegir. Pero esa definición es demasiado cómoda: quien elige entre dos males que otro le impuso también está eligiendo, y nadie diría que es libre. Elegir es apenas el gesto final de la libertad, no su contenido. Lo que decide si una elección es libre no es el momento de escoger, sino todo lo que ocurrió antes: si la persona tuvo información verdadera, si tuvo alternativas reales y si podía negarse sin ser destruida.\nDe ahí que ampliar la libertad casi nunca consista en multiplicar las opciones. Un mercado que ofrece cuarenta marcas del mismo producto no ha hecho más libre a quien no puede comprar ninguna. La libertad crece cuando crecen las condiciones que hacen posible una elección con sentido, y esas condiciones —conocimiento, recursos, tiempo, la posibilidad de decir que no— no se reparten solas.»",
+      "enunciado": "El ejemplo del mercado con cuarenta marcas se usa en el texto para",
+      "opciones": [
+        "mostrar que más opciones no significan más libertad.",
+        "criticar el precio de los productos en Colombia.",
+        "defender que la competencia mejora la calidad.",
+        "explicar cómo funciona la oferta y la demanda."
+      ],
+      "correcta": 0,
+      "explicacion": "El ejemplo ilustra la frase anterior: «ampliar la libertad casi nunca consiste en multiplicar las opciones». Cuarenta marcas frente a alguien que no puede comprar ninguna es el caso extremo de opciones que no liberan.",
+      "trampa": "El distractor más peligroso es «criticar el precio de los productos»: toma el tema del ejemplo (el mercado) por su función. Un ejemplo casi nunca está para hablar de sí mismo: está para probar la idea que lo antecede."
+    },
+    {
+      "id": "LC-011",
+      "competencia": "Comprender cómo se articulan las partes del texto",
+      "componente": "Texto continuo filosófico",
+      "tema": "Conectores y estructura",
+      "dificultad": 4,
+      "contexto": "Lea el siguiente texto.\n\n«Se repite que la libertad consiste en poder elegir. Pero esa definición es demasiado cómoda: quien elige entre dos males que otro le impuso también está eligiendo, y nadie diría que es libre. Elegir es apenas el gesto final de la libertad, no su contenido. Lo que decide si una elección es libre no es el momento de escoger, sino todo lo que ocurrió antes: si la persona tuvo información verdadera, si tuvo alternativas reales y si podía negarse sin ser destruida.\nDe ahí que ampliar la libertad casi nunca consista en multiplicar las opciones. Un mercado que ofrece cuarenta marcas del mismo producto no ha hecho más libre a quien no puede comprar ninguna. La libertad crece cuando crecen las condiciones que hacen posible una elección con sentido, y esas condiciones —conocimiento, recursos, tiempo, la posibilidad de decir que no— no se reparten solas.»",
+      "enunciado": "La expresión «De ahí que» al comenzar el segundo párrafo indica que lo que sigue es",
+      "opciones": [
+        "una objeción a lo dicho antes.",
+        "un ejemplo que contradice lo dicho antes.",
+        "una consecuencia de lo dicho antes.",
+        "un cambio de tema."
+      ],
+      "correcta": 2,
+      "explicacion": "«De ahí que» es un conector consecutivo: introduce lo que se deduce de lo anterior. Si la libertad depende de las condiciones previas, entonces —consecuencia— ampliarla no es multiplicar opciones. Los conectores son el mapa del texto y el examen los pregunta siempre.",
+      "trampa": "El distractor más peligroso es «una objeción a lo dicho antes»: confunde el conector consecutivo con uno adversativo («sin embargo», «pero»). Vale la pena memorizar tres grupos: consecuencia, oposición y adición."
+    },
+    {
+      "id": "LC-012",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto continuo filosófico",
+      "tema": "Aplicación de una tesis a un caso",
+      "dificultad": 5,
+      "contexto": "Lea el siguiente texto.\n\n«Se repite que la libertad consiste en poder elegir. Pero esa definición es demasiado cómoda: quien elige entre dos males que otro le impuso también está eligiendo, y nadie diría que es libre. Elegir es apenas el gesto final de la libertad, no su contenido. Lo que decide si una elección es libre no es el momento de escoger, sino todo lo que ocurrió antes: si la persona tuvo información verdadera, si tuvo alternativas reales y si podía negarse sin ser destruida.\nDe ahí que ampliar la libertad casi nunca consista en multiplicar las opciones. Un mercado que ofrece cuarenta marcas del mismo producto no ha hecho más libre a quien no puede comprar ninguna. La libertad crece cuando crecen las condiciones que hacen posible una elección con sentido, y esas condiciones —conocimiento, recursos, tiempo, la posibilidad de decir que no— no se reparten solas.»",
+      "enunciado": "Según el criterio del autor, ¿cuál de estas personas está tomando la decisión MENOS libre?",
+      "opciones": [
+        "Quien escoge entre dos universidades tras visitar ambas.",
+        "Quien firma un contrato que no puede leer y no puede rechazar.",
+        "Quien elige un empleo entre tres ofertas parecidas.",
+        "Quien decide no votar después de informarse sobre los candidatos."
+      ],
+      "correcta": 1,
+      "explicacion": "El autor da tres condiciones: información verdadera, alternativas reales y poder negarse sin ser destruido. Quien firma un contrato que no puede leer y no puede rechazar falla en las tres. Las demás situaciones cumplen al menos dos condiciones.",
+      "trampa": "El distractor más peligroso es «decide no votar después de informarse»: atrae porque no votar suena a renuncia a la libertad, pero es una decisión informada y voluntaria, y cumple el criterio del autor. No confundas la decisión que a uno le parece mal con la decisión no libre."
+    },
+    {
+      "id": "LC-013",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto discontinuo",
+      "tema": "Lectura literal de una tabla",
+      "dificultad": 2,
+      "contexto": "Observe la siguiente tabla, tomada del informe de una alcaldía sobre el servicio de acueducto en cuatro barrios.\n\n| Barrio     | Hogares | Hogares con agua las 24 horas | Reclamos por mala calidad (año) |\n|------------|---------|-------------------------------|----------------------------------|\n| El Prado   |   1.200 |                         1.150 |                               18 |\n| San José   |   3.400 |                         2.040 |                              612 |\n| La Cumbre  |     800 |                           240 |                              256 |\n| Villa Luz  |   2.600 |                         2.470 |                               39 |\n\nAl pie de la tabla, el informe concluye: «El barrio San José es el que presenta mayores problemas de calidad del agua, pues registra el mayor número de reclamos.»",
+      "enunciado": "¿Cuántos hogares del barrio La Cumbre NO tienen agua las 24 horas?",
+      "opciones": [
+        "240",
+        "256",
+        "560",
+        "800"
+      ],
+      "correcta": 2,
+      "explicacion": "La tabla da el total de hogares (800) y los que sí tienen agua todo el día (240). Los que no la tienen son la resta: 800 − 240 = 560. La tabla casi nunca entrega el dato que preguntan: hay que operarlo.",
+      "trampa": "El distractor más peligroso es «240»: es el número que aparece escrito en la tabla, y por eso se marca de afán. Lee dos veces si preguntan por los que SÍ o por los que NO."
+    },
+    {
+      "id": "LC-014",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto discontinuo",
+      "tema": "Evaluación de una conclusión con datos",
+      "dificultad": 5,
+      "contexto": "Observe la siguiente tabla, tomada del informe de una alcaldía sobre el servicio de acueducto en cuatro barrios.\n\n| Barrio     | Hogares | Hogares con agua las 24 horas | Reclamos por mala calidad (año) |\n|------------|---------|-------------------------------|----------------------------------|\n| El Prado   |   1.200 |                         1.150 |                               18 |\n| San José   |   3.400 |                         2.040 |                              612 |\n| La Cumbre  |     800 |                           240 |                              256 |\n| Villa Luz  |   2.600 |                         2.470 |                               39 |\n\nAl pie de la tabla, el informe concluye: «El barrio San José es el que presenta mayores problemas de calidad del agua, pues registra el mayor número de reclamos.»",
+      "enunciado": "La conclusión del informe sobre San José es cuestionable porque",
+      "opciones": [
+        "San José no es el barrio con más hogares de la ciudad.",
+        "el barrio El Prado también tiene reclamos por mala calidad.",
+        "los reclamos no siempre se registran en el sistema de la alcaldía.",
+        "compara números absolutos entre barrios de tamaños muy distintos."
+      ],
+      "correcta": 3,
+      "explicacion": "San José tiene 612 reclamos entre 3.400 hogares: 18 por cada 100. La Cumbre tiene 256 entre 800 hogares: 32 por cada 100, casi el doble de intensidad. Al comparar totales en vez de proporciones, el informe señala al barrio equivocado. Este error —confundir cantidad con tasa— es de los más preguntados del examen.",
+      "trampa": "El distractor más peligroso es «los reclamos no siempre se registran»: es una crítica razonable en la vida real, pero no se puede sustentar con la tabla, porque es información que el texto no da. En Lectura Crítica solo vale lo que se puede probar con lo que está ahí."
+    },
+    {
+      "id": "LC-015",
+      "competencia": "Comprender cómo se articulan las partes del texto",
+      "componente": "Texto discontinuo",
+      "tema": "Relación entre datos y afirmación",
+      "dificultad": 4,
+      "contexto": "Observe la siguiente tabla, tomada del informe de una alcaldía sobre el servicio de acueducto en cuatro barrios.\n\n| Barrio     | Hogares | Hogares con agua las 24 horas | Reclamos por mala calidad (año) |\n|------------|---------|-------------------------------|----------------------------------|\n| El Prado   |   1.200 |                         1.150 |                               18 |\n| San José   |   3.400 |                         2.040 |                              612 |\n| La Cumbre  |     800 |                           240 |                              256 |\n| Villa Luz  |   2.600 |                         2.470 |                               39 |\n\nAl pie de la tabla, el informe concluye: «El barrio San José es el que presenta mayores problemas de calidad del agua, pues registra el mayor número de reclamos.»",
+      "enunciado": "¿Qué dato de la tabla apoya mejor la idea de que la continuidad del servicio y los reclamos están relacionados?",
+      "opciones": [
+        "El Prado y Villa Luz: casi todos con agua 24 horas y muy pocos reclamos.",
+        "San José: el mayor número de hogares de los cuatro barrios.",
+        "La Cumbre: el barrio con menos hogares de la tabla.",
+        "Villa Luz: 2.600 hogares en total."
+      ],
+      "correcta": 0,
+      "explicacion": "Para mostrar una relación hay que emparejar las dos variables. El Prado (1.150 de 1.200 con servicio, 18 reclamos) y Villa Luz (2.470 de 2.600, 39 reclamos) muestran juntos el mismo patrón: donde hay continuidad, hay pocos reclamos.",
+      "trampa": "Los distractores peligrosos son los que mencionan un solo dato («el mayor número de hogares», «el barrio con menos hogares», «2.600 hogares»). Son ciertos, pero cada uno nombra una sola variable, y un dato suelto nunca puede sostener una relación entre dos cosas."
+    },
+    {
+      "id": "LC-016",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto discontinuo",
+      "tema": "Interpretación de una caricatura",
+      "dificultad": 4,
+      "contexto": "Observe la siguiente caricatura (descripción).\n\nEn el primer cuadro, un hombre de corbata está de pie sobre una montaña de libros y le grita a un niño que está abajo, en el suelo: «¡Lee más! ¡La lectura te va a sacar de ahí!». En el segundo cuadro se ve el conjunto completo: la montaña de libros sobre la que está parado el hombre es tan alta que el niño no alcanza ni el primer libro, y una cerca con candado rodea la montaña. El pie de la caricatura dice: «Igualdad de oportunidades».",
+      "enunciado": "La caricatura critica principalmente",
+      "opciones": [
+        "que los niños de hoy no quieran leer libros.",
+        "que se exija esfuerzo a quien no tiene acceso a los medios.",
+        "que los libros sean demasiado costosos en Colombia.",
+        "que los adultos den consejos a los niños sin conocerlos."
+      ],
+      "correcta": 1,
+      "explicacion": "El chiste está en el contraste entre los dos cuadros: el consejo («lee más») es imposible de cumplir porque los libros están cercados con candado y fuera del alcance del niño. El pie, «Igualdad de oportunidades», es irónico: señala que hay consejo pero no acceso.",
+      "trampa": "El distractor más peligroso es «que los libros sean demasiado costosos»: es el tema más cercano (libros y plata), pero la caricatura no habla de precios: habla de una cerca con candado, es decir, de acceso bloqueado. En caricaturas, la ironía del pie de página casi siempre marca la respuesta."
+    },
+    {
+      "id": "LC-017",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Comprensión de una voz narrativa",
+      "dificultad": 3,
+      "contexto": "Lea el siguiente fragmento de «La vorágine» (1924), de José Eustasio Rivera.\n\n«Antes de que me hubiera apasionado por mujer alguna, jugué mi corazón al azar y me lo ganó la Violencia. […] ¡Nada de ideales, nada de virtud, nada de éxito! Mis manos se han hecho para el látigo y el remo. Aquí no hay más ley que la selva, ni más señor que el hambre.»",
+      "enunciado": "Al decir «me lo ganó la Violencia», el narrador expresa que",
+      "opciones": [
+        "la violencia se apoderó de su vida antes que el amor.",
+        "fue víctima de un robo en la selva.",
+        "ganó una apuesta gracias a su carácter violento.",
+        "perdió a la mujer que amaba a manos de otro hombre."
+      ],
+      "correcta": 0,
+      "explicacion": "La frase anterior da la clave: «antes de que me hubiera apasionado por mujer alguna». El narrador contrapone dos destinos posibles —el amor y la violencia— y dice que ganó el segundo. La palabra «Violencia» va en mayúscula porque está personificada: es la que gana la apuesta.",
+      "trampa": "El distractor más peligroso es «perdió a la mujer que amaba»: suena a novela y el fragmento menciona mujeres, pero el texto dice justo lo contrario: la violencia llegó antes de cualquier amor."
+    },
+    {
+      "id": "LC-018",
+      "competencia": "Reflexionar y evaluar el contenido del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Tono y visión de mundo",
+      "dificultad": 4,
+      "contexto": "Lea el siguiente fragmento de «La vorágine» (1924), de José Eustasio Rivera.\n\n«Antes de que me hubiera apasionado por mujer alguna, jugué mi corazón al azar y me lo ganó la Violencia. […] ¡Nada de ideales, nada de virtud, nada de éxito! Mis manos se han hecho para el látigo y el remo. Aquí no hay más ley que la selva, ni más señor que el hambre.»",
+      "enunciado": "El tono del fragmento se describe mejor como",
+      "opciones": [
+        "nostálgico y esperanzado.",
+        "irónico y burlón.",
+        "amargo y de derrota.",
+        "neutral y descriptivo."
+      ],
+      "correcta": 2,
+      "explicacion": "Las marcas están en el texto: la triple negación «¡Nada de ideales, nada de virtud, nada de éxito!», el destino de las manos hechas «para el látigo y el remo» y el cierre «no hay más ley que la selva, ni más señor que el hambre». Todo apunta a una voz vencida.",
+      "trampa": "El distractor más peligroso es «nostálgico y esperanzado»: se marca porque el fragmento empieza recordando el pasado, y recordar se asocia a nostalgia. Pero la nostalgia añora; aquí no se añora nada, se constata una pérdida."
+    },
+    {
+      "id": "LC-019",
+      "competencia": "Comprender cómo se articulan las partes del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Recursos del lenguaje poético",
+      "dificultad": 4,
+      "contexto": "Lea la siguiente estrofa del «Nocturno III» (1894), de José Asunción Silva.\n\n«Una noche,\nuna noche toda llena de murmullos, de perfumes y de músicas de alas;\nuna noche\nen que ardían en la sombra nupcial y húmeda las luciérnagas fantásticas,\na mi lado lentamente, contra mí ceñida toda, muda y pálida,\ncomo si un presentimiento de amarguras infinitas\nhasta el más secreto fondo de las fibras te agitara,\npor la senda florecida que atraviesa la llanura caminabas.»",
+      "enunciado": "En la estrofa, la repetición de «una noche» al inicio de los versos produce el efecto de",
+      "opciones": [
+        "indicar que ocurrieron varias noches distintas.",
+        "corregir un dato que el poeta había dado mal.",
+        "señalar el paso rápido de las horas.",
+        "marcar un ritmo que detiene el tiempo del recuerdo."
+      ],
+      "correcta": 3,
+      "explicacion": "La repetición de una palabra al comienzo de varios versos se llama anáfora. Aquí, volver a «una noche» hace que el poema se quede suspendido en ese instante en vez de avanzar: el recuerdo se detiene y se estira. Es el efecto que se pregunta.",
+      "trampa": "El distractor más peligroso es «señalar el paso rápido de las horas»: es lo contrario de lo que ocurre, porque la repetición frena y no acelera. Cuando dudes con un recurso poético, pregúntate qué le hace al ritmo de la lectura en voz alta."
+    },
+    {
+      "id": "LC-020",
+      "competencia": "Identificar y entender los contenidos explícitos del texto",
+      "componente": "Texto continuo literario",
+      "tema": "Inferencia sobre el estado de ánimo",
+      "dificultad": 4,
+      "contexto": "Lea la siguiente estrofa del «Nocturno III» (1894), de José Asunción Silva.\n\n«Una noche,\nuna noche toda llena de murmullos, de perfumes y de músicas de alas;\nuna noche\nen que ardían en la sombra nupcial y húmeda las luciérnagas fantásticas,\na mi lado lentamente, contra mí ceñida toda, muda y pálida,\ncomo si un presentimiento de amarguras infinitas\nhasta el más secreto fondo de las fibras te agitara,\npor la senda florecida que atraviesa la llanura caminabas.»",
+      "enunciado": "Los adjetivos «muda y pálida» aplicados a la acompañante sugieren que ella",
+      "opciones": [
+        "caminaba en silencio porque disfrutaba el paisaje.",
+        "estaba enferma o cerca de la muerte.",
+        "se había enojado con el poeta esa noche.",
+        "era una figura imaginaria y no una persona real."
+      ],
+      "correcta": 1,
+      "explicacion": "«Pálida» remite al cuerpo desfalleciente y «muda» al silencio de quien ya no habla; el verso siguiente refuerza con «un presentimiento de amarguras infinitas» que la agita «hasta el más secreto fondo de las fibras». Todo el conjunto anuncia la muerte, que es el tema del poema.",
+      "trampa": "El distractor más peligroso es «caminaba en silencio porque disfrutaba el paisaje»: toma «muda» como un silencio tranquilo e ignora «pálida» y el presentimiento. En poesía hay que leer los adjetivos juntos: uno solo casi nunca decide el sentido."
+    }
+  ]
+}

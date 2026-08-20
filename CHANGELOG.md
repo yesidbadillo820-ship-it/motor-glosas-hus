@@ -1,5 +1,62 @@
 # Registro de cambios
 
+## Sesión 20-ago-2026 — Sistema de preparación para el ICFES Saber 11 (`icfes/`)
+
+Módulo **independiente** del Motor de Glosas: no importa nada de `app/` ni de
+`tools/`, y solo usa la librería estándar de Python 3.11, así que la carpeta
+`icfes/` se puede copiar a cualquier computador y funciona.
+
+### Qué trae
+- **`icfes/dominio.py`** — el examen modelado con datos oficiales: 254 preguntas
+  calificables (41/50/50/58/55), 24 de pilotaje, pesos 3-3-3-3-1, dos sesiones
+  de 4 h 30, y las 17 competencias de las cinco áreas.
+- **`icfes/puntaje.py`** — puntaje global 0-500 con la fórmula oficial
+  (`(3·LC+3·MAT+3·SOC+3·CN+1·ING)/13 × 5`); estimación de área 0-100 con curva
+  declarada y editable (`CURVA_PUNTAJE`), siempre rotulada como estimación;
+  reparto de una meta global en metas por área; corrección por azar.
+- **`icfes/banco/`** — 110 preguntas de práctica en JSON (una por área), todas
+  con explicación y con el distractor principal identificado. Cubre las 17
+  competencias. Textos de Lectura Crítica en dominio público.
+- **`icfes/plan.py`** — plan de 50 semanas en cuatro fases, con reparto de horas
+  por peso oficial × brecha, piso del 8 % por área, día de descanso semanal,
+  última semana aliviada y 11 simulacros completos.
+- **`icfes/repaso.py`** — SM-2 adaptado; nunca programa un repaso posterior al
+  examen; deduce la calidad del repaso de acierto, tiempo y causa del error.
+- **`icfes/simulacro.py`** — simulacros con la estructura y los segundos por
+  pregunta reales; a escala cuando el banco no alcanza, avisándolo.
+- **`icfes/progreso.py`** — dominio ponderado por recencia, cuaderno de errores
+  por causa con su remedio, racha y proyección por mínimos cuadrados que declara
+  cuándo no es confiable.
+- **`icfes/almacen.py`** — SQLite local (`~/.icfes/progreso.db`).
+- **`icfes/cli.py`** — `python -m icfes iniciar|hoy|plan|practicar|simulacro|
+  repaso|progreso|banco|exportar-web`.
+- **`icfes/exportar_web.py`** + **`plantilla_web.html`** — aplicación web de un
+  solo archivo, sin red, adaptable a celular, con tema claro/oscuro y avance en
+  `localStorage`.
+- **`tools/ICFES_APP.cmd`** — bot de doble clic para Windows (CRLF).
+
+### Correcciones hechas durante el desarrollo
+- **Simulacro**: reconstruía las respuestas desde la base de datos, así que una
+  pregunta acertada en una práctica del mismo día contaba como acertada en el
+  simulacro. La ronda ahora devuelve las respuestas reales, traducidas del orden
+  barajado al orden original de la pregunta.
+- **Exportación web**: la plantilla dejaba su objeto por defecto pegado al JSON
+  inyectado (`const DATOS = {…}{…};`) y la página no cargaba. Se detectó abriendo
+  la app en Chromium. Corregido con marcas de apertura/cierre y cubierto por
+  prueba.
+- **Banco**: la primera versión concentraba el 65 % de las respuestas correctas
+  en la letra B. Como las opciones se barajan en cada práctica, el validador
+  ahora exige que ninguna explicación nombre letras y verifica el reparto.
+
+### Pruebas
+239 pruebas en `tests/test_icfes/`; `ruff check` y `ruff format` limpios.
+Recorrido completo de la app web verificado en Chromium (práctica, explicación,
+cronómetro, resultado, progreso, persistencia tras recargar) sin errores de
+JavaScript.
+
+### Documentación
+`docs/GUIA_SISTEMA_ICFES.md` y `docs/ESTRATEGIA_ICFES_400.md`.
+
 ## Sesión 10-jul-2026 — Suite Cartera HUS: herramienta multifuncional (GUI + CLI)
 
 Integra en `tools/suite_cartera_hus/` la Suite de Cartera/Auditoría (menú

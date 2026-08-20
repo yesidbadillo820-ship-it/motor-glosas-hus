@@ -5308,7 +5308,89 @@ motor las intente.
   correo que ya iba a salir**. El registro es secundario y jamás puede costar
   un envío: ahora está protegido también en el punto de llamada.
 
+### 20-08-2026 — Sistema de preparación para el ICFES Saber 11 (carpeta `icfes/`)
+
+**Qué se pidió:** un sistema completo para prepararse durante un año para el
+examen del ICFES (Saber 11), apuntándole a 400 puntos de 500, con unas 12 horas
+de estudio a la semana y presentación en el Calendario A de agosto de 2027.
+
+**Aclaración importante:** este trabajo NO es del Motor de Glosas ni de Cartera.
+Es un módulo aparte, guardado en la carpeta `icfes/`, que no toca ni depende de
+nada de `app/` ni de `tools/`. Se puede copiar solo a otro computador y funciona.
+
+**Qué quedó hecho:**
+
+1. **El examen modelado tal como es** (`icfes/dominio.py`): las cinco áreas con
+   sus preguntas reales (Lectura Crítica 41, Matemáticas 50, Sociales 50,
+   Ciencias Naturales 58, Inglés 55 = 254 calificables, más 24 de pilotaje que
+   no dan puntaje), los pesos oficiales (3 para todas menos Inglés que pesa 1),
+   las dos sesiones de 4 h 30 y las competencias de cada área. Si el ICFES
+   cambia algo, se cambia ese solo archivo.
+2. **Motor de puntaje** (`icfes/puntaje.py`): el puntaje global de 0 a 500 con la
+   fórmula oficial, y la traducción de «acerté 34 de 50» a un puntaje de área.
+   Esa traducción **se declara siempre como estimación**, porque el ICFES usa un
+   modelo estadístico que no se puede replicar. También calcula, para una meta
+   dada, cuántas preguntas hay que acertar en cada área.
+3. **Banco de 110 preguntas** (`icfes/banco/`, un JSON por área), todas con
+   explicación y con el aviso de **cuál es la trampa** de la pregunta. Cubre las
+   17 competencias de las cinco áreas. Los textos de Lectura Crítica son de
+   obras colombianas de dominio público (Isaacs, Silva, Rivera). Se aclara en
+   todas partes que son preguntas de práctica, no del examen real.
+4. **Plan de estudio de 50 semanas** (`icfes/plan.py`): reparte las horas según
+   cuánto pesa cada área y dónde está la brecha, en cuatro fases (Fundamentos →
+   Competencias → Entrenamiento de examen → Afinamiento), con 11 simulacros
+   completos, un día de descanso a la semana y la última semana aliviada.
+5. **Repaso espaciado** (`icfes/repaso.py`): decide qué toca repasar cada día
+   para que lo de marzo no se olvide en agosto. **Nunca programa un repaso
+   después del examen.**
+6. **Simulacros cronometrados** (`icfes/simulacro.py`) con la estructura real y
+   los segundos por pregunta del examen (2 min 15 s en la sesión 1, 2 min 1 s en
+   la 2). Como el banco todavía no llega a 254 preguntas, los simulacros se
+   arman **a escala** y el sistema lo dice en pantalla.
+7. **Cuaderno de errores y proyección** (`icfes/progreso.py`): agrupa las fallas
+   por causa (no sabía el tema, iba de afán, marqué mal…) con el remedio de cada
+   una, y proyecta a qué puntaje se llega el día del examen, avisando cuándo esa
+   proyección todavía no es confiable.
+8. **Programa de consola** (`python -m icfes ...`) y **aplicación web de un solo
+   archivo** que funciona **sin internet**, sirve en el celular y guarda el
+   avance en el navegador. En Windows se genera con doble clic en
+   `tools\ICFES_APP.cmd`.
+
+**Dos fallas encontradas durante el trabajo y corregidas:**
+
+- El simulacro reconstruía las respuestas leyendo la base de datos, así que una
+  pregunta practicada más temprano ese mismo día se contaba como acertada dentro
+  del simulacro. Ahora la ronda devuelve las respuestas reales.
+- La plantilla de la aplicación web dejaba pegado su objeto vacío al lado de los
+  datos inyectados y **la página no cargaba nada**. Se detectó abriendo la
+  aplicación en un navegador de verdad, no con pruebas de escritorio. Quedó
+  corregido con marcas de apertura y cierre, y con una prueba que lo vigila.
+
+**Comprobaciones:** 239 pruebas de `pytest` propias del módulo, `ruff` limpio
+(revisión y formato), y la aplicación web abierta en Chromium comprobando el
+recorrido completo (practicar, explicación, cronómetro, resultado, progreso y
+que el avance sobrevive al recargar), sin un solo error de JavaScript.
+
+**Documentos:** `docs/GUIA_SISTEMA_ICFES.md` (cómo se usa) y
+`docs/ESTRATEGIA_ICFES_400.md` (el plan concreto para llegar a 400).
+
 ## 3) PENDIENTE
+
+### Sistema ICFES (nuevo, 20-08)
+- **Hacer el simulacro de diagnóstico.** Sin él, el plan reparte las horas a
+  ciegas (asume 50 de 100 en cada área). Es lo primero que hay que hacer:
+  `python -m icfes simulacro --tipo completo`, o desde la aplicación web.
+- **Confirmar la fecha real del examen.** El plan usa el 8 de agosto de 2027
+  como fecha provisional; el Calendario A de 2026 fue el 26 de julio. Cuando el
+  ICFES publique la fecha oficial de 2027, se corrige con
+  `python -m icfes iniciar --examen AAAA-MM-DD --meta 400 --horas 12` y el plan
+  se recalcula solo.
+- **Hacer crecer el banco de preguntas.** Hoy tiene 110; para que un simulacro
+  salga de tamaño real hacen falta 254. El formato está explicado en
+  `docs/GUIA_SISTEMA_ICFES.md` y `python -m icfes banco` avisa si algo quedó mal.
+- **Bajar los cuadernillos oficiales del ICFES** (son gratis en su página) y
+  hacerlos completos y cronometrados, sobre todo de abril de 2027 en adelante.
+  Las preguntas del banco son de práctica, no del examen real.
 
 ### Organización de trabajos (nuevo, 18-08)
 - **Correr `ORGANIZAR_TRABAJOS_BOTS.cmd` en un PC real del hospital** y
@@ -5591,6 +5673,16 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+### Sistema ICFES (20-08)
+1. **Correr el diagnóstico** y volver a mirar el plan: con el resultado real, el
+   reparto de horas cambia y deja de ser parejo.
+2. **Generar la aplicación web** (doble clic en `tools\ICFES_APP.cmd`) y pasarla
+   al celular, que es donde se va a estudiar la mayoría de los días.
+3. **Revisar y fusionar el pull request** de la rama
+   `claude/icfes-prefix-system-ngvyk4`.
+4. Si el diagnóstico de Inglés sale en Pre-A1 o A1, subir Inglés de 1 a 2 horas
+   semanales: pasar de 40 a 70 en esa área son 11 puntos del global.
 
 ### Lo más fresco (del 19-08)
 
