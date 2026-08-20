@@ -4507,6 +4507,42 @@ intocable. De aquí en adelante se toca cuando estorbe una corrección de fondo
 
 ---
 
+### 20-08 — «Salen 4 y son 5»: el oficio ya explica los envíos que llegan vacíos
+
+En el oficio **FHUS-AS-I01190-26** salían **5 envíos cargados**
+(232619, 232638, 232640, 232644 y 232649) y solo **4 facturas** en la tabla. La
+que faltaba era la del envío **232619**: **HUS0000544836 ($99.900,
+COMPAÑÍA MUNDIAL DE SEGUROS)**.
+
+**Por qué pasaba.** La página no perdió nada ni se equivocó de cuenta: esa
+factura **ya estaba abierta en otro oficio**. Cuando se escribe un envío, el
+sistema NO trae de nuevo las facturas que siguen pendientes (o que ya se
+radicaron) en otro oficio — si lo hiciera, la misma factura estaría en dos
+oficios al tiempo. El problema era que **eso solo se avisaba una vez**, en el
+momento de cargar el envío, y después no quedaba ni rastro en pantalla: el
+chip del envío seguía diciendo «(1)» aunque esa factura nunca hubiera entrado
+ahí. De ahí el «salen 4 y son 5».
+
+**Qué quedó ahora.**
+
+1. **El chip dice la verdad.** Cuando un envío no dejó todas sus facturas en
+   el oficio, el chip se pinta en amarillo y muestra **«232619 (0 de 1)»**:
+   quedaron 0 de la 1 que traía la fuente. Si todo llegó completo, se ve
+   igual que siempre. La lista de oficios también lo muestra, en corto
+   («232619(0/1)»).
+2. **Debajo dice por qué, con nombre propio.** «🔎 Del envío **232619** falta
+   la factura **HUS0000544836**: sigue pendiente de auditar en el oficio
+   FHUS-AS-I01188-26; resuélvala allá (radicar o devolver) y después vuelva a
+   escribir el envío aquí.» El mensaje cambia según el caso: ya radicada en
+   otro oficio, devuelta esperando reingreso, o que se mudó a un oficio nuevo.
+3. **No molesta cuando el auditor quitó la factura a propósito** con la 🗑:
+   en ese caso la cuenta del envío ya bajó y no aparece ningún aviso.
+
+7 pruebas nuevas. Para ver dónde quedó una factura sin abrir la página:
+`venv\Scripts\python.exe tools\preauditoria_revisar_envio.py 232619`.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

@@ -2188,3 +2188,107 @@ class TestRevertirReingresoConservaSuOficioEmitido:
         client.delete(f"/preauditoria/oficios/{oB['id']}/facturas/{fid}")
         r2 = client.post(f"/preauditoria/oficios/{oA['id']}/oficio-devolucion")
         assert r2.status_code != 200 or r2.json().get("total_facturas", 0) == 0
+
+
+# ------------------------------------------------------------------
+# Envíos que no dejaron todas sus facturas en el oficio
+# (caso real 20-08-2026: la ventana mostraba 5 envíos y 4 facturas)
+# ------------------------------------------------------------------
+
+
+class TestEnvioSinTodasSusFacturas:
+    """Cuando una factura del envío ya venía abierta (o radicada) en otro
+    oficio, el sistema la omite: el envío queda cargado pero sin ella. La
+    pantalla debe decir cuántas quedaron de verdad y dónde está la que falta."""
+
+    ENV_B = "229999"
+
+    def _dos_oficios(self, client):
+        """F1 se queda abierta en el oficio A; el envío se vuelve a escribir en B."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(self.ENV_B, F2, 120000)])
+        _subir_dgreport(client, [F1, F2])
+        oA = _crear_oficio(client, radicado="FHUS-AS-I01188-26")
+        _escribir(client, oA["id"], ENV)
+        oB = _crear_oficio(client, radicado="FHUS-AS-I01190-26", fecha="2026-07-22T08:30")
+        _escribir(client, oB["id"], ENV)  # F1 sigue pendiente en A: se omite
+        _escribir(client, oB["id"], self.ENV_B)  # esta sí entra
+        return oA, oB
+
+    def _envio(self, ficha, envio):
+        return [e for e in ficha["envios_escritos"] if e["envio"] == envio][0]
+
+    def test_el_chip_dice_cuantas_quedaron_de_verdad(self, client):
+        _, oB = self._dos_oficios(client)
+        ficha = client.get(f"/preauditoria/oficios/{oB['id']}").json()
+        assert ficha["total_facturas"] == 1  # solo F2
+        vacio = self._envio(ficha, ENV)
+        assert vacio["total_facturas"] == 1  # lo que traía la fuente
+        assert vacio["en_este_oficio"] == 0  # lo que quedó aquí
+        completo = self._envio(ficha, self.ENV_B)
+        assert completo["en_este_oficio"] == completo["total_facturas"] == 1
+        assert completo["faltantes"] == []
+
+    def test_dice_cual_factura_falta_y_donde_quedo(self, client):
+        _, oB = self._dos_oficios(client)
+        ficha = client.get(f"/preauditoria/oficios/{oB['id']}").json()
+        falta = self._envio(ficha, ENV)["faltantes"]
+        assert len(falta) == 1
+        assert falta[0]["factura"] == F1
+        assert falta[0]["oficio"] == "FHUS-AS-I01188-26"
+        assert "pendiente" in falta[0]["motivo"]
+        assert "FHUS-AS-I01188-26" in falta[0]["motivo"]
+
+    def test_la_factura_ya_radicada_se_explica_distinto(self, client):
+        oA, _ = self._dos_oficios(client)
+        _radicar(client, _factura_id(client, F1))  # queda cerrada en A
+        oC = _crear_oficio(client, radicado="FHUS-AS-I01191-26", fecha="2026-07-23T08:30")
+        _escribir(client, oC["id"], ENV)
+        ficha = client.get(f"/preauditoria/oficios/{oC['id']}").json()
+        falta = self._envio(ficha, ENV)["faltantes"]
+        assert falta[0]["factura"] == F1
+        assert "radicada" in falta[0]["motivo"]
+        assert oA["numero_radicado"] in falta[0]["motivo"]
+
+    def test_si_se_va_a_otro_oficio_el_de_origen_lo_dice(self, client):
+        """Devuelta en A y reingresada en C: el chip de A deja de mentir."""
+        oA, _ = self._dos_oficios(client)
+        _devolver(client, _factura_id(client, F1))
+        oC = _crear_oficio(client, radicado="FHUS-AS-I01192-26", fecha="2026-07-24T08:30")
+        _escribir(client, oC["id"], ENV)  # reingreso: F1 se muda al oficio C
+        fichaA = client.get(f"/preauditoria/oficios/{oA['id']}").json()
+        assert fichaA["total_facturas"] == 0
+        falta = self._envio(fichaA, ENV)["faltantes"]
+        assert falta[0]["factura"] == F1
+        assert "FHUS-AS-I01192-26" in falta[0]["motivo"]
+
+    def test_la_lista_de_oficios_tambien_cuenta_lo_que_quedo(self, client):
+        _, oB = self._dos_oficios(client)
+        items = client.get("/preauditoria/oficios").json()["items"]
+        fila = [o for o in items if o["id"] == oB["id"]][0]
+        assert self._envio(fila, ENV)["en_este_oficio"] == 0
+        # La lista no hace la consulta cara del detalle (no debe volverse lenta).
+        assert "faltantes" not in self._envio(fila, ENV)
+
+    def test_el_envio_normal_no_genera_ningun_aviso(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 120000)])
+        _subir_dgreport(client, [F1, F2])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        ficha = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        e = self._envio(ficha, ENV)
+        assert e["en_este_oficio"] == e["total_facturas"] == 2
+        assert e["faltantes"] == []
+
+    def test_quitar_una_factura_a_proposito_no_deja_avisos(self, client, db_session):
+        """Si el auditor la quitó con la 🗑, el sistema no le insiste."""
+        _actuar_como_admin(db_session)
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700), _rad_fila(ENV, F2, 120000)])
+        _subir_dgreport(client, [F1, F2])
+        o = _crear_oficio(client)
+        _escribir(client, o["id"], ENV)
+        fid = _factura_id(client, F1)
+        assert client.delete(f"/preauditoria/oficios/{o['id']}/facturas/{fid}").status_code == 200
+        ficha = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        e = self._envio(ficha, ENV)
+        assert e["en_este_oficio"] == e["total_facturas"] == 1
+        assert e["faltantes"] == []
