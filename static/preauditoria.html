@@ -469,12 +469,31 @@ async function cargarOficios(page){
         '<td style="color:var(--rojo)">'+o.devueltas+'</td>'+
         '<td><button class="btn btn-borde btn-chico" onclick="abrirOficio('+o.id+')">Abrir</button>'+
         (o.tiene_adres ? ' <button class="btn btn-verde btn-chico" title="Excel con la información completa para ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ ADRES</button>' : '')+
+        (ES_ADMIN ? ' <button class="btn btn-borde btn-chico" title="Corregir el número del oficio (quedó mal digitado)" onclick="corregirOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">✏</button>' : '')+
         (ES_ADMIN ? ' <button class="btn btn-rojo btn-chico" onclick="eliminarOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">🗑</button>' : '')+
         '</td></tr>';
     }).join('');
     pager(document.getElementById('pg-oficios'),d,'cargarOficios');
   }catch(e){ errorTabla('tb-oficios', cols, e); }
 }
+// Corregir el número de un oficio mal digitado (caso real: quedó
+// FHUS-AS-101190-26, con un uno en vez de la I). El número va copiado en las
+// facturas y en el historial: el servidor los corrige todos de una vez.
+async function corregirOficio(id, actual){
+  var nuevo = prompt('Número correcto del oficio.\n\nQuedará así en sus facturas, en el historial y en los informes.', actual);
+  if(nuevo === null) return;
+  nuevo = nuevo.trim();
+  if(!nuevo || nuevo === actual) return;
+  try{
+    var d = await api('/preauditoria/oficios/'+id, {method:'PATCH',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({numero_radicado:nuevo})});
+    await cargarOficios();
+    if(OFICIO_ABIERTO === id) abrirOficio(id);
+    alert('Listo: '+d.antes+' quedó como '+d.ahora+'.\n'+
+      d.facturas+' factura(s) y '+d.eventos+' registro(s) del historial quedaron con el número corregido.');
+  }catch(e){ alert(e.message); }
+}
+
 // Qué oficio está abierto en pantalla, para poder refrescarlo después de
 // auditar una de sus facturas (si no, la ventana se queda con datos viejos y
 // tocaba recargar la página para ver el cambio).

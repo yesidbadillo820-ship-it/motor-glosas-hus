@@ -4610,6 +4610,27 @@ en el oficio nuevo.
 
 ---
 
+### 20-08 (cierre) — Corregir el número de un oficio mal digitado
+
+Un oficio quedó registrado como **FHUS-AS-101190-26**, con un **uno** en vez
+de la **I** (los demás son FHUS-AS-I01162-26). Hasta hoy no había forma de
+arreglarlo: tocaba borrar el oficio —y con él su historia— y volverlo a
+registrar.
+
+**Ahora, en «Oficios y envíos», cada fila tiene un botón ✏** (solo
+administración y coordinación) para corregir el número. El número del oficio
+no es un dato suelto: va copiado en cada factura del oficio y en cada
+renglón de su historial, así que el sistema los corrige todos en la misma
+operación y avisa cuántos quedaron corregidos.
+
+Salvaguardas: no deja dejarlo en blanco, no deja ponerle el número de otro
+oficio ya registrado (dice cuál y de qué fecha), y si dos personas lo
+corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
+
+6 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

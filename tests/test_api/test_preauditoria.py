@@ -2306,3 +2306,78 @@ class TestEnvioSinTodasSusFacturas:
         e = self._envio(ficha, ENV)
         assert e["en_este_oficio"] == e["total_facturas"] == 1
         assert e["faltantes"] == []
+
+
+# ------------------------------------------------------------------
+# Corregir el número de un oficio mal digitado
+# (caso real 20-08-2026: quedó FHUS-AS-101190-26, con un uno por la I)
+# ------------------------------------------------------------------
+
+
+class TestRenombrarOficio:
+    def _con_factura(self, client, radicado="FHUS-AS-101190-26"):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        o = _crear_oficio(client, radicado=radicado)
+        _escribir(client, o["id"], ENV)
+        return o
+
+    def test_el_auditor_no_puede_corregirlo(self, client):
+        o = self._con_factura(client)
+        r = client.patch(
+            f"/preauditoria/oficios/{o['id']}", json={"numero_radicado": "FHUS-AS-I01190-26"}
+        )
+        assert r.status_code == 403
+
+    def test_el_numero_queda_corregido_en_todas_partes(self, client, db_session):
+        _actuar_como_admin(db_session)
+        o = self._con_factura(client)
+        r = client.patch(
+            f"/preauditoria/oficios/{o['id']}", json={"numero_radicado": " fhus-as-i01190-26 "}
+        )
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["antes"] == "FHUS-AS-101190-26"
+        assert d["ahora"] == "FHUS-AS-I01190-26"
+        assert d["facturas"] == 1
+        assert d["eventos"] >= 1
+        # …en el oficio, en la factura del consolidado y en el historial.
+        assert d["oficio"]["numero_radicado"] == "FHUS-AS-I01190-26"
+        hist = client.get(f"/preauditoria/facturas/{F1}/historial").json()
+        assert hist["actual"]["oficio_fhus"] == "FHUS-AS-I01190-26"
+        assert all(
+            e["oficio_fhus"] == "FHUS-AS-I01190-26" for e in hist["eventos"] if e.get("oficio_fhus")
+        )
+
+    def test_no_deja_pisar_el_numero_de_otro_oficio(self, client, db_session):
+        _actuar_como_admin(db_session)
+        o = self._con_factura(client)
+        otro = _crear_oficio(client, radicado="FHUS-AS-I01196-26", fecha="2026-07-25T08:30")
+        r = client.patch(
+            f"/preauditoria/oficios/{o['id']}", json={"numero_radicado": otro["numero_radicado"]}
+        )
+        assert r.status_code == 409
+        assert "otro oficio" in r.json()["detail"]
+
+    def test_el_numero_vacio_se_rechaza_con_mensaje(self, client, db_session):
+        _actuar_como_admin(db_session)
+        o = self._con_factura(client)
+        r = client.patch(f"/preauditoria/oficios/{o['id']}", json={"numero_radicado": "   "})
+        assert r.status_code == 400
+        assert "Escriba el número" in r.json()["detail"]
+
+    def test_dejar_el_mismo_numero_no_rompe_nada(self, client, db_session):
+        _actuar_como_admin(db_session)
+        o = self._con_factura(client)
+        r = client.patch(
+            f"/preauditoria/oficios/{o['id']}", json={"numero_radicado": o["numero_radicado"]}
+        )
+        assert r.status_code == 200
+        assert r.json()["sin_cambios"] is True
+
+    def test_el_oficio_que_no_existe_avisa(self, client, db_session):
+        _actuar_como_admin(db_session)
+        r = client.patch(
+            "/preauditoria/oficios/9999", json={"numero_radicado": "FHUS-AS-I09999-26"}
+        )
+        assert r.status_code == 404
