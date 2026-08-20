@@ -4663,6 +4663,22 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
 
 ---
 
+### 20-08 — Bot de SALUD TOTAL: notificación de glosas → cargue masivo de recepción
+
+- **Nuevo bot `tools/organizar_objeciones_saludtotal.py`** (tercer hermano de
+  SAVIA y FAMISANAR): convierte la notificación de glosas de SALUD TOTAL
+  (6 columnas, export "NotificacionGLS_…") al formato de trabajo de 16
+  columnas para el cargue masivo de recepción. Particularidades resueltas:
+  la factura llega pelada (464306 → HUS0000464306), tres textos venían con el
+  encoding dañado («Ã“» → «Ó», se reparan solos) y **Salud Total no manda el
+  código del servicio, solo el nombre** — la casilla queda vacía, o se
+  homologa por nombre con `--maestro` (acepta un OBJECIONES trabajado tipo
+  LOTE_02 o un listado código|nombre; match exacto, sin inventar).
+- Procesado el archivo real `PARA_MASIVO.xlsx`: 227 objeciones, 2 facturas
+  (HUS0000464306: 197, tipo 2; HUS0000464511: 30, tipo 0), **$67.110.206**
+  glosados. Verificación 227/227 filas fieles a la fuente. 19 pruebas nuevas
+  (149 en verde entre los 3 bots + lector de pesos).
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
