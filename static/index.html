@@ -16897,7 +16897,14 @@ function renderResult(d){
   // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
   // el JS puede togglearla después si la verificación cambia.
   var _qgIssues = (d.verificacion_citas && d.verificacion_citas.issues) || [];
-  var qgOk = !!(d.verificacion_citas && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
+  // 19-08-2026. Antes bastaba con que `verificacion_citas` existiera. Pero el
+  // verificador devuelve ese mismo objeto —vacío— cuando NO pudo revisar (por
+  // ejemplo si no cargó el corpus de normas), así que el sello «VALIDADO POR
+  // QUALITY GATE» se estampaba sobre un dictamen que nadie miró. Ahora se
+  // exige que diga que sí revisó.
+  var _vc = d.verificacion_citas;
+  var _seRevisó = !!(_vc && _vc.verificado !== false);
+  var qgOk = !!(_vc && _seRevisó && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
 
   var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   var consecDoc = d.glosa_id ? ('GL-'+d.glosa_id) : (d.codigo_glosa || '—');
@@ -16915,6 +16922,11 @@ function renderResult(d){
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
     + (d.accion_ia ? renderAccionIA(d) : '')
 
+    +(_vc && _vc.verificado === false
+       ? '<div style="background:#fffbeb;border:2px solid #d97706;border-radius:8px;padding:.7rem .9rem;margin-bottom:.6rem;font-size:.82rem;color:#7c2d12"><b>⚠ Las citas de este dictamen NO se revisaron.</b> '
+         + escHtml(_vc.motivo_no_verificado || 'El verificador no pudo correr.')
+         + '</div>'
+       : '')
     +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
     +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'

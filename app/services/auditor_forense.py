@@ -35,6 +35,8 @@ Funciona via:
 """
 
 from __future__ import annotations
+
+from app.core.config import espera_maxima
 import asyncio
 import os
 import re
@@ -306,7 +308,7 @@ async def auditar_forense(
                 "cache_hit": True,
             }
 
-    timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
+    timeout = httpx.Timeout(connect=15.0, read=espera_maxima(240.0), write=60.0, pool=10.0)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -399,7 +401,9 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
         try:
             from app.services.gemini_service import GeminiService
 
-            gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
+            gem = GeminiService(
+                api_key=gemini_key, default_model=gemini_model, timeout=espera_maxima(240.0)
+            )
             texto, modelo_usado = await gem.completar(
                 system=SYSTEM_AUDITOR_FORENSE,
                 user=user_text,
@@ -446,7 +450,9 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                 pdfs_a_imagenes_combinadas, pdfs_raw, max_imagenes_total=20, dpi=130
             )
             if imagenes:
-                gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
+                gem = GeminiService(
+                    api_key=gemini_key, default_model=gemini_model, timeout=espera_maxima(240.0)
+                )
                 user_text_vision = (
                     f"FACTURA: {factura}\n\n"
                     f"Las imagenes adjuntas son las paginas escaneadas de los soportes "

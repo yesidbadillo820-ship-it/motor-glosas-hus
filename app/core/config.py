@@ -213,6 +213,38 @@ def _exportar_claves_al_entorno(settings: "Settings") -> None:
             _os.environ[nombre_env] = valor
 
 
+# ─── El techo de espera contra el túnel ──────────────────────────────────────
+#
+# El portal se sirve por un túnel que corta la petición alrededor de los 100
+# segundos. Cualquier espera más larga que eso es una carrera perdida de
+# antemano: el túnel contesta primero con un «Error 502» pelado y el auditor
+# no se entera de qué pasó — ni siquiera de que su trabajo se perdió.
+#
+# 19-08-2026. Un barrido del despliegue real encontró OCHO esperas entre 120 y
+# 240 segundos, empezando por la de Groq —que es el camino de TODOS los
+# dictámenes y el único proveedor que la red del hospital deja salir—. Se
+# arreglan de raíz: acá se decide el techo y ninguna llamada lo pasa.
+#
+# Se puede ajustar con TUNEL_CORTA_EN_SEGUNDOS si el túnel cambia.
+def _corte_del_tunel() -> float:
+    import os
+
+    try:
+        return max(20.0, float(os.getenv("TUNEL_CORTA_EN_SEGUNDOS", "100")))
+    except ValueError:
+        return 100.0
+
+
+def espera_maxima(deseado: float, margen: float = 15.0) -> float:
+    """Recorta una espera para que el motor conteste ANTES que el túnel.
+
+    Se deja un margen para que al motor le alcance a armar y enviar su propia
+    respuesta —un mensaje que el auditor pueda leer— en vez de que el túnel lo
+    atropelle a mitad de camino.
+    """
+    return max(10.0, min(float(deseado), _corte_del_tunel() - margen))
+
+
 # Modelos que el proveedor ya retiró: responden 404 y dejan el OCR muerto en
 # silencio. Se ignoran aunque el .env los mande, porque un archivo de
 # configuración viejo en un PC no puede tumbar una herramienta.
