@@ -97,3 +97,8 @@ scratchpad/
 tests/benchmark/salidas/
 tests/benchmark/historial_live.jsonl
 tests/benchmark/historial.jsonl
+
+# Aplicación web del sistema ICFES: se genera con `python -m icfes exportar-web`
+# a partir del banco de preguntas. Es un archivo derivado, no se versiona.
+ICFES.html
+icfes-app.html

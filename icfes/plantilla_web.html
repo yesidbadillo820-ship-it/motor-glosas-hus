@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Preparación ICFES Saber 11</title>
+<style>
+:root{
+  --fondo:#f6f7f9; --tarjeta:#ffffff; --texto:#101828; --suave:#5b6472; --borde:#e3e7ed;
+  --acento:#1d4ed8; --acento-suave:#eff4ff; --ok:#15803d; --ok-suave:#f0fdf4;
+  --mal:#be123c; --mal-suave:#fff1f2; --alerta:#b45309; --alerta-suave:#fffbeb;
+  --sombra:0 1px 2px rgba(16,24,40,.06),0 8px 24px -12px rgba(16,24,40,.18);
+  --radio:14px; --ancho:760px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --fondo:#0d1117; --tarjeta:#161b22; --texto:#e6edf3; --suave:#9aa4b2; --borde:#272e38;
+    --acento:#6ea8fe; --acento-suave:#16233b; --ok:#4ade80; --ok-suave:#12231a;
+    --mal:#fb7185; --mal-suave:#2a1420; --alerta:#fbbf24; --alerta-suave:#291f0c;
+    --sombra:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --fondo:#0d1117; --tarjeta:#161b22; --texto:#e6edf3; --suave:#9aa4b2; --borde:#272e38;
+  --acento:#6ea8fe; --acento-suave:#16233b; --ok:#4ade80; --ok-suave:#12231a;
+  --mal:#fb7185; --mal-suave:#2a1420; --alerta:#fbbf24; --alerta-suave:#291f0c;
+  --sombra:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--texto);
+  font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+.envoltura{max-width:var(--ancho);margin:0 auto;padding:16px 16px 96px}
+h1{font-size:1.35rem;margin:0 0 4px}
+h2{font-size:1.1rem;margin:24px 0 10px}
+h3{font-size:.95rem;margin:0 0 6px}
+p{margin:0 0 10px}
+.silencio{color:var(--suave);font-size:.88rem}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:var(--radio);
+  padding:16px;box-shadow:var(--sombra);margin-bottom:14px}
+.cabecera{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+  padding:14px 0 6px;flex-wrap:wrap}
+.regresiva{font-size:2rem;font-weight:700;line-height:1.1;color:var(--acento)}
+.rejilla{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.cifra{background:var(--acento-suave);border-radius:12px;padding:12px}
+.cifra b{display:block;font-size:1.5rem;line-height:1.2}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--borde);
+  background:var(--tarjeta);color:var(--texto);padding:11px 14px;transition:.15s}
+button:hover{border-color:var(--acento)}
+button:disabled{opacity:.5;cursor:default}
+.primario{background:var(--acento);border-color:var(--acento);color:#fff;font-weight:600}
+.primario:hover{filter:brightness(1.08)}
+.fila{display:flex;gap:8px;flex-wrap:wrap}
+.opcion{display:flex;gap:12px;width:100%;text-align:left;align-items:flex-start;
+  padding:13px 14px;margin-bottom:8px;line-height:1.5}
+.opcion .letra{flex:0 0 26px;height:26px;border-radius:50%;background:var(--acento-suave);
+  color:var(--acento);font-weight:700;display:grid;place-items:center;font-size:.85rem}
+.opcion.buena{background:var(--ok-suave);border-color:var(--ok)}
+.opcion.buena .letra{background:var(--ok);color:#fff}
+.opcion.mala{background:var(--mal-suave);border-color:var(--mal)}
+.opcion.mala .letra{background:var(--mal);color:#fff}
+.contexto{background:var(--acento-suave);border-left:3px solid var(--acento);
+  border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:14px;white-space:pre-wrap;
+  font-size:.93rem;max-height:44vh;overflow:auto}
+.contexto table{border-collapse:collapse;width:100%;font-size:.85rem}
+.contexto td,.contexto th{border:1px solid var(--borde);padding:4px 7px;text-align:left}
+.explica{border-left:3px solid var(--ok);background:var(--ok-suave);padding:12px 14px;
+  border-radius:0 10px 10px 0;margin-top:12px}
+.explica.trampa{border-color:var(--alerta);background:var(--alerta-suave)}
+.barra{height:9px;border-radius:99px;background:var(--borde);overflow:hidden;margin:5px 0 2px}
+.barra i{display:block;height:100%;background:var(--acento);border-radius:99px}
+.medidor{display:flex;justify-content:space-between;font-size:.83rem;color:var(--suave)}
+.marca{display:inline-block;font-size:.74rem;padding:2px 8px;border-radius:99px;
+  background:var(--acento-suave);color:var(--acento);font-weight:600}
+.marca.ok{background:var(--ok-suave);color:var(--ok)}
+.marca.mal{background:var(--mal-suave);color:var(--mal)}
+.marca.alerta{background:var(--alerta-suave);color:var(--alerta)}
+.reloj{position:sticky;top:0;z-index:5;background:var(--tarjeta);border:1px solid var(--borde);
+  border-radius:12px;padding:9px 14px;display:flex;justify-content:space-between;
+  align-items:center;margin-bottom:12px;font-variant-numeric:tabular-nums}
+.reloj.poco{border-color:var(--mal);color:var(--mal)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--tarjeta);
+  border-top:1px solid var(--borde);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;border-radius:0;background:none;padding:11px 4px;font-size:.72rem;
+  color:var(--suave);display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button.activo{color:var(--acento);font-weight:700}
+nav button span{font-size:1.15rem;line-height:1}
+input,select{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--borde);
+  background:var(--fondo);color:var(--texto);width:100%;max-width:100%}
+label{display:block;margin:12px 0 4px;font-size:.87rem;color:var(--suave)}
+table.datos{width:100%;border-collapse:collapse;font-size:.9rem}
+table.datos th,table.datos td{padding:7px 6px;border-bottom:1px solid var(--borde);text-align:left}
+table.datos td.num,table.datos th.num{text-align:right;font-variant-numeric:tabular-nums}
+.aviso{background:var(--alerta-suave);border:1px solid var(--alerta);color:var(--alerta);
+  border-radius:10px;padding:11px 13px;font-size:.87rem;margin-bottom:12px}
+.desplaza{overflow-x:auto}
+@media (max-width:520px){ .regresiva{font-size:1.6rem} .envoltura{padding:12px 12px 92px} }
+</style>
+</head>
+<body>
+<div class="envoltura" id="app"></div>
+<nav id="nav"></nav>
+<script>
+"use strict";
+const DATOS = /*<DATOS>*/{"preguntas":[],"areas":{},"config":null}/*</DATOS>*/;
+/* El bloque de arriba se reemplaza al exportar. Con los valores por defecto la
+   plantilla sigue siendo un HTML válido que se puede abrir tal cual. */
+
+/* ---------------------------------------------------------------- guardado */
+const CLAVE = "icfes.v1";
+function leer(){
+  try{ const c = localStorage.getItem(CLAVE); if(c) return JSON.parse(c); }catch(e){}
+  return null;
+}
+function guardar(){
+  try{ localStorage.setItem(CLAVE, JSON.stringify(E)); }catch(e){}
+}
+const BASE = {config:DATOS.config, intentos:[], tarjetas:{}, simulacros:[]};
+let E = Object.assign({}, BASE, leer() || {});
+if(!E.config) E.config = DATOS.config;
+
+/* ---------------------------------------------------------------- puntajes */
+/* Misma curva declarada en icfes/puntaje.py. Es una ESTIMACIÓN, no el
+   puntaje oficial del ICFES, que usa un modelo estadístico (TRI). */
+const CURVA=[[0,0],[.25,20],[.40,38],[.50,48],[.60,57],[.70,66],[.80,76],[.90,87],[1,100]];
+function interpolar(x,c){
+  if(x<=c[0][0])return c[0][1];
+  if(x>=c[c.length-1][0])return c[c.length-1][1];
+  for(let i=0;i<c.length-1;i++){
+    const [x0,y0]=c[i],[x1,y1]=c[i+1];
+    if(x>=x0&&x<=x1) return x1===x0?y1:y0+(y1-y0)*(x-x0)/(x1-x0);
+  }
+  return c[c.length-1][1];
+}
+function puntajeArea(bien,total){ return total>0?Math.round(interpolar(bien/total,CURVA)):0; }
+function puntajeGlobal(porArea){
+  let num=0,den=0;
+  for(const k of ORDEN){
+    if(porArea[k]===undefined) return null;
+    num+=porArea[k]*DATOS.areas[k].peso; den+=DATOS.areas[k].peso;
+  }
+  return den?Math.round(num/den*5):null;
+}
+function semaforo(p){
+  if(p<36)return["crítico","mal"]; if(p<51)return["en construcción","alerta"];
+  if(p<71)return["sólido",""]; return["alto","ok"];
+}
+function nivelIngles(p){
+  if(p<47)return"Pre-A1"; if(p<58)return"A1"; if(p<68)return"A2"; return"B1";
+}
+const ORDEN=["lectura_critica","matematicas","sociales_ciudadanas","ciencias_naturales","ingles"];
+
+/* ------------------------------------------------------------------ fechas */
+const DIAS=["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
+const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto",
+             "septiembre","octubre","noviembre","diciembre"];
+function hoyISO(){ const d=new Date(); return d.getFullYear()+"-"+
+  String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function aFecha(iso){ const [a,m,d]=iso.split("-").map(Number); return new Date(a,m-1,d); }
+function fechaLarga(iso){ const f=aFecha(iso);
+  return DIAS[(f.getDay()+6)%7]+" "+f.getDate()+" de "+MESES[f.getMonth()]+" de "+f.getFullYear(); }
+function diasEntre(a,b){ return Math.round((aFecha(b)-aFecha(a))/86400000); }
+
+/* ------------------------------------------------------- repaso espaciado */
+/* Misma lógica de icfes/repaso.py (SM-2), incluida la regla de no programar
+   ningún repaso después del examen. */
+function tarjeta(id){
+  return E.tarjetas[id] || {reps:0, facilidad:2.5, intervalo:0, proxima:null};
+}
+function calificarTarjeta(id, calidad, hoy){
+  const t = tarjeta(id); let reps, intervalo;
+  if(calidad < 3){ reps=0; intervalo=1; }
+  else{
+    reps=t.reps+1;
+    intervalo = reps===1?1 : reps===2?6 : Math.max(1,Math.round(t.intervalo*t.facilidad));
+  }
+  const ajuste = 0.1-(5-calidad)*(0.08+(5-calidad)*0.02);
+  const facilidad = Math.max(1.3, t.facilidad+ajuste);
+  const f = aFecha(hoy); f.setDate(f.getDate()+intervalo);
+  let proxima = f.getFullYear()+"-"+String(f.getMonth()+1).padStart(2,"0")+"-"+
+                String(f.getDate()).padStart(2,"0");
+  if(E.config && E.config.examen && proxima >= E.config.examen){
+    const e = aFecha(E.config.examen); e.setDate(e.getDate()-1);
+    proxima = e.getFullYear()+"-"+String(e.getMonth()+1).padStart(2,"0")+"-"+
+              String(e.getDate()).padStart(2,"0");
+  }
+  E.tarjetas[id] = {reps, facilidad, intervalo, proxima};
+  guardar();
+}
+function calidadDe(acerto, segundos, causa){
+  if(!acerto) return (causa==="concepto"||causa==="adivine")?0:(causa?2:1);
+  if(segundos>180) return 3; if(segundos>72) return 4; return 5;
+}
+function vencidas(hoy){
+  return DATOS.preguntas.filter(p=>{
+    const t=E.tarjetas[p.id]; return t && t.proxima && t.proxima<=hoy;
+  });
+}
+
+/* --------------------------------------------------------------- utilidades */
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function contextoHTML(t){
+  const lineas=t.split("\n"); let salida="",tabla=[];
+  const cerrar=()=>{
+    if(!tabla.length) return;
+    salida+='<div class="desplaza"><table>'+tabla.map((f,i)=>{
+      const c=f.split("|").slice(1,-1).map(x=>x.trim());
+      if(c.every(x=>/^:?-+:?$/.test(x))) return "";
+      const et=i===0?"th":"td";
+      return "<tr>"+c.map(x=>"<"+et+">"+negrita(esc(x))+"</"+et+">").join("")+"</tr>";
+    }).join("")+"</table></div>";
+    tabla=[];
+  };
+  for(const l of lineas){
+    if(l.trim().startsWith("|")&&l.trim().endsWith("|")) tabla.push(l.trim());
+    else{ cerrar(); salida+=negrita(esc(l))+"\n"; }
+  }
+  cerrar(); return salida;
+}
+function negrita(s){ return s.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>"); }
+function barajar(pregunta){
+  const orden=pregunta.opciones.map((_,i)=>i);
+  for(let i=orden.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1)); [orden[i],orden[j]]=[orden[j],orden[i]];
+  }
+  return {orden, opciones:orden.map(i=>pregunta.opciones[i]),
+          correcta:orden.indexOf(pregunta.correcta)};
+}
+function muestra(lista,n){
+  const c=lista.slice();
+  for(let i=c.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [c[i],c[j]]=[c[j],c[i]]; }
+  return c.slice(0,n);
+}
+function registrar(p, acerto, segundos, causa){
+  E.intentos.push({fecha:hoyISO(), id:p.id, area:p.area, competencia:p.competencia,
+                   tema:p.tema, acerto, segundos:Math.round(segundos), causa:causa||null});
+  calificarTarjeta(p.id, calidadDe(acerto,segundos,causa), hoyISO());
+}
+
+/* -------------------------------------------------------------- navegación */
+const VISTAS=[["inicio","🏠","Inicio"],["practicar","✍️","Practicar"],
+              ["simulacro","⏱️","Simulacro"],["progreso","📈","Progreso"],
+              ["ajustes","⚙️","Ajustes"]];
+let vista="inicio", sesion=null;
+function ir(v){ vista=v; sesion=null; pintar(); window.scrollTo(0,0); }
+function pintar(){
+  document.getElementById("nav").innerHTML = VISTAS.map(([id,ic,txt])=>
+    `<button class="${id===vista?"activo":""}" onclick="ir('${id}')">
+       <span>${ic}</span>${txt}</button>`).join("");
+  const app=document.getElementById("app");
+  app.innerHTML = ({inicio:vInicio, practicar:vPracticar, simulacro:vSimulacro,
+                    progreso:vProgreso, ajustes:vAjustes}[vista])();
+  if(sesion && sesion.cronometro) arrancarReloj();
+}
+
+/* ------------------------------------------------------------------ inicio */
+function vInicio(){
+  const c=E.config, hoy=hoyISO();
+  const dias = c&&c.examen ? diasEntre(hoy,c.examen) : null;
+  const ultimo = E.simulacros.filter(s=>s.global!==null).slice(-1)[0];
+  const porRepasar = vencidas(hoy).length;
+  const racha = calcularRacha(hoy);
+  let html = `<div class="cabecera"><div>
+      <h1>Preparación ICFES Saber 11</h1>
+      <p class="silencio">${c&&c.examen?fechaLarga(c.examen):"Sin fecha de examen"}</p>
+    </div></div>`;
+  if(dias!==null){
+    html += `<div class="tarjeta"><div class="regresiva">
+      ${dias>0?dias+" días":dias===0?"¡HOY!":"El examen ya pasó"}</div>
+      <p class="silencio">para el examen${dias>0?" · "+Math.floor(dias/7)+" semanas":""}</p>
+      <div class="rejilla" style="margin-top:12px">
+        <div class="cifra"><b>${c.meta}</b><span class="silencio">meta de 500</span></div>
+        <div class="cifra"><b>${ultimo?ultimo.global:"—"}</b>
+          <span class="silencio">último simulacro</span></div>
+        <div class="cifra"><b>${racha}</b><span class="silencio">días de racha</span></div>
+        <div class="cifra"><b>${E.intentos.length}</b>
+          <span class="silencio">preguntas hechas</span></div>
+      </div></div>`;
+  }
+  html += `<div class="tarjeta"><h3>Qué hacer ahora</h3>`;
+  if(porRepasar>0){
+    html += `<p>Tienes <b>${porRepasar}</b> preguntas que ya toca repasar. El repaso es
+      lo más rentable del día: es lo que evita que se te olvide lo estudiado.</p>
+      <button class="primario" onclick="iniciarRepaso()">Repasar ${Math.min(porRepasar,20)} preguntas</button>`;
+  } else if(!ultimo){
+    html += `<p>Todavía no sabes de dónde partes. Haz un simulacro completo: es
+      el que te dice en qué áreas estás y cómo repartir el tiempo.</p>
+      <button class="primario" onclick="ir('simulacro')">Hacer el diagnóstico</button>`;
+  } else {
+    html += `<p>Nada pendiente de repaso. Es buen momento para preguntas nuevas.</p>
+      <button class="primario" onclick="ir('practicar')">Practicar</button>`;
+  }
+  html += `</div>`;
+  if(ultimo){
+    html += `<h2>Cómo vas por área</h2><div class="tarjeta">`;
+    for(const k of ORDEN){
+      const p = ultimo.porArea[k]; if(p===undefined) continue;
+      const [etiqueta,clase]=semaforo(p);
+      html += `<div style="margin-bottom:12px">
+        <div class="medidor"><span>${esc(DATOS.areas[k].nombre)}</span>
+          <span>${p}/100 <span class="marca ${clase}">${etiqueta}</span></span></div>
+        <div class="barra"><i style="width:${p}%"></i></div></div>`;
+    }
+    html += `<p class="silencio">Puntajes estimados por este sistema a partir de tus
+      simulacros, no puntajes oficiales del ICFES.</p></div>`;
+  }
+  return html;
+}
+function calcularRacha(hoy){
+  const dias=new Set(E.intentos.map(i=>i.fecha));
+  if(!dias.size) return 0;
+  let cursor=aFecha(hoy);
+  const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+
+              String(d.getDate()).padStart(2,"0");
+  if(!dias.has(iso(cursor))) cursor.setDate(cursor.getDate()-1);
+  let n=0;
+  while(dias.has(iso(cursor))){ n++; cursor.setDate(cursor.getDate()-1); }
+  return n;
+}
+
+/* --------------------------------------------------------------- practicar */
+function vPracticar(){
+  if(sesion) return vRonda();
+  let html = `<h1>Practicar</h1>
+    <p class="silencio">Escoge un área y una cantidad. Después de cada pregunta vas a
+    ver por qué la respuesta es la correcta y cuál es la trampa.</p>
+    <div class="tarjeta"><label for="areaPractica">Área</label>
+    <select id="areaPractica"><option value="">Todas las áreas</option>`;
+  for(const k of ORDEN){
+    const n=DATOS.preguntas.filter(p=>p.area===k).length;
+    html += `<option value="${k}">${esc(DATOS.areas[k].nombre)} (${n})</option>`;
+  }
+  html += `</select>
+    <label for="cuantas">Cuántas preguntas</label>
+    <select id="cuantas"><option>5</option><option selected>10</option>
+      <option>15</option><option>20</option></select>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+      <input type="checkbox" id="soloNuevas" style="width:auto" checked>
+      Solo preguntas que no he visto</label>
+    <div class="fila" style="margin-top:14px">
+      <button class="primario" onclick="iniciarPractica()">Empezar</button></div></div>`;
+  const debiles = competenciasDebiles(3);
+  if(debiles.length){
+    html += `<h2>Por aquí deberías empezar</h2><div class="tarjeta">
+      <p class="silencio">Tus competencias más flojas, según lo que has respondido:</p>`;
+    for(const d of debiles){
+      html += `<div style="margin-bottom:10px"><div class="medidor">
+        <span>${esc(d.nombre)}</span><span>${Math.round(d.p*100)}%</span></div>
+        <div class="barra"><i style="width:${d.p*100}%"></i></div></div>`;
+    }
+    html += `</div>`;
+  }
+  return html;
+}
+function iniciarPractica(){
+  const area=document.getElementById("areaPractica").value;
+  const n=parseInt(document.getElementById("cuantas").value,10);
+  const nuevas=document.getElementById("soloNuevas").checked;
+  const vistos=new Set(E.intentos.map(i=>i.id));
+  let pool=DATOS.preguntas.filter(p=>!area||p.area===area);
+  if(nuevas){
+    const frescas=pool.filter(p=>!vistos.has(p.id));
+    if(frescas.length) pool=frescas;
+  }
+  if(!pool.length){ alert("No hay preguntas para ese filtro."); return; }
+  sesion={modo:"practica", preguntas:muestra(pool,n), i:0, bien:0, respuestas:{},
+          inicio:Date.now(), cronometro:false, mostrando:false};
+  pintar();
+}
+function iniciarRepaso(){
+  const lista=vencidas(hoyISO());
+  if(!lista.length){ alert("No hay nada pendiente de repaso."); return; }
+  vista="practicar";
+  sesion={modo:"repaso", preguntas:muestra(lista,Math.min(20,lista.length)), i:0, bien:0,
+          respuestas:{}, inicio:Date.now(), cronometro:false, mostrando:false};
+  pintar(); window.scrollTo(0,0);
+}
+
+/* --------------------------------------------------------------- simulacro */
+function vSimulacro(){
+  if(sesion) return vRonda();
+  const conteo={}; for(const k of ORDEN) conteo[k]=DATOS.preguntas.filter(p=>p.area===k).length;
+  const totalBanco=DATOS.preguntas.length;
+  let html=`<h1>Simulacro</h1>
+    <p class="silencio">Con la estructura y el tiempo del examen real. En la sesión 1 hay
+    2 minutos y 15 segundos por pregunta; en la sesión 2, 2 minutos y 1 segundo.
+    Sin explicaciones hasta el final, como en el examen.</p>
+    <div class="aviso">El banco tiene ${totalBanco} preguntas y el examen real trae 254,
+    así que los simulacros se arman <b>a escala</b>: misma proporción por área y
+    los mismos segundos por pregunta, pero más cortos. Entrenan el ritmo, no el
+    cansancio de las 4 h 30.</div>
+    <div class="tarjeta"><label for="tipoSim">Tipo de simulacro</label>
+    <select id="tipoSim">
+      <option value="completo">Examen completo (las cinco áreas)</option>
+      <option value="sesion1">Sesión 1 (Lectura Crítica + Mat + Soc + Naturales)</option>
+      <option value="sesion2">Sesión 2 (Inglés + Mat + Soc + Naturales)</option>`;
+  for(const k of ORDEN) html+=`<option value="area:${k}">Solo ${esc(DATOS.areas[k].nombre)}</option>`;
+  html+=`</select>
+    <label for="topeSim">Tope de preguntas</label>
+    <select id="topeSim"><option>20</option><option selected>40</option>
+      <option>60</option><option value="999">Todas las que haya</option></select>
+    <div class="fila" style="margin-top:14px">
+      <button class="primario" onclick="iniciarSimulacro()">Empezar con cronómetro</button>
+    </div></div>`;
+  const hechos=E.simulacros.slice().reverse();
+  if(hechos.length){
+    html+=`<h2>Simulacros anteriores</h2><div class="tarjeta desplaza">
+      <table class="datos"><tr><th>Fecha</th><th>Tipo</th><th class="num">Aciertos</th>
+      <th class="num">Global</th></tr>`;
+    for(const s of hechos.slice(0,12)){
+      html+=`<tr><td>${s.fecha}</td><td>${esc(s.tipo)}</td>
+        <td class="num">${s.bien}/${s.total}</td>
+        <td class="num">${s.global!==null?s.global:"—"}</td></tr>`;
+    }
+    html+=`</table></div>`;
+  }
+  return html;
+}
+const REPARTO={
+  completo:{lectura_critica:41,matematicas:50,sociales_ciudadanas:50,ciencias_naturales:58,ingles:55},
+  sesion1:{lectura_critica:41,matematicas:25,sociales_ciudadanas:25,ciencias_naturales:29},
+  sesion2:{ingles:55,matematicas:25,sociales_ciudadanas:25,ciencias_naturales:29}
+};
+const SEGUNDOS={completo:128,sesion1:135,sesion2:121};
+function iniciarSimulacro(){
+  const tipo=document.getElementById("tipoSim").value;
+  const tope=parseInt(document.getElementById("topeSim").value,10);
+  let oficial, segundos;
+  if(tipo.startsWith("area:")){
+    const k=tipo.slice(5);
+    oficial={}; oficial[k]=DATOS.areas[k].preguntas; segundos=135;
+  } else { oficial=REPARTO[tipo]; segundos=SEGUNDOS[tipo]; }
+  const totalOficial=Object.values(oficial).reduce((a,b)=>a+b,0);
+  let escala=Math.min(1,tope/totalOficial);
+  for(const k in oficial){
+    const hay=DATOS.preguntas.filter(p=>p.area===k).length;
+    escala=Math.min(escala, hay/oficial[k]);
+  }
+  const preguntas=[];
+  for(const k in oficial){
+    const cuantas=Math.max(1,Math.round(oficial[k]*escala));
+    preguntas.push(...muestra(DATOS.preguntas.filter(p=>p.area===k),cuantas));
+  }
+  if(!preguntas.length){ alert("No hay preguntas suficientes."); return; }
+  vista="simulacro";
+  sesion={modo:"simulacro", tipo, preguntas:muestra(preguntas,preguntas.length), i:0, bien:0,
+          respuestas:{}, inicio:Date.now(), cronometro:true, mostrando:false,
+          limite:preguntas.length*segundos, escala:preguntas.length/totalOficial};
+  pintar();
+}
+let temporizador=null;
+function arrancarReloj(){
+  if(temporizador) clearInterval(temporizador);
+  const pintarReloj=()=>{
+    const caja=document.getElementById("reloj"); if(!caja||!sesion) return;
+    const usados=(Date.now()-sesion.inicio)/1000;
+    const queda=Math.max(0,sesion.limite-usados);
+    const m=Math.floor(queda/60), s=Math.floor(queda%60);
+    caja.querySelector("b").textContent=m+":"+String(s).padStart(2,"0");
+    caja.classList.toggle("poco", queda<sesion.limite*0.15);
+    if(queda<=0){ clearInterval(temporizador); temporizador=null; terminar(); }
+  };
+  pintarReloj(); temporizador=setInterval(pintarReloj,1000);
+}
+
+/* ------------------------------------------------------- ronda de preguntas */
+function vRonda(){
+  const s=sesion;
+  if(s.i>=s.preguntas.length) return vResultado();
+  const p=s.preguntas[s.i];
+  if(!s.barajado) s.barajado=barajar(p);
+  const b=s.barajado;
+  const letras=["A","B","C","D"];
+  let html="";
+  if(s.cronometro){
+    html+=`<div class="reloj" id="reloj"><span>Pregunta ${s.i+1} de ${s.preguntas.length}</span>
+      <b>--:--</b></div>`;
+  }
+  html+=`<div class="medidor"><span>${esc(DATOS.areas[p.area].nombre)} · ${esc(p.competencia)}</span>
+      <span>${s.i+1} / ${s.preguntas.length}</span></div>
+    <div class="barra" style="margin-bottom:14px">
+      <i style="width:${s.i/s.preguntas.length*100}%"></i></div>`;
+  if(p.contexto) html+=`<div class="contexto">${contextoHTML(p.contexto)}</div>`;
+  html+=`<div class="tarjeta"><h3>${negrita(esc(p.enunciado))}</h3><div style="margin-top:12px">`;
+  for(let i=0;i<b.opciones.length;i++){
+    let clase="";
+    if(s.mostrando){
+      if(i===b.correcta) clase="buena";
+      else if(i===s.elegida) clase="mala";
+    }
+    html+=`<button class="opcion ${clase}" ${s.mostrando?"disabled":""}
+      onclick="responder(${i})"><span class="letra">${letras[i]}</span>
+      <span>${negrita(esc(b.opciones[i]))}</span></button>`;
+  }
+  html+=`</div>`;
+  if(!s.mostrando && s.modo!=="simulacro"){
+    html+=`<button onclick="responder(null)" class="silencio"
+      style="border:0;background:none;padding:6px 0">No sé — saltar</button>`;
+  }
+  if(s.mostrando && s.modo!=="simulacro"){
+    html+=`<div class="explica"><b>${s.elegida===b.correcta?"✓ Correcta":"✗ Incorrecta"}.</b>
+      ${negrita(esc(p.explicacion))}</div>`;
+    if(p.trampa) html+=`<div class="explica trampa"><b>La trampa:</b> ${negrita(esc(p.trampa))}</div>`;
+    if(s.elegida!==b.correcta && !s.causaPedida){
+      html+=`<div style="margin-top:14px"><p class="silencio">
+        ¿Por qué fallaste? Esto arma tu cuaderno de errores.</p><div class="fila">`;
+      const causas=[["concepto","No sabía el tema"],["lectura","Entendí mal la pregunta"],
+        ["calculo","Me equivoqué en la cuenta"],["tiempo","Iba de afán"],
+        ["descuido","Marqué otra sin querer"],["adivine","Adiviné"]];
+      for(const [k,t] of causas) html+=`<button onclick="marcarCausa('${k}')">${t}</button>`;
+      html+=`</div></div>`;
+    }
+  }
+  if(s.mostrando){
+    html+=`<div class="fila" style="margin-top:16px">
+      <button class="primario" onclick="siguiente()">
+        ${s.i+1>=s.preguntas.length?"Ver resultado":"Siguiente"}</button></div>`;
+  }
+  html+=`</div><div class="fila"><button onclick="if(confirm('¿Terminar la sesión?'))terminar()">
+    Terminar</button></div>`;
+  return html;
+}
+function responder(i){
+  const s=sesion, p=s.preguntas[s.i], b=s.barajado;
+  s.elegida=i;
+  s.segundos=(Date.now()-(s.marcaPregunta||s.inicio))/1000;
+  const acerto = i===b.correcta;
+  if(acerto) s.bien++;
+  if(i!==null) s.respuestas[p.id]=b.orden[i];
+  s.acertoActual=acerto;
+  if(s.modo==="simulacro"){
+    registrar(p, acerto, s.segundos, acerto?null:"adivine");
+    siguiente();
+  } else {
+    s.mostrando=true; s.causaPedida=false;
+    if(acerto){ registrar(p, true, s.segundos, null); s.causaPedida=true; }
+    pintar();
+  }
+}
+function marcarCausa(causa){
+  const s=sesion, p=s.preguntas[s.i];
+  registrar(p, false, s.segundos||60, causa);
+  s.causaPedida=true; pintar();
+}
+function siguiente(){
+  const s=sesion, p=s.preguntas[s.i];
+  if(s.mostrando && !s.causaPedida) registrar(p, false, s.segundos||60, null);
+  s.i++; s.mostrando=false; s.elegida=undefined; s.barajado=null;
+  s.causaPedida=false; s.marcaPregunta=Date.now();
+  if(s.i>=s.preguntas.length) terminar(); else pintar();
+}
+function terminar(){
+  if(temporizador){ clearInterval(temporizador); temporizador=null; }
+  const s=sesion;
+  if(s.modo==="simulacro" && !s.guardado){
+    const porArea={}, totales={};
+    for(const p of s.preguntas.slice(0,Math.max(s.i,1))){
+      totales[p.area]=(totales[p.area]||0)+1;
+      const r=s.respuestas[p.id];
+      porArea[p.area]=(porArea[p.area]||0)+((r!==undefined&&r===p.correcta)?1:0);
+    }
+    const puntajes={};
+    for(const k in totales) puntajes[k]=puntajeArea(porArea[k],totales[k]);
+    E.simulacros.push({fecha:hoyISO(), tipo:s.tipo, bien:s.bien, total:s.preguntas.length,
+      porArea:puntajes, global:puntajeGlobal(puntajes), escala:s.escala,
+      segundos:Math.round((Date.now()-s.inicio)/1000)});
+    guardar(); s.guardado=true;
+  }
+  s.i=s.preguntas.length; s.mostrando=false; pintar();
+}
+function vResultado(){
+  const s=sesion;
+  const totales={}, bien={};
+  for(const p of s.preguntas){
+    totales[p.area]=(totales[p.area]||0)+1;
+    const r=s.respuestas[p.id];
+    bien[p.area]=(bien[p.area]||0)+((r!==undefined&&r===p.correcta)?1:0);
+  }
+  const puntajes={}; for(const k in totales) puntajes[k]=puntajeArea(bien[k],totales[k]);
+  const glob=puntajeGlobal(puntajes);
+  const pct=s.preguntas.length?Math.round(s.bien/s.preguntas.length*100):0;
+  let html=`<h1>Resultado</h1><div class="tarjeta">
+    <div class="regresiva">${s.bien} / ${s.preguntas.length}</div>
+    <p class="silencio">${pct}% de acierto ·
+      ${Math.round((Date.now()-s.inicio)/60000)} minutos</p>`;
+  if(glob!==null){
+    html+=`<div class="rejilla" style="margin-top:12px">
+      <div class="cifra"><b>${glob}</b><span class="silencio">global estimado de 500</span></div>
+      <div class="cifra"><b>${E.config?E.config.meta:"—"}</b>
+        <span class="silencio">tu meta</span></div></div>`;
+  }
+  html+=`</div>`;
+  if(s.modo==="simulacro" && s.escala && s.escala<0.99){
+    html+=`<div class="aviso">Simulacro a escala ${Math.round(s.escala*100)}% del examen real.
+      Sirve para compararte contigo mismo a lo largo del año, no para anunciar un puntaje.</div>`;
+  }
+  html+=`<h2>Por área</h2><div class="tarjeta">`;
+  for(const k of ORDEN){
+    if(totales[k]===undefined) continue;
+    const p=puntajes[k], [etq,cl]=semaforo(p);
+    html+=`<div style="margin-bottom:12px"><div class="medidor">
+      <span>${esc(DATOS.areas[k].nombre)}</span>
+      <span>${bien[k]}/${totales[k]} · ${p}/100 <span class="marca ${cl}">${etq}</span></span></div>
+      <div class="barra"><i style="width:${p}%"></i></div></div>`;
+  }
+  if(totales["ingles"]!==undefined){
+    html+=`<p class="silencio">Inglés — nivel estimado ${nivelIngles(puntajes["ingles"])} del
+      Marco Común Europeo.</p>`;
+  }
+  html+=`</div>`;
+  const fallas=s.preguntas.filter(p=>{
+    const r=s.respuestas[p.id]; return r===undefined || r!==p.correcta;
+  });
+  if(fallas.length){
+    html+=`<h2>Lo que fallaste (${fallas.length})</h2>`;
+    for(const p of fallas){
+      html+=`<div class="tarjeta"><div class="medidor">
+        <span class="silencio">${esc(DATOS.areas[p.area].nombre)} · ${esc(p.tema)}</span></div>
+        <h3 style="margin-top:6px">${negrita(esc(p.enunciado))}</h3>
+        <p><b>Respuesta correcta:</b> ${negrita(esc(p.opciones[p.correcta]))}</p>
+        <div class="explica">${negrita(esc(p.explicacion))}</div>`;
+      if(p.trampa) html+=`<div class="explica trampa"><b>La trampa:</b> ${negrita(esc(p.trampa))}</div>`;
+      html+=`</div>`;
+    }
+  }
+  html+=`<div class="fila"><button class="primario" onclick="ir('inicio')">Volver al inicio</button>
+    <button onclick="ir('${s.modo==='simulacro'?'simulacro':'practicar'}')">Otra ronda</button></div>`;
+  return html;
+}
+
+/* -------------------------------------------------------------- progreso */
+function competenciasDebiles(n){
+  const acum={};
+  for(const i of E.intentos){
+    const a=acum[i.competencia]||(acum[i.competencia]=[0,0]);
+    a[1]++; if(i.acerto) a[0]++;
+  }
+  return Object.entries(acum).filter(([,v])=>v[1]>=4)
+    .map(([k,v])=>({nombre:k,p:v[0]/v[1],n:v[1]}))
+    .sort((a,b)=>a.p-b.p).slice(0,n);
+}
+function vProgreso(){
+  const hoy=hoyISO();
+  let html=`<h1>Progreso</h1>`;
+  if(!E.intentos.length){
+    return html+`<div class="tarjeta"><p>Todavía no has respondido ninguna pregunta.
+      Empieza por un simulacro para saber de dónde partes.</p>
+      <button class="primario" onclick="ir('simulacro')">Hacer el diagnóstico</button></div>`;
+  }
+  const conGlobal=E.simulacros.filter(s=>s.global!==null);
+  html+=`<div class="tarjeta"><div class="rejilla">
+    <div class="cifra"><b>${E.intentos.length}</b><span class="silencio">preguntas hechas</span></div>
+    <div class="cifra"><b>${calcularRacha(hoy)}</b><span class="silencio">días de racha</span></div>
+    <div class="cifra"><b>${conGlobal.length}</b><span class="silencio">simulacros</span></div>
+    <div class="cifra"><b>${Object.keys(E.tarjetas).length}</b>
+      <span class="silencio">en repaso</span></div></div></div>`;
+
+  if(conGlobal.length>=2 && E.config && E.config.examen){
+    const pts=conGlobal.map(s=>[diasEntre(conGlobal[0].fecha,s.fecha), s.global]);
+    const n=pts.length, mx=pts.reduce((a,p)=>a+p[0],0)/n, my=pts.reduce((a,p)=>a+p[1],0)/n;
+    const varr=pts.reduce((a,p)=>a+(p[0]-mx)**2,0);
+    if(varr>0){
+      const m=pts.reduce((a,p)=>a+(p[0]-mx)*(p[1]-my),0)/varr, b=my-m*mx;
+      const d=diasEntre(conGlobal[0].fecha, E.config.examen);
+      const proy=Math.max(0,Math.min(500,Math.round(b+m*d)));
+      html+=`<div class="tarjeta"><h3>Proyección al día del examen</h3>
+        <div class="regresiva">${proy}</div>
+        <p class="silencio">Si sostienes el ritmo actual (${(m*30).toFixed(0)} puntos al mes).
+        ${n<3?"Con menos de 3 simulacros esta proyección todavía no es confiable.":
+          proy<E.config.meta?"A ese ritmo te faltarían "+(E.config.meta-proy)+
+          " puntos para tu meta.":"A ese ritmo alcanzas tu meta."}</p></div>`;
+    }
+  }
+  const debiles=competenciasDebiles(6);
+  if(debiles.length){
+    html+=`<h2>Competencias más flojas</h2><div class="tarjeta">`;
+    for(const d of debiles){
+      html+=`<div style="margin-bottom:12px"><div class="medidor">
+        <span>${esc(d.nombre)}</span><span>${Math.round(d.p*100)}% · ${d.n} preg.</span></div>
+        <div class="barra"><i style="width:${d.p*100}%"></i></div></div>`;
+    }
+    html+=`</div>`;
+  }
+  const causas={}; let totalFallas=0;
+  for(const i of E.intentos){ if(!i.acerto&&i.causa){ causas[i.causa]=(causas[i.causa]||0)+1; totalFallas++; } }
+  const REMEDIOS={concepto:["No sabía el tema","Estudiar el tema de cero y volver a practicarlo en 2 días."],
+    lectura:["Entendí mal la pregunta","Subrayar qué piden antes de mirar las opciones."],
+    calculo:["Me equivoqué en la cuenta","Hacer la operación en el papel, no de memoria."],
+    tiempo:["Iba de afán","Practicar con cronómetro y saltar lo que se atasque."],
+    descuido:["Marqué otra sin querer","Revisar que la letra marcada sea la que se pensó."],
+    adivine:["Adiviné","Es un vacío de tema: mandarlo directo al plan de estudio."]};
+  if(totalFallas){
+    html+=`<h2>Por qué estás fallando</h2><div class="tarjeta">`;
+    for(const [k,v] of Object.entries(causas).sort((a,b)=>b[1]-a[1])){
+      const [nombre,remedio]=REMEDIOS[k]||[k,""];
+      html+=`<div style="margin-bottom:14px"><div class="medidor">
+        <span><b>${nombre}</b></span><span>${v} veces · ${Math.round(v/totalFallas*100)}%</span></div>
+        <div class="barra"><i style="width:${v/totalFallas*100}%"></i></div>
+        <p class="silencio" style="margin-top:4px">Qué hacer: ${remedio}</p></div>`;
+    }
+    html+=`</div>`;
+  }
+  const repetidas={};
+  for(const i of E.intentos) if(!i.acerto) repetidas[i.id]=(repetidas[i.id]||0)+1;
+  const tercas=Object.entries(repetidas).filter(([,v])=>v>=2).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if(tercas.length){
+    html+=`<h2>Preguntas que has fallado más de una vez</h2><div class="tarjeta">
+      <p class="silencio">Estas son las que de verdad no sabes. El repaso espaciado ya
+      las tiene marcadas.</p><div class="desplaza"><table class="datos">`;
+    for(const [id,v] of tercas){
+      const p=DATOS.preguntas.find(q=>q.id===id);
+      html+=`<tr><td>${esc(id)}</td><td>${p?esc(p.tema):""}</td>
+        <td class="num">${v} fallas</td></tr>`;
+    }
+    html+=`</table></div></div>`;
+  }
+  return html;
+}
+
+/* --------------------------------------------------------------- ajustes */
+function vAjustes(){
+  const c=E.config||{};
+  return `<h1>Ajustes</h1>
+    <div class="tarjeta">
+      <label for="fx">Fecha del examen</label>
+      <input type="date" id="fx" value="${c.examen||""}">
+      <label for="mt">Meta de puntaje global (0 a 500)</label>
+      <input type="number" id="mt" min="0" max="500" value="${c.meta||400}">
+      <label for="hs">Horas de estudio por semana</label>
+      <input type="number" id="hs" min="1" max="60" step="0.5" value="${c.horas||12}">
+      <div class="fila" style="margin-top:16px">
+        <button class="primario" onclick="guardarAjustes()">Guardar</button></div>
+    </div>
+    <h2>Tus datos</h2>
+    <div class="tarjeta">
+      <p class="silencio">Todo tu avance se guarda solo en este navegador: nadie más lo ve
+      y no se sube a ningún lado. Si cambias de computador o borras los datos del
+      navegador, se pierde. Por eso conviene exportarlo de vez en cuando.</p>
+      <div class="fila">
+        <button onclick="exportarDatos()">Descargar mi avance</button>
+        <button onclick="document.getElementById('importar').click()">Cargar un avance</button>
+        <input type="file" id="importar" accept=".json" style="display:none"
+          onchange="importarDatos(this)">
+      </div>
+      <div class="fila" style="margin-top:16px">
+        <button onclick="borrarTodo()">Borrar todo mi avance</button></div>
+    </div>
+    <h2>Sobre los puntajes</h2>
+    <div class="tarjeta"><p class="silencio">
+      El puntaje global (0 a 500) se calcula con la fórmula oficial del ICFES:
+      Lectura Crítica, Matemáticas, Sociales y Ciencias Naturales pesan 3 cada una,
+      Inglés pesa 1, se divide entre 13 y se multiplica por 5.<br><br>
+      El puntaje de cada área (0 a 100) es una <b>estimación de este sistema</b> a
+      partir del porcentaje que aciertas. El ICFES usa un modelo estadístico que pesa
+      cada pregunta según su dificultad real, y eso no se puede replicar aquí. Úsalo
+      para compararte contigo mismo, no como un pronóstico exacto.<br><br>
+      Las preguntas de este banco son de práctica, escritas siguiendo la estructura y
+      las competencias del Saber 11. No son preguntas del examen real. Los cuadernillos
+      oficiales de práctica los publica el ICFES gratis en su página.</p></div>`;
+}
+function guardarAjustes(){
+  const fx=document.getElementById("fx").value;
+  const mt=parseInt(document.getElementById("mt").value,10);
+  const hs=parseFloat(document.getElementById("hs").value);
+  if(!fx){ alert("Falta la fecha del examen."); return; }
+  E.config={examen:fx, meta:isNaN(mt)?400:Math.max(0,Math.min(500,mt)), horas:isNaN(hs)?12:hs};
+  guardar(); ir("inicio");
+}
+function exportarDatos(){
+  const texto=JSON.stringify(E,null,2);
+  const area=document.createElement("textarea");
+  area.value=texto; area.style.width="100%"; area.style.height="220px";
+  const caja=document.createElement("div"); caja.className="tarjeta";
+  caja.innerHTML="<h3>Copia este texto y guárdalo en un archivo</h3>"+
+    "<p class='silencio'>Selecciona todo (Ctrl+A o mantén pulsado) y cópialo. "+
+    "Para restaurarlo, pega el archivo con «Cargar un avance».</p>";
+  caja.appendChild(area);
+  document.getElementById("app").prepend(caja);
+  area.focus(); area.select();
+}
+function importarDatos(input){
+  const archivo=input.files&&input.files[0]; if(!archivo) return;
+  const lector=new FileReader();
+  lector.onload=()=>{
+    try{
+      const datos=JSON.parse(lector.result);
+      if(!datos || typeof datos!=="object") throw new Error("formato");
+      E=Object.assign({}, BASE, datos);
+      guardar(); alert("Avance cargado."); ir("inicio");
+    }catch(e){ alert("Ese archivo no tiene el formato correcto."); }
+  };
+  lector.readAsText(archivo);
+}
+function borrarTodo(){
+  if(!confirm("Se borra TODO tu avance de este navegador. ¿Seguro?")) return;
+  E=JSON.parse(JSON.stringify(BASE)); guardar(); ir("inicio");
+}
+
+pintar();
+</script>
+</body>
+</html>
