@@ -5436,6 +5436,25 @@ bien. Si encuentra uno de esos al lado, lo nombra.
 
 - 9 pruebas en `tests/test_core/test_si_falta_el_env_se_avisa.py`.
 
+### 20-08 (noche) — La contraseña de Gmail se pega con espacios
+
+Google muestra la contraseña de aplicación en cuatro grupos de cuatro —«abcd
+efgh ijkl mnop»— y uno la pega tal cual, que es lo natural. **Los espacios son
+solo para leerla**, no son parte de la clave.
+
+El problema: algunos servidores la aceptan así y otros la rechazan, y el error
+que devuelven es **el mismo** «Username and Password not accepted» que sale
+cuando la clave está de verdad equivocada. Uno se pone a generar claves nuevas
+sin necesidad.
+
+Ahora el motor le quita los espacios **solo** cuando la clave tiene la forma
+exacta de una contraseña de aplicación de Google (16 letras o números en 4
+grupos de 4). Cualquier otra se manda tal cual: hay servidores de correo donde
+un espacio **sí** es parte de la contraseña, y tocarla ahí sería romperla.
+
+- 12 pruebas en `tests/test_services/test_la_clave_de_gmail_con_espacios.py`,
+  la mitad dedicadas a lo que NO se debe tocar.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
