@@ -4904,6 +4904,49 @@ decisión ya estaba tomada y tenía sus pruebas.
 - 7 pruebas nuevas en `tests/test_services/test_verificacion_contractual.py`,
   al lado de las que ya cuidaban el tema.
 
+### 20-08 (noche) — Cargadas las tarifas de la Resolución 283 de 2026
+
+Yesid mandó **`TARIFAS_INSTITUCIONALES_RES_283.xlsx`**, la resolución nueva de
+tarifas institucionales del HUS. Al compararla con lo que el motor ya tenía
+cargado (Res. 054/2026 + 124/2026) salió que:
+
+- **662 procedimientos NUEVOS** que el motor no conocía. Sin ellos, cuando la
+  EPS glosaba uno de esos códigos el dictamen no podía dar el valor propio del
+  hospital. Ahí está buena parte del laboratorio: baciloscopia ($96.800),
+  troponina I ($172.700), dengue IgM ($104.000), leishmania, mycobacterium…
+- **22 tarifas que YA estaban y cambiaron de valor.** El hospital venía
+  defendiendo cifras viejas: **HIERRO TOTAL a $50.000 cuando la resolución
+  dice $66.500**; TROPONINA T a $90.900 cuando dice $109.100; renina a
+  $108.400 cuando dice $131.300. En esas glosas se estaba pidiendo de menos.
+- Ninguna igual.
+
+**Cómo quedó.** El catálogo pasó de **1.932 a 2.594 tarifas**. La 283 **se
+suma**, no reemplaza: no se dio de baja ninguna de las que hoy se usan para
+defender. Donde los dos catálogos pisan el mismo código, manda la 283 por ser
+más reciente.
+
+**Cada tarifa cita su propia resolución.** Una tarifa de la 283 cita la 283;
+una de las anteriores sigue citando la 054 + 124. La EPS verifica la norma
+citada: citar una resolución que no contiene esa tarifa es regalarle el
+argumento.
+
+**Cuatro códigos quedaron FUERA a propósito.** La resolución los publica
+repetidos con valores distintos —`399802` HEMOFILTRACIÓN VENOVENOSA sale a
+$5.450.000, $7.260.000 y $9.075.000— y no dice cuál aplica a cada caso.
+Elegir uno sería inventarle una cifra al dictamen. Cuando aparezca uno de
+esos, el motor **avisa que la tarifa está publicada por niveles y que hay que
+verificarla contra el nivel prestado**, en vez de afirmar la que no es.
+
+> **Pendiente para Yesid:** decirnos qué distingue los niveles de esos cuatro
+> códigos (399802 hemofiltración, 399502 hemoperfusión, 399601 perfusión de
+> cuerpo entero, 908338 aminoácidos/metabolitos). Con esa regla entran al
+> catálogo automático.
+
+- Para volver a cargar una resolución futura:
+  `python tools/generar_tarifas_propias_hus_json.py --res283 RUTA.xlsx`
+- 18 pruebas nuevas en `tests/test_services/test_tarifas_res_283_2026.py`,
+  incluidas las que vigilan que **no se haya perdido** ninguna tarifa vieja.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

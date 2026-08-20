@@ -407,14 +407,62 @@ def buscar_tarifa_propia_hus(cups_o_codigo_ips: str) -> dict | None:
     catalogo = tarifas_propias_hus_completas()
     fila = catalogo.get(k) or catalogo.get(_cups_base(k))
     if fila:
+        # 20-08-2026: el catálogo pasó a tener tarifas de varias resoluciones.
+        # La ficha dice de cuál sale cada una para que el dictamen cite la que
+        # corresponde y no una derogada — la EPS verifica la norma citada.
         return {
             "codigo_ips": fila.get("codigo_ips") or k,
             "factor_smdlv": None,
             "valor_pesos_2026": int(fila["valor"]),
             "descripcion": fila.get("descripcion", ""),
             "norma": f"Tarifa propia HUS 2026 ({fila.get('tipo', 'PROPIA')})",
+            "resolucion": _RESOLUCIONES.get(
+                fila.get("norma", ""), "Resolución 054 de 2026 + Resolución 124 de 2026 ESE HUS"
+            ),
         }
     return None
+
+
+# Cómo se cita cada resolución en el dictamen. La clave es lo que el generador
+# graba en el catálogo; sin clave, la cita histórica (054 + 124 de 2026).
+_RESOLUCIONES: dict[str, str] = {
+    "RES_283_2026": "Resolución 283 de 2026 ESE HUS",
+}
+
+
+def tarifa_por_niveles(cups: str) -> list[int] | None:
+    """Los valores de un CUPS que la resolución publica por NIVELES.
+
+    20-08-2026. La Res. 283/2026 trae cuatro códigos repetidos con valores
+    distintos —399802 HEMOFILTRACIÓN VENOVENOSA a $5.450.000, $7.260.000 y
+    $9.075.000— sin decir cuál aplica a cada caso. Quedaron FUERA del catálogo
+    a propósito: elegir uno sería inventarle al dictamen una cifra que puede no
+    ser la del paciente.
+
+    Devolverlos acá permite que el motor AVISE («esta tarifa tiene tres
+    niveles, verifíquela») en vez de callar o de afirmar la que no es.
+    """
+    if not cups:
+        return None
+    meta = _meta_propias()
+    niveles = (meta.get("res_283_2026") or {}).get("por_niveles_excluidos") or {}
+    k = str(cups).strip().upper()
+    return niveles.get(k) or niveles.get(_cups_base(k))
+
+
+def _meta_propias() -> dict:
+    """El bloque `_meta` del catálogo comprimido (leído una sola vez)."""
+    global _CACHE_META_PROPIAS
+    if _CACHE_META_PROPIAS is not None:
+        return _CACHE_META_PROPIAS
+    meta: dict = {}
+    try:
+        with gzip.open(_RUTA_PROPIAS, "rt", encoding="utf-8") as f:
+            meta = json.load(f).get("_meta", {}) or {}
+    except (OSError, EOFError, ValueError, KeyError, TypeError):
+        meta = {}
+    _CACHE_META_PROPIAS = meta
+    return meta
 
 
 # ─── Manual SOAT 2026 completo — Circular Externa 047 de 2025 ───────────────
@@ -440,6 +488,7 @@ _RUTA_PROPIAS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "data", "tarifas_propias_hus.json.gz"
 )
 _CACHE_PROPIAS: dict[str, dict] | None = None
+_CACHE_META_PROPIAS: dict | None = None
 
 
 def tarifas_soat_2026_completas() -> dict[str, tuple[float, int, str, str]]:
@@ -528,14 +577,29 @@ def contexto_tarifa_oficial(cups: str) -> str:
 
     hus = buscar_tarifa_propia_hus(cups)
     if hus:
+        _res = hus.get("resolucion") or "Res. 054/2026 + Res. 124/2026 ESE HUS"
         bloques.append(
-            f"[TARIFA PROPIA HUS - Res. 124/2026 · código IPS {hus['codigo_ips']}]\n"
+            f"[TARIFA PROPIA HUS - {_res} · código IPS {hus['codigo_ips']}]\n"
             f"Descripción: {hus['descripcion']}\n"
             f"Factor: {hus['factor_smdlv']} SMDLV → Valor oficial 2026: "
             f"${hus['valor_pesos_2026']:,.0f}\n"
             "Este es el valor exacto publicado en la resolución institucional. "
             "Si la EPS reconoce un valor menor sin soporte contractual, defender "
-            "la tarifa oficial citando la Res. 124 de marzo 25 de 2026 ESE HUS."
+            f"la tarifa oficial citando la {_res}."
+        )
+
+    # Tarifa publicada por niveles: se avisa, no se elige.
+    niveles = tarifa_por_niveles(cups)
+    if niveles:
+        _lista = ", ".join(_pesos(v) for v in niveles)
+        bloques.append(
+            f"[TARIFA PROPIA HUS POR NIVELES - CUPS {cups}]\n"
+            f"La Resolución 283 de 2026 publica este código con {len(niveles)} "
+            f"valores distintos: {_lista}.\n"
+            "NO afirmes ninguno de esos valores como la tarifa del caso: la "
+            "resolución no dice cuál aplica. Indica que la tarifa institucional "
+            "de este procedimiento está publicada por niveles y debe verificarse "
+            "contra el nivel efectivamente prestado."
         )
 
     soat = buscar_tarifa_soat_2026(cups)
@@ -563,8 +627,10 @@ def tarifa_a_banner_dict(cups: str) -> dict | None:
             "valor_pactado": float(hus["valor_pesos_2026"]),
             "tipo_tarifa": "VALOR_FIJO",
             "factor_ajuste": 0.0,
-            "modalidad": "TARIFA PROPIA HUS (Res. 124/2026)",
-            "contrato_numero": "Resolución 054 de 2026 + Resolución 124 de 2026 ESE HUS",
+            "modalidad": f"TARIFA PROPIA HUS ({hus.get('resolucion') or 'Res. 124/2026'})",
+            "contrato_numero": (
+                hus.get("resolucion") or "Resolución 054 de 2026 + Resolución 124 de 2026 ESE HUS"
+            ),
             "fuente_archivo": "Catálogo oficial HUS",
             "eps": None,
             "vigencia_desde": None,
