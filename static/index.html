@@ -17768,9 +17768,16 @@ function _bindKanbanDragDrop(){
                estadoNuevo === 'RESPONDIDA' ? 'RESPONDIDA' :
                estadoNuevo === 'CONCILIADA' ? 'CONCILIADA' : 'RADICADA';
       try{
-        var r = await fetch('/glosas/'+gid+'/workflow', {
-          method:'POST', headers:{'Content-Type':'application/json',...authH()},
-          body: JSON.stringify({estado_nuevo: wf, nota: 'Drag desde Kanban'}),
+        // 20-08-2026. Acá se llamaba a POST /glosas/{id}/workflow, que NO
+        // existe: el backend expone PATCH, y encima ese endpoint es del flujo
+        // de aprobación (BORRADOR/EN_REVISION/APROBADA), no del estado de la
+        // glosa. El Kanban mueve entre RADICADA / RESPONDIDA / CONCILIADA, que
+        // es lo que atiende PATCH /glosas/{id}/estado. Resultado: arrastrar una
+        // tarjeta contestaba 405, la glosa se quedaba donde estaba y salía el
+        // aviso genérico «No se pudo cambiar el estado».
+        // Ese endpoint recibe el estado por la URL, no en el cuerpo.
+        var r = await fetch('/glosas/'+gid+'/estado?nuevo_estado='+encodeURIComponent(wf), {
+          method:'PATCH', headers:authH(),
         });
         if(r.ok){
           toast('Movido', 'Glosa #'+gid+' → '+estadoNuevo, 'success');
