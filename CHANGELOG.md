@@ -1,5 +1,33 @@
 # Registro de cambios
 
+## Sesión 20-ago-2026 (cierre) — Bot de doble clic del ICFES y guías corregidas
+
+**Falla del primer uso real:** los comandos de la guía se corrieron desde
+`C:\Users\cartera` y Python respondió `No module named icfes`. `python -m icfes`
+requiere que la consola esté dentro de la carpeta del repositorio, y ninguna de
+las tres guías lo decía.
+
+### Cambios
+- **`tools/ICFES.cmd`** (nuevo): bot de doble clic con menú completo — hoy,
+  practicar, repasar, simulacro, progreso, plan, configurar y exportar la app.
+  Hace `cd /d "%~dp0.."` antes de llamar a Python, así que el error no puede
+  ocurrir; y verifica que Python esté instalado antes de intentar nada.
+- **`docs/GUIA_SISTEMA_ICFES.md`**, **`docs/ESTRATEGIA_ICFES_400.md`** y
+  **`README.md`**: el doble clic va primero, el `cd` aparece como paso cero y se
+  explica qué significa `No module named icfes`.
+
+### Pruebas (`tests/test_icfes/test_bots_windows.py`, 12 nuevas)
+- Los bots del ICFES se paran en la carpeta del repositorio y avisan si falta
+  Python.
+- El menú no llama a ningún subcomando que no exista en el CLI (se valida
+  contra el parser real).
+- Los bots no traen credenciales.
+- **Todos los `.cmd` del repositorio conservan finales de línea CRLF.** Esta
+  regla estaba en `.gitattributes` y en CLAUDE.md pero no tenía prueba; con LF
+  la ventana se cierra en Windows sin ejecutar nada.
+
+Total del módulo: 251 pruebas.
+
 ## Sesión 20-ago-2026 — Sistema de preparación para el ICFES Saber 11 (`icfes/`)
 
 Módulo **independiente** del Motor de Glosas: no importa nada de `app/` ni de

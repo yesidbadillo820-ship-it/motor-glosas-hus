@@ -36,7 +36,12 @@ por fases, repaso espaciado, simulacros cronometrados y cuaderno de errores.
 
 No depende de `app/` ni de librerías externas (solo Python 3.11 estándar).
 
+En Windows, doble clic en `tools\ICFES.cmd` (menú) o `tools\ICFES_APP.cmd`
+(genera la app web). Desde la consola, **hay que estar dentro de la carpeta del
+repositorio** o Python responde `No module named icfes`:
+
 ```bash
+cd C:\temp-notas                                   # la carpeta del repositorio
 python -m icfes iniciar --examen 2027-08-08 --meta 400 --horas 12
 python -m icfes hoy
 python -m icfes exportar-web --salida ICFES.html   # app que funciona sin internet

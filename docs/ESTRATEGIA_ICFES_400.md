@@ -184,7 +184,14 @@ en su página: haz todos, completos y cronometrados, sobre todo en la fase 3.
 
 ## 5. Cómo arranca la semana 1
 
+La forma más simple es **doble clic en `tools\ICFES.cmd`**, que abre un menú
+con todo. Si prefieres escribir los comandos, el `cd` de la primera línea no es
+opcional: sin él, Python responde `No module named icfes`.
+
 ```bash
+# 0. Pararse en la carpeta del repositorio (sin esto, nada funciona)
+cd C:\temp-notas
+
 # 1. Configurar (una sola vez)
 python -m icfes iniciar --examen 2027-08-08 --meta 400 --horas 12 --nombre "Tu nombre"
 
@@ -199,7 +206,8 @@ python -m icfes hoy
 ```
 
 O, más cómodo para el día a día: genera la aplicación web con doble clic en
-`tools\ICFES_APP.cmd` y estudia desde el celular.
+`tools\ICFES_APP.cmd` y estudia desde el celular. Esa aplicación no necesita
+Python, ni consola, ni estar en ninguna carpeta: doble clic y ya.
 
 **El primer diagnóstico probablemente te va a dar bajo. Eso es lo que se
 busca.** Un diagnóstico que sale bien no sirve para repartir el tiempo; uno que
