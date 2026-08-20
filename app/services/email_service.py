@@ -48,6 +48,68 @@ def _build_html_base(titulo: str, contenido: str) -> str:
 """
 
 
+def _anotar(destinatario: str, asunto: str, aceptado: bool, error: str = "") -> None:
+    """Envoltura a prueba de todo alrededor del registro.
+
+    20-08-2026. `_anotar_envio` ya se protege por dentro, pero eso solo cubre
+    los fallos que él conoce. Si algo revienta antes —un import roto, la base
+    caída de otra forma—, la excepción subiría y tumbaría un correo que ya
+    estaba listo para salir. El registro es secundario: JAMÁS puede costar un
+    envío.
+    """
+    try:
+        _anotar_envio(destinatario, asunto, aceptado, error)
+    except Exception:  # pragma: no cover - defensivo a propósito
+        pass
+
+
+def _anotar_envio(destinatario: str, asunto: str, aceptado: bool, error: str = "") -> None:
+    """Deja constancia del intento en la base (20-08-2026).
+
+    Yesid configuró el correo y preguntó «¿cómo miro eso acá?». Hasta ahora no
+    se podía: cada correo salía sin dejar rastro en el portal, y para saber si
+    algo se había enviado había que entrar a la bandeja de Gmail de la cuenta
+    que envía — justo lo que un auditor no debería tener que hacer.
+
+    Nunca tumba un envío: si el registro falla, el correo ya salió y eso es lo
+    que importa.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import EnvioCorreoRecord
+
+        db = SessionLocal()
+        try:
+            db.add(
+                EnvioCorreoRecord(
+                    destinatario=(destinatario or "")[:200],
+                    asunto=(asunto or "")[:300],
+                    contexto=_contexto_de(asunto),
+                    aceptado=bool(aceptado),
+                    error=(error or "")[:2000] or None,
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:  # pragma: no cover - el registro es secundario
+        logger.debug(f"No se pudo anotar el envío de correo: {e}")
+
+
+def _contexto_de(asunto: str) -> str:
+    """De qué pantalla salió el correo, deducido del asunto."""
+    a = (asunto or "").lower()
+    if "prueba" in a:
+        return "prueba"
+    if "recepción" in a or "recepcion" in a:
+        return "recepcion"
+    if "vence" in a or "vencimiento" in a:
+        return "vencimientos"
+    if "lote" in a or "batch" in a:
+        return "lote"
+    return "otro"
+
+
 def _enviar_sync(
     destinatario: str,
     asunto: str,
@@ -57,6 +119,7 @@ def _enviar_sync(
     cfg = get_settings()
     if not cfg.smtp_user or not cfg.smtp_password:
         logger.warning("Email no configurado: SMTP_USER o SMTP_PASSWORD vacíos")
+        _anotar(destinatario, asunto, False, "El servidor no tiene correo configurado")
         return False
 
     try:
@@ -96,9 +159,11 @@ def _enviar_sync(
             f"Email enviado a {destinatario}: {asunto}"
             + (f" (con {len(adjuntos)} adjunto/s)" if adjuntos else "")
         )
+        _anotar(destinatario, asunto, True)
         return True
     except Exception as e:
         logger.error(f"Error enviando email a {destinatario}: {e}")
+        _anotar(destinatario, asunto, False, f"{type(e).__name__}: {e}")
         return False
 
 

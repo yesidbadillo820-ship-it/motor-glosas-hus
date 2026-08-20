@@ -26,6 +26,7 @@ from datetime import date, datetime, timedelta
 from io import BytesIO
 from typing import Optional
 
+from app.core.logging_utils import logger
 from sqlalchemy import func as sa_func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -585,10 +586,39 @@ def _upsert_por_bloques(db: Session, filas: list[dict], aplicar) -> dict:
     retoma donde quedó, porque el upsert nunca duplica.
     """
     totales = {"nuevas": 0, "actualizadas": 0, "sin_cambio": 0}
+    procesadas = 0
     for i in range(0, len(filas), TAM_BLOQUE_UPSERT):
-        parciales = aplicar(filas[i : i + TAM_BLOQUE_UPSERT])
-        for clave in totales:
+        bloque = filas[i : i + TAM_BLOQUE_UPSERT]
+        try:
+            parciales = aplicar(bloque)
+        except Exception as e:
+            # 20-08-2026. Antes la excepción salía derecho y el auditor veía un
+            # error a secas, como si no se hubiera guardado NADA. Pero los
+            # bloques anteriores YA están confirmados en la base: creerlos
+            # perdidos lleva a rehacer trabajo que no hace falta, o peor, a
+            # dudar de lo que sí quedó.
+            #
+            # No se traga el error: se devuelve junto con lo que sí entró, y en
+            # qué fila se quedó. Volver a subir el mismo archivo retoma donde
+            # quedó, porque el upsert nunca duplica.
+            db.rollback()
+            logger.warning(
+                f"[preauditoria] el cargue se cortó en la fila {procesadas + 1} "
+                f"de {len(filas)}: {type(e).__name__}: {e}"
+            )
+            totales["error"] = (
+                f"El cargue se cortó en la fila {procesadas + 1} de {len(filas)}. "
+                f"Las {procesadas} anteriores SÍ quedaron guardadas. "
+                "Vuelva a subir el mismo archivo: retoma donde quedó y no duplica nada."
+            )
+            totales["filas_procesadas"] = procesadas
+            totales["completo"] = False
+            return totales
+        for clave in ("nuevas", "actualizadas", "sin_cambio"):
             totales[clave] += parciales[clave]
+        procesadas += len(bloque)
+    totales["filas_procesadas"] = procesadas
+    totales["completo"] = True
     return totales
 
 

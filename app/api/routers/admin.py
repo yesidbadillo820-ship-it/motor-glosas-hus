@@ -5464,3 +5464,68 @@ async def probar_correo(
             "smtp_user": cfg.smtp_user,
         },
     }
+
+
+@router.get("/correos-recientes")
+def correos_recientes(
+    limite: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Los últimos intentos de envío del motor, con su resultado.
+
+    20-08-2026. Yesid configuró el correo y preguntó «¿cómo miro eso acá?».
+    Hasta ahora no se podía: cada correo salía sin dejar rastro en el portal.
+
+    IMPORTANTE, y va en la respuesta para que la pantalla lo diga: acá queda
+    si el servidor de correo ACEPTÓ el mensaje. Que LLEGUE al buzón del gestor
+    es otra cosa — si la dirección no existe, el rebote llega minutos después
+    a la cuenta que envía y no se ve desde acá. Prometer entrega sería mentir.
+    """
+    from app.models.db import EnvioCorreoRecord
+
+    limite = max(1, min(int(limite or 100), 500))
+    filas = (
+        db.query(EnvioCorreoRecord)
+        .order_by(EnvioCorreoRecord.creado_en.desc(), EnvioCorreoRecord.id.desc())
+        .limit(limite)
+        .all()
+    )
+
+    envios = [
+        {
+            "id": f.id,
+            "destinatario": f.destinatario,
+            "asunto": f.asunto,
+            "contexto": f.contexto,
+            "aceptado": bool(f.aceptado),
+            "error": f.error,
+            "cuando": f.creado_en.isoformat() if f.creado_en else None,
+        }
+        for f in filas
+    ]
+
+    # Cuántos por buzón: sirve para ver de una que una dirección concentra los
+    # fallos, que es lo que pasa cuando el correo no existe.
+    por_destinatario: dict[str, dict] = {}
+    for e in envios:
+        d = por_destinatario.setdefault(
+            e["destinatario"], {"destinatario": e["destinatario"], "aceptados": 0, "fallidos": 0}
+        )
+        d["aceptados" if e["aceptado"] else "fallidos"] += 1
+
+    return {
+        "envios": envios,
+        "por_destinatario": sorted(
+            por_destinatario.values(), key=lambda d: -(d["aceptados"] + d["fallidos"])
+        ),
+        "total": len(envios),
+        "aceptados": sum(1 for e in envios if e["aceptado"]),
+        "fallidos": sum(1 for e in envios if not e["aceptado"]),
+        "advertencia": (
+            "Esta lista dice si el servidor de correo ACEPTÓ el mensaje, "
+            "no si llegó al buzón. Cuando una dirección no existe, "
+            "el rebote «Address not found» llega minutos después "
+            "a la cuenta que envía los correos, y ahí sí hay que mirarlo."
+        ),
+    }

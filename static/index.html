@@ -4710,6 +4710,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <button class="btn-sm" onclick="cargarBillingForense()" style="background:#fef2f2;color:#991b1b;border-color:#fecaca;">Billing forense IA</button>
             <button class="btn-sm" onclick="cargarIAStatus()" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0;">Estado de IAs</button>
             <button class="btn-sm" onclick="probarCorreo(this)" style="background:#fefce8;color:#854d0e;border-color:#fde68a;">📧 Probar correo</button>
+            <button class="btn-sm" onclick="verCorreosRecientes(this)" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe;">📬 Correos enviados</button>
           </div>
         </div>
         <div id="diag-correo" style="margin-bottom:1rem;"></div>
@@ -16542,6 +16543,63 @@ async function probarCorreo(btn){
     if(caja) caja.innerHTML = '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:14px 16px;border-radius:8px;color:#991b1b">No se pudo consultar: '+escHtml(String(e))+'</div>';
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = '📧 Probar correo'; }
+  }
+}
+
+
+// 📬 Correos enviados (20-08-2026). Yesid configuró el correo y preguntó
+// «¿cómo miro eso acá?». Antes no se podía: cada correo salía sin dejar
+// rastro en el portal, y para saber si algo había salido tocaba entrar a la
+// bandeja de Gmail de la cuenta que envía.
+//
+// Se dice CLARO qué muestra y qué no: acá queda si el servidor ACEPTÓ el
+// mensaje. Que llegue al buzón es otra cosa, y el rebote «Address not found»
+// aparece minutos después en la cuenta que envía, no acá.
+async function verCorreosRecientes(btn){
+  var caja = document.getElementById('diag-correo');
+  if(btn){ btn.disabled = true; btn.textContent = 'Consultando…'; }
+  try{
+    var r = await fetch('/admin/correos-recientes?limite=100', {headers: authH()});
+    var d = await r.json();
+    if(!caja) return;
+    if(!d || !d.envios || !d.envios.length){
+      caja.innerHTML = '<div style="background:#f8fafc;border:1px solid var(--border);padding:14px 16px;border-radius:8px">'
+        + 'Todavía no hay ningún envío registrado. Los correos que salieron ANTES de hoy no aparecen: '
+        + 'el registro empezó con este cambio.</div>';
+      return;
+    }
+    var h = '<div style="background:#f8fafc;border:1px solid var(--border);padding:14px 16px;border-radius:8px">'
+      + '<div style="font-weight:800;margin-bottom:.5rem">📬 Últimos '+d.total+' envíos · '
+      + '<span style="color:#15803d">'+d.aceptados+' aceptados</span> · '
+      + '<span style="color:#b91c1c">'+d.fallidos+' fallidos</span></div>';
+
+    h += '<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:.7rem">'
+       + '<tr style="text-align:left;color:var(--text3)"><th style="padding:3px 8px 3px 0">Buzón</th>'
+       + '<th style="padding:3px 8px">Aceptados</th><th style="padding:3px 8px">Fallidos</th></tr>';
+    (d.por_destinatario||[]).slice(0,20).forEach(function(x){
+      h += '<tr><td style="padding:3px 8px 3px 0">'+escHtml(x.destinatario)+'</td>'
+         + '<td style="padding:3px 8px;color:#15803d">'+x.aceptados+'</td>'
+         + '<td style="padding:3px 8px;color:'+(x.fallidos?'#b91c1c':'var(--text3)')+'">'+x.fallidos+'</td></tr>';
+    });
+    h += '</table>';
+
+    var fallidos = d.envios.filter(function(e){ return !e.aceptado; });
+    if(fallidos.length){
+      h += '<div style="font-weight:700;color:#b91c1c;margin:.6rem 0 .3rem">Los que fallaron al salir</div>';
+      fallidos.slice(0,15).forEach(function(e){
+        h += '<div style="font-size:.8rem;margin-bottom:.25rem">'
+           + '<b>'+escHtml(e.destinatario)+'</b> — '+escHtml(e.error||'sin detalle')+'</div>';
+      });
+    }
+
+    h += '<div style="margin-top:.8rem;padding:.6rem .8rem;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:6px;font-size:.8rem;color:#92400e">'
+       + escHtml(d.advertencia||'') + '</div>';
+    h += '</div>';
+    caja.innerHTML = h;
+  }catch(e){
+    if(caja) caja.innerHTML = '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:14px 16px;border-radius:8px;color:#991b1b">No se pudo consultar: '+escHtml(String(e))+'</div>';
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '📬 Correos enviados'; }
   }
 }
 
