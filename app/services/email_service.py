@@ -234,6 +234,52 @@ def emails_por_gestor(gestores_nombres: list, db=None) -> dict[str, list[str]]:
     return salida
 
 
+def _hay_glosas_medicas(resumen: dict) -> bool:
+    """¿El lote trae glosas de pertinencia o calidad?
+
+    Son las que no se pueden contestar desde cartera sin concepto clínico: el
+    plan de trabajo ya las marca con `con_medico`.
+    """
+    for glosas in (resumen.get("por_gestor") or {}).values():
+        for g in glosas or []:
+            if (g.get("plan") or {}).get("con_medico"):
+                return True
+    return False
+
+
+def emails_de_medicos_auditores(db=None) -> list[str]:
+    """A qué correos llega lo médico. Vacío si nadie los ha señalado.
+
+    20-08-2026 (pedido de Yesid: «que también les llegue al correo de las
+    doctoras»). Dos maneras de decir quiénes son, y sirve cualquiera:
+
+      · `MEDICOS_AUDITORES_EMAIL` en el .env, separados por coma;
+      · el campo «equipo» del usuario, con algo que diga MEDIC.
+
+    A propósito NO se deduce del rol ni del correo: que alguien sea
+    SUPER_ADMIN, o que su correo empiece por «auditor», no lo vuelve médico.
+    Mandarle historia clínica a quien no es del área por una corazonada del
+    sistema sería peor que no mandarla.
+    """
+    correos: set[str] = set()
+    try:
+        crudo = get_settings().medicos_auditores_email or ""
+        correos.update(e.strip().lower() for e in crudo.split(",") if e.strip())
+    except Exception:  # pragma: no cover - una config rota no tumba el envío
+        pass
+
+    if db is not None:
+        try:
+            from app.models.db import UsuarioRecord
+
+            for u in db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all():
+                if u.email and "MEDIC" in (u.equipo or "").upper():
+                    correos.add(u.email.strip().lower())
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"No se pudo leer el equipo de los usuarios: {e}")
+    return sorted(correos)
+
+
 _COLOR_URGENCIA = {
     "VENCIDA": "#111827",
     "HOY": "#b91c1c",
@@ -359,8 +405,16 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     gestores = list(por_gestor_dict.keys())
     emails_gestores = _buscar_emails_por_gestor(gestores, db=db) if db is not None else []
 
+    # Las médicas auditoras entran SOLO si el lote trae glosas médicas: si no,
+    # se les llenaría el buzón de tarifas y facturación que no les competen, y
+    # terminarían ignorando también las que sí.
+    hay_medicas = _hay_glosas_medicas(resumen)
+    emails_medicos = emails_de_medicos_auditores(db=db) if hay_medicas else []
+
     # Union sin duplicados
-    destinatarios = sorted({*(e.lower() for e in destinatarios_base), *emails_gestores})
+    destinatarios = sorted(
+        {*(e.lower() for e in destinatarios_base), *emails_gestores, *emails_medicos}
+    )
     if not destinatarios:
         logger.warning("Sin destinatarios: ni ALERTAS_EMAIL ni usuarios-gestor matcheados")
         # Este es el peor caso y el más silencioso: NADIE recibió nada. Se
@@ -486,6 +540,8 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
         # coincide con ningún usuario activo del portal.
         "gestores_sin_correo": sorted(g for g, correos in cruce.items() if not correos),
         "difusion_general": sorted(destinatarios_base),
+        "hay_glosas_medicas": hay_medicas,
+        "medicos_auditores": emails_medicos,
     }
     return exitos
 

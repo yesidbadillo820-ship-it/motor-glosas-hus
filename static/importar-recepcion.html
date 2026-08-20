@@ -491,6 +491,21 @@ function pintarDetalleDelCorreo(c){
        + fallidos.map(function(x){ return esc(x.email); }).join(' · ') + '</div>';
   }
 
+  if(c.hay_glosas_medicas){
+    if((c.medicos_auditores || []).length){
+      h += '<div class="ok" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
+         + ' (pertinencia o calidad) y también se les envió a las médicas auditoras:<br>'
+         + c.medicos_auditores.map(esc).join(' · ') + '</div>';
+    } else {
+      h += '<div class="err" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
+         + ' (pertinencia o calidad) pero <b>NO hay médicas auditoras registradas</b>,'
+         + ' así que no le llegó a ninguna.<br><span style="font-size:.85em">Para arreglarlo:'
+         + ' escriba <code>AUDITORIA MEDICA</code> en el campo «equipo» de esas usuarias, en'
+         + ' la pantalla de Usuarios. O configure MEDICOS_AUDITORES_EMAIL en el servidor.'
+         + '</span></div>';
+    }
+  }
+
   var ok = (c.destinatarios || []).filter(function(x){ return x.ok; });
   if(ok.length){
     var filas = Object.keys(c.por_gestor || {}).sort().map(function(g){

@@ -184,3 +184,106 @@ class TestElResumenDiceAQuienLeLlego:
         }
         await es.enviar_resumen_importacion_recepcion(resumen, db=db)
         assert resumen["correo"]["gestores_sin_correo"] == ["GESTOR QUE NO EXISTE"]
+
+
+class TestElCorreoDeLasDoctoras:
+    """«Tener presente que también les llegue al correo de las doctoras»
+    (pedido de Yesid, 20-08-2026).
+
+    Las médicas auditoras entran SOLO cuando el lote trae glosas médicas
+    —pertinencia o calidad—, que son las que no se pueden contestar desde
+    cartera sin concepto clínico. Si entraran siempre, se les llenaría el
+    buzón de tarifas y facturación que no les competen, y terminarían
+    ignorando también las que sí.
+    """
+
+    def _resumen(self, con_medico: bool) -> dict:
+        return {
+            "total": 1,
+            "creadas": 1,
+            "actualizadas": 0,
+            "ratificadas": 0,
+            "extemporaneas": 0,
+            "semaforo": {},
+            "por_gestor": {
+                "IRMA RIOS": [
+                    {"factura": "HUS1", "plan": {"con_medico": con_medico}},
+                ]
+            },
+        }
+
+    def _con_doctoras(self, db):
+        """Marca a LAURA DIAZ como del equipo médico — que es exactamente lo
+        que hace el coordinador en la pantalla de Usuarios."""
+        from app.models.db import UsuarioRecord
+
+        u = (
+            db.query(UsuarioRecord)
+            .filter(UsuarioRecord.email == "auditorhus01@sinacsc.com")
+            .first()
+        )
+        u.equipo = "AUDITORIA MEDICA"
+        db.commit()
+
+    def test_una_glosa_medica_se_reconoce(self, db):
+        from app.services.email_service import _hay_glosas_medicas
+
+        assert _hay_glosas_medicas(self._resumen(True))
+        assert not _hay_glosas_medicas(self._resumen(False))
+
+    def test_se_las_encuentra_por_el_campo_equipo(self, db):
+        from app.services.email_service import emails_de_medicos_auditores
+
+        self._con_doctoras(db)
+        assert emails_de_medicos_auditores(db=db) == ["auditorhus01@sinacsc.com"]
+
+    def test_o_por_la_configuracion_del_servidor(self, db, monkeypatch):
+        from app.core.config import get_settings
+        from app.services.email_service import emails_de_medicos_auditores
+
+        cfg = get_settings()
+        monkeypatch.setattr(
+            cfg, "medicos_auditores_email", "dra1@hus.gov.co, dra2@hus.gov.co", raising=False
+        )
+        correos = emails_de_medicos_auditores(db=None)
+        assert correos == ["dra1@hus.gov.co", "dra2@hus.gov.co"]
+
+    def test_sin_señalarlas_no_se_adivina_quien_es_medico(self, db):
+        """Ser SUPER_ADMIN, o tener un correo que empiece por «auditor», NO
+        vuelve médico a nadie. Mandarle historia clínica a quien no es del
+        área por una corazonada del sistema sería peor que no mandarla."""
+        from app.services.email_service import emails_de_medicos_auditores
+
+        assert emails_de_medicos_auditores(db=db) == []
+
+    @pytest.mark.asyncio
+    async def test_con_glosas_medicas_les_llega(self, db, monkeypatch):
+        from app.services import email_service as es
+
+        async def _ok(destinatario, asunto, html):
+            return True
+
+        monkeypatch.setattr(es, "enviar_email", _ok)
+        self._con_doctoras(db)
+        resumen = self._resumen(True)
+        await es.enviar_resumen_importacion_recepcion(resumen, db=db)
+        correo = resumen["correo"]
+        assert correo["hay_glosas_medicas"] is True
+        assert "auditorhus01@sinacsc.com" in correo["medicos_auditores"]
+        assert any(d["email"] == "auditorhus01@sinacsc.com" for d in correo["destinatarios"])
+
+    @pytest.mark.asyncio
+    async def test_sin_glosas_medicas_NO_les_llega(self, db, monkeypatch):
+        from app.services import email_service as es
+
+        async def _ok(destinatario, asunto, html):
+            return True
+
+        monkeypatch.setattr(es, "enviar_email", _ok)
+        self._con_doctoras(db)
+        resumen = self._resumen(False)
+        await es.enviar_resumen_importacion_recepcion(resumen, db=db)
+        correo = resumen["correo"]
+        assert correo["hay_glosas_medicas"] is False
+        assert correo["medicos_auditores"] == []
+        assert all(d["email"] != "auditorhus01@sinacsc.com" for d in correo["destinatarios"])
