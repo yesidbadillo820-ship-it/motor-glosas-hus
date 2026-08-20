@@ -115,6 +115,9 @@
 
     <div id="omitidas" style="margin-top:16px"></div>
     <div id="errores" style="margin-top:20px"></div>
+
+    <!-- Qué hacer con cada glosa (lo pinta pintarPlanDeTrabajo) -->
+    <div id="plan-trabajo"></div>
   </div>
 
   <div id="historial-card" class="card">
@@ -405,9 +408,152 @@ function mostrarResultado(d){
       d.errores.map(e=>`<div class="err">${e}</div>`).join('');
   }
 
+  // El plan de trabajo: qué hacer con cada glosa, no solo cuántas llegaron.
+  pintarPlanDeTrabajo(d);
+
   // Refrescar el historial para que la nueva importación quede
   // descargable aunque el usuario recargue la página.
   cargarHistorial();
+}
+
+// ─── Plan de trabajo por gestor ─────────────────────────────────────────────
+// 20-08-2026. Yesid: «que en la página esta recepción sea más intuitiva, sepan
+// qué entidad deben trabajar, cómo la deben trabajar, qué respuesta es la más
+// adecuada, los tiempos de radicación vs el tiempo de la notificación de la
+// glosa; si es médica que se trabaje en conjunto con el médico auditor; si son
+// extemporáneas tener cuidado; las ratificadas de una vez que salga el mensaje
+// de texto fijo».
+//
+// El plan lo arma el motor (app/services/plan_de_trabajo.py) y viaja dentro de
+// `por_gestor`. Acá solo se pinta — así el correo y la pantalla dicen SIEMPRE
+// lo mismo.
+
+var COLOR_URGENCIA = {
+  VENCIDA: '#111827', HOY: '#b91c1c', URGENTE: '#dc2626',
+  PRONTO: '#b45309', NORMAL: '#15803d'
+};
+
+function esc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pesos(v){
+  // El formato de la plata es UNO SOLO en todo el portal: `window.SDS_FMT.cop`
+  // (de sinac-ux.js, que esta página ya carga). Escribirlo a mano con
+  // `toLocaleString` fue justo lo que una prueba del repo atrapó el 20-08:
+  // dos formatos distintos para el mismo peso confunden al auditor y hacen
+  // que un valor se lea distinto según la pantalla.
+  if (window.SDS_FMT && window.SDS_FMT.cop) return window.SDS_FMT.cop(v);
+  var n = Math.round(Number(v || 0)) || 0;              // respaldo si aún no cargó
+  return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function pintarPlanDeTrabajo(d){
+  var cont = document.getElementById('plan-trabajo');
+  if(!cont) return;
+  var porGestor = d.por_gestor || {};
+  var gestores = Object.keys(porGestor);
+  if(!gestores.length){ cont.innerHTML = ''; return; }
+
+  // Primero lo urgente: dentro de cada gestor, por prioridad y luego por plata.
+  function ordenar(gs){
+    return gs.slice().sort(function(a,b){
+      var pa = (a.plan && a.plan.prioridad != null) ? a.plan.prioridad : 3;
+      var pb = (b.plan && b.plan.prioridad != null) ? b.plan.prioridad : 3;
+      if(pa !== pb) return pa - pb;
+      return Number(b.valor || 0) - Number(a.valor || 0);
+    });
+  }
+
+  var html = '<h3 style="margin:24px 0 4px;color:#1e3a8a">🧭 Qué hacer con cada glosa</h3>'
+    + '<div style="font-size:13px;color:#6b7280;margin-bottom:14px">'
+    + 'Ordenadas por urgencia. Lo de arriba es lo que hay que trabajar primero.</div>';
+
+  gestores.sort();
+  for(var i = 0; i < gestores.length; i++){
+    var gestor = gestores[i];
+    var glosas = ordenar(porGestor[gestor] || []);
+    html += '<div style="margin:18px 0 8px;font-weight:800;color:#1e40af;font-size:15px">'
+      + '👤 ' + esc(gestor)
+      + ' <span style="color:#6b7280;font-weight:500;font-size:13px">('
+      + glosas.length + ' glosa' + (glosas.length === 1 ? '' : 's') + ')</span></div>';
+
+    for(var j = 0; j < glosas.length; j++){
+      html += tarjetaDeGlosa(glosas[j], gestor + '-' + j);
+    }
+  }
+  cont.innerHTML = html;
+}
+
+function tarjetaDeGlosa(g, id){
+  var p = g.plan || {};
+  var color = COLOR_URGENCIA[p.urgencia] || '#6b7280';
+  var h = '<div style="border:1px solid #e5e7eb;border-left:5px solid ' + color
+    + ';border-radius:10px;padding:12px 14px;margin:8px 0;background:#fff">';
+
+  // Cabecera: factura, entidad, plata, cuándo vence.
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline">'
+    + '<b style="font-size:15px">' + esc(g.factura) + '</b>'
+    + '<span style="background:' + color + ';color:#fff;border-radius:999px;'
+    + 'padding:2px 9px;font-size:11px;font-weight:700">' + esc(p.urgencia || '') + '</span>'
+    + '<span style="color:#374151;font-size:13px">' + esc(g.eps) + '</span>'
+    + '<span style="margin-left:auto;font-weight:700;color:#111827">' + pesos(g.valor) + '</span>'
+    + '</div>';
+
+  if(p.titular){
+    h += '<div style="margin-top:6px;font-weight:700;color:#5b21b6;font-size:13px">'
+      + esc(p.titular) + '</div>';
+  }
+
+  h += '<div style="font-size:12px;color:#6b7280;margin-top:2px">Vence ' + esc(g.vence)
+    + (g.causal ? ' · causal ' + esc(g.causal) : '') + '</div>';
+
+  if(p.ruta){
+    var fondo = p.con_medico ? '#fef2f2' : '#f8fafc';
+    var borde = p.con_medico ? '#dc2626' : '#cbd5e1';
+    h += '<div style="margin-top:8px;padding:8px 10px;background:' + fondo
+      + ';border-left:3px solid ' + borde + ';border-radius:6px;font-size:12.5px;color:#374151">'
+      + '<b>Cómo se trabaja:</b> ' + esc(p.ruta) + '</div>';
+  }
+
+  if(p.respuesta_sugerida){
+    h += '<div style="margin-top:6px;font-size:12.5px;color:#374151">'
+      + '<b>Qué responder:</b> ' + esc(p.respuesta_sugerida) + '</div>';
+  }
+
+  var avisos = p.avisos || [];
+  for(var k = 0; k < avisos.length; k++){
+    h += '<div style="margin-top:6px;padding:7px 10px;background:#fffbeb;'
+      + 'border-left:3px solid #d97706;border-radius:6px;font-size:12px;color:#7c2d12">⚠ '
+      + esc(avisos[k]) + '</div>';
+  }
+
+  // El texto fijo de la ratificada, listo para copiar.
+  if(p.texto_listo){
+    h += '<div style="margin-top:8px">'
+      + '<button onclick="copiarTexto(\'' + id + '\')" '
+      + 'style="background:#7c3aed;color:#fff;border:0;border-radius:7px;'
+      + 'padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">'
+      + '📋 Copiar la respuesta de ratificada</button>'
+      + '<textarea id="txt-' + id + '" readonly style="width:100%;margin-top:6px;'
+      + 'height:70px;font-size:11px;padding:7px;border:1px solid #ddd6fe;'
+      + 'border-radius:6px;background:#faf5ff;color:#4c1d95">'
+      + esc(p.texto_listo) + '</textarea></div>';
+  }
+
+  return h + '</div>';
+}
+
+function copiarTexto(id){
+  var t = document.getElementById('txt-' + id);
+  if(!t) return;
+  t.select();
+  try{
+    navigator.clipboard.writeText(t.value);
+    var b = t.previousElementSibling;
+    if(b){ var o = b.textContent; b.textContent = '✓ Copiado'; setTimeout(function(){ b.textContent = o; }, 1600); }
+  }catch(e){ document.execCommand('copy'); }
 }
 
 async function descargarExcelRecepcion(id, btn){

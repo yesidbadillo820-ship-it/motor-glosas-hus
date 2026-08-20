@@ -35,9 +35,39 @@ rem de la aplicacion y, como esta tarea corre cada 5 minutos, le mataba
 rem el motor de pruebas al auditor sin que entendiera por que se le
 rem apagaba solo (revision del 04-08-2026).
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >> "%LOG%" 2>&1
-echo [%date% %time%] deploy aplicado; el servidor se reinicia solo >> "%LOG%"
+echo [%date% %time%] deploy aplicado; se comprueba que vuelva a subir >> "%LOG%"
 
 :asegurar
 rem Pase lo que pase, garantizar que servidor y tunel esten corriendo
 if exist "%BASE%\arrancar_motor_glosas.cmd" call "%BASE%\arrancar_motor_glosas.cmd"
+
+rem ---------------------------------------------------------------
+rem  RED DE SEGURIDAD (20-08-2026).
+rem
+rem  Esta tarea MATA el motor para aplicar el codigo nuevo, contando
+rem  con que el vigilante lo resucite. El vigilante es una ventana de
+rem  consola: si alguien la cierra, o la sesion de Windows se cierra,
+rem  no queda nadie que lo levante y el hospital se queda SIN PORTAL
+rem  hasta que una persona lo note y lo arranque a mano.
+rem
+rem  Paso tres veces el 20-08 y cada vez fue Yesid quien lo levanto.
+rem  Aca se comprueba que de verdad volvio; si no, se arranca directo
+rem  sin depender del vigilante.
+rem ---------------------------------------------------------------
+timeout /t 12 /nobreak >nul
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
+if not errorlevel 1 goto :fin
+
+echo [%date% %time%] el motor NO volvio solo: se arranca directo >> "%LOG%"
+cd /d "%REPO%"
+start "" /b "%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%LOG%" 2>&1
+timeout /t 15 /nobreak >nul
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
+if errorlevel 1 (
+  echo [%date% %time%] ALERTA: el motor sigue caido tras arrancarlo directo >> "%LOG%"
+) else (
+  echo [%date% %time%] motor levantado por la red de seguridad >> "%LOG%"
+)
+
+:fin
 exit /b 0
