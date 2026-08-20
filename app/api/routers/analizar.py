@@ -512,6 +512,70 @@ def _decidir_estado_y_codigo(
     return val_obj, "RADICADA", None, None
 
 
+# ─── Por qué se acepta una glosa ─────────────────────────────────────────────
+#
+# 20-08-2026. Yesid respondió una glosa «FA0102 — se glosa insumo no facturable
+# dentro de estancias», la aceptó, y el documento que se radica salió diciendo:
+#
+#   «ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE $10.000 … ESTO CORRESPONDE A UN
+#    MAYOR VALOR COBRADO SEGÚN CONTRATO S-13-1-03-1-04958 PACTADO ENTRE LAS
+#    PARTES. SE AJUSTAN LOS VALORES DANDO CUMPLIMIENTO A ESTAS TARIFAS.»
+#
+# «Mayor valor cobrado» es un motivo de TARIFA. La glosa no era de tarifa: era
+# de facturación —un insumo que no se cobra aparte porque ya va dentro de la
+# estancia—. El texto estaba escrito a mano, igual para TODAS las causales, así
+# que en cualquier glosa que no fuera TA el hospital estaba radicando un motivo
+# que no corresponde. Y citaba un número de contrato que ahí no venía al caso.
+#
+# Cada familia dice lo suyo, y ninguna afirma nada que no se pueda sostener.
+_MOTIVO_ACEPTACION: dict[str, str] = {
+    "TA": (
+        "ESTO CORRESPONDE A UN MAYOR VALOR COBRADO FRENTE A LA TARIFA PACTADA "
+        "EN {contrato}. SE AJUSTAN LOS VALORES DANDO CUMPLIMIENTO A ESAS TARIFAS."
+    ),
+    "FA": ("SE ACEPTA LA OBSERVACIÓN DE FACTURACIÓN Y SE PROCEDE AL AJUSTE DEL CARGO OBSERVADO."),
+    "SO": (
+        "SE ACEPTA POR NO APORTARSE EL SOPORTE REQUERIDO DENTRO DEL TÉRMINO, Y "
+        "SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+    ),
+    "AU": (
+        "SE ACEPTA POR NO ACREDITARSE LA AUTORIZACIÓN EXIGIDA PARA EL SERVICIO, "
+        "Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+    ),
+    "CO": (
+        "SE ACEPTA POR CORRESPONDER A UN SERVICIO NO CUBIERTO PARA EL USUARIO, "
+        "Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+    ),
+    "CL": ("SE ACEPTA LA OBSERVACIÓN DE PERTINENCIA Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."),
+    "PE": ("SE ACEPTA LA OBSERVACIÓN DE PERTINENCIA Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."),
+}
+
+# Cuando la causal no se reconoce NO se inventa un motivo: se acepta y ya. Un
+# dictamen que no explica de más es mejor que uno que explica mal.
+_MOTIVO_ACEPTACION_GENERICO = "SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+
+
+def _motivo_de_aceptacion(codigo_glosa: str, num_contrato: str) -> str:
+    """El porqué de la aceptación, acorde con la causal de la glosa."""
+    from app.services.plan_de_trabajo import familia_de
+
+    plantilla = _MOTIVO_ACEPTACION.get(familia_de(codigo_glosa))
+    if not plantilla:
+        return _MOTIVO_ACEPTACION_GENERICO
+    return plantilla.format(contrato=num_contrato)
+
+
+def _pesos_col(valor: float) -> str:
+    """`10000` → `$10.000`. Con punto de miles, como se escribe en Colombia.
+
+    20-08-2026. Salía «$ 10,000» —con coma— en el documento que se radica ante
+    la EPS. En Colombia esa coma es el separador decimal: «10,000» se lee como
+    diez. Un valor mal escrito en una respuesta de glosa es una discusión que
+    nadie quiere tener.
+    """
+    return "$" + f"{int(round(valor or 0)):,}".replace(",", ".")
+
+
 def _construir_dictamen_aceptacion(
     eps: str,
     codigo_glosa: str,
@@ -542,10 +606,8 @@ def _construir_dictamen_aceptacion(
         <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:15px 0;border-radius:8px;">
             <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
             <p style="font-size:13px;line-height:1.8;color:#166534;">
-                ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
-                CORRESPONDIENTE {servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
-                SEGÚN <strong>{num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
-                DANDO CUMPLIMIENTO A ESTAS TARIFAS.
+                ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>{_pesos_col(val_ac)}</strong>,
+                CORRESPONDIENTE {servicio_descr}. {_motivo_de_aceptacion(codigo_glosa, num_contrato)}
             </p>
         </div>"""
         val_en_disputa = 0.0
@@ -555,14 +617,12 @@ def _construir_dictamen_aceptacion(
         <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
             <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
             <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
-                CORRESPONDIENTE {servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
-                SEGÚN <strong>{num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
-                DANDO CUMPLIMIENTO A ESTAS TARIFAS.
+                ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>{_pesos_col(val_ac)}</strong>,
+                CORRESPONDIENTE {servicio_descr}. {_motivo_de_aceptacion(codigo_glosa, num_contrato)}
             </p>
             <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                EL VALOR RESTANTE DE <strong>${val_en_disputa:,.0f}</strong> NO SE ACEPTA POR LA ESE HUS
-                YA QUE SE EVIDENCIA QUE ESTE VALOR CORRESPONDE AL VALOR PACTADO ENTRE LAS PARTES.
+                EL VALOR RESTANTE DE <strong>{_pesos_col(val_en_disputa)}</strong> NO SE ACEPTA POR LA
+                ESE HUS Y SE SUSTENTA EN LA ARGUMENTACIÓN TÉCNICA Y JURÍDICA QUE SE ANEXA.
             </p>
         </div>"""
 
@@ -578,7 +638,7 @@ def _construir_dictamen_aceptacion(
         <tbody>
             <tr>
                 <td style="padding:10px;text-align:center;font-weight:700;border-bottom:1px solid #e2e8f0;">{codigo_glosa}</td>
-                <td style="padding:10px;text-align:center;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">$ {val_obj:,.0f}</td>
+                <td style="padding:10px;text-align:center;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">{_pesos_col(val_obj)}</td>
                 <td style="padding:10px;text-align:center;border-bottom:1px solid #e2e8f0;">
                     <b>{cod_resp}</b><br>
                     <span style="font-size:10px;color:#64748b;">{desc_resp}</span>
@@ -593,11 +653,11 @@ def _construir_dictamen_aceptacion(
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <tr>
                 <td style="padding:6px 8px;color:#475569;">Valor objetado</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">$ {val_obj:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">{_pesos_col(val_obj)}</td>
             </tr>
             <tr>
                 <td style="padding:6px 8px;color:#047857;">Valor aceptado</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#047857;font-variant-numeric:tabular-nums;">$ {val_ac:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#047857;font-variant-numeric:tabular-nums;">{_pesos_col(val_ac)}</td>
             </tr>"""
     if estado == "PARCIALMENTE_ACEPTADA":
         tabla_valores += f"""
