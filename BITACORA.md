@@ -4981,6 +4981,53 @@ paso la IA lee un texto más claro.
 - 14 pruebas nuevas en `tests/test_api/test_importacion_masiva_de_verdad.py`,
   con un pegado tal cual sale de Excel (tabs, encabezado y pesos con punto).
 
+### 20-08 (noche) — Tres botones del portal que no hacían nada
+
+En `CLAUDE.md` está el caso que lo enseñó: **«Salud Total» estuvo tres meses
+devolviendo «Not Found» porque se borró su router sin mirar que la pantalla
+seguía llamándolo.** Se revisó el portal entero buscando lo mismo, comparando
+**cada llamada que hace la pantalla contra las rutas que el motor de verdad
+atiende**. Aparecieron tres funciones muertas:
+
+**1. Arrastrar una glosa en el tablero Kanban.** La tarjeta no se movía y
+salía «No se pudo cambiar el estado». Llamaba a una ruta con el método
+equivocado y, encima, a la ruta equivocada: usaba la del flujo de *aprobación*
+(BORRADOR → EN REVISIÓN → APROBADA) cuando el Kanban mueve entre RADICADA,
+RESPONDIDA y CONCILIADA, que es otra cosa. Ahora usa la correcta.
+
+**2. Crear y borrar snippets** (los atajos de texto: usted escribe `/ratif` y
+se convierte en su párrafo de ratificación completo). La tabla estaba creada
+en la base de datos y la pantalla «Gestionar mis snippets» estaba hecha. Lo
+que faltaba era el medio: el motor devolvía lista vacía y no tenía ni crear,
+ni borrar, ni contar usos. Usted abría el gestor, escribía su atajo, guardaba…
+y salía «Falló». Quedó implementado completo, incluidos los atajos de EQUIPO y
+los GLOBAL del coordinador.
+
+> Detalle que evita un dolor de cabeza: si alguien guardaba «ratif» sin la
+> barra, el atajo quedaba en la lista viéndose perfecto pero **no se expandía
+> nunca**. Ahora la barra se pone sola.
+
+**3. El simulador de conciliación.** Decía qué le va a contestar la EPS en la
+audiencia y con qué responderle. Nunca se implementó: usted escribía su
+postura, esperaba, y salía «No se pudo simular». El análisis que hace el
+trabajo ya existía y se usaba en otra pantalla; solo faltaba conectarlo.
+
+> Los contraargumentos NO los inventa una IA: salen del catálogo por tipo de
+> glosa, y la probabilidad es la **tasa real de levantamiento de esa EPS** en
+> audiencias anteriores. Si no hay historia con esa EPS, la probabilidad sale
+> vacía y en pantalla aparece «—». Es preferible a poner un número inventado
+> del que después alguien tome una decisión de plata.
+
+**Y para que no vuelva a pasar:** quedó una prueba que revisa las **246 rutas**
+que llama el portal contra las que el motor atiende. Si alguien borra un
+router y deja la pantalla llamándolo, la prueba se pone roja el mismo día.
+Se comprobó volviendo a romper el Kanban a propósito: efectivamente se pone
+roja.
+
+- 39 pruebas nuevas entre
+  `tests/test_frontend/test_el_portal_no_llama_rutas_que_no_existen.py` y
+  `tests/test_services/test_snippets_service.py`.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
