@@ -4774,6 +4774,51 @@ dictamen bien fundamentado.
   (quedan ~124 notas por subir al portal). La NC332660 corregida se entregó
   y quedó lista para re-subir.
 
+### 20-08 (noche) — Probamos 5 dictámenes de verdad: 3 defectos que se radicaban
+
+Yesid corrió cinco glosas de prueba en «Analizar glosa» y pegó los dictámenes
+completos. Salieron tres cosas que se estaban radicando ante las EPS:
+
+**1. Cien mil pesos convertidos en un código de procedimiento.**
+La glosa decía *«SO5801 — ausencia total de soporte de la curacion, VALOR
+GLOSADO 100000»* y el dictamen salió afirmando «SERVICIO FACTURADO **CUPS
+100000**». La causa: había DOS lectores de CUPS en el mismo archivo. Uno
+endurecido durante meses —descarta fechas, números de factura, colas de
+contrato, montos— y otro de una sola línea, que tomaba cualquier número de 5 o
+6 dígitos. **El dictamen que se radica usaba el de una línea.** Se borró el
+duplicado y se apuntó al bueno, más un filtro nuevo: si la propia glosa dice
+que ese número es plata («valor glosado», «monto», «cuantía»), es plata.
+
+*El verificador de citas sí lo atrapó* —medalla C, «CUPS 100000 no existe en el
+catálogo»— así que el aviso funcionó. Pero es mejor que el error no se escriba.
+
+**2. El dictamen se contradecía en el mismo renglón.**
+«ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE $200, CORRESPONDIENTE AL **SERVICIO
+CUBIERTO**. SE ACEPTA POR CORRESPONDER A UN **SERVICIO NO CUBIERTO**…».
+Cubierto y no cubierto a la vez. Pasaba igual en autorizaciones («AL
+PROCEDIMIENTO AUTORIZADO… SE ACEPTA POR NO ACREDITARSE LA AUTORIZACIÓN») y en
+soportes. Cuando el hospital está aceptando que algo falta, no puede afirmar en
+la misma frase que ese algo está. Se quitaron los adjetivos que califican justo
+lo que está en discusión; se conservaron los que son un hecho (el cargo se
+facturó, el procedimiento se prestó, el medicamento se dispensó).
+
+**3. Una glosa parcial radicada como «ACEPTADA AL 100%» — se regalaban $60.000.**
+La EPS objetó $100.000 y el gestor aceptó $40.000. El dictamen salió con
+**RE9702 «GLOSA ACEPTADA AL 100%»** y valor objetado $40.000. Radicado así, el
+hospital renuncia a los $60.000 que sí estaba defendiendo, y encima lo
+certifica. Pasaba porque la IA no extrajo el valor objetado, quedaba en cero, y
+un respaldo lo daba por aceptación total igualando objetado a aceptado. **El
+dato estaba escrito en la propia glosa** y el lector de valores ya sabía
+leerlo; nadie le preguntaba. Ahora se le pregunta cuando la IA no trae el
+valor. Sale correctamente **RE9801, parcial, con $60.000 en disputa**.
+
+- 17 pruebas nuevas en `tests/test_api/test_el_dictamen_no_se_contradice.py`,
+  con el texto exacto de las glosas de Yesid. Incluye las dos mitades del
+  arreglo del CUPS: que la plata ya no entre, y que un CUPS de verdad (890201,
+  898040) siga detectándose.
+- La prueba del cableado se comprobó **quitando el arreglo a propósito** para
+  ver que se pone roja; si no, no sirve de nada.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
