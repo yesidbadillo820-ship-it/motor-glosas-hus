@@ -106,6 +106,18 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     alertas_email: str = ""
+    # 20-08-2026 (pedido de Yesid: «que también les llegue al correo de las
+    # doctoras»). Las médicas auditoras reciben el resumen SOLO cuando el lote
+    # trae glosas médicas —pertinencia o calidad—, que son las que no se
+    # pueden contestar desde cartera sin concepto clínico.
+    #
+    # Dos maneras de decir quiénes son, y sirve cualquiera:
+    #   · MEDICOS_AUDITORES_EMAIL en el .env, separados por coma; o
+    #   · el campo «equipo» del usuario en la pantalla de Usuarios, con algo
+    #     que diga MEDIC (p. ej. «AUDITORIA MEDICA»).
+    # No se adivina por el rol ni por el correo: quién es médico es un dato
+    # del hospital, no algo que el sistema pueda deducir.
+    medicos_auditores_email: str = ""
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.5.0"
     banner_capacitacion: str = ""

@@ -5080,6 +5080,57 @@ letras; el nombre exacto sigue valiendo para cualquier largo.
 - 17 pruebas nuevas en `tests/test_services/test_a_quien_le_llega_el_correo.py`,
   **con los usuarios y los gestores reales**.
 
+### 20-08 (noche) — El radicable le metía a COOSALUD facturas del Ejército
+
+Yesid importó el lote del 19 de agosto —35 glosas— y descargó el Excel
+radicable. Salió **un solo archivo** llamado
+`RESPUESTA_GLOSAS_COOSALUD_19AGO2026_HUS.xlsx`, con el **contrato de COOSALUD
+en el encabezado** (68001C00060340-24)… y **las 35 facturas adentro**.
+
+De esas 35, **6 son del DISPENSARIO MÉDICO / EJÉRCITO**, por **$10.290.042**.
+
+Radicado así, el hospital le presenta a COOSALUD seis facturas de otro
+pagador, bajo un contrato que nada tiene que ver con ellas: COOSALUD lo
+devuelve, y de paso ve las facturas de otra entidad.
+
+**Por qué pasaba.** El archivo se rotulaba con la entidad **más frecuente** del
+lote (29 de COOSALUD contra 6 del Ejército, gana COOSALUD), pero después no se
+filtraba por ella. Nadie sacaba las otras.
+
+**Cómo queda.** Un radicable se presenta ante UNA entidad, así que ahora se
+arma **uno por entidad**. Si el lote trae una sola, se descarga el Excel igual
+que siempre; si trae varias, bajan **todas juntas en un ZIP** — así no falta
+ninguna ni termina ninguna donde no es.
+
+### Y lo del correo a las doctoras
+
+Pedido de Yesid: «que también les llegue al correo de las doctoras». Ya está:
+cuando el lote trae **glosas médicas** —pertinencia o calidad, las que no se
+pueden contestar desde cartera sin concepto clínico— el resumen les llega
+también a ellas. Si el lote no trae ninguna médica, **no** se les manda: si no,
+se les llenaría el buzón de tarifas y facturación que no les competen, y
+terminarían ignorando también las que sí importan.
+
+**Cómo señalar quiénes son** (sirve cualquiera de las dos):
+
+1. En la pantalla de **Usuarios**, escribirle `AUDITORIA MEDICA` en el campo
+   **equipo** a cada doctora. Es lo más cómodo y no necesita tocar el servidor.
+2. O configurar `MEDICOS_AUDITORES_EMAIL` en el `.env` del servidor, con los
+   correos separados por coma.
+
+A propósito **no se adivina**: que alguien sea SUPER_ADMIN, o que su correo
+empiece por «auditor», no lo vuelve médico. Mandarle historia clínica a quien
+no es del área por una corazonada del sistema sería peor que no mandarla.
+
+Y si el lote trae glosas médicas pero **nadie está señalado**, la pantalla lo
+dice en rojo con el paso a seguir, en vez de callarse.
+
+- 8 pruebas en `tests/test_services/test_el_radicable_no_mezcla_entidades.py`
+  (con las 6 facturas reales del Ejército) y 6 más en
+  `test_a_quien_le_llega_el_correo.py` para lo de las doctoras.
+- El arreglo del radicable se comprobó **quitando el filtro a propósito**: se
+  ponen 4 pruebas en rojo.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
