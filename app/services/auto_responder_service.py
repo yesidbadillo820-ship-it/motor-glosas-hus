@@ -622,6 +622,11 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
             nuevo = "SIN_CORREO_CONFIG"
         elif enviados <= 0 and motivo == "SIN_ARCHIVO_ORIGINAL":
             nuevo = "SIN_ARCHIVO_ORIGINAL"
+        elif enviados <= 0 and motivo == "FALLO_ENVIO":
+            # Sí había a quién mandarle: el servidor de correo rechazó el
+            # envío. Decirlo distinto evita mandar al auditor a revisar la
+            # lista de gestores, que está bien.
+            nuevo = "FALLO_ENVIO"
         elif enviados <= 0:
             nuevo = "SIN_DESTINATARIOS"
         elif sin_email:
@@ -640,6 +645,7 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
                 "LISTO",
                 "PARCIAL",
                 "SIN_DESTINATARIOS",
+                "FALLO_ENVIO",
                 "SIN_CORREO_CONFIG",
                 "SIN_ARCHIVO_ORIGINAL",
             ):
