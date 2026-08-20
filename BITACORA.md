@@ -5582,6 +5582,36 @@ Ahora hay una etiqueta aparte: **«✗ el servidor de correo rechazó el envío�
   incluidas las que comprueban que los demás estados (ENVIADO, PARCIAL, sin
   correo configurado, sin archivo) **no cambian**.
 
+### 20-08 (noche) — Dos motores escribiendo en dos bases distintas
+
+**Lo destapó el propio panel de Diagnóstico** del PC de cartera:
+
+> ⚠️ Hay 2 motores distintos corriendo en este equipo
+> (PID 7504 puerto 8080, PID 14328 puerto 8000)
+
+Y la base de datos se guardaba en **ruta relativa** (`sqlite:///./glosas.db`),
+o sea **relativa a la carpeta desde la que arrancó cada motor**. Arrancados
+desde carpetas distintas, **cada uno escribe en su propia base de datos**.
+
+**Eso explica lo que Yesid vio:** las glosas pasaron de **62 a 35** y el
+historial de importaciones se reinició. **No se perdió nada** — está en la otra
+base.
+
+**Por qué es de lo más grave que puede pasar:** trabajar sobre una base
+creyendo estar viendo la otra significa responder una glosa que en «la» base
+sigue pendiente, y **nadie se entera hasta que vence**.
+
+**Cómo queda.** La base se ancla a la carpeta del repositorio, arranque el
+motor desde donde arranque. Pero si un despliegue **ya tiene** su base en otra
+carpeta, se respeta la que existe y se avisa en el registro: cambiársela le
+escondería sus datos, que es justo el daño que esto viene a evitar. Y un
+`DATABASE_URL` puesto a mano sigue mandando sobre todo.
+
+**Lo que hay que hacer en el PC de cartera:** apagar el motor sobrante del
+puerto 8000. El del 8080 es el que sirve la página por internet.
+
+- 6 pruebas en `tests/test_core/test_la_base_no_depende_de_la_carpeta.py`.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)
