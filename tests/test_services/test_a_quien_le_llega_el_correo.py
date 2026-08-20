@@ -287,3 +287,206 @@ class TestElCorreoDeLasDoctoras:
         assert correo["hay_glosas_medicas"] is False
         assert correo["medicos_auditores"] == []
         assert all(d["email"] != "auditorhus01@sinacsc.com" for d in correo["destinatarios"])
+
+
+class TestACadaDoctoraLoSuyo:
+    """El Excel del HUS dice QUÉ doctora lleva cada glosa (20-08-2026).
+
+    La columna `PROFESIONAL(MEDICO)` trae «LAURA DIAZ», «LEIDY SANGUINO» o
+    «ZULAY GONZALEZ» según el caso, y la columna `TIPO GLOSA` dice si es
+    Administrativo, Medico o Mixta.
+
+    Yesid confirmó que son solo esas tres las médicas auditoras. Con el nombre
+    por glosa, a cada una le llega lo suyo en vez de mandarles a las tres el
+    lote entero: quien recibe treinta glosas que no son suyas deja de abrir el
+    correo, y ahí se pierden también las que sí.
+
+    OJO con los nombres: el Excel escribe «LEIDY SANGUINO» y el portal la
+    tiene como «LEIDY JHOANA SANGUINO»; «ZULAY GONZALEZ» contra «LEYDI ZULAY
+    GONZALEZ». Sin comparar por tokens, esos dos correos no saldrían nunca.
+    """
+
+    # Los nombres EXACTOS como aparecen en el Excel del 19 de agosto.
+    EN_EL_EXCEL = {
+        "LAURA DIAZ": "auditorhus01@sinacsc.com",
+        "LEIDY SANGUINO": "auditorhus02@sinacsc.com",
+        "ZULAY GONZALEZ": "auditorhus03@sinacsc.com",
+    }
+
+    def _resumen(self, glosas: list[tuple[bool, str]]) -> dict:
+        return {
+            "total": len(glosas),
+            "creadas": len(glosas),
+            "actualizadas": 0,
+            "ratificadas": 0,
+            "extemporaneas": 0,
+            "semaforo": {},
+            "por_gestor": {
+                "YESID PEREZ": [
+                    {
+                        "factura": f"HUS{i}",
+                        "plan": {"con_medico": medica, "profesional_medico": quien},
+                    }
+                    for i, (medica, quien) in enumerate(glosas)
+                ]
+            },
+        }
+
+    def test_las_tres_del_excel_resuelven_a_su_correo(self, db):
+        from app.services.email_service import emails_de_las_doctoras
+
+        resumen = self._resumen([(True, n) for n in self.EN_EL_EXCEL])
+        encontradas, sin_correo = emails_de_las_doctoras(resumen, db=db)
+        assert encontradas == self.EN_EL_EXCEL
+        assert sin_correo == []
+
+    def test_el_segundo_nombre_no_las_deja_por_fuera(self, db):
+        """«LEIDY SANGUINO» (Excel) vs «LEIDY JHOANA SANGUINO» (portal)."""
+        from app.services.email_service import emails_de_las_doctoras
+
+        encontradas, _ = emails_de_las_doctoras(self._resumen([(True, "LEIDY SANGUINO")]), db=db)
+        assert encontradas == {"LEIDY SANGUINO": "auditorhus02@sinacsc.com"}
+
+    def test_una_glosa_administrativa_no_nombra_doctora(self, db):
+        from app.services.email_service import _doctoras_nombradas
+
+        assert _doctoras_nombradas(self._resumen([(False, "")])) == []
+
+    def test_no_se_repite_la_misma_doctora(self, db):
+        """LAURA DIAZ sale en varias filas del Excel; el correo es uno solo."""
+        from app.services.email_service import _doctoras_nombradas
+
+        resumen = self._resumen([(True, "LAURA DIAZ"), (True, "LAURA DIAZ")])
+        assert _doctoras_nombradas(resumen) == ["LAURA DIAZ"]
+
+    def test_un_nombre_que_no_esta_en_el_portal_se_reporta(self, db):
+        from app.services.email_service import emails_de_las_doctoras
+
+        encontradas, sin_correo = emails_de_las_doctoras(
+            self._resumen([(True, "DRA QUE NO EXISTE")]), db=db
+        )
+        assert encontradas == {}
+        assert sin_correo == ["DRA QUE NO EXISTE"]
+
+    @pytest.mark.asyncio
+    async def test_a_cada_una_le_llega_y_a_las_otras_no(self, db, monkeypatch):
+        """Si el lote solo trae glosas de LAURA, no se molesta a las otras."""
+        from app.services import email_service as es
+
+        async def _ok(destinatario, asunto, html):
+            return True
+
+        monkeypatch.setattr(es, "enviar_email", _ok)
+        resumen = self._resumen([(True, "LAURA DIAZ")])
+        await es.enviar_resumen_importacion_recepcion(resumen, db=db)
+        correo = resumen["correo"]
+        assert correo["doctoras"] == {"LAURA DIAZ": "auditorhus01@sinacsc.com"}
+        enviados = {d["email"] for d in correo["destinatarios"]}
+        assert "auditorhus01@sinacsc.com" in enviados
+        assert "auditorhus02@sinacsc.com" not in enviados
+        assert "auditorhus03@sinacsc.com" not in enviados
+
+    @pytest.mark.asyncio
+    async def test_sin_glosas_medicas_no_se_molesta_a_ninguna(self, db, monkeypatch):
+        from app.services import email_service as es
+
+        async def _ok(destinatario, asunto, html):
+            return True
+
+        monkeypatch.setattr(es, "enviar_email", _ok)
+        resumen = self._resumen([(False, "")])
+        await es.enviar_resumen_importacion_recepcion(resumen, db=db)
+        enviados = {d["email"] for d in resumen["correo"]["destinatarios"]}
+        assert not any(e.startswith("auditorhus") for e in enviados)
+
+    @pytest.mark.asyncio
+    async def test_si_el_excel_no_dice_quien_se_avisa_a_todas(self, db, monkeypatch):
+        """Glosa médica sin doctora anotada: mejor avisarle a todas las
+        registradas que dejarla sin avisar a nadie."""
+        from app.services import email_service as es
+
+        monkeypatch.setattr(es, "enviar_email", lambda d, a, h: _true())
+
+        async def _true():
+            return True
+
+        u = (
+            db.query(__import__("app.models.db", fromlist=["x"]).UsuarioRecord)
+            .filter_by(email="auditorhus01@sinacsc.com")
+            .first()
+        )
+        u.equipo = "AUDITORIA MEDICA"
+        db.commit()
+
+        resumen = self._resumen([(True, "")])
+        await es.enviar_resumen_importacion_recepcion(resumen, db=db)
+        correo = resumen["correo"]
+        assert correo["doctoras"] == {}
+        assert "auditorhus01@sinacsc.com" in correo["medicos_auditores"]
+
+
+class TestElAvisoDiceLaCausaDeVerdad:
+    """20-08-2026. Yesid importó, no salió correo, y la pantalla marcó la
+    importación como «✗ sin destinatarios» — que suena a que no se encontró a
+    quién mandarle. Importó otra vez buscando el error en la lista de
+    gestores. Pero la causa era otra: **el servidor no tiene el correo
+    configurado**, y ese mismo estado se ponía para las dos cosas.
+
+    Un aviso que apunta al lugar equivocado hace perder más tiempo que no
+    tener aviso.
+    """
+
+    def _estado(self, envio: dict) -> str:
+        """Qué estado le quedaría a la importación con ese resultado."""
+        enviados = int(envio.get("enviados", 0) or 0)
+        motivo = envio.get("motivo") or ""
+        if enviados <= 0 and motivo == "SIN_CORREO_CONFIG":
+            return "SIN_CORREO_CONFIG"
+        if enviados <= 0 and motivo == "SIN_ARCHIVO_ORIGINAL":
+            return "SIN_ARCHIVO_ORIGINAL"
+        if enviados <= 0:
+            return "SIN_DESTINATARIOS"
+        return "PARCIAL" if envio.get("gestores_sin_email") else "ENVIADO"
+
+    @pytest.mark.asyncio
+    async def test_sin_smtp_el_motivo_lo_dice(self, db, monkeypatch):
+        from app.core.config import get_settings
+        from app.services.email_service import enviar_excel_recepcion_con_respuestas
+
+        cfg = get_settings()
+        monkeypatch.setattr(cfg, "smtp_user", "", raising=False)
+        monkeypatch.setattr(cfg, "smtp_password", "", raising=False)
+
+        envio = await enviar_excel_recepcion_con_respuestas(
+            resumen={}, excel_original=b"x", glosa_ids=[], db=db
+        )
+        assert envio["motivo"] == "SIN_CORREO_CONFIG"
+        assert envio["enviados"] == 0
+
+    def test_y_el_estado_no_culpa_a_los_gestores(self):
+        assert self._estado({"enviados": 0, "motivo": "SIN_CORREO_CONFIG"}) == "SIN_CORREO_CONFIG"
+
+    def test_sin_archivo_original_es_otra_cosa(self):
+        assert (
+            self._estado({"enviados": 0, "motivo": "SIN_ARCHIVO_ORIGINAL"})
+            == "SIN_ARCHIVO_ORIGINAL"
+        )
+
+    def test_sin_destinatarios_de_verdad_sigue_diciendolo(self):
+        """Cuando SÍ hay correo configurado y aun así no hubo a quién
+        mandarle, el estado de siempre sigue valiendo."""
+        assert self._estado({"enviados": 0}) == "SIN_DESTINATARIOS"
+
+    def test_cuando_sale_bien_no_se_marca_error(self):
+        assert self._estado({"enviados": 3}) == "ENVIADO"
+        assert self._estado({"enviados": 3, "gestores_sin_email": ["X"]}) == "PARCIAL"
+
+    def test_la_pantalla_tiene_una_etiqueta_para_cada_causa(self):
+        import pathlib
+
+        html = (
+            pathlib.Path(__file__).resolve().parents[2] / "static/importar-recepcion.html"
+        ).read_text(encoding="utf-8")
+        for estado in ("SIN_DESTINATARIOS", "SIN_CORREO_CONFIG", "SIN_ARCHIVO_ORIGINAL"):
+            assert estado in html, f"la pantalla no sabe pintar {estado}"
+        assert "no tiene correo configurado" in html

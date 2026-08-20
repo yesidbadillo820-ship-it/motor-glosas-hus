@@ -614,7 +614,15 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
 
         enviados = int(envio.get("enviados", 0) or 0)
         sin_email = envio.get("gestores_sin_email") or []
-        if enviados <= 0:
+        motivo = envio.get("motivo") or ""
+        if enviados <= 0 and motivo == "SIN_CORREO_CONFIG":
+            # 20-08-2026: no es que no hubiera a quién mandarle. Es que el
+            # servidor no tiene correo configurado. Decirlo distinto evita
+            # que el auditor busque el problema en la lista de gestores.
+            nuevo = "SIN_CORREO_CONFIG"
+        elif enviados <= 0 and motivo == "SIN_ARCHIVO_ORIGINAL":
+            nuevo = "SIN_ARCHIVO_ORIGINAL"
+        elif enviados <= 0:
             nuevo = "SIN_DESTINATARIOS"
         elif sin_email:
             nuevo = "PARCIAL"
@@ -628,7 +636,13 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
                 .first()
             )
             # No pisar SIN_ARCHIVO (prune) — solo si sigue en LISTO.
-            if rec and rec.estado in ("LISTO", "PARCIAL", "SIN_DESTINATARIOS"):
+            if rec and rec.estado in (
+                "LISTO",
+                "PARCIAL",
+                "SIN_DESTINATARIOS",
+                "SIN_CORREO_CONFIG",
+                "SIN_ARCHIVO_ORIGINAL",
+            ):
                 rec.estado = nuevo
                 s.commit()
                 logger.info(

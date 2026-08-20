@@ -206,6 +206,11 @@ def _plan_de(
         "avisos": p.avisos,
         "con_medico": p.con_medico,
         "texto_listo": p.texto_listo,
+        # 20-08-2026: QUÉ doctora lleva esta glosa. El Excel lo trae en la
+        # columna PROFESIONAL(MEDICO) y hasta ahora solo se usaba para armar
+        # el texto del plan. Con el nombre acá, el resumen le puede llegar a
+        # la doctora que de verdad la tiene, y no a las tres.
+        "profesional_medico": (profesional_medico or "").strip(),
     }
 
 
