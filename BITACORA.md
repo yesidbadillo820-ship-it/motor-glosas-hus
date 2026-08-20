@@ -4679,6 +4679,17 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
   glosados. Verificación 227/227 filas fieles a la fuente. 19 pruebas nuevas
   (149 en verde entre los 3 bots + lector de pesos).
 
+- **Notas crédito al portal de SAVIA (Conexiones):** el portal rechazaba el
+  XML de la NC 332660 con «Invalid byte 2 of 4-byte UTF-8 sequence». Causa:
+  el XML es válido, pero el portal re-codifica mal los ACENTOS al leer el
+  documento embebido (una «ó» se vuelve un byte que su lector no entiende).
+  Arreglo: **nuevo bot `tools/reparar_xml_nc_ascii.py`** — convierte los
+  acentos a entidades XML (`&#243;`), el archivo queda 100 % ASCII, el
+  contenido y las firmas DIAN internas quedan idénticos (verificado
+  canónicamente antes de escribir). Sirve por archivo o carpeta completa
+  (quedan ~124 notas por subir al portal). La NC332660 corregida se entregó
+  y quedó lista para re-subir.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
