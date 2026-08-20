@@ -68,6 +68,15 @@ SERVICIO_PROPIO = {
     ("DELETE", "/usuarios/yo/tareas/{tarea_id}"),
     # El buzón de sugerencias: cualquiera del hospital puede proponer algo.
     ("POST", "/sugerencias"),
+    # 20-08-2026 — snippets: los atajos de texto de cada quien («/ratif» →
+    # su párrafo de ratificación). Se crean SIEMPRE a nombre del usuario de la
+    # sesión (usuario_email=current_user.email), así que un VIEWER puede tener
+    # los suyos sin que eso le dé acceso a nada de nadie. Cerrarlos por rol
+    # dejaría sin atajos justo a quien más escribe a mano.
+    ("POST", "/snippets"),
+    # Sumar uno al contador de uso del atajo que acaba de escribir. La
+    # pantalla lo llama sin esperar respuesta; no puede fallar ni bloquear.
+    ("POST", "/snippets/{snippet_id}/usar"),
     # 13-08-2026 — las pantallas repuestas. Todas filtran por el correo del
     # usuario DENTRO de la consulta (verificado en el código), así que un
     # auditor no puede tocar lo de otro aunque adivine el identificador:
@@ -106,6 +115,11 @@ CHEQUEO_INTERNO = {
     # Borrar un comentario: solo su autor, o un coordinador. La regla depende
     # de quién escribió el comentario, no del rol de quien lo borra.
     ("DELETE", "/comentarios-thread/{comentario_id}"),
+    # 20-08-2026 — borrar un snippet: solo su dueño. Un snippet GLOBAL lo VE
+    # todo el mundo, así que la regla no puede depender del rol de quien
+    # borra sino de quién lo creó; el handler responde 403 si es de otra
+    # persona.
+    ("DELETE", "/snippets/{snippet_id}"),
 }
 
 # Señales de que el handler comprueba rol o propiedad por dentro.
