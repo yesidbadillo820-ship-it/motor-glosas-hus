@@ -197,3 +197,106 @@ def folios_inventados(dictamen: str, evidencia: str) -> list[int]:
         return []
     reales = folios_en_evidencia(evidencia)
     return [f for f in citados if f not in reales]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+#  AFIRMACIONES DOCUMENTALES SIN RESPALDO — 20-08-2026
+#
+#  Hermano del control de folios, para el caso que aquel no ve. Yesid probó
+#  una glosa de pertinencia (CL0801, AXA COLPATRIA) SIN adjuntar un solo
+#  soporte, y el dictamen salió afirmando:
+#
+#      «…CUMPLE CON LOS CRITERIOS CLÍNICOS DEL MÉDICO TRATANTE, QUIEN
+#       DOCUMENTÓ LA INDICACIÓN EN LA HISTORIA CLÍNICA INTEGRAL.»
+#
+#  Nadie abrió una historia clínica. La medalla decía «7 citas contra corpus ·
+#  0 hallazgos» y el sello «VALIDADO POR QUALITY GATE». No cita ningún folio,
+#  así que el control de folios la deja pasar limpia.
+#
+#  Es la misma mentira sin el número: el hospital certifica ante la EPS lo que
+#  dice un documento que no leyó. Y en pertinencia es justo el punto en
+#  disputa, así que la EPS pide la historia, ve que la afirmación no sale de
+#  ahí, y ratifica.
+#
+#  REGLA DELIBERADAMENTE ESTRECHA: solo se marca cuando NO se leyó ningún
+#  soporte. Con soportes a la vista no se puede saber sin leerlos de verdad si
+#  la afirmación es fiel, y un aviso equivocado es peor que ninguno — enseña
+#  al auditor a ignorar los avisos. Media verificación honesta vale más que
+#  una completa que se inventa la mitad.
+# ─────────────────────────────────────────────────────────────────────────
+
+# Documentos clínicos cuyo CONTENIDO solo se puede afirmar habiéndolos leído.
+_DOC_CLINICO = (
+    r"(?:historias?\s+cl[íi]nicas?|epicrisis|hojas?\s+de\s+atenci[óo]n"
+    r"|descripci[óo]n\s+quir[úu]rgica|hojas?\s+de\s+administraci[óo]n"
+    r"|registros?\s+de\s+enfermer[íi]a|notas?\s+m[ée]dicas?"
+    r"|notas?\s+de\s+evoluci[óo]n|evoluci[óo]n\s+m[ée]dica"
+    r"|record\s+anest[ée]sico|f[óo]rmulas?\s+m[ée]dicas?)"
+)
+
+# Verbos con los que un dictamen AFIRMA lo que un documento dice. No entran
+# los que solo lo anuncian u ofrecen ("se anexa", "se remite", "obra en el
+# expediente", "está a disposición"): esos no afirman contenido.
+# Se listan las formas conjugadas una por una, con y sin tilde: muchos
+# dictámenes salen en mayúsculas y sin acentos. No entra "DOCUMENTAL" ni
+# "DOCUMENTACIÓN" (adjetivo y sustantivo, no afirman nada).
+_VERBO_AFIRMA = (
+    r"(?:acredit(?:a|an|[óo]|aron)"
+    r"|document(?:a|an|[óo]|aron)"
+    r"|registr(?:a|an|[óo]|aron)"
+    r"|consign(?:a|an|[óo]|aron)"
+    r"|certific(?:a|an|[óo]|aron)"
+    r"|evidenci(?:a|an|[óo]|aron)"
+    r"|describ(?:e|en|i[óo])"
+    r"|demuestra[n]?|reflej(?:a|an)|const(?:a|an|[óo])"
+    r"|da\s+cuenta|dan\s+cuenta|deja\s+constancia"
+    r"|se\s+(?:observa|evidencia|consigna|describe|registra|acredita))\b"
+)
+
+# "EL DOCUMENTO DE LA HISTORIA CLÍNICA" es un sustantivo, no una afirmación.
+# Sin esta guarda, «SE APORTA EL DOCUMENTO DE LA HISTORIA CLÍNICA» —que no
+# afirma ningún contenido— saldría marcado.
+_NO_TRAS_ARTICULO = (
+    r"(?<!\bEL )(?<!\bUN )(?<!\bDEL )(?<!\bLOS )(?<!\bel )(?<!\bun )(?<!\bdel )(?<!\blos )"
+)
+
+# «LA HISTORIA CLÍNICA ACREDITA…»  y  «…CONSTA EN LA HISTORIA CLÍNICA»
+_AFIRMACION_DOCUMENTAL = re.compile(
+    rf"(?:{_DOC_CLINICO}[^.;]{{0,60}}?\s{_NO_TRAS_ARTICULO}{_VERBO_AFIRMA}"
+    rf"|{_NO_TRAS_ARTICULO}{_VERBO_AFIRMA}\s[^.;]{{0,60}}?"
+    rf"\b(?:en|de)\s+(?:la|el|las|los)\s+{_DOC_CLINICO})",
+    re.IGNORECASE,
+)
+
+# Señales de que SÍ se leyó un expediente. Si el texto que tuvo la IA a la
+# vista trae cualquiera de estas, hubo documento y esta verificación se
+# abstiene (la de folios sigue operando por su cuenta).
+_SENAL_DE_EXPEDIENTE = re.compile(
+    rf"(?:{_DOC_CLINICO}|{_PALABRA_FOLIO}\s*\d|═══\s*SOPORTE|EVIDENCIA\s+FORENSE)",
+    re.IGNORECASE,
+)
+
+
+def se_leyo_expediente(evidencia: str) -> bool:
+    """¿El texto que la IA tuvo a la vista contiene algún documento clínico?"""
+    if not evidencia or not evidencia.strip():
+        return False
+    return bool(_SENAL_DE_EXPEDIENTE.search(evidencia))
+
+
+def afirmaciones_documentales_sin_respaldo(dictamen: str, evidencia: str) -> list[str]:
+    """Frases del dictamen que afirman lo que dice un documento no leído.
+
+    Devuelve la frase completa (recortada) de cada afirmación, para que el
+    auditor vea en pantalla exactamente qué se está diciendo de más. Lista
+    vacía cuando sí se leyó expediente: ahí esta verificación se abstiene.
+    """
+    if not dictamen or se_leyo_expediente(evidencia):
+        return []
+    hallazgos: list[str] = []
+    for frase in re.split(r"(?<=[.;])\s+", dictamen):
+        if _AFIRMACION_DOCUMENTAL.search(frase):
+            limpia = re.sub(r"\s+", " ", frase).strip()
+            if limpia and limpia not in hallazgos:
+                hallazgos.append(limpia[:300])
+    return hallazgos
