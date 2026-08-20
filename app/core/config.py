@@ -26,6 +26,43 @@ from pydantic_settings import BaseSettings
 # respeta: manda el de la carpeta actual. La raíz del repositorio es el
 # respaldo para cuando ahí no hay ninguno, que es justo el caso que estaba
 # roto.
+# 20-08-2026. El valor por defecto era `sqlite:///./glosas.db` — una ruta
+# RELATIVA, o sea relativa a la carpeta desde la que se arrancó cada motor.
+#
+# El panel de Diagnóstico del PC de cartera destapó lo que eso significa: había
+# DOS motores corriendo (puerto 8080 y puerto 8000). Arrancados desde carpetas
+# distintas, cada uno escribe en SU PROPIA base de datos. El auditor vio las
+# glosas pasar de 62 a 35 y el historial de importaciones reiniciarse: no se
+# había perdido nada, estaba en la otra base.
+#
+# Trabajar sobre una base mientras se cree estar viendo la otra es de lo peor
+# que le puede pasar a un área de cartera: se responde una glosa que en «la»
+# base sigue pendiente, y nadie se entera hasta que vence.
+#
+# Se ancla a la raíz del repositorio. PERO si ya existe una base en la carpeta
+# actual y NO en la raíz, se respeta la que existe: cambiarle la base a un
+# despliegue en marcha le escondería sus datos, que es exactamente el daño que
+# esto viene a evitar.
+def _ruta_de_la_base() -> str:
+    raiz = Path(__file__).resolve().parent.parent.parent
+    en_la_raiz = raiz / "glosas.db"
+    local = Path.cwd() / "glosas.db"
+    if local.is_file() and not en_la_raiz.is_file() and local != en_la_raiz:
+        logging.getLogger("motor_glosas").warning(
+            "[CONFIG] La base de datos está en %s, fuera de la carpeta del "
+            "repositorio. Se respeta para no esconder datos, pero conviene "
+            "moverla a %s: con dos motores corriendo desde carpetas distintas, "
+            "cada uno escribiría en una base diferente.",
+            local,
+            en_la_raiz,
+        )
+        return f"sqlite:///{local.as_posix()}"
+    return f"sqlite:///{en_la_raiz.as_posix()}"
+
+
+_RUTA_BD_POR_DEFECTO = _ruta_de_la_base()
+
+
 def _ruta_del_env() -> str:
     local = Path.cwd() / ".env"
     if local.is_file():
@@ -46,7 +83,7 @@ class Settings(BaseSettings):
     # Ronda 30: URL pública para los enlaces de los correos (antes había
     # hosts viejos y contradictorios: onrender.com y fly.dev).
     app_base_url: str = "https://iaglosassinac.help"
-    database_url: str = "sqlite:///./glosas.db"
+    database_url: str = _RUTA_BD_POR_DEFECTO
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
     # 480 min = jornada laboral de 8h. Con 60 min los gestores quedaban en
