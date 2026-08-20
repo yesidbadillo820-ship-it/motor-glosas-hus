@@ -247,6 +247,61 @@ def _hay_glosas_medicas(resumen: dict) -> bool:
     return False
 
 
+def _doctoras_nombradas(resumen: dict) -> list[str]:
+    """Las médicas que el Excel nombra en las glosas médicas del lote.
+
+    20-08-2026. El archivo del HUS trae una columna PROFESIONAL(MEDICO) que
+    dice QUÉ doctora lleva cada glosa —«LAURA DIAZ», «LEIDY SANGUINO»,
+    «ZULAY GONZALEZ»—. Con eso, a cada una le llega lo suyo en vez de
+    mandarles a las tres el lote entero: quien recibe treinta glosas que no
+    son suyas deja de abrir el correo, y ahí se pierden también las que sí.
+    """
+    nombres: list[str] = []
+    for glosas in (resumen.get("por_gestor") or {}).values():
+        for g in glosas or []:
+            plan = g.get("plan") or {}
+            if not plan.get("con_medico"):
+                continue
+            quien = (plan.get("profesional_medico") or "").strip()
+            if quien and quien.upper() not in {n.upper() for n in nombres}:
+                nombres.append(quien)
+    return nombres
+
+
+def emails_de_las_doctoras(resumen: dict, db=None) -> tuple[dict[str, str], list[str]]:
+    """Resuelve cada doctora nombrada en el lote a su correo.
+
+    Devuelve (`{nombre del Excel: correo}`, `[nombres sin correo]`).
+
+    Se usa el mismo resolvedor que para los gestores, que compara por tokens:
+    el Excel escribe «LEIDY SANGUINO» y el portal la tiene como «LEIDY JHOANA
+    SANGUINO»; sin comparar por tokens, ese correo no saldría nunca.
+    """
+    nombres = _doctoras_nombradas(resumen)
+    if not nombres or db is None:
+        return {}, nombres
+    try:
+        from app.services.recepcion_service import (
+            construir_indice_usuarios,
+            resolver_gestor_a_email,
+        )
+
+        indice = construir_indice_usuarios(db)
+    except Exception as e:  # pragma: no cover - sin índice no se inventa nada
+        logger.warning(f"No se pudo construir el índice de usuarios: {e}")
+        return {}, nombres
+
+    encontradas: dict[str, str] = {}
+    sin_correo: list[str] = []
+    for nombre in nombres:
+        email, _motivo = resolver_gestor_a_email(nombre, indice)
+        if email:
+            encontradas[nombre] = email
+        else:
+            sin_correo.append(nombre)
+    return encontradas, sin_correo
+
+
 def emails_de_medicos_auditores(db=None) -> list[str]:
     """A qué correos llega lo médico. Vacío si nadie los ha señalado.
 
@@ -409,7 +464,15 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     # se les llenaría el buzón de tarifas y facturación que no les competen, y
     # terminarían ignorando también las que sí.
     hay_medicas = _hay_glosas_medicas(resumen)
-    emails_medicos = emails_de_medicos_auditores(db=db) if hay_medicas else []
+    # A cada doctora lo suyo: el Excel dice quién lleva cada glosa médica.
+    doctoras, doctoras_sin_correo = (
+        emails_de_las_doctoras(resumen, db=db) if hay_medicas else ({}, [])
+    )
+    emails_medicos = sorted(set(doctoras.values()))
+    if hay_medicas and not emails_medicos:
+        # Nadie nombrado en el Excel, o ninguna resolvió: se cae a la lista
+        # del servidor para que las glosas médicas no queden sin avisar.
+        emails_medicos = emails_de_medicos_auditores(db=db)
 
     # Union sin duplicados
     destinatarios = sorted(
@@ -542,6 +605,8 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
         "difusion_general": sorted(destinatarios_base),
         "hay_glosas_medicas": hay_medicas,
         "medicos_auditores": emails_medicos,
+        "doctoras": doctoras,
+        "doctoras_sin_correo": doctoras_sin_correo,
     }
     return exitos
 
@@ -782,13 +847,30 @@ async def enviar_excel_recepcion_con_respuestas(
     Retorna {'destinatarios', 'enviados', 'gestores_atendidos', 'broadcast_ok'}.
     """
     cfg = get_settings()
+    # 20-08-2026 (caso real de Yesid). Cuando esto devolvía «enviados: 0» a
+    # secas, la pantalla marcaba la importación como «✗ sin destinatarios» —
+    # que suena a que no se encontró a quién mandarle. Pero la causa de
+    # verdad era otra: el servidor no tiene el correo configurado. Yesid
+    # importó dos veces buscando el error donde no estaba.
+    #
+    # El motivo viaja para que la pantalla diga cuál de las tres cosas pasó.
     if not cfg.smtp_user or not cfg.smtp_password:
         logger.warning("[EXCEL-EMAIL] no enviado: SMTP_USER/SMTP_PASSWORD vacíos")
-        return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
+        return {
+            "destinatarios": 0,
+            "enviados": 0,
+            "gestores_atendidos": 0,
+            "motivo": "SIN_CORREO_CONFIG",
+        }
 
     if not excel_original:
         logger.warning("[EXCEL-EMAIL] no enviado: archivo original vacío")
-        return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
+        return {
+            "destinatarios": 0,
+            "enviados": 0,
+            "gestores_atendidos": 0,
+            "motivo": "SIN_ARCHIVO_ORIGINAL",
+        }
 
     # Imports diferidos para evitar ciclo email_service ↔ recepcion_*
     from app.services.recepcion_excel_response import (

@@ -492,9 +492,26 @@ function pintarDetalleDelCorreo(c){
   }
 
   if(c.hay_glosas_medicas){
-    if((c.medicos_auditores || []).length){
+    var dras = c.doctoras || {};
+    var nombresDra = Object.keys(dras);
+    var sinDra = c.doctoras_sin_correo || [];
+    if(nombresDra.length){
+      h += '<div class="ok" style="margin:10px 0">🩺 <b>Glosas médicas — a cada doctora la suya</b>'
+         + ' (según la columna PROFESIONAL(MEDICO) del Excel):<br>'
+         + nombresDra.sort().map(function(n){
+             return '<b>' + esc(n) + '</b> → ' + esc(dras[n]);
+           }).join('<br>')
+         + '</div>';
+      if(sinDra.length){
+        h += '<div class="err" style="margin:10px 0">🩺 <b>Sin correo:</b> '
+           + sinDra.map(esc).join(' · ')
+           + '<br><span style="font-size:.85em">Ese nombre del Excel no coincide con ningún'
+           + ' usuario activo del portal. Revise cómo está escrito en Usuarios.</span></div>';
+      }
+    } else if((c.medicos_auditores || []).length){
       h += '<div class="ok" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
-         + ' (pertinencia o calidad) y también se les envió a las médicas auditoras:<br>'
+         + ' pero el Excel no dice cuál doctora las lleva, así que se envió a todas'
+         + ' las médicas auditoras registradas:<br>'
          + c.medicos_auditores.map(esc).join(' · ') + '</div>';
     } else {
       h += '<div class="err" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
@@ -726,7 +743,9 @@ async function cargarHistorial(){
       const m = {
         ENVIADO:['#dcfce7','#166534','✓ correo enviado'],
         PARCIAL:['#fef3c7','#92400e','⚠ envío parcial'],
-        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ sin destinatarios'],
+        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ nadie a quien enviarlo'],
+        SIN_CORREO_CONFIG:['#fee2e2','#991b1b','✗ el servidor no tiene correo configurado'],
+        SIN_ARCHIVO_ORIGINAL:['#fef3c7','#92400e','✗ no quedó el archivo original'],
         ERROR:['#fee2e2','#991b1b','✗ error de envío'],
         SIN_ARCHIVO:['#f3f4f6','#6b7280','archivo purgado'],
         LISTO:['#dbeafe','#1e40af','procesando…'],

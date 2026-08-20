@@ -5131,6 +5131,45 @@ dice en rojo con el paso a seguir, en vez de callarse.
 - El arreglo del radicable se comprobó **quitando el filtro a propósito**: se
   ponen 4 pruebas en rojo.
 
+### 20-08 (noche) — Por qué no salió el correo, y a cada doctora lo suyo
+
+**1. El aviso apuntaba al lugar equivocado.** Yesid importó, no salió correo, y
+la pantalla marcó la importación como **«✗ sin destinatarios»** — que se lee
+como «no encontré a quién mandarle». Importó otra vez buscando el error en la
+lista de gestores. Pero la causa era otra: **el servidor no tiene el correo
+configurado**, y ese mismo estado se ponía para las dos cosas.
+
+Un aviso que apunta al lugar equivocado hace perder más tiempo que no tener
+aviso. Ahora la pantalla distingue tres causas:
+
+| Lo que sale | Qué pasó de verdad |
+|---|---|
+| ✗ **el servidor no tiene correo configurado** | Faltan `SMTP_USER` / `SMTP_PASSWORD` |
+| ✗ nadie a quien enviarlo | Sí hay correo configurado, pero ningún gestor cruzó |
+| ✗ no quedó el archivo original | Se purgó el .xlsx del lote |
+
+**2. A cada doctora lo suyo.** Yesid confirmó que las médicas auditoras son
+**solo tres**: LAURA DIAZ, LEIDY SANGUINO y ZULAY GONZALEZ. Y mostró algo
+mejor: **el Excel ya dice cuál doctora lleva cada glosa**, en la columna
+`PROFESIONAL(MEDICO)`.
+
+Así que no se les manda a las tres el lote entero: a cada una le llega **lo
+suyo**. Quien recibe treinta glosas que no son suyas deja de abrir el correo, y
+ahí se pierden también las que sí.
+
+> **Un detalle que casi las deja sin correo:** el Excel escribe «LEIDY
+> SANGUINO» y el portal la tiene como «LEIDY JHOANA SANGUINO»; «ZULAY
+> GONZALEZ» contra «LEYDI ZULAY GONZALEZ». Comparando letra por letra, esos
+> dos correos no habrían salido nunca. Se usa la comparación por palabras que
+> ya existía para los gestores, y las tres resuelven bien.
+
+Si una glosa médica no dice qué doctora la lleva, se les avisa a todas las
+registradas — mejor eso que dejarla sin avisar. Y si el nombre del Excel no
+coincide con ningún usuario, la pantalla lo dice con el nombre exacto.
+
+- 37 pruebas en `tests/test_services/test_a_quien_le_llega_el_correo.py`, con
+  los nombres **tal como vienen en el Excel del 19 de agosto**.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
