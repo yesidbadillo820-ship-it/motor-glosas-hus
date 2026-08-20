@@ -4709,6 +4709,25 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
   disco del servidor; prueba de control: revalidar a la misma hora una nota
   ya aceptada (si esa también falla, es el servidor, no la nota).
 
+### 20-08 (tarde) — Masivo de SALUD TOTAL consolidado con Dinámica Gerencial
+
+- Se cruzó la notificación de glosas de SALUD TOTAL (PARA_MASIVO_1, 202
+  objeciones de 2 facturas, $67.110.206) con el **DGReport de Dinámica
+  Gerencial** (1.448 líneas con el código SLNSERPRO real de cada servicio) y
+  se armó el masivo de 16 columnas **con los códigos DGH puestos**: 174 de
+  202 (86%) homologados. Métodos, del más al menos seguro: nombre exacto
+  (67), palabras contenidas (43), valor unitario coincidente (26), similitud
+  alta (20), referencia compartida (13), talla/presentación (5). Cada
+  asignación quedó documentada en la tabla `HOMOLOGACION_SALUDTOTAL_DGH.xlsx`
+  (verde = seguro, amarillo = revisar — p. ej. productos con dos códigos
+  "gemelos" en DG —, rojo = sin código, casilla vacía, no se inventó nada).
+- 28 renglones quedaron sin código (no aparecen con nombre reconocible en el
+  DGReport): están en rojo en la tabla para que el auditor los complete.
+- **La pantalla de Facturación Electrónica de DGH confirmó el diagnóstico de
+  la NC 332865**: las 4 notas válidas se enviaron el 18-08 entre 10:43 y
+  10:56 de la MAÑANA; los reintentos de la 332865 fueron en la TARDE y ambos
+  quedaron «Rechazado» por timeout del validador. Queda para mañana temprano.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
