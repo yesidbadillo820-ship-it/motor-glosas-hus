@@ -5373,6 +5373,152 @@ que el avance sobrevive al recargar), sin un solo error de JavaScript.
 
 **Documentos:** `docs/GUIA_SISTEMA_ICFES.md` (cómo se usa) y
 `docs/ESTRATEGIA_ICFES_400.md` (el plan concreto para llegar a 400).
+### 20-08 (noche) — Los soportes del .zip caían donde el índice nunca mira
+
+Último pendiente de la lista, y era real. La carpeta de soportes se resolvía
+en **dos lugares con reglas distintas**:
+
+| | El índice mira | El .zip se guarda en |
+|---|---|---|
+| 1º | **`config/soportes_root.txt`** | `SOPORTES_LOCAL_ROOT` |
+| 2º | `SOPORTES_ROOT` | `SOPORTES_ROOT` |
+| 3º | `SOPORTES_LOCAL_ROOT` | `/tmp/motor-soportes` |
+
+La subida **ni siquiera leía** `config/soportes_root.txt`, que es justamente
+donde el hospital dejó escrita la suya (`\\Prime\radicacion_2026`).
+
+**Qué pasaba:** el auditor subía un .zip de soportes, el motor decía «subido»,
+y los PDFs quedaban en una carpeta que **el índice nunca recorre**. Después
+buscaba la factura, no aparecía, y **no había forma de entender por qué** — el
+archivo estaba, pero en otro lado.
+
+**Cómo queda.** Una sola función responde «dónde viven los soportes», y la
+usan las dos: el índice y la subida. Si mañana cambia el criterio, cambia para
+las dos a la vez.
+
+- 8 pruebas en `tests/test_services/test_el_zip_cae_donde_el_indice_busca.py`,
+  incluida una que se pone roja si alguien vuelve a resolver la carpeta a mano
+  en el router — que es exactamente como nació el defecto.
+
+### 20-08 (noche) — Resubir el mismo archivo no es un error
+
+Yesid volvió a subir `GLOSAS 19 AGOSTO.xlsx` —el mismo que ya había entrado
+bien— y la pantalla le mostró:
+
+> ⚠ **Importación procesada — 0 glosas detectadas**
+> TOTAL 0 · NUEVAS 0 · ACTUALIZADAS 0 · RATIFICADAS 0 · **EXTEMPORÁNEAS 29**
+> *Posibles causas: el Excel no tiene la hoja correcta… los headers no
+> matchean…*
+
+**Dos problemas de golpe.**
+
+**1. «0 detectadas» junto a «29 extemporáneas» no pueden ser ciertas a la
+vez.** Los contadores de ratificadas y extemporáneas se sumaban al CLASIFICAR
+la fila, antes de saber si la fila iba a entrar. Una fila que después resultaba
+duplicada se saltaba el total, pero su extemporaneidad ya estaba contada. Ahora
+se cuentan cuando la fila **sí** entra.
+
+**2. El aviso lo mandaba a buscar un problema que no existía.** El archivo
+estaba perfecto: **las 35 glosas ya estaban importadas**, que es lo normal al
+volver a subir el mismo archivo. Pero la pantalla le decía que revisara la hoja
+y los encabezados.
+
+**Ahora son dos mensajes distintos, porque son dos situaciones distintas:**
+
+| Lo que pasó | Lo que sale |
+|---|---|
+| Todas ya estaban | ✅ verde: «**nada nuevo que registrar** — las 35 glosas del archivo YA estaban importadas. No se creó ninguna nueva y no se perdió nada, el archivo está bien» |
+| No se leyó ninguna fila | ⚠ ámbar: el aviso de la hoja y los encabezados, que ahí **sí** aplica |
+
+Y se agregó el contador **«YA ESTABAN»**, que antes no se veía en ninguna
+parte: el auditor no tenía cómo saber qué había pasado.
+
+- 8 pruebas en `tests/test_services/test_resubir_el_mismo_archivo_no_asusta.py`.
+
+### 20-08 (noche) — El .env podía no encontrarse, y nadie se enteraba
+
+Buscando por qué el motor decía «el correo no está configurado», apareció algo
+más grande. La configuración se leía de `".env"` — una ruta **relativa**, que
+se resuelve contra **la carpeta desde la que se arrancó el motor**, no contra
+la del repositorio.
+
+Si el motor arranca desde otra carpeta, el `.env` **no se encuentra** y toda la
+configuración cae a sus valores por defecto **en silencio**: sin claves de IA,
+sin correo, sin nada. Y no hay ningún aviso, porque «no encontré el archivo» y
+«el archivo está vacío» se ven exactamente igual.
+
+Que en este repositorio ya exista `config/soportes_root.txt` —leído por ruta
+absoluta, con un comentario explicando que las variables de entorno no
+sobrevivían al vigilante que revive el motor— dice que esta clase de problema
+**ya había mordido antes por otro lado**.
+
+**Cómo queda.** Manda el `.env` de la carpeta actual si lo hay —arrancar desde
+una carpeta con su propio `.env` es legítimo, así corren las pruebas—, y si
+no hay ninguno se usa el de la raíz del repositorio, que es el caso que estaba
+roto.
+
+> **Nota de honestidad:** el primer intento fue absoluto a secas y puso en rojo
+> dos pruebas del `.env` con acentos, que arrancan el motor desde una carpeta
+> temporal con su propio archivo. **Las pruebas tenían razón**: ese caso es
+> legítimo. Se corrigió para respetar los dos.
+
+- 8 pruebas en `tests/test_api/test_el_env_se_encuentra_siempre.py`.
+
+### Y lo del correo, con el dato en la mano
+
+La consulta al `.env` del PC de cartera salió **vacía las dos veces**:
+`SMTP_USER` y `SMTP_PASSWORD` **no están en el archivo**. Los correos que
+Yesid vio en Gmail salieron de otra configuración o de otro momento.
+
+**Lo que falta hacer en el PC de cartera:** agregar esas dos líneas al
+`C:\motor-glosas\repo\.env` y reiniciar el motor. Ojo con el Bloc de notas:
+suele guardar como `.env.txt`, y así el motor nunca lo lee.
+
+### 20-08 (noche) — Si falta el .env, ahora el motor lo dice
+
+La otra mitad del arreglo anterior. Anclar bien la ruta evita que el archivo se
+pierda, pero no sirve de nada si cuando falta **el motor se calla**: desde
+afuera, «no encontré el archivo» y «el archivo está vacío» se ven exactamente
+igual, y uno termina buscando el problema donde no está. Que es justo lo que
+nos pasó con el correo.
+
+**Ahora avisa en dos sitios:** en el registro al arrancar, y como una sección
+propia en la pantalla de **Diagnóstico**, marcada en rojo — porque sin `.env`
+el motor corre sin claves de IA y sin correo, y eso no es un detalle.
+
+Y detecta el descuido clásico de Windows: **el Bloc de notas guarda «.env» como
+«.env.txt»** y el explorador esconde la extensión, así que el archivo se ve
+bien. Si encuentra uno de esos al lado, lo nombra.
+
+> **No grita por lo normal:** `.env.example` y las demás plantillas del
+> repositorio no se señalan. Un aviso que salta por algo corriente enseña a
+> ignorar los avisos.
+
+> **Nota de honestidad:** puse la sección de primera y dos pruebas se pusieron
+> rojas. Tenían razón, y por un buen motivo: la sección del **motor** va
+> primero porque si hay dos motores corriendo ningún otro dato del panel es
+> confiable, y la **versión** va segunda. La mía quedó tercera.
+
+- 9 pruebas en `tests/test_core/test_si_falta_el_env_se_avisa.py`.
+
+### 20-08 (noche) — La contraseña de Gmail se pega con espacios
+
+Google muestra la contraseña de aplicación en cuatro grupos de cuatro —«abcd
+efgh ijkl mnop»— y uno la pega tal cual, que es lo natural. **Los espacios son
+solo para leerla**, no son parte de la clave.
+
+El problema: algunos servidores la aceptan así y otros la rechazan, y el error
+que devuelven es **el mismo** «Username and Password not accepted» que sale
+cuando la clave está de verdad equivocada. Uno se pone a generar claves nuevas
+sin necesidad.
+
+Ahora el motor le quita los espacios **solo** cuando la clave tiene la forma
+exacta de una contraseña de aplicación de Google (16 letras o números en 4
+grupos de 4). Cualquier otra se manda tal cual: hay servidores de correo donde
+un espacio **sí** es parte de la contraseña, y tocarla ahí sería romperla.
+
+- 12 pruebas en `tests/test_services/test_la_clave_de_gmail_con_espacios.py`,
+  la mitad dedicadas a lo que NO se debe tocar.
 
 ## 3) PENDIENTE
 

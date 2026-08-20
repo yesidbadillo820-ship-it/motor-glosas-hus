@@ -98,6 +98,7 @@
       <div class="stat"><div class="n" id="s-act" style="color:#2563eb">0</div><div class="l">ACTUALIZADAS</div></div>
       <div class="stat"><div class="n" id="s-rat" style="color:#7c3aed">0</div><div class="l">RATIFICADAS</div></div>
       <div class="stat"><div class="n" id="s-ext" style="color:#dc2626">0</div><div class="l">EXTEMPORÁNEAS</div></div>
+      <div class="stat" id="s-dup-box" style="display:none"><div class="n" id="s-dup" style="color:#64748b">0</div><div class="l">YA ESTABAN</div></div>
     </div>
 
     <h3 style="margin:20px 0 10px">Semáforo</h3>
@@ -264,27 +265,49 @@ function mostrarResultado(d){
   // Si total = 0 mostramos un título distinto y advertencia clara —
   // sino el "✅ Importación completada" + 0 glosas confunde al gestor.
   var totalNum = d.total || 0;
-  if(totalNum === 0){
+  var duplicadas = d.duplicadas || 0;
+  var prev = document.getElementById('warn-cero');
+  if(prev) prev.remove();
+
+  // 20-08-2026. Antes, cualquier «total 0» mostraba el mismo aviso: revisá la
+  // hoja, revisá los encabezados. Yesid resubió el mismo archivo —que estaba
+  // perfecto— y lo mandó a buscar un problema que no existía. Las 35 glosas ya
+  // estaban importadas, y eso es una noticia normal, no un error.
+  //
+  // Son dos situaciones distintas y ahora se dicen distinto.
+  if(totalNum === 0 && duplicadas > 0){
+    document.getElementById('result-title').innerHTML =
+      '<span style="color:#15803d">✅ Importación procesada — nada nuevo que registrar</span>';
+    var ok = document.createElement('div');
+    ok.id = 'warn-cero';
+    ok.style.cssText = 'background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:12px;margin:10px 0;color:#15803d;font-size:13px;line-height:1.5';
+    ok.innerHTML = '<b>Las ' + duplicadas + ' glosas del archivo YA estaban importadas.</b><br>'
+      + 'No se creó ninguna nueva y no se perdió nada — el archivo está bien. '
+      + 'Esto es lo normal al volver a subir el mismo archivo.<br>'
+      + 'Si esperaba glosas nuevas, revise que el Excel sea el del lote nuevo y no el anterior.';
+    document.getElementById('result').insertBefore(ok, document.getElementById('result').children[1] || null);
+  } else if(totalNum === 0){
     document.getElementById('result-title').innerHTML =
       '<span style="color:#92400e">⚠ Importación procesada — 0 glosas detectadas</span>';
-    var prev = document.getElementById('warn-cero');
-    if(!prev){
-      var warn = document.createElement('div');
-      warn.id = 'warn-cero';
-      warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
-      warn.innerHTML = '<b>Posibles causas:</b><br>'
-        + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
-        + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
-        + '• Las filas están vacías o solo tienen headers.<br>'
-        + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
-      document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
-    }
+    var warn = document.createElement('div');
+    warn.id = 'warn-cero';
+    warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
+    warn.innerHTML = '<b>No se leyó ninguna fila del archivo. Posibles causas:</b><br>'
+      + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
+      + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
+      + '• Las filas están vacías o solo tienen headers.<br>'
+      + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
+    document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
   } else {
     document.getElementById('result-title').textContent = '✅ Importación completada';
     var prevWarn = document.getElementById('warn-cero');
     if(prevWarn) prevWarn.remove();
   }
   document.getElementById('s-total').textContent = totalNum;
+  var cajaDup = document.getElementById('s-dup-box');
+  if(cajaDup) cajaDup.style.display = duplicadas > 0 ? '' : 'none';
+  var celdaDup = document.getElementById('s-dup');
+  if(celdaDup) celdaDup.textContent = duplicadas;
   document.getElementById('s-nuevas').textContent = d.creadas || 0;
   document.getElementById('s-act').textContent = d.actualizadas || 0;
   document.getElementById('s-rat').textContent = d.ratificadas || 0;
@@ -297,7 +320,23 @@ function mostrarResultado(d){
   document.getElementById('sn').textContent = sem.NEGRO || 0;
 
   document.getElementById('e-num').textContent = d.correos_enviados || 0;
-  pintarDetalleDelCorreo(d.correo);
+  // 20-08-2026. Cuando el archivo no trae nada nuevo, no hay a quién
+  // avisarle: el «Correos enviados: 0» es correcto, pero a secas se lee como
+  // una falla. Yesid reimportó varias veces mirando ese cero sin saber si era
+  // un problema del correo o la consecuencia de que no hubiera novedades.
+  if(totalNum === 0 && duplicadas > 0){
+    var cajaMail = document.getElementById('email-detalle');
+    if(cajaMail){
+      cajaMail.innerHTML = '<div style="background:#f8fafc;border:1px solid var(--border);'
+        + 'padding:12px 14px;border-radius:8px;font-size:.9em">'
+        + 'No se envió ningún correo <b>porque no había nada nuevo que avisar</b>. '
+        + 'No es una falla del correo.<br>'
+        + 'Para comprobar que el correo funciona, use <b>Diagnóstico → 📧 Probar correo</b>.'
+        + '</div>';
+    }
+  } else {
+    pintarDetalleDelCorreo(d.correo);
+  }
 
   // 🤖 Indicador prominente de auto-procesamiento IA en background
   if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){

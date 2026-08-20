@@ -1,8 +1,40 @@
 import logging
 import warnings
+from functools import lru_cache
+from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from functools import lru_cache
+
+
+# 20-08-2026. Acá decía `"env_file": ".env"` — una ruta RELATIVA, que Pydantic
+# resuelve contra la carpeta desde la que se arrancó el proceso, no contra la
+# del repositorio. Si el motor arranca desde otra carpeta, el .env no se
+# encuentra y TODA la configuración cae a sus valores por defecto **en
+# silencio**: sin claves de IA, sin correo, sin nada. Y no hay ningún aviso,
+# porque «no encontré el archivo» y «el archivo está vacío» se ven igual.
+#
+# Que en este repositorio ya exista `config/soportes_root.txt`, leído por ruta
+# absoluta y con un comentario explicando que las variables de entorno no
+# sobrevivían al vigilante, dice que esta clase de problema ya había mordido
+# antes por otro lado.
+#
+# Anclarlo a la raíz del repositorio lo vuelve independiente de desde dónde se
+# arranque el motor.
+# Arrancar desde una carpeta que trae SU PROPIO .env es un caso legítimo —así
+# corren las pruebas y así puede correr una segunda instancia—, y eso se
+# respeta: manda el de la carpeta actual. La raíz del repositorio es el
+# respaldo para cuando ahí no hay ninguno, que es justo el caso que estaba
+# roto.
+def _ruta_del_env() -> str:
+    local = Path.cwd() / ".env"
+    if local.is_file():
+        return str(local)
+    return str(Path(__file__).resolve().parent.parent.parent / ".env")
+
+
+_RUTA_ENV = _ruta_del_env()
+
 
 logger = logging.getLogger("motor_glosas")
 
@@ -140,7 +172,7 @@ class Settings(BaseSettings):
     agente_lotes_token: str = ""
 
     model_config = {
-        "env_file": ".env",
+        "env_file": _RUTA_ENV,
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
@@ -303,6 +335,60 @@ def modelo_gemini_vigente(pedido: str | None = None) -> str:
     return valor
 
 
+def diagnostico_del_env() -> dict:
+    """¿Se encontró el archivo de configuración? (20-08-2026)
+
+    La otra mitad del arreglo de la ruta. Anclar bien el `.env` evita que se
+    pierda, pero no sirve de nada si cuando falta el motor se calla: «no
+    encontré el archivo» y «el archivo está vacío» se ven exactamente igual
+    desde afuera, y el auditor termina buscando el problema donde no está.
+
+    Acá queda el dato para que la pantalla de Diagnóstico lo diga.
+    """
+    ruta = Path(_ruta_del_env())
+    existe = ruta.is_file()
+    # El descuido clásico: el Bloc de notas guarda «.env» como «.env.txt» y
+    # Windows esconde la extensión, así que en el explorador se ve bien.
+    # `.env.example` y compañía son archivos del repositorio, no descuidos:
+    # señalarlos sería ruido, y un aviso que grita por algo normal enseña a
+    # ignorar los avisos.
+    _PLANTILLAS = {".env", ".env.example", ".env.sample", ".env.template", ".env.dist"}
+    sospechosos = []
+    try:
+        carpeta = ruta.parent
+        if carpeta.is_dir():
+            sospechosos = sorted(
+                f.name
+                for f in carpeta.iterdir()
+                if f.is_file()
+                and f.name.lower().startswith(".env")
+                and f.name.lower() not in _PLANTILLAS
+            )
+    except OSError:
+        sospechosos = []
+    return {
+        "ruta": str(ruta),
+        "existe": existe,
+        "archivos_parecidos": sospechosos,
+        "aviso": (
+            ""
+            if existe
+            else (
+                f"No existe {ruta}. El motor está funcionando SOLO con las variables "
+                "del entorno: puede faltarle las claves de IA, el correo y más, sin "
+                "que nada lo diga."
+                + (
+                    f" Ojo: en esa carpeta hay {', '.join(sospechosos)} — el Bloc de "
+                    "notas suele guardar «.env» como «.env.txt» y Windows esconde la "
+                    "extensión."
+                    if sospechosos
+                    else ""
+                )
+            )
+        ),
+    }
+
+
 def _leer_configuracion() -> "Settings":
     """Construye la configuración sin que un acento pueda tumbar el portal.
 
@@ -319,6 +405,10 @@ def _leer_configuracion() -> "Settings":
     """
     import logging
 
+    _diag = diagnostico_del_env()
+    if not _diag["existe"]:
+        logging.getLogger("motor_glosas").warning("[CONFIG] %s", _diag["aviso"])
+
     try:
         return Settings()
     except UnicodeDecodeError as e:
@@ -328,7 +418,7 @@ def _leer_configuracion() -> "Settings":
             e,
         )
     try:
-        return Settings(_env_file=".env", _env_file_encoding="cp1252")
+        return Settings(_env_file=_ruta_del_env(), _env_file_encoding="cp1252")
     except Exception as e:  # noqa: BLE001 - el portal arranca igual
         logging.getLogger("motor_glosas").error(
             "No se pudo leer el .env (%s). El motor arranca SOLO con las variables "
