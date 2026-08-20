@@ -4698,6 +4698,16 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
   cuadro del Lote V2 de junio (dockerrips caído): NO se corrige nada en los
   archivos — se reintenta la validación y, si repite, se reinicia el
   contenedor del validador. No subir la nota hasta tener ResultState=true.
+  **Diagnóstico afinado (20-08, segundo rechazo):** se comparó TODO contra
+  las 3 hermanas aceptadas — paquete de envío idéntico (mismas claves,
+  CUV='0', XML embebido correcto), RIPS con la misma estructura (solo cambian
+  los datos del paciente) y facturas hermanas incluso MÁS viejas (feb-2025)
+  que pasaron. La única diferencia real es LA HORA: todo lo que se validó en
+  la MAÑANA (10:43–10:56 a.m.) pasó; los dos intentos de la 332865 fueron en
+  la TARDE (3:12 p.m. y 2:30 p.m.) y dieron timeout. Plan: revalidar mañana a
+  primera hora; si aún falla, reiniciar el Docker del validador y revisar
+  disco del servidor; prueba de control: revalidar a la misma hora una nota
+  ya aceptada (si esa también falla, es el servidor, no la nota).
 
 ## 3) PENDIENTE
 
