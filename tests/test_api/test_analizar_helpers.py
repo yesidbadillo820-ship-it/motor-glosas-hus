@@ -71,7 +71,13 @@ class TestConstruirDictamenAceptacion:
         # Debe traer la tabla de códigos
         assert "TA0201" in html
         assert "RE9702" in html
-        assert "168,563" in html
+        # 20-08-2026. Esta línea exigía «168,563» —con COMA—, que es formato
+        # gringo. En Colombia la coma es el separador decimal: «168,563» se lee
+        # como ciento sesenta y ocho con quinientos sesenta y tres milésimas.
+        # La prueba estaba fijando el defecto: cuando el dictamen empezó a
+        # escribir bien la plata, ESTA prueba falló por tener razón el código.
+        assert "$168.563" in html
+        assert "168,563" not in html
         # Bloque verde de aceptación total
         assert "RESPUESTA A GLOSA" in html
         assert "ACEPTA GLOSA TOTAL" in html
