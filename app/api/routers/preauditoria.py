@@ -475,6 +475,31 @@ def ver_oficio(
     return _oficio_dict(db, o, con_facturas=True)
 
 
+class RenombrarOficioIn(BaseModel):
+    numero_radicado: str = Field(..., min_length=3, max_length=60)
+
+
+@router.patch("/oficios/{oficio_id}")
+def renombrar_oficio(
+    oficio_id: int,
+    body: RenombrarOficioIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Corrige el número de radicado de un oficio mal digitado.
+
+    El número queda copiado en cada factura y en cada evento del historial:
+    el servicio los corrige todos en la misma operación.
+    """
+    o = db.get(OficioRecepcionRecord, oficio_id)
+    if not o:
+        raise HTTPException(404, "Oficio no encontrado")
+    res = svc.renombrar_oficio(db, o, body.numero_radicado)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 409), res.get("mensaje", "No se pudo corregir"))
+    return {**res, "oficio": _oficio_dict(db, o)}
+
+
 class EliminarOficiosIn(BaseModel):
     ids: list[int] = Field(..., min_length=1, max_length=100)
 

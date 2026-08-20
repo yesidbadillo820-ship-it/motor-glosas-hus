@@ -1625,6 +1625,83 @@ def _facturas_migradas_con_historial(
     return sorted({f for (f,) in q.distinct().all() if f})
 
 
+def renombrar_oficio(db: Session, oficio: OficioRecepcionRecord, nuevo_radicado: str) -> dict:
+    """Corrige el número de radicado de un oficio ya registrado.
+
+    POR QUÉ EXISTE (caso real 20-08-2026): un oficio quedó grabado como
+    FHUS-AS-101190-26, con un UNO en vez de la I, y no había forma de
+    corregirlo sin borrarlo y perder su historia. El número no es un dato
+    suelto: se copia en cada factura del oficio y en cada evento del
+    historial, así que corregirlo aquí lo corrige en todas partes (dos
+    UPDATE, sin recorrer factura por factura).
+    """
+    nuevo = re.sub(r"\s+", "", (nuevo_radicado or "")).upper()
+    if not nuevo:
+        return {"ok": False, "codigo": 400, "mensaje": "Escriba el número correcto del oficio."}
+    if len(nuevo) > 60:
+        return {"ok": False, "codigo": 400, "mensaje": "El número del oficio es demasiado largo."}
+    antes = oficio.numero_radicado
+    if nuevo == antes:
+        return {
+            "ok": True,
+            "sin_cambios": True,
+            "antes": antes,
+            "ahora": nuevo,
+            "facturas": 0,
+            "eventos": 0,
+        }
+    otro = (
+        db.query(OficioRecepcionRecord)
+        .filter(
+            OficioRecepcionRecord.numero_radicado == nuevo,
+            OficioRecepcionRecord.id != oficio.id,
+        )
+        .first()
+    )
+    if otro:
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"Ya hay otro oficio registrado como {nuevo} (recibido el "
+                f"{otro.fecha_recibido:%d/%m/%Y}): revise cuál es el correcto."
+            ),
+        }
+    oficio.numero_radicado = nuevo
+    facturas = (
+        db.query(FacturaPreauditoriaRecord)
+        .filter(FacturaPreauditoriaRecord.oficio_actual_id == oficio.id)
+        .update({FacturaPreauditoriaRecord.oficio_fhus: nuevo}, synchronize_session=False)
+    )
+    eventos = (
+        db.query(FacturaEventoRecord)
+        .filter(FacturaEventoRecord.oficio_id == oficio.id)
+        .update({FacturaEventoRecord.oficio_fhus: nuevo}, synchronize_session=False)
+    )
+    try:
+        db.commit()
+    except IntegrityError:
+        # Otra persona registró ese mismo número mientras tanto: nada queda
+        # a medias y el aviso es claro, no un error de programa.
+        db.rollback()
+        return {
+            "ok": False,
+            "codigo": 409,
+            "mensaje": (
+                f"Otra persona acaba de registrar el oficio {nuevo}. "
+                "Actualice la página y revise cuál es el correcto."
+            ),
+        }
+    return {
+        "ok": True,
+        "sin_cambios": False,
+        "antes": antes,
+        "ahora": nuevo,
+        "facturas": facturas or 0,
+        "eventos": eventos or 0,
+    }
+
+
 def eliminar_oficio(db: Session, oficio: OficioRecepcionRecord) -> dict:
     """Elimina un oficio de recepción mal registrado, con salvaguardas.
 
