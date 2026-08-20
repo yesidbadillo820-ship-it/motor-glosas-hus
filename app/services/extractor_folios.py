@@ -118,3 +118,82 @@ def extraer_referencias_documentales(contexto_pdf: str) -> dict:
         "firmas_medicos": firmas,
         "resumen_citable": resumen,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────
+#  VERIFICACIÓN DE FOLIOS CITADOS — 20-08-2026
+#
+#  Hasta hoy el motor ya no inventaba CUPS ni soportes, pero SÍ folios. Un
+#  dictamen podía decir «SEGÚN CONSTA EN EL FOLIO 25 DE LA HISTORIA CLÍNICA»
+#  sin que nadie hubiera abierto una historia clínica. Es la afirmación más
+#  fácil de tumbar que existe: la EPS pide el folio 25, no está, y ratifica
+#  la glosa completa — además de dejar en el expediente una afirmación
+#  documental falsa firmada por el hospital.
+#
+#  La clave que hace segura la verificación: **la IA y el verificador leen
+#  exactamente el mismo texto**. Si el folio no aparece en lo que la IA
+#  pudo leer, la IA no lo leyó: se lo inventó.
+# ─────────────────────────────────────────────────────────────────────────
+
+# Palabras con las que un documento —o un dictamen— nombra un folio.
+# El \b inicial evita que "PORTAFOLIO 5" cuente como folio.
+_PALABRA_FOLIO = r"(?:folios?|fls?\.|hojas?|p[áa]ginas?|p[áa]gs?\.|pags?\.)"
+
+# Un folio citado puede venir suelto ("FOLIO 25"), en lista ("FOLIOS 3, 5 Y 7")
+# o en rango ("FOLIOS 12 AL 15"). Se capturan TODOS los números escritos; los
+# rangos NO se expanden a propósito: un dictamen que dice «FOLIOS 1 A 40»
+# afirma esos dos extremos, no cuarenta folios, y expandirlos llenaría la
+# pantalla del auditor de avisos que no puede atender.
+_PATRON_FOLIO_CITADO = re.compile(
+    r"\b" + _PALABRA_FOLIO + r"\s*(?:nros?\.?|n[oº°]s?\.?|n[uú]meros?|nums?\.?)?\s*"
+    r"(\d{1,4}(?:\s*(?:,|y|a|al|-|–|—|hasta)\s*\d{1,4})*)",
+    re.IGNORECASE,
+)
+
+
+def _numeros_de(bruto: str) -> list[int]:
+    """Los números escritos dentro de una lista/rango de folios."""
+    return [int(n) for n in re.findall(r"\d{1,4}", bruto or "") if 1 <= int(n) <= 9999]
+
+
+def folios_citados(texto: str) -> list[int]:
+    """Folios que un texto AFIRMA, en orden y sin repetir.
+
+    Se usa sobre el dictamen: es lo que el hospital le está diciendo a la EPS
+    que revise.
+    """
+    if not texto:
+        return []
+    vistos: list[int] = []
+    for bruto in _PATRON_FOLIO_CITADO.findall(texto):
+        for n in _numeros_de(bruto):
+            if n not in vistos:
+                vistos.append(n)
+    return vistos
+
+
+def folios_en_evidencia(texto: str) -> set[int]:
+    """Folios que de verdad aparecen en el texto leído del expediente.
+
+    A diferencia de `extraer_referencias_documentales`, que devuelve solo los
+    5 más frecuentes para no saturar el prompt, aquí se devuelven TODOS: si se
+    comparara contra la lista recortada, un folio real pero poco repetido se
+    marcaría como inventado.
+    """
+    if not texto:
+        return set()
+    return {int(m) for m in _PATRON_FOLIO.findall(texto) if 1 <= int(m) <= 9999}
+
+
+def folios_inventados(dictamen: str, evidencia: str) -> list[int]:
+    """Folios que el dictamen cita y que NO están en el expediente leído.
+
+    `evidencia` es el texto que la IA tuvo a la vista (contexto de los PDF y
+    el texto de la glosa). Vacío significa que no se leyó ningún soporte: ahí
+    CUALQUIER folio citado es inventado, porque no había de dónde sacarlo.
+    """
+    citados = folios_citados(dictamen)
+    if not citados:
+        return []
+    reales = folios_en_evidencia(evidencia)
+    return [f for f in citados if f not in reales]
