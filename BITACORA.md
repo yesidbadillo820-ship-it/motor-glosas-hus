@@ -4543,6 +4543,42 @@ ahí. De ahí el «salen 4 y son 5».
 
 ---
 
+### 20-08 (tarde) — «¿Este Excel ya está subido?»: ahora se puede saber
+
+Llegaron dos archivos con la misma pregunta: la hoja del oficio
+**FHUS-AS-I01162-26** (14 facturas con las decisiones del 18 de agosto) y el
+Excel de **Radicación de Cuentas** bajado del DGH hoy. Hasta ahora no había
+forma sencilla de saber si eso ya estaba en el sistema.
+
+**Dos cosas quedaron para responder esa pregunta sola:**
+
+1. **La pestaña «Fuentes» ahora dice cuál fue el último archivo.** Debajo de
+   los contadores aparece: «Último archivo de Radicación: **Document12.xlsx**
+   · subido el 19/08/2026». Si el nombre no es el del archivo que acaba de
+   bajar, ese archivo todavía no está subido.
+2. **Comando de comparación** (no cambia nada, solo mira):
+   `venv\Scripts\python.exe tools\preauditoria_comparar_acta.py "D:\...\FHUS-AS-I01162-26.xlsx"`
+   Lee el Excel (el formato clásico del equipo o el consolidado ADRES) y dice
+   factura por factura qué dice el papel y qué dice el sistema, con una marca:
+   **AL DÍA** (ya está igual), **ADELANTE** (el sistema sabe eso y además
+   avanzó: por ejemplo el acta la muestra devuelta y en la página ya reingresó
+   a otro oficio), **FALTA** (esa decisión no está registrada), **DIFERENTE**
+   (se contradicen, hay que mirarlo a mano) y **NO ESTÁ** (esa factura no
+   existe en el sistema). Al final resume qué facturas piden acción y recuerda
+   que lo correcto es auditarlas en la página, no volver a importar el Excel.
+
+**Lo que se encontró en los dos archivos de hoy:** el Excel de Radicación
+trae **376 facturas nuevas** y **96 envíos nuevos** frente al que estaba
+cargado (y 26 facturas que facturación cambió de envío), así que hay que
+subirlo; y de la hoja del oficio FHUS-AS-I01162-26, varias decisiones del 18
+de agosto todavía no estaban en el sistema — entre ellas la devolución de
+**HUS0000544836**, que es justo la factura del envío 232619 que no aparecía
+en el oficio nuevo.
+
+13 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

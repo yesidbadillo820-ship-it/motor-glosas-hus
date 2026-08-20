@@ -183,6 +183,20 @@ class TestFuentes:
         d = client.get("/preauditoria/fuentes/radicacion").json()
         assert d["items"][0]["entidad"] == "AXA COLPATRIA"
 
+    def test_el_resumen_dice_cual_fue_el_ultimo_archivo(self, client):
+        """Sin esto no había forma de saber en la página si el Excel que se
+        acaba de bajar del DGH ya estaba subido (pregunta real del 20-08)."""
+        vacio = client.get("/preauditoria/fuentes/resumen").json()
+        assert vacio["radicacion_ultimo_archivo"] is None
+        assert vacio["radicacion_ultimo_cargue"] is None
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        d = client.get("/preauditoria/fuentes/resumen").json()
+        assert d["radicacion_ultimo_archivo"] == "radicacion.xlsx"
+        assert d["radicacion_ultimo_cargue"]
+        assert d["dgreport_ultimo_archivo"] == "dgreport.xlsx"
+        assert d["dgreport_ultimo_cargue"]
+
     def test_dgreport_upsert(self, client):
         r = _subir_dgreport(client, [F1, F2])
         assert r.status_code == 200
