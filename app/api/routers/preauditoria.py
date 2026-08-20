@@ -328,6 +328,15 @@ async def subir_dgreport(
     }
 
 
+def _ultimo_cargue(db: Session, modelo) -> tuple[Optional[str], Optional[str]]:
+    """Archivo y fecha del último cargue de una fuente (una sola consulta)."""
+    cuando = sa_func.coalesce(modelo.actualizado_en, modelo.importado_en)
+    fila = db.query(modelo.fuente_archivo, cuando).order_by(cuando.desc()).first()
+    if fila is None:
+        return None, None
+    return fila[0], _fecha_iso(fila[1])
+
+
 @router.get("/fuentes/resumen")
 def resumen_fuentes(
     db: Session = Depends(get_db),
@@ -336,10 +345,19 @@ def resumen_fuentes(
     n_rad = db.query(sa_func.count(RadicacionCuentaRecord.id)).scalar() or 0
     n_envios = db.query(sa_func.count(sa_func.distinct(RadicacionCuentaRecord.envio))).scalar() or 0
     n_dg = db.query(sa_func.count(DgReportRecord.id)).scalar() or 0
+    rad = _ultimo_cargue(db, RadicacionCuentaRecord)
+    dgr = _ultimo_cargue(db, DgReportRecord)
     return {
         "radicacion_facturas": n_rad,
         "radicacion_envios": n_envios,
         "dgreport_facturas": n_dg,
+        # Qué archivo entró de último y cuándo: sin esto no había forma de
+        # saber en la página si el Excel que se acaba de bajar del DGH ya se
+        # había subido o no (la pregunta del 20-08-2026).
+        "radicacion_ultimo_archivo": rad[0],
+        "radicacion_ultimo_cargue": rad[1],
+        "dgreport_ultimo_archivo": dgr[0],
+        "dgreport_ultimo_cargue": dgr[1],
     }
 
 

@@ -133,6 +133,7 @@
       </div>
     </div>
     <div class="kpis" id="src-resumen" style="margin-top:12px"></div>
+    <p class="leyenda" id="src-ultimo"></p>
   </div>
 
   <div class="card" id="zona-admin" style="display:none;border:1px solid var(--rojo)">
@@ -394,6 +395,15 @@ async function cargarResumenFuentes(){
       '<div class="kpi"><div class="v">'+d.radicacion_facturas+'</div><div class="l">Facturas en Radicación</div></div>'+
       '<div class="kpi"><div class="v">'+d.radicacion_envios+'</div><div class="l">Envíos distintos</div></div>'+
       '<div class="kpi"><div class="v">'+d.dgreport_facturas+'</div><div class="l">Facturas con Facturación Electrónica</div></div>';
+    // Qué archivo entró de último: así se sabe de una si el Excel que se acaba
+    // de bajar del DGH ya está subido o todavía no.
+    var ult=function(nombre, archivo, cuando){
+      if(!archivo && !cuando) return '';
+      return '<div>'+nombre+': <b>'+esc(archivo||'(sin nombre)')+'</b>'+(cuando?' · subido el '+fBog(cuando):'')+'</div>';
+    };
+    document.getElementById('src-ultimo').innerHTML=
+      ult('Último archivo de Radicación', d.radicacion_ultimo_archivo, d.radicacion_ultimo_cargue)+
+      ult('Último archivo de Facturación Electrónica', d.dgreport_ultimo_archivo, d.dgreport_ultimo_cargue);
   }catch(e){}
 }
 
