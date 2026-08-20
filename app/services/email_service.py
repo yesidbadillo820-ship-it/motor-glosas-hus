@@ -1168,4 +1168,10 @@ async def enviar_excel_recepcion_con_respuestas(
         "gestores_sin_email": gestores_sin_email,
         "gestores_detalle": gestores_detalle,
         "broadcast_ok": broadcast_ok,
+        # 20-08-2026. Sin esto, «no salió ningún correo» se mostraba SIEMPRE
+        # como «nadie a quien enviarlo», aunque sí hubiera destinatarios y lo
+        # que fallara fuera el servidor de correo. El auditor se pone a revisar
+        # la lista de gestores —que está bien— mientras el problema está en
+        # otro lado. Ya nos pasó hoy con el correo mal configurado.
+        "motivo": ("FALLO_ENVIO" if (enviados <= 0 and destinatarios_unicos) else ""),
     }

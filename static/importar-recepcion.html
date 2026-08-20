@@ -783,6 +783,10 @@ async function cargarHistorial(){
         ENVIADO:['#dcfce7','#166534','✓ correo enviado'],
         PARCIAL:['#fef3c7','#92400e','⚠ envío parcial'],
         SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ nadie a quien enviarlo'],
+        // 20-08-2026: sí había a quién mandarle; lo que falló fue el servidor
+        // de correo. Antes esto salía como «nadie a quien enviarlo» y mandaba
+        // al auditor a revisar la lista de gestores, que estaba bien.
+        FALLO_ENVIO:['#fee2e2','#991b1b','✗ el servidor de correo rechazó el envío'],
         SIN_CORREO_CONFIG:['#fee2e2','#991b1b','✗ el servidor no tiene correo configurado'],
         SIN_ARCHIVO_ORIGINAL:['#fef3c7','#92400e','✗ no quedó el archivo original'],
         ERROR:['#fee2e2','#991b1b','✗ error de envío'],

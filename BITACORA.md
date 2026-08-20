@@ -5552,6 +5552,36 @@ comandos sin decirlo.
 Python, ni consola, ni carpeta correcta, ni internet. Doble clic y funciona,
 también en el celular.
 
+### 20-08 (noche) — EL CORREO YA FUNCIONA ✅
+
+Yesid apretó **📧 Probar correo** y el mensaje llegó a su bandeja de
+`glosashus09@sinacsc.com`.
+
+**La causa era la que se sospechaba:** la contraseña de aplicación se había
+generado en la cuenta `yesidbadillo820@gmail.com`, pero el `.env` decía
+`SMTP_USER=motorglosas@gmail.com`. Una contraseña de aplicación **solo sirve
+para la cuenta donde se generó**. Corrigió el usuario y salió a la primera.
+
+Y el detalle que importa: **llegó a un buzón `@sinacsc.com`**. Esos eran los
+que rebotaban con «Address not found» cuando salían desde la cuenta
+equivocada. Ahora sí entregan.
+
+### Y un último defecto de la misma familia
+
+La etiqueta **«✗ nadie a quien enviarlo»** era un cajón de sastre: salía
+siempre que no saliera ningún correo, **aunque sí hubiera destinatarios y lo
+que fallara fuera el servidor de correo**. Eso manda al auditor a revisar la
+lista de gestores —que está bien— mientras el problema está en otro lado.
+
+Nos pasó hoy mismo: con el correo mal configurado, la pantalla decía «nadie a
+quien enviarlo».
+
+Ahora hay una etiqueta aparte: **«✗ el servidor de correo rechazó el envío»**.
+
+- 7 pruebas en `tests/test_services/test_el_correo_no_dice_nadie_cuando_si_habia.py`,
+  incluidas las que comprueban que los demás estados (ENVIADO, PARCIAL, sin
+  correo configurado, sin archivo) **no cambian**.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)
