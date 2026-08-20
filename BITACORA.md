@@ -5241,6 +5241,33 @@ por aceptada**: la plata se regala.
 - 10 pruebas en `tests/test_services/test_salud_total_no_se_pasa_del_tunel.py`,
   incluida la que vigila que no vuelva el 120 fijo escrito a mano.
 
+### 20-08 (noche) — Un cargue que se corta a mitad ahora dice qué SÍ quedó
+
+Revisando el pendiente que decía «la importación de DGH deshace filas mientras
+el resumen dice que quedaron guardadas», resultó que **eso ya estaba bien
+resuelto**: las fuentes de Pre-auditoría se cargan por bloques y cada bloque se
+confirma apenas termina, así que una interrupción no pierde lo guardado y
+volver a subir el mismo archivo retoma donde quedó sin duplicar nada.
+
+Lo que faltaba era **contarlo**. Si el cargue reventaba en el bloque 5 de 10,
+el auditor veía un error a secas —**como si no se hubiera guardado nada**—
+cuando en realidad los cuatro anteriores ya estaban en la base. Eso lleva a
+rehacer trabajo que no hace falta o, peor, a dudar de lo que sí quedó.
+
+**Ahora dice:** «El cargue se cortó en la fila 301 de 1.000. Las 300 anteriores
+SÍ quedaron guardadas. Vuelva a subir el mismo archivo: retoma donde quedó y no
+duplica nada».
+
+También se suelta la transacción a medias. Sin eso, la sesión quedaba
+envenenada y todo lo que viniera después en esa misma petición fallaba sin
+explicación.
+
+- 7 pruebas en `tests/test_services/test_el_cargue_a_medias_se_ve.py`.
+- Una prueba vieja comparaba el diccionario COMPLETO con `==` y se puso roja
+  por las dos claves nuevas. No estaba fijando ningún defecto —solo era
+  estricta con la forma—, así que se ajustó para comparar **los conteos**, que
+  es lo que de verdad cuida.
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)

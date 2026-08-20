@@ -1460,15 +1460,23 @@ class TestCargueMasivoPorBloques:
         ]
 
     def test_conteos_exactos_cruzando_bloques(self, db_session, monkeypatch):
+        # 20-08-2026: se comparaba el diccionario COMPLETO con ==. El cargue
+        # ahora devuelve además `filas_procesadas` y `completo`, para poder
+        # decirle al auditor qué SÍ quedó guardado cuando un cargue se corta a
+        # mitad. Lo que esta prueba cuida son los CONTEOS, así que se comparan
+        # esos y no la forma exacta del diccionario.
+        def _conteos(r: dict) -> dict:
+            return {k: r[k] for k in ("nuevas", "actualizadas", "sin_cambio")}
+
         monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 3)  # 10 filas → 4 bloques
         filas = self._filas(10)
-        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
-            "nuevas": 10,
-            "actualizadas": 0,
-            "sin_cambio": 0,
-        }
+        primero = svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")
+        assert _conteos(primero) == {"nuevas": 10, "actualizadas": 0, "sin_cambio": 0}
+        assert primero["completo"] is True
+        assert primero["filas_procesadas"] == 10
+
         # re-subir el mismo archivo: todo sin cambio (idempotente)
-        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
+        assert _conteos(svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")) == {
             "nuevas": 0,
             "actualizadas": 0,
             "sin_cambio": 10,
@@ -1476,7 +1484,7 @@ class TestCargueMasivoPorBloques:
         # subir el archivo corregido: todo actualizado, sin duplicar
         for f in filas:
             f["valor"] += 1
-        assert svc.upsert_radicacion(db_session, filas, "b.xlsx", "YESID") == {
+        assert _conteos(svc.upsert_radicacion(db_session, filas, "b.xlsx", "YESID")) == {
             "nuevas": 0,
             "actualizadas": 10,
             "sin_cambio": 0,
