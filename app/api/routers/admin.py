@@ -5347,3 +5347,120 @@ def descargar_backup_db(
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+#  PROBAR EL CORREO — 20-08-2026
+#
+#  Yesid importó dos veces sin que saliera un solo correo. El motivo real era
+#  que el `.env` del servidor no tiene NADA de correo —ni usuario, ni
+#  contraseña—, pero no había forma de comprobarlo sin volver a importar todo
+#  el archivo y mirar el resultado. Cinco minutos por intento, para averiguar
+#  algo que se responde en dos segundos.
+#
+#  Este botón manda un correo de prueba al buzón de quien lo aprieta y dice
+#  exactamente qué pasó, traduciendo los errores de SMTP —que son crípticos—
+#  a algo que el auditor pueda accionar.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _explicar_error_smtp(error: str) -> str:
+    """Traduce el error del servidor de correo a algo accionable."""
+    e = (error or "").lower()
+    if "authentication" in e or "auth" in e or "535" in e or "credentials" in e:
+        return (
+            "El usuario o la contraseña del correo no son válidos. Con Gmail o "
+            "Google Workspace NO sirve la contraseña normal: hay que generar una "
+            "«contraseña de aplicación» de 16 letras y poner ESA en SMTP_PASSWORD."
+        )
+    if "timed out" in e or "timeout" in e or "unreachable" in e or "refused" in e:
+        return (
+            "El servidor no pudo conectarse a smtp.gmail.com por el puerto 587. "
+            "Suele ser el firewall del hospital bloqueando la salida."
+        )
+    if "name or service not known" in e or "getaddrinfo" in e:
+        return "No se pudo resolver el nombre del servidor de correo. Revise SMTP_HOST."
+    return "El servidor de correo rechazó el envío."
+
+
+@router.post("/probar-correo")
+async def probar_correo(
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Manda un correo de prueba al buzón de quien aprieta el botón.
+
+    No toca ninguna glosa: solo comprueba que el motor pueda enviar.
+    """
+    from app.core.config import get_settings
+    from app.services.email_service import enviar_email
+
+    cfg = get_settings()
+    if not cfg.smtp_user or not cfg.smtp_password:
+        faltan = [
+            nombre
+            for nombre, valor in (
+                ("SMTP_USER", cfg.smtp_user),
+                ("SMTP_PASSWORD", cfg.smtp_password),
+            )
+            if not valor
+        ]
+        return {
+            "ok": False,
+            "destinatario": current_user.email,
+            "titulo": "El servidor no tiene correo configurado",
+            "detalle": (
+                f"Falta {' y '.join(faltan)} en el archivo .env del servidor. "
+                "Mientras eso falte, NINGÚN correo del motor sale — ni el de "
+                "recepción, ni las alertas de vencimiento."
+            ),
+            "config": {
+                "smtp_host": cfg.smtp_host,
+                "smtp_port": cfg.smtp_port,
+                "smtp_user": cfg.smtp_user or "(vacío)",
+                "smtp_password": "(vacío)" if not cfg.smtp_password else "(configurada)",
+            },
+        }
+
+    asunto = "Prueba de correo — Motor de Glosas HUS"
+    cuerpo = (
+        "<p>Si está leyendo esto, el motor <b>sí puede enviar correos</b>.</p>"
+        "<p>Este mensaje lo generó el botón «Probar correo» del panel de "
+        "Diagnóstico. No modificó ninguna glosa.</p>"
+    )
+    try:
+        enviado = await enviar_email(current_user.email, asunto, cuerpo)
+    except Exception as e:  # pragma: no cover - el envío ya captura lo suyo
+        return {
+            "ok": False,
+            "destinatario": current_user.email,
+            "titulo": "El envío falló",
+            "detalle": _explicar_error_smtp(str(e)),
+            "error_tecnico": str(e)[:300],
+        }
+
+    if enviado:
+        return {
+            "ok": True,
+            "destinatario": current_user.email,
+            "titulo": "Correo enviado",
+            "detalle": (
+                f"Salió un mensaje de prueba a {current_user.email}. Si no llega en "
+                "un par de minutos, revise la carpeta de correo no deseado: el "
+                "motor ya hizo su parte."
+            ),
+        }
+    return {
+        "ok": False,
+        "destinatario": current_user.email,
+        "titulo": "El servidor de correo rechazó el envío",
+        "detalle": (
+            "El motor intentó enviar y el servidor no lo aceptó. La causa más "
+            "común es que SMTP_PASSWORD no sea una «contraseña de aplicación». "
+            "El detalle exacto queda en el log del servidor."
+        ),
+        "config": {
+            "smtp_host": cfg.smtp_host,
+            "smtp_port": cfg.smtp_port,
+            "smtp_user": cfg.smtp_user,
+        },
+    }
