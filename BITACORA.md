@@ -5520,6 +5520,38 @@ un espacio **sí** es parte de la contraseña, y tocarla ahí sería romperla.
 - 12 pruebas en `tests/test_services/test_la_clave_de_gmail_con_espacios.py`,
   la mitad dedicadas a lo que NO se debe tocar.
 
+### 20-08-2026 (cierre) — El sistema ICFES no arrancaba desde PowerShell
+
+**Qué pasó en el primer uso real.** Se copiaron los comandos de la guía a una
+ventana de PowerShell parada en `C:\Users\cartera` y Python respondió cuatro
+veces `No module named icfes`. **El sistema estaba bien; la carpeta estaba
+mal.** `python -m icfes` solo encuentra el módulo si la consola está parada
+dentro de la carpeta del repositorio (`C:\temp-notas`), y la guía mostraba los
+comandos sin decirlo.
+
+**Qué se hizo para que no vuelva a pasar:**
+
+1. **`tools\ICFES.cmd`** — bot de doble clic con menú: qué estudiar hoy,
+   practicar, repasar, simulacro, progreso, plan, configurar y generar la
+   aplicación web. Lo primero que hace es pararse solo en la carpeta correcta,
+   así que el error es imposible. También avisa, con instrucciones, si Python
+   no está instalado.
+2. **Las tres guías corregidas** (`docs/GUIA_SISTEMA_ICFES.md`,
+   `docs/ESTRATEGIA_ICFES_400.md` y `README.md`): ahora ponen el doble clic
+   primero, muestran el `cd C:\temp-notas` como paso cero y explican qué
+   significa el mensaje `No module named icfes` cuando aparece.
+3. **12 pruebas nuevas** (`tests/test_icfes/test_bots_windows.py`) que vigilan
+   lo que de verdad rompe estos bots: que se paren en la carpeta del
+   repositorio, que avisen si falta Python, que no llamen a comandos que no
+   existen, que no traigan contraseñas, y —esto no tenía prueba en todo el
+   repositorio— **que los 38 archivos `.cmd` conserven finales de línea de
+   Windows**. Con finales de línea de Unix, la ventana se cierra sin ejecutar
+   nada, que es una falla que ya se había sufrido antes.
+
+**Recordatorio:** la aplicación `ICFES.html` no necesita nada de esto. No pide
+Python, ni consola, ni carpeta correcta, ni internet. Doble clic y funciona,
+también en el celular.
+
 ### 20-08 (noche) — EL CORREO YA FUNCIONA ✅
 
 Yesid apretó **📧 Probar correo** y el mensaje llegó a su bandeja de
@@ -5555,7 +5587,8 @@ Ahora hay una etiqueta aparte: **«✗ el servidor de correo rechazó el envío�
 ### Sistema ICFES (nuevo, 20-08)
 - **Hacer el simulacro de diagnóstico.** Sin él, el plan reparte las horas a
   ciegas (asume 50 de 100 en cada área). Es lo primero que hay que hacer:
-  `python -m icfes simulacro --tipo completo`, o desde la aplicación web.
+  doble clic en `tools\ICFES.cmd` → opción 4 → examen completo. O, más simple
+  todavía, desde la aplicación `ICFES.html`, que no necesita ni Python.
 - **Confirmar la fecha real del examen.** El plan usa el 8 de agosto de 2027
   como fecha provisional; el Calendario A de 2026 fue el 26 de julio. Cuando el
   ICFES publique la fecha oficial de 2027, se corrige con

@@ -56,7 +56,20 @@ cable y ábrelo con el navegador del teléfono.
 
 ### B. El programa de consola (para el plan y los informes)
 
+**La forma fácil: doble clic en `tools\ICFES.cmd`.** Abre un menú con todo
+(hoy, practicar, repasar, simulacro, progreso, plan) y se para solo en la
+carpeta correcta.
+
+> **Si prefieres escribir los comandos, lee esto primero.** `python -m icfes`
+> **solo funciona si la consola está parada dentro de la carpeta del
+> repositorio.** Si la abres en `C:\Users\tu-usuario` y escribes el comando,
+> Python responde `No module named icfes` — no es que el sistema esté dañado,
+> es que no está mirando ahí. Empieza siempre con el `cd`:
+
 ```bash
+# PRIMERO: pararse en la carpeta del repositorio (en el PC de cartera es esta)
+cd C:\temp-notas
+
 # Una sola vez: configurar
 python -m icfes iniciar --examen 2027-08-08 --meta 400 --horas 12
 
@@ -74,6 +87,10 @@ python -m icfes banco                     # qué hay en el banco
 ```
 
 Nombres cortos de las áreas: `lc`, `mat`, `soc`, `cn`, `ing`.
+
+Si no sabes dónde quedó el repositorio, entra a la carpeta que creas que es y
+escribe `git rev-parse --show-toplevel`: si responde una ruta, esa es; si
+responde un error, no es esa carpeta.
 
 El avance de la consola se guarda en `~/.icfes/progreso.db`. Se puede mover
 con la variable de entorno `ICFES_DATOS` o con `--datos ruta`.
