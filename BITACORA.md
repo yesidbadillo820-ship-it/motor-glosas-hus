@@ -4947,6 +4947,40 @@ verificarla contra el nivel prestado**, en vez de afirmar la que no es.
 - 18 pruebas nuevas en `tests/test_services/test_tarifas_res_283_2026.py`,
   incluidas las que vigilan que **no se haya perdido** ninguna tarifa vieja.
 
+### 20-08 (noche) — Importación masiva: dos defectos que salían en TODAS
+
+Se probó el botón como lo usa el auditor de verdad: seleccionar el rango en
+Excel —arrastrando desde la primera fila, que es lo normal— y pegarlo.
+
+**1. La fila de títulos entraba como una glosa.** Quedaba guardada con entidad
+«ENTIDAD», factura «FACTURA», valor «VALOR» y código «CODIGO». Se le gastaba
+una llamada a la IA, le aparecía a usted en la lista y contaba en los totales
+del lote. El filtro que había —«el código mide 2 o más caracteres»— la dejaba
+pasar, porque «CODIGO» mide seis.
+
+Ahora se reconoce y se salta. Para no comerse una glosa de verdad, se exige
+que **manden** las etiquetas (la mitad o más de las celdas llenas): una glosa
+cuyo motivo diga «el valor de la factura no coincide» sigue entrando.
+
+**2. El valor glosado se leía como si fuera el CUPS.** El texto que el
+importador le arma a la IA ponía el valor suelto:
+
+> «SO0201 **125000** FALTA SOPORTE 890201 no anexan hoja»
+
+…y el lector de códigos tomaba los **pesos glosados** como el código del
+procedimiento. **Le ganaba incluso al CUPS de verdad** (890201) que venía en
+su propia columna, porque el valor aparece primero. En una importación de 90
+glosas, eso son 90 dictámenes citando un CUPS que no existe — y la EPS cruza
+los CUPS contra su sistema.
+
+El arreglo es decir qué es ese número: ahora el texto dice «VALOR GLOSADO
+125000». El lector ya sabía descartar lo que el texto presenta como plata (se
+había puesto esa misma tarde), así que con la etiqueta se resuelve solo, y de
+paso la IA lee un texto más claro.
+
+- 14 pruebas nuevas en `tests/test_api/test_importacion_masiva_de_verdad.py`,
+  con un pegado tal cual sale de Excel (tabs, encabezado y pesos con punto).
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
