@@ -8578,7 +8578,7 @@ async function initImportacionMasiva(){
   }catch(e){}
   // Poblar dropdown gestor (auditores activos)
   try{
-    var r2 = await fetch('/usuarios/', {headers:authH()});
+    var r2 = await fetch('/usuarios/asignables', {headers:authH()});
     if(r2.ok){
       var users = await r2.json();
       var sg = document.getElementById('im-gestor');
@@ -14633,7 +14633,7 @@ async function bulkAsignarGestor(){
   // Cargar lista de auditores activos para el dropdown
   var users = [];
   try{
-    var ru = await fetch('/usuarios/', {headers: authH()});
+    var ru = await fetch('/usuarios/asignables', {headers: authH()});
     if(ru.ok){
       users = (await ru.json()).filter(function(u){
         var rol = (u.rol||'').toUpperCase();
@@ -15069,7 +15069,7 @@ async function reasignarGlosaUI(glosaId, gestorActual){
   // Primero traer lista de auditores disponibles
   var lista = [];
   try{
-    var r = await fetch('/usuarios/', {headers: authH()});
+    var r = await fetch('/usuarios/asignables', {headers: authH()});
     if(r.ok){
       lista = await r.json();
     }
@@ -20830,7 +20830,7 @@ async function reasignarDeGestor(emailOrigen, totalPend){
   // Cargar lista de candidatos activos
   var users = [];
   try{
-    var ru = await fetch('/usuarios/', {headers: authH()});
+    var ru = await fetch('/usuarios/asignables', {headers: authH()});
     if(ru.ok){
       users = (await ru.json()).filter(function(u){
         var rol = (u.rol||'').toUpperCase();
@@ -23917,7 +23917,7 @@ async function cargarDatosSpotlight(){
   try{
     var [g, u, c] = await Promise.all([
       fetch('/glosas/historial?limit=200', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-      fetch('/usuarios/', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch('/usuarios/asignables', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
       fetch('/contratos/', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
     ]);
     SPOT_DATA.glosas = Array.isArray(g) ? g : [];

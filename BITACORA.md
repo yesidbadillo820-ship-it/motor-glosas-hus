@@ -6197,14 +6197,72 @@ hospital sin que nada la mirara.
 Ya quedó puesta la revisión sobre esa rama, y una prueba que avisa si alguien
 la saca de la lista sin darse cuenta de lo que cuesta.
 
+### 21-08 (tarde) — La lista de usuarios ya no la puede pedir cualquiera
+
+Por la mañana se escondió el botón de Usuarios del menú, y quedó dicho con
+todas las letras que **esconder un botón ordena la pantalla pero no protege el
+dato**. Esto es lo que sí lo protege.
+
+Cualquier auditor podía sacar el listado entero de las 27 cuentas del portal
+—nombre, correo, rol, y también las cuentas de gente que ya no está—
+escribiendo la dirección a mano.
+
+**No era descuido.** Cinco pantallas la usaban de verdad: importación masiva,
+asignar en lote, reasignar una glosa, reasignar todo lo de un gestor y el
+buscador de Ctrl+K. Todas para lo mismo: llenar una lista desplegable de «¿a
+quién le paso esto?». Pedían la lista completa y escogían en el navegador.
+Cerrar la puerta sin más habría dejado esas cinco pantallas sin desplegable.
+
+Se pasó el filtro al servidor: esas cinco piden ahora una lista que trae solo
+lo que un desplegable necesita —quién está activo y puede recibir trabajo—. La
+lista completa quedó solo en la pantalla de Usuarios, que ya exige rol de
+coordinación.
+
+Dos cuidados que no se ven pero pesan:
+
+- **Las cuentas inactivas ya no salen.** Asignarle una glosa a alguien que ya
+  no trabaja acá es perderla de vista.
+- **Las filas viejas no se pierden.** Si algún registro trae el rol escrito
+  distinto —en minúsculas, con espacios, o de la forma antigua—, esa persona
+  desaparecería del desplegable sin que nadie entendiera por qué, y su trabajo
+  se le seguiría asignando a otro. Ahora se compara sin importar cómo esté
+  escrito.
+
+### 21-08 (tarde) — Por qué el arranque quedó con la cuenta equivocada
+
+Al correr el instalador del arranque salió **«Error: Acceso denegado»**. Eso
+destapó dos cosas, y la segunda es la grave.
+
+**La fácil.** Crear una tarea que guarda una contraseña exige permisos de
+administrador. Sin ellos, Windows contesta «Acceso denegado». El mensaje de
+ayuda ahora nombra ese texto tal cual sale en pantalla.
+
+**La grave.** Al abrir la ventana como administrador, si Windows pide **otra
+cuenta**, la ventana pasa a correr con **esa otra**. Y el instalador tomaba la
+cuenta de la ventana dando por hecho que era la del auditor.
+
+Así fue como la tarea de la mañana quedó puesta con la cuenta `cpimiento`
+cuando la del motor es `cartera`. **Y no da ningún error:** la tarea queda, el
+motor arranca, todo se ve bien. Pero si esa cuenta no tiene permiso para
+entrar a la carpeta de soportes del servidor, el índice amanece vacío y nadie
+entiende por qué las facturas no aparecen. Un defecto que no se ve es peor que
+uno que revienta.
+
+Ahora el instalador muestra con qué cuenta está corriendo la ventana, avisa de
+la trampa, y deja escribir otra: Enter para dejar la que detectó, o el nombre
+correcto para corregirla. Al final dice con cuál quedó, que es la única forma
+de que el auditor se entere si se equivocó.
+
 ## 3) PENDIENTE
 
 ### Permisos del portal (nuevo, 21-08 tarde)
-- **Cerrar la consulta de usuarios.** Hoy cualquiera que haya entrado con su
-  clave puede pedir la lista de usuarios del portal, con correos y roles.
-  Esconder el botón del menú, que es lo que se hizo, **ordena la pantalla pero
-  no protege el dato**. Cerrarla de verdad exige revisar las cinco pantallas
-  que la usan, para no dejar sin funcionar algo que hoy trabaja bien.
+- ~~Cerrar la consulta de usuarios.~~ **HECHO el 21-08 por la tarde.** Ya
+  exige rol de coordinación, y las cinco pantallas que la usaban para armar
+  un desplegable piden ahora una lista aparte con solo lo suyo.
+- **Confirmar con qué cuenta quedó la tarea de arranque.** La primera vez
+  quedó con `cpimiento` en vez de `cartera`, porque al elevar la ventana
+  Windows pidió esa otra cuenta. El instalador ahora pregunta; hay que
+  volver a correrlo y escribir la cuenta correcta.
 - **Comprobar el arranque automático de verdad:** reiniciar el PC y, **sin
   iniciar sesión**, abrir el portal desde el celular. Si carga, quedó bien. Si
   no, doble clic en `ESTADO_MOTOR.cmd`, que ahora dice cuál tarea duerme.

@@ -86,13 +86,13 @@ rem     proceso nuevo cada 5 segundos llenando el registro. Asi, el
 rem     vigilante de mas simplemente espera: si el otro se cae, este
 rem     toma el relevo.
 powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'python*' -and $_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
-if errorlevel 1 (
 rem  ESPERAS CON PING, NO CON TIMEOUT (21-08-2026). Estos bots ahora
 rem  corren tambien SIN sesion iniciada (tarea de arranque del PC), y
 rem  ahi `timeout` no siempre tiene una consola de verdad: contesta
 rem  "Input redirection is not supported" y sigue de largo sin esperar,
 rem  con lo que el bucle se vuelve loco. `ping` a uno mismo espera
 rem  igual y funciona en todos los casos. ping -n 6 = 5 segundos.
+if errorlevel 1 (
   ping -n 6 127.0.0.1 >nul
   goto :loop
 )

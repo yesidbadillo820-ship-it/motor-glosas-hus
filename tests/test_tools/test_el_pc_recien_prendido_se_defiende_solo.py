@@ -87,6 +87,33 @@ class TestLasEsperasAguantanElArranqueDelPC:
             )
 
 
+class TestNingunComentarioRompeUnBloque:
+    """Trampa vieja de los .cmd de Windows: un `rem` con paréntesis metido
+    DENTRO de un bloque `( ... )`. El intérprete cuenta esos paréntesis igual
+    que si fueran código, así que un comentario puede cerrar el bloque antes de
+    tiempo y dejar de ejecutar las órdenes que venían después — sin un solo
+    mensaje de error.
+
+    Casi pasa el 21-08-2026: la nota que explica por qué se espera con `ping`
+    quedó, al insertarla, dentro del bloque que reintenta el bucle."""
+
+    def test_ningun_rem_con_parentesis_dentro_de_un_bloque(self):
+        for ruta in SIN_SESION + [INSTALADOR]:
+            nivel = 0
+            for n, linea in enumerate(_texto(ruta).splitlines(), 1):
+                pelada = linea.strip()
+                es_comentario = pelada.lower().startswith("rem")
+                if es_comentario:
+                    assert not (nivel > 0 and ("(" in pelada or ")" in pelada)), (
+                        f"{ruta.name} línea {n}: un `rem` con paréntesis dentro "
+                        f"de un bloque. Puede cerrar el bloque antes de tiempo y "
+                        f"el bot deja de hacer lo que sigue, en silencio.\n"
+                        f"  {pelada[:70]}"
+                    )
+                    continue
+                nivel = max(0, nivel + linea.count("(") - linea.count(")"))
+
+
 class TestElAutodespliegueTrabajaSinSesionIniciada:
     def _linea(self) -> str:
         t = _texto(INSTALADOR)

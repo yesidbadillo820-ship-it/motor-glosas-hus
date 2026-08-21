@@ -92,6 +92,56 @@ class TestCorreConLaCuentaDelUsuario:
         assert "/RL HIGHEST" not in _linea_schtasks()
 
 
+class TestLaTrampaDeEjecutarComoAdministrador:
+    """Crear una tarea con contraseña guardada exige permisos de
+    administrador: sin ellos, `schtasks` contesta «Acceso denegado». Pero al
+    abrir la ventana como administrador, si Windows pide OTRA cuenta, la
+    ventana pasa a correr con ESA otra y `%USERNAME%` ya no es la del auditor.
+
+    Así fue como la tarea del 21-08 quedó puesta con `cpimiento` cuando la
+    cuenta del motor es `cartera`. Y no da error: la tarea queda, el motor
+    arranca, y si esa cuenta no entra a la carpeta de soportes del servidor,
+    el índice amanece vacío sin que nadie entienda por qué.
+    """
+
+    def test_pregunta_con_que_cuenta_en_vez_de_suponer(self):
+        t = _texto()
+        assert "set /p" in t and "OTRA" in t, (
+            "El instalador vuelve a suponer que la cuenta correcta es la de "
+            "la ventana. Con «Ejecutar como administrador» eso es falso."
+        )
+
+    def test_lo_que_escriba_el_auditor_manda(self):
+        t = _texto()
+        assert 'if not "%OTRA%"=="" set "CUENTA=%OTRA%"' in t
+
+    def test_avisa_de_la_trampa_antes_de_preguntar(self):
+        """Preguntar sin explicar por qué no sirve de nada: el auditor daría
+        Enter sin pensarlo."""
+        t = _texto().lower()
+        assert "administrador" in t and "otra cuenta" in t
+
+    def test_explica_para_que_sirve_esa_cuenta(self):
+        """La razón concreta: es la que entra a la carpeta de soportes."""
+        assert "soportes" in _texto().lower()
+
+    def test_dice_al_final_con_que_cuenta_quedo(self):
+        """Sin esto, el auditor no tiene cómo enterarse de que quedó puesta
+        con la cuenta equivocada."""
+        t = _texto()
+        assert "Corre con la cuenta:  %CUENTA%" in t
+
+    def test_el_mensaje_de_error_nombra_el_acceso_denegado(self):
+        """Es el texto exacto que sale en pantalla. Si el mensaje de ayuda no
+        lo nombra, el auditor no sabe cuál de las causas es la suya."""
+        t = _texto()
+        assert "Acceso denegado" in t
+
+    def test_y_avisa_de_no_poner_la_cuenta_de_administrador(self):
+        t = _texto().lower()
+        assert "no la de administrador" in t
+
+
 class TestNoRompeNadaDeLoQueYaFunciona:
     def test_avisa_que_lo_demas_sigue_igual(self):
         t = _texto()
