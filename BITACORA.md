@@ -5963,6 +5963,58 @@ encuentran el valor lo escriben igual: **$ 796.600**.
   extract Colombian peso format»… pero exigía «1,500,000» **con comas**, que es
   formato gringo. El nombre decía una cosa y la comprobación la contraria.
 
+### 21-08 — Centro de costos: los medicamentos van a Servicio Farmacéutico
+
+**Decisión de Yesid, y así queda:** los medicamentos y los insumos se imputan
+a **Servicio Farmacéutico**.
+
+Se investigó primero con los datos reales del archivo del DGH del 19 de agosto
+(669 filas). Vale la pena dejar escrito lo que se encontró, porque cambia cómo
+hay que leer esta pantalla:
+
+**El centro de costos no es una propiedad del servicio.** El mismo catéter va
+a Urgencias si atendieron ahí al paciente, y a Sala de Partos si estaba allá.
+En ese archivo, `CATETER INTRAVENOSO 20` aparece en Urgencias, Sala de Partos
+**y** Radiografía. Por eso las «371 filas sin propuesta» no eran un hueco: eran
+las reglas negándose, con razón, a adivinar dónde estaba el paciente.
+
+Con la decisión tomada, lo que faltaba era **reconocer el medicamento cuando
+el archivo no trae la columna «tipo de elemento»** — que es la mayoría de las
+veces. Ahora se detecta por la forma de la descripción (TAB, AMP, VIAL, SOL
+INY, CATETER, SONDA, APÓSITO…), anclada a palabra completa para que «AMP» no
+enganche «AMPUTACION».
+
+**Tres correcciones de paso:**
+
+1. **Un defecto que ya existía:** `POTASIO CLORURO AMP` y `SOLUCION LACTATO DE
+   RINGER` se proponían a **Laboratorio** — la regla los enganchaba por
+   «potasio» y «lactato», que también son nombres de exámenes. Son
+   medicamentos. Ahora la detección de medicamento manda sobre las pistas de
+   área.
+2. **Lo obstétrico no va a quirófanos.** La cesárea, la asistencia del parto y
+   la ligadura de trompas las carga el hospital a **Urgencias
+   Ginecobstétricas** (733101, «Sala de Partos» en el DGH).
+3. **Los sublaboratorios se respetan.** El hospital separa Química,
+   Bacteriología, Uroanálisis, Hematología e Inmunología, cada uno con su
+   código. Proponer el genérico «Laboratorio Clínico» es acercarse pero errar,
+   y el gasto queda imputado donde no fue.
+
+**Resultado sobre los 203 servicios distintos del archivo real:**
+
+| | |
+|---|---|
+| Servicio Farmacéutico | 76 |
+| Área específica correcta | 39 |
+| Sin propuesta | 47 (23%, antes 34%) |
+
+**Nota honesta sobre la medición:** los cinco sublaboratorios salen como «no
+coinciden» en la comparación automática, pero **están bien**: sus códigos no
+están en el catálogo base del repositorio, solo en el archivo de la macro del
+hospital. En producción, donde el catálogo sí los trae, salen con su código.
+
+Lo que queda sin propuesta son consultas y procedimientos donde el área
+depende del caso, no del nombre. Ahí el gestor decide, que es lo correcto.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)

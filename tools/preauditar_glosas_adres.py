@@ -322,6 +322,18 @@ PISTAS_CENTRO_COSTOS: tuple[tuple[str, str], ...] = (
         "UNIDAD DE SANGRE|GLOBULOS ROJOS|HEMOCLASIFICACION|COMPATIBILIDAD"
         "|ANTICUERPOS IRREGULARES|PLASMA|PLAQUETAS|CRIOPRECIPITADO",
     ),
+    # El hospital separa el laboratorio por especialidad y cada uno tiene su
+    # código. Proponer el genérico cuando la verdad es «LABORATORIO - QUIMICA»
+    # es acercarse pero errar, y el gasto queda imputado donde no fue.
+    # Sacado de lo que el HUS asignó en el archivo del 19 de agosto.
+    ("LABORATORIO - QUIMICA", r"TRANSAMINASA|BILIRRUBIN|AMILASA|LIPASA|FOSFATASA"),
+    ("LABORATORIO - BACTERIOLOGIA", r"COPROCULTIVO|SARS COV|ANTIGENO|GRAM |CULTIVO DE"),
+    (
+        "LABORATORIO - UROANALISIS Y PARASITOLOGIA",
+        r"UROCULTIVO|COPROSCOPICO|PARCIAL DE ORINA|COPROLOGICO|HEMOCULTIVO",
+    ),
+    ("LABORATORIO - HEMATOLOGIA", r"HEMOGRAMA|CUADRO HEMATICO|RECUENTO DE PLAQUETAS"),
+    ("LABORATORIO - INMUNOLOGIA", r"TROPONINA|GONADOTROPINA|SUBUNIDAD BETA|BHCG"),
     (
         "LABORATORIO CLINICO",
         "HEMOGRAMA|CUADRO HEMATICO|GLUCOSA|GLUCOMETRIA|CREATININA|NITROGENO UREICO"
@@ -356,7 +368,41 @@ PISTAS_CENTRO_COSTOS: tuple[tuple[str, str], ...] = (
     ("URGENCIAS ADULTOS", "CONSULTA DE URGENCIAS|DERECHOS DE SALA DE YESOS|INMOVILIZACION"),
     ("CONSULTA EXTERNA ESPECIALIZADA", "CONSULTA AMBULATORIA|INTERCONSULTA|VALORACION INICIAL"),
     ("UNIDAD RENAL", "DIALISIS|HEMODIALISIS|UNIDAD RENAL"),
-    ("SERVICIO FARMACEUTICO", "MEDICAMENTO"),  # respaldo por Tipo Elemento
+    ("SERVICIO FARMACEUTICO", "MEDICAMENTO"),
+    # ─── 21-08-2026: procedimientos y exámenes atados a un área ──────────
+    # Sacados de lo que el HUS asignó DE VERDAD en el archivo del DGH del 19
+    # de agosto (669 filas). No se inventó ninguno: cada patrón corresponde a
+    # servicios que el hospital imputó siempre al mismo centro.
+    #
+    # Van DESPUÉS de las pistas de arriba para no pisarlas, y solo cubren lo
+    # que se hace EN un área concreta. Los medicamentos y los insumos NO
+    # entran acá: esos van a Servicio Farmacéutico por decisión del auditor.
+    (
+        "CONSULTA EXTERNA ESPECIALIZADA",
+        r"CONSULTA DE PRIMERA VEZ POR|CONSULTA DE CONTROL O DE SEGUIMIENTO",
+    ),
+    ("FISIOTERAPIA Y REHABILITACION", r"AUDIOMETRIA|LOGOAUDIOMETRIA|FONOAUDIOLOG"),
+    (
+        "GASTROENTEROLOGIA",
+        r"COLONOSCOPIA|ESOFAGOGASTRODUODENOSCOPIA|RECTOSIGMOIDOSCOPIA|GASTROSCOPIA",
+    ),
+    ("CARDIOLOGIA Y HERMODINAMIA", r"ELECTROCARDIOGRAMA|HOLTER|ECOCARDIOGRAMA|PRUEBA DE ESFUERZO"),
+    ("LABORATORIO CLINICO", r"COPROSCOPICO|COPROCULTIVO|UROCULTIVO|HEMOCULTIVO|UROANALISIS"),
+    # Lo obstétrico va a Urgencias Ginecobstétricas (733101 — «Sala de Partos»
+    # en el archivo del DGH), NO a quirófanos: así lo carga el hospital. Va
+    # ANTES que la regla de quirófanos para que la ligadura de trompas por
+    # laparotomía no se la lleve quirófanos.
+    (
+        "URGENCIAS GINECOBSTETRICAS",
+        r"CESAREA|ASISTENCIA DEL PARTO|ATENCION DEL PARTO|EPISIORRAFIA|PERINEORRAFIA"
+        r"|AMNIOCENTESIS|TROMPA DE FALOPIO|LEGRADO",
+    ),
+    # Marcas inequívocas de que el procedimiento se hizo en quirófano.
+    (
+        "QUIROFANOS",
+        r"POR ARTROSCOPIA|POR LAPAROSCOPIA|VIA ABIERTA"
+        r"|CESAREA|COLGAJO|AMNIOCENTESIS|SECUESTRECTOMIA",
+    ),  # respaldo por Tipo Elemento
 )
 CENTRO_POR_TIPO_ELEMENTO: dict[str, str] = {
     "MEDICAMENTOS": "SERVICIO FARMACEUTICO",
@@ -481,6 +527,29 @@ def reparto_de_area(causal: str, tipo_elemento: str, descripcion: str) -> tuple[
     )
 
 
+# Formas farmacéuticas y presentaciones de insumo, ancladas a palabra
+# completa para no engancharse dentro de otra: «AMP» no puede casar con
+# AMPUTACION, ni «TAB» con TABIQUE.
+#
+# 21-08-2026 — decisión de Yesid: medicamentos e insumos a Servicio
+# Farmacéutico. Se reconocen por la forma de la descripción, que es lo único
+# que hay cuando el archivo no trae el tipo de elemento.
+_PARECE_MEDICAMENTO_O_INSUMO = re.compile(
+    r"\b(?:"
+    # formas farmacéuticas
+    r"TAB|TABLETA|TABLETAS|AMP|AMPOLLA|AMPOLLAS|VIAL|VIALES|JARABE|CAPSULA|CAPSULAS"
+    r"|SUSPENSION|SOLUCION|SOL\s+INY|INYECTABLE|SUPOSITORIO|CREMA|UNGUENTO|GOTAS"
+    r"|SOBRE|SOBRES|FCO|FRASCO|POLVO|GRAGEA|GRAGEAS|ELIXIR|EMULSION"
+    # insumos y dispositivos
+    r"|CATETER|SONDA|AGUJA|AGUJAS|JERINGA|JERINGAS|APOSITO|APOSITOS|VENDA|VENDAS"
+    r"|GASA|GASAS|GUANTE|GUANTES|ELECTRODO|ELECTRODOS|CANULA|CANULAS|MASCARILLA"
+    r"|BOLSA\s+RECOLECTORA|EQUIPO\s+DE|SET\s+DE|KIT|TUBO|TUBOS|LLAVE\s+DE\s+TRES"
+    r"|MICRONEBULIZADOR|RESUCITADOR|TERMOMETRO|BAJALENGUAS|ESPARADRAPO|MICROPORE"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
 def centro_de_costos(
     tipo_elemento: str, descripcion: str, catalogo: tuple[str, ...] | list[str] | None = None
 ) -> str:
@@ -491,11 +560,41 @@ def centro_de_costos(
     texto = _norm_desc(descripcion)
     if not texto or re.search(SIN_CENTRO_CLARO, texto):
         return ""
+    # Los medicamentos y los insumos van a Servicio Farmacéutico —decisión del
+    # auditor, 21-08-2026— y esa decisión manda SOBRE las pistas de área.
+    #
+    # No es un detalle de orden: «POTASIO CLORURO AMP X 2 MEQ/ML» y «SOLUCION
+    # LACTATO DE RINGER BOLSA X 500ML» son medicamentos, pero la pista de
+    # laboratorio los enganchaba por «potasio» y «lactato», que también son
+    # nombres de exámenes. Salían propuestos a Laboratorio Clínico.
+    #
+    # Se exige una forma farmacéutica o de insumo EXPLÍCITA (AMP, BOLSA X,
+    # TAB, CATETER…), así que un examen de verdad —«POTASIO EN SUERO»— no
+    # entra acá y sigue yendo a laboratorio.
+    if _PARECE_MEDICAMENTO_O_INSUMO.search(texto):
+        return centro_oficial("SERVICIO FARMACEUTICO", catalogo)
+
     for area, patron in PISTAS_CENTRO_COSTOS:
         if re.search(patron, texto):
             return centro_oficial(area, catalogo)
     respaldo = CENTRO_POR_TIPO_ELEMENTO.get(_norm(tipo_elemento), "")
-    return centro_oficial(respaldo, catalogo) if respaldo else ""
+    if respaldo:
+        return centro_oficial(respaldo, catalogo)
+
+    # Último recurso: reconocer el medicamento o el insumo POR SU DESCRIPCIÓN.
+    #
+    # 21-08-2026, decisión de Yesid: los medicamentos y los insumos van a
+    # Servicio Farmacéutico. La regla de arriba ya lo hacía, pero SOLO cuando
+    # el archivo trae la columna «tipo de elemento» — y muchas veces no la
+    # trae. Sin eso, el acetaminofén se quedaba sin propuesta y el gestor lo
+    # llenaba a mano, uno por uno.
+    #
+    # Va DE ÚLTIMO a propósito: primero mandan las áreas específicas
+    # (tomografía, patología, laboratorio…) y el tipo de elemento, para no
+    # pisar el material de osteosíntesis, que va a Quirófanos.
+    if _PARECE_MEDICAMENTO_O_INSUMO.search(texto):
+        return centro_oficial("SERVICIO FARMACEUTICO", catalogo)
+    return ""
 
 
 def sugerir(
