@@ -6178,6 +6178,25 @@ candado estuviera escrito en el archivo. Estaba escrito. Nadie probó la
 ventanas de Windows y hacen la cuenta de verdad: con el defecto puesto de
 vuelta a propósito, cinco de ellas se ponen en rojo.
 
+### 21-08 (tarde) — La rama que llega al hospital no se estaba revisando
+
+Buscando por qué la corrección del reinicio entró sin que ninguna revisión
+automática terminara sobre ella, apareció algo más grande.
+
+El PC de cartera baja el código cada 5 minutos de la rama `motor-glosas`. Esa
+es, por lejos, la rama más delicada del repositorio: es **la única que de
+verdad llega al hospital**. Y era **la única que no se revisaba**. Las
+revisiones automáticas corrían en las ramas de trabajo y en las principales,
+pero no en esa. O sea: todo se comprobaba **antes** de juntar los trabajos y
+nada **después**.
+
+Eso importa porque acá se juntan dos y tres trabajos en paralelo tocando los
+mismos archivos —hoy mismo pasó dos veces—. Una unión mal resuelta llegaba al
+hospital sin que nada la mirara.
+
+Ya quedó puesta la revisión sobre esa rama, y una prueba que avisa si alguien
+la saca de la lista sin darse cuenta de lo que cuesta.
+
 ## 3) PENDIENTE
 
 ### Permisos del portal (nuevo, 21-08 tarde)
