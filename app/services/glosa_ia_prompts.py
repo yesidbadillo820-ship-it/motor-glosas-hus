@@ -809,8 +809,19 @@ def extraer_datos_soporte(contexto_pdf: str) -> dict:
     if m:
         datos["medico"] = m.group(1).strip()
 
-    # Fecha atención
-    m = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", contexto_pdf)
+    # Fecha atención — SOLO si viene etiquetada.
+    #
+    # 21-08-2026: acá se tomaba la primera fecha suelta del expediente, que
+    # puede ser la de nacimiento del paciente o la de expedición de cualquier
+    # documento. Una fecha de atención equivocada arrastra al dictamen a decir
+    # que el contrato estaba vencido cuando no lo estaba. Mejor «NO
+    # IDENTIFICADA», que es lo que ya trae por defecto.
+    m = re.search(
+        r"(?:fecha\s+(?:de\s+)?(?:atenci[oó]n|prestaci[oó]n|ingreso|egreso|servicio)"
+        r"|f\.?\s*(?:atenci[oó]n|ingreso))[\s:=]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        contexto_pdf,
+        re.I,
+    )
     if m:
         datos["fecha_atencion"] = m.group(1)
 
@@ -2695,14 +2706,42 @@ def build_user_prompt(
         # cualquier "yyyy-mm-dd" o "dd/mm/yyyy" que aparezca en trazabilidad.
         import re as _re_vig
 
-        fechas_candidatas = _re_vig.findall(
-            r"\b(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{4})\b",
+        # 21-08-2026. Acá se tomaba LA PRIMERA FECHA que apareciera en
+        # cualquier parte —número de factura, radicado o los primeros 5.000
+        # caracteres de los PDF— y se trataba como la fecha de la atención.
+        #
+        # Esa primera fecha puede ser cualquier cosa: la de nacimiento del
+        # paciente, la de expedición de un documento, la de validación del
+        # CUV. Yesid analizó dos glosas de FAMISANAR y los dictámenes salieron
+        # diciendo «el servicio se prestó FUERA DE LA VIGENCIA del contrato
+        # S-13-1-03-1-04958» —y hasta «SIN CONTRATO PACTADO» en el
+        # encabezado— cuando ese contrato rige del 15/04/2026 al 14/04/2027 y
+        # el propio dictamen citaba su anexo tarifario dos párrafos más abajo.
+        #
+        # Ante la EPS eso es de lo peor que se puede escribir: quien dice que
+        # no tiene contrato vigente pierde el derecho a exigir la tarifa
+        # pactada. Y no lo causó un dato malo: lo causó adivinar.
+        #
+        # Ahora solo cuenta una fecha que venga ETIQUETADA como la de la
+        # atención o la de la factura. Si no la hay, NO se dice nada: no saber
+        # cuándo se prestó el servicio no es prueba de que el contrato estuviera
+        # vencido.
+        _texto_vig = (
             (numero_factura or "")
             + " "
             + (numero_radicado or "")
             + " "
-            + (contexto_pdf or "")[:5000],
+            + (contexto_pdf or "")[:5000]
         )
+        _m_vig = _re_vig.search(
+            r"(?:fecha\s+(?:de\s+)?(?:atenci[oó]n|prestaci[oó]n|servicio|ingreso|egreso|factura)"
+            r"|f\.?\s*(?:atenci[oó]n|factura|prestaci[oó]n)"
+            r"|fecha_atencion|fecha_factura)"
+            r"[\s:=]*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{4})",
+            _texto_vig,
+            _re_vig.IGNORECASE,
+        )
+        fechas_candidatas = [_m_vig.group(1)] if _m_vig else []
         if fechas_candidatas:
             fecha_factura_str = fechas_candidatas[0]
             v = validar_factura_en_vigencia(eps, fecha_factura_str)

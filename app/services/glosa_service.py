@@ -5376,6 +5376,50 @@ def _hay_contrato_verificado(info_tarifa: dict | None) -> bool:
     return valor > 0
 
 
+# ─── La plata, como se escribe en Colombia ──────────────────────────────────
+# 21-08-2026. `_extraer_valor` devolvía el número TAL CUAL venía en el texto.
+# Si la glosa decía «valor 796600», el dictamen que se radica salía con
+# «VALOR OBJETADO $ 796600» —sin puntos de miles—, y si decía «$150.000» salía
+# bien. O sea: el formato de una cifra que va a la EPS dependía de cómo la
+# hubiera escrito quien redactó la glosa.
+
+
+def _en_pesos_colombianos(crudo: str) -> str:
+    """`796600` → `$796.600`. `150.000` → `$150.000`. Punto de miles.
+
+    Si el número no se puede leer, se devuelve tal cual: es preferible mostrar
+    lo que decía el texto a inventar una cifra.
+    """
+    # Se quita la puntuación de sobra del final: el texto suele venir como
+    # «…por $6.434.900.» y ese punto es el de la frase, no de la cifra.
+    limpio = (crudo or "").strip().rstrip(".,")
+    if not limpio:
+        return "$ 0.00"
+
+    # SOLO se toca lo que viene SIN formato: dígitos pelados como «796600».
+    # Si el texto ya trae puntos o comas —«1.234.567,89», «150.000»— se
+    # devuelve tal cual.
+    #
+    # 21-08-2026: la primera versión de esto pasaba TODO por un redondeo a
+    # entero, y «1.234.567,89» salía «$ 1.234.568». Lo cazó una prueba del
+    # repositorio que cuidaba justamente eso. Perder ochenta y nueve centavos
+    # en una cifra que se radica ante la EPS no es un detalle de formato: es
+    # cambiar el valor. La prueba tenía razón.
+    # Comas de miles a la gringa: «1,500,000». La forma es inequívoca —grupos
+    # de exactamente tres dígitos separados por coma y sin un solo punto— así
+    # que no se confunde con el decimal colombiano «1.234.567,89» ni con
+    # «150,50». Se pasan a punto: la cifra que se radica va en colombiano.
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+", limpio):
+        return "$ " + limpio.replace(",", ".")
+
+    if not limpio.isdigit():
+        return f"$ {limpio}"
+
+    # Con espacio después del «$»: la forma que esta función ha devuelto
+    # siempre. Lo que estaba mal no era el espacio, era el punto de miles.
+    return "$ " + f"{int(limpio):,}".replace(",", ".")
+
+
 class GlosaService:
     def __init__(
         self,
@@ -9036,7 +9080,7 @@ class GlosaService:
 
             valor_num = _pvc(f"{m_mult.group(1)} {m_mult.group(2)}")
             if valor_num > 0:
-                return f"$ {int(round(valor_num)):,}".replace(",", ".")
+                return "$ " + f"{int(round(valor_num)):,}".replace(",", ".")
 
         # Ronda 26/29: el OBJETADO ETIQUETADO manda. El lookahead consume la
         # corrida numérica completa para que "VALOR OBJETADO 100%" no
@@ -9051,7 +9095,7 @@ class GlosaService:
             _hits = re.findall(_p_lab, t, re.IGNORECASE)
             if _hits:
                 _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
-                return f"$ {_mejor.strip().rstrip('.,')}"
+                return _en_pesos_colombianos(_mejor)
 
         patrones = [
             r"\$\s*([\d][\d\.,]{2,})",
@@ -9081,7 +9125,7 @@ class GlosaService:
             if m:
                 raw = m.group(1).strip().rstrip(".,")
                 if any(ch.isdigit() for ch in raw):
-                    return f"$ {raw}"
+                    return _en_pesos_colombianos(raw)
 
         # Filas pegadas desde Excel (TSV): "TA0801⇥882298⇥DESCRIPCIÓN⇥36.402⇥MOTIVO".
         # El valor viene como columna SIN '$' y los patrones de arriba no lo
@@ -9095,7 +9139,7 @@ class GlosaService:
                 for celda in linea.split("\t"):
                     celda = celda.strip()
                     if pat_moneda_col.fullmatch(celda):
-                        return f"$ {celda}"
+                        return _en_pesos_colombianos(celda)
 
         # Números deletreados en palabras (12-jun-2026, ronda 2 — fix #7):
         # "por novecientos cincuenta y dos millones de pesos" entraba como

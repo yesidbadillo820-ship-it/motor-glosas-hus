@@ -312,9 +312,20 @@ class TestExtraccionValor:
     """Tests for value extraction from glosa text."""
 
     def test_extraer_valor_formato_colombiano(self, glosa_service):
-        """Should extract Colombian peso format."""
+        """Un millón y medio, escrito como se escribe en Colombia.
+
+        21-08-2026. Esta prueba se llama «formato_colombiano» y su descripción
+        decía «Should extract Colombian peso format»… pero exigía
+        «1,500,000» CON COMAS, que es formato gringo. El nombre decía una cosa
+        y la comprobación la contraria.
+
+        En Colombia la coma es el separador decimal: «1,500,000» se lee mal.
+        La glosa puede venir escrita con comas —eso no se controla—, pero lo
+        que el motor DEVUELVE, y que termina en el documento que se radica
+        ante la EPS, va con punto de miles.
+        """
         result = glosa_service._extraer_valor("Glosa por $1,500,000")
-        assert "$ 1,500,000" in result or "1,500,000" in result
+        assert result == "$ 1.500.000"
 
     def test_extraer_valor_sin_signo(self, glosa_service):
         """Un valor sin «$» SÍ es un valor.
@@ -328,8 +339,10 @@ class TestExtraccionValor:
         formato: es una cifra falsa en un documento que se radica.
         """
         result = glosa_service._extraer_valor("Valor 500000 sin pesos")
-        assert "500000" in result
-        assert "0.00" not in result
+        assert result == "$ 500.000"
+        # Contra el centinela exacto, no una subcadena: «0.00» SÍ está dentro
+        # de «500.000» —es 5·00.00·0— y una comprobación así se cumple sola.
+        assert result != "$ 0.00"
 
     def test_un_porcentaje_no_es_plata(self, glosa_service):
         """El otro lado: «valor 100%» no puede leerse como cien pesos."""
