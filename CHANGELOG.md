@@ -1,5 +1,57 @@
 # Registro de cambios
 
+## Sesión 20-ago-2026 (noche) — Rediseño de la aplicación web del ICFES
+
+De cuatro pantallas planas a un panel con el plan de estudio adentro.
+
+### Funcionalidad nueva
+- **El plan de estudio ahora vive en la aplicación**: Inicio abre en «qué te
+  toca hoy» con los bloques del día y un botón para empezar cada uno; la
+  pantalla **Plan** muestra las cuatro fases y el detalle de cualquier semana.
+- **Estudiar** (pantalla nueva): repaso del día, cuaderno de errores, las
+  competencias más flojas con botón para practicarlas, y práctica libre con
+  filtros de área, competencia, dificultad y procedencia.
+- **Progreso**: proyección al día del examen, línea del año, una mini gráfica
+  por área, competencias ordenadas, causas de error con su remedio, calendario
+  de constancia y preguntas reincidentes.
+- **Durante las preguntas**: cronómetro con el ritmo real del examen y semáforo
+  de ritmo, atajos de teclado (A-D y Enter), marcar preguntas para revisar y
+  lecturas largas en serif.
+- Barra lateral en pantallas grandes; barra inferior en celular.
+
+### Una sola fuente de verdad
+- La política del plan (fases, mezclas, piso por área, minutos por bloque) y las
+  escalas de puntaje se **exportan** desde `icfes/plan.py` y `icfes/puntaje.py`
+  en vez de reescribirse en JavaScript.
+- **`tests/test_icfes/test_nucleo_web.py`** extrae el núcleo de cálculo de la
+  plantilla, lo corre con node y lo compara contra Python: metas por área,
+  reparto de horas, puntaje, repaso espaciado y el plan completo **bloque por
+  bloque** en tres escenarios. Se salta si node no está instalado.
+
+### Color y accesibilidad
+- Paleta de gráficas validada con el script de la guía de visualización: rampa
+  secuencial monótona en claro y oscuro, y contraste ≥ 3:1 en las dos
+  superficies.
+- La primera versión coloreaba cada barra por estado; el validador la rechazó
+  (verde y rojo se confunden para daltonismo, ΔE 4,1). Se corrigió por diseño:
+  una sola serie, un solo tono, y el estado en una etiqueta con texto.
+- Tres estados de tema (claro, oscuro por sistema, oscuro elegido) con una
+  prueba que verifica que ningún color viva solo dentro de un bloque de tema.
+
+### Correcciones encontradas probando en navegador
+- Dos simulacros el mismo día se superponían en la gráfica de línea y sus zonas
+  de hover se tapaban. Ahora la serie deja un punto por día (el último) y el
+  ancho de la zona sensible se calcula desde la separación real entre puntos.
+- El calendario de constancia solo miraba hacia atrás desde hoy: con avance
+  importado decía «199 días con estudio» y salía vacío.
+- En práctica el cronómetro estaba congelado y el semáforo de ritmo siempre en
+  verde.
+
+### Pruebas
+266 en total (27 nuevas). `ruff check` y `ruff format` limpios sobre 1.229
+archivos. Recorrido completo verificado en Chromium: escritorio y celular, tema
+claro y oscuro, sin errores de JavaScript y sin desbordamiento horizontal.
+
 ## Sesión 20-ago-2026 (cierre) — Bot de doble clic del ICFES y guías corregidas
 
 **Falla del primer uso real:** los comandos de la guía se corrieron desde

@@ -36,6 +36,23 @@ computador.
 Es un solo archivo HTML que se abre con doble clic. Sirve en el celular y en
 el computador, no necesita internet y guarda tu avance en el navegador.
 
+Trae seis pantallas:
+
+| Pantalla | Qué tiene |
+|---|---|
+| **Inicio** | Cuenta regresiva, tus cuatro cifras del día, **los bloques que te tocan hoy** con un botón para empezar cada uno, la línea de tu puntaje en el año y las barras por área con la marca de la meta. |
+| **Estudiar** | Repaso del día, cuaderno de errores, tus competencias más flojas con un botón para practicarlas, y práctica libre con filtros de área, competencia, dificultad y «solo las que fallé». |
+| **Simulacro** | Los tiempos reales del examen, el reparto por área que va a tener tu simulacro y el historial. |
+| **Progreso** | Proyección al día del examen, tu línea del año, una mini gráfica por cada área, competencias de la más floja a la más firme, el cuaderno de errores con el remedio de cada causa, el calendario de constancia y las preguntas que has fallado más de una vez. |
+| **Plan** | Las cuatro fases con sus fechas y el detalle de cualquier semana. |
+| **Ajustes** | Fecha, meta, horas, copia de seguridad de tu avance y la explicación honesta de qué significan los puntajes. |
+
+Durante las preguntas: **cronómetro con el ritmo del examen** (un punto verde
+que se pone ámbar y luego rojo cuando te pasas del tiempo), atajos de teclado
+—<kbd>A</kbd>, <kbd>B</kbd>, <kbd>C</kbd>, <kbd>D</kbd> para responder y
+<kbd>Enter</kbd> para seguir—, y las lecturas largas en letra serif, que cansa
+menos la vista.
+
 **En Windows:** doble clic en `tools\ICFES_APP.cmd`. Genera la aplicación en
 el Escritorio como `ICFES.html` y la abre. De ahí en adelante, doble clic
 directo en `ICFES.html`.
@@ -226,6 +243,18 @@ Después de agregar preguntas, corre `python -m icfes banco`. Si dice
 | `icfes/cli.py` | El programa de consola. |
 | `icfes/exportar_web.py` | Genera la app web de un solo archivo. |
 | `icfes/plantilla_web.html` | El HTML, CSS y JavaScript de esa app. |
+
+**Sobre la app y la consola:** las dos calculan el plan, el puntaje y el repaso
+con las mismas reglas. No es una promesa: la política del plan (las fases y sus
+mezclas) se **exporta** desde `icfes/plan.py` en vez de reescribirse, y una
+prueba (`tests/test_icfes/test_nucleo_web.py`) corre el cálculo de la app con
+node y lo compara contra el de Python **bloque por bloque**, en tres escenarios
+distintos. Si alguno se desvía, la prueba falla.
+
+Los colores de las gráficas tampoco son de gusto: salen de una paleta validada
+para daltonismo y contraste. Por eso las barras de un mismo dato van todas del
+mismo tono —es una sola serie, no cinco categorías— y el estado se dice siempre
+con texto además del color.
 
 El módulo es **autónomo**: no depende de nada más del repositorio ni de
 librerías externas. Solo librería estándar de Python 3.11. Se puede copiar la
