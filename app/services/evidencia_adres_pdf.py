@@ -39,7 +39,14 @@ def rta_glosa_completa(glosa: dict) -> str:
 
     Se arma desde lo que el gestor decidió en la pantalla: si aceptó un valor,
     sale la variante con «CANTIDAD ACEPTADA»; si no, la de «POR VALOR DE».
+
+    Si la glosa ya trae la respuesta escrita (`rta_completa`) —porque viene de
+    la macro, donde la redactó el auditor— se usa **tal cual**: el texto del
+    auditor no se vuelve a armar ni se corrige.
     """
+    escrita = str(glosa.get("rta_completa") or "").strip()
+    if escrita:
+        return escrita
     causal = glosa.get("causal_codigo") or ""
     decision = glosa.get("decision") or ""
     descripcion = glosa.get("descripcion") or ""
@@ -132,7 +139,10 @@ def generar_pdf_evidencia(datos: dict) -> bytes:
         )
 
     anchos = [2.4 * cm, 1.9 * cm, 2.6 * cm, 4.4 * cm, 5.4 * cm, 2.3 * cm]
-    tabla = Table(filas, colWidths=anchos, repeatRows=1)
+    # `splitInRow` deja partir un renglón entre dos páginas. Hace falta: hay
+    # respuestas de más de 2.500 caracteres —una sola celda más alta que la
+    # hoja— y sin esto el PDF de esa factura no se puede armar.
+    tabla = Table(filas, colWidths=anchos, repeatRows=1, splitInRow=1)
     tabla.setStyle(
         TableStyle(
             [
