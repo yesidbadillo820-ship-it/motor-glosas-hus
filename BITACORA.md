@@ -5612,6 +5612,90 @@ puerto 8000. El del 8080 es el que sirve la página por internet.
 
 - 6 pruebas en `tests/test_core/test_la_base_no_depende_de_la_carpeta.py`.
 
+---
+
+### 20-08-2026 (noche) — La aplicación del ICFES quedó rediseñada
+
+**Qué se pidió:** que la aplicación fuera más práctica, más profesional, más
+intuitiva, más detallada y que no se sintiera tan plana.
+
+**Lo que le faltaba de fondo no era el color: era el plan.** La primera versión
+tenía el banco de preguntas y los simulacros, pero el plan de estudio vivía
+solo en la consola. Ahora la aplicación abre en «qué te toca hoy», con los
+bloques del día y un botón para empezar cada uno.
+
+**Lo que cambió:**
+
+1. **Seis pantallas** en vez de cuatro: se agregaron **Plan** (las cuatro fases
+   con el detalle de cualquier semana) y una pantalla de **Estudiar** que reúne
+   el repaso del día, el cuaderno de errores, las competencias más flojas con
+   su botón de practicar, y la práctica libre con filtros.
+2. **Gráficas de verdad:** la línea del puntaje en el año con la meta marcada y
+   globo de datos al pasar el mouse; barras por área con la marca de la meta de
+   cada una; una mini gráfica por cada prueba; el calendario de constancia del
+   año; y las causas de error con su remedio al lado.
+3. **Durante las preguntas:** cronómetro que corre con el ritmo real del examen
+   (un punto que pasa de verde a ámbar y a rojo cuando te demoras de más),
+   atajos de teclado para responder, y las lecturas largas en letra serif.
+4. **En el computador** aparece una barra lateral fija; en el celular, la barra
+   de abajo de siempre.
+
+**El detalle que más importa, y que no se ve:** la aplicación y la consola
+ahora calculan **exactamente lo mismo**. Las fases del plan y sus proporciones
+ya no están escritas dos veces: se exportan desde `icfes/plan.py`. Y hay una
+prueba que corre el cálculo de la aplicación con node y lo compara contra el de
+Python **bloque por bloque** —2.315 bloques en tres escenarios distintos—, para
+que nadie cambie una fórmula en un lado y se olvide del otro.
+
+**Los colores de las gráficas están validados,** no escogidos a ojo. La primera
+versión coloreaba cada barra según el estado (rojo, naranja, azul, verde) y el
+validador la rechazó: verde y rojo se confunden para una persona con daltonismo.
+Se corrigió cambiando el diseño, no el color: las barras van todas del mismo
+tono —que además es lo correcto, porque es un solo dato— y el estado se dice con
+una etiqueta de texto.
+
+**Tres fallas encontradas al probar en un navegador de verdad y corregidas:**
+
+- Dos simulacros el mismo día se dibujaban uno encima del otro en la gráfica y
+  el globo de datos ya no sabía a cuál se refería.
+- El calendario de constancia solo miraba hacia atrás desde hoy: si se
+  importaba el avance de otro equipo, decía «199 días con estudio» y salía
+  vacío.
+- En práctica, el cronómetro estaba congelado en cero y el punto de ritmo
+  siempre en verde.
+
+**Comprobaciones:** 266 pruebas (27 nuevas), `ruff` limpio sobre los 1.229
+archivos del repositorio, y el recorrido completo de la aplicación probado en
+Chromium en computador y en celular, en tema claro y oscuro, sin un solo error
+de JavaScript y sin que la página se salga de ancho.
+
+---
+
+### 20-08 (cierre) — Cada auditor puede deshacer LO SUYO
+
+El botón **«Dejar pendiente»** (el que deshace una auditoría ya decidida)
+estaba reservado a coordinación y administración. En la práctica eso dejaba
+al auditor trancado con su propio error de dedo: si radicaba una factura por
+equivocación, tenía que buscar a alguien más para que se la devolviera a
+pendiente.
+
+**Desde hoy:** cada auditor puede volver a pendiente **las facturas que él
+mismo radicó o devolvió**. No cambia nada más:
+
+- La decisión **de otra persona** sigue siendo de coordinación (el aviso dice
+  quién la auditó).
+- Una factura que **ya salió en un oficio de devolución entregado** no se
+  deshace: ese PDF ya está en manos de la entidad. Para eso hay que eliminar
+  antes el oficio de devolución (eso sí es de administración).
+- Corregir la **observación** de una factura ya decidida sigue igual que
+  antes: solo coordinación y administración.
+
+Todo queda en el historial con el nombre de quien deshizo y a qué hora.
+
+7 pruebas nuevas.
+
+---
+
 ### 21-08 — Responder de una vez las glosas que repiten causal
 
 **Lo que pidió Yesid, textual:** «hay glosas que vienen por 7 ítems y a esos 7

@@ -99,7 +99,27 @@ def test_la_pagina_no_pide_nada_por_internet(banco, tmp_path):
 def test_la_pagina_se_adapta_al_celular(banco, tmp_path):
     html = exportar(banco, tmp_path / "app.html").read_text(encoding="utf-8")
     assert 'name="viewport"' in html
-    assert "prefers-color-scheme: dark" in html
+    # El espacio después de los dos puntos es opcional en CSS: la prueba no
+    # puede depender de cómo se escribió, solo de que la regla exista.
+    assert re.search(r"prefers-color-scheme:\s*dark", html)
+
+
+def test_la_pagina_respeta_el_tema_elegido_por_el_lector(banco, tmp_path):
+    """Tres estados: claro, oscuro por sistema y oscuro elegido a mano."""
+    html = exportar(banco, tmp_path / "app.html").read_text(encoding="utf-8")
+    assert re.search(r":root\[data-theme=.dark.\]", html)
+    assert re.search(r":root:not\(\[data-theme=.light.\]\)", html)
+
+
+def test_ningun_color_vive_solo_dentro_de_un_bloque_de_tema(banco, tmp_path):
+    """El error clásico: un color definido solo en el bloque oscuro queda sin
+    valor cuando el lector no ha elegido tema, y la página sale ilegible."""
+    html = exportar(banco, tmp_path / "app.html").read_text(encoding="utf-8")
+    estilo = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    raiz = estilo.split("@media (prefers-color-scheme:dark)")[0]
+    base = set(re.findall(r"(--[a-z0-9-]+)\s*:", raiz))
+    oscuro = set(re.findall(r"(--[a-z0-9-]+)\s*:", estilo.split(':root[data-theme="dark"]')[1]))
+    assert not (oscuro - base), f"tokens sin valor por defecto: {oscuro - base}"
 
 
 def test_toda_lectura_del_navegador_esta_protegida(banco, tmp_path):
@@ -111,14 +131,52 @@ def test_toda_lectura_del_navegador_esta_protegida(banco, tmp_path):
         assert "try{" in contexto, llamada
 
 
-def test_la_curva_de_puntaje_de_la_web_es_la_misma_de_python(banco, tmp_path):
+def test_la_curva_de_puntaje_de_la_web_es_la_misma_de_python(banco):
+    """La app no reescribe la curva: la recibe exportada desde Python."""
     from icfes.puntaje import CURVA_PUNTAJE
 
+    curva = construir_datos(banco)["escalas"]["curva"]
+    assert [tuple(par) for par in curva] == [tuple(par) for par in CURVA_PUNTAJE]
+
+
+def test_los_niveles_de_ingles_y_el_semaforo_vienen_de_python(banco):
+    from icfes.puntaje import NIVELES_INGLES, SEMAFORO_AREA
+
+    escalas = construir_datos(banco)["escalas"]
+    assert [tuple(x) for x in escalas["ingles"]] == [tuple(x) for x in NIVELES_INGLES]
+    assert [tuple(x) for x in escalas["semaforo"]] == [tuple(x) for x in SEMAFORO_AREA]
+
+
+def test_la_politica_del_plan_viene_de_python(banco):
+    """Las fases y sus mezclas no se reescriben en JavaScript: se exportan.
+
+    Si alguien cambia una proporción en icfes/plan.py, la app cambia con ella.
+    """
+    from icfes.plan import FASES, MINUTOS_POR_BLOQUE, MINUTOS_SIMULACRO_COMPLETO, PISO_POR_AREA
+
+    plan = construir_datos(banco)["plan"]
+    assert plan["minutos_bloque"] == MINUTOS_POR_BLOQUE
+    assert plan["minutos_simulacro"] == MINUTOS_SIMULACRO_COMPLETO
+    assert plan["piso_area"] == PISO_POR_AREA
+    assert [f["nombre"] for f in plan["fases"]] == [f.nombre for f in FASES]
+    for exportada, original in zip(plan["fases"], FASES, strict=True):
+        assert exportada["proporcion"] == original.proporcion
+        assert exportada["objetivo"] == original.objetivo
+        assert [tuple(m) for m in exportada["mezcla"]] == [
+            (t.value, p) for t, p in original.mezcla.items()
+        ]
+
+
+def test_la_app_trae_todas_las_pantallas(banco, tmp_path):
     html = exportar(banco, tmp_path / "app.html").read_text(encoding="utf-8")
-    linea = re.search(r"const CURVA=\[(.+?)\];", html).group(1)
-    pares = re.findall(r"\[([\d.]+),([\d.]+)\]", linea)
-    en_web = [(float(a), float(b)) for a, b in pares]
-    assert en_web == [(x, y) for x, y in CURVA_PUNTAJE]
+    for pantalla in ("vInicio", "vEstudiar", "vSimulacro", "vProgreso", "vPlan", "vAjustes"):
+        assert f"function {pantalla}(" in html, f"falta la pantalla {pantalla}"
+
+
+def test_la_app_avisa_que_los_puntajes_son_estimaciones(banco, tmp_path):
+    html = exportar(banco, tmp_path / "app.html").read_text(encoding="utf-8")
+    assert "es una estimación" in html
+    assert "no son preguntas del examen real" in html.lower() or "No son preguntas" in html
 
 
 def test_una_plantilla_sin_marcas_es_error(banco, tmp_path):

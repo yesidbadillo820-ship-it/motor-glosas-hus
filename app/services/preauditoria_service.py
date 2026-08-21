@@ -1267,6 +1267,37 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
 # ==================================================================
 
 
+def puede_revertir(
+    factura_row: FacturaPreauditoriaRecord, usuario: str, es_coordinacion: bool
+) -> tuple[bool, str]:
+    """¿Esta persona puede volver a PENDIENTE una auditoría ya decidida?
+
+    Regla acordada con Cartera (20-08-2026): **cada auditor deshace lo suyo**
+    mientras no haya salido del hospital. Antes solo coordinación podía, y los
+    auditores quedaban trancados por su propio error de dedo. Lo que NO cambia:
+    la decisión de otra persona, y cualquiera que ya salió en un oficio de
+    devolución con consecutivo emitido, siguen siendo de coordinación — ese PDF
+    ya está en manos de la entidad.
+
+    Devuelve (puede, motivo_si_no_puede).
+    """
+    if es_coordinacion:
+        return True, ""
+    if factura_row.oficio_devolucion_id:
+        return False, (
+            f"{factura_row.factura} ya salió en un oficio de devolución entregado: "
+            "solo coordinación o administración puede deshacer esa auditoría."
+        )
+    mia = (factura_row.auditor or "").strip().casefold() == (usuario or "").strip().casefold()
+    if not mia:
+        quien = factura_row.auditor or "otra persona"
+        return False, (
+            f"La auditoría de {factura_row.factura} la hizo {quien}: solo esa persona, "
+            "coordinación o administración puede deshacerla."
+        )
+    return True, ""
+
+
 def _unir_observacion(observaciones: str = None, motivo: str = None) -> Optional[str]:
     """Junta lo escrito en "Observaciones" con lo escrito en "Motivo" al radicar.
 
