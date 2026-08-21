@@ -2251,7 +2251,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
       <div class="sn-group">
         <div class="sn-label">Análisis</div>
-        <button class="sn-item" data-tip="Inteligencia" onclick="sidebarTab(this,'inteligencia')" id="sn-inteligencia">
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Inteligencia" onclick="sidebarTab(this,'inteligencia')" id="sn-inteligencia">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
           <span class="sn-item-label">Inteligencia</span>
           <span class="sn-badge" id="intel-badge-side" style="display:none">0</span>
@@ -2273,7 +2273,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span class="sn-item-label">Historial</span>
         </button>
-        <button class="sn-item" data-tip="Expediente" onclick="sidebarTab(this,'expediente')" id="sn-expediente">
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Expediente" onclick="sidebarTab(this,'expediente')" id="sn-expediente">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="sn-item-label">Expediente</span>
         </button>
@@ -2308,7 +2308,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span class="sn-item-label">Tarifas</span>
         </button>
-        <button class="sn-item" data-tip="Usuarios" onclick="sidebarTab(this,'usuarios')">
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Usuarios" onclick="sidebarTab(this,'usuarios')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M17 21V19A4 4 0 0 0 13 15H5A4 4 0 0 0 1 19V21"/><circle cx="9" cy="7" r="4"/><path d="M23 21V19A4 4 0 0 0 20 15.13"/><path d="M16 3.13A4 4 0 0 1 16 11"/></svg>
           <span class="sn-item-label">Usuarios</span>
         </button>
@@ -2383,7 +2383,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span class="sn-item-label">Diagnóstico</span>
         </button>
-        <button class="sn-item sn-highlight" data-tip="Importar recepción" onclick="window.location.href='/importar-recepcion'">
+        <button class="sn-item sn-highlight" data-solo-coordinacion="1" data-tip="Importar recepción" onclick="window.location.href='/importar-recepcion'">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span class="sn-item-label">Importar recepción</span>
         </button>
@@ -6987,6 +6987,8 @@ async function doLogin(){
     } else {
       var d=await r.json();
       TOKEN=d.access_token;USER_NAME=d.nombre||email;USER_ROL=d.rol||'';
+      window.USER_ROL=USER_ROL;
+      try{ aplicarPermisosDelMenu(); }catch(e){}
       localStorage.setItem('hus_token',TOKEN);
       localStorage.setItem('hus_user',USER_NAME);
       localStorage.setItem('hus_rol',USER_ROL);
@@ -11807,7 +11809,7 @@ var CP_ACCIONES = [
   {seccion:"Herramientas", icono:"💚", titulo:"Salud Total", hint:"Procesar TXT", tab:"salud-total"},
   {seccion:"Herramientas", icono:"🧾", titulo:"Validador ADRES", hint:"FURIPS y autorizaciones", tab:"validador-adres"},
   // Acciones rápidas
-  {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", accion:function(){window.location.href='/importar-recepcion'}},
+  {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", soloCoordinacion:true, accion:function(){window.location.href='/importar-recepcion'}},
   {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
   {seccion:"Acciones", icono:"🧾", titulo:"Pre-auditoría", hint:"Consolidado de facturas", accion:function(){window.location.href='/preauditoria'}},
   {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
@@ -11841,6 +11843,9 @@ function filtrarCommandPalette(q){
   q = (q||'').toLowerCase().trim();
   // Filtro de acciones estáticas
   CP_FILTERED = CP_ACCIONES.filter(function(a){
+    // 21-08-2026: esconder el botón del menú no sirve de nada si el buscador
+    // ⌘K sigue ofreciendo la misma pantalla. Mismo criterio en los dos sitios.
+    if(a.soloCoordinacion && !esDeCoordinacion()) return false;
     if(!q) return true;
     return (a.titulo.toLowerCase().indexOf(q)>=0)
         || (a.hint && a.hint.toLowerCase().indexOf(q)>=0)
@@ -13343,6 +13348,52 @@ async function cargarMiDesempenoPremium(){
 }
 
 // Sidebar: activa el item, sincroniza con tab() y en mobile cierra el drawer
+
+// ═══════════════════════════════════════════════════════════════════════
+//  QUÉ VE CADA QUIEN EN EL MENÚ (21-08-2026)
+//
+//  El menú mostraba sus 34 botones a todo el mundo. Un auditor veía
+//  «Usuarios», «Mando ejecutivo» e «Inteligencia» —pantallas que no le
+//  corresponden— y las abría para encontrarse con un error o con datos que
+//  no son de su trabajo.
+//
+//  Directiva de Yesid: el rol AUDITOR ve TODO menos Inteligencia,
+//  Expediente, Usuarios, Mando ejecutivo e Importar recepción.
+//
+//  Se marca con `data-solo-coordinacion="1"` en el propio botón: agregar o
+//  quitar una pantalla después es cambiar un atributo, no buscar código.
+//
+//  OJO CON LO QUE ESTO ES Y NO ES: esconder un botón ORDENA la pantalla, no
+//  protege nada. Quien sepa la dirección puede entrar igual. La protección
+//  de verdad está en el servidor —crear y borrar usuarios ya exige rol de
+//  administrador— y donde falte, hay que ponerla allá, no acá.
+// ═══════════════════════════════════════════════════════════════════════
+
+function esDeCoordinacion(){
+  var rol = (window.USER_ROL || localStorage.getItem('hus_rol') || '').toUpperCase();
+  return rol === 'SUPER_ADMIN' || rol === 'COORDINADOR';
+}
+
+function aplicarPermisosDelMenu(){
+  if(typeof document === 'undefined' || !document.querySelectorAll) return;
+  var puede = esDeCoordinacion();
+  var items = document.querySelectorAll('[data-solo-coordinacion="1"]');
+  for(var i = 0; i < items.length; i++){
+    items[i].style.display = puede ? '' : 'none';
+  }
+  // Las secciones que quedan sin un solo botón visible tampoco deben dejar
+  // su título flotando («GESTIÓN» sin nada debajo se ve roto).
+  var titulos = document.querySelectorAll('.sn-section-title, .sn-group-title');
+  for(var t = 0; t < titulos.length; t++){
+    var nodo = titulos[t].nextElementSibling, algunoVisible = false;
+    while(nodo && !nodo.classList.contains('sn-section-title') && !nodo.classList.contains('sn-group-title')){
+      if(nodo.classList.contains('sn-item') && nodo.style.display !== 'none'){ algunoVisible = true; break; }
+      nodo = nodo.nextElementSibling;
+    }
+    titulos[t].style.display = algunoVisible ? '' : 'none';
+  }
+}
+
 function sidebarTab(el, id){
   document.querySelectorAll('.sn-item').forEach(function(b){b.classList.remove('active')});
   if(el) el.classList.add('active');
@@ -23500,6 +23551,10 @@ window.addEventListener('DOMContentLoaded',function(){
   if(TOKEN){
     initApp();
   }
+  // 21-08-2026. El caso que de verdad importa: la sesión YA está abierta y el
+  // auditor recarga la página. Sin esto, los botones que no le corresponden
+  // reaparecen en cada F5 y el orden del menú dura un solo rato.
+  try{ aplicarPermisosDelMenu(); }catch(e){}
   if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
   // Registrar service worker para PWA (solo si es servido por HTTPS o localhost)
   if('serviceWorker' in navigator){
