@@ -5346,6 +5346,36 @@ def generar_texto_injustificada(
     )
 
 
+# ─── El dictamen no puede negar un contrato que el motor SÍ encontró ─────────
+# 21-08-2026. Ver el comentario largo en el punto donde se usa.
+
+_NIEGA_EL_CONTRATO = re.compile(
+    r"AUSENCIA\s+DE\s+CONTRATO"
+    r"|SIN\s+CONTRATO\s+(?:BILATERAL|FORMAL|PACTADO|VIGENTE)"
+    r"|NO\s+(?:EXISTE|EXISTIENDO|HAY)\s+CONTRATO",
+    re.IGNORECASE,
+)
+
+
+def _hay_contrato_verificado(info_tarifa: dict | None) -> bool:
+    """¿El motor encontró contrato Y tarifa pactada para esta glosa?
+
+    Se exige que haya una tarifa CON VALOR: un contrato registrado pero sin
+    tarifa para ese CUPS no sirve para sostener «respétese lo pactado», y ahí
+    la argumentación del Decreto 2423 Art. 87 sigue siendo la buena.
+    """
+    if not info_tarifa:
+        return False
+    tarifa = info_tarifa.get("tarifa") or {}
+    if not tarifa:
+        return False
+    try:
+        valor = float(info_tarifa.get("valor_pactado_calc") or tarifa.get("valor_pactado") or 0)
+    except (TypeError, ValueError):
+        return False
+    return valor > 0
+
+
 class GlosaService:
     def __init__(
         self,
@@ -5988,6 +6018,31 @@ class GlosaService:
                 )
                 system_prompt = system_prompt + hint_aseguradora
                 logger.info(f"[ASEGURADORA SOAT] detectada: {nombre_real} — prompt reforzado")
+            # 21-08-2026. La plantilla TA-G01 del banco dice «EN AUSENCIA DE
+            # CONTRATO BILATERAL FORMAL ENTRE EL HUS Y LA ENTIDAD PAGADORA…» y
+            # se le ofrecía a la IA como ejemplo a imitar SIN mirar si el motor
+            # ya había encontrado contrato.
+            #
+            # Resultado, visto por Yesid: el panel de arriba decía «Tarifa
+            # pactada encontrada · Contrato S-13-1-03-1-04958», el encabezado
+            # del dictamen citaba ese mismo contrato, y el cuerpo negaba que
+            # existiera. Ante la EPS eso es regalarle el argumento: si el
+            # hospital dice que no hay contrato, no puede después exigir que se
+            # respete la tarifa pactada.
+            #
+            # La plantilla NO se borra: cuando de verdad no hay contrato, esa
+            # argumentación del Decreto 2423 Art. 87 es correcta y es la única
+            # defensa que hay. Solo se deja de ofrecer cuando sí lo hay.
+            if few_shots and _hay_contrato_verificado(info_tarifa):
+                antes = len(few_shots)
+                few_shots = [e for e in few_shots if not _NIEGA_EL_CONTRATO.search(e or "")]
+                if len(few_shots) < antes:
+                    logger.info(
+                        "[CONTRATO] Se apartaron %d plantilla(s) que niegan el contrato: "
+                        "el motor SÍ encontró tarifa pactada para esta glosa",
+                        antes - len(few_shots),
+                    )
+
             # Inyectar few-shots de plantillas gold (si hay) al final del system
             if few_shots:
                 bloque_ejemplos = "\n\nEJEMPLOS DE RESPUESTAS GANADORAS PREVIAS (usa el MISMO estilo, tono y nivel de detalle):\n"
@@ -9004,6 +9059,22 @@ class GlosaService:
             r"\bvalor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
             r"\bpor\s+valor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
             r"\b([\d][\d\.,]{4,})\s*(?:pesos|cop|cop\.|col\$)\b",
+            # 21-08-2026. Va de ÚLTIMO a propósito: solo actúa si ninguno de
+            # los de arriba enganchó, así no le quita precedencia a nada.
+            #
+            # Yesid pegó «CL0801 - ... - 898201 ESTUDIO DE COLORACION - valor
+            # 279900» y el dictamen salió diciendo VALOR OBJETADO «$ 0.00»:
+            # los patrones exigían «$», o «valor DE», o el sufijo «pesos». Un
+            # «valor 279900» a secas —que es como lo escribe cualquiera— no
+            # cumplía ninguno. Y un dictamen que declara cero pesos objetados
+            # ante la EPS es una cifra falsa, no un detalle de formato.
+            #
+            # El lookahead descarta «valor 100%»: un porcentaje no es plata.
+            r"\bvalor(?:\s+(?:total|unitario|glosad[oa]|objetad[oa]|facturad[oa]|cobrad[oa]))?"
+            # Dos dígitos mínimo, no tres: la glosa de la dipirona era de
+            # TREINTA pesos («valor 30») y con {2,} se perdía. Un solo dígito
+            # sí se descarta — «valor 2 conceptos» no es plata.
+            r"\s*[:=]?\s+\$?\s*([\d][\d\.,]{1,})(?![\d\.,]*\s*%)",
         ]
         for p in patrones:
             m = re.search(p, t, re.IGNORECASE)

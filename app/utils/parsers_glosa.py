@@ -21,6 +21,18 @@ import re
 from typing import Optional
 
 
+def _pesos(valor) -> str:
+    """`2072200` → `$2.072.200`. Punto de miles, como se escribe en Colombia.
+
+    21-08-2026. Acá se escribía `f"{_pesos(x)}"`, que produce `$2,072,200` — con
+    COMA. En Colombia la coma es el separador decimal: eso se lee como dos con
+    setenta y dos milésimas. Yesid lo vio en el panel de tarifa pactada y en la
+    línea de «Valor en disputa». Una cifra mal escrita en una respuesta de
+    glosa es una discusión que nadie quiere tener con la EPS.
+    """
+    return "$" + f"{int(round(float(valor or 0))):,}".replace(",", ".")
+
+
 def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> Optional[str]:
     """Intenta extraer el nombre del servicio/procedimiento y el CUPS desde el texto
     de la glosa y/o los soportes adjuntos.
@@ -475,11 +487,11 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     if tipo == "SOAT_PORCENTAJE":
         signo = "+" if factor > 0 else ""
         if val_pact > 0:
-            pact_txt = f"SOAT {signo}{factor:.0f}% (pactado ${val_pact:,.0f})"
+            pact_txt = f"SOAT {signo}{factor:.0f}% (pactado {_pesos(val_pact)})"
         else:
             pact_txt = f"SOAT {signo}{factor:.0f}% (SOAT base no cargado)"
     else:
-        pact_txt = f"${val_pact:,.0f}"
+        pact_txt = f"{_pesos(val_pact)}"
 
     import html as _html
 
@@ -490,14 +502,14 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
         ("Tarifa pactada en contrato", f'<b style="color:#059669;">{pact_txt}</b>'),
     ]
     if val_fact > 0:
-        filas_tabla.append(("Valor facturado HUS", f"${val_fact:,.0f}"))
+        filas_tabla.append(("Valor facturado HUS", f"{_pesos(val_fact)}"))
     if val_rec > 0:
-        filas_tabla.append(("Valor reconocido EPS", f"${val_rec:,.0f}"))
+        filas_tabla.append(("Valor reconocido EPS", f"{_pesos(val_rec)}"))
     if val_obj > 0:
         filas_tabla.append(
             (
                 "Valor objetado EPS",
-                f'<b style="color:#b91c1c;">${val_obj:,.0f}</b>',
+                f'<b style="color:#b91c1c;">{_pesos(val_obj)}</b>',
             )
         )
 
@@ -530,10 +542,10 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
                 "font-size:.82rem;color:#1e3a8a;margin-bottom:.5rem;"
                 'border-left:3px solid #3b82f6;">'
                 "<b>🔍 Interpretación SOAT base del CUPS (calculada):</b><br>"
-                f"• <b>HUS</b>: asumiendo ${val_fact:,.0f} × {1 + factor / 100:.3f} "
-                f"→ SOAT base = <b>${soat_hus:,.0f}</b><br>"
-                f"• <b>EPS</b>: asumiendo ${val_rec:,.0f} × {1 + factor / 100:.3f} "
-                f"→ SOAT base = <b>${soat_eps:,.0f}</b><br>"
+                f"• <b>HUS</b>: asumiendo {_pesos(val_fact)} × {1 + factor / 100:.3f} "
+                f"→ SOAT base = <b>{_pesos(soat_hus)}</b><br>"
+                f"• <b>EPS</b>: asumiendo {_pesos(val_rec)} × {1 + factor / 100:.3f} "
+                f"→ SOAT base = <b>{_pesos(soat_eps)}</b><br>"
                 "→ Verificar el valor SOAT oficial del CUPS en el <i>Manual "
                 "Tarifario SOAT 2026 — Circular Externa 047 de 2025 MinSalud "
                 "(UVB 2026 = $12.110)</i>. Fórmula: valor_pesos = Tarifa_UVB × "

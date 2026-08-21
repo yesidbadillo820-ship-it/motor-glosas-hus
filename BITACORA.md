@@ -5795,6 +5795,55 @@ de medicamento, o de otro sistema.
 - Y se comprobó que **sigue cazando** el CUPS inventado de ayer: cuando el
   motor tomó «valor glosado 100000» y escribió «CUPS 100000».
 
+### 21-08 — Los tres defectos que faltaban de las pruebas de Yesid
+
+**1 · El dictamen declaraba «VALOR OBJETADO $ 0.00»**
+
+Yesid pegó «CL0801 — … — **valor 279900**» y el documento que se radica salió
+diciendo que el valor objetado era **cero pesos**. Eso no es un detalle de
+formato: **es una cifra falsa en un documento que va a la EPS.**
+
+La causa: el lector de valores exigía un «$», o la palabra «valor **de**», o el
+sufijo «pesos». Un «valor 279900» a secas —que es como lo escribe cualquiera—
+no cumplía ninguna. Ahora sí se lee, incluida la glosa de **treinta pesos** de
+la dipirona.
+
+Y no se rompió lo que ya andaba: «valor **100%**» sigue sin leerse como plata,
+y «valor 2 conceptos» tampoco.
+
+**2 · La plata con comas gringas**
+
+> Tarifa pactada en contrato **$2,072,200**
+> Valor en disputa **$ 2,288,600**
+
+En Colombia la coma es el separador **decimal**: eso se lee como dos con
+setenta y dos milésimas. Corregido en **33 sitios** de tres archivos, todos
+plata que el auditor ve.
+
+**3 · El dictamen negaba su propio contrato**
+
+En la misma pantalla, el motor decía arriba «**Tarifa pactada encontrada ·
+Contrato S-13-1-03-1-04958 · $2.072.200**» y el cuerpo del dictamen decía «**EN
+AUSENCIA DE CONTRATO BILATERAL FORMAL**».
+
+Ante la EPS eso es **regalarle el argumento**: si el hospital dice que no hay
+contrato, no puede después exigir que se respete la tarifa pactada.
+
+La causa: una plantilla del banco (la TA-G01) trae esa frase escrita, y se le
+ofrecía a la IA como ejemplo a imitar **sin mirar si el motor ya había
+encontrado contrato**.
+
+> **La plantilla NO se borró.** Cuando de verdad no hay contrato, esa
+> argumentación del Decreto 2423 Art. 87 es correcta y es la única defensa que
+> existe. Solo se deja de ofrecer cuando sí lo hay — y se exige que haya
+> **tarifa con valor**, porque un contrato sin tarifa para ese CUPS tampoco
+> sirve para sostener «respétese lo pactado».
+
+- 38 pruebas nuevas. **Tres pruebas viejas fijaban los defectos** y se
+  corrigieron: una exigía «120,000» con coma, otra «83,800», y una tercera
+  daba por bueno que un «valor 500000» sin «$» **no se encontrara** —su
+  docstring lo llamaba «returns default when not found»—.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)

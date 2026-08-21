@@ -473,7 +473,7 @@ def _agregar_banner_tarifa_post(
                         "titulo": "✅ Valor oficial HUS/SOAT conocido — defender",
                         "razon": (
                             f"El valor oficial publicado para este CUPS es "
-                            f"${oficial['valor_pactado']:,.0f} según {oficial['contrato_numero']}. "
+                            f"{_pesos_col(oficial['valor_pactado'])} según {oficial['contrato_numero']}. "
                             "Defender este valor citando la norma institucional."
                         ),
                         "valor_a_defender": val_obj,
@@ -663,7 +663,7 @@ def _construir_dictamen_aceptacion(
         tabla_valores += f"""
             <tr>
                 <td style="padding:6px 8px;color:#b91c1c;">Valor en disputa</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">$ {val_en_disputa:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">{_pesos_col(val_en_disputa)}</td>
             </tr>"""
     tabla_valores += """
         </table>
@@ -752,7 +752,7 @@ async def _persistir_y_responder(
             val_obj = objetado_en_texto
             logger.info(
                 f"[{req_id}] valor objetado tomado del texto de la glosa: "
-                f"${objetado_en_texto:,.0f} (la IA no lo extrajo)"
+                f"{_pesos_col(objetado_en_texto)} (la IA no lo extrajo)"
             )
 
     _agregar_banner_tarifa_post(

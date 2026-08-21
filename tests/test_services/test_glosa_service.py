@@ -317,9 +317,26 @@ class TestExtraccionValor:
         assert "$ 1,500,000" in result or "1,500,000" in result
 
     def test_extraer_valor_sin_signo(self, glosa_service):
-        """Should handle value without $ sign - returns default when not found."""
+        """Un valor sin «$» SÍ es un valor.
+
+        21-08-2026. Esta prueba exigía «$ 0.00» y su docstring lo llamaba
+        «returns default when not found» — o sea, daba por correcto NO
+        encontrarlo. Estaba fijando el defecto.
+
+        Yesid pegó «CL0801 - ... - valor 279900» y el dictamen salió declarando
+        ante la EPS un valor objetado de CERO PESOS. Eso no es un detalle de
+        formato: es una cifra falsa en un documento que se radica.
+        """
         result = glosa_service._extraer_valor("Valor 500000 sin pesos")
-        assert "$ 0.00" in result
+        assert "500000" in result
+        assert "0.00" not in result
+
+    def test_un_porcentaje_no_es_plata(self, glosa_service):
+        """El otro lado: «valor 100%» no puede leerse como cien pesos."""
+        assert "$ 0.00" in glosa_service._extraer_valor("glosa aceptada al valor 100%")
+
+    def test_un_numero_suelto_despues_de_valor_no_basta(self, glosa_service):
+        assert "$ 0.00" in glosa_service._extraer_valor("se detectaron valor 2 conceptos")
 
     def test_extraer_valor_inexistente(self, glosa_service):
         """Should return default $0.00 when no value found."""
