@@ -5612,6 +5612,33 @@ puerto 8000. El del 8080 es el que sirve la página por internet.
 
 - 6 pruebas en `tests/test_core/test_la_base_no_depende_de_la_carpeta.py`.
 
+---
+
+### 20-08 (cierre) — Cada auditor puede deshacer LO SUYO
+
+El botón **«Dejar pendiente»** (el que deshace una auditoría ya decidida)
+estaba reservado a coordinación y administración. En la práctica eso dejaba
+al auditor trancado con su propio error de dedo: si radicaba una factura por
+equivocación, tenía que buscar a alguien más para que se la devolviera a
+pendiente.
+
+**Desde hoy:** cada auditor puede volver a pendiente **las facturas que él
+mismo radicó o devolvió**. No cambia nada más:
+
+- La decisión **de otra persona** sigue siendo de coordinación (el aviso dice
+  quién la auditó).
+- Una factura que **ya salió en un oficio de devolución entregado** no se
+  deshace: ese PDF ya está en manos de la entidad. Para eso hay que eliminar
+  antes el oficio de devolución (eso sí es de administración).
+- Corregir la **observación** de una factura ya decidida sigue igual que
+  antes: solo coordinación y administración.
+
+Todo queda en el historial con el nombre de quien deshizo y a qué hora.
+
+7 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)
