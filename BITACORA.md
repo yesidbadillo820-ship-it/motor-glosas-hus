@@ -6295,6 +6295,56 @@ que lo vigila se amplió a los **51 bots** del repositorio: la trampa no era de
 ese archivo, es de los `.cmd` de Windows, y cualquier bot de doble clic puede
 caer en ella.
 
+### 21-08 (noche) — Por qué el código no llegaba al PC, aunque estaba listo
+
+Todo el día se corrigieron cosas, se probaron y se fusionaron… y **nada de eso
+llegó al PC de cartera**. Los datos que mandó Yesid dieron el porqué. Tres
+hechos que parecían no tener relación:
+
+- El registro del autodespliegue estaba lleno de **las líneas de cada visita a
+  la página**, no de sus propios mensajes.
+- La tarea del autodespliegue terminó con un código de error.
+- El repositorio del PC llevaba horas clavado en una versión vieja.
+
+**Encajan en uno solo.** La red de seguridad —la parte que arranca el motor
+cuando no volvió solo— lo arrancaba *sin abrirle ventana propia*. Así el motor
+hereda la salida de la tarea, y Windows solo da una tarea por terminada cuando
+nadie más tiene esa salida abierta. El motor no la suelta nunca.
+
+Entonces la tarea se quedaba «corriendo» para siempre, Windows terminaba
+matándola y, como está puesta en no abrir dos a la vez, **saltaba todas las
+pasadas siguientes**.
+
+Dicho corto: **la red de seguridad, al salvar el motor una vez, mataba el
+autodespliegue para siempre.** Y de paso tapaba el único registro donde se
+podía ver lo que estaba pasando. Nadie se entera: todo «se ve bien» hasta que
+alguien nota que lo nuevo no llega.
+
+Ya está corregido: el motor se abre en su propia ventana y escribe donde le
+corresponde. La tarea termina enseguida y la siguiente pasada corre normal.
+
+**Y para que no se vuelva a esconder:** la pantalla de estado ahora delata una
+tarea *atascada*. Antes, una tarea trabada decía «corriendo» y se veía igual de
+sana que una que funciona. Ahora, si una tarea de cinco minutos lleva media
+hora corriendo, lo dice y explica cómo cerrarla.
+
+### 21-08 (noche) — Preguntar no bastaba: hay que decirle cuál es la cuenta
+
+El instalador del arranque ya preguntaba con qué cuenta debía correr la tarea.
+Yesid le dio Enter a la que mostraba la ventana —la de administrador— y la
+tarea quedó otra vez con la cuenta equivocada. Preguntar algo sin dar la
+respuesta no sirve de mucho.
+
+Ahora el instalador **averigua** cuál es la buena: la lee de la tarea del
+autodespliegue, que lleva meses funcionando y sí entra a la carpeta de soportes
+del servidor. Y se la muestra antes de preguntar.
+
+**Otra cosa que salió de esa misma corrida:** la segunda contraseña se escribió
+mal, el autodespliegue no quedó cambiado… y el mensaje final decía igual que
+todo seguía funcionando. Un instalador que dice que quedó lo que no quedó es
+peor que uno que falla: el auditor se va tranquilo con la mitad del trabajo sin
+hacer. Ahora el resumen final depende de cómo fue de verdad.
+
 ## 3) PENDIENTE
 
 ### Permisos del portal (nuevo, 21-08 tarde)

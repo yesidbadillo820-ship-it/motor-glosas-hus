@@ -226,6 +226,36 @@ class TestLaPantallaDeEstadoLoDelata:
         autodespliegue arranca cada 5 minutos: verlo así es lo normal."""
         assert "267009" in _texto(ESTADO)
 
+    def test_delata_una_tarea_atascada(self):
+        """Una tarea ATASCADA se ve igual que una sana: dice «corriendo» y ya.
+
+        Fue justo lo que escondió el problema del 21-08. El autodespliegue
+        arrancaba el motor de una forma que no soltaba la salida de la tarea,
+        Windows no la daba nunca por terminada, y como está puesta en no abrir
+        dos a la vez, **dejó de correr durante horas**. El portal no recibió
+        cuatro correcciones ya fusionadas, y todo «se veía bien».
+
+        Una tarea que corre cada 5 minutos no puede llevar media hora
+        corriendo.
+        """
+        t = _texto(ESTADO)
+        assert "esta atascada" in t, (
+            "La pantalla de estado no distingue una tarea que trabaja de una "
+            "atascada: es el defecto que costó una tarde entera de no saber "
+            "por qué el código no llegaba."
+        )
+        assert "TotalMinutes" in t, "no se mide cuánto lleva corriendo"
+
+    def test_y_dice_que_hacer_con_ella(self):
+        t = _texto(ESTADO)
+        assert "Programador de tareas" in t
+
+    def test_no_confunde_una_pasada_normal_con_un_atasco(self):
+        """El autodespliegue corre cada 5 minutos: verlo «corriendo» recién
+        arrancado es lo normal. Solo se avisa pasado un buen rato."""
+        t = _texto(ESTADO)
+        assert "$minutos -gt 20" in t
+
     def test_sigue_en_ascii(self):
         """Windows PowerShell lee este archivo como ANSI: con tildes, los
         mensajes salen rotos en pantalla."""
