@@ -4728,6 +4728,19 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
   10:56 de la MAÑANA; los reintentos de la 332865 fueron en la TARDE y ambos
   quedaron «Rechazado» por timeout del validador. Queda para mañana temprano.
 
+### 21-08 — La NC 332865 por fin validó: el patrón de la mañana era cierto
+
+- Tal como decía el diagnóstico, la nota **332865 validó BIEN hoy a las 8:29
+  de la mañana** (ResultState=True, CUV emitido, 0 rechazos) con los MISMOS
+  archivos de siempre. En total fueron 5 intentos: los 4 de la tarde/noche
+  fallaron por timeout del validador y el único de la mañana pasó. **Regla
+  práctica que queda:** los RIPS de notas crédito se validan EN LA MAÑANA
+  (antes de ~11 a.m.).
+- Se armó y entregó la carpeta lista para el portal de SAVIA
+  (NC332865.xml arreglado + NC332865.json + NC332865_CUV.json bueno). Con
+  esta quedan entregadas las 5 notas del lote (332657, 332658, 332659,
+  332660 ya subida y aceptada, y 332865).
+
 ## 3) PENDIENTE
 
 ### Organización de trabajos (nuevo, 18-08)
