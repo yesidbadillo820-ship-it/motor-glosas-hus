@@ -187,3 +187,88 @@ class TestLaIaSeCorrigeSola:
         )
         folio = [d for d in defectos if d["regla"] == "folio_inventado"]
         assert folio and "ACREDITA" in folio[0]["sugerencia"].upper()
+
+
+# ─────────────────────────────────────────────────────────────────────────
+#  21-08-2026 — LO QUE SE ESCAPÓ EN LA PRUEBA REAL
+#
+#  Yesid analizó dos glosas SIN adjuntar un solo PDF y los dos dictámenes
+#  salieron con medalla A y «0 hallazgos», afirmando lo que decía una historia
+#  clínica que nadie abrió. La protección estaba, pero no cubría estas formas.
+#
+#  La causa de fondo: la señal de «sí hubo expediente» aceptaba que el propio
+#  dictamen NOMBRARA un documento clínico. O sea, decir «historia clínica» era
+#  a la vez la afirmación sospechosa y la prueba de que había documento. Ahora
+#  la señal exige rastro real de lectura: un folio con número o un bloque de
+#  soporte del expediente.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+class TestLoQueSeEscapoEl21DeAgosto:
+    """Las frases exactas de los dos dictámenes reales."""
+
+    def test_indicado_en_la_historia_clinica(self):
+        assert afirmaciones_documentales_sin_respaldo(
+            "EL PROCEDIMIENTO ESTÁ DEBIDAMENTE INDICADO EN LA HISTORIA CLÍNICA, "
+            "EL CUPS FACTURADO CORRESPONDE EXACTAMENTE AL ESTUDIO REALIZADO.",
+            "",
+        )
+
+    def test_se_adjunto_historia_clinica_que_cumple(self):
+        assert afirmaciones_documentales_sin_respaldo(
+            "SE ADJUNTÓ HISTORIA CLÍNICA INTEGRAL QUE CUMPLE CON LOS REQUISITOS "
+            "DE SECUENCIALIDAD Y COMPLETITUD.",
+            "",
+        )
+
+    def test_quien_documento_la_indicacion(self):
+        assert afirmaciones_documentales_sin_respaldo(
+            "CUMPLE CON LOS CRITERIOS CLÍNICOS DEL MÉDICO TRATANTE, QUIEN DOCUMENTÓ "
+            "LA INDICACIÓN EN LA HISTORIA CLÍNICA INTEGRAL.",
+            "",
+        )
+
+
+class TestLosFalsosPositivosSiguenDescartados:
+    """Un aviso equivocado en cada dictamen enseña a ignorar los avisos. Estas
+    frases son legítimas y NO pueden marcarse."""
+
+    def test_se_anexa_no_afirma_contenido(self):
+        assert not afirmaciones_documentales_sin_respaldo(
+            "SE ANEXA LA HISTORIA CLÍNICA COMPLETA.", ""
+        )
+
+    def test_esta_a_disposicion_tampoco(self):
+        assert not afirmaciones_documentales_sin_respaldo(
+            "LA HISTORIA CLÍNICA ESTÁ A DISPOSICIÓN DE LA EPS.", ""
+        )
+
+    def test_citar_la_norma_que_exige_el_soporte(self):
+        assert not afirmaciones_documentales_sin_respaldo(
+            "LA HISTORIA CLÍNICA ES EL SOPORTE EXIGIDO POR LA RESOLUCIÓN 2284 DE 2023.",
+            "",
+        )
+
+    def test_reclamarle_a_la_eps_que_no_precisó(self):
+        assert not afirmaciones_documentales_sin_respaldo(
+            "LA EPS NO PRECISÓ QUÉ SOPORTE ECHA DE MENOS.", ""
+        )
+
+    def test_una_factura_que_cumple_la_norma_no_es_una_afirmacion_clinica(self):
+        """«CUMPLE» ahora es verbo de afirmación, y eso podría disparar sobre
+        la factura electrónica. No debe: no habla de un documento clínico."""
+        assert not afirmaciones_documentales_sin_respaldo(
+            "LA FACTURA ELECTRÓNICA CUMPLE CON EL ARTÍCULO 617 DEL ESTATUTO TRIBUTARIO.",
+            "",
+        )
+
+
+class TestConExpedienteLeidoSeAbstiene:
+    def test_si_el_forense_leyo_folios_no_se_marca(self):
+        contexto = (
+            "═══ SOPORTE AUTO: historia_clinica ═══\n"
+            "FOLIO 12: paciente con dolor abdominal de 3 días de evolución"
+        )
+        assert not afirmaciones_documentales_sin_respaldo(
+            "EL PROCEDIMIENTO ESTÁ INDICADO EN LA HISTORIA CLÍNICA.", contexto
+        )
