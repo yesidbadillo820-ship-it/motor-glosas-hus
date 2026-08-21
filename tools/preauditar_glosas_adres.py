@@ -550,6 +550,40 @@ _PARECE_MEDICAMENTO_O_INSUMO = re.compile(
 )
 
 
+def _centro_si_existe(area: str, catalogo) -> str:
+    """El área pedida si el catálogo en uso la tiene; si no, su genérico.
+
+    21-08-2026. El hospital separa el laboratorio por especialidad —Química,
+    Bacteriología, Uroanálisis, Hematología, Inmunología— y cada una tiene su
+    código en el archivo del DGH. Proponer el genérico cuando la verdad es
+    «LABORATORIO - QUIMICA» es acercarse pero errar.
+
+    PERO el catálogo base de este script son los 45 centros de la hoja oculta
+    de la macro, y ahí los sublaboratorios no están. Escribir en la macro un
+    centro que ella no reconoce es peor que ser impreciso: puede romper el
+    cargue.
+
+    Así que se propone el fino solo cuando el catálogo que se está usando
+    —el de la macro real del paquete— de verdad lo tiene. Si no, el genérico.
+    """
+    oficial = centro_oficial(area, catalogo)
+    if re.match(r"^\d{6}-", oficial):
+        return oficial
+    generico = _GENERICO_DE.get(area, "")
+    return centro_oficial(generico, catalogo) if generico else ""
+
+
+# Cuando el catálogo no trae el área fina, a qué caer.
+_GENERICO_DE = {
+    "LABORATORIO - QUIMICA": "LABORATORIO CLINICO",
+    "LABORATORIO - HEMATOLOGIA": "LABORATORIO CLINICO",
+    "LABORATORIO - INMUNOLOGIA": "LABORATORIO CLINICO",
+    "LABORATORIO - BACTERIOLOGIA": "LABORATORIO CLINICO",
+    "LABORATORIO - UROANALISIS Y PARASITOLOGIA": "LABORATORIO CLINICO",
+    "OTRAS UNIDADES APOYO DIAGNOSTICO": "LABORATORIO CLINICO",
+}
+
+
 def centro_de_costos(
     tipo_elemento: str, descripcion: str, catalogo: tuple[str, ...] | list[str] | None = None
 ) -> str:
@@ -576,7 +610,7 @@ def centro_de_costos(
 
     for area, patron in PISTAS_CENTRO_COSTOS:
         if re.search(patron, texto):
-            return centro_oficial(area, catalogo)
+            return _centro_si_existe(area, catalogo)
     respaldo = CENTRO_POR_TIPO_ELEMENTO.get(_norm(tipo_elemento), "")
     if respaldo:
         return centro_oficial(respaldo, catalogo)
