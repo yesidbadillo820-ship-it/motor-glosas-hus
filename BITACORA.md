@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 20-08-2026
+**Última actualización:** 21-08-2026
 
 ---
 
@@ -2903,6 +2903,47 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   facturas que no cuadran ($247.617.689, el 83 % del paquete).
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
+
+### 21-08-2026 — El PDF y el Word de respuesta, uno por cada factura
+
+**Lo que pidió el auditor:** que de la macro salgan de una vez los documentos
+que se radican — el **PDF de respuesta** por factura y, además, un **Word** con
+el formato del `Reporte_Factura_HUS298253_CAROLINA.docx` que compartió de
+ejemplo.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/respuestas_adres_por_factura.py`,
+que de un solo tirón saca los dos por cada factura:
+
+- `RTA_ADRES_<FACTURA>.pdf` — el REPORTE RTA ADRES, con su tabla de seis
+  columnas. Reusa el mismo generador que ya usa la pantalla web, así que el
+  papel sale idéntico se arme por donde se arme.
+- `Reporte_Factura_<FACTURA>_<GESTOR>.docx` — encabezado con lo aceptado, una
+  respuesta por párrafo y **las aceptadas de primeras**, tal como lo pidió.
+
+El texto de cada respuesta sale **tal cual** de la columna «RTA GLOSA COMPLETA»
+de la macro: es lo que redactó el auditor y el bot no lo reescribe.
+
+**Resultado del paquete 31068:** 324 facturas → **324 PDF y 324 Word**, sin un
+solo error. $798.133.471 glosados y $91.617.467 aceptados, 108 facturas por
+gestor.
+
+**Dos cosas que el bot no decide solo, y hay que saberlas:**
+
+1. **El aviso de glosa extemporánea** es una afirmación jurídica sobre el
+   paquete y la macro no trae las fechas para comprobarla. Por eso hay que
+   pedirlo con `--extemporanea`. La entrega del 21-08 se hizo **con** el aviso,
+   porque el Word de ejemplo lo traía; si para el 31068 no aplica, se vuelve a
+   correr sin esa opción y listo.
+2. **Las glosas totales no se responden una por una** (1.630 renglones): no
+   entran en los documentos, pero se avisan al pie con cuántas son y cuánto
+   valen. Nada queda escondido.
+
+De paso se arregló un defecto del generador de PDF que también afectaba a la
+pantalla web: hay respuestas de más de 2.500 caracteres —una sola celda más
+alta que la hoja— y el PDF de esas dos facturas no se podía armar. Ahora el
+renglón se parte entre dos páginas.
+
+---
 
 ### 20-08-2026 — Cada soporte, en la carpeta de su factura
 
