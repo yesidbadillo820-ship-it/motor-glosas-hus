@@ -111,12 +111,50 @@ else {
     $avisos += "Si el PC se reinicia, la pagina no vuelve sola: falta el arranque automatico."
 }
 
-foreach ($t in @("MotorGlosas_Autodeploy", "MotorGlosas_Backup")) {
+# Que una tarea exista NO basta: si Windows la dejo en "solo cuando el
+# usuario haya iniciado sesion", al prender el PC sin que nadie entre esa
+# tarea duerme. Paso el 21-08-2026 con el autodespliegue: su red de
+# seguridad, que es la que levanta el motor cuando no vuelve solo, no se
+# entero de que el portal estaba caido. Por eso aca se mira tambien COMO
+# corre, no solo si esta.
+foreach ($t in @("MotorGlosas_Arranque", "MotorGlosas_Autodeploy", "MotorGlosas_Backup")) {
     $tarea = Get-ScheduledTask -TaskName $t
-    if ($tarea) { Write-Host ("   [OK] tarea " + $t + ": " + $tarea.State) }
-    else {
+    if (-not $tarea) {
         Write-Host ("   [FALTA] tarea " + $t)
-        $avisos += ("Falta la tarea programada " + $t)
+        if ($t -eq "MotorGlosas_Arranque") {
+            $avisos += "El motor NO arranca solo al prender el PC. Doble clic en tools\ARRANQUE_AUTOMATICO_MOTOR.cmd"
+        }
+        else {
+            $avisos += ("Falta la tarea programada " + $t)
+        }
+        continue
+    }
+
+    $tipo = $tarea.Principal.LogonType
+    $sinSesion = ($tipo -eq "Password" -or $tipo -eq "S4U")
+    if ($sinSesion) {
+        Write-Host ("   [OK] tarea " + $t + ": " + $tarea.State + " - trabaja aunque nadie inicie sesion")
+    }
+    else {
+        Write-Host ("   [OJO] tarea " + $t + ": " + $tarea.State + " - SOLO con sesion iniciada")
+        $avisos += ("La tarea " + $t + " solo corre si alguien inicio sesion: si el PC se reinicia de noche, no trabaja. Doble clic en tools\ARRANQUE_AUTOMATICO_MOTOR.cmd")
+    }
+
+    # Como le fue la ultima vez. 0 = bien; 267009 = corriendo ahora mismo.
+    $info = Get-ScheduledTaskInfo -TaskName $t
+    if ($info) {
+        $r = $info.LastTaskResult
+        if ($r -eq 0 -or $r -eq 267009) {
+            Write-Host ("        ultima vez: " + $info.LastRunTime + " (bien)")
+        }
+        elseif ($null -eq $info.LastRunTime -or $info.LastRunTime.Year -lt 2000) {
+            Write-Host "        ultima vez: nunca se ha ejecutado"
+            $avisos += ("La tarea " + $t + " existe pero nunca ha corrido.")
+        }
+        else {
+            Write-Host ("        ultima vez: " + $info.LastRunTime + " - TERMINO CON ERROR (codigo " + $r + ")")
+            $avisos += ("La tarea " + $t + " fallo la ultima vez (codigo " + $r + ").")
+        }
     }
 }
 

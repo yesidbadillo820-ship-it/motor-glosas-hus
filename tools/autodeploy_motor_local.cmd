@@ -54,14 +54,20 @@ rem  Paso tres veces el 20-08 y cada vez fue Yesid quien lo levanto.
 rem  Aca se comprueba que de verdad volvio; si no, se arranca directo
 rem  sin depender del vigilante.
 rem ---------------------------------------------------------------
-timeout /t 12 /nobreak >nul
+rem  ESPERAS CON PING, NO CON TIMEOUT (21-08-2026). Estos bots ahora
+rem  corren tambien SIN sesion iniciada (tarea de arranque del PC), y
+rem  ahi `timeout` no siempre tiene una consola de verdad: contesta
+rem  "Input redirection is not supported" y sigue de largo sin esperar,
+rem  con lo que el bucle se vuelve loco. `ping` a uno mismo espera
+rem  igual y funciona en todos los casos. ping -n 6 = 5 segundos.
+ping -n 13 127.0.0.1 >nul
 powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
 if not errorlevel 1 goto :fin
 
 echo [%date% %time%] el motor NO volvio solo: se arranca directo >> "%LOG%"
 cd /d "%REPO%"
 start "" /b "%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%LOG%" 2>&1
-timeout /t 15 /nobreak >nul
+ping -n 16 127.0.0.1 >nul
 powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
 if errorlevel 1 (
   echo [%date% %time%] ALERTA: el motor sigue caido tras arrancarlo directo >> "%LOG%"

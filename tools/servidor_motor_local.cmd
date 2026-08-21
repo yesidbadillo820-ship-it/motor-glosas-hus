@@ -87,7 +87,13 @@ rem     vigilante de mas simplemente espera: si el otro se cae, este
 rem     toma el relevo.
 powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'python*' -and $_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
 if errorlevel 1 (
-  timeout /t 5 /nobreak >nul
+rem  ESPERAS CON PING, NO CON TIMEOUT (21-08-2026). Estos bots ahora
+rem  corren tambien SIN sesion iniciada (tarea de arranque del PC), y
+rem  ahi `timeout` no siempre tiene una consola de verdad: contesta
+rem  "Input redirection is not supported" y sigue de largo sin esperar,
+rem  con lo que el bucle se vuelve loco. `ping` a uno mismo espera
+rem  igual y funciona en todos los casos. ping -n 6 = 5 segundos.
+  ping -n 6 127.0.0.1 >nul
   goto :loop
 )
 
@@ -113,5 +119,5 @@ for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
 echo [%date% %time%] arrancando el servidor... >> "%LOG%"
 "%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%LOG%" 2>&1
 echo [%date% %time%] el servidor se detuvo; se reinicia en 5 segundos >> "%LOG%"
-timeout /t 5 /nobreak >nul
+ping -n 6 127.0.0.1 >nul
 goto :loop

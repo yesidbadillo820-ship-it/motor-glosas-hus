@@ -46,9 +46,25 @@ class TestLaRedDeSeguridad:
         )
 
     def test_espera_antes_de_comprobar(self):
-        """Preguntar de inmediato daría un falso negativo: tarda en subir."""
+        """Preguntar de inmediato daría un falso negativo: tarda en subir.
+
+        Lo que importa es que ESPERE, no con qué orden. El 21-08-2026 las
+        esperas pasaron de `timeout` a `ping`: `timeout` necesita una consola
+        de verdad y, cuando el bot corre sin sesión iniciada, contesta «Input
+        redirection is not supported» y sigue de largo **sin esperar**. Esta
+        prueba acepta las dos formas y comprueba lo único que de verdad
+        protege: que la espera exista y dure lo suficiente.
+        """
         t = _texto()
-        assert re.search(r"timeout /t \d+ /nobreak", t)
+        con_timeout = [int(x) for x in re.findall(r"timeout /t (\d+) /nobreak", t)]
+        # `ping -n N` manda N paquetes con un segundo entre uno y otro.
+        con_ping = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1", t)]
+        esperas = con_timeout + con_ping
+        assert esperas, "la red de seguridad pregunta sin esperar nada"
+        assert max(esperas) >= 10, (
+            f"la espera más larga es de {max(esperas)} s: el motor tarda más "
+            f"que eso en subir y se daría por caído estando bien."
+        )
 
     def test_deja_constancia_en_el_registro(self):
         """Si la red de seguridad actuó, tiene que quedar escrito."""
