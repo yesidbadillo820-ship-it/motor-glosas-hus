@@ -17,6 +17,14 @@ from pathlib import Path
 from .almacen import Configuracion
 from .banco import Banco
 from .dominio import AREAS, ORDEN_AREAS
+from .plan import (
+    FASES,
+    MINUTOS_POR_BLOQUE,
+    MINUTOS_SIMULACRO_COMPLETO,
+    PISO_POR_AREA,
+    TipoSesion,
+)
+from .puntaje import CURVA_PUNTAJE, NIVELES_INGLES, SEMAFORO_AREA
 
 #: La plantilla con el HTML, el CSS y el JavaScript de la aplicación.
 PLANTILLA: Path = Path(__file__).parent / "plantilla_web.html"
@@ -57,7 +65,40 @@ def construir_datos(banco: Banco, config: Configuracion | None = None) -> dict:
         }
         for area in ORDEN_AREAS
     }
-    datos: dict = {"preguntas": preguntas, "areas": areas, "config": None}
+    # La política del plan (fases, mezclas, pisos) se exporta desde Python en vez
+    # de reescribirse en JavaScript. Así hay UNA sola fuente de verdad: si aquí
+    # cambia una proporción, la aplicación web cambia con ella. Una prueba
+    # verifica que lo exportado sea idéntico a las constantes de icfes/plan.py.
+    plan = {
+        "minutos_bloque": MINUTOS_POR_BLOQUE,
+        "minutos_simulacro": MINUTOS_SIMULACRO_COMPLETO,
+        "piso_area": PISO_POR_AREA,
+        "orden_areas": [a.value for a in ORDEN_AREAS],
+        "fases": [
+            {
+                "nombre": f.nombre,
+                "objetivo": f.objetivo,
+                "proporcion": f.proporcion,
+                "mezcla": [[t.value, p] for t, p in f.mezcla.items()],
+            }
+            for f in FASES
+        ],
+        "sesiones": {
+            t.value: {"etiqueta": t.etiqueta, "instruccion": t.instruccion} for t in TipoSesion
+        },
+    }
+    escalas = {
+        "curva": [list(par) for par in CURVA_PUNTAJE],
+        "ingles": [[tope, nivel, desc] for tope, nivel, desc in NIVELES_INGLES],
+        "semaforo": [[tope, etq, consejo] for tope, etq, consejo in SEMAFORO_AREA],
+    }
+    datos: dict = {
+        "preguntas": preguntas,
+        "areas": areas,
+        "plan": plan,
+        "escalas": escalas,
+        "config": None,
+    }
     if config is not None:
         datos["config"] = {
             "examen": config.fecha_examen.isoformat(),
