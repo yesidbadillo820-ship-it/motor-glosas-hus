@@ -5346,6 +5346,80 @@ def generar_texto_injustificada(
     )
 
 
+# ─── El dictamen no puede negar un contrato que el motor SÍ encontró ─────────
+# 21-08-2026. Ver el comentario largo en el punto donde se usa.
+
+_NIEGA_EL_CONTRATO = re.compile(
+    r"AUSENCIA\s+DE\s+CONTRATO"
+    r"|SIN\s+CONTRATO\s+(?:BILATERAL|FORMAL|PACTADO|VIGENTE)"
+    r"|NO\s+(?:EXISTE|EXISTIENDO|HAY)\s+CONTRATO",
+    re.IGNORECASE,
+)
+
+
+def _hay_contrato_verificado(info_tarifa: dict | None) -> bool:
+    """¿El motor encontró contrato Y tarifa pactada para esta glosa?
+
+    Se exige que haya una tarifa CON VALOR: un contrato registrado pero sin
+    tarifa para ese CUPS no sirve para sostener «respétese lo pactado», y ahí
+    la argumentación del Decreto 2423 Art. 87 sigue siendo la buena.
+    """
+    if not info_tarifa:
+        return False
+    tarifa = info_tarifa.get("tarifa") or {}
+    if not tarifa:
+        return False
+    try:
+        valor = float(info_tarifa.get("valor_pactado_calc") or tarifa.get("valor_pactado") or 0)
+    except (TypeError, ValueError):
+        return False
+    return valor > 0
+
+
+# ─── La plata, como se escribe en Colombia ──────────────────────────────────
+# 21-08-2026. `_extraer_valor` devolvía el número TAL CUAL venía en el texto.
+# Si la glosa decía «valor 796600», el dictamen que se radica salía con
+# «VALOR OBJETADO $ 796600» —sin puntos de miles—, y si decía «$150.000» salía
+# bien. O sea: el formato de una cifra que va a la EPS dependía de cómo la
+# hubiera escrito quien redactó la glosa.
+
+
+def _en_pesos_colombianos(crudo: str) -> str:
+    """`796600` → `$796.600`. `150.000` → `$150.000`. Punto de miles.
+
+    Si el número no se puede leer, se devuelve tal cual: es preferible mostrar
+    lo que decía el texto a inventar una cifra.
+    """
+    # Se quita la puntuación de sobra del final: el texto suele venir como
+    # «…por $6.434.900.» y ese punto es el de la frase, no de la cifra.
+    limpio = (crudo or "").strip().rstrip(".,")
+    if not limpio:
+        return "$ 0.00"
+
+    # SOLO se toca lo que viene SIN formato: dígitos pelados como «796600».
+    # Si el texto ya trae puntos o comas —«1.234.567,89», «150.000»— se
+    # devuelve tal cual.
+    #
+    # 21-08-2026: la primera versión de esto pasaba TODO por un redondeo a
+    # entero, y «1.234.567,89» salía «$ 1.234.568». Lo cazó una prueba del
+    # repositorio que cuidaba justamente eso. Perder ochenta y nueve centavos
+    # en una cifra que se radica ante la EPS no es un detalle de formato: es
+    # cambiar el valor. La prueba tenía razón.
+    # Comas de miles a la gringa: «1,500,000». La forma es inequívoca —grupos
+    # de exactamente tres dígitos separados por coma y sin un solo punto— así
+    # que no se confunde con el decimal colombiano «1.234.567,89» ni con
+    # «150,50». Se pasan a punto: la cifra que se radica va en colombiano.
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+", limpio):
+        return "$ " + limpio.replace(",", ".")
+
+    if not limpio.isdigit():
+        return f"$ {limpio}"
+
+    # Con espacio después del «$»: la forma que esta función ha devuelto
+    # siempre. Lo que estaba mal no era el espacio, era el punto de miles.
+    return "$ " + f"{int(limpio):,}".replace(",", ".")
+
+
 class GlosaService:
     def __init__(
         self,
@@ -5435,6 +5509,14 @@ class GlosaService:
                 few_shots = []
             few_shots = list(few_shots) + [hint_gestor]
         texto_base = str(data.tabla_excel).strip().upper()
+
+        # 20-08-2026 — lo que la IA TIENE A LA VISTA para redactar: el
+        # contexto de los PDF más el texto de la glosa. Con esto se revisa
+        # que el dictamen no cite folios inventados: la IA y el validador
+        # leen EXACTAMENTE el mismo texto, así que un folio que no esté
+        # aquí, la IA no lo leyó — se lo inventó. Si no hay soportes queda
+        # solo el texto de la glosa, que es justo lo que se pudo leer.
+        _evidencia_leida = (contexto_pdf or "") + "\n" + texto_base
 
         # ── Ronda 19 (Bug BB, 30-jun-2026): resolver EPS efectiva ──
         # Si el dropdown de EPS contradice la EPS nombrada en el texto de la
@@ -5980,6 +6062,31 @@ class GlosaService:
                 )
                 system_prompt = system_prompt + hint_aseguradora
                 logger.info(f"[ASEGURADORA SOAT] detectada: {nombre_real} — prompt reforzado")
+            # 21-08-2026. La plantilla TA-G01 del banco dice «EN AUSENCIA DE
+            # CONTRATO BILATERAL FORMAL ENTRE EL HUS Y LA ENTIDAD PAGADORA…» y
+            # se le ofrecía a la IA como ejemplo a imitar SIN mirar si el motor
+            # ya había encontrado contrato.
+            #
+            # Resultado, visto por Yesid: el panel de arriba decía «Tarifa
+            # pactada encontrada · Contrato S-13-1-03-1-04958», el encabezado
+            # del dictamen citaba ese mismo contrato, y el cuerpo negaba que
+            # existiera. Ante la EPS eso es regalarle el argumento: si el
+            # hospital dice que no hay contrato, no puede después exigir que se
+            # respete la tarifa pactada.
+            #
+            # La plantilla NO se borra: cuando de verdad no hay contrato, esa
+            # argumentación del Decreto 2423 Art. 87 es correcta y es la única
+            # defensa que hay. Solo se deja de ofrecer cuando sí lo hay.
+            if few_shots and _hay_contrato_verificado(info_tarifa):
+                antes = len(few_shots)
+                few_shots = [e for e in few_shots if not _NIEGA_EL_CONTRATO.search(e or "")]
+                if len(few_shots) < antes:
+                    logger.info(
+                        "[CONTRATO] Se apartaron %d plantilla(s) que niegan el contrato: "
+                        "el motor SÍ encontró tarifa pactada para esta glosa",
+                        antes - len(few_shots),
+                    )
+
             # Inyectar few-shots de plantillas gold (si hay) al final del system
             if few_shots:
                 bloque_ejemplos = "\n\nEJEMPLOS DE RESPUESTAS GANADORAS PREVIAS (usa el MISMO estilo, tono y nivel de detalle):\n"
@@ -6899,6 +7006,7 @@ class GlosaService:
                         codigo_respuesta=cod_res,
                         texto_glosa=texto_base,
                         codigos_validos_extra=_codigos_extra_val,
+                        evidencia=_evidencia_leida,
                     )
                     # Mejora #7: chequear si el dictamen es copia textual
                     # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -6985,6 +7093,7 @@ class GlosaService:
                                 codigo_respuesta=cod_res,
                                 texto_glosa=texto_base,
                                 codigos_validos_extra=_codigos_extra_val,
+                                evidencia=_evidencia_leida,
                             )
                             if len(_defectos_retry) < len(_defectos):
                                 logger.info(
@@ -7748,7 +7857,7 @@ class GlosaService:
         try:
             from app.services.citation_verifier import verificar_citas as _vc
 
-            verif_citas = _vc(dictamen, eps=str(data.eps or ""))
+            verif_citas = _vc(dictamen, eps=str(data.eps or ""), evidencia=_evidencia_leida)
 
             # ═══════════════════════════════════════════════════════════
             #  RED FINAL ronda 2 (12-jun-2026, fix #2): NUNCA radicar una
@@ -7771,7 +7880,11 @@ class GlosaService:
                     )
                     if _dictamen_descomillado != dictamen:
                         dictamen = _dictamen_descomillado
-                        verif_citas = _vc(dictamen, eps=str(data.eps or ""))
+                        verif_citas = _vc(
+                            dictamen,
+                            eps=str(data.eps or ""),
+                            evidencia=_evidencia_leida,
+                        )
             except Exception as _e_desc:
                 # Un fallo del descomillado jamás invalida la verificación
                 # ya calculada — se entrega el dictamen original con badge.
@@ -8967,7 +9080,7 @@ class GlosaService:
 
             valor_num = _pvc(f"{m_mult.group(1)} {m_mult.group(2)}")
             if valor_num > 0:
-                return f"$ {int(round(valor_num)):,}".replace(",", ".")
+                return "$ " + f"{int(round(valor_num)):,}".replace(",", ".")
 
         # Ronda 26/29: el OBJETADO ETIQUETADO manda. El lookahead consume la
         # corrida numérica completa para que "VALOR OBJETADO 100%" no
@@ -8982,7 +9095,7 @@ class GlosaService:
             _hits = re.findall(_p_lab, t, re.IGNORECASE)
             if _hits:
                 _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
-                return f"$ {_mejor.strip().rstrip('.,')}"
+                return _en_pesos_colombianos(_mejor)
 
         patrones = [
             r"\$\s*([\d][\d\.,]{2,})",
@@ -8990,13 +9103,29 @@ class GlosaService:
             r"\bvalor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
             r"\bpor\s+valor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
             r"\b([\d][\d\.,]{4,})\s*(?:pesos|cop|cop\.|col\$)\b",
+            # 21-08-2026. Va de ÚLTIMO a propósito: solo actúa si ninguno de
+            # los de arriba enganchó, así no le quita precedencia a nada.
+            #
+            # Yesid pegó «CL0801 - ... - 898201 ESTUDIO DE COLORACION - valor
+            # 279900» y el dictamen salió diciendo VALOR OBJETADO «$ 0.00»:
+            # los patrones exigían «$», o «valor DE», o el sufijo «pesos». Un
+            # «valor 279900» a secas —que es como lo escribe cualquiera— no
+            # cumplía ninguno. Y un dictamen que declara cero pesos objetados
+            # ante la EPS es una cifra falsa, no un detalle de formato.
+            #
+            # El lookahead descarta «valor 100%»: un porcentaje no es plata.
+            r"\bvalor(?:\s+(?:total|unitario|glosad[oa]|objetad[oa]|facturad[oa]|cobrad[oa]))?"
+            # Dos dígitos mínimo, no tres: la glosa de la dipirona era de
+            # TREINTA pesos («valor 30») y con {2,} se perdía. Un solo dígito
+            # sí se descarta — «valor 2 conceptos» no es plata.
+            r"\s*[:=]?\s+\$?\s*([\d][\d\.,]{1,})(?![\d\.,]*\s*%)",
         ]
         for p in patrones:
             m = re.search(p, t, re.IGNORECASE)
             if m:
                 raw = m.group(1).strip().rstrip(".,")
                 if any(ch.isdigit() for ch in raw):
-                    return f"$ {raw}"
+                    return _en_pesos_colombianos(raw)
 
         # Filas pegadas desde Excel (TSV): "TA0801⇥882298⇥DESCRIPCIÓN⇥36.402⇥MOTIVO".
         # El valor viene como columna SIN '$' y los patrones de arriba no lo
@@ -9010,7 +9139,7 @@ class GlosaService:
                 for celda in linea.split("\t"):
                     celda = celda.strip()
                     if pat_moneda_col.fullmatch(celda):
-                        return f"$ {celda}"
+                        return _en_pesos_colombianos(celda)
 
         # Números deletreados en palabras (12-jun-2026, ronda 2 — fix #7):
         # "por novecientos cincuenta y dos millones de pesos" entraba como

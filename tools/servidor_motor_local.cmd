@@ -11,6 +11,30 @@ title MotorGlosasServidor
 set "REPO=C:\motor-glosas\repo"
 if not exist "%REPO%\venv\Scripts\python.exe" exit /b 1
 
+rem ---------------------------------------------------------------
+rem  UN SOLO VIGILANTE (21-08-2026).
+rem
+rem  El autodeploy corre cada 5 minutos y SIEMPRE llama a
+rem  arrancar_motor_glosas.cmd, que abre este vigilante sin preguntar
+rem  si ya hay uno. Cada pasada abria otra ventana: el PC de cartera
+rem  amanecio con CUATRO ventanas "MotorGlosasServidor" y cuatro
+rem  motores, dos de ellos en el puerto 8000.
+rem
+rem  Eso no es solo desorden. Cada motor leyo las claves y el codigo
+rem  cuando arranco, asi que pueden estar mirando bases de datos
+rem  distintas. El 20-08 eso le escondio a la auditora su consolidado
+rem  entero -1.189 facturas- y costo una tarde entera entender por que.
+rem
+rem  Se cuenta cuantos procesos corren este mismo archivo. Si hay mas
+rem  de uno, el que sobra se va en silencio. Mismo metodo que ya usa
+rem  el bucle de abajo para no arrancar dos motores.
+rem ---------------------------------------------------------------
+powershell -NoProfile -Command "$n=@(Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'servidor_motor_local'}).Count; if($n -gt 1){exit 1}else{exit 0}"
+if errorlevel 1 (
+  echo [%date% %time%] ya habia un vigilante corriendo: este sobra y se cierra >> "%REPO%\data\servidor.log"
+  exit /b 0
+)
+
 cd /d "%REPO%"
 rem Carpeta donde el motor busca los soportes.
 rem

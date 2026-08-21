@@ -135,6 +135,30 @@ def diagnostico_completo(
             "data": {},
         }
 
+    # ─── ¿Se encontró el archivo de configuración? ─────────────────────
+    # 20-08-2026. Va casi primero por la misma razón que lo de arriba: si el
+    # `.env` no se encontró, el motor corre con TODOS los valores por defecto
+    # —sin claves de IA, sin correo— y ninguna otra sección de este panel dice
+    # por qué. «No encontré el archivo» y «el archivo está vacío» se ven igual
+    # desde afuera, y así el auditor busca el problema donde no está.
+    try:
+        from app.core.config import diagnostico_del_env
+
+        _env = diagnostico_del_env()
+        out["secciones"]["configuracion"] = {
+            "estado": "ok" if _env["existe"] else "error",
+            "mensaje": (
+                f"Configuración leída de {_env['ruta']}" if _env["existe"] else _env["aviso"]
+            ),
+            "data": _env,
+        }
+    except Exception as e:  # pragma: no cover - el panel nunca se cae entero
+        out["secciones"]["configuracion"] = {
+            "estado": "warning",
+            "mensaje": f"No se pudo revisar el archivo de configuración: {e}",
+            "data": {},
+        }
+
     # ─── Base de datos (SQLite local en VM HUS o Postgres remoto) ──
     # Detecta el tipo desde DATABASE_URL: SQLite (self-hosted, default
     # desde 23-jun-2026) o Postgres (Neon antiguo). Mostrar correctamente

@@ -1,3 +1,4 @@
+import re
 import smtplib
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
@@ -48,6 +49,90 @@ def _build_html_base(titulo: str, contenido: str) -> str:
 """
 
 
+# Google muestra la contraseña de aplicación en cuatro grupos de cuatro
+# —«abcd efgh ijkl mnop»— y uno la pega tal cual, que es lo natural. Los
+# espacios son solo para leerla: no son parte de la clave. Algunos servidores
+# la aceptan igual y otros la rechazan, y el error que devuelven es el mismo
+# «Username and Password not accepted» que sale cuando la clave está de verdad
+# equivocada — así que uno se pone a generar claves nuevas sin necesidad.
+#
+# 20-08-2026. Se quitan los espacios SOLO cuando la clave tiene la forma exacta
+# de una contraseña de aplicación de Google (16 letras o números en 4 grupos de
+# 4). Cualquier otra clave se manda tal cual: hay servidores de correo donde un
+# espacio sí es parte de la contraseña, y tocarla ahí sería romperla.
+_APP_PASSWORD_GOOGLE = re.compile(r"^[A-Za-z0-9]{4}(?: [A-Za-z0-9]{4}){3}$")
+
+
+def clave_para_el_servidor(clave: str) -> str:
+    """La contraseña como la espera el servidor de correo."""
+    limpia = (clave or "").strip()
+    if _APP_PASSWORD_GOOGLE.match(limpia):
+        return limpia.replace(" ", "")
+    return limpia
+
+
+def _anotar(destinatario: str, asunto: str, aceptado: bool, error: str = "") -> None:
+    """Envoltura a prueba de todo alrededor del registro.
+
+    20-08-2026. `_anotar_envio` ya se protege por dentro, pero eso solo cubre
+    los fallos que él conoce. Si algo revienta antes —un import roto, la base
+    caída de otra forma—, la excepción subiría y tumbaría un correo que ya
+    estaba listo para salir. El registro es secundario: JAMÁS puede costar un
+    envío.
+    """
+    try:
+        _anotar_envio(destinatario, asunto, aceptado, error)
+    except Exception:  # pragma: no cover - defensivo a propósito
+        pass
+
+
+def _anotar_envio(destinatario: str, asunto: str, aceptado: bool, error: str = "") -> None:
+    """Deja constancia del intento en la base (20-08-2026).
+
+    Yesid configuró el correo y preguntó «¿cómo miro eso acá?». Hasta ahora no
+    se podía: cada correo salía sin dejar rastro en el portal, y para saber si
+    algo se había enviado había que entrar a la bandeja de Gmail de la cuenta
+    que envía — justo lo que un auditor no debería tener que hacer.
+
+    Nunca tumba un envío: si el registro falla, el correo ya salió y eso es lo
+    que importa.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import EnvioCorreoRecord
+
+        db = SessionLocal()
+        try:
+            db.add(
+                EnvioCorreoRecord(
+                    destinatario=(destinatario or "")[:200],
+                    asunto=(asunto or "")[:300],
+                    contexto=_contexto_de(asunto),
+                    aceptado=bool(aceptado),
+                    error=(error or "")[:2000] or None,
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:  # pragma: no cover - el registro es secundario
+        logger.debug(f"No se pudo anotar el envío de correo: {e}")
+
+
+def _contexto_de(asunto: str) -> str:
+    """De qué pantalla salió el correo, deducido del asunto."""
+    a = (asunto or "").lower()
+    if "prueba" in a:
+        return "prueba"
+    if "recepción" in a or "recepcion" in a:
+        return "recepcion"
+    if "vence" in a or "vencimiento" in a:
+        return "vencimientos"
+    if "lote" in a or "batch" in a:
+        return "lote"
+    return "otro"
+
+
 def _enviar_sync(
     destinatario: str,
     asunto: str,
@@ -57,6 +142,7 @@ def _enviar_sync(
     cfg = get_settings()
     if not cfg.smtp_user or not cfg.smtp_password:
         logger.warning("Email no configurado: SMTP_USER o SMTP_PASSWORD vacíos")
+        _anotar(destinatario, asunto, False, "El servidor no tiene correo configurado")
         return False
 
     try:
@@ -89,16 +175,18 @@ def _enviar_sync(
 
         with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port, timeout=30) as server:
             server.starttls()
-            server.login(cfg.smtp_user, cfg.smtp_password)
+            server.login(cfg.smtp_user, clave_para_el_servidor(cfg.smtp_password))
             server.send_message(msg)
 
         logger.info(
             f"Email enviado a {destinatario}: {asunto}"
             + (f" (con {len(adjuntos)} adjunto/s)" if adjuntos else "")
         )
+        _anotar(destinatario, asunto, True)
         return True
     except Exception as e:
         logger.error(f"Error enviando email a {destinatario}: {e}")
+        _anotar(destinatario, asunto, False, f"{type(e).__name__}: {e}")
         return False
 
 
@@ -189,14 +277,150 @@ def _buscar_emails_por_gestor(gestores_nombres: list, db=None) -> list:
             nombre_upper = u.nombre.strip().upper()
             for g in gestores_norm:
                 # Match exacto O contains (para manejar prefijos tipo
-                # "A_A_A_A (EQUIPO ASEGURADORAS)" vs "EQUIPO ASEGURADORAS")
-                if nombre_upper == g or g in nombre_upper or nombre_upper in g:
+                # "A_A_A_A (EQUIPO ASEGURADORAS)" vs "EQUIPO ASEGURADORAS").
+                #
+                # 20-08-2026: el "contains" exige 4 caracteres. Sin ese piso,
+                # una celda de gestor con una letra suelta —una «A» por un
+                # dedazo en el Excel— le mandaba el correo a 22 de los 24
+                # usuarios, porque casi todo nombre contiene una A. Cada quien
+                # recibía un plan de trabajo que no era el suyo, y el dueño de
+                # verdad podía no aparecer. Una «S» alcanzaba a 17.
+                #
+                # El match EXACTO sigue valiendo para cualquier longitud: si
+                # alguien se llama literalmente así, es esa persona.
+                if nombre_upper == g:
+                    emails.add(u.email.strip().lower())
+                    break
+                if len(g) >= 4 and (g in nombre_upper or nombre_upper in g):
                     emails.add(u.email.strip().lower())
                     break
         return sorted(emails)
     except Exception as e:
         logger.warning(f"Error buscando usuarios por gestor: {e}")
         return []
+
+
+def emails_por_gestor(gestores_nombres: list, db=None) -> dict[str, list[str]]:
+    """A qué correo concreto le llega lo de cada gestor. `{}` si no hay BD.
+
+    20-08-2026. `_buscar_emails_por_gestor` devuelve la lista de correos toda
+    junta, y con eso el resumen solo podía decir «se enviaron 3 correos». El
+    auditor no tenía cómo saber que CAROLINA se quedó por fuera, porque su
+    nombre en el Excel no coincide con ningún usuario del portal — que es la
+    falla que de verdad ocurre, no que se caiga el SMTP.
+
+    Acá se devuelve el cruce abierto: gestor → correos. El que no cruza queda
+    con lista vacía y sale nombrado en pantalla.
+    """
+    if db is None:
+        return {}
+    salida: dict[str, list[str]] = {}
+    for nombre in gestores_nombres or []:
+        if not nombre or not str(nombre).strip():
+            continue
+        salida[str(nombre)] = _buscar_emails_por_gestor([nombre], db=db)
+    return salida
+
+
+def _hay_glosas_medicas(resumen: dict) -> bool:
+    """¿El lote trae glosas de pertinencia o calidad?
+
+    Son las que no se pueden contestar desde cartera sin concepto clínico: el
+    plan de trabajo ya las marca con `con_medico`.
+    """
+    for glosas in (resumen.get("por_gestor") or {}).values():
+        for g in glosas or []:
+            if (g.get("plan") or {}).get("con_medico"):
+                return True
+    return False
+
+
+def _doctoras_nombradas(resumen: dict) -> list[str]:
+    """Las médicas que el Excel nombra en las glosas médicas del lote.
+
+    20-08-2026. El archivo del HUS trae una columna PROFESIONAL(MEDICO) que
+    dice QUÉ doctora lleva cada glosa —«LAURA DIAZ», «LEIDY SANGUINO»,
+    «ZULAY GONZALEZ»—. Con eso, a cada una le llega lo suyo en vez de
+    mandarles a las tres el lote entero: quien recibe treinta glosas que no
+    son suyas deja de abrir el correo, y ahí se pierden también las que sí.
+    """
+    nombres: list[str] = []
+    for glosas in (resumen.get("por_gestor") or {}).values():
+        for g in glosas or []:
+            plan = g.get("plan") or {}
+            if not plan.get("con_medico"):
+                continue
+            quien = (plan.get("profesional_medico") or "").strip()
+            if quien and quien.upper() not in {n.upper() for n in nombres}:
+                nombres.append(quien)
+    return nombres
+
+
+def emails_de_las_doctoras(resumen: dict, db=None) -> tuple[dict[str, str], list[str]]:
+    """Resuelve cada doctora nombrada en el lote a su correo.
+
+    Devuelve (`{nombre del Excel: correo}`, `[nombres sin correo]`).
+
+    Se usa el mismo resolvedor que para los gestores, que compara por tokens:
+    el Excel escribe «LEIDY SANGUINO» y el portal la tiene como «LEIDY JHOANA
+    SANGUINO»; sin comparar por tokens, ese correo no saldría nunca.
+    """
+    nombres = _doctoras_nombradas(resumen)
+    if not nombres or db is None:
+        return {}, nombres
+    try:
+        from app.services.recepcion_service import (
+            construir_indice_usuarios,
+            resolver_gestor_a_email,
+        )
+
+        indice = construir_indice_usuarios(db)
+    except Exception as e:  # pragma: no cover - sin índice no se inventa nada
+        logger.warning(f"No se pudo construir el índice de usuarios: {e}")
+        return {}, nombres
+
+    encontradas: dict[str, str] = {}
+    sin_correo: list[str] = []
+    for nombre in nombres:
+        email, _motivo = resolver_gestor_a_email(nombre, indice)
+        if email:
+            encontradas[nombre] = email
+        else:
+            sin_correo.append(nombre)
+    return encontradas, sin_correo
+
+
+def emails_de_medicos_auditores(db=None) -> list[str]:
+    """A qué correos llega lo médico. Vacío si nadie los ha señalado.
+
+    20-08-2026 (pedido de Yesid: «que también les llegue al correo de las
+    doctoras»). Dos maneras de decir quiénes son, y sirve cualquiera:
+
+      · `MEDICOS_AUDITORES_EMAIL` en el .env, separados por coma;
+      · el campo «equipo» del usuario, con algo que diga MEDIC.
+
+    A propósito NO se deduce del rol ni del correo: que alguien sea
+    SUPER_ADMIN, o que su correo empiece por «auditor», no lo vuelve médico.
+    Mandarle historia clínica a quien no es del área por una corazonada del
+    sistema sería peor que no mandarla.
+    """
+    correos: set[str] = set()
+    try:
+        crudo = get_settings().medicos_auditores_email or ""
+        correos.update(e.strip().lower() for e in crudo.split(",") if e.strip())
+    except Exception:  # pragma: no cover - una config rota no tumba el envío
+        pass
+
+    if db is not None:
+        try:
+            from app.models.db import UsuarioRecord
+
+            for u in db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all():
+                if u.email and "MEDIC" in (u.equipo or "").upper():
+                    correos.add(u.email.strip().lower())
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"No se pudo leer el equipo de los usuarios: {e}")
+    return sorted(correos)
 
 
 _COLOR_URGENCIA = {
@@ -324,10 +548,38 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     gestores = list(por_gestor_dict.keys())
     emails_gestores = _buscar_emails_por_gestor(gestores, db=db) if db is not None else []
 
+    # Las médicas auditoras entran SOLO si el lote trae glosas médicas: si no,
+    # se les llenaría el buzón de tarifas y facturación que no les competen, y
+    # terminarían ignorando también las que sí.
+    hay_medicas = _hay_glosas_medicas(resumen)
+    # A cada doctora lo suyo: el Excel dice quién lleva cada glosa médica.
+    doctoras, doctoras_sin_correo = (
+        emails_de_las_doctoras(resumen, db=db) if hay_medicas else ({}, [])
+    )
+    emails_medicos = sorted(set(doctoras.values()))
+    if hay_medicas and not emails_medicos:
+        # Nadie nombrado en el Excel, o ninguna resolvió: se cae a la lista
+        # del servidor para que las glosas médicas no queden sin avisar.
+        emails_medicos = emails_de_medicos_auditores(db=db)
+
     # Union sin duplicados
-    destinatarios = sorted({*(e.lower() for e in destinatarios_base), *emails_gestores})
+    destinatarios = sorted(
+        {*(e.lower() for e in destinatarios_base), *emails_gestores, *emails_medicos}
+    )
     if not destinatarios:
         logger.warning("Sin destinatarios: ni ALERTAS_EMAIL ni usuarios-gestor matcheados")
+        # Este es el peor caso y el más silencioso: NADIE recibió nada. Se
+        # deja escrito en el resumen para que salga en pantalla, en vez de un
+        # «0 correos» que se lee como si no hubiera nada que enviar.
+        resumen["correo"] = {
+            "smtp_configurado": bool(cfg.smtp_user and cfg.smtp_password),
+            "enviados": 0,
+            "intentados": 0,
+            "destinatarios": [],
+            "por_gestor": emails_por_gestor(gestores, db=db),
+            "gestores_sin_correo": sorted(g for g in gestores if g),
+            "difusion_general": sorted(destinatarios_base),
+        }
         return 0
     logger.info(
         f"Destinatarios importación recepción: {len(destinatarios)} "
@@ -418,10 +670,32 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
 
     html = _build_html_base(asunto, contenido)
     exitos = 0
+    # 20-08-2026: se anota QUÉ pasó con cada correo, uno por uno. Antes solo
+    # se devolvía el total, y un «3 de 5» no dice cuáles dos fallaron.
+    detalle: list[dict] = []
     for destinatario in destinatarios:
-        if await enviar_email(destinatario, asunto, html):
+        ok = await enviar_email(destinatario, asunto, html)
+        if ok:
             exitos += 1
+        detalle.append({"email": destinatario, "ok": bool(ok)})
     logger.info(f"Resumen de importación enviado a {exitos}/{len(destinatarios)} destinatarios")
+
+    cruce = emails_por_gestor(gestores, db=db)
+    resumen["correo"] = {
+        "smtp_configurado": bool(cfg.smtp_user and cfg.smtp_password),
+        "enviados": exitos,
+        "intentados": len(destinatarios),
+        "destinatarios": detalle,
+        "por_gestor": cruce,
+        # Los que el motor NO sabe a quién mandarle: su nombre en el Excel no
+        # coincide con ningún usuario activo del portal.
+        "gestores_sin_correo": sorted(g for g, correos in cruce.items() if not correos),
+        "difusion_general": sorted(destinatarios_base),
+        "hay_glosas_medicas": hay_medicas,
+        "medicos_auditores": emails_medicos,
+        "doctoras": doctoras,
+        "doctoras_sin_correo": doctoras_sin_correo,
+    }
     return exitos
 
 
@@ -661,13 +935,30 @@ async def enviar_excel_recepcion_con_respuestas(
     Retorna {'destinatarios', 'enviados', 'gestores_atendidos', 'broadcast_ok'}.
     """
     cfg = get_settings()
+    # 20-08-2026 (caso real de Yesid). Cuando esto devolvía «enviados: 0» a
+    # secas, la pantalla marcaba la importación como «✗ sin destinatarios» —
+    # que suena a que no se encontró a quién mandarle. Pero la causa de
+    # verdad era otra: el servidor no tiene el correo configurado. Yesid
+    # importó dos veces buscando el error donde no estaba.
+    #
+    # El motivo viaja para que la pantalla diga cuál de las tres cosas pasó.
     if not cfg.smtp_user or not cfg.smtp_password:
         logger.warning("[EXCEL-EMAIL] no enviado: SMTP_USER/SMTP_PASSWORD vacíos")
-        return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
+        return {
+            "destinatarios": 0,
+            "enviados": 0,
+            "gestores_atendidos": 0,
+            "motivo": "SIN_CORREO_CONFIG",
+        }
 
     if not excel_original:
         logger.warning("[EXCEL-EMAIL] no enviado: archivo original vacío")
-        return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
+        return {
+            "destinatarios": 0,
+            "enviados": 0,
+            "gestores_atendidos": 0,
+            "motivo": "SIN_ARCHIVO_ORIGINAL",
+        }
 
     # Imports diferidos para evitar ciclo email_service ↔ recepcion_*
     from app.services.recepcion_excel_response import (
@@ -877,4 +1168,10 @@ async def enviar_excel_recepcion_con_respuestas(
         "gestores_sin_email": gestores_sin_email,
         "gestores_detalle": gestores_detalle,
         "broadcast_ok": broadcast_ok,
+        # 20-08-2026. Sin esto, «no salió ningún correo» se mostraba SIEMPRE
+        # como «nadie a quien enviarlo», aunque sí hubiera destinatarios y lo
+        # que fallara fuera el servidor de correo. El auditor se pone a revisar
+        # la lista de gestores —que está bien— mientras el problema está en
+        # otro lado. Ya nos pasó hoy con el correo mal configurado.
+        "motivo": ("FALLO_ENVIO" if (enviados <= 0 and destinatarios_unicos) else ""),
     }

@@ -102,3 +102,70 @@ class TestLaAlertaLlegaAlPrompt:
         # factor 1.0 → no hay descuento que calcular: la calculadora de
         # factor pactado no aplica.
         assert "factor_contractual" not in sin_contrato or "SOAT" in sin_contrato
+
+
+class TestSinFechaNoSeNiegaElContrato:
+    """20-08-2026 — caso real de Yesid, TA0201 del DISPENSARIO MEDICO.
+
+    El dictamen salió con «Contrato: SIN CONTRATO PACTADO / Tarifa pactada:
+    SOAT PLENO» y, en el cuerpo, citando textual el Parágrafo 3 del contrato
+    que dice SOAT-20 %. Dos cosas malas a la vez:
+
+      · el hospital NIEGA ante la entidad un contrato que sí existió —el
+        440-DIGSA/DMBUG-2025 corrió hasta el 30/07/2026—, y
+      · al declarar SOAT PLENO frente a un pactado de SOAT-20 %, le concede a
+        la EPS justo lo que glosó: que cobró de más. En una glosa de TARIFA
+        eso es perder por escrito.
+
+    La causa: el formulario no traía fecha del servicio, así que se usó la de
+    HOY. Una glosa SIEMPRE es de un servicio pasado, y ese contrato llevaba 21
+    días vencido.
+
+    Lo que NO cambia —y por eso están las pruebas de abajo—: cuando la fecha
+    sí se conoce y ningún contrato la cubría, «SIN CONTRATO PACTADO» es un
+    hecho verificado y se mantiene, porque además SOAT pleno es más favorable
+    al hospital que el descuento pactado.
+    """
+
+    def test_sin_fecha_el_contrato_vencido_se_nombra_no_se_niega(self):
+        c = get_contrato("DISPENSARIO MEDICO")
+        assert c["numero"] != "SIN CONTRATO PACTADO"
+        assert "440-DIGSA/DMBUG-2025" in c["numero"]
+
+    def test_y_avisa_que_hay_que_mirar_la_fecha_del_servicio(self):
+        c = get_contrato("DISPENSARIO MEDICO")
+        assert "VERIFICAR LA FECHA DEL SERVICIO" in c["numero"].upper()
+        assert c.get("_vigencia_vencida") is True
+
+    def test_la_tarifa_sigue_siendo_soat_pleno(self):
+        """Sin saber la fecha no se puede aplicar un descuento pactado.
+        Aplicarlo de menos también sería un error; lo que se elimina es la
+        frase «no teníamos contrato», no la tarifa."""
+        c = get_contrato("DISPENSARIO MEDICO")
+        assert c["factor"] == 1.00
+
+    def test_con_fecha_conocida_se_mantiene_la_decision_anterior(self):
+        """La corrección es SOLO para cuando nadie dijo la fecha."""
+        c = get_contrato("COMPENSAR", dt.date(2026, 7, 29))
+        assert c["numero"] == "SIN CONTRATO PACTADO"
+        assert c["factor"] == 1.00
+        assert not c.get("_vigencia_vencida")
+
+    def test_una_entidad_sin_ningun_contrato_sigue_igual(self):
+        """«OTRA / SIN DEFINIR» nunca tuvo contrato: ahí sí es la verdad."""
+        c = get_contrato("OTRA / SIN DEFINIR")
+        assert c["numero"] == "SIN CONTRATO PACTADO"
+
+    def test_no_se_le_exige_al_dictamen_citar_un_contrato_vencido(self):
+        """Sin saber si el servicio cae dentro de la vigencia, obligar a
+        citarlo sería empujar a afirmar una cobertura que nadie verificó."""
+        from app.services.validador_dictamen import check_contrato_mencionado
+
+        r = check_contrato_mencionado("ESE HUS NO ACEPTA LA GLOSA.", "DISPENSARIO MEDICO")
+        assert r["aprobado"] is True
+
+    def test_pero_un_contrato_vigente_si_se_exige(self):
+        from app.services.validador_dictamen import check_contrato_mencionado
+
+        r = check_contrato_mencionado("ESE HUS NO ACEPTA LA GLOSA.", "FAMISANAR EPS")
+        assert r["aprobado"] is False

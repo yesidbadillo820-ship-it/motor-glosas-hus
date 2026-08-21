@@ -783,3 +783,103 @@ async def acta_excel_pdf(
         pass
 
     return HTMLResponse(content=html_impreso)
+
+
+class SimuladorConciliacionInput(BaseModel):
+    postura_hus: str
+
+
+@router.post("/{conciliacion_id}/simulador/")
+def simular_conciliacion(
+    conciliacion_id: int,
+    datos: SimuladorConciliacionInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Qué le va a contestar la EPS en la audiencia, y con qué responderle.
+
+    20-08-2026. El botón «Simular» del panel de conciliaciones existía en
+    pantalla desde hacía tiempo y llamaba a esta ruta, que NUNCA se
+    implementó: el auditor escribía su postura, esperaba, y le salía «No se
+    pudo simular». La función que hace el trabajo —`preparar_audiencia`— sí
+    estaba hecha y ya se usaba en otra pantalla; solo faltaba conectarla acá y
+    devolver los campos con los nombres que este panel espera.
+
+    Nada de esto lo inventa una IA: los contraargumentos salen del catálogo por
+    tipo de glosa y la probabilidad es la tasa REAL de levantamiento de esa EPS
+    en audiencias anteriores. Si no hay historia con esa EPS, la probabilidad
+    va vacía y en pantalla sale «—»: es preferible a poner un número inventado
+    del que después alguien tome una decisión de plata.
+    """
+    from app.services.conciliador_ia import preparar_audiencia
+
+    conc = ConciliacionRepository(db).obtener_por_id(conciliacion_id)
+    if not conc:
+        raise HTTPException(status_code=404, detail="La conciliación no existe.")
+
+    postura = (datos.postura_hus or "").strip()
+    if len(postura) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Escriba la postura del HUS con al menos 20 caracteres.",
+        )
+
+    if not conc.glosa_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Esta conciliación no está ligada a una glosa, así que no hay "
+            "historia con la cual compararla.",
+        )
+
+    material = preparar_audiencia(db, conc.glosa_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="No se encontró la glosa de esta conciliación.")
+
+    stats = material.get("estadistica_eps") or {}
+    tasa = stats.get("tasa_levantamiento_pct")
+    n_previas = stats.get("n_audiencias_previas") or 0
+
+    contras = []
+    for ca in material.get("contraargumentos") or []:
+        contras.append(
+            {
+                "titulo": ca.get("titulo", ""),
+                # El panel muestra `texto` como el argumento de la EPS y
+                # `respuesta_sugerida_hus` como la réplica del hospital.
+                "texto": ca.get("texto") or ca.get("titulo", ""),
+                "respuesta_sugerida_hus": ca.get("respuesta_sugerida", ""),
+                "frecuencia_estimada": ca.get("frecuencia_estimada", ""),
+            }
+        )
+
+    if n_previas:
+        origen = (
+            f"Histórico real: {n_previas} audiencia(s) previa(s) con esta EPS "
+            f"(no es una estimación de IA)."
+        )
+    else:
+        origen = (
+            "Sin audiencias previas registradas con esta EPS: no hay base para "
+            "estimar una probabilidad, y no se inventa una."
+        )
+
+    consejo = material.get("recomendacion_tactica") or ""
+    valor_min = material.get("valor_minimo_aceptable") or 0
+    if valor_min:
+        consejo = f"{consejo}\n\nValor mínimo aceptable sugerido: ${int(valor_min):,}".replace(
+            ",", "."
+        )
+    normas = material.get("normas_clave") or []
+    if normas:
+        consejo = f"{consejo}\n\nNormas clave: " + " · ".join(normas)
+
+    return {
+        "conciliacion_id": conciliacion_id,
+        "glosa_id": conc.glosa_id,
+        "probabilidad_exito_hus": tasa,
+        "_modelo": origen,
+        "contraargumentos": contras,
+        "consejo_estrategico": consejo.strip(),
+        "postura_hus_evaluada": postura[:2000],
+        "estadistica_eps": stats,
+    }

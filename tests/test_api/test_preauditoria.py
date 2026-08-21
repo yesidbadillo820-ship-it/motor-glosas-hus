@@ -20,7 +20,12 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth import get_password_hash
 from app.database import Base, get_db
-from app.models.db import DgReportRecord, RadicacionCuentaRecord, UsuarioRecord
+from app.models.db import (
+    DgReportRecord,
+    FacturaPreauditoriaRecord,
+    RadicacionCuentaRecord,
+    UsuarioRecord,
+)
 from app.services import preauditoria_service as svc
 
 
@@ -1460,15 +1465,23 @@ class TestCargueMasivoPorBloques:
         ]
 
     def test_conteos_exactos_cruzando_bloques(self, db_session, monkeypatch):
+        # 20-08-2026: se comparaba el diccionario COMPLETO con ==. El cargue
+        # ahora devuelve además `filas_procesadas` y `completo`, para poder
+        # decirle al auditor qué SÍ quedó guardado cuando un cargue se corta a
+        # mitad. Lo que esta prueba cuida son los CONTEOS, así que se comparan
+        # esos y no la forma exacta del diccionario.
+        def _conteos(r: dict) -> dict:
+            return {k: r[k] for k in ("nuevas", "actualizadas", "sin_cambio")}
+
         monkeypatch.setattr(svc, "TAM_BLOQUE_UPSERT", 3)  # 10 filas → 4 bloques
         filas = self._filas(10)
-        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
-            "nuevas": 10,
-            "actualizadas": 0,
-            "sin_cambio": 0,
-        }
+        primero = svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")
+        assert _conteos(primero) == {"nuevas": 10, "actualizadas": 0, "sin_cambio": 0}
+        assert primero["completo"] is True
+        assert primero["filas_procesadas"] == 10
+
         # re-subir el mismo archivo: todo sin cambio (idempotente)
-        assert svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID") == {
+        assert _conteos(svc.upsert_radicacion(db_session, filas, "a.xlsx", "YESID")) == {
             "nuevas": 0,
             "actualizadas": 0,
             "sin_cambio": 10,
@@ -1476,7 +1489,7 @@ class TestCargueMasivoPorBloques:
         # subir el archivo corregido: todo actualizado, sin duplicar
         for f in filas:
             f["valor"] += 1
-        assert svc.upsert_radicacion(db_session, filas, "b.xlsx", "YESID") == {
+        assert _conteos(svc.upsert_radicacion(db_session, filas, "b.xlsx", "YESID")) == {
             "nuevas": 0,
             "actualizadas": 10,
             "sin_cambio": 0,
@@ -1834,12 +1847,16 @@ class TestSoloAdminModificaDecididas:
         )
         assert r.status_code == 403, r.text
 
-    def test_auditor_no_revierte_una_decidida(self, client):
+    def test_auditor_no_revierte_la_decision_de_otra_persona(self, client, db_session):
+        """Desde el 20-08 cada auditor deshace LO SUYO; lo de otro, no."""
         _o, fid = self._setup(client)
         assert _radicar(client, fid).status_code == 200
+        f = db_session.get(FacturaPreauditoriaRecord, fid)
+        f.auditor = "OTRA PERSONA"
+        db_session.commit()
         r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
         assert r.status_code == 403, r.text
-        assert "revertir" in r.json()["detail"]
+        assert "OTRA PERSONA" in r.json()["detail"]
         # la decisión no cambió
         assert client.get(f"/preauditoria/facturas/{fid}").json()["resultado"] == "RADICAR"
 
@@ -2381,3 +2398,81 @@ class TestRenombrarOficio:
             "/preauditoria/oficios/9999", json={"numero_radicado": "FHUS-AS-I09999-26"}
         )
         assert r.status_code == 404
+
+
+# ------------------------------------------------------------------
+# Cada auditor deshace LO SUYO (regla acordada el 20-08-2026)
+# ------------------------------------------------------------------
+
+
+class TestDeshacerLoSuyo:
+    """Antes «Dejar pendiente» era solo de coordinación y el auditor quedaba
+    trancado con su propio error de dedo. Ahora deshace lo suyo, mientras esa
+    auditoría no haya salido del hospital en un oficio de devolución."""
+
+    def _factura(self, client, factura=F1, envio=ENV, radicado="FHUS-ROL-9"):
+        _subir_radicacion(client, [_rad_fila(envio, factura, 250700)])
+        _subir_dgreport(client, [factura])
+        o = _crear_oficio(client, radicado, "2026-07-20T08:00")
+        _escribir(client, o["id"], envio)
+        return o, _factura_id(client, factura)
+
+    def test_el_auditor_deshace_su_propia_radicacion(self, client):
+        _o, fid = self._factura(client)
+        assert _radicar(client, fid).status_code == 200
+        r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r.status_code == 200, r.text
+        assert client.get(f"/preauditoria/facturas/{fid}").json()["resultado"] == "PENDIENTE"
+
+    def test_el_auditor_deshace_su_propia_devolucion(self, client):
+        _o, fid = self._factura(client)
+        assert _devolver(client, fid).status_code == 200
+        r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r.status_code == 200, r.text
+        d = client.get(f"/preauditoria/facturas/{fid}").json()
+        assert d["resultado"] == "PENDIENTE"
+        assert d["num_devoluciones"] == 0
+
+    def test_no_deshace_lo_que_ya_salio_en_un_oficio_de_devolucion(self, client, db_session):
+        """Ese PDF ya está en manos de la entidad: eso sí es de coordinación."""
+        o, fid = self._factura(client)
+        assert _devolver(client, fid).status_code == 200
+        dev = client.post(f"/preauditoria/oficios/{o['id']}/oficio-devolucion")
+        assert dev.status_code == 200, dev.text
+        r = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r.status_code == 403, r.text
+        assert "oficio de devolución" in r.json()["detail"]
+        # Tampoco coordinación: ese PDF ya está en manos de la entidad (regla
+        # que ya existía). Para deshacerlo hay que eliminar antes el oficio de
+        # devolución.
+        _actuar_como_admin(db_session)
+        r2 = client.patch(f"/preauditoria/facturas/{fid}/auditar", json={"resultado": "PENDIENTE"})
+        assert r2.status_code == 409, r2.text
+        assert "no se puede revertir" in r2.json()["detail"]
+
+    def test_la_regla_sola_sin_pasar_por_la_pagina(self):
+        """La decide el servicio, para que el router solo la aplique."""
+        from types import SimpleNamespace
+
+        from app.services import preauditoria_service as s
+
+        propia = SimpleNamespace(factura=F1, auditor="CLAUDIA", oficio_devolucion_id=None)
+        ajena = SimpleNamespace(factura=F1, auditor="EDGAR", oficio_devolucion_id=None)
+        emitida = SimpleNamespace(factura=F1, auditor="CLAUDIA", oficio_devolucion_id=7)
+        assert s.puede_revertir(propia, "claudia", False)[0] is True
+        assert s.puede_revertir(propia, " CLAUDIA ", False)[0] is True
+        assert s.puede_revertir(ajena, "CLAUDIA", False)[0] is False
+        assert s.puede_revertir(emitida, "CLAUDIA", False)[0] is False
+        # Coordinación pasa por encima de las dos restricciones.
+        assert s.puede_revertir(ajena, "CLAUDIA", True)[0] is True
+        assert s.puede_revertir(emitida, "CLAUDIA", True)[0] is True
+
+    def test_la_factura_sin_auditor_no_la_deshace_cualquiera(self):
+        from types import SimpleNamespace
+
+        from app.services import preauditoria_service as s
+
+        huerfana = SimpleNamespace(factura=F1, auditor=None, oficio_devolucion_id=None)
+        puede, motivo = s.puede_revertir(huerfana, "CLAUDIA", False)
+        assert puede is False
+        assert "otra persona" in motivo

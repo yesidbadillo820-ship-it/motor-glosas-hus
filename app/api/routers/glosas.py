@@ -4582,6 +4582,52 @@ def listar_conceptos_glosa(
     }
 
 
+# 20-08-2026. Al pegar desde Excel lo normal es seleccionar el rango CON el
+# encabezado: es lo que hace cualquiera al arrastrar el mouse desde la primera
+# fila. Esa fila entraba como una glosa más —eps «ENTIDAD», factura «FACTURA»,
+# valor «VALOR», código «CODIGO»—, se le gastaba una llamada a la IA, quedaba
+# guardada y le aparecía al auditor en la lista y en los totales del lote.
+#
+# El filtro que había («el código mide 2 o más caracteres») la dejaba pasar,
+# porque «CODIGO» mide seis.
+_ETIQUETAS_ENCABEZADO = {
+    "entidad",
+    "eps",
+    "factura",
+    "no factura",
+    "numero factura",
+    "valor",
+    "valor glosado",
+    "valor objetado",
+    "codigo",
+    "cod",
+    "codigo glosa",
+    "concepto",
+    "concepto glosa",
+    "descripcion",
+    "cups",
+    "servicio",
+    "motivo",
+    "observacion",
+    "observaciones",
+}
+
+
+def _es_fila_de_encabezado(partes: list[str]) -> bool:
+    """¿Esta fila son los títulos de las columnas y no una glosa?
+
+    Se exige que MANDEN las etiquetas —la mitad o más de las celdas con
+    contenido—, no que aparezca una suelta: hay glosas cuyo motivo dice
+    «no coincide el valor» y no por eso son un encabezado.
+    """
+    celdas = [c.strip().lower() for c in partes if c and c.strip()]
+    if len(celdas) < 3:
+        return False
+    sin_tildes = str.maketrans("áéíóúü", "aeiouu")
+    coinciden = sum(1 for c in celdas if c.translate(sin_tildes) in _ETIQUETAS_ENCABEZADO)
+    return coinciden >= max(3, (len(celdas) + 1) // 2)
+
+
 def _parsear_filas_excel(texto: str) -> list[dict]:
     """
     Parsea el texto pegado de Excel y extrae cada fila como diccionario.
@@ -4615,6 +4661,10 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
             continue
 
         if len(partes) < 4:
+            continue
+
+        # La fila de títulos del Excel no es una glosa.
+        if _es_fila_de_encabezado(partes):
             continue
 
         # Si hay más de 8 columnas, re-unir el excedente al motivo (último campo)
@@ -4685,7 +4735,23 @@ async def _procesar_fila_en_background(
         else:
             eps_final = eps_formulario
 
-        texto_glosa = f"{fila_data['codigo']} {fila_data['valor']} {fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
+        # 20-08-2026. El valor iba suelto entre el código y la descripción:
+        #
+        #     "SO0201 125000 FALTA SOPORTE 890201 no anexan hoja"
+        #
+        # y el extractor de CUPS tomaba «125000» —los pesos glosados— como el
+        # código del procedimiento. Le ganaba incluso al CUPS de verdad (890201)
+        # que venía en su propia columna, porque el valor aparece primero. En
+        # una importación de 90 glosas eso son 90 dictámenes citando un CUPS
+        # que no existe, y la EPS cruza los CUPS contra su sistema.
+        #
+        # Basta con decir qué es ese número. El lector de CUPS ya descarta lo
+        # que el texto presenta como plata, así que etiquetarlo lo resuelve —y
+        # de paso la IA lee un texto más claro que el de antes.
+        texto_glosa = (
+            f"{fila_data['codigo']} VALOR GLOSADO {fila_data['valor']} "
+            f"{fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
+        )
 
         data = GlosaInput(
             eps=eps_final,
@@ -5925,19 +5991,60 @@ def descargar_excel_radicable_recepcion(
     del contrato. Se construye 100 % desde BD — no necesita el .xlsx
     original, por eso no aplica el 410 de archivo purgado.
     """
+    import io
+    import zipfile
+
     from fastapi.responses import StreamingResponse
 
-    from app.services.excel_radicable import generar_excel_radicable_con_nombre
+    from app.services.excel_radicable import (
+        entidades_del_lote,
+        generar_excel_radicable_con_nombre,
+    )
 
+    # 20-08-2026 (caso real de Yesid). El lote del 19 de agosto traía 29
+    # facturas de COOSALUD y 6 del DISPENSARIO MÉDICO / EJÉRCITO. Salía UN
+    # archivo rotulado «COOSALUD», con su contrato en el encabezado, pero con
+    # las 35 facturas adentro: se le radicaban a COOSALUD $10.290.042 de otro
+    # pagador. Un radicable se presenta ante UNA entidad.
+    #
+    # Ahora se arma uno por entidad. Si el lote trae una sola, se descarga el
+    # .xlsx igual que antes; si trae varias, van todas en un .zip para que no
+    # falte ninguna y ninguna termine donde no es.
     try:
-        xlsx, nombre = generar_excel_radicable_con_nombre(db, recepcion_import_id=rec_id)
+        entidades = entidades_del_lote(db, recepcion_import_id=rec_id)
     except LookupError:
         raise HTTPException(404, "Importación no encontrada")
 
+    if not entidades:
+        raise HTTPException(404, "Esa importación no tiene glosas para radicar")
+
+    if len(entidades) == 1:
+        xlsx, nombre = generar_excel_radicable_con_nombre(
+            db, recepcion_import_id=rec_id, eps_filtro=entidades[0]["eps"]
+        )
+        return StreamingResponse(
+            iter([xlsx]),
+            media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        )
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
+        for ent in entidades:
+            xlsx, nombre = generar_excel_radicable_con_nombre(
+                db, recepcion_import_id=rec_id, eps_filtro=ent["eps"]
+            )
+            z.writestr(nombre, xlsx)
+    buffer.seek(0)
+    zip_nombre = f"RADICABLES_{len(entidades)}_ENTIDADES_HUS.zip"
+    logger.info(
+        f"[excel-radicable] lote {rec_id} con {len(entidades)} entidades → "
+        + ", ".join(f"{e['sigla']}:{e['glosas']}" for e in entidades)
+    )
     return StreamingResponse(
-        iter([xlsx]),
-        media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        iter([buffer.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_nombre}"'},
     )
 
 

@@ -560,6 +560,51 @@ def get_contrato(eps: str, fecha_hecho=None) -> dict:
                 "Se aplica tarifa SOAT plena (Circular Externa 047 de 2025 del "
                 "MinSalud, Manual SOAT 2026 indexado a UVB) y Decreto 780 de 2016."
             )
+            # 20-08-2026 (caso real de Yesid, TA0201 del DISPENSARIO MEDICO).
+            # El dictamen salía con «Contrato: SIN CONTRATO PACTADO / Tarifa
+            # pactada: SOAT PLENO» y en el cuerpo citaba, textual, el Parágrafo
+            # 3 del contrato que decía SOAT-20 %. Dos cosas malas a la vez:
+            #
+            #   · el hospital NIEGA ante la entidad un contrato que sí existió
+            #     —el 440-DIGSA/DMBUG-2025 corrió hasta el 30/07/2026—, y
+            #   · al declarar SOAT PLENO frente a un pactado de SOAT-20 %, le
+            #     está concediendo a la EPS justo lo que glosó: que cobró de
+            #     más. En una glosa de TARIFA eso es perder por escrito.
+            #
+            # Por qué pasa: sin fecha del servicio en el formulario se usa la de
+            # HOY, y una glosa SIEMPRE es de un servicio pasado. El contrato
+            # llevaba 21 días vencido; el servicio es de cuando sí regía.
+            #
+            # Ojo con el alcance: cuando el formulario SÍ trae la fecha, decir
+            # «SIN CONTRATO PACTADO» es correcto y está decidido a propósito.
+            # Esto corrige únicamente el caso en que la fecha no se conoce.
+            #
+            # No se adivina la fecha del servicio —eso sería inventar—. Lo que
+            # se corrige es la afirmación falsa: el contrato se nombra, se dice
+            # que su vigencia terminó y se pide verificar la fecha del servicio.
+            # La tarifa sigue siendo SOAT pleno: sin saber la fecha no se puede
+            # aplicar un descuento pactado, y aplicarlo de más también es un
+            # error. Lo que se elimina es el «no teníamos contrato».
+            # SOLO cuando nadie dijo la fecha. Si el formulario SÍ la trajo y
+            # ningún contrato la cubría, «SIN CONTRATO PACTADO» es un hecho
+            # verificado y así debe quedar: es una decisión tomada a
+            # propósito —SOAT pleno es además más favorable al hospital que el
+            # descuento pactado— y tiene sus pruebas. Lo que no se vale es
+            # afirmarlo cuando la fecha se la inventó el sistema poniendo hoy.
+            if fecha_hecho is not None:
+                ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
+                return ficha
+
+            _vencidos = " · ".join(
+                f"{c.numero or 'sin número'} (venció "
+                f"{c.hasta.isoformat() if c.hasta else 'sin fecha de cierre'})"
+                for c in otros
+            )
+            ficha["numero"] = (
+                f"CONTRATO CON VIGENCIA TERMINADA: {_vencidos}. "
+                "VERIFICAR LA FECHA DEL SERVICIO ANTES DE RADICAR."
+            )
+            ficha["_vigencia_vencida"] = True
             ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
             return ficha
     except Exception:  # la malla nunca puede tumbar un dictamen
@@ -764,8 +809,19 @@ def extraer_datos_soporte(contexto_pdf: str) -> dict:
     if m:
         datos["medico"] = m.group(1).strip()
 
-    # Fecha atención
-    m = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", contexto_pdf)
+    # Fecha atención — SOLO si viene etiquetada.
+    #
+    # 21-08-2026: acá se tomaba la primera fecha suelta del expediente, que
+    # puede ser la de nacimiento del paciente o la de expedición de cualquier
+    # documento. Una fecha de atención equivocada arrastra al dictamen a decir
+    # que el contrato estaba vencido cuando no lo estaba. Mejor «NO
+    # IDENTIFICADA», que es lo que ya trae por defecto.
+    m = re.search(
+        r"(?:fecha\s+(?:de\s+)?(?:atenci[oó]n|prestaci[oó]n|ingreso|egreso|servicio)"
+        r"|f\.?\s*(?:atenci[oó]n|ingreso))[\s:=]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        contexto_pdf,
+        re.I,
+    )
     if m:
         datos["fecha_atencion"] = m.group(1)
 
@@ -1195,6 +1251,10 @@ Para BLINDAR la respuesta frente a una posible ratificación:
 ═══════════════ ANCLAJE PROBATORIO (cuando haya PDF con datos) ═══════════════
 Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 • "LA HISTORIA CLÍNICA FOLIO [N], SUSCRITA POR EL MÉDICO TRATANTE DR. [NOMBRE], ACREDITA..."
+  ↳ el FOLIO [N] va ÚNICAMENTE si el PDF trae ese número escrito. Si el
+    documento no está foliado, quita el folio y déjalo por fecha:
+    "LA HISTORIA CLÍNICA DEL [FECHA], SUSCRITA POR..., ACREDITA...".
+    Un folio que la EPS busca y no encuentra ratifica la glosa completa.
 • "LA EPICRISIS DE FECHA [FECHA] DOCUMENTA EL DIAGNÓSTICO [CIE-10] Y EL PROCEDIMIENTO REALIZADO..."
 • "LOS RIPS RADICADOS CONFORME A LA RESOLUCIÓN 2275/2023 CON CUV EXPEDIDO POR ADRES CONSIGNAN..."
 • "LA FACTURA ELECTRÓNICA DE VENTA CUMPLE LOS REQUISITOS DEL ART. 617 DEL ESTATUTO TRIBUTARIO Y LA RESOLUCIÓN 042/2020 DIAN."
@@ -2646,14 +2706,42 @@ def build_user_prompt(
         # cualquier "yyyy-mm-dd" o "dd/mm/yyyy" que aparezca en trazabilidad.
         import re as _re_vig
 
-        fechas_candidatas = _re_vig.findall(
-            r"\b(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{4})\b",
+        # 21-08-2026. Acá se tomaba LA PRIMERA FECHA que apareciera en
+        # cualquier parte —número de factura, radicado o los primeros 5.000
+        # caracteres de los PDF— y se trataba como la fecha de la atención.
+        #
+        # Esa primera fecha puede ser cualquier cosa: la de nacimiento del
+        # paciente, la de expedición de un documento, la de validación del
+        # CUV. Yesid analizó dos glosas de FAMISANAR y los dictámenes salieron
+        # diciendo «el servicio se prestó FUERA DE LA VIGENCIA del contrato
+        # S-13-1-03-1-04958» —y hasta «SIN CONTRATO PACTADO» en el
+        # encabezado— cuando ese contrato rige del 15/04/2026 al 14/04/2027 y
+        # el propio dictamen citaba su anexo tarifario dos párrafos más abajo.
+        #
+        # Ante la EPS eso es de lo peor que se puede escribir: quien dice que
+        # no tiene contrato vigente pierde el derecho a exigir la tarifa
+        # pactada. Y no lo causó un dato malo: lo causó adivinar.
+        #
+        # Ahora solo cuenta una fecha que venga ETIQUETADA como la de la
+        # atención o la de la factura. Si no la hay, NO se dice nada: no saber
+        # cuándo se prestó el servicio no es prueba de que el contrato estuviera
+        # vencido.
+        _texto_vig = (
             (numero_factura or "")
             + " "
             + (numero_radicado or "")
             + " "
-            + (contexto_pdf or "")[:5000],
+            + (contexto_pdf or "")[:5000]
         )
+        _m_vig = _re_vig.search(
+            r"(?:fecha\s+(?:de\s+)?(?:atenci[oó]n|prestaci[oó]n|servicio|ingreso|egreso|factura)"
+            r"|f\.?\s*(?:atenci[oó]n|factura|prestaci[oó]n)"
+            r"|fecha_atencion|fecha_factura)"
+            r"[\s:=]*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{4})",
+            _texto_vig,
+            _re_vig.IGNORECASE,
+        )
+        fechas_candidatas = [_m_vig.group(1)] if _m_vig else []
         if fechas_candidatas:
             fecha_factura_str = fechas_candidatas[0]
             v = validar_factura_en_vigencia(eps, fecha_factura_str)

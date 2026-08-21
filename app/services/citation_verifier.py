@@ -2,12 +2,15 @@
 citation_verifier.py — Valida que las normas y citas legales en el dictamen
 correspondan al texto real del corpus normativa_completa.
 
-Detecta 4 problemas comunes que la EPS usa para ratificar glosas:
+Detecta 6 problemas comunes que la EPS usa para ratificar glosas:
   1. NORMA_INEXISTENTE — dictamen cita "Res. 9999/2099" que no existe
   2. ARTICULO_FUERA_DE_NORMA — cita Art. 47 de norma que no tiene Art. 47
   3. CITA_LITERAL_FALSA — texto entrecomillado «...» que no aparece literal
   4. CITA_VACIA — comillas atribuidas a una norma pero sin texto adentro
      («.»), que hasta el 18-08-2026 salían selladas como «cita verificada»
+  5. CUPS_INEXISTENTE — código de procedimiento que no está en el catálogo
+  6. FOLIO_INVENTADO — el dictamen afirma un folio que no aparece en los
+     soportes leídos (20-08-2026); requiere que el llamador pase `evidencia`
 
 Salida: lista de issues con severidad. La UI los muestra como warnings
 debajo del dictamen y sugiere reformulación.
@@ -304,7 +307,14 @@ def _corpus_clausulas_contrato(eps: Optional[str] = None) -> str:
 
 # «CUPS 348240», «código CUPS: 871121», «CUPS890201». Se piden 6 dígitos, que
 # es como son los CUPS del Ministerio; con menos se confundiría con valores.
-PAT_CUPS = re.compile(r"\bCUPS\s*:?\s*(\d{6})\b", re.IGNORECASE)
+PAT_CUPS = re.compile(
+    r"\bCUPS\s*:?\s*(?=[A-Za-z0-9\-]*\d)([A-Za-z0-9][A-Za-z0-9\-]{2,11})\b",
+    re.IGNORECASE,
+)
+_PAT_ANIO_MANUAL = re.compile(r"^(?:19|20)\d{2}$")
+_FORMA_INSTITUCIONAL_HUS = re.compile(r"^(?:FMQ|FMO|AGMO|S|M)\d{2,6}[A-Z]?\d{0,2}$", re.IGNORECASE)
+_FORMA_CUM = re.compile(r"^\d{4,9}-\d{1,3}$")
+_FORMA_CUPS = re.compile(r"^[0-9A-Z]{6}(?:[A-Z]\d{0,2}|-\d{2})?$", re.IGNORECASE)
 
 
 def _verificar_cups(texto: str, issues: list[dict]) -> None:
@@ -336,6 +346,34 @@ def _verificar_cups(texto: str, issues: list[dict]) -> None:
             continue
         if existe:
             continue
+        if _PAT_ANIO_MANUAL.match(cups):
+            continue
+        etiqueta = None
+        if _FORMA_INSTITUCIONAL_HUS.match(cups):
+            etiqueta = "codigo institucional del HUS"
+        elif _FORMA_CUM.match(cups):
+            etiqueta = "CUM (medicamento)"
+        elif not _FORMA_CUPS.match(cups):
+            etiqueta = "codigo de otro sistema"
+        if etiqueta:
+            issues.append(
+                {
+                    "tipo": "CODIGO_NO_ES_CUPS",
+                    "severidad": "ALTA",
+                    "cita": f"CUPS {cups}",
+                    "detalle": (
+                        f"El dictamen llama CUPS al codigo {cups}, que es un {etiqueta}. "
+                        "El codigo puede ser el correcto de la factura, pero la etiqueta "
+                        "no: la EPS cruza los CUPS contra su sistema, no lo encuentra y "
+                        "ratifica la glosa completa."
+                    ),
+                    "sugerencia": (
+                        f"Deje el codigo tal cual y cambie la palabra: escriba "
+                        f"«{etiqueta} {cups}» en vez de «CUPS {cups}»."
+                    ),
+                }
+            )
+            continue
         issues.append(
             {
                 "tipo": "CUPS_INEXISTENTE",
@@ -355,7 +393,157 @@ def _verificar_cups(texto: str, issues: list[dict]) -> None:
         )
 
 
-def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
+def _verificar_folios(texto: str, issues: list[dict], evidencia: Optional[str]) -> None:
+    """Marca los folios que el dictamen cita y que no están en el expediente.
+
+    Caso real 20-08-2026. Los CUPS y los soportes ya se verificaban, pero los
+    FOLIOS no: el dictamen podía escribir «SEGÚN CONSTA EN EL FOLIO 25 DE LA
+    HISTORIA CLÍNICA» sin que nadie hubiera abierto una historia clínica, y
+    salía sellado con «citas verificadas · 0 hallazgos».
+
+    Es la afirmación más fácil de tumbar que hay: la EPS pide el folio 25, no
+    está, ratifica la glosa completa — y en el expediente queda una
+    afirmación documental falsa firmada por el hospital.
+
+    Por qué la revisión es confiable: la IA y este verificador leen EL MISMO
+    texto. Si el folio no aparece en lo que la IA tuvo a la vista, la IA no lo
+    leyó — se lo inventó.
+
+    `evidencia` es ese texto (contexto de los PDF + texto de la glosa):
+      · None  → el llamador no lo aportó; no se revisa (no se inventa un fallo).
+      · ""    → no se leyó ningún soporte: CUALQUIER folio citado es inventado.
+      · texto → se comparan uno a uno.
+    """
+    # `None` NO es lo mismo que `""`:
+    #   ""   → «se analizó sin adjuntar nada»  → se revisa y se marca.
+    #   None → «este camino no sabe qué se leyó» → no se opina.
+    #
+    # 21-08-2026. Dos llamadores pasan None a propósito y hay que dejarlos así:
+    #
+    #   · quality_gate/post_validator.check_citas_verificadas — solo recibe el
+    #     texto y la EPS; no tiene el contexto de los PDF.
+    #   · dictamen_postprocesor — BORRA las frases con citas inválidas. Si acá
+    #     se marcaran afirmaciones documentales, borraría argumentación clínica
+    #     legítima de dictámenes donde SÍ se adjuntaron soportes.
+    #
+    # Pasarles `""` para «cerrar el hueco» convertiría esto en una máquina de
+    # avisos falsos, y un aviso equivocado en cada dictamen enseña al auditor a
+    # ignorar los avisos. La protección de verdad corre en el camino de
+    # GlosaService.analizar, que sí sabe qué se leyó.
+    if evidencia is None:
+        return
+    try:
+        from app.services.extractor_folios import folios_inventados
+    except Exception:  # pragma: no cover - sin el extractor no se inventa un fallo
+        return
+
+    inventados = folios_inventados(texto or "", evidencia)
+    if not inventados:
+        return
+
+    listado = ", ".join(str(f) for f in inventados[:8])
+    if len(inventados) > 8:
+        listado += f" (y {len(inventados) - 8} más)"
+    plural = len(inventados) > 1
+    sin_soportes = not (evidencia or "").strip()
+    issues.append(
+        {
+            "tipo": "FOLIO_INVENTADO",
+            "severidad": "ALTA",
+            "cita": f"Folio{'s' if plural else ''} {listado}",
+            "detalle": (
+                (
+                    f"El dictamen cita el{'os' if plural else ''} folio{'s' if plural else ''} "
+                    f"{listado}, pero en este análisis NO se leyó ningún soporte: no había de "
+                    "dónde sacar ese número."
+                )
+                if sin_soportes
+                else (
+                    f"El dictamen cita el{'os' if plural else ''} folio{'s' if plural else ''} "
+                    f"{listado} y no aparece{'n' if plural else ''} en los soportes leídos del "
+                    "expediente."
+                )
+            )
+            + " La EPS pide ese folio, no lo encuentra y ratifica la glosa completa.",
+            "sugerencia": (
+                (
+                    # Sin un solo soporte leído no sirve mandarlo a escribir
+                    # «LA HISTORIA CLÍNICA ACREDITA…»: sería cambiar una
+                    # afirmación sin respaldo por otra.
+                    "Adjunte el soporte y vuelva a analizar, o quite la referencia "
+                    "documental: sin soportes a la vista el dictamen no puede afirmar "
+                    "qué dice la historia clínica, ni con folio ni sin él."
+                )
+                if sin_soportes
+                else (
+                    "Quite el número de folio y deje la referencia al documento "
+                    "(«LA HISTORIA CLÍNICA ACREDITA...»), o adjunte el soporte donde "
+                    "sí conste ese folio y vuelva a analizar."
+                )
+            ),
+        }
+    )
+
+
+def _verificar_afirmaciones_documentales(
+    texto: str, issues: list[dict], evidencia: Optional[str]
+) -> None:
+    """Marca lo que el dictamen afirma que dice un documento que nadie leyó.
+
+    Caso real 20-08-2026 (CL0801, AXA COLPATRIA). Yesid analizó una glosa de
+    pertinencia SIN adjuntar un solo soporte y el dictamen salió diciendo:
+
+        «…CUMPLE CON LOS CRITERIOS CLÍNICOS DEL MÉDICO TRATANTE, QUIEN
+         DOCUMENTÓ LA INDICACIÓN EN LA HISTORIA CLÍNICA INTEGRAL.»
+
+    Sin citar folio, así que la verificación de folios lo dejaba pasar y salía
+    con «7 citas contra corpus · 0 hallazgos» y el sello del Quality Gate.
+
+    Es la misma mentira sin el número. En una glosa de pertinencia, lo que
+    dice la historia clínica ES el punto en disputa: la EPS la pide, ve que la
+    afirmación no sale de ahí, y ratifica.
+
+    Solo se revisa cuando NO se leyó expediente. Con soportes a la vista haría
+    falta leerlos de verdad para saber si la frase es fiel, y marcar por las
+    dudas enseñaría al auditor a ignorar los avisos.
+    """
+    if evidencia is None:
+        return
+    try:
+        from app.services.extractor_folios import afirmaciones_documentales_sin_respaldo
+    except Exception:  # pragma: no cover - sin el extractor no se inventa un fallo
+        return
+
+    afirmaciones = afirmaciones_documentales_sin_respaldo(texto or "", evidencia)
+    if not afirmaciones:
+        return
+
+    plural = len(afirmaciones) > 1
+    issues.append(
+        {
+            "tipo": "AFIRMACION_SIN_SOPORTE",
+            "severidad": "ALTA",
+            "cita": afirmaciones[0][:160],
+            "detalle": (
+                f"El dictamen afirma lo que dice{'n' if plural else ''} un documento "
+                "clínico, pero en este análisis NO se leyó ningún soporte. El hospital "
+                "estaría certificando ante la EPS el contenido de una historia clínica "
+                "que nadie abrió" + (f" ({len(afirmaciones)} frases)." if plural else ".")
+            ),
+            "sugerencia": (
+                "Adjunte el soporte y vuelva a analizar —así la afirmación queda "
+                "respaldada—, o redacte sin afirmar contenido: pida a la EPS que "
+                "precise qué echa de menos y ofrezca el documento, sin decir qué dice."
+            ),
+        }
+    )
+
+
+def verificar_citas(
+    dictamen_html: str,
+    eps: Optional[str] = None,
+    evidencia: Optional[str] = None,
+) -> dict:
     """Escanea el dictamen y devuelve un reporte de validación.
 
     Estructura:
@@ -365,7 +553,8 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
           "issues": [
             {
               "tipo": "NORMA_INEXISTENTE" | "ARTICULO_FUERA_DE_NORMA"
-                      | "CITA_LITERAL_FALSA" | "CITA_VACIA",
+                      | "CITA_LITERAL_FALSA" | "CITA_VACIA"
+                      | "CUPS_INEXISTENTE" | "FOLIO_INVENTADO",
               "severidad": "ALTA" | "MEDIA" | "BAJA",
               "cita": str,      # lo que aparece en el dictamen
               "detalle": str,   # explicación
@@ -374,6 +563,10 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
           ],
           "tiene_problemas_graves": bool,  # alguna severidad ALTA
         }
+
+    `evidencia` es el texto que la IA tuvo a la vista para redactar (contexto
+    de los PDF + texto de la glosa). Si no se pasa, los folios NO se revisan:
+    sin saber qué leyó la IA no se puede decir que inventó nada.
 
     Si el corpus no se puede importar, devuelve reporte vacío (no rompe nada).
     """
@@ -607,6 +800,14 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
     # 6. Códigos CUPS que no existen en el catálogo oficial.
     _verificar_cups(texto, issues)
     total_citas += len(PAT_CUPS.findall(texto))
+
+    # 7. Folios que el dictamen afirma y que no están en el expediente leído.
+    _verificar_folios(texto, issues, evidencia)
+    _verificar_afirmaciones_documentales(texto, issues, evidencia)
+    if evidencia is not None:
+        from app.services.extractor_folios import folios_citados as _fc
+
+        total_citas += len(_fc(texto))
 
     ok = max(0, total_citas - len(issues))
     tiene_graves = any(i["severidad"] == "ALTA" for i in issues)

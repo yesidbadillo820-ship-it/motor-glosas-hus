@@ -206,6 +206,11 @@ def _plan_de(
         "avisos": p.avisos,
         "con_medico": p.con_medico,
         "texto_listo": p.texto_listo,
+        # 20-08-2026: QUÉ doctora lleva esta glosa. El Excel lo trae en la
+        # columna PROFESIONAL(MEDICO) y hasta ahora solo se usaba para armar
+        # el texto del plan. Con el nombre acá, el resumen le puede llegar a
+        # la doctora que de verdad la tiene, y no a las tres.
+        "profesional_medico": (profesional_medico or "").strip(),
     }
 
 
@@ -1178,12 +1183,10 @@ class RecepcionService:
                     estado = "RATIFICADA"
                     texto_ref = radicado_info or referencia
                     dictamen = _dictamen_ratificada(eps_canonica, factura, texto_ref)
-                    resumen.ratificadas += 1
                     requiere_ia = False
                 elif es_extemporanea:
                     estado = "EXTEMPORANEA"
                     dictamen = _dictamen_extemporanea(eps_canonica, factura, dias_transcurridos)
-                    resumen.extemporaneas += 1
                     requiere_ia = False
                 else:
                     estado = "RADICADA"
@@ -1292,6 +1295,21 @@ class RecepcionService:
                         resumen.glosas_ids_todas.append(nueva.id)
 
                 resumen.total += 1
+                # 20-08-2026. Estos dos se contaban arriba, al clasificar la
+                # fila — ANTES de saber si la fila iba a entrar. Una fila que
+                # después resultaba duplicada hacía `continue` y se saltaba el
+                # `total`, pero su extemporaneidad YA estaba contada.
+                #
+                # Yesid resubió el mismo archivo y la pantalla mostró «0 glosas
+                # detectadas» junto a «29 EXTEMPORÁNEAS»: dos números que no
+                # pueden ser ciertos a la vez. Peor: el aviso le sugería revisar
+                # la hoja y los encabezados del Excel, mandándolo a buscar un
+                # problema que no existía. Lo que pasaba era que las 35 ya
+                # estaban importadas.
+                if estado == "EXTEMPORANEA":
+                    resumen.extemporaneas += 1
+                elif estado == "RATIFICADA":
+                    resumen.ratificadas += 1
                 resumen.semaforo[semaforo] = resumen.semaforo.get(semaforo, 0) + 1
                 resumen.por_gestor.setdefault(gestor, []).append(
                     {

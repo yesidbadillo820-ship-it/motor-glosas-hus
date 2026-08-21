@@ -18,8 +18,9 @@ Caso de uso (Yesid mayo 2026):
   Gestor: "Necesito buscar si en los soportes cargados se encuentra
    la BACILOSCOPIA COLORACION ACIDO ALCOHOL-RESISTENTE [ZIEHL-NEELSEN]"
   IA:     [Lee los PDFs de la factura via PDF-nativo Claude]
-          "Según análisis: el servicio se encuentra en el FOLIO 25
-           de la historia clínica, fecha 28/02/2026 17:00-18:10..."
+          "Según análisis: el servicio se encuentra en la historia
+           clínica del 28/02/2026, 17:00-18:10 (folio, si el documento
+           viene foliado)..."
 
 Output estructurado en formato forense de 4 secciones:
   1. CONTEXTO DE LA GLOSA
@@ -54,7 +55,7 @@ Tu trabajo es leer los SOPORTES DOCUMENTALES de una factura específica (histori
 
 REGLAS DURAS:
 1. SOLO afirma cosas que pueden verificarse en los soportes provistos. Si no encuentras evidencia, dilo explícitamente.
-2. Cita SIEMPRE el folio o página específica donde está la evidencia (ej: "FOLIO 25", "página 4 de la historia clínica").
+2. Cita el folio o la página SOLO cuando el documento lo traiga escrito (número de folio, sello de foliación, o «Página N de M» impreso). Si el documento NO está foliado, nómbralo por su tipo y su fecha: «LA HOJA DE ATENCIÓN DE URGENCIAS DEL [fecha] REGISTRA...». Nunca escribas un número de folio que no hayas leído en el documento: la EPS busca ese folio, no lo encuentra y ratifica la glosa completa.
 3. Cuando cites textualmente lo que dice un soporte, usa COMILLAS DOBLES y mayúsculas si así está en el original.
 4. Si el gestor pregunta por un servicio/procedimiento específico, busca exhaustivamente: nombre del procedimiento, código CUPS, código FMQ, sinónimos clínicos.
 5. NO inventes folios, fechas, nombres ni datos clínicos.

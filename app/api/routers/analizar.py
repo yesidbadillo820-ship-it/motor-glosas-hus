@@ -473,7 +473,7 @@ def _agregar_banner_tarifa_post(
                         "titulo": "✅ Valor oficial HUS/SOAT conocido — defender",
                         "razon": (
                             f"El valor oficial publicado para este CUPS es "
-                            f"${oficial['valor_pactado']:,.0f} según {oficial['contrato_numero']}. "
+                            f"{_pesos_col(oficial['valor_pactado'])} según {oficial['contrato_numero']}. "
                             "Defender este valor citando la norma institucional."
                         ),
                         "valor_a_defender": val_obj,
@@ -663,7 +663,7 @@ def _construir_dictamen_aceptacion(
         tabla_valores += f"""
             <tr>
                 <td style="padding:6px 8px;color:#b91c1c;">Valor en disputa</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">$ {val_en_disputa:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">{_pesos_col(val_en_disputa)}</td>
             </tr>"""
     tabla_valores += """
         </table>
@@ -729,6 +729,31 @@ async def _persistir_y_responder(
 
     val_obj = parse_valor_cop(resultado.valor_objetado)
     val_ac = parse_valor_cop(valor_aceptado)
+
+    # 20-08-2026 (caso real de Yesid, COMPAÑIA MUNDIAL DE SEGUROS). La glosa
+    # decía "SO5801 - ausencia total de soporte de la curacion, VALOR GLOSADO
+    # 100000" y el gestor aceptó $40.000 en el formulario. El dictamen salió:
+    #
+    #     GLOSA ACEPTADA AL 100%  ·  RE9702  ·  Valor objetado $40.000
+    #
+    # Era una aceptación PARCIAL: se objetaron cien mil y se aceptaron
+    # cuarenta. Al no traer la IA el valor objetado, quedaba en cero, y el
+    # respaldo de abajo lo daba por aceptación total igualando objetado a
+    # aceptado. Radicado así, el hospital renuncia a los $60.000 que sí estaba
+    # defendiendo, y encima lo certifica con un RE9702 «aceptada al 100%».
+    #
+    # El dato estaba escrito en la propia glosa. `_extraer_valores_glosa` ya
+    # sabía leerlo —"valor glosado 100000" → objetado 100000—; nadie le
+    # preguntaba. Solo se consulta cuando la IA no trajo el valor, así que
+    # cuando sí lo trae manda la IA y esto no cambia nada.
+    if val_obj <= 0:
+        objetado_en_texto = _extraer_valores_glosa(tabla_excel or "").get("objetado", 0.0)
+        if objetado_en_texto > 0:
+            val_obj = objetado_en_texto
+            logger.info(
+                f"[{req_id}] valor objetado tomado del texto de la glosa: "
+                f"{_pesos_col(objetado_en_texto)} (la IA no lo extrajo)"
+            )
 
     _agregar_banner_tarifa_post(
         db,

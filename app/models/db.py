@@ -604,6 +604,34 @@ class SugerenciaRecord(Base):
     nota_admin = Column(Text, nullable=True)
 
 
+class EnvioCorreoRecord(Base):
+    """Cada intento de envío de correo del motor (20-08-2026).
+
+    POR QUÉ EXISTE. Yesid configuró el correo y preguntó: «¿cómo miro eso
+    acá?». Hasta ahora no se podía: cada correo salía y no quedaba ni rastro
+    en el portal. Para saber si algo se había enviado había que entrar a la
+    bandeja de Gmail de la cuenta que envía, que es justo lo que un auditor
+    no debería tener que hacer.
+
+    OJO CON LO QUE ESTO SIGNIFICA, que no es poco: acá queda si el servidor de
+    correo ACEPTÓ el mensaje. Que después LLEGUE al buzón del gestor es otra
+    cosa — si la dirección no existe, el rebote llega minutos más tarde a la
+    cuenta que envía y NO se ve desde acá. Esa distinción se dice en pantalla:
+    prometer entrega sería mentir.
+    """
+
+    __tablename__ = "envios_correo"
+
+    id = Column(Integer, primary_key=True, index=True)
+    destinatario = Column(String(200), index=True, nullable=False)
+    asunto = Column(String(300), nullable=True)
+    # De dónde salió: "recepcion", "prueba", "alertas", "excel-recepcion"…
+    contexto = Column(String(60), index=True, nullable=True)
+    aceptado = Column(Boolean, default=False, nullable=False)
+    error = Column(Text, nullable=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class LoteImportacionRecord(Base):
     """Histórico de lotes de Importación Masiva (IM Fase 1.3).
 

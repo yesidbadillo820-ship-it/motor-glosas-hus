@@ -40,6 +40,142 @@ En el paquete 31068: 2.763 de 3.262 renglones con servicio (84,7 %).
 una de punta a punta que arma los tres libros de entrada y verifica el archivo
 de salida celda por celda.
 
+## Sesión 20-ago-2026 (noche) — Rediseño de la aplicación web del ICFES
+
+De cuatro pantallas planas a un panel con el plan de estudio adentro.
+
+### Funcionalidad nueva
+- **El plan de estudio ahora vive en la aplicación**: Inicio abre en «qué te
+  toca hoy» con los bloques del día y un botón para empezar cada uno; la
+  pantalla **Plan** muestra las cuatro fases y el detalle de cualquier semana.
+- **Estudiar** (pantalla nueva): repaso del día, cuaderno de errores, las
+  competencias más flojas con botón para practicarlas, y práctica libre con
+  filtros de área, competencia, dificultad y procedencia.
+- **Progreso**: proyección al día del examen, línea del año, una mini gráfica
+  por área, competencias ordenadas, causas de error con su remedio, calendario
+  de constancia y preguntas reincidentes.
+- **Durante las preguntas**: cronómetro con el ritmo real del examen y semáforo
+  de ritmo, atajos de teclado (A-D y Enter), marcar preguntas para revisar y
+  lecturas largas en serif.
+- Barra lateral en pantallas grandes; barra inferior en celular.
+
+### Una sola fuente de verdad
+- La política del plan (fases, mezclas, piso por área, minutos por bloque) y las
+  escalas de puntaje se **exportan** desde `icfes/plan.py` y `icfes/puntaje.py`
+  en vez de reescribirse en JavaScript.
+- **`tests/test_icfes/test_nucleo_web.py`** extrae el núcleo de cálculo de la
+  plantilla, lo corre con node y lo compara contra Python: metas por área,
+  reparto de horas, puntaje, repaso espaciado y el plan completo **bloque por
+  bloque** en tres escenarios. Se salta si node no está instalado.
+
+### Color y accesibilidad
+- Paleta de gráficas validada con el script de la guía de visualización: rampa
+  secuencial monótona en claro y oscuro, y contraste ≥ 3:1 en las dos
+  superficies.
+- La primera versión coloreaba cada barra por estado; el validador la rechazó
+  (verde y rojo se confunden para daltonismo, ΔE 4,1). Se corrigió por diseño:
+  una sola serie, un solo tono, y el estado en una etiqueta con texto.
+- Tres estados de tema (claro, oscuro por sistema, oscuro elegido) con una
+  prueba que verifica que ningún color viva solo dentro de un bloque de tema.
+
+### Correcciones encontradas probando en navegador
+- Dos simulacros el mismo día se superponían en la gráfica de línea y sus zonas
+  de hover se tapaban. Ahora la serie deja un punto por día (el último) y el
+  ancho de la zona sensible se calcula desde la separación real entre puntos.
+- El calendario de constancia solo miraba hacia atrás desde hoy: con avance
+  importado decía «199 días con estudio» y salía vacío.
+- En práctica el cronómetro estaba congelado y el semáforo de ritmo siempre en
+  verde.
+
+### Pruebas
+266 en total (27 nuevas). `ruff check` y `ruff format` limpios sobre 1.229
+archivos. Recorrido completo verificado en Chromium: escritorio y celular, tema
+claro y oscuro, sin errores de JavaScript y sin desbordamiento horizontal.
+
+## Sesión 20-ago-2026 (cierre) — Bot de doble clic del ICFES y guías corregidas
+
+**Falla del primer uso real:** los comandos de la guía se corrieron desde
+`C:\Users\cartera` y Python respondió `No module named icfes`. `python -m icfes`
+requiere que la consola esté dentro de la carpeta del repositorio, y ninguna de
+las tres guías lo decía.
+
+### Cambios
+- **`tools/ICFES.cmd`** (nuevo): bot de doble clic con menú completo — hoy,
+  practicar, repasar, simulacro, progreso, plan, configurar y exportar la app.
+  Hace `cd /d "%~dp0.."` antes de llamar a Python, así que el error no puede
+  ocurrir; y verifica que Python esté instalado antes de intentar nada.
+- **`docs/GUIA_SISTEMA_ICFES.md`**, **`docs/ESTRATEGIA_ICFES_400.md`** y
+  **`README.md`**: el doble clic va primero, el `cd` aparece como paso cero y se
+  explica qué significa `No module named icfes`.
+
+### Pruebas (`tests/test_icfes/test_bots_windows.py`, 12 nuevas)
+- Los bots del ICFES se paran en la carpeta del repositorio y avisan si falta
+  Python.
+- El menú no llama a ningún subcomando que no exista en el CLI (se valida
+  contra el parser real).
+- Los bots no traen credenciales.
+- **Todos los `.cmd` del repositorio conservan finales de línea CRLF.** Esta
+  regla estaba en `.gitattributes` y en CLAUDE.md pero no tenía prueba; con LF
+  la ventana se cierra en Windows sin ejecutar nada.
+
+Total del módulo: 251 pruebas.
+
+## Sesión 20-ago-2026 — Sistema de preparación para el ICFES Saber 11 (`icfes/`)
+
+Módulo **independiente** del Motor de Glosas: no importa nada de `app/` ni de
+`tools/`, y solo usa la librería estándar de Python 3.11, así que la carpeta
+`icfes/` se puede copiar a cualquier computador y funciona.
+
+### Qué trae
+- **`icfes/dominio.py`** — el examen modelado con datos oficiales: 254 preguntas
+  calificables (41/50/50/58/55), 24 de pilotaje, pesos 3-3-3-3-1, dos sesiones
+  de 4 h 30, y las 17 competencias de las cinco áreas.
+- **`icfes/puntaje.py`** — puntaje global 0-500 con la fórmula oficial
+  (`(3·LC+3·MAT+3·SOC+3·CN+1·ING)/13 × 5`); estimación de área 0-100 con curva
+  declarada y editable (`CURVA_PUNTAJE`), siempre rotulada como estimación;
+  reparto de una meta global en metas por área; corrección por azar.
+- **`icfes/banco/`** — 110 preguntas de práctica en JSON (una por área), todas
+  con explicación y con el distractor principal identificado. Cubre las 17
+  competencias. Textos de Lectura Crítica en dominio público.
+- **`icfes/plan.py`** — plan de 50 semanas en cuatro fases, con reparto de horas
+  por peso oficial × brecha, piso del 8 % por área, día de descanso semanal,
+  última semana aliviada y 11 simulacros completos.
+- **`icfes/repaso.py`** — SM-2 adaptado; nunca programa un repaso posterior al
+  examen; deduce la calidad del repaso de acierto, tiempo y causa del error.
+- **`icfes/simulacro.py`** — simulacros con la estructura y los segundos por
+  pregunta reales; a escala cuando el banco no alcanza, avisándolo.
+- **`icfes/progreso.py`** — dominio ponderado por recencia, cuaderno de errores
+  por causa con su remedio, racha y proyección por mínimos cuadrados que declara
+  cuándo no es confiable.
+- **`icfes/almacen.py`** — SQLite local (`~/.icfes/progreso.db`).
+- **`icfes/cli.py`** — `python -m icfes iniciar|hoy|plan|practicar|simulacro|
+  repaso|progreso|banco|exportar-web`.
+- **`icfes/exportar_web.py`** + **`plantilla_web.html`** — aplicación web de un
+  solo archivo, sin red, adaptable a celular, con tema claro/oscuro y avance en
+  `localStorage`.
+- **`tools/ICFES_APP.cmd`** — bot de doble clic para Windows (CRLF).
+
+### Correcciones hechas durante el desarrollo
+- **Simulacro**: reconstruía las respuestas desde la base de datos, así que una
+  pregunta acertada en una práctica del mismo día contaba como acertada en el
+  simulacro. La ronda ahora devuelve las respuestas reales, traducidas del orden
+  barajado al orden original de la pregunta.
+- **Exportación web**: la plantilla dejaba su objeto por defecto pegado al JSON
+  inyectado (`const DATOS = {…}{…};`) y la página no cargaba. Se detectó abriendo
+  la app en Chromium. Corregido con marcas de apertura/cierre y cubierto por
+  prueba.
+- **Banco**: la primera versión concentraba el 65 % de las respuestas correctas
+  en la letra B. Como las opciones se barajan en cada práctica, el validador
+  ahora exige que ninguna explicación nombre letras y verifica el reparto.
+
+### Pruebas
+239 pruebas en `tests/test_icfes/`; `ruff check` y `ruff format` limpios.
+Recorrido completo de la app web verificado en Chromium (práctica, explicación,
+cronómetro, resultado, progreso, persistencia tras recargar) sin errores de
+JavaScript.
+
+### Documentación
+`docs/GUIA_SISTEMA_ICFES.md` y `docs/ESTRATEGIA_ICFES_400.md`.
 
 ## Sesión 10-jul-2026 — Suite Cartera HUS: herramienta multifuncional (GUI + CLI)
 

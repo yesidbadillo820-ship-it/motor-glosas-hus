@@ -26,6 +26,18 @@ from sqlalchemy.orm import Session
 from app.models.db import TarifaContratadaRecord
 
 
+def _pesos(valor) -> str:
+    """`2072200` → `$2.072.200`. Punto de miles, como se escribe en Colombia.
+
+    21-08-2026. Acá se escribía `f"{_pesos(x)}"`, que produce `$2,072,200` — con
+    COMA. En Colombia la coma es el separador decimal: eso se lee como dos con
+    setenta y dos milésimas. Yesid lo vio en el panel de tarifa pactada y en la
+    línea de «Valor en disputa». Una cifra mal escrita en una respuesta de
+    glosa es una discusión que nadie quiere tener con la EPS.
+    """
+    return "$" + f"{int(round(float(valor or 0))):,}".replace(",", ".")
+
+
 def _eps_matchea(eps_glosa: str, eps_tarifa: str) -> bool:
     """Match permisivo de EPS por tokens significativos.
 
@@ -269,14 +281,14 @@ def _recomendacion(
                 "titulo": "✅ Defender (discrepancia sobre SOAT base, no sobre descuento)",
                 "razon": (
                     f"Contrato pactado: SOAT {signo}{factor_pct:.0f}%. HUS facturó "
-                    f"${valor_facturado:,.0f}, lo que implica valor SOAT base "
-                    f"${soat_base_hus:,.0f} para el CUPS. La EPS reconoce "
-                    f"${valor_reconocido:,.0f} (implica SOAT base ${soat_base_eps:,.0f}). "
+                    f"{_pesos(valor_facturado)}, lo que implica valor SOAT base "
+                    f"{_pesos(soat_base_hus)} para el CUPS. La EPS reconoce "
+                    f"{_pesos(valor_reconocido)} (implica SOAT base {_pesos(soat_base_eps)}). "
                     "Ambas partes aplican el mismo descuento pactado — el conflicto "
                     "es sobre la tarifa SOAT oficial del CUPS. Verificar Circular "
                     "Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB — "
                     "UVB 2026 = $12.110) y el Decreto 780/2016; si HUS aplicó el "
-                    f"SOAT correcto, defender íntegramente los ${valor_facturado:,.0f}."
+                    f"SOAT correcto, defender íntegramente los {_pesos(valor_facturado)}."
                 ),
                 "valor_a_defender": valor_objetado,
                 "valor_a_aceptar": 0.0,
@@ -308,8 +320,8 @@ def _recomendacion(
             "accion": "DEFENDER_TOTAL",
             "titulo": "✅ Defender 100%",
             "razon": (
-                f"El valor facturado (${valor_facturado:,.0f}) coincide con la "
-                f"tarifa pactada (${valor_pactado:,.0f}). La glosa es "
+                f"El valor facturado ({_pesos(valor_facturado)}) coincide con la "
+                f"tarifa pactada ({_pesos(valor_pactado)}). La glosa es "
                 f"INJUSTIFICADA: la EPS no puede glosar lo que ella misma pactó."
             ),
             "valor_a_defender": valor_pactado,
@@ -322,8 +334,8 @@ def _recomendacion(
             "accion": "DEFENDER_TOTAL",
             "titulo": "✅ Defender 100% (facturado < pactado)",
             "razon": (
-                f"El hospital facturó ${valor_facturado:,.0f}, MENOR al "
-                f"pactado (${valor_pactado:,.0f}). La glosa es INJUSTIFICADA: "
+                f"El hospital facturó {_pesos(valor_facturado)}, MENOR al "
+                f"pactado ({_pesos(valor_pactado)}). La glosa es INJUSTIFICADA: "
                 f"lo cobrado está dentro del contrato."
             ),
             "valor_a_defender": valor_facturado,
@@ -347,12 +359,12 @@ def _recomendacion(
                     "accion": "DEFENDER_TOTAL_AJUSTE_INTERNO",
                     "titulo": "🛡 Defender íntegro + ajuste interno (no ceder al argumento EPS)",
                     "razon": (
-                        f"La EPS objeta ${valor_objetado:,.0f} alegando que NO hay "
+                        f"La EPS objeta {_pesos(valor_objetado)} alegando que NO hay "
                         f"contrato pactado, pero el catálogo SÍ tiene tarifa para "
-                        f"este CUPS (${valor_pactado:,.0f}). Aceptar parcial validaría "
+                        f"este CUPS ({_pesos(valor_pactado)}). Aceptar parcial validaría "
                         f"el argumento falso de la EPS. Defender íntegros los "
-                        f"${valor_objetado:,.0f}; el sobrecargo interno HUS de "
-                        f"${diferencia_abs:,.0f} se ajusta con nota crédito al "
+                        f"{_pesos(valor_objetado)}; el sobrecargo interno HUS de "
+                        f"{_pesos(diferencia_abs)} se ajusta con nota crédito al "
                         f"expediente, NO se cede a la glosa."
                     ),
                     "valor_a_defender": valor_objetado,
@@ -364,10 +376,10 @@ def _recomendacion(
                 "accion": "ACEPTAR_PARCIAL",
                 "titulo": "⚠️ Aceptar parcial por la diferencia",
                 "razon": (
-                    f"El hospital facturó ${valor_facturado:,.0f} pero la "
-                    f"tarifa pactada es ${valor_pactado:,.0f}. La diferencia "
-                    f"${diferencia_abs:,.0f} SÍ procede aceptarla; el resto "
-                    f"(${valor_a_defender:,.0f}) se defiende como pactado."
+                    f"El hospital facturó {_pesos(valor_facturado)} pero la "
+                    f"tarifa pactada es {_pesos(valor_pactado)}. La diferencia "
+                    f"{_pesos(diferencia_abs)} SÍ procede aceptarla; el resto "
+                    f"({_pesos(valor_a_defender)}) se defiende como pactado."
                 ),
                 "valor_a_defender": valor_a_defender,
                 "valor_a_aceptar": valor_a_aceptar,
@@ -378,8 +390,8 @@ def _recomendacion(
                 "accion": "REVISAR",
                 "titulo": "❗ Revisar manualmente",
                 "razon": (
-                    f"La diferencia facturado-pactado (${diferencia_abs:,.0f}) "
-                    f"EXCEDE el valor objetado por la EPS (${valor_objetado:,.0f}). "
+                    f"La diferencia facturado-pactado ({_pesos(diferencia_abs)}) "
+                    f"EXCEDE el valor objetado por la EPS ({_pesos(valor_objetado)}). "
                     f"Revisar si hay más CUPS involucrados o si la tarifa "
                     f"cargada es la correcta."
                 ),
@@ -631,7 +643,7 @@ def formato_texto_banner(info: dict) -> str:
         signo = "+" if factor > 0 else ""
         pactada_txt = f"SOAT {signo}{factor:.0f}% (factor pactado)"
     else:
-        pactada_txt = f"${t.get('valor_pactado', 0):,.0f} (valor fijo)"
+        pactada_txt = f"{_pesos(t.get('valor_pactado', 0))} (valor fijo)"
     return (
         "\n[TARIFA PACTADA ENCONTRADA EN EL CONTRATO]\n"
         f"CUPS: {t.get('codigo_cups')}\n"
@@ -640,8 +652,8 @@ def formato_texto_banner(info: dict) -> str:
         f"Contrato: {t.get('contrato_numero') or '—'}\n"
         f"Modalidad: {t.get('modalidad') or '—'}\n"
         f"Tarifa pactada: {pactada_txt}\n"
-        f"Valor facturado por HUS: ${info['valor_facturado']:,.0f}\n"
-        f"Valor objetado por EPS: ${info['valor_objetado']:,.0f}\n"
+        f"Valor facturado por HUS: {_pesos(info['valor_facturado'])}\n"
+        f"Valor objetado por EPS: {_pesos(info['valor_objetado'])}\n"
         f"Recomendación: {r.get('titulo', '—')} — {r.get('razon', '')}\n"
         "USA ESTOS DATOS EN TU DICTAMEN. Cita el número de contrato y "
         "el valor pactado exacto. Argumenta que la EPS no puede desconocer "

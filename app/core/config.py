@@ -1,8 +1,77 @@
 import logging
 import warnings
+from functools import lru_cache
+from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from functools import lru_cache
+
+
+# 20-08-2026. Acá decía `"env_file": ".env"` — una ruta RELATIVA, que Pydantic
+# resuelve contra la carpeta desde la que se arrancó el proceso, no contra la
+# del repositorio. Si el motor arranca desde otra carpeta, el .env no se
+# encuentra y TODA la configuración cae a sus valores por defecto **en
+# silencio**: sin claves de IA, sin correo, sin nada. Y no hay ningún aviso,
+# porque «no encontré el archivo» y «el archivo está vacío» se ven igual.
+#
+# Que en este repositorio ya exista `config/soportes_root.txt`, leído por ruta
+# absoluta y con un comentario explicando que las variables de entorno no
+# sobrevivían al vigilante, dice que esta clase de problema ya había mordido
+# antes por otro lado.
+#
+# Anclarlo a la raíz del repositorio lo vuelve independiente de desde dónde se
+# arranque el motor.
+# Arrancar desde una carpeta que trae SU PROPIO .env es un caso legítimo —así
+# corren las pruebas y así puede correr una segunda instancia—, y eso se
+# respeta: manda el de la carpeta actual. La raíz del repositorio es el
+# respaldo para cuando ahí no hay ninguno, que es justo el caso que estaba
+# roto.
+# 20-08-2026. El valor por defecto era `sqlite:///./glosas.db` — una ruta
+# RELATIVA, o sea relativa a la carpeta desde la que se arrancó cada motor.
+#
+# El panel de Diagnóstico del PC de cartera destapó lo que eso significa: había
+# DOS motores corriendo (puerto 8080 y puerto 8000). Arrancados desde carpetas
+# distintas, cada uno escribe en SU PROPIA base de datos. El auditor vio las
+# glosas pasar de 62 a 35 y el historial de importaciones reiniciarse: no se
+# había perdido nada, estaba en la otra base.
+#
+# Trabajar sobre una base mientras se cree estar viendo la otra es de lo peor
+# que le puede pasar a un área de cartera: se responde una glosa que en «la»
+# base sigue pendiente, y nadie se entera hasta que vence.
+#
+# Se ancla a la raíz del repositorio. PERO si ya existe una base en la carpeta
+# actual y NO en la raíz, se respeta la que existe: cambiarle la base a un
+# despliegue en marcha le escondería sus datos, que es exactamente el daño que
+# esto viene a evitar.
+def _ruta_de_la_base() -> str:
+    raiz = Path(__file__).resolve().parent.parent.parent
+    en_la_raiz = raiz / "glosas.db"
+    local = Path.cwd() / "glosas.db"
+    if local.is_file() and not en_la_raiz.is_file() and local != en_la_raiz:
+        logging.getLogger("motor_glosas").warning(
+            "[CONFIG] La base de datos está en %s, fuera de la carpeta del "
+            "repositorio. Se respeta para no esconder datos, pero conviene "
+            "moverla a %s: con dos motores corriendo desde carpetas distintas, "
+            "cada uno escribiría en una base diferente.",
+            local,
+            en_la_raiz,
+        )
+        return f"sqlite:///{local.as_posix()}"
+    return f"sqlite:///{en_la_raiz.as_posix()}"
+
+
+_RUTA_BD_POR_DEFECTO = _ruta_de_la_base()
+
+
+def _ruta_del_env() -> str:
+    local = Path.cwd() / ".env"
+    if local.is_file():
+        return str(local)
+    return str(Path(__file__).resolve().parent.parent.parent / ".env")
+
+
+_RUTA_ENV = _ruta_del_env()
+
 
 logger = logging.getLogger("motor_glosas")
 
@@ -14,7 +83,7 @@ class Settings(BaseSettings):
     # Ronda 30: URL pública para los enlaces de los correos (antes había
     # hosts viejos y contradictorios: onrender.com y fly.dev).
     app_base_url: str = "https://iaglosassinac.help"
-    database_url: str = "sqlite:///./glosas.db"
+    database_url: str = _RUTA_BD_POR_DEFECTO
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
     # 480 min = jornada laboral de 8h. Con 60 min los gestores quedaban en
@@ -106,6 +175,18 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     alertas_email: str = ""
+    # 20-08-2026 (pedido de Yesid: «que también les llegue al correo de las
+    # doctoras»). Las médicas auditoras reciben el resumen SOLO cuando el lote
+    # trae glosas médicas —pertinencia o calidad—, que son las que no se
+    # pueden contestar desde cartera sin concepto clínico.
+    #
+    # Dos maneras de decir quiénes son, y sirve cualquiera:
+    #   · MEDICOS_AUDITORES_EMAIL en el .env, separados por coma; o
+    #   · el campo «equipo» del usuario en la pantalla de Usuarios, con algo
+    #     que diga MEDIC (p. ej. «AUDITORIA MEDICA»).
+    # No se adivina por el rol ni por el correo: quién es médico es un dato
+    # del hospital, no algo que el sistema pueda deducir.
+    medicos_auditores_email: str = ""
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.5.0"
     banner_capacitacion: str = ""
@@ -128,7 +209,7 @@ class Settings(BaseSettings):
     agente_lotes_token: str = ""
 
     model_config = {
-        "env_file": ".env",
+        "env_file": _RUTA_ENV,
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
@@ -291,6 +372,60 @@ def modelo_gemini_vigente(pedido: str | None = None) -> str:
     return valor
 
 
+def diagnostico_del_env() -> dict:
+    """¿Se encontró el archivo de configuración? (20-08-2026)
+
+    La otra mitad del arreglo de la ruta. Anclar bien el `.env` evita que se
+    pierda, pero no sirve de nada si cuando falta el motor se calla: «no
+    encontré el archivo» y «el archivo está vacío» se ven exactamente igual
+    desde afuera, y el auditor termina buscando el problema donde no está.
+
+    Acá queda el dato para que la pantalla de Diagnóstico lo diga.
+    """
+    ruta = Path(_ruta_del_env())
+    existe = ruta.is_file()
+    # El descuido clásico: el Bloc de notas guarda «.env» como «.env.txt» y
+    # Windows esconde la extensión, así que en el explorador se ve bien.
+    # `.env.example` y compañía son archivos del repositorio, no descuidos:
+    # señalarlos sería ruido, y un aviso que grita por algo normal enseña a
+    # ignorar los avisos.
+    _PLANTILLAS = {".env", ".env.example", ".env.sample", ".env.template", ".env.dist"}
+    sospechosos = []
+    try:
+        carpeta = ruta.parent
+        if carpeta.is_dir():
+            sospechosos = sorted(
+                f.name
+                for f in carpeta.iterdir()
+                if f.is_file()
+                and f.name.lower().startswith(".env")
+                and f.name.lower() not in _PLANTILLAS
+            )
+    except OSError:
+        sospechosos = []
+    return {
+        "ruta": str(ruta),
+        "existe": existe,
+        "archivos_parecidos": sospechosos,
+        "aviso": (
+            ""
+            if existe
+            else (
+                f"No existe {ruta}. El motor está funcionando SOLO con las variables "
+                "del entorno: puede faltarle las claves de IA, el correo y más, sin "
+                "que nada lo diga."
+                + (
+                    f" Ojo: en esa carpeta hay {', '.join(sospechosos)} — el Bloc de "
+                    "notas suele guardar «.env» como «.env.txt» y Windows esconde la "
+                    "extensión."
+                    if sospechosos
+                    else ""
+                )
+            )
+        ),
+    }
+
+
 def _leer_configuracion() -> "Settings":
     """Construye la configuración sin que un acento pueda tumbar el portal.
 
@@ -307,6 +442,10 @@ def _leer_configuracion() -> "Settings":
     """
     import logging
 
+    _diag = diagnostico_del_env()
+    if not _diag["existe"]:
+        logging.getLogger("motor_glosas").warning("[CONFIG] %s", _diag["aviso"])
+
     try:
         return Settings()
     except UnicodeDecodeError as e:
@@ -316,7 +455,7 @@ def _leer_configuracion() -> "Settings":
             e,
         )
     try:
-        return Settings(_env_file=".env", _env_file_encoding="cp1252")
+        return Settings(_env_file=_ruta_del_env(), _env_file_encoding="cp1252")
     except Exception as e:  # noqa: BLE001 - el portal arranca igual
         logging.getLogger("motor_glosas").error(
             "No se pudo leer el .env (%s). El motor arranca SOLO con las variables "

@@ -4781,9 +4781,1312 @@ corrigen al mismo tiempo el aviso es claro en vez de un error de programa.
 
 6 pruebas nuevas.
 
+### 20-08 (noche) — El dictamen ya no puede citar un folio que nadie leyó
+
+Era el último hueco grande de la familia «la IA se lo inventa». Los **CUPS**
+ya se verificaban contra el catálogo, y los **soportes** contra el expediente
+real del servidor. Los **folios** no los revisaba nadie.
+
+**Qué pasaba.** Un dictamen podía salir con la medalla verde «citas
+verificadas · 0 hallazgos» diciendo:
+
+> «SEGÚN CONSTA EN EL FOLIO 25 DE LA HISTORIA CLÍNICA…»
+
+sin que nadie hubiera abierto una historia clínica. Es la afirmación **más
+fácil de tumbar que existe**: la EPS pide el folio 25, no lo encuentra y
+ratifica la glosa completa — y además queda en el expediente una afirmación
+documental falsa firmada por el hospital.
+
+**Por qué ahora sí se puede revisar.** La clave es simple: *la IA y el
+revisor leen exactamente el mismo texto*. Si el folio no aparece en lo que la
+IA tuvo a la vista, la IA no lo leyó: se lo inventó. Y cuando no se adjuntó
+ningún soporte, cualquier folio citado está inventado, porque no había de
+dónde sacarlo.
+
+**Qué hace el sistema ahora, en orden:**
+
+1. **Se lo devuelve a la IA para que lo corrija.** El folio inventado entra
+   como defecto crítico y dispara el reintento que ya existía, con la
+   instrucción exacta: *«no cites números de folio; refiérete al documento
+   por su nombre — LA HISTORIA CLÍNICA ACREDITA…»*. La redacción jurídica la
+   rehace la IA; el sistema **no** reescribe el texto legal a mano.
+2. **Si aun así queda, el auditor lo ve antes de radicar.** El aviso sale en
+   el recuadro rojo bajo el dictamen, la medalla de Evidencia baja a **C
+   («corregir antes de radicar»)** y **se cae el sello «VALIDADO POR QUALITY
+   GATE»**. En español claro: dice cuál es el folio, que no está en los
+   soportes leídos, y qué escribir en su lugar.
+
+**Cuidado con los falsos avisos.** Un aviso equivocado en cada dictamen
+enseña al auditor a ignorar los avisos, y ahí se pierde también el
+verdadero. Por eso quedaron probados los casos que *no* son un folio: «HOJA
+DE ADMINISTRACIÓN DE MEDICAMENTOS», «HISTORIA CLÍNICA DE 25 FOLIOS»
+(contar folios no es citar uno), «PORTAFOLIO 5» y las normas con números
+(«RESOLUCIÓN 2284 DE 2023»). Y un folio real pero poco repetido en el
+expediente tampoco se marca.
+
+**Y se corrigió la causa, no solo el síntoma.** Buscando de dónde salía el
+número apareció la razón: la instrucción que se le da al Auditor Forense
+decía, en la misma lista, dos cosas que no se pueden cumplir a la vez:
+
+> «2. Cita **SIEMPRE** el folio o página específica (ej: **"FOLIO 25"**)»
+> «5. NO inventes folios»
+
+Cuando el documento **no viene foliado** —y muchos no vienen— no hay manera
+de obedecer las dos. La IA obedece la que le manda hacer algo y se inventa
+el número. Peor: el ejemplo traía un número copiable, «FOLIO 25», que es
+**exactamente** el que salía en los dictámenes inventados.
+
+Ahora la regla dice: cite el folio **solo si el documento lo trae escrito**;
+si no está foliado, nombre el documento por su tipo y su fecha («LA HOJA DE
+ATENCIÓN DE URGENCIAS DEL 28/02/2026 REGISTRA…»). El mismo ajuste se hizo en
+el molde del dictamen, que ofrecía «LA HISTORIA CLÍNICA FOLIO [N]…» sin
+decir cuándo no usarlo.
+
+**33 pruebas nuevas**, cuatro de ellas vigilando que el cableado no se
+suelte: si mañana alguien agrega otra ruta que llame al revisor sin pasarle
+lo que leyó la IA, la prueba se pone roja.
+
+Y una salvaguarda al revés: los folios que **sí** leyó el Auditor Forense
+—el que abre los soportes antes de redactar— cuentan como leídos y no se
+marcan. Sería el peor aviso equivocado posible: castigar justamente al
+dictamen bien fundamentado.
+
 ---
 
+### 20-08 — Bot de SALUD TOTAL: notificación de glosas → cargue masivo de recepción
+
+- **Nuevo bot `tools/organizar_objeciones_saludtotal.py`** (tercer hermano de
+  SAVIA y FAMISANAR): convierte la notificación de glosas de SALUD TOTAL
+  (6 columnas, export "NotificacionGLS_…") al formato de trabajo de 16
+  columnas para el cargue masivo de recepción. Particularidades resueltas:
+  la factura llega pelada (464306 → HUS0000464306), tres textos venían con el
+  encoding dañado («Ã“» → «Ó», se reparan solos) y **Salud Total no manda el
+  código del servicio, solo el nombre** — la casilla queda vacía, o se
+  homologa por nombre con `--maestro` (acepta un OBJECIONES trabajado tipo
+  LOTE_02 o un listado código|nombre; match exacto, sin inventar).
+- Procesado el archivo real `PARA_MASIVO.xlsx`: 227 objeciones, 2 facturas
+  (HUS0000464306: 197, tipo 2; HUS0000464511: 30, tipo 0), **$67.110.206**
+  glosados. Verificación 227/227 filas fieles a la fuente. 19 pruebas nuevas
+  (149 en verde entre los 3 bots + lector de pesos).
+
+- **Notas crédito al portal de SAVIA (Conexiones):** el portal rechazaba el
+  XML de la NC 332660 con «Invalid byte 2 of 4-byte UTF-8 sequence». Causa:
+  el XML es válido, pero el portal re-codifica mal los ACENTOS al leer el
+  documento embebido (una «ó» se vuelve un byte que su lector no entiende).
+  Arreglo: **nuevo bot `tools/reparar_xml_nc_ascii.py`** — convierte los
+  acentos a entidades XML (`&#243;`), el archivo queda 100 % ASCII, el
+  contenido y las firmas DIAN internas quedan idénticos (verificado
+  canónicamente antes de escribir). Sirve por archivo o carpeta completa
+  (quedan ~124 notas por subir al portal). La NC332660 corregida se entregó
+  y quedó lista para re-subir.
+
+### 20-08 (noche) — Probamos 5 dictámenes de verdad: 3 defectos que se radicaban
+
+Yesid corrió cinco glosas de prueba en «Analizar glosa» y pegó los dictámenes
+completos. Salieron tres cosas que se estaban radicando ante las EPS:
+
+**1. Cien mil pesos convertidos en un código de procedimiento.**
+La glosa decía *«SO5801 — ausencia total de soporte de la curacion, VALOR
+GLOSADO 100000»* y el dictamen salió afirmando «SERVICIO FACTURADO **CUPS
+100000**». La causa: había DOS lectores de CUPS en el mismo archivo. Uno
+endurecido durante meses —descarta fechas, números de factura, colas de
+contrato, montos— y otro de una sola línea, que tomaba cualquier número de 5 o
+6 dígitos. **El dictamen que se radica usaba el de una línea.** Se borró el
+duplicado y se apuntó al bueno, más un filtro nuevo: si la propia glosa dice
+que ese número es plata («valor glosado», «monto», «cuantía»), es plata.
+
+*El verificador de citas sí lo atrapó* —medalla C, «CUPS 100000 no existe en el
+catálogo»— así que el aviso funcionó. Pero es mejor que el error no se escriba.
+
+**2. El dictamen se contradecía en el mismo renglón.**
+«ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE $200, CORRESPONDIENTE AL **SERVICIO
+CUBIERTO**. SE ACEPTA POR CORRESPONDER A UN **SERVICIO NO CUBIERTO**…».
+Cubierto y no cubierto a la vez. Pasaba igual en autorizaciones («AL
+PROCEDIMIENTO AUTORIZADO… SE ACEPTA POR NO ACREDITARSE LA AUTORIZACIÓN») y en
+soportes. Cuando el hospital está aceptando que algo falta, no puede afirmar en
+la misma frase que ese algo está. Se quitaron los adjetivos que califican justo
+lo que está en discusión; se conservaron los que son un hecho (el cargo se
+facturó, el procedimiento se prestó, el medicamento se dispensó).
+
+**3. Una glosa parcial radicada como «ACEPTADA AL 100%» — se regalaban $60.000.**
+La EPS objetó $100.000 y el gestor aceptó $40.000. El dictamen salió con
+**RE9702 «GLOSA ACEPTADA AL 100%»** y valor objetado $40.000. Radicado así, el
+hospital renuncia a los $60.000 que sí estaba defendiendo, y encima lo
+certifica. Pasaba porque la IA no extrajo el valor objetado, quedaba en cero, y
+un respaldo lo daba por aceptación total igualando objetado a aceptado. **El
+dato estaba escrito en la propia glosa** y el lector de valores ya sabía
+leerlo; nadie le preguntaba. Ahora se le pregunta cuando la IA no trae el
+valor. Sale correctamente **RE9801, parcial, con $60.000 en disputa**.
+
+- 17 pruebas nuevas en `tests/test_api/test_el_dictamen_no_se_contradice.py`,
+  con el texto exacto de las glosas de Yesid. Incluye las dos mitades del
+  arreglo del CUPS: que la plata ya no entre, y que un CUPS de verdad (890201,
+  898040) siga detectándose.
+- La prueba del cableado se comprobó **quitando el arreglo a propósito** para
+  ver que se pone roja; si no, no sirve de nada.
+
+### 20-08 (noche) — Y la mentira que va SIN número de folio
+
+En la misma tanda de pruebas apareció el defecto más grave de los cinco.
+Yesid analizó una glosa de pertinencia (**CL0801, AXA COLPATRIA**) **sin
+adjuntar un solo soporte**, y el dictamen salió diciendo:
+
+> «EL SERVICIO DE APOYO DIAGNÓSTICO FACTURADO CUMPLE CON LOS CRITERIOS
+> CLÍNICOS DEL MÉDICO TRATANTE, **QUIEN DOCUMENTÓ LA INDICACIÓN EN LA
+> HISTORIA CLÍNICA INTEGRAL**.»
+
+Nadie abrió una historia clínica. Y salió con medalla verde: «7 citas contra
+corpus · 0 hallazgos» y el sello «VALIDADO POR QUALITY GATE».
+
+El control de folios que se había puesto esa misma mañana **no la ve**, porque
+no cita ningún folio. Es la misma mentira sin el número: el hospital certifica
+ante la EPS lo que dice un documento que no leyó. Y en una glosa de pertinencia
+eso es justo el punto en disputa — la EPS pide la historia, ve que la
+afirmación no sale de ahí, y ratifica.
+
+**Cómo queda.** Cuando no se leyó ningún soporte, el dictamen no puede afirmar
+qué dice un documento clínico. Primero se le devuelve a la IA para que lo
+reescriba (fundamentando en contrato, normativa y carga de la prueba, y
+exigiendo a la EPS que precise qué echa de menos); si insiste, el auditor lo ve
+en pantalla como hallazgo grave, con la frase exacta que sobra.
+
+**Un detalle que salió de paso:** el consejo del control de folios decía «quite
+el folio y escriba *LA HISTORIA CLÍNICA ACREDITA…*». Sin soportes leídos, eso
+es cambiar una invención por otra. Ahora ese consejo solo aparece cuando sí hay
+expediente; sin él, el consejo es no afirmar contenido.
+
+**Regla a propósito estrecha:** solo se marca cuando **no se leyó ningún**
+soporte. Con documentos a la vista haría falta leerlos de verdad para saber si
+la frase es fiel, y un aviso equivocado es peor que ninguno — enseña al auditor
+a ignorar los avisos. Media verificación honesta vale más que una completa que
+se inventa la mitad.
+
+- 18 pruebas nuevas en
+  `tests/test_services/test_el_dictamen_no_afirma_lo_que_no_leyo.py`. Seis
+  formas de inventar quedan marcadas; y **seis frases legítimas siguen
+  pasando limpias**: «se anexa la historia clínica», «está a disposición de la
+  EPS», «obra en el expediente», «la historia clínica es el soporte exigido por
+  la Resolución 2284», «la EPS no precisó qué soporte echa de menos» y «se
+  aporta el documento de la historia clínica» (ahí «documento» es sustantivo,
+  no verbo).
+
+### 20-08 (noche) — El dictamen que le daba la razón a la EPS
+
+Tercer defecto de la misma tanda, y el que **cuesta plata**. La glosa era
+`TA0201` del **DISPENSARIO MEDICO** —mayor valor cobrado en electrodo ECG— y
+el dictamen salió diciendo, en el encabezado:
+
+> Contrato: **SIN CONTRATO PACTADO** · Tarifa pactada: **SOAT PLENO**
+
+…y en el cuerpo citaba, palabra por palabra, el **Parágrafo 3 del contrato**
+que dice **SOAT −20 %**. Dos cosas malas a la vez:
+
+1. El hospital **niega ante la entidad un contrato que sí existió** — el
+   `440-DIGSA/DMBUG-2025`, que corrió del 30/12/2025 al 30/07/2026.
+2. Al declarar SOAT pleno frente a un pactado de SOAT −20 %, **le está
+   concediendo a la EPS justo lo que glosó**: que cobró de más. En una glosa
+   de tarifa, eso es perder por escrito.
+
+**Por qué pasaba.** El formulario no traía fecha del servicio, y sin fecha el
+sistema usa **la de hoy**. Una glosa siempre es de un servicio pasado; ese
+contrato llevaba 21 días vencido, pero el servicio es de cuando sí regía.
+
+**Cómo queda.** Cuando nadie dijo la fecha, el dictamen ya no afirma que no
+había contrato: lo nombra, dice que su vigencia terminó y pide **verificar la
+fecha del servicio antes de radicar**. La tarifa sigue siendo SOAT pleno — sin
+saber la fecha no se puede aplicar un descuento pactado, y aplicarlo de menos
+también sería un error. Lo que se elimina es el «no teníamos contrato».
+
+**Lo que NO se tocó, a propósito.** Cuando la fecha **sí** se conoce y ningún
+contrato la cubría, «SIN CONTRATO PACTADO» se mantiene: es un hecho verificado
+y además SOAT pleno es más favorable al hospital que el descuento pactado. Esa
+decisión ya estaba tomada y tenía sus pruebas.
+
+> **Nota de honestidad:** el primer intento de este arreglo fue demasiado
+> amplio y puso en rojo tres pruebas que llevaban meses cuidando justamente esa
+> decisión. Las pruebas tenían razón. Se estrechó el cambio al único caso que
+> de verdad está mal —cuando la fecha se la inventa el sistema poniendo hoy—.
+
+- 7 pruebas nuevas en `tests/test_services/test_verificacion_contractual.py`,
+  al lado de las que ya cuidaban el tema.
+
+### 20-08 (noche) — Cargadas las tarifas de la Resolución 283 de 2026
+
+Yesid mandó **`TARIFAS_INSTITUCIONALES_RES_283.xlsx`**, la resolución nueva de
+tarifas institucionales del HUS. Al compararla con lo que el motor ya tenía
+cargado (Res. 054/2026 + 124/2026) salió que:
+
+- **662 procedimientos NUEVOS** que el motor no conocía. Sin ellos, cuando la
+  EPS glosaba uno de esos códigos el dictamen no podía dar el valor propio del
+  hospital. Ahí está buena parte del laboratorio: baciloscopia ($96.800),
+  troponina I ($172.700), dengue IgM ($104.000), leishmania, mycobacterium…
+- **22 tarifas que YA estaban y cambiaron de valor.** El hospital venía
+  defendiendo cifras viejas: **HIERRO TOTAL a $50.000 cuando la resolución
+  dice $66.500**; TROPONINA T a $90.900 cuando dice $109.100; renina a
+  $108.400 cuando dice $131.300. En esas glosas se estaba pidiendo de menos.
+- Ninguna igual.
+
+**Cómo quedó.** El catálogo pasó de **1.932 a 2.594 tarifas**. La 283 **se
+suma**, no reemplaza: no se dio de baja ninguna de las que hoy se usan para
+defender. Donde los dos catálogos pisan el mismo código, manda la 283 por ser
+más reciente.
+
+**Cada tarifa cita su propia resolución.** Una tarifa de la 283 cita la 283;
+una de las anteriores sigue citando la 054 + 124. La EPS verifica la norma
+citada: citar una resolución que no contiene esa tarifa es regalarle el
+argumento.
+
+**Cuatro códigos quedaron FUERA a propósito.** La resolución los publica
+repetidos con valores distintos —`399802` HEMOFILTRACIÓN VENOVENOSA sale a
+$5.450.000, $7.260.000 y $9.075.000— y no dice cuál aplica a cada caso.
+Elegir uno sería inventarle una cifra al dictamen. Cuando aparezca uno de
+esos, el motor **avisa que la tarifa está publicada por niveles y que hay que
+verificarla contra el nivel prestado**, en vez de afirmar la que no es.
+
+> **Pendiente para Yesid:** decirnos qué distingue los niveles de esos cuatro
+> códigos (399802 hemofiltración, 399502 hemoperfusión, 399601 perfusión de
+> cuerpo entero, 908338 aminoácidos/metabolitos). Con esa regla entran al
+> catálogo automático.
+
+- Para volver a cargar una resolución futura:
+  `python tools/generar_tarifas_propias_hus_json.py --res283 RUTA.xlsx`
+- 18 pruebas nuevas en `tests/test_services/test_tarifas_res_283_2026.py`,
+  incluidas las que vigilan que **no se haya perdido** ninguna tarifa vieja.
+
+### 20-08 (noche) — Importación masiva: dos defectos que salían en TODAS
+
+Se probó el botón como lo usa el auditor de verdad: seleccionar el rango en
+Excel —arrastrando desde la primera fila, que es lo normal— y pegarlo.
+
+**1. La fila de títulos entraba como una glosa.** Quedaba guardada con entidad
+«ENTIDAD», factura «FACTURA», valor «VALOR» y código «CODIGO». Se le gastaba
+una llamada a la IA, le aparecía a usted en la lista y contaba en los totales
+del lote. El filtro que había —«el código mide 2 o más caracteres»— la dejaba
+pasar, porque «CODIGO» mide seis.
+
+Ahora se reconoce y se salta. Para no comerse una glosa de verdad, se exige
+que **manden** las etiquetas (la mitad o más de las celdas llenas): una glosa
+cuyo motivo diga «el valor de la factura no coincide» sigue entrando.
+
+**2. El valor glosado se leía como si fuera el CUPS.** El texto que el
+importador le arma a la IA ponía el valor suelto:
+
+> «SO0201 **125000** FALTA SOPORTE 890201 no anexan hoja»
+
+…y el lector de códigos tomaba los **pesos glosados** como el código del
+procedimiento. **Le ganaba incluso al CUPS de verdad** (890201) que venía en
+su propia columna, porque el valor aparece primero. En una importación de 90
+glosas, eso son 90 dictámenes citando un CUPS que no existe — y la EPS cruza
+los CUPS contra su sistema.
+
+El arreglo es decir qué es ese número: ahora el texto dice «VALOR GLOSADO
+125000». El lector ya sabía descartar lo que el texto presenta como plata (se
+había puesto esa misma tarde), así que con la etiqueta se resuelve solo, y de
+paso la IA lee un texto más claro.
+
+- 14 pruebas nuevas en `tests/test_api/test_importacion_masiva_de_verdad.py`,
+  con un pegado tal cual sale de Excel (tabs, encabezado y pesos con punto).
+
+### 20-08 (noche) — Tres botones del portal que no hacían nada
+
+En `CLAUDE.md` está el caso que lo enseñó: **«Salud Total» estuvo tres meses
+devolviendo «Not Found» porque se borró su router sin mirar que la pantalla
+seguía llamándolo.** Se revisó el portal entero buscando lo mismo, comparando
+**cada llamada que hace la pantalla contra las rutas que el motor de verdad
+atiende**. Aparecieron tres funciones muertas:
+
+**1. Arrastrar una glosa en el tablero Kanban.** La tarjeta no se movía y
+salía «No se pudo cambiar el estado». Llamaba a una ruta con el método
+equivocado y, encima, a la ruta equivocada: usaba la del flujo de *aprobación*
+(BORRADOR → EN REVISIÓN → APROBADA) cuando el Kanban mueve entre RADICADA,
+RESPONDIDA y CONCILIADA, que es otra cosa. Ahora usa la correcta.
+
+**2. Crear y borrar snippets** (los atajos de texto: usted escribe `/ratif` y
+se convierte en su párrafo de ratificación completo). La tabla estaba creada
+en la base de datos y la pantalla «Gestionar mis snippets» estaba hecha. Lo
+que faltaba era el medio: el motor devolvía lista vacía y no tenía ni crear,
+ni borrar, ni contar usos. Usted abría el gestor, escribía su atajo, guardaba…
+y salía «Falló». Quedó implementado completo, incluidos los atajos de EQUIPO y
+los GLOBAL del coordinador.
+
+> Detalle que evita un dolor de cabeza: si alguien guardaba «ratif» sin la
+> barra, el atajo quedaba en la lista viéndose perfecto pero **no se expandía
+> nunca**. Ahora la barra se pone sola.
+
+**3. El simulador de conciliación.** Decía qué le va a contestar la EPS en la
+audiencia y con qué responderle. Nunca se implementó: usted escribía su
+postura, esperaba, y salía «No se pudo simular». El análisis que hace el
+trabajo ya existía y se usaba en otra pantalla; solo faltaba conectarlo.
+
+> Los contraargumentos NO los inventa una IA: salen del catálogo por tipo de
+> glosa, y la probabilidad es la **tasa real de levantamiento de esa EPS** en
+> audiencias anteriores. Si no hay historia con esa EPS, la probabilidad sale
+> vacía y en pantalla aparece «—». Es preferible a poner un número inventado
+> del que después alguien tome una decisión de plata.
+
+**Y para que no vuelva a pasar:** quedó una prueba que revisa las **246 rutas**
+que llama el portal contra las que el motor atiende. Si alguien borra un
+router y deja la pantalla llamándolo, la prueba se pone roja el mismo día.
+Se comprobó volviendo a romper el Kanban a propósito: efectivamente se pone
+roja.
+
+- 39 pruebas nuevas entre
+  `tests/test_frontend/test_el_portal_no_llama_rutas_que_no_existen.py` y
+  `tests/test_services/test_snippets_service.py`.
+
+### 20-08 (noche) — «¿Cómo compruebo que el correo le llegó a los gestores?»
+
+Pregunta de Yesid al subir el archivo de recepción. La pantalla decía **«📧
+Correos enviados: 3»** y nada más — con eso no hay forma de saber a quién le
+llegó y a quién no.
+
+**Primero, lo que hay que tener claro.** Son tres cosas distintas:
+
+1. **se armó** el correo — se ve en pantalla;
+2. **salió** del servidor sin error — ahora también se ve en pantalla;
+3. **llegó** al buzón del gestor — **esto no lo sabe ningún sistema de correo**,
+   ni el nuestro ni ninguno, salvo que el mensaje rebote.
+
+Lo que se podía mejorar era el nivel 2, y era mucho.
+
+**Ahora la pantalla dice, después de subir:**
+
+- **a qué buzón concreto salió** el correo de cada gestor (`IRMA RIOS →
+  carterahus01@sinacsc.com`);
+- **qué gestores del Excel se quedaron sin correo** porque su nombre no
+  coincide con ningún usuario del portal — con la explicación de cómo
+  arreglarlo (crear el usuario, o poner en el Excel el mismo nombre con el
+  que está registrado);
+- **cuáles rebotaron** al salir;
+- y si el servidor **no tiene correo configurado**, lo dice de frente en vez
+  de mostrar un «0» que se lee como si no hubiera nada que enviar.
+
+**La comprobación con datos reales.** Se cruzaron los 6 gestores del archivo
+del 19 de agosto (85 glosas) contra los 23 usuarios del portal:
+
+| Gestor | Glosas | Le llega a |
+|---|---|---|
+| YESID PEREZ | 35 | glosashus09 |
+| IVAN ARCINIEGAS | 26 | glosashus13 |
+| IRMA RIOS | 7 | carterahus01 |
+| MARICELA ROJAS | 7 | glosashus05 |
+| EQUIPO ASEGURADORAS | 6 | **los 4 buzones del equipo** |
+| KAREN ORTIZ | 4 | radicadevoluciones |
+
+**Los seis tienen correo.** Ese archivo sale completo.
+
+**Y de paso apareció un defecto feo.** El cruce de nombres aceptaba
+«contiene» sin exigir un mínimo de letras. Si en la casilla del gestor
+quedaba **una sola letra** —una «A» por un dedazo en el Excel— el correo le
+llegaba a **22 de los 23 usuarios**, porque casi todo nombre lleva una A. Cada
+quien habría recibido un plan de trabajo que no es el suyo, y el dueño de
+verdad podía no aparecer. Una «S» alcanzaba a 17. Ahora el «contiene» exige 4
+letras; el nombre exacto sigue valiendo para cualquier largo.
+
+- 17 pruebas nuevas en `tests/test_services/test_a_quien_le_llega_el_correo.py`,
+  **con los usuarios y los gestores reales**.
+
+### 20-08 (noche) — El radicable le metía a COOSALUD facturas del Ejército
+
+Yesid importó el lote del 19 de agosto —35 glosas— y descargó el Excel
+radicable. Salió **un solo archivo** llamado
+`RESPUESTA_GLOSAS_COOSALUD_19AGO2026_HUS.xlsx`, con el **contrato de COOSALUD
+en el encabezado** (68001C00060340-24)… y **las 35 facturas adentro**.
+
+De esas 35, **6 son del DISPENSARIO MÉDICO / EJÉRCITO**, por **$10.290.042**.
+
+Radicado así, el hospital le presenta a COOSALUD seis facturas de otro
+pagador, bajo un contrato que nada tiene que ver con ellas: COOSALUD lo
+devuelve, y de paso ve las facturas de otra entidad.
+
+**Por qué pasaba.** El archivo se rotulaba con la entidad **más frecuente** del
+lote (29 de COOSALUD contra 6 del Ejército, gana COOSALUD), pero después no se
+filtraba por ella. Nadie sacaba las otras.
+
+**Cómo queda.** Un radicable se presenta ante UNA entidad, así que ahora se
+arma **uno por entidad**. Si el lote trae una sola, se descarga el Excel igual
+que siempre; si trae varias, bajan **todas juntas en un ZIP** — así no falta
+ninguna ni termina ninguna donde no es.
+
+### Y lo del correo a las doctoras
+
+Pedido de Yesid: «que también les llegue al correo de las doctoras». Ya está:
+cuando el lote trae **glosas médicas** —pertinencia o calidad, las que no se
+pueden contestar desde cartera sin concepto clínico— el resumen les llega
+también a ellas. Si el lote no trae ninguna médica, **no** se les manda: si no,
+se les llenaría el buzón de tarifas y facturación que no les competen, y
+terminarían ignorando también las que sí importan.
+
+**Cómo señalar quiénes son** (sirve cualquiera de las dos):
+
+1. En la pantalla de **Usuarios**, escribirle `AUDITORIA MEDICA` en el campo
+   **equipo** a cada doctora. Es lo más cómodo y no necesita tocar el servidor.
+2. O configurar `MEDICOS_AUDITORES_EMAIL` en el `.env` del servidor, con los
+   correos separados por coma.
+
+A propósito **no se adivina**: que alguien sea SUPER_ADMIN, o que su correo
+empiece por «auditor», no lo vuelve médico. Mandarle historia clínica a quien
+no es del área por una corazonada del sistema sería peor que no mandarla.
+
+Y si el lote trae glosas médicas pero **nadie está señalado**, la pantalla lo
+dice en rojo con el paso a seguir, en vez de callarse.
+
+- 8 pruebas en `tests/test_services/test_el_radicable_no_mezcla_entidades.py`
+  (con las 6 facturas reales del Ejército) y 6 más en
+  `test_a_quien_le_llega_el_correo.py` para lo de las doctoras.
+- El arreglo del radicable se comprobó **quitando el filtro a propósito**: se
+  ponen 4 pruebas en rojo.
+
+### 20-08 (noche) — Por qué no salió el correo, y a cada doctora lo suyo
+
+**1. El aviso apuntaba al lugar equivocado.** Yesid importó, no salió correo, y
+la pantalla marcó la importación como **«✗ sin destinatarios»** — que se lee
+como «no encontré a quién mandarle». Importó otra vez buscando el error en la
+lista de gestores. Pero la causa era otra: **el servidor no tiene el correo
+configurado**, y ese mismo estado se ponía para las dos cosas.
+
+Un aviso que apunta al lugar equivocado hace perder más tiempo que no tener
+aviso. Ahora la pantalla distingue tres causas:
+
+| Lo que sale | Qué pasó de verdad |
+|---|---|
+| ✗ **el servidor no tiene correo configurado** | Faltan `SMTP_USER` / `SMTP_PASSWORD` |
+| ✗ nadie a quien enviarlo | Sí hay correo configurado, pero ningún gestor cruzó |
+| ✗ no quedó el archivo original | Se purgó el .xlsx del lote |
+
+**2. A cada doctora lo suyo.** Yesid confirmó que las médicas auditoras son
+**solo tres**: LAURA DIAZ, LEIDY SANGUINO y ZULAY GONZALEZ. Y mostró algo
+mejor: **el Excel ya dice cuál doctora lleva cada glosa**, en la columna
+`PROFESIONAL(MEDICO)`.
+
+Así que no se les manda a las tres el lote entero: a cada una le llega **lo
+suyo**. Quien recibe treinta glosas que no son suyas deja de abrir el correo, y
+ahí se pierden también las que sí.
+
+> **Un detalle que casi las deja sin correo:** el Excel escribe «LEIDY
+> SANGUINO» y el portal la tiene como «LEIDY JHOANA SANGUINO»; «ZULAY
+> GONZALEZ» contra «LEYDI ZULAY GONZALEZ». Comparando letra por letra, esos
+> dos correos no habrían salido nunca. Se usa la comparación por palabras que
+> ya existía para los gestores, y las tres resuelven bien.
+
+Si una glosa médica no dice qué doctora la lleva, se les avisa a todas las
+registradas — mejor eso que dejarla sin avisar. Y si el nombre del Excel no
+coincide con ningún usuario, la pantalla lo dice con el nombre exacto.
+
+- 37 pruebas en `tests/test_services/test_a_quien_le_llega_el_correo.py`, con
+  los nombres **tal como vienen en el Excel del 19 de agosto**.
+
+### 20-08 (noche) — Botón «Probar correo»: por qué no salía ninguno
+
+**El diagnóstico quedó cerrado.** Yesid corrió la consulta en el PC de cartera
+y el `.env` **no tiene absolutamente nada de correo**: ni `SMTP_USER`, ni
+`SMTP_PASSWORD`, ni `SMTP_HOST`, ni `ALERTAS_EMAIL`. Por eso salieron cero
+correos — no era problema de los gestores ni de los nombres.
+
+Lo importante: **mientras eso falte, NINGÚN correo del motor sale.** Ni el
+resumen de recepción, ni las alertas de vencimiento.
+
+**El problema de fondo era otro:** comprobarlo costaba volver a importar el
+archivo entero y mirar el resultado. Cinco minutos por intento, para algo que
+se responde en dos segundos. Por eso Yesid importó dos veces.
+
+**Ahora hay un botón «📧 Probar correo»** en el panel de Diagnóstico. Manda un
+mensaje al buzón de quien lo aprieta y dice qué pasó — sin tocar ninguna
+glosa. Y traduce los errores del servidor de correo, que son crípticos:
+
+| Lo que responde el servidor | Lo que sale en pantalla |
+|---|---|
+| `535 Username and Password not accepted` | «Con Gmail no sirve la contraseña normal: hay que generar una **contraseña de aplicación** de 16 letras» |
+| `Connection timed out` | «Suele ser el firewall del hospital bloqueando la salida» |
+| `Name or service not known` | «Revise SMTP_HOST» |
+
+La contraseña **nunca se muestra**, ni siquiera cuando está puesta: dice
+«(configurada)» y ya.
+
+**Lo que falta para que el correo funcione** (lo tiene que hacer el hospital,
+no se puede desde acá): agregar al `.env` del servidor la cuenta desde la que
+saldrán los correos y su contraseña de aplicación.
+
+- 10 pruebas en `tests/test_api/test_probar_correo.py`, incluida la que
+  verifica que la contraseña no se filtre en la respuesta.
+
+### 20-08 (noche) — Salud Total: 44 glosas ya no tumban la petición
+
+Una notificación de SALUD TOTAL trae **44 glosas**. Se analizaban de tres en
+tres, esperando hasta **120 segundos por cada una**… y el túnel por el que
+entra el portal **corta a los ~100 segundos**.
+
+O sea: **la espera de UNA SOLA glosa ya era más larga que lo que aguanta la
+conexión.** La petición se caía con un 502 y se perdía todo el trabajo que la
+IA ya había hecho —los tokens gastados incluidos—, sin que saliera ni un
+archivo.
+
+**Cómo queda.** Ahora hay un presupuesto de tiempo para todo el lote, sacado
+del corte real del túnel y no de un número inventado. Cuando se acaba, las
+glosas que falten **salen por plantilla** —que es una respuesta válida y
+radicable— en vez de arriesgar que la petición entera se caiga y no salga
+ninguna. Entre «todas con plantilla» y «ninguna», la plantilla gana sin
+discusión.
+
+| | Antes | Ahora |
+|---|---|---|
+| Espera por glosa | 120 s (fijos) | 85 s |
+| Presupuesto del lote | ninguno | 70 s |
+| Corte del túnel | ~100 s | ~100 s |
+
+El resumen ahora dice **cuántas quedaron por falta de tiempo**, aparte de las
+que fallaron: no es lo mismo, porque volviendo a correrlo esas sí pueden
+mejorar.
+
+**Lo que NO se tocó, y por eso conviene saberlo:** cada fila sale SIEMPRE con
+respuesta por plantilla aunque la IA falle. Eso ya estaba bien resuelto de
+antes, y es lo que impide el desastre de verdad — una fila vacía en el archivo
+que se radica es una glosa sin responder, y **una glosa sin responder se da
+por aceptada**: la plata se regala.
+
+- 10 pruebas en `tests/test_services/test_salud_total_no_se_pasa_del_tunel.py`,
+  incluida la que vigila que no vuelva el 120 fijo escrito a mano.
+
+### 20-08 (noche) — Un cargue que se corta a mitad ahora dice qué SÍ quedó
+
+Revisando el pendiente que decía «la importación de DGH deshace filas mientras
+el resumen dice que quedaron guardadas», resultó que **eso ya estaba bien
+resuelto**: las fuentes de Pre-auditoría se cargan por bloques y cada bloque se
+confirma apenas termina, así que una interrupción no pierde lo guardado y
+volver a subir el mismo archivo retoma donde quedó sin duplicar nada.
+
+Lo que faltaba era **contarlo**. Si el cargue reventaba en el bloque 5 de 10,
+el auditor veía un error a secas —**como si no se hubiera guardado nada**—
+cuando en realidad los cuatro anteriores ya estaban en la base. Eso lleva a
+rehacer trabajo que no hace falta o, peor, a dudar de lo que sí quedó.
+
+**Ahora dice:** «El cargue se cortó en la fila 301 de 1.000. Las 300 anteriores
+SÍ quedaron guardadas. Vuelva a subir el mismo archivo: retoma donde quedó y no
+duplica nada».
+
+También se suelta la transacción a medias. Sin eso, la sesión quedaba
+envenenada y todo lo que viniera después en esa misma petición fallaba sin
+explicación.
+
+- 7 pruebas en `tests/test_services/test_el_cargue_a_medias_se_ve.py`.
+- Una prueba vieja comparaba el diccionario COMPLETO con `==` y se puso roja
+  por las dos claves nuevas. No estaba fijando ningún defecto —solo era
+  estricta con la forma—, así que se ajustó para comparar **los conteos**, que
+  es lo que de verdad cuida.
+
+### 20-08 (noche) — El correo YA SALE, y ahora se ve desde el portal
+
+**Yesid configuró el correo en el servidor y los correos empezaron a salir.**
+Ese problema quedó cerrado.
+
+Pero en la bandeja de la cuenta que envía aparecieron los **rebotes**:
+
+> 🏥 Motor Glosas HUS — 150 glosas importadas desde recepción
+> «**Address not found** — Your message wasn't delivered…»
+> «**Message blocked**…»
+
+Es decir: el motor envía bien, pero **las direcciones de destino están
+rebotando**. `Address not found` significa que esa dirección **no existe** en
+el servidor de destino.
+
+Y preguntó cómo mirar eso desde el portal. No se podía: cada correo salía sin
+dejar rastro, y para saber si algo se había enviado había que entrar a Gmail —
+justo lo que un auditor no debería tener que hacer.
+
+**Ahora hay un botón «📬 Correos enviados»** en Diagnóstico, al lado del de
+«Probar correo». Muestra los últimos 100 intentos: a qué buzón, cuándo, si
+salió o falló, y **un resumen por dirección** — que es lo que deja ver de una
+que un buzón concentra todos los fallos.
+
+> **Lo que muestra y lo que NO, dicho en la propia pantalla:** acá queda si el
+> servidor de correo **aceptó** el mensaje. Que **llegue** al buzón es otra
+> cosa — cuando la dirección no existe, el rebote llega minutos después a la
+> cuenta que envía y **no se ve desde acá**. Prometer entrega sería mentir.
+
+**Lo que hay que revisar ahora** (es del hospital, no del motor): que las
+direcciones `@sinacsc.com` de los usuarios **existan de verdad** como buzones.
+Las que rebotan con «Address not found» no van a recibir nada por más que el
+motor las intente.
+
+- 7 pruebas en `tests/test_api/test_correos_enviados_se_ven.py`.
+- Una de ellas encontró un defecto de verdad: la protección del registro
+  estaba solo por dentro, así que un fallo inesperado **habría tumbado un
+  correo que ya iba a salir**. El registro es secundario y jamás puede costar
+  un envío: ahora está protegido también en el punto de llamada.
+
+### 20-08-2026 — Sistema de preparación para el ICFES Saber 11 (carpeta `icfes/`)
+
+**Qué se pidió:** un sistema completo para prepararse durante un año para el
+examen del ICFES (Saber 11), apuntándole a 400 puntos de 500, con unas 12 horas
+de estudio a la semana y presentación en el Calendario A de agosto de 2027.
+
+**Aclaración importante:** este trabajo NO es del Motor de Glosas ni de Cartera.
+Es un módulo aparte, guardado en la carpeta `icfes/`, que no toca ni depende de
+nada de `app/` ni de `tools/`. Se puede copiar solo a otro computador y funciona.
+
+**Qué quedó hecho:**
+
+1. **El examen modelado tal como es** (`icfes/dominio.py`): las cinco áreas con
+   sus preguntas reales (Lectura Crítica 41, Matemáticas 50, Sociales 50,
+   Ciencias Naturales 58, Inglés 55 = 254 calificables, más 24 de pilotaje que
+   no dan puntaje), los pesos oficiales (3 para todas menos Inglés que pesa 1),
+   las dos sesiones de 4 h 30 y las competencias de cada área. Si el ICFES
+   cambia algo, se cambia ese solo archivo.
+2. **Motor de puntaje** (`icfes/puntaje.py`): el puntaje global de 0 a 500 con la
+   fórmula oficial, y la traducción de «acerté 34 de 50» a un puntaje de área.
+   Esa traducción **se declara siempre como estimación**, porque el ICFES usa un
+   modelo estadístico que no se puede replicar. También calcula, para una meta
+   dada, cuántas preguntas hay que acertar en cada área.
+3. **Banco de 110 preguntas** (`icfes/banco/`, un JSON por área), todas con
+   explicación y con el aviso de **cuál es la trampa** de la pregunta. Cubre las
+   17 competencias de las cinco áreas. Los textos de Lectura Crítica son de
+   obras colombianas de dominio público (Isaacs, Silva, Rivera). Se aclara en
+   todas partes que son preguntas de práctica, no del examen real.
+4. **Plan de estudio de 50 semanas** (`icfes/plan.py`): reparte las horas según
+   cuánto pesa cada área y dónde está la brecha, en cuatro fases (Fundamentos →
+   Competencias → Entrenamiento de examen → Afinamiento), con 11 simulacros
+   completos, un día de descanso a la semana y la última semana aliviada.
+5. **Repaso espaciado** (`icfes/repaso.py`): decide qué toca repasar cada día
+   para que lo de marzo no se olvide en agosto. **Nunca programa un repaso
+   después del examen.**
+6. **Simulacros cronometrados** (`icfes/simulacro.py`) con la estructura real y
+   los segundos por pregunta del examen (2 min 15 s en la sesión 1, 2 min 1 s en
+   la 2). Como el banco todavía no llega a 254 preguntas, los simulacros se
+   arman **a escala** y el sistema lo dice en pantalla.
+7. **Cuaderno de errores y proyección** (`icfes/progreso.py`): agrupa las fallas
+   por causa (no sabía el tema, iba de afán, marqué mal…) con el remedio de cada
+   una, y proyecta a qué puntaje se llega el día del examen, avisando cuándo esa
+   proyección todavía no es confiable.
+8. **Programa de consola** (`python -m icfes ...`) y **aplicación web de un solo
+   archivo** que funciona **sin internet**, sirve en el celular y guarda el
+   avance en el navegador. En Windows se genera con doble clic en
+   `tools\ICFES_APP.cmd`.
+
+**Dos fallas encontradas durante el trabajo y corregidas:**
+
+- El simulacro reconstruía las respuestas leyendo la base de datos, así que una
+  pregunta practicada más temprano ese mismo día se contaba como acertada dentro
+  del simulacro. Ahora la ronda devuelve las respuestas reales.
+- La plantilla de la aplicación web dejaba pegado su objeto vacío al lado de los
+  datos inyectados y **la página no cargaba nada**. Se detectó abriendo la
+  aplicación en un navegador de verdad, no con pruebas de escritorio. Quedó
+  corregido con marcas de apertura y cierre, y con una prueba que lo vigila.
+
+**Comprobaciones:** 239 pruebas de `pytest` propias del módulo, `ruff` limpio
+(revisión y formato), y la aplicación web abierta en Chromium comprobando el
+recorrido completo (practicar, explicación, cronómetro, resultado, progreso y
+que el avance sobrevive al recargar), sin un solo error de JavaScript.
+
+**Documentos:** `docs/GUIA_SISTEMA_ICFES.md` (cómo se usa) y
+`docs/ESTRATEGIA_ICFES_400.md` (el plan concreto para llegar a 400).
+### 20-08 (noche) — Los soportes del .zip caían donde el índice nunca mira
+
+Último pendiente de la lista, y era real. La carpeta de soportes se resolvía
+en **dos lugares con reglas distintas**:
+
+| | El índice mira | El .zip se guarda en |
+|---|---|---|
+| 1º | **`config/soportes_root.txt`** | `SOPORTES_LOCAL_ROOT` |
+| 2º | `SOPORTES_ROOT` | `SOPORTES_ROOT` |
+| 3º | `SOPORTES_LOCAL_ROOT` | `/tmp/motor-soportes` |
+
+La subida **ni siquiera leía** `config/soportes_root.txt`, que es justamente
+donde el hospital dejó escrita la suya (`\\Prime\radicacion_2026`).
+
+**Qué pasaba:** el auditor subía un .zip de soportes, el motor decía «subido»,
+y los PDFs quedaban en una carpeta que **el índice nunca recorre**. Después
+buscaba la factura, no aparecía, y **no había forma de entender por qué** — el
+archivo estaba, pero en otro lado.
+
+**Cómo queda.** Una sola función responde «dónde viven los soportes», y la
+usan las dos: el índice y la subida. Si mañana cambia el criterio, cambia para
+las dos a la vez.
+
+- 8 pruebas en `tests/test_services/test_el_zip_cae_donde_el_indice_busca.py`,
+  incluida una que se pone roja si alguien vuelve a resolver la carpeta a mano
+  en el router — que es exactamente como nació el defecto.
+
+### 20-08 (noche) — Resubir el mismo archivo no es un error
+
+Yesid volvió a subir `GLOSAS 19 AGOSTO.xlsx` —el mismo que ya había entrado
+bien— y la pantalla le mostró:
+
+> ⚠ **Importación procesada — 0 glosas detectadas**
+> TOTAL 0 · NUEVAS 0 · ACTUALIZADAS 0 · RATIFICADAS 0 · **EXTEMPORÁNEAS 29**
+> *Posibles causas: el Excel no tiene la hoja correcta… los headers no
+> matchean…*
+
+**Dos problemas de golpe.**
+
+**1. «0 detectadas» junto a «29 extemporáneas» no pueden ser ciertas a la
+vez.** Los contadores de ratificadas y extemporáneas se sumaban al CLASIFICAR
+la fila, antes de saber si la fila iba a entrar. Una fila que después resultaba
+duplicada se saltaba el total, pero su extemporaneidad ya estaba contada. Ahora
+se cuentan cuando la fila **sí** entra.
+
+**2. El aviso lo mandaba a buscar un problema que no existía.** El archivo
+estaba perfecto: **las 35 glosas ya estaban importadas**, que es lo normal al
+volver a subir el mismo archivo. Pero la pantalla le decía que revisara la hoja
+y los encabezados.
+
+**Ahora son dos mensajes distintos, porque son dos situaciones distintas:**
+
+| Lo que pasó | Lo que sale |
+|---|---|
+| Todas ya estaban | ✅ verde: «**nada nuevo que registrar** — las 35 glosas del archivo YA estaban importadas. No se creó ninguna nueva y no se perdió nada, el archivo está bien» |
+| No se leyó ninguna fila | ⚠ ámbar: el aviso de la hoja y los encabezados, que ahí **sí** aplica |
+
+Y se agregó el contador **«YA ESTABAN»**, que antes no se veía en ninguna
+parte: el auditor no tenía cómo saber qué había pasado.
+
+- 8 pruebas en `tests/test_services/test_resubir_el_mismo_archivo_no_asusta.py`.
+
+### 20-08 (noche) — El .env podía no encontrarse, y nadie se enteraba
+
+Buscando por qué el motor decía «el correo no está configurado», apareció algo
+más grande. La configuración se leía de `".env"` — una ruta **relativa**, que
+se resuelve contra **la carpeta desde la que se arrancó el motor**, no contra
+la del repositorio.
+
+Si el motor arranca desde otra carpeta, el `.env` **no se encuentra** y toda la
+configuración cae a sus valores por defecto **en silencio**: sin claves de IA,
+sin correo, sin nada. Y no hay ningún aviso, porque «no encontré el archivo» y
+«el archivo está vacío» se ven exactamente igual.
+
+Que en este repositorio ya exista `config/soportes_root.txt` —leído por ruta
+absoluta, con un comentario explicando que las variables de entorno no
+sobrevivían al vigilante que revive el motor— dice que esta clase de problema
+**ya había mordido antes por otro lado**.
+
+**Cómo queda.** Manda el `.env` de la carpeta actual si lo hay —arrancar desde
+una carpeta con su propio `.env` es legítimo, así corren las pruebas—, y si
+no hay ninguno se usa el de la raíz del repositorio, que es el caso que estaba
+roto.
+
+> **Nota de honestidad:** el primer intento fue absoluto a secas y puso en rojo
+> dos pruebas del `.env` con acentos, que arrancan el motor desde una carpeta
+> temporal con su propio archivo. **Las pruebas tenían razón**: ese caso es
+> legítimo. Se corrigió para respetar los dos.
+
+- 8 pruebas en `tests/test_api/test_el_env_se_encuentra_siempre.py`.
+
+### Y lo del correo, con el dato en la mano
+
+La consulta al `.env` del PC de cartera salió **vacía las dos veces**:
+`SMTP_USER` y `SMTP_PASSWORD` **no están en el archivo**. Los correos que
+Yesid vio en Gmail salieron de otra configuración o de otro momento.
+
+**Lo que falta hacer en el PC de cartera:** agregar esas dos líneas al
+`C:\motor-glosas\repo\.env` y reiniciar el motor. Ojo con el Bloc de notas:
+suele guardar como `.env.txt`, y así el motor nunca lo lee.
+
+### 20-08 (noche) — Si falta el .env, ahora el motor lo dice
+
+La otra mitad del arreglo anterior. Anclar bien la ruta evita que el archivo se
+pierda, pero no sirve de nada si cuando falta **el motor se calla**: desde
+afuera, «no encontré el archivo» y «el archivo está vacío» se ven exactamente
+igual, y uno termina buscando el problema donde no está. Que es justo lo que
+nos pasó con el correo.
+
+**Ahora avisa en dos sitios:** en el registro al arrancar, y como una sección
+propia en la pantalla de **Diagnóstico**, marcada en rojo — porque sin `.env`
+el motor corre sin claves de IA y sin correo, y eso no es un detalle.
+
+Y detecta el descuido clásico de Windows: **el Bloc de notas guarda «.env» como
+«.env.txt»** y el explorador esconde la extensión, así que el archivo se ve
+bien. Si encuentra uno de esos al lado, lo nombra.
+
+> **No grita por lo normal:** `.env.example` y las demás plantillas del
+> repositorio no se señalan. Un aviso que salta por algo corriente enseña a
+> ignorar los avisos.
+
+> **Nota de honestidad:** puse la sección de primera y dos pruebas se pusieron
+> rojas. Tenían razón, y por un buen motivo: la sección del **motor** va
+> primero porque si hay dos motores corriendo ningún otro dato del panel es
+> confiable, y la **versión** va segunda. La mía quedó tercera.
+
+- 9 pruebas en `tests/test_core/test_si_falta_el_env_se_avisa.py`.
+
+### 20-08 (noche) — La contraseña de Gmail se pega con espacios
+
+Google muestra la contraseña de aplicación en cuatro grupos de cuatro —«abcd
+efgh ijkl mnop»— y uno la pega tal cual, que es lo natural. **Los espacios son
+solo para leerla**, no son parte de la clave.
+
+El problema: algunos servidores la aceptan así y otros la rechazan, y el error
+que devuelven es **el mismo** «Username and Password not accepted» que sale
+cuando la clave está de verdad equivocada. Uno se pone a generar claves nuevas
+sin necesidad.
+
+Ahora el motor le quita los espacios **solo** cuando la clave tiene la forma
+exacta de una contraseña de aplicación de Google (16 letras o números en 4
+grupos de 4). Cualquier otra se manda tal cual: hay servidores de correo donde
+un espacio **sí** es parte de la contraseña, y tocarla ahí sería romperla.
+
+- 12 pruebas en `tests/test_services/test_la_clave_de_gmail_con_espacios.py`,
+  la mitad dedicadas a lo que NO se debe tocar.
+
+### 20-08-2026 (cierre) — El sistema ICFES no arrancaba desde PowerShell
+
+**Qué pasó en el primer uso real.** Se copiaron los comandos de la guía a una
+ventana de PowerShell parada en `C:\Users\cartera` y Python respondió cuatro
+veces `No module named icfes`. **El sistema estaba bien; la carpeta estaba
+mal.** `python -m icfes` solo encuentra el módulo si la consola está parada
+dentro de la carpeta del repositorio (`C:\temp-notas`), y la guía mostraba los
+comandos sin decirlo.
+
+**Qué se hizo para que no vuelva a pasar:**
+
+1. **`tools\ICFES.cmd`** — bot de doble clic con menú: qué estudiar hoy,
+   practicar, repasar, simulacro, progreso, plan, configurar y generar la
+   aplicación web. Lo primero que hace es pararse solo en la carpeta correcta,
+   así que el error es imposible. También avisa, con instrucciones, si Python
+   no está instalado.
+2. **Las tres guías corregidas** (`docs/GUIA_SISTEMA_ICFES.md`,
+   `docs/ESTRATEGIA_ICFES_400.md` y `README.md`): ahora ponen el doble clic
+   primero, muestran el `cd C:\temp-notas` como paso cero y explican qué
+   significa el mensaje `No module named icfes` cuando aparece.
+3. **12 pruebas nuevas** (`tests/test_icfes/test_bots_windows.py`) que vigilan
+   lo que de verdad rompe estos bots: que se paren en la carpeta del
+   repositorio, que avisen si falta Python, que no llamen a comandos que no
+   existen, que no traigan contraseñas, y —esto no tenía prueba en todo el
+   repositorio— **que los 38 archivos `.cmd` conserven finales de línea de
+   Windows**. Con finales de línea de Unix, la ventana se cierra sin ejecutar
+   nada, que es una falla que ya se había sufrido antes.
+
+**Recordatorio:** la aplicación `ICFES.html` no necesita nada de esto. No pide
+Python, ni consola, ni carpeta correcta, ni internet. Doble clic y funciona,
+también en el celular.
+
+### 20-08 (noche) — EL CORREO YA FUNCIONA ✅
+
+Yesid apretó **📧 Probar correo** y el mensaje llegó a su bandeja de
+`glosashus09@sinacsc.com`.
+
+**La causa era la que se sospechaba:** la contraseña de aplicación se había
+generado en la cuenta `yesidbadillo820@gmail.com`, pero el `.env` decía
+`SMTP_USER=motorglosas@gmail.com`. Una contraseña de aplicación **solo sirve
+para la cuenta donde se generó**. Corrigió el usuario y salió a la primera.
+
+Y el detalle que importa: **llegó a un buzón `@sinacsc.com`**. Esos eran los
+que rebotaban con «Address not found» cuando salían desde la cuenta
+equivocada. Ahora sí entregan.
+
+### Y un último defecto de la misma familia
+
+La etiqueta **«✗ nadie a quien enviarlo»** era un cajón de sastre: salía
+siempre que no saliera ningún correo, **aunque sí hubiera destinatarios y lo
+que fallara fuera el servidor de correo**. Eso manda al auditor a revisar la
+lista de gestores —que está bien— mientras el problema está en otro lado.
+
+Nos pasó hoy mismo: con el correo mal configurado, la pantalla decía «nadie a
+quien enviarlo».
+
+Ahora hay una etiqueta aparte: **«✗ el servidor de correo rechazó el envío»**.
+
+- 7 pruebas en `tests/test_services/test_el_correo_no_dice_nadie_cuando_si_habia.py`,
+  incluidas las que comprueban que los demás estados (ENVIADO, PARCIAL, sin
+  correo configurado, sin archivo) **no cambian**.
+
+### 20-08 (noche) — Dos motores escribiendo en dos bases distintas
+
+**Lo destapó el propio panel de Diagnóstico** del PC de cartera:
+
+> ⚠️ Hay 2 motores distintos corriendo en este equipo
+> (PID 7504 puerto 8080, PID 14328 puerto 8000)
+
+Y la base de datos se guardaba en **ruta relativa** (`sqlite:///./glosas.db`),
+o sea **relativa a la carpeta desde la que arrancó cada motor**. Arrancados
+desde carpetas distintas, **cada uno escribe en su propia base de datos**.
+
+**Eso explica lo que Yesid vio:** las glosas pasaron de **62 a 35** y el
+historial de importaciones se reinició. **No se perdió nada** — está en la otra
+base.
+
+**Por qué es de lo más grave que puede pasar:** trabajar sobre una base
+creyendo estar viendo la otra significa responder una glosa que en «la» base
+sigue pendiente, y **nadie se entera hasta que vence**.
+
+**Cómo queda.** La base se ancla a la carpeta del repositorio, arranque el
+motor desde donde arranque. Pero si un despliegue **ya tiene** su base en otra
+carpeta, se respeta la que existe y se avisa en el registro: cambiársela le
+escondería sus datos, que es justo el daño que esto viene a evitar. Y un
+`DATABASE_URL` puesto a mano sigue mandando sobre todo.
+
+**Lo que hay que hacer en el PC de cartera:** apagar el motor sobrante del
+puerto 8000. El del 8080 es el que sirve la página por internet.
+
+- 6 pruebas en `tests/test_core/test_la_base_no_depende_de_la_carpeta.py`.
+
+---
+
+### 20-08-2026 (noche) — La aplicación del ICFES quedó rediseñada
+
+**Qué se pidió:** que la aplicación fuera más práctica, más profesional, más
+intuitiva, más detallada y que no se sintiera tan plana.
+
+**Lo que le faltaba de fondo no era el color: era el plan.** La primera versión
+tenía el banco de preguntas y los simulacros, pero el plan de estudio vivía
+solo en la consola. Ahora la aplicación abre en «qué te toca hoy», con los
+bloques del día y un botón para empezar cada uno.
+
+**Lo que cambió:**
+
+1. **Seis pantallas** en vez de cuatro: se agregaron **Plan** (las cuatro fases
+   con el detalle de cualquier semana) y una pantalla de **Estudiar** que reúne
+   el repaso del día, el cuaderno de errores, las competencias más flojas con
+   su botón de practicar, y la práctica libre con filtros.
+2. **Gráficas de verdad:** la línea del puntaje en el año con la meta marcada y
+   globo de datos al pasar el mouse; barras por área con la marca de la meta de
+   cada una; una mini gráfica por cada prueba; el calendario de constancia del
+   año; y las causas de error con su remedio al lado.
+3. **Durante las preguntas:** cronómetro que corre con el ritmo real del examen
+   (un punto que pasa de verde a ámbar y a rojo cuando te demoras de más),
+   atajos de teclado para responder, y las lecturas largas en letra serif.
+4. **En el computador** aparece una barra lateral fija; en el celular, la barra
+   de abajo de siempre.
+
+**El detalle que más importa, y que no se ve:** la aplicación y la consola
+ahora calculan **exactamente lo mismo**. Las fases del plan y sus proporciones
+ya no están escritas dos veces: se exportan desde `icfes/plan.py`. Y hay una
+prueba que corre el cálculo de la aplicación con node y lo compara contra el de
+Python **bloque por bloque** —2.315 bloques en tres escenarios distintos—, para
+que nadie cambie una fórmula en un lado y se olvide del otro.
+
+**Los colores de las gráficas están validados,** no escogidos a ojo. La primera
+versión coloreaba cada barra según el estado (rojo, naranja, azul, verde) y el
+validador la rechazó: verde y rojo se confunden para una persona con daltonismo.
+Se corrigió cambiando el diseño, no el color: las barras van todas del mismo
+tono —que además es lo correcto, porque es un solo dato— y el estado se dice con
+una etiqueta de texto.
+
+**Tres fallas encontradas al probar en un navegador de verdad y corregidas:**
+
+- Dos simulacros el mismo día se dibujaban uno encima del otro en la gráfica y
+  el globo de datos ya no sabía a cuál se refería.
+- El calendario de constancia solo miraba hacia atrás desde hoy: si se
+  importaba el avance de otro equipo, decía «199 días con estudio» y salía
+  vacío.
+- En práctica, el cronómetro estaba congelado en cero y el punto de ritmo
+  siempre en verde.
+
+**Comprobaciones:** 266 pruebas (27 nuevas), `ruff` limpio sobre los 1.229
+archivos del repositorio, y el recorrido completo de la aplicación probado en
+Chromium en computador y en celular, en tema claro y oscuro, sin un solo error
+de JavaScript y sin que la página se salga de ancho.
+
+---
+
+### 20-08 (cierre) — Cada auditor puede deshacer LO SUYO
+
+El botón **«Dejar pendiente»** (el que deshace una auditoría ya decidida)
+estaba reservado a coordinación y administración. En la práctica eso dejaba
+al auditor trancado con su propio error de dedo: si radicaba una factura por
+equivocación, tenía que buscar a alguien más para que se la devolviera a
+pendiente.
+
+**Desde hoy:** cada auditor puede volver a pendiente **las facturas que él
+mismo radicó o devolvió**. No cambia nada más:
+
+- La decisión **de otra persona** sigue siendo de coordinación (el aviso dice
+  quién la auditó).
+- Una factura que **ya salió en un oficio de devolución entregado** no se
+  deshace: ese PDF ya está en manos de la entidad. Para eso hay que eliminar
+  antes el oficio de devolución (eso sí es de administración).
+- Corregir la **observación** de una factura ya decidida sigue igual que
+  antes: solo coordinación y administración.
+
+Todo queda en el historial con el nombre de quien deshizo y a qué hora.
+
+7 pruebas nuevas.
+
+---
+
+### 21-08 — Responder de una vez las glosas que repiten causal
+
+**Lo que pidió Yesid, textual:** «hay glosas que vienen por 7 ítems y a esos 7
+ítems se les da la misma respuesta, y hoy por hoy lo hacen uno a uno».
+
+En la factura HUS405724 la causal **3209** —«la ayuda diagnóstica no tiene
+justificación»— viene sobre RX de pie y RX de pierna. Servicios distintos,
+misma respuesta. Escribirla dos veces es trabajo regalado; con siete, es media
+mañana.
+
+**Lo que hay ahora, en la pantalla de Glosas ADRES:**
+
+**1 · Un aviso arriba de la tabla**
+
+> ⚠ Hay causales que se repiten en esta factura — se pueden responder de una
+> sola vez
+> **3209** · La ayuda diagnóstica no tiene justificación
+> 7 glosas · 5 sin responder — **[ Responder las 7 juntas ]**
+
+**2 · Un cuadro donde usted escoge cuáles**
+
+Al apretarlo salen **las 7 filas listadas**, cada una con su servicio, su valor
+y su centro de costos, **con la casilla marcada**. Las que ya tienen decisión
+salen **desmarcadas y en ámbar**, para no pisar trabajo hecho sin querer.
+
+Usted desmarca las que necesiten respuesta distinta, escribe **una sola**
+observación técnica, escoge **una sola** decisión, y confirma.
+
+Es literalmente lo que pidió: *«que diga a cuáles servicios de esos 7 tendrían
+la misma respuesta»*.
+
+**3 · Un filtro para buscar dentro de la factura**
+
+Caja de texto (busca en causal, servicio, CUPS, observación y centro de
+costos) más tres desplegables: por causal —**con el número de veces que
+viene**—, por clasificación y por «sin decidir / ya decididas».
+
+> **El filtro solo esconde filas.** Los totales de arriba y las pastillas por
+> clasificación **no cambian nunca**: son de la factura completa. Si el filtro
+> moviera esos números, usted no sabría cuánto lleva de verdad. La pantalla lo
+> dice: «Mostrando 4 de 21 glosas · los totales de arriba son de la factura
+> completa».
+
+**Tres candados, y ninguno sobra:**
+
+- Se manda la **lista explícita** de las glosas marcadas, nunca un filtro. El
+  servidor no decide a qué filas va: aplica exactamente lo que usted marcó.
+- La causal y la clasificación **viajan como testigo**. Si una glosa del lote
+  no es de esa causal, de esa clasificación y de esa misma factura, **no se
+  escribe** y se reporta por qué.
+- **La plata no se comparte.** El lote no acepta valores ni cantidades: cada
+  glosa conserva su propio valor glosado. Compartirlo sería inventar cifras.
+
+**La 4506 no se mezcla.** Esa causal se reparte glosa por glosa entre
+Facturación y Pertinencia; si se agruparan juntas, un gestor de facturación
+arrastraría en su lote las que son de la médica auditora.
+
+- 28 pruebas nuevas (14 del servicio + 14 de la pantalla). Las de pantalla
+  **ejecutan el JavaScript de verdad en node**, no leen el HTML como texto.
+
+> **Nota:** al escribirlo llamé a una función `abrirModal` que **no existe** en
+> el portal. El JavaScript compilaba igual —era un error de ejecución— y solo
+> habría reventado al apretar el botón. Lo cazó una prueba que corre `gaPintar`
+> de verdad. Se le hizo su propio cuadro, aislado del modal de dictámenes.
+
+### 21-08 — «CUPS FMQ0952» no es un CUPS
+
+Otro de los defectos que cazaron las pruebas de Yesid. Los dictámenes salieron
+diciendo **«CUPS FMQ0952»** y **«CUPS 34363-4»**.
+
+- `FMQ0952` es un **código interno del hospital** para insumos (el electrodo de
+  ECG).
+- `34363-4` es un **CUM**, el código de un medicamento (la dipirona).
+
+Ninguno es un CUPS: los del Ministerio son seis dígitos, a veces con un sufijo
+de letra (`890283H`).
+
+**Por qué importa:** la EPS cruza los CUPS contra su sistema. Un código que no
+existe como CUPS no lo encuentra, y **ratifica la glosa completa** — así el
+argumento jurídico esté impecable.
+
+**Lo que NO se hace, y es la mitad importante:** no se prohíbe nombrar el
+código. El hospital **sí** factura con `FMQ0952`, y ponerlo ayuda a la EPS a
+ubicar el ítem. Lo que está mal es **la etiqueta**. Por eso el aviso dice:
+
+> «Deje el código tal cual y cambie la palabra: escriba *código institucional
+> del HUS FMQ0952* en vez de *CUPS FMQ0952*».
+
+El aviso además distingue de dónde viene el código: institucional del HUS, CUM
+de medicamento, o de otro sistema.
+
+- 27 pruebas en `tests/test_services/test_no_todo_codigo_es_un_cups.py`, la
+  mitad dedicadas a **los CUPS reales que NO se pueden marcar**: los 14 de las
+  facturas del 19 de agosto, incluidos los raros con sufijo (`625104PUR`,
+  `129A02H`, `869501H1`). Un aviso equivocado en cada dictamen enseña al
+  auditor a ignorar los avisos.
+- Y se comprobó que **sigue cazando** el CUPS inventado de ayer: cuando el
+  motor tomó «valor glosado 100000» y escribió «CUPS 100000».
+
+### 21-08 — Los tres defectos que faltaban de las pruebas de Yesid
+
+**1 · El dictamen declaraba «VALOR OBJETADO $ 0.00»**
+
+Yesid pegó «CL0801 — … — **valor 279900**» y el documento que se radica salió
+diciendo que el valor objetado era **cero pesos**. Eso no es un detalle de
+formato: **es una cifra falsa en un documento que va a la EPS.**
+
+La causa: el lector de valores exigía un «$», o la palabra «valor **de**», o el
+sufijo «pesos». Un «valor 279900» a secas —que es como lo escribe cualquiera—
+no cumplía ninguna. Ahora sí se lee, incluida la glosa de **treinta pesos** de
+la dipirona.
+
+Y no se rompió lo que ya andaba: «valor **100%**» sigue sin leerse como plata,
+y «valor 2 conceptos» tampoco.
+
+**2 · La plata con comas gringas**
+
+> Tarifa pactada en contrato **$2,072,200**
+> Valor en disputa **$ 2,288,600**
+
+En Colombia la coma es el separador **decimal**: eso se lee como dos con
+setenta y dos milésimas. Corregido en **33 sitios** de tres archivos, todos
+plata que el auditor ve.
+
+**3 · El dictamen negaba su propio contrato**
+
+En la misma pantalla, el motor decía arriba «**Tarifa pactada encontrada ·
+Contrato S-13-1-03-1-04958 · $2.072.200**» y el cuerpo del dictamen decía «**EN
+AUSENCIA DE CONTRATO BILATERAL FORMAL**».
+
+Ante la EPS eso es **regalarle el argumento**: si el hospital dice que no hay
+contrato, no puede después exigir que se respete la tarifa pactada.
+
+La causa: una plantilla del banco (la TA-G01) trae esa frase escrita, y se le
+ofrecía a la IA como ejemplo a imitar **sin mirar si el motor ya había
+encontrado contrato**.
+
+> **La plantilla NO se borró.** Cuando de verdad no hay contrato, esa
+> argumentación del Decreto 2423 Art. 87 es correcta y es la única defensa que
+> existe. Solo se deja de ofrecer cuando sí lo hay — y se exige que haya
+> **tarifa con valor**, porque un contrato sin tarifa para ese CUPS tampoco
+> sirve para sostener «respétese lo pactado».
+
+- 38 pruebas nuevas. **Tres pruebas viejas fijaban los defectos** y se
+  corrigieron: una exigía «120,000» con coma, otra «83,800», y una tercera
+  daba por bueno que un «valor 500000» sin «$» **no se encontrara** —su
+  docstring lo llamaba «returns default when not found»—.
+
+### 21-08 — Un «agujero» que resultó ser una decisión correcta
+
+Revisando el guardián de afirmaciones documentales apareció esto: hay **dos
+caminos por donde esa protección nunca corre** —el Quality Gate y el
+postprocesador de dictámenes— porque no le pasan el dato de qué se leyó.
+
+Sonaba a hueco. **Revisándolo, es lo correcto**, y conviene que quede escrito:
+
+| Lo que se le pasa | Qué significa | Qué hace |
+|---|---|---|
+| el texto de los PDF | se leyó eso | contrasta contra ello |
+| vacío | se analizó **sin adjuntar nada** | marca cualquier afirmación sobre documentos |
+| nada | **este camino no sabe** qué se leyó | no opina |
+
+Los dos llamadores están en el tercer caso, y con razón:
+
+- El **Quality Gate** solo recibe el texto y la EPS. No tiene los PDF.
+- El **postprocesador BORRA** las frases con citas inválidas. Si ahí se
+  marcaran afirmaciones documentales, **borraría argumentación clínica
+  legítima** de dictámenes donde sí se adjuntaron soportes.
+
+Pasarles «vacío» para «cerrar el hueco» convertiría la protección en una
+máquina de avisos falsos — y un aviso equivocado en cada dictamen enseña al
+auditor a ignorar los avisos.
+
+**No se cambió nada.** Se dejó escrito por qué está así, y 7 pruebas que
+protegen la decisión para que nadie la «arregle» sin saber.
+
+### 21-08 — El motor arranca solo al PRENDER el PC
+
+**El problema, en concreto.** El arranque estaba en la carpeta Inicio de
+Windows, que se dispara **al iniciar sesión**. Si el PC se reinicia de noche y
+nadie entra, el hospital amanece sin portal.
+
+**Pasó hoy a las 8:57 de la mañana:** «Bad gateway · Host Error», y hubo que
+sacar el motor a mano por PowerShell.
+
+**Cómo se arregla.** Doble clic en **`tools\ARRANQUE_AUTOMATICO_MOTOR.cmd`**.
+Crea una tarea de Windows que arranca el motor **al prender el equipo**, sin
+que nadie tenga que iniciar sesión.
+
+**Le va a pedir la contraseña de Windows, y con razón.** La tarea corre con la
+cuenta del usuario a propósito, porque el motor necesita entrar a
+`\\Prime\radicacion_2026` para el índice de soportes — y la cuenta del sistema
+normalmente **no tiene ese permiso**. La contraseña la pide Windows, se guarda
+en su bóveda, y **no queda escrita en ningún archivo del repositorio**.
+
+**Espera un minuto tras el arranque:** al prender el PC la red del hospital
+todavía no está lista.
+
+**Lo que NO cambia:** sigue arrancando también al iniciar sesión (como
+respaldo), el vigilante sigue reviviendo el motor si se cae, y el
+autodespliegue sigue bajando el código nuevo cada 5 minutos.
+
+**Cómo comprobar que quedó de verdad:** reiniciar el PC y, **sin iniciar
+sesión**, abrir el portal desde el celular o desde otro equipo. Si carga,
+quedó.
+
+> **Lo más probable que lo rompa dentro de seis meses:** si cambia la
+> contraseña de Windows, la tarea deja de arrancar **en silencio**. Hay que
+> volver a correr el archivo. El propio instalador lo advierte.
+
+- 18 pruebas en `tests/test_tools/test_arranque_automatico.py`, incluidas las
+  que vigilan que no quede ninguna contraseña escrita, que no pida permisos de
+  administrador que no necesita, y que conserve los finales de línea de
+  Windows.
+
+### 21-08 — El dictamen decía que el contrato estaba vencido, y no lo estaba
+
+Yesid probó seis dictámenes más. **Se confirmó lo corregido** —el valor ya se
+lee, los códigos CUM se marcan bien, la parcial sale correcta, los soportes
+son los reales del servidor— y aparecieron dos defectos nuevos.
+
+**1 · «FUERA DE LA VIGENCIA DEL CONTRATO» — falso.**
+
+Dos glosas de FAMISANAR salieron diciendo que el servicio se prestó fuera de
+la vigencia del contrato `S-13-1-03-1-04958`, y una hasta puso **«Contrato:
+SIN CONTRATO PACTADO»** en el encabezado… mientras la línea de abajo decía
+«Tarifa pactada: SOAT UVB VIGENTE -5 %» y el cuerpo citaba el anexo tarifario
+de ese mismo contrato, **vigente del 15/04/2026 al 14/04/2027**.
+
+**Ante la EPS eso es de lo peor que se puede escribir:** quien dice que no
+tiene contrato vigente pierde el derecho a exigir la tarifa pactada.
+
+**La causa: adivinar.** El motor tomaba **la primera fecha que apareciera** en
+el número de factura, el radicado o los primeros 5.000 caracteres de los PDF, y
+la trataba como la fecha de la atención. Esa primera fecha puede ser la de
+nacimiento del paciente, la de expedición de un documento o la de validación
+del CUV.
+
+Ahora **solo cuenta una fecha etiquetada** como de atención, prestación,
+ingreso o factura. Si no la hay, **no se dice nada**: no saber cuándo se prestó
+el servicio no es prueba de que el contrato estuviera vencido.
+
+**2 · La cifra volvía a salir sin puntos.**
+
+El valor ya se **leía** bien pero se **escribía** crudo: «VALOR OBJETADO
+$ 796600». O sea que el formato de una cifra que va a la EPS dependía de cómo
+la hubiera escrito quien redactó la glosa. Ahora los cuatro caminos que
+encuentran el valor lo escriben igual: **$ 796.600**.
+
+> **Y el CI me corrigió a mí.** La primera versión de este arreglo del formato
+> pasaba TODAS las cifras por un redondeo a entero, así que «1.234.567,89»
+> salía «$ 1.234.568». **Ochenta y nueve centavos perdidos en un documento que
+> se radica ante la EPS** — eso no es formato, es cambiar el valor. Lo cazó una
+> prueba que ya existía y que cuidaba justamente eso.
+>
+> La regla correcta era más estrecha: **solo se toca lo que viene sin formato**.
+> Si la cifra ya trae puntos o comas, se respeta tal cual. Y las comas gringas
+> («1,500,000») sí se pasan a punto, porque su forma es inequívoca.
+
+- 8 pruebas nuevas. **Una de ellas encontró un segundo bloque de alerta de
+  vigencia** que yo no había visto — resultó ser código muerto, y quedó una
+  prueba que avisa si alguien empieza a usarlo.
+- **Tres pruebas viejas fijaban defectos.** La más llamativa se llamaba
+  `test_extraer_valor_formato_colombiano` y su descripción decía «Should
+  extract Colombian peso format»… pero exigía «1,500,000» **con comas**, que es
+  formato gringo. El nombre decía una cosa y la comprobación la contraria.
+
 ## 3) PENDIENTE
+
+### Sistema ICFES (nuevo, 20-08)
+- **Hacer el simulacro de diagnóstico.** Sin él, el plan reparte las horas a
+  ciegas (asume 50 de 100 en cada área). Es lo primero que hay que hacer:
+  doble clic en `tools\ICFES.cmd` → opción 4 → examen completo. O, más simple
+  todavía, desde la aplicación `ICFES.html`, que no necesita ni Python.
+- **Confirmar la fecha real del examen.** El plan usa el 8 de agosto de 2027
+  como fecha provisional; el Calendario A de 2026 fue el 26 de julio. Cuando el
+  ICFES publique la fecha oficial de 2027, se corrige con
+  `python -m icfes iniciar --examen AAAA-MM-DD --meta 400 --horas 12` y el plan
+  se recalcula solo.
+- **Hacer crecer el banco de preguntas.** Hoy tiene 110; para que un simulacro
+  salga de tamaño real hacen falta 254. El formato está explicado en
+  `docs/GUIA_SISTEMA_ICFES.md` y `python -m icfes banco` avisa si algo quedó mal.
+- **Bajar los cuadernillos oficiales del ICFES** (son gratis en su página) y
+  hacerlos completos y cronometrados, sobre todo de abril de 2027 en adelante.
+  Las preguntas del banco son de práctica, no del examen real.
 
 ### Organización de trabajos (nuevo, 18-08)
 - **Correr `ORGANIZAR_TRABAJOS_BOTS.cmd` en un PC real del hospital** y
@@ -5067,6 +6370,16 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
+### Sistema ICFES (20-08)
+1. **Correr el diagnóstico** y volver a mirar el plan: con el resultado real, el
+   reparto de horas cambia y deja de ser parejo.
+2. **Generar la aplicación web** (doble clic en `tools\ICFES_APP.cmd`) y pasarla
+   al celular, que es donde se va a estudiar la mayoría de los días.
+3. **Revisar y fusionar el pull request** de la rama
+   `claude/icfes-prefix-system-ngvyk4`.
+4. Si el diagnóstico de Inglés sale en Pre-A1 o A1, subir Inglés de 1 a 2 horas
+   semanales: pasar de 40 a 70 en esa área son 11 puntos del global.
+
 ### Lo más fresco (del 19-08)
 
 **Lo primero: correr `tools\VERIFICAR_TRABAJO_HOY.cmd`** en el PC de cartera
@@ -5091,8 +6404,12 @@ solo renglón, dígalo y se hace.
   `SENTRY_DSN=...`. Los pasos completos salen en la pantalla de Diagnóstico.
 - **Volver a responder una glosa de HUS468334** y mirar dos cosas: que la
   relación de soportes traiga los documentos de verdad, y que si el dictamen
-  cita un folio, ese folio diga lo que la IA afirma. **Si inventa un folio,
-  avisar de inmediato** — es lo más grave que puede pasar.
+  cita un folio, ese folio diga lo que la IA afirma.
+  *(20-08, noche: el folio inventado ya lo detecta el sistema solo — lo
+  devuelve a la IA para que lo corrija y, si insiste, lo avisa en rojo y
+  quita el sello «VALIDADO». Lo que falta es verlo funcionar con una glosa
+  de verdad: si sale un aviso de folio que usted sabe que SÍ estaba en los
+  papeles, avise, porque sería un aviso equivocado.)*
 
 **Auditor Forense (probar en el PC de cartera):**
 

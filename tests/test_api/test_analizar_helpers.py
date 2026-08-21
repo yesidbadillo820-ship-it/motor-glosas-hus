@@ -103,7 +103,12 @@ class TestConstruirDictamenAceptacion:
         assert "RE9801" in html
         # Diferencia 200k - 80k = 120k debe aparecer como "valor en disputa"
         assert "Valor en disputa" in html
-        assert "120,000" in html
+        # 21-08-2026. Acá decía «120,000» —con COMA—, igual que la línea de
+        # «168,563» que se corrigió ayer en esta misma clase. Es formato
+        # gringo: en Colombia la coma es el separador decimal. Yesid lo vio en
+        # pantalla en «Valor en disputa $ 2,288,600».
+        assert "$120.000" in html
+        assert "120,000" not in html
 
     def test_html_no_tiene_valor_negativo(self):
         """Si por error val_ac > val_obj, val_rechazado podría ser

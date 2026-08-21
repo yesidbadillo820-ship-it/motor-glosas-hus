@@ -98,6 +98,7 @@
       <div class="stat"><div class="n" id="s-act" style="color:#2563eb">0</div><div class="l">ACTUALIZADAS</div></div>
       <div class="stat"><div class="n" id="s-rat" style="color:#7c3aed">0</div><div class="l">RATIFICADAS</div></div>
       <div class="stat"><div class="n" id="s-ext" style="color:#dc2626">0</div><div class="l">EXTEMPORÁNEAS</div></div>
+      <div class="stat" id="s-dup-box" style="display:none"><div class="n" id="s-dup" style="color:#64748b">0</div><div class="l">YA ESTABAN</div></div>
     </div>
 
     <h3 style="margin:20px 0 10px">Semáforo</h3>
@@ -109,6 +110,7 @@
     </div>
 
     <div id="email-box" class="ok" style="margin:15px 0">📧 Correos enviados: <b id="e-num">0</b></div>
+    <div id="email-detalle"></div>
 
     <h3 style="margin:20px 0 10px">Asignaciones por gestor</h3>
     <div id="gestores"></div>
@@ -263,27 +265,49 @@ function mostrarResultado(d){
   // Si total = 0 mostramos un título distinto y advertencia clara —
   // sino el "✅ Importación completada" + 0 glosas confunde al gestor.
   var totalNum = d.total || 0;
-  if(totalNum === 0){
+  var duplicadas = d.duplicadas || 0;
+  var prev = document.getElementById('warn-cero');
+  if(prev) prev.remove();
+
+  // 20-08-2026. Antes, cualquier «total 0» mostraba el mismo aviso: revisá la
+  // hoja, revisá los encabezados. Yesid resubió el mismo archivo —que estaba
+  // perfecto— y lo mandó a buscar un problema que no existía. Las 35 glosas ya
+  // estaban importadas, y eso es una noticia normal, no un error.
+  //
+  // Son dos situaciones distintas y ahora se dicen distinto.
+  if(totalNum === 0 && duplicadas > 0){
+    document.getElementById('result-title').innerHTML =
+      '<span style="color:#15803d">✅ Importación procesada — nada nuevo que registrar</span>';
+    var ok = document.createElement('div');
+    ok.id = 'warn-cero';
+    ok.style.cssText = 'background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:12px;margin:10px 0;color:#15803d;font-size:13px;line-height:1.5';
+    ok.innerHTML = '<b>Las ' + duplicadas + ' glosas del archivo YA estaban importadas.</b><br>'
+      + 'No se creó ninguna nueva y no se perdió nada — el archivo está bien. '
+      + 'Esto es lo normal al volver a subir el mismo archivo.<br>'
+      + 'Si esperaba glosas nuevas, revise que el Excel sea el del lote nuevo y no el anterior.';
+    document.getElementById('result').insertBefore(ok, document.getElementById('result').children[1] || null);
+  } else if(totalNum === 0){
     document.getElementById('result-title').innerHTML =
       '<span style="color:#92400e">⚠ Importación procesada — 0 glosas detectadas</span>';
-    var prev = document.getElementById('warn-cero');
-    if(!prev){
-      var warn = document.createElement('div');
-      warn.id = 'warn-cero';
-      warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
-      warn.innerHTML = '<b>Posibles causas:</b><br>'
-        + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
-        + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
-        + '• Las filas están vacías o solo tienen headers.<br>'
-        + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
-      document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
-    }
+    var warn = document.createElement('div');
+    warn.id = 'warn-cero';
+    warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
+    warn.innerHTML = '<b>No se leyó ninguna fila del archivo. Posibles causas:</b><br>'
+      + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
+      + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
+      + '• Las filas están vacías o solo tienen headers.<br>'
+      + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
+    document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
   } else {
     document.getElementById('result-title').textContent = '✅ Importación completada';
     var prevWarn = document.getElementById('warn-cero');
     if(prevWarn) prevWarn.remove();
   }
   document.getElementById('s-total').textContent = totalNum;
+  var cajaDup = document.getElementById('s-dup-box');
+  if(cajaDup) cajaDup.style.display = duplicadas > 0 ? '' : 'none';
+  var celdaDup = document.getElementById('s-dup');
+  if(celdaDup) celdaDup.textContent = duplicadas;
   document.getElementById('s-nuevas').textContent = d.creadas || 0;
   document.getElementById('s-act').textContent = d.actualizadas || 0;
   document.getElementById('s-rat').textContent = d.ratificadas || 0;
@@ -296,6 +320,23 @@ function mostrarResultado(d){
   document.getElementById('sn').textContent = sem.NEGRO || 0;
 
   document.getElementById('e-num').textContent = d.correos_enviados || 0;
+  // 20-08-2026. Cuando el archivo no trae nada nuevo, no hay a quién
+  // avisarle: el «Correos enviados: 0» es correcto, pero a secas se lee como
+  // una falla. Yesid reimportó varias veces mirando ese cero sin saber si era
+  // un problema del correo o la consecuencia de que no hubiera novedades.
+  if(totalNum === 0 && duplicadas > 0){
+    var cajaMail = document.getElementById('email-detalle');
+    if(cajaMail){
+      cajaMail.innerHTML = '<div style="background:#f8fafc;border:1px solid var(--border);'
+        + 'padding:12px 14px;border-radius:8px;font-size:.9em">'
+        + 'No se envió ningún correo <b>porque no había nada nuevo que avisar</b>. '
+        + 'No es una falla del correo.<br>'
+        + 'Para comprobar que el correo funciona, use <b>Diagnóstico → 📧 Probar correo</b>.'
+        + '</div>';
+    }
+  } else {
+    pintarDetalleDelCorreo(d.correo);
+  }
 
   // 🤖 Indicador prominente de auto-procesamiento IA en background
   if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){
@@ -447,6 +488,99 @@ function pesos(v){
   if (window.SDS_FMT && window.SDS_FMT.cop) return window.SDS_FMT.cop(v);
   var n = Math.round(Number(v || 0)) || 0;              // respaldo si aún no cargó
   return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// ── A quién le llegó el correo, y a quién NO ──────────────────────────────
+// 20-08-2026. La pantalla decía «Correos enviados: 3» y nada más. Con eso el
+// auditor no tenía cómo saber que a CAROLINA no le llegó nada porque su
+// nombre en el Excel no coincide con ningún usuario del portal — que es la
+// falla que de verdad ocurre, no que se caiga el servidor de correo.
+//
+// Se muestra lo que el motor SÍ puede afirmar: a qué buzón salió cada correo
+// y quién quedó sin destinatario. Que el gestor lo haya ABIERTO no lo sabe
+// nadie, y por eso no se insinúa.
+function pintarDetalleDelCorreo(c){
+  var caja = document.getElementById('email-detalle');
+  if(!caja) return;
+  caja.innerHTML = '';
+  if(!c) return;
+
+  var h = '';
+
+  if(!c.smtp_configurado){
+    h += '<div class="err" style="margin:10px 0"><b>El correo no está configurado en este servidor.</b>'
+       + ' No salió ningún mensaje. Las glosas SÍ quedaron importadas: avise a los gestores por otro medio'
+       + ' y pida que configuren SMTP_USER y SMTP_PASSWORD.</div>';
+    caja.innerHTML = h;
+    return;
+  }
+
+  var sin = c.gestores_sin_correo || [];
+  if(sin.length){
+    h += '<div class="err" style="margin:10px 0"><b>' + sin.length + ' gestor(es) NO recibieron el correo</b>'
+       + ' — su nombre en el Excel no coincide con ningún usuario activo del portal:<br>'
+       + sin.map(esc).join(' · ')
+       + '<br><span style="font-size:.85em">Arréglelo creando el usuario, o poniendo en el Excel el mismo nombre'
+       + ' con el que está registrado en Usuarios.</span></div>';
+  }
+
+  var fallidos = (c.destinatarios || []).filter(function(x){ return !x.ok; });
+  if(fallidos.length){
+    h += '<div class="err" style="margin:10px 0"><b>' + fallidos.length + ' correo(s) rebotaron</b> al intentar salir:<br>'
+       + fallidos.map(function(x){ return esc(x.email); }).join(' · ') + '</div>';
+  }
+
+  if(c.hay_glosas_medicas){
+    var dras = c.doctoras || {};
+    var nombresDra = Object.keys(dras);
+    var sinDra = c.doctoras_sin_correo || [];
+    if(nombresDra.length){
+      h += '<div class="ok" style="margin:10px 0">🩺 <b>Glosas médicas — a cada doctora la suya</b>'
+         + ' (según la columna PROFESIONAL(MEDICO) del Excel):<br>'
+         + nombresDra.sort().map(function(n){
+             return '<b>' + esc(n) + '</b> → ' + esc(dras[n]);
+           }).join('<br>')
+         + '</div>';
+      if(sinDra.length){
+        h += '<div class="err" style="margin:10px 0">🩺 <b>Sin correo:</b> '
+           + sinDra.map(esc).join(' · ')
+           + '<br><span style="font-size:.85em">Ese nombre del Excel no coincide con ningún'
+           + ' usuario activo del portal. Revise cómo está escrito en Usuarios.</span></div>';
+      }
+    } else if((c.medicos_auditores || []).length){
+      h += '<div class="ok" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
+         + ' pero el Excel no dice cuál doctora las lleva, así que se envió a todas'
+         + ' las médicas auditoras registradas:<br>'
+         + c.medicos_auditores.map(esc).join(' · ') + '</div>';
+    } else {
+      h += '<div class="err" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
+         + ' (pertinencia o calidad) pero <b>NO hay médicas auditoras registradas</b>,'
+         + ' así que no le llegó a ninguna.<br><span style="font-size:.85em">Para arreglarlo:'
+         + ' escriba <code>AUDITORIA MEDICA</code> en el campo «equipo» de esas usuarias, en'
+         + ' la pantalla de Usuarios. O configure MEDICOS_AUDITORES_EMAIL en el servidor.'
+         + '</span></div>';
+    }
+  }
+
+  var ok = (c.destinatarios || []).filter(function(x){ return x.ok; });
+  if(ok.length){
+    var filas = Object.keys(c.por_gestor || {}).sort().map(function(g){
+      var correos = (c.por_gestor[g] || []);
+      var val = correos.length
+        ? '<span style="color:#15803d">' + correos.map(esc).join(', ') + '</span>'
+        : '<span style="color:#b91c1c">sin usuario en el portal</span>';
+      return '<tr><td style="padding:3px 10px 3px 0;font-weight:600">' + esc(g) + '</td><td style="padding:3px 0">' + val + '</td></tr>';
+    }).join('');
+    h += '<details style="margin:10px 0"><summary style="cursor:pointer">'
+       + 'Ver a qué buzón salió cada uno (' + ok.length + ')</summary>'
+       + '<table style="margin-top:8px;font-size:.9em;border-collapse:collapse">' + filas + '</table>'
+       + '<div style="margin-top:8px;font-size:.85em;color:#555">'
+       + 'Esto confirma que el mensaje salió del servidor sin error. Si el gestor lo ABRIÓ o no,'
+       + ' eso no lo sabe ningún sistema de correo: pídale que le confirme.</div>'
+       + '</details>';
+  }
+
+  caja.innerHTML = h;
 }
 
 function pintarPlanDeTrabajo(d){
@@ -648,7 +782,13 @@ async function cargarHistorial(){
       const m = {
         ENVIADO:['#dcfce7','#166534','✓ correo enviado'],
         PARCIAL:['#fef3c7','#92400e','⚠ envío parcial'],
-        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ sin destinatarios'],
+        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ nadie a quien enviarlo'],
+        // 20-08-2026: sí había a quién mandarle; lo que falló fue el servidor
+        // de correo. Antes esto salía como «nadie a quien enviarlo» y mandaba
+        // al auditor a revisar la lista de gestores, que estaba bien.
+        FALLO_ENVIO:['#fee2e2','#991b1b','✗ el servidor de correo rechazó el envío'],
+        SIN_CORREO_CONFIG:['#fee2e2','#991b1b','✗ el servidor no tiene correo configurado'],
+        SIN_ARCHIVO_ORIGINAL:['#fef3c7','#92400e','✗ no quedó el archivo original'],
         ERROR:['#fee2e2','#991b1b','✗ error de envío'],
         SIN_ARCHIVO:['#f3f4f6','#6b7280','archivo purgado'],
         LISTO:['#dbeafe','#1e40af','procesando…'],
