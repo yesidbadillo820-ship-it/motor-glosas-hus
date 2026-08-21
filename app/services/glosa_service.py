@@ -5390,21 +5390,34 @@ def _en_pesos_colombianos(crudo: str) -> str:
     Si el número no se puede leer, se devuelve tal cual: es preferible mostrar
     lo que decía el texto a inventar una cifra.
     """
-    limpio = (crudo or "").strip()
+    # Se quita la puntuación de sobra del final: el texto suele venir como
+    # «…por $6.434.900.» y ese punto es el de la frase, no de la cifra.
+    limpio = (crudo or "").strip().rstrip(".,")
     if not limpio:
         return "$ 0.00"
-    try:
-        from app.utils.moneda import parse_valor_cop
 
-        valor = parse_valor_cop(limpio)
-    except Exception:
+    # SOLO se toca lo que viene SIN formato: dígitos pelados como «796600».
+    # Si el texto ya trae puntos o comas —«1.234.567,89», «150.000»— se
+    # devuelve tal cual.
+    #
+    # 21-08-2026: la primera versión de esto pasaba TODO por un redondeo a
+    # entero, y «1.234.567,89» salía «$ 1.234.568». Lo cazó una prueba del
+    # repositorio que cuidaba justamente eso. Perder ochenta y nueve centavos
+    # en una cifra que se radica ante la EPS no es un detalle de formato: es
+    # cambiar el valor. La prueba tenía razón.
+    # Comas de miles a la gringa: «1,500,000». La forma es inequívoca —grupos
+    # de exactamente tres dígitos separados por coma y sin un solo punto— así
+    # que no se confunde con el decimal colombiano «1.234.567,89» ni con
+    # «150,50». Se pasan a punto: la cifra que se radica va en colombiano.
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+", limpio):
+        return "$ " + limpio.replace(",", ".")
+
+    if not limpio.isdigit():
         return f"$ {limpio}"
-    if not valor:
-        return f"$ {limpio}"
-    # Con espacio después del «$»: es la forma que esta función ha devuelto
-    # siempre y la que esperan las pruebas del repositorio. Lo que estaba mal
-    # no era el espacio, era la falta del punto de miles.
-    return "$ " + f"{int(round(valor)):,}".replace(",", ".")
+
+    # Con espacio después del «$»: la forma que esta función ha devuelto
+    # siempre. Lo que estaba mal no era el espacio, era el punto de miles.
+    return "$ " + f"{int(limpio):,}".replace(",", ".")
 
 
 class GlosaService:

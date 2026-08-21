@@ -111,6 +111,26 @@ class TestElValorSeLeeCuandoEsta:
         assert svc._extraer_valor("TA0801\t882298\tDESCRIPCION\t36.402\tMOTIVO") == "$ 36.402"
         assert svc._extraer_valor("por valor de $150.000") == "$ 150.000"
 
+    def test_los_centavos_no_se_redondean(self, svc):
+        """21-08-2026. La primera versión de este arreglo pasaba TODO por un
+        redondeo a entero, y «1.234.567,89» salía «$ 1.234.568».
+
+        Lo cazó una prueba del repositorio que cuidaba justamente eso —y tenía
+        razón—: perder ochenta y nueve centavos en una cifra que se radica ante
+        la EPS no es formato, es cambiar el valor.
+
+        Regla: solo se toca lo que viene SIN formato. Si ya trae puntos o
+        comas, se respeta tal cual.
+        """
+        fila = "SO0601\t906466\tEXAMEN\t1.234.567,89\tmotivo"
+        assert svc._extraer_valor(fila) == "$ 1.234.567,89"
+
+    def test_las_comas_gringas_pasan_a_punto(self, svc):
+        """«1,500,000» es formato gringo y la forma es inequívoca: grupos de
+        exactamente tres dígitos, sin un solo punto. No se confunde con el
+        decimal colombiano."""
+        assert svc._extraer_valor("Glosa por $1,500,000") == "$ 1.500.000"
+
     def test_lo_que_ya_funcionaba_no_cambia(self, svc):
         assert "1.084.488" in svc._extraer_valor("$ 1.084.488")
 

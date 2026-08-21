@@ -5945,6 +5945,16 @@ $ 796600». O sea que el formato de una cifra que va a la EPS dependía de cómo
 la hubiera escrito quien redactó la glosa. Ahora los cuatro caminos que
 encuentran el valor lo escriben igual: **$ 796.600**.
 
+> **Y el CI me corrigió a mí.** La primera versión de este arreglo del formato
+> pasaba TODAS las cifras por un redondeo a entero, así que «1.234.567,89»
+> salía «$ 1.234.568». **Ochenta y nueve centavos perdidos en un documento que
+> se radica ante la EPS** — eso no es formato, es cambiar el valor. Lo cazó una
+> prueba que ya existía y que cuidaba justamente eso.
+>
+> La regla correcta era más estrecha: **solo se toca lo que viene sin formato**.
+> Si la cifra ya trae puntos o comas, se respeta tal cual. Y las comas gringas
+> («1,500,000») sí se pasan a punto, porque su forma es inequívoca.
+
 - 8 pruebas nuevas. **Una de ellas encontró un segundo bloque de alerta de
   vigencia** que yo no había visto — resultó ser código muerto, y quedó una
   prueba que avisa si alguien empieza a usarlo.
