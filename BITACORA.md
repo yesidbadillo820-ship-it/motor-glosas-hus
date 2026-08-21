@@ -5677,6 +5677,40 @@ arrastraría en su lote las que son de la médica auditora.
 > habría reventado al apretar el botón. Lo cazó una prueba que corre `gaPintar`
 > de verdad. Se le hizo su propio cuadro, aislado del modal de dictámenes.
 
+### 21-08 — «CUPS FMQ0952» no es un CUPS
+
+Otro de los defectos que cazaron las pruebas de Yesid. Los dictámenes salieron
+diciendo **«CUPS FMQ0952»** y **«CUPS 34363-4»**.
+
+- `FMQ0952` es un **código interno del hospital** para insumos (el electrodo de
+  ECG).
+- `34363-4` es un **CUM**, el código de un medicamento (la dipirona).
+
+Ninguno es un CUPS: los del Ministerio son seis dígitos, a veces con un sufijo
+de letra (`890283H`).
+
+**Por qué importa:** la EPS cruza los CUPS contra su sistema. Un código que no
+existe como CUPS no lo encuentra, y **ratifica la glosa completa** — así el
+argumento jurídico esté impecable.
+
+**Lo que NO se hace, y es la mitad importante:** no se prohíbe nombrar el
+código. El hospital **sí** factura con `FMQ0952`, y ponerlo ayuda a la EPS a
+ubicar el ítem. Lo que está mal es **la etiqueta**. Por eso el aviso dice:
+
+> «Deje el código tal cual y cambie la palabra: escriba *código institucional
+> del HUS FMQ0952* en vez de *CUPS FMQ0952*».
+
+El aviso además distingue de dónde viene el código: institucional del HUS, CUM
+de medicamento, o de otro sistema.
+
+- 27 pruebas en `tests/test_services/test_no_todo_codigo_es_un_cups.py`, la
+  mitad dedicadas a **los CUPS reales que NO se pueden marcar**: los 14 de las
+  facturas del 19 de agosto, incluidos los raros con sufijo (`625104PUR`,
+  `129A02H`, `869501H1`). Un aviso equivocado en cada dictamen enseña al
+  auditor a ignorar los avisos.
+- Y se comprobó que **sigue cazando** el CUPS inventado de ayer: cuando el
+  motor tomó «valor glosado 100000» y escribió «CUPS 100000».
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)

@@ -307,7 +307,14 @@ def _corpus_clausulas_contrato(eps: Optional[str] = None) -> str:
 
 # «CUPS 348240», «código CUPS: 871121», «CUPS890201». Se piden 6 dígitos, que
 # es como son los CUPS del Ministerio; con menos se confundiría con valores.
-PAT_CUPS = re.compile(r"\bCUPS\s*:?\s*(\d{6})\b", re.IGNORECASE)
+PAT_CUPS = re.compile(
+    r"\bCUPS\s*:?\s*(?=[A-Za-z0-9\-]*\d)([A-Za-z0-9][A-Za-z0-9\-]{2,11})\b",
+    re.IGNORECASE,
+)
+_PAT_ANIO_MANUAL = re.compile(r"^(?:19|20)\d{2}$")
+_FORMA_INSTITUCIONAL_HUS = re.compile(r"^(?:FMQ|FMO|AGMO|S|M)\d{2,6}[A-Z]?\d{0,2}$", re.IGNORECASE)
+_FORMA_CUM = re.compile(r"^\d{4,9}-\d{1,3}$")
+_FORMA_CUPS = re.compile(r"^[0-9A-Z]{6}(?:[A-Z]\d{0,2}|-\d{2})?$", re.IGNORECASE)
 
 
 def _verificar_cups(texto: str, issues: list[dict]) -> None:
@@ -338,6 +345,34 @@ def _verificar_cups(texto: str, issues: list[dict]) -> None:
         except Exception:  # pragma: no cover
             continue
         if existe:
+            continue
+        if _PAT_ANIO_MANUAL.match(cups):
+            continue
+        etiqueta = None
+        if _FORMA_INSTITUCIONAL_HUS.match(cups):
+            etiqueta = "codigo institucional del HUS"
+        elif _FORMA_CUM.match(cups):
+            etiqueta = "CUM (medicamento)"
+        elif not _FORMA_CUPS.match(cups):
+            etiqueta = "codigo de otro sistema"
+        if etiqueta:
+            issues.append(
+                {
+                    "tipo": "CODIGO_NO_ES_CUPS",
+                    "severidad": "ALTA",
+                    "cita": f"CUPS {cups}",
+                    "detalle": (
+                        f"El dictamen llama CUPS al codigo {cups}, que es un {etiqueta}. "
+                        "El codigo puede ser el correcto de la factura, pero la etiqueta "
+                        "no: la EPS cruza los CUPS contra su sistema, no lo encuentra y "
+                        "ratifica la glosa completa."
+                    ),
+                    "sugerencia": (
+                        f"Deje el codigo tal cual y cambie la palabra: escriba "
+                        f"«{etiqueta} {cups}» en vez de «CUPS {cups}»."
+                    ),
+                }
+            )
             continue
         issues.append(
             {
