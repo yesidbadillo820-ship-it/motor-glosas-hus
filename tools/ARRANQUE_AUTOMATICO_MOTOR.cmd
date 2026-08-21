@@ -97,6 +97,13 @@ rem  queda, el motor arranca, y si esa cuenta no entra a la carpeta de
 rem  soportes del servidor, el indice amanece vacio sin que nadie
 rem  entienda por que. Por eso ahora se pregunta, en vez de suponer.
 set "CUENTA=%USERDOMAIN%\%USERNAME%"
+rem  SE MIRA CON QUE CUENTA TRABAJA HOY EL MOTOR (21-08-2026, noche).
+rem  El auditor le dio Enter a la cuenta que mostraba la ventana
+rem  -la de administrador- y la tarea quedo con la cuenta equivocada.
+rem  El propio PC ya sabe cual es la buena: es la del autodespliegue,
+rem  que lleva meses funcionando. Se lee de ahi y se le muestra.
+set "SUGERIDA="
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$t=Get-ScheduledTask -TaskName 'MotorGlosas_Autodeploy' -ErrorAction SilentlyContinue; if($t){$t.Principal.UserId}"`) do set "SUGERIDA=%%A"
 echo   Esta ventana esta corriendo con la cuenta:  %CUENTA%
 echo.
 echo   OJO: la tarea tiene que correr con la cuenta que usa el motor
@@ -104,6 +111,11 @@ echo   todos los dias, la que SI entra a la carpeta de soportes del
 echo   servidor. Si abrio esta ventana como administrador y Windows le
 echo   pidio otra cuenta, arriba aparece esa otra y NO es la que sirve.
 echo.
+if defined SUGERIDA (
+  echo   ^>^>^> La cuenta con la que el motor trabaja hoy es:  %SUGERIDA%
+  echo   ^>^>^> Si arriba aparece otra distinta, escriba ESTA.
+  echo.
+)
 set "OTRA="
 set /p "OTRA=   Enter para dejar %CUENTA%, o escriba DOMINIO\usuario: "
 if not "%OTRA%"=="" set "CUENTA=%OTRA%"
@@ -186,8 +198,10 @@ if errorlevel 1 (
   echo   iniciado sesion. Se puede reintentar corriendo este mismo
   echo   archivo mas tarde. No se rompio nada.
   echo.
+  set "AUTODEPLOY_OK="
 ) else (
   echo    Autodespliegue con red de seguridad permanente: listo.
+  set "AUTODEPLOY_OK=1"
 )
 
 rem ---------- 4) Comprobar que quedo ----------------------------
@@ -212,7 +226,14 @@ echo.
 echo   Lo que NO cambio:
 echo     - Sigue arrancando tambien al iniciar sesion (respaldo).
 echo     - El vigilante sigue reviviendo el motor si se cae.
-echo     - El autodespliegue sigue bajando el codigo nuevo cada 5 min.
+if defined AUTODEPLOY_OK (
+  echo     - El autodespliegue sigue bajando el codigo cada 5 minutos, y
+  echo       ahora tambien con el PC recien prendido.
+) else (
+  echo     - OJO: el autodespliegue NO quedo cambiado. Sigue bajando el
+  echo       codigo cada 5 minutos, pero SOLO si alguien inicio sesion.
+  echo       Vuelva a correr este archivo para terminar de dejarlo.
+)
 echo.
 echo   OJO con los soportes: tras prender el PC, el indice tarda
 echo   unos minutos en recorrer el servidor. Si busca una factura

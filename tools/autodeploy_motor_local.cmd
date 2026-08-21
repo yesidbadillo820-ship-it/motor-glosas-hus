@@ -13,6 +13,8 @@ set "REPO=%BASE%\repo"
 if not exist "%REPO%\.git" exit /b 0
 cd /d "%REPO%"
 set "LOG=%REPO%\data\autodeploy.log"
+rem Si el registro pasa de ~5 MB se reinicia, para no llenar el disco.
+if exist "%LOG%" for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
 
 git fetch origin motor-glosas >nul 2>&1
 if errorlevel 1 (
@@ -66,7 +68,26 @@ if not errorlevel 1 goto :fin
 
 echo [%date% %time%] el motor NO volvio solo: se arranca directo >> "%LOG%"
 cd /d "%REPO%"
-start "" /b "%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%LOG%" 2>&1
+rem  SE SUELTA EL PROCESO A PROPOSITO (21-08-2026, noche). Antes era
+rem  `start /b ... >> %LOG%`, y eso trajo dos desastres encadenados:
+rem
+rem   1. `/b` no abre ventana nueva, asi que el motor HEREDA la salida
+rem      de esta tarea. Windows da la tarea por terminada solo cuando
+rem      nadie mas tiene esa salida abierta... y el motor no la suelta
+rem      nunca. La tarea se quedaba 'corriendo' para siempre, Windows
+rem      terminaba matandola (resultado 255) y, como esta puesta en no
+rem      abrir dos a la vez, SALTABA TODAS LAS PASADAS SIGUIENTES. El
+rem      autodespliegue dejo de bajar codigo durante horas sin avisar.
+rem   2. Como heredaba la salida, el registro del autodespliegue se
+rem      llenaba de las lineas de cada visita a la pagina, tapando los
+rem      mensajes propios. Justo el archivo donde habia que mirar para
+rem      entender por que no bajaba nada.
+rem
+rem  Ahora se abre en su propia ventana (`cmd /s /c`, que ademas es la
+rem  forma segura de pasar comillas dentro de comillas) y escribe en
+rem  servidor.log, que es donde va lo del servidor. Esta tarea termina
+rem  enseguida y la siguiente pasada corre normal.
+start "MotorGlosasRescate" /min cmd /s /c ""%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%REPO%\data\servidor.log" 2>&1"
 ping -n 16 127.0.0.1 >nul
 powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
 if errorlevel 1 (
