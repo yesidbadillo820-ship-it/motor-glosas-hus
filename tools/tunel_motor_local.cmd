@@ -35,5 +35,11 @@ for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
 echo [%date% %time%] conectando el tunel (protocolo %PROTOCOLO%)... >> "%LOG%"
 "%BASE%\cloudflared.exe" tunnel --no-autoupdate --protocol %PROTOCOLO% run --token %TOKEN% >> "%LOG%" 2>&1
 echo [%date% %time%] el tunel se corto; se reconecta en 5 segundos >> "%LOG%"
-timeout /t 5 /nobreak >nul
+rem  ESPERAS CON PING, NO CON TIMEOUT (21-08-2026). Estos bots ahora
+rem  corren tambien SIN sesion iniciada (tarea de arranque del PC), y
+rem  ahi `timeout` no siempre tiene una consola de verdad: contesta
+rem  "Input redirection is not supported" y sigue de largo sin esperar,
+rem  con lo que el bucle se vuelve loco. `ping` a uno mismo espera
+rem  igual y funciona en todos los casos. ping -n 6 = 5 segundos.
+ping -n 6 127.0.0.1 >nul
 goto :loop

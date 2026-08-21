@@ -28,8 +28,21 @@ rem
 rem  Se cuenta cuantos procesos corren este mismo archivo. Si hay mas
 rem  de uno, el que sobra se va en silencio. Mismo metodo que ya usa
 rem  el bucle de abajo para no arrancar dos motores.
+rem
+rem  OJO CON UNA TRAMPA (corregido el 21-08-2026, la tarde del mismo
+rem  dia). La primera version contaba TODO proceso cuya linea de
+rem  ordenes dijera 'servidor_motor_local'... y la propia orden de
+rem  PowerShell que hace la cuenta lleva ese texto escrito adentro.
+rem  O sea que PowerShell se contaba a si mismo: 1 vigilante + 1
+rem  PowerShell = 2, y el vigilante -aun siendo el unico- se cerraba
+rem  SIEMPRE. Resultado en el PC de cartera: se reinicio el equipo y
+rem  el tunel subio pero el motor nunca arranco (pantalla 502).
+rem  Por eso ahora solo se cuentan procesos cmd.exe, que es lo que de
+rem  verdad es un vigilante. PowerShell es powershell.exe y queda
+rem  fuera. La misma proteccion se le puso al uvicorn de abajo, que
+rem  se salvaba solo por casualidad.
 rem ---------------------------------------------------------------
-powershell -NoProfile -Command "$n=@(Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'servidor_motor_local'}).Count; if($n -gt 1){exit 1}else{exit 0}"
+powershell -NoProfile -Command "$n=@(Get-CimInstance Win32_Process | Where-Object {$_.Name -eq 'cmd.exe' -and $_.CommandLine -match 'servidor_motor_local'}).Count; if($n -gt 1){exit 1}else{exit 0}"
 if errorlevel 1 (
   echo [%date% %time%] ya habia un vigilante corriendo: este sobra y se cierra >> "%REPO%\data\servidor.log"
   exit /b 0
@@ -72,9 +85,15 @@ rem     servidor que moria al instante contra el puerto ocupado, un
 rem     proceso nuevo cada 5 segundos llenando el registro. Asi, el
 rem     vigilante de mas simplemente espera: si el otro se cae, este
 rem     toma el relevo.
-powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'python*' -and $_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 1}else{exit 0}"
 if errorlevel 1 (
-  timeout /t 5 /nobreak >nul
+rem  ESPERAS CON PING, NO CON TIMEOUT (21-08-2026). Estos bots ahora
+rem  corren tambien SIN sesion iniciada (tarea de arranque del PC), y
+rem  ahi `timeout` no siempre tiene una consola de verdad: contesta
+rem  "Input redirection is not supported" y sigue de largo sin esperar,
+rem  con lo que el bucle se vuelve loco. `ping` a uno mismo espera
+rem  igual y funciona en todos los casos. ping -n 6 = 5 segundos.
+  ping -n 6 127.0.0.1 >nul
   goto :loop
 )
 
@@ -100,5 +119,5 @@ for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
 echo [%date% %time%] arrancando el servidor... >> "%LOG%"
 "%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%LOG%" 2>&1
 echo [%date% %time%] el servidor se detuvo; se reinicia en 5 segundos >> "%LOG%"
-timeout /t 5 /nobreak >nul
+ping -n 6 127.0.0.1 >nul
 goto :loop

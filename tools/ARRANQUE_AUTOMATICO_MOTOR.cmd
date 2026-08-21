@@ -91,6 +91,42 @@ if errorlevel 1 (
   exit /b 1
 )
 
+rem ---------- 3b) El autodespliegue tambien sin sesion ----------
+rem  POR QUE (21-08-2026, tarde). El autodespliegue corre cada 5
+rem  minutos y trae una RED DE SEGURIDAD: si el motor no esta
+rem  arriba, lo arranca directo. Es lo que ha salvado el portal
+rem  varias veces.
+rem
+rem  Pero esa tarea se creo sin decir con que cuenta corre, y
+rem  Windows por defecto la deja en 'solo cuando el usuario haya
+rem  iniciado sesion'. O sea: la red de seguridad dormia justo
+rem  cuando mas hacia falta, al prender el PC sin que nadie entre.
+rem  Se reinicio el equipo esa tarde, el motor no arranco, y la red
+rem  de seguridad no se entero.
+rem
+rem  Se vuelve a crear con la misma cuenta, para que trabaje igual
+rem  este quien este. Windows pide la contrasena OTRA VEZ: es la
+rem  misma de antes, y se guarda en la boveda de Windows, nunca en
+rem  un archivo de este repositorio.
+echo.
+echo   Ahora la tarea del autodespliegue, para que la red de
+echo   seguridad tambien trabaje con el PC recien prendido.
+echo   Windows le pide la MISMA contrasena una segunda vez.
+echo.
+schtasks /Create /F /TN "MotorGlosas_Autodeploy" /SC MINUTE /MO 5 ^
+  /RU "%CUENTA%" /RP * /TR "\"%REPO%\tools\autodeploy_motor_local.cmd\""
+if errorlevel 1 (
+  echo.
+  echo   OJO: no se pudo cambiar la tarea del autodespliegue.
+  echo   El arranque del PC SI quedo puesto y el motor va a subir.
+  echo   Lo unico que falta es la red de seguridad cuando nadie ha
+  echo   iniciado sesion. Se puede reintentar corriendo este mismo
+  echo   archivo mas tarde. No se rompio nada.
+  echo.
+) else (
+  echo    Autodespliegue con red de seguridad permanente: listo.
+)
+
 rem ---------- 4) Comprobar que quedo ----------------------------
 echo.
 echo   Comprobando...
