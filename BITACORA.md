@@ -6253,16 +6253,63 @@ la trampa, y deja escribir otra: Enter para dejar la que detectó, o el nombre
 correcto para corregirla. Al final dice con cuál quedó, que es la única forma
 de que el auditor se entere si se equivocó.
 
+### 21-08 (noche) — El intento fallido había borrado la tarea de arranque
+
+Yesid mandó lo que decía su PC, y ahí apareció lo que faltaba entender:
+
+> `MotorGlosas_Arranque .... NO EXISTE`
+
+La tarea que se había creado por la mañana **ya no estaba**. La historia
+completa del día, en tres actos:
+
+1. Por la mañana la tarea quedó creada.
+2. Por la tarde, un intento sin permisos contestó «Acceso denegado».
+3. Por la noche ya no había tarea.
+
+**Por qué.** Al crear la tarea, Windows **primero borra la que hubiera**. Si
+después falla por falta de permisos, se queda **sin ninguna**. O sea que el
+intento dejó el PC peor de como estaba — y de eso nadie se entera **hasta el
+próximo reinicio**, que es justo cuando ya no se puede hacer nada.
+
+Ahora el instalador pregunta por los permisos **antes de tocar nada**. Sin
+ellos se va explicando cómo abrirlo bien y dejando todo como estaba. Y si aun
+así falla más adelante, avisa con todas las letras que puede no haber quedado
+ninguna tarea.
+
+**Lo que sí quedó confirmado, y era la duda de la mañana:** el autodespliegue
+corre con la cuenta `cartera` —la buena, no `cpimiento`— y esa cuenta **sí
+entra** a la carpeta de soportes del servidor. Ya sabemos con qué cuenta hay
+que dejar la tarea de arranque.
+
+### 21-08 (noche) — La revisión de la rama del hospital sirvió el mismo día
+
+Por la tarde se puso la revisión automática sobre `motor-glosas`, la rama de la
+que el PC baja el código. **Lo primero que hizo fue delatar un defecto propio
+que ya estaba fusionado:** un comentario que quedó dentro de un bloque entre
+paréntesis del vigilante, que en los archivos de Windows es un sitio frágil —
+puede hacer que el bot deje de hacer parte de su trabajo sin avisar.
+
+Sin esa revisión, ese comentario se quedaba en el archivo que mantiene el
+portal vivo y nadie se enteraba nunca. Ya está corregido, y de paso la prueba
+que lo vigila se amplió a los **51 bots** del repositorio: la trampa no era de
+ese archivo, es de los `.cmd` de Windows, y cualquier bot de doble clic puede
+caer en ella.
+
 ## 3) PENDIENTE
 
 ### Permisos del portal (nuevo, 21-08 tarde)
 - ~~Cerrar la consulta de usuarios.~~ **HECHO el 21-08 por la tarde.** Ya
   exige rol de coordinación, y las cinco pantallas que la usaban para armar
   un desplegable piden ahora una lista aparte con solo lo suyo.
-- **Confirmar con qué cuenta quedó la tarea de arranque.** La primera vez
-  quedó con `cpimiento` en vez de `cartera`, porque al elevar la ventana
-  Windows pidió esa otra cuenta. El instalador ahora pregunta; hay que
-  volver a correrlo y escribir la cuenta correcta.
+- **VOLVER A CREAR LA TAREA DE ARRANQUE — es lo más urgente.** Hoy **no
+  existe**: el intento fallido de la tarde la borró. Mientras siga así, si el
+  PC se reinicia el portal **no vuelve solo**; depende de que alguien inicie
+  sesión. Cómo hacerlo: clic derecho sobre
+  `tools\ARRANQUE_AUTOMATICO_MOTOR.cmd` → **Ejecutar como administrador**, y
+  cuando pregunte la cuenta escribir **`cartera`** (ya está confirmado que esa
+  cuenta entra a la carpeta de soportes). Pedirá la clave dos veces.
+- **Comprobar después con `ESTADO_MOTOR.cmd`:** las dos tareas deben decir
+  «trabaja aunque nadie inicie sesión: SI».
 - **Comprobar el arranque automático de verdad:** reiniciar el PC y, **sin
   iniciar sesión**, abrir el portal desde el celular. Si carga, quedó bien. Si
   no, doble clic en `ESTADO_MOTOR.cmd`, que ahora dice cuál tarea duerme.
