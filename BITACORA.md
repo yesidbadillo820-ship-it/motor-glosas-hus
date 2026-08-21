@@ -6121,7 +6121,82 @@ hospital. En producción, donde el catálogo sí los trae, salen con su código.
 Lo que queda sin propuesta son consultas y procedimientos donde el área
 depende del caso, no del nombre. Ahí el gestor decide, que es lo correcto.
 
+### 21-08 (tarde) — El menú muestra solo lo que a cada quien le toca
+
+Pedido de Yesid: el rol AUDITOR ve todo **menos** Inteligencia, Expediente,
+Usuarios, Mando ejecutivo e Importar de Recepción.
+
+Esos botones ahora se ocultan para quien no sea coordinador o administrador.
+Si un título de sección queda sin botones, el título también se oculta: no
+queda un rótulo suelto sin nada debajo. El buscador de comandos (Ctrl+K)
+filtra igual, porque esconder el botón y dejar el atajo sería ordenar la
+pantalla a medias.
+
+**Lo que hay que decir con todas las letras:** esconder un botón **ordena** la
+pantalla, **no protege** el dato. La consulta de usuarios sigue abierta a
+cualquiera que haya entrado con su clave; quien escriba la dirección a mano
+todavía puede ver la lista de usuarios con sus correos. Cerrar esa puerta es
+un trabajo aparte —hay cinco pantallas que la usan— y quedó **pendiente**.
+
+### 21-08 (tarde) — Se reinició el PC y el motor no arrancó: dos agujeros
+
+Yesid reinició el PC de cartera para comprobar el arranque automático. El
+portal contestó **«Bad gateway 502»**: el túnel de Cloudflare sí subió, el
+motor no.
+
+**Agujero 1 — el vigilante se contaba a sí mismo.** En la mañana se le puso un
+candado al vigilante para que no hubiera cuatro ventanas abiertas a la vez: el
+vigilante cuenta cuántos hay antes de arrancar y, si sobra, se cierra. La
+cuenta la hace una orden de Windows… y esa orden lleva escrito adentro el
+mismo texto que busca. Windows no esconde al que pregunta, así que se contaba
+a sí mismo: **1 vigilante + 1 orden contando = 2**, y como dos es «más de
+uno», el vigilante se cerraba **siempre**, aun siendo el único. No fue cosa
+del reinicio: llevaba así desde la mañana; el reinicio solo lo dejó a la
+vista. Ahora la cuenta solo mira las ventanas que de verdad son vigilantes.
+
+**Agujero 2 — la red de seguridad dormía.** El autodespliegue corre cada 5
+minutos y trae una red de seguridad: si el motor no está arriba, lo arranca
+directo. Es la que ha salvado el portal varias veces. Pero esa tarea se creó
+sin decirle a Windows con qué cuenta corre, y Windows por defecto la deja en
+«solo cuando alguien haya iniciado sesión». O sea: dormía justo en el único
+momento para el que se hizo. Ahora se vuelve a crear con la cuenta del
+usuario, para que trabaje esté quien esté.
+
+De paso, las esperas de los tres bots que ahora corren con el PC recién
+prendido pasaron de una orden que necesita ventana de verdad a otra que
+funciona siempre. Los tiempos quedan iguales.
+
+**Y para que no vuelva a pasar sin que nadie lo vea:** la pantalla de estado
+(doble clic en `ESTADO_MOTOR.cmd`) ahora revisa también la tarea de arranque
+y, de cada tarea, dice si trabaja aunque nadie inicie sesión o si duerme, y
+cómo le fue la última vez. Una tarea que existe pero duerme se veía igual de
+bien que una que trabaja: esa fue exactamente la trampa.
+
+**Lección de las pruebas.** Las pruebas de la mañana miraban que el texto del
+candado estuviera escrito en el archivo. Estaba escrito. Nadie probó la
+**cuenta**, que era lo único que importaba. Las nuevas simulan la lista de
+ventanas de Windows y hacen la cuenta de verdad: con el defecto puesto de
+vuelta a propósito, cinco de ellas se ponen en rojo.
+
 ## 3) PENDIENTE
+
+### Permisos del portal (nuevo, 21-08 tarde)
+- **Cerrar la consulta de usuarios.** Hoy cualquiera que haya entrado con su
+  clave puede pedir la lista de usuarios del portal, con correos y roles.
+  Esconder el botón del menú, que es lo que se hizo, **ordena la pantalla pero
+  no protege el dato**. Cerrarla de verdad exige revisar las cinco pantallas
+  que la usan, para no dejar sin funcionar algo que hoy trabaja bien.
+- **Comprobar el arranque automático de verdad:** reiniciar el PC y, **sin
+  iniciar sesión**, abrir el portal desde el celular. Si carga, quedó bien. Si
+  no, doble clic en `ESTADO_MOTOR.cmd`, que ahora dice cuál tarea duerme.
+- **Volver a correr `tools\ARRANQUE_AUTOMATICO_MOTOR.cmd`** cuando el arreglo
+  de esta tarde llegue al PC: ahora también deja el autodespliegue trabajando
+  con el PC recién prendido, y para eso Windows pide la contraseña una segunda
+  vez (es la misma).
+- **Confirmar que la cuenta del arranque llega al servidor.** La tarea quedó
+  instalada con la cuenta `ESEHUS\cpimiento`, no con `cartera`. Falta
+  comprobar que esa cuenta sí entra a `\\Prime\radicacion_2026`; si no, el
+  índice de soportes queda vacío aunque el portal abra.
 
 ### Sistema ICFES (nuevo, 20-08)
 - **Hacer el simulacro de diagnóstico.** Sin él, el plan reparte las horas a
