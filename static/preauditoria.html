@@ -315,6 +315,15 @@ if (!TOKEN) { alert('Debes iniciar sesión primero'); location.href = '/'; }
 document.getElementById('hd-user').textContent = localStorage.getItem('hus_user') || '';
 var USER_ROL = (localStorage.getItem('hus_rol') || '').toUpperCase();
 var ES_ADMIN = (USER_ROL === 'SUPER_ADMIN' || USER_ROL === 'COORDINADOR');
+// Cada auditor puede deshacer LO SUYO (mientras no haya salido en un oficio
+// de devolución entregado). El servidor manda; esto solo evita que el botón
+// se vea habilitado para algo que va a rebotar.
+var MI_NOMBRE = (localStorage.getItem('hus_user') || '').trim().toUpperCase();
+function esMia(f){ return !!f.auditor && String(f.auditor).trim().toUpperCase() === MI_NOMBRE; }
+function puedeRevertir(f){
+  if(ES_ADMIN || f.resultado === 'PENDIENTE') return true;
+  return esMia(f) && !f.oficio_devolucion_id;
+}
 // La autorización real la impone el servidor; esto solo muestra/oculta botones.
 if (ES_ADMIN) {
   document.addEventListener('DOMContentLoaded', function(){
@@ -717,7 +726,7 @@ async function abrirAuditar(id){
         '<button class="btn btn-rojo" '+(limite?'disabled':'')+' onclick="auditar('+f.id+',\'DEVUELTA\')">✖ Devolver</button>'+
         // Revertir una auditoría YA DECIDIDA es solo de coordinación/admin:
         // cambia lo que ya se reportó. El backend lo exige igual (403).
-        '<button class="btn btn-borde" '+((f.resultado!=='PENDIENTE' && !ES_ADMIN)?'disabled title="Solo coordinación o administración puede revertir una auditoría ya decidida"':'')+' onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
+        '<button class="btn btn-borde" '+(puedeRevertir(f)?'':'disabled title="'+(f.oficio_devolucion_id?'Esta factura ya salió en un oficio de devolución entregado: solo coordinación o administración puede deshacerla':'La auditó '+esc(f.auditor||'otra persona')+': solo esa persona o coordinación puede deshacerla')+'"')+' onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
   }catch(e){ document.getElementById('ma-cuerpo').innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
 }
 // Evita que un doble clic (o clics repetidos porque el servidor va lento)

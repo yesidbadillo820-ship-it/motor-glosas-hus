@@ -824,18 +824,15 @@ def auditar_factura(
     f = db.get(FacturaPreauditoriaRecord, factura_id)
     if not f:
         raise HTTPException(404, "Factura no encontrada")
-    # Una auditoría YA DECIDIDA (radicada o devuelta) solo la modifica
-    # coordinación/administración: revertirla cambia lo que se reportó.
-    if (
-        body.resultado == "PENDIENTE"
-        and f.resultado_actual != svc.RESULTADO_PENDIENTE
-        and not _es_admin_o_coordinador(current_user)
-    ):
-        raise HTTPException(
-            403,
-            "Solo coordinación o administración puede revertir una auditoría "
-            "ya radicada o devuelta.",
+    # Deshacer una auditoría YA DECIDIDA: cada auditor puede con LO SUYO
+    # mientras no haya salido en un oficio de devolución entregado; lo de otra
+    # persona sigue siendo de coordinación (la regla vive en el servicio).
+    if body.resultado == "PENDIENTE" and f.resultado_actual != svc.RESULTADO_PENDIENTE:
+        puede, motivo = svc.puede_revertir(
+            f, _nombre_auditor(current_user), _es_admin_o_coordinador(current_user)
         )
+        if not puede:
+            raise HTTPException(403, motivo)
     res = svc.auditar_factura(
         db,
         f,
