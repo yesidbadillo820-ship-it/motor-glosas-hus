@@ -169,7 +169,10 @@ class TestElAutodespliegueTrabajaSinSesionIniciada:
         """Que el autodespliegue no se pueda cambiar NO puede hacer creer que
         el arranque tampoco quedó: son dos cosas distintas."""
         t = _texto(INSTALADOR)
-        i = t.index("MotorGlosas_Autodeploy")
+        # Se ancla en la ORDEN que crea la tarea, no en la primera vez que
+        # aparece su nombre: el instalador también lo nombra antes, cuando
+        # averigua con qué cuenta trabaja hoy el motor.
+        i = t.index('schtasks /Create /F /TN "MotorGlosas_Autodeploy"')
         despues = t[i : i + 900]
         assert "No se rompio nada" in despues or "no se rompio nada" in despues.lower()
         assert "SI quedo puesto" in despues or "arranque" in despues.lower()
