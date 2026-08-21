@@ -92,6 +92,61 @@ class TestCorreConLaCuentaDelUsuario:
         assert "/RL HIGHEST" not in _linea_schtasks()
 
 
+class TestNoDejarElPcPeorDeComoEstaba:
+    """Lo que pasó de verdad el 21-08, en tres actos:
+
+    1. Por la mañana la tarea de arranque quedó creada.
+    2. Por la tarde, un intento sin permisos contestó «Acceso denegado».
+    3. Por la noche ya no había tarea de arranque.
+
+    La causa: crear la tarea usa `/F`, que primero borra la que hubiera. Si
+    después falla, se queda **sin ninguna**. El intento dejó el PC peor de como
+    estaba, y de eso nadie se entera hasta el próximo reinicio — que es
+    exactamente cuando ya no se puede hacer nada.
+    """
+
+    def test_pregunta_por_los_permisos_antes_de_tocar_nada(self):
+        t = _texto()
+        assert "net session" in t, (
+            "No se comprueba si hay permisos de administrador. Sin eso, un "
+            "intento fallido borra la tarea que ya funcionaba."
+        )
+
+    def test_y_lo_pregunta_ANTES_de_crear_la_tarea(self):
+        """Comprobarlo después no sirve de nada: el daño ya está hecho."""
+        t = _texto()
+        assert t.index("net session") < t.index("schtasks /Create"), (
+            "La comprobación de permisos quedó DESPUÉS de crear la tarea."
+        )
+
+    def test_si_no_hay_permisos_se_va_sin_hacer_nada(self):
+        t = _texto()
+        i = t.index("net session")
+        despues = t[i : i + 1200]
+        assert "exit /b 1" in despues
+        assert "No se toco nada" in despues
+
+    def test_y_explica_como_abrirlo_bien(self):
+        t = _texto()
+        i = t.index("net session")
+        despues = t[i : i + 1200]
+        assert "Ejecutar como administrador" in despues
+
+    def test_avisa_de_la_otra_cuenta_desde_ese_mismo_aviso(self):
+        """Es el momento en que el auditor va a elevar la ventana: avisarle
+        después sería tarde."""
+        t = _texto()
+        i = t.index("net session")
+        despues = t[i : i + 1200]
+        assert "NO la de administrador" in despues
+
+    def test_si_aun_asi_falla_avisa_que_puede_no_quedar_ninguna(self):
+        """El caso que quedó sin contar: falló, y la que había ya no está."""
+        t = _texto()
+        assert "AHORA NO HAY NINGUNA" in t
+        assert "ESTADO_MOTOR.cmd" in t
+
+
 class TestLaTrampaDeEjecutarComoAdministrador:
     """Crear una tarea con contraseña guardada exige permisos de
     administrador: sin ellos, `schtasks` contesta «Acceso denegado». Pero al

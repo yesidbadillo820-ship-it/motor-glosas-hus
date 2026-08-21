@@ -97,21 +97,46 @@ class TestNingunComentarioRompeUnBloque:
     Casi pasa el 21-08-2026: la nota que explica por qué se espera con `ping`
     quedó, al insertarla, dentro del bloque que reintenta el bucle."""
 
-    def test_ningun_rem_con_parentesis_dentro_de_un_bloque(self):
+    def _revisar(self, ruta: Path) -> list[tuple[int, str]]:
+        nivel, malos = 0, []
+        for n, linea in enumerate(_texto(ruta).splitlines(), 1):
+            pelada = linea.strip()
+            if pelada.lower().startswith("rem") or pelada.startswith("::"):
+                if nivel > 0 and ("(" in pelada or ")" in pelada):
+                    malos.append((n, pelada[:70]))
+                continue
+            nivel = max(0, nivel + linea.count("(") - linea.count(")"))
+        return malos
+
+    def test_en_los_bots_del_arranque(self):
         for ruta in SIN_SESION + [INSTALADOR]:
-            nivel = 0
-            for n, linea in enumerate(_texto(ruta).splitlines(), 1):
-                pelada = linea.strip()
-                es_comentario = pelada.lower().startswith("rem")
-                if es_comentario:
-                    assert not (nivel > 0 and ("(" in pelada or ")" in pelada)), (
-                        f"{ruta.name} línea {n}: un `rem` con paréntesis dentro "
-                        f"de un bloque. Puede cerrar el bloque antes de tiempo y "
-                        f"el bot deja de hacer lo que sigue, en silencio.\n"
-                        f"  {pelada[:70]}"
-                    )
-                    continue
-                nivel = max(0, nivel + linea.count("(") - linea.count(")"))
+            malos = self._revisar(ruta)
+            assert not malos, (
+                f"{ruta.name}: un `rem` con paréntesis dentro de un bloque. "
+                f"Puede cerrar el bloque antes de tiempo y el bot deja de hacer "
+                f"lo que sigue, en silencio.\n" + "\n".join(f"  línea {n}: {s}" for n, s in malos)
+            )
+
+    def test_y_en_TODOS_los_bots_del_repositorio(self):
+        """La trampa no es de estos cuatro archivos: es de los .cmd de Windows.
+        Cualquiera de los bots de doble clic del auditor puede caer en ella, y
+        cuando cae no avisa: simplemente deja de hacer parte de su trabajo.
+
+        Los 51 que hay hoy están limpios; esta prueba es para que el número 52
+        no entre con el defecto puesto."""
+        raiz = Path(__file__).resolve().parents[2]
+        archivos = [
+            f for patron in ("*.cmd", "*.bat") for f in raiz.rglob(patron) if ".git" not in f.parts
+        ]
+        assert len(archivos) >= 40, "se perdieron bots: ¿cambió la estructura?"
+
+        problemas = {f: self._revisar(f) for f in archivos}
+        problemas = {f: m for f, m in problemas.items() if m}
+        assert not problemas, "comentarios con paréntesis dentro de un bloque:\n" + "\n".join(
+            f"  {f.relative_to(raiz)} línea {n}: {s}"
+            for f, malos in problemas.items()
+            for n, s in malos
+        )
 
 
 class TestElAutodespliegueTrabajaSinSesionIniciada:

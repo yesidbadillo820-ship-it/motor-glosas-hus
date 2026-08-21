@@ -52,6 +52,37 @@ if not exist "%LANZADOR%" (
   exit /b 1
 )
 
+rem ---------- 1b) ¿Hay permisos de administrador? ---------------
+rem  SE COMPRUEBA ANTES DE TOCAR NADA (21-08-2026, noche).
+rem
+rem  Crear la tarea usa /F, que primero borra la que hubiera. Si
+rem  despues falla por falta de permisos, se queda SIN NINGUNA: el
+rem  intento deja el PC peor de como estaba. Paso de verdad: por la
+rem  manana la tarea quedo creada, por la tarde un intento sin
+rem  permisos contesto 'Acceso denegado', y en la noche ya no habia
+rem  tarea de arranque. Nadie se entera hasta el proximo reinicio.
+rem
+rem  'net session' solo funciona con permisos de administrador: es la
+rem  forma clasica de preguntarlo en un .cmd.
+net session >nul 2>&1
+if errorlevel 1 (
+  echo   Esta ventana NO tiene permisos de administrador, y sin ellos
+  echo   Windows no deja crear una tarea que guarde una contrasena.
+  echo.
+  echo   QUE HACER: cierre esta ventana. Busque el archivo
+  echo     %%~f0
+  echo   haga clic DERECHO encima y elija 'Ejecutar como administrador'.
+  echo.
+  echo   OJO: si al hacerlo Windows le pide OTRA cuenta, mas adelante
+  echo   este archivo le va a preguntar con que cuenta debe correr la
+  echo   tarea. Ahi escriba la cuenta del motor, NO la de administrador.
+  echo.
+  echo   No se toco nada: todo quedo como estaba.
+  echo.
+  pause
+  exit /b 1
+)
+
 rem ---------- 2) Quien es el usuario -----------------------------
 rem  LA TRAMPA DE 'EJECUTAR COMO ADMINISTRADOR' (21-08-2026, tarde).
 rem  Crear una tarea que corre con una cuenta y su contrasena guardada
@@ -112,8 +143,12 @@ if errorlevel 1 (
   echo     2. Si dijo que la contrasena no sirve: vuelva a intentar. Ojo
   echo        con el bloqueo de mayusculas.
   echo.
-  echo   Mientras tanto el motor sigue arrancando al iniciar sesion,
-  echo   como hasta ahora. No se rompio nada.
+  echo   OJO IMPORTANTE: al crear la tarea se borra primero la que
+  echo   hubiera. Si ya existia una y esto fallo, AHORA NO HAY NINGUNA:
+  echo   el motor NO va a arrancar solo al prender el PC hasta que este
+  echo   archivo termine bien. Compruebelo con tools\ESTADO_MOTOR.cmd.
+  echo.
+  echo   El motor sigue arrancando al iniciar sesion, eso no se toco.
   echo.
   pause
   exit /b 1
