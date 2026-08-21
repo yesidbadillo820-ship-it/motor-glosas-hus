@@ -53,8 +53,31 @@ if not exist "%LANZADOR%" (
 )
 
 rem ---------- 2) Quien es el usuario -----------------------------
+rem  LA TRAMPA DE 'EJECUTAR COMO ADMINISTRADOR' (21-08-2026, tarde).
+rem  Crear una tarea que corre con una cuenta y su contrasena guardada
+rem  exige permisos de administrador: sin ellos schtasks contesta
+rem  'Acceso denegado'. Pero al abrir la ventana como administrador, si
+rem  Windows pide OTRA cuenta, la ventana pasa a correr con ESA otra y
+rem  %USERNAME% ya no es la del auditor.
+rem
+rem  Asi fue como la tarea de la manana quedo puesta con la cuenta
+rem  cpimiento cuando la del motor es cartera. No da error: la tarea
+rem  queda, el motor arranca, y si esa cuenta no entra a la carpeta de
+rem  soportes del servidor, el indice amanece vacio sin que nadie
+rem  entienda por que. Por eso ahora se pregunta, en vez de suponer.
 set "CUENTA=%USERDOMAIN%\%USERNAME%"
-echo   La tarea va a correr con la cuenta:  %CUENTA%
+echo   Esta ventana esta corriendo con la cuenta:  %CUENTA%
+echo.
+echo   OJO: la tarea tiene que correr con la cuenta que usa el motor
+echo   todos los dias, la que SI entra a la carpeta de soportes del
+echo   servidor. Si abrio esta ventana como administrador y Windows le
+echo   pidio otra cuenta, arriba aparece esa otra y NO es la que sirve.
+echo.
+set "OTRA="
+set /p "OTRA=   Enter para dejar %CUENTA%, o escriba DOMINIO\usuario: "
+if not "%OTRA%"=="" set "CUENTA=%OTRA%"
+echo.
+echo   La tarea va a correr con:  %CUENTA%
 echo.
 echo   Windows le va a pedir la contrasena de ESA cuenta.
 echo   La escribe usted; no se guarda en ningun archivo del motor.
@@ -80,9 +103,14 @@ if errorlevel 1 (
   echo   NO se pudo crear la tarea.
   echo.
   echo   Las dos causas mas comunes:
-  echo     1. La contrasena no era la correcta. Vuelva a intentar.
-  echo     2. Hace falta abrir esta ventana como administrador:
-  echo        clic derecho sobre el archivo - Ejecutar como administrador.
+  echo     1. Si dijo 'Acceso denegado': hace falta abrir esta ventana
+  echo        como administrador. Clic derecho sobre el archivo -
+  echo        Ejecutar como administrador.
+  echo        Y si al elevarla Windows le pide OTRA cuenta, cuando este
+  echo        archivo le pregunte con que cuenta correr, escriba la del
+  echo        motor, no la de administrador.
+  echo     2. Si dijo que la contrasena no sirve: vuelva a intentar. Ojo
+  echo        con el bloqueo de mayusculas.
   echo.
   echo   Mientras tanto el motor sigue arrancando al iniciar sesion,
   echo   como hasta ahora. No se rompio nada.
@@ -142,6 +170,8 @@ echo.
 echo   ============================================================
 echo     LISTO. El motor va a arrancar solo al prender el PC,
 echo     sin que nadie tenga que iniciar sesion.
+echo.
+echo     Corre con la cuenta:  %CUENTA%
 echo   ============================================================
 echo.
 echo   Lo que NO cambio:
