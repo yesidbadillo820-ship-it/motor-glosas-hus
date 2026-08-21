@@ -2904,6 +2904,71 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 21-08-2026 — Las glosas del ADRES, en el formato OBJECIONES de DGH
+
+**Lo que pidió el auditor:** organizar el archivo del **«ADRES DANIEL»** para
+convertirlo en el archivo de **OBJECIONES** que se viene trabajando con
+COOSALUD, «pero que todos los servicios queden completos», y usar el DGReport y
+el Homologador Gold Standard para homologar los servicios o códigos que no se
+encuentren.
+
+**El problema de fondo:** el ADRES y DGH le ponen nombres distintos al mismo
+servicio. El ADRES usa el **código SOAT** (`29117` terapia respiratoria,
+`38134` habitación de cuatro o más camas) y el **registro INVIMA** de los
+medicamentos y materiales (`2016DM-0000315-R2`); DGH usa su código interno
+(`939403`, `10A004`, `FMQ0041`). Mientras no estén homologados, el archivo no se
+puede cargar: esa columna es la que amarra cada objeción con el renglón que se
+facturó.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/organizar_objeciones_adres.py`, con
+su botón de doble clic `OBJECIONES_ADRES.cmd` y su guía
+`README_organizar_objeciones_adres.md`. Homologa por seis caminos, siempre
+dentro de la misma factura y parando en cuanto uno acierta: código directo,
+SOAT→CUPS con el Homologador, descripción igual, descripción que empieza igual,
+**valor exacto más palabras en común** (así se resuelve «Habitación de cuatro ó
+mas camas» ↔ «Internación complejidad alta cuatro o mas camas») y descripción
+muy parecida.
+
+**Resultado del paquete 31068:** las **4.619 glosas** de las **324 facturas**
+salieron en dos archivos —`OBJECIONES_ADRES_LOTE_01.xlsx` (300 facturas) y
+`_LOTE_02.xlsx` (24)—, porque DGH no recibe más de 300 facturas por archivo. Se
+homologaron **2.763 de los 3.262 renglones que señalan un servicio (84,7 %)**.
+Total objetado: **$1.032.239.679**.
+
+**Ningún renglón se perdió**, que era lo que pidió: hay tantas filas en la
+salida como glosas trae el ADRES. Y **lo que no se pudo homologar no se
+inventó**: sale con la casilla vacía y queda listado en el archivo
+`REVISAR_OBJECIONES_ADRES.xlsx` con el candidato más parecido.
+
+**Tres cosas que hay que revisar antes de cargar:**
+
+1. **El código de la glosa.** El ADRES usa códigos numéricos de cuatro dígitos
+   (`3106`, `3209`, `4506`) y DGH los de seis del Manual Único (`SO3401`,
+   `CL0101`). **No hay una tabla oficial que los equipare**, así que el bot
+   escribe el del ADRES tal cual. La hoja `CODIGOS` del archivo REVISAR trae los
+   50 códigos con cuánta plata mueve cada uno y el grupo del Manual Único que le
+   corresponde, para armar la equivalencia; después se le pasa al bot con
+   `--mapa-codigos`.
+2. **499 renglones sin código de servicio** ($135.744.756). Casi todos son los
+   códigos SOAT que descomponen una cirugía —honorarios de cirujano, ayudantía,
+   derechos de sala, materiales—: DGH factura la cirugía en **un solo renglón**,
+   así que no hay a cuál amarrarlos uno por uno. Se probó deducirlos sumando los
+   componentes hasta cuadrar con el renglón de DGH y **se descartó**: en varias
+   facturas cuadraban dos combinaciones distintas, y adivinar mal el servicio en
+   un archivo que se carga al ERP es peor que dejarlo en blanco.
+3. **1.630 renglones de glosa total por FURIPS** ($236.217.091) no traen causal
+   propia, y **1.357** no señalan ningún servicio: el ADRES glosó la reclamación
+   entera. Salen en el archivo y quedan avisados uno por uno.
+
+El bot también trae el **guardián de valores** del cruce de DGH de la Suite
+Cartera: la objeción nunca supera el valor del servicio en DGH ni el saldo de la
+factura. En el 31068 recortó **$2.110.859** en 15 renglones, todos anotados con
+el antes y el después.
+
+Y como siempre: **piloto de UNA factura antes del cargue masivo**.
+
+---
+
 ### 21-08-2026 — El PDF y el Word de respuesta, uno por cada factura
 
 **Lo que pidió el auditor:** que de la macro salgan de una vez los documentos

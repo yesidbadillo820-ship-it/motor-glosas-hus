@@ -1,5 +1,46 @@
 # Registro de cambios
 
+## Sesión 21-ago-2026 — `organizar_objeciones_adres.py`: glosas del ADRES → OBJECIONES de DGH
+
+Bot nuevo (`tools/organizar_objeciones_adres.py` + `OBJECIONES_ADRES.cmd` +
+`README_organizar_objeciones_adres.md`) que convierte el Excel de glosas del
+ADRES al layout de 16 columnas que recibe Dinámica Gerencial.
+
+### Homologación del código de servicio (`SLNSERPRO`)
+Seis pasos, siempre dentro de la misma factura, parando en el primero que
+acierta: código directo (igualando ceros de relleno), SOAT→CUPS con el
+Homologador Gold Standard, descripción igual, descripción por prefijo, valor
+exacto + ≥50 % de palabras en común, y similitud ≥0,85. Lo que no se resuelve
+sale con la casilla **vacía** y con su mejor candidato listado en `REVISAR` —
+nunca se escribe un código deducido.
+
+En el paquete 31068: 2.763 de 3.262 renglones con servicio (84,7 %).
+
+### Reglas del formato
+- `CDCONSEC` y `GENUSUARIO4` como TEXTO, `CROCLAOBJ=0`, `GENUSUARIO4=999`.
+- `CRNCXC` en formato largo (`HUS311371` → `HUS0000311371`).
+- `CROTIPOBJ` por factura: administrativas `0`, pertinencia `1`, mezcla `2`.
+- **Guardián de valores** (el mismo de `cruces_dgh.generar_objeciones`): la
+  objeción no supera el valor del servicio en DGH ni el saldo de la factura.
+- **Lotes de 300 facturas** (tope de DGH), sin partir ninguna factura.
+
+### Detalles que costaron
+- El libro del ADRES trae una tabla dinámica con las mismas columnas pero los
+  valores sumados (`Suma de Valor Glosado`); detectar la hoja de glosas por dos
+  columnas dejaba todas las objeciones en cero. Ahora se exigen cuatro.
+- El texto de la causal viene repetido detrás de su código en la misma celda;
+  se corta en la última aparición de `<código>-`.
+- `CRNCONOBJ`: el ADRES usa códigos numéricos de 4 dígitos y DGH los de 6 del
+  Manual Único, y **no existe tabla oficial que los equipare**. Se escribe el
+  del ADRES tal cual y se entrega la hoja `CODIGOS` + `--mapa-codigos` para que
+  el auditor defina la equivalencia.
+
+### Pruebas
+`tests/test_tools/test_organizar_objeciones_adres.py` — 49 pruebas, incluida
+una de punta a punta que arma los tres libros de entrada y verifica el archivo
+de salida celda por celda.
+
+
 ## Sesión 10-jul-2026 — Suite Cartera HUS: herramienta multifuncional (GUI + CLI)
 
 Integra en `tools/suite_cartera_hus/` la Suite de Cartera/Auditoría (menú
