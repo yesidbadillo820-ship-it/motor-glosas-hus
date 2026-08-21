@@ -5911,6 +5911,48 @@ quedó.
   administrador que no necesita, y que conserve los finales de línea de
   Windows.
 
+### 21-08 — El dictamen decía que el contrato estaba vencido, y no lo estaba
+
+Yesid probó seis dictámenes más. **Se confirmó lo corregido** —el valor ya se
+lee, los códigos CUM se marcan bien, la parcial sale correcta, los soportes
+son los reales del servidor— y aparecieron dos defectos nuevos.
+
+**1 · «FUERA DE LA VIGENCIA DEL CONTRATO» — falso.**
+
+Dos glosas de FAMISANAR salieron diciendo que el servicio se prestó fuera de
+la vigencia del contrato `S-13-1-03-1-04958`, y una hasta puso **«Contrato:
+SIN CONTRATO PACTADO»** en el encabezado… mientras la línea de abajo decía
+«Tarifa pactada: SOAT UVB VIGENTE -5 %» y el cuerpo citaba el anexo tarifario
+de ese mismo contrato, **vigente del 15/04/2026 al 14/04/2027**.
+
+**Ante la EPS eso es de lo peor que se puede escribir:** quien dice que no
+tiene contrato vigente pierde el derecho a exigir la tarifa pactada.
+
+**La causa: adivinar.** El motor tomaba **la primera fecha que apareciera** en
+el número de factura, el radicado o los primeros 5.000 caracteres de los PDF, y
+la trataba como la fecha de la atención. Esa primera fecha puede ser la de
+nacimiento del paciente, la de expedición de un documento o la de validación
+del CUV.
+
+Ahora **solo cuenta una fecha etiquetada** como de atención, prestación,
+ingreso o factura. Si no la hay, **no se dice nada**: no saber cuándo se prestó
+el servicio no es prueba de que el contrato estuviera vencido.
+
+**2 · La cifra volvía a salir sin puntos.**
+
+El valor ya se **leía** bien pero se **escribía** crudo: «VALOR OBJETADO
+$ 796600». O sea que el formato de una cifra que va a la EPS dependía de cómo
+la hubiera escrito quien redactó la glosa. Ahora los cuatro caminos que
+encuentran el valor lo escriben igual: **$ 796.600**.
+
+- 8 pruebas nuevas. **Una de ellas encontró un segundo bloque de alerta de
+  vigencia** que yo no había visto — resultó ser código muerto, y quedó una
+  prueba que avisa si alguien empieza a usarlo.
+- **Tres pruebas viejas fijaban defectos.** La más llamativa se llamaba
+  `test_extraer_valor_formato_colombiano` y su descripción decía «Should
+  extract Colombian peso format»… pero exigía «1,500,000» **con comas**, que es
+  formato gringo. El nombre decía una cosa y la comprobación la contraria.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)

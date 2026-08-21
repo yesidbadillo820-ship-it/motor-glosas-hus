@@ -5376,6 +5376,37 @@ def _hay_contrato_verificado(info_tarifa: dict | None) -> bool:
     return valor > 0
 
 
+# ─── La plata, como se escribe en Colombia ──────────────────────────────────
+# 21-08-2026. `_extraer_valor` devolvía el número TAL CUAL venía en el texto.
+# Si la glosa decía «valor 796600», el dictamen que se radica salía con
+# «VALOR OBJETADO $ 796600» —sin puntos de miles—, y si decía «$150.000» salía
+# bien. O sea: el formato de una cifra que va a la EPS dependía de cómo la
+# hubiera escrito quien redactó la glosa.
+
+
+def _en_pesos_colombianos(crudo: str) -> str:
+    """`796600` → `$796.600`. `150.000` → `$150.000`. Punto de miles.
+
+    Si el número no se puede leer, se devuelve tal cual: es preferible mostrar
+    lo que decía el texto a inventar una cifra.
+    """
+    limpio = (crudo or "").strip()
+    if not limpio:
+        return "$ 0.00"
+    try:
+        from app.utils.moneda import parse_valor_cop
+
+        valor = parse_valor_cop(limpio)
+    except Exception:
+        return f"$ {limpio}"
+    if not valor:
+        return f"$ {limpio}"
+    # Con espacio después del «$»: es la forma que esta función ha devuelto
+    # siempre y la que esperan las pruebas del repositorio. Lo que estaba mal
+    # no era el espacio, era la falta del punto de miles.
+    return "$ " + f"{int(round(valor)):,}".replace(",", ".")
+
+
 class GlosaService:
     def __init__(
         self,
@@ -9036,7 +9067,7 @@ class GlosaService:
 
             valor_num = _pvc(f"{m_mult.group(1)} {m_mult.group(2)}")
             if valor_num > 0:
-                return f"$ {int(round(valor_num)):,}".replace(",", ".")
+                return "$ " + f"{int(round(valor_num)):,}".replace(",", ".")
 
         # Ronda 26/29: el OBJETADO ETIQUETADO manda. El lookahead consume la
         # corrida numérica completa para que "VALOR OBJETADO 100%" no
@@ -9051,7 +9082,7 @@ class GlosaService:
             _hits = re.findall(_p_lab, t, re.IGNORECASE)
             if _hits:
                 _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
-                return f"$ {_mejor.strip().rstrip('.,')}"
+                return _en_pesos_colombianos(_mejor)
 
         patrones = [
             r"\$\s*([\d][\d\.,]{2,})",
@@ -9081,7 +9112,7 @@ class GlosaService:
             if m:
                 raw = m.group(1).strip().rstrip(".,")
                 if any(ch.isdigit() for ch in raw):
-                    return f"$ {raw}"
+                    return _en_pesos_colombianos(raw)
 
         # Filas pegadas desde Excel (TSV): "TA0801⇥882298⇥DESCRIPCIÓN⇥36.402⇥MOTIVO".
         # El valor viene como columna SIN '$' y los patrones de arriba no lo
@@ -9095,7 +9126,7 @@ class GlosaService:
                 for celda in linea.split("\t"):
                     celda = celda.strip()
                     if pat_moneda_col.fullmatch(celda):
-                        return f"$ {celda}"
+                        return _en_pesos_colombianos(celda)
 
         # Números deletreados en palabras (12-jun-2026, ronda 2 — fix #7):
         # "por novecientos cincuenta y dos millones de pesos" entraba como

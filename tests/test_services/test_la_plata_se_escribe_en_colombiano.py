@@ -81,9 +81,9 @@ class TestElValorSeLeeCuandoEsta:
     @pytest.mark.parametrize(
         "texto,esperado",
         [
-            ("CL0801 - 898201 ESTUDIO DE COLORACION - valor 279900", "279900"),
-            ("TA5801 - 740001 CESAREA SEGMENTARIA - valor 1980300", "1980300"),
-            ("AU5801 - no se aporta autorizacion - valor glosado 2788600", "2788600"),
+            ("CL0801 - 898201 ESTUDIO DE COLORACION - valor 279900", "279.900"),
+            ("TA5801 - 740001 CESAREA SEGMENTARIA - valor 1980300", "1.980.300"),
+            ("AU5801 - no se aporta autorizacion - valor glosado 2788600", "2.788.600"),
             ("FA2006 - 34363-4 DIPIRONA SODICA - valor 30", "30"),
             ("TA0701 - 19929516-5 ACETAMINOFEN JARABE - valor 200", "200"),
         ],
@@ -93,10 +93,26 @@ class TestElValorSeLeeCuandoEsta:
         assert esperado in r
         assert "0.00" not in r
 
+    def test_la_cifra_sale_con_punto_de_miles(self, svc):
+        """21-08-2026. El valor ya se LEÍA bien pero se ESCRIBÍA crudo: la
+        glosa decía «valor 796600» y el dictamen que se radica salía con
+        «VALOR OBJETADO $ 796600», sin puntos. O sea que el formato de una
+        cifra que va a la EPS dependía de cómo la hubiera escrito quien
+        redactó la glosa."""
+        assert svc._extraer_valor("CL0101 - 879131 TOMOGRAFIA - valor 796600") == "$ 796.600"
+        assert svc._extraer_valor("CL5801 - 981601 EXTRACCION - valor 622500") == "$ 622.500"
+
+    def test_todos_los_caminos_dan_el_mismo_formato(self, svc):
+        """Hay cuatro formas de encontrar el valor —patrón, multiplicador
+        verbal, columna de Excel, respaldo— y las cuatro tienen que escribirlo
+        igual."""
+        assert svc._extraer_valor("120 mil pesos") == "$ 120.000"
+        assert svc._extraer_valor("factura de $850 millones") == "$ 850.000.000"
+        assert svc._extraer_valor("TA0801\t882298\tDESCRIPCION\t36.402\tMOTIVO") == "$ 36.402"
+        assert svc._extraer_valor("por valor de $150.000") == "$ 150.000"
+
     def test_lo_que_ya_funcionaba_no_cambia(self, svc):
-        assert "150.000" in svc._extraer_valor("por valor de $150.000")
         assert "1.084.488" in svc._extraer_valor("$ 1.084.488")
-        assert "120.000" in svc._extraer_valor("120 mil pesos")
 
     @pytest.mark.parametrize(
         "texto",
