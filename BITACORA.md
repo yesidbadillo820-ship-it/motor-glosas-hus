@@ -5872,6 +5872,45 @@ auditor a ignorar los avisos.
 **No se cambió nada.** Se dejó escrito por qué está así, y 7 pruebas que
 protegen la decisión para que nadie la «arregle» sin saber.
 
+### 21-08 — El motor arranca solo al PRENDER el PC
+
+**El problema, en concreto.** El arranque estaba en la carpeta Inicio de
+Windows, que se dispara **al iniciar sesión**. Si el PC se reinicia de noche y
+nadie entra, el hospital amanece sin portal.
+
+**Pasó hoy a las 8:57 de la mañana:** «Bad gateway · Host Error», y hubo que
+sacar el motor a mano por PowerShell.
+
+**Cómo se arregla.** Doble clic en **`tools\ARRANQUE_AUTOMATICO_MOTOR.cmd`**.
+Crea una tarea de Windows que arranca el motor **al prender el equipo**, sin
+que nadie tenga que iniciar sesión.
+
+**Le va a pedir la contraseña de Windows, y con razón.** La tarea corre con la
+cuenta del usuario a propósito, porque el motor necesita entrar a
+`\\Prime\radicacion_2026` para el índice de soportes — y la cuenta del sistema
+normalmente **no tiene ese permiso**. La contraseña la pide Windows, se guarda
+en su bóveda, y **no queda escrita en ningún archivo del repositorio**.
+
+**Espera un minuto tras el arranque:** al prender el PC la red del hospital
+todavía no está lista.
+
+**Lo que NO cambia:** sigue arrancando también al iniciar sesión (como
+respaldo), el vigilante sigue reviviendo el motor si se cae, y el
+autodespliegue sigue bajando el código nuevo cada 5 minutos.
+
+**Cómo comprobar que quedó de verdad:** reiniciar el PC y, **sin iniciar
+sesión**, abrir el portal desde el celular o desde otro equipo. Si carga,
+quedó.
+
+> **Lo más probable que lo rompa dentro de seis meses:** si cambia la
+> contraseña de Windows, la tarea deja de arrancar **en silencio**. Hay que
+> volver a correr el archivo. El propio instalador lo advierte.
+
+- 18 pruebas en `tests/test_tools/test_arranque_automatico.py`, incluidas las
+  que vigilan que no quede ninguna contraseña escrita, que no pida permisos de
+  administrador que no necesita, y que conserve los finales de línea de
+  Windows.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)
