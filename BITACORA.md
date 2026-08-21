@@ -5844,6 +5844,34 @@ encontrado contrato**.
   daba por bueno que un «valor 500000» sin «$» **no se encontrara** —su
   docstring lo llamaba «returns default when not found»—.
 
+### 21-08 — Un «agujero» que resultó ser una decisión correcta
+
+Revisando el guardián de afirmaciones documentales apareció esto: hay **dos
+caminos por donde esa protección nunca corre** —el Quality Gate y el
+postprocesador de dictámenes— porque no le pasan el dato de qué se leyó.
+
+Sonaba a hueco. **Revisándolo, es lo correcto**, y conviene que quede escrito:
+
+| Lo que se le pasa | Qué significa | Qué hace |
+|---|---|---|
+| el texto de los PDF | se leyó eso | contrasta contra ello |
+| vacío | se analizó **sin adjuntar nada** | marca cualquier afirmación sobre documentos |
+| nada | **este camino no sabe** qué se leyó | no opina |
+
+Los dos llamadores están en el tercer caso, y con razón:
+
+- El **Quality Gate** solo recibe el texto y la EPS. No tiene los PDF.
+- El **postprocesador BORRA** las frases con citas inválidas. Si ahí se
+  marcaran afirmaciones documentales, **borraría argumentación clínica
+  legítima** de dictámenes donde sí se adjuntaron soportes.
+
+Pasarles «vacío» para «cerrar el hueco» convertiría la protección en una
+máquina de avisos falsos — y un aviso equivocado en cada dictamen enseña al
+auditor a ignorar los avisos.
+
+**No se cambió nada.** Se dejó escrito por qué está así, y 7 pruebas que
+protegen la decisión para que nadie la «arregle» sin saber.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)

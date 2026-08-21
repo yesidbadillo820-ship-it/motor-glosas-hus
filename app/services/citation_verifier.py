@@ -414,6 +414,22 @@ def _verificar_folios(texto: str, issues: list[dict], evidencia: Optional[str]) 
       · ""    → no se leyó ningún soporte: CUALQUIER folio citado es inventado.
       · texto → se comparan uno a uno.
     """
+    # `None` NO es lo mismo que `""`:
+    #   ""   → «se analizó sin adjuntar nada»  → se revisa y se marca.
+    #   None → «este camino no sabe qué se leyó» → no se opina.
+    #
+    # 21-08-2026. Dos llamadores pasan None a propósito y hay que dejarlos así:
+    #
+    #   · quality_gate/post_validator.check_citas_verificadas — solo recibe el
+    #     texto y la EPS; no tiene el contexto de los PDF.
+    #   · dictamen_postprocesor — BORRA las frases con citas inválidas. Si acá
+    #     se marcaran afirmaciones documentales, borraría argumentación clínica
+    #     legítima de dictámenes donde SÍ se adjuntaron soportes.
+    #
+    # Pasarles `""` para «cerrar el hueco» convertiría esto en una máquina de
+    # avisos falsos, y un aviso equivocado en cada dictamen enseña al auditor a
+    # ignorar los avisos. La protección de verdad corre en el camino de
+    # GlosaService.analizar, que sí sabe qué se leyó.
     if evidencia is None:
         return
     try:
