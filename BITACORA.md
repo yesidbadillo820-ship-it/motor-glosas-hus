@@ -5612,6 +5612,71 @@ puerto 8000. El del 8080 es el que sirve la página por internet.
 
 - 6 pruebas en `tests/test_core/test_la_base_no_depende_de_la_carpeta.py`.
 
+### 21-08 — Responder de una vez las glosas que repiten causal
+
+**Lo que pidió Yesid, textual:** «hay glosas que vienen por 7 ítems y a esos 7
+ítems se les da la misma respuesta, y hoy por hoy lo hacen uno a uno».
+
+En la factura HUS405724 la causal **3209** —«la ayuda diagnóstica no tiene
+justificación»— viene sobre RX de pie y RX de pierna. Servicios distintos,
+misma respuesta. Escribirla dos veces es trabajo regalado; con siete, es media
+mañana.
+
+**Lo que hay ahora, en la pantalla de Glosas ADRES:**
+
+**1 · Un aviso arriba de la tabla**
+
+> ⚠ Hay causales que se repiten en esta factura — se pueden responder de una
+> sola vez
+> **3209** · La ayuda diagnóstica no tiene justificación
+> 7 glosas · 5 sin responder — **[ Responder las 7 juntas ]**
+
+**2 · Un cuadro donde usted escoge cuáles**
+
+Al apretarlo salen **las 7 filas listadas**, cada una con su servicio, su valor
+y su centro de costos, **con la casilla marcada**. Las que ya tienen decisión
+salen **desmarcadas y en ámbar**, para no pisar trabajo hecho sin querer.
+
+Usted desmarca las que necesiten respuesta distinta, escribe **una sola**
+observación técnica, escoge **una sola** decisión, y confirma.
+
+Es literalmente lo que pidió: *«que diga a cuáles servicios de esos 7 tendrían
+la misma respuesta»*.
+
+**3 · Un filtro para buscar dentro de la factura**
+
+Caja de texto (busca en causal, servicio, CUPS, observación y centro de
+costos) más tres desplegables: por causal —**con el número de veces que
+viene**—, por clasificación y por «sin decidir / ya decididas».
+
+> **El filtro solo esconde filas.** Los totales de arriba y las pastillas por
+> clasificación **no cambian nunca**: son de la factura completa. Si el filtro
+> moviera esos números, usted no sabría cuánto lleva de verdad. La pantalla lo
+> dice: «Mostrando 4 de 21 glosas · los totales de arriba son de la factura
+> completa».
+
+**Tres candados, y ninguno sobra:**
+
+- Se manda la **lista explícita** de las glosas marcadas, nunca un filtro. El
+  servidor no decide a qué filas va: aplica exactamente lo que usted marcó.
+- La causal y la clasificación **viajan como testigo**. Si una glosa del lote
+  no es de esa causal, de esa clasificación y de esa misma factura, **no se
+  escribe** y se reporta por qué.
+- **La plata no se comparte.** El lote no acepta valores ni cantidades: cada
+  glosa conserva su propio valor glosado. Compartirlo sería inventar cifras.
+
+**La 4506 no se mezcla.** Esa causal se reparte glosa por glosa entre
+Facturación y Pertinencia; si se agruparan juntas, un gestor de facturación
+arrastraría en su lote las que son de la médica auditora.
+
+- 28 pruebas nuevas (14 del servicio + 14 de la pantalla). Las de pantalla
+  **ejecutan el JavaScript de verdad en node**, no leen el HTML como texto.
+
+> **Nota:** al escribirlo llamé a una función `abrirModal` que **no existe** en
+> el portal. El JavaScript compilaba igual —era un error de ejecución— y solo
+> habría reventado al apretar el botón. Lo cazó una prueba que corre `gaPintar`
+> de verdad. Se le hizo su propio cuadro, aislado del modal de dictámenes.
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)

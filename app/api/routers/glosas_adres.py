@@ -24,7 +24,7 @@ Rutas:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -388,3 +388,56 @@ def aplicar(
         solo_confianza=cuerpo.solo_confianza,
     )
     return {"ok": True, "aplicadas": n}
+
+
+# ─── Responder varias glosas de la misma causal de una sola vez ──────────────
+#
+# 21-08-2026, pedido de Yesid: «hay glosas que vienen por 7 ítems y a esos 7 se
+# les da la misma respuesta, y hoy por hoy lo hacen uno a uno».
+
+
+class RespuestaEnLoteIn(BaseModel):
+    """Lo que el gestor marcó en pantalla, con su testigo.
+
+    `causal_codigo` y `clasificacion` no son adorno: viajan como constancia de
+    lo que la persona TENÍA a la vista. El servicio comprueba que cada glosa
+    del lote sea de esa causal y esa clasificación, así una pantalla vieja o
+    una petición armada a mano no puede escribir sobre glosas ajenas.
+
+    No hay valor ni cantidad a propósito: la respuesta técnica se comparte, la
+    plata no.
+    """
+
+    glosa_ids: list[int] = Field(..., min_length=1, max_length=200)
+    observacion_tecnico: str = Field(..., max_length=4000)
+    decision: str | None = None
+    causal_codigo: str = ""
+    clasificacion: str = ""
+
+
+@router.post("/glosas/respuesta-en-lote")
+def responder_en_lote(
+    cuerpo: RespuestaEnLoteIn,
+    db: Session = Depends(get_db),
+    usuario: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Aplica UNA misma observación técnica —y opcionalmente una decisión— a
+    varias glosas de la misma causal.
+
+    Nunca falla entera por una fila mala: aplica lo que puede y devuelve por
+    qué omitió cada una de las demás.
+    """
+    try:
+        return svc.responder_en_lote(
+            db,
+            glosa_ids=cuerpo.glosa_ids,
+            observacion_tecnico=cuerpo.observacion_tecnico,
+            decision=cuerpo.decision,
+            causal_codigo=cuerpo.causal_codigo,
+            clasificacion=cuerpo.clasificacion,
+            usuario=usuario.email,
+        )
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
