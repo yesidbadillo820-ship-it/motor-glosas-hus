@@ -234,6 +234,16 @@ def _pintar_tabla() -> dict:
             "gaCeldaArea",
             "gaCeldaCentro",
             "gaCeldaAceptado",
+            # 21-08-2026: `gaPintar` ahora llama al aviso de causales repetidas
+            # y a la barra de filtro. Sin traerlas, este banco de pruebas
+            # revienta con «gaAvisoRepetidas is not defined» — que es justo lo
+            # que hizo cuando se agregaron, y por eso esta prueba vale: ejecuta
+            # la función de verdad en vez de leer el HTML como texto.
+            "gaClasifEfectiva",
+            "gaGrupos",
+            "gaAvisoRepetidas",
+            "gaBarraFiltro",
+            "gaAplicarFiltro",
             "gaPintar",
         )
     )

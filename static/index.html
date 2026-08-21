@@ -19680,6 +19680,244 @@ async function gaBuscar(){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FILTRO Y RESPUESTA EN LOTE — Glosas ADRES (21-08-2026)
+//
+//  Pedido de Yesid: «hay glosas que vienen por 7 ítems y a esos 7 se les da
+//  la misma respuesta, y hoy por hoy lo hacen uno a uno».
+//
+//  El filtro SOLO ESCONDE FILAS. Los totales de arriba y las pastillas por
+//  clasificación son de la factura completa y no cambian nunca: si el filtro
+//  moviera esos números, el gestor no sabría cuánto lleva de verdad.
+// ═══════════════════════════════════════════════════════════════════════
+
+var GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
+
+function gaSinTildes(t){
+  return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// La clasificación con la que el gestor VE la glosa (igual que el backend).
+function gaClasifEfectiva(g){
+  if(g.requiere_asignacion) return 'POR ASIGNAR';
+  return String(g.clasificacion || 'SIN CLASIFICAR').toUpperCase();
+}
+
+function gaGrupos(d){
+  var por = {};
+  (d.glosas||[]).forEach(function(g){
+    var causal = String(g.causal_codigo||'').trim();
+    if(!causal) return;
+    var clave = causal + '|' + gaClasifEfectiva(g);
+    if(!por[clave]) por[clave] = {causal:causal, texto:g.causal_texto||'',
+                                  clasificacion:gaClasifEfectiva(g), filas:[]};
+    por[clave].filas.push(g);
+  });
+  return Object.keys(por).map(function(k){ return por[k]; })
+    .filter(function(x){ return x.filas.length >= 2; })
+    .sort(function(a,b){ return b.filas.length - a.filas.length; });
+}
+
+function gaAvisoRepetidas(d){
+  var grupos = gaGrupos(d);
+  if(!grupos.length) return '';   // nada de «0 causales repetidas»
+  var h = '<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:.8rem 1rem;margin:1rem 0">'
+        + '<div style="font-weight:800;color:#92400e;margin-bottom:.5rem">⚠ Hay causales que se repiten en esta factura — se pueden responder de una sola vez</div>';
+  grupos.forEach(function(g, i){
+    var pend = g.filas.filter(function(x){ return !String(x.decision||'').trim(); }).length;
+    h += '<div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;padding:.35rem 0;border-top:'+(i?'1px solid #fde68a':'0')+'">'
+       + '<div style="flex:1 1 340px;font-size:.82rem;color:#78350f">'
+       + '<b>'+escHtml(g.causal)+'</b> · '+escHtml(g.texto).slice(0,70)
+       + '<br><span style="opacity:.8">'+g.filas.length+' glosas · '+pend+' sin responder · '+escHtml(g.clasificacion)+'</span></div>'
+       + '<button class="btn-sm" onclick="gaAbrirLote(\''+escHtml(g.causal)+'\',\''+escHtml(g.clasificacion)+'\')" '
+       + 'style="background:#f59e0b;color:#fff;border:0;font-weight:700">Responder las '+g.filas.length+' juntas</button>'
+       + '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function gaBarraFiltro(d){
+  var glosas = d.glosas || [];
+  if(glosas.length < 5) return '';   // con 4 filas el filtro estorba
+
+  var causales = {}, clasifs = {};
+  glosas.forEach(function(g){
+    var c = String(g.causal_codigo||'').trim();
+    if(c) causales[c] = (causales[c]||0) + 1;
+    var k = gaClasifEfectiva(g);
+    clasifs[k] = (clasifs[k]||0) + 1;
+  });
+
+  var h = '<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.8rem 0">'
+    + '<input id="ga-filtro-texto" placeholder="Buscar causal, servicio, CUPS, observación…" '
+    + 'value="'+escHtml(GA_FILTRO.texto)+'" oninput="GA_FILTRO.texto=this.value;gaAplicarFiltro()" '
+    + 'style="flex:1 1 260px;padding:.4rem .6rem;border:1px solid var(--border);border-radius:8px;font-size:.8rem">';
+
+  h += '<select id="ga-filtro-causal" onchange="GA_FILTRO.causal=this.value;gaAplicarFiltro()" '
+     + 'style="padding:.4rem;border:1px solid var(--border);border-radius:8px;font-size:.78rem">'
+     + '<option value="">Todas las causales</option>';
+  Object.keys(causales).sort().forEach(function(c){
+    h += '<option value="'+escHtml(c)+'"'+(GA_FILTRO.causal===c?' selected':'')+'>'+escHtml(c)+' ('+causales[c]+')</option>';
+  });
+  h += '</select>';
+
+  h += '<select id="ga-filtro-clasificacion" onchange="GA_FILTRO.clasificacion=this.value;gaAplicarFiltro()" '
+     + 'style="padding:.4rem;border:1px solid var(--border);border-radius:8px;font-size:.78rem">'
+     + '<option value="">Toda clasificación</option>';
+  Object.keys(clasifs).sort().forEach(function(c){
+    h += '<option value="'+escHtml(c)+'"'+(GA_FILTRO.clasificacion===c?' selected':'')+'>'+escHtml(c)+' ('+clasifs[c]+')</option>';
+  });
+  h += '</select>';
+
+  h += '<select id="ga-filtro-estado" onchange="GA_FILTRO.estado=this.value;gaAplicarFiltro()" '
+     + 'style="padding:.4rem;border:1px solid var(--border);border-radius:8px;font-size:.78rem">'
+     + '<option value="">Todas</option>'
+     + '<option value="PEND"'+(GA_FILTRO.estado==='PEND'?' selected':'')+'>Sin decidir</option>'
+     + '<option value="LISTA"'+(GA_FILTRO.estado==='LISTA'?' selected':'')+'>Ya decididas</option>'
+     + '</select>';
+
+  h += '<button class="btn-sm" onclick="GA_FILTRO={texto:\'\',causal:\'\',clasificacion:\'\',estado:\'\'};gaPintar(GA_DATOS)">Limpiar</button>';
+  h += '</div><div id="ga-filtro-cuenta" style="font-size:.75rem;color:var(--text3);margin-bottom:.5rem"></div>';
+  return h;
+}
+
+function gaAplicarFiltro(){
+  // Se llama al final de gaPintar, después del innerHTML. Si no hay un DOM de
+  // verdad —el banco de pruebas ejecuta gaPintar con un document de mentira—
+  // no hay nada que esconder y se sale sin ruido.
+  if(typeof document === 'undefined' || !document.querySelectorAll) return;
+  var filas = document.querySelectorAll('tr[data-ga-fila]');
+  if(!filas || !filas.length) return;
+  var t = gaSinTildes(GA_FILTRO.texto);
+  var visibles = 0;
+  filas.forEach(function(tr){
+    var ok = true;
+    if(GA_FILTRO.causal && tr.getAttribute('data-causal') !== GA_FILTRO.causal) ok = false;
+    if(ok && GA_FILTRO.clasificacion && tr.getAttribute('data-clasif') !== GA_FILTRO.clasificacion) ok = false;
+    if(ok && GA_FILTRO.estado){
+      var decidida = tr.getAttribute('data-decidida') === '1';
+      if(GA_FILTRO.estado === 'PEND' && decidida) ok = false;
+      if(GA_FILTRO.estado === 'LISTA' && !decidida) ok = false;
+    }
+    if(ok && t && gaSinTildes(tr.getAttribute('data-busca')).indexOf(t) === -1) ok = false;
+    tr.style.display = ok ? '' : 'none';
+    if(ok) visibles++;
+  });
+  var cuenta = document.getElementById('ga-filtro-cuenta');
+  if(cuenta){
+    cuenta.innerHTML = (visibles === filas.length)
+      ? filas.length + ' glosas'
+      : '<b>Mostrando '+visibles+' de '+filas.length+' glosas</b> · los totales de arriba son de la factura completa, no cambian con el filtro.';
+  }
+}
+
+
+
+// Cuadro propio, aparte del modal de dictámenes: ese lo usa verDictamen() y
+// resetea paneles suyos al abrirse. Mezclarlos acoplaría dos cosas que no
+// tienen nada que ver.
+function gaModal(titulo, cuerpo){
+  var viejo = document.getElementById('ga-modal');
+  if(viejo) viejo.remove();
+  var d = document.createElement('div');
+  d.id = 'ga-modal';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;'
+                  + 'display:flex;align-items:center;justify-content:center;padding:1rem';
+  d.onclick = function(e){ if(e.target === d) gaCerrarModal(); };
+  d.innerHTML = '<div style="background:var(--bg);border-radius:14px;max-width:640px;width:100%;'
+              + 'max-height:88vh;overflow:auto;padding:1.2rem 1.4rem;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+              + '<h3 style="margin:0 0 .8rem;font-size:1.05rem">'+escHtml(titulo)+'</h3>'
+              + cuerpo + '</div>';
+  document.body.appendChild(d);
+}
+
+function gaCerrarModal(){
+  var d = document.getElementById('ga-modal');
+  if(d) d.remove();
+}
+
+// El cuadro donde el gestor escoge CUÁLES de las N filas reciben la misma
+// respuesta. Nunca se aplica nada sin que vea exactamente a qué va: el
+// sistema propone el grupo, la persona decide quién entra.
+function gaAbrirLote(causal, clasificacion){
+  var grupo = gaGrupos(GA_DATOS).filter(function(x){
+    return x.causal === causal && x.clasificacion === clasificacion;
+  })[0];
+  if(!grupo){ toast('Sin filas', 'Ya no hay glosas de esa causal', 'error'); return; }
+
+  var h = '<div style="font-size:.85rem;color:var(--text2);margin-bottom:.6rem">'
+        + 'Causal <b>'+escHtml(causal)+'</b> · '+escHtml(grupo.texto)+'<br>'
+        + 'Marque las que llevan <b>la misma respuesta</b>. Las que ya tienen decisión salen desmarcadas.</div>';
+
+  h += '<div style="max-height:38vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:.4rem">';
+  grupo.filas.forEach(function(g){
+    var yaTiene = !!String(g.decision||'').trim();
+    h += '<label style="display:flex;gap:.5rem;align-items:flex-start;padding:.35rem;border-radius:6px;'
+       + (yaTiene?'background:#fffbeb;':'')+'">'
+       + '<input type="checkbox" class="ga-lote-item" value="'+g.id+'"'+(yaTiene?'':' checked')+'>'
+       + '<span style="font-size:.78rem;line-height:1.35"><b>'+escHtml(g.codigo||'')+'</b> '
+       + escHtml(String(g.descripcion||'').slice(0,70))
+       + '<br><span style="color:var(--text3)">'+fmtCOP(g.valor_glosado)
+       + (g.centro_costos ? ' · '+escHtml(g.centro_costos) : '')
+       + (yaTiene ? ' · <b style="color:#b45309">ya: '+escHtml(g.decision)+'</b>' : '')
+       + '</span></span></label>';
+  });
+  h += '</div>';
+
+  h += '<div style="margin-top:.7rem"><label style="font-size:.75rem;color:var(--text3)">Decisión para todas</label>'
+     + '<select id="ga-lote-decision" style="width:100%;padding:.45rem;border:1px solid var(--border);border-radius:8px;margin-top:.2rem">'
+     + '<option value="">— no cambiar la decisión —</option>'
+     + '<option value="SE ACEPTA">SE ACEPTA</option>'
+     + '<option value="SE OBJETA">SE OBJETA</option>'
+     + '<option value="SE SUBSANA">SE SUBSANA</option>'
+     + '</select></div>';
+
+  h += '<div style="margin-top:.6rem"><label style="font-size:.75rem;color:var(--text3)">Observación técnica (la misma para todas)</label>'
+     + '<textarea id="ga-lote-obs" rows="4" style="width:100%;padding:.5rem;border:1px solid var(--border);border-radius:8px;margin-top:.2rem;font-size:.82rem"></textarea></div>';
+
+  h += '<div style="margin-top:.4rem;padding:.5rem .7rem;background:#f8fafc;border-radius:8px;font-size:.75rem;color:var(--text3)">'
+     + 'No se toca ningún valor ni cantidad: cada glosa conserva su propio valor glosado.</div>';
+
+  h += '<div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.8rem">'
+     + '<button class="btn-sm" onclick="gaCerrarModal()">Cancelar</button>'
+     + '<button class="btn-sm" id="ga-lote-aplicar" onclick="gaAplicarLote(\''+escHtml(causal)+'\',\''+escHtml(clasificacion)+'\')" '
+     + 'style="background:var(--primary);color:#fff;border:0;font-weight:700">Aplicar a las marcadas</button></div>';
+
+  gaModal('Responder ' + grupo.filas.length + ' glosas de una vez', h);
+}
+
+async function gaAplicarLote(causal, clasificacion){
+  var ids = Array.prototype.slice.call(document.querySelectorAll('.ga-lote-item:checked'))
+              .map(function(x){ return parseInt(x.value, 10); });
+  if(!ids.length){ toast('Nada marcado', 'Marque al menos una glosa', 'error'); return; }
+  var obs = (document.getElementById('ga-lote-obs')||{}).value || '';
+  if(!obs.trim()){ toast('Falta la respuesta', 'Escriba la observación técnica', 'error'); return; }
+  var dec = (document.getElementById('ga-lote-decision')||{}).value || null;
+
+  var btn = document.getElementById('ga-lote-aplicar');
+  if(btn){ btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  try{
+    var r = await fetch('/glosas-adres/glosas/respuesta-en-lote', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({glosa_ids: ids, observacion_tecnico: obs, decision: dec,
+                            causal_codigo: causal, clasificacion: clasificacion})
+    });
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.detail || 'No se pudo aplicar');
+    gaCerrarModal();
+    var msg = d.aplicadas + ' glosa(s) respondidas de una vez';
+    if(d.omitidas) msg += ' · ' + d.omitidas + ' omitidas';
+    toast('Listo', msg, 'success');
+    gaBuscar();
+  }catch(e){
+    toast('Error', e.message, 'error');
+    if(btn){ btn.disabled = false; btn.textContent = 'Aplicar a las marcadas'; }
+  }
+}
+
 function gaPintar(d){
   var r = d.resumen;
   var h = '';
@@ -19742,6 +19980,9 @@ function gaPintar(d){
     h += '</div>';
   }
 
+  h += gaAvisoRepetidas(d);
+  h += gaBarraFiltro(d);
+
   h += '<div class="chart-card" style="margin-bottom:1rem"><div class="chart-hdr">Glosas del ADRES · '+
        'la decisión es suya, el sistema solo propone</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'+
        '<thead>'+
@@ -19764,7 +20005,17 @@ function gaPintar(d){
        '</tr></thead><tbody>';
   (d.glosas||[]).forEach(function(g){
     var color = g.decision ? '#15803d' : (g.sugerencia ? '#b45309' : 'var(--text3)');
-    h += '<tr style="border-top:1px solid var(--border)">'+
+    // 21-08-2026: atributos para que el filtro pueda esconder filas sin volver
+    // a pedirle nada al servidor. `data-busca` junta en un solo texto todo lo
+    // que el gestor podría escribir en la caja de búsqueda.
+    var busca = [g.causal_codigo, g.causal_texto, g.codigo, g.descripcion,
+                 g.anotacion, g.observacion_tecnico, g.centro_costos].join(' ');
+    h += '<tr data-ga-fila="1"'+
+         ' data-causal="'+escHtml(String(g.causal_codigo||'').trim())+'"'+
+         ' data-clasif="'+escHtml(gaClasifEfectiva(g))+'"'+
+         ' data-decidida="'+(String(g.decision||'').trim() ? '1' : '0')+'"'+
+         ' data-busca="'+escHtml(busca)+'"'+
+         ' style="border-top:1px solid var(--border)">'+
          '<td style="padding:.45rem;white-space:nowrap"><b>'+escHtml(g.causal_codigo||'—')+'</b></td>'+
          '<td style="max-width:270px">'+escHtml(g.causal_texto||'—')+
              (g.anotacion ? '<div style="color:var(--text3);font-size:.7rem;margin-top:.2rem">'+escHtml(g.anotacion)+'</div>' : '')+'</td>'+
@@ -19812,6 +20063,7 @@ function gaPintar(d){
     h += '</tbody></table></div></div>';
   }
   document.getElementById('ga-resultado').innerHTML = h;
+  gaAplicarFiltro();
 }
 
 // La causal 4506 la trabajan dos areas: los gestores por FACTURACION y las

@@ -250,6 +250,10 @@ _VERBO_AFIRMA = (
     r"|describ(?:e|en|i[óo])"
     r"|demuestra[n]?|reflej(?:a|an)|const(?:a|an|[óo])"
     r"|da\s+cuenta|dan\s+cuenta|deja\s+constancia"
+    r"|cumpl(?:e|en|i[óo])|contien(?:e|en)|inclu(?:ye|yen)"
+    r"|(?:indicad|consignad|registrad|documentad|descrit|acreditad|evidenciad"
+    r"|soportad|sustentad|plasmad|anotad|demostrad|justificad|certificad"
+    r"|contenid)(?:o|a|os|as)"
     r"|se\s+(?:observa|evidencia|consigna|describe|registra|acredita))\b"
 )
 
@@ -272,7 +276,8 @@ _AFIRMACION_DOCUMENTAL = re.compile(
 # vista trae cualquiera de estas, hubo documento y esta verificación se
 # abstiene (la de folios sigue operando por su cuenta).
 _SENAL_DE_EXPEDIENTE = re.compile(
-    rf"(?:{_DOC_CLINICO}|{_PALABRA_FOLIO}\s*\d|═══\s*SOPORTE|EVIDENCIA\s+FORENSE)",
+    rf"(?:{_PALABRA_FOLIO}\s*\d|═+\s*(?:SOPORTE|DOCUMENTO)"
+    r"|SOPORTES\s+DOCUMENTALES|EVIDENCIA\s+FORENSE)",
     re.IGNORECASE,
 )
 

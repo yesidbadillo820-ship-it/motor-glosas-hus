@@ -840,6 +840,159 @@ def guardar_decision(
     return glosa
 
 
+# ─── Responder varias glosas de la misma causal de una sola vez ─────────────
+#
+# 21-08-2026, pedido de Yesid: «hay glosas que vienen por 7 ítems y a esos 7
+# se les da la misma respuesta, y hoy por hoy lo hacen uno a uno».
+#
+# En la factura HUS405724 la causal 3209 —«la ayuda diagnóstica no tiene
+# justificación»— viene sobre RX de pie y RX de pierna: servicios distintos,
+# misma respuesta. Escribirla dos veces es trabajo regalado; con siete, es
+# media mañana.
+#
+# TRES CANDADOS, y ninguno sobra:
+#
+#  1. Se manda la lista EXPLÍCITA de ids, nunca un filtro. Si el cuerpo fuera
+#     {causal: "3209", factura: "..."} el servidor decidiría a qué filas va, y
+#     podría alcanzar filas que el gestor nunca vio en pantalla. Se aplica
+#     exactamente lo que la persona marcó.
+#  2. La causal y la clasificación viajan como testigo de lo que se vio. Cada
+#     id tiene que pertenecer a esa causal, a esa clasificación, a la misma
+#     factura y al mismo paquete. El que no cumpla NO se escribe y sale en los
+#     avisos.
+#  3. NO se acepta valor ni cantidad en el lote. La respuesta técnica se puede
+#     compartir; la plata no. Cada glosa tiene su propio valor glosado y
+#     copiarlo de una a otra sería inventar cifras.
+
+
+def responder_en_lote(
+    db: Session,
+    *,
+    glosa_ids: list[int],
+    observacion_tecnico: str,
+    decision: str | None = None,
+    causal_codigo: str = "",
+    clasificacion: str = "",
+    usuario: str = "",
+) -> dict:
+    """Aplica UNA misma respuesta a varias glosas de la misma causal.
+
+    Devuelve cuántas se aplicaron, cuáles, y por qué se omitió cada una de las
+    que no. Nunca falla entera por una fila mala: hace lo que puede y lo
+    cuenta.
+    """
+    if not glosa_ids:
+        raise ValueError("No se recibió ninguna glosa.")
+    if len(glosa_ids) > 200:
+        raise ValueError("Son demasiadas glosas para un solo lote (máximo 200).")
+
+    limpia: str | None = None
+    if decision is not None:
+        limpia = decision.strip().upper() or None
+        if limpia and limpia not in DECISIONES:
+            raise ValueError(f"Decisión no válida: {decision!r}. Use una de {DECISIONES}.")
+
+    filas = db.query(GlosaAdresRecord).filter(GlosaAdresRecord.id.in_(list(set(glosa_ids)))).all()
+    por_id = {g.id: g for g in filas}
+
+    # El ámbito lo fija la PRIMERA glosa encontrada: todas tienen que ser de su
+    # misma factura y su mismo paquete.
+    ancla = next((por_id[i] for i in glosa_ids if i in por_id), None)
+    if ancla is None:
+        raise LookupError("Ninguna de las glosas existe.")
+
+    causal = (causal_codigo or "").strip()
+    clasif = (clasificacion or "").strip().upper()
+
+    aplicadas: list[int] = []
+    avisos: list[dict] = []
+
+    for gid in glosa_ids:
+        g = por_id.get(gid)
+        if g is None:
+            avisos.append({"glosa_id": gid, "motivo": "no existe"})
+            continue
+        if g.paquete_id != ancla.paquete_id or g.factura_clave != ancla.factura_clave:
+            avisos.append({"glosa_id": gid, "motivo": "es de otra factura"})
+            continue
+        if causal and (g.causal_codigo or "").strip() != causal:
+            avisos.append({"glosa_id": gid, "motivo": f"no es de la causal {causal}"})
+            continue
+        if clasif and _clasificacion_efectiva(g) != clasif:
+            avisos.append({"glosa_id": gid, "motivo": "es de otra clasificación"})
+            continue
+        if getattr(g, "glosa_total", False):
+            avisos.append(
+                {"glosa_id": gid, "motivo": "es una glosa total, no se responde por ítem"}
+            )
+            continue
+
+        g.observacion_tecnico = observacion_tecnico
+        if limpia is not None:
+            g.decision = limpia
+            g.decidido_por = usuario
+            g.decidido_en = datetime.now(UTC)
+        _marcar_en_proceso(db, g)
+        aplicadas.append(gid)
+
+    db.commit()
+    return {
+        "ok": bool(aplicadas),
+        "aplicadas": len(aplicadas),
+        "omitidas": len(avisos),
+        "ids_aplicadas": aplicadas,
+        "avisos": avisos,
+    }
+
+
+def _clasificacion_efectiva(g: GlosaAdresRecord) -> str:
+    """La clasificación con la que el gestor VE la glosa en pantalla."""
+    if getattr(g, "requiere_asignacion", False):
+        return "POR ASIGNAR"
+    return (g.clasificacion or "SIN CLASIFICAR").strip().upper()
+
+
+def causales_repetidas(db: Session, *, paquete_id: int, factura_clave: str) -> list[dict]:
+    """Las causales que vienen 2 o más veces en una factura.
+
+    Es lo que alimenta el aviso «esta causal viene 7 veces, ¿misma respuesta
+    para todas?». Solo propone: quién entra al lote lo decide el gestor.
+    """
+    filas = (
+        db.query(GlosaAdresRecord)
+        .filter(GlosaAdresRecord.paquete_id == paquete_id)
+        .filter(GlosaAdresRecord.factura_clave == factura_clave)
+        .all()
+    )
+    grupos: dict[tuple[str, str], dict] = {}
+    for g in filas:
+        causal = (g.causal_codigo or "").strip()
+        if not causal or getattr(g, "glosa_total", False):
+            continue
+        clave = (causal, _clasificacion_efectiva(g))
+        grupo = grupos.setdefault(
+            clave,
+            {
+                "causal_codigo": causal,
+                "causal_texto": (g.causal_texto or "").strip(),
+                "clasificacion": clave[1],
+                "glosas": 0,
+                "sin_responder": 0,
+                "valor": 0.0,
+                "ids": [],
+            },
+        )
+        grupo["glosas"] += 1
+        grupo["valor"] += float(g.valor_glosado or 0)
+        grupo["ids"].append(g.id)
+        if not (g.decision or "").strip():
+            grupo["sin_responder"] += 1
+
+    repetidas = [g for g in grupos.values() if g["glosas"] >= 2]
+    repetidas.sort(key=lambda g: (-g["glosas"], g["causal_codigo"]))
+    return repetidas
+
+
 def _marcar_en_proceso(db: Session, glosa: GlosaAdresRecord) -> None:
     ficha = (
         db.query(FacturaAdresRecord)

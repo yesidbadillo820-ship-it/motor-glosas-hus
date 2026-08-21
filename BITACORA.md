@@ -5696,6 +5696,105 @@ Todo queda en el historial con el nombre de quien deshizo y a qué hora.
 
 ---
 
+### 21-08 — Responder de una vez las glosas que repiten causal
+
+**Lo que pidió Yesid, textual:** «hay glosas que vienen por 7 ítems y a esos 7
+ítems se les da la misma respuesta, y hoy por hoy lo hacen uno a uno».
+
+En la factura HUS405724 la causal **3209** —«la ayuda diagnóstica no tiene
+justificación»— viene sobre RX de pie y RX de pierna. Servicios distintos,
+misma respuesta. Escribirla dos veces es trabajo regalado; con siete, es media
+mañana.
+
+**Lo que hay ahora, en la pantalla de Glosas ADRES:**
+
+**1 · Un aviso arriba de la tabla**
+
+> ⚠ Hay causales que se repiten en esta factura — se pueden responder de una
+> sola vez
+> **3209** · La ayuda diagnóstica no tiene justificación
+> 7 glosas · 5 sin responder — **[ Responder las 7 juntas ]**
+
+**2 · Un cuadro donde usted escoge cuáles**
+
+Al apretarlo salen **las 7 filas listadas**, cada una con su servicio, su valor
+y su centro de costos, **con la casilla marcada**. Las que ya tienen decisión
+salen **desmarcadas y en ámbar**, para no pisar trabajo hecho sin querer.
+
+Usted desmarca las que necesiten respuesta distinta, escribe **una sola**
+observación técnica, escoge **una sola** decisión, y confirma.
+
+Es literalmente lo que pidió: *«que diga a cuáles servicios de esos 7 tendrían
+la misma respuesta»*.
+
+**3 · Un filtro para buscar dentro de la factura**
+
+Caja de texto (busca en causal, servicio, CUPS, observación y centro de
+costos) más tres desplegables: por causal —**con el número de veces que
+viene**—, por clasificación y por «sin decidir / ya decididas».
+
+> **El filtro solo esconde filas.** Los totales de arriba y las pastillas por
+> clasificación **no cambian nunca**: son de la factura completa. Si el filtro
+> moviera esos números, usted no sabría cuánto lleva de verdad. La pantalla lo
+> dice: «Mostrando 4 de 21 glosas · los totales de arriba son de la factura
+> completa».
+
+**Tres candados, y ninguno sobra:**
+
+- Se manda la **lista explícita** de las glosas marcadas, nunca un filtro. El
+  servidor no decide a qué filas va: aplica exactamente lo que usted marcó.
+- La causal y la clasificación **viajan como testigo**. Si una glosa del lote
+  no es de esa causal, de esa clasificación y de esa misma factura, **no se
+  escribe** y se reporta por qué.
+- **La plata no se comparte.** El lote no acepta valores ni cantidades: cada
+  glosa conserva su propio valor glosado. Compartirlo sería inventar cifras.
+
+**La 4506 no se mezcla.** Esa causal se reparte glosa por glosa entre
+Facturación y Pertinencia; si se agruparan juntas, un gestor de facturación
+arrastraría en su lote las que son de la médica auditora.
+
+- 28 pruebas nuevas (14 del servicio + 14 de la pantalla). Las de pantalla
+  **ejecutan el JavaScript de verdad en node**, no leen el HTML como texto.
+
+> **Nota:** al escribirlo llamé a una función `abrirModal` que **no existe** en
+> el portal. El JavaScript compilaba igual —era un error de ejecución— y solo
+> habría reventado al apretar el botón. Lo cazó una prueba que corre `gaPintar`
+> de verdad. Se le hizo su propio cuadro, aislado del modal de dictámenes.
+
+### 21-08 — «CUPS FMQ0952» no es un CUPS
+
+Otro de los defectos que cazaron las pruebas de Yesid. Los dictámenes salieron
+diciendo **«CUPS FMQ0952»** y **«CUPS 34363-4»**.
+
+- `FMQ0952` es un **código interno del hospital** para insumos (el electrodo de
+  ECG).
+- `34363-4` es un **CUM**, el código de un medicamento (la dipirona).
+
+Ninguno es un CUPS: los del Ministerio son seis dígitos, a veces con un sufijo
+de letra (`890283H`).
+
+**Por qué importa:** la EPS cruza los CUPS contra su sistema. Un código que no
+existe como CUPS no lo encuentra, y **ratifica la glosa completa** — así el
+argumento jurídico esté impecable.
+
+**Lo que NO se hace, y es la mitad importante:** no se prohíbe nombrar el
+código. El hospital **sí** factura con `FMQ0952`, y ponerlo ayuda a la EPS a
+ubicar el ítem. Lo que está mal es **la etiqueta**. Por eso el aviso dice:
+
+> «Deje el código tal cual y cambie la palabra: escriba *código institucional
+> del HUS FMQ0952* en vez de *CUPS FMQ0952*».
+
+El aviso además distingue de dónde viene el código: institucional del HUS, CUM
+de medicamento, o de otro sistema.
+
+- 27 pruebas en `tests/test_services/test_no_todo_codigo_es_un_cups.py`, la
+  mitad dedicadas a **los CUPS reales que NO se pueden marcar**: los 14 de las
+  facturas del 19 de agosto, incluidos los raros con sufijo (`625104PUR`,
+  `129A02H`, `869501H1`). Un aviso equivocado en cada dictamen enseña al
+  auditor a ignorar los avisos.
+- Y se comprobó que **sigue cazando** el CUPS inventado de ayer: cuando el
+  motor tomó «valor glosado 100000» y escribió «CUPS 100000».
+
 ## 3) PENDIENTE
 
 ### Sistema ICFES (nuevo, 20-08)
