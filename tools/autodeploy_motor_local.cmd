@@ -16,9 +16,38 @@ set "LOG=%REPO%\data\autodeploy.log"
 rem Si el registro pasa de ~5 MB se reinicia, para no llenar el disco.
 if exist "%LOG%" for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
 
+rem ---------------------------------------------------------------
+rem  ENCONTRAR GIT (22-08-2026).
+rem
+rem  Una tarea programada NO hereda el camino de busqueda del
+rem  usuario: arranca con un entorno minimo. Si git se instalo solo
+rem  para el usuario, o el camino se puso despues de crear la tarea,
+rem  aqui adentro `git` sencillamente NO EXISTE.
+rem
+rem  Lo grave no es que falle: es que fallaba EN SILENCIO. El bot
+rem  anotaba una linea de 'sin internet' y seguia de largo, asi que
+rem  el PC se quedaba con la version vieja para siempre y todo se
+rem  veia bien. Paso el 21-08: cuatro correcciones ya publicadas no
+rem  llegaron al hospital y nadie se entero hasta que alguien miro.
+rem ---------------------------------------------------------------
+rem  Se AGREGA la carpeta de git al camino de busqueda, en vez de
+rem  guardar la ruta completa: una ruta con espacios -Program Files-
+rem  metida dentro de un `for /f` es un sitio clasico de errores en
+rem  los .cmd de Windows. Asi las ordenes de abajo quedan igual que
+rem  siempre y no hay comillas que se puedan partir mal.
+where git >nul 2>&1 && goto :hay_git
+if exist "%ProgramFiles%\Git\cmd\git.exe" set "PATH=%PATH%;%ProgramFiles%\Git\cmd"
+if exist "%ProgramFiles(x86)%\Git\cmd\git.exe" set "PATH=%PATH%;%ProgramFiles(x86)%\Git\cmd"
+if exist "%LOCALAPPDATA%\Programs\Git\cmd\git.exe" set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Git\cmd"
+where git >nul 2>&1 && goto :hay_git
+echo [%date% %time%] NO SE ENCUENTRA GIT: el PC se va a quedar con la version vieja. Instale Git o agreguelo al PATH del sistema. >> "%LOG%"
+goto :asegurar
+:hay_git
+
+echo [%date% %time%] revisando si hay codigo nuevo... >> "%LOG%"
 git fetch origin motor-glosas >nul 2>&1
 if errorlevel 1 (
-  echo [%date% %time%] sin internet o sin acceso a GitHub: se reintenta en 5 min >> "%LOG%"
+  echo [%date% %time%] NO SE PUDO CONSULTAR GITHUB: el PC se queda con la version que tiene. Se reintenta en 5 min. >> "%LOG%"
   goto :asegurar
 )
 

@@ -6345,6 +6345,38 @@ todo seguía funcionando. Un instalador que dice que quedó lo que no quedó es
 peor que uno que falla: el auditor se va tranquilo con la mitad del trabajo sin
 hacer. Ahora el resumen final depende de cómo fue de verdad.
 
+### 22-08 — «¿Estoy corriendo el código de hoy?» ya se puede responder
+
+Repasando con calma los datos de anoche, la explicación que había dado no
+cuadraba del todo. La tarea del autodespliegue **sí estaba corriendo** cada
+cinco minutos —lo decía su propia hora de última ejecución—, y aun así el PC
+seguía con la versión vieja.
+
+Si corría y no bajaba nada, el problema está antes: en el momento de
+**consultar GitHub**. Y ahí apareció algo que no habíamos mirado: una tarea
+programada de Windows **no hereda el camino de búsqueda del usuario**. Arranca
+con un entorno mínimo. Si `git` se instaló solo para el usuario, dentro de la
+tarea `git` sencillamente no existe — y el bot anotaba una línea y seguía de
+largo, dejando el PC con la versión vieja **para siempre**, sin que nada se
+viera mal.
+
+Dos arreglos, los dos de lo mismo: que se pueda ver.
+
+1. **El autodespliegue busca git donde Windows lo instala**, no solo en el
+   camino de búsqueda. Y si aun así no lo encuentra, lo dice con todas las
+   letras en vez de callarse. También deja constancia de cada pasada, para que
+   se sepa si está corriendo.
+2. **La pantalla de estado responde la pregunta.** Ahora muestra qué versión
+   hay en el PC, cuál es la última publicada que se alcanzó a consultar, y qué
+   fue lo último que dijo el autodespliegue de sí mismo. Si el PC está atrás,
+   sale un aviso; si no encuentra git o no logra hablar con GitHub, lo traduce
+   a algo que se entienda.
+
+**Lo que falta por confirmar:** todavía no sabemos con certeza cuál de las dos
+cosas era. Las líneas propias del autodespliegue lo dirán —quedaron tapadas
+por el tráfico de la página, que ya se corrigió—. Lo que sí es seguro es que
+los dos defectos eran reales y los dos dejaban el PC atrás en silencio.
+
 ## 3) PENDIENTE
 
 ### Permisos del portal (nuevo, 21-08 tarde)

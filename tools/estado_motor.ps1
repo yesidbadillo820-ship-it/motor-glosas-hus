@@ -174,6 +174,53 @@ foreach ($t in @("MotorGlosas_Arranque", "MotorGlosas_Autodeploy", "MotorGlosas_
     }
 }
 
+# --- El codigo que esta corriendo ------------------------------------
+#
+# La pregunta que estuvo horas sin respuesta el 21-08-2026: "estoy
+# corriendo el codigo de hoy?". Todo se veia bien y el PC llevaba horas
+# con una version vieja, porque el autodespliegue fallaba en silencio.
+#
+# No se pide nada por internet: se compara con lo ULTIMO que el
+# autodespliegue alcanzo a consultar. Si eso ya esta viejo, la fecha de
+# la ultima consulta lo delata igual.
+Write-Host ""
+Write-Host " EL CODIGO QUE ESTA CORRIENDO"
+Push-Location $Repo
+$aqui = (git rev-parse --short HEAD 2>$null)
+$alla = (git rev-parse --short origin/motor-glosas 2>$null)
+Pop-Location
+if (-not $aqui) {
+    Write-Host "   [OJO] no se pudo leer la version: git no responde en esta carpeta"
+    $avisos += "No se pudo saber que version esta corriendo. Sin git, el autodespliegue tampoco puede bajar codigo nuevo."
+}
+elseif (-not $alla -or $aqui -eq $alla) {
+    Write-Host ("   [OK] version " + $aqui + " - al dia con lo ultimo que se consulto")
+}
+else {
+    Write-Host ("   [OJO] aqui hay " + $aqui + " y lo publicado es " + $alla + ": falta aplicar codigo nuevo")
+    $avisos += "El PC tiene codigo viejo: hay una version mas nueva ya consultada y sin aplicar."
+}
+
+# Lo ultimo que dijo el autodespliegue de si mismo. Sus lineas empiezan
+# con [fecha hora]; el resto del archivo puede traer otras cosas.
+$adlog = Join-Path $Repo "data\autodeploy.log"
+if (Test-Path $adlog) {
+    $ultima = Select-String -Path $adlog -Pattern '^\[' | Select-Object -Last 1
+    if ($ultima) {
+        Write-Host ("   ultimo aviso del autodespliegue: " + $ultima.Line.Trim())
+        if ($ultima.Line -match 'NO SE ENCUENTRA GIT') {
+            $avisos += "El autodespliegue NO encuentra git: el PC nunca va a recibir codigo nuevo. Instale Git o agreguelo al PATH del sistema."
+        }
+        elseif ($ultima.Line -match 'NO SE PUDO CONSULTAR GITHUB') {
+            $avisos += "El autodespliegue no logra consultar GitHub: revise la conexion o el proxy del hospital."
+        }
+    }
+    else {
+        Write-Host "   [OJO] el autodespliegue no ha dejado ni un aviso propio"
+        $avisos += "El autodespliegue no ha escrito nada suyo en su registro: puede que no este corriendo."
+    }
+}
+
 # --- Resumen ---------------------------------------------------------
 Write-Host ""
 Write-Host " AVISOS"
