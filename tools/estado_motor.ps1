@@ -141,10 +141,26 @@ foreach ($t in @("MotorGlosas_Arranque", "MotorGlosas_Autodeploy", "MotorGlosas_
     }
 
     # Como le fue la ultima vez. 0 = bien; 267009 = corriendo ahora mismo.
+    #
+    # OJO CON EL 267009. Una tarea ATASCADA se ve igual que una sana: dice
+    # "corriendo" y ya. Fue justo lo que escondio el problema del 21-08-2026:
+    # el autodespliegue arrancaba el motor de una forma que no soltaba la
+    # salida de la tarea, Windows no la daba nunca por terminada, y como esta
+    # puesta en no abrir dos a la vez, dejo de correr durante horas. Todo se
+    # veia bien. Por eso, si dice "corriendo" pero arranco hace rato, se
+    # avisa: una tarea de 5 minutos no puede llevar media hora corriendo.
     $info = Get-ScheduledTaskInfo -TaskName $t
     if ($info) {
         $r = $info.LastTaskResult
-        if ($r -eq 0 -or $r -eq 267009) {
+        $minutos = $null
+        if ($info.LastRunTime -and $info.LastRunTime.Year -gt 2000) {
+            $minutos = [int]((Get-Date) - $info.LastRunTime).TotalMinutes
+        }
+        if ($r -eq 267009 -and $null -ne $minutos -and $minutos -gt 20) {
+            Write-Host ("        ultima vez: " + $info.LastRunTime + " - LLEVA " + $minutos + " MINUTOS CORRIENDO: esta atascada")
+            $avisos += ("La tarea " + $t + " lleva " + $minutos + " minutos sin terminar: esta atascada y mientras tanto NO vuelve a correr. Cierrela desde el Programador de tareas de Windows.")
+        }
+        elseif ($r -eq 0 -or $r -eq 267009) {
             Write-Host ("        ultima vez: " + $info.LastRunTime + " (bien)")
         }
         elseif ($null -eq $info.LastRunTime -or $info.LastRunTime.Year -lt 2000) {

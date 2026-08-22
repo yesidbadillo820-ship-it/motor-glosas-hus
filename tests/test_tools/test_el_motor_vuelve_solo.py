@@ -39,10 +39,27 @@ class TestLaRedDeSeguridad:
         assert "uvicorn app.main:app" in despues[1], "no se verifica que el motor volvió"
 
     def test_lo_arranca_si_no_volvio(self):
+        """Lo que importa es que arranque el motor de producción, no con qué
+        forma exacta de `start`.
+
+        Esta prueba pedía literalmente `start "" /b`, y ese `/b` resultó ser el
+        defecto: sin ventana nueva el motor hereda la salida de la tarea,
+        Windows nunca da la tarea por terminada, la mata con 255 y salta todas
+        las pasadas siguientes. El autodespliegue dejó de bajar código durante
+        horas sin avisar (21-08-2026).
+
+        Ahora se comprueba lo que de verdad protege —que arranca el motor
+        correcto— y, además, que NO vuelva el `/b` que lo rompía.
+        """
         t = _texto()
         assert "se arranca directo" in t
-        assert re.search(r"start\s+\"\"\s+/b.*uvicorn app\.main:app", t), (
-            "no hay arranque directo del motor"
+        arranque = re.search(r"^\s*start\s+.*uvicorn app\.main:app.*$", t, re.M)
+        assert arranque, "no hay arranque directo del motor"
+        linea = arranque.group(0)
+        assert "app.main:app" in linea and "--port 8080" in linea
+        antes_del_comando = linea.split("cmd", 1)[0]
+        assert "/b" not in antes_del_comando, (
+            "volvió el `start /b`: la tarea del autodespliegue se queda colgada y deja de correr."
         )
 
     def test_espera_antes_de_comprobar(self):

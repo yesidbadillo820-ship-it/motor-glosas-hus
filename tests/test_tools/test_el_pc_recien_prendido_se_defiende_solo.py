@@ -169,7 +169,10 @@ class TestElAutodespliegueTrabajaSinSesionIniciada:
         """Que el autodespliegue no se pueda cambiar NO puede hacer creer que
         el arranque tampoco quedó: son dos cosas distintas."""
         t = _texto(INSTALADOR)
-        i = t.index("MotorGlosas_Autodeploy")
+        # Se ancla en la ORDEN que crea la tarea, no en la primera vez que
+        # aparece su nombre: el instalador también lo nombra antes, cuando
+        # averigua con qué cuenta trabaja hoy el motor.
+        i = t.index('schtasks /Create /F /TN "MotorGlosas_Autodeploy"')
         despues = t[i : i + 900]
         assert "No se rompio nada" in despues or "no se rompio nada" in despues.lower()
         assert "SI quedo puesto" in despues or "arranque" in despues.lower()
@@ -222,6 +225,36 @@ class TestLaPantallaDeEstadoLoDelata:
         """267009 es «va corriendo ahora mismo», no un error. El
         autodespliegue arranca cada 5 minutos: verlo así es lo normal."""
         assert "267009" in _texto(ESTADO)
+
+    def test_delata_una_tarea_atascada(self):
+        """Una tarea ATASCADA se ve igual que una sana: dice «corriendo» y ya.
+
+        Fue justo lo que escondió el problema del 21-08. El autodespliegue
+        arrancaba el motor de una forma que no soltaba la salida de la tarea,
+        Windows no la daba nunca por terminada, y como está puesta en no abrir
+        dos a la vez, **dejó de correr durante horas**. El portal no recibió
+        cuatro correcciones ya fusionadas, y todo «se veía bien».
+
+        Una tarea que corre cada 5 minutos no puede llevar media hora
+        corriendo.
+        """
+        t = _texto(ESTADO)
+        assert "esta atascada" in t, (
+            "La pantalla de estado no distingue una tarea que trabaja de una "
+            "atascada: es el defecto que costó una tarde entera de no saber "
+            "por qué el código no llegaba."
+        )
+        assert "TotalMinutes" in t, "no se mide cuánto lleva corriendo"
+
+    def test_y_dice_que_hacer_con_ella(self):
+        t = _texto(ESTADO)
+        assert "Programador de tareas" in t
+
+    def test_no_confunde_una_pasada_normal_con_un_atasco(self):
+        """El autodespliegue corre cada 5 minutos: verlo «corriendo» recién
+        arrancado es lo normal. Solo se avisa pasado un buen rato."""
+        t = _texto(ESTADO)
+        assert "$minutos -gt 20" in t
 
     def test_sigue_en_ascii(self):
         """Windows PowerShell lee este archivo como ANSI: con tildes, los

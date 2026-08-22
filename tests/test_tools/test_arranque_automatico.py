@@ -92,6 +92,71 @@ class TestCorreConLaCuentaDelUsuario:
         assert "/RL HIGHEST" not in _linea_schtasks()
 
 
+class TestLeDiceCualEsLaCuentaBuena:
+    """El auditor le dio Enter a la cuenta que mostraba la ventana —la de
+    administrador— y la tarea quedó con la cuenta equivocada. Preguntar no
+    bastó: hay que **decirle cuál es la buena**.
+
+    Y el propio PC ya lo sabe: es la cuenta con la que corre el
+    autodespliegue, que lleva meses funcionando y sí entra a la carpeta de
+    soportes del servidor.
+    """
+
+    def test_lee_la_cuenta_que_ya_usa_el_motor(self):
+        t = _texto()
+        assert "MotorGlosas_Autodeploy" in t and "Principal.UserId" in t, (
+            "El instalador no averigua con qué cuenta trabaja hoy el motor, y "
+            "el auditor se queda adivinando."
+        )
+
+    def test_se_la_muestra_antes_de_preguntar(self):
+        """Mostrarla después de que ya escribió no sirve de nada."""
+        t = _texto()
+        assert t.index("SUGERIDA") < t.index("set /p")
+
+    def test_le_dice_que_escriba_esa_si_no_coincide(self):
+        assert "escriba ESTA" in _texto()
+
+    def test_si_no_se_puede_averiguar_no_estorba(self):
+        """En un PC sin esa tarea la variable queda vacía y el aviso no sale:
+        el instalador tiene que seguir funcionando igual."""
+        t = _texto()
+        assert 'set "SUGERIDA="' in t
+        assert "if defined SUGERIDA" in t
+
+
+class TestNoCantarVictoriaAMedias:
+    """Lo que pasó: la segunda contraseña se escribió mal, el autodespliegue
+    NO quedó cambiado… y el mensaje final decía igual «El autodespliegue sigue
+    bajando el codigo nuevo cada 5 min», como si todo hubiera salido bien.
+
+    Un instalador que dice que quedó lo que no quedó es peor que uno que
+    falla: el auditor se va tranquilo con la mitad del trabajo sin hacer.
+    """
+
+    def test_se_acuerda_de_si_el_autodespliegue_quedo(self):
+        assert "AUTODEPLOY_OK" in _texto()
+
+    def test_el_mensaje_final_depende_de_como_fue(self):
+        t = _texto()
+        i = t.index("Lo que NO cambio")
+        despues = t[i:]
+        assert "if defined AUTODEPLOY_OK" in despues, (
+            "El mensaje final dice lo mismo salga bien o salga mal."
+        )
+
+    def test_si_no_quedo_lo_dice_con_todas_las_letras(self):
+        t = _texto()
+        assert "el autodespliegue NO quedo cambiado" in t
+        assert "SOLO si alguien inicio sesion" in t
+
+    def test_y_dice_como_terminarlo(self):
+        assert "Vuelva a correr este archivo para terminar de dejarlo" in _texto()
+
+    def test_si_quedo_tambien_lo_dice(self):
+        assert "ahora tambien con el PC recien prendido" in _texto()
+
+
 class TestNoDejarElPcPeorDeComoEstaba:
     """Lo que pasó de verdad el 21-08, en tres actos:
 
