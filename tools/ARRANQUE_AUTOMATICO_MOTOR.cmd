@@ -97,13 +97,17 @@ rem  queda, el motor arranca, y si esa cuenta no entra a la carpeta de
 rem  soportes del servidor, el indice amanece vacio sin que nadie
 rem  entienda por que. Por eso ahora se pregunta, en vez de suponer.
 set "CUENTA=%USERDOMAIN%\%USERNAME%"
-rem  SE MIRA CON QUE CUENTA TRABAJA HOY EL MOTOR (21-08-2026, noche).
-rem  El auditor le dio Enter a la cuenta que mostraba la ventana
-rem  -la de administrador- y la tarea quedo con la cuenta equivocada.
-rem  El propio PC ya sabe cual es la buena: es la del autodespliegue,
-rem  que lleva meses funcionando. Se lee de ahi y se le muestra.
+rem  SE MIRA CON QUE CUENTA SE TRABAJA EN ESTE PC (24-08-2026).
+rem  Antes la sugerencia se leia de la tarea del autodespliegue; pero
+rem  una instalacion con la cuenta equivocada la ENVENENA: la tarea
+rem  queda con esa cuenta y la proxima vez el instalador la sugiere
+rem  como si fuera la buena. Ahora se lee de la SESION DE CONSOLA:
+rem  quien esta sentado en este PC todos los dias. Eso no lo cambia
+rem  ninguna instalacion mala. De respaldo, la tarea del backup, que
+rem  nunca se ha recreado con otra cuenta.
 set "SUGERIDA="
-for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$t=Get-ScheduledTask -TaskName 'MotorGlosas_Autodeploy' -ErrorAction SilentlyContinue; if($t){$t.Principal.UserId}"`) do set "SUGERIDA=%%A"
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystem).UserName"`) do set "SUGERIDA=%%A"
+if not defined SUGERIDA for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$t=Get-ScheduledTask -TaskName 'MotorGlosas_Backup' -ErrorAction SilentlyContinue; if($t){$t.Principal.UserId}"`) do set "SUGERIDA=%%A"
 echo   Esta ventana esta corriendo con la cuenta:  %CUENTA%
 echo.
 echo   OJO: la tarea tiene que correr con la cuenta que usa el motor
@@ -111,14 +115,22 @@ echo   todos los dias, la que SI entra a la carpeta de soportes del
 echo   servidor. Si abrio esta ventana como administrador y Windows le
 echo   pidio otra cuenta, arriba aparece esa otra y NO es la que sirve.
 echo.
-if defined SUGERIDA (
-  echo   ^>^>^> La cuenta con la que el motor trabaja hoy es:  %SUGERIDA%
-  echo   ^>^>^> Si arriba aparece otra distinta, escriba ESTA.
+rem  EL ENTER ELIGE LA CUENTA BUENA (24-08-2026, tercera caida).
+rem  Tres personas distintas le dieron Enter a la cuenta de
+rem  administrador de la ventana, aun con el aviso en mayusculas
+rem  delante. El camino facil tiene que ser el correcto: Enter usa
+rem  la cuenta del dia a dia; para usar la de la ventana hay que
+rem  escribirla a proposito.
+set "PREDET=%CUENTA%"
+if defined SUGERIDA if /i not "%SUGERIDA%"=="%CUENTA%" set "PREDET=%SUGERIDA%"
+if defined SUGERIDA if /i not "%SUGERIDA%"=="%CUENTA%" (
+  echo   ^>^>^> La cuenta del dia a dia en este PC es:  %SUGERIDA%
+  echo   ^>^>^> El Enter la elige a ELLA, no a la de la ventana.
   echo.
 )
 set "OTRA="
-set /p "OTRA=   Enter para dejar %CUENTA%, o escriba DOMINIO\usuario: "
-if not "%OTRA%"=="" set "CUENTA=%OTRA%"
+set /p "OTRA=   Enter para usar %PREDET%, o escriba otra (DOMINIO\usuario): "
+if "%OTRA%"=="" (set "CUENTA=%PREDET%") else set "CUENTA=%OTRA%"
 echo.
 echo   La tarea va a correr con:  %CUENTA%
 echo.
