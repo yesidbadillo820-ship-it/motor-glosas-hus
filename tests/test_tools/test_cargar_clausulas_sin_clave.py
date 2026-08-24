@@ -102,6 +102,87 @@ class TestLasMismasReglasQueLaRutaWeb:
         assert buenas[0]["pagina"] == 5
 
 
+class TestGuardarContraLaBaseDeVerdad:
+    """Las pruebas de la primera versión revisaban el archivo y las reglas,
+    pero NUNCA guardaron contra el modelo real. Así pasó de largo que la
+    columna se llama `numero_clausula` y el archivo dice `numero`: el bot dijo
+    «17 cláusulas listas», mostró la base correcta… y reventó en el PC de
+    cartera al escribir la primera fila (24-08-2026)."""
+
+    @pytest.fixture()
+    def base(self, monkeypatch):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import StaticPool
+
+        import app.database as database
+        from app.models.db import Base
+
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(engine)
+        fabrica = sessionmaker(bind=engine)
+        monkeypatch.setattr(database, "SessionLocal", fabrica)
+        yield fabrica
+        engine.dispose()
+
+    def test_guarda_de_verdad_y_en_las_columnas_correctas(self, base):
+        from app.models.db import ClausulaContrato
+
+        r = bot.guardar("POSITIVA", [_clausula()], reemplazar=True)
+        assert r["insertadas"] == 1 and r["total_actual"] == 1
+
+        s = base()
+        fila = s.query(ClausulaContrato).one()
+        s.close()
+        assert fila.eps == "POSITIVA"
+        assert fila.numero_clausula == "CLÁUSULA QUINTA (Otrosí 02)"
+        assert fila.tema == "TA"
+        assert fila.pagina == 5
+        assert "pago por evento" in fila.texto_literal
+
+    def test_reemplazar_borra_lo_viejo_y_agregar_no(self, base):
+        bot.guardar("POSITIVA", [_clausula(titulo="vieja")], reemplazar=True)
+        r = bot.guardar("POSITIVA", [_clausula(titulo="nueva")], reemplazar=True)
+        assert r["total_actual"] == 1
+        r = bot.guardar("POSITIVA", [_clausula(titulo="extra")], reemplazar=False)
+        assert r["total_actual"] == 2
+
+    def test_si_revienta_a_mitad_no_borra_lo_que_habia(self, base):
+        """El incidente exacto del 24-08: con reemplazar, primero se borran las
+        existentes y luego se insertan. Si el insertar revienta, el borrado NO
+        puede quedar hecho — el auditor perdería sus cláusulas por un intento
+        fallido, igual que el instalador que borraba la tarea de arranque."""
+        from app.models.db import ClausulaContrato
+
+        bot.guardar("POSITIVA", [_clausula(titulo="la que ya estaba")], reemplazar=True)
+        rota = _clausula()
+        del rota["numero"]  # el bot revienta al leerla
+        with pytest.raises(KeyError):
+            bot.guardar("POSITIVA", [rota], reemplazar=True)
+
+        s = base()
+        vivas = s.query(ClausulaContrato).count()
+        s.close()
+        assert vivas == 1, "el intento fallido se llevó las cláusulas que había"
+
+    def test_el_lote_real_de_positiva_entra_completo(self, base):
+        from pathlib import Path
+
+        ruta = Path(
+            "/tmp/claude-0/-home-user-motor-glosas-hus/"
+            "f7600728-984d-52f4-a29a-9a155772437a/scratchpad/clausulas_positiva.json"
+        )
+        if not ruta.exists():
+            pytest.skip("el lote de POSITIVA no está en esta máquina")
+        buenas, _ = bot.revisar(bot.leer_lote(ruta))
+        r = bot.guardar("POSITIVA", buenas, reemplazar=True)
+        assert r["insertadas"] == 17 and r["total_actual"] == 17
+
+
 class TestElBotNoEsconde:
     def test_dice_a_que_base_escribe(self):
         """La lección del 20-08: dos bases conviviendo y un motor mirando la

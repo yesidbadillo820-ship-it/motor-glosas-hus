@@ -6454,6 +6454,23 @@ autodespliegue contó tres cosas que había que arreglar:
    reglas de la ruta web — y dice SIEMPRE a qué base escribe, por la lección
    de las dos bases del 20-08.
 
+### 24-08 (mediodía) — El cargador dijo «todo listo» y reventó en la última línea
+
+Yesid corrió el cargador de cláusulas en el PC. Dijo «17 cláusulas listas»,
+mostró la base correcta (`motorglosas.db`)… y reventó al escribir la primera
+fila: la columna de la base se llama `numero_clausula` y el archivo dice
+`numero`. La pantalla del portal hace esa traducción; el bot no la copió.
+
+**Nada se perdió:** el guardado es todo-o-nada, así que el intento fallido no
+alcanzó a borrar las cláusulas que ya había.
+
+**Por qué las pruebas no lo vieron:** revisaban el archivo y las reglas, pero
+nunca guardaron contra la base de verdad. Ya guardan: hay pruebas que insertan
+en una base real y comprueban columna por columna, y una que reproduce el
+incidente exacto —un intento fallido no puede llevarse lo que había, la misma
+lección del instalador que borraba la tarea de arranque—. Con el defecto
+puesto de vuelta a propósito, cuatro se ponen en rojo.
+
 ## 3) PENDIENTE
 
 ### Contrato POSITIVA (nuevo, 24-08)
