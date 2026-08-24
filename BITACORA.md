@@ -6622,6 +6622,49 @@ recorre el archivo entero: **cualquier color que pida un token inexistente
 pone la construcción en rojo**. El botón del caso tiene además su prueba con
 nombre propio.
 
+### 24-08 (tarde) — El fantasma tenía nombre, y el Enter volvió a caer
+
+**El fantasma.** El motor «inmatable» que atendió todo el día con código viejo
+resultó ser nuestra propia tarea de arranque de ayer: quedó creada con la
+cuenta `cpimiento`, al prender el PC arrancó el motor bajo esa cuenta **sin
+sesión**, y por eso era invisible e intocable desde la sesión de `cartera`.
+Se cazó con una ventana de administrador de verdad (la elevación ahora la pide
+Windows con su aviso azul, porque el «ejecutar como administrador» manual
+falló dos veces) y cayeron los cuatro procesos de una vez.
+
+**El Enter, tercera caída.** Al reinstalar la tarea, el instalador mostró en
+mayúsculas «la cuenta del motor es cartera — escriba ESTA»… y el Enter volvió
+a dejar la de la ventana (`cpimiento`), ahora en las DOS tareas. Tres personas
+distintas han caído en el mismo Enter: el aviso no basta.
+
+**El arreglo es de diseño: el camino fácil tiene que ser el correcto.** Ahora
+el Enter elige la cuenta del día a día, y la de la ventana hay que escribirla
+a propósito. Y la sugerencia ya no se lee de la tarea del autodespliegue —una
+instalación mala la envenena y la próxima vez sugiere la cuenta equivocada
+como si fuera la buena— sino de la **sesión de consola**: quién está sentado
+en este PC todos los días, cosa que ninguna instalación mala puede cambiar.
+
+### 24-08 (tarde) — El lector de tarifas aprendió los anexos del Dispensario
+
+Llegaron los tarifarios del contrato 440 del Dispensario y el lector se
+saltaba **el anexo entero de medicamentos e insumos** —8 hojas, ~3.000
+códigos CUM/FMQ/QX— sin decir una palabra. Tres causas, una detrás de otra:
+
+1. El código se titula «CODIGO CUM» o «CODIGO» a secas, no «CUPS».
+2. Dos anexos traen encabezados de TRES columnas y la regla exigía cuatro:
+   2.000 dispositivos médicos invisibles.
+3. La hoja TARIFAS PROPIAS de la propuesta trae una columna TARIFA con el
+   TEXTO «PROPIA» y el valor real en OFERTA — y la «prioridad» de columnas
+   resultó ilusoria: la búsqueda recorría los encabezados en orden, no los
+   candidatos, así que TARIFA (texto) ganaba y la hoja entera se leía como
+   ceros. Una prueba nueva me cazó el arreglo a medias; ahora la prioridad
+   es real, candidato por candidato.
+
+Con esto, del paquete del contrato 440 salen **7.085 servicios** (SOAT
+SMLV-20%) **+ 3.063 medicamentos e insumos**, con 37 códigos en conflicto
+para revisión. Y los tarifarios 2025 de COOSALUD y COMPENSAR ya validaron
+igual que el de POSITIVA: 2.988 limpias y 737 por definir cada uno.
+
 ### 21-08 — El oficio del que la factura YA SALIÓ dejó de pedir lo imposible
 
 **El caso.** La factura **HUS0000551678** ($3.285.631) entró al oficio

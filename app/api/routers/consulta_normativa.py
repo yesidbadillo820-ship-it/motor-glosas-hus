@@ -463,11 +463,48 @@ CATALOGO_NORMAS = [
     },
     # ─── CIRCULARES ───
     {
+        # 24-08-2026 — enriquecida con el texto de la circular real (49 pág,
+        # entregada por el auditor). Las keywords son lo que la pantalla
+        # muestra como "texto": frases con sustancia, no etiquetas sueltas.
         "clave": "CIRCULAR EXTERNA 047 DE 2025 MINSALUD",
         "nombre": "Circular Externa 047 de 2025 MinSalud",
-        "titulo": "Manual SOAT 2026 — indexación a UVB",
+        "titulo": "Indexación de tarifas del Manual de Régimen Tarifario a UVB — vigencia 2026 (30-dic-2025)",
         "vigente": True,
-        "keywords": ["SOAT", "UVB", "manual", "tarifas 2026"],
+        "keywords": [
+            "SOAT",
+            "UVB",
+            "manual tarifario",
+            "tarifas 2026",
+            "Art. 313 Ley 2294 de 2023 crea la Unidad de Valor Básico",
+            "para liquidar en pesos se multiplica el valor de la UVB vigente por la tarifa en UVB",
+            "UVB 2026 = $12.110 (Resolución MinHacienda)",
+            "aplica a aseguradoras SOAT, entidades responsables de pago, prestadores y transporte de pacientes",
+            "indexación",
+            "accidente de tránsito",
+        ],
+    },
+    {
+        # 24-08-2026 — cargada del PDF real (45 pág) entregado por el auditor.
+        # Defensa clave del HUS en glosas de medicamentos: el precio máximo es
+        # POR MERCADO RELEVANTE (mg/unidad) y el Parágrafo 2 del Art. 1 permite
+        # a las IPS ADICIONAR el margen del Art. 11 de la Circular 18 de 2024.
+        "clave": "CIRCULAR 19 DE 2024 CNPMDM",
+        "nombre": "Circular 19 de 2024 CNPMDM (MinSalud–MinCIT)",
+        "titulo": "Precio máximo de venta de medicamentos en control directo — deroga la Circular 13 de 2022",
+        "vigente": True,
+        "keywords": [
+            "precio máximo de venta",
+            "control directo de precios",
+            "medicamentos regulados",
+            "mercado relevante",
+            "CNPMDM",
+            "CUM",
+            "Parágrafo 2 Art. 1: la IPS puede adicionar al precio máximo el margen del Art. 11 de la Circular 18 de 2024",
+            "sanciona la SIC según Art. 132 Ley 1438 de 2011",
+            "rige desde el 30 de julio de 2024 y deroga la Circular 13 de 2022",
+            "transacción institucional",
+            "regulados",
+        ],
     },
     {
         "clave": "CIRCULAR 030 DE 2013 MINSALUD",

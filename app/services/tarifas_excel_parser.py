@@ -156,6 +156,11 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     hset = {h for h in headers_normalizados if h}
     hunion = " ".join(hset)
     cups_like = any("CUPS" in h for h in hset)
+    # 24-08-2026 — los anexos de medicamentos e insumos del Dispensario
+    # (contrato 440) titulan el código «CODIGO CUM» o «CODIGO» a secas
+    # (CUM, FMQ, QX…): sin esto, las 8 hojas se saltaban en silencio.
+    # Va DESPUÉS de los formatos específicos: solo alcanza el fallback.
+    codigo_like = "CODIGO CUM" in hset or "CODIGO" in hset
 
     # FOMAG (tarifario y excluidos comparten estructura) — distintivo:
     # "PROPUESTA IPS" + "OBSERVACION FOMAG" + "CUPS RESOL 2641"
@@ -189,6 +194,10 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
         # que se pacta viene en "PROPUESTA FINAL" (el UVB del año menos el
         # 5% del contrato). Sin esta palabra la hoja no se reconocía.
         "PROPUESTA FINAL",
+        # 24-08-2026 — anexos de medicamentos del Dispensario y la hoja
+        # TARIFAS PROPIAS de su propuesta (el valor viene en OFERTA).
+        "PRECIO DE VENTA",
+        "OFERTA",
     )
     has_value = any(k in hunion for k in value_keywords)
     if not has_value:
@@ -199,7 +208,7 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
         # (Ronda 46: soporte para tarifarios DMBUG y similares con año en header)
         _AGNOS_PATRON = re.compile(r"^(VALOR|TARIFA|PRECIO)\s*(\d{4})?\s*$")
         has_value = any(_AGNOS_PATRON.match(h) for h in hset if h)
-    if cups_like and has_value:
+    if (cups_like or codigo_like) and has_value:
         return "SIMPLE_FIJO"
     return None
 
@@ -247,11 +256,20 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
         # que de verdad se pacta en "PROPUESTA FINAL"; sin esta palabra la
         # hoja no se reconocía y se perdían 4.586 tarifas.
         "PROPUESTA FINAL",
+        # 24-08-2026: anexos de medicamentos e insumos del Dispensario
+        # (contrato 440) y la hoja TARIFAS PROPIAS de su propuesta.
+        "PRECIO DE VENTA",
+        "CODIGO CUM",
+        "OFERTA",
     ]
     limite = min(200, len(rows))
     for idx, fila in enumerate(rows[:limite]):
         no_vacios = [c for c in fila if c is not None and str(c).strip()]
-        if len(no_vacios) < 4:
+        # 24-08-2026 — era < 4, y los anexos 05/06 del Dispensario traen
+        # encabezados de TRES columnas (CODIGO | NOMBRE | PRECIO DE VENTA):
+        # 2.000 dispositivos médicos se saltaban en silencio. Tres celdas
+        # con dos palabras fuertes siguen siendo una tabla de tarifas.
+        if len(no_vacios) < 3:
             continue
         fila_norm = [_normalizar_texto(c) for c in fila]
         matches = sum(1 for celda in fila_norm if any(kw in celda for kw in keywords_fuertes))
@@ -617,7 +635,24 @@ def _parsear_simple_fijo(
     `nombre_hoja` se usa para decir de qué manera quedó pactada la tarifa
     cuando la fila no trae una columna que lo diga. Ver `_modalidad_de_hoja`.
     """
-    idx_cups = _indice_columna(headers, "CUPS")
+    # 24-08-2026 — el anexo de medicamentos e insumos del Dispensario
+    # (contrato 440) titula el código «CODIGO CUM» o «CODIGO» a secas
+    # (CUM, FMQ, QX…), y el lector se saltaba las 8 hojas enteras sin
+    # decir nada. «CODIGO» va de último a propósito: solo aplica cuando
+    # no hay nada mejor, y las filas basura las frenan el validador de
+    # códigos y el valor > 0.
+    # …y la prioridad también acá es POR CANDIDATO: en el tarifario de
+    # SALUD MÍA conviven «CODIGO IPS» (columna 1, códigos con letra) y
+    # «CUPS 2341/25» (columna 3, el CUPS oficial). Con la llamada única,
+    # CODIGO alcanzaba la pasada de subcadenas y agarraba «CODIGO IPS»
+    # antes de que CUPS llegara a su pasada de prefijos: 4.124 tarifas
+    # quedaban guardadas por el código interno y las glosas —que llegan
+    # con el CUPS oficial— no las encontraban.
+    idx_cups = None
+    for candidato in ("CUPS", "CODIGO CUM", "CODIGO"):
+        idx_cups = _indice_columna(headers, candidato)
+        if idx_cups is not None:
+            break
     if idx_cups is None:
         # 06-08-2026 — hoja AMBULATORIO de la propuesta 2026 de FAMISANAR:
         # la columna del CUPS se titula con la resolución que los define
@@ -649,14 +684,25 @@ def _parsear_simple_fijo(
             idx_valor = i_desc
             break
     if idx_valor is None:
-        idx_valor = _indice_columna(
-            headers,
+        # 24-08-2026 — LA PRIORIDAD SE RESPETA DE VERDAD: un candidato a la
+        # vez. La llamada única con todos los candidatos parecía priorizar,
+        # pero su primera pasada recorre LOS ENCABEZADOS en orden y devuelve
+        # el primero que sea cualquier candidato: en la PROPUESTA del
+        # Dispensario encontraba TARIFA (columna con el TEXTO «PROPIA»)
+        # antes de llegar a OFERTA (el valor real), y la hoja entera se
+        # leía como ceros y se descartaba en silencio.
+        for candidato in (
             # 06-08-2026 — va de PRIMERA: en la hoja UVB de FAMISANAR conviven
             # "VALOR UVB 2026" (el de referencia) y "PROPUESTA FINAL" (ese mismo
             # menos el 5% del contrato, que es el que se pacta). Si gana el de
             # referencia, el motor defiende con una tarifa 5% más alta que la
             # pactada y la glosa se ratifica.
             "PROPUESTA FINAL",
+            # 24-08-2026 — la PROPUESTA del Dispensario: TARIFA trae el TEXTO
+            # «PROPIA» y el valor de verdad está en OFERTA. Y sus anexos de
+            # medicamentos titulan el precio «PRECIO DE VENTA».
+            "OFERTA",
+            "PRECIO DE VENTA",
             "PRECIO DE REFERENCIA",
             "TARIFA UNITARIA",
             "VALOR PACTADO",
@@ -672,7 +718,10 @@ def _parsear_simple_fijo(
             "VALOR",
             "PRECIO",
             "TARIFA",
-        )
+        ):
+            idx_valor = _indice_columna(headers, candidato)
+            if idx_valor is not None:
+                break
     idx_modalidad = _indice_columna(
         headers,
         "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",

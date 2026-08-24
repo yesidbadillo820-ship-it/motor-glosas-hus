@@ -170,6 +170,120 @@ class TestElCeroDeAdelante:
         assert r["filas"][0]["codigo_cups"] == "1250"
 
 
+class TestLosAnexosDeMedicamentosDelDispensario:
+    """El «TARIFAS DEL CONTRATO» 440 del Dispensario trae 8 anexos de
+    medicamentos e insumos (~3.000 códigos CUM, FMQ, QX) y el lector se los
+    saltaba TODOS en silencio, por tres razones distintas que estas pruebas
+    fijan una a una (24-08-2026)."""
+
+    def test_reconoce_codigo_cum_con_precio_de_venta(self):
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "ANEXO 02": [
+                        ["", "ANEXO 02 - MEDICAMENTOS", "", ""],
+                        ["", "", "", ""],
+                        [
+                            "CODIGO CUM",
+                            "CODIGO AGRUPAMIENTO",
+                            "NOMBRE DEL MEDICAMENTO",
+                            "PRECIO DE VENTA",
+                        ],
+                        ["20028352-08", "J05AF06", "ABACAVIR TAB 300 MG", 900],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "20028352-08"
+        assert r["filas"][0]["valor_pactado"] == 900
+
+    def test_un_encabezado_de_TRES_columnas_tambien_es_tarifario(self):
+        """Era «mínimo 4 columnas»: los anexos 05/06 (CODIGO | NOMBRE |
+        PRECIO DE VENTA) perdían 2.000 dispositivos médicos en silencio."""
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "ANEXO 05": [
+                        ["ANEXO 05 - DISPOSITIVOS", "", ""],
+                        ["", "", ""],
+                        ["CODIGO", "NOMBRE", "PRECIO DE VENTA"],
+                        ["FMQ1764", "ACIDOS GRASOS HIPEROXIGENADOS", 135200],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "FMQ1764"
+
+    def test_cuando_TARIFA_es_un_texto_manda_la_OFERTA(self):
+        """La PROPUESTA trae una columna TARIFA con el TEXTO «PROPIA» y el
+        valor real en OFERTA: si gana TARIFA, la hoja entera se lee como
+        ceros y se descarta sin decir nada."""
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "TARIFAS PROPIAS": [
+                        [
+                            "CUPS",
+                            "DESCRIPCION CUPS",
+                            "CODIGO IPS",
+                            "DESCRIPCION IPS",
+                            "TARIFA",
+                            "OFERTA",
+                        ],
+                        [
+                            "039001",
+                            "INSERCION DE CATETER",
+                            "039001H",
+                            "INSERCION",
+                            "PROPIA",
+                            1689585,
+                        ],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["valor_pactado"] == 1689585
+
+
+class TestElCupsOficialLeGanaAlCodigoInterno:
+    """Tarifario de SALUD MÍA (24-08-2026): conviven «CODIGO IPS» (columna 1,
+    códigos con letra: 010101H) y «CUPS 2341/25» (columna 3, el oficial). El
+    candidato CODIGO alcanzaba la pasada de subcadenas y agarraba CODIGO IPS
+    antes de que CUPS llegara a su pasada de prefijos: 4.124 tarifas quedaban
+    guardadas por el código interno, y las glosas —que llegan con el CUPS
+    oficial— no las encontraban."""
+
+    def test_prefiere_el_cups_y_guarda_el_interno_aparte(self):
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "SERVICIOS IPS": [
+                        [
+                            "CODIGO IPS",
+                            "DESCRIPCIÓN CUPS",
+                            "CUPS 2341/25",
+                            "DESCRIPCIÓN CUPS",
+                            "TARIFA",
+                        ],
+                        [
+                            "010101H",
+                            "PUNCION CISTERNAL - HUS",
+                            "010101",
+                            "PUNCION CISTERNAL",
+                            777793.35,
+                        ],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "010101", "ganó el código interno"
+        assert r["filas"][0]["codigo_ips"] == "010101H", "se perdió el código interno"
+
+
 class TestLosRepetidosQueSeContradicen:
     def test_dos_valores_distintos_no_se_cargan_y_se_avisa(self):
         """El 103204 real traía CINCO valores. Cargarlos deja que el orden de
