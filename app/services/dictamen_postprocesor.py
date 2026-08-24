@@ -195,6 +195,21 @@ def _extraer_componentes_cita(cita: str) -> tuple[str, str, str]:
       'Art. 10 DECRETO 780/2016' → ('10', '780', '2016')
       'Resolución 1552/2019' → ('', '1552', '2019')
     """
+    # OJO ANTES DE "ARREGLAR" ESTA EXPRESION (24-08-2026). Reconoce
+    # "RESOLUCION 1552/2019" pero NO "Resolución 1552 de 2019", que es
+    # justamente el formato con que el verificador escribe las citas de
+    # NORMA_INEXISTENTE. O sea que una norma inventada nunca llego a esta
+    # lista y nunca se borro por este camino.
+    #
+    # Se deja asi A PROPOSITO. Ampliarla para que acepte " de " haria que se
+    # borren oraciones enteras por cada norma que no este en el corpus, y el
+    # corpus tiene 131 normas de las miles que existen: una resolucion real
+    # que no hayamos cargado saldria del documento radicado sin que nadie se
+    # entere. Ese es exactamente el dano que se acaba de corregir con los
+    # articulos (ver el aviso ARTICULO_NO_VERIFICABLE en citation_verifier).
+    #
+    # El aviso igual le llega al gestor: sale en rojo en el panel de
+    # verificacion de citas, que es donde debe decidirlo una persona.
     c = cita.upper()
     m_art = re.search(r"ART\.?\s*(\d+)", c)
     m_norma = re.search(r"(?:LEY|DECRETO|RESOLUCI[ÓO]N)\s+(\d+)\s*[/\s]\s*(\d{4})", c)

@@ -84,8 +84,17 @@ PAT_SENTENCIA = re.compile(
     r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})\s*(?:[/\-]|\s+de\s+)\s*(\d{2,4})\b",
     re.IGNORECASE,
 )
+# «DEL DECRETO» NO SE RECONOCÍA (24-08-2026). El patrón aceptaba «de la Ley»
+# y «de Ley», pero no la contracción «del», que es la forma normal de escribir
+# en español: «el artículo 87 DEL Decreto 2423 de 1996». Con esa forma solo se
+# capturaba el número del artículo y la norma quedaba en blanco, así que la
+# cita no se revisaba contra nada. Se agregan «del», «de los», «de las», el año
+# escrito con barra («Decreto 2423/1996») y dos tipos de norma que faltaban.
 PAT_ARTICULO = re.compile(
-    r"(?:art(?:ículo|iculo|\.)\s*)(\d{1,4})(?:\s*(?:de\s+(?:la\s+)?(Resolución|Ley|Decreto)\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})))?",
+    r"(?:art(?:ículo|iculo|\.)\s*)(\d{1,4})"
+    r"(?:\s*(?:de\s+la|de\s+los|de\s+las|del|de)\s+"
+    r"(Resoluci[óo]n|Ley|Decreto|Circular|Acuerdo)\s+(?:N[oº°\.]?\s*)?(\d{1,5})"
+    r"(?:\s+de\s+|\s*[/\-]\s*)(\d{4}))?",
     re.IGNORECASE,
 )
 # Texto entrecomillado — chevrones franceses « » preferidos en el motor
@@ -883,15 +892,57 @@ def verificar_citas(
             # Las claves de articulos pueden ser strings o ints
             keys_art = {str(k) for k in arts.keys()}
             if str(art_num) not in keys_art:
-                issues.append(
-                    {
-                        "tipo": "ARTICULO_FUERA_DE_NORMA",
-                        "severidad": "MEDIA",
-                        "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
-                        "detalle": f"La {norma_tipo} {norma_num}/{norma_anio} no contiene el Art. {art_num} en el corpus cargado.",
-                        "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
-                    }
-                )
+                # QUE NO ESTÉ AQUÍ NO SIGNIFICA QUE NO EXISTA (24-08-2026).
+                #
+                # El corpus guarda 131 normas y solo 26 tienen algún artículo
+                # cargado; la que más tiene, cuatro. De la Ley 100 de 1993 están
+                # el 168, el 177 y el 178 — tres de casi trescientos.
+                #
+                # Aun así, este aviso decía «la norma no contiene el artículo» y
+                # el limpiador de dictámenes borra la ORACIÓN ENTERA que lo
+                # menciona. Reproducido ese día: un dictamen que citaba el
+                # Art. 156 de la Ley 100 —artículo real y de los cimientos del
+                # sistema— salía sin esa frase. O sea: el motor le quitaba al
+                # documento que se radica ante la EPS un argumento correcto, sin
+                # decírselo a nadie.
+                #
+                # Ahora solo se afirma que el artículo no existe cuando de la
+                # norma se cargó su lista COMPLETA de artículos, que es cuando
+                # de verdad se puede afirmar. Si la lista es parcial, se avisa
+                # con severidad baja y sin borrar nada: «no se pudo verificar».
+                completa = bool(n.get("articulos_completos"))
+                if completa:
+                    issues.append(
+                        {
+                            "tipo": "ARTICULO_FUERA_DE_NORMA",
+                            "severidad": "MEDIA",
+                            "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
+                            "detalle": (
+                                f"La {norma_tipo} {norma_num}/{norma_anio} no contiene el "
+                                f"Art. {art_num}. De esta norma el sistema tiene cargados "
+                                "todos sus artículos, así que el número está mal."
+                            ),
+                            "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
+                        }
+                    )
+                elif arts:
+                    issues.append(
+                        {
+                            "tipo": "ARTICULO_NO_VERIFICABLE",
+                            "severidad": "BAJA",
+                            "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
+                            "detalle": (
+                                f"De la {norma_tipo} {norma_num}/{norma_anio} el sistema solo "
+                                f"tiene cargados {len(arts)} artículo(s), y el {art_num} no "
+                                "está entre ellos. Puede ser correcto: no hay con qué "
+                                "comprobarlo. Verifíquelo a mano antes de radicar."
+                            ),
+                            "sugerencia": (
+                                "Confirme el número contra el texto oficial de la norma, o "
+                                "cargue ese artículo al corpus para que quede verificado."
+                            ),
+                        }
+                    )
 
     # 3b. Contenido atribuido a un artículo real que ese artículo no tiene.
     total_citas += _verificar_atribuciones(texto, issues, normas)

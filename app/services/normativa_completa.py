@@ -79,6 +79,39 @@ LEYES = {
         "ambito": "Reforma SGSSS — trámite de glosas y pagos",
         "vigente": True,
         "articulos": {
+            # Agregados el 24-08-2026, transcritos del PDF oficial del
+            # Ministerio de Salud. Estaban citados en dictámenes reales y una
+            # prueba de mayo de 2026 los daba por "citas inventadas": no lo
+            # son, existen. El motor los borraba del documento radicado.
+            "1": {
+                "titulo": "Objeto de la ley",
+                "texto": (
+                    "Esta ley tiene como objeto el fortalecimiento del Sistema General de "
+                    "Seguridad Social en Salud a través de un modelo de prestación del "
+                    "servicio público en salud que en el marco de la estrategia Atención "
+                    "Primaria en Salud permita la acción coordinada del Estado, las "
+                    "instituciones y la sociedad para el mejoramiento de la salud y la "
+                    "creación de un ambiente sano y saludable, que brinde servicios de mayor "
+                    "calidad, incluyente y equitativo, donde el centro y objetivo de todos "
+                    "los esfuerzos sean los residentes en el país."
+                ),
+                "aplicacion": "Marco general. Por sí solo no sustenta una defensa tarifaria.",
+                "keywords": ["objeto", "fortalecimiento", "atención primaria"],
+            },
+            "2": {
+                "titulo": "Orientación del Sistema General de Seguridad Social en Salud",
+                "texto": (
+                    "El Sistema General de Seguridad Social en Salud estará orientado a "
+                    "generar condiciones que protejan la salud de los colombianos, siendo el "
+                    "bienestar del usuario el eje central y núcleo articulador de las "
+                    "políticas en salud. Para esto concurrirán acciones de salud pública, "
+                    "promoción de la salud, prevención de la enfermedad y demás prestaciones "
+                    "que, en el marco de una estrategia de Atención Primaria en Salud, sean "
+                    "necesarias para promover de manera constante la salud de la población."
+                ),
+                "aplicacion": "Marco general. Por sí solo no sustenta una defensa tarifaria.",
+                "keywords": ["orientación", "bienestar del usuario", "atención primaria"],
+            },
             "56": {
                 "titulo": "Trámite de pagos",
                 "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda. Nota operativa (Manual Único de Glosas Res. 2284/2023 + Manual SIIFA 2026): una vez levantada o aceptada la glosa, el pago al prestador debe efectuarse dentro de los cinco (5) días hábiles siguientes.",
@@ -151,6 +184,18 @@ LEYES = {
         "ambito": "Derecho fundamental a la salud",
         "vigente": True,
         "articulos": {
+            # Agregado el 24-08-2026, transcrito del PDF oficial del Ministerio
+            # de Salud. Una prueba de mayo de 2026 lo daba por "cita inventada":
+            # no lo es, y el motor lo borraba del documento radicado.
+            "1": {
+                "titulo": "Objeto",
+                "texto": (
+                    "La presente ley tiene por objeto garantizar el derecho fundamental a la "
+                    "salud, regularlo y establecer sus mecanismos de protección."
+                ),
+                "aplicacion": "Marco general del derecho fundamental a la salud.",
+                "keywords": ["objeto", "derecho fundamental", "mecanismos de protección"],
+            },
             "2": {
                 "titulo": "Naturaleza y contenido del derecho fundamental a la salud",
                 "texto": "El derecho fundamental a la salud es autónomo e irrenunciable en lo individual y en lo colectivo. Comprende los servicios de salud de manera oportuna, eficaz y con calidad para la preservación, el mejoramiento y la promoción de la salud.",
@@ -536,6 +581,39 @@ DECRETOS = {
         "ambito": "Tarifas SOAT — marco histórico",
         "vigente": True,
         "keywords": ["SOAT", "tarifa", "manual tarifario"],
+        # El Art. 87 se agregó el 24-08-2026. El dictamen GL-207 (AURORA) lo
+        # citó completo para defender una tarifa propia del hospital, y el
+        # sistema no lo tenía: no podía respaldar una cita que resultó ser
+        # CORRECTA. Transcrito del PDF oficial del Ministerio de Salud ese
+        # mismo día (decreto-2423-de-1996.pdf, 149 páginas, 241 artículos).
+        # Es el fundamento de la tarifa institucional cuando el procedimiento
+        # no está en el manual: sirve seguido en glosas de mayor valor cobrado.
+        "articulos": {
+            "87": {
+                "titulo": "Procedimiento sin tarifa asignada — tarifa de la institución",
+                "texto": (
+                    "Por las circunstancias de orden tecnológico, cuando alguna Institución "
+                    "Prestadora de Servicios de Salud realice un procedimiento que no se "
+                    "encuentre definido y por lo tanto no tenga asignada tarifa, éste se "
+                    "reconocerá por la tarifa que tenga definida la Institución, previa la "
+                    "comprobación del médico tratante, de que dicho procedimiento no se "
+                    "encuentra relacionado en el presente Decreto ni siquiera bajo otra "
+                    "denominación."
+                ),
+                "aplicacion": (
+                    "Glosas de mayor valor cobrado sobre procedimientos que el manual SOAT "
+                    "no tiene tarifados. OJO: el propio artículo exige la comprobación del "
+                    "médico tratante de que el procedimiento no está en el decreto ni bajo "
+                    "otro nombre — sin esa comprobación el argumento queda cojo."
+                ),
+                "keywords": [
+                    "tarifa institucional",
+                    "procedimiento no definido",
+                    "sin tarifa asignada",
+                    "mayor valor cobrado",
+                ],
+            },
+        },
     },
     "DECRETO 3752 DE 2003": {
         "nombre": "Decreto 3752 de 2003",
