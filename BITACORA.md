@@ -6547,6 +6547,27 @@ instalación mala la envenena y la próxima vez sugiere la cuenta equivocada
 como si fuera la buena— sino de la **sesión de consola**: quién está sentado
 en este PC todos los días, cosa que ninguna instalación mala puede cambiar.
 
+### 24-08 (tarde) — El lector de tarifas aprendió los anexos del Dispensario
+
+Llegaron los tarifarios del contrato 440 del Dispensario y el lector se
+saltaba **el anexo entero de medicamentos e insumos** —8 hojas, ~3.000
+códigos CUM/FMQ/QX— sin decir una palabra. Tres causas, una detrás de otra:
+
+1. El código se titula «CODIGO CUM» o «CODIGO» a secas, no «CUPS».
+2. Dos anexos traen encabezados de TRES columnas y la regla exigía cuatro:
+   2.000 dispositivos médicos invisibles.
+3. La hoja TARIFAS PROPIAS de la propuesta trae una columna TARIFA con el
+   TEXTO «PROPIA» y el valor real en OFERTA — y la «prioridad» de columnas
+   resultó ilusoria: la búsqueda recorría los encabezados en orden, no los
+   candidatos, así que TARIFA (texto) ganaba y la hoja entera se leía como
+   ceros. Una prueba nueva me cazó el arreglo a medias; ahora la prioridad
+   es real, candidato por candidato.
+
+Con esto, del paquete del contrato 440 salen **7.085 servicios** (SOAT
+SMLV-20%) **+ 3.063 medicamentos e insumos**, con 37 códigos en conflicto
+para revisión. Y los tarifarios 2025 de COOSALUD y COMPENSAR ya validaron
+igual que el de POSITIVA: 2.988 limpias y 737 por definir cada uno.
+
 ## 3) PENDIENTE
 
 ### Tarifas POSITIVA (nuevo, 24-08 tarde)

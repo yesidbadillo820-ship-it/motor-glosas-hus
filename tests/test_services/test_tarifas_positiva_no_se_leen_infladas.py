@@ -170,6 +170,84 @@ class TestElCeroDeAdelante:
         assert r["filas"][0]["codigo_cups"] == "1250"
 
 
+class TestLosAnexosDeMedicamentosDelDispensario:
+    """El «TARIFAS DEL CONTRATO» 440 del Dispensario trae 8 anexos de
+    medicamentos e insumos (~3.000 códigos CUM, FMQ, QX) y el lector se los
+    saltaba TODOS en silencio, por tres razones distintas que estas pruebas
+    fijan una a una (24-08-2026)."""
+
+    def test_reconoce_codigo_cum_con_precio_de_venta(self):
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "ANEXO 02": [
+                        ["", "ANEXO 02 - MEDICAMENTOS", "", ""],
+                        ["", "", "", ""],
+                        [
+                            "CODIGO CUM",
+                            "CODIGO AGRUPAMIENTO",
+                            "NOMBRE DEL MEDICAMENTO",
+                            "PRECIO DE VENTA",
+                        ],
+                        ["20028352-08", "J05AF06", "ABACAVIR TAB 300 MG", 900],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "20028352-08"
+        assert r["filas"][0]["valor_pactado"] == 900
+
+    def test_un_encabezado_de_TRES_columnas_tambien_es_tarifario(self):
+        """Era «mínimo 4 columnas»: los anexos 05/06 (CODIGO | NOMBRE |
+        PRECIO DE VENTA) perdían 2.000 dispositivos médicos en silencio."""
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "ANEXO 05": [
+                        ["ANEXO 05 - DISPOSITIVOS", "", ""],
+                        ["", "", ""],
+                        ["CODIGO", "NOMBRE", "PRECIO DE VENTA"],
+                        ["FMQ1764", "ACIDOS GRASOS HIPEROXIGENADOS", 135200],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "FMQ1764"
+
+    def test_cuando_TARIFA_es_un_texto_manda_la_OFERTA(self):
+        """La PROPUESTA trae una columna TARIFA con el TEXTO «PROPIA» y el
+        valor real en OFERTA: si gana TARIFA, la hoja entera se lee como
+        ceros y se descarta sin decir nada."""
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "TARIFAS PROPIAS": [
+                        [
+                            "CUPS",
+                            "DESCRIPCION CUPS",
+                            "CODIGO IPS",
+                            "DESCRIPCION IPS",
+                            "TARIFA",
+                            "OFERTA",
+                        ],
+                        [
+                            "039001",
+                            "INSERCION DE CATETER",
+                            "039001H",
+                            "INSERCION",
+                            "PROPIA",
+                            1689585,
+                        ],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["valor_pactado"] == 1689585
+
+
 class TestLosRepetidosQueSeContradicen:
     def test_dos_valores_distintos_no_se_cargan_y_se_avisa(self):
         """El 103204 real traía CINCO valores. Cargarlos deja que el orden de
