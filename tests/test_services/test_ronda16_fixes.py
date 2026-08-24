@@ -227,19 +227,48 @@ class TestBugPv3CorpusExpandido:
         norma = _TODAS_LAS_NORMAS["SENTENCIA T-970 DE 2014"]
         assert "muerte digna" in str(norma).lower() or "paliativ" in str(norma).lower()
 
-    def test_auto_037_2024_seguimiento_cart_t(self):
+    def test_auto_037_2024_dice_lo_que_de_verdad_dice(self):
+        """El Auto existe, pero no trata de lo que el sistema decía.
+
+        La prueba original exigía que hablara de terapia CAR-T y de seguimiento
+        a la Sentencia T-553/2024. Se leyó su texto oficial el 24-08-2026: cero
+        menciones de CAR-T, y la sentencia a la que supuestamente le hacía
+        seguimiento no existe.
+
+        Lo que trata de verdad resultó más útil para cartera: un conflicto de
+        jurisdicciones (expediente CJU-4122) en el que un hospital demandó a una
+        caja de compensación por la factura de una atención de urgencias. La
+        Sala Plena resolvió que la jurisdicción ORDINARIA LABORAL es la
+        competente para cobrar ejecutivamente facturas de servicios de salud.
+        """
         assert "AUTO 037 DE 2024" in _TODAS_LAS_NORMAS
         norma = _TODAS_LAS_NORMAS["AUTO 037 DE 2024"]
-        assert "CAR-T" in str(norma) or "Cart-T" in str(norma) or "Tisagenlecleucel" in str(norma)
+        texto = str(norma).lower()
+        assert "car-t" not in texto and "tisagenlecleucel" not in texto
+        assert "jurisdicción" in texto or "jurisdiccion" in texto
+        assert "factura" in texto
+        assert norma.get("verificada")
 
-    def test_auto_116_2024_sostenibilidad(self):
+    def test_auto_116_2024_dice_lo_que_de_verdad_dice(self):
+        """Otro auto que decía algo que no dice.
+
+        La prueba original exigía que hablara de ADRES, giro directo o
+        sostenibilidad del sistema, y así lo describía el corpus: «soporte
+        fuerte para glosas con riesgo de no-pago por liquidación inminente».
+        Se leyó su texto oficial el 24-08-2026: cero menciones de ADRES, cero
+        de giro directo, cero de sostenibilidad.
+
+        Lo que trata es un conflicto de jurisdicciones (expediente CJU-4747)
+        sobre el reintegro de subsidios de incapacidad: define ante qué juez se
+        demanda un acto administrativo, no sirve para responder una glosa.
+        """
         assert "AUTO 116 DE 2024" in _TODAS_LAS_NORMAS
         norma = _TODAS_LAS_NORMAS["AUTO 116 DE 2024"]
-        assert (
-            "ADRES" in str(norma)
-            or "giro directo" in str(norma).lower()
-            or "sostenibilidad" in str(norma).lower()
-        )
+        texto = str(norma).lower()
+        assert "adres" not in texto
+        assert "giro directo" not in texto
+        assert "jurisdicci" in texto
+        assert norma.get("verificada")
 
 
 class TestBloqueClinicoExpandido:

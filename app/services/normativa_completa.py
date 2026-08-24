@@ -1488,12 +1488,17 @@ JURISPRUDENCIA = {
     "SENTENCIA T-171 DE 2018": {
         "nombre": "Sentencia T-171 de 2018",
         "corte": "Corte Constitucional",
-        "titulo": "Pertinencia médica y autoridad del tratante",
-        "ratio": "El criterio del médico tratante prevalece sobre la auditoría administrativa cuando existe sustento clínico. La EPS no puede negar sin prueba técnica equivalente.",
         "ratio_literal": "La auditoría administrativa carece de potestad para negar procedimientos médicamente indicados cuando no aporta contradicción científica con sustento clínico equivalente al del médico tratante.",
-        "aplica_a": "Defensa de pertinencia clínica y servicios especializados",
-        "keywords": ["T-171", "pertinencia", "autoridad médica"],
         "verificada": "24-08-2026 relatoria Corte Constitucional",
+        "titulo": "Atencion integral a adulta mayor tras fractura de cadera",
+        "ratio": (
+            "La EPS no presto atencion integral a una adulta mayor de 88 anos. La Corte reconoce "
+            "la primacia del criterio del medico tratante, pero el eje del fallo es garantizar un "
+            "diagnostico efectivo integral, no fijar una regla sobre auditoria de cuentas."
+        ),
+        "aplica_a": "Atencion integral y valoracion medica",
+        "magistrado_ponente": "Cristina Pardo Schlesinger",
+        "keywords": ["T-171", "atencion integral", "medico tratante"],
     },
     "SENTENCIA T-134 DE 2022": {
         "nombre": "Sentencia T-134 de 2022",
@@ -1596,147 +1601,185 @@ JURISPRUDENCIA = {
     # ─── R52 B: ampliación catálogo de jurisprudencia ──────────────────────
     "SENTENCIA T-024 DE 2009": {
         "nombre": "Sentencia T-024 de 2009",
-        "titulo": "Pago de servicios de salud — obligación EPS",
         "ambito": "Glosas y mora en pago a IPS — derecho fundamental afectado",
         "vigente": True,
-        "ratio": "Las EPS no pueden trasladar a las IPS las consecuencias económicas de su gestión administrativa interna mediante glosas dilatorias. El pago oportuno es presupuesto para garantizar el derecho a la salud.",
-        "aplica_a": "Defensa contra glosas reiterativas que dilatan el pago",
-        "keywords": ["T-024/2009", "pago oportuno", "glosas dilatorias"],
+        "titulo": "Custodia de menor y restitucion por via de tutela",
+        "ratio": (
+            "Derecho de familia: custodia de una nina e interes superior del menor, en tutela "
+            "contra el ICBF. NO trata del pago de servicios de salud ni de obligaciones de las "
+            "EPS."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Rodrigo Escobar Gil",
+        "keywords": ["T-024", "custodia", "interes superior del menor"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-744 DE 2009": {
         "nombre": "Sentencia T-744 de 2009",
-        "titulo": "Acceso a servicios y autorización médica — autonomía profesional",
         "ambito": "Pertinencia médica vs. negativa de la EPS",
         "vigente": True,
-        "ratio": "La autonomía del médico tratante es la regla; la EPS no puede sustituir el criterio médico ni condicionar la prestación a autorizaciones administrativas que generen barreras.",
-        "aplica_a": "Defensa de glosas por pertinencia donde la EPS cuestiona criterio del tratante",
-        "keywords": ["T-744/2009", "autonomía médica", "barreras"],
+        "titulo": "Salud de una persona privada de la libertad con enfermedad mental",
+        "ratio": (
+            "Acceso a los servicios de salud de un interno con enfermedad mental. Toca el acceso "
+            "y la autorizacion, pero NO fija una regla general de autonomia profesional frente a "
+            "la auditoria de la EPS: no sirve como fundamento de pertinencia clinica."
+        ),
+        "aplica_a": "Acceso a servicios de personas privadas de la libertad",
+        "magistrado_ponente": "Gabriel Eduardo Mendoza Martelo",
+        "keywords": ["T-744", "privados de la libertad", "salud mental"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-940 DE 2009": {
         "nombre": "Sentencia T-940 de 2009",
-        "titulo": "Pago integral a IPS — no fragmentación arbitraria",
         "ambito": "Glosa parcial — proporcionalidad",
         "vigente": True,
-        "ratio": "Las glosas parciales solo proceden sobre los rubros efectivamente cuestionados, debidamente fundamentados; rebajas globales o porcentuales sin sustento técnico violan el debido proceso contractual.",
-        "aplica_a": "Defensa contra glosas tipo 'rebaja global' del valor facturado",
-        "keywords": ["T-940/2009", "glosa parcial", "rebaja global", "proporcionalidad"],
+        "titulo": "Hemodialisis sin contrato vigente con la IPS (insuficiencia renal terminal)",
+        "ratio": (
+            "La EPS-S debe autorizar la hemodialisis en la IPS que la presta aunque no tenga "
+            "contrato vigente con ella, y garantizar el tratamiento integral. Es una orden a "
+            "favor del PACIENTE. NO trata del pago de facturas a las IPS ni de fragmentacion de "
+            "pagos."
+        ),
+        "aplica_a": "Acceso del paciente a la IPS aunque no haya contrato",
+        "magistrado_ponente": "Luis Ernesto Vargas Silva",
+        "keywords": ["T-940", "hemodialisis", "sin contrato", "tratamiento integral"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-117 DE 2013": {
         "nombre": "Sentencia T-117 de 2013",
-        "titulo": "Continuidad del tratamiento — atención integral",
         "ambito": "Cobertura — interrupción de tratamiento por glosa",
         "vigente": True,
-        "ratio": "Una vez iniciado un tratamiento, la EPS no puede interrumpirlo bajo el argumento de exclusión del PBS si existe pertinencia médica documentada.",
-        "aplica_a": "Glosas de cobertura sobre tratamientos en curso",
-        "keywords": ["T-117/2013", "continuidad", "tratamiento", "integralidad"],
+        "titulo": "Tutela contra providencia judicial por defecto factico (materia penal)",
+        "ratio": (
+            "Exclusion de una entrevista forense del juicio oral. Es derecho procesal penal y "
+            "probatorio. NO trata de continuidad del tratamiento ni de atencion integral en "
+            "salud."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Alexei Julio Estrada",
+        "keywords": ["T-117", "defecto factico", "prueba penal"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-307 DE 2017": {
         "nombre": "Sentencia T-307 de 2017",
-        "titulo": "Recobros NO PBS — flujo oportuno de recursos",
         "ambito": "MIPRES y recobros — barreras administrativas",
         "vigente": True,
-        "ratio": "Las trabas administrativas para reconocer recobros NO PBS deben interpretarse en favor del prestador y del usuario; las glosas a recobros deben fundarse en hechos objetivos verificables.",
-        "aplica_a": "Glosas a recobros MIPRES/NO PBS",
-        "keywords": ["T-307/2017", "recobros", "MIPRES", "no PBS"],
-    },
-    "SENTENCIA T-543 DE 2013": {
-        "nombre": "Sentencia T-543 de 2013",
-        "titulo": "Atención inicial de urgencias — pago obligatorio",
-        "ambito": "Urgencias sin autorización previa",
-        "vigente": True,
-        "ratio": "La atención inicial de urgencias es obligatoria sin autorización previa y debe ser cubierta por la EPS o el FOSYGA/ADRES. La glosa por 'falta de autorización' en urgencias es contraria al ordenamiento.",
-        "aplica_a": "Glosa AU0101 (sin autorización) en servicios de urgencias",
-        "keywords": ["T-543/2013", "urgencias", "autorización previa", "AU0101"],
+        "titulo": "Pension de sobrevivientes de la companera permanente (Policia Nacional)",
+        "ratio": (
+            "Regimen pensional especial. NO trata de recobros NO PBS ni de flujo de recursos del "
+            "sistema de salud."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Gloria Stella Ortiz Delgado",
+        "keywords": ["T-307", "pension de sobrevivientes"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-126 DE 2018": {
         "nombre": "Sentencia T-126 de 2018",
-        "titulo": "Historia clínica como prueba plena",
         "ambito": "Soportes de glosa — valor probatorio de la HC",
         "vigente": True,
-        "ratio": "La historia clínica institucional, debidamente diligenciada, constituye prueba plena de los servicios efectivamente prestados, salvo prueba en contrario aportada por la EPS.",
-        "aplica_a": "Glosas SO0101 (soporte) cuando la HC respalda la atención",
-        "keywords": ["T-126/2018", "historia clínica", "prueba plena", "SO0101"],
+        "titulo": "Tutela contra providencia judicial — violencia sexual en el conflicto armado",
+        "ratio": (
+            "Acceso a la justicia de una victima de violencia sexual. NO fija ninguna regla sobre "
+            "la historia clinica como prueba, ni sobre facturacion o auditoria de cuentas "
+            "medicas."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Cristina Pardo Schlesinger",
+        "keywords": ["T-126", "violencia sexual", "acceso a la justicia"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA C-313 DE 2014": {
         "nombre": "Sentencia C-313 de 2014",
-        "titulo": "Control de constitucionalidad de la Ley Estatutaria 1751 de 2015",
         "ambito": "Salud como derecho fundamental autónomo",
         "vigente": True,
-        "ratio": "La salud es un derecho fundamental autónomo; ni la sostenibilidad fiscal ni los procedimientos administrativos pueden negar el acceso efectivo. La Corte declaró exequible la Ley Estatutaria con condicionamientos.",
-        "aplica_a": "Defensa estructural en glosas de cobertura/exclusión",
-        "keywords": ["C-313/2014", "Ley estatutaria", "derecho fundamental", "salud"],
+        "titulo": "Control previo de constitucionalidad de la Ley Estatutaria de Salud",
+        "ratio": (
+            "Revision PREVIA y automatica del proyecto que luego fue la Ley 1751 de 2015. El "
+            "asunto de fondo si es el derecho fundamental a la salud; el enunciado anterior decia "
+            "'Ley Estatutaria 1751 de 2015', que en 2014 aun no existia con ese numero."
+        ),
+        "aplica_a": "Marco general del derecho fundamental a la salud",
+        "magistrado_ponente": "Gabriel Eduardo Mendoza Martelo",
+        "keywords": ["C-313", "ley estatutaria", "derecho fundamental a la salud"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     # Ronda 15 (Bug P v2): sentencias específicas que aparecen en producción
     # y el verifier marcaba como inexistentes.
-    "SENTENCIA T-027 DE 2020": {
-        "nombre": "Sentencia T-027 de 2020",
-        "titulo": "Atención integral al menor con cáncer — Ley 1388/2010",
-        "ambito": "Pediatría oncológica — derecho a la salud reforzado del NNA",
-        "vigente": True,
-        "ratio": "La atención integral del menor con cáncer no admite barreras administrativas (PBS, MIPRES, CTC) cuando la vida está en riesgo. La EPS debe garantizar acceso pleno incluyendo terapias avanzadas cuando las líneas previas fracasan.",
-        "aplica_a": "Defensa de glosas a tratamientos oncológicos pediátricos de alto costo",
-        "keywords": ["T-027/2020", "cáncer infantil", "Ley 1388", "atención integral menor"],
-    },
-    "SENTENCIA T-553 DE 2024": {
-        "nombre": "Sentencia T-553 de 2024",
-        "titulo": "CAR-T cells en leucemia pediátrica refractaria — cobertura directa",
-        "ambito": "Terapias CAR-T en LLA pediátrica — eliminación de barreras MIPRES",
-        "vigente": True,
-        "ratio": "La Corte Constitucional ordenó la cobertura DIRECTA de terapias CAR-T (Tisagenlecleucel, Axicabtagene) en pacientes pediátricos con leucemia linfoblástica aguda refractaria a líneas previas, sin exigir trámites de MIPRES ni junta CRES, cuando hay riesgo vital inminente y opciones terapéuticas agotadas. Esta es la cita OBLIGATORIA en glosas a CAR-T pediátrico.",
-        "aplica_a": "Defensa Cart-T (Kymriah, Yescarta) en LLA pediátrica refractaria",
-        "keywords": [
-            "T-553/2024",
-            "CAR-T",
-            "Cart-T",
-            "Tisagenlecleucel",
-            "Kymriah",
-            "LLA pediátrica",
-        ],
-    },
     "SENTENCIA T-705 DE 2017": {
         "nombre": "Sentencia T-705 de 2017",
-        "titulo": "Atención en urgencias a migrantes irregulares — dignidad humana",
         "ambito": "Migrantes venezolanos sin afiliación al SGSSS — atención inicial obligatoria",
         "vigente": True,
-        "ratio": "La atención inicial de urgencias a migrantes sin afiliación al SGSSS es obligatoria por dignidad humana (Art. 1 CP). El pago, sin embargo, corresponde al Ente Territorial vía SGP (Decreto 064/2020), no a una EPS donde el paciente no estaba afiliado.",
-        "aplica_a": "Defensa de glosas en atención a migrantes irregulares",
-        "keywords": ["T-705/2017", "migrante", "Venezuela", "urgencias", "dignidad humana"],
+        "titulo": "Atencion en salud a un menor migrante venezolano",
+        "ratio": (
+            "Tutela de un menor venezolano contra un instituto departamental de salud. Trata la "
+            "atencion del migrante, pero el enunciado anterior la presentaba como regla de "
+            "urgencias: revisar el alcance antes de apoyarse en ella."
+        ),
+        "aplica_a": "Atencion a poblacion migrante",
+        "magistrado_ponente": "Jose Fernando Reyes Cuartas",
+        "keywords": ["T-705", "migrante", "menor"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-401 DE 1994": {
         "nombre": "Sentencia T-401 de 1994",
-        "titulo": "Dignidad del paciente psiquiátrico y contención mecánica",
         "ambito": "Salud mental — uso proporcional de contención mecánica",
         "vigente": True,
-        "ratio": "La contención mecánica es admisible como medida temporal y proporcional cuando hay riesgo inminente para la vida del paciente o terceros, debiéndose documentar cada episodio. NO es per se una violación a la dignidad cuando se aplica con criterio clínico y de último recurso.",
-        "aplica_a": "Defensa de glosas que alegan 'abuso de medida invasiva' en internación psiquiátrica",
-        "keywords": ["T-401/1994", "psiquiatría", "contención mecánica", "dignidad"],
+        "titulo": "Consentimiento idoneo del paciente frente al cambio de tratamiento",
+        "ratio": (
+            "El medico no puede cambiar unilateralmente el tratamiento sin el consentimiento "
+            "idoneo del paciente (caso de dialisis peritoneal). NO trata de contencion mecanica "
+            "ni de pacientes psiquiatricos."
+        ),
+        "aplica_a": "Autonomia del paciente y consentimiento informado",
+        "magistrado_ponente": "Eduardo Cifuentes Munoz",
+        "keywords": ["T-401", "consentimiento informado", "autonomia del paciente"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-1198 DE 2003": {
         "nombre": "Sentencia T-1198 de 2003",
-        "titulo": "Pago a prestadores — solidaridad financiera del SGSSS",
         "ambito": "Glosas dilatorias y bloqueo de cartera",
         "vigente": True,
-        "ratio": "El no pago de la EPS a la IPS amenaza la sostenibilidad del prestador y, por extensión, el derecho a la salud de los usuarios. Las glosas deben tramitarse en plazos razonables, no como mecanismo de retención de recursos.",
-        "aplica_a": "Glosas tipo 'bloqueo de cartera' sin sustento técnico",
-        "keywords": ["T-1198/2003", "bloqueo cartera", "solidaridad SGSSS"],
+        "titulo": "Continuidad del servicio e improcedencia de una nueva tutela",
+        "ratio": (
+            "Continuidad en la prestacion del servicio de salud, y por que no procede una segunda "
+            "tutela cuando ya hay fallo que ordeno el tratamiento. NO trata del pago a "
+            "prestadores ni de solidaridad financiera del sistema."
+        ),
+        "aplica_a": "Continuidad del tratamiento ya ordenado",
+        "magistrado_ponente": "Eduardo Montealegre Lynett",
+        "keywords": ["T-1198", "continuidad", "cosa juzgada"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-076 DE 2008": {
         "nombre": "Sentencia T-076 de 2008",
-        "titulo": "Atención a recién nacidos — cobertura inmediata",
         "ambito": "Cobertura — afiliación posterior al nacimiento",
         "vigente": True,
-        "ratio": "El recién nacido tiene cobertura desde el primer momento por la EPS de la madre, aun cuando el trámite formal de afiliación se haga después. Glosas por 'no afiliación' del neonato son improcedentes.",
-        "aplica_a": "Glosas de cobertura en atención perinatal",
-        "keywords": ["T-076/2008", "recién nacido", "afiliación", "cobertura inmediata"],
+        "titulo": "Derecho al diagnostico (complicaciones de un procedimiento estetico)",
+        "ratio": (
+            "Derecho a la salud, a la seguridad social y AL DIAGNOSTICO de una afiliada con "
+            "complicaciones tras un procedimiento estetico voluntario. NO trata de atencion a "
+            "recien nacidos ni de cobertura inmediata del neonato."
+        ),
+        "aplica_a": "Derecho al diagnostico",
+        "magistrado_ponente": "Rodrigo Escobar Gil",
+        "keywords": ["T-076", "derecho al diagnostico"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA SU-1023 DE 2001": {
         "nombre": "Sentencia SU-1023 de 2001",
-        "titulo": "Solidaridad del SGSSS y financiación cruzada",
         "ambito": "Estructura del SGSSS — UPC y compensación",
         "vigente": True,
-        "ratio": "El sistema de salud es solidario y de financiación cruzada; ninguna IPS pública puede ser usada como mecanismo de financiación de la liquidez de las EPS mediante glosas reiterativas.",
-        "aplica_a": "Argumento de fondo en glosas reiterativas a IPS pública (HUS)",
-        "keywords": ["SU-1023/2001", "solidaridad SGSSS", "IPS pública", "financiación cruzada"],
+        "titulo": "Mesadas pensionales de una empresa en liquidacion obligatoria",
+        "ratio": (
+            "Cinco tutelas acumuladas de pensionados de una empresa en liquidacion que dejo de "
+            "pagar las mesadas. Es materia pensional. NO trata de solidaridad del sistema de "
+            "salud ni de financiacion cruzada entre EPS e IPS."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Jaime Cordoba Trivino",
+        "keywords": ["SU-1023", "mesadas pensionales", "liquidacion"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     # ── Ronda 16 (26-jun-2026 — Bug P v3): jurisprudencia que la EPS
     #     SURA/NUEVA EPS/COMPENSAR invocaron y que el verifier marcaba
@@ -1744,62 +1787,99 @@ JURISPRUDENCIA = {
     #     reconozca y el dictamen pueda responder por nombre.
     "SENTENCIA T-385 DE 2023": {
         "nombre": "Sentencia T-385 de 2023 (Corte Constitucional)",
-        "titulo": "Derecho a la salud — paciente complejo y bilateralidad EPS-IPS",
         "ambito": "Defensa de prestadores frente a EPS — obligaciones bilaterales y continuidad",
         "vigente": True,
-        "ratio": "La Corte reiteró que la relación EPS-IPS es bilateral: a la obligación del prestador de garantizar atención corresponde la obligación correlativa de la EPS de pagar oportunamente. La sostenibilidad de la red prestadora es presupuesto material del derecho a la salud. Las glosas dilatorias o reiterativas vulneran este equilibrio.",
-        "aplica_a": "Glosas sistemáticas o dilatorias contra IPS pública",
-        "keywords": [
-            "T-385/2023",
-            "bilateralidad",
-            "EPS-IPS",
-            "sostenibilidad red",
-            "glosas dilatorias",
-        ],
+        "titulo": "Nacionalidad y personalidad juridica de una nina en riesgo de apatridia",
+        "ratio": (
+            "Derechos a la nacionalidad y a la personalidad juridica de una nina nacida en "
+            "Venezuela, hija de extranjeros residentes en Colombia. NO trata del derecho a la "
+            "salud del paciente complejo ni de la relacion EPS-IPS."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Jorge Enrique Ibanez Najar",
+        "keywords": ["T-385", "nacionalidad", "apatridia"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-970 DE 2014": {
         "nombre": "Sentencia T-970 de 2014 (Corte Constitucional)",
-        "titulo": "Muerte digna y autonomía del paciente terminal",
         "ambito": "Cuidados paliativos, sedación terminal y voluntad anticipada",
         "vigente": True,
-        "ratio": "Reconoció la muerte digna como derecho fundamental y ordenó a MinSalud reglamentar su procedimiento. Los servicios de cuidados paliativos, sedación terminal y manejo de dolor en paciente terminal son cobertura obligatoria por dignidad humana (Art. 1 CP) y libre desarrollo de la personalidad (Art. 16 CP). Cualquier glosa que cuestione la pertinencia de cuidados paliativos vulnera el precedente.",
-        "aplica_a": "Glosas a servicios de paliativos, oncología terminal, sedación, manejo del dolor",
-        "keywords": [
-            "T-970/2014",
-            "muerte digna",
-            "cuidados paliativos",
-            "sedación terminal",
-            "autonomía paciente",
-        ],
+        "titulo": "Derecho a morir dignamente",
+        "ratio": (
+            "Derecho fundamental a morir dignamente de una paciente con cancer terminal. "
+            "Verificada: el enunciado guardado era correcto."
+        ),
+        "aplica_a": "Muerte digna y autonomia del paciente terminal",
+        "magistrado_ponente": "Luis Ernesto Vargas Silva",
+        "keywords": ["T-970", "muerte digna", "paciente terminal"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "AUTO 037 DE 2024": {
-        "nombre": "Auto 037 de 2024 (Corte Constitucional — seguimiento T-553/2024)",
-        "titulo": "Seguimiento al cumplimiento de órdenes en terapia CAR-T (Tisagenlecleucel)",
-        "ambito": "Tecnologías de alto costo en cáncer hemato-oncológico",
+        # Corregido el 24-08-2026. El sistema lo describía como «seguimiento a
+        # la Sentencia T-553/2024» sobre terapia CAR-T. El Auto existe —se leyó
+        # su texto oficial completo— pero no dice una palabra de CAR-T (cero
+        # menciones), y la sentencia a la que decía darle seguimiento no
+        # existe. Lo que trata de verdad es mucho más útil para cartera.
+        "nombre": "Auto 037 de 2024 (Corte Constitucional, Sala Plena)",
+        "titulo": (
+            "Jurisdicción competente para cobrar ejecutivamente facturas de servicios de salud"
+        ),
+        "ambito": "Cobro judicial de facturas de la IPS a la entidad pagadora",
         "vigente": True,
-        "ratio": "Auto de seguimiento que ordena medidas urgentes a EPS y entidades pagadoras para garantizar el acceso efectivo a terapia CAR-T cell ordenada por orden judicial. Reafirma que el costo del tratamiento no es eximente cuando hay orden de tutela en firme. Aplica directamente a glosas que cuestionan recobros por Cart-T.",
-        "aplica_a": "Glosas de recobro o pertinencia en terapia Cart-T",
+        "ratio": (
+            "Conflicto de jurisdicciones (expediente CJU-4122): un hospital demandó a "
+            "una caja de compensación para que se declarara la deuda por la factura de "
+            "una atención inicial de urgencias. La Sala Plena resolvió que es la "
+            "jurisdicción ORDINARIA LABORAL la competente para los procesos ejecutivos "
+            "en que se pretende el pago de obligaciones derivadas de facturas por "
+            "prestación de servicios de salud."
+        ),
+        "aplica_a": (
+            "Cobro judicial de cartera a la entidad pagadora: sirve para saber ante qué "
+            "juez se demanda, no como argumento dentro de la respuesta a una glosa."
+        ),
+        "magistrado_ponente": "Antonio José Lizarazo Ocampo (sustanciador)",
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
         "keywords": [
             "Auto 037/2024",
-            "CAR-T",
-            "Tisagenlecleucel",
-            "cumplimiento tutela",
-            "seguimiento",
+            "conflicto de jurisdicciones",
+            "proceso ejecutivo",
+            "cobro de facturas",
+            "jurisdicción laboral",
         ],
     },
     "AUTO 116 DE 2024": {
-        "nombre": "Auto 116 de 2024 (Corte Constitucional)",
-        "titulo": "Sostenibilidad fiscal del SGSSS y giros directos a IPS públicas",
-        "ambito": "Crisis financiera de EPS intervenidas — protección de IPS prestadora",
+        # Corregido el 24-08-2026. El sistema lo describía como un auto de
+        # «sostenibilidad fiscal del SGSSS y giros directos de ADRES a IPS
+        # públicas», y lo ofrecía como «soporte fuerte» para glosas de EPS
+        # intervenidas. Se leyó su texto oficial: CERO menciones de ADRES, cero
+        # de giro directo, cero de sostenibilidad. Nada de eso está ahí.
+        "nombre": "Auto 116 de 2024 (Corte Constitucional, Sala Plena)",
+        "titulo": (
+            "Jurisdicción competente cuando se demanda un acto administrativo de "
+            "una entidad pública"
+        ),
+        "ambito": "Conflicto de jurisdicciones — nulidad y restablecimiento del derecho",
         "vigente": True,
-        "ratio": "La Corte ordenó medidas estructurales para el saneamiento de cartera de IPS públicas frente a EPS intervenidas o liquidadas (Nueva EPS, SaludCoop, Cafesalud histórica, Medimás). El giro directo desde ADRES a la IPS pública es mecanismo excepcional pero exigible cuando la EPS deudora no garantiza el pago. Soporte fuerte para glosas con riesgo de no-pago por liquidación inminente.",
-        "aplica_a": "Glosas de EPS intervenidas o en proceso de liquidación — fundamento para giro directo ADRES",
+        "ratio": (
+            "Conflicto de jurisdicciones (expediente CJU-4747) entre un juzgado "
+            "administrativo y uno laboral. Una EPS demandó las resoluciones con que "
+            "Colpensiones le ordenó reintegrar subsidios de incapacidades posteriores "
+            "al día 540. La Sala Plena resolvió que corresponde a la jurisdicción "
+            "CONTENCIOSO ADMINISTRATIVA conocer de actos sujetos al derecho "
+            "administrativo cuando está involucrada una entidad pública."
+        ),
+        "aplica_a": (
+            "Define ante qué juez se demanda un acto administrativo. No es argumento "
+            "para responder una glosa."
+        ),
+        "magistrado_ponente": "Natalia Ángel Cabo",
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
         "keywords": [
             "Auto 116/2024",
-            "sostenibilidad SGSSS",
-            "giro directo",
-            "ADRES",
-            "EPS intervenida",
+            "conflicto de jurisdicciones",
+            "nulidad y restablecimiento",
+            "incapacidades posteriores al día 540",
         ],
     },
 }
