@@ -648,11 +648,13 @@ def _parsear_simple_fijo(
     # antes de que CUPS llegara a su pasada de prefijos: 4.124 tarifas
     # quedaban guardadas por el código interno y las glosas —que llegan
     # con el CUPS oficial— no las encontraban.
-    idx_cups = None
-    for candidato in ("CUPS", "CODIGO CUM", "CODIGO"):
-        idx_cups = _indice_columna(headers, candidato)
-        if idx_cups is not None:
-            break
+    # El orden es sagrado, y el CI lo demostró el mismo día (24-08): el
+    # candidato CODIGO, puesto antes que el respaldo de la resolución,
+    # secuestró la hoja AMBULATORIO de FAMISANAR 2026 —allí el CUPS
+    # oficial va titulado «Res 2706/25» y convive con una columna CODIGO
+    # de códigos propios (902210AMB)—. El CUPS oficial se busca por TODAS
+    # sus formas antes de conformarse con un CODIGO a secas.
+    idx_cups = _indice_columna(headers, "CUPS")
     if idx_cups is None:
         # 06-08-2026 — hoja AMBULATORIO de la propuesta 2026 de FAMISANAR:
         # la columna del CUPS se titula con la resolución que los define
@@ -662,6 +664,10 @@ def _parsear_simple_fijo(
             if h and _COLUMNA_DE_CODIGO.match(h) and h.upper().startswith(("RES", "RESOLUCION")):
                 idx_cups = i
                 break
+    if idx_cups is None:
+        idx_cups = _indice_columna(headers, "CODIGO CUM")
+    if idx_cups is None:
+        idx_cups = _indice_columna(headers, "CODIGO")
     idx_desc = _indice_columna(
         headers, "DESCRIPCION CUPS", "DESCRIPCION IPS", "DESCRIPCION", "DESCRIPCIÓN", "NOMBRE"
     )
