@@ -1,5 +1,52 @@
 # Registro de cambios
 
+## Sesión 24-ago-2026 — `organizar_objeciones_adres.py`: cuadre contra el reporte del ADRES
+
+### El defecto que corrige
+El detalle del ADRES cuenta la misma plata varias veces, y la conversión la
+sumaba tal cual: el paquete 31068 salía en **$1.032.239.679** contra los
+**$646.908.552** que el ADRES reporta glosados. Cargado a DGH habría objetado
+hasta tres veces el mismo dinero.
+
+Dos fuentes de repetición, ambas del archivo del ADRES:
+- Filas de causal de reclamación (2102, 2103…) con el valor **completo** de la
+  reclamación, además del detalle por servicio.
+- El mismo servicio (mismo código, cantidad y valores) repetido por cada causal.
+
+### `--reporte-reclamaciones`
+Lee el `ReporteReclamPAQUETE_*.xlsx` (encabezado en la 2ª fila: encima va la de
+totales) y deja cada factura sumando **exactamente** su `Valor Glosado`:
+1. `conciliar_factura` quita las filas que repiten el total de la reclamación.
+2. Quita las repeticiones, mayor primero, **sin bajarse del valor reportado**.
+3. `cuadrar_con_reporte` corre **al final**, sobre los valores ya topados por el
+   guardián de DGH, y reparte el residuo desde el renglón mayor hacia abajo sin
+   dejar valores negativos. También reescribe el `$<valor>` del `CRDOBSERV`.
+
+Resultado 31068: **324/324 facturas cuadradas**, $646.908.553 (Δ $1 por redondeo
+a pesos enteros), 169 renglones quitados, 65 facturas ajustadas.
+
+### `--completar-servicios`
+Ningún `SLNSERPRO` queda vacío: se usa el candidato del cruce y, si no hay,
+`servicio_principal` (el servicio de más peso de la factura en DGH). No es
+homologación — cada fila así queda en `REVISAR` con `CODIGO DE SERVICIO
+ASIGNADO` y su procedencia. En el 31068: 1.856 vacíos → **0**, con 1.768 filas
+marcadas.
+
+### Otros
+- `_hoja_con` acepta `max_filas` para encabezados que no están en la 1ª fila.
+- Motivos nuevos en REVISAR: `REV_REPITE_TOTAL`, `REV_DUPLICADO`,
+  `REV_AJUSTE_REPORTE`, `REV_FACTURA_SIN_REPORTE`, `REV_SERVICIO_ASIGNADO`.
+- El resumen del CLI imprime el cuadre contra el reporte y las facturas que no
+  cuadren.
+
+### Pruebas
+16 nuevas (65 en total en el archivo): que se quite el renglón que repite el
+total, que las repeticiones se quiten de mayor a menor, que **nunca se baje del
+valor reportado**, que el cuadre mande sobre el tope de DGH, que el ajuste se
+reparta si no cabe en un renglón, que ningún valor quede negativo, y que el
+lector tolere el encabezado en la 2ª fila.
+
+
 ## Sesión 21-ago-2026 — `organizar_objeciones_adres.py`: glosas del ADRES → OBJECIONES de DGH
 
 Bot nuevo (`tools/organizar_objeciones_adres.py` + `OBJECIONES_ADRES.cmd` +

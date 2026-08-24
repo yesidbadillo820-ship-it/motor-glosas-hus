@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 21-08-2026
+**Última actualización:** 24-08-2026
 
 ---
 
@@ -2904,6 +2904,61 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 24-08-2026 — Las objeciones del ADRES, cuadradas con lo que el ADRES reporta
+
+**Lo que pidió el auditor:** que los archivos de objeciones cuadren con el
+**Valor Glosado** que trae el `ReporteReclamPAQUETE_31068`, y que **ningún
+renglón quede sin código de servicio**.
+
+**Lo que estaba pasando (y era grave):** el detalle del ADRES cuenta la misma
+plata más de una vez. Los archivos entregados el 21-08 sumaban
+**$1.032.239.679** cuando el ADRES reporta **$646.908.552** glosados. Cargar eso
+a Dinámica Gerencial habría sido objetar hasta **tres veces el mismo dinero**.
+
+**Por qué se repetía.** Dos motivos, los dos del archivo del ADRES:
+
+1. Cuando el ADRES glosa la reclamación entera por el FURIPS, además de listar
+   los servicios mete **una fila por cada causal de reclamación** (2102, 2103…)
+   con el valor **completo**. La factura HUS0000311371 aparecía por $39.722.100
+   cuando el ADRES reporta $13.240.700: el detalle ($13.240.700) más dos
+   renglones de causal, cada uno por el total.
+2. El mismo servicio, con la misma cantidad y el mismo valor, listado otra vez
+   porque le cayó otra causal encima.
+
+**Lo que quedó hecho.** El bot ahora recibe el reporte del ADRES y deja **cada
+factura sumando exactamente lo que el ADRES dice que glosó**: quita los
+renglones que repiten el total, después las repeticiones —la más grande primero
+y **sin bajarse nunca del valor reportado**, porque quitar de más sería objetar
+menos de lo que nos glosaron— y si aún queda diferencia la carga al renglón
+mayor. **Todo lo que se quita y todo lo que se ajusta queda anotado** en la hoja
+REVISAR, con el antes y el después.
+
+**Resultado del paquete 31068:**
+
+- **324 de 324 facturas cuadran** con el reporte del ADRES.
+- Total objetado: **$646.908.553** (el peso de diferencia es el redondeo: el
+  ADRES reporta $646.908.551,95 y DGH recibe pesos enteros).
+- Se quitaron **169 renglones** repetidos y se ajustaron **65 facturas**.
+- **Ningún renglón quedó sin código de servicio** (antes eran 1.856).
+
+**Dos cosas que hay que revisar, y son importantes:**
+
+1. **1.768 renglones ($307.480.311) llevan un código de servicio ASIGNADO**, no
+   homologado: cuando el cruce no encontró el servicio, se les puso el candidato
+   más parecido o el servicio de más peso de la factura. Es para que el archivo
+   cargue, no es una homologación. Están todos listados en REVISAR.
+2. **65 facturas llevan un valor ajustado** ($64.825.592 en 69 renglones) para
+   que la factura cuadre. Cada ajuste está en REVISAR con el valor de antes y el
+   de después.
+
+**Un hallazgo aparte, que corrige la entrega del 21-08:** el reporte del ADRES
+dice que las **581 reclamaciones del paquete son «Reclamacion Normal»** — o sea,
+**ninguna es extemporánea**. Los PDF y los Word que se armaron el 21-08 se
+hicieron **con** el aviso de glosa extemporánea, porque el documento de ejemplo
+lo traía. Hay que volver a generarlos **sin** esa opción antes de radicarlos.
+
+---
+
 ### 21-08-2026 — Las glosas del ADRES, en el formato OBJECIONES de DGH
 
 **Lo que pidió el auditor:** organizar el archivo del **«ADRES DANIEL»** para
@@ -4373,6 +4428,48 @@ de primero y avisa si algo del corte desapareció del informe (posible
 reformulación de la EPS). Con pruebas que cuidan las dos confusiones caras:
 contar como logro lo que ya venía respondido, e inflar el valor de las
 devoluciones.
+
+### 24-08-2026 — Dispensario: el paquete de notas crédito quedó armado y verificado
+
+**De dónde salió.** El Dispensario mandó el `CRRPNota.pdf` con **91 notas
+crédito** (la mayoría de la conciliación del acta 858, más anulaciones). Había
+que armar el paquete para subirlas al portal SIMED con el robot
+`tools/cargar_soportes_simed.py`.
+
+**Lo que se armó.** El PDF se partió en **86 carpetas** (una por nota
+electrónica), cada una con su `NC_<nota>_HUS<factura>.pdf`. De las 91 páginas,
+86 son notas cargables; las otras son repetidas o sin nota. También salió el
+`LISTADO_NOTAS_CARGUE_DISPENSARIO.xlsx` con el inventario y una hoja aparte
+con **3 facturas aceptadas en el acta 858 que aún no tienen nota crédito**
+(443525, 443566 y 486894 — hay que pedírselas a Facturación).
+
+**Las triadas se completaron desde el share.** Con los comandos entregados,
+el auditor copió del share de facturación (`202608\FACTURAS_NOTA`) el XML y
+el resultado del validador (CUV) de cada nota: las 86 quedaron con sus tres
+archivos.
+
+**La verificación del CUV (la regla de siempre antes de cargar) dio esto:**
+**34 notas con CUV vigente** (se pueden cargar ya) y **52 rechazadas**. Se
+extrajo el motivo de cada rechazo (queda el detalle en
+`_motivos_rechazo.csv`): **47 son "RVG01" con tiempo agotado del validador**
+— o sea falla del validador, no de los RIPS: solo hay que pedir a SISTEMAS
+que las **revalide**, sin corregir nada; 2 son diagnóstico repetido
+(RVC086, el mismo defecto del lote anterior); 1 es precio de medicamento
+sobre la Circular 19/2024 (RVG20); y 2 son factura referenciada que no
+coincide (GI018). Quedó redactado el **informe para SISTEMAS** con las
+listas completas y qué se pide en cada grupo.
+
+**Dos notas venían sin factura legible en el PDF** (páginas donde el número
+salió como HUS0000000000). Se identificaron releyendo el cuerpo de la nota y
+casando el valor contra el acta 858: la nota 332742 es de la factura
+**HUS0000447748** y la 332832 de la **HUS0000486963**. Se entregaron los
+comandos para renombrar sus archivos.
+
+**Cómo se carga (queda listo para correr):** primero el piloto de 1 nota
+(`--solo 332526 --con-cabeza`), y si sale bien, el lote de las 34 con CUV
+vigente usando `--lista` con el CSV `_lista_cuv_ok.csv` (así el robot NO toca
+las 52 rechazadas que siguen en la misma carpeta). Cuando SISTEMAS revalide,
+se recopia el CUV nuevo del share, se re-verifica y se carga el resto.
 
 ---
 
@@ -6568,7 +6665,88 @@ SMLV-20%) **+ 3.063 medicamentos e insumos**, con 37 códigos en conflicto
 para revisión. Y los tarifarios 2025 de COOSALUD y COMPENSAR ya validaron
 igual que el de POSITIVA: 2.988 limpias y 737 por definir cada uno.
 
+### 21-08 — El oficio del que la factura YA SALIÓ dejó de pedir lo imposible
+
+**El caso.** La factura **HUS0000551678** ($3.285.631) entró al oficio
+**FHUS-AS-I01196-26**, se auditó, se devolvió, salió en el oficio de
+devolución **DEV-PRE-AUD-0118-2026** y facturación la reenvió: hoy está
+reingresada en el oficio **FHUS-AS-I01212-26**. Todo correcto.
+
+Pero el oficio viejo mostraba dos cosas equivocadas:
+
+1. El aviso decía «*sigue pendiente de auditar en el oficio FHUS-AS-I01212-26:
+   resuélvala allá y **vuelva a escribir el envío aquí**»* — invitando a
+   traerla de vuelta a un oficio que ya cumplió y que ya tiene su PDF firmado.
+2. El oficio se quedaba en **ROJO**, como si nadie lo hubiera auditado, solo
+   porque ya no tenía facturas propias.
+
+**Cómo quedó.** El sistema ahora distingue dos situaciones que antes veía
+iguales:
+
+- **La factura pasó por este oficio y siguió su camino** → aviso azul: «✅
+  Envío 233277 · factura HUS0000551678: ya pasó por este oficio: salió devuelta
+  en DEV-PRE-AUD-0118-2026 y hoy está en FHUS-AS-I01212-26 (reingresada, sin
+  decidir). Aquí no queda nada pendiente.» El chip del envío se muestra como
+  **«233277 (ya siguió)»**, sin el amarillo de alerta.
+- **La factura nunca entró** (está trancada en otro oficio) → sigue el aviso
+  amarillo de siempre, con el «resuélvala allá».
+
+Y el oficio que se quedó sin facturas **porque todas siguieron su camino**
+ahora aparece **COMPLETADO** en vez de rojo. El que nunca ha tenido facturas
+—recién registrado, sin envíos— sí sigue corriendo su plazo, como debe ser.
+
+7 pruebas nuevas (143 en el módulo).
+
+---
+
+### 24-08 (tarde) — El autodespliegue se colgó y nadie se enteró (otra vez)
+
+**Qué pasó.** El PC de cartera llevaba horas sin recibir el código nuevo. En
+el registro del autodespliegue, la misma línea repetida cada 5 minutos:
+«*otra pasada sigue trabajando: esta se salta*». Una pasada se quedó colgada
+preguntándole a GitHub, nunca soltó el **candado** —el archivo que evita que
+dos pasadas se pisen— y todas las siguientes se saltaron. En pantalla no se
+veía nada raro.
+
+**Por qué se cuelga `git`.** Dos casos normales: que GitHub pida usuario y
+clave (en una tarea programada no hay nadie que los escriba, y git espera
+para siempre) o que la red del hospital deje la conexión a medias.
+
+**Tres arreglos, todos de visibilidad:**
+
+1. **Git tiene prohibido preguntar y tiene reloj.** El autodespliegue le pone
+   mordaza (`GIT_TERMINAL_PROMPT=0`) y un tope de **3 minutos**: si no
+   contesta, se corta y queda anotado el motivo, en vez de dejar el candado
+   puesto toda la tarde.
+2. **Bot de doble clic `tools\ACTUALIZAR_PAGINA.cmd`** (lo pidió Yesid): baja
+   los cambios y los deja funcionando **ahora**, sin esperar los 5 minutos.
+   Muestra en pantalla qué versión hay, qué cambios entran, reinicia el motor,
+   comprueba que la página volvió a responder y —si el motor no vuelve solo—
+   lo arranca él. De paso suelta el candado si quedó trabado, para que el
+   automático vuelva a andar. Al final recuerda el **Ctrl + F5**.
+3. **La pantalla de estado lo delata.** `ESTADO_MOTOR.cmd` ahora avisa: «*el
+   autodespliegue lleva N min con el candado puesto: está trabado*», y dice
+   qué correr para destrabarlo. Una pasada normal no dura ni dos minutos.
+
+11 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
+
+### Notas crédito del Dispensario (nuevo, 24-08)
+- **Cargar al SIMED las 34 notas con CUV vigente** (piloto con la 332526 y
+  luego `--lista "_lista_cuv_ok.csv"`); pegar en el chat el reporte del robot.
+- **SISTEMAS:** entregarles el informe de los 52 rechazos de CUV y hacerles
+  seguimiento — 47 solo necesitan revalidación (timeout del validador), 2
+  con diagnóstico repetido (436861 y 441161), 1 precio de medicamento
+  (442517), 2 factura referenciada (549496 y 545752). Cuando revaliden:
+  recopiar los CUV del share, re-verificar y cargar las nuevas en firme.
+- **Facturación:** pedir las notas crédito de las 3 facturas aceptadas en el
+  acta 858 que no aparecen en el CRRP: 443525, 443566 y 486894.
+- **Acta 879:** quedan 2 líneas de la factura 474268 (CL0801, $6.093) sin
+  texto de la doctora, y 3 líneas sin decidir (478141 $1, 487192 $20,
+  481589 $1.705.924); confirmar fecha y número contra el PDF firmado.
 
 ### Tarifas POSITIVA (nuevo, 24-08 tarde)
 - **Volver a cargar el Excel de tarifas** cuando baje el lector corregido:
@@ -6916,6 +7094,17 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Notas crédito del Dispensario (lo primero, 24-08):**
+(a) renombrar los archivos de las notas 332742 (→ HUS0000447748) y 332832
+(→ HUS0000486963) con los comandos entregados; (b) correr el **piloto** del
+robot con la nota 332526 y, si sale bien, el lote de las **34 con CUV
+vigente** usando `--lista "_lista_cuv_ok.csv"`; (c) pasar a SISTEMAS el
+informe de los 52 rechazos (47 solo necesitan REVALIDACIÓN — timeout del
+validador; 2 diagnóstico repetido; 1 precio Circular 19/2024; 2 factura
+referenciada); (d) pedir a Facturación las notas de las 3 facturas aceptadas
+sin NC (443525, 443566, 486894); (e) cuando SISTEMAS revalide: recopiar los
+CUV del share, re-verificar y cargar las que queden en firme.
 
 ### Sistema ICFES (20-08)
 1. **Correr el diagnóstico** y volver a mirar el plan: con el resultado real, el

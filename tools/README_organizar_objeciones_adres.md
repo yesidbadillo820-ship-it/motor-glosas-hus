@@ -32,6 +32,7 @@ el renglón que se facturó.
 | `--adres` | Excel de glosas del ADRES | Es la fuente: una fila por glosa |
 | `--dgh` | `DGReport_*.xlsx` (hoja `DGDATATABLE`) | Trae los servicios que DGH tiene facturados en cada factura |
 | `--homologador` | `01._Homologador_Gold_Standard_CUPS_a_SOAT_*.xlsx` | Traduce el código SOAT del ADRES a CUPS |
+| `--reporte-reclamaciones` | `ReporteReclamPAQUETE_*.xlsx` | La cifra oficial: cuánto glosó el ADRES en cada factura |
 | `--salida` | Carpeta destino | Ahí quedan los lotes y el archivo de control |
 
 El bot **busca solo** la hoja de glosas dentro del Excel del ADRES: es la que
@@ -74,6 +75,60 @@ En el paquete 31068 esto resolvió **2.763 de 3.262 renglones con servicio
 descomponen una cirugía (honorarios de cirujano, ayudantía, derechos de sala,
 materiales): DGH factura la cirugía en **un solo renglón**, así que no hay un
 servicio al cual amarrarlos uno por uno.
+
+---
+
+## 3bis) El cuadre contra el reporte del ADRES (`--reporte-reclamaciones`)
+
+**El detalle del ADRES cuenta la misma plata más de una vez.** Sumado tal cual,
+el paquete 31068 daba **$1.032.239.679**, cuando el ADRES reporta **$646.908.552**
+glosados. Cargar eso a DGH sería objetar hasta tres veces el mismo dinero.
+
+Son dos formas de repetición:
+
+1. **Renglones que repiten el total de la reclamación.** Cuando el ADRES glosa la
+   reclamación entera por el FURIPS, además de listar los servicios mete **una
+   fila por cada causal de reclamación** (2102, 2103…) con el valor **completo**.
+   La factura `HUS0000311371` aparece por $39.722.100 cuando el ADRES reporta
+   $13.240.700: el detalle ($13.240.700) más dos renglones de causal, cada uno
+   por el total.
+2. **Renglones repetidos:** el mismo servicio, misma cantidad y mismo valor,
+   listado otra vez porque le cayó otra causal encima.
+
+Con `--reporte-reclamaciones` el bot deja **cada factura sumando exactamente el
+Valor Glosado que reporta el ADRES**, en este orden:
+
+1. Quita los renglones que repiten el total de la reclamación.
+2. Quita las repeticiones, **la más grande primero** y **sin bajarse nunca del
+   valor reportado** (quitar de más sería objetar menos de lo que el ADRES glosó).
+3. Si aún queda diferencia, la carga al renglón **mayor** —el que menos se
+   deforma en proporción— y sigue con el siguiente si no cabe. Ningún valor
+   queda negativo.
+
+El cuadre se hace **de último**, sobre los valores ya definitivos, porque el
+guardián de valores de DGH pudo recortar algún renglón antes.
+
+**Todo lo que se quita y todo lo que se ajusta queda en la hoja `REVISAR`**, con
+el antes y el después. En el paquete 31068: 169 renglones quitados y 65 facturas
+ajustadas, y las **324 de 324 facturas** quedaron cuadradas.
+
+---
+
+## 3ter) Que ningún renglón quede sin código de servicio (`--completar-servicios`)
+
+Por defecto, lo que no se pudo homologar sale con la casilla vacía. Con
+`--completar-servicios` **ningún renglón queda sin código**:
+
+1. Si el cruce encontró un candidato parecido pero no lo suficiente para darlo
+   por bueno, se usa ese.
+2. Si no hay ninguno, se usa el **servicio de más peso de la factura** en DGH
+   (el que más plata suma).
+
+Esto **no es una homologación**: es un destino por defecto para que el archivo
+cargue. Por eso **cada uno de esos renglones queda listado en `REVISAR`** con el
+motivo `CODIGO DE SERVICIO ASIGNADO (no salio del cruce)` y con de dónde salió el
+código. En el paquete 31068 fueron 1.768 renglones ($307.480.311): revíselos
+antes de cargar.
 
 ---
 
@@ -131,11 +186,13 @@ y le deja la traducción al auditor:
 
 ```
 py tools\organizar_objeciones_adres.py ^
-    --adres        "ADRES_DANIEL_31068.xlsx" ^
-    --dgh          "DGReport_1.xlsx" ^
-    --homologador  "01._Homologador_Gold_Standard_CUPS_a_SOAT__Ano_2026.xlsx" ^
-    --salida       "OBJECIONES_ADRES" ^
-    --paquete      "31068"
+    --adres                  "ADRES_DANIEL_31068.xlsx" ^
+    --dgh                    "DGReport_1.xlsx" ^
+    --homologador            "01._Homologador_Gold_Standard_CUPS_a_SOAT__Ano_2026.xlsx" ^
+    --reporte-reclamaciones  "ReporteReclamPAQUETE_31068.xlsx" ^
+    --completar-servicios ^
+    --salida                 "OBJECIONES_ADRES" ^
+    --paquete                "31068"
 ```
 
 Opciones útiles:
@@ -143,6 +200,8 @@ Opciones útiles:
 | Opción | Para qué |
 |---|---|
 | `--paquete 31068` | Deja solo las glosas de ese paquete |
+| `--reporte-reclamaciones archivo.xlsx` | Cuadra cada factura contra el glosado que reporta el ADRES |
+| `--completar-servicios` | Que ningún renglón quede sin código de servicio |
 | `--fecha 2026-08-21` | Fecha de la objeción (por defecto, hoy) |
 | `--mapa-codigos archivo.json` | Traduce el código del ADRES al de DGH |
 | `--excluir-glosa-total` | Deja fuera los renglones sin código de glosa |
@@ -167,6 +226,11 @@ El archivo `REVISAR_OBJECIONES_ADRES.xlsx` trae tres hojas:
   | `VALOR AJUSTADO AL TOPE DE DGH` | La objeción se recortó; va el antes y el después |
   | `GLOSA ACEPTADA COMPLETA` | Se aceptó todo el valor: quizá no haya que objetarla |
   | `LA FACTURA NO ESTA EN EL REPORTE DE DGH` | Falta esa factura en el DGReport |
+  | `CODIGO DE SERVICIO ASIGNADO` | El código no salió del cruce; va de dónde se sacó |
+  | `RENGLON QUITADO: repetia el glosado de toda la reclamacion` | El ADRES lo contaba dos veces |
+  | `RENGLON QUITADO: duplicado del ADRES` | El mismo servicio listado otra vez |
+  | `VALOR AJUSTADO PARA CUADRAR CON EL REPORTE DEL ADRES` | Va el antes y el después |
+  | `LA FACTURA NO ESTA EN EL REPORTE DE RECLAMACIONES` | No se pudo cuadrar |
 
 - **`CODIGOS`** — la tabla para armar el `--mapa-codigos`.
 
@@ -176,8 +240,13 @@ Y siempre, antes del cargue masivo: **piloto de UNA factura**.
 
 ## 8) Pruebas
 
-`tests/test_tools/test_organizar_objeciones_adres.py` (49 pruebas). Cubren que no
+`tests/test_tools/test_organizar_objeciones_adres.py` (65 pruebas). Cubren que no
 se pierda ningún renglón, que el código de DGH salga del cruce y no de una
 suposición, que no se elija un candidato cuando hay dos igual de posibles, que el
 guardián recorte al tope, que los lotes no partan una factura y que el bot no se
 quede con la tabla dinámica en vez de la hoja de glosas.
+
+Del cuadre: que se quite el renglón que repite el total de la reclamación, que
+las repeticiones se quiten de mayor a menor, que **nunca se baje del valor
+reportado**, que el cuadre mande sobre el tope de DGH, que el ajuste se reparta
+si no cabe en un solo renglón y que ningún valor quede negativo.

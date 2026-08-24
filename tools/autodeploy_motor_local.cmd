@@ -70,9 +70,24 @@ goto :asegurar
 :hay_git
 
 echo [%date% %time%] revisando si hay codigo nuevo... >> "%LOG%"
-git fetch origin motor-glosas >nul 2>&1
+rem ---------------------------------------------------------------
+rem  GIT NO SE PUEDE QUEDAR COLGADO (24-08-2026).
+rem
+rem  `git fetch` a secas se queda esperando PARA SIEMPRE en dos casos
+rem  normales: si GitHub pide usuario y clave -aqui no hay nadie que
+rem  los escriba- o si la red del hospital deja la conexion a medias.
+rem  Y como esta pasada ya tomo el candado, ninguna de las siguientes
+rem  puede trabajar: el PC se queda con la version vieja y en pantalla
+rem  no se ve nada raro. Paso el 24-08: el registro se lleno de "otra
+rem  pasada sigue trabajando" durante horas.
+rem
+rem  Ahora: git tiene prohibido preguntar, y si en 3 minutos no ha
+rem  terminado se le corta y se anota el motivo.
+rem ---------------------------------------------------------------
+set "GIT_TERMINAL_PROMPT=0"
+powershell -NoProfile -Command "$p=Start-Process -FilePath 'git' -ArgumentList 'fetch','origin','motor-glosas' -WorkingDirectory '%REPO%' -PassThru -WindowStyle Hidden; if(-not $p.WaitForExit(180000)){ try{ $p.Kill() }catch{}; exit 1 }; exit $p.ExitCode"
 if errorlevel 1 (
-  echo [%date% %time%] NO SE PUDO CONSULTAR GITHUB: el PC se queda con la version que tiene. Se reintenta en 5 min. >> "%LOG%"
+  echo [%date% %time%] NO SE PUDO CONSULTAR GITHUB ^(sin internet, o tardo mas de 3 minutos^): el PC se queda con la version que tiene. Se reintenta en 5 min. >> "%LOG%"
   goto :asegurar
 )
 
