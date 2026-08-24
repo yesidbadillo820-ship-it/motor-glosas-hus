@@ -539,6 +539,217 @@ def _verificar_afirmaciones_documentales(
     )
 
 
+# ── Atribuirle a un artículo real un contenido que no es suyo ────────────
+#
+# POR QUÉ (24-08-2026). Una auditoría independiente de nueve dictámenes
+# encontró que el Art. 57 de la Ley 1438 de 2011 se citó en tres expedientes
+# (GL-190, GL-192 y GL-195) con TRES contenidos distintos, y ninguno es el
+# suyo: «las decisiones de facturación son definitivas y no admiten recurso»,
+# «la carga de la prueba corresponde a la entidad que impone la glosa» y «la
+# carga de la prueba recae en la entidad». El Art. 57 real regula el trámite
+# y los plazos de las glosas — 20 días hábiles para glosar, 15 para responder,
+# 10 para decidir — y no dice una palabra ni de firmeza ni de prueba.
+#
+# El corpus del sistema NO tiene el error: se revisó y el Art. 57 guardado es
+# el correcto. La invención ocurre al redactar.
+#
+# Las redes que ya existían solo miran lo que va ENTRE COMILLAS. Estas tres
+# atribuciones iban sin comillas, parafraseadas, así que pasaron por las
+# cuatro revisiones y el dictamen salió sellado como verificado.
+#
+# CÓMO SE ATRAPA SIN INVENTAR. No se puede exigir que una paráfrasis use las
+# mismas palabras del artículo — parafrasear es legítimo. Pero una doctrina
+# jurídica CON NOMBRE PROPIO es distinta: si un artículo de verdad reparte la
+# carga de la prueba, su texto la nombra. Entonces la regla es estrecha y
+# comprobable: cuando el dictamen dice que un artículo concreto «establece»
+# una de estas doctrinas, se va al texto real de ESE artículo en el corpus y
+# se mira si la nombra. Si no la nombra, se avisa. Nada más se revisa: una
+# paráfrasis que no invoca ninguna doctrina con nombre no se toca.
+#
+# (nombre para el auditor, cómo se nombra en el dictamen, huella en el texto real)
+DOCTRINAS_CON_NOMBRE: tuple[tuple[str, str, str], ...] = (
+    (
+        "la carga de la prueba",
+        r"CARGA\s+DE\s+LA\s+PRUEBA|INVERSI[ÓO]N\s+DE\s+LA\s+CARGA",
+        r"carga de la prueba|probatori|onus probandi",
+    ),
+    (
+        "la firmeza de la decisión (que no admite recurso)",
+        r"NO\s+ADMITEN?\s+RECURSO|IRRECURRIBLE|INIMPUGNABLE|"
+        r"QUEDAN?\s+EN\s+FIRME|SON\s+DEFINITIVAS?\s+Y\s+NO",
+        r"recurso|en firme|irrecurrible|inimpugnable|ejecutori",
+    ),
+    (
+        "el silencio administrativo positivo",
+        r"SILENCIO\s+ADMINISTRATIVO",
+        r"silencio",
+    ),
+    (
+        "la responsabilidad solidaria",
+        r"RESPONSABILIDAD\s+SOLIDARIA|SOLIDARIAMENTE\s+RESPONSABLES?",
+        r"solidar",
+    ),
+    ("la caducidad", r"\bCADUCIDAD\b", r"caducidad"),
+    ("la prescripción", r"\bPRESCRIPCI[ÓO]N\b", r"prescripci"),
+    (
+        "la nulidad de pleno derecho",
+        r"NULIDAD\s+DE\s+PLENO\s+DERECHO|NULIDAD\s+ABSOLUTA",
+        r"nulidad",
+    ),
+    (
+        "la presunción de veracidad, legalidad o buena fe",
+        r"PRESUNCI[ÓO]N\s+DE\s+(?:VERACIDAD|LEGALIDAD|BUENA\s+FE)",
+        r"presunci",
+    ),
+)
+
+_VERBOS_DE_ATRIBUCION = (
+    r"ESTABLECE|ESTABLECEN|DISPONE|DISPONEN|SEÑALA|SENALA|CONSAGRA|INDICA|"
+    r"PRECEPT[ÚU]A|PREV[ÉE]|CONTEMPLA|ORDENA|DETERMINA|ESTIPULA|REZA|"
+    r"PRESCRIBE|CONFORME\s+AL\s+CUAL|SEG[ÚU]N\s+EL\s+CUAL"
+)
+
+_NORMAS_CITABLES = r"LEY|DECRETO|RESOLUCI[ÓO]N|CIRCULAR|ACUERDO"
+
+# Forma 1: «Art. 57 de la Ley 1438 de 2011, que establece que ...»
+PAT_ATRIBUCION_ART_PRIMERO = re.compile(
+    r"ART[ÍI]?CULOS?\.?\s*(\d{1,4})\s*"
+    r"(?:DE\s+)?(?:LA\s+|EL\s+)?"
+    r"(" + _NORMAS_CITABLES + r")\s*(?:N[oº°.]?\s*)?(\d{1,5})"
+    r"\s*(?:DE\s+|\s*[/\-]\s*)(\d{2,4})"
+    r"[^.;]{0,40}?[,\s]+(?:QUE\s+)?(?:" + _VERBOS_DE_ATRIBUCION + r")\b"
+    r"\s*(?:QUE\s*)?:?\s*"
+    r"([^.;]{10,400})",
+    re.IGNORECASE,
+)
+
+# Forma 2: «La Ley 1438 de 2011, en su artículo 57, establece que ...»
+PAT_ATRIBUCION_NORMA_PRIMERO = re.compile(
+    r"(" + _NORMAS_CITABLES + r")\s*(?:N[oº°.]?\s*)?(\d{1,5})"
+    r"\s*(?:DE\s+|\s*[/\-]\s*)(\d{2,4})"
+    r"[,\s]+EN\s+SU\s+ART[ÍI]?CULO\.?\s*(\d{1,4})"
+    r"[^.;]{0,40}?[,\s]+(?:QUE\s+)?(?:" + _VERBOS_DE_ATRIBUCION + r")\b"
+    r"\s*(?:QUE\s*)?:?\s*"
+    r"([^.;]{10,400})",
+    re.IGNORECASE,
+)
+
+
+def _texto_real_del_articulo(
+    tipo: str, numero: str, anio: str, art: str, normas: dict
+) -> Optional[str]:
+    """Devuelve el texto guardado de ese artículo, o None si no se puede leer.
+
+    Se exige que el artículo traiga cuerpo de verdad (200 caracteres): contra
+    un resumen de dos renglones no se puede afirmar que algo «no está», y
+    acusar en falso es peor que no revisar.
+    """
+    clave = _buscar_clave_norma(tipo[:3].lower(), numero, anio, normas)
+    if not clave:
+        return None
+    articulos = (normas.get(clave) or {}).get("articulos") or {}
+    datos = None
+    for k, v in articulos.items():
+        if str(k) == str(art):
+            datos = v
+            break
+    if not isinstance(datos, dict):
+        return None
+    cuerpo = " ".join(
+        str(datos.get(campo) or "") for campo in ("titulo", "texto", "aplicacion", "keywords")
+    )
+    return cuerpo if len(cuerpo) >= 200 else None
+
+
+def _lo_que_se_le_atribuye(contenido: str) -> str:
+    """Recorta la frase a lo que el artículo de verdad «establece».
+
+    Hace falta para no acusar en falso. En una frase como
+
+        «conforme al Art. 21, que establece el trámite de glosas, la carga
+         de la prueba corresponde a la EPS»
+
+    al artículo se le atribuye SOLO «el trámite de glosas»; lo que va después
+    de la coma es otra afirmación del redactor. Sin este recorte se marcaría un
+    dictamen correcto — y una alarma en falso sobre un documento que se radica
+    ante la EPS es peor que no revisar, porque enseña al auditor a no creerle a
+    las alarmas.
+
+    Distinguir las dos formas es cuestión de una coma. El inciso ABRE con coma:
+
+        «establece que, en el trámite de glosas, la carga de la prueba…»
+                      ↑ acá empieza un paréntesis; lo atribuido viene después
+
+    mientras que la segunda oración NO:
+
+        «establece el trámite de glosas, la carga de la prueba…»
+                     ↑ esto es lo atribuido; lo de después ya es otra cosa
+    """
+    texto = (contenido or "").strip()
+    if not texto.startswith(","):
+        return texto.split(",")[0].strip()
+    # Abre con coma: es un inciso. Lo atribuido viene después de cerrarlo.
+    partes = [p.strip() for p in texto.split(",")]
+    despues_del_inciso = ", ".join(p for p in partes[2:] if p).strip()
+    return despues_del_inciso or " ".join(p for p in partes[1:] if p).strip()
+
+
+def _verificar_atribuciones(texto: str, issues: list[dict], normas: dict) -> int:
+    """Revisa que lo que el dictamen le atribuye a un artículo sea suyo.
+
+    Devuelve cuántas atribuciones alcanzó a revisar, para que el contador de
+    «citas verificadas» diga la verdad sobre el trabajo hecho.
+    """
+    revisadas = 0
+    vistas: set[str] = set()
+    candidatas: list[tuple[str, str, str, str, str]] = []
+    for m in PAT_ATRIBUCION_ART_PRIMERO.finditer(texto):
+        art, tipo, numero, anio, contenido = m.groups()
+        candidatas.append((art, tipo, numero, anio, contenido))
+    for m in PAT_ATRIBUCION_NORMA_PRIMERO.finditer(texto):
+        tipo, numero, anio, art, contenido = m.groups()
+        candidatas.append((art, tipo, numero, anio, contenido))
+
+    for art, tipo, numero, anio, contenido in candidatas:
+        if len(anio) == 2:
+            anio = "20" + anio if int(anio) < 50 else "19" + anio
+        real = _texto_real_del_articulo(tipo, numero, anio, art, normas)
+        if real is None:
+            continue  # sin texto real no hay con qué comparar: otras redes lo miran
+        revisadas += 1
+        real_norm = _normalizar(real)
+        atribuido = _lo_que_se_le_atribuye(contenido)
+        for nombre, como_se_nombra, huella in DOCTRINAS_CON_NOMBRE:
+            if not re.search(como_se_nombra, atribuido, re.IGNORECASE):
+                continue
+            if re.search(huella, real_norm, re.IGNORECASE):
+                continue  # el artículo sí trata de eso: la atribución se sostiene
+            firma = f"{tipo.upper()}|{numero}|{anio}|{art}|{nombre}"
+            if firma in vistas:
+                continue
+            vistas.add(firma)
+            frase = atribuido.strip()
+            issues.append(
+                {
+                    "tipo": "ATRIBUCION_FALSA",
+                    "severidad": "ALTA",
+                    "cita": f"Art. {art} {tipo.title()} {numero}/{anio}",
+                    "detalle": (
+                        f"El dictamen dice que el Art. {art} de la {tipo.lower()} "
+                        f"{numero} de {anio} trata sobre {nombre}, y el texto real de "
+                        f"ese artículo no lo menciona. Lo atribuido: "
+                        f"«{frase[:180]}{'...' if len(frase) > 180 else ''}»."
+                    ),
+                    "sugerencia": (
+                        f"Cita el artículo que de verdad regula {nombre}, o quita esa "
+                        f"atribución y usa el Art. {art} para lo que sí dice. Radicado "
+                        "así, la EPS puede desmontar el argumento mostrando el texto."
+                    ),
+                }
+            )
+    return revisadas
+
+
 def verificar_citas(
     dictamen_html: str,
     eps: Optional[str] = None,
@@ -681,6 +892,9 @@ def verificar_citas(
                         "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
                     }
                 )
+
+    # 3b. Contenido atribuido a un artículo real que ese artículo no tiene.
+    total_citas += _verificar_atribuciones(texto, issues, normas)
 
     # 4. Citas VACÍAS: comillas abiertas para citar la norma, sin texto adentro.
     # Van antes de las citas literales porque no hay nada que contrastar contra

@@ -240,6 +240,15 @@ def quitar_citas_invalidas_dinamico(texto: str, eps: str | None = None) -> str:
     # Extraer componentes (art, num_norma, año) de cada cita problemática
     componentes_invalidos: list[tuple[str, str, str]] = []
     for i in issues:
+        # ATRIBUCION_FALSA no se trata aquí (24-08-2026). Los demás hallazgos
+        # con forma de norma dicen «esta cita no existe», y borrar la frase
+        # entera es lo correcto. Ese dice algo distinto: el artículo SÍ existe,
+        # lo que está mal es el contenido que se le atribuyó. Si se borrara por
+        # componentes, se llevaría por delante también las frases donde ese
+        # mismo artículo está bien citado en el mismo dictamen. El hallazgo se
+        # le muestra al auditor y hace que el Quality Gate mande a rehacer.
+        if i.get("tipo") == "ATRIBUCION_FALSA":
+            continue
         if i.get("severidad") in ("ALTA", "MEDIA") and i.get("cita"):
             comps = _extraer_componentes_cita(i["cita"])
             # Solo agregar si tiene al menos núm norma + año (para evitar false positives)
