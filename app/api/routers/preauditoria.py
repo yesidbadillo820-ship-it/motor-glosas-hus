@@ -188,7 +188,12 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         for f in facturas
         if f.resultado_actual == svc.RESULTADO_DEVUELTA and f.oficio_devolucion_id is None
     )
-    completado = bool(facturas) and pendientes == 0
+    # Un oficio se da por cumplido cuando no le queda nada pendiente. También
+    # el que se quedó SIN facturas porque todas siguieron su camino (devueltas
+    # aquí y reingresadas en otro oficio): antes esos quedaban en rojo para
+    # siempre, como si nadie los hubiera auditado. La consulta extra solo
+    # ocurre en los oficios vacíos.
+    completado = pendientes == 0 and (bool(facturas) or svc.tuvo_facturas(db, o.id))
     envios = (
         db.query(EnvioCargadoRecord)
         .filter(EnvioCargadoRecord.oficio_id == o.id)

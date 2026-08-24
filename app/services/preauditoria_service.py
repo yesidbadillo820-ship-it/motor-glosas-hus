@@ -831,13 +831,36 @@ def _avisos_de_fuente_rezagada(src: list) -> list[str]:
 # ==================================================================
 
 
-def _donde_quedo(factura: str, ubicada, oficio_id: int) -> dict:
-    """Explica, en una frase, por qué una factura del envío no está en el oficio."""
+# El estado interno, dicho como lo diría el auditor.
+ESTADO_EN_PALABRAS = {
+    ESTADO_NUEVA: "sin decidir",
+    ESTADO_RADICADA: "radicada",
+    ESTADO_DEVUELTA_PEND: "devuelta",
+    ESTADO_EN_SUBSANACION: "reingresada, sin decidir",
+    ESTADO_SUBSANADA: "radicada tras subsanar",
+    ESTADO_NUEV_DEVUELTA: "devuelta otra vez",
+    ESTADO_BLOQUEADA: "bloqueada (3 devoluciones)",
+}
+
+
+def _en_palabras(estado: str) -> str:
+    return ESTADO_EN_PALABRAS.get(estado, (estado or "—").lower())
+
+
+def _donde_quedo(factura: str, ubicada, oficio_id: int, paso: Optional[dict] = None) -> dict:
+    """Explica, en una frase, por qué una factura del envío no está en el oficio.
+
+    `paso` viene con datos cuando la factura SÍ estuvo en este oficio y ya
+    siguió su camino (caso real 21-08-2026: se devolvió aquí, salió en el
+    oficio DEV-PRE-AUD-0118-2026 y reingresó en el oficio siguiente). Eso no
+    es un faltante que el auditor deba resolver: este oficio ya cumplió.
+    """
     if ubicada is None:
         return {
             "factura": factura,
             "oficio": None,
             "estado": None,
+            "cerrado": False,
             "motivo": (
                 "la fuente la trae en este envío pero no quedó registrada en el "
                 "sistema: vuelva a escribir el envío para que entre."
@@ -845,10 +868,19 @@ def _donde_quedo(factura: str, ubicada, oficio_id: int) -> dict:
         }
     canon, radicado = ubicada
     donde = radicado or canon.oficio_fhus or "otro oficio"
+    cerrado = False
     if canon.oficio_actual_id == oficio_id:
         motivo = (
             f"sí está en este oficio, pero entró con el envío {canon.envio_actual}: "
             "la fuente la cambió de envío."
+        )
+    elif paso is not None:
+        # Estuvo aquí y siguió: lo que corresponde es informarlo, no pedir nada.
+        cerrado = True
+        salida = f"salió devuelta en {paso['consecutivo']} y " if paso.get("consecutivo") else ""
+        motivo = (
+            f"ya pasó por este oficio: {salida}hoy está en {donde} "
+            f"({_en_palabras(canon.estado)}). Aquí no queda nada pendiente."
         )
     elif canon.resultado_actual == RESULTADO_PENDIENTE:
         motivo = (
@@ -868,8 +900,61 @@ def _donde_quedo(factura: str, ubicada, oficio_id: int) -> dict:
         "factura": factura,
         "oficio": radicado or canon.oficio_fhus,
         "estado": canon.estado,
+        "cerrado": cerrado,
         "motivo": motivo,
     }
+
+
+def _paso_por_el_oficio(db: Session, oficio_id: int, facturas: list) -> dict:
+    """De esas facturas, cuáles ESTUVIERON en este oficio (y en qué oficio de
+    devolución salieron, si salieron en alguno). Dos consultas, no una por
+    factura."""
+    if not facturas:
+        return {}
+    paso: dict = {}
+    dev_ids: set = set()
+    for i in range(0, len(facturas), 400):
+        for numero, dev_id in (
+            db.query(FacturaPreauditoriaRecord.factura, FacturaEventoRecord.oficio_devolucion_id)
+            .join(
+                FacturaEventoRecord,
+                FacturaEventoRecord.factura_id == FacturaPreauditoriaRecord.id,
+            )
+            .filter(
+                FacturaEventoRecord.oficio_id == oficio_id,
+                FacturaPreauditoriaRecord.factura.in_(facturas[i : i + 400]),
+            )
+            .all()
+        ):
+            actual = paso.setdefault(numero, {"consecutivo": None})
+            if dev_id and not actual["consecutivo"]:
+                actual["consecutivo"] = dev_id
+                dev_ids.add(dev_id)
+    if dev_ids:
+        consecutivos = {
+            d.id: d.consecutivo
+            for d in db.query(OficioDevolucionRecord)
+            .filter(OficioDevolucionRecord.id.in_(dev_ids))
+            .all()
+        }
+        for datos in paso.values():
+            if datos["consecutivo"]:
+                datos["consecutivo"] = consecutivos.get(datos["consecutivo"])
+    return paso
+
+
+def tuvo_facturas(db: Session, oficio_id: int) -> bool:
+    """¿Este oficio llegó a tener facturas alguna vez?
+
+    Un oficio que se quedó vacío porque TODAS sus facturas siguieron su camino
+    (se devolvieron aquí y reingresaron en otro oficio) ya cumplió su tarea: no
+    puede seguir en rojo como si nadie lo hubiera auditado. Uno recién
+    registrado, todavía sin envíos, sí sigue corriendo su plazo.
+    """
+    return (
+        db.query(FacturaEventoRecord.id).filter(FacturaEventoRecord.oficio_id == oficio_id).first()
+        is not None
+    )
 
 
 def faltantes_por_envio(db: Session, oficio_id: int, facturas: list) -> dict:
@@ -926,10 +1011,11 @@ def faltantes_por_envio(db: Session, oficio_id: int, facturas: list) -> dict:
             .all()
         ):
             ubicacion[canon.factura] = (canon, radicado)
+    paso = _paso_por_el_oficio(db, oficio_id, faltan)
     salida = {}
     for envio in envios:
         detalle = [
-            _donde_quedo(f, ubicacion.get(f), oficio_id)
+            _donde_quedo(f, ubicacion.get(f), oficio_id, paso.get(f))
             for f in sorted(en_fuente.get(envio, set()) - aqui.get(envio, set()))
         ]
         if detalle:

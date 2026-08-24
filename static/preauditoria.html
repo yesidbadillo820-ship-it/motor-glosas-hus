@@ -69,6 +69,7 @@
   .aviso-ok{background:#e6f4ea; color:var(--verde);}
   .aviso-err{background:#fde8e6; color:var(--rojo);}
   .aviso-warn{background:#fdf3d7; color:#8a6d00;}
+  .aviso-info{background:var(--azul-claro); color:var(--azul);}
   .mono{font-family:ui-monospace,Consolas,monospace; font-size:.82rem;}
   .modal-fondo{display:none; position:fixed; inset:0; background:rgba(10,20,40,.5); z-index:50; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto;}
   .modal-fondo.on{display:flex;}
@@ -528,15 +529,28 @@ async function abrirOficio(id){
     var faltantes=[];
     var envios=(o.envios_escritos||[]).map(function(e){
       var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
+      var det=(e.faltantes||[]);
       var completo=(hay===e.total_facturas);
-      (e.faltantes||[]).forEach(function(f){ faltantes.push({envio:e.envio, det:f}); });
-      return '<span class="chip'+(completo?'':' chip-incompleto')+'" style="margin:2px 4px 2px 0"'+
-        (completo?'':' title="Este envío traía '+e.total_facturas+' factura(s) y solo '+hay+' quedaron en este oficio"')+'>'+
-        esc(e.envio)+' ('+(completo?e.total_facturas:hay+' de '+e.total_facturas)+')'+
+      // Las que ya pasaron por este oficio y siguieron su camino no son un
+      // faltante: el oficio ya cumplió con ellas y el chip no debe alarmar.
+      var porResolver=det.filter(function(f){ return !f.cerrado; }).length;
+      var yaSalieron=(!completo && det.length>0 && porResolver===0);
+      det.forEach(function(f){ faltantes.push({envio:e.envio, det:f}); });
+      var texto = completo ? String(e.total_facturas)
+                : (yaSalieron ? 'ya siguió' : hay+' de '+e.total_facturas);
+      var ayuda = completo ? ''
+                : (yaSalieron ? ' title="Sus facturas pasaron por este oficio y ya siguieron su camino"'
+                              : ' title="Este envío traía '+e.total_facturas+' factura(s) y solo '+hay+' quedaron en este oficio"');
+      return '<span class="chip'+((completo||yaSalieron)?'':' chip-incompleto')+'" style="margin:2px 4px 2px 0"'+ayuda+'>'+
+        esc(e.envio)+' ('+texto+')'+
         (ES_ADMIN?' <a href="javascript:eliminarEnvio('+o.id+',\''+esc(e.envio)+'\')" title="Quitar este envío del oficio" style="color:var(--rojo);font-weight:700">✕</a>':'')+
         '</span>';
     }).join('');
     var explica=faltantes.map(function(x){
+      if(x.det.cerrado){
+        return '<div class="aviso aviso-info">✅ Envío <b>'+esc(x.envio)+'</b> · factura <b>'+
+          esc(x.det.factura)+'</b>: '+esc(x.det.motivo)+'</div>';
+      }
       return '<div class="aviso aviso-warn">🔎 Del envío <b>'+esc(x.envio)+'</b> falta la factura <b>'+
         esc(x.det.factura)+'</b>: '+esc(x.det.motivo)+'</div>';
     }).join('');

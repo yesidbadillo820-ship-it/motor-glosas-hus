@@ -6622,6 +6622,40 @@ recorre el archivo entero: **cualquier color que pida un token inexistente
 pone la construcción en rojo**. El botón del caso tiene además su prueba con
 nombre propio.
 
+### 21-08 — El oficio del que la factura YA SALIÓ dejó de pedir lo imposible
+
+**El caso.** La factura **HUS0000551678** ($3.285.631) entró al oficio
+**FHUS-AS-I01196-26**, se auditó, se devolvió, salió en el oficio de
+devolución **DEV-PRE-AUD-0118-2026** y facturación la reenvió: hoy está
+reingresada en el oficio **FHUS-AS-I01212-26**. Todo correcto.
+
+Pero el oficio viejo mostraba dos cosas equivocadas:
+
+1. El aviso decía «*sigue pendiente de auditar en el oficio FHUS-AS-I01212-26:
+   resuélvala allá y **vuelva a escribir el envío aquí**»* — invitando a
+   traerla de vuelta a un oficio que ya cumplió y que ya tiene su PDF firmado.
+2. El oficio se quedaba en **ROJO**, como si nadie lo hubiera auditado, solo
+   porque ya no tenía facturas propias.
+
+**Cómo quedó.** El sistema ahora distingue dos situaciones que antes veía
+iguales:
+
+- **La factura pasó por este oficio y siguió su camino** → aviso azul: «✅
+  Envío 233277 · factura HUS0000551678: ya pasó por este oficio: salió devuelta
+  en DEV-PRE-AUD-0118-2026 y hoy está en FHUS-AS-I01212-26 (reingresada, sin
+  decidir). Aquí no queda nada pendiente.» El chip del envío se muestra como
+  **«233277 (ya siguió)»**, sin el amarillo de alerta.
+- **La factura nunca entró** (está trancada en otro oficio) → sigue el aviso
+  amarillo de siempre, con el «resuélvala allá».
+
+Y el oficio que se quedó sin facturas **porque todas siguieron su camino**
+ahora aparece **COMPLETADO** en vez de rojo. El que nunca ha tenido facturas
+—recién registrado, sin envíos— sí sigue corriendo su plazo, como debe ser.
+
+7 pruebas nuevas (143 en el módulo).
+
+---
+
 ## 3) PENDIENTE
 
 ### Notas crédito del Dispensario (nuevo, 24-08)
