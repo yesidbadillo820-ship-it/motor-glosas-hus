@@ -4429,6 +4429,48 @@ reformulación de la EPS). Con pruebas que cuidan las dos confusiones caras:
 contar como logro lo que ya venía respondido, e inflar el valor de las
 devoluciones.
 
+### 24-08-2026 — Dispensario: el paquete de notas crédito quedó armado y verificado
+
+**De dónde salió.** El Dispensario mandó el `CRRPNota.pdf` con **91 notas
+crédito** (la mayoría de la conciliación del acta 858, más anulaciones). Había
+que armar el paquete para subirlas al portal SIMED con el robot
+`tools/cargar_soportes_simed.py`.
+
+**Lo que se armó.** El PDF se partió en **86 carpetas** (una por nota
+electrónica), cada una con su `NC_<nota>_HUS<factura>.pdf`. De las 91 páginas,
+86 son notas cargables; las otras son repetidas o sin nota. También salió el
+`LISTADO_NOTAS_CARGUE_DISPENSARIO.xlsx` con el inventario y una hoja aparte
+con **3 facturas aceptadas en el acta 858 que aún no tienen nota crédito**
+(443525, 443566 y 486894 — hay que pedírselas a Facturación).
+
+**Las triadas se completaron desde el share.** Con los comandos entregados,
+el auditor copió del share de facturación (`202608\FACTURAS_NOTA`) el XML y
+el resultado del validador (CUV) de cada nota: las 86 quedaron con sus tres
+archivos.
+
+**La verificación del CUV (la regla de siempre antes de cargar) dio esto:**
+**34 notas con CUV vigente** (se pueden cargar ya) y **52 rechazadas**. Se
+extrajo el motivo de cada rechazo (queda el detalle en
+`_motivos_rechazo.csv`): **47 son "RVG01" con tiempo agotado del validador**
+— o sea falla del validador, no de los RIPS: solo hay que pedir a SISTEMAS
+que las **revalide**, sin corregir nada; 2 son diagnóstico repetido
+(RVC086, el mismo defecto del lote anterior); 1 es precio de medicamento
+sobre la Circular 19/2024 (RVG20); y 2 son factura referenciada que no
+coincide (GI018). Quedó redactado el **informe para SISTEMAS** con las
+listas completas y qué se pide en cada grupo.
+
+**Dos notas venían sin factura legible en el PDF** (páginas donde el número
+salió como HUS0000000000). Se identificaron releyendo el cuerpo de la nota y
+casando el valor contra el acta 858: la nota 332742 es de la factura
+**HUS0000447748** y la 332832 de la **HUS0000486963**. Se entregaron los
+comandos para renombrar sus archivos.
+
+**Cómo se carga (queda listo para correr):** primero el piloto de 1 nota
+(`--solo 332526 --con-cabeza`), y si sale bien, el lote de las 34 con CUV
+vigente usando `--lista` con el CSV `_lista_cuv_ok.csv` (así el robot NO toca
+las 52 rechazadas que siguen en la misma carpeta). Cuando SISTEMAS revalide,
+se recopia el CUV nuevo del share, se re-verifica y se carga el resto.
+
 ---
 
 ---
@@ -6562,6 +6604,20 @@ tras corregirle la traducción del campo.
 
 ## 3) PENDIENTE
 
+### Notas crédito del Dispensario (nuevo, 24-08)
+- **Cargar al SIMED las 34 notas con CUV vigente** (piloto con la 332526 y
+  luego `--lista "_lista_cuv_ok.csv"`); pegar en el chat el reporte del robot.
+- **SISTEMAS:** entregarles el informe de los 52 rechazos de CUV y hacerles
+  seguimiento — 47 solo necesitan revalidación (timeout del validador), 2
+  con diagnóstico repetido (436861 y 441161), 1 precio de medicamento
+  (442517), 2 factura referenciada (549496 y 545752). Cuando revaliden:
+  recopiar los CUV del share, re-verificar y cargar las nuevas en firme.
+- **Facturación:** pedir las notas crédito de las 3 facturas aceptadas en el
+  acta 858 que no aparecen en el CRRP: 443525, 443566 y 486894.
+- **Acta 879:** quedan 2 líneas de la factura 474268 (CL0801, $6.093) sin
+  texto de la doctora, y 3 líneas sin decidir (478141 $1, 487192 $20,
+  481589 $1.705.924); confirmar fecha y número contra el PDF firmado.
+
 ### Tarifas POSITIVA (nuevo, 24-08 tarde)
 - **Volver a cargar el Excel de tarifas** cuando baje el lector corregido:
   misma pantalla, mismo archivo, y ESTA VEZ marcar la casilla «Reemplazar
@@ -6908,6 +6964,17 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Notas crédito del Dispensario (lo primero, 24-08):**
+(a) renombrar los archivos de las notas 332742 (→ HUS0000447748) y 332832
+(→ HUS0000486963) con los comandos entregados; (b) correr el **piloto** del
+robot con la nota 332526 y, si sale bien, el lote de las **34 con CUV
+vigente** usando `--lista "_lista_cuv_ok.csv"`; (c) pasar a SISTEMAS el
+informe de los 52 rechazos (47 solo necesitan REVALIDACIÓN — timeout del
+validador; 2 diagnóstico repetido; 1 precio Circular 19/2024; 2 factura
+referenciada); (d) pedir a Facturación las notas de las 3 facturas aceptadas
+sin NC (443525, 443566, 486894); (e) cuando SISTEMAS revalide: recopiar los
+CUV del share, re-verificar y cargar las que queden en firme.
 
 ### Sistema ICFES (20-08)
 1. **Correr el diagnóstico** y volver a mirar el plan: con el resultado real, el
