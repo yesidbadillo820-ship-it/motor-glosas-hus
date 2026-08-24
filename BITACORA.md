@@ -6732,6 +6732,38 @@ para siempre) o que la red del hospital deje la conexión a medias.
 
 ---
 
+### 24-08 (noche) — La fábrica de cláusulas: seis EPS más con contrato en el motor
+
+Con los ZIP que armó Yesid (el copiador automático encontró TODOS los archivos
+al primer intento), se transcribieron y cargaron los contratos de **PPL (10
+cláusulas), FOMAG (7), COMPENSAR (6), DISPENSARIO 440 (7), AURORA con sus dos
+minutas ARL y Vida-AP (10) y SEGUROS MUNDIAL (5, pendiente de crear la EPS en
+Contratos)**. Con POSITIVA, ya son SIETE las EPS que se defienden citando su
+contrato firmado. Las joyas: en PPL, «la carencia de la autorización NO será
+motivo de glosa» y «siempre se privilegiará la tarifa institucional»; en
+FOMAG, la renovación automática y el 70% a 20 días hábiles; en AURORA, el
+suministro de MAOS a cargo de la aseguradora.
+
+**Los archivos de conflictos volvieron todos marcados con SI en ambas filas**
+— así no hay decisión: el motor guarda UN valor por código. En vez de
+devolverlos sin más, se usaron las reglas de los contratos recién transcritos:
+la de POSITIVA (gana SOAT –15%) y la de PPL (gana la institucional) resolvieron
+**316 códigos cada una** sin tocar al auditor; quedaron listas para cargar y
+los residuales bajaron a 421 con la instrucción clara: UN solo SI por código.
+
+**Y el CI volvió a ganarse el sueldo:** el candidato «CODIGO» del lector
+—agregado en la mañana para los medicamentos del Dispensario— secuestró la
+hoja AMBULATORIO de FAMISANAR 2026, donde el CUPS oficial se titula «Res
+2706/25». Dos corridas selectivas mías pasaron en verde; la suite completa del
+CI vio el rojo. El orden quedó sagrado y comentado: CUPS → Res-#### → CODIGO
+CUM → CODIGO. La lección se repite: la corrida selectiva es una opinión, la
+suite completa es el veredicto.
+
+**El día también enterró al fantasma:** el motor de las 7:55 (la tarea de
+ayer bajo cpimiento) cayó con la cacería elevada, el motor bueno arrancó a las
+14:45 bajo cartera, y las dos tareas de arranque quedaron por fin con la
+cuenta correcta y el permiso de lotes otorgado.
+
 ## 3) PENDIENTE
 
 ### Notas crédito del Dispensario (nuevo, 24-08)
