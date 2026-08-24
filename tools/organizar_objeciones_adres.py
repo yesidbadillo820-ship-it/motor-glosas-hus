@@ -136,6 +136,11 @@ REV_SIN_CODIGO_GLOSA = "SIN CODIGO DE GLOSA (glosa total por FURIPS)"
 REV_FACTURA_SIN_DGH = "LA FACTURA NO ESTA EN EL REPORTE DE DGH"
 REV_VALOR_AJUSTADO = "VALOR AJUSTADO AL TOPE DE DGH"
 REV_TODO_ACEPTADO = "GLOSA ACEPTADA COMPLETA (no habria que objetarla)"
+REV_REPITE_TOTAL = "RENGLON QUITADO: repetia el glosado de toda la reclamacion"
+REV_DUPLICADO = "RENGLON QUITADO: duplicado del ADRES"
+REV_AJUSTE_REPORTE = "VALOR AJUSTADO PARA CUADRAR CON EL REPORTE DEL ADRES"
+REV_FACTURA_SIN_REPORTE = "LA FACTURA NO ESTA EN EL REPORTE DE RECLAMACIONES"
+REV_SERVICIO_ASIGNADO = "CODIGO DE SERVICIO ASIGNADO (no salio del cruce)"
 
 
 # ─── Datos de entrada ────────────────────────────────────────────────────────
@@ -338,16 +343,21 @@ def leer_adres(
         wb.close()
 
 
-def _hoja_con(wb, alias: dict[str, set[str]], obligatorias: tuple[str, ...]) -> str:
-    """Nombre de la primera hoja cuyo encabezado tenga todas esas columnas."""
+def _hoja_con(
+    wb, alias: dict[str, set[str]], obligatorias: tuple[str, ...], max_filas: int = 1
+) -> str:
+    """Nombre de la primera hoja cuyo encabezado tenga todas esas columnas.
+
+    `max_filas` sube cuando el encabezado no está en la primera fila (el reporte
+    del ADRES trae encima una fila con los totales del paquete).
+    """
     for nombre in wb.sheetnames:
-        filas = wb[nombre].iter_rows(min_row=1, max_row=1, values_only=True)
-        headers = next(filas, None)
-        if not headers:
-            continue
-        idx = _indices(list(headers), alias)
-        if all(c in idx for c in obligatorias):
-            return nombre
+        for headers in wb[nombre].iter_rows(min_row=1, max_row=max_filas, values_only=True):
+            if not headers:
+                continue
+            idx = _indices(list(headers), alias)
+            if all(c in idx for c in obligatorias):
+                return nombre
     return ""
 
 
@@ -466,6 +476,81 @@ def leer_dgh(ruta: Path) -> dict[str, list[LineaDgh]]:
                 )
             )
         return dict(fuera)
+    finally:
+        wb.close()
+
+
+# ─── Lectura del reporte de reclamaciones del ADRES ──────────────────────────
+
+# El ReporteReclamPAQUETE_*.xlsx: una fila por reclamación, con lo que el ADRES
+# dice oficialmente que reclamó, aprobó y glosó de cada factura. Es la cifra que
+# manda: contra ella tiene que cuadrar el archivo que se carga a DGH.
+COLUMNAS_RECLAMACION = {
+    "factura": {"NUMERO DE FACTURA", "NUMERO FACTURA", "FACTURA"},
+    "radicacion": {"NUMERO DE RADICACION", "NUMERO RADICACION"},
+    "reclamado": {"VALOR RECLAMADO"},
+    "aprobado": {"VALOR APROBADO"},
+    "glosado": {"VALOR GLOSADO"},
+    "paquete": {"PAQUETE", "NUMERO PAQUETE"},
+    "estado": {"ESTADO RECLAMACION", "ESTADO DE RECLAMACION"},
+    "extemporaneidad": {"TIPO DE EXTEMPORANEIDAD", "TIPO EXTEMPORANEIDAD"},
+}
+
+
+@dataclass
+class Reclamacion:
+    """Lo que el ADRES reporta de una factura, a nivel de reclamación."""
+
+    factura: str = ""
+    radicacion: str = ""
+    reclamado: float = 0.0
+    aprobado: float = 0.0
+    glosado: float = 0.0
+    estado: str = ""
+    extemporaneidad: str = ""
+
+
+def leer_reporte_reclamaciones(ruta: Path, paquete: str = "") -> dict[str, Reclamacion]:
+    """{factura larga: Reclamacion} del ReporteReclamPAQUETE del ADRES."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(filename=str(ruta), data_only=True, read_only=True)
+    try:
+        # El encabezado NO está en la primera fila: el archivo trae encima una
+        # fila con los totales del paquete. Por eso se busca en las primeras.
+        nombre = _hoja_con(wb, COLUMNAS_RECLAMACION, ("factura", "glosado"), max_filas=10)
+        if not nombre:
+            raise ValueError(
+                f"{ruta.name} no parece el reporte de reclamaciones del ADRES: no encontré "
+                "las columnas 'Número de Factura' y 'Valor Glosado'."
+            )
+        ws = wb[nombre]
+        idx: dict[str, int] = {}
+        fuera: dict[str, Reclamacion] = {}
+        for fila in ws.iter_rows(values_only=True):
+            if fila is None:
+                continue
+            if not idx:
+                # El archivo trae una fila de totales por encima del encabezado.
+                candidato = _indices(list(fila), COLUMNAS_RECLAMACION)
+                if "factura" in candidato and "glosado" in candidato:
+                    idx = candidato
+                continue
+            factura = _texto(_celda(fila, idx, "factura"))
+            if not factura:
+                continue
+            if paquete and _texto(_celda(fila, idx, "paquete")) != paquete:
+                continue
+            fuera[factura_larga(factura)] = Reclamacion(
+                factura=factura,
+                radicacion=_texto(_celda(fila, idx, "radicacion")),
+                reclamado=a_numero(_celda(fila, idx, "reclamado")),
+                aprobado=a_numero(_celda(fila, idx, "aprobado")),
+                glosado=a_numero(_celda(fila, idx, "glosado")),
+                estado=_texto(_celda(fila, idx, "estado")),
+                extemporaneidad=_texto(_celda(fila, idx, "extemporaneidad")),
+            )
+        return fuera
     finally:
         wb.close()
 
@@ -748,6 +833,121 @@ def aplicar_tope(valor: float, tope_servicio: float, saldo: float) -> tuple[int,
     return int(round(final)), motivo
 
 
+# ─── Conciliación con el reporte del ADRES ───────────────────────────────────
+
+# El detalle del ADRES cuenta la misma plata más de una vez. Dos formas:
+#
+#   1. Renglones que repiten el glosado de TODA la reclamación. Cuando el ADRES
+#      glosa la reclamación entera por el FURIPS, además de listar los servicios
+#      mete una fila por cada causal de reclamación (2102, 2103…) con el valor
+#      COMPLETO. La factura HUS0000311371 aparece así por $39.722.100 cuando el
+#      ADRES reporta $13.240.700: el detalle ($13.240.700) más dos renglones de
+#      causal, cada uno por el total.
+#   2. Renglones repetidos: el mismo servicio, misma cantidad y mismo valor,
+#      listado otra vez porque le cayó otra causal encima.
+#
+# Sumar todo eso y cargarlo a DGH sería objetar tres veces la misma plata. Aquí
+# se quita el sobrante, de menos invasivo a más, y todo lo que se quita queda
+# anotado en REVISAR.
+
+
+@dataclass
+class Conciliacion:
+    """Cómo quedó una factura frente a lo que reporta el ADRES."""
+
+    filas: list[FilaAdres] = field(default_factory=list)
+    quitadas: list[tuple[FilaAdres, str]] = field(default_factory=list)
+    objetivo: float = 0.0
+    ajuste: float = 0.0  # lo que faltó para cuadrar exacto (+ sobra, − falta)
+
+
+def _clave_repetido(fila: FilaAdres) -> tuple:
+    """Dos renglones son el mismo si coinciden servicio, cantidad, valores y causal."""
+    return (
+        _norm_codigo(fila.cod_elemento),
+        fila.cantidad,
+        round(fila.valor_reclamado, 2),
+        round(fila.valor_glosado, 2),
+        fila.codigo_glosa,
+    )
+
+
+def conciliar_factura(filas: list[FilaAdres], glosado_reportado: float) -> Conciliacion:
+    """Deja de la factura solo lo que suma el glosado que reporta el ADRES.
+
+    Quita primero los renglones que repiten el total de la reclamación y después
+    las repeticiones, siempre la más grande primero y **sin bajarse del
+    objetivo** — nunca se quita de más. Lo que quede de diferencia se anota en
+    `ajuste` para corregirlo en el renglón mayor, a la vista.
+    """
+    resultado = Conciliacion(filas=list(filas), objetivo=glosado_reportado)
+    if glosado_reportado <= 0 or not filas:
+        return resultado
+    suma = round(sum(f.valor_glosado for f in resultado.filas), 2)
+
+    # 1) los renglones que repiten el glosado de toda la reclamación.
+    if suma > glosado_reportado + TOLERANCIA_PESOS:
+        for fila in [
+            f
+            for f in resultado.filas
+            if abs(f.valor_glosado - glosado_reportado) <= TOLERANCIA_PESOS
+        ]:
+            if len(resultado.filas) <= 1:
+                break
+            if round(suma - fila.valor_glosado, 2) < glosado_reportado - TOLERANCIA_PESOS:
+                continue
+            resultado.filas.remove(fila)
+            resultado.quitadas.append((fila, REV_REPITE_TOTAL))
+            suma = round(suma - fila.valor_glosado, 2)
+
+    # 2) las repeticiones, la más grande primero, sin bajarse del objetivo.
+    while suma > glosado_reportado + TOLERANCIA_PESOS:
+        vistas: set[tuple] = set()
+        repetidas: list[FilaAdres] = []
+        for fila in resultado.filas:
+            clave = _clave_repetido(fila)
+            if clave in vistas:
+                repetidas.append(fila)
+            else:
+                vistas.add(clave)
+        repetidas = [
+            f
+            for f in repetidas
+            if round(suma - f.valor_glosado, 2) >= glosado_reportado - TOLERANCIA_PESOS
+        ]
+        if not repetidas:
+            break
+        fila = max(repetidas, key=lambda f: f.valor_glosado)
+        resultado.filas.remove(fila)
+        resultado.quitadas.append((fila, REV_DUPLICADO))
+        suma = round(suma - fila.valor_glosado, 2)
+
+    resultado.ajuste = round(suma - glosado_reportado, 2)
+    return resultado
+
+
+# ─── Código de servicio para los renglones que no cruzaron ───────────────────
+
+
+def servicio_principal(lineas: list[LineaDgh]) -> LineaDgh | None:
+    """El servicio de más peso de la factura en DGH: el que más plata suma.
+
+    Es el que se usa cuando el auditor pide que **ningún renglón quede sin
+    código de servicio** y el cruce no encontró ninguno. No es una homologación:
+    es un destino por defecto, y cada renglón así queda marcado en REVISAR.
+    """
+    if not lineas:
+        return None
+    suma: dict[str, float] = defaultdict(float)
+    for linea in lineas:
+        if linea.slnserpro:
+            suma[linea.slnserpro] += linea.valor
+    if not suma:
+        return None
+    codigo = max(suma.items(), key=lambda kv: (kv[1], kv[0]))[0]
+    return next(x for x in lineas if x.slnserpro == codigo)
+
+
 # ─── Armado de los registros ─────────────────────────────────────────────────
 
 
@@ -759,6 +959,59 @@ class Conversion:
     revisiones: list[Revision] = field(default_factory=list)
     metodos: dict[str, int] = field(default_factory=dict)
     recorte: float = 0.0  # lo que le quitó el guardián de valores de DGH
+    quitadas: int = 0  # renglones repetidos que sacó la conciliación
+    ajustadas: int = 0  # facturas que hubo que ajustar para cuadrar
+    asignados: int = 0  # renglones con código de servicio puesto por defecto
+
+
+def _conciliar(
+    filas: list[FilaAdres],
+    reclamaciones: dict[str, Reclamacion] | None,
+    salida: Conversion,
+) -> list[FilaAdres]:
+    """Quita del detalle del ADRES los renglones que repiten plata ya contada.
+
+    Devuelve los renglones que quedan. La diferencia que sobre después de esto la
+    cuadra `cuadrar_con_reporte`, ya sobre los valores finales.
+    """
+    if not reclamaciones:
+        return filas
+
+    por_factura: dict[str, list[FilaAdres]] = defaultdict(list)
+    for fila in filas:
+        por_factura[factura_larga(fila.factura)].append(fila)
+
+    quedan: list[FilaAdres] = []
+    sin_reporte: set[str] = set()
+    for crncxc, del_factura in por_factura.items():
+        reclamacion = reclamaciones.get(crncxc)
+        if reclamacion is None:
+            if crncxc not in sin_reporte:
+                sin_reporte.add(crncxc)
+                salida.revisiones.append(
+                    Revision(
+                        factura=crncxc,
+                        motivo=REV_FACTURA_SIN_REPORTE,
+                        valor_glosado=sum(f.valor_glosado for f in del_factura),
+                        detalle="No se pudo cuadrar: esa factura no está en el reporte del ADRES.",
+                    )
+                )
+            quedan.extend(del_factura)
+            continue
+        conciliacion = conciliar_factura(del_factura, reclamacion.glosado)
+        for fila, motivo in conciliacion.quitadas:
+            salida.quitadas += 1
+            salida.revisiones.append(
+                _revision(
+                    fila,
+                    crncxc,
+                    motivo,
+                    f"La factura sumaba de más; el ADRES reporta {a_texto(reclamacion.glosado)} "
+                    "glosados.",
+                )
+            )
+        quedan.extend(conciliacion.filas)
+    return quedan
 
 
 def construir_registros(
@@ -768,11 +1021,22 @@ def construir_registros(
     fecha: _dt.datetime,
     mapa_codigos: dict[str, str] | None = None,
     incluir_glosa_total: bool = True,
+    reclamaciones: dict[str, Reclamacion] | None = None,
+    completar_servicios: bool = False,
 ) -> Conversion:
     """Convierte las glosas del ADRES en filas del formato OBJECIONES.
 
     Sale una fila por glosa —ninguna se pierde— y una anotación en REVISAR por
     cada renglón que necesite ojo humano.
+
+    Con `reclamaciones` (el ReporteReclamPAQUETE del ADRES) el total de cada
+    factura queda **cuadrado contra lo que el ADRES reporta como glosado**: se
+    quitan los renglones que el detalle repite y, si aún queda diferencia, se
+    ajusta el renglón mayor. Todo lo quitado y lo ajustado va a REVISAR.
+
+    Con `completar_servicios` ningún renglón sale sin código de servicio: el que
+    no cruzó se lleva el candidato más parecido y, si no hay ninguno, el servicio
+    de más peso de la factura en DGH. Cada uno queda marcado en REVISAR.
     """
     mapa_codigos = {k.strip(): v.strip() for k, v in (mapa_codigos or {}).items()}
     salida = Conversion()
@@ -783,6 +1047,8 @@ def construir_registros(
     clasificaciones: dict[str, set[str]] = defaultdict(set)
     for fila in filas:
         clasificaciones[factura_larga(fila.factura)].add(fila.clasificacion)
+
+    filas = _conciliar(filas, reclamaciones, salida)
 
     facturas_sin_dgh: set[str] = set()
     for fila in filas:
@@ -809,8 +1075,24 @@ def construir_registros(
             resolucion = Resolucion()
         metodos[resolucion.metodo or METODO_SIN_CRUCE] += 1
 
+        asignado = ""
+        if completar_servicios and not resolucion.slnserpro:
+            principal = servicio_principal(lineas)
+            if resolucion.candidato:
+                asignado = (
+                    f"por parecido con {resolucion.candidato} {resolucion.candidato_desc}".strip()
+                )
+                resolucion.slnserpro = resolucion.candidato
+            elif principal is not None:
+                asignado = f"servicio de más peso de la factura: {principal.slnserpro} {principal.rotulo()}"
+                resolucion.slnserpro = principal.slnserpro
+            if asignado:
+                salida.asignados += 1
+
         codigo = mapa_codigos.get(fila.codigo_glosa, fila.codigo_glosa)
         valor, ajuste = aplicar_tope(fila.valor_glosado, resolucion.tope_servicio, resolucion.saldo)
+        # El ajuste que cuadra la factura con el reporte del ADRES manda sobre el
+        # tope de DGH: el archivo tiene que sumar lo que el ADRES dice que glosó.
         salida.registros.append(
             {
                 "CDCONSEC": str(consecutivos[crncxc]),
@@ -832,6 +1114,12 @@ def construir_registros(
             }
         )
 
+        if asignado:
+            salida.revisiones.append(
+                _revision(
+                    fila, crncxc, REV_SERVICIO_ASIGNADO, f"{resolucion.slnserpro}: {asignado}"
+                )
+            )
         if ajuste:
             salida.recorte += fila.valor_glosado - valor
             salida.revisiones.append(_revision(fila, crncxc, REV_VALOR_AJUSTADO, ajuste))
@@ -877,7 +1165,73 @@ def construir_registros(
             )
 
     salida.metodos = dict(metodos)
+    cuadrar_con_reporte(salida, reclamaciones)
     return salida
+
+
+def cuadrar_con_reporte(salida: Conversion, reclamaciones: dict[str, Reclamacion] | None) -> None:
+    """Deja cada factura sumando EXACTAMENTE el glosado que reporta el ADRES.
+
+    Se hace de último, sobre los valores ya definitivos, porque el guardián de
+    valores de DGH pudo haber recortado algún renglón: si el cuadre se calculara
+    antes, ese recorte volvería a descuadrar la factura.
+
+    La diferencia se carga al renglón **mayor**, que es el que menos se deforma
+    en proporción y el más fácil de ubicar para revisarlo. Todo ajuste queda
+    anotado en REVISAR con el antes y el después.
+    """
+    if not reclamaciones:
+        return
+    por_factura: dict[str, list[dict]] = defaultdict(list)
+    for registro in salida.registros:
+        por_factura[str(registro["CRNCXC"])].append(registro)
+
+    for crncxc, registros in por_factura.items():
+        reclamacion = reclamaciones.get(crncxc)
+        if reclamacion is None or reclamacion.glosado <= 0:
+            continue
+        suma = sum(int(r["CROVALOBJ"] or 0) for r in registros)
+        sobra = round(suma - reclamacion.glosado)
+        if abs(sobra) <= TOLERANCIA_PESOS:
+            continue
+        # Se empieza por el renglón mayor: es el que menos se deforma en
+        # proporción. Si el sobrante no cabe en él, se sigue con el siguiente —
+        # nunca se deja un valor negativo.
+        ajustados = 0
+        for registro in sorted(registros, key=lambda r: -int(r["CROVALOBJ"] or 0)):
+            if abs(sobra) <= TOLERANCIA_PESOS:
+                break
+            antes = int(registro["CROVALOBJ"] or 0)
+            despues = max(0, antes - sobra)
+            if antes == despues:
+                continue
+            registro["CROVALOBJ"] = despues
+            registro["CRDOBSERV"] = _cambiar_valor_final(
+                str(registro["CRDOBSERV"] or ""), antes, despues
+            )
+            sobra -= antes - despues
+            ajustados += 1
+            salida.revisiones.append(
+                Revision(
+                    factura=crncxc,
+                    motivo=REV_AJUSTE_REPORTE,
+                    cod_elemento=str(registro["SLNSERPRO"] or ""),
+                    codigo_glosa=str(registro["CRNCONOBJ"] or ""),
+                    valor_glosado=float(despues),
+                    detalle=f"{a_texto(antes)} → {a_texto(despues)}, para que la factura sume "
+                    f"los {a_texto(reclamacion.glosado)} que reporta glosados el ADRES.",
+                )
+            )
+        if ajustados:
+            salida.ajustadas += 1
+
+
+def _cambiar_valor_final(texto: str, antes: int, despues: int) -> str:
+    """Cambia el ``$<valor>`` del final del CRDOBSERV cuando se ajusta el valor."""
+    cola = f"${antes}"
+    if texto.endswith(cola):
+        return texto[: -len(cola)] + f"${despues}"
+    return texto
 
 
 def _revision(fila: FilaAdres, crncxc: str, motivo: str, detalle: str) -> Revision:
@@ -1089,6 +1443,19 @@ def construir_parser() -> argparse.ArgumentParser:
     p.add_argument("--adres", type=Path, required=True, help="Excel de glosas del ADRES.")
     p.add_argument("--dgh", type=Path, help="DGReport con los servicios facturados (DGDATATABLE).")
     p.add_argument("--homologador", type=Path, help="Homologador Gold Standard CUPS ↔ SOAT.")
+    p.add_argument(
+        "--reporte-reclamaciones",
+        type=Path,
+        help="ReporteReclamPAQUETE del ADRES. Con él, el total de cada factura queda "
+        "cuadrado contra el Valor Glosado que reporta el ADRES.",
+    )
+    p.add_argument(
+        "--completar-servicios",
+        action="store_true",
+        help="Que ningún renglón quede sin código de servicio: el que no cruce se lleva "
+        "el candidato más parecido o el servicio de más peso de la factura. Cada uno "
+        "queda marcado en REVISAR.",
+    )
     p.add_argument("--salida", type=Path, required=True, help="Carpeta destino.")
     p.add_argument(
         "--paquete", default="", help="Deja solo las glosas de ese paquete (p.ej. 31068)."
@@ -1160,6 +1527,24 @@ def main(argv: list[str] | None = None) -> int:
         soat_a_cups = leer_homologador(args.homologador)
         logger.info("  %d códigos SOAT con CUPS", len(soat_a_cups))
 
+    reclamaciones: dict[str, Reclamacion] = {}
+    if args.reporte_reclamaciones:
+        if not args.reporte_reclamaciones.is_file():
+            logger.error("No existe el reporte de reclamaciones: %s", args.reporte_reclamaciones)
+            return 1
+        logger.info("Leyendo el reporte del ADRES: %s", args.reporte_reclamaciones.name)
+        reclamaciones = leer_reporte_reclamaciones(args.reporte_reclamaciones, args.paquete)
+        con_glosa = [r for r in reclamaciones.values() if r.glosado > 0]
+        logger.info(
+            "  %d reclamaciones · %d con glosa · glosado reportado %s",
+            len(reclamaciones),
+            len(con_glosa),
+            a_texto(sum(r.glosado for r in con_glosa)),
+        )
+        extemporaneas = {r.extemporaneidad for r in reclamaciones.values() if r.extemporaneidad}
+        if extemporaneas:
+            logger.info("  Tipo de extemporaneidad: %s", ", ".join(sorted(extemporaneas)))
+
     mapa = _cargar_mapa(args.mapa_codigos)
     conversion = construir_registros(
         filas,
@@ -1168,6 +1553,8 @@ def main(argv: list[str] | None = None) -> int:
         fecha=_parse_fecha(args.fecha),
         mapa_codigos=mapa,
         incluir_glosa_total=not args.excluir_glosa_total,
+        reclamaciones=reclamaciones,
+        completar_servicios=args.completar_servicios,
     )
 
     grupos = lotes(conversion.registros, args.max_facturas)
@@ -1184,6 +1571,39 @@ def main(argv: list[str] | None = None) -> int:
         )
     control = args.salida / f"REVISAR_{args.prefijo}.xlsx"
     escribir_revisar(conversion, filas, control, mapa)
+
+    if reclamaciones:
+        objetado: dict[str, float] = defaultdict(float)
+        for registro in conversion.registros:
+            objetado[str(registro["CRNCXC"])] += float(registro["CROVALOBJ"] or 0)
+        descuadran = [
+            (f, reclamaciones[f].glosado, v)
+            for f, v in objetado.items()
+            if f in reclamaciones and abs(v - reclamaciones[f].glosado) > TOLERANCIA_PESOS
+        ]
+        logger.info("\nCuadre contra el reporte del ADRES:")
+        logger.info(
+            "   glosado que reporta el ADRES : %s",
+            a_texto(sum(r.glosado for r in reclamaciones.values())),
+        )
+        logger.info("   objetado en estos archivos   : %s", a_texto(sum(objetado.values())))
+        logger.info(
+            "   facturas que cuadran         : %d de %d",
+            len(objetado) - len(descuadran),
+            len(objetado),
+        )
+        logger.info("   renglones repetidos quitados : %d", conversion.quitadas)
+        logger.info("   facturas ajustadas al reporte: %d", conversion.ajustadas)
+        for f, esperado, v in sorted(descuadran, key=lambda x: -abs(x[2] - x[1]))[:10]:
+            logger.warning("   [!] %s: reporte %s, objetado %s", f, a_texto(esperado), a_texto(v))
+
+    vacios = sum(1 for r in conversion.registros if not r["SLNSERPRO"])
+    logger.info("\nRenglones sin código de servicio: %d", vacios)
+    if conversion.asignados:
+        logger.info(
+            "   %d llevan un código ASIGNADO (no salió del cruce): están en REVISAR.",
+            conversion.asignados,
+        )
 
     homologados = sum(v for k, v in conversion.metodos.items() if k)
     con_servicio = sum(1 for f in filas if f.cod_elemento)

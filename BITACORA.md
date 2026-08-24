@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 21-08-2026
+**Última actualización:** 24-08-2026
 
 ---
 
@@ -2903,6 +2903,61 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   facturas que no cuadran ($247.617.689, el 83 % del paquete).
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
+
+### 24-08-2026 — Las objeciones del ADRES, cuadradas con lo que el ADRES reporta
+
+**Lo que pidió el auditor:** que los archivos de objeciones cuadren con el
+**Valor Glosado** que trae el `ReporteReclamPAQUETE_31068`, y que **ningún
+renglón quede sin código de servicio**.
+
+**Lo que estaba pasando (y era grave):** el detalle del ADRES cuenta la misma
+plata más de una vez. Los archivos entregados el 21-08 sumaban
+**$1.032.239.679** cuando el ADRES reporta **$646.908.552** glosados. Cargar eso
+a Dinámica Gerencial habría sido objetar hasta **tres veces el mismo dinero**.
+
+**Por qué se repetía.** Dos motivos, los dos del archivo del ADRES:
+
+1. Cuando el ADRES glosa la reclamación entera por el FURIPS, además de listar
+   los servicios mete **una fila por cada causal de reclamación** (2102, 2103…)
+   con el valor **completo**. La factura HUS0000311371 aparecía por $39.722.100
+   cuando el ADRES reporta $13.240.700: el detalle ($13.240.700) más dos
+   renglones de causal, cada uno por el total.
+2. El mismo servicio, con la misma cantidad y el mismo valor, listado otra vez
+   porque le cayó otra causal encima.
+
+**Lo que quedó hecho.** El bot ahora recibe el reporte del ADRES y deja **cada
+factura sumando exactamente lo que el ADRES dice que glosó**: quita los
+renglones que repiten el total, después las repeticiones —la más grande primero
+y **sin bajarse nunca del valor reportado**, porque quitar de más sería objetar
+menos de lo que nos glosaron— y si aún queda diferencia la carga al renglón
+mayor. **Todo lo que se quita y todo lo que se ajusta queda anotado** en la hoja
+REVISAR, con el antes y el después.
+
+**Resultado del paquete 31068:**
+
+- **324 de 324 facturas cuadran** con el reporte del ADRES.
+- Total objetado: **$646.908.553** (el peso de diferencia es el redondeo: el
+  ADRES reporta $646.908.551,95 y DGH recibe pesos enteros).
+- Se quitaron **169 renglones** repetidos y se ajustaron **65 facturas**.
+- **Ningún renglón quedó sin código de servicio** (antes eran 1.856).
+
+**Dos cosas que hay que revisar, y son importantes:**
+
+1. **1.768 renglones ($307.480.311) llevan un código de servicio ASIGNADO**, no
+   homologado: cuando el cruce no encontró el servicio, se les puso el candidato
+   más parecido o el servicio de más peso de la factura. Es para que el archivo
+   cargue, no es una homologación. Están todos listados en REVISAR.
+2. **65 facturas llevan un valor ajustado** ($64.825.592 en 69 renglones) para
+   que la factura cuadre. Cada ajuste está en REVISAR con el valor de antes y el
+   de después.
+
+**Un hallazgo aparte, que corrige la entrega del 21-08:** el reporte del ADRES
+dice que las **581 reclamaciones del paquete son «Reclamacion Normal»** — o sea,
+**ninguna es extemporánea**. Los PDF y los Word que se armaron el 21-08 se
+hicieron **con** el aviso de glosa extemporánea, porque el documento de ejemplo
+lo traía. Hay que volver a generarlos **sin** esa opción antes de radicarlos.
+
+---
 
 ### 21-08-2026 — Las glosas del ADRES, en el formato OBJECIONES de DGH
 
