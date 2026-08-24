@@ -221,6 +221,19 @@ if (Test-Path $adlog) {
     }
 }
 
+# El candado trabado: la falla que no se veia (24-08-2026). Si una pasada
+# se cuelga y no suelta el candado, TODAS las siguientes se saltan y el PC
+# se queda con la version vieja mientras el registro solo repite "otra
+# pasada sigue trabajando". Una pasada normal no dura ni dos minutos.
+$candado = Join-Path $Repo "data\autodeploy.lock"
+if (Test-Path $candado) {
+    $edad = [int]((Get-Date) - (Get-Item $candado).LastWriteTime).TotalMinutes
+    if ($edad -ge 10) {
+        Write-Host ("   [OJO] el autodespliegue lleva " + $edad + " min con el candado puesto: esta trabado")
+        $avisos += "El autodespliegue esta trabado (candado de $edad min): el PC no recibe codigo nuevo. Corra tools\ACTUALIZAR_PAGINA.cmd."
+    }
+}
+
 # --- Resumen ---------------------------------------------------------
 Write-Host ""
 Write-Host " AVISOS"

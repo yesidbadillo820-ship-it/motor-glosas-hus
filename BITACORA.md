@@ -6656,6 +6656,39 @@ ahora aparece **COMPLETADO** en vez de rojo. El que nunca ha tenido facturas
 
 ---
 
+### 24-08 (tarde) — El autodespliegue se colgó y nadie se enteró (otra vez)
+
+**Qué pasó.** El PC de cartera llevaba horas sin recibir el código nuevo. En
+el registro del autodespliegue, la misma línea repetida cada 5 minutos:
+«*otra pasada sigue trabajando: esta se salta*». Una pasada se quedó colgada
+preguntándole a GitHub, nunca soltó el **candado** —el archivo que evita que
+dos pasadas se pisen— y todas las siguientes se saltaron. En pantalla no se
+veía nada raro.
+
+**Por qué se cuelga `git`.** Dos casos normales: que GitHub pida usuario y
+clave (en una tarea programada no hay nadie que los escriba, y git espera
+para siempre) o que la red del hospital deje la conexión a medias.
+
+**Tres arreglos, todos de visibilidad:**
+
+1. **Git tiene prohibido preguntar y tiene reloj.** El autodespliegue le pone
+   mordaza (`GIT_TERMINAL_PROMPT=0`) y un tope de **3 minutos**: si no
+   contesta, se corta y queda anotado el motivo, en vez de dejar el candado
+   puesto toda la tarde.
+2. **Bot de doble clic `tools\ACTUALIZAR_PAGINA.cmd`** (lo pidió Yesid): baja
+   los cambios y los deja funcionando **ahora**, sin esperar los 5 minutos.
+   Muestra en pantalla qué versión hay, qué cambios entran, reinicia el motor,
+   comprueba que la página volvió a responder y —si el motor no vuelve solo—
+   lo arranca él. De paso suelta el candado si quedó trabado, para que el
+   automático vuelva a andar. Al final recuerda el **Ctrl + F5**.
+3. **La pantalla de estado lo delata.** `ESTADO_MOTOR.cmd` ahora avisa: «*el
+   autodespliegue lleva N min con el candado puesto: está trabado*», y dice
+   qué correr para destrabarlo. Una pasada normal no dura ni dos minutos.
+
+11 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Notas crédito del Dispensario (nuevo, 24-08)
