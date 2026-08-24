@@ -55,6 +55,41 @@ for /f %%a in ('git rev-parse HEAD') do set "LOCAL=%%a"
 for /f %%a in ('git rev-parse origin/motor-glosas') do set "REMOTO=%%a"
 if "%LOCAL%"=="%REMOTO%" goto :asegurar
 
+rem ---------------------------------------------------------------
+rem  NO TUMBARLE LA PAGINA A LAS GESTORAS (24-08-2026).
+rem
+rem  Pedido de Yesid, textual: «necesito que cada vez que hagamos
+rem  cambios y demas no se les este cayendo la pagina a los gestores
+rem  a cada rato».
+rem
+rem  Aplicar el codigo nuevo obliga a apagar el motor y volverlo a
+rem  levantar: entre 15 y 30 segundos de pagina caida, y lo que
+rem  estuviera a medio hacer se pierde -un dictamen que la IA estaba
+rem  redactando se va con el motor-.
+rem
+rem  Entonces se pregunta primero. Si hay alguien trabajando, no se
+rem  toca NADA -ni siquiera se baja el codigo, porque dejar el motor
+rem  viejo con los archivos de pantalla nuevos rompe cosas- y se
+rem  reintenta en 5 minutos. En una oficina de tres personas siempre
+rem  aparece un hueco.
+rem
+rem  DOS SALIDAS PARA QUE NUNCA SE QUEDE ATASCADO:
+rem   - Si el motor no contesta, se aplica de una: no hay a quien
+rem     interrumpir.
+rem   - Si lleva mas de una hora esperando, se aplica igual. Una
+rem     correccion urgente no puede quedarse fuera todo el dia.
+rem ---------------------------------------------------------------
+set "ESPERA=%REPO%\data\deploy_aplazado.txt"
+set "OCUPADO="
+for /f "usebackq delims=" %%O in (`powershell -NoProfile -Command "try{$r=Invoke-RestMethod -Uri 'http://127.0.0.1:8080/sistema/ocupacion' -TimeoutSec 5; if($r.hay_gente_trabajando){'SI'}else{'NO'}}catch{'SINMOTOR'}"`) do set "OCUPADO=%%O"
+
+if "%OCUPADO%"=="SI" (
+  if not exist "%ESPERA%" echo %date% %time% > "%ESPERA%"
+  call :aplazar_o_seguir
+  if errorlevel 1 goto :asegurar
+)
+if exist "%ESPERA%" del "%ESPERA%" >nul 2>&1
+
 echo [%date% %time%] codigo nuevo detectado: %REMOTO:~0,7% — aplicando... >> "%LOG%"
 git reset --hard origin/motor-glosas >> "%LOG%" 2>&1
 rem psycopg2 es solo para PostgreSQL: aca la base es SQLite, se salta
@@ -65,7 +100,10 @@ rem SOLO el de produccion (--port 8080). Antes cerraba cualquier uvicorn
 rem de la aplicacion y, como esta tarea corre cada 5 minutos, le mataba
 rem el motor de pruebas al auditor sin que entendiera por que se le
 rem apagaba solo (revision del 04-08-2026).
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >> "%LOG%" 2>&1
+rem  Se le pide al motor que se cierre, y solo si no hace caso en 8
+rem  segundos se le fuerza. Asi lo que estuviera contestando en ese
+rem  momento alcanza a terminar en vez de cortarse a la mitad.
+powershell -NoProfile -Command "$ps=Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; foreach($p in $ps){ Stop-Process -Id $p.ProcessId -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 8; foreach($p in $ps){ if(Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue){ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue } }" >> "%LOG%" 2>&1
 echo [%date% %time%] deploy aplicado; se comprueba que vuelva a subir >> "%LOG%"
 
 :asegurar
@@ -127,3 +165,24 @@ if errorlevel 1 (
 
 :fin
 exit /b 0
+
+rem ---------------------------------------------------------------
+rem  ¿Sigo esperando a que quede libre, o ya fue demasiado?
+rem  Devuelve 1 = seguir esperando · 0 = aplicar igual.
+rem  Una hora es el techo: una correccion urgente no puede quedarse
+rem  fuera todo el dia porque siempre hay alguien conectado.
+rem ---------------------------------------------------------------
+:aplazar_o_seguir
+rem  Arranca en 0 a proposito: si PowerShell no contesta, la cuenta
+rem  queda vacia y `if  GEQ 60` seria un error de sintaxis que deja
+rem  el bot a medias sin decir nada.
+set "MINUTOS=0"
+for /f "usebackq delims=" %%M in (`powershell -NoProfile -Command "try{$t=(Get-Item '%ESPERA%').LastWriteTime; [int]((Get-Date)-$t).TotalMinutes}catch{0}"`) do set "MINUTOS=%%M"
+if not defined MINUTOS set "MINUTOS=0"
+if "%MINUTOS%"=="" set "MINUTOS=0"
+if %MINUTOS% GEQ 60 (
+  echo [%date% %time%] llevaba %MINUTOS% minutos esperando un hueco: se aplica igual >> "%LOG%"
+  exit /b 0
+)
+echo [%date% %time%] hay gente trabajando: el cambio espera un hueco ^(%MINUTOS% min^) >> "%LOG%"
+exit /b 1

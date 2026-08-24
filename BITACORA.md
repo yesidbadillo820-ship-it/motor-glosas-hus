@@ -6377,6 +6377,46 @@ cosas era. Las líneas propias del autodespliegue lo dirán —quedaron tapadas
 por el tráfico de la página, que ya se corrigió—. Lo que sí es seguro es que
 los dos defectos eran reales y los dos dejaban el PC atrás en silencio.
 
+### 24-08 — Los cambios ya no le tumban la página a las gestoras
+
+Pedido de Yesid: «necesito que cada vez que hagamos cambios y demás no se les
+esté cayendo la página a los gestores a cada rato».
+
+**Cómo era.** Cada cinco minutos el sistema revisa si hay algo nuevo y, si lo
+hay, lo aplica: apaga el motor y lo vuelve a levantar. Son entre 15 y 30
+segundos de página caída — y lo que estuviera a medio hacer se pierde. Un
+dictamen que la IA estaba redactando se va con el motor, y eso son minutos de
+trabajo de una médica auditora.
+
+**Cómo es ahora.** El sistema **pregunta antes**. Si hay alguien trabajando, no
+toca nada y vuelve a preguntar en cinco minutos. En una oficina de tres
+personas siempre aparece un hueco —una llamada, un café, una reunión— y el
+cambio entra sin que nadie lo note.
+
+**El punto fino, que es donde esto se rompe si se hace mal:** una pestaña
+abierta NO es alguien trabajando. La página se refresca sola —pregunta la salud
+cada 30 segundos, los indicadores cada 30, el estado de la IA cada 5—. Si eso
+contara, una pantalla olvidada encendida el viernes bloquearía los cambios
+hasta el lunes. Entonces se cuenta solo lo que pidió una persona: responder,
+guardar, abrir una pantalla, buscar, exportar. Lo que la página se pregunta
+sola, no.
+
+**Dos salidas para que nunca se quede atascado:**
+
+- Si el motor está caído, el cambio se aplica de una: no hay a quién
+  interrumpir, y esperar solo dejaría el portal caído más tiempo.
+- Si lleva más de una hora esperando un hueco, se aplica igual. Una corrección
+  urgente no puede quedarse fuera todo el día porque siempre hay alguien
+  conectado.
+
+**Y cuando por fin toca apagar**, ahora se le pide al motor que se cierre y solo
+se le fuerza si no hace caso en ocho segundos. Así lo que estuviera contestando
+en ese momento alcanza a terminar en vez de cortarse a la mitad.
+
+**Nada de esto queda escrito de quién ni de qué.** La pregunta que hace el bot
+solo dice cuántos segundos lleva la página en silencio: ni nombres, ni correos,
+ni en qué factura estaba nadie.
+
 ## 3) PENDIENTE
 
 ### Permisos del portal (nuevo, 21-08 tarde)

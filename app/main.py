@@ -1543,6 +1543,24 @@ app.add_middleware(CorrelationIdMiddleware)
 # subdominio (hus.ia-glosas.com → 'HUS'). Por defecto 'HUS' para no
 # romper el flujo single-tenant actual. Cuando entre cliente #2 solo
 # hay que setear tenant_id en sus glosas y este middleware ya filtra.
+# Saber si hay alguien trabajando, para que un despliegue no le tumbe la
+# pagina a las gestoras en plena jornada (24-08-2026). Ver
+# app/services/actividad.py: distingue lo que pide una persona de lo que el
+# propio portal se pregunta solo cada tanto.
+#
+# Va antes de todo y no puede fallar: si algo se rompe aca, el portal entero
+# deja de responder. Por eso el try/except mudo.
+@app.middleware("http")
+async def _actividad_middleware(request, call_next):
+    try:
+        from app.services.actividad import marcar_actividad
+
+        marcar_actividad(request.method, request.url.path)
+    except Exception:
+        pass
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def _tenant_middleware(request, call_next):
     try:
