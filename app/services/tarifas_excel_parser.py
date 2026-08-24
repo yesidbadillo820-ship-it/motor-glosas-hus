@@ -641,7 +641,18 @@ def _parsear_simple_fijo(
     # decir nada. «CODIGO» va de último a propósito: solo aplica cuando
     # no hay nada mejor, y las filas basura las frenan el validador de
     # códigos y el valor > 0.
-    idx_cups = _indice_columna(headers, "CUPS", "CODIGO CUM", "CODIGO")
+    # …y la prioridad también acá es POR CANDIDATO: en el tarifario de
+    # SALUD MÍA conviven «CODIGO IPS» (columna 1, códigos con letra) y
+    # «CUPS 2341/25» (columna 3, el CUPS oficial). Con la llamada única,
+    # CODIGO alcanzaba la pasada de subcadenas y agarraba «CODIGO IPS»
+    # antes de que CUPS llegara a su pasada de prefijos: 4.124 tarifas
+    # quedaban guardadas por el código interno y las glosas —que llegan
+    # con el CUPS oficial— no las encontraban.
+    idx_cups = None
+    for candidato in ("CUPS", "CODIGO CUM", "CODIGO"):
+        idx_cups = _indice_columna(headers, candidato)
+        if idx_cups is not None:
+            break
     if idx_cups is None:
         # 06-08-2026 — hoja AMBULATORIO de la propuesta 2026 de FAMISANAR:
         # la columna del CUPS se titula con la resolución que los define

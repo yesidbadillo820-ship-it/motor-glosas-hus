@@ -248,6 +248,42 @@ class TestLosAnexosDeMedicamentosDelDispensario:
         assert r["filas"][0]["valor_pactado"] == 1689585
 
 
+class TestElCupsOficialLeGanaAlCodigoInterno:
+    """Tarifario de SALUD MÍA (24-08-2026): conviven «CODIGO IPS» (columna 1,
+    códigos con letra: 010101H) y «CUPS 2341/25» (columna 3, el oficial). El
+    candidato CODIGO alcanzaba la pasada de subcadenas y agarraba CODIGO IPS
+    antes de que CUPS llegara a su pasada de prefijos: 4.124 tarifas quedaban
+    guardadas por el código interno, y las glosas —que llegan con el CUPS
+    oficial— no las encontraban."""
+
+    def test_prefiere_el_cups_y_guarda_el_interno_aparte(self):
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "SERVICIOS IPS": [
+                        [
+                            "CODIGO IPS",
+                            "DESCRIPCIÓN CUPS",
+                            "CUPS 2341/25",
+                            "DESCRIPCIÓN CUPS",
+                            "TARIFA",
+                        ],
+                        [
+                            "010101H",
+                            "PUNCION CISTERNAL - HUS",
+                            "010101",
+                            "PUNCION CISTERNAL",
+                            777793.35,
+                        ],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "010101", "ganó el código interno"
+        assert r["filas"][0]["codigo_ips"] == "010101H", "se perdió el código interno"
+
+
 class TestLosRepetidosQueSeContradicen:
     def test_dos_valores_distintos_no_se_cargan_y_se_avisa(self):
         """El 103204 real traía CINCO valores. Cargarlos deja que el orden de
