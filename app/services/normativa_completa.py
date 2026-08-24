@@ -745,9 +745,49 @@ RESOLUCIONES = {
         "ambito": "Historia clínica como documento médico-legal",
         "vigente": True,
         "articulos": {
+            # Estos dos artículos estaban pegados en uno solo (24-08-2026). El
+            # texto del Art. 3 traía al final «la historia clínica es un
+            # documento privado, obligatorio y sometido a reserva», que no es
+            # del Art. 3 sino del literal a) del Art. 1. Los dictámenes copiaban
+            # la frase completa entre comillas y se la atribuían al Art. 3, así
+            # que media cita quedaba mal atribuida. Lo detectó la segunda
+            # auditoría independiente. Ambos textos se transcribieron del PDF
+            # oficial del Ministerio de Salud ese mismo día.
+            "1": {
+                "titulo": "Definiciones",
+                "texto": (
+                    "La Historia Clínica es un documento privado, obligatorio y sometido a "
+                    "reserva, en el cual se registran cronológicamente las condiciones de "
+                    "salud del paciente, los actos médicos y los demás procedimientos "
+                    "ejecutados por el equipo de salud que interviene en su atención. Dicho "
+                    "documento únicamente puede ser conocido por terceros previa autorización "
+                    "del paciente o en los casos previstos por la ley."
+                ),
+                "aplicacion": "Definición legal de la historia clínica y su reserva",
+                "keywords": [
+                    "historia clínica",
+                    "documento privado",
+                    "reserva",
+                    "definición",
+                ],
+            },
             "3": {
                 "titulo": "Características de la historia clínica",
-                "texto": "La historia clínica debe cumplir con las siguientes características: INTEGRALIDAD, SECUENCIALIDAD, RACIONALIDAD CIENTÍFICA, DISPONIBILIDAD y OPORTUNIDAD. La historia clínica es un documento privado, obligatorio y sometido a reserva.",
+                "texto": (
+                    "Las características básicas son: Integralidad: la historia clínica de un "
+                    "usuario debe reunir la información de los aspectos científicos, técnicos "
+                    "y administrativos relativos a la atención en salud. Secuencialidad: los "
+                    "registros de la prestación de los servicios en salud deben consignarse en "
+                    "la secuencia cronológica en que ocurrió la atención. Racionalidad "
+                    "científica: es la aplicación de criterios científicos en el "
+                    "diligenciamiento y registro de las acciones en salud brindadas a un "
+                    "usuario, de modo que evidencie en forma lógica, clara y completa el "
+                    "procedimiento que se realizó. Disponibilidad: es la posibilidad de "
+                    "utilizar la historia clínica en el momento en que se necesita, con las "
+                    "limitaciones que impone la Ley. Oportunidad: es el diligenciamiento de "
+                    "los registros de atención de la historia clínica, simultánea o "
+                    "inmediatamente después de que ocurre la prestación del servicio."
+                ),
                 "aplicacion": "Historia clínica = documento médico-legal de plena prueba",
                 "keywords": [
                     "historia clínica",
