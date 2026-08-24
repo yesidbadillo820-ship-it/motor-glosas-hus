@@ -2048,10 +2048,19 @@ def _neutralizar_art_168_fuera_de_contexto(
     # Patrón: cualquier mención de Art. 168 Ley 100 (variantes)
     # Cubre: "Art. 168", "Artículo 168", "ART. 168", "Articulo 168",
     # con/sin "Ley 100", con/sin "/1993" o "de 1993".
+    #
+    # EL CONECTOR VA SUELTO A PROPÓSITO (24-08-2026). El dictamen GL-198 de
+    # COMPENSAR salió impreso diciendo «EN VIRTUD DE LO DISPUESTO EN EL
+    # ARTÍCULO 168 LA LEY 100 DE 1993» — sin el «DE». La IA se come esa
+    # palabra de vez en cuando, y la versión anterior del patrón solo
+    # aceptaba «DE LA LEY» o «DE LEY»: bastaba esa letra de menos para que
+    # la cita inaplicable pasara derecho hasta el papel que firma el
+    # auditor. Ahora «DE» y «LA» son cada uno opcionales por su lado, así
+    # que las cuatro formas caen: «DE LA LEY», «DE LEY», «LA LEY», «LEY».
     pat_art168 = re.compile(
         r"(?:EL\s+|AL\s+|SEGÚN\s+EL\s+|CONFORME\s+AL?\s+)?"
         r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*168"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
         re.IGNORECASE,
     )
     nuevo, n = pat_art168.subn(
@@ -2159,7 +2168,7 @@ def _neutralizar_art_177_relleno(
         r"(?:CONFORME\s+(?:A\s+LO\s+DISPUESTO\s+EN\s+)?(?:EL\s+|AL\s+)?|"
         r"AS[ÍI]\s+MISMO,?\s+(?:EL\s+|AL\s+)?|EL\s+|AL\s+)?"
         r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*177"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
         r"[^.]{0,400}?(?:MOVILIZAR|RECURSOS|\bPOS\b|PLAN\s+OBLIGATORIO|"
         r"PATRIMONIOS?\s+AUT[ÓO]NOM|FIDUCIARIA)[^.]{0,400}(?:\.|$)",
         re.IGNORECASE | re.DOTALL,
@@ -2174,7 +2183,7 @@ def _neutralizar_art_177_relleno(
     pat_art177_bare = re.compile(
         r"(?:CONFORME\s+(?:AL?\s+)?|EL\s+|AL\s+)?"
         r"(?:ART[ÍI]?CULO?S?|ARTS?\.?)\s*177"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
         re.IGNORECASE,
     )
     nuevo, n_bare = pat_art177_bare.subn(
