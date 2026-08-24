@@ -40,6 +40,31 @@ from app.services.health_monitor import checar_salud
 router = APIRouter(prefix="/sistema", tags=["sistema"])
 
 
+@router.get("/ocupacion")
+def ocupacion():
+    """¿Hay alguien trabajando en el portal ahora mismo?
+
+    La pregunta el autodespliegue antes de apagar el motor para aplicar codigo
+    nuevo. Si hay gente trabajando, espera cinco minutos y vuelve a preguntar:
+    en una oficina de tres personas siempre aparece un hueco, y el cambio entra
+    sin que nadie note nada. Pedido de Yesid el 24-08-2026, textual: «necesito
+    que cada vez que hagamos cambios y demas no se les este cayendo la pagina a
+    los gestores a cada rato».
+
+    No pide sesion a proposito: la hace un bot local que no tiene clave. Y no
+    dice nada delicado — ni quien, ni que estaba haciendo, ni cuantos son. Solo
+    cuantos segundos lleva el portal en silencio.
+    """
+    from app.services import actividad
+
+    segundos = actividad.segundos_inactivo()
+    return {
+        "segundos_inactivo": int(segundos),
+        "hay_gente_trabajando": actividad.hay_gente_trabajando(),
+        "umbral_segundos": actividad.SEGUNDOS_DE_SILENCIO,
+    }
+
+
 @router.get("/salud")
 def salud_detallada(
     db: Session = Depends(get_db),
