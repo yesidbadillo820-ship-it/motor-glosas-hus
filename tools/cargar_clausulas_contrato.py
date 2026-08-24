@@ -112,7 +112,21 @@ def guardar(eps: str, clausulas: list[dict], *, reemplazar: bool) -> dict:
                 synchronize_session=False
             )
         for c in clausulas:
-            db.add(ClausulaContrato(eps=eps_norm, **c))
+            # El archivo dice `numero` (igual que la ruta web) pero la columna
+            # se llama `numero_clausula`: la traducción va campo por campo, a
+            # propósito. Pasar el diccionario entero (**c) fue el defecto del
+            # 24-08: reventó en el PC de cartera con "'numero' is an invalid
+            # keyword argument" después de decir que todo estaba listo.
+            db.add(
+                ClausulaContrato(
+                    eps=eps_norm,
+                    numero_clausula=c["numero"],
+                    tema=c["tema"],
+                    titulo=c["titulo"],
+                    texto_literal=c["texto_literal"],
+                    pagina=c.get("pagina"),
+                )
+            )
         db.commit()
         total = db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).count()
     finally:
