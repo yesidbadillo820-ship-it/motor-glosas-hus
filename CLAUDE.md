@@ -51,6 +51,11 @@ todas las sesiones y todos los chats de Claude Code.
 - Nunca incluir el identificador del modelo en commits, PRs ni código pusheado.
 - No confundir plataformas: COOSALUD (vco.ctamedicas.com), SIMED (Dispensario)
   y Dinámica Gerencial (DGH) son sistemas distintos con bots distintos.
+- Si el auditor pasa un archivo con más contenido del que menciona el pedido
+  (varias hojas, listados de más), trabajar SOLO sobre la parte pedida
+  inicialmente; si no es obvio qué hoja o grupo usar, preguntar antes de
+  procesar todo el archivo. (Lección del 24-08: el cruce se hizo con la Hoja1
+  de 10.017 facturas cuando el trabajo del auditor era la hoja de 5.122.)
 - Antes de cargar notas crédito al SIMED, validar el CUV
   (`tools/verificar_cuv_notas.py`) — el portal acepta notas con CUV inválido
   pero quedan mal radicadas.
