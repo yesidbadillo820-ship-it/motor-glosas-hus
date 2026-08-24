@@ -6417,7 +6417,55 @@ en ese momento alcanza a terminar en vez de cortarse a la mitad.
 solo dice cuántos segundos lleva la página en silencio: ni nombres, ni correos,
 ni en qué factura estaba nadie.
 
+### 24-08 (mañana) — Lo que contó el primer despliegue del lunes
+
+El lunes a las 9:22, con la fusión del fin de semana, el registro del
+autodespliegue contó tres cosas que había que arreglar:
+
+1. **«codigo nuevo detectado» salió dos veces, con medio segundo de
+   diferencia.** Dos pasadas corriendo al tiempo. Eso es grave: cada una apaga
+   el motor contando con revivirlo, y entre las dos lo dejan caído —una lo
+   levanta y la otra lo vuelve a matar—. Ahora hay un candado: una sola pasada
+   a la vez, y si una muere sin soltar el candado, caduca a los 30 minutos
+   para no quedarse esperando a un muerto. Es un archivo, no una cuenta de
+   procesos: contar procesos ya salió mal este mes con el vigilante.
+
+2. **«ALERTA: el motor sigue caido» con el portal funcionando.** El bot
+   esperaba 12 segundos fijos y preguntaba una vez. El motor del hospital
+   carga una base de 133 MB y tarda más: se daba por muerto estando vivo, y se
+   le arrancaba un segundo motor encima. Ahora pregunta cada 3 segundos hasta
+   90: si sube en 10, sigue en 10; si de verdad no sube, se entera después de
+   un plazo que sí alcanza.
+
+3. **El contrato de POSITIVA no se pudo cargar por la IA.** El PDF del
+   contrato original está escaneado —cero texto— y la ruta manual exige un
+   token que el auditor no tiene a mano: se intentó tres veces y las tres
+   terminaron en «Credenciales inválidas».
+
+   Se hicieron dos cosas. Primero, se leyeron los otrosíes 02 y 03 —esos sí
+   tienen texto— y se transcribieron **17 cláusulas literales**: tarifas (no
+   pactados a SOAT, insumos a tarifas institucionales), soportes (los 13 datos
+   de la factura, RIPS), plazos (20 días para glosar, 15 para responder, pago
+   a 30), autorizaciones, cobertura, vigencia hasta el 19-ene-2027, y las dos
+   joyas de la página 12: POSITIVA reconoce **intereses moratorios** y
+   **reconocimiento económico** cuando formula glosas infundadas o
+   inexistentes. Segundo, se hizo el bot `tools/cargar_clausulas_contrato.py`,
+   que carga esas cláusulas directo en la base, sin clave, con las mismas
+   reglas de la ruta web — y dice SIEMPRE a qué base escribe, por la lección
+   de las dos bases del 20-08.
+
 ## 3) PENDIENTE
+
+### Contrato POSITIVA (nuevo, 24-08)
+- **Cargar las 17 cláusulas en el PC de cartera.** El archivo ya está en
+  `data\clausulas_positiva.json`; cuando el autodespliegue baje el bot nuevo,
+  correr: `venv\Scripts\python.exe tools\cargar_clausulas_contrato.py
+  POSITIVA data\clausulas_positiva.json` y comprobar que diga 17 insertadas y
+  que la base sea `motorglosas.db`.
+- **El contrato original 525/2017 sigue escaneado.** Si se quieren sus
+  cláusulas originales (multas, garantías, terminación), hay que pasarle OCR
+  primero. Lo que rige hoy en tarifas, plazos y glosas ya quedó transcrito de
+  los otrosíes.
 
 ### Permisos del portal (nuevo, 21-08 tarde)
 - ~~Cerrar la consulta de usuarios.~~ **HECHO el 21-08 por la tarde.** Ya

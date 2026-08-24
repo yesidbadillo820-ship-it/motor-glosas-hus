@@ -108,6 +108,63 @@ class TestNuncaSeQuedaAtascado:
         assert 'set "MINUTOS=0"' in t
 
 
+class TestUnaSolaPasadaALaVez:
+    """El registro del PC de cartera mostró «codigo nuevo detectado» **dos
+    veces con medio segundo de diferencia**: dos pasadas corriendo al tiempo.
+
+    Eso es grave. Cada pasada apaga el motor contando con revivirlo, y entre
+    las dos lo dejan caído: una lo levanta y la otra lo vuelve a matar. En ese
+    mismo registro, la línea siguiente fue «ALERTA: el motor sigue caido».
+    """
+
+    def test_hay_un_candado(self):
+        t = _texto()
+        assert "autodeploy.lock" in t, (
+            "Nada impide que dos pasadas del autodespliegue corran a la vez y se peleen el motor."
+        )
+
+    def test_se_toma_antes_de_tocar_el_codigo(self):
+        t = _texto()
+        assert t.index(":tomar_candado") < t.index("git fetch")
+
+    def test_la_pasada_que_sobra_se_va_sin_hacer_nada(self):
+        t = _texto()
+        i = t.index('if not exist "%CANDADO%" goto :tomar_candado')
+        # Hasta la ETIQUETA, al principio de su renglón: buscar el nombre a
+        # secas encontraría el `goto` de esta misma línea y el trozo saldría
+        # vacío.
+        bloque = t[i : t.index("\n:tomar_candado", i)]
+        assert "exit /b 0" in bloque
+        assert "otra pasada sigue trabajando" in bloque
+        assert "git reset" not in bloque
+
+    def test_se_suelta_al_terminar(self):
+        """Sin soltarlo, la primera pasada bloquearía todas las demás."""
+        t = _texto()
+        i = t.index("\n:fin")
+        assert 'del "%CANDADO%"' in t[i : i + 120]
+
+    def test_no_se_cuenta_procesos(self):
+        """Contar procesos ya salió mal este mes: la orden que contaba se
+        contaba a sí misma y dejó el hospital sin portal tras un reinicio. Un
+        archivo no tiene esa trampa."""
+        t = _texto()
+        i = t.index("CANDADO=")
+        assert "Get-CimInstance" not in t[i - 900 : i]
+
+    def test_un_candado_de_una_pasada_muerta_no_bloquea_para_siempre(self):
+        """Si una pasada muere sin soltarlo, el autodespliegue no puede
+        quedarse esperando a un muerto: dejaría de traer código sin avisar,
+        que es exactamente lo que costó una tarde entera."""
+        t = _texto()
+        assert "%EDAD% GEQ 30" in t
+        assert "se ignora" in t
+
+    def test_y_si_no_se_puede_medir_su_edad_no_revienta(self):
+        t = _texto()
+        assert 'set "EDAD=999"' in t
+
+
 class TestApagarConBuenosModales:
     def test_pide_que_se_cierre_antes_de_forzar(self):
         t = _texto()

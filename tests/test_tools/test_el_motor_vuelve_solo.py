@@ -63,24 +63,29 @@ class TestLaRedDeSeguridad:
         )
 
     def test_espera_antes_de_comprobar(self):
-        """Preguntar de inmediato daría un falso negativo: tarda en subir.
+        """Preguntar de inmediato daría un falso negativo: el motor tarda en
+        subir.
 
-        Lo que importa es que ESPERE, no con qué orden. El 21-08-2026 las
-        esperas pasaron de `timeout` a `ping`: `timeout` necesita una consola
-        de verdad y, cuando el bot corre sin sesión iniciada, contesta «Input
-        redirection is not supported» y sigue de largo **sin esperar**. Esta
-        prueba acepta las dos formas y comprueba lo único que de verdad
-        protege: que la espera exista y dure lo suficiente.
+        Esto ya fijó dos veces el mecanismo equivocado. Primero pedía
+        `timeout`, que no espera nada sin sesión iniciada. Después pedía una
+        espera larga de una sola vez, y el 24-08 se vio que 12 segundos no le
+        alcanzan a un motor que carga una base de 133 MB: se daba por muerto
+        estando vivo y se le levantaba otro encima.
+
+        Ahora se comprueba lo único que de verdad protege: **cuánto está
+        dispuesto a esperar en total** antes de declararlo caído.
         """
         t = _texto()
-        con_timeout = [int(x) for x in re.findall(r"timeout /t (\d+) /nobreak", t)]
-        # `ping -n N` manda N paquetes con un segundo entre uno y otro.
-        con_ping = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1", t)]
-        esperas = con_timeout + con_ping
-        assert esperas, "la red de seguridad pregunta sin esperar nada"
-        assert max(esperas) >= 10, (
-            f"la espera más larga es de {max(esperas)} s: el motor tarda más "
-            f"que eso en subir y se daría por caído estando bien."
+        pausa = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1", t)]
+        vueltas = [int(x) for x in re.findall(r"%INTENTOS%\s+(?:GEQ|LSS)\s+(\d+)", t)]
+        fijas = [int(x) for x in re.findall(r"timeout /t (\d+) /nobreak", t)]
+        if vueltas:
+            total = min(pausa) * min(vueltas)
+        else:
+            total = max(pausa + fijas or [0])
+        assert total >= 60, (
+            f"la red de seguridad solo espera {total} segundos: puede dar el "
+            f"motor por caído estando vivo y arrancarle un segundo encima."
         )
 
     def test_deja_constancia_en_el_registro(self):
