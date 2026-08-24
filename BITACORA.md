@@ -6526,7 +6526,53 @@ incidente exacto —un intento fallido no puede llevarse lo que había, la misma
 lección del instalador que borraba la tarea de arranque—. Con el defecto
 puesto de vuelta a propósito, cuatro se ponen en rojo.
 
+### 24-08 (tarde) — Las tarifas de POSITIVA entraron infladas y se corrigió el lector
+
+Se cargó por la pantalla el Excel «TARIFAS ESE HUS 2025 - POSITIVA»: 4.742
+tarifas. Al revisarlas fila por fila apareció lo grave: **entraron con el SOAT
+pleno, no con el SOAT –15% pactado**. La hoja trae las dos columnas y el
+lector conocía la del valor pleno pero no la del descuento. Ejemplo real: la
+punción cisternal quedó en $915.051 cuando lo pactado es $777.793. Con eso,
+cada dictamen de tarifas defendería un valor 15% más alto que el contrato — la
+EPS ratifica la glosa y el dictamen es falso.
+
+Tres correcciones al lector, con sus pruebas:
+
+1. **La columna del descuento pactado gana siempre.** Un encabezado tipo
+   «SOAT -15%» al lado del valor pleno es SIEMPRE lo pactado. (Es la misma
+   trampa que ya había pasado con FAMISANAR y su «PROPUESTA FINAL».)
+2. **El cero de adelante.** Excel guarda el CUPS como número y se come el
+   cero: 010101 quedaba 10101 y el motor no lo encontraba — decía «sin tarifa
+   pactada» teniéndola. Ahora se guarda a 6 dígitos, y el buscador además
+   tolera las 4.742 que ya quedaron guardadas sin el cero.
+3. **Los repetidos que se contradicen no se cargan.** El mismo CUPS aparece
+   hasta con cinco valores distintos en el archivo (el 103204: de $94.399 a
+   $1.926.567). Antes se cargaban todos y el azar del orden decidía cuál
+   citaba el dictamen. Ahora se omiten, se avisa cuáles, y el motor dice «sin
+   tarifa pactada» — que es la verdad hasta que el auditor defina cuál rige.
+
+Con el lector corregido, del Excel real entran **2.988 tarifas limpias** y
+quedan **737 códigos por definir**, entregados en un archivo aparte para
+marcar cuál valor rige (más una celda con fórmula dañada: el 512104 dice
+#VALUE! en el propio Excel).
+
+**También quedó cargado el contrato:** las 17 cláusulas de POSITIVA se ven en
+la pantalla de Tarifas desde las 4:12 p. m. — el cargador sin clave funcionó
+tras corregirle la traducción del campo.
+
 ## 3) PENDIENTE
+
+### Tarifas POSITIVA (nuevo, 24-08 tarde)
+- **Volver a cargar el Excel de tarifas** cuando baje el lector corregido:
+  misma pantalla, mismo archivo, y ESTA VEZ marcar la casilla «Reemplazar
+  tarifas existentes de esta EPS» (las 4.742 actuales están con el valor
+  pleno, no el pactado). Deben quedar ~2.988 y un aviso con los códigos en
+  conflicto.
+- **OJO mientras tanto: no confiar en dictámenes de tarifas de POSITIVA** —
+  citarían valores 15% más altos que el contrato.
+- **Definir los 737 códigos del archivo «tarifas_positiva_POR_DEFINIR.csv»**
+  (columna «¿cuál rige?»). Cuando estén marcados, se cargan aparte.
+- **Arreglar en el Excel la celda del CUPS 512104** (dice #VALUE!).
 
 ### Contrato POSITIVA (nuevo, 24-08)
 - **Cargar las 17 cláusulas en el PC de cartera.** El archivo ya está en
