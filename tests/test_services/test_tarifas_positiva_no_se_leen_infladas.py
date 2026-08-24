@@ -284,6 +284,35 @@ class TestElCupsOficialLeGanaAlCodigoInterno:
         assert r["filas"][0]["codigo_ips"] == "010101H", "se perdió el código interno"
 
 
+class TestElRespaldoDeLaResolucionLeGanaAlCodigo:
+    """El CI del 24-08 cazó esto el mismo día del cambio: el candidato CODIGO,
+    puesto antes que el respaldo de la resolución, secuestró la hoja
+    AMBULATORIO de FAMISANAR 2026 — allí el CUPS oficial va titulado
+    «Res 2706/25» y convive con una columna CODIGO de códigos propios
+    (902210AMB). Dos corridas selectivas mías no incluyeron ese archivo;
+    la suite completa sí."""
+
+    def test_el_cups_titulado_con_resolucion_gana_al_codigo_propio(self):
+        r = parsear_excel_tarifas(
+            _excel(
+                {
+                    "AMBULATORIO": [
+                        [
+                            "CODIGO",
+                            "DESCRIPCION IPS",
+                            "Res 2706/25",
+                            "DESCRIPCION CUPS",
+                            "TARIFA 2026",
+                        ],
+                        ["902210AMB", "HEMOGRAMA IV", "902210", "HEMOGRAMA IV", 17600],
+                    ],
+                }
+            )
+        )
+        assert len(r["filas"]) == 1
+        assert r["filas"][0]["codigo_cups"] == "902210", "ganó el código propio"
+
+
 class TestLosRepetidosQueSeContradicen:
     def test_dos_valores_distintos_no_se_cargan_y_se_avisa(self):
         """El 103204 real traía CINCO valores. Cargarlos deja que el orden de
