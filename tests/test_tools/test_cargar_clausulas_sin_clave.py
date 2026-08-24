@@ -183,6 +183,43 @@ class TestGuardarContraLaBaseDeVerdad:
         assert r["insertadas"] == 17 and r["total_actual"] == 17
 
 
+class TestSiLaEpsNoExisteLoDiceEnCristiano:
+    """SEGUROS MUNDIAL (24-08): la EPS no existía en Contratos y la llave
+    foránea tumbó el guardado con un traceback de 60 líneas de SQLAlchemy.
+    El auditor no tiene por qué descifrar eso."""
+
+    def test_una_eps_sin_registro_recibe_instrucciones_no_traceback(self, monkeypatch):
+        from sqlalchemy import create_engine, event
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import StaticPool
+
+        import app.database as database
+        from app.models.db import Base
+
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+
+        @event.listens_for(engine, "connect")
+        def _fk_on(dbapi, rec):
+            dbapi.execute("PRAGMA foreign_keys=ON")
+
+        Base.metadata.create_all(engine)
+        monkeypatch.setattr(database, "SessionLocal", sessionmaker(bind=engine))
+
+        import pytest as _pytest
+
+        with _pytest.raises(SystemExit) as exc:
+            bot.guardar("SEGUROS MUNDIAL", [_clausula()], reemplazar=True)
+        mensaje = str(exc.value)
+        assert "NO existe en la pantalla de Contratos" in mensaje
+        assert "Créela primero" in mensaje
+        assert "No se guardó ni se borró nada" in mensaje
+        engine.dispose()
+
+
 class TestElBotNoEsconde:
     def test_dice_a_que_base_escribe(self):
         """La lección del 20-08: dos bases conviviendo y un motor mirando la

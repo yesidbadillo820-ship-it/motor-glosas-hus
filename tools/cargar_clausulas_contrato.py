@@ -127,7 +127,22 @@ def guardar(eps: str, clausulas: list[dict], *, reemplazar: bool) -> dict:
                     pagina=c.get("pagina"),
                 )
             )
-        db.commit()
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            # 24-08-2026 — SEGUROS MUNDIAL: la EPS no existía en Contratos y
+            # la llave foránea tumbó el guardado con un traceback de 60
+            # líneas. El auditor no tiene por qué descifrar SQLAlchemy.
+            if "FOREIGN KEY" in str(e):
+                raise SystemExit(
+                    f"\nLa EPS «{eps_norm}» NO existe en la pantalla de Contratos "
+                    f"del portal, y las cláusulas se cuelgan de ella.\n"
+                    f"Créela primero (Gestión → Contratos, con ese nombre exacto) "
+                    f"y vuelva a correr este mismo comando.\n"
+                    f"No se guardó ni se borró nada."
+                )
+            raise
         total = db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).count()
     finally:
         db.close()
