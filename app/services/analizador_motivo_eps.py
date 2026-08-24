@@ -249,7 +249,7 @@ def bloque_puntos_a_refutar(puntos: dict) -> str:
     if puntos.get("cuestiona_pertinencia"):
         partes.append(
             f"  {n}. La EPS cuestiona pertinencia clínica — invoca "
-            "Art. 17 Ley 1751/2015 (autonomía médica) + T-478/1995. "
+            "Art. 17 Ley 1751/2015 (autonomía médica). "
             "Recalca que el médico tratante es el competente para "
             "valorar; auditoría administrativa NO sustituye criterio "
             "clínico."

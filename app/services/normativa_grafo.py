@@ -94,7 +94,7 @@ ARISTAS_GRAFO: list[tuple[str, str, str, str]] = [
         "sentencia_t_1025_2002",
         "fundamenta_a",
         "ley_100_1993",
-        "T-1025/2002 sobre urgencias, art. 168 Ley 100",
+        "art. 168 Ley 100 sobre urgencias",
     ),
     (
         "ley_1751_2015",

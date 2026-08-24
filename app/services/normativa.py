@@ -195,13 +195,15 @@ NORMAS_VIGENTES: dict[str, dict] = {
     },
     "SENTENCIA T-1025/2002": {
         "nombre": "Sentencia T-1025 de 2002",
-        "resumen": "Urgencias no requieren autorización previa. Aplica transversalmente.",
+        # Verificada el 24-08-2026 contra la relatoría de la Corte Constitucional.
+        "resumen": "Consentimiento informado en cirugía de asignación de sexo en menores intersexuales. NO trata de urgencias.",
         "tipo": "SENTENCIA",
         "vigente": True,
     },
     "SENTENCIA T-478/1995": {
         "nombre": "Sentencia T-478 de 1995",
-        "resumen": "Autonomía médica como derecho fundamental protegido.",
+        # Verificada el 24-08-2026 contra la relatoría de la Corte Constitucional.
+        "resumen": "Seguridad social y tratamiento asilar de personas con discapacidad psíquica. NO trata de autonomía médica.",
         "tipo": "SENTENCIA",
         "vigente": True,
     },

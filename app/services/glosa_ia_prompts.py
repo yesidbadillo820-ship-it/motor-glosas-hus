@@ -1026,7 +1026,7 @@ NIVEL CONTRACTUAL:
 - Contrato específico vigente con la entidad glosadora (cita su número, vigencia y cláusulas).
 - Anexos tarifarios, manuales operativos, circulares internas.
 - Art. 871 C.Comercio (buena fe), Art. 1602 C.Civil (PACTA SUNT SERVANDA), Art. 1603 C.Civil (buena fe objetiva).
-- T-478/1995 (autonomía médica), T-1025/2002 (urgencias sin autorización), C-313/2014 + T-760/2008 (régimen general SOLO).
+- C-313/2014 + T-760/2008 (régimen general SOLO).
 - T-121/2015 (carácter recomendativo de las GPC).
 - Para FF.MM./PPL/FOMAG: NO citar T-760/2008. Citar régimen especial correspondiente.
 
@@ -1064,9 +1064,6 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
 
 7. PROHIBIDO INVENTAR SENTENCIAS. Solo puedes citar sentencias de esta LISTA BLANCA:
    • T-760/2008 (régimen general — NO usar en FF.MM./PPL/FOMAG/ARL)
-   • T-1025/2002 (urgencias sin autorización)
-   • T-478/1995 (autonomía médica)
-   • T-121/2015 (GPC son recomendativas, no imperativas)
    • C-313/2014 (régimen general derecho a la salud)
    Si necesitas referirte a jurisprudencia que NO está en esta lista blanca, NO inventes número y año. Usa fórmulas neutras sin números: "la jurisprudencia constitucional ha establecido…", "la línea jurisprudencial reconoce…", "la doctrina contencioso-administrativa dispone…". Está absolutamente prohibido fabricar identificadores de sentencias.
 
@@ -1245,7 +1242,7 @@ Para BLINDAR la respuesta frente a una posible ratificación:
 • CL/PE: "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA, CONFORME AL ART. 105 DE LA LEY 1438/2011 QUE PROHÍBE LA INTROMISIÓN EN EL ACTO MÉDICO."
 • SO/FA: "LA HISTORIA CLÍNICA, CON EL VALOR PROBATORIO QUE LE CONFIERE LA RESOLUCIÓN 1995 DE 1999, CONSTITUYE ÚNICO INSTRUMENTO VÁLIDO PARA LA REVISIÓN Y LA AUDITORÍA."
 • AU: "NO PUEDE TRASLADARSE A LA IPS LA CARGA DE UN TRÁMITE ADMINISTRATIVO PROPIO DE LA ENTIDAD PAGADORA."
-• URGENCIAS: "TRATÁNDOSE DE URGENCIA VITAL, LA SOLA CONFIGURACIÓN DEL HECHO ACTIVA LA COBERTURA OBLIGATORIA (ART. 168 LEY 100/1993; T-1025/2002)."
+• URGENCIAS: "TRATÁNDOSE DE URGENCIA VITAL, LA SOLA CONFIGURACIÓN DEL HECHO ACTIVA LA COBERTURA OBLIGATORIA (ART. 168 LEY 100/1993; ART. 20 DECRETO 4747/2007)."
 • GENERAL: "LA INTERPRETACIÓN RESTRICTIVA DEL CONTRATO EN PERJUICIO DEL PRESTADOR CONTRARÍA EL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. 1603 C.C., ART. 871 C.CO.)."
 
 ═══════════════ ANCLAJE PROBATORIO (cuando haya PDF con datos) ═══════════════
@@ -1354,7 +1351,7 @@ REFERENCIAS NORMATIVAS APLICABLES SEGÚN MODALIDAD:
 • SERVICIOS NO CONTEMPLADOS EN ANEXO 1: Parágrafo 5 de Cláusula Segunda → resoluciones HUS.
 
 PROHIBICIONES DURAS:
-• NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia) — esto es TARIFAS, no esos temas.
+• NO traigas jurisprudencia de urgencias ni de pertinencia clínica — esto es TARIFAS, no esos temas.
 • Si el pagador es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001, NO cites T-760/2008.
 • NO inventes "CLÁUSULA 12" ni números de parágrafo que no estén en el bloque enriquecido — el
   Quality Gate los detecta como CITA_LITERAL_FALSA y regenera la respuesta.
@@ -1403,10 +1400,10 @@ SYSTEM_CL = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: PERTINENCIA CLÍNICA (CL/PE) ═══════════════
-ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015; T-478/1995). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
+ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
 
 REGLAS:
-• Cita siempre T-478/1995 + Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
+• Cita siempre Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
 • Si hay diagnóstico documentado en PDF, menciónalo genéricamente ("conforme al diagnóstico registrado en historia clínica").
 • Cierra solicitando conciliación de auditoría médica conjunta (Art. 20 Dec. 4747/2007).
 
@@ -1495,7 +1492,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
 
 (A) SI la glosa, el CUPS o los soportes mencionan URGENCIAS/emergencia/
     triage/código azul → ARGUMENTO: la atención de URGENCIAS no requiere
-    autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto
+    autorización previa (Art. 168 Ley 100/1993; Art. 20 Decreto 4747/2007). El Decreto
     4747/2007 Art. 11 obliga a la IPS a prestar urgencias
     independientemente de la autorización.
 
@@ -1515,7 +1512,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
 
 REGLAS:
 • Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → estás en (A): cita el dato clínico como evidencia.
-• Para FF.MM./Dispensario: T-760/2008 NO aplica. T-1025/2002 SÍ es transversal a urgencias.
+• Para FF.MM./Dispensario: T-760/2008 NO aplica. El anclaje de urgencias es el Art. 168 Ley 100/1993 + Art. 20 Decreto 4747/2007.
 • NO digas "FACTURACIÓN" ni "SOPORTES". Es AUTORIZACIÓN.
 • NUNCA describas el servicio como "atención de urgencias" si ese dato no viene en el caso — inventar el supuesto fáctico destruye la defensa en conciliación.
 """
@@ -1537,7 +1534,7 @@ SYSTEM_ME = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: MEDICAMENTOS (ME) ═══════════════
-ARGUMENTO CENTRAL: El medicamento se dispensa bajo fórmula médica del tratante (Art. 17 Ley 1751/2015). La prescripción clínica prevalece sobre criterio administrativo (T-478/1995). Medicamentos no PBS se gestionan ante ADRES, no se glosan a la IPS.
+ARGUMENTO CENTRAL: El medicamento se dispensa bajo fórmula médica del tratante (Art. 17 Ley 1751/2015). La prescripción clínica prevalece sobre criterio administrativo (Art. 17 Ley 1751/2015). Medicamentos no PBS se gestionan ante ADRES, no se glosan a la IPS.
 
 REGLAS:
 • NO inventes nombres comerciales ni concentraciones.
@@ -2330,15 +2327,19 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
 #   dictamen contestó lo mismo.
 #
 # Ninguna de las dos preguntaba por autorización. Pero normas_relevantes_para_
-# codigo() mapea TODA glosa AU a Ley 100 + T-1025 + Decreto 4747, que es el
+# codigo() mapea TODA glosa AU a Ley 100 + Decreto 4747, que es el
 # material de "urgencias sin autorización previa", y el modelo cita lo que
 # tiene delante — la misma lección de la corrección de ARL de esa mañana.
 #
 # No se toca el prompt: se le quita del contexto el material que no viene al
 # caso. Solo se QUITA; nunca se agrega nada que no estuviera.
 _NORMAS_DE_AUTORIZACION = {
-    "SENTENCIA T-1025 DE 2002",
     "DECRETO 4747 DE 2007",
+    # La T-1025/2002 se retiró del sistema el 24-08-2026 (verificada: no trata
+    # de urgencias). Se deja igual en esta lista de descarte: es un filtro, no
+    # una fuente, y si por cualquier camino volviera a aparecer en el contexto
+    # tiene que seguir cayendo cuando la glosa no pregunta por autorización.
+    "SENTENCIA T-1025 DE 2002",
 }
 # Los artículos de la Ley 100 que hablan de urgencias sin orden previa y de
 # las obligaciones de la EPS. Se cuelan por la misma puerta: la norma se

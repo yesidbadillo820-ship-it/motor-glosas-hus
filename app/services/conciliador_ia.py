@@ -84,7 +84,7 @@ _CONTRAARGUMENTOS_PLANTILLA = {
             "titulo": "La EPS dirá: 'no había autorización previa'",
             "respuesta_sugerida": (
                 "Atención por urgencia vital — Art. 168 Ley 100/1993 + "
-                "Sentencia T-1025/2002: las urgencias no requieren "
+                "Art. 168 Ley 100/1993: las urgencias no requieren "
                 "autorización. Mostrar registro de triage."
             ),
         },
@@ -218,7 +218,7 @@ def preparar_audiencia(
         ],
         "AU": [
             "Art. 168 Ley 100/1993 (urgencias)",
-            "Sentencia T-1025/2002 (urgencias sin autorización previa)",
+            "Art. 168 Ley 100/1993 (urgencias sin autorización previa)",
             "Res. 5269/2017 (PBS)",
         ],
         "CL": [

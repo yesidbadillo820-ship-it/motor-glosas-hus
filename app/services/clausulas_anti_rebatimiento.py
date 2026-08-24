@@ -40,7 +40,7 @@ CLAUSULAS_POR_TIPO: dict[str, list[dict]] = {
     "AU": [
         {
             "contra": "La EPS alega que 'no se solicitó autorización previa' pese a ser urgencia.",
-            "preanulacion": "LA AUTORIZACIÓN PREVIA NO CONSTITUYE REQUISITO LEGAL EN LA ATENCIÓN DE URGENCIAS (ART. 168 LEY 100/1993; T-1025/2002), SIENDO LA SOLA CONFIGURACIÓN DEL HECHO VITAL LA QUE ACTIVA LA COBERTURA OBLIGATORIA.",
+            "preanulacion": "LA AUTORIZACIÓN PREVIA NO CONSTITUYE REQUISITO LEGAL EN LA ATENCIÓN DE URGENCIAS (ART. 168 LEY 100/1993; ART. 20 DECRETO 4747/2007), SIENDO LA SOLA CONFIGURACIÓN DEL HECHO VITAL LA QUE ACTIVA LA COBERTURA OBLIGATORIA.",
         },
         {
             "contra": "La EPS argumenta que 'el paciente debió ser remitido a red contratada'.",
@@ -60,7 +60,7 @@ CLAUSULAS_POR_TIPO: dict[str, list[dict]] = {
     "CL": [
         {
             "contra": "La EPS sostiene que 'el procedimiento no era pertinente según guía clínica'.",
-            "preanulacion": "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA QUE NO EXAMINÓ AL PACIENTE (ART. 17 LEY 1751/2015; T-478/1995), LA AUDITORÍA DEBE APORTAR CONTRADICCIÓN CIENTÍFICA CON SUSTENTO CLÍNICO EQUIVALENTE.",
+            "preanulacion": "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA QUE NO EXAMINÓ AL PACIENTE (ART. 17 LEY 1751/2015), LA AUDITORÍA DEBE APORTAR CONTRADICCIÓN CIENTÍFICA CON SUSTENTO CLÍNICO EQUIVALENTE.",
         },
         {
             "contra": "La EPS alega 'falta de indicación clínica' pese a la historia clínica.",
@@ -70,7 +70,7 @@ CLAUSULAS_POR_TIPO: dict[str, list[dict]] = {
     "PE": [
         {
             "contra": "La EPS sostiene que 'el procedimiento no era pertinente según guía clínica'.",
-            "preanulacion": "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA QUE NO EXAMINÓ AL PACIENTE (ART. 17 LEY 1751/2015; T-478/1995).",
+            "preanulacion": "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA QUE NO EXAMINÓ AL PACIENTE (ART. 17 LEY 1751/2015).",
         },
     ],
     "FA": [
@@ -162,7 +162,7 @@ def _clausulas_au_segun_supuesto(texto_glosa: str) -> list[dict]:
     """Bifurcación del SYSTEM_AU aplicada a las cláusulas anti-rebatimiento.
 
     (A) URGENCIAS consta en el texto Y no se declara programado/electivo →
-        cláusulas AU clásicas (urgencia vital, Art. 168 Ley 100; T-1025/2002).
+        cláusulas AU clásicas (urgencia vital, Art. 168 Ley 100).
     (B) Electivo declarado, o supuesto desconocido (texto vacío) → PROHIBIDO
         afirmar urgencias: cláusulas de silencio administrativo positivo.
     """

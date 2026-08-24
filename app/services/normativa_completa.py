@@ -1323,54 +1323,49 @@ JURISPRUDENCIA = {
         ),
         "aplica_a": "EPS del régimen contributivo/subsidiado (NO aplica a Sanidad Militar, PPL, FOMAG, Policía)",
         "keywords": ["T-760", "derecho salud", "EPS", "negación servicios", "riesgo vital"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-1025 DE 2002": {
         "nombre": "Sentencia T-1025 de 2002",
         "corte": "Corte Constitucional",
-        "titulo": "Urgencias sin autorización previa",
-        "ratio": "Las urgencias son de cobertura obligatoria sin requisito de autorización previa. La autorización es administrativa y no puede condicionar la atención vital.",
-        "ratio_literal": "La atención de urgencias no puede estar sometida a requisitos administrativos de autorización previa; la sola configuración del evento vital activa la cobertura obligatoria del sistema.",
-        "extracto_judicial": (
-            "«La atención de urgencias constituye una obligación ineludible de las instituciones "
-            "prestadoras de servicios de salud, independientemente de la capacidad de pago del "
-            "usuario o de la existencia de trámites administrativos previos. La vida y la "
-            "integridad personal son bienes jurídicos que no pueden ser condicionados a "
-            "formalidades que retarden la atención médica inmediata.»"
+        "titulo": "Consentimiento informado en cirugia de asignacion de sexo (menores intersexuales)",
+        "ratio": (
+            "Consentimiento informado del menor para intervenciones altamente invasivas. La Corte "
+            "precisa que estas cirugias NO califican como urgencia. NO trata sobre atencion de "
+            "urgencias sin autorizacion previa. "
         ),
-        "aplica_a": "Urgencias — transversal a todos los regímenes",
-        "keywords": ["T-1025", "urgencias", "autorización", "cobertura obligatoria"],
+        "aplica_a": "No aplicable a glosas de urgencias ni de autorizacion previa",
+        "magistrado_ponente": "Rodrigo Escobar Gil",
+        "keywords": ["T-1025", "consentimiento informado", "menores intersexuales"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-478 DE 1995": {
         "nombre": "Sentencia T-478 de 1995",
         "corte": "Corte Constitucional",
-        "titulo": "Autonomía médica como derecho fundamental",
-        "ratio": "La autonomía del médico tratante es un derecho fundamental protegido. El auditor administrativo no puede invalidar el criterio clínico desde revisión documental.",
-        "ratio_literal": "La autonomía del médico tratante no puede ser sustituida por decisiones administrativas ajenas al ejercicio clínico; el juicio profesional prevalece sobre la auditoría documental.",
-        "extracto_judicial": (
-            "«La relación médico-paciente está amparada por el principio de autonomía profesional, "
-            "el cual constituye una garantía institucional del ejercicio de la medicina. Las "
-            "decisiones terapéuticas adoptadas por el médico tratante, en virtud de su formación "
-            "científica y del conocimiento directo del paciente, no pueden ser revocadas por "
-            "instancias administrativas ajenas al acto médico sin contrapeso científico equivalente.»"
+        "titulo": "Seguridad social y tratamiento asilar de personas con discapacidad psiquica",
+        "ratio": (
+            "Obligaciones del Estado y de las instituciones de salud frente al acceso a servicios "
+            "de personas con enfermedad mental cronica. NO trata sobre autonomia del medico "
+            "tratante. "
         ),
-        "aplica_a": "Glosas de pertinencia clínica (CL/PE)",
-        "keywords": ["T-478", "autonomía médica", "médico tratante", "pertinencia"],
+        "aplica_a": "No aplicable a glosas de pertinencia ni de autonomia medica",
+        "magistrado_ponente": "Alejandro Martinez Caballero",
+        "keywords": ["T-478", "discapacidad psiquica", "tratamiento asilar"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-121 DE 2015": {
         "nombre": "Sentencia T-121 de 2015",
         "corte": "Corte Constitucional",
-        "titulo": "Carácter recomendativo de las Guías de Práctica Clínica (GPC)",
-        "ratio": "Las Guías de Práctica Clínica del Ministerio de Salud tienen carácter recomendativo, no imperativo. La autonomía profesional del médico tratante permite apartarse de ellas cuando las particularidades clínicas del paciente lo justifiquen.",
-        "ratio_literal": "Las guías de práctica clínica constituyen recomendaciones que orientan la decisión médica, pero no la sustituyen. La autonomía profesional del médico tratante permite, e incluso obliga, apartarse de ellas cuando las particularidades del paciente así lo demanden.",
-        "extracto_judicial": (
-            "«Las guías de práctica clínica son instrumentos orientadores, no imperativos, "
-            "que reconocen la naturaleza individual de cada paciente. La medicina no es una "
-            "ciencia algorítmica; el médico tratante, con la información clínica del caso "
-            "concreto, conserva la potestad de adoptar la decisión más adecuada para la "
-            "salud del paciente, aún cuando esta difiera de la recomendación general.»"
+        "titulo": "Autorizacion de procedimientos quirurgicos ordenados al menor (epispadias)",
+        "ratio": (
+            "La EPS debe autorizar los procedimientos ordenados por el medico tratante cuando el "
+            "servicio se requiere con necesidad. NO trata sobre las Guias de Practica Clinica ni "
+            "sobre su caracter recomendativo. "
         ),
-        "aplica_a": "Glosas CL0103 (no acorde a GPC) — defiende la autonomía sobre la recomendación",
-        "keywords": ["T-121", "GPC", "guías de práctica clínica", "recomendativo", "autonomía"],
+        "aplica_a": "Autorizacion de servicios ordenados por el tratante",
+        "magistrado_ponente": "Luis Guillermo Guerrero Perez",
+        "keywords": ["T-121", "autorizacion", "medico tratante", "menor"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-171 DE 2018": {
         "nombre": "Sentencia T-171 de 2018",
@@ -1380,70 +1375,90 @@ JURISPRUDENCIA = {
         "ratio_literal": "La auditoría administrativa carece de potestad para negar procedimientos médicamente indicados cuando no aporta contradicción científica con sustento clínico equivalente al del médico tratante.",
         "aplica_a": "Defensa de pertinencia clínica y servicios especializados",
         "keywords": ["T-171", "pertinencia", "autoridad médica"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-134 DE 2022": {
         "nombre": "Sentencia T-134 de 2022",
         "corte": "Corte Constitucional",
         "titulo": "Oportunidad en prestación de servicios de salud",
         "ratio": "Las demoras administrativas en autorizaciones o pagos violan el derecho fundamental a la salud. Las EPS no pueden trasladar su ineficiencia a pacientes o prestadores.",
-        "ratio_literal": "Las EPS no pueden trasladar al prestador ni al paciente las cargas derivadas de su propia ineficiencia administrativa en trámites de autorización o pago.",
         "aplica_a": "Glosas administrativas que trasladan cargas indebidas a la IPS",
         "keywords": ["T-134", "oportunidad", "demoras administrativas"],
+        "verificada": False,
     },
     "SENTENCIA T-050 DE 2017": {
         "nombre": "Sentencia T-050 de 2017",
         "corte": "Corte Constitucional",
         "titulo": "Atención integral y continuidad del tratamiento",
         "ratio": "Los pacientes tienen derecho a recibir atención continua sin interrupciones por cambios de EPS o trámites administrativos. El prestador que garantizó continuidad debe ser remunerado íntegramente.",
-        "ratio_literal": "La continuidad en la prestación de servicios de salud no puede ser interrumpida por trámites administrativos entre entidades del sistema, y quien la garantiza tiene derecho al reconocimiento íntegro.",
         "aplica_a": "Continuidad de tratamiento, oncología, crónicos",
         "keywords": ["T-050", "continuidad", "atención integral"],
+        "verificada": False,
     },
     # ─── Ronda 50 Paso 11: ampliación jurisprudencia ─────────────────────
     "SENTENCIA T-235 DE 1998": {
         "nombre": "Sentencia T-235 de 1998",
         "corte": "Corte Constitucional",
-        "titulo": "Historia clínica como prueba de la prestación",
-        "ratio": "La historia clínica institucional constituye plena prueba de los actos médicos realizados. La EPS no puede negar el pago alegando ausencia de soporte cuando la HC documenta la atención.",
-        "ratio_literal": "La historia clínica documenta de manera fehaciente la prestación efectiva del servicio y por sí misma constituye plena prueba para efectos del reconocimiento económico.",
-        "aplica_a": "Glosas SO0101, SO0102 (soportes faltantes) cuando la HC sí documenta",
-        "keywords": ["T-235", "historia clínica", "soportes", "plena prueba", "1995/1999"],
+        "titulo": "Participacion politica — exclusion de listas electorales universitarias",
+        "ratio": (
+            "Derechos de participacion en elecciones internas de una universidad publica. NO trata "
+            "de salud, ni de historia clinica, ni de prestacion de servicios. "
+        ),
+        "aplica_a": "Ninguna glosa de salud — materia ajena",
+        "magistrado_ponente": "Fabio Moron Diaz",
+        "keywords": ["T-235", "participacion politica"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA SU-480 DE 1997": {
         "nombre": "Sentencia SU-480 de 1997",
         "corte": "Corte Constitucional (Sala Plena)",
-        "titulo": "Atención inicial de urgencias sin autorización",
-        "ratio": "La sala plena unificó: la atención inicial de urgencias es obligatoria sin autorización previa. Cualquier exigencia administrativa previa que retrase la atención es inconstitucional.",
-        "ratio_literal": "Ningún requisito formal previo, incluyendo la autorización de la entidad pagadora, puede oponerse a la atención inicial de urgencias.",
-        "aplica_a": "Urgencias — autoridad de unificación (vincula a todas las salas)",
-        "keywords": ["SU-480", "urgencias", "unificación", "sala plena", "autorización previa"],
+        "titulo": "Medicamentos no incluidos en el POS (antirretrovirales, VIH/sida)",
+        "ratio": (
+            "La EPS debe entregar el medicamento prescrito por el medico tratante aunque no figure "
+            "en el listado, cuando esta de por medio la vida del paciente, y puede repetir contra "
+            "el Estado. NO trata sobre atencion inicial de urgencias. "
+        ),
+        "aplica_a": "Cobertura de medicamentos fuera del listado",
+        "magistrado_ponente": "Alejandro Martinez Caballero",
+        "keywords": ["SU-480", "medicamentos no POS", "antirretrovirales"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-313 DE 2007": {
         "nombre": "Sentencia T-313 de 2007",
         "corte": "Corte Constitucional",
         "titulo": "Autorización tácita por silencio administrativo",
         "ratio": "Si la EPS no responde la solicitud de autorización en el plazo legal, opera el silencio positivo: el servicio queda autorizado y la EPS está obligada al pago íntegro sin glosa por autorización.",
-        "ratio_literal": "El silencio administrativo en materia de autorizaciones de salud opera a favor del usuario y del prestador, generando derechos plenamente exigibles.",
         "aplica_a": "Glosas AU0101, AU0201 cuando hubo solicitud sin respuesta dentro del plazo",
         "keywords": ["T-313", "silencio positivo", "autorización tácita", "plazo respuesta"],
+        "verificada": False,
     },
     "SENTENCIA T-642 DE 2008": {
         "nombre": "Sentencia T-642 de 2008",
         "corte": "Corte Constitucional",
-        "titulo": "Flujo de recursos y pago oportuno a IPS",
-        "ratio": "Las EPS deben pagar a los prestadores en los términos del art. 13 Ley 1122/2007. El retraso injustificado vulnera el derecho a la salud porque pone en riesgo la sostenibilidad de la red prestadora.",
-        "ratio_literal": "El pago oportuno a la red prestadora es condición esencial para la garantía del derecho fundamental a la salud, y su retraso o negación injustificada compromete la responsabilidad de la entidad responsable del pago.",
-        "aplica_a": "Defensa frente a glosas usadas como herramienta dilatoria de pago",
-        "keywords": ["T-642", "pago oportuno", "flujo recursos", "Ley 1122 art 13"],
+        "titulo": "Transporte, alojamiento y manutencion para el tratamiento de un menor",
+        "ratio": (
+            "La EPS debe sufragar los gastos de desplazamiento y hospedaje del paciente para "
+            "acceder al tratamiento. NO trata sobre flujo de recursos ni sobre el pago oportuno de "
+            "la EPS a la IPS. "
+        ),
+        "aplica_a": "Gastos de acceso al tratamiento del paciente",
+        "magistrado_ponente": "Nilson Pinilla Pinilla",
+        "keywords": ["T-642", "transporte", "alojamiento"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-053 DE 2009": {
         "nombre": "Sentencia T-053 de 2009",
         "corte": "Corte Constitucional",
-        "titulo": "Inadmisibilidad de glosas injustificadas",
-        "ratio": "La formulación de glosas sin sustento técnico-jurídico configura abuso del derecho y mala fe contractual. La EPS debe motivar cada glosa con base normativa y probatoria suficiente.",
-        "ratio_literal": "Las objeciones a la facturación deben ser técnicamente sustentadas; las formuladas sin motivación adecuada constituyen abuso del derecho y vulneran el principio de buena fe contractual (Art. 871 C. Comercio).",
-        "aplica_a": "Glosas FA injustificadas, glosas sin fundamento normativo o probatorio",
-        "keywords": ["T-053", "glosas injustificadas", "buena fe", "abuso del derecho", "Art. 871"],
+        "titulo": "Tratamiento integral a persona con paralisis cerebral y epilepsia",
+        "ratio": (
+            "El tratamiento integral no se agota en el suministro de medicamentos: comprende todos "
+            "los servicios e insumos relacionados con la patologia. NO trata sobre glosas de la EPS "
+            "a la IPS. "
+        ),
+        "aplica_a": "Atencion integral al paciente",
+        "magistrado_ponente": "Humberto Antonio Sierra Porto",
+        "keywords": ["T-053", "tratamiento integral", "paralisis cerebral"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "CONSEJO_ESTADO_2018_00154": {
         "nombre": "Consejo de Estado, Sec. Tercera, Rad. 2018-00154",
@@ -1917,15 +1932,21 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
             "CIRCULAR 030 DE 2013",
             "RESOLUCION 2284 DE 2023",
         ],
-        "AU": ["LEY 100 DE 1993", "SENTENCIA T-1025 DE 2002", "DECRETO 4747 DE 2007"],
+        # T-1025/2002 se retiro el 24-08-2026: verificada contra la relatoria de la
+        # Corte, trata de consentimiento informado en cirugia de asignacion de sexo,
+        # no de urgencias. El anclaje correcto de urgencias es el Art. 168 de la
+        # Ley 100 y el Art. 20 del Decreto 4747, que ya estaban aqui.
+        "AU": ["LEY 100 DE 1993", "DECRETO 4747 DE 2007"],
         "CO": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-760 DE 2008"],
         "CL": [
             "LEY 1751 DE 2015",
-            "SENTENCIA T-478 DE 1995",
+            # T-478/1995 se retiro el 24-08-2026: verificada, trata de seguridad
+            # social de personas con discapacidad psiquica, no de autonomia medica.
+            # El anclaje correcto es el Art. 17 de la Ley 1751, que ya estaba aqui.
             "SENTENCIA T-171 DE 2018",
             "RESOLUCION 1995 DE 1999",
         ],
-        "PE": ["LEY 1751 DE 2015", "SENTENCIA T-478 DE 1995", "RESOLUCION 1995 DE 1999"],
+        "PE": ["LEY 1751 DE 2015", "SENTENCIA T-171 DE 2018", "RESOLUCION 1995 DE 1999"],
         "FA": [
             "LEY 100 DE 1993",
             "RESOLUCION 1995 DE 1999",
@@ -1937,6 +1958,6 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
             "CODIGO DE COMERCIO - ARTICULO 871",
             "RESOLUCION 5269 DE 2017",
         ],
-        "ME": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-478 DE 1995"],
+        "ME": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017"],
     }
     return mapping.get(prefijo, ["LEY 100 DE 1993", "RESOLUCION 2284 DE 2023"])

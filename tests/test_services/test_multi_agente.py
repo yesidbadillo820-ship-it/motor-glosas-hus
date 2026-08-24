@@ -16,21 +16,35 @@ class TestAgenteJuridico:
         assert "871" in joined
         assert "1602" in joined
 
-    def test_ta_evita_t1025_y_t478(self):
+    def test_ta_avisa_que_no_traiga_urgencias_ni_pertinencia(self):
+        """En una glosa de TARIFA, la jurisprudencia de urgencias y la de
+        autonomía médica no vienen al caso y el agente debe advertirlo.
+
+        Antes esta prueba fijaba dos sentencias por su número (T-1025 y
+        T-478). El 24-08-2026 esas dos se retiraron del sistema: verificadas
+        contra la relatoría de la Corte, ninguna trata del tema que se les
+        atribuía. La advertencia sigue siendo la misma, así que la prueba
+        ahora fija lo que importa —el tema— y no el número de la sentencia.
+        """
         r = agente_juridico("TA0201", "NUEVA EPS", "Inicial")
-        joined = " ".join(r["evitar"])
-        assert "T-1025" in joined or "1025" in joined
-        assert "T-478" in joined or "478" in joined
+        joined = " ".join(r["evitar"]).lower()
+        assert "urgencia" in joined
+        assert "autonomía médica" in joined or "autonomia medica" in joined
 
     def test_so_incluye_1995(self):
         r = agente_juridico("SO0101", "COOSALUD", "Inicial")
         joined = " ".join(r["normas_primarias"])
         assert "1995" in joined
 
-    def test_au_cita_t1025(self):
+    def test_au_trae_el_anclaje_de_urgencias(self):
+        """En una glosa de AUTORIZACIÓN el agente tiene que dar el respaldo
+        de que la urgencia no exige autorización previa. Ese respaldo es hoy
+        el Art. 20 del Decreto 4747/2007 (antes se citaba la T-1025/2002,
+        retirada el 24-08-2026 por no tratar de urgencias)."""
         r = agente_juridico("AU0101", "COMPENSAR", "Inicial")
-        joined = " ".join(r["jurisprudencia"])
-        assert "T-1025" in joined or "1025" in joined
+        joined = " ".join(r["jurisprudencia"]).lower()
+        assert "4747" in joined
+        assert "urgencia" in joined
 
     def test_fomag_evita_t760(self):
         r = agente_juridico("TA0201", "FOMAG", "Inicial")

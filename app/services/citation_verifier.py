@@ -863,7 +863,7 @@ def verificar_citas(
                     "severidad": "MEDIA",
                     "cita": f"Sentencia {sala.upper()}-{num}/{anio}",
                     "detalle": "Sentencia no incluida en el corpus jurisprudencial.",
-                    "sugerencia": "Verifica que la sentencia exista o reemplaza por una conocida (ej: T-760/2008, T-1025/2002).",
+                    "sugerencia": "Verifica que la sentencia exista o reemplaza por una verificada (ej: T-760/2008).",
                 }
             )
 
