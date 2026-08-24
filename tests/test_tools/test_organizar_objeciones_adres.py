@@ -627,3 +627,244 @@ def test_sin_hoja_de_glosas_avisa_claro(tmp_path):
     vacio = _libro(tmp_path, "VACIO.xlsx", {"Hoja1": [["A", "B"], [1, 2]]})
     with pytest.raises(ValueError, match="No encontré"):
         org.leer_adres(vacio)
+
+
+# ─── Cuadre contra el reporte de reclamaciones del ADRES ─────────────────────
+
+CAB_RECLAM = [
+    "Nit",
+    "Nombre Entidad",
+    "Código Habilitación",
+    "Fecha Radicación Consolidado",
+    "Número Consolidado",
+    "Fecha Radicación",
+    "Número de Radicación",
+    "Descripción tipo Aprobación",
+    "Número de Factura",
+    "Tipo Doc. Victima",
+    "Número Doc. Victima",
+    "Apellidos de la Victima",
+    "Nombres de la Víctima",
+    "Naturaleza del Evento",
+    "Fecha Evento",
+    "Valor Reclamado",
+    "Valor Aprobado",
+    "Valor Glosado",
+    "Paquete",
+    "Estado reclamación",
+    "Fecha Devolución",
+    "Tipo de Extemporaneidad",
+]
+
+
+def reclamacion(factura, reclamado, aprobado, glosado, paquete="31068"):
+    return [
+        "900006037",
+        "E.S.E. HOSPITAL UNIVERSITARIO",
+        "680010079201",
+        "01/12/2025",
+        "503044",
+        "02/12/2025",
+        "14344247",
+        "En Trámite",
+        factura,
+        "Cedula de ciudadanía",
+        "13444921",
+        "PEREZ",
+        "JUAN",
+        "Accidente de tránsito",
+        "14/02/2025",
+        reclamado,
+        aprobado,
+        glosado,
+        paquete,
+        "Gestion de Pago",
+        None,
+        "Reclamacion Normal",
+    ]
+
+
+def _adres_fila(factura, cod, vglos, codnum="3106", clasif="SOPORTES", desc="Servicio"):
+    return org.FilaAdres(
+        factura=factura,
+        cod_elemento=cod,
+        descripcion=desc,
+        codigo_glosa=codnum,
+        clasificacion=clasif,
+        cantidad=1,
+        valor_reclamado=vglos,
+        valor_glosado=vglos,
+    )
+
+
+def test_conciliar_quita_el_renglon_que_repite_el_total_de_la_reclamacion():
+    """El caso HUS0000311371: el detalle suma el glosado, y además el ADRES mete
+    una fila por cada causal de reclamación con el valor COMPLETO."""
+    filas = [
+        _adres_fila("HUS1", "A", 600),
+        _adres_fila("HUS1", "B", 400),
+        _adres_fila("HUS1", "", 1000, codnum="2102"),  # repite todo
+        _adres_fila("HUS1", "", 1000, codnum="2103"),  # repite todo otra vez
+    ]
+    c = org.conciliar_factura(filas, 1000)
+    assert round(sum(f.valor_glosado for f in c.filas)) == 1000
+    assert [m for _, m in c.quitadas] == [org.REV_REPITE_TOTAL] * 2
+    assert c.ajuste == 0
+
+
+def test_conciliar_quita_duplicados_empezando_por_el_mayor():
+    filas = [
+        _adres_fila("HUS1", "A", 600),
+        _adres_fila("HUS1", "A", 600),  # duplicado
+        _adres_fila("HUS1", "B", 400),
+        _adres_fila("HUS1", "B", 400),  # duplicado
+    ]
+    c = org.conciliar_factura(filas, 1000)
+    assert round(sum(f.valor_glosado for f in c.filas)) == 1000
+    assert len(c.quitadas) == 2
+
+
+def test_conciliar_nunca_se_baja_del_valor_reportado():
+    """Quitar de más sería objetar menos de lo que el ADRES glosó."""
+    filas = [_adres_fila("HUS1", "A", 600), _adres_fila("HUS1", "A", 600)]
+    c = org.conciliar_factura(filas, 1000)
+    assert c.filas == filas  # quitar uno dejaría 600 < 1000: no se quita
+    assert c.ajuste == 200  # queda la diferencia, para ajustarla a la vista
+
+
+def test_conciliar_no_toca_la_factura_que_ya_cuadra():
+    filas = [_adres_fila("HUS1", "A", 600), _adres_fila("HUS1", "B", 400)]
+    c = org.conciliar_factura(filas, 1000)
+    assert c.filas == filas and not c.quitadas and c.ajuste == 0
+
+
+def test_conciliar_sin_reporte_no_hace_nada():
+    filas = [_adres_fila("HUS1", "A", 600)]
+    assert org.conciliar_factura(filas, 0).filas == filas
+
+
+def test_la_factura_queda_sumando_exactamente_lo_que_reporta_el_adres():
+    filas = [
+        _adres_fila("HUS0000000001", "A", 600),
+        _adres_fila("HUS0000000001", "A", 600),
+        _adres_fila("HUS0000000001", "B", 400),
+    ]
+    recl = {"HUS0000000001": org.Reclamacion(factura="HUS1", glosado=1000)}
+    conv = org.construir_registros(filas, {}, {}, fecha=HOY, reclamaciones=recl)
+    assert sum(int(r["CROVALOBJ"]) for r in conv.registros) == 1000
+    # el duplicado sobraba: se quita, y no hace falta deformar ningún valor
+    assert len(conv.registros) == 2
+    assert any(r.motivo == org.REV_DUPLICADO for r in conv.revisiones)
+    assert not any(r.motivo == org.REV_AJUSTE_REPORTE for r in conv.revisiones)
+
+
+def test_el_cuadre_manda_sobre_el_tope_de_dgh():
+    """Si el guardián de DGH recorta un renglón, la factura seguiría descuadrada.
+    Por eso el cuadre se hace de último, sobre los valores ya definitivos."""
+    fila = _adres_fila("HUS0000000001", "873420", 200000, desc="Radiografia")
+    dgh = {
+        "HUS0000000001": [
+            org.LineaDgh(slnserpro="873420", desc_institucional="RADIOGRAFIA", valor=95400)
+        ]
+    }
+    recl = {"HUS0000000001": org.Reclamacion(factura="HUS1", glosado=95400)}
+    conv = org.construir_registros([fila], dgh, {}, fecha=HOY, reclamaciones=recl)
+    assert sum(int(r["CROVALOBJ"]) for r in conv.registros) == 95400
+
+
+def test_el_ajuste_se_reparte_si_no_cabe_en_el_renglon_mayor():
+    filas = [_adres_fila("HUS0000000001", str(n), 100) for n in range(5)]
+    recl = {"HUS0000000001": org.Reclamacion(factura="HUS1", glosado=250)}
+    conv = org.construir_registros(filas, {}, {}, fecha=HOY, reclamaciones=recl)
+    valores = [int(r["CROVALOBJ"]) for r in conv.registros]
+    assert sum(valores) == 250
+    assert min(valores) >= 0  # nunca un valor negativo
+
+
+def test_la_factura_que_no_esta_en_el_reporte_queda_avisada():
+    fila = _adres_fila("HUS0000000009", "A", 500)
+    recl = {"HUS0000000001": org.Reclamacion(factura="HUS1", glosado=1000)}
+    conv = org.construir_registros([fila], {}, {}, fecha=HOY, reclamaciones=recl)
+    assert any(r.motivo == org.REV_FACTURA_SIN_REPORTE for r in conv.revisiones)
+    assert int(conv.registros[0]["CROVALOBJ"]) == 500  # no se toca
+
+
+def test_el_crdobserv_muestra_el_valor_ya_ajustado():
+    filas = [_adres_fila("HUS0000000001", "A", 1000)]
+    recl = {"HUS0000000001": org.Reclamacion(factura="HUS1", glosado=700)}
+    registro = org.construir_registros(filas, {}, {}, fecha=HOY, reclamaciones=recl).registros[0]
+    assert registro["CROVALOBJ"] == 700
+    assert registro["CRDOBSERV"].endswith("$700")
+
+
+# ─── Que ningún renglón quede sin código de servicio ─────────────────────────
+
+
+def test_servicio_principal_es_el_que_mas_plata_suma():
+    lineas = [
+        org.LineaDgh(slnserpro="A", desc_institucional="CHICO", valor=100),
+        org.LineaDgh(slnserpro="B", desc_institucional="GRANDE", valor=500),
+        org.LineaDgh(slnserpro="A", desc_institucional="CHICO", valor=100),
+    ]
+    assert org.servicio_principal(lineas).slnserpro == "B"
+
+
+def test_servicio_principal_sin_lineas_es_none():
+    assert org.servicio_principal([]) is None
+    assert org.servicio_principal([org.LineaDgh(slnserpro="", valor=10)]) is None
+
+
+def test_completar_servicios_no_deja_ningun_campo_vacio():
+    filas = [
+        _adres_fila("HUS0000000001", "873420", 100, desc="Radiografia"),  # cruza
+        _adres_fila("HUS0000000001", "NO-EXISTE", 100, desc="Algo raro"),  # no cruza
+        _adres_fila("HUS0000000001", "", 100, desc=""),  # sin servicio
+    ]
+    dgh = {
+        "HUS0000000001": [
+            org.LineaDgh(slnserpro="873420", desc_institucional="RADIOGRAFIA", valor=100),
+            org.LineaDgh(slnserpro="105M01", desc_institucional="INTERNACION UCI", valor=900),
+        ]
+    }
+    conv = org.construir_registros(filas, dgh, {}, fecha=HOY, completar_servicios=True)
+    assert all(r["SLNSERPRO"] for r in conv.registros)
+    assert conv.asignados == 2
+    asignadas = [r for r in conv.revisiones if r.motivo == org.REV_SERVICIO_ASIGNADO]
+    assert len(asignadas) == 2  # los dos quedan listados, ninguno pasa callado
+
+
+def test_sin_completar_servicios_el_campo_sigue_vacio():
+    """El comportamiento de siempre: lo que no cruza NO se rellena solo."""
+    filas = [_adres_fila("HUS0000000001", "", 100, desc="")]
+    dgh = {"HUS0000000001": [org.LineaDgh(slnserpro="105M01", valor=900)]}
+    conv = org.construir_registros(filas, dgh, {}, fecha=HOY)
+    assert conv.registros[0]["SLNSERPRO"] is None
+    assert conv.asignados == 0
+
+
+def test_leer_reporte_reclamaciones(tmp_path):
+    """El encabezado no está en la primera fila: encima va la fila de totales."""
+    ruta = _libro(
+        tmp_path,
+        "REPORTE.xlsx",
+        {
+            "Hoja1": [
+                [None] * 15 + [2553743739, 1906835186, 646908551.95] + [None] * 4,
+                CAB_RECLAM,
+                reclamacion("HUS379512", 670000, 670000, 0),
+                reclamacion("HUS378595", 7927655, 5694855, 2232800),
+                reclamacion("HUS999999", 100, 0, 100, paquete="31069"),
+            ]
+        },
+    )
+    recl = org.leer_reporte_reclamaciones(ruta, paquete="31068")
+    assert set(recl) == {"HUS0000379512", "HUS0000378595"}  # el otro paquete queda fuera
+    assert recl["HUS0000378595"].glosado == 2232800
+    assert recl["HUS0000378595"].extemporaneidad == "Reclamacion Normal"
+    assert recl["HUS0000379512"].glosado == 0
+
+
+def test_reporte_que_no_es_el_del_adres_avisa_claro(tmp_path):
+    otro = _libro(tmp_path, "OTRO.xlsx", {"Hoja1": [["A", "B"], [1, 2]]})
+    with pytest.raises(ValueError, match="no parece el reporte de reclamaciones"):
+        org.leer_reporte_reclamaciones(otro)

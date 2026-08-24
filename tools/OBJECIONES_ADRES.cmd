@@ -76,7 +76,18 @@ if not exist "%HOM%" (
   exit /b 2
 )
 
-set /p "PAQUETE=  4) Numero de paquete (Enter = todos): "
+set /p "REP=  4) ReporteReclamPAQUETE del ADRES: "
+set "REP=%REP:"=%"
+if not exist "%REP%" (
+  echo [ERROR] No existe ese archivo: %REP%
+  echo         Sin el, las objeciones no se pueden cuadrar con lo que
+  echo         el ADRES reporta como glosado.
+  echo.
+  pause
+  exit /b 2
+)
+
+set /p "PAQUETE=  5) Numero de paquete (Enter = todos): "
 set "PAQUETE=%PAQUETE:"=%"
 
 REM --- 4) Carpeta de salida, al lado del Excel del ADRES ---------------
@@ -87,10 +98,11 @@ echo ------------------------------------------------------------
 echo   Generando en: %DESTINO%
 echo ------------------------------------------------------------
 echo.
+set "COMUN=--adres "%ADRES%" --dgh "%DGH%" --homologador "%HOM%" --reporte-reclamaciones "%REP%" --completar-servicios --salida "%DESTINO%""
 if defined PAQUETE (
-  %PYEXE% "%MOTOR%" --adres "%ADRES%" --dgh "%DGH%" --homologador "%HOM%" --salida "%DESTINO%" --paquete "%PAQUETE%"
+  %PYEXE% "%MOTOR%" %COMUN% --paquete "%PAQUETE%"
 ) else (
-  %PYEXE% "%MOTOR%" --adres "%ADRES%" --dgh "%DGH%" --homologador "%HOM%" --salida "%DESTINO%"
+  %PYEXE% "%MOTOR%" %COMUN%
 )
 if errorlevel 1 (
   echo.
@@ -105,9 +117,11 @@ echo ------------------------------------------------------------
 echo   1. Abra REVISAR_OBJECIONES_ADRES.xlsx, hoja CODIGOS: el ADRES
 echo      usa codigos numericos (3106, 3209...) y DGH los de seis del
 echo      Manual Unico (SO3401, CL0101...). Complete la equivalencia.
-echo   2. Mire la hoja REVISAR: ahi estan los renglones sin codigo de
-echo      servicio, con el candidato mas parecido.
-echo   3. Haga el piloto de UNA factura antes del cargue masivo.
+echo   2. Mire la hoja REVISAR: ahi estan los renglones con codigo de
+echo      servicio ASIGNADO (no homologado), los que se quitaron por
+echo      repetidos y los valores que se ajustaron para cuadrar.
+echo   3. Verifique arriba que las facturas cuadren con el reporte del ADRES.
+echo   4. Haga el piloto de UNA factura antes del cargue masivo.
 echo.
 pause
 exit /b 0
