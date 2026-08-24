@@ -2074,6 +2074,57 @@ def _neutralizar_art_168_fuera_de_contexto(
     return nuevo
 
 
+# Un renglón del "FUNDAMENTO NORMATIVO" es una NORMA solo si se puede ir a
+# buscar: ley, decreto, resolución, circular, acuerdo, sentencia, artículo de
+# código, o la Constitución. Todo lo demás es una frase.
+# El número puede venir separado por una o dos palabras: «CIRCULAR EXTERNA
+# 047», «RESOLUCIÓN CONJUNTA 3047», «SENTENCIA T-760». Sin ese margen se
+# descartaban normas de verdad; con más, entraría cualquier frase larga que
+# tenga un número suelto al final.
+_ES_NORMA_CITABLE = re.compile(
+    r"(?:LEY|DECRETO|RESOLUCI[ÓO]N|CIRCULAR|ACUERDO|SENTENCIA|ORDENANZA|"
+    r"MANUAL|ANEXO|CONSTITUCI[ÓO]N|ART[ÍI]CULOS?|ARTS?\.)"
+    r"(?:\s+[A-ZÁÉÍÓÚÑ]{2,12}){0,2}"
+    r"[\s:.-]*[A-Z]{0,3}-?\s?\d",
+    re.IGNORECASE,
+)
+
+
+def _solo_normas_citables(normas_clave: str | None) -> str:
+    """Deja en el FUNDAMENTO NORMATIVO solo lo que de verdad es una norma.
+
+    POR QUÉ (24-08-2026). Una auditoría independiente de nueve dictámenes
+    encontró impreso, bajo el título «3 normas más relevantes», el renglón:
+
+        LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD
+
+    Eso no es una norma: no tiene ley, decreto ni artículo, y nadie puede ir a
+    verificarlo. Sale de una defensa que SÍ funciona —cuando la glosa no es de
+    urgencias, el motor reemplaza la cita del Art. 168 Ley 100 por esa frase
+    neutra para no citar una norma inaplicable— pero la frase se colaba a la
+    lista de normas, donde parece una cita y no lo es.
+
+    La lista iba de la IA al HTML sin ningún filtro. Acá se separa: los
+    renglones citables se conservan tal cual; los demás se descartan. Si no
+    queda ninguno, se devuelve vacío y el bloque entero no se pinta — es
+    preferible no mostrar fundamento a mostrar uno que no se puede verificar.
+    """
+    if not normas_clave:
+        return ""
+    citables = [
+        renglon.strip()
+        for renglon in normas_clave.split("|")
+        if renglon.strip() and _ES_NORMA_CITABLE.search(renglon)
+    ]
+    descartadas = len([r for r in normas_clave.split("|") if r.strip()]) - len(citables)
+    if descartadas:
+        logger.warning(
+            f"[FUNDAMENTO-NORMATIVO] {descartadas} renglón(es) descartado(s) por no "
+            f"ser una norma citable: {normas_clave[:200]}"
+        )
+    return " | ".join(citables)
+
+
 def _neutralizar_art_177_relleno(
     dictamen: str,
     texto_glosa: str | None = None,
@@ -9355,6 +9406,29 @@ class GlosaService:
         contrato = a_mayusculas_html(contrato) if contrato else contrato
         tarifa = a_mayusculas_html(tarifa) if tarifa else tarifa
         normas_clave = a_mayusculas_html(normas_clave) if normas_clave else normas_clave
+        # Solo lo que de verdad es una norma llega al FUNDAMENTO NORMATIVO.
+        normas_clave = _solo_normas_citables(normas_clave)
+
+        # ── El valor objetado dice la verdad, no «$ 0.00» ──────────────────
+        #
+        # 24-08-2026, auditoría independiente: en 5 de 9 dictámenes la celda
+        # VALOR OBJETADO decía «$ 0.00» —porque el texto pegado no traía
+        # cifra— y aun así el dictamen afirmaba «GLOSA NO ACEPTADA · SUBSANADA
+        # EN SU TOTALIDAD» con el mismo tono de seguridad que un caso con
+        # cifra clara. Un documento que se radica ante la EPS diciendo que se
+        # objetan cero pesos es un documento que se cae solo.
+        #
+        # No se inventa una cifra: se escribe lo único cierto —que el valor
+        # está en el expediente— que es la misma frase que el motor ya usa
+        # cuando la IA intenta alucinar un monto.
+        _valor_txt = str(valor or "").strip()
+        _sin_cifra = _valor_txt in ("", "$ 0.00", "$0.00", "$ 0", "$0", "0")
+        if _sin_cifra:
+            valor = "VALOR EN EL EXPEDIENTE"
+            logger.warning(
+                "[VALOR-OBJETADO-VACIO] el dictamen se generó sin cifra objetada; "
+                "la celda dice «VALOR EN EL EXPEDIENTE» en vez de «$ 0.00»"
+            )
         colores = {
             "TA_TARIFA": "#1e40af",
             "SO_SOPORTES": "#7c3aed",
