@@ -56,14 +56,24 @@ class TestElAutodespliegueEncuentraGit:
         assert "%GIT%" not in t, "volvió la ruta guardada en una variable"
 
     def test_las_ordenes_de_git_siguen_escritas_igual(self):
+        """Git se llama por su nombre, nunca por una ruta absoluta: es lo que
+        hace que agregarlo al camino de búsqueda sirva de algo.
+
+        El `fetch` ya no va suelto —desde el 24-08 corre con tope de tiempo,
+        porque una pasada colgada en GitHub dejó al hospital con la versión
+        vieja durante horas— pero se sigue invocando igual: `git`.
+        """
         t = _bot()
         for orden in (
-            "git fetch origin motor-glosas",
             "git rev-parse HEAD",
             "git rev-parse origin/motor-glosas",
             "git reset --hard origin/motor-glosas",
         ):
             assert orden in t, f"se perdió `{orden}`"
+        assert "-FilePath 'git'" in t and "'fetch','origin','motor-glosas'" in t, (
+            "el fetch dejó de llamar a git por su nombre: con una ruta absoluta, "
+            "el arreglo del camino de búsqueda deja de servir"
+        )
 
     def test_si_no_aparece_lo_dice_en_vez_de_callarse(self):
         t = _bot()
