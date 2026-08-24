@@ -1501,7 +1501,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
     que fue urgencias. Defensa correcta para electivos:
     • La solicitud de autorización fue radicada y la entidad no respondió
       en los plazos de la Res. 2284/2023 → opera la autorización por
-      SILENCIO ADMINISTRATIVO POSITIVO (T-313/2007) — SOLO si el caso
+      SILENCIO ADMINISTRATIVO POSITIVO — SOLO si el caso
       trae datos de la solicitud; si no, exige los soportes.
     • La falta de autorización NO exime del pago de servicios
       efectivamente prestados con pertinencia médica (la autorización es

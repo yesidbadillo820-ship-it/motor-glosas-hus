@@ -162,3 +162,68 @@ class TestElMotorYaNoLasOfreceComoMunicion:
         prompts = io.open("app/services/glosa_ia_prompts.py", encoding="utf-8").read()
         assert "Art. 17 Ley 1751/2015" in prompts, "se perdió el anclaje de autonomía médica"
         assert "Art. 168 Ley 100/1993" in prompts, "se perdió el anclaje de urgencias"
+
+
+class TestNoSeCitaJurisprudenciaSinVerificar:
+    """Regla general, más allá de las siete de aquel día.
+
+    Tres sentencias (T-313/2007, T-050/2017 y T-134/2022) no se pudieron abrir
+    en el sitio de la Corte: la página las sirve por JavaScript y devuelve solo
+    el encabezado. Quedaron marcadas como NO verificadas y sin cita literal.
+
+    Mientras no estén verificadas no pueden ir en el texto que se radica ante la
+    EPS. Con siete de diez verificadas resultando equivocadas, dar por buena una
+    que nadie contrastó sería repetir el error a propósito. La T-313/2007 sí
+    estaba en una cláusula armada y en el prompt: se le quitó el número y quedó
+    la doctrina con su anclaje verificable, la Resolución 2284 de 2023.
+    """
+
+    TEXTOS_QUE_ARGUMENTAN = [
+        "app/services/glosa_ia_prompts.py",
+        "app/services/clausulas_anti_rebatimiento.py",
+        "app/services/salud_total_service.py",
+        "app/services/multi_agente.py",
+        "app/services/conciliador_ia.py",
+        "app/services/analizador_motivo_eps.py",
+        "app/services/predictor_glosas.py",
+        "app/services/normativa_grafo.py",
+    ]
+
+    @staticmethod
+    def _numeros_sin_verificar() -> set:
+        """Ej. {'T-313/2007'} → cómo se escriben en el texto del motor."""
+        sin_verificar = set()
+        for clave, datos in SENTENCIAS.items():
+            # Solo las que SE REVISARON y no se pudieron confirmar. Una entrada
+            # sin la marca todavía no se ha mirado, que es distinto: acusarla
+            # aquí sería tratar «no revisada» como «falsa», y eso no es lo que
+            # se sabe. A medida que se verifiquen, cada una queda con su fecha
+            # (si se confirma) o con False (si no se pudo abrir el texto).
+            if datos.get("verificada") is not False:
+                continue
+            # "SENTENCIA T-313 DE 2007" → "T-313/2007" y "T-313"
+            partes = clave.replace("SENTENCIA ", "").split(" DE ")
+            if len(partes) == 2:
+                sin_verificar.add(partes[0].strip())
+        return sin_verificar
+
+    def test_hay_tres_sin_verificar_y_estan_marcadas(self):
+        assert self._numeros_sin_verificar() >= {"T-313", "T-050", "T-134"}
+
+    @pytest.mark.parametrize("ruta", TEXTOS_QUE_ARGUMENTAN)
+    def test_ningun_texto_del_motor_cita_una_sin_verificar(self, ruta):
+        import io
+
+        contenido = io.open(ruta, encoding="utf-8").read()
+        malos = []
+        for numero in self._numeros_sin_verificar():
+            for renglon in contenido.split("\n"):
+                if renglon.strip().startswith("#"):
+                    continue
+                if numero in renglon:
+                    malos.append(f"{numero}: {renglon.strip()[:90]}")
+        assert not malos, (
+            f"{ruta} cita jurisprudencia que nadie verificó contra el texto "
+            f"oficial: {malos[:3]}. Verifíquela y marque «verificada» en el "
+            "corpus, o quite el número y deje la doctrina con su norma."
+        )
