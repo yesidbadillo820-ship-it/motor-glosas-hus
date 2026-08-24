@@ -113,6 +113,33 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     if fila:
         return fila
 
+    # 1b) El mismo CUPS con o sin el cero de adelante (24-08-2026).
+    #
+    # Excel guarda los CUPS como número y se come el cero inicial: 010101
+    # queda 10101. En el Excel de POSITIVA entraron así 4.742 tarifas, y como
+    # esta búsqueda compara texto EXACTO, una glosa que llega con 010101 no
+    # encontraba la tarifa guardada como 10101 — el motor decía «sin tarifa
+    # pactada» teniéndola. Se reintenta con la otra forma del mismo código;
+    # solo dígitos, para no tocar códigos con letra (890283H) ni compuestos.
+    variantes = set()
+    if cups.isdigit():
+        if len(cups) == 5:
+            variantes.add(cups.zfill(6))
+        if len(cups) == 6 and cups.startswith("0"):
+            variantes.add(cups.lstrip("0"))
+    for otra in variantes:
+        candidatos = (
+            db.query(TarifaContratadaRecord)
+            .filter(TarifaContratadaRecord.activa == 1)
+            .filter(TarifaContratadaRecord.codigo_cups == otra)
+            .order_by(TarifaContratadaRecord.creado_en.desc())
+            .limit(20)
+            .all()
+        )
+        fila = _resolver_por_eps(candidatos)
+        if fila:
+            return fila
+
     # 2) Match por codigo_ips — misma estrategia
     fila = (
         db.query(TarifaContratadaRecord)

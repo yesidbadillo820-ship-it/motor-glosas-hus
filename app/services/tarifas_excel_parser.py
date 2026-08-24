@@ -630,30 +630,49 @@ def _parsear_simple_fijo(
     idx_desc = _indice_columna(
         headers, "DESCRIPCION CUPS", "DESCRIPCION IPS", "DESCRIPCION", "DESCRIPCIÓN", "NOMBRE"
     )
-    idx_valor = _indice_columna(
-        headers,
-        # 06-08-2026 — va de PRIMERA: en la hoja UVB de FAMISANAR conviven
-        # "VALOR UVB 2026" (el de referencia) y "PROPUESTA FINAL" (ese mismo
-        # menos el 5% del contrato, que es el que se pacta). Si gana el de
-        # referencia, el motor defiende con una tarifa 5% más alta que la
-        # pactada y la glosa se ratifica.
-        "PROPUESTA FINAL",
-        "PRECIO DE REFERENCIA",
-        "TARIFA UNITARIA",
-        "VALOR PACTADO",
-        "VALOR UNITARIO",
-        "PRECIO UNITARIO",
-        # Ronda 46: soporte para tarifarios con año en el header (DMBUG, HUS)
-        "TARIFA 2025",
-        "TARIFA 2026",
-        "VALOR 2025",
-        "VALOR 2026",
-        "TARIFA 2024",
-        "VALOR 2024",
-        "VALOR",
-        "PRECIO",
-        "TARIFA",
+    # 24-08-2026 — LA COLUMNA DEL DESCUENTO PACTADO GANA SIEMPRE.
+    # El caso POSITIVA: la hoja SOAT trae «VALOR 2025» (el SOAT pleno) y
+    # «SOAT -15%» (lo pactado en el Otrosí 03). La lista de alias conocía
+    # VALOR 2025 y no conocía SOAT -15%, así que el motor cargó 4.742
+    # tarifas con el SOAT pleno: $915.051 donde lo pactado era $777.793.
+    # Con eso, cada dictamen de tarifas defendería un valor 15% más alto
+    # que el contrato — la glosa se ratifica y el dictamen es falso.
+    # Es la misma trampa ya documentada abajo con la hoja UVB de FAMISANAR,
+    # solo que aquella tenía alias y esta no: un encabezado «BASE ± N%» es
+    # SIEMPRE el pactado cuando convive con la base sola.
+    idx_valor = None
+    patron_descuento = re.compile(
+        r"(?:^|\s)(SOAT|ISS|UVR|UVB|UVT)\s*[-+\u2212\u2013]\s*\d{1,3}\s*%"
     )
+    for i_desc, h_desc in enumerate(headers):
+        if h_desc and patron_descuento.search(h_desc):
+            idx_valor = i_desc
+            break
+    if idx_valor is None:
+        idx_valor = _indice_columna(
+            headers,
+            # 06-08-2026 — va de PRIMERA: en la hoja UVB de FAMISANAR conviven
+            # "VALOR UVB 2026" (el de referencia) y "PROPUESTA FINAL" (ese mismo
+            # menos el 5% del contrato, que es el que se pacta). Si gana el de
+            # referencia, el motor defiende con una tarifa 5% más alta que la
+            # pactada y la glosa se ratifica.
+            "PROPUESTA FINAL",
+            "PRECIO DE REFERENCIA",
+            "TARIFA UNITARIA",
+            "VALOR PACTADO",
+            "VALOR UNITARIO",
+            "PRECIO UNITARIO",
+            # Ronda 46: soporte para tarifarios con año en el header (DMBUG, HUS)
+            "TARIFA 2025",
+            "TARIFA 2026",
+            "VALOR 2025",
+            "VALOR 2026",
+            "TARIFA 2024",
+            "VALOR 2024",
+            "VALOR",
+            "PRECIO",
+            "TARIFA",
+        )
     idx_modalidad = _indice_columna(
         headers,
         "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
@@ -674,6 +693,16 @@ def _parsear_simple_fijo(
         if not cups_raw:
             continue
         cups = str(cups_raw).strip()
+        if cups.endswith(".0"):
+            cups = cups[:-2]
+        # 24-08-2026 — Excel guarda el CUPS como número y se come el cero de
+        # adelante: 010101 queda 10101. El sistema guarda y busca los CUPS a
+        # 6 dígitos (comparación exacta de texto), así que un CUPS de 5 se
+        # vuelve invisible para el lookup. Solo 5 dígitos: los capítulos
+        # reales del CUPS van del 01 al 09; a un código de 4 no le falta UN
+        # cero, y rellenarlo inventaría un código.
+        if cups.isdigit() and len(cups) == 5:
+            cups = cups.zfill(6)
         if not _es_codigo_cups_valido(cups):
             continue
         valor = _normalizar_valor(_celda(fila, idx_valor))
@@ -987,6 +1016,8 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
         except Exception:
             pass
 
+    filas_total = _resolver_repetidos(filas_total, errores)
+
     return {
         "eps": meta_global["eps"],
         "contrato": meta_global["contrato"],
@@ -996,3 +1027,49 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
         "hojas_detectadas": hojas_detectadas,
         "errores": errores,
     }
+
+
+def _resolver_repetidos(filas: list[dict], errores: list[str]) -> list[dict]:
+    """Un mismo código con DOS valores distintos no se carga: se omite y se avisa.
+
+    POR QUÉ (24-08-2026, el Excel de POSITIVA). El mismo CUPS aparecía varias
+    veces —dentro de la hoja SOAT con homólogos distintos, y también repetido
+    entre la hoja SOAT y la INSTITUCIONALES— con valores que no coinciden
+    (103204 traía CINCO valores, de $94.399 a $1.926.567). Antes se cargaban
+    TODAS las filas y el lookup se quedaba con la más reciente: un valor
+    elegido por orden de llegada, no por el contrato. Un dictamen que cita una
+    tarifa elegida al azar es un dictamen falso.
+
+    La regla del proyecto es no inventar: si el archivo trae dos valores para
+    el mismo código, este parser no sabe cuál rige — lo decide el auditor.
+    Se omite el código, se deja UNA línea por código en `errores` con sus
+    valores, y el motor dirá «sin tarifa pactada» para ese CUPS, que es la
+    verdad. Los repetidos con el MISMO valor sí se cargan (una sola vez):
+    repetir no es contradecirse.
+    """
+    from collections import OrderedDict
+
+    por_codigo: "OrderedDict[str, list[dict]]" = OrderedDict()
+    for f in filas:
+        por_codigo.setdefault(f.get("codigo_cups") or "", []).append(f)
+
+    limpias: list[dict] = []
+    conflictos: list[str] = []
+    for codigo, grupo in por_codigo.items():
+        valores = sorted({f["valor_pactado"] for f in grupo})
+        if len(valores) == 1:
+            limpias.append(grupo[0])
+            continue
+        pintados = " / ".join(f"${v:,.0f}".replace(",", ".") for v in valores)
+        conflictos.append(f"{codigo}: {pintados}")
+
+    if conflictos:
+        MOSTRAR = 40
+        errores.append(
+            f"{len(conflictos)} códigos vienen con VALORES DISTINTOS en el "
+            f"archivo y NO se cargaron (el contrato debe decir cuál rige; "
+            f"cargarlos al azar produce dictámenes falsos): "
+            + " · ".join(conflictos[:MOSTRAR])
+            + (f" · … y {len(conflictos) - MOSTRAR} más" if len(conflictos) > MOSTRAR else "")
+        )
+    return limpias
