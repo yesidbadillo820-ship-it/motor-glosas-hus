@@ -6602,6 +6602,26 @@ marcar cuál valor rige (más una celda con fórmula dañada: el 512104 dice
 la pantalla de Tarifas desde las 4:12 p. m. — el cargador sin clave funcionó
 tras corregirle la traducción del campo.
 
+### 24-08 (tarde) — El botón invisible destapó siete colores fantasma
+
+Yesid reportó que el botón «Aplicar a las marcadas» —el del lote de glosas
+ADRES— salía **en blanco, invisible**: letra blanca sobre fondo blanco.
+
+La causa: el botón pedía su color a un token que **no existe** en el portal
+(`--primary`, inventado al escribir la función). Sin token, el fondo queda
+transparente y el botón desaparece.
+
+Al barrer el archivo completo aparecieron **siete tokens fantasma en 65
+sitios**: textos grises que pedían `--text-3` cuando el real es `--text3`,
+fondos que pedían `--bg2` cuando el real es `--bg-card`, bordes y esquinas
+igual. Todo eso se estaba pintando con el color heredado por accidente, no
+con el del diseño — se veía «casi bien», que es la peor clase de mal.
+
+Los 65 sitios quedaron apuntando a la paleta real, y quedó una prueba que
+recorre el archivo entero: **cualquier color que pida un token inexistente
+pone la construcción en rojo**. El botón del caso tiene además su prueba con
+nombre propio.
+
 ## 3) PENDIENTE
 
 ### Notas crédito del Dispensario (nuevo, 24-08)
