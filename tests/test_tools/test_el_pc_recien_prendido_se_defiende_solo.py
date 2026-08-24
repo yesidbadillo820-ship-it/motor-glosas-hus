@@ -62,20 +62,44 @@ class TestLasEsperasAguantanElArranqueDelPC:
                 f"consume el equipo entero."
             )
 
-    def test_las_esperas_siguen_durando_mas_o_menos_lo_mismo(self):
+    def test_los_bucles_de_reintento_esperan_lo_de_siempre(self):
         """`ping -n N` manda N paquetes con un segundo entre uno y otro: la
-        espera real son N-1 segundos. Cambiar el método no puede cambiar los
-        tiempos que ya estaban pensados."""
+        espera real son N-1 segundos.
+
+        El vigilante y el túnel reintentan cada 5 segundos, y eso no cambió.
+        El autodespliegue es otra cosa y se comprueba aparte: dejó de esperar
+        un tiempo fijo y ahora pregunta repetidamente."""
         esperados = {
             "servidor_motor_local.cmd": [5, 5],
             "tunel_motor_local.cmd": [5],
-            "autodeploy_motor_local.cmd": [12, 15],
         }
         for ruta in SIN_SESION:
+            if ruta.name not in esperados:
+                continue
             n = [int(x) for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1 >nul", _texto(ruta))]
             assert [x - 1 for x in n] == esperados[ruta.name], (
                 f"{ruta.name}: las esperas quedaron en {[x - 1 for x in n]} segundos"
             )
+
+    def test_el_autodespliegue_le_da_al_motor_tiempo_de_arrancar(self):
+        """El motor del hospital carga una base de 133 MB. Con una espera fija
+        de 12 segundos se daba por muerto estando vivo, y se arrancaba un
+        SEGUNDO motor encima del que estaba subiendo: los dos peleaban por el
+        puerto y el registro decía «ALERTA: el motor sigue caido» con el portal
+        funcionando. Pasó el 24-08 a las 9:22.
+
+        Lo que se cuida es el plazo TOTAL antes de darlo por muerto, no cada
+        pausa suelta."""
+        t = _texto(TOOLS / "autodeploy_motor_local.cmd")
+        pausa = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1 >nul", t)]
+        vueltas = [int(x) for x in re.findall(r"%INTENTOS%\s+(?:GEQ|LSS)\s+(\d+)", t)]
+        assert pausa and vueltas, "el autodespliegue ya no pregunta repetidamente"
+        total = min(pausa) * min(vueltas)
+        assert total >= 60, (
+            f"solo espera {total} segundos antes de dar el motor por muerto: "
+            f"con una base de 133 MB eso alcanza para declararlo caído estando "
+            f"vivo y levantarle otro encima."
+        )
 
     def test_explica_por_que_no_usa_timeout(self):
         """Sin la explicación, el próximo que lea el archivo lo 'arregla' de
