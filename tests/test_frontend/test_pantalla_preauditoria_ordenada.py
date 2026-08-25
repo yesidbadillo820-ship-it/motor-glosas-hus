@@ -139,3 +139,40 @@ assert.strictEqual(mensajeError(null, 500), 'Error 500');
 
     def test_el_recuadro_no_deja_escribir_mas_de_la_cuenta(self):
         assert 'id="au-obs" rows="4" maxlength="4000"' in _texto()
+
+
+class TestElChipDelEnvioNoInventa:
+    """25-08-2026: los envíos que entraron por la importación del consolidado
+    histórico quedaron con «traía 0 facturas» —el Excel no lo decía— y el chip
+    pintaba «226945(1/0)» o «226943(0)» en oficios que sí tenían facturas."""
+
+    def test_sin_dato_muestra_lo_que_hay(self, tmp_path):
+        if not shutil.which("node"):  # pragma: no cover
+            pytest.skip("node no está instalado en este entorno")
+        cuerpo = _bloques()[0]
+        m = re.search(r"function cuentaEnvio\(e\)\{.*?\n\}", cuerpo, re.S)
+        assert m, "no existe la función que arma la cuenta del chip"
+        prueba = (
+            m.group(0)
+            + """
+const assert = require('assert');
+// El caso que se vio en pantalla: el registro no sabe cuántas traía.
+assert.strictEqual(cuentaEnvio({envio:'226943', total_facturas:0, en_este_oficio:0}), '0');
+assert.strictEqual(cuentaEnvio({envio:'226945', total_facturas:0, en_este_oficio:1}), '1',
+  'con el registro en cero seguía inventando un "1/0"');
+// Lo normal no cambia.
+assert.strictEqual(cuentaEnvio({envio:'232638', total_facturas:1, en_este_oficio:1}), '1');
+assert.strictEqual(cuentaEnvio({envio:'232619', total_facturas:1, en_este_oficio:0}), '0/1');
+"""
+        )
+        archivo = tmp_path / "chip.js"
+        archivo.write_text(prueba, encoding="utf-8")
+        r = subprocess.run(
+            ["node", str(archivo)], capture_output=True, text=True, timeout=60, errors="replace"
+        )
+        assert r.returncode == 0, r.stderr[:700]
+
+    def test_la_ventana_del_oficio_usa_la_misma_regla(self):
+        t = _texto()
+        assert "var sinDato=(!e.total_facturas || e.total_facturas<=0);" in t
+        assert "var completo=sinDato || (hay===e.total_facturas);" in t
