@@ -96,9 +96,18 @@ class TestNoSeRompioLaRedDeSeguridad:
         assert "ALERTA: el motor sigue caido" in _texto()
 
     def test_sigue_esperando_a_que_arranque_antes_de_juzgar(self):
-        """Preguntar de inmediato daría un falso negativo."""
-        esperas = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1", _texto())]
-        assert esperas and max(esperas) >= 10
+        """Preguntar de inmediato daría un falso negativo.
+
+        Ya no es una pausa larga de una sola vez: se pregunta cada pocos
+        segundos hasta un tope. Lo que se cuida es el plazo TOTAL, porque el
+        24-08 se vio que 12 segundos no le alcanzan a un motor que carga una
+        base de 133 MB — se daba por muerto estando vivo, y se le arrancaba un
+        segundo encima."""
+        t = _texto()
+        pausa = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1", t)]
+        vueltas = [int(x) for x in re.findall(r"%INTENTOS%\s+(?:GEQ|LSS)\s+(\d+)", t)]
+        assert pausa and vueltas, "ya no pregunta repetidamente"
+        assert min(pausa) * min(vueltas) >= 60
 
     def test_sigue_bajando_de_la_rama_del_hospital(self):
         assert "origin/motor-glosas" in _texto()

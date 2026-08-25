@@ -2476,3 +2476,245 @@ class TestDeshacerLoSuyo:
         puede, motivo = s.puede_revertir(huerfana, "CLAUDIA", False)
         assert puede is False
         assert "otra persona" in motivo
+
+
+# ------------------------------------------------------------------
+# El oficio del que la factura YA SALIÓ (caso real 21-08-2026)
+# ------------------------------------------------------------------
+
+
+class TestOficioQueYaCumplio:
+    """La factura entró aquí, se devolvió, salió en el oficio de devolución y
+    reingresó en el oficio siguiente. El oficio viejo pedía «resuélvala allá y
+    vuelva a escribir el envío aquí» —cuando ya no hay nada que hacer— y encima
+    se quedaba en rojo para siempre."""
+
+    def _escenario(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 3285631)])
+        _subir_dgreport(client, [F1])
+        viejo = _crear_oficio(client, radicado="FHUS-AS-I01196-26", fecha="2026-07-15T08:30")
+        _escribir(client, viejo["id"], ENV)
+        _devolver(client, _factura_id(client, F1), motivo="Adjuntar historia clínica")
+        dev = client.post(f"/preauditoria/oficios/{viejo['id']}/oficio-devolucion").json()
+        nuevo = _crear_oficio(client, radicado="FHUS-AS-I01212-26", fecha="2026-07-22T08:30")
+        _escribir(client, nuevo["id"], ENV)  # reingresa: la factura se muda
+        return viejo, nuevo, dev
+
+    def test_el_aviso_dice_que_ya_siguio_su_camino(self, client):
+        viejo, nuevo, dev = self._escenario(client)
+        ficha = client.get(f"/preauditoria/oficios/{viejo['id']}").json()
+        falta = ficha["envios_escritos"][0]["faltantes"][0]
+        assert falta["factura"] == F1
+        assert falta["cerrado"] is True
+        assert "ya pasó por este oficio" in falta["motivo"]
+        assert dev["consecutivo"] in falta["motivo"]
+        assert "FHUS-AS-I01212-26" in falta["motivo"]
+        # …y NO le pide al auditor que la vuelva a escribir aquí.
+        assert "vuelva a escribir el envío aquí" not in falta["motivo"]
+
+    def test_el_oficio_vacio_queda_completado_y_no_en_rojo(self, client):
+        viejo, _nuevo, _dev = self._escenario(client)
+        ficha = client.get(f"/preauditoria/oficios/{viejo['id']}").json()
+        assert ficha["total_facturas"] == 0
+        assert ficha["semaforo"]["estado"] == "COMPLETADO"
+
+    def test_un_oficio_recien_registrado_sigue_corriendo_su_plazo(self, client):
+        """El que nunca ha tenido facturas no está cumplido: le falta trabajar."""
+        o = _crear_oficio(client, radicado="FHUS-AS-I01300-26", fecha="2026-07-15T08:30")
+        ficha = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        assert ficha["total_facturas"] == 0
+        assert ficha["semaforo"]["estado"] != "COMPLETADO"
+
+    def test_la_que_nunca_entro_sigue_pidiendo_accion(self, client):
+        """Contraste: si la factura jamás pasó por el oficio, el aviso sí pide
+        resolverla en el otro oficio."""
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        a = _crear_oficio(client, radicado="FHUS-AS-I01188-26")
+        _escribir(client, a["id"], ENV)  # la factura queda abierta aquí
+        b = _crear_oficio(client, radicado="FHUS-AS-I01190-26", fecha="2026-07-22T08:30")
+        _escribir(client, b["id"], ENV)  # aquí no entra: sigue abierta en A
+        ficha = client.get(f"/preauditoria/oficios/{b['id']}").json()
+        falta = ficha["envios_escritos"][0]["faltantes"][0]
+        assert falta["cerrado"] is False
+        assert "resuélvala allá" in falta["motivo"]
+        assert ficha["semaforo"]["estado"] != "COMPLETADO"
+
+
+# ------------------------------------------------------------------
+# ADRES devuelve el PAQUETE completo (regla de Cartera, 25-08-2026)
+# ------------------------------------------------------------------
+
+NIT_ADRES = "901037916"
+ENT_ADRES = "ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD"
+
+
+def _rad_adres(envio, factura, valor=250700):
+    return _rad_fila(envio, factura, valor, nit=NIT_ADRES, entidad=ENT_ADRES)
+
+
+class TestPaqueteAdresDevuelto:
+    """ADRES no devuelve facturas sueltas: devuelve el paquete completo, así
+    tenga facturas que pre-auditoría ya había dado por buenas. Esas tienen que
+    poder volver a entrar. Para las demás entidades, una radicada NO se mueve."""
+
+    def _radicada(self, client, filas, radicado="FHUS-AS-I01300-26"):
+        _subir_radicacion(client, filas)
+        _subir_dgreport(client, [f[1] for f in filas])
+        o = _crear_oficio(client, radicado=radicado, fecha="2026-07-20T08:30")
+        _escribir(client, o["id"], ENV)
+        for f in filas:
+            _radicar(client, _factura_id(client, f[1]))
+        return o
+
+    def test_la_radicada_de_adres_vuelve_a_entrar(self, client):
+        a = self._radicada(client, [_rad_adres(ENV, F1)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        r = _escribir(client, b["id"], ENV)
+        assert r.status_code == 200, r.text
+        assert r.json()["reingresos_adres"] == 1
+        assert r.json()["omitidas"] == 0
+
+        ficha = client.get(f"/preauditoria/oficios/{b['id']}").json()
+        assert [f["factura"] for f in ficha["facturas"]] == [F1]
+        suya = ficha["facturas"][0]
+        assert suya["resultado"] == "PENDIENTE"
+        assert suya["estado"] == "EN_SUBSANACION"
+        assert suya["ronda"] == 2
+        # …y salió del oficio viejo.
+        assert client.get(f"/preauditoria/oficios/{a['id']}").json()["total_facturas"] == 0
+
+    def test_no_le_gasta_el_cupo_de_las_tres_devoluciones(self, client):
+        """Ese contador es de las devoluciones que hace pre-auditoría a
+        facturación. Que ADRES nos devuelva el paquete no es una devolución
+        nuestra: si contara, tres paquetes devueltos bloquearían la factura."""
+        self._radicada(client, [_rad_adres(ENV, F1)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        _escribir(client, b["id"], ENV)
+        d = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert d["num_devoluciones"] == 0
+
+    def test_la_de_otra_entidad_sigue_sin_poder_moverse(self, client):
+        """La regla vieja se conserva para todas las demás: es la que evita
+        que una factura ya radicada se cobre dos veces."""
+        a = self._radicada(client, [_rad_fila(ENV, F1, 250700)])  # AXA COLPATRIA
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        r = _escribir(client, b["id"], ENV).json()
+        assert r["reingresos_adres"] == 0
+        assert r["omitidas"] == 1
+        assert any("ya estaba radicada" in a for a in r["advertencias"])
+        assert client.get(f"/preauditoria/oficios/{b['id']}").json()["total_facturas"] == 0
+        assert client.get(f"/preauditoria/oficios/{a['id']}").json()["total_facturas"] == 1
+
+    def test_ver_antes_lo_anuncia_antes_de_cargar(self, client):
+        self._radicada(client, [_rad_adres(ENV, F1)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        p = client.get(f"/preauditoria/oficios/{b['id']}/envios/{ENV}/preview").json()
+        assert p["reingresos_adres"] == 1
+        assert p["ya_radicadas"] == 0  # ya no se cuenta como "no va a entrar"
+        assert [f["clasificacion"] for f in p["facturas"]] == ["REINGRESO_ADRES"]
+
+    def test_el_historial_deja_dicho_que_fue_por_adres(self, client):
+        self._radicada(client, [_rad_adres(ENV, F1)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        _escribir(client, b["id"], ENV)
+        eventos = client.get(f"/preauditoria/facturas/{F1}/historial").json()["eventos"]
+        ultimo = eventos[-1]
+        assert ultimo["tipo"] == "REINGRESO"  # el tipo NO cambia: el registro de envíos lo cuenta
+        assert "ADRES devolvió el paquete completo" in (ultimo["motivo"] or "")
+        assert "FHUS-AS-I01300-26" in (ultimo["motivo"] or "")
+
+    def test_al_quitar_el_envio_la_factura_vuelve_a_RADICADA(self, client, db_session):
+        """Y no a «devuelta»: nadie la devolvió nunca."""
+        _actuar_como_admin(db_session)
+        a = self._radicada(client, [_rad_adres(ENV, F1)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        _escribir(client, b["id"], ENV)
+        r = client.delete(f"/preauditoria/oficios/{b['id']}/envios/{ENV}")
+        assert r.status_code == 200, r.text
+        d = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert d["resultado"] == "RADICAR"
+        assert d["estado"] == "RADICADA"
+        assert d["oficio_fhus"] == a["numero_radicado"]
+        assert d["motivo_devolucion"] in (None, "")
+
+    def test_al_quitar_la_factura_con_la_papelera_pasa_lo_mismo(self, client, db_session):
+        _actuar_como_admin(db_session)
+        self._radicada(client, [_rad_adres(ENV, F1)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        _escribir(client, b["id"], ENV)
+        fid = _factura_id(client, F1)
+        r = client.delete(f"/preauditoria/oficios/{b['id']}/facturas/{fid}")
+        assert r.status_code == 200, r.text
+        d = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert d["resultado"] == "RADICAR"
+        assert d["estado"] == "RADICADA"
+
+    def test_envio_con_facturas_de_adres_y_de_otra_entidad(self, client):
+        """Caso borde real: en un mismo envío entra una de ADRES y una de otra
+        entidad. Solo la de ADRES vuelve."""
+        a = self._radicada(client, [_rad_adres(ENV, F1), _rad_fila(ENV, F2, 120000)])
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        r = _escribir(client, b["id"], ENV).json()
+        assert r["reingresos_adres"] == 1
+        assert r["omitidas"] == 1
+        facturas_b = client.get(f"/preauditoria/oficios/{b['id']}").json()["facturas"]
+        assert [f["factura"] for f in facturas_b] == [F1]
+        facturas_a = client.get(f"/preauditoria/oficios/{a['id']}").json()["facturas"]
+        assert [f["factura"] for f in facturas_a] == [F2]
+
+    def test_una_devuelta_de_adres_sigue_reingresando_como_subsanacion(self, client):
+        """No se rompió el camino normal: una ADRES devuelta reingresa como
+        subsanación y SÍ cuenta su devolución."""
+        _subir_radicacion(client, [_rad_adres(ENV, F1)])
+        _subir_dgreport(client, [F1])
+        a = _crear_oficio(client, radicado="FHUS-AS-I01300-26", fecha="2026-07-20T08:30")
+        _escribir(client, a["id"], ENV)
+        _devolver(client, _factura_id(client, F1), motivo="Falta FURIPS")
+        b = _crear_oficio(client, radicado="FHUS-AS-I01301-26", fecha="2026-07-24T08:30")
+        r = _escribir(client, b["id"], ENV).json()
+        assert r["reingresos"] == 1
+        assert r["reingresos_adres"] == 0
+        d = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
+        assert d["num_devoluciones"] == 1
+
+
+class TestObservacionLarga:
+    """25-08-2026: al pegar el mensaje de error de ADRES SIA (larguísimo) en la
+    observación, el servidor lo rechazaba y la pantalla mostraba
+    «[object Object]». Ni se guardaba, ni se entendía por qué."""
+
+    def _pendiente(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        o = _crear_oficio(client, radicado="FHUS-AS-I01400-26")
+        _escribir(client, o["id"], ENV)
+        return _factura_id(client, F1)
+
+    def test_cabe_el_mensaje_de_error_de_adres(self, client):
+        fid = self._pendiente(client)
+        texto = (
+            "ERROR EN ADRES SIA *Verificando el cumplimiento de requisitos mínimos, no es "
+            "posible realizar la radicación debido a que el documento Formulario Único de "
+            "Reclamaciones - FUR no fue anexado o el nombre del archivo no cumple con la "
+            "nomenclatura establecida. " * 12
+        )
+        assert 2000 < len(texto) <= 4000
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": texto, "observaciones": texto},
+        )
+        assert r.status_code == 200, r.text
+        assert (
+            client.get(f"/preauditoria/facturas/{F1}/historial")
+            .json()["actual"]["motivo_devolucion"]
+            .startswith("ERROR EN ADRES SIA")
+        )
+
+    def test_pero_el_tope_sigue_existiendo(self, client):
+        fid = self._pendiente(client)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": "x" * 4100},
+        )
+        assert r.status_code == 422

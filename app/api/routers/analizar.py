@@ -1020,6 +1020,27 @@ async def analizar(
         f"eps={eps} | tono={tono} | modo={modo_respuesta}"
     )
 
+    # ── El selector y el texto tienen que hablar de la misma EPS ──────────
+    #
+    # 24-08-2026. Una auditoría independiente encontró el defecto más caro de
+    # nueve dictámenes: el selector había quedado en POSITIVA de un caso
+    # anterior, el texto pegado decía «EPS: PPL», y el motor defendió a PPL
+    # CITANDO EL CONTRATO DE POSITIVA. Pasó dos veces en el mismo lote.
+    #
+    # Se corta antes de gastar un solo token: un dictamen con el contrato de
+    # otra entidad no es un dictamen flojo, es uno falso, y se radica ante la
+    # EPS como un error del hospital.
+    from app.services.eps_del_texto import choque_de_eps, mensaje_de_choque
+
+    _eps_texto = choque_de_eps(eps, tabla_excel)
+    if _eps_texto:
+        logger.warning(
+            f"[{req_id}] [EPS-CRUZADA] selector={eps!r} vs texto={_eps_texto!r} — "
+            f"análisis detenido antes de generar el dictamen"
+        )
+        _publicar_progreso(_tid, "error", {"detalle": "EPS del selector no coincide"})
+        raise HTTPException(status_code=400, detail=mensaje_de_choque(eps, _eps_texto))
+
     try:
         data = GlosaInput(
             eps=eps,

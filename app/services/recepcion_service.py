@@ -1044,17 +1044,39 @@ class RecepcionService:
 
         # factura -> causal, para encontrarlas desde `por_gestor`
         por_factura: dict[str, str] = {}
+        # factura -> médica que lleva la glosa (columna PROFESIONAL(MEDICO) del
+        # Excel). Se saca de la MISMA consulta que ya se está haciendo: no hay
+        # una segunda vuelta a la base.
+        medico_por_factura: dict[str, str] = {}
         for g in self.db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all():
             dato = mayor.get(g.id)
-            if dato and g.factura:
-                por_factura[str(g.factura).strip().upper()] = dato[1]
+            clave_fac = str(g.factura).strip().upper() if g.factura else ""
+            if dato and clave_fac:
+                por_factura[clave_fac] = dato[1]
+            if clave_fac and getattr(g, "profesional_medico", None):
+                medico_por_factura[clave_fac] = str(g.profesional_medico).strip()
 
         for glosas in (resumen.por_gestor or {}).values():
             for item in glosas:
-                cod = por_factura.get(str(item.get("factura") or "").strip().upper())
+                clave_fac = str(item.get("factura") or "").strip().upper()
+                cod = por_factura.get(clave_fac)
                 if not cod:
                     continue
                 item["causal"] = cod
+                # LA MÉDICA NO SE PIERDE AL REHACER EL PLAN (25-08-2026).
+                #
+                # Acá el plan se vuelve a armar con la causal, y antes se le
+                # pasaba `profesional_medico=None`: eso borraba el nombre que
+                # SÍ se había leído del Excel unas líneas antes y que sí queda
+                # guardado en la glosa.
+                #
+                # No era cosmético. El correo de recepción usa ese campo para
+                # saber a qué doctora mandarle sus glosas: sin nombre, la lista
+                # de médicas salía vacía y a las auditoras NO les llegaba nada.
+                # Se vio el 25-08 con el lote de 117 glosas: los seis gestores
+                # recibieron su correo y las tres médicas no, aunque doce
+                # glosas venían marcadas «Mixta» o «Medico» con su nombre en la
+                # columna PROFESIONAL(MEDICO).
                 item["plan"] = _plan_de(
                     codigo_glosa=cod,
                     tipo_glosa=item.get("tipo_glosa"),
@@ -1062,7 +1084,7 @@ class RecepcionService:
                     dias_radicacion=None,
                     estado=item.get("estado"),
                     valor=item.get("valor"),
-                    profesional_medico=None,
+                    profesional_medico=medico_por_factura.get(clave_fac),
                 )
                 # No se pierden los avisos que ya se habían calculado con los
                 # datos de la hoja de resumen (días de radicación, médico).

@@ -34,6 +34,7 @@ NUNCA rompe el dictamen principal: se anota el código como no procesado.
 
 import logging
 import os
+import re
 
 from app.services.quality_gate_adapter import (
     ejecutar_con_quality_gate,
@@ -283,6 +284,67 @@ def _sanitizar_argumento(
         return texto
 
 
+# ── A cada código, SU valor ────────────────────────────────────────────────
+#
+# POR QUÉ (24-08-2026). El dictamen GL-206 (PPL) respondió una glosa con dos
+# códigos. El texto decía:
+#
+#     «TA2902 $150.000 por tarifa Y ADEMÁS SO3401 $80.000 por falta de epicrisis»
+#
+# El motor extrae UN SOLO valor para toda la glosa —el primero que aparece— y
+# se lo entrega a todas las secciones con la orden «copia ese número exacto».
+# Así que la respuesta del SO3401 salió impresa diciendo «RESPECTO DEL VALOR
+# OBJETADO DE $ 150.000», que es la plata del OTRO código. Los $80.000 no
+# aparecieron en ninguna parte del documento, y el total «a defender» de la
+# pantalla tampoco los sumó.
+#
+# LA REGLA ES ESTRECHA A PROPÓSITO. Repartir plata adivinando es peor que no
+# repartirla: si al SO3401 se le cuelga el monto equivocado, el hospital radica
+# una cifra falsa. Por eso solo se reparte cuando el texto no deja lugar a duda,
+# y ante la menor sombra se devuelve vacío y todo sigue como antes.
+
+
+def valores_por_codigo(texto_glosa: str, codigos: list[str]) -> dict[str, str]:
+    """Reparte los montos del texto entre los códigos, solo si es evidente.
+
+    Devuelve {} —y entonces no se cambia nada— salvo que se cumpla TODO:
+
+      · cada código aparece en el texto;
+      · ningún monto queda ANTES del primer código (un monto al frente suele
+        ser el total de la glosa, no el de un código);
+      · hay al menos dos montos y a cada código le toca EXACTAMENTE UNO en su
+        tramo, contando desde su código hasta el siguiente;
+      · los montos son distintos entre sí (si se repiten, lo más probable es
+        que sea un único valor global escrito varias veces).
+    """
+    if not texto_glosa or len(codigos) < 2:
+        return {}
+
+    posiciones: list[tuple[int, str]] = []
+    for codigo in codigos:
+        m = re.search(r"\b" + re.escape(codigo) + r"\b", texto_glosa, re.IGNORECASE)
+        if not m:
+            return {}  # falta un código en el texto: no se reparte nada
+        posiciones.append((m.start(), codigo))
+    posiciones.sort()
+
+    patron_monto = re.compile(r"\$\s*[\d][\d\.,]*")
+    if patron_monto.search(texto_glosa[: posiciones[0][0]]):
+        return {}  # hay plata antes del primer código: huele a total global
+
+    reparto: dict[str, str] = {}
+    for i, (inicio, codigo) in enumerate(posiciones):
+        fin = posiciones[i + 1][0] if i + 1 < len(posiciones) else len(texto_glosa)
+        montos = patron_monto.findall(texto_glosa[inicio:fin])
+        if len(montos) != 1:
+            return {}  # ninguno o varios: no se puede atribuir con certeza
+        reparto[codigo] = "$ " + montos[0].lstrip("$").strip().rstrip(".,")
+
+    if len(set(reparto.values())) != len(reparto):
+        return {}  # montos repetidos: probablemente un solo valor global
+    return reparto
+
+
 async def _generar_seccion_codigo(
     *,
     servicio,
@@ -320,6 +382,16 @@ async def _generar_seccion_codigo(
 
     from app.services.glosa_ia_prompts import build_user_prompt, get_system_prompt
 
+    # El valor de ESTE código, si el texto lo dice sin ambigüedad. Si no, se
+    # queda el de siempre (el de toda la glosa): no se inventa un reparto.
+    _reparto = valores_por_codigo(texto_glosa, todos_los_codigos)
+    _valor_sec = _reparto.get(codigo) or valor_objetado
+    if _reparto.get(codigo) and _reparto[codigo] != valor_objetado:
+        logger.info(
+            f"[MULTI-CODIGO] {codigo}: el texto le atribuye {_reparto[codigo]} "
+            f"(el valor global de la glosa es {valor_objetado})"
+        )
+
     prefijo = codigo[:2].upper()
     system_prompt = get_system_prompt(prefijo=prefijo, eps=eps)
 
@@ -347,14 +419,14 @@ async def _generar_seccion_codigo(
         numero_radicado=numero_radicado,
         dias_habiles=dias_habiles,
         es_extemporanea=es_extemporanea,
-        valor_objetado=valor_objetado,
+        valor_objetado=_valor_sec,
         tono=tono,
         clausulas_contrato=clausulas,
     ) + construir_bloque_instruccion_adicional(
         codigo=codigo,
         codigo_principal=codigo_principal,
         todos_los_codigos=todos_los_codigos,
-        valor_objetado=valor_objetado,
+        valor_objetado=_valor_sec,
     )
 
     # SIEMPRE vía Quality Gate (no gateado por QUALITY_GATE_ENABLED): cada
@@ -393,7 +465,7 @@ async def _generar_seccion_codigo(
         servicio=servicio,
         eps=eps,
         codigo_glosa=codigo,
-        valor_objetado=valor_objetado,
+        valor_objetado=_valor_sec,
         texto_glosa=texto_glosa,
         es_ratificacion=es_ratificacion,
         es_extemporanea=es_extemporanea,
@@ -423,7 +495,7 @@ async def _generar_seccion_codigo(
         es_ratificacion=es_ratificacion,
         es_extemporanea=es_extemporanea,
         codigo=codigo,
-        valor_objetado=valor_objetado,
+        valor_objetado=_valor_sec,
     )
     texto = texto.replace("\n", "<br/>").replace("*", "")
 

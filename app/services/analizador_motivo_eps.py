@@ -95,6 +95,35 @@ _PAT_PERTINENCIA = re.compile(
 )
 
 
+# ── Dos causales que se le escapaban (24-08-2026) ─────────────────────
+#
+# La auditoría encontró tres dictámenes que contestaron algo distinto de lo
+# que la EPS levantó:
+#
+#   · GL-194 y GL-202 — la EPS glosó «precio superior al regulado» de un
+#     medicamento (Abiraterona) y el dictamen respondió sobre la validez
+#     formal de la factura electrónica y sobre la tarifa SOAT del contrato,
+#     sin tocar la regulación de precios ni una vez.
+#   · GL-190 — la EPS pidió «se reliquida a manual ISS 2001» y el dictamen
+#     nunca dice por qué el ISS 2001 no aplica: solo reafirma que rige SOAT.
+#
+# Ninguna de las dos causales tenía patrón, así que el bloque que le dice al
+# motor qué atacar salía vacío y la respuesta se iba por lo genérico.
+_PAT_PRECIO_REGULADO = re.compile(
+    r"(PRECIO\s+(?:SUPERIOR|POR\s+ENCIMA)\s+(?:AL?\s+)?(?:PRECIO\s+)?REGULADO|"
+    r"PRECIO\s+M[ÁA]XIMO\s+DE\s+VENTA|CONTROL\s+DIRECTO\s+DE\s+PRECIOS|"
+    r"MEDICAMENTO\s+REGULADO|CNPMDM|CIRCULAR\s+19\s+DE\s+2024|"
+    r"SOBRECOSTO\s+(?:DE|EN)\s+MEDICAMENTO)",
+    re.IGNORECASE,
+)
+_PAT_MANUAL_ALTERNO = re.compile(
+    r"(RELIQUID\w*\s+(?:A|SEG[ÚU]N|CON)\s+(?:EL\s+)?MANUAL|"
+    r"MANUAL\s+ISS\s*2001|\bISS\s*2001\b|"
+    r"SE\s+LIQUIDA\s+(?:A|SEG[ÚU]N)\s+(?:EL\s+)?MANUAL)",
+    re.IGNORECASE,
+)
+
+
 # ──────────────────────────────────────────────────────────────────────
 # API pública
 # ──────────────────────────────────────────────────────────────────────
@@ -160,6 +189,12 @@ def extraer_puntos_eps(texto_glosa: str) -> dict:
     cuestiona_pertinencia = bool(_PAT_PERTINENCIA.search(texto))
 
     return {
+        "precio_regulado": bool(_PAT_PRECIO_REGULADO.search(texto)),
+        "manual_alterno": (
+            _PAT_MANUAL_ALTERNO.search(texto).group(1).strip().upper()
+            if _PAT_MANUAL_ALTERNO.search(texto)
+            else None
+        ),
         "motivo_principal": motivo_principal,
         "valor_reconocido": valor_reconocido,
         "descuento_aplicado": descuento_aplicado,
@@ -173,6 +208,8 @@ def extraer_puntos_eps(texto_glosa: str) -> dict:
 
 def _vacio() -> dict:
     return {
+        "precio_regulado": False,
+        "manual_alterno": None,
         "motivo_principal": None,
         "valor_reconocido": None,
         "descuento_aplicado": None,
@@ -200,10 +237,35 @@ def bloque_puntos_a_refutar(puntos: dict) -> str:
             puntos.get("soportes_faltantes"),
             puntos.get("exige_devolucion"),
             puntos.get("cuestiona_pertinencia"),
+            puntos.get("precio_regulado"),
+            puntos.get("manual_alterno"),
         ]
     )
     if not tiene_algo:
-        return ""
+        # SIN PUNTOS RECONOCIDOS, IGUAL SE LE PONE LA CAUSAL DELANTE
+        # (24-08-2026). Antes, si ninguno de los patrones enganchaba, este
+        # bloque desaparecía entero y el motor se quedaba sin nadie que le
+        # dijera QUÉ tenía que refutar. Ahí es donde se colaban los dictámenes
+        # que contestan otra cosa: la EPS glosaba «precio superior al
+        # regulado» y la respuesta hablaba de la validez formal de la factura.
+        # Los patrones no pueden cubrir todas las formas de escribir una
+        # objeción, pero el texto literal de la EPS siempre está: se le pone
+        # delante y se le exige contestar ESO.
+        motivo = (puntos.get("motivo_principal") or "").strip()
+        if not motivo:
+            return ""
+        return "\n".join(
+            [
+                "",
+                "═══ LO QUE LA EPS OBJETA (texto literal de la glosa) ═══",
+                f"  «{motivo[:400]}»",
+                "",
+                "Tu párrafo 2 DEBE contestar ESA afirmación, no otra. Si respondes",
+                "sobre un tema distinto —aunque sea correcto— la EPS ratifica la",
+                "glosa: lo que no se contesta se da por aceptado.",
+                "",
+            ]
+        )
 
     partes = [
         "",
@@ -242,17 +304,40 @@ def bloque_puntos_a_refutar(puntos: dict) -> str:
         partes.append(
             f"  {n}. La EPS dice que faltan: {soportes} — refuta con "
             "Resolución 1995/1999 (historia clínica como plena prueba "
-            "médico-legal), Resolución 866/2021 (RIPS), y Circular "
+            "médico-legal), la norma de RIPS vigente al momento de la "
+            "prestación (Res. 948/2026; Res. 2275/2023 si el servicio "
+            "es anterior al 14-05-2026), y Circular "
             "030/2013 si son errores formales subsanables."
         )
         n += 1
     if puntos.get("cuestiona_pertinencia"):
         partes.append(
             f"  {n}. La EPS cuestiona pertinencia clínica — invoca "
-            "Art. 17 Ley 1751/2015 (autonomía médica) + T-478/1995. "
+            "Art. 17 Ley 1751/2015 (autonomía médica). "
             "Recalca que el médico tratante es el competente para "
             "valorar; auditoría administrativa NO sustituye criterio "
             "clínico."
+        )
+        n += 1
+    if puntos.get("precio_regulado"):
+        partes.append(
+            f"  {n}. La EPS dice que el precio supera el REGULADO — este es el "
+            "punto a atacar, no la validez de la factura ni la tarifa del "
+            "contrato. Responde sobre la regulación de precios: la Circular 19 "
+            "de 2024 del CNPMDM fija el precio máximo por MERCADO RELEVANTE "
+            "(mg/unidad), y su Parágrafo 2 del Art. 1 permite a la IPS "
+            "ADICIONAR el margen del Art. 11 de la Circular 18 de 2024. Exige "
+            "que la EPS indique el CUM, el mercado relevante y el precio máximo "
+            "concreto con que hizo la comparación."
+        )
+        n += 1
+    if puntos.get("manual_alterno"):
+        partes.append(
+            f"  {n}. La EPS pide reliquidar con otro manual "
+            f'("{puntos["manual_alterno"]}") — NO basta con reafirmar cuál rige. '
+            "Di EXPRESAMENTE por qué ese manual NO aplica a este contrato y a "
+            "este servicio: qué manual quedó pactado, en qué cláusula, y desde "
+            "cuándo. Sin esa explicación la EPS ratifica."
         )
         n += 1
     if puntos.get("exige_devolucion"):

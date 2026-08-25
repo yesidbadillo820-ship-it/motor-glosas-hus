@@ -102,20 +102,37 @@ class TestLeDiceCualEsLaCuentaBuena:
     soportes del servidor.
     """
 
-    def test_lee_la_cuenta_que_ya_usa_el_motor(self):
+    def test_lee_la_cuenta_del_dia_a_dia_de_la_consola(self):
+        """La fuente cambió el 24-08: la tarea del autodespliegue se ENVENENA
+        —una instalación con la cuenta equivocada deja la tarea con esa cuenta
+        y la próxima vez el instalador la sugiere como si fuera la buena—. La
+        sesión de consola no la cambia ninguna instalación mala."""
         t = _texto()
-        assert "MotorGlosas_Autodeploy" in t and "Principal.UserId" in t, (
-            "El instalador no averigua con qué cuenta trabaja hoy el motor, y "
-            "el auditor se queda adivinando."
+        assert "Win32_ComputerSystem" in t and "UserName" in t, (
+            "El instalador no mira quién trabaja en este PC todos los días."
         )
+        assert "MotorGlosas_Backup" in t, "se perdió el respaldo de la sugerencia"
 
     def test_se_la_muestra_antes_de_preguntar(self):
         """Mostrarla después de que ya escribió no sirve de nada."""
         t = _texto()
         assert t.index("SUGERIDA") < t.index("set /p")
 
-    def test_le_dice_que_escriba_esa_si_no_coincide(self):
-        assert "escriba ESTA" in _texto()
+    def test_el_enter_elige_la_cuenta_del_dia_a_dia(self):
+        """Tercera caída del mismo humano-Enter (24-08): aun con el aviso en
+        mayúsculas, tres personas distintas dejaron la cuenta de administrador
+        de la ventana. El camino fácil tiene que ser el correcto: el Enter usa
+        la cuenta sugerida; la de la ventana hay que escribirla a propósito."""
+        t = _texto()
+        assert 'set "PREDET=%CUENTA%"' in t
+        assert 'if /i not "%SUGERIDA%"=="%CUENTA%" set "PREDET=%SUGERIDA%"' in t
+        assert "Enter para usar %PREDET%" in t
+        assert 'if "%OTRA%"=="" (set "CUENTA=%PREDET%")' in t
+
+    def test_y_lo_avisa_antes_del_enter(self):
+        t = _texto()
+        assert "El Enter la elige a ELLA" in t
+        assert t.index("El Enter la elige a ELLA") < t.index("set /p")
 
     def test_si_no_se_puede_averiguar_no_estorba(self):
         """En un PC sin esa tarea la variable queda vacía y el aviso no sale:
@@ -233,7 +250,7 @@ class TestLaTrampaDeEjecutarComoAdministrador:
 
     def test_lo_que_escriba_el_auditor_manda(self):
         t = _texto()
-        assert 'if not "%OTRA%"=="" set "CUENTA=%OTRA%"' in t
+        assert 'else set "CUENTA=%OTRA%"' in t
 
     def test_avisa_de_la_trampa_antes_de_preguntar(self):
         """Preguntar sin explicar por qué no sirve de nada: el auditor daría

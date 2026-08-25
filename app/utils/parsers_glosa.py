@@ -501,17 +501,23 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     filas_tabla = [
         ("Tarifa pactada en contrato", f'<b style="color:#059669;">{pact_txt}</b>'),
     ]
-    if val_fact > 0:
-        filas_tabla.append(("Valor facturado HUS", f"{_pesos(val_fact)}"))
+    # LO QUE FALTA TAMBIEN SE MUESTRA (24-08-2026). Antes, cuando un valor
+    # llegaba en cero, la fila simplemente no se pintaba. Y en este motor el
+    # cero no significa "cero pesos": significa "no se pudo leer la cifra".
+    # Asi que el auditor veia la caja verde con "Tarifa pactada $915.051" y
+    # "Defender 100%" sin ver de donde salia esa conclusion — porque el dato
+    # que la origino era justamente el que estaba escondido. Paso en el
+    # dictamen GL-204. Ahora la fila se pinta igual y dice que falta.
+    _FALTA = '<span style="color:#b45309;">no registrado en el caso</span>'
+    filas_tabla.append(("Valor facturado HUS", _pesos(val_fact) if val_fact > 0 else _FALTA))
     if val_rec > 0:
         filas_tabla.append(("Valor reconocido EPS", f"{_pesos(val_rec)}"))
-    if val_obj > 0:
-        filas_tabla.append(
-            (
-                "Valor objetado EPS",
-                f'<b style="color:#b91c1c;">{_pesos(val_obj)}</b>',
-            )
+    filas_tabla.append(
+        (
+            "Valor objetado EPS",
+            f'<b style="color:#b91c1c;">{_pesos(val_obj)}</b>' if val_obj > 0 else _FALTA,
         )
+    )
 
     tabla_html = (
         '<table style="width:100%;border-collapse:collapse;font-size:.85rem;'
@@ -530,6 +536,23 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
             "</tr>"
         )
     tabla_html += "</table>"
+
+    # EL AVISO DE MODALIDAD, DONDE EL GESTOR LO VEA (24-08-2026). Cuando la
+    # fila del catálogo se contradice a sí misma —la modalidad anuncia un
+    # descuento y la fila lo declara en cero— no se puede saber si el valor
+    # guardado ya lo trae aplicado. Es lo que produjo la contradicción entre
+    # expedientes que encontró la auditoría: el mismo contrato y el mismo CUPS
+    # leídos como «SOAT pleno» en uno y «SOAT −15 %» en otros dos. El dictamen
+    # ya deja de afirmar la modalidad; acá se le dice al gestor por qué.
+    aviso_html = ""
+    _aviso = (info_tarifa.get("aviso_modalidad") or "").strip()
+    if _aviso:
+        aviso_html = (
+            '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;'
+            'padding:.55rem .7rem;margin-bottom:.6rem;font-size:.8rem;color:#92400e;">'
+            "⚠️ <b>Revise la modalidad antes de radicar.</b> " + esc(_aviso) + "</div>"
+        )
+    tabla_html += aviso_html
 
     # Interpretación SOAT base (si aplica)
     interp_html = ""

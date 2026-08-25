@@ -1130,6 +1130,52 @@ _PATRONES_FRASES_ABSURDAS: tuple[re.Pattern[str], ...] = (
         r"CL[ÁA]USULA\s+\d{1,3}\s*[-—–]\s*ANTI[-‐\s]?REBATIMIENTO[^\.\n]{0,160}[\.\s]*",
         re.IGNORECASE,
     ),
+    # ── 25-08-2026: AMENAZAS AL PAGADOR ──────────────────────────────
+    # La regla 8.decies del prompt ya las prohíbe, pero era solo una
+    # instrucción: en los dictámenes GL-118 y GL-119 la IA amenazó igual.
+    # Una amenaza pone al auditor de la EPS a la defensiva y escala el
+    # caso; además el hospital no tiene facultad sancionatoria sobre el
+    # pagador, así que la amenaza es hueca y se nota.
+    #
+    # Lo que NO se toca porque es legítimo y debe seguir saliendo:
+    #   · elevar el conflicto a la Superintendencia (Art. 126 Ley 1438),
+    #   · el levantamiento por falta de respuesta (Art. 57 Ley 1438),
+    #   · negarle a la EPS la facultad sancionatoria sobre el prestador,
+    #   · atribuir a la entidad la responsabilidad presupuestal.
+    re.compile(
+        r"(?:SE\s+)?(?:ADVIERTE|APERCIBE|PREVIENE)\s+(?:QUE\s+|A\s+[^\.\n]{0,40}QUE\s+)?"
+        r"[^\.\n]{0,140}?"
+        r"(?:RESPONSABILIDAD\s+(?:PENAL|DISCIPLINARIA|FISCAL|INSTITUCIONAL)|"
+        r"SANCI[ÓO]N(?:ES)?|MULTAS?|DENUNCIA)"
+        r"[^\.\n]{0,90}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:SE\s+)?(?:TOMAR[ÁA]N|EMPRENDER[ÁA]N|ADELANTAR[ÁA]N|INICIAR[ÁA]N|"
+        r"INSTAURAR[ÁA]N|EJERCER[ÁA]N)\s+(?:LAS\s+|LOS\s+)?"
+        r"(?:ACCIONES|MEDIDAS)\s+(?:LEGALES|JUDICIALES|PENALES|SANCIONATORIAS)"
+        r"[^\.\n]{0,90}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"[^\.\n]{0,70}(?:GENERAR[ÁA]|ACARREAR[ÁA]|CONLLEVAR[ÁA]|CONSTITUIR[ÁA])\s+"
+        r"(?:UNA?\s+)?RESPONSABILIDAD\s+(?:PENAL|DISCIPLINARIA|FISCAL|INSTITUCIONAL)"
+        r"[^\.\n]{0,90}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"BAJO\s+APERCIBIMIENTO\s+DE[^\.\n]{0,110}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:SE\s+)?COMPULSAR[ÁA]N?\s+COPIAS[^\.\n]{0,110}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"[^\.\n]{0,70}SER[ÁA]\s+OBJETO\s+DE\s+(?:DENUNCIA|INVESTIGACI[ÓO]N)"
+        r"\s+(?:PENAL|DISCIPLINARIA|FISCAL)[^\.\n]{0,90}[\.\s]*",
+        re.IGNORECASE,
+    ),
 )
 
 
@@ -1231,16 +1277,21 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         re.compile(r"\bGLOSA\s+12345\b", re.IGNORECASE),
         "LA GLOSA APLICADA",
     ),
-    # "Resolución 2641 de 2024" — norma inventada que el prompt mencionaba como
-    # ejemplo de lo prohibido. La quitamos en cualquier forma.
-    (
-        re.compile(r"\b(?:LA\s+)?RESOLUCI[ÓO]N\s+2641\s+DE\s+2024\b", re.IGNORECASE),
-        "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD",
-    ),
-    (
-        re.compile(r"\bRes\.?\s*2641/2024\b", re.IGNORECASE),
-        "normativa vigente",
-    ),
+    # LA "RESOLUCION 2641 DE 2024" NO ERA INVENTADA (25-08-2026).
+    #
+    # Aqui habia dos reglas que la borraban del dictamen y la cambiaban por
+    # "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD". Se creia inventada porque
+    # el prompt la usaba como EJEMPLO de norma prohibida y la IA la copiaba.
+    #
+    # Al verificarla resulto ser REAL: es la Resolucion 2641 del 23 de
+    # diciembre de 2024, la que establecio la CUPS que rigio durante 2025
+    # (hoy derogada por la Res. 2706 de 2025 desde el 1 de enero de 2026).
+    #
+    # O sea que el motor borraba la cita CORRECTA y en su lugar dejaba una
+    # frase sin ley, decreto ni articulo — justo la clase de pseudo-norma que
+    # la auditoria independiente reprocho. Se retiraron las dos reglas. Si la
+    # fecha del servicio no corresponde, quien avisa ahora es el aviso de
+    # norma derogada del verificador de citas, que si mira la vigencia.
     # "historia clínica N° 1234567" — número del prompt-ejemplo
     (
         re.compile(
@@ -1948,7 +1999,7 @@ def _neutralizar_valores_inventados(
 #     urgencias (terapia ABA crónica, UCI 18 días ortopédicos, terapia
 #     enzimática Cerezyme, doppler obstétrica electivo). Un auditor EPS
 #     desestima de pinta — la cita es desproporcionada al hecho.
-#   - Art. 177 Ley 100 ("movilizar recursos para POS") en glosas de TARIFA,
+#   - Art. 177 Ley 100 (la DEFINICIÓN de qué es una EPS) en glosas de TARIFA,
 #     PERTINENCIA y EVENTO ADVERSO — temas donde no está en discusión la
 #     obligación financiera de la EPS sino otros aspectos (cómputo tarifa,
 #     criterio médico, prevenibilidad).
@@ -2048,14 +2099,33 @@ def _neutralizar_art_168_fuera_de_contexto(
     # Patrón: cualquier mención de Art. 168 Ley 100 (variantes)
     # Cubre: "Art. 168", "Artículo 168", "ART. 168", "Articulo 168",
     # con/sin "Ley 100", con/sin "/1993" o "de 1993".
+    #
+    # EL CONECTOR VA SUELTO A PROPÓSITO (24-08-2026). El dictamen GL-198 de
+    # COMPENSAR salió impreso diciendo «EN VIRTUD DE LO DISPUESTO EN EL
+    # ARTÍCULO 168 LA LEY 100 DE 1993» — sin el «DE». La IA se come esa
+    # palabra de vez en cuando, y la versión anterior del patrón solo
+    # aceptaba «DE LA LEY» o «DE LEY»: bastaba esa letra de menos para que
+    # la cita inaplicable pasara derecho hasta el papel que firma el
+    # auditor. Ahora «DE» y «LA» son cada uno opcionales por su lado, así
+    # que las cuatro formas caen: «DE LA LEY», «DE LEY», «LA LEY», «LEY».
     pat_art168 = re.compile(
         r"(?:EL\s+|AL\s+|SEGÚN\s+EL\s+|CONFORME\s+AL?\s+)?"
         r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*168"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
         re.IGNORECASE,
     )
+    # 25-08-2026 (2.ª auditoría). El reemplazo decía «LA NORMATIVA DE
+    # CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD» — y eso se lee
+    # como el TÍTULO de una norma concreta que nadie puede ir a buscar: no
+    # tiene ley, decreto ni artículo. El filtro del FUNDAMENTO NORMATIVO ya
+    # la sacaba de la lista, pero dentro del argumento seguía sonando a cita.
+    #
+    # La red dispara justamente cuando la glosa NO es de urgencias, o sea
+    # cuando no hay un artículo concreto que invocar. Lo honesto es decirlo
+    # con una frase que se lea como lo que es —una remisión general— y no
+    # como el nombre de un documento.
     nuevo, n = pat_art168.subn(
-        "LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD",
+        "LAS REGLAS GENERALES DEL SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD",
         dictamen,
     )
     # También frase suelta "atención inicial de urgencias" cuando no aplica
@@ -2074,14 +2144,144 @@ def _neutralizar_art_168_fuera_de_contexto(
     return nuevo
 
 
+# Un renglón del "FUNDAMENTO NORMATIVO" es una NORMA solo si se puede ir a
+# buscar: ley, decreto, resolución, circular, acuerdo, sentencia, artículo de
+# código, o la Constitución. Todo lo demás es una frase.
+# El número puede venir separado por una o dos palabras: «CIRCULAR EXTERNA
+# 047», «RESOLUCIÓN CONJUNTA 3047», «SENTENCIA T-760». Sin ese margen se
+# descartaban normas de verdad; con más, entraría cualquier frase larga que
+# tenga un número suelto al final.
+_ES_NORMA_CITABLE = re.compile(
+    r"(?:LEY|DECRETO|RESOLUCI[ÓO]N|CIRCULAR|ACUERDO|SENTENCIA|ORDENANZA|"
+    r"MANUAL|ANEXO|CONSTITUCI[ÓO]N|ART[ÍI]CULOS?|ARTS?\.)"
+    r"(?:\s+[A-ZÁÉÍÓÚÑ]{2,12}){0,2}"
+    r"[\s:.-]*[A-Z]{0,3}-?\s?\d",
+    re.IGNORECASE,
+)
+
+
+def _solo_normas_citables(normas_clave: str | None) -> str:
+    """Deja en el FUNDAMENTO NORMATIVO solo lo que de verdad es una norma.
+
+    POR QUÉ (24-08-2026). Una auditoría independiente de nueve dictámenes
+    encontró impreso, bajo el título «3 normas más relevantes», el renglón:
+
+        LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD
+
+    Eso no es una norma: no tiene ley, decreto ni artículo, y nadie puede ir a
+    verificarlo. Sale de una defensa que SÍ funciona —cuando la glosa no es de
+    urgencias, el motor reemplaza la cita del Art. 168 Ley 100 por una frase
+    neutra para no citar una norma inaplicable— pero la frase se colaba a la
+    lista de normas, donde parece una cita y no lo es. (El 25-08 se cambió
+    además la frase que la red genera, porque «LA NORMATIVA DE...» se leía
+    como el título de un documento; este filtro sigue de malla.)
+
+    La lista iba de la IA al HTML sin ningún filtro. Acá se separa: los
+    renglones citables se conservan tal cual; los demás se descartan. Si no
+    queda ninguno, se devuelve vacío y el bloque entero no se pinta — es
+    preferible no mostrar fundamento a mostrar uno que no se puede verificar.
+    """
+    if not normas_clave:
+        return ""
+    citables = [
+        renglon.strip()
+        for renglon in normas_clave.split("|")
+        if renglon.strip() and _ES_NORMA_CITABLE.search(renglon)
+    ]
+    descartadas = len([r for r in normas_clave.split("|") if r.strip()]) - len(citables)
+    if descartadas:
+        logger.warning(
+            f"[FUNDAMENTO-NORMATIVO] {descartadas} renglón(es) descartado(s) por no "
+            f"ser una norma citable: {normas_clave[:200]}"
+        )
+    return " | ".join(citables)
+
+
+def _no_afirmar_contrato_vencido(dictamen: str, eps: str = "") -> str:
+    """Quita del dictamen la afirmación de que un contrato vencido sigue vigente.
+
+    POR QUÉ (25-08-2026). Los dictámenes GL-118 y GL-119 salieron diciendo que
+    el contrato 440-DIGSA/DMBUG-2025 «PERMANECE VIGENTE HASTA 30 DE JULIO DE
+    2026» — y ese día ya había pasado hacía casi un mes. En el mismo documento,
+    el encabezado decía «CONTRATO CON VIGENCIA TERMINADA». O sea que el papel
+    que se radica ante la entidad se contradecía solo.
+
+    La causa de fondo se corrigió en el prompt (el renglón se llamaba «Contrato
+    vigente» aunque su contenido dijera «terminada», y así se le entregaba una
+    contradicción a la IA). Esto es la red de abajo: si aun así el dictamen lo
+    afirma, la afirmación se cambia por una que no miente.
+
+    NO se borra la mención del contrato: nombrarlo es correcto y muchas veces
+    necesario. Lo que se quita es el «sigue vigente».
+    """
+    if not dictamen:
+        return dictamen
+    try:
+        from app.services.glosa_ia_prompts import get_contrato
+
+        if not (get_contrato(eps or "") or {}).get("_vigencia_vencida"):
+            return dictamen
+    except Exception:
+        return dictamen
+
+    reemplazos = [
+        (
+            # OJO: solo la AFIRMACIÓN, nunca el número del contrato. La primera
+            # versión de este patrón se comía «440-DIGSA/DMBUG-2025» al pasar
+            # por delante — y borrar el número es justo lo que no se debe
+            # hacer: nombrar el contrato es correcto, lo que sobra es el
+            # «sigue vigente». Lo cazó la prueba antes de que llegara a
+            # producción.
+            re.compile(
+                r"\bPERMANECE\s+VIGENTE(?:\s+HASTA\s+[^.,;]{0,40})?",
+                re.IGNORECASE,
+            ),
+            "RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+        (
+            re.compile(r"\bCONTRATO\s+(?:SE\s+ENCUENTRA\s+)?VIGENTE\b", re.IGNORECASE),
+            "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+        (
+            re.compile(r"\bSE\s+ENCUENTRA\s+EN\s+EJECUCI[ÓO]N\b", re.IGNORECASE),
+            "RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+        (
+            re.compile(r"\bCONTRATO\s+VIGENTE\s+HASTA\s+[^.,;]{0,40}", re.IGNORECASE),
+            "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+    ]
+    resultado, total = dictamen, 0
+    for patron, texto in reemplazos:
+        resultado, n = patron.subn(texto, resultado)
+        total += n
+    if total:
+        logger.warning(
+            f"[CONTRATO-VENCIDO] {total} afirmación(es) de vigencia neutralizada(s): "
+            f"el contrato de «{eps}» ya venció y el dictamen decía que sigue vigente"
+        )
+    return resultado
+
+
 def _neutralizar_art_177_relleno(
     dictamen: str,
     texto_glosa: str | None = None,
     codigo_glosa: str | None = None,
 ) -> str:
-    """Bug G (ronda 13): si el dictamen cita Art. 177 Ley 100 ("movilizar
-    recursos para POS") pero el debate no es sobre obligación financiera
-    de la EPS, neutraliza la cita por la genérica.
+    """Bug G (ronda 13): si el dictamen cita el Art. 177 de la Ley 100 pero el
+    debate no es sobre la obligación de la EPS de garantizar la prestación,
+    neutraliza la cita por la genérica.
+
+    25-08-2026 — SE CORRIGIÓ LA DESCRIPCIÓN. Este comentario decía que el
+    Art. 177 trata de «movilizar recursos para POS». Verificado contra el texto
+    oficial de la Ley 100: esa frase NO EXISTE en la ley, y el Art. 177 es la
+    DEFINICIÓN de qué es una EPS («entidades responsables de la afiliación, el
+    registro de los afiliados y el recaudo de sus cotizaciones»). El corpus lo
+    tenía cargado con ese texto inventado y de ahí venía la confusión.
+
+    La red sigue haciendo lo mismo y sigue estando bien: el Art. 177 no viene a
+    cuento en una glosa de tarifa, de pertinencia o de soportes. Lo que cambia
+    es que ahora la razón está bien escrita.
 
     Aplica cuando:
       - El texto contiene marcadores de TARIFA / PERTINENCIA / ARL /
@@ -2108,7 +2308,7 @@ def _neutralizar_art_177_relleno(
         r"(?:CONFORME\s+(?:A\s+LO\s+DISPUESTO\s+EN\s+)?(?:EL\s+|AL\s+)?|"
         r"AS[ÍI]\s+MISMO,?\s+(?:EL\s+|AL\s+)?|EL\s+|AL\s+)?"
         r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*177"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
         r"[^.]{0,400}?(?:MOVILIZAR|RECURSOS|\bPOS\b|PLAN\s+OBLIGATORIO|"
         r"PATRIMONIOS?\s+AUT[ÓO]NOM|FIDUCIARIA)[^.]{0,400}(?:\.|$)",
         re.IGNORECASE | re.DOTALL,
@@ -2116,14 +2316,15 @@ def _neutralizar_art_177_relleno(
     nuevo, n = pat_art177.subn("", dictamen)
     # Ronda 21 (caso MEDIMÁS): cita "pelada" de Art. 177 Ley 100 SIN sufijo
     # POS, usada como fundamento tarifario ("rige el manual ... conforme al
-    # art. 177 de la ley 100/1993"). El Art. 177 regula el deber de las EPS
-    # de movilizar recursos al POS — no es fundamento de una tarifa. En
+    # art. 177 de la ley 100/1993"). El Art. 177 es la DEFINICIÓN de qué es una
+    # EPS (verificado el 25-08-2026 contra el texto oficial) — no es fundamento
+    # de una tarifa por ningún lado. En
     # debate no-financiero se REEMPLAZA (no se borra, para no dejar la
     # oración sin base) por el fundamento contractual correcto.
     pat_art177_bare = re.compile(
         r"(?:CONFORME\s+(?:AL?\s+)?|EL\s+|AL\s+)?"
         r"(?:ART[ÍI]?CULO?S?|ARTS?\.?)\s*177"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
         re.IGNORECASE,
     )
     nuevo, n_bare = pat_art177_bare.subn(
@@ -3963,6 +4164,103 @@ def _neutralizar_cups_igual_factura(texto: str, numero_factura: str | None) -> s
     return resultado
 
 
+# ── Ronda 35 (25-08-2026): CUPS que la IA nunca tuvo a la vista ──────────
+# Lote de 117 dictámenes de recepción del 25-ago. 19 citaron un CUPS que no
+# existe. La prueba de que son inventados no es que falten del catálogo —
+# es que el MISMO código nombra servicios distintos en dictámenes distintos:
+#   734101 → "RADIOGRAFÍA DE MAXILAR INFERIOR" y "RADIOGRAFÍA DE PIERNA"
+#   730102 → "URGENCIAS ADULTOS" y "INTERNACIÓN ADULTOS COMPLEJIDAD ALTA"
+# Un código no puede nombrar dos procedimientos. El archivo de recepción no
+# trae columna de CUPS: la IA rellenó el hueco con un número de seis cifras.
+#
+# La regla es la misma que ya se aplica a los folios: si el código no está
+# en lo que la IA tuvo a la vista, la IA no lo leyó — se lo inventó.
+_PAT_MENCION_CUPS = re.compile(
+    r"(?:\b(?:CON|DEL|DE|EL|LA)\s+)?"  # conector que quedaría huérfano
+    r"(?:C[ÓO]DIGO\s+)?CUPS\s*[:\-#]?\s*(?:N[°ºO\.]{0,2}\s*)?"
+    r"(?=[A-Za-z0-9\-]*\d)([A-Za-z0-9][A-Za-z0-9\-]{2,11})\b",
+    re.IGNORECASE,
+)
+
+
+def _cups_en_evidencia(codigo: str, evidencia: str) -> bool:
+    """True si el código aparece en el texto que la IA tuvo a la vista."""
+    if not codigo or not evidencia:
+        return False
+    base = codigo.upper().strip()
+    variantes = {base, base.lstrip("0")}
+    sin_sufijo = re.sub(r"[A-Z]+\d*$|-\d{1,3}$", "", base).strip()
+    if sin_sufijo:
+        variantes.add(sin_sufijo)
+        variantes.add(sin_sufijo.lstrip("0"))
+        if sin_sufijo.isdigit() and len(sin_sufijo) <= 6:
+            variantes.add(sin_sufijo.zfill(6))
+    ev = evidencia.upper()
+    for v in variantes:
+        if len(v) < 3:
+            continue
+        if re.search(r"(?<![A-Z0-9])" + re.escape(v) + r"(?![A-Z0-9])", ev):
+            return True
+    return False
+
+
+def _cups_esta_en_catalogo(codigo: str) -> bool:
+    """True si el código es verificable en el catálogo del motor.
+
+    Vale como salvavidas: un código verificable NUNCA se borra, aunque no
+    esté en el expediente. Es la lección de la Resolución 2641 de 2024, que
+    una red anterior borró creyéndola inventada siendo real.
+    """
+    try:
+        from app.services.cups_soat_service import buscar_cups, descripcion_cups
+    except Exception:  # pragma: no cover - sin catálogo no se borra nada
+        return True
+    try:
+        return bool(descripcion_cups(codigo)) or bool(buscar_cups(codigo, limite=1))
+    except Exception:  # pragma: no cover
+        return True
+
+
+def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
+    """Quita del dictamen los CUPS que no están ni en el expediente ni en el catálogo.
+
+    Conservadora por diseño: solo borra el código cuando NO aparece en lo que
+    la IA leyó Y ADEMÁS no se puede verificar en el catálogo. Se conserva la
+    descripción del servicio — lo que sale es el número, que es lo inventado.
+    """
+    if not texto:
+        return texto
+
+    borrados: list[str] = []
+
+    def _sub(m: "re.Match[str]") -> str:
+        codigo = m.group(1)
+        if _cups_en_evidencia(codigo, evidencia or ""):
+            return m.group(0)
+        if _cups_esta_en_catalogo(codigo):
+            return m.group(0)
+        borrados.append(codigo)
+        return ""
+
+    resultado, n = _PAT_MENCION_CUPS.subn(_sub, texto)
+    if not borrados:
+        return texto
+    # Limpieza de lo que deja el hueco: paréntesis vacíos, comas sueltas,
+    # conectores duplicados y espacios de más.
+    resultado = re.sub(r"[\(\[]\s*[\)\]]", "", resultado)
+    resultado = re.sub(r"\s+([,;.\)])", r"\1", resultado)
+    resultado = re.sub(r"\(\s*,\s*", "(", resultado)
+    resultado = re.sub(r",\s*,", ",", resultado)
+    resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+    resultado = re.sub(r" +\n", "\n", resultado)
+    logger.warning(
+        f"[CUPS-SIN-RESPALDO] {len(borrados)} código(s) citados como CUPS sin estar en "
+        f"el expediente ni en el catálogo: {', '.join(borrados)} — retirados del dictamen "
+        "(ronda 35, lote recepción 25-08-2026)."
+    )
+    return resultado
+
+
 # ── Ronda 22: normas citadas para el TEMA EQUIVOCADO (alucinación grave) ──
 # Yesid 30-jun (caso ECOOPSOS): el dictamen citó "Ley 1388/2010 que garantiza
 # la atención integral a población con discapacidad auditiva" — pero la Ley
@@ -3996,6 +4294,315 @@ def _corregir_norma_mal_aplicada(dictamen: str) -> str:
                     f"[NORMA-TEMA-EQUIVOCADO] {n} cita(s) corregida(s) → {reemplazo} "
                     "(la norma original no corresponde al tema del dictamen)."
                 )
+    return nuevo
+
+
+# ── 25-08-2026: contestar la factura cuando la glosa no era de la factura ─
+# La segunda auditoría del lote cruzó, código por código, el motivo REAL del
+# pagador contra lo que contestó el motor. De 79 códigos, 74 contestaban el
+# tema — buen resultado. Los 5 que no ($3.564.600) fallaban todos igual:
+#
+#   FA1606 (3 casos): el pagador dice «el régimen del afiliado al momento de
+#     la prestación es distinto al registrado en el contrato» y el motor
+#     contesta que la factura electrónica es válida ante la DIAN.
+#   FA0703 (2 casos): el pagador dice «insumo no facturable» nombrando el
+#     código del ítem, y el motor contesta lo mismo de la DIAN.
+#
+# Ninguna de las dos glosas es de la FORMA de la factura. Contestar la DIAN
+# deja la glosa sin refutar, y en auditoría lo que no se refuta se descuenta.
+#
+# Esta red no reescribe el argumento —eso lo hace el prompt, que ya lleva la
+# defensa central de cada código—: avisa. El dictamen sale con una nota
+# visible para que el gestor lo devuelva antes de radicarlo.
+_CODIGOS_QUE_NO_SON_DE_FORMA = {
+    "FA1606": "quién es el responsable de pago (régimen del afiliado en la BDUA)",
+    "FA1605": "quién es el responsable de pago (régimen del afiliado en la BDUA)",
+    "FA0703": "si el ítem ya estaba incluido en la atención agrupada",
+    "FA0803": "si el ítem ya estaba incluido en la atención agrupada",
+    "FA0603": "si el ítem ya estaba incluido en la atención agrupada",
+}
+_PAT_ARGUMENTO_DE_FORMA = re.compile(
+    r"V[ÁA]LIDA\s+POR\s+LA\s+DIAN|VALIDAD[AO]\s+POR\s+LA\s+DIAN|CUFE|"
+    r"ART[ÍI]CULO\s+617\s+DEL\s+ESTATUTO\s+TRIBUTARIO|RESOLUCI[ÓO]N\s+DIAN|"
+    r"NUMERACI[ÓO]N\s+CONSECUTIVA\s+AUTORIZADA",
+    re.IGNORECASE,
+)
+# Señales de que SÍ entró en el tema de fondo, aunque también hable de la
+# factura. Con cualquiera de estas no se avisa: el argumento está completo.
+_PAT_ENTRO_EN_EL_TEMA = {
+    "responsable": re.compile(
+        r"\bBDUA\b|R[ÉE]GIMEN\s+(?:DEL\s+)?(?:AFILIADO|USUARIO)|"
+        r"VERIFICACI[ÓO]N\s+DE\s+DERECHOS|CONTRIBUTIVO|SUBSIDIADO",
+        re.IGNORECASE,
+    ),
+    "agrupada": re.compile(
+        r"ATENCI[ÓO]N\s+AGRUPADA|PAQUETE|NO\s+EST[ÁA]\s+INCLUID|"
+        r"NO\s+SE\s+ENCUENTRA\s+INCLUID|ANEXO\s+(?:N[°º.]?\s*)?\d",
+        re.IGNORECASE,
+    ),
+}
+
+
+def _avisar_si_contesta_la_forma(dictamen: str, codigo: str) -> str:
+    """Avisa cuando la respuesta habla de la factura y la glosa era de fondo.
+
+    No toca el argumento: le pone al dictamen una nota que el gestor ve antes
+    de radicar. Preferimos avisar de más que dejar pasar una glosa contestada
+    por el lado equivocado.
+    """
+    if not dictamen or not codigo:
+        return dictamen
+    tema = _CODIGOS_QUE_NO_SON_DE_FORMA.get(str(codigo).strip().upper())
+    if not tema:
+        return dictamen
+    if not _PAT_ARGUMENTO_DE_FORMA.search(dictamen):
+        return dictamen
+    clave = "responsable" if "responsable" in tema else "agrupada"
+    if _PAT_ENTRO_EN_EL_TEMA[clave].search(dictamen):
+        return dictamen
+    logger.warning(
+        f"[CONTESTA-LA-FORMA] la respuesta a {codigo} argumenta validez de la factura "
+        f"y la glosa era sobre {tema} — se marcó para revisión del gestor."
+    )
+    return (
+        dictamen.rstrip()
+        + f"\n\n⚠ REVISAR ANTES DE RADICAR: la glosa {codigo} no discute la forma de la "
+        f"factura sino {tema}. Esta respuesta argumenta la validez de la factura "
+        "electrónica y no entra en ese punto: la entidad puede darla por no contestada."
+    )
+
+
+# ── 25-08-2026: el artículo equivocado de una norma que sí existe ────────
+# La segunda auditoría del lote encontró que las 28 respuestas de ratificación
+# —el 100 %— citaban el «ARTÍCULO 20 DEL DECRETO 4747 DE 2007» como si
+# regulara el trámite de glosas. Se verificó contra el texto oficial de
+# MinSalud: el Art. 20 es el del RIPS. El trámite de glosas está en el 23 y el
+# Manual Único en el 22.
+#
+# Lo grave no fue la cita sino que se certificaba sola: el corpus del motor
+# tenía cargado ese mismo artículo con encabezado y texto inventados, así que
+# el revisor la daba por buena. El corpus ya quedó corregido; esta red es la
+# malla por si el modelo la vuelve a escribir de memoria.
+#
+# Se exige el CONTEXTO además del número: el Art. 20 existe y citarlo para
+# RIPS es correcto. Solo se corrige cuando el texto habla de glosas.
+_ARTICULOS_MAL_CITADOS: tuple[tuple[re.Pattern[str], re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\bART[ÍI]CULO\s+20\b(\s*(?:DEL?|DE\s+L[AO]S?)?\s*DECRETO\s+4747)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"GLOSA|CONCILIACI[ÓO]N|TR[ÁA]MITE|RATIFICA|OBJECI[ÓO]N",
+            re.IGNORECASE,
+        ),
+        "23",
+    ),
+    (
+        re.compile(
+            r"\bART\.\s*20\b(\s*(?:DEL?\s+)?DEC(?:RETO)?\.?\s+4747)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"GLOSA|CONCILIACI[ÓO]N|TR[ÁA]MITE|RATIFICA|OBJECI[ÓO]N",
+            re.IGNORECASE,
+        ),
+        "23",
+    ),
+)
+
+
+def _corregir_articulo_mal_citado(dictamen: str) -> str:
+    """Corrige el número de artículo cuando la norma es real y el artículo no.
+
+    Conservadora: solo dispara si el número equivocado Y el tema aparecen los
+    dos en el dictamen. Nunca borra la cita — la norma sirve al argumento; lo
+    que se arregla es el dato que la entidad verifica primero.
+    """
+    if not dictamen:
+        return dictamen
+    nuevo = dictamen
+    for re_mal, re_ctx, correcto in _ARTICULOS_MAL_CITADOS:
+        if not re_ctx.search(nuevo):
+            continue
+
+        def _sub(m: "re.Match[str]", _c: str = correcto) -> str:
+            cabeza = m.group(0)[: m.start(1) - m.start()]
+            cabeza = re.sub(r"\b20\b", _c, cabeza)
+            return cabeza + m.group(1)
+
+        nuevo, n = re_mal.subn(_sub, nuevo)
+        if n:
+            logger.warning(
+                f"[ARTICULO-MAL-CITADO] {n} cita(s) corregida(s) al artículo {correcto} "
+                "del Decreto 4747 de 2007 (el 20 es el del RIPS, no el del trámite de glosas)."
+            )
+    return nuevo
+
+
+# ── 25-08-2026: norma derogada citada sin decir desde cuándo ─────────────
+# 21 de los 117 dictámenes del lote citaron la Resolución 2275 de 2023 como
+# si siguiera vigente. La derogó la Resolución 948 de 2026 el 14 de mayo.
+#
+# OJO: citarla NO siempre está mal. Para un servicio prestado antes del
+# 14-05-2026 la norma aplicable ES la 2275 — cambiarla por la 948 sería
+# meterle al dictamen una norma que no regía ese día. Y la fecha del
+# servicio no la sabemos con certeza: en el formulario viene la de
+# RADICACIÓN de la factura, que es posterior a la atención.
+#
+# Por eso no se reemplaza: se COMPLETA. El dictamen pasa a decir cuál rige
+# hoy y desde cuándo, que es la regla que el prompt ya le pide a la IA y la
+# misma que llevan las etiquetas de soportes. Así la cita es correcta
+# cualquiera que sea la fecha del servicio, y la entidad no puede rebatirla
+# diciendo «esa resolución está derogada».
+_NORMAS_DEROGADAS_SIN_REGLA: tuple[tuple[re.Pattern[str], re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\bRESOLUCI[ÓO]N\s+2275\s*(?:DE\s*|/)\s*2023\b",
+            re.IGNORECASE,
+        ),
+        # Si el dictamen YA nombra la 948, no hay nada que completar.
+        re.compile(r"\b948\s*(?:DE\s*|/)\s*2026\b", re.IGNORECASE),
+        " (VIGENTE PARA SERVICIOS ANTERIORES AL 14 DE MAYO DE 2026; "
+        "DESDE ESA FECHA RIGE LA RESOLUCIÓN 948 DE 2026)",
+    ),
+)
+
+
+def _completar_norma_derogada(dictamen: str) -> str:
+    """Añade la regla de fecha a una norma derogada que el dictamen cita.
+
+    No la reemplaza: para un servicio anterior a la derogatoria la norma
+    citada es la correcta y cambiarla sería el error contrario.
+    """
+    if not dictamen:
+        return dictamen
+    nuevo = dictamen
+    for re_norma, re_ya_dicho, coletilla in _NORMAS_DEROGADAS_SIN_REGLA:
+        if re_ya_dicho.search(nuevo):
+            continue
+        # Solo la PRIMERA mención lleva la aclaración; repetirla en cada
+        # aparición vuelve el dictamen ilegible.
+        m = re_norma.search(nuevo)
+        if not m:
+            continue
+        texto = coletilla if m.group(0).isupper() else coletilla.lower()
+        # Si la cita ya trae su propio paréntesis explicativo —«RESOLUCIÓN
+        # 2275 DE 2023 (FEV EN EL SECTOR SALUD)»— la aclaración va DESPUÉS,
+        # no pegada: dos paréntesis seguidos se leen mal.
+        corte = m.end()
+        siguiente = re.match(r"\s*\([^()]{0,120}\)", nuevo[corte:])
+        if siguiente:
+            corte += siguiente.end()
+        nuevo = nuevo[:corte] + texto + nuevo[corte:]
+        logger.warning(
+            "[NORMA-DEROGADA] se añadió la regla de fecha a la cita "
+            f"«{m.group(0)}» (derogada, pero válida para servicios anteriores)."
+        )
+    return nuevo
+
+
+# ── 25-08-2026: la preposición que la IA se come ─────────────────────────
+# En el lote de recepción del día, 11 de los 117 dictámenes salieron sin el
+# «DE» en fórmulas donde el español no admite otra cosa:
+#
+#   «SE SOLICITA EL LEVANTAMIENTO LA GLOSA»            (7 veces)
+#   «EL ARTÍCULO 17 LA LEY 1751 DE 2015»               (4 veces)
+#   «LA AUTONOMÍA DE LOS PROFESIONALES LA SALUD»       (dentro de una cita
+#                                                       textual del Art. 17)
+#
+# No lo hace ninguna de las redes: se probó cada patrón del módulo contra la
+# frase bien escrita y ninguno la toca. Lo escribe así el modelo. El último
+# caso es el más grave: está DENTRO de las comillas, así que el hospital le
+# atribuye a la Ley 1751 una frase mal transcrita.
+#
+# Lista corta y verificada contra el lote — no una regla general de gramática:
+# «SOLICITA EL LEVANTAMIENTO» y «DE PLENO DERECHO EL FENÓMENO» están bien
+# escritas y no se tocan.
+_PREPOSICION_COMIDA: tuple[tuple[re.Pattern[str], int], ...] = (
+    # (patrón, índice del grupo que lleva el artículo al que le falta el «de»)
+    (re.compile(r"\bLEVANTAMIENTO\s+(LA|EL|LOS|LAS)\b", re.IGNORECASE), 1),
+    (
+        re.compile(
+            r"(?:ART[ÍI]CULO|ART\.)\s*\d{1,3}[°º]?\s+(LA|EL)\s+LEY\b",
+            re.IGNORECASE,
+        ),
+        1,
+    ),
+    (re.compile(r"\bPROFESIONALES\s+(LA)\s+SALUD\b", re.IGNORECASE), 1),
+)
+
+
+def _reponer_preposicion_comida(texto: str) -> str:
+    """Devuelve el «DE» que el modelo se come en tres fórmulas fijas.
+
+    Solo estas tres: son las que aparecieron en el lote y en las tres el
+    español no admite la forma sin preposición. No es un corrector de
+    gramática general — eso terminaría cambiando texto correcto.
+    """
+    if not texto:
+        return texto
+    nuevo = texto
+    n = 0
+    for patron, grupo in _PREPOSICION_COMIDA:
+
+        def _sub(m: "re.Match[str]", _g: int = grupo) -> str:
+            art = m.group(_g)
+            de = "DE" if art.isupper() else "de"
+            ini_art = m.start(_g) - m.start()
+            return f"{m.group(0)[:ini_art]}{de} {m.group(0)[ini_art:]}"
+
+        nuevo, k = patron.subn(_sub, nuevo)
+        n += k
+    if n:
+        logger.warning(
+            f"[PREPOSICION-COMIDA] {n} «de» repuesto(s) en el dictamen final "
+            "(«LEVANTAMIENTO LA GLOSA», «ARTÍCULO N LA LEY», «PROFESIONALES LA SALUD»)."
+        )
+    return nuevo
+
+
+# ── 25-08-2026: la norma existe pero el AÑO está mal ─────────────────────
+# Lote de recepción del día: 2 dictámenes citaron "Resolución 3100 de 2020".
+# El número es correcto —es la resolución de habilitación de servicios— pero
+# el año no: es de 2019 (25 de noviembre). Con el año cambiado la entidad no
+# encuentra la norma y trata la cita como inventada.
+#
+# Tabla estrecha a propósito: solo pares número+año verificados contra la
+# fuente oficial. No se adivina el año de nada.
+_NORMAS_ANIO_EQUIVOCADO: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\bRESOLUCI[ÓO]N\s+3100\s*(?:DE\s*|/)\s*2020\b",
+            re.IGNORECASE,
+        ),
+        "RESOLUCIÓN 3100 DE 2019",
+    ),
+)
+
+
+def _corregir_anio_de_norma(dictamen: str) -> str:
+    """Corrige el año de una norma real citada con el año cambiado.
+
+    No borra la cita: la norma sirve al argumento y es real. Lo que se
+    arregla es el dato que la entidad verifica primero.
+    """
+    if not dictamen:
+        return dictamen
+    nuevo = dictamen
+    for re_mal, correcta in _NORMAS_ANIO_EQUIVOCADO:
+
+        def _sub(m: "re.Match[str]", _c: str = correcta) -> str:
+            # Respeta la caja del párrafo: si venía en minúscula, sale en
+            # minúscula (regla de la ronda 10).
+            return _c if m.group(0).isupper() else _c.capitalize()
+
+        nuevo, n = re_mal.subn(_sub, nuevo)
+        if n:
+            logger.warning(
+                f"[NORMA-ANIO-EQUIVOCADO] {n} cita(s) corregida(s) → {correcta} "
+                "(la norma es real; el año estaba cambiado)."
+            )
     return nuevo
 
 
@@ -4589,11 +5196,27 @@ def generar_texto_tarifa_match(
     modalidad = t.get("modalidad") or "pactada"
     fuente = t.get("fuente_archivo") or "catálogo oficial"
 
+    # NO SE AFIRMA UNA MODALIDAD QUE NO CONCUERDA CON EL NÚMERO (24-08-2026).
+    #
+    # Esta plantilla se imprime tal cual en el documento que se radica, sin IA
+    # de por medio. La auditoría encontró el mismo contrato (0525/2017 de
+    # POSITIVA) y el mismo CUPS leídos de dos maneras dentro del mismo lote:
+    # uno decía "$915.051, modalidad SOAT" y otros dos "SOAT -15 %".
+    #
+    # Cuando la fila del catálogo se contradice a sí misma —la modalidad
+    # anuncia un descuento y la fila lo declara en cero— el valor se sigue
+    # usando, pero la frase "BAJO LA MODALIDAD X" se cambia por una que no
+    # afirma nada que no conste.
+    if info_tarifa.get("tarifa_verificada") is False:
+        frase_modalidad = "SEGÚN EL VALOR REGISTRADO EN EL CATÁLOGO DEL CONTRATO"
+    else:
+        frase_modalidad = f"BAJO LA MODALIDAD {modalidad}"
+
     return (
         f"ESE HUS NO ACEPTA LA GLOSA {codigo_glosa} INTERPUESTA POR {eps.upper()} "
         f"POR VALOR DE {val_obj_fmt}, TODA VEZ QUE EL VALOR FACTURADO ({fact_fmt}) "
         f"COINCIDE EXACTAMENTE CON LA TARIFA PACTADA EN EL {contrato} PARA EL CUPS "
-        f"{cups} — {desc} — BAJO LA MODALIDAD {modalidad}. "
+        f"{cups} — {desc} — {frase_modalidad}. "
         f"LA IDENTIDAD ENTRE VALOR FACTURADO Y VALOR PACTADO CONVIERTE ESTA GLOSA "
         f"EN IMPROCEDENTE: LA ENTIDAD PAGADORA NO PUEDE DESCONOCER UNILATERALMENTE "
         f"EL VALOR QUE ELLA MISMA PACTÓ, POR APLICACIÓN DEL ARTÍCULO 871 DEL CÓDIGO "
@@ -4672,7 +5295,7 @@ def generar_texto_aceptacion_parcial(
 TEXTO_RATIFICADA = (
     "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
     "DE LA GLOSA INICIAL Y SE DA CONTINUACIÓN AL PROCESO DE CONFORMIDAD CON EL ARTÍCULO "
-    "57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007. SE SOLICITA "
+    "57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 23 DEL DECRETO 4747 DE 2007. SE SOLICITA "
     "LA PROGRAMACIÓN DE LA FECHA DE CONCILIACIÓN DE AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE "
     "LAS PARTES. DE NO LLEGARSE A ACUERDO, SE ELEVARÁ EL CONFLICTO ANTE LA "
     "SUPERINTENDENCIA NACIONAL DE SALUD SEGÚN LO DISPUESTO EN EL ART. 126 DE LA LEY "
@@ -4692,9 +5315,10 @@ TEXTO_RATIFICADA = (
 # el argumento de "agotamiento presupuestal".
 TEXTO_DMBUG_TARIFAS = (
     "ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE TARIFAS INTERPUESTA POR DMBUG "
-    "SOBRE LOS SERVICIOS EN MENCION. ENTRE LAS PARTES SE ENCUENTRA SUSCRITO Y "
-    "VIGENTE EL CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025 "
-    "(PROCESO CD477), CON PLAZO HASTA 30/07/2026, QUE EN SU CLÁUSULA SEGUNDA "
+    "SOBRE LOS SERVICIOS EN MENCION. ENTRE LAS PARTES SE SUSCRIBIÓ EL "
+    "CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025 "
+    "(PROCESO CD477), CON PLAZO HASTA 30/07/2026, VIGENTE A LA FECHA DE "
+    "PRESTACIÓN DE LOS SERVICIOS FACTURADOS, QUE EN SU CLÁUSULA SEGUNDA "
     "– PARÁGRAFO 1 INCORPORA EL ANEXO No. 1 CON 7.141 ÍTEMS TARIFADOS, ENTRE "
     "LOS CUALES SE ENCUENTRA LOS SERVICIOS FACTURADOS. LA AFIRMACIÓN DE "
     "INEXISTENCIA DE CONTRATO ES INEXACTA. EL ARGUMENTO DE AGOTAMIENTO "
@@ -4710,11 +5334,38 @@ TEXTO_DMBUG_TARIFAS = (
     "PRESUPUESTAL ES "
     "RESPONSABILIDAD DEL DMBUG (ART. 71 DEL DECRETO 111/1996) Y NO PUEDE "
     "TRASLADARSE AL PRESTADOR. ASIMISMO, EL DECRETO 2423 DE 1996 OPERA EN "
-    "AUSENCIA DE PACTO; HABIENDO CONTRATO VIGENTE, NO PROCEDE COMO CRITERIO "
-    "SUSTITUTIVO. SE SOLICITA EL LEVANTAMIENTO ÍNTEGRO DE LA GLOSA Y EL "
+    "AUSENCIA DE PACTO; HABIENDO CONTRATO VIGENTE A LA FECHA DE LA "
+    "PRESTACIÓN, NO PROCEDE COMO CRITERIO SUSTITUTIVO. SE SOLICITA EL LEVANTAMIENTO ÍNTEGRO DE LA GLOSA Y EL "
     "RECONOCIMIENTO DEL VALOR PACTADO EN EL ANEXO No. 1 DEL CONTRATO "
     "440-DIGSA/DMBUG-2025."
 )
+
+
+def _dmbug_cubierto_por_el_contrato(fecha_hecho) -> bool:
+    """¿El servicio se prestó dentro del plazo del contrato 440-DIGSA/DMBUG-2025?
+
+    Caso real 25-08-2026. El texto canónico de arriba salió 14 veces en el
+    lote del día afirmando que el contrato «SE ENCUENTRA SUSCRITO Y VIGENTE»
+    y, en la misma frase, que su plazo iba «HASTA 30/07/2026» — una fecha ya
+    pasada. La entidad lee las dos mitades y la respuesta se cae sola.
+
+    El plazo se lee de la malla contractual (fuente única), no de un dato
+    escrito a mano acá. Si el servicio quedó FUERA del plazo, este texto no
+    sirve: su argumento central sería falso y la glosa debe ir por el camino
+    normal, que sí lee el caso y pasa por control de calidad.
+
+    Sin fecha del servicio se deja pasar el texto: una glosa siempre es de un
+    servicio pasado y el contrato rigió casi todo el período: bloquear por no
+    saber la fecha le quitaría al hospital su mejor defensa.
+    """
+    if fecha_hecho is None:
+        return True
+    try:
+        from app.services import malla_contractual as _malla
+
+        return _malla.vigente("DISPENSARIO MEDICO", fecha_hecho) is not None
+    except Exception:  # la malla nunca puede tumbar un dictamen
+        return True
 
 
 def _es_dispensario_medico(eps: str) -> bool:
@@ -5249,6 +5900,75 @@ _KEYWORDS_ASEGURADORAS_SOAT = (
 )
 
 
+# ── 25-08-2026, decisión del área: las ratificadas de ASEGURADORA se analizan ──
+# La 2.ª auditoría del lote señaló que las 21 respuestas a glosas ratificadas
+# salían todas con la misma plantilla y ninguna entraba en el motivo concreto
+# por el que la entidad ratificó (caso HUS0000512271, Aurora: «se ratifica por
+# estancia no autorizada», contestado con el texto genérico).
+#
+# Yesid decidió: «en el caso de las ratificadas, cuando son de aseguradoras
+# estas no van con esa respuesta, sino que toca hacerle su respectivo
+# análisis». Las demás —EPS, Dispensario, Policía, Magisterio, PPL— siguen con
+# la plantilla institucional, que es lo que el área pidió en abril.
+#
+# Esta lista es a propósito MÁS ESTRECHA que _KEYWORDS_ASEGURADORAS_SOAT, que
+# se usa para otra cosa (reforzar el prompt de tarifas) e incluye al
+# Dispensario y a Sanidad Militar. Aquí eso sería un error: esas entidades
+# tienen contrato y su propio flujo. Acá solo van compañías de seguros y ARL.
+_ASEGURADORAS_QUE_SE_ANALIZAN = (
+    "ASEGURADORA",
+    "SEGUROS",
+    "COMPAÑIA DE SEGUROS",
+    "COMPANIA DE SEGUROS",
+    "PREVISORA",
+    "AURORA",
+    "SOLIDARIA",
+    "MUNDIAL",
+    "BOLIVAR",
+    "MAPFRE",
+    "AXA",
+    "ALLIANZ",
+    "LIBERTY",
+    "COLPATRIA",
+    "EQUIDAD",
+    "SURAMERICANA",
+    "POSITIVA",
+    " ARL",
+    "ARL ",
+)
+# Entidades que llevan alguna de esas palabras pero NO son aseguradoras para
+# este efecto: tienen contrato con el hospital y su propia forma de responder.
+_NO_SON_ASEGURADORA_AUNQUE_LO_PAREZCAN = (
+    "DISPENSARIO",
+    "DIRECCION DE SANIDAD",
+    "DIRECCIÓN DE SANIDAD",
+    "SANIDAD MILITAR",
+    "SANIDAD NAVAL",
+    "SANIDAD AEREA",
+    "SANIDAD AÉREA",
+    "POLICIA NACIONAL",
+    "POLICÍA NACIONAL",
+    "FOMAG",
+    "MAGISTERIO",
+    "FIDUPREVISORA",
+)
+
+
+def _ratificada_va_al_analisis(eps: str) -> bool:
+    """¿Esta ratificación la contesta el motor en vez de la plantilla fija?
+
+    Sí cuando el pagador es una aseguradora o una ARL. Con esas, la plantilla
+    genérica deja sin refutar el motivo concreto de la ratificación — y en
+    auditoría lo que no se refuta se descuenta.
+    """
+    if not eps:
+        return False
+    n = str(eps).upper()
+    if any(k in n for k in _NO_SON_ASEGURADORA_AUNQUE_LO_PAREZCAN):
+        return False
+    return any(k in n for k in _ASEGURADORAS_QUE_SE_ANALIZAN)
+
+
 def _es_aseguradora_soat(nombre: str) -> bool:
     """True si el nombre parece de aseguradora SOAT/ARL sin contrato pactado."""
     if not nombre:
@@ -5696,9 +6416,18 @@ class GlosaService:
         tiene_contrato = eps_key in (contratos_db or {})
 
         argumento_fijo = None
-        if es_ratificacion:
+        # 25-08-2026: con una ASEGURADORA, la ratificación va al motor para que
+        # refute el motivo concreto. Con las demás sigue la plantilla del área.
+        _rat_al_analisis = es_ratificacion and _ratificada_va_al_analisis(str(data.eps or ""))
+        if es_ratificacion and not _rat_al_analisis:
             argumento_fijo = TEXTO_RATIFICADA
             tipo_glosa = "RATIFICADA"
+        elif _rat_al_analisis:
+            tipo_glosa = "RATIFICADA"
+            logger.info(
+                f"[RATIFICADA-ASEGURADORA] {data.eps} — se analiza el motivo en vez de "
+                "usar la plantilla fija (decisión del área, 25-08-2026)."
+            )
         elif es_extemporanea:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
@@ -5710,6 +6439,11 @@ class GlosaService:
             # una y dejaría mudas las demás — y en auditoría callar sobre un
             # concepto equivale a aceptarlo: la EPS descuenta lo no refutado.
             and len(self._subconceptos_actuales) < 2
+            # 25-08-2026: y que el servicio esté DENTRO del plazo del
+            # contrato. Fuera del plazo el texto canónico afirma algo falso.
+            and _dmbug_cubierto_por_el_contrato(
+                getattr(data, "fecha_radicacion", None) or getattr(data, "fecha_recepcion", None)
+            )
         ):
             # Override institucional (Yesid abr 2026): las glosas TA* del
             # Dispensario Médico Bucaramanga (DMBUG) responden con el texto
@@ -6196,6 +6930,7 @@ class GlosaService:
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
                 clausulas_contrato=_clausulas_contrato,
                 fecha_hecho=_fecha_hecho,
+                es_ratificacion=es_ratificacion,
             )
 
             # ── Concepto×concepto (jun-2026) ──
@@ -6440,10 +7175,23 @@ class GlosaService:
                     f"  • Modalidad real   : {modalidad_real}\n"
                     f"  • Tarifa pactada   : {pact_txt}\n"
                     f"  • Contrato         : {contrato_real}\n"
-                    f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
-                    f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
-                    f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
-                    "REGLAS OBLIGATORIAS:\n"
+                    # Sin cifra no se escribe "$0": el 0 de este motor
+                    # significa "no se pudo leer", y ponerlo como dato hacia
+                    # que la IA concluyera sola que se facturo por debajo de lo
+                    # pactado (ver el dictamen GL-204). Si no hay cifra, se le
+                    # dice a la IA que no la hay.
+                    + (
+                        f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
+                        if val_fact > 0
+                        else "  • Valor facturado HUS: NO REGISTRADO en el caso\n"
+                    )
+                    + (
+                        f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
+                        if val_rec > 0
+                        else "  • Valor reconocido EPS: NO REGISTRADO en el caso\n"
+                    )
+                    + f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
+                    + "REGLAS OBLIGATORIAS:\n"
                     "  1. Cita SIEMPRE el contrato y la modalidad REALES del catálogo,\n"
                     "     NO los genéricos de la ficha EPS global.\n"
                     "  2. Si la modalidad contiene 'PROPIA', 'PROPIAS', 'MANUAL HUS',\n"
@@ -6454,8 +7202,15 @@ class GlosaService:
                     "  3. Si la modalidad contiene 'SOAT' o 'UVB': cita la Circular\n"
                     "     047/2025 MinSalud + UVB 2026 $12.110.\n"
                     "  4. Usa el VALOR facturado y reconocido EXACTOS de arriba.\n"
-                    "  5. Si tarifa pactada > valor facturado: la glosa es\n"
-                    "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
+                    + (
+                        "  5. Si tarifa pactada > valor facturado: la glosa es\n"
+                        "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
+                        if val_fact > 0
+                        else "  5. NO digas que se facturó por debajo de lo pactado: el\n"
+                        "     valor facturado NO quedó registrado en este caso, así\n"
+                        "     que no hay con qué compararlo. Pedí que se aporte la\n"
+                        "     cifra en vez de afirmar que la glosa es improcedente.\n"
+                    )
                 )
                 user_prompt = user_prompt + bloque_tarifa
 
@@ -8005,6 +8760,24 @@ class GlosaService:
             except Exception as _e_cfx:
                 logger.debug(f"[CUPS-FACTURA] red final no aplicada: {_e_cfx}")
 
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 35 (25-08-2026) — RED FINAL CUPS sin respaldo.
+            #  Lote de 117 dictámenes de recepción: 19 citaron un CUPS
+            #  inexistente. El archivo de recepción no trae columna de
+            #  CUPS, así que la IA rellenó el hueco: el mismo 734101 salió
+            #  como "radiografía de maxilar inferior" y como "radiografía
+            #  de pierna". Se retira el número cuando no está en lo que la
+            #  IA leyó NI se puede verificar en el catálogo.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_cups_respaldado = _neutralizar_cups_sin_respaldo(
+                    dictamen, _evidencia_leida
+                )
+                if _dictamen_cups_respaldado != dictamen:
+                    dictamen = _dictamen_cups_respaldado
+            except Exception as _e_csr:
+                logger.debug(f"[CUPS-SIN-RESPALDO] red final no aplicada: {_e_csr}")
+
             # Ronda 22 — RED FINAL: norma citada para el tema equivocado
             # (caso ECOOPSOS: Ley 1388/2010 —cáncer— citada para discapacidad
             # auditiva). Defensa en profundidad de la regla 8.terdecies.
@@ -8014,6 +8787,57 @@ class GlosaService:
                     dictamen = _dictamen_norma_ok
             except Exception as _e_nm:
                 logger.debug(f"[NORMA-TEMA-EQUIVOCADO] red final no aplicada: {_e_nm}")
+
+            # 25-08-2026 — RED FINAL: norma real citada con el año cambiado
+            # ("Resolución 3100 de 2020" cuando es de 2019). La entidad no
+            # la encuentra y la trata como inventada.
+            try:
+                _dictamen_anio_ok = _corregir_anio_de_norma(dictamen)
+                if _dictamen_anio_ok != dictamen:
+                    dictamen = _dictamen_anio_ok
+            except Exception as _e_na:
+                logger.debug(f"[NORMA-ANIO-EQUIVOCADO] red final no aplicada: {_e_na}")
+
+            # 25-08-2026 — RED FINAL: el «de» que el modelo se come
+            # («LEVANTAMIENTO LA GLOSA», «ARTÍCULO 17 LA LEY»). Va de última
+            # para que también repare lo que dejen las redes anteriores.
+            # 25-08-2026 — RED FINAL: norma derogada citada sin decir desde
+            # cuándo (Res. 2275/2023, derogada por la 948/2026 el 14-05-2026).
+            # No se reemplaza: se completa con la regla de la fecha.
+            try:
+                _dictamen_derogada_ok = _completar_norma_derogada(dictamen)
+                if _dictamen_derogada_ok != dictamen:
+                    dictamen = _dictamen_derogada_ok
+            except Exception as _e_nd:
+                logger.debug(f"[NORMA-DEROGADA] red final no aplicada: {_e_nd}")
+
+            # 25-08-2026 — RED FINAL: artículo equivocado de una norma real.
+            # El Art. 20 del Decreto 4747 es el del RIPS; el del trámite de
+            # glosas es el 23. Salió en el 100 % de las ratificaciones.
+            try:
+                _dictamen_art_ok = _corregir_articulo_mal_citado(dictamen)
+                if _dictamen_art_ok != dictamen:
+                    dictamen = _dictamen_art_ok
+            except Exception as _e_am:
+                logger.debug(f"[ARTICULO-MAL-CITADO] red final no aplicada: {_e_am}")
+
+            # 25-08-2026 — AVISO: la respuesta habla de la factura y la glosa
+            # era de fondo (FA1606 = quién paga; FA0703 = si ya estaba en el
+            # paquete). No se reescribe el argumento: se marca para que el
+            # gestor lo devuelva antes de radicar.
+            try:
+                _dictamen_avisado = _avisar_si_contesta_la_forma(dictamen, str(codigo_det or ""))
+                if _dictamen_avisado != dictamen:
+                    dictamen = _dictamen_avisado
+            except Exception as _e_cf2:
+                logger.debug(f"[CONTESTA-LA-FORMA] aviso no aplicado: {_e_cf2}")
+
+            try:
+                _dictamen_con_de = _reponer_preposicion_comida(dictamen)
+                if _dictamen_con_de != dictamen:
+                    dictamen = _dictamen_con_de
+            except Exception as _e_pc:
+                logger.debug(f"[PREPOSICION-COMIDA] red final no aplicada: {_e_pc}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 5 (16-jun-2026) — RED FINAL EPS inventada.
@@ -8135,6 +8959,9 @@ class GlosaService:
                 # Ronda 18 (Bug Y): si la glosa cita CTR-XXXX-XXX-HUS y el
                 # dictamen dice "SIN CONTRATO PACTADO", reescribirlo.
                 _dict_y = _reescribir_negacion_contrato(_dict_u, texto_glosa=_texto_glosa_input_md)
+                # 25-08-2026: un contrato vencido no «permanece vigente». Ver
+                # _no_afirmar_contrato_vencido — GL-118 y GL-119.
+                _dict_y = _no_afirmar_contrato_vencido(_dict_y, eps=str(data.eps or ""))
                 # Ronda 18 (Bug Z): audita cláusulas evadidas (no modifica;
                 # registra warning para que el gestor revise).
                 try:
@@ -9237,7 +10064,10 @@ class GlosaService:
     # Qué documento acredita cada tipo de soporte del expediente, con la
     # norma que lo respalda. Solo tipos que el indexador reconoce de verdad.
     _MARCO_LEGAL_SOPORTE = {
-        "factura_electronica": ("Factura electrónica de venta", "Res. 2275/2023 (FEV)"),
+        "factura_electronica": (
+            "Factura electrónica de venta",
+            "Res. 948/2026 (FEV); Res. 2275/2023 si el servicio es anterior al 14-05-2026",
+        ),
         "historia_clinica": ("Historia clínica", "Res. 1995/1999"),
         "epicrisis": ("Epicrisis", "Res. 1995/1999"),
         "hoja_atencion_urgencias": ("Hoja de atención de urgencias", "Res. 1995/1999"),
@@ -9245,15 +10075,24 @@ class GlosaService:
             "Hoja de administración de medicamentos",
             "Res. 1995/1999",
         ),
-        "rips": ("RIPS radicados", "Res. 2275/2023"),
-        "cuv": ("CUV — constancia de validación del Ministerio", "Res. 2275/2023"),
+        # RIPS, CUV y XML: la norma cambió el 14-05-2026 (Res. 948/2026 derogó
+        # la Res. 2275/2023). Se nombran las dos con la regla de la fecha para
+        # que el dictamen no cite una derogada sobre un servicio de este año.
+        "rips": ("RIPS radicados", "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)"),
+        "cuv": (
+            "CUV — constancia de validación del Ministerio",
+            "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
+        ),
         "comprobante_recibido_cobro": ("Comprobante de recibido de cobro", "Res. 2284/2023"),
         "furips": ("FURIPS", "Circular 022/2023"),
         "resultados_msps": ("Resultados de apoyo diagnóstico", "Res. 3047/2008 Anexo 5"),
         "otros_procedimientos": ("Soporte de procedimientos", "Res. 3047/2008 Anexo 5"),
         "pde": ("Soporte de estancia", "Res. 3047/2008 Anexo 5"),
         "pdx": ("Soporte de diagnóstico", "Res. 3047/2008 Anexo 5"),
-        "xml_cufe": ("XML CUFE de la factura", "Res. 2275/2023"),
+        "xml_cufe": (
+            "XML CUFE de la factura",
+            "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
+        ),
     }
 
     def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:
@@ -9355,6 +10194,29 @@ class GlosaService:
         contrato = a_mayusculas_html(contrato) if contrato else contrato
         tarifa = a_mayusculas_html(tarifa) if tarifa else tarifa
         normas_clave = a_mayusculas_html(normas_clave) if normas_clave else normas_clave
+        # Solo lo que de verdad es una norma llega al FUNDAMENTO NORMATIVO.
+        normas_clave = _solo_normas_citables(normas_clave)
+
+        # ── El valor objetado dice la verdad, no «$ 0.00» ──────────────────
+        #
+        # 24-08-2026, auditoría independiente: en 5 de 9 dictámenes la celda
+        # VALOR OBJETADO decía «$ 0.00» —porque el texto pegado no traía
+        # cifra— y aun así el dictamen afirmaba «GLOSA NO ACEPTADA · SUBSANADA
+        # EN SU TOTALIDAD» con el mismo tono de seguridad que un caso con
+        # cifra clara. Un documento que se radica ante la EPS diciendo que se
+        # objetan cero pesos es un documento que se cae solo.
+        #
+        # No se inventa una cifra: se escribe lo único cierto —que el valor
+        # está en el expediente— que es la misma frase que el motor ya usa
+        # cuando la IA intenta alucinar un monto.
+        _valor_txt = str(valor or "").strip()
+        _sin_cifra = _valor_txt in ("", "$ 0.00", "$0.00", "$ 0", "$0", "0")
+        if _sin_cifra:
+            valor = "VALOR EN EL EXPEDIENTE"
+            logger.warning(
+                "[VALOR-OBJETADO-VACIO] el dictamen se generó sin cifra objetada; "
+                "la celda dice «VALOR EN EL EXPEDIENTE» en vez de «$ 0.00»"
+            )
         colores = {
             "TA_TARIFA": "#1e40af",
             "SO_SOPORTES": "#7c3aed",
@@ -9387,7 +10249,14 @@ class GlosaService:
         if servicio or contrato or tarifa:
             servicio_html = f"<div><b>Servicio objetado:</b> {servicio}</div>" if servicio else ""
             contrato_html = f"<div><b>Contrato:</b> {contrato}</div>" if contrato else ""
-            tarifa_html = f"<div><b>Tarifa pactada:</b> {tarifa}</div>" if tarifa else ""
+            # 25-08-2026 (2.ª auditoría, HUS0000538289): el mismo recuadro decía
+            # «Contrato: SIN CONTRATO PACTADO» y debajo «Tarifa PACTADA: SOAT
+            # PLENO». Si no hay contrato no hay nada pactado — la contradicción
+            # está en la etiqueta, no en el dato: el SOAT pleno es justamente lo
+            # que se aplica A FALTA de pacto. Se cambia la palabra.
+            _sin_pacto = "SIN CONTRATO" in str(contrato or "").upper()
+            _etiqueta_tarifa = "Tarifa aplicada" if _sin_pacto else "Tarifa pactada"
+            tarifa_html = f"<div><b>{_etiqueta_tarifa}:</b> {tarifa}</div>" if tarifa else ""
             bloque_servicio = f"""
             <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-top:10px;">
                 {servicio_html}{contrato_html}{tarifa_html}

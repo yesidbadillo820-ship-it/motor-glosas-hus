@@ -63,6 +63,647 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (cierre 3) — El repaso normativo: otros cuatro artículos mal, y un argumento que estábamos regalando
+
+Siguiendo lo que pidió el área —leer el Decreto 4747 completo y el Decreto 780
+de 2016—, apareció más de lo mismo. Y esta vez apareció también algo a favor.
+
+**El Decreto 780 tenía su propio artículo inventado.** El corpus guardaba un
+artículo 2.5.3.4.1.1 titulado «Prohibición de auditoría previa como barrera».
+Se verificó contra el Decreto 441 de 2022, que es el que le agregó ese capítulo
+al 780: **el 2.5.3.4.1.1 es el «Objeto» del capítulo** y no dice nada de
+auditoría previa. El texto estaba inventado. Se corrigió y se cargó, con su
+texto literal, el 2.5.3.4.3.3, que sí es el de la auditoría de cuentas médicas.
+
+**Pero la prohibición SÍ existe — y en un sitio mejor.** Está en el
+**artículo 56 de la Ley 1438 de 2011**:
+
+> «Se prohíbe el establecimiento de la obligatoriedad de procesos de auditoría
+> previa a la presentación de las facturas por prestación de servicios o
+> cualquier práctica tendiente a impedir la recepción.»
+
+Es de rango de **ley**, más fuerte que el decreto o la resolución. El motor
+tenía el argumento correcto colgado de una norma inventada: si la entidad iba a
+verificar la cita, no encontraba nada. Ahora está donde debe, y además quedó
+cargado el artículo 5 de la Resolución 2284 de 2023, que repite la prohibición
+y la llama por su nombre: «prácticas dilatorias no autorizadas».
+
+**Y tres artículos más de la Ley 1438 tenían mal el nombre:**
+
+| El motor decía | Lo que dice de verdad |
+|---|---|
+| Art. 56 — «Trámite de pagos» | «Pagos a los prestadores de servicios de salud» |
+| Art. 105 — «Prohibición de intromisión en el acto médico» | «Autonomía profesional» |
+| Art. 126 — «Supervisión, inspección y vigilancia» | «Función jurisdiccional de la Superintendencia Nacional de Salud» |
+
+Dos de ellos tenían además **texto inventado**. El del 56 hablaba de pagar «el
+monto total dentro de los treinta días» — la ley no dice eso, remite los plazos
+al Gobierno Nacional y a la Ley 1122. Afirmar un plazo que la norma no fija era
+darle a la entidad una cita fácil de desmentir. El del 105 le atribuía a la ley
+la frase «las entidades no podrán interferir», que tampoco está.
+
+**Y en la Ley 100 había otro texto que no existe.** El artículo 177 figuraba
+como «Obligaciones de las EPS — movilizar los recursos para el otorgamiento del
+POS a través de patrimonios autónomos». Se buscó esa frase en el texto completo
+de la ley: **no aparece**. El artículo 177 es la *definición* de qué es una EPS.
+Importa porque el motor tiene una malla entera construida sobre esa creencia —
+la malla hace lo correcto (el 177 no viene a cuento en una glosa de tarifa),
+pero su razón estaba mal escrita, y de ahí salía la cita. El artículo 178, de
+paso, tenía un resumen donde debía ir la cita textual: si el motor lo ponía
+entre comillas, no coincidía con la ley.
+
+**El plazo de pago estaba dicho a medias.** El artículo 13 de la Ley 1122
+figuraba como si las EPS tuvieran que girar «como mínimo el 50% dentro de los
+cinco días», así, en plano. El literal real lo condiciona a la **modalidad de
+pago**: 100% mes anticipado si el contrato es por capitación, y el 50%
+anticipado solo si es por evento, global prospectivo o grupo diagnóstico. Y los
+treinta días del saldo corren solo «en caso de no presentarse objeción o glosa
+alguna». Citar la regla sin sus condiciones era darle a la entidad la forma de
+tumbarla de una en cualquier contrato capitado.
+
+**Tres normas resultaron estar bien**, y también vale anotarlo: la Resolución
+1995 de 1999 (la de historia clínica), el artículo 71 del Decreto 111 —el que
+sostiene la defensa contra el «presupuesto agotado» del Dispensario— y el
+artículo 34 de la Ley 23 de 1981. Coinciden literalmente con la fuente.
+
+**Cuánto falta.** Se midió: de las 147 normas del corpus, **28 tienen texto de
+artículo guardado**. Al cierre del día quedan **12 normas verificadas contra la
+fuente oficial (29 artículos)** y **16 pendientes (20 artículos)**. Las
+verificadas son todas las que el motor usa a diario. Las que quedan son de uso
+ocasional: Ley 80, Ley 599, el CPACA, la Resolución 1885 y otras.
+
+**El balance del repaso, sin adornos:** de las doce normas revisadas a fondo
+hoy, **seis tenían al menos un artículo con el nombre o el texto inventado**.
+Ese es el tamaño real de lo que destapó la auditoría de la madrugada.
+
+### 25-08-2026 (cierre 2) — Las ratificadas de aseguradora ya no salen con la plantilla
+
+El área revisó los seis pendientes y respondió. Cuatro ya estaban hechos
+—el motor reiniciado, el archivo de recepción reenviado, los 6 archivos de
+objeciones de COOSALUD subidos a DGH— y quedaron dos decisiones.
+
+**La decisión sobre las ratificaciones.** Yesid la resolvió así: «cuando son de
+aseguradoras, estas no van con esa respuesta, sino que toca hacerle su
+respectivo análisis».
+
+Quedó implementado. Cuando el pagador es una **compañía de seguros o una ARL**,
+la ratificación ya no sale con el texto fijo: la redacta el motor, y le llega la
+instrucción de **nombrar la razón concreta por la que la entidad ratificó** y
+responderla punto por punto. Se le entrega además el argumento que faltaba: el
+artículo 23 del Decreto 4747 prohíbe formular glosas nuevas sobre la misma
+factura salvo por hechos nuevos, así que una ratificación que estrena causal es
+rebatible.
+
+**Las demás siguen igual.** EPS, Dispensario, Policía, Magisterio y PPL
+conservan la plantilla institucional que el área pidió en abril — con el
+artículo corregido, eso sí.
+
+**Un criterio que hay que confirmar.** Para decidir quién es «aseguradora» se
+hizo una lista corta: compañías de seguros y ARL (Aurora, La Previsora,
+Solidaria, Mundial, Positiva, Suramericana y las demás del ramo). Se dejaron
+**por fuera** a propósito el Dispensario, Sanidad Militar, la Policía y el
+FOMAG, porque tienen contrato con el hospital y su propia forma de responder —
+aunque el nombre de algunas lleve la palabra «seguros» o «previsora». Si alguna
+de esas también debe analizarse, se mueve.
+
+**La cuenta de Edgar Silva** queda anotada como tarea de pantalla: esa cuenta
+vive en la base del hospital, no en el código. Hay que entrar a
+Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y dejar
+`carterahus02@sinacsc.com`.
+
+**Y se armó un banco de diez pruebas** para comprobar en pantalla que todo lo
+del día quedó funcionando: cada caso apunta a un defecto concreto de hoy, con
+lo que debe pasar y la señal de alarma al lado.
+
+### 25-08-2026 (cierre) — Las pantallas que fallaban sin decir nada
+
+Terminado el asunto de las respuestas, se retomó lo de la página. Primero se
+midió, y la medición cambió lo que había que hacer.
+
+**Lo que se creía y lo que resultó.** El tablero de mejoras tenía anotado que
+había que ponerle a las tablas un aviso de «cargando». Al medirlo apareció algo
+peor: de las **278** funciones de la página que le piden datos al motor, **77**
+tienen su manejo de error, pero ese manejo **solo escribe en la consola del
+navegador** — una ventana que el auditor no abre nunca.
+
+O sea que si se cae la red, la tabla vieja se queda en pantalla **con cara de
+estar al día**, y el auditor concilia contra números que ya no son. No era un
+problema de espera: era de silencio.
+
+**La peor de todas: la tarjeta de glosas por vencerse.** Si fallaba, no
+aparecía, y nadie se enteraba de que había glosas a punto de vencerse. Una
+glosa no contestada dentro del plazo **se entiende aceptada** (Art. 57 de la
+Ley 1438). El silencio de esa tarjeta cuesta plata. Y encima se devolvía
+callada también cuando el servidor respondía con error, no solo cuando fallaba
+la red.
+
+Ahora las **14 pantallas donde usted mira plata o toma decisiones** avisan con
+un mensaje que dice qué no cargó y advierte que **lo que ve puede estar
+desactualizado**: vencimientos, historial, tablero, cobranza, resumen del mes,
+las cuatro del tablero de mando, ADRES, contratos, plata recuperada, analítica
+predictiva y los comentarios del expediente. El aviso no se repite antes de 15
+segundos: con la red caída fallan seis cosas a la vez y seis avisos seguidos no
+los lee nadie.
+
+**La cortina de carga decía algo que no era.** Cuando el sistema estaba
+*borrando datos*, la pantalla mostraba «Identificando tipo de glosa…».
+Resulta que cinco funciones le pasaban un mensaje a la cortina y la cortina lo
+descartaba, rotando siempre la lista del análisis. Ya respeta lo que le dicen.
+
+**Dos casillas del tablero se cerraron sin escribir código, porque la premisa
+era falsa:**
+
+- Se creía que cada estado (Aceptada, Radicada, Conciliada…) se pintaba de
+  color distinto en cada pantalla. **Se midió: no pasa.** El único con varios
+  tonos es «Ratificada», y son los tres del mismo rojo — que es como se pinta
+  un recuadro, no un error.
+- Se creía que la página no tenía disciplina de colores. **Tampoco.** Tiene
+  **su propio** sistema, con 90 nombres de color y 2.072 usos. Lo que sobra es
+  un segundo juego de colores que se carga y nadie usa. Unificarlos serían
+  2.072 cambios sobre algo que funciona: no se hace sin que usted lo pida.
+
+**Y un conteo mío que salió mal, otra vez.** El primer conteo de pantallas
+mudas dio 24; el bueno era 77. Se caían de la cuenta las funciones que mezclan
+un manejo vacío con uno de consola. Es la segunda vez que un conteo de estos
+sale corto (el de julio dio 14 y eran 7). Quedó anotado en la prueba para que
+la próxima vez no se repita.
+
+### 25-08-2026 (noche) — Un segundo auditor encontró un artículo de ley mal citado en TODAS las ratificaciones
+
+Llegó una segunda auditoría de las mismas 117 respuestas, hecha por fuera y
+con otro método: en vez de mirar el texto por dentro, contrastó las citas
+contra las leyes publicadas y comparó, código por código, lo que el pagador
+reclamó contra lo que el motor contestó. Encontró cosas que la primera
+revisión no vio.
+
+**Lo más grave: el artículo estaba mal, y el motor mismo se daba el visto bueno.**
+
+Las 28 respuestas de ratificación —el 100 %— decían que el trámite de glosas
+está en el **artículo 20 del Decreto 4747 de 2007**. Se fue a buscar el texto
+oficial del decreto en el Ministerio de Salud: el artículo 20 es el del
+**RIPS**. El del trámite de glosas es el **23**.
+
+Y al revisar el decreto completo apareció lo de fondo: de los tres artículos
+de esa norma que el motor tenía guardados, **los tres estaban mal**, con
+título y texto inventados:
+
+| El motor decía | Lo que dice de verdad |
+|---|---|
+| Art. 11 — «Atención de urgencias» | «Verificación de derechos de los usuarios» |
+| Art. 20 — «Trámite de glosas» | «Registro Individual de Prestaciones — RIPS» |
+| Art. 21 — «Pago durante trámite de glosas» | «Soportes de las facturas» |
+
+Lo peligroso no era la cita: era que **se aprobaba sola**. El revisor de citas
+del motor compara contra esa misma lista guardada, así que la respuesta salía
+sellada «citas verificadas» llevando una norma que dice otra cosa. Es la misma
+lección de las sentencias del 24 de agosto: una lista sin verificar no
+verifica nada.
+
+Se corrigieron los tres artículos con el texto literal del decreto, se
+agregaron el 22 y el 23 que faltaban, y se repasaron **una por una las 17
+citas** a ese decreto que había repartidas por todo el programa.
+
+De paso quedó algo bueno: el artículo 11 de verdad —el de verificación de
+derechos— es justo el que sirve para las glosas de «este paciente era de otro
+responsable». Antes no se podía usar porque estaba mal guardado.
+
+**Una frase entrecomillada que no existe en ninguna ley.**
+Varias respuestas ponían entre comillas, como si fuera del decreto, un texto
+sobre que la urgencia no se puede condicionar a autorización previa. Se buscó
+en el decreto completo: **no está**. Al corregir la lista guardada, el propio
+revisor del motor ya la detecta y le quita las comillas.
+
+**Cinco glosas contestadas por el lado equivocado ($3.564.600).**
+El auditor cruzó los 79 códigos de las respuestas contra el motivo real del
+pagador. **74 de 79 sí contestaban el tema** — buen resultado. Los cinco que
+no, fallaron todos igual:
+
+- **Tres glosas FA1606** ($2.571.800): el pagador dijo «el régimen del
+  afiliado el día de la atención era contributivo y en el contrato figura
+  subsidiado», y el motor contestó que la factura electrónica es válida ante
+  la DIAN. No es lo que preguntaron.
+- **Dos glosas FA0703** ($992.800): el pagador dijo «este insumo no es
+  facturable» nombrando su código, y el motor contestó lo mismo de la DIAN.
+
+En auditoría, lo que no se refuta se descuenta. Ahora el motor sabe cómo se
+contesta cada uno de esos dos códigos —el FA1606 con la consulta BDUA a la
+fecha de la atención, el FA0703 con el anexo del paquete— y si aun así sale
+hablando de la DIAN, la respuesta baja con un aviso visible: **«REVISAR ANTES
+DE RADICAR»**.
+
+**Dos cosas de forma que también salieron:**
+
+- El recuadro verde decía «Contrato: SIN CONTRATO PACTADO» y debajo «Tarifa
+  **pactada**: SOAT PLENO». Si no hay contrato no hay nada pactado. Ahora esa
+  línea dice «Tarifa **aplicada**» — que es lo correcto: el SOAT pleno es
+  justamente lo que se aplica a falta de pacto.
+- Cuando la glosa no es de urgencias, el motor cambiaba la cita del artículo
+  168 por la frase «LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA
+  GENERAL DE SALUD». Eso se lee como el título de una norma que nadie puede
+  ir a buscar. Ahora dice «las reglas generales del Sistema General de
+  Seguridad Social en Salud», que se lee por lo que es.
+
+**Algo que ya estaba arreglado y salió igual.** Esa frase aparecía además en
+la lista de «3 normas más relevantes». El filtro que la saca de ahí existe
+desde el 24 de agosto y **sí estaba** en la versión del hospital — pero las
+117 respuestas se generaron antes de reiniciar el motor. Es la prueba de que
+lo corregido no sirve de nada hasta que la PC de cartera se reinicia.
+
+**Lo que NO se tocó, porque es decisión del área.** El auditor señala que las
+21 respuestas de ratificación usan la misma plantilla y ninguna entra en el
+motivo concreto por el que la entidad ratificó. La plantilla la pidió el área
+y funciona jurídicamente, así que no se cambió por cuenta propia. Queda la
+pregunta en PENDIENTE.
+
+### 25-08-2026 (tarde) — Se revisaron las 117 respuestas que salieron hoy
+
+Con el archivo de recepción ya cargado, se pasó **una por una** las 117
+respuestas que redactó el motor por el revisor de citas. Salieron cinco
+problemas y los cinco quedaron corregidos con su prueba.
+
+**1. Códigos CUPS que nadie le mostró al motor (12 respuestas).**
+El archivo de recepción **no trae columna de CUPS** — trae factura, entidad y
+valor. El motor, al no tener el código, se lo inventaba. La prueba de que era
+invento y no un dato: el **mismo código 734101** salió como «radiografía de
+maxilar inferior» en una respuesta y como «radiografía de pierna» en otra; el
+**730102** salió como «urgencias adultos» y como «internación adultos
+complejidad alta». Un código no puede nombrar dos servicios. Un CUPS inventado
+es de lo primero que la EPS cruza contra su sistema: no lo encuentra y ratifica
+la glosa completa, por buena que esté la defensa.
+*Ahora:* si el código no aparece en lo que el motor tuvo a la vista **y**
+tampoco se puede verificar en el catálogo, sale del documento y queda el
+nombre del servicio. Un código verificable nunca se borra.
+
+**2. El Dispensario: un contrato vencido presentado como vigente (14 respuestas).**
+El texto fijo del Dispensario decía, en la misma frase, que el contrato
+440-DIGSA/DMBUG-2025 «se encuentra suscrito y **vigente**» y que su plazo iba
+«hasta el **30/07/2026**». Hoy es 25 de agosto: el plazo se cumplió hace 26
+días. La entidad lee las dos mitades de la frase y tumba la respuesta sin
+discutir el fondo.
+*Ahora:* el texto dice que el contrato estaba vigente **a la fecha en que se
+prestó el servicio** —que es lo cierto y además defiende mejor—, y si el
+servicio quedó fuera del plazo el motor no usa ese texto: manda la glosa por
+el camino normal, que sí lee el caso.
+
+**3. Una ley real que el motor daba por inventada (3 respuestas).**
+El revisor marcaba la **Ley 1164 de 2007** como inexistente. Existe: es la ley
+del Talento Humano en Salud y su artículo 26 dice justo lo que la respuesta le
+atribuye (que el acto profesional «se caracteriza por la autonomía
+profesional»). Lo que faltaba era tenerla cargada. Se verificó contra el texto
+oficial y se cargó con sus artículos 26 y 35.
+
+**4. Una resolución citada con el año cambiado (2 respuestas).**
+Se citó la «Resolución 3100 de 2020». El número es correcto —es la de
+habilitación de servicios— pero es de **2019**. Con el año cambiado la entidad
+no la encuentra y trata la cita como inventada. Se corrige sola.
+
+**5. La palabra «de» que se comía el modelo (11 respuestas).**
+Salieron frases como «se solicita el levantamiento **la** glosa» y «el artículo
+17 **la** ley 1751». La peor: dentro de unas comillas que citaban textualmente
+el artículo 17, decía «los profesionales **la** salud» — o sea, el hospital le
+atribuía a la ley una frase mal transcrita. Se comprobó que no era ninguna de
+las mallas del motor: lo escribía así el modelo. Ahora se repone.
+
+**Además, dos cosas que ya venían pendientes:**
+
+- **Amenazas al pagador.** Había una instrucción que las prohibía, pero era
+  solo eso —una instrucción— y en las pruebas de agosto el motor amenazó igual
+  con responsabilidad penal y acciones legales. Ahora hay una malla que las
+  quita. Lo legítimo sigue saliendo: elevar el caso a la Superintendencia
+  (Art. 126 Ley 1438), pedir el levantamiento por falta de respuesta (Art. 57)
+  y negarle a la EPS la facultad de sancionar al hospital.
+- **La Resolución 2275 de 2023, derogada (21 respuestas).** Aquí no se
+  reemplazó nada, y a propósito: para un servicio prestado **antes** del 14 de
+  mayo de 2026 esa ES la norma aplicable, y cambiarla por la 948 de 2026 sería
+  meterle a la respuesta una norma que ese día no regía. Lo que se hace es
+  **completar**: la respuesta ahora dice cuál rige hoy y desde cuándo. Así la
+  cita es correcta cualquiera que sea la fecha, y la entidad no puede rebatirla
+  diciendo «esa resolución está derogada». De paso, el aviso al gestor dejó de
+  sonar cuando el documento ya lo explica: 21 avisos por lo mismo hacen que
+  nadie los lea.
+
+**Cómo quedó el mismo lote de 117 respuestas, pasado por las mallas nuevas:**
+
+| Problema | Antes | Después |
+|---|---|---|
+| CUPS que no existe | 7 | **0** |
+| Código que no es CUPS | 5 | **0** |
+| Norma que no existe | 2 | **0** |
+| Norma derogada sin decir desde cuándo | 21 | **2** |
+| Frases con la preposición comida | 11 | **0** |
+
+### 25-08-2026 (mañana) — El correo no salía, y no era la contraseña
+
+Día de arrancar en producción: se borraron las glosas de prueba y entró el
+archivo de recepción con **117 glosas** reales. Pero el correo a los gestores
+no salía, y lo que costó fue encontrar por qué.
+
+**El motor mandaba los correos sin fecha.** Todos los envíos rebotaban con
+«550 Command rejected» desde que el hospital pasó su correo al servidor
+institucional. El panel del motor decía que la causa más común era la
+contraseña — y no lo era: se probó la clave a mano contra ese mismo servidor y
+entró perfecto. Lo que faltaba era la **fecha y el identificador** del mensaje,
+que el estándar exige. Gmail los perdonaba; el servidor institucional no. Ese
+defecto llevaba meses ahí y solo se destapó al cambiar de servidor.
+
+**El panel adivinaba en vez de mirar.** Decía «la causa más común es que la
+contraseña no sea una contraseña de aplicación» sin haber leído el error, y
+mandaba a buscar el detalle en un archivo de registro de 3 MB — cuando el error
+exacto ya estaba guardado en la base. Eso costó la mañana. Ahora lee el error
+real, lo traduce, y cuando no lo entiende **lo dice** en vez de culpar a nadie.
+
+**A las médicas auditoras no les llegaba nada.** Los seis gestores recibieron
+su correo; Laura Díaz, Zulay González y Leidy Sanguino no, aunque doce glosas
+venían marcadas «Mixta» o «Medico» con su nombre. El nombre sí se leía del
+Excel y sí quedaba guardado, pero al rehacer el plan de trabajo con la causal
+se le pasaba vacío y **se borraba** — y el correo usa justo ese campo para
+saber a quién escribirle.
+
+**Y dos cosas de pantalla.** La plata salía con doble signo («$$ 2.319.514»), y
+la alerta roja de vencimientos se contradecía sola: decía que opera el silencio
+contra el prestador y en el mismo renglón que el Art. 57 no aplica al hospital.
+Verificado el texto oficial: **sí** obliga al prestador. Ahora cita la norma de
+verdad.
+
+**«Tengo estos botones pero no hacen nada.»** No estaban dañados: nunca fueron
+botones. El rectángulo morado que dice «Editar manual» es una etiqueta que
+avisa que la glosa necesita revisión humana, pero estaba pintada igual que los
+botones del sistema. Ya se ve como lo que es.
+
+**De paso, el despliegue.** El motor se quedó con el código de la víspera
+porque había gente trabajando, y correr el bot a mano se aplazaba igual. Ahora
+`autodeploy_motor_local.cmd YA` aplica de una y deja constancia.
+### Julio–Agosto 2026 — Frente COOSALUD: objeciones en DGH y respuestas en el portal
+
+Este frente lo llevó un chat aparte (los bots de `tools/`: organizar el ZIP del
+portal → consolidar → cruzar con DGH → OBJECIONES → trámites). Se resume aquí
+para que quede en la memoria común.
+
+**Palabras que se usan en este frente**
+
+| Término | Qué es |
+|---|---|
+| **Glosa** | Objeción de la EPS a un cobro de la factura (no quiere pagar una parte) |
+| **DGH** | Dinámica Gerencial Hospitalaria — el sistema contable del hospital; ahí se registran las objeciones y las respuestas de trámites |
+| **Portal VCO** | Portal web de COOSALUD (vco.ctamedicas.com) donde se responden las glosas ante la EPS |
+| **OBJECIONES** | Excel que se carga a DGH para registrar las glosas objetadas (máximo 300 facturas por cargue) |
+| **Trámite** | Excel de DGH con la respuesta de cada glosa (máximo 499 facturas por archivo) |
+| **RE9502 / RE9901** | Códigos de respuesta: 9502 = glosa extemporánea (la EPS glosó tarde, art. 57 Ley 1438/2011) · 9901 = glosa a tiempo, se responde con el texto del área |
+| **CALIDAD (CL)** | Glosas de pertinencia médica: las responden las doctoras de auditoría médica, no cartera |
+| **Copago** | Cuota moderadora que paga el paciente; DGH no permite objetar esa parte |
+
+**Junio 2026 — preparación**
+
+- **17/06** — Conexión automática a Dinámica Gerencial.
+- **22/06** — El bot del portal COOSALUD aprende a adjuntar soportes con
+  respaldo (PDX→HAM→PDE), a cerrar glosas residuales y a dejar evidencias.
+- **30/06 al 02/07** — Bot que responde glosas *dentro* de DGH (manejando las
+  ventanas del programa).
+
+**Julio 2026 — el cargue masivo (el grueso del trabajo)**
+
+- **08/07** — Nacen los tres bots del masivo: **organizador** (parte el ZIP del
+  portal en carpetas FACTURAS/DETALLES/GLOSAS por lotes de 300),
+  **consolidador** (une todo, arma la observación de cada glosa, cruza con la
+  base de DGH y genera el OBJECIONES) y **HACER TODO COOSALUD.bat**.
+- **09/07** — Ajustes tras errores reales de DGH: cruce del servicio en 4
+  niveles, una glosa de CALIDAD manda sobre las administrativas, guardián de
+  valor/saldo, y el bot **CORREGIR ERRORES DGH** (DGH no guarda nada cuando el
+  cargue trae un error, hay que rearmar el archivo completo).
+- **10 y 17/07** — **Copago**: DGH descuenta la cuota moderadora, así que lo
+  máximo objetable de cada línea es (valor del servicio − copago). Primero se
+  avisaba, después el bot lo recorta solo. Esto explicaba los errores de valor.
+- **14/07** — **CONSOLIDADO RESPUESTAS GLOSAS** (la respuesta de cada glosa,
+  RE9502 o RE9901; las de CALIDAD quedan en blanco para las doctoras) y bot
+  **RESPUESTA TRÁMITES DGH**. Operación: **2.170 facturas objetadas** (~$4.741
+  millones) y 5 archivos de trámites subidos.
+- **16 y 21/07** — Lote de **41 facturas** ($754 millones) y lote de **1.600
+  facturas** (4.257 ítems, $230.736.952), procesado completo el mismo día.
+- **22/07** — Cierre del lote 1.600: **4 ventanas del portal en paralelo**
+  cerraron 1.425 facturas en 2,5 horas. Se armaron los trámites (4 lotes de
+  499) y el Excel de control **GI-33-5181-2026** (2.215 facturas, 0 sin
+  trabajar).
+- **27/07** — Documento de entrega técnica del módulo
+  (`docs/ENTREGA_MODULO_COOSALUD.md`).
+
+**Agosto 2026**
+
+- **13 y 14/08** — Tres cosas de fondo:
+  - **CROTIPOBJ arreglado.** El tipo de objeción (0 administrativa / 1 médica /
+    2 mixta) se calculaba mirando *todas* las glosas del portal, incluso las que
+    solo se mencionan en la observación. DGH lo calcula sobre el concepto que
+    uno **escribe**. Ahora el bot hace lo mismo: si todos los conceptos escritos
+    de la factura son CL → médica; si ninguno → administrativa; si hay de los
+    dos → mixta. Se verificó contra las 5 facturas que DGH había clasificado
+    distinto y todas coincidieron; en el masivo de agosto cambiaron 8 de 589.
+  - Bot **LISTA FACTURAS YA EN TRÁMITES** (`facturas_ya_en_tramites.py`): revisa
+    la carpeta de masivos ya enviados y arma el TXT de facturas que **no** se
+    deben repetir (repetir una hace que DGH rechace el cargue). Solo cuenta los
+    masivos realmente diligenciados y de la EPS que se le pida, para no mezclar
+    Dispensario con COOSALUD.
+  - **Lotes procesados**: COOSALUD 7 (23 facturas, $27,9 millones), COOSALUD 1
+    (29 facturas, $5,4 millones) y el masivo de agosto (589 facturas, $5.612
+    millones). Cierre del mes: **641 facturas / $5.674.278.862**.
+- **19/08** — Bot **FILTRAR BASE DGH** (`filtrar_base_dgh.py`): recorta la base
+  "SERVICIOS FACTURADOS COOSALUD DGH.xlsx" (70 MB) a las facturas del lote, para
+  poder moverla o subirla.
+- **25/08** — **Lote COOSALUD_25082026: 1.573 facturas.**
+  - Organizado en 6 lotes y consolidado: **4.533 ítems, 4.691 glosas,
+    $289.077.286**. Todas a tiempo (RE9901); solo 2 con CALIDAD (HUS532676 y
+    HUS532956); 193 con copago.
+  - Entregados los consolidados y el paquete del portal (Excel masivo + 4 listas
+    para correr en paralelo: 394/394/394/391).
+  - **Tropiezo**: al cruzar con DGH la base solo trajo **9 de las 1.573**. La
+    base que se estaba usando es del 08/07 y además venía recortada (leyó
+    1.048.000 filas, prácticamente el tope de Excel, que es 1.048.576). Hay que
+    bajar de DGH un export **nuevo**, por tandas de fechas.
+  - Por eso FILTRAR BASE DGH ahora acepta **varias bases a la vez** (las
+    tandas), quita las filas repetidas y avisa dos cosas: si una base llegó al
+    tope de filas de Excel (salió recortada) y hasta qué número de factura llega
+    cada una, que es como se ve de una si está vieja.
+  - La base de facturación ENE–JUL sirvió para ubicar el rango: **1.537 de las
+    1.573** se facturaron entre el **23/06 y el 31/07**, todas de COOSALUD, y
+    las 36 restantes son de agosto. Ese es el rango con el que hay que bajar el
+    export de SERVICIOS FACTURADOS. De paso, el bot aprendió a buscar el
+    encabezado cuando no está en la primera fila y a avisar cuando le pasan un
+    reporte que no trae el detalle de servicios (y por tanto no sirve para el
+    OBJECIONES).
+  - **Portal COOSALUD cerrado el mismo día**: 4 ventanas en paralelo cerraron
+    las **1.573 facturas** entre las 10:24 y las 12:51 (**2 h 27 min** de reloj;
+    7 h 52 min de trabajo del robot repartido en las cuatro). Resultado:
+    **1.527 OK**, 2 con la glosa de CALIDAD abierta a propósito (HUS532676 y
+    HUS532956, esperando a las doctoras), **43 NO_EN_BOLSA** y 1 terminada sin
+    cartel de asignación. O sea 1.529 respondidas y **44 por revisar**.
+    Por ventana: S1 394 en 99 min · S2 394 en 103 min · S3 394 en 123 min ·
+    S4 391 en 146 min. Las NO_EN_BOLSA se concentran al final del rango
+    (3 en S2, 14 en S3, 26 en S4), que es el mismo patrón del lote de 1.600.
+  - **OBJECIONES generado el mismo día.** Llegó la base buena —el export de
+    SERVICIOS FACTURADOS de enero a agosto, en formato **.xlsb**— y cruzó
+    **1.573 de 1.573**. Salieron **6 lotes, 4.525 filas, 1.572 facturas,
+    $287.610.516**. La diferencia contra los $289.077.286 del consolidado son
+    $1.466.770 y se explica entera: $816.230 de 72 objeciones recortadas al
+    tope que DGH acepta (copago y saldo) y $650.540 de 8 servicios que no
+    existen en la base de DGH.
+  - **HUS538337 quedó por fuera**: sus 5 servicios ($407.000) no están en DGH,
+    así que no hay nada que objetarle. Va a registro manual, como HUS530335 y
+    HUS506920. Otras tres entraron incompletas por lo mismo: HUS531604
+    ($174.240), HUS537835 ($47.520) y HUS543541 ($21.780).
+  - **Tres fuentes coinciden** en que las únicas dos facturas con CALIDAD son
+    HUS532676 y HUS532956: así las marcó el consolidador al armar el lote, así
+    las dejó el portal (OK_CALIDAD_ABIERTA) y así salieron en el OBJECIONES
+    (las únicas dos mixtas).
+  - **El bot aprendió a leer .xlsb**, que es el formato en que DGH exporta la
+    base. Antes tocaba convertirla a mano.
+  - **Defecto propio encontrado y corregido el mismo día**: al aceptar varias
+    tandas se habían quitado las filas repetidas, y una base DGH SÍ trae filas
+    idénticas de verdad (el mismo medicamento dispensado varias veces en una
+    factura), cada una un servicio objetable. Con las repetidas quitadas el
+    OBJECIONES bajaba a 4.284 filas y **249 servicios sin cruzar**; sin
+    quitarlas son 4.525 filas y **8**. Ahora solo se descarta lo que ya venía
+    en una tanda anterior, comparando cuántas veces aparece en cada una.
+
+**Dónde está cada cosa de este frente**
+
+| Qué | Dónde |
+|---|---|
+| Bots de COOSALUD (organizar, consolidar, corregir errores, trámites, filtrar base) | `tools/` — en el PC de cartera: `D:\USUARIO CARTERA\Desktop\ORGANIZADO\2026-07-08\COMPRIMIDOS\BOTS COOSALUD\` |
+| Bot que responde en el portal COOSALUD | `tools/responder_glosas_coosalud.py` |
+| Reglas del proceso | `docs/CONTEXTO_COOSALUD.md` y `docs/ENTREGA_MODULO_COOSALUD.md` |
+| Facturas del piloto ya objetadas (no repetir) | `tools/FACTURAS YA OBJETADAS.txt` |
+
+---
+
+### 25-08-2026 (madrugada) — La revisión más incómoda: la mayor parte de la jurisprudencia del motor era inventada
+
+Este día empezó con los ejemplos de prueba de la ronda 2 y con la segunda
+auditoría independiente (expedientes GL-199 a GL-207). Terminó destapando el
+defecto más grave que ha tenido el sistema.
+
+**Lo que se encontró.** El auditor señaló que un dictamen citaba la Sentencia
+T-478 de 1995 para defender la autonomía médica, y que esa sentencia trata de
+otra cosa. Al ir a mirar la base de conocimiento del motor, el problema no era
+un caso suelto: **de las 29 sentencias que el sistema guardaba, unas dos de
+cada tres decían algo que la sentencia no dice**. Se verificaron una por una
+contra la relatoría de la Corte Constitucional.
+
+- **Tres no existen.** No es que el tema esté mal: la providencia nunca se
+  dictó. La T-543 de 2013, la T-553 de 2024 y la T-027 de 2020. Se comprobó por
+  dos caminos: el buscador oficial de la Corte no las conoce, y las páginas de
+  sus vecinas cargan completas mientras las suyas salen vacías. Se borraron.
+- **Trece decían otro tema.** La T-024 de 2009, que el sistema daba como «pago
+  de servicios de salud», es una tutela de custodia de una niña contra el ICBF.
+  La T-126 de 2018, que daba como «historia clínica como prueba plena», es un
+  caso de violencia sexual. La T-307 de 2017, que daba como «recobros NO PBS»,
+  es una pensión de sobrevivientes. Y así.
+- **Dos autos también.** El Auto 037 de 2024 figuraba como seguimiento a la
+  sentencia inexistente sobre terapia CAR-T. El auto sí existe, pero trata de
+  algo que resultó **más útil para cartera**: la Corte resolvió que la
+  jurisdicción ordinaria laboral es la competente para cobrar ejecutivamente
+  las facturas de servicios de salud.
+
+**Por qué era tan peligroso.** El revisor de citas del motor contrasta lo que
+va entrecomillado contra ese mismo corpus. Una cita inventada guardada ahí
+**se certifica sola**: el dictamen la copia, el revisor la encuentra, y el
+documento sale con el sello «citas verificadas · 0 hallazgos». Al auditor de la
+EPS le bastaría abrir el enlace para tumbar todo el escrito.
+
+**Las defensas no perdieron nada.** En todos los textos donde estaban, iban
+acompañadas de su anclaje legal correcto —el Art. 17 de la Ley 1751 de 2015
+para autonomía médica, el Art. 168 de la Ley 100 y el Art. 20 del Decreto 4747
+para urgencias—, así que quitarlas no debilitó ningún argumento.
+
+**Y la revisión siguió: TODA la base normativa del motor, no solo las
+sentencias.** Con ese antecedente había que mirar el resto, y apareció lo mismo.
+
+- **Una resolución derogada hace tres meses, citada como vigente.** La
+  Resolución 2275 de 2023 —la de factura electrónica y RIPS, que el motor cita
+  en seis sitios— fue derogada el 14 de mayo de 2026 por la Resolución 948 de
+  2026. Un dictamen radicado hoy que se apoye en ella le entrega a la EPS la
+  forma de tumbarlo. Peor: el corpus tenía desde siempre un campo que dice si la
+  norma sigue vigente, **y el revisor de citas nunca lo miraba**. Ahora avisa.
+- **Otras tres normas decían lo que no era.** La «Resolución 1604 de 2024», que
+  el sistema daba como norma de RIPS, es un acto del Ministerio del Interior que
+  le reconoce personería jurídica a una iglesia. La Resolución 866 de 2021, que
+  se ofrecía en cuatro archivos como «los RIPS», es la de interoperabilidad de la
+  historia clínica: se leyó su texto completo y la sigla RIPS no aparece ni una
+  vez. Y la «Resolución 2641 de 2025» no existe.
+- **El motor borraba una cita CORRECTA.** Tenía un limpiador que quitaba del
+  dictamen «Resolución 2641 de 2024» por creerla inventada, y la cambiaba por la
+  frase «la normativa vigente del Ministerio de Salud». Esa resolución es real
+  —es la que estableció la CUPS que rigió en 2025—, así que el motor borraba lo
+  bueno y dejaba una pseudo-norma sin ley ni artículo.
+- **Y les ofrecía a la IA 24 normas que él mismo no tenía cargadas.** Le pedíamos
+  que las citara y luego se las marcábamos en rojo como inexistentes. Doce eran
+  reales y se cargaron; de las otras ocho, **tres no existen** («Acuerdo 002 de
+  2010 USPEC», «Decreto 1760 de 2022» y «Resolución 5853 de 2003») y cinco
+  estaban mal nombradas: la 5159 de 2015 es Resolución y no decreto, la 506 de
+  2021 es de MinSalud y no de la DIAN, la «Resolución 2284 de 2024» es de 2023,
+  la «Resolución 1604 de 2022» es un Decreto sobre colegios de las cajas de
+  compensación, y la Resolución 010 de 2018 es de la DIAN y no dice nada del
+  pago de migrantes, que era para lo que se citaba.
+
+- **Y una segunda resolución derogada, esta de un pagador nuestro.** La
+  Resolución 5159 de 2015, el modelo de atención en salud para la población
+  privada de la libertad, la derogó la Resolución 1099 de 2026. El prompt del
+  motor decía con todas sus letras «OBLIGACIÓN: citar SIEMPRE la Res.
+  5159/2015 al defender cobertura PPL», y el corpus la daba por vigente en dos
+  catálogos. Ahora el motor cita la Ley 1709 de 2014 —que vale en cualquier
+  caso— y la resolución que estuviera vigente **a la fecha de la atención**.
+- **Lo mismo con la CUPS.** El sistema tenía una «Resolución 2641 de 2025» que
+  no existe, y la que sí existe (2641 de 2024) está derogada desde enero por la
+  Resolución 2706 de 2025, que se cargó con su texto oficial.
+
+Tres cosas que salieron **a favor**: la Circular 007 de 2025 no era un
+«cronograma» sino una circular conjunta con la Superintendencia que **prohíbe
+imponerle barreras y exigencias no normadas a los prestadores**; la Resolución
+2335 de 2023 no era de cáncer infantil sino de la **ejecución y seguimiento de
+los acuerdos de voluntades**; y el Auto 037 de 2024 resolvió que la
+**jurisdicción ordinaria laboral es la competente para cobrar ejecutivamente las
+facturas de salud**. Las tres son munición útil que estaba mal rotulada.
+
+**Y al revés: el motor le estaba borrando al dictamen artículos que sí existen.**
+Buscando otra cosa apareció esto. El sistema afirmaba «esta norma no contiene
+ese artículo» mirando solo los artículos que tiene cargados, y tiene poquísimos:
+de 131 normas, apenas 26 traen alguno. De la Ley 100 estaban cargados tres de
+casi trescientos. Como el limpiador borra la oración entera, un dictamen que
+citara el Art. 156 de la Ley 100 salía sin esa frase. Ahora solo se afirma que
+un artículo no existe cuando de esa norma se cargó la lista completa; si es
+parcial, se avisa en severidad baja y no se borra nada. Se cargaron además,
+transcritos de los PDF oficiales del Ministerio, el Art. 87 del Decreto 2423
+(la cita del expediente GL-207 **era correcta**, lo que faltaba era el
+respaldo), los Arts. 1 y 2 de la Ley 1438 y el Art. 1 de la Ley 1751.
+
+**Los otros cuatro defectos de la auditoría, corregidos:**
+
+1. **«Defender el 100 %» de nada (GL-204).** La glosa se capturó sin la cifra,
+   y en este motor un cero significa «no se pudo leer», no «cero pesos». Como
+   0 es menor que $915.051, el sistema concluyó que la glosa era injustificada
+   y recomendó defender el 100 %. Y el panel escondía justamente la fila del
+   valor que originó la conclusión. Ahora, sin cifra, dice REVISAR y pide
+   capturarla; y el panel muestra en ámbar «no registrado en el caso».
+2. **A cada código, su plata (GL-206).** Una glosa con dos códigos: la
+   respuesta del SO3401 salió diciendo «valor objetado de $150.000», que era la
+   plata del otro código. Ahora, cuando el texto lo dice sin lugar a duda, cada
+   sección recibe el suyo. La regla es estrecha a propósito: ante la menor
+   sombra no se reparte, porque colgar un monto equivocado es peor.
+3. **Contestar lo que la EPS objetó, no otra cosa.** La EPS glosaba «precio
+   superior al regulado» y el dictamen respondía sobre la validez formal de la
+   factura. El bloque que le dice al motor qué atacar salía vacío cuando ningún
+   patrón enganchaba. Ahora nunca sale vacío: cuando no reconoce la causal, le
+   pone delante el texto literal de la EPS. Se agregaron además las dos
+   causales que faltaban (precio regulado y reliquidación a otro manual) y se
+   cargaron al corpus la Circular 19 y la Circular 18 de 2024.
+4. **Una palabra de menos.** El dictamen escribió «ARTÍCULO 168 LA LEY 100»,
+   sin el «DE», y por esa palabra no se activó la defensa que tumba esa cita
+   cuando la glosa no es de urgencias. Ya caen las cuatro formas.
+
+**Y una corrección menor de la misma familia:** el Art. 3 de la Resolución 1995
+llevaba pegada una frase que es del Art. 1. Quedaron separados, cada uno con su
+texto oficial.
+
+Todo con pruebas: la suite completa quedó en **8.616 verdes** (los 12 rojos son
+de programas que no están instalados en la máquina de pruebas, ajenos al motor).
+
 ### Abril 2026 — Nace el Motor de Glosas
 - **08 al 10-04:** primera versión de la aplicación: análisis de glosas con IA,
   dictámenes con normativa colombiana (Res. 3047/2008, Ley 1438/2011, etc.),
@@ -4493,6 +5134,63 @@ reformulación de la EPS). Con pruebas que cuidan las dos confusiones caras:
 contar como logro lo que ya venía respondido, e inflar el valor de las
 devoluciones.
 
+### 24-08-2026 — Dispensario: el paquete de notas crédito quedó armado y verificado
+
+**De dónde salió.** El Dispensario mandó el `CRRPNota.pdf` con **91 notas
+crédito** (la mayoría de la conciliación del acta 858, más anulaciones). Había
+que armar el paquete para subirlas al portal SIMED con el robot
+`tools/cargar_soportes_simed.py`.
+
+**Lo que se armó.** El PDF se partió en **86 carpetas** (una por nota
+electrónica), cada una con su `NC_<nota>_HUS<factura>.pdf`. De las 91 páginas,
+86 son notas cargables; las otras son repetidas o sin nota. También salió el
+`LISTADO_NOTAS_CARGUE_DISPENSARIO.xlsx` con el inventario y una hoja aparte
+con **3 facturas aceptadas en el acta 858 que aún no tienen nota crédito**
+(443525, 443566 y 486894 — hay que pedírselas a Facturación).
+
+**Las triadas se completaron desde el share.** Con los comandos entregados,
+el auditor copió del share de facturación (`202608\FACTURAS_NOTA`) el XML y
+el resultado del validador (CUV) de cada nota: las 86 quedaron con sus tres
+archivos.
+
+**La verificación del CUV (la regla de siempre antes de cargar) dio esto:**
+**34 notas con CUV vigente** (se pueden cargar ya) y **52 rechazadas**. Se
+extrajo el motivo de cada rechazo (queda el detalle en
+`_motivos_rechazo.csv`): **47 son "RVG01" con tiempo agotado del validador**
+— o sea falla del validador, no de los RIPS: solo hay que pedir a SISTEMAS
+que las **revalide**, sin corregir nada; 2 son diagnóstico repetido
+(RVC086, el mismo defecto del lote anterior); 1 es precio de medicamento
+sobre la Circular 19/2024 (RVG20); y 2 son factura referenciada que no
+coincide (GI018). Quedó redactado el **informe para SISTEMAS** con las
+listas completas y qué se pide en cada grupo.
+
+**Dos notas venían sin factura legible en el PDF** (páginas donde el número
+salió como HUS0000000000). Se identificaron releyendo el cuerpo de la nota y
+casando el valor contra el acta 858: la nota 332742 es de la factura
+**HUS0000447748** y la 332832 de la **HUS0000486963**. Se entregaron los
+comandos para renombrar sus archivos.
+
+**Cómo se carga (queda listo para correr):** primero el piloto de 1 nota
+(`--solo 332526 --con-cabeza`), y si sale bien, el lote de las 34 con CUV
+vigente usando `--lista` con el CSV `_lista_cuv_ok.csv` (así el robot NO toca
+las 52 rechazadas que siguen en la misma carpeta). Cuando SISTEMAS revalide,
+se recopia el CUV nuevo del share, se re-verifica y se carga el resto.
+
+**El cargue se corrió el mismo día y salió esto.** La primera corrida mostró
+8 notas seguidas con «la factura no aparece en la grilla». No era falla del
+robot ni del nombre de los archivos: al revisar el CRRP resultó que **de las
+34 con CUV vigente solo 21 son del acta 858** (facturas con glosa, que sí
+están en la pantalla que trabaja el robot); las otras **13 son anulaciones de
+factura completa (12) y un trámite de devolución (1)**, que el portal no
+lista ahí porque no son glosas conciliadas. Con la lista corregida
+(`_lista_acta858_ok.csv`), **las 21 del acta 858 quedaron cargadas y
+finalizadas en el SIMED: 21 de 21 OK** (reporte
+`_reporte_carga_simed.csv`). También se renombraron todos los archivos de
+`HUS0000xxxxxx` a `HUSxxxxxx` para que el adjunto coincida con el número real
+de la factura electrónica. Las 13 anulaciones/trámite quedaron con sus
+carpetas completas (PDF+XML+CUV), a la espera de definir con el gestor del
+Dispensario por qué canal las recibe.
+
 ---
 
 ---
@@ -6536,7 +7234,556 @@ en ese momento alcanza a terminar en vez de cortarse a la mitad.
 solo dice cuántos segundos lleva la página en silencio: ni nombres, ni correos,
 ni en qué factura estaba nadie.
 
+### 24-08 (mañana) — Lo que contó el primer despliegue del lunes
+
+El lunes a las 9:22, con la fusión del fin de semana, el registro del
+autodespliegue contó tres cosas que había que arreglar:
+
+1. **«codigo nuevo detectado» salió dos veces, con medio segundo de
+   diferencia.** Dos pasadas corriendo al tiempo. Eso es grave: cada una apaga
+   el motor contando con revivirlo, y entre las dos lo dejan caído —una lo
+   levanta y la otra lo vuelve a matar—. Ahora hay un candado: una sola pasada
+   a la vez, y si una muere sin soltar el candado, caduca a los 30 minutos
+   para no quedarse esperando a un muerto. Es un archivo, no una cuenta de
+   procesos: contar procesos ya salió mal este mes con el vigilante.
+
+2. **«ALERTA: el motor sigue caido» con el portal funcionando.** El bot
+   esperaba 12 segundos fijos y preguntaba una vez. El motor del hospital
+   carga una base de 133 MB y tarda más: se daba por muerto estando vivo, y se
+   le arrancaba un segundo motor encima. Ahora pregunta cada 3 segundos hasta
+   90: si sube en 10, sigue en 10; si de verdad no sube, se entera después de
+   un plazo que sí alcanza.
+
+3. **El contrato de POSITIVA no se pudo cargar por la IA.** El PDF del
+   contrato original está escaneado —cero texto— y la ruta manual exige un
+   token que el auditor no tiene a mano: se intentó tres veces y las tres
+   terminaron en «Credenciales inválidas».
+
+   Se hicieron dos cosas. Primero, se leyeron los otrosíes 02 y 03 —esos sí
+   tienen texto— y se transcribieron **17 cláusulas literales**: tarifas (no
+   pactados a SOAT, insumos a tarifas institucionales), soportes (los 13 datos
+   de la factura, RIPS), plazos (20 días para glosar, 15 para responder, pago
+   a 30), autorizaciones, cobertura, vigencia hasta el 19-ene-2027, y las dos
+   joyas de la página 12: POSITIVA reconoce **intereses moratorios** y
+   **reconocimiento económico** cuando formula glosas infundadas o
+   inexistentes. Segundo, se hizo el bot `tools/cargar_clausulas_contrato.py`,
+   que carga esas cláusulas directo en la base, sin clave, con las mismas
+   reglas de la ruta web — y dice SIEMPRE a qué base escribe, por la lección
+   de las dos bases del 20-08.
+
+### 24-08 (mediodía) — El cargador dijo «todo listo» y reventó en la última línea
+
+Yesid corrió el cargador de cláusulas en el PC. Dijo «17 cláusulas listas»,
+mostró la base correcta (`motorglosas.db`)… y reventó al escribir la primera
+fila: la columna de la base se llama `numero_clausula` y el archivo dice
+`numero`. La pantalla del portal hace esa traducción; el bot no la copió.
+
+**Nada se perdió:** el guardado es todo-o-nada, así que el intento fallido no
+alcanzó a borrar las cláusulas que ya había.
+
+**Por qué las pruebas no lo vieron:** revisaban el archivo y las reglas, pero
+nunca guardaron contra la base de verdad. Ya guardan: hay pruebas que insertan
+en una base real y comprueban columna por columna, y una que reproduce el
+incidente exacto —un intento fallido no puede llevarse lo que había, la misma
+lección del instalador que borraba la tarea de arranque—. Con el defecto
+puesto de vuelta a propósito, cuatro se ponen en rojo.
+
+### 24-08 (tarde) — Las tarifas de POSITIVA entraron infladas y se corrigió el lector
+
+Se cargó por la pantalla el Excel «TARIFAS ESE HUS 2025 - POSITIVA»: 4.742
+tarifas. Al revisarlas fila por fila apareció lo grave: **entraron con el SOAT
+pleno, no con el SOAT –15% pactado**. La hoja trae las dos columnas y el
+lector conocía la del valor pleno pero no la del descuento. Ejemplo real: la
+punción cisternal quedó en $915.051 cuando lo pactado es $777.793. Con eso,
+cada dictamen de tarifas defendería un valor 15% más alto que el contrato — la
+EPS ratifica la glosa y el dictamen es falso.
+
+Tres correcciones al lector, con sus pruebas:
+
+1. **La columna del descuento pactado gana siempre.** Un encabezado tipo
+   «SOAT -15%» al lado del valor pleno es SIEMPRE lo pactado. (Es la misma
+   trampa que ya había pasado con FAMISANAR y su «PROPUESTA FINAL».)
+2. **El cero de adelante.** Excel guarda el CUPS como número y se come el
+   cero: 010101 quedaba 10101 y el motor no lo encontraba — decía «sin tarifa
+   pactada» teniéndola. Ahora se guarda a 6 dígitos, y el buscador además
+   tolera las 4.742 que ya quedaron guardadas sin el cero.
+3. **Los repetidos que se contradicen no se cargan.** El mismo CUPS aparece
+   hasta con cinco valores distintos en el archivo (el 103204: de $94.399 a
+   $1.926.567). Antes se cargaban todos y el azar del orden decidía cuál
+   citaba el dictamen. Ahora se omiten, se avisa cuáles, y el motor dice «sin
+   tarifa pactada» — que es la verdad hasta que el auditor defina cuál rige.
+
+Con el lector corregido, del Excel real entran **2.988 tarifas limpias** y
+quedan **737 códigos por definir**, entregados en un archivo aparte para
+marcar cuál valor rige (más una celda con fórmula dañada: el 512104 dice
+#VALUE! en el propio Excel).
+
+**También quedó cargado el contrato:** las 17 cláusulas de POSITIVA se ven en
+la pantalla de Tarifas desde las 4:12 p. m. — el cargador sin clave funcionó
+tras corregirle la traducción del campo.
+
+### 24-08 (tarde) — El botón invisible destapó siete colores fantasma
+
+Yesid reportó que el botón «Aplicar a las marcadas» —el del lote de glosas
+ADRES— salía **en blanco, invisible**: letra blanca sobre fondo blanco.
+
+La causa: el botón pedía su color a un token que **no existe** en el portal
+(`--primary`, inventado al escribir la función). Sin token, el fondo queda
+transparente y el botón desaparece.
+
+Al barrer el archivo completo aparecieron **siete tokens fantasma en 65
+sitios**: textos grises que pedían `--text-3` cuando el real es `--text3`,
+fondos que pedían `--bg2` cuando el real es `--bg-card`, bordes y esquinas
+igual. Todo eso se estaba pintando con el color heredado por accidente, no
+con el del diseño — se veía «casi bien», que es la peor clase de mal.
+
+Los 65 sitios quedaron apuntando a la paleta real, y quedó una prueba que
+recorre el archivo entero: **cualquier color que pida un token inexistente
+pone la construcción en rojo**. El botón del caso tiene además su prueba con
+nombre propio.
+
+### 24-08 (tarde) — El fantasma tenía nombre, y el Enter volvió a caer
+
+**El fantasma.** El motor «inmatable» que atendió todo el día con código viejo
+resultó ser nuestra propia tarea de arranque de ayer: quedó creada con la
+cuenta `cpimiento`, al prender el PC arrancó el motor bajo esa cuenta **sin
+sesión**, y por eso era invisible e intocable desde la sesión de `cartera`.
+Se cazó con una ventana de administrador de verdad (la elevación ahora la pide
+Windows con su aviso azul, porque el «ejecutar como administrador» manual
+falló dos veces) y cayeron los cuatro procesos de una vez.
+
+**El Enter, tercera caída.** Al reinstalar la tarea, el instalador mostró en
+mayúsculas «la cuenta del motor es cartera — escriba ESTA»… y el Enter volvió
+a dejar la de la ventana (`cpimiento`), ahora en las DOS tareas. Tres personas
+distintas han caído en el mismo Enter: el aviso no basta.
+
+**El arreglo es de diseño: el camino fácil tiene que ser el correcto.** Ahora
+el Enter elige la cuenta del día a día, y la de la ventana hay que escribirla
+a propósito. Y la sugerencia ya no se lee de la tarea del autodespliegue —una
+instalación mala la envenena y la próxima vez sugiere la cuenta equivocada
+como si fuera la buena— sino de la **sesión de consola**: quién está sentado
+en este PC todos los días, cosa que ninguna instalación mala puede cambiar.
+
+### 24-08 (tarde) — El lector de tarifas aprendió los anexos del Dispensario
+
+Llegaron los tarifarios del contrato 440 del Dispensario y el lector se
+saltaba **el anexo entero de medicamentos e insumos** —8 hojas, ~3.000
+códigos CUM/FMQ/QX— sin decir una palabra. Tres causas, una detrás de otra:
+
+1. El código se titula «CODIGO CUM» o «CODIGO» a secas, no «CUPS».
+2. Dos anexos traen encabezados de TRES columnas y la regla exigía cuatro:
+   2.000 dispositivos médicos invisibles.
+3. La hoja TARIFAS PROPIAS de la propuesta trae una columna TARIFA con el
+   TEXTO «PROPIA» y el valor real en OFERTA — y la «prioridad» de columnas
+   resultó ilusoria: la búsqueda recorría los encabezados en orden, no los
+   candidatos, así que TARIFA (texto) ganaba y la hoja entera se leía como
+   ceros. Una prueba nueva me cazó el arreglo a medias; ahora la prioridad
+   es real, candidato por candidato.
+
+Con esto, del paquete del contrato 440 salen **7.085 servicios** (SOAT
+SMLV-20%) **+ 3.063 medicamentos e insumos**, con 37 códigos en conflicto
+para revisión. Y los tarifarios 2025 de COOSALUD y COMPENSAR ya validaron
+igual que el de POSITIVA: 2.988 limpias y 737 por definir cada uno.
+
+### 21-08 — El oficio del que la factura YA SALIÓ dejó de pedir lo imposible
+
+**El caso.** La factura **HUS0000551678** ($3.285.631) entró al oficio
+**FHUS-AS-I01196-26**, se auditó, se devolvió, salió en el oficio de
+devolución **DEV-PRE-AUD-0118-2026** y facturación la reenvió: hoy está
+reingresada en el oficio **FHUS-AS-I01212-26**. Todo correcto.
+
+Pero el oficio viejo mostraba dos cosas equivocadas:
+
+1. El aviso decía «*sigue pendiente de auditar en el oficio FHUS-AS-I01212-26:
+   resuélvala allá y **vuelva a escribir el envío aquí**»* — invitando a
+   traerla de vuelta a un oficio que ya cumplió y que ya tiene su PDF firmado.
+2. El oficio se quedaba en **ROJO**, como si nadie lo hubiera auditado, solo
+   porque ya no tenía facturas propias.
+
+**Cómo quedó.** El sistema ahora distingue dos situaciones que antes veía
+iguales:
+
+- **La factura pasó por este oficio y siguió su camino** → aviso azul: «✅
+  Envío 233277 · factura HUS0000551678: ya pasó por este oficio: salió devuelta
+  en DEV-PRE-AUD-0118-2026 y hoy está en FHUS-AS-I01212-26 (reingresada, sin
+  decidir). Aquí no queda nada pendiente.» El chip del envío se muestra como
+  **«233277 (ya siguió)»**, sin el amarillo de alerta.
+- **La factura nunca entró** (está trancada en otro oficio) → sigue el aviso
+  amarillo de siempre, con el «resuélvala allá».
+
+Y el oficio que se quedó sin facturas **porque todas siguieron su camino**
+ahora aparece **COMPLETADO** en vez de rojo. El que nunca ha tenido facturas
+—recién registrado, sin envíos— sí sigue corriendo su plazo, como debe ser.
+
+7 pruebas nuevas (143 en el módulo).
+
+---
+
+### 24-08 (tarde) — El autodespliegue se colgó y nadie se enteró (otra vez)
+
+**Qué pasó.** El PC de cartera llevaba horas sin recibir el código nuevo. En
+el registro del autodespliegue, la misma línea repetida cada 5 minutos:
+«*otra pasada sigue trabajando: esta se salta*». Una pasada se quedó colgada
+preguntándole a GitHub, nunca soltó el **candado** —el archivo que evita que
+dos pasadas se pisen— y todas las siguientes se saltaron. En pantalla no se
+veía nada raro.
+
+**Por qué se cuelga `git`.** Dos casos normales: que GitHub pida usuario y
+clave (en una tarea programada no hay nadie que los escriba, y git espera
+para siempre) o que la red del hospital deje la conexión a medias.
+
+**Tres arreglos, todos de visibilidad:**
+
+1. **Git tiene prohibido preguntar y tiene reloj.** El autodespliegue le pone
+   mordaza (`GIT_TERMINAL_PROMPT=0`) y un tope de **3 minutos**: si no
+   contesta, se corta y queda anotado el motivo, en vez de dejar el candado
+   puesto toda la tarde.
+2. **Bot de doble clic `tools\ACTUALIZAR_PAGINA.cmd`** (lo pidió Yesid): baja
+   los cambios y los deja funcionando **ahora**, sin esperar los 5 minutos.
+   Muestra en pantalla qué versión hay, qué cambios entran, reinicia el motor,
+   comprueba que la página volvió a responder y —si el motor no vuelve solo—
+   lo arranca él. De paso suelta el candado si quedó trabado, para que el
+   automático vuelva a andar. Al final recuerda el **Ctrl + F5**.
+3. **La pantalla de estado lo delata.** `ESTADO_MOTOR.cmd` ahora avisa: «*el
+   autodespliegue lleva N min con el candado puesto: está trabado*», y dice
+   qué correr para destrabarlo. Una pasada normal no dura ni dos minutos.
+
+11 pruebas nuevas.
+
+---
+
+### 24-08 (noche) — La fábrica de cláusulas: seis EPS más con contrato en el motor
+
+Con los ZIP que armó Yesid (el copiador automático encontró TODOS los archivos
+al primer intento), se transcribieron y cargaron los contratos de **PPL (10
+cláusulas), FOMAG (7), COMPENSAR (6), DISPENSARIO 440 (7), AURORA con sus dos
+minutas ARL y Vida-AP (10) y SEGUROS MUNDIAL (5, pendiente de crear la EPS en
+Contratos)**. Con POSITIVA, ya son SIETE las EPS que se defienden citando su
+contrato firmado. Las joyas: en PPL, «la carencia de la autorización NO será
+motivo de glosa» y «siempre se privilegiará la tarifa institucional»; en
+FOMAG, la renovación automática y el 70% a 20 días hábiles; en AURORA, el
+suministro de MAOS a cargo de la aseguradora.
+
+**Los archivos de conflictos volvieron todos marcados con SI en ambas filas**
+— así no hay decisión: el motor guarda UN valor por código. En vez de
+devolverlos sin más, se usaron las reglas de los contratos recién transcritos:
+la de POSITIVA (gana SOAT –15%) y la de PPL (gana la institucional) resolvieron
+**316 códigos cada una** sin tocar al auditor; quedaron listas para cargar y
+los residuales bajaron a 421 con la instrucción clara: UN solo SI por código.
+
+**Y el CI volvió a ganarse el sueldo:** el candidato «CODIGO» del lector
+—agregado en la mañana para los medicamentos del Dispensario— secuestró la
+hoja AMBULATORIO de FAMISANAR 2026, donde el CUPS oficial se titula «Res
+2706/25». Dos corridas selectivas mías pasaron en verde; la suite completa del
+CI vio el rojo. El orden quedó sagrado y comentado: CUPS → Res-#### → CODIGO
+CUM → CODIGO. La lección se repite: la corrida selectiva es una opinión, la
+suite completa es el veredicto.
+
+**El día también enterró al fantasma:** el motor de las 7:55 (la tarea de
+ayer bajo cpimiento) cayó con la cacería elevada, el motor bueno arrancó a las
+14:45 bajo cartera, y las dos tareas de arranque quedaron por fin con la
+cuenta correcta y el permiso de lotes otorgado.
+
+---
+
+### 25-08 — Los paquetes de ADRES vuelven completos, y la pantalla se ordenó
+
+**1) La excepción de ADRES.** Pedido de Yesid: «los paquetes que son del ADRES,
+cuando se devuelven —así haya facturas en OK radicadas— se devuelven todas y
+toca volverlas a ingresar al sistema; pero cuando ya esté radicada no se debe
+dejar colocar en otro envío u oficio: es trabajar para que esto se pueda hacer
+**solo** para las del ADRES».
+
+Así quedó:
+
+- Al escribir un envío, una factura **de ADRES** que ya estaba radicada
+  **vuelve a entrar** como una ronda nueva, queda pendiente de auditar y el
+  historial anota por qué: «ADRES devolvió el paquete completo: esta factura ya
+  estaba RADICADA en el oficio tal y vuelve a auditarse».
+- **Para las demás entidades no cambia nada:** una radicada sigue sin poder
+  moverse. Es la regla que evita cobrar dos veces la misma factura.
+- **No le gasta el cupo de las 3 devoluciones.** Ese contador es de las
+  devoluciones que hace pre-auditoría a facturación; que ADRES nos devuelva el
+  paquete no es una devolución nuestra. Si contara, tres paquetes devueltos
+  dejarían la factura bloqueada sin razón.
+- **«Ver antes» lo avisa** antes de cargar: «🔁 N factura(s) de ADRES ya estaban
+  radicadas y van a volver a entrar».
+- Y si el envío se quitó por error con la ✕ o con la 🗑, la factura vuelve a
+  **RADICADA** —no a «devuelta»—: nadie la devolvió nunca.
+
+**2) El ruido visual.** Yesid: «hay mucho ruido visual, todos los botones ahí
+todos juntos, sin nada de profesionalismo y estética». Se ordenó así:
+
+- Los botones de cada fila van ahora en **una sola barra**, del mismo alto, con
+  la misma separación y pegados a la derecha — en las cuatro tablas, no solo en
+  una: oficios, facturas del oficio, consolidado y oficios de devolución.
+- El **lápiz de corregir el número ya se dibuja**: era un emoji que ese
+  navegador no sabía pintar (salía una rayita) y ahora es un dibujo propio, igual
+  en todos los computadores. Los botones de solo dibujo llevan su explicación al
+  pasar el mouse.
+- Las columnas de números (Facturas, Pend., OK, Dev.) van **alineadas a la
+  derecha** y con cifras del mismo ancho, para compararlas de un vistazo.
+- La columna de **envíos ya no estira la fila**: muestra los primeros seis y
+  «+N más», y la lista completa queda en el globo de ayuda.
+
+**Y una red de seguridad que faltaba:** ahora hay una prueba que **compila** el
+JavaScript de esta pantalla. Antes solo se revisaba el del portal principal, así
+que un error de escritura aquí dejaba la pantalla muerta sin que ninguna prueba
+se enterara.
+
+15 pruebas nuevas (152 en el módulo, 309 con las de pantalla).
+
+### 25-08-2026 — Dispensario: lote de glosas del 25-ago respondido completo (24/24)
+
+Llegó el lote nuevo del Dispensario (`GLOSAS_25_AGOSTO.xlsx`): **24 facturas,
+64 objeciones, $56.169.241**, con vencimientos el 4 y el 7 de septiembre y
+ninguna devolución. Se armó el Excel de respuestas con el motor de siempre,
+**cuadrado al peso** contra la hoja INICIAL: 59 respuestas de tarifas (con los
+refuerzos según lo que dice cada observación: cotización previa, dispositivos,
+referentes SOAT) y **5 médicas de pertinencia** (la fluoroscopia 1-de-2 de la
+factura 540394 y las interconsultas y cultivos de la 543137) con el argumento
+institucional.
+
+**Resultado del robot:** piloto con la 540273 bien, corrida completa con
+**22 OK**, y las otras 2 verificadas: la 540273 era el propio piloto (ya
+finalizada) y la 538877 respondió con un aviso informativo del portal — se
+verificó aparte y ya no está en pendientes. **Las 24 quedaron respondidas y
+finalizadas**, cada una con su pantallazo en `evidencias_glosa\`. El portal
+generó el consecutivo del paquete: **GI-33-5369-2026**.
+
+También se resolvió el enredo del PR de la bitácora: el respaldo del 24-08 se
+aplicó dos veces (en este chat y en otro), la principal quedó con la versión
+vieja del plan y el PR chocó; se fusionaron las dos versiones conservando el
+trabajo de todas las sesiones y quedó todo en la rama principal (PR #469).
+
+---
+
+### 25-08 (tarde) — «[object Object]»: el error que no decía nada
+
+Elías pegó en la observación el mensaje de error que devuelve **ADRES SIA**
+—ese texto larguísimo del FUR— y al guardar salió un aviso rojo que decía
+**«[object Object]»**. Ni se guardaba, ni se entendía por qué.
+
+Eran dos cosas:
+
+1. **El texto no cabía.** La observación tenía tope de 2.000 caracteres y los
+   mensajes de ADRES pasan de eso. Ahora el tope es de **4.000**, el mismo del
+   motivo de devolución (en la pantalla es un solo recuadro que viaja en los
+   dos campos), y el recuadro no deja escribir de más: se corta solo al llegar.
+2. **El aviso era inútil.** Cuando el servidor rechaza un dato, manda el motivo
+   como una lista de datos y la pantalla lo mostraba tal cual, en su forma
+   interna. Ahora lo traduce: «observaciones: el texto es muy largo: máximo
+   4000 caracteres». Vale para cualquier error de este tipo, no solo para este.
+
+4 pruebas nuevas, una de ellas ejecuta de verdad la traducción del error.
+
+---
+
+### 25-08 (noche) — «Esto lo hizo Vanesa, pero aparece Óscar»
+
+Yesid preguntó por qué algunos envíos que recepciona y gestiona **Vanesa**
+quedan a nombre del gestor **Óscar**.
+
+**La respuesta.** El sistema guarda el nombre de la persona en tres momentos
+distintos —quién **registró** el oficio, quién **escribió** el envío y quién
+**auditó** cada factura— y en los tres casos el nombre sale de la **sesión
+abierta en el navegador**, no de quién esté sentado al computador. Si dos
+gestores comparten el mismo equipo y no cierran sesión, todo lo que haga el
+segundo queda firmado por el primero. Hay un segundo camino posible: las
+facturas que entraron por **importación del Excel** llevan el auditor que decía
+la columna AUDITOR del archivo, no el de quien las tocó después.
+
+**Cómo averiguar cuál de los dos fue,** sin cambiar nada:
+
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py FHUS-AS-I01197-26
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py 232050
+
+Muestra, uno al lado del otro y con fecha y hora: quién registró el oficio,
+quién escribió cada envío, quién auditó cada factura y el historial renglón por
+renglón con su firma. Las líneas que trajo el Excel quedan marcadas.
+
+**Lo que hay que hacer en la oficina:** cada gestor entra con su propio usuario
+y cierra sesión al terminar. El nombre de quien tiene la sesión abierta se ve
+arriba a la derecha en la página: si no es el suyo, hay que cerrar sesión antes
+de trabajar.
+
+10 pruebas nuevas.
+
+---
+
+### 25-08 (cierre) — De dónde salieron esos nombres, y el chip que decía «(1/0)»
+
+Yesid comparó el Excel del informe contra la pantalla y aparecieron dos cosas.
+
+**1) «Salen gestores escribiendo envíos y ellos solo recepcionan».** El
+movimiento **ESCRITA no es auditar**: es el registro de quién **cargó el envío**
+en la página (el paso 4 de la pantalla). Y el nombre no lo pone el sistema según
+el cargo de cada quien: lo pone según la **sesión abierta en el navegador**. Si
+un gestor deja su sesión abierta y otro trabaja en ese computador, todo queda
+firmado por el primero.
+
+Se le entregó a la Dirección el informe **INFORME_AUTORIA_PREAUDITORIA_SINAC**
+(Excel con fórmulas y gráficos) con los números: 3.889 movimientos, **92 sin
+gestor identificado** (los trajo el cargue del consolidado histórico, sobre 55
+facturas, y **164 de los 183 oficios** quedaron registrados así), la lista
+completa de esos 92 con casilla para asignar responsable, y el hallazgo de que
+**VANESSA OSPINA** está partida en dos por un nombre mal escrito («VANESA
+OSPINA», 29 movimientos entre el 18 y el 25 de agosto), más un movimiento a
+nombre de «Auditor Principal», que no es una persona.
+
+**2) El chip decía «226945(1/0)» y «226943(0)».** Los envíos que entraron por la
+importación quedaron con «traía 0 facturas» —el Excel no lo decía— y el chip
+comparaba contra ese cero: mostraba que el envío no había traído nada en oficios
+que sí tienen facturas. Ahora, cuando el registro no sabe cuántas traía, la
+pantalla muestra lo único cierto: **las que están ahí**. Y el importador ya
+guarda el número real de facturas por envío, así que a los cargues nuevos no les
+vuelve a pasar.
+
+4 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
+
+### Del motor de glosas, al 25-08 (cierre)
+- **~~Reiniciar el motor~~ — HECHO** (confirmado por el área el 25-08).
+- **~~Reenviar el archivo de recepción~~ — HECHO.**
+- **~~Subir a DGH los 6 archivos de objeciones de COOSALUD~~ — HECHO.**
+- **~~La plantilla de las ratificaciones~~ — RESUELTO.** El área decidió que las
+  de aseguradora se analizan. Implementado el 25-08 (ver la entrada del día).
+  Falta que el área confirme el criterio de quién cuenta como aseguradora.
+- **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
+  entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
+  dejar `carterahus02@sinacsc.com`.
+- **Terminar de repasar la base normativa** — **las de uso diario ya están.**
+  12 normas verificadas contra fuente oficial (29 artículos): Decreto 4747,
+  Decreto 780, Decreto 111, Decreto 2423, Ley 23, Ley 100, Ley 1122, Ley 1164,
+  Ley 1438, Ley 1751, Resolución 1995 y Resolución 2284. **Quedan 16 normas con
+  20 artículos**, todas de uso ocasional (Ley 80, Ley 599, el CPACA, la
+  Resolución 1885, entre otras). Se pueden hacer cuando haya un rato.
+
+### Lo que quedó de la noche del 25-08
+- **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
+  señala que las 21 respuestas a glosas ratificadas usan el mismo texto y
+  ninguna entra en el motivo concreto por el que la entidad ratificó. El texto
+  lo pidió el área en abril y jurídicamente se sostiene, así que no se cambió
+  sin preguntarle. Hay una mejora concreta disponible: el artículo 23 del
+  Decreto 4747 dice que **no se pueden formular glosas nuevas sobre la misma
+  factura salvo por hechos nuevos** — o sea que si la entidad ratifica
+  estrenando causal, eso es rebatible. ¿Se agrega ese argumento a la plantilla?
+- **Repasar el resto de la base normativa.** Del Decreto 4747 estaban mal los
+  tres artículos que había. Falta pasar por la misma verificación las demás
+  normas del corpus que tienen texto de artículo guardado — el Decreto 780 de
+  2016 es el primero de la lista.
+
+### Del motor de glosas, al 25-08 (tarde)
+- **Reenviar el archivo de hoy con las columnas de IA.** Las 117 respuestas
+  salieron correctas, pero el Excel que llegó a los gestores salió **sin** las
+  columnas RESPUESTA IA / ESTADO IA. Vale la pena reenviarlo ya corregido.
+- **La cuenta repetida de Edgar Silva.** Los correos a `devoluciones1@sinacsc.com`
+  rebotan; el bueno es `carterahus02@sinacsc.com`. Hay que dejar una sola cuenta
+  en el motor.
+- **Que a las médicas les llegue lo suyo.** Ya quedó el nombre de la profesional
+  amarrado a la glosa; falta reenviar el lote de hoy para que les llegue.
+- **Los CSV de «valores distintos»** de la carga de tarifas: 256 del
+  Dispensario, 737 de Compensar y 737 de Positiva. Cada uno es un código con
+  dos precios: hay que decidir cuál queda.
+- **Revisar de dónde saldrá el CUPS.** El archivo de recepción no lo trae, así
+  que el motor ya no lo escribe (bien: antes se lo inventaba). Si se quiere que
+  la respuesta nombre el procedimiento con su código, hay que traerlo de DGH o
+  agregar la columna al archivo.
+
+### Del frente COOSALUD (glosas y trámites), al 25-08
+- **Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573** (uno por uno,
+  por el tope de 300 facturas). Si alguno devuelve error, corregirlo con el bot
+  CORREGIR ERRORES DGH y reintentar el archivo completo. Después van los
+  trámites de ese lote.
+- **Repasar las 44 del lote de 1.573 que no quedaron OK en el portal**: 43
+  NO_EN_BOLSA (no estaban en la bolsa del usuario: hay que ver si las tiene
+  otro auditor o si ya venían respondidas) y 1 que terminó sin cartel de
+  asignación. El resto del portal ya está cerrado.
+- **8 facturas de auditoría médica de agosto** (HUS527358, HUS529493, HUS530150,
+  HUS530676, HUS530701, HUS531001, HUS531885, HUS533202): esperar la respuesta
+  de las doctoras para armar sus trámites. Siguen pendientes también las 37 del
+  masivo del 14/07.
+- **Registrar a mano en DGH** lo que no cruza: HUS530335 y HUS506920, y los
+  ítems sueltos ACETAZOLAMIDA de HUS527199 ($10.200) y BUPIVACAÍNA de HUS529267,
+  HUS531631 y HUS531672 ($30.600 cada una).
+- **Evidencias**: unificar → PDF `GI-33-5300-2026` → carpeta en el servidor Z:.
+- **Confirmar en DGH** los códigos TA0601, TA2301 y AU2301 para cerrar la
+  homologación 206/207/223/423 en el bot.
+
+
+### Del motor de glosas, después de la revisión del 25-08
+- **Reiniciar el motor del hospital.** Sigue corriendo código viejo: se
+  confirmó mirando los dictámenes de la ronda 2 (sale una frase en el
+  «Fundamento normativo» que ya se había quitado). Mientras no se reinicie,
+  ninguna de estas correcciones está funcionando en la PC de cartera.
+- **Los correos de Usuarios hay que depurarlos.** Edgar Silva tiene dos
+  cuentas y una apunta a `devoluciones1@sinacsc.com`, que rebota con «Address
+  not found»; la buena es `carterahus02@sinacsc.com`. Mientras no se corrija,
+  los avisos que se le mandan salen y se pierden en silencio.
+- **Las tres médicas no recibieron el lote del 25-08.** El arreglo entra para
+  las importaciones siguientes; para las doce glosas de ese día hay que
+  pasarles el Excel-respuesta a mano.
+- **Ojo con la fecha del servicio.** Varias normas que el motor citaba se
+  derogaron este año: la Res. 2275 de 2023 (factura electrónica y RIPS, la
+  reemplazó la Res. 948 de 2026), la Res. 5159 de 2015 (PPL, la reemplazó la
+  Res. 1099 de 2026) y la CUPS 2641 de 2024 (la reemplazó la Res. 2706 de
+  2025). Para atenciones anteriores siguen siendo las aplicables, así que el
+  motor ahora escoge según la fecha del servicio y el sistema avisa cuando la
+  cita ya no rige.
+- **Tres sentencias quedaron marcadas como NO VERIFICADAS** (T-313/2007,
+  T-050/2017 y T-134/2022): el sitio de la Corte las sirve por JavaScript y no
+  se pudo leer su texto. Ya no se citan en ningún dictamen. Si alguien consigue
+  el texto oficial, se marcan y vuelven a quedar disponibles.
+- **Queda pendiente la contradicción de tarifa del contrato 0525/2017**: un
+  expediente lo lee como SOAT pleno ($915.051 para el CUPS 010101) y otros dos
+  como SOAT −15 %. Se resuelve reimportando las tarifas de POSITIVA con
+  «Reemplazar» marcado — el 010101 debe quedar en $777.793.
+
+
+### Notas crédito del Dispensario (nuevo, 24-08)
+- ~~Cargar al SIMED las notas del acta 858 con CUV vigente~~ **Hecho el
+  mismo 24-08: las 21 del acta 858 quedaron cargadas (21/21 OK).**
+- **Las 13 anulaciones/trámite con CUV vigente** (notas 332526, 332710,
+  332712, 332724, 332746, 332747, 332749, 332774, 332798, 332952, 333121,
+  333122, 333198) no van por la pantalla de glosas del robot: definir con el
+  gestor del Dispensario por qué canal las recibe y enviarlas (las carpetas
+  ya están completas y renombradas).
+- **SISTEMAS:** entregarles el informe de los 52 rechazos de CUV y hacerles
+  seguimiento — 47 solo necesitan revalidación (timeout del validador), 2
+  con diagnóstico repetido (436861 y 441161), 1 precio de medicamento
+  (442517), 2 factura referenciada (549496 y 545752). Cuando revaliden:
+  recopiar los CUV del share, re-verificar y cargar las nuevas en firme.
+- **Facturación:** pedir las notas crédito de las 3 facturas aceptadas en el
+  acta 858 que no aparecen en el CRRP: 443525, 443566 y 486894.
+- **Acta 879:** quedan 2 líneas de la factura 474268 (CL0801, $6.093) sin
+  texto de la doctora, y 3 líneas sin decidir (478141 $1, 487192 $20,
+  481589 $1.705.924); confirmar fecha y número contra el PDF firmado.
+
+### Tarifas POSITIVA (nuevo, 24-08 tarde)
+- **Volver a cargar el Excel de tarifas** cuando baje el lector corregido:
+  misma pantalla, mismo archivo, y ESTA VEZ marcar la casilla «Reemplazar
+  tarifas existentes de esta EPS» (las 4.742 actuales están con el valor
+  pleno, no el pactado). Deben quedar ~2.988 y un aviso con los códigos en
+  conflicto.
+- **OJO mientras tanto: no confiar en dictámenes de tarifas de POSITIVA** —
+  citarían valores 15% más altos que el contrato.
+- **Definir los 737 códigos del archivo «tarifas_positiva_POR_DEFINIR.csv»**
+  (columna «¿cuál rige?»). Cuando estén marcados, se cargan aparte.
+- **Arreglar en el Excel la celda del CUPS 512104** (dice #VALUE!).
+
+### Contrato POSITIVA (nuevo, 24-08)
+- **Cargar las 17 cláusulas en el PC de cartera.** El archivo ya está en
+  `data\clausulas_positiva.json`; cuando el autodespliegue baje el bot nuevo,
+  correr: `venv\Scripts\python.exe tools\cargar_clausulas_contrato.py
+  POSITIVA data\clausulas_positiva.json` y comprobar que diga 17 insertadas y
+  que la base sea `motorglosas.db`.
+- **El contrato original 525/2017 sigue escaneado.** Si se quieren sus
+  cláusulas originales (multas, garantías, terminación), hay que pasarle OCR
+  primero. Lo que rige hoy en tarifas, plazos y glosas ya quedó transcrito de
+  los otrosíes.
 
 ### Permisos del portal (nuevo, 21-08 tarde)
 - ~~Cerrar la consulta de usuarios.~~ **HECHO el 21-08 por la tarde.** Ya
@@ -6861,6 +8108,47 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Frente COOSALUD (25-08):** (a) subir a DGH los 6 archivos de OBJECIONES del
+lote de 1.573; (b) armar los trámites de ese lote cuando las objeciones estén
+cargadas; (c) repasar las 44 del portal que no quedaron OK; (d) registrar a
+mano HUS538337 (y las tres incompletas); (e) insistir con auditoría médica por
+las 8 facturas de CALIDAD de agosto.
+
+
+**Lo primero del motor (25-08):** reiniciar el motor en la PC de cartera para
+que tome las correcciones de la jurisprudencia y de los valores. Sin eso, los
+dictámenes siguen saliendo con las citas inventadas.
+
+**Lo primero del motor (26-08):** volver a **desplegar y reiniciar** el motor en
+la PC de cartera para que tome las cinco correcciones de esta tarde (los CUPS
+inventados, el contrato vencido del Dispensario, la Ley 1164, el año de la
+Resolución 3100 y la preposición comida). Mientras no se reinicie, las
+respuestas siguen saliendo con esos defectos.
+
+**Y después:** reenviar el archivo de recepción de hoy —esta vez con las
+columnas de IA y con copia a las médicas— y dejar una sola cuenta de correo
+para Edgar Silva.
+
+**Lo primero de todo (26-08):** el reinicio del motor dejó de ser un pendiente
+más. Hoy quedó demostrado que una corrección del 24 de agosto **sí estaba** en
+la versión del hospital y aun así salió el defecto en las 117 respuestas,
+porque el motor no se había reiniciado. Todo lo corregido ayer y hoy sigue sin
+efecto hasta ese reinicio.
+
+
+**Lote de glosas del 25-ago (Dispensario):** cerrado — las 24 respondidas
+con el consecutivo **GI-33-5369-2026** ya anotado.
+
+**Notas crédito del Dispensario (lo primero, 25-08):** el cargue del acta
+858 ya quedó (21/21 OK el 24-08). Lo que sigue: (a) pasar a SISTEMAS el
+informe de los 52 rechazos (47 solo necesitan REVALIDACIÓN — timeout del
+validador; 2 diagnóstico repetido; 1 precio Circular 19/2024; 2 factura
+referenciada); (b) definir con el gestor del Dispensario el canal para las
+13 anulaciones/trámite con CUV vigente y enviarlas; (c) pedir a Facturación
+las notas de las 3 facturas aceptadas sin NC (443525, 443566, 486894);
+(d) cuando SISTEMAS revalide: recopiar los CUV del share, re-verificar y
+cargar las que queden en firme.
 
 ### Sistema ICFES (20-08)
 1. **Correr el diagnóstico** y volver a mirar el plan: con el resultado real, el

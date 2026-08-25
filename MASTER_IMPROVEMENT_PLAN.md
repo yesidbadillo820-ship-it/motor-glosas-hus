@@ -46,7 +46,7 @@ con prueba.
 - [x] `presentacion-ia.html` íd.
 - [x] `terapia-fisica-paciente-encamado.html` íd.
 - [x] Prueba que falla si una página del portal deja de cargar el sistema de diseño (12 casos, uno por página y por archivo).
-- [ ] Que además **usen** los tokens `--sds-*` en vez de sus colores propios. Cargarlos es el primer paso; reemplazar los colores a mano es tarea aparte, pantalla por pantalla.
+- [ ] Que además **usen** los tokens `--sds-*`. **Medido el 25-08 y replanteado:** `index.html` no está sin disciplina — tiene **su propio** sistema, con 90 tokens y 2.072 usos (`--text3`, `--bg-card`, `--border`…). Lo que pasa es que `sinac-ds.css` carga un **segundo** vocabulario que nadie usa. Migrar los 2.072 usos es el cambio gigante que la regla 1 del proyecto prohíbe sin defecto visible que lo justifique. **DECISIÓN DEL DUEÑO.**
 
 ### 1.2 La moneda se formatea de 74 maneras
 
@@ -93,13 +93,25 @@ creía que su decisión había quedado registrada y no había quedado.
 **326** llamadas al servidor. Estados vacíos: 41 apariciones.
 
 - [x] Medir la cobertura actual.
+- [x] **Lo que de verdad dolía no era el skeleton: era el silencio.** Contadas las 278 funciones que llaman al motor, **77** tienen `catch` pero el catch solo escribe en la consola del navegador — que el auditor no abre. Si se cae la red, la tabla vieja se queda en pantalla con cara de estar al día. (Primer conteo: 24, y estaba mal; se caían las que mezclan un catch vacío con uno de consola.)
+- [x] `avisarNoCargo()` — un solo aviso, con el nombre de la pantalla en cristiano, que dice que **lo que se ve puede estar desactualizado**. No repite antes de 15 s: con la red caída fallan seis cosas a la vez.
+- [x] Enchufado en las **14 pantallas donde el auditor mira plata o decide**: vencimientos, historial, tablero, cobranza, resumen del mes, mando (×4), ADRES, contratos, plata recuperada, analítica predictiva y comentarios del expediente.
+- [x] **La tarjeta de vencimientos** era la más grave: además se devolvía callada cuando el servidor respondía con error (`if(!r.ok) return;`). Su silencio se traduce en glosas aceptadas por vencimiento (Art. 57 Ley 1438).
+- [x] **La cortina de carga decía algo que no era:** `showLoading()` descartaba el mensaje que le pasaban y rotaba siempre «Identificando tipo de glosa…». Mientras el sistema *borraba datos*, la pantalla decía que analizaba una glosa. Ahora respeta el mensaje.
+- [x] Prueba que falla si una de esas 14 vuelve a callarse, o si la cortina vuelve a descartar el mensaje (34 casos).
 - [ ] Inventario de las pantallas que tardan (>1s) y no avisan. **PENDIENTE DE VALIDAR** — hay que medirlo con el motor del hospital, no se puede desde acá.
-- [ ] Las tablas de glosas, historial y expediente muestran *skeleton* mientras cargan.
+- [ ] *Skeleton* en las tablas mientras cargan. Menos urgente de lo que parecía: lo grave era el silencio, no la espera.
 - [ ] Estado vacío ilustrado y con acción sugerida en las tablas principales.
+- [ ] Las **63 restantes** que fallan en silencio son adornos (insignias, banners, sugerencias). Que un adorno no cargue no le hace perder plata a nadie; se dejan para cuando alguna moleste.
 
-### 1.5 Badges de estado unificados
+### 1.5 Badges de estado unificados — **medido el 25-08: no hay tal problema**
 
-- [ ] Inventario de los estados que se pintan hoy (Aceptada, Conciliada, Objetada, Radicada…) y de sus colores actuales. **PENDIENTE DE VALIDAR**.
+El inventario se hizo. **La premisa era falsa:** no hay estados pintados de
+colores distintos según la pantalla. El único con más de un tono es
+`RATIFICADA`, y son los tres del mismo rojo (fondo `#fee2e2`, borde `#ef4444`,
+texto `#991b1b`) — que es como se pinta un badge, no una inconsistencia.
+
+- [x] Inventario de los estados que se pintan hoy y de sus colores actuales. **No hay divergencia que corregir.**
 - [ ] Una sola clase de badge por estado, con el mismo color en todas las pantallas.
 - [ ] Prueba que falla si un estado se pinta con un color distinto en dos pantallas.
 

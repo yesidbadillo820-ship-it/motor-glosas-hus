@@ -103,3 +103,38 @@ class TestListarNormas:
         r = client.get("/consulta-normativa/normas")
         nombres = [n["nombre"] for n in r.json()["normas"]]
         assert nombres == sorted(nombres)
+
+
+class TestLasCircularesQueEntregoElAuditor:
+    """24-08-2026: Yesid entregó los PDF reales de la Circular 047/2025
+    (UVB, Manual SOAT 2026) y la Circular 19/2024 CNPMDM (precio máximo de
+    medicamentos) para que la biblioteca conteste cuando las busquen."""
+
+    def test_buscar_uvb_encuentra_la_047_con_sustancia(self):
+        from app.api.routers.consulta_normativa import _buscar_normas
+
+        r = _buscar_normas("valor UVB manual tarifario SOAT 2026")
+        assert r, "la búsqueda no devolvió nada"
+        top = r[0]
+        assert "047" in top["norma"]
+        assert "12.110" in top["texto"], "no cita el valor de la UVB 2026"
+
+    def test_buscar_precio_maximo_de_medicamentos_encuentra_la_19(self):
+        from app.api.routers.consulta_normativa import _buscar_normas
+
+        r = _buscar_normas("precio máximo de venta medicamentos control directo")
+        assert any("Circular 19 de 2024" in n["norma"] for n in r), (
+            "la Circular 19/2024 CNPMDM no aparece: es la defensa de las "
+            "glosas de medicamentos regulados"
+        )
+
+    def test_la_19_cita_el_margen_de_la_ips(self):
+        """El arma concreta: Parágrafo 2 del Art. 1 — la IPS puede adicionar
+        el margen del Art. 11 de la Circular 18 de 2024. Sin eso en el texto,
+        la biblioteca da el nombre pero no la defensa."""
+        from app.api.routers.consulta_normativa import CATALOGO_NORMAS
+
+        entrada = next(n for n in CATALOGO_NORMAS if n["clave"] == "CIRCULAR 19 DE 2024 CNPMDM")
+        kws = " ".join(entrada["keywords"])
+        assert "margen" in kws and "Circular 18 de 2024" in kws
+        assert "deroga la Circular 13 de 2022" in entrada["titulo"]

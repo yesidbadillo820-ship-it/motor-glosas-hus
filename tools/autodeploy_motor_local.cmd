@@ -6,8 +6,18 @@ rem  REVIVIR_EXPRESS_SIN_DOCKER.cmd). Si hay codigo nuevo fusionado en
 rem  la rama motor-glosas: lo baja, actualiza dependencias y reinicia
 rem  el servidor (su vigilante lo revive solo con el codigo nuevo).
 rem  Registro en data\autodeploy.log
+rem
+rem  SE PUEDE PEDIR A MANO CON:  autodeploy_motor_local.cmd YA
+rem  Eso salta la espera de "hay gente trabajando" y aplica de una.
+rem  Ver la explicacion completa mas abajo, junto a esa espera.
 rem ================================================================
 setlocal
+rem  Orden expresa del auditor: aplicar sin esperar hueco.
+set "FORZADO="
+if /i "%~1"=="YA" set "FORZADO=1"
+if /i "%~1"=="/YA" set "FORZADO=1"
+if /i "%~1"=="--YA" set "FORZADO=1"
+if /i "%~1"=="FORZAR" set "FORZADO=1"
 set "BASE=C:\motor-glosas"
 set "REPO=%BASE%\repo"
 if not exist "%REPO%\.git" exit /b 0
@@ -15,6 +25,31 @@ cd /d "%REPO%"
 set "LOG=%REPO%\data\autodeploy.log"
 rem Si el registro pasa de ~5 MB se reinicia, para no llenar el disco.
 if exist "%LOG%" for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
+
+rem ---------------------------------------------------------------
+rem  UNA SOLA PASADA A LA VEZ (24-08-2026).
+rem
+rem  El registro del PC de cartera mostro 'codigo nuevo detectado'
+rem  DOS VECES con medio segundo de diferencia: dos pasadas corriendo
+rem  al tiempo. Eso es grave, porque cada una apaga el motor contando
+rem  con revivirlo, y entre las dos lo dejan caido: una lo levanta y
+rem  la otra lo vuelve a matar.
+rem
+rem  Se usa un archivo como candado y NO una cuenta de procesos: eso
+rem  ultimo ya se intento en el vigilante y salio mal -la orden que
+rem  contaba se contaba a si misma y dejo el hospital sin portal-.
+rem
+rem  Caduca a los 30 minutos: si una pasada muere sin borrarlo, el
+rem  autodespliegue no puede quedarse bloqueado esperando a un muerto.
+rem ---------------------------------------------------------------
+set "CANDADO=%REPO%\data\autodeploy.lock"
+if not exist "%CANDADO%" goto :tomar_candado
+call :candado_caducado
+if not errorlevel 1 goto :tomar_candado
+echo [%date% %time%] otra pasada sigue trabajando: esta se salta >> "%LOG%"
+exit /b 0
+:tomar_candado
+echo %date% %time% > "%CANDADO%"
 
 rem ---------------------------------------------------------------
 rem  ENCONTRAR GIT (22-08-2026).
@@ -45,9 +80,24 @@ goto :asegurar
 :hay_git
 
 echo [%date% %time%] revisando si hay codigo nuevo... >> "%LOG%"
-git fetch origin motor-glosas >nul 2>&1
+rem ---------------------------------------------------------------
+rem  GIT NO SE PUEDE QUEDAR COLGADO (24-08-2026).
+rem
+rem  `git fetch` a secas se queda esperando PARA SIEMPRE en dos casos
+rem  normales: si GitHub pide usuario y clave -aqui no hay nadie que
+rem  los escriba- o si la red del hospital deja la conexion a medias.
+rem  Y como esta pasada ya tomo el candado, ninguna de las siguientes
+rem  puede trabajar: el PC se queda con la version vieja y en pantalla
+rem  no se ve nada raro. Paso el 24-08: el registro se lleno de "otra
+rem  pasada sigue trabajando" durante horas.
+rem
+rem  Ahora: git tiene prohibido preguntar, y si en 3 minutos no ha
+rem  terminado se le corta y se anota el motivo.
+rem ---------------------------------------------------------------
+set "GIT_TERMINAL_PROMPT=0"
+powershell -NoProfile -Command "$p=Start-Process -FilePath 'git' -ArgumentList 'fetch','origin','motor-glosas' -WorkingDirectory '%REPO%' -PassThru -WindowStyle Hidden; if(-not $p.WaitForExit(180000)){ try{ $p.Kill() }catch{}; exit 1 }; exit $p.ExitCode"
 if errorlevel 1 (
-  echo [%date% %time%] NO SE PUDO CONSULTAR GITHUB: el PC se queda con la version que tiene. Se reintenta en 5 min. >> "%LOG%"
+  echo [%date% %time%] NO SE PUDO CONSULTAR GITHUB ^(sin internet, o tardo mas de 3 minutos^): el PC se queda con la version que tiene. Se reintenta en 5 min. >> "%LOG%"
   goto :asegurar
 )
 
@@ -83,7 +133,24 @@ set "ESPERA=%REPO%\data\deploy_aplazado.txt"
 set "OCUPADO="
 for /f "usebackq delims=" %%O in (`powershell -NoProfile -Command "try{$r=Invoke-RestMethod -Uri 'http://127.0.0.1:8080/sistema/ocupacion' -TimeoutSec 5; if($r.hay_gente_trabajando){'SI'}else{'NO'}}catch{'SINMOTOR'}"`) do set "OCUPADO=%%O"
 
-if "%OCUPADO%"=="SI" (
+rem
+rem  LA ORDEN DEL AUDITOR LE GANA A LA ESPERA (25-08-2026).
+rem
+rem  Aparecio corriendo esto: el motor del hospital se quedo con codigo
+rem  de la vispera porque el auditor estaba usando el sistema, y al
+rem  correr este bot a mano para forzarlo... se aplazo igual. El
+rem  guardia no distinguia entre el ciclo automatico de cada 5 minutos
+rem  y una orden expresa de una persona, asi que la unica salida era
+rem  esperar la hora. Con una correccion urgente adentro, eso es mucho.
+rem
+rem  Ahora, llamandolo con YA, se aplica de una. La espera automatica
+rem  sigue igual de intacta: quien la salta es una persona que sabe lo
+rem  que hace y que puede avisarle a las gestoras antes.
+rem
+if defined FORZADO if "%OCUPADO%"=="SI" (
+  echo [%date% %time%] hay gente trabajando, pero se pidio YA: se aplica igual >> "%LOG%"
+)
+if not defined FORZADO if "%OCUPADO%"=="SI" (
   if not exist "%ESPERA%" echo %date% %time% > "%ESPERA%"
   call :aplazar_o_seguir
   if errorlevel 1 goto :asegurar
@@ -129,9 +196,30 @@ rem  ahi `timeout` no siempre tiene una consola de verdad: contesta
 rem  "Input redirection is not supported" y sigue de largo sin esperar,
 rem  con lo que el bucle se vuelve loco. `ping` a uno mismo espera
 rem  igual y funciona en todos los casos. ping -n 6 = 5 segundos.
-ping -n 13 127.0.0.1 >nul
-powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
+rem ---------------------------------------------------------------
+rem  ESPERAR PREGUNTANDO, NO UN TIEMPO FIJO (24-08-2026).
+rem
+rem  Antes se esperaban 12 segundos y se preguntaba UNA vez. El motor
+rem  del hospital carga una base de 133 MB y tarda mas que eso, asi
+rem  que se daba por muerto estando vivo... y se arrancaba un SEGUNDO
+rem  motor encima del que estaba subiendo. Los dos peleaban por el
+rem  mismo puerto y el registro decia 'ALERTA: el motor sigue caido'
+rem  con el portal funcionando. Paso el 24-08 a las 9:22.
+rem
+rem  Ahora se pregunta cada 3 segundos hasta 90. Si sube en 10, se
+rem  sigue en 10: no se pierde tiempo. Y si de verdad no sube, se
+rem  entera despues de un plazo que si le alcanza.
+rem ---------------------------------------------------------------
+set /a INTENTOS=0
+:esperar_que_suba
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'python*' -and $_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
 if not errorlevel 1 goto :fin
+set /a INTENTOS+=1
+if %INTENTOS% GEQ 30 goto :no_subio_solo
+ping -n 4 127.0.0.1 >nul
+goto :esperar_que_suba
+
+:no_subio_solo
 
 echo [%date% %time%] el motor NO volvio solo: se arranca directo >> "%LOG%"
 cd /d "%REPO%"
@@ -155,8 +243,18 @@ rem  forma segura de pasar comillas dentro de comillas) y escribe en
 rem  servidor.log, que es donde va lo del servidor. Esta tarea termina
 rem  enseguida y la siguiente pasada corre normal.
 start "MotorGlosasRescate" /min cmd /s /c ""%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%REPO%\data\servidor.log" 2>&1"
-ping -n 16 127.0.0.1 >nul
-powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
+rem  Misma espera con preguntas: un arranque en frio puede tardar.
+set /a INTENTOS=0
+:esperar_al_rescate
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'python*' -and $_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
+if not errorlevel 1 goto :rescate_ok
+set /a INTENTOS+=1
+if %INTENTOS% LSS 30 (
+  ping -n 4 127.0.0.1 >nul
+  goto :esperar_al_rescate
+)
+:rescate_ok
+powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process | Where-Object {$_.Name -like 'python*' -and $_.CommandLine -match 'uvicorn app.main:app' -and $_.CommandLine -match '--port\s+8080'}; if($p){exit 0}else{exit 1}"
 if errorlevel 1 (
   echo [%date% %time%] ALERTA: el motor sigue caido tras arrancarlo directo >> "%LOG%"
 ) else (
@@ -164,6 +262,7 @@ if errorlevel 1 (
 )
 
 :fin
+del "%CANDADO%" >nul 2>&1
 exit /b 0
 
 rem ---------------------------------------------------------------
@@ -172,6 +271,20 @@ rem  Devuelve 1 = seguir esperando · 0 = aplicar igual.
 rem  Una hora es el techo: una correccion urgente no puede quedarse
 rem  fuera todo el dia porque siempre hay alguien conectado.
 rem ---------------------------------------------------------------
+rem ---------------------------------------------------------------
+rem  ¿El candado es de una pasada viva o de una que murio?
+rem  Devuelve 0 = caducado, se puede tomar · 1 = hay otra trabajando.
+rem ---------------------------------------------------------------
+:candado_caducado
+set "EDAD=999"
+for /f "usebackq delims=" %%E in (`powershell -NoProfile -Command "try{$t=(Get-Item '%CANDADO%').LastWriteTime; [int]((Get-Date)-$t).TotalMinutes}catch{999}"`) do set "EDAD=%%E"
+if "%EDAD%"=="" set "EDAD=999"
+if %EDAD% GEQ 30 (
+  echo [%date% %time%] habia un candado de %EDAD% min sin soltar: se ignora >> "%LOG%"
+  exit /b 0
+)
+exit /b 1
+
 :aplazar_o_seguir
 rem  Arranca en 0 a proposito: si PowerShell no contesta, la cuenta
 rem  queda vacia y `if  GEQ 60` seria un error de sintaxis que deja

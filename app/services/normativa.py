@@ -161,17 +161,33 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # Verificada el 25-08-2026 contra el PDF oficial del Ministerio: NO es la
+    # norma de RIPS, como decía este resumen. Reglamenta los datos clínicos
+    # para la interoperabilidad de la historia clínica (Ley 2015 de 2020).
     "RESOLUCION 866/2021": {
         "nombre": "Resolución 866 de 2021",
-        "resumen": "Registros Individuales de Prestación de Servicios de Salud (RIPS). Campos obligatorios.",
+        "resumen": "Datos clínicos para la interoperabilidad de la historia clínica (Ley 2015 de 2020). NO es la norma de RIPS.",
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # Derogada por el art. 12 de la Resolución 1099 de 2026 (verificado el
+    # 25-08-2026 en el PDF oficial). Sigue aplicando a atenciones anteriores.
+    #
+    # SE QUEDA EN ESTE CATÁLOGO A PROPÓSITO, no en NORMAS_DEROGADAS. Ese otro
+    # diccionario es para citas EQUIVOCADAS («la Ley 1122 es de 2007, no de
+    # 2011»), que están mal siempre, y produce un hallazgo de nivel «error».
+    # Esta no está equivocada: es la norma correcta para las atenciones
+    # anteriores a junio de 2026. De la fecha avisa el verificador de citas,
+    # con severidad media y explicando la regla — ver NORMA_DEROGADA en
+    # citation_verifier.py.
+    #
+    # (El campo «vigente» de aquí es informativo: validar_citas solo mira si la
+    # clave está en el diccionario, no lee este campo.)
     "RESOLUCION 5159/2015": {
         "nombre": "Resolución 5159 de 2015",
-        "resumen": "Cobertura en salud para población privada de la libertad (PPL). Complemento con Ley 1709/2014.",
+        "resumen": "Modelo de atención en salud para la población privada de la libertad (PPL). Derogada por la Res. 1099 de 2026; aplica a atenciones anteriores a junio de 2026.",
         "tipo": "RESOLUCION",
-        "vigente": True,
+        "vigente": False,
     },
     # Códigos
     "ART 871 C.COMERCIO": {
@@ -195,13 +211,15 @@ NORMAS_VIGENTES: dict[str, dict] = {
     },
     "SENTENCIA T-1025/2002": {
         "nombre": "Sentencia T-1025 de 2002",
-        "resumen": "Urgencias no requieren autorización previa. Aplica transversalmente.",
+        # Verificada el 24-08-2026 contra la relatoría de la Corte Constitucional.
+        "resumen": "Consentimiento informado en cirugía de asignación de sexo en menores intersexuales. NO trata de urgencias.",
         "tipo": "SENTENCIA",
         "vigente": True,
     },
     "SENTENCIA T-478/1995": {
         "nombre": "Sentencia T-478 de 1995",
-        "resumen": "Autonomía médica como derecho fundamental protegido.",
+        # Verificada el 24-08-2026 contra la relatoría de la Corte Constitucional.
+        "resumen": "Seguridad social y tratamiento asilar de personas con discapacidad psíquica. NO trata de autonomía médica.",
         "tipo": "SENTENCIA",
         "vigente": True,
     },

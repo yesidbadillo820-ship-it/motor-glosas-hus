@@ -72,12 +72,16 @@ class EnvioIn(BaseModel):
 class AuditarIn(BaseModel):
     resultado: str = Field(..., pattern="^(RADICAR|DEVUELTA|PENDIENTE)$")
     motivo_devolucion: Optional[str] = Field(None, max_length=4000)
-    observaciones: Optional[str] = Field(None, max_length=2000)
+    # Mismo tope que el motivo: en la pantalla es UN SOLO recuadro que viaja en
+    # los dos campos. Con 2.000 se caía al pegar el mensaje de error de ADRES
+    # SIA, que es larguísimo, y encima el aviso salía como "[object Object]"
+    # (25-08-2026). La columna de la base es Text: no tiene tope.
+    observaciones: Optional[str] = Field(None, max_length=4000)
 
 
 class ObservacionIn(BaseModel):
     # Anotar la observación de una factura ya auditada, sin revertir la decisión.
-    observaciones: str = Field(..., max_length=2000)
+    observaciones: str = Field(..., max_length=4000)
 
 
 class OficioDevolucionIn(BaseModel):
@@ -188,7 +192,12 @@ def _oficio_dict(db: Session, o: OficioRecepcionRecord, con_facturas: bool = Fal
         for f in facturas
         if f.resultado_actual == svc.RESULTADO_DEVUELTA and f.oficio_devolucion_id is None
     )
-    completado = bool(facturas) and pendientes == 0
+    # Un oficio se da por cumplido cuando no le queda nada pendiente. También
+    # el que se quedó SIN facturas porque todas siguieron su camino (devueltas
+    # aquí y reingresadas en otro oficio): antes esos quedaban en rojo para
+    # siempre, como si nadie los hubiera auditado. La consulta extra solo
+    # ocurre en los oficios vacíos.
+    completado = pendientes == 0 and (bool(facturas) or svc.tuvo_facturas(db, o.id))
     envios = (
         db.query(EnvioCargadoRecord)
         .filter(EnvioCargadoRecord.oficio_id == o.id)

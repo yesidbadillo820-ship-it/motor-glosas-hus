@@ -156,6 +156,11 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     hset = {h for h in headers_normalizados if h}
     hunion = " ".join(hset)
     cups_like = any("CUPS" in h for h in hset)
+    # 24-08-2026 — los anexos de medicamentos e insumos del Dispensario
+    # (contrato 440) titulan el código «CODIGO CUM» o «CODIGO» a secas
+    # (CUM, FMQ, QX…): sin esto, las 8 hojas se saltaban en silencio.
+    # Va DESPUÉS de los formatos específicos: solo alcanza el fallback.
+    codigo_like = "CODIGO CUM" in hset or "CODIGO" in hset
 
     # FOMAG (tarifario y excluidos comparten estructura) — distintivo:
     # "PROPUESTA IPS" + "OBSERVACION FOMAG" + "CUPS RESOL 2641"
@@ -189,6 +194,10 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
         # que se pacta viene en "PROPUESTA FINAL" (el UVB del año menos el
         # 5% del contrato). Sin esta palabra la hoja no se reconocía.
         "PROPUESTA FINAL",
+        # 24-08-2026 — anexos de medicamentos del Dispensario y la hoja
+        # TARIFAS PROPIAS de su propuesta (el valor viene en OFERTA).
+        "PRECIO DE VENTA",
+        "OFERTA",
     )
     has_value = any(k in hunion for k in value_keywords)
     if not has_value:
@@ -199,7 +208,7 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
         # (Ronda 46: soporte para tarifarios DMBUG y similares con año en header)
         _AGNOS_PATRON = re.compile(r"^(VALOR|TARIFA|PRECIO)\s*(\d{4})?\s*$")
         has_value = any(_AGNOS_PATRON.match(h) for h in hset if h)
-    if cups_like and has_value:
+    if (cups_like or codigo_like) and has_value:
         return "SIMPLE_FIJO"
     return None
 
@@ -247,11 +256,20 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
         # que de verdad se pacta en "PROPUESTA FINAL"; sin esta palabra la
         # hoja no se reconocía y se perdían 4.586 tarifas.
         "PROPUESTA FINAL",
+        # 24-08-2026: anexos de medicamentos e insumos del Dispensario
+        # (contrato 440) y la hoja TARIFAS PROPIAS de su propuesta.
+        "PRECIO DE VENTA",
+        "CODIGO CUM",
+        "OFERTA",
     ]
     limite = min(200, len(rows))
     for idx, fila in enumerate(rows[:limite]):
         no_vacios = [c for c in fila if c is not None and str(c).strip()]
-        if len(no_vacios) < 4:
+        # 24-08-2026 — era < 4, y los anexos 05/06 del Dispensario traen
+        # encabezados de TRES columnas (CODIGO | NOMBRE | PRECIO DE VENTA):
+        # 2.000 dispositivos médicos se saltaban en silencio. Tres celdas
+        # con dos palabras fuertes siguen siendo una tabla de tarifas.
+        if len(no_vacios) < 3:
             continue
         fila_norm = [_normalizar_texto(c) for c in fila]
         matches = sum(1 for celda in fila_norm if any(kw in celda for kw in keywords_fuertes))
@@ -617,6 +635,25 @@ def _parsear_simple_fijo(
     `nombre_hoja` se usa para decir de qué manera quedó pactada la tarifa
     cuando la fila no trae una columna que lo diga. Ver `_modalidad_de_hoja`.
     """
+    # 24-08-2026 — el anexo de medicamentos e insumos del Dispensario
+    # (contrato 440) titula el código «CODIGO CUM» o «CODIGO» a secas
+    # (CUM, FMQ, QX…), y el lector se saltaba las 8 hojas enteras sin
+    # decir nada. «CODIGO» va de último a propósito: solo aplica cuando
+    # no hay nada mejor, y las filas basura las frenan el validador de
+    # códigos y el valor > 0.
+    # …y la prioridad también acá es POR CANDIDATO: en el tarifario de
+    # SALUD MÍA conviven «CODIGO IPS» (columna 1, códigos con letra) y
+    # «CUPS 2341/25» (columna 3, el CUPS oficial). Con la llamada única,
+    # CODIGO alcanzaba la pasada de subcadenas y agarraba «CODIGO IPS»
+    # antes de que CUPS llegara a su pasada de prefijos: 4.124 tarifas
+    # quedaban guardadas por el código interno y las glosas —que llegan
+    # con el CUPS oficial— no las encontraban.
+    # El orden es sagrado, y el CI lo demostró el mismo día (24-08): el
+    # candidato CODIGO, puesto antes que el respaldo de la resolución,
+    # secuestró la hoja AMBULATORIO de FAMISANAR 2026 —allí el CUPS
+    # oficial va titulado «Res 2706/25» y convive con una columna CODIGO
+    # de códigos propios (902210AMB)—. El CUPS oficial se busca por TODAS
+    # sus formas antes de conformarse con un CODIGO a secas.
     idx_cups = _indice_columna(headers, "CUPS")
     if idx_cups is None:
         # 06-08-2026 — hoja AMBULATORIO de la propuesta 2026 de FAMISANAR:
@@ -627,33 +664,74 @@ def _parsear_simple_fijo(
             if h and _COLUMNA_DE_CODIGO.match(h) and h.upper().startswith(("RES", "RESOLUCION")):
                 idx_cups = i
                 break
+    if idx_cups is None:
+        idx_cups = _indice_columna(headers, "CODIGO CUM")
+    if idx_cups is None:
+        idx_cups = _indice_columna(headers, "CODIGO")
     idx_desc = _indice_columna(
         headers, "DESCRIPCION CUPS", "DESCRIPCION IPS", "DESCRIPCION", "DESCRIPCIÓN", "NOMBRE"
     )
-    idx_valor = _indice_columna(
-        headers,
-        # 06-08-2026 — va de PRIMERA: en la hoja UVB de FAMISANAR conviven
-        # "VALOR UVB 2026" (el de referencia) y "PROPUESTA FINAL" (ese mismo
-        # menos el 5% del contrato, que es el que se pacta). Si gana el de
-        # referencia, el motor defiende con una tarifa 5% más alta que la
-        # pactada y la glosa se ratifica.
-        "PROPUESTA FINAL",
-        "PRECIO DE REFERENCIA",
-        "TARIFA UNITARIA",
-        "VALOR PACTADO",
-        "VALOR UNITARIO",
-        "PRECIO UNITARIO",
-        # Ronda 46: soporte para tarifarios con año en el header (DMBUG, HUS)
-        "TARIFA 2025",
-        "TARIFA 2026",
-        "VALOR 2025",
-        "VALOR 2026",
-        "TARIFA 2024",
-        "VALOR 2024",
-        "VALOR",
-        "PRECIO",
-        "TARIFA",
+    # 24-08-2026 — LA COLUMNA DEL DESCUENTO PACTADO GANA SIEMPRE.
+    # El caso POSITIVA: la hoja SOAT trae «VALOR 2025» (el SOAT pleno) y
+    # «SOAT -15%» (lo pactado en el Otrosí 03). La lista de alias conocía
+    # VALOR 2025 y no conocía SOAT -15%, así que el motor cargó 4.742
+    # tarifas con el SOAT pleno: $915.051 donde lo pactado era $777.793.
+    # Con eso, cada dictamen de tarifas defendería un valor 15% más alto
+    # que el contrato — la glosa se ratifica y el dictamen es falso.
+    # Es la misma trampa ya documentada abajo con la hoja UVB de FAMISANAR,
+    # solo que aquella tenía alias y esta no: un encabezado «BASE ± N%» es
+    # SIEMPRE el pactado cuando convive con la base sola.
+    idx_valor = None
+    patron_descuento = re.compile(
+        r"(?:^|\s)(SOAT|ISS|UVR|UVB|UVT)\s*[-+\u2212\u2013]\s*\d{1,3}\s*%"
     )
+    # El encabezado que dio el valor, cuando fue una columna de descuento.
+    # Sirve abajo para que la modalidad salga de LA MISMA CELDA que el número.
+    hdr_descuento = ""
+    for i_desc, h_desc in enumerate(headers):
+        if h_desc and patron_descuento.search(h_desc):
+            idx_valor = i_desc
+            hdr_descuento = h_desc
+            break
+    if idx_valor is None:
+        # 24-08-2026 — LA PRIORIDAD SE RESPETA DE VERDAD: un candidato a la
+        # vez. La llamada única con todos los candidatos parecía priorizar,
+        # pero su primera pasada recorre LOS ENCABEZADOS en orden y devuelve
+        # el primero que sea cualquier candidato: en la PROPUESTA del
+        # Dispensario encontraba TARIFA (columna con el TEXTO «PROPIA»)
+        # antes de llegar a OFERTA (el valor real), y la hoja entera se
+        # leía como ceros y se descartaba en silencio.
+        for candidato in (
+            # 06-08-2026 — va de PRIMERA: en la hoja UVB de FAMISANAR conviven
+            # "VALOR UVB 2026" (el de referencia) y "PROPUESTA FINAL" (ese mismo
+            # menos el 5% del contrato, que es el que se pacta). Si gana el de
+            # referencia, el motor defiende con una tarifa 5% más alta que la
+            # pactada y la glosa se ratifica.
+            "PROPUESTA FINAL",
+            # 24-08-2026 — la PROPUESTA del Dispensario: TARIFA trae el TEXTO
+            # «PROPIA» y el valor de verdad está en OFERTA. Y sus anexos de
+            # medicamentos titulan el precio «PRECIO DE VENTA».
+            "OFERTA",
+            "PRECIO DE VENTA",
+            "PRECIO DE REFERENCIA",
+            "TARIFA UNITARIA",
+            "VALOR PACTADO",
+            "VALOR UNITARIO",
+            "PRECIO UNITARIO",
+            # Ronda 46: soporte para tarifarios con año en el header (DMBUG, HUS)
+            "TARIFA 2025",
+            "TARIFA 2026",
+            "VALOR 2025",
+            "VALOR 2026",
+            "TARIFA 2024",
+            "VALOR 2024",
+            "VALOR",
+            "PRECIO",
+            "TARIFA",
+        ):
+            idx_valor = _indice_columna(headers, candidato)
+            if idx_valor is not None:
+                break
     idx_modalidad = _indice_columna(
         headers,
         "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
@@ -674,6 +752,16 @@ def _parsear_simple_fijo(
         if not cups_raw:
             continue
         cups = str(cups_raw).strip()
+        if cups.endswith(".0"):
+            cups = cups[:-2]
+        # 24-08-2026 — Excel guarda el CUPS como número y se come el cero de
+        # adelante: 010101 queda 10101. El sistema guarda y busca los CUPS a
+        # 6 dígitos (comparación exacta de texto), así que un CUPS de 5 se
+        # vuelve invisible para el lookup. Solo 5 dígitos: los capítulos
+        # reales del CUPS van del 01 al 09; a un código de 4 no le falta UN
+        # cero, y rellenarlo inventaría un código.
+        if cups.isdigit() and len(cups) == 5:
+            cups = cups.zfill(6)
         if not _es_codigo_cups_valido(cups):
             continue
         valor = _normalizar_valor(_celda(fila, idx_valor))
@@ -682,9 +770,24 @@ def _parsear_simple_fijo(
         desc = (
             _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
         )
-        modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
-        if not modalidad:
-            modalidad = _modalidad_de_hoja(nombre_hoja)
+        # LA MODALIDAD SALE DE LA MISMA CELDA QUE EL NÚMERO (24-08-2026).
+        #
+        # La auditoría encontró el mismo contrato (0525/2017 de POSITIVA) y el
+        # mismo CUPS leídos de dos maneras dentro del mismo lote: uno decía
+        # "$915.051, modalidad SOAT" y otros dos "SOAT -15 %". El 85 % de
+        # $915.051 es $777.793, así que una de las dos lecturas estaba mal.
+        #
+        # Pasaba porque el número salía de una columna y las palabras de OTRA,
+        # y nadie las cruzaba. Cuando el valor se tomó de una columna cuyo
+        # encabezado YA dice el descuento ("SOAT -15%"), ese encabezado ES la
+        # modalidad: usarlo evita que el número y las palabras se contradigan.
+        # Es lo que ya hace bien el lector del Anexo 3 en este mismo archivo.
+        if hdr_descuento:
+            modalidad = _limpiar_descripcion(hdr_descuento)
+        else:
+            modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
+            if not modalidad:
+                modalidad = _modalidad_de_hoja(nombre_hoja)
         # Si hay código IPS propio, guardarlo en observación (útil para trazabilidad)
         cod_ips = str(_celda(fila, idx_cod_ips) or "").strip() if idx_cod_ips is not None else ""
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None
@@ -987,6 +1090,8 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
         except Exception:
             pass
 
+    filas_total = _resolver_repetidos(filas_total, errores)
+
     return {
         "eps": meta_global["eps"],
         "contrato": meta_global["contrato"],
@@ -996,3 +1101,49 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
         "hojas_detectadas": hojas_detectadas,
         "errores": errores,
     }
+
+
+def _resolver_repetidos(filas: list[dict], errores: list[str]) -> list[dict]:
+    """Un mismo código con DOS valores distintos no se carga: se omite y se avisa.
+
+    POR QUÉ (24-08-2026, el Excel de POSITIVA). El mismo CUPS aparecía varias
+    veces —dentro de la hoja SOAT con homólogos distintos, y también repetido
+    entre la hoja SOAT y la INSTITUCIONALES— con valores que no coinciden
+    (103204 traía CINCO valores, de $94.399 a $1.926.567). Antes se cargaban
+    TODAS las filas y el lookup se quedaba con la más reciente: un valor
+    elegido por orden de llegada, no por el contrato. Un dictamen que cita una
+    tarifa elegida al azar es un dictamen falso.
+
+    La regla del proyecto es no inventar: si el archivo trae dos valores para
+    el mismo código, este parser no sabe cuál rige — lo decide el auditor.
+    Se omite el código, se deja UNA línea por código en `errores` con sus
+    valores, y el motor dirá «sin tarifa pactada» para ese CUPS, que es la
+    verdad. Los repetidos con el MISMO valor sí se cargan (una sola vez):
+    repetir no es contradecirse.
+    """
+    from collections import OrderedDict
+
+    por_codigo: "OrderedDict[str, list[dict]]" = OrderedDict()
+    for f in filas:
+        por_codigo.setdefault(f.get("codigo_cups") or "", []).append(f)
+
+    limpias: list[dict] = []
+    conflictos: list[str] = []
+    for codigo, grupo in por_codigo.items():
+        valores = sorted({f["valor_pactado"] for f in grupo})
+        if len(valores) == 1:
+            limpias.append(grupo[0])
+            continue
+        pintados = " / ".join(f"${v:,.0f}".replace(",", ".") for v in valores)
+        conflictos.append(f"{codigo}: {pintados}")
+
+    if conflictos:
+        MOSTRAR = 40
+        errores.append(
+            f"{len(conflictos)} códigos vienen con VALORES DISTINTOS en el "
+            f"archivo y NO se cargaron (el contrato debe decir cuál rige; "
+            f"cargarlos al azar produce dictámenes falsos): "
+            + " · ".join(conflictos[:MOSTRAR])
+            + (f" · … y {len(conflictos) - MOSTRAR} más" if len(conflictos) > MOSTRAR else "")
+        )
+    return limpias

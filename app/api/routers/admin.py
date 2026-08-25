@@ -5364,23 +5364,76 @@ def descargar_backup_db(
 # ─────────────────────────────────────────────────────────────────────────
 
 
-def _explicar_error_smtp(error: str) -> str:
-    """Traduce el error del servidor de correo a algo accionable."""
+def _explicar_error_smtp(error: str, host: str = "", puerto: int = 0) -> str:
+    """Traduce el error del servidor de correo a algo accionable.
+
+    OJO CON EL ORDEN DE LAS PREGUNTAS (25-08-2026). La primera versión
+    preguntaba por «auth» ANTES que nada y remataba con «el servidor rechazó el
+    envío… la causa más común es que SMTP_PASSWORD no sea una contraseña de
+    aplicación». Ese remate se llevó una mañana entera del hospital: el correo
+    rebotaba con «550 5.7.1 Command rejected» —que NO es autenticación— y el
+    panel insistía en culpar a la contraseña. Se probó el login a mano y entraba
+    perfecto; lo que faltaba era la fecha en el encabezado del mensaje.
+
+    Por eso ahora el rechazo del mensaje se pregunta PRIMERO, se dice
+    explícitamente que no es la clave, y el mensaje por defecto ya no acusa a
+    nadie: dice que no se pudo interpretar y dónde mirar.
+    """
     e = (error or "").lower()
-    if "authentication" in e or "auth" in e or "535" in e or "credentials" in e:
+    donde = f"{host or 'el servidor de correo'}:{puerto}" if puerto else (host or "el servidor")
+    # El servidor ACEPTÓ la conexión y el usuario, pero rechazó el mensaje.
+    if "550" in e or "5.7.1" in e or "command rejected" in e or "not allowed" in e:
         return (
-            "El usuario o la contraseña del correo no son válidos. Con Gmail o "
-            "Google Workspace NO sirve la contraseña normal: hay que generar una "
-            "«contraseña de aplicación» de 16 letras y poner ESA en SMTP_PASSWORD."
+            "El servidor aceptó la conexión pero RECHAZÓ el mensaje. Esto NO es "
+            "la contraseña: si fuera la clave, ni siquiera habría dejado entrar. "
+            "Suele ser que al mensaje le falte un encabezado que el servidor "
+            "exige, o que la dirección del remitente no coincida con la cuenta "
+            "con que se conecta."
+        )
+    if "authentication" in e or "535" in e or "credentials" in e or "not accepted" in e:
+        return (
+            "El servidor NO aceptó el usuario o la contraseña. Si el correo es de "
+            "Gmail o Google Workspace, la contraseña normal no sirve: hay que "
+            "generar una «contraseña de aplicación» de 16 letras. Si es un "
+            "servidor propio, es la contraseña del buzón tal cual."
         )
     if "timed out" in e or "timeout" in e or "unreachable" in e or "refused" in e:
         return (
-            "El servidor no pudo conectarse a smtp.gmail.com por el puerto 587. "
-            "Suele ser el firewall del hospital bloqueando la salida."
+            f"No se pudo conectar a {donde}. Suele ser el firewall del hospital "
+            "bloqueando la salida, o el puerto equivocado."
         )
     if "name or service not known" in e or "getaddrinfo" in e:
         return "No se pudo resolver el nombre del servidor de correo. Revise SMTP_HOST."
-    return "El servidor de correo rechazó el envío."
+    return (
+        "El envío falló y el mensaje del servidor no se pudo interpretar. El "
+        "texto exacto queda abajo, en «detalle técnico»."
+    )
+
+
+def _ultimo_error_de_envio(destinatario: str) -> str:
+    """El error que quedó anotado del último intento a esa dirección.
+
+    Existe porque el panel decía «el detalle exacto queda en el log del
+    servidor», y eso obliga al auditor a entrar por consola a un archivo de
+    3 MB. El error YA se guarda en la base con cada intento: se lee de ahí.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import EnvioCorreoRecord
+
+        db = SessionLocal()
+        try:
+            fila = (
+                db.query(EnvioCorreoRecord)
+                .filter(EnvioCorreoRecord.destinatario == destinatario)
+                .order_by(EnvioCorreoRecord.id.desc())
+                .first()
+            )
+            return (fila.error or "") if fila else ""
+        finally:
+            db.close()
+    except Exception:  # pragma: no cover - defensivo: nunca romper el panel
+        return ""
 
 
 @router.post("/probar-correo")
@@ -5434,7 +5487,7 @@ async def probar_correo(
             "ok": False,
             "destinatario": current_user.email,
             "titulo": "El envío falló",
-            "detalle": _explicar_error_smtp(str(e)),
+            "detalle": _explicar_error_smtp(str(e), cfg.smtp_host, cfg.smtp_port),
             "error_tecnico": str(e)[:300],
         }
 
@@ -5449,15 +5502,15 @@ async def probar_correo(
                 "motor ya hizo su parte."
             ),
         }
+    # El error real ya quedó anotado en la base con el intento: se lee de ahí
+    # en vez de mandar al auditor a bucear en el log del servidor.
+    crudo = _ultimo_error_de_envio(current_user.email)
     return {
         "ok": False,
         "destinatario": current_user.email,
-        "titulo": "El servidor de correo rechazó el envío",
-        "detalle": (
-            "El motor intentó enviar y el servidor no lo aceptó. La causa más "
-            "común es que SMTP_PASSWORD no sea una «contraseña de aplicación». "
-            "El detalle exacto queda en el log del servidor."
-        ),
+        "titulo": "El envío falló",
+        "detalle": _explicar_error_smtp(crudo, cfg.smtp_host, cfg.smtp_port),
+        "error_tecnico": crudo[:300] or "(sin detalle: revise data/servidor.log)",
         "config": {
             "smtp_host": cfg.smtp_host,
             "smtp_port": cfg.smtp_port,

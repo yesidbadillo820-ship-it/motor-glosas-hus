@@ -326,7 +326,11 @@ class TestRegresionRonda16:
     def test_ronda16_corpus_normas_intactas(self):
         from app.services.normativa_completa import _TODAS_LAS_NORMAS
 
-        assert "SENTENCIA T-553 DE 2024" in _TODAS_LAS_NORMAS
+        # La T-553/2024 se borró el 24-08-2026: no existe (comprobado contra
+        # la base de la Relatoría de la Corte). El Auto 037 de 2024 sí existe,
+        # pero trata de la jurisdicción competente para cobrar facturas de
+        # salud, no de terapia CAR-T como decía el sistema.
+        assert "SENTENCIA T-553 DE 2024" not in _TODAS_LAS_NORMAS
         assert "AUTO 037 DE 2024" in _TODAS_LAS_NORMAS
 
     def test_ronda16_sanitizer_sancion_intacto(self):

@@ -19,6 +19,8 @@ Uso típico desde `glosa_service.analizar()`:
 
 from __future__ import annotations
 
+import re
+
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -112,6 +114,33 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     fila = _resolver_por_eps(candidatos)
     if fila:
         return fila
+
+    # 1b) El mismo CUPS con o sin el cero de adelante (24-08-2026).
+    #
+    # Excel guarda los CUPS como número y se come el cero inicial: 010101
+    # queda 10101. En el Excel de POSITIVA entraron así 4.742 tarifas, y como
+    # esta búsqueda compara texto EXACTO, una glosa que llega con 010101 no
+    # encontraba la tarifa guardada como 10101 — el motor decía «sin tarifa
+    # pactada» teniéndola. Se reintenta con la otra forma del mismo código;
+    # solo dígitos, para no tocar códigos con letra (890283H) ni compuestos.
+    variantes = set()
+    if cups.isdigit():
+        if len(cups) == 5:
+            variantes.add(cups.zfill(6))
+        if len(cups) == 6 and cups.startswith("0"):
+            variantes.add(cups.lstrip("0"))
+    for otra in variantes:
+        candidatos = (
+            db.query(TarifaContratadaRecord)
+            .filter(TarifaContratadaRecord.activa == 1)
+            .filter(TarifaContratadaRecord.codigo_cups == otra)
+            .order_by(TarifaContratadaRecord.creado_en.desc())
+            .limit(20)
+            .all()
+        )
+        fila = _resolver_por_eps(candidatos)
+        if fila:
+            return fila
 
     # 2) Match por codigo_ips — misma estrategia
     fila = (
@@ -229,6 +258,31 @@ def _motivo_cuestiona_contrato(motivo_glosa: str) -> bool:
     return any(f in txt for f in _FRASES_CUESTIONA_CONTRATO)
 
 
+def fila_se_contradice(modalidad: str, tipo: str, factor_pct: float) -> bool:
+    """¿La fila del catálogo dice dos cosas que no pueden ser las dos ciertas?
+
+    POR QUÉ (24-08-2026). La auditoría encontró el mismo contrato —el 0525 de
+    2017 de POSITIVA— y el mismo CUPS 010101 leídos de dos maneras dentro del
+    mismo lote: un expediente dijo «tarifa pactada $915.051, modalidad SOAT» y
+    otros dos dijeron «SOAT −15 %». El 85 % de $915.051 es $777.793, así que
+    una de las dos lecturas está mal.
+
+    Pasa cuando la MODALIDAD de la fila anuncia un descuento («SOAT -15 %»)
+    pero la fila declara el descuento en CERO: ahí no se puede saber si el
+    valor guardado ya lo trae aplicado o si hay que aplicárselo.
+
+    La condición mira SOLO adentro de la fila, a propósito. Una regla más
+    ancha —por ejemplo, mirar también el factor de la ficha de la EPS— marcaría
+    casi toda glosa de tarifa, porque 13 de las 14 fichas tienen factor menor
+    que 1. Y un aviso que sale siempre es un aviso que el auditor aprende a
+    ignorar.
+    """
+    anuncia_descuento = re.search(
+        r"(SOAT|ISS|UVB|UVR|UVT)\s*[-−–]\s*\d{1,3}\s*%", (modalidad or "").upper()
+    )
+    return bool(tipo == "VALOR_FIJO" and factor_pct == 0 and anuncia_descuento)
+
+
 def _recomendacion(
     valor_facturado: float,
     valor_pactado: float,
@@ -311,6 +365,33 @@ def _recomendacion(
             "diferencia": 0.0,
             "soat_base_hus": soat_base_hus,
             "soat_base_eps": soat_base_eps,
+        }
+
+    # SIN CIFRA FACTURADA NO HAY NADA QUE COMPARAR (24-08-2026).
+    #
+    # En este motor, "facturado = 0" no quiere decir que el hospital cobrara
+    # cero: quiere decir que no se pudo leer la cifra del caso. Pero las reglas
+    # de abajo comparan numeros, y 0 < 915.051 es cierto, asi que el sistema
+    # concluia "el hospital facturo menos que lo pactado, la glosa es
+    # INJUSTIFICADA, defender el 100%". Defender el 100% de nada.
+    #
+    # Salio impreso asi en el dictamen GL-204 (POSITIVA, CUPS 010101), con la
+    # caja verde y todo. Y el auditor NO veia de donde salia: el panel esconde
+    # la fila del valor facturado justamente cuando vale 0.
+    if valor_facturado <= 0 and valor_pactado > 0:
+        return {
+            "accion": "REVISAR",
+            "titulo": "❔ Falta el valor facturado",
+            "razon": (
+                f"La tarifa pactada del contrato es {_pesos(valor_pactado)}, pero en "
+                "este caso no quedó registrado cuánto facturó el hospital, así que no "
+                "hay con qué compararla. Capture el valor facturado y vuelva a "
+                "analizar. NO se puede afirmar que la glosa sea injustificada sin esa "
+                "cifra."
+            ),
+            "valor_a_defender": valor_objetado,
+            "valor_a_aceptar": 0.0,
+            "diferencia": 0.0,
         }
 
     diferencia_abs = round(valor_facturado - valor_pactado, 2)
@@ -517,8 +598,44 @@ def evaluar_glosa_tarifa(
         except Exception:
             contrato_num = None
 
+    # ── LA FILA SE CONTRADICE A SÍ MISMA ──────────────────────────────────
+    #
+    # POR QUÉ (24-08-2026). La auditoría encontró que el mismo contrato —el
+    # 0525 de 2017 de POSITIVA— y el mismo CUPS 010101 se leyeron de dos
+    # maneras distintas dentro del mismo lote: un expediente dijo "tarifa
+    # pactada $915.051, modalidad SOAT" y otros dos dijeron "SOAT -15 %". El
+    # 85 % de $915.051 es $777.793: una de las dos lecturas está mal.
+    #
+    # La causa es que el número y las palabras salen de columnas distintas del
+    # Excel y nadie las cruza. Cuando la MODALIDAD de la propia fila anuncia un
+    # descuento ("SOAT -15 %") pero la fila declara el descuento en CERO, no se
+    # puede saber si el valor guardado ya lo trae aplicado o no. Ahí no se
+    # corrige el número —recalcularlo sería inventar una tarifa— pero tampoco
+    # se afirma la modalidad como si constara: se avisa.
+    #
+    # La condición es estrecha a propósito: solo mira la contradicción DENTRO
+    # de la fila. Una regla más ancha (por ejemplo, mirar el factor de la ficha
+    # de la EPS) marcaría casi toda glosa de tarifa, y un aviso que sale
+    # siempre es un aviso que el auditor aprende a ignorar.
+    _mod_txt = (getattr(tarifa, "modalidad", "") or "").upper()
+    tarifa_verificada = not fila_se_contradice(_mod_txt, tipo, factor_pct)
+    aviso_modalidad = (
+        ""
+        if tarifa_verificada
+        else (
+            f"El catálogo trae un valor fijo ({_pesos(valor_pactado_calc)}) pero la "
+            f"modalidad dice «{_mod_txt.strip()}». No consta si ese valor ya tiene el "
+            "descuento aplicado o si hay que aplicárselo. Verifíquelo contra el anexo "
+            "del contrato antes de radicar."
+        )
+    )
+
     return {
         "encontrada": True,
+        # Si es False, el número y la modalidad de esta fila no concuerdan: se
+        # puede usar el número, pero no afirmar la modalidad como si constara.
+        "tarifa_verificada": tarifa_verificada,
+        "aviso_modalidad": aviso_modalidad,
         "tarifa": {
             "id": tarifa.id,
             "eps": tarifa.eps,
