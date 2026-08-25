@@ -63,6 +63,106 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### Julio–Agosto 2026 — Frente COOSALUD: objeciones en DGH y respuestas en el portal
+
+Este frente lo llevó un chat aparte (los bots de `tools/`: organizar el ZIP del
+portal → consolidar → cruzar con DGH → OBJECIONES → trámites). Se resume aquí
+para que quede en la memoria común.
+
+**Palabras que se usan en este frente**
+
+| Término | Qué es |
+|---|---|
+| **Glosa** | Objeción de la EPS a un cobro de la factura (no quiere pagar una parte) |
+| **DGH** | Dinámica Gerencial Hospitalaria — el sistema contable del hospital; ahí se registran las objeciones y las respuestas de trámites |
+| **Portal VCO** | Portal web de COOSALUD (vco.ctamedicas.com) donde se responden las glosas ante la EPS |
+| **OBJECIONES** | Excel que se carga a DGH para registrar las glosas objetadas (máximo 300 facturas por cargue) |
+| **Trámite** | Excel de DGH con la respuesta de cada glosa (máximo 499 facturas por archivo) |
+| **RE9502 / RE9901** | Códigos de respuesta: 9502 = glosa extemporánea (la EPS glosó tarde, art. 57 Ley 1438/2011) · 9901 = glosa a tiempo, se responde con el texto del área |
+| **CALIDAD (CL)** | Glosas de pertinencia médica: las responden las doctoras de auditoría médica, no cartera |
+| **Copago** | Cuota moderadora que paga el paciente; DGH no permite objetar esa parte |
+
+**Junio 2026 — preparación**
+
+- **17/06** — Conexión automática a Dinámica Gerencial.
+- **22/06** — El bot del portal COOSALUD aprende a adjuntar soportes con
+  respaldo (PDX→HAM→PDE), a cerrar glosas residuales y a dejar evidencias.
+- **30/06 al 02/07** — Bot que responde glosas *dentro* de DGH (manejando las
+  ventanas del programa).
+
+**Julio 2026 — el cargue masivo (el grueso del trabajo)**
+
+- **08/07** — Nacen los tres bots del masivo: **organizador** (parte el ZIP del
+  portal en carpetas FACTURAS/DETALLES/GLOSAS por lotes de 300),
+  **consolidador** (une todo, arma la observación de cada glosa, cruza con la
+  base de DGH y genera el OBJECIONES) y **HACER TODO COOSALUD.bat**.
+- **09/07** — Ajustes tras errores reales de DGH: cruce del servicio en 4
+  niveles, una glosa de CALIDAD manda sobre las administrativas, guardián de
+  valor/saldo, y el bot **CORREGIR ERRORES DGH** (DGH no guarda nada cuando el
+  cargue trae un error, hay que rearmar el archivo completo).
+- **10 y 17/07** — **Copago**: DGH descuenta la cuota moderadora, así que lo
+  máximo objetable de cada línea es (valor del servicio − copago). Primero se
+  avisaba, después el bot lo recorta solo. Esto explicaba los errores de valor.
+- **14/07** — **CONSOLIDADO RESPUESTAS GLOSAS** (la respuesta de cada glosa,
+  RE9502 o RE9901; las de CALIDAD quedan en blanco para las doctoras) y bot
+  **RESPUESTA TRÁMITES DGH**. Operación: **2.170 facturas objetadas** (~$4.741
+  millones) y 5 archivos de trámites subidos.
+- **16 y 21/07** — Lote de **41 facturas** ($754 millones) y lote de **1.600
+  facturas** (4.257 ítems, $230.736.952), procesado completo el mismo día.
+- **22/07** — Cierre del lote 1.600: **4 ventanas del portal en paralelo**
+  cerraron 1.425 facturas en 2,5 horas. Se armaron los trámites (4 lotes de
+  499) y el Excel de control **GI-33-5181-2026** (2.215 facturas, 0 sin
+  trabajar).
+- **27/07** — Documento de entrega técnica del módulo
+  (`docs/ENTREGA_MODULO_COOSALUD.md`).
+
+**Agosto 2026**
+
+- **13 y 14/08** — Tres cosas de fondo:
+  - **CROTIPOBJ arreglado.** El tipo de objeción (0 administrativa / 1 médica /
+    2 mixta) se calculaba mirando *todas* las glosas del portal, incluso las que
+    solo se mencionan en la observación. DGH lo calcula sobre el concepto que
+    uno **escribe**. Ahora el bot hace lo mismo: si todos los conceptos escritos
+    de la factura son CL → médica; si ninguno → administrativa; si hay de los
+    dos → mixta. Se verificó contra las 5 facturas que DGH había clasificado
+    distinto y todas coincidieron; en el masivo de agosto cambiaron 8 de 589.
+  - Bot **LISTA FACTURAS YA EN TRÁMITES** (`facturas_ya_en_tramites.py`): revisa
+    la carpeta de masivos ya enviados y arma el TXT de facturas que **no** se
+    deben repetir (repetir una hace que DGH rechace el cargue). Solo cuenta los
+    masivos realmente diligenciados y de la EPS que se le pida, para no mezclar
+    Dispensario con COOSALUD.
+  - **Lotes procesados**: COOSALUD 7 (23 facturas, $27,9 millones), COOSALUD 1
+    (29 facturas, $5,4 millones) y el masivo de agosto (589 facturas, $5.612
+    millones). Cierre del mes: **641 facturas / $5.674.278.862**.
+- **19/08** — Bot **FILTRAR BASE DGH** (`filtrar_base_dgh.py`): recorta la base
+  "SERVICIOS FACTURADOS COOSALUD DGH.xlsx" (70 MB) a las facturas del lote, para
+  poder moverla o subirla.
+- **25/08** — **Lote COOSALUD_25082026: 1.573 facturas.**
+  - Organizado en 6 lotes y consolidado: **4.533 ítems, 4.691 glosas,
+    $289.077.286**. Todas a tiempo (RE9901); solo 2 con CALIDAD (HUS532676 y
+    HUS532956); 193 con copago.
+  - Entregados los consolidados y el paquete del portal (Excel masivo + 4 listas
+    para correr en paralelo: 394/394/394/391).
+  - **Tropiezo**: al cruzar con DGH la base solo trajo **9 de las 1.573**. La
+    base que se estaba usando es del 08/07 y además venía recortada (leyó
+    1.048.000 filas, prácticamente el tope de Excel, que es 1.048.576). Hay que
+    bajar de DGH un export **nuevo**, por tandas de fechas.
+  - Por eso FILTRAR BASE DGH ahora acepta **varias bases a la vez** (las
+    tandas), quita las filas repetidas y avisa dos cosas: si una base llegó al
+    tope de filas de Excel (salió recortada) y hasta qué número de factura llega
+    cada una, que es como se ve de una si está vieja.
+
+**Dónde está cada cosa de este frente**
+
+| Qué | Dónde |
+|---|---|
+| Bots de COOSALUD (organizar, consolidar, corregir errores, trámites, filtrar base) | `tools/` — en el PC de cartera: `D:\USUARIO CARTERA\Desktop\ORGANIZADO\2026-07-08\COMPRIMIDOS\BOTS COOSALUD\` |
+| Bot que responde en el portal COOSALUD | `tools/responder_glosas_coosalud.py` |
+| Reglas del proceso | `docs/CONTEXTO_COOSALUD.md` y `docs/ENTREGA_MODULO_COOSALUD.md` |
+| Facturas del piloto ya objetadas (no repetir) | `tools/FACTURAS YA OBJETADAS.txt` |
+
+---
+
 ### 25-08-2026 (madrugada) — La revisión más incómoda: la mayor parte de la jurisprudencia del motor era inventada
 
 Este día empezó con los ejemplos de prueba de la ronda 2 y con la segunda
@@ -6948,6 +7048,26 @@ se enterara.
 
 ## 3) PENDIENTE
 
+### Del frente COOSALUD (glosas y trámites), al 25-08
+- **Base DGH nueva** — es lo que bloquea el lote de 1.573: bajar de DGH el
+  export de SERVICIOS FACTURADOS COOSALUD que cubra de HUS533xxx en adelante.
+  Si no cabe en un solo Excel (el tope son 1.048.576 filas), bajarlo por tandas
+  de fechas y pasarlas todas juntas al bot FILTRAR BASE DGH. Con eso se genera
+  el OBJECIONES del lote.
+- **Portal COOSALUD del lote de 1.573**: correr las 4 listas en paralelo
+  (S1–S4). No depende de la base DGH, se puede hacer ya.
+- **8 facturas de auditoría médica de agosto** (HUS527358, HUS529493, HUS530150,
+  HUS530676, HUS530701, HUS531001, HUS531885, HUS533202): esperar la respuesta
+  de las doctoras para armar sus trámites. Siguen pendientes también las 37 del
+  masivo del 14/07.
+- **Registrar a mano en DGH** lo que no cruza: HUS530335 y HUS506920, y los
+  ítems sueltos ACETAZOLAMIDA de HUS527199 ($10.200) y BUPIVACAÍNA de HUS529267,
+  HUS531631 y HUS531672 ($30.600 cada una).
+- **Evidencias**: unificar → PDF `GI-33-5300-2026` → carpeta en el servidor Z:.
+- **Confirmar en DGH** los códigos TA0601, TA2301 y AU2301 para cerrar la
+  homologación 206/207/223/423 en el bot.
+
+
 ### Del motor de glosas, después de la revisión del 25-08
 - **Reiniciar el motor del hospital.** Sigue corriendo código viejo: se
   confirmó mirando los dictámenes de la ronda 2 (sale una frase en el
@@ -7330,6 +7450,13 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Frente COOSALUD (25-08):** (a) bajar la base DGH nueva —por tandas si toca— y
+correr FILTRAR BASE DGH con las 1.573 facturas; (b) generar el OBJECIONES del
+lote y subirlo a DGH en tandas de 300; (c) correr el portal COOSALUD con las 4
+listas del lote; (d) insistir con auditoría médica por las 8 facturas de
+CALIDAD de agosto.
+
 
 **Lo primero del motor (25-08):** reiniciar el motor en la PC de cartera para
 que tome las correcciones de la jurisprudencia y de los valores. Sin eso, los

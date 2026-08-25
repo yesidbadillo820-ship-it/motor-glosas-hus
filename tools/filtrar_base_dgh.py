@@ -1,0 +1,247 @@
+"""filtrar_base_dgh.py — Recorta la base DGH a las facturas de un lote.
+
+La base "SERVICIOS FACTURADOS COOSALUD DGH.xlsx" pesa 70 MB y no se puede
+mover fácilmente (correo, chat, etc.). Este script deja solo las filas de las
+facturas que se están trabajando, y el archivo resultante pesa unos pocos KB.
+
+Se pueden pasar VARIAS bases (tandas). Un Excel no puede tener más de
+1.048.576 filas, así que cuando la base completa no cabe hay que bajarla de
+DGH por partes (por rango de fechas) y pasarlas todas aquí: el script las lee
+en orden y junta lo que encuentra en cada una.
+
+Las facturas se pueden indicar de tres formas (elige una):
+  --carpeta   la carpeta "CARGUE MASIVO COOSALUD" del lote (lee las cabeceras
+              HUS*.xlsx de la subcarpeta FACTURAS). Es lo más cómodo.
+  --lista     un TXT con una factura por línea (HUS522791 / 522791 / HUS0000522791).
+  --facturas  la lista separada por comas.
+
+USO:
+    py filtrar_base_dgh.py "D:\\...\\SERVICIOS FACTURADOS COOSALUD DGH.xlsx" ^
+        --carpeta "D:\\USUARIO CARTERA\\Desktop\\CARGUE MASIVO COOSALUD"
+
+    py filtrar_base_dgh.py "D:\\...\\BASE ENERO-JUNIO.xlsx" "D:\\...\\BASE JULIO-AGOSTO.xlsx" ^
+        --lista "D:\\...\\FACTURAS LOTE.txt"
+
+Genera "BASE_DGH_FILTRADA.xlsx" (o lo que diga --salida).
+
+Al final avisa si una base viene recortada (llegó al tope de filas de Excel) y
+en qué rango de facturas va cada base, que es la causa típica de que "no
+aparezcan" facturas nuevas: la base es vieja y no las trae todavía.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+try:
+    import openpyxl
+except ImportError:
+    sys.stderr.write("Falta openpyxl. Corre: py -m pip install openpyxl\n")
+    sys.exit(2)
+
+COLS_FACTURA = ("FACTURA", "NUMERO_FACTURA", "NUMERO FACTURA", "CUENTA")
+# Tope duro de filas de una hoja de Excel. Si una base se le acerca, es que
+# el export de DGH salió recortado y faltan facturas.
+TOPE_EXCEL = 1_048_575
+CERCA_DEL_TOPE = 1_000_000
+
+
+def nfact(v: object) -> str | None:
+    """HUS0000522511 / 0000522511 / 522511 / 522511-1 -> 522511."""
+    d = re.sub(r"\D", "", str(v or "")).lstrip("0")
+    return d or None
+
+
+def norm(h: object) -> str:
+    return re.sub(r"\s+", " ", str(h or "")).strip().upper()
+
+
+def facturas_de_carpeta(carpeta: Path) -> set[str]:
+    """Facturas del lote: nombres HUS######.xlsx de la subcarpeta FACTURAS."""
+    facturas: set[str] = set()
+    raiz = carpeta / "FACTURAS" if (carpeta / "FACTURAS").is_dir() else carpeta
+    for arch in raiz.rglob("*.xlsx"):
+        nombre = arch.name.upper()
+        if nombre.startswith("~$") or nombre.startswith(("DETALLE", "GLOSAS", "CONSOLIDADO")):
+            continue
+        f = nfact(arch.stem)
+        if f:
+            facturas.add(f)
+    return facturas
+
+
+def leer_base(base: Path, objetivo: set[str]) -> dict:
+    """Lee una base DGH y devuelve las filas de las facturas buscadas.
+
+    Además informa cuántas filas trae y entre qué facturas va, para poder
+    detectar bases viejas o recortadas.
+    """
+    print(f"\nLeyendo base: {base.name} (pesa bastante, tarda un poco) ...")
+    wb = openpyxl.load_workbook(base, read_only=True, data_only=True)
+    try:
+        ws = wb[wb.sheetnames[0]]
+        it = ws.iter_rows(values_only=True)
+        headers = list(next(it, []) or [])
+        idx = next((i for i, h in enumerate(headers) if norm(h) in COLS_FACTURA), None)
+        if idx is None:
+            return {"error": f"no hallé la columna FACTURA. Encabezados: {headers}"}
+        print(f"  Columna de factura: '{headers[idx]}' (posición {idx + 1})")
+
+        filas: list[list] = []
+        encontradas: set[str] = set()
+        total = 0
+        menor = mayor = None
+        for row in it:
+            total += 1
+            f = nfact(row[idx]) if idx < len(row) else None
+            if not f:
+                continue
+            n = int(f)
+            if menor is None or n < menor:
+                menor = n
+            if mayor is None or n > mayor:
+                mayor = n
+            if f in objetivo:
+                filas.append(list(row))
+                encontradas.add(f)
+        return {
+            "headers": headers,
+            "filas": filas,
+            "encontradas": encontradas,
+            "total": total,
+            "menor": menor,
+            "mayor": mayor,
+        }
+    finally:
+        wb.close()
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Recorta la base DGH a las facturas de un lote.")
+    p.add_argument(
+        "bases",
+        nargs="+",
+        help="Ruta(s) de SERVICIOS FACTURADOS COOSALUD DGH.xlsx (varias si bajaste por tandas).",
+    )
+    p.add_argument("--carpeta", default=None, help='Carpeta "CARGUE MASIVO COOSALUD" del lote.')
+    p.add_argument("--lista", default=None, help="TXT con una factura por línea.")
+    p.add_argument("--facturas", default=None, help="Facturas separadas por coma.")
+    p.add_argument("--salida", default=None, help="Xlsx de salida. Def: BASE_DGH_FILTRADA.xlsx")
+    args = p.parse_args(argv)
+
+    rutas = [Path(b.strip().strip('"')) for b in args.bases]
+    faltantes = [r for r in rutas if not r.is_file()]
+    if faltantes:
+        for r in faltantes:
+            sys.stderr.write(f"No existe la base: {r}\n")
+        return 2
+
+    objetivo: set[str] = set()
+    if args.carpeta:
+        carpeta = Path(args.carpeta.strip().strip('"'))
+        if not carpeta.is_dir():
+            sys.stderr.write(f"No existe la carpeta: {carpeta}\n")
+            return 2
+        objetivo = facturas_de_carpeta(carpeta)
+        print(f"Facturas leídas de la carpeta: {len(objetivo)}")
+    elif args.lista:
+        lista = Path(args.lista.strip().strip('"'))
+        if not lista.is_file():
+            sys.stderr.write(f"No existe la lista: {lista}\n")
+            return 2
+        objetivo = {f for f in (nfact(x) for x in lista.read_text(errors="replace").split()) if f}
+        print(f"Facturas leídas del TXT: {len(objetivo)}")
+    elif args.facturas:
+        objetivo = {f for f in (nfact(x) for x in args.facturas.split(",")) if f}
+        print(f"Facturas indicadas: {len(objetivo)}")
+    else:
+        sys.stderr.write("Indica --carpeta, --lista o --facturas.\n")
+        return 2
+    if not objetivo:
+        sys.stderr.write("No encontré ninguna factura que buscar.\n")
+        return 2
+
+    headers: list = []
+    vistas: set[tuple] = set()
+    todas_filas: list[list] = []
+    encontradas: set[str] = set()
+    resumen: list[tuple[str, int, int | None, int | None, int]] = []
+
+    for ruta in rutas:
+        info = leer_base(ruta, objetivo)
+        if info.get("error"):
+            sys.stderr.write(f"{ruta.name}: {info['error']}\n")
+            return 2
+        if not headers:
+            headers = info["headers"]
+        nuevas = 0
+        for fila in info["filas"]:
+            clave = tuple(fila)
+            if clave in vistas:
+                continue  # la misma fila ya venía en otra tanda
+            vistas.add(clave)
+            todas_filas.append(fila)
+            nuevas += 1
+        encontradas |= info["encontradas"]
+        resumen.append((ruta.name, info["total"], info["menor"], info["mayor"], nuevas))
+        print(
+            f"  Filas leídas: {info['total']:,} | facturas del lote halladas: "
+            f"{len(info['encontradas'])} | filas nuevas guardadas: {nuevas:,}"
+        )
+
+    out = openpyxl.Workbook()
+    wo = out.active
+    wo.title = "BASE"
+    wo.append(list(headers))
+    for fila in todas_filas:
+        wo.append(fila)
+
+    salida = (
+        Path(args.salida.strip().strip('"'))
+        if args.salida
+        else rutas[0].parent / "BASE_DGH_FILTRADA.xlsx"
+    )
+    try:
+        out.save(salida)
+    except Exception:
+        salida = Path.cwd() / "BASE_DGH_FILTRADA.xlsx"
+        out.save(salida)
+
+    print("\n===== RESUMEN =====")
+    for nombre, total, menor, mayor, nuevas in resumen:
+        rango = f"HUS{menor} a HUS{mayor}" if menor and mayor else "sin facturas legibles"
+        print(f"  {nombre}")
+        print(f"     filas: {total:,} | va de {rango} | aportó {nuevas:,} filas")
+        if total >= CERCA_DEL_TOPE:
+            print(
+                f"     *** OJO: esta base trae {total:,} filas y el tope de Excel es "
+                f"{TOPE_EXCEL:,}. Es casi seguro que el export salió RECORTADO y le "
+                "faltan facturas. Bájala de DGH por partes (por rango de fechas)."
+            )
+    print(f"\n  Filas guardadas:      {len(todas_filas):,}")
+    print(f"  Facturas encontradas: {len(encontradas)} de {len(objetivo)}")
+
+    faltan = objetivo - encontradas
+    if faltan:
+        print(f"\n  NO están en la(s) base(s) ({len(faltan)}):")
+        ordenadas = sorted(faltan, key=int)
+        print("  " + ", ".join("HUS" + f for f in ordenadas[:40]))
+        if len(ordenadas) > 40:
+            print(f"  ... y {len(ordenadas) - 40} más.")
+        mayor_base = max((m for _, _, _, m, _ in resumen if m), default=None)
+        menor_falta = int(ordenadas[0])
+        if mayor_base and menor_falta > mayor_base:
+            print(
+                f"\n  *** La base más nueva llega hasta HUS{mayor_base} y la factura que "
+                f"falta más antigua es HUS{menor_falta}: la base está DESACTUALIZADA. "
+                "Baja de DGH un export nuevo que cubra esas fechas."
+            )
+    print(f"\nListo. Sube este archivo: {salida.resolve()}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
