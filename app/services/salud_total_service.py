@@ -63,7 +63,7 @@ OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. 
 # Observacion IPS del TXT que exige max 500 chars.
 # Mantiene los 4 puntos clave:
 #   1. No acepta la glosa ratificada, mantiene respuesta inicial.
-#   2. Cita normativa (Art. 57 Ley 1438, Art. 20 Dec. 4747, Res. 2284/2023).
+#   2. Cita normativa (Art. 57 Ley 1438, Art. 23 Dec. 4747, Res. 2284/2023).
 #   3. Solicita mesa de conciliacion.
 #   4. Advierte levantamiento tacito + correo institucional.
 OBS_RATIFICADA = (

@@ -179,7 +179,12 @@ class TestBugDArt168FueraContexto:
         )
         resultado = _neutralizar_art_168_fuera_de_contexto(dictamen, texto_glosa)
         assert "168" not in resultado
-        assert "NORMATIVA DE CONTINUIDAD" in resultado.upper()
+        assert "SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD" in resultado.upper(), (
+            "la frase debe seguir siendo legible, no un hueco"
+        )
+        assert "NORMATIVA DE CONTINUIDAD Y COBERTURA" not in resultado.upper(), (
+            "esa frase se leía como el título de una norma que no existe (2.ª auditoría 25-08)"
+        )
 
     def test_terapia_enzimatica_cronica_NO_invoca_art_168(self):
         # Caso 1 real: medicamento huérfano IMIGLUCERASA en hospital.

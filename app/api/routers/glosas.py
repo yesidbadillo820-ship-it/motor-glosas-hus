@@ -10645,7 +10645,7 @@ def preview_auditoria(
                 "id": "diferencia_sin_referente",
                 "severidad": "MEDIA",
                 "descripcion": "La EPS glosa una diferencia sin indicar el valor de referencia.",
-                "argumento": "Inmotivación: Decreto 4747/2007 Art. 21 exige sustentación precisa.",
+                "argumento": "Inmotivación: Decreto 4747/2007 Art. 22 exige que la causal esté en el Manual Único.",
             }
         )
         score += 15

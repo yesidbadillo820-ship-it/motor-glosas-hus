@@ -191,7 +191,7 @@ def check_invitacion_conciliacion(texto: str) -> dict:
         "mensaje": msg,
         "sugerencia": ""
         if tiene
-        else "Incluye invitación a mesa de conciliación (Art. 20 Dec. 4747/2007)",
+        else "Incluye invitación a mesa de conciliación (Art. 23 Dec. 4747/2007)",
     }
 
 

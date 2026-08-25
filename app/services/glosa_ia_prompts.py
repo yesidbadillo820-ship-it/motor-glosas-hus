@@ -954,7 +954,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 8.ter (RONDA 16). PROHIBIDO ACEPTAR SANCIONES UNILATERALES DE LA EPS: si la EPS aplica una glosa por concepto de "sanción del N%", "multa del N%", "penalidad por demora", "retención punitiva" o cualquier figura sancionatoria, la defensa es RECHAZO TAJANTE por VICIO DE COMPETENCIA. La EPS NO TIENE FACULTAD SANCIONATORIA sobre el prestador — esa función está reservada constitucionalmente a:
    • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126).
    • El Juez competente (Ley 1564/2012 Art. 33 — Código General del Proceso).
-   Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (prohibición de intromisión) + Decreto 4747/2007 Art. 21 (taxatividad de causales de glosa).
+   Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (prohibición de intromisión) + Decreto 4747/2007 Art. 22 (el Manual Único fija las causales de glosa y su adopción es obligatoria).
 
 8.quater (RONDA 18). DEFENSA DE TECNOLOGÍA CARA — JUSTIFICACIÓN CLÍNICA OBLIGATORIA: si el servicio cuestionado por la EPS es una tecnología de alto costo (da Vinci robot, MED-EL implante coclear, Cart-T cell therapy, TMS, Norwood, Epicel, Zolgensma, terapia génica), invocar SOLO la autonomía médica (Ley 23/1981, Ley 1751/2015 Art. 17) es defensa débil que la EPS desestima por insuficiente. La defensa correcta combina TRES capas:
    1. **Indicación clínica documentada en HC**: justificar la elección del dispositivo/procedimiento citando datos clínicos concretos del paciente (estadio del cáncer, preservación nervio erector, anatomía pélvica estrecha, ventana crítica de desarrollo del lenguaje 0-3 años, etc.). NO basta con "el médico lo decidió".
@@ -970,7 +970,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 8.sexies (RONDA 18). NUNCA NEGAR EL CONTRATO CITADO POR LA EPS: si la glosa textual identifica un número de contrato (CTR-2024-XXX-HUS, contrato N° 12345, "conforme al contrato vigente"), el dictamen ESTÁ PROHIBIDO de afirmar "SIN CONTRATO PACTADO" o "no existe contrato". Negar un contrato citado ante un agente liquidador del Estado anula la respuesta entera por falta de rigor. La defensa correcta es citar el contrato y diferir de la interpretación de la EPS, no negar su existencia.
 
-8.septies (RONDA 21). REBATIR POR NOMBRE CADA NORMA QUE LA EPS INVOQUE: si la glosa cita una norma o artículo como fundamento (p. ej. "Decreto 4747/2007 Art. 20", "Res. 0112/2012", "Política Nacional de Seguridad del Paciente", "Art. 871 C.Co."), la defensa DEBE mencionar esa norma por su nombre/número y dar respuesta sustantiva (acotar su alcance, explicar por qué NO aplica al caso, o por qué juega a favor del prestador). El silencio sobre una norma invocada por la EPS equivale a CONCESIÓN tácita ante la mesa de conciliación. NO basta citar normas genéricas propias: hay que NEUTRALIZAR las del contrario.
+8.septies (RONDA 21). REBATIR POR NOMBRE CADA NORMA QUE LA EPS INVOQUE: si la glosa cita una norma o artículo como fundamento (p. ej. "Decreto 4747/2007 Art. 23", "Res. 0112/2012", "Política Nacional de Seguridad del Paciente", "Art. 871 C.Co."), la defensa DEBE mencionar esa norma por su nombre/número y dar respuesta sustantiva (acotar su alcance, explicar por qué NO aplica al caso, o por qué juega a favor del prestador). El silencio sobre una norma invocada por la EPS equivale a CONCESIÓN tácita ante la mesa de conciliación. NO basta citar normas genéricas propias: hay que NEUTRALIZAR las del contrario.
 
 8.octies (RONDA 21). EPS EN LIQUIDACIÓN / INTERVENIDA: si la glosa menciona liquidación, intervención, agente liquidadora o "verificación de saldos por SuperSalud", PROHIBIDO responder con relleno ("conforme al régimen legal aplicable"). La defensa correcta ancla: (a) la liquidación NO extingue el crédito por servicios efectivamente prestados; (b) las acreencias por servicios de salud tienen PRELACIÓN en el proceso liquidatorio; (c) la agente liquidadora designada por SuperSalud debe reconocer la obligación conforme a la prelación de pagos, y procede el giro directo de ADRES cuando aplique. El proceso de liquidación NO es excusa para no reconocer el servicio.
 
@@ -1005,7 +1005,7 @@ NIVEL CONSTITUCIONAL Y LEGAL:
 
 NIVEL REGLAMENTARIO SECTORIAL:
 - Decreto 780/2016 (Decreto Único Reglamentario en Salud).
-- Decreto 4747/2007: Art. 11 (urgencias sin autorización), Art. 20 (conciliación), Art. 21 (debida sustentación de glosas).
+- Decreto 4747/2007: Art. 21 (la entidad NO puede exigir soportes distintos a los definidos por el Ministerio), Art. 22 (el Manual Único fija las causales de glosa y es de obligatoria adopción), Art. 23 (trámite de glosas: términos, prohibición de glosar dos veces salvo hechos nuevos, y escalamiento a la SuperSalud). OJO: el Art. 20 es el del RIPS y el Art. 11 es el de verificación de derechos — NO son los del trámite de glosas.
 - Decreto 1011/2006 (SOGCS), Decreto 2423/1996 (SOAT).
 - Decreto 1082/2015 Subsección IV Art. 2.2.1.2.1.4.4 (contratación estatal — relevante porque HUS es ESE pública).
 - Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012 (ARL — Riesgos Laborales).
@@ -1115,7 +1115,7 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
 ═══════════════ IDENTIFICACIÓN EXPRESA DE VICIOS DE LA GLOSA (cuando aplique) ═══════════════
 Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO en el párrafo de refutación:
 
-• INMOTIVACIÓN — la EPS no expone hecho concreto, norma vulnerada ni cuadro comparativo. Cita: Decreto 4747/2007 Art. 21 + CPACA Art. 42 + Ley 1438/2011 Art. 57.
+• INMOTIVACIÓN — la EPS no expone hecho concreto, norma vulnerada ni cuadro comparativo. Cita: Decreto 4747/2007 Art. 22 + CPACA Art. 42 + Ley 1438/2011 Art. 57.
 • CONTRADICCIÓN INTERNA — el motivo escrito por el auditor se contradice con el código tipificado o con las observaciones. Cita la contradicción literal entre comillas.
 • APLICACIÓN INDEBIDA DE CAUSAL — la causal invocada (TA0201, FA0205, etc.) no corresponde al hecho real. Cita Res. 3047/2008 Anexo Técnico No. 6 (tipicidad).
 • INVERSIÓN DE LA CARGA PROBATORIA — la EPS exige a la IPS soportes adicionales no tipificados en el catálogo legal. Cita Ley 1438/2011 Art. 57 (carga dinámica) + Art. 29 C.P. + CPACA Art. 42.
@@ -1256,7 +1256,7 @@ Para BLINDAR la respuesta frente a una posible ratificación:
 • CL/PE: "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA, CONFORME AL ART. 105 DE LA LEY 1438/2011 QUE PROHÍBE LA INTROMISIÓN EN EL ACTO MÉDICO."
 • SO/FA: "LA HISTORIA CLÍNICA, CON EL VALOR PROBATORIO QUE LE CONFIERE LA RESOLUCIÓN 1995 DE 1999, CONSTITUYE ÚNICO INSTRUMENTO VÁLIDO PARA LA REVISIÓN Y LA AUDITORÍA."
 • AU: "NO PUEDE TRASLADARSE A LA IPS LA CARGA DE UN TRÁMITE ADMINISTRATIVO PROPIO DE LA ENTIDAD PAGADORA."
-• URGENCIAS: "TRATÁNDOSE DE URGENCIA VITAL, LA SOLA CONFIGURACIÓN DEL HECHO ACTIVA LA COBERTURA OBLIGATORIA (ART. 168 LEY 100/1993; ART. 20 DECRETO 4747/2007)."
+• URGENCIAS: "TRATÁNDOSE DE URGENCIA VITAL, LA SOLA CONFIGURACIÓN DEL HECHO ACTIVA LA COBERTURA OBLIGATORIA (ART. 168 LEY 100/1993: «SU PRESTACIÓN NO REQUIERE CONTRATO NI ORDEN PREVIA»)."
 • GENERAL: "LA INTERPRETACIÓN RESTRICTIVA DEL CONTRATO EN PERJUICIO DEL PRESTADOR CONTRARÍA EL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. 1603 C.C., ART. 871 C.CO.)."
 
 ═══════════════ ANCLAJE PROBATORIO (cuando haya PDF con datos) ═══════════════
@@ -1274,7 +1274,7 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 ERROR PARCIAL: acepta expresamente el valor procedente y defiende el remanente con argumentos reforzados.
 GLOSA INFUNDADA: expone la FALTA DE TIPICIDAD + AUSENCIA DE SOPORTE PROBATORIO + cita el catálogo de causales (Res. 3047/2008 Anexo Técnico No. 6).
 GLOSA CONTRADICTORIA: TRANSCRIBE LITERALMENTE la contradicción interna entre comillas y solicita DESESTIMACIÓN POR VICIO DE MOTIVACIÓN.
-GLOSA INMOTIVADA: argumenta defecto formal y solicita levantamiento por incumplimiento del Decreto 4747/2007 Art. 21.
+GLOSA INMOTIVADA: argumenta defecto formal y solicita levantamiento por incumplimiento del Decreto 4747/2007 Art. 22.
 
 ═══════════════ CHECKLIST OBLIGATORIO ANTES DE EMITIR ═══════════════
 Verifica MENTALMENTE antes de cerrar el <argumento>:
@@ -1347,8 +1347,8 @@ ESTRUCTURA OBLIGATORIA (8 movimientos):
    RECONOCEN LA VIGENCIA DEL VÍNCULO (PRINCIPIO DE BUENA FE: ART. 83 C.P.,
    ARTS. 1602 Y 1603 C.C., ART. 871 C.CO.); (III) EN GRACIA DE DISCUSIÓN, DE
    NO EXISTIR CONTRATO, LAS ATENCIONES SE RECONOCERÍAN A TARIFA SOAT PLENA
-   VIGENTE (ART. 20 DEL DECRETO 4747 DE 2007, COMPILADO EN EL DECRETO 780 DE
-   2016) Y NO A VALORES INFERIORES IMPUESTOS UNILATERALMENTE, SO PENA DE
+   VIGENTE (DECRETO 2423 DE 1996 — MANUAL TARIFARIO SOAT, QUE OPERA EN
+   AUSENCIA DE PACTO) Y NO A VALORES INFERIORES IMPUESTOS UNILATERALMENTE, SO PENA DE
    ENRIQUECIMIENTO SIN JUSTA CAUSA DE LA ENTIDAD QUE RECIBIÓ Y AUTORIZÓ EL
    SERVICIO PARA SUS AFILIADOS".
 
@@ -1419,7 +1419,7 @@ ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015)
 REGLAS:
 • Cita siempre Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
 • Si hay diagnóstico documentado en PDF, menciónalo genéricamente ("conforme al diagnóstico registrado en historia clínica").
-• Cierra solicitando conciliación de auditoría médica conjunta (Art. 20 Dec. 4747/2007).
+• Cierra solicitando conciliación de auditoría médica conjunta (Art. 23 Dec. 4747/2007).
 
 • SI LA EPS INVOCA UNA GPC POR NOMBRE (ronda 21 — caso da Vinci: "no acorde a GPC", "GPC Cáncer de Próstata MinSalud 2023", "guía de práctica clínica"), la autonomía médica es solo la PRIMERA capa. La defensa OBLIGATORIA añade:
   (a) Las GPC son RECOMENDATIVAS, no imperativas ni de obligatorio cumplimiento absoluto: admiten excepción ante la condición concreta del paciente (Sentencia T-121/2015; Art. 17 Ley 1751/2015). NO son norma de exclusión de cobertura.
@@ -1506,9 +1506,10 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
 
 (A) SI la glosa, el CUPS o los soportes mencionan URGENCIAS/emergencia/
     triage/código azul → ARGUMENTO: la atención de URGENCIAS no requiere
-    autorización previa (Art. 168 Ley 100/1993; Art. 20 Decreto 4747/2007). El Decreto
-    4747/2007 Art. 11 obliga a la IPS a prestar urgencias
-    independientemente de la autorización.
+    autorización previa (Art. 168 Ley 100/1993: «su prestación no requiere
+    contrato ni orden previa»). El Art. 11 del Decreto 4747/2007 agrega que la
+    verificación de derechos es POSTERIOR al triage y no puede ser causa para
+    negar la urgencia.
 
 (B) SI NO CONSTA que fue urgencias (servicio electivo/ambulatorio/
     hospitalario programado o supuesto desconocido) → PROHIBIDO afirmar
@@ -1526,7 +1527,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
 
 REGLAS:
 • Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → estás en (A): cita el dato clínico como evidencia.
-• Para FF.MM./Dispensario: T-760/2008 NO aplica. El anclaje de urgencias es el Art. 168 Ley 100/1993 + Art. 20 Decreto 4747/2007.
+• Para FF.MM./Dispensario: T-760/2008 NO aplica. El anclaje de urgencias es el Art. 168 Ley 100/1993 («su prestación no requiere contrato ni orden previa»).
 • NO digas "FACTURACIÓN" ni "SOPORTES". Es AUTORIZACIÓN.
 • NUNCA describas el servicio como "atención de urgencias" si ese dato no viene en el caso — inventar el supuesto fáctico destruye la defensa en conciliación.
 """
@@ -2585,7 +2586,7 @@ def build_user_prompt(
                 "nombre": "GLOSA CONTRADICTORIA / MAL IMPUTADA",
                 "ataque": "El propio auditor confiesa contradiccion entre el motivo escrito y el codigo aplicado. "
                 "TRANSCRIBE LITERALMENTE entre comillas la confesion del auditor y solicita "
-                "DESESTIMACION POR VICIO DE MOTIVACION (Decreto 4747/2007 Art. 21 + Ley 1438/2011 Art. 57).",
+                "DESESTIMACION POR VICIO DE MOTIVACION (Decreto 4747/2007 Art. 22 + Ley 1438/2011 Art. 57).",
             }
         )
     # Inversion carga probatoria (exige soportes no tipificados)
