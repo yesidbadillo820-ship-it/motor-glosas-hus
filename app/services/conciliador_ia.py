@@ -1,6 +1,6 @@
 """Conciliador IA — preparador de audiencias de conciliación.
 
-Cuando una glosa va a mesa de conciliación (Art. 20 Decreto 4747/2007),
+Cuando una glosa va a mesa de conciliación (Art. 23 Decreto 4747/2007),
 el gestor llega a la audiencia con:
   • Posibles contraargumentos de la EPS basados en el histórico contra
     esa misma EPS para el mismo código de glosa.
@@ -248,7 +248,7 @@ def preparar_audiencia(
             tipo,
             [
                 "Art. 57 Ley 1438/2011",
-                "Art. 20 Decreto 4747/2007",
+                "Art. 23 Decreto 4747/2007",
                 "Res. 2284/2023 (Manual Único)",
             ],
         ),

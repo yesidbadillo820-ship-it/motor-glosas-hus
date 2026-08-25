@@ -1,5 +1,101 @@
 # Registro de cambios
 
+## Sesión 25-ago-2026 (noche) — 2.ª auditoría del lote: el Decreto 4747 tenía tres artículos inventados
+
+Un segundo auditor revisó las mismas 117 respuestas con otro método: contrastó
+las citas contra el texto publicado de las leyes y cruzó, código por código, el
+motivo real del pagador contra lo contestado. Encontró lo que la primera pasada
+no vio.
+
+### 1. `DECRETO 4747 DE 2007` — corpus corregido contra la fuente oficial
+
+Las 28 respuestas de ratificación (100 %) citaban el **Art. 20** como el del
+trámite de glosas. Verificado contra el texto de MinSalud: el Art. 20 es el del
+**RIPS**; el trámite está en el **23**. Y de los tres artículos que el corpus
+tenía cargados, **los tres** estaban mal, con epígrafe y texto fabricados:
+
+| Corpus decía | Texto oficial |
+|---|---|
+| Art. 11 — «Atención de urgencias» | «Verificación de derechos de los usuarios» |
+| Art. 20 — «Trámite de glosas — conciliación» | «Registro Individual de Prestaciones — RIPS» |
+| Art. 21 — «Pago durante trámite de glosas» | «Soportes de las facturas» |
+
+**El defecto estructural, no la cita:** `citation_verifier` contrasta contra ese
+mismo corpus, así que la cita fabricada **se autocertificaba** — el dictamen
+salía «citas verificadas · 0 hallazgos» con una norma que dice otra cosa. Misma
+clase de defecto que la jurisprudencia del 24-08.
+
+Se cargaron los cinco artículos con texto literal (11, 20, 21, 22, 23) y se
+repasaron las **17 citas** al decreto repartidas por `glosa_ia_prompts`,
+`multi_agente`, `conciliador_ia`, `validador_dictamen`, `memoria_gestor`,
+`contexto_contractual_enriquecido`, `salud_total_service` y `routers/glosas`.
+
+`TEXTO_RATIFICADA` ahora cita el Art. 23. `_corregir_articulo_mal_citado` es la
+malla: corrige «Art. 20 del Decreto 4747» → 23 **solo** cuando el contexto habla
+de glosas (el Art. 20 existe y citarlo para RIPS es correcto).
+
+Efecto colateral bueno: el Art. 11 real —verificación de derechos— es
+exactamente el fundamento de las glosas FA1605/FA1606. Estaba inutilizable
+porque el corpus lo tenía mal.
+
+### 2. Cita literal fabricada — se detecta sola al corregir el corpus
+
+Varias respuestas AU0202 atribuían al Art. 11 un texto entrecomillado sobre
+urgencias sin autorización previa. No está en el decreto. Corregido el corpus,
+`verificar_citas` la marca `CITA_LITERAL_FALSA` (ALTA) y
+`_descomillar_citas_falsas` la desactiva. No hizo falta regla nueva.
+
+### 3. `_avisar_si_contesta_la_forma` — responder la glosa que es
+
+De 79 códigos, **74 abordaban el motivo real**. Los 5 que no ($3.564.600)
+fallaban igual: contestaban validez de factura electrónica ante la DIAN cuando
+la glosa era de fondo.
+
+- **FA1606** (3, $2.571.800) — el pagador alega régimen del afiliado distinto al
+  del contrato. Lo resuelve la BDUA a la fecha de atención, no la DIAN.
+- **FA0703** (2, $992.800) — «insumo no facturable» con código del ítem. Lo
+  resuelve el anexo del paquete.
+
+`catalogo_glosas` gana la defensa central de ambos códigos (patrón ya usado en
+FA0202/FA0802). La red no reescribe el argumento: añade **«⚠ REVISAR ANTES DE
+RADICAR»** cuando el dictamen argumenta forma y no entró en el fondo. No dispara
+si el texto ya menciona BDUA/régimen/verificación de derechos (FA1606) o
+paquete/anexo (FA0703), ni en códigos que sí son de forma.
+
+### 4. Dos defectos de forma
+
+- **Etiqueta contradictoria** (HUS0000538289): «Contrato: SIN CONTRATO PACTADO»
+  junto a «Tarifa **pactada**: SOAT PLENO». Sin contrato no hay pacto — el SOAT
+  pleno es lo que se aplica *a falta* de pacto. La etiqueta pasa a «Tarifa
+  aplicada» cuando no hay contrato.
+- **Pseudo-norma en el cuerpo del argumento**:
+  `_neutralizar_art_168_fuera_de_contexto` sustituía la cita inaplicable por «LA
+  NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD», que se lee
+  como el título de un documento inexistente. Ahora: «las reglas generales del
+  Sistema General de Seguridad Social en Salud». `_solo_normas_citables` sigue
+  de malla para la lista de FUNDAMENTO.
+
+### Nota de despliegue
+
+El filtro `_solo_normas_citables` (24-08) **sí estaba** en el commit desplegado
+y aun así la pseudo-norma salió en el FUNDAMENTO de las 117: se generaron antes
+de reiniciar el motor. Lo corregido no tiene efecto hasta el reinicio.
+
+### Lo que no se tocó
+
+Las 21 respuestas de ratificación usan una plantilla que no entra en el motivo
+concreto de la ratificación (0/44 códigos). El texto lo pidió el área y se
+sostiene jurídicamente; cambiarlo es decisión del auditor. Queda anotado en
+BITACORA con la mejora disponible: el Art. 23 prohíbe glosas nuevas sobre la
+misma factura salvo por hechos nuevos.
+
+### Pruebas
+
+`test_decreto_4747_articulos_reales.py` (16) ·
+`test_contestar_el_tema_de_la_glosa.py` (13). Reescritas para fijar la intención
+en vez de la redacción: `test_ronda13_fixes` (pseudo-norma) y `test_multi_agente`
+(anclaje de urgencias — tercer anclaje equivocado para lo mismo).
+
 ## Sesión 25-ago-2026 (tarde) — Auditoría de las 117 respuestas del primer lote productivo
 
 Se pasaron por el revisor de citas las 117 respuestas que el motor generó con

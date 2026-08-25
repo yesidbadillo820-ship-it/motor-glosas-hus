@@ -690,32 +690,143 @@ DECRETOS = {
             "agotamiento presupuestal",
         ],
     },
+    # 25-08-2026 — CORREGIDO CONTRA LA FUENTE OFICIAL.
+    # La segunda auditoría del lote del día encontró que el motor citaba el
+    # «Artículo 20 del Decreto 4747 de 2007» como si regulara el trámite de
+    # glosas — en las 28 respuestas de ratificación, el 100 %. Se contrastó
+    # con el texto del decreto publicado por MinSalud y los TRES artículos que
+    # tenía cargados este corpus estaban mal, con encabezado y texto
+    # inventados:
+    #
+    #   Art. 11 decía «Atención de urgencias»            → es «Verificación de
+    #                                                       derechos de los usuarios»
+    #   Art. 20 decía «Trámite de glosas — conciliación» → es «RIPS»
+    #   Art. 21 decía «Pago durante trámite de glosas»   → es «Soportes de las facturas»
+    #
+    # El trámite de glosas está en el Art. 23, y el Manual Único en el 22.
+    # Como el revisor de citas contrasta contra ESTE corpus, la cita inventada
+    # se certificaba sola: el dictamen salía «verificado» con una norma que
+    # dice otra cosa. Es la misma lección de la jurisprudencia del 24-08.
+    #
+    # Los textos de abajo son literales del decreto. No se resumen ni se
+    # reescriben: si el hospital los pone entre comillas, la entidad los
+    # compara contra el original.
     "DECRETO 4747 DE 2007": {
-        "nombre": "Decreto 4747 de 2007",
+        "nombre": "Decreto 4747 de 2007 (Ministerio de la Protección Social, 7 de diciembre)",
         "titulo": "Relaciones entre prestadores de servicios de salud y entidades responsables del pago",
-        "ambito": "Trámite de glosas, facturación y conciliación",
+        "ambito": "Trámite de glosas, soportes de factura y manual único",
         "vigente": True,
         "articulos": {
             "11": {
-                "titulo": "Atención de urgencias",
-                "texto": "La atención de urgencias se prestará con independencia de la existencia o no de un acuerdo de voluntades entre la entidad responsable del pago y el prestador de servicios de salud. Las entidades responsables del pago no podrán condicionar la atención inicial de urgencias a la existencia previa de autorización administrativa para el acceso a la prestación del servicio.",
-                "aplicacion": "Urgencias sin autorización previa",
-                "keywords": ["urgencia", "autorización", "atención inicial"],
+                "titulo": "Verificación de derechos de los usuarios",
+                "texto": (
+                    "La verificación de derechos de los usuarios es el procedimiento por medio "
+                    "del cual se identifica la entidad responsable del pago de los servicios de "
+                    "salud que demanda el usuario y el derecho del mismo a ser cubierto por "
+                    "dicha entidad. (…) Parágrafo 1. El procedimiento de verificación de "
+                    "derechos será posterior a la selección y clasificación del paciente, "
+                    "«triage», y no podrá ser causa bajo ninguna circunstancia para negar la "
+                    "atención de urgencias."
+                ),
+                "aplicacion": (
+                    "Sirve cuando la glosa dice que el usuario no estaba afiliado o que el "
+                    "responsable era otro: la verificación no puede negar la urgencia. NO es "
+                    "el artículo de «urgencias sin autorización previa» — ese argumento se "
+                    "sostiene en el Art. 67 de la Ley 1438 de 2011 y el Art. 168 de la Ley 100."
+                ),
+                "keywords": ["verificación de derechos", "afiliación", "triage", "urgencias"],
             },
             "20": {
-                "titulo": "Trámite de glosas — conciliación",
-                "texto": "El trámite de glosas y de solicitudes de aclaraciones o ampliaciones es la instancia de conciliación entre el prestador de servicios de salud y la entidad responsable del pago, con el fin de resolver las discrepancias presentadas frente a los valores facturados. El trámite deberá agotarse dentro de los términos establecidos en el artículo 57 de la Ley 1438 de 2011 y podrá realizarse conforme al procedimiento de conciliación entre las partes.",
-                "aplicacion": "Conciliación de auditoría como paso obligatorio antes de ratificación",
-                "keywords": ["conciliación", "auditoría", "glosa", "trámite"],
+                "titulo": "Registro Individual de Prestaciones de Salud - RIPS",
+                "texto": (
+                    "El Ministerio de la Protección Social revisará y ajustará el formato, "
+                    "codificaciones, procedimientos y malla de validación de obligatoria "
+                    "adopción por todas las entidades del Sistema General de Seguridad Social "
+                    "en Salud, para el reporte del Registro Individual de Prestaciones de "
+                    "Salud - RIPS."
+                ),
+                "aplicacion": (
+                    "RIPS. NO regula el trámite de glosas: para eso es el Art. 23 de este "
+                    "mismo decreto."
+                ),
+                "keywords": ["RIPS", "registro individual", "malla de validación"],
             },
             "21": {
-                "titulo": "Pago durante trámite de glosas",
-                "texto": "Durante el trámite de las glosas, la entidad responsable del pago no podrá dejar de pagar el valor aceptado ni podrá condicionar el pago a la aceptación total de las glosas.",
-                "aplicacion": "Pago parcial del valor aceptado durante glosa",
-                "keywords": ["pago parcial", "glosa", "valor aceptado"],
+                "titulo": "Soportes de las facturas de prestación de servicios",
+                "texto": (
+                    "Los prestadores de servicios de salud deberán presentar a las entidades "
+                    "responsables de pago, las facturas con los soportes que, de acuerdo con el "
+                    "mecanismo de pago, establezca el Ministerio de la Protección Social. La "
+                    "entidad responsable del pago no podrá exigir soportes adicionales a los "
+                    "definidos para el efecto por el Ministerio de la Protección Social."
+                ),
+                "aplicacion": (
+                    "Es el artículo para las glosas SO: la entidad NO puede exigir un soporte "
+                    "que el Ministerio no haya definido."
+                ),
+                "keywords": ["soportes", "factura", "soportes adicionales", "SO"],
+            },
+            "22": {
+                "titulo": "Manual único de glosas, devoluciones y respuestas",
+                "texto": (
+                    "El Ministerio de la Protección Social expedirá el Manual Único de Glosas, "
+                    "devoluciones y respuestas, en el que se establecerán la denominación, "
+                    "codificación de las causas de glosa y de devolución de facturas, el cual "
+                    "es de obligatoria adopción por todas las entidades del Sistema General de "
+                    "Seguridad Social en Salud."
+                ),
+                "aplicacion": (
+                    "Fundamenta que la entidad debe glosar con los códigos del manual vigente "
+                    "(hoy la Resolución 2284 de 2023) y no con causales de su propia cosecha."
+                ),
+                "keywords": ["manual único de glosas", "codificación", "causales"],
+            },
+            "23": {
+                "titulo": "Trámite de glosas",
+                "texto": (
+                    "Las entidades responsables del pago de servicios de salud dentro de los "
+                    "treinta (30) días hábiles siguientes a la presentación de la factura con "
+                    "todos sus soportes, formularán y comunicarán a los prestadores de "
+                    "servicios de salud las glosas a cada factura, con base en la codificación "
+                    "y alcance definidos en el manual único de glosas, devoluciones y "
+                    "respuestas. Una vez formuladas las glosas a una factura, no se podrán "
+                    "formular nuevas glosas a la misma factura, salvo las que surjan de hechos "
+                    "nuevos detectados en la respuesta dada a la glosa inicial. El prestador de "
+                    "servicios de salud deberá dar respuesta a las glosas presentadas por las "
+                    "entidades responsables del pago de servicios de salud, dentro de los "
+                    "quince (15) días hábiles siguientes a su recepción. (…) La entidad "
+                    "responsable del pago, dentro de los diez (10) días hábiles siguientes, "
+                    "decidirá si levanta total o parcialmente las glosas o las deja como "
+                    "definitivas. Los valores por las glosas levantadas deberán ser cancelados "
+                    "dentro de los cinco (5) días hábiles siguientes, informando de este hecho "
+                    "al prestador de servicios de salud. (…) Vencidos los términos y en el caso "
+                    "de que persista el desacuerdo se acudirá a la Superintendencia Nacional de "
+                    "Salud, en los términos establecidos por la ley."
+                ),
+                "aplicacion": (
+                    "ESTE es el artículo del trámite de glosas — el que hay que citar, no el "
+                    "20. Dos avisos al usarlo: (1) el plazo de 30 días hábiles para formular "
+                    "la glosa lo redujo a VEINTE el Art. 57 de la Ley 1438 de 2011, que es "
+                    "posterior y prevalece; los 15 de respuesta y los 10 de decisión coinciden "
+                    "en las dos normas. (2) Aquí está la prohibición de glosar dos veces la "
+                    "misma factura salvo por hechos nuevos, que es la defensa contra una "
+                    "ratificación que estrena causal."
+                ),
+                "keywords": [
+                    "trámite de glosas",
+                    "términos",
+                    "20 días",
+                    "15 días",
+                    "10 días",
+                    "hechos nuevos",
+                    "ratificación",
+                    "superintendencia",
+                ],
             },
         },
-        "keywords": ["glosa", "conciliación", "4747"],
+        "articulos_completos": False,
+        "verificada": "25-08-2026 contra el texto oficial de MinSalud",
+        "keywords": ["glosa", "trámite de glosas", "soportes", "manual único", "4747"],
     },
     "DECRETO 780 DE 2016": {
         "nombre": "Decreto 780 de 2016 (Decreto Único Reglamentario Sector Salud)",
@@ -2589,7 +2700,9 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
         # T-1025/2002 se retiro el 24-08-2026: verificada contra la relatoria de la
         # Corte, trata de consentimiento informado en cirugia de asignacion de sexo,
         # no de urgencias. El anclaje correcto de urgencias es el Art. 168 de la
-        # Ley 100 y el Art. 20 del Decreto 4747, que ya estaban aqui.
+        # Ley 100 («su prestacion no requiere contrato ni orden previa»).
+        # 25-08-2026: este comentario decia ademas «y el Art. 20 del Decreto
+        # 4747» — el Art. 20 es el del RIPS. Corregido contra la fuente.
         "AU": ["LEY 100 DE 1993", "DECRETO 4747 DE 2007"],
         "CO": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-760 DE 2008"],
         "CL": [

@@ -2114,8 +2114,18 @@ def _neutralizar_art_168_fuera_de_contexto(
         r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
         re.IGNORECASE,
     )
+    # 25-08-2026 (2.ª auditoría). El reemplazo decía «LA NORMATIVA DE
+    # CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD» — y eso se lee
+    # como el TÍTULO de una norma concreta que nadie puede ir a buscar: no
+    # tiene ley, decreto ni artículo. El filtro del FUNDAMENTO NORMATIVO ya
+    # la sacaba de la lista, pero dentro del argumento seguía sonando a cita.
+    #
+    # La red dispara justamente cuando la glosa NO es de urgencias, o sea
+    # cuando no hay un artículo concreto que invocar. Lo honesto es decirlo
+    # con una frase que se lea como lo que es —una remisión general— y no
+    # como el nombre de un documento.
     nuevo, n = pat_art168.subn(
-        "LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD",
+        "LAS REGLAS GENERALES DEL SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD",
         dictamen,
     )
     # También frase suelta "atención inicial de urgencias" cuando no aplica
@@ -2160,9 +2170,11 @@ def _solo_normas_citables(normas_clave: str | None) -> str:
 
     Eso no es una norma: no tiene ley, decreto ni artículo, y nadie puede ir a
     verificarlo. Sale de una defensa que SÍ funciona —cuando la glosa no es de
-    urgencias, el motor reemplaza la cita del Art. 168 Ley 100 por esa frase
+    urgencias, el motor reemplaza la cita del Art. 168 Ley 100 por una frase
     neutra para no citar una norma inaplicable— pero la frase se colaba a la
-    lista de normas, donde parece una cita y no lo es.
+    lista de normas, donde parece una cita y no lo es. (El 25-08 se cambió
+    además la frase que la red genera, porque «LA NORMATIVA DE...» se leía
+    como el título de un documento; este filtro sigue de malla.)
 
     La lista iba de la IA al HTML sin ningún filtro. Acá se separa: los
     renglones citables se conservan tal cual; los demás se descartan. Si no
@@ -4273,6 +4285,149 @@ def _corregir_norma_mal_aplicada(dictamen: str) -> str:
     return nuevo
 
 
+# ── 25-08-2026: contestar la factura cuando la glosa no era de la factura ─
+# La segunda auditoría del lote cruzó, código por código, el motivo REAL del
+# pagador contra lo que contestó el motor. De 79 códigos, 74 contestaban el
+# tema — buen resultado. Los 5 que no ($3.564.600) fallaban todos igual:
+#
+#   FA1606 (3 casos): el pagador dice «el régimen del afiliado al momento de
+#     la prestación es distinto al registrado en el contrato» y el motor
+#     contesta que la factura electrónica es válida ante la DIAN.
+#   FA0703 (2 casos): el pagador dice «insumo no facturable» nombrando el
+#     código del ítem, y el motor contesta lo mismo de la DIAN.
+#
+# Ninguna de las dos glosas es de la FORMA de la factura. Contestar la DIAN
+# deja la glosa sin refutar, y en auditoría lo que no se refuta se descuenta.
+#
+# Esta red no reescribe el argumento —eso lo hace el prompt, que ya lleva la
+# defensa central de cada código—: avisa. El dictamen sale con una nota
+# visible para que el gestor lo devuelva antes de radicarlo.
+_CODIGOS_QUE_NO_SON_DE_FORMA = {
+    "FA1606": "quién es el responsable de pago (régimen del afiliado en la BDUA)",
+    "FA1605": "quién es el responsable de pago (régimen del afiliado en la BDUA)",
+    "FA0703": "si el ítem ya estaba incluido en la atención agrupada",
+    "FA0803": "si el ítem ya estaba incluido en la atención agrupada",
+    "FA0603": "si el ítem ya estaba incluido en la atención agrupada",
+}
+_PAT_ARGUMENTO_DE_FORMA = re.compile(
+    r"V[ÁA]LIDA\s+POR\s+LA\s+DIAN|VALIDAD[AO]\s+POR\s+LA\s+DIAN|CUFE|"
+    r"ART[ÍI]CULO\s+617\s+DEL\s+ESTATUTO\s+TRIBUTARIO|RESOLUCI[ÓO]N\s+DIAN|"
+    r"NUMERACI[ÓO]N\s+CONSECUTIVA\s+AUTORIZADA",
+    re.IGNORECASE,
+)
+# Señales de que SÍ entró en el tema de fondo, aunque también hable de la
+# factura. Con cualquiera de estas no se avisa: el argumento está completo.
+_PAT_ENTRO_EN_EL_TEMA = {
+    "responsable": re.compile(
+        r"\bBDUA\b|R[ÉE]GIMEN\s+(?:DEL\s+)?(?:AFILIADO|USUARIO)|"
+        r"VERIFICACI[ÓO]N\s+DE\s+DERECHOS|CONTRIBUTIVO|SUBSIDIADO",
+        re.IGNORECASE,
+    ),
+    "agrupada": re.compile(
+        r"ATENCI[ÓO]N\s+AGRUPADA|PAQUETE|NO\s+EST[ÁA]\s+INCLUID|"
+        r"NO\s+SE\s+ENCUENTRA\s+INCLUID|ANEXO\s+(?:N[°º.]?\s*)?\d",
+        re.IGNORECASE,
+    ),
+}
+
+
+def _avisar_si_contesta_la_forma(dictamen: str, codigo: str) -> str:
+    """Avisa cuando la respuesta habla de la factura y la glosa era de fondo.
+
+    No toca el argumento: le pone al dictamen una nota que el gestor ve antes
+    de radicar. Preferimos avisar de más que dejar pasar una glosa contestada
+    por el lado equivocado.
+    """
+    if not dictamen or not codigo:
+        return dictamen
+    tema = _CODIGOS_QUE_NO_SON_DE_FORMA.get(str(codigo).strip().upper())
+    if not tema:
+        return dictamen
+    if not _PAT_ARGUMENTO_DE_FORMA.search(dictamen):
+        return dictamen
+    clave = "responsable" if "responsable" in tema else "agrupada"
+    if _PAT_ENTRO_EN_EL_TEMA[clave].search(dictamen):
+        return dictamen
+    logger.warning(
+        f"[CONTESTA-LA-FORMA] la respuesta a {codigo} argumenta validez de la factura "
+        f"y la glosa era sobre {tema} — se marcó para revisión del gestor."
+    )
+    return (
+        dictamen.rstrip()
+        + f"\n\n⚠ REVISAR ANTES DE RADICAR: la glosa {codigo} no discute la forma de la "
+        f"factura sino {tema}. Esta respuesta argumenta la validez de la factura "
+        "electrónica y no entra en ese punto: la entidad puede darla por no contestada."
+    )
+
+
+# ── 25-08-2026: el artículo equivocado de una norma que sí existe ────────
+# La segunda auditoría del lote encontró que las 28 respuestas de ratificación
+# —el 100 %— citaban el «ARTÍCULO 20 DEL DECRETO 4747 DE 2007» como si
+# regulara el trámite de glosas. Se verificó contra el texto oficial de
+# MinSalud: el Art. 20 es el del RIPS. El trámite de glosas está en el 23 y el
+# Manual Único en el 22.
+#
+# Lo grave no fue la cita sino que se certificaba sola: el corpus del motor
+# tenía cargado ese mismo artículo con encabezado y texto inventados, así que
+# el revisor la daba por buena. El corpus ya quedó corregido; esta red es la
+# malla por si el modelo la vuelve a escribir de memoria.
+#
+# Se exige el CONTEXTO además del número: el Art. 20 existe y citarlo para
+# RIPS es correcto. Solo se corrige cuando el texto habla de glosas.
+_ARTICULOS_MAL_CITADOS: tuple[tuple[re.Pattern[str], re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\bART[ÍI]CULO\s+20\b(\s*(?:DEL?|DE\s+L[AO]S?)?\s*DECRETO\s+4747)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"GLOSA|CONCILIACI[ÓO]N|TR[ÁA]MITE|RATIFICA|OBJECI[ÓO]N",
+            re.IGNORECASE,
+        ),
+        "23",
+    ),
+    (
+        re.compile(
+            r"\bART\.\s*20\b(\s*(?:DEL?\s+)?DEC(?:RETO)?\.?\s+4747)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"GLOSA|CONCILIACI[ÓO]N|TR[ÁA]MITE|RATIFICA|OBJECI[ÓO]N",
+            re.IGNORECASE,
+        ),
+        "23",
+    ),
+)
+
+
+def _corregir_articulo_mal_citado(dictamen: str) -> str:
+    """Corrige el número de artículo cuando la norma es real y el artículo no.
+
+    Conservadora: solo dispara si el número equivocado Y el tema aparecen los
+    dos en el dictamen. Nunca borra la cita — la norma sirve al argumento; lo
+    que se arregla es el dato que la entidad verifica primero.
+    """
+    if not dictamen:
+        return dictamen
+    nuevo = dictamen
+    for re_mal, re_ctx, correcto in _ARTICULOS_MAL_CITADOS:
+        if not re_ctx.search(nuevo):
+            continue
+
+        def _sub(m: "re.Match[str]", _c: str = correcto) -> str:
+            cabeza = m.group(0)[: m.start(1) - m.start()]
+            cabeza = re.sub(r"\b20\b", _c, cabeza)
+            return cabeza + m.group(1)
+
+        nuevo, n = re_mal.subn(_sub, nuevo)
+        if n:
+            logger.warning(
+                f"[ARTICULO-MAL-CITADO] {n} cita(s) corregida(s) al artículo {correcto} "
+                "del Decreto 4747 de 2007 (el 20 es el del RIPS, no el del trámite de glosas)."
+            )
+    return nuevo
+
+
 # ── 25-08-2026: norma derogada citada sin decir desde cuándo ─────────────
 # 21 de los 117 dictámenes del lote citaron la Resolución 2275 de 2023 como
 # si siguiera vigente. La derogó la Resolución 948 de 2026 el 14 de mayo.
@@ -5128,7 +5283,7 @@ def generar_texto_aceptacion_parcial(
 TEXTO_RATIFICADA = (
     "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
     "DE LA GLOSA INICIAL Y SE DA CONTINUACIÓN AL PROCESO DE CONFORMIDAD CON EL ARTÍCULO "
-    "57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007. SE SOLICITA "
+    "57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 23 DEL DECRETO 4747 DE 2007. SE SOLICITA "
     "LA PROGRAMACIÓN DE LA FECHA DE CONCILIACIÓN DE AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE "
     "LAS PARTES. DE NO LLEGARSE A ACUERDO, SE ELEVARÁ EL CONFLICTO ANTE LA "
     "SUPERINTENDENCIA NACIONAL DE SALUD SEGÚN LO DISPUESTO EN EL ART. 126 DE LA LEY "
@@ -8565,6 +8720,27 @@ class GlosaService:
             except Exception as _e_nd:
                 logger.debug(f"[NORMA-DEROGADA] red final no aplicada: {_e_nd}")
 
+            # 25-08-2026 — RED FINAL: artículo equivocado de una norma real.
+            # El Art. 20 del Decreto 4747 es el del RIPS; el del trámite de
+            # glosas es el 23. Salió en el 100 % de las ratificaciones.
+            try:
+                _dictamen_art_ok = _corregir_articulo_mal_citado(dictamen)
+                if _dictamen_art_ok != dictamen:
+                    dictamen = _dictamen_art_ok
+            except Exception as _e_am:
+                logger.debug(f"[ARTICULO-MAL-CITADO] red final no aplicada: {_e_am}")
+
+            # 25-08-2026 — AVISO: la respuesta habla de la factura y la glosa
+            # era de fondo (FA1606 = quién paga; FA0703 = si ya estaba en el
+            # paquete). No se reescribe el argumento: se marca para que el
+            # gestor lo devuelva antes de radicar.
+            try:
+                _dictamen_avisado = _avisar_si_contesta_la_forma(dictamen, str(codigo_det or ""))
+                if _dictamen_avisado != dictamen:
+                    dictamen = _dictamen_avisado
+            except Exception as _e_cf2:
+                logger.debug(f"[CONTESTA-LA-FORMA] aviso no aplicado: {_e_cf2}")
+
             try:
                 _dictamen_con_de = _reponer_preposicion_comida(dictamen)
                 if _dictamen_con_de != dictamen:
@@ -9982,7 +10158,14 @@ class GlosaService:
         if servicio or contrato or tarifa:
             servicio_html = f"<div><b>Servicio objetado:</b> {servicio}</div>" if servicio else ""
             contrato_html = f"<div><b>Contrato:</b> {contrato}</div>" if contrato else ""
-            tarifa_html = f"<div><b>Tarifa pactada:</b> {tarifa}</div>" if tarifa else ""
+            # 25-08-2026 (2.ª auditoría, HUS0000538289): el mismo recuadro decía
+            # «Contrato: SIN CONTRATO PACTADO» y debajo «Tarifa PACTADA: SOAT
+            # PLENO». Si no hay contrato no hay nada pactado — la contradicción
+            # está en la etiqueta, no en el dato: el SOAT pleno es justamente lo
+            # que se aplica A FALTA de pacto. Se cambia la palabra.
+            _sin_pacto = "SIN CONTRATO" in str(contrato or "").upper()
+            _etiqueta_tarifa = "Tarifa aplicada" if _sin_pacto else "Tarifa pactada"
+            tarifa_html = f"<div><b>{_etiqueta_tarifa}:</b> {tarifa}</div>" if tarifa else ""
             bloque_servicio = f"""
             <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-top:10px;">
                 {servicio_html}{contrato_html}{tarifa_html}

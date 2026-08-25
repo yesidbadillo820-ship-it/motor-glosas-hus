@@ -63,6 +63,93 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (noche) — Un segundo auditor encontró un artículo de ley mal citado en TODAS las ratificaciones
+
+Llegó una segunda auditoría de las mismas 117 respuestas, hecha por fuera y
+con otro método: en vez de mirar el texto por dentro, contrastó las citas
+contra las leyes publicadas y comparó, código por código, lo que el pagador
+reclamó contra lo que el motor contestó. Encontró cosas que la primera
+revisión no vio.
+
+**Lo más grave: el artículo estaba mal, y el motor mismo se daba el visto bueno.**
+
+Las 28 respuestas de ratificación —el 100 %— decían que el trámite de glosas
+está en el **artículo 20 del Decreto 4747 de 2007**. Se fue a buscar el texto
+oficial del decreto en el Ministerio de Salud: el artículo 20 es el del
+**RIPS**. El del trámite de glosas es el **23**.
+
+Y al revisar el decreto completo apareció lo de fondo: de los tres artículos
+de esa norma que el motor tenía guardados, **los tres estaban mal**, con
+título y texto inventados:
+
+| El motor decía | Lo que dice de verdad |
+|---|---|
+| Art. 11 — «Atención de urgencias» | «Verificación de derechos de los usuarios» |
+| Art. 20 — «Trámite de glosas» | «Registro Individual de Prestaciones — RIPS» |
+| Art. 21 — «Pago durante trámite de glosas» | «Soportes de las facturas» |
+
+Lo peligroso no era la cita: era que **se aprobaba sola**. El revisor de citas
+del motor compara contra esa misma lista guardada, así que la respuesta salía
+sellada «citas verificadas» llevando una norma que dice otra cosa. Es la misma
+lección de las sentencias del 24 de agosto: una lista sin verificar no
+verifica nada.
+
+Se corrigieron los tres artículos con el texto literal del decreto, se
+agregaron el 22 y el 23 que faltaban, y se repasaron **una por una las 17
+citas** a ese decreto que había repartidas por todo el programa.
+
+De paso quedó algo bueno: el artículo 11 de verdad —el de verificación de
+derechos— es justo el que sirve para las glosas de «este paciente era de otro
+responsable». Antes no se podía usar porque estaba mal guardado.
+
+**Una frase entrecomillada que no existe en ninguna ley.**
+Varias respuestas ponían entre comillas, como si fuera del decreto, un texto
+sobre que la urgencia no se puede condicionar a autorización previa. Se buscó
+en el decreto completo: **no está**. Al corregir la lista guardada, el propio
+revisor del motor ya la detecta y le quita las comillas.
+
+**Cinco glosas contestadas por el lado equivocado ($3.564.600).**
+El auditor cruzó los 79 códigos de las respuestas contra el motivo real del
+pagador. **74 de 79 sí contestaban el tema** — buen resultado. Los cinco que
+no, fallaron todos igual:
+
+- **Tres glosas FA1606** ($2.571.800): el pagador dijo «el régimen del
+  afiliado el día de la atención era contributivo y en el contrato figura
+  subsidiado», y el motor contestó que la factura electrónica es válida ante
+  la DIAN. No es lo que preguntaron.
+- **Dos glosas FA0703** ($992.800): el pagador dijo «este insumo no es
+  facturable» nombrando su código, y el motor contestó lo mismo de la DIAN.
+
+En auditoría, lo que no se refuta se descuenta. Ahora el motor sabe cómo se
+contesta cada uno de esos dos códigos —el FA1606 con la consulta BDUA a la
+fecha de la atención, el FA0703 con el anexo del paquete— y si aun así sale
+hablando de la DIAN, la respuesta baja con un aviso visible: **«REVISAR ANTES
+DE RADICAR»**.
+
+**Dos cosas de forma que también salieron:**
+
+- El recuadro verde decía «Contrato: SIN CONTRATO PACTADO» y debajo «Tarifa
+  **pactada**: SOAT PLENO». Si no hay contrato no hay nada pactado. Ahora esa
+  línea dice «Tarifa **aplicada**» — que es lo correcto: el SOAT pleno es
+  justamente lo que se aplica a falta de pacto.
+- Cuando la glosa no es de urgencias, el motor cambiaba la cita del artículo
+  168 por la frase «LA NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA
+  GENERAL DE SALUD». Eso se lee como el título de una norma que nadie puede
+  ir a buscar. Ahora dice «las reglas generales del Sistema General de
+  Seguridad Social en Salud», que se lee por lo que es.
+
+**Algo que ya estaba arreglado y salió igual.** Esa frase aparecía además en
+la lista de «3 normas más relevantes». El filtro que la saca de ahí existe
+desde el 24 de agosto y **sí estaba** en la versión del hospital — pero las
+117 respuestas se generaron antes de reiniciar el motor. Es la prueba de que
+lo corregido no sirve de nada hasta que la PC de cartera se reinicia.
+
+**Lo que NO se tocó, porque es decisión del área.** El auditor señala que las
+21 respuestas de ratificación usan la misma plantilla y ninguna entra en el
+motivo concreto por el que la entidad ratificó. La plantilla la pidió el área
+y funciona jurídicamente, así que no se cambió por cuenta propia. Queda la
+pregunta en PENDIENTE.
+
 ### 25-08-2026 (tarde) — Se revisaron las 117 respuestas que salieron hoy
 
 Con el archivo de recepción ya cargado, se pasó **una por una** las 117
@@ -7265,6 +7352,20 @@ Eran dos cosas:
 
 ## 3) PENDIENTE
 
+### Del motor de glosas, al 25-08 (noche)
+- **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
+  señala que las 21 respuestas a glosas ratificadas usan el mismo texto y
+  ninguna entra en el motivo concreto por el que la entidad ratificó. El texto
+  lo pidió el área en abril y jurídicamente se sostiene, así que no se cambió
+  sin preguntarle. Hay una mejora concreta disponible: el artículo 23 del
+  Decreto 4747 dice que **no se pueden formular glosas nuevas sobre la misma
+  factura salvo por hechos nuevos** — o sea que si la entidad ratifica
+  estrenando causal, eso es rebatible. ¿Se agrega ese argumento a la plantilla?
+- **Repasar el resto de la base normativa.** Del Decreto 4747 estaban mal los
+  tres artículos que había. Falta pasar por la misma verificación las demás
+  normas del corpus que tienen texto de artículo guardado — el Decreto 780 de
+  2016 es el primero de la lista.
+
 ### Del motor de glosas, al 25-08 (tarde)
 - **Reenviar el archivo de hoy con las columnas de IA.** Las 117 respuestas
   salieron correctas, pero el Excel que llegó a los gestores salió **sin** las
@@ -7718,6 +7819,12 @@ respuestas siguen saliendo con esos defectos.
 **Y después:** reenviar el archivo de recepción de hoy —esta vez con las
 columnas de IA y con copia a las médicas— y dejar una sola cuenta de correo
 para Edgar Silva.
+
+**Lo primero de todo (26-08):** el reinicio del motor dejó de ser un pendiente
+más. Hoy quedó demostrado que una corrección del 24 de agosto **sí estaba** en
+la versión del hospital y aun así salió el defecto en las 117 respuestas,
+porque el motor no se había reiniciado. Todo lo corregido ayer y hoy sigue sin
+efecto hasta ese reinicio.
 
 
 **Lote de glosas del 25-ago (Dispensario):** las 24 quedaron respondidas;

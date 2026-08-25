@@ -92,7 +92,7 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
             "Art. 168 Ley 100 de 1993 (atención inicial de urgencias sin autorización previa)"
         )
         resultado["jurisprudencia"].append(
-            "Art. 20 Decreto 4747/2007 (autorización posterior en urgencias)"
+            "Art. 168 Ley 100/1993 (la urgencia no requiere contrato ni orden previa)"
         )
     elif prefijo in ("CL", "PE"):  # Pertinencia clínica
         resultado["normas_primarias"].append("Art. 17 Ley 1751 de 2015 (autonomía médica)")
@@ -129,7 +129,7 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
     # Ratificación: agregar cita de conciliación obligatoria
     if es_ratif:
         resultado["normas_primarias"].append(
-            "Art. 20 Decreto 4747 de 2007 (mesa de conciliación de auditoría)"
+            "Art. 23 Decreto 4747 de 2007 (trámite de glosas y escalamiento a la SuperSalud)"
         )
 
     return resultado
