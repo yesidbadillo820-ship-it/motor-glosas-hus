@@ -7350,6 +7350,38 @@ Eran dos cosas:
 
 ---
 
+### 25-08 (noche) — «Esto lo hizo Vanesa, pero aparece Óscar»
+
+Yesid preguntó por qué algunos envíos que recepciona y gestiona **Vanesa**
+quedan a nombre del gestor **Óscar**.
+
+**La respuesta.** El sistema guarda el nombre de la persona en tres momentos
+distintos —quién **registró** el oficio, quién **escribió** el envío y quién
+**auditó** cada factura— y en los tres casos el nombre sale de la **sesión
+abierta en el navegador**, no de quién esté sentado al computador. Si dos
+gestores comparten el mismo equipo y no cierran sesión, todo lo que haga el
+segundo queda firmado por el primero. Hay un segundo camino posible: las
+facturas que entraron por **importación del Excel** llevan el auditor que decía
+la columna AUDITOR del archivo, no el de quien las tocó después.
+
+**Cómo averiguar cuál de los dos fue,** sin cambiar nada:
+
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py FHUS-AS-I01197-26
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py 232050
+
+Muestra, uno al lado del otro y con fecha y hora: quién registró el oficio,
+quién escribió cada envío, quién auditó cada factura y el historial renglón por
+renglón con su firma. Las líneas que trajo el Excel quedan marcadas.
+
+**Lo que hay que hacer en la oficina:** cada gestor entra con su propio usuario
+y cierra sesión al terminar. El nombre de quien tiene la sesión abierta se ve
+arriba a la derecha en la página: si no es el suyo, hay que cerrar sesión antes
+de trabajar.
+
+10 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Del motor de glosas, al 25-08 (noche)
