@@ -53,6 +53,7 @@ ESTADO_MOVIDO = "MOVIDO"
 ESTADO_RENOMBRADO = "MOVIDO Y RENOMBRADO"
 ESTADO_YA_ESTABA = "YA ESTABA EN SU CARPETA"
 ESTADO_SIN_FACTURA = "SIN NÚMERO DE FACTURA"
+ESTADO_SIN_CARPETA = "SIN CARPETA PARA ESA FACTURA"
 ESTADO_ERROR = "ERROR"
 
 
@@ -88,6 +89,25 @@ def factura_del_nombre(nombre: str) -> str:
     return f"HUS{numeros.pop()}" if len(numeros) == 1 else ""
 
 
+def carpetas_por_factura(carpeta: Path) -> dict[str, Path]:
+    """{número de factura: carpeta que ya existe}.
+
+    Las carpetas no siempre se llaman exactamente como la factura: el equipo les
+    agrega una nota detrás (`HUS379477_PEND. CARTA CORONEL`, `HUS367368
+    ACEPTADO`, `HUS378523_MAOS`). Sin esto, un soporte de la HUS379477 no
+    encontraría su carpeta y se crearía una segunda, vacía, al lado de la buena.
+
+    Si dos carpetas dijeran la misma factura, gana la primera en orden
+    alfabético y así el resultado no depende de cómo las liste el sistema.
+    """
+    mapa: dict[str, Path] = {}
+    for sub in sorted(p for p in carpeta.iterdir() if p.is_dir()):
+        factura = factura_del_nombre(sub.name)
+        if factura:
+            mapa.setdefault(factura, sub)
+    return mapa
+
+
 def nombre_libre(carpeta: Path, nombre: str) -> tuple[Path, bool]:
     """(ruta libre en la carpeta, ¿hubo que renombrar?).
 
@@ -104,13 +124,21 @@ def nombre_libre(carpeta: Path, nombre: str) -> tuple[Path, bool]:
     raise ValueError(f"No hay un nombre libre para {nombre!r} en {carpeta}")
 
 
-def planificar(carpeta: Path, patron: str = "*.pdf") -> list[Movimiento]:
+def planificar(
+    carpeta: Path, patron: str = "*.pdf", solo_existentes: bool = False
+) -> list[Movimiento]:
     """Qué habría que mover, sin mover nada.
 
     Solo mira los archivos que están **sueltos** en la carpeta: lo que ya está
     dentro de una subcarpeta se deja quieto.
+
+    Con `solo_existentes`, un archivo cuya factura **no tiene carpeta** se queda
+    donde está en vez de crearle una. Es lo que hace falta al repartir un lote
+    que abarca varios gestores: en la carpeta de CAROLINA solo deben caer los
+    soportes de las facturas de CAROLINA, no crearse las de CLAUDIA y OSCAR.
     """
     planes: list[Movimiento] = []
+    existentes = carpetas_por_factura(carpeta)
     carpetas_previstas: set[Path] = set()
     for ruta in sorted(carpeta.glob(patron)):
         if not ruta.is_file() or ruta.name.startswith(("~$", ".")):
@@ -125,15 +153,25 @@ def planificar(carpeta: Path, patron: str = "*.pdf") -> list[Movimiento]:
                 )
             )
             continue
-        destino_carpeta = carpeta / factura
+        destino_carpeta = existentes.get(factura, carpeta / factura)
         nueva = not destino_carpeta.exists() and destino_carpeta not in carpetas_previstas
+        if nueva and solo_existentes:
+            planes.append(
+                Movimiento(
+                    archivo=ruta.name,
+                    factura=factura,
+                    estado=ESTADO_SIN_CARPETA,
+                    observacion="Esa factura no tiene carpeta aquí; el archivo se queda donde está.",
+                )
+            )
+            continue
         if nueva:
             carpetas_previstas.add(destino_carpeta)
         planes.append(
             Movimiento(
                 archivo=ruta.name,
                 factura=factura,
-                carpeta=factura,
+                carpeta=destino_carpeta.name,
                 nombre_final=ruta.name,
                 estado=ESTADO_MOVIDO,
                 carpeta_creada=nueva,
@@ -142,10 +180,15 @@ def planificar(carpeta: Path, patron: str = "*.pdf") -> list[Movimiento]:
     return planes
 
 
-def organizar(carpeta: Path, patron: str = "*.pdf", aplicar: bool = False) -> list[Movimiento]:
+def organizar(
+    carpeta: Path,
+    patron: str = "*.pdf",
+    aplicar: bool = False,
+    solo_existentes: bool = False,
+) -> list[Movimiento]:
     """Mueve cada soporte a la carpeta de su factura. Si `aplicar` es False,
     solo dice qué haría."""
-    planes = planificar(carpeta, patron)
+    planes = planificar(carpeta, patron, solo_existentes)
     if not aplicar:
         return planes
 
@@ -153,7 +196,7 @@ def organizar(carpeta: Path, patron: str = "*.pdf", aplicar: bool = False) -> li
         if plan.estado != ESTADO_MOVIDO:
             continue
         origen = carpeta / plan.archivo
-        destino_carpeta = carpeta / plan.factura
+        destino_carpeta = carpeta / plan.carpeta
         try:
             destino_carpeta.mkdir(exist_ok=True)
             destino, renombrado = nombre_libre(destino_carpeta, origen.name)
@@ -213,6 +256,12 @@ def construir_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Mover de verdad. Sin esto solo muestra qué haría.",
     )
+    p.add_argument(
+        "--solo-carpetas-existentes",
+        action="store_true",
+        help="No crear carpetas: mover solo lo que ya tiene carpeta. Es lo que hace falta "
+        "al repartir un lote que abarca varios gestores.",
+    )
     p.add_argument("--reporte-csv", type=Path, help="Listado de lo que se movió y a dónde.")
     return p
 
@@ -225,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("No existe la carpeta: %s", args.carpeta)
         return 1
 
-    movimientos = organizar(args.carpeta, args.patron, args.aplicar)
+    movimientos = organizar(args.carpeta, args.patron, args.aplicar, args.solo_carpetas_existentes)
     if args.reporte_csv:
         escribir_reporte(args.reporte_csv, movimientos)
 
@@ -257,6 +306,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nSe quedaron donde estaban ({len(sin_factura)}), no dicen de qué factura son:")
         for m in sin_factura:
             print(f"   {m.archivo}")
+
+    sin_carpeta = [m for m in movimientos if m.estado == ESTADO_SIN_CARPETA]
+    if sin_carpeta:
+        facturas = sorted({m.factura for m in sin_carpeta})
+        print(
+            f"\nSin carpeta aquí ({len(sin_carpeta)} archivo(s), {len(facturas)} factura(s)): "
+            "se quedan donde están."
+        )
+        print(f"   {', '.join(facturas[:15])}{' …' if len(facturas) > 15 else ''}")
 
     if errores:
         print(f"\nCon error ({len(errores)}):")

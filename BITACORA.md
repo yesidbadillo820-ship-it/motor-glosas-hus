@@ -3545,6 +3545,36 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
 
+### 25-08-2026 (noche) — La respuesta a glosa, repartida en la carpeta de cada factura
+
+**De dónde sale.** La simulación sobre las tres carpetas del paquete (CAROLINA,
+CLAUDIA y OSCAR) mostró que **a las 174 carpetas les falta la respuesta a glosa
+y la epicrisis** — el 100 %. Sin eso, el PDF unido saldría sin los dos renglones
+que encabezan la lista del área.
+
+Las respuestas ya existen: son los 324 `RTA_ADRES_<FACTURA>.pdf` que se armaron
+el 21-08. Solo faltaba llevarlas a su carpeta.
+
+**Dos cosas que lo impedían, ya arregladas:**
+
+1. **Las carpetas traen notas detrás del número.** `HUS379477_PEND. CARTA
+   CORONEL`, `HUS367368 ACEPTADO`, `HUS378523_MAOS`. El bot que archiva
+   soportes buscaba una carpeta llamada exactamente como la factura, así que a
+   esas no las encontraba: **habría creado una segunda carpeta vacía al lado de
+   la buena**, y el soporte habría quedado separado del resto.
+2. **El lote es de las tres carpetas juntas.** Al soltar las 324 respuestas en
+   la carpeta de un gestor, el bot le habría creado las carpetas de los otros
+   dos. Con la opción nueva **«solo carpetas existentes»** deja quietas las que
+   no son de ese gestor, y las lista al final para que no pasen calladas.
+
+Probado de punta a punta con el ZIP de verdad: las respuestas cayeron en su
+carpeta —incluidas las de nombre con nota— y el PDF unido ya sale con la
+RESPUESTA A GLOSA de primera.
+
+**Queda pendiente la EPICRISIS**, que no está en ninguna carpeta.
+
+---
+
 ### 25-08-2026 — Un solo PDF de soportes por factura, en el orden que pide el área
 
 **Lo que pidió el auditor:** que los soportes de cada factura se unan en un solo
