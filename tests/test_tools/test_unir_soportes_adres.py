@@ -279,3 +279,28 @@ def test_main_de_punta_a_punta(tmp_path):
 
 def test_main_avisa_si_la_carpeta_no_existe(tmp_path):
     assert org.main(["--carpeta", str(tmp_path / "no-existe")]) == 1
+
+
+# ─── Nombres con las palabras pegadas ────────────────────────────────────────
+
+
+def test_palabras_pegadas_sin_separador():
+    """`RegistroEnfermeria.pdf` no trae guion ni espacio entre las dos palabras.
+
+    Sin cortar donde cambia de minúscula a mayúscula quedaba
+    «REGISTROENFERMERIA», donde ENFERMERIA ya no es una palabra suelta, y el
+    archivo se iba a OTROS (caso real de la HUS389652).
+    """
+    assert org.clasificar("RegistroEnfermeria.pdf").clave == "ENFERMERIA"
+    assert org.clasificar("NotasEnfermeria.pdf").clave == "ENFERMERIA"
+    assert org.clasificar("HistoriaClinica.pdf").clave == "HISTORIA"
+    assert org.clasificar("AyudasDiagnosticas.pdf").clave == "AYUDAS"
+    # Lo que ya venía en mayúsculas sigue igual.
+    assert org.clasificar("HUS400387 ANGIOTOMOGRAFIA.pdf").clave == "AYUDAS"
+    assert org.clasificar("NTE-C.pdf").clave == "ENFERMERIA"
+
+
+def test_lo_que_de_verdad_no_dice_nada_sigue_a_revisar():
+    """`HUS390378-folio 7.pdf` no dice de qué es: tiene que salir a revisar."""
+    grupo, reconocido = org.clasificar_con_marca("HUS390378-folio 7.pdf")
+    assert grupo.clave == "OTROS" and not reconocido
