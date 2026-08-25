@@ -129,3 +129,68 @@ class TestElMotorYaNoOfreceLaDerogadaASecas:
                     f"{ruta} nombra la Res. 2275/2023 sin decir que fue derogada: "
                     f"{renglon.strip()[:100]}"
                 )
+
+
+class TestLaResolucionDePplTambienDejoDeRegir:
+    """PPL es uno de los pagadores reales del hospital, y el prompt ordenaba
+    citar SIEMPRE una resolución derogada en junio de 2026.
+
+    La Resolución 5159 de 2015 (modelo de atención en salud para la población
+    privada de la libertad) fue derogada por el artículo 12 de la Resolución
+    1099 de 2026: «rige a partir de la fecha de su expedición y deroga las
+    Resoluciones 5159 de 2015 y 3595 de 2016». Verificado en el PDF oficial del
+    Ministerio.
+
+    El corpus la tenía como vigente en dos sitios y el prompt decía
+    «OBLIGACIÓN: Citar SIEMPRE Res. 5159/2015 al defender cobertura PPL».
+    """
+
+    def test_la_5159_quedo_marcada_como_derogada(self):
+        from app.services.normativa_completa import _TODAS_LAS_NORMAS
+
+        n = _TODAS_LAS_NORMAS["RESOLUCION 5159 DE 2015"]
+        assert n["vigente"] is False
+        assert "1099" in n["derogada_por"]
+
+    def test_tambien_en_el_catalogo_corto(self):
+        """El otro catálogo del repositorio también quedó al día."""
+        from app.services.normativa import NORMAS_VIGENTES
+
+        assert NORMAS_VIGENTES["RESOLUCION 5159/2015"]["vigente"] is False
+        assert "1099" in NORMAS_VIGENTES["RESOLUCION 5159/2015"]["resumen"]
+
+    def test_citarla_no_se_trata_como_una_cita_equivocada(self):
+        """Derogada no es lo mismo que equivocada.
+
+        El catálogo corto tiene un diccionario aparte para citas EQUIVOCADAS
+        («la Ley 1122 es de 2007, no de 2011»), y lo que cae ahí sale como
+        hallazgo de nivel «error». La Res. 5159 no está equivocada: es la norma
+        correcta para las atenciones anteriores a junio de 2026. De la fecha
+        avisa el verificador de citas, con severidad media.
+        """
+        from app.services.normativa import validar_citas
+
+        r = validar_citas("CONFORME A LA RESOLUCION 5159/2015 SE DEFIENDE LA COBERTURA.")
+        assert not any("5159" in d["cita"] for d in r["derogadas"])
+
+    def test_la_1099_de_2026_esta_cargada(self):
+        from app.services.normativa_completa import _TODAS_LAS_NORMAS
+
+        n = _TODAS_LAS_NORMAS["RESOLUCION 1099 DE 2026"]
+        assert n["vigente"] is True
+        assert n.get("verificada")
+        assert "privada de la libertad" in n["titulo"].lower()
+
+    def test_el_prompt_ya_no_ordena_citarla_siempre(self):
+        import io
+
+        prompts = io.open("app/services/glosa_ia_prompts.py", encoding="utf-8").read()
+        assert "Citar SIEMPRE Res. 5159/2015" not in prompts
+        assert "1099/2026" in prompts, "el prompt debe ofrecer la norma vigente"
+
+    def test_citarla_avisa_pero_la_vigente_pasa_limpia(self):
+        from app.services.citation_verifier import verificar_citas
+
+        derogada = verificar_citas("CONFORME A LA RESOLUCIÓN 5159 DE 2015.")
+        assert any(i["tipo"] == "NORMA_DEROGADA" for i in derogada["issues"])
+        assert verificar_citas("CONFORME A LA RESOLUCIÓN 1099 DE 2026.")["issues"] == []

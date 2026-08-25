@@ -170,11 +170,24 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # Derogada por el art. 12 de la Resolución 1099 de 2026 (verificado el
+    # 25-08-2026 en el PDF oficial). Sigue aplicando a atenciones anteriores.
+    #
+    # SE QUEDA EN ESTE CATÁLOGO A PROPÓSITO, no en NORMAS_DEROGADAS. Ese otro
+    # diccionario es para citas EQUIVOCADAS («la Ley 1122 es de 2007, no de
+    # 2011»), que están mal siempre, y produce un hallazgo de nivel «error».
+    # Esta no está equivocada: es la norma correcta para las atenciones
+    # anteriores a junio de 2026. De la fecha avisa el verificador de citas,
+    # con severidad media y explicando la regla — ver NORMA_DEROGADA en
+    # citation_verifier.py.
+    #
+    # (El campo «vigente» de aquí es informativo: validar_citas solo mira si la
+    # clave está en el diccionario, no lee este campo.)
     "RESOLUCION 5159/2015": {
         "nombre": "Resolución 5159 de 2015",
-        "resumen": "Cobertura en salud para población privada de la libertad (PPL). Complemento con Ley 1709/2014.",
+        "resumen": "Modelo de atención en salud para la población privada de la libertad (PPL). Derogada por la Res. 1099 de 2026; aplica a atenciones anteriores a junio de 2026.",
         "tipo": "RESOLUCION",
-        "vigente": True,
+        "vigente": False,
     },
     # Códigos
     "ART 871 C.COMERCIO": {

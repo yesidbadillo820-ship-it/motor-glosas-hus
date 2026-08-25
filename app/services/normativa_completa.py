@@ -1180,11 +1180,44 @@ RESOLUCIONES = {
         "keywords": ["conciliación", "auditoría médica", "2175"],
     },
     "RESOLUCION 5159 DE 2015": {
-        "nombre": "Resolución 5159 de 2015 (MinSalud)",
-        "titulo": "Procedimiento atención salud PPL",
-        "ambito": "Atención integral PPL",
+        # DEROGADA (verificado el 25-08-2026 en el PDF oficial del Ministerio).
+        # La derogó el artículo 12 de la Resolución 1099 de 2026: «rige a partir
+        # de la fecha de su expedición y deroga las Resoluciones 5159 de 2015 y
+        # 3595 de 2016». El motor la tenía como vigente en dos sitios y el
+        # prompt ordenaba «citar SIEMPRE Res. 5159/2015» al defender PPL, que es
+        # uno de los pagadores reales del hospital.
+        #
+        # NO se borra: para atenciones prestadas antes de junio de 2026 sigue
+        # siendo la norma aplicable, y hay que poder citarla bien.
+        "nombre": "Resolución 5159 del 30 de noviembre de 2015 (MinSalud)",
+        "titulo": "Modelo de atención en salud para la población privada de la libertad",
+        "ambito": "PPL — atenciones prestadas antes de junio de 2026",
+        "vigente": False,
+        "derogada_por": (
+            "la derogó el artículo 12 de la Resolución 1099 de 2026, que rige desde su "
+            "expedición (junto con la Resolución 3595 de 2016)"
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
+        "keywords": ["PPL", "reclusos", "INPEC", "5159"],
+    },
+    "RESOLUCION 1099 DE 2026": {
+        # Cargada el 25-08-2026, transcrita del PDF oficial del Ministerio
+        # (9 páginas). Es la que rige hoy para la atención en salud de la
+        # población privada de la libertad, y el sistema no la tenía.
+        "nombre": "Resolución 1099 de 2026 (MinSalud)",
+        "titulo": "Modelo de atención en salud para la población privada de la libertad",
+        "ambito": "PPL — norma vigente desde junio de 2026",
         "vigente": True,
-        "keywords": ["PPL", "reclusos", "5159"],
+        "notas": (
+            "Adopta el modelo de atención en salud para la población privada de la "
+            "libertad bajo custodia, inspección y vigilancia del INPEC. Su artículo 12 "
+            "dice que rige desde su expedición y deroga las Resoluciones 5159 de 2015 y "
+            "3595 de 2016. OJO CON LA FECHA DE LA ATENCIÓN: para lo prestado antes de "
+            "junio de 2026 la norma aplicable sigue siendo la Res. 5159 de 2015. La "
+            "Ley 1709 de 2014 es el respaldo legal de fondo en los dos casos."
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
+        "keywords": ["PPL", "INPEC", "modelo de atención", "1099 de 2026"],
     },
     # Ronda 48: Resolución 2641 de 2025 — Clasificación CUPS y tabla de
     # homologación oficial entre códigos internos de prestadores y la

@@ -1011,7 +1011,9 @@ NIVEL REGLAMENTARIO SECTORIAL:
 - Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012 (ARL — Riesgos Laborales).
 - Decreto 1795/2000 (sistema de salud FF.MM. y Policía) + Acuerdo 002/2001 CSSMP + Acuerdo 080/2022 CSSMP.
 - Decreto 3752/2003 + Ley 91/1989 (FOMAG / Magisterio).
-- Ley 1709/2014 + Resolución 5159/2015 (PPL).
+- PPL: Ley 1709/2014 (respaldo legal de fondo, en cualquier caso) + la
+  resolución vigente al momento de la atención: Res. 1099/2026 desde junio de
+  2026, Res. 5159/2015 para lo anterior.
 
 NIVEL TÉCNICO-OPERATIVO:
 - Resolución 3047/2008 + 416/2009 (Anexo Técnico No. 5 soportes, Anexo Técnico No. 6 catálogo único de glosas).
@@ -1402,7 +1404,7 @@ SYSTEM_CO = (
 ARGUMENTO CENTRAL: El servicio está incluido en el Plan de Beneficios (Res. 5269/2017) o en el régimen especial aplicable. Las exclusiones son taxativas (Art. 15 Ley 1751/2015).
 
 REGLAS:
-• Si la entidad es PPL/FOMAG/FF.MM./POLICÍA: NO uses "EPS"; usa "ENTIDAD PAGADORA" o "FONDO". Cita Dec. 1795/2000 + Acuerdo 002/2001 (FF.MM.), Res. 5159/2015 + Ley 1709/2014 (PPL), Dec. 3752/2003 (FOMAG).
+• Si la entidad es PPL/FOMAG/FF.MM./POLICÍA: NO uses "EPS"; usa "ENTIDAD PAGADORA" o "FONDO". Cita Dec. 1795/2000 + Acuerdo 002/2001 (FF.MM.), Ley 1709/2014 + la resolución de PPL vigente al momento de la atención (Res. 1099/2026 desde junio de 2026; Res. 5159/2015 antes), Dec. 3752/2003 (FOMAG).
 • Para ARL (Positiva/Aurora): cita Dec. 1295/1994 + Dec. 1072/2015 + Ley 1562/2012.
 • NO cites T-760/2008 si NO es EPS regular.
 """
@@ -1602,7 +1604,9 @@ REGIMEN_ESPECIAL = {
     "PPL": (
         "RÉGIMEN ESPECIAL — POBLACIÓN PRIVADA DE LA LIBERTAD\n"
         "- Ley 1709/2014: Reforma al Código Penitenciario y Carcelario.\n"
-        "- Resolución 5159/2015: Procedimiento atención salud PPL — cobertura integral.\n"
+        "- Resolución 1099/2026: modelo de atención en salud PPL — VIGENTE desde\n"
+        "  junio de 2026. Derogó la Res. 5159/2015, que sigue siendo la aplicable\n"
+        "  a las atenciones prestadas ANTES de esa fecha.\n"
         "- Decreto 1142/2016: Modelo de atención en salud PPL.\n"
         "- Fondo de Atención en Salud PPL administrado por Fiduprevisora S.A.\n"
         "- La cobertura es INTEGRAL y NO se rige solo por el PBS regular.\n"
@@ -1611,7 +1615,9 @@ REGIMEN_ESPECIAL = {
         "(o 'Patrimonio Autónomo Fondo de Atención en Salud PPL'), NUNCA "
         "'PPL' a secas ni 'el fondo PPL' — PPL designa a la población, no "
         "a la entidad que paga.\n"
-        "OBLIGACIÓN: Citar SIEMPRE Res. 5159/2015 + Ley 1709/2014 al defender cobertura PPL."
+        "OBLIGACIÓN: al defender cobertura PPL cita SIEMPRE la Ley 1709/2014 y la\n"
+        "resolución vigente A LA FECHA DE LA ATENCIÓN — mira la fecha del servicio\n"
+        "antes de escoger: Res. 1099/2026 desde junio de 2026, Res. 5159/2015 antes."
     ),
     "FOMAG": (
         "RÉGIMEN ESPECIAL — MAGISTERIO (DOCENTES OFICIALES)\n"

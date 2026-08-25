@@ -69,11 +69,24 @@ def test_fix_g_arl_anadido_al_catalogo():
     assert "1295" in nota
 
 
-def test_fix_g_ppl_nota_incluye_decreto_5159():
-    """PPL nota actualizada con Decreto 5159/2010 + lineamiento TBC."""
+def test_fix_g_ppl_nota_incluye_la_5159():
+    """La nota de PPL nombra la 5159 y el lineamiento de tuberculosis.
+
+    El nombre original de esta prueba y su explicación decían «Decreto 5159 de
+    2010». Las dos cosas estaban mal: es una RESOLUCIÓN y es de 2015. Se
+    verificó el 25-08-2026 contra el PDF oficial del Ministerio, cuyo
+    encabezado dice «RESOLUCIÓN NÚMERO 005159 DE 2015 (30 NOV 2015)».
+
+    Y hay algo más que el auditor debe saber: esa resolución fue DEROGADA por
+    la Resolución 1099 de 2026. Para atenciones prestadas antes de junio de
+    2026 sigue siendo la aplicable, así que la nota la conserva; lo que cambió
+    es que el prompt ya no ordena citarla siempre, sino la que estuviera
+    vigente a la fecha de la atención.
+    """
     nota = CONTRATOS_HUS["PPL"]["nota"]
     assert "5159" in nota
     assert "tuberculosis" in nota.lower() or "tbc" in nota.lower()
+    assert "Decreto 5159" not in nota, "la 5159 es una Resolución, no un decreto"
 
 
 # ── Fix H: kits normativos por contexto clínico ──────────────────────
