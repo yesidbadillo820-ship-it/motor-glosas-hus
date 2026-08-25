@@ -4649,11 +4649,27 @@ def generar_texto_tarifa_match(
     modalidad = t.get("modalidad") or "pactada"
     fuente = t.get("fuente_archivo") or "catálogo oficial"
 
+    # NO SE AFIRMA UNA MODALIDAD QUE NO CONCUERDA CON EL NÚMERO (24-08-2026).
+    #
+    # Esta plantilla se imprime tal cual en el documento que se radica, sin IA
+    # de por medio. La auditoría encontró el mismo contrato (0525/2017 de
+    # POSITIVA) y el mismo CUPS leídos de dos maneras dentro del mismo lote:
+    # uno decía "$915.051, modalidad SOAT" y otros dos "SOAT -15 %".
+    #
+    # Cuando la fila del catálogo se contradice a sí misma —la modalidad
+    # anuncia un descuento y la fila lo declara en cero— el valor se sigue
+    # usando, pero la frase "BAJO LA MODALIDAD X" se cambia por una que no
+    # afirma nada que no conste.
+    if info_tarifa.get("tarifa_verificada") is False:
+        frase_modalidad = "SEGÚN EL VALOR REGISTRADO EN EL CATÁLOGO DEL CONTRATO"
+    else:
+        frase_modalidad = f"BAJO LA MODALIDAD {modalidad}"
+
     return (
         f"ESE HUS NO ACEPTA LA GLOSA {codigo_glosa} INTERPUESTA POR {eps.upper()} "
         f"POR VALOR DE {val_obj_fmt}, TODA VEZ QUE EL VALOR FACTURADO ({fact_fmt}) "
         f"COINCIDE EXACTAMENTE CON LA TARIFA PACTADA EN EL {contrato} PARA EL CUPS "
-        f"{cups} — {desc} — BAJO LA MODALIDAD {modalidad}. "
+        f"{cups} — {desc} — {frase_modalidad}. "
         f"LA IDENTIDAD ENTRE VALOR FACTURADO Y VALOR PACTADO CONVIERTE ESTA GLOSA "
         f"EN IMPROCEDENTE: LA ENTIDAD PAGADORA NO PUEDE DESCONOCER UNILATERALMENTE "
         f"EL VALOR QUE ELLA MISMA PACTÓ, POR APLICACIÓN DEL ARTÍCULO 871 DEL CÓDIGO "

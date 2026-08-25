@@ -19,6 +19,8 @@ Uso típico desde `glosa_service.analizar()`:
 
 from __future__ import annotations
 
+import re
+
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -571,8 +573,45 @@ def evaluar_glosa_tarifa(
         except Exception:
             contrato_num = None
 
+    # ── LA FILA SE CONTRADICE A SÍ MISMA ──────────────────────────────────
+    #
+    # POR QUÉ (24-08-2026). La auditoría encontró que el mismo contrato —el
+    # 0525 de 2017 de POSITIVA— y el mismo CUPS 010101 se leyeron de dos
+    # maneras distintas dentro del mismo lote: un expediente dijo "tarifa
+    # pactada $915.051, modalidad SOAT" y otros dos dijeron "SOAT -15 %". El
+    # 85 % de $915.051 es $777.793: una de las dos lecturas está mal.
+    #
+    # La causa es que el número y las palabras salen de columnas distintas del
+    # Excel y nadie las cruza. Cuando la MODALIDAD de la propia fila anuncia un
+    # descuento ("SOAT -15 %") pero la fila declara el descuento en CERO, no se
+    # puede saber si el valor guardado ya lo trae aplicado o no. Ahí no se
+    # corrige el número —recalcularlo sería inventar una tarifa— pero tampoco
+    # se afirma la modalidad como si constara: se avisa.
+    #
+    # La condición es estrecha a propósito: solo mira la contradicción DENTRO
+    # de la fila. Una regla más ancha (por ejemplo, mirar el factor de la ficha
+    # de la EPS) marcaría casi toda glosa de tarifa, y un aviso que sale
+    # siempre es un aviso que el auditor aprende a ignorar.
+    _mod_txt = (getattr(tarifa, "modalidad", "") or "").upper()
+    _anuncia_descuento = re.search(r"(SOAT|ISS|UVB|UVR|UVT)\s*[-−–]\s*\d{1,3}\s*%", _mod_txt)
+    tarifa_verificada = not (tipo == "VALOR_FIJO" and factor_pct == 0 and _anuncia_descuento)
+    aviso_modalidad = (
+        ""
+        if tarifa_verificada
+        else (
+            f"El catálogo trae un valor fijo ({_pesos(valor_pactado_calc)}) pero la "
+            f"modalidad dice «{_mod_txt.strip()}». No consta si ese valor ya tiene el "
+            "descuento aplicado o si hay que aplicárselo. Verifíquelo contra el anexo "
+            "del contrato antes de radicar."
+        )
+    )
+
     return {
         "encontrada": True,
+        # Si es False, el número y la modalidad de esta fila no concuerdan: se
+        # puede usar el número, pero no afirmar la modalidad como si constara.
+        "tarifa_verificada": tarifa_verificada,
+        "aviso_modalidad": aviso_modalidad,
         "tarifa": {
             "id": tarifa.id,
             "eps": tarifa.eps,
