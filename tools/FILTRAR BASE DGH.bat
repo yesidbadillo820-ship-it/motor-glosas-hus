@@ -12,6 +12,11 @@ cd /d "%~dp0"
 set "PYEXE=py"
 where py >nul 2>nul || set "PYEXE=python"
 
+REM Librerias que necesita el bot. openpyxl lee/escribe .xlsx; pyxlsb lee los
+REM .xlsb (Excel binario), que es como DGH exporta la base de servicios.
+"%PYEXE%" -c "import openpyxl" 2>nul || "%PYEXE%" -m pip install --quiet openpyxl
+"%PYEXE%" -c "import pyxlsb" 2>nul || "%PYEXE%" -m pip install --quiet pyxlsb
+
 echo.
 echo   Arrastra los archivos a la ventana (no hace falta escribir la ruta).
 echo   Cuando no tengas mas bases que agregar, solo pulsa Enter.
