@@ -36,6 +36,7 @@ siempre es un aviso que el auditor aprende a ignorar.
 """
 
 from app.services.glosa_service import generar_texto_tarifa_match
+from app.services.tarifa_lookup_service import fila_se_contradice
 
 
 def _info(modalidad: str, verificada) -> dict:
@@ -112,3 +113,64 @@ class TestLaModalidadSaleDeLaMismaCeldaQueElNumero:
         filas = r["filas"]
         assert filas
         assert "PLENO" in filas[0]["modalidad"].upper()
+
+
+class TestElGestorVeElAviso:
+    """Un cambio que el auditor no ve es un cambio que no sirve."""
+
+    def _banner(self, aviso: str):
+        from app.services.tarifa_lookup_service import _recomendacion
+        from app.utils.parsers_glosa import _generar_banner_tarifa_html
+
+        return _generar_banner_tarifa_html(
+            {
+                "encontrada": True,
+                "cups": "010101",
+                "eps": "POSITIVA",
+                "contrato": "OT3-0525-2017",
+                "modalidad": "SOAT -15%",
+                "descripcion": "PUNCION CISTERNAL",
+                "valor_pactado": 915051.0,
+                "valor_facturado": 915051.0,
+                "valor_objetado": 77793.0,
+                "valor_reconocido": 0.0,
+                "fuente": "TARIFAS ESE HUS 2025- POSITIVA.xlsx",
+                "aviso_modalidad": aviso,
+                "recomendacion": _recomendacion(
+                    valor_facturado=915051.0, valor_pactado=915051.0, valor_objetado=77793.0
+                ),
+            }
+        )
+
+    def test_el_aviso_sale_en_el_panel(self):
+        html = self._banner(
+            "El catálogo trae un valor fijo pero la modalidad anuncia un descuento."
+        )
+        assert "Revise la modalidad antes de radicar" in html
+        assert "anuncia un descuento" in html
+
+    def test_sin_contradiccion_no_hay_aviso(self):
+        assert "Revise la modalidad" not in self._banner("")
+
+
+class TestElEvaluadorMarcaLaContradiccion:
+    """La regla es estrecha: solo la contradicción DENTRO de la fila."""
+
+    def test_valor_fijo_con_modalidad_que_anuncia_descuento_se_marca(self):
+        assert fila_se_contradice("SOAT -15%", "VALOR_FIJO", 0.0) is True
+
+    def test_las_variantes_de_escritura_tambien(self):
+        for modalidad in ("SOAT-15%", "SOAT - 15 %", "SOAT −15%", "ISS -10%", "UVB -5 %"):
+            assert fila_se_contradice(modalidad, "VALOR_FIJO", 0.0) is True, modalidad
+
+    def test_valor_fijo_con_modalidad_sin_descuento_no_se_marca(self):
+        assert fila_se_contradice("SOAT PLENO", "VALOR_FIJO", 0.0) is False
+        assert fila_se_contradice("TARIFAS PROPIAS HUS", "VALOR_FIJO", 0.0) is False
+        assert fila_se_contradice("", "VALOR_FIJO", 0.0) is False
+
+    def test_si_la_fila_declara_el_descuento_no_hay_contradiccion(self):
+        """Cuando la propia fila dice −15 %, número y palabras concuerdan."""
+        assert fila_se_contradice("SOAT -15%", "SOAT_PORCENTAJE", -15.0) is False
+
+    def test_una_tarifa_porcentual_nunca_se_marca(self):
+        assert fila_se_contradice("SOAT -15%", "SOAT_PORCENTAJE", 0.0) is False

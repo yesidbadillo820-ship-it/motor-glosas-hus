@@ -537,6 +537,23 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
         )
     tabla_html += "</table>"
 
+    # EL AVISO DE MODALIDAD, DONDE EL GESTOR LO VEA (24-08-2026). Cuando la
+    # fila del catálogo se contradice a sí misma —la modalidad anuncia un
+    # descuento y la fila lo declara en cero— no se puede saber si el valor
+    # guardado ya lo trae aplicado. Es lo que produjo la contradicción entre
+    # expedientes que encontró la auditoría: el mismo contrato y el mismo CUPS
+    # leídos como «SOAT pleno» en uno y «SOAT −15 %» en otros dos. El dictamen
+    # ya deja de afirmar la modalidad; acá se le dice al gestor por qué.
+    aviso_html = ""
+    _aviso = (info_tarifa.get("aviso_modalidad") or "").strip()
+    if _aviso:
+        aviso_html = (
+            '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;'
+            'padding:.55rem .7rem;margin-bottom:.6rem;font-size:.8rem;color:#92400e;">'
+            "⚠️ <b>Revise la modalidad antes de radicar.</b> " + esc(_aviso) + "</div>"
+        )
+    tabla_html += aviso_html
+
     # Interpretación SOAT base (si aplica)
     interp_html = ""
     if tipo == "SOAT_PORCENTAJE":
