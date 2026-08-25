@@ -6877,6 +6877,34 @@ function _toastSonido(type){
   }catch(_){}
 }
 
+// ─── Una pantalla que no cargó no puede quedarse callada ─────────────────
+// 25-08-2026. Se contaron las 278 funciones de esta página que le piden datos
+// al motor: 77 tienen su «catch», pero el catch solo escribe en la consola del
+// navegador — que el auditor no abre nunca. Si se cae la red, la tabla vieja
+// se queda en pantalla con cara de estar al día.
+//
+// El caso que lo decidió es la tarjeta de vencimientos: si falla, no aparece,
+// y el auditor no se entera de que había glosas por vencerse. Una glosa no
+// contestada a tiempo se da por aceptada (Art. 57 Ley 1438) — o sea que el
+// silencio de esa tarjeta cuesta plata.
+//
+// Se avisa UNA vez por pantalla y no más de una cada 15 segundos: con la red
+// caída fallan seis cosas a la vez y seis avisos seguidos no los lee nadie.
+var _avisosDeCarga = {};
+function avisarNoCargo(queCosa, e){
+  try{
+    var ahora = Date.now();
+    if(_avisosDeCarga[queCosa] && (ahora - _avisosDeCarga[queCosa]) < 15000) return;
+    _avisosDeCarga[queCosa] = ahora;
+    console.error(queCosa + ':', e);
+    if(typeof toast === 'function'){
+      toast('No se pudo cargar: ' + queCosa,
+            'Lo que ve en pantalla puede estar desactualizado. Revise la conexión y vuelva a entrar.',
+            'error');
+    }
+  }catch(_){}
+}
+
 function toast(title,msg,type,opciones){
   // opciones: {undo: function, undoLabel: 'Deshacer', duracion: 8000}
   opciones = opciones || {};
@@ -15650,7 +15678,7 @@ async function loadContratos(){
       hEps.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
       grid.innerHTML+='<div class="contrato-card"><div class="contrato-eps">'+escHtml(c.eps)+'</div><div class="contrato-det">'+escHtml(c.detalles)+'</div></div>';
     });
-  }catch(e){console.error(e);}
+  }catch(e){ avisarNoCargo('los contratos', e); }
 }
 
 // ─── CONTRATOS · Metadatos enriquecidos (editor admin) ───────────────────
@@ -17259,7 +17287,7 @@ async function cargarComentarios(glosaId){
         (c.resuelto ? '<div class="thread-resuelto-lbl">✓ Resuelto por '+escHtml(c.resuelto_por||'')+'</div>' : '') +
       '</div>';
     }).join('');
-  }catch(e){ console.error('comentarios:', e); }
+  }catch(e){ avisarNoCargo('los comentarios del expediente', e); }
 }
 
 async function enviarComentario(){
@@ -19007,14 +19035,20 @@ function imprimirDictamen(){
 }
 
 // ─── LOADING ──────────────────────────────────────────────────────────────
-function showLoading(){
-  loadMsgIdx=0;
-  document.getElementById('load-msg').textContent=loadMsgs[0];
+function showLoading(mensaje){
+  var el=document.getElementById('load-msg');
   document.getElementById('loading').classList.add('show');
+  clearInterval(loadInterval);
+  if(mensaje){
+    if(el) el.textContent=mensaje;
+    return;
+  }
+  loadMsgIdx=0;
+  if(el) el.textContent=loadMsgs[0];
   loadInterval=setInterval(function(){
     loadMsgIdx=(loadMsgIdx+1)%loadMsgs.length;
-    var el=document.getElementById('load-msg');
-    if(el) el.textContent=loadMsgs[loadMsgIdx];
+    var e2=document.getElementById('load-msg');
+    if(e2) e2.textContent=loadMsgs[loadMsgIdx];
   },2200);
 }
 function hideLoading(){
@@ -19075,7 +19109,7 @@ async function loadDash(){
     // Win-rate por EPS+código (feature #7)
     cargarWinRateDetalle();
 
-  } catch(e){console.error('Dashboard error',e);}
+  } catch(e){ avisarNoCargo('el tablero', e); }
 }
 
 // ─── WIN-RATE DETALLADO POR (EPS, CÓDIGO) ──────────────────────────
@@ -19208,7 +19242,7 @@ async function cargarPlataRecuperada(){
         {key:'valor_recuperado', label:'Recuperado', align:'right', fmt:fmt},
       ]);
     }
-  }catch(e){ console.error('plata-recuperada error', e); }
+  }catch(e){ avisarNoCargo('la plata recuperada', e); }
 }
 
 // ─── Soportes (anclar servidor de archivos) ───────────────────────────
@@ -19595,7 +19629,7 @@ async function loadDashCobranza(){
           }).join('')+
         '</tbody></table>'
       : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin facturas pendientes</div>';
-  } catch(e){ console.error('Cobranza Live error', e); }
+  } catch(e){ avisarNoCargo('el tablero de cobranza', e); }
 }
 
 // ─── Glosas ADRES ─────────────────────────────────────────────────────────
@@ -19625,7 +19659,7 @@ async function loadGlosasAdres(){
     document.getElementById('ga-aviso').textContent =
       paquetes[0].filas + ' glosas cargadas · importado por ' + escHtml(paquetes[0].importado_por||'—');
     await gaCargarLista();
-  }catch(e){ console.error('Glosas ADRES', e); }
+  }catch(e){ avisarNoCargo('las glosas de ADRES', e); }
 }
 
 // Apenas se carga el archivo del ADRES salen las facturas a auditar. El gestor
@@ -20522,7 +20556,7 @@ async function loadResumenMes(){
           '</div>';
         }).join('')
       : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin datos del mes</div>';
-  } catch(e){ console.error('Resumen mes error', e); }
+  } catch(e){ avisarNoCargo('el resumen del mes', e); }
 }
 
 // ─── B.1: Mando ejecutivo (single-pane-of-glass) ─────────────────────────
@@ -20664,7 +20698,7 @@ async function loadMando(){
     // Métricas IA por usuario
     loadMandoIAPorUsuario();
 
-  } catch(e){ console.error('Mando error', e); }
+  } catch(e){ avisarNoCargo('el tablero de mando', e); }
 }
 
 async function loadMandoIAPorUsuario(){
@@ -20708,7 +20742,7 @@ async function loadMandoIAPorUsuario(){
         '</div>';
       }).join('') +
       (ranking.length > 10 ? '<div style="font-size:.7rem;color:var(--text3);text-align:center;padding:.4rem">+'+(ranking.length-10)+' más</div>' : '');
-  }catch(e){ console.warn('mando ia', e); }
+  }catch(e){ avisarNoCargo('el uso de IA por usuario', e); }
 }
 
 // Imprimir Mando ejecutivo. Aprovecha @media print global para ocultar
@@ -20757,7 +20791,7 @@ async function loadMandoVacaciones(){
         (u.motivo ? '<div style="font-size:.72rem;color:var(--text3);font-style:italic">"'+escHtml(u.motivo)+'"</div>' : '')+
       '</div>';
     }).join('');
-  } catch(e){ console.warn('vacaciones mando', e); }
+  } catch(e){ avisarNoCargo('las vacaciones del equipo', e); }
 }
 
 async function loadMandoDetector(critFromAlertas){
@@ -20850,7 +20884,7 @@ async function loadMandoDetector(critFromAlertas){
       var badge = document.getElementById('mando-badge');
       if(badge){ badge.textContent = String(totalCrit); badge.style.display = 'inline-flex'; }
     }
-  } catch(e){ console.error('Detector error', e); }
+  } catch(e){ avisarNoCargo('el detector de riesgos', e); }
 }
 
 // ─── Reasignar pendientes desde gestor inactivo ──────────────────────────
@@ -21127,7 +21161,7 @@ async function cargarAnaliticaPredictiva(){
     mkChart('ch-dow','bar', dow.labels, [{
       label:'Glosas', data:dow.counts, backgroundColor:'#0d9488', borderRadius:4
     }], {scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}});
-  }catch(e){ console.error('Analitica predictiva:', e); }
+  }catch(e){ avisarNoCargo('la analítica predictiva', e); }
 }
 
 function _apPctClass(p){
@@ -21248,7 +21282,7 @@ async function loadHist(page){
     try{ window._autopilot_map = await promMapa; }catch(_){}
     renderHist(d.items);
     renderPager(d);
-  } catch(e){console.error(e);}
+  } catch(e){ avisarNoCargo('el historial de glosas', e); }
 }
 
 function toggleFiltrosAvanzados(){
@@ -22184,11 +22218,11 @@ function vencPintarTarjetaInicio(){
 async function vencCargarTarjeta(){
   try{
     var r=await fetch('/alertas/vencimientos',{headers:authH()});
-    if(!r.ok) return;
+    if(!r.ok){ avisarNoCargo('la tarjeta de glosas por vencerse', 'HTTP '+r.status); return; }
     VENC.datos=await r.json();
     VENC.glosas=VENC.datos.glosas||[];
     vencPintarTarjetaInicio();
-  }catch(_){}
+  }catch(e){ avisarNoCargo('la tarjeta de glosas por vencerse', e); }
 }
 
 function vencPintarAvisoSmtp(){

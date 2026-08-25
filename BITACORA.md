@@ -63,6 +63,59 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (cierre) — Las pantallas que fallaban sin decir nada
+
+Terminado el asunto de las respuestas, se retomó lo de la página. Primero se
+midió, y la medición cambió lo que había que hacer.
+
+**Lo que se creía y lo que resultó.** El tablero de mejoras tenía anotado que
+había que ponerle a las tablas un aviso de «cargando». Al medirlo apareció algo
+peor: de las **278** funciones de la página que le piden datos al motor, **77**
+tienen su manejo de error, pero ese manejo **solo escribe en la consola del
+navegador** — una ventana que el auditor no abre nunca.
+
+O sea que si se cae la red, la tabla vieja se queda en pantalla **con cara de
+estar al día**, y el auditor concilia contra números que ya no son. No era un
+problema de espera: era de silencio.
+
+**La peor de todas: la tarjeta de glosas por vencerse.** Si fallaba, no
+aparecía, y nadie se enteraba de que había glosas a punto de vencerse. Una
+glosa no contestada dentro del plazo **se entiende aceptada** (Art. 57 de la
+Ley 1438). El silencio de esa tarjeta cuesta plata. Y encima se devolvía
+callada también cuando el servidor respondía con error, no solo cuando fallaba
+la red.
+
+Ahora las **14 pantallas donde usted mira plata o toma decisiones** avisan con
+un mensaje que dice qué no cargó y advierte que **lo que ve puede estar
+desactualizado**: vencimientos, historial, tablero, cobranza, resumen del mes,
+las cuatro del tablero de mando, ADRES, contratos, plata recuperada, analítica
+predictiva y los comentarios del expediente. El aviso no se repite antes de 15
+segundos: con la red caída fallan seis cosas a la vez y seis avisos seguidos no
+los lee nadie.
+
+**La cortina de carga decía algo que no era.** Cuando el sistema estaba
+*borrando datos*, la pantalla mostraba «Identificando tipo de glosa…».
+Resulta que cinco funciones le pasaban un mensaje a la cortina y la cortina lo
+descartaba, rotando siempre la lista del análisis. Ya respeta lo que le dicen.
+
+**Dos casillas del tablero se cerraron sin escribir código, porque la premisa
+era falsa:**
+
+- Se creía que cada estado (Aceptada, Radicada, Conciliada…) se pintaba de
+  color distinto en cada pantalla. **Se midió: no pasa.** El único con varios
+  tonos es «Ratificada», y son los tres del mismo rojo — que es como se pinta
+  un recuadro, no un error.
+- Se creía que la página no tenía disciplina de colores. **Tampoco.** Tiene
+  **su propio** sistema, con 90 nombres de color y 2.072 usos. Lo que sobra es
+  un segundo juego de colores que se carga y nadie usa. Unificarlos serían
+  2.072 cambios sobre algo que funciona: no se hace sin que usted lo pida.
+
+**Y un conteo mío que salió mal, otra vez.** El primer conteo de pantallas
+mudas dio 24; el bueno era 77. Se caían de la cuenta las funciones que mezclan
+un manejo vacío con uno de consola. Es la segunda vez que un conteo de estos
+sale corto (el de julio dio 14 y eran 7). Quedó anotado en la prueba para que
+la próxima vez no se repita.
+
 ### 25-08-2026 (noche) — Un segundo auditor encontró un artículo de ley mal citado en TODAS las ratificaciones
 
 Llegó una segunda auditoría de las mismas 117 respuestas, hecha por fuera y
