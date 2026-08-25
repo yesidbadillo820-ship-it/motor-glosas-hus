@@ -11,7 +11,7 @@ Bot de doble clic para Windows: **`tools/UNIR_SOPORTES_ADRES.cmd`**.
 
 | # | Grupo | Cómo lo reconoce en el nombre del archivo |
 |---|---|---|
-| 1 | RESPUESTA A GLOSA | `RESPUESTA A GLOSA`, `RTA GLOSA`, `RESPUESTA` |
+| 1 | RESPUESTA A GLOSA | `RESPUESTA A GLOSA`, `RTA GLOSA`, `RESPUESTA`, y `RTA ADRES` (así se llama el PDF que arma `respuestas_adres_por_factura.py`) |
 | 2 | EPICRISIS | `EPICRISIS`, `EPICRIS`, `EPI` |
 | 3 | HISTORIA CLÍNICA — consulta de urgencias | `CONSULTA DE URGENCIAS`, `URGENCIAS`, `TRIAGE` |
 | 4 | HISTORIA CLÍNICA — terapias | `TERAPIAS`, `FISIOTERAPIA`, `RESPIRATORIA` |

@@ -50,7 +50,6 @@ class TestSacarLaFacturaDelNombre:
         [
             "RESUMEN DEL LOTE.pdf",
             "acta de conciliación.pdf",
-            "factura HUS352890.pdf",  # el número no está al comienzo
             "HUSABC-algo.pdf",  # HUS sin número
             "",
         ],
@@ -346,3 +345,36 @@ class TestElCasoRealDeCarolina:
         despues = {p.name for p in carpeta.iterdir() if p.is_dir()}
         assert antes <= despues
         assert len(despues) == len(antes) + 18
+
+
+# ─── El número de factura cuando no va al principio ──────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("nombre", "factura"),
+    [
+        # Lo de siempre: el número al principio.
+        ("HUS392861-MEDICAMENTOS.pdf", "HUS392861"),
+        ("HUS 0000352890 recibido.pdf", "HUS352890"),
+        # El PDF de respuesta que arma el motor lleva su propio prefijo.
+        ("RTA_ADRES_HUS311371.pdf", "HUS311371"),
+        ("Reporte_Factura_HUS298253_CAROLINA.docx", "HUS298253"),
+        # Los del ADRES traen el código de habilitación adelante.
+        ("680010079201_HUS378523_FACOSTE.pdf", "HUS378523"),
+        ("680010079201_HUS0000352890_FACTURA.xml", "HUS352890"),
+        # Si empieza por un número, ese manda aunque el nombre traiga otro.
+        ("HUS311371 y HUS352890 juntas.pdf", "HUS311371"),
+        # Sin número al comienzo y con dos distintos adentro: no se adivina.
+        ("copia de HUS311371 y HUS352890.pdf", ""),
+        # El número en la mitad, sin ambigüedad: sí se resuelve. (Antes no: la
+        # regla era «solo al comienzo», y dejaba fuera los RTA_ADRES_* y los
+        # archivos del ADRES, que traen el código de habilitación adelante.)
+        ("factura HUS352890.pdf", "HUS352890"),
+        # La misma factura repetida sí se resuelve.
+        ("HUS311371 - copia HUS311371.pdf", "HUS311371"),
+        # Sin número, nada.
+        ("REPS.pdf", ""),
+    ],
+)
+def test_factura_del_nombre_aunque_no_este_al_principio(nombre, factura):
+    assert org.factura_del_nombre(nombre) == factura

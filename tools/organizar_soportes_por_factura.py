@@ -44,6 +44,10 @@ logger = logging.getLogger("organizar_soportes")
 # Así nombra el equipo los soportes: HUS + el número, y enseguida el separador
 # que sea (guion, guion bajo, espacio, dos guiones…).
 _RE_FACTURA = re.compile(r"^\s*(HUS\s*0*(\d+))", re.IGNORECASE)
+# Algunos soportes no EMPIEZAN por el número: los arma el motor con su propio
+# prefijo (`RTA_ADRES_HUS311371.pdf`) o vienen del ADRES con el código de
+# habilitación adelante (`680010079201_HUS378523_FACOSTE.pdf`).
+_RE_FACTURA_ADENTRO = re.compile(r"HUS\s*0*(\d+)", re.IGNORECASE)
 
 ESTADO_MOVIDO = "MOVIDO"
 ESTADO_RENOMBRADO = "MOVIDO Y RENOMBRADO"
@@ -71,9 +75,17 @@ def factura_del_nombre(nombre: str) -> str:
     `HUS392861-MEDICAMENTOS.pdf` → `HUS392861`.
     `HUS 0000352890 recibido.pdf` → `HUS352890` (sin espacio ni ceros de
     relleno, que es como se llaman las carpetas).
+    `RTA_ADRES_HUS311371.pdf` → `HUS311371` (el número no va al principio).
+    `HUS1 vs HUS2.pdf` → `""` (nombra dos facturas: no se adivina).
     """
     m = _RE_FACTURA.match(nombre)
-    return f"HUS{m.group(2)}" if m else ""
+    if m:
+        return f"HUS{m.group(2)}"
+    # Si no empieza por el número, sirve igual mientras el nombre nombre UNA
+    # sola factura: `RTA_ADRES_HUS311371.pdf` → HUS311371. Con dos números
+    # distintos no se adivina — se queda donde está y sale en el listado.
+    numeros = {n.lstrip("0") or "0" for n in _RE_FACTURA_ADENTRO.findall(nombre)}
+    return f"HUS{numeros.pop()}" if len(numeros) == 1 else ""
 
 
 def nombre_libre(carpeta: Path, nombre: str) -> tuple[Path, bool]:
