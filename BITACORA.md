@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 24-08-2026
+**Última actualización:** 25-08-2026
 
 ---
 
@@ -2903,6 +2903,70 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   facturas que no cuadran ($247.617.689, el 83 % del paquete).
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
+
+### 25-08-2026 — Un solo PDF de soportes por factura, en el orden que pide el área
+
+**Lo que pidió el auditor:** que los soportes de cada factura se unan en un solo
+PDF, y que queden en el **orden exacto** de la lista del área: respuesta a
+glosa, epicrisis, historia clínica (urgencias, terapias, curaciones,
+evoluciones, procedimientos), ayudas diagnósticas, medicamentos, notas de
+enfermería, insumos y otros. Cada factura en su carpeta, con su número.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/unir_soportes_adres.py`, con su
+botón de doble clic `UNIR_SOPORTES_ADRES.cmd` y su guía. Reconoce de qué es cada
+PDF **por el nombre del archivo** —las palabras con que las nombra el equipo y
+las abreviaturas del auditor (EPI, HC, DX, MED, NTE, INS)— y los une en el orden
+de la lista. El **detallado no entra al PDF**: la lista lo pide en Excel, así
+que se queda aparte en la carpeta.
+
+**Dos cuidados con los nombres**, que son los errores que se cometen solos:
+«NOTAS DE ENFERMERÍA» no se lo puede llevar la palabra «NOTAS» (gana siempre la
+palabra más larga), y «INS» no puede casar dentro de «INSTITUCIONAL» (las
+abreviaturas cortas tienen que ir sueltas).
+
+**Lo que no reconoce, no se pierde:** va al grupo OTROS y sale listado en el
+reporte para que el auditor lo revise. Si al equipo le falta una palabra, se
+agrega sin tocar el código con `--mapa-nombres`.
+
+**Tres candados, porque unir no se deshace de un clic:** simula por defecto y
+muestra el orden completo antes de escribir nada; nunca se come su propio
+consolidado (se puede correr las veces que haga falta); y un PDF dañado se omite
+y queda anotado, sin tumbar el lote.
+
+**El reporte avisa además** qué facturas no tienen respuesta a glosa o no tienen
+epicrisis, que son los dos soportes obligatorios.
+
+---
+
+### 25-08-2026 — El detallado ya no deja servicios huérfanos
+
+**Lo que reportó el auditor:** «tuve que modificar un detallado que me había
+salido porque me había quitado los servicios y me tocó hacer el detallado
+manual».
+
+**Qué estaba pasando.** Cuando el ADRES **aprueba la cirugía** pero **sigue
+glosando sus componentes** —honorarios del cirujano, del anestesiólogo, de
+ayudantía, derechos de sala, materiales—, el bot quitaba el renglón de la
+cirugía por aprobado y dejaba los componentes solos. El detallado quedaba
+mostrando «servicios profesionales del cirujano» y «derechos de sala» **sin
+decir de qué cirugía son**. Así no se puede defender, y toca rehacerlo a mano,
+que fue justo lo que le tocó hacer en la HUS383283.
+
+Pasa porque los dos sistemas hablan distinto: el ADRES glosa con **códigos
+SOAT** (39010, 39110, 39214…) y la factura del hospital trae la cirugía con su
+**código CUPS** (13723, 14171…). El CUPS no aparece en el reporte del ADRES, así
+que el bot lo leía como «aprobado» y lo borraba.
+
+**Cómo quedó.** El renglón principal ahora **se conserva como ENCABEZADO**: se
+ve, para que se sepa a qué cirugía pertenecen los servicios, pero **no suma al
+total** —su valor ya está en los renglones que quedaron—. Es exactamente lo que
+usted hizo a mano. Si no queda ningún componente vivo, el principal se va como
+siempre.
+
+En la bitácora CSV esos renglones salen con la acción `ENCABEZADO` y la nota de
+por qué se quedaron.
+
+---
 
 ### 24-08-2026 — Las objeciones del ADRES, cuadradas con lo que el ADRES reporta
 

@@ -568,6 +568,79 @@ class TestDesglose:
         assert res.subtotal_antes == 1000000  # el subtotal real, no la suma de renglones
         assert res.subtotal_despues == 600000  # solo el honorario sigue glosado
 
+    def test_el_principal_se_queda_como_encabezado_si_su_desglose_sigue_glosado(self, tmp_path):
+        """El caso que le tocó arreglar a mano al auditor (HUS383283).
+
+        La entidad aprobó el procedimiento (15103) pero sigue glosando los
+        honorarios del cirujano, que cuelgan de él. Si el procedimiento se va,
+        el detallado queda mostrando «honorarios del cirujano» sin decir de qué
+        cirugía son: así no se puede defender. Se conserva como ENCABEZADO —se
+        ve, pero no suma, porque su valor ya está en el renglón que quedó—.
+        """
+        idx = aj.IndiceHoja(openpyxl.load_workbook(self._hoja(tmp_path))["Sheet"])
+        fac = aj.segmentar_facturas(idx)[0]
+        glosas = [
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo="15103",
+                descripcion="Desbridamiento",
+                tipo_elemento="Procedimientos",
+                cant_reclamada=1,
+                valor_reclamado=1000000,
+                valor_aprobado=1000000,  # la entidad YA lo aprobó
+            ),
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo="39005",
+                descripcion="Honorarios cirujano",
+                tipo_elemento="Procedimientos",
+                cant_reclamada=1,
+                valor_reclamado=600000,
+                valor_glosado=600000,  # pero sigue glosando esto
+            ),
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo="39209",
+                descripcion="Derechos de sala",
+                tipo_elemento="Procedimientos",
+                cant_reclamada=1,
+                valor_reclamado=400000,
+                valor_aprobado=400000,
+            ),
+        ]
+        res, _ = aj.procesar_factura(idx, fac, glosas, hoja="Sheet", aplicar=False)
+        por_codigo = {d.codigo: d for d in res.detalle}
+        assert por_codigo["15103"].accion == aj.ACCION_ENCABEZADO
+        assert por_codigo["39005"].accion == "CONSERVADO"
+        assert por_codigo["39209"].accion == "QUITADO"
+        # El encabezado no suma: el total es solo lo que sigue glosado.
+        assert res.subtotal_despues == 600000
+        assert "no suma al total" in por_codigo["15103"].observacion
+
+    def test_el_principal_aprobado_se_va_si_su_desglose_tambien(self, tmp_path):
+        """Sin renglón de desglose vivo no hay a quién encabezar: se va, como siempre."""
+        idx = aj.IndiceHoja(openpyxl.load_workbook(self._hoja(tmp_path))["Sheet"])
+        fac = aj.segmentar_facturas(idx)[0]
+        glosas = [
+            aj.FilaGlosa(
+                factura="HUS400000",
+                codigo=cod,
+                descripcion=desc,
+                tipo_elemento="Procedimientos",
+                cant_reclamada=1,
+                valor_reclamado=valor,
+                valor_aprobado=valor,
+            )
+            for cod, desc, valor in (
+                ("15103", "Desbridamiento", 1000000),
+                ("39005", "Honorarios cirujano", 600000),
+                ("39209", "Derechos de sala", 400000),
+            )
+        ]
+        res, _ = aj.procesar_factura(idx, fac, glosas, hoja="Sheet", aplicar=False)
+        assert {d.accion for d in res.detalle} == {"QUITADO"}
+        assert res.subtotal_despues == 0
+
 
 class TestMapeoPorSolapamiento:
     def test_vr_ent_no_se_lleva_el_bloque_de_vr_pac(self):
