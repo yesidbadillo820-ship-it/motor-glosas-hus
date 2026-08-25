@@ -1,5 +1,27 @@
 # Registro de cambios
 
+## Sesión 25-ago-2026 (noche) — repartir la respuesta a glosa por carpeta de factura
+
+`organizar_soportes_por_factura.py`:
+
+- **`carpetas_por_factura()`**: mapea el número de factura a la carpeta que ya
+  existe, aunque traiga una nota detrás (`HUS379477_PEND. CARTA CORONEL`,
+  `HUS367368 ACEPTADO`, `HUS378523_MAOS`). Antes se buscaba `carpeta / factura`
+  literal, así que a esas no las encontraba y **creaba una carpeta gemela
+  vacía**. Con dos carpetas para la misma factura gana la primera alfabética,
+  para que el resultado no dependa del orden del sistema de archivos.
+- **`--solo-carpetas-existentes`**: mueve solo lo que ya tiene carpeta, sin
+  crear ninguna. Hace falta al repartir un lote que abarca varios gestores: las
+  324 respuestas se sueltan en cada carpeta y solo caen las que corresponden;
+  las demás quedan listadas con el estado `SIN CARPETA PARA ESA FACTURA`.
+
+`unir_soportes_adres.py`: `_factura_de_carpeta` pasa a delegar en
+`factura_del_nombre` — la regla de cómo se saca el número de un nombre queda en
+un solo sitio.
+
+8 pruebas nuevas (54 en el archivo), y ensayo de punta a punta con el ZIP real.
+
+
 ## Sesión 25-ago-2026 — `unir_soportes_adres.py` + arreglo del desglose huérfano
 
 ### `unir_soportes_adres.py` (nuevo)

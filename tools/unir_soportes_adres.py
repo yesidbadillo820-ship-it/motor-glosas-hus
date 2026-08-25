@@ -62,6 +62,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # El motor de unión ya existe y está probado: aquí solo se le da el ORDEN.
+from organizar_soportes_por_factura import factura_del_nombre  # noqa: E402
 from unir_pdfs_carpetas import _cargar_lector_escritor, clave_natural, unir_pdfs  # noqa: E402
 
 logger = logging.getLogger("unir_soportes_adres")
@@ -297,9 +298,12 @@ ESTADO_ERROR = "ERROR"
 
 
 def _factura_de_carpeta(carpeta: Path) -> str:
-    """`HUS379477_PEND. CARTA CORONEL` → `HUS379477`; si no hay número, el nombre."""
-    m = re.match(r"^\s*(HUS)\s*0*(\d+)", carpeta.name, re.IGNORECASE)
-    return f"HUS{m.group(2)}" if m else carpeta.name.strip()
+    """`HUS379477_PEND. CARTA CORONEL` → `HUS379477`; si no hay número, el nombre.
+
+    Usa el mismo lector que el bot que archiva los soportes: la regla de cómo se
+    saca el número de factura de un nombre vive en un solo sitio.
+    """
+    return factura_del_nombre(carpeta.name) or carpeta.name.strip()
 
 
 def planificar(
