@@ -2426,6 +2426,7 @@ def build_user_prompt(
     tono: Optional[str] = "conciliador",
     clausulas_contrato: Optional[list] = None,
     fecha_hecho=None,
+    es_ratificacion: bool = False,
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -2639,6 +2640,29 @@ def build_user_prompt(
                 "o auditor medico de la MISMA ESPECIALIDAD que emitio la indicacion "
                 "(Res. 3047/2008 Anexo Tecnico No. 6). Sin ese soporte la glosa es invalida.",
             }
+        )
+
+    # ── Ratificación de una ASEGURADORA (decisión del área, 25-08-2026) ──
+    # Estas ya no salen con la plantilla fija: el motor tiene que refutar el
+    # motivo CONCRETO por el que la entidad ratificó. La 2.ª auditoría del lote
+    # del 25-08 midió que ninguna de las 21 ratificaciones entraba en ese
+    # motivo — el 0 % — porque todas usaban el mismo texto.
+    bloque_ratificacion_str = ""
+    if es_ratificacion:
+        bloque_ratificacion_str = (
+            "\n═══ ESTA ES UNA RATIFICACIÓN — NO REPITAS LA RESPUESTA INICIAL ═══\n"
+            "La entidad ya recibió la respuesta del hospital y decidió MANTENER la "
+            "glosa. Tu trabajo NO es volver a exponer la defensa inicial: es refutar "
+            "LA RAZÓN QUE LA ENTIDAD DA AHORA para ratificar.\n"
+            "1. Nombra esa razón textualmente y respóndela punto por punto. Si no la "
+            "refutas, en la mesa de conciliación se entiende concedida.\n"
+            "2. Si al ratificar la entidad ESTRENA una causal distinta de la inicial, "
+            "dilo: el Art. 23 del Decreto 4747 de 2007 prohíbe formular glosas nuevas "
+            "sobre la misma factura salvo por hechos nuevos surgidos de la respuesta.\n"
+            "3. Cierra pidiendo conciliación de auditoría (Art. 23 Dec. 4747/2007) y, "
+            "de no haber acuerdo, el escalamiento a la Superintendencia Nacional de "
+            "Salud (Art. 126 Ley 1438/2011). TONO FIRME, nunca amenazante.\n"
+            "4. NO afirmes que el silencio de la entidad equivale a aceptación.\n"
         )
 
     bloque_vicios_str = ""
@@ -3405,7 +3429,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
+{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_ratificacion_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 

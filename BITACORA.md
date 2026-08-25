@@ -63,6 +63,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (cierre 2) — Las ratificadas de aseguradora ya no salen con la plantilla
+
+El área revisó los seis pendientes y respondió. Cuatro ya estaban hechos
+—el motor reiniciado, el archivo de recepción reenviado, los 6 archivos de
+objeciones de COOSALUD subidos a DGH— y quedaron dos decisiones.
+
+**La decisión sobre las ratificaciones.** Yesid la resolvió así: «cuando son de
+aseguradoras, estas no van con esa respuesta, sino que toca hacerle su
+respectivo análisis».
+
+Quedó implementado. Cuando el pagador es una **compañía de seguros o una ARL**,
+la ratificación ya no sale con el texto fijo: la redacta el motor, y le llega la
+instrucción de **nombrar la razón concreta por la que la entidad ratificó** y
+responderla punto por punto. Se le entrega además el argumento que faltaba: el
+artículo 23 del Decreto 4747 prohíbe formular glosas nuevas sobre la misma
+factura salvo por hechos nuevos, así que una ratificación que estrena causal es
+rebatible.
+
+**Las demás siguen igual.** EPS, Dispensario, Policía, Magisterio y PPL
+conservan la plantilla institucional que el área pidió en abril — con el
+artículo corregido, eso sí.
+
+**Un criterio que hay que confirmar.** Para decidir quién es «aseguradora» se
+hizo una lista corta: compañías de seguros y ARL (Aurora, La Previsora,
+Solidaria, Mundial, Positiva, Suramericana y las demás del ramo). Se dejaron
+**por fuera** a propósito el Dispensario, Sanidad Militar, la Policía y el
+FOMAG, porque tienen contrato con el hospital y su propia forma de responder —
+aunque el nombre de algunas lleve la palabra «seguros» o «previsora». Si alguna
+de esas también debe analizarse, se mueve.
+
+**La cuenta de Edgar Silva** queda anotada como tarea de pantalla: esa cuenta
+vive en la base del hospital, no en el código. Hay que entrar a
+Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y dejar
+`carterahus02@sinacsc.com`.
+
+**Y se armó un banco de diez pruebas** para comprobar en pantalla que todo lo
+del día quedó funcionando: cada caso apunta a un defecto concreto de hoy, con
+lo que debe pasar y la señal de alarma al lado.
+
 ### 25-08-2026 (cierre) — Las pantallas que fallaban sin decir nada
 
 Terminado el asunto de las respuestas, se retomó lo de la página. Primero se
@@ -7405,7 +7444,20 @@ Eran dos cosas:
 
 ## 3) PENDIENTE
 
-### Del motor de glosas, al 25-08 (noche)
+### Del motor de glosas, al 25-08 (cierre)
+- **~~Reiniciar el motor~~ — HECHO** (confirmado por el área el 25-08).
+- **~~Reenviar el archivo de recepción~~ — HECHO.**
+- **~~Subir a DGH los 6 archivos de objeciones de COOSALUD~~ — HECHO.**
+- **~~La plantilla de las ratificaciones~~ — RESUELTO.** El área decidió que las
+  de aseguradora se analizan. Implementado el 25-08 (ver la entrada del día).
+  Falta que el área confirme el criterio de quién cuenta como aseguradora.
+- **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
+  entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
+  dejar `carterahus02@sinacsc.com`.
+- **Terminar de repasar la base normativa** — en curso. Ya está descargado el
+  texto oficial completo del Decreto 4747; sigue el Decreto 780 de 2016.
+
+### Lo que quedó de la noche del 25-08
 - **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
   señala que las 21 respuestas a glosas ratificadas usan el mismo texto y
   ninguna entra en el motivo concreto por el que la entidad ratificó. El texto
