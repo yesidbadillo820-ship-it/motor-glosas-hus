@@ -25,6 +25,76 @@ import unicodedata
 # ═══════════════════════════════════════════════════════════════════
 
 LEYES = {
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "LEY 1564 DE 2012": {
+        "nombre": "Ley 1564 de 2012 (Congreso de la Republica)",
+        "titulo": "Codigo General del Proceso",
+        "ambito": "Cobro judicial de la cartera y valor probatorio de la factura",
+        "vigente": True,
+        "notas": (
+            "Sirve para sostener que la factura y el acta de conciliacion prestan merito "
+            "ejecutivo (Art. 422). Se usa al preparar el cobro, no como argumento de fondo de la "
+            "glosa."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["codigo general del proceso", "merito ejecutivo", "factura", "cobro judicial"],
+    },
+    "LEY 1618 DE 2013": {
+        "nombre": "Ley Estatutaria 1618 de 2013 (Congreso de la Republica)",
+        "titulo": "Derechos de las personas con discapacidad",
+        "ambito": "Atencion integral y sin barreras al paciente con discapacidad",
+        "vigente": True,
+        "notas": (
+            "Respalda la habilitacion y rehabilitacion integral cuando la EPS glosa servicios de "
+            "un paciente con discapacidad alegando que no estan cubiertos."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["discapacidad", "atencion integral", "rehabilitacion", "ley estatutaria"],
+    },
+    "LEY 2277 DE 2022": {
+        "nombre": "Ley 2277 de 2022 (Congreso de Colombia)",
+        "titulo": "Reforma tributaria para la igualdad y la justicia social",
+        "ambito": "Solo para asuntos tributarios de la factura",
+        "vigente": True,
+        "notas": (
+            "El motor la cita por su articulo 89 para la UVB del manual tarifario SOAT. OJO: es "
+            "una reforma TRIBUTARIA; en una glosa solo sirve para IVA, retenciones y la unidad de "
+            "valor, no como fundamento clinico ni contractual."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["reforma tributaria", "UVB", "unidad de valor basico", "articulo 89"],
+    },
+    "LEY 776 DE 2002": {
+        "nombre": "Ley 776 de 2002 (Congreso de la Republica)",
+        "titulo": "Prestaciones del Sistema General de Riesgos Profesionales",
+        "ambito": "De quien es la cuenta cuando el evento es de origen laboral",
+        "vigente": True,
+        "notas": (
+            "Sirve cuando la EPS glosa una atencion alegando que el origen es laboral (o al "
+            "reves): define las prestaciones que cubre el sistema de riesgos y quien responde por "
+            "ellas."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["riesgos laborales", "origen laboral", "ARL", "prestaciones"],
+    },
+    "LEY 789 DE 2002": {
+        "nombre": "Ley 789 de 2002 (Congreso de la Republica)",
+        "titulo": "Apoyo al empleo y ampliacion de la proteccion social",
+        "ambito": "Acreditacion del pago de aportes al sistema (Art. 50)",
+        "vigente": True,
+        "notas": (
+            "Su articulo 50 exige acreditar el pago de aportes a salud, pensiones, riesgos "
+            "laborales y cajas de compensacion. Se invoca cuando la entidad condiciona el pago a "
+            "requisitos de aportes."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["aportes al sistema", "articulo 50", "proteccion social"],
+    },
     "LEY 100 DE 1993": {
         "nombre": "Ley 100 de 1993",
         "titulo": "Por la cual se crea el Sistema de Seguridad Social Integral",
@@ -79,6 +149,39 @@ LEYES = {
         "ambito": "Reforma SGSSS — trámite de glosas y pagos",
         "vigente": True,
         "articulos": {
+            # Agregados el 24-08-2026, transcritos del PDF oficial del
+            # Ministerio de Salud. Estaban citados en dictámenes reales y una
+            # prueba de mayo de 2026 los daba por "citas inventadas": no lo
+            # son, existen. El motor los borraba del documento radicado.
+            "1": {
+                "titulo": "Objeto de la ley",
+                "texto": (
+                    "Esta ley tiene como objeto el fortalecimiento del Sistema General de "
+                    "Seguridad Social en Salud a través de un modelo de prestación del "
+                    "servicio público en salud que en el marco de la estrategia Atención "
+                    "Primaria en Salud permita la acción coordinada del Estado, las "
+                    "instituciones y la sociedad para el mejoramiento de la salud y la "
+                    "creación de un ambiente sano y saludable, que brinde servicios de mayor "
+                    "calidad, incluyente y equitativo, donde el centro y objetivo de todos "
+                    "los esfuerzos sean los residentes en el país."
+                ),
+                "aplicacion": "Marco general. Por sí solo no sustenta una defensa tarifaria.",
+                "keywords": ["objeto", "fortalecimiento", "atención primaria"],
+            },
+            "2": {
+                "titulo": "Orientación del Sistema General de Seguridad Social en Salud",
+                "texto": (
+                    "El Sistema General de Seguridad Social en Salud estará orientado a "
+                    "generar condiciones que protejan la salud de los colombianos, siendo el "
+                    "bienestar del usuario el eje central y núcleo articulador de las "
+                    "políticas en salud. Para esto concurrirán acciones de salud pública, "
+                    "promoción de la salud, prevención de la enfermedad y demás prestaciones "
+                    "que, en el marco de una estrategia de Atención Primaria en Salud, sean "
+                    "necesarias para promover de manera constante la salud de la población."
+                ),
+                "aplicacion": "Marco general. Por sí solo no sustenta una defensa tarifaria.",
+                "keywords": ["orientación", "bienestar del usuario", "atención primaria"],
+            },
             "56": {
                 "titulo": "Trámite de pagos",
                 "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda. Nota operativa (Manual Único de Glosas Res. 2284/2023 + Manual SIIFA 2026): una vez levantada o aceptada la glosa, el pago al prestador debe efectuarse dentro de los cinco (5) días hábiles siguientes.",
@@ -151,6 +254,18 @@ LEYES = {
         "ambito": "Derecho fundamental a la salud",
         "vigente": True,
         "articulos": {
+            # Agregado el 24-08-2026, transcrito del PDF oficial del Ministerio
+            # de Salud. Una prueba de mayo de 2026 lo daba por "cita inventada":
+            # no lo es, y el motor lo borraba del documento radicado.
+            "1": {
+                "titulo": "Objeto",
+                "texto": (
+                    "La presente ley tiene por objeto garantizar el derecho fundamental a la "
+                    "salud, regularlo y establecer sus mecanismos de protección."
+                ),
+                "aplicacion": "Marco general del derecho fundamental a la salud.",
+                "keywords": ["objeto", "derecho fundamental", "mecanismos de protección"],
+            },
             "2": {
                 "titulo": "Naturaleza y contenido del derecho fundamental a la salud",
                 "texto": "El derecho fundamental a la salud es autónomo e irrenunciable en lo individual y en lo colectivo. Comprende los servicios de salud de manera oportuna, eficaz y con calidad para la preservación, el mejoramiento y la promoción de la salud.",
@@ -441,6 +556,65 @@ LEYES = {
 # ═══════════════════════════════════════════════════════════════════
 
 DECRETOS = {
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "DECRETO 1477 DE 2014": {
+        "nombre": "Decreto 1477 de 2014 (Ministerio del Trabajo)",
+        "titulo": "Tabla de Enfermedades Laborales",
+        "ambito": "Discusion de origen: laboral o comun",
+        "vigente": True,
+        "notas": (
+            "Sirve para sustentar de quien es la cuenta cuando la EPS glosa una atencion alegando "
+            "origen laboral: la tabla dice que enfermedades se presumen laborales."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["tabla de enfermedades laborales", "origen", "ARL"],
+    },
+    "DECRETO 1352 DE 2013": {
+        "nombre": "Decreto 1352 de 2013 (Ministerio del Trabajo)",
+        "titulo": "Juntas de Calificacion de Invalidez",
+        "ambito": "Quien decide la controversia de origen",
+        "vigente": True,
+        "notas": (
+            "Sirve en glosas de ARL: si la aseguradora alega que el evento no fue laboral sino "
+            "comun, esa discusion la resuelven las Juntas de Calificacion, no la auditoria de "
+            "cuentas."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["juntas de calificacion", "origen", "invalidez", "ARL"],
+    },
+    "DECRETO 1142 DE 2016": {
+        "nombre": "Decreto 1142 de 2016 (Presidencia — sector Justicia)",
+        "titulo": "Atencion en salud de la poblacion privada de la libertad",
+        "ambito": "PPL — servicios a cargo del fondo de atencion en salud",
+        "vigente": True,
+        "notas": (
+            "Sustenta que los servicios de salud de las personas privadas de la libertad se "
+            "prestan y se pagan por el esquema especial del INPEC/USPEC, no por el PBS regular."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["PPL", "privados de la libertad", "INPEC", "modelo de atencion"],
+    },
+    "DECRETO 2462 DE 2013": {
+        "nombre": "Decreto 2462 de 2013 (Presidencia — sector Salud)",
+        "titulo": "Estructura de la Superintendencia Nacional de Salud",
+        "ambito": "Inspeccion y vigilancia sobre EPS e IPS",
+        "vigente": False,
+        "derogada_por": (
+            "figura como no vigente; verificar la norma que reestructuro la Supersalud antes de "
+            "citarlo"
+        ),
+        "notas": (
+            "Servia para senalar que dependencia de la Supersalud ejerce la inspeccion y "
+            "vigilancia. Revisar la norma que lo reemplazo antes de citarlo."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["Supersalud", "inspeccion y vigilancia", "estructura"],
+    },
     # 11-jun-2026: el texto fijo DMBUG cita el art. 71 del Estatuto
     # Orgánico del Presupuesto (defensa "agotamiento presupuestal es
     # responsabilidad del contratante") y el verifier lo marcaba
@@ -536,6 +710,39 @@ DECRETOS = {
         "ambito": "Tarifas SOAT — marco histórico",
         "vigente": True,
         "keywords": ["SOAT", "tarifa", "manual tarifario"],
+        # El Art. 87 se agregó el 24-08-2026. El dictamen GL-207 (AURORA) lo
+        # citó completo para defender una tarifa propia del hospital, y el
+        # sistema no lo tenía: no podía respaldar una cita que resultó ser
+        # CORRECTA. Transcrito del PDF oficial del Ministerio de Salud ese
+        # mismo día (decreto-2423-de-1996.pdf, 149 páginas, 241 artículos).
+        # Es el fundamento de la tarifa institucional cuando el procedimiento
+        # no está en el manual: sirve seguido en glosas de mayor valor cobrado.
+        "articulos": {
+            "87": {
+                "titulo": "Procedimiento sin tarifa asignada — tarifa de la institución",
+                "texto": (
+                    "Por las circunstancias de orden tecnológico, cuando alguna Institución "
+                    "Prestadora de Servicios de Salud realice un procedimiento que no se "
+                    "encuentre definido y por lo tanto no tenga asignada tarifa, éste se "
+                    "reconocerá por la tarifa que tenga definida la Institución, previa la "
+                    "comprobación del médico tratante, de que dicho procedimiento no se "
+                    "encuentra relacionado en el presente Decreto ni siquiera bajo otra "
+                    "denominación."
+                ),
+                "aplicacion": (
+                    "Glosas de mayor valor cobrado sobre procedimientos que el manual SOAT "
+                    "no tiene tarifados. OJO: el propio artículo exige la comprobación del "
+                    "médico tratante de que el procedimiento no está en el decreto ni bajo "
+                    "otro nombre — sin esa comprobación el argumento queda cojo."
+                ),
+                "keywords": [
+                    "tarifa institucional",
+                    "procedimiento no definido",
+                    "sin tarifa asignada",
+                    "mayor valor cobrado",
+                ],
+            },
+        },
     },
     "DECRETO 3752 DE 2003": {
         "nombre": "Decreto 3752 de 2003",
@@ -601,11 +808,22 @@ DECRETOS = {
         "keywords": ["COVID-19", "pandemia", "emergencia sanitaria", "excepciones"],
     },
     "DECRETO 064 DE 2020": {
-        "nombre": "Decreto 064 de 2020",
-        "titulo": "Reglamento del aseguramiento — flujo de recursos del SGSSS",
-        "ambito": "Pago a IPS, giro directo, glosas",
+        # Corregido el 25-08-2026. El sistema lo daba como "reglamento del
+        # aseguramiento — flujo de recursos del SGSSS". La primera mitad es
+        # cierta (si es norma de aseguramiento), la segunda no: no trata del
+        # flujo de recursos, y citarlo asi ante una EPS es peligroso.
+        "nombre": "Decreto 064 del 20 de enero de 2020",
+        "titulo": "Afiliacion al regimen subsidiado y afiliacion de oficio",
+        "ambito": "Afiliacion — modifica y adiciona articulos del Decreto 780 de 2016",
         "vigente": True,
-        "keywords": ["flujo recursos", "aseguramiento", "giro directo IPS"],
+        "notas": (
+            "Modifica los articulos 2.1.3.11, 2.1.3.13, 2.1.5.1, 2.1.7.7, 2.1.7.8 y "
+            "2.1.3.17 y adiciona los 2.1.5.4 y 2.1.5.5 del Decreto 780 de 2016, sobre "
+            "afiliados al regimen subsidiado y afiliacion de oficio. NO es norma de flujo "
+            "de recursos."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["afiliacion de oficio", "regimen subsidiado", "Decreto 780 de 2016"],
     },
     # Ronda 14 (Bug P): normas reales que el verifier marcaba como
     # inexistentes en producción.
@@ -666,6 +884,62 @@ DECRETOS = {
 # ═══════════════════════════════════════════════════════════════════
 
 RESOLUCIONES = {
+    "RESOLUCION 506 DE 2021": {
+        # Cargada el 25-08-2026. El motor la ofrecia en el prompt como
+        # "Resolucion 506/2021 DIAN" y no estaba en el corpus, asi que citarla
+        # producia una alarma roja de "norma inexistente". Verificada contra
+        # fuente oficial: NO es de la DIAN, la expidio el Ministerio de Salud
+        # el 19 de abril de 2021, y ya no rige.
+        "nombre": "Resolucion 506 de 2021 (MinSalud)",
+        "titulo": "Campos de datos adicionales del sector salud en la factura electronica",
+        "ambito": "Factura electronica en salud — campos adicionales del sector",
+        "vigente": False,
+        "derogada_por": (
+            "figura como no vigente; para la factura electronica en salud rige hoy la "
+            "Res. 948 de 2026"
+        ),
+        "notas": (
+            "Adopto el anexo tecnico de campos de datos adicionales del sector salud en "
+            "la factura electronica de venta. Solo aplica a servicios facturados mientras "
+            "estuvo vigente."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["factura electronica", "FEV", "campos del sector salud", "MinSalud"],
+    },
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "RESOLUCION 1403 DE 2007": {
+        "nombre": "Resolucion 1403 de 2007 (Ministerio de la Proteccion Social)",
+        "titulo": "Modelo de Gestion del Servicio Farmaceutico",
+        "ambito": "Glosas de medicamentos y dispositivos medicos",
+        "vigente": True,
+        "notas": (
+            "Fija como debe hacerse la prescripcion, la dispensacion y el registro de "
+            "medicamentos. Sirve para defender glosas de medicamentos por supuestos defectos de "
+            "formula o de entrega."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["servicio farmaceutico", "medicamentos", "prescripcion", "dispensacion"],
+    },
+    "RESOLUCION 3539 DE 2019": {
+        "nombre": "Resolucion 3539 de 2019 (MinSalud)",
+        "titulo": "Reporte de servicios negados por las EPS",
+        "ambito": "Solo para el tema de negacion de servicios",
+        "vigente": False,
+        "derogada_por": (
+            "figura como no vigente; verificar la norma que la reemplazo antes de citarla"
+        ),
+        "notas": (
+            "Obliga a la EPS a registrar y reportar al Ministerio los servicios que niega. NO es "
+            "una norma de habilitacion, como decia el catalogo del motor."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["servicios negados", "reporte", "EPS"],
+    },
     "RESOLUCION 2284 DE 2023": {
         "nombre": "Resolución 2284 de 2023 (MinSalud)",
         "titulo": "Manual Único de Devoluciones, Glosas y Respuestas",
@@ -721,8 +995,47 @@ RESOLUCIONES = {
         "nombre": "Resolución 2275 de 2023 (MinSalud)",
         "titulo": "Factura Electrónica de Venta en Salud (FEV) + RIPS",
         "ambito": "Facturación electrónica — validación previa MinSalud",
+        # DEROGADA (verificado el 24-08-2026 en el PDF oficial del Ministerio).
+        # El sistema la daba por vigente y la citaba en seis sitios distintos
+        # como fundamento de facturación electrónica. La derogó la Resolución
+        # 948 del 14 de mayo de 2026, que rige desde su expedición. Un dictamen
+        # radicado hoy que se apoye en ella le entrega a la EPS la forma de
+        # desmontar el argumento: basta con mostrar la derogatoria.
+        #
+        # NO se borra del corpus: para servicios prestados antes del 14-05-2026
+        # sigue siendo la norma aplicable, y hay que poder citarla bien.
+        "vigente": False,
+        "derogada_por": (
+            "la derogó la Resolución 948 del 14 de mayo de 2026, que rige desde su "
+            "expedición (junto con las Resoluciones 558 y 1884 de 2024)"
+        ),
+        "keywords": ["FEV", "RIPS", "factura electrónica", "validación", "derogada"],
+    },
+    "RESOLUCION 948 DE 2026": {
+        # Agregada el 24-08-2026, transcrita del PDF oficial del Ministerio de
+        # Salud (resolucion-0948-de-2026.pdf, 17 páginas). Es la que rige hoy
+        # para RIPS y factura electrónica; el sistema no la tenía y seguía
+        # citando la derogada.
+        "nombre": "Resolución 948 del 14 de mayo de 2026 (MinSalud)",
+        "titulo": "RIPS como soporte de la Factura Electrónica de Venta en salud",
+        "ambito": "Facturación electrónica y RIPS — norma vigente desde el 14-05-2026",
         "vigente": True,
-        "keywords": ["FEV", "RIPS", "factura electrónica", "validación"],
+        "notas": (
+            "Artículo 1: reglamenta el Registro Individual de Prestación de Servicios "
+            "de Salud (RIPS) como soporte de la Factura Electrónica de Venta (FEV) en "
+            "salud y adopta los documentos técnicos. Su artículo de vigencia dice que "
+            "rige a partir de su expedición y deroga las Resoluciones 2275 de 2023 y "
+            "558 y 1884 de 2024. OJO CON LA FECHA DEL SERVICIO: para lo prestado antes "
+            "del 14 de mayo de 2026 la norma aplicable sigue siendo la Res. 2275/2023."
+        ),
+        "verificada": "24-08-2026 PDF oficial MinSalud",
+        "keywords": [
+            "RIPS",
+            "FEV",
+            "factura electrónica",
+            "soporte de cobro",
+            "948 de 2026",
+        ],
     },
     "RESOLUCION 3047 DE 2008": {
         "nombre": "Resolución 3047 de 2008",
@@ -745,9 +1058,49 @@ RESOLUCIONES = {
         "ambito": "Historia clínica como documento médico-legal",
         "vigente": True,
         "articulos": {
+            # Estos dos artículos estaban pegados en uno solo (24-08-2026). El
+            # texto del Art. 3 traía al final «la historia clínica es un
+            # documento privado, obligatorio y sometido a reserva», que no es
+            # del Art. 3 sino del literal a) del Art. 1. Los dictámenes copiaban
+            # la frase completa entre comillas y se la atribuían al Art. 3, así
+            # que media cita quedaba mal atribuida. Lo detectó la segunda
+            # auditoría independiente. Ambos textos se transcribieron del PDF
+            # oficial del Ministerio de Salud ese mismo día.
+            "1": {
+                "titulo": "Definiciones",
+                "texto": (
+                    "La Historia Clínica es un documento privado, obligatorio y sometido a "
+                    "reserva, en el cual se registran cronológicamente las condiciones de "
+                    "salud del paciente, los actos médicos y los demás procedimientos "
+                    "ejecutados por el equipo de salud que interviene en su atención. Dicho "
+                    "documento únicamente puede ser conocido por terceros previa autorización "
+                    "del paciente o en los casos previstos por la ley."
+                ),
+                "aplicacion": "Definición legal de la historia clínica y su reserva",
+                "keywords": [
+                    "historia clínica",
+                    "documento privado",
+                    "reserva",
+                    "definición",
+                ],
+            },
             "3": {
                 "titulo": "Características de la historia clínica",
-                "texto": "La historia clínica debe cumplir con las siguientes características: INTEGRALIDAD, SECUENCIALIDAD, RACIONALIDAD CIENTÍFICA, DISPONIBILIDAD y OPORTUNIDAD. La historia clínica es un documento privado, obligatorio y sometido a reserva.",
+                "texto": (
+                    "Las características básicas son: Integralidad: la historia clínica de un "
+                    "usuario debe reunir la información de los aspectos científicos, técnicos "
+                    "y administrativos relativos a la atención en salud. Secuencialidad: los "
+                    "registros de la prestación de los servicios en salud deben consignarse en "
+                    "la secuencia cronológica en que ocurrió la atención. Racionalidad "
+                    "científica: es la aplicación de criterios científicos en el "
+                    "diligenciamiento y registro de las acciones en salud brindadas a un "
+                    "usuario, de modo que evidencie en forma lógica, clara y completa el "
+                    "procedimiento que se realizó. Disponibilidad: es la posibilidad de "
+                    "utilizar la historia clínica en el momento en que se necesita, con las "
+                    "limitaciones que impone la Ley. Oportunidad: es el diligenciamiento de "
+                    "los registros de atención de la historia clínica, simultánea o "
+                    "inmediatamente después de que ocurre la prestación del servicio."
+                ),
                 "aplicacion": "Historia clínica = documento médico-legal de plena prueba",
                 "keywords": [
                     "historia clínica",
@@ -760,11 +1113,27 @@ RESOLUCIONES = {
         "keywords": ["historia clínica", "1995", "documento médico-legal"],
     },
     "RESOLUCION 866 DE 2021": {
-        "nombre": "Resolución 866 de 2021 (MinSalud)",
-        "titulo": "Registros Individuales de Prestación de Servicios de Salud (RIPS)",
-        "ambito": "RIPS obligatorios — reglamentación y generación",
+        # Corregida el 25-08-2026. El sistema la daba como "los RIPS" y la
+        # ofrecia para refutar glosas de soportes. No es eso: reglamenta los
+        # datos clinicos para la INTEROPERABILIDAD DE LA HISTORIA CLINICA
+        # (desarrolla la Ley 2015 de 2020). Citarla como norma de RIPS ante una
+        # EPS es entregarle el argumento de que el prestador no sabe que cita.
+        "nombre": "Resolucion 866 de 2021 (MinSalud)",
+        "titulo": "Datos clinicos para la interoperabilidad de la historia clinica",
+        "ambito": "Historia clinica electronica interoperable — Ley 2015 de 2020",
         "vigente": True,
-        "keywords": ["RIPS", "registros individuales", "866"],
+        "notas": (
+            "Define el conjunto de elementos de datos clinicos relevantes que deben "
+            "poder intercambiarse entre prestadores. NO es la norma de RIPS: la de RIPS "
+            "como soporte de la factura electronica es hoy la Res. 948 de 2026."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": [
+            "interoperabilidad",
+            "historia clinica electronica",
+            "datos clinicos",
+            "Ley 2015 de 2020",
+        ],
     },
     "CIRCULAR 047 DE 2025": {
         "nombre": "Circular Externa 047 de 2025 (MinSalud)",
@@ -811,70 +1180,95 @@ RESOLUCIONES = {
         "keywords": ["conciliación", "auditoría médica", "2175"],
     },
     "RESOLUCION 5159 DE 2015": {
-        "nombre": "Resolución 5159 de 2015 (MinSalud)",
-        "titulo": "Procedimiento atención salud PPL",
-        "ambito": "Atención integral PPL",
+        # DEROGADA (verificado el 25-08-2026 en el PDF oficial del Ministerio).
+        # La derogó el artículo 12 de la Resolución 1099 de 2026: «rige a partir
+        # de la fecha de su expedición y deroga las Resoluciones 5159 de 2015 y
+        # 3595 de 2016». El motor la tenía como vigente en dos sitios y el
+        # prompt ordenaba «citar SIEMPRE Res. 5159/2015» al defender PPL, que es
+        # uno de los pagadores reales del hospital.
+        #
+        # NO se borra: para atenciones prestadas antes de junio de 2026 sigue
+        # siendo la norma aplicable, y hay que poder citarla bien.
+        "nombre": "Resolución 5159 del 30 de noviembre de 2015 (MinSalud)",
+        "titulo": "Modelo de atención en salud para la población privada de la libertad",
+        "ambito": "PPL — atenciones prestadas antes de junio de 2026",
+        "vigente": False,
+        "derogada_por": (
+            "la derogó el artículo 12 de la Resolución 1099 de 2026, que rige desde su "
+            "expedición (junto con la Resolución 3595 de 2016)"
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
+        "keywords": ["PPL", "reclusos", "INPEC", "5159"],
+    },
+    "RESOLUCION 1099 DE 2026": {
+        # Cargada el 25-08-2026, transcrita del PDF oficial del Ministerio
+        # (9 páginas). Es la que rige hoy para la atención en salud de la
+        # población privada de la libertad, y el sistema no la tenía.
+        "nombre": "Resolución 1099 de 2026 (MinSalud)",
+        "titulo": "Modelo de atención en salud para la población privada de la libertad",
+        "ambito": "PPL — norma vigente desde junio de 2026",
         "vigente": True,
-        "keywords": ["PPL", "reclusos", "5159"],
+        "notas": (
+            "Adopta el modelo de atención en salud para la población privada de la "
+            "libertad bajo custodia, inspección y vigilancia del INPEC. Su artículo 12 "
+            "dice que rige desde su expedición y deroga las Resoluciones 5159 de 2015 y "
+            "3595 de 2016. OJO CON LA FECHA DE LA ATENCIÓN: para lo prestado antes de "
+            "junio de 2026 la norma aplicable sigue siendo la Res. 5159 de 2015. La "
+            "Ley 1709 de 2014 es el respaldo legal de fondo en los dos casos."
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
+        "keywords": ["PPL", "INPEC", "modelo de atención", "1099 de 2026"],
     },
     # Ronda 48: Resolución 2641 de 2025 — Clasificación CUPS y tabla de
     # homologación oficial entre códigos internos de prestadores y la
     # numeración vigente (CUPS 2025).
-    "RESOLUCION 2641 DE 2025": {
-        "nombre": "Resolución 2641 de 2025 (MinSalud)",
-        "titulo": "Clasificación Única de Procedimientos en Salud (CUPS) versión 2025 — Tabla de homologación oficial",
-        "ambito": (
-            "Reemplaza la Res. 2341 de 2024 (CUPS 2024) y establece la "
-            "TABLA DE HOMOLOGACIÓN entre códigos internos de prestadores "
-            "(ej. códigos institucionales HUS con sufijo H, H1, H2, o con "
-            "versión -18/-16/-19) y la numeración CUPS oficial vigente. "
-            "De OBLIGATORIO CUMPLIMIENTO para RIPS, FEV y todo reporte "
-            "de cuentas médicas. En el sistema IA GLOSAS SINAC la "
-            "equivalencia se aplica automáticamente cuando la EPS glosa "
-            "con el código viejo — ver homologador_cups.py."
+    "RESOLUCION 2641 DE 2024": {
+        # Corregida el 25-08-2026, DOBLE ERROR. El sistema la guardaba como
+        # "Resolucion 2641 de 2025 — CUPS version vigente", y ni el ano ni la
+        # vigencia eran ciertos:
+        #   · No existe una "Resolucion 2641 de 2025". La real es de 2024,
+        #     expedida el 23 de diciembre de 2024 (al sector se le dice "CUPS
+        #     2025" porque rigio desde el 1 de enero de 2025).
+        #   · Y ya no rige: la derogo la Resolucion 2706 de 2025 desde el
+        #     1 de enero de 2026.
+        #
+        # Peor todavia: el motor tenia un limpiador que BORRABA del dictamen la
+        # cita "Resolucion 2641 de 2024" por considerarla inventada, y la
+        # cambiaba por la frase vaga "la normativa vigente del Ministerio de
+        # Salud". O sea que borraba la cita CORRECTA y dejaba una pseudo-norma.
+        # Ese limpiador se retiro en el mismo cambio.
+        "nombre": "Resolucion 2641 del 23 de diciembre de 2024 (MinSalud)",
+        "titulo": "Clasificacion Unica de Procedimientos en Salud (CUPS) — vigencia 2025",
+        "ambito": "CUPS aplicable a servicios prestados durante 2025",
+        "vigente": False,
+        "derogada_por": (
+            "la derogo la Resolucion 2706 de 2025 (23 de diciembre de 2025) a partir del "
+            "1 de enero de 2026, junto con las Resoluciones 2689 de 2024 y 756 de 2025"
         ),
+        "notas": (
+            "Reemplazo a la Resolucion 2336 de 2023. OJO CON LA FECHA DEL SERVICIO: para "
+            "lo prestado durante 2025 esta es la CUPS aplicable; para 2026 en adelante, "
+            "la Res. 2706 de 2025."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["CUPS", "procedimientos en salud", "2641 de 2024", "vigencia 2025"],
+    },
+    "RESOLUCION 2706 DE 2025": {
+        # Agregada el 25-08-2026, transcrita del PDF oficial del Ministerio
+        # (395 paginas, firmada el 23 de diciembre de 2025). Es la CUPS que
+        # rige hoy y el sistema no la tenia.
+        "nombre": "Resolucion 2706 del 23 de diciembre de 2025 (MinSalud)",
+        "titulo": "Clasificacion Unica de Procedimientos en Salud (CUPS) vigente",
+        "ambito": "CUPS aplicable a los servicios prestados desde el 1 de enero de 2026",
         "vigente": True,
-        "articulos": {
-            "uso_obligatorio": {
-                "titulo": "Uso obligatorio de CUPS 2025",
-                "texto": (
-                    "Todos los prestadores y entidades responsables del pago "
-                    "deberán emplear la numeración CUPS 2025 establecida en "
-                    "esta resolución para la facturación, glosa, conciliación "
-                    "y reporte al Registro Individual de Prestación de "
-                    "Servicios de Salud (RIPS, Res. 202/2021 y 2275/2023 FEV). "
-                    "Cuando el Excel del contrato o la factura traiga el "
-                    "código interno del prestador (ej. '39147B-18', '890348H', "
-                    "'372301H'), se entenderá equivalente al CUPS 2025 oficial "
-                    "según la tabla de homologación del Anexo Técnico."
-                ),
-                "aplicacion": (
-                    "Ante glosas con código viejo, aplicar homologación "
-                    "Res. 2641/2025 antes de evaluar la tarifa pactada. "
-                    "El sistema lo hace automáticamente vía codigo_ips + "
-                    "homologador_cups.py."
-                ),
-                "keywords": [
-                    "CUPS 2025",
-                    "homologación",
-                    "equivalencia",
-                    "código interno",
-                    "código viejo",
-                    "2641",
-                    "RIPS",
-                    "FEV",
-                ],
-            },
-        },
-        "keywords": [
-            "CUPS",
-            "2641",
-            "homologación",
-            "clasificación única",
-            "procedimientos",
-            "código interno",
-            "MinSalud 2025",
-        ],
+        "notas": (
+            "Su Articulo 5 dice: 'La presente resolucion rige a partir del 1 de enero de "
+            "2026 y deroga, a partir de esa fecha, las Resoluciones 2641 de 2024, 2689 de "
+            "2024 y 756 de 2025'. Es la norma con que se comprueba la descripcion de un "
+            "CUPS facturado en 2026."
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
+        "keywords": ["CUPS", "procedimientos en salud", "2706 de 2025", "vigente"],
     },
     "RESOLUCION 2341 DE 2024": {
         "nombre": "Resolución 2341 de 2024 (MinSalud)",
@@ -990,11 +1384,26 @@ RESOLUCIONES = {
         "keywords": ["Res. 2003", "habilitación 2014", "manual inscripción"],
     },
     "RESOLUCION 1604 DE 2024": {
-        "nombre": "Resolución 1604 de 2024 (MinSalud)",
-        "titulo": "Modificaciones al RIPS y FEV — actualizaciones técnicas",
-        "ambito": "RIPS y Factura Electrónica de Venta",
+        # Corregida el 25-08-2026. El sistema la daba como "modificaciones al
+        # RIPS y a la factura electronica". No tiene NADA que ver: es un acto
+        # del Ministerio del INTERIOR que le reconoce personeria juridica a una
+        # iglesia. Ni siquiera es del sector salud. Se conserva con su
+        # contenido real para que, si alguien la cita, el sistema sepa que es.
+        #
+        # La norma de RIPS que probablemente se queria referenciar es la
+        # Resolucion 1884 de 2024 (plazos de RIPS), hoy derogada por la
+        # Res. 948 de 2026 junto con la 2275 de 2023 y la 558 de 2024.
+        "nombre": "Resolucion 1604 de 2024 (Ministerio del Interior)",
+        "titulo": "Personeria juridica especial a una entidad religiosa",
+        "ambito": "Asuntos religiosos — ajena por completo a las cuentas medicas",
         "vigente": True,
-        "keywords": ["RIPS 2024", "FEV", "actualización", "Res. 2275"],
+        "notas": (
+            "NO USAR EN NINGUNA RESPUESTA DE GLOSA: no es una norma de salud. Si lo que "
+            "se busca es la reglamentacion de RIPS y factura electronica, hoy rige la "
+            "Res. 948 de 2026."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["personeria juridica", "entidad religiosa", "Ministerio del Interior"],
     },
     "RESOLUCION 754 DE 2024": {
         "nombre": "Resolución 754 de 2024 (MinSalud)",
@@ -1007,7 +1416,12 @@ RESOLUCIONES = {
         "nombre": "Resolución 000042 de 2020 (DIAN)",
         "titulo": "Sistema de facturación electrónica de venta",
         "ambito": "Factura Electrónica de Venta (FEV), CUFE, requisitos técnicos DIAN",
-        "vigente": True,
+        # Verificada el 25-08-2026 contra fuente oficial.
+        "vigente": False,
+        "derogada_por": (
+            "la derogo expresamente la Resolucion DIAN 000165 del 1 de noviembre de 2023, cuyo "
+            "articulo 70 dice que rige desde su publicacion y deroga la Res. 000042 de 2020"
+        ),
         "keywords": [
             "factura electrónica",
             "FEV",
@@ -1034,6 +1448,9 @@ RESOLUCIONES = {
         "vigente": True,
         "notas": "Reconoce la auto-administración domiciliaria del Factor VIII/IX/VIIa como modalidad estándar en pacientes con hemofilia severa, evitando el riesgo de hemartrosis por desplazamiento. La EPS NO puede exigir asistencia institucional cada 48h.",
         "keywords": ["Resolución 1652", "hemofilia", "PAB", "Factor VIII", "auto-administración"],
+        # 25-08-2026: no se pudo confirmar si sigue vigente (las
+        # fuentes oficiales no respondieron). Verificar antes de citarla.
+        "vigencia_sin_confirmar": True,
     },
     "RESOLUCION 2292 DE 2021": {
         "nombre": "Resolución 2292 de 2021 (MinSalud)",
@@ -1044,17 +1461,26 @@ RESOLUCIONES = {
         "keywords": ["Resolución 2292", "PBS", "UPC", "hemofilia", "Emicizumab"],
     },
     "RESOLUCION 2335 DE 2023": {
-        "nombre": "Resolución 2335 de 2023 (MinSalud)",
-        "titulo": "Reglamentación atención integral cáncer infantil — Ley 1388/2010",
-        "ambito": "Pediatría oncológica — atención integral con red de complejidad",
+        # Corregida el 25-08-2026. El sistema la daba como "reglamentacion de
+        # la atencion integral del cancer infantil (Ley 1388/2010)", y un
+        # dictamen la cito ademas "en materia de RIPS": ninguna de las dos.
+        # Lo que trata resulto MAS util para cartera de lo que decia el rotulo.
+        "nombre": "Resolucion 2335 del 29 de diciembre de 2023 (MinSalud)",
+        "titulo": "Ejecucion, seguimiento y ajuste de los acuerdos de voluntades",
+        "ambito": "Relacion contractual entre prestadores y entidades responsables de pago",
         "vigente": True,
-        "notas": "Define el alcance de la atención integral del cáncer infantil incluyendo terapias avanzadas (trasplante MO, CAR-T cells) cuando las líneas previas han fallado. La EPS no puede excluir terapias génicas argumentando 'fuera de PBS' si son la única alternativa terapéutica.",
+        "notas": (
+            "21 articulos y 2 anexos tecnicos. Fija los procedimientos y aspectos "
+            "tecnicos para ejecutar, hacer seguimiento y ajustar los acuerdos de "
+            "voluntades entre la IPS y la entidad pagadora. Sirve para discutir la "
+            "ejecucion del contrato, no para cancer infantil ni para RIPS."
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
         "keywords": [
-            "Resolución 2335",
-            "cáncer infantil",
-            "Ley 1388",
-            "atención integral",
-            "CAR-T",
+            "acuerdos de voluntades",
+            "ejecucion del contrato",
+            "seguimiento",
+            "prestador y pagador",
         ],
     },
     "RESOLUCION 2358 DE 1998": {
@@ -1132,11 +1558,68 @@ RESOLUCIONES = {
 # ═══════════════════════════════════════════════════════════════════
 
 CIRCULARES = {
+    # Agregadas el 24-08-2026. Estaban en la pantalla de Consulta Normativa
+    # pero NO en el corpus con que se revisan las citas, así que un dictamen
+    # que las citara —y hay glosas de medicamentos que obligan a citarlas—
+    # salía marcado con «NORMA_INEXISTENTE» en rojo. Son las dos normas con
+    # que se responde una glosa de «precio superior al regulado».
+    "CIRCULAR 19 DE 2024": {
+        "nombre": "Circular 19 de 2024 (CNPMDM — MinSalud/MinCIT)",
+        "titulo": "Precio máximo de venta de medicamentos en control directo",
+        "ambito": "Medicamentos con control directo de precios — por mercado relevante",
+        "vigente": True,
+        "notas": (
+            "Rige desde el 30 de julio de 2024 y deroga la Circular 13 de 2022. "
+            "Fija el precio máximo POR MERCADO RELEVANTE (mg/unidad). CLAVE PARA LA "
+            "DEFENSA: el Parágrafo 2 del Art. 1 permite a la IPS ADICIONAR al precio "
+            "máximo el margen del Art. 11 de la Circular 18 de 2024, así que facturar "
+            "por encima del precio máximo NO es por sí solo un sobrecosto."
+        ),
+        "keywords": [
+            "precio máximo de venta",
+            "control directo de precios",
+            "medicamentos regulados",
+            "mercado relevante",
+            "CNPMDM",
+            "CUM",
+        ],
+    },
+    "CIRCULAR 18 DE 2024": {
+        # Corregida el 25-08-2026. Esta entrada se habia agregado ese mismo dia
+        # describiendola como "margenes de comercializacion", y al verificarla
+        # contra la fuente oficial el enunciado resulto incompleto: su objeto es
+        # la METODOLOGIA del regimen de control directo de precios.
+        "nombre": "Circular 18 de 2024 (CNPMDM — MinSalud/MinCIT)",
+        "titulo": "Metodologia del regimen de control directo de precios de medicamentos",
+        "ambito": "Como se fija el precio maximo de un medicamento regulado",
+        "vigente": True,
+        "notas": (
+            "Define la metodologia con que la Comision Nacional de Precios identifica los "
+            "medicamentos que entran al control directo y como se les fija el precio. Su "
+            "Articulo 11 es el margen al que remite el Paragrafo 2 del Articulo 1 de la "
+            "Circular 19 de 2024, y por eso las dos se citan juntas al responder una glosa "
+            "por 'precio superior al regulado'."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": [
+            "control directo de precios",
+            "metodologia",
+            "precio maximo",
+            "CNPMDM",
+            "margen Art. 11",
+        ],
+    },
     "CIRCULAR 025 DE 2024": {
         "nombre": "Circular 025 de 31-dic-2024 (MinSalud)",
         "titulo": "Manual Tarifario SOAT actualizado — UVB",
         "ambito": "Unidad de Valor Básico (UVB) vigente desde 01/01/2025",
-        "vigente": True,
+        # Verificada el 25-08-2026 contra fuente oficial.
+        "vigente": False,
+        "derogada_por": (
+            "fijo las tarifas SOLO para la vigencia 2025 (asi lo dice su propio asunto). Para s"
+            "ervicios prestados desde el 1 de enero de 2026 rige la Circular Externa 047 del 30"
+            " de diciembre de 2025"
+        ),
         "notas": "Reemplaza el uso de UVT (2023-2024). Todos los valores tarifarios SOAT se expresan ahora en UVB.",
         "keywords": ["UVB", "unidad valor básico", "025/2024", "SOAT"],
     },
@@ -1149,11 +1632,27 @@ CIRCULARES = {
         "keywords": ["errores formales", "subsanables", "030/2013", "circular"],
     },
     "CIRCULAR 007 DE 2025": {
-        "nombre": "Circular Externa 007 de 2025 (MinSalud)",
-        "titulo": "Cronograma implementación Manual Único de Glosas",
-        "ambito": "Implementación Res. 2284/2023",
+        # Corregida el 25-08-2026. El sistema la daba como "cronograma de
+        # implementacion del Manual Unico de Glosas". No es eso, y lo que si es
+        # resulto mucho mas util para defender al hospital.
+        "nombre": "Circular Externa Conjunta 007 del 3 de marzo de 2025",
+        "titulo": ("Prohibicion de barreras y de exigencias no normadas a los prestadores"),
+        "ambito": "Exigencias de la entidad pagadora que no estan en ninguna norma",
         "vigente": True,
-        "keywords": ["cronograma", "implementación", "007/2025"],
+        "notas": (
+            "Circular CONJUNTA del Ministerio de Salud y la Superintendencia Nacional de "
+            "Salud (no solo del Ministerio). Su asunto textual es el cumplimiento de la "
+            "normativa legal y la PROHIBICION de medidas no normadas, de imponer barreras "
+            "y de hacer solicitudes no permitidas a los prestadores de servicios de salud. "
+            "Util cuando la EPS exige un requisito que ninguna norma le impone al hospital."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": [
+            "barreras al prestador",
+            "exigencias no normadas",
+            "SuperSalud",
+            "circular conjunta",
+        ],
     },
     "CIRCULAR 0000022 DE 2023": {
         "nombre": "Circular 0000022 de 2023 (MinSalud + DIAN)",
@@ -1323,127 +1822,147 @@ JURISPRUDENCIA = {
         ),
         "aplica_a": "EPS del régimen contributivo/subsidiado (NO aplica a Sanidad Militar, PPL, FOMAG, Policía)",
         "keywords": ["T-760", "derecho salud", "EPS", "negación servicios", "riesgo vital"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-1025 DE 2002": {
         "nombre": "Sentencia T-1025 de 2002",
         "corte": "Corte Constitucional",
-        "titulo": "Urgencias sin autorización previa",
-        "ratio": "Las urgencias son de cobertura obligatoria sin requisito de autorización previa. La autorización es administrativa y no puede condicionar la atención vital.",
-        "ratio_literal": "La atención de urgencias no puede estar sometida a requisitos administrativos de autorización previa; la sola configuración del evento vital activa la cobertura obligatoria del sistema.",
-        "extracto_judicial": (
-            "«La atención de urgencias constituye una obligación ineludible de las instituciones "
-            "prestadoras de servicios de salud, independientemente de la capacidad de pago del "
-            "usuario o de la existencia de trámites administrativos previos. La vida y la "
-            "integridad personal son bienes jurídicos que no pueden ser condicionados a "
-            "formalidades que retarden la atención médica inmediata.»"
+        "titulo": "Consentimiento informado en cirugia de asignacion de sexo (menores intersexuales)",
+        "ratio": (
+            "Consentimiento informado del menor para intervenciones altamente invasivas. La Corte "
+            "precisa que estas cirugias NO califican como urgencia. NO trata sobre atencion de "
+            "urgencias sin autorizacion previa. "
         ),
-        "aplica_a": "Urgencias — transversal a todos los regímenes",
-        "keywords": ["T-1025", "urgencias", "autorización", "cobertura obligatoria"],
+        "aplica_a": "No aplicable a glosas de urgencias ni de autorizacion previa",
+        "magistrado_ponente": "Rodrigo Escobar Gil",
+        "keywords": ["T-1025", "consentimiento informado", "menores intersexuales"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-478 DE 1995": {
         "nombre": "Sentencia T-478 de 1995",
         "corte": "Corte Constitucional",
-        "titulo": "Autonomía médica como derecho fundamental",
-        "ratio": "La autonomía del médico tratante es un derecho fundamental protegido. El auditor administrativo no puede invalidar el criterio clínico desde revisión documental.",
-        "ratio_literal": "La autonomía del médico tratante no puede ser sustituida por decisiones administrativas ajenas al ejercicio clínico; el juicio profesional prevalece sobre la auditoría documental.",
-        "extracto_judicial": (
-            "«La relación médico-paciente está amparada por el principio de autonomía profesional, "
-            "el cual constituye una garantía institucional del ejercicio de la medicina. Las "
-            "decisiones terapéuticas adoptadas por el médico tratante, en virtud de su formación "
-            "científica y del conocimiento directo del paciente, no pueden ser revocadas por "
-            "instancias administrativas ajenas al acto médico sin contrapeso científico equivalente.»"
+        "titulo": "Seguridad social y tratamiento asilar de personas con discapacidad psiquica",
+        "ratio": (
+            "Obligaciones del Estado y de las instituciones de salud frente al acceso a servicios "
+            "de personas con enfermedad mental cronica. NO trata sobre autonomia del medico "
+            "tratante. "
         ),
-        "aplica_a": "Glosas de pertinencia clínica (CL/PE)",
-        "keywords": ["T-478", "autonomía médica", "médico tratante", "pertinencia"],
+        "aplica_a": "No aplicable a glosas de pertinencia ni de autonomia medica",
+        "magistrado_ponente": "Alejandro Martinez Caballero",
+        "keywords": ["T-478", "discapacidad psiquica", "tratamiento asilar"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-121 DE 2015": {
         "nombre": "Sentencia T-121 de 2015",
         "corte": "Corte Constitucional",
-        "titulo": "Carácter recomendativo de las Guías de Práctica Clínica (GPC)",
-        "ratio": "Las Guías de Práctica Clínica del Ministerio de Salud tienen carácter recomendativo, no imperativo. La autonomía profesional del médico tratante permite apartarse de ellas cuando las particularidades clínicas del paciente lo justifiquen.",
-        "ratio_literal": "Las guías de práctica clínica constituyen recomendaciones que orientan la decisión médica, pero no la sustituyen. La autonomía profesional del médico tratante permite, e incluso obliga, apartarse de ellas cuando las particularidades del paciente así lo demanden.",
-        "extracto_judicial": (
-            "«Las guías de práctica clínica son instrumentos orientadores, no imperativos, "
-            "que reconocen la naturaleza individual de cada paciente. La medicina no es una "
-            "ciencia algorítmica; el médico tratante, con la información clínica del caso "
-            "concreto, conserva la potestad de adoptar la decisión más adecuada para la "
-            "salud del paciente, aún cuando esta difiera de la recomendación general.»"
+        "titulo": "Autorizacion de procedimientos quirurgicos ordenados al menor (epispadias)",
+        "ratio": (
+            "La EPS debe autorizar los procedimientos ordenados por el medico tratante cuando el "
+            "servicio se requiere con necesidad. NO trata sobre las Guias de Practica Clinica ni "
+            "sobre su caracter recomendativo. "
         ),
-        "aplica_a": "Glosas CL0103 (no acorde a GPC) — defiende la autonomía sobre la recomendación",
-        "keywords": ["T-121", "GPC", "guías de práctica clínica", "recomendativo", "autonomía"],
+        "aplica_a": "Autorizacion de servicios ordenados por el tratante",
+        "magistrado_ponente": "Luis Guillermo Guerrero Perez",
+        "keywords": ["T-121", "autorizacion", "medico tratante", "menor"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-171 DE 2018": {
         "nombre": "Sentencia T-171 de 2018",
         "corte": "Corte Constitucional",
-        "titulo": "Pertinencia médica y autoridad del tratante",
-        "ratio": "El criterio del médico tratante prevalece sobre la auditoría administrativa cuando existe sustento clínico. La EPS no puede negar sin prueba técnica equivalente.",
         "ratio_literal": "La auditoría administrativa carece de potestad para negar procedimientos médicamente indicados cuando no aporta contradicción científica con sustento clínico equivalente al del médico tratante.",
-        "aplica_a": "Defensa de pertinencia clínica y servicios especializados",
-        "keywords": ["T-171", "pertinencia", "autoridad médica"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
+        "titulo": "Atencion integral a adulta mayor tras fractura de cadera",
+        "ratio": (
+            "La EPS no presto atencion integral a una adulta mayor de 88 anos. La Corte reconoce "
+            "la primacia del criterio del medico tratante, pero el eje del fallo es garantizar un "
+            "diagnostico efectivo integral, no fijar una regla sobre auditoria de cuentas."
+        ),
+        "aplica_a": "Atencion integral y valoracion medica",
+        "magistrado_ponente": "Cristina Pardo Schlesinger",
+        "keywords": ["T-171", "atencion integral", "medico tratante"],
     },
     "SENTENCIA T-134 DE 2022": {
         "nombre": "Sentencia T-134 de 2022",
         "corte": "Corte Constitucional",
         "titulo": "Oportunidad en prestación de servicios de salud",
         "ratio": "Las demoras administrativas en autorizaciones o pagos violan el derecho fundamental a la salud. Las EPS no pueden trasladar su ineficiencia a pacientes o prestadores.",
-        "ratio_literal": "Las EPS no pueden trasladar al prestador ni al paciente las cargas derivadas de su propia ineficiencia administrativa en trámites de autorización o pago.",
         "aplica_a": "Glosas administrativas que trasladan cargas indebidas a la IPS",
         "keywords": ["T-134", "oportunidad", "demoras administrativas"],
+        "verificada": False,
     },
     "SENTENCIA T-050 DE 2017": {
         "nombre": "Sentencia T-050 de 2017",
         "corte": "Corte Constitucional",
         "titulo": "Atención integral y continuidad del tratamiento",
         "ratio": "Los pacientes tienen derecho a recibir atención continua sin interrupciones por cambios de EPS o trámites administrativos. El prestador que garantizó continuidad debe ser remunerado íntegramente.",
-        "ratio_literal": "La continuidad en la prestación de servicios de salud no puede ser interrumpida por trámites administrativos entre entidades del sistema, y quien la garantiza tiene derecho al reconocimiento íntegro.",
         "aplica_a": "Continuidad de tratamiento, oncología, crónicos",
         "keywords": ["T-050", "continuidad", "atención integral"],
+        "verificada": False,
     },
     # ─── Ronda 50 Paso 11: ampliación jurisprudencia ─────────────────────
     "SENTENCIA T-235 DE 1998": {
         "nombre": "Sentencia T-235 de 1998",
         "corte": "Corte Constitucional",
-        "titulo": "Historia clínica como prueba de la prestación",
-        "ratio": "La historia clínica institucional constituye plena prueba de los actos médicos realizados. La EPS no puede negar el pago alegando ausencia de soporte cuando la HC documenta la atención.",
-        "ratio_literal": "La historia clínica documenta de manera fehaciente la prestación efectiva del servicio y por sí misma constituye plena prueba para efectos del reconocimiento económico.",
-        "aplica_a": "Glosas SO0101, SO0102 (soportes faltantes) cuando la HC sí documenta",
-        "keywords": ["T-235", "historia clínica", "soportes", "plena prueba", "1995/1999"],
+        "titulo": "Participacion politica — exclusion de listas electorales universitarias",
+        "ratio": (
+            "Derechos de participacion en elecciones internas de una universidad publica. NO trata "
+            "de salud, ni de historia clinica, ni de prestacion de servicios. "
+        ),
+        "aplica_a": "Ninguna glosa de salud — materia ajena",
+        "magistrado_ponente": "Fabio Moron Diaz",
+        "keywords": ["T-235", "participacion politica"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA SU-480 DE 1997": {
         "nombre": "Sentencia SU-480 de 1997",
         "corte": "Corte Constitucional (Sala Plena)",
-        "titulo": "Atención inicial de urgencias sin autorización",
-        "ratio": "La sala plena unificó: la atención inicial de urgencias es obligatoria sin autorización previa. Cualquier exigencia administrativa previa que retrase la atención es inconstitucional.",
-        "ratio_literal": "Ningún requisito formal previo, incluyendo la autorización de la entidad pagadora, puede oponerse a la atención inicial de urgencias.",
-        "aplica_a": "Urgencias — autoridad de unificación (vincula a todas las salas)",
-        "keywords": ["SU-480", "urgencias", "unificación", "sala plena", "autorización previa"],
+        "titulo": "Medicamentos no incluidos en el POS (antirretrovirales, VIH/sida)",
+        "ratio": (
+            "La EPS debe entregar el medicamento prescrito por el medico tratante aunque no figure "
+            "en el listado, cuando esta de por medio la vida del paciente, y puede repetir contra "
+            "el Estado. NO trata sobre atencion inicial de urgencias. "
+        ),
+        "aplica_a": "Cobertura de medicamentos fuera del listado",
+        "magistrado_ponente": "Alejandro Martinez Caballero",
+        "keywords": ["SU-480", "medicamentos no POS", "antirretrovirales"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-313 DE 2007": {
         "nombre": "Sentencia T-313 de 2007",
         "corte": "Corte Constitucional",
         "titulo": "Autorización tácita por silencio administrativo",
         "ratio": "Si la EPS no responde la solicitud de autorización en el plazo legal, opera el silencio positivo: el servicio queda autorizado y la EPS está obligada al pago íntegro sin glosa por autorización.",
-        "ratio_literal": "El silencio administrativo en materia de autorizaciones de salud opera a favor del usuario y del prestador, generando derechos plenamente exigibles.",
         "aplica_a": "Glosas AU0101, AU0201 cuando hubo solicitud sin respuesta dentro del plazo",
         "keywords": ["T-313", "silencio positivo", "autorización tácita", "plazo respuesta"],
+        "verificada": False,
     },
     "SENTENCIA T-642 DE 2008": {
         "nombre": "Sentencia T-642 de 2008",
         "corte": "Corte Constitucional",
-        "titulo": "Flujo de recursos y pago oportuno a IPS",
-        "ratio": "Las EPS deben pagar a los prestadores en los términos del art. 13 Ley 1122/2007. El retraso injustificado vulnera el derecho a la salud porque pone en riesgo la sostenibilidad de la red prestadora.",
-        "ratio_literal": "El pago oportuno a la red prestadora es condición esencial para la garantía del derecho fundamental a la salud, y su retraso o negación injustificada compromete la responsabilidad de la entidad responsable del pago.",
-        "aplica_a": "Defensa frente a glosas usadas como herramienta dilatoria de pago",
-        "keywords": ["T-642", "pago oportuno", "flujo recursos", "Ley 1122 art 13"],
+        "titulo": "Transporte, alojamiento y manutencion para el tratamiento de un menor",
+        "ratio": (
+            "La EPS debe sufragar los gastos de desplazamiento y hospedaje del paciente para "
+            "acceder al tratamiento. NO trata sobre flujo de recursos ni sobre el pago oportuno de "
+            "la EPS a la IPS. "
+        ),
+        "aplica_a": "Gastos de acceso al tratamiento del paciente",
+        "magistrado_ponente": "Nilson Pinilla Pinilla",
+        "keywords": ["T-642", "transporte", "alojamiento"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-053 DE 2009": {
         "nombre": "Sentencia T-053 de 2009",
         "corte": "Corte Constitucional",
-        "titulo": "Inadmisibilidad de glosas injustificadas",
-        "ratio": "La formulación de glosas sin sustento técnico-jurídico configura abuso del derecho y mala fe contractual. La EPS debe motivar cada glosa con base normativa y probatoria suficiente.",
-        "ratio_literal": "Las objeciones a la facturación deben ser técnicamente sustentadas; las formuladas sin motivación adecuada constituyen abuso del derecho y vulneran el principio de buena fe contractual (Art. 871 C. Comercio).",
-        "aplica_a": "Glosas FA injustificadas, glosas sin fundamento normativo o probatorio",
-        "keywords": ["T-053", "glosas injustificadas", "buena fe", "abuso del derecho", "Art. 871"],
+        "titulo": "Tratamiento integral a persona con paralisis cerebral y epilepsia",
+        "ratio": (
+            "El tratamiento integral no se agota en el suministro de medicamentos: comprende todos "
+            "los servicios e insumos relacionados con la patologia. NO trata sobre glosas de la EPS "
+            "a la IPS. "
+        ),
+        "aplica_a": "Atencion integral al paciente",
+        "magistrado_ponente": "Humberto Antonio Sierra Porto",
+        "keywords": ["T-053", "tratamiento integral", "paralisis cerebral"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "CONSEJO_ESTADO_2018_00154": {
         "nombre": "Consejo de Estado, Sec. Tercera, Rad. 2018-00154",
@@ -1463,147 +1982,185 @@ JURISPRUDENCIA = {
     # ─── R52 B: ampliación catálogo de jurisprudencia ──────────────────────
     "SENTENCIA T-024 DE 2009": {
         "nombre": "Sentencia T-024 de 2009",
-        "titulo": "Pago de servicios de salud — obligación EPS",
         "ambito": "Glosas y mora en pago a IPS — derecho fundamental afectado",
         "vigente": True,
-        "ratio": "Las EPS no pueden trasladar a las IPS las consecuencias económicas de su gestión administrativa interna mediante glosas dilatorias. El pago oportuno es presupuesto para garantizar el derecho a la salud.",
-        "aplica_a": "Defensa contra glosas reiterativas que dilatan el pago",
-        "keywords": ["T-024/2009", "pago oportuno", "glosas dilatorias"],
+        "titulo": "Custodia de menor y restitucion por via de tutela",
+        "ratio": (
+            "Derecho de familia: custodia de una nina e interes superior del menor, en tutela "
+            "contra el ICBF. NO trata del pago de servicios de salud ni de obligaciones de las "
+            "EPS."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Rodrigo Escobar Gil",
+        "keywords": ["T-024", "custodia", "interes superior del menor"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-744 DE 2009": {
         "nombre": "Sentencia T-744 de 2009",
-        "titulo": "Acceso a servicios y autorización médica — autonomía profesional",
         "ambito": "Pertinencia médica vs. negativa de la EPS",
         "vigente": True,
-        "ratio": "La autonomía del médico tratante es la regla; la EPS no puede sustituir el criterio médico ni condicionar la prestación a autorizaciones administrativas que generen barreras.",
-        "aplica_a": "Defensa de glosas por pertinencia donde la EPS cuestiona criterio del tratante",
-        "keywords": ["T-744/2009", "autonomía médica", "barreras"],
+        "titulo": "Salud de una persona privada de la libertad con enfermedad mental",
+        "ratio": (
+            "Acceso a los servicios de salud de un interno con enfermedad mental. Toca el acceso "
+            "y la autorizacion, pero NO fija una regla general de autonomia profesional frente a "
+            "la auditoria de la EPS: no sirve como fundamento de pertinencia clinica."
+        ),
+        "aplica_a": "Acceso a servicios de personas privadas de la libertad",
+        "magistrado_ponente": "Gabriel Eduardo Mendoza Martelo",
+        "keywords": ["T-744", "privados de la libertad", "salud mental"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-940 DE 2009": {
         "nombre": "Sentencia T-940 de 2009",
-        "titulo": "Pago integral a IPS — no fragmentación arbitraria",
         "ambito": "Glosa parcial — proporcionalidad",
         "vigente": True,
-        "ratio": "Las glosas parciales solo proceden sobre los rubros efectivamente cuestionados, debidamente fundamentados; rebajas globales o porcentuales sin sustento técnico violan el debido proceso contractual.",
-        "aplica_a": "Defensa contra glosas tipo 'rebaja global' del valor facturado",
-        "keywords": ["T-940/2009", "glosa parcial", "rebaja global", "proporcionalidad"],
+        "titulo": "Hemodialisis sin contrato vigente con la IPS (insuficiencia renal terminal)",
+        "ratio": (
+            "La EPS-S debe autorizar la hemodialisis en la IPS que la presta aunque no tenga "
+            "contrato vigente con ella, y garantizar el tratamiento integral. Es una orden a "
+            "favor del PACIENTE. NO trata del pago de facturas a las IPS ni de fragmentacion de "
+            "pagos."
+        ),
+        "aplica_a": "Acceso del paciente a la IPS aunque no haya contrato",
+        "magistrado_ponente": "Luis Ernesto Vargas Silva",
+        "keywords": ["T-940", "hemodialisis", "sin contrato", "tratamiento integral"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-117 DE 2013": {
         "nombre": "Sentencia T-117 de 2013",
-        "titulo": "Continuidad del tratamiento — atención integral",
         "ambito": "Cobertura — interrupción de tratamiento por glosa",
         "vigente": True,
-        "ratio": "Una vez iniciado un tratamiento, la EPS no puede interrumpirlo bajo el argumento de exclusión del PBS si existe pertinencia médica documentada.",
-        "aplica_a": "Glosas de cobertura sobre tratamientos en curso",
-        "keywords": ["T-117/2013", "continuidad", "tratamiento", "integralidad"],
+        "titulo": "Tutela contra providencia judicial por defecto factico (materia penal)",
+        "ratio": (
+            "Exclusion de una entrevista forense del juicio oral. Es derecho procesal penal y "
+            "probatorio. NO trata de continuidad del tratamiento ni de atencion integral en "
+            "salud."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Alexei Julio Estrada",
+        "keywords": ["T-117", "defecto factico", "prueba penal"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-307 DE 2017": {
         "nombre": "Sentencia T-307 de 2017",
-        "titulo": "Recobros NO PBS — flujo oportuno de recursos",
         "ambito": "MIPRES y recobros — barreras administrativas",
         "vigente": True,
-        "ratio": "Las trabas administrativas para reconocer recobros NO PBS deben interpretarse en favor del prestador y del usuario; las glosas a recobros deben fundarse en hechos objetivos verificables.",
-        "aplica_a": "Glosas a recobros MIPRES/NO PBS",
-        "keywords": ["T-307/2017", "recobros", "MIPRES", "no PBS"],
-    },
-    "SENTENCIA T-543 DE 2013": {
-        "nombre": "Sentencia T-543 de 2013",
-        "titulo": "Atención inicial de urgencias — pago obligatorio",
-        "ambito": "Urgencias sin autorización previa",
-        "vigente": True,
-        "ratio": "La atención inicial de urgencias es obligatoria sin autorización previa y debe ser cubierta por la EPS o el FOSYGA/ADRES. La glosa por 'falta de autorización' en urgencias es contraria al ordenamiento.",
-        "aplica_a": "Glosa AU0101 (sin autorización) en servicios de urgencias",
-        "keywords": ["T-543/2013", "urgencias", "autorización previa", "AU0101"],
+        "titulo": "Pension de sobrevivientes de la companera permanente (Policia Nacional)",
+        "ratio": (
+            "Regimen pensional especial. NO trata de recobros NO PBS ni de flujo de recursos del "
+            "sistema de salud."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Gloria Stella Ortiz Delgado",
+        "keywords": ["T-307", "pension de sobrevivientes"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-126 DE 2018": {
         "nombre": "Sentencia T-126 de 2018",
-        "titulo": "Historia clínica como prueba plena",
         "ambito": "Soportes de glosa — valor probatorio de la HC",
         "vigente": True,
-        "ratio": "La historia clínica institucional, debidamente diligenciada, constituye prueba plena de los servicios efectivamente prestados, salvo prueba en contrario aportada por la EPS.",
-        "aplica_a": "Glosas SO0101 (soporte) cuando la HC respalda la atención",
-        "keywords": ["T-126/2018", "historia clínica", "prueba plena", "SO0101"],
+        "titulo": "Tutela contra providencia judicial — violencia sexual en el conflicto armado",
+        "ratio": (
+            "Acceso a la justicia de una victima de violencia sexual. NO fija ninguna regla sobre "
+            "la historia clinica como prueba, ni sobre facturacion o auditoria de cuentas "
+            "medicas."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Cristina Pardo Schlesinger",
+        "keywords": ["T-126", "violencia sexual", "acceso a la justicia"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA C-313 DE 2014": {
         "nombre": "Sentencia C-313 de 2014",
-        "titulo": "Control de constitucionalidad de la Ley Estatutaria 1751 de 2015",
         "ambito": "Salud como derecho fundamental autónomo",
         "vigente": True,
-        "ratio": "La salud es un derecho fundamental autónomo; ni la sostenibilidad fiscal ni los procedimientos administrativos pueden negar el acceso efectivo. La Corte declaró exequible la Ley Estatutaria con condicionamientos.",
-        "aplica_a": "Defensa estructural en glosas de cobertura/exclusión",
-        "keywords": ["C-313/2014", "Ley estatutaria", "derecho fundamental", "salud"],
+        "titulo": "Control previo de constitucionalidad de la Ley Estatutaria de Salud",
+        "ratio": (
+            "Revision PREVIA y automatica del proyecto que luego fue la Ley 1751 de 2015. El "
+            "asunto de fondo si es el derecho fundamental a la salud; el enunciado anterior decia "
+            "'Ley Estatutaria 1751 de 2015', que en 2014 aun no existia con ese numero."
+        ),
+        "aplica_a": "Marco general del derecho fundamental a la salud",
+        "magistrado_ponente": "Gabriel Eduardo Mendoza Martelo",
+        "keywords": ["C-313", "ley estatutaria", "derecho fundamental a la salud"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     # Ronda 15 (Bug P v2): sentencias específicas que aparecen en producción
     # y el verifier marcaba como inexistentes.
-    "SENTENCIA T-027 DE 2020": {
-        "nombre": "Sentencia T-027 de 2020",
-        "titulo": "Atención integral al menor con cáncer — Ley 1388/2010",
-        "ambito": "Pediatría oncológica — derecho a la salud reforzado del NNA",
-        "vigente": True,
-        "ratio": "La atención integral del menor con cáncer no admite barreras administrativas (PBS, MIPRES, CTC) cuando la vida está en riesgo. La EPS debe garantizar acceso pleno incluyendo terapias avanzadas cuando las líneas previas fracasan.",
-        "aplica_a": "Defensa de glosas a tratamientos oncológicos pediátricos de alto costo",
-        "keywords": ["T-027/2020", "cáncer infantil", "Ley 1388", "atención integral menor"],
-    },
-    "SENTENCIA T-553 DE 2024": {
-        "nombre": "Sentencia T-553 de 2024",
-        "titulo": "CAR-T cells en leucemia pediátrica refractaria — cobertura directa",
-        "ambito": "Terapias CAR-T en LLA pediátrica — eliminación de barreras MIPRES",
-        "vigente": True,
-        "ratio": "La Corte Constitucional ordenó la cobertura DIRECTA de terapias CAR-T (Tisagenlecleucel, Axicabtagene) en pacientes pediátricos con leucemia linfoblástica aguda refractaria a líneas previas, sin exigir trámites de MIPRES ni junta CRES, cuando hay riesgo vital inminente y opciones terapéuticas agotadas. Esta es la cita OBLIGATORIA en glosas a CAR-T pediátrico.",
-        "aplica_a": "Defensa Cart-T (Kymriah, Yescarta) en LLA pediátrica refractaria",
-        "keywords": [
-            "T-553/2024",
-            "CAR-T",
-            "Cart-T",
-            "Tisagenlecleucel",
-            "Kymriah",
-            "LLA pediátrica",
-        ],
-    },
     "SENTENCIA T-705 DE 2017": {
         "nombre": "Sentencia T-705 de 2017",
-        "titulo": "Atención en urgencias a migrantes irregulares — dignidad humana",
         "ambito": "Migrantes venezolanos sin afiliación al SGSSS — atención inicial obligatoria",
         "vigente": True,
-        "ratio": "La atención inicial de urgencias a migrantes sin afiliación al SGSSS es obligatoria por dignidad humana (Art. 1 CP). El pago, sin embargo, corresponde al Ente Territorial vía SGP (Decreto 064/2020), no a una EPS donde el paciente no estaba afiliado.",
-        "aplica_a": "Defensa de glosas en atención a migrantes irregulares",
-        "keywords": ["T-705/2017", "migrante", "Venezuela", "urgencias", "dignidad humana"],
+        "titulo": "Atencion en salud a un menor migrante venezolano",
+        "ratio": (
+            "Tutela de un menor venezolano contra un instituto departamental de salud. Trata la "
+            "atencion del migrante, pero el enunciado anterior la presentaba como regla de "
+            "urgencias: revisar el alcance antes de apoyarse en ella."
+        ),
+        "aplica_a": "Atencion a poblacion migrante",
+        "magistrado_ponente": "Jose Fernando Reyes Cuartas",
+        "keywords": ["T-705", "migrante", "menor"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-401 DE 1994": {
         "nombre": "Sentencia T-401 de 1994",
-        "titulo": "Dignidad del paciente psiquiátrico y contención mecánica",
         "ambito": "Salud mental — uso proporcional de contención mecánica",
         "vigente": True,
-        "ratio": "La contención mecánica es admisible como medida temporal y proporcional cuando hay riesgo inminente para la vida del paciente o terceros, debiéndose documentar cada episodio. NO es per se una violación a la dignidad cuando se aplica con criterio clínico y de último recurso.",
-        "aplica_a": "Defensa de glosas que alegan 'abuso de medida invasiva' en internación psiquiátrica",
-        "keywords": ["T-401/1994", "psiquiatría", "contención mecánica", "dignidad"],
+        "titulo": "Consentimiento idoneo del paciente frente al cambio de tratamiento",
+        "ratio": (
+            "El medico no puede cambiar unilateralmente el tratamiento sin el consentimiento "
+            "idoneo del paciente (caso de dialisis peritoneal). NO trata de contencion mecanica "
+            "ni de pacientes psiquiatricos."
+        ),
+        "aplica_a": "Autonomia del paciente y consentimiento informado",
+        "magistrado_ponente": "Eduardo Cifuentes Munoz",
+        "keywords": ["T-401", "consentimiento informado", "autonomia del paciente"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-1198 DE 2003": {
         "nombre": "Sentencia T-1198 de 2003",
-        "titulo": "Pago a prestadores — solidaridad financiera del SGSSS",
         "ambito": "Glosas dilatorias y bloqueo de cartera",
         "vigente": True,
-        "ratio": "El no pago de la EPS a la IPS amenaza la sostenibilidad del prestador y, por extensión, el derecho a la salud de los usuarios. Las glosas deben tramitarse en plazos razonables, no como mecanismo de retención de recursos.",
-        "aplica_a": "Glosas tipo 'bloqueo de cartera' sin sustento técnico",
-        "keywords": ["T-1198/2003", "bloqueo cartera", "solidaridad SGSSS"],
+        "titulo": "Continuidad del servicio e improcedencia de una nueva tutela",
+        "ratio": (
+            "Continuidad en la prestacion del servicio de salud, y por que no procede una segunda "
+            "tutela cuando ya hay fallo que ordeno el tratamiento. NO trata del pago a "
+            "prestadores ni de solidaridad financiera del sistema."
+        ),
+        "aplica_a": "Continuidad del tratamiento ya ordenado",
+        "magistrado_ponente": "Eduardo Montealegre Lynett",
+        "keywords": ["T-1198", "continuidad", "cosa juzgada"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-076 DE 2008": {
         "nombre": "Sentencia T-076 de 2008",
-        "titulo": "Atención a recién nacidos — cobertura inmediata",
         "ambito": "Cobertura — afiliación posterior al nacimiento",
         "vigente": True,
-        "ratio": "El recién nacido tiene cobertura desde el primer momento por la EPS de la madre, aun cuando el trámite formal de afiliación se haga después. Glosas por 'no afiliación' del neonato son improcedentes.",
-        "aplica_a": "Glosas de cobertura en atención perinatal",
-        "keywords": ["T-076/2008", "recién nacido", "afiliación", "cobertura inmediata"],
+        "titulo": "Derecho al diagnostico (complicaciones de un procedimiento estetico)",
+        "ratio": (
+            "Derecho a la salud, a la seguridad social y AL DIAGNOSTICO de una afiliada con "
+            "complicaciones tras un procedimiento estetico voluntario. NO trata de atencion a "
+            "recien nacidos ni de cobertura inmediata del neonato."
+        ),
+        "aplica_a": "Derecho al diagnostico",
+        "magistrado_ponente": "Rodrigo Escobar Gil",
+        "keywords": ["T-076", "derecho al diagnostico"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA SU-1023 DE 2001": {
         "nombre": "Sentencia SU-1023 de 2001",
-        "titulo": "Solidaridad del SGSSS y financiación cruzada",
         "ambito": "Estructura del SGSSS — UPC y compensación",
         "vigente": True,
-        "ratio": "El sistema de salud es solidario y de financiación cruzada; ninguna IPS pública puede ser usada como mecanismo de financiación de la liquidez de las EPS mediante glosas reiterativas.",
-        "aplica_a": "Argumento de fondo en glosas reiterativas a IPS pública (HUS)",
-        "keywords": ["SU-1023/2001", "solidaridad SGSSS", "IPS pública", "financiación cruzada"],
+        "titulo": "Mesadas pensionales de una empresa en liquidacion obligatoria",
+        "ratio": (
+            "Cinco tutelas acumuladas de pensionados de una empresa en liquidacion que dejo de "
+            "pagar las mesadas. Es materia pensional. NO trata de solidaridad del sistema de "
+            "salud ni de financiacion cruzada entre EPS e IPS."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Jaime Cordoba Trivino",
+        "keywords": ["SU-1023", "mesadas pensionales", "liquidacion"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     # ── Ronda 16 (26-jun-2026 — Bug P v3): jurisprudencia que la EPS
     #     SURA/NUEVA EPS/COMPENSAR invocaron y que el verifier marcaba
@@ -1611,62 +2168,99 @@ JURISPRUDENCIA = {
     #     reconozca y el dictamen pueda responder por nombre.
     "SENTENCIA T-385 DE 2023": {
         "nombre": "Sentencia T-385 de 2023 (Corte Constitucional)",
-        "titulo": "Derecho a la salud — paciente complejo y bilateralidad EPS-IPS",
         "ambito": "Defensa de prestadores frente a EPS — obligaciones bilaterales y continuidad",
         "vigente": True,
-        "ratio": "La Corte reiteró que la relación EPS-IPS es bilateral: a la obligación del prestador de garantizar atención corresponde la obligación correlativa de la EPS de pagar oportunamente. La sostenibilidad de la red prestadora es presupuesto material del derecho a la salud. Las glosas dilatorias o reiterativas vulneran este equilibrio.",
-        "aplica_a": "Glosas sistemáticas o dilatorias contra IPS pública",
-        "keywords": [
-            "T-385/2023",
-            "bilateralidad",
-            "EPS-IPS",
-            "sostenibilidad red",
-            "glosas dilatorias",
-        ],
+        "titulo": "Nacionalidad y personalidad juridica de una nina en riesgo de apatridia",
+        "ratio": (
+            "Derechos a la nacionalidad y a la personalidad juridica de una nina nacida en "
+            "Venezuela, hija de extranjeros residentes en Colombia. NO trata del derecho a la "
+            "salud del paciente complejo ni de la relacion EPS-IPS."
+        ),
+        "aplica_a": "Ninguna glosa de cuentas medicas — materia ajena",
+        "magistrado_ponente": "Jorge Enrique Ibanez Najar",
+        "keywords": ["T-385", "nacionalidad", "apatridia"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "SENTENCIA T-970 DE 2014": {
         "nombre": "Sentencia T-970 de 2014 (Corte Constitucional)",
-        "titulo": "Muerte digna y autonomía del paciente terminal",
         "ambito": "Cuidados paliativos, sedación terminal y voluntad anticipada",
         "vigente": True,
-        "ratio": "Reconoció la muerte digna como derecho fundamental y ordenó a MinSalud reglamentar su procedimiento. Los servicios de cuidados paliativos, sedación terminal y manejo de dolor en paciente terminal son cobertura obligatoria por dignidad humana (Art. 1 CP) y libre desarrollo de la personalidad (Art. 16 CP). Cualquier glosa que cuestione la pertinencia de cuidados paliativos vulnera el precedente.",
-        "aplica_a": "Glosas a servicios de paliativos, oncología terminal, sedación, manejo del dolor",
-        "keywords": [
-            "T-970/2014",
-            "muerte digna",
-            "cuidados paliativos",
-            "sedación terminal",
-            "autonomía paciente",
-        ],
+        "titulo": "Derecho a morir dignamente",
+        "ratio": (
+            "Derecho fundamental a morir dignamente de una paciente con cancer terminal. "
+            "Verificada: el enunciado guardado era correcto."
+        ),
+        "aplica_a": "Muerte digna y autonomia del paciente terminal",
+        "magistrado_ponente": "Luis Ernesto Vargas Silva",
+        "keywords": ["T-970", "muerte digna", "paciente terminal"],
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
     },
     "AUTO 037 DE 2024": {
-        "nombre": "Auto 037 de 2024 (Corte Constitucional — seguimiento T-553/2024)",
-        "titulo": "Seguimiento al cumplimiento de órdenes en terapia CAR-T (Tisagenlecleucel)",
-        "ambito": "Tecnologías de alto costo en cáncer hemato-oncológico",
+        # Corregido el 24-08-2026. El sistema lo describía como «seguimiento a
+        # la Sentencia T-553/2024» sobre terapia CAR-T. El Auto existe —se leyó
+        # su texto oficial completo— pero no dice una palabra de CAR-T (cero
+        # menciones), y la sentencia a la que decía darle seguimiento no
+        # existe. Lo que trata de verdad es mucho más útil para cartera.
+        "nombre": "Auto 037 de 2024 (Corte Constitucional, Sala Plena)",
+        "titulo": (
+            "Jurisdicción competente para cobrar ejecutivamente facturas de servicios de salud"
+        ),
+        "ambito": "Cobro judicial de facturas de la IPS a la entidad pagadora",
         "vigente": True,
-        "ratio": "Auto de seguimiento que ordena medidas urgentes a EPS y entidades pagadoras para garantizar el acceso efectivo a terapia CAR-T cell ordenada por orden judicial. Reafirma que el costo del tratamiento no es eximente cuando hay orden de tutela en firme. Aplica directamente a glosas que cuestionan recobros por Cart-T.",
-        "aplica_a": "Glosas de recobro o pertinencia en terapia Cart-T",
+        "ratio": (
+            "Conflicto de jurisdicciones (expediente CJU-4122): un hospital demandó a "
+            "una caja de compensación para que se declarara la deuda por la factura de "
+            "una atención inicial de urgencias. La Sala Plena resolvió que es la "
+            "jurisdicción ORDINARIA LABORAL la competente para los procesos ejecutivos "
+            "en que se pretende el pago de obligaciones derivadas de facturas por "
+            "prestación de servicios de salud."
+        ),
+        "aplica_a": (
+            "Cobro judicial de cartera a la entidad pagadora: sirve para saber ante qué "
+            "juez se demanda, no como argumento dentro de la respuesta a una glosa."
+        ),
+        "magistrado_ponente": "Antonio José Lizarazo Ocampo (sustanciador)",
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
         "keywords": [
             "Auto 037/2024",
-            "CAR-T",
-            "Tisagenlecleucel",
-            "cumplimiento tutela",
-            "seguimiento",
+            "conflicto de jurisdicciones",
+            "proceso ejecutivo",
+            "cobro de facturas",
+            "jurisdicción laboral",
         ],
     },
     "AUTO 116 DE 2024": {
-        "nombre": "Auto 116 de 2024 (Corte Constitucional)",
-        "titulo": "Sostenibilidad fiscal del SGSSS y giros directos a IPS públicas",
-        "ambito": "Crisis financiera de EPS intervenidas — protección de IPS prestadora",
+        # Corregido el 24-08-2026. El sistema lo describía como un auto de
+        # «sostenibilidad fiscal del SGSSS y giros directos de ADRES a IPS
+        # públicas», y lo ofrecía como «soporte fuerte» para glosas de EPS
+        # intervenidas. Se leyó su texto oficial: CERO menciones de ADRES, cero
+        # de giro directo, cero de sostenibilidad. Nada de eso está ahí.
+        "nombre": "Auto 116 de 2024 (Corte Constitucional, Sala Plena)",
+        "titulo": (
+            "Jurisdicción competente cuando se demanda un acto administrativo de "
+            "una entidad pública"
+        ),
+        "ambito": "Conflicto de jurisdicciones — nulidad y restablecimiento del derecho",
         "vigente": True,
-        "ratio": "La Corte ordenó medidas estructurales para el saneamiento de cartera de IPS públicas frente a EPS intervenidas o liquidadas (Nueva EPS, SaludCoop, Cafesalud histórica, Medimás). El giro directo desde ADRES a la IPS pública es mecanismo excepcional pero exigible cuando la EPS deudora no garantiza el pago. Soporte fuerte para glosas con riesgo de no-pago por liquidación inminente.",
-        "aplica_a": "Glosas de EPS intervenidas o en proceso de liquidación — fundamento para giro directo ADRES",
+        "ratio": (
+            "Conflicto de jurisdicciones (expediente CJU-4747) entre un juzgado "
+            "administrativo y uno laboral. Una EPS demandó las resoluciones con que "
+            "Colpensiones le ordenó reintegrar subsidios de incapacidades posteriores "
+            "al día 540. La Sala Plena resolvió que corresponde a la jurisdicción "
+            "CONTENCIOSO ADMINISTRATIVA conocer de actos sujetos al derecho "
+            "administrativo cuando está involucrada una entidad pública."
+        ),
+        "aplica_a": (
+            "Define ante qué juez se demanda un acto administrativo. No es argumento "
+            "para responder una glosa."
+        ),
+        "magistrado_ponente": "Natalia Ángel Cabo",
+        "verificada": "24-08-2026 relatoria Corte Constitucional",
         "keywords": [
             "Auto 116/2024",
-            "sostenibilidad SGSSS",
-            "giro directo",
-            "ADRES",
-            "EPS intervenida",
+            "conflicto de jurisdicciones",
+            "nulidad y restablecimiento",
+            "incapacidades posteriores al día 540",
         ],
     },
 }
@@ -1677,6 +2271,24 @@ JURISPRUDENCIA = {
 # ═══════════════════════════════════════════════════════════════════
 
 ACUERDOS = {
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "ACUERDO 080 DE 2022 CSSMP": {
+        "nombre": "Acuerdo 080 de 2022 (Consejo Superior de Salud de las FF.MM. y de Policia)",
+        "titulo": "Gestion farmaceutica del Subsistema de Salud de las Fuerzas Militares",
+        "ambito": "Sanidad Militar y de Policia — medicamentos cubiertos",
+        "vigente": True,
+        "notas": (
+            "Es la lista oficial de medicamentos cubiertos del subsistema (el MUMT) y las reglas "
+            "de dispensacion. Se cita en glosas de medicamentos de Dispensario y Sanidad Militar."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["sanidad militar", "MUMT", "gestion farmaceutica", "CSSMP"],
+    },
     "ACUERDO 002 DE 2001 CSSFFMM": {
         "nombre": "Acuerdo 002 del 27-04-2001 Consejo Superior de Salud FF.MM.",
         "titulo": "Régimen de atención y remuneración a IPS prestadoras",
@@ -1917,15 +2529,21 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
             "CIRCULAR 030 DE 2013",
             "RESOLUCION 2284 DE 2023",
         ],
-        "AU": ["LEY 100 DE 1993", "SENTENCIA T-1025 DE 2002", "DECRETO 4747 DE 2007"],
+        # T-1025/2002 se retiro el 24-08-2026: verificada contra la relatoria de la
+        # Corte, trata de consentimiento informado en cirugia de asignacion de sexo,
+        # no de urgencias. El anclaje correcto de urgencias es el Art. 168 de la
+        # Ley 100 y el Art. 20 del Decreto 4747, que ya estaban aqui.
+        "AU": ["LEY 100 DE 1993", "DECRETO 4747 DE 2007"],
         "CO": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-760 DE 2008"],
         "CL": [
             "LEY 1751 DE 2015",
-            "SENTENCIA T-478 DE 1995",
+            # T-478/1995 se retiro el 24-08-2026: verificada, trata de seguridad
+            # social de personas con discapacidad psiquica, no de autonomia medica.
+            # El anclaje correcto es el Art. 17 de la Ley 1751, que ya estaba aqui.
             "SENTENCIA T-171 DE 2018",
             "RESOLUCION 1995 DE 1999",
         ],
-        "PE": ["LEY 1751 DE 2015", "SENTENCIA T-478 DE 1995", "RESOLUCION 1995 DE 1999"],
+        "PE": ["LEY 1751 DE 2015", "SENTENCIA T-171 DE 2018", "RESOLUCION 1995 DE 1999"],
         "FA": [
             "LEY 100 DE 1993",
             "RESOLUCION 1995 DE 1999",
@@ -1937,6 +2555,6 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
             "CODIGO DE COMERCIO - ARTICULO 871",
             "RESOLUCION 5269 DE 2017",
         ],
-        "ME": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-478 DE 1995"],
+        "ME": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017"],
     }
     return mapping.get(prefijo, ["LEY 100 DE 1993", "RESOLUCION 2284 DE 2023"])

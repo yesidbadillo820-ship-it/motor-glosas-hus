@@ -203,7 +203,25 @@ class TestRegresionRonda11SiguenAplicandose:
         resultado = _neutralizar_alucinaciones_prompt(texto)
         assert "CUPS 1234" not in resultado
 
-    def test_resolucion_2641_2024_sigue_neutralizada(self):
+    def test_la_resolucion_2641_2024_ya_no_se_neutraliza(self):
+        """La Resolución 2641 de 2024 NO era inventada.
+
+        Estas pruebas exigían que el motor la borrara del dictamen. Se creía
+        inventada porque el prompt la usaba como EJEMPLO de norma prohibida y la IA
+        la copiaba. Al verificarla el 25-08-2026 contra la fuente oficial resultó
+        REAL: es la Resolución 2641 del 23 de diciembre de 2024, la que estableció
+        la CUPS que rigió durante 2025.
+
+        O sea que el motor borraba la cita CORRECTA y en su lugar dejaba «la
+        normativa vigente del Ministerio de Salud» — una frase sin ley, decreto ni
+        artículo, justo la clase de pseudo-norma que la auditoría independiente
+        reprochó. Se retiró esa neutralización.
+
+        Hoy esa resolución está derogada (la Res. 2706 de 2025 la reemplazó desde el
+        1 de enero de 2026), y de eso avisa el verificador de citas, que ahora sí
+        mira la vigencia. Avisar no es lo mismo que borrar: para un servicio
+        prestado en 2025 citarla es lo correcto.
+        """
         texto = "Conforme a la Resolución 2641 de 2024 art. 5"
         resultado = _neutralizar_alucinaciones_prompt(texto)
-        assert "Resolución 2641 de 2024" not in resultado
+        assert "2641 de 2024" in resultado, "se volvió a borrar una cita correcta"

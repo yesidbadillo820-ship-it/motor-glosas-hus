@@ -685,9 +685,13 @@ def _parsear_simple_fijo(
     patron_descuento = re.compile(
         r"(?:^|\s)(SOAT|ISS|UVR|UVB|UVT)\s*[-+\u2212\u2013]\s*\d{1,3}\s*%"
     )
+    # El encabezado que dio el valor, cuando fue una columna de descuento.
+    # Sirve abajo para que la modalidad salga de LA MISMA CELDA que el número.
+    hdr_descuento = ""
     for i_desc, h_desc in enumerate(headers):
         if h_desc and patron_descuento.search(h_desc):
             idx_valor = i_desc
+            hdr_descuento = h_desc
             break
     if idx_valor is None:
         # 24-08-2026 — LA PRIORIDAD SE RESPETA DE VERDAD: un candidato a la
@@ -766,9 +770,24 @@ def _parsear_simple_fijo(
         desc = (
             _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
         )
-        modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
-        if not modalidad:
-            modalidad = _modalidad_de_hoja(nombre_hoja)
+        # LA MODALIDAD SALE DE LA MISMA CELDA QUE EL NÚMERO (24-08-2026).
+        #
+        # La auditoría encontró el mismo contrato (0525/2017 de POSITIVA) y el
+        # mismo CUPS leídos de dos maneras dentro del mismo lote: uno decía
+        # "$915.051, modalidad SOAT" y otros dos "SOAT -15 %". El 85 % de
+        # $915.051 es $777.793, así que una de las dos lecturas estaba mal.
+        #
+        # Pasaba porque el número salía de una columna y las palabras de OTRA,
+        # y nadie las cruzaba. Cuando el valor se tomó de una columna cuyo
+        # encabezado YA dice el descuento ("SOAT -15%"), ese encabezado ES la
+        # modalidad: usarlo evita que el número y las palabras se contradigan.
+        # Es lo que ya hace bien el lector del Anexo 3 en este mismo archivo.
+        if hdr_descuento:
+            modalidad = _limpiar_descripcion(hdr_descuento)
+        else:
+            modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
+            if not modalidad:
+                modalidad = _modalidad_de_hoja(nombre_hoja)
         # Si hay código IPS propio, guardarlo en observación (útil para trazabilidad)
         cod_ips = str(_celda(fila, idx_cod_ips) or "").strip() if idx_cod_ips is not None else ""
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None

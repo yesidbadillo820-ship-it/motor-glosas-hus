@@ -100,7 +100,8 @@ CONTRATOS_HUS: dict[str, dict] = {
             "(descuento -10%) y servicios institucionales HUS valorados en "
             "tarifa propia. Tope Plan Complementario IV nivel catastróficas: "
             "$109.959.400. Medicamentos: tarifas IPS según listado trimestral "
-            "(Res. 2641/2024). Material de osteosíntesis: 12% sobre valor "
+            "(Res. 2641/2024 para 2025; Res. 2706/2025 desde 2026). Material de "
+            "osteosíntesis: 12% sobre valor "
             "facturado (Res. 171/2024). Régimen contributivo Ley 100/1993. "
             "NO aplican normas extranjeras (NOM mexicana, ISO 9001, IEC, "
             "IEEE, AHA/ASA) como fundamento de glosa en Colombia."
@@ -141,8 +142,13 @@ CONTRATOS_HUS: dict[str, dict] = {
             "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora "
             "(cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → "
             "FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo "
-            "especial: Decreto 5159 de 2015 (atención en salud PPL), Ley 1709 "
-            "de 2014 (reforma penitenciaria), Acuerdo 002 de 2010 USPEC (modelo "
+            # Corregido el 25-08-2026: la 5159 de 2015 es RESOLUCIÓN, no decreto
+            # (así la nombra bien el resto del motor), y el "Acuerdo 002 de
+            # 2010 USPEC" NO EXISTE — se retiró. El modelo de atención de PPL
+            # lo fija el Decreto 1142 de 2016, que sí es real y ya está en el
+            # corpus.
+            "especial: Resolución 5159 de 2015 (atención en salud PPL), Ley 1709 "
+            "de 2014 (reforma penitenciaria), Decreto 1142 de 2016 (modelo "
             "de atención), Sentencia T-388 de 2013 (Estado de Cosas "
             "Inconstitucional en cárceles → obligación reforzada del Estado), "
             "Lineamiento Nacional Programa Nacional Tuberculosis 2025 (cubre "
@@ -184,8 +190,9 @@ CONTRATOS_HUS: dict[str, dict] = {
             "especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, "
             "Bucaramanga. RÉGIMEN ESPECIAL DEL MAGISTERIO — normas aplicables: "
             "Decreto 3752 de 2003 (régimen de excepción del magisterio), Decreto "
-            "1655 de 2015 (estructura FOMAG), Resolución 5853 de 2003 (modelo de "
-            "atención), Ley 91 de 1989 (Fondo Nacional de Prestaciones Sociales "
+            # La "Resolución 5853 de 2003" se retiró el 25-08-2026: no existe.
+            "1655 de 2015 (estructura FOMAG), Ley 91 de 1989 (Fondo Nacional de "
+            "Prestaciones Sociales "
             "del Magisterio). NO aplican: Decreto-Ley 1795 de 2000 (ese es "
             "Fuerzas Militares), Decreto 1295 de 1994 (ese es ARL — riesgo "
             "profesional, no aplica a embarazo/maternidad incluso si ocurre "
@@ -929,7 +936,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 ═══════════════ REGLAS DE DEFENSA INTELIGENTE (RONDA 14, 25-jun-2026) ═══════════════
 6. RESPONDÉ POR NOMBRE A CADA CONTRAARGUMENTO ESPECÍFICO: si la EPS cita un Auto/Sentencia/Concepto específico (ej. "Auto 116 de 2024", "Sentencia T-934/2023", "Concepto 0156-2022 SuperSalud"), tu defensa DEBE responder por nombre a esa cita. "El que calla, otorga" — omitir el contraargumento es una concesión tácita. Distinguí jurisprudencia que ratifica vs jurisprudencia que matiza: si la EPS invoca un Auto que limita una Sentencia previa, contraatacá con un fallo MÁS RECIENTE o argumentá la inaplicabilidad por hecho distinto.
 7. NO DEFIENDAS A CIEGAS — RECONOCÉ BASE PARCIAL DE LA EPS: a veces la EPS tiene razón administrativa parcial. Casos donde corresponde aceptar y proponer conciliación parcial en vez de defender 100%:
-   - Paciente NO afiliado al SGSSS (migrante irregular sin PPT/PEP) — la obligación de atención inicial sí es del HUS (Art. 168 Ley 100, T-705/2017 dignidad migrante), pero el pago de los servicios prestados corresponde al Ente Territorial vía SGP (Decreto 064/2020, Resolución 010/2018), NO a una EPS donde el paciente no estaba afiliado. La defensa debe redirigir el cobro a Secretaría de Salud Departamental.
+   - Paciente NO afiliado al SGSSS (migrante irregular sin PPT/PEP) — la obligación de atención inicial sí es del HUS (Art. 168 Ley 100, T-705/2017 dignidad migrante), pero el pago de los servicios prestados corresponde al Ente Territorial vía SGP, NO a una EPS donde el paciente no estaba afiliado. La defensa debe redirigir el cobro a Secretaría de Salud Departamental.
    - Tarifa institucional cobrada en lugar de tarifa pactada del contrato: si el contrato tiene anexo tarifario explícito (UCI Nivel 3, UCI subespecialidad), NO inventés un nombre nuevo ("UCI hepatobiliar") para evadir el anexo. Aceptá el ajuste tarifario y pleítea solo el delta justificado clínicamente.
    - RIPS radicados fuera de plazo: la radicación tempestiva sí es requisito formal. La defensa correcta es solicitar levantamiento PARA REPETIR el RIPS, no negar la falla.
 8. JUSTIFICA CLÍNICAMENTE LAS DECISIONES MÉDICAS: cuando la EPS cuestiona un protocolo o uso "off-label", la defensa NO es solo "autonomía médica Ley 23/1981" — esa es defensa perezosa que la EPS desestima. La defensa correcta cita literatura clínica:
@@ -940,12 +947,12 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
    - Cardiopatía congénita compleja (síndrome de hipoplasia ventricular izquierdo HLHS) — cirugía estadiada de Norwood (Etapa I) seguida de Glenn (Etapa II) y Fontan (Etapa III): protocolo de ELECCIÓN. Recomendación AHA/ACC 2018 nivel A. Mortalidad sin cirugía > 99% en el primer mes de vida. La objeción "cirugía paliativa innecesaria" es injustificable — sin Norwood el paciente fallece.
    - VIH/SIDA + Síndrome de Reconstitución Inmune (IRIS) post-TARV: el deterioro clínico paradójico en las primeras semanas de tratamiento es complicación PREVISIBLE y protocolizada (CDC MMWR 2017, Resolución 1652/2021 Anexo VIH). La EPS NO puede glosar la hospitalización por "complicación evitable" — el IRIS es marcador de éxito inmunológico, no de mala praxis.
    - Hemofilia A/B con inhibidores ≥ 5 BU: el Factor VII activado recombinante (eptacog alfa) o el complejo aPCC (FEIBA) son indicación 1A en sangrado mayor refractario al factor concentrado convencional (WFH Guidelines 2020, Resolución 1652/2021). La objeción "uso compasivo no autorizado" es errónea — son medicamentos formulados en el PBS específicamente para este escenario.
-   - Cart-T cell therapy (Tisagenlecleucel, Axicabtagene): indicación 1B en linfoma B refractario tras 2 líneas previas (FDA 2017, INVIMA 2023). Procedimiento ÚNICO con potencial curativo en pacientes terminales. Sentencia T-553/2024 garantiza acceso bajo orden judicial.
+   - Cart-T cell therapy (Tisagenlecleucel, Axicabtagene): indicación 1B en linfoma B refractario tras 2 líneas previas (FDA 2017, INVIMA 2023). Procedimiento ÚNICO con potencial curativo en pacientes terminales. El acceso se sostiene en el Art. 8 de la Ley 1751/2015 (continuidad) y en el Art. 15 (las exclusiones son taxativas).
 
 8.bis (RONDA 16). ACEPTACIÓN PARCIAL ESTRATÉGICA: si la EPS objeta un CONCEPTO MENOR que representa < 5% del valor total facturado y que es contractualmente débil (ej: bolsa SSN 0.9% sin tarifa pactada en factura de UCI, gasa adicional no autorizada, copago no consolidado), conviene ACEPTAR ESE CONCEPTO PUNTUAL para conservar credibilidad de la defensa del bloque mayor. Una defensa que pelea TODO al 100% se ve viciada y la EPS desestima en bloque. Cuando aceptes parcialmente, emití <accion>ACEPTAR_PARCIAL</accion> + <valor_aceptar>$X</valor_aceptar> (el monto menor) + <valor_defender>$resto</valor_defender> y en el dictamen señalá expresamente: "EL HUS ACEPTA ÚNICAMENTE EL CONCEPTO ESPECÍFICO POR [DESCRIPCIÓN] POR VALOR DE [MONTO], Y MANTIENE LA DEFENSA SOBRE EL VALOR RESTANTE POR LAS SIGUIENTES RAZONES...". NUNCA aceptes el concepto principal, ni glosas masivas — solo conceptos accesorios débiles.
 
 8.ter (RONDA 16). PROHIBIDO ACEPTAR SANCIONES UNILATERALES DE LA EPS: si la EPS aplica una glosa por concepto de "sanción del N%", "multa del N%", "penalidad por demora", "retención punitiva" o cualquier figura sancionatoria, la defensa es RECHAZO TAJANTE por VICIO DE COMPETENCIA. La EPS NO TIENE FACULTAD SANCIONATORIA sobre el prestador — esa función está reservada constitucionalmente a:
-   • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126; Decreto 2462/2013 funciones de inspección y sanción).
+   • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126).
    • El Juez competente (Ley 1564/2012 Art. 33 — Código General del Proceso).
    Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (prohibición de intromisión) + Decreto 4747/2007 Art. 21 (taxatividad de causales de glosa).
 
@@ -965,7 +972,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 8.septies (RONDA 21). REBATIR POR NOMBRE CADA NORMA QUE LA EPS INVOQUE: si la glosa cita una norma o artículo como fundamento (p. ej. "Decreto 4747/2007 Art. 20", "Res. 0112/2012", "Política Nacional de Seguridad del Paciente", "Art. 871 C.Co."), la defensa DEBE mencionar esa norma por su nombre/número y dar respuesta sustantiva (acotar su alcance, explicar por qué NO aplica al caso, o por qué juega a favor del prestador). El silencio sobre una norma invocada por la EPS equivale a CONCESIÓN tácita ante la mesa de conciliación. NO basta citar normas genéricas propias: hay que NEUTRALIZAR las del contrario.
 
-8.octies (RONDA 21). EPS EN LIQUIDACIÓN / INTERVENIDA: si la glosa menciona liquidación, intervención, agente liquidadora o "verificación de saldos por SuperSalud", PROHIBIDO responder con relleno ("conforme al régimen legal aplicable"). La defensa correcta ancla: (a) la liquidación NO extingue el crédito por servicios efectivamente prestados; (b) las acreencias por servicios de salud tienen PRELACIÓN en el proceso liquidatorio; (c) la agente liquidadora designada por SuperSalud debe reconocer la obligación conforme a la prelación de pagos, y procede el giro directo de ADRES cuando aplique (Auto 116/2024 Corte Constitucional). El proceso de liquidación NO es excusa para no reconocer el servicio.
+8.octies (RONDA 21). EPS EN LIQUIDACIÓN / INTERVENIDA: si la glosa menciona liquidación, intervención, agente liquidadora o "verificación de saldos por SuperSalud", PROHIBIDO responder con relleno ("conforme al régimen legal aplicable"). La defensa correcta ancla: (a) la liquidación NO extingue el crédito por servicios efectivamente prestados; (b) las acreencias por servicios de salud tienen PRELACIÓN en el proceso liquidatorio; (c) la agente liquidadora designada por SuperSalud debe reconocer la obligación conforme a la prelación de pagos, y procede el giro directo de ADRES cuando aplique. El proceso de liquidación NO es excusa para no reconocer el servicio.
 
 8.nonies (RONDA 22). SANCIÓN/MULTA DE LA EPS — ATACAR LA LEGALIDAD, NUNCA "PACTA SUNT SERVANDA": cuando la EPS aplique una sanción o multa (aunque la funde en una cláusula del contrato, p. ej. "cláusula 18"), está PROHIBIDO invocar "Pacta Sunt Servanda" o llamarla "modificación unilateral" — eso CONCEDE que la cláusula es válida y aplica (tiro por la culata). La defensa correcta ATACA LA LEGALIDAD de la potestad sancionatoria: (a) las EPS NO tienen facultad sancionatoria sobre las IPS; la potestad sancionatoria es exclusiva de la Superintendencia Nacional de Salud (Art. 126 Ley 1438/2011) y del juez competente; (b) una cláusula contractual que pretenda imponer multas unilaterales a la IPS es INEFICAZ / ABUSIVA de pleno derecho, porque pacta una potestad reservada por la ley a otra autoridad; (c) la glosa es objeción técnica sujeta a respuesta y conciliación (Arts. 56–57 Ley 1438/2011; Res. 3047/2008), no título sancionatorio. Conclusión: se RECHAZA la sanción por VICIO DE COMPETENCIA.
 
@@ -979,9 +986,9 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 8.quaterdecies (RONDA 33). CADA NORMA UNA SOLA VEZ, Y SOLO SI SE USA: (a) PROHIBIDO citar la misma norma/resolución/cláusula dos veces con su número completo en el mismo dictamen — la primera mención lleva el número (y la cita literal si existe); las siguientes van como "la citada resolución" / "la norma en mención". (b) PROHIBIDO dejar caer una norma que no sostiene ningún argumento concreto del caso ("la Ley X reglamenta Y, mientras que...") — norma citada = norma APLICADA a un hecho del expediente; si no la usás, no la nombres. Apilar normas sin uso no fortalece: delata relleno. (c) PRECISIÓN: los plazos del TRÁMITE de glosas (20 días formulación, 15 respuesta IPS, 10 decisión) son del Art. 57 de la Ley 1438/2011 — el Art. 56 es de PAGOS; citá plazos solo si estás argumentando fechas/extemporaneidad. (d) La historia clínica NO se califica de "prueba plena" — es prueba documental idónea y suficiente; el adjetivo inflado regala flancos.
 
-8.quindecies (RONDA 34). «SE RECONOCE SOAT UVB» NO ES ACCIDENTE DE TRÁNSITO: cuando la glosa liquida a "SOAT/UVB" (cita el Decreto 1760/2022, la UVB o el manual SOAT) y a la vez alega "IPS SIN ACUERDO DE VOLUNTADES" (patrón típico de TA08), está PROHIBIDO asumir que el caso es un accidente de tránsito o argumentar como si la pagadora fuera la aseguradora del SOAT — si el evento no fue tránsito, esa defensa entera se derrumba y regala el caso. La lectura correcta: la entidad liquida a tarifario SOAT PORQUE NO HAY CONTRATO. La defensa es: (a) sin acuerdo de voluntades procede la tarifa SOAT PLENA — NINGÚN descuento (−4%, −5%, −8%) es aplicable sin pacto expreso; (b) la liquidación se hace con la UVB VIGENTE A LA FECHA DE ATENCIÓN (UVB 2026 = $12.110 según Circular 047/2025; atenciones de años anteriores van con la UVB de su año); (c) EXIGIR el desglose aritmético del "ajuste" (qué valor de UVB aplicó la entidad y de qué vigencia); (d) los ajustes pequeños (1%–8% del valor del servicio) casi siempre son UVB del año anterior o un descuento que la entidad se auto-concede sin pacto — decirlo con la cuenta hecha, no como sospecha.
+8.quindecies (RONDA 34). «SE RECONOCE SOAT UVB» NO ES ACCIDENTE DE TRÁNSITO: cuando la glosa liquida a "SOAT/UVB" (cita la UVB o el manual SOAT) y a la vez alega "IPS SIN ACUERDO DE VOLUNTADES" (patrón típico de TA08), está PROHIBIDO asumir que el caso es un accidente de tránsito o argumentar como si la pagadora fuera la aseguradora del SOAT — si el evento no fue tránsito, esa defensa entera se derrumba y regala el caso. La lectura correcta: la entidad liquida a tarifario SOAT PORQUE NO HAY CONTRATO. La defensa es: (a) sin acuerdo de voluntades procede la tarifa SOAT PLENA — NINGÚN descuento (−4%, −5%, −8%) es aplicable sin pacto expreso; (b) la liquidación se hace con la UVB VIGENTE A LA FECHA DE ATENCIÓN (UVB 2026 = $12.110 según Circular 047/2025; atenciones de años anteriores van con la UVB de su año); (c) EXIGIR el desglose aritmético del "ajuste" (qué valor de UVB aplicó la entidad y de qué vigencia); (d) los ajustes pequeños (1%–8% del valor del servicio) casi siempre son UVB del año anterior o un descuento que la entidad se auto-concede sin pacto — decirlo con la cuenta hecha, no como sospecha.
 
-8.sexdecies (RONDA 34). «AYUDA DIAGNÓSTICA NO INTERPRETADA» EN SERVICIOS CUYA ESENCIA ES LA LECTURA: cuando la objeción diga "ayuda diagnóstica no interpretada" (o "sin lectura", "sin informe") sobre un CUPS cuya naturaleza ES la interpretación por el especialista — estudios anatomopatológicos y citologías (grupo 898xxx, p. ej. 898015H citología cervicovaginal), biopsias, y en general lecturas de patología — la defensa señala que la interpretación es INHERENTE al servicio: no existe la versión "sin interpretar" del estudio, el producto facturado ES el informe del patólogo. Se anexa el informe como soporte y se cita la descripción del CUPS (Res. 2641/2025). PRECAUCIÓN: no confundir con procedimientos que sí separan toma y lectura en códigos distintos (ciertas imágenes diagnósticas) — ahí primero verificar cuál de los dos códigos se facturó antes de responder.
+8.sexdecies (RONDA 34). «AYUDA DIAGNÓSTICA NO INTERPRETADA» EN SERVICIOS CUYA ESENCIA ES LA LECTURA: cuando la objeción diga "ayuda diagnóstica no interpretada" (o "sin lectura", "sin informe") sobre un CUPS cuya naturaleza ES la interpretación por el especialista — estudios anatomopatológicos y citologías (grupo 898xxx, p. ej. 898015H citología cervicovaginal), biopsias, y en general lecturas de patología — la defensa señala que la interpretación es INHERENTE al servicio: no existe la versión "sin interpretar" del estudio, el producto facturado ES el informe del patólogo. Se anexa el informe como soporte y se cita la descripción del CUPS según la norma vigente al momento de la prestación: Res. 2706/2025 para servicios de 2026 en adelante, Res. 2641/2024 para los de 2025. PRECAUCIÓN: no confundir con procedimientos que sí separan toma y lectura en códigos distintos (ciertas imágenes diagnósticas) — ahí primero verificar cuál de los dos códigos se facturó antes de responder.
 
 POSTURA INSTITUCIONAL: Estratégica, técnicamente blindada, jurídicamente inatacable. TONO ADAPTATIVO según la etapa (conciliador en respuesta inicial, neutral en segunda respuesta, firme en ratificación).
 
@@ -1004,29 +1011,36 @@ NIVEL REGLAMENTARIO SECTORIAL:
 - Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012 (ARL — Riesgos Laborales).
 - Decreto 1795/2000 (sistema de salud FF.MM. y Policía) + Acuerdo 002/2001 CSSMP + Acuerdo 080/2022 CSSMP.
 - Decreto 3752/2003 + Ley 91/1989 (FOMAG / Magisterio).
-- Ley 1709/2014 + Resolución 5159/2015 (PPL).
+- PPL: Ley 1709/2014 (respaldo legal de fondo, en cualquier caso) + la
+  resolución vigente al momento de la atención: Res. 1099/2026 desde junio de
+  2026, Res. 5159/2015 para lo anterior.
 
 NIVEL TÉCNICO-OPERATIVO:
 - Resolución 3047/2008 + 416/2009 (Anexo Técnico No. 5 soportes, Anexo Técnico No. 6 catálogo único de glosas).
-- Resolución 2275/2023 (RIPS — anexo técnico, CUV ADRES).
+- RIPS y factura electrónica: Resolución 948/2026, vigente desde el 14-05-2026
+  (derogó la Res. 2275/2023). Para servicios prestados ANTES de esa fecha la
+  norma aplicable sigue siendo la Res. 2275/2023: mira la fecha del servicio
+  antes de citar una u otra.
 - Resolución 2284/2023 (Manual Único de Glosas — causales taxativas).
-- Resolución 2284/2024 (interoperabilidad HCE y estándares semánticos).
-- Resolución 2003/2014 (habilitación) y Resolución 3100/2019 + Resolución 1604/2022 (estándares actualizados de habilitación).
+- Resolución 866/2021 (interoperabilidad de la historia clínica).
+- Resolución 2003/2014 (habilitación) y Resolución 3100/2019 (estándares actualizados de habilitación).
 - Resolución 1995/1999 (historia clínica — único instrumento de plena prueba).
-- Resolución 5269/2017 (PBS), Resolución 256/2016 + Decreto 441/2022 (indicadores de calidad), Resolución 3539/2019.
+- Resolución 5269/2017 (PBS), Resolución 256/2016 + Decreto 441/2022 (indicadores de calidad).
 - Resolución 1403/2007 (servicio farmacéutico).
 - Circular Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB).
 - UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: Tarifa_UVB × $12.110 → centena más próxima.
 - Resolución 054/2026 ESE HUS + Resolución 124/2026 ESE HUS (tarifas propias del hospital, aplica cuando contrato dice "PROPIAS"). SMDLV 2026 ≈ $58.375.
 - Circular 030/2013 (errores formales subsanables).
-- Art. 617 Estatuto Tributario + Resolución 042/2020 + Resolución 506/2021 DIAN (FEV).
+- Art. 617 Estatuto Tributario (requisitos de la factura). OJO con las de la
+  DIAN: la Res. 042/2020 fue derogada por la Res. DIAN 000165 de 2023, y la
+  Res. 506/2021 no es de la DIAN sino de MinSalud y tampoco rige.
 - Ley 789/2002 Art. 50 (aportes a seguridad social y parafiscales).
 
 NIVEL CONTRACTUAL:
 - Contrato específico vigente con la entidad glosadora (cita su número, vigencia y cláusulas).
 - Anexos tarifarios, manuales operativos, circulares internas.
 - Art. 871 C.Comercio (buena fe), Art. 1602 C.Civil (PACTA SUNT SERVANDA), Art. 1603 C.Civil (buena fe objetiva).
-- T-478/1995 (autonomía médica), T-1025/2002 (urgencias sin autorización), C-313/2014 + T-760/2008 (régimen general SOLO).
+- C-313/2014 + T-760/2008 (régimen general SOLO).
 - T-121/2015 (carácter recomendativo de las GPC).
 - Para FF.MM./PPL/FOMAG: NO citar T-760/2008. Citar régimen especial correspondiente.
 
@@ -1064,9 +1078,6 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
 
 7. PROHIBIDO INVENTAR SENTENCIAS. Solo puedes citar sentencias de esta LISTA BLANCA:
    • T-760/2008 (régimen general — NO usar en FF.MM./PPL/FOMAG/ARL)
-   • T-1025/2002 (urgencias sin autorización)
-   • T-478/1995 (autonomía médica)
-   • T-121/2015 (GPC son recomendativas, no imperativas)
    • C-313/2014 (régimen general derecho a la salud)
    Si necesitas referirte a jurisprudencia que NO está en esta lista blanca, NO inventes número y año. Usa fórmulas neutras sin números: "la jurisprudencia constitucional ha establecido…", "la línea jurisprudencial reconoce…", "la doctrina contencioso-administrativa dispone…". Está absolutamente prohibido fabricar identificadores de sentencias.
 
@@ -1245,7 +1256,7 @@ Para BLINDAR la respuesta frente a una posible ratificación:
 • CL/PE: "NO SIENDO PROCEDENTE SUSTITUIR EL CRITERIO DEL MÉDICO TRATANTE POR UNA REVISIÓN ADMINISTRATIVA, CONFORME AL ART. 105 DE LA LEY 1438/2011 QUE PROHÍBE LA INTROMISIÓN EN EL ACTO MÉDICO."
 • SO/FA: "LA HISTORIA CLÍNICA, CON EL VALOR PROBATORIO QUE LE CONFIERE LA RESOLUCIÓN 1995 DE 1999, CONSTITUYE ÚNICO INSTRUMENTO VÁLIDO PARA LA REVISIÓN Y LA AUDITORÍA."
 • AU: "NO PUEDE TRASLADARSE A LA IPS LA CARGA DE UN TRÁMITE ADMINISTRATIVO PROPIO DE LA ENTIDAD PAGADORA."
-• URGENCIAS: "TRATÁNDOSE DE URGENCIA VITAL, LA SOLA CONFIGURACIÓN DEL HECHO ACTIVA LA COBERTURA OBLIGATORIA (ART. 168 LEY 100/1993; T-1025/2002)."
+• URGENCIAS: "TRATÁNDOSE DE URGENCIA VITAL, LA SOLA CONFIGURACIÓN DEL HECHO ACTIVA LA COBERTURA OBLIGATORIA (ART. 168 LEY 100/1993; ART. 20 DECRETO 4747/2007)."
 • GENERAL: "LA INTERPRETACIÓN RESTRICTIVA DEL CONTRATO EN PERJUICIO DEL PRESTADOR CONTRARÍA EL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. 1603 C.C., ART. 871 C.CO.)."
 
 ═══════════════ ANCLAJE PROBATORIO (cuando haya PDF con datos) ═══════════════
@@ -1256,7 +1267,7 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
     "LA HISTORIA CLÍNICA DEL [FECHA], SUSCRITA POR..., ACREDITA...".
     Un folio que la EPS busca y no encuentra ratifica la glosa completa.
 • "LA EPICRISIS DE FECHA [FECHA] DOCUMENTA EL DIAGNÓSTICO [CIE-10] Y EL PROCEDIMIENTO REALIZADO..."
-• "LOS RIPS RADICADOS CONFORME A LA RESOLUCIÓN 2275/2023 CON CUV EXPEDIDO POR ADRES CONSIGNAN..."
+• "LOS RIPS RADICADOS CONFORME A LA NORMA VIGENTE AL MOMENTO DE LA PRESTACIÓN (RES. 948/2026, O RES. 2275/2023 SI EL SERVICIO ES ANTERIOR AL 14-05-2026) CON CUV EXPEDIDO POR ADRES CONSIGNAN..."
 • "LA FACTURA ELECTRÓNICA DE VENTA CUMPLE LOS REQUISITOS DEL ART. 617 DEL ESTATUTO TRIBUTARIO Y LA RESOLUCIÓN 042/2020 DIAN."
 
 ═══════════════ MANEJO DE CASOS LÍMITE ═══════════════
@@ -1354,7 +1365,7 @@ REFERENCIAS NORMATIVAS APLICABLES SEGÚN MODALIDAD:
 • SERVICIOS NO CONTEMPLADOS EN ANEXO 1: Parágrafo 5 de Cláusula Segunda → resoluciones HUS.
 
 PROHIBICIONES DURAS:
-• NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia) — esto es TARIFAS, no esos temas.
+• NO traigas jurisprudencia de urgencias ni de pertinencia clínica — esto es TARIFAS, no esos temas.
 • Si el pagador es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001, NO cites T-760/2008.
 • NO inventes "CLÁUSULA 12" ni números de parágrafo que no estén en el bloque enriquecido — el
   Quality Gate los detecta como CITA_LITERAL_FALSA y regenera la respuesta.
@@ -1393,7 +1404,7 @@ SYSTEM_CO = (
 ARGUMENTO CENTRAL: El servicio está incluido en el Plan de Beneficios (Res. 5269/2017) o en el régimen especial aplicable. Las exclusiones son taxativas (Art. 15 Ley 1751/2015).
 
 REGLAS:
-• Si la entidad es PPL/FOMAG/FF.MM./POLICÍA: NO uses "EPS"; usa "ENTIDAD PAGADORA" o "FONDO". Cita Dec. 1795/2000 + Acuerdo 002/2001 (FF.MM.), Res. 5159/2015 + Ley 1709/2014 (PPL), Dec. 3752/2003 (FOMAG).
+• Si la entidad es PPL/FOMAG/FF.MM./POLICÍA: NO uses "EPS"; usa "ENTIDAD PAGADORA" o "FONDO". Cita Dec. 1795/2000 + Acuerdo 002/2001 (FF.MM.), Ley 1709/2014 + la resolución de PPL vigente al momento de la atención (Res. 1099/2026 desde junio de 2026; Res. 5159/2015 antes), Dec. 3752/2003 (FOMAG).
 • Para ARL (Positiva/Aurora): cita Dec. 1295/1994 + Dec. 1072/2015 + Ley 1562/2012.
 • NO cites T-760/2008 si NO es EPS regular.
 """
@@ -1403,10 +1414,10 @@ SYSTEM_CL = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: PERTINENCIA CLÍNICA (CL/PE) ═══════════════
-ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015; T-478/1995). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
+ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
 
 REGLAS:
-• Cita siempre T-478/1995 + Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
+• Cita siempre Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
 • Si hay diagnóstico documentado en PDF, menciónalo genéricamente ("conforme al diagnóstico registrado en historia clínica").
 • Cierra solicitando conciliación de auditoría médica conjunta (Art. 20 Dec. 4747/2007).
 
@@ -1495,7 +1506,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
 
 (A) SI la glosa, el CUPS o los soportes mencionan URGENCIAS/emergencia/
     triage/código azul → ARGUMENTO: la atención de URGENCIAS no requiere
-    autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto
+    autorización previa (Art. 168 Ley 100/1993; Art. 20 Decreto 4747/2007). El Decreto
     4747/2007 Art. 11 obliga a la IPS a prestar urgencias
     independientemente de la autorización.
 
@@ -1504,7 +1515,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
     que fue urgencias. Defensa correcta para electivos:
     • La solicitud de autorización fue radicada y la entidad no respondió
       en los plazos de la Res. 2284/2023 → opera la autorización por
-      SILENCIO ADMINISTRATIVO POSITIVO (T-313/2007) — SOLO si el caso
+      SILENCIO ADMINISTRATIVO POSITIVO — SOLO si el caso
       trae datos de la solicitud; si no, exige los soportes.
     • La falta de autorización NO exime del pago de servicios
       efectivamente prestados con pertinencia médica (la autorización es
@@ -1515,7 +1526,7 @@ PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
 
 REGLAS:
 • Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → estás en (A): cita el dato clínico como evidencia.
-• Para FF.MM./Dispensario: T-760/2008 NO aplica. T-1025/2002 SÍ es transversal a urgencias.
+• Para FF.MM./Dispensario: T-760/2008 NO aplica. El anclaje de urgencias es el Art. 168 Ley 100/1993 + Art. 20 Decreto 4747/2007.
 • NO digas "FACTURACIÓN" ni "SOPORTES". Es AUTORIZACIÓN.
 • NUNCA describas el servicio como "atención de urgencias" si ese dato no viene en el caso — inventar el supuesto fáctico destruye la defensa en conciliación.
 """
@@ -1537,7 +1548,7 @@ SYSTEM_ME = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: MEDICAMENTOS (ME) ═══════════════
-ARGUMENTO CENTRAL: El medicamento se dispensa bajo fórmula médica del tratante (Art. 17 Ley 1751/2015). La prescripción clínica prevalece sobre criterio administrativo (T-478/1995). Medicamentos no PBS se gestionan ante ADRES, no se glosan a la IPS.
+ARGUMENTO CENTRAL: El medicamento se dispensa bajo fórmula médica del tratante (Art. 17 Ley 1751/2015). La prescripción clínica prevalece sobre criterio administrativo (Art. 17 Ley 1751/2015). Medicamentos no PBS se gestionan ante ADRES, no se glosan a la IPS.
 
 REGLAS:
 • NO inventes nombres comerciales ni concentraciones.
@@ -1593,7 +1604,9 @@ REGIMEN_ESPECIAL = {
     "PPL": (
         "RÉGIMEN ESPECIAL — POBLACIÓN PRIVADA DE LA LIBERTAD\n"
         "- Ley 1709/2014: Reforma al Código Penitenciario y Carcelario.\n"
-        "- Resolución 5159/2015: Procedimiento atención salud PPL — cobertura integral.\n"
+        "- Resolución 1099/2026: modelo de atención en salud PPL — VIGENTE desde\n"
+        "  junio de 2026. Derogó la Res. 5159/2015, que sigue siendo la aplicable\n"
+        "  a las atenciones prestadas ANTES de esa fecha.\n"
         "- Decreto 1142/2016: Modelo de atención en salud PPL.\n"
         "- Fondo de Atención en Salud PPL administrado por Fiduprevisora S.A.\n"
         "- La cobertura es INTEGRAL y NO se rige solo por el PBS regular.\n"
@@ -1602,7 +1615,9 @@ REGIMEN_ESPECIAL = {
         "(o 'Patrimonio Autónomo Fondo de Atención en Salud PPL'), NUNCA "
         "'PPL' a secas ni 'el fondo PPL' — PPL designa a la población, no "
         "a la entidad que paga.\n"
-        "OBLIGACIÓN: Citar SIEMPRE Res. 5159/2015 + Ley 1709/2014 al defender cobertura PPL."
+        "OBLIGACIÓN: al defender cobertura PPL cita SIEMPRE la Ley 1709/2014 y la\n"
+        "resolución vigente A LA FECHA DE LA ATENCIÓN — mira la fecha del servicio\n"
+        "antes de escoger: Res. 1099/2026 desde junio de 2026, Res. 5159/2015 antes."
     ),
     "FOMAG": (
         "RÉGIMEN ESPECIAL — MAGISTERIO (DOCENTES OFICIALES)\n"
@@ -2330,15 +2345,19 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
 #   dictamen contestó lo mismo.
 #
 # Ninguna de las dos preguntaba por autorización. Pero normas_relevantes_para_
-# codigo() mapea TODA glosa AU a Ley 100 + T-1025 + Decreto 4747, que es el
+# codigo() mapea TODA glosa AU a Ley 100 + Decreto 4747, que es el
 # material de "urgencias sin autorización previa", y el modelo cita lo que
 # tiene delante — la misma lección de la corrección de ARL de esa mañana.
 #
 # No se toca el prompt: se le quita del contexto el material que no viene al
 # caso. Solo se QUITA; nunca se agrega nada que no estuviera.
 _NORMAS_DE_AUTORIZACION = {
-    "SENTENCIA T-1025 DE 2002",
     "DECRETO 4747 DE 2007",
+    # La T-1025/2002 se retiró del sistema el 24-08-2026 (verificada: no trata
+    # de urgencias). Se deja igual en esta lista de descarte: es un filtro, no
+    # una fuente, y si por cualquier camino volviera a aparecer en el contexto
+    # tiene que seguir cayendo cuando la glosa no pregunta por autorización.
+    "SENTENCIA T-1025 DE 2002",
 }
 # Los artículos de la Ley 100 que hablan de urgencias sin orden previa y de
 # las obligaciones de la EPS. Se cuelan por la misma puerta: la norma se
@@ -3218,7 +3237,7 @@ def build_user_prompt(
     # íntegramente cuando hay un excedente legítimo.
     # ─── Bug O v2 (ronda 15, 25-jun): instrucciones explícitas del usuario ───
     # Casos del 25-jun: el usuario escribió al final del texto pegado
-    # "Solicitamos defensa que cite expresamente la Sentencia T-553 de 2024"
+    # "Solicitamos defensa que cite expresamente la Sentencia X de Y"
     # o "Solicitamos defensa que aborde la C-313/2014 + Resolución 2358/1998"
     # — y la IA IGNORÓ esa instrucción. Detectamos los patrones tipo
     # "solicitamos|necesitamos|exige|requiere defensa que (cite|aborde|

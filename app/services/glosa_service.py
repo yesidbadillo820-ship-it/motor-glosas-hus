@@ -1231,16 +1231,21 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         re.compile(r"\bGLOSA\s+12345\b", re.IGNORECASE),
         "LA GLOSA APLICADA",
     ),
-    # "Resolución 2641 de 2024" — norma inventada que el prompt mencionaba como
-    # ejemplo de lo prohibido. La quitamos en cualquier forma.
-    (
-        re.compile(r"\b(?:LA\s+)?RESOLUCI[ÓO]N\s+2641\s+DE\s+2024\b", re.IGNORECASE),
-        "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD",
-    ),
-    (
-        re.compile(r"\bRes\.?\s*2641/2024\b", re.IGNORECASE),
-        "normativa vigente",
-    ),
+    # LA "RESOLUCION 2641 DE 2024" NO ERA INVENTADA (25-08-2026).
+    #
+    # Aqui habia dos reglas que la borraban del dictamen y la cambiaban por
+    # "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD". Se creia inventada porque
+    # el prompt la usaba como EJEMPLO de norma prohibida y la IA la copiaba.
+    #
+    # Al verificarla resulto ser REAL: es la Resolucion 2641 del 23 de
+    # diciembre de 2024, la que establecio la CUPS que rigio durante 2025
+    # (hoy derogada por la Res. 2706 de 2025 desde el 1 de enero de 2026).
+    #
+    # O sea que el motor borraba la cita CORRECTA y en su lugar dejaba una
+    # frase sin ley, decreto ni articulo — justo la clase de pseudo-norma que
+    # la auditoria independiente reprocho. Se retiraron las dos reglas. Si la
+    # fecha del servicio no corresponde, quien avisa ahora es el aviso de
+    # norma derogada del verificador de citas, que si mira la vigencia.
     # "historia clínica N° 1234567" — número del prompt-ejemplo
     (
         re.compile(
@@ -2048,10 +2053,19 @@ def _neutralizar_art_168_fuera_de_contexto(
     # Patrón: cualquier mención de Art. 168 Ley 100 (variantes)
     # Cubre: "Art. 168", "Artículo 168", "ART. 168", "Articulo 168",
     # con/sin "Ley 100", con/sin "/1993" o "de 1993".
+    #
+    # EL CONECTOR VA SUELTO A PROPÓSITO (24-08-2026). El dictamen GL-198 de
+    # COMPENSAR salió impreso diciendo «EN VIRTUD DE LO DISPUESTO EN EL
+    # ARTÍCULO 168 LA LEY 100 DE 1993» — sin el «DE». La IA se come esa
+    # palabra de vez en cuando, y la versión anterior del patrón solo
+    # aceptaba «DE LA LEY» o «DE LEY»: bastaba esa letra de menos para que
+    # la cita inaplicable pasara derecho hasta el papel que firma el
+    # auditor. Ahora «DE» y «LA» son cada uno opcionales por su lado, así
+    # que las cuatro formas caen: «DE LA LEY», «DE LEY», «LA LEY», «LEY».
     pat_art168 = re.compile(
         r"(?:EL\s+|AL\s+|SEGÚN\s+EL\s+|CONFORME\s+AL?\s+)?"
         r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*168"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
         re.IGNORECASE,
     )
     nuevo, n = pat_art168.subn(
@@ -2159,7 +2173,7 @@ def _neutralizar_art_177_relleno(
         r"(?:CONFORME\s+(?:A\s+LO\s+DISPUESTO\s+EN\s+)?(?:EL\s+|AL\s+)?|"
         r"AS[ÍI]\s+MISMO,?\s+(?:EL\s+|AL\s+)?|EL\s+|AL\s+)?"
         r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*177"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
         r"[^.]{0,400}?(?:MOVILIZAR|RECURSOS|\bPOS\b|PLAN\s+OBLIGATORIO|"
         r"PATRIMONIOS?\s+AUT[ÓO]NOM|FIDUCIARIA)[^.]{0,400}(?:\.|$)",
         re.IGNORECASE | re.DOTALL,
@@ -2174,7 +2188,7 @@ def _neutralizar_art_177_relleno(
     pat_art177_bare = re.compile(
         r"(?:CONFORME\s+(?:AL?\s+)?|EL\s+|AL\s+)?"
         r"(?:ART[ÍI]?CULO?S?|ARTS?\.?)\s*177"
-        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
+        r"\s*(?:DE\s+)?(?:LA\s+)?LEY\s+100(?:\s*[/\-]\s*\d{4}|\s+DE\s+\d{4})?",
         re.IGNORECASE,
     )
     nuevo, n_bare = pat_art177_bare.subn(
@@ -4640,11 +4654,27 @@ def generar_texto_tarifa_match(
     modalidad = t.get("modalidad") or "pactada"
     fuente = t.get("fuente_archivo") or "catálogo oficial"
 
+    # NO SE AFIRMA UNA MODALIDAD QUE NO CONCUERDA CON EL NÚMERO (24-08-2026).
+    #
+    # Esta plantilla se imprime tal cual en el documento que se radica, sin IA
+    # de por medio. La auditoría encontró el mismo contrato (0525/2017 de
+    # POSITIVA) y el mismo CUPS leídos de dos maneras dentro del mismo lote:
+    # uno decía "$915.051, modalidad SOAT" y otros dos "SOAT -15 %".
+    #
+    # Cuando la fila del catálogo se contradice a sí misma —la modalidad
+    # anuncia un descuento y la fila lo declara en cero— el valor se sigue
+    # usando, pero la frase "BAJO LA MODALIDAD X" se cambia por una que no
+    # afirma nada que no conste.
+    if info_tarifa.get("tarifa_verificada") is False:
+        frase_modalidad = "SEGÚN EL VALOR REGISTRADO EN EL CATÁLOGO DEL CONTRATO"
+    else:
+        frase_modalidad = f"BAJO LA MODALIDAD {modalidad}"
+
     return (
         f"ESE HUS NO ACEPTA LA GLOSA {codigo_glosa} INTERPUESTA POR {eps.upper()} "
         f"POR VALOR DE {val_obj_fmt}, TODA VEZ QUE EL VALOR FACTURADO ({fact_fmt}) "
         f"COINCIDE EXACTAMENTE CON LA TARIFA PACTADA EN EL {contrato} PARA EL CUPS "
-        f"{cups} — {desc} — BAJO LA MODALIDAD {modalidad}. "
+        f"{cups} — {desc} — {frase_modalidad}. "
         f"LA IDENTIDAD ENTRE VALOR FACTURADO Y VALOR PACTADO CONVIERTE ESTA GLOSA "
         f"EN IMPROCEDENTE: LA ENTIDAD PAGADORA NO PUEDE DESCONOCER UNILATERALMENTE "
         f"EL VALOR QUE ELLA MISMA PACTÓ, POR APLICACIÓN DEL ARTÍCULO 871 DEL CÓDIGO "
@@ -6491,10 +6521,23 @@ class GlosaService:
                     f"  • Modalidad real   : {modalidad_real}\n"
                     f"  • Tarifa pactada   : {pact_txt}\n"
                     f"  • Contrato         : {contrato_real}\n"
-                    f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
-                    f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
-                    f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
-                    "REGLAS OBLIGATORIAS:\n"
+                    # Sin cifra no se escribe "$0": el 0 de este motor
+                    # significa "no se pudo leer", y ponerlo como dato hacia
+                    # que la IA concluyera sola que se facturo por debajo de lo
+                    # pactado (ver el dictamen GL-204). Si no hay cifra, se le
+                    # dice a la IA que no la hay.
+                    + (
+                        f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
+                        if val_fact > 0
+                        else "  • Valor facturado HUS: NO REGISTRADO en el caso\n"
+                    )
+                    + (
+                        f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
+                        if val_rec > 0
+                        else "  • Valor reconocido EPS: NO REGISTRADO en el caso\n"
+                    )
+                    + f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
+                    + "REGLAS OBLIGATORIAS:\n"
                     "  1. Cita SIEMPRE el contrato y la modalidad REALES del catálogo,\n"
                     "     NO los genéricos de la ficha EPS global.\n"
                     "  2. Si la modalidad contiene 'PROPIA', 'PROPIAS', 'MANUAL HUS',\n"
@@ -6505,8 +6548,15 @@ class GlosaService:
                     "  3. Si la modalidad contiene 'SOAT' o 'UVB': cita la Circular\n"
                     "     047/2025 MinSalud + UVB 2026 $12.110.\n"
                     "  4. Usa el VALOR facturado y reconocido EXACTOS de arriba.\n"
-                    "  5. Si tarifa pactada > valor facturado: la glosa es\n"
-                    "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
+                    + (
+                        "  5. Si tarifa pactada > valor facturado: la glosa es\n"
+                        "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
+                        if val_fact > 0
+                        else "  5. NO digas que se facturó por debajo de lo pactado: el\n"
+                        "     valor facturado NO quedó registrado en este caso, así\n"
+                        "     que no hay con qué compararlo. Pedí que se aporte la\n"
+                        "     cifra en vez de afirmar que la glosa es improcedente.\n"
+                    )
                 )
                 user_prompt = user_prompt + bloque_tarifa
 
@@ -9288,7 +9338,10 @@ class GlosaService:
     # Qué documento acredita cada tipo de soporte del expediente, con la
     # norma que lo respalda. Solo tipos que el indexador reconoce de verdad.
     _MARCO_LEGAL_SOPORTE = {
-        "factura_electronica": ("Factura electrónica de venta", "Res. 2275/2023 (FEV)"),
+        "factura_electronica": (
+            "Factura electrónica de venta",
+            "Res. 948/2026 (FEV); Res. 2275/2023 si el servicio es anterior al 14-05-2026",
+        ),
         "historia_clinica": ("Historia clínica", "Res. 1995/1999"),
         "epicrisis": ("Epicrisis", "Res. 1995/1999"),
         "hoja_atencion_urgencias": ("Hoja de atención de urgencias", "Res. 1995/1999"),
@@ -9296,15 +9349,24 @@ class GlosaService:
             "Hoja de administración de medicamentos",
             "Res. 1995/1999",
         ),
-        "rips": ("RIPS radicados", "Res. 2275/2023"),
-        "cuv": ("CUV — constancia de validación del Ministerio", "Res. 2275/2023"),
+        # RIPS, CUV y XML: la norma cambió el 14-05-2026 (Res. 948/2026 derogó
+        # la Res. 2275/2023). Se nombran las dos con la regla de la fecha para
+        # que el dictamen no cite una derogada sobre un servicio de este año.
+        "rips": ("RIPS radicados", "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)"),
+        "cuv": (
+            "CUV — constancia de validación del Ministerio",
+            "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
+        ),
         "comprobante_recibido_cobro": ("Comprobante de recibido de cobro", "Res. 2284/2023"),
         "furips": ("FURIPS", "Circular 022/2023"),
         "resultados_msps": ("Resultados de apoyo diagnóstico", "Res. 3047/2008 Anexo 5"),
         "otros_procedimientos": ("Soporte de procedimientos", "Res. 3047/2008 Anexo 5"),
         "pde": ("Soporte de estancia", "Res. 3047/2008 Anexo 5"),
         "pdx": ("Soporte de diagnóstico", "Res. 3047/2008 Anexo 5"),
-        "xml_cufe": ("XML CUFE de la factura", "Res. 2275/2023"),
+        "xml_cufe": (
+            "XML CUFE de la factura",
+            "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
+        ),
     }
 
     def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:

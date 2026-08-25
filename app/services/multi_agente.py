@@ -73,15 +73,16 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
         )
         resultado["normas_secundarias"].append("Decreto 780 de 2016 (marco general sector salud)")
         resultado["evitar"].append(
-            "T-1025/2002 (pertinencia en urgencias) — NO aplica a controversia tarifaria"
+            "jurisprudencia de urgencias — NO aplica a controversia tarifaria"
         )
-        resultado["evitar"].append("T-478/1995 (autonomía médica) — NO aplica a tarifas")
+        resultado["evitar"].append("jurisprudencia de autonomía médica — NO aplica a tarifas")
     elif prefijo == "SO":  # Soportes
         resultado["normas_primarias"].append(
             "Resolución 1995 de 1999 Art. 3 (historia clínica como documento de plena prueba médico-legal)"
         )
         resultado["normas_primarias"].append(
-            "Resolución 866 de 2021 (RIPS — soportes electrónicos)"
+            "Res. 948/2026 (RIPS como soporte de la factura electrónica; "
+            "Res. 2275/2023 si el servicio es anterior al 14-05-2026)"
         )
         resultado["normas_secundarias"].append(
             "Circular 030 de 2013 MinSalud (errores formales subsanables en la facturación)"
@@ -91,12 +92,12 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
             "Art. 168 Ley 100 de 1993 (atención inicial de urgencias sin autorización previa)"
         )
         resultado["jurisprudencia"].append(
-            "Sentencia T-1025/2002 (autorización posterior en urgencias)"
+            "Art. 20 Decreto 4747/2007 (autorización posterior en urgencias)"
         )
     elif prefijo in ("CL", "PE"):  # Pertinencia clínica
         resultado["normas_primarias"].append("Art. 17 Ley 1751 de 2015 (autonomía médica)")
         resultado["jurisprudencia"].append(
-            "Sentencia T-478/1995 (autonomía profesional en decisiones clínicas)"
+            "Art. 17 Ley 1751/2015 (autonomía profesional en decisiones clínicas)"
         )
     elif prefijo == "CO":  # Cobertura
         resultado["normas_primarias"].append(

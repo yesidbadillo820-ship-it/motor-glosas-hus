@@ -125,13 +125,25 @@ class TestBugPv2CorpusExpandido:
     def test_resolucion_2358_1998_crisis_psiquiatricas(self):
         assert "RESOLUCION 2358 DE 1998" in _TODAS_LAS_NORMAS
 
-    def test_sentencia_t553_2024_cart_t(self):
-        assert "SENTENCIA T-553 DE 2024" in _TODAS_LAS_NORMAS
-        norma = _TODAS_LAS_NORMAS["SENTENCIA T-553 DE 2024"]
-        assert "CAR-T" in str(norma) or "Cart-T" in str(norma) or "CART-T" in str(norma)
+    def test_la_t553_2024_y_la_t027_2020_no_pueden_volver(self):
+        """Estas dos sentencias NO EXISTEN. Se borraron el 24-08-2026.
 
-    def test_sentencia_t027_2020_cancer_infantil(self):
-        assert "SENTENCIA T-027 DE 2020" in _TODAS_LAS_NORMAS
+        La prueba original exigía que estuvieran en el corpus, y que la
+        T-553/2024 hablara de terapia CAR-T. Se comprobó contra la base de la
+        Relatoría de la Corte, por dos caminos independientes:
+
+          · el autocompletado de «T-553/2» solo devuelve T-553/23;
+          · el de «T-027/2» devuelve T-027/22, /23 y /25 — nunca /20;
+          · y las páginas vecinas de cada una cargan completas mientras que
+            las suyas devuelven el cascarón vacío de «no encontrada».
+
+        Citarlas en una respuesta que el hospital radica ante una EPS es
+        entregarle al auditor de la EPS la forma de tumbar todo el escrito:
+        le basta con abrir el enlace.
+        """
+        assert "SENTENCIA T-553 DE 2024" not in _TODAS_LAS_NORMAS
+        assert "SENTENCIA T-027 DE 2020" not in _TODAS_LAS_NORMAS
+        assert "SENTENCIA T-543 DE 2013" not in _TODAS_LAS_NORMAS
 
     def test_sentencia_t705_2017_migrantes(self):
         assert "SENTENCIA T-705 DE 2017" in _TODAS_LAS_NORMAS
