@@ -34,6 +34,9 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 try:
@@ -41,6 +44,13 @@ try:
 except ImportError:
     sys.stderr.write("Falta openpyxl. Corre: py -m pip install openpyxl\n")
     sys.exit(2)
+
+# DGH exporta la base en .xlsb (Excel binario), que openpyxl no sabe leer.
+# pyxlsb es opcional: solo hace falta si la base viene en ese formato.
+try:
+    from pyxlsb import open_workbook as _abrir_xlsb
+except ImportError:
+    _abrir_xlsb = None
 
 COLS_FACTURA = ("FACTURA", "NUMERO_FACTURA", "NUMERO FACTURA", "CUENTA")
 # Cuántas filas mirar buscando el encabezado (algunos exports traen título).
@@ -52,6 +62,33 @@ COLS_SERVICIOS_MINIMAS = ("SLNSERPRO_SERVICIO", "VR_SERVICIO", "SALDO_FACT")
 # el export de DGH salió recortado y faltan facturas.
 TOPE_EXCEL = 1_048_575
 CERCA_DEL_TOPE = 1_000_000
+
+
+@contextmanager
+def filas_de(base: Path) -> Iterator[Iterator[list]]:
+    """Filas de la primera hoja, venga el archivo en .xlsx o en .xlsb.
+
+    DGH exporta la base de servicios facturados en .xlsb (Excel binario) y
+    openpyxl no lo lee; para ese formato se usa pyxlsb, que solo hace falta
+    instalar si de verdad llega un .xlsb.
+    """
+    if base.suffix.lower() == ".xlsb":
+        if _abrir_xlsb is None:
+            raise RuntimeError(
+                "Esta base viene en formato .xlsb (Excel binario) y falta la "
+                "librería para leerlo. Corre:  py -m pip install pyxlsb\n"
+                "  (o guárdala como .xlsx desde Excel: Archivo > Guardar como)"
+            )
+        with _abrir_xlsb(str(base)) as wb:
+            with wb.get_sheet(wb.sheets[0]) as sh:
+                yield ([c.v for c in fila] for fila in sh.rows())
+        return
+    wb = openpyxl.load_workbook(base, read_only=True, data_only=True)
+    try:
+        ws = wb[wb.sheetnames[0]]
+        yield (list(fila) for fila in ws.iter_rows(values_only=True))
+    finally:
+        wb.close()
 
 
 def nfact(v: object) -> str | None:
@@ -85,10 +122,7 @@ def leer_base(base: Path, objetivo: set[str]) -> dict:
     detectar bases viejas o recortadas.
     """
     print(f"\nLeyendo base: {base.name} (pesa bastante, tarda un poco) ...")
-    wb = openpyxl.load_workbook(base, read_only=True, data_only=True)
-    try:
-        ws = wb[wb.sheetnames[0]]
-        it = ws.iter_rows(values_only=True)
+    with filas_de(base) as it:
         # El encabezado no siempre está en la primera fila: hay exports que
         # arrancan con el título del reporte y un par de filas en blanco. Se
         # busca la primera fila que traiga la columna de factura.
@@ -150,8 +184,6 @@ def leer_base(base: Path, objetivo: set[str]) -> dict:
             "menor": menor,
             "mayor": mayor,
         }
-    finally:
-        wb.close()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -222,7 +254,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     headers: list = []
-    vistas: set[tuple] = set()
+    # Cuántas copias de cada fila llevamos guardadas. OJO: una base DGH SÍ trae
+    # filas idénticas de verdad (el mismo medicamento dispensado varias veces en
+    # la misma factura), y cada una es un servicio distinto que se puede objetar.
+    # Por eso NO se quitan las repetidas dentro de un mismo archivo: solo se
+    # descarta lo que ya venía en una tanda anterior, comparando cuántas veces
+    # aparece en cada una. (Quitarlas todas dejó 249 servicios sin cruzar en el
+    # lote de 1.573, contra 8 conservándolas.)
+    llevadas: Counter[tuple] = Counter()
     todas_filas: list[list] = []
     encontradas: set[str] = set()
     resumen: list[tuple[str, int, int | None, int | None, int]] = []
@@ -235,11 +274,12 @@ def main(argv: list[str] | None = None) -> int:
         if not headers:
             headers = info["headers"]
         nuevas = 0
+        de_esta = Counter(tuple(f) for f in info["filas"])
         for fila in info["filas"]:
             clave = tuple(fila)
-            if clave in vistas:
-                continue  # la misma fila ya venía en otra tanda
-            vistas.add(clave)
+            if llevadas[clave] >= de_esta[clave]:
+                continue  # esta tanda no aporta más copias que las que ya hay
+            llevadas[clave] += 1
             todas_filas.append(fila)
             nuevas += 1
         encontradas |= info["encontradas"]

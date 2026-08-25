@@ -285,6 +285,30 @@ para que quede en la memoria común.
     Por ventana: S1 394 en 99 min · S2 394 en 103 min · S3 394 en 123 min ·
     S4 391 en 146 min. Las NO_EN_BOLSA se concentran al final del rango
     (3 en S2, 14 en S3, 26 en S4), que es el mismo patrón del lote de 1.600.
+  - **OBJECIONES generado el mismo día.** Llegó la base buena —el export de
+    SERVICIOS FACTURADOS de enero a agosto, en formato **.xlsb**— y cruzó
+    **1.573 de 1.573**. Salieron **6 lotes, 4.525 filas, 1.572 facturas,
+    $287.610.516**. La diferencia contra los $289.077.286 del consolidado son
+    $1.466.770 y se explica entera: $816.230 de 72 objeciones recortadas al
+    tope que DGH acepta (copago y saldo) y $650.540 de 8 servicios que no
+    existen en la base de DGH.
+  - **HUS538337 quedó por fuera**: sus 5 servicios ($407.000) no están en DGH,
+    así que no hay nada que objetarle. Va a registro manual, como HUS530335 y
+    HUS506920. Otras tres entraron incompletas por lo mismo: HUS531604
+    ($174.240), HUS537835 ($47.520) y HUS543541 ($21.780).
+  - **Tres fuentes coinciden** en que las únicas dos facturas con CALIDAD son
+    HUS532676 y HUS532956: así las marcó el consolidador al armar el lote, así
+    las dejó el portal (OK_CALIDAD_ABIERTA) y así salieron en el OBJECIONES
+    (las únicas dos mixtas).
+  - **El bot aprendió a leer .xlsb**, que es el formato en que DGH exporta la
+    base. Antes tocaba convertirla a mano.
+  - **Defecto propio encontrado y corregido el mismo día**: al aceptar varias
+    tandas se habían quitado las filas repetidas, y una base DGH SÍ trae filas
+    idénticas de verdad (el mismo medicamento dispensado varias veces en una
+    factura), cada una un servicio objetable. Con las repetidas quitadas el
+    OBJECIONES bajaba a 4.284 filas y **249 servicios sin cruzar**; sin
+    quitarlas son 4.525 filas y **8**. Ahora solo se descarta lo que ya venía
+    en una tanda anterior, comparando cuántas veces aparece en cada una.
 
 **Dónde está cada cosa de este frente**
 
@@ -7259,11 +7283,10 @@ Eran dos cosas:
   agregar la columna al archivo.
 
 ### Del frente COOSALUD (glosas y trámites), al 25-08
-- **Base DGH nueva** — es lo que bloquea el lote de 1.573: bajar de DGH el
-  export de SERVICIOS FACTURADOS COOSALUD que cubra de HUS533xxx en adelante.
-  Si no cabe en un solo Excel (el tope son 1.048.576 filas), bajarlo por tandas
-  de fechas y pasarlas todas juntas al bot FILTRAR BASE DGH. Con eso se genera
-  el OBJECIONES del lote.
+- **Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573** (uno por uno,
+  por el tope de 300 facturas). Si alguno devuelve error, corregirlo con el bot
+  CORREGIR ERRORES DGH y reintentar el archivo completo. Después van los
+  trámites de ese lote.
 - **Repasar las 44 del lote de 1.573 que no quedaron OK en el portal**: 43
   NO_EN_BOLSA (no estaban en la bolsa del usuario: hay que ver si las tiene
   otro auditor o si ya venían respondidas) y 1 que terminó sin cartel de
@@ -7675,11 +7698,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
-**Frente COOSALUD (25-08):** (a) bajar el export de SERVICIOS FACTURADOS de DGH
-del **23/06/2026 a hoy** —por tandas si no cabe— y correr FILTRAR BASE DGH con
-las 1.573 facturas; (b) generar el OBJECIONES del lote y subirlo a DGH en
-tandas de 300; (c) repasar las 44 del portal que no quedaron OK; (d) insistir
-con auditoría médica por las 8 facturas de CALIDAD de agosto.
+**Frente COOSALUD (25-08):** (a) subir a DGH los 6 archivos de OBJECIONES del
+lote de 1.573; (b) armar los trámites de ese lote cuando las objeciones estén
+cargadas; (c) repasar las 44 del portal que no quedaron OK; (d) registrar a
+mano HUS538337 (y las tres incompletas); (e) insistir con auditoría médica por
+las 8 facturas de CALIDAD de agosto.
 
 
 **Lo primero del motor (25-08):** reiniciar el motor en la PC de cartera para
