@@ -102,10 +102,21 @@ al Gobierno Nacional y a la Ley 1122. Afirmar un plazo que la norma no fija era
 darle a la entidad una cita fácil de desmentir. El del 105 le atribuía a la ley
 la frase «las entidades no podrán interferir», que tampoco está.
 
+**Y en la Ley 100 había otro texto que no existe.** El artículo 177 figuraba
+como «Obligaciones de las EPS — movilizar los recursos para el otorgamiento del
+POS a través de patrimonios autónomos». Se buscó esa frase en el texto completo
+de la ley: **no aparece**. El artículo 177 es la *definición* de qué es una EPS.
+Importa porque el motor tiene una malla entera construida sobre esa creencia —
+la malla hace lo correcto (el 177 no viene a cuento en una glosa de tarifa),
+pero su razón estaba mal escrita, y de ahí salía la cita. El artículo 178, de
+paso, tenía un resumen donde debía ir la cita textual: si el motor lo ponía
+entre comillas, no coincidía con la ley.
+
 **Cuánto falta.** Se midió: de las 147 normas del corpus, **28 tienen texto de
-artículo guardado**. Cuatro ya quedaron verificadas contra la fuente oficial;
-**quedan 24 normas con 39 artículos** por revisar. Las más citadas —Ley 1751,
-Ley 100 y la Resolución 1995— son las siguientes de la lista.
+artículo guardado**. Al cierre del día quedan **7 normas verificadas contra la
+fuente oficial (23 artículos)** y **21 normas pendientes (26 artículos)**. Las
+verificadas son las que el motor más usa: Decreto 4747, Decreto 780, Ley 100,
+Ley 1164, Ley 1438, Ley 1751 y Resolución 2284.
 
 ### 25-08-2026 (cierre 2) — Las ratificadas de aseguradora ya no salen con la plantilla
 
@@ -7530,11 +7541,12 @@ de trabajar.
 - **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
   entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
   dejar `carterahus02@sinacsc.com`.
-- **Terminar de repasar la base normativa** — en curso. Hechos: Decreto 4747,
-  Decreto 780, Resolución 2284 y Ley 1438. **Quedan 24 normas con 39 artículos**
-  cuyo texto guardado no se ha contrastado contra la fuente. Las que más se
-  citan son las siguientes: Ley 1751 de 2015 (4 artículos), Ley 100 de 1993 (3)
-  y Resolución 1995 de 1999 (2).
+- **Terminar de repasar la base normativa** — en curso. Ya están verificadas
+  contra fuente oficial las 7 normas que el motor más usa (23 artículos):
+  Decreto 4747, Decreto 780, Ley 100, Ley 1164, Ley 1438, Ley 1751 y
+  Resolución 2284. **Quedan 21 normas con 26 artículos.** La siguiente de la
+  lista es la Resolución 1995 de 1999 (la de historia clínica), que el motor
+  cita mucho en las glosas de soportes.
 
 ### Lo que quedó de la noche del 25-08
 - **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor

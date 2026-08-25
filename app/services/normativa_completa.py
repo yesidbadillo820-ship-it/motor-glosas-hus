@@ -95,6 +95,9 @@ LEYES = {
         "verificada": "25-08-2026 fuente oficial",
         "keywords": ["aportes al sistema", "articulo 50", "proteccion social"],
     },
+    # 25-08-2026: artículos 168, 177 y 178 contrastados contra el texto
+    # oficial (normograma SuperSalud). El 177 estaba mal de nombre y de
+    # texto; el 178 tenía un resumen donde debía ir la cita.
     "LEY 100 DE 1993": {
         "nombre": "Ley 100 de 1993",
         "titulo": "Por la cual se crea el Sistema de Seguridad Social Integral",
@@ -113,19 +116,51 @@ LEYES = {
                     "obligatoria",
                 ],
             },
+            # 25-08-2026 — CORREGIDO. Decía «Obligaciones de las Entidades
+            # Promotoras de Salud» y le atribuía un texto sobre «movilizar los
+            # recursos para el otorgamiento del POS a través de patrimonios
+            # autónomos». Esa frase NO APARECE en la Ley 100: se buscó en el
+            # texto completo. El artículo 177 es la DEFINICIÓN de qué es una EPS.
             "177": {
-                "titulo": "Obligaciones de las Entidades Promotoras de Salud",
-                "texto": "Las Entidades Promotoras de Salud tendrán las siguientes obligaciones: (...) c) Movilizar los recursos para el otorgamiento del Plan Obligatorio de Salud, a través de patrimonios autónomos o en administración fiduciaria o cualquier otro mecanismo idóneo; d) Definir procedimientos para controlar la atención integral, eficiente, oportuna y de calidad en los servicios prestados por las Instituciones Prestadoras de Servicios de Salud; (...) f) Organizar la forma y mecanismos a través de los cuales los afiliados y sus familias puedan acceder a los servicios de salud en todo el territorio nacional.",
-                "aplicacion": "Obligación EPS de reconocer y pagar servicios prestados",
-                "keywords": ["obligación EPS", "pago", "reconocimiento", "servicios prestados"],
+                "titulo": "Definición",
+                "texto": (
+                    "Las Entidades Promotoras de Salud son las entidades responsables de "
+                    "la afiliación, y el registro de los afiliados y del recaudo de sus "
+                    "cotizaciones, por delegación del Fondo de Solidaridad y Garantía. Su "
+                    "función básica será organizar y garantizar, directa o indirectamente, "
+                    "la prestación del Plan de Salud Obligatorio a los afiliados y girar, "
+                    "dentro de los términos previstos en la presente Ley, la diferencia "
+                    "entre los ingresos por cotizaciones de sus afiliados y el valor de "
+                    "las correspondientes Unidades de Pago por Capitación al Fondo de "
+                    "Solidaridad y Garantía."
+                ),
+                "aplicacion": (
+                    "Sirve para recordarle a la EPS que garantizar la prestación es su "
+                    "función básica, no un favor. NO le atribuya el deber de «movilizar "
+                    "recursos al POS»: esa frase no está en la ley. Las funciones "
+                    "detalladas están en el artículo 178."
+                ),
+                "keywords": ["EPS", "definición", "afiliación", "UPC"],
             },
             "178": {
                 "titulo": "Funciones de las EPS",
-                "texto": "Las Entidades Promotoras de Salud tendrán como funciones básicas las siguientes: 1. Ser delegatarias del Fondo de Solidaridad y Garantía; 2. Promover la afiliación; 3. Organizar y garantizar la prestación de los servicios del POS; 4. Aceptar a toda persona que solicite afiliación; 5. Definir procedimientos para garantizar el libre acceso a instituciones prestadoras; (...)",
+                "texto": (
+                    "Las Entidades Promotoras de Salud tendrán las siguientes funciones: "
+                    "1. Ser delegatarias del Fondo de Solidaridad y Garantía para la "
+                    "captación de los aportes de los afiliados al Sistema General de "
+                    "Seguridad Social en Salud. 2. Promover la afiliación de grupos de "
+                    "población no cubiertos actualmente por la Seguridad Social. "
+                    "3. Organizar la forma y mecanismos a través de los cuales los "
+                    "afiliados y sus familias puedan acceder a los servicios de salud en "
+                    "todo el territorio nacional. (…) 4. Definir procedimientos para "
+                    "garantizar el libre acceso de los afiliados y sus familias, a las "
+                    "Instituciones Prestadoras (…)"
+                ),
                 "aplicacion": "Funciones de las EPS en el sistema",
                 "keywords": ["funciones EPS", "POS", "afiliación"],
             },
         },
+        "verificada": "25-08-2026 arts. 168, 177 y 178 contra el texto oficial (normograma SuperSalud)",
         "keywords": ["sistema general", "seguridad social", "SGSSS", "salud", "pensiones"],
     },
     "LEY 1122 DE 2007": {
@@ -279,6 +314,7 @@ LEYES = {
                 "keywords": ["autonomía profesional", "acto médico", "pertinencia"],
             },
         },
+        "verificada": "25-08-2026 arts. 56, 105 y 126 contra el texto oficial (normograma SuperSalud)",
         "keywords": [
             "glosa",
             "plazo",
@@ -288,6 +324,7 @@ LEYES = {
             "intromisión acto médico",
         ],
     },
+    # 25-08-2026: artículos 15 y 17 contrastados contra el texto oficial.
     "LEY 1751 DE 2015": {
         "nombre": "Ley 1751 de 2015 (Estatutaria de Salud)",
         "titulo": "Por medio de la cual se regula el derecho fundamental a la salud",
@@ -313,7 +350,8 @@ LEYES = {
                 "keywords": ["derecho fundamental", "salud", "autonomía"],
             },
             "15": {
-                "titulo": "Prestaciones de salud — exclusiones",
+                # 25-08-2026: el epígrafe real es solo «Prestaciones de salud».
+                "titulo": "Prestaciones de salud",
                 "texto": "El Sistema garantizará el derecho fundamental a la salud a través de la prestación de servicios y tecnologías, estructurados sobre una concepción integral de la salud, que incluya su promoción, la prevención, la paliación, la atención de la enfermedad y rehabilitación de sus secuelas. En todo caso, los recursos públicos asignados a la salud no podrán destinarse a financiar servicios y tecnologías en los que se advierta alguno de los siguientes criterios: a) Que tengan como finalidad principal un propósito cosmético o suntuario; b) Que no exista evidencia científica sobre su seguridad y eficacia; c) Que no exista evidencia científica sobre su efectividad clínica; d) Que su uso no haya sido autorizado por la autoridad competente; e) Que se encuentren en fase de experimentación; f) Que tengan que ser prestados en el exterior.",
                 "aplicacion": "Exclusiones TAXATIVAS del sistema (6 causales)",
                 "keywords": ["exclusiones", "PBS", "UPC", "cobertura"],
@@ -330,6 +368,7 @@ LEYES = {
                 ],
             },
         },
+        "verificada": "25-08-2026 arts. 15 y 17 contra el texto oficial (normograma SuperSalud)",
         "keywords": ["estatutaria", "derecho fundamental", "autonomía"],
     },
     "LEY 1709 DE 2014": {

@@ -1999,7 +1999,7 @@ def _neutralizar_valores_inventados(
 #     urgencias (terapia ABA crónica, UCI 18 días ortopédicos, terapia
 #     enzimática Cerezyme, doppler obstétrica electivo). Un auditor EPS
 #     desestima de pinta — la cita es desproporcionada al hecho.
-#   - Art. 177 Ley 100 ("movilizar recursos para POS") en glosas de TARIFA,
+#   - Art. 177 Ley 100 (la DEFINICIÓN de qué es una EPS) en glosas de TARIFA,
 #     PERTINENCIA y EVENTO ADVERSO — temas donde no está en discusión la
 #     obligación financiera de la EPS sino otros aspectos (cómputo tarifa,
 #     criterio médico, prevenibilidad).
@@ -2268,9 +2268,20 @@ def _neutralizar_art_177_relleno(
     texto_glosa: str | None = None,
     codigo_glosa: str | None = None,
 ) -> str:
-    """Bug G (ronda 13): si el dictamen cita Art. 177 Ley 100 ("movilizar
-    recursos para POS") pero el debate no es sobre obligación financiera
-    de la EPS, neutraliza la cita por la genérica.
+    """Bug G (ronda 13): si el dictamen cita el Art. 177 de la Ley 100 pero el
+    debate no es sobre la obligación de la EPS de garantizar la prestación,
+    neutraliza la cita por la genérica.
+
+    25-08-2026 — SE CORRIGIÓ LA DESCRIPCIÓN. Este comentario decía que el
+    Art. 177 trata de «movilizar recursos para POS». Verificado contra el texto
+    oficial de la Ley 100: esa frase NO EXISTE en la ley, y el Art. 177 es la
+    DEFINICIÓN de qué es una EPS («entidades responsables de la afiliación, el
+    registro de los afiliados y el recaudo de sus cotizaciones»). El corpus lo
+    tenía cargado con ese texto inventado y de ahí venía la confusión.
+
+    La red sigue haciendo lo mismo y sigue estando bien: el Art. 177 no viene a
+    cuento en una glosa de tarifa, de pertinencia o de soportes. Lo que cambia
+    es que ahora la razón está bien escrita.
 
     Aplica cuando:
       - El texto contiene marcadores de TARIFA / PERTINENCIA / ARL /
@@ -2305,8 +2316,9 @@ def _neutralizar_art_177_relleno(
     nuevo, n = pat_art177.subn("", dictamen)
     # Ronda 21 (caso MEDIMÁS): cita "pelada" de Art. 177 Ley 100 SIN sufijo
     # POS, usada como fundamento tarifario ("rige el manual ... conforme al
-    # art. 177 de la ley 100/1993"). El Art. 177 regula el deber de las EPS
-    # de movilizar recursos al POS — no es fundamento de una tarifa. En
+    # art. 177 de la ley 100/1993"). El Art. 177 es la DEFINICIÓN de qué es una
+    # EPS (verificado el 25-08-2026 contra el texto oficial) — no es fundamento
+    # de una tarifa por ningún lado. En
     # debate no-financiero se REEMPLAZA (no se borra, para no dejar la
     # oración sin base) por el fundamento contractual correcto.
     pat_art177_bare = re.compile(

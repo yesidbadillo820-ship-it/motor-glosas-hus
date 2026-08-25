@@ -127,3 +127,51 @@ class TestLey1438ArticulosCorregidos:
         assert self.L1438["126"]["titulo"] == (
             "Función jurisdiccional de la Superintendencia Nacional de Salud"
         )
+
+
+class TestLey100Articulo177:
+    """El texto que el corpus le atribuia NO ESTA en la Ley 100.
+
+    Decia: art. 177 «Obligaciones de las Entidades Promotoras de Salud —
+    Movilizar los recursos para el otorgamiento del POS a traves de
+    patrimonios autonomos...». Se busco esa frase en el texto completo de la
+    ley: no aparece. El articulo 177 es la DEFINICION de que es una EPS.
+
+    Importa porque el motor tiene una malla entera
+    (_neutralizar_art_177_relleno) construida sobre esa creencia. La malla
+    sigue haciendo lo correcto —el 177 no viene a cuento en una glosa de
+    tarifa— pero su razon estaba mal escrita, y de ahi salia la cita.
+    """
+
+    L100 = NORMAS["LEY 100 DE 1993"]["articulos"]
+
+    def test_el_177_es_la_definicion_de_eps(self):
+        assert self.L100["177"]["titulo"] == "Definición"
+        assert "entidades responsables de la afiliación" in self.L100["177"]["texto"]
+
+    def test_ya_no_le_atribuye_lo_de_movilizar_recursos(self):
+        assert "Movilizar los recursos" not in self.L100["177"]["texto"]
+        assert "esa frase no está en la ley" in self.L100["177"]["aplicacion"]
+
+    def test_el_178_lleva_la_cita_y_no_un_resumen(self):
+        """Antes guardaba una versión condensada. Si el motor la ponía entre
+        comillas, era una cita que no coincide con la ley."""
+        texto = self.L100["178"]["texto"]
+        assert "captación de los aportes de los afiliados" in texto
+        assert "funciones básicas las siguientes" not in texto
+
+    def test_el_168_de_urgencias_sigue_intacto(self):
+        """Es el anclaje de urgencias del motor: no se puede haber dañado."""
+        assert self.L100["168"]["titulo"] == "Atención inicial de urgencias"
+        assert "no requiere contrato ni orden previa" in self.L100["168"]["texto"]
+
+
+class TestLey1751:
+    L1751 = NORMAS["LEY 1751 DE 2015"]["articulos"]
+
+    def test_el_15_se_llama_solo_prestaciones_de_salud(self):
+        assert self.L1751["15"]["titulo"] == "Prestaciones de salud"
+
+    def test_el_17_de_autonomia_estaba_bien_y_sigue_bien(self):
+        """Es la cita que mas usa el motor en glosas de pertinencia."""
+        assert self.L1751["17"]["titulo"] == "Autonomía profesional"
