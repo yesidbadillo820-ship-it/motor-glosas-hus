@@ -954,7 +954,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 8.ter (RONDA 16). PROHIBIDO ACEPTAR SANCIONES UNILATERALES DE LA EPS: si la EPS aplica una glosa por concepto de "sanción del N%", "multa del N%", "penalidad por demora", "retención punitiva" o cualquier figura sancionatoria, la defensa es RECHAZO TAJANTE por VICIO DE COMPETENCIA. La EPS NO TIENE FACULTAD SANCIONATORIA sobre el prestador — esa función está reservada constitucionalmente a:
    • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126).
    • El Juez competente (Ley 1564/2012 Art. 33 — Código General del Proceso).
-   Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (prohibición de intromisión) + Decreto 4747/2007 Art. 22 (el Manual Único fija las causales de glosa y su adopción es obligatoria).
+   Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (autonomía profesional) + Decreto 4747/2007 Art. 22 (el Manual Único fija las causales de glosa y su adopción es obligatoria).
 
 8.quater (RONDA 18). DEFENSA DE TECNOLOGÍA CARA — JUSTIFICACIÓN CLÍNICA OBLIGATORIA: si el servicio cuestionado por la EPS es una tecnología de alto costo (da Vinci robot, MED-EL implante coclear, Cart-T cell therapy, TMS, Norwood, Epicel, Zolgensma, terapia génica), invocar SOLO la autonomía médica (Ley 23/1981, Ley 1751/2015 Art. 17) es defensa débil que la EPS desestima por insuficiente. La defensa correcta combina TRES capas:
    1. **Indicación clínica documentada en HC**: justificar la elección del dispositivo/procedimiento citando datos clínicos concretos del paciente (estadio del cáncer, preservación nervio erector, anatomía pélvica estrecha, ventana crítica de desarrollo del lenguaje 0-3 años, etc.). NO basta con "el médico lo decidió".
@@ -998,7 +998,7 @@ MISIÓN: Redactar respuestas técnico-jurídicas a glosas de EPS y entidades pag
 NIVEL CONSTITUCIONAL Y LEGAL:
 - Constitución Política Art. 29 (debido proceso), Art. 13 (igualdad), Art. 49 (derecho a la salud).
 - Ley 100/1993, Ley 715/2001 Art. 67 (urgencias y continuidad), Ley 1122/2007.
-- Ley 1438/2011: Art. 56 (pagos), Art. 57 (trámite y plazos de glosas), Art. 105 (prohibición de intromisión en el acto médico), Art. 126 (SuperSalud).
+- Ley 1438/2011: Art. 56 (pagos, intereses moratorios y PROHIBICIÓN de exigir auditoría previa para recibir la factura), Art. 57 (trámite y plazos de glosas), Art. 105 (autonomía profesional: el profesional emite con libertad su opinión sobre la atención de su paciente), Art. 126 (función jurisdiccional de la SuperSalud; su literal f) es el de los conflictos por glosas).
 - Ley 1751/2015 (Estatutaria en Salud): Art. 6, Art. 8 (continuidad), Art. 15 (exclusiones taxativas), Art. 17 (autonomía profesional).
 - Ley 23/1981 (Ética Médica): Art. 1, Art. 11 (decisión independiente), Art. 12.
 - Ley 1755/2015 (derecho de petición), Ley 80/1993 Art. 23, Art. 27 (equilibrio económico), Ley 1150/2007.
@@ -2426,6 +2426,7 @@ def build_user_prompt(
     tono: Optional[str] = "conciliador",
     clausulas_contrato: Optional[list] = None,
     fecha_hecho=None,
+    es_ratificacion: bool = False,
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -2639,6 +2640,29 @@ def build_user_prompt(
                 "o auditor medico de la MISMA ESPECIALIDAD que emitio la indicacion "
                 "(Res. 3047/2008 Anexo Tecnico No. 6). Sin ese soporte la glosa es invalida.",
             }
+        )
+
+    # ── Ratificación de una ASEGURADORA (decisión del área, 25-08-2026) ──
+    # Estas ya no salen con la plantilla fija: el motor tiene que refutar el
+    # motivo CONCRETO por el que la entidad ratificó. La 2.ª auditoría del lote
+    # del 25-08 midió que ninguna de las 21 ratificaciones entraba en ese
+    # motivo — el 0 % — porque todas usaban el mismo texto.
+    bloque_ratificacion_str = ""
+    if es_ratificacion:
+        bloque_ratificacion_str = (
+            "\n═══ ESTA ES UNA RATIFICACIÓN — NO REPITAS LA RESPUESTA INICIAL ═══\n"
+            "La entidad ya recibió la respuesta del hospital y decidió MANTENER la "
+            "glosa. Tu trabajo NO es volver a exponer la defensa inicial: es refutar "
+            "LA RAZÓN QUE LA ENTIDAD DA AHORA para ratificar.\n"
+            "1. Nombra esa razón textualmente y respóndela punto por punto. Si no la "
+            "refutas, en la mesa de conciliación se entiende concedida.\n"
+            "2. Si al ratificar la entidad ESTRENA una causal distinta de la inicial, "
+            "dilo: el Art. 23 del Decreto 4747 de 2007 prohíbe formular glosas nuevas "
+            "sobre la misma factura salvo por hechos nuevos surgidos de la respuesta.\n"
+            "3. Cierra pidiendo conciliación de auditoría (Art. 23 Dec. 4747/2007) y, "
+            "de no haber acuerdo, el escalamiento a la Superintendencia Nacional de "
+            "Salud (Art. 126 Ley 1438/2011). TONO FIRME, nunca amenazante.\n"
+            "4. NO afirmes que el silencio de la entidad equivale a aceptación.\n"
         )
 
     bloque_vicios_str = ""
@@ -3405,7 +3429,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
+{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_ratificacion_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 

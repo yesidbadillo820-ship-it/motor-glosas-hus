@@ -1999,7 +1999,7 @@ def _neutralizar_valores_inventados(
 #     urgencias (terapia ABA crónica, UCI 18 días ortopédicos, terapia
 #     enzimática Cerezyme, doppler obstétrica electivo). Un auditor EPS
 #     desestima de pinta — la cita es desproporcionada al hecho.
-#   - Art. 177 Ley 100 ("movilizar recursos para POS") en glosas de TARIFA,
+#   - Art. 177 Ley 100 (la DEFINICIÓN de qué es una EPS) en glosas de TARIFA,
 #     PERTINENCIA y EVENTO ADVERSO — temas donde no está en discusión la
 #     obligación financiera de la EPS sino otros aspectos (cómputo tarifa,
 #     criterio médico, prevenibilidad).
@@ -2268,9 +2268,20 @@ def _neutralizar_art_177_relleno(
     texto_glosa: str | None = None,
     codigo_glosa: str | None = None,
 ) -> str:
-    """Bug G (ronda 13): si el dictamen cita Art. 177 Ley 100 ("movilizar
-    recursos para POS") pero el debate no es sobre obligación financiera
-    de la EPS, neutraliza la cita por la genérica.
+    """Bug G (ronda 13): si el dictamen cita el Art. 177 de la Ley 100 pero el
+    debate no es sobre la obligación de la EPS de garantizar la prestación,
+    neutraliza la cita por la genérica.
+
+    25-08-2026 — SE CORRIGIÓ LA DESCRIPCIÓN. Este comentario decía que el
+    Art. 177 trata de «movilizar recursos para POS». Verificado contra el texto
+    oficial de la Ley 100: esa frase NO EXISTE en la ley, y el Art. 177 es la
+    DEFINICIÓN de qué es una EPS («entidades responsables de la afiliación, el
+    registro de los afiliados y el recaudo de sus cotizaciones»). El corpus lo
+    tenía cargado con ese texto inventado y de ahí venía la confusión.
+
+    La red sigue haciendo lo mismo y sigue estando bien: el Art. 177 no viene a
+    cuento en una glosa de tarifa, de pertinencia o de soportes. Lo que cambia
+    es que ahora la razón está bien escrita.
 
     Aplica cuando:
       - El texto contiene marcadores de TARIFA / PERTINENCIA / ARL /
@@ -2305,8 +2316,9 @@ def _neutralizar_art_177_relleno(
     nuevo, n = pat_art177.subn("", dictamen)
     # Ronda 21 (caso MEDIMÁS): cita "pelada" de Art. 177 Ley 100 SIN sufijo
     # POS, usada como fundamento tarifario ("rige el manual ... conforme al
-    # art. 177 de la ley 100/1993"). El Art. 177 regula el deber de las EPS
-    # de movilizar recursos al POS — no es fundamento de una tarifa. En
+    # art. 177 de la ley 100/1993"). El Art. 177 es la DEFINICIÓN de qué es una
+    # EPS (verificado el 25-08-2026 contra el texto oficial) — no es fundamento
+    # de una tarifa por ningún lado. En
     # debate no-financiero se REEMPLAZA (no se borra, para no dejar la
     # oración sin base) por el fundamento contractual correcto.
     pat_art177_bare = re.compile(
@@ -5888,6 +5900,75 @@ _KEYWORDS_ASEGURADORAS_SOAT = (
 )
 
 
+# ── 25-08-2026, decisión del área: las ratificadas de ASEGURADORA se analizan ──
+# La 2.ª auditoría del lote señaló que las 21 respuestas a glosas ratificadas
+# salían todas con la misma plantilla y ninguna entraba en el motivo concreto
+# por el que la entidad ratificó (caso HUS0000512271, Aurora: «se ratifica por
+# estancia no autorizada», contestado con el texto genérico).
+#
+# Yesid decidió: «en el caso de las ratificadas, cuando son de aseguradoras
+# estas no van con esa respuesta, sino que toca hacerle su respectivo
+# análisis». Las demás —EPS, Dispensario, Policía, Magisterio, PPL— siguen con
+# la plantilla institucional, que es lo que el área pidió en abril.
+#
+# Esta lista es a propósito MÁS ESTRECHA que _KEYWORDS_ASEGURADORAS_SOAT, que
+# se usa para otra cosa (reforzar el prompt de tarifas) e incluye al
+# Dispensario y a Sanidad Militar. Aquí eso sería un error: esas entidades
+# tienen contrato y su propio flujo. Acá solo van compañías de seguros y ARL.
+_ASEGURADORAS_QUE_SE_ANALIZAN = (
+    "ASEGURADORA",
+    "SEGUROS",
+    "COMPAÑIA DE SEGUROS",
+    "COMPANIA DE SEGUROS",
+    "PREVISORA",
+    "AURORA",
+    "SOLIDARIA",
+    "MUNDIAL",
+    "BOLIVAR",
+    "MAPFRE",
+    "AXA",
+    "ALLIANZ",
+    "LIBERTY",
+    "COLPATRIA",
+    "EQUIDAD",
+    "SURAMERICANA",
+    "POSITIVA",
+    " ARL",
+    "ARL ",
+)
+# Entidades que llevan alguna de esas palabras pero NO son aseguradoras para
+# este efecto: tienen contrato con el hospital y su propia forma de responder.
+_NO_SON_ASEGURADORA_AUNQUE_LO_PAREZCAN = (
+    "DISPENSARIO",
+    "DIRECCION DE SANIDAD",
+    "DIRECCIÓN DE SANIDAD",
+    "SANIDAD MILITAR",
+    "SANIDAD NAVAL",
+    "SANIDAD AEREA",
+    "SANIDAD AÉREA",
+    "POLICIA NACIONAL",
+    "POLICÍA NACIONAL",
+    "FOMAG",
+    "MAGISTERIO",
+    "FIDUPREVISORA",
+)
+
+
+def _ratificada_va_al_analisis(eps: str) -> bool:
+    """¿Esta ratificación la contesta el motor en vez de la plantilla fija?
+
+    Sí cuando el pagador es una aseguradora o una ARL. Con esas, la plantilla
+    genérica deja sin refutar el motivo concreto de la ratificación — y en
+    auditoría lo que no se refuta se descuenta.
+    """
+    if not eps:
+        return False
+    n = str(eps).upper()
+    if any(k in n for k in _NO_SON_ASEGURADORA_AUNQUE_LO_PAREZCAN):
+        return False
+    return any(k in n for k in _ASEGURADORAS_QUE_SE_ANALIZAN)
+
+
 def _es_aseguradora_soat(nombre: str) -> bool:
     """True si el nombre parece de aseguradora SOAT/ARL sin contrato pactado."""
     if not nombre:
@@ -6335,9 +6416,18 @@ class GlosaService:
         tiene_contrato = eps_key in (contratos_db or {})
 
         argumento_fijo = None
-        if es_ratificacion:
+        # 25-08-2026: con una ASEGURADORA, la ratificación va al motor para que
+        # refute el motivo concreto. Con las demás sigue la plantilla del área.
+        _rat_al_analisis = es_ratificacion and _ratificada_va_al_analisis(str(data.eps or ""))
+        if es_ratificacion and not _rat_al_analisis:
             argumento_fijo = TEXTO_RATIFICADA
             tipo_glosa = "RATIFICADA"
+        elif _rat_al_analisis:
+            tipo_glosa = "RATIFICADA"
+            logger.info(
+                f"[RATIFICADA-ASEGURADORA] {data.eps} — se analiza el motivo en vez de "
+                "usar la plantilla fija (decisión del área, 25-08-2026)."
+            )
         elif es_extemporanea:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
@@ -6840,6 +6930,7 @@ class GlosaService:
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
                 clausulas_contrato=_clausulas_contrato,
                 fecha_hecho=_fecha_hecho,
+                es_ratificacion=es_ratificacion,
             )
 
             # ── Concepto×concepto (jun-2026) ──

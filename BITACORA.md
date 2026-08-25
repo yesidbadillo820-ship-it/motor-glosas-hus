@@ -63,6 +63,100 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (cierre 3) — El repaso normativo: otros cuatro artículos mal, y un argumento que estábamos regalando
+
+Siguiendo lo que pidió el área —leer el Decreto 4747 completo y el Decreto 780
+de 2016—, apareció más de lo mismo. Y esta vez apareció también algo a favor.
+
+**El Decreto 780 tenía su propio artículo inventado.** El corpus guardaba un
+artículo 2.5.3.4.1.1 titulado «Prohibición de auditoría previa como barrera».
+Se verificó contra el Decreto 441 de 2022, que es el que le agregó ese capítulo
+al 780: **el 2.5.3.4.1.1 es el «Objeto» del capítulo** y no dice nada de
+auditoría previa. El texto estaba inventado. Se corrigió y se cargó, con su
+texto literal, el 2.5.3.4.3.3, que sí es el de la auditoría de cuentas médicas.
+
+**Pero la prohibición SÍ existe — y en un sitio mejor.** Está en el
+**artículo 56 de la Ley 1438 de 2011**:
+
+> «Se prohíbe el establecimiento de la obligatoriedad de procesos de auditoría
+> previa a la presentación de las facturas por prestación de servicios o
+> cualquier práctica tendiente a impedir la recepción.»
+
+Es de rango de **ley**, más fuerte que el decreto o la resolución. El motor
+tenía el argumento correcto colgado de una norma inventada: si la entidad iba a
+verificar la cita, no encontraba nada. Ahora está donde debe, y además quedó
+cargado el artículo 5 de la Resolución 2284 de 2023, que repite la prohibición
+y la llama por su nombre: «prácticas dilatorias no autorizadas».
+
+**Y tres artículos más de la Ley 1438 tenían mal el nombre:**
+
+| El motor decía | Lo que dice de verdad |
+|---|---|
+| Art. 56 — «Trámite de pagos» | «Pagos a los prestadores de servicios de salud» |
+| Art. 105 — «Prohibición de intromisión en el acto médico» | «Autonomía profesional» |
+| Art. 126 — «Supervisión, inspección y vigilancia» | «Función jurisdiccional de la Superintendencia Nacional de Salud» |
+
+Dos de ellos tenían además **texto inventado**. El del 56 hablaba de pagar «el
+monto total dentro de los treinta días» — la ley no dice eso, remite los plazos
+al Gobierno Nacional y a la Ley 1122. Afirmar un plazo que la norma no fija era
+darle a la entidad una cita fácil de desmentir. El del 105 le atribuía a la ley
+la frase «las entidades no podrán interferir», que tampoco está.
+
+**Y en la Ley 100 había otro texto que no existe.** El artículo 177 figuraba
+como «Obligaciones de las EPS — movilizar los recursos para el otorgamiento del
+POS a través de patrimonios autónomos». Se buscó esa frase en el texto completo
+de la ley: **no aparece**. El artículo 177 es la *definición* de qué es una EPS.
+Importa porque el motor tiene una malla entera construida sobre esa creencia —
+la malla hace lo correcto (el 177 no viene a cuento en una glosa de tarifa),
+pero su razón estaba mal escrita, y de ahí salía la cita. El artículo 178, de
+paso, tenía un resumen donde debía ir la cita textual: si el motor lo ponía
+entre comillas, no coincidía con la ley.
+
+**Cuánto falta.** Se midió: de las 147 normas del corpus, **28 tienen texto de
+artículo guardado**. Al cierre del día quedan **7 normas verificadas contra la
+fuente oficial (23 artículos)** y **21 normas pendientes (26 artículos)**. Las
+verificadas son las que el motor más usa: Decreto 4747, Decreto 780, Ley 100,
+Ley 1164, Ley 1438, Ley 1751 y Resolución 2284.
+
+### 25-08-2026 (cierre 2) — Las ratificadas de aseguradora ya no salen con la plantilla
+
+El área revisó los seis pendientes y respondió. Cuatro ya estaban hechos
+—el motor reiniciado, el archivo de recepción reenviado, los 6 archivos de
+objeciones de COOSALUD subidos a DGH— y quedaron dos decisiones.
+
+**La decisión sobre las ratificaciones.** Yesid la resolvió así: «cuando son de
+aseguradoras, estas no van con esa respuesta, sino que toca hacerle su
+respectivo análisis».
+
+Quedó implementado. Cuando el pagador es una **compañía de seguros o una ARL**,
+la ratificación ya no sale con el texto fijo: la redacta el motor, y le llega la
+instrucción de **nombrar la razón concreta por la que la entidad ratificó** y
+responderla punto por punto. Se le entrega además el argumento que faltaba: el
+artículo 23 del Decreto 4747 prohíbe formular glosas nuevas sobre la misma
+factura salvo por hechos nuevos, así que una ratificación que estrena causal es
+rebatible.
+
+**Las demás siguen igual.** EPS, Dispensario, Policía, Magisterio y PPL
+conservan la plantilla institucional que el área pidió en abril — con el
+artículo corregido, eso sí.
+
+**Un criterio que hay que confirmar.** Para decidir quién es «aseguradora» se
+hizo una lista corta: compañías de seguros y ARL (Aurora, La Previsora,
+Solidaria, Mundial, Positiva, Suramericana y las demás del ramo). Se dejaron
+**por fuera** a propósito el Dispensario, Sanidad Militar, la Policía y el
+FOMAG, porque tienen contrato con el hospital y su propia forma de responder —
+aunque el nombre de algunas lleve la palabra «seguros» o «previsora». Si alguna
+de esas también debe analizarse, se mueve.
+
+**La cuenta de Edgar Silva** queda anotada como tarea de pantalla: esa cuenta
+vive en la base del hospital, no en el código. Hay que entrar a
+Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y dejar
+`carterahus02@sinacsc.com`.
+
+**Y se armó un banco de diez pruebas** para comprobar en pantalla que todo lo
+del día quedó funcionando: cada caso apunta a un defecto concreto de hoy, con
+lo que debe pasar y la señal de alarma al lado.
+
 ### 25-08-2026 (cierre) — Las pantallas que fallaban sin decir nada
 
 Terminado el asunto de las respuestas, se retomó lo de la página. Primero se
@@ -7437,7 +7531,24 @@ de trabajar.
 
 ## 3) PENDIENTE
 
-### Del motor de glosas, al 25-08 (noche)
+### Del motor de glosas, al 25-08 (cierre)
+- **~~Reiniciar el motor~~ — HECHO** (confirmado por el área el 25-08).
+- **~~Reenviar el archivo de recepción~~ — HECHO.**
+- **~~Subir a DGH los 6 archivos de objeciones de COOSALUD~~ — HECHO.**
+- **~~La plantilla de las ratificaciones~~ — RESUELTO.** El área decidió que las
+  de aseguradora se analizan. Implementado el 25-08 (ver la entrada del día).
+  Falta que el área confirme el criterio de quién cuenta como aseguradora.
+- **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
+  entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
+  dejar `carterahus02@sinacsc.com`.
+- **Terminar de repasar la base normativa** — en curso. Ya están verificadas
+  contra fuente oficial las 7 normas que el motor más usa (23 artículos):
+  Decreto 4747, Decreto 780, Ley 100, Ley 1164, Ley 1438, Ley 1751 y
+  Resolución 2284. **Quedan 21 normas con 26 artículos.** La siguiente de la
+  lista es la Resolución 1995 de 1999 (la de historia clínica), que el motor
+  cita mucho en las glosas de soportes.
+
+### Lo que quedó de la noche del 25-08
 - **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
   señala que las 21 respuestas a glosas ratificadas usan el mismo texto y
   ninguna entra en el motivo concreto por el que la entidad ratificó. El texto

@@ -95,6 +95,9 @@ LEYES = {
         "verificada": "25-08-2026 fuente oficial",
         "keywords": ["aportes al sistema", "articulo 50", "proteccion social"],
     },
+    # 25-08-2026: artículos 168, 177 y 178 contrastados contra el texto
+    # oficial (normograma SuperSalud). El 177 estaba mal de nombre y de
+    # texto; el 178 tenía un resumen donde debía ir la cita.
     "LEY 100 DE 1993": {
         "nombre": "Ley 100 de 1993",
         "titulo": "Por la cual se crea el Sistema de Seguridad Social Integral",
@@ -113,19 +116,51 @@ LEYES = {
                     "obligatoria",
                 ],
             },
+            # 25-08-2026 — CORREGIDO. Decía «Obligaciones de las Entidades
+            # Promotoras de Salud» y le atribuía un texto sobre «movilizar los
+            # recursos para el otorgamiento del POS a través de patrimonios
+            # autónomos». Esa frase NO APARECE en la Ley 100: se buscó en el
+            # texto completo. El artículo 177 es la DEFINICIÓN de qué es una EPS.
             "177": {
-                "titulo": "Obligaciones de las Entidades Promotoras de Salud",
-                "texto": "Las Entidades Promotoras de Salud tendrán las siguientes obligaciones: (...) c) Movilizar los recursos para el otorgamiento del Plan Obligatorio de Salud, a través de patrimonios autónomos o en administración fiduciaria o cualquier otro mecanismo idóneo; d) Definir procedimientos para controlar la atención integral, eficiente, oportuna y de calidad en los servicios prestados por las Instituciones Prestadoras de Servicios de Salud; (...) f) Organizar la forma y mecanismos a través de los cuales los afiliados y sus familias puedan acceder a los servicios de salud en todo el territorio nacional.",
-                "aplicacion": "Obligación EPS de reconocer y pagar servicios prestados",
-                "keywords": ["obligación EPS", "pago", "reconocimiento", "servicios prestados"],
+                "titulo": "Definición",
+                "texto": (
+                    "Las Entidades Promotoras de Salud son las entidades responsables de "
+                    "la afiliación, y el registro de los afiliados y del recaudo de sus "
+                    "cotizaciones, por delegación del Fondo de Solidaridad y Garantía. Su "
+                    "función básica será organizar y garantizar, directa o indirectamente, "
+                    "la prestación del Plan de Salud Obligatorio a los afiliados y girar, "
+                    "dentro de los términos previstos en la presente Ley, la diferencia "
+                    "entre los ingresos por cotizaciones de sus afiliados y el valor de "
+                    "las correspondientes Unidades de Pago por Capitación al Fondo de "
+                    "Solidaridad y Garantía."
+                ),
+                "aplicacion": (
+                    "Sirve para recordarle a la EPS que garantizar la prestación es su "
+                    "función básica, no un favor. NO le atribuya el deber de «movilizar "
+                    "recursos al POS»: esa frase no está en la ley. Las funciones "
+                    "detalladas están en el artículo 178."
+                ),
+                "keywords": ["EPS", "definición", "afiliación", "UPC"],
             },
             "178": {
                 "titulo": "Funciones de las EPS",
-                "texto": "Las Entidades Promotoras de Salud tendrán como funciones básicas las siguientes: 1. Ser delegatarias del Fondo de Solidaridad y Garantía; 2. Promover la afiliación; 3. Organizar y garantizar la prestación de los servicios del POS; 4. Aceptar a toda persona que solicite afiliación; 5. Definir procedimientos para garantizar el libre acceso a instituciones prestadoras; (...)",
+                "texto": (
+                    "Las Entidades Promotoras de Salud tendrán las siguientes funciones: "
+                    "1. Ser delegatarias del Fondo de Solidaridad y Garantía para la "
+                    "captación de los aportes de los afiliados al Sistema General de "
+                    "Seguridad Social en Salud. 2. Promover la afiliación de grupos de "
+                    "población no cubiertos actualmente por la Seguridad Social. "
+                    "3. Organizar la forma y mecanismos a través de los cuales los "
+                    "afiliados y sus familias puedan acceder a los servicios de salud en "
+                    "todo el territorio nacional. (…) 4. Definir procedimientos para "
+                    "garantizar el libre acceso de los afiliados y sus familias, a las "
+                    "Instituciones Prestadoras (…)"
+                ),
                 "aplicacion": "Funciones de las EPS en el sistema",
                 "keywords": ["funciones EPS", "POS", "afiliación"],
             },
         },
+        "verificada": "25-08-2026 arts. 168, 177 y 178 contra el texto oficial (normograma SuperSalud)",
         "keywords": ["sistema general", "seguridad social", "SGSSS", "salud", "pensiones"],
     },
     "LEY 1122 DE 2007": {
@@ -143,6 +178,9 @@ LEYES = {
         },
         "keywords": ["flujo recursos", "anticipo", "pagos"],
     },
+    # 25-08-2026: artículos 56, 105 y 126 verificados y corregidos contra el
+    # texto oficial (normograma de la SuperSalud). Los tres tenían mal el
+    # epígrafe y dos de ellos, además, texto que no está en la ley.
     "LEY 1438 DE 2011": {
         "nombre": "Ley 1438 de 2011",
         "titulo": "Por medio de la cual se reforma el Sistema General de Seguridad Social en Salud",
@@ -182,17 +220,41 @@ LEYES = {
                 "aplicacion": "Marco general. Por sí solo no sustenta una defensa tarifaria.",
                 "keywords": ["orientación", "bienestar del usuario", "atención primaria"],
             },
+            # 25-08-2026 — CORREGIDO. Decía «Trámite de pagos» con un texto que
+            # hablaba de pagar «el monto total dentro de los treinta (30) días».
+            # El artículo real se llama «Pagos a los prestadores de servicios de
+            # salud» y remite los plazos a lo que fije el Gobierno según la Ley
+            # 1122. Y trae algo que el motor no estaba usando: la prohibición de
+            # exigir auditoría previa para recibir la factura — que el corpus le
+            # atribuía, con texto inventado, a un artículo del Decreto 780.
             "56": {
-                "titulo": "Trámite de pagos",
-                "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda. Nota operativa (Manual Único de Glosas Res. 2284/2023 + Manual SIIFA 2026): una vez levantada o aceptada la glosa, el pago al prestador debe efectuarse dentro de los cinco (5) días hábiles siguientes.",
-                "aplicacion": "Pago total 30 días hábiles + anticipo 50% no sujeto a glosa + pago 5 días hábiles post-levantamiento",
+                "titulo": "Pagos a los prestadores de servicios de salud",
+                "texto": (
+                    "Las Entidades Promotoras de Salud pagarán los servicios a los "
+                    "prestadores de servicios de salud dentro de los plazos, condiciones, "
+                    "términos y porcentajes que establezca el Gobierno Nacional según el "
+                    "mecanismo de pago, de acuerdo con lo establecido en la Ley 1122 de "
+                    "2007. El no pago dentro de los plazos causará intereses moratorios a "
+                    "la tasa establecida para los impuestos administrados por la Dirección "
+                    "de Impuestos y Aduanas Nacionales (DIAN). Se prohíbe el "
+                    "establecimiento de la obligatoriedad de procesos de auditoría previa "
+                    "a la presentación de las facturas por prestación de servicios o "
+                    "cualquier práctica tendiente a impedir la recepción."
+                ),
+                "aplicacion": (
+                    "Dos argumentos fuertes en un solo artículo: (1) el no pago a tiempo "
+                    "causa intereses moratorios a la tasa DIAN; (2) está PROHIBIDO exigir "
+                    "auditoría previa para recibir la factura, o cualquier práctica que "
+                    "impida la recepción. Es de rango de LEY, más fuerte que la "
+                    "Resolución 2284. NO afirmar «treinta días»: el artículo remite los "
+                    "plazos al Gobierno Nacional y a la Ley 1122 de 2007."
+                ),
                 "keywords": [
-                    "pago",
-                    "30 días",
-                    "50%",
-                    "anticipo",
-                    "trámite de pagos",
-                    "5 días pago",
+                    "pagos",
+                    "intereses moratorios",
+                    "auditoría previa",
+                    "recepción de facturas",
+                    "DIAN",
                 ],
             },
             "57": {
@@ -213,8 +275,12 @@ LEYES = {
                     "SIIFA",
                 ],
             },
+            # 25-08-2026: el título decía «Supervisión, inspección y vigilancia».
+            # El real es «Función jurisdiccional de la Superintendencia Nacional
+            # de Salud», y lo que hace es adicionarle literales al Art. 41 de la
+            # Ley 1122 — entre ellos el f), que es justo el de las glosas.
             "126": {
-                "titulo": "Supervisión, inspección y vigilancia",
+                "titulo": "Función jurisdiccional de la Superintendencia Nacional de Salud",
                 "texto": "La Superintendencia Nacional de Salud tendrá la función jurisdiccional, sin perjuicio de la competencia de los jueces de la República, para conocer y fallar en derecho con carácter definitivo y con las facultades propias de un juez, los conflictos entre las entidades promotoras de salud y sus afiliados o entre las entidades territoriales y las entidades responsables del pago de los servicios de salud, y los prestadores de servicios de salud, en materia de glosas de facturas.",
                 "aplicacion": "Función jurisdiccional SuperSalud para conflictos de glosas",
                 "keywords": [
@@ -225,20 +291,30 @@ LEYES = {
                     "arbitraje",
                 ],
             },
+            # 25-08-2026 — CORREGIDO. Decía «Prohibición de intromisión en el
+            # acto médico» con un texto que no está en la ley. El artículo real
+            # se llama «Autonomía profesional» y DEFINE qué es esa autonomía;
+            # sirve igual para la defensa, pero hay que citarlo por lo que dice.
             "105": {
-                "titulo": "Prohibición de intromisión en el acto médico",
-                "texto": "Las entidades responsables del pago de los servicios de salud no podrán interferir en la autonomía profesional del médico tratante, ni sustituir sus decisiones clínicas por consideraciones administrativas o económicas. El criterio del médico tratante prevalece sobre la opinión del auditor médico que no examinó al paciente. La violación de esta prohibición compromete la responsabilidad civil de la entidad pagadora por las consecuencias en la salud del usuario.",
-                "aplicacion": "Defensa en glosas de PERTINENCIA CLÍNICA (CL/PE) — proscribe revisión administrativa del criterio médico",
-                "keywords": [
-                    "intromisión",
-                    "acto médico",
-                    "autonomía profesional",
-                    "pertinencia clínica",
-                    "criterio médico tratante",
-                    "Art. 105",
-                ],
+                "titulo": "Autonomía profesional",
+                "texto": (
+                    "Entiéndase por autonomía de los profesionales de la salud, la "
+                    "garantía que el profesional de la salud pueda emitir con toda "
+                    "libertad su opinión profesional con respecto a la atención y "
+                    "tratamiento de sus pacientes con calidad, aplicando las normas, "
+                    "principios y valores que regulan el ejercicio de su profesión."
+                ),
+                "aplicacion": (
+                    "Para las glosas de pertinencia: la ley garantiza que el médico opine "
+                    "con libertad sobre la atención de su paciente. Acompaña al Art. 17 de "
+                    "la Ley 1751 de 2015 y al Art. 26 de la Ley 1164 de 2007. NO le "
+                    "atribuya la frase «las entidades no podrán interferir»: eso no está "
+                    "en el artículo."
+                ),
+                "keywords": ["autonomía profesional", "acto médico", "pertinencia"],
             },
         },
+        "verificada": "25-08-2026 arts. 56, 105 y 126 contra el texto oficial (normograma SuperSalud)",
         "keywords": [
             "glosa",
             "plazo",
@@ -248,6 +324,7 @@ LEYES = {
             "intromisión acto médico",
         ],
     },
+    # 25-08-2026: artículos 15 y 17 contrastados contra el texto oficial.
     "LEY 1751 DE 2015": {
         "nombre": "Ley 1751 de 2015 (Estatutaria de Salud)",
         "titulo": "Por medio de la cual se regula el derecho fundamental a la salud",
@@ -273,7 +350,8 @@ LEYES = {
                 "keywords": ["derecho fundamental", "salud", "autonomía"],
             },
             "15": {
-                "titulo": "Prestaciones de salud — exclusiones",
+                # 25-08-2026: el epígrafe real es solo «Prestaciones de salud».
+                "titulo": "Prestaciones de salud",
                 "texto": "El Sistema garantizará el derecho fundamental a la salud a través de la prestación de servicios y tecnologías, estructurados sobre una concepción integral de la salud, que incluya su promoción, la prevención, la paliación, la atención de la enfermedad y rehabilitación de sus secuelas. En todo caso, los recursos públicos asignados a la salud no podrán destinarse a financiar servicios y tecnologías en los que se advierta alguno de los siguientes criterios: a) Que tengan como finalidad principal un propósito cosmético o suntuario; b) Que no exista evidencia científica sobre su seguridad y eficacia; c) Que no exista evidencia científica sobre su efectividad clínica; d) Que su uso no haya sido autorizado por la autoridad competente; e) Que se encuentren en fase de experimentación; f) Que tengan que ser prestados en el exterior.",
                 "aplicacion": "Exclusiones TAXATIVAS del sistema (6 causales)",
                 "keywords": ["exclusiones", "PBS", "UPC", "cobertura"],
@@ -290,6 +368,7 @@ LEYES = {
                 ],
             },
         },
+        "verificada": "25-08-2026 arts. 15 y 17 contra el texto oficial (normograma SuperSalud)",
         "keywords": ["estatutaria", "derecho fundamental", "autonomía"],
     },
     "LEY 1709 DE 2014": {
@@ -833,14 +912,62 @@ DECRETOS = {
         "titulo": "Decreto Único Reglamentario del Sector Salud y Protección Social",
         "ambito": "Marco general reglamentario sector salud",
         "vigente": True,
+        # 25-08-2026 — CORREGIDO CONTRA LA FUENTE. Este corpus tenía cargado un
+        # artículo 2.5.3.4.1.1 titulado «Prohibición de auditoría previa como
+        # barrera», con un texto que no existe. Verificado contra el Decreto
+        # 441 de 2022 (que es el que agregó este capítulo al Decreto 780):
+        # el 2.5.3.4.1.1 es el «Objeto» del capítulo.
+        #
+        # La prohibición SÍ es real, pero vive en otra parte: en el artículo 5
+        # de la Resolución 2284 de 2023, que está más abajo en este archivo con
+        # su texto literal. Es la que hay que citar.
         "articulos": {
             "2.5.3.4.1.1": {
-                "titulo": "Prohibición de auditoría previa como barrera",
-                "texto": "No podrá establecerse la auditoría previa como barrera para la radicación de facturas por servicios de salud efectivamente prestados. La auditoría es un mecanismo posterior al pago y no un requisito previo.",
-                "aplicacion": "PROHÍBE auditoría previa como barrera de radicación",
-                "keywords": ["auditoría previa", "radicación", "barrera"],
+                "titulo": "Objeto",
+                "texto": (
+                    "El presente capítulo tiene por objeto regular algunos aspectos "
+                    "generales de los acuerdos de voluntades entre las entidades "
+                    "responsables de pago y los prestadores de servicios de salud o "
+                    "proveedores de tecnologías en salud, celebrados entre dos o más "
+                    "personas naturales o jurídicas para la prestación o provisión de "
+                    "servicios y tecnologías en salud, en sus etapas precontractual, "
+                    "contractual y post contractual, y establecer mecanismos de "
+                    "protección a los usuarios."
+                ),
+                "aplicacion": (
+                    "Es el artículo de encabezado del capítulo. NO prohíbe la auditoría "
+                    "previa: para eso es el artículo 5 de la Resolución 2284 de 2023."
+                ),
+                "keywords": ["acuerdos de voluntades", "objeto", "capítulo"],
+            },
+            "2.5.3.4.3.3": {
+                "titulo": "Auditoría de cuentas médicas",
+                "texto": (
+                    "La auditoría de las cuentas médicas se realizará con base en los "
+                    "soportes definidos en el artículo 2.5.3.4.4.1 del presente decreto, "
+                    "con sujeción a los estándares establecidos en el Manual Único de "
+                    "Devoluciones, Glosas y Respuestas expedido por el Ministerio de "
+                    "Salud y Protección Social, conforme a los términos señalados en el "
+                    "trámite de glosas establecido en el artículo 57 de la Ley 1438 de "
+                    "2011, y de acuerdo con la información reportada y validada en el "
+                    "Registro Individual de Prestaciones de Salud."
+                ),
+                "aplicacion": (
+                    "Ata la auditoría de la entidad a TRES cosas: los soportes definidos "
+                    "por norma, las causales del Manual Único y los plazos del Art. 57. "
+                    "Sirve contra la entidad que glosa por fuera del manual, que exige "
+                    "un soporte que la norma no pide, o que se pasa del término."
+                ),
+                "keywords": [
+                    "auditoría de cuentas médicas",
+                    "soportes",
+                    "manual único",
+                    "plazos",
+                ],
             },
         },
+        "articulos_completos": False,
+        "verificada": "25-08-2026 contra el Decreto 441 de 2022 (norma que lo adicionó)",
         "keywords": ["decreto único", "reglamentario", "780"],
     },
     "DECRETO 441 DE 2022": {
@@ -1106,6 +1233,38 @@ RESOLUCIONES = {
         "titulo": "Manual Único de Devoluciones, Glosas y Respuestas",
         "ambito": "Norma maestra vigente — CÓDIGOS TAXATIVOS de glosas",
         "vigente": True,
+        # 25-08-2026: se carga el artículo 5 con su texto literal. Es el que de
+        # verdad prohíbe exigir auditoría previa para radicar — el corpus se lo
+        # atribuía al Decreto 780, con un texto inventado.
+        "articulos": {
+            "5": {
+                "titulo": "Auditoría de cuentas médicas",
+                "texto": (
+                    "De conformidad con lo establecido en el artículo 2.5.3.4.3.3 del "
+                    "Decreto número 780 de 2016, las entidades responsables de pago no "
+                    "podrán exigir que, para radicar las facturas de venta en salud, se "
+                    "haya surtido un proceso de auditoría previo o paso por mallas "
+                    "validadoras propias ni el envío previo de la factura, actuaciones "
+                    "que se consideran prácticas dilatorias no autorizadas. Corresponde "
+                    "a las entidades responsables de pago adelantar la auditoría de las "
+                    "cuentas médicas."
+                ),
+                "aplicacion": (
+                    "ESTE es el artículo contra la entidad que condiciona la radicación "
+                    "a pasar antes por su malla o su auditoría: la norma llama a eso "
+                    "«práctica dilatoria no autorizada». Se cita por su nombre —Art. 5 "
+                    "de la Res. 2284 de 2023—, no como artículo del Decreto 780."
+                ),
+                "keywords": [
+                    "auditoría previa",
+                    "radicación",
+                    "mallas validadoras",
+                    "prácticas dilatorias",
+                ],
+            },
+        },
+        "articulos_completos": False,
+        "verificada": "25-08-2026 contra el texto oficial (normograma SuperSalud)",
         "anexos": {
             "Anexo Técnico No. 3": "Listado TAXATIVO de códigos de glosa (6 dígitos). La EPS no puede inventar códigos fuera de este catálogo.",
         },
