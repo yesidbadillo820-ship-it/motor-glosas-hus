@@ -63,6 +63,47 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (mañana) — El correo no salía, y no era la contraseña
+
+Día de arrancar en producción: se borraron las glosas de prueba y entró el
+archivo de recepción con **117 glosas** reales. Pero el correo a los gestores
+no salía, y lo que costó fue encontrar por qué.
+
+**El motor mandaba los correos sin fecha.** Todos los envíos rebotaban con
+«550 Command rejected» desde que el hospital pasó su correo al servidor
+institucional. El panel del motor decía que la causa más común era la
+contraseña — y no lo era: se probó la clave a mano contra ese mismo servidor y
+entró perfecto. Lo que faltaba era la **fecha y el identificador** del mensaje,
+que el estándar exige. Gmail los perdonaba; el servidor institucional no. Ese
+defecto llevaba meses ahí y solo se destapó al cambiar de servidor.
+
+**El panel adivinaba en vez de mirar.** Decía «la causa más común es que la
+contraseña no sea una contraseña de aplicación» sin haber leído el error, y
+mandaba a buscar el detalle en un archivo de registro de 3 MB — cuando el error
+exacto ya estaba guardado en la base. Eso costó la mañana. Ahora lee el error
+real, lo traduce, y cuando no lo entiende **lo dice** en vez de culpar a nadie.
+
+**A las médicas auditoras no les llegaba nada.** Los seis gestores recibieron
+su correo; Laura Díaz, Zulay González y Leidy Sanguino no, aunque doce glosas
+venían marcadas «Mixta» o «Medico» con su nombre. El nombre sí se leía del
+Excel y sí quedaba guardado, pero al rehacer el plan de trabajo con la causal
+se le pasaba vacío y **se borraba** — y el correo usa justo ese campo para
+saber a quién escribirle.
+
+**Y dos cosas de pantalla.** La plata salía con doble signo («$$ 2.319.514»), y
+la alerta roja de vencimientos se contradecía sola: decía que opera el silencio
+contra el prestador y en el mismo renglón que el Art. 57 no aplica al hospital.
+Verificado el texto oficial: **sí** obliga al prestador. Ahora cita la norma de
+verdad.
+
+**«Tengo estos botones pero no hacen nada.»** No estaban dañados: nunca fueron
+botones. El rectángulo morado que dice «Editar manual» es una etiqueta que
+avisa que la glosa necesita revisión humana, pero estaba pintada igual que los
+botones del sistema. Ya se ve como lo que es.
+
+**De paso, el despliegue.** El motor se quedó con el código de la víspera
+porque había gente trabajando, y correr el bot a mano se aplazaba igual. Ahora
+`autodeploy_motor_local.cmd YA` aplica de una y deja constancia.
 ### Julio–Agosto 2026 — Frente COOSALUD: objeciones en DGH y respuestas en el portal
 
 Este frente lo llevó un chat aparte (los bots de `tools/`: organizar el ZIP del
@@ -7088,6 +7129,13 @@ se enterara.
   confirmó mirando los dictámenes de la ronda 2 (sale una frase en el
   «Fundamento normativo» que ya se había quitado). Mientras no se reinicie,
   ninguna de estas correcciones está funcionando en la PC de cartera.
+- **Los correos de Usuarios hay que depurarlos.** Edgar Silva tiene dos
+  cuentas y una apunta a `devoluciones1@sinacsc.com`, que rebota con «Address
+  not found»; la buena es `carterahus02@sinacsc.com`. Mientras no se corrija,
+  los avisos que se le mandan salen y se pierden en silencio.
+- **Las tres médicas no recibieron el lote del 25-08.** El arreglo entra para
+  las importaciones siguientes; para las doce glosas de ese día hay que
+  pasarles el Excel-respuesta a mano.
 - **Ojo con la fecha del servicio.** Varias normas que el motor citaba se
   derogaron este año: la Res. 2275 de 2023 (factura electrónica y RIPS, la
   reemplazó la Res. 948 de 2026), la Res. 5159 de 2015 (PPL, la reemplazó la

@@ -14282,7 +14282,17 @@ function _renderMisGlosas(dataRaw){
       if(apnInfo){
         var apnBg = apnInfo.color || '#6366f1';
         var apnTooltip = (apnInfo.razon || '').replace(/"/g, '&quot;');
-        wfChip = '<span class="chip" title="' + apnTooltip + '" style="background:' + apnBg + ';color:#fff;border:0;margin-right:4px;font-size:.7rem">' + (apnInfo.icono||'') + ' ' + (apnInfo.etiqueta||'') + '</span>' + wfChip;
+        // ETIQUETA, NO BOTÓN (25-08-2026). Esto se pintaba con fondo sólido
+        // y color de acción, o sea idéntico a los botones del sistema. Yesid
+        // intentó hacerle clic y escribió «tengo estos botones pero no hacen
+        // nada» — y tenía razón: nunca fue clicable, es el nivel de
+        // auto-piloto de la glosa.
+        //
+        // En un sistema donde todo lo morado es un botón, una etiqueta
+        // disfrazada de botón enseña a desconfiar de la interfaz. Ahora va con
+        // borde y sin relleno, igual que el chip de estado que tiene al lado,
+        // que sí se lee como lo que es. El tooltip con el porqué se conserva.
+        wfChip = '<span class="chip" title="' + apnTooltip + '" style="background:transparent;color:' + apnBg + ';border:1px solid ' + apnBg + ';margin-right:4px;font-size:.7rem">' + (apnInfo.icono||'') + ' ' + (apnInfo.etiqueta||'') + '</span>' + wfChip;
       }
 
       // Ronda 29: chip autopilot al lado del workflow (si hay data)
