@@ -4702,6 +4702,21 @@ vigente usando `--lista` con el CSV `_lista_cuv_ok.csv` (así el robot NO toca
 las 52 rechazadas que siguen en la misma carpeta). Cuando SISTEMAS revalide,
 se recopia el CUV nuevo del share, se re-verifica y se carga el resto.
 
+**El cargue se corrió el mismo día y salió esto.** La primera corrida mostró
+8 notas seguidas con «la factura no aparece en la grilla». No era falla del
+robot ni del nombre de los archivos: al revisar el CRRP resultó que **de las
+34 con CUV vigente solo 21 son del acta 858** (facturas con glosa, que sí
+están en la pantalla que trabaja el robot); las otras **13 son anulaciones de
+factura completa (12) y un trámite de devolución (1)**, que el portal no
+lista ahí porque no son glosas conciliadas. Con la lista corregida
+(`_lista_acta858_ok.csv`), **las 21 del acta 858 quedaron cargadas y
+finalizadas en el SIMED: 21 de 21 OK** (reporte
+`_reporte_carga_simed.csv`). También se renombraron todos los archivos de
+`HUS0000xxxxxx` a `HUSxxxxxx` para que el adjunto coincida con el número real
+de la factura electrónica. Las 13 anulaciones/trámite quedaron con sus
+carpetas completas (PDF+XML+CUV), a la espera de definir con el gestor del
+Dispensario por qué canal las recibe.
+
 ---
 
 ---
@@ -7091,8 +7106,13 @@ se enterara.
 
 
 ### Notas crédito del Dispensario (nuevo, 24-08)
-- **Cargar al SIMED las 34 notas con CUV vigente** (piloto con la 332526 y
-  luego `--lista "_lista_cuv_ok.csv"`); pegar en el chat el reporte del robot.
+- ~~Cargar al SIMED las notas del acta 858 con CUV vigente~~ **Hecho el
+  mismo 24-08: las 21 del acta 858 quedaron cargadas (21/21 OK).**
+- **Las 13 anulaciones/trámite con CUV vigente** (notas 332526, 332710,
+  332712, 332724, 332746, 332747, 332749, 332774, 332798, 332952, 333121,
+  333122, 333198) no van por la pantalla de glosas del robot: definir con el
+  gestor del Dispensario por qué canal las recibe y enviarlas (las carpetas
+  ya están completas y renombradas).
 - **SISTEMAS:** entregarles el informe de los 52 rechazos de CUV y hacerles
   seguimiento — 47 solo necesitan revalidación (timeout del validador), 2
   con diagnóstico repetido (436861 y 441161), 1 precio de medicamento
@@ -7463,16 +7483,15 @@ que tome las correcciones de la jurisprudencia y de los valores. Sin eso, los
 dictámenes siguen saliendo con las citas inventadas.
 
 
-**Notas crédito del Dispensario (lo primero, 24-08):**
-(a) renombrar los archivos de las notas 332742 (→ HUS0000447748) y 332832
-(→ HUS0000486963) con los comandos entregados; (b) correr el **piloto** del
-robot con la nota 332526 y, si sale bien, el lote de las **34 con CUV
-vigente** usando `--lista "_lista_cuv_ok.csv"`; (c) pasar a SISTEMAS el
+**Notas crédito del Dispensario (lo primero, 25-08):** el cargue del acta
+858 ya quedó (21/21 OK el 24-08). Lo que sigue: (a) pasar a SISTEMAS el
 informe de los 52 rechazos (47 solo necesitan REVALIDACIÓN — timeout del
 validador; 2 diagnóstico repetido; 1 precio Circular 19/2024; 2 factura
-referenciada); (d) pedir a Facturación las notas de las 3 facturas aceptadas
-sin NC (443525, 443566, 486894); (e) cuando SISTEMAS revalide: recopiar los
-CUV del share, re-verificar y cargar las que queden en firme.
+referenciada); (b) definir con el gestor del Dispensario el canal para las
+13 anulaciones/trámite con CUV vigente y enviarlas; (c) pedir a Facturación
+las notas de las 3 facturas aceptadas sin NC (443525, 443566, 486894);
+(d) cuando SISTEMAS revalide: recopiar los CUV del share, re-verificar y
+cargar las que queden en firme.
 
 ### Sistema ICFES (20-08)
 1. **Correr el diagnóstico** y volver a mirar el plan: con el resultado real, el
