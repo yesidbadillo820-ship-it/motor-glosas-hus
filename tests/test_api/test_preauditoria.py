@@ -2677,3 +2677,44 @@ class TestPaqueteAdresDevuelto:
         assert r["reingresos_adres"] == 0
         d = client.get(f"/preauditoria/facturas/{F1}/historial").json()["actual"]
         assert d["num_devoluciones"] == 1
+
+
+class TestObservacionLarga:
+    """25-08-2026: al pegar el mensaje de error de ADRES SIA (larguísimo) en la
+    observación, el servidor lo rechazaba y la pantalla mostraba
+    «[object Object]». Ni se guardaba, ni se entendía por qué."""
+
+    def _pendiente(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        _subir_dgreport(client, [F1])
+        o = _crear_oficio(client, radicado="FHUS-AS-I01400-26")
+        _escribir(client, o["id"], ENV)
+        return _factura_id(client, F1)
+
+    def test_cabe_el_mensaje_de_error_de_adres(self, client):
+        fid = self._pendiente(client)
+        texto = (
+            "ERROR EN ADRES SIA *Verificando el cumplimiento de requisitos mínimos, no es "
+            "posible realizar la radicación debido a que el documento Formulario Único de "
+            "Reclamaciones - FUR no fue anexado o el nombre del archivo no cumple con la "
+            "nomenclatura establecida. " * 12
+        )
+        assert 2000 < len(texto) <= 4000
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": texto, "observaciones": texto},
+        )
+        assert r.status_code == 200, r.text
+        assert (
+            client.get(f"/preauditoria/facturas/{F1}/historial")
+            .json()["actual"]["motivo_devolucion"]
+            .startswith("ERROR EN ADRES SIA")
+        )
+
+    def test_pero_el_tope_sigue_existiendo(self, client):
+        fid = self._pendiente(client)
+        r = client.patch(
+            f"/preauditoria/facturas/{fid}/auditar",
+            json={"resultado": "DEVUELTA", "motivo_devolucion": "x" * 4100},
+        )
+        assert r.status_code == 422
