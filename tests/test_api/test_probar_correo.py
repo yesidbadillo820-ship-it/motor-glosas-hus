@@ -109,7 +109,15 @@ class TestCuandoSiEstaConfigurado:
         monkeypatch.setattr("app.services.email_service.enviar_email", _falla)
         r = await mod.probar_correo(current_user=_Usuario())
         assert r["ok"] is False
-        assert "contraseña de aplicación" in r["detalle"]
+        # 25-08-2026: antes se exigía que el panel dijera «contraseña de
+        # aplicación» pasara lo que pasara. Eso es adivinar: el día que el
+        # hospital cambió de servidor, el error real fue «550 Command
+        # rejected» —al mensaje le faltaba la fecha— y el panel siguió
+        # culpando a la contraseña mientras el login entraba perfecto.
+        # Ahora, sin un error que interpretar, el panel dice justamente eso.
+        assert "no se pudo interpretar" in r["detalle"]
+        assert "contraseña" not in r["detalle"].lower()
+        assert r["error_tecnico"], "el panel debe mostrar el error crudo"
 
 
 class TestLosErroresSeTraducen:
@@ -128,5 +136,17 @@ class TestLosErroresSeTraducen:
         assert "SMTP_HOST" in msg
 
     def test_uno_desconocido_no_inventa_una_causa(self):
+        """La intención de siempre, con la redacción corregida el 25-08-2026.
+
+        El texto anterior decía «el servidor rechazó el envío… la causa más
+        común es que SMTP_PASSWORD no sea una contraseña de aplicación». Eso
+        SÍ inventaba una causa, y le costó una mañana al hospital: el error
+        real era «550 Command rejected» —al mensaje le faltaba la fecha— y el
+        panel insistía en culpar a la contraseña mientras el login entraba
+        perfecto. Ahora, cuando no entiende el error, lo dice y manda al
+        detalle técnico.
+        """
         msg = _explicar_error_smtp("algo rarísimo que nadie ha visto")
-        assert "rechazó el envío" in msg
+        assert "no se pudo interpretar" in msg
+        assert "detalle técnico" in msg
+        assert "contraseña" not in msg.lower(), "volvió a inventar una causa"
