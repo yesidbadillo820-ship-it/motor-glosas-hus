@@ -89,7 +89,15 @@ GRUPOS: tuple[Grupo, ...] = (
         1,
         "RESPUESTA",
         "RESPUESTA A GLOSA",
-        ("RESPUESTA A GLOSA", "RESPUESTA GLOSA", "RTA GLOSA", "RESPUESTA"),
+        (
+            "RESPUESTA A GLOSA",
+            "RESPUESTA GLOSA",
+            "RTA GLOSA",
+            # Así se llama el PDF que arma respuestas_adres_por_factura.py:
+            # RTA_ADRES_HUS311371.pdf. Es la respuesta a glosa del paquete.
+            "RTA ADRES",
+            "RESPUESTA",
+        ),
     ),
     Grupo(2, "EPICRISIS", "EPICRISIS", ("EPICRISIS", "EPICRIS", "EPI")),
     Grupo(
