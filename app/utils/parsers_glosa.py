@@ -501,17 +501,23 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     filas_tabla = [
         ("Tarifa pactada en contrato", f'<b style="color:#059669;">{pact_txt}</b>'),
     ]
-    if val_fact > 0:
-        filas_tabla.append(("Valor facturado HUS", f"{_pesos(val_fact)}"))
+    # LO QUE FALTA TAMBIEN SE MUESTRA (24-08-2026). Antes, cuando un valor
+    # llegaba en cero, la fila simplemente no se pintaba. Y en este motor el
+    # cero no significa "cero pesos": significa "no se pudo leer la cifra".
+    # Asi que el auditor veia la caja verde con "Tarifa pactada $915.051" y
+    # "Defender 100%" sin ver de donde salia esa conclusion — porque el dato
+    # que la origino era justamente el que estaba escondido. Paso en el
+    # dictamen GL-204. Ahora la fila se pinta igual y dice que falta.
+    _FALTA = '<span style="color:#b45309;">no registrado en el caso</span>'
+    filas_tabla.append(("Valor facturado HUS", _pesos(val_fact) if val_fact > 0 else _FALTA))
     if val_rec > 0:
         filas_tabla.append(("Valor reconocido EPS", f"{_pesos(val_rec)}"))
-    if val_obj > 0:
-        filas_tabla.append(
-            (
-                "Valor objetado EPS",
-                f'<b style="color:#b91c1c;">{_pesos(val_obj)}</b>',
-            )
+    filas_tabla.append(
+        (
+            "Valor objetado EPS",
+            f'<b style="color:#b91c1c;">{_pesos(val_obj)}</b>' if val_obj > 0 else _FALTA,
         )
+    )
 
     tabla_html = (
         '<table style="width:100%;border-collapse:collapse;font-size:.85rem;'

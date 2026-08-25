@@ -6500,10 +6500,23 @@ class GlosaService:
                     f"  • Modalidad real   : {modalidad_real}\n"
                     f"  • Tarifa pactada   : {pact_txt}\n"
                     f"  • Contrato         : {contrato_real}\n"
-                    f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
-                    f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
-                    f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
-                    "REGLAS OBLIGATORIAS:\n"
+                    # Sin cifra no se escribe "$0": el 0 de este motor
+                    # significa "no se pudo leer", y ponerlo como dato hacia
+                    # que la IA concluyera sola que se facturo por debajo de lo
+                    # pactado (ver el dictamen GL-204). Si no hay cifra, se le
+                    # dice a la IA que no la hay.
+                    + (
+                        f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
+                        if val_fact > 0
+                        else "  • Valor facturado HUS: NO REGISTRADO en el caso\n"
+                    )
+                    + (
+                        f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
+                        if val_rec > 0
+                        else "  • Valor reconocido EPS: NO REGISTRADO en el caso\n"
+                    )
+                    + f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
+                    + "REGLAS OBLIGATORIAS:\n"
                     "  1. Cita SIEMPRE el contrato y la modalidad REALES del catálogo,\n"
                     "     NO los genéricos de la ficha EPS global.\n"
                     "  2. Si la modalidad contiene 'PROPIA', 'PROPIAS', 'MANUAL HUS',\n"
@@ -6514,8 +6527,15 @@ class GlosaService:
                     "  3. Si la modalidad contiene 'SOAT' o 'UVB': cita la Circular\n"
                     "     047/2025 MinSalud + UVB 2026 $12.110.\n"
                     "  4. Usa el VALOR facturado y reconocido EXACTOS de arriba.\n"
-                    "  5. Si tarifa pactada > valor facturado: la glosa es\n"
-                    "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
+                    + (
+                        "  5. Si tarifa pactada > valor facturado: la glosa es\n"
+                        "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
+                        if val_fact > 0
+                        else "  5. NO digas que se facturó por debajo de lo pactado: el\n"
+                        "     valor facturado NO quedó registrado en este caso, así\n"
+                        "     que no hay con qué compararlo. Pedí que se aporte la\n"
+                        "     cifra en vez de afirmar que la glosa es improcedente.\n"
+                    )
                 )
                 user_prompt = user_prompt + bloque_tarifa
 

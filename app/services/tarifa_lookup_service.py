@@ -340,6 +340,33 @@ def _recomendacion(
             "soat_base_eps": soat_base_eps,
         }
 
+    # SIN CIFRA FACTURADA NO HAY NADA QUE COMPARAR (24-08-2026).
+    #
+    # En este motor, "facturado = 0" no quiere decir que el hospital cobrara
+    # cero: quiere decir que no se pudo leer la cifra del caso. Pero las reglas
+    # de abajo comparan numeros, y 0 < 915.051 es cierto, asi que el sistema
+    # concluia "el hospital facturo menos que lo pactado, la glosa es
+    # INJUSTIFICADA, defender el 100%". Defender el 100% de nada.
+    #
+    # Salio impreso asi en el dictamen GL-204 (POSITIVA, CUPS 010101), con la
+    # caja verde y todo. Y el auditor NO veia de donde salia: el panel esconde
+    # la fila del valor facturado justamente cuando vale 0.
+    if valor_facturado <= 0 and valor_pactado > 0:
+        return {
+            "accion": "REVISAR",
+            "titulo": "❔ Falta el valor facturado",
+            "razon": (
+                f"La tarifa pactada del contrato es {_pesos(valor_pactado)}, pero en "
+                "este caso no quedó registrado cuánto facturó el hospital, así que no "
+                "hay con qué compararla. Capture el valor facturado y vuelva a "
+                "analizar. NO se puede afirmar que la glosa sea injustificada sin esa "
+                "cifra."
+            ),
+            "valor_a_defender": valor_objetado,
+            "valor_a_aceptar": 0.0,
+            "diferencia": 0.0,
+        }
+
     diferencia_abs = round(valor_facturado - valor_pactado, 2)
 
     if abs(diferencia_abs) <= tolerancia and valor_pactado > 0:
