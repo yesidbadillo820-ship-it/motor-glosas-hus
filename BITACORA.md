@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 24-08-2026
+**Última actualización:** 25-08-2026
 
 ---
 
@@ -62,6 +62,88 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 25-08-2026 (madrugada) — La revisión más incómoda: la mayor parte de la jurisprudencia del motor era inventada
+
+Este día empezó con los ejemplos de prueba de la ronda 2 y con la segunda
+auditoría independiente (expedientes GL-199 a GL-207). Terminó destapando el
+defecto más grave que ha tenido el sistema.
+
+**Lo que se encontró.** El auditor señaló que un dictamen citaba la Sentencia
+T-478 de 1995 para defender la autonomía médica, y que esa sentencia trata de
+otra cosa. Al ir a mirar la base de conocimiento del motor, el problema no era
+un caso suelto: **de las 29 sentencias que el sistema guardaba, unas dos de
+cada tres decían algo que la sentencia no dice**. Se verificaron una por una
+contra la relatoría de la Corte Constitucional.
+
+- **Tres no existen.** No es que el tema esté mal: la providencia nunca se
+  dictó. La T-543 de 2013, la T-553 de 2024 y la T-027 de 2020. Se comprobó por
+  dos caminos: el buscador oficial de la Corte no las conoce, y las páginas de
+  sus vecinas cargan completas mientras las suyas salen vacías. Se borraron.
+- **Trece decían otro tema.** La T-024 de 2009, que el sistema daba como «pago
+  de servicios de salud», es una tutela de custodia de una niña contra el ICBF.
+  La T-126 de 2018, que daba como «historia clínica como prueba plena», es un
+  caso de violencia sexual. La T-307 de 2017, que daba como «recobros NO PBS»,
+  es una pensión de sobrevivientes. Y así.
+- **Dos autos también.** El Auto 037 de 2024 figuraba como seguimiento a la
+  sentencia inexistente sobre terapia CAR-T. El auto sí existe, pero trata de
+  algo que resultó **más útil para cartera**: la Corte resolvió que la
+  jurisdicción ordinaria laboral es la competente para cobrar ejecutivamente
+  las facturas de servicios de salud.
+
+**Por qué era tan peligroso.** El revisor de citas del motor contrasta lo que
+va entrecomillado contra ese mismo corpus. Una cita inventada guardada ahí
+**se certifica sola**: el dictamen la copia, el revisor la encuentra, y el
+documento sale con el sello «citas verificadas · 0 hallazgos». Al auditor de la
+EPS le bastaría abrir el enlace para tumbar todo el escrito.
+
+**Las defensas no perdieron nada.** En todos los textos donde estaban, iban
+acompañadas de su anclaje legal correcto —el Art. 17 de la Ley 1751 de 2015
+para autonomía médica, el Art. 168 de la Ley 100 y el Art. 20 del Decreto 4747
+para urgencias—, así que quitarlas no debilitó ningún argumento.
+
+**Y al revés: el motor le estaba borrando al dictamen artículos que sí existen.**
+Buscando otra cosa apareció esto. El sistema afirmaba «esta norma no contiene
+ese artículo» mirando solo los artículos que tiene cargados, y tiene poquísimos:
+de 131 normas, apenas 26 traen alguno. De la Ley 100 estaban cargados tres de
+casi trescientos. Como el limpiador borra la oración entera, un dictamen que
+citara el Art. 156 de la Ley 100 salía sin esa frase. Ahora solo se afirma que
+un artículo no existe cuando de esa norma se cargó la lista completa; si es
+parcial, se avisa en severidad baja y no se borra nada. Se cargaron además,
+transcritos de los PDF oficiales del Ministerio, el Art. 87 del Decreto 2423
+(la cita del expediente GL-207 **era correcta**, lo que faltaba era el
+respaldo), los Arts. 1 y 2 de la Ley 1438 y el Art. 1 de la Ley 1751.
+
+**Los otros cuatro defectos de la auditoría, corregidos:**
+
+1. **«Defender el 100 %» de nada (GL-204).** La glosa se capturó sin la cifra,
+   y en este motor un cero significa «no se pudo leer», no «cero pesos». Como
+   0 es menor que $915.051, el sistema concluyó que la glosa era injustificada
+   y recomendó defender el 100 %. Y el panel escondía justamente la fila del
+   valor que originó la conclusión. Ahora, sin cifra, dice REVISAR y pide
+   capturarla; y el panel muestra en ámbar «no registrado en el caso».
+2. **A cada código, su plata (GL-206).** Una glosa con dos códigos: la
+   respuesta del SO3401 salió diciendo «valor objetado de $150.000», que era la
+   plata del otro código. Ahora, cuando el texto lo dice sin lugar a duda, cada
+   sección recibe el suyo. La regla es estrecha a propósito: ante la menor
+   sombra no se reparte, porque colgar un monto equivocado es peor.
+3. **Contestar lo que la EPS objetó, no otra cosa.** La EPS glosaba «precio
+   superior al regulado» y el dictamen respondía sobre la validez formal de la
+   factura. El bloque que le dice al motor qué atacar salía vacío cuando ningún
+   patrón enganchaba. Ahora nunca sale vacío: cuando no reconoce la causal, le
+   pone delante el texto literal de la EPS. Se agregaron además las dos
+   causales que faltaban (precio regulado y reliquidación a otro manual) y se
+   cargaron al corpus la Circular 19 y la Circular 18 de 2024.
+4. **Una palabra de menos.** El dictamen escribió «ARTÍCULO 168 LA LEY 100»,
+   sin el «DE», y por esa palabra no se activó la defensa que tumba esa cita
+   cuando la glosa no es de urgencias. Ya caen las cuatro formas.
+
+**Y una corrección menor de la misma familia:** el Art. 3 de la Resolución 1995
+llevaba pegada una frase que es del Art. 1. Quedaron separados, cada uno con su
+texto oficial.
+
+Todo con pruebas: la suite completa quedó en **8.547 verdes** (los 12 rojos son
+de programas que no están instalados en la máquina de pruebas, ajenos al motor).
 
 ### Abril 2026 — Nace el Motor de Glosas
 - **08 al 10-04:** primera versión de la aplicación: análisis de glosas con IA,
@@ -6766,6 +6848,21 @@ cuenta correcta y el permiso de lotes otorgado.
 
 ## 3) PENDIENTE
 
+### Del motor de glosas, después de la revisión del 25-08
+- **Reiniciar el motor del hospital.** Sigue corriendo código viejo: se
+  confirmó mirando los dictámenes de la ronda 2 (sale una frase en el
+  «Fundamento normativo» que ya se había quitado). Mientras no se reinicie,
+  ninguna de estas correcciones está funcionando en la PC de cartera.
+- **Tres sentencias quedaron marcadas como NO VERIFICADAS** (T-313/2007,
+  T-050/2017 y T-134/2022): el sitio de la Corte las sirve por JavaScript y no
+  se pudo leer su texto. Ya no se citan en ningún dictamen. Si alguien consigue
+  el texto oficial, se marcan y vuelven a quedar disponibles.
+- **Queda pendiente la contradicción de tarifa del contrato 0525/2017**: un
+  expediente lo lee como SOAT pleno ($915.051 para el CUPS 010101) y otros dos
+  como SOAT −15 %. Se resuelve reimportando las tarifas de POSITIVA con
+  «Reemplazar» marcado — el 010101 debe quedar en $777.793.
+
+
 ### Notas crédito del Dispensario (nuevo, 24-08)
 - **Cargar al SIMED las 34 notas con CUV vigente** (piloto con la 332526 y
   luego `--lista "_lista_cuv_ok.csv"`); pegar en el chat el reporte del robot.
@@ -7126,6 +7223,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Lo primero del motor (25-08):** reiniciar el motor en la PC de cartera para
+que tome las correcciones de la jurisprudencia y de los valores. Sin eso, los
+dictámenes siguen saliendo con las citas inventadas.
+
 
 **Notas crédito del Dispensario (lo primero, 24-08):**
 (a) renombrar los archivos de las notas 332742 (→ HUS0000447748) y 332832
