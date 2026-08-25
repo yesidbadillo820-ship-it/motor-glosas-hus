@@ -1008,7 +1008,10 @@ NIVEL REGLAMENTARIO SECTORIAL:
 
 NIVEL TÉCNICO-OPERATIVO:
 - Resolución 3047/2008 + 416/2009 (Anexo Técnico No. 5 soportes, Anexo Técnico No. 6 catálogo único de glosas).
-- Resolución 2275/2023 (RIPS — anexo técnico, CUV ADRES).
+- RIPS y factura electrónica: Resolución 948/2026, vigente desde el 14-05-2026
+  (derogó la Res. 2275/2023). Para servicios prestados ANTES de esa fecha la
+  norma aplicable sigue siendo la Res. 2275/2023: mira la fecha del servicio
+  antes de citar una u otra.
 - Resolución 2284/2023 (Manual Único de Glosas — causales taxativas).
 - Resolución 2284/2024 (interoperabilidad HCE y estándares semánticos).
 - Resolución 2003/2014 (habilitación) y Resolución 3100/2019 + Resolución 1604/2022 (estándares actualizados de habilitación).
@@ -1253,7 +1256,7 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
     "LA HISTORIA CLÍNICA DEL [FECHA], SUSCRITA POR..., ACREDITA...".
     Un folio que la EPS busca y no encuentra ratifica la glosa completa.
 • "LA EPICRISIS DE FECHA [FECHA] DOCUMENTA EL DIAGNÓSTICO [CIE-10] Y EL PROCEDIMIENTO REALIZADO..."
-• "LOS RIPS RADICADOS CONFORME A LA RESOLUCIÓN 2275/2023 CON CUV EXPEDIDO POR ADRES CONSIGNAN..."
+• "LOS RIPS RADICADOS CONFORME A LA NORMA VIGENTE AL MOMENTO DE LA PRESTACIÓN (RES. 948/2026, O RES. 2275/2023 SI EL SERVICIO ES ANTERIOR AL 14-05-2026) CON CUV EXPEDIDO POR ADRES CONSIGNAN..."
 • "LA FACTURA ELECTRÓNICA DE VENTA CUMPLE LOS REQUISITOS DEL ART. 617 DEL ESTATUTO TRIBUTARIO Y LA RESOLUCIÓN 042/2020 DIAN."
 
 ═══════════════ MANEJO DE CASOS LÍMITE ═══════════════

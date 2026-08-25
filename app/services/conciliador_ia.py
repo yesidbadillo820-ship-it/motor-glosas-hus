@@ -56,7 +56,8 @@ _CONTRAARGUMENTOS_PLANTILLA = {
             "respuesta_sugerida": (
                 "Aportar historia clínica completa (Res. 1995/1999 — "
                 "plena prueba), RIPS radicados (Res. 866/2021), factura "
-                "electrónica (Res. 2275/2023)."
+                "electrónica (Res. 948/2026; Res. 2275/2023 si el servicio es\n"
+                "anterior al 14-05-2026)."
             ),
         },
         {
@@ -210,7 +211,7 @@ def preparar_audiencia(
         "FA": [
             "Circular 030/2013 (errores formales subsanables)",
             "Art. 177 Ley 100/1993 (deber EPS de pagar)",
-            "Res. 2275/2023 (factura electrónica)",
+            "Res. 948/2026 (factura electrónica; Res. 2275/2023 para servicios anteriores al 14-05-2026)",
         ],
         "SO": [
             "Res. 1995/1999 (historia clínica como plena prueba)",

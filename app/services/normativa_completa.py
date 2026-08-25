@@ -799,8 +799,47 @@ RESOLUCIONES = {
         "nombre": "Resolución 2275 de 2023 (MinSalud)",
         "titulo": "Factura Electrónica de Venta en Salud (FEV) + RIPS",
         "ambito": "Facturación electrónica — validación previa MinSalud",
+        # DEROGADA (verificado el 24-08-2026 en el PDF oficial del Ministerio).
+        # El sistema la daba por vigente y la citaba en seis sitios distintos
+        # como fundamento de facturación electrónica. La derogó la Resolución
+        # 948 del 14 de mayo de 2026, que rige desde su expedición. Un dictamen
+        # radicado hoy que se apoye en ella le entrega a la EPS la forma de
+        # desmontar el argumento: basta con mostrar la derogatoria.
+        #
+        # NO se borra del corpus: para servicios prestados antes del 14-05-2026
+        # sigue siendo la norma aplicable, y hay que poder citarla bien.
+        "vigente": False,
+        "derogada_por": (
+            "la derogó la Resolución 948 del 14 de mayo de 2026, que rige desde su "
+            "expedición (junto con las Resoluciones 558 y 1884 de 2024)"
+        ),
+        "keywords": ["FEV", "RIPS", "factura electrónica", "validación", "derogada"],
+    },
+    "RESOLUCION 948 DE 2026": {
+        # Agregada el 24-08-2026, transcrita del PDF oficial del Ministerio de
+        # Salud (resolucion-0948-de-2026.pdf, 17 páginas). Es la que rige hoy
+        # para RIPS y factura electrónica; el sistema no la tenía y seguía
+        # citando la derogada.
+        "nombre": "Resolución 948 del 14 de mayo de 2026 (MinSalud)",
+        "titulo": "RIPS como soporte de la Factura Electrónica de Venta en salud",
+        "ambito": "Facturación electrónica y RIPS — norma vigente desde el 14-05-2026",
         "vigente": True,
-        "keywords": ["FEV", "RIPS", "factura electrónica", "validación"],
+        "notas": (
+            "Artículo 1: reglamenta el Registro Individual de Prestación de Servicios "
+            "de Salud (RIPS) como soporte de la Factura Electrónica de Venta (FEV) en "
+            "salud y adopta los documentos técnicos. Su artículo de vigencia dice que "
+            "rige a partir de su expedición y deroga las Resoluciones 2275 de 2023 y "
+            "558 y 1884 de 2024. OJO CON LA FECHA DEL SERVICIO: para lo prestado antes "
+            "del 14 de mayo de 2026 la norma aplicable sigue siendo la Res. 2275/2023."
+        ),
+        "verificada": "24-08-2026 PDF oficial MinSalud",
+        "keywords": [
+            "RIPS",
+            "FEV",
+            "factura electrónica",
+            "soporte de cobro",
+            "948 de 2026",
+        ],
     },
     "RESOLUCION 3047 DE 2008": {
         "nombre": "Resolución 3047 de 2008",

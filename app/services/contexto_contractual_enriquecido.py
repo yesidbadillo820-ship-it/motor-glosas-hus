@@ -657,7 +657,7 @@ def _soportes_por_familia(familia: str, cups: list[str]) -> list[str]:
     if fam == "SO":
         s = [
             "Historia clínica institucional con folios completos",
-            "RIPS radicados (JSON Res. 2275/2023)",
+            "RIPS radicados (JSON Res. 948/2026; Res. 2275/2023 si el servicio es anterior al 14-05-2026)",
             "Factura electrónica de venta + CUV MinSalud",
             "Anexo técnico nº 5 Res. 3047/2008 cumplido",
         ]

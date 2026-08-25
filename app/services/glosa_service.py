@@ -9333,7 +9333,10 @@ class GlosaService:
     # Qué documento acredita cada tipo de soporte del expediente, con la
     # norma que lo respalda. Solo tipos que el indexador reconoce de verdad.
     _MARCO_LEGAL_SOPORTE = {
-        "factura_electronica": ("Factura electrónica de venta", "Res. 2275/2023 (FEV)"),
+        "factura_electronica": (
+            "Factura electrónica de venta",
+            "Res. 948/2026 (FEV); Res. 2275/2023 si el servicio es anterior al 14-05-2026",
+        ),
         "historia_clinica": ("Historia clínica", "Res. 1995/1999"),
         "epicrisis": ("Epicrisis", "Res. 1995/1999"),
         "hoja_atencion_urgencias": ("Hoja de atención de urgencias", "Res. 1995/1999"),
@@ -9341,15 +9344,24 @@ class GlosaService:
             "Hoja de administración de medicamentos",
             "Res. 1995/1999",
         ),
-        "rips": ("RIPS radicados", "Res. 2275/2023"),
-        "cuv": ("CUV — constancia de validación del Ministerio", "Res. 2275/2023"),
+        # RIPS, CUV y XML: la norma cambió el 14-05-2026 (Res. 948/2026 derogó
+        # la Res. 2275/2023). Se nombran las dos con la regla de la fecha para
+        # que el dictamen no cite una derogada sobre un servicio de este año.
+        "rips": ("RIPS radicados", "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)"),
+        "cuv": (
+            "CUV — constancia de validación del Ministerio",
+            "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
+        ),
         "comprobante_recibido_cobro": ("Comprobante de recibido de cobro", "Res. 2284/2023"),
         "furips": ("FURIPS", "Circular 022/2023"),
         "resultados_msps": ("Resultados de apoyo diagnóstico", "Res. 3047/2008 Anexo 5"),
         "otros_procedimientos": ("Soporte de procedimientos", "Res. 3047/2008 Anexo 5"),
         "pde": ("Soporte de estancia", "Res. 3047/2008 Anexo 5"),
         "pdx": ("Soporte de diagnóstico", "Res. 3047/2008 Anexo 5"),
-        "xml_cufe": ("XML CUFE de la factura", "Res. 2275/2023"),
+        "xml_cufe": (
+            "XML CUFE de la factura",
+            "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
+        ),
     }
 
     def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:

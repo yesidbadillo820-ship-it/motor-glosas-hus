@@ -262,7 +262,13 @@ def quitar_citas_invalidas_dinamico(texto: str, eps: str | None = None) -> str:
         # componentes, se llevaría por delante también las frases donde ese
         # mismo artículo está bien citado en el mismo dictamen. El hallazgo se
         # le muestra al auditor y hace que el Quality Gate mande a rehacer.
-        if i.get("tipo") == "ATRIBUCION_FALSA":
+        if i.get("tipo") in ("ATRIBUCION_FALSA", "NORMA_DEROGADA"):
+            # Ninguno de los dos habla de una cita que no exista, que es lo
+            # unico que justifica borrarle una oracion al documento radicado.
+            # ATRIBUCION_FALSA: el articulo existe y puede estar bien citado en
+            # otra parte. NORMA_DEROGADA: la norma existe y, si el servicio se
+            # presto mientras regia, citarla es lo correcto. Los dos se le
+            # muestran al gestor, que es quien sabe la fecha del servicio.
             continue
         if i.get("severidad") in ("ALTA", "MEDIA") and i.get("cita"):
             comps = _extraer_componentes_cita(i["cita"])

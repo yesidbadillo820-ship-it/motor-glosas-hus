@@ -857,6 +857,40 @@ def verificar_citas(
                             "sugerencia": "Verifica la cita o reemplaza por una norma vigente del corpus.",
                         }
                     )
+                elif normas[clave].get("vigente") is False:
+                    # LA NORMA EXISTE PERO YA NO RIGE (24-08-2026).
+                    #
+                    # El corpus tenía desde siempre un campo que dice si la
+                    # norma sigue vigente, y nadie lo miraba: un dictamen podía
+                    # apoyarse en una resolución derogada y salir con cero
+                    # hallazgos. Se descubrió revisando la Resolución 2275 de
+                    # 2023 —la de factura electrónica y RIPS, que el motor cita
+                    # en varios sitios—: la derogó la Resolución 948 del 14 de
+                    # mayo de 2026, y el motor la seguía dando por vigente.
+                    #
+                    # El aviso es MEDIA y no ALTA a propósito: si el servicio
+                    # se prestó mientras la norma regía, citarla puede ser lo
+                    # correcto. Quien sabe la fecha del servicio es el gestor,
+                    # así que se le avisa y él decide.
+                    _nota = (normas[clave].get("derogada_por") or "").strip()
+                    issues.append(
+                        {
+                            "tipo": "NORMA_DEROGADA",
+                            "severidad": "MEDIA",
+                            "cita": f"{tipo_label} {numero} de {anio}",
+                            "detalle": (
+                                f"La {tipo_label} {numero} de {anio} ya no está vigente"
+                                + (f": {_nota}" if _nota else ".")
+                                + " Si el servicio se prestó mientras regía, citarla puede "
+                                "ser correcto; si es posterior, la EPS puede desmontar el "
+                                "argumento mostrando la derogatoria."
+                            ),
+                            "sugerencia": (
+                                "Revise la fecha del servicio. Si es posterior a la "
+                                "derogatoria, cite la norma que la reemplazó."
+                            ),
+                        }
+                    )
 
     # 2. Verificar Sentencias
     for m in PAT_SENTENCIA.finditer(texto):
