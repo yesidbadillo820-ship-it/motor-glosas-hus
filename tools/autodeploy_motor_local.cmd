@@ -6,8 +6,18 @@ rem  REVIVIR_EXPRESS_SIN_DOCKER.cmd). Si hay codigo nuevo fusionado en
 rem  la rama motor-glosas: lo baja, actualiza dependencias y reinicia
 rem  el servidor (su vigilante lo revive solo con el codigo nuevo).
 rem  Registro en data\autodeploy.log
+rem
+rem  SE PUEDE PEDIR A MANO CON:  autodeploy_motor_local.cmd YA
+rem  Eso salta la espera de "hay gente trabajando" y aplica de una.
+rem  Ver la explicacion completa mas abajo, junto a esa espera.
 rem ================================================================
 setlocal
+rem  Orden expresa del auditor: aplicar sin esperar hueco.
+set "FORZADO="
+if /i "%~1"=="YA" set "FORZADO=1"
+if /i "%~1"=="/YA" set "FORZADO=1"
+if /i "%~1"=="--YA" set "FORZADO=1"
+if /i "%~1"=="FORZAR" set "FORZADO=1"
 set "BASE=C:\motor-glosas"
 set "REPO=%BASE%\repo"
 if not exist "%REPO%\.git" exit /b 0
@@ -123,7 +133,24 @@ set "ESPERA=%REPO%\data\deploy_aplazado.txt"
 set "OCUPADO="
 for /f "usebackq delims=" %%O in (`powershell -NoProfile -Command "try{$r=Invoke-RestMethod -Uri 'http://127.0.0.1:8080/sistema/ocupacion' -TimeoutSec 5; if($r.hay_gente_trabajando){'SI'}else{'NO'}}catch{'SINMOTOR'}"`) do set "OCUPADO=%%O"
 
-if "%OCUPADO%"=="SI" (
+rem
+rem  LA ORDEN DEL AUDITOR LE GANA A LA ESPERA (25-08-2026).
+rem
+rem  Aparecio corriendo esto: el motor del hospital se quedo con codigo
+rem  de la vispera porque el auditor estaba usando el sistema, y al
+rem  correr este bot a mano para forzarlo... se aplazo igual. El
+rem  guardia no distinguia entre el ciclo automatico de cada 5 minutos
+rem  y una orden expresa de una persona, asi que la unica salida era
+rem  esperar la hora. Con una correccion urgente adentro, eso es mucho.
+rem
+rem  Ahora, llamandolo con YA, se aplica de una. La espera automatica
+rem  sigue igual de intacta: quien la salta es una persona que sabe lo
+rem  que hace y que puede avisarle a las gestoras antes.
+rem
+if defined FORZADO if "%OCUPADO%"=="SI" (
+  echo [%date% %time%] hay gente trabajando, pero se pidio YA: se aplica igual >> "%LOG%"
+)
+if not defined FORZADO if "%OCUPADO%"=="SI" (
   if not exist "%ESPERA%" echo %date% %time% > "%ESPERA%"
   call :aplazar_o_seguir
   if errorlevel 1 goto :asegurar

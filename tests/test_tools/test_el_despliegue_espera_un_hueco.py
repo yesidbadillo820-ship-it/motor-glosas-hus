@@ -55,9 +55,14 @@ class TestPreguntaAntesDeTocarNada:
     def test_si_hay_gente_no_toca_nada(self):
         """Se mira el bloque EXACTO, de su paréntesis de apertura al de
         cierre. Una ventana de tantos caracteres alcanzaría a incluir lo que
-        viene después y la prueba diría cualquier cosa."""
+        viene después y la prueba diría cualquier cosa.
+
+        Desde el 25-08-2026 hay dos bloques que empiezan igual: el de la orden
+        forzada («YA») y el del ciclo automático. Este mira el AUTOMÁTICO, que
+        es el que tiene que seguir respetando a las gestoras.
+        """
         t = _texto()
-        i = t.index('if "%OCUPADO%"=="SI" (')
+        i = t.index('if not defined FORZADO if "%OCUPADO%"=="SI" (')
         fin = t.index("\n)", i)
         bloque = t[i:fin]
         assert "goto :asegurar" in bloque, "no se salta el despliegue"
@@ -215,3 +220,63 @@ class TestNoSeRompioLoQueYaFuncionaba:
         etiqueta_sub = t.index("\n:aplazar_o_seguir\r\n")
         assert etiqueta_fin < etiqueta_sub
         assert "exit /b 0" in t[etiqueta_fin:etiqueta_sub]
+
+
+class TestLaOrdenDelAuditorLeGanaALaEspera:
+    """Con «YA» se aplica de una, sin esperar el hueco (25-08-2026).
+
+    Apareció corriendo esto. El motor del hospital se quedó con el código de la
+    víspera porque el auditor estaba usando el sistema, y al correr el bot a
+    mano para forzarlo **se aplazó igual**: el guardia no distinguía entre el
+    ciclo automático de cada 5 minutos y una orden expresa de una persona. La
+    única salida era esperar la hora, y adentro iba una corrección urgente —el
+    motor estaba sacando dictámenes con citas de sentencias que no existen—.
+
+    El log de esa mañana lo dejó escrito:
+
+        [8:14:06] hay gente trabajando: el cambio espera un hueco (0 min)
+        [8:19:06] hay gente trabajando: el cambio espera un hueco (5 min)
+        [8:24:06] hay gente trabajando: el cambio espera un hueco (10 min)
+
+    La espera automática no cambió: quien la salta es una persona, que sabe lo
+    que hace y puede avisarle a las gestoras antes de tumbar la página.
+    """
+
+    def test_reconoce_la_orden_de_forzar(self):
+        t = _texto()
+        assert '"%~1"=="YA"' in t.replace(" ", ""), (
+            "el bot ya no entiende «autodeploy_motor_local.cmd YA», que es como "
+            "el auditor fuerza un despliegue urgente"
+        )
+
+    def test_acepta_las_formas_en_que_uno_lo_escribe(self):
+        """Nadie se acuerda de si era YA, /YA o --YA."""
+        t = _texto().replace(" ", "")
+        for forma in ('"%~1"=="YA"', '"%~1"=="/YA"', '"%~1"=="--YA"', '"%~1"=="FORZAR"'):
+            assert forma in t, f"no reconoce la forma {forma}"
+
+    def test_forzado_se_salta_la_espera(self):
+        t = _texto()
+        assert 'if defined FORZADO if "%OCUPADO%"=="SI"' in t, (
+            "cuando se fuerza, ya no se salta la espera de hueco"
+        )
+        assert 'if not defined FORZADO if "%OCUPADO%"=="SI"' in t, (
+            "la espera de hueco debe seguir aplicándose cuando NO se fuerza"
+        )
+
+    def test_queda_escrito_en_el_registro_que_se_forzo(self):
+        """Si se tumbó la página a propósito, tiene que quedar constancia."""
+        t = _texto()
+        assert "se pidio YA: se aplica igual" in t
+
+    def test_sin_forzar_la_espera_sigue_intacta(self):
+        """La defensa que pidió Yesid no se debilitó."""
+        t = _texto()
+        assert "call :aplazar_o_seguir" in t
+        assert "goto :asegurar" in t
+
+    def test_la_cabecera_le_dice_al_auditor_como_se_usa(self):
+        t = _texto()
+        assert "autodeploy_motor_local.cmd YA" in t, (
+            "el bot debe explicar arriba cómo se fuerza; nadie lee el código"
+        )
