@@ -161,9 +161,12 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # Verificada el 25-08-2026 contra el PDF oficial del Ministerio: NO es la
+    # norma de RIPS, como decía este resumen. Reglamenta los datos clínicos
+    # para la interoperabilidad de la historia clínica (Ley 2015 de 2020).
     "RESOLUCION 866/2021": {
         "nombre": "Resolución 866 de 2021",
-        "resumen": "Registros Individuales de Prestación de Servicios de Salud (RIPS). Campos obligatorios.",
+        "resumen": "Datos clínicos para la interoperabilidad de la historia clínica (Ley 2015 de 2020). NO es la norma de RIPS.",
         "tipo": "RESOLUCION",
         "vigente": True,
     },

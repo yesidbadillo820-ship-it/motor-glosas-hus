@@ -679,11 +679,22 @@ DECRETOS = {
         "keywords": ["COVID-19", "pandemia", "emergencia sanitaria", "excepciones"],
     },
     "DECRETO 064 DE 2020": {
-        "nombre": "Decreto 064 de 2020",
-        "titulo": "Reglamento del aseguramiento — flujo de recursos del SGSSS",
-        "ambito": "Pago a IPS, giro directo, glosas",
+        # Corregido el 25-08-2026. El sistema lo daba como "reglamento del
+        # aseguramiento — flujo de recursos del SGSSS". La primera mitad es
+        # cierta (si es norma de aseguramiento), la segunda no: no trata del
+        # flujo de recursos, y citarlo asi ante una EPS es peligroso.
+        "nombre": "Decreto 064 del 20 de enero de 2020",
+        "titulo": "Afiliacion al regimen subsidiado y afiliacion de oficio",
+        "ambito": "Afiliacion — modifica y adiciona articulos del Decreto 780 de 2016",
         "vigente": True,
-        "keywords": ["flujo recursos", "aseguramiento", "giro directo IPS"],
+        "notas": (
+            "Modifica los articulos 2.1.3.11, 2.1.3.13, 2.1.5.1, 2.1.7.7, 2.1.7.8 y "
+            "2.1.3.17 y adiciona los 2.1.5.4 y 2.1.5.5 del Decreto 780 de 2016, sobre "
+            "afiliados al regimen subsidiado y afiliacion de oficio. NO es norma de flujo "
+            "de recursos."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["afiliacion de oficio", "regimen subsidiado", "Decreto 780 de 2016"],
     },
     # Ronda 14 (Bug P): normas reales que el verifier marcaba como
     # inexistentes en producción.
@@ -917,11 +928,27 @@ RESOLUCIONES = {
         "keywords": ["historia clínica", "1995", "documento médico-legal"],
     },
     "RESOLUCION 866 DE 2021": {
-        "nombre": "Resolución 866 de 2021 (MinSalud)",
-        "titulo": "Registros Individuales de Prestación de Servicios de Salud (RIPS)",
-        "ambito": "RIPS obligatorios — reglamentación y generación",
+        # Corregida el 25-08-2026. El sistema la daba como "los RIPS" y la
+        # ofrecia para refutar glosas de soportes. No es eso: reglamenta los
+        # datos clinicos para la INTEROPERABILIDAD DE LA HISTORIA CLINICA
+        # (desarrolla la Ley 2015 de 2020). Citarla como norma de RIPS ante una
+        # EPS es entregarle el argumento de que el prestador no sabe que cita.
+        "nombre": "Resolucion 866 de 2021 (MinSalud)",
+        "titulo": "Datos clinicos para la interoperabilidad de la historia clinica",
+        "ambito": "Historia clinica electronica interoperable — Ley 2015 de 2020",
         "vigente": True,
-        "keywords": ["RIPS", "registros individuales", "866"],
+        "notas": (
+            "Define el conjunto de elementos de datos clinicos relevantes que deben "
+            "poder intercambiarse entre prestadores. NO es la norma de RIPS: la de RIPS "
+            "como soporte de la factura electronica es hoy la Res. 948 de 2026."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": [
+            "interoperabilidad",
+            "historia clinica electronica",
+            "datos clinicos",
+            "Ley 2015 de 2020",
+        ],
     },
     "CIRCULAR 047 DE 2025": {
         "nombre": "Circular Externa 047 de 2025 (MinSalud)",
@@ -977,61 +1004,53 @@ RESOLUCIONES = {
     # Ronda 48: Resolución 2641 de 2025 — Clasificación CUPS y tabla de
     # homologación oficial entre códigos internos de prestadores y la
     # numeración vigente (CUPS 2025).
-    "RESOLUCION 2641 DE 2025": {
-        "nombre": "Resolución 2641 de 2025 (MinSalud)",
-        "titulo": "Clasificación Única de Procedimientos en Salud (CUPS) versión 2025 — Tabla de homologación oficial",
-        "ambito": (
-            "Reemplaza la Res. 2341 de 2024 (CUPS 2024) y establece la "
-            "TABLA DE HOMOLOGACIÓN entre códigos internos de prestadores "
-            "(ej. códigos institucionales HUS con sufijo H, H1, H2, o con "
-            "versión -18/-16/-19) y la numeración CUPS oficial vigente. "
-            "De OBLIGATORIO CUMPLIMIENTO para RIPS, FEV y todo reporte "
-            "de cuentas médicas. En el sistema IA GLOSAS SINAC la "
-            "equivalencia se aplica automáticamente cuando la EPS glosa "
-            "con el código viejo — ver homologador_cups.py."
+    "RESOLUCION 2641 DE 2024": {
+        # Corregida el 25-08-2026, DOBLE ERROR. El sistema la guardaba como
+        # "Resolucion 2641 de 2025 — CUPS version vigente", y ni el ano ni la
+        # vigencia eran ciertos:
+        #   · No existe una "Resolucion 2641 de 2025". La real es de 2024,
+        #     expedida el 23 de diciembre de 2024 (al sector se le dice "CUPS
+        #     2025" porque rigio desde el 1 de enero de 2025).
+        #   · Y ya no rige: la derogo la Resolucion 2706 de 2025 desde el
+        #     1 de enero de 2026.
+        #
+        # Peor todavia: el motor tenia un limpiador que BORRABA del dictamen la
+        # cita "Resolucion 2641 de 2024" por considerarla inventada, y la
+        # cambiaba por la frase vaga "la normativa vigente del Ministerio de
+        # Salud". O sea que borraba la cita CORRECTA y dejaba una pseudo-norma.
+        # Ese limpiador se retiro en el mismo cambio.
+        "nombre": "Resolucion 2641 del 23 de diciembre de 2024 (MinSalud)",
+        "titulo": "Clasificacion Unica de Procedimientos en Salud (CUPS) — vigencia 2025",
+        "ambito": "CUPS aplicable a servicios prestados durante 2025",
+        "vigente": False,
+        "derogada_por": (
+            "la derogo la Resolucion 2706 de 2025 (23 de diciembre de 2025) a partir del "
+            "1 de enero de 2026, junto con las Resoluciones 2689 de 2024 y 756 de 2025"
         ),
+        "notas": (
+            "Reemplazo a la Resolucion 2336 de 2023. OJO CON LA FECHA DEL SERVICIO: para "
+            "lo prestado durante 2025 esta es la CUPS aplicable; para 2026 en adelante, "
+            "la Res. 2706 de 2025."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["CUPS", "procedimientos en salud", "2641 de 2024", "vigencia 2025"],
+    },
+    "RESOLUCION 2706 DE 2025": {
+        # Agregada el 25-08-2026, transcrita del PDF oficial del Ministerio
+        # (395 paginas, firmada el 23 de diciembre de 2025). Es la CUPS que
+        # rige hoy y el sistema no la tenia.
+        "nombre": "Resolucion 2706 del 23 de diciembre de 2025 (MinSalud)",
+        "titulo": "Clasificacion Unica de Procedimientos en Salud (CUPS) vigente",
+        "ambito": "CUPS aplicable a los servicios prestados desde el 1 de enero de 2026",
         "vigente": True,
-        "articulos": {
-            "uso_obligatorio": {
-                "titulo": "Uso obligatorio de CUPS 2025",
-                "texto": (
-                    "Todos los prestadores y entidades responsables del pago "
-                    "deberán emplear la numeración CUPS 2025 establecida en "
-                    "esta resolución para la facturación, glosa, conciliación "
-                    "y reporte al Registro Individual de Prestación de "
-                    "Servicios de Salud (RIPS, Res. 202/2021 y 2275/2023 FEV). "
-                    "Cuando el Excel del contrato o la factura traiga el "
-                    "código interno del prestador (ej. '39147B-18', '890348H', "
-                    "'372301H'), se entenderá equivalente al CUPS 2025 oficial "
-                    "según la tabla de homologación del Anexo Técnico."
-                ),
-                "aplicacion": (
-                    "Ante glosas con código viejo, aplicar homologación "
-                    "Res. 2641/2025 antes de evaluar la tarifa pactada. "
-                    "El sistema lo hace automáticamente vía codigo_ips + "
-                    "homologador_cups.py."
-                ),
-                "keywords": [
-                    "CUPS 2025",
-                    "homologación",
-                    "equivalencia",
-                    "código interno",
-                    "código viejo",
-                    "2641",
-                    "RIPS",
-                    "FEV",
-                ],
-            },
-        },
-        "keywords": [
-            "CUPS",
-            "2641",
-            "homologación",
-            "clasificación única",
-            "procedimientos",
-            "código interno",
-            "MinSalud 2025",
-        ],
+        "notas": (
+            "Su Articulo 5 dice: 'La presente resolucion rige a partir del 1 de enero de "
+            "2026 y deroga, a partir de esa fecha, las Resoluciones 2641 de 2024, 2689 de "
+            "2024 y 756 de 2025'. Es la norma con que se comprueba la descripcion de un "
+            "CUPS facturado en 2026."
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
+        "keywords": ["CUPS", "procedimientos en salud", "2706 de 2025", "vigente"],
     },
     "RESOLUCION 2341 DE 2024": {
         "nombre": "Resolución 2341 de 2024 (MinSalud)",
@@ -1147,11 +1166,26 @@ RESOLUCIONES = {
         "keywords": ["Res. 2003", "habilitación 2014", "manual inscripción"],
     },
     "RESOLUCION 1604 DE 2024": {
-        "nombre": "Resolución 1604 de 2024 (MinSalud)",
-        "titulo": "Modificaciones al RIPS y FEV — actualizaciones técnicas",
-        "ambito": "RIPS y Factura Electrónica de Venta",
+        # Corregida el 25-08-2026. El sistema la daba como "modificaciones al
+        # RIPS y a la factura electronica". No tiene NADA que ver: es un acto
+        # del Ministerio del INTERIOR que le reconoce personeria juridica a una
+        # iglesia. Ni siquiera es del sector salud. Se conserva con su
+        # contenido real para que, si alguien la cita, el sistema sepa que es.
+        #
+        # La norma de RIPS que probablemente se queria referenciar es la
+        # Resolucion 1884 de 2024 (plazos de RIPS), hoy derogada por la
+        # Res. 948 de 2026 junto con la 2275 de 2023 y la 558 de 2024.
+        "nombre": "Resolucion 1604 de 2024 (Ministerio del Interior)",
+        "titulo": "Personeria juridica especial a una entidad religiosa",
+        "ambito": "Asuntos religiosos — ajena por completo a las cuentas medicas",
         "vigente": True,
-        "keywords": ["RIPS 2024", "FEV", "actualización", "Res. 2275"],
+        "notas": (
+            "NO USAR EN NINGUNA RESPUESTA DE GLOSA: no es una norma de salud. Si lo que "
+            "se busca es la reglamentacion de RIPS y factura electronica, hoy rige la "
+            "Res. 948 de 2026."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["personeria juridica", "entidad religiosa", "Ministerio del Interior"],
     },
     "RESOLUCION 754 DE 2024": {
         "nombre": "Resolución 754 de 2024 (MinSalud)",
@@ -1164,7 +1198,12 @@ RESOLUCIONES = {
         "nombre": "Resolución 000042 de 2020 (DIAN)",
         "titulo": "Sistema de facturación electrónica de venta",
         "ambito": "Factura Electrónica de Venta (FEV), CUFE, requisitos técnicos DIAN",
-        "vigente": True,
+        # Verificada el 25-08-2026 contra fuente oficial.
+        "vigente": False,
+        "derogada_por": (
+            "la derogo expresamente la Resolucion DIAN 000165 del 1 de noviembre de 2023, cuyo "
+            "articulo 70 dice que rige desde su publicacion y deroga la Res. 000042 de 2020"
+        ),
         "keywords": [
             "factura electrónica",
             "FEV",
@@ -1191,6 +1230,9 @@ RESOLUCIONES = {
         "vigente": True,
         "notas": "Reconoce la auto-administración domiciliaria del Factor VIII/IX/VIIa como modalidad estándar en pacientes con hemofilia severa, evitando el riesgo de hemartrosis por desplazamiento. La EPS NO puede exigir asistencia institucional cada 48h.",
         "keywords": ["Resolución 1652", "hemofilia", "PAB", "Factor VIII", "auto-administración"],
+        # 25-08-2026: no se pudo confirmar si sigue vigente (las
+        # fuentes oficiales no respondieron). Verificar antes de citarla.
+        "vigencia_sin_confirmar": True,
     },
     "RESOLUCION 2292 DE 2021": {
         "nombre": "Resolución 2292 de 2021 (MinSalud)",
@@ -1201,17 +1243,26 @@ RESOLUCIONES = {
         "keywords": ["Resolución 2292", "PBS", "UPC", "hemofilia", "Emicizumab"],
     },
     "RESOLUCION 2335 DE 2023": {
-        "nombre": "Resolución 2335 de 2023 (MinSalud)",
-        "titulo": "Reglamentación atención integral cáncer infantil — Ley 1388/2010",
-        "ambito": "Pediatría oncológica — atención integral con red de complejidad",
+        # Corregida el 25-08-2026. El sistema la daba como "reglamentacion de
+        # la atencion integral del cancer infantil (Ley 1388/2010)", y un
+        # dictamen la cito ademas "en materia de RIPS": ninguna de las dos.
+        # Lo que trata resulto MAS util para cartera de lo que decia el rotulo.
+        "nombre": "Resolucion 2335 del 29 de diciembre de 2023 (MinSalud)",
+        "titulo": "Ejecucion, seguimiento y ajuste de los acuerdos de voluntades",
+        "ambito": "Relacion contractual entre prestadores y entidades responsables de pago",
         "vigente": True,
-        "notas": "Define el alcance de la atención integral del cáncer infantil incluyendo terapias avanzadas (trasplante MO, CAR-T cells) cuando las líneas previas han fallado. La EPS no puede excluir terapias génicas argumentando 'fuera de PBS' si son la única alternativa terapéutica.",
+        "notas": (
+            "21 articulos y 2 anexos tecnicos. Fija los procedimientos y aspectos "
+            "tecnicos para ejecutar, hacer seguimiento y ajustar los acuerdos de "
+            "voluntades entre la IPS y la entidad pagadora. Sirve para discutir la "
+            "ejecucion del contrato, no para cancer infantil ni para RIPS."
+        ),
+        "verificada": "25-08-2026 PDF oficial MinSalud",
         "keywords": [
-            "Resolución 2335",
-            "cáncer infantil",
-            "Ley 1388",
-            "atención integral",
-            "CAR-T",
+            "acuerdos de voluntades",
+            "ejecucion del contrato",
+            "seguimiento",
+            "prestador y pagador",
         ],
     },
     "RESOLUCION 2358 DE 1998": {
@@ -1316,27 +1367,41 @@ CIRCULARES = {
         ],
     },
     "CIRCULAR 18 DE 2024": {
+        # Corregida el 25-08-2026. Esta entrada se habia agregado ese mismo dia
+        # describiendola como "margenes de comercializacion", y al verificarla
+        # contra la fuente oficial el enunciado resulto incompleto: su objeto es
+        # la METODOLOGIA del regimen de control directo de precios.
         "nombre": "Circular 18 de 2024 (CNPMDM — MinSalud/MinCIT)",
-        "titulo": "Márgenes de comercialización de medicamentos regulados",
-        "ambito": "Margen que la IPS puede adicionar al precio máximo regulado",
+        "titulo": "Metodologia del regimen de control directo de precios de medicamentos",
+        "ambito": "Como se fija el precio maximo de un medicamento regulado",
         "vigente": True,
         "notas": (
-            "Su Art. 11 es el margen al que remite el Parágrafo 2 del Art. 1 de la "
-            "Circular 19 de 2024. Se cita junto con ella al responder una glosa por "
-            "«precio superior al regulado»."
+            "Define la metodologia con que la Comision Nacional de Precios identifica los "
+            "medicamentos que entran al control directo y como se les fija el precio. Su "
+            "Articulo 11 es el margen al que remite el Paragrafo 2 del Articulo 1 de la "
+            "Circular 19 de 2024, y por eso las dos se citan juntas al responder una glosa "
+            "por 'precio superior al regulado'."
         ),
+        "verificada": "25-08-2026 fuente oficial",
         "keywords": [
-            "margen de comercialización",
-            "precio regulado",
+            "control directo de precios",
+            "metodologia",
+            "precio maximo",
             "CNPMDM",
-            "Art. 11",
+            "margen Art. 11",
         ],
     },
     "CIRCULAR 025 DE 2024": {
         "nombre": "Circular 025 de 31-dic-2024 (MinSalud)",
         "titulo": "Manual Tarifario SOAT actualizado — UVB",
         "ambito": "Unidad de Valor Básico (UVB) vigente desde 01/01/2025",
-        "vigente": True,
+        # Verificada el 25-08-2026 contra fuente oficial.
+        "vigente": False,
+        "derogada_por": (
+            "fijo las tarifas SOLO para la vigencia 2025 (asi lo dice su propio asunto). Para s"
+            "ervicios prestados desde el 1 de enero de 2026 rige la Circular Externa 047 del 30"
+            " de diciembre de 2025"
+        ),
         "notas": "Reemplaza el uso de UVT (2023-2024). Todos los valores tarifarios SOAT se expresan ahora en UVB.",
         "keywords": ["UVB", "unidad valor básico", "025/2024", "SOAT"],
     },
@@ -1349,11 +1414,27 @@ CIRCULARES = {
         "keywords": ["errores formales", "subsanables", "030/2013", "circular"],
     },
     "CIRCULAR 007 DE 2025": {
-        "nombre": "Circular Externa 007 de 2025 (MinSalud)",
-        "titulo": "Cronograma implementación Manual Único de Glosas",
-        "ambito": "Implementación Res. 2284/2023",
+        # Corregida el 25-08-2026. El sistema la daba como "cronograma de
+        # implementacion del Manual Unico de Glosas". No es eso, y lo que si es
+        # resulto mucho mas util para defender al hospital.
+        "nombre": "Circular Externa Conjunta 007 del 3 de marzo de 2025",
+        "titulo": ("Prohibicion de barreras y de exigencias no normadas a los prestadores"),
+        "ambito": "Exigencias de la entidad pagadora que no estan en ninguna norma",
         "vigente": True,
-        "keywords": ["cronograma", "implementación", "007/2025"],
+        "notas": (
+            "Circular CONJUNTA del Ministerio de Salud y la Superintendencia Nacional de "
+            "Salud (no solo del Ministerio). Su asunto textual es el cumplimiento de la "
+            "normativa legal y la PROHIBICION de medidas no normadas, de imponer barreras "
+            "y de hacer solicitudes no permitidas a los prestadores de servicios de salud. "
+            "Util cuando la EPS exige un requisito que ninguna norma le impone al hospital."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": [
+            "barreras al prestador",
+            "exigencias no normadas",
+            "SuperSalud",
+            "circular conjunta",
+        ],
     },
     "CIRCULAR 0000022 DE 2023": {
         "nombre": "Circular 0000022 de 2023 (MinSalud + DIAN)",

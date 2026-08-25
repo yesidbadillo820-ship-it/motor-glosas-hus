@@ -1231,16 +1231,21 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         re.compile(r"\bGLOSA\s+12345\b", re.IGNORECASE),
         "LA GLOSA APLICADA",
     ),
-    # "Resolución 2641 de 2024" — norma inventada que el prompt mencionaba como
-    # ejemplo de lo prohibido. La quitamos en cualquier forma.
-    (
-        re.compile(r"\b(?:LA\s+)?RESOLUCI[ÓO]N\s+2641\s+DE\s+2024\b", re.IGNORECASE),
-        "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD",
-    ),
-    (
-        re.compile(r"\bRes\.?\s*2641/2024\b", re.IGNORECASE),
-        "normativa vigente",
-    ),
+    # LA "RESOLUCION 2641 DE 2024" NO ERA INVENTADA (25-08-2026).
+    #
+    # Aqui habia dos reglas que la borraban del dictamen y la cambiaban por
+    # "LA NORMATIVA VIGENTE DEL MINISTERIO DE SALUD". Se creia inventada porque
+    # el prompt la usaba como EJEMPLO de norma prohibida y la IA la copiaba.
+    #
+    # Al verificarla resulto ser REAL: es la Resolucion 2641 del 23 de
+    # diciembre de 2024, la que establecio la CUPS que rigio durante 2025
+    # (hoy derogada por la Res. 2706 de 2025 desde el 1 de enero de 2026).
+    #
+    # O sea que el motor borraba la cita CORRECTA y en su lugar dejaba una
+    # frase sin ley, decreto ni articulo — justo la clase de pseudo-norma que
+    # la auditoria independiente reprocho. Se retiraron las dos reglas. Si la
+    # fecha del servicio no corresponde, quien avisa ahora es el aviso de
+    # norma derogada del verificador de citas, que si mira la vigencia.
     # "historia clínica N° 1234567" — número del prompt-ejemplo
     (
         re.compile(

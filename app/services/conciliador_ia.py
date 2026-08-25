@@ -55,7 +55,8 @@ _CONTRAARGUMENTOS_PLANTILLA = {
             "titulo": "La EPS dirá: 'falta soporte de la prestación'",
             "respuesta_sugerida": (
                 "Aportar historia clínica completa (Res. 1995/1999 — "
-                "plena prueba), RIPS radicados (Res. 866/2021), factura "
+                "plena prueba), RIPS radicados (Res. 948/2026; Res. 2275/2023 "
+                "si el servicio es anterior al 14-05-2026), factura "
                 "electrónica (Res. 948/2026; Res. 2275/2023 si el servicio es\n"
                 "anterior al 14-05-2026)."
             ),

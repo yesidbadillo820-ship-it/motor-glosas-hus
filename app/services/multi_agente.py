@@ -81,7 +81,8 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
             "Resolución 1995 de 1999 Art. 3 (historia clínica como documento de plena prueba médico-legal)"
         )
         resultado["normas_primarias"].append(
-            "Resolución 866 de 2021 (RIPS — soportes electrónicos)"
+            "Res. 948/2026 (RIPS como soporte de la factura electrónica; "
+            "Res. 2275/2023 si el servicio es anterior al 14-05-2026)"
         )
         resultado["normas_secundarias"].append(
             "Circular 030 de 2013 MinSalud (errores formales subsanables en la facturación)"

@@ -304,7 +304,9 @@ def bloque_puntos_a_refutar(puntos: dict) -> str:
         partes.append(
             f"  {n}. La EPS dice que faltan: {soportes} — refuta con "
             "Resolución 1995/1999 (historia clínica como plena prueba "
-            "médico-legal), Resolución 866/2021 (RIPS), y Circular "
+            "médico-legal), la norma de RIPS vigente al momento de la "
+            "prestación (Res. 948/2026; Res. 2275/2023 si el servicio "
+            "es anterior al 14-05-2026), y Circular "
             "030/2013 si son errores formales subsanables."
         )
         n += 1

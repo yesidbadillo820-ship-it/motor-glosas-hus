@@ -1,7 +1,8 @@
 """Homologador CUPS → SOAT (tarifación) — Manual Único Res. 2775 → Manual SOAT.
 
 DISTINTO del homologador_cups.py (que homologa CUPS_viejo → CUPS_nuevo de
-la Res. 2641/2025). Este módulo mapea un código CUPS a su(s) código(s)
+la Res. 2706/2025, vigente desde el 1-ene-2026; antes, la Res. 2641/2024).
+Este módulo mapea un código CUPS a su(s) código(s)
 SOAT oficial(es), con la descripción de cada uno, para fundamentar la
 tarifa en glosas de TARIFA (TA).
 
