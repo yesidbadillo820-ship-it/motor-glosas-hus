@@ -70,29 +70,40 @@
   - **Excel GI-33-5181-2026**: control de 2.215 facturas contra todo lo trabajado en el chat — las 2.215 están, 0 NA.
   - Se dejaron los comandos para unificar las evidencias (Word + PDF `GI-33-5181-2026`) y armar la carpeta en el servidor Z: (RESPUESTA GLOSA INICIAL\GI-33-5181-2026 + EVIDENCIAS SUBIDAS).
   - Se creó esta **bitácora** y la instrucción en CLAUDE.md; se arregló el CI (3 pruebas con fechas vencidas) y quedó en verde.
+- **27/07** — **Documento de entrega técnica** del módulo COOSALUD (`docs/ENTREGA_MODULO_COOSALUD.md`): arquitectura, cada bot, el flujo completo, reglas de negocio y riesgos. Sirve para pasarle el conocimiento a otro equipo.
+- **13–14/08** — **Operación** (chat) y tres correcciones de fondo:
+  - **CROTIPOBJ arreglado**: el tipo de objeción (0 administrativa / 1 médica / 2 mixta) se calculaba mirando *todas* las glosas del portal, incluso las que solo se mencionan en la observación. DGH lo calcula sobre el concepto que uno **escribe**. Ahora el bot hace lo mismo: si todos los conceptos escritos de la factura son CL → médica; si ninguno → administrativa; si hay de los dos → mixta. Se verificó con las 5 facturas que DGH había clasificado distinto y todas coincidieron; en el masivo de agosto cambiaron 8 de 589.
+  - Bot **LISTA FACTURAS YA EN TRÁMITES** (`facturas_ya_en_tramites.py`): revisa la carpeta de masivos ya enviados y arma el TXT de facturas que **no** se deben repetir. Solo cuenta los masivos realmente diligenciados (con CÓDIGO RESPUESTA lleno) y de la EPS que se le pida, para no mezclar Dispensario con COOSALUD.
+  - **Lotes procesados**: COOSALUD 7 (23 facturas, $27,9 millones), COOSALUD 1 (29 facturas, $5,4 millones) y el masivo de agosto (589 facturas, $5.612 millones). Cierre del mes: **641 facturas / $5.674.278.862**.
+- **19/08** — Bot **FILTRAR BASE DGH** (`filtrar_base_dgh.py`): recorta la base "SERVICIOS FACTURADOS COOSALUD DGH.xlsx" (70 MB) a las facturas del lote, para poder moverla. Se le pasan las facturas por carpeta, por TXT o por lista.
+- **25/08** — **Lote nuevo COOSALUD_25082026: 1.573 facturas**:
+  - Organizado en 6 lotes y consolidado: **4.533 ítems, 4.691 glosas, $289.077.286**. Todas a tiempo (RE9901); solo 2 con CALIDAD (HUS532676 y HUS532956); 193 con copago.
+  - Entregados los consolidados y el paquete del portal (Excel masivo + 4 listas para correr en paralelo: 394/394/394/391).
+  - **Tropiezo**: al cruzar con DGH la base solo trajo **9 de las 1.573**. La base que se está usando es del 08/07 y además venía recortada (leyó 1.048.000 filas, prácticamente el tope de Excel). Hay que bajar de DGH un export **nuevo**, por tandas de fechas.
+  - Por eso el bot FILTRAR BASE DGH ahora acepta **varias bases a la vez** (las tandas), quita las filas repetidas y avisa dos cosas: si una base llegó al tope de filas de Excel (salió recortada) y hasta qué número de factura llega cada una (para ver de una si está vieja).
 
 ---
 
 ## PENDIENTE
 
-1. **Correr el comando de las 137 pendientes** en el portal (Excel y lista ya entregados) y cuadrar con su reporte.
-2. **Que los de DGH suban los 5 archivos de trámites** entregados el 22/07 (4 lotes del 1.600 + 35 restantes). Si el parcial de 6 facturas del 21/07 no se ha subido, subirlo también.
-3. **Evidencias**: correr los 4 pasos (lista → Word → PDF `GI-33-5181-2026` → carpeta en Z:) cuando estén cerradas las 137.
-4. **Registrar manualmente en DGH**: HUS530335 y HUS506920 (sus servicios no están en la base DGH).
-5. **4 de las 5 no-cruzadas ya registradas en DGH** (513595, 515251, 516765, 520580): definir su respuesta y generar su mini-trámite.
-6. **37 facturas de auditoría médica** (masivo del 14/07): subir sus trámites cuando las doctoras respondan (sus conceptos ya vienen en el export del 22/07).
-7. **Casos sueltos**: HUS531067 (trámite del 14/07, verificar si ya tiene respuesta) y HUS520206 (está entre las 37 de doctoras).
-8. **Confirmar en DGH** los códigos TA0601, TA2301 y AU2301 para dejar la homologación 206/207/223/423 en el bot.
+1. **Base DGH nueva** (lo que bloquea el lote de 1.573): bajar de DGH el export de SERVICIOS FACTURADOS COOSALUD que cubra de HUS533xxx en adelante. Si no cabe en un solo Excel, bajarlo por tandas de fechas y pasarlas todas al bot FILTRAR BASE DGH. Con eso se genera el OBJECIONES del lote.
+2. **Portal COOSALUD del lote de 1.573**: correr las 4 listas en paralelo (S1–S4). No depende de la base DGH, se puede hacer ya.
+3. **8 facturas de auditoría médica de agosto** (HUS527358, HUS529493, HUS530150, HUS530676, HUS530701, HUS531001, HUS531885, HUS533202): esperar la respuesta de las doctoras para armar sus trámites.
+4. **Registrar manualmente en DGH**: HUS530335 y HUS506920; y los ítems sueltos ACETAZOLAMIDA de HUS527199 ($10.200) y BUPIVACAÍNA de HUS529267, HUS531631 y HUS531672 ($30.600 cada una).
+5. **Evidencias**: unificar → PDF `GI-33-5300-2026` → carpeta en el servidor Z:.
+6. **37 facturas de auditoría médica** del masivo del 14/07: siguen esperando a las doctoras.
+7. **Confirmar en DGH** los códigos TA0601, TA2301 y AU2301 para dejar cerrada la homologación 206/207/223/423 en el bot.
+8. **Riesgo conocido**: quedan ~14 pruebas del proyecto con fechas fijas que se van a vencer y tumbar el CI. Cambiarlas a fechas relativas cuando haya un rato.
 
 ---
 
-## PARA MAÑANA (23/07/2026)
+## PARA MAÑANA (26/08/2026)
 
-1. Verificar que los de DGH hayan subido los 5 archivos de trámites; si devuelven errores, corregir y reintentar.
-2. Correr (si no se corrió hoy) el comando de las 137 pendientes y confirmar que el portal quede en cero.
-3. Evidencias → PDF GI-33-5181-2026 → carpeta en el servidor Z:.
-4. Registrar a mano HUS530335 y HUS506920 en DGH.
-5. Preguntar a auditoría médica por las 37 de CALIDAD.
+1. Bajar la base DGH nueva (por tandas si toca) y correr FILTRAR BASE DGH con las 1.573 facturas.
+2. Generar el OBJECIONES del lote de 1.573 y subirlo a DGH en tandas de 300.
+3. Correr el portal COOSALUD con las 4 listas del lote de 1.573.
+4. Insistir con auditoría médica por las 8 facturas de CALIDAD de agosto.
+5. Registrar a mano en DGH lo que no cruza (HUS530335, HUS506920 y los 4 ítems sueltos).
 
 ---
 
