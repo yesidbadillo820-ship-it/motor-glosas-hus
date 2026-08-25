@@ -7208,8 +7208,8 @@ institucional.
 **22 OK**, y las otras 2 verificadas: la 540273 era el propio piloto (ya
 finalizada) y la 538877 respondió con un aviso informativo del portal — se
 verificó aparte y ya no está en pendientes. **Las 24 quedaron respondidas y
-finalizadas**, cada una con su pantallazo en `evidencias_glosa\`. Queda
-pendiente solo anotar el **GI del paquete** cuando el portal lo genere.
+finalizadas**, cada una con su pantallazo en `evidencias_glosa\`. El portal
+generó el consecutivo del paquete: **GI-33-5369-2026**.
 
 También se resolvió el enredo del PR de la bitácora: el respaldo del 24-08 se
 aplicó dos veces (en este chat y en otro), la principal quedó con la versión
@@ -7697,9 +7697,8 @@ columnas de IA y con copia a las médicas— y dejar una sola cuenta de correo
 para Edgar Silva.
 
 
-**Lote de glosas del 25-ago (Dispensario):** las 24 quedaron respondidas;
-solo falta **anotar el GI del paquete** cuando el portal lo genere (pedírselo
-al chat para dejarlo en la bitácora, como el GI-33-5335-2026 del lote 14-ago).
+**Lote de glosas del 25-ago (Dispensario):** cerrado — las 24 respondidas
+con el consecutivo **GI-33-5369-2026** ya anotado.
 
 **Notas crédito del Dispensario (lo primero, 25-08):** el cargue del acta
 858 ya quedó (21/21 OK el 24-08). Lo que sigue: (a) pasar a SISTEMAS el
