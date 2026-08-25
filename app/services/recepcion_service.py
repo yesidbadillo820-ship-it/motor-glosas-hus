@@ -151,6 +151,124 @@ def _normalizar(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
+# ─── Texto de glosa compilado desde los conceptos (hojas I/R) ────────────────
+# La hoja INICIAL/RATIFICADA no trae el "por qué" de la glosa; ese texto vive
+# en las hojas I/R (ListadoConceptos.Observaciones + ConceptoObjecion.Nombre).
+# Compilamos esos conceptos en texto_glosa_original para que la IA del
+# auto-responder LEA EL CONCEPTO REAL de la EPS (antes recibía el dictamen
+# placeholder "Pendiente de análisis..." — bug reportado 2026-06-10).
+MARCA_TEXTO_CONCEPTOS = "[CONCEPTOS GLOSADOS"
+_MAX_TEXTO_CONCEPTOS = 30_000  # tope < GlosaInput.tabla_excel (50K)
+
+
+def _fmt_cop(valor) -> str:
+    try:
+        return f"${int(round(float(valor or 0))):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "$0"
+
+
+def _plan_de(
+    *,
+    codigo_glosa,
+    tipo_glosa,
+    dias_restantes,
+    dias_radicacion,
+    estado,
+    valor,
+    profesional_medico,
+) -> dict:
+    """El plan de trabajo de una glosa, en forma de diccionario simple.
+
+    Se devuelve como dict —no como objeto— porque este resumen viaja al correo
+    y a la pantalla tal cual, sin pasar por la base de datos.
+    """
+    from app.services.glosa_service import TEXTO_RATIFICADA
+    from app.services.plan_de_trabajo import construir_plan
+
+    p = construir_plan(
+        codigo_glosa=codigo_glosa,
+        tipo_glosa=tipo_glosa,
+        dias_restantes=dias_restantes,
+        dias_radicacion=dias_radicacion,
+        ratificada=(estado == "RATIFICADA"),
+        extemporanea=(estado == "EXTEMPORANEA"),
+        valor_objetado=valor,
+        profesional_medico=profesional_medico,
+        texto_ratificada=TEXTO_RATIFICADA,
+    )
+    return {
+        "prioridad": p.prioridad,
+        "urgencia": p.urgencia,
+        "titular": p.titular,
+        "ruta": p.ruta,
+        "respuesta_sugerida": p.respuesta_sugerida,
+        "avisos": p.avisos,
+        "con_medico": p.con_medico,
+        "texto_listo": p.texto_listo,
+        # 20-08-2026: QUÉ doctora lleva esta glosa. El Excel lo trae en la
+        # columna PROFESIONAL(MEDICO) y hasta ahora solo se usaba para armar
+        # el texto del plan. Con el nombre acá, el resumen le puede llegar a
+        # la doctora que de verdad la tiene, y no a las tres.
+        "profesional_medico": (profesional_medico or "").strip(),
+    }
+
+
+def _dias_desde_texto(vence: str | None):
+    """«03/09/2026» → días que faltan. None si no se puede leer."""
+    from datetime import date, datetime
+
+    if not vence or vence == "N/A":
+        return None
+    try:
+        d = datetime.strptime(str(vence), "%d/%m/%Y").date()
+    except ValueError:
+        return None
+    return (d - date.today()).days
+
+
+def componer_texto_desde_conceptos(db, glosa) -> str:
+    """Compila el texto de la glosa desde sus ConceptoGlosaRecord.
+
+    Devuelve "" si la glosa no tiene conceptos vinculados. El texto
+    empieza con MARCA_TEXTO_CONCEPTOS para distinguirlo de texto
+    cargado manualmente (nunca se pisa texto manual al reimportar).
+    """
+    if glosa is None or glosa.id is None:
+        return ""
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.glosa_id == glosa.id)
+        .order_by(ConceptoGlosaRecord.id)
+        .all()
+    )
+    if not conceptos:
+        return ""
+    bloques = [
+        f"{MARCA_TEXTO_CONCEPTOS} — DETALLE DGH] Factura {glosa.factura or 's/n'} — "
+        f"{len(conceptos)} concepto(s) objetado(s) por la EPS:"
+    ]
+    for i, c in enumerate(conceptos, start=1):
+        encabezado = f"CONCEPTO {i}: {c.codigo_glosa or 'sin código'}"
+        if c.nombre_glosa:
+            encabezado += f" — {c.nombre_glosa}"
+        lineas = [encabezado]
+        servicio = " — ".join(x for x in (c.cups_codigo, c.cups_descripcion) if x)
+        if servicio:
+            lineas.append(f"Servicio/CUPS: {servicio}")
+        if c.centro_costo:
+            lineas.append(f"Centro de costo: {c.centro_costo}")
+        if c.valor_objetado:
+            lineas.append(f"Valor objetado: {_fmt_cop(c.valor_objetado)}")
+        if c.observacion_eps:
+            lineas.append(f"Observación EPS: {c.observacion_eps}")
+        bloques.append("\n".join(lineas))
+    texto = "\n\n".join(bloques)
+    if len(texto) > _MAX_TEXTO_CONCEPTOS:
+        texto = texto[:_MAX_TEXTO_CONCEPTOS] + "\n[... truncado]"
+    return texto
+
+
 def _fix_mojibake(texto: str) -> str:
     """Arregla texto UTF-8 leído como Latin-1 (mojibake) y limpia artefactos.
 
@@ -191,6 +309,130 @@ def _fix_mojibake(texto: str) -> str:
     return texto
 
 
+# ─── Resolución GESTOR (Excel) → UsuarioRecord (asignación automática) ───────
+# La columna GESTOR de la hoja INICIAL trae el nombre de pila del gestor
+# ("YESID PEREZ"). Para que la glosa aparezca en "Mis glosas" del usuario
+# correcto hay que setear auditor_email (gestor_nombre solo matchea por
+# igualdad EXACTA con UsuarioRecord.nombre — tildes o mayúsculas distintas
+# rompen la visibilidad). Matching tolerante: sin tildes/mayúsculas,
+# containment, subconjunto de tokens y local-part del email
+# ("yesid.perez@hus.com" ≈ "YESID PEREZ").
+
+
+def _tokens_nombre(texto: str) -> frozenset[str]:
+    return frozenset(t for t in _normalizar(texto or "").split(" ") if len(t) >= 2)
+
+
+def construir_indice_usuarios(db) -> list[dict]:
+    """Índice en memoria de usuarios activos para resolver gestores."""
+    try:
+        from app.models.db import UsuarioRecord
+
+        usuarios = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
+    except Exception as e:
+        logger.warning(f"No se pudo cargar usuarios para asignar gestores: {e}")
+        return []
+    indice: list[dict] = []
+    for u in usuarios:
+        email = (u.email or "").strip().lower()
+        if not email:
+            continue
+        local_como_nombre = re.sub(r"[._\-+]+", " ", email.split("@", 1)[0])
+        indice.append(
+            {
+                "usuario": u,
+                "email": email,
+                "nombre_norm": _normalizar(u.nombre or ""),
+                "tokens_nombre": _tokens_nombre(u.nombre or ""),
+                "email_local_norm": _normalizar(local_como_nombre),
+                "tokens_email": _tokens_nombre(local_como_nombre),
+            }
+        )
+    return indice
+
+
+def _email_con_delegacion(usuario, email: str) -> str:
+    """Si el usuario está de vacaciones con delegado configurado, la
+    asignación automática se redirige al delegado (mismo criterio que
+    /glosas/bulk/asignar — ver UsuarioRecord.delega_a_email)."""
+    try:
+        vd = usuario.vacaciones_desde
+        vh = usuario.vacaciones_hasta
+        delegado = (usuario.delega_a_email or "").strip().lower()
+        if not (vd and vh and delegado):
+            return email
+        from datetime import timezone as _tz
+
+        ahora = datetime.now(_tz.utc)
+        try:
+            en_vacaciones = vd <= ahora <= vh
+        except TypeError:
+            # BD con datetimes naive (SQLite) — comparar naive vs naive
+            en_vacaciones = vd <= datetime.now() <= vh
+        if en_vacaciones:
+            logger.info(
+                f"Gestor {email} en vacaciones — asignación redirigida al delegado {delegado}"
+            )
+            return delegado
+    except Exception as e:
+        logger.debug(f"Chequeo de delegación falló para {email}: {e}")
+    return email
+
+
+def resolver_gestor_a_email(nombre_gestor: str, indice: list[dict]) -> tuple[Optional[str], str]:
+    """Resuelve el nombre de gestor del Excel a un email de usuario.
+
+    Devuelve (email | None, motivo) con motivo en:
+      "exacto"    — nombre normalizado idéntico
+      "parcial"   — containment o tokens del más corto ⊆ tokens del más largo
+      "email"     — match contra el local-part del email
+      "vacio"     — celda vacía / "SIN ASIGNAR"
+      "ambiguo"   — varios usuarios distintos matchean (ej. equipos que
+                    comparten nombre): NO se asigna a uno al azar; el
+                    correo grupal del Excel-respuesta ya los cubre.
+      "sin_match" — ningún usuario activo coincide (se reporta como
+                    advertencia en el resumen de importación).
+    """
+    g_norm = _normalizar(nombre_gestor or "")
+    if not g_norm or g_norm == "sin asignar":
+        return None, "vacio"
+    g_tokens = _tokens_nombre(nombre_gestor)
+
+    def _matchea(e: dict) -> str | None:
+        n = e["nombre_norm"]
+        if n:
+            if n == g_norm:
+                return "exacto"
+            if g_norm in n or n in g_norm:
+                return "parcial"
+            tn = e["tokens_nombre"]
+            if g_tokens and tn and (g_tokens <= tn or tn <= g_tokens):
+                return "parcial"
+        el = e["email_local_norm"]
+        if el:
+            if el == g_norm or g_norm in el:
+                return "email"
+            te = e["tokens_email"]
+            if g_tokens and te and g_tokens <= te:
+                return "email"
+        return None
+
+    matches = [(e, m) for e in indice if (m := _matchea(e))]
+    if not matches:
+        return None, "sin_match"
+    emails_distintos = {e["email"] for e, _ in matches}
+    if len(emails_distintos) > 1:
+        # Desempate: si hay UN solo match exacto, gana (los parciales
+        # suelen ser homónimos/equipos).
+        exactos = [(e, m) for e, m in matches if m == "exacto"]
+        if len({e["email"] for e, _ in exactos}) == 1:
+            e, _ = exactos[0]
+            return _email_con_delegacion(e["usuario"], e["email"]), "exacto"
+        return None, "ambiguo"
+    e, motivo = matches[0]
+    return _email_con_delegacion(e["usuario"], e["email"]), motivo
+
+
 def _split_entidad(entidad: str) -> tuple[str, str]:
     """Separa 'U220181 - FAMISANAR EPS SUBSIDIADO' en ('U220181', 'FAMISANAR EPS SUBSIDIADO').
 
@@ -202,6 +444,74 @@ def _split_entidad(entidad: str) -> tuple[str, str]:
     if m:
         return m.group(1).strip(), m.group(2).strip()
     return "", entidad.strip()
+
+
+# Ronda 10 (17-jun-2026) — el DGH manda la entidad en formato Syscafe muy
+# verboso ("C260043 - ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S
+# CONTRIBUTIVO", "U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA
+# LA PREVISORA S.A. FOMAG"). Antes guardábamos esa cadena cruda como
+# `eps`, y la IA la copiaba al dictamen como cabecera ("ESE HUS NO ACEPTA
+# GLOSA APLICADA POR C260043 - ENTIDAD PROMOTORA..."). Normalizamos a la
+# clave canónica del catálogo CONTRATOS_HUS para que la IA use "FAMISANAR
+# EPS", "FOMAG", "MUTUAL SER EPS" — los mismos nombres que conocen sus
+# bloques de contexto contractual.
+_TOKENS_EPS_CANONICA: tuple[tuple[str, str], ...] = (
+    # (token de búsqueda en mayúsculas, nombre canónico final).
+    # Orden importa: el más específico primero (NUEVA EPS antes que SOLO
+    # "EPS", FOMAG/MAGISTERIO antes que FIDEICOMISOS).
+    ("FAMISANAR", "FAMISANAR EPS"),
+    ("FOMAG", "FOMAG"),
+    ("MAGISTERIO", "FOMAG"),
+    ("FIDUPREVISORA", "FOMAG"),
+    ("NUEVA EPS", "NUEVA EPS"),
+    ("COOSALUD", "COOSALUD"),
+    ("COMPENSAR", "COMPENSAR"),
+    ("POSITIVA", "POSITIVA"),
+    ("SANITAS", "SANITAS"),
+    ("MUTUAL SER", "MUTUAL SER EPS"),
+    ("MUTUALSER", "MUTUAL SER EPS"),
+    ("SALUD TOTAL", "SALUD TOTAL EPS"),
+    ("SALUDTOTAL", "SALUD TOTAL EPS"),
+    ("SURA", "SURA EPS"),
+    ("ECOOPSOS", "ECOOPSOS"),
+    ("EMSSANAR", "EMSSANAR"),
+    ("ASMET SALUD", "ASMET SALUD"),
+    ("ASMETSALUD", "ASMET SALUD"),
+    ("CAPITAL SALUD", "CAPITAL SALUD EPS"),
+    ("CAPRESOCA", "CAPRESOCA EPS"),
+    ("DUSAKAWI", "DUSAKAWI EPS"),
+    ("PIJAOS", "PIJAOS SALUD EPS"),
+    ("MALLAMAS", "MALLAMAS EPS"),
+    ("DMBUG", "DMBUG"),
+    # Ronda 10 (17-jun-2026) — entidades de las fuerzas militares NO se
+    # canonizan: "DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO" pierde
+    # "EJERCITO" si colapsamos a "DISPENSARIO MEDICO". Idem POLICIA / ARMADA
+    # / SANIDAD MILITAR — cada una tiene su régimen normativo propio y el
+    # dispensario específico es información importante. Para esos casos el
+    # fallback (strip del prefijo Syscafe) preserva el nombre completo.
+    ("CLINICA CHICAMOCHA", "CLINICA CHICAMOCHA"),
+)
+
+
+def _normalizar_eps_canonica(entidad_raw: str) -> str:
+    """Devuelve el nombre canónico corto si reconoce la entidad, o el
+    nombre limpio (sin código Syscafe) en otro caso.
+
+    Caso real prod 17-jun: "C260043 - ENTIDAD PROMOTORA DE SALUD FAMISANAR
+    S A S CONTRIBUTIVO" → "FAMISANAR EPS".
+    "U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA
+    S.A.  FOMAG" → "FOMAG".
+    "U220251 - MUTUAL SER EPS" → "MUTUAL SER EPS".
+    """
+    if not entidad_raw:
+        return ""
+    _, nombre = _split_entidad(entidad_raw)
+    nombre_up = (nombre or entidad_raw).upper()
+    nombre_norm = re.sub(r"\s+", " ", nombre_up).strip()
+    for token, canonico in _TOKENS_EPS_CANONICA:
+        if token in nombre_norm:
+            return canonico
+    return nombre_norm or entidad_raw.strip()
 
 
 def _mapear_cabeceras(
@@ -491,6 +801,16 @@ class ResumenImportacion:
         self.filas_omitidas_detalle: list[dict] = []
         # Hojas descartadas por no tener columnas reconocibles.
         self.hojas_descartadas: list[dict] = []
+        # Asignación automática GESTOR → usuario (auditor_email).
+        # gestores_asignados: {nombre_gestor: email_asignado}
+        # gestores_sin_usuario: nombres que no matchearon ningún usuario
+        # activo (las glosas quedan sin auditor_email y el coordinador ve
+        # la advertencia en el resumen).
+        # advertencias: avisos no-fatales (separados de `errores`, que
+        # significa "filas/hojas que no se pudieron importar").
+        self.gestores_asignados: dict[str, str] = {}
+        self.gestores_sin_usuario: list[str] = []
+        self.advertencias: list[str] = []
 
     def registrar_omitida(self, fila: int, motivo: str) -> None:
         self.filas_omitidas += 1
@@ -515,12 +835,50 @@ class ResumenImportacion:
             "filas_omitidas": self.filas_omitidas,
             "filas_omitidas_detalle": self.filas_omitidas_detalle,
             "hojas_descartadas": self.hojas_descartadas,
+            "gestores_asignados": self.gestores_asignados,
+            "gestores_sin_usuario": self.gestores_sin_usuario,
+            "advertencias": self.advertencias,
         }
 
 
 class RecepcionService:
     def __init__(self, db: Session):
         self.db = db
+        # Índice de usuarios y cache de resolución gestor→email; viven lo
+        # que dura la importación (una instancia por archivo procesado).
+        self._indice_usuarios: list[dict] | None = None
+        self._cache_gestor: dict[str, Optional[str]] = {}
+
+    def _resolver_gestor(self, gestor: str, resumen: "ResumenImportacion") -> Optional[str]:
+        """Email del usuario asignable para este gestor (o None).
+
+        Cachea por nombre normalizado y registra UNA advertencia por
+        gestor sin usuario para que el coordinador la vea en el resumen.
+        """
+        clave = _normalizar(gestor or "")
+        if clave in self._cache_gestor:
+            return self._cache_gestor[clave]
+        if self._indice_usuarios is None:
+            self._indice_usuarios = construir_indice_usuarios(self.db)
+        email, motivo = resolver_gestor_a_email(gestor, self._indice_usuarios)
+        if email:
+            resumen.gestores_asignados[gestor] = email
+            logger.info(f"Gestor '{gestor}' → {email} (match {motivo})")
+        elif motivo == "sin_match":
+            resumen.gestores_sin_usuario.append(gestor)
+            resumen.advertencias.append(
+                f"El gestor '{gestor}' no coincide con ningún usuario activo "
+                f"del sistema — sus glosas quedan sin asignar (auditor_email "
+                f"vacío). Cree el usuario o corrija el nombre en el Excel."
+            )
+            logger.warning(f"Gestor '{gestor}' sin usuario activo que matchee — sin asignar")
+        elif motivo == "ambiguo":
+            logger.info(
+                f"Gestor '{gestor}' matchea varios usuarios distintos "
+                f"(¿equipo?) — no se asigna auditor_email a uno solo"
+            )
+        self._cache_gestor[clave] = email
+        return email
 
     def procesar_excel(self, contenido: bytes) -> ResumenImportacion:
         """Procesa el archivo Excel completo (múltiples hojas).
@@ -647,7 +1005,71 @@ class RecepcionService:
                 "Ninguna hoja tiene columnas reconocibles. El parser busca hojas "
                 "tipo RECEPCION (con FACTURA+VENCE) o CONCEPTOS (con ListadoConceptos.*)."
             )
+
+        # Las hojas de resumen (INICIAL/RATIFICADA) no traen la causal: esa vive
+        # en las hojas de detalle, que se leen después. Acá, ya con todo dentro,
+        # se completa el plan de cada glosa con su causal real — que es lo que
+        # convierte «causal por clasificar» en «Soportes: relacione los que SÍ
+        # están en el expediente». 20-08-2026.
+        try:
+            self._completar_planes_con_causal(resumen)
+        except Exception as e:  # noqa: BLE001 - el resumen vale igual sin esto
+            logger.warning(f"No se pudo completar el plan con las causales: {e}")
         return resumen
+
+    def _completar_planes_con_causal(self, resumen) -> None:
+        """Rellena la causal en el plan de cada glosa del resumen.
+
+        Se toma la causal del concepto de MÁS VALOR: si una factura viene
+        glosada por soportes y por tarifa, la que manda para saber cómo
+        trabajarla es la que tiene más plata detrás.
+        """
+        from app.models.db import ConceptoGlosaRecord, GlosaRecord
+
+        ids = list(resumen.glosas_ids_todas or [])
+        if not ids:
+            return
+        conceptos = (
+            self.db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id.in_(ids)).all()
+        )
+        # glosa_id -> causal del concepto de más valor
+        mayor: dict[int, tuple[float, str]] = {}
+        for c in conceptos:
+            cod = (getattr(c, "codigo_glosa", "") or "").strip()
+            if not cod:
+                continue
+            val = float(getattr(c, "valor_objetado", 0) or 0)
+            if val >= mayor.get(c.glosa_id, (-1.0, ""))[0]:
+                mayor[c.glosa_id] = (val, cod)
+
+        # factura -> causal, para encontrarlas desde `por_gestor`
+        por_factura: dict[str, str] = {}
+        for g in self.db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all():
+            dato = mayor.get(g.id)
+            if dato and g.factura:
+                por_factura[str(g.factura).strip().upper()] = dato[1]
+
+        for glosas in (resumen.por_gestor or {}).values():
+            for item in glosas:
+                cod = por_factura.get(str(item.get("factura") or "").strip().upper())
+                if not cod:
+                    continue
+                item["causal"] = cod
+                item["plan"] = _plan_de(
+                    codigo_glosa=cod,
+                    tipo_glosa=item.get("tipo_glosa"),
+                    dias_restantes=_dias_desde_texto(item.get("vence")),
+                    dias_radicacion=None,
+                    estado=item.get("estado"),
+                    valor=item.get("valor"),
+                    profesional_medico=None,
+                )
+                # No se pierden los avisos que ya se habían calculado con los
+                # datos de la hoja de resumen (días de radicación, médico).
+                previos = [a for a in (item.get("_avisos_previos") or [])]
+                for a in previos:
+                    if a not in item["plan"]["avisos"]:
+                        item["plan"]["avisos"].append(a)
 
     def _procesar_filas_hoja(
         self,
@@ -688,9 +1110,22 @@ class RecepcionService:
 
                 # Separar código plan (U220181) del nombre para normalización
                 eps_codigo, eps_nombre_limpio = _split_entidad(entidad)
+                # Ronda 10 (17-jun-2026) — el Syscafe-DGH manda nombres
+                # verbosos ("C260043 - ENTIDAD PROMOTORA DE SALUD FAMISANAR
+                # S A S CONTRIBUTIVO"). Antes guardábamos esa cadena cruda
+                # como `eps` y la IA la copiaba al dictamen como cabecera.
+                # Normalizamos a la clave canónica del catálogo (FAMISANAR
+                # EPS, FOMAG, MUTUAL SER EPS) — los mismos nombres que
+                # conocen sus bloques de contexto contractual y el resto
+                # del catálogo.
+                eps_canonica = _normalizar_eps_canonica(entidad) or entidad
 
                 consecutivo = str(_get("consecutivo_dgh") or "").strip()
                 gestor = str(_get("gestor") or "").strip().upper() or "SIN ASIGNAR"
+                # Asignación automática: GESTOR del Excel → usuario activo
+                # (auditor_email). Si no hay match queda sin asignar y se
+                # reporta advertencia (una vez por gestor).
+                auditor_email_asignado = self._resolver_gestor(gestor, resumen)
                 radicado_info = str(_get("radicado") or "").strip()
                 referencia = str(_get("referencia") or "").strip()
                 observacion_tecnico = _fix_mojibake(str(_get("observacion_tecnico") or "").strip())
@@ -747,13 +1182,11 @@ class RecepcionService:
                 if ratificada:
                     estado = "RATIFICADA"
                     texto_ref = radicado_info or referencia
-                    dictamen = _dictamen_ratificada(entidad, factura, texto_ref)
-                    resumen.ratificadas += 1
+                    dictamen = _dictamen_ratificada(eps_canonica, factura, texto_ref)
                     requiere_ia = False
                 elif es_extemporanea:
                     estado = "EXTEMPORANEA"
-                    dictamen = _dictamen_extemporanea(entidad, factura, dias_transcurridos)
-                    resumen.extemporaneas += 1
+                    dictamen = _dictamen_extemporanea(eps_canonica, factura, dias_transcurridos)
                     requiere_ia = False
                 else:
                     estado = "RADICADA"
@@ -781,11 +1214,12 @@ class RecepcionService:
                 existente = q.first()
 
                 campos = dict(
-                    eps=entidad,
+                    eps=eps_canonica,
                     eps_codigo=eps_codigo or None,
                     paciente="N/A",
                     factura=factura,
-                    numero_radicado=numero_radicado_real,
+                    numero_radicado=(numero_radicado_real or None)
+                    and str(numero_radicado_real)[:50],
                     consecutivo_dgh=consecutivo or None,
                     gestor_nombre=gestor,
                     tecnico_recepcion=tecnico_recepcion or None,
@@ -814,6 +1248,11 @@ class RecepcionService:
                     workflow_state=estado,
                     modelo_ia="importacion_recepcion",
                 )
+                # Solo si se resolvió un usuario: así una reimportación sin
+                # match NUNCA borra una asignación manual previa (la clave
+                # ausente no entra al setattr del upsert).
+                if auditor_email_asignado:
+                    campos["auditor_email"] = auditor_email_asignado
 
                 if existente:
                     # Detectar duplicado exacto (misma factura+consecutivo+valor+fecha)
@@ -856,12 +1295,27 @@ class RecepcionService:
                         resumen.glosas_ids_todas.append(nueva.id)
 
                 resumen.total += 1
+                # 20-08-2026. Estos dos se contaban arriba, al clasificar la
+                # fila — ANTES de saber si la fila iba a entrar. Una fila que
+                # después resultaba duplicada hacía `continue` y se saltaba el
+                # `total`, pero su extemporaneidad YA estaba contada.
+                #
+                # Yesid resubió el mismo archivo y la pantalla mostró «0 glosas
+                # detectadas» junto a «29 EXTEMPORÁNEAS»: dos números que no
+                # pueden ser ciertos a la vez. Peor: el aviso le sugería revisar
+                # la hoja y los encabezados del Excel, mandándolo a buscar un
+                # problema que no existía. Lo que pasaba era que las 35 ya
+                # estaban importadas.
+                if estado == "EXTEMPORANEA":
+                    resumen.extemporaneas += 1
+                elif estado == "RATIFICADA":
+                    resumen.ratificadas += 1
                 resumen.semaforo[semaforo] = resumen.semaforo.get(semaforo, 0) + 1
                 resumen.por_gestor.setdefault(gestor, []).append(
                     {
                         "factura": factura,
                         "consecutivo_dgh": consecutivo,
-                        "eps": entidad,
+                        "eps": eps_canonica,
                         "valor": valor,
                         "vence": fecha_vence.strftime("%d/%m/%Y"),
                         "fecha_entrega": fecha_entrega.strftime("%d/%m/%Y")
@@ -871,10 +1325,30 @@ class RecepcionService:
                         "estado": estado,
                         "tipo_glosa": tipo_glosa_excel or "-",
                         "radicado": numero_radicado_real or "-",
+                        # 20-08-2026. El correo al gestor decía QUÉ llegó pero
+                        # no QUÉ HACER. El plan sale de datos que este mismo
+                        # archivo ya trae: causal, tipo de glosa, médico y los
+                        # días entre radicación y notificación.
+                        "plan": _plan_de(
+                            codigo_glosa=None,
+                            tipo_glosa=tipo_glosa_excel,
+                            dias_restantes=dias_restantes,
+                            dias_radicacion=dias_transcurridos,
+                            estado=estado,
+                            valor=valor,
+                            profesional_medico=profesional_medico,
+                        ),
                     }
                 )
 
             except Exception as e:
+                # Ronda 30: sanear la sesión — un flush fallido la deja
+                # envenenada y TODAS las filas siguientes (y el commit final)
+                # fallan, perdiendo el lote entero.
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
                 resumen.errores.append(f"Fila {num_fila}: {e}")
                 logger.warning(f"Error procesando fila {num_fila}: {e}")
                 continue
@@ -924,8 +1398,13 @@ class RecepcionService:
                 consecutivo = str(_get("consecutivo") or "").strip()
                 raw_codigo = str(_get("concepto_codigo") or "").strip().upper()
                 oid = str(_get("concepto_oid") or "").strip()
-                if not factura or not consecutivo or not raw_codigo:
-                    # Sin estos 3 campos mínimos, la fila no es un concepto válido
+                if not factura or not raw_codigo:
+                    # Sin factura+código no es un concepto válido. El
+                    # 'Consecutivo' puede venir vacío: exports DGH/PowerQuery
+                    # del DMBUG ponen el consecutivo solo en la cabecera y
+                    # dejan vacías las 277 filas de detalle por concepto.
+                    # En ese caso el match a la glosa padre cae a "factura
+                    # sola" (fallback 2 más abajo).
                     continue
 
                 nombre_glosa = _fix_mojibake(str(_get("concepto_nombre") or "").strip())
@@ -957,14 +1436,19 @@ class RecepcionService:
                 _ck = (factura, consecutivo)
                 glosa_padre = _padre_cache.get(_ck, _MISS)
                 if glosa_padre is _MISS:
-                    glosa_padre = (
-                        self.db.query(GlosaRecord)
-                        .filter(
-                            GlosaRecord.factura == factura,
-                            GlosaRecord.consecutivo_dgh == consecutivo,
+                    # Match exacto solo si la fila trae consecutivo. Si viene
+                    # vacío (export DGH del DMBUG: cabecera tiene consec, las
+                    # filas de detalle no), salteamos al fallback factura-sola.
+                    glosa_padre = None
+                    if consecutivo:
+                        glosa_padre = (
+                            self.db.query(GlosaRecord)
+                            .filter(
+                                GlosaRecord.factura == factura,
+                                GlosaRecord.consecutivo_dgh == consecutivo,
+                            )
+                            .first()
                         )
-                        .first()
-                    )
                     if not glosa_padre and consecutivo:
                         # Fallback 1: factura + consecutivo NULL (parent
                         # creado sin consecutivo). Se lo seteamos ahora.
@@ -1007,7 +1491,10 @@ class RecepcionService:
                                         f"BD tiene '{prev_consec}', I/R trae '{consecutivo}'. "
                                         f"Vinculando igual y conservando el de BD."
                                     )
-                            elif not prev_consec:
+                            elif not prev_consec and consecutivo:
+                                # Solo sobrescribir si la fila TRAE consecutivo.
+                                # No pisar con cadena vacía cuando el export
+                                # del DGH dejó el campo en blanco.
                                 glosa_padre.consecutivo_dgh = consecutivo
                     # Flush para que la asignación de consecutivo sea
                     # visible a queries siguientes; cachear el resultado
@@ -1087,6 +1574,30 @@ class RecepcionService:
                 resumen.errores.append(f"[Conceptos {nombre_hoja}] Fila {num_fila}: {e}")
                 logger.warning(f"Error procesando concepto fila {num_fila}: {e}")
                 continue
+
+        # Compilar texto_glosa_original de cada glosa que recibió conceptos:
+        # es lo que la IA del auto-responder lee como "texto de la glosa".
+        # Sin esto, la IA recibía el dictamen placeholder ("Pendiente de
+        # análisis...") en vez del CONCEPTO real de la EPS. Solo se pisa si
+        # el campo está vacío o si lo compuso una importación anterior
+        # (empieza con MARCA_TEXTO_CONCEPTOS) — el texto manual se respeta.
+        try:
+            self.db.flush()  # los conceptos recién agregados deben ser visibles
+        except Exception as e:
+            logger.warning(f"flush pre-compilación de conceptos falló: {e}")
+        padres_unicos = {p.id: p for p in _padre_cache.values() if p is not None and p.id}
+        for glosa_padre in padres_unicos.values():
+            try:
+                actual = (glosa_padre.texto_glosa_original or "").strip()
+                if actual and not actual.startswith(MARCA_TEXTO_CONCEPTOS):
+                    continue
+                texto = componer_texto_desde_conceptos(self.db, glosa_padre)
+                if texto:
+                    glosa_padre.texto_glosa_original = texto
+            except Exception as e:
+                logger.warning(
+                    f"No se pudo compilar texto de conceptos para glosa {glosa_padre.id}: {e}"
+                )
 
         try:
             self.db.commit()

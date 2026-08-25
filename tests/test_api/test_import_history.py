@@ -71,7 +71,12 @@ class TestImportHistory:
         r = client.get("/sistema/import-history")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "umbral_cluster", "total_clusters_detectados", "items"):
+        for key in (
+            "ventana_dias",
+            "umbral_cluster",
+            "total_clusters_detectados",
+            "items",
+        ):
             assert key in d
         assert d["umbral_cluster"] == 10
 
@@ -88,29 +93,35 @@ class TestImportHistory:
         from datetime import timedelta
 
         ts = ahora_utc() - timedelta(days=3)
+
         for _ in range(12):
             _seed(db_session, ts)
+
         r = client.get("/sistema/import-history")
         d = r.json()
+
         assert d["total_clusters_detectados"] == 1
         assert d["items"][0]["glosas_creadas"] == 12
 
     def test_orden_clusters_desc(self, client, db_session):
         from datetime import timedelta
 
-        # Fechas RELATIVAS a "ahora" y dentro de la ventana de 60 días. Con fechas
-        # fijas el test caducaba: una vez pasados 60 días de esas fechas quedaban
-        # fuera de la ventana, la lista venía vacía y el test fallaba con
-        # IndexError en items[0].
+        # Fechas relativas a "ahora" y dentro de la ventana de 60 días.
+        # El cluster de 20 debe aparecer antes que el de 11.
         ts1 = ahora_utc() - timedelta(days=20)
         ts2 = ahora_utc() - timedelta(days=10)
-        # 20 glosas en ts1 (cluster más grande)
+
+        # 20 glosas en el primer cluster
         for _ in range(20):
             _seed(db_session, ts1)
-        # 11 glosas en ts2
+
+        # 11 glosas en el segundo cluster
         for _ in range(11):
             _seed(db_session, ts2)
+
         r = client.get("/sistema/import-history?dias=60")
         d = r.json()
+
+        # Orden por cantidad descendente
         assert d["items"][0]["glosas_creadas"] == 20
         assert d["items"][1]["glosas_creadas"] == 11

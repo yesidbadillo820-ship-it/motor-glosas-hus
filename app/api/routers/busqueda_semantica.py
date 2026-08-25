@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_auditor_o_superior
 from app.core.config import get_settings
 from app.core.logging_utils import logger
 from app.services.glosa_service import GlosaService
@@ -26,7 +26,7 @@ class BusquedaInput(BaseModel):
 async def buscar(
     data: BusquedaInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Búsqueda semántica en historial. Combina:
     1. Preselección SQL amplia (texto + código + EPS + servicio) para reducir set
@@ -79,10 +79,11 @@ async def buscar(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     # Si no hay IA disponible, devolver la preselección por relevancia básica
@@ -164,7 +165,7 @@ async def buscar(
 async def buscar_corpus(
     data: BusquedaInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Busqueda semantica EXTENDIDA al corpus completo del sistema:
     glosas + contratos + tarifas + plantillas Gold + soportes

@@ -69,10 +69,10 @@ def _seed(db, dias_atras_objecion, valor=1000):
 
 class TestFechaObjecionMensual:
     def test_serie(self, client, db_session):
-        # Ambas objeciones hoy: garantiza que caen en el mismo mes calendario
-        # sin importar el día del mes en que corran los tests. Offsets relativos
-        # (p. ej. 5 y 10 días atrás) cruzan el borde de mes a comienzos de mes
-        # y volvían el test frágil por fecha.
+        # Anclamos a hoy (dias_atras=0) en ambos seeds para que SIEMPRE caigan
+        # en el mes actual. Antes se usaba 5 y 10 días → en los primeros 10
+        # días del mes (p.ej. hoy 9 jun) -5 sigue en junio pero -10 cae en
+        # mayo y el test fallaba intermitentemente según fecha del calendario.
         _seed(db_session, dias_atras_objecion=0, valor=1000)
         _seed(db_session, dias_atras_objecion=0, valor=2000)
 

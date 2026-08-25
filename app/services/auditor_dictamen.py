@@ -68,7 +68,10 @@ def auditar_dictamen(glosa, db) -> dict:
     cod_resp = (getattr(glosa, "codigo_respuesta", "") or "").strip().upper()
     cod_glosa = (getattr(glosa, "codigo_glosa", "") or "").strip().upper()
     eps = (getattr(glosa, "eps", "") or "").strip()
-    valor_obj = float(getattr(glosa, "valor_objetado", 0) or 0)
+    try:
+        valor_obj = float(getattr(glosa, "valor_objetado", 0) or 0)
+    except (ValueError, TypeError):
+        valor_obj = 0.0
 
     # 1. Dictamen vacío o muy corto
     if not dictamen:

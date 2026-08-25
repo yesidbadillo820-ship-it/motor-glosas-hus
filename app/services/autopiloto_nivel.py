@@ -24,10 +24,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass
-
-
-# Umbrales de confianza
-UMBRAL_AUTO = 98
 UMBRAL_REVISAR = 85
 
 

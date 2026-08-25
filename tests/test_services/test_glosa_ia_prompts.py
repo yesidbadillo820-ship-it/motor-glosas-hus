@@ -121,13 +121,17 @@ class TestUserPrompt:
         )
         assert "J18.9" in prompt
 
-    def test_build_user_prompt_trunca_pdf(self):
-        """Should truncate long PDF context."""
-        long_pdf = "X" * 10000
+    def test_build_user_prompt_trunca_pdf(self, monkeypatch):
+        """Should truncate long PDF context at the configurable cap
+        (Fase 2 Soportes jul-2026: default 12K — era 2000 — vía
+        GLOSA_SOPORTES_MAX_CHARS_SIMPLE)."""
+        monkeypatch.setenv("GLOSA_SOPORTES_MAX_CHARS_SIMPLE", "4000")
+        long_pdf = "X" * 3999 + " MARCA_TRAS_EL_CAP " + "Y" * 6000
         prompt = build_user_prompt(
             texto_glosa="GLOSA", contexto_pdf=long_pdf, codigo="TA0001", eps="EPS TEST"
         )
-        assert len(prompt) < 15000
+        assert "XXXX" in prompt  # el inicio del PDF sí entra
+        assert "MARCA_TRAS_EL_CAP" not in prompt  # cortado en el cap
 
     def test_bloque_excedente_facturado_mayor_que_pactado(self):
         """Caso TA0201: HUS facturó $247.663, pactado $231.556, objetado
@@ -244,3 +248,59 @@ class TestUserPrompt:
         )
         assert "INSTRUCCIÓN" in prompt.upper() or "INSTRUCCIONES" in prompt.upper()
         assert "NORMAS" in prompt.upper()
+
+
+class TestClausulaContratoTruncacion:
+    """Regresión: la cláusula no debe cortarse a mitad de palabra.
+
+    Antes el builder cortaba el texto literal a 500 chars y agregaba '…',
+    dejando p.ej. '...VIGENCIA FISCAL 202…' que la IA copiaba dentro de las
+    comillas del dictamen. Ahora una cláusula típica entra completa y, si
+    excede el límite, se corta en frontera de palabra.
+    """
+
+    def _clausula(self, texto):
+        return [
+            {
+                "numero_clausula": "PRIMERA",
+                "titulo": "OBJETO",
+                "texto_literal": texto,
+                "pagina": 1,
+            }
+        ]
+
+    def test_clausula_normal_no_se_trunca(self):
+        """Una cláusula realista (<2000 chars) entra completa, sin '…'."""
+        texto = (
+            "LA PRESTACIÓN DE LOS SERVICIOS DE SALUD DE MEDIANA Y ALTA "
+            "COMPLEJIDAD, GARANTIZANDO LA COBERTURA INTEGRAL DE LAS ATENCIONES "
+            "INCLUIDAS EN EL PLAN DE COMPLEJIDAD, A PARTIR DEL MES DE DICIEMBRE "
+            "DE LA VIGENCIA FISCAL 2025"
+        )
+        prompt = build_user_prompt(
+            texto_glosa="GLOSA CO",
+            contexto_pdf="",
+            codigo="CO0001",
+            eps="DISPENSARIO MEDICO",
+            clausulas_contrato=self._clausula(texto),
+        )
+        assert "VIGENCIA FISCAL 2025" in prompt
+        assert "202…" not in prompt
+        assert "2025…" not in prompt
+
+    def test_clausula_muy_larga_corta_en_frontera_de_palabra(self):
+        """Si excede el límite, no parte una palabra a la mitad."""
+        # 300 palabras "palabra" (~2400 chars) + un marcador final.
+        texto = (" ".join(["palabra"] * 300)) + " FINDELACLAUSULA2025"
+        prompt = build_user_prompt(
+            texto_glosa="GLOSA",
+            contexto_pdf="",
+            codigo="CO0001",
+            eps="EPS TEST",
+            clausulas_contrato=self._clausula(texto),
+        )
+        # Se truncó con marcador de omisión claro, no con '…' pegado.
+        assert "[…]" in prompt
+        # El corte cae en frontera de palabra: no debe aparecer una "palabra"
+        # partida (p.ej. "palab […]") justo antes del marcador.
+        assert "palabra […]" in prompt or "palabra[…]" not in prompt

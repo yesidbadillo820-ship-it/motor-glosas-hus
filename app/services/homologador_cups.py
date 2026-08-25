@@ -79,8 +79,9 @@ HOMOLOGACIONES_EXPLICITAS: dict[str, tuple[str, str]] = {
     ),
     # CONSULTA DE PRIMERA VEZ por especialista en genética
     "39143A-18": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GENÉTICA MÉDICA"),
-    "39143A-16": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ANESTESIOLOGÍA"),
-    "39143A-19": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN DERMATOLOGÍA"),
+    # Ronda 30: 39143A-16/-19 (anestesiología/dermatología) se quitaron —
+    # mapeaban al CUPS de GENÉTICA (890248), tarifa y descripción erradas.
+    # Sin la entrada, la resolución cae a la tarifa contratada real del Excel.
     # ─── Consulta otras especialidades ──────────────────────────────────────
     # Códigos IPS con sufijo H1/H2 (variantes de especialidad HUS)
     # Estos están ya en tarifas_oficiales.py; se listan también acá para
@@ -570,17 +571,6 @@ def agregar_homologacion(codigo_viejo: str, cups_oficial: str, descripcion: str 
 
 
 # ─── Texto oficial para citar en dictámenes ────────────────────────────────
-
-TEXTO_RES_2641_2025 = (
-    "RESOLUCIÓN 2641 DE 2025 (Ministerio de Salud y Protección Social): "
-    "Por la cual se adopta la Clasificación Única de Procedimientos en "
-    "Salud (CUPS) versión 2025 y se establece la TABLA DE HOMOLOGACIÓN "
-    "entre códigos internos de prestadores, códigos CUPS anteriores y la "
-    "numeración oficial vigente. El uso de códigos homologados es de "
-    "OBLIGATORIO CUMPLIMIENTO para reportar al Registro Individual de "
-    "Prestación de Servicios de Salud (RIPS) y para la facturación "
-    "electrónica (FEV, Res. 2275/2023)."
-)
 
 
 def cita_res_2641(codigo_viejo: str, cups_oficial: str) -> str:

@@ -1,0 +1,463 @@
+@echo off
+REM ====================================================================
+REM  CARGAR_SIIFA.cmd  -  Bot de doble clic para el Motor Glosas HUS.
+REM  Todo el cargue de respuestas a SIIFA (Ministerio de Salud) en un
+REM  solo menu: bajar el informe, armar los archivos de respuestas,
+REM  piloto de 1 glosa y cargue masivo con reporte.
+REM
+REM  Se instala solo Python y sus componentes si faltan. USO: doble clic.
+REM ====================================================================
+chcp 65001 >nul 2>&1
+setlocal EnableExtensions DisableDelayedExpansion
+title CARGAR RESPUESTAS EN SIIFA - Motor Glosas HUS
+cd /d "%~dp0.."
+
+echo.
+echo ============================================================
+echo   CARGAR RESPUESTAS EN SIIFA - E.S.E. HUS
+echo ============================================================
+echo.
+
+REM --- 1) Buscar Python (validando por ejecucion) ---------------------
+set "PYEXE="
+py -3 -c "import sys" >nul 2>&1 && set "PYEXE=py -3"
+if not defined PYEXE ( python -c "import sys" >nul 2>&1 && set "PYEXE=python" )
+if not defined PYEXE ( python3 -c "import sys" >nul 2>&1 && set "PYEXE=python3" )
+if not defined PYEXE goto instalarpython
+
+:deps
+REM --- 2) Asegurar los componentes (Excel y conexion) -----------------
+%PYEXE% -c "import openpyxl, httpx" >nul 2>&1 && goto deps_pdf
+echo [i] Instalando los componentes por unica vez, espera...
+%PYEXE% -m pip install --quiet --user openpyxl httpx >nul 2>&1
+%PYEXE% -c "import openpyxl, httpx" >nul 2>&1 && goto deps_pdf
+echo [ATENCION] No quedaron instalados (revisa el internet del equipo).
+echo.
+
+:deps_pdf
+REM Para las constancias en PDF de la verificacion. Si no queda, el resto
+REM funciona igual: solo no salen los PDF.
+%PYEXE% -c "import reportlab" >nul 2>&1 && goto credenciales
+%PYEXE% -m pip install --quiet --user reportlab >nul 2>&1
+
+:elegirips
+REM --- 3) CON CUAL IPS se trabaja. Va primero que todo: de aca salen las
+REM credenciales, la carpeta y el nombre de la ventana. Con cuatro ventanas
+REM abiertas, saber en cual esta parado es lo que evita el error caro.
+echo.
+echo   Con cual IPS vas a trabajar?
+echo.
+echo     [1] HUS      - E.S.E. Hospital Universitario de Santander
+echo     [2] SOCORRO  - Clinica Socorro
+echo     [3] GIRON    - Clinica Giron
+echo     [4] GUANE    - Clinica Guane
+echo.
+set "IPS="
+set /p "IPS=  Numero (o el nombre corto): "
+set "IPS=%IPS:"=%"
+if "%IPS%"=="1" set "IPS=HUS"
+if "%IPS%"=="2" set "IPS=SOCORRO"
+if "%IPS%"=="3" set "IPS=GIRON"
+if "%IPS%"=="4" set "IPS=GUANE"
+if /i "%IPS%"=="HUS" goto ipsok
+if /i "%IPS%"=="SOCORRO" goto ipsok
+if /i "%IPS%"=="GIRON" goto ipsok
+if /i "%IPS%"=="GUANE" goto ipsok
+echo.
+echo   [!] Elegi 1, 2, 3 o 4 (o escribi HUS, SOCORRO, GIRON o GUANE).
+goto elegirips
+
+:ipsok
+REM El nombre de la IPS en el titulo de la ventana: es lo unico que distingue
+REM una ventana de otra cuando hay cuatro abiertas.
+title SIIFA - %IPS% - Motor Glosas
+echo.
+echo   [OK] Trabajando con: %IPS%
+echo.
+
+:credenciales
+REM --- 4) Usuario y clave DE ESA IPS (nunca se escriben en el codigo) ---
+REM Cada IPS tiene su propio usuario en el portal, asi que sus credenciales
+REM viven en variables distintas: SIIFA_USER_HUS, SIIFA_USER_SOCORRO, etc.
+call set "UVAR=SIIFA_USER_%IPS%"
+call set "PVAR=SIIFA_PASSWORD_%IPS%"
+call set "UVAL=%%%UVAR%%%"
+call set "PVAL=%%%PVAR%%%"
+if defined UVAL if defined PVAL goto carpeta
+echo   Faltan el usuario y la clave de %IPS% (los del portal del Ministerio).
+echo   Quedan guardados en este equipo, no se escriben en ningun archivo.
+echo.
+set "UVAL="
+set /p "UVAL=  Usuario SIIFA de %IPS%: "
+REM La clave se pide oculta (no queda escrita en la pantalla).
+for /f "delims=" %%P in ('powershell -NoProfile -Command "$s=Read-Host -AsSecureString '  Clave SIIFA'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"') do set "PVAL=%%P"
+if not defined PVAL set /p "PVAL=  Clave SIIFA:   "
+if not defined UVAL goto sincredenciales
+if not defined PVAL goto sincredenciales
+setx %UVAR% "%UVAL%" >nul
+setx %PVAR% "%PVAL%" >nul
+set "%UVAR%=%UVAL%"
+set "%PVAR%=%PVAL%"
+echo.
+echo   [OK] Guardadas las de %IPS%. La proxima vez ya no las pide.
+echo.
+
+:carpeta
+REM --- 4) Carpeta de trabajo (se valida ANTES de bajar nada) ----------
+echo.
+set "DEFCARP=D:\USUARIO CARTERA\Documents\SIIFA\%IPS%"
+echo   Carpeta de trabajo de %IPS% (Enter para la de por defecto):
+echo   [%DEFCARP%]
+echo   Es una CARPETA, no un comando: algo como D:\...\SIIFA
+set "CARPETA="
+set /p "CARPETA=  Ruta: "
+REM Primero la de por defecto y DESPUES quitar comillas: al reves, un Enter
+REM (variable vacia) dejaba de carpeta la basura «"=» y todo fallaba luego.
+if not defined CARPETA set "CARPETA=%DEFCARP%"
+set "CARPETA=%CARPETA:"=%"
+if not defined CARPETA goto carpetamala
+:quitarbs
+if "%CARPETA:~-1%"=="\" ( set "CARPETA=%CARPETA:~0,-1%" & goto quitarbs )
+if not exist "%CARPETA%" mkdir "%CARPETA%" >nul 2>&1
+if not exist "%CARPETA%" goto carpetamala
+REM Que se pueda ESCRIBIR: de nada sirve bajar el informe y no poder guardarlo.
+echo prueba> "%CARPETA%\_prueba_hus.tmp" 2>nul
+if not exist "%CARPETA%\_prueba_hus.tmp" goto carpetasinpermiso
+del "%CARPETA%\_prueba_hus.tmp" >nul 2>&1
+echo   [OK] Carpeta lista: %CARPETA%
+
+set "INFORME=%CARPETA%\informe_seguimientos.xlsx"
+set "GLOSAS=%CARPETA%\respuestas_GLOSAS.xlsx"
+set "DEVOL=%CARPETA%\respuestas_DEVOLUCIONES.xlsx"
+
+:menu
+REM Marcar lo que ya esta hecho: asi se ve de un vistazo por donde va.
+set "HAYINF=falta"
+set "HAYRES=faltan"
+set "HAYPIL=falta"
+if exist "%INFORME%" set "HAYINF=listo"
+if exist "%GLOSAS%" set "HAYRES=listos"
+if exist "%CARPETA%\piloto_siifa.csv" set "HAYPIL=hecho"
+echo.
+echo ============================================================
+echo   IPS: %IPS%
+echo   Carpeta: %CARPETA%
+echo ============================================================
+echo   [1] Bajar de SIIFA el informe de seguimientos      (%HAYINF%)
+echo   [2] Armar los archivos de respuestas               (%HAYRES%)
+echo   [3] PILOTO - subir 1 sola glosa                    (%HAYPIL%)
+echo   [4] Cargar TODAS las glosas
+echo   [5] Cargar TODAS las devoluciones
+echo   [6] Reintentar lo que quedo con error
+echo   [7] Ver los codigos de respuesta que acepta SIIFA
+echo   [8] Cambiar de IPS o de carpeta
+echo   [9] VERIFICAR en SIIFA lo que quedo subido (+ constancias PDF)
+echo   [N] Ver que llego NUEVO a SIIFA (entidad, factura, glosa/devolucion)
+echo   [E] ESTADO del tramite: que gano, que falta subsanar, que se vence
+echo   [S] SUBSANAR lo que la EPS reitero (etapa 4 - solo 7 dias habiles)
+echo   [B] BALANCE de un corte: que se respondio, que falta, que hay nuevo
+echo   [0] Salir
+echo.
+set "OPCION="
+set /p "OPCION=  Opcion: "
+if "%OPCION%"=="1" goto informe
+if "%OPCION%"=="2" goto armar
+if "%OPCION%"=="3" goto piloto
+if "%OPCION%"=="4" goto cargarglosas
+if "%OPCION%"=="5" goto cargardevol
+if "%OPCION%"=="6" goto reintentar
+if "%OPCION%"=="7" goto catalogo
+if "%OPCION%"=="8" goto elegirips
+if "%OPCION%"=="9" goto verificar
+if /i "%OPCION%"=="N" goto novedades
+if /i "%OPCION%"=="E" goto estado
+if /i "%OPCION%"=="S" goto subsanar
+if /i "%OPCION%"=="B" goto balance
+if "%OPCION%"=="0" goto fin
+echo   [!] Escribe un numero del menu.
+goto menu
+
+:informe
+echo.
+echo --- Bajando de SIIFA todos los seguimientos (tarda varios minutos) ---
+%PYEXE% tools\siifa_reporte_seguimientos.py --ips %IPS% --salida "%INFORME%"
+goto hecho
+
+:novedades
+REM Guarda el informe que ya se tenia, baja el de hoy y compara los dos.
+REM Asi el auditor ve de una que llego nuevo sin buscar pagina por pagina.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Guardando el informe anterior y bajando el de hoy ---
+move /y "%INFORME%" "%CARPETA%\informe_ANTERIOR.xlsx" >nul
+%PYEXE% tools\siifa_reporte_seguimientos.py --ips %IPS% --salida "%INFORME%"
+if not exist "%INFORME%" goto novedadesfallo
+echo.
+echo --- Comparando: que llego nuevo ---
+%PYEXE% tools\siifa_novedades.py --nuevo "%INFORME%" --anterior "%CARPETA%\informe_ANTERIOR.xlsx"
+goto hecho
+
+:estado
+REM Semaforo de las cinco etapas del tramite. Lo que le toca al hospital
+REM sale de primero: una glosa reiterada solo da 7 dias habiles.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Estado del tramite de cada glosa ---
+%PYEXE% tools\siifa_estado_tramite.py --informe "%INFORME%" --salida "%CARPETA%\ESTADO_TRAMITE.xlsx"
+goto hecho
+
+:subsanar
+REM Etapa 4: la EPS reitero y al hospital le quedan 7 dias habiles.
+REM Se arma el archivo y se hace el piloto de 1 antes del cargue.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo --- Armando la subsanacion de lo reiterado ---
+%PYEXE% tools\siifa_armar_subsanacion.py --informe "%INFORME%" --salida "%CARPETA%\SUBSANACION.xlsx"
+if not exist "%CARPETA%\SUBSANACION.xlsx" goto hecho
+echo.
+echo   REVISA el archivo antes de subirlo. Para cargar el piloto de 1:
+echo     %PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%CARPETA%\SUBSANACION.xlsx" --accion reiteracion-respuesta --piloto 1 --reporte "%CARPETA%\piloto_subsanacion.csv"
+goto hecho
+
+:balance
+REM Las cuatro cuentas de despues de un cargue: que estaba glosado al corte,
+REM que de eso quedo respondido, que sigue sin responder y que llego nuevo.
+echo.
+if not exist "%INFORME%" goto sininforme
+echo   Archivo del CORTE: el informe con el que se armaron las respuestas
+echo   (el de antes del cargue). El de HOY es %INFORME%.
+set "CORTE="
+set /p "CORTE=  Ruta del corte: "
+REM Igual que con la carpeta: comprobar que escribio algo ANTES de tocarlo.
+if not defined CORTE goto sincorte
+set "CORTE=%CORTE:"=%"
+if not defined CORTE goto sincorte
+if not exist "%CORTE%" goto sincorte
+echo.
+echo --- Balance: el corte contra lo que SIIFA tiene hoy ---
+%PYEXE% tools\siifa_balance.py --ips %IPS% --corte "%CORTE%" --hoy "%INFORME%" --salida "%CARPETA%\BALANCE_SIIFA_%IPS%.xlsx"
+goto hecho
+
+:novedadesfallo
+REM Si la bajada fallo, se devuelve el informe anterior: no se pierde nada.
+move /y "%CARPETA%\informe_ANTERIOR.xlsx" "%INFORME%" >nul
+echo.
+echo   [ERROR] No se pudo bajar el informe de hoy. El anterior quedo intacto.
+goto hecho
+
+:armar
+echo.
+echo   Export de tramites de DGH (el Excel grande, hoja BD TRAMITE).
+echo   Es el que trae lo que el hospital YA respondio.
+set "DGH="
+set /p "DGH=  Ruta: "
+REM Igual que con la carpeta: comprobar que escribio algo ANTES de tocarlo.
+if not defined DGH goto sindgh
+set "DGH=%DGH:"=%"
+if not defined DGH goto sindgh
+if not exist "%DGH%" goto sindgh
+if not exist "%INFORME%" goto sininforme
+echo.
+echo --- Armando los archivos de respuestas ---
+%PYEXE% tools\siifa_redactar_respuestas.py --informe "%INFORME%" --tramites "%DGH%" --salida-glosas "%GLOSAS%" --salida-devoluciones "%DEVOL%" --solo-lo-ya-respondido
+echo.
+echo   Los archivos _REDACTADAS son los que escribio el motor: NO se suben
+echo   todavia, quedan para revisar y subir por tandas.
+goto hecho
+
+:piloto
+if not exist "%GLOSAS%" goto singlosas
+echo.
+echo --- PILOTO: se sube UNA sola glosa, la primera del archivo ---
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%GLOSAS%" --piloto 1 --reporte "%CARPETA%\piloto_siifa.csv"
+echo.
+echo   AHORA, ANTES DE SEGUIR: entra al portal, filtra esa factura,
+echo   abre los tres puntos - Ver Historico y confirma que la respuesta
+echo   quedo con SU codigo y SU fecha. Toma el pantallazo de evidencia.
+goto hecho
+
+:cargarglosas
+if not exist "%GLOSAS%" goto singlosas
+if not exist "%CARPETA%\piloto_siifa.csv" goto sinpiloto
+echo.
+echo --- Cargando TODAS las glosas ---
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --saltar-csv "%CARPETA%\piloto_siifa.csv"
+goto hecho
+
+:cargardevol
+if not exist "%DEVOL%" goto sindevol
+echo.
+echo --- Cargando TODAS las devoluciones ---
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv"
+goto hecho
+
+:reintentar
+echo.
+echo   [G] las glosas    [D] las devoluciones
+set "CUAL="
+set /p "CUAL=  Cual reintentar: "
+if /i "%CUAL%"=="G" goto reintentarg
+if /i "%CUAL%"=="D" goto reintentard
+echo   [!] Escribe G o D.
+goto menu
+
+:reintentarg
+if not exist "%CARPETA%\reporte_GLOSAS.csv" goto sinreporte
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS_2.csv" --saltar-csv "%CARPETA%\reporte_GLOSAS.csv"
+goto hecho
+
+:reintentard
+if not exist "%CARPETA%\reporte_DEVOLUCIONES.csv" goto sinreporte
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES_2.csv" --saltar-csv "%CARPETA%\reporte_DEVOLUCIONES.csv"
+goto hecho
+
+:verificar
+echo.
+echo   Le pregunta a SIIFA que quedo registrado de verdad y saca la hoja de
+echo   verificacion mas una constancia PDF por factura (carpeta EVIDENCIAS).
+echo.
+echo   [G] las glosas    [D] las devoluciones
+set "QUE="
+set /p "QUE=  Cual verificar: "
+if /i "%QUE%"=="G" goto verificarg
+if /i "%QUE%"=="D" goto verificard
+echo   [!] Escribe G o D.
+goto menu
+
+:verificarg
+if not exist "%GLOSAS%" goto singlosas
+if not exist "%CARPETA%\reporte_GLOSAS.csv" goto verificarg_todo
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%GLOSAS%" --reporte "%CARPETA%\reporte_GLOSAS.csv" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+:verificarg_todo
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%GLOSAS%" --salida "%CARPETA%\verificacion_GLOSAS.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+
+:verificard
+if not exist "%DEVOL%" goto sindevol
+if not exist "%CARPETA%\reporte_DEVOLUCIONES.csv" goto verificard_todo
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%DEVOL%" --reporte "%CARPETA%\reporte_DEVOLUCIONES.csv" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+:verificard_todo
+%PYEXE% tools\siifa_verificar_cargue.py --ips %IPS% --excel "%DEVOL%" --salida "%CARPETA%\verificacion_DEVOLUCIONES.xlsx" --constancias "%CARPETA%\EVIDENCIAS"
+goto hecho
+
+:catalogo
+echo.
+%PYEXE% tools\responder_glosas_siifa.py --ips %IPS% --listar-catalogo
+goto hecho
+
+:hecho
+echo.
+echo ------------------------------------------------------------
+echo   Listo. Revisa los mensajes de arriba.
+echo ------------------------------------------------------------
+pause
+goto menu
+
+:sininforme
+echo   [ERROR] Falta el informe de SIIFA. Corre primero la opcion [1].
+pause
+goto menu
+
+:singlosas
+echo   [ERROR] Falta %GLOSAS%. Corre primero la opcion [2].
+pause
+goto menu
+
+:sindevol
+echo   [ERROR] Falta %DEVOL%. Corre primero la opcion [2].
+pause
+goto menu
+
+:sinpiloto
+echo   [ERROR] Todavia no se ha hecho el piloto. Corre primero la [3]:
+echo           es la regla del hospital, una sola glosa y se verifica.
+pause
+goto menu
+
+:sinreporte
+echo   [ERROR] No hay reporte de una corrida anterior que reintentar.
+pause
+goto menu
+
+:sindgh
+echo   [ERROR] No se encontro el export de DGH en esa ruta.
+pause
+goto menu
+
+:sincorte
+echo   [ERROR] No se encontro el archivo del corte en esa ruta.
+pause
+goto menu
+
+:carpetamala
+echo.
+echo   [ERROR] Esa ruta no sirve como carpeta:
+echo           %CARPETA%
+echo           Escribe SOLO la ruta de una carpeta (ej. D:\USUARIO CARTERA\Documents\SIIFA),
+echo           sin comandos ni nombres de archivo. Enter usa la de por defecto.
+echo.
+goto carpeta
+
+:carpetasinpermiso
+echo.
+echo   [ERROR] La carpeta existe pero no deja guardar archivos:
+echo           %CARPETA%
+echo           Elige otra (o revisa si la unidad de red esta conectada).
+echo.
+goto carpeta
+
+:sincredenciales
+echo   [ERROR] Sin usuario y clave no se puede entrar a SIIFA.
+pause
+exit /b 1
+
+:fin
+echo.
+echo   Hasta luego.
+echo.
+exit /b 0
+
+REM ==== Instalacion automatica de Python ==============================
+:instalarpython
+echo [i] No se encontro Python. Instalandolo automaticamente (sin admin),
+echo     puede tardar unos minutos, NO cierres la ventana...
+echo.
+where winget >nul 2>&1 || goto py_descarga
+winget install -e --id Python.Python.3.12 --silent --disable-interactivity --accept-package-agreements --accept-source-agreements >nul 2>&1
+call :redetectar
+if defined PYEXE goto pyok
+:py_descarga
+set "PYINST=%TEMP%\python_instalador_hus.exe"
+set "PYURL=https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe"
+del "%PYINST%" >nul 2>&1
+echo [i] Descargando Python desde python.org - 25 MB aprox., espera...
+curl.exe -L -s -o "%PYINST%" "%PYURL%" 2>nul
+if not exist "%PYINST%" powershell -NoProfile -Command "Invoke-WebRequest -Uri $env:PYURL -OutFile $env:PYINST" >nul 2>&1
+if not exist "%PYINST%" goto sinpython
+"%PYINST%" /quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_test=0
+del "%PYINST%" >nul 2>&1
+call :redetectar
+if defined PYEXE goto pyok
+goto sinpython
+:pyok
+echo [OK] Python quedo instalado. Continuando...
+echo.
+goto deps
+:redetectar
+set "PYEXE="
+py -3 -c "import sys" >nul 2>&1 && set "PYEXE=py -3"
+if defined PYEXE goto :eof
+python -c "import sys" >nul 2>&1 && set "PYEXE=python"
+if defined PYEXE goto :eof
+for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do if exist "%%D\python.exe" set PYEXE="%%D\python.exe"
+if defined PYEXE %PYEXE% -c "import sys" >nul 2>&1 || set "PYEXE="
+goto :eof
+
+:sinpython
+echo [ERROR] No se pudo instalar Python. Instalalo de https://www.python.org/downloads/
+echo         (marca "Add python.exe to PATH") y vuelve a intentar.
+echo.
+pause
+exit /b 1

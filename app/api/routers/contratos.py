@@ -1,6 +1,8 @@
 import os
+import json
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -10,7 +12,7 @@ from app.database import get_db
 from app.models.schemas import ContratoInput
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.audit_repository import AuditRepository
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.models.db import UsuarioRecord, ContratoRecord, ClausulaContrato
 from app.core.rate_limit import limiter
 
@@ -40,9 +42,18 @@ def listar_contratos(
 def crear_o_actualizar_contrato(
     data: ContratoInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    """Crea un nuevo contrato o actualiza uno existente si la EPS ya existe."""
+    """Crea un nuevo contrato o actualiza uno existente si la EPS ya existe.
+
+    Acceso: AUDITOR o superior. Subir el contrato firmado es trabajo diario del
+    gestor —la propia pantalla se lo pide—, así que el auditor conserva el
+    permiso; lo que cambia es que el VIEWER deja de tenerlo. Antes bastaba con
+    estar autenticado.
+
+    **Borrar** el contrato o sus cláusulas sí exige COORDINADOR: eso deja sin
+    base todos los dictámenes de esa EPS.
+    """
     repo = ContratoRepository(db)
     return repo.upsert(data)
 
@@ -450,7 +461,7 @@ def historial_contrato(
 def eliminar_contrato(
     eps: str,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Elimina el contrato de una EPS específica."""
     repo = ContratoRepository(db)
@@ -473,7 +484,7 @@ async def subir_pdf_contrato(
     eps: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Sube el PDF del contrato vigente para la EPS y extrae cláusulas.
 
@@ -642,7 +653,7 @@ def listar_clausulas_contrato(
 def borrar_clausulas_contrato(
     eps: str,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Borra todas las cláusulas extraídas (no borra el PDF guardado).
 
@@ -682,7 +693,7 @@ def cargar_clausulas_manual(
     eps: str,
     batch: ClausulasManualBatch,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Inserta cláusulas escritas a mano (no requiere subir PDF ni gastar
     tokens IA). El gestor copia el texto literal del contrato firmado.
@@ -738,3 +749,363 @@ def cargar_clausulas_manual(
         "total_actual": total,
         "modo": "reemplazar" if batch.reemplazar else "agregar",
     }
+
+
+# ─── Metadatos enriquecidos del contrato (editor admin) ───────────────
+# El PR #106 creó las 12 columnas y el inyector
+# contexto_contractual_enriquecido.py ya las consume para armar el bloque
+# [CONTRATO VIGENTE — DATOS AUDITABLES] del prompt. Pero sin editor todo
+# quedaba NULL y el dictamen salía genérico (auditoría 10-jun-2026 vs la
+# "otra IA" que cita contrato, NITs, SECOP, plazo y anexos). Estos
+# endpoints cierran ese hueco.
+#
+# NOTA: este archivo NO usa `from __future__ import annotations` a
+# propósito — slowapi + PEP 563 rompe los body models Pydantic en los
+# endpoints decorados (regresión vista en producción jun-2026).
+
+# NIT colombiano laxo: tras quitar espacios solo se aceptan dígitos,
+# puntos de miles y guión del dígito de verificación. Se preserva el
+# formato con puntos porque el dictamen cita "NIT 900.006.037-4" tal cual.
+_NIT_CHARS_VALIDOS = re.compile(r"^[\d.\-]+$")
+
+# Longitudes de columna (ver ContratoRecord) — se trunca defensivamente
+# en vez de reventar con 500 en Postgres: el editor manda textos que un
+# humano pegó desde el PDF y pueden venir más largos que la columna.
+_MAX_CAMPOS_META = {
+    "numero_contrato": 120,
+    "razon_social_eps": 300,
+    "razon_social_ips": 300,
+    "numero_proceso_secop": 120,
+}
+
+# Anexos estándar de los contratos de prestación de servicios de salud
+# del HUS (numeración tipo DIGSA/Famisanar). Sugerencias editables para
+# el botón "Cargar anexos comunes" del panel — no se imponen.
+ANEXOS_SUGERIDOS_ESTANDAR = [
+    {"nombre": "Anexo 1", "descripcion": "Tarifas y servicios pactados"},
+    {"nombre": "Anexo 2", "descripcion": "Red de servicios habilitados y sedes"},
+    {"nombre": "Anexo 3", "descripcion": "Servicios CUPS con tarifa SOAT ± %"},
+    {"nombre": "Anexo 3.1", "descripcion": "Medicamentos a valor fijo (CUM)"},
+    {"nombre": "Anexo 3.2", "descripcion": "Suministros e insumos (con IVA)"},
+    {"nombre": "Anexo 05", "descripcion": "Dispositivos médicos"},
+    {
+        "nombre": "Anexo técnico 5 Res. 3047/2008",
+        "descripcion": "Soportes de facturación exigibles al prestador",
+    },
+]
+
+
+class AnexoContratoInput(BaseModel):
+    nombre: str = ""
+    descripcion: str = ""
+
+
+class MetadatosContratoInput(BaseModel):
+    """Body del PUT — todos opcionales; el formulario manda el set completo.
+
+    Semántica PUT real: reemplaza los 12 campos enriquecidos. Campo vacío
+    o ausente → NULL en BD (el inyector degrada elegantemente).
+    """
+
+    numero_contrato: Optional[str] = None
+    nit_eps: Optional[str] = None
+    nit_ips: Optional[str] = None
+    razon_social_eps: Optional[str] = None
+    razon_social_ips: Optional[str] = None
+    numero_proceso_secop: Optional[str] = None
+    secop_url: Optional[str] = None
+    fecha_suscripcion: Optional[str] = None
+    fecha_inicio: Optional[str] = None
+    fecha_fin: Optional[str] = None
+    objeto_contractual: Optional[str] = None
+    anexos_descripcion: Optional[List[AnexoContratoInput]] = None
+    modalidades_tarifarias: Optional[List[str]] = None
+
+
+def _texto_o_none(valor: Optional[str], maximo: int) -> Optional[str]:
+    """Strip + truncado a longitud de columna; vacío → None."""
+    if valor is None:
+        return None
+    limpio = valor.strip()
+    return limpio[:maximo] if limpio else None
+
+
+def _normalizar_nit(valor: Optional[str], campo: str) -> Optional[str]:
+    """Normaliza quitando espacios; rechaza solo caracteres claramente inválidos.
+
+    Acepta '900.006.037-4', '900006037-4' y '900006037' (regex laxo
+    \\d{6,12} + dígito de verificación opcional). No fuerza un formato:
+    el dictamen cita el NIT tal como el gestor lo escribió.
+    """
+    if valor is None:
+        return None
+    limpio = valor.replace(" ", "").strip()
+    if not limpio:
+        return None
+    if not _NIT_CHARS_VALIDOS.match(limpio):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{campo} contiene caracteres inválidos: '{valor}'. "
+            "Use solo dígitos, puntos y guión (ej: 900.006.037-4).",
+        )
+    digitos = limpio.replace(".", "").replace("-", "")
+    if not digitos.isdigit() or not (6 <= len(digitos) <= 13):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{campo} no parece un NIT colombiano válido: '{valor}' "
+            "(se esperan 6-12 dígitos + dígito de verificación opcional).",
+        )
+    return limpio
+
+
+def _parsear_fecha_iso(valor: Optional[str], campo: str) -> Optional[datetime]:
+    """ISO YYYY-MM-DD → datetime UTC (la columna es DateTime). Vacío → None."""
+    if valor is None:
+        return None
+    limpio = valor.strip()
+    if not limpio:
+        return None
+    try:
+        d = date.fromisoformat(limpio)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{campo} debe ser fecha ISO YYYY-MM-DD (recibido: '{valor}').",
+        )
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
+
+def _fecha_a_iso(dt: Optional[datetime]) -> Optional[str]:
+    return dt.date().isoformat() if dt else None
+
+
+def _parsear_lista_json(texto: Optional[str]) -> list:
+    """Text JSON de BD → list. Vacío o corrupto → [] (nunca rompe el GET)."""
+    if not texto:
+        return []
+    try:
+        valor = json.loads(texto)
+        return valor if isinstance(valor, list) else []
+    except (ValueError, TypeError):
+        return []
+
+
+def _buscar_contrato(db: Session, eps: str) -> Optional[ContratoRecord]:
+    """Busca por eps crudo y normalizado (upper+strip) — hay registros
+    históricos guardados sin normalizar, igual que en /clausulas."""
+    eps_norm = (eps or "").upper().strip()
+    return db.query(ContratoRecord).filter(ContratoRecord.eps.in_([eps, eps_norm])).first()
+
+
+def _serializar_metadatos(contrato: ContratoRecord) -> dict:
+    """Forma única de respuesta para GET y PUT (el front rellena el form con esto)."""
+    return {
+        "eps": contrato.eps,
+        "detalles": contrato.detalles,
+        "pdf_path": contrato.pdf_path,
+        "pdf_subido_en": contrato.pdf_subido_en.isoformat() if contrato.pdf_subido_en else None,
+        "numero_contrato": contrato.numero_contrato,
+        "nit_eps": contrato.nit_eps,
+        "nit_ips": contrato.nit_ips,
+        "razon_social_eps": contrato.razon_social_eps,
+        "razon_social_ips": contrato.razon_social_ips,
+        "numero_proceso_secop": contrato.numero_proceso_secop,
+        "secop_url": contrato.secop_url,
+        "fecha_suscripcion": _fecha_a_iso(contrato.fecha_suscripcion),
+        "fecha_inicio": _fecha_a_iso(contrato.fecha_inicio),
+        "fecha_fin": _fecha_a_iso(contrato.fecha_fin),
+        "objeto_contractual": contrato.objeto_contractual,
+        "anexos_descripcion": _parsear_lista_json(contrato.anexos_descripcion),
+        "modalidades_tarifarias": _parsear_lista_json(contrato.modalidades_tarifarias),
+    }
+
+
+@router.get("/{eps}/anexos/sugeridos")
+def anexos_sugeridos(
+    eps: str,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sugerencias estándar de anexos para auto-llenar el editor.
+
+    Lectura libre (cualquier usuario autenticado): son plantillas, no
+    datos del contrato. El front las añade como filas editables.
+    """
+    return {"eps": eps, "sugeridos": ANEXOS_SUGERIDOS_ESTANDAR}
+
+
+@router.get("/{eps}/metadatos")
+def obtener_metadatos_contrato(
+    eps: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Devuelve los metadatos enriquecidos del contrato de la EPS.
+
+    Lectura abierta a AUDITOR+ para que vean los datos auditables
+    (contrato, NITs, SECOP, plazo, anexos) al analizar glosas. 404 si la
+    EPS no tiene ContratoRecord — el front lo interpreta como "contrato
+    nuevo" y muestra el formulario vacío.
+    """
+    contrato = _buscar_contrato(db, eps)
+    if not contrato:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No existe contrato registrado para EPS '{eps}'.",
+        )
+    logger.info(f"[CONTRATO-META] consulta eps={contrato.eps} usuario={current_user.email}")
+    return _serializar_metadatos(contrato)
+
+
+@router.put("/{eps}/metadatos")
+def actualizar_metadatos_contrato(
+    eps: str,
+    body: MetadatosContratoInput,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Actualiza (o crea) los 12 metadatos enriquecidos en un solo request.
+
+    Validaciones:
+      - NITs: laxo colombiano, normaliza quitando espacios (400 solo si
+        trae caracteres claramente inválidos).
+      - secop_url: https obligatorio si no viene vacía (evita ftp:// y
+        javascript: inyectados al prompt/dictamen).
+      - fechas ISO YYYY-MM-DD; vacío → NULL; fecha_inicio <= fecha_fin.
+      - objeto_contractual máx 5000 chars.
+      - anexos [{nombre, descripcion}] y modalidades [str] → Text JSON.
+
+    Si la fila no existe se crea (flujo "EPS con glosas sin contrato").
+    Registra el cambio en audit_log con valor_anterior/valor_nuevo.
+    """
+    eps_norm = (eps or "").upper().strip()
+    if not eps_norm:
+        raise HTTPException(status_code=400, detail="EPS vacía")
+
+    # ── Validar/normalizar TODO antes de tocar la fila ──
+    nit_eps = _normalizar_nit(body.nit_eps, "nit_eps")
+    nit_ips = _normalizar_nit(body.nit_ips, "nit_ips")
+
+    secop_url = _texto_o_none(body.secop_url, 500)
+    if secop_url and not secop_url.lower().startswith("https://"):
+        raise HTTPException(
+            status_code=400,
+            detail="secop_url debe comenzar con https:// "
+            f"(recibido: '{secop_url[:80]}'). Copie la URL del proceso desde SECOP II.",
+        )
+
+    fecha_suscripcion = _parsear_fecha_iso(body.fecha_suscripcion, "fecha_suscripcion")
+    fecha_inicio = _parsear_fecha_iso(body.fecha_inicio, "fecha_inicio")
+    fecha_fin = _parsear_fecha_iso(body.fecha_fin, "fecha_fin")
+    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+        raise HTTPException(
+            status_code=400,
+            detail=f"fecha_inicio ({body.fecha_inicio}) no puede ser posterior a "
+            f"fecha_fin ({body.fecha_fin}).",
+        )
+
+    objeto = (body.objeto_contractual or "").strip() or None
+    if objeto and len(objeto) > 5000:
+        raise HTTPException(
+            status_code=400,
+            detail=f"objeto_contractual supera el máximo de 5000 caracteres ({len(objeto)}).",
+        )
+
+    anexos_json: Optional[str] = None
+    if body.anexos_descripcion:
+        anexos_limpios = []
+        for a in body.anexos_descripcion:
+            nombre = (a.nombre or "").strip()[:120]
+            descripcion = (a.descripcion or "").strip()[:400]
+            if nombre or descripcion:
+                anexos_limpios.append({"nombre": nombre, "descripcion": descripcion})
+        if anexos_limpios:
+            anexos_json = json.dumps(anexos_limpios, ensure_ascii=False)
+
+    modalidades_json: Optional[str] = None
+    if body.modalidades_tarifarias:
+        modalidades = [m.strip()[:120] for m in body.modalidades_tarifarias if m and m.strip()]
+        if modalidades:
+            modalidades_json = json.dumps(modalidades, ensure_ascii=False)
+
+    # ── Fila: buscar o crear ──
+    contrato = _buscar_contrato(db, eps)
+    creado = False
+    if not contrato:
+        # detalles="" (no None): el grid del panel concatena el campo y
+        # mostraría el literal "null" si quedara NULL.
+        contrato = ContratoRecord(eps=eps_norm, detalles="")
+        db.add(contrato)
+        creado = True
+
+    valores_anteriores = {
+        "numero_contrato": contrato.numero_contrato,
+        "nit_eps": contrato.nit_eps,
+        "nit_ips": contrato.nit_ips,
+        "razon_social_eps": contrato.razon_social_eps,
+        "razon_social_ips": contrato.razon_social_ips,
+        "numero_proceso_secop": contrato.numero_proceso_secop,
+        "secop_url": contrato.secop_url,
+        "fecha_suscripcion": _fecha_a_iso(contrato.fecha_suscripcion),
+        "fecha_inicio": _fecha_a_iso(contrato.fecha_inicio),
+        "fecha_fin": _fecha_a_iso(contrato.fecha_fin),
+        "objeto_contractual": contrato.objeto_contractual,
+        "anexos_descripcion": contrato.anexos_descripcion,
+        "modalidades_tarifarias": contrato.modalidades_tarifarias,
+    }
+
+    contrato.numero_contrato = _texto_o_none(
+        body.numero_contrato, _MAX_CAMPOS_META["numero_contrato"]
+    )
+    contrato.nit_eps = nit_eps
+    contrato.nit_ips = nit_ips
+    contrato.razon_social_eps = _texto_o_none(
+        body.razon_social_eps, _MAX_CAMPOS_META["razon_social_eps"]
+    )
+    contrato.razon_social_ips = _texto_o_none(
+        body.razon_social_ips, _MAX_CAMPOS_META["razon_social_ips"]
+    )
+    contrato.numero_proceso_secop = _texto_o_none(
+        body.numero_proceso_secop, _MAX_CAMPOS_META["numero_proceso_secop"]
+    )
+    contrato.secop_url = secop_url
+    contrato.fecha_suscripcion = fecha_suscripcion
+    contrato.fecha_inicio = fecha_inicio
+    contrato.fecha_fin = fecha_fin
+    contrato.objeto_contractual = objeto
+    contrato.anexos_descripcion = anexos_json
+    contrato.modalidades_tarifarias = modalidades_json
+    db.commit()
+    db.refresh(contrato)
+
+    respuesta = _serializar_metadatos(contrato)
+
+    # Audit log — qué cambió, quién y desde dónde (trazabilidad
+    # SuperSalud). Best-effort: si falla no revienta el guardado.
+    try:
+        valores_nuevos = {
+            k: v
+            for k, v in respuesta.items()
+            if k not in ("eps", "detalles", "pdf_path", "pdf_subido_en")
+        }
+        ip_origen = request.client.host if request.client else None
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol or "AUDITOR",
+            accion="UPDATE_CONTRATO_METADATOS",
+            tabla="contratos",
+            registro_id=None,
+            campo="contratos.metadatos",
+            valor_anterior=json.dumps(valores_anteriores, ensure_ascii=False),
+            valor_nuevo=json.dumps(valores_nuevos, ensure_ascii=False),
+            detalle=f"EPS={contrato.eps}, {'creado' if creado else 'actualizado'} desde editor",
+            ip=ip_origen,
+        )
+    except Exception as _e_audit:
+        logger.debug(f"[AUDIT] no se pudo registrar UPDATE_CONTRATO_METADATOS: {_e_audit}")
+
+    logger.info(
+        f"[CONTRATO-META] eps={contrato.eps} {'creado' if creado else 'actualizado'} "
+        f"usuario={current_user.email} contrato={contrato.numero_contrato or '—'}"
+    )
+    return respuesta

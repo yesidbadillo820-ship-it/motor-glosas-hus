@@ -97,6 +97,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
+# Lector de pesos compartido por los bots (ver `_dinero.py`): era la cuarta
+# copia de la misma regla, y una de las cuatro estaba mal.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _dinero import a_numero as a_numero_compartido  # noqa: E402
+
 try:
     import openpyxl
     from openpyxl.utils import get_column_letter
@@ -383,46 +388,24 @@ def cruzar_codigo(
 
 
 def a_numero(v: object) -> float | None:
-    """Convierte un valor monetario a número. Maneja formato colombiano
-    ("1.234.567,89"), US ("1,234,567.89"), miles sueltos ("26,140" / "1.234.567")
-    y negativos contables. Devuelve None si no es un número.
-    (Misma convención que app/services/recepcion_service._a_float.)
+    """Valor monetario → número, con el lector único de `tools/_dinero.py`.
+
+    Era la cuarta copia de la misma regla en `tools/` (savia, emssanar, vco y
+    esta). Tres estaban bien y la de SAVIA multiplicaba por cien los valores
+    con centavos. Ahora todas cuelgan del mismo lector, que a su vez apunta al
+    parser del núcleo.
+
+    Se conserva el `None` para "no era un número": el consolidado lo usa para
+    dejar la celda en blanco en vez de escribir un cero que no estaba.
     """
     if v is None:
         return None
-    if isinstance(v, (int, float)):
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
         return float(v)
     s = norm_texto(v)
-    if not s:
-        return None
-    negativo = s.startswith("-") or (s.startswith("(") and s.endswith(")"))
-    s = re.sub(r"[^\d.,]", "", s)
     if not s or not any(c.isdigit() for c in s):
         return None
-
-    tiene_punto, tiene_coma = "." in s, "," in s
-    if tiene_punto and tiene_coma:
-        # El separador decimal es el que aparece más a la derecha.
-        if s.rfind(",") > s.rfind("."):
-            s = s.replace(".", "").replace(",", ".")  # 1.234.567,89
-        else:
-            s = s.replace(",", "")  # 1,234,567.89
-    elif tiene_coma:
-        # Una sola coma con 1-2 decimales -> decimal; si no, miles.
-        if s.count(",") == 1 and len(s.split(",")[1]) in (1, 2):
-            s = s.replace(",", ".")
-        else:
-            s = s.replace(",", "")
-    elif tiene_punto:
-        # Un solo punto con 1-2 decimales -> decimal; si no, miles.
-        if not (s.count(".") == 1 and len(s.split(".")[1]) in (1, 2)):
-            s = s.replace(".", "")
-
-    try:
-        n = float(s)
-    except ValueError:
-        return None
-    return -n if negativo else n
+    return a_numero_compartido(s)
 
 
 def fmt_valor(v: object) -> str:

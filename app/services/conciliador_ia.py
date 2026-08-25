@@ -55,8 +55,10 @@ _CONTRAARGUMENTOS_PLANTILLA = {
             "titulo": "La EPS dirá: 'falta soporte de la prestación'",
             "respuesta_sugerida": (
                 "Aportar historia clínica completa (Res. 1995/1999 — "
-                "plena prueba), RIPS radicados (Res. 866/2021), factura "
-                "electrónica (Res. 2275/2023)."
+                "plena prueba), RIPS radicados (Res. 948/2026; Res. 2275/2023 "
+                "si el servicio es anterior al 14-05-2026), factura "
+                "electrónica (Res. 948/2026; Res. 2275/2023 si el servicio es\n"
+                "anterior al 14-05-2026)."
             ),
         },
         {
@@ -84,7 +86,7 @@ _CONTRAARGUMENTOS_PLANTILLA = {
             "titulo": "La EPS dirá: 'no había autorización previa'",
             "respuesta_sugerida": (
                 "Atención por urgencia vital — Art. 168 Ley 100/1993 + "
-                "Sentencia T-1025/2002: las urgencias no requieren "
+                "Art. 168 Ley 100/1993: las urgencias no requieren "
                 "autorización. Mostrar registro de triage."
             ),
         },
@@ -210,7 +212,7 @@ def preparar_audiencia(
         "FA": [
             "Circular 030/2013 (errores formales subsanables)",
             "Art. 177 Ley 100/1993 (deber EPS de pagar)",
-            "Res. 2275/2023 (factura electrónica)",
+            "Res. 948/2026 (factura electrónica; Res. 2275/2023 para servicios anteriores al 14-05-2026)",
         ],
         "SO": [
             "Res. 1995/1999 (historia clínica como plena prueba)",
@@ -218,7 +220,7 @@ def preparar_audiencia(
         ],
         "AU": [
             "Art. 168 Ley 100/1993 (urgencias)",
-            "Sentencia T-1025/2002 (urgencias sin autorización previa)",
+            "Art. 168 Ley 100/1993 (urgencias sin autorización previa)",
             "Res. 5269/2017 (PBS)",
         ],
         "CL": [

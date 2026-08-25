@@ -49,16 +49,32 @@ def apply() -> bool:
         system: str,
         user: str,
         pdfs_raw: list[tuple[str, bytes]],
+        modelo_override: str | None = None,
     ) -> tuple[str, str]:
         # ---- Nivel A: Anthropic Claude (PDF nativo) ----
         try:
-            return await original(self, system, user, pdfs_raw)
+            return await original(self, system, user, pdfs_raw, modelo_override)
         except Exception as e_a:
             logger.warning(f"[FALLBACK-A] Anthropic multimodal fallo: {e_a}")
 
+        # Fase 2 fix (jul-2026): para casos CRÍTICOS (Opus) no dejamos que
+        # Gemini Flash sea el AUTOR del dictamen — mejor re-lanzar y que el
+        # caller caiga a la ruta de texto, que conserva la escalación a Opus.
+        if (modelo_override or "").startswith("claude-opus"):
+            logger.warning(
+                "[FALLBACK] Caso crítico (Opus): NO se degrada a Gemini como autor; "
+                "se re-lanza para caer a la ruta de texto con el modelo escalado."
+            )
+            raise RuntimeError(
+                "Multimodal Anthropic falló en caso crítico (Opus); "
+                "cae a texto sin degradar a Gemini"
+            )
+
         # ---- Nivel B: Gemini Flash con PDFs nativos ----
         gemini = getattr(self, "gemini", None)
-        gemini_model = getattr(self, "gemini_model", None) or "gemini-2.0-flash"
+        from app.core.config import modelo_gemini_vigente
+
+        gemini_model = modelo_gemini_vigente(getattr(self, "gemini_model", None))
         if gemini is not None:
             try:
                 texto, modelo = await gemini.completar_con_retry(

@@ -30,7 +30,13 @@ def db_session():
 
 @pytest.fixture
 def usuario():
-    return UsuarioRecord(id=1, email="x@hus.com", rol="AUDITOR", activo=1)
+    """COORDINADOR: borrar un contrato deja sin base los dictámenes de esa EPS.
+
+    Crear y actualizar siguen al alcance del AUDITOR —subir el contrato firmado
+    es trabajo diario del gestor—; borrarlo no. El VIEWER ya no puede ninguna
+    de las dos.
+    """
+    return UsuarioRecord(id=1, email="x@hus.com", rol="COORDINADOR", activo=1)
 
 
 @pytest.fixture

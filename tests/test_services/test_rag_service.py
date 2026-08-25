@@ -143,25 +143,3 @@ class TestBuscarCasosSimilares:
             assert r == []
         finally:
             empty.close()
-
-
-class TestConstruirContextoRag:
-    def test_sin_casos_retorna_vacio(self):
-        assert RAGService().construir_contexto_rag([]) == ""
-
-    def test_con_casos_construye_bloque_precedentes(self):
-        casos = [
-            {
-                "codigo_glosa": "TA0201",
-                "eps": "FAMISANAR",
-                "etapa": "respuesta",
-                "decision_eps": "LEVANTADA",
-                "score_similitud": 0.75,
-                "extracto_dictamen": "Extracto del precedente...",
-                "id": 1,
-            }
-        ]
-        ctx = RAGService().construir_contexto_rag(casos)
-        assert "PRECEDENTES EXITOSOS" in ctx
-        assert "TA0201" in ctx
-        assert "FAMISANAR" in ctx

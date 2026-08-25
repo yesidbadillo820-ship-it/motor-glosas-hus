@@ -47,6 +47,8 @@ contexto adicional en el flujo clásico.
 """
 
 from __future__ import annotations
+
+from app.core.config import espera_maxima
 import os
 import json
 import logging
@@ -98,7 +100,7 @@ class Agent:
                 "error": "ANTHROPIC_API_KEY no configurada",
             }
 
-        timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+        timeout = httpx.Timeout(connect=15.0, read=espera_maxima(180.0), write=30.0, pool=10.0)
         headers = {
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",

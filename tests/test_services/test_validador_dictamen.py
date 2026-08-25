@@ -167,12 +167,23 @@ class TestCheckEnumeracion:
         assert r["aprobado"] is True
 
     def test_solo_uno_de_los_dos_falla(self):
-        r = check_enumeracion("EN PRIMER LUGAR el contrato")
+        # Auditoría jul-2026: la exigencia aplica a dictámenes COMPLEJOS
+        # (>210 palabras); los simples tienen la enumeración PROHIBIDA por
+        # el propio prompt y quedaron exentos del check.
+        relleno = " relleno" * 220
+        r = check_enumeracion("EN PRIMER LUGAR el contrato" + relleno)
         assert r["aprobado"] is False
 
     def test_sin_enumeracion(self):
-        r = check_enumeracion("texto plano sin numeración")
+        relleno = " relleno" * 220
+        r = check_enumeracion("texto plano sin numeración" + relleno)
         assert r["aprobado"] is False
+
+    def test_dictamen_simple_exento(self):
+        """El caso simple (2 párrafos, <=210 palabras) no se castiga por
+        obedecer la prohibición de enumerar."""
+        r = check_enumeracion("texto plano corto de dictamen simple sin numeración")
+        assert r["aprobado"] is True
 
 
 class TestCheckCodigoRespuestaCoherente:

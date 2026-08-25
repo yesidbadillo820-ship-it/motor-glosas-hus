@@ -36,10 +36,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ /app/app/
 COPY scripts/ /app/scripts/
 COPY static/ /app/static/
-# data/ contiene fixtures versionados (banco HUS 50 plantillas, etc.) que
-# el lifespan lee al arranque para auto-seed. SIN ESTO el seed falla
-# silenciosamente con "archivo no existe" y la BD queda sin plantillas.
-COPY data/ /app/data/
+# data/ contiene fixtures versionados (banco HUS 50 plantillas, cláusulas,
+# perfiles) que el lifespan lee al arranque para auto-seed. Ronda 30: se
+# copian SOLO los .json — antes `COPY data/` horneaba también data/soportes
+# (PDFs de pacientes) y data/backups del build context de la VM dentro de
+# cada imagen (fuga de PHI + imagen inflada). El runtime usa esos datos vía
+# el volumen /data, nunca vía /app/data. .dockerignore es la otra mitad.
+COPY data/*.json /app/data/
+# Tablero de calidad: el scorer + casos + el runner en vivo viajan con la
+# imagen para poder medir el motor desde el contenedor:
+#   docker compose exec motor python tools/scoreboard_live.py
+COPY tools/ /app/tools/
+COPY tests/benchmark/ /app/tests/benchmark/
 
 # Carpeta de soportes — montada como volumen persistente Fly al
 # correr (ver fly.toml). Si no se monta volumen, queda en disco

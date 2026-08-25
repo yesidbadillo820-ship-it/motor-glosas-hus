@@ -71,7 +71,13 @@ class TestConstruirDictamenAceptacion:
         # Debe traer la tabla de códigos
         assert "TA0201" in html
         assert "RE9702" in html
-        assert "168,563" in html
+        # 20-08-2026. Esta línea exigía «168,563» —con COMA—, que es formato
+        # gringo. En Colombia la coma es el separador decimal: «168,563» se lee
+        # como ciento sesenta y ocho con quinientos sesenta y tres milésimas.
+        # La prueba estaba fijando el defecto: cuando el dictamen empezó a
+        # escribir bien la plata, ESTA prueba falló por tener razón el código.
+        assert "$168.563" in html
+        assert "168,563" not in html
         # Bloque verde de aceptación total
         assert "RESPUESTA A GLOSA" in html
         assert "ACEPTA GLOSA TOTAL" in html
@@ -97,7 +103,12 @@ class TestConstruirDictamenAceptacion:
         assert "RE9801" in html
         # Diferencia 200k - 80k = 120k debe aparecer como "valor en disputa"
         assert "Valor en disputa" in html
-        assert "120,000" in html
+        # 21-08-2026. Acá decía «120,000» —con COMA—, igual que la línea de
+        # «168,563» que se corrigió ayer en esta misma clase. Es formato
+        # gringo: en Colombia la coma es el separador decimal. Yesid lo vio en
+        # pantalla en «Valor en disputa $ 2,288,600».
+        assert "$120.000" in html
+        assert "120,000" not in html
 
     def test_html_no_tiene_valor_negativo(self):
         """Si por error val_ac > val_obj, val_rechazado podría ser

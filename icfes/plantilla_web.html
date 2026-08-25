@@ -1,0 +1,1953 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Preparación ICFES Saber 11</title>
+<style>
+/* ===========================================================================
+   Sistema de diseño. Todo con tipografías del sistema operativo a propósito:
+   la aplicación tiene que funcionar SIN INTERNET, y una tipografía traída de
+   la web dejaría la página coja apenas se caiga la conexión.
+
+   Los colores de las gráficas no son de gusto: salen de una paleta validada
+   para daltonismo y contraste. Las barras de un mismo dato van todas del mismo
+   tono (es UNA serie); el estado va en una etiqueta con texto, nunca en el
+   color solo.
+   =========================================================================== */
+:root{
+  /* superficies y tinta — modo claro */
+  --plano:#F1F4F8; --sup:#FFFFFF; --sup2:#F7F9FC; --sup3:#EBF0F6;
+  --tinta:#0F1621; --tinta2:#48546A; --tinta3:#74809A;
+  --linea:#DEE5EE; --linea2:#EDF1F7;
+  /* datos */
+  --marca:#2a78d6; --marca-t:#1B5AA8; --marca-suave:#E9F1FC; --marca-borde:#BBD5F5;
+  --rampa1:#86b6ef; --rampa2:#5598e7; --rampa3:#2a78d6; --rampa4:#184f95;
+  --rejilla:#E8ECF2; --eje:#CBD4DF;
+  /* estado (siempre acompañado de texto) */
+  --bien:#0ca30c; --bien-t:#046604; --bien-f:#EAF7EA;
+  --medio:#fab219; --medio-t:#7E5300; --medio-f:#FEF6E4;
+  --serio:#ec835a; --serio-t:#96421C; --serio-f:#FDEFE8;
+  --critico:#d03b3b; --critico-t:#981919; --critico-f:#FCECEC;
+  /* forma */
+  --r1:6px; --r2:10px; --r3:14px; --r4:20px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+  --e1:0 1px 2px rgba(15,22,33,.06);
+  --e2:0 1px 2px rgba(15,22,33,.05), 0 4px 12px -4px rgba(15,22,33,.10);
+  --e3:0 2px 4px rgba(15,22,33,.05), 0 12px 28px -10px rgba(15,22,33,.20);
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,"Cascadia Mono","Segoe UI Mono","SF Mono",Menlo,Consolas,monospace;
+  --rail:236px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --plano:#0C1017; --sup:#161B22; --sup2:#1B222C; --sup3:#232B37;
+    --tinta:#E8EDF4; --tinta2:#A6B1C2; --tinta3:#7C889B;
+    --linea:#28313D; --linea2:#1F2631;
+    --marca:#3987e5; --marca-t:#84B4F2; --marca-suave:#15243A; --marca-borde:#24405F;
+    --rampa1:#184f95; --rampa2:#2a78d6; --rampa3:#5598e7; --rampa4:#9ec5f4;
+    --rejilla:#232B36; --eje:#3A4452;
+    --bien:#0ca30c; --bien-t:#5FD05F; --bien-f:#0F2412;
+    --medio:#fab219; --medio-t:#F7C948; --medio-f:#2A2110;
+    --serio:#ec835a; --serio-t:#F3A183; --serio-f:#2A1A13;
+    --critico:#d03b3b; --critico-t:#F07070; --critico-f:#2A1414;
+    --e1:0 1px 2px rgba(0,0,0,.4);
+    --e2:0 1px 2px rgba(0,0,0,.4), 0 4px 12px -4px rgba(0,0,0,.6);
+    --e3:0 2px 4px rgba(0,0,0,.5), 0 14px 30px -10px rgba(0,0,0,.85);
+  }
+}
+:root[data-theme="dark"]{
+  --plano:#0C1017; --sup:#161B22; --sup2:#1B222C; --sup3:#232B37;
+  --tinta:#E8EDF4; --tinta2:#A6B1C2; --tinta3:#7C889B;
+  --linea:#28313D; --linea2:#1F2631;
+  --marca:#3987e5; --marca-t:#84B4F2; --marca-suave:#15243A; --marca-borde:#24405F;
+  --rampa1:#184f95; --rampa2:#2a78d6; --rampa3:#5598e7; --rampa4:#9ec5f4;
+  --rejilla:#232B36; --eje:#3A4452;
+  --bien:#0ca30c; --bien-t:#5FD05F; --bien-f:#0F2412;
+  --medio:#fab219; --medio-t:#F7C948; --medio-f:#2A2110;
+  --serio:#ec835a; --serio-t:#F3A183; --serio-f:#2A1A13;
+  --critico:#d03b3b; --critico-t:#F07070; --critico-f:#2A1414;
+  --e1:0 1px 2px rgba(0,0,0,.4);
+  --e2:0 1px 2px rgba(0,0,0,.4), 0 4px 12px -4px rgba(0,0,0,.6);
+  --e3:0 2px 4px rgba(0,0,0,.5), 0 14px 30px -10px rgba(0,0,0,.85);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--plano); color:var(--tinta);
+  font-family:var(--sans); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+h1,h2,h3{margin:0; font-weight:650; letter-spacing:-.015em; text-wrap:balance}
+h1{font-size:1.6rem; line-height:1.15}
+h2{font-size:1.12rem; line-height:1.25}
+h3{font-size:.95rem; line-height:1.3; font-weight:600}
+p{margin:0 0 var(--s3)}
+a{color:var(--marca-t)}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.rot{font-size:.7rem; text-transform:uppercase; letter-spacing:.09em; font-weight:650;
+     color:var(--tinta3)}
+.tenue{color:var(--tinta2)}
+.mini{font-size:.82rem}
+.serif{font-family:var(--serif)}
+
+/* ------------------------------------------------------------ armazón ---- */
+.app{display:grid; min-height:100vh; grid-template-columns:1fr}
+.rail{display:none}
+.zona{min-width:0; padding:0 var(--s4) 92px}
+.limite{max-width:1000px; margin:0 auto}
+.limite.lectura{max-width:760px}
+
+.barra{position:sticky; top:0; z-index:30; background:color-mix(in srgb,var(--plano) 88%,transparent);
+  backdrop-filter:saturate(1.6) blur(10px); border-bottom:1px solid var(--linea);
+  margin:0 calc(var(--s4)*-1) var(--s5); padding:var(--s3) var(--s4)}
+.barra .fila{max-width:1000px; margin:0 auto; display:flex; align-items:center;
+  justify-content:space-between; gap:var(--s3)}
+.marcaapp{display:flex; align-items:center; gap:var(--s2); min-width:0}
+.sello{width:30px; height:30px; border-radius:9px; flex:none; display:grid; place-items:center;
+  background:var(--marca); color:#fff; font-weight:700; font-size:.78rem; letter-spacing:-.03em;
+  box-shadow:var(--e1)}
+.marcaapp b{font-size:.95rem; font-weight:650; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis}
+.cuenta{display:flex; align-items:baseline; gap:6px; white-space:nowrap}
+.cuenta b{font-family:var(--mono); font-size:1.05rem; font-weight:600}
+
+/* ------------------------------------------------------------ tarjetas --- */
+.tarjeta{background:var(--sup); border:1px solid var(--linea); border-radius:var(--r3);
+  box-shadow:var(--e2); padding:var(--s4); margin-bottom:var(--s4)}
+.tarjeta.plana{box-shadow:none}
+.tarjeta.acento{border-color:var(--marca-borde); background:linear-gradient(180deg,
+  var(--marca-suave) 0%, var(--sup) 60%)}
+.enc{display:flex; align-items:flex-start; justify-content:space-between; gap:var(--s3);
+  margin-bottom:var(--s3)}
+.enc .rot{margin-bottom:2px}
+.rejilla{display:grid; gap:var(--s4)}
+@media(min-width:760px){ .rejilla.dos{grid-template-columns:1fr 1fr} }
+
+/* --------------------------------------------------------------- kpis ---- */
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1px;
+  background:var(--linea); border:1px solid var(--linea); border-radius:var(--r3);
+  overflow:hidden; box-shadow:var(--e2); margin-bottom:var(--s4)}
+.kpi{background:var(--sup); padding:var(--s3) var(--s4); min-width:0}
+.kpi .v{font-family:var(--mono); font-size:1.7rem; font-weight:600; line-height:1.1;
+  letter-spacing:-.03em; display:block; margin:2px 0 1px}
+.kpi .d{font-size:.76rem; color:var(--tinta3); display:flex; align-items:center; gap:4px}
+.kpi .delta{font-size:.75rem; font-weight:650; font-family:var(--mono)}
+.kpi .delta.sube{color:var(--bien-t)} .kpi .delta.baja{color:var(--critico-t)}
+
+/* ------------------------------------------------------------- botones --- */
+button,.btn{font:inherit; font-weight:550; cursor:pointer; border-radius:var(--r2);
+  border:1px solid var(--linea); background:var(--sup); color:var(--tinta);
+  padding:10px 15px; transition:background .14s,border-color .14s,transform .08s;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px}
+button:hover{border-color:var(--marca); background:var(--sup2)}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.45; cursor:default; transform:none}
+.pri{background:var(--marca); border-color:var(--marca); color:#fff; font-weight:600}
+.pri:hover{background:var(--marca-t); border-color:var(--marca-t)}
+.fantasma{border-color:transparent; background:transparent; color:var(--tinta2); padding:8px 10px}
+.fantasma:hover{background:var(--sup3); border-color:transparent}
+.bloque{width:100%}
+.fila-btn{display:flex; gap:var(--s2); flex-wrap:wrap}
+
+/* ------------------------------------------------------------- fichas ---- */
+.ficha{display:inline-flex; align-items:center; gap:5px; font-size:.74rem; font-weight:650;
+  padding:3px 9px; border-radius:99px; border:1px solid var(--linea); background:var(--sup2);
+  color:var(--tinta2); white-space:nowrap}
+.ficha .pt{width:7px; height:7px; border-radius:50%; flex:none}
+.ficha.bien{background:var(--bien-f); border-color:transparent; color:var(--bien-t)}
+.ficha.bien .pt{background:var(--bien)}
+.ficha.medio{background:var(--medio-f); border-color:transparent; color:var(--medio-t)}
+.ficha.medio .pt{background:var(--medio)}
+.ficha.serio{background:var(--serio-f); border-color:transparent; color:var(--serio-t)}
+.ficha.serio .pt{background:var(--serio)}
+.ficha.critico{background:var(--critico-f); border-color:transparent; color:var(--critico-t)}
+.ficha.critico .pt{background:var(--critico)}
+.ficha.marca{background:var(--marca-suave); border-color:transparent; color:var(--marca-t)}
+.ficha.marca .pt{background:var(--marca)}
+
+/* ------------------------------------------------------------ gráficas --- */
+.viz{margin-top:var(--s3)}
+.viz-tit{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3);
+  margin-bottom:var(--s2)}
+.viz svg{display:block; width:100%; height:auto; overflow:visible}
+.rejilla-l{stroke:var(--rejilla); stroke-width:1}
+.eje-l{stroke:var(--eje); stroke-width:1}
+.eje-t{fill:var(--tinta3); font-size:10.5px; font-family:var(--mono)}
+.serie-l{fill:none; stroke:var(--marca); stroke-width:2; stroke-linecap:round;
+  stroke-linejoin:round}
+.serie-a{fill:var(--marca); opacity:.10}
+.pto{fill:var(--marca); stroke:var(--sup); stroke-width:2}
+.pto.fin{r:5.5}
+.meta-l{stroke:var(--tinta3); stroke-width:1.5; stroke-dasharray:5 4; fill:none}
+.meta-t{fill:var(--tinta3); font-size:10.5px; font-weight:650}
+.cruz{stroke:var(--tinta3); stroke-width:1; stroke-dasharray:3 3}
+
+/* barras horizontales — una sola serie, el estado va en la ficha */
+.barras{display:flex; flex-direction:column; gap:var(--s3)}
+.br{display:grid; grid-template-columns:1fr auto; gap:15px var(--s3); align-items:center}
+.br .n{font-size:.88rem; font-weight:550; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap}
+.br .v{font-family:var(--mono); font-size:.85rem; color:var(--tinta2); white-space:nowrap;
+  display:flex; align-items:center; gap:var(--s2)}
+.br .pista{grid-column:1/-1; position:relative; height:12px; background:var(--sup3);
+  border-radius:0 3px 3px 0}
+.br .relleno{position:absolute; inset:0 auto 0 0; background:var(--marca);
+  border-radius:0 4px 4px 0; transition:width .5s cubic-bezier(.2,.7,.3,1)}
+.br .meta{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--tinta2);
+  border-radius:1px}
+.br .meta::after{content:attr(data-t); position:absolute; top:-15px; left:50%;
+  transform:translateX(-50%); font-size:.62rem; font-weight:650; color:var(--tinta3);
+  font-family:var(--mono); white-space:nowrap}
+
+/* barras verticales pequeñas (pronóstico de repasos) */
+.cols{display:flex; align-items:flex-end; gap:6px; height:78px; margin-top:var(--s2)}
+.col{flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;
+  gap:5px; min-width:0}
+.col .b{width:100%; background:var(--marca); border-radius:4px 4px 0 0; min-height:2px;
+  transition:height .4s ease}
+.col .b.vacio{background:var(--sup3)}
+.col .e{font-size:.64rem; color:var(--tinta3); white-space:nowrap}
+.col .q{font-size:.68rem; font-family:var(--mono); color:var(--tinta2); font-weight:600}
+
+/* calendario de estudio (rampa secuencial validada) */
+.cal{display:grid; grid-template-columns:repeat(53,1fr); gap:2px; margin-top:var(--s2)}
+.cal i{aspect-ratio:1; border-radius:2px; background:var(--sup3); display:block}
+.cal i[data-n="1"]{background:var(--rampa1)} .cal i[data-n="2"]{background:var(--rampa2)}
+.cal i[data-n="3"]{background:var(--rampa3)} .cal i[data-n="4"]{background:var(--rampa4)}
+.cal-ley{display:flex; align-items:center; gap:5px; justify-content:flex-end;
+  margin-top:var(--s2); font-size:.68rem; color:var(--tinta3)}
+.cal-ley i{width:10px; height:10px; border-radius:2px; background:var(--sup3); display:block}
+
+/* mini gráficas por área */
+.multis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--s3)}
+.multi{border:1px solid var(--linea); border-radius:var(--r2); padding:var(--s3);
+  background:var(--sup2)}
+.multi .t{font-size:.76rem; color:var(--tinta2); font-weight:600; margin-bottom:2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.multi .v{font-family:var(--mono); font-size:1.2rem; font-weight:600; letter-spacing:-.02em}
+
+/* globo de datos */
+.globo{position:fixed; z-index:60; pointer-events:none; background:var(--sup);
+  border:1px solid var(--linea); border-radius:var(--r2); box-shadow:var(--e3);
+  padding:8px 11px; font-size:.78rem; opacity:0; transition:opacity .12s; max-width:230px}
+.globo.ver{opacity:1}
+.globo b{font-family:var(--mono); font-size:.92rem; display:block}
+
+/* ------------------------------------------------- bloques del plan ------ */
+.bloques{display:flex; flex-direction:column; gap:var(--s2)}
+.bloque-p{display:grid; grid-template-columns:auto 1fr auto; gap:var(--s3); align-items:center;
+  padding:var(--s3); border:1px solid var(--linea); border-radius:var(--r2);
+  background:var(--sup2); transition:border-color .14s,background .14s}
+.bloque-p:hover{border-color:var(--marca-borde); background:var(--marca-suave)}
+.bloque-p.hecho{opacity:.55}
+.bloque-p .ic{width:34px; height:34px; border-radius:9px; display:grid; place-items:center;
+  background:var(--marca-suave); color:var(--marca-t); font-size:1rem; flex:none}
+.bloque-p .tx{min-width:0}
+.bloque-p .tx b{display:block; font-size:.9rem; font-weight:600}
+.bloque-p .tx span{display:block; font-size:.78rem; color:var(--tinta3); overflow:hidden;
+  text-overflow:ellipsis}
+@media(max-width:560px){
+  .bloque-p{grid-template-columns:auto 1fr}
+  .bloque-p .fila-btn{grid-column:1/-1; justify-content:flex-end}
+  .bloque-p .fila-btn button:last-child{flex:1}
+}
+
+/* ------------------------------------------------------------ preguntas -- */
+.hud{position:sticky; top:56px; z-index:20; background:var(--sup); border:1px solid var(--linea);
+  border-radius:var(--r2); box-shadow:var(--e2); padding:9px var(--s3); margin-bottom:var(--s4);
+  display:flex; align-items:center; justify-content:space-between; gap:var(--s3)}
+.hud .paso{font-size:.78rem; color:var(--tinta2); font-weight:600; white-space:nowrap}
+.hud .crono{font-family:var(--mono); font-size:1rem; font-weight:600; display:flex;
+  align-items:center; gap:7px}
+.hud .ritmo{width:8px; height:8px; border-radius:50%; background:var(--bien)}
+.hud .ritmo.tarde{background:var(--medio)} .hud .ritmo.muytarde{background:var(--critico)}
+.hud.rojo{border-color:var(--critico)} .hud.rojo .crono{color:var(--critico-t)}
+.progreso{height:4px; background:var(--sup3); border-radius:99px; overflow:hidden;
+  margin-bottom:var(--s4)}
+.progreso i{display:block; height:100%; background:var(--marca); border-radius:99px;
+  transition:width .3s ease}
+
+.contexto{background:var(--sup2); border:1px solid var(--linea); border-left:3px solid var(--marca);
+  border-radius:0 var(--r2) var(--r2) 0; padding:var(--s4); margin-bottom:var(--s4);
+  font-family:var(--serif); font-size:1rem; line-height:1.7; white-space:pre-wrap;
+  max-height:46vh; overflow:auto}
+.contexto table{border-collapse:collapse; width:100%; font-family:var(--sans);
+  font-size:.82rem; margin:var(--s2) 0; white-space:normal}
+.contexto th,.contexto td{border:1px solid var(--linea); padding:5px 8px; text-align:left}
+.contexto th{background:var(--sup3); font-weight:650}
+.enunciado{font-family:var(--serif); font-size:1.12rem; line-height:1.55; margin-bottom:var(--s4)}
+
+.opciones{display:flex; flex-direction:column; gap:var(--s2)}
+.op{display:grid; grid-template-columns:auto 1fr auto; gap:var(--s3); text-align:left;
+  align-items:flex-start; padding:13px var(--s3); line-height:1.5; width:100%;
+  border-radius:var(--r2); font-family:var(--serif); font-size:1rem; font-weight:400}
+.op .l{width:26px; height:26px; border-radius:8px; background:var(--sup3); color:var(--tinta2);
+  font-family:var(--sans); font-weight:700; font-size:.8rem; display:grid; place-items:center;
+  flex:none; margin-top:1px}
+.op .mk{font-size:1rem; opacity:0}
+.op:hover:not(:disabled) .l{background:var(--marca-suave); color:var(--marca-t)}
+.op.buena{background:var(--bien-f); border-color:var(--bien)}
+.op.buena .l{background:var(--bien); color:#fff}
+.op.buena .mk{opacity:1; color:var(--bien-t)}
+.op.mala{background:var(--critico-f); border-color:var(--critico)}
+.op.mala .l{background:var(--critico); color:#fff}
+.op.mala .mk{opacity:1; color:var(--critico-t)}
+.op:disabled{opacity:1; cursor:default}
+.teclas{font-size:.72rem; color:var(--tinta3); margin-top:var(--s2); text-align:center}
+kbd{font-family:var(--mono); font-size:.7rem; background:var(--sup3); border:1px solid var(--linea);
+  border-bottom-width:2px; border-radius:4px; padding:1px 5px}
+
+.veredicto{display:flex; align-items:center; gap:var(--s2); font-weight:650; font-size:.95rem;
+  margin:var(--s4) 0 var(--s3)}
+.veredicto.si{color:var(--bien-t)} .veredicto.no{color:var(--critico-t)}
+.explica{border-radius:var(--r2); padding:var(--s3) var(--s4); margin-bottom:var(--s3);
+  font-size:.94rem; line-height:1.6; border:1px solid var(--linea); background:var(--sup2)}
+.explica .rot{display:block; margin-bottom:4px}
+.explica.trampa{background:var(--medio-f); border-color:transparent}
+.explica.trampa .rot{color:var(--medio-t)}
+
+/* --------------------------------------------------------- formularios -- */
+label{display:block; font-size:.78rem; color:var(--tinta2); font-weight:600;
+  margin:var(--s4) 0 5px}
+input,select{font:inherit; width:100%; padding:10px 12px; border-radius:var(--r2);
+  border:1px solid var(--linea); background:var(--sup2); color:var(--tinta)}
+input:focus,select:focus{outline:2px solid var(--marca); outline-offset:1px;
+  border-color:var(--marca)}
+.opts{display:flex; gap:var(--s2); flex-wrap:wrap}
+.opts button{font-size:.82rem; padding:7px 13px; border-radius:99px}
+.opts button[aria-pressed="true"]{background:var(--marca); border-color:var(--marca); color:#fff}
+.check{display:flex; align-items:center; gap:var(--s2); font-size:.88rem; color:var(--tinta);
+  font-weight:500; margin-top:var(--s3); cursor:pointer}
+.check input{width:auto; margin:0}
+
+/* --------------------------------------------------------------- tablas -- */
+.desliza{overflow-x:auto; -webkit-overflow-scrolling:touch}
+table.datos{width:100%; border-collapse:collapse; font-size:.87rem}
+table.datos th{text-align:left; font-size:.68rem; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--tinta3); font-weight:650; padding:8px 10px;
+  border-bottom:1px solid var(--linea); white-space:nowrap}
+table.datos td{padding:9px 10px; border-bottom:1px solid var(--linea2)}
+table.datos tr:last-child td{border-bottom:0}
+table.datos td.n,table.datos th.n{text-align:right; font-family:var(--mono);
+  font-variant-numeric:tabular-nums}
+table.datos tbody tr:hover{background:var(--sup2)}
+
+/* -------------------------------------------------------------- avisos --- */
+.aviso{display:flex; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r2);
+  font-size:.86rem; line-height:1.55; margin-bottom:var(--s4); border:1px solid var(--linea);
+  background:var(--sup2)}
+.aviso .ic{flex:none; font-size:1rem; line-height:1.4}
+.aviso.ojo{background:var(--medio-f); border-color:transparent; color:var(--medio-t)}
+.aviso.info{background:var(--marca-suave); border-color:transparent; color:var(--marca-t)}
+.vacio{text-align:center; padding:var(--s6) var(--s4); color:var(--tinta3)}
+.vacio .big{font-size:2rem; display:block; margin-bottom:var(--s2); opacity:.5}
+.vacio p{max-width:30rem; margin:0 auto var(--s4)}
+
+/* ---------------------------------------------------------- navegación --- */
+.nav{position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex;
+  background:color-mix(in srgb,var(--sup) 94%,transparent); backdrop-filter:blur(12px);
+  border-top:1px solid var(--linea); padding-bottom:env(safe-area-inset-bottom)}
+.nav button{flex:1; flex-direction:column; gap:3px; border:0; border-radius:0;
+  background:none; padding:9px 2px 8px; font-size:.66rem; font-weight:600; color:var(--tinta3)}
+.nav button:hover{background:var(--sup2); border:0}
+.nav button .ic{font-size:1.12rem; line-height:1}
+.nav button[aria-current="page"]{color:var(--marca-t)}
+.nav button[aria-current="page"] .ic{transform:translateY(-1px)}
+
+@media(min-width:960px){
+  .app{grid-template-columns:var(--rail) 1fr}
+  .rail{display:flex; flex-direction:column; gap:2px; padding:var(--s4) var(--s3);
+    border-right:1px solid var(--linea); background:var(--sup); position:sticky; top:0;
+    height:100vh; overflow-y:auto}
+  .rail .marcaapp{padding:var(--s2) var(--s2) var(--s5)}
+  .rail button{justify-content:flex-start; border:0; background:none; padding:9px 11px;
+    font-size:.88rem; color:var(--tinta2); border-radius:var(--r2); font-weight:550}
+  .rail button:hover{background:var(--sup3); border:0}
+  .rail button[aria-current="page"]{background:var(--marca-suave); color:var(--marca-t);
+    font-weight:650}
+  .rail .ic{font-size:1.05rem; width:22px; text-align:center}
+  .rail .pin{margin-top:auto; font-size:.72rem; color:var(--tinta3); padding:var(--s3) var(--s2) 0;
+    border-top:1px solid var(--linea)}
+  .nav{display:none}
+  .zona{padding:0 var(--s6) var(--s6)}
+  .barra{margin:0 calc(var(--s6)*-1) var(--s5); padding:var(--s3) var(--s6)}
+  .barra .marcaapp{display:none}
+  .barra .fila{justify-content:flex-end}
+  .hud{top:60px}
+}
+@media(max-width:400px){
+  .kpi .v{font-size:1.45rem}
+  h1{font-size:1.35rem}
+}
+:focus-visible{outline:2px solid var(--marca); outline-offset:2px; border-radius:4px}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important; transition-duration:.01ms !important}
+}
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:sube .32s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes sube{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" id="rail"></aside>
+  <div class="zona">
+    <div class="barra"><div class="fila" id="barra"></div></div>
+    <main class="limite" id="app"></main>
+  </div>
+</div>
+<nav class="nav" id="nav"></nav>
+<div class="globo" id="globo"></div>
+<script>
+"use strict";
+const DATOS = /*<DATOS>*/{"preguntas":[],"areas":{},"plan":null,"escalas":null,"config":null}/*</DATOS>*/;
+/* El bloque de arriba se reemplaza al exportar. Con los valores por defecto la
+   plantilla sigue siendo un HTML válido que se puede abrir tal cual. */
+
+/* ===========================================================================
+   NUCLEO — cálculo puro, sin pantalla ni navegador.
+
+   Estas funciones son la traducción exacta de icfes/puntaje.py y icfes/plan.py.
+   Que sean exactas no es una promesa: hay una prueba (test_nucleo_web.py) que
+   corre este mismo bloque con node y compara sus resultados contra los de
+   Python. Si alguna se desvía, la prueba falla.
+
+   Por eso NO pueden tocar el DOM ni leer variables globales: reciben todo por
+   parámetro. Las marcas NUCLEO de abajo delimitan lo que la prueba extrae.
+   =========================================================================== */
+/* <NUCLEO> */
+
+/** Redondeo de Python (mitad al par), que NO es el de JavaScript.
+ *  Python: round(2.5) = 2.  JavaScript: Math.round(2.5) = 3.
+ *  Sin esto, el plan de la app se desviaría del de la consola en los empates. */
+function redondear(x){
+  const piso = Math.floor(x), resto = x - piso;
+  if (Math.abs(resto - 0.5) < 1e-9) return (piso % 2 === 0) ? piso : piso + 1;
+  return Math.round(x);
+}
+
+function interpolar(x, curva){
+  if (x <= curva[0][0]) return curva[0][1];
+  if (x >= curva[curva.length-1][0]) return curva[curva.length-1][1];
+  for (let i = 0; i < curva.length - 1; i++){
+    const [x0,y0] = curva[i], [x1,y1] = curva[i+1];
+    if (x >= x0 && x <= x1) return x1 === x0 ? y1 : y0 + (y1-y0)*(x-x0)/(x1-x0);
+  }
+  return curva[curva.length-1][1];
+}
+
+/** Estimación del puntaje de área (0 a 100). NO es el puntaje del ICFES. */
+function puntajeArea(correctas, total, curva){
+  if (total <= 0) return 0;
+  return redondear(interpolar(correctas/total, curva));
+}
+
+/** Qué proporción hay que acertar para llegar a ese puntaje. */
+function proporcionParaPuntaje(puntaje, curva){
+  return interpolar(puntaje, curva.map(([x,y]) => [y,x]));
+}
+
+/** Puntaje global 0-500 con la fórmula oficial del ICFES. */
+function puntajeGlobal(porArea, areas, orden){
+  let num = 0, den = 0;
+  for (const k of orden){
+    if (porArea[k] === undefined || porArea[k] === null) return null;
+    num += porArea[k] * areas[k].peso; den += areas[k].peso;
+  }
+  return den ? redondear(num/den*5) : null;
+}
+
+/** Reparte una meta global (0-500) en metas por área (0-100). */
+function metaPorArea(metaGlobal, actuales, areas, orden){
+  const objetivo = metaGlobal/5;
+  if (!actuales) { const r = {}; for (const a of orden) r[a] = redondear(objetivo); return r; }
+  const pesoTotal = orden.reduce((s,a) => s + areas[a].peso, 0);
+  const igActual = orden.reduce((s,a) => s + actuales[a]*areas[a].peso, 0) / pesoTotal;
+  if (objetivo - igActual <= 0){
+    const r = {}; for (const a of orden) r[a] = redondear(Math.min(100, actuales[a])); return r;
+  }
+  const metas = {}; for (const a of orden) metas[a] = actuales[a];
+  for (let vuelta = 0; vuelta < 20; vuelta++){
+    const ig = orden.reduce((s,a) => s + metas[a]*areas[a].peso, 0) / pesoTotal;
+    const falta = objetivo - ig;
+    if (falta <= 0.01) break;
+    const margen = {}; for (const a of orden) margen[a] = Math.max(0, 100 - metas[a]);
+    const capacidad = orden.reduce((s,a) => s + margen[a]*areas[a].peso, 0) / pesoTotal;
+    if (capacidad <= 0) break;
+    const factor = Math.min(1, falta/capacidad);
+    for (const a of orden) metas[a] = Math.min(100, metas[a] + margen[a]*factor);
+  }
+  const r = {}; for (const a of orden) r[a] = redondear(metas[a]); return r;
+}
+
+/** Reparte "total" unidades entre claves según sus pesos (método del resto mayor). */
+function repartirEntero(pares, total){
+  const claves = pares.map(p => p[0]);
+  const salida = {}; for (const c of claves) salida[c] = 0;
+  if (total <= 0 || !claves.length) return salida;
+  const suma = pares.reduce((s,p) => s + p[1], 0);
+  if (suma <= 0) return salida;
+  const exactos = {};
+  for (const [c,p] of pares){ exactos[c] = p/suma*total; salida[c] = Math.floor(exactos[c]); }
+  const faltan = total - claves.reduce((s,c) => s + salida[c], 0);
+  const orden = claves.slice().sort((a,b) => {
+    const da = exactos[a]-salida[a], db = exactos[b]-salida[b];
+    if (da !== db) return db - da;          // resto mayor primero
+    return a < b ? 1 : a > b ? -1 : 0;      // desempate por nombre, al revés (reverse=True)
+  });
+  for (let i = 0; i < faltan; i++) salida[orden[i % orden.length]] += 1;
+  return salida;
+}
+
+/** Qué parte del tiempo semanal se lleva cada área (suma 1). */
+function repartirHoras(diagnostico, metaGlobal, areas, orden, piso){
+  const metas = metaPorArea(metaGlobal, diagnostico, areas, orden);
+  const prioridad = {};
+  for (const a of orden){
+    const brecha = Math.max(0, metas[a] - diagnostico[a]) / 100;
+    prioridad[a] = areas[a].peso * (0.15 + brecha);
+  }
+  const total = orden.reduce((s,a) => s + prioridad[a], 0);
+  if (total <= 0){ const r = {}; for (const a of orden) r[a] = 1/orden.length; return r; }
+  let reparto = {}; for (const a of orden) reparto[a] = prioridad[a]/total;
+  const bajos = orden.filter(a => reparto[a] < piso);
+  if (bajos.length){
+    const sobrante = 1 - piso*bajos.length;
+    const resto = orden.filter(a => !bajos.includes(a))
+                       .reduce((s,a) => s + reparto[a], 0);
+    const ajustado = {};
+    for (const a of orden){
+      ajustado[a] = bajos.includes(a) ? piso : (reparto[a]/resto)*sobrante;
+    }
+    reparto = ajustado;
+  }
+  return reparto;
+}
+
+/** A qué fase pertenece la semana número N. */
+function faseDeSemana(numero, totalSemanas, fases){
+  let acumulado = 0;
+  for (const fase of fases){
+    acumulado += fase.proporcion;
+    if (numero <= Math.max(1, redondear(acumulado*totalSemanas))) return fase;
+  }
+  return fases[fases.length-1];
+}
+
+/* --- fechas como número de día, en UTC, para no sufrir con los husos ------ */
+function aDias(iso){ const [a,m,d] = iso.split("-").map(Number); return Date.UTC(a,m-1,d)/86400000; }
+function deDias(n){ return new Date(n*86400000).toISOString().slice(0,10); }
+
+/** Sobre qué se trabaja un bloque: una competencia o un componente. */
+function focoDe(area, tipo, semilla, areas){
+  const f = areas[area];
+  if (tipo === "practica" || tipo === "simulacro_area")
+    return f.competencias[semilla % f.competencias.length];
+  if (tipo === "teoria") return f.componentes[semilla % f.componentes.length];
+  if (tipo === "repaso") return "Lo que venza hoy en el repaso espaciado";
+  if (tipo === "cuaderno_errores") return "Errores marcados sin resolver";
+  return "Examen completo";
+}
+
+/** Arma el plan completo, semana por semana, hasta el día antes del examen. */
+function generarPlan(diagnostico, examenISO, metaGlobal, horasSemana, inicioISO, cfg, diasPorSemana){
+  diasPorSemana = diasPorSemana || 6;
+  const areas = cfg.areasFicha, orden = cfg.orden_areas, fases = cfg.fases;
+  const reparto = repartirHoras(diagnostico, metaGlobal, areas, orden, cfg.piso_area);
+  const inicio = aDias(inicioISO), examen = aDias(examenISO);
+  const totalSemanas = Math.max(1, Math.floor((examen - inicio)/7));
+  const porSemana = Math.max(diasPorSemana, redondear(horasSemana*60/cfg.minutos_bloque));
+  const semanas = [];
+
+  for (let numero = 1; numero <= totalSemanas; numero++){
+    const arranque = inicio + (numero-1)*7;
+    const cierre = Math.min(arranque + 6, examen - 1);
+    const fase = faseDeSemana(numero, totalSemanas, fases);
+    const ultima = numero === totalSemanas;
+    const cupo = ultima ? redondear(porSemana*0.6) : porSemana;
+    const mezcla = ultima ? [["repaso",0.6],["cuaderno_errores",0.4]] : fase.mezcla;
+
+    const porArea = repartirEntero(orden.map(a => [a, reparto[a]]), cupo);
+    const porTipo = repartirEntero(mezcla, cupo);
+
+    const tipos = [];
+    for (const [t] of mezcla) for (let i = 0; i < (porTipo[t]||0); i++) tipos.push(t);
+
+    const intercaladas = [];
+    const pendiente = Object.assign({}, porArea);
+    while (intercaladas.length < cupo){
+      let movio = false;
+      for (const a of orden){
+        if (pendiente[a] > 0 && intercaladas.length < cupo){
+          intercaladas.push(a); pendiente[a] -= 1; movio = true;
+        }
+      }
+      if (!movio) break;
+    }
+
+    const bloques = [];
+    const cuantos = Math.min(intercaladas.length, tipos.length);
+    for (let i = 0; i < cuantos; i++){
+      const area = intercaladas[i], tipo = tipos[i];
+      let dia = arranque + (i % diasPorSemana);
+      if (dia > cierre) dia = cierre;
+      bloques.push({fecha:deDias(dia), tipo, minutos:cfg.minutos_bloque, area,
+                    foco:focoDe(area, tipo, i + numero, areas)});
+    }
+
+    const cada = {"Entrenamiento de examen":2, "Afinamiento":1}[fase.nombre];
+    if (cada && numero % cada === 0 && !ultima){
+      const libre = Math.min(arranque + diasPorSemana, cierre);
+      bloques.push({fecha:deDias(libre), tipo:"simulacro_completo",
+                    minutos:cfg.minutos_simulacro, area:null,
+                    foco: Math.floor(numero/cada) % 2 === 1 ? "Sesión 1" : "Sesión 2"});
+    }
+    bloques.sort((x,y) => x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1
+                          : (x.tipo < y.tipo ? -1 : x.tipo > y.tipo ? 1 : 0));
+    semanas.push({numero, inicio:deDias(arranque), fin:deDias(cierre),
+                  fase:fase.nombre, bloques});
+  }
+  return {inicio:inicioISO, examen:examenISO, meta:metaGlobal, horas:horasSemana,
+          reparto, semanas};
+}
+
+/** Repetición espaciada (SM-2), igual que icfes/repaso.py. */
+function calificarTarjeta(tarjeta, calidad, hoyISO, examenISO){
+  const t = tarjeta || {reps:0, facilidad:2.5, intervalo:0, proxima:null};
+  let reps, intervalo;
+  if (calidad < 3){ reps = 0; intervalo = 1; }
+  else {
+    reps = t.reps + 1;
+    intervalo = reps === 1 ? 1 : reps === 2 ? 6
+              : Math.max(1, redondear(t.intervalo * t.facilidad));
+  }
+  const ajuste = 0.1 - (5-calidad)*(0.08 + (5-calidad)*0.02);
+  const facilidad = Math.max(1.3, t.facilidad + ajuste);
+  let proxima = deDias(aDias(hoyISO) + intervalo);
+  if (examenISO && proxima >= examenISO){
+    proxima = deDias(Math.max(aDias(hoyISO) + 1, aDias(examenISO) - 1));
+  }
+  return {reps, facilidad:Math.round(facilidad*10000)/10000, intervalo, proxima};
+}
+
+/** De lo que pasó al responder a una calificación de 0 a 5. */
+function calidadDe(acerto, segundos, causa){
+  if (!acerto) return (causa === "concepto" || causa === "adivine") ? 0
+                    : (causa === "descuido" || causa === "tiempo") ? 2 : 1;
+  if (segundos === null || segundos === undefined) return 4;
+  if (segundos > 180) return 3;
+  if (segundos > 72) return 4;
+  return 5;
+}
+/* </NUCLEO> */
+
+/* ===========================================================================
+   Guardado en el navegador. Todo envuelto en try/catch porque en una ventana
+   privada, o con las cookies bloqueadas, localStorage lanza excepción: un
+   estudiante no puede quedarse sin app por eso.
+   =========================================================================== */
+const CLAVE = "icfes.v2";
+const CFG = Object.assign({}, DATOS.plan, {areasFicha: DATOS.areas});
+const ORDEN = DATOS.plan ? DATOS.plan.orden_areas : [];
+const CURVA = DATOS.escalas ? DATOS.escalas.curva : [[0,0],[1,100]];
+const BASE = {config:DATOS.config, intentos:[], tarjetas:{}, simulacros:[], marcadas:[], hechos:{}};
+
+function leerGuardado(){
+  try{ const c = localStorage.getItem(CLAVE); if(c) return JSON.parse(c); }catch(e){}
+  try{ const v = localStorage.getItem("icfes.v1"); if(v) return JSON.parse(v); }catch(e){}
+  return null;
+}
+let E = Object.assign({}, BASE, leerGuardado() || {});
+if(!E.config) E.config = DATOS.config;
+if(!E.marcadas) E.marcadas = [];
+if(!E.hechos) E.hechos = {};
+function guardar(){ try{ localStorage.setItem(CLAVE, JSON.stringify(E)); }catch(e){} }
+
+/* ------------------------------------------------------------- utilidades */
+const DIAS = ["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
+const DIAS3 = ["lun","mar","mié","jue","vie","sáb","dom"];
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto",
+               "septiembre","octubre","noviembre","diciembre"];
+const MES3 = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function hoyISO(){ const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function diaSem(iso){ return (new Date(aDias(iso)*86400000).getUTCDay()+6)%7; }
+function fLarga(iso){ const [a,m,d]=iso.split("-").map(Number);
+  return `${DIAS[diaSem(iso)]} ${d} de ${MESES[m-1]} de ${a}`; }
+function fCorta(iso){ const [,m,d]=iso.split("-").map(Number); return `${DIAS3[diaSem(iso)]} ${d} ${MES3[m-1]}`; }
+function fMini(iso){ const [,m,d]=iso.split("-").map(Number); return `${d} ${MES3[m-1]}`; }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function neg(s){ return s.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>"); }
+function txt(s){ return neg(esc(s)); }
+function plural(n, uno, muchos){ return n === 1 ? uno : muchos; }
+
+function semaforo(p){
+  for(const [tope,etq,consejo] of (DATOS.escalas?DATOS.escalas.semaforo:[])){
+    if(p < tope) return {etq, consejo, clase:{["crítico"]:"critico",["en construcción"]:"serio",
+      ["sólido"]:"marca",["alto"]:"bien"}[etq] || "marca"};
+  }
+  return {etq:"alto", consejo:"", clase:"bien"};
+}
+function nivelIngles(p){
+  for(const [tope,nivel,desc] of (DATOS.escalas?DATOS.escalas.ingles:[])) if(p<tope) return {nivel,desc};
+  return {nivel:"B1", desc:""};
+}
+function nombreArea(k){ return DATOS.areas[k] ? DATOS.areas[k].nombre : k; }
+
+/* -------------------------------------------------------------- consultas */
+function diagnostico(){
+  const conTodo = E.simulacros.filter(s => s.global !== null && s.global !== undefined);
+  if(conTodo.length){
+    const u = conTodo[conTodo.length-1];
+    if(ORDEN.every(a => u.porArea[a] !== undefined)) return {datos:u.porArea, real:true};
+  }
+  const r = {}; for(const a of ORDEN) r[a] = 50;
+  return {datos:r, real:false};
+}
+function planActual(){
+  const c = E.config;
+  if(!c || !c.examen) return null;
+  const hoy = hoyISO();
+  if(aDias(c.examen) <= aDias(hoy)) return null;
+  const arranque = E.intentos.length ? E.intentos[0].fecha : hoy;
+  const desde = aDias(arranque) < aDias(hoy) ? arranque : hoy;
+  return generarPlan(diagnostico().datos, c.examen, c.meta || 400,
+                     c.horas || 12, desde, CFG, c.dias || 6);
+}
+function bloquesDe(plan, iso){
+  if(!plan) return [];
+  for(const s of plan.semanas) if(s.inicio <= iso && iso <= s.fin)
+    return s.bloques.filter(b => b.fecha === iso);
+  return [];
+}
+function semanaDe(plan, iso){
+  if(!plan) return null;
+  return plan.semanas.find(s => s.inicio <= iso && iso <= s.fin) || null;
+}
+function vencidas(iso){
+  return DATOS.preguntas.filter(p => { const t = E.tarjetas[p.id];
+    return t && t.proxima && t.proxima <= iso; });
+}
+function racha(iso){
+  const dias = new Set(E.intentos.map(i => i.fecha));
+  if(!dias.size) return 0;
+  let cursor = aDias(iso);
+  if(!dias.has(deDias(cursor))) cursor -= 1;
+  let n = 0;
+  while(dias.has(deDias(cursor))){ n++; cursor -= 1; }
+  return n;
+}
+function conGlobal(){ return E.simulacros.filter(s => s.global !== null && s.global !== undefined); }
+
+/** La serie de puntaje global para las gráficas de tiempo.
+ *  Si en un mismo día se hicieron varios simulacros, se queda el ÚLTIMO: dos
+ *  puntos en la misma fecha se dibujan uno encima del otro y el globo de datos
+ *  ya no sabe a cuál se refiere. La tabla («Ver tabla») sí los muestra todos,
+ *  así que no se esconde ningún resultado. */
+function serieGlobal(){
+  const porDia = new Map();
+  for(const s of conGlobal()) porDia.set(s.fecha, s.global);
+  return [...porDia.entries()].sort((a,b) => a[0] < b[0] ? -1 : 1)
+    .map(([fecha,v]) => ({fecha, v}));
+}
+function dominioPorCompetencia(minimo){
+  const acum = {};
+  for(const i of E.intentos){
+    const a = acum[i.competencia] || (acum[i.competencia] = {bien:0, total:0, area:i.area});
+    a.total++; if(i.acerto) a.bien++;
+  }
+  return Object.entries(acum).filter(([,v]) => v.total >= (minimo||4))
+    .map(([k,v]) => ({nombre:k, p:v.bien/v.total, n:v.total, area:v.area}))
+    .sort((x,y) => x.p - y.p);
+}
+
+/* ===========================================================================
+   Gráficas. Colores desde los tokens validados: una sola serie va toda del
+   mismo tono (es UN dato, no cinco categorías), y el estado se dice con texto
+   además del color, para que un daltónico lea lo mismo.
+   =========================================================================== */
+const globo = () => document.getElementById("globo");
+function mostrarGlobo(html, x, y){
+  const g = globo(); if(!g) return;
+  g.innerHTML = html; g.classList.add("ver");
+  const r = g.getBoundingClientRect();
+  let iz = x - r.width/2, ar = y - r.height - 12;
+  iz = Math.max(8, Math.min(iz, window.innerWidth - r.width - 8));
+  if(ar < 8) ar = y + 16;
+  g.style.left = iz+"px"; g.style.top = ar+"px";
+}
+function ocultarGlobo(){ const g = globo(); if(g) g.classList.remove("ver"); }
+
+/** Línea de progreso en el tiempo, con la meta como referencia punteada. */
+function graficaLinea(puntos, meta, id){
+  if(puntos.length < 2) return "";
+  const An = 640, Al = 190, mI = 38, mD = 46, mA = 14, mB = 26;
+  const x0 = aDias(puntos[0].fecha), x1 = aDias(puntos[puntos.length-1].fecha);
+  const vals = puntos.map(p => p.v).concat(meta ? [meta] : []);
+  let yMin = Math.max(0, Math.min(...vals) - 40), yMax = Math.min(500, Math.max(...vals) + 40);
+  if(yMax - yMin < 80){ yMax = Math.min(500, yMin + 80); }
+  const ex = v => mI + (x1 === x0 ? 0 : (aDias(v)-x0)/(x1-x0)) * (An-mI-mD);
+  const ey = v => mA + (1 - (v-yMin)/(yMax-yMin)) * (Al-mA-mB);
+  const d = puntos.map((p,i) => (i?"L":"M") + ex(p.fecha).toFixed(1) + " " + ey(p.v).toFixed(1)).join(" ");
+  const area = d + ` L${ex(puntos[puntos.length-1].fecha).toFixed(1)} ${Al-mB} L${ex(puntos[0].fecha).toFixed(1)} ${Al-mB} Z`;
+  const pasos = 4, lineas = [];
+  for(let i = 0; i <= pasos; i++){
+    const v = yMin + (yMax-yMin)*i/pasos, y = ey(v);
+    lineas.push(`<line class="rejilla-l" x1="${mI}" y1="${y.toFixed(1)}" x2="${An-mD}" y2="${y.toFixed(1)}"/>
+      <text class="eje-t" x="${mI-7}" y="${(y+3.5).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`);
+  }
+  const metaL = meta ? `<line class="meta-l" x1="${mI}" y1="${ey(meta).toFixed(1)}" x2="${An-mD}" y2="${ey(meta).toFixed(1)}"/>
+    <text class="meta-t" x="${An-mD+5}" y="${(ey(meta)+3.5).toFixed(1)}">meta ${meta}</text>` : "";
+  const pts = puntos.map((p,i) => `<circle class="pto${i===puntos.length-1?" fin":""}" r="${i===puntos.length-1?5.5:3.5}"
+    cx="${ex(p.fecha).toFixed(1)}" cy="${ey(p.v).toFixed(1)}"/>`).join("");
+  const anchoZona = Math.max(6, Math.min(30, (An-mI-mD)/Math.max(1, puntos.length-1)));
+  const zonas = puntos.map((p,i) => {
+    const cx = ex(p.fecha);
+    return `<rect x="${(cx-anchoZona/2).toFixed(1)}" y="${mA}" width="${anchoZona.toFixed(1)}"
+      height="${Al-mA-mB}" fill="transparent" data-f="${p.fecha}" data-v="${p.v}"
+      data-x="${cx.toFixed(1)}" class="zn" style="cursor:crosshair"/>`;
+  }).join("");
+  const primeros = `<text class="eje-t" x="${mI}" y="${Al-6}">${fMini(puntos[0].fecha)}</text>
+    <text class="eje-t" x="${An-mD}" y="${Al-6}" text-anchor="end">${fMini(puntos[puntos.length-1].fecha)}</text>`;
+  return `<svg viewBox="0 0 ${An} ${Al}" role="img" aria-label="Puntaje global en el tiempo" id="${id}">
+    ${lineas.join("")}${metaL}
+    <path class="serie-a" d="${area}"/><path class="serie-l" d="${d}"/>
+    <line class="cruz" id="${id}-cruz" x1="0" y1="${mA}" x2="0" y2="${Al-mB}" style="opacity:0"/>
+    ${pts}${primeros}${zonas}
+  </svg>`;
+}
+function activarLinea(id){
+  const svg = document.getElementById(id); if(!svg) return;
+  const cruz = document.getElementById(id+"-cruz");
+  svg.querySelectorAll(".zn").forEach(z => {
+    const dentra = ev => {
+      const r = (ev.touches ? ev.touches[0] : ev);
+      cruz.setAttribute("x1", z.dataset.x); cruz.setAttribute("x2", z.dataset.x);
+      cruz.style.opacity = "1";
+      mostrarGlobo(`<b>${z.dataset.v} pts</b>${fCorta(z.dataset.f)}`, r.clientX, r.clientY);
+    };
+    z.addEventListener("mouseenter", dentra);
+    z.addEventListener("mousemove", dentra);
+    z.addEventListener("touchstart", dentra, {passive:true});
+    z.addEventListener("mouseleave", () => { cruz.style.opacity="0"; ocultarGlobo(); });
+  });
+  svg.addEventListener("mouseleave", () => { cruz.style.opacity="0"; ocultarGlobo(); });
+}
+
+/** Barras por área. Una sola serie (todas del mismo tono) + marca de meta. */
+function barrasAreas(porArea, metas){
+  return `<div class="barras">` + ORDEN.map(k => {
+    const v = porArea[k]; if(v === undefined) return "";
+    const s = semaforo(v), m = metas ? metas[k] : null;
+    return `<div class="br">
+      <span class="n">${esc(nombreArea(k))}</span>
+      <span class="v"><span class="num">${v}</span><span class="ficha ${s.clase}"><i class="pt"></i>${s.etq}</span></span>
+      <span class="pista" data-globo="${esc(nombreArea(k))}: ${v} de 100${m?` · meta ${m}`:""}">
+        <i class="relleno" style="width:${v}%"></i>
+        ${m ? `<i class="meta" style="left:${m}%" data-t="${m}"></i>` : ""}
+      </span></div>`;
+  }).join("") + `</div>`;
+}
+
+/** Columnas pequeñas: cuántos repasos caen cada día de la próxima semana. */
+function columnasRepaso(iso){
+  const agenda = [];
+  for(let i = 0; i < 7; i++){
+    const f = deDias(aDias(iso)+i);
+    let n = 0;
+    for(const p of DATOS.preguntas){
+      const t = E.tarjetas[p.id];
+      if(!t || !t.proxima) continue;
+      if(i === 0 ? t.proxima <= f : t.proxima === f) n++;
+    }
+    agenda.push({f, n});
+  }
+  const max = Math.max(1, ...agenda.map(a => a.n));
+  return `<div class="cols">` + agenda.map(a => `<div class="col">
+      <span class="q">${a.n || ""}</span>
+      <span class="b${a.n?"":" vacio"}" style="height:${a.n?Math.max(6,a.n/max*58):3}px"
+        data-globo="${a.n} ${plural(a.n,"repaso","repasos")} · ${fCorta(a.f)}"></span>
+      <span class="e">${DIAS3[diaSem(a.f)]}</span></div>`).join("") + `</div>`;
+}
+
+/** Calendario de estudio: rampa secuencial de un solo tono (validada). */
+function calendarioEstudio(iso){
+  const porDia = {};
+  for(const i of E.intentos) porDia[i.fecha] = (porDia[i.fecha]||0)+1;
+  const ultimo = E.intentos.length
+    ? E.intentos.reduce((m,i) => i.fecha > m ? i.fecha : m, E.intentos[0].fecha) : iso;
+  const fin = Math.max(aDias(iso), aDias(ultimo));
+  const ini = fin - 363 - diaSem(deDias(fin-363));
+  const celdas = [];
+  for(let d = ini; d <= fin; d++){
+    const f = deDias(d), n = porDia[f] || 0;
+    const nivel = n === 0 ? 0 : n < 5 ? 1 : n < 12 ? 2 : n < 25 ? 3 : 4;
+    celdas.push(`<i data-n="${nivel}" data-globo="${n} ${plural(n,'pregunta','preguntas')} · ${fCorta(f)}"></i>`);
+  }
+  return `<div class="cal" style="grid-template-columns:repeat(${Math.ceil(celdas.length/7)},1fr);
+    grid-auto-flow:column; grid-template-rows:repeat(7,1fr)">${celdas.join("")}</div>
+    <div class="cal-ley">menos <i></i><i data-n="1" style="background:var(--rampa1)"></i>
+      <i data-n="2" style="background:var(--rampa2)"></i><i data-n="3" style="background:var(--rampa3)"></i>
+      <i data-n="4" style="background:var(--rampa4)"></i> más</div>`;
+}
+
+/** Mini gráfica por área: una serie por recuadro, sin colores que compitan. */
+function sparkline(valores){
+  if(valores.length < 2) return `<svg viewBox="0 0 90 26"></svg>`;
+  const mn = Math.min(...valores), mx = Math.max(...valores), rango = mx-mn || 1;
+  const d = valores.map((v,i) => (i?"L":"M") + (i/(valores.length-1)*86+2).toFixed(1) + " "
+    + (23 - (v-mn)/rango*20).toFixed(1)).join(" ");
+  return `<svg viewBox="0 0 90 26" aria-hidden="true"><path class="serie-l" d="${d}"/>
+    <circle class="pto" r="3" cx="88" cy="${(23-(valores[valores.length-1]-mn)/rango*20).toFixed(1)}"/></svg>`;
+}
+function multiplesPorArea(){
+  const hist = conGlobal();
+  if(hist.length < 2) return "";
+  return `<div class="multis">` + ORDEN.map(k => {
+    const vals = hist.map(s => s.porArea[k]).filter(v => v !== undefined);
+    if(!vals.length) return "";
+    const ult = vals[vals.length-1], prim = vals[0], dif = ult - prim;
+    return `<div class="multi"><div class="t">${esc(nombreArea(k))}</div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px">
+        <span class="v">${ult}</span>
+        <span class="mini num" style="color:var(--${dif>0?'bien-t':dif<0?'critico-t':'tinta3'})">
+          ${dif>0?"+":""}${dif}</span></div>
+      ${sparkline(vals)}</div>`;
+  }).join("") + `</div>`;
+}
+
+/* Globos de datos para cualquier elemento con data-globo */
+function activarGlobos(raiz){
+  raiz.querySelectorAll("[data-globo]").forEach(el => {
+    const ver = ev => { const r = ev.touches ? ev.touches[0] : ev;
+      mostrarGlobo(esc(el.dataset.globo), r.clientX, r.clientY); };
+    el.addEventListener("mouseenter", ver);
+    el.addEventListener("mousemove", ver);
+    el.addEventListener("touchstart", ver, {passive:true});
+    el.addEventListener("mouseleave", ocultarGlobo);
+  });
+}
+
+/* ===========================================================================
+   Navegación y pantallas
+   =========================================================================== */
+const VISTAS = [["inicio","🏠","Inicio"],["estudiar","✍️","Estudiar"],
+                ["simulacro","⏱️","Simulacro"],["progreso","📈","Progreso"],
+                ["plan","🗓️","Plan"],["ajustes","⚙️","Ajustes"]];
+let vista = "inicio", sesion = null, cronoID = null, BLOQUES_HOY = [];
+
+function ir(v){
+  if(sesion && !confirmarSalida()) return;
+  vista = v; sesion = null; pintar(); window.scrollTo(0,0);
+}
+function confirmarSalida(){
+  if(sesion.i >= sesion.preguntas.length) return true;
+  return confirm("Tienes una sesión sin terminar. ¿Salir de todos modos? Lo respondido queda guardado.");
+}
+
+function pintar(){
+  const c = E.config;
+  const dias = c && c.examen ? aDias(c.examen) - aDias(hoyISO()) : null;
+  document.getElementById("rail").innerHTML =
+    `<div class="marcaapp"><span class="sello">S11</span><b>Preparación ICFES</b></div>` +
+    VISTAS.map(([id,ic,t]) => `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
+      <span class="ic">${ic}</span>${t}</button>`).join("") +
+    `<div class="pin">${c&&c.examen ? `Examen<br><b>${fLarga(c.examen)}</b>` : "Sin fecha de examen"}</div>`;
+  document.getElementById("nav").innerHTML = VISTAS.map(([id,ic,t]) =>
+    `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
+      <span class="ic">${ic}</span>${t}</button>`).join("");
+  document.getElementById("barra").innerHTML =
+    `<div class="marcaapp"><span class="sello">S11</span><b>Preparación ICFES</b></div>` +
+    (dias !== null ? `<div class="cuenta"><b class="num">${dias > 0 ? dias : 0}</b>
+      <span class="mini tenue">${dias > 0 ? plural(dias,"día para el examen","días para el examen")
+        : dias === 0 ? "¡el examen es hoy!" : "el examen ya pasó"}</span></div>` : "");
+
+  const app = document.getElementById("app");
+  const render = {inicio:vInicio, estudiar:vEstudiar, simulacro:vSimulacro,
+                  progreso:vProgreso, plan:vPlan, ajustes:vAjustes}[vista];
+  app.innerHTML = sesion ? vSesion() : render();
+  app.classList.toggle("lectura", !!sesion);
+  app.querySelectorAll(".entra").forEach((el,i) => el.style.animationDelay = (i*40)+"ms");
+  activarGlobos(app);
+  if(document.getElementById("g-progreso")) activarLinea("g-progreso");
+  if(sesion && sesion.i < sesion.preguntas.length) arrancarCrono();
+}
+
+/* -------------------------------------------------------------- INICIO --- */
+function vInicio(){
+  const c = E.config, hoy = hoyISO();
+  if(!c || !c.examen) return bienvenida();
+  const plan = planActual(), sem = semanaDe(plan, hoy);
+  const bloques = bloquesDe(plan, hoy);
+  const porRepasar = vencidas(hoy).length;
+  const hist = conGlobal(), ult = hist[hist.length-1], previo = hist[hist.length-2];
+  const diag = diagnostico();
+  const dias = aDias(c.examen) - aDias(hoy);
+
+  let h = `<div class="entra">`;
+  h += `<h1>${saludo()}</h1>
+    <p class="tenue">${fLarga(hoy)}${sem ? ` · semana ${sem.numero} de ${plan.semanas.length}
+      · fase «${esc(sem.fase)}»` : ""}</p>`;
+
+  h += `<div class="kpis" style="margin-top:var(--s4)">
+    <div class="kpi"><span class="d">Último puntaje</span>
+      <span class="v">${ult ? ult.global : "—"}</span>
+      <span class="d">${ult && previo ? `<span class="delta ${ult.global>=previo.global?"sube":"baja"}">
+        ${ult.global>=previo.global?"▲":"▼"} ${Math.abs(ult.global-previo.global)}</span> vs. anterior`
+        : "de 500"}</span></div>
+    <div class="kpi"><span class="d">Meta</span><span class="v">${c.meta||400}</span>
+      <span class="d">${ult ? `faltan ${Math.max(0,(c.meta||400)-ult.global)}` : "de 500"}</span></div>
+    <div class="kpi"><span class="d">Racha</span><span class="v">${racha(hoy)}</span>
+      <span class="d">${plural(racha(hoy),"día seguido","días seguidos")}</span></div>
+    <div class="kpi"><span class="d">Repasos hoy</span><span class="v">${porRepasar}</span>
+      <span class="d">${porRepasar ? "ya vencidos" : "al día"}</span></div>
+  </div>`;
+
+  if(!diag.real){
+    h += `<div class="tarjeta acento"><div class="enc"><div>
+      <span class="rot">Primer paso</span><h2>Todavía no sabes de dónde partes</h2></div></div>
+      <p class="tenue">El plan está repartiendo tus ${c.horas||12} horas semanales suponiendo que
+      estás en 50 sobre 100 en las cinco áreas. Un simulacro completo lo ajusta a tu nivel real
+      y cambia el reparto.</p>
+      <p class="tenue mini">Va a darte bajo, y eso es lo que se busca: no mide cuánto sabes,
+      mide dónde poner las horas.</p>
+      <button class="pri" onclick="ir('simulacro')">Hacer el diagnóstico</button></div>`;
+  }
+
+  h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Hoy</span>
+    <h2>${bloques.length ? `${bloques.length} ${plural(bloques.length,"bloque","bloques")}
+      · ${bloques.reduce((s,b)=>s+b.minutos,0)} minutos` : "Día de descanso"}</h2></div>
+    ${porRepasar ? `<button class="pri" onclick="iniciarRepaso()">Repasar ${Math.min(porRepasar,20)}</button>` : ""}
+    </div>`;
+  if(!bloques.length){
+    h += `<p class="tenue">Descansar también es parte del plan. Si quieres adelantar,
+      practica lo que quieras desde <b>Estudiar</b>.</p>`;
+  } else {
+    BLOQUES_HOY = bloques;
+    h += `<div class="bloques">` + bloques.map((b,i) => {
+      const clave = b.fecha+"|"+i, hecho = E.hechos[clave];
+      const ic = {teoria:"📖",practica:"✍️",repaso:"🔁",simulacro_area:"⏱️",
+                  simulacro_completo:"🎯",cuaderno_errores:"📕"}[b.tipo] || "•";
+      return `<div class="bloque-p${hecho?" hecho":""}">
+        <span class="ic">${ic}</span>
+        <span class="tx"><b>${b.area?esc(nombreArea(b.area)):"Todo el examen"} · ${
+          esc(CFG.sesiones[b.tipo].etiqueta)}</b>
+          <span>${esc(b.foco)} · ${b.minutos} min</span></span>
+        <span class="fila-btn">
+          <button class="fantasma" title="Marcar como hecho" onclick="marcarHecho('${clave}')">
+            ${hecho?"✓":"○"}</button>
+          <button onclick="arrancarBloque(${i})">Empezar</button>
+        </span></div>`;
+    }).join("") + `</div>`;
+  }
+  h += `</div>`;
+
+  if(serieGlobal().length >= 2){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Puntaje global</span>
+      <h2>Cómo vas en el año</h2></div>
+      <button class="fantasma mini" onclick="alternarTabla('t-progreso')">Ver tabla</button></div>
+      <div class="viz">${graficaLinea(serieGlobal(), c.meta||400, "g-progreso")}</div>
+      <div id="t-progreso" hidden class="desliza"><table class="datos">
+        <tr><th>Fecha</th><th class="n">Global</th><th class="n">Aciertos</th></tr>` +
+        hist.slice().reverse().map(s=>`<tr><td>${fCorta(s.fecha)}</td>
+          <td class="n">${s.global}</td><td class="n">${s.bien}/${s.total}</td></tr>`).join("") +
+      `</table></div></div>`;
+  }
+
+  if(diag.real){
+    const metas = metaPorArea(c.meta||400, diag.datos, DATOS.areas, ORDEN);
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Por área</span>
+      <h2>Dónde estás y a dónde tienes que llegar</h2></div></div>
+      ${barrasAreas(diag.datos, metas)}
+      <p class="mini tenue" style="margin:var(--s4) 0 0">La marca vertical es la meta que
+      necesitas en cada área para llegar a ${c.meta||400} puntos. Puntajes estimados por este
+      sistema, no oficiales del ICFES.</p></div>`;
+  }
+
+  if(Object.keys(E.tarjetas).length){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Repaso espaciado</span>
+      <h2>Lo que viene esta semana</h2></div></div>
+      ${columnasRepaso(hoy)}
+      <p class="mini tenue" style="margin-top:var(--s3)">Si un día se acumula mucho, adelanta
+      algo el día anterior. El repaso es lo que evita que lo de marzo se te olvide en agosto.</p></div>`;
+  }
+  return h + `</div>`;
+}
+function saludo(){
+  const h = new Date().getHours();
+  const n = (E.config && E.config.nombre) ? ", " + E.config.nombre : "";
+  return (h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches") + n;
+}
+function bienvenida(){
+  return `<div class="entra"><h1>Preparación ICFES Saber 11</h1>
+    <p class="tenue">Un sistema para prepararte durante todo el año: banco de preguntas con
+    explicación, plan de estudio, repaso espaciado y simulacros con el tiempo real del examen.</p>
+    <div class="tarjeta acento"><h2>Empecemos por lo básico</h2>
+      <p class="tenue">Necesito tres datos. Después el sistema arma solo el plan hasta el día
+      del examen.</p>
+      <button class="pri" onclick="ir('ajustes')">Configurar</button></div>
+    <div class="aviso info"><span class="ic">ℹ️</span><span>Todo lo que respondas se guarda
+      solo en este navegador. No se sube a ningún lado y funciona sin internet.</span></div></div>`;
+}
+function marcarHecho(clave){
+  if(E.hechos[clave]) delete E.hechos[clave]; else E.hechos[clave] = true;
+  guardar(); pintar();
+}
+function alternarTabla(id){
+  const t = document.getElementById(id); if(t) t.hidden = !t.hidden;
+}
+
+/* ------------------------------------------------------------ ESTUDIAR --- */
+let filtro = {area:"", competencia:"", dificultad:"", fuente:"nuevas", cuantas:10};
+
+function vEstudiar(){
+  const hoy = hoyISO(), porRepasar = vencidas(hoy).length;
+  const debiles = dominioPorCompetencia().slice(0,4);
+  const falladas = new Set(E.intentos.filter(i => !i.acerto).map(i => i.id));
+  const vistos = new Set(E.intentos.map(i => i.id));
+  let h = `<div class="entra"><h1>Estudiar</h1>
+    <p class="tenue">Después de cada pregunta vas a ver por qué la respuesta es la correcta y
+    cuál es la trampa. Lee la explicación también cuando aciertes.</p>`;
+
+  h += `<div class="rejilla dos">`;
+  h += `<div class="tarjeta${porRepasar?" acento":""}"><div class="enc"><div>
+      <span class="rot">Lo más rentable del día</span><h2>Repaso espaciado</h2></div></div>
+    <p class="tenue">${porRepasar ? `Tienes <b>${porRepasar}</b> ${plural(porRepasar,"pregunta que ya toca","preguntas que ya toca")}
+      volver a ver. Son las que estás a punto de olvidar.`
+      : "Nada pendiente por ahora. Vuelve mañana o practica preguntas nuevas."}</p>
+    <button class="pri bloque" ${porRepasar?"":"disabled"} onclick="iniciarRepaso()">
+      ${porRepasar ? `Repasar ${Math.min(porRepasar,20)} ${plural(Math.min(porRepasar,20),"pregunta","preguntas")}` : "Sin repasos pendientes"}</button></div>`;
+  h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Cuaderno de errores</span>
+      <h2>Las que has fallado</h2></div></div>
+    <p class="tenue">${falladas.size ? `<b>${falladas.size}</b> ${plural(falladas.size,"pregunta","preguntas")}
+      que fallaste al menos una vez. Rehacerlas vale más que preguntas nuevas.`
+      : "Todavía no has fallado ninguna. Aparecerán aquí cuando pase."}</p>
+    <button class="bloque" ${falladas.size?"":"disabled"} onclick="iniciarFalladas()">
+      ${falladas.size ? "Rehacer mis errores" : "Sin errores registrados"}</button></div>`;
+  h += `</div>`;
+
+  if(debiles.length){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Por aquí empieza</span>
+      <h2>Tus competencias más flojas</h2></div></div>
+      <div class="barras">` + debiles.map(d => `<div class="br">
+        <span class="n">${esc(d.nombre)}</span>
+        <span class="v"><span class="num">${Math.round(d.p*100)}%</span>
+          <button class="fantasma mini" onclick="practicarCompetencia('${esc(d.area)}','${esc(d.nombre).replace(/'/g,"\\'")}')">Practicar</button></span>
+        <span class="pista" data-globo="${esc(d.nombre)}: ${d.bien||Math.round(d.p*d.n)} de ${d.n} correctas">
+          <i class="relleno" style="width:${d.p*100}%"></i></span></div>`).join("")
+      + `</div><p class="mini tenue" style="margin:var(--s4) 0 0">Se calcula con las competencias
+        donde ya llevas al menos 4 preguntas.</p></div>`;
+  }
+
+  h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Práctica libre</span>
+      <h2>Escoge qué practicar</h2></div></div>
+    <label for="f-area">Área</label>
+    <select id="f-area" onchange="filtro.area=this.value; filtro.competencia=''; pintar()">
+      <option value="">Todas las áreas</option>` +
+      ORDEN.map(k => `<option value="${k}" ${filtro.area===k?"selected":""}>${esc(nombreArea(k))}
+        (${DATOS.preguntas.filter(p=>p.area===k).length})</option>`).join("") + `</select>`;
+  if(filtro.area){
+    h += `<label for="f-comp">Competencia</label>
+      <select id="f-comp" onchange="filtro.competencia=this.value; pintar()">
+        <option value="">Todas las competencias</option>` +
+        DATOS.areas[filtro.area].competencias.map(c =>
+          `<option value="${esc(c)}" ${filtro.competencia===c?"selected":""}>${esc(c)}</option>`).join("")
+      + `</select>`;
+  }
+  h += `<label>Dificultad</label><div class="opts">` +
+    [["","Toda"],["1,2","Fácil"],["3","Media"],["4,5","Difícil"]].map(([v,t]) =>
+      `<button aria-pressed="${filtro.dificultad===v}" onclick="filtro.dificultad='${v}'; pintar()">${t}</button>`).join("")
+    + `</div>`;
+  h += `<label>De dónde</label><div class="opts">` +
+    [["nuevas","Solo nuevas"],["todas","Todas"],["falladas","Solo las que fallé"]].map(([v,t]) =>
+      `<button aria-pressed="${filtro.fuente===v}" onclick="filtro.fuente='${v}'; pintar()">${t}</button>`).join("")
+    + `</div>`;
+  h += `<label>Cuántas preguntas</label><div class="opts">` +
+    [5,10,15,20,30].map(n => `<button aria-pressed="${filtro.cuantas===n}"
+      onclick="filtro.cuantas=${n}; pintar()">${n}</button>`).join("") + `</div>`;
+
+  const pool = filtrarPreguntas();
+  h += `<div class="fila-btn" style="margin-top:var(--s5)">
+    <button class="pri" ${pool.length?"":"disabled"} onclick="iniciarPractica()">
+      Empezar con ${Math.min(filtro.cuantas, pool.length)} ${plural(Math.min(filtro.cuantas,pool.length),"pregunta","preguntas")}</button>
+    <span class="ficha">${pool.length} ${plural(pool.length,"disponible","disponibles")}
+      · ${vistos.size} ${plural(vistos.size,"vista","vistas")} en total</span></div>`;
+  if(!pool.length) h += `<p class="mini tenue" style="margin-top:var(--s3)">No hay preguntas con
+    ese filtro. Prueba con «Todas» en «De dónde».</p>`;
+  h += `</div></div>`;
+  return h;
+}
+
+function filtrarPreguntas(){
+  const vistos = new Set(E.intentos.map(i => i.id));
+  const falladas = new Set(E.intentos.filter(i => !i.acerto).map(i => i.id));
+  const difs = filtro.dificultad ? filtro.dificultad.split(",").map(Number) : null;
+  return DATOS.preguntas.filter(p => {
+    if(filtro.area && p.area !== filtro.area) return false;
+    if(filtro.competencia && p.competencia !== filtro.competencia) return false;
+    if(difs && !difs.includes(p.dificultad)) return false;
+    if(filtro.fuente === "nuevas" && vistos.has(p.id)) return false;
+    if(filtro.fuente === "falladas" && !falladas.has(p.id)) return false;
+    return true;
+  });
+}
+function muestra(lista, n){
+  const c = lista.slice();
+  for(let i = c.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [c[i],c[j]]=[c[j],c[i]]; }
+  return c.slice(0, n);
+}
+function nuevaSesion(preguntas, extra){
+  return Object.assign({preguntas, i:0, bien:0, respuestas:{}, inicio:Date.now(),
+    marcaPregunta:Date.now(), crono:false, mostrando:false, elegida:undefined,
+    barajado:null, causaPedida:false, modo:"practica"}, extra||{});
+}
+function iniciarPractica(){
+  const pool = filtrarPreguntas();
+  if(!pool.length) return;
+  vista = "estudiar";
+  sesion = nuevaSesion(muestra(pool, filtro.cuantas), {titulo:"Práctica"});
+  pintar(); window.scrollTo(0,0);
+}
+function iniciarRepaso(){
+  const lista = vencidas(hoyISO());
+  if(!lista.length) return;
+  vista = "estudiar";
+  sesion = nuevaSesion(muestra(lista, Math.min(20, lista.length)),
+    {titulo:"Repaso espaciado", modo:"repaso"});
+  pintar(); window.scrollTo(0,0);
+}
+function iniciarFalladas(){
+  const ids = new Set(E.intentos.filter(i => !i.acerto).map(i => i.id));
+  const lista = DATOS.preguntas.filter(p => ids.has(p.id));
+  if(!lista.length) return;
+  vista = "estudiar";
+  sesion = nuevaSesion(muestra(lista, Math.min(20, lista.length)),
+    {titulo:"Cuaderno de errores", modo:"errores"});
+  pintar(); window.scrollTo(0,0);
+}
+function practicarCompetencia(area, competencia){
+  filtro.area = area; filtro.competencia = competencia;
+  filtro.fuente = "todas"; iniciarPractica();
+}
+function arrancarBloque(indice){
+  const b = BLOQUES_HOY[indice]; if(!b) return;
+  if(b.tipo === "repaso") return iniciarRepaso();
+  if(b.tipo === "cuaderno_errores") return iniciarFalladas();
+  if(b.tipo === "simulacro_completo") return ir("simulacro");
+  if(b.tipo === "simulacro_area"){
+    return iniciarSimulacro("area:"+b.area, 25);
+  }
+  filtro.area = b.area || "";
+  filtro.competencia = (b.tipo === "practica" &&
+    DATOS.areas[b.area] && DATOS.areas[b.area].competencias.includes(b.foco)) ? b.foco : "";
+  filtro.fuente = "todas"; filtro.dificultad = "";
+  filtro.cuantas = b.tipo === "teoria" ? 5 : 10;
+  iniciarPractica();
+}
+
+/* ----------------------------------------------------------- SIMULACRO --- */
+/* Reparto y segundos por pregunta del examen real. Salen de icfes/dominio.py:
+   sesión 1 son 120 preguntas en 4 h 30 (135 s), sesión 2 son 134 (121 s). */
+const REPARTO = {
+  completo:{lectura_critica:41,matematicas:50,sociales_ciudadanas:50,ciencias_naturales:58,ingles:55},
+  sesion1:{lectura_critica:41,matematicas:25,sociales_ciudadanas:25,ciencias_naturales:29},
+  sesion2:{ingles:55,matematicas:25,sociales_ciudadanas:25,ciencias_naturales:29}
+};
+const SEGS = {completo:128, sesion1:135, sesion2:121};
+let tipoSim = "completo", topeSim = 40;
+
+function vSimulacro(){
+  const hist = E.simulacros.slice().reverse();
+  const oficial = tipoSim.startsWith("area:")
+    ? {[tipoSim.slice(5)]: DATOS.areas[tipoSim.slice(5)].preguntas} : REPARTO[tipoSim];
+  const totalOficial = Object.values(oficial).reduce((a,b)=>a+b,0);
+  let escala = Math.min(1, topeSim/totalOficial);
+  for(const k in oficial) escala = Math.min(escala, DATOS.preguntas.filter(p=>p.area===k).length/oficial[k]);
+  const previsto = {}; let suma = 0;
+  for(const k in oficial){ previsto[k] = Math.max(1, Math.round(oficial[k]*escala)); suma += previsto[k]; }
+  const segs = tipoSim.startsWith("area:") ? 135 : SEGS[tipoSim];
+
+  let h = `<div class="entra"><h1>Simulacro</h1>
+    <p class="tenue">Con la estructura y el tiempo del examen real. Sin explicaciones hasta el
+    final, igual que el día del examen.</p>`;
+
+  h += `<div class="kpis">
+    <div class="kpi"><span class="d">Sesión 1</span><span class="v">2:15</span>
+      <span class="d">por pregunta · 120 preguntas</span></div>
+    <div class="kpi"><span class="d">Sesión 2</span><span class="v">2:01</span>
+      <span class="d">por pregunta · 134 preguntas</span></div>
+    <div class="kpi"><span class="d">Cada sesión</span><span class="v">4:30</span>
+      <span class="d">horas seguidas</span></div>
+    <div class="kpi"><span class="d">Calificables</span><span class="v">254</span>
+      <span class="d">más 24 de pilotaje</span></div></div>`;
+
+  h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Armar el simulacro</span>
+      <h2>¿Cuál vas a presentar?</h2></div></div>
+    <label>Tipo</label><div class="opts">` +
+    [["completo","Examen completo"],["sesion1","Sesión 1"],["sesion2","Sesión 2"]].map(([v,t]) =>
+      `<button aria-pressed="${tipoSim===v}" onclick="tipoSim='${v}'; pintar()">${t}</button>`).join("") +
+    ORDEN.map(k => `<button aria-pressed="${tipoSim==='area:'+k}"
+      onclick="tipoSim='area:${k}'; pintar()">Solo ${esc(nombreArea(k))}</button>`).join("")
+    + `</div>`;
+  h += `<label>Cuántas preguntas</label><div class="opts">` +
+    [20,40,60,999].map(n => `<button aria-pressed="${topeSim===n}"
+      onclick="topeSim=${n}; pintar()">${n===999?"Todas":n}</button>`).join("") + `</div>`;
+
+  h += `<div class="aviso ojo" style="margin-top:var(--s5)"><span class="ic">⚠️</span><span>
+    Este simulacro va a <b>escala ${Math.round(suma/totalOficial*100)} %</b>: ${suma} preguntas
+    en vez de ${totalOficial}, con la misma proporción por área y los mismos ${segs} segundos por
+    pregunta. Entrena el ritmo, pero <b>no</b> el cansancio de las 4 h 30. Para eso están los
+    cuadernillos oficiales del ICFES.</span></div>`;
+
+  h += `<div class="desliza"><table class="datos">
+    <tr><th>Área</th><th class="n">En el examen</th><th class="n">En tu simulacro</th></tr>` +
+    Object.keys(previsto).map(k => `<tr><td>${esc(nombreArea(k))}</td>
+      <td class="n">${oficial[k]}</td><td class="n">${previsto[k]}</td></tr>`).join("") +
+    `<tr><td><b>Total</b></td><td class="n"><b>${totalOficial}</b></td>
+      <td class="n"><b>${suma}</b></td></tr></table></div>`;
+  h += `<div class="fila-btn" style="margin-top:var(--s5)">
+    <button class="pri" onclick="iniciarSimulacro(tipoSim, topeSim)">
+      Empezar · ${Math.round(suma*segs/60)} minutos</button></div></div>`;
+
+  if(hist.length){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Historial</span>
+      <h2>Simulacros anteriores</h2></div></div><div class="desliza"><table class="datos">
+      <tr><th>Fecha</th><th>Tipo</th><th class="n">Aciertos</th><th class="n">%</th>
+      <th class="n">Global</th></tr>` + hist.slice(0,15).map(s => `<tr>
+        <td>${fCorta(s.fecha)}</td><td class="mini tenue">${esc(nombreTipo(s.tipo))}</td>
+        <td class="n">${s.bien}/${s.total}</td>
+        <td class="n">${Math.round(s.bien/s.total*100)}%</td>
+        <td class="n">${s.global !== null && s.global !== undefined ? s.global : "—"}</td></tr>`).join("")
+      + `</table></div><p class="mini tenue" style="margin-top:var(--s3)">Solo los simulacros con
+      las cinco áreas dan puntaje global: uno de un área sola no dice nada del examen completo.</p></div>`;
+  }
+  return h + `</div>`;
+}
+function nombreTipo(t){
+  if(t && t.startsWith("area:")) return "Solo " + nombreArea(t.slice(5));
+  return {completo:"Examen completo", sesion1:"Sesión 1", sesion2:"Sesión 2"}[t] || t;
+}
+function iniciarSimulacro(tipo, tope){
+  let oficial, segs;
+  if(tipo.startsWith("area:")){
+    const k = tipo.slice(5); oficial = {[k]: DATOS.areas[k].preguntas}; segs = 135;
+  } else { oficial = REPARTO[tipo]; segs = SEGS[tipo]; }
+  const totalOficial = Object.values(oficial).reduce((a,b)=>a+b,0);
+  let escala = Math.min(1, tope/totalOficial);
+  for(const k in oficial) escala = Math.min(escala, DATOS.preguntas.filter(p=>p.area===k).length/oficial[k]);
+  const preguntas = [];
+  for(const k in oficial){
+    const cuantas = Math.max(1, Math.round(oficial[k]*escala));
+    preguntas.push(...muestra(DATOS.preguntas.filter(p=>p.area===k), cuantas));
+  }
+  if(!preguntas.length) return;
+  vista = "simulacro";
+  sesion = nuevaSesion(muestra(preguntas, preguntas.length), {
+    modo:"simulacro", tipo, crono:true, titulo:nombreTipo(tipo),
+    limite:preguntas.length*segs, objetivo:segs,
+    escala:preguntas.length/totalOficial});
+  pintar(); window.scrollTo(0,0);
+}
+
+/* ------------------------------------------------- ronda de preguntas ---- */
+function arrancarCrono(){
+  if(cronoID) clearInterval(cronoID);
+  const tic = () => {
+    const caja = document.getElementById("crono");
+    if(!caja || !sesion || sesion.i >= sesion.preguntas.length){
+      clearInterval(cronoID); cronoID = null; return;
+    }
+    const punto = document.getElementById("ritmo");
+    const obj = sesion.objetivo || 120;
+    if(sesion.crono){
+      // Simulacro: cuenta atrás del tiempo total, como en el examen.
+      const queda = Math.max(0, sesion.limite - (Date.now()-sesion.inicio)/1000);
+      caja.textContent = Math.floor(queda/60) + ":" + String(Math.floor(queda%60)).padStart(2,"0");
+      const hud = document.getElementById("hud");
+      if(hud) hud.classList.toggle("rojo", queda < sesion.limite*0.12);
+      if(queda <= 0){ clearInterval(cronoID); cronoID = null; terminar(); return; }
+    } else {
+      // Práctica: cuenta hacia adelante en la pregunta actual. Enseña el ritmo
+      // sin la presión del examen; el punto avisa cuando ya te pasaste.
+      const seg = sesion.mostrando ? (sesion.segundos || 0)
+                                   : (Date.now() - sesion.marcaPregunta)/1000;
+      caja.textContent = Math.floor(seg/60) + ":" + String(Math.floor(seg%60)).padStart(2,"0");
+    }
+    if(punto){
+      const seg = sesion.crono ? (Date.now()-sesion.marcaPregunta)/1000
+        : (sesion.mostrando ? (sesion.segundos||0) : (Date.now()-sesion.marcaPregunta)/1000);
+      punto.className = "ritmo" + (seg > obj*1.5 ? " muytarde" : seg > obj ? " tarde" : "");
+    }
+  };
+  tic(); cronoID = setInterval(tic, 1000);
+}
+function barajar(p){
+  const orden = p.opciones.map((_,i) => i);
+  for(let i = orden.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [orden[i],orden[j]]=[orden[j],orden[i]]; }
+  return {orden, opciones:orden.map(i => p.opciones[i]), correcta:orden.indexOf(p.correcta)};
+}
+function contextoHTML(t){
+  const lineas = t.split("\n"); let out = "", tabla = [];
+  const cerrar = () => {
+    if(!tabla.length) return;
+    out += `<div class="desliza"><table>` + tabla.map((f,i) => {
+      const c = f.split("|").slice(1,-1).map(x => x.trim());
+      if(c.every(x => /^:?-+:?$/.test(x))) return "";
+      const et = i === 0 ? "th" : "td";
+      return "<tr>" + c.map(x => `<${et}>${txt(x)}</${et}>`).join("") + "</tr>";
+    }).join("") + `</table></div>`; tabla = [];
+  };
+  for(const l of lineas){
+    if(l.trim().startsWith("|") && l.trim().endsWith("|")) tabla.push(l.trim());
+    else { cerrar(); out += txt(l) + "\n"; }
+  }
+  cerrar(); return out;
+}
+function vSesion(){
+  const s = sesion;
+  if(s.i >= s.preguntas.length) return vResultado();
+  const p = s.preguntas[s.i];
+  if(!s.barajado) s.barajado = barajar(p);
+  const b = s.barajado, L = ["A","B","C","D"];
+  const seg = (Date.now() - s.marcaPregunta)/1000;
+  const obj = s.objetivo || 120;
+  const ritmo = seg > obj*1.5 ? "muytarde" : seg > obj ? "tarde" : "";
+  const marcada = E.marcadas.includes(p.id);
+
+  let h = `<div class="hud" id="hud">
+      <span class="paso">${esc(s.titulo || "Práctica")} · ${s.i+1} de ${s.preguntas.length}</span>
+      <span class="crono"><span class="ritmo ${ritmo}" id="ritmo"></span>
+        <span id="crono">0:00</span>
+        <span class="mini tenue" style="font-weight:400">${s.crono ? "restante"
+          : `de ${Math.floor(obj/60)}:${String(obj%60).padStart(2,"0")}`}</span></span>
+    </div>
+    <div class="progreso"><i style="width:${s.i/s.preguntas.length*100}%"></i></div>`;
+
+  h += `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;
+    margin-bottom:var(--s3);flex-wrap:wrap">
+    <span class="ficha marca"><i class="pt"></i>${esc(nombreArea(p.area))}</span>
+    <span class="mini tenue">${esc(p.competencia)}</span></div>`;
+
+  if(p.contexto) h += `<div class="contexto">${contextoHTML(p.contexto)}</div>`;
+  h += `<div class="enunciado">${txt(p.enunciado)}</div>`;
+  h += `<div class="opciones">` + b.opciones.map((o,i) => {
+    let cl = "";
+    if(s.mostrando){ if(i === b.correcta) cl = "buena"; else if(i === s.elegida) cl = "mala"; }
+    return `<button class="op ${cl}" ${s.mostrando?"disabled":""} onclick="responder(${i})">
+      <span class="l">${L[i]}</span><span>${txt(o)}</span>
+      <span class="mk">${cl==="buena"?"✓":cl==="mala"?"✗":""}</span></button>`;
+  }).join("") + `</div>`;
+
+  if(!s.mostrando){
+    h += `<p class="teclas">Puedes responder con el teclado:
+      <kbd>A</kbd> <kbd>B</kbd> <kbd>C</kbd> <kbd>D</kbd>${s.modo!=="simulacro"?" · <kbd>Enter</kbd> para seguir":""}</p>`;
+  }
+
+  if(s.mostrando && s.modo !== "simulacro"){
+    const bien = s.elegida === b.correcta;
+    h += `<div class="veredicto ${bien?"si":"no"}">${bien?"✓ Correcta":"✗ Incorrecta"}
+      <span class="mini tenue" style="font-weight:400">· ${Math.round(s.segundos)} segundos</span></div>`;
+    h += `<div class="explica"><span class="rot">Por qué</span>${txt(p.explicacion)}</div>`;
+    if(p.trampa) h += `<div class="explica trampa"><span class="rot">La trampa</span>${txt(p.trampa)}</div>`;
+    if(!bien && !s.causaPedida){
+      h += `<div class="tarjeta plana" style="background:var(--sup2);margin-top:var(--s4)">
+        <span class="rot">¿Por qué fallaste?</span>
+        <p class="mini tenue" style="margin:4px 0 var(--s3)">Esto arma tu cuaderno de errores.
+        Fallar por afán no se arregla igual que fallar por no saber el tema.</p>
+        <div class="opts">` + [["concepto","No sabía el tema"],["lectura","Entendí mal la pregunta"],
+          ["calculo","Me equivoqué en la cuenta"],["tiempo","Iba de afán"],
+          ["descuido","Marqué otra sin querer"],["adivine","Adiviné"]].map(([k,t]) =>
+          `<button onclick="marcarCausa('${k}')">${t}</button>`).join("") + `</div></div>`;
+    }
+  }
+
+  h += `<div class="fila-btn" style="margin-top:var(--s5);justify-content:space-between">
+    <button class="fantasma" onclick="marcarPregunta('${p.id}')">
+      ${marcada?"★ Marcada":"☆ Marcar para revisar"}</button>
+    <span class="fila-btn">
+      <button class="fantasma" onclick="salirSesion()">Terminar</button>
+      ${s.mostrando ? `<button class="pri" onclick="siguiente()">
+        ${s.i+1 >= s.preguntas.length ? "Ver resultado" : "Siguiente"}</button>` : ""}
+    </span></div>`;
+  return h;
+}
+function marcarPregunta(id){
+  const i = E.marcadas.indexOf(id);
+  if(i >= 0) E.marcadas.splice(i,1); else E.marcadas.push(id);
+  guardar(); pintar();
+}
+function salirSesion(){ if(confirmarSalida()){ terminar(); } }
+
+function registrar(p, acerto, segundos, causa){
+  E.intentos.push({fecha:hoyISO(), id:p.id, area:p.area, competencia:p.competencia,
+                   tema:p.tema, acerto, segundos:Math.round(segundos), causa:causa||null});
+  E.tarjetas[p.id] = calificarTarjeta(E.tarjetas[p.id], calidadDe(acerto, segundos, causa),
+                                      hoyISO(), E.config ? E.config.examen : null);
+  guardar();
+}
+function responder(i){
+  const s = sesion; if(s.mostrando) return;
+  const p = s.preguntas[s.i], b = s.barajado;
+  s.elegida = i;
+  s.segundos = (Date.now() - s.marcaPregunta)/1000;
+  const acerto = i === b.correcta;
+  if(acerto) s.bien++;
+  s.respuestas[p.id] = b.orden[i];      // índice en el orden ORIGINAL de la pregunta
+  if(s.modo === "simulacro"){
+    registrar(p, acerto, s.segundos, acerto ? null : "adivine");
+    s.i++; s.barajado = null; s.marcaPregunta = Date.now();
+    if(s.i >= s.preguntas.length) terminar(); else pintar();
+  } else {
+    s.mostrando = true; s.causaPedida = acerto;
+    if(acerto) registrar(p, true, s.segundos, null);
+    pintar();
+  }
+}
+function marcarCausa(causa){
+  const s = sesion;
+  registrar(s.preguntas[s.i], false, s.segundos || 60, causa);
+  s.causaPedida = true; pintar();
+}
+function siguiente(){
+  const s = sesion;
+  if(s.mostrando && !s.causaPedida) registrar(s.preguntas[s.i], false, s.segundos || 60, null);
+  s.i++; s.mostrando = false; s.elegida = undefined; s.barajado = null;
+  s.causaPedida = false; s.marcaPregunta = Date.now();
+  if(s.i >= s.preguntas.length) terminar(); else pintar();
+}
+function terminar(){
+  if(cronoID){ clearInterval(cronoID); cronoID = null; }
+  const s = sesion;
+  if(s.modo === "simulacro" && !s.guardado && s.i > 0){
+    const totales = {}, bien = {};
+    for(const p of s.preguntas.slice(0, s.i)){
+      totales[p.area] = (totales[p.area]||0)+1;
+      const r = s.respuestas[p.id];
+      bien[p.area] = (bien[p.area]||0) + ((r !== undefined && r === p.correcta) ? 1 : 0);
+    }
+    const puntajes = {};
+    for(const k in totales) puntajes[k] = puntajeArea(bien[k], totales[k], CURVA);
+    E.simulacros.push({fecha:hoyISO(), tipo:s.tipo, bien:s.bien, total:s.i,
+      porArea:puntajes, global:puntajeGlobal(puntajes, DATOS.areas, ORDEN),
+      escala:s.escala, segundos:Math.round((Date.now()-s.inicio)/1000)});
+    guardar(); s.guardado = true;
+  }
+  s.i = s.preguntas.length; s.mostrando = false; pintar(); window.scrollTo(0,0);
+}
+
+function vResultado(){
+  const s = sesion, c = E.config || {};
+  const totales = {}, bien = {};
+  for(const p of s.preguntas){
+    totales[p.area] = (totales[p.area]||0)+1;
+    const r = s.respuestas[p.id];
+    bien[p.area] = (bien[p.area]||0) + ((r !== undefined && r === p.correcta) ? 1 : 0);
+  }
+  const puntajes = {};
+  for(const k in totales) puntajes[k] = puntajeArea(bien[k], totales[k], CURVA);
+  const glob = puntajeGlobal(puntajes, DATOS.areas, ORDEN);
+  const hist = conGlobal();
+  const previo = hist.length >= 2 ? hist[hist.length-2] : null;
+  const pct = s.preguntas.length ? Math.round(s.bien/s.preguntas.length*100) : 0;
+  const mins = Math.round((Date.now()-s.inicio)/60000);
+
+  let h = `<div class="entra"><h1>${esc(s.titulo||"Resultado")}</h1>
+    <p class="tenue">${fLarga(hoyISO())} · ${mins} ${plural(mins,"minuto","minutos")}</p>`;
+
+  h += `<div class="kpis">
+    <div class="kpi"><span class="d">Aciertos</span><span class="v">${s.bien}/${s.preguntas.length}</span>
+      <span class="d">${pct}% de acierto</span></div>`;
+  if(glob !== null){
+    h += `<div class="kpi"><span class="d">Global estimado</span><span class="v">${glob}</span>
+      <span class="d">${previo ? `<span class="delta ${glob>=previo.global?"sube":"baja"}">
+        ${glob>=previo.global?"▲":"▼"} ${Math.abs(glob-previo.global)}</span> vs. anterior`
+        : "de 500"}</span></div>
+      <div class="kpi"><span class="d">Meta</span><span class="v">${c.meta||400}</span>
+        <span class="d">faltan ${Math.max(0,(c.meta||400)-glob)}</span></div>`;
+  }
+  const seg = s.preguntas.length ? Math.round((Date.now()-s.inicio)/1000/s.preguntas.length) : 0;
+  h += `<div class="kpi"><span class="d">Ritmo</span><span class="v">${Math.floor(seg/60)}:${String(seg%60).padStart(2,"0")}</span>
+    <span class="d">por pregunta${s.objetivo ? ` · objetivo ${Math.floor(s.objetivo/60)}:${String(s.objetivo%60).padStart(2,"0")}` : ""}</span></div></div>`;
+
+  if(s.escala && s.escala < 0.99){
+    h += `<div class="aviso ojo"><span class="ic">⚠️</span><span>Simulacro a escala
+      ${Math.round(s.escala*100)} % del examen real. Sirve para compararte contigo mismo a lo
+      largo del año, no para anunciar un puntaje.</span></div>`;
+  }
+
+  if(Object.keys(totales).length > 1 || glob !== null){
+    const metas = glob !== null ? metaPorArea(c.meta||400, puntajes, DATOS.areas, ORDEN) : null;
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Por área</span>
+      <h2>Cómo te fue en cada prueba</h2></div></div>${barrasAreas(puntajes, metas)}`;
+    if(puntajes["ingles"] !== undefined){
+      const n = nivelIngles(puntajes["ingles"]);
+      h += `<p class="mini tenue" style="margin-top:var(--s4)">Inglés — nivel estimado
+        <b>${n.nivel}</b> del Marco Común Europeo. ${esc(n.desc)}</p>`;
+    }
+    h += `</div>`;
+  }
+
+  const porComp = {};
+  for(const p of s.preguntas){
+    const a = porComp[p.competencia] || (porComp[p.competencia] = {bien:0,total:0});
+    a.total++; const r = s.respuestas[p.id];
+    if(r !== undefined && r === p.correcta) a.bien++;
+  }
+  const flojas = Object.entries(porComp).filter(([,v]) => v.total >= 2)
+    .map(([k,v]) => ({k, p:v.bien/v.total, ...v})).sort((a,b) => a.p - b.p).slice(0,4);
+  if(flojas.length){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Competencias</span>
+      <h2>Por aquí empieza el próximo repaso</h2></div></div><div class="barras">` +
+      flojas.map(f => `<div class="br"><span class="n">${esc(f.k)}</span>
+        <span class="v"><span class="num">${f.bien}/${f.total}</span></span>
+        <span class="pista" data-globo="${esc(f.k)}: ${f.bien} de ${f.total}">
+          <i class="relleno" style="width:${f.p*100}%"></i></span></div>`).join("")
+      + `</div></div>`;
+  }
+
+  const fallas = s.preguntas.filter(p => {
+    const r = s.respuestas[p.id]; return r === undefined || r !== p.correcta; });
+  if(fallas.length){
+    h += `<div class="enc" style="margin-top:var(--s6)"><div><span class="rot">Repaso</span>
+      <h2>Lo que fallaste (${fallas.length})</h2></div></div>
+      <p class="tenue mini" style="margin-top:calc(var(--s3)*-1)">Ya quedaron marcadas en el
+      repaso espaciado: el sistema te las va a volver a mostrar antes de que se te olviden.</p>`;
+    for(const p of fallas){
+      h += `<div class="tarjeta"><div style="display:flex;gap:8px;flex-wrap:wrap;
+        margin-bottom:var(--s3)">
+        <span class="ficha marca"><i class="pt"></i>${esc(nombreArea(p.area))}</span>
+        <span class="ficha">${esc(p.tema)}</span></div>
+        <div class="enunciado" style="font-size:1rem;margin-bottom:var(--s3)">${txt(p.enunciado)}</div>
+        <div class="explica" style="background:var(--bien-f);border-color:transparent">
+          <span class="rot" style="color:var(--bien-t)">Respuesta correcta</span>
+          ${txt(p.opciones[p.correcta])}</div>
+        <div class="explica"><span class="rot">Por qué</span>${txt(p.explicacion)}</div>`;
+      if(p.trampa) h += `<div class="explica trampa"><span class="rot">La trampa</span>${txt(p.trampa)}</div>`;
+      h += `</div>`;
+    }
+  }
+  h += `<div class="fila-btn" style="margin-top:var(--s5)">
+    <button class="pri" onclick="ir('inicio')">Volver al inicio</button>
+    <button onclick="ir('${s.modo==='simulacro'?'simulacro':'estudiar'}')">Otra ronda</button></div></div>`;
+  return h;
+}
+
+/* ------------------------------------------------------------- PROGRESO -- */
+function vProgreso(){
+  const hoy = hoyISO(), c = E.config || {};
+  if(!E.intentos.length){
+    return `<div class="entra"><h1>Progreso</h1><div class="tarjeta"><div class="vacio">
+      <span class="big">📈</span><h2>Todavía no hay nada que medir</h2>
+      <p>Cuando respondas preguntas, aquí vas a ver tu dominio por competencia, por qué estás
+      fallando y a qué puntaje vas a llegar el día del examen.</p>
+      <button class="pri" onclick="ir('simulacro')">Empezar con el diagnóstico</button>
+    </div></div></div>`;
+  }
+  const hist = conGlobal();
+  let h = `<div class="entra"><h1>Progreso</h1>`;
+  h += `<div class="kpis">
+    <div class="kpi"><span class="d">Preguntas hechas</span><span class="v">${E.intentos.length}</span>
+      <span class="d">${new Set(E.intentos.map(i=>i.id)).size} distintas</span></div>
+    <div class="kpi"><span class="d">Racha</span><span class="v">${racha(hoy)}</span>
+      <span class="d">${plural(racha(hoy),"día seguido","días seguidos")}</span></div>
+    <div class="kpi"><span class="d">Simulacros</span><span class="v">${hist.length}</span>
+      <span class="d">con las cinco áreas</span></div>
+    <div class="kpi"><span class="d">En repaso</span><span class="v">${Object.keys(E.tarjetas).length}</span>
+      <span class="d">${vencidas(hoy).length} vencen hoy</span></div></div>`;
+
+  if(serieGlobal().length >= 2 && c.examen){
+    const serie = serieGlobal();
+    const p0 = aDias(serie[0].fecha);
+    const pts = serie.map(s => [aDias(s.fecha)-p0, s.v]);
+    const n = pts.length, mx = pts.reduce((a,p)=>a+p[0],0)/n, my = pts.reduce((a,p)=>a+p[1],0)/n;
+    const varr = pts.reduce((a,p)=>a+(p[0]-mx)**2,0);
+    if(varr > 0){
+      const m = pts.reduce((a,p)=>a+(p[0]-mx)*(p[1]-my),0)/varr, bb = my-m*mx;
+      const proy = Math.max(0, Math.min(500, Math.round(bb + m*(aDias(c.examen)-p0))));
+      const meta = c.meta || 400;
+      h += `<div class="tarjeta acento"><div class="enc"><div>
+        <span class="rot">Proyección al día del examen</span>
+        <h2 style="font-size:2.4rem;font-family:var(--mono);letter-spacing:-.03em">${proy}</h2></div>
+        <span class="ficha ${proy>=meta?"bien":"medio"}"><i class="pt"></i>
+          ${proy>=meta?"alcanzas la meta":"por debajo de la meta"}</span></div>
+        <p class="tenue" style="margin:0">${n < 3
+          ? `Con ${n} simulacros esta proyección <b>todavía no es confiable</b>. Haz al menos tres, separados por semanas.`
+          : m <= 0
+            ? "El puntaje no está subiendo. Antes de estudiar más horas, mira el cuaderno de errores: casi siempre el problema es el método."
+            : `Vas subiendo <b>${(m*30).toFixed(0)} puntos al mes</b>. ${proy>=meta
+              ? "A ese ritmo alcanzas la meta." : `A ese ritmo te faltarían ${meta-proy} puntos.`}`}</p></div>`;
+    }
+  }
+  if(serieGlobal().length >= 2){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Puntaje global</span>
+      <h2>Tu línea del año</h2></div></div>
+      <div class="viz">${graficaLinea(serieGlobal(), c.meta||400, "g-progreso")}</div>
+      <p class="mini tenue" style="margin-top:var(--s3)">Si un día hiciste varios simulacros,
+      la línea muestra el último de ese día.</p></div>`;
+    const m = multiplesPorArea();
+    if(m) h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Por área</span>
+      <h2>Cada prueba por separado</h2></div></div>${m}
+      <p class="mini tenue" style="margin-top:var(--s3)">El número grande es tu último puntaje;
+      el pequeño, cuánto has subido o bajado desde tu primer simulacro.</p></div>`;
+  }
+
+  const debiles = dominioPorCompetencia().slice(0,8);
+  if(debiles.length){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Competencias</span>
+      <h2>De la más floja a la más firme</h2></div></div><div class="barras">` +
+      debiles.map(d => `<div class="br"><span class="n">${esc(d.nombre)}</span>
+        <span class="v"><span class="num">${Math.round(d.p*100)}%</span>
+          <span class="ficha ${semaforo(d.p*100).clase}"><i class="pt"></i>${semaforo(d.p*100).etq}</span></span>
+        <span class="pista" data-globo="${esc(d.nombre)} · ${d.n} preguntas respondidas">
+          <i class="relleno" style="width:${d.p*100}%"></i></span></div>`).join("") + `</div></div>`;
+  }
+
+  const causas = {}; let totalF = 0;
+  for(const i of E.intentos) if(!i.acerto && i.causa){ causas[i.causa] = (causas[i.causa]||0)+1; totalF++; }
+  const REM = {concepto:["No sabía el tema","Estudiar el tema de cero y volver a practicarlo en 2 días."],
+    lectura:["Entendí mal la pregunta","Subrayar qué piden antes de mirar las opciones."],
+    calculo:["Me equivoqué en la cuenta","Hacer la operación en el papel, no de memoria."],
+    tiempo:["Iba de afán","Practicar con cronómetro y saltar lo que se atasque."],
+    descuido:["Marqué otra sin querer","Revisar que la letra marcada sea la que se pensó."],
+    adivine:["Adiviné","Es un vacío de tema: va directo al plan de estudio."]};
+  if(totalF){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Cuaderno de errores</span>
+      <h2>Por qué estás fallando</h2></div></div><div class="barras">` +
+      Object.entries(causas).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+        const [nom, rem] = REM[k] || [k,""];
+        return `<div class="br"><span class="n">${nom}</span>
+          <span class="v"><span class="num">${v}</span>
+            <span class="mini tenue">${Math.round(v/totalF*100)}%</span></span>
+          <span class="pista" data-globo="${nom}: ${v} de ${totalF} errores">
+            <i class="relleno" style="width:${v/totalF*100}%"></i></span>
+          <span class="mini tenue" style="grid-column:1/-1;margin-top:2px">→ ${rem}</span></div>`;
+      }).join("") + `</div></div>`;
+  }
+
+  h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Constancia</span>
+    <h2>Tu año de estudio</h2></div>
+    <span class="mini tenue">${new Set(E.intentos.map(i=>i.fecha)).size} días con estudio</span></div>
+    <div class="desliza">${calendarioEstudio(hoy)}</div></div>`;
+
+  const rep = {};
+  for(const i of E.intentos) if(!i.acerto) rep[i.id] = (rep[i.id]||0)+1;
+  const tercas = Object.entries(rep).filter(([,v]) => v >= 2).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  if(tercas.length){
+    h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Reincidentes</span>
+      <h2>Las que has fallado más de una vez</h2></div>
+      <button onclick="iniciarFalladas()">Rehacerlas</button></div>
+      <p class="tenue mini">Estas son las que de verdad no sabes. El repaso espaciado ya las
+      tiene marcadas para volver seguido.</p><div class="desliza"><table class="datos">
+      <tr><th>Pregunta</th><th>Tema</th><th class="n">Fallas</th></tr>` +
+      tercas.map(([id,v]) => { const p = DATOS.preguntas.find(q => q.id === id);
+        return `<tr><td class="num mini">${esc(id)}</td><td>${p?esc(p.tema):""}</td>
+          <td class="n">${v}</td></tr>`; }).join("") + `</table></div></div>`;
+  }
+  return h + `</div>`;
+}
+
+/* ------------------------------------------------------------------ PLAN - */
+let semanaAbierta = null;
+function vPlan(){
+  const c = E.config;
+  if(!c || !c.examen) return `<div class="entra"><h1>Plan</h1><div class="tarjeta">
+    <div class="vacio"><span class="big">🗓️</span><h2>Falta la fecha del examen</h2>
+    <p>Con la fecha, la meta y tus horas semanales, el sistema arma el plan completo hasta el
+    día del examen.</p><button class="pri" onclick="ir('ajustes')">Configurar</button>
+    </div></div></div>`;
+  const plan = planActual();
+  if(!plan) return `<div class="entra"><h1>Plan</h1><div class="aviso ojo">
+    <span class="ic">⚠️</span><span>La fecha del examen ya pasó. Cámbiala en Ajustes.</span></div></div>`;
+  const hoy = hoyISO(), actual = semanaDe(plan, hoy);
+  const diag = diagnostico();
+  const metas = metaPorArea(c.meta||400, diag.datos, DATOS.areas, ORDEN);
+  const totalHoras = plan.semanas.reduce((s,x) => s + x.bloques.reduce((t,b)=>t+b.minutos,0), 0)/60;
+
+  let h = `<div class="entra"><h1>Plan de estudio</h1>
+    <p class="tenue">Del ${fLarga(plan.inicio)} al ${fLarga(plan.examen)}</p>`;
+  h += `<div class="kpis">
+    <div class="kpi"><span class="d">Semanas</span><span class="v">${plan.semanas.length}</span>
+      <span class="d">hasta el examen</span></div>
+    <div class="kpi"><span class="d">Horas por semana</span><span class="v">${c.horas||12}</span>
+      <span class="d">${c.dias||6} días de estudio</span></div>
+    <div class="kpi"><span class="d">Horas en total</span><span class="v">${Math.round(totalHoras)}</span>
+      <span class="d">si cumples el plan</span></div>
+    <div class="kpi"><span class="d">Simulacros</span>
+      <span class="v">${plan.semanas.reduce((s,x)=>s+x.bloques.filter(b=>b.tipo==="simulacro_completo").length,0)}</span>
+      <span class="d">completos</span></div></div>`;
+
+  if(!diag.real){
+    h += `<div class="aviso ojo"><span class="ic">⚠️</span><span>Este reparto supone que estás
+      en 50 sobre 100 en las cinco áreas, porque todavía no has hecho un simulacro completo.
+      Apenas lo hagas, el plan se recalcula solo con tu nivel real.</span></div>`;
+  }
+
+  h += `<div class="tarjeta"><div class="enc"><div><span class="rot">Reparto del tiempo</span>
+    <h2>Dónde rinde cada hora</h2></div></div><div class="desliza"><table class="datos">
+    <tr><th>Área</th><th class="n">Hoy</th><th class="n">Meta</th><th class="n">Horas/sem</th>
+    <th class="n">Vale</th></tr>` + ORDEN.map(k => {
+      const vale = DATOS.areas[k].peso*5/ORDEN.reduce((s,a)=>s+DATOS.areas[a].peso,0);
+      return `<tr><td>${esc(nombreArea(k))}</td><td class="n">${Math.round(diag.datos[k])}</td>
+        <td class="n">${metas[k]}</td>
+        <td class="n">${(plan.reparto[k]*(c.horas||12)).toFixed(1)} h</td>
+        <td class="n">${vale.toFixed(2)}</td></tr>`; }).join("") + `</table></div>
+    <p class="mini tenue" style="margin-top:var(--s3)"><b>Vale</b> es cuántos puntos del global
+    (0 a 500) gana subir un punto en esa área. Un punto de Matemáticas vale tres veces uno de
+    Inglés: por eso el reparto no es parejo.</p></div>`;
+
+  const fases = [];
+  for(const s of plan.semanas){
+    let f = fases.find(x => x.nombre === s.fase);
+    if(!f){ f = {nombre:s.fase, semanas:[], objetivo:(CFG.fases.find(y=>y.nombre===s.fase)||{}).objetivo||""};
+      fases.push(f); }
+    f.semanas.push(s);
+  }
+  h += `<div class="enc" style="margin-top:var(--s6)"><div><span class="rot">Calendario</span>
+    <h2>Las cuatro fases</h2></div></div>`;
+  for(const f of fases){
+    const ini = f.semanas[0], fin = f.semanas[f.semanas.length-1];
+    const esActual = actual && actual.fase === f.nombre;
+    h += `<div class="tarjeta${esActual?" acento":""}"><div class="enc"><div>
+        <span class="rot">${esActual?"Fase actual":`Semanas ${ini.numero} a ${fin.numero}`}</span>
+        <h2>${esc(f.nombre)}</h2></div>
+        <span class="ficha">${fMini(ini.inicio)} → ${fMini(fin.fin)}</span></div>
+      <p class="tenue">${esc(f.objetivo)}</p>
+      <div class="fila-btn">` + f.semanas.map(s => `<button class="mini"
+        style="padding:5px 9px;${s.numero===(actual?actual.numero:-1)?"border-color:var(--marca);color:var(--marca-t);font-weight:700":""}"
+        onclick="semanaAbierta=${semanaAbierta===s.numero?"null":s.numero}; pintar()">${s.numero}</button>`).join("")
+      + `</div>`;
+    const abierta = f.semanas.find(s => s.numero === semanaAbierta);
+    if(abierta){
+      const porDia = {};
+      for(const b of abierta.bloques) (porDia[b.fecha] = porDia[b.fecha] || []).push(b);
+      h += `<div style="margin-top:var(--s4);border-top:1px solid var(--linea);padding-top:var(--s4)">
+        <span class="rot">Semana ${abierta.numero} · ${fMini(abierta.inicio)} a ${fMini(abierta.fin)}</span>
+        <div class="bloques" style="margin-top:var(--s3)">` +
+        Object.keys(porDia).sort().map(d => `<div>
+          <div class="mini tenue" style="margin:var(--s2) 0 4px;font-weight:650">${fCorta(d)}</div>` +
+          porDia[d].map(b => `<div class="bloque-p" style="margin-bottom:6px">
+            <span class="ic">${({teoria:"📖",practica:"✍️",repaso:"🔁",simulacro_area:"⏱️",
+              simulacro_completo:"🎯",cuaderno_errores:"📕"})[b.tipo]||"•"}</span>
+            <span class="tx"><b>${b.area?esc(nombreArea(b.area)):"Todo el examen"} · ${esc(CFG.sesiones[b.tipo].etiqueta)}</b>
+              <span>${esc(b.foco)} · ${b.minutos} min</span></span><span></span></div>`).join("")
+          + `</div>`).join("") + `</div></div>`;
+    }
+    h += `</div>`;
+  }
+  return h + `</div>`;
+}
+
+/* ---------------------------------------------------------------- AJUSTES */
+function vAjustes(){
+  const c = E.config || {};
+  return `<div class="entra"><h1>Ajustes</h1>
+    <div class="tarjeta"><div class="enc"><div><span class="rot">Lo esencial</span>
+      <h2>Tu examen y tu meta</h2></div></div>
+      <label for="a-nom">Cómo te llamas</label>
+      <input id="a-nom" value="${esc(c.nombre||"")}" placeholder="Tu nombre" autocomplete="name">
+      <label for="a-fx">Fecha del examen</label>
+      <input type="date" id="a-fx" value="${c.examen||""}">
+      <p class="mini tenue" style="margin-top:6px">El Calendario A de 2026 fue el 26 de julio.
+      Cuando el ICFES publique la fecha oficial de 2027, cámbiala aquí y el plan se recalcula solo.</p>
+      <label for="a-mt">Meta de puntaje global</label>
+      <input type="number" id="a-mt" min="0" max="500" value="${c.meta||400}">
+      <p class="mini tenue" style="margin-top:6px">El promedio nacional está entre 250 y 260.
+      Pasar de 400 lo logran menos de uno de cada veinte.</p>
+      <label for="a-hs">Horas de estudio por semana</label>
+      <input type="number" id="a-hs" min="1" max="60" step="0.5" value="${c.horas||12}">
+      <label for="a-ds">Días de estudio por semana</label>
+      <input type="number" id="a-ds" min="1" max="7" value="${c.dias||6}">
+      <p class="mini tenue" style="margin-top:6px">Deja al menos un día de descanso. Un plan que
+      nadie aguanta no es un plan.</p>
+      <div class="fila-btn" style="margin-top:var(--s5)">
+        <button class="pri" onclick="guardarAjustes()">Guardar</button></div></div>
+
+    <div class="tarjeta"><div class="enc"><div><span class="rot">Tus datos</span>
+      <h2>Copia de seguridad</h2></div></div>
+      <p class="tenue">Tu avance vive solo en este navegador: nadie más lo ve y no se sube a
+      ningún lado. Si cambias de computador o borras los datos de navegación, se pierde. Sácale
+      copia de vez en cuando.</p>
+      <div class="fila-btn">
+        <button onclick="exportarDatos()">Ver mi avance para copiarlo</button>
+        <button onclick="document.getElementById('a-imp').click()">Cargar un avance</button>
+        <input type="file" id="a-imp" accept=".json,.txt" hidden onchange="importarDatos(this)">
+      </div>
+      <div id="caja-export"></div>
+      <div class="fila-btn" style="margin-top:var(--s5)">
+        <button onclick="borrarTodo()">Borrar todo mi avance</button></div></div>
+
+    <div class="tarjeta"><div class="enc"><div><span class="rot">Honestidad</span>
+      <h2>Qué significan estos puntajes</h2></div></div>
+      <p class="tenue mini">El <b>puntaje global (0 a 500)</b> se calcula con la fórmula oficial
+      del ICFES: Lectura Crítica, Matemáticas, Sociales y Ciencias Naturales pesan 3 cada una,
+      Inglés pesa 1, se divide entre 13 y se multiplica por 5. Esa parte es exacta.</p>
+      <p class="tenue mini">El <b>puntaje de cada área (0 a 100) es una estimación</b> de este
+      sistema a partir del porcentaje que aciertas. El ICFES usa un modelo estadístico que pesa
+      cada pregunta según su dificultad real, medida con miles de estudiantes, y eso no se puede
+      replicar aquí. Úsalo para compararte contigo mismo, no como pronóstico.</p>
+      <p class="tenue mini">Las <b>preguntas son de práctica</b>, escritas siguiendo la
+      estructura y las competencias del Saber 11. No son preguntas del examen real: esas están
+      en los cuadernillos que el ICFES publica gratis en su página.</p>
+      <p class="tenue mini" style="margin-bottom:0">Banco actual:
+      <b>${DATOS.preguntas.length} preguntas</b> · ${ORDEN.map(k =>
+        `${DATOS.preguntas.filter(p=>p.area===k).length} de ${esc(nombreArea(k))}`).join(" · ")}.</p></div>
+    </div>`;
+}
+function guardarAjustes(){
+  const fx = document.getElementById("a-fx").value;
+  if(!fx){ alert("Falta la fecha del examen."); return; }
+  const mt = parseInt(document.getElementById("a-mt").value,10);
+  const hs = parseFloat(document.getElementById("a-hs").value);
+  const ds = parseInt(document.getElementById("a-ds").value,10);
+  E.config = {nombre:document.getElementById("a-nom").value.trim(), examen:fx,
+    meta:isNaN(mt)?400:Math.max(0,Math.min(500,mt)), horas:isNaN(hs)?12:Math.max(1,hs),
+    dias:isNaN(ds)?6:Math.max(1,Math.min(7,ds))};
+  guardar(); ir("inicio");
+}
+function exportarDatos(){
+  const caja = document.getElementById("caja-export");
+  caja.innerHTML = `<label for="a-txt">Selecciona todo este texto y guárdalo en un archivo</label>
+    <textarea id="a-txt" style="width:100%;height:190px;font-family:var(--mono);font-size:.72rem;
+      padding:10px;border-radius:var(--r2);border:1px solid var(--linea);background:var(--sup2);
+      color:var(--tinta)"></textarea>`;
+  const t = document.getElementById("a-txt");
+  t.value = JSON.stringify(E, null, 2); t.focus(); t.select();
+}
+function importarDatos(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    try{
+      const d = JSON.parse(lector.result);
+      if(!d || typeof d !== "object" || !Array.isArray(d.intentos)) throw new Error("formato");
+      E = Object.assign({}, BASE, d); guardar();
+      alert("Avance cargado."); ir("inicio");
+    }catch(e){ alert("Ese archivo no tiene el formato correcto."); }
+  };
+  lector.readAsText(f);
+}
+function borrarTodo(){
+  if(!confirm("Se borra TODO tu avance de este navegador: intentos, simulacros y repasos. ¿Seguro?")) return;
+  E = JSON.parse(JSON.stringify(BASE)); guardar(); ir("inicio");
+}
+
+/* ------------------------------------------------------------- teclado --- */
+document.addEventListener("keydown", ev => {
+  if(!sesion || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const t = ev.target;
+  if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+  if(sesion.i >= sesion.preguntas.length) return;
+  const letra = "ABCD".indexOf(ev.key.toUpperCase());
+  if(letra >= 0 && !sesion.mostrando){ ev.preventDefault(); responder(letra); return; }
+  if((ev.key === "Enter" || ev.key === " ") && sesion.mostrando){ ev.preventDefault(); siguiente(); }
+});
+
+pintar();
+</script>
+</body>
+</html>

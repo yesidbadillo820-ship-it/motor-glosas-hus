@@ -64,6 +64,8 @@ REGLAS DURAS:
 6. Si el usuario pide "audita esta factura" sin más, asumí que quiere el auditor_forense con pregunta genérica.
 7. Cuando devuelvas valores monetarios, formatealos en pesos colombianos: "$1.234.567 COP".
 8. Para fechas, usá formato dd/mm/aaaa.
+9. NUNCA cites un contrato como base de defensa sin verificar antes con consultar_malla_contractual que regía EL DÍA DEL HECHO (no hoy). Si ese día no regía ninguno, decilo: la defensa correcta es a tarifa SOAT plena, no el contrato muerto.
+10. No sos solo un asistente que responde: sos el DIRECTOR DE OPERACIONES del área. Cuando pregunten qué hacer, qué es urgente o cómo va la operación — o cuando el contexto lo amerite — llamá diagnostico_operacion y DIRIGÍ: empezá por lo rojo (prioridad 1), di cuánta plata está en juego, qué pantalla abrir y qué hacer primero. Advertí lo que el usuario no preguntó pero necesita saber.
 
 Comunicate con calidez profesional — sos parte del equipo del HUS, no un bot externo."""
 
@@ -182,6 +184,87 @@ TOOLS_ASISTENTE = [
         "name": "estadisticas_sistema",
         "description": "Devuelve KPIs globales: total glosas, valor objetado mes, valor recuperado, tasa éxito, EPS top, glosas vencidas, etc.",
         "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "consultar_malla_contractual",
+        "description": (
+            "La malla contractual oficial del HUS. Con pagador devuelve el contrato "
+            "que regía ESE día (número, vigencia, tarifa, factor, qué cubre y qué no); "
+            "sin pagador devuelve el panorama completo: vencidos, por vencer y vigentes. "
+            "Úsala SIEMPRE antes de citar un contrato como base de defensa."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "pagador": {
+                    "type": "string",
+                    "description": "EPS o entidad (ej: COMPENSAR, FOMAG, POLICIA). Vacío = panorama completo.",
+                },
+                "fecha": {
+                    "type": "string",
+                    "description": "Fecha del hecho AAAA-MM-DD. Vacío = hoy.",
+                },
+            },
+        },
+    },
+    {
+        "name": "perfil_pagador",
+        "description": (
+            "El Motor Universal: TODO lo que el sistema sabe hacer con un "
+            "pagador — contrato vigente por fecha, respuesta masiva por "
+            "lotes y su bot, conversores de Automatización, contacto de "
+            "radicación. Úsalo cuando pregunten '¿qué se puede hacer con "
+            "X EPS?' o al planear cómo atacar la cartera de un pagador."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"pagador": {"type": "string"}},
+            "required": ["pagador"],
+        },
+    },
+    {
+        "name": "gobierno_ia",
+        "description": (
+            "El gasto de IA del sistema (últimos 30 días): cuánto va hoy, en "
+            "la semana y el mes, por modelo y por usuario, el porcentaje de "
+            "caché y las glosas más caras de defender. Úsalo cuando pregunten "
+            "por el costo/consumo de la IA."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "diagnostico_operacion",
+        "description": (
+            "El barrido completo de la operación HOY: glosas vencidas y por "
+            "vencer con su plata, contratos caídos o por caer, análisis "
+            "defendidos sin contrato vigente, audiencias encima sin acta y "
+            "actas con hallazgos. Devuelve las acciones priorizadas. Úsalo "
+            "SIEMPRE que pregunten qué hacer, qué es urgente, cómo va la "
+            "operación o al armar el plan del día."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "consultar_expediente",
+        "description": (
+            "El expediente completo de una glosa: ficha, contrato que rige, "
+            "constancia contractual, línea de tiempo de TODO lo que ha pasado "
+            "(análisis, versiones, cambios de estado, comentarios, actas), "
+            "conciliaciones y el CENTRO DOCUMENTAL (dictamen PDF, actas, "
+            "paquete de evidencia, soportes del share con su ruta). Úsalo "
+            "cuando pregunten '¿qué ha pasado con…?', '¿qué documentos hay?' "
+            "o antes de recomendar el siguiente paso."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "glosa_id": {"type": "integer", "description": "ID interno de la glosa"},
+                "factura": {
+                    "type": "string",
+                    "description": "Número de factura (HUS000…) si no se conoce el ID",
+                },
+            },
+        },
     },
 ]
 
@@ -313,6 +396,82 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
                 }
             )
 
+        if name == "consultar_malla_contractual":
+            from datetime import date as _date
+            from datetime import datetime as _dt
+
+            from app.services import malla_contractual as _malla
+
+            pagador = (args.get("pagador") or "").strip()
+            crudo = (args.get("fecha") or "").strip()
+            try:
+                dia = _dt.strptime(crudo, "%Y-%m-%d").date() if crudo else _date.today()
+            except ValueError:
+                return json.dumps(
+                    {"error": "La fecha debe venir como AAAA-MM-DD"}, ensure_ascii=False
+                )
+
+            if not pagador:
+                return json.dumps(_malla.estado_vigencia(dia), ensure_ascii=False)
+
+            contrato = _malla.vigente(pagador, dia)
+            todos = _malla.contratos_de(pagador)
+            return json.dumps(
+                {
+                    "pagador": pagador,
+                    "fecha": dia.isoformat(),
+                    "malla_al": _malla.FECHA_MALLA.isoformat(),
+                    "hay_contrato": contrato is not None,
+                    "contrato": contrato.como_dict() if contrato else None,
+                    "otros_contratos": [
+                        c.como_dict()
+                        for c in todos
+                        if contrato is None or c.numero != contrato.numero
+                    ],
+                },
+                ensure_ascii=False,
+            )
+
+        if name == "perfil_pagador":
+            from app.services import perfil_pagador as _pp
+
+            return json.dumps(_pp.perfil(args.get("pagador") or ""), ensure_ascii=False)
+
+        if name == "gobierno_ia":
+            from app.api.routers.gobierno_ia import resumen_gobierno_ia
+
+            return json.dumps(resumen_gobierno_ia(db=db, current_user=None), ensure_ascii=False)
+
+        if name == "diagnostico_operacion":
+            from app.services import centro_inteligencia
+
+            return json.dumps(centro_inteligencia.diagnostico(db), ensure_ascii=False)
+
+        if name == "consultar_expediente":
+            from app.api.routers.glosas import construir_expediente
+            from app.models.db import GlosaRecord
+
+            glosa_id = args.get("glosa_id")
+            factura = (args.get("factura") or "").strip()
+            if not glosa_id and factura:
+                g = (
+                    db.query(GlosaRecord)
+                    .filter(GlosaRecord.factura.ilike(f"%{factura}%"))
+                    .order_by(GlosaRecord.id.desc())
+                    .first()
+                )
+                glosa_id = g.id if g else None
+            if not glosa_id:
+                return json.dumps(
+                    {"error": "No encontré esa glosa: dame el ID o el número de factura."},
+                    ensure_ascii=False,
+                )
+            exp = construir_expediente(int(glosa_id), db)
+            # La línea de tiempo completa puede ser enorme: al chat van los
+            # últimos 15 eventos; el resto queda en la pantalla Expediente.
+            exp["timeline"] = exp["timeline"][:15]
+            return json.dumps(exp, ensure_ascii=False)
+
         if name == "estadisticas_sistema":
             from app.models.db import GlosaRecord
             from sqlalchemy import func
@@ -406,6 +565,38 @@ def _sanear_content(content):
     return str(content) if str(content).strip() else None
 
 
+def _explicar_fallo_de_red(e: Exception) -> str:
+    """Traduce el fallo de red a algo que el auditor pueda accionar.
+
+    19-08-2026. Decía «Error red: [WinError 10054] Se ha forzado la
+    interrupción de una conexión existente por el host remoto». El auditor no
+    sabe qué es un WinError, y menos que eso significa que la red del hospital
+    está tumbando la conexión con el proveedor de IA — que es lo que pasa en el
+    PC de cartera: el Diagnóstico marca Anthropic en ámbar por lo mismo.
+    """
+    texto = str(e)
+    caido = any(
+        marca in texto
+        for marca in ("10054", "10060", "ConnectError", "ConnectTimeout", "getaddrinfo")
+    )
+    if caido:
+        return (
+            "No se pudo conectar con el proveedor de IA (Anthropic). Es un "
+            "bloqueo de red, no un problema del dato: la red del hospital está "
+            "cortando la salida hacia api.anthropic.com. Revíselo en "
+            "Diagnóstico → Anthropic, y pídale a Sistemas que permita la salida "
+            "HTTPS hacia api.anthropic.com. Mientras tanto, los dictámenes "
+            f"siguen saliendo por Groq. (detalle técnico: {texto[:120]})"
+        )
+    if "ReadTimeout" in texto or "TimeoutException" in texto:
+        return (
+            "El asistente se demoró más de lo que el portal puede esperar. "
+            "Vuelva a intentarlo con una pregunta más concreta; si sigue "
+            "pasando, avísele al chat."
+        )
+    return f"No se pudo hablar con el proveedor de IA: {texto[:200]}"
+
+
 async def chat_con_asistente(
     mensajes: list[dict],
     db,
@@ -413,6 +604,8 @@ async def chat_con_asistente(
     api_key: str = None,
     modelo: str = None,
     max_turns: int = 6,
+    system_extra: str = "",
+    tools_permitidas: list[str] | None = None,
 ) -> dict:
     """Loop multi-turn del asistente. Recibe historial de mensajes,
     devuelve la respuesta final + tools que usó.
@@ -434,7 +627,17 @@ async def chat_con_asistente(
     if not mensajes:
         return {"respuesta": "", "error": "Sin mensajes"}
 
-    timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+    # 19-08-2026. Era read=180. El portal se sirve por un túnel que corta la
+    # petición alrededor de los 100 segundos, así que el motor SIEMPRE perdía
+    # esa carrera: cuando el asistente se demoraba, el auditor no veía el
+    # motivo sino un «Error 502» del túnel, sin una palabra que le dijera qué
+    # pasó. Yesid lo vio corriendo sus dos agentes.
+    #
+    # Con 75 segundos el motor contesta primero y puede explicar el problema
+    # —que es lo que ocurre acá: la red del hospital tumba la conexión con
+    # api.anthropic.com—. Más vale un mensaje claro en 75 segundos que un 502
+    # mudo en 100.
+    timeout = httpx.Timeout(connect=10.0, read=75.0, write=30.0, pool=10.0)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -470,6 +673,17 @@ async def chat_con_asistente(
     tools_usadas = []
     tokens_total = {"input": 0, "output": 0}
 
+    # Constructor de Agentes: un agente corre con SU misión encima del
+    # sistema base y SOLO con las herramientas que su ficha le permite.
+    system_final = SYSTEM_ASISTENTE_MAESTRO + (
+        ("\n\n" + system_extra.strip()) if system_extra and system_extra.strip() else ""
+    )
+    if tools_permitidas is not None:
+        permitidas = set(tools_permitidas)
+        tools_finales = [t for t in TOOLS_ASISTENTE if t["name"] in permitidas]
+    else:
+        tools_finales = TOOLS_ASISTENTE
+
     async with httpx.AsyncClient(timeout=timeout) as client:
         for turno in range(max_turns):
             try:
@@ -480,13 +694,17 @@ async def chat_con_asistente(
                         "model": modelo,
                         "max_tokens": 4000,
                         "temperature": 0.2,
-                        "system": SYSTEM_ASISTENTE_MAESTRO,
-                        "tools": TOOLS_ASISTENTE,
+                        "system": system_final,
+                        "tools": tools_finales,
                         "messages": msgs_anthropic,
                     },
                 )
             except Exception as e:
-                return {"respuesta": "", "error": f"Error red: {e}", "tools_llamadas": tools_usadas}
+                return {
+                    "respuesta": "",
+                    "error": _explicar_fallo_de_red(e),
+                    "tools_llamadas": tools_usadas,
+                }
 
             if resp.status_code != 200:
                 # Detectar específicamente errores de billing de Anthropic

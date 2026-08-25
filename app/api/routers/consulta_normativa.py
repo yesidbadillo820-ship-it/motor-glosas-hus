@@ -1,19 +1,130 @@
 """Router de consulta normativa — R79 P2.
 
 Endpoints:
-  GET /consulta-normativa/normas/export.json  — exporta catálogo completo de normas.
+  POST /consulta-normativa                    — busca en la biblioteca normativa.
+  GET  /consulta-normativa/normas             — lista el índice de normas.
+  GET  /consulta-normativa/normas/export.json — exporta catálogo completo de normas.
 """
 
 import json
+import re
+import unicodedata
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
+from pydantic import BaseModel
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/consulta-normativa", tags=["consulta-normativa"])
+
+
+# Palabras vacías que no aportan a la búsqueda (no penalizan ni suman).
+_STOPWORDS = {
+    "que",
+    "cual",
+    "cuales",
+    "como",
+    "para",
+    "por",
+    "los",
+    "las",
+    "del",
+    "una",
+    "uno",
+    "con",
+    "sin",
+    "the",
+    "and",
+    "es",
+    "el",
+    "la",
+    "de",
+    "en",
+    "se",
+    "su",
+    "al",
+    "lo",
+    "un",
+    "dice",
+    "norma",
+    "ley",
+    "art",
+    "articulo",
+    "sobre",
+    "cuando",
+    "donde",
+    "regula",
+    "aplica",
+    "que",
+    "hay",
+}
+
+
+def _norm_txt(s: str) -> str:
+    """Lowercase + sin tildes + solo alfanumérico/espacios."""
+    if not s:
+        return ""
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _tokens_consulta(pregunta: str) -> list[str]:
+    return [t for t in _norm_txt(pregunta).split() if len(t) >= 3 and t not in _STOPWORDS]
+
+
+def _buscar_normas(pregunta: str, limite: int = 8) -> list[dict]:
+    """Búsqueda por coincidencia de términos sobre nombre + título + keywords
+    de CATALOGO_NORMAS. Scoring simple y explicable (sin dependencias):
+      • +3 si un término aparece en el nombre de la norma
+      • +2 si aparece en una keyword
+      • +1 si aparece en el título
+    Devuelve las `limite` normas con mayor score (>0), ordenadas desc.
+    """
+    tokens = _tokens_consulta(pregunta)
+    if not tokens:
+        return []
+    resultados = []
+    for n in CATALOGO_NORMAS:
+        nombre_n = _norm_txt(n.get("nombre", ""))
+        titulo_n = _norm_txt(n.get("titulo", ""))
+        kws_n = [_norm_txt(k) for k in (n.get("keywords") or [])]
+        kws_join = " ".join(kws_n)
+        score = 0
+        for t in tokens:
+            if t in nombre_n:
+                score += 3
+            if t in kws_join:
+                score += 2
+            if t in titulo_n:
+                score += 1
+        if score > 0:
+            resultados.append((score, n))
+    resultados.sort(key=lambda x: x[0], reverse=True)
+    salida = []
+    for score, n in resultados[: max(1, min(limite, 25))]:
+        salida.append(
+            {
+                "norma": n.get("nombre", ""),
+                "articulo": None,
+                "titulo": n.get("titulo", ""),
+                "texto": ", ".join(n.get("keywords") or [])[:300],
+                "aplicacion": None,
+                "vigente": bool(n.get("vigente", True)),
+                "score": score,
+            }
+        )
+    return salida
+
+
+class ConsultaNormativaInput(BaseModel):
+    pregunta: str
+    limite: Optional[int] = 8
 
 
 # Catálogo canónico de normas del marco normativo HUS
@@ -274,11 +385,15 @@ CATALOGO_NORMAS = [
         "keywords": ["habilitación", "estándares", "servicios"],
     },
     {
-        "clave": "RESOLUCION 1604 DE 2022",
-        "nombre": "Resolución 1604 de 2022",
-        "titulo": "Estándares de habilitación — actualización 2022",
+        # Corregida el 25-08-2026 contra fuente oficial. No es una resolución
+        # de habilitación: es el DECRETO 1604 de 2022, que adiciona artículos al
+        # Decreto 1072 de 2015 sobre las instituciones educativas de las Cajas
+        # de Compensación. Nada que ver con habilitación de servicios de salud.
+        "clave": "DECRETO 1604 DE 2022",
+        "nombre": "Decreto 1604 de 2022",
+        "titulo": "Instituciones educativas de las Cajas de Compensación Familiar",
         "vigente": True,
-        "keywords": ["habilitación", "estándares", "2022"],
+        "keywords": ["cajas de compensación", "instituciones educativas"],
     },
     {
         "clave": "RESOLUCION 1995 DE 1999",
@@ -316,25 +431,32 @@ CATALOGO_NORMAS = [
         "keywords": ["PPL", "privados de libertad", "penitenciaria"],
     },
     {
+        # Corregida el 25-08-2026 contra fuente oficial. No es de habilitación:
+        # es el instrumento con que las EPS reportan al Ministerio los servicios
+        # que NIEGAN. Y figura como no vigente.
         "clave": "RESOLUCION 3539 DE 2019",
         "nombre": "Resolución 3539 de 2019",
-        "titulo": "Procedimientos y condiciones de habilitación de servicios de salud — complementaria",
-        "vigente": True,
-        "keywords": ["habilitación", "condiciones", "servicios"],
+        "titulo": "Reporte de servicios negados por las EPS",
+        "vigente": False,
+        "keywords": ["servicios negados", "reporte", "EPS"],
     },
     {
+        # Derogada por la Resolución DIAN 000165 del 1 de noviembre de 2023
+        # (verificado el 25-08-2026: su artículo 70 la deroga expresamente).
         "clave": "RESOLUCION 042 DE 2020 DIAN",
         "nombre": "Resolución 042 de 2020 DIAN",
         "titulo": "Factura Electrónica de Venta (FEV) — Habilitación",
-        "vigente": True,
+        "vigente": False,
         "keywords": ["factura electrónica", "FEV", "DIAN", "facturación"],
     },
     {
-        "clave": "RESOLUCION 506 DE 2021 DIAN",
-        "nombre": "Resolución 506 de 2021 DIAN",
-        "titulo": "Factura Electrónica de Venta — Actualización",
-        "vigente": True,
-        "keywords": ["factura electrónica", "FEV", "DIAN"],
+        # Corregida el 25-08-2026 contra fuente oficial. NO es de la DIAN: la
+        # expidió el Ministerio de Salud el 19 de abril de 2021. Y ya no rige.
+        "clave": "RESOLUCION 506 DE 2021",
+        "nombre": "Resolución 506 de 2021 (MinSalud)",
+        "titulo": "Campos de datos adicionales del sector salud en la factura electrónica",
+        "vigente": False,
+        "keywords": ["factura electrónica", "FEV", "campos del sector salud"],
     },
     {
         "clave": "RESOLUCION 054 DE 2026 ESE HUS",
@@ -352,11 +474,48 @@ CATALOGO_NORMAS = [
     },
     # ─── CIRCULARES ───
     {
+        # 24-08-2026 — enriquecida con el texto de la circular real (49 pág,
+        # entregada por el auditor). Las keywords son lo que la pantalla
+        # muestra como "texto": frases con sustancia, no etiquetas sueltas.
         "clave": "CIRCULAR EXTERNA 047 DE 2025 MINSALUD",
         "nombre": "Circular Externa 047 de 2025 MinSalud",
-        "titulo": "Manual SOAT 2026 — indexación a UVB",
+        "titulo": "Indexación de tarifas del Manual de Régimen Tarifario a UVB — vigencia 2026 (30-dic-2025)",
         "vigente": True,
-        "keywords": ["SOAT", "UVB", "manual", "tarifas 2026"],
+        "keywords": [
+            "SOAT",
+            "UVB",
+            "manual tarifario",
+            "tarifas 2026",
+            "Art. 313 Ley 2294 de 2023 crea la Unidad de Valor Básico",
+            "para liquidar en pesos se multiplica el valor de la UVB vigente por la tarifa en UVB",
+            "UVB 2026 = $12.110 (Resolución MinHacienda)",
+            "aplica a aseguradoras SOAT, entidades responsables de pago, prestadores y transporte de pacientes",
+            "indexación",
+            "accidente de tránsito",
+        ],
+    },
+    {
+        # 24-08-2026 — cargada del PDF real (45 pág) entregado por el auditor.
+        # Defensa clave del HUS en glosas de medicamentos: el precio máximo es
+        # POR MERCADO RELEVANTE (mg/unidad) y el Parágrafo 2 del Art. 1 permite
+        # a las IPS ADICIONAR el margen del Art. 11 de la Circular 18 de 2024.
+        "clave": "CIRCULAR 19 DE 2024 CNPMDM",
+        "nombre": "Circular 19 de 2024 CNPMDM (MinSalud–MinCIT)",
+        "titulo": "Precio máximo de venta de medicamentos en control directo — deroga la Circular 13 de 2022",
+        "vigente": True,
+        "keywords": [
+            "precio máximo de venta",
+            "control directo de precios",
+            "medicamentos regulados",
+            "mercado relevante",
+            "CNPMDM",
+            "CUM",
+            "Parágrafo 2 Art. 1: la IPS puede adicionar al precio máximo el margen del Art. 11 de la Circular 18 de 2024",
+            "sanciona la SIC según Art. 132 Ley 1438 de 2011",
+            "rige desde el 30 de julio de 2024 y deroga la Circular 13 de 2022",
+            "transacción institucional",
+            "regulados",
+        ],
     },
     {
         "clave": "CIRCULAR 030 DE 2013 MINSALUD",
@@ -1009,3 +1168,51 @@ def exportar_normas(
             "Content-Disposition": "attachment; filename=normas-hus.json",
         },
     )
+
+
+@router.post("")
+def consultar_biblioteca(
+    data: ConsultaNormativaInput,
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Busca normas en la biblioteca por una pregunta en lenguaje natural.
+
+    Alimenta el cuadro "Buscar en la biblioteca" del panel Consulta
+    Normativa. Antes la UI llamaba a este endpoint pero no existía (404) —
+    por eso el panel "no generaba nada funcional". Búsqueda por coincidencia
+    de términos sobre el catálogo normativo HUS (>100 normas).
+    """
+    pregunta = (data.pregunta or "").strip()
+    if not pregunta:
+        return {"resultados": [], "total_encontrados": 0, "pregunta": pregunta}
+    resultados = _buscar_normas(pregunta, data.limite or 8)
+    return {
+        "resultados": resultados,
+        "total_encontrados": len(resultados),
+        "pregunta": pregunta,
+    }
+
+
+@router.get("/normas")
+def listar_normas(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Índice de todas las normas indexadas (botón "Ver todas las normas").
+
+    Devuelve nombre + título + nº de artículos por norma. Antes la UI lo
+    llamaba pero el endpoint no existía (404).
+    """
+    normas = []
+    for n in CATALOGO_NORMAS:
+        normas.append(
+            {
+                "nombre": n.get("nombre", ""),
+                "titulo": n.get("titulo", ""),
+                "vigente": bool(n.get("vigente", True)),
+                # El catálogo no desglosa artículos por norma; 0 = sin desglose.
+                "num_articulos": int(n.get("num_articulos", 0) or 0),
+            }
+        )
+    # Orden alfabético por nombre para que el índice sea escaneable.
+    normas.sort(key=lambda x: x["nombre"])
+    return {"total": len(normas), "normas": normas}

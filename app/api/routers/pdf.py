@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_auditor_o_superior
 from app.core.config import get_settings
 from app.models.db import UsuarioRecord
 from app.services.pdf_service import PdfService
@@ -20,7 +20,7 @@ cfg = get_settings()
 @router.post("/pdf/ocr")
 async def pdf_ocr(
     archivo: UploadFile = File(...),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Sube un PDF y devuelve su texto. Si el PDF es escaneado y hay
     ANTHROPIC_API_KEY configurada, usa Claude Vision como OCR."""

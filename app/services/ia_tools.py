@@ -260,14 +260,18 @@ def _exec_lookup_tarifa(args: dict) -> str:
     from app.database import SessionLocal
 
     try:
-        from app.models.db import TarifaContratada
+        from app.models.db import TarifaContratadaRecord as TarifaContratada
     except Exception:
         return json.dumps({"tarifa": None, "error": "Modelo TarifaContratada no disponible"})
     db = SessionLocal()
     try:
         row = (
             db.query(TarifaContratada)
-            .filter(TarifaContratada.eps == eps, TarifaContratada.codigo_cups == cups)
+            .filter(
+                TarifaContratada.eps == eps,
+                TarifaContratada.codigo_cups == cups,
+                TarifaContratada.activa == 1,
+            )
             .first()
         )
         if not row:

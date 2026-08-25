@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_auditor_o_superior
 from app.core.config import get_settings
 from app.database import get_db
 from app.models.db import UsuarioRecord
@@ -29,7 +29,7 @@ class AsistenteChatIn(BaseModel):
 async def asistente_chat(
     data: AsistenteChatIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
     _cupo_ia: None = Depends(_consumir_cupo_ia),
 ):
     mensajes = [

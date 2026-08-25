@@ -1,5 +1,7 @@
 """Tests for GlosaService."""
 
+import pytest
+
 from app.services.glosa_service import (
     generar_texto_extemporanea,
     generar_texto_injustificada,
@@ -129,6 +131,93 @@ class TestCalculoDiasHabiles:
         assert result == 1
 
 
+class TestDiasHabilesFechasInvalidas:
+    """Regresión auditoría jun-2026 P1 #5: con fechas imparseables el método
+    devolvía 0 → la glosa quedaba "DENTRO DE TÉRMINOS (0 DÍAS HÁBILES)" y la
+    defensa por extemporaneidad (RE9502) se perdía en silencio. Ahora debe
+    devolver None y analizar() debe pedir verificación de fechas."""
+
+    @pytest.mark.parametrize(
+        "f1,f2",
+        [
+            ("FECHA-INVALIDA", "2026-03-02"),
+            ("2026-03-02", "no-es-fecha"),
+            ("", ""),
+            (None, "2026-03-02"),
+            ("2026-13-45", "2026-03-02"),  # mes/día imposibles
+            ("02/03/2026", "03/03/2026"),  # formato no ISO
+        ],
+    )
+    def test_fechas_invalidas_devuelven_none(self, glosa_service, f1, f2):
+        assert glosa_service._calcular_dias_habiles(f1, f2) is None
+
+    def test_fechas_validas_siguen_devolviendo_int(self, glosa_service):
+        assert glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-09") == 5
+
+    def test_acepta_timestamp_iso_con_hora(self, glosa_service):
+        """El slice [:10] debe seguir aceptando 'YYYY-MM-DDTHH:MM:SS'."""
+        assert glosa_service._calcular_dias_habiles("2026-03-02T08:30:00", "2026-03-03") == 1
+
+    @pytest.mark.asyncio
+    async def test_analizar_no_clasifica_dentro_de_terminos(self, glosa_service, monkeypatch):
+        """Si el cálculo de días falla, el dictamen NO debe decir
+        'DENTRO DE TÉRMINOS' — debe pedir verificación de fechas."""
+        from app.models.schemas import GlosaInput
+
+        monkeypatch.setattr(glosa_service, "_calcular_dias_habiles", lambda f1, f2: None)
+
+        # Desde el incidente 04-08-2026 la IA sin claves LANZA (un fallo de
+        # proveedor no es un dictamen), así que acá se stubea con un texto
+        # real: lo que este test verifica es el mensaje de tiempo, no la IA.
+        async def _ia_stub(
+            system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+        ):
+            return (
+                "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE FALTA DE "
+                "SOPORTE DE ENTREGA SOBRE EL CODIGO FA0101, TODA VEZ QUE LA "
+                "FACTURA FUE RADICADA EN TERMINOS Y CONSTA EL ACUSE DE RECIBO "
+                "EN EL EXPEDIENTE. SE SOLICITA EL LEVANTAMIENTO DE LA "
+                "GLOSA.</argumento>",
+                "stub",
+            )
+
+        monkeypatch.setattr(glosa_service, "_llamar_ia", _ia_stub)
+        data = GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            fecha_radicacion="2026-03-02",
+            fecha_recepcion="2026-04-20",
+            tabla_excel="FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA",
+            valor_aceptado="0",
+        )
+        resultado = await glosa_service.analizar(
+            data, contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+        assert "DENTRO DE TÉRMINOS" not in resultado.mensaje_tiempo
+        assert "FECHAS NO VÁLIDAS" in resultado.mensaje_tiempo
+        assert resultado.color_tiempo == "bg-amber-500"
+
+    @pytest.mark.asyncio
+    async def test_analizar_extemporanea_sigue_funcionando(self, glosa_service):
+        """Control: con fechas válidas y >20 días hábiles la glosa se marca
+        EXTEMPORÁNEA como siempre (la defensa RE9502 se conserva)."""
+        from app.models.schemas import GlosaInput
+
+        data = GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            fecha_radicacion="2026-03-02",
+            fecha_recepcion="2026-04-20",  # ~35 días hábiles
+            tabla_excel="FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA",
+            valor_aceptado="0",
+        )
+        resultado = await glosa_service.analizar(
+            data, contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+        assert "EXTEMPORÁNEA" in resultado.mensaje_tiempo
+        assert resultado.color_tiempo == "bg-red-600"
+
+
 class TestConstantes:
     """Tests for system constants."""
 
@@ -223,14 +312,44 @@ class TestExtraccionValor:
     """Tests for value extraction from glosa text."""
 
     def test_extraer_valor_formato_colombiano(self, glosa_service):
-        """Should extract Colombian peso format."""
+        """Un millón y medio, escrito como se escribe en Colombia.
+
+        21-08-2026. Esta prueba se llama «formato_colombiano» y su descripción
+        decía «Should extract Colombian peso format»… pero exigía
+        «1,500,000» CON COMAS, que es formato gringo. El nombre decía una cosa
+        y la comprobación la contraria.
+
+        En Colombia la coma es el separador decimal: «1,500,000» se lee mal.
+        La glosa puede venir escrita con comas —eso no se controla—, pero lo
+        que el motor DEVUELVE, y que termina en el documento que se radica
+        ante la EPS, va con punto de miles.
+        """
         result = glosa_service._extraer_valor("Glosa por $1,500,000")
-        assert "$ 1,500,000" in result or "1,500,000" in result
+        assert result == "$ 1.500.000"
 
     def test_extraer_valor_sin_signo(self, glosa_service):
-        """Should handle value without $ sign - returns default when not found."""
+        """Un valor sin «$» SÍ es un valor.
+
+        21-08-2026. Esta prueba exigía «$ 0.00» y su docstring lo llamaba
+        «returns default when not found» — o sea, daba por correcto NO
+        encontrarlo. Estaba fijando el defecto.
+
+        Yesid pegó «CL0801 - ... - valor 279900» y el dictamen salió declarando
+        ante la EPS un valor objetado de CERO PESOS. Eso no es un detalle de
+        formato: es una cifra falsa en un documento que se radica.
+        """
         result = glosa_service._extraer_valor("Valor 500000 sin pesos")
-        assert "$ 0.00" in result
+        assert result == "$ 500.000"
+        # Contra el centinela exacto, no una subcadena: «0.00» SÍ está dentro
+        # de «500.000» —es 5·00.00·0— y una comprobación así se cumple sola.
+        assert result != "$ 0.00"
+
+    def test_un_porcentaje_no_es_plata(self, glosa_service):
+        """El otro lado: «valor 100%» no puede leerse como cien pesos."""
+        assert "$ 0.00" in glosa_service._extraer_valor("glosa aceptada al valor 100%")
+
+    def test_un_numero_suelto_despues_de_valor_no_basta(self, glosa_service):
+        assert "$ 0.00" in glosa_service._extraer_valor("se detectaron valor 2 conceptos")
 
     def test_extraer_valor_inexistente(self, glosa_service):
         """Should return default $0.00 when no value found."""

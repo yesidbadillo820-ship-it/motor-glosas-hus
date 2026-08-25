@@ -1,12 +1,13 @@
 import re
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.core.tz import ahora_utc
+from app.core.tz import a_utc, ahora_utc
+from app.models.schemas import GlosaExpedienteOut, GlosaHistorialItem
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
@@ -16,7 +17,18 @@ from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
-from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
+from app.models.db import (
+    UsuarioRecord,
+    GlosaRecord,
+    ConceptoGlosaRecord,
+    ContratoRecord,
+    ROL_SUPER_ADMIN,
+    ROL_COORDINADOR,
+    ROL_AUDITOR,
+    ROL_VIEWER,
+)
+from app.utils.moneda import parse_valor_cop
+from app.utils.html_a_texto import dictamen_a_texto_plano
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -182,9 +194,51 @@ def _limpiar_observacion(dictamen_html: str) -> str:
     return txt.strip()
 
 
-@router.get("/historial", response_model=list)
+def _puede_ver_paciente(usuario: UsuarioRecord, glosa) -> bool:
+    """¿Este usuario tiene relación legítima con los datos de este paciente?
+
+    E00 (Ley 1581/2012): el nombre del paciente es dato sensible y solo lo ve
+    quien lo necesita para trabajar el caso — el gestor asignado — o quien
+    tiene responsabilidad sobre todo el proceso (coordinación y administración).
+    Antes, `GET /glosas/historial` devolvía el nombre de TODOS los pacientes
+    del hospital a cualquier usuario autenticado.
+    """
+    if usuario.rol in (ROL_SUPER_ADMIN, ROL_COORDINADOR):
+        return True
+    if usuario.rol == ROL_VIEWER:
+        return False
+    duenio_correo = (glosa.auditor_email or "").strip().lower()
+    duenio_nombre = (glosa.gestor_nombre or "").strip().lower()
+    # Glosa sin asignar: es trabajo que cualquier auditor puede tomar, y
+    # ocultarle el paciente le impediría trabajarla. Se protege lo que YA
+    # tiene dueño, que es donde el dato de otro paciente no le corresponde.
+    if not duenio_correo and not duenio_nombre:
+        return True
+    correo = (usuario.email or "").strip().lower()
+    if correo and duenio_correo == correo:
+        return True
+    nombre = (usuario.nombre or "").strip().lower()
+    return bool(nombre) and duenio_nombre == nombre
+
+
+def _paciente_visible(usuario: UsuarioRecord, glosa) -> Optional[str]:
+    """Nombre del paciente, o sus iniciales si el usuario no tiene relación.
+
+    Se enmascara en vez de omitir para que las filas sigan siendo
+    distinguibles en pantalla sin revelar la identidad.
+    """
+    nombre = (glosa.paciente or "").strip()
+    if not nombre or _puede_ver_paciente(usuario, glosa):
+        return glosa.paciente
+    return " ".join(f"{p[0]}." for p in nombre.split() if p)[:60] or None
+
+
+@router.get("/historial", response_model=list[GlosaHistorialItem])
 def historial(
-    limit: int = 50,
+    # le=500: sin tope, un limit=10_000_000 serializa la tabla completa
+    # (dictamenes HTML incluidos) en una sola respuesta — DoS trivial
+    # autenticado (auditoría jun-2026, P2 #9).
+    limit: int = Query(50, ge=1, le=500),
     eps: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
@@ -211,7 +265,7 @@ def historial(
                 "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
                 "entidad": entidad_real,
                 "eps": g.eps,  # alias para compatibilidad (valor raw, sin resolver)
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "concepto_glosa": g.concepto_glosa,
@@ -283,7 +337,7 @@ def historial_paginado(
                 "id": g.id,
                 "eps": g.eps,
                 "entidad": entidad_real,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "concepto_glosa": g.concepto_glosa,
@@ -356,7 +410,7 @@ def exportar_json(
                 "id": g.id,
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
                 "eps": g.eps,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
@@ -399,11 +453,21 @@ def exportar_xlsx(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Exporta el historial filtrado a XLSX con las 13 columnas IPS + observación."""
+    """Exporta el historial filtrado en formato RADICABLE institucional.
+
+    Cambio 12-jun-2026 (pedido del dueño): este export usaba un layout de
+    22 columnas planas con el dictamen truncado a 800 chars — visto en el
+    lote real: 713/809 dictámenes cortados a mitad de oración y formato
+    incompatible con la radicación ante la EPS. Ahora reusa el generador
+    del Excel radicable (PR #111): header verde institucional, 12 columnas
+    canónicas, una fila por concepto, fila TOTAL GLOSADO y hoja
+    FUNDAMENTO JURÍDICO — el mismo formato que produce la "otra IA".
+    """
     from io import BytesIO
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+
     from fastapi.responses import StreamingResponse
+
+    from app.services.excel_radicable import generar_excel_radicable_con_nombre
 
     repo = GlosaRepository(db)
     glosas_raw = repo.listar_para_export(
@@ -419,10 +483,7 @@ def exportar_xlsx(
         workflow=workflow,
     )
 
-    # R-export 27-abr-2026: deduplicar por (factura, código, cups, etapa)
-    # quedándonos con la versión más reciente. Antes el Excel exportaba
-    # TODAS las versiones (13 filas para una sola glosa que se reanalizó
-    # 13 veces). Ahora 1 fila por glosa única — la última.
+    # Dedup por (factura, código, cups, etapa) — la versión más reciente.
     visto = {}
     for g in glosas_raw:
         clave = (
@@ -431,16 +492,49 @@ def exportar_xlsx(
             (g.cups_servicio or "").strip().upper(),
             (g.etapa or "").strip().upper(),
         )
-        # Solo conservamos si NO había una entrada para esta clave o
-        # si la nueva es más reciente (creado_en mayor).
         prev = visto.get(clave)
         if prev is None or (g.creado_en and prev.creado_en and g.creado_en > prev.creado_en):
             visto[clave] = g
-    glosas = sorted(
-        visto.values(),
-        key=lambda x: x.creado_en or 0,
-        reverse=True,
+    glosas = sorted(visto.values(), key=lambda x: x.creado_en or 0, reverse=True)
+    glosa_ids = [g.id for g in glosas]
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="EXPORTAR_XLSX",
+        tabla="historial",
+        detalle=f"Registros exportados: {len(glosas)} (formato radicable)",
     )
+
+    try:
+        contenido, filename = generar_excel_radicable_con_nombre(db, glosa_ids=glosa_ids)
+    except Exception as e:
+        # Si el generador radicable falla por cualquier razón (lote vacío,
+        # datos inconsistentes) devolvemos 422 con la causa — el cliente
+        # decide si reintenta con filtros distintos.
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=422,
+            detail=f"No se pudo generar el Excel radicable: {e}",
+        ) from e
+
+    return StreamingResponse(
+        BytesIO(contenido),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _exportar_xlsx_legacy_22_columnas(glosas, db, current_user):
+    """Generador legacy de 22 columnas planas — preservado por si algún
+    proceso externo dependía del layout viejo. NO se invoca desde el
+    endpoint público; queda como referencia/debug.
+    """
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse  # noqa: F401
 
     wb = Workbook()
     ws = wb.active
@@ -490,8 +584,15 @@ def exportar_xlsx(
             or (g.texto_glosa_original or "").strip()
             or (g.concepto_glosa or "").strip()
         )
-        # Dictamen: el texto limpio (sin HTML) generado por la defensa.
-        dictamen_txt = _limpiar_observacion(g.dictamen) or ""
+        # Dictamen: texto plano legible (la tabla de cabecera se vuelve
+        # "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..." en vez de perderse o
+        # salir como HTML crudo).
+        # Dictamen: texto plano legible (la tabla de cabecera se vuelve
+        # "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..." en vez de perderse o
+        # salir como HTML crudo). Cap a 30.000 chars (Excel soporta 32.767
+        # por celda; el cap viejo de 800 cortaba 713/809 dictámenes a
+        # mitad de oración — visto en producción 12-jun-2026).
+        dictamen_txt = dictamen_a_texto_plano(g.dictamen) or ""
         recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
         ws.append(
             [
@@ -509,7 +610,7 @@ def exportar_xlsx(
                 float(recuperado),
                 g.codigo_respuesta or "",
                 obs_eps_raw[:600] if obs_eps_raw else "",
-                dictamen_txt[:800] if dictamen_txt else "",
+                dictamen_txt[:30000] if dictamen_txt else "",
                 g.etapa or "",
                 g.estado or "",
                 g.workflow_state or "",
@@ -971,7 +1072,9 @@ def buscar_similares_texto(
     if not tokens_query:
         return {"total_evaluadas": 0, "items": []}
 
-    candidatas = db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).all()
+    candidatas = (
+        db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).limit(5000).all()
+    )
 
     items = []
     for g in candidatas:
@@ -1032,7 +1135,7 @@ def buscar_avanzado(
     Devuelve hasta `limit` resultados (default 50, max 500), ordenados
     DESC por creado_en.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     q = db.query(GlosaRecord)
     if eps:
@@ -1063,10 +1166,11 @@ def buscar_avanzado(
             raise HTTPException(400, "fecha_desde debe ser YYYY-MM-DD")
     if fecha_hasta:
         try:
-            dt = datetime.strptime(fecha_hasta, "%Y-%m-%d").replace(
+            # Ronda 30: inclusive del día completo (antes excluía el día 'hasta').
+            dt = (datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)).replace(
                 tzinfo=timezone.utc,
             )
-            q = q.filter(GlosaRecord.creado_en <= dt)
+            q = q.filter(GlosaRecord.creado_en < dt)
         except ValueError:
             raise HTTPException(400, "fecha_hasta debe ser YYYY-MM-DD")
 
@@ -1081,7 +1185,7 @@ def buscar_avanzado(
                 "id": g.id,
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
                 "eps": g.eps,
-                "paciente": g.paciente,
+                "paciente": _paciente_visible(current_user, g),
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
@@ -1146,7 +1250,7 @@ def buscar_por_id_o_factura(
             "consecutivo_dgh": g.consecutivo_dgh,
             "numero_radicado": g.numero_radicado,
             "codigo_glosa": g.codigo_glosa,
-            "paciente": g.paciente,
+            "paciente": _paciente_visible(current_user, g),
             "valor_objetado": float(g.valor_objetado or 0),
             "estado": g.estado,
             "creado_en": g.creado_en.isoformat() if g.creado_en else None,
@@ -1188,10 +1292,11 @@ async def generar_lote(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     sem = asyncio.Semaphore(5)
@@ -1382,10 +1487,11 @@ async def refinar_dictamen_endpoint(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
     nuevo_argumento = await service.refinar_dictamen(
         dictamen_actual_html=glosa.dictamen,
@@ -1460,7 +1566,7 @@ class ValidarNormasInput(BaseModel):
 @router.post("/validar-normas")
 def validar_normas_texto(
     data: ValidarNormasInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Valida citas normativas en un texto libre (sin persistir).
     Útil para que el auditor chequee rápido un borrador."""
@@ -1473,7 +1579,7 @@ def validar_normas_texto(
 async def validar_pre_radicacion(
     glosa_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Valida el dictamen antes de radicarlo ante la EPS.
 
@@ -1494,10 +1600,11 @@ async def validar_pre_radicacion(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     # Calcular días hábiles si hay fechas
@@ -1669,8 +1776,10 @@ def dashboard_plata_recuperada(
             raise HTTPException(400, "desde debe ser YYYY-MM-DD")
     if hasta:
         try:
-            h = datetime.fromisoformat(hasta)
-            base_q = base_q.filter(GlosaRecord.creado_en <= h)
+            # Ronda 30: 'hasta' inclusive del día completo — antes 'YYYY-MM-DD'
+            # parseaba a medianoche 00:00 y excluía todo ese día.
+            h = datetime.strptime(hasta, "%Y-%m-%d") + timedelta(days=1)
+            base_q = base_q.filter(GlosaRecord.creado_en < h)
         except ValueError:
             raise HTTPException(400, "hasta debe ser YYYY-MM-DD")
 
@@ -2524,8 +2633,43 @@ def actualizar_estado(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
+    estados_validos = {
+        "RADICADA",
+        "BORRADOR",
+        "EN_REVISION",
+        "RESPONDIDA",
+        "LEVANTADA",
+        "RATIFICADA",
+        "ACEPTADA",
+        "PARCIALMENTE_ACEPTADA",
+        "RESUELTA",
+        "CONCILIADA",
+        "ARCHIVADA",
+    }
+    estado_norm = (nuevo_estado or "").strip().upper()
+    if estado_norm not in estados_validos:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Estado '{estado_norm}' inválido. Use uno de: {', '.join(sorted(estados_validos))}",
+        )
+
+    # E00 · la cuarta puerta. Las tres de `workflow.py` ya están cerradas; esta
+    # es la más ancha de todas: pone la glosa en cualquiera de los once estados,
+    # incluidos LEVANTADA (el hospital ganó) y ACEPTADA (el hospital desistió).
+    # Cualquier usuario autenticado podía hacerlo.
+    if current_user.rol == ROL_VIEWER:
+        raise HTTPException(status_code=403, detail="VIEWER no puede cambiar estados")
+
     repo = GlosaRepository(db)
-    glosa = repo.actualizar_estado(glosa_id, nuevo_estado, responsable="sistema")
+    glosa_previa = repo.obtener_por_id(glosa_id)
+    if glosa_previa and current_user.rol == ROL_AUDITOR:
+        duenio = (glosa_previa.auditor_email or "").strip().lower()
+        if duenio and duenio != (current_user.email or "").strip().lower():
+            raise HTTPException(status_code=403, detail="Esta glosa está asignada a otro auditor")
+
+    # Y quedaba escrito `responsable="sistema"`: el registro no decía quién lo
+    # hizo. Ahora queda el correo de quien lo pidió.
+    glosa = repo.actualizar_estado(glosa_id, estado_norm, responsable=current_user.email)
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
     logger.info(f"Estado actualizado | glosa_id={glosa_id} | nuevo_estado={nuevo_estado}")
@@ -2579,12 +2723,15 @@ def exportar_resumen_eps_csv(
         estado = (g.estado or "").upper()
         if estado in ESTADOS_CERRADOS:
             b["cerradas"] += 1
-            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
-                b["decididas"] += 1
-                if estado == "LEVANTADA":
-                    b["levantadas"] += 1
         else:
             b["abiertas"] += 1
+        # Ronda 30: RATIFICADA NO está en ESTADOS_CERRADOS, así que la rama
+        # anidada de decididas era código muerto — la EPS que ratifica sí
+        # DECIDIÓ. El conteo de decididas/levantadas va desanidado.
+        if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
 
     def _generar():
         buf = io.StringIO()
@@ -2718,6 +2865,86 @@ def exportar_paquete_multi_zip(
         buf,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.get("/lote/pdf-zip")
+def exportar_pdfs_radicables_zip(
+    ids: str = Query(..., description="IDs CSV, ej '1,2,3' (máx 50)"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """ZIP con el PDF radicable de cada glosa solicitada.
+
+    Complementa /glosas/{id}/dictamen.pdf para radicaciones masivas:
+    un PDF formal por glosa (respuesta_glosa_{factura}_{id}.pdf).
+    Las glosas sin dictamen se omiten y quedan listadas en README.txt.
+
+    Param `ids`: lista CSV de IDs (máx 50 por request — cada PDF se
+    renderiza con reportlab en memoria).
+
+    Declarado ANTES de /{glosa_id} para evitar colisión con el path
+    resolver de FastAPI.
+    """
+    import io
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services.dictamen_pdf import generar_pdf_dictamen, nombre_archivo_pdf
+
+    try:
+        ids_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(400, "ids debe ser CSV de enteros")
+
+    if not ids_list:
+        raise HTTPException(400, "ids no puede estar vacío")
+    if len(ids_list) > 50:
+        raise HTTPException(400, "máximo 50 glosas por paquete de PDFs")
+
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids_list)).all()
+    if not glosas:
+        raise HTTPException(404, "Ninguna glosa encontrada")
+
+    encontrados = {g.id for g in glosas}
+    no_encontrados = [i for i in ids_list if i not in encontrados]
+    sin_dictamen: list[int] = []
+    con_pdf: list[str] = []
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for g in glosas:
+            if not (g.dictamen or "").strip():
+                sin_dictamen.append(g.id)
+                continue
+            try:
+                fname = nombre_archivo_pdf(g)
+                zf.writestr(fname, generar_pdf_dictamen(g))
+                con_pdf.append(fname)
+            except Exception as e:
+                logger.warning(f"[pdf-zip] glosa {g.id}: PDF falló: {e}")
+                sin_dictamen.append(g.id)
+        indice = (
+            f"PDFs RADICABLES — RESPUESTA A GLOSA / OBJECIÓN\n"
+            f"Generado: {ahora_utc().isoformat()}\n"
+            f"Por: {current_user.email}\n\n"
+            f"PDFs incluidos ({len(con_pdf)}):\n"
+            + "".join(f"  - {n}\n" for n in con_pdf)
+            + (f"\nGlosas SIN dictamen (omitidas): {sin_dictamen}\n" if sin_dictamen else "")
+            + (f"IDs no encontrados: {no_encontrados}\n" if no_encontrados else "")
+        )
+        zf.writestr("README.txt", indice)
+
+    if not con_pdf:
+        raise HTTPException(404, "Ninguna de las glosas solicitadas tiene dictamen generado")
+
+    buf.seek(0)
+    fname_zip = f"respuestas-glosa-pdf-{ahora_utc().strftime('%Y%m%d-%H%M%S')}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname_zip}"'},
     )
 
 
@@ -3140,7 +3367,7 @@ def detectar_glosas_similares_en_bloque(
     }
 
 
-@router.get("/{glosa_id}")
+@router.get("/{glosa_id}", response_model=GlosaExpedienteOut)
 def obtener_glosa(
     glosa_id: int,
     db: Session = Depends(get_db),
@@ -3190,6 +3417,19 @@ def obtener_glosa(
         "tipo_glosa_excel": glosa.tipo_glosa_excel,
         "profesional_medico": glosa.profesional_medico,
         "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
+        # Seguimiento de cierre (decisión EPS + nota crédito)
+        "decision_eps": glosa.decision_eps,
+        "fecha_decision_eps": glosa.fecha_decision_eps.isoformat()
+        if glosa.fecha_decision_eps
+        else None,
+        "valor_recuperado": float(glosa.valor_recuperado or 0.0),
+        "observacion_eps": glosa.observacion_eps,
+        "numero_nota_credito": glosa.numero_nota_credito,
+        "fecha_nota_credito": glosa.fecha_nota_credito.isoformat()
+        if glosa.fecha_nota_credito
+        else None,
+        "valor_nota_credito": float(glosa.valor_nota_credito or 0.0),
+        "nota_credito_observacion": glosa.nota_credito_observacion,
     }
 
 
@@ -3213,7 +3453,7 @@ def preparar_conciliacion(
 def autopiloto_niveles_batch(
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Batch: clasifica un conjunto de glosas en niveles de auto-piloto.
 
@@ -3321,6 +3561,15 @@ class DecisionEPSInput(BaseModel):
     observacion_eps: Optional[str] = None
 
 
+class NotaCreditoInput(BaseModel):
+    # Nombres alineados con el contrato que la UI ya envía (static/index.html
+    # guardarNotaCredito): numero_nota / fecha_nota / valor / observacion.
+    numero_nota: str = Field(..., min_length=1)
+    fecha_nota: Optional[str] = None  # ISO date; default = hoy
+    valor: Optional[float] = None  # si viene vacío → se usa valor_aceptado
+    observacion: Optional[str] = None
+
+
 class AsignarAuditorInput(BaseModel):
     auditor_email: str
 
@@ -3420,6 +3669,104 @@ def cambiar_workflow(
     }
 
 
+class MarcarRadicadaInput(BaseModel):
+    """Evidencia de radicación ante la entidad: el número de radicado
+    que asigna la EPS al recibir la objeción + observación opcional
+    (canal usado, nombre del archivo de confirmación, etc.)."""
+
+    numero_radicado: str = Field(..., min_length=1, max_length=50)
+    fecha_radicacion: Optional[date] = None  # default: hoy
+    observacion: Optional[str] = Field(default=None, max_length=2000)
+
+
+@router.post("/{glosa_id}/marcar-radicada")
+def marcar_radicada(
+    glosa_id: int,
+    data: MarcarRadicadaInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Registra la radicación de la respuesta ante la entidad CON
+    evidencia auditable.
+
+    Extiende el botón "Marcar radicada" (que solo movía workflow_state
+    vía PATCH /workflow): además de pasar la glosa a RADICADA, persiste
+    el número de radicado que asignó la EPS, la fecha, quién dejó la
+    constancia y una observación opcional — y escribe la entrada
+    MARCAR_RADICADA en el audit log (visible en /glosas/{id}/timeline).
+
+    Permisos: COORDINADOR/SUPER_ADMIN cualquier glosa; AUDITOR solo las
+    suyas (asignadas a su email o sin asignar). El adjunto con la
+    confirmación de la entidad (screenshot/PDF) queda como follow-up.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if (
+        current_user.rol == "AUDITOR"
+        and glosa.auditor_email
+        and (glosa.auditor_email != current_user.email)
+    ):
+        raise HTTPException(403, "Esta glosa está asignada a otro gestor")
+
+    numero = data.numero_radicado.strip()
+    if not numero:
+        raise HTTPException(400, "numero_radicado no puede estar vacío")
+
+    radicado_anterior = glosa.numero_radicado
+    workflow_anterior = glosa.workflow_state or "BORRADOR"
+
+    if data.fecha_radicacion:
+        radicado_en = datetime(
+            data.fecha_radicacion.year,
+            data.fecha_radicacion.month,
+            data.fecha_radicacion.day,
+            12,  # mediodía UTC: el .date() es estable en Bogotá (UTC-5)
+            tzinfo=timezone.utc,
+        )
+    else:
+        radicado_en = ahora_utc()
+
+    glosa.numero_radicado = numero[:50]
+    glosa.radicado_en = radicado_en
+    glosa.radicado_por = current_user.email
+    if data.observacion:
+        glosa.radicado_observacion = data.observacion.strip()[:2000]
+    glosa.workflow_state = "RADICADA"
+    db.commit()
+    db.refresh(glosa)
+
+    detalle = f"Radicado N° {numero} ante {glosa.eps or 'entidad'}"
+    if data.fecha_radicacion:
+        detalle += f" el {data.fecha_radicacion.isoformat()}"
+    if data.observacion:
+        detalle += f" | {data.observacion.strip()}"
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="MARCAR_RADICADA",
+        tabla="historial",
+        registro_id=glosa_id,
+        campo="numero_radicado",
+        valor_anterior=radicado_anterior,
+        valor_nuevo=numero,
+        detalle=detalle,
+    )
+    logger.info(f"Glosa {glosa_id} marcada RADICADA (N° {numero}) por {current_user.email}")
+
+    return {
+        "message": "Radicación registrada",
+        "glosa_id": glosa_id,
+        "numero_radicado": glosa.numero_radicado,
+        "radicado_en": glosa.radicado_en.isoformat() if glosa.radicado_en else None,
+        "radicado_por": glosa.radicado_por,
+        "observacion": glosa.radicado_observacion,
+        "workflow_anterior": workflow_anterior,
+        "workflow_state": glosa.workflow_state,
+    }
+
+
 @router.patch("/{glosa_id}/decision-eps")
 def registrar_decision_eps(
     glosa_id: int,
@@ -3474,6 +3821,144 @@ def registrar_decision_eps(
         detalle=f"Decisión: {decision} | recuperado: ${data.valor_recuperado:,.0f}",
     )
     return {"message": "Decisión registrada", "glosa_id": glosa_id, "decision_eps": decision}
+
+
+@router.get("/{glosa_id}/nota-credito")
+def obtener_nota_credito(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Datos de la nota crédito registrada en una glosa (para precargar el
+    modal de edición en la UI)."""
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    return {
+        "glosa_id": glosa_id,
+        "numero_nota_credito": glosa.numero_nota_credito,
+        "fecha_nota_credito": glosa.fecha_nota_credito.isoformat()
+        if glosa.fecha_nota_credito
+        else None,
+        "valor_nota_credito": float(glosa.valor_nota_credito or 0.0),
+        "observacion": glosa.nota_credito_observacion,
+    }
+
+
+@router.patch("/{glosa_id}/nota-credito")
+def registrar_nota_credito(
+    glosa_id: int,
+    data: NotaCreditoInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Registra la nota crédito emitida cuando una glosa se acepta (parcial
+    o total). Cierra el ciclo de seguimiento de cartera: el gestor sabe qué
+    glosas se aceptaron y con qué N° de nota crédito se descargaron.
+
+    Es independiente de /decision-eps: la nota crédito suele emitirse días
+    después de aceptar la glosa, así que se captura por separado. Si la
+    glosa aún no estaba marcada como ACEPTADA, registrar la nota crédito la
+    mueve a ese estado (tener nota crédito implica que se aceptó).
+
+    Si `valor` viene vacío, se usa el valor_aceptado de la glosa (la UI
+    informa al gestor de este default).
+    """
+    numero = (data.numero_nota or "").strip()
+    if not numero:
+        raise HTTPException(400, "El número de nota crédito es obligatorio")
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # Valor: el explícito manda; si viene vacío se toma el valor_aceptado.
+    # Si tampoco hay valor aceptado, no hay nada que descargar → 400.
+    valor = data.valor
+    if valor is None or float(valor) <= 0:
+        valor = float(glosa.valor_aceptado or 0.0)
+    if valor <= 0:
+        raise HTTPException(
+            400,
+            "La glosa no tiene valor aceptado. Indica el valor de la nota "
+            "crédito explícitamente o registra primero la aceptación parcial.",
+        )
+
+    # Fecha: si viene, debe ser parseable; una fecha basura es error del
+    # gestor, no se silencia.
+    if data.fecha_nota:
+        try:
+            fecha_nc = a_utc(datetime.fromisoformat(data.fecha_nota.replace("Z", "")))
+        except (ValueError, TypeError):
+            raise HTTPException(400, f"Fecha de nota crédito inválida: {data.fecha_nota!r}")
+    else:
+        fecha_nc = ahora_utc()
+
+    glosa.numero_nota_credito = numero
+    glosa.valor_nota_credito = float(valor)
+    glosa.fecha_nota_credito = fecha_nc
+    if data.observacion:
+        glosa.nota_credito_observacion = data.observacion
+
+    # Tener nota crédito implica que la glosa se aceptó. Si no estaba ya en
+    # un estado de cierre por decisión EPS, marcarla ACEPTADA.
+    if (glosa.decision_eps or "").upper() not in ("ACEPTADA", "LEVANTADA", "RATIFICADA"):
+        glosa.decision_eps = "ACEPTADA"
+        glosa.fecha_decision_eps = ahora_utc()
+    if (glosa.estado or "").upper() not in ("ACEPTADA", "LEVANTADA", "RATIFICADA"):
+        glosa.estado = "ACEPTADA"
+    db.commit()
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="NOTA_CREDITO",
+        tabla="glosas",
+        registro_id=glosa_id,
+        campo="numero_nota_credito",
+        valor_nuevo=numero,
+        detalle=f"Nota crédito {numero} | valor: ${float(valor or 0):,.0f}",
+    )
+    return {
+        "message": "Nota crédito registrada",
+        "glosa_id": glosa_id,
+        "numero_nota_credito": numero,
+        "valor_nota_credito": float(valor),
+        "fecha_nota_credito": glosa.fecha_nota_credito.isoformat()
+        if glosa.fecha_nota_credito
+        else None,
+        "observacion": glosa.nota_credito_observacion,
+    }
+
+
+@router.delete("/{glosa_id}/nota-credito", status_code=204)
+def eliminar_nota_credito(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Borra la nota crédito de una glosa (corrección de captura). No cambia
+    la decisión EPS ni el estado — solo limpia los campos de nota crédito."""
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    numero_previo = glosa.numero_nota_credito
+    glosa.numero_nota_credito = None
+    glosa.fecha_nota_credito = None
+    glosa.valor_nota_credito = 0.0
+    glosa.nota_credito_observacion = None
+    db.commit()
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="NOTA_CREDITO",
+        tabla="glosas",
+        registro_id=glosa_id,
+        campo="numero_nota_credito",
+        valor_anterior=numero_previo,
+        valor_nuevo=None,
+        detalle="Nota crédito eliminada",
+    )
+    return None
 
 
 # ─── Sprint #4 — Decisión EPS en LOTE ────────────────────────────────────
@@ -4097,6 +4582,52 @@ def listar_conceptos_glosa(
     }
 
 
+# 20-08-2026. Al pegar desde Excel lo normal es seleccionar el rango CON el
+# encabezado: es lo que hace cualquiera al arrastrar el mouse desde la primera
+# fila. Esa fila entraba como una glosa más —eps «ENTIDAD», factura «FACTURA»,
+# valor «VALOR», código «CODIGO»—, se le gastaba una llamada a la IA, quedaba
+# guardada y le aparecía al auditor en la lista y en los totales del lote.
+#
+# El filtro que había («el código mide 2 o más caracteres») la dejaba pasar,
+# porque «CODIGO» mide seis.
+_ETIQUETAS_ENCABEZADO = {
+    "entidad",
+    "eps",
+    "factura",
+    "no factura",
+    "numero factura",
+    "valor",
+    "valor glosado",
+    "valor objetado",
+    "codigo",
+    "cod",
+    "codigo glosa",
+    "concepto",
+    "concepto glosa",
+    "descripcion",
+    "cups",
+    "servicio",
+    "motivo",
+    "observacion",
+    "observaciones",
+}
+
+
+def _es_fila_de_encabezado(partes: list[str]) -> bool:
+    """¿Esta fila son los títulos de las columnas y no una glosa?
+
+    Se exige que MANDEN las etiquetas —la mitad o más de las celdas con
+    contenido—, no que aparezca una suelta: hay glosas cuyo motivo dice
+    «no coincide el valor» y no por eso son un encabezado.
+    """
+    celdas = [c.strip().lower() for c in partes if c and c.strip()]
+    if len(celdas) < 3:
+        return False
+    sin_tildes = str.maketrans("áéíóúü", "aeiouu")
+    coinciden = sum(1 for c in celdas if c.translate(sin_tildes) in _ETIQUETAS_ENCABEZADO)
+    return coinciden >= max(3, (len(celdas) + 1) // 2)
+
+
 def _parsear_filas_excel(texto: str) -> list[dict]:
     """
     Parsea el texto pegado de Excel y extrae cada fila como diccionario.
@@ -4130,6 +4661,10 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
             continue
 
         if len(partes) < 4:
+            continue
+
+        # La fila de títulos del Excel no es una glosa.
+        if _es_fila_de_encabezado(partes):
             continue
 
         # Si hay más de 8 columnas, re-unir el excedente al motivo (último campo)
@@ -4180,10 +4715,11 @@ async def _procesar_fila_en_background(
             primary_ai=cfg.primary_ai,
             anthropic_model=cfg.anthropic_model,
             groq_model=cfg.groq_model,
+            groq_model_fallback_1=cfg.groq_model_fallback_1,
+            groq_model_fallback_2=cfg.groq_model_fallback_2,
+            groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
             gemini_api_key=cfg.gemini_api_key,
             gemini_model=cfg.gemini_model,
-            openrouter_api_key=cfg.openrouter_api_key,
-            openrouter_model=cfg.openrouter_model,
         )
 
         from app.models.schemas import GlosaInput
@@ -4199,7 +4735,23 @@ async def _procesar_fila_en_background(
         else:
             eps_final = eps_formulario
 
-        texto_glosa = f"{fila_data['codigo']} {fila_data['valor']} {fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
+        # 20-08-2026. El valor iba suelto entre el código y la descripción:
+        #
+        #     "SO0201 125000 FALTA SOPORTE 890201 no anexan hoja"
+        #
+        # y el extractor de CUPS tomaba «125000» —los pesos glosados— como el
+        # código del procedimiento. Le ganaba incluso al CUPS de verdad (890201)
+        # que venía en su propia columna, porque el valor aparece primero. En
+        # una importación de 90 glosas eso son 90 dictámenes citando un CUPS
+        # que no existe, y la EPS cruza los CUPS contra su sistema.
+        #
+        # Basta con decir qué es ese número. El lector de CUPS ya descarta lo
+        # que el texto presenta como plata, así que etiquetarlo lo resuelve —y
+        # de paso la IA lee un texto más claro que el de antes.
+        texto_glosa = (
+            f"{fila_data['codigo']} VALOR GLOSADO {fila_data['valor']} "
+            f"{fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
+        )
 
         data = GlosaInput(
             eps=eps_final,
@@ -4263,7 +4815,9 @@ async def _procesar_fila_en_background(
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
+                # parse_valor_cop: "7.700,00" → 7700.0 (el patrón anterior
+                # re.sub(r"[^\d]") inflaba 100× — auditoría jun-2026 P0 #1)
+                valor_objetado=parse_valor_cop(fila_data.get("valor", "0")),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
@@ -4281,7 +4835,7 @@ async def _procesar_fila_en_background(
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
+                valor_objetado=parse_valor_cop(fila_data.get("valor", "0")),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
@@ -4354,7 +4908,7 @@ async def _procesar_fila_en_background(
 async def preview_importar_masiva(
     request: ImportacionMasivaRequest,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """IM Fase 1.2: previsualiza el lote SIN procesar.
 
@@ -4493,7 +5047,7 @@ async def importar_glosas_masiva(
     request: ImportacionMasivaRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """
     Importa glosas masivamente desde texto pegado de Excel.
@@ -4936,7 +5490,7 @@ async def retry_fila_lote(
 def check_lote_duplicado(
     request: ImportacionMasivaRequest,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """IM F1.4: detecta si el texto pegado coincide con un lote
     procesado anteriormente (texto_hash matching). Permite advertir
@@ -5159,7 +5713,7 @@ async def importar_recepcion(
     background_tasks: BackgroundTasks,
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Sube el Excel de recepción y lo procesa EN SEGUNDO PLANO.
 
@@ -5169,6 +5723,12 @@ async def importar_recepcion(
     y tumbe la app (incidente 2026-05-19).
     """
     req_id = set_request_id()
+    # Ronda 30: validar el tamaño ANTES de cargar todo a RAM. archivo.size
+    # ya viene del multipart spooleado a disco por Starlette (no depende del
+    # Content-Length del cliente). En la VM de 1GB, un upload gigante hacía
+    # OOM justo al await read().
+    if archivo.size is not None and archivo.size > 15_000_000:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (>15 MB)")
     contenido = await archivo.read()
     if not contenido:
         raise HTTPException(status_code=400, detail="Archivo vacío")
@@ -5415,6 +5975,79 @@ def descargar_excel_respuesta_recepcion(
     )
 
 
+@router.get("/importar-recepcion/{rec_id}/excel-radicable")
+def descargar_excel_radicable_recepcion(
+    rec_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Genera y descarga el «Excel radicable» de una importación.
+
+    Jun-2026: a diferencia del Excel-respuesta (que anota el archivo
+    original de recepción para uso interno de los gestores), este es el
+    formato institucional que se radica ante la entidad pagadora: hoja
+    RESPUESTA GLOSAS (una fila por concepto, con DECISIÓN y RESPUESTA
+    ESE HUS) + hoja FUNDAMENTO JURÍDICO generada desde los metadatos
+    del contrato. Se construye 100 % desde BD — no necesita el .xlsx
+    original, por eso no aplica el 410 de archivo purgado.
+    """
+    import io
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services.excel_radicable import (
+        entidades_del_lote,
+        generar_excel_radicable_con_nombre,
+    )
+
+    # 20-08-2026 (caso real de Yesid). El lote del 19 de agosto traía 29
+    # facturas de COOSALUD y 6 del DISPENSARIO MÉDICO / EJÉRCITO. Salía UN
+    # archivo rotulado «COOSALUD», con su contrato en el encabezado, pero con
+    # las 35 facturas adentro: se le radicaban a COOSALUD $10.290.042 de otro
+    # pagador. Un radicable se presenta ante UNA entidad.
+    #
+    # Ahora se arma uno por entidad. Si el lote trae una sola, se descarga el
+    # .xlsx igual que antes; si trae varias, van todas en un .zip para que no
+    # falte ninguna y ninguna termine donde no es.
+    try:
+        entidades = entidades_del_lote(db, recepcion_import_id=rec_id)
+    except LookupError:
+        raise HTTPException(404, "Importación no encontrada")
+
+    if not entidades:
+        raise HTTPException(404, "Esa importación no tiene glosas para radicar")
+
+    if len(entidades) == 1:
+        xlsx, nombre = generar_excel_radicable_con_nombre(
+            db, recepcion_import_id=rec_id, eps_filtro=entidades[0]["eps"]
+        )
+        return StreamingResponse(
+            iter([xlsx]),
+            media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        )
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
+        for ent in entidades:
+            xlsx, nombre = generar_excel_radicable_con_nombre(
+                db, recepcion_import_id=rec_id, eps_filtro=ent["eps"]
+            )
+            z.writestr(nombre, xlsx)
+    buffer.seek(0)
+    zip_nombre = f"RADICABLES_{len(entidades)}_ENTIDADES_HUS.zip"
+    logger.info(
+        f"[excel-radicable] lote {rec_id} con {len(entidades)} entidades → "
+        + ", ".join(f"{e['sigla']}:{e['glosas']}" for e in entidades)
+    )
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_nombre}"'},
+    )
+
+
 @router.get("/batch/{batch_id}")
 def obtener_estado_batch(
     batch_id: str,
@@ -5608,10 +6241,11 @@ async def reanalizar_glosa(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     contrato_repo = ContratoRepository(db)
@@ -5854,7 +6488,7 @@ def descargar_paquete_evidencia(
                 "tipo": f"AUDIT_{a.accion or 'ACCION'}",
                 "actor": a.usuario_email,
                 "timestamp": a.timestamp.isoformat() if a.timestamp else None,
-                "detalle": (a.detalle or "")[:200],
+                "detalle": _detalle_legible(a.detalle)[0][:200],
             }
         )
     for c in db.query(ComentarioGlosaRecord).filter_by(glosa_id=glosa_id).all():
@@ -6011,6 +6645,41 @@ def descargar_dictamen_txt(
     return Response(
         content=payload,
         media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.get("/{glosa_id}/dictamen.pdf")
+def descargar_dictamen_pdf_radicable(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """PDF radicable de la respuesta de glosa (documento formal).
+
+    Varias EPS exigen subir un PDF con la respuesta del hospital para
+    radicar la objeción. Genera el documento formal con encabezado
+    institucional, bloque de datos, dictamen en texto limpio (sin HTML
+    crudo) y espacio de firma/sello. Ver app/services/dictamen_pdf.
+    """
+    from fastapi.responses import StreamingResponse
+
+    from app.services.dictamen_pdf import generar_pdf_dictamen, nombre_archivo_pdf
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not (glosa.dictamen or "").strip():
+        raise HTTPException(
+            404,
+            "La glosa no tiene dictamen generado — genera la respuesta antes de descargar el PDF radicable",
+        )
+
+    pdf_bytes = generar_pdf_dictamen(glosa)
+    fname = nombre_archivo_pdf(glosa)
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
@@ -7248,6 +7917,70 @@ def dictamen_similar_anterior(
             similar.fecha_decision_eps.isoformat() if similar.fecha_decision_eps else None
         ),
         "sin_match": False,
+    }
+
+
+@router.get("/stats/historicos-ganadores")
+def historicos_ganadores(
+    eps: str,
+    codigo: str,
+    limit: int = 3,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista los N dictámenes LEVANTADOS más recientes del mismo (eps, codigo).
+
+    Side-by-side con "el ganador histórico" — el gestor puede ver hasta 3
+    casos previos donde un argumento similar ya ganó, leer el dictamen
+    completo y copiar las frases que probaron funcionar.
+
+    A diferencia de /{id}/dictamen-similar-anterior (que necesita una glosa
+    ya guardada como pivote), este endpoint acepta eps+codigo directos
+    para poder dispararse ANTES del primer "Analizar con IA" — el panel UI
+    se carga apenas el gestor selecciona EPS y se detecta el código.
+
+    Usa ilike+trim para tolerar variaciones de casing/espacios en la EPS
+    (mismo criterio que few_shot_gold).
+    """
+    eps_norm = (eps or "").strip()
+    cod_norm = (codigo or "").strip().upper()
+    if not eps_norm or not cod_norm:
+        return {"total": 0, "items": [], "razon": "Falta eps o codigo"}
+
+    limit = max(1, min(int(limit or 3), 10))
+
+    filas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps_norm))
+        .filter(GlosaRecord.codigo_glosa == cod_norm)
+        .filter(GlosaRecord.estado == "LEVANTADA")
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .order_by(GlosaRecord.fecha_decision_eps.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
+
+    valor_recuperado_total = sum(float(g.valor_recuperado or 0) for g in filas)
+
+    return {
+        "total": len(filas),
+        "eps": eps_norm,
+        "codigo": cod_norm,
+        "valor_recuperado_total": valor_recuperado_total,
+        "items": [
+            {
+                "glosa_id": g.id,
+                "dictamen": g.dictamen,
+                "valor_recuperado": float(g.valor_recuperado or 0),
+                "valor_objetado": float(g.valor_objetado or 0),
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+                "auditor_email": g.auditor_email or "",
+                "paciente": _paciente_visible(current_user, g) or "",
+            }
+            for g in filas
+        ],
     }
 
 
@@ -9434,6 +10167,26 @@ def audit_resumen_glosa(
     }
 
 
+def _detalle_legible(crudo: Optional[str]) -> tuple[str, Optional[dict]]:
+    """Las constancias que guardan JSON con un campo `resumen` se muestran
+    en cristiano; el JSON completo pasa a metadata para quien lo necesite.
+
+    Sin esto, la línea de tiempo le mostraba al auditor un pedazo de JSON
+    cortado a los 300 caracteres — ilegible y con pinta de error.
+    """
+    texto = crudo or ""
+    if texto.lstrip().startswith("{"):
+        import json
+
+        try:
+            datos = json.loads(texto)
+            if isinstance(datos, dict) and datos.get("resumen"):
+                return str(datos["resumen"]), datos
+        except Exception:
+            pass
+    return texto, None
+
+
 @router.get("/{glosa_id}/timeline")
 def timeline_glosa(
     glosa_id: int,
@@ -9512,18 +10265,22 @@ def timeline_glosa(
         .all()
     )
     for a in auditorias:
+        detalle_txt, constancia = _detalle_legible(a.detalle)
+        meta = {
+            "campo": a.campo,
+            "valor_anterior": (a.valor_anterior or "")[:80],
+            "valor_nuevo": (a.valor_nuevo or "")[:80],
+            "ip": a.ip,
+        }
+        if constancia:
+            meta["constancia"] = constancia
         eventos.append(
             {
                 "timestamp": a.timestamp.isoformat() if a.timestamp else None,
                 "tipo": f"AUDIT_{a.accion or 'ACCION'}",
                 "actor": a.usuario_email or "—",
-                "detalle": (a.detalle or "")[:300],
-                "metadata": {
-                    "campo": a.campo,
-                    "valor_anterior": (a.valor_anterior or "")[:80],
-                    "valor_nuevo": (a.valor_nuevo or "")[:80],
-                    "ip": a.ip,
-                },
+                "detalle": detalle_txt[:300],
+                "metadata": meta,
             }
         )
 
@@ -9583,6 +10340,251 @@ def timeline_glosa(
     }
 
 
+def construir_expediente(glosa_id: int, db: Session) -> dict:
+    """El expediente completo de una glosa, consolidado en una sola llamada.
+
+    Es la fuente única que usan la pantalla Expediente, la API y el
+    asistente IA: la ficha, el contrato que regía el día del hecho, la
+    constancia contractual, la línea de tiempo completa, las conciliaciones
+    y los soportes documentales conocidos.
+    """
+    import json as _json
+
+    from app.models.db import AuditLogRecord, DictamenVersionRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    tl = timeline_glosa(glosa_id, db=db, current_user=None)
+
+    # El contrato que rige HOY el expediente (la constancia guarda el del
+    # día del análisis; esto muestra además si a la fecha sigue vigente).
+    contrato = None
+    try:
+        from app.services import malla_contractual as _mc
+
+        dia_hecho = (
+            glosa.fecha_radicacion_factura.date()
+            if glosa.fecha_radicacion_factura
+            else (glosa.fecha_recepcion.date() if glosa.fecha_recepcion else date.today())
+        )
+        _vig = _mc.vigente(glosa.eps or "", dia_hecho)
+        if _vig is not None:
+            contrato = {**_vig.como_dict(), "fecha_evaluada": dia_hecho.isoformat()}
+    except Exception:
+        contrato = None
+
+    # La última verificación contractual registrada en el expediente
+    constancia = None
+    fila_c = (
+        db.query(AuditLogRecord)
+        .filter(
+            AuditLogRecord.accion == "VERIFICACION_CONTRACTUAL",
+            AuditLogRecord.registro_id == glosa_id,
+            AuditLogRecord.tabla.in_(("glosas", "historial")),
+        )
+        .order_by(AuditLogRecord.id.desc())
+        .first()
+    )
+    if fila_c is not None:
+        try:
+            constancia = _json.loads(fila_c.detalle or "")
+        except Exception:
+            constancia = {"veredicto": fila_c.campo, "resumen": (fila_c.detalle or "")[:200]}
+
+    conciliaciones = []
+    try:
+        from app.repositories.conciliacion_repository import ConciliacionRepository
+
+        for c in ConciliacionRepository(db).listar_por_glosa(glosa_id):
+            conciliaciones.append(
+                {
+                    "id": c.id,
+                    "fecha_audiencia": (
+                        c.fecha_audiencia.isoformat() if c.fecha_audiencia else None
+                    ),
+                    "resultado": c.resultado,
+                    "valor_conciliado": float(c.valor_conciliado or 0),
+                    "acta_numero": c.acta_numero,
+                }
+            )
+    except Exception:
+        conciliaciones = []
+
+    soportes = []
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        if glosa.factura:
+            for s in (get_indexer().lookup(glosa.factura, auto_rebuild=False) or [])[:25]:
+                soportes.append(
+                    {
+                        "nombre": s.get("nombre_archivo"),
+                        "tipo": s.get("tipo_codigo"),
+                        "ruta": s.get("ruta"),
+                    }
+                )
+    except Exception:
+        soportes = []
+
+    versiones = (
+        db.query(DictamenVersionRecord).filter(DictamenVersionRecord.glosa_id == glosa_id).count()
+    )
+
+    # El Centro Documental del expediente: la carpeta se arma sola.
+    try:
+        from app.services import centro_documental
+
+        documentos = centro_documental.documentos_de(glosa, db)
+    except Exception:
+        documentos = {"glosa_id": glosa.id, "total_documentos": 0, "grupos": []}
+
+    return {
+        "glosa_id": glosa.id,
+        "documentos": documentos,
+        "ficha": {
+            "eps": glosa.eps,
+            "factura": glosa.factura,
+            "paciente": glosa.paciente,
+            "codigo_glosa": glosa.codigo_glosa,
+            "concepto": getattr(glosa, "concepto_glosa", None),
+            "etapa": glosa.etapa,
+            "estado": glosa.estado,
+            "valor_objetado": float(glosa.valor_objetado or 0),
+            "valor_aceptado": float(glosa.valor_aceptado or 0),
+            "dias_restantes": glosa.dias_restantes,
+            "auditor": glosa.auditor_email,
+            "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
+            "tiene_dictamen": bool(glosa.dictamen),
+        },
+        "contrato": contrato,
+        "constancia_contractual": constancia,
+        "timeline": tl["eventos"],
+        "total_eventos": tl["total_eventos"],
+        "conciliaciones": conciliaciones,
+        "soportes": soportes,
+        "versiones_dictamen": versiones,
+    }
+
+
+@router.get("/{glosa_id}/expediente")
+def expediente_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """La vista única del expediente: quién es, con qué contrato se
+    defiende, qué ha pasado (línea de tiempo completa), en qué mesas ha
+    estado y qué soportes existen. Lo que antes exigía abrir cuatro
+    pantallas y un popup."""
+    return construir_expediente(glosa_id, db)
+
+
+@router.get("/{glosa_id}/documentos")
+def documentos_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El Centro Documental del expediente, solo: todos los documentos de
+    la glosa organizados por grupo, cada uno con su enlace del sistema o
+    su ruta en el share del hospital. Sin búsquedas manuales."""
+    from app.services import centro_documental
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    return centro_documental.documentos_de(glosa, db)
+
+
+@router.get("/expediente/factura")
+def expediente_de_factura(
+    numero: str = Query(..., min_length=3, description="Número de factura (HUS000…)"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El expediente consolidado de UNA factura: todas sus glosas con sus
+    estados y valores, y los totales. Una factura con cuatro glosas es UN
+    caso, no cuatro búsquedas."""
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.ilike(f"%{numero.strip()}%"))
+        .order_by(GlosaRecord.id)
+        .all()
+    )
+    if not glosas:
+        raise HTTPException(404, f"Ninguna glosa registrada para la factura '{numero}'")
+
+    from app.services.motor_vencimientos import ESTADOS_CERRADOS
+
+    fichas = [
+        {
+            "glosa_id": g.id,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "etapa": g.etapa,
+            "eps": g.eps,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "valor_aceptado": float(g.valor_aceptado or 0),
+            "dias_restantes": g.dias_restantes,
+            "auditor": g.auditor_email,
+            "cerrada": g.estado in ESTADOS_CERRADOS,
+        }
+        for g in glosas
+    ]
+    return {
+        "factura": glosas[0].factura,
+        "eps": glosas[0].eps,
+        "glosas": fichas,
+        "totales": {
+            "glosas": len(fichas),
+            "abiertas": sum(1 for f in fichas if not f["cerrada"]),
+            "valor_objetado": sum(f["valor_objetado"] for f in fichas),
+            "valor_aceptado": sum(f["valor_aceptado"] for f in fichas),
+        },
+    }
+
+
+@router.get("/expediente/buscar")
+def expediente_buscar(
+    q: str = Query(..., min_length=1, description="ID de glosa o número de factura"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Encuentra el expediente por ID de glosa o por número de factura
+    (completo o con los ceros que sea): es la caja de búsqueda de la
+    pantalla Expediente."""
+    texto = q.strip()
+    encontradas = []
+    if texto.isdigit() and len(texto) <= 9:
+        g = GlosaRepository(db).obtener_por_id(int(texto))
+        if g:
+            encontradas = [g]
+    if not encontradas:
+        like = f"%{texto.upper().replace('HUS', '').lstrip('0') or texto}%"
+        encontradas = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.factura.ilike(f"%{texto}%") | GlosaRecord.factura.ilike(like))
+            .order_by(GlosaRecord.id.desc())
+            .limit(10)
+            .all()
+        )
+    return {
+        "resultados": [
+            {
+                "glosa_id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+            for g in encontradas
+        ]
+    }
+
+
 class _PreviewAuditoriaIn(BaseModel):
     texto_glosa: str = Field(..., min_length=1, max_length=10_000)
     eps: str = Field(default="")
@@ -9592,7 +10594,7 @@ class _PreviewAuditoriaIn(BaseModel):
 def preview_auditoria(
     body: _PreviewAuditoriaIn,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Analiza el texto de una glosa sin generar dictamen: detecta patrones
     problemáticos, calcula score de defensibilidad y sugiere acción."""

@@ -1,0 +1,30 @@
+# Cloudflare Tunnel — config para Motor Glosas HUS
+#
+# Esta config dice a cloudflared:
+#   - Qué túnel usar (tunnel: <UUID>)
+#   - Qué dominio público apunta a qué servicio interno
+#
+# Para activar:
+#   1. cp deploy/cloudflared/config.yml.example deploy/cloudflared/config.yml
+#   2. Reemplazá TODOS los placeholders <...> con tus valores reales
+#   3. Asegurate que el archivo <UUID>.json (credentials del túnel) esté
+#      en deploy/cloudflared/ (lo genera `cloudflared tunnel create`)
+#   4. docker compose up -d
+
+# UUID del túnel (te lo da `cloudflared tunnel create motor-glosas`)
+tunnel: <REEMPLAZAR_CON_UUID_DEL_TUNEL>
+
+# Ruta DENTRO del contenedor cloudflared al archivo credentials.
+# El nombre del archivo es el mismo UUID del túnel + .json
+credentials-file: /etc/cloudflared/<REEMPLAZAR_CON_UUID_DEL_TUNEL>.json
+
+# Reglas de ingreso (la última debe ser 404, regla catch-all)
+ingress:
+  # iaglosassinac.help → servicio motor (en la red interna docker)
+  - hostname: iaglosassinac.help
+    service: http://motor:8080
+  # Si en el futuro querés otro subdominio (ej. www.iaglosassinac.help),
+  # agregás otra entrada arriba de la catch-all.
+  # - hostname: www.iaglosassinac.help
+  #   service: http://motor:8080
+  - service: http_status:404

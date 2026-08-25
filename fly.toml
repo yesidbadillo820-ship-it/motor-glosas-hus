@@ -84,7 +84,17 @@ primary_region = "gru"
 
 # ─── Despliegue ──────────────────────────────────────────────────────
 [deploy]
-  release_command = "python -c 'from app.database import Base, engine; Base.metadata.create_all(bind=engine); print(\"DB schema OK\")'"
+  # SIN release_command de create_all (17-jun-2026).
+  # Antes corría `Base.metadata.create_all` en una máquina EFÍMERA de
+  # release. Dos problemas:
+  #   1) Esa máquina NO monta el volumen /data, así que con la DB en
+  #      SQLite (sqlite:////data/...) el create_all iría a un disco
+  #      efímero inútil.
+  #   2) Con Postgres, si la DB estaba caída (p.ej. Neon excedió cuota),
+  #      el release fallaba (exit 1) y abortaba TODO el deploy — fue lo
+  #      que tumbó v371/372/373.
+  # El schema se crea en el startup de la app (lifespan en app/main.py,
+  # con 5 reintentos), que SÍ corre en la máquina con /data montado.
   strategy = "rolling"
 
 # Sentry (opcional — si decides activar tracking de errores)

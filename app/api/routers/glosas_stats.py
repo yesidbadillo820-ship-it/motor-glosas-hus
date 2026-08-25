@@ -14,13 +14,17 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func as _f
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual, get_auditor_o_superior
 from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import (
     AuditLogRecord,
+    ComentarioGlosaRecord,
+    ConciliacionRecord,
     ConceptoGlosaRecord,
+    DictamenVersionRecord,
     GlosaRecord,
+    TarifaContratadaRecord,
     UsuarioRecord,
 )
 
@@ -49,8 +53,6 @@ def stats_por_gestor(
     """
 
     from sqlalchemy import func as _f
-
-    from app.core.tz import ahora_utc
 
     desde = ahora_utc() - timedelta(days=int(dias))
 
@@ -303,6 +305,16 @@ def stats_concentracion_pareto(
 
     valores = sorted(por_eps.values(), reverse=True)
     total = sum(valores)
+    # Ronda 30: si el objetado total es 0 (o negativo), evitar ZeroDivision
+    # (500) en el cálculo de Pareto/Gini — devolver el payload vacío.
+    if total <= 0:
+        return {
+            "total_eps": len(por_eps),
+            "valor_total": 0,
+            "eps_para_80_pct": 0,
+            "gini_coefficient": 0.0,
+            "top_eps_concentracion": [],
+        }
 
     # Pareto: cuántas EPS para 80%
     acumulado = 0.0
@@ -366,8 +378,6 @@ def stats_refinaciones(
       - promedio_versiones_por_glosa
       - tasa_refinacion_pct (REFINAR / total acciones)
     """
-
-    from app.models.db import DictamenVersionRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
     versiones = (
@@ -444,8 +454,6 @@ def stats_conciliaciones(
       - audiencias_proximas_30d
     """
     from datetime import timezone
-
-    from app.models.db import ConciliacionRecord
 
     todas = db.query(ConciliacionRecord).all()
 
@@ -926,8 +934,10 @@ def stats_estatus_eps(
         b = por_eps[eps]
         b["total"] += 1
         estado = (g.estado or "").upper()
-        if estado in ESTADOS_CERRADOS:
-            if estado in {"LEVANTADA", "ACEPTADA"}:
+        # Ronda 30: RATIFICADA es una DECISIÓN de la EPS (cerró el trámite),
+        # no una glosa abierta — antes caía al else y contaba como vencida.
+        if estado in ESTADOS_CERRADOS or estado == "RATIFICADA":
+            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
                 b["decididas"] += 1
                 if estado == "LEVANTADA":
                     b["levantadas"] += 1
@@ -1770,8 +1780,6 @@ def stats_mas_comentadas(
     comentarios.
     """
 
-    from app.models.db import ComentarioGlosaRecord
-
     rows = (
         db.query(
             ComentarioGlosaRecord.glosa_id,
@@ -1939,8 +1947,6 @@ def stats_refinaciones_por_dia(
     """
     from datetime import timezone
 
-    from app.models.db import DictamenVersionRecord
-
     desde = ahora_utc() - timedelta(days=int(dias))
     versiones = (
         db.query(DictamenVersionRecord).filter(DictamenVersionRecord.creado_en >= desde).all()
@@ -2002,8 +2008,6 @@ def stats_tiempo_primer_dictamen(
       - tiempo_max_horas
     """
     from datetime import timezone
-
-    from app.models.db import DictamenVersionRecord
 
     rows = (
         db.query(
@@ -2283,7 +2287,6 @@ def stats_dashboard_mensual_completo(
 
     Hito R350: dashboard ejecutivo definitivo del mes.
     """
-    from app.core.tz import ahora_utc
 
     inicio = ahora_utc().replace(
         day=1,
@@ -2433,7 +2436,6 @@ def stats_conciliaciones_acta_firmadas(
     valor_ratificado_hus. Útil como inventario formal
     de cierres bilaterales.
     """
-    from app.models.db import ConciliacionRecord
 
     rows = (
         db.query(ConciliacionRecord)
@@ -2542,7 +2544,6 @@ def stats_conciliaciones_pendientes(
 
     Por estado_bilateral: count, valor_conciliado_total.
     """
-    from app.models.db import ConciliacionRecord
 
     PENDIENTES = [
         "PROGRAMADA",
@@ -2716,7 +2717,6 @@ def stats_codigo_respuesta_mes_actual(
     Snapshot de codigos_respuesta usados por HUS este
     mes, con count y tasa de levantamiento.
     """
-    from app.core.tz import ahora_utc
 
     inicio = ahora_utc().replace(
         day=1,
@@ -2986,7 +2986,6 @@ def stats_conciliaciones_por_eps(
     (a través de glosas) y suma de valores. Útil para
     saber qué EPS llegan más al proceso bilateral.
     """
-    from app.models.db import ConciliacionRecord
 
     rows = db.query(
         ConciliacionRecord.glosa_id,
@@ -3054,7 +3053,6 @@ def stats_glosas_conciliadas_detalle(
 
     Ordena DESC por valor_conciliado total agregado.
     """
-    from app.models.db import ConciliacionRecord
 
     # Para cada glosa con concil, sumar valor
     rows = (
@@ -3180,7 +3178,6 @@ def stats_conciliaciones_top_monto(
       - id, glosa_id, valor_conciliado, resultado,
         estado_bilateral, fecha_audiencia
     """
-    from app.models.db import ConciliacionRecord
 
     rows = (
         db.query(ConciliacionRecord)
@@ -3298,8 +3295,6 @@ def stats_eps_volumen_mes_anterior(
 
     Ordenado DESC por count_glosas.
     """
-
-    from app.core.tz import ahora_utc
 
     ahora = ahora_utc()
     inicio_mes_actual = ahora.replace(
@@ -3982,7 +3977,7 @@ def stats_comparativa_anio(
 def stats_tasas_pares_batch(
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """R382 P1: tasas par (eps, codigo_glosa) en batch.
 
@@ -4662,7 +4657,6 @@ def stats_progreso_equipo_mes(
 
     Útil para landing del dashboard del equipo.
     """
-    from app.core.tz import ahora_utc
 
     inicio_mes = ahora_utc().replace(
         day=1,
@@ -5500,7 +5494,18 @@ def stats_dashboard_cobranza(
     por_eps: dict[str, float] = {}
     por_factura: dict[str, dict] = {}
 
+    # Ronda 30: saldo_factura y valor_factura son campos a NIVEL DE FACTURA.
+    # Si una factura tiene varias glosas abiertas, el saldo se sumaba una vez
+    # por glosa → doble/triple conteo de la cartera en los KPIs. Se procesa
+    # cada factura UNA sola vez; las glosas sin factura (o "N/A") se cuentan
+    # individualmente por id para no perderlas del total.
+    _repr_factura: dict[str, GlosaRecord] = {}
     for g in abiertas:
+        factura = (g.factura or "").strip()
+        clave = factura if (factura and factura != "N/A") else f"__id_{g.id}"
+        _repr_factura.setdefault(clave, g)
+
+    for g in _repr_factura.values():
         saldo = float(g.saldo_factura or 0)
         valor = float(g.valor_factura or 0)
         saldo_total += saldo
@@ -5575,8 +5580,6 @@ def stats_sin_actividad_reciente(
 
     Solo abiertas, ordenado por valor_objetado DESC.
     """
-
-    from app.models.db import AuditLogRecord
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
@@ -6153,7 +6156,6 @@ def stats_glosas_sin_comentarios(
     Filtro: solo abiertas. Ordena DESC por valor_objetado
     para priorizar las de mayor cuantía.
     """
-    from app.models.db import ComentarioGlosaRecord
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
@@ -6368,8 +6370,6 @@ def stats_conciliaciones_mensual(
     """
     from datetime import timezone
 
-    from app.models.db import ConciliacionRecord
-
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
     rows = db.query(ConciliacionRecord).filter(ConciliacionRecord.creado_en >= desde).all()
 
@@ -6435,8 +6435,6 @@ def stats_comentarios_actividad_mensual(
     Útil para medir colaboración del equipo en el tiempo.
     """
     from datetime import timezone
-
-    from app.models.db import ComentarioGlosaRecord
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
     rows = db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.creado_en >= desde).all()
@@ -8789,8 +8787,6 @@ def stats_multi_concepto_ratio(
     Devuelve totales + ratio_multi_pct + promedio.
     """
 
-    from app.models.db import ConceptoGlosaRecord
-
     total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
 
     rows = (
@@ -8836,8 +8832,6 @@ def stats_audit_mas_cambiada(
 
     Devuelve top N glosas ordenado DESC por eventos audit.
     """
-
-    from app.models.db import AuditLogRecord
 
     rows = (
         db.query(
@@ -8894,8 +8888,6 @@ def stats_glosas_mas_refinadas(
 
     Devuelve top N ordenado DESC por número de versiones.
     """
-
-    from app.models.db import DictamenVersionRecord
 
     rows = (
         db.query(
@@ -9275,8 +9267,6 @@ def stats_transiciones_recientes(
     Útil para entender el flujo del proceso en tiempo real.
     """
 
-    from app.models.db import AuditLogRecord
-
     desde = ahora_utc() - timedelta(hours=int(horas))
     eventos = (
         db.query(AuditLogRecord)
@@ -9428,8 +9418,6 @@ def stats_analizadas_hoy(
       - por_accion (CREAR/REFINAR/REGENERAR/RESTAURAR)
       - por_autor: top 5
     """
-
-    from app.models.db import DictamenVersionRecord
 
     ahora = ahora_utc()
     inicio_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -9600,13 +9588,6 @@ def stats_cups_sin_tarifa(
 
     Param `eps`: nombre exacto de la EPS.
     """
-    from app.models.db import (
-        ConceptoGlosaRecord,
-        GlosaRecord,
-        TarifaContratadaRecord,
-    )
-
-    # CUPS con tarifa cargada para esta EPS
     cups_con_tarifa = {
         t.codigo_cups
         for t in (
@@ -9687,13 +9668,6 @@ def stats_tarifa_coincidente(
     Útil para medir el % de glosas TA con base de comparación
     sólida.
     """
-    from app.models.db import (
-        ConceptoGlosaRecord,
-        GlosaRecord,
-        TarifaContratadaRecord,
-    )
-
-    # Glosas TA* abiertas o cerradas, con CUPS
     conceptos_ta = (
         db.query(ConceptoGlosaRecord)
         .filter(ConceptoGlosaRecord.codigo_glosa.like("TA%"))
@@ -9861,8 +9835,6 @@ def stats_comentarios_globales(
 
     Ventana default 30d.
     """
-
-    from app.models.db import ComentarioGlosaRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
     coms = db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.creado_en >= desde).all()
@@ -11223,8 +11195,6 @@ def stats_tendencia_diaria(
 
     from sqlalchemy import func as _f
 
-    from app.core.tz import ahora_utc
-
     desde = (ahora_utc() - timedelta(days=int(dias))).date()
 
     # Agregar por fecha (truncando a date)
@@ -11308,8 +11278,6 @@ def stats_por_tipo_glosa(
     """
 
     from sqlalchemy import func as _f
-
-    from app.core.tz import ahora_utc
 
     desde = ahora_utc() - timedelta(days=int(dias))
 

@@ -144,7 +144,9 @@ def _tokenizar(texto: str) -> list[str]:
     if not texto:
         return []
     repl = str.maketrans("áéíóúñ", "aeioun")
-    norm = texto.translate(repl).lower()
+    # Ronda 30: lower() ANTES de quitar tildes — si no, 'Á' no baja a 'a'
+    # y los textos en MAYÚSCULAS tokenizaban distinto que el corpus.
+    norm = texto.lower().translate(repl)
     tokens = re.findall(r"[a-z]{4,}", norm)
     return [t for t in tokens if t not in _STOPWORDS]
 
@@ -267,17 +269,3 @@ class RAGService:
                 f"codigo={codigo_glosa} top_score={resultados[0]['score_similitud']:.2f}"
             )
         return resultados
-
-    def construir_contexto_rag(self, casos: list[dict]) -> str:
-        if not casos:
-            return ""
-        lineas = [
-            "=== PRECEDENTES EXITOSOS DEL PROPIO HUS ===",
-            f"Se encontraron {len(casos)} caso(s) similar(es):\n",
-        ]
-        for i, c in enumerate(casos, 1):
-            lineas.append(
-                f"PRECEDENTE #{i} — Código: {c['codigo_glosa']} | EPS: {c['eps']}\n"
-                f"Extracto: {c['extracto_dictamen']}\n{'─' * 60}"
-            )
-        return "\n".join(lineas)

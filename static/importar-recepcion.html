@@ -4,45 +4,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Importar Recepción · IA GLOSAS SINAC SC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet"/>
   <style>
+    /* ═══ REDISEÑO SINAC 11-jun-2026 — paleta institucional azul+verde+blanco ═══ */
+    :root{
+      --sinac-blue-900:#0B3D91; --sinac-blue-800:#0D47A1; --sinac-blue-700:#1565C0;
+      --sinac-blue-100:#E3F2FD; --sinac-blue-50:#F5FAFF;
+      --sinac-green-700:#2E7D32; --sinac-green-600:#388E3C; --sinac-green-100:#E8F5E9;
+      --sinac-gray-900:#212B36; --sinac-gray-700:#455A64; --sinac-gray-500:#607D8B;
+      --sinac-gray-200:#CFD8DC; --sinac-gray-100:#ECEFF1; --sinac-gray-50:#F5F7FA;
+      --grad-header:linear-gradient(135deg,#0B3D91 0%,#1565C0 100%);
+    }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;background:#f3f4f6;color:#111827;padding:20px}
-    .wrap{max-width:1000px;margin:0 auto}
-    h1{color:#0e1f3d;font-size:24px;margin-bottom:6px}
-    p.lead{color:#6b7280;margin-bottom:22px;font-size:13px}
-    .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:24px;margin-bottom:18px}
-    label{display:block;font-weight:600;margin-bottom:8px;color:#374151}
-    input[type=file]{width:100%;padding:12px;border:2px dashed #9ca3af;border-radius:8px;background:#f9fafb;cursor:pointer}
-    input[type=file]:hover{border-color:#2563eb;background:#eff6ff}
-    button{background:#2563eb;color:#fff;border:0;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
-    button:hover{background:#1e40af}
-    button:disabled{background:#9ca3af;cursor:not-allowed}
-    .back{display:inline-block;margin-bottom:12px;color:#2563eb;text-decoration:none;font-size:13px}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:#F8FAFC;color:var(--sinac-gray-900);padding:0 0 40px}
+    .sinac-band{
+      background:var(--grad-header);color:#fff;padding:14px 24px;margin-bottom:22px;
+      display:flex;align-items:center;gap:12px;
+      box-shadow:0 4px 16px rgba(11,61,145,.18);
+    }
+    .sinac-band .wm{font-family:'Manrope','Inter',sans-serif;font-weight:800;font-size:18px;letter-spacing:.14em}
+    .sinac-band .wm-dot{display:inline-block;width:7px;height:7px;border-radius:2px;background:#66BB6A;margin-left:4px;vertical-align:baseline}
+    .sinac-band .sep{width:1px;height:24px;background:rgba(255,255,255,.25)}
+    .sinac-band .sub{font-size:12px;color:rgba(255,255,255,.85);font-weight:500}
+    .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+    h1{font-family:'Manrope','Inter',sans-serif;color:var(--sinac-blue-900);font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+    h2,h3{font-family:'Manrope','Inter',sans-serif;letter-spacing:-.01em}
+    p.lead{color:var(--sinac-gray-500);margin-bottom:22px;font-size:13px}
+    .card{background:#fff;border-radius:12px;border:1px solid var(--sinac-gray-100);box-shadow:0 1px 2px rgba(11,61,145,.04),0 1px 3px rgba(11,61,145,.05);padding:24px;margin-bottom:18px;border-top:3px solid var(--sinac-blue-700)}
+    label{display:block;font-weight:600;margin-bottom:8px;color:var(--sinac-gray-700)}
+    input[type=file]{width:100%;padding:12px;border:2px dashed var(--sinac-gray-200);border-radius:8px;background:var(--sinac-gray-50);cursor:pointer;font-family:inherit}
+    input[type=file]:hover{border-color:var(--sinac-blue-700);background:var(--sinac-blue-50)}
+    input[type=file]:focus-visible{outline:3px solid rgba(21,101,192,.35);outline-offset:2px}
+    button{background:var(--sinac-blue-700);color:#fff;border:0;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,transform .12s,box-shadow .15s}
+    button:hover{background:var(--sinac-blue-800);transform:translateY(-1px);box-shadow:0 4px 12px rgba(11,61,145,.18)}
+    button:focus-visible{outline:3px solid rgba(21,101,192,.35);outline-offset:2px}
+    button:disabled{background:var(--sinac-gray-500);cursor:not-allowed;transform:none;box-shadow:none}
+    .back{display:inline-block;margin-bottom:12px;color:var(--sinac-blue-700);text-decoration:none;font-size:13px;font-weight:600}
     .back:hover{text-decoration:underline}
     .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:15px 0}
-    .stat{background:#eff6ff;border-radius:8px;padding:14px;text-align:center}
-    .stat .n{font-size:22px;font-weight:bold;color:#1e40af}
-    .stat .l{font-size:11px;color:#6b7280;margin-top:4px}
+    .stat{background:var(--sinac-blue-50);border:1px solid var(--sinac-blue-100);border-radius:8px;padding:14px;text-align:center}
+    .stat .n{font-family:'Manrope','Inter',sans-serif;font-size:22px;font-weight:800;color:var(--sinac-blue-800)}
+    .stat .l{font-size:11px;color:var(--sinac-gray-500);margin-top:4px;letter-spacing:.04em}
     .semaforo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0}
     .sem{border-radius:8px;padding:14px;text-align:center;color:#fff}
-    .sem .n{font-size:22px;font-weight:bold}
+    .sem .n{font-family:'Manrope','Inter',sans-serif;font-size:22px;font-weight:800}
     .sem .l{font-size:11px;margin-top:4px}
-    .sem.verde{background:#16a34a}
+    .sem.verde{background:var(--sinac-green-600)}
     .sem.amarillo{background:#eab308}
     .sem.rojo{background:#dc2626}
     .sem.negro{background:#111827}
-    .gestor{background:#f9fafb;border-left:3px solid #3b82f6;border-radius:6px;padding:10px 14px;margin:10px 0}
-    .gestor-head{font-weight:bold;color:#1e40af;margin-bottom:4px}
-    .gestor ul{margin-left:18px;font-size:12px;color:#374151}
+    .gestor{background:var(--sinac-gray-50);border-left:3px solid var(--sinac-blue-700);border-radius:6px;padding:10px 14px;margin:10px 0}
+    .gestor-head{font-weight:bold;color:var(--sinac-blue-800);margin-bottom:4px}
+    .gestor ul{margin-left:18px;font-size:12px;color:var(--sinac-gray-700)}
     .badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;color:#fff;margin-left:4px}
-    .err{background:#fee2e2;color:#991b1b;padding:10px;border-radius:6px;margin:6px 0;font-size:12px}
-    .ok{background:#d1fae5;color:#065f46;padding:12px;border-radius:8px}
+    .err{background:#fee2e2;color:#991b1b;padding:10px;border-radius:6px;margin:6px 0;font-size:12px;border-left:3px solid #dc2626}
+    .ok{background:var(--sinac-green-100);color:#1B5E20;padding:12px;border-radius:8px;border-left:3px solid var(--sinac-green-600)}
     .hidden{display:none}
     .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:sp 1s linear infinite;margin-right:8px;vertical-align:middle}
     @keyframes sp{to{transform:rotate(360deg)}}
   </style>
+<!-- Sistema de diseño SINAC: tokens (--sds-*) y formato único de plata,
+     números y fechas (window.SDS_FMT). Antes esta página no lo cargaba y la
+     misma cifra salía escrita distinto que en el portal. -->
+<link rel="stylesheet" href="/static/sinac-ds.css"/>
+<script src="/static/sinac-ux.js" defer></script>
 </head>
 <body>
+<div class="sinac-band">
+  <span class="wm">SINAC<span class="wm-dot"></span></span>
+  <span class="sep"></span>
+  <span class="sub">HUS · Motor de Glosas IA — Importar recepción · Powered by SINAC SC SAS</span>
+</div>
 <div class="wrap">
   <a class="back" href="/">← Volver al panel</a>
   <h1>📥 Importar Excel de Recepción</h1>
@@ -65,6 +98,7 @@
       <div class="stat"><div class="n" id="s-act" style="color:#2563eb">0</div><div class="l">ACTUALIZADAS</div></div>
       <div class="stat"><div class="n" id="s-rat" style="color:#7c3aed">0</div><div class="l">RATIFICADAS</div></div>
       <div class="stat"><div class="n" id="s-ext" style="color:#dc2626">0</div><div class="l">EXTEMPORÁNEAS</div></div>
+      <div class="stat" id="s-dup-box" style="display:none"><div class="n" id="s-dup" style="color:#64748b">0</div><div class="l">YA ESTABAN</div></div>
     </div>
 
     <h3 style="margin:20px 0 10px">Semáforo</h3>
@@ -76,12 +110,16 @@
     </div>
 
     <div id="email-box" class="ok" style="margin:15px 0">📧 Correos enviados: <b id="e-num">0</b></div>
+    <div id="email-detalle"></div>
 
     <h3 style="margin:20px 0 10px">Asignaciones por gestor</h3>
     <div id="gestores"></div>
 
     <div id="omitidas" style="margin-top:16px"></div>
     <div id="errores" style="margin-top:20px"></div>
+
+    <!-- Qué hacer con cada glosa (lo pinta pintarPlanDeTrabajo) -->
+    <div id="plan-trabajo"></div>
   </div>
 
   <div id="historial-card" class="card">
@@ -96,6 +134,20 @@ const TOKEN = localStorage.getItem('hus_token') || sessionStorage.getItem('hus_t
 
 if(!TOKEN){
   alert('Debes iniciar sesión primero');
+  window.location.href = '/';
+}
+
+// Sesión expirada (JWT vencido): cualquier fetch devuelve 401 aunque el
+// token exista en localStorage. Antes el historial pintaba "(401)" y se
+// quedaba ahí — visto en producción 10-jun-2026. Ahora: limpiar el token
+// muerto y volver al login una sola vez.
+let _yaRedirigiendo = false;
+function sesionExpirada(){
+  if(_yaRedirigiendo) return;
+  _yaRedirigiendo = true;
+  localStorage.removeItem('hus_token');
+  sessionStorage.removeItem('hus_token');
+  alert('Tu sesión expiró. Vuelve a iniciar sesión.');
   window.location.href = '/';
 }
 
@@ -176,6 +228,7 @@ async function pollEstado(id){
       const r = await fetch('/glosas/importar-recepcion/'+id+'/status', {
         headers:{'Authorization':'Bearer '+TOKEN}
       });
+      if(r.status === 401){ clearInterval(_pollTimer); sesionExpirada(); return; }
       if(!r.ok) return;
       const s = await r.json();
       cargarHistorial();
@@ -212,27 +265,49 @@ function mostrarResultado(d){
   // Si total = 0 mostramos un título distinto y advertencia clara —
   // sino el "✅ Importación completada" + 0 glosas confunde al gestor.
   var totalNum = d.total || 0;
-  if(totalNum === 0){
+  var duplicadas = d.duplicadas || 0;
+  var prev = document.getElementById('warn-cero');
+  if(prev) prev.remove();
+
+  // 20-08-2026. Antes, cualquier «total 0» mostraba el mismo aviso: revisá la
+  // hoja, revisá los encabezados. Yesid resubió el mismo archivo —que estaba
+  // perfecto— y lo mandó a buscar un problema que no existía. Las 35 glosas ya
+  // estaban importadas, y eso es una noticia normal, no un error.
+  //
+  // Son dos situaciones distintas y ahora se dicen distinto.
+  if(totalNum === 0 && duplicadas > 0){
+    document.getElementById('result-title').innerHTML =
+      '<span style="color:#15803d">✅ Importación procesada — nada nuevo que registrar</span>';
+    var ok = document.createElement('div');
+    ok.id = 'warn-cero';
+    ok.style.cssText = 'background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:12px;margin:10px 0;color:#15803d;font-size:13px;line-height:1.5';
+    ok.innerHTML = '<b>Las ' + duplicadas + ' glosas del archivo YA estaban importadas.</b><br>'
+      + 'No se creó ninguna nueva y no se perdió nada — el archivo está bien. '
+      + 'Esto es lo normal al volver a subir el mismo archivo.<br>'
+      + 'Si esperaba glosas nuevas, revise que el Excel sea el del lote nuevo y no el anterior.';
+    document.getElementById('result').insertBefore(ok, document.getElementById('result').children[1] || null);
+  } else if(totalNum === 0){
     document.getElementById('result-title').innerHTML =
       '<span style="color:#92400e">⚠ Importación procesada — 0 glosas detectadas</span>';
-    var prev = document.getElementById('warn-cero');
-    if(!prev){
-      var warn = document.createElement('div');
-      warn.id = 'warn-cero';
-      warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
-      warn.innerHTML = '<b>Posibles causas:</b><br>'
-        + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
-        + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
-        + '• Las filas están vacías o solo tienen headers.<br>'
-        + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
-      document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
-    }
+    var warn = document.createElement('div');
+    warn.id = 'warn-cero';
+    warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
+    warn.innerHTML = '<b>No se leyó ninguna fila del archivo. Posibles causas:</b><br>'
+      + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
+      + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
+      + '• Las filas están vacías o solo tienen headers.<br>'
+      + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
+    document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
   } else {
     document.getElementById('result-title').textContent = '✅ Importación completada';
     var prevWarn = document.getElementById('warn-cero');
     if(prevWarn) prevWarn.remove();
   }
   document.getElementById('s-total').textContent = totalNum;
+  var cajaDup = document.getElementById('s-dup-box');
+  if(cajaDup) cajaDup.style.display = duplicadas > 0 ? '' : 'none';
+  var celdaDup = document.getElementById('s-dup');
+  if(celdaDup) celdaDup.textContent = duplicadas;
   document.getElementById('s-nuevas').textContent = d.creadas || 0;
   document.getElementById('s-act').textContent = d.actualizadas || 0;
   document.getElementById('s-rat').textContent = d.ratificadas || 0;
@@ -245,6 +320,23 @@ function mostrarResultado(d){
   document.getElementById('sn').textContent = sem.NEGRO || 0;
 
   document.getElementById('e-num').textContent = d.correos_enviados || 0;
+  // 20-08-2026. Cuando el archivo no trae nada nuevo, no hay a quién
+  // avisarle: el «Correos enviados: 0» es correcto, pero a secas se lee como
+  // una falla. Yesid reimportó varias veces mirando ese cero sin saber si era
+  // un problema del correo o la consecuencia de que no hubiera novedades.
+  if(totalNum === 0 && duplicadas > 0){
+    var cajaMail = document.getElementById('email-detalle');
+    if(cajaMail){
+      cajaMail.innerHTML = '<div style="background:#f8fafc;border:1px solid var(--border);'
+        + 'padding:12px 14px;border-radius:8px;font-size:.9em">'
+        + 'No se envió ningún correo <b>porque no había nada nuevo que avisar</b>. '
+        + 'No es una falla del correo.<br>'
+        + 'Para comprobar que el correo funciona, use <b>Diagnóstico → 📧 Probar correo</b>.'
+        + '</div>';
+    }
+  } else {
+    pintarDetalleDelCorreo(d.correo);
+  }
 
   // 🤖 Indicador prominente de auto-procesamiento IA en background
   if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){
@@ -292,6 +384,7 @@ function mostrarResultado(d){
         var rr = await fetch('/glosas/importar-recepcion/'+d.recepcion_import_id+'/excel-respuesta', {
           headers:{'Authorization':'Bearer '+TOKEN}
         });
+        if(rr.status === 401){ sesionExpirada(); return; }
         if(!rr.ok){
           var de = {};
           try{ de = await rr.json(); }catch(_e){}
@@ -356,9 +449,245 @@ function mostrarResultado(d){
       d.errores.map(e=>`<div class="err">${e}</div>`).join('');
   }
 
+  // El plan de trabajo: qué hacer con cada glosa, no solo cuántas llegaron.
+  pintarPlanDeTrabajo(d);
+
   // Refrescar el historial para que la nueva importación quede
   // descargable aunque el usuario recargue la página.
   cargarHistorial();
+}
+
+// ─── Plan de trabajo por gestor ─────────────────────────────────────────────
+// 20-08-2026. Yesid: «que en la página esta recepción sea más intuitiva, sepan
+// qué entidad deben trabajar, cómo la deben trabajar, qué respuesta es la más
+// adecuada, los tiempos de radicación vs el tiempo de la notificación de la
+// glosa; si es médica que se trabaje en conjunto con el médico auditor; si son
+// extemporáneas tener cuidado; las ratificadas de una vez que salga el mensaje
+// de texto fijo».
+//
+// El plan lo arma el motor (app/services/plan_de_trabajo.py) y viaja dentro de
+// `por_gestor`. Acá solo se pinta — así el correo y la pantalla dicen SIEMPRE
+// lo mismo.
+
+var COLOR_URGENCIA = {
+  VENCIDA: '#111827', HOY: '#b91c1c', URGENTE: '#dc2626',
+  PRONTO: '#b45309', NORMAL: '#15803d'
+};
+
+function esc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pesos(v){
+  // El formato de la plata es UNO SOLO en todo el portal: `window.SDS_FMT.cop`
+  // (de sinac-ux.js, que esta página ya carga). Escribirlo a mano con
+  // `toLocaleString` fue justo lo que una prueba del repo atrapó el 20-08:
+  // dos formatos distintos para el mismo peso confunden al auditor y hacen
+  // que un valor se lea distinto según la pantalla.
+  if (window.SDS_FMT && window.SDS_FMT.cop) return window.SDS_FMT.cop(v);
+  var n = Math.round(Number(v || 0)) || 0;              // respaldo si aún no cargó
+  return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// ── A quién le llegó el correo, y a quién NO ──────────────────────────────
+// 20-08-2026. La pantalla decía «Correos enviados: 3» y nada más. Con eso el
+// auditor no tenía cómo saber que a CAROLINA no le llegó nada porque su
+// nombre en el Excel no coincide con ningún usuario del portal — que es la
+// falla que de verdad ocurre, no que se caiga el servidor de correo.
+//
+// Se muestra lo que el motor SÍ puede afirmar: a qué buzón salió cada correo
+// y quién quedó sin destinatario. Que el gestor lo haya ABIERTO no lo sabe
+// nadie, y por eso no se insinúa.
+function pintarDetalleDelCorreo(c){
+  var caja = document.getElementById('email-detalle');
+  if(!caja) return;
+  caja.innerHTML = '';
+  if(!c) return;
+
+  var h = '';
+
+  if(!c.smtp_configurado){
+    h += '<div class="err" style="margin:10px 0"><b>El correo no está configurado en este servidor.</b>'
+       + ' No salió ningún mensaje. Las glosas SÍ quedaron importadas: avise a los gestores por otro medio'
+       + ' y pida que configuren SMTP_USER y SMTP_PASSWORD.</div>';
+    caja.innerHTML = h;
+    return;
+  }
+
+  var sin = c.gestores_sin_correo || [];
+  if(sin.length){
+    h += '<div class="err" style="margin:10px 0"><b>' + sin.length + ' gestor(es) NO recibieron el correo</b>'
+       + ' — su nombre en el Excel no coincide con ningún usuario activo del portal:<br>'
+       + sin.map(esc).join(' · ')
+       + '<br><span style="font-size:.85em">Arréglelo creando el usuario, o poniendo en el Excel el mismo nombre'
+       + ' con el que está registrado en Usuarios.</span></div>';
+  }
+
+  var fallidos = (c.destinatarios || []).filter(function(x){ return !x.ok; });
+  if(fallidos.length){
+    h += '<div class="err" style="margin:10px 0"><b>' + fallidos.length + ' correo(s) rebotaron</b> al intentar salir:<br>'
+       + fallidos.map(function(x){ return esc(x.email); }).join(' · ') + '</div>';
+  }
+
+  if(c.hay_glosas_medicas){
+    var dras = c.doctoras || {};
+    var nombresDra = Object.keys(dras);
+    var sinDra = c.doctoras_sin_correo || [];
+    if(nombresDra.length){
+      h += '<div class="ok" style="margin:10px 0">🩺 <b>Glosas médicas — a cada doctora la suya</b>'
+         + ' (según la columna PROFESIONAL(MEDICO) del Excel):<br>'
+         + nombresDra.sort().map(function(n){
+             return '<b>' + esc(n) + '</b> → ' + esc(dras[n]);
+           }).join('<br>')
+         + '</div>';
+      if(sinDra.length){
+        h += '<div class="err" style="margin:10px 0">🩺 <b>Sin correo:</b> '
+           + sinDra.map(esc).join(' · ')
+           + '<br><span style="font-size:.85em">Ese nombre del Excel no coincide con ningún'
+           + ' usuario activo del portal. Revise cómo está escrito en Usuarios.</span></div>';
+      }
+    } else if((c.medicos_auditores || []).length){
+      h += '<div class="ok" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
+         + ' pero el Excel no dice cuál doctora las lleva, así que se envió a todas'
+         + ' las médicas auditoras registradas:<br>'
+         + c.medicos_auditores.map(esc).join(' · ') + '</div>';
+    } else {
+      h += '<div class="err" style="margin:10px 0">🩺 <b>El lote trae glosas médicas</b>'
+         + ' (pertinencia o calidad) pero <b>NO hay médicas auditoras registradas</b>,'
+         + ' así que no le llegó a ninguna.<br><span style="font-size:.85em">Para arreglarlo:'
+         + ' escriba <code>AUDITORIA MEDICA</code> en el campo «equipo» de esas usuarias, en'
+         + ' la pantalla de Usuarios. O configure MEDICOS_AUDITORES_EMAIL en el servidor.'
+         + '</span></div>';
+    }
+  }
+
+  var ok = (c.destinatarios || []).filter(function(x){ return x.ok; });
+  if(ok.length){
+    var filas = Object.keys(c.por_gestor || {}).sort().map(function(g){
+      var correos = (c.por_gestor[g] || []);
+      var val = correos.length
+        ? '<span style="color:#15803d">' + correos.map(esc).join(', ') + '</span>'
+        : '<span style="color:#b91c1c">sin usuario en el portal</span>';
+      return '<tr><td style="padding:3px 10px 3px 0;font-weight:600">' + esc(g) + '</td><td style="padding:3px 0">' + val + '</td></tr>';
+    }).join('');
+    h += '<details style="margin:10px 0"><summary style="cursor:pointer">'
+       + 'Ver a qué buzón salió cada uno (' + ok.length + ')</summary>'
+       + '<table style="margin-top:8px;font-size:.9em;border-collapse:collapse">' + filas + '</table>'
+       + '<div style="margin-top:8px;font-size:.85em;color:#555">'
+       + 'Esto confirma que el mensaje salió del servidor sin error. Si el gestor lo ABRIÓ o no,'
+       + ' eso no lo sabe ningún sistema de correo: pídale que le confirme.</div>'
+       + '</details>';
+  }
+
+  caja.innerHTML = h;
+}
+
+function pintarPlanDeTrabajo(d){
+  var cont = document.getElementById('plan-trabajo');
+  if(!cont) return;
+  var porGestor = d.por_gestor || {};
+  var gestores = Object.keys(porGestor);
+  if(!gestores.length){ cont.innerHTML = ''; return; }
+
+  // Primero lo urgente: dentro de cada gestor, por prioridad y luego por plata.
+  function ordenar(gs){
+    return gs.slice().sort(function(a,b){
+      var pa = (a.plan && a.plan.prioridad != null) ? a.plan.prioridad : 3;
+      var pb = (b.plan && b.plan.prioridad != null) ? b.plan.prioridad : 3;
+      if(pa !== pb) return pa - pb;
+      return Number(b.valor || 0) - Number(a.valor || 0);
+    });
+  }
+
+  var html = '<h3 style="margin:24px 0 4px;color:#1e3a8a">🧭 Qué hacer con cada glosa</h3>'
+    + '<div style="font-size:13px;color:#6b7280;margin-bottom:14px">'
+    + 'Ordenadas por urgencia. Lo de arriba es lo que hay que trabajar primero.</div>';
+
+  gestores.sort();
+  for(var i = 0; i < gestores.length; i++){
+    var gestor = gestores[i];
+    var glosas = ordenar(porGestor[gestor] || []);
+    html += '<div style="margin:18px 0 8px;font-weight:800;color:#1e40af;font-size:15px">'
+      + '👤 ' + esc(gestor)
+      + ' <span style="color:#6b7280;font-weight:500;font-size:13px">('
+      + glosas.length + ' glosa' + (glosas.length === 1 ? '' : 's') + ')</span></div>';
+
+    for(var j = 0; j < glosas.length; j++){
+      html += tarjetaDeGlosa(glosas[j], gestor + '-' + j);
+    }
+  }
+  cont.innerHTML = html;
+}
+
+function tarjetaDeGlosa(g, id){
+  var p = g.plan || {};
+  var color = COLOR_URGENCIA[p.urgencia] || '#6b7280';
+  var h = '<div style="border:1px solid #e5e7eb;border-left:5px solid ' + color
+    + ';border-radius:10px;padding:12px 14px;margin:8px 0;background:#fff">';
+
+  // Cabecera: factura, entidad, plata, cuándo vence.
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline">'
+    + '<b style="font-size:15px">' + esc(g.factura) + '</b>'
+    + '<span style="background:' + color + ';color:#fff;border-radius:999px;'
+    + 'padding:2px 9px;font-size:11px;font-weight:700">' + esc(p.urgencia || '') + '</span>'
+    + '<span style="color:#374151;font-size:13px">' + esc(g.eps) + '</span>'
+    + '<span style="margin-left:auto;font-weight:700;color:#111827">' + pesos(g.valor) + '</span>'
+    + '</div>';
+
+  if(p.titular){
+    h += '<div style="margin-top:6px;font-weight:700;color:#5b21b6;font-size:13px">'
+      + esc(p.titular) + '</div>';
+  }
+
+  h += '<div style="font-size:12px;color:#6b7280;margin-top:2px">Vence ' + esc(g.vence)
+    + (g.causal ? ' · causal ' + esc(g.causal) : '') + '</div>';
+
+  if(p.ruta){
+    var fondo = p.con_medico ? '#fef2f2' : '#f8fafc';
+    var borde = p.con_medico ? '#dc2626' : '#cbd5e1';
+    h += '<div style="margin-top:8px;padding:8px 10px;background:' + fondo
+      + ';border-left:3px solid ' + borde + ';border-radius:6px;font-size:12.5px;color:#374151">'
+      + '<b>Cómo se trabaja:</b> ' + esc(p.ruta) + '</div>';
+  }
+
+  if(p.respuesta_sugerida){
+    h += '<div style="margin-top:6px;font-size:12.5px;color:#374151">'
+      + '<b>Qué responder:</b> ' + esc(p.respuesta_sugerida) + '</div>';
+  }
+
+  var avisos = p.avisos || [];
+  for(var k = 0; k < avisos.length; k++){
+    h += '<div style="margin-top:6px;padding:7px 10px;background:#fffbeb;'
+      + 'border-left:3px solid #d97706;border-radius:6px;font-size:12px;color:#7c2d12">⚠ '
+      + esc(avisos[k]) + '</div>';
+  }
+
+  // El texto fijo de la ratificada, listo para copiar.
+  if(p.texto_listo){
+    h += '<div style="margin-top:8px">'
+      + '<button onclick="copiarTexto(\'' + id + '\')" '
+      + 'style="background:#7c3aed;color:#fff;border:0;border-radius:7px;'
+      + 'padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">'
+      + '📋 Copiar la respuesta de ratificada</button>'
+      + '<textarea id="txt-' + id + '" readonly style="width:100%;margin-top:6px;'
+      + 'height:70px;font-size:11px;padding:7px;border:1px solid #ddd6fe;'
+      + 'border-radius:6px;background:#faf5ff;color:#4c1d95">'
+      + esc(p.texto_listo) + '</textarea></div>';
+  }
+
+  return h + '</div>';
+}
+
+function copiarTexto(id){
+  var t = document.getElementById('txt-' + id);
+  if(!t) return;
+  t.select();
+  try{
+    navigator.clipboard.writeText(t.value);
+    var b = t.previousElementSibling;
+    if(b){ var o = b.textContent; b.textContent = '✓ Copiado'; setTimeout(function(){ b.textContent = o; }, 1600); }
+  }catch(e){ document.execCommand('copy'); }
 }
 
 async function descargarExcelRecepcion(id, btn){
@@ -369,6 +698,7 @@ async function descargarExcelRecepcion(id, btn){
     const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-respuesta', {
       headers:{'Authorization':'Bearer '+TOKEN}
     });
+    if(rr.status === 401){ sesionExpirada(); return; }
     if(!rr.ok){
       let de={}; try{ de = await rr.json(); }catch(_e){}
       alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
@@ -391,12 +721,53 @@ async function descargarExcelRecepcion(id, btn){
   }
 }
 
+// 📄 Excel radicable (jun-2026): formato institucional que se radica ante
+// la entidad pagadora (hoja RESPUESTA GLOSAS una-fila-por-concepto + hoja
+// FUNDAMENTO JURÍDICO). Mismo manejo de auth/errores que el Excel-respuesta.
+async function descargarExcelRadicable(id, btn){
+  const txt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generando…';
+  try{
+    const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-radicable', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(rr.status === 401){ sesionExpirada(); return; }
+    if(!rr.ok){
+      let de={}; try{ de = await rr.json(); }catch(_e){}
+      alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+      return;
+    }
+    // El servidor manda el nombre institucional (RESPUESTA_GLOSAS_..._HUS.xlsx)
+    // en el Content-Disposition; si no se puede leer, fallback genérico.
+    let nombre = 'RESPUESTA_GLOSAS_'+id+'_HUS.xlsx';
+    const cd = rr.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    const blob = await rr.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Error de red al descargar: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = txt;
+  }
+}
+
 async function cargarHistorial(){
   const cont = document.getElementById('historial-lista');
   try{
     const r = await fetch('/glosas/importar-recepcion/historial', {
       headers:{'Authorization':'Bearer '+TOKEN}
     });
+    if(r.status === 401){ sesionExpirada(); return; }
     if(!r.ok){
       cont.innerHTML = '<div style="color:#991b1b;font-size:13px">No se pudo cargar el historial ('+r.status+')</div>';
       return;
@@ -411,7 +782,13 @@ async function cargarHistorial(){
       const m = {
         ENVIADO:['#dcfce7','#166534','✓ correo enviado'],
         PARCIAL:['#fef3c7','#92400e','⚠ envío parcial'],
-        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ sin destinatarios'],
+        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ nadie a quien enviarlo'],
+        // 20-08-2026: sí había a quién mandarle; lo que falló fue el servidor
+        // de correo. Antes esto salía como «nadie a quien enviarlo» y mandaba
+        // al auditor a revisar la lista de gestores, que estaba bien.
+        FALLO_ENVIO:['#fee2e2','#991b1b','✗ el servidor de correo rechazó el envío'],
+        SIN_CORREO_CONFIG:['#fee2e2','#991b1b','✗ el servidor no tiene correo configurado'],
+        SIN_ARCHIVO_ORIGINAL:['#fef3c7','#92400e','✗ no quedó el archivo original'],
         ERROR:['#fee2e2','#991b1b','✗ error de envío'],
         SIN_ARCHIVO:['#f3f4f6','#6b7280','archivo purgado'],
         LISTO:['#dbeafe','#1e40af','procesando…'],
@@ -423,6 +800,9 @@ async function cargarHistorial(){
       const dl = im.descargable
         ? `<button onclick="descargarExcelRecepcion(${im.id}, this)" style="background:#10b981;color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">⬇ Excel-respuesta</button>`
         : `<span style="color:#9ca3af;font-size:12px">archivo ya no disponible</span>`;
+      // El radicable se regenera 100% desde BD: disponible aunque el
+      // archivo original de la importación ya haya sido purgado.
+      const dlRad = `<button onclick="descargarExcelRadicable(${im.id}, this)" style="background:var(--sinac-green-700);color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">📄 Excel radicable</button>`;
       const pend = im.dictamenes_pendientes||0;
       const listos = im.dictamenes_listos||0;
       const iaInfo = (listos+pend) > 0
@@ -436,7 +816,7 @@ async function cargarHistorial(){
           <span style="color:#6b7280">${im.archivo_nombre||'recepcion.xlsx'} · ${im.total_glosas} glosa(s) · ${im.usuario_email||''}</span>
           ${iaInfo?'<br>'+iaInfo:''}
         </div>
-        <div>${dl}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${dl}${dlRad}</div>
       </div>`;
     }).join('');
   }catch(e){

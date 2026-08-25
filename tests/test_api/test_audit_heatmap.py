@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,18 +14,6 @@ from app.auth import get_password_hash
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import AuditLogRecord, UsuarioRecord
-
-
-def _lunes_pasado():
-    """Lunes de la semana pasada (7-13 días atrás), a las 00:00.
-
-    Se usa en vez de una fecha fija para que los tests no caduquen cuando esa
-    fecha se sale de la ventana de días que consulta el endpoint.
-    """
-    ahora = ahora_utc()
-    return (ahora - timedelta(days=ahora.weekday() + 7)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
 
 
 @pytest.fixture
@@ -82,6 +70,16 @@ def _seed(db, ts):
     db.commit()
 
 
+def _fecha_reciente(dia_semana: int, hora: int, minuto: int = 0) -> datetime:
+    """Fecha UTC de hace 7–13 días que cae en el día de semana pedido
+    (0=Lunes … 6=Domingo). Con las fechas FIJAS de abril este test iba a
+    explotar ~18-ago-2026, cuando 2026-04-20 saliera de la ventana de
+    120 días (mismo patrón que tumbó CI el 22-jul con la ventana de 90)."""
+    ahora = ahora_utc()
+    retro = (ahora.weekday() - dia_semana) % 7 + 7
+    return ahora.replace(hour=hora, minute=minuto, second=0, microsecond=0) - timedelta(days=retro)
+
+
 class TestAuditHeatmap:
     def test_estructura(self, client):
         r = client.get("/audit/heatmap-actividad")
@@ -91,14 +89,11 @@ class TestAuditHeatmap:
             assert key in d
 
     def test_clasifica_dia_hora(self, client, db_session):
-        # Fechas relativas (lunes de la semana pasada) para que no caduquen
-        # al salirse de la ventana de días que consulta el endpoint.
-        lunes = _lunes_pasado()
-        # Lunes (weekday=0), 10am
-        _seed(db_session, lunes.replace(hour=10, minute=0))
-        _seed(db_session, lunes.replace(hour=10, minute=30))
-        # Miércoles (weekday=2), 14h
-        _seed(db_session, (lunes + timedelta(days=2)).replace(hour=14, minute=5))
+        # Lunes reciente (weekday=0), 10am
+        _seed(db_session, _fecha_reciente(0, 10))
+        _seed(db_session, _fecha_reciente(0, 10, 30))
+        # Miércoles reciente (weekday=2), 14h
+        _seed(db_session, _fecha_reciente(2, 14, 5))
 
         r = client.get("/audit/heatmap-actividad?dias=120")
         d = r.json()
@@ -108,9 +103,8 @@ class TestAuditHeatmap:
         assert items[(2, 14)]["count"] == 1
 
     def test_orden_dia_hora(self, client, db_session):
-        lunes = _lunes_pasado()
-        _seed(db_session, lunes.replace(hour=10, minute=0))
-        _seed(db_session, (lunes + timedelta(days=2)).replace(hour=14, minute=0))
+        _seed(db_session, _fecha_reciente(0, 10))
+        _seed(db_session, _fecha_reciente(2, 14))
         r = client.get("/audit/heatmap-actividad?dias=120")
         d = r.json()
         keys = [(it["dia_semana"], it["hora"]) for it in d["items"]]

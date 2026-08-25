@@ -48,6 +48,15 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
+def _lunes_reciente():
+    """Lunes de la semana pasada (7-13 días atrás): siempre en el pasado y
+    dentro de la ventana default de 90 días, sin importar la fecha de hoy."""
+    ahora = ahora_utc()
+    return (ahora - timedelta(days=ahora.weekday() + 7)).replace(
+        hour=10, minute=0, second=0, microsecond=0
+    )
+
+
 def _seed(db, fecha):
     db.add(
         GlosaRecord(
@@ -74,16 +83,11 @@ class TestPorDiaSemana:
         assert d["items"][6]["dia"] == "Domingo"
 
     def test_clasifica_por_dia(self, client, db_session):
-        # Fechas relativas para no salirnos de la ventana de 90 días:
-        # el lunes de la semana pasada (7-13 días atrás) y su miércoles.
-        ahora = ahora_utc()
-        lunes = (ahora - timedelta(days=ahora.weekday() + 7)).replace(
-            minute=0, second=0, microsecond=0
-        )
-        _seed(db_session, lunes.replace(hour=10))
-        _seed(db_session, lunes.replace(hour=11))
+        lunes = _lunes_reciente()
+        _seed(db_session, lunes)
+        _seed(db_session, lunes + timedelta(hours=1))
         miercoles = lunes + timedelta(days=2)
-        _seed(db_session, miercoles.replace(hour=10))
+        _seed(db_session, miercoles)
 
         r = client.get("/glosas/stats/por-dia-semana")
         d = r.json()
@@ -93,12 +97,7 @@ class TestPorDiaSemana:
         assert d["total_glosas"] == 3
 
     def test_pct_del_total(self, client, db_session):
-        # Fechas relativas (lunes/martes de la semana pasada) para que
-        # nunca caduquen fuera de la ventana de 90 días.
-        ahora = ahora_utc()
-        lunes = (ahora - timedelta(days=ahora.weekday() + 7)).replace(
-            hour=10, minute=0, second=0, microsecond=0
-        )
+        lunes = _lunes_reciente()
         # 4 glosas el lunes
         for _ in range(4):
             _seed(db_session, lunes)

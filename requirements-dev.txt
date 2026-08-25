@@ -1,0 +1,17 @@
+# Motor Glosas HUS — dependencias de desarrollo/test
+# Producción usa SOLO requirements.txt. Estas se instalan en el job de
+# tests de CI (.github/workflows/ci.yml) y localmente para correr pytest.
+#
+# Históricamente pytest no estaba declarado en ningún lado y el CI fallaba
+# con "No module named pytest" sin llegar a ejecutar las pruebas. Este
+# archivo lo soluciona.
+
+-r requirements.txt
+
+pytest==9.0.3
+pytest-asyncio==1.3.0
+
+# Motor de la caja de herramientas PDF de la Suite Cartera HUS
+# (tools/suite_cartera_hus). Necesario para tests/test_pdf_tools.py; si falta,
+# esas pruebas se saltan solas (pytest.importorskip), no fallan.
+pymupdf>=1.24

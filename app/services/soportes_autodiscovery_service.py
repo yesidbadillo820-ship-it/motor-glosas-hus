@@ -45,7 +45,22 @@ logger = logging.getLogger("motor_glosas.soportes")
 # patrones más específicos primero.
 TIPOS_SOPORTE = {
     "FEV": "factura_electronica",
+    # FVS = Factura de Venta en Salud (código ADRES). El servidor de
+    # radicación del HUS nombra la factura así: FVS_900006037_HUSxxxx.pdf.
+    # Sin esta entrada esos PDF quedaban etiquetados «otro» en vez de la
+    # factura, aunque sí se encontraban por número. 18-08-2026.
+    "FVS": "factura_electronica",
     "HEV": "historia_clinica",
+    # Códigos del anexo técnico que el servidor de radicación sí usa y que el
+    # indexador no reconocía. Se vieron el 19-08-2026 en la factura HUS468334,
+    # respondiendo una glosa SO0201 por «ausencia de soportes de la CONSULTA DE
+    # URGENCIAS»: el documento que prueba esa consulta es justamente la HAU, y
+    # el sistema la tenía como archivo suelto. De doce soportes, seis quedaban
+    # sin clasificar — y como el Auditor Forense escoge por tipo, la epicrisis
+    # y la hoja de medicamentos competían de últimas.
+    "EPI": "epicrisis",
+    "HAM": "hoja_administracion_medicamentos",
+    "HAU": "hoja_atencion_urgencias",
     "CRC": "comprobante_recibido_cobro",
     "OPF": "otros_procedimientos",
     "PDE": "pde",
@@ -75,8 +90,11 @@ _MESES = (
     "NOVIEMBRE",
     "DICIEMBRE",
 )
+# Las carpetas reales del 2026 llevan un ordinal delante: "8. AGOSTO 2026 -
+# SOPORTES RADICACION". Sin tolerar ese "8. " (o "12. ") el mes, el año y —lo
+# que de verdad importa— la EPS de cada soporte salían vacíos. 18-08-2026.
 _RE_MES_RAIZ = re.compile(
-    r"^\s*(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
+    r"^\s*(?:\d{1,2}\.?\s*)?(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
     re.IGNORECASE,
 )
 
@@ -135,7 +153,37 @@ def _clasificar_archivo(nombre: str) -> Optional[tuple[str, str]]:
     # XML CUFE: típicamente `ad{19}numeros{...}.xml`
     if n.startswith("AD") and n.endswith(".XML"):
         return ("AD", TIPOS_SOPORTE["AD"])
+    # El servidor de radicación nombra estos tres SOLO con el número de
+    # factura —`HUS468334.json`, `HUS468334.xml`, `HUS468334_CUV.json`—, sin
+    # prefijo que los delate. Se reconocen por la extensión. 19-08-2026.
+    if n.endswith(".XML"):
+        return ("AD", TIPOS_SOPORTE["AD"])
+    if n.endswith(".JSON"):
+        if "CUV" in n:
+            return ("CUV", "cuv")
+        return ("RIPS", TIPOS_SOPORTE["RIPS"])
     return None
+
+
+# Carpetas del servidor que NO son una EPS: son pasos del archivado.
+_CARPETAS_ESTRUCTURALES = {
+    "DD FACTURACION",
+    "ESCANEO",
+    "RIPS",
+    "SOPORTES",
+    "CORRESPONDENCIA",
+}
+
+
+def _nombre_estructural(nombre: str) -> bool:
+    """True si la carpeta es un paso del archivado y no el nombre de una EPS.
+
+    Tolera el ordinal delante y los espacios: «1. DD FACTURACION»,
+    «1.DD FACTURACION» y «DD  FACTURACION» son la misma carpeta.
+    """
+    limpio = re.sub(r"^\s*\d{1,2}\s*\.\s*", "", str(nombre or "").upper())
+    limpio = re.sub(r"\s+", " ", limpio).strip()
+    return limpio in _CARPETAS_ESTRUCTURALES
 
 
 def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
@@ -164,19 +212,26 @@ def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
                 meta["anio"] = int(m.group(2))
             except ValueError:
                 pass
-            # La EPS es lo que viene DESPUÉS del mes, salvo que sea
-            # "1. DD FACTURACION" / "ESCANEO" / "RIPS" (carpetas
-            # estructurales que no representan EPS).
+            # La EPS es lo que viene DESPUÉS del mes, salvo que sea una
+            # carpeta estructural (DD FACTURACION, ESCANEO, RIPS…).
+            #
+            # 19-08-2026 — La lista se comparaba tal cual y decía
+            # "1. DD FACTURACION" CON espacio; en el servidor real la carpeta
+            # se llama "1.DD FACTURACION" SIN espacio, así que no coincidía y
+            # se tomaba como si fuera la EPS: los soportes de ALIANZA MEDELLIN
+            # salían con EPS = "1.DD FACTURACION". Ahora se compara sin el
+            # ordinal y sin espacios de sobra, para que dé igual cómo esté
+            # escrito.
             for j in range(i + 1, len(partes)):
                 pj_up = upper_parts[j]
                 if (
-                    pj_up
-                    not in {"1. DD FACTURACION", "ESCANEO", "RIPS", "SOPORTES", "CORRESPONDENCIA"}
-                    and "SOPORTES RADICACION" not in pj_up
-                    and not pj_up.startswith("ENV-")
+                    _nombre_estructural(pj_up)
+                    or "SOPORTES RADICACION" in pj_up
+                    or pj_up.startswith("ENV-")
                 ):
-                    meta["eps"] = partes[j]
-                    break
+                    continue
+                meta["eps"] = partes[j]
+                break
             break
 
     # ENV (carpeta de envío/lote)
@@ -185,6 +240,57 @@ def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
             meta["env"] = parte
             break
     return meta
+
+
+def _raiz_configurada() -> Optional[str]:
+    """Lee la carpeta de soportes de `config/soportes_root.txt`, si existe.
+
+    Un archivo local (no versionado) con una sola línea, por ejemplo:
+        \\\\Prime\\radicacion_2026
+    Así el auditor cambia el servidor sin tocar código y sin que el autodeploy
+    se lo borre. Si no está, devuelve None y se usan las variables de entorno.
+    """
+    try:
+        ruta = Path(__file__).resolve().parent.parent.parent / "config" / "soportes_root.txt"
+        if not ruta.is_file():
+            return None
+        for linea in ruta.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            valor = linea.strip().strip('"').strip("'")
+            if valor and not valor.startswith("#"):
+                return valor
+    except OSError:
+        return None
+    return None
+
+
+def raiz_de_soportes() -> str:
+    """La carpeta de soportes del hospital. UNA sola respuesta para todos.
+
+    20-08-2026. El indexador resolvía la carpeta acá y el router de subida la
+    resolvía por su cuenta, en otro orden — y sin leer `config/soportes_root.txt`,
+    que es justamente donde el hospital dejó escrita la suya. El auditor subía
+    un .zip, el motor decía «subido», y los PDFs quedaban en una carpeta que el
+    índice nunca recorre: buscaba la factura, no aparecía, y no había manera de
+    entender por qué.
+
+    Dos lugares decidiendo lo mismo con reglas distintas es un defecto
+    esperando el momento. Acá queda uno solo.
+
+    Orden:
+      1. `config/soportes_root.txt` — la carpeta que escogió el hospital. Va
+         primero a propósito: el vigilante que revive el motor conserva las
+         variables de cuando ÉL arrancó, así que cambiar el .cmd no servía de
+         nada hasta reiniciar el vigilante entero.
+      2. `SOPORTES_ROOT` — mount directo del share.
+      3. `SOPORTES_LOCAL_ROOT` — el agente sube por HTTP y el motor escribe acá.
+      4. `/tmp/motor-soportes` — sin configurar nada.
+    """
+    return (
+        _raiz_configurada()
+        or os.getenv("SOPORTES_ROOT")
+        or os.getenv("SOPORTES_LOCAL_ROOT")
+        or "/tmp/motor-soportes"
+    )
 
 
 class SoportesIndexer:
@@ -204,12 +310,14 @@ class SoportesIndexer:
         #   4. default /tmp/motor-soportes (Plan B sin config — coincide
         #      con el default de _local_root en el router de upload, así
         #      que el motor lee exactamente lo que el agente subió).
+        #   1.b config/soportes_root.txt — la carpeta que escogió el hospital.
+        #      Va ANTES de las variables de entorno a propósito: el vigilante
+        #      que revive el motor guarda las variables de cuando ÉL arrancó,
+        #      así que cambiar el .cmd no servía de nada hasta reiniciar el
+        #      vigilante entero. Leyendo el archivo acá, el motor toma la
+        #      carpeta correcta arranque como arranque. 18-08-2026.
         if raiz is None:
-            raiz = (
-                os.getenv("SOPORTES_ROOT")
-                or os.getenv("SOPORTES_LOCAL_ROOT")
-                or "/tmp/motor-soportes"
-            )
+            raiz = raiz_de_soportes()
         self.raiz = Path(raiz)
         # Crear si no existe — el agente puede subir antes del primer
         # rebuild. Sin esto el indexador reporta "raíz no existe" aunque
@@ -225,6 +333,7 @@ class SoportesIndexer:
         self._ultimo_error: Optional[str] = None
         self._archivos_escaneados: int = 0
         self._archivos_indexados: int = 0
+        self._construyendo: bool = False
 
     def _esta_caliente(self) -> bool:
         if not self._indice:
@@ -279,7 +388,17 @@ class SoportesIndexer:
            a TODAS las facturas detectadas en esa carpeta. Esto cubre
            FURIPS, XML CUFE y ResultadosMSPS que vienen a nivel de lote.
         """
-        with self._lock:
+        # 18-08-2026 — El candado se pedía bloqueando. Con el servidor real
+        # (miles de archivos por red) el recorrido dura minutos, y CUALQUIER
+        # otra petición que tocara el índice —una búsqueda, por ejemplo— se
+        # quedaba esperando su turno hasta que el proxy la cortaba con un
+        # «Error 524». Ahora, si ya hay una reconstrucción en curso, esta se
+        # devuelve de inmediato en vez de hacer cola.
+        if not self._lock.acquire(blocking=False):
+            logger.info("Ya hay una reconstrucción de soportes en curso; no se arranca otra.")
+            return self.stats()
+        try:
+            self._construyendo = True
             inicio = time.time()
             self._indice = {}
             self._archivos_escaneados = 0
@@ -341,6 +460,9 @@ class SoportesIndexer:
                 f"{len(self._indice)} facturas únicas en {duracion}s"
             )
             return self.stats()
+        finally:
+            self._construyendo = False
+            self._lock.release()
 
     def lookup(self, factura: str, auto_rebuild: bool = True) -> list[dict]:
         """Devuelve los soportes detectados para una factura.
@@ -348,7 +470,9 @@ class SoportesIndexer:
         Acepta cualquier formato (`HUS0000495050`, `495050`, etc.) y
         reconstruye el índice si está frío y `auto_rebuild=True`.
         """
-        if auto_rebuild and not self._esta_caliente():
+        # Si hay una reconstrucción en curso se responde con lo que ya haya
+        # en el índice: esperar a que termine deja la pantalla colgada.
+        if auto_rebuild and not self._construyendo and not self._esta_caliente():
             self.rebuild()
         norm = normalizar_factura(factura)
         if not norm:
@@ -379,6 +503,7 @@ class SoportesIndexer:
                 round(time.time() - self._construido_en, 1) if self._construido_en else None
             ),
             "ttl_segundos": self.ttl_segundos,
+            "construyendo": self._construyendo,
             "ultimo_error": self._ultimo_error,
         }
 
@@ -411,7 +536,9 @@ class SoportesIndexer:
               ...
             ]
         """
-        if auto_rebuild and not self._esta_caliente():
+        # Igual que en lookup: con una reconstrucción en curso se responde con
+        # lo que ya hay, nunca se hace esperar a la pantalla.
+        if auto_rebuild and not self._construyendo and not self._esta_caliente():
             self.rebuild()
         if not query or len(query.strip()) < 2:
             return []

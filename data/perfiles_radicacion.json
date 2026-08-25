@@ -1,0 +1,226 @@
+{
+  "_meta": {
+    "descripcion": "Perfiles de radicación de facturas por entidad — ESE Hospital Universitario de Santander. Lo consume tools/radicar_facturacion.py. Editable sin tocar código.",
+    "version": "1.0",
+    "actualizado": "2026-06",
+    "normativa": "Resolución 2284 de 2023 (soportes y trámite de glosas), Resolución 2275 de 2023 (SOAT/ADRES), Resolución 1432 de 2024 (FEVRIPS).",
+    "notas": [
+      "Los NIT de los PAGADORES quedan vacíos a propósito: complételos desde el contrato/RUT de cada entidad. Un NIT errado en la radicación causa devoluciones. La resolución de entidad funciona por nombre/alias, no por NIT.",
+      "El NIT que se usa en la nomenclatura de soportes y en el nombre del ZIP es el del PRESTADOR (HUS), no el del pagador.",
+      "Los 'soportes_esperados' por servicio son RECOMENDADOS (Res. 2284/2023): si faltan, el radicador advierte (REVISAR_TIPIFICACION) pero no bloquea. Solo 'base_obligatorios' bloquea la radicación.",
+      "'portal' y 'bot' son informativos: indican por dónde se radica/responde hoy. Ajústelos a su operación.",
+      "Para agregar una entidad nueva: copie un bloque de 'entidades' y cámbiele id, nombre y alias."
+    ]
+  },
+
+  "prestador": {
+    "nombre": "ESE HOSPITAL UNIVERSITARIO DE SANTANDER",
+    "sigla": "HUS",
+    "nit": "900006037",
+    "patron_factura": "HUS\\d{4,12}"
+  },
+
+  "soportes": {
+    "base_obligatorios": ["FEV", "RIP", "CUV"],
+    "por_servicio": {
+      "consultas": [],
+      "procedimientos": ["HEV"],
+      "urgencias": ["HAU"],
+      "hospitalizacion": ["EPI"],
+      "medicamentos": ["OPF"],
+      "otrosServicios": ["OPF"],
+      "recienNacidos": ["EPI"]
+    },
+    "_nota_quirurgico": "Cuando haya procedimientos quirúrgicos se esperan además DQX (descripción quirúrgica) y RAN (registro de anestesia); no se infieren del RIPS, revíselos manualmente."
+  },
+
+  "entidades": [
+    {
+      "id": "NUEVA_EPS",
+      "nombre": "NUEVA EPS",
+      "alias": ["NUEVA EPS", "NUEVAEPS", "NUEVA E.P.S."],
+      "nit": "",
+      "regimen": "CONTRIBUTIVO/SUBSIDIADO",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Estilo formal-normativo. Exige historia clínica completa y cita textual de la Res. 2284/2023."
+    },
+    {
+      "id": "COOSALUD",
+      "nombre": "COOSALUD EPS",
+      "alias": ["COOSALUD", "COOSALUD EPS", "COOSALUD E.P.S.", "COOSALUD EPS-S"],
+      "nit": "",
+      "regimen": "SUBSIDIADO",
+      "canal": "PORTAL_BOT",
+      "portal": "https://vco.ctamedicas.com",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "tools/responder_glosas_coosalud.py",
+      "observaciones": "Portal cuentas médicas (CTA Médicas). Estilo administrativo: cifras exactas, contrato vigente, tarifario. La respuesta de glosas se automatiza con responder_glosas_coosalud.py."
+    },
+    {
+      "id": "COMPENSAR",
+      "nombre": "COMPENSAR EPS",
+      "alias": ["COMPENSAR", "COMPENSAR EPS", "COMPENSAR E.P.S."],
+      "nit": "",
+      "regimen": "CONTRIBUTIVO",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Estilo técnico-clínico: exige historia clínica + CIE-10 + CUPS. Prefiere mesa de auditoría médica conjunta."
+    },
+    {
+      "id": "DISPENSARIO_MEDICO",
+      "nombre": "DISPENSARIO MEDICO BUCARAMANGA",
+      "alias": [
+        "DISPENSARIO MEDICO",
+        "DISPENSARIO MEDICO BUCARAMANGA",
+        "DISPENSARIO MEDICO BUCARAMANG",
+        "DMBUG",
+        "U220311"
+      ],
+      "nit": "",
+      "eps_codigo": "U220311",
+      "regimen": "ESPECIAL_FFMM",
+      "canal": "PORTAL_BOT",
+      "portal": "https://auditool25.tool.com.co",
+      "nomenclatura": "DISPENSARIO_HUS_CORTO",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "CARPETA",
+      "bot": "tools/cargar_soportes_simed.py",
+      "observaciones": "Subsistema de salud de las FF.MM. Portal SIMED/AuditTool. CRÍTICO: usa factura en formato HUS CORTO (HUS487523, sin ceros de relleno) — el portal rechaza HUS0000487523. Fundamento: Dec. 1795/2000, Acuerdo 002/2001 FF.MM."
+    },
+    {
+      "id": "POLICIA_NACIONAL",
+      "nombre": "POLICIA NACIONAL - DISAN",
+      "alias": ["POLICIA NACIONAL", "DISAN", "DIRECCION DE SANIDAD POLICIA", "SANIDAD POLICIA"],
+      "nit": "",
+      "regimen": "ESPECIAL_FFMM",
+      "canal": "CORREO",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Subsistema de salud de la Policía. Contrato 068, Res. 00011/2025, Ley 352/1997. Prefiere conciliación interadministrativa."
+    },
+    {
+      "id": "PPL_FIDUPREVISORA",
+      "nombre": "PPL - FONDO NACIONAL DE SALUD PPL",
+      "alias": ["PPL", "POBLACION PRIVADA DE LA LIBERTAD", "FONDO PPL", "USPEC", "FIDUPREVISORA PPL"],
+      "nit": "",
+      "regimen": "ESPECIAL",
+      "canal": "CORREO",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Población privada de la libertad. Ley 1709/2014 + Res. 5159/2015. Conciliación con el Fondo."
+    },
+    {
+      "id": "FOMAG",
+      "nombre": "FOMAG - FONDO NACIONAL PRESTACIONES SOCIALES DEL MAGISTERIO",
+      "alias": ["FOMAG", "MAGISTERIO", "FIDUPREVISORA FOMAG", "FONDO MAGISTERIO"],
+      "nit": "",
+      "regimen": "ESPECIAL",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Magisterio. Ley 91/1989 + Dec. 3752/2003. Conciliación con el Patrimonio Autónomo."
+    },
+    {
+      "id": "SALUD_TOTAL",
+      "nombre": "SALUD TOTAL EPS",
+      "alias": ["SALUD TOTAL", "SALUD TOTAL EPS", "SALUDTOTAL"],
+      "nit": "",
+      "regimen": "CONTRIBUTIVO",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Estilo administrativo automatizado: respuestas cortas y directas, 2-3 normas. Reconocimiento íntegro."
+    },
+    {
+      "id": "SANITAS",
+      "nombre": "EPS SANITAS",
+      "alias": ["SANITAS", "EPS SANITAS", "KERALTY"],
+      "nit": "",
+      "regimen": "CONTRIBUTIVO",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Estilo formal-regulatorio: múltiples normas, jurisprudencia, estructura impecable."
+    },
+    {
+      "id": "FAMISANAR",
+      "nombre": "FAMISANAR EPS",
+      "alias": ["FAMISANAR", "FAMISANAR EPS", "FAMISANAR EPS SUBSIDIADO"],
+      "nit": "",
+      "regimen": "CONTRIBUTIVO/SUBSIDIADO",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Aparece en el histórico de glosas del HUS. Sin bot dedicado."
+    },
+    {
+      "id": "ASEGURADORA_SOLIDARIA",
+      "nombre": "ASEGURADORA SOLIDARIA DE COLOMBIA",
+      "alias": ["ASEGURADORA SOLIDARIA", "SOLIDARIA", "ASEGURADORA SOLIDARIA DE COLOMBIA"],
+      "nit": "",
+      "regimen": "SOAT",
+      "canal": "CORREO",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": false,
+      "soportes_extra": ["FUR", "SER"],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "SOAT (accidente de tránsito). Requiere FUR (Formato Único de Reclamación) y FUR SERVICIOS además de los soportes clínicos. Ver tools/adres/."
+    },
+    {
+      "id": "ADRES",
+      "nombre": "ADRES - ADMINISTRADORA DE LOS RECURSOS DEL SGSSS",
+      "alias": ["ADRES", "ECAT", "FOSYGA", "RECLAMACIONES ADRES"],
+      "nit": "901037916",
+      "regimen": "SOAT/ECAT",
+      "canal": "ADRES",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": false,
+      "soportes_extra": ["FUR", "SER", "IPO"],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "tools/adres/",
+      "observaciones": "Reclamaciones ECAT (víctimas de accidentes de tránsito sin SOAT, eventos catastróficos). FUR + FUR SERVICIOS + informe policial (IPO). NIT ADRES público; valídelo igual."
+    }
+  ]
+}

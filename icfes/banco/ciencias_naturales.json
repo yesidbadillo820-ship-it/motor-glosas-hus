@@ -1,0 +1,418 @@
+{
+  "area": "ciencias_naturales",
+  "version": 1,
+  "nota": "Preguntas de práctica escritas para este sistema siguiendo las competencias y componentes del Saber 11. No son preguntas del ICFES.",
+  "preguntas": [
+    {
+      "id": "CN-001",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Biológico",
+      "tema": "Ósmosis y transporte celular",
+      "dificultad": 3,
+      "enunciado": "Se colocan glóbulos rojos en una solución con mucha más sal que su interior. ¿Qué le ocurre a las células?",
+      "opciones": [
+        "Se arrugan porque sale agua hacia la solución.",
+        "Se hinchan porque entra agua desde la solución.",
+        "No cambian porque la membrana impide el paso del agua.",
+        "Se dividen para equilibrar la concentración."
+      ],
+      "correcta": 0,
+      "explicacion": "En la ósmosis el agua se mueve hacia donde hay más soluto. Si afuera hay más sal que adentro (medio hipertónico), el agua sale de la célula y esta se arruga. La membrana sí deja pasar el agua: lo que regula es el paso de los solutos.",
+      "trampa": "El distractor de que la célula se hincha describe lo que pasa en el caso contrario, cuando la solución tiene menos sal (hipotónica). Pregúntate siempre dónde hay MÁS soluto: hacia allá va el agua."
+    },
+    {
+      "id": "CN-002",
+      "competencia": "Indagación",
+      "componente": "Biológico",
+      "tema": "Cruces genéticos",
+      "dificultad": 4,
+      "enunciado": "En una planta, el color morado de la flor (A) domina sobre el blanco (a). Se cruzan dos plantas de genotipo Aa. ¿Qué proporción de la descendencia se espera que tenga flores blancas?",
+      "opciones": [
+        "0 %",
+        "25 %",
+        "50 %",
+        "75 %"
+      ],
+      "correcta": 1,
+      "explicacion": "El cruce Aa × Aa produce las combinaciones AA, Aa, aA y aa: una de cada cuatro. Solo aa muestra el color blanco, porque el blanco es recesivo y necesita los dos alelos. Por eso se espera un 25 %.",
+      "trampa": "El distractor «50 %» sale de contar Aa y aA como si fueran blancas o de pensar que la mitad de la descendencia hereda cada color. Dibuja el cuadro de cuatro casillas: es la forma más segura de no equivocarse."
+    },
+    {
+      "id": "CN-003",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Biológico",
+      "tema": "Sistema circulatorio",
+      "dificultad": 3,
+      "enunciado": "La sangre que sale del ventrículo izquierdo del corazón hacia la aorta se caracteriza por",
+      "opciones": [
+        "regresar de los pulmones hacia el corazón.",
+        "ir cargada de dióxido de carbono hacia los pulmones.",
+        "ir cargada de oxígeno hacia todo el cuerpo.",
+        "provenir directamente del intestino delgado."
+      ],
+      "correcta": 2,
+      "explicacion": "La sangre llega oxigenada desde los pulmones a la aurícula izquierda, pasa al ventrículo izquierdo y este la bombea por la aorta hacia todo el cuerpo. El lado derecho del corazón es el que maneja sangre pobre en oxígeno y la envía a los pulmones.",
+      "trampa": "El distractor de la sangre que va a los pulmones corresponde al ventrículo DERECHO. La regla que salva: izquierdo igual a oxigenada y hacia el cuerpo; derecho igual a desoxigenada y hacia el pulmón."
+    },
+    {
+      "id": "CN-004",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Biológico",
+      "tema": "Fotosíntesis y respiración celular",
+      "dificultad": 4,
+      "enunciado": "Una planta encerrada en un recipiente transparente y sellado sobrevive varios días, pero si se cubre el recipiente con una tela negra la planta muere. La mejor explicación es que",
+      "opciones": [
+        "sin luz la planta no puede realizar respiración celular.",
+        "la oscuridad hace que la planta pierda toda su agua.",
+        "la tela negra impide la entrada de dióxido de carbono.",
+        "sin luz la planta no puede producir el alimento que consume."
+      ],
+      "correcta": 3,
+      "explicacion": "La fotosíntesis necesita luz para transformar dióxido de carbono y agua en glucosa y oxígeno. La respiración celular, en cambio, ocurre día y noche y consume esa glucosa. Sin luz la planta sigue gastando pero deja de producir, y termina agotando sus reservas.",
+      "trampa": "El distractor «sin luz no puede realizar respiración celular» invierte los dos procesos: la que necesita luz es la fotosíntesis. La respiración celular ocurre en todos los seres vivos y a toda hora, también en las plantas."
+    },
+    {
+      "id": "CN-005",
+      "competencia": "Indagación",
+      "componente": "Biológico",
+      "tema": "Flujo de energía en un ecosistema",
+      "dificultad": 4,
+      "contexto": "En un ecosistema se midió la energía disponible en cada nivel:\n\n| Nivel | Energía (kcal/m² por año) |\n|---|---|\n| Productores (plantas) | 20.000 |\n| Consumidores primarios (herbívoros) | 2.000 |\n| Consumidores secundarios | 190 |\n| Consumidores terciarios | 21 |",
+      "enunciado": "A partir de los datos, ¿qué explica que la energía disponible disminuya tanto en cada nivel?",
+      "opciones": [
+        "La mayor parte de la energía se pierde como calor y en el metabolismo.",
+        "Los organismos de cada nivel son cada vez más pequeños.",
+        "Los consumidores terciarios comen menos que los herbívoros.",
+        "La energía se acumula en los productores y no se transfiere."
+      ],
+      "correcta": 0,
+      "explicacion": "De un nivel al siguiente solo pasa alrededor del 10 % de la energía: 20.000 a 2.000 y de ahí a 190. El resto se gasta en los procesos vitales del propio organismo y se disipa como calor, que ya no puede ser aprovechado por el nivel siguiente. Por eso las cadenas tróficas rara vez tienen más de cuatro o cinco niveles.",
+      "trampa": "El distractor del tamaño de los organismos confunde una consecuencia con la causa. Que haya menos depredadores grandes es efecto de la pérdida de energía, no su explicación."
+    },
+    {
+      "id": "CN-006",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Biológico",
+      "tema": "Selección natural",
+      "dificultad": 5,
+      "enunciado": "En una isla azotada por vientos fuertes, con los años predominan los insectos con alas más cortas. La explicación evolutiva correcta es que",
+      "opciones": [
+        "los insectos acortaron sus alas para resistir el viento.",
+        "ya existían insectos de alas cortas y el viento favoreció su supervivencia.",
+        "el viento desgastó las alas de los insectos y eso se heredó.",
+        "los insectos decidieron dejar de volar para no ser arrastrados."
+      ],
+      "correcta": 1,
+      "explicacion": "La variación no la produce la necesidad: en la población ya había insectos con alas de distinto tamaño. El viento actúa como filtro, porque los de alas largas son arrastrados y dejan menos descendencia. Con las generaciones, la proporción de alas cortas aumenta. La selección natural escoge entre lo que ya existe.",
+      "trampa": "Los distractores de que «acortaron sus alas» o de que «el desgaste se heredó» son la explicación de Lamarck, y suenan muy razonables. El examen las pone a propósito: los caracteres adquiridos en vida no se heredan."
+    },
+    {
+      "id": "CN-007",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Biológico",
+      "tema": "Homeostasis y regulación hormonal",
+      "dificultad": 4,
+      "enunciado": "Después de almorzar, el nivel de glucosa en la sangre sube y minutos después vuelve a su valor normal. Esto ocurre porque el páncreas libera",
+      "opciones": [
+        "adrenalina, que acelera el ritmo cardiaco.",
+        "glucagón, que libera glucosa desde el hígado.",
+        "insulina, que facilita la entrada de glucosa a las células.",
+        "bilis, que descompone la glucosa en el intestino."
+      ],
+      "correcta": 2,
+      "explicacion": "La insulina, producida por el páncreas, permite que la glucosa entre a las células y se almacene, con lo que baja su concentración en la sangre. El glucagón hace lo contrario y actúa cuando la glucosa está baja: los dos juntos mantienen el equilibrio, que es lo que se llama homeostasis.",
+      "trampa": "El distractor «glucagón» es la hormona correcta pero para la situación contraria. Cuando aparezcan dos hormonas antagónicas, decide primero si el valor tiene que SUBIR o BAJAR y después escoge."
+    },
+    {
+      "id": "CN-008",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Físico",
+      "tema": "Movimiento rectilíneo uniforme",
+      "dificultad": 2,
+      "enunciado": "Un bus recorre 180 kilómetros en 3 horas manteniendo una rapidez constante. ¿Cuál es esa rapidez?",
+      "opciones": [
+        "54 km/h",
+        "540 km/h",
+        "80 km/h",
+        "60 km/h"
+      ],
+      "correcta": 3,
+      "explicacion": "La rapidez es la distancia dividida entre el tiempo: 180 ÷ 3 = 60 km/h. Se puede comprobar al revés: 60 km/h por 3 horas dan los 180 kilómetros.",
+      "trampa": "El distractor «540 km/h» sale de multiplicar en vez de dividir. Antes de operar, mira las unidades de la respuesta: si piden kilómetros POR hora, los kilómetros van arriba y las horas abajo."
+    },
+    {
+      "id": "CN-009",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Físico",
+      "tema": "Segunda ley de Newton",
+      "dificultad": 3,
+      "enunciado": "Sobre un carro de 1.200 kg actúa una fuerza neta que le produce una aceleración de 2 m/s². ¿Cuál es el valor de esa fuerza?",
+      "opciones": [
+        "2.400 N",
+        "1.200 N",
+        "600 N",
+        "4.800 N"
+      ],
+      "correcta": 0,
+      "explicacion": "La segunda ley de Newton dice que la fuerza neta es masa por aceleración: F = 1.200 × 2 = 2.400 N. Si la masa fuera el doble y se quisiera la misma aceleración, habría que aplicar el doble de fuerza.",
+      "trampa": "El distractor «600 N» sale de dividir la masa entre la aceleración. Cuando dudes entre multiplicar y dividir, piensa en el caso extremo: empujar algo más pesado con la misma aceleración exige MÁS fuerza, no menos."
+    },
+    {
+      "id": "CN-010",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Físico",
+      "tema": "Conservación de la energía mecánica",
+      "dificultad": 4,
+      "enunciado": "Un objeto se deja caer desde 20 metros de altura, sin rozamiento con el aire. Tomando g = 10 m/s², ¿con qué rapidez llega al suelo?",
+      "opciones": [
+        "10 m/s",
+        "20 m/s",
+        "14 m/s",
+        "40 m/s"
+      ],
+      "correcta": 1,
+      "explicacion": "Toda la energía potencial se convierte en energía cinética: m·g·h = ½·m·v². La masa se cancela y queda v = raíz de (2·g·h) = raíz de (2 × 10 × 20) = raíz de 400 = 20 m/s. Por eso todos los cuerpos caen igual cuando no hay rozamiento.",
+      "trampa": "El distractor «40 m/s» sale de multiplicar 2 × 20 sin sacar la raíz cuadrada. La rapidez aparece elevada al cuadrado en la fórmula de la energía cinética: nunca olvides deshacer ese cuadrado."
+    },
+    {
+      "id": "CN-011",
+      "competencia": "Indagación",
+      "componente": "Físico",
+      "tema": "Ondas: rapidez, frecuencia y longitud",
+      "dificultad": 4,
+      "enunciado": "Una onda sonora se propaga en el aire a 340 m/s con una frecuencia de 170 Hz. ¿Cuál es su longitud de onda?",
+      "opciones": [
+        "0,5 m",
+        "170 m",
+        "2 m",
+        "578 m"
+      ],
+      "correcta": 2,
+      "explicacion": "La relación entre las tres magnitudes es v = λ · f, de donde λ = v ÷ f = 340 ÷ 170 = 2 metros. Es decir, entre dos crestas consecutivas hay dos metros.",
+      "trampa": "El distractor «578 m» sale de multiplicar 340 por 170 en vez de dividir. Verifica con las unidades: metros por segundo divididos entre ciclos por segundo dan metros, que es lo que pide una longitud."
+    },
+    {
+      "id": "CN-012",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Físico",
+      "tema": "Ley de Ohm",
+      "dificultad": 3,
+      "enunciado": "Un bombillo con una resistencia de 4 ohmios se conecta a una fuente de 12 voltios. ¿Qué intensidad de corriente circula por él?",
+      "opciones": [
+        "0,33 A",
+        "48 A",
+        "16 A",
+        "3 A"
+      ],
+      "correcta": 3,
+      "explicacion": "La ley de Ohm establece que V = I · R, así que I = V ÷ R = 12 ÷ 4 = 3 amperios. Si se aumentara la resistencia manteniendo el voltaje, la corriente bajaría.",
+      "trampa": "El distractor «0,33 A» sale de dividir al revés (4 ÷ 12). Ordena siempre la fórmula despejando la letra que te piden ANTES de reemplazar los números."
+    },
+    {
+      "id": "CN-013",
+      "competencia": "Indagación",
+      "componente": "Físico",
+      "tema": "Densidad y flotación",
+      "dificultad": 4,
+      "enunciado": "Un bloque tiene una masa de 300 g y ocupa un volumen de 200 cm³. Sabiendo que la densidad del agua es 1 g/cm³, al soltarlo en agua el bloque",
+      "opciones": [
+        "se hunde, porque su densidad es 1,5 g/cm³.",
+        "flota, porque su densidad es menor que la del agua.",
+        "flota, porque su masa es mayor que su volumen.",
+        "queda suspendido, porque su densidad es igual a la del agua."
+      ],
+      "correcta": 0,
+      "explicacion": "La densidad es masa sobre volumen: 300 ÷ 200 = 1,5 g/cm³. Como es mayor que la del agua (1 g/cm³), el bloque se hunde. Lo que decide flotar o hundirse es la densidad, no el peso: un barco de acero flota y un tornillo del mismo material se hunde.",
+      "trampa": "El distractor «flota porque su masa es mayor que su volumen» compara dos magnitudes distintas, gramos con centímetros cúbicos, lo cual no tiene sentido físico aunque los números lo permitan. Solo se comparan densidades con densidades."
+    },
+    {
+      "id": "CN-014",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Físico",
+      "tema": "Calor y temperatura",
+      "dificultad": 4,
+      "enunciado": "Una taza de agua a 90 °C y una olla con cinco litros de agua a 90 °C están a la misma temperatura. Sin embargo, la olla puede derretir mucho más hielo. Esto se explica porque la olla",
+      "opciones": [
+        "está a mayor temperatura aunque el termómetro marque igual.",
+        "contiene más energía térmica por tener mucha más masa.",
+        "transfiere el calor a mayor velocidad que la taza.",
+        "tiene el agua a mayor presión que la taza."
+      ],
+      "correcta": 1,
+      "explicacion": "Temperatura y calor no son lo mismo. La temperatura mide qué tan agitadas están las partículas, y es igual en las dos. El calor que un cuerpo puede entregar depende además de cuánta materia tenga: con cinco litros hay mucha más energía disponible que con una taza.",
+      "trampa": "El distractor de que «está a mayor temperatura aunque el termómetro marque igual» contradice el propio enunciado. Cuando una opción niega un dato que el problema afirma, se descarta de inmediato."
+    },
+    {
+      "id": "CN-015",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Químico",
+      "tema": "Tabla periódica",
+      "dificultad": 3,
+      "enunciado": "Dos elementos ubicados en el mismo grupo (columna) de la tabla periódica comparten principalmente",
+      "opciones": [
+        "la misma masa atómica.",
+        "el mismo número de protones en su núcleo.",
+        "el mismo número de electrones en su capa externa.",
+        "el mismo número de capas de electrones."
+      ],
+      "correcta": 2,
+      "explicacion": "Los elementos de un mismo grupo tienen igual número de electrones de valencia, y por eso reaccionan de forma parecida: el sodio y el potasio, por ejemplo, reaccionan violentamente con el agua. El número de capas es lo que comparten los elementos de un mismo periodo (fila).",
+      "trampa": "El distractor del número de protones definiría al mismo elemento, no a dos distintos: el número de protones es la identidad de cada elemento. Si dos elementos tuvieran los mismos protones, serían el mismo."
+    },
+    {
+      "id": "CN-016",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Químico",
+      "tema": "Enlace iónico y covalente",
+      "dificultad": 3,
+      "enunciado": "El cloruro de sodio (NaCl) se forma cuando el sodio, un metal, cede un electrón al cloro, un no metal. Ese tipo de unión se llama enlace",
+      "opciones": [
+        "covalente, porque los dos átomos comparten electrones.",
+        "de hidrógeno, porque se forma un compuesto estable.",
+        "metálico, porque uno de los elementos es un metal.",
+        "iónico, porque hay transferencia de electrones entre los átomos."
+      ],
+      "correcta": 3,
+      "explicacion": "Cuando un átomo cede electrones y otro los recibe, ambos quedan con carga eléctrica opuesta y se atraen: eso es un enlace iónico, típico entre metal y no metal. En el covalente, propio de dos no metales como en el agua, los electrones se comparten en vez de transferirse.",
+      "trampa": "El distractor «metálico, porque uno de los elementos es un metal» razona por la palabra y no por el proceso. El enlace metálico ocurre entre átomos de metal entre sí, no entre un metal y un no metal."
+    },
+    {
+      "id": "CN-017",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Químico",
+      "tema": "Balanceo de ecuaciones",
+      "dificultad": 4,
+      "enunciado": "La combustión del metano se representa así: CH₄ + O₂ → CO₂ + H₂O. Al balancear correctamente la ecuación, los coeficientes que faltan son",
+      "opciones": [
+        "CH₄ + 2O₂ → CO₂ + 2H₂O.",
+        "CH₄ + O₂ → CO₂ + H₂O (ya está balanceada).",
+        "2CH₄ + O₂ → 2CO₂ + H₂O.",
+        "CH₄ + 4O₂ → CO₂ + 4H₂O."
+      ],
+      "correcta": 0,
+      "explicacion": "Hay que tener los mismos átomos de cada elemento a ambos lados. Con CH₄ + 2O₂ → CO₂ + 2H₂O quedan 1 carbono, 4 hidrógenos y 4 oxígenos a cada lado. Balancear no es un capricho: expresa que la materia no se crea ni se destruye.",
+      "trampa": "El distractor de que «ya está balanceada» se marca al contar solo el carbono, que efectivamente cuadra. Cuenta SIEMPRE los tres elementos, empezando por el que aparece en menos compuestos."
+    },
+    {
+      "id": "CN-018",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Químico",
+      "tema": "Escala de pH",
+      "dificultad": 4,
+      "enunciado": "Una solución tiene pH 3 y otra pH 5. Comparadas entre sí, la de pH 3 es",
+      "opciones": [
+        "dos veces más ácida que la de pH 5.",
+        "cien veces más ácida que la de pH 5.",
+        "dos veces más básica que la de pH 5.",
+        "igual de ácida, porque ambas están por debajo de 7."
+      ],
+      "correcta": 1,
+      "explicacion": "La escala de pH es logarítmica: cada unidad hacia abajo multiplica por diez la concentración de iones hidrógeno. Entre pH 3 y pH 5 hay dos unidades, o sea 10 × 10 = 100 veces más ácida.",
+      "trampa": "El distractor «dos veces más ácida» resta 5 − 3 y toma la diferencia como si la escala fuera normal. En escalas logarítmicas, restar unidades equivale a multiplicar o dividir, nunca a sumar o restar."
+    },
+    {
+      "id": "CN-019",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Químico",
+      "tema": "Cambios de estado",
+      "dificultad": 3,
+      "enunciado": "El hielo seco (dióxido de carbono sólido) se convierte directamente en gas sin pasar por líquido. Ese cambio de estado se llama",
+      "opciones": [
+        "evaporación.",
+        "condensación.",
+        "sublimación.",
+        "fusión."
+      ],
+      "correcta": 2,
+      "explicacion": "La sublimación es el paso directo de sólido a gas, sin estado líquido intermedio. Ocurre con el hielo seco y también con la naftalina. La fusión es de sólido a líquido y la evaporación de líquido a gas.",
+      "trampa": "El distractor «evaporación» es el cambio a gas más conocido, pero parte de un líquido. Cuando la pregunta insista en «directamente» o «sin pasar por líquido», está señalando la sublimación."
+    },
+    {
+      "id": "CN-020",
+      "competencia": "Uso comprensivo del conocimiento científico",
+      "componente": "Químico",
+      "tema": "Concentración de soluciones",
+      "dificultad": 3,
+      "enunciado": "Se disuelven 20 gramos de sal en 180 gramos de agua. ¿Cuál es la concentración de la solución en porcentaje masa a masa?",
+      "opciones": [
+        "9 %",
+        "20 %",
+        "11 %",
+        "10 %"
+      ],
+      "correcta": 3,
+      "explicacion": "El porcentaje masa a masa es la masa del soluto dividida entre la masa TOTAL de la solución: 20 ÷ (20 + 180) = 20 ÷ 200 = 0,10, es decir 10 %.",
+      "trampa": "El distractor «11 %» sale de dividir los 20 gramos entre los 180 del agua, olvidando que la sal disuelta también hace parte de la solución. El denominador es soluto más solvente, siempre."
+    },
+    {
+      "id": "CN-021",
+      "competencia": "Indagación",
+      "componente": "Ciencia, tecnología y sociedad",
+      "tema": "Diseño experimental",
+      "dificultad": 4,
+      "contexto": "Un estudiante quiere saber si la cantidad de luz afecta el crecimiento del fríjol. Siembra cuatro materas idénticas, con la misma tierra, la misma cantidad de agua y la misma semilla, y las expone a distintas horas de luz al día. A las tres semanas mide la altura:\n\n| Matera | Horas de luz al día | Altura a las 3 semanas |\n|---|---|---|\n| 1 | 0 h | 4 cm |\n| 2 | 4 h | 11 cm |\n| 3 | 8 h | 19 cm |\n| 4 | 12 h | 20 cm |",
+      "enunciado": "En el experimento del estudiante, la matera 1 (0 horas de luz) cumple la función de",
+      "opciones": [
+        "grupo control, para comparar contra la ausencia del factor estudiado.",
+        "variable dependiente, porque es la que se mide.",
+        "error experimental, porque la planta casi no creció.",
+        "muestra descartable, porque no aporta información."
+      ],
+      "correcta": 0,
+      "explicacion": "El grupo control es aquel al que no se le aplica el factor que se está estudiando, y sirve de punto de comparación. Sin la matera sin luz no habría con qué contrastar el crecimiento de las demás, y no se podría afirmar que la diferencia se debe a la luz.",
+      "trampa": "El distractor «muestra descartable» es el error de fondo que el examen quiere detectar: el resultado que parece «no servir» suele ser el más importante, porque es el que permite atribuirle el efecto a la variable estudiada."
+    },
+    {
+      "id": "CN-022",
+      "competencia": "Indagación",
+      "componente": "Ciencia, tecnología y sociedad",
+      "tema": "Interpretación de resultados",
+      "dificultad": 5,
+      "contexto": "Un estudiante quiere saber si la cantidad de luz afecta el crecimiento del fríjol. Siembra cuatro materas idénticas, con la misma tierra, la misma cantidad de agua y la misma semilla, y las expone a distintas horas de luz al día. A las tres semanas mide la altura:\n\n| Matera | Horas de luz al día | Altura a las 3 semanas |\n|---|---|---|\n| 1 | 0 h | 4 cm |\n| 2 | 4 h | 11 cm |\n| 3 | 8 h | 19 cm |\n| 4 | 12 h | 20 cm |",
+      "enunciado": "¿Cuál conclusión se puede sostener con los datos obtenidos?",
+      "opciones": [
+        "A más horas de luz, el crecimiento aumenta siempre en la misma proporción.",
+        "El crecimiento aumenta con la luz, pero el aumento se hace menor después de 8 horas.",
+        "La luz no tiene ningún efecto sobre el crecimiento del fríjol.",
+        "Con 24 horas de luz la planta alcanzaría el doble de altura."
+      ],
+      "correcta": 1,
+      "explicacion": "De 0 a 4 horas la planta creció 7 cm, de 4 a 8 creció 8 cm, pero de 8 a 12 solo creció 1 cm. El efecto de la luz es claro, pero se va agotando: el crecimiento tiende a estabilizarse. Describir esa forma de la relación es leer bien los datos.",
+      "trampa": "El distractor de las 24 horas extrapola más allá del rango medido. Un experimento solo permite concluir sobre las condiciones que efectivamente se probaron; lo que pase con 24 horas es una hipótesis, no un resultado."
+    },
+    {
+      "id": "CN-023",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Ciencia, tecnología y sociedad",
+      "tema": "Efecto invernadero",
+      "dificultad": 4,
+      "enunciado": "El aumento de dióxido de carbono en la atmósfera contribuye al calentamiento global porque este gas",
+      "opciones": [
+        "impide que la luz del Sol llegue a la superficie terrestre.",
+        "destruye la capa de ozono que protege de la radiación.",
+        "retiene parte del calor que la superficie devuelve hacia el espacio.",
+        "aumenta directamente la temperatura del Sol."
+      ],
+      "correcta": 2,
+      "explicacion": "La luz solar atraviesa la atmósfera y calienta la superficie, que devuelve esa energía como radiación infrarroja. Los gases de efecto invernadero absorben parte de esa radiación de salida y la retienen: por eso el planeta se calienta. El efecto invernadero natural es indispensable; el problema es su intensificación.",
+      "trampa": "El distractor de la capa de ozono mezcla dos problemas ambientales distintos: el agujero de ozono lo causaron principalmente los clorofluorocarbonos y tiene que ver con la radiación ultravioleta, no con el calentamiento."
+    },
+    {
+      "id": "CN-024",
+      "competencia": "Explicación de fenómenos",
+      "componente": "Ciencia, tecnología y sociedad",
+      "tema": "Resistencia a los antibióticos",
+      "dificultad": 5,
+      "enunciado": "Un paciente suspende el antibiótico apenas se siente mejor, sin terminar el tratamiento. Esto favorece la aparición de bacterias resistentes porque",
+      "opciones": [
+        "las bacterias se acostumbran al medicamento y aprenden a resistirlo.",
+        "el cuerpo deja de producir defensas cuando recibe antibióticos.",
+        "el medicamento se transforma en una sustancia que alimenta a las bacterias.",
+        "sobreviven las bacterias menos sensibles y se reproducen sin competencia."
+      ],
+      "correcta": 3,
+      "explicacion": "El antibiótico elimina primero a las bacterias más sensibles. Si el tratamiento se corta, quedan vivas justamente las más resistentes, que ya no tienen con quién competir y se multiplican. Es selección natural ocurriendo en pocos días dentro del cuerpo del paciente.",
+      "trampa": "El distractor de que «se acostumbran y aprenden» es la versión intuitiva y equivocada: una bacteria individual no cambia para adaptarse. Lo que cambia es la composición de la población, porque unas mueren y otras no."
+    }
+  ]
+}

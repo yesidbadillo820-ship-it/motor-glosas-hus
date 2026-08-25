@@ -1,0 +1,138 @@
+════════════════════════════════════════════════════════════════════
+  HERRAMIENTAS PDF — PASO A PASO (para el analista de cartera)
+  Suite Cartera HUS · ESE Hospital Universitario de Santander
+════════════════════════════════════════════════════════════════════
+
+Esta guía es para USAR el bot de PDF sin saber nada de programación.
+Cubre las 26 utilidades de PDF que trae la Suite: ordenar, convertir,
+editar, proteger y las funciones con Inteligencia Artificial.
+
+
+1) CÓMO ABRIR EL BOT
+--------------------
+   1. Doble clic en  INICIAR_SUITE.bat
+   2. Cuando abra la ventana, clic en el botón verde  «🧰 Herramientas PDF»
+   3. Se abre una ventana con todas las operaciones agrupadas. Clic en la
+      que necesite; la Suite le pedirá el archivo (y datos como páginas o
+      clave) y hará el trabajo.
+
+   TODO lo que genere el bot queda en:
+       SALIDAS\HERRAMIENTAS_PDF\
+   (use el botón «📂 Abrir carpeta de SALIDAS» para llegar rápido).
+
+
+2) QUÉ HACE CADA GRUPO (en cristiano, para cartera)
+---------------------------------------------------
+   ORDENAR
+     Unir ............ pega varios PDF en uno (p. ej. factura + soportes).
+     Dividir ......... parte un PDF grande en varios.
+     Eliminar/Extraer  quita o conserva ciertas páginas.
+     Reordenar ....... cambia el orden de las páginas.
+     Rotar ........... endereza páginas acostadas.
+
+   OPTIMIZAR
+     Comprimir ....... baja el peso de un PDF pesado para poder radicarlo.
+     Reparar ......... intenta arreglar un PDF que no abre bien.
+
+   IMÁGENES
+     Imágenes → PDF .. junta fotos/pantallazos en un PDF.
+     PDF → Imágenes .. saca cada página como imagen (para pantallazos).
+
+   EDITAR
+     Marca de agua ... estampa un texto (p. ej. "COPIA - HUS").
+     Números de pág. . numera las páginas.
+     Recortar ........ recorta los márgenes.
+
+   SEGURIDAD
+     Proteger ........ le pone contraseña al PDF.
+     Desbloquear ..... le quita la contraseña (hay que conocerla).
+     Censurar ........ TACHA datos sensibles y los BORRA del archivo
+                       (no es solo pintar negro encima: el texto desaparece).
+
+   CONVERTIR (Office)      << necesita LibreOffice, ver punto 3 >>
+     Office → PDF .... Word/Excel/PowerPoint/HTML  a PDF.
+     PDF → Word ...... para editar un PDF recibido.
+     PDF → Excel ..... saca las tablas de un PDF a Excel (¡glosas!).
+     PDF → PowerPoint  cada página como diapositiva.
+     PDF → PDF/A ..... versión "archivable" que piden algunos portales.
+
+   PDF INTELLIGENCE (IA)   << necesita internet + clave, ver punto 4 >>
+     Resumir con IA .. resumen ejecutivo del documento.
+     Traducir PDF .... traduce a otro idioma (queda en Word).
+     PDF → Markdown .. pasa el PDF a texto Markdown.
+     OCR ............. saca el texto AUNQUE el PDF sea un escaneo.
+
+   HUS
+     PDF ↔ .cmd ...... el truco de renombrar para el portal.
+
+
+3) PARA LAS CONVERSIONES DE OFFICE: INSTALAR LIBREOFFICE (una sola vez)
+----------------------------------------------------------------------
+   Las opciones «Office → PDF» y «PDF → PDF/A» usan LibreOffice (gratis).
+   Si no está instalado, la Suite se lo avisa y no pasa nada malo.
+
+   Instalación (una vez por equipo):
+     1. Entre a:  https://es.libreoffice.org/descarga/
+     2. Descargue e instale con las opciones por defecto (Siguiente,
+        Siguiente, Instalar).
+     3. Listo. La Suite lo detecta sola; no hay que configurar nada.
+
+   (Las conversiones PDF → Word / Excel / PowerPoint NO necesitan
+    LibreOffice: funcionan siempre.)
+
+
+4) PARA LAS FUNCIONES DE IA: CONFIGURAR LA CLAVE (GEMINI_API_KEY)
+----------------------------------------------------------------
+   Resumir, Traducir, Markdown y OCR usan la misma Inteligencia Artificial
+   (Google Gemini) que el motor de glosas. Necesitan DOS cosas:
+       a) Internet.
+       b) La clave GEMINI_API_KEY  (la MISMA del motor de glosas;
+          pídala al área de Sistemas si no la tiene).
+
+   Cómo dejar la clave puesta en el equipo (Windows) — RECOMENDADO:
+     1. Menú Inicio → escriba:  variables de entorno
+     2. Abra «Editar las variables de entorno del sistema».
+     3. Botón «Variables de entorno…».
+     4. En «Variables de usuario» → «Nueva…»
+            Nombre:  GEMINI_API_KEY
+            Valor :  (pegue aquí la clave)
+     5. Aceptar en todas las ventanas.
+     6. CIERRE y vuelva a abrir la Suite (para que tome la clave).
+
+   Alternativa rápida (solo para esa sesión, por consola):
+       set GEMINI_API_KEY=su_clave_aqui
+
+   IMPORTANTE: la clave es como una contraseña. No la comparta por correo
+   ni la escriba en archivos que se suban al repositorio.
+
+
+5) EJEMPLOS POR CONSOLA (opcional, para quien automatiza)
+---------------------------------------------------------
+   Lo mismo que los botones, pero escribiéndolo. En la carpeta de la Suite:
+       python suite_cli.py pdf unir factura.pdf soporte.pdf -o COMPLETO.pdf
+       python suite_cli.py pdf comprimir cuenta_grande.pdf
+       python suite_cli.py pdf pdf2excel glosas_coosalud.pdf
+       python suite_cli.py pdf office2pdf carta_objecion.docx
+       python suite_cli.py pdf ocr escaneo_soporte.pdf
+       python suite_cli.py pdf traducir contrato.pdf --idioma inglés
+   Ver TODAS las operaciones:
+       python suite_cli.py pdf --help
+
+
+6) PROBLEMAS COMUNES
+--------------------
+   «Dice que falta LibreOffice»
+        → Instálelo (punto 3). Solo lo piden Office→PDF y PDF→PDF/A.
+
+   «Dice que falta GEMINI_API_KEY»
+        → Configure la clave (punto 4) y reabra la Suite. Solo la piden
+          las 4 funciones de IA; el resto del bot funciona sin ella.
+
+   «La IA se demora»
+        → Traducir/OCR/Markdown van página por página; un documento de
+          muchas páginas toma su tiempo. Verá el avance en la consola.
+
+   «El resultado no aparece»
+        → Está en  SALIDAS\HERRAMIENTAS_PDF\  (botón «Abrir carpeta»).
+
+════════════════════════════════════════════════════════════════════

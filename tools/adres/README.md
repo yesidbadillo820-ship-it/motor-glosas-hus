@@ -9,6 +9,7 @@ correr **desde cualquier PC**: rutas por parámetro, sin nada hardcodeado.
 | Script | Fase | Qué hace | Dependencia |
 |---|---|---|---|
 | `inspeccionar_soportes.py` | ✅ | Inventaría una carpeta de factura, clasifica cada soporte al código ADRES y lee el RIPS/CUV/FEV | stdlib |
+| `validar_furips.py` | ✅ | **Bot de validación FURIPS**: malla Circular 022/2023 + cruce contra soportes (RIPS, CUV, FEV, factura PDF, epicrisis) + informe Excel masivo. Ver `README_validar_furips.md` | openpyxl, pypdf/pdfplumber |
 | `rips_lectura.py` | ✅ | Módulo compartido: parseo y normalización del RIPS | stdlib |
 | `generar_fur_servicios.py` | ✅ | Excel **FUR SERVICIOS** pre-rellenado desde el RIPS | openpyxl |
 | `generar_fur.py` | ⬜ | Excel **FUR** (autollena víctima desde RIPS+aviso; resto manual/IPAT) | openpyxl |
@@ -41,6 +42,15 @@ py generar_fur_servicios.py ^
     --carpeta "C:\...\FACTURAS\HUS428139" ^
     --salida  "C:\...\FACTURAS\HUS428139_FURSERVICIOS.xlsx"
 ```
+
+## Radicación masiva multi-entidad
+
+El procesamiento de **muchas facturas** con reporte (lo que figuraba como
+`cargar_masivo_adres.py`) y, además, la radicación ante **cualquier entidad**
+(no solo ADRES) vive ahora en `../radicar_facturacion.py`. Reutiliza estos
+mismos parsers (`rips_lectura.py`, `factura_lectura.py`), tipifica los soportes,
+valida la completitud por entidad y arma carpetas + ZIP. Ver
+`../README_radicar_facturacion.md`.
 
 ## Nombramiento ADRES de soportes (para el ZIP final)
 

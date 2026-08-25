@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,21 +11,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth import get_password_hash
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import AuditLogRecord, UsuarioRecord
-
-
-def _lunes_pasado():
-    """Lunes de la semana pasada (7-13 días atrás), a las 00:00.
-
-    Se usa en vez de una fecha fija para que los tests no caduquen cuando esa
-    fecha se sale de la ventana de días que consulta el endpoint.
-    """
-    ahora = ahora_utc()
-    return (ahora - timedelta(days=ahora.weekday() + 7)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
 
 
 @pytest.fixture
@@ -93,9 +80,13 @@ class TestHeatmapUsuario:
         assert d["total_eventos"] == 0
 
     def test_filtra_por_usuario(self, client, db_session):
-        lunes = _lunes_pasado()
-        _seed(db_session, "alice@x", lunes.replace(hour=10))
-        _seed(db_session, "bob@x", lunes.replace(hour=10))
+        # La fecha va relativa a hoy, no clavada en el calendario. Estaba
+        # escrita 20-04-2026 con ventana de 120 días: el 18-08-2026 el evento
+        # salió de la ventana por unas horas y la prueba empezó a fallar sola,
+        # sin que nadie tocara el código.
+        hace_un_mes = datetime.now(timezone.utc) - timedelta(days=30)
+        _seed(db_session, "alice@x", hace_un_mes)
+        _seed(db_session, "bob@x", hace_un_mes)
 
         r = client.get("/admin/heatmap-usuario?usuario_email=alice@x&dias=120")
         d = r.json()

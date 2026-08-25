@@ -32,13 +32,22 @@ class EmailService:
         if not SMTP_DISPONIBLE:
             logger.warning("smtplib no disponible. Correos no se enviarán.")
 
-    def enviar_alerta_glosas(self, glosas: list, dias_limite: int = 5) -> tuple[bool, str]:
+    def enviar_alerta_glosas(
+        self,
+        glosas: list,
+        dias_limite: int = 5,
+        destinatarios: Optional[List[str]] = None,
+    ) -> tuple[bool, str]:
         """
         Envía correo con glosas próximas a vencer.
 
         Args:
             glosas: Lista de glosas con dias_restantes <= dias_limite
             dias_limite: Umbral de días para alertar
+            destinatarios: A quién enviarle ESTE correo. Si no se indica, se
+                usa la lista global de ALERTAS_EMAIL (comportamiento previo).
+                El Motor de Vencimientos lo usa para mandarle a cada persona
+                un solo correo con lo suyo, en vez de la misma lista a todos.
 
         Returns:
             tuple: (exito, mensaje)
@@ -53,7 +62,7 @@ class EmailService:
         if not glosas:
             return True, "No hay glosas para alertar"
 
-        destinatarios = self._obtener_destinatarios()
+        destinatarios = destinatarios or self._obtener_destinatarios()
         if not destinatarios:
             return False, "No hay destinatarios configurados"
 

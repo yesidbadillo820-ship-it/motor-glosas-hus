@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_auditor_o_superior
 from app.models.db import UsuarioRecord
 from app.services.validador_dictamen import evaluar_dictamen
 
@@ -23,7 +23,7 @@ class ValidarRequest(BaseModel):
 @router.post("/pre-radicacion")
 def validar_pre_radicacion(
     req: ValidarRequest,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Corre el checklist de 10 puntos sobre el dictamen. Retorna score, veredicto y detalle."""
     resultado = evaluar_dictamen(
