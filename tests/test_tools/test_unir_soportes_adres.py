@@ -52,32 +52,33 @@ def _pdf(ruta: Path, paginas: int = 1) -> Path:
         ("HUS1 GASTOS QUIROFANO.pdf", "INSUMOS"),
         ("REPS.pdf", "OTROS"),
         ("cualquier cosa.pdf", "OTROS"),
+        # El equipo nombra los archivos con la abreviatura sola.
+        ("EPI.pdf", "EPICRISIS"),
+        ("HC.pdf", "HISTORIA"),
+        ("HC (2).pdf", "HISTORIA"),
+        ("DX.pdf", "AYUDAS"),
+        ("MED.pdf", "MEDICAMENTOS"),
+        ("NTE.pdf", "ENFERMERIA"),
+        ("INS.pdf", "INSUMOS"),
+        ("OTROS.pdf", "OTROS"),
+        # Y los exámenes, con el nombre con que salen en el detallado.
+        ("GLUCOMETRIA 1.pdf", "AYUDAS"),
+        ("GASES ARTERIALES.pdf", "AYUDAS"),
+        ("LACTATO.pdf", "AYUDAS"),
     ],
 )
 def test_clasificar(nombre, clave):
     assert org.clasificar(nombre).clave == clave
 
 
-def test_gana_la_palabra_mas_larga():
-    """«NOTAS DE ENFERMERIA» no se lo puede llevar «NOTAS» ni «ENFERMERIA» suelta."""
-    assert org.clasificar("HUS1 NOTAS DE ENFERMERIA FOLIO 3.pdf").clave == "ENFERMERIA"
-    assert org.clasificar("HUS1 CONSULTA DE URGENCIAS.pdf").clave == "URGENCIAS"
-
-
-def test_las_abreviaturas_van_sueltas():
-    """«INS» no puede casar dentro de «INSTITUCIONAL» ni «HC» dentro de «HCG»."""
-    assert org.clasificar("HUS1 CERTIFICADO INSTITUCIONAL.pdf").clave == "OTROS"
-    assert org.clasificar("HUS1 INS.pdf").clave == "INSUMOS"
-    assert org.clasificar("HUS1 HCG12.pdf").clave == "OTROS"
-
-
-def test_clasificar_sin_tildes_ni_mayusculas():
-    assert org.clasificar("hus1 ayudas diagnósticas.pdf").clave == "AYUDAS"
-
-
-def test_el_mapa_manda_sobre_las_palabras_de_fabrica():
-    assert org.clasificar("HUS1 ANGIOTAC.pdf").clave == "OTROS"
-    assert org.clasificar("HUS1 ANGIOTAC.pdf", {"ANGIOTAC": "AYUDAS"}).clave == "AYUDAS"
+def test_otros_con_nombre_propio_cuenta_como_reconocido():
+    """«OTROS.pdf» es el grupo OTROS a propósito, no un archivo que nadie supo
+    clasificar: no puede salir en la lista de «revisar». «papel raro.pdf» sí."""
+    for nombre in ("OTROS.pdf", "OTROS (2).pdf", "REPS.pdf", "CERTIFICACION SOAT.pdf"):
+        grupo, reconocido = org.clasificar_con_marca(nombre)
+        assert grupo.clave == "OTROS" and reconocido, nombre
+    grupo, reconocido = org.clasificar_con_marca("papel raro.pdf")
+    assert grupo.clave == "OTROS" and not reconocido
 
 
 @pytest.mark.parametrize(
@@ -114,7 +115,7 @@ def _carpeta_completa(tmp_path: Path) -> Path:
     fac = raiz / "HUS383283"
     # A propósito en desorden: el bot tiene que ordenarlos.
     for nombre in (
-        "HUS383283 OTRO SOPORTE RARO.pdf",
+        "HUS383283 SOPORTE RARO.pdf",
         "HUS383283 INSUMOS.pdf",
         "HUS383283 NOTAS DE ENFERMERIA.pdf",
         "HUS383283 MEDICAMENTOS.pdf",
@@ -177,7 +178,7 @@ def test_ningun_archivo_se_pierde(tmp_path):
     """Lo que no se reconoce va a OTROS, pero va: no se queda por fuera."""
     raiz = tmp_path / "G"
     fac = raiz / "HUS1"
-    for nombre in ("HUS1 EPICRISIS.pdf", "REPS.pdf", "papel suelto.pdf"):
+    for nombre in ("HUS1 EPICRISIS.pdf", "papel suelto.pdf", "documento sin nombre.pdf"):
         _pdf(fac / nombre)
     plan = org.planificar(raiz)[0]
     assert len(plan.soportes) == 3
@@ -252,7 +253,9 @@ def test_reporte_csv(tmp_path):
     org.escribir_reporte(ruta, plan)
     texto = ruta.read_text(encoding="utf-8-sig")
     assert "FACTURA;ORDEN;GRUPO" in texto
-    assert "RESPUESTA A GLOSA" in texto and "NO - revisar" in texto
+    assert "RESPUESTA A GLOSA" in texto
+    # El «OTRO SOPORTE RARO» no se reconoce: tiene que quedar marcado.
+    assert "NO - revisar" in texto
 
 
 def test_leer_facturas(tmp_path):

@@ -134,6 +134,20 @@ GRUPOS: tuple[Grupo, ...] = (
             "RESONANCIA",
             "ELECTROMIOGRAFIA",
             "NEUROCONDUCCION",
+            # Así vienen nombrados los PDF de exámenes: con el nombre con que
+            # salen en el detallado (bloques LABORATORIOS e IMAGENOLOGIA).
+            "GLUCOMETRIA",
+            "GASES ARTERIALES",
+            "LACTATO",
+            "HEMOGRAMA",
+            "CUADRO HEMATICO",
+            "PARCIAL DE ORINA",
+            "CREATININA",
+            "IONOGRAMA",
+            "PORTATILES",
+            "ECOCARDIOGRAMA",
+            "DOPPLER",
+            "ENDOSCOPIA",
             "DX",
         ),
     ),
@@ -163,9 +177,12 @@ GRUPOS: tuple[Grupo, ...] = (
             "INS",
         ),
     ),
-    Grupo(13, "OTROS", "OTROS", ()),  # cajón final: todo lo que no se reconoce
+    # OTROS es a la vez un grupo con nombre propio —el equipo nombra archivos
+    # «OTROS.pdf»— y el cajón donde cae lo que no se reconoce. Con sus palabras,
+    # un OTROS.pdf sale RECONOCIDO y no como algo que el auditor deba mirar.
+    Grupo(13, "OTROS", "OTROS", ("OTROS", "OTRO", "SOAT", "CERTIFICACION", "REPS")),
 )
-GRUPO_OTROS = GRUPOS[-1]
+GRUPO_OTROS = next(g for g in GRUPOS if g.clave == "OTROS")
 
 # El detallado NO entra al PDF: la lista lo pide en Excel, aparte.
 PALABRAS_DETALLADO = ("DETALLADO", "DETALLE DE FACTURA")
@@ -201,6 +218,23 @@ def clasificar(nombre: str, mapa: dict[str, str] | None = None) -> Grupo:
     return mejor[1]
 
 
+def clasificar_con_marca(nombre: str, mapa: dict[str, str] | None = None) -> tuple[Grupo, bool]:
+    """(grupo, ¿lo reconoció de verdad?).
+
+    OTROS es a la vez un grupo con nombre propio y el cajón de lo desconocido:
+    un archivo llamado «OTROS.pdf» está bien clasificado y NO debe salir en la
+    lista de «revisar»; uno llamado «papel raro.pdf» sí.
+    """
+    grupo = clasificar(nombre, mapa)
+    if grupo is not GRUPO_OTROS:
+        return grupo, True
+    limpio = _norm(nombre)
+    caso = any(_es_palabra(_norm(p), limpio) for p in GRUPO_OTROS.palabras if _norm(p))
+    if mapa and not caso:
+        caso = any(_norm(p) and _norm(p) in limpio for p in mapa)
+    return grupo, caso
+
+
 def _es_palabra(aguja: str, pajar: str) -> bool:
     """¿Aparece `aguja` como palabra completa dentro de `pajar`?
 
@@ -225,11 +259,8 @@ class Soporte:
 
     ruta: Path
     grupo: Grupo
+    reconocido: bool = True
     paginas: int = 0
-
-    @property
-    def reconocido(self) -> bool:
-        return self.grupo is not GRUPO_OTROS
 
 
 @dataclass
@@ -291,7 +322,11 @@ def planificar(
                 continue
             pdfs.append(ruta)
         # Dentro de cada grupo, orden natural por el nombre del archivo.
-        soportes = [Soporte(ruta=p, grupo=clasificar(p.name, mapa)) for p in pdfs]
+        soportes = [
+            Soporte(ruta=p, grupo=g, reconocido=ok)
+            for p in pdfs
+            for g, ok in [clasificar_con_marca(p.name, mapa)]
+        ]
         soportes.sort(key=lambda s: (s.grupo.orden, clave_natural(s.ruta.name)))
         fac.soportes = soportes
         fac.destino = sub / f"{numero}{SUFIJO_UNIDO}.pdf"
