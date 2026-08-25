@@ -2139,6 +2139,72 @@ def _solo_normas_citables(normas_clave: str | None) -> str:
     return " | ".join(citables)
 
 
+def _no_afirmar_contrato_vencido(dictamen: str, eps: str = "") -> str:
+    """Quita del dictamen la afirmación de que un contrato vencido sigue vigente.
+
+    POR QUÉ (25-08-2026). Los dictámenes GL-118 y GL-119 salieron diciendo que
+    el contrato 440-DIGSA/DMBUG-2025 «PERMANECE VIGENTE HASTA 30 DE JULIO DE
+    2026» — y ese día ya había pasado hacía casi un mes. En el mismo documento,
+    el encabezado decía «CONTRATO CON VIGENCIA TERMINADA». O sea que el papel
+    que se radica ante la entidad se contradecía solo.
+
+    La causa de fondo se corrigió en el prompt (el renglón se llamaba «Contrato
+    vigente» aunque su contenido dijera «terminada», y así se le entregaba una
+    contradicción a la IA). Esto es la red de abajo: si aun así el dictamen lo
+    afirma, la afirmación se cambia por una que no miente.
+
+    NO se borra la mención del contrato: nombrarlo es correcto y muchas veces
+    necesario. Lo que se quita es el «sigue vigente».
+    """
+    if not dictamen:
+        return dictamen
+    try:
+        from app.services.glosa_ia_prompts import get_contrato
+
+        if not (get_contrato(eps or "") or {}).get("_vigencia_vencida"):
+            return dictamen
+    except Exception:
+        return dictamen
+
+    reemplazos = [
+        (
+            # OJO: solo la AFIRMACIÓN, nunca el número del contrato. La primera
+            # versión de este patrón se comía «440-DIGSA/DMBUG-2025» al pasar
+            # por delante — y borrar el número es justo lo que no se debe
+            # hacer: nombrar el contrato es correcto, lo que sobra es el
+            # «sigue vigente». Lo cazó la prueba antes de que llegara a
+            # producción.
+            re.compile(
+                r"\bPERMANECE\s+VIGENTE(?:\s+HASTA\s+[^.,;]{0,40})?",
+                re.IGNORECASE,
+            ),
+            "RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+        (
+            re.compile(r"\bCONTRATO\s+(?:SE\s+ENCUENTRA\s+)?VIGENTE\b", re.IGNORECASE),
+            "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+        (
+            re.compile(r"\bSE\s+ENCUENTRA\s+EN\s+EJECUCI[ÓO]N\b", re.IGNORECASE),
+            "RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+        (
+            re.compile(r"\bCONTRATO\s+VIGENTE\s+HASTA\s+[^.,;]{0,40}", re.IGNORECASE),
+            "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
+    ]
+    resultado, total = dictamen, 0
+    for patron, texto in reemplazos:
+        resultado, n = patron.subn(texto, resultado)
+        total += n
+    if total:
+        logger.warning(
+            f"[CONTRATO-VENCIDO] {total} afirmación(es) de vigencia neutralizada(s): "
+            f"el contrato de «{eps}» ya venció y el dictamen decía que sigue vigente"
+        )
+    return resultado
+
+
 def _neutralizar_art_177_relleno(
     dictamen: str,
     texto_glosa: str | None = None,
@@ -8236,6 +8302,9 @@ class GlosaService:
                 # Ronda 18 (Bug Y): si la glosa cita CTR-XXXX-XXX-HUS y el
                 # dictamen dice "SIN CONTRATO PACTADO", reescribirlo.
                 _dict_y = _reescribir_negacion_contrato(_dict_u, texto_glosa=_texto_glosa_input_md)
+                # 25-08-2026: un contrato vencido no «permanece vigente». Ver
+                # _no_afirmar_contrato_vencido — GL-118 y GL-119.
+                _dict_y = _no_afirmar_contrato_vencido(_dict_y, eps=str(data.eps or ""))
                 # Ronda 18 (Bug Z): audita cláusulas evadidas (no modifica;
                 # registra warning para que el gestor revise).
                 try:
