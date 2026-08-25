@@ -1,5 +1,44 @@
 # Registro de cambios
 
+## Sesión 25-ago-2026 — `unir_soportes_adres.py` + arreglo del desglose huérfano
+
+### `unir_soportes_adres.py` (nuevo)
+Une los soportes de cada carpeta de factura en un solo `<FACTURA>_SOPORTES.pdf`,
+en el orden de la lista del área (13 grupos, de RESPUESTA A GLOSA a OTROS). El
+detallado queda fuera del PDF: la lista lo pide en Excel.
+
+Clasifica por nombre de archivo con dos reglas que evitan los falsos positivos:
+gana la **palabra más larga** («NOTAS DE ENFERMERIA» sobre «NOTAS»), y las
+abreviaturas cortas se buscan como **palabra completa** (`INS` no casa dentro de
+`INSTITUCIONAL`). Lo no reconocido va a OTROS y sale marcado en el reporte.
+`--mapa-nombres` agrega palabras sin tocar el código.
+
+Reusa `unir_pdfs` / `clave_natural` de `unir_pdfs_carpetas.py` — la unión y el
+orden natural ya estaban resueltos; aquí solo se agrega la capa de orden.
+
+Simula por defecto (`--aplicar` para escribir), se excluye a sí mismo de la
+entrada (idempotente) y un PDF ilegible se omite sin tumbar el lote. Avisa las
+facturas sin RESPUESTA A GLOSA o sin EPICRISIS.
+
+Incluye `UNIR_SOPORTES_ADRES.cmd` (CRLF), guía en español y 42 pruebas.
+
+### `ajustar_detallado_glosas.py` — desglose huérfano
+**Defecto:** cada ítem se decidía por separado. Cuando la entidad aprobaba el
+procedimiento (CUPS, que no aparece en el reporte del ADRES porque este glosa
+con códigos SOAT) pero seguía glosando sus componentes, el principal se quitaba
+y los componentes quedaban huérfanos: el detallado mostraba honorarios y
+derechos de sala sin decir de qué cirugía eran. El auditor tuvo que rehacer a
+mano la HUS383283.
+
+**Arreglo:** una pasada previa marca los principales cuyo desglose sobrevive y
+los conserva con la acción nueva `ACCION_ENCABEZADO` — se ven, pero no suman al
+subtotal, porque su valor ya está en los renglones de desglose. La condición de
+"no suma" de los hijos se corrigió en consecuencia (`id(padre) not in
+rescatados`), para que el valor no se pierda ni se cuente dos veces.
+
+2 pruebas nuevas: el principal se queda como encabezado y no suma; y si su
+desglose también se fue, se va como siempre.
+
 ## Sesión 25-ago-2026 (noche) — 2.ª auditoría del lote: el Decreto 4747 tenía tres artículos inventados
 
 Un segundo auditor revisó las mismas 117 respuestas con otro método: contrastó

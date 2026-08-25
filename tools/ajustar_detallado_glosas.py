@@ -159,6 +159,10 @@ _RE_FACTURA = re.compile(r"HUS\s?0*\d{4,12}", re.IGNORECASE)
 # Tolerancia en pesos al comparar valores (redondeos del portal).
 TOLERANCIA_PESOS = 1.0
 
+# El renglón principal que la entidad aprobó pero que se conserva porque sus
+# renglones de desglose siguen glosados. Se ve en el detallado; no suma.
+ACCION_ENCABEZADO = "ENCABEZADO"
+
 
 # ─── Normalización ───────────────────────────────────────────────────────────
 
@@ -1416,6 +1420,29 @@ def procesar_factura(
             ultimo = i
     sobrevive: dict[int, bool] = {}
 
+    # Un renglón de desglose no se sostiene solo. Si la entidad aprobó el
+    # procedimiento que lo encabeza pero sigue glosando sus componentes, al
+    # quitar el principal el detallado queda mostrando «servicios profesionales
+    # del cirujano», «derechos de sala» y «materiales» sin decir DE QUÉ CIRUGÍA
+    # son: así no se puede defender, y toca rehacerlo a mano.
+    #
+    # El principal vuelve como ENCABEZADO: se ve, pero NO suma al total —su
+    # valor ya está en los renglones de desglose que quedaron—.
+    rescatados: set[int] = set()
+    for bloque in bloques:
+        for item in bloque.items:
+            if not item.desglose:
+                continue
+            rep_hijo, _ = pares.get(posicion[id(item)], (None, ""))
+            if decidir(item, rep_hijo, modo_parcial, sin_cruce)[0] == "QUITADO":
+                continue
+            padre = padre_de.get(id(item))
+            if padre is None:
+                continue
+            rep_padre, _ = pares.get(posicion[id(padre)], (None, ""))
+            if decidir(padre, rep_padre, modo_parcial, sin_cruce)[0] == "QUITADO":
+                rescatados.add(id(padre))
+
     a_borrar: set[int] = set()
     subtotal = 0.0
     vivos_factura = 0
@@ -1425,6 +1452,13 @@ def procesar_factura(
         for item in bloque.items:
             rep, criterio = pares.get(posicion[id(item)], (None, ""))
             accion, cant, valor, nota = decidir(item, rep, modo_parcial, sin_cruce)
+            if id(item) in rescatados:
+                accion, cant, valor = ACCION_ENCABEZADO, item.cantidad, item.vr_ent
+                nota = (
+                    "La entidad lo aprobó, pero sigue glosando sus renglones de "
+                    "desglose: se conserva como encabezado para que se vea a qué "
+                    "servicio pertenecen"
+                )
             res.detalle.append(
                 ResultadoItem(
                     factura=fac.factura,
@@ -1458,7 +1492,16 @@ def procesar_factura(
             # Un renglón de desglose solo suma si el renglón que lo encabeza ya
             # NO está: si quedaran los dos, el valor se contaría dos veces.
             padre = padre_de.get(id(item))
-            if item.desglose and padre is not None and sobrevive.get(id(padre)):
+            if accion == ACCION_ENCABEZADO:
+                res.detalle[
+                    -1
+                ].observacion += " | no suma al total: sus renglones de desglose ya lo suman"
+            elif (
+                item.desglose
+                and padre is not None
+                and sobrevive.get(id(padre))
+                and id(padre) not in rescatados
+            ):
                 res.detalle[
                     -1
                 ].observacion += " | no suma al total: su renglón principal sigue en la factura"
