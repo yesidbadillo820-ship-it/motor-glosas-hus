@@ -6895,6 +6895,57 @@ ayer bajo cpimiento) cayó con la cacería elevada, el motor bueno arrancó a la
 14:45 bajo cartera, y las dos tareas de arranque quedaron por fin con la
 cuenta correcta y el permiso de lotes otorgado.
 
+---
+
+### 25-08 — Los paquetes de ADRES vuelven completos, y la pantalla se ordenó
+
+**1) La excepción de ADRES.** Pedido de Yesid: «los paquetes que son del ADRES,
+cuando se devuelven —así haya facturas en OK radicadas— se devuelven todas y
+toca volverlas a ingresar al sistema; pero cuando ya esté radicada no se debe
+dejar colocar en otro envío u oficio: es trabajar para que esto se pueda hacer
+**solo** para las del ADRES».
+
+Así quedó:
+
+- Al escribir un envío, una factura **de ADRES** que ya estaba radicada
+  **vuelve a entrar** como una ronda nueva, queda pendiente de auditar y el
+  historial anota por qué: «ADRES devolvió el paquete completo: esta factura ya
+  estaba RADICADA en el oficio tal y vuelve a auditarse».
+- **Para las demás entidades no cambia nada:** una radicada sigue sin poder
+  moverse. Es la regla que evita cobrar dos veces la misma factura.
+- **No le gasta el cupo de las 3 devoluciones.** Ese contador es de las
+  devoluciones que hace pre-auditoría a facturación; que ADRES nos devuelva el
+  paquete no es una devolución nuestra. Si contara, tres paquetes devueltos
+  dejarían la factura bloqueada sin razón.
+- **«Ver antes» lo avisa** antes de cargar: «🔁 N factura(s) de ADRES ya estaban
+  radicadas y van a volver a entrar».
+- Y si el envío se quitó por error con la ✕ o con la 🗑, la factura vuelve a
+  **RADICADA** —no a «devuelta»—: nadie la devolvió nunca.
+
+**2) El ruido visual.** Yesid: «hay mucho ruido visual, todos los botones ahí
+todos juntos, sin nada de profesionalismo y estética». Se ordenó así:
+
+- Los botones de cada fila van ahora en **una sola barra**, del mismo alto, con
+  la misma separación y pegados a la derecha — en las cuatro tablas, no solo en
+  una: oficios, facturas del oficio, consolidado y oficios de devolución.
+- El **lápiz de corregir el número ya se dibuja**: era un emoji que ese
+  navegador no sabía pintar (salía una rayita) y ahora es un dibujo propio, igual
+  en todos los computadores. Los botones de solo dibujo llevan su explicación al
+  pasar el mouse.
+- Las columnas de números (Facturas, Pend., OK, Dev.) van **alineadas a la
+  derecha** y con cifras del mismo ancho, para compararlas de un vistazo.
+- La columna de **envíos ya no estira la fila**: muestra los primeros seis y
+  «+N más», y la lista completa queda en el globo de ayuda.
+
+**Y una red de seguridad que faltaba:** ahora hay una prueba que **compila** el
+JavaScript de esta pantalla. Antes solo se revisaba el del portal principal, así
+que un error de escritura aquí dejaba la pantalla muerta sin que ninguna prueba
+se enterara.
+
+15 pruebas nuevas (152 en el módulo, 309 con las de pantalla).
+
+---
+
 ## 3) PENDIENTE
 
 ### Del motor de glosas, después de la revisión del 25-08

@@ -1083,7 +1083,7 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
     )
     src = facturas_de_envio(db, envio)
     facturas = []
-    nuevas = reingresos = radicadas = pendientes_otro = 0
+    nuevas = reingresos = radicadas = pendientes_otro = reingresos_adres = 0
     alertas = []
     for r in src:
         canon = (
@@ -1102,8 +1102,14 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
                     f"{r.factura} lleva {canon.num_devoluciones} devoluciones: solo radicar/escalar"
                 )
         elif canon.resultado_actual == RESULTADO_RADICAR:
-            clasif = "YA_RADICADA"
-            radicadas += 1
+            # ADRES devuelve el paquete completo: sus radicadas SÍ vuelven a entrar
+            # (regla de Cartera, 25-08-2026). Las de las demás entidades no.
+            if es_adres(r.nit, r.entidad):
+                clasif = "REINGRESO_ADRES"
+                reingresos_adres += 1
+            else:
+                clasif = "YA_RADICADA"
+                radicadas += 1
         else:  # PENDIENTE
             clasif = "YA_ABIERTA"
             pendientes_otro += 1
@@ -1134,6 +1140,7 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
         "total_en_fuente": len(src),
         "nuevas": nuevas,
         "reingresos": reingresos,
+        "reingresos_adres": reingresos_adres,
         "ya_radicadas": radicadas,
         "ya_abiertas": pendientes_otro,
         "alertas_limite_devoluciones": alertas,
@@ -1165,6 +1172,9 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
       MAX_OFICIOS_POR_ENVIO oficios distintos. Al recargar, reingresan las
       facturas devueltas; las radicadas y las aún pendientes se omiten con
       su advertencia.
+    - EXCEPCIÓN ADRES: ADRES devuelve el PAQUETE completo, así traiga facturas
+      ya radicadas. Solo para esa entidad, una factura RADICADA vuelve a entrar
+      como una ronda nueva (sin gastar el cupo de las 3 devoluciones).
     """
     envio = str(envio).strip()
     cargas = (
@@ -1203,7 +1213,7 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
             "envio": envio,
         }
 
-    nuevas = reingresos = omitidas = 0
+    nuevas = reingresos = omitidas = reingresos_adres = 0
     alertas = []
     advertencias = []
     # TODO el volcado va dentro del try: si otra petición simultánea escribe
@@ -1271,6 +1281,56 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
                         f"{r.factura} ya lleva {canon.num_devoluciones} devoluciones: "
                         "solo debería radicarse o escalarse."
                     )
+            elif canon.resultado_actual == RESULTADO_RADICAR and es_adres(r.nit, r.entidad):
+                # ADRES DEVUELVE EL PAQUETE COMPLETO (regla de Cartera, 25-08-2026).
+                #
+                # Para todas las demás entidades, una factura radicada NO se vuelve
+                # a mover: entrar dos veces sería cobrarla dos veces. ADRES trabaja
+                # distinto: no devuelve facturas sueltas, devuelve el PAQUETE, y
+                # vuelven todas — incluidas las que pre-auditoría ya había dado por
+                # buenas. Esas tienen que poder entrar otra vez.
+                #
+                # Se reusa el evento REINGRESO a propósito (no un tipo nuevo): el
+                # registro de envíos se reconstruye contando ESCRITA y REINGRESO
+                # (tools/preauditoria_reconstruir_envios.py) y un tipo inventado
+                # dejaría esos envíos fuera de la cuenta. El motivo del evento dice
+                # que vino de ADRES, que es lo que el auditor necesita leer.
+                venia_de = canon.oficio_fhus or "otro oficio"
+                canon.ronda_actual += 1
+                canon.num_subsanacion = canon.ronda_actual - 1
+                canon.envio_actual = envio
+                canon.oficio_actual_id = oficio.id
+                canon.oficio_fhus = oficio.numero_radicado
+                canon.f_recibido = oficio.fecha_recibido
+                canon.resultado_actual = RESULTADO_PENDIENTE
+                canon.estado = ESTADO_EN_SUBSANACION
+                canon.pendiente_subsanacion = 0
+                canon.auditor = None
+                canon.fecha_auditoria = None
+                canon.oficio_devolucion_id = None
+                # num_devoluciones NO se toca: ese contador es el cupo de 3
+                # devoluciones que hace la PRE-AUDITORÍA a facturación, el que
+                # bloquea la factura. Que ADRES nos devuelva el paquete no es una
+                # devolución nuestra y no puede gastar ese cupo.
+                db.flush()
+                db.add(
+                    _nuevo_evento(
+                        canon,
+                        "REINGRESO",
+                        oficio=oficio,
+                        fuente=fuente,
+                        usuario=usuario,
+                        motivo=(
+                            f"ADRES devolvió el paquete completo: esta factura ya estaba "
+                            f"RADICADA en {venia_de} y vuelve a auditarse."
+                        ),
+                    )
+                )
+                reingresos_adres += 1
+                advertencias.append(
+                    f"{r.factura} estaba radicada en {venia_de}: ADRES devuelve el paquete "
+                    "completo, así que volvió a entrar para auditarse."
+                )
             elif canon.resultado_actual == RESULTADO_RADICAR:
                 omitidas += 1
                 advertencias.append(f"{r.factura} ya estaba radicada: no se reingresó.")
@@ -1281,7 +1341,7 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
                     "resuélvala primero."
                 )
 
-        if cargas and not nuevas and not reingresos:
+        if cargas and not nuevas and not reingresos and not reingresos_adres:
             # Recarga que no trajo nada: ninguna factura del envío estaba devuelta.
             # Se permite (la regla es hasta 3 oficios) pero se avisa con claridad.
             advertencias.append(
@@ -1298,7 +1358,7 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
                 oficio_id=oficio.id,
                 total_facturas=len(src),
                 nuevas=nuevas,
-                reingresos=reingresos,
+                reingresos=reingresos + reingresos_adres,
                 cargado_por=usuario,
             )
         )
@@ -1342,6 +1402,7 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
         "total_en_fuente": len(src),
         "nuevas": nuevas,
         "reingresos": reingresos,
+        "reingresos_adres": reingresos_adres,
         "omitidas": omitidas,
         "alertas_limite_devoluciones": alertas,
         "advertencias": advertencias,
@@ -1708,16 +1769,28 @@ def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int
             db.delete(f)
             borradas += 1
         else:
-            # Reingreso: revertir a la devolución anterior sin perder historial.
+            # Reingreso: revertir al estado que la factura tenía ANTES de entrar a
+            # este oficio, sin perder historial. Ese estado es el del último evento
+            # que cerró una ronda en OTRO oficio. Casi siempre es una devolución —la
+            # subsanación de toda la vida—, pero en los paquetes de ADRES puede ser
+            # una RADICADA que volvió a entrar porque ADRES devolvió el paquete
+            # completo: a esa hay que devolverla a RADICADA, no inventarle una
+            # devolución que nunca ocurrió.
             evento_dev = (
                 db.query(FacturaEventoRecord)
                 .filter(
                     FacturaEventoRecord.factura_id == f.id,
-                    FacturaEventoRecord.tipo_evento.in_(["DEVUELTA", "NUEVAMENTE_DEVUELTA"]),
+                    FacturaEventoRecord.tipo_evento.in_(
+                        ["DEVUELTA", "NUEVAMENTE_DEVUELTA", "RADICADA", "SUBSANADA"]
+                    ),
                     FacturaEventoRecord.oficio_id != oficio_id,
                 )
                 .order_by(FacturaEventoRecord.creado_en.desc(), FacturaEventoRecord.id.desc())
                 .first()
+            )
+            venia_radicada = evento_dev is not None and evento_dev.tipo_evento in (
+                "RADICADA",
+                "SUBSANADA",
             )
             db.query(FacturaEventoRecord).filter(
                 FacturaEventoRecord.factura_id == f.id,
@@ -1725,21 +1798,29 @@ def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int
             ).delete(synchronize_session=False)
             f.ronda_actual -= 1
             f.num_subsanacion = max(0, f.ronda_actual - 1)
-            f.resultado_actual = RESULTADO_DEVUELTA
-            f.pendiente_subsanacion = 1
-            if f.num_devoluciones >= MAX_DEVOLUCIONES:
-                f.estado = ESTADO_BLOQUEADA
-            elif f.ronda_actual == 1:
-                f.estado = ESTADO_DEVUELTA_PEND
+            if venia_radicada:
+                f.resultado_actual = RESULTADO_RADICAR
+                f.pendiente_subsanacion = 0
+                f.estado = ESTADO_SUBSANADA if f.num_devoluciones else ESTADO_RADICADA
             else:
-                f.estado = ESTADO_NUEV_DEVUELTA
+                f.resultado_actual = RESULTADO_DEVUELTA
+                f.pendiente_subsanacion = 1
+                if f.num_devoluciones >= MAX_DEVOLUCIONES:
+                    f.estado = ESTADO_BLOQUEADA
+                elif f.ronda_actual == 1:
+                    f.estado = ESTADO_DEVUELTA_PEND
+                else:
+                    f.estado = ESTADO_NUEV_DEVUELTA
             if evento_dev:
                 f.envio_actual = evento_dev.envio
                 f.oficio_actual_id = evento_dev.oficio_id
                 f.oficio_fhus = evento_dev.oficio_fhus
                 f.f_recibido = evento_dev.f_recibido
                 f.auditor = evento_dev.auditor
-                f.motivo_ultima_devolucion = evento_dev.motivo
+                # El "motivo de la última devolución" solo tiene sentido si lo que
+                # se recupera ES una devolución: en una RADICADA ese campo sería
+                # una frase de radicación disfrazada de motivo de devolución.
+                f.motivo_ultima_devolucion = None if venia_radicada else evento_dev.motivo
                 f.fecha_auditoria = evento_dev.creado_en
                 # Si esa devolución ya había salido en un oficio con
                 # consecutivo emitido, la factura vuelve amarrada a él. Sin

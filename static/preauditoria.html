@@ -40,6 +40,17 @@
   .btn-rojo{background:var(--rojo); color:#fff;}
   .btn-chico{padding:4px 10px; font-size:.78rem;}
   .btn:disabled{opacity:.5; cursor:not-allowed;}
+  /* ACCIONES DE CADA FILA (25-08-2026). Antes los botones se apilaban en
+     dos renglones, de distinto alto y sin alineación: la tabla se veía
+     desordenada. Ahora van en una sola barra, del mismo alto y con la
+     misma separación, pegados a la derecha. */
+  .acciones{display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:nowrap;}
+  td.col-acciones{white-space:nowrap; text-align:right; vertical-align:middle;}
+  .btn-ico{display:inline-flex; align-items:center; justify-content:center; width:30px; height:26px; padding:0; line-height:1;}
+  .btn-ico svg{width:15px; height:15px; display:block; pointer-events:none;}
+  /* Números en columna: alineados a la derecha y con cifras del mismo ancho,
+     para poder compararlos de un vistazo. */
+  th.num, td.num{text-align:right; font-variant-numeric:tabular-nums;}
   table{width:100%; border-collapse:collapse; font-size:.82rem;}
   th{background:var(--azul-claro); color:var(--azul-osc); text-align:left; padding:8px; border-bottom:2px solid var(--borde); white-space:nowrap;}
   td{padding:7px 8px; border-bottom:1px solid var(--borde); vertical-align:top;}
@@ -180,7 +191,7 @@
     <div class="tbl-scroll"><table>
       <thead><tr><th id="th-sel" style="display:none"><input type="checkbox" onclick="selTodos(this)"></th>
         <th>Radicado</th><th>Recibido</th><th>Recepcionó</th><th>Auditor(es)</th><th>Plazo</th><th>Envíos</th>
-        <th>Facturas</th><th>Pend.</th><th>OK</th><th>Dev.</th><th></th></tr></thead>
+        <th class="num">Facturas</th><th class="num">Pend.</th><th class="num">OK</th><th class="num">Dev.</th><th></th></tr></thead>
       <tbody id="tb-oficios"></tbody></table></div>
     <div class="pager" id="pg-oficios"></div>
   </div>
@@ -316,6 +327,11 @@ if (!TOKEN) { alert('Debes iniciar sesión primero'); location.href = '/'; }
 document.getElementById('hd-user').textContent = localStorage.getItem('hus_user') || '';
 var USER_ROL = (localStorage.getItem('hus_rol') || '').toUpperCase();
 var ES_ADMIN = (USER_ROL === 'SUPER_ADMIN' || USER_ROL === 'COORDINADOR');
+// Iconos dibujados, no emojis: el ✏ (U+270F) no se dibuja en el navegador del
+// hospital —sale una rayita— y dos botones seguidos con distinta pinta se ven
+// desordenados. Un SVG se ve igual en todos los computadores.
+var ICO_LAPIZ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
+var ICO_BASURA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>';
 // Cada auditor puede deshacer LO SUYO (mientras no haya salido en un oficio
 // de devolución entregado). El servidor manda; esto solo evita que el botón
 // se vea habilitado para algo que va a rebotar.
@@ -463,10 +479,17 @@ async function cargarOficios(page){
     else tb.innerHTML=d.items.map(function(o){
       // Si el envío no dejó todas sus facturas aquí se muestra "quedaron/traía"
       // (0/1), para que no cuadre a la fuerza 5 envíos con 4 facturas.
-      var envs=o.envios_escritos.map(function(e){
+      var lista=o.envios_escritos.map(function(e){
         var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
         return esc(e.envio)+'('+(hay===e.total_facturas?e.total_facturas:hay+'/'+e.total_facturas)+')';
-      }).join(' ');
+      });
+      // Un oficio puede traer 20 envíos y ese bloque de texto hacía la fila tres
+      // veces más alta que las demás. Se muestran los primeros y el resto se
+      // cuenta; la lista completa queda en el globo de ayuda de la celda.
+      var TOPE_ENV=6;
+      var envs=(lista.length>TOPE_ENV
+        ? lista.slice(0,TOPE_ENV).join(' ')+' <span class="leyenda">+'+(lista.length-TOPE_ENV)+' más</span>'
+        : lista.join(' '));
       var auds=(o.auditores||[]).join(', ');
       return '<tr>'+
         (ES_ADMIN ? '<td><input type="checkbox" class="sel-oficio" value="'+o.id+'"></td>' : '')+
@@ -474,14 +497,17 @@ async function cargarOficios(page){
         '<td>'+fBog(o.fecha_recibido)+'</td>'+
         '<td>'+esc(o.recepcionado_por||'—')+'</td>'+
         '<td>'+esc(auds||'—')+'</td>'+
-        '<td>'+semHtml(o.semaforo)+'</td><td class="mono" style="font-size:.75rem">'+(envs||'—')+'</td>'+
-        '<td><b>'+o.total_facturas+'</b></td><td>'+o.pendientes+'</td><td style="color:var(--verde)">'+o.radicar+'</td>'+
-        '<td style="color:var(--rojo)">'+o.devueltas+'</td>'+
-        '<td><button class="btn btn-borde btn-chico" onclick="abrirOficio('+o.id+')">Abrir</button>'+
-        (o.tiene_adres ? ' <button class="btn btn-verde btn-chico" title="Excel con la información completa para ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ ADRES</button>' : '')+
-        (ES_ADMIN ? ' <button class="btn btn-borde btn-chico" title="Corregir el número del oficio (quedó mal digitado)" onclick="corregirOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">✏</button>' : '')+
-        (ES_ADMIN ? ' <button class="btn btn-rojo btn-chico" onclick="eliminarOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">🗑</button>' : '')+
-        '</td></tr>';
+        '<td>'+semHtml(o.semaforo)+'</td>'+
+        '<td class="mono" style="font-size:.75rem" title="'+esc(lista.join(' '))+'">'+(envs||'—')+'</td>'+
+        '<td class="num"><b>'+o.total_facturas+'</b></td><td class="num">'+o.pendientes+'</td>'+
+        '<td class="num" style="color:var(--verde)">'+o.radicar+'</td>'+
+        '<td class="num" style="color:var(--rojo)">'+o.devueltas+'</td>'+
+        '<td class="col-acciones"><div class="acciones">'+
+          '<button class="btn btn-borde btn-chico" onclick="abrirOficio('+o.id+')">Abrir</button>'+
+          (o.tiene_adres ? '<button class="btn btn-verde btn-chico" title="Excel con la información completa para ADRES" onclick="descargarAdres('+o.id+',\''+esc(o.numero_radicado)+'\')">⬇ ADRES</button>' : '')+
+          (ES_ADMIN ? '<button class="btn btn-borde btn-chico btn-ico" title="Corregir el número del oficio (quedó mal digitado)" aria-label="Corregir el número del oficio" onclick="corregirOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">'+ICO_LAPIZ+'</button>' : '')+
+          (ES_ADMIN ? '<button class="btn btn-rojo btn-chico btn-ico" title="Eliminar este oficio" aria-label="Eliminar este oficio" onclick="eliminarOficio('+o.id+',\''+esc(o.numero_radicado)+'\')">'+ICO_BASURA+'</button>' : '')+
+        '</div></td></tr>';
     }).join('');
     pager(document.getElementById('pg-oficios'),d,'cargarOficios');
   }catch(e){ errorTabla('tb-oficios', cols, e); }
@@ -518,10 +544,11 @@ async function abrirOficio(id){
         // Si ya salió en un oficio de devolución se dice cuál: así se entiende
         // por qué no vuelve a entrar en el próximo.
         (f.consecutivo_devolucion?'<br><span class="leyenda">📄 ya salió en '+esc(f.consecutivo_devolucion)+'</span>':'')+'</td>'+
-        '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
+        '<td class="col-acciones"><div class="acciones">'+
+        '<button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button>'+
         '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button>'+
-        (ES_ADMIN?' <button class="btn btn-rojo btn-chico" title="Quitar esta factura del oficio (entró por error)" onclick="quitarFactura('+o.id+','+f.id+',\''+esc(f.factura)+'\')">🗑</button>':'')+
-        '</td></tr>';
+        (ES_ADMIN?'<button class="btn btn-rojo btn-chico btn-ico" title="Quitar esta factura del oficio (entró por error)" aria-label="Quitar esta factura del oficio" onclick="quitarFactura('+o.id+','+f.id+',\''+esc(f.factura)+'\')">'+ICO_BASURA+'</button>':'')+
+        '</div></td></tr>';
     }).join('');
     // Cada chip dice cuántas facturas del envío quedaron DE VERDAD en el
     // oficio. Antes decía siempre cuántas traía la fuente, y por eso se veían
@@ -605,6 +632,12 @@ async function previewEnvio(id){
       h+='<div class="aviso aviso-warn">Este envío ya salió en <b>'+esc(enOtros)+'</b> y ninguna de sus facturas está devuelta: cargarlo aquí no moverá ninguna factura.</div>';
     }
     h+='<div class="aviso aviso-ok">Trae <b>'+p.total_en_fuente+'</b> factura(s): '+p.nuevas+' nuevas, '+p.reingresos+' subsanaciones, '+p.ya_radicadas+' ya radicadas.</div>';
+    // ADRES devuelve el paquete completo: sus facturas ya radicadas vuelven a
+    // entrar. Se anuncia ANTES de cargar, porque es la excepción a la regla de
+    // que una radicada no se mueve.
+    if(p.reingresos_adres>0){
+      h+='<div class="aviso aviso-info">🔁 <b>'+p.reingresos_adres+'</b> factura(s) de <b>ADRES</b> ya estaban radicadas y van a volver a entrar para auditarse: ADRES devuelve el paquete completo. No gastan cupo de devoluciones.</div>';
+    }
     // Facturas que la fuente arrastra de un cargue anterior: puede que
     // facturación ya las haya sacado del envío (el DGH mostraría una menos).
     (p.avisos_fuente||[]).forEach(function(a){ h+='<div class="aviso aviso-warn">🕵️ '+esc(a)+'</div>'; });
@@ -617,7 +650,9 @@ async function commitEnvio(id){
   if(!env){ msg.innerHTML='<div class="aviso aviso-err">Escriba el envío.</div>'; return; }
   try{ var d=await api('/preauditoria/oficios/'+id+'/envios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({envio:env})});
     if(d.ya_cargado){ msg.innerHTML='<div class="aviso aviso-warn">'+esc(d.mensaje)+'</div>'; return; }
-    var h='<div class="aviso aviso-ok">Cargado: <b>'+d.nuevas+'</b> nuevas, '+d.reingresos+' subsanaciones'+(d.omitidas?', '+d.omitidas+' omitidas':'')+'.</div>';
+    var h='<div class="aviso aviso-ok">Cargado: <b>'+d.nuevas+'</b> nuevas, '+d.reingresos+' subsanaciones'+
+      (d.reingresos_adres?', '+d.reingresos_adres+' reingresadas por devolución de ADRES':'')+
+      (d.omitidas?', '+d.omitidas+' omitidas':'')+'.</div>';
     (d.alertas_limite_devoluciones||[]).forEach(function(a){ h+='<div class="aviso aviso-err">⚠️ '+esc(a)+'</div>'; });
     (d.advertencias||[]).forEach(function(a){ h+='<div class="aviso aviso-warn">'+esc(a)+'</div>'; });
     msg.innerHTML=h;
@@ -709,8 +744,10 @@ async function cargarConsolidado(page){
         '<td>'+esc(f.envio||'—')+'</td><td>'+esc(f.entidad||'—')+'</td><td>'+cop(f.valor)+'</td>'+
         '<td>'+esc(f.correo_fe||'')+'</td><td>'+estadoChip(f.estado)+'</td><td>'+f.ronda+'</td>'+
         '<td>'+f.num_subsanacion+'</td><td>'+f.num_devoluciones+'/'+f.max_devoluciones+'</td><td>'+esc(f.auditor||'—')+'</td>'+
-        '<td><button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button> '+
-        '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">👁 Ver</button></td></tr>';
+        '<td class="col-acciones"><div class="acciones">'+
+        '<button class="btn btn-azul btn-chico" onclick="abrirAuditar('+f.id+')">Auditar</button>'+
+        '<button class="btn btn-borde btn-chico" onclick="verHist(\''+esc(f.factura)+'\')">Ver</button>'+
+        '</div></td></tr>';
     }).join('');
     pager(document.getElementById('pg-consolidado'),d,'cargarConsolidado');
   }catch(e){ errorTabla('tb-consolidado', 11, e); }
@@ -850,9 +887,10 @@ async function cargarDevoluciones(page){
     else tb.innerHTML=d.items.map(function(o){
       return '<tr><td class="mono"><b>'+esc(o.consecutivo)+'</b></td><td>'+fBog(o.fecha_generado)+'</td>'+
         '<td class="mono">'+esc(o.oficio_radicado||'—')+'</td><td>'+o.total_facturas+'</td><td>'+cop(o.total_valor)+'</td>'+
-        '<td>'+esc(o.generado_por||'—')+'</td><td><button class="btn btn-borde btn-chico" onclick="verPdf(\''+o.pdf_url+'\')">📄 PDF</button>'+
-        (ES_ADMIN?' <button class="btn btn-rojo btn-chico" title="Eliminar este oficio de devolución" onclick="eliminarOficioDevolucion('+o.id+',\''+esc(o.consecutivo)+'\','+o.total_facturas+')">🗑</button>':'')+
-        '</td></tr>';
+        '<td>'+esc(o.generado_por||'—')+'</td><td class="col-acciones"><div class="acciones">'+
+        '<button class="btn btn-borde btn-chico" onclick="verPdf(\''+o.pdf_url+'\')">PDF</button>'+
+        (ES_ADMIN?'<button class="btn btn-rojo btn-chico btn-ico" title="Eliminar este oficio de devolución" aria-label="Eliminar este oficio de devolución" onclick="eliminarOficioDevolucion('+o.id+',\''+esc(o.consecutivo)+'\','+o.total_facturas+')">'+ICO_BASURA+'</button>':'')+
+        '</div></td></tr>';
     }).join('');
     pager(document.getElementById('pg-devoluciones'),d,'cargarDevoluciones');
   }catch(e){ errorTabla('tb-devoluciones', 7, e); }
