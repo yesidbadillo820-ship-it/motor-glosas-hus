@@ -25,6 +25,76 @@ import unicodedata
 # ═══════════════════════════════════════════════════════════════════
 
 LEYES = {
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "LEY 1564 DE 2012": {
+        "nombre": "Ley 1564 de 2012 (Congreso de la Republica)",
+        "titulo": "Codigo General del Proceso",
+        "ambito": "Cobro judicial de la cartera y valor probatorio de la factura",
+        "vigente": True,
+        "notas": (
+            "Sirve para sostener que la factura y el acta de conciliacion prestan merito "
+            "ejecutivo (Art. 422). Se usa al preparar el cobro, no como argumento de fondo de la "
+            "glosa."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["codigo general del proceso", "merito ejecutivo", "factura", "cobro judicial"],
+    },
+    "LEY 1618 DE 2013": {
+        "nombre": "Ley Estatutaria 1618 de 2013 (Congreso de la Republica)",
+        "titulo": "Derechos de las personas con discapacidad",
+        "ambito": "Atencion integral y sin barreras al paciente con discapacidad",
+        "vigente": True,
+        "notas": (
+            "Respalda la habilitacion y rehabilitacion integral cuando la EPS glosa servicios de "
+            "un paciente con discapacidad alegando que no estan cubiertos."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["discapacidad", "atencion integral", "rehabilitacion", "ley estatutaria"],
+    },
+    "LEY 2277 DE 2022": {
+        "nombre": "Ley 2277 de 2022 (Congreso de Colombia)",
+        "titulo": "Reforma tributaria para la igualdad y la justicia social",
+        "ambito": "Solo para asuntos tributarios de la factura",
+        "vigente": True,
+        "notas": (
+            "El motor la cita por su articulo 89 para la UVB del manual tarifario SOAT. OJO: es "
+            "una reforma TRIBUTARIA; en una glosa solo sirve para IVA, retenciones y la unidad de "
+            "valor, no como fundamento clinico ni contractual."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["reforma tributaria", "UVB", "unidad de valor basico", "articulo 89"],
+    },
+    "LEY 776 DE 2002": {
+        "nombre": "Ley 776 de 2002 (Congreso de la Republica)",
+        "titulo": "Prestaciones del Sistema General de Riesgos Profesionales",
+        "ambito": "De quien es la cuenta cuando el evento es de origen laboral",
+        "vigente": True,
+        "notas": (
+            "Sirve cuando la EPS glosa una atencion alegando que el origen es laboral (o al "
+            "reves): define las prestaciones que cubre el sistema de riesgos y quien responde por "
+            "ellas."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["riesgos laborales", "origen laboral", "ARL", "prestaciones"],
+    },
+    "LEY 789 DE 2002": {
+        "nombre": "Ley 789 de 2002 (Congreso de la Republica)",
+        "titulo": "Apoyo al empleo y ampliacion de la proteccion social",
+        "ambito": "Acreditacion del pago de aportes al sistema (Art. 50)",
+        "vigente": True,
+        "notas": (
+            "Su articulo 50 exige acreditar el pago de aportes a salud, pensiones, riesgos "
+            "laborales y cajas de compensacion. Se invoca cuando la entidad condiciona el pago a "
+            "requisitos de aportes."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["aportes al sistema", "articulo 50", "proteccion social"],
+    },
     "LEY 100 DE 1993": {
         "nombre": "Ley 100 de 1993",
         "titulo": "Por la cual se crea el Sistema de Seguridad Social Integral",
@@ -486,6 +556,65 @@ LEYES = {
 # ═══════════════════════════════════════════════════════════════════
 
 DECRETOS = {
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "DECRETO 1477 DE 2014": {
+        "nombre": "Decreto 1477 de 2014 (Ministerio del Trabajo)",
+        "titulo": "Tabla de Enfermedades Laborales",
+        "ambito": "Discusion de origen: laboral o comun",
+        "vigente": True,
+        "notas": (
+            "Sirve para sustentar de quien es la cuenta cuando la EPS glosa una atencion alegando "
+            "origen laboral: la tabla dice que enfermedades se presumen laborales."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["tabla de enfermedades laborales", "origen", "ARL"],
+    },
+    "DECRETO 1352 DE 2013": {
+        "nombre": "Decreto 1352 de 2013 (Ministerio del Trabajo)",
+        "titulo": "Juntas de Calificacion de Invalidez",
+        "ambito": "Quien decide la controversia de origen",
+        "vigente": True,
+        "notas": (
+            "Sirve en glosas de ARL: si la aseguradora alega que el evento no fue laboral sino "
+            "comun, esa discusion la resuelven las Juntas de Calificacion, no la auditoria de "
+            "cuentas."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["juntas de calificacion", "origen", "invalidez", "ARL"],
+    },
+    "DECRETO 1142 DE 2016": {
+        "nombre": "Decreto 1142 de 2016 (Presidencia — sector Justicia)",
+        "titulo": "Atencion en salud de la poblacion privada de la libertad",
+        "ambito": "PPL — servicios a cargo del fondo de atencion en salud",
+        "vigente": True,
+        "notas": (
+            "Sustenta que los servicios de salud de las personas privadas de la libertad se "
+            "prestan y se pagan por el esquema especial del INPEC/USPEC, no por el PBS regular."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["PPL", "privados de la libertad", "INPEC", "modelo de atencion"],
+    },
+    "DECRETO 2462 DE 2013": {
+        "nombre": "Decreto 2462 de 2013 (Presidencia — sector Salud)",
+        "titulo": "Estructura de la Superintendencia Nacional de Salud",
+        "ambito": "Inspeccion y vigilancia sobre EPS e IPS",
+        "vigente": False,
+        "derogada_por": (
+            "figura como no vigente; verificar la norma que reestructuro la Supersalud antes de "
+            "citarlo"
+        ),
+        "notas": (
+            "Servia para senalar que dependencia de la Supersalud ejerce la inspeccion y "
+            "vigilancia. Revisar la norma que lo reemplazo antes de citarlo."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["Supersalud", "inspeccion y vigilancia", "estructura"],
+    },
     # 11-jun-2026: el texto fijo DMBUG cita el art. 71 del Estatuto
     # Orgánico del Presupuesto (defensa "agotamiento presupuestal es
     # responsabilidad del contratante") y el verifier lo marcaba
@@ -755,6 +884,62 @@ DECRETOS = {
 # ═══════════════════════════════════════════════════════════════════
 
 RESOLUCIONES = {
+    "RESOLUCION 506 DE 2021": {
+        # Cargada el 25-08-2026. El motor la ofrecia en el prompt como
+        # "Resolucion 506/2021 DIAN" y no estaba en el corpus, asi que citarla
+        # producia una alarma roja de "norma inexistente". Verificada contra
+        # fuente oficial: NO es de la DIAN, la expidio el Ministerio de Salud
+        # el 19 de abril de 2021, y ya no rige.
+        "nombre": "Resolucion 506 de 2021 (MinSalud)",
+        "titulo": "Campos de datos adicionales del sector salud en la factura electronica",
+        "ambito": "Factura electronica en salud — campos adicionales del sector",
+        "vigente": False,
+        "derogada_por": (
+            "figura como no vigente; para la factura electronica en salud rige hoy la "
+            "Res. 948 de 2026"
+        ),
+        "notas": (
+            "Adopto el anexo tecnico de campos de datos adicionales del sector salud en "
+            "la factura electronica de venta. Solo aplica a servicios facturados mientras "
+            "estuvo vigente."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["factura electronica", "FEV", "campos del sector salud", "MinSalud"],
+    },
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "RESOLUCION 1403 DE 2007": {
+        "nombre": "Resolucion 1403 de 2007 (Ministerio de la Proteccion Social)",
+        "titulo": "Modelo de Gestion del Servicio Farmaceutico",
+        "ambito": "Glosas de medicamentos y dispositivos medicos",
+        "vigente": True,
+        "notas": (
+            "Fija como debe hacerse la prescripcion, la dispensacion y el registro de "
+            "medicamentos. Sirve para defender glosas de medicamentos por supuestos defectos de "
+            "formula o de entrega."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["servicio farmaceutico", "medicamentos", "prescripcion", "dispensacion"],
+    },
+    "RESOLUCION 3539 DE 2019": {
+        "nombre": "Resolucion 3539 de 2019 (MinSalud)",
+        "titulo": "Reporte de servicios negados por las EPS",
+        "ambito": "Solo para el tema de negacion de servicios",
+        "vigente": False,
+        "derogada_por": (
+            "figura como no vigente; verificar la norma que la reemplazo antes de citarla"
+        ),
+        "notas": (
+            "Obliga a la EPS a registrar y reportar al Ministerio los servicios que niega. NO es "
+            "una norma de habilitacion, como decia el catalogo del motor."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["servicios negados", "reporte", "EPS"],
+    },
     "RESOLUCION 2284 DE 2023": {
         "nombre": "Resolución 2284 de 2023 (MinSalud)",
         "titulo": "Manual Único de Devoluciones, Glosas y Respuestas",
@@ -2053,6 +2238,24 @@ JURISPRUDENCIA = {
 # ═══════════════════════════════════════════════════════════════════
 
 ACUERDOS = {
+    # ── Cargadas el 25-08-2026 ──────────────────────────────────────────
+    # Los prompts del motor ya le ofrecian estas normas a la IA, pero no
+    # estaban en el corpus con que se revisan las citas. Resultado: la IA las
+    # citaba (porque se lo pedimos) y el revisor las marcaba en rojo como
+    # "norma inexistente" sobre un dictamen que podia estar bien. Verificadas
+    # una por una contra fuente oficial antes de cargarlas.
+    "ACUERDO 080 DE 2022 CSSMP": {
+        "nombre": "Acuerdo 080 de 2022 (Consejo Superior de Salud de las FF.MM. y de Policia)",
+        "titulo": "Gestion farmaceutica del Subsistema de Salud de las Fuerzas Militares",
+        "ambito": "Sanidad Militar y de Policia — medicamentos cubiertos",
+        "vigente": True,
+        "notas": (
+            "Es la lista oficial de medicamentos cubiertos del subsistema (el MUMT) y las reglas "
+            "de dispensacion. Se cita en glosas de medicamentos de Dispensario y Sanidad Militar."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": ["sanidad militar", "MUMT", "gestion farmaceutica", "CSSMP"],
+    },
     "ACUERDO 002 DE 2001 CSSFFMM": {
         "nombre": "Acuerdo 002 del 27-04-2001 Consejo Superior de Salud FF.MM.",
         "titulo": "Régimen de atención y remuneración a IPS prestadoras",

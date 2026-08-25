@@ -385,11 +385,15 @@ CATALOGO_NORMAS = [
         "keywords": ["habilitación", "estándares", "servicios"],
     },
     {
-        "clave": "RESOLUCION 1604 DE 2022",
-        "nombre": "Resolución 1604 de 2022",
-        "titulo": "Estándares de habilitación — actualización 2022",
+        # Corregida el 25-08-2026 contra fuente oficial. No es una resolución
+        # de habilitación: es el DECRETO 1604 de 2022, que adiciona artículos al
+        # Decreto 1072 de 2015 sobre las instituciones educativas de las Cajas
+        # de Compensación. Nada que ver con habilitación de servicios de salud.
+        "clave": "DECRETO 1604 DE 2022",
+        "nombre": "Decreto 1604 de 2022",
+        "titulo": "Instituciones educativas de las Cajas de Compensación Familiar",
         "vigente": True,
-        "keywords": ["habilitación", "estándares", "2022"],
+        "keywords": ["cajas de compensación", "instituciones educativas"],
     },
     {
         "clave": "RESOLUCION 1995 DE 1999",
@@ -427,25 +431,32 @@ CATALOGO_NORMAS = [
         "keywords": ["PPL", "privados de libertad", "penitenciaria"],
     },
     {
+        # Corregida el 25-08-2026 contra fuente oficial. No es de habilitación:
+        # es el instrumento con que las EPS reportan al Ministerio los servicios
+        # que NIEGAN. Y figura como no vigente.
         "clave": "RESOLUCION 3539 DE 2019",
         "nombre": "Resolución 3539 de 2019",
-        "titulo": "Procedimientos y condiciones de habilitación de servicios de salud — complementaria",
-        "vigente": True,
-        "keywords": ["habilitación", "condiciones", "servicios"],
+        "titulo": "Reporte de servicios negados por las EPS",
+        "vigente": False,
+        "keywords": ["servicios negados", "reporte", "EPS"],
     },
     {
+        # Derogada por la Resolución DIAN 000165 del 1 de noviembre de 2023
+        # (verificado el 25-08-2026: su artículo 70 la deroga expresamente).
         "clave": "RESOLUCION 042 DE 2020 DIAN",
         "nombre": "Resolución 042 de 2020 DIAN",
         "titulo": "Factura Electrónica de Venta (FEV) — Habilitación",
-        "vigente": True,
+        "vigente": False,
         "keywords": ["factura electrónica", "FEV", "DIAN", "facturación"],
     },
     {
-        "clave": "RESOLUCION 506 DE 2021 DIAN",
-        "nombre": "Resolución 506 de 2021 DIAN",
-        "titulo": "Factura Electrónica de Venta — Actualización",
-        "vigente": True,
-        "keywords": ["factura electrónica", "FEV", "DIAN"],
+        # Corregida el 25-08-2026 contra fuente oficial. NO es de la DIAN: la
+        # expidió el Ministerio de Salud el 19 de abril de 2021. Y ya no rige.
+        "clave": "RESOLUCION 506 DE 2021",
+        "nombre": "Resolución 506 de 2021 (MinSalud)",
+        "titulo": "Campos de datos adicionales del sector salud en la factura electrónica",
+        "vigente": False,
+        "keywords": ["factura electrónica", "FEV", "campos del sector salud"],
     },
     {
         "clave": "RESOLUCION 054 DE 2026 ESE HUS",

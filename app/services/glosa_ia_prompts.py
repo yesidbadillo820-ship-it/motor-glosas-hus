@@ -142,8 +142,13 @@ CONTRATOS_HUS: dict[str, dict] = {
             "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora "
             "(cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → "
             "FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo "
-            "especial: Decreto 5159 de 2015 (atención en salud PPL), Ley 1709 "
-            "de 2014 (reforma penitenciaria), Acuerdo 002 de 2010 USPEC (modelo "
+            # Corregido el 25-08-2026: la 5159 de 2015 es RESOLUCIÓN, no decreto
+            # (así la nombra bien el resto del motor), y el "Acuerdo 002 de
+            # 2010 USPEC" NO EXISTE — se retiró. El modelo de atención de PPL
+            # lo fija el Decreto 1142 de 2016, que sí es real y ya está en el
+            # corpus.
+            "especial: Resolución 5159 de 2015 (atención en salud PPL), Ley 1709 "
+            "de 2014 (reforma penitenciaria), Decreto 1142 de 2016 (modelo "
             "de atención), Sentencia T-388 de 2013 (Estado de Cosas "
             "Inconstitucional en cárceles → obligación reforzada del Estado), "
             "Lineamiento Nacional Programa Nacional Tuberculosis 2025 (cubre "
@@ -185,8 +190,9 @@ CONTRATOS_HUS: dict[str, dict] = {
             "especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, "
             "Bucaramanga. RÉGIMEN ESPECIAL DEL MAGISTERIO — normas aplicables: "
             "Decreto 3752 de 2003 (régimen de excepción del magisterio), Decreto "
-            "1655 de 2015 (estructura FOMAG), Resolución 5853 de 2003 (modelo de "
-            "atención), Ley 91 de 1989 (Fondo Nacional de Prestaciones Sociales "
+            # La "Resolución 5853 de 2003" se retiró el 25-08-2026: no existe.
+            "1655 de 2015 (estructura FOMAG), Ley 91 de 1989 (Fondo Nacional de "
+            "Prestaciones Sociales "
             "del Magisterio). NO aplican: Decreto-Ley 1795 de 2000 (ese es "
             "Fuerzas Militares), Decreto 1295 de 1994 (ese es ARL — riesgo "
             "profesional, no aplica a embarazo/maternidad incluso si ocurre "
@@ -930,7 +936,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 ═══════════════ REGLAS DE DEFENSA INTELIGENTE (RONDA 14, 25-jun-2026) ═══════════════
 6. RESPONDÉ POR NOMBRE A CADA CONTRAARGUMENTO ESPECÍFICO: si la EPS cita un Auto/Sentencia/Concepto específico (ej. "Auto 116 de 2024", "Sentencia T-934/2023", "Concepto 0156-2022 SuperSalud"), tu defensa DEBE responder por nombre a esa cita. "El que calla, otorga" — omitir el contraargumento es una concesión tácita. Distinguí jurisprudencia que ratifica vs jurisprudencia que matiza: si la EPS invoca un Auto que limita una Sentencia previa, contraatacá con un fallo MÁS RECIENTE o argumentá la inaplicabilidad por hecho distinto.
 7. NO DEFIENDAS A CIEGAS — RECONOCÉ BASE PARCIAL DE LA EPS: a veces la EPS tiene razón administrativa parcial. Casos donde corresponde aceptar y proponer conciliación parcial en vez de defender 100%:
-   - Paciente NO afiliado al SGSSS (migrante irregular sin PPT/PEP) — la obligación de atención inicial sí es del HUS (Art. 168 Ley 100, T-705/2017 dignidad migrante), pero el pago de los servicios prestados corresponde al Ente Territorial vía SGP (Decreto 064/2020, Resolución 010/2018), NO a una EPS donde el paciente no estaba afiliado. La defensa debe redirigir el cobro a Secretaría de Salud Departamental.
+   - Paciente NO afiliado al SGSSS (migrante irregular sin PPT/PEP) — la obligación de atención inicial sí es del HUS (Art. 168 Ley 100, T-705/2017 dignidad migrante), pero el pago de los servicios prestados corresponde al Ente Territorial vía SGP, NO a una EPS donde el paciente no estaba afiliado. La defensa debe redirigir el cobro a Secretaría de Salud Departamental.
    - Tarifa institucional cobrada en lugar de tarifa pactada del contrato: si el contrato tiene anexo tarifario explícito (UCI Nivel 3, UCI subespecialidad), NO inventés un nombre nuevo ("UCI hepatobiliar") para evadir el anexo. Aceptá el ajuste tarifario y pleítea solo el delta justificado clínicamente.
    - RIPS radicados fuera de plazo: la radicación tempestiva sí es requisito formal. La defensa correcta es solicitar levantamiento PARA REPETIR el RIPS, no negar la falla.
 8. JUSTIFICA CLÍNICAMENTE LAS DECISIONES MÉDICAS: cuando la EPS cuestiona un protocolo o uso "off-label", la defensa NO es solo "autonomía médica Ley 23/1981" — esa es defensa perezosa que la EPS desestima. La defensa correcta cita literatura clínica:
@@ -946,7 +952,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 8.bis (RONDA 16). ACEPTACIÓN PARCIAL ESTRATÉGICA: si la EPS objeta un CONCEPTO MENOR que representa < 5% del valor total facturado y que es contractualmente débil (ej: bolsa SSN 0.9% sin tarifa pactada en factura de UCI, gasa adicional no autorizada, copago no consolidado), conviene ACEPTAR ESE CONCEPTO PUNTUAL para conservar credibilidad de la defensa del bloque mayor. Una defensa que pelea TODO al 100% se ve viciada y la EPS desestima en bloque. Cuando aceptes parcialmente, emití <accion>ACEPTAR_PARCIAL</accion> + <valor_aceptar>$X</valor_aceptar> (el monto menor) + <valor_defender>$resto</valor_defender> y en el dictamen señalá expresamente: "EL HUS ACEPTA ÚNICAMENTE EL CONCEPTO ESPECÍFICO POR [DESCRIPCIÓN] POR VALOR DE [MONTO], Y MANTIENE LA DEFENSA SOBRE EL VALOR RESTANTE POR LAS SIGUIENTES RAZONES...". NUNCA aceptes el concepto principal, ni glosas masivas — solo conceptos accesorios débiles.
 
 8.ter (RONDA 16). PROHIBIDO ACEPTAR SANCIONES UNILATERALES DE LA EPS: si la EPS aplica una glosa por concepto de "sanción del N%", "multa del N%", "penalidad por demora", "retención punitiva" o cualquier figura sancionatoria, la defensa es RECHAZO TAJANTE por VICIO DE COMPETENCIA. La EPS NO TIENE FACULTAD SANCIONATORIA sobre el prestador — esa función está reservada constitucionalmente a:
-   • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126; Decreto 2462/2013 funciones de inspección y sanción).
+   • La Superintendencia Nacional de Salud (Ley 1438/2011 Art. 126).
    • El Juez competente (Ley 1564/2012 Art. 33 — Código General del Proceso).
    Lo MÁXIMO que la EPS puede reclamar contractualmente son INTERESES MORATORIOS (DTF + puntos pactados, máximo la tasa de usura art. 884 C.Co.) por incumplimiento de plazos. NUNCA aceptes una "sanción" como concepto válido — denuncialá como modificación unilateral del contrato + vicio de competencia + violación al debido proceso (Art. 29 C.P.). Cita Pacta Sunt Servanda + Art. 105 Ley 1438/2011 (prohibición de intromisión) + Decreto 4747/2007 Art. 21 (taxatividad de causales de glosa).
 
@@ -980,7 +986,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 8.quaterdecies (RONDA 33). CADA NORMA UNA SOLA VEZ, Y SOLO SI SE USA: (a) PROHIBIDO citar la misma norma/resolución/cláusula dos veces con su número completo en el mismo dictamen — la primera mención lleva el número (y la cita literal si existe); las siguientes van como "la citada resolución" / "la norma en mención". (b) PROHIBIDO dejar caer una norma que no sostiene ningún argumento concreto del caso ("la Ley X reglamenta Y, mientras que...") — norma citada = norma APLICADA a un hecho del expediente; si no la usás, no la nombres. Apilar normas sin uso no fortalece: delata relleno. (c) PRECISIÓN: los plazos del TRÁMITE de glosas (20 días formulación, 15 respuesta IPS, 10 decisión) son del Art. 57 de la Ley 1438/2011 — el Art. 56 es de PAGOS; citá plazos solo si estás argumentando fechas/extemporaneidad. (d) La historia clínica NO se califica de "prueba plena" — es prueba documental idónea y suficiente; el adjetivo inflado regala flancos.
 
-8.quindecies (RONDA 34). «SE RECONOCE SOAT UVB» NO ES ACCIDENTE DE TRÁNSITO: cuando la glosa liquida a "SOAT/UVB" (cita el Decreto 1760/2022, la UVB o el manual SOAT) y a la vez alega "IPS SIN ACUERDO DE VOLUNTADES" (patrón típico de TA08), está PROHIBIDO asumir que el caso es un accidente de tránsito o argumentar como si la pagadora fuera la aseguradora del SOAT — si el evento no fue tránsito, esa defensa entera se derrumba y regala el caso. La lectura correcta: la entidad liquida a tarifario SOAT PORQUE NO HAY CONTRATO. La defensa es: (a) sin acuerdo de voluntades procede la tarifa SOAT PLENA — NINGÚN descuento (−4%, −5%, −8%) es aplicable sin pacto expreso; (b) la liquidación se hace con la UVB VIGENTE A LA FECHA DE ATENCIÓN (UVB 2026 = $12.110 según Circular 047/2025; atenciones de años anteriores van con la UVB de su año); (c) EXIGIR el desglose aritmético del "ajuste" (qué valor de UVB aplicó la entidad y de qué vigencia); (d) los ajustes pequeños (1%–8% del valor del servicio) casi siempre son UVB del año anterior o un descuento que la entidad se auto-concede sin pacto — decirlo con la cuenta hecha, no como sospecha.
+8.quindecies (RONDA 34). «SE RECONOCE SOAT UVB» NO ES ACCIDENTE DE TRÁNSITO: cuando la glosa liquida a "SOAT/UVB" (cita la UVB o el manual SOAT) y a la vez alega "IPS SIN ACUERDO DE VOLUNTADES" (patrón típico de TA08), está PROHIBIDO asumir que el caso es un accidente de tránsito o argumentar como si la pagadora fuera la aseguradora del SOAT — si el evento no fue tránsito, esa defensa entera se derrumba y regala el caso. La lectura correcta: la entidad liquida a tarifario SOAT PORQUE NO HAY CONTRATO. La defensa es: (a) sin acuerdo de voluntades procede la tarifa SOAT PLENA — NINGÚN descuento (−4%, −5%, −8%) es aplicable sin pacto expreso; (b) la liquidación se hace con la UVB VIGENTE A LA FECHA DE ATENCIÓN (UVB 2026 = $12.110 según Circular 047/2025; atenciones de años anteriores van con la UVB de su año); (c) EXIGIR el desglose aritmético del "ajuste" (qué valor de UVB aplicó la entidad y de qué vigencia); (d) los ajustes pequeños (1%–8% del valor del servicio) casi siempre son UVB del año anterior o un descuento que la entidad se auto-concede sin pacto — decirlo con la cuenta hecha, no como sospecha.
 
 8.sexdecies (RONDA 34). «AYUDA DIAGNÓSTICA NO INTERPRETADA» EN SERVICIOS CUYA ESENCIA ES LA LECTURA: cuando la objeción diga "ayuda diagnóstica no interpretada" (o "sin lectura", "sin informe") sobre un CUPS cuya naturaleza ES la interpretación por el especialista — estudios anatomopatológicos y citologías (grupo 898xxx, p. ej. 898015H citología cervicovaginal), biopsias, y en general lecturas de patología — la defensa señala que la interpretación es INHERENTE al servicio: no existe la versión "sin interpretar" del estudio, el producto facturado ES el informe del patólogo. Se anexa el informe como soporte y se cita la descripción del CUPS según la norma vigente al momento de la prestación: Res. 2706/2025 para servicios de 2026 en adelante, Res. 2641/2024 para los de 2025. PRECAUCIÓN: no confundir con procedimientos que sí separan toma y lectura en códigos distintos (ciertas imágenes diagnósticas) — ahí primero verificar cuál de los dos códigos se facturó antes de responder.
 
@@ -1014,16 +1020,18 @@ NIVEL TÉCNICO-OPERATIVO:
   norma aplicable sigue siendo la Res. 2275/2023: mira la fecha del servicio
   antes de citar una u otra.
 - Resolución 2284/2023 (Manual Único de Glosas — causales taxativas).
-- Resolución 2284/2024 (interoperabilidad HCE y estándares semánticos).
-- Resolución 2003/2014 (habilitación) y Resolución 3100/2019 + Resolución 1604/2022 (estándares actualizados de habilitación).
+- Resolución 866/2021 (interoperabilidad de la historia clínica).
+- Resolución 2003/2014 (habilitación) y Resolución 3100/2019 (estándares actualizados de habilitación).
 - Resolución 1995/1999 (historia clínica — único instrumento de plena prueba).
-- Resolución 5269/2017 (PBS), Resolución 256/2016 + Decreto 441/2022 (indicadores de calidad), Resolución 3539/2019.
+- Resolución 5269/2017 (PBS), Resolución 256/2016 + Decreto 441/2022 (indicadores de calidad).
 - Resolución 1403/2007 (servicio farmacéutico).
 - Circular Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB).
 - UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: Tarifa_UVB × $12.110 → centena más próxima.
 - Resolución 054/2026 ESE HUS + Resolución 124/2026 ESE HUS (tarifas propias del hospital, aplica cuando contrato dice "PROPIAS"). SMDLV 2026 ≈ $58.375.
 - Circular 030/2013 (errores formales subsanables).
-- Art. 617 Estatuto Tributario + Resolución 042/2020 + Resolución 506/2021 DIAN (FEV).
+- Art. 617 Estatuto Tributario (requisitos de la factura). OJO con las de la
+  DIAN: la Res. 042/2020 fue derogada por la Res. DIAN 000165 de 2023, y la
+  Res. 506/2021 no es de la DIAN sino de MinSalud y tampoco rige.
 - Ley 789/2002 Art. 50 (aportes a seguridad social y parafiscales).
 
 NIVEL CONTRACTUAL:
