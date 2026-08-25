@@ -132,6 +132,17 @@ sentencias.** Con ese antecedente había que mirar el resto, y apareció lo mism
   compensación, y la Resolución 010 de 2018 es de la DIAN y no dice nada del
   pago de migrantes, que era para lo que se citaba.
 
+- **Y una segunda resolución derogada, esta de un pagador nuestro.** La
+  Resolución 5159 de 2015, el modelo de atención en salud para la población
+  privada de la libertad, la derogó la Resolución 1099 de 2026. El prompt del
+  motor decía con todas sus letras «OBLIGACIÓN: citar SIEMPRE la Res.
+  5159/2015 al defender cobertura PPL», y el corpus la daba por vigente en dos
+  catálogos. Ahora el motor cita la Ley 1709 de 2014 —que vale en cualquier
+  caso— y la resolución que estuviera vigente **a la fecha de la atención**.
+- **Lo mismo con la CUPS.** El sistema tenía una «Resolución 2641 de 2025» que
+  no existe, y la que sí existe (2641 de 2024) está derogada desde enero por la
+  Resolución 2706 de 2025, que se cargó con su texto oficial.
+
 Tres cosas que salieron **a favor**: la Circular 007 de 2025 no era un
 «cronograma» sino una circular conjunta con la Superintendencia que **prohíbe
 imponerle barreras y exigencias no normadas a los prestadores**; la Resolución
@@ -180,7 +191,7 @@ respaldo), los Arts. 1 y 2 de la Ley 1438 y el Art. 1 de la Ley 1751.
 llevaba pegada una frase que es del Art. 1. Quedaron separados, cada uno con su
 texto oficial.
 
-Todo con pruebas: la suite completa quedó en **8.610 verdes** (los 12 rojos son
+Todo con pruebas: la suite completa quedó en **8.616 verdes** (los 12 rojos son
 de programas que no están instalados en la máquina de pruebas, ajenos al motor).
 
 ### Abril 2026 — Nace el Motor de Glosas
@@ -6891,6 +6902,13 @@ cuenta correcta y el permiso de lotes otorgado.
   confirmó mirando los dictámenes de la ronda 2 (sale una frase en el
   «Fundamento normativo» que ya se había quitado). Mientras no se reinicie,
   ninguna de estas correcciones está funcionando en la PC de cartera.
+- **Ojo con la fecha del servicio.** Varias normas que el motor citaba se
+  derogaron este año: la Res. 2275 de 2023 (factura electrónica y RIPS, la
+  reemplazó la Res. 948 de 2026), la Res. 5159 de 2015 (PPL, la reemplazó la
+  Res. 1099 de 2026) y la CUPS 2641 de 2024 (la reemplazó la Res. 2706 de
+  2025). Para atenciones anteriores siguen siendo las aplicables, así que el
+  motor ahora escoge según la fecha del servicio y el sistema avisa cuando la
+  cita ya no rige.
 - **Tres sentencias quedaron marcadas como NO VERIFICADAS** (T-313/2007,
   T-050/2017 y T-134/2022): el sitio de la Corte las sirve por JavaScript y no
   se pudo leer su texto. Ya no se citan en ningún dictamen. Si alguien consigue
