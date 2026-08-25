@@ -1,5 +1,81 @@
 # Registro de cambios
 
+## Sesión 25-ago-2026 (tarde) — Auditoría de las 117 respuestas del primer lote productivo
+
+Se pasaron por el revisor de citas las 117 respuestas que el motor generó con
+el archivo de recepción del día. Cinco defectos, cinco correcciones con prueba.
+
+### 1. CUPS que el motor nunca tuvo a la vista (12 respuestas)
+El archivo de recepción **no trae columna de CUPS**. La IA rellenaba el hueco
+con un número de seis cifras. La prueba de que era invento: el mismo `734101`
+nombró «radiografía de maxilar inferior» en un dictamen y «radiografía de
+pierna» en otro; el `730102`, «urgencias adultos» e «internación adultos
+complejidad alta».
+
+`_neutralizar_cups_sin_respaldo(texto, evidencia)` — misma regla que ya se
+aplicaba a los folios: si el código no está en lo que la IA leyó, no lo leyó.
+Se exige **además** que no se pueda verificar en el catálogo, para que un
+código real nunca se borre (lección de la Res. 2641 de 2024). Se retira solo el
+número; la descripción del servicio se conserva.
+
+### 2. El texto fijo del Dispensario declaraba vigente un contrato vencido (14)
+`TEXTO_DMBUG_TARIFAS` afirmaba «SE ENCUENTRA SUSCRITO Y **VIGENTE** EL CONTRATO
+440-DIGSA/DMBUG-2025 … CON PLAZO HASTA **30/07/2026**» — el 25 de agosto, 26
+días después del plazo. Frase autocontradictoria en un documento radicado.
+
+- El texto ancla la vigencia **a la fecha de prestación**, que es lo verificable
+  y además defiende mejor.
+- `_dmbug_cubierto_por_el_contrato(fecha_hecho)` lee el plazo de
+  `malla_contractual` (fuente única) y, si el servicio quedó fuera, el texto
+  canónico no se usa: la glosa va por el camino normal. Sin fecha se deja pasar
+  — una glosa siempre es de un servicio pasado.
+
+### 3. `LEY 1164 DE 2007` cargada al corpus (3 respuestas)
+El revisor la marcaba `NORMA_INEXISTENTE` (ALTA). Existe: Talento Humano en
+Salud, 3 de octubre de 2007. Se verificó contra el texto oficial de MinSalud y
+se cargaron sus artículos 26 («el acto profesional se caracteriza por la
+autonomía profesional») y 35.
+
+### 4. `_corregir_anio_de_norma` — la norma es real, el año no (2 respuestas)
+«Resolución 3100 de 2020» → es de **2019**. La resolución ya estaba en el
+corpus con el año correcto; faltaba corregir la cita. Tabla estrecha: solo
+pares número+año verificados contra la fuente.
+
+### 5. `_reponer_preposicion_comida` — el «de» que se come el modelo (11)
+«levantamiento **la** glosa», «artículo 17 **la** ley», y —dentro de comillas
+que citan textualmente el Art. 17— «los profesionales **la** salud». Se probó
+cada patrón del módulo contra la frase correcta: ninguna malla la toca, lo
+escribe así el modelo. Lista de tres fórmulas verificadas, no un corrector
+gramatical general.
+
+### Además
+- **Amenazas al pagador**: la regla 8.decies las prohibía por instrucción y el
+  modelo amenazaba igual (GL-118/GL-119). Ahora hay malla. Lo legítimo se
+  conserva: Art. 126 Ley 1438 (SuperSalud), Art. 57 (levantamiento por falta de
+  respuesta) y negarle a la EPS la facultad sancionatoria.
+- **`_completar_norma_derogada`** (Res. 2275/2023, 21 respuestas): no se
+  reemplaza — para un servicio anterior al 14-05-2026 esa ES la norma
+  aplicable. Se **completa** con la regla de fecha. `citation_verifier` deja de
+  avisar cuando el documento ya nombra la sucesora
+  (`_norma_sucesora_ya_nombrada`).
+
+### Resultado sobre el mismo lote de 117
+
+| Hallazgo | Antes | Después |
+|---|---|---|
+| `CUPS_INEXISTENTE` (ALTA) | 7 | **0** |
+| `CODIGO_NO_ES_CUPS` (ALTA) | 5 | **0** |
+| `NORMA_INEXISTENTE` (ALTA) | 2 | **0** |
+| `NORMA_DEROGADA` (MEDIA) | 21 | **2** |
+| Preposición comida | 11 | **0** |
+
+Pruebas nuevas: `test_cups_inventado_no_sale_en_el_dictamen.py` (17),
+`test_dmbug_no_dice_vigente_lo_vencido.py` (8),
+`test_el_dictamen_no_amenaza_al_pagador.py` (13),
+`test_normas_reales_que_faltaban.py` (14),
+`test_el_de_que_se_come_el_modelo.py` (11),
+`test_norma_derogada_dice_desde_cuando.py` (14).
+
 ## Sesión 24-ago-2026 — `organizar_objeciones_adres.py`: cuadre contra el reporte del ADRES
 
 ### El defecto que corrige

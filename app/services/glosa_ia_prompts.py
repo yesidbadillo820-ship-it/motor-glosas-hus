@@ -3332,6 +3332,31 @@ def build_user_prompt(
             "de otros casos pertenece a OTRA entidad y citarlo invalida el dictamen."
         )
 
+    # NO LE ENTREGUES UNA CONTRADICCIÓN A LA IA (25-08-2026).
+    #
+    # El renglón se llamaba «Contrato vigente» SIEMPRE, y cuando la vigencia
+    # había terminado el sistema metía ahí dentro el texto «CONTRATO CON
+    # VIGENCIA TERMINADA». O sea que la IA leía un campo que se llama
+    # «vigente» con un contenido que dice «terminada», y resolvía la
+    # contradicción como podía: los dictámenes GL-118 y GL-119 salieron
+    # afirmando que el contrato «PERMANECE VIGENTE HASTA 30 DE JULIO DE 2026»
+    # —y ese día ya había pasado hacía casi un mes—, con el encabezado del
+    # mismo documento diciendo lo contrario.
+    #
+    # Si la EPS lo revisa, tumba la respuesta entera. Ahora el renglón se
+    # llama por lo que es y la prohibición va escrita.
+    _etiqueta_contrato = "Contrato vigente "
+    if contrato.get("_vigencia_vencida"):
+        _etiqueta_contrato = "Contrato (VENCIDO)"
+        _nota_contrato = (
+            "\n  ⚠ PROHIBIDO afirmar que este contrato está vigente, que "
+            "«permanece vigente» o que «se encuentra en ejecución»: su vigencia "
+            "YA TERMINÓ. Puedes nombrarlo como el contrato que rigió la relación, "
+            "pero NO como fundamento de una tarifa pactada hoy. Si el servicio se "
+            "prestó mientras estuvo vigente, dilo condicionado a la fecha del "
+            "servicio; si no consta la fecha, pídela en vez de afirmar cobertura."
+        )
+
     # Regla de oro para la IA: los datos del BLOQUE 1 son AUTORITATIVOS.
     # La EPS a veces menciona CUPS o valores alternativos en el texto de
     # la glosa ("se reconoce tarifa SOAT UVB vigente código 39143") — eso
@@ -3342,7 +3367,7 @@ def build_user_prompt(
 ═══ BLOQUE 1: DATOS DEL CASO (AUTORITATIVOS — usa EXACTAMENTE estos) ═══
 • Tipo de glosa     : {nombre_tipo} ({codigo})
 • Entidad pagadora  : {eps}
-• Contrato vigente  : {numero_contrato}{_nota_contrato}
+• {_etiqueta_contrato} : {numero_contrato}{_nota_contrato}
 • Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa{_nota_cups}

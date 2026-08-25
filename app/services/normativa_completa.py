@@ -345,6 +345,56 @@ LEYES = {
         "keywords": ["FOMAG", "magisterio", "docentes"],
     },
     # ─── R52 B: ampliación catálogo legal ──────────────────────────────────
+    # 25-08-2026: el lote de recepcion cito 3 veces la Ley 1164 de 2007 para
+    # sostener la autonomia del medico tratante y el revisor la marco como
+    # NORMA_INEXISTENTE — no porque no exista, sino porque el corpus no la
+    # tenia. La ley es real (Diario Oficial, 3 de octubre de 2007) y su
+    # articulo 26 dice justo lo que el dictamen le atribuye.
+    "LEY 1164 DE 2007": {
+        "nombre": "Ley 1164 de 2007 (Congreso de Colombia, 3 de octubre de 2007)",
+        "titulo": "Disposiciones en materia del Talento Humano en Salud",
+        "ambito": "Ejercicio profesional, autonomia y etica del personal de salud",
+        "vigente": True,
+        "articulos": {
+            "26": {
+                "titulo": "Acto propio de los profesionales de la salud",
+                "texto": (
+                    "Entendido como el conjunto de acciones orientadas a la atencion integral "
+                    "del usuario, aplicadas por el profesional autorizado legalmente para "
+                    "ejercerlas dentro del perfil que le otorga el respectivo titulo, el acto "
+                    "profesional se caracteriza por la autonomia profesional y la relacion "
+                    "entre el profesional de la salud y el usuario. Esta relacion de asistencia "
+                    "en salud genera una obligacion de medios, basada en la competencia "
+                    "profesional."
+                ),
+            },
+            "35": {
+                "titulo": "De los principios Eticos y Bioeticos",
+                "texto": (
+                    "Ademas de los principios rectores consagrados en la Constitucion Politica, "
+                    "son requisitos de quien ejerce una profesion u ocupacion en salud, la "
+                    "veracidad, la igualdad, la autonomia, la beneficencia, el mal menor, la no "
+                    "maleficencia, la totalidad y la causa de doble efecto. De autonomia: el "
+                    "personal de salud debe ejercer su capacidad para deliberar, decidir y "
+                    "actuar."
+                ),
+            },
+        },
+        "notas": (
+            "Es el respaldo legal de la autonomia del medico tratante frente a una glosa de "
+            "pertinencia: el articulo 26 define el acto profesional como caracterizado por la "
+            "autonomia. Acompana al articulo 17 de la Ley 1751 de 2015, no lo reemplaza."
+        ),
+        "verificada": "25-08-2026 fuente oficial",
+        "keywords": [
+            "talento humano en salud",
+            "autonomia profesional",
+            "acto propio",
+            "medico tratante",
+            "pertinencia",
+            "etica",
+        ],
+    },
     "LEY 23 DE 1981": {
         "nombre": "Ley 23 de 1981",
         "titulo": "Normas en materia de Ética Médica",
@@ -1344,6 +1394,13 @@ RESOLUCIONES = {
         "titulo": "Procedimientos y condiciones de inscripción de prestadores y habilitación de servicios",
         "ambito": "Habilitación de servicios — base para auditoría de pertinencia",
         "vigente": True,
+        # 25-08-2026: dos dictámenes del lote la citaron como «Resolución 3100
+        # de 2020». El número es correcto, el año no. Con el año cambiado la
+        # entidad no la encuentra y trata la cita como inventada.
+        "notas": (
+            "OJO CON EL AÑO: es de 2019 (25 de noviembre), no de 2020. "
+            "Sirve para acreditar que el servicio facturado estaba habilitado."
+        ),
         "keywords": ["habilitación", "REPS", "registro especial prestadores", "estándares"],
     },
     "RESOLUCION 202 DE 2021": {

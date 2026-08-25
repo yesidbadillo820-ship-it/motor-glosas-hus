@@ -63,6 +63,83 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (tarde) — Se revisaron las 117 respuestas que salieron hoy
+
+Con el archivo de recepción ya cargado, se pasó **una por una** las 117
+respuestas que redactó el motor por el revisor de citas. Salieron cinco
+problemas y los cinco quedaron corregidos con su prueba.
+
+**1. Códigos CUPS que nadie le mostró al motor (12 respuestas).**
+El archivo de recepción **no trae columna de CUPS** — trae factura, entidad y
+valor. El motor, al no tener el código, se lo inventaba. La prueba de que era
+invento y no un dato: el **mismo código 734101** salió como «radiografía de
+maxilar inferior» en una respuesta y como «radiografía de pierna» en otra; el
+**730102** salió como «urgencias adultos» y como «internación adultos
+complejidad alta». Un código no puede nombrar dos servicios. Un CUPS inventado
+es de lo primero que la EPS cruza contra su sistema: no lo encuentra y ratifica
+la glosa completa, por buena que esté la defensa.
+*Ahora:* si el código no aparece en lo que el motor tuvo a la vista **y**
+tampoco se puede verificar en el catálogo, sale del documento y queda el
+nombre del servicio. Un código verificable nunca se borra.
+
+**2. El Dispensario: un contrato vencido presentado como vigente (14 respuestas).**
+El texto fijo del Dispensario decía, en la misma frase, que el contrato
+440-DIGSA/DMBUG-2025 «se encuentra suscrito y **vigente**» y que su plazo iba
+«hasta el **30/07/2026**». Hoy es 25 de agosto: el plazo se cumplió hace 26
+días. La entidad lee las dos mitades de la frase y tumba la respuesta sin
+discutir el fondo.
+*Ahora:* el texto dice que el contrato estaba vigente **a la fecha en que se
+prestó el servicio** —que es lo cierto y además defiende mejor—, y si el
+servicio quedó fuera del plazo el motor no usa ese texto: manda la glosa por
+el camino normal, que sí lee el caso.
+
+**3. Una ley real que el motor daba por inventada (3 respuestas).**
+El revisor marcaba la **Ley 1164 de 2007** como inexistente. Existe: es la ley
+del Talento Humano en Salud y su artículo 26 dice justo lo que la respuesta le
+atribuye (que el acto profesional «se caracteriza por la autonomía
+profesional»). Lo que faltaba era tenerla cargada. Se verificó contra el texto
+oficial y se cargó con sus artículos 26 y 35.
+
+**4. Una resolución citada con el año cambiado (2 respuestas).**
+Se citó la «Resolución 3100 de 2020». El número es correcto —es la de
+habilitación de servicios— pero es de **2019**. Con el año cambiado la entidad
+no la encuentra y trata la cita como inventada. Se corrige sola.
+
+**5. La palabra «de» que se comía el modelo (11 respuestas).**
+Salieron frases como «se solicita el levantamiento **la** glosa» y «el artículo
+17 **la** ley 1751». La peor: dentro de unas comillas que citaban textualmente
+el artículo 17, decía «los profesionales **la** salud» — o sea, el hospital le
+atribuía a la ley una frase mal transcrita. Se comprobó que no era ninguna de
+las mallas del motor: lo escribía así el modelo. Ahora se repone.
+
+**Además, dos cosas que ya venían pendientes:**
+
+- **Amenazas al pagador.** Había una instrucción que las prohibía, pero era
+  solo eso —una instrucción— y en las pruebas de agosto el motor amenazó igual
+  con responsabilidad penal y acciones legales. Ahora hay una malla que las
+  quita. Lo legítimo sigue saliendo: elevar el caso a la Superintendencia
+  (Art. 126 Ley 1438), pedir el levantamiento por falta de respuesta (Art. 57)
+  y negarle a la EPS la facultad de sancionar al hospital.
+- **La Resolución 2275 de 2023, derogada (21 respuestas).** Aquí no se
+  reemplazó nada, y a propósito: para un servicio prestado **antes** del 14 de
+  mayo de 2026 esa ES la norma aplicable, y cambiarla por la 948 de 2026 sería
+  meterle a la respuesta una norma que ese día no regía. Lo que se hace es
+  **completar**: la respuesta ahora dice cuál rige hoy y desde cuándo. Así la
+  cita es correcta cualquiera que sea la fecha, y la entidad no puede rebatirla
+  diciendo «esa resolución está derogada». De paso, el aviso al gestor dejó de
+  sonar cuando el documento ya lo explica: 21 avisos por lo mismo hacen que
+  nadie los lea.
+
+**Cómo quedó el mismo lote de 117 respuestas, pasado por las mallas nuevas:**
+
+| Problema | Antes | Después |
+|---|---|---|
+| CUPS que no existe | 7 | **0** |
+| Código que no es CUPS | 5 | **0** |
+| Norma que no existe | 2 | **0** |
+| Norma derogada sin decir desde cuándo | 21 | **2** |
+| Frases con la preposición comida | 11 | **0** |
+
 ### 25-08-2026 (mañana) — El correo no salía, y no era la contraseña
 
 Día de arrancar en producción: se borraron las glosas de prueba y entró el
@@ -7125,6 +7202,23 @@ Eran dos cosas:
 
 ## 3) PENDIENTE
 
+### Del motor de glosas, al 25-08 (tarde)
+- **Reenviar el archivo de hoy con las columnas de IA.** Las 117 respuestas
+  salieron correctas, pero el Excel que llegó a los gestores salió **sin** las
+  columnas RESPUESTA IA / ESTADO IA. Vale la pena reenviarlo ya corregido.
+- **La cuenta repetida de Edgar Silva.** Los correos a `devoluciones1@sinacsc.com`
+  rebotan; el bueno es `carterahus02@sinacsc.com`. Hay que dejar una sola cuenta
+  en el motor.
+- **Que a las médicas les llegue lo suyo.** Ya quedó el nombre de la profesional
+  amarrado a la glosa; falta reenviar el lote de hoy para que les llegue.
+- **Los CSV de «valores distintos»** de la carga de tarifas: 256 del
+  Dispensario, 737 de Compensar y 737 de Positiva. Cada uno es un código con
+  dos precios: hay que decidir cuál queda.
+- **Revisar de dónde saldrá el CUPS.** El archivo de recepción no lo trae, así
+  que el motor ya no lo escribe (bien: antes se lo inventaba). Si se quiere que
+  la respuesta nombre el procedimiento con su código, hay que traerlo de DGH o
+  agregar la columna al archivo.
+
 ### Del frente COOSALUD (glosas y trámites), al 25-08
 - **Base DGH nueva** — es lo que bloquea el lote de 1.573: bajar de DGH el
   export de SERVICIOS FACTURADOS COOSALUD que cubra de HUS533xxx en adelante.
@@ -7550,6 +7644,16 @@ CALIDAD de agosto.
 **Lo primero del motor (25-08):** reiniciar el motor en la PC de cartera para
 que tome las correcciones de la jurisprudencia y de los valores. Sin eso, los
 dictámenes siguen saliendo con las citas inventadas.
+
+**Lo primero del motor (26-08):** volver a **desplegar y reiniciar** el motor en
+la PC de cartera para que tome las cinco correcciones de esta tarde (los CUPS
+inventados, el contrato vencido del Dispensario, la Ley 1164, el año de la
+Resolución 3100 y la preposición comida). Mientras no se reinicie, las
+respuestas siguen saliendo con esos defectos.
+
+**Y después:** reenviar el archivo de recepción de hoy —esta vez con las
+columnas de IA y con copia a las médicas— y dejar una sola cuenta de correo
+para Edgar Silva.
 
 
 **Notas crédito del Dispensario (lo primero, 25-08):** el cargue del acta
