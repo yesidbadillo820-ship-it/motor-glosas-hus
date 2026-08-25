@@ -2,6 +2,7 @@ import html as _html
 import re
 import smtplib
 from email.mime.application import MIMEApplication
+from email.utils import formatdate, make_msgid
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -173,6 +174,20 @@ def _enviar_sync(
         msg["Subject"] = asunto
         msg["From"] = cfg.smtp_user
         msg["To"] = destinatario
+        # FECHA E IDENTIFICADOR: NO SON ADORNO (25-08-2026).
+        #
+        # El mensaje salía solo con Asunto, De y Para. Gmail lo aceptaba, así
+        # que nadie lo notó en meses. El día que el hospital pasó su correo al
+        # servidor institucional (correopremium), TODOS los envíos empezaron a
+        # rebotar con «550 5.7.1 Command rejected» — y el panel decía que era
+        # la contraseña, cuando el login entraba perfecto.
+        #
+        # La causa: el estándar de correo (RFC 5322) exige la fecha, y los
+        # servidores endurecidos rechazan como sospechoso lo que llega sin
+        # fecha ni identificador de mensaje. Se agregan los dos.
+        msg["Date"] = formatdate(localtime=True)
+        dominio = cfg.smtp_user.split("@")[-1] if "@" in (cfg.smtp_user or "") else None
+        msg["Message-ID"] = make_msgid(domain=dominio or None)
 
         with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port, timeout=30) as server:
             server.starttls()
