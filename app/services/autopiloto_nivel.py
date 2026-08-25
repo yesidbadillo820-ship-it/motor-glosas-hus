@@ -33,7 +33,7 @@ def clasificar_nivel(glosa, db) -> dict:
 
         {
           "nivel": "AUTO_RADICAR" | "REVISAR_RAPIDO" | "EDITAR_MANUAL",
-          "icono": "🤖" | "⚡" | "✏",
+          "icono": "🤖" | "⚡" | "✏️",
           "color": "#10b981" | "#f59e0b" | "#6366f1",
           "etiqueta": "Mecánica — 1 click",
           "razon": "Extemporánea de 27 días con texto canónico aplicado",
@@ -131,7 +131,7 @@ def clasificar_nivel(glosa, db) -> dict:
 
     return {
         "nivel": "EDITAR_MANUAL",
-        "icono": "✏",
+        "icono": "✏️",
         "color": "#6366f1",
         "etiqueta": "Editar manual",
         "razon": razon,
