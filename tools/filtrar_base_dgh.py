@@ -43,6 +43,11 @@ except ImportError:
     sys.exit(2)
 
 COLS_FACTURA = ("FACTURA", "NUMERO_FACTURA", "NUMERO FACTURA", "CUENTA")
+# Cuántas filas mirar buscando el encabezado (algunos exports traen título).
+FILAS_BUSCA_CABECERA = 10
+# Columnas del detalle de servicios sin las cuales el consolidador NO puede
+# armar el OBJECIONES: sirven para avisar si nos pasaron otro reporte.
+COLS_SERVICIOS_MINIMAS = ("SLNSERPRO_SERVICIO", "VR_SERVICIO", "SALDO_FACT")
 # Tope duro de filas de una hoja de Excel. Si una base se le acerca, es que
 # el export de DGH salió recortado y faltan facturas.
 TOPE_EXCEL = 1_048_575
@@ -84,11 +89,41 @@ def leer_base(base: Path, objetivo: set[str]) -> dict:
     try:
         ws = wb[wb.sheetnames[0]]
         it = ws.iter_rows(values_only=True)
-        headers = list(next(it, []) or [])
-        idx = next((i for i, h in enumerate(headers) if norm(h) in COLS_FACTURA), None)
+        # El encabezado no siempre está en la primera fila: hay exports que
+        # arrancan con el título del reporte y un par de filas en blanco. Se
+        # busca la primera fila que traiga la columna de factura.
+        headers: list = []
+        idx = None
+        primeras: list[list] = []
+        for _ in range(FILAS_BUSCA_CABECERA):
+            fila = list(next(it, []) or [])
+            if not fila:
+                continue
+            primeras.append(fila)
+            pos = next((i for i, h in enumerate(fila) if norm(h) in COLS_FACTURA), None)
+            if pos is not None:
+                headers, idx = fila, pos
+                break
         if idx is None:
-            return {"error": f"no hallé la columna FACTURA. Encabezados: {headers}"}
+            vistas = " | ".join(str([str(c)[:20] for c in f[:8]]) for f in primeras[:4])
+            return {
+                "error": (
+                    f"no hallé la columna FACTURA en las primeras "
+                    f"{FILAS_BUSCA_CABECERA} filas. Lo que se leyó: {vistas}"
+                )
+            }
+        if len(primeras) > 1:
+            print(f"  (el encabezado estaba en la fila {len(primeras)}, no en la primera)")
         print(f"  Columna de factura: '{headers[idx]}' (posición {idx + 1})")
+
+        faltan_cols = [c for c in COLS_SERVICIOS_MINIMAS if c not in {norm(h) for h in headers}]
+        if faltan_cols:
+            print(
+                "  *** OJO: a este archivo le faltan columnas del detalle de "
+                f"servicios ({', '.join(faltan_cols)}). Parece otro reporte, no la "
+                "base SERVICIOS FACTURADOS: sirve para consultar, pero el "
+                "consolidador no puede armar el OBJECIONES con él."
+            )
 
         filas: list[list] = []
         encontradas: set[str] = set()
