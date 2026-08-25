@@ -7193,6 +7193,29 @@ se enterara.
 
 15 pruebas nuevas (152 en el módulo, 309 con las de pantalla).
 
+### 25-08-2026 — Dispensario: lote de glosas del 25-ago respondido completo (24/24)
+
+Llegó el lote nuevo del Dispensario (`GLOSAS_25_AGOSTO.xlsx`): **24 facturas,
+64 objeciones, $56.169.241**, con vencimientos el 4 y el 7 de septiembre y
+ninguna devolución. Se armó el Excel de respuestas con el motor de siempre,
+**cuadrado al peso** contra la hoja INICIAL: 59 respuestas de tarifas (con los
+refuerzos según lo que dice cada observación: cotización previa, dispositivos,
+referentes SOAT) y **5 médicas de pertinencia** (la fluoroscopia 1-de-2 de la
+factura 540394 y las interconsultas y cultivos de la 543137) con el argumento
+institucional.
+
+**Resultado del robot:** piloto con la 540273 bien, corrida completa con
+**22 OK**, y las otras 2 verificadas: la 540273 era el propio piloto (ya
+finalizada) y la 538877 respondió con un aviso informativo del portal — se
+verificó aparte y ya no está en pendientes. **Las 24 quedaron respondidas y
+finalizadas**, cada una con su pantallazo en `evidencias_glosa\`. Queda
+pendiente solo anotar el **GI del paquete** cuando el portal lo genere.
+
+También se resolvió el enredo del PR de la bitácora: el respaldo del 24-08 se
+aplicó dos veces (en este chat y en otro), la principal quedó con la versión
+vieja del plan y el PR chocó; se fusionaron las dos versiones conservando el
+trabajo de todas las sesiones y quedó todo en la rama principal (PR #469).
+
 ---
 
 ### 25-08 (tarde) — «[object Object]»: el error que no decía nada
@@ -7673,6 +7696,10 @@ respuestas siguen saliendo con esos defectos.
 columnas de IA y con copia a las médicas— y dejar una sola cuenta de correo
 para Edgar Silva.
 
+
+**Lote de glosas del 25-ago (Dispensario):** las 24 quedaron respondidas;
+solo falta **anotar el GI del paquete** cuando el portal lo genere (pedírselo
+al chat para dejarlo en la bitácora, como el GI-33-5335-2026 del lote 14-ago).
 
 **Notas crédito del Dispensario (lo primero, 25-08):** el cargue del acta
 858 ya quedó (21/21 OK el 24-08). Lo que sigue: (a) pasar a SISTEMAS el
