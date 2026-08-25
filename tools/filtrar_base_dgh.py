@@ -137,6 +137,28 @@ def main(argv: list[str] | None = None) -> int:
     if faltantes:
         for r in faltantes:
             sys.stderr.write(f"No existe la base: {r}\n")
+        # Casi siempre es que el archivo todavía no se ha bajado de DGH, o que
+        # el nombre no es el que se escribió. Mostramos qué Excel SÍ hay en esa
+        # carpeta para no tener que ir a mirar.
+        for carpeta in dict.fromkeys(r.parent for r in faltantes):
+            sys.stderr.write(f"\nExcel que SÍ hay en {carpeta}:\n")
+            if not carpeta.is_dir():
+                sys.stderr.write("  (esa carpeta tampoco existe)\n")
+                continue
+            hallados = sorted(
+                (x for x in carpeta.glob("*.xls*") if not x.name.startswith("~$")),
+                key=lambda x: x.stat().st_mtime,
+                reverse=True,
+            )[:15]
+            if not hallados:
+                sys.stderr.write("  (ningún Excel en esa carpeta)\n")
+            for x in hallados:
+                mb = x.stat().st_size / (1024 * 1024)
+                sys.stderr.write(f"  {x.name}   ({mb:,.1f} MB)\n")
+        sys.stderr.write(
+            "\nCopia el nombre EXACTO de la base que vas a usar. Si la base nueva no "
+            "aparece en la lista, todavía no se ha bajado de DGH.\n"
+        )
         return 2
 
     objetivo: set[str] = set()
