@@ -101,3 +101,41 @@ class TestLaTablaSeLee:
         assert "TOPE_ENV" in t, "no hay tope de envíos visibles"
         assert "más</span>" in t, "no dice cuántos envíos quedaron sin mostrar"
         assert "title=\"'+esc(lista.join(' '))+'\"" in t, "la lista completa no queda en el globo"
+
+
+class TestLosErroresSeEntienden:
+    """«[object Object]» no le dice nada a nadie. El servidor manda los errores
+    de validación como una lista de objetos, y la pantalla los tiene que
+    traducir a español."""
+
+    def test_la_pantalla_traduce_los_errores_del_servidor(self, tmp_path):
+        if not shutil.which("node"):  # pragma: no cover
+            pytest.skip("node no está instalado en este entorno")
+        cuerpo = _bloques()[0]
+        m = re.search(r"function mensajeError\(d, status\)\{.*?\n\}", cuerpo, re.S)
+        assert m, "no existe la función que traduce los errores"
+        prueba = (
+            m.group(0)
+            + """
+const assert = require('assert');
+// El caso real: FastAPI manda una lista de objetos.
+const largo = mensajeError({detail:[{loc:['body','observaciones'],
+  msg:'String should have at most 4000 characters', type:'string_too_long'}]}, 422);
+assert.ok(!largo.includes('[object Object]'), 'sigue saliendo [object Object]');
+assert.ok(largo.includes('observaciones'), 'no dice en qué campo fue');
+assert.ok(largo.includes('muy largo'), 'no lo explica en español: ' + largo);
+// Un error normal del sistema sigue mostrándose tal cual.
+assert.strictEqual(mensajeError({detail:'El envío ya fue cargado'}, 409), 'El envío ya fue cargado');
+// Y si no viene nada, al menos el número.
+assert.strictEqual(mensajeError(null, 500), 'Error 500');
+"""
+        )
+        archivo = tmp_path / "err.js"
+        archivo.write_text(prueba, encoding="utf-8")
+        r = subprocess.run(
+            ["node", str(archivo)], capture_output=True, text=True, timeout=60, errors="replace"
+        )
+        assert r.returncode == 0, r.stderr[:700]
+
+    def test_el_recuadro_no_deja_escribir_mas_de_la_cuenta(self):
+        assert 'id="au-obs" rows="4" maxlength="4000"' in _texto()

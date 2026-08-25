@@ -7102,6 +7102,27 @@ se enterara.
 
 ---
 
+### 25-08 (tarde) — «[object Object]»: el error que no decía nada
+
+Elías pegó en la observación el mensaje de error que devuelve **ADRES SIA**
+—ese texto larguísimo del FUR— y al guardar salió un aviso rojo que decía
+**«[object Object]»**. Ni se guardaba, ni se entendía por qué.
+
+Eran dos cosas:
+
+1. **El texto no cabía.** La observación tenía tope de 2.000 caracteres y los
+   mensajes de ADRES pasan de eso. Ahora el tope es de **4.000**, el mismo del
+   motivo de devolución (en la pantalla es un solo recuadro que viaja en los
+   dos campos), y el recuadro no deja escribir de más: se corta solo al llegar.
+2. **El aviso era inútil.** Cuando el servidor rechaza un dato, manda el motivo
+   como una lista de datos y la pantalla lo mostraba tal cual, en su forma
+   interna. Ahora lo traduce: «observaciones: el texto es muy largo: máximo
+   4000 caracteres». Vale para cualquier error de este tipo, no solo para este.
+
+4 pruebas nuevas, una de ellas ejecuta de verdad la traducción del error.
+
+---
+
 ## 3) PENDIENTE
 
 ### Del frente COOSALUD (glosas y trámites), al 25-08

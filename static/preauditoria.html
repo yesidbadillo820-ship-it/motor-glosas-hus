@@ -356,12 +356,35 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 function salir(){ localStorage.removeItem('hus_token'); localStorage.removeItem('hus_user'); location.href='/'; }
 function authH(extra){ return Object.assign({'Authorization':'Bearer '+TOKEN}, extra||{}); }
+// El servidor no siempre manda el motivo como texto: cuando rechaza un dato lo
+// manda como una LISTA de objetos, y `new Error(objeto)` pintaba en pantalla
+// «[object Object]» — un error sin una sola pista de qué pasó. Le ocurrió a
+// Elías el 25-08-2026 al pegar el mensaje de error de ADRES SIA en la
+// observación: lo único que vio fue esa frase inútil.
+function mensajeError(d, status){
+  var detalle = d && d.detail;
+  if(typeof detalle === 'string' && detalle) return detalle;
+  if(Array.isArray(detalle)){
+    var partes = detalle.map(function(e){
+      var campo = (e && e.loc && e.loc.length) ? String(e.loc[e.loc.length-1]) : '';
+      var texto = (e && (e.msg || e.message)) || 'dato no válido';
+      var largo = /at most (\d+) characters/.exec(texto);
+      if(largo) texto = 'el texto es muy largo: máximo '+largo[1]+' caracteres';
+      return campo ? campo+': '+texto : texto;
+    }).filter(Boolean);
+    if(partes.length) return partes.join(' · ');
+  }
+  if(detalle && typeof detalle === 'object'){
+    return detalle.mensaje || detalle.msg || JSON.stringify(detalle);
+  }
+  return 'Error '+status;
+}
 async function api(url, opts){
   opts = opts || {}; opts.headers = authH(opts.headers);
   var r = await fetch(url, opts);
   if (r.status === 401){ salir(); throw new Error('sesión vencida'); }
   var d=null; try{ d=await r.json(); }catch(e){}
-  if(!r.ok){ throw new Error((d&&d.detail)?d.detail:('Error '+r.status)); }
+  if(!r.ok){ throw new Error(mensajeError(d, r.status)); }
   return d;
 }
 function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -770,7 +793,7 @@ async function abrirAuditar(id){
       // se escriba aquí se guarda siempre y, si la factura se DEVUELVE, es el
       // texto que sale en el oficio de devolución.
       '<label class="campo" style="margin:10px 0">Observación — se guarda siempre; si devuelve, este texto sale en el oficio de devolución'+
-        '<textarea id="au-obs" rows="4" style="width:100%">'+esc(f.motivo_devolucion||f.observaciones||'')+'</textarea></label>'+
+        '<textarea id="au-obs" rows="4" maxlength="4000" style="width:100%">'+esc(f.motivo_devolucion||f.observaciones||'')+'</textarea></label>'+
       '<div id="au-msg"></div>'+
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
