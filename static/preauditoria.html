@@ -387,6 +387,18 @@ async function api(url, opts){
   if(!r.ok){ throw new Error(mensajeError(d, r.status)); }
   return d;
 }
+// Cuántas facturas mostrar en el chip de un envío.
+// Los envíos que entraron por la importación del consolidado histórico quedaron
+// con «traía 0 facturas» —el Excel no lo decía— y el chip pintaba cosas sin
+// sentido como «226945(1/0)» o «226943(0)» en oficios que sí tienen facturas.
+// Cuando el registro no sabe cuántas traía, se muestra lo único cierto: las que
+// están aquí (25-08-2026).
+function cuentaEnvio(e){
+  var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
+  var traia=e.total_facturas;
+  if(!traia || traia<=0) return String(hay);
+  return hay===traia ? String(traia) : hay+'/'+traia;
+}
 function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 // Delega en el formato único del portal (sinac-ux.js). Antes esta página
 // escribía "$ 1.234.567" y el portal "$1.234.567" para la misma cifra.
@@ -503,8 +515,7 @@ async function cargarOficios(page){
       // Si el envío no dejó todas sus facturas aquí se muestra "quedaron/traía"
       // (0/1), para que no cuadre a la fuerza 5 envíos con 4 facturas.
       var lista=o.envios_escritos.map(function(e){
-        var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
-        return esc(e.envio)+'('+(hay===e.total_facturas?e.total_facturas:hay+'/'+e.total_facturas)+')';
+        return esc(e.envio)+'('+cuentaEnvio(e)+')';
       });
       // Un oficio puede traer 20 envíos y ese bloque de texto hacía la fila tres
       // veces más alta que las demás. Se muestran los primeros y el resto se
@@ -580,13 +591,16 @@ async function abrirOficio(id){
     var envios=(o.envios_escritos||[]).map(function(e){
       var hay=(e.en_este_oficio==null?e.total_facturas:e.en_este_oficio);
       var det=(e.faltantes||[]);
-      var completo=(hay===e.total_facturas);
+      // Sin dato de cuántas traía (envíos de la importación histórica) no hay
+      // nada que comparar: lo que está aquí es lo cierto.
+      var sinDato=(!e.total_facturas || e.total_facturas<=0);
+      var completo=sinDato || (hay===e.total_facturas);
       // Las que ya pasaron por este oficio y siguieron su camino no son un
       // faltante: el oficio ya cumplió con ellas y el chip no debe alarmar.
       var porResolver=det.filter(function(f){ return !f.cerrado; }).length;
       var yaSalieron=(!completo && det.length>0 && porResolver===0);
       det.forEach(function(f){ faltantes.push({envio:e.envio, det:f}); });
-      var texto = completo ? String(e.total_facturas)
+      var texto = completo ? cuentaEnvio(e)
                 : (yaSalieron ? 'ya siguió' : hay+' de '+e.total_facturas);
       var ayuda = completo ? ''
                 : (yaSalieron ? ' title="Sus facturas pasaron por este oficio y ya siguieron su camino"'

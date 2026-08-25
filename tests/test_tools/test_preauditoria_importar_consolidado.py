@@ -579,3 +579,26 @@ def test_evento_de_la_pagina_bloquea_actualizacion(db, tmp_path):
     )
     assert _eventos_de(con, "HUS013") == ["ESCRITA"]
     con.close()
+
+
+class TestElRegistroDeEnviosGuardaCuantasTraia:
+    """25-08-2026: el importador escribía 0 en las tres cuentas del registro de
+    envíos y la página mostraba «226945(1/0)» o «226943(0)» en oficios que sí
+    tenían facturas."""
+
+    def test_guarda_el_numero_real_de_facturas_por_envio(self, tmp_path, db):
+        ruta = _excel(
+            tmp_path,
+            [
+                _fila(1, "HUS0000504507", "226943", "SI", oficio="FHUS-AS-I00600-26"),
+                _fila(2, "HUS0000504541", "226943", "SI", oficio="FHUS-AS-I00600-26"),
+                _fila(3, "HUS0000504407", "226945", "SI", oficio="FHUS-AS-I00600-26"),
+            ],
+        )
+        _correr(ruta, db, aplicar=True)
+        con = sqlite3.connect(db)
+        filas = dict(
+            con.execute("SELECT envio, total_facturas FROM preaud_envios_cargados").fetchall()
+        )
+        con.close()
+        assert filas == {"226943": 2, "226945": 1}

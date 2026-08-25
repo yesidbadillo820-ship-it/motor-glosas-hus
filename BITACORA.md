@@ -7547,6 +7547,38 @@ de trabajar.
 
 ---
 
+### 25-08 (cierre) — De dónde salieron esos nombres, y el chip que decía «(1/0)»
+
+Yesid comparó el Excel del informe contra la pantalla y aparecieron dos cosas.
+
+**1) «Salen gestores escribiendo envíos y ellos solo recepcionan».** El
+movimiento **ESCRITA no es auditar**: es el registro de quién **cargó el envío**
+en la página (el paso 4 de la pantalla). Y el nombre no lo pone el sistema según
+el cargo de cada quien: lo pone según la **sesión abierta en el navegador**. Si
+un gestor deja su sesión abierta y otro trabaja en ese computador, todo queda
+firmado por el primero.
+
+Se le entregó a la Dirección el informe **INFORME_AUTORIA_PREAUDITORIA_SINAC**
+(Excel con fórmulas y gráficos) con los números: 3.889 movimientos, **92 sin
+gestor identificado** (los trajo el cargue del consolidado histórico, sobre 55
+facturas, y **164 de los 183 oficios** quedaron registrados así), la lista
+completa de esos 92 con casilla para asignar responsable, y el hallazgo de que
+**VANESSA OSPINA** está partida en dos por un nombre mal escrito («VANESA
+OSPINA», 29 movimientos entre el 18 y el 25 de agosto), más un movimiento a
+nombre de «Auditor Principal», que no es una persona.
+
+**2) El chip decía «226945(1/0)» y «226943(0)».** Los envíos que entraron por la
+importación quedaron con «traía 0 facturas» —el Excel no lo decía— y el chip
+comparaba contra ese cero: mostraba que el envío no había traído nada en oficios
+que sí tienen facturas. Ahora, cuando el registro no sabe cuántas traía, la
+pantalla muestra lo único cierto: **las que están ahí**. Y el importador ya
+guarda el número real de facturas por envío, así que a los cargues nuevos no les
+vuelve a pasar.
+
+4 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Del motor de glosas, al 25-08 (cierre)
