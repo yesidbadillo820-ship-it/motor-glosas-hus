@@ -19,11 +19,11 @@ Bot de doble clic para Windows: **`tools/UNIR_SOPORTES_ADRES.cmd`**.
 | 6 | HISTORIA CLÍNICA — evoluciones | `EVOLUCIONES`, `INTERCONSULTA` |
 | 7 | HISTORIA CLÍNICA — procedimientos | `PROCEDIMIENTOS`, `DESCRIPCION QUIRURGICA` |
 | 8 | HISTORIA CLÍNICA (el resto) | `HISTORIA CLINICA`, `HC` |
-| 9 | AYUDAS DIAGNÓSTICAS | `AYUDAS DIAGNOSTICAS`, `LABORATORIO`, `RADIOGRAFIA`, `TOMOGRAFIA`, `ECOGRAFIA`, `DX`… |
+| 9 | AYUDAS DIAGNÓSTICAS | `AYUDAS DIAGNOSTICAS`, `LABORATORIO`, `RADIOGRAFIA`, `TOMOGRAFIA`, `ECOGRAFIA`, `DX`, y los nombres con que salen los exámenes en el detallado: `GLUCOMETRIA`, `GASES ARTERIALES`, `LACTATO`, `HEMOGRAMA`… |
 | 10 | MEDICAMENTOS | `MEDICAMENTOS`, `INGESTA`, `PLAN DE MANEJO`, `MED` |
 | 11 | NOTAS DE ENFERMERÍA | `NOTAS DE ENFERMERIA`, `ENFERMERIA`, `NTE` |
 | 12 | INSUMOS | `INSUMOS`, `GASTOS QUIROFANO`, `INS` |
-| 13 | OTROS | todo lo que no reconoció |
+| 13 | OTROS | `OTROS`, `SOAT`, `CERTIFICACION`, `REPS` — y todo lo que no reconoció |
 
 **El DETALLADO no entra al PDF**: la lista lo pide en Excel, así que se queda
 como archivo aparte en la carpeta de la factura.
@@ -41,7 +41,12 @@ Por el **nombre del archivo**. Dos reglas que evitan los errores típicos:
   «NOTAS DE ENFERMERÍA» no se lo lleva `NOTAS`, y «CONSULTA DE URGENCIAS» no se
   confunde con una consulta cualquiera.
 - **Las abreviaturas van sueltas.** `INS` no puede casar dentro de
-  `INSTITUCIONAL`, ni `HC` dentro de `HCG12`.
+  `INSTITUCIONAL`, ni `HC` dentro de `HCG12`. Esto importa porque el equipo
+  nombra los archivos **con la abreviatura sola**: `EPI.pdf`, `HC.pdf`,
+  `DX.pdf`, `MED.pdf`, `NTE.pdf`, `INS.pdf`, `OTROS.pdf`.
+- **`OTROS` es un grupo con nombre propio, no solo el cajón.** Un `OTROS.pdf`
+  está bien clasificado y **no** sale en la lista de «revisar»; un
+  `papel suelto.pdf` sí.
 
 **Lo que no reconoce no se pierde**: va al grupo OTROS y sale listado aparte en
 el reporte, para que el auditor lo mire.
