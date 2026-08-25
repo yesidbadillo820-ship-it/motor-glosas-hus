@@ -187,3 +187,67 @@ class TestLoQueNoSeToco:
         """Lo llaman cientos de sitios; cambiarle el nombre habría sido un
         cambio gigante sin necesidad."""
         assert "function fmtCOP(" in _leer("index.html")
+
+
+class TestUnSoloSignoDePeso:
+    """Y un solo signo, no dos (25-08-2026).
+
+    En la pantalla «Mis glosas pendientes» la columna de valor salía así:
+
+        $$ 2.319.514
+
+    y la alerta roja de vencimientos decía «Valor en riesgo: $$ 0».
+
+    Es el mismo problema de esta prueba visto por el otro lado: `fmtCOP` ya
+    trae el signo, y en dos sitios se le agregaba otro delante. El formato es
+    uno solo justamente para no tener que acordarse de si el signo va o no va.
+    """
+
+    def test_la_columna_de_valor_no_duplica_el_signo(self):
+        assert """'<td class="num">$' + valor +""" not in _leer("index.html"), (
+            "volvió a agregarse un $ delante de fmtCOP: la columna de plata de "
+            "«Mis glosas» sale «$$ 2.319.514»"
+        )
+
+    def test_la_alerta_de_vencimientos_tampoco(self):
+        assert "'Valor en riesgo: <b>$' + valor" not in _leer("index.html"), (
+            "la alerta vuelve a salir «Valor en riesgo: $$ 0»"
+        )
+
+    @pytest.mark.parametrize("variante", ["'$' + fmtCOP(", '"$" + fmtCOP(', "'$'+fmtCOP("])
+    def test_a_fmtcop_no_se_le_pega_un_signo(self, variante):
+        assert variante not in _leer("index.html"), f"alguien volvió a escribir {variante}"
+
+
+class TestLaAlertaDeVencimientosNoSeContradice:
+    """La misma línea traía una frase falsa (25-08-2026).
+
+    La alerta roja que avisa de una glosa que vence hoy decía:
+
+        «Si no se responden hoy, opera el silencio en contra del prestador
+         (Art. 57 Ley 1438/2011 sólo aplica a EPS, NO al hospital).»
+
+    Las dos mitades no pueden ser ciertas a la vez, y el paréntesis es falso.
+    Se verificó el texto oficial: el Art. 57 SÍ obliga al prestador — «si los
+    prestadores no contestan en el plazo señalado, se entenderá aceptada la
+    glosa». O sea que la frase desmentía su propia advertencia, y encima en el
+    aviso que le dice al gestor que se le está venciendo una glosa.
+    """
+
+    def test_ya_no_dice_que_el_articulo_57_no_aplica_al_hospital(self):
+        assert "sólo aplica a EPS, NO al hospital" not in _leer("index.html"), (
+            "volvió la frase falsa: el Art. 57 SÍ obliga al prestador"
+        )
+
+    def test_cita_el_texto_real_de_la_norma(self):
+        t = _leer("index.html")
+        assert "se entenderá aceptada la glosa" in t, (
+            "la alerta debe decirle al gestor lo que de verdad pasa si no responde"
+        )
+        assert "Art. 57, Ley 1438 de 2011" in t
+
+    def test_la_advertencia_sigue_en_pie(self):
+        """El arreglo no podía dejar al gestor sin el aviso."""
+        t = _leer("index.html")
+        assert "vencen en las próximas 24h" in t
+        assert "Valor en riesgo" in t

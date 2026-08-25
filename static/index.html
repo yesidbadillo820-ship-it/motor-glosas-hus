@@ -14406,7 +14406,9 @@ function _renderMisGlosas(dataRaw){
         '<td class="mono">' + escHtml(g.consecutivo_dgh || '—') + '</td>' +
         '<td>' + radicadoTxt + '</td>' +
         '<td>' + tipoTxt + '</td>' +
-        '<td class="num">$' + valor + '</td>' +
+        // fmtCOP YA trae el signo: agregarle otro sacaba «$$ 2.319.514»
+        // en la columna de plata de «Mis glosas» (visto el 25-08-2026).
+        '<td class="num">' + valor + '</td>' +
         '<td>' + vence + '</td>' +
         // Dias = dias habiles RADICACION -> DOCUMENTO DGH (indicador de extemporaneidad).
         // Si > 20 → la EPS glosó fuera de termino. Fallback a dias_restantes si el
@@ -14590,8 +14592,24 @@ async function cargarBannerVencen24h(){
               d.total + ' glosa(s) vencen en las próximas 24h' +
             '</div>' +
             '<div style="font-size:.78rem;margin-top:.2rem">' +
-              'Valor en riesgo: <b>$' + valor + '</b> · ' +
-              'Si no se responden hoy, opera el silencio en contra del prestador (Art. 57 Ley 1438/2011 sólo aplica a EPS, NO al hospital).' +
+              // Dos arreglos del 25-08-2026, los dos vistos en pantalla:
+              //
+              // 1) fmtCOP ya trae el signo, y aquí se le ponía otro: la
+              //    alerta salía diciendo «Valor en riesgo: $$ 0».
+              //
+              // 2) La frase se contradecía sola. Decía «opera el silencio en
+              //    contra del prestador (Art. 57 Ley 1438/2011 sólo aplica a
+              //    EPS, NO al hospital)» — las dos mitades no pueden ser
+              //    ciertas a la vez. Se verificó el texto oficial: el Art. 57
+              //    SÍ obliga al prestador («si los prestadores no contestan en
+              //    el plazo señalado, se entenderá aceptada la glosa»). O sea
+              //    que el paréntesis era falso y además desmentía la propia
+              //    advertencia, en una alerta roja que avisa de una glosa que
+              //    vence hoy. Ahora se cita el texto real.
+              'Valor en riesgo: <b>' + valor + '</b> · ' +
+              'Si no se responden hoy la glosa se entiende ACEPTADA: «si los prestadores ' +
+              'no contestan en el plazo señalado, se entenderá aceptada la glosa» ' +
+              '(Art. 57, Ley 1438 de 2011).' +
             '</div>' +
           '</div>' +
           '<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:0" onclick="aplicarVista(\'vencen_hoy\')">Ver y resolver ahora</button>' +
