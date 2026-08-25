@@ -102,6 +102,44 @@ acompañadas de su anclaje legal correcto —el Art. 17 de la Ley 1751 de 2015
 para autonomía médica, el Art. 168 de la Ley 100 y el Art. 20 del Decreto 4747
 para urgencias—, así que quitarlas no debilitó ningún argumento.
 
+**Y la revisión siguió: TODA la base normativa del motor, no solo las
+sentencias.** Con ese antecedente había que mirar el resto, y apareció lo mismo.
+
+- **Una resolución derogada hace tres meses, citada como vigente.** La
+  Resolución 2275 de 2023 —la de factura electrónica y RIPS, que el motor cita
+  en seis sitios— fue derogada el 14 de mayo de 2026 por la Resolución 948 de
+  2026. Un dictamen radicado hoy que se apoye en ella le entrega a la EPS la
+  forma de tumbarlo. Peor: el corpus tenía desde siempre un campo que dice si la
+  norma sigue vigente, **y el revisor de citas nunca lo miraba**. Ahora avisa.
+- **Otras tres normas decían lo que no era.** La «Resolución 1604 de 2024», que
+  el sistema daba como norma de RIPS, es un acto del Ministerio del Interior que
+  le reconoce personería jurídica a una iglesia. La Resolución 866 de 2021, que
+  se ofrecía en cuatro archivos como «los RIPS», es la de interoperabilidad de la
+  historia clínica: se leyó su texto completo y la sigla RIPS no aparece ni una
+  vez. Y la «Resolución 2641 de 2025» no existe.
+- **El motor borraba una cita CORRECTA.** Tenía un limpiador que quitaba del
+  dictamen «Resolución 2641 de 2024» por creerla inventada, y la cambiaba por la
+  frase «la normativa vigente del Ministerio de Salud». Esa resolución es real
+  —es la que estableció la CUPS que rigió en 2025—, así que el motor borraba lo
+  bueno y dejaba una pseudo-norma sin ley ni artículo.
+- **Y les ofrecía a la IA 24 normas que él mismo no tenía cargadas.** Le pedíamos
+  que las citara y luego se las marcábamos en rojo como inexistentes. Doce eran
+  reales y se cargaron; de las otras ocho, **tres no existen** («Acuerdo 002 de
+  2010 USPEC», «Decreto 1760 de 2022» y «Resolución 5853 de 2003») y cinco
+  estaban mal nombradas: la 5159 de 2015 es Resolución y no decreto, la 506 de
+  2021 es de MinSalud y no de la DIAN, la «Resolución 2284 de 2024» es de 2023,
+  la «Resolución 1604 de 2022» es un Decreto sobre colegios de las cajas de
+  compensación, y la Resolución 010 de 2018 es de la DIAN y no dice nada del
+  pago de migrantes, que era para lo que se citaba.
+
+Tres cosas que salieron **a favor**: la Circular 007 de 2025 no era un
+«cronograma» sino una circular conjunta con la Superintendencia que **prohíbe
+imponerle barreras y exigencias no normadas a los prestadores**; la Resolución
+2335 de 2023 no era de cáncer infantil sino de la **ejecución y seguimiento de
+los acuerdos de voluntades**; y el Auto 037 de 2024 resolvió que la
+**jurisdicción ordinaria laboral es la competente para cobrar ejecutivamente las
+facturas de salud**. Las tres son munición útil que estaba mal rotulada.
+
 **Y al revés: el motor le estaba borrando al dictamen artículos que sí existen.**
 Buscando otra cosa apareció esto. El sistema afirmaba «esta norma no contiene
 ese artículo» mirando solo los artículos que tiene cargados, y tiene poquísimos:
@@ -142,7 +180,7 @@ respaldo), los Arts. 1 y 2 de la Ley 1438 y el Art. 1 de la Ley 1751.
 llevaba pegada una frase que es del Art. 1. Quedaron separados, cada uno con su
 texto oficial.
 
-Todo con pruebas: la suite completa quedó en **8.547 verdes** (los 12 rojos son
+Todo con pruebas: la suite completa quedó en **8.610 verdes** (los 12 rojos son
 de programas que no están instalados en la máquina de pruebas, ajenos al motor).
 
 ### Abril 2026 — Nace el Motor de Glosas
