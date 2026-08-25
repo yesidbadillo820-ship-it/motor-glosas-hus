@@ -169,13 +169,44 @@ LEYES = {
         "ambito": "Modificaciones al SGSSS",
         "vigente": True,
         "articulos": {
+            # 25-08-2026 — CORREGIDO. El texto guardado decía, en plano, que las
+            # EPS «girarán como mínimo el 50% de los valores facturados dentro de
+            # los cinco días». El literal d) real lo condiciona a la MODALIDAD de
+            # pago: 100% mes anticipado si el contrato es por capitación, y el 50%
+            # anticipado solo «si fuesen por otra modalidad». Afirmar la regla sin
+            # su condición es darle a la entidad la forma de tumbarla en un
+            # contrato capitado.
             "13": {
-                "titulo": "Flujo y protección de los recursos",
-                "texto": "Para efectos de garantizar el flujo oportuno de los recursos, las Entidades Promotoras de Salud contributivas y subsidiadas girarán a los prestadores de servicios de salud, en el régimen contributivo, como mínimo el 50% de los valores facturados dentro de los cinco días posteriores a la presentación de la factura por parte del prestador. En el régimen subsidiado, las Entidades Promotoras de Salud girarán un anticipo equivalente al 50% del valor de la facturación, también dentro de los cinco días posteriores.",
-                "aplicacion": "Anticipo del 50% de facturación en 5 días",
-                "keywords": ["anticipo", "flujo de recursos", "pago", "5 días", "50%"],
+                "titulo": "Flujo y protección de los recursos (literal d)",
+                "texto": (
+                    "Las Entidades Promotoras de Salud EPS de ambos regímenes pagarán "
+                    "los servicios a los Prestadores de Servicios de salud habilitados, "
+                    "mes anticipado en un 100% si los contratos son por capitación. Si "
+                    "fuesen por otra modalidad, como pago por evento, global prospectivo "
+                    "o grupo diagnóstico se hará como mínimo un pago anticipado del 50% "
+                    "del valor de la factura, dentro de los cinco días posteriores a su "
+                    "presentación. En caso de no presentarse objeción o glosa alguna, el "
+                    "saldo se pagará dentro de los treinta (30) días siguientes a la "
+                    "presentación de la factura."
+                ),
+                "aplicacion": (
+                    "Los plazos de pago. OJO CON LA CONDICIÓN: el anticipo del 50% en "
+                    "cinco días es para pago por evento, global prospectivo o grupo "
+                    "diagnóstico. Si el contrato es por CAPITACIÓN la regla es otra: "
+                    "100% mes anticipado. Y los 30 días del saldo corren solo «en caso "
+                    "de no presentarse objeción o glosa alguna» — con glosa de por medio "
+                    "el que manda es el Art. 57 de la Ley 1438."
+                ),
+                "keywords": [
+                    "flujo de recursos",
+                    "plazos de pago",
+                    "anticipo 50%",
+                    "capitación",
+                    "treinta días",
+                ],
             },
         },
+        "verificada": "25-08-2026 art. 13 literal d) contra el texto oficial — se corrigió: faltaba la condición de modalidad",
         "keywords": ["flujo recursos", "anticipo", "pagos"],
     },
     # 25-08-2026: artículos 56, 105 y 126 verificados y corregidos contra el
@@ -485,6 +516,7 @@ LEYES = {
                 "texto": "La historia clínica es el registro obligatorio de las condiciones de salud del paciente. Es un documento privado sometido a reserva que únicamente puede ser conocido por terceros previa autorización del paciente o en los casos previstos por la ley.",
             },
         },
+        "verificada": "25-08-2026 art. 34 contra el texto oficial — coincide literalmente",
         "keywords": ["ética médica", "historia clínica", "secreto profesional", "reserva"],
     },
     "LEY 715 DE 2001": {
@@ -762,6 +794,7 @@ DECRETOS = {
                 "keywords": ["presupuesto", "apropiación", "disponibilidad", "agotamiento", "CDP"],
             },
         },
+        "verificada": "25-08-2026 art. 71 contra el texto oficial — coincide literalmente",
         "keywords": [
             "estatuto orgánico",
             "presupuesto",
@@ -997,6 +1030,7 @@ DECRETOS = {
         "titulo": "Manual de Tarifas SOAT",
         "ambito": "Tarifas SOAT — marco histórico",
         "vigente": True,
+        "verificada": "24-08-2026 art. 87 (ver la entrada de ese día)",
         "keywords": ["SOAT", "tarifa", "manual tarifario"],
         # El Art. 87 se agregó el 24-08-2026. El dictamen GL-207 (AURORA) lo
         # citó completo para defender una tarifa propia del hospital, y el
@@ -1430,6 +1464,9 @@ RESOLUCIONES = {
                 ],
             },
         },
+        # 25-08-2026: arts. 1 y 3 contrastados contra el PDF oficial de
+        # MinSalud. Los dos coinciden literalmente. Esta norma estaba bien.
+        "verificada": "25-08-2026 arts. 1 y 3 contra el PDF oficial de MinSalud — sin hallazgos",
         "keywords": ["historia clínica", "1995", "documento médico-legal"],
     },
     "RESOLUCION 866 DE 2021": {

@@ -175,3 +175,55 @@ class TestLey1751:
     def test_el_17_de_autonomia_estaba_bien_y_sigue_bien(self):
         """Es la cita que mas usa el motor en glosas de pertinencia."""
         assert self.L1751["17"]["titulo"] == "Autonomía profesional"
+
+
+class TestLey1122PlazosDePago:
+    """El plazo de pago tenia la regla sin su condicion.
+
+    El corpus decia, en plano: las EPS «giraran como minimo el 50% de los
+    valores facturados dentro de los cinco dias». El literal d) del articulo
+    13 lo condiciona a la MODALIDAD: 100% mes anticipado si el contrato es por
+    capitacion, y el 50% anticipado solo «si fuesen por otra modalidad, como
+    pago por evento, global prospectivo o grupo diagnostico».
+
+    Afirmar la regla sin su condicion es darle a la entidad la forma de
+    tumbarla de una en cualquier contrato capitado.
+    """
+
+    ART = NORMAS["LEY 1122 DE 2007"]["articulos"]["13"]
+
+    def test_trae_la_condicion_de_capitacion(self):
+        assert "100% si los contratos son por capitación" in self.ART["texto"]
+
+    def test_trae_la_condicion_del_anticipo(self):
+        assert "Si fuesen por otra modalidad" in self.ART["texto"]
+        assert "pago por evento, global prospectivo o grupo diagnóstico" in self.ART["texto"]
+
+    def test_los_treinta_dias_van_con_su_salvedad(self):
+        """Los 30 días del saldo corren solo si NO hay glosa. Con glosa manda
+        el Art. 57 de la Ley 1438."""
+        assert "no presentarse objeción o glosa alguna" in self.ART["texto"]
+        assert "Art. 57 de la Ley 1438" in self.ART["aplicacion"]
+
+    def test_avisa_del_riesgo_de_citarlo_a_medias(self):
+        assert "OJO CON LA CONDICIÓN" in self.ART["aplicacion"]
+
+
+class TestLasQueEstabanBien:
+    """No todo lo revisado estaba mal — dejarlo escrito tambien sirve."""
+
+    def test_resolucion_1995_historia_clinica(self):
+        n = NORMAS["RESOLUCION 1995 DE 1999"]
+        assert "sin hallazgos" in n["verificada"]
+        assert "documento privado, obligatorio y sometido a reserva" in n["articulos"]["1"]["texto"]
+
+    def test_decreto_111_certificado_de_disponibilidad(self):
+        """Es el que sostiene la defensa contra el «presupuesto agotado» del
+        Dispensario."""
+        art = NORMAS["DECRETO 111 DE 1996"]["articulos"]["71"]
+        assert "certificados de disponibilidad previos" in art["texto"]
+        assert "coincide literalmente" in NORMAS["DECRETO 111 DE 1996"]["verificada"]
+
+    def test_ley_23_historia_clinica(self):
+        art = NORMAS["LEY 23 DE 1981"]["articulos"]["34"]
+        assert "documento privado sometido a reserva" in art["texto"]

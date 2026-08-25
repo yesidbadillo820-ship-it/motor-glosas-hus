@@ -112,11 +112,29 @@ pero su razón estaba mal escrita, y de ahí salía la cita. El artículo 178, d
 paso, tenía un resumen donde debía ir la cita textual: si el motor lo ponía
 entre comillas, no coincidía con la ley.
 
+**El plazo de pago estaba dicho a medias.** El artículo 13 de la Ley 1122
+figuraba como si las EPS tuvieran que girar «como mínimo el 50% dentro de los
+cinco días», así, en plano. El literal real lo condiciona a la **modalidad de
+pago**: 100% mes anticipado si el contrato es por capitación, y el 50%
+anticipado solo si es por evento, global prospectivo o grupo diagnóstico. Y los
+treinta días del saldo corren solo «en caso de no presentarse objeción o glosa
+alguna». Citar la regla sin sus condiciones era darle a la entidad la forma de
+tumbarla de una en cualquier contrato capitado.
+
+**Tres normas resultaron estar bien**, y también vale anotarlo: la Resolución
+1995 de 1999 (la de historia clínica), el artículo 71 del Decreto 111 —el que
+sostiene la defensa contra el «presupuesto agotado» del Dispensario— y el
+artículo 34 de la Ley 23 de 1981. Coinciden literalmente con la fuente.
+
 **Cuánto falta.** Se midió: de las 147 normas del corpus, **28 tienen texto de
-artículo guardado**. Al cierre del día quedan **7 normas verificadas contra la
-fuente oficial (23 artículos)** y **21 normas pendientes (26 artículos)**. Las
-verificadas son las que el motor más usa: Decreto 4747, Decreto 780, Ley 100,
-Ley 1164, Ley 1438, Ley 1751 y Resolución 2284.
+artículo guardado**. Al cierre del día quedan **12 normas verificadas contra la
+fuente oficial (29 artículos)** y **16 pendientes (20 artículos)**. Las
+verificadas son todas las que el motor usa a diario. Las que quedan son de uso
+ocasional: Ley 80, Ley 599, el CPACA, la Resolución 1885 y otras.
+
+**El balance del repaso, sin adornos:** de las doce normas revisadas a fondo
+hoy, **seis tenían al menos un artículo con el nombre o el texto inventado**.
+Ese es el tamaño real de lo que destapó la auditoría de la madrugada.
 
 ### 25-08-2026 (cierre 2) — Las ratificadas de aseguradora ya no salen con la plantilla
 
@@ -7541,12 +7559,12 @@ de trabajar.
 - **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
   entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
   dejar `carterahus02@sinacsc.com`.
-- **Terminar de repasar la base normativa** — en curso. Ya están verificadas
-  contra fuente oficial las 7 normas que el motor más usa (23 artículos):
-  Decreto 4747, Decreto 780, Ley 100, Ley 1164, Ley 1438, Ley 1751 y
-  Resolución 2284. **Quedan 21 normas con 26 artículos.** La siguiente de la
-  lista es la Resolución 1995 de 1999 (la de historia clínica), que el motor
-  cita mucho en las glosas de soportes.
+- **Terminar de repasar la base normativa** — **las de uso diario ya están.**
+  12 normas verificadas contra fuente oficial (29 artículos): Decreto 4747,
+  Decreto 780, Decreto 111, Decreto 2423, Ley 23, Ley 100, Ley 1122, Ley 1164,
+  Ley 1438, Ley 1751, Resolución 1995 y Resolución 2284. **Quedan 16 normas con
+  20 artículos**, todas de uso ocasional (Ley 80, Ley 599, el CPACA, la
+  Resolución 1885, entre otras). Se pueden hacer cuando haya un rato.
 
 ### Lo que quedó de la noche del 25-08
 - **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
