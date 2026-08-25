@@ -402,6 +402,39 @@ def _verificar_cups(texto: str, issues: list[dict]) -> None:
         )
 
 
+def _norma_sucesora_ya_nombrada(derogada_por: str, texto: str) -> bool:
+    """¿El dictamen ya nombra la norma que reemplazó a la derogada?
+
+    `derogada_por` viene del corpus con una frase del estilo «derogada por la
+    Resolución 948 de 2026 (14 de mayo)». Se saca de ahí el número y el año y
+    se busca esa pareja en el dictamen. Si está, el lector ya tiene la
+    información y el aviso solo hace ruido.
+    """
+    if not derogada_por or not texto:
+        return False
+    # La frase del corpus es prosa: «la derogó la Resolución 948 del 14 de
+    # mayo de 2026, que rige desde su expedición (junto con las Resoluciones
+    # 558 y 1884 de 2024)». Hay que engancharse al número que sigue al tipo
+    # de norma —948— y no al primer par número+año que aparezca, que sería
+    # el 1884 de 2024 y no es la sucesora.
+    m = re.search(
+        r"(?:resoluci[oó]n|ley|decreto|circular|acuerdo)\s+(\d{2,5})\b"
+        r"[^.;]{0,60}?\b((?:19|20)\d{2})\b",
+        derogada_por,
+        re.IGNORECASE,
+    )
+    if not m:
+        return False
+    numero, anio = m.group(1), m.group(2)
+    return bool(
+        re.search(
+            rf"\b{re.escape(numero)}\s*(?:de|/)\s*{re.escape(anio)}\b",
+            texto,
+            re.IGNORECASE,
+        )
+    )
+
+
 def _verificar_folios(texto: str, issues: list[dict], evidencia: Optional[str]) -> None:
     """Marca los folios que el dictamen cita y que no están en el expediente.
 
@@ -873,6 +906,14 @@ def verificar_citas(
                     # correcto. Quien sabe la fecha del servicio es el gestor,
                     # así que se le avisa y él decide.
                     _nota = (normas[clave].get("derogada_por") or "").strip()
+                    # 25-08-2026: si el propio dictamen ya dice cuál norma la
+                    # reemplazó y desde cuándo, el aviso sobra. En el lote de
+                    # recepción del día salieron 21 avisos por la Res. 2275 de
+                    # 2023 — y el gestor que ve 21 avisos de algo que el texto
+                    # ya explica deja de leerlos todos. Se exige que el
+                    # dictamen nombre la sucesora, no solo que hable de fechas.
+                    if _nota and _norma_sucesora_ya_nombrada(_nota, texto):
+                        continue
                     issues.append(
                         {
                             "tipo": "NORMA_DEROGADA",
