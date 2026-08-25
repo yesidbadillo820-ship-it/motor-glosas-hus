@@ -197,9 +197,16 @@ GRUPO_OTROS = next(g for g in GRUPOS if g.clave == "OTROS")
 PALABRAS_DETALLADO = ("DETALLADO", "DETALLE DE FACTURA")
 
 
+# `RegistroEnfermeria.pdf` no trae separador entre las dos palabras. Al pasarlo
+# a mayúsculas quedaba «REGISTROENFERMERIA», donde ENFERMERIA ya no es una
+# palabra suelta y el archivo se iba a OTROS. Se corta donde cambia de minúscula
+# a mayúscula, ANTES de subirlo todo a mayúsculas.
+_RE_PEGADAS = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
 def _norm(texto: object) -> str:
     """Mayúsculas, sin tildes, sin signos: para comparar nombres de archivo."""
-    s = unicodedata.normalize("NFKD", str(texto or "").upper())
+    s = unicodedata.normalize("NFKD", _RE_PEGADAS.sub(" ", str(texto or "")).upper())
     s = "".join(c for c in s if not unicodedata.combining(c))
     return " ".join(re.sub(r"[^A-Z0-9]+", " ", s).split())
 
