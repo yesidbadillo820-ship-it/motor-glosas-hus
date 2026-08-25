@@ -269,6 +269,22 @@ para que quede en la memoria común.
     tandas), quita las filas repetidas y avisa dos cosas: si una base llegó al
     tope de filas de Excel (salió recortada) y hasta qué número de factura llega
     cada una, que es como se ve de una si está vieja.
+  - La base de facturación ENE–JUL sirvió para ubicar el rango: **1.537 de las
+    1.573** se facturaron entre el **23/06 y el 31/07**, todas de COOSALUD, y
+    las 36 restantes son de agosto. Ese es el rango con el que hay que bajar el
+    export de SERVICIOS FACTURADOS. De paso, el bot aprendió a buscar el
+    encabezado cuando no está en la primera fila y a avisar cuando le pasan un
+    reporte que no trae el detalle de servicios (y por tanto no sirve para el
+    OBJECIONES).
+  - **Portal COOSALUD cerrado el mismo día**: 4 ventanas en paralelo cerraron
+    las **1.573 facturas** entre las 10:24 y las 12:51 (**2 h 27 min** de reloj;
+    7 h 52 min de trabajo del robot repartido en las cuatro). Resultado:
+    **1.527 OK**, 2 con la glosa de CALIDAD abierta a propósito (HUS532676 y
+    HUS532956, esperando a las doctoras), **43 NO_EN_BOLSA** y 1 terminada sin
+    cartel de asignación. O sea 1.529 respondidas y **44 por revisar**.
+    Por ventana: S1 394 en 99 min · S2 394 en 103 min · S3 394 en 123 min ·
+    S4 391 en 146 min. Las NO_EN_BOLSA se concentran al final del rango
+    (3 en S2, 14 en S3, 26 en S4), que es el mismo patrón del lote de 1.600.
 
 **Dónde está cada cosa de este frente**
 
@@ -7225,8 +7241,10 @@ Eran dos cosas:
   Si no cabe en un solo Excel (el tope son 1.048.576 filas), bajarlo por tandas
   de fechas y pasarlas todas juntas al bot FILTRAR BASE DGH. Con eso se genera
   el OBJECIONES del lote.
-- **Portal COOSALUD del lote de 1.573**: correr las 4 listas en paralelo
-  (S1–S4). No depende de la base DGH, se puede hacer ya.
+- **Repasar las 44 del lote de 1.573 que no quedaron OK en el portal**: 43
+  NO_EN_BOLSA (no estaban en la bolsa del usuario: hay que ver si las tiene
+  otro auditor o si ya venían respondidas) y 1 que terminó sin cartel de
+  asignación. El resto del portal ya está cerrado.
 - **8 facturas de auditoría médica de agosto** (HUS527358, HUS529493, HUS530150,
   HUS530676, HUS530701, HUS531001, HUS531885, HUS533202): esperar la respuesta
   de las doctoras para armar sus trámites. Siguen pendientes también las 37 del
@@ -7634,11 +7652,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
-**Frente COOSALUD (25-08):** (a) bajar la base DGH nueva —por tandas si toca— y
-correr FILTRAR BASE DGH con las 1.573 facturas; (b) generar el OBJECIONES del
-lote y subirlo a DGH en tandas de 300; (c) correr el portal COOSALUD con las 4
-listas del lote; (d) insistir con auditoría médica por las 8 facturas de
-CALIDAD de agosto.
+**Frente COOSALUD (25-08):** (a) bajar el export de SERVICIOS FACTURADOS de DGH
+del **23/06/2026 a hoy** —por tandas si no cabe— y correr FILTRAR BASE DGH con
+las 1.573 facturas; (b) generar el OBJECIONES del lote y subirlo a DGH en
+tandas de 300; (c) repasar las 44 del portal que no quedaron OK; (d) insistir
+con auditoría médica por las 8 facturas de CALIDAD de agosto.
 
 
 **Lo primero del motor (25-08):** reiniciar el motor en la PC de cartera para
