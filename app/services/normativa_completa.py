@@ -1250,6 +1250,49 @@ RESOLUCIONES = {
 # ═══════════════════════════════════════════════════════════════════
 
 CIRCULARES = {
+    # Agregadas el 24-08-2026. Estaban en la pantalla de Consulta Normativa
+    # pero NO en el corpus con que se revisan las citas, así que un dictamen
+    # que las citara —y hay glosas de medicamentos que obligan a citarlas—
+    # salía marcado con «NORMA_INEXISTENTE» en rojo. Son las dos normas con
+    # que se responde una glosa de «precio superior al regulado».
+    "CIRCULAR 19 DE 2024": {
+        "nombre": "Circular 19 de 2024 (CNPMDM — MinSalud/MinCIT)",
+        "titulo": "Precio máximo de venta de medicamentos en control directo",
+        "ambito": "Medicamentos con control directo de precios — por mercado relevante",
+        "vigente": True,
+        "notas": (
+            "Rige desde el 30 de julio de 2024 y deroga la Circular 13 de 2022. "
+            "Fija el precio máximo POR MERCADO RELEVANTE (mg/unidad). CLAVE PARA LA "
+            "DEFENSA: el Parágrafo 2 del Art. 1 permite a la IPS ADICIONAR al precio "
+            "máximo el margen del Art. 11 de la Circular 18 de 2024, así que facturar "
+            "por encima del precio máximo NO es por sí solo un sobrecosto."
+        ),
+        "keywords": [
+            "precio máximo de venta",
+            "control directo de precios",
+            "medicamentos regulados",
+            "mercado relevante",
+            "CNPMDM",
+            "CUM",
+        ],
+    },
+    "CIRCULAR 18 DE 2024": {
+        "nombre": "Circular 18 de 2024 (CNPMDM — MinSalud/MinCIT)",
+        "titulo": "Márgenes de comercialización de medicamentos regulados",
+        "ambito": "Margen que la IPS puede adicionar al precio máximo regulado",
+        "vigente": True,
+        "notas": (
+            "Su Art. 11 es el margen al que remite el Parágrafo 2 del Art. 1 de la "
+            "Circular 19 de 2024. Se cita junto con ella al responder una glosa por "
+            "«precio superior al regulado»."
+        ),
+        "keywords": [
+            "margen de comercialización",
+            "precio regulado",
+            "CNPMDM",
+            "Art. 11",
+        ],
+    },
     "CIRCULAR 025 DE 2024": {
         "nombre": "Circular 025 de 31-dic-2024 (MinSalud)",
         "titulo": "Manual Tarifario SOAT actualizado — UVB",
