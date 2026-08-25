@@ -1,3 +1,4 @@
+import html as _html
 import re
 import smtplib
 from email.mime.application import MIMEApplication
@@ -527,6 +528,63 @@ def _bloque_del_gestor(gestor: str, glosas: list) -> str:
     </div>"""
 
 
+# ── Cómo entrar al Motor de Glosas ───────────────────────────────────────
+#
+# POR QUÉ (25-08-2026). Varios gestores reciben el aviso de que tienen glosas
+# asignadas y no saben cómo entrar al portal a responderlas. Yesid pidió que el
+# propio correo lo explique, y añadió «o si se puede colocar mucho mejor».
+#
+# TRES DECISIONES DE REDACCIÓN, que no son cosméticas:
+#
+# 1) EL USUARIO VA PERSONALIZADO. Este aviso se manda a cada destinatario por
+#    separado, así que se le puede escribir SU dirección en vez de una regla
+#    general. Cada quien lee la suya y no la de los demás. (Para eso el HTML
+#    se arma DENTRO del bucle de envío; antes se armaba una sola vez afuera.)
+#
+# 2) SOLO A QUIEN TIENE CUENTA. El aviso también va a las direcciones de
+#    difusión general, que no siempre son usuarios del portal. Explicarle a
+#    alguien cómo entrar con una cuenta que no tiene solo lo confunde.
+#
+# 3) LA CLAVE SE NOMBRA COMO DE PRIMER INGRESO Y NO SE IMPRIME. La regla del
+#    hospital es que la clave inicial es lo que va antes del arroba. Escrita
+#    en un correo, esa regla sirve para TODAS las cuentas, y un correo se
+#    reenvía. Se dice que es solo para entrar la primera vez y se recuerda que
+#    el portal obliga a cambiarla en ese momento —lo hace de verdad: el modal
+#    «Cambio de contraseña requerido» no deja operar sin cambiarla—. La clave
+#    de nadie se escribe, ni la del propio destinatario.
+
+
+def bloque_acceso_al_motor(destinatario: str, usuarios_del_portal=None) -> str:
+    """Recuadro que le dice al gestor cómo entrar al Motor de Glosas.
+
+    `usuarios_del_portal` es el conjunto de correos que SÍ tienen cuenta. Si se
+    pasa y el destinatario no está, no se pinta nada: a quien no tiene cuenta,
+    explicarle cómo entrar solo lo confunde.
+    """
+    correo = (destinatario or "").strip()
+    if not correo or "@" not in correo:
+        return ""
+    if usuarios_del_portal is not None:
+        conocidos = {(c or "").strip().lower() for c in usuarios_del_portal}
+        if correo.lower() not in conocidos:
+            return ""
+    enlace = _html.escape(get_settings().app_base_url)
+    usuario = _html.escape(correo)
+    return (
+        '<div style="margin-top:22px;padding:15px;background:#eff6ff;'
+        'border:1px solid #bfdbfe;border-radius:8px;font-size:13px;color:#1e3a5f">'
+        "<b>¿Es la primera vez que entra al Motor de Glosas?</b><br>"
+        f'Abra <a href="{enlace}" style="color:#1e40af">{enlace}</a> y use:<br><br>'
+        f"&nbsp;&nbsp;<b>Usuario:</b> {usuario}<br>"
+        "&nbsp;&nbsp;<b>Contraseña de primer ingreso:</b> la parte de su correo "
+        "que va <i>antes</i> del arroba.<br><br>"
+        "El sistema le va a pedir que la cambie apenas entre: es obligatorio y "
+        "no lo deja trabajar hasta que lo haga. Elija una que no use en otros "
+        "sitios."
+        "</div>"
+    )
+
+
 async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     """Envía un correo broadcast a todos los gestores listando las glosas importadas.
 
@@ -668,12 +726,24 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     </p>
     """
 
-    html = _build_html_base(asunto, contenido)
+    # Quiénes de los destinatarios tienen cuenta en el portal: solo a ellos se
+    # les explica cómo entrar. Los correos de difusión general no siempre son
+    # usuarios, y decirle a alguien cómo entrar con una cuenta que no tiene
+    # solo lo confunde.
+    usuarios_del_portal = set(emails_gestores or []) | set(emails_medicos or [])
+
     exitos = 0
     # 20-08-2026: se anota QUÉ pasó con cada correo, uno por uno. Antes solo
     # se devolvía el total, y un «3 de 5» no dice cuáles dos fallaron.
     detalle: list[dict] = []
     for destinatario in destinatarios:
+        # El HTML se arma DENTRO del bucle (25-08-2026) para poder escribirle
+        # a cada quien SU dirección en el recuadro de acceso al Motor. Antes
+        # se armaba una sola vez afuera y era el mismo para todos.
+        html = _build_html_base(
+            asunto,
+            contenido + bloque_acceso_al_motor(destinatario, usuarios_del_portal),
+        )
         ok = await enviar_email(destinatario, asunto, html)
         if ok:
             exitos += 1
