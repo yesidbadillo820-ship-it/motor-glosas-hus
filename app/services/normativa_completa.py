@@ -143,6 +143,9 @@ LEYES = {
         },
         "keywords": ["flujo recursos", "anticipo", "pagos"],
     },
+    # 25-08-2026: artículos 56, 105 y 126 verificados y corregidos contra el
+    # texto oficial (normograma de la SuperSalud). Los tres tenían mal el
+    # epígrafe y dos de ellos, además, texto que no está en la ley.
     "LEY 1438 DE 2011": {
         "nombre": "Ley 1438 de 2011",
         "titulo": "Por medio de la cual se reforma el Sistema General de Seguridad Social en Salud",
@@ -182,17 +185,41 @@ LEYES = {
                 "aplicacion": "Marco general. Por sí solo no sustenta una defensa tarifaria.",
                 "keywords": ["orientación", "bienestar del usuario", "atención primaria"],
             },
+            # 25-08-2026 — CORREGIDO. Decía «Trámite de pagos» con un texto que
+            # hablaba de pagar «el monto total dentro de los treinta (30) días».
+            # El artículo real se llama «Pagos a los prestadores de servicios de
+            # salud» y remite los plazos a lo que fije el Gobierno según la Ley
+            # 1122. Y trae algo que el motor no estaba usando: la prohibición de
+            # exigir auditoría previa para recibir la factura — que el corpus le
+            # atribuía, con texto inventado, a un artículo del Decreto 780.
             "56": {
-                "titulo": "Trámite de pagos",
-                "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda. Nota operativa (Manual Único de Glosas Res. 2284/2023 + Manual SIIFA 2026): una vez levantada o aceptada la glosa, el pago al prestador debe efectuarse dentro de los cinco (5) días hábiles siguientes.",
-                "aplicacion": "Pago total 30 días hábiles + anticipo 50% no sujeto a glosa + pago 5 días hábiles post-levantamiento",
+                "titulo": "Pagos a los prestadores de servicios de salud",
+                "texto": (
+                    "Las Entidades Promotoras de Salud pagarán los servicios a los "
+                    "prestadores de servicios de salud dentro de los plazos, condiciones, "
+                    "términos y porcentajes que establezca el Gobierno Nacional según el "
+                    "mecanismo de pago, de acuerdo con lo establecido en la Ley 1122 de "
+                    "2007. El no pago dentro de los plazos causará intereses moratorios a "
+                    "la tasa establecida para los impuestos administrados por la Dirección "
+                    "de Impuestos y Aduanas Nacionales (DIAN). Se prohíbe el "
+                    "establecimiento de la obligatoriedad de procesos de auditoría previa "
+                    "a la presentación de las facturas por prestación de servicios o "
+                    "cualquier práctica tendiente a impedir la recepción."
+                ),
+                "aplicacion": (
+                    "Dos argumentos fuertes en un solo artículo: (1) el no pago a tiempo "
+                    "causa intereses moratorios a la tasa DIAN; (2) está PROHIBIDO exigir "
+                    "auditoría previa para recibir la factura, o cualquier práctica que "
+                    "impida la recepción. Es de rango de LEY, más fuerte que la "
+                    "Resolución 2284. NO afirmar «treinta días»: el artículo remite los "
+                    "plazos al Gobierno Nacional y a la Ley 1122 de 2007."
+                ),
                 "keywords": [
-                    "pago",
-                    "30 días",
-                    "50%",
-                    "anticipo",
-                    "trámite de pagos",
-                    "5 días pago",
+                    "pagos",
+                    "intereses moratorios",
+                    "auditoría previa",
+                    "recepción de facturas",
+                    "DIAN",
                 ],
             },
             "57": {
@@ -213,8 +240,12 @@ LEYES = {
                     "SIIFA",
                 ],
             },
+            # 25-08-2026: el título decía «Supervisión, inspección y vigilancia».
+            # El real es «Función jurisdiccional de la Superintendencia Nacional
+            # de Salud», y lo que hace es adicionarle literales al Art. 41 de la
+            # Ley 1122 — entre ellos el f), que es justo el de las glosas.
             "126": {
-                "titulo": "Supervisión, inspección y vigilancia",
+                "titulo": "Función jurisdiccional de la Superintendencia Nacional de Salud",
                 "texto": "La Superintendencia Nacional de Salud tendrá la función jurisdiccional, sin perjuicio de la competencia de los jueces de la República, para conocer y fallar en derecho con carácter definitivo y con las facultades propias de un juez, los conflictos entre las entidades promotoras de salud y sus afiliados o entre las entidades territoriales y las entidades responsables del pago de los servicios de salud, y los prestadores de servicios de salud, en materia de glosas de facturas.",
                 "aplicacion": "Función jurisdiccional SuperSalud para conflictos de glosas",
                 "keywords": [
@@ -225,18 +256,27 @@ LEYES = {
                     "arbitraje",
                 ],
             },
+            # 25-08-2026 — CORREGIDO. Decía «Prohibición de intromisión en el
+            # acto médico» con un texto que no está en la ley. El artículo real
+            # se llama «Autonomía profesional» y DEFINE qué es esa autonomía;
+            # sirve igual para la defensa, pero hay que citarlo por lo que dice.
             "105": {
-                "titulo": "Prohibición de intromisión en el acto médico",
-                "texto": "Las entidades responsables del pago de los servicios de salud no podrán interferir en la autonomía profesional del médico tratante, ni sustituir sus decisiones clínicas por consideraciones administrativas o económicas. El criterio del médico tratante prevalece sobre la opinión del auditor médico que no examinó al paciente. La violación de esta prohibición compromete la responsabilidad civil de la entidad pagadora por las consecuencias en la salud del usuario.",
-                "aplicacion": "Defensa en glosas de PERTINENCIA CLÍNICA (CL/PE) — proscribe revisión administrativa del criterio médico",
-                "keywords": [
-                    "intromisión",
-                    "acto médico",
-                    "autonomía profesional",
-                    "pertinencia clínica",
-                    "criterio médico tratante",
-                    "Art. 105",
-                ],
+                "titulo": "Autonomía profesional",
+                "texto": (
+                    "Entiéndase por autonomía de los profesionales de la salud, la "
+                    "garantía que el profesional de la salud pueda emitir con toda "
+                    "libertad su opinión profesional con respecto a la atención y "
+                    "tratamiento de sus pacientes con calidad, aplicando las normas, "
+                    "principios y valores que regulan el ejercicio de su profesión."
+                ),
+                "aplicacion": (
+                    "Para las glosas de pertinencia: la ley garantiza que el médico opine "
+                    "con libertad sobre la atención de su paciente. Acompaña al Art. 17 de "
+                    "la Ley 1751 de 2015 y al Art. 26 de la Ley 1164 de 2007. NO le "
+                    "atribuya la frase «las entidades no podrán interferir»: eso no está "
+                    "en el artículo."
+                ),
+                "keywords": ["autonomía profesional", "acto médico", "pertinencia"],
             },
         },
         "keywords": [
@@ -833,14 +873,62 @@ DECRETOS = {
         "titulo": "Decreto Único Reglamentario del Sector Salud y Protección Social",
         "ambito": "Marco general reglamentario sector salud",
         "vigente": True,
+        # 25-08-2026 — CORREGIDO CONTRA LA FUENTE. Este corpus tenía cargado un
+        # artículo 2.5.3.4.1.1 titulado «Prohibición de auditoría previa como
+        # barrera», con un texto que no existe. Verificado contra el Decreto
+        # 441 de 2022 (que es el que agregó este capítulo al Decreto 780):
+        # el 2.5.3.4.1.1 es el «Objeto» del capítulo.
+        #
+        # La prohibición SÍ es real, pero vive en otra parte: en el artículo 5
+        # de la Resolución 2284 de 2023, que está más abajo en este archivo con
+        # su texto literal. Es la que hay que citar.
         "articulos": {
             "2.5.3.4.1.1": {
-                "titulo": "Prohibición de auditoría previa como barrera",
-                "texto": "No podrá establecerse la auditoría previa como barrera para la radicación de facturas por servicios de salud efectivamente prestados. La auditoría es un mecanismo posterior al pago y no un requisito previo.",
-                "aplicacion": "PROHÍBE auditoría previa como barrera de radicación",
-                "keywords": ["auditoría previa", "radicación", "barrera"],
+                "titulo": "Objeto",
+                "texto": (
+                    "El presente capítulo tiene por objeto regular algunos aspectos "
+                    "generales de los acuerdos de voluntades entre las entidades "
+                    "responsables de pago y los prestadores de servicios de salud o "
+                    "proveedores de tecnologías en salud, celebrados entre dos o más "
+                    "personas naturales o jurídicas para la prestación o provisión de "
+                    "servicios y tecnologías en salud, en sus etapas precontractual, "
+                    "contractual y post contractual, y establecer mecanismos de "
+                    "protección a los usuarios."
+                ),
+                "aplicacion": (
+                    "Es el artículo de encabezado del capítulo. NO prohíbe la auditoría "
+                    "previa: para eso es el artículo 5 de la Resolución 2284 de 2023."
+                ),
+                "keywords": ["acuerdos de voluntades", "objeto", "capítulo"],
+            },
+            "2.5.3.4.3.3": {
+                "titulo": "Auditoría de cuentas médicas",
+                "texto": (
+                    "La auditoría de las cuentas médicas se realizará con base en los "
+                    "soportes definidos en el artículo 2.5.3.4.4.1 del presente decreto, "
+                    "con sujeción a los estándares establecidos en el Manual Único de "
+                    "Devoluciones, Glosas y Respuestas expedido por el Ministerio de "
+                    "Salud y Protección Social, conforme a los términos señalados en el "
+                    "trámite de glosas establecido en el artículo 57 de la Ley 1438 de "
+                    "2011, y de acuerdo con la información reportada y validada en el "
+                    "Registro Individual de Prestaciones de Salud."
+                ),
+                "aplicacion": (
+                    "Ata la auditoría de la entidad a TRES cosas: los soportes definidos "
+                    "por norma, las causales del Manual Único y los plazos del Art. 57. "
+                    "Sirve contra la entidad que glosa por fuera del manual, que exige "
+                    "un soporte que la norma no pide, o que se pasa del término."
+                ),
+                "keywords": [
+                    "auditoría de cuentas médicas",
+                    "soportes",
+                    "manual único",
+                    "plazos",
+                ],
             },
         },
+        "articulos_completos": False,
+        "verificada": "25-08-2026 contra el Decreto 441 de 2022 (norma que lo adicionó)",
         "keywords": ["decreto único", "reglamentario", "780"],
     },
     "DECRETO 441 DE 2022": {
@@ -1106,6 +1194,38 @@ RESOLUCIONES = {
         "titulo": "Manual Único de Devoluciones, Glosas y Respuestas",
         "ambito": "Norma maestra vigente — CÓDIGOS TAXATIVOS de glosas",
         "vigente": True,
+        # 25-08-2026: se carga el artículo 5 con su texto literal. Es el que de
+        # verdad prohíbe exigir auditoría previa para radicar — el corpus se lo
+        # atribuía al Decreto 780, con un texto inventado.
+        "articulos": {
+            "5": {
+                "titulo": "Auditoría de cuentas médicas",
+                "texto": (
+                    "De conformidad con lo establecido en el artículo 2.5.3.4.3.3 del "
+                    "Decreto número 780 de 2016, las entidades responsables de pago no "
+                    "podrán exigir que, para radicar las facturas de venta en salud, se "
+                    "haya surtido un proceso de auditoría previo o paso por mallas "
+                    "validadoras propias ni el envío previo de la factura, actuaciones "
+                    "que se consideran prácticas dilatorias no autorizadas. Corresponde "
+                    "a las entidades responsables de pago adelantar la auditoría de las "
+                    "cuentas médicas."
+                ),
+                "aplicacion": (
+                    "ESTE es el artículo contra la entidad que condiciona la radicación "
+                    "a pasar antes por su malla o su auditoría: la norma llama a eso "
+                    "«práctica dilatoria no autorizada». Se cita por su nombre —Art. 5 "
+                    "de la Res. 2284 de 2023—, no como artículo del Decreto 780."
+                ),
+                "keywords": [
+                    "auditoría previa",
+                    "radicación",
+                    "mallas validadoras",
+                    "prácticas dilatorias",
+                ],
+            },
+        },
+        "articulos_completos": False,
+        "verificada": "25-08-2026 contra el texto oficial (normograma SuperSalud)",
         "anexos": {
             "Anexo Técnico No. 3": "Listado TAXATIVO de códigos de glosa (6 dígitos). La EPS no puede inventar códigos fuera de este catálogo.",
         },

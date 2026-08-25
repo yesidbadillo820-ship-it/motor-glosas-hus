@@ -63,6 +63,50 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 25-08-2026 (cierre 3) — El repaso normativo: otros cuatro artículos mal, y un argumento que estábamos regalando
+
+Siguiendo lo que pidió el área —leer el Decreto 4747 completo y el Decreto 780
+de 2016—, apareció más de lo mismo. Y esta vez apareció también algo a favor.
+
+**El Decreto 780 tenía su propio artículo inventado.** El corpus guardaba un
+artículo 2.5.3.4.1.1 titulado «Prohibición de auditoría previa como barrera».
+Se verificó contra el Decreto 441 de 2022, que es el que le agregó ese capítulo
+al 780: **el 2.5.3.4.1.1 es el «Objeto» del capítulo** y no dice nada de
+auditoría previa. El texto estaba inventado. Se corrigió y se cargó, con su
+texto literal, el 2.5.3.4.3.3, que sí es el de la auditoría de cuentas médicas.
+
+**Pero la prohibición SÍ existe — y en un sitio mejor.** Está en el
+**artículo 56 de la Ley 1438 de 2011**:
+
+> «Se prohíbe el establecimiento de la obligatoriedad de procesos de auditoría
+> previa a la presentación de las facturas por prestación de servicios o
+> cualquier práctica tendiente a impedir la recepción.»
+
+Es de rango de **ley**, más fuerte que el decreto o la resolución. El motor
+tenía el argumento correcto colgado de una norma inventada: si la entidad iba a
+verificar la cita, no encontraba nada. Ahora está donde debe, y además quedó
+cargado el artículo 5 de la Resolución 2284 de 2023, que repite la prohibición
+y la llama por su nombre: «prácticas dilatorias no autorizadas».
+
+**Y tres artículos más de la Ley 1438 tenían mal el nombre:**
+
+| El motor decía | Lo que dice de verdad |
+|---|---|
+| Art. 56 — «Trámite de pagos» | «Pagos a los prestadores de servicios de salud» |
+| Art. 105 — «Prohibición de intromisión en el acto médico» | «Autonomía profesional» |
+| Art. 126 — «Supervisión, inspección y vigilancia» | «Función jurisdiccional de la Superintendencia Nacional de Salud» |
+
+Dos de ellos tenían además **texto inventado**. El del 56 hablaba de pagar «el
+monto total dentro de los treinta días» — la ley no dice eso, remite los plazos
+al Gobierno Nacional y a la Ley 1122. Afirmar un plazo que la norma no fija era
+darle a la entidad una cita fácil de desmentir. El del 105 le atribuía a la ley
+la frase «las entidades no podrán interferir», que tampoco está.
+
+**Cuánto falta.** Se midió: de las 147 normas del corpus, **28 tienen texto de
+artículo guardado**. Cuatro ya quedaron verificadas contra la fuente oficial;
+**quedan 24 normas con 39 artículos** por revisar. Las más citadas —Ley 1751,
+Ley 100 y la Resolución 1995— son las siguientes de la lista.
+
 ### 25-08-2026 (cierre 2) — Las ratificadas de aseguradora ya no salen con la plantilla
 
 El área revisó los seis pendientes y respondió. Cuatro ya estaban hechos
@@ -7486,8 +7530,11 @@ de trabajar.
 - **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
   entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
   dejar `carterahus02@sinacsc.com`.
-- **Terminar de repasar la base normativa** — en curso. Ya está descargado el
-  texto oficial completo del Decreto 4747; sigue el Decreto 780 de 2016.
+- **Terminar de repasar la base normativa** — en curso. Hechos: Decreto 4747,
+  Decreto 780, Resolución 2284 y Ley 1438. **Quedan 24 normas con 39 artículos**
+  cuyo texto guardado no se ha contrastado contra la fuente. Las que más se
+  citan son las siguientes: Ley 1751 de 2015 (4 artículos), Ley 100 de 1993 (3)
+  y Resolución 1995 de 1999 (2).
 
 ### Lo que quedó de la noche del 25-08
 - **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor

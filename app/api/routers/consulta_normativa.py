@@ -1093,7 +1093,7 @@ CATALOGO_NORMAS = [
     {
         "clave": "LEY 1438 DE 2011 ART 105",
         "nombre": "Ley 1438 de 2011 — Art. 105",
-        "titulo": "Prohibición de intromisión en el acto médico por parte de las EPS",
+        "titulo": "Autonomía profesional (Art. 105 Ley 1438 de 2011)",
         "vigente": True,
         "keywords": ["acto médico", "intromisión", "autonomía", "Art. 105"],
     },
