@@ -7411,8 +7411,8 @@ institucional.
 **22 OK**, y las otras 2 verificadas: la 540273 era el propio piloto (ya
 finalizada) y la 538877 respondió con un aviso informativo del portal — se
 verificó aparte y ya no está en pendientes. **Las 24 quedaron respondidas y
-finalizadas**, cada una con su pantallazo en `evidencias_glosa\`. Queda
-pendiente solo anotar el **GI del paquete** cuando el portal lo genere.
+finalizadas**, cada una con su pantallazo en `evidencias_glosa\`. El portal
+generó el consecutivo del paquete: **GI-33-5369-2026**.
 
 También se resolvió el enredo del PR de la bitácora: el respaldo del 24-08 se
 aplicó dos veces (en este chat y en otro), la principal quedó con la versión
@@ -7439,6 +7439,38 @@ Eran dos cosas:
    4000 caracteres». Vale para cualquier error de este tipo, no solo para este.
 
 4 pruebas nuevas, una de ellas ejecuta de verdad la traducción del error.
+
+---
+
+### 25-08 (noche) — «Esto lo hizo Vanesa, pero aparece Óscar»
+
+Yesid preguntó por qué algunos envíos que recepciona y gestiona **Vanesa**
+quedan a nombre del gestor **Óscar**.
+
+**La respuesta.** El sistema guarda el nombre de la persona en tres momentos
+distintos —quién **registró** el oficio, quién **escribió** el envío y quién
+**auditó** cada factura— y en los tres casos el nombre sale de la **sesión
+abierta en el navegador**, no de quién esté sentado al computador. Si dos
+gestores comparten el mismo equipo y no cierran sesión, todo lo que haga el
+segundo queda firmado por el primero. Hay un segundo camino posible: las
+facturas que entraron por **importación del Excel** llevan el auditor que decía
+la columna AUDITOR del archivo, no el de quien las tocó después.
+
+**Cómo averiguar cuál de los dos fue,** sin cambiar nada:
+
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py FHUS-AS-I01197-26
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py 232050
+
+Muestra, uno al lado del otro y con fecha y hora: quién registró el oficio,
+quién escribió cada envío, quién auditó cada factura y el historial renglón por
+renglón con su firma. Las líneas que trajo el Excel quedan marcadas.
+
+**Lo que hay que hacer en la oficina:** cada gestor entra con su propio usuario
+y cierra sesión al terminar. El nombre de quien tiene la sesión abierta se ve
+arriba a la derecha en la página: si no es el suyo, hay que cerrar sesión antes
+de trabajar.
+
+10 pruebas nuevas.
 
 ---
 
@@ -7932,9 +7964,8 @@ porque el motor no se había reiniciado. Todo lo corregido ayer y hoy sigue sin
 efecto hasta ese reinicio.
 
 
-**Lote de glosas del 25-ago (Dispensario):** las 24 quedaron respondidas;
-solo falta **anotar el GI del paquete** cuando el portal lo genere (pedírselo
-al chat para dejarlo en la bitácora, como el GI-33-5335-2026 del lote 14-ago).
+**Lote de glosas del 25-ago (Dispensario):** cerrado — las 24 respondidas
+con el consecutivo **GI-33-5369-2026** ya anotado.
 
 **Notas crédito del Dispensario (lo primero, 25-08):** el cargue del acta
 858 ya quedó (21/21 OK el 24-08). Lo que sigue: (a) pasar a SISTEMAS el
