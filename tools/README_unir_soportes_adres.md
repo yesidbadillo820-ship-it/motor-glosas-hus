@@ -139,9 +139,16 @@ mismo.
 ### El NIT del nombre
 
 El `680010079201` **no se inventa**: sale del nombre de los propios archivos de
-la carpeta (la epicrisis y la factura vienen así). Si en una carpeta ningún
-archivo lo trae, el folio queda como `HUS######_EPICRIS.pdf` y el bot lo avisa;
-con `--prefijo 680010079201` se le puede dar.
+la carpeta (la epicrisis y la factura vienen así, `<NIT>_<FACTURA>_<TIPO>.pdf`).
+Si en una carpeta ningún archivo lo trae, el folio queda como
+`HUS######_EPICRIS.pdf` y el bot lo avisa; con `--prefijo 680010079201` se le
+puede dar.
+
+**Ojo con el flujo de dos pasos.** Si primero corre `--renombrar` y después
+`--folio`, al numerar desaparece el nombre que traía el NIT y ya no hay de dónde
+sacarlo. El bot lo avisa al terminar el renombrado, con el NIT que encontró:
+guárdelo y páselo con `--prefijo`. Corriendo `--folio` de una sola vez no hace
+falta.
 
 ---
 
@@ -181,7 +188,7 @@ El resultado queda en la carpeta de cada factura como
 
 ---
 
-## 4) Los seis candados
+## 4) Los ocho candados
 
 Armar folios no se deshace de un clic, así que:
 
@@ -206,6 +213,16 @@ Armar folios no se deshace de un clic, así que:
    que le falta una hoja no se sube sin que el auditor lo sepa.
 6. **Sin Excel ni LibreOffice no revienta.** Si no hay con qué pasar el
    detallado a PDF, lo deja anotado y sigue con lo demás.
+7. **Una corrida que se cae no deja destrozos.** El renombrado va en dos
+   vueltas (primero a un nombre de paso `~renombrando~…`, porque el nombre que
+   le toca a un archivo puede ser el que todavía tiene otro). Si algo falla a
+   mitad, **se deshace**: cada archivo vuelve al nombre que tenía. Y si de una
+   corrida anterior quedó algo colgado, la siguiente **le devuelve su nombre**
+   antes de empezar — un `~renombrando~HC.pdf` es la historia clínica del
+   paciente, no basura.
+8. **El reporte abierto en Excel no tumba la corrida.** En Windows el CSV no se
+   deja escribir si está abierto; el trabajo ya está hecho y no se pierde por
+   no poder dejar el listado.
 
 ---
 
@@ -227,19 +244,37 @@ En el reporte CSV:
   `..._EPICRIS.pdf` (o `..._FACTURA.pdf`) en una carpeta ya armada, pero sin su
   archivo numerado al lado. El bot no adivina: lo trata como el folio viejo. Si
   en realidad es un soporte nuevo, renómbrelo con su número y vuelva a correr.
+- **`no es un PDF: no entra al folio`** — una epicrisis en Word, una radiografía
+  en JPG. Páselas a PDF y vuelva a correr.
+- **`quedó a medio renombrar por una corrida caída`** — con `--aplicar` el bot
+  le devuelve su nombre solo.
+- **`NO se armó el folio: … no lo escribió este bot`** — en la ruta del folio
+  hay un archivo que podría ser un soporte de verdad. No se pisó nada. Si es un
+  soporte, renómbrelo con su número; si es un folio viejo, bórrelo.
 - **`SIN PDF QUE UNIR`** — la carpeta está vacía.
 
 ---
 
 ## 6) Pruebas
 
-`tests/test_tools/test_unir_soportes_adres.py` (104 pruebas). Cubren el orden
+`tests/test_tools/test_unir_soportes_adres.py` (149 pruebas). Cubren el orden
 completo de los trece grupos del folio clínico y los cuatro del de la factura,
 que gane la palabra más larga, que las abreviaturas no casen dentro de otras
 palabras, que ningún archivo se pierda, que sin `--aplicar` no se escriba nada,
-que la simulación muestre el folio como va a quedar de verdad, que la segunda
-corrida deje exactamente lo mismo —incluso cuando a la factura le falta la
-epicrisis, que fue el caso que se escapó en la prueba real—, que las notas
-crédito queden pendientes sin contarse como falta y que entren de cuartas
-cuando lleguen, que el NIT no se invente, y que ni un PDF dañado ni la falta de
-Excel/LibreOffice tumben el lote.
+que la simulación muestre el folio como va a quedar de verdad, y que la segunda
+corrida deje exactamente lo mismo.
+
+Las regresiones que dejó la revisión a fondo del 26-08 —cada una falla sin su
+arreglo y pasa con él—:
+
+| Prueba | Lo que evita |
+|---|---|
+| `test_una_epicrisis_sin_firma_es_un_soporte_no_un_folio` | Que el bot borre la epicrisis y suba el folio sin ella |
+| `test_un_huerfano_a_medio_renombrar_no_se_pierde` | Que un archivo de una corrida caída se pierda en la siguiente |
+| `test_si_el_renombrado_revienta_a_mitad_se_deshace` | Que queden archivos `~renombrando~…` para siempre |
+| `test_el_orden_del_folio_no_cambia_entre_corridas` | Que las páginas del folio salgan en otro orden |
+| `test_una_fecha_no_puede_pasar_por_NIT` | Que el folio salga con el nombre equivocado |
+| `test_las_notas_credito_con_el_nombre_del_hospital` | Que la nota crédito acabe en el folio clínico |
+| `test_avisa_el_soporte_que_no_entro_al_folio` | Que un soporte dañado se caiga en silencio |
+| `test_una_factura_bloqueada_no_tumba_las_demas` | Que un PDF abierto en Acrobat deje sin folio a las otras 323 |
+| `test_el_reporte_abierto_en_excel_no_tumba_la_corrida` | Perder el trabajo ya hecho por no poder escribir el CSV |
