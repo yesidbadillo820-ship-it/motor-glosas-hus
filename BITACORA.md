@@ -8160,6 +8160,38 @@ lista vacía, cero meses, cien meses.
 
 ---
 
+### 26-08 (cierre 2) — La pantalla nueva le quitó el puesto a una ruta que ya existía
+
+Lo cuento porque es un error mío y porque la lección sirve.
+
+**Qué pasó.** La pantalla «Mi día» que se subió hace un rato colgaba de la
+dirección `/mi-dia`. Resulta que **esa dirección ya estaba ocupada** desde
+antes: era el resumen personal del gestor (tareas del día, saludo, alertas).
+Cuando dos partes del programa piden la misma dirección, el motor le hace caso
+a la primera que se registre y **la otra queda muerta sin decir nada** — sin
+error, sin aviso: simplemente empieza a devolver otra cosa. Es exactamente la
+forma en que «Salud Total» estuvo tres meses devolviendo «Not Found».
+
+**Qué se dañó, en concreto.** Nada de lo que usted usa. Revisé todo el portal:
+**ninguna pantalla llamaba la dirección vieja**. Y la pantalla nueva sí
+funciona en el motor del hospital. El daño fue que quedó una dirección muerta
+y que la rama del hospital quedó en rojo un rato.
+
+**Cómo quedó.** El tablero de tres columnas se mudó a `/mi-dia/tablero` y la
+dirección vieja volvió a ser lo que era. **Y quedó una prueba que cierra el
+problema completo, no solo este caso:** recorre todas las direcciones del
+motor y se pone roja si dos comparten camino, diciendo cuáles son. Antes esto
+solo se descubría cuando alguien reportaba que una pantalla dejó de funcionar.
+
+**Lo que enseñó, sin adornos.** Mis propias pruebas locales SÍ lo habían
+cazado —las mismas cinco— pero subí antes de que la corrida terminara. Y
+después le dije a usted que las marcas rojas eran solo cancelaciones, porque
+miré dos de los cuatro casos y generalicé. Las dos cosas fueron mías: no subir
+con la corrida a medias, y no sacar conclusiones de una muestra cuando el dato
+está a un clic.
+
+---
+
 ## 3) PENDIENTE
 
 ### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
