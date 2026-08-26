@@ -23,9 +23,28 @@ el nombre con que se suben al ADRES:
 porque ese nombre es justo el que traían la epicrisis y la factura antes de
 renombrarlas.
 
+### El orden dentro del folio de la FACTURA
+
+El `..._FACTURA.pdf` que viene con el XML **no es solo la factura**: trae varios
+renglones pegados. `partes_de_la_factura()` mira página por página cuál es cuál:
+
+```
+HUS311736 -> {'FACTURA': (1, 7), 'DETALLADO': (8, 9), 'DIAN': (10, 18), 'NOTAS': (19, 19)}
+HUS311371 -> {'FACTURA': (1, 4), 'DIAN': (5, 10)}
+```
+
+Cuando el detallado llega **aparte** (en Excel), no basta con ponerlo detrás:
+quedaría de tercero, después de la representación gráfica. Por eso el bot
+**parte** el PDF y mete cada pedazo en su puesto: factura, detallado,
+representación gráfica, nota crédito.
+
+Si el PDF ya trae los renglones en su orden y no hay nada que intercalar, **se
+deja entero**: partirlo y volverlo a pegar no aporta y sí puede dañar algo.
+
 ### La carátula
 
-Cada folio abre con una página de índice, como la pide el área:
+**Solo el folio clínico la lleva.** El de la factura no, porque el área lo pidió
+así. Cada folio clínico abre con una página de índice:
 
 ```
 1.RESPUESTA A GLOSA ______________________________________  2

@@ -487,7 +487,7 @@ def test_armar_folios_deja_los_dos_pdf_con_su_nombre(tmp_path):
         "680010079201_HUS352904_FACTURA.pdf",
     ]
     # +1 en cada uno: la carátula que abre el folio.
-    assert plan.paginas == 1 + 5 and plan.paginas_factura == 1 + 2
+    assert plan.paginas == 1 + 5 and plan.paginas_factura == 2
     assert plan.estado == org.ESTADO_UNIDO and plan.estado_factura == org.ESTADO_UNIDO
 
 
@@ -514,7 +514,7 @@ def test_armar_folios_dos_veces_deja_lo_mismo(tmp_path):
     antes = sorted(p.name for p in fac.iterdir())
     plan = org.armar_folios(raiz, aplicar=True)[0]
     assert sorted(p.name for p in fac.iterdir()) == antes
-    assert plan.paginas == 1 + 5 and plan.paginas_factura == 1 + 2
+    assert plan.paginas == 1 + 5 and plan.paginas_factura == 2
     assert len(pypdf.PdfReader(str(fac / "680010079201_HUS352904_EPICRIS.pdf")).pages) == 1 + 5
     assert [p.name for p in plan.folios_previos] == [
         "680010079201_HUS352904_EPICRIS.pdf",
@@ -573,7 +573,7 @@ def test_cuando_lleguen_las_notas_entran_de_cuartas(tmp_path):
         "2 DETALLADO.pdf",
         "3 NOTAS CREDITO.pdf",
     ]
-    assert plan.paginas_factura == 1 + 3
+    assert plan.paginas_factura == 3
 
 
 def test_avisa_los_renglones_que_le_faltan_al_folio_de_la_factura(tmp_path):
@@ -763,7 +763,7 @@ def test_un_pdf_dañado_no_tumba_el_folio_de_la_factura(tmp_path):
     (fac / "HUS1 DETALLADO.pdf").write_bytes(b"esto no es un PDF")
     plan = org.armar_folios(raiz, aplicar=True)[0]
     assert plan.estado_factura == org.ESTADO_UNIDO
-    assert plan.paginas_factura == 1 + 1
+    assert plan.paginas_factura == 1
     assert plan.omitidos
 
 
@@ -1480,3 +1480,110 @@ def test_el_nombre_original_se_conserva_entre_corridas(tmp_path):
     org.armar_folios(raiz, aplicar=True)
     plan = org.planificar(raiz)[0]
     assert plan.soportes[0].como_llego == "1 RESPUESTA A GLOSA.pdf"
+
+
+# ─── El orden dentro del folio de la FACTURA ─────────────────────────────────
+
+
+def _factura_pegada(ruta: Path, paginas: list[str]) -> Path:
+    """Un `..._FACTURA.pdf` como el que viene con el XML: varios renglones
+    pegados, cada uno con su marca en la primera página."""
+    return _pdf_con_texto(ruta, paginas)
+
+
+def test_partes_de_la_factura_encuentra_cada_pedazo(tmp_path):
+    ruta = _factura_pegada(
+        tmp_path / "680010079201_HUS311736_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA HUS311736 CUFE"] * 7
+        + ["DETALLADO FACTURA ELECTRONICA HUS311736"] * 2
+        + ["Representacion Grafica Codigo Unico de Factura CUFE"]
+        + ["Datos Totales"] * 8
+        + ["NOTA Credito N 253292"],
+    )
+    assert org.partes_de_la_factura(ruta) == {
+        "FACTURA": (1, 7),
+        "DETALLADO": (8, 9),
+        "DIAN": (10, 18),
+        "NOTAS": (19, 19),
+    }
+
+
+def test_el_detallado_va_de_SEGUNDO_aunque_llegue_aparte(tmp_path):
+    """El caso que reportó el área.
+
+    El `..._FACTURA.pdf` del XML trae la factura y la representación gráfica
+    PEGADAS. Si el detallado llega aparte y solo se le pone detrás, queda de
+    tercero: factura → representación gráfica → detallado. El área lo quiere de
+    segundo, así que hay que partir el PDF y meterlo en la mitad.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311371"
+    _pdf(fac / "RTA_ADRES_HUS311371.pdf", paginas=2)
+    _factura_pegada(
+        fac / "680010079201_HUS311371_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA HUS311371"] * 4
+        + ["Representacion Grafica Codigo Unico de Factura CUFE"]
+        + ["Datos Totales"] * 5,
+    )
+    _pdf_con_texto(fac / "HUS311371 DETALLADO.pdf", ["EL DETALLADO"] * 3)
+
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    folio = pypdf.PdfReader(str(fac / "680010079201_HUS311371_FACTURA.pdf"))
+    assert plan.paginas_factura == 4 + 3 + 6  # sin carátula: el área no la quiere
+
+    texto = [(p.extract_text() or "") for p in folio.pages]
+    assert "FACTURA ELECTRONICA DE VENTA" in texto[0]  # 1. la factura
+    assert "EL DETALLADO" in texto[4]  # 2. el detallado, en la mitad
+    assert "Representacion Grafica" in texto[7]  # 3. la representación gráfica
+
+
+def test_la_factura_que_ya_trae_todo_en_orden_no_se_parte(tmp_path):
+    """Si el PDF del XML ya trae los renglones en su orden, se deja entero:
+    partirlo y volverlo a pegar no aporta nada y sí puede dañar algo."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "RTA_ADRES_HUS311736.pdf", paginas=2)
+    _factura_pegada(
+        fac / "680010079201_HUS311736_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA HUS311736"] * 7
+        + ["DETALLADO FACTURA ELECTRONICA HUS311736"] * 2
+        + ["Representacion Grafica Codigo Unico de Factura CUFE"]
+        + ["Datos Totales"] * 9,
+    )
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.paginas_factura == 19  # entero, tal como venía
+
+
+def test_el_folio_de_la_factura_NO_lleva_caratula(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=2)
+    _pdf(fac / "680010079201_HUS1_FACTURA.pdf", paginas=5)
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.paginas == 1 + 2  # el clínico SÍ la lleva
+    assert plan.paginas_factura == 5  # el de la factura NO
+
+
+def test_partir_la_factura_no_deja_basura(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=1)
+    _factura_pegada(
+        fac / "680010079201_HUS1_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA HUS1"] * 2
+        + ["Representacion Grafica Codigo Unico de Factura CUFE"] * 2,
+    )
+    _pdf_con_texto(fac / "HUS1 DETALLADO.pdf", ["EL DETALLADO"])
+    org.armar_folios(raiz, aplicar=True)
+    assert not [p.name for p in fac.iterdir() if ".tmp" in p.name]
+
+
+def test_sanar_temporales_barre_la_basura_de_una_corrida_caida(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    (fac / "680010079201_HUS1_FACTURA.1FACTURA.tmp.pdf").write_bytes(b"basura")
+    (fac / "680010079201_HUS1_EPICRIS.cuerpo.tmp.pdf").write_bytes(b"basura")
+    org.sanar_temporales(raiz)
+    assert not [p.name for p in fac.iterdir() if ".tmp" in p.name]
+    assert (fac / "HC.pdf").exists()  # lo del auditor no se toca
