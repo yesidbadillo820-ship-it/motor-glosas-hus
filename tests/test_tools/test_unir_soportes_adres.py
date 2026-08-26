@@ -1093,3 +1093,91 @@ def test_avisa_el_soporte_que_no_entro_al_folio(tmp_path, caplog):
     # Con el nombre que TIENE ahora en la carpeta, que es el que el auditor va
     # a buscar: para entonces ya quedó numerado.
     assert "2 EPICRISIS.pdf" in salida
+
+
+@pytest.mark.parametrize(
+    ("nombre", "esperado"),
+    [
+        ("680010079201_HUS352904_EPICRIS", "680010079201"),
+        ("680010079201_HUS352904_FACTURA", "680010079201"),
+        # Una FECHA o un número de ingreso NO son el NIT.
+        ("20240913_HUS352904 EVOLUCION", ""),
+        ("13092024 HUS352904 HC", ""),
+        ("190029_HUS352904_ingreso", ""),
+        # Ni el NIT de otra factura.
+        ("680010079201_HUS999999_EPICRIS", ""),
+    ],
+)
+def test_una_fecha_no_puede_pasar_por_NIT(nombre, esperado):
+    """Con «números al principio y esta factura después» bastaba, y el folio
+    salía llamándose `20240913_HUS352904_EPICRIS.pdf`."""
+    assert org.prefijo_del_nombre(nombre, "HUS352904") == esperado
+
+
+def test_en_el_mapa_de_nombres_tambien_gana_la_palabra_mas_larga():
+    """El resultado no puede depender del orden en que estén las líneas del JSON."""
+    for mapa in (
+        {"TAC": "AYUDAS", "TAC DE TORAX": "OTROS"},
+        {"TAC DE TORAX": "OTROS", "TAC": "AYUDAS"},
+    ):
+        assert org.clasificar("HUS1 TAC DE TORAX.pdf", mapa).clave == "OTROS"
+
+
+def test_el_reporte_abierto_en_excel_no_tumba_la_corrida(tmp_path, monkeypatch, caplog):
+    """En Windows un CSV abierto en Excel no se deja escribir. El trabajo ya
+    está hecho: no se pierde por no poder dejar el listado."""
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS1" / "RTA_ADRES_HUS1.pdf")
+
+    def _bloqueado(ruta, plan):
+        raise PermissionError(13, "El archivo está abierto en otro programa")
+
+    monkeypatch.setattr(org, "escribir_reporte", _bloqueado)
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        codigo = org.main(
+            [
+                "--carpeta",
+                str(raiz),
+                "--folio",
+                "--aplicar",
+                "--reporte-csv",
+                str(tmp_path / "r.csv"),
+            ]
+        )
+    assert codigo == 0
+    assert (raiz / "HUS1" / "HUS1_EPICRIS.pdf").exists()  # el folio sí se armó
+    assert "abierto en Excel" in caplog.text
+
+
+def test_renombrar_tambien_numera_el_folio_de_la_factura(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    _pdf(fac / "680010079201_HUS1_FACTURA.pdf")
+    assert org.main(["--carpeta", str(raiz), "--renombrar", "--aplicar"]) == 0
+    assert sorted(p.name for p in fac.iterdir()) == ["1 FACTURA.pdf", "1 RESPUESTA A GLOSA.pdf"]
+
+
+def test_avisa_las_banderas_que_no_hacen_nada_sin_folio(tmp_path, caplog):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS1" / "HC.pdf")
+    with caplog.at_level(logging.WARNING, logger="unir_soportes_adres"):
+        org.main(["--carpeta", str(raiz), "--prefijo", "900123456", "--convertir-detallado"])
+    assert "--prefijo" in caplog.text and "--convertir-detallado" in caplog.text
+    assert "solo funciona" in caplog.text
+
+
+def test_avisa_los_archivos_que_no_son_pdf(tmp_path, caplog):
+    """Una epicrisis en Word o una radiografía en JPG no entran al folio.
+    No pueden desaparecer sin que el auditor se entere."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    (fac / "EPICRISIS.docx").write_bytes(b"x")
+    (fac / "RADIOGRAFIA.jpg").write_bytes(b"x")
+    (fac / "Thumbs.db").write_bytes(b"x")  # basura de Windows: esta no se avisa
+    plan = org.planificar(raiz)[0]
+    assert sorted(p.name for p in plan.no_son_pdf) == ["EPICRISIS.docx", "RADIOGRAFIA.jpg"]
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        org.main(["--carpeta", str(raiz), "--folio"])
+    assert "NO son PDF" in caplog.text and "EPICRISIS.docx" in caplog.text

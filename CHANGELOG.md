@@ -45,7 +45,35 @@ soporte(s) NO entraron al folio».
 Y dos candados más de robustez: una copia fallida de la factura, o un archivo
 bloqueado al renombrar con `--renombrar`, ya no tumban las otras 323 facturas.
 
-133 pruebas en el archivo.
+### Y seis más, de la misma revisión
+
+**6. Una FECHA pasaba por NIT.** `prefijo_del_nombre` solo pedía «números al
+principio y esta factura después», así que `20240913_HUS352904 EVOLUCION.pdf`
+daba NIT `20240913` y el folio salía llamándose `20240913_HUS352904_EPICRIS.pdf`.
+Ahora se exige el nombre completo del ADRES (`<NIT>_<FACTURA>_<TIPO>`) y nada
+más; un número de ingreso o una fecha ya no cuelan.
+
+**7. `--mapa-nombres` dependía del orden del JSON.** Con
+`{"TAC": …, "TAC DE TORAX": …}` ganaba la primera línea escrita, no la palabra
+más larga. Ahora gana la más larga, como en el diccionario de siempre.
+
+**8. El reporte abierto en Excel tumbaba la corrida.** En Windows el CSV no se
+deja escribir si está abierto; el traceback llegaba **después** de armar todos
+los folios. Ahora se avisa y el trabajo no se pierde.
+
+**9. `--renombrar` dejaba a medias la carpeta.** Numeraba el folio clínico pero
+no el de la factura, y el CSV prometía renglones que nadie armaba.
+
+**10. Las banderas que no hacen nada sin `--folio`** (`--carpeta-facturas`,
+`--prefijo`, `--convertir-detallado`) se ignoraban en silencio: el auditor creía
+que había traído las facturas. Ahora avisan.
+
+**11. Los archivos que no son PDF desaparecían sin avisar.** Una epicrisis en
+Word o una radiografía en JPG no entran al folio, pero tampoco pueden
+esfumarse: salen listadas en pantalla y en el reporte. La basura de Windows
+(`Thumbs.db`, `desktop.ini`) no se reporta.
+
+144 pruebas en el archivo.
 
 
 ## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)

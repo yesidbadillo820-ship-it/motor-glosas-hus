@@ -301,6 +301,11 @@ TODOS_LOS_GRUPOS: tuple[Grupo, ...] = GRUPOS + GRUPOS_FACTURA
 # El detallado NO entra al folio clínico: va de segundo en el de la factura.
 PALABRAS_DETALLADO = ("DETALLADO", "DETALLE DE FACTURA")
 
+# Lo que Windows y Office dejan tirado en las carpetas y no es un soporte.
+_EXTENSIONES_QUE_NO_SON_SOPORTE = frozenset(
+    {".xlsx", ".xlsm", ".xls", ".db", ".ini", ".tmp", ".lnk", ".url", ".xml", ".zip"}
+)
+
 
 # `RegistroEnfermeria.pdf` no trae separador entre las dos palabras. Al pasarlo
 # a mayúsculas quedaba «REGISTROENFERMERIA», donde ENFERMERIA ya no es una
@@ -325,13 +330,19 @@ def clasificar(nombre: str, mapa: dict[str, str] | None = None) -> Grupo:
     """
     limpio = _norm(nombre)
     if mapa:
+        # Gana la palabra MÁS LARGA del mapa, no la primera que esté escrita en
+        # el JSON: con `{"TAC": …, "TAC DE TORAX": …}` el resultado no puede
+        # depender del orden en que el auditor escribió las líneas.
+        mejor_mapa: tuple[int, Grupo | None] = (0, None)
         for palabra, clave in mapa.items():
-            if _norm(palabra) and _norm(palabra) in limpio:
-                grupo = next(
-                    (g for g in TODOS_LOS_GRUPOS if g.clave == clave.strip().upper()), None
-                )
-                if grupo is not None:
-                    return grupo
+            aguja = _norm(palabra)
+            if not aguja or aguja not in limpio or len(aguja) <= mejor_mapa[0]:
+                continue
+            grupo = next((g for g in TODOS_LOS_GRUPOS if g.clave == clave.strip().upper()), None)
+            if grupo is not None:
+                mejor_mapa = (len(aguja), grupo)
+        if mejor_mapa[1] is not None:
+            return mejor_mapa[1]
     # Se lleva la cuenta aparte de los grupos genéricos: solo ganan si ningún
     # grupo preciso apareció en el nombre.
     mejor: tuple[int, Grupo] = (0, GRUPO_OTROS)
@@ -436,6 +447,9 @@ class Factura:
     prefijo: str = ""
     # Detallados que todavía están en Excel y hay que pasar a PDF.
     detallados_sin_pdf: list[Path] = field(default_factory=list)
+    # Archivos de la carpeta que no son PDF: al folio no pueden entrar, pero
+    # tampoco pueden desaparecer sin que el auditor se entere.
+    no_son_pdf: list[Path] = field(default_factory=list)
     # Folios firmados por este bot en una corrida anterior: no se vuelven a
     # meter adentro de sí mismos, se rehacen.
     folios_previos: list[Path] = field(default_factory=list)
@@ -503,13 +517,19 @@ def nombre_folio(prefijo: str, factura: str, sufijo: str) -> str:
 def prefijo_del_nombre(nombre: str, factura: str) -> str:
     """El NIT con que vienen nombrados los archivos, o «» si el nombre no lo trae.
 
-    `680010079201_HUS352904_EPICRIS` → `680010079201`. Solo lo toma si lo que
-    sigue es de verdad esta factura: así no se cuela cualquier número suelto.
+    `680010079201_HUS352904_EPICRIS` → `680010079201`.
+
+    Se exige el nombre COMPLETO del ADRES —`<NIT>_<FACTURA>_<TIPO>`— y nada más.
+    Con solo pedir «números al principio y esta factura después», una fecha o un
+    número de ingreso pasaban por NIT (`20240913_HUS352904 EVOLUCION.pdf` →
+    `20240913`) y el folio salía con el nombre equivocado.
     """
     partes = _norm(Path(nombre).stem).split()
-    if len(partes) < 2 or not partes[0].isdigit() or len(partes[0]) < 6:
+    if len(partes) != 3 or not partes[0].isdigit() or len(partes[0]) < 6:
         return ""
-    if factura_del_nombre(" ".join(partes[1:])) != factura:
+    if factura_del_nombre(partes[1]) != factura:
+        return ""
+    if partes[2] not in {s.strip("_") for s in (SUFIJO_EPICRIS, SUFIJO_FACTURA)}:
         return ""
     return partes[0]
 
@@ -648,6 +668,8 @@ def _planificar_carpeta(sub: Path, numero: str, mapa: dict[str, str] | None) -> 
             fac.detallados.append(r)
             continue
         if r.suffix.lower() != ".pdf":
+            if r.suffix.lower() not in _EXTENSIONES_QUE_NO_SON_SOPORTE:
+                fac.no_son_pdf.append(r)
             continue
         if r.stem.upper().endswith(SUFIJO_UNIDO):
             continue  # el consolidado de una corrida anterior
@@ -1064,6 +1086,20 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         FOLIO_FACTURA,
                     ]
                 )
+            for otro in fac.no_son_pdf:
+                w.writerow(
+                    [
+                        fac.factura,
+                        "",
+                        "",
+                        otro.name,
+                        "NO - revisar",
+                        str(otro.parent),
+                        "",
+                        "no es un PDF: no entra al folio. Si es un soporte, pásela a PDF",
+                        "",
+                    ]
+                )
             for det in fac.detallados_sin_pdf:
                 w.writerow(
                     [
@@ -1340,6 +1376,18 @@ def _resumen_folios(
         )
         logger.info("   No se les agrega otro encima: el folio quedaría con el renglón dos veces.")
 
+    no_pdf = [(f, p) for f in plan for p in f.no_son_pdf]
+    if no_pdf:
+        logger.info(
+            "\nArchivos que NO son PDF (%d) y por eso no entran al folio. Si alguno es un "
+            "soporte, páselo a PDF y vuelva a correr:",
+            len(no_pdf),
+        )
+        for fac, p in no_pdf[:10]:
+            logger.info("   %s: %s", fac.factura, p.name)
+        if len(no_pdf) > 10:
+            logger.info("   … y %d más, en el reporte CSV.", len(no_pdf) - 10)
+
     # Un soporte que no se pudo leer se omite y el folio SÍ se arma. Eso no
     # puede pasar en silencio: al ADRES subiría un folio al que le falta una
     # hoja y en pantalla decía «armado» sin más.
@@ -1399,6 +1447,23 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Lista de trabajo: %d facturas", len(facturas))
 
     mapa = _cargar_mapa(args.mapa_nombres)
+    if not args.folio:
+        # Sin --folio estas opciones no hacen nada. Callarlo es peor: el auditor
+        # cree que trajo las facturas y que convirtió el detallado.
+        sueltas = [
+            nombre
+            for nombre, puesta in (
+                ("--carpeta-facturas", bool(args.carpeta_facturas)),
+                ("--prefijo", bool(args.prefijo)),
+                ("--convertir-detallado", args.convertir_detallado),
+            )
+            if puesta
+        ]
+        if sueltas:
+            logger.warning(
+                "AVISO: %s solo funciona(n) con --folio. Esta corrida las ignora.",
+                ", ".join(sueltas),
+            )
     copias: list[Copia] = []
     conversiones: list[tuple[str, Path, str]] = []
     if args.folio:
@@ -1425,6 +1490,9 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             try:
                 renombrar_en_orden(fac, args.aplicar)
+                # También el folio de la factura: si no, la carpeta queda a
+                # medio numerar y el CSV promete renglones que nadie armó.
+                renombrar_lista(fac.soportes_factura, args.aplicar)
             except OSError as e:
                 logger.warning("  %s: no pude renombrar (%s)", fac.factura, e)
                 fac.omitidos.append(f"no pude renombrar: {e}")
@@ -1435,7 +1503,17 @@ def main(argv: list[str] | None = None) -> int:
     else:
         plan = unir(args.carpeta, facturas, mapa, args.aplicar)
     if args.reporte_csv:
-        escribir_reporte(args.reporte_csv, plan)
+        try:
+            escribir_reporte(args.reporte_csv, plan)
+        except OSError as e:
+            # En Windows, un CSV abierto en Excel no se deja escribir. El
+            # trabajo ya está hecho: no se pierde por no poder dejar el listado.
+            logger.warning(
+                "\nNo pude escribir el reporte %s (%s). "
+                "¿Lo tiene abierto en Excel? Ciérrelo y vuelva a correr.",
+                args.reporte_csv,
+                e,
+            )
 
     if not plan:
         logger.info("\nNo encontré carpetas de factura en %s", args.carpeta)
