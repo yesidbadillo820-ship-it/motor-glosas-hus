@@ -25,6 +25,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
@@ -473,3 +474,61 @@ def panel_operacional(
         "carga_por_auditor": carga[:15],
         "sin_asignar": next((a["abiertas"] for a in carga if a["auditor"] == "(sin asignar)"), 0),
     }
+
+
+class SinDatoOut(BaseModel):
+    """Lo que el tablero NO puede afirmar, contado aparte."""
+
+    levantadas_sin_valor: int = 0
+    sin_fecha_vencimiento: int = 0
+    sin_fecha_radicacion: int = 0
+
+
+class CasillaPlataOut(BaseModel):
+    """Una fila del tablero — sirve igual para un mes que para una EPS."""
+
+    glosas: int = 0
+    glosado: float = 0
+    levantado: float = 0
+    ratificado: float = 0
+    aceptado: float = 0
+    sin_decision: float = 0
+    respondido_a_tiempo: float = 0
+    respondido_tarde: float = 0
+    perdido_por_vencimiento: float = 0
+    tasa_levantado_pct: float = 0
+    sin_dato: SinDatoOut = SinDatoOut()
+    mes: str = ""
+    etiqueta: str = ""
+    eps: str = ""
+
+
+class PlataRecuperadaOut(BaseModel):
+    desde: str
+    hasta: str
+    meses_pedidos: int
+    eps_filtrada: str = ""
+    meses: list[CasillaPlataOut] = []
+    eps: list[CasillaPlataOut] = []
+    total: CasillaPlataOut
+    nota: str = ""
+
+
+@router.get("/plata-recuperada", response_model=PlataRecuperadaOut)
+def plata_recuperada(
+    meses: int = 6,
+    eps: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Cuánta plata se glosó y en qué terminó — mes a mes y EPS por EPS.
+
+    El número que pide la gerencia, en una sola pantalla: glosado,
+    respondido a tiempo, levantado, ratificado y perdido por vencimiento.
+
+    Todo sale de columnas de la base. Lo que no tiene dato se cuenta aparte
+    en `sin_dato` y no se rellena con supuestos.
+    """
+    from app.services.plata_recuperada import resumen_plata_recuperada
+
+    return resumen_plata_recuperada(db, meses=meses, eps=eps)

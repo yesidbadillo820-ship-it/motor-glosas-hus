@@ -2291,6 +2291,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="sn-item-label">Expediente</span>
         </button>
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata">
+          <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="sn-item-label">Plata recuperada</span>
+        </button>
         <button class="sn-item" data-tip="Vencimientos" onclick="sidebarTab(this,'vencimientos')" id="sn-vencimientos">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
           <span class="sn-item-label">Vencimientos</span>
@@ -3333,6 +3337,58 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           Datos en tiempo real · Endpoint: <code>/dashboard-ejecutivo/vivo</code> ·
           Solo COORDINADOR / SUPER_ADMIN
         </div>
+      </div>
+    </div>
+
+    <!-- 26-08-2026 · Tablero de plata recuperada.
+         Habia 32 pantallas y una sola grafica. El motor sabia cuanto se
+         gloso, cuanto se respondio y cuanto se levanto, pero eso no se veia
+         junto en ninguna parte. Este es el numero que pide la gerencia. -->
+    <div class="panel" id="p-plata">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">💰 Plata glosada y en qué terminó</div>
+            <div style="font-size:.78rem;color:var(--text3)">Mes a mes y EPS por EPS · glosado, respondido a tiempo, levantado, ratificado y perdido por vencimiento</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <select id="plata-meses" onchange="cargarPlata()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);font-size:.8rem;font-family:var(--font)">
+              <option value="3">Últimos 3 meses</option>
+              <option value="6" selected>Últimos 6 meses</option>
+              <option value="12">Últimos 12 meses</option>
+              <option value="24">Últimos 24 meses</option>
+            </select>
+            <button class="btn btn-ghost" onclick="cargarPlata()" style="font-size:.8rem">Actualizar</button>
+          </div>
+        </div>
+
+        <div class="kpi-grid" id="plata-kpis">
+          <div class="kpi"><div class="kpi-lbl">Glosado</div><div class="kpi-num" id="plata-glosado">—</div><div class="kpi-sub">lo que las EPS objetaron</div></div>
+          <div class="kpi"><div class="kpi-lbl">Levantado</div><div class="kpi-num" id="plata-levantado">—</div><div class="kpi-sub">plata que se recuperó</div></div>
+          <div class="kpi"><div class="kpi-lbl">Ratificado</div><div class="kpi-num" id="plata-ratificado">—</div><div class="kpi-sub">la EPS mantuvo la glosa</div></div>
+          <div class="kpi"><div class="kpi-lbl">Perdido por vencimiento</div><div class="kpi-num" id="plata-perdido">—</div><div class="kpi-sub">no se contestó a tiempo</div></div>
+          <div class="kpi"><div class="kpi-lbl">Sin decidir</div><div class="kpi-num" id="plata-sindec">—</div><div class="kpi-sub">la EPS no ha contestado</div></div>
+          <div class="kpi"><div class="kpi-lbl">Tasa de levantamiento</div><div class="kpi-num" id="plata-tasa">—</div><div class="kpi-sub">levantado sobre glosado</div></div>
+        </div>
+
+        <div id="plata-faltantes" style="display:none;margin-top:.9rem;padding:.7rem .9rem;border:1px solid var(--c-amber);border-radius:8px;background:rgba(245,158,11,.08);font-size:.8rem;color:var(--text2)"></div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Mes a mes</div>
+          <canvas id="ch-plata-mes" style="max-height:220px"></canvas>
+        </div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Detalle por mes</div>
+          <div style="overflow-x:auto"><table id="plata-tabla-mes" style="width:100%;border-collapse:collapse;font-size:.78rem"></table></div>
+        </div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Detalle por EPS</div>
+          <div style="overflow-x:auto"><table id="plata-tabla-eps" style="width:100%;border-collapse:collapse;font-size:.78rem"></table></div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.7rem;color:var(--text3);text-align:center" id="plata-nota">—</div>
       </div>
     </div>
 
@@ -8316,6 +8372,7 @@ function tab(btn,id){
   if(id==='glosas-adres') loadGlosasAdres();
   if(id==='resumen-mes') loadResumenMes();
   if(id==='mando'){ loadMando(); loadOperacion(); }
+  if(id==='plata') cargarPlata();
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -21349,6 +21406,115 @@ function mkChart(id,type,labels,datasets,opts){
   var c=document.getElementById(id);
   if(charts[id]){charts[id].destroy();}
   charts[id]=new Chart(c,{type:type,data:{labels:labels,datasets:datasets},options:Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#374151',font:{size:12}}}}},opts||{})});
+}
+
+// ─── TABLERO DE PLATA RECUPERADA (26-08-2026) ─────────────────────────────
+// Lo que pide la gerencia en una sola pantalla. Todo sale de /dashboard-
+// ejecutivo/plata-recuperada, que a su vez saca cada peso de una columna de
+// la base. Lo que no tiene dato NO se rellena: se avisa arriba, en amarillo.
+function _plataFila(celdas, esCabecera){
+  var tag = esCabecera ? 'th' : 'td';
+  var estilo = esCabecera
+    ? 'text-align:left;padding:.45rem .5rem;border-bottom:2px solid var(--border2);color:var(--text3);font-weight:700;white-space:nowrap'
+    : 'padding:.4rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap';
+  return '<tr>' + celdas.map(function(c, i){
+    var alin = (i === 0) ? '' : 'text-align:right;';
+    return '<' + tag + ' style="' + alin + estilo + '">' + c + '</' + tag + '>';
+  }).join('') + '</tr>';
+}
+
+function _plataPintarTabla(idTabla, filas, etiquetaPrimera, campoPrimera){
+  var t = document.getElementById(idTabla);
+  if(!t) return;
+  if(!filas || !filas.length){
+    t.innerHTML = '<tr><td style="padding:1rem;color:var(--text3);text-align:center">'
+      + 'No hay glosas en el periodo escogido.</td></tr>';
+    return;
+  }
+  var html = _plataFila([etiquetaPrimera, 'Glosas', 'Glosado', 'A tiempo', 'Tarde',
+                         'Levantado', 'Ratificado', 'Perdido', 'Sin decidir', '% levant.'], true);
+  filas.forEach(function(f){
+    html += _plataFila([
+      f[campoPrimera] || '—',
+      f.glosas,
+      fmtCOP(f.glosado),
+      fmtCOP(f.respondido_a_tiempo),
+      fmtCOP(f.respondido_tarde),
+      '<span style="color:var(--c-green);font-weight:700">' + fmtCOP(f.levantado) + '</span>',
+      fmtCOP(f.ratificado),
+      (f.perdido_por_vencimiento > 0
+        ? '<span style="color:var(--c-red);font-weight:700">' + fmtCOP(f.perdido_por_vencimiento) + '</span>'
+        : fmtCOP(0)),
+      fmtCOP(f.sin_decision),
+      (f.tasa_levantado_pct || 0).toFixed(1) + '%'
+    ], false);
+  });
+  t.innerHTML = html;
+}
+
+function _plataAvisarFaltantes(sd){
+  var caja = document.getElementById('plata-faltantes');
+  if(!caja) return;
+  var faltas = [];
+  if(sd && sd.levantadas_sin_valor > 0){
+    faltas.push(sd.levantadas_sin_valor + ' glosa(s) que la EPS levantó sin que nadie anotara '
+      + 'cuánta plata era — esa plata NO está sumada en «Levantado»');
+  }
+  if(sd && sd.sin_fecha_vencimiento > 0){
+    faltas.push(sd.sin_fecha_vencimiento + ' glosa(s) sin fecha de vencimiento — de esas no se '
+      + 'puede decir si se respondieron a tiempo');
+  }
+  if(sd && sd.sin_fecha_radicacion > 0){
+    faltas.push(sd.sin_fecha_radicacion + ' glosa(s) sin fecha de radicación registrada');
+  }
+  if(!faltas.length){ caja.style.display = 'none'; return; }
+  caja.style.display = 'block';
+  caja.innerHTML = '<strong>⚠ Lo que este tablero no puede afirmar:</strong><ul style="margin:.4rem 0 0 1.1rem">'
+    + faltas.map(function(f){ return '<li>' + f + '</li>'; }).join('') + '</ul>';
+}
+
+async function cargarPlata(){
+  var sel = document.getElementById('plata-meses');
+  var meses = sel ? sel.value : 6;
+  var kpis = ['plata-glosado','plata-levantado','plata-ratificado','plata-perdido',
+              'plata-sindec','plata-tasa'];
+  kpis.forEach(function(id){ var e = document.getElementById(id); if(e) e.textContent = '…'; });
+  try{
+    var r = await fetch('/dashboard-ejecutivo/plata-recuperada?meses=' + encodeURIComponent(meses),
+                        {headers: authH()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var t = d.total || {};
+    document.getElementById('plata-glosado').textContent = fmtCOP(t.glosado);
+    document.getElementById('plata-levantado').textContent = fmtCOP(t.levantado);
+    document.getElementById('plata-ratificado').textContent = fmtCOP(t.ratificado);
+    document.getElementById('plata-perdido').textContent = fmtCOP(t.perdido_por_vencimiento);
+    document.getElementById('plata-sindec').textContent = fmtCOP(t.sin_decision);
+    document.getElementById('plata-tasa').textContent = (t.tasa_levantado_pct || 0).toFixed(1) + '%';
+    _plataAvisarFaltantes(t.sin_dato);
+    _plataPintarTabla('plata-tabla-mes', d.meses, 'Mes', 'etiqueta');
+    _plataPintarTabla('plata-tabla-eps', d.eps, 'EPS', 'eps');
+    var nota = document.getElementById('plata-nota');
+    if(nota) nota.textContent = d.nota || '';
+    var meses_ = d.meses || [];
+    if(meses_.length && typeof mkChart === 'function'){
+      mkChart('ch-plata-mes','bar', meses_.map(function(m){ return m.etiqueta; }), [
+        {label:'Glosado', data: meses_.map(function(m){ return m.glosado; }),
+         backgroundColor:'rgba(107,114,128,.55)'},
+        {label:'Levantado', data: meses_.map(function(m){ return m.levantado; }),
+         backgroundColor:'rgba(22,163,74,.75)'},
+        {label:'Ratificado', data: meses_.map(function(m){ return m.ratificado; }),
+         backgroundColor:'rgba(234,88,12,.75)'},
+        {label:'Perdido por vencimiento', data: meses_.map(function(m){ return m.perdido_por_vencimiento; }),
+         backgroundColor:'rgba(198,40,40,.85)'}
+      ]);
+    }
+  }catch(e){
+    kpis.forEach(function(id){ var el = document.getElementById(id); if(el) el.textContent = '—'; });
+    _plataPintarTabla('plata-tabla-mes', [], 'Mes', 'etiqueta');
+    _plataPintarTabla('plata-tabla-eps', [], 'EPS', 'eps');
+    avisarNoCargo('el tablero de plata recuperada', e);
+  }
 }
 
 // ─── HISTORIAL ────────────────────────────────────────────────────────────
