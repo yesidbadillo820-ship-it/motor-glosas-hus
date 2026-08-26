@@ -391,10 +391,9 @@ class Factura:
     prefijo: str = ""
     # Detallados que todavía están en Excel y hay que pasar a PDF.
     detallados_sin_pdf: list[Path] = field(default_factory=list)
-    # Folios de una corrida anterior, que no se vuelven a meter adentro.
+    # Folios firmados por este bot en una corrida anterior: no se vuelven a
+    # meter adentro de sí mismos, se rehacen.
     folios_previos: list[Path] = field(default_factory=list)
-    # Los que además hay que mirar: podrían ser un soporte recién agregado.
-    folios_dudosos: list[Path] = field(default_factory=list)
     # Renglones que la propia factura ya trae pegados adentro (DETALLADO, DIAN,
     # NOTAS): no se le vuelven a agregar encima.
     trae_la_factura: set[str] = field(default_factory=set)
@@ -427,6 +426,7 @@ ESTADO_UNIDO = "UNIDO"
 ESTADO_SIMULADO = "SE UNIRIA"
 ESTADO_RENOMBRADO = "RENOMBRADO"
 ESTADO_SIN_PDF = "SIN PDF QUE UNIR"
+ESTADO_NO_PISA = "NO SE ARMO: HABRIA PISADO UN SOPORTE"
 ESTADO_ERROR = "ERROR"
 
 
@@ -469,50 +469,47 @@ def prefijo_del_nombre(nombre: str, factura: str) -> str:
     return partes[0]
 
 
-# Un soporte ya numerado dentro del folio: «1 RESPUESTA A GLOSA.pdf».
-_RE_NUMERADO = re.compile(r"^\s*\d+\s+\S")
+# El folio se llama IGUAL que el archivo del que sale (`..._EPICRIS.pdf`), así
+# que por el nombre no hay forma de distinguirlos. Por eso el bot le deja una
+# firma adentro a lo que escribe: en la corrida siguiente sabe cuál es suyo
+# —un hecho, no una adivinanza— y jamás pisa un soporte de verdad.
+MARCA_FOLIO = "motor-glosas-hus/unir_soportes_adres"
+METADATOS_FOLIO = {"/Producer": MARCA_FOLIO}
 
 
-def _grupos_ya_numerados(archivos: list[Path], mapa: dict[str, str] | None = None) -> set[str]:
-    """Qué grupos ya tienen su archivo numerado en la carpeta."""
-    return {
-        clasificar(r.name, mapa).clave
-        for r in archivos
-        if r.suffix.lower() == ".pdf" and _RE_NUMERADO.match(r.stem)
-    }
+def es_folio_nuestro(pdf: Path, PdfReader=None) -> bool:
+    """¿Este PDF lo escribió este mismo bot en una corrida anterior?
 
-
-def es_folio_previo(tallo: str, factura: str, numerados: set[str]) -> bool:
-    """¿Este PDF es el folio que dejó una corrida anterior?
-
-    El folio se llama igual que el archivo del que salió (`..._EPICRIS.pdf`,
-    `..._FACTURA.pdf`), así que por el nombre solo no se distinguen. Lo que sí
-    los distingue es la carpeta: después de armar los folios, TODOS los soportes
-    quedaron numerados («1 …», «2 …»), y con el nombre original ya no queda
-    ninguno. Entonces, si en la carpeta hay archivos numerados, el
-    `..._EPICRIS.pdf` que quede es el folio, y no se vuelve a meter dentro de
-    sí mismo.
+    Se mira la firma que quedó adentro. Un PDF que no se pueda leer se toma como
+    **ajeno**: ante la duda no se pisa nada.
     """
-    if not numerados:
-        return False  # primera corrida: todavía son los archivos de origen
+    if PdfReader is None:
+        PdfReader, _ = _cargar_lector_escritor()
+    try:
+        datos = PdfReader(str(pdf)).metadata or {}
+        return MARCA_FOLIO in str(datos.get("/Producer", ""))
+    except Exception as e:  # noqa: BLE001 - un PDF ilegible no afirma nada
+        logger.debug("No pude leer la firma de %s: %s", pdf.name, e)
+        return False
+
+
+def tiene_nombre_de_folio(tallo: str, factura: str) -> bool:
+    """¿Se llama como se llamaría un folio de esta factura?"""
     limpio = _norm(tallo)
     return any(
         limpio.endswith(f"{factura} {s.strip('_')}") for s in (SUFIJO_EPICRIS, SUFIJO_FACTURA)
     )
 
 
-def _folio_dudoso(tallo: str, factura: str, numerados: set[str]) -> bool:
-    """¿Se tomó por folio algo que podría ser un soporte recién agregado?
+def es_folio_previo(ruta: Path, factura: str, PdfReader=None) -> bool:
+    """¿Este PDF es un folio que dejó una corrida anterior?
 
-    Pasa cuando la carpeta ya está armada pero al renglón le falta su archivo
-    numerado: por ejemplo un `..._EPICRIS.pdf` sin «2 EPICRISIS.pdf» al lado.
-    No se adivina: se toma como folio y se avisa para que el auditor lo mire.
+    Se responde con la **firma** que el bot le deja adentro a lo que escribe, no
+    con el nombre: el folio se llama igual que el archivo del que salió, así que
+    el nombre no distingue nada. Un PDF firmado por el bot es suyo; cualquier
+    otro es un soporte de verdad y no se toca.
     """
-    limpio = _norm(tallo)
-    for sufijo, clave in ((SUFIJO_EPICRIS, "EPICRISIS"), (SUFIJO_FACTURA, "FACTURA")):
-        if limpio.endswith(f"{factura} {sufijo.strip('_')}") and clave not in numerados:
-            return True
-    return False
+    return tiene_nombre_de_folio(ruta.stem, factura) and es_folio_nuestro(ruta, PdfReader)
 
 
 def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tuple[Path, str]]:
@@ -598,7 +595,7 @@ def _planificar_carpeta(sub: Path, numero: str, mapa: dict[str, str] | None) -> 
         if r.suffix.lower() == ".pdf" and (encontrado := prefijo_del_nombre(r.stem, numero)):
             fac.prefijo = encontrado
             break
-    numerados = _grupos_ya_numerados(archivos, mapa)
+    PdfReader, _ = _cargar_lector_escritor()
 
     pdfs: list[Path] = []
     for r in archivos:
@@ -609,10 +606,12 @@ def _planificar_carpeta(sub: Path, numero: str, mapa: dict[str, str] | None) -> 
             continue
         if r.stem.upper().endswith(SUFIJO_UNIDO):
             continue  # el consolidado de una corrida anterior
-        if es_folio_previo(r.stem, numero, numerados):
+        if es_folio_previo(r, numero, PdfReader):
+            # Es un folio que escribió este mismo bot: no se vuelve a meter
+            # dentro de sí mismo, se rehace. Un archivo que SOLO se llame así
+            # —la epicrisis viene como `..._EPICRIS.pdf`— es un soporte de
+            # verdad y sigue de largo, como cualquier otro.
             fac.folios_previos.append(r)
-            if _folio_dudoso(r.stem, numero, numerados):
-                fac.folios_dudosos.append(r)
             continue
         if es_detallado(r.name):
             fac.detallados.append(r)
@@ -716,8 +715,35 @@ def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter) -> None:
     destino = fac.destino_epicris if clinico else fac.destino_factura
     if not soportes or destino is None:
         return
+
+    # EL CANDADO QUE IMPORTA. El folio se llama igual que el archivo del que
+    # sale, así que su destino puede ser un soporte de verdad. Si el bot se
+    # equivoca al decidir cuál es el folio de la corrida anterior, lo deja fuera
+    # del folio Y ADEMÁS lo pisa: la epicrisis se pierde para siempre y el folio
+    # sube al ADRES sin ella. No hay respaldo.
+    #
+    # Por eso, a la hora de escribir, solo se pisa lo que se sabe con certeza
+    # que es el folio de una corrida anterior. Cualquier otra cosa que esté en
+    # esa ruta detiene el armado de ESA factura y se avisa. Perder un soporte no
+    # se deshace; no armar un folio, sí.
+    if destino.exists() and not es_folio_nuestro(destino, PdfReader):
+        aviso = (
+            f"NO se armó el folio: {destino.name} ya existe y no lo escribió este bot. "
+            "Puede ser un soporte de verdad. Si es un soporte, renómbrelo con su "
+            "número y vuelva a correr; si es un folio viejo, bórrelo."
+        )
+        logger.warning("  %s: %s", fac.factura, aviso)
+        fac.omitidos.append(aviso)
+        if clinico:
+            fac.estado = ESTADO_NO_PISA
+        else:
+            fac.estado_factura = ESTADO_NO_PISA
+        return
+
     try:
-        paginas, omitidos = unir_pdfs([s.ruta for s in soportes], destino, PdfReader, PdfWriter)
+        paginas, omitidos = unir_pdfs(
+            [s.ruta for s in soportes], destino, PdfReader, PdfWriter, METADATOS_FOLIO
+        )
         estado = ESTADO_UNIDO if paginas else ESTADO_ERROR
         if not paginas:
             omitidos.append("ningún PDF tenía páginas legibles")
@@ -834,8 +860,20 @@ def copiar_facturas(
             copias.append(Copia(fac.factura, None, None, ESTADO_SIN_FACTURA))
             continue
         destino = fac.carpeta / origen.name
+        if destino.exists():
+            # Ahí ya hay algo. No se pisa: puede ser un soporte de verdad.
+            copias.append(Copia(fac.factura, origen, destino, ESTADO_NO_PISA))
+            continue
         if aplicar:
-            shutil.copy2(origen, destino)
+            try:
+                shutil.copy2(origen, destino)
+            except OSError as e:
+                # Un archivo bloqueado o el share caído: esa factura se salta,
+                # las otras 323 siguen.
+                logger.warning("  %s: no pude copiar la factura (%s)", fac.factura, e)
+                fac.omitidos.append(f"no pude copiar la factura: {e}")
+                copias.append(Copia(fac.factura, origen, destino, ESTADO_ERROR))
+                continue
         _sumar_al_folio(fac, destino, GRUPO_FACTURA)
         # La factura viene nombrada con el NIT: si la carpeta no lo traía, el
         # folio ya puede llevarlo.
@@ -1052,23 +1090,16 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                     ]
                 )
             for previo in fac.folios_previos:
-                dudoso = previo in fac.folios_dudosos
                 w.writerow(
                     [
                         fac.factura,
                         "",
                         "",
                         previo.name,
-                        "NO - revisar" if dudoso else "SI",
+                        "SI",
                         str(previo.parent),
                         "",
-                        (
-                            "REVISAR: se tomó como el folio de la corrida anterior, pero al "
-                            "renglón le falta su archivo numerado. Si es un soporte nuevo, "
-                            "renómbrelo con su número y vuelva a correr el bot."
-                            if dudoso
-                            else "es el folio de una corrida anterior: se vuelve a armar"
-                        ),
+                        "es el folio de una corrida anterior: se vuelve a armar",
                         "",
                     ]
                 )
@@ -1264,18 +1295,18 @@ def _resumen_folios(
         )
         logger.info("   No se les agrega otro encima: el folio quedaría con el renglón dos veces.")
 
-    dudosos = [(f, p) for f in plan for p in f.folios_dudosos]
-    if dudosos:
+    no_pisados = [f for f in plan if ESTADO_NO_PISA in (f.estado, f.estado_factura)]
+    if no_pisados:
         logger.info(
-            "\nOJO, revise estos archivos (%d): se tomaron como el folio de la corrida "
-            "anterior, pero al renglón le falta su archivo numerado. Si alguno es un "
-            "soporte nuevo, renómbrelo con su número y vuelva a correr el bot:",
-            len(dudosos),
+            "\nOJO, en %d factura(s) NO se armó el folio: en esa ruta ya hay un archivo que "
+            "no escribió este bot y podría ser un soporte de verdad. No se pisó nada. Si es "
+            "un soporte, renómbrelo con su número; si es un folio viejo, bórrelo:",
+            len(no_pisados),
         )
-        for fac, p in dudosos[:10]:
-            logger.info("   %s: %s", fac.factura, p.name)
-        if len(dudosos) > 10:
-            logger.info("   … y %d más, en el reporte CSV.", len(dudosos) - 10)
+        for fac in no_pisados[:10]:
+            logger.info("   %s", fac.factura)
+        if len(no_pisados) > 10:
+            logger.info("   … y %d más, en el reporte CSV.", len(no_pisados) - 10)
 
     sin_nit = [f.factura for f in plan if not f.prefijo and (f.soportes or f.soportes_factura)]
     if sin_nit:
@@ -1332,7 +1363,13 @@ def main(argv: list[str] | None = None) -> int:
         for fac in plan:
             if not fac.soportes:
                 continue
-            renombrar_en_orden(fac, args.aplicar)
+            try:
+                renombrar_en_orden(fac, args.aplicar)
+            except OSError as e:
+                logger.warning("  %s: no pude renombrar (%s)", fac.factura, e)
+                fac.omitidos.append(f"no pude renombrar: {e}")
+                fac.estado = ESTADO_ERROR
+                continue
             if args.aplicar:
                 fac.estado = ESTADO_RENOMBRADO
     else:

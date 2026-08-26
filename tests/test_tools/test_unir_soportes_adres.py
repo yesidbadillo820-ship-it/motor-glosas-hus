@@ -826,25 +826,64 @@ def test_el_folio_no_se_anida_aunque_falte_ese_soporte(tmp_path):
     assert len(pypdf.PdfReader(str(fac / "680010079201_HUS311736_EPICRIS.pdf")).pages) == 2
 
 
-def test_avisa_cuando_no_puede_saber_si_es_folio_o_soporte_nuevo(tmp_path):
-    """Carpeta ya armada + un `..._EPICRIS.pdf` sin su «2 EPICRISIS.pdf» al lado:
-    se toma como el folio anterior, pero tiene que quedar avisado."""
+def test_una_epicrisis_sin_firma_es_un_soporte_no_un_folio(tmp_path):
+    """LA REGRESIÓN QUE MÁS IMPORTA.
+
+    La epicrisis del ADRES viene llamada `680010079201_HUS######_EPICRIS.pdf`,
+    que es exactamente como se llamará el folio. Antes el bot decidía por el
+    nombre y por si la carpeta traía archivos numerados: en una carpeta donde el
+    auditor ya había numerado algo a mano, tomaba la epicrisis DE VERDAD por un
+    folio viejo, la dejaba fuera del folio y acto seguido la pisaba. La epicrisis
+    se perdía para siempre y el folio subía al ADRES sin ella.
+    """
     raiz = tmp_path / "G"
-    fac = raiz / "HUS311736"
-    _pdf(fac / "1 RESPUESTA A GLOSA.pdf")
-    _pdf(fac / "680010079201_HUS311736_EPICRIS.pdf")
-    plan = org.planificar(raiz)[0]
-    assert [p.name for p in plan.folios_dudosos] == ["680010079201_HUS311736_EPICRIS.pdf"]
-    ruta = tmp_path / "r.csv"
-    org.escribir_reporte(ruta, [plan])
-    assert "REVISAR: se tomó como el folio" in ruta.read_text(encoding="utf-8-sig")
+    fac = raiz / "HUS352904"
+    _pdf(fac / "1 RESPUESTA A GLOSA.pdf", paginas=1)  # numerado a mano
+    epicrisis = _pdf(fac / "680010079201_HUS352904_EPICRIS.pdf", paginas=5)
+    _pdf(fac / "HC.pdf", paginas=3)
+
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+
+    # La epicrisis entró al folio, no se perdió.
+    assert plan.folios_previos == []
+    assert [s.grupo.clave for s in plan.soportes] == ["RESPUESTA", "EPICRISIS", "HISTORIA"]
+    assert plan.paginas == 9  # 1 + 5 + 3: las cinco páginas de la epicrisis están
+    # La epicrisis se renombró (no se borró): sus 5 páginas siguen ahí.
+    assert len(pypdf.PdfReader(str(fac / "2 EPICRISIS.pdf")).pages) == 5
+    # Y esa ruta ahora la ocupa el folio, con las 9 páginas.
+    assert len(pypdf.PdfReader(str(epicrisis)).pages) == 9
+    assert org.es_folio_nuestro(epicrisis)
 
 
-def test_el_folio_de_la_primera_corrida_no_es_dudoso(tmp_path):
+def test_el_folio_queda_firmado_y_se_reconoce_en_la_corrida_siguiente(tmp_path):
     raiz = _carpeta_con_los_dos_folios(tmp_path)
     org.armar_folios(raiz, aplicar=True)
+    fac = raiz / "HUS352904"
+    assert org.es_folio_nuestro(fac / "680010079201_HUS352904_EPICRIS.pdf")
+    assert org.es_folio_nuestro(fac / "680010079201_HUS352904_FACTURA.pdf")
+    # Un soporte cualquiera NO lleva la firma.
+    assert not org.es_folio_nuestro(fac / "1 RESPUESTA A GLOSA.pdf")
     plan = org.planificar(raiz)[0]
-    assert len(plan.folios_previos) == 2 and plan.folios_dudosos == []
+    assert sorted(p.name for p in plan.folios_previos) == [
+        "680010079201_HUS352904_EPICRIS.pdf",
+        "680010079201_HUS352904_FACTURA.pdf",
+    ]
+
+
+def test_no_pisa_un_archivo_que_no_escribio_el_bot(tmp_path):
+    """Si en la ruta del folio hay algo sin firma, no se arma nada: no se pisa."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "1 RESPUESTA A GLOSA.pdf")
+    # Un archivo ajeno, justo donde iría el folio, que el renombrado no libera.
+    ajeno = _pdf(fac / "HUS1_EPICRIS.pdf", paginas=7)
+    ajeno.chmod(0o444)
+    plan = org.planificar(raiz)[0]
+    plan.soportes = [s for s in plan.soportes if s.ruta != ajeno]  # se quedó fuera
+    org.aplicar_folios([plan], aplicar=True)
+    assert plan.estado == org.ESTADO_NO_PISA
+    assert len(pypdf.PdfReader(str(ajeno)).pages) == 7  # intacto
+    assert plan.omitidos and "no lo escribió este bot" in plan.omitidos[0]
 
 
 def test_una_factura_bloqueada_no_tumba_las_demas(tmp_path, monkeypatch):
