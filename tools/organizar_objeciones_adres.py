@@ -423,7 +423,9 @@ def _leer_glosas(ws, descripciones: dict, paquete: str) -> list[FilaAdres]:
 # ─── Lectura del reporte de DGH ──────────────────────────────────────────────
 
 COLUMNAS_DGH = {
-    "slnserpro": {"SLNSERPRO SERVICIO", "SLNSERPRO_SERVICIO"},
+    # "SERVICIOS DGH" es como sale la columna en el export que usa cartera; sin
+    # ella el código quedaba vacío aunque el cruce sí encontrara la línea.
+    "slnserpro": {"SLNSERPRO SERVICIO", "SLNSERPRO_SERVICIO", "SERVICIOS DGH", "SERVICIOS_DGH"},
     "desc_institucional": {"DESCRIPCION INSTITUCIONAL"},
     "cups": {"SLNSERPRO CUPS", "SLNSERPRO_CUPS"},
     "desc_cups": {"DESCRIPCION CUPS"},
@@ -674,9 +676,16 @@ def resolver_slnserpro(
         return Resolucion()
 
     def resultado(linea: LineaDgh, metodo: str) -> Resolucion:
-        mismos = [x for x in lineas if x.slnserpro == linea.slnserpro]
+        # El código que se escribe: el de servicio si viene, y si no el CUPS o
+        # el del medicamento, que en DGH identifican la misma línea. Antes se
+        # escribía el de servicio a secas y, si el export no traía esa columna,
+        # el renglón salía SIN código aunque el cruce sí hubiera acertado.
+        codigo_linea = (
+            linea.slnserpro or linea.cups or linea.cod_medicamento or linea.cod_med_factura
+        )
+        mismos = [x for x in lineas if (x.slnserpro or x.cups) == (linea.slnserpro or linea.cups)]
         return Resolucion(
-            slnserpro=linea.slnserpro,
+            slnserpro=codigo_linea,
             metodo=metodo,
             candidato=linea.slnserpro,
             candidato_desc=linea.rotulo(),
@@ -1617,6 +1626,17 @@ def main(argv: list[str] | None = None) -> int:
             con_servicio,
             homologados / con_servicio * 100,
         )
+    # El porcentaje de arriba mira solo los renglones que traían servicio, así
+    # que puede decir 100% con miles de celdas SLNSERPRO en blanco. Lo que de
+    # verdad decide si el archivo se puede cargar es cuántas filas salen vacías.
+    if vacios:
+        logger.warning(
+            "   [!] OJO: %d de %d filas salen SIN SLNSERPRO. DGH las rechaza.",
+            vacios,
+            len(conversion.registros),
+        )
+    else:
+        logger.info("   Las %d filas salen con SLNSERPRO.", len(conversion.registros))
     logger.info("\nArchivo de control: %s", control)
     logger.info(
         "REVISE la hoja CODIGOS antes de cargar: el ADRES usa códigos numéricos y DGH los\n"
