@@ -304,3 +304,86 @@ def test_lo_que_de_verdad_no_dice_nada_sigue_a_revisar():
     """`HUS390378-folio 7.pdf` no dice de qué es: tiene que salir a revisar."""
     grupo, reconocido = org.clasificar_con_marca("HUS390378-folio 7.pdf")
     assert grupo.clave == "OTROS" and not reconocido
+
+
+# ─── Renombrado numerado dentro del folio ────────────────────────────────────
+
+
+def test_nombre_numerado():
+    grupo = next(g for g in org.GRUPOS if g.clave == "RESPUESTA")
+    assert org.nombre_numerado(1, grupo) == "1 RESPUESTA A GLOSA.pdf"
+    assert org.nombre_numerado(12, grupo, ".PDF") == "12 RESPUESTA A GLOSA.PDF"
+
+
+def test_nombre_numerado_sin_caracteres_que_windows_rechaza():
+    """Los títulos con «/» o «:» no pueden llegar tal cual a un nombre de archivo."""
+    grupo = org.Grupo(99, "X", 'A/B:C"D', ())
+    assert org.nombre_numerado(1, grupo) == "1 A B C D.pdf"
+
+
+def test_renombrar_deja_los_soportes_como_los_nombra_el_area(tmp_path):
+    """`📁 HUS179983 OK / 1 RESPUESTA A GLOSA / 2 HISTORIA CLINICA / 3 OTRO`."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS352904"
+    for nombre in ("RTA_ADRES_HUS352904.pdf", "HC.pdf", "OTROS.pdf", "DX.pdf"):
+        _pdf(fac / nombre)
+    org.renombrar_en_orden(org.planificar(raiz)[0], aplicar=True)
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 HISTORIA CLINICA.pdf",
+        "3 AYUDAS DIAGNOSTICAS.pdf",
+        "4 OTROS.pdf",
+    ]
+
+
+def test_renombrar_no_pisa_cuando_el_nombre_nuevo_es_el_de_otro(tmp_path):
+    """El nombre que le toca a un archivo puede ser el que todavía tiene otro.
+
+    Renombrando de una, uno pisaría al otro: por eso se hace en dos vueltas.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    # «2 HISTORIA CLINICA.pdf» ya existe, pero le toca ser el 3.
+    for nombre in ("1 RESPUESTA A GLOSA.pdf", "2 HISTORIA CLINICA.pdf", "DX.pdf"):
+        _pdf(fac / nombre)
+    org.renombrar_en_orden(org.planificar(raiz)[0], aplicar=True)
+    nombres = sorted(p.name for p in fac.iterdir())
+    assert nombres == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 HISTORIA CLINICA.pdf",
+        "3 AYUDAS DIAGNOSTICAS.pdf",
+    ]
+    assert len(nombres) == 3  # no se perdió ni se duplicó ninguno
+
+
+def test_renombrar_dos_veces_deja_lo_mismo(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    for nombre in ("RTA_ADRES_HUS1.pdf", "HC.pdf"):
+        _pdf(fac / nombre)
+    for _ in range(2):
+        org.renombrar_en_orden(org.planificar(raiz)[0], aplicar=True)
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 HISTORIA CLINICA.pdf",
+    ]
+
+
+def test_renombrar_sin_aplicar_no_toca_nada(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    plan = org.renombrar_en_orden(org.planificar(raiz)[0], aplicar=False)
+    assert plan == [(fac / "HC.pdf", "1 HISTORIA CLINICA.pdf")]
+    assert (fac / "HC.pdf").exists()
+
+
+def test_main_renombrar(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    for nombre in ("RTA_ADRES_HUS1.pdf", "HC.pdf"):
+        _pdf(fac / nombre)
+    assert org.main(["--carpeta", str(raiz), "--renombrar", "--aplicar"]) == 0
+    assert (fac / "1 RESPUESTA A GLOSA.pdf").exists()
+    # En modo renombrar NO se arma el PDF unido.
+    assert not (fac / "HUS1_SOPORTES.pdf").exists()
