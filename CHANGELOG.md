@@ -1,5 +1,25 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 2) — el detallado convertido no se pierde de vista
+
+Al ir a repartir los 317 detallados del paquete —que salen del bot hermano con
+el número por todo nombre, `HUS388262.xlsx`— apareció que al pasarlos a PDF
+quedaban como `HUS388262.pdf`, y **con ese nombre el bot ya no sabe qué son**:
+en la corrida siguiente se iban a OTROS del folio CLÍNICO, cuando su sitio es el
+renglón 2 del folio de la FACTURA. (Peor: `HUS<num>.pdf` es también el nombre
+con que sale una nota crédito del CRRP, así que el nombre es genuinamente
+ambiguo.)
+
+Ahora la conversión los deja como `HUS388262 DETALLADO.pdf`. Si el nombre ya
+dice qué es, no se le agrega nada.
+
+Comprobado de punta a punta con un detallado real del paquete: se convierte,
+entra al folio de la factura como «2 DETALLADO.pdf», la carátula dice
+«2.DETALLADO → 13», y la segunda corrida deja exactamente lo mismo.
+
+1775 pruebas en `tests/test_tools`.
+
+
 ## Sesión 26-ago-2026 (cierre) — la carátula del folio
 
 El área mandó la carátula que necesita: un índice de una página que abre el

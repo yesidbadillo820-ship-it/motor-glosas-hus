@@ -1208,6 +1208,21 @@ def _sumar_al_folio(fac: Factura, ruta: Path, grupo: Grupo) -> None:
 ESTADO_SE_PASARIA = "SE PASARIA A PDF"
 
 
+def nombre_detallado_pdf(origen: Path) -> Path:
+    """El detallado pasado a PDF, con un nombre que el bot vuelva a reconocer.
+
+    `dividir_detallado_por_factura.py` los deja con el número por todo nombre
+    (`HUS352904.xlsx`). Convertido a `HUS352904.pdf` a secas ya no se sabe que
+    es el detallado —podría ser cualquier cosa, hasta una nota crédito del
+    CRRP— y en la corrida siguiente se iba a OTROS del folio CLÍNICO. Con la
+    palabra puesta se reconoce siempre.
+    """
+    candidato = origen.with_suffix(".pdf")
+    if es_detallado(candidato.name):
+        return candidato
+    return origen.with_name(f"{origen.stem} DETALLADO.pdf")
+
+
 def convertir_detallados(plan: list[Factura], aplicar: bool = False) -> list[tuple[str, Path, str]]:
     """Pasa a PDF el detallado que todavía está en Excel (renglón 2 del folio).
 
@@ -1239,7 +1254,9 @@ def convertir_detallados(plan: list[Factura], aplicar: bool = False) -> list[tup
     except SystemExit as e:  # sin Excel ni LibreOffice en el equipo
         return [(fac.factura, d, f"{ESTADO_ERROR}: {e}") for fac, d in pendientes]
 
-    convs = [excel_a_pdf.Conversion(origen=d, destino=d.with_suffix(".pdf")) for _, d in pendientes]
+    convs = [
+        excel_a_pdf.Conversion(origen=d, destino=nombre_detallado_pdf(d)) for _, d in pendientes
+    ]
     if motor == "excel":
         excel_a_pdf.convertir_con_excel(convs)
     else:
