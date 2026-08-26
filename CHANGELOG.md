@@ -1,5 +1,34 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 4) — el orden del folio de la factura, y sin índice
+
+Tres cosas que pidió el área al revisar el resultado:
+
+**1. El folio de la FACTURA no lleva índice.** Solo el clínico. Ya está.
+
+**2. El detallado tiene que ir de SEGUNDO, y quedaba de tercero.** El
+`..._FACTURA.pdf` que viene con el XML trae la factura y la representación
+gráfica **pegadas**; si el detallado llega aparte y solo se le pone detrás,
+queda después de las dos. Ahora `partes_de_la_factura()` mira página por página
+qué es cada pedazo y el bot **parte** el PDF para meter el detallado en la
+mitad:
+
+```
+antes:  factura(1-4) → representación gráfica(5-10) → detallado
+ahora:  factura(1-4) → detallado(5-8) → representación gráfica(9-14)
+```
+
+Si el PDF ya trae todo en orden —como la HUS311736, que trae los cuatro
+renglones— **se deja entero**: partirlo y volverlo a pegar no aporta y sí puede
+dañar algo.
+
+**3. La basura visual.** `sanar_temporales()` barre ahora los `.tmp` que deja
+una corrida caída, y el armado por pedazos limpia los suyos aunque falle.
+
+Comprobado con los dos archivos reales del paquete. 170 pruebas en el archivo,
+1784 en `tests/test_tools`.
+
+
 ## Sesión 26-ago-2026 (cierre 3) — el aviso decía un nombre que no existe
 
 Armando el paquete completo (223 folios), CLAUDIA avisó de 11 archivos «que no
