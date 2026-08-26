@@ -235,6 +235,7 @@ import contextlib
 import os
 import re
 import shutil
+import time
 import sys
 from pathlib import Path
 
@@ -325,10 +326,40 @@ def unir_pdfs(
     if metadatos:
         escritor.add_metadata(metadatos)
     tmp = destino.with_suffix(destino.suffix + ".tmp")
-    with open(tmp, "wb") as fh:
-        escritor.write(fh)
-    os.replace(tmp, destino)  # escritura atómica: no deja PDFs a medias
+    try:
+        with open(tmp, "wb") as fh:
+            escritor.write(fh)
+        reemplazar_con_reintento(tmp, destino)  # atómica: no deja PDFs a medias
+    except Exception:
+        # No dejar el .tmp huérfano (mismo cuidado que `copiar_como`): en
+        # Windows el destino puede estar ABIERTO en un visor de PDF, o
+        # bloqueado por el antivirus, y entonces `os.replace` no pasa.
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
     return paginas, omitidos
+
+
+ESPERAS_REEMPLAZO = (0.2, 0.5, 1.0, 2.0)
+
+
+def reemplazar_con_reintento(origen: Path, destino: Path) -> None:
+    """Mueve `origen` encima de `destino`, aguantando un bloqueo pasajero.
+
+    Sobre el share del hospital, el antivirus abre el archivo recién escrito
+    para mirarlo y, mientras tanto, Windows contesta «Acceso denegado». Dura un
+    instante: en el paquete 31068 cada corrida tumbaba UNA factura distinta —en
+    una falló la 376521 y pasó la 377385; en la siguiente, al revés—. Se espera
+    un momento y se vuelve a intentar; si de verdad está bloqueado (alguien con
+    el PDF abierto), después de los intentos el error sube igual.
+    """
+    for espera in ESPERAS_REEMPLAZO:
+        try:
+            os.replace(origen, destino)
+            return
+        except PermissionError:
+            time.sleep(espera)
+    os.replace(origen, destino)
 
 
 def copiar_como(origen: Path, destino: Path) -> None:
@@ -336,7 +367,7 @@ def copiar_como(origen: Path, destino: Path) -> None:
     tmp = destino.with_suffix(destino.suffix + ".tmp")
     try:
         shutil.copyfile(origen, tmp)
-        os.replace(tmp, destino)
+        reemplazar_con_reintento(tmp, destino)
     except Exception:
         # No dejar el .tmp huérfano (p. ej. destino solo-lectura o bloqueado
         # por antivirus/portal en Windows).
@@ -400,7 +431,7 @@ def comprimir_pdf(destino: Path, dpi: int = 150, calidad: int = 80) -> tuple[int
         if despues >= antes:
             tmp.unlink()
             return None
-        os.replace(tmp, destino)
+        reemplazar_con_reintento(tmp, destino)
         return antes, despues, avisos
     except Exception:
         with contextlib.suppress(OSError):

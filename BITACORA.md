@@ -8023,6 +8023,44 @@ las tres quedan con su correo.
 
 ---
 
+### 26-08 (tarde) — El botón «Exportar Excel» ahora saca un informe, no un volcado
+
+Yesid: «quisiera que el botón de exportar Excel me genere el Excel bien
+detallado, bien definido, algo pulido». Antes salía **una sola hoja de 15
+columnas**: los datos estaban, pero no decían nada.
+
+**Ahora el mismo botón saca un libro de siete hojas:**
+
+- **CÓMO LEER** — qué contesta cada hoja, para que cualquiera lo abra y se
+  ubique.
+- **RESUMEN** — cuántas facturas hay, cuántas listas para radicar, cuántas
+  devueltas, la tasa de devolución, las **tres causas que más devuelven** y el
+  gráfico de resultado.
+- **POR QUÉ SE DEVUELVEN** — las devoluciones **agrupadas por causa**
+  (deducida de lo que escribió el gestor), con cuántas facturas, cuánta plata,
+  el porcentaje y **qué hacer** en cada una. Con su gráfico.
+- **DEVUELTAS AL DETALLE** — solo las devueltas, con el texto completo de lo
+  observado. Es la hoja que se le pasa a Facturación.
+- **POR GESTOR** — cuántas auditó cada uno, cuántas radicó, cuántas devolvió y
+  su tasa, con gráfico.
+- **POR ENTIDAD** — lo mismo por aseguradora.
+- **FACTURAS** — una fila por factura con **todo**, incluida la observación del
+  gestor y quién escribió el envío y quién auditó. Con filtros en el
+  encabezado.
+
+Los totales son **fórmulas vivas**, no números pegados: si el auditor corrige
+una fila, los resúmenes se recalculan solos. El archivo sale con la fecha en el
+nombre (`CONSOLIDADO_PRE_AUDITORIA_26-08-2026.xlsx`).
+
+**Lo que no se inventa:** la causa se deduce del texto del gestor. Lo que no se
+puede clasificar queda como «Otros motivos», y lo que se devolvió sin escribir
+nada, como «Sin motivo escrito» — esas dos filas son, en sí mismas, un
+hallazgo.
+
+9 pruebas nuevas (166 en el módulo).
+
+---
+
 ### 26-08 (cierre) — Las doce ideas para el motor, implementadas
 
 Usted dijo «vamos a implementar todas las ideas». Quedaron **once de doce**. La

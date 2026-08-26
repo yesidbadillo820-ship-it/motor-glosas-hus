@@ -1040,70 +1040,23 @@ def exportar_consolidado(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    from openpyxl import Workbook
+    """El consolidado como INFORME, no como volcado de celdas.
 
-    # Un solo JOIN a las fuentes (evita N+1 sobre miles de facturas).
-    filas = (
-        db.query(FacturaPreauditoriaRecord, RadicacionCuentaRecord, DgReportRecord)
-        .outerjoin(
-            RadicacionCuentaRecord,
-            RadicacionCuentaRecord.factura == FacturaPreauditoriaRecord.factura,
-        )
-        .outerjoin(DgReportRecord, DgReportRecord.factura == FacturaPreauditoriaRecord.factura)
-        .order_by(FacturaPreauditoriaRecord.envio_actual, FacturaPreauditoriaRecord.factura)
-        .all()
-    )
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "CONSOLIDADO"
-    encabezados = [
-        "ENVIO",
-        "F_RECIBIDO",
-        "OFICIO FHUS",
-        "FACTURA",
-        "F_FACTURA",
-        "VALOR",
-        "NIT",
-        "ENTIDAD",
-        "CORREO F.E.",
-        "ESTADO",
-        "RESULTADO",
-        "N SUBSANACION",
-        "DEVOLUCIONES",
-        "AUDITOR",
-        "MOTIVO DEVOLUCION",
-    ]
-    ws.append(encabezados)
-    for f, rad, dg in filas:
-        ws.append(
-            [
-                f.envio_actual or (rad.envio if rad else None),
-                (
-                    _fecha_iso(f.f_recibido)
-                    or _fecha_fuente_iso(rad.f_recibido if rad else None)
-                    or ""
-                )[:10],
-                f.oficio_fhus,
-                f.factura,
-                (_fecha_fuente_iso(rad.f_factura if rad else None) or "")[:10],
-                (rad.valor if rad else 0) or 0,
-                rad.nit if rad else None,
-                rad.entidad if rad else None,
-                dg.correo_fe if dg else "NO",
-                f.estado,
-                f.resultado_actual,
-                f.num_subsanacion,
-                f.num_devoluciones,
-                f.auditor,
-                f.motivo_ultima_devolucion,
-            ]
-        )
-    buf = BytesIO()
-    wb.save(buf)
+    Antes salía una sola hoja de 15 columnas: los datos estaban, pero no
+    contaban nada. Ahora salen las devoluciones agrupadas por causa, el detalle
+    con lo que escribió cada gestor y los resúmenes por gestor y por entidad,
+    con fórmulas vivas y gráficos. El armado vive en el servicio.
+    """
+    from app.services.preauditoria_excel import construir_consolidado_excel
+
+    contenido = construir_consolidado_excel(db, generado_por=_nombre_auditor(current_user))
+    dia = datetime.now(TZ_BOGOTA).strftime("%d-%m-%Y")
     return StreamingResponse(
-        BytesIO(buf.getvalue()),
+        BytesIO(contenido),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="CONSOLIDADO_PRE_AUDITORIA.xlsx"'},
+        headers={
+            "Content-Disposition": (f'attachment; filename="CONSOLIDADO_PRE_AUDITORIA_{dia}.xlsx"')
+        },
     )
 
 

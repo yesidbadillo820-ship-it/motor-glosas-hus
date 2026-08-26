@@ -81,7 +81,6 @@ import csv
 import json
 import logging
 import contextlib
-import os
 import re
 import shutil
 import sys
@@ -92,7 +91,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # El motor de unión ya existe y está probado: aquí solo se le da el ORDEN.
 from organizar_soportes_por_factura import factura_del_nombre  # noqa: E402
-from unir_pdfs_carpetas import _cargar_lector_escritor, clave_natural, unir_pdfs  # noqa: E402
+from unir_pdfs_carpetas import (  # noqa: E402
+    _cargar_lector_escritor,
+    clave_natural,
+    reemplazar_con_reintento,
+    unir_pdfs,
+)
 
 logger = logging.getLogger("unir_soportes_adres")
 
@@ -623,6 +627,26 @@ def es_temporal(nombre: str) -> bool:
     return nombre.startswith(PREFIJO_TEMPORAL)
 
 
+def explicar_error(e: Exception) -> str:
+    """El error del sistema, dicho como para el auditor y no como para el técnico.
+
+    Windows contesta «[WinError 5] Acceso denegado» con dos rutas de 200
+    caracteres: eso no le dice a nadie qué hacer. Casi siempre es que el PDF
+    está abierto en un visor.
+    """
+    if isinstance(e, PermissionError):
+        # En `os.replace` el bloqueado es el DESTINO (`filename2`).
+        cual = getattr(e, "filename2", None) or getattr(e, "filename", None) or ""
+        nombre = Path(str(cual)).name.removesuffix(".tmp")
+        quien = f"«{nombre}»" if nombre else "el archivo"
+        return (
+            f"acceso denegado a {quien}. Casi siempre es que está ABIERTO en un visor "
+            "de PDF: ciérrelo y vuelva a correr el bot. Si no, puede ser el antivirus, "
+            "o que no tiene permiso para escribir en esa carpeta."
+        )
+    return str(e)
+
+
 def sanar_temporales(carpeta: Path) -> list[tuple[str, Path]]:
     """Devuelve a su nombre los archivos que dejó a medias una corrida caída.
 
@@ -631,9 +655,12 @@ def sanar_temporales(carpeta: Path) -> list[tuple[str, Path]]:
     donde estaba, sin pisar nada.
     """
     sanados: list[tuple[str, Path]] = []
-    # Los pedazos y cuerpos que deja el armado si se cae a mitad. Son basura
-    # del bot, con su propia terminación: no se confunden con nada del auditor.
-    for basura in sorted(p for p in carpeta.rglob("*.tmp.pdf*") if p.is_file()):
+    # Los pedazos y cuerpos que deja el armado si se cae a mitad, y el
+    # `..._FACTURA.pdf.tmp` que queda cuando el destino estaba bloqueado. Son
+    # basura del bot, con su propia terminación: no se confunden con nada del
+    # auditor.
+    regados = {p for patron in ("*.tmp.pdf*", "*.pdf.tmp") for p in carpeta.rglob(patron)}
+    for basura in sorted(p for p in regados if p.is_file()):
         with contextlib.suppress(OSError):
             basura.unlink()
             logger.info("  Limpiado: %s", basura.name)
@@ -902,15 +929,19 @@ def aplicar_folios(
     if not aplicar:
         return plan
     PdfReader, PdfWriter = _cargar_lector_escritor()
-    for fac in plan:
+    for n, fac in enumerate(plan, 1):
+        # Sin esto el bot se queda callado varios minutos sobre el share y
+        # parece colgado.
+        logger.info("  [%d/%d] %s", n, len(plan), fac.factura)
         try:
             renombrar_lista(fac.soportes, aplicar=True)
             renombrar_lista(fac.soportes_factura, aplicar=True)
         except OSError as e:
             # Un archivo abierto en Acrobat, sin permisos, o el share que se cae:
             # esa factura se salta y las otras 323 siguen. Queda anotado.
-            logger.warning("  %s: no pude renombrar (%s)", fac.factura, e)
-            fac.omitidos.append(f"no pude renombrar: {e}")
+            dicho = explicar_error(e)
+            logger.warning("  %s: no pude renombrar (%s)", fac.factura, dicho)
+            fac.omitidos.append(f"no pude renombrar: {dicho}")
             fac.estado = fac.estado_factura = ESTADO_ERROR
             continue
         _unir_folio(fac, FOLIO_EPICRIS, PdfReader, PdfWriter, caratula)
@@ -1030,8 +1061,9 @@ def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter, caratula: bool = 
         if not paginas:
             omitidos.append("ningún PDF tenía páginas legibles")
     except Exception as e:  # noqa: BLE001 - una factura mala no tumba el lote
-        logger.warning("  %s: %s", fac.factura, e)
-        paginas, omitidos, estado = 0, [str(e)], ESTADO_ERROR
+        dicho = explicar_error(e)
+        logger.warning("  %s: %s", fac.factura, dicho)
+        paginas, omitidos, estado = 0, [dicho], ESTADO_ERROR
     finally:
         for basura in pedazos:
             with contextlib.suppress(OSError):
@@ -1113,7 +1145,7 @@ def _poner_caratula(
         entradas = entradas_de_caratula(soportes, dict(detalle))
         if not escribir_caratula(entradas, caratula):
             # Sin reportlab no hay carátula, pero el folio no se pierde.
-            os.replace(cuerpo, destino)
+            reemplazar_con_reintento(cuerpo, destino)
             omitidos.append("sin carátula: falta reportlab (py -m pip install reportlab)")
             return len(PdfReader(str(destino)).pages), omitidos
         paginas, mas = unir_pdfs([caratula, cuerpo], destino, PdfReader, PdfWriter, METADATOS_FOLIO)

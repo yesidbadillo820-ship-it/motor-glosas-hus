@@ -2769,3 +2769,124 @@ class TestElNumeroDeFacturaSeCruzaAunqueVengaCorto:
         _subir_radicacion(client, [_rad_fila(ENV, "544936", 99900)])
         d = client.get("/preauditoria/fuentes/radicacion").json()
         assert any(f["factura"] == "HUS0000544936" for f in d["items"])
+
+
+# ------------------------------------------------------------------
+# El Excel del botón «Exportar» tiene que ser un informe, no un volcado
+# ------------------------------------------------------------------
+
+
+class TestExcelDelConsolidado:
+    """26-08-2026, pedido de Yesid: «que el botón de exportar Excel me genere
+    el Excel bien detallado, bien definido, algo pulido»."""
+
+    def _con_datos(self, client, db_session):
+        _subir_radicacion(
+            client,
+            [
+                _rad_fila(ENV, F1, 250700),
+                _rad_fila(ENV, F2, 120000, entidad="ADMINISTRADORA DE LOS RECURSOS "),
+            ],
+        )
+        _subir_dgreport(client, [F1, F2])
+        o = _crear_oficio(client, radicado="FHUS-AS-I01600-26")
+        _escribir(client, o["id"], ENV)
+        _radicar(client, _factura_id(client, F1))
+        _devolver(
+            client,
+            _factura_id(client, F2),
+            motivo="No se encuentra soporte .pdf de Furips ni SIRAS",
+        )
+        return o
+
+    def _libro(self, client):
+        from openpyxl import load_workbook
+
+        r = client.get("/preauditoria/consolidado/export.xlsx")
+        assert r.status_code == 200, r.text
+        assert "CONSOLIDADO_PRE_AUDITORIA" in r.headers["content-disposition"]
+        return load_workbook(BytesIO(r.content))
+
+    def test_trae_las_hojas_del_informe(self, client, db_session):
+        self._con_datos(client, db_session)
+        wb = self._libro(client)
+        for hoja in (
+            "CÓMO LEER",
+            "RESUMEN",
+            "POR QUÉ SE DEVUELVEN",
+            "DEVUELTAS AL DETALLE",
+            "POR GESTOR",
+            "POR ENTIDAD",
+            "FACTURAS",
+        ):
+            assert hoja in wb.sheetnames, f"falta la hoja {hoja}"
+
+    def test_cada_factura_lleva_lo_que_escribio_el_gestor(self, client, db_session):
+        self._con_datos(client, db_session)
+        fa = self._libro(client)["FACTURAS"]
+        filas = [[c.value for c in r] for r in fa.iter_rows(min_row=5)]
+        devuelta = [f for f in filas if f[2] == F2][0]
+        assert devuelta[10] == "DEVUELTA"
+        assert "Furips" in (devuelta[12] or ""), "no salió la observación del gestor"
+
+    def test_agrupa_las_devoluciones_por_causa(self, client, db_session):
+        """La pregunta que de verdad importa: por qué se están devolviendo."""
+        self._con_datos(client, db_session)
+        pq = self._libro(client)["POR QUÉ SE DEVUELVEN"]
+        causas = [pq.cell(f, 1).value for f in range(5, 12) if pq.cell(f, 1).value]
+        assert "Falta FURIPS o SIRAS" in causas
+        # …y con la recomendación al lado, no solo el conteo.
+        fila = causas.index("Falta FURIPS o SIRAS") + 5
+        assert "FURIPS" in (pq.cell(fila, 6).value or "")
+
+    def test_los_totales_son_formulas_vivas(self, client, db_session):
+        """Si el auditor corrige una fila, el resumen se recalcula solo."""
+        self._con_datos(client, db_session)
+        rs = self._libro(client)["RESUMEN"]
+        formulas = [rs.cell(f, 3).value for f in range(5, 11)]
+        assert all(str(v).startswith("=") for v in formulas if v), formulas
+        assert any("DEVUELTA" in str(v) for v in formulas)
+
+    def test_trae_los_graficos(self, client, db_session):
+        self._con_datos(client, db_session)
+        wb = self._libro(client)
+        assert wb["RESUMEN"]._charts, "el resumen no trae gráfico"
+        assert wb["POR QUÉ SE DEVUELVEN"]._charts, "las causas no traen gráfico"
+        assert wb["POR GESTOR"]._charts, "los gestores no traen gráfico"
+
+    def test_el_detalle_de_devueltas_sirve_para_facturacion(self, client, db_session):
+        self._con_datos(client, db_session)
+        dd = self._libro(client)["DEVUELTAS AL DETALLE"]
+        fila = [dd.cell(5, c).value for c in range(1, 10)]
+        assert fila[3] == F2
+        assert "Furips" in (fila[6] or "")
+
+    def test_con_el_consolidado_vacio_no_se_cae(self, client):
+        """Un módulo recién estrenado también tiene que poder exportar."""
+        wb = self._libro(client)
+        assert "FACTURAS" in wb.sheetnames
+        assert wb["RESUMEN"]["C5"].value.startswith("=")
+
+
+class TestLaCausaDeLaDevolucion:
+    """La clasificación sale del texto del gestor: si no se entiende, se dice."""
+
+    def test_reconoce_las_causas_del_equipo(self):
+        from app.services.preauditoria_excel import causa_de
+
+        assert causa_de("No se encuentra soporte .pdf de Furips ni SIRAS") == "Falta FURIPS o SIRAS"
+        assert (
+            causa_de("FACTURA NO CUENTA CON EL COMPROBANTE DE RECIBIDO DEL USUARIO")
+            == "Falta el comprobante de recibido del usuario"
+        )
+        assert (
+            causa_de("No se evidencia correo enviado desde el correo de facturación electrónica.")
+            == "Sin soporte de envío de la factura electrónica"
+        )
+
+    def test_lo_que_no_se_entiende_no_se_inventa(self):
+        from app.services.preauditoria_excel import OTROS, SIN_TEXTO, causa_de
+
+        assert causa_de("") == SIN_TEXTO
+        assert causa_de("   ") == SIN_TEXTO
+        assert causa_de("revisar con el jefe") == OTROS

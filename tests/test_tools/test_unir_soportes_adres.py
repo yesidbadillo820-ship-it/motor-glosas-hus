@@ -1587,3 +1587,90 @@ def test_sanar_temporales_barre_la_basura_de_una_corrida_caida(tmp_path):
     org.sanar_temporales(raiz)
     assert not [p.name for p in fac.iterdir() if ".tmp" in p.name]
     assert (fac / "HC.pdf").exists()  # lo del auditor no se toca
+
+
+def test_sanar_temporales_barre_tambien_el_pdf_tmp(tmp_path):
+    """El `..._FACTURA.pdf.tmp` que deja un destino bloqueado también es basura.
+
+    Del paquete 31068: `sanar_temporales` barría `*.tmp.pdf*` (los pedazos del
+    armado) pero NO el `*.pdf.tmp` de la escritura atómica, así que el archivo
+    regado se quedaba ahí corrida tras corrida.
+    """
+    carpeta = tmp_path / "HUS311371"
+    carpeta.mkdir()
+    basura = carpeta / "680010079201_HUS311371_FACTURA.pdf.tmp"
+    basura.write_bytes(b"%PDF-1.4 a medias")
+    pedazo = carpeta / "680010079201_HUS311371_FACTURA.1FACTURA.tmp.pdf"
+    pedazo.write_bytes(b"%PDF-1.4 pedazo")
+    bueno = carpeta / "1 FACTURA.pdf"
+    bueno.write_bytes(b"%PDF-1.4 de verdad")
+
+    org.sanar_temporales(tmp_path)
+
+    assert not basura.exists(), "no barrió el .pdf.tmp"
+    assert not pedazo.exists(), "no barrió el .tmp.pdf"
+    assert bueno.exists(), "se llevó por delante un soporte de verdad"
+
+
+def test_el_acceso_denegado_se_explica_en_cristiano():
+    """«[WinError 5] Acceso denegado: <ruta larga> -> <ruta larga>» no le sirve al auditor.
+
+    Tiene que decirle QUÉ archivo y QUÉ hacer: casi siempre está abierto en un
+    visor de PDF.
+    """
+    e = PermissionError(
+        5,
+        "Acceso denegado",
+        r"\\Prime\...\680010079201_HUS311371_FACTURA.pdf.tmp",
+        5,
+        r"\\Prime\...\680010079201_HUS311371_FACTURA.pdf",
+    )
+    dicho = org.explicar_error(e)
+
+    assert "680010079201_HUS311371_FACTURA.pdf" in dicho, "no dice cuál archivo"
+    assert "abierto" in dicho.lower(), "no dice qué hacer"
+    assert "WinError" not in dicho
+
+
+def test_explicar_error_deja_pasar_los_demas_errores():
+    assert org.explicar_error(ValueError("el PDF no abre")) == "el PDF no abre"
+
+
+def _abiertos(ruta: Path) -> int:
+    """Cuántos descriptores del proceso apuntan a este archivo (solo Linux)."""
+    fds = Path("/proc/self/fd")
+    if not fds.is_dir():
+        pytest.skip("sin /proc: no se puede contar descriptores abiertos")
+    n = 0
+    for fd in fds.iterdir():
+        try:
+            if fd.resolve() == ruta.resolve():
+                n += 1
+        except OSError:
+            continue
+    return n
+
+
+def test_leerle_la_firma_a_un_folio_no_lo_deja_abierto(tmp_path):
+    """Leer la firma no puede dejar el archivo abierto.
+
+    Guarda de Windows: allá un archivo abierto no se deja reemplazar y
+    `os.replace` responde «Acceso denegado». Hoy pypdf cierra solo, pero en
+    Linux —donde corren las pruebas— sí se puede pisar un archivo abierto, así
+    que sin esta guarda una fuga de este tipo pasaría de largo hasta que
+    reventara en el servidor de cartera.
+    """
+    pdf = tmp_path / "680010079201_HUS311371_EPICRIS.pdf"
+    _pdf(pdf, 2)
+
+    assert org.es_folio_nuestro(pdf) is False
+    assert _abiertos(pdf) == 0, "quedó abierto tras leerle la firma"
+
+
+def test_mirar_las_partes_de_la_factura_no_la_deja_abierta(tmp_path):
+    pdf = tmp_path / "1 FACTURA.pdf"
+    _pdf(pdf, 3)
+
+    org.partes_de_la_factura(pdf)
+
+    assert _abiertos(pdf) == 0, "quedó abierta tras mirarle las partes"
