@@ -111,7 +111,11 @@ archivos.
   renglón 1 y la representación gráfica de la DIAN.
 - **Seis facturas sin detallado**: HUS311371, HUS354080, HUS367368, HUS376239,
   HUS376811 y HUS394817. No venían en el zip.
-- **11 archivos en CLAUDIA que el bot no supo qué eran** y quedaron en OTROS.
+- **~~11 archivos en CLAUDIA que el bot no supo qué eran~~ — RESUELTO.** El
+  área confirmó que **van en OTROS**, así que ya están bien puestos y no hay
+  nada que cambiar. Salieron 16 en total; nueve están en carpetas marcadas
+  `_MAOS`. El aviso de «no reconocido» se apaga solo en la corrida siguiente:
+  ahora se llaman «N OTROS.pdf» y con ese nombre el bot sí los reconoce.
 
 ### 26-08-2026 (tarde) — La revisión que encontró que el bot borraba la epicrisis
 
