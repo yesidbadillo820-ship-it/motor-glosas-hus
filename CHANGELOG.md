@@ -1,5 +1,26 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (piloto) — el número es del renglón, y las copias de Windows en su sitio
+
+Dos cosas que salieron al correr el piloto sobre la HUS311371 de CAROLINA, que
+trae `HC.pdf` y `HC (2).pdf`:
+
+**1. El número es del RENGLÓN, no del archivo.** El área lo dijo claro: dos
+historias clínicas son las dos el renglón 2, y en la carátula del folio va un
+solo «2. HISTORIA CLINICA». Antes salían «2 HISTORIA CLINICA.pdf» y
+«3 HISTORIA CLINICA.pdf», que en la carátula se leían como dos renglones
+distintos. Ahora la segunda queda «2 HISTORIA CLINICA (2).pdf».
+
+**2. El original quedaba de último.** Windows nombra los repetidos `HC.pdf`,
+`HC (2).pdf`, `HC (3).pdf`, pero con el orden natural a secas «HC (2)» va antes
+que «HC.» —el espacio pesa menos que el punto— así que el orden salía
+`HC (2) → HC (3) → HC (10) → HC`. `clave_orden()` lo pone en su sitio.
+
+Las dos comprobadas con el caso real y estables en tres corridas seguidas.
+
+153 pruebas en el archivo.
+
+
 ## Sesión 26-ago-2026 (tarde) — la revisión adversarial: pérdida de datos y cuatro defectos más
 
 Se pasó el bot de folios por una revisión con cinco lentes distintas —colisiones
