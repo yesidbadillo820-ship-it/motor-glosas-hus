@@ -18,6 +18,14 @@ que «HC.» —el espacio pesa menos que el punto— así que el orden salía
 
 Las dos comprobadas con el caso real y estables en tres corridas seguidas.
 
+**3. La pantalla mentía sobre el nombre repetido.** En el piloto real, las dos
+historias clínicas salían listadas las dos como «2 HISTORIA CLINICA.pdf», como
+si la segunda hubiera pisado a la primera. En disco quedaban bien —
+«2 HISTORIA CLINICA.pdf» y «2 HISTORIA CLINICA (2).pdf»— porque el «(2)» lo
+resolvía `nombre_libre` al momento de renombrar, después de imprimir el
+listado. Ahora `nombres_en_orden()` calcula el nombre definitivo ANTES, así que
+la pantalla y el reporte muestran exactamente lo que va a quedar en la carpeta.
+
 153 pruebas en el archivo.
 
 

@@ -647,6 +647,28 @@ def numeros_de_renglon(soportes: list[Soporte]) -> list[int]:
     return [numeros[s.grupo.clave] for s in soportes]
 
 
+def nombres_en_orden(soportes: list[Soporte]) -> list[str]:
+    """El nombre que le va a quedar a cada soporte. Uno por soporte, en orden.
+
+    Cuando dos van en el mismo renglón, el segundo lleva el «(2)» de Windows:
+    `2 HISTORIA CLINICA.pdf` y `2 HISTORIA CLINICA (2).pdf`. Se calcula aquí y
+    no al renombrar, para que lo que se ve en pantalla y en el reporte sea
+    EXACTAMENTE lo que va a quedar en la carpeta. Antes las dos salían listadas
+    con el mismo nombre y parecía que una hubiera pisado a la otra.
+    """
+    usados: dict[str, int] = {}
+    nombres: list[str] = []
+    for soporte, numero in zip(soportes, numeros_de_renglon(soportes)):
+        base = nombre_numerado(numero, soporte.grupo, soporte.ruta.suffix)
+        usados[base] = usados.get(base, 0) + 1
+        if usados[base] == 1:
+            nombres.append(base)
+            continue
+        tallo, sufijo = Path(base).stem, Path(base).suffix
+        nombres.append(f"{tallo} ({usados[base]}){sufijo}")
+    return nombres
+
+
 def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tuple[Path, str]]:
     """Renombra una lista de soportes a `<n> <GRUPO>.pdf`, en su orden.
 
@@ -657,10 +679,7 @@ def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tupl
     Si algo falla a mitad, **se deshace**: los que ya iban con nombre de paso
     vuelven al que tenían. Antes quedaban como «~renombrando~…» para siempre.
     """
-    plan = [
-        (s.ruta, nombre_numerado(n, s.grupo, s.ruta.suffix))
-        for s, n in zip(soportes, numeros_de_renglon(soportes))
-    ]
+    plan = list(zip((s.ruta for s in soportes), nombres_en_orden(soportes)))
     if not aplicar:
         return plan
     # (soporte, nombre original, ruta temporal, nombre nuevo)
@@ -1403,14 +1422,9 @@ def _mostrar_folio(titulo: str, destino: Path | None, soportes: list[Soporte]) -
         logger.info("     %s: no hay nada todavía", titulo)
         return
     logger.info("     %s → %s", titulo, (destino or Path()).name)
-    for n, s in zip(numeros_de_renglon(soportes), soportes):
+    for nombre, s in zip(nombres_en_orden(soportes), soportes):
         marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
-        logger.info(
-            "        %-34s (era %s)%s",
-            nombre_numerado(n, s.grupo, s.ruta.suffix),
-            s.ruta.name,
-            marca,
-        )
+        logger.info("        %-34s (era %s)%s", nombre, s.ruta.name, marca)
 
 
 def _resumen_folios(
@@ -1680,15 +1694,12 @@ def main(argv: list[str] | None = None) -> int:
                 logger.info("\n  %s\\", fac.carpeta.name)
             else:
                 logger.info("\n  %s → %s", fac.factura, (fac.destino or Path()).name)
-            for n, s in zip(numeros_de_renglon(fac.soportes), fac.soportes):
+            nombres = nombres_en_orden(fac.soportes)
+            numeros = numeros_de_renglon(fac.soportes)
+            for nombre, n, s in zip(nombres, numeros, fac.soportes):
                 marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
                 if args.renombrar:
-                    logger.info(
-                        "     %-36s (era %s)%s",
-                        nombre_numerado(n, s.grupo, s.ruta.suffix),
-                        s.ruta.name,
-                        marca,
-                    )
+                    logger.info("     %-36s (era %s)%s", nombre, s.ruta.name, marca)
                 else:
                     logger.info("     %2d. [%s] %s%s", n, s.grupo.titulo, s.ruta.name, marca)
         if len(con_pdf) > 3:
