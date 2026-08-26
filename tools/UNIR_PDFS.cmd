@@ -286,12 +286,17 @@ def unir_pdfs(
     PdfReader,
     PdfWriter,
     metadatos: dict[str, str] | None = None,
+    detalle: list[tuple[Path, int]] | None = None,
 ) -> tuple[int, list[str]]:
     """Une `pdfs` en `destino`. Devuelve (n_paginas, [archivos_omitidos]).
 
     `metadatos` deja una firma dentro del PDF resultante. Sirve para que el bot
     que lo escribió pueda reconocerlo después como suyo y no confundirlo con un
     soporte de verdad.
+
+    `detalle`, si se pasa, recibe `(ruta, n_paginas)` de cada archivo que SÍ
+    entró. Sirve para saber en qué página empieza cada uno — que es lo que
+    necesita una carátula para no mentir.
     """
     escritor = PdfWriter()
     paginas = 0
@@ -311,6 +316,8 @@ def unir_pdfs(
                 omitidos.append(f"{pdf.name} (sin páginas legibles)")
             else:
                 paginas += n
+                if detalle is not None:
+                    detalle.append((pdf, n))
         except Exception as exc:  # PDF dañado/ilegible: se omite y se sigue
             omitidos.append(f"{pdf.name} ({type(exc).__name__})")
     if paginas == 0:

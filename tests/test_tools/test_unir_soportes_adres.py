@@ -486,7 +486,8 @@ def test_armar_folios_deja_los_dos_pdf_con_su_nombre(tmp_path):
         "680010079201_HUS352904_EPICRIS.pdf",
         "680010079201_HUS352904_FACTURA.pdf",
     ]
-    assert plan.paginas == 5 and plan.paginas_factura == 2
+    # +1 en cada uno: la carátula que abre el folio.
+    assert plan.paginas == 1 + 5 and plan.paginas_factura == 1 + 2
     assert plan.estado == org.ESTADO_UNIDO and plan.estado_factura == org.ESTADO_UNIDO
 
 
@@ -513,8 +514,8 @@ def test_armar_folios_dos_veces_deja_lo_mismo(tmp_path):
     antes = sorted(p.name for p in fac.iterdir())
     plan = org.armar_folios(raiz, aplicar=True)[0]
     assert sorted(p.name for p in fac.iterdir()) == antes
-    assert plan.paginas == 5 and plan.paginas_factura == 2
-    assert len(pypdf.PdfReader(str(fac / "680010079201_HUS352904_EPICRIS.pdf")).pages) == 5
+    assert plan.paginas == 1 + 5 and plan.paginas_factura == 1 + 2
+    assert len(pypdf.PdfReader(str(fac / "680010079201_HUS352904_EPICRIS.pdf")).pages) == 1 + 5
     assert [p.name for p in plan.folios_previos] == [
         "680010079201_HUS352904_EPICRIS.pdf",
         "680010079201_HUS352904_FACTURA.pdf",
@@ -572,7 +573,7 @@ def test_cuando_lleguen_las_notas_entran_de_cuartas(tmp_path):
         "2 DETALLADO.pdf",
         "3 NOTAS CREDITO.pdf",
     ]
-    assert plan.paginas_factura == 3
+    assert plan.paginas_factura == 1 + 3
 
 
 def test_avisa_los_renglones_que_le_faltan_al_folio_de_la_factura(tmp_path):
@@ -762,7 +763,7 @@ def test_un_pdf_dañado_no_tumba_el_folio_de_la_factura(tmp_path):
     (fac / "HUS1 DETALLADO.pdf").write_bytes(b"esto no es un PDF")
     plan = org.armar_folios(raiz, aplicar=True)[0]
     assert plan.estado_factura == org.ESTADO_UNIDO
-    assert plan.paginas_factura == 1
+    assert plan.paginas_factura == 1 + 1
     assert plan.omitidos
 
 
@@ -823,8 +824,8 @@ def test_el_folio_no_se_anida_aunque_falte_ese_soporte(tmp_path):
     antes = sorted(p.name for p in fac.iterdir())
     plan = org.armar_folios(raiz, aplicar=True)[0]
     assert sorted(p.name for p in fac.iterdir()) == antes
-    assert plan.paginas == 2  # la respuesta y la historia clínica, nada más
-    assert len(pypdf.PdfReader(str(fac / "680010079201_HUS311736_EPICRIS.pdf")).pages) == 2
+    assert plan.paginas == 1 + 2  # carátula + la respuesta y la historia clínica
+    assert len(pypdf.PdfReader(str(fac / "680010079201_HUS311736_EPICRIS.pdf")).pages) == 1 + 2
 
 
 def test_una_epicrisis_sin_firma_es_un_soporte_no_un_folio(tmp_path):
@@ -848,11 +849,11 @@ def test_una_epicrisis_sin_firma_es_un_soporte_no_un_folio(tmp_path):
     # La epicrisis entró al folio, no se perdió.
     assert plan.folios_previos == []
     assert [s.grupo.clave for s in plan.soportes] == ["RESPUESTA", "EPICRISIS", "HISTORIA"]
-    assert plan.paginas == 9  # 1 + 5 + 3: las cinco páginas de la epicrisis están
+    assert plan.paginas == 1 + 9  # carátula + 1 + 5 + 3: la epicrisis está
     # La epicrisis se renombró (no se borró): sus 5 páginas siguen ahí.
     assert len(pypdf.PdfReader(str(fac / "2 EPICRISIS.pdf")).pages) == 5
     # Y esa ruta ahora la ocupa el folio, con las 9 páginas.
-    assert len(pypdf.PdfReader(str(epicrisis)).pages) == 9
+    assert len(pypdf.PdfReader(str(epicrisis)).pages) == 1 + 9
     assert org.es_folio_nuestro(epicrisis)
 
 
@@ -1196,7 +1197,7 @@ def test_un_huerfano_a_medio_renombrar_no_se_pierde(tmp_path):
     org.armar_folios(raiz, aplicar=True)
     paginas = sorted(len(pypdf.PdfReader(str(p)).pages) for p in fac.glob("? HISTORIA*.pdf"))
     assert paginas == [3, 7]  # los dos siguen ahí
-    assert len(pypdf.PdfReader(str(fac / "HUS1_EPICRIS.pdf")).pages) == 10
+    assert len(pypdf.PdfReader(str(fac / "HUS1_EPICRIS.pdf")).pages) == 1 + 10
 
 
 def test_si_el_renombrado_revienta_a_mitad_se_deshace(tmp_path, monkeypatch):
@@ -1228,7 +1229,7 @@ def test_si_el_renombrado_revienta_a_mitad_se_deshace(tmp_path, monkeypatch):
     ]
     # Y la corrida siguiente lo arma sin ayuda.
     plan = org.armar_folios(raiz, aplicar=True)[0]
-    assert plan.estado == org.ESTADO_UNIDO and plan.paginas == 3
+    assert plan.estado == org.ESTADO_UNIDO and plan.paginas == 1 + 3
 
 
 def test_los_huerfanos_se_avisan_en_simulacion(tmp_path):
@@ -1264,7 +1265,7 @@ def test_el_folio_es_estable_con_carpetas_de_nombre_raro(tmp_path):
     _pdf(fac / "EPI.pdf", paginas=4)
     _pdf(fac / "HC.pdf", paginas=2)
     paginas = {org.armar_folios(raiz, aplicar=True)[0].paginas for _ in range(3)}
-    assert paginas == {7}  # las tres corridas dejan lo mismo
+    assert paginas == {1 + 7}  # las tres corridas dejan lo mismo
 
 
 def test_las_copias_de_windows_van_en_su_orden():
@@ -1320,7 +1321,7 @@ def test_el_numero_es_del_renglon_no_del_archivo(tmp_path):
         "HUS311371_EPICRIS.pdf",
     ]
     # Y las tres van adentro, en su orden: 1 + 2 + 3.
-    assert len(pypdf.PdfReader(str(fac / "HUS311371_EPICRIS.pdf")).pages) == 6
+    assert len(pypdf.PdfReader(str(fac / "HUS311371_EPICRIS.pdf")).pages) == 1 + 6
 
 
 def test_los_renglones_repetidos_son_estables_entre_corridas(tmp_path):
@@ -1335,3 +1336,104 @@ def test_los_renglones_repetidos_son_estables_entre_corridas(tmp_path):
     org.armar_folios(raiz, aplicar=True)
     assert sorted(p.name for p in fac.iterdir()) == antes
     assert "2 HISTORIA CLINICA (3).pdf" in antes
+
+
+# ─── La carátula: el índice que abre el folio ────────────────────────────────
+
+
+def test_la_caratula_dice_en_que_pagina_empieza_cada_renglon(tmp_path):
+    """Como la pidió el área: un renglón por línea, con su página.
+
+    El número tiene que ser la página EXACTA del folio ya armado — un índice
+    que miente es peor que no tener índice.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=68)  # 1 RESPUESTA A GLOSA
+    _pdf(fac / "HC.pdf", paginas=100)  # 2 HISTORIA CLINICA
+    _pdf(fac / "HC (2).pdf", paginas=67)  # …el mismo renglón 2
+    _pdf(fac / "DX.pdf", paginas=14)  # 3 AYUDAS DIAGNOSTICAS
+    _pdf(fac / "MED.pdf", paginas=18)  # 4 MEDICAMENTOS
+    _pdf(fac / "INS.pdf", paginas=5)  # 5 INSUMOS
+
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    folio = fac / "HUS1_EPICRIS.pdf"
+    lector = pypdf.PdfReader(str(folio))
+    assert len(lector.pages) == 1 + 68 + 100 + 67 + 14 + 18 + 5
+    assert plan.paginas == len(lector.pages)
+
+    texto = lector.pages[0].extract_text() or ""
+    # Las cinco líneas, con la página donde de verdad empieza cada renglón.
+    for renglon, pagina in (
+        ("1.RESPUESTA A GLOSA", 2),
+        ("2.HISTORIA CLINICA", 70),
+        ("3.AYUDAS DIAGNOSTICAS", 237),
+        ("4.MEDICAMENTOS", 251),
+        ("5.INSUMOS", 269),
+    ):
+        assert renglon in texto, renglon
+        assert str(pagina) in texto, f"{renglon} → {pagina}"
+
+
+def test_las_dos_historias_clinicas_son_UNA_linea_de_la_caratula(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=2)
+    _pdf(fac / "HC.pdf", paginas=3)
+    _pdf(fac / "HC (2).pdf", paginas=4)
+    plan = org.planificar(raiz)[0]
+    paginas = {s.ruta: n for s, n in zip(plan.soportes, (2, 3, 4))}
+    assert org.entradas_de_caratula(plan.soportes, paginas) == [
+        ("1.RESPUESTA A GLOSA", 2),
+        ("2.HISTORIA CLINICA", 4),
+    ]
+
+
+def test_el_soporte_que_no_entro_no_figura_en_la_caratula(tmp_path):
+    """Un PDF dañado se omite del folio; si igual saliera en el índice, todas
+    las páginas de abajo quedarían corridas."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=2)
+    _pdf(fac / "HC.pdf", paginas=3)
+    plan = org.planificar(raiz)[0]
+    # La historia clínica no entró (0 páginas).
+    paginas = {plan.soportes[0].ruta: 2}
+    assert org.entradas_de_caratula(plan.soportes, paginas) == [("1.RESPUESTA A GLOSA", 2)]
+
+
+def test_sin_caratula_el_folio_se_arma_igual(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=2)
+    plan = org.armar_folios(raiz, aplicar=True, caratula=False)[0]
+    assert plan.paginas == 2  # sin la página del índice
+    assert len(pypdf.PdfReader(str(fac / "HUS1_EPICRIS.pdf")).pages) == 2
+
+
+def test_la_caratula_no_deja_archivos_temporales(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf", paginas=2)
+    _pdf(fac / "HC.pdf", paginas=3)
+    org.armar_folios(raiz, aplicar=True)
+    assert not [p.name for p in fac.iterdir() if ".tmp" in p.name]
+
+
+@pytest.mark.parametrize(
+    ("origen", "esperado"),
+    [
+        # Así los deja `dividir_detallado_por_factura.py`: el número y nada más.
+        ("HUS352904.xlsx", "HUS352904 DETALLADO.pdf"),
+        # Si el nombre ya dice qué es, no se le agrega nada.
+        ("DETALLADO HUS1.xlsx", "DETALLADO HUS1.pdf"),
+        ("HUS352904 DETALLADO.xlsx", "HUS352904 DETALLADO.pdf"),
+    ],
+)
+def test_el_detallado_convertido_conserva_un_nombre_reconocible(origen, esperado):
+    """`HUS352904.xlsx` pasado a `HUS352904.pdf` a secas ya no se sabe qué es:
+    en la corrida siguiente se iba a OTROS del folio CLÍNICO."""
+    destino = org.nombre_detallado_pdf(Path(origen))
+    assert destino.name == esperado
+    assert org.es_detallado(destino.name)
+    assert org.clasificar(destino.name).clave == "DETALLADO"

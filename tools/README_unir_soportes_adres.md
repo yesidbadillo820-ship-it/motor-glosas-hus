@@ -23,6 +23,27 @@ el nombre con que se suben al ADRES:
 porque ese nombre es justo el que traían la epicrisis y la factura antes de
 renombrarlas.
 
+### La carátula
+
+Cada folio abre con una página de índice, como la pide el área:
+
+```
+1.RESPUESTA A GLOSA ______________________________________  2
+2.HISTORIA CLINICA _______________________________________ 70
+3.AYUDAS DIAGNOSTICAS ___________________________________ 237
+4.MEDICAMENTOS __________________________________________ 251
+5.INSUMOS _______________________________________________ 269
+```
+
+Una línea por **renglón**, no por archivo: las dos historias clínicas son un
+solo «2.HISTORIA CLINICA», y apunta a donde empieza la primera. El número es la
+página exacta del folio ya armado (la 1 es la carátula misma). Un soporte que
+no entró —un PDF dañado— **no figura**: si figurara, todas las páginas de abajo
+quedarían corridas.
+
+Con `--sin-caratula` no se pone. Si al equipo le falta `reportlab`, el folio se
+arma igual sin índice y se avisa en el reporte.
+
 Bot de doble clic para Windows: **`tools/UNIR_SOPORTES_ADRES.cmd`**.
 
 ---

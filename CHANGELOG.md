@@ -1,5 +1,56 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 2) — el detallado convertido no se pierde de vista
+
+Al ir a repartir los 317 detallados del paquete —que salen del bot hermano con
+el número por todo nombre, `HUS388262.xlsx`— apareció que al pasarlos a PDF
+quedaban como `HUS388262.pdf`, y **con ese nombre el bot ya no sabe qué son**:
+en la corrida siguiente se iban a OTROS del folio CLÍNICO, cuando su sitio es el
+renglón 2 del folio de la FACTURA. (Peor: `HUS<num>.pdf` es también el nombre
+con que sale una nota crédito del CRRP, así que el nombre es genuinamente
+ambiguo.)
+
+Ahora la conversión los deja como `HUS388262 DETALLADO.pdf`. Si el nombre ya
+dice qué es, no se le agrega nada.
+
+Comprobado de punta a punta con un detallado real del paquete: se convierte,
+entra al folio de la factura como «2 DETALLADO.pdf», la carátula dice
+«2.DETALLADO → 13», y la segunda corrida deja exactamente lo mismo.
+
+1775 pruebas en `tests/test_tools`.
+
+
+## Sesión 26-ago-2026 (cierre) — la carátula del folio
+
+El área mandó la carátula que necesita: un índice de una página que abre el
+folio, con el renglón y la página donde empieza.
+
+```
+1.RESPUESTA A GLOSA ______________________________________  2
+2.HISTORIA CLINICA _______________________________________ 70
+3.AYUDAS DIAGNOSTICAS ___________________________________ 237
+```
+
+Una línea por **renglón**, no por archivo — que era lo que quería decir con
+«en la carátula solo quedaría 1. RESPUESTA — 2. HISTORIA CLINICA». Las dos
+historias clínicas son una sola línea y apunta a donde empieza la primera.
+
+Lo que se cuidó, porque un índice que miente es peor que no tener índice:
+
+- El número es la página **exacta** del folio ya armado, contando la carátula.
+- Un soporte que NO entró (un PDF dañado) no figura: si figurara, todas las
+  páginas de abajo quedarían corridas. Por eso la carátula se arma con las
+  páginas que de verdad escribió `unir_pdfs`, no con las que se esperaban.
+- Sin `reportlab` el folio se arma igual, sin índice, y se avisa.
+- No quedan archivos temporales en la carpeta.
+
+`unir_pdfs` acepta un parámetro `detalle` opcional que devuelve cuántas páginas
+puso cada archivo; los demás bots que lo usan no cambian. `UNIR_PDFS.cmd`
+regenerado (su prueba del motor embebido volvió a detectar el desfase).
+
+`--sin-caratula` la desactiva. 158 pruebas en el archivo, 1772 en `tests/test_tools`.
+
+
 ## Sesión 26-ago-2026 (piloto) — el número es del renglón, y las copias de Windows en su sitio
 
 Dos cosas que salieron al correr el piloto sobre la HUS311371 de CAROLINA, que
