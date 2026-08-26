@@ -1,5 +1,51 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 5) — las once ideas para el motor
+
+Se implementaron once de las doce ideas propuestas. La #12 (unificar los dos
+vocabularios de color) queda sin hacer: son 2.072 cambios sobre algo que
+funciona y sin defecto visible; está escrita en la bitácora para constancia y
+solo se hace si el área lo pide.
+
+**Antes de radicar**
+
+- **No radicar sin el soporte de la causal.** `catalogo_glosas.py` gana el mapa
+  `SOPORTE_QUE_PIDE_LA_CAUSAL` y `soportes_que_pide(codigo)`; el dictamen avisa
+  cuando falta.
+- **`agente_auditor_eps()`** en `multi_agente.py`: seis flancos sacados de
+  fallas reales de agosto. Se dispara **cuando `citation_verifier` no encuentra
+  nada** — el caso que quemó esta semana. Lee `verif_citas` (la revisión que sí
+  llevó evidencia) en vez de volver a revisar; volver a revisar ahí sería sin
+  evidencia y un folio inventado pasaría de largo. Tres pruebas fijan ese
+  cableado.
+- **El sello dice contra qué se verificó** — `_estado_del_corpus()`.
+- **`_cups_desde_dgh()`**: cuando el texto no trae CUPS, se lee el que DGH ya
+  registró para esa factura en `ConceptoRecord`.
+
+**Aprendizaje**
+
+- Las plantillas gold se escogen por `valor_recuperado` y no por `usos`
+  (tres sitios de selección en `plantillas_gold.py`).
+- `_notas_de_la_promocion()` guarda con la plantilla lo que el gestor contestó
+  a «¿cuál argumento la levantó?». Si no contestó, no se inventa nada.
+
+**Pantallas nuevas**
+
+- `app/services/plata_recuperada.py` + `GET /dashboard-ejecutivo/plata-recuperada`
+  + panel `p-plata`. Una sola consulta para todo el periodo. Lo que no tiene
+  dato va a `sin_dato` y sale avisado en pantalla; no se rellena con supuestos.
+- `app/services/mi_dia.py` + `GET /mi-dia` + panel `p-mi-dia`. Tres columnas,
+  cada glosa en una sola. **`dias_restantes` vale 0 por defecto**, así que un 0
+  sin `fecha_vencimiento` es ambiguo entre «vencida» y «nadie la calculó»: se
+  devuelve `None` y esa glosa va al final, no al principio.
+
+**Pruebas:** 87 nuevas en cinco archivos. `tests/test_services` +
+`tests/test_api`: 6.601 en verde. `tests/test_frontend`: 264 en verde — la
+prueba de tokens fantasma atajó cuatro colores inexistentes en la pantalla
+nueva antes del commit.
+
+
+
 ## Sesión 26-ago-2026 (cierre 4) — el orden del folio de la factura, y sin índice
 
 Tres cosas que pidió el área al revisar el resultado:

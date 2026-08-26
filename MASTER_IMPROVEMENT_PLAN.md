@@ -119,6 +119,11 @@ texto `#991b1b`) — que es como se pinta un badge, no una inconsistencia.
 
 - [ ] Inventario de tablas y de qué filtros tiene cada una. **PENDIENTE DE VALIDAR**.
 - [ ] Filtro por texto, por estado y por rango de fechas en las tablas de glosas e historial.
+  - [x] **Texto, en «Mis glosas»** (26-08). Busca por factura, EPS y código
+    sobre las filas ya cargadas. 13 pruebas en
+    `tests/test_frontend/test_buscar_y_densidad.py`.
+  - [ ] Por estado y por rango de fechas. Sin hacer.
+  - [ ] En la tabla de historial y en la del expediente. Sin hacer.
 
 ---
 

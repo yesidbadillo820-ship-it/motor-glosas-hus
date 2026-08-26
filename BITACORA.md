@@ -8023,6 +8023,105 @@ las tres quedan con su correo.
 
 ---
 
+### 26-08 (cierre) — Las doce ideas para el motor, implementadas
+
+Usted dijo «vamos a implementar todas las ideas». Quedaron **once de doce**. La
+que falta es la única que le dije que no recomendaba, y es decisión suya (está
+en PENDIENTE, abajo).
+
+**Lo que cambia lo que sale del motor**
+
+- **No deja marcar como listo lo que no tiene con qué probarse.** El motor ya
+  sabe qué soporte pide cada causal —SO0101 la epicrisis, AU0202 la
+  autorización, CL la historia— y si no está, lo dice en el propio dictamen. De
+  los 10 del último lote auditado, 9 afirmaban cosas de la historia clínica sin
+  un solo soporte adjunto.
+- **Un auditor de la EPS, antes de radicar.** Los defectos graves de agosto los
+  encontraron tres auditorías *después* de que los dictámenes salieran — y
+  todos habían salido con el sello «citas verificadas · 0 hallazgos». Por eso el
+  revisor nuevo se enciende justo ahí: cuando la revisión de citas no encontró
+  nada, un agente lee el dictamen como lo leería el auditor de la entidad y
+  responde «por dónde lo tumbaría yo». Los seis flancos que revisa salen de
+  fallas reales de este mes: cita que no dice lo que se le atribuye, afirmar lo
+  que no se probó, contradicción interna, código que no cruza, plazo al revés y
+  no contestar la causal.
+- **El sello dice contra qué se verificó.** Antes decía «citas verificadas · 0
+  hallazgos» a secas, y esta semana quedó demostrado que ese sello podía darse
+  el visto bueno a sí mismo. Ahora dice cuántas normas están contrastadas
+  contra fuente oficial y cuántas no.
+- **El CUPS lo trae de DGH.** El archivo de recepción no tiene columna de CUPS.
+  El motor ya no se lo inventa —eso era lo grave— pero así perdía el argumento
+  del código. Ahora, cuando el texto no lo trae, busca el que el propio DGH
+  tiene guardado para esa factura. No inventa: lee.
+
+**Lo que hace que el motor aprenda**
+
+- **Primero sale la plantilla que más plata ha recuperado**, no la más usada.
+  Se usó mucho no es lo mismo que funcionó.
+- **Al levantar una glosa se le hace una sola pregunta al gestor:** «¿cuál
+  argumento la levantó?». Esa frase queda pegada a la plantilla, que es la
+  mejor prueba que existe de qué sirve con esa EPS y esa causal. Se puede dejar
+  en blanco, y si se deja en blanco no se inventa nada.
+
+**Dos pantallas nuevas**
+
+- **«Plata recuperada»** (la ve coordinación). Cuánto se glosó y en qué
+  terminó, mes a mes y EPS por EPS: glosado, respondido a tiempo, respondido
+  tarde, levantado, ratificado, perdido por vencimiento y sin decidir. Es el
+  número que pide la gerencia. Había 32 pantallas y una sola gráfica en todo el
+  sistema.
+
+  **Lo que más importa de este tablero es lo que NO hace: no rellena.** Una
+  glosa que la EPS levantó y a la que nadie le anotó cuánta plata era, no se
+  cuenta por el valor objetado — se cuenta aparte y sale arriba, en amarillo,
+  diciendo que esa plata no está sumada. Lo mismo con las que no tienen fecha
+  de vencimiento (de esas no se puede decir si se respondieron a tiempo). Un
+  tablero que se inventa el relleno miente con más autoridad que uno que se
+  queda corto y lo dice.
+
+- **«Mi día»** (la ve cualquier gestor). Tres columnas y nada más: responder lo
+  que llegó, revisar lo que el motor marcó, radicar lo que está listo. Cada
+  glosa cae en una sola, y cada tarjeta dice en una línea por qué está ahí.
+  Primero lo que vence antes; a igualdad de días, lo de más plata. Las otras 32
+  pantallas siguen ahí para quien las necesite, pero dejan de ser el punto de
+  partida.
+
+  **Aquí también hay un «no se inventa»,** y salió escribiendo las pruebas: la
+  base guarda un contador de días que vale **cero por defecto**. Un cero sin
+  fecha de vencimiento puede querer decir «se venció» o «nadie le calculó el
+  plazo», y en la base se ven idénticos. No se escogió ninguno: esa glosa sale
+  como «sin plazo conocido» y se va al final de la columna, en vez de
+  disfrazarse de urgente y empujar hacia abajo lo que de verdad vence mañana.
+
+**Lo de todos los días**
+
+- **Buscar dentro de las tablas** (38 tablas, y para hallar una factura había
+  que pasar páginas — en un lote de 1.573 eso es inviable).
+- **Modo compacto**, que aprieta las filas para revisar doscientas seguidas y
+  se recuerda por usuario.
+- **Los avisos de «revisar antes de radicar» salen en rojo al imprimir**, para
+  que nadie los mande por accidente.
+- **Las pantallas de plata avisan cuando no cargan.** Catorce pantallas fallaban
+  en silencio: si el servidor no respondía, el auditor veía ceros y creía que
+  no había nada.
+
+**Dos cosas que se arreglaron por el camino, y las encontraron las pruebas, no
+yo:**
+
+1. El revisor nuevo iba a volver a revisar las citas por su cuenta, y lo habría
+   hecho **sin la evidencia** — un folio inventado le habría pasado de largo y
+   el contador habría quedado en cero por ignorancia, no por estar limpio. Una
+   prueba que ya existía lo señaló. Ahora lee la revisión que ya se hizo.
+2. Cuatro colores de la pantalla nueva no existían en la paleta: se habrían
+   pintado transparentes. Lo cazó la prueba que se escribió en su día por el
+   botón invisible del lote ADRES.
+
+**87 pruebas nuevas** en cinco archivos, con sus casos borde: factura en cero,
+EPS vacía, glosa vencida que la EPS ya levantó, respuesta de 5.000 caracteres,
+lista vacía, cero meses, cien meses.
+
+---
+
 ## 3) PENDIENTE
 
 ### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
@@ -8109,6 +8208,18 @@ otras 131 siguen sin contrastar**, y quedó escrito en el archivo.
 casos de prueba resultó ser idéntico —byte por byte— al de la auditoría
 anterior. No trae los dictámenes nuevos: son los mismos, generados antes de las
 correcciones. Falta volver a enviarlo.
+
+### 26-08 — La única idea que falta, y es decisión suya
+
+De las doce ideas para el motor quedaron once hechas. La que falta es la **#12,
+unificar los dos vocabularios de color** de la página.
+
+Se lo dejo escrito tal como se lo dije: **no la recomiendo.** Conviven dos
+sistemas de color —el propio de la página (90 nombres, 2.072 usos) y el de
+`sinac-ds.css`, que se carga y casi nadie usa—. Unificarlos son **2.072 cambios
+sobre algo que funciona y sin ningún defecto visible que lo justifique**. Queda
+escrita para que exista la constancia, no porque valga la pena. Si usted me
+dice que sí, se hace.
 
 ### ⭐ Lo primero, al cierre del 25-08
 
@@ -8629,6 +8740,28 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Lo primero del motor (26-08, cierre de la noche):** volver a **desplegar y
+reiniciar** el motor en la PC de cartera. Lo que entra con este despliegue son
+las once ideas: el aviso de «falta el soporte», el auditor de la EPS antes de
+radicar, el sello honesto, el CUPS traído de DGH, la plantilla que más plata ha
+recuperado, la pregunta de «¿cuál argumento la levantó?», y las dos pantallas
+nuevas —**«Mi día»** y **«Plata recuperada»**—. Mientras no se reinicie, nada
+de eso se ve.
+
+**Lo primero de usted, después del reinicio:** entrar a **«Mi día»** (está en
+el menú, arriba, con el solcito). Es la pantalla con la que debería empezar el
+día el gestor. Si le sirve como está, se queda; si le falta algo, dígamelo y se
+ajusta.
+
+**Y decidir la idea #12** (unificar los dos vocabularios de color). Está
+explicada en PENDIENTE. Repito lo que le dije: son 2.072 cambios sobre algo que
+funciona y no la recomiendo. Solo se hace si usted lo pide.
+
+**Sigue faltando (de ayer):** volver a exportar los 10 casos de prueba. El
+documento que subió resultó idéntico —byte por byte— al de la auditoría
+anterior: son los dictámenes viejos, generados antes de las correcciones.
+
 
 **Folio ADRES — HAY QUE VOLVER A CORRER LOS TRES GESTORES (26-08 cierre 2).**
 Los 223 folios se armaron con el orden viejo del folio de la factura (el
