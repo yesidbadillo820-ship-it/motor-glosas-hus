@@ -1265,3 +1265,73 @@ def test_el_folio_es_estable_con_carpetas_de_nombre_raro(tmp_path):
     _pdf(fac / "HC.pdf", paginas=2)
     paginas = {org.armar_folios(raiz, aplicar=True)[0].paginas for _ in range(3)}
     assert paginas == {7}  # las tres corridas dejan lo mismo
+
+
+def test_las_copias_de_windows_van_en_su_orden():
+    """`HC.pdf`, `HC (2).pdf`, `HC (3).pdf` es como Windows nombra los repetidos.
+
+    Con el orden natural a secas el ORIGINAL quedaba de último —«HC (2)» va
+    antes que «HC.» porque el espacio pesa menos que el punto— y la historia
+    clínica salía al revés dentro del folio. Caso real de la HUS311371.
+    """
+    nombres = ["HC (10).pdf", "HC.pdf", "HC (3).pdf", "HC (2).pdf"]
+    assert sorted(nombres, key=org.clave_orden) == [
+        "HC.pdf",
+        "HC (2).pdf",
+        "HC (3).pdf",
+        "HC (10).pdf",
+    ]
+    # Y el orden natural de siempre sigue igual.
+    assert sorted(["EVOLUCIONES 10.pdf", "EVOLUCIONES 2.pdf"], key=org.clave_orden) == [
+        "EVOLUCIONES 2.pdf",
+        "EVOLUCIONES 10.pdf",
+    ]
+
+
+def test_el_folio_pone_la_historia_clinica_en_orden(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311371"
+    _pdf(fac / "RTA_ADRES_HUS311371.pdf", paginas=1)
+    _pdf(fac / "HC.pdf", paginas=2)
+    _pdf(fac / "HC (2).pdf", paginas=3)
+    plan = org.planificar(raiz)[0]
+    assert [s.ruta.name for s in plan.soportes] == [
+        "RTA_ADRES_HUS311371.pdf",
+        "HC.pdf",
+        "HC (2).pdf",
+    ]
+
+
+def test_el_numero_es_del_renglon_no_del_archivo(tmp_path):
+    """Caso real de la HUS311371, tal como lo pidió el área: dos historias
+    clínicas son las dos el renglón 2. En la carátula del folio hay un solo
+    «2. HISTORIA CLINICA», no un 2 y un 3.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311371"
+    _pdf(fac / "RTA_ADRES_HUS311371.pdf", paginas=1)
+    _pdf(fac / "HC.pdf", paginas=2)
+    _pdf(fac / "HC (2).pdf", paginas=3)
+    org.armar_folios(raiz, aplicar=True)
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 HISTORIA CLINICA (2).pdf",
+        "2 HISTORIA CLINICA.pdf",
+        "HUS311371_EPICRIS.pdf",
+    ]
+    # Y las tres van adentro, en su orden: 1 + 2 + 3.
+    assert len(pypdf.PdfReader(str(fac / "HUS311371_EPICRIS.pdf")).pages) == 6
+
+
+def test_los_renglones_repetidos_son_estables_entre_corridas(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    _pdf(fac / "HC.pdf")
+    _pdf(fac / "HC (2).pdf")
+    _pdf(fac / "HC (3).pdf")
+    org.armar_folios(raiz, aplicar=True)
+    antes = sorted(p.name for p in fac.iterdir())
+    org.armar_folios(raiz, aplicar=True)
+    assert sorted(p.name for p in fac.iterdir()) == antes
+    assert "2 HISTORIA CLINICA (3).pdf" in antes

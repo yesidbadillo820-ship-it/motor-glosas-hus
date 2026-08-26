@@ -395,6 +395,26 @@ def _es_palabra(aguja: str, pajar: str) -> bool:
 _RE_SOLO_FACTURA = re.compile(r"^HUS\s*0*\d+$")
 
 
+# Windows nombra los repetidos `HC.pdf`, `HC (2).pdf`, `HC (3).pdf`. Con el
+# orden natural a secas el ORIGINAL quedaba de ÚLTIMO —«HC (2)» va antes que
+# «HC.» porque el espacio pesa menos que el punto—, así que la historia clínica
+# salía al revés dentro del folio.
+_RE_COPIA_WINDOWS = re.compile(r"^(.*?)\s*\((\d+)\)$")
+
+
+def clave_orden(nombre: str) -> list:
+    """Orden natural, con las copias de Windows en su sitio.
+
+    `HC.pdf` → `HC (2).pdf` → `HC (3).pdf` → `HC (10).pdf`, que es el orden en
+    que las fue guardando el auditor.
+    """
+    tallo, sufijo = Path(nombre).stem, Path(nombre).suffix
+    copia = _RE_COPIA_WINDOWS.match(tallo)
+    if copia:
+        return clave_natural(f"{copia.group(1)}{sufijo}") + [int(copia.group(2))]
+    return clave_natural(nombre) + [0]
+
+
 def es_detallado(nombre: str) -> bool:
     limpio = _norm(Path(nombre).stem)
     if any(_norm(p) in limpio for p in PALABRAS_DETALLADO):
@@ -613,6 +633,20 @@ def sanar_temporales(carpeta: Path) -> list[tuple[str, Path]]:
     return sanados
 
 
+def numeros_de_renglon(soportes: list[Soporte]) -> list[int]:
+    """A cada soporte le toca el número de su RENGLÓN, no el de su posición.
+
+    Si una factura trae dos historias clínicas, las dos son el renglón 2: en la
+    carátula del folio hay un solo «2. HISTORIA CLINICA». La segunda queda como
+    «2 HISTORIA CLINICA (2).pdf», que es como Windows nombra los repetidos.
+    """
+    numeros: dict[str, int] = {}
+    for s in soportes:
+        if s.grupo.clave not in numeros:
+            numeros[s.grupo.clave] = len(numeros) + 1
+    return [numeros[s.grupo.clave] for s in soportes]
+
+
 def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tuple[Path, str]]:
     """Renombra una lista de soportes a `<n> <GRUPO>.pdf`, en su orden.
 
@@ -625,7 +659,7 @@ def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tupl
     """
     plan = [
         (s.ruta, nombre_numerado(n, s.grupo, s.ruta.suffix))
-        for n, s in enumerate(soportes, start=1)
+        for s, n in zip(soportes, numeros_de_renglon(soportes))
     ]
     if not aplicar:
         return plan
@@ -755,7 +789,7 @@ def _planificar_carpeta(sub: Path, numero: str, mapa: dict[str, str] | None) -> 
         for p in pdfs
         for g, ok in [clasificar_con_marca(p.name, mapa)]
     ]
-    soportes.sort(key=lambda s: (s.grupo.orden, clave_natural(s.ruta.name)))
+    soportes.sort(key=lambda s: (s.grupo.orden, clave_orden(s.ruta.name)))
     fac.soportes = [s for s in soportes if s.grupo.folio == FOLIO_EPICRIS]
     fac.soportes_factura = [s for s in soportes if s.grupo.folio == FOLIO_FACTURA]
     # El detallado que solo está en Excel: al folio únicamente entran PDF.
@@ -1044,7 +1078,7 @@ def revisar_facturas(plan: list[Factura], indice: dict[str, Path] | None = None)
 def _sumar_al_folio(fac: Factura, ruta: Path, grupo: Grupo) -> None:
     """Mete un archivo en el folio de la factura, en el renglón que le toca."""
     fac.soportes_factura.append(Soporte(ruta=ruta, grupo=grupo))
-    fac.soportes_factura.sort(key=lambda s: (s.grupo.orden, clave_natural(s.ruta.name)))
+    fac.soportes_factura.sort(key=lambda s: (s.grupo.orden, clave_orden(s.ruta.name)))
     fac.estado_factura = ESTADO_SIMULADO
 
 
@@ -1125,7 +1159,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
         w = csv.writer(fh, delimiter=";")
         w.writerow(COLUMNAS_REPORTE)
         for fac in plan:
-            for n, s in enumerate(fac.soportes, start=1):
+            for n, s in zip(numeros_de_renglon(fac.soportes), fac.soportes):
                 w.writerow(
                     [
                         fac.factura,
@@ -1139,7 +1173,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         FOLIO_EPICRIS,
                     ]
                 )
-            for n, s in enumerate(fac.soportes_factura, start=1):
+            for n, s in zip(numeros_de_renglon(fac.soportes_factura), fac.soportes_factura):
                 w.writerow(
                     [
                         fac.factura,
@@ -1369,7 +1403,7 @@ def _mostrar_folio(titulo: str, destino: Path | None, soportes: list[Soporte]) -
         logger.info("     %s: no hay nada todavía", titulo)
         return
     logger.info("     %s → %s", titulo, (destino or Path()).name)
-    for n, s in enumerate(soportes, start=1):
+    for n, s in zip(numeros_de_renglon(soportes), soportes):
         marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
         logger.info(
             "        %-34s (era %s)%s",
@@ -1646,7 +1680,7 @@ def main(argv: list[str] | None = None) -> int:
                 logger.info("\n  %s\\", fac.carpeta.name)
             else:
                 logger.info("\n  %s → %s", fac.factura, (fac.destino or Path()).name)
-            for n, s in enumerate(fac.soportes, start=1):
+            for n, s in zip(numeros_de_renglon(fac.soportes), fac.soportes):
                 marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
                 if args.renombrar:
                     logger.info(
