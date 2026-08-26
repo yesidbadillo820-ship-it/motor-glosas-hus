@@ -298,3 +298,25 @@ def test_motor_embebido_en_cmd_identico_al_py():
         "La copia embebida en tools/UNIR_PDFS.cmd difiere de tools/unir_pdfs_carpetas.py. "
         "Regenera el .cmd (encabezado batch + contenido del .py en CRLF)."
     )
+
+
+def test_si_no_puede_escribir_el_destino_no_deja_el_tmp_tirado(tmp_path, monkeypatch):
+    """Destino bloqueado (abierto en un visor en Windows) → sin `.pdf.tmp` huérfano.
+
+    En el paquete 31068 pasó de verdad: el folio de una factura estaba abierto,
+    `os.replace` dio «Acceso denegado» y quedó un `..._FACTURA.pdf.tmp` regado
+    en la carpeta del gestor. `copiar_como` ya limpiaba; `unir_pdfs` no.
+    """
+    mod = _cargar_modulo()
+    origen = tmp_path / "1 FACTURA.pdf"
+    _hacer_pdf(origen, 2)
+    destino = tmp_path / "FOLIO.pdf"
+
+    def replace_denegado(src, dst):
+        raise PermissionError(5, "Acceso denegado", str(src), 5, str(dst))
+
+    monkeypatch.setattr(mod.os, "replace", replace_denegado)
+    with pytest.raises(PermissionError):
+        mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
+
+    assert list(tmp_path.glob("*.tmp")) == [], "quedó un .tmp huérfano en la carpeta"
