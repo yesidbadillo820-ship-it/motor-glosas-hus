@@ -1,5 +1,24 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 6) — la ruta de «Mi día» pisaba una que ya existía
+
+Defecto que entró con el PR #506 y lo cazó el CI.
+
+`GET /mi-dia` ya existía en `health.py` (resumen personal del gestor: tareas,
+saludo, alertas). El router del tablero nuevo registró la misma ruta y, como se
+incluye antes que el de health, FastAPI se quedó con la nueva y la vieja quedó
+muerta en silencio — el modo de falla de «Salud Total».
+
+- El tablero se muda a `GET /mi-dia/tablero`; la pantalla llama la nueva.
+- `tests/test_api/test_ninguna_ruta_pisa_a_otra.py`: recorre `app.routes` y
+  falla si dos comparten (método, camino), nombrándolas. Más un guardia que
+  exige >100 rutas para que la prueba no pase por estar vacía.
+
+Ninguna pantalla del portal consumía la ruta vieja, así que no se rompió nada
+de cara al auditor. `tests/test_api/`: 2.783 en verde.
+
+
+
 ## Sesión 26-ago-2026 (cierre 5) — las once ideas para el motor
 
 Se implementaron once de las doce ideas propuestas. La #12 (unificar los dos
