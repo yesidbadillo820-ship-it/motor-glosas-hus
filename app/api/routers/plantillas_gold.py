@@ -251,7 +251,15 @@ def obtener_few_shot(
             PlantillaGoldRecord.codigo_glosa == codigo,
             PlantillaGoldRecord.eps == eps_u,
         )
-        .order_by(PlantillaGoldRecord.usos.desc())
+        # 26-08-2026: se ordenaba por VECES USADAS, que no es lo mismo que
+        # servir. Una plantilla usada veinte veces que nunca levantó una
+        # glosa ganaba a una usada dos veces que recuperó millones. Ahora
+        # manda la plata que de verdad se recuperó, y las veces usadas
+        # solo desempatan.
+        .order_by(
+            PlantillaGoldRecord.valor_recuperado.desc(),
+            PlantillaGoldRecord.usos.desc(),
+        )
         .limit(limite)
         .all()
     )
@@ -268,7 +276,15 @@ def obtener_few_shot(
             PlantillaGoldRecord.codigo_glosa == codigo,
             ~PlantillaGoldRecord.id.in_(ids_ya) if ids_ya else True,
         )
-        .order_by(PlantillaGoldRecord.usos.desc())
+        # 26-08-2026: se ordenaba por VECES USADAS, que no es lo mismo que
+        # servir. Una plantilla usada veinte veces que nunca levantó una
+        # glosa ganaba a una usada dos veces que recuperó millones. Ahora
+        # manda la plata que de verdad se recuperó, y las veces usadas
+        # solo desempatan.
+        .order_by(
+            PlantillaGoldRecord.valor_recuperado.desc(),
+            PlantillaGoldRecord.usos.desc(),
+        )
         .limit(faltan)
         .all()
     )
@@ -289,7 +305,15 @@ def obtener_few_shot(
             PlantillaGoldRecord.codigo_glosa.like(patron_familia),
             ~PlantillaGoldRecord.id.in_(ids_ya) if ids_ya else True,
         )
-        .order_by(PlantillaGoldRecord.usos.desc())
+        # 26-08-2026: se ordenaba por VECES USADAS, que no es lo mismo que
+        # servir. Una plantilla usada veinte veces que nunca levantó una
+        # glosa ganaba a una usada dos veces que recuperó millones. Ahora
+        # manda la plata que de verdad se recuperó, y las veces usadas
+        # solo desempatan.
+        .order_by(
+            PlantillaGoldRecord.valor_recuperado.desc(),
+            PlantillaGoldRecord.usos.desc(),
+        )
         .limit(faltan)
         .all()
     )

@@ -5403,6 +5403,51 @@ TEXTO_DMBUG_TARIFAS = (
 )
 
 
+def _cups_desde_dgh(numero_factura: str | None) -> tuple[str, str]:
+    """El CUPS real de la factura, leído de lo que DGH ya cargó.
+
+    26-08-2026, de las propuestas al motor. El archivo de recepción no trae
+    columna de CUPS: por eso el motor se lo inventaba, y por eso ahora —bien—
+    no escribe ninguno. Pero así la respuesta pierde el argumento del código:
+    no puede nombrar el servicio que defiende ni cruzarlo contra el catálogo
+    del contrato.
+
+    La tabla de conceptos SÍ tiene el CUPS y su descripción cuando la glosa
+    entró alguna vez por el importador de DGH. Si la factura está ahí, se toma
+    de ahí. Esto NO inventa nada: es el código que el propio DGH registró para
+    esa factura.
+
+    Devuelve (codigo, descripcion) o ("", "").
+    """
+    if not numero_factura:
+        return "", ""
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ConceptoRecord
+
+        db = SessionLocal()
+        try:
+            fila = (
+                db.query(ConceptoRecord)
+                .filter(ConceptoRecord.factura == str(numero_factura).strip())
+                .filter(ConceptoRecord.cups_codigo.isnot(None))
+                .filter(ConceptoRecord.cups_codigo != "")
+                .order_by(ConceptoRecord.valor_objetado.desc())
+                .first()
+            )
+            if not fila:
+                return "", ""
+            return (
+                str(fila.cups_codigo or "").strip(),
+                str(fila.cups_descripcion or "").strip(),
+            )
+        finally:
+            db.close()
+    except Exception as e:  # noqa: BLE001 — sin base no se inventa un código
+        logger.debug(f"[CUPS-DGH] no se pudo consultar: {e}")
+        return "", ""
+
+
 def _item_del_anexo_dmbug(cups: str | None) -> str:
     """Devuelve la frase que nombra el ítem del Anexo 1, si se puede probar.
 
@@ -7015,6 +7060,20 @@ class GlosaService:
                         if not _cups_desc(_m2.group(1), texto_base):
                             cups_verificado = _m2.group(1)
                             break
+
+            # 26-08-2026 — RESPALDO: el CUPS que DGH ya registró para esta
+            # factura. El archivo de recepción no trae la columna, así que sin
+            # esto el dictamen se queda sin poder nombrar el servicio. No se
+            # inventa nada: es el código que el propio DGH tiene guardado.
+            if not cups_verificado:
+                _c_dgh, _d_dgh = _cups_desde_dgh(str(getattr(data, "numero_factura", "") or ""))
+                if _c_dgh:
+                    cups_verificado = _c_dgh
+                    logger.info(
+                        f"[CUPS-DGH] factura {data.numero_factura}: el texto no traía CUPS; "
+                        f"se tomó {_c_dgh} de lo que DGH registró"
+                        + (f" ({_d_dgh[:60]})" if _d_dgh else "")
+                    )
 
             # Extraer valor facturado/pactado de info_tarifa cuando esté
             # disponible. Es la única forma fiable de distinguir el
@@ -9024,6 +9083,46 @@ class GlosaService:
                     )
             except Exception as _e_fs:
                 logger.debug(f"[FALTA-SOPORTE] aviso no aplicado: {_e_fs}")
+
+            # 26-08-2026 — EL AUDITOR DE LA EPS, ANTES DE RADICAR.
+            # Se enchufa donde de verdad hace falta: cuando el revisor de citas
+            # NO encontró nada. Ese es justo el caso que quemó esta semana —
+            # tres auditorías destaparon defectos graves en dictámenes que
+            # habían salido con el sello «citas verificadas · 0 hallazgos».
+            # Cuando el revisor SÍ marca algo, el gestor ya tiene qué mirar y
+            # este recordatorio sobraría.
+            try:
+                # El sello que va a ver el auditor ya está calculado más
+                # arriba (`verif_citas`), y se calculó CON la evidencia leída.
+                # Se lee ese mismo resultado en vez de volver a revisar: si se
+                # revisara otra vez aquí, sería sin evidencia — y un folio
+                # inventado no se vería. Si el revisor no pudo correr,
+                # `verif_citas` es None y no se promete nada.
+                _hallazgos_previos = (
+                    len(verif_citas.get("issues") or []) if isinstance(verif_citas, dict) else -1
+                )
+                if _hallazgos_previos == 0:
+                    from app.services.multi_agente import agente_auditor_eps
+
+                    _adv = agente_auditor_eps(dictamen, str(codigo_det or ""), str(data.eps or ""))
+                    _fl = _adv.get("flancos") or []
+                    if _fl:
+                        _lineas = "\n".join(
+                            f"   · {x['flanco']}: {x['como_lo_tumbaria']}" for x in _fl[:6]
+                        )
+                        dictamen = dictamen.rstrip() + (
+                            "\n\n⚠ ANTES DE RADICAR, LÉALO COMO EL AUDITOR DE LA ENTIDAD. "
+                            "La revisión automática de citas no encontró nada, y eso no basta: "
+                            "los defectos graves de agosto salieron en dictámenes con ese mismo "
+                            "sello. Estos son los flancos por los que la entidad lo tumbaría:\n"
+                            + _lineas
+                        )
+                        logger.info(
+                            f"[AUDITOR-EPS] {codigo_det}: {len(_fl)} flanco(s) señalados "
+                            "(el revisor de citas no había encontrado nada)."
+                        )
+            except Exception as _e_ae:
+                logger.debug(f"[AUDITOR-EPS] no se aplicó: {_e_ae}")
 
             try:
                 _dictamen_con_de = _reponer_preposicion_comida(dictamen)
