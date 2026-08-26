@@ -781,10 +781,19 @@ GRUPOS_POR_CLASIFICACION: tuple[tuple[str, str], ...] = (
 GRUPO_CLINICO = "CL"
 
 
+GRUPOS_MANUAL = ("CL", "SO", "TA", "FA", "CO", "AU")
+
+
 def grupo_dgh(clasificacion: str) -> str:
     """El grupo del Manual Único (CL/SO/TA/FA/CO/AU) que sugiere la clasificación
     que escribió el auditor. Cadena vacía si no se reconoce."""
     texto = _norm(clasificacion)
+    # Muchos archivos ya traen la clasificación como el código del Manual Único
+    # (CL0601, SO6101, TA0501). Antes solo se buscaban palabras («CALIDAD»,
+    # «PERTINENCIA»), así que esos códigos no se reconocían y TODA la columna
+    # CROTIPOBJ salía en 0 (administrativa).
+    if len(texto) >= 4 and texto[:2] in GRUPOS_MANUAL and texto[2:].strip().isdigit():
+        return texto[:2]
     for palabra, grupo in GRUPOS_POR_CLASIFICACION:
         if palabra in texto:
             return grupo
@@ -1172,6 +1181,24 @@ def construir_registros(
                     f"Aceptado {a_texto(fila.valor_aceptado)} de {a_texto(fila.valor_glosado)}",
                 )
             )
+
+    # CROTIPOBJ definitivo: por FACTURA y según el CRNCONOBJ que de verdad quedó
+    # escrito, no según la clasificación de origen. Es la misma regla del cargue
+    # de COOSALUD: DGH clasifica la objeción por su concepto principal, así que
+    # si TODOS los conceptos escritos de la factura son CL sale médica (1), si
+    # NINGUNO lo es sale administrativa (0), y si hay de los dos, mixta (2).
+    # Ojo: se calcula al final porque antes de _conciliar hay renglones que
+    # todavía se pueden caer del archivo.
+    cl_por_factura: dict[str, set[bool]] = defaultdict(set)
+    for registro in salida.registros:
+        es_cl = str(registro.get("CRNCONOBJ") or "").upper()[:2] == GRUPO_CLINICO
+        cl_por_factura[str(registro["CRNCXC"])].add(es_cl)
+    tipo_por_factura = {
+        f: (1 if flags == {True} else 0 if flags == {False} else 2)
+        for f, flags in cl_por_factura.items()
+    }
+    for registro in salida.registros:
+        registro["CROTIPOBJ"] = tipo_por_factura[str(registro["CRNCXC"])]
 
     salida.metodos = dict(metodos)
     cuadrar_con_reporte(salida, reclamaciones)
