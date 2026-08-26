@@ -686,8 +686,16 @@ def aplicar_folios(plan: list[Factura], aplicar: bool = False, prefijo: str = ""
         return plan
     PdfReader, PdfWriter = _cargar_lector_escritor()
     for fac in plan:
-        renombrar_lista(fac.soportes, aplicar=True)
-        renombrar_lista(fac.soportes_factura, aplicar=True)
+        try:
+            renombrar_lista(fac.soportes, aplicar=True)
+            renombrar_lista(fac.soportes_factura, aplicar=True)
+        except OSError as e:
+            # Un archivo abierto en Acrobat, sin permisos, o el share que se cae:
+            # esa factura se salta y las otras 323 siguen. Queda anotado.
+            logger.warning("  %s: no pude renombrar (%s)", fac.factura, e)
+            fac.omitidos.append(f"no pude renombrar: {e}")
+            fac.estado = fac.estado_factura = ESTADO_ERROR
+            continue
         _unir_folio(fac, FOLIO_EPICRIS, PdfReader, PdfWriter)
         _unir_folio(fac, FOLIO_FACTURA, PdfReader, PdfWriter)
     return plan

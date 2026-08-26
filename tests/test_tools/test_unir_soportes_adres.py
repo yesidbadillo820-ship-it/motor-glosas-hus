@@ -845,3 +845,27 @@ def test_el_folio_de_la_primera_corrida_no_es_dudoso(tmp_path):
     org.armar_folios(raiz, aplicar=True)
     plan = org.planificar(raiz)[0]
     assert len(plan.folios_previos) == 2 and plan.folios_dudosos == []
+
+
+def test_una_factura_bloqueada_no_tumba_las_demas(tmp_path, monkeypatch):
+    """En el share del hospital son 324 facturas. Un archivo abierto en Acrobat
+    —o el share que se cae— no puede dejar sin folio a las otras 323."""
+    raiz = tmp_path / "G"
+    for numero in ("HUS1", "HUS2", "HUS3"):
+        _pdf(raiz / numero / "HC.pdf")
+
+    original = Path.rename
+
+    def _rename(self, destino):
+        if "HUS2" in str(self):
+            raise PermissionError(13, "El archivo está abierto en otro programa")
+        return original(self, destino)
+
+    monkeypatch.setattr(Path, "rename", _rename)
+    plan = org.armar_folios(raiz, aplicar=True)
+
+    assert (raiz / "HUS1" / "HUS1_EPICRIS.pdf").exists()
+    assert (raiz / "HUS3" / "HUS3_EPICRIS.pdf").exists()
+    malas = [f for f in plan if f.estado == org.ESTADO_ERROR]
+    assert [f.factura for f in malas] == ["HUS2"]
+    assert malas[0].omitidos and "no pude renombrar" in malas[0].omitidos[0]
