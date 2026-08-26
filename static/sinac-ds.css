@@ -29,25 +29,44 @@
   --sds-sp-8: 32px;
   --sds-sp-12: 48px;
 
-  /* Paleta — azul HUS + neutrales + 2 acentos */
-  --sds-blue-50: #eff6ff;
-  --sds-blue-500: #3b82f6;
-  --sds-blue-600: #2563eb;
-  --sds-blue-700: #1d4ed8;
-  --sds-blue-900: #1e3a8a;
+  /* ═══ Paleta — UN SOLO VOCABULARIO DE COLOR (26-08-2026) ═══
 
-  --sds-gray-50: #f8fafc;
-  --sds-gray-100: #f1f5f9;
-  --sds-gray-200: #e2e8f0;
-  --sds-gray-400: #94a3b8;
-  --sds-gray-600: #475569;
-  --sds-gray-900: #0f172a;
+     Hasta hoy convivían dos paletas distintas: la corporativa del
+     rebrand de junio (--sinac-*, la que usa toda la página) y la de
+     este archivo, de mayo, con sus propios azules y verdes. No eran
+     dos nombres para el mismo color: eran colores distintos. Y este
+     archivo NO está muerto — sus reglas pintan la pantalla de
+     Analizar, así que el mismo «verificado» salía de un verde en el
+     dictamen y de otro verde en el resto del motor.
 
-  --sds-success: #16a34a;
-  --sds-success-bg: #f0fdf4;
-  --sds-amber: #d97706;
-  --sds-amber-bg: #fffbeb;
-  --sds-rose: #e11d48;
+     Ahora estos nombres son los que se escriben (como pide CLAUDE.md)
+     pero el color que devuelven es el corporativo. Un solo vocabulario.
+
+     EL RESPALDO NO ES ADORNO: de las seis páginas que cargan este
+     archivo, cuatro no definen --sinac-* (preauditoría, importar
+     masiva, presentación IA, terapia física). Sin el color de
+     respaldo esos tokens quedarían vacíos y el elemento se pintaría
+     transparente — que es exactamente como quedó invisible el botón
+     del lote ADRES. El respaldo es el MISMO color corporativo, no el
+     viejo, para que esas cuatro páginas también queden unificadas. */
+  --sds-blue-50:  var(--sinac-blue-50,  #F5FAFF);
+  --sds-blue-500: var(--sinac-blue-500, #1E88E5);
+  --sds-blue-600: var(--sinac-blue-600, #1976D2);
+  --sds-blue-700: var(--sinac-blue-700, #1565C0);
+  --sds-blue-900: var(--sinac-blue-900, #0B3D91);
+
+  --sds-gray-50:  var(--sinac-gray-50,  #F5F7FA);
+  --sds-gray-100: var(--sinac-gray-100, #ECEFF1);
+  --sds-gray-200: var(--sinac-gray-200, #CFD8DC);
+  --sds-gray-400: var(--sinac-gray-400, #90A4AE);
+  --sds-gray-600: var(--sinac-gray-700, #455A64);
+  --sds-gray-900: var(--sinac-gray-900, #212B36);
+
+  --sds-success:    var(--sinac-green-700, #2E7D32);
+  --sds-success-bg: var(--sinac-green-100, #E8F5E9);
+  --sds-amber:      var(--c-amber,       #E65100);
+  --sds-amber-bg:   var(--c-amber-light, #FFF3E0);
+  --sds-rose:       var(--c-red,         #C62828);
 
   /* Sombras (3 niveles) */
   --sds-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
