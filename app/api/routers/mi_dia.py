@@ -20,6 +20,12 @@ from app.models.db import UsuarioRecord
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.mi_dia import armar_mi_dia
 
+# OJO CON LA RUTA: `GET /mi-dia` ya existe desde antes en `health.py` — es el
+# resumen personal del gestor (tareas del día, saludo, alertas). Este tablero
+# cuelga de `/mi-dia/tablero` para no pisarlo. Se pisó una vez, el 26-08-2026:
+# como este router se registra antes que el de health, la ruta vieja quedó
+# muerta sin que nada lo dijera. Lo cazó el CI, y quedó una prueba que impide
+# que dos rutas compartan camino y método.
 router = APIRouter(prefix="/mi-dia", tags=["mi-dia"])
 
 
@@ -53,7 +59,7 @@ class MiDiaOut(BaseModel):
     vencidas: int = 0
 
 
-@router.get("", response_model=MiDiaOut)
+@router.get("/tablero", response_model=MiDiaOut)
 def mi_dia(
     por_columna: int = Query(25, ge=5, le=100),
     db: Session = Depends(get_db),
