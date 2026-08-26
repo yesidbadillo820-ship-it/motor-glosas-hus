@@ -23475,8 +23475,18 @@ async function registrarDecisionEPS(id){
   var decision=prompt('Decisión de la EPS:\nLEVANTADA (ganamos)\nACEPTADA (perdimos)\nRATIFICADA (va a conciliación)\nPENDIENTE');
   if(!decision)return;
   var valor=parseFloat(prompt('Valor recuperado ($):')||'0')||0;
+  // 26-08-2026 — cerrar el ciclo. Cuando la EPS nos da la razón, el gestor
+  // sabe POR QUÉ; sin esa frase el motor lleva un año escribiendo sin saber
+  // qué le funciona. Una sola pregunta, y se puede dejar en blanco.
+  var porQue='';
+  if(decision.toUpperCase()==='LEVANTADA'){
+    porQue=prompt('¿Cuál argumento la levantó?\n(Opcional — queda guardado con la plantilla '
+      +'para que el motor lo use primero la próxima vez con esta EPS y esta causal.)')||'';
+  }
   try{
-    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({decision_eps:decision.toUpperCase(),valor_recuperado:valor})});
+    var cuerpo={decision_eps:decision.toUpperCase(),valor_recuperado:valor};
+    if(porQue.trim())cuerpo.observacion_eps=porQue.trim();
+    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify(cuerpo)});
     var d=await r.json().catch(function(){return{};});
     toast(r.ok?'Decisión registrada':'Error',d.message||d.detail||('El servidor respondió '+r.status),r.ok?'success':'error');
     if(r.ok)loadHist(1);
