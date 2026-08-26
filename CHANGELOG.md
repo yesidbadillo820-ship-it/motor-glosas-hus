@@ -1,5 +1,110 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (tarde) — la revisión adversarial: pérdida de datos y cuatro defectos más
+
+Se pasó el bot de folios por una revisión con cinco lentes distintas —colisiones
+de nombres, idempotencia, pérdida de archivos, Windows/SMB, contratos—, y cada
+hallazgo se puso a dos escépticos que tenían que reproducirlo contra el código
+real. Salieron 31; estos son los que se confirmaron y se arreglaron.
+
+**1. PÉRDIDA DE DATOS: el folio pisaba la epicrisis de verdad.** El folio se
+llama igual que el archivo del que sale (`..._EPICRIS.pdf`). Para distinguirlos
+el bot miraba si la carpeta traía archivos numerados; en una carpeta donde el
+auditor ya había numerado algo a mano —que es lo que pide la hoja del área— la
+epicrisis DE VERDAD se tomaba por folio viejo, se dejaba fuera del folio y se
+pisaba. Comprobado: epicrisis de 5 páginas → tras UNA corrida, esa ruta tenía un
+folio de 4 páginas sin la epicrisis y la epicrisis no existía. Sin respaldo.
+
+La heurística se reemplaza por un hecho: el bot **firma** los PDF que escribe
+(`/Producer`) y reconoce los suyos por esa firma. Lo que no la lleva es un
+soporte y se trata como tal — que era lo correcto: la epicrisis entra al folio y
+se renombra, y con eso queda libre el nombre. Se quitan `_RE_NUMERADO`,
+`_grupos_ya_numerados` y `folios_dudosos`. Candado extra: si en la ruta del
+folio hay algo sin firma, no se arma ese folio y se avisa.
+
+**2. Las notas crédito no se reconocían con el nombre del hospital.** Vienen
+como `NC_263272_HUS352904.pdf`; caían en OTROS del folio CLÍNICO y el reporte
+seguía diciendo que faltaban. Se agregan `NC` y `NOTA ELECTRONICA`, comprobando
+que no disparan falsos positivos (`HC`, `RESONANCIA`, `INCAPACIDAD`, `NTE-C`).
+
+**3. El folio cambiaba de orden entre corridas.** El nombre que escribe el
+propio bot, `3 HISTORIA CLINICA - TERAPIAS.pdf`, se releía como HISTORIA a
+secas, porque «HISTORIA CLINICA» es más larga que «TERAPIAS» y ganaba. El
+soporte cambiaba de grupo y se renumeraba. Ahora HISTORIA CLINICA es un grupo
+**genérico**: cualquier grupo más preciso le gana. Igual para curaciones,
+evoluciones y procedimientos.
+
+**4. El detallado del bot hermano no se reconocía.**
+`dividir_detallado_por_factura.py` lo deja como `HUS352904.xlsx`, el número y
+nada más: nunca se pasaba a PDF y no entraba al folio.
+
+**5. Un soporte dañado desaparecía del folio en silencio.** Se omitía, el folio
+se armaba sin él y en pantalla decía «armado». Ahora sale avisado: «OJO, N
+soporte(s) NO entraron al folio».
+
+Y dos candados más de robustez: una copia fallida de la factura, o un archivo
+bloqueado al renombrar con `--renombrar`, ya no tumban las otras 323 facturas.
+
+### Y seis más, de la misma revisión
+
+**6. Una FECHA pasaba por NIT.** `prefijo_del_nombre` solo pedía «números al
+principio y esta factura después», así que `20240913_HUS352904 EVOLUCION.pdf`
+daba NIT `20240913` y el folio salía llamándose `20240913_HUS352904_EPICRIS.pdf`.
+Ahora se exige el nombre completo del ADRES (`<NIT>_<FACTURA>_<TIPO>`) y nada
+más; un número de ingreso o una fecha ya no cuelan.
+
+**7. `--mapa-nombres` dependía del orden del JSON.** Con
+`{"TAC": …, "TAC DE TORAX": …}` ganaba la primera línea escrita, no la palabra
+más larga. Ahora gana la más larga, como en el diccionario de siempre.
+
+**8. El reporte abierto en Excel tumbaba la corrida.** En Windows el CSV no se
+deja escribir si está abierto; el traceback llegaba **después** de armar todos
+los folios. Ahora se avisa y el trabajo no se pierde.
+
+**9. `--renombrar` dejaba a medias la carpeta.** Numeraba el folio clínico pero
+no el de la factura, y el CSV prometía renglones que nadie armaba.
+
+**10. Las banderas que no hacen nada sin `--folio`** (`--carpeta-facturas`,
+`--prefijo`, `--convertir-detallado`) se ignoraban en silencio: el auditor creía
+que había traído las facturas. Ahora avisan.
+
+**11. Los archivos que no son PDF desaparecían sin avisar.** Una epicrisis en
+Word o una radiografía en JPG no entran al folio, pero tampoco pueden
+esfumarse: salen listadas en pantalla y en el reporte. La basura de Windows
+(`Thumbs.db`, `desktop.ini`) no se reporta.
+
+### Y el último grupo: lo que deja una corrida que se cae a mitad
+
+El renombrado va en dos vueltas —primero a un nombre de paso `~renombrando~…`,
+porque el nombre que le toca a un archivo puede ser el que todavía tiene otro—.
+Si la corrida se caía en medio, eso dejaba dos destrozos:
+
+**12. Un `~renombrando~HC.pdf` colgado se PERDÍA en la corrida siguiente.** El
+nombre de paso se armaba con `ruta.with_name(...)` a secas, así que al renombrar
+`HC.pdf` se pisaba el huérfano. Comprobado: un huérfano de 7 páginas
+desaparecía y la carpeta quedaba con un `~renombrando~~renombrando~HC.pdf` y sin
+folio. Ahora el nombre de paso se pide libre (`nombre_libre`), y
+`sanar_temporales()` le devuelve su nombre a lo que quedó colgado antes de
+empezar: el huérfano de 7 páginas se recupera y entra al folio.
+
+**13. No había vuelta atrás.** Si la segunda vuelta fallaba, los archivos
+quedaban como `~renombrando~…` para siempre y la factura sin folio. Ahora se
+deshace: cada uno vuelve al nombre que tenía, y la corrida siguiente arma el
+folio sin ayuda.
+
+**14. `--renombrar` borraba el NIT sin decirlo.** Al numerar, el nombre que lo
+traía (`680010079201_HUS######_EPICRIS.pdf`) desaparece, y después no hay de
+dónde sacarlo: los folios salían como `HUS######_EPICRIS.pdf`. Ahora avisa con
+el NIT que encontró, para pasarlo con `--prefijo`.
+
+En simulación los huérfanos no entran al folio pero sí salen en el reporte.
+
+149 pruebas en el archivo. Se comprobó además que quedaron cerrados los otros
+dos confirmados: `--renombrar` y después `--folio` ya no destruye el PDF de la
+factura (19 páginas intactas), y una carpeta con punto y espacios
+(`HUS379477_PEND. CARTA CORONEL`) da el mismo folio en tres corridas seguidas.
+
+
 ## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)
 
 El área aclaró cómo es el folio completo, y son **dos PDF por factura**, no uno:
