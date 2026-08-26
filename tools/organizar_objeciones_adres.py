@@ -817,6 +817,22 @@ def crotipobj_factura(clasificaciones: set[str]) -> int:
     return 0
 
 
+def _mezclar_tipos(por_codigo: int, previos: set[int]) -> int:
+    """Junta lo que dice el código escrito con lo que ya se sabía de la factura.
+
+    Los tres tipos son 0 administrativa, 1 clínica y 2 mixta. Si de un lado
+    sale clínica y del otro administrativa, la factura es mixta. Un lado nunca
+    puede borrar al otro: eso fue lo que hizo que una factura con soportes Y
+    pertinencia saliera al ADRES marcada como administrativa.
+    """
+    tipos = {int(por_codigo)} | {int(t) for t in previos}
+    if 2 in tipos:
+        return 2
+    if tipos == {0, 1}:
+        return 2
+    return max(tipos) if tipos else 0
+
+
 def construir_crdobserv(codigo: str, fila: FilaAdres, valor: int) -> str:
     """El texto de la objeción, con la forma que usa DGH:
 
@@ -1189,16 +1205,32 @@ def construir_registros(
     # NINGUNO lo es sale administrativa (0), y si hay de los dos, mixta (2).
     # Ojo: se calcula al final porque antes de _conciliar hay renglones que
     # todavía se pueden caer del archivo.
+    # 26-08-2026 — OJO: esta vuelta PISABA el CROTIPOBJ que ya venía bien
+    # calculado arriba con la clasificación del auditor. Cuando el código
+    # escrito no arranca en CL —porque la causal quedó como SO, TA o FA— este
+    # recálculo lo bajaba a 0, y una factura MIXTA (soportes + pertinencia)
+    # salía al ADRES marcada como administrativa. Ahora no se pisa: se junta
+    # lo que dice el código escrito CON lo que ya se había concluido de la
+    # clasificación, y manda la mezcla. Un `0` calculado aquí no puede borrar
+    # un `1` o un `2` que ya se había probado antes.
     cl_por_factura: dict[str, set[bool]] = defaultdict(set)
+    tipo_previo: dict[str, set[int]] = defaultdict(set)
     for registro in salida.registros:
+        factura = str(registro["CRNCXC"])
         es_cl = str(registro.get("CRNCONOBJ") or "").upper()[:2] == GRUPO_CLINICO
-        cl_por_factura[str(registro["CRNCXC"])].add(es_cl)
+        cl_por_factura[factura].add(es_cl)
+        previo = registro.get("CROTIPOBJ")
+        if previo is not None:
+            tipo_previo[factura].add(int(previo))
     tipo_por_factura = {
         f: (1 if flags == {True} else 0 if flags == {False} else 2)
         for f, flags in cl_por_factura.items()
     }
     for registro in salida.registros:
-        registro["CROTIPOBJ"] = tipo_por_factura[str(registro["CRNCXC"])]
+        factura = str(registro["CRNCXC"])
+        registro["CROTIPOBJ"] = _mezclar_tipos(
+            tipo_por_factura[factura], tipo_previo.get(factura, set())
+        )
 
     salida.metodos = dict(metodos)
     cuadrar_con_reporte(salida, reclamaciones)
