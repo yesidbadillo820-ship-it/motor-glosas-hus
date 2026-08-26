@@ -80,6 +80,8 @@ import argparse
 import csv
 import json
 import logging
+import contextlib
+import os
 import re
 import shutil
 import sys
@@ -854,7 +856,12 @@ def unir(
 # ─── Los dos folios de cada factura ──────────────────────────────────────────
 
 
-def aplicar_folios(plan: list[Factura], aplicar: bool = False, prefijo: str = "") -> list[Factura]:
+def aplicar_folios(
+    plan: list[Factura],
+    aplicar: bool = False,
+    prefijo: str = "",
+    caratula: bool = True,
+) -> list[Factura]:
     """Deja cada factura con sus DOS folios, como los pide el ADRES.
 
     En la carpeta de la factura:
@@ -888,12 +895,71 @@ def aplicar_folios(plan: list[Factura], aplicar: bool = False, prefijo: str = ""
             fac.omitidos.append(f"no pude renombrar: {e}")
             fac.estado = fac.estado_factura = ESTADO_ERROR
             continue
-        _unir_folio(fac, FOLIO_EPICRIS, PdfReader, PdfWriter)
-        _unir_folio(fac, FOLIO_FACTURA, PdfReader, PdfWriter)
+        _unir_folio(fac, FOLIO_EPICRIS, PdfReader, PdfWriter, caratula)
+        _unir_folio(fac, FOLIO_FACTURA, PdfReader, PdfWriter, caratula)
     return plan
 
 
-def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter) -> None:
+# ─── La carátula: el índice que abre el folio ────────────────────────────────
+
+
+def entradas_de_caratula(
+    soportes: list[Soporte], paginas: dict[Path, int], desde: int = 2
+) -> list[tuple[str, int]]:
+    """[(«1.RESPUESTA A GLOSA», 2), («2.HISTORIA CLINICA», 70)…]
+
+    Una línea por RENGLÓN, no por archivo: si la factura trae dos historias
+    clínicas, en la carátula hay un solo «2.HISTORIA CLINICA» y apunta a donde
+    empieza la primera. `desde` es la página en que arranca el contenido — 2,
+    porque la 1 es la carátula misma.
+    """
+    entradas: list[tuple[str, int]] = []
+    vistos: set[str] = set()
+    pagina = desde
+    for numero, soporte in zip(numeros_de_renglon(soportes), soportes):
+        cuantas = paginas.get(soporte.ruta, 0)
+        if not cuantas:
+            continue  # no entró al folio: no puede figurar en el índice
+        if soporte.grupo.clave not in vistos:
+            vistos.add(soporte.grupo.clave)
+            entradas.append((f"{numero}.{soporte.grupo.titulo}", pagina))
+        pagina += cuantas
+    return entradas
+
+
+def escribir_caratula(entradas: list[tuple[str, int]], destino: Path) -> bool:
+    """La página de índice, como la pide el área: renglón, línea y página.
+
+    Devuelve False si no hay con qué dibujarla (falta reportlab); el folio se
+    arma igual, sin carátula, y se avisa.
+    """
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+    except ImportError:
+        return False
+
+    ancho, alto = letter
+    izquierda, derecha = 60, ancho - 60
+    c = canvas.Canvas(str(destino), pagesize=letter)
+    y = alto - 70
+    for texto, pagina in entradas:
+        c.setFont("Helvetica", 11)
+        c.drawString(izquierda, y, texto)
+        numero = str(pagina)
+        c.drawRightString(derecha, y, numero)
+        # La línea que une el renglón con su página, sin tocar ni uno ni otro.
+        inicio = izquierda + c.stringWidth(texto, "Helvetica", 11) + 6
+        fin = derecha - c.stringWidth(numero, "Helvetica", 11) - 6
+        if fin > inicio:
+            c.setLineWidth(0.5)
+            c.line(inicio, y - 2, fin, y - 2)
+        y -= 25
+    c.save()
+    return True
+
+
+def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter, caratula: bool = True) -> None:
     """Une uno de los dos folios. Una factura mala no tumba el lote."""
     clinico = cual == FOLIO_EPICRIS
     soportes = fac.soportes if clinico else fac.soportes_factura
@@ -926,9 +992,16 @@ def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter) -> None:
         return
 
     try:
+        detalle: list[tuple[Path, int]] = []
+        entradas = [s.ruta for s in soportes]
+        cuerpo = destino.with_suffix(".cuerpo.tmp.pdf") if caratula else destino
         paginas, omitidos = unir_pdfs(
-            [s.ruta for s in soportes], destino, PdfReader, PdfWriter, METADATOS_FOLIO
+            entradas, cuerpo, PdfReader, PdfWriter, METADATOS_FOLIO, detalle
         )
+        if paginas and caratula:
+            paginas, omitidos = _poner_caratula(
+                fac, soportes, destino, cuerpo, detalle, omitidos, PdfReader, PdfWriter
+            )
         estado = ESTADO_UNIDO if paginas else ESTADO_ERROR
         if not paginas:
             omitidos.append("ningún PDF tenía páginas legibles")
@@ -942,17 +1015,45 @@ def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter) -> None:
     fac.omitidos.extend(omitidos)
 
 
+def _poner_caratula(
+    fac: Factura,
+    soportes: list[Soporte],
+    destino: Path,
+    cuerpo: Path,
+    detalle: list[tuple[Path, int]],
+    omitidos: list[str],
+    PdfReader,
+    PdfWriter,
+) -> tuple[int, list[str]]:
+    """Antepone el índice al folio y deja todo en `destino`."""
+    caratula = destino.with_suffix(".caratula.tmp.pdf")
+    try:
+        entradas = entradas_de_caratula(soportes, dict(detalle))
+        if not escribir_caratula(entradas, caratula):
+            # Sin reportlab no hay carátula, pero el folio no se pierde.
+            os.replace(cuerpo, destino)
+            omitidos.append("sin carátula: falta reportlab (py -m pip install reportlab)")
+            return len(PdfReader(str(destino)).pages), omitidos
+        paginas, mas = unir_pdfs([caratula, cuerpo], destino, PdfReader, PdfWriter, METADATOS_FOLIO)
+        return paginas, omitidos + mas
+    finally:
+        for basura in (caratula, cuerpo):
+            with contextlib.suppress(OSError):
+                basura.unlink()
+
+
 def armar_folios(
     carpeta: Path,
     facturas: set[str] | None = None,
     mapa: dict[str, str] | None = None,
     aplicar: bool = False,
     prefijo: str = "",
+    caratula: bool = True,
 ) -> list[Factura]:
     """Planifica y arma los dos folios. Sin `aplicar`, solo dice qué haría."""
     if aplicar:
         sanar_temporales(carpeta)
-    return aplicar_folios(planificar(carpeta, facturas, mapa), aplicar, prefijo)
+    return aplicar_folios(planificar(carpeta, facturas, mapa), aplicar, prefijo, caratula)
 
 
 # ─── La factura, que vive en otra carpeta (la del XML) ───────────────────────
@@ -1404,6 +1505,11 @@ def construir_parser() -> argparse.ArgumentParser:
         "de una carpeta no lo traen. Sin esto se usa el que traigan los archivos.",
     )
     p.add_argument(
+        "--sin-caratula",
+        action="store_true",
+        help="No poner la página de índice al principio de cada folio.",
+    )
+    p.add_argument(
         "--convertir-detallado",
         action="store_true",
         help="Pasar a PDF el detallado que esté en Excel, para que entre al folio de la factura.",
@@ -1614,7 +1720,7 @@ def main(argv: list[str] | None = None) -> int:
         revisar_facturas(plan, indice)
         if args.convertir_detallado:
             conversiones = convertir_detallados(plan, args.aplicar)
-        aplicar_folios(plan, args.aplicar, args.prefijo)
+        aplicar_folios(plan, args.aplicar, args.prefijo, not args.sin_caratula)
     elif args.renombrar:
         # Solo numerar: cada soporte queda como «1 RESPUESTA A GLOSA.pdf», sin
         # pegar nada en un solo PDF.
