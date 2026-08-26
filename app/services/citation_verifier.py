@@ -645,8 +645,17 @@ DOCTRINAS_CON_NOMBRE: tuple[tuple[str, str, str], ...] = (
     ),
 )
 
+# 25-08-2026 (3.ª auditoría). El dictamen GL-127 dijo «LA LEY 1438/2011 ART. 57
+# IMPONE QUE LA CARGA DE LA PRUEBA RECAE EN LA EPS» y esta red no lo vio: la
+# tabla de doctrinas SÍ tenía «carga de la prueba», pero el verbo «IMPONE» no
+# estaba en esta lista, así que el patrón ni siquiera enganchaba la frase.
+# Mismo tipo de agujero que el del conector comido: la defensa existía y una
+# palabra de menos la dejaba pasar. Se agregan los verbos que aparecieron en
+# los dictámenes reales (IMPONE, FIJA, OTORGA, EXIGE, OBLIGA...).
 _VERBOS_DE_ATRIBUCION = (
     r"ESTABLECE|ESTABLECEN|DISPONE|DISPONEN|SEÑALA|SENALA|CONSAGRA|INDICA|"
+    r"IMPONE|IMPONEN|FIJA|FIJAN|OTORGA|OTORGAN|EXIGE|EXIGEN|OBLIGA|OBLIGAN|"
+    r"GARANTIZA|GARANTIZAN|FACULTA|AUTORIZA|RECONOCE|ATRIBUYE|CONFIERE|"
     r"PRECEPT[ÚU]A|PREV[ÉE]|CONTEMPLA|ORDENA|DETERMINA|ESTIPULA|REZA|"
     r"PRESCRIBE|CONFORME\s+AL\s+CUAL|SEG[ÚU]N\s+EL\s+CUAL"
 )
@@ -655,7 +664,7 @@ _NORMAS_CITABLES = r"LEY|DECRETO|RESOLUCI[ÓO]N|CIRCULAR|ACUERDO"
 
 # Forma 1: «Art. 57 de la Ley 1438 de 2011, que establece que ...»
 PAT_ATRIBUCION_ART_PRIMERO = re.compile(
-    r"ART[ÍI]?CULOS?\.?\s*(\d{1,4})\s*"
+    r"(?:ART[ÍI]?CULOS?|ARTS?)\.?\s*(\d{1,4})\s*"
     r"(?:DE\s+)?(?:LA\s+|EL\s+)?"
     r"(" + _NORMAS_CITABLES + r")\s*(?:N[oº°.]?\s*)?(\d{1,5})"
     r"\s*(?:DE\s+|\s*[/\-]\s*)(\d{2,4})"
@@ -669,7 +678,23 @@ PAT_ATRIBUCION_ART_PRIMERO = re.compile(
 PAT_ATRIBUCION_NORMA_PRIMERO = re.compile(
     r"(" + _NORMAS_CITABLES + r")\s*(?:N[oº°.]?\s*)?(\d{1,5})"
     r"\s*(?:DE\s+|\s*[/\-]\s*)(\d{2,4})"
-    r"[,\s]+EN\s+SU\s+ART[ÍI]?CULO\.?\s*(\d{1,4})"
+    r"[,\s]+EN\s+SU\s+(?:ART[ÍI]?CULO|ART)\.?\s*(\d{1,4})"
+    r"[^.;]{0,40}?[,\s]+(?:QUE\s+)?(?:" + _VERBOS_DE_ATRIBUCION + r")\b"
+    r"\s*(?:QUE\s*)?:?\s*"
+    r"([^.;]{10,400})",
+    re.IGNORECASE,
+)
+
+
+# Forma 3 (25-08-2026, GL-127): «La Ley 1438/2011 Art. 57 impone que ...» —
+# la norma primero y el artículo pegado detrás, SIN el «en su». Las dos formas
+# de arriba no la cubrían, así que la atribución falsa de ese dictamen pasó
+# derecho hasta el papel. Es la tercera vez en el día que un patrón demasiado
+# estrecho deja pasar un defecto que la defensa ya sabía detectar.
+PAT_ATRIBUCION_NORMA_ART_PEGADO = re.compile(
+    r"(" + _NORMAS_CITABLES + r")\s*(?:N[oº°.]?\s*)?(\d{1,5})"
+    r"\s*(?:DE\s+|\s*[/\-]\s*)(\d{2,4})"
+    r"[,\s]+(?:ART[ÍI]?CULOS?|ARTS?)\.?\s*(\d{1,4})"
     r"[^.;]{0,40}?[,\s]+(?:QUE\s+)?(?:" + _VERBOS_DE_ATRIBUCION + r")\b"
     r"\s*(?:QUE\s*)?:?\s*"
     r"([^.;]{10,400})",
@@ -680,11 +705,24 @@ PAT_ATRIBUCION_NORMA_PRIMERO = re.compile(
 def _texto_real_del_articulo(
     tipo: str, numero: str, anio: str, art: str, normas: dict
 ) -> Optional[str]:
-    """Devuelve el texto guardado de ese artículo, o None si no se puede leer.
+    """Devuelve el texto de LA NORMA para ese artículo, o None si no se puede.
 
     Se exige que el artículo traiga cuerpo de verdad (200 caracteres): contra
     un resumen de dos renglones no se puede afirmar que algo «no está», y
     acusar en falso es peor que no revisar.
+
+    25-08-2026 — SOLO EL EPÍGRAFE Y EL TEXTO DE LA NORMA. Antes esta función
+    devolvía también los campos «aplicacion» y «keywords», que son comentario
+    NUESTRO sobre cómo usar el artículo, no la ley.
+
+    Eso volvía la revisión inútil por el peor camino: al artículo 57 de la Ley
+    1438 se le puso una nota que dice «NO le atribuya la carga de la prueba: el
+    artículo no la menciona» — y esa nota, al concatenarse, hacía que la malla
+    encontrara «carga de la prueba» en lo que creía ser el texto legal y diera
+    por buena justo la atribución que la nota prohibía.
+
+    Es la misma autocertificación que este motor lleva todo el día corrigiendo,
+    en su versión más incómoda: la advertencia se desactivaba a sí misma.
     """
     clave = _buscar_clave_norma(tipo[:3].lower(), numero, anio, normas)
     if not clave:
@@ -697,9 +735,7 @@ def _texto_real_del_articulo(
             break
     if not isinstance(datos, dict):
         return None
-    cuerpo = " ".join(
-        str(datos.get(campo) or "") for campo in ("titulo", "texto", "aplicacion", "keywords")
-    )
+    cuerpo = " ".join(str(datos.get(campo) or "") for campo in ("titulo", "texto"))
     return cuerpo if len(cuerpo) >= 200 else None
 
 
@@ -749,6 +785,9 @@ def _verificar_atribuciones(texto: str, issues: list[dict], normas: dict) -> int
         art, tipo, numero, anio, contenido = m.groups()
         candidatas.append((art, tipo, numero, anio, contenido))
     for m in PAT_ATRIBUCION_NORMA_PRIMERO.finditer(texto):
+        tipo, numero, anio, art, contenido = m.groups()
+        candidatas.append((art, tipo, numero, anio, contenido))
+    for m in PAT_ATRIBUCION_NORMA_ART_PEGADO.finditer(texto):
         tipo, numero, anio, art, contenido = m.groups()
         candidatas.append((art, tipo, numero, anio, contenido))
 

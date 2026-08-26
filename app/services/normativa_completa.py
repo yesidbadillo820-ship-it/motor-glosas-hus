@@ -288,22 +288,73 @@ LEYES = {
                     "DIAN",
                 ],
             },
+            # 25-08-2026 (noche) — CORREGIDO CONTRA DOS FUENTES OFICIALES
+            # (normograma de la SuperSalud y Senado de la República).
+            #
+            # El "texto" guardado era una PARÁFRASIS con dos frases que NO están
+            # en el artículo:
+            #   · «Si los prestadores no contestan en el plazo señalado, se
+            #     entenderá aceptada la glosa» — la consecuencia es real, pero
+            #     su fuente es el código RE2202 del Manual Único (Res. 2284 de
+            #     2023), no este artículo.
+            #   · «podrá optar por la conciliación, el ARBITRAJE o acudir ante
+            #     las autoridades judiciales» — el artículo no menciona
+            #     arbitraje; manda a la Superintendencia Nacional de Salud.
+            #
+            # Y le faltaban los números dentro del texto: los plazos estaban
+            # solo en la lista de abajo, desconectados de la cita. De ahí salió
+            # el dictamen GL-131, que escribió «el artículo 57 fija DIEZ (10)
+            # días hábiles para responder» — son QUINCE. Decirle a la entidad
+            # que nuestro plazo es más corto de lo que es le regala el
+            # argumento de extemporaneidad contra el propio hospital.
             "57": {
                 "titulo": "Trámite de glosas",
-                "texto": "Las entidades responsables del pago de servicios de salud formularán y comunicarán a los prestadores de servicios de salud las glosas a cada factura, con base en la codificación y alcance definidos por el Ministerio de Salud y Protección Social. Una vez formuladas las glosas a una factura, no se podrán formular nuevas glosas a la misma factura, salvo las que surjan de hechos nuevos detectados en la respuesta dada a la glosa inicial. El prestador de servicios de salud deberá dar respuesta a las glosas presentadas por las entidades responsables del pago dentro del plazo fijado por la norma. Si los prestadores no contestan en el plazo señalado, se entenderá aceptada la glosa. Si no hay acuerdo entre las partes, la entidad responsable del pago podrá optar por la conciliación, el arbitraje o acudir ante las autoridades judiciales.\n\nPLAZOS OPERATIVOS VIGENTES (Ley 1438/2011 + Manual Único Res. 2284/2023 + Manual SIIFA 2026):\n• FORMULACIÓN (EPS/ERP): 20 días hábiles tras radicación de la factura.\n• RESPUESTA (IPS/Prestador): 15 días hábiles tras recepción de la glosa.\n• SUBSANACIÓN (IPS): 7 días hábiles adicionales si la glosa es subsanable.\n• DECISIÓN FINAL (EPS): 10 días hábiles tras la respuesta de la IPS para levantar o ratificar.\n• PAGO POST-LEVANTAMIENTO: 5 días hábiles siguientes al levantamiento de la glosa.\n\nCRITERIO INSTITUCIONAL HUS: toda glosa formulada después de 20 días hábiles es EXTEMPORÁNEA e improcedente (aceptación tácita).",
-                "aplicacion": "PLAZOS: 20 días EPS formular | 15 días IPS responder | 7 días IPS subsanar | 10 días EPS decidir | 5 días EPS pagar tras levantamiento",
+                "texto": (
+                    "Las entidades responsables del pago de servicios de salud dentro de "
+                    "los veinte (20) días hábiles siguientes a la presentación de la "
+                    "factura con todos sus soportes, formularán y comunicarán a los "
+                    "prestadores de servicios de salud las glosas a cada factura, con base "
+                    "en la codificación y alcance definidos en la normatividad vigente. "
+                    "Una vez formuladas las glosas a una factura no se podrán formular "
+                    "nuevas glosas a la misma factura, salvo las que surjan de hechos "
+                    "nuevos detectados en la respuesta dada a la glosa inicial. El "
+                    "prestador de servicios de salud deberá dar respuesta a las glosas "
+                    "presentadas por las entidades responsables del pago de servicios de "
+                    "salud, dentro de los quince (15) días hábiles siguientes a su "
+                    "recepción, indicando su aceptación o justificando la no aceptación. "
+                    "La entidad responsable del pago, dentro de los diez (10) días hábiles "
+                    "siguientes a la recepción de la respuesta, decidirá si levanta total "
+                    "o parcialmente las glosas o las deja como definitivas. Si cumplidos "
+                    "los quince (15) días hábiles, el prestador de servicios de salud "
+                    "considera que la glosa es subsanable, tendrá un plazo máximo de siete "
+                    "(7) días hábiles para subsanar la causa de las glosas no levantadas "
+                    "(…). Una vez vencidos los términos, y en el caso de que persista el "
+                    "desacuerdo se acudirá a la Superintendencia Nacional de Salud, bien "
+                    "sea en uso de la facultad de conciliación o jurisdiccional a elección "
+                    "del prestador."
+                ),
+                "aplicacion": (
+                    "El artículo que más usa el motor. TRES AVISOS al citarlo:\n"
+                    "(1) NO le atribuya la carga de la prueba: el artículo no la menciona "
+                    "(dictamen GL-127 lo hizo y es refutable de una).\n"
+                    "(2) NO le atribuya la aceptación tácita por silencio del prestador: "
+                    "esa consecuencia es real pero viene del código RE2202 del Manual "
+                    "Único (Res. 2284 de 2023) — cítela por su nombre.\n"
+                    "(3) Los plazos, sin cambiarlos: 20 hábiles para que la entidad "
+                    "glose · 15 para que el prestador responda · 10 para que la entidad "
+                    "decida · 7 de subsanación · 5 para pagar lo levantado.\n"
+                    "Lo mejor del artículo para el hospital: prohíbe glosas nuevas sobre "
+                    "la misma factura salvo por hechos nuevos, y deja a ELECCIÓN DEL "
+                    "PRESTADOR la vía ante la SuperSalud."
+                ),
                 "keywords": [
-                    "glosa",
+                    "trámite de glosas",
                     "20 días",
                     "15 días",
-                    "7 días",
                     "10 días",
-                    "5 días",
-                    "plazo",
-                    "trámite de glosas",
+                    "hechos nuevos",
                     "extemporánea",
-                    "subsanación",
-                    "SIIFA",
+                    "superintendencia",
                 ],
             },
             # 25-08-2026: el título decía «Supervisión, inspección y vigilancia».
@@ -2729,11 +2780,11 @@ def consultar_normativa(pregunta: str, limite: int = 5) -> List[dict]:
     # Ej: "ley 1438", "art 57 ley 1438", "resolución 2284", "decreto 4747"
     patrones_directos = [
         (r"(?:art[íi]culo|art\.?)\s*(\d+)\s+(?:de\s+la\s+)?ley\s+(\d+)", "LEY {1} DE {0}", "{0}"),
-        (r"ley\s+(\d+)\s+(?:de\s+)?(\d{4})?", "LEY {0} DE {1}", None),
-        (r"resoluci[oó]n\s+(\d+)\s+(?:de\s+)?(\d{4})?", "RESOLUCION {0} DE {1}", None),
-        (r"decreto\s+(\d+)\s+(?:de\s+)?(\d{4})?", "DECRETO {0} DE {1}", None),
-        (r"circular\s+(\d+)\s+(?:de\s+)?(\d{4})?", "CIRCULAR {0} DE {1}", None),
-        (r"sentencia\s+t[-\s]?(\d+)\s+(?:de\s+)?(\d{4})?", "SENTENCIA T-{0} DE {1}", None),
+        (r"ley\s+(\d+)\s*(?:de\s+)?(\d{4})?", "LEY {0} DE {1}", None),
+        (r"resoluci[oó]n\s+(\d+)\s*(?:de\s+)?(\d{4})?", "RESOLUCION {0} DE {1}", None),
+        (r"decreto\s+(\d+)\s*(?:de\s+)?(\d{4})?", "DECRETO {0} DE {1}", None),
+        (r"circular\s+(\d+)\s*(?:de\s+)?(\d{4})?", "CIRCULAR {0} DE {1}", None),
+        (r"sentencia\s+t[-\s]?(\d+)\s*(?:de\s+)?(\d{4})?", "SENTENCIA T-{0} DE {1}", None),
     ]
 
     resultados_directos: List[dict] = []

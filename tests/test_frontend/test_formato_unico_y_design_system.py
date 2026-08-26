@@ -239,12 +239,29 @@ class TestLaAlertaDeVencimientosNoSeContradice:
             "volvió la frase falsa: el Art. 57 SÍ obliga al prestador"
         )
 
-    def test_cita_el_texto_real_de_la_norma(self):
-        t = _leer("index.html")
-        assert "se entenderá aceptada la glosa" in t, (
-            "la alerta debe decirle al gestor lo que de verdad pasa si no responde"
-        )
+    def test_cita_cada_cosa_con_su_norma(self):
+        """CORREGIDA EL MISMO DÍA (25-08, noche).
+
+        Esta prueba fijaba que la alerta dijera «se entenderá aceptada la
+        glosa» atribuido al Art. 57 de la Ley 1438. Se verificó contra DOS
+        fuentes oficiales (normograma de la SuperSalud y Senado) y esa frase
+        NO ESTÁ en el artículo: la prueba estaba blindando un error.
+
+        Lo cierto son dos cosas de dos normas distintas, y la alerta debe
+        citarlas por separado:
+          · Art. 57 Ley 1438/2011 → el plazo de 15 días hábiles para responder
+          · Res. 2284/2023, código RE2202 → si la respuesta llega tarde, «se
+            configura la aceptación tácita de la glosa»
+        """
+        t = (RAIZ / "static" / "index.html").read_text(encoding="utf-8")
+        assert "15 días hábiles" in t
         assert "Art. 57, Ley 1438 de 2011" in t
+        assert "RE2202" in t
+        assert "se configura la aceptación tácita de la " in t
+        assert "Resolución 2284 de 2023" in t
+        assert "se entenderá aceptada la glosa" not in t, (
+            "esa frase no está en el Art. 57: no se puede entrecomillar como si lo fuera"
+        )
 
     def test_la_advertencia_sigue_en_pie(self):
         """El arreglo no podía dejar al gestor sin el aviso."""

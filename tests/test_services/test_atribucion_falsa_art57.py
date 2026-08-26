@@ -37,16 +37,27 @@ def _atribuciones(texto: str) -> list[dict]:
 
 class TestElCorpusNoTieneLaCulpa:
     def test_el_articulo_57_guardado_es_el_correcto(self):
-        """Lo que el auditor pidió comprobar: si el error estaba en la base."""
+        """ACTUALIZADA EL 25-08 (noche): el corpus guardaba una PARÁFRASIS.
+
+        Decía «dentro del plazo fijado por la norma» en vez de los quince (15)
+        días, y los números vivían en una lista aparte, desconectados de la
+        cita. De ahí salió el dictamen GL-131, que escribió que el artículo
+        «fija DIEZ (10) días hábiles para responder» — son QUINCE.
+
+        Ahora se exige el literal, con sus números dentro del texto.
+        """
         from app.services.normativa_completa import _TODAS_LAS_NORMAS
 
-        art57 = _TODAS_LAS_NORMAS["LEY 1438 DE 2011"]["articulos"]["57"]
-        texto = art57["texto"].lower()
-        assert "glosa" in texto
-        assert "20 días hábiles" in texto or "20 dias habiles" in texto
-        # Lo que la IA le inventó NO está en el texto guardado:
-        assert "carga de la prueba" not in texto
-        assert "no admite recurso" not in texto
+        texto = _TODAS_LAS_NORMAS["LEY 1438 DE 2011"]["articulos"]["57"]["texto"].lower()
+        for numero in (
+            "veinte (20) días hábiles",
+            "quince (15) días hábiles",
+            "diez (10) días hábiles",
+        ):
+            assert numero in texto, numero
+        assert "carga de la prueba" not in texto, (
+            "el artículo no la menciona — atribuírsela es lo que esta prueba vigila"
+        )
 
 
 class TestLasTresFrasesDeLaAuditoria:

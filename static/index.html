@@ -14638,16 +14638,33 @@ async function cargarBannerVencen24h(){
               // 2) La frase se contradecía sola. Decía «opera el silencio en
               //    contra del prestador (Art. 57 Ley 1438/2011 sólo aplica a
               //    EPS, NO al hospital)» — las dos mitades no pueden ser
-              //    ciertas a la vez. Se verificó el texto oficial: el Art. 57
-              //    SÍ obliga al prestador («si los prestadores no contestan en
-              //    el plazo señalado, se entenderá aceptada la glosa»). O sea
-              //    que el paréntesis era falso y además desmentía la propia
-              //    advertencia, en una alerta roja que avisa de una glosa que
-              //    vence hoy. Ahora se cita el texto real.
+              //    ciertas a la vez. El paréntesis era falso: el Art. 57 SÍ le
+              //    fija plazo al prestador.
+              //
+              // 3) CORRECCIÓN DEL MISMO DÍA (25-08, noche). Al reescribirla se
+              //    puso entre comillas, atribuida al Art. 57, la frase «si los
+              //    prestadores no contestan en el plazo señalado, se entenderá
+              //    aceptada la glosa». Esa frase NO ESTÁ en el artículo — se
+              //    comprobó contra dos fuentes oficiales (normograma de la
+              //    SuperSalud y Senado de la República). Poner comillas sobre
+              //    algo que la ley no dice es el mismo defecto que este motor
+              //    lleva todo el día corrigiendo, y esta vez lo escribí yo.
+              //
+              //    Lo cierto, y verificado, son dos cosas de dos normas
+              //    distintas:
+              //      · Art. 57 Ley 1438/2011: el prestador responde dentro de
+              //        los QUINCE (15) días hábiles siguientes a la recepción,
+              //        «indicando su aceptación o justificando la no
+              //        aceptación». (literal)
+              //      · Res. 2284/2023, código RE2202: si la respuesta llega
+              //        fuera de término, «se configura la aceptación tácita de
+              //        la glosa». (literal del Manual Único)
+              //    Se citan las dos, cada una por su nombre.
               'Valor en riesgo: <b>' + valor + '</b> · ' +
-              'Si no se responden hoy la glosa se entiende ACEPTADA: «si los prestadores ' +
-              'no contestan en el plazo señalado, se entenderá aceptada la glosa» ' +
-              '(Art. 57, Ley 1438 de 2011).' +
+              'El plazo para responder es de <b>15 días hábiles</b> desde que llegó la ' +
+              'glosa (Art. 57, Ley 1438 de 2011). Pasado ese término la respuesta se ' +
+              'presenta por fuera de plazo y <b>se configura la aceptación tácita de la ' +
+              'glosa</b> (código RE2202 del Manual Único, Resolución 2284 de 2023).' +
             '</div>' +
           '</div>' +
           '<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:0" onclick="aplicarVista(\'vencen_hoy\')">Ver y resolver ahora</button>' +
