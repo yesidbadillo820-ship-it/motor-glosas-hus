@@ -52,14 +52,11 @@ class TestNingunColorSeDeclaraPorSuCuenta:
         assert len(_definiciones_de_color(ds)) >= 10
 
     def test_todos_apuntan_a_la_paleta_corporativa(self, ds: str):
-        sueltos = {
-            n: v for n, v in _definiciones_de_color(ds).items() if not v.startswith("var(")
-        }
+        sueltos = {n: v for n, v in _definiciones_de_color(ds).items() if not v.startswith("var(")}
         assert not sueltos, (
             "Estos colores del sistema de diseño se declaran por su cuenta en vez "
             "de apuntar a la paleta corporativa, así que vuelven a ser un segundo "
-            "vocabulario:\n"
-            + "\n".join(f"  {n}: {v}" for n, v in sorted(sueltos.items()))
+            "vocabulario:\n" + "\n".join(f"  {n}: {v}" for n, v in sorted(sueltos.items()))
         )
 
     def test_apuntan_a_un_token_de_la_casa(self, ds: str):
@@ -75,9 +72,7 @@ class TestNingunoSeQuedaSinRespaldo:
     pinta transparente — así quedó invisible el botón del lote ADRES."""
 
     def test_todos_traen_su_color_de_respaldo(self, ds: str):
-        sin_respaldo = {
-            n: v for n, v in _definiciones_de_color(ds).items() if "," not in v
-        }
+        sin_respaldo = {n: v for n, v in _definiciones_de_color(ds).items() if "," not in v}
         assert not sin_respaldo, (
             "Estos colores no traen respaldo: en preauditoría, importar masiva, "
             "presentación IA y terapia física quedarían vacíos:\n"
@@ -94,9 +89,24 @@ class TestNingunoSeQuedaSinRespaldo:
     def test_el_respaldo_es_el_corporativo_no_el_viejo(self, ds: str):
         """Si el respaldo fuera el color viejo, las cuatro páginas sueltas
         seguirían con la paleta de mayo y no se habría unificado nada."""
-        viejos = {"#eff6ff", "#3b82f6", "#2563eb", "#1d4ed8", "#1e3a8a",
-                  "#f8fafc", "#f1f5f9", "#e2e8f0", "#94a3b8", "#475569",
-                  "#0f172a", "#16a34a", "#f0fdf4", "#d97706", "#fffbeb", "#e11d48"}
+        viejos = {
+            "#eff6ff",
+            "#3b82f6",
+            "#2563eb",
+            "#1d4ed8",
+            "#1e3a8a",
+            "#f8fafc",
+            "#f1f5f9",
+            "#e2e8f0",
+            "#94a3b8",
+            "#475569",
+            "#0f172a",
+            "#16a34a",
+            "#f0fdf4",
+            "#d97706",
+            "#fffbeb",
+            "#e11d48",
+        }
         for nombre, valor in _definiciones_de_color(ds).items():
             respaldo = valor.split(",", 1)[1].rstrip(") ").strip().lower()
             assert respaldo not in viejos, (
