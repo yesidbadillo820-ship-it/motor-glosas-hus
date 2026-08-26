@@ -1437,3 +1437,46 @@ def test_el_detallado_convertido_conserva_un_nombre_reconocible(origen, esperado
     assert destino.name == esperado
     assert org.es_detallado(destino.name)
     assert org.clasificar(destino.name).clave == "DETALLADO"
+
+
+def test_el_no_reconocido_se_avisa_con_el_nombre_con_que_llego(tmp_path, caplog):
+    """El caso real de CLAUDIA: 11 archivos avisados como «3 OTROS.pdf».
+
+    Ese es el nombre que el bot les acaba de poner; el de verdad —el que le
+    diría al auditor qué archivo es— ya no está en el disco. Hay que decirle
+    con cuál llegó.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS378523"
+    _pdf(fac / "RTA_ADRES_HUS378523.pdf")
+    _pdf(fac / "HC.pdf")
+    _pdf(fac / "FACOSTE.pdf")  # no se reconoce: va a OTROS
+
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        assert org.main(["--carpeta", str(raiz), "--folio", "--aplicar"]) == 0
+
+    assert (fac / "3 OTROS.pdf").exists()  # quedó renombrado
+    assert "llegó como «FACOSTE.pdf»" in caplog.text
+
+
+def test_el_reporte_guarda_el_nombre_con_que_llego(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    _pdf(fac / "FACOSTE.pdf")
+    plan = org.armar_folios(raiz, aplicar=True)
+    ruta = tmp_path / "r.csv"
+    org.escribir_reporte(ruta, plan)
+    texto = ruta.read_text(encoding="utf-8-sig")
+    assert "LLEGO COMO" in texto
+    assert "FACOSTE.pdf" in texto
+
+
+def test_el_nombre_original_se_conserva_entre_corridas(tmp_path):
+    """En la segunda corrida el archivo ya llegó numerado: ese ES su nombre."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    org.armar_folios(raiz, aplicar=True)
+    plan = org.planificar(raiz)[0]
+    assert plan.soportes[0].como_llego == "1 RESPUESTA A GLOSA.pdf"
