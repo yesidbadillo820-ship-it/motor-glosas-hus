@@ -63,6 +63,47 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
+
+El área revisó los folios ya armados y mandó tres correcciones. Las tres
+quedaron hechas y fusionadas el mismo día (PR #500).
+
+**1. El folio de la FACTURA no lleva índice.** La página de índice es solo para
+el folio clínico (`..._EPICRIS.pdf`). El de la factura ahora abre directo en la
+factura, sin carátula.
+
+**2. El detallado quedaba de tercero, no de segundo.** Este era el de fondo. El
+`..._FACTURA.pdf` que baja con el XML no trae un solo documento: trae la
+factura y la representación gráfica de la DIAN **pegadas en el mismo archivo**.
+Cuando el detallado llegaba aparte y el bot solo lo ponía detrás, quedaba
+después de las dos:
+
+```
+antes:   1 factura  ->  representacion grafica  ->  detallado (de ultimo)
+ahora:   1 factura  ->  2 detallado  ->  3 representacion grafica  ->  4 nota credito
+```
+
+Ahora el bot **abre ese PDF y mira página por página qué es cada pedazo** (la
+marca viene en la primera página de cada renglón y las siguientes son
+continuación), lo parte, y mete cada renglón en su puesto. Si el archivo ya
+viene completo y en orden, no lo parte: lo deja tal cual.
+
+Comprobado con dos facturas reales del área:
+
+| Factura | Cómo llegó | Resultado |
+|---|---|---|
+| HUS311736 | trae todo adentro | 19 páginas, queda entero |
+| HUS311371 | detallado aparte | 14 páginas: factura 1–4, detallado 5–8, gráfica 9–14 |
+
+**3. El ruido visual.** Los archivos temporales que quedaban regados en las
+carpetas (los `.tmp.pdf`) ahora se barren solos al empezar cada corrida, incluso
+si la corrida anterior se cayó a mitad de camino.
+
+**Lo que hay que hacer en el servidor.** Como los 223 folios se armaron con el
+orden viejo, hay que **volver a correr los tres gestores** para que se rehagan
+con el orden bueno y sin índice en el de la factura. Es la misma orden de
+siempre, después de un `git pull`.
+
 ### 26-08-2026 (cierre) — El paquete 31068 quedó armado: 223 folios
 
 Hoy se terminó de armar el paquete completo. Las cifras:
@@ -8002,7 +8043,8 @@ las tres quedan con su correo.
 ### Folio ADRES del paquete 31068 (26-08)
 - **~~Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN~~ — RESUELTO.** Son
   las páginas 10 a 18 del mismo `..._FACTURA.pdf` que viene con el XML. Ese
-  archivo ya es el folio de la factura completo.
+  archivo trae la factura y la gráfica pegadas; por eso el bot ahora lo parte
+  para meter el detallado en la mitad (ver la entrada del 26-08 cierre 2).
 - **DECISIÓN SUYA: las notas crédito.** El `..._FACTURA.pdf` de la HUS311736 ya
   trae una nota crédito (la N° 253292, del trámite de objeción 179143 de junio).
   Las de los valores aceptados de ESTE paquete son otras. ¿Se deja la que ya
@@ -8477,6 +8519,19 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Folio ADRES — HAY QUE VOLVER A CORRER LOS TRES GESTORES (26-08 cierre 2).**
+Los 223 folios se armaron con el orden viejo del folio de la factura (el
+detallado quedaba de último) y con índice en el folio de la factura. Eso ya
+quedó corregido en el programa. Después de hacer `git pull` en
+`C:\motor-glosas\repo`, se vuelve a correr el bot en CAROLINA, CLAUDIA y OSCAR
+y los folios se rehacen solos con el orden bueno:
+
+```
+1 FACTURA  ->  2 DETALLADO  ->  3 REPRESENTACION GRAFICA  ->  4 NOTA CREDITO
+```
+
+No hay que borrar nada antes: el bot reconoce sus propios folios y los rehace.
 
 **Folio ADRES — YA ESTÁ ARMADO (26-08 cierre).** Los 223 folios quedaron hechos
 en los tres gestores. Lo que sigue no es armar, es decidir: la versión A o B de
