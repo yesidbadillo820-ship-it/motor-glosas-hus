@@ -849,6 +849,11 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
 .sb-label::before{content:'';width:3px;height:12px;background:var(--c-teal2);border-radius:2px;flex-shrink:0}
 .field{margin-bottom:.85rem}
 .field label{display:block;font-size:.7rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.35rem}
+/* 26-08-2026 — modo compacto. Las filas están hechas para leerse cómodas,
+   no para revisar doscientas seguidas. */
+body.denso table td, body.denso table th{padding-top:.28rem;padding-bottom:.28rem;font-size:.82rem}
+body.denso table{line-height:1.3}
+body.denso .card{padding:.7rem .9rem}
 input,select,textarea{
   width:100%;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--r);
   padding:.6rem .8rem;font-size:.85rem;font-family:var(--font);color:var(--text);outline:none;
@@ -1792,6 +1797,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   table{page-break-inside:avoid}
   h1,h2,h3,h4{page-break-after:avoid}
   .dont-break{page-break-inside:avoid}
+  /* 26-08-2026: los avisos de «no radicar» son lo único del sistema que SÍ
+     debe imprimirse — y en rojo. Si alguien imprime un dictamen que los lleva,
+     tiene que verlo antes de radicarlo. La regla de arriba oculta [onclick] y
+     .btn; esta se asegura de que el aviso no se vaya con ellos. */
+  .aviso-no-radicar{
+    display:block!important;border:2px solid #dc2626!important;
+    background:#fef2f2!important;color:#7f1d1d!important;font-weight:700!important;
+    page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
   /* Encabezado institucional impreso */
   body::before{
     content:"ESE HOSPITAL UNIVERSITARIO DE SANTANDER · NIT 900.006.037-4";
@@ -2999,6 +3013,21 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <button type="button" class="mis-tab" data-filter="todas" onclick="setMisFiltro('todas')"
                   style="padding:.5rem 1rem;border:none;background:transparent;border-bottom:3px solid transparent;color:var(--text3);font-weight:600;cursor:pointer;font-size:.85rem;margin-bottom:-2px;">
             🔍 Todas <span id="mis-count-todas" style="background:var(--text3);color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem;margin-left:.3rem;">0</span>
+          </button>
+        </div>
+
+        <!-- 26-08-2026: buscador y densidad.
+             En un lote de 1.573 facturas, encontrar una pasando páginas es
+             inviable, y las filas están hechas para leerse cómodas, no para
+             revisar doscientas seguidas. El gestor pasa el día acá. -->
+        <div style="display:flex;gap:.6rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center">
+          <input type="search" id="mis-buscar" placeholder="Buscar factura, EPS, código…"
+                 oninput="filtrarMisGlosas()" aria-label="Buscar en mis glosas"
+                 style="flex:1 1 240px;min-width:200px;padding:.45rem .7rem;font-size:.85rem"/>
+          <span id="mis-buscar-cuenta" style="font-size:.75rem;color:var(--text3);white-space:nowrap"></span>
+          <button type="button" onclick="alternarDensidad()" id="btn-densidad"
+                  style="padding:.45rem .8rem;font-size:.78rem;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;white-space:nowrap">
+            Filas compactas
           </button>
         </div>
 
@@ -14132,6 +14161,55 @@ async function borrarPreset(presetId, ev){
   }catch(e){ toast('Error de red', String(e), 'error'); }
 }
 
+// ─── Buscar dentro de la tabla, sin ir al servidor ──────────────────────
+// 26-08-2026. En un lote de 1.573 facturas, encontrar una pasando páginas es
+// inviable. Filtra sobre lo que ya está pintado: es instantáneo y no gasta una
+// llamada al motor.
+function filtrarMisGlosas(){
+  try{
+    var q = (document.getElementById('mis-buscar') || {}).value || '';
+    q = q.trim().toLowerCase();
+    var body = document.getElementById('mis-body');
+    if(!body) return;
+    var filas = body.querySelectorAll('tr');
+    var visibles = 0;
+    for(var i=0; i<filas.length; i++){
+      var texto = (filas[i].textContent || '').toLowerCase();
+      var pasa = !q || texto.indexOf(q) !== -1;
+      filas[i].style.display = pasa ? '' : 'none';
+      if(pasa) visibles++;
+    }
+    var cuenta = document.getElementById('mis-buscar-cuenta');
+    if(cuenta){
+      cuenta.textContent = q
+        ? (visibles + ' de ' + filas.length)
+        : '';
+    }
+  }catch(_){}
+}
+
+// ─── Filas compactas ────────────────────────────────────────────────────
+// Quien revisa lotes grandes lo deja puesto siempre, así que se recuerda.
+function alternarDensidad(){
+  try{
+    var compacto = document.body.classList.toggle('denso');
+    try{ localStorage.setItem('sinac_denso', compacto ? '1' : '0'); }catch(_){}
+    var btn = document.getElementById('btn-densidad');
+    if(btn) btn.textContent = compacto ? 'Filas cómodas' : 'Filas compactas';
+  }catch(_){}
+}
+(function recordarDensidad(){
+  try{
+    if(localStorage.getItem('sinac_denso') === '1'){
+      document.body.classList.add('denso');
+      document.addEventListener('DOMContentLoaded', function(){
+        var b = document.getElementById('btn-densidad');
+        if(b) b.textContent = 'Filas cómodas';
+      });
+    }
+  }catch(_){}
+})();
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var vista = window._mis_vista || '';
@@ -17082,8 +17160,20 @@ function renderMedallasDictamen(d, scoreColor){
   if(!v){
     grade='—'; gradeCls='nd'; gradeTag='SIN DATOS'; gradeDet='Sin verificación de citas disponible';
   } else if(issues.length === 0){
+    // 26-08-2026: el sello decía «N citas contra corpus · 0 hallazgos» sin
+    // decir nunca qué tan de fiar es ese corpus. Esa semana se descubrió que
+    // 21 de las 26 normas guardadas tenían algún artículo con el nombre o el
+    // texto inventado: el sello llevaba meses certificando contra una lista
+    // que nadie había contrastado. Ahora lleva su propia hoja de vida, y si
+    // alguien agrega una norma sin verificar, el sello lo dice.
     grade='A'; gradeCls='a'; gradeTag='CITAS VERIFICADAS';
     gradeDet=(v.total_citas || 0)+' citas contra corpus · 0 hallazgos';
+    if(v.corpus && v.corpus.leyenda){
+      gradeDet += ' · ' + v.corpus.leyenda;
+      if(v.corpus.normas_sin_verificar > 0){
+        grade='B'; gradeCls='b'; gradeTag='CORPUS INCOMPLETO';
+      }
+    }
   } else if(altas === 0){
     grade='B'; gradeCls='b'; gradeTag='HALLAZGOS LEVES';
     gradeDet=issues.length+' hallazgo(s) leve(s) (sin severidad ALTA) en '+(v.total_citas || issues.length)+' citas';

@@ -402,6 +402,41 @@ def _verificar_cups(texto: str, issues: list[dict]) -> None:
         )
 
 
+def _estado_del_corpus() -> dict:
+    """Cuánto del corpus está contrastado contra fuente oficial.
+
+    Se cuentan solo las normas que guardan el TEXTO de algún artículo, que son
+    las que se pueden citar entre comillas y por tanto las que hay que haber
+    verificado. Una norma que solo tiene nombre y título no se cita literal.
+    """
+    try:
+        from app.services.normativa_completa import _TODAS_LAS_NORMAS
+
+        verificadas = sin_verificar = 0
+        for norma in _TODAS_LAS_NORMAS.values():
+            arts = norma.get("articulos") or {}
+            if not any(isinstance(d, dict) and d.get("texto") for d in arts.values()):
+                continue
+            if norma.get("verificada"):
+                verificadas += 1
+            else:
+                sin_verificar += 1
+        return {
+            "normas_verificadas": verificadas,
+            "normas_sin_verificar": sin_verificar,
+            "leyenda": (
+                f"{verificadas} normas contrastadas contra fuente oficial"
+                + (
+                    f" · {sin_verificar} SIN CONTRASTAR"
+                    if sin_verificar
+                    else " · ninguna sin contrastar"
+                )
+            ),
+        }
+    except Exception:  # pragma: no cover - sin corpus no se promete nada
+        return {"normas_verificadas": 0, "normas_sin_verificar": 0, "leyenda": ""}
+
+
 def _norma_sucesora_ya_nombrada(derogada_por: str, texto: str) -> bool:
     """¿El dictamen ya nombra la norma que reemplazó a la derogada?
 
@@ -1204,4 +1239,11 @@ def verificar_citas(
         "tiene_problemas_graves": tiene_graves,
         # Sí se revisó de verdad: la pantalla puede estampar el sello.
         "verificado": True,
+        # 26-08-2026: el sello decía «N citas contra corpus · 0 hallazgos» sin
+        # decir NUNCA qué tan de fiar es ese corpus. Esa semana se descubrió
+        # que 21 de las 26 normas guardadas tenían algún artículo con el nombre
+        # o el texto inventado — o sea que el sello estuvo meses certificando
+        # contra una lista que nadie había contrastado.
+        # Ahora el sello lleva su propia hoja de vida.
+        "corpus": _estado_del_corpus(),
     }

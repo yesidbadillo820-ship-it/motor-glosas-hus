@@ -63,6 +63,101 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
+
+El área revisó los folios ya armados y mandó tres correcciones. Las tres
+quedaron hechas y fusionadas el mismo día (PR #500).
+
+**1. El folio de la FACTURA no lleva índice.** La página de índice es solo para
+el folio clínico (`..._EPICRIS.pdf`). El de la factura ahora abre directo en la
+factura, sin carátula.
+
+**2. El detallado quedaba de tercero, no de segundo.** Este era el de fondo. El
+`..._FACTURA.pdf` que baja con el XML no trae un solo documento: trae la
+factura y la representación gráfica de la DIAN **pegadas en el mismo archivo**.
+Cuando el detallado llegaba aparte y el bot solo lo ponía detrás, quedaba
+después de las dos:
+
+```
+antes:   1 factura  ->  representacion grafica  ->  detallado (de ultimo)
+ahora:   1 factura  ->  2 detallado  ->  3 representacion grafica  ->  4 nota credito
+```
+
+Ahora el bot **abre ese PDF y mira página por página qué es cada pedazo** (la
+marca viene en la primera página de cada renglón y las siguientes son
+continuación), lo parte, y mete cada renglón en su puesto. Si el archivo ya
+viene completo y en orden, no lo parte: lo deja tal cual.
+
+Comprobado con dos facturas reales del área:
+
+| Factura | Cómo llegó | Resultado |
+|---|---|---|
+| HUS311736 | trae todo adentro | 19 páginas, queda entero |
+| HUS311371 | detallado aparte | 14 páginas: factura 1–4, detallado 5–8, gráfica 9–14 |
+
+**3. El ruido visual.** Los archivos temporales que quedaban regados en las
+carpetas (los `.tmp.pdf`) ahora se barren solos al empezar cada corrida, incluso
+si la corrida anterior se cayó a mitad de camino.
+
+**Lo que hay que hacer en el servidor.** Como los 223 folios se armaron con el
+orden viejo, hay que **volver a correr los tres gestores** para que se rehagan
+con el orden bueno y sin índice en el de la factura. Es la misma orden de
+siempre, después de un `git pull`.
+
+### 26-08-2026 (cierre) — El paquete 31068 quedó armado: 223 folios
+
+Hoy se terminó de armar el paquete completo. Las cifras:
+
+| Gestor | Folios | Páginas clínicas | Páginas de factura | Detallados |
+|---|---|---|---|---|
+| CAROLINA | 49 | 894 | 419 | 48 |
+| CLAUDIA | 108 | 1.812 | 900 | 105 |
+| OSCAR | 66 | 1.297 | 618 | 65 |
+| **Total** | **223** | **4.003** | **1.937** | **218** |
+
+**La carátula.** El área mandó la que necesita y quedó puesta: cada folio abre
+con una página de índice que dice en qué página empieza cada renglón.
+
+```
+1.RESPUESTA A GLOSA ______________________________________  2
+2.HISTORIA CLINICA _______________________________________ 70
+3.AYUDAS DIAGNOSTICAS ___________________________________ 237
+```
+
+Es una línea por **renglón**, no por archivo: si la factura trae dos historias
+clínicas, en la carátula hay un solo «2. HISTORIA CLINICA».
+
+**Los detallados.** Se repartieron los 317 que mandó el área: 216 entraron a su
+carpeta y 101 quedaron guardados en `C:\temp-folio\DET_SIN_CARPETA` porque esas
+facturas no tienen carpeta en ningún gestor. Después el bot los pasó a PDF y los
+metió como renglón 2 del folio de la factura.
+
+**Las respuestas no se tocaron.** Se comprobó que la del zip nuevo y la que ya
+estaba en la carpeta son idénticas (mismo tamaño exacto), así que no había nada
+que reemplazar y se evitó el riesgo de dejarlas duplicadas.
+
+**Cinco defectos más, encontrados mientras se corría.** Todos arreglados el
+mismo día: el número del folio es del renglón y no del archivo; las copias de
+Windows (`HC (2).pdf`) iban en desorden; la pantalla mostraba dos veces el mismo
+nombre como si un archivo hubiera pisado al otro; el detallado convertido perdía
+su nombre y se iba al folio equivocado; y el aviso de «no reconocido» mostraba
+un nombre que ya no existe, dejando al auditor sin pista para encontrar esos
+archivos.
+
+**Lo que quedó señalado, que no es del bot sino de los datos:**
+
+- **A las 223 facturas les falta la EPICRISIS.** No está en ninguna carpeta. Si
+  el ADRES la exige, es el hueco más grande del paquete.
+- **La HUS381290 no tiene su factura** en la carpeta del XML: le falta el
+  renglón 1 y la representación gráfica de la DIAN.
+- **Seis facturas sin detallado**: HUS311371, HUS354080, HUS367368, HUS376239,
+  HUS376811 y HUS394817. No venían en el zip.
+- **~~11 archivos en CLAUDIA que el bot no supo qué eran~~ — RESUELTO.** El
+  área confirmó que **van en OTROS**, así que ya están bien puestos y no hay
+  nada que cambiar. Salieron 16 en total; nueve están en carpetas marcadas
+  `_MAOS`. El aviso de «no reconocido» se apaga solo en la corrida siguiente:
+  ahora se llaman «N OTROS.pdf» y con ese nombre el bot sí los reconoce.
+
 ### 26-08-2026 (tarde) — La revisión que encontró que el bot borraba la epicrisis
 
 Antes de dejarlo correr sobre el servidor, se le pasó al bot de folios una
@@ -7930,6 +8025,7 @@ las tres quedan con su correo.
 
 ## 3) PENDIENTE
 
+<<<<<<< HEAD
 ### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
 
 Usted pidió verificar, corregir y completar las 16 normas que faltaban. Se
@@ -8037,11 +8133,28 @@ Tres cosas, en este orden:
    extemporánea. El dictamen GL-130 afirma «77 días hábiles» y «ha operado de
    pleno derecho la aceptación tácita» como hecho consumado. Si el conteo
    falla, la causal original nunca quedó respondida.
+=======
+### Folio ADRES del paquete 31068 (26-08, cierre)
+- **DECISIÓN SUYA: las cinco respuestas del Word «PARA_CORREGIR».** Se enviaron
+  dos versiones. La **A** incluye 310 glosas «SE SUBSANA» que hoy se omiten
+  (son el desglose de reclamaciones que el ADRES glosó enteras por el FURIPS,
+  pero el auditor SÍ les escribió respuesta): son **$34.718.970** que al ADRES
+  le llegarían sin respuesta visible. La **B** mantiene la regla de siempre.
+- **DECISIÓN SUYA: el texto dañado de la HUS396996.** Tres celdas traen
+  `EXTENSIÃ"N` en vez de `EXTENSIÓN`. No se tocó porque la regla del generador
+  es que el texto sale tal cual lo escribió el auditor.
+- **DECISIÓN SUYA: si la HUS396996 entra.** En el Word venía sin rótulo, de
+  primera, mientras las otras cuatro sí están rotuladas.
+- **La EPICRISIS de las 223 facturas.** Falta en todas. Hay que decidir si se
+  consigue o si el paquete va sin ella.
+- **La HUS381290** necesita que le busquen su factura en la carpeta del XML.
+>>>>>>> origin/motor-glosas
 
 ### Folio ADRES del paquete 31068 (26-08)
 - **~~Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN~~ — RESUELTO.** Son
   las páginas 10 a 18 del mismo `..._FACTURA.pdf` que viene con el XML. Ese
-  archivo ya es el folio de la factura completo.
+  archivo trae la factura y la gráfica pegadas; por eso el bot ahora lo parte
+  para meter el detallado en la mitad (ver la entrada del 26-08 cierre 2).
 - **DECISIÓN SUYA: las notas crédito.** El `..._FACTURA.pdf` de la HUS311736 ya
   trae una nota crédito (la N° 253292, del trámite de objeción 179143 de junio).
   Las de los valores aceptados de ESTE paquete son otras. ¿Se deja la que ya
@@ -8519,7 +8632,27 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
-**Folio ADRES (26-08), lo PRIMERO de lo primero:** NO correr el bot sobre el
+**Folio ADRES — HAY QUE VOLVER A CORRER LOS TRES GESTORES (26-08 cierre 2).**
+Los 223 folios se armaron con el orden viejo del folio de la factura (el
+detallado quedaba de último) y con índice en el folio de la factura. Eso ya
+quedó corregido en el programa. Después de hacer `git pull` en
+`C:\motor-glosas\repo`, se vuelve a correr el bot en CAROLINA, CLAUDIA y OSCAR
+y los folios se rehacen solos con el orden bueno:
+
+```
+1 FACTURA  ->  2 DETALLADO  ->  3 REPRESENTACION GRAFICA  ->  4 NOTA CREDITO
+```
+
+No hay que borrar nada antes: el bot reconoce sus propios folios y los rehace.
+
+**Folio ADRES — YA ESTÁ ARMADO (26-08 cierre).** Los 223 folios quedaron hechos
+en los tres gestores. Lo que sigue no es armar, es decidir: la versión A o B de
+las cinco respuestas, el texto dañado de la HUS396996, y qué se hace con la
+epicrisis que le falta a las 223. Si se cambia alguna respuesta, se reemplaza el
+`1 RESPUESTA A GLOSA.pdf` de esa carpeta y se vuelve a correr el bot solo para
+ella: el folio se rehace solo.
+
+**(Ya cumplido) Folio ADRES (26-08), lo PRIMERO de lo primero:** NO correr el bot sobre el
 servidor hasta que esté fusionado el PR #492 (el que arregla que el bot borraba
 la epicrisis). Después de eso, correr el botón
 `tools/UNIR_SOPORTES_ADRES.cmd` en **una sola carpeta de prueba** (una factura),

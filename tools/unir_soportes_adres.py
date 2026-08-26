@@ -439,6 +439,18 @@ class Soporte:
     grupo: Grupo
     reconocido: bool = True
     paginas: int = 0
+    # Con qué nombre llegó, antes de numerarlo. Sin esto, un archivo que no se
+    # reconoció salía avisado con su nombre NUEVO («3 OTROS.pdf»), que no le
+    # dice nada al auditor — y el de verdad ya no está en el disco.
+    nombre_original: str = ""
+
+    def __post_init__(self) -> None:
+        self.nombre_original = self.nombre_original or self.ruta.name
+
+    @property
+    def como_llego(self) -> str:
+        """El nombre original si cambió; si no, el que tiene."""
+        return self.nombre_original
 
 
 @dataclass
@@ -619,6 +631,12 @@ def sanar_temporales(carpeta: Path) -> list[tuple[str, Path]]:
     donde estaba, sin pisar nada.
     """
     sanados: list[tuple[str, Path]] = []
+    # Los pedazos y cuerpos que deja el armado si se cae a mitad. Son basura
+    # del bot, con su propia terminación: no se confunden con nada del auditor.
+    for basura in sorted(p for p in carpeta.rglob("*.tmp.pdf*") if p.is_file()):
+        with contextlib.suppress(OSError):
+            basura.unlink()
+            logger.info("  Limpiado: %s", basura.name)
     for r in sorted(p for p in carpeta.rglob(f"{PREFIJO_TEMPORAL}*") if p.is_file()):
         limpio = r.name
         while es_temporal(limpio):
@@ -991,9 +1009,15 @@ def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter, caratula: bool = 
             fac.estado_factura = ESTADO_NO_PISA
         return
 
+    # El folio de la FACTURA NO lleva índice: lo pidió así el área.
+    caratula = caratula and clinico
+    pedazos: list[Path] = []
     try:
         detalle: list[tuple[Path, int]] = []
-        entradas = [s.ruta for s in soportes]
+        if clinico:
+            entradas = [s.ruta for s in soportes]
+        else:
+            entradas, pedazos = piezas_del_folio_factura(fac, PdfReader, PdfWriter)
         cuerpo = destino.with_suffix(".cuerpo.tmp.pdf") if caratula else destino
         paginas, omitidos = unir_pdfs(
             entradas, cuerpo, PdfReader, PdfWriter, METADATOS_FOLIO, detalle
@@ -1008,11 +1032,69 @@ def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter, caratula: bool = 
     except Exception as e:  # noqa: BLE001 - una factura mala no tumba el lote
         logger.warning("  %s: %s", fac.factura, e)
         paginas, omitidos, estado = 0, [str(e)], ESTADO_ERROR
+    finally:
+        for basura in pedazos:
+            with contextlib.suppress(OSError):
+                basura.unlink()
     if clinico:
         fac.paginas, fac.estado = paginas, estado
     else:
         fac.paginas_factura, fac.estado_factura = paginas, estado
     fac.omitidos.extend(omitidos)
+
+
+def _extraer_paginas(
+    origen: Path, desde: int, hasta: int, destino: Path, PdfReader, PdfWriter
+) -> Path:
+    """Saca las páginas [desde, hasta] de `origen` a un PDF aparte."""
+    escritor = PdfWriter()
+    for pagina in list(PdfReader(str(origen)).pages)[desde - 1 : hasta]:
+        escritor.add_page(pagina)
+    with open(destino, "wb") as fh:
+        escritor.write(fh)
+    return destino
+
+
+def piezas_del_folio_factura(fac: Factura, PdfReader, PdfWriter) -> tuple[list[Path], list[Path]]:
+    """Los PDF del folio de la factura, en el orden 1-2-3-4, y qué borrar después.
+
+    El `..._FACTURA.pdf` que viene con el XML trae varios renglones pegados: la
+    factura, a veces el detallado, la representación gráfica de la DIAN y a
+    veces la nota crédito. Cuando el detallado llega aparte (en Excel), no basta
+    con ponerlo detrás: **iría después de la representación gráfica**, y el área
+    lo quiere de segundo. Así que se parte el PDF y cada pedazo va a su puesto.
+    """
+    sueltos = {s.grupo.clave: s.ruta for s in fac.soportes_factura}
+    bulto = sueltos.pop("FACTURA", None)
+    if bulto is None:
+        # Sin la factura no hay nada que partir: lo que haya, en su orden.
+        return [sueltos[c] for c in ORDEN_FOLIO_FACTURA if c in sueltos], []
+
+    partes = partes_de_la_factura(bulto, PdfReader)
+    if not partes or not sueltos:
+        # O no se pudo mirar adentro, o no hay nada que intercalar: va entero.
+        return [bulto] + [sueltos[c] for c in ORDEN_FOLIO_FACTURA if c in sueltos], []
+
+    piezas: list[Path] = []
+    temporales: list[Path] = []
+    for n, clave in enumerate(ORDEN_FOLIO_FACTURA, start=1):
+        if clave in sueltos:
+            piezas.append(sueltos[clave])  # el archivo aparte manda
+            continue
+        if clave not in partes:
+            continue
+        desde, hasta = partes[clave]
+        pedazo = bulto.with_suffix(f".{n}{clave}.tmp.pdf")
+        try:
+            piezas.append(_extraer_paginas(bulto, desde, hasta, pedazo, PdfReader, PdfWriter))
+            temporales.append(pedazo)
+        except Exception as e:  # noqa: BLE001 - si no se puede partir, va entero
+            logger.warning("  %s: no pude partir %s (%s)", fac.factura, bulto.name, e)
+            for basura in temporales:
+                with contextlib.suppress(OSError):
+                    basura.unlink()
+            return [bulto] + [sueltos[c] for c in ORDEN_FOLIO_FACTURA if c in sueltos], []
+    return piezas, temporales
 
 
 def _poner_caratula(
@@ -1078,39 +1160,63 @@ def indice_facturas(carpeta: Path) -> dict[str, Path]:
 # DIAN y la nota crédito. Si el bot le agregara encima el detallado del Excel,
 # el folio subiría al ADRES con el detallado DOS VECES. Por eso se mira qué trae
 # adentro antes de tocarlo.
+# El orden importa: una página de la representación gráfica también dice
+# «FACTURA ELECTRONICA DE VENTA», así que esa marca se mira DESPUÉS.
 MARCAS_RENGLON: tuple[tuple[str, str], ...] = (
     ("DETALLADO", "DETALLADO FACTURA"),
-    ("DIAN", "REPRESENTACION GRAFICA"),
     ("NOTAS", "NOTA CREDITO"),
+    ("DIAN", "REPRESENTACION GRAFICA"),
+    ("FACTURA", "FACTURA ELECTRONICA DE VENTA"),
 )
+
+# El orden del folio de la factura, tal como lo pidió el área.
+ORDEN_FOLIO_FACTURA: tuple[str, ...] = ("FACTURA", "DETALLADO", "DIAN", "NOTAS")
 
 # Cuántas páginas se leen buscando esas marcas. Las traen al principio; leer el
 # PDF entero de 324 facturas sobre el share sería lento sin ganar nada.
 PAGINAS_A_MIRAR = 25
 
 
-def renglones_que_trae(pdf: Path, PdfReader=None) -> set[str]:
-    """Qué renglones del folio ya vienen pegados dentro de este PDF.
+def partes_de_la_factura(pdf: Path, PdfReader=None) -> dict[str, tuple[int, int]]:
+    """Qué renglones trae pegados el PDF de la factura, y en qué páginas.
 
-    Devuelve las claves (`DETALLADO`, `DIAN`, `NOTAS`) que encontró. Si el PDF
-    no se puede leer, devuelve vacío: se prefiere no afirmar nada a adivinar.
+    `{"FACTURA": (1, 7), "DETALLADO": (8, 9), "DIAN": (10, 18), "NOTAS": (19, 19)}`
+    — páginas contadas desde 1. Una página sin marca propia sigue siendo del
+    renglón anterior, que es como vienen: la marca va en la primera y las demás
+    son continuación.
+
+    Si el PDF no se puede leer, devuelve vacío: se prefiere no afirmar nada a
+    adivinar.
     """
     if PdfReader is None:
         PdfReader, _ = _cargar_lector_escritor()
-    faltan = {clave: _norm(marca) for clave, marca in MARCAS_RENGLON}
-    trae: set[str] = set()
+    marcas = [(clave, _norm(marca)) for clave, marca in MARCAS_RENGLON]
+    rangos: dict[str, tuple[int, int]] = {}
+    actual: str | None = None
     try:
-        lector = PdfReader(str(pdf))
-        for pagina in list(lector.pages)[:PAGINAS_A_MIRAR]:
-            if not faltan:
-                break
+        for numero, pagina in enumerate(PdfReader(str(pdf)).pages, start=1):
             limpio = _norm(pagina.extract_text() or "")
-            for clave in [c for c, marca in faltan.items() if marca in limpio]:
-                trae.add(clave)
-                faltan.pop(clave)
+            for clave, marca in marcas:
+                if marca in limpio:
+                    actual = clave
+                    break
+            if actual is None:
+                continue  # tapas o páginas sueltas antes del primer renglón
+            inicio = rangos.get(actual, (numero, numero))[0]
+            rangos[actual] = (inicio, numero)
     except Exception as e:  # noqa: BLE001 - un PDF ilegible no tumba el lote
         logger.debug("No pude mirar dentro de %s: %s", pdf.name, e)
-    return trae
+        return {}
+    return rangos
+
+
+def renglones_que_trae(pdf: Path, PdfReader=None) -> set[str]:
+    """Qué OTROS renglones vienen pegados dentro del PDF de la factura.
+
+    La factura misma no cuenta: la pregunta es qué trae ADEMÁS, para no
+    agregárselo encima.
+    """
+    return set(partes_de_la_factura(pdf, PdfReader)) - {"FACTURA"}
 
 
 ESTADO_COPIADA = "COPIADA"
@@ -1286,6 +1392,7 @@ COLUMNAS_REPORTE = (
     "ESTADO",
     "OBSERVACION",
     "FOLIO",
+    "LLEGO COMO",
 )
 
 
@@ -1308,6 +1415,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         fac.estado,
                         "",
                         FOLIO_EPICRIS,
+                        s.como_llego,
                     ]
                 )
             for n, s in zip(numeros_de_renglon(fac.soportes_factura), fac.soportes_factura):
@@ -1322,6 +1430,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         fac.estado_factura,
                         "",
                         FOLIO_FACTURA,
+                        s.como_llego,
                     ]
                 )
             for colgado in fac.temporales_colgados:
@@ -1836,7 +1945,10 @@ def main(argv: list[str] | None = None) -> int:
             "\nArchivos que NO se reconocieron (%d) — quedaron en OTROS:", len(sin_reconocer)
         )
         for fac, s in sin_reconocer[:10]:
-            logger.info("   %s: %s", fac.factura, s.ruta.name)
+            if s.como_llego != s.ruta.name:
+                logger.info("   %s: %s (llegó como «%s»)", fac.factura, s.ruta.name, s.como_llego)
+            else:
+                logger.info("   %s: %s", fac.factura, s.ruta.name)
         if len(sin_reconocer) > 10:
             logger.info("   … y %d más, en el reporte CSV.", len(sin_reconocer) - 10)
 

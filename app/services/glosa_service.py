@@ -3473,6 +3473,33 @@ def _neutralizar_placeholders_template(texto: str) -> str:
     return resultado
 
 
+# ── Los avisos del motor tienen que verse, sobre todo en papel ───────────
+# 26-08-2026. El motor le agrega al dictamen avisos como «⛔ NO RADICAR
+# TODAVÍA» o «⚠ REVISAR ANTES DE RADICAR». Viajan como texto plano a propósito,
+# para que las mallas los sigan leyendo. Pero el dictamen se radica impreso, y
+# un aviso que sale como un renglón más de texto no detiene a nadie.
+_PAT_AVISO_DEL_MOTOR = re.compile(
+    r"(⛔[^\n]*|⚠ REVISAR ANTES DE RADICAR[^\n]*)",
+    re.IGNORECASE,
+)
+
+
+def _resaltar_avisos(html: str) -> str:
+    """Envuelve los avisos del motor para que se vean en pantalla y en papel."""
+    if not html:
+        return html
+
+    def _sub(m: "re.Match[str]") -> str:
+        return (
+            '<div class="aviso-no-radicar" style="display:block;margin:10px 0;padding:10px 12px;'
+            "border:2px solid #dc2626;border-radius:6px;background:#fef2f2;color:#7f1d1d;"
+            "font-weight:700;font-size:12px;line-height:1.5;-webkit-print-color-adjust:exact;"
+            'print-color-adjust:exact;">' + m.group(1) + "</div>"
+        )
+
+    return _PAT_AVISO_DEL_MOTOR.sub(_sub, html)
+
+
 def _neutralizar_frases_absurdas(texto: str) -> str:
     """Elimina muletillas arrogantes sin valor legal del dictamen."""
     if not texto:
@@ -8974,6 +9001,30 @@ class GlosaService:
             except Exception as _e_psi:
                 logger.debug(f"[PAGADOR-SIN-IDENTIFICAR] aviso no aplicado: {_e_psi}")
 
+            # 26-08-2026 — NO RADICAR SIN EL SOPORTE DE LA CAUSAL.
+            # Nueve de cada diez dictámenes del lote del 25 afirmaban cosas de
+            # la historia clínica sin un solo soporte anexo. El aviso existía
+            # pero era genérico; ahora dice QUÉ falta y por qué importa en este
+            # caso concreto, que es lo que hace que no se ignore.
+            try:
+                _faltan = self._falta_el_soporte_de_la_causal(
+                    str(getattr(data, "numero_factura", "") or ""), str(codigo_det or "")
+                )
+                if _faltan:
+                    _lista = _faltan[0] if len(_faltan) == 1 else " o ".join(_faltan)
+                    logger.warning(
+                        f"[FALTA-SOPORTE] {codigo_det}: no está {_lista} en el expediente "
+                        "— el dictamen se marcó como NO listo para radicar."
+                    )
+                    dictamen = dictamen.rstrip() + (
+                        f"\n\n⛔ NO RADICAR TODAVÍA: para responder una glosa {codigo_det} "
+                        f"hace falta {_lista}, y no aparece en el expediente de la factura. "
+                        "Este documento argumenta, pero no prueba: anexe el soporte antes "
+                        "de radicarlo o la entidad ratifica la glosa."
+                    )
+            except Exception as _e_fs:
+                logger.debug(f"[FALTA-SOPORTE] aviso no aplicado: {_e_fs}")
+
             try:
                 _dictamen_con_de = _reponer_preposicion_comida(dictamen)
                 if _dictamen_con_de != dictamen:
@@ -10237,6 +10288,53 @@ class GlosaService:
         ),
     }
 
+    def _falta_el_soporte_de_la_causal(
+        self, numero_factura: Optional[str], codigo_glosa: str
+    ) -> list[str]:
+        """Los soportes que esa causal necesita y que NO están en el expediente.
+
+        26-08-2026. El aviso de soportes era genérico —«no se encontró el
+        expediente»— y por eso se ignoraba: no decía qué faltaba ni por qué
+        importaba en ESE caso. Nueve de cada diez dictámenes del lote del 25
+        salieron así.
+
+        Ahora se compara lo que pide la causal (catalogo_glosas) contra lo que
+        el indexador encontró de verdad, y se nombra lo que falta. Un dictamen
+        de SO0101 sin epicrisis no es un dictamen: la glosa dice justamente que
+        la epicrisis no soporta la estancia.
+        """
+        if not numero_factura or not codigo_glosa:
+            return []
+        try:
+            from app.services.catalogo_glosas import soportes_que_pide
+
+            pedidos = soportes_que_pide(codigo_glosa)
+            if not pedidos:
+                return []
+            from app.services.soportes_autodiscovery_service import get_indexer
+
+            hallados = {
+                str((s or {}).get("tipo") or "").strip().lower()
+                for s in (get_indexer().lookup(numero_factura) or [])
+            }
+            # Basta con UNO de los soportes que sirven para la causal: la
+            # epicrisis y la hoja de urgencias prueban lo mismo según el caso.
+            if hallados & set(pedidos):
+                return []
+            nombres = {
+                "historia_clinica": "la historia clínica",
+                "epicrisis": "la epicrisis",
+                "hoja_atencion_urgencias": "la hoja de atención de urgencias",
+                "hoja_administracion_medicamentos": "la hoja de administración de medicamentos",
+                "factura_electronica": "la factura electrónica",
+                "rips": "los RIPS",
+                "cuv": "el CUV",
+            }
+            return [nombres.get(p, p) for p in pedidos]
+        except Exception as e:  # noqa: BLE001 — sin índice no se acusa
+            logger.debug(f"[SOPORTE-DE-LA-CAUSAL] no se pudo revisar: {e}")
+            return []
+
     def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:
         """La relación de soportes de la factura, leída del expediente real.
 
@@ -10332,6 +10430,12 @@ class GlosaService:
         # refinado. Antes dependía de que el modelo obedeciera y salía
         # mezclado (05-08-2026, pedido de Yesid).
         argumento = a_mayusculas_html(argumento)
+        # 26-08-2026: los avisos que el motor le agrega al dictamen viajan como
+        # texto plano para que las mallas puedan seguir leyéndolos. Acá, en el
+        # último paso, se envuelven para que SE VEAN — y sobre todo para que se
+        # vean al imprimir. El dictamen se radica en papel o PDF, y un aviso de
+        # «no radicar» que sale como un renglón más de texto no lo detiene nadie.
+        argumento = _resaltar_avisos(argumento)
         servicio = a_mayusculas_html(servicio) if servicio else servicio
         contrato = a_mayusculas_html(contrato) if contrato else contrato
         tarifa = a_mayusculas_html(tarifa) if tarifa else tarifa
