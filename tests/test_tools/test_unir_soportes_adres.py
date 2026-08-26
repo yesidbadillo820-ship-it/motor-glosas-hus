@@ -1181,3 +1181,87 @@ def test_avisa_los_archivos_que_no_son_pdf(tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
         org.main(["--carpeta", str(raiz), "--folio"])
     assert "NO son PDF" in caplog.text and "EPICRISIS.docx" in caplog.text
+
+
+# ─── Lo que deja una corrida que se cayó a mitad ─────────────────────────────
+
+
+def test_un_huerfano_a_medio_renombrar_no_se_pierde(tmp_path):
+    """Un `~renombrando~HC.pdf` colgado no es basura: es la historia clínica con
+    el nombre a medio cambiar. Antes, la corrida siguiente lo PISABA."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf", paginas=3)
+    _pdf(fac / f"{org.PREFIJO_TEMPORAL}HC.pdf", paginas=7)
+    org.armar_folios(raiz, aplicar=True)
+    paginas = sorted(len(pypdf.PdfReader(str(p)).pages) for p in fac.glob("? HISTORIA*.pdf"))
+    assert paginas == [3, 7]  # los dos siguen ahí
+    assert len(pypdf.PdfReader(str(fac / "HUS1_EPICRIS.pdf")).pages) == 10
+
+
+def test_si_el_renombrado_revienta_a_mitad_se_deshace(tmp_path, monkeypatch):
+    """Antes quedaban archivos «~renombrando~…» para siempre y la factura sin folio."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS2"
+    for nombre in ("RTA_ADRES_HUS2.pdf", "HC.pdf", "DX.pdf"):
+        _pdf(fac / nombre)
+
+    original = Path.rename
+    veces = {"n": 0}
+
+    def _revienta(self, destino):
+        if org.PREFIJO_TEMPORAL in str(self):
+            veces["n"] += 1
+            if veces["n"] == 2:
+                raise PermissionError(13, "se cayó el share")
+        return original(self, destino)
+
+    monkeypatch.setattr(Path, "rename", _revienta)
+    org.armar_folios(raiz, aplicar=True)
+    monkeypatch.undo()
+
+    # Todo volvió a su nombre: ni un «~renombrando~» colgado.
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "DX.pdf",
+        "HC.pdf",
+    ]
+    # Y la corrida siguiente lo arma sin ayuda.
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.estado == org.ESTADO_UNIDO and plan.paginas == 3
+
+
+def test_los_huerfanos_se_avisan_en_simulacion(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / f"{org.PREFIJO_TEMPORAL}HC.pdf")
+    plan = org.planificar(raiz)[0]
+    assert [p.name for p in plan.temporales_colgados] == [f"{org.PREFIJO_TEMPORAL}HC.pdf"]
+    assert plan.soportes == []  # con ese nombre no entra al folio
+    ruta = tmp_path / "r.csv"
+    org.escribir_reporte(ruta, [plan])
+    assert "a medio renombrar" in ruta.read_text(encoding="utf-8-sig")
+
+
+def test_renombrar_avisa_que_se_pierde_el_NIT(tmp_path, caplog):
+    """Al numerar, el nombre que traía el NIT desaparece: después no hay de
+    dónde sacarlo para nombrar los folios."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "680010079201_HUS311736_EPICRIS.pdf")
+    _pdf(fac / "HC.pdf")
+    with caplog.at_level(logging.WARNING, logger="unir_soportes_adres"):
+        assert org.main(["--carpeta", str(raiz), "--renombrar", "--aplicar"]) == 0
+    assert "se pierde el NIT" in caplog.text
+    assert "--prefijo 680010079201" in caplog.text
+
+
+def test_el_folio_es_estable_con_carpetas_de_nombre_raro(tmp_path):
+    """`HUS379477_PEND. CARTA CORONEL` tiene punto y espacios."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS379477_PEND. CARTA CORONEL"
+    _pdf(fac / "RTA_ADRES_HUS379477.pdf", paginas=1)
+    _pdf(fac / "EPI.pdf", paginas=4)
+    _pdf(fac / "HC.pdf", paginas=2)
+    paginas = {org.armar_folios(raiz, aplicar=True)[0].paginas for _ in range(3)}
+    assert paginas == {7}  # las tres corridas dejan lo mismo

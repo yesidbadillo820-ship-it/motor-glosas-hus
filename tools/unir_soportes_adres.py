@@ -450,6 +450,8 @@ class Factura:
     # Archivos de la carpeta que no son PDF: al folio no pueden entrar, pero
     # tampoco pueden desaparecer sin que el auditor se entere.
     no_son_pdf: list[Path] = field(default_factory=list)
+    # Lo que dejó con el nombre a medio cambiar una corrida que se cayó.
+    temporales_colgados: list[Path] = field(default_factory=list)
     # Folios firmados por este bot en una corrida anterior: no se vuelven a
     # meter adentro de sí mismos, se rehacen.
     folios_previos: list[Path] = field(default_factory=list)
@@ -577,12 +579,49 @@ def es_folio_previo(ruta: Path, factura: str, PdfReader=None) -> bool:
     return tiene_nombre_de_folio(ruta.stem, factura) and es_folio_nuestro(ruta, PdfReader)
 
 
+# Nombre de paso del renombrado en dos vueltas. Si la corrida se cae a mitad,
+# los archivos quedan con este prefijo: `sanar_temporales()` los devuelve a su
+# nombre en la corrida siguiente.
+PREFIJO_TEMPORAL = "~renombrando~"
+
+
+def es_temporal(nombre: str) -> bool:
+    return nombre.startswith(PREFIJO_TEMPORAL)
+
+
+def sanar_temporales(carpeta: Path) -> list[tuple[str, Path]]:
+    """Devuelve a su nombre los archivos que dejó a medias una corrida caída.
+
+    Un `~renombrando~HC.pdf` colgado no es basura: es la historia clínica del
+    paciente con el nombre a medio cambiar. Se le quita el prefijo y se deja
+    donde estaba, sin pisar nada.
+    """
+    sanados: list[tuple[str, Path]] = []
+    for r in sorted(p for p in carpeta.rglob(f"{PREFIJO_TEMPORAL}*") if p.is_file()):
+        limpio = r.name
+        while es_temporal(limpio):
+            limpio = limpio[len(PREFIJO_TEMPORAL) :]
+        if not limpio:
+            continue
+        try:
+            destino, _ = nombre_libre(r.parent, limpio)
+            r.rename(destino)
+        except OSError as e:
+            logger.warning("  No pude devolverle el nombre a %s: %s", r.name, e)
+            continue
+        sanados.append((r.name, destino))
+    return sanados
+
+
 def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tuple[Path, str]]:
     """Renombra una lista de soportes a `<n> <GRUPO>.pdf`, en su orden.
 
     Devuelve [(ruta actual, nombre nuevo)]. Se hace en dos vueltas —primero a un
     nombre temporal— porque el nombre que le toca a un archivo puede ser el que
     todavía tiene otro: renombrando de una, uno pisaría al otro.
+
+    Si algo falla a mitad, **se deshace**: los que ya iban con nombre de paso
+    vuelven al que tenían. Antes quedaban como «~renombrando~…» para siempre.
     """
     plan = [
         (s.ruta, nombre_numerado(n, s.grupo, s.ruta.suffix))
@@ -590,20 +629,41 @@ def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tupl
     ]
     if not aplicar:
         return plan
-    temporales: list[tuple[Soporte, Path, str]] = []
-    for soporte, (ruta, nuevo) in zip(soportes, plan):
-        if ruta.name == nuevo or not ruta.exists():
-            # Si el archivo ya no está (se lo llevaron del share a mitad de la
-            # corrida), no se cae el lote: se sigue con los demás.
-            continue
-        temporal = ruta.with_name(f"~renombrando~{ruta.name}")
-        ruta.rename(temporal)
-        temporales.append((soporte, temporal, nuevo))
-    for soporte, temporal, nuevo in temporales:
-        destino, _ = nombre_libre(temporal.parent, nuevo)
-        temporal.rename(destino)
-        soporte.ruta = destino
+    # (soporte, nombre original, ruta temporal, nombre nuevo)
+    temporales: list[tuple[Soporte, str, Path, str]] = []
+    try:
+        for soporte, (ruta, nuevo) in zip(soportes, plan):
+            if ruta.name == nuevo or not ruta.exists():
+                # Si el archivo ya no está (se lo llevaron del share a mitad de
+                # la corrida), no se cae el lote: se sigue con los demás.
+                continue
+            # Nombre de paso LIBRE: con `ruta.with_name(...)` a secas, un
+            # «~renombrando~HC.pdf» colgado de una corrida caída se pisaba y ese
+            # soporte se perdía.
+            temporal, _ = nombre_libre(ruta.parent, f"{PREFIJO_TEMPORAL}{ruta.name}")
+            ruta.rename(temporal)
+            temporales.append((soporte, ruta.name, temporal, nuevo))
+        for soporte, _antes, temporal, nuevo in temporales:
+            destino, _ = nombre_libre(temporal.parent, nuevo)
+            temporal.rename(destino)
+            soporte.ruta = destino
+    except OSError:
+        _deshacer_renombrado(temporales)
+        raise
     return plan
+
+
+def _deshacer_renombrado(temporales: list[tuple[Soporte, str, Path, str]]) -> None:
+    """Devuelve a su nombre lo que quedó con nombre de paso."""
+    for soporte, antes, temporal, _nuevo in temporales:
+        if not temporal.exists():
+            continue  # ese ya se renombró bien
+        try:
+            destino, _ = nombre_libre(temporal.parent, antes)
+            temporal.rename(destino)
+            soporte.ruta = destino
+        except OSError as e:
+            logger.warning("  No pude deshacer el renombrado de %s: %s", antes, e)
 
 
 def renombrar_en_orden(fac: Factura, aplicar: bool = False) -> list[tuple[Path, str]]:
@@ -654,6 +714,11 @@ def _planificar_carpeta(sub: Path, numero: str, mapa: dict[str, str] | None) -> 
     archivos = sorted(
         r for r in sub.rglob("*") if r.is_file() and not r.name.startswith(("~$", "."))
     )
+    # Lo que dejó a medias una corrida caída: no entra al folio con ese nombre,
+    # pero tampoco se ignora. Con --aplicar se le devuelve el suyo antes de
+    # empezar (`sanar_temporales`).
+    fac.temporales_colgados = [r for r in archivos if es_temporal(r.name)]
+    archivos = [r for r in archivos if not es_temporal(r.name)]
     # El NIT sale del nombre de los propios archivos (la epicrisis y la factura
     # vienen como 680010079201_HUS######_...). Si no lo traen, queda vacío.
     for r in archivos:
@@ -832,6 +897,8 @@ def armar_folios(
     prefijo: str = "",
 ) -> list[Factura]:
     """Planifica y arma los dos folios. Sin `aplicar`, solo dice qué haría."""
+    if aplicar:
+        sanar_temporales(carpeta)
     return aplicar_folios(planificar(carpeta, facturas, mapa), aplicar, prefijo)
 
 
@@ -1084,6 +1151,21 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         fac.estado_factura,
                         "",
                         FOLIO_FACTURA,
+                    ]
+                )
+            for colgado in fac.temporales_colgados:
+                w.writerow(
+                    [
+                        fac.factura,
+                        "",
+                        "",
+                        colgado.name,
+                        "NO - revisar",
+                        str(colgado.parent),
+                        "",
+                        "quedó a medio renombrar por una corrida caída: con --aplicar "
+                        "se le devuelve su nombre",
+                        "",
                     ]
                 )
             for otro in fac.no_son_pdf:
@@ -1466,8 +1548,12 @@ def main(argv: list[str] | None = None) -> int:
             )
     copias: list[Copia] = []
     conversiones: list[tuple[str, Path, str]] = []
+    nits: set[str] = set()
     if args.folio:
         # El trabajo completo: los dos folios de cada factura.
+        if args.aplicar:
+            for antes, ahora in sanar_temporales(args.carpeta):
+                logger.info("Recuperado de una corrida caída: %s → %s", antes, ahora.name)
         plan = planificar(args.carpeta, facturas, mapa)
         indice: dict[str, Path] | None = None
         if args.carpeta_facturas:
@@ -1484,10 +1570,15 @@ def main(argv: list[str] | None = None) -> int:
     elif args.renombrar:
         # Solo numerar: cada soporte queda como «1 RESPUESTA A GLOSA.pdf», sin
         # pegar nada en un solo PDF.
+        if args.aplicar:
+            for antes, ahora in sanar_temporales(args.carpeta):
+                logger.info("Recuperado de una corrida caída: %s → %s", antes, ahora.name)
         plan = planificar(args.carpeta, facturas, mapa)
         for fac in plan:
             if not fac.soportes:
                 continue
+            if fac.prefijo:
+                nits.add(fac.prefijo)
             try:
                 renombrar_en_orden(fac, args.aplicar)
                 # También el folio de la factura: si no, la carpeta queda a
@@ -1523,6 +1614,16 @@ def main(argv: list[str] | None = None) -> int:
     sin_pdf = [f for f in plan if not f.soportes]
     errores = [f for f in plan if ESTADO_ERROR in (f.estado, f.estado_factura)]
     sin_reconocer = [(f, s) for f in plan for s in f.soportes if not s.reconocido]
+
+    if args.renombrar and nits:
+        # Al numerar, el nombre que traía el NIT
+        # (680010079201_HUS######_EPICRIS.pdf) se pierde: después ya no hay de
+        # dónde sacarlo para nombrar los folios.
+        logger.warning(
+            "\nOJO: al numerar se pierde el NIT que traían los nombres. Para armar los "
+            "folios después, agregue --prefijo %s",
+            sorted(nits)[0],
+        )
 
     if args.folio:
         _resumen_folios(plan, copias, conversiones, args.aplicar)

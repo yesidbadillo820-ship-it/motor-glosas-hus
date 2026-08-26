@@ -73,7 +73,36 @@ Word o una radiografía en JPG no entran al folio, pero tampoco pueden
 esfumarse: salen listadas en pantalla y en el reporte. La basura de Windows
 (`Thumbs.db`, `desktop.ini`) no se reporta.
 
-144 pruebas en el archivo.
+### Y el último grupo: lo que deja una corrida que se cae a mitad
+
+El renombrado va en dos vueltas —primero a un nombre de paso `~renombrando~…`,
+porque el nombre que le toca a un archivo puede ser el que todavía tiene otro—.
+Si la corrida se caía en medio, eso dejaba dos destrozos:
+
+**12. Un `~renombrando~HC.pdf` colgado se PERDÍA en la corrida siguiente.** El
+nombre de paso se armaba con `ruta.with_name(...)` a secas, así que al renombrar
+`HC.pdf` se pisaba el huérfano. Comprobado: un huérfano de 7 páginas
+desaparecía y la carpeta quedaba con un `~renombrando~~renombrando~HC.pdf` y sin
+folio. Ahora el nombre de paso se pide libre (`nombre_libre`), y
+`sanar_temporales()` le devuelve su nombre a lo que quedó colgado antes de
+empezar: el huérfano de 7 páginas se recupera y entra al folio.
+
+**13. No había vuelta atrás.** Si la segunda vuelta fallaba, los archivos
+quedaban como `~renombrando~…` para siempre y la factura sin folio. Ahora se
+deshace: cada uno vuelve al nombre que tenía, y la corrida siguiente arma el
+folio sin ayuda.
+
+**14. `--renombrar` borraba el NIT sin decirlo.** Al numerar, el nombre que lo
+traía (`680010079201_HUS######_EPICRIS.pdf`) desaparece, y después no hay de
+dónde sacarlo: los folios salían como `HUS######_EPICRIS.pdf`. Ahora avisa con
+el NIT que encontró, para pasarlo con `--prefijo`.
+
+En simulación los huérfanos no entran al folio pero sí salen en el reporte.
+
+149 pruebas en el archivo. Se comprobó además que quedaron cerrados los otros
+dos confirmados: `--renombrar` y después `--folio` ya no destruye el PDF de la
+factura (19 páginas intactas), y una carpeta con punto y espacios
+(`HUS379477_PEND. CARTA CORONEL`) da el mismo folio en tres corridas seguidas.
 
 
 ## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)

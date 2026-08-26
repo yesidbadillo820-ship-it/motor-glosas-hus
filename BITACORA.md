@@ -113,7 +113,16 @@ momento, esa factura se salta con su motivo y las otras 323 siguen.
 que esté fusionado el PR #492. Y cuando lo corra, hágalo primero sobre UNA sola
 carpeta de prueba.
 
-Pruebas: 133 en `tests/test_tools/test_unir_soportes_adres.py`.
+**6 a 14 (los demás).** Una fecha en el nombre de un archivo se tomaba como si
+fuera el NIT del hospital y el folio salía mal nombrado; el reporte abierto en
+Excel tumbaba la corrida entera después de haber armado todos los folios; los
+archivos que no son PDF (una epicrisis en Word, una radiografía en JPG)
+desaparecían sin avisar; y si la corrida se caía a mitad de renombrar, un
+archivo quedaba a medio cambiar de nombre y en la corrida siguiente **se
+perdía**. Todo eso quedó cerrado, y ahora la corrida que se cae se deshace sola
+y la siguiente recupera lo que quedó colgado.
+
+Pruebas: 149 en `tests/test_tools/test_unir_soportes_adres.py`.
 
 
 ### 26-08-2026 — El folio de cada factura del ADRES: ahora son DOS PDF, no uno
