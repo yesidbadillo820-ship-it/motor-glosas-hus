@@ -103,6 +103,27 @@ def aprender_de_decision_eps(
     return {"accion": "skip", "razon": f"decisión {decision} no dispara aprendizaje"}
 
 
+def _notas_de_la_promocion(glosa: GlosaRecord) -> str:
+    """Lo que queda escrito junto a la plantilla que se acaba de promover.
+
+    26-08-2026 — cerrar el ciclo. El motor promovía el argumento del
+    dictamen, pero lo que el gestor sabe (por qué la EPS la levantó) se
+    quedaba en el aire. Cuando el gestor lo anota al registrar la decisión,
+    esa frase entra aquí: es la mejor prueba que existe de qué argumento
+    funciona con esa EPS y esa causal. Si no anotó nada, no se inventa —
+    queda solo lo que el sistema sí puede afirmar.
+    """
+    notas = (
+        f"Promovida automáticamente el {ahora_utc().isoformat()} "
+        f"tras decisión EPS=LEVANTADA. Valor recuperado: "
+        f"${int(glosa.valor_recuperado or 0):,}."
+    )
+    dijo_el_gestor = (glosa.observacion_eps or "").strip()
+    if dijo_el_gestor:
+        notas += f"\nSegún el gestor, lo que la levantó fue: {dijo_el_gestor[:600]}"
+    return notas
+
+
 def _promover_a_gold(
     db: Session, glosa: GlosaRecord, eps: str, codigo: str, creado_por: str
 ) -> dict:
@@ -154,11 +175,7 @@ def _promover_a_gold(
         valor_recuperado=float(glosa.valor_recuperado or 0.0),
         usos=0,
         creado_por=f"auto-feedback ({creado_por})",
-        notas=(
-            f"Promovida automáticamente el {ahora_utc().isoformat()} "
-            f"tras decisión EPS=LEVANTADA. Valor recuperado: "
-            f"${int(glosa.valor_recuperado or 0):,}."
-        ),
+        notas=_notas_de_la_promocion(glosa),
         activa=1,
     )
     db.add(nueva)

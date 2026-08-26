@@ -849,6 +849,11 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
 .sb-label::before{content:'';width:3px;height:12px;background:var(--c-teal2);border-radius:2px;flex-shrink:0}
 .field{margin-bottom:.85rem}
 .field label{display:block;font-size:.7rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.35rem}
+/* 26-08-2026 — modo compacto. Las filas están hechas para leerse cómodas,
+   no para revisar doscientas seguidas. */
+body.denso table td, body.denso table th{padding-top:.28rem;padding-bottom:.28rem;font-size:.82rem}
+body.denso table{line-height:1.3}
+body.denso .card{padding:.7rem .9rem}
 input,select,textarea{
   width:100%;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--r);
   padding:.6rem .8rem;font-size:.85rem;font-family:var(--font);color:var(--text);outline:none;
@@ -1792,6 +1797,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   table{page-break-inside:avoid}
   h1,h2,h3,h4{page-break-after:avoid}
   .dont-break{page-break-inside:avoid}
+  /* 26-08-2026: los avisos de «no radicar» son lo único del sistema que SÍ
+     debe imprimirse — y en rojo. Si alguien imprime un dictamen que los lleva,
+     tiene que verlo antes de radicarlo. La regla de arriba oculta [onclick] y
+     .btn; esta se asegura de que el aviso no se vaya con ellos. */
+  .aviso-no-radicar{
+    display:block!important;border:2px solid #dc2626!important;
+    background:#fef2f2!important;color:#7f1d1d!important;font-weight:700!important;
+    page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
   /* Encabezado institucional impreso */
   body::before{
     content:"ESE HOSPITAL UNIVERSITARIO DE SANTANDER · NIT 900.006.037-4";
@@ -2260,6 +2274,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
         </button>
+        <button class="sn-item" data-tip="Mi día" onclick="sidebarTab(this,'mi-dia')" id="sn-mi-dia">
+          <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+          <span class="sn-item-label">Mi día</span>
+        </button>
         <button class="sn-item" data-tip="Mi desempeño" onclick="sidebarTab(this,'mi-desempeno')">
           <svg class="i i-md" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           <span class="sn-item-label">Mi desempeño</span>
@@ -2276,6 +2294,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <button class="sn-item" data-solo-coordinacion="1" data-tip="Expediente" onclick="sidebarTab(this,'expediente')" id="sn-expediente">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="sn-item-label">Expediente</span>
+        </button>
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata">
+          <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="sn-item-label">Plata recuperada</span>
         </button>
         <button class="sn-item" data-tip="Vencimientos" onclick="sidebarTab(this,'vencimientos')" id="sn-vencimientos">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
@@ -3002,6 +3024,21 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </button>
         </div>
 
+        <!-- 26-08-2026: buscador y densidad.
+             En un lote de 1.573 facturas, encontrar una pasando páginas es
+             inviable, y las filas están hechas para leerse cómodas, no para
+             revisar doscientas seguidas. El gestor pasa el día acá. -->
+        <div style="display:flex;gap:.6rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center">
+          <input type="search" id="mis-buscar" placeholder="Buscar factura, EPS, código…"
+                 oninput="filtrarMisGlosas()" aria-label="Buscar en mis glosas"
+                 style="flex:1 1 240px;min-width:200px;padding:.45rem .7rem;font-size:.85rem"/>
+          <span id="mis-buscar-cuenta" style="font-size:.75rem;color:var(--text3);white-space:nowrap"></span>
+          <button type="button" onclick="alternarDensidad()" id="btn-densidad"
+                  style="padding:.45rem .8rem;font-size:.78rem;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;white-space:nowrap">
+            Filas compactas
+          </button>
+        </div>
+
         <!-- Presets de filtros guardados -->
         <div id="mis-presets" style="display:flex;gap:.4rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center"></div>
 
@@ -3304,6 +3341,95 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           Datos en tiempo real · Endpoint: <code>/dashboard-ejecutivo/vivo</code> ·
           Solo COORDINADOR / SUPER_ADMIN
         </div>
+      </div>
+    </div>
+
+    <!-- 26-08-2026 · «Mi dia».
+         Treinta y dos pantallas para un gestor que en el dia a dia hace tres
+         cosas: responder lo que llego, revisar lo que el motor marco y
+         radicar lo que esta listo. Las otras siguen ahi para quien las
+         necesite, pero dejan de ser el punto de partida. -->
+    <div class="panel" id="p-mi-dia">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">☀️ Mi día</div>
+            <div style="font-size:.78rem;color:var(--text3)" id="midia-sub">Lo que le toca hoy, ordenado por lo que más urge</div>
+          </div>
+          <button class="btn btn-ghost" onclick="cargarMiDia()" style="font-size:.8rem">Actualizar</button>
+        </div>
+
+        <div id="midia-cols" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">📝 Responder lo que llegó <span id="midia-n-responder" style="float:right;font-weight:700"></span></div>
+            <div id="midia-responder" style="padding:.5rem"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">🔎 Revisar lo que el motor marcó <span id="midia-n-revisar" style="float:right;font-weight:700"></span></div>
+            <div id="midia-revisar" style="padding:.5rem"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">📤 Radicar lo que está listo <span id="midia-n-radicar" style="float:right;font-weight:700"></span></div>
+            <div id="midia-radicar" style="padding:.5rem"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.72rem;color:var(--text3);text-align:center">
+          Primero lo que vence antes; a igualdad de días, lo de más plata.
+          Lo que no tiene plazo conocido va al final — no se le inventa uno.
+        </div>
+      </div>
+    </div>
+
+    <!-- 26-08-2026 · Tablero de plata recuperada.
+         Habia 32 pantallas y una sola grafica. El motor sabia cuanto se
+         gloso, cuanto se respondio y cuanto se levanto, pero eso no se veia
+         junto en ninguna parte. Este es el numero que pide la gerencia. -->
+    <div class="panel" id="p-plata">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">💰 Plata glosada y en qué terminó</div>
+            <div style="font-size:.78rem;color:var(--text3)">Mes a mes y EPS por EPS · glosado, respondido a tiempo, levantado, ratificado y perdido por vencimiento</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <select id="plata-meses" onchange="cargarPlata()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);font-size:.8rem;font-family:var(--font)">
+              <option value="3">Últimos 3 meses</option>
+              <option value="6" selected>Últimos 6 meses</option>
+              <option value="12">Últimos 12 meses</option>
+              <option value="24">Últimos 24 meses</option>
+            </select>
+            <button class="btn btn-ghost" onclick="cargarPlata()" style="font-size:.8rem">Actualizar</button>
+          </div>
+        </div>
+
+        <div class="kpi-grid" id="plata-kpis">
+          <div class="kpi"><div class="kpi-lbl">Glosado</div><div class="kpi-num" id="plata-glosado">—</div><div class="kpi-sub">lo que las EPS objetaron</div></div>
+          <div class="kpi"><div class="kpi-lbl">Levantado</div><div class="kpi-num" id="plata-levantado">—</div><div class="kpi-sub">plata que se recuperó</div></div>
+          <div class="kpi"><div class="kpi-lbl">Ratificado</div><div class="kpi-num" id="plata-ratificado">—</div><div class="kpi-sub">la EPS mantuvo la glosa</div></div>
+          <div class="kpi"><div class="kpi-lbl">Perdido por vencimiento</div><div class="kpi-num" id="plata-perdido">—</div><div class="kpi-sub">no se contestó a tiempo</div></div>
+          <div class="kpi"><div class="kpi-lbl">Sin decidir</div><div class="kpi-num" id="plata-sindec">—</div><div class="kpi-sub">la EPS no ha contestado</div></div>
+          <div class="kpi"><div class="kpi-lbl">Tasa de levantamiento</div><div class="kpi-num" id="plata-tasa">—</div><div class="kpi-sub">levantado sobre glosado</div></div>
+        </div>
+
+        <div id="plata-faltantes" style="display:none;margin-top:.9rem;padding:.7rem .9rem;border:1px solid var(--c-amber);border-radius:8px;background:rgba(245,158,11,.08);font-size:.8rem;color:var(--text2)"></div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Mes a mes</div>
+          <canvas id="ch-plata-mes" style="max-height:220px"></canvas>
+        </div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Detalle por mes</div>
+          <div style="overflow-x:auto"><table id="plata-tabla-mes" style="width:100%;border-collapse:collapse;font-size:.78rem"></table></div>
+        </div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Detalle por EPS</div>
+          <div style="overflow-x:auto"><table id="plata-tabla-eps" style="width:100%;border-collapse:collapse;font-size:.78rem"></table></div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.7rem;color:var(--text3);text-align:center" id="plata-nota">—</div>
       </div>
     </div>
 
@@ -8287,6 +8413,8 @@ function tab(btn,id){
   if(id==='glosas-adres') loadGlosasAdres();
   if(id==='resumen-mes') loadResumenMes();
   if(id==='mando'){ loadMando(); loadOperacion(); }
+  if(id==='mi-dia') cargarMiDia();
+  if(id==='plata') cargarPlata();
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -14132,6 +14260,55 @@ async function borrarPreset(presetId, ev){
   }catch(e){ toast('Error de red', String(e), 'error'); }
 }
 
+// ─── Buscar dentro de la tabla, sin ir al servidor ──────────────────────
+// 26-08-2026. En un lote de 1.573 facturas, encontrar una pasando páginas es
+// inviable. Filtra sobre lo que ya está pintado: es instantáneo y no gasta una
+// llamada al motor.
+function filtrarMisGlosas(){
+  try{
+    var q = (document.getElementById('mis-buscar') || {}).value || '';
+    q = q.trim().toLowerCase();
+    var body = document.getElementById('mis-body');
+    if(!body) return;
+    var filas = body.querySelectorAll('tr');
+    var visibles = 0;
+    for(var i=0; i<filas.length; i++){
+      var texto = (filas[i].textContent || '').toLowerCase();
+      var pasa = !q || texto.indexOf(q) !== -1;
+      filas[i].style.display = pasa ? '' : 'none';
+      if(pasa) visibles++;
+    }
+    var cuenta = document.getElementById('mis-buscar-cuenta');
+    if(cuenta){
+      cuenta.textContent = q
+        ? (visibles + ' de ' + filas.length)
+        : '';
+    }
+  }catch(_){}
+}
+
+// ─── Filas compactas ────────────────────────────────────────────────────
+// Quien revisa lotes grandes lo deja puesto siempre, así que se recuerda.
+function alternarDensidad(){
+  try{
+    var compacto = document.body.classList.toggle('denso');
+    try{ localStorage.setItem('sinac_denso', compacto ? '1' : '0'); }catch(_){}
+    var btn = document.getElementById('btn-densidad');
+    if(btn) btn.textContent = compacto ? 'Filas cómodas' : 'Filas compactas';
+  }catch(_){}
+}
+(function recordarDensidad(){
+  try{
+    if(localStorage.getItem('sinac_denso') === '1'){
+      document.body.classList.add('denso');
+      document.addEventListener('DOMContentLoaded', function(){
+        var b = document.getElementById('btn-densidad');
+        if(b) b.textContent = 'Filas cómodas';
+      });
+    }
+  }catch(_){}
+})();
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var vista = window._mis_vista || '';
@@ -17082,8 +17259,20 @@ function renderMedallasDictamen(d, scoreColor){
   if(!v){
     grade='—'; gradeCls='nd'; gradeTag='SIN DATOS'; gradeDet='Sin verificación de citas disponible';
   } else if(issues.length === 0){
+    // 26-08-2026: el sello decía «N citas contra corpus · 0 hallazgos» sin
+    // decir nunca qué tan de fiar es ese corpus. Esa semana se descubrió que
+    // 21 de las 26 normas guardadas tenían algún artículo con el nombre o el
+    // texto inventado: el sello llevaba meses certificando contra una lista
+    // que nadie había contrastado. Ahora lleva su propia hoja de vida, y si
+    // alguien agrega una norma sin verificar, el sello lo dice.
     grade='A'; gradeCls='a'; gradeTag='CITAS VERIFICADAS';
     gradeDet=(v.total_citas || 0)+' citas contra corpus · 0 hallazgos';
+    if(v.corpus && v.corpus.leyenda){
+      gradeDet += ' · ' + v.corpus.leyenda;
+      if(v.corpus.normas_sin_verificar > 0){
+        grade='B'; gradeCls='b'; gradeTag='CORPUS INCOMPLETO';
+      }
+    }
   } else if(altas === 0){
     grade='B'; gradeCls='b'; gradeTag='HALLAZGOS LEVES';
     gradeDet=issues.length+' hallazgo(s) leve(s) (sin severidad ALTA) en '+(v.total_citas || issues.length)+' citas';
@@ -21261,6 +21450,206 @@ function mkChart(id,type,labels,datasets,opts){
   charts[id]=new Chart(c,{type:type,data:{labels:labels,datasets:datasets},options:Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#374151',font:{size:12}}}}},opts||{})});
 }
 
+// ─── «MI DÍA» (26-08-2026) ────────────────────────────────────────────────
+// Tres columnas y nada más: responder lo que llegó, revisar lo que el motor
+// marcó y radicar lo que está listo. El reparto y el orden los hace el
+// servidor (/mi-dia); aquí solo se pinta.
+function _midiaPlazo(g){
+  if(g.dias_que_faltan === null || g.dias_que_faltan === undefined){
+    return '<span style="color:var(--text3)">sin plazo conocido</span>';
+  }
+  if(g.vencida){
+    return '<span style="color:var(--c-red);font-weight:700">vencida hace '
+      + Math.abs(g.dias_que_faltan) + ' d</span>';
+  }
+  var color = g.dias_que_faltan <= 3 ? 'var(--c-amber)' : 'var(--text2)';
+  var texto = 'faltan ' + g.dias_que_faltan + ' d';
+  if(g.plazo_sin_fecha) texto += ' (sin fecha, del contador)';
+  return '<span style="color:' + color + ';font-weight:600">' + texto + '</span>';
+}
+
+function _midiaPintarColumna(idCaja, idContador, col, vacio){
+  var caja = document.getElementById(idCaja);
+  var cont = document.getElementById(idContador);
+  if(!caja) return;
+  if(cont){
+    cont.textContent = (col && col.cantidad) ? col.cantidad : '';
+    cont.style.color = (col && col.vencidas > 0) ? 'var(--c-red)' : 'var(--text3)';
+  }
+  if(!col || !col.glosas || !col.glosas.length){
+    caja.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">'
+      + escHtml(vacio) + '</div>';
+    return;
+  }
+  var html = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">'
+    + col.cantidad + ' glosa(s) · ' + fmtCOP(col.valor)
+    + (col.vencidas > 0
+        ? ' · <span style="color:var(--c-red);font-weight:700">' + col.vencidas + ' vencida(s)</span>'
+        : '')
+    + '</div>';
+  col.glosas.forEach(function(g){
+    html += '<div style="padding:.5rem .6rem;border:1px solid var(--border);border-radius:8px;margin-bottom:.45rem;cursor:pointer;background:var(--bg-card)"'
+      + ' onclick="verGlosa(' + Number(g.id) + ')" title="Abrir la glosa">'
+      + '<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:baseline">'
+      +   '<strong style="font-size:.82rem">' + escHtml(g.factura || '(sin factura)') + '</strong>'
+      +   '<span style="font-size:.82rem;font-weight:700">' + fmtCOP(g.valor_objetado) + '</span>'
+      + '</div>'
+      + '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">'
+      +   escHtml(g.eps || '') + (g.codigo_glosa ? ' · ' + escHtml(g.codigo_glosa) : '')
+      + '</div>'
+      + '<div style="font-size:.72rem;margin-top:.25rem;display:flex;justify-content:space-between;gap:.5rem">'
+      +   '<span style="color:var(--text2)">' + escHtml(g.motivo || '') + '</span>'
+      +   _midiaPlazo(g)
+      + '</div>'
+      + '</div>';
+  });
+  if(col.hay_mas > 0){
+    html += '<div style="font-size:.72rem;color:var(--text3);text-align:center;padding:.3rem">'
+      + 'y ' + col.hay_mas + ' más — están en «Mis glosas»</div>';
+  }
+  caja.innerHTML = html;
+}
+
+async function cargarMiDia(){
+  ['midia-responder','midia-revisar','midia-radicar'].forEach(function(id){
+    var e = document.getElementById(id);
+    if(e) e.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">Cargando…</div>';
+  });
+  try{
+    var r = await fetch('/mi-dia', {headers: authH()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    _midiaPintarColumna('midia-responder','midia-n-responder', d.responder,
+                        'Nada por responder. Todo lo que llegó ya tiene respuesta escrita.');
+    _midiaPintarColumna('midia-revisar','midia-n-revisar', d.revisar,
+                        'El motor no marcó nada pendiente de revisar.');
+    _midiaPintarColumna('midia-radicar','midia-n-radicar', d.radicar,
+                        'Nada aprobado esperando el portal.');
+    var sub = document.getElementById('midia-sub');
+    if(sub){
+      sub.textContent = d.total_abiertas
+        ? (d.total_abiertas + ' glosa(s) abiertas · ' + fmtCOP(d.valor_en_riesgo) + ' en riesgo'
+           + (d.vencidas ? ' · ' + d.vencidas + ' vencida(s)' : ''))
+        : 'Sin glosas abiertas asignadas.';
+    }
+  }catch(e){
+    ['midia-responder','midia-revisar','midia-radicar'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.innerHTML = '<div style="padding:1rem;color:var(--c-red);font-size:.8rem;text-align:center">No se pudo cargar.</div>';
+    });
+    avisarNoCargo('«Mi día»', e);
+  }
+}
+
+// ─── TABLERO DE PLATA RECUPERADA (26-08-2026) ─────────────────────────────
+// Lo que pide la gerencia en una sola pantalla. Todo sale de /dashboard-
+// ejecutivo/plata-recuperada, que a su vez saca cada peso de una columna de
+// la base. Lo que no tiene dato NO se rellena: se avisa arriba, en amarillo.
+function _plataFila(celdas, esCabecera){
+  var tag = esCabecera ? 'th' : 'td';
+  var estilo = esCabecera
+    ? 'text-align:left;padding:.45rem .5rem;border-bottom:2px solid var(--border2);color:var(--text3);font-weight:700;white-space:nowrap'
+    : 'padding:.4rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap';
+  return '<tr>' + celdas.map(function(c, i){
+    var alin = (i === 0) ? '' : 'text-align:right;';
+    return '<' + tag + ' style="' + alin + estilo + '">' + c + '</' + tag + '>';
+  }).join('') + '</tr>';
+}
+
+function _plataPintarTabla(idTabla, filas, etiquetaPrimera, campoPrimera){
+  var t = document.getElementById(idTabla);
+  if(!t) return;
+  if(!filas || !filas.length){
+    t.innerHTML = '<tr><td style="padding:1rem;color:var(--text3);text-align:center">'
+      + 'No hay glosas en el periodo escogido.</td></tr>';
+    return;
+  }
+  var html = _plataFila([etiquetaPrimera, 'Glosas', 'Glosado', 'A tiempo', 'Tarde',
+                         'Levantado', 'Ratificado', 'Perdido', 'Sin decidir', '% levant.'], true);
+  filas.forEach(function(f){
+    html += _plataFila([
+      f[campoPrimera] || '—',
+      f.glosas,
+      fmtCOP(f.glosado),
+      fmtCOP(f.respondido_a_tiempo),
+      fmtCOP(f.respondido_tarde),
+      '<span style="color:var(--c-green);font-weight:700">' + fmtCOP(f.levantado) + '</span>',
+      fmtCOP(f.ratificado),
+      (f.perdido_por_vencimiento > 0
+        ? '<span style="color:var(--c-red);font-weight:700">' + fmtCOP(f.perdido_por_vencimiento) + '</span>'
+        : fmtCOP(0)),
+      fmtCOP(f.sin_decision),
+      (f.tasa_levantado_pct || 0).toFixed(1) + '%'
+    ], false);
+  });
+  t.innerHTML = html;
+}
+
+function _plataAvisarFaltantes(sd){
+  var caja = document.getElementById('plata-faltantes');
+  if(!caja) return;
+  var faltas = [];
+  if(sd && sd.levantadas_sin_valor > 0){
+    faltas.push(sd.levantadas_sin_valor + ' glosa(s) que la EPS levantó sin que nadie anotara '
+      + 'cuánta plata era — esa plata NO está sumada en «Levantado»');
+  }
+  if(sd && sd.sin_fecha_vencimiento > 0){
+    faltas.push(sd.sin_fecha_vencimiento + ' glosa(s) sin fecha de vencimiento — de esas no se '
+      + 'puede decir si se respondieron a tiempo');
+  }
+  if(sd && sd.sin_fecha_radicacion > 0){
+    faltas.push(sd.sin_fecha_radicacion + ' glosa(s) sin fecha de radicación registrada');
+  }
+  if(!faltas.length){ caja.style.display = 'none'; return; }
+  caja.style.display = 'block';
+  caja.innerHTML = '<strong>⚠ Lo que este tablero no puede afirmar:</strong><ul style="margin:.4rem 0 0 1.1rem">'
+    + faltas.map(function(f){ return '<li>' + f + '</li>'; }).join('') + '</ul>';
+}
+
+async function cargarPlata(){
+  var sel = document.getElementById('plata-meses');
+  var meses = sel ? sel.value : 6;
+  var kpis = ['plata-glosado','plata-levantado','plata-ratificado','plata-perdido',
+              'plata-sindec','plata-tasa'];
+  kpis.forEach(function(id){ var e = document.getElementById(id); if(e) e.textContent = '…'; });
+  try{
+    var r = await fetch('/dashboard-ejecutivo/plata-recuperada?meses=' + encodeURIComponent(meses),
+                        {headers: authH()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var t = d.total || {};
+    document.getElementById('plata-glosado').textContent = fmtCOP(t.glosado);
+    document.getElementById('plata-levantado').textContent = fmtCOP(t.levantado);
+    document.getElementById('plata-ratificado').textContent = fmtCOP(t.ratificado);
+    document.getElementById('plata-perdido').textContent = fmtCOP(t.perdido_por_vencimiento);
+    document.getElementById('plata-sindec').textContent = fmtCOP(t.sin_decision);
+    document.getElementById('plata-tasa').textContent = (t.tasa_levantado_pct || 0).toFixed(1) + '%';
+    _plataAvisarFaltantes(t.sin_dato);
+    _plataPintarTabla('plata-tabla-mes', d.meses, 'Mes', 'etiqueta');
+    _plataPintarTabla('plata-tabla-eps', d.eps, 'EPS', 'eps');
+    var nota = document.getElementById('plata-nota');
+    if(nota) nota.textContent = d.nota || '';
+    var meses_ = d.meses || [];
+    if(meses_.length && typeof mkChart === 'function'){
+      mkChart('ch-plata-mes','bar', meses_.map(function(m){ return m.etiqueta; }), [
+        {label:'Glosado', data: meses_.map(function(m){ return m.glosado; }),
+         backgroundColor:'rgba(107,114,128,.55)'},
+        {label:'Levantado', data: meses_.map(function(m){ return m.levantado; }),
+         backgroundColor:'rgba(22,163,74,.75)'},
+        {label:'Ratificado', data: meses_.map(function(m){ return m.ratificado; }),
+         backgroundColor:'rgba(234,88,12,.75)'},
+        {label:'Perdido por vencimiento', data: meses_.map(function(m){ return m.perdido_por_vencimiento; }),
+         backgroundColor:'rgba(198,40,40,.85)'}
+      ]);
+    }
+  }catch(e){
+    kpis.forEach(function(id){ var el = document.getElementById(id); if(el) el.textContent = '—'; });
+    _plataPintarTabla('plata-tabla-mes', [], 'Mes', 'etiqueta');
+    _plataPintarTabla('plata-tabla-eps', [], 'EPS', 'eps');
+    avisarNoCargo('el tablero de plata recuperada', e);
+  }
+}
+
 // ─── HISTORIAL ────────────────────────────────────────────────────────────
 function debounceHist(){
   clearTimeout(histDebounce);
@@ -23086,8 +23475,18 @@ async function registrarDecisionEPS(id){
   var decision=prompt('Decisión de la EPS:\nLEVANTADA (ganamos)\nACEPTADA (perdimos)\nRATIFICADA (va a conciliación)\nPENDIENTE');
   if(!decision)return;
   var valor=parseFloat(prompt('Valor recuperado ($):')||'0')||0;
+  // 26-08-2026 — cerrar el ciclo. Cuando la EPS nos da la razón, el gestor
+  // sabe POR QUÉ; sin esa frase el motor lleva un año escribiendo sin saber
+  // qué le funciona. Una sola pregunta, y se puede dejar en blanco.
+  var porQue='';
+  if(decision.toUpperCase()==='LEVANTADA'){
+    porQue=prompt('¿Cuál argumento la levantó?\n(Opcional — queda guardado con la plantilla '
+      +'para que el motor lo use primero la próxima vez con esta EPS y esta causal.)')||'';
+  }
   try{
-    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({decision_eps:decision.toUpperCase(),valor_recuperado:valor})});
+    var cuerpo={decision_eps:decision.toUpperCase(),valor_recuperado:valor};
+    if(porQue.trim())cuerpo.observacion_eps=porQue.trim();
+    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify(cuerpo)});
     var d=await r.json().catch(function(){return{};});
     toast(r.ok?'Decisión registrada':'Error',d.message||d.detail||('El servidor respondió '+r.status),r.ok?'success':'error');
     if(r.ok)loadHist(1);

@@ -8061,7 +8061,226 @@ hallazgo.
 
 ---
 
+### 26-08 (cierre) — Las doce ideas para el motor, implementadas
+
+Usted dijo «vamos a implementar todas las ideas». Quedaron **once de doce**. La
+que falta es la única que le dije que no recomendaba, y es decisión suya (está
+en PENDIENTE, abajo).
+
+**Lo que cambia lo que sale del motor**
+
+- **No deja marcar como listo lo que no tiene con qué probarse.** El motor ya
+  sabe qué soporte pide cada causal —SO0101 la epicrisis, AU0202 la
+  autorización, CL la historia— y si no está, lo dice en el propio dictamen. De
+  los 10 del último lote auditado, 9 afirmaban cosas de la historia clínica sin
+  un solo soporte adjunto.
+- **Un auditor de la EPS, antes de radicar.** Los defectos graves de agosto los
+  encontraron tres auditorías *después* de que los dictámenes salieran — y
+  todos habían salido con el sello «citas verificadas · 0 hallazgos». Por eso el
+  revisor nuevo se enciende justo ahí: cuando la revisión de citas no encontró
+  nada, un agente lee el dictamen como lo leería el auditor de la entidad y
+  responde «por dónde lo tumbaría yo». Los seis flancos que revisa salen de
+  fallas reales de este mes: cita que no dice lo que se le atribuye, afirmar lo
+  que no se probó, contradicción interna, código que no cruza, plazo al revés y
+  no contestar la causal.
+- **El sello dice contra qué se verificó.** Antes decía «citas verificadas · 0
+  hallazgos» a secas, y esta semana quedó demostrado que ese sello podía darse
+  el visto bueno a sí mismo. Ahora dice cuántas normas están contrastadas
+  contra fuente oficial y cuántas no.
+- **El CUPS lo trae de DGH.** El archivo de recepción no tiene columna de CUPS.
+  El motor ya no se lo inventa —eso era lo grave— pero así perdía el argumento
+  del código. Ahora, cuando el texto no lo trae, busca el que el propio DGH
+  tiene guardado para esa factura. No inventa: lee.
+
+**Lo que hace que el motor aprenda**
+
+- **Primero sale la plantilla que más plata ha recuperado**, no la más usada.
+  Se usó mucho no es lo mismo que funcionó.
+- **Al levantar una glosa se le hace una sola pregunta al gestor:** «¿cuál
+  argumento la levantó?». Esa frase queda pegada a la plantilla, que es la
+  mejor prueba que existe de qué sirve con esa EPS y esa causal. Se puede dejar
+  en blanco, y si se deja en blanco no se inventa nada.
+
+**Dos pantallas nuevas**
+
+- **«Plata recuperada»** (la ve coordinación). Cuánto se glosó y en qué
+  terminó, mes a mes y EPS por EPS: glosado, respondido a tiempo, respondido
+  tarde, levantado, ratificado, perdido por vencimiento y sin decidir. Es el
+  número que pide la gerencia. Había 32 pantallas y una sola gráfica en todo el
+  sistema.
+
+  **Lo que más importa de este tablero es lo que NO hace: no rellena.** Una
+  glosa que la EPS levantó y a la que nadie le anotó cuánta plata era, no se
+  cuenta por el valor objetado — se cuenta aparte y sale arriba, en amarillo,
+  diciendo que esa plata no está sumada. Lo mismo con las que no tienen fecha
+  de vencimiento (de esas no se puede decir si se respondieron a tiempo). Un
+  tablero que se inventa el relleno miente con más autoridad que uno que se
+  queda corto y lo dice.
+
+- **«Mi día»** (la ve cualquier gestor). Tres columnas y nada más: responder lo
+  que llegó, revisar lo que el motor marcó, radicar lo que está listo. Cada
+  glosa cae en una sola, y cada tarjeta dice en una línea por qué está ahí.
+  Primero lo que vence antes; a igualdad de días, lo de más plata. Las otras 32
+  pantallas siguen ahí para quien las necesite, pero dejan de ser el punto de
+  partida.
+
+  **Aquí también hay un «no se inventa»,** y salió escribiendo las pruebas: la
+  base guarda un contador de días que vale **cero por defecto**. Un cero sin
+  fecha de vencimiento puede querer decir «se venció» o «nadie le calculó el
+  plazo», y en la base se ven idénticos. No se escogió ninguno: esa glosa sale
+  como «sin plazo conocido» y se va al final de la columna, en vez de
+  disfrazarse de urgente y empujar hacia abajo lo que de verdad vence mañana.
+
+**Lo de todos los días**
+
+- **Buscar dentro de las tablas** (38 tablas, y para hallar una factura había
+  que pasar páginas — en un lote de 1.573 eso es inviable).
+- **Modo compacto**, que aprieta las filas para revisar doscientas seguidas y
+  se recuerda por usuario.
+- **Los avisos de «revisar antes de radicar» salen en rojo al imprimir**, para
+  que nadie los mande por accidente.
+- **Las pantallas de plata avisan cuando no cargan.** Catorce pantallas fallaban
+  en silencio: si el servidor no respondía, el auditor veía ceros y creía que
+  no había nada.
+
+**Dos cosas que se arreglaron por el camino, y las encontraron las pruebas, no
+yo:**
+
+1. El revisor nuevo iba a volver a revisar las citas por su cuenta, y lo habría
+   hecho **sin la evidencia** — un folio inventado le habría pasado de largo y
+   el contador habría quedado en cero por ignorancia, no por estar limpio. Una
+   prueba que ya existía lo señaló. Ahora lee la revisión que ya se hizo.
+2. Cuatro colores de la pantalla nueva no existían en la paleta: se habrían
+   pintado transparentes. Lo cazó la prueba que se escribió en su día por el
+   botón invisible del lote ADRES.
+
+**87 pruebas nuevas** en cinco archivos, con sus casos borde: factura en cero,
+EPS vacía, glosa vencida que la EPS ya levantó, respuesta de 5.000 caracteres,
+lista vacía, cero meses, cien meses.
+
+---
+
 ## 3) PENDIENTE
+
+### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
+
+Usted pidió verificar, corregir y completar las 16 normas que faltaban. Se
+hizo, con dieciséis revisores trabajando en paralelo y un segundo par de ojos
+que intentaba tumbar cada hallazgo antes de darlo por bueno.
+
+**El resultado, sin adornos: de los 20 artículos, los 20 estaban mal.** Y
+ninguno se cayó al intentar refutarlo.
+
+| Qué tenían | Cuántos |
+|---|---|
+| Título **y** texto inventados | 13 |
+| El texto cambiado | 3 |
+| El título cambiado | 2 |
+| El artículo **no existe** en esa norma | 2 |
+
+Tres ejemplos de lo que decía el motor:
+
+- **Decreto 1082**, artículo 2.2.1.2.1.4.4 — el motor lo daba como
+  «Contratación de prestadores de servicios de salud». Es «Convenios o
+  contratos interadministrativos», y el texto que le habían puesto sale de otro
+  decreto, el 1510 de 2013.
+- **Decreto 1795** (el del sistema de salud de las Fuerzas Militares), artículo
+  6 — figuraba como «Cobertura». Es «Principios y características».
+- **Resolución 4886 de 2018**, artículo 25 — esa resolución adopta la Política
+  Nacional de Salud Mental y **no tiene ese artículo**.
+
+Los 20 quedaron corregidos con el texto literal de la norma, los 2 que no
+existen se retiraron, y las 16 normas quedaron marcadas con la fuente contra la
+que se verificaron.
+
+**El corpus completo, al cierre: 26 normas, 47 artículos, cero pendientes.**
+
+Y quedó una prueba que impide que vuelva a pasar: si alguien agrega un artículo
+con su texto y no deja escrito contra qué fuente lo verificó, la prueba se pone
+roja y el cambio no entra.
+
+**El balance de la semana.** Sumando las tres auditorías: de las 26 normas del
+corpus, **veintiuna tenían al menos un artículo con el nombre o el texto
+inventado**. El motor llevaba meses citando derecho que no existe, con un sello
+que decía «citas verificadas» porque se contrastaba contra esa misma lista.
+
+### 26-08-2026 — Seis decisiones del área, aplicadas
+
+**El texto del Dispensario ya no generaliza: prueba el ítem.** Afirmaba que el
+servicio «se encuentra» entre los 7.141 ítems del Anexo 1 sin decir cuál. Ahora
+esa afirmación sale del texto fijo, y en su lugar el motor **busca el código en
+el catálogo del contrato** que usted cargó: si lo encuentra, lo nombra con su
+descripción y su valor pactado — eso es una prueba, no una generalización. Si
+no lo encuentra, no afirma nada.
+
+**El cómputo de días hábiles ya se ve.** El texto de glosa extemporánea decía
+«han transcurrido 77 días hábiles» sin mostrar una sola fecha. Ahora escribe
+entre qué dos fechas contó: la radicación de la factura y la notificación de la
+glosa. Si el conteo falla, se nota antes de radicar — y la entidad puede
+rehacerlo, que es lo que le da fuerza al argumento.
+
+**La cuenta de Edgar Silva se volvía a crear sola.** Los correos a
+`devoluciones1@` rebotaban y la cuenta buena es `carterahus02@`. Borrarla en la
+pantalla no servía de nada: **estaba sembrada en el código de arranque**, así
+que reaparecía en cada reinicio del motor. Ahí quedó corregida.
+
+**Los códigos con dos valores ahora se resuelven con la fórmula del contrato.**
+Eran 256 del Dispensario, 737 de Compensar y 737 de Positiva que no se cargaban
+porque el archivo traía el mismo código con precios distintos. Usted decidió:
+«el que mejor se ajuste a las tarifas pactadas». Ahora el motor toma el valor
+SOAT oficial del código, le aplica el descuento del contrato de esa entidad y
+escoge el que caiga sobre ese número. **No es «el más parecido»:** se exige que
+quede a menos del 2 % del esperado y que ningún otro quede igual de cerca. Si
+nada cuadra, el código se sigue omitiendo, como antes.
+
+**Y apareció una segunda lista de normas que nadie había mirado.** Aparte del
+corpus que alimenta a la IA, la pantalla de Consulta Normativa tiene su propia
+lista de 132 entradas. Al auditar los dictámenes salió que una estaba
+inventada: decía que el artículo 10 del Decreto 2423 de 1996 son «tarifas
+mínimas SOAT para urgencias», y verificado contra el PDF oficial de MinSalud
+ese artículo es **la nomenclatura de las intervenciones quirúrgicas de
+proctología**. Se reemplazó por el artículo 87, que sí es el de tarifas. **Las
+otras 131 siguen sin contrastar**, y quedó escrito en el archivo.
+
+**Nota sobre el archivo que subió.** El documento con los resultados de los 10
+casos de prueba resultó ser idéntico —byte por byte— al de la auditoría
+anterior. No trae los dictámenes nuevos: son los mismos, generados antes de las
+correcciones. Falta volver a enviarlo.
+
+### 26-08 — La única idea que falta, y es decisión suya
+
+De las doce ideas para el motor quedaron once hechas. La que falta es la **#12,
+unificar los dos vocabularios de color** de la página.
+
+Se lo dejo escrito tal como se lo dije: **no la recomiendo.** Conviven dos
+sistemas de color —el propio de la página (90 nombres, 2.072 usos) y el de
+`sinac-ds.css`, que se carga y casi nadie usa—. Unificarlos son **2.072 cambios
+sobre algo que funciona y sin ningún defecto visible que lo justifique**. Queda
+escrita para que exista la constancia, no porque valga la pena. Si usted me
+dice que sí, se hace.
+
+### ⭐ Lo primero, al cierre del 25-08
+
+Tres cosas, en este orden:
+
+1. **Correr los 10 casos de prueba en la pantalla del motor.** Están armados
+   para que cada uno pruebe algo concreto que se arregló ese día. Si el motor
+   pasa los diez, lo del 25 quedó funcionando de verdad en el hospital. Es lo
+   único que falta para dar el día por cerrado.
+2. **Dos decisiones del área**, las dos sobre textos institucionales que no se
+   tocan sin permiso:
+   - **La plantilla del Dispensario** afirma que el servicio «se encuentra»
+     entre los 7.141 ítems del Anexo 1, sin decir cuál ni verificarlo caso por
+     caso. Puede ser cierta en general y falsa en un caso puntual. ¿Se cambia
+     por una frase que no afirme lo que no se verificó?
+   - **El criterio de «aseguradora»** para las ratificaciones: hoy van al
+     análisis las compañías de seguros y las ARL, y conservan la plantilla las
+     EPS, el Dispensario, Sanidad Militar, la Policía y el Magisterio. Falta que
+     el área lo confirme o lo corrija.
+3. **Verificar el cómputo de días hábiles** antes de radicar una glosa como
+   extemporánea. El dictamen GL-130 afirma «77 días hábiles» y «ha operado de
+   pleno derecho la aceptación tácita» como hecho consumado. Si el conteo
+   falla, la causal original nunca quedó respondida.
 
 ### Folio ADRES del paquete 31068 (26-08, cierre)
 - **DECISIÓN SUYA: las cinco respuestas del Word «PARA_CORREGIR».** Se enviaron
@@ -8104,7 +8323,8 @@ hallazgo.
 - **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
   entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
   dejar `carterahus02@sinacsc.com`.
-- **Terminar de repasar la base normativa** — **las de uso diario ya están.**
+- ~~**Terminar de repasar la base normativa**~~ — **HECHO, completo.** 26
+  normas, 47 artículos, cero pendientes. (Antes decía:)
   12 normas verificadas contra fuente oficial (29 artículos): Decreto 4747,
   Decreto 780, Decreto 111, Decreto 2423, Ley 23, Ley 100, Ley 1122, Ley 1164,
   Ley 1438, Ley 1751, Resolución 1995 y Resolución 2284. **Quedan 16 normas con
@@ -8112,7 +8332,10 @@ hallazgo.
   Resolución 1885, entre otras). Se pueden hacer cuando haya un rato.
 
 ### Lo que quedó de la noche del 25-08
-- **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
+- ~~**Decisión suya: la plantilla de las ratificaciones**~~ — **RESUELTO** el
+  mismo día: el área decidió que las de aseguradora van al análisis y las demás
+  conservan la plantilla. Ya está implementado. (Se deja el texto de abajo
+  porque explica de dónde salió.) El segundo auditor
   señala que las 21 respuestas a glosas ratificadas usan el mismo texto y
   ninguna entra en el motivo concreto por el que la entidad ratificó. El texto
   lo pidió el área en abril y jurídicamente se sostiene, así que no se cambió
@@ -8126,14 +8349,11 @@ hallazgo.
   2016 es el primero de la lista.
 
 ### Del motor de glosas, al 25-08 (tarde)
-- **Reenviar el archivo de hoy con las columnas de IA.** Las 117 respuestas
-  salieron correctas, pero el Excel que llegó a los gestores salió **sin** las
-  columnas RESPUESTA IA / ESTADO IA. Vale la pena reenviarlo ya corregido.
-- **La cuenta repetida de Edgar Silva.** Los correos a `devoluciones1@sinacsc.com`
-  rebotan; el bueno es `carterahus02@sinacsc.com`. Hay que dejar una sola cuenta
-  en el motor.
-- **Que a las médicas les llegue lo suyo.** Ya quedó el nombre de la profesional
-  amarrado a la glosa; falta reenviar el lote de hoy para que les llegue.
+- ~~Reenviar el archivo con las columnas de IA~~ · ~~que a las médicas les
+  llegue lo suyo~~ — **HECHO**, confirmado por el área el 25-08 (noche).
+- ~~La cuenta repetida de Edgar Silva~~ — el área decidió: queda
+  `carterahus02@sinacsc.com`. Falta hacerlo en la pantalla de Usuarios; no es
+  tarea de código.
 - **Los CSV de «valores distintos»** de la carga de tarifas: 256 del
   Dispensario, 737 de Compensar y 737 de Positiva. Cada uno es un código con
   dos precios: hay que decidir cuál queda.
@@ -8143,7 +8363,8 @@ hallazgo.
   agregar la columna al archivo.
 
 ### Del frente COOSALUD (glosas y trámites), al 25-08
-- **Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573** (uno por uno,
+- ~~**Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573**~~ — HECHO,
+  confirmado por el área el 25-08. (Detalle original: uno por uno,
   por el tope de 300 facturas). Si alguno devuelve error, corregirlo con el bot
   CORREGIR ERRORES DGH y reintentar el archivo completo. Después van los
   trámites de ese lote.
@@ -8557,6 +8778,28 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Lo primero del motor (26-08, cierre de la noche):** volver a **desplegar y
+reiniciar** el motor en la PC de cartera. Lo que entra con este despliegue son
+las once ideas: el aviso de «falta el soporte», el auditor de la EPS antes de
+radicar, el sello honesto, el CUPS traído de DGH, la plantilla que más plata ha
+recuperado, la pregunta de «¿cuál argumento la levantó?», y las dos pantallas
+nuevas —**«Mi día»** y **«Plata recuperada»**—. Mientras no se reinicie, nada
+de eso se ve.
+
+**Lo primero de usted, después del reinicio:** entrar a **«Mi día»** (está en
+el menú, arriba, con el solcito). Es la pantalla con la que debería empezar el
+día el gestor. Si le sirve como está, se queda; si le falta algo, dígamelo y se
+ajusta.
+
+**Y decidir la idea #12** (unificar los dos vocabularios de color). Está
+explicada en PENDIENTE. Repito lo que le dije: son 2.072 cambios sobre algo que
+funciona y no la recomiendo. Solo se hace si usted lo pide.
+
+**Sigue faltando (de ayer):** volver a exportar los 10 casos de prueba. El
+documento que subió resultó idéntico —byte por byte— al de la auditoría
+anterior: son los dictámenes viejos, generados antes de las correcciones.
+
 
 **Folio ADRES — HAY QUE VOLVER A CORRER LOS TRES GESTORES (26-08 cierre 2).**
 Los 223 folios se armaron con el orden viejo del folio de la factura (el

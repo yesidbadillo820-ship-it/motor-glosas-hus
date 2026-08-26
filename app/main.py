@@ -1014,7 +1014,7 @@ async def lifespan(app: FastAPI):
             ("auditorhus02@sinacsc.com", "AUDITOR", "LEIDY JHOANA SANGUINO"),
             ("auditorhus03@sinacsc.com", "AUDITOR", "LEYDI ZULAY GONZALEZ"),
             ("devoluciones03@sinacsc.com", "AUDITOR", "JOHANNA MORENO"),
-            ("devoluciones1@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
+            ("carterahus02@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
             ("glosashus03@sinacsc.com", "AUDITOR", "OSCAR VILLAMIZAR"),
             # Pedido 03-08-2026: ELIAS con todos los permisos de admin.
             ("glosashus15@sinacsc.com", "SUPER_ADMIN", "ELIAS CARVAJAL"),
@@ -1607,6 +1607,7 @@ from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.mi_dia import router as mi_dia_router
 from app.api.routers.vida import router as vida_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
@@ -1677,6 +1678,7 @@ app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
+app.include_router(mi_dia_router)
 app.include_router(vida_router)  # Capa de Vida (ronda 32): saludo + celebraciones
 app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)

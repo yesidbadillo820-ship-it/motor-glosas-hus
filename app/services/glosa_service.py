@@ -3473,6 +3473,33 @@ def _neutralizar_placeholders_template(texto: str) -> str:
     return resultado
 
 
+# ── Los avisos del motor tienen que verse, sobre todo en papel ───────────
+# 26-08-2026. El motor le agrega al dictamen avisos como «⛔ NO RADICAR
+# TODAVÍA» o «⚠ REVISAR ANTES DE RADICAR». Viajan como texto plano a propósito,
+# para que las mallas los sigan leyendo. Pero el dictamen se radica impreso, y
+# un aviso que sale como un renglón más de texto no detiene a nadie.
+_PAT_AVISO_DEL_MOTOR = re.compile(
+    r"(⛔[^\n]*|⚠ REVISAR ANTES DE RADICAR[^\n]*)",
+    re.IGNORECASE,
+)
+
+
+def _resaltar_avisos(html: str) -> str:
+    """Envuelve los avisos del motor para que se vean en pantalla y en papel."""
+    if not html:
+        return html
+
+    def _sub(m: "re.Match[str]") -> str:
+        return (
+            '<div class="aviso-no-radicar" style="display:block;margin:10px 0;padding:10px 12px;'
+            "border:2px solid #dc2626;border-radius:6px;background:#fef2f2;color:#7f1d1d;"
+            "font-weight:700;font-size:12px;line-height:1.5;-webkit-print-color-adjust:exact;"
+            'print-color-adjust:exact;">' + m.group(1) + "</div>"
+        )
+
+    return _PAT_AVISO_DEL_MOTOR.sub(_sub, html)
+
+
 def _neutralizar_frases_absurdas(texto: str) -> str:
     """Elimina muletillas arrogantes sin valor legal del dictamen."""
     if not texto:
@@ -5354,8 +5381,8 @@ TEXTO_DMBUG_TARIFAS = (
     "CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025 "
     "(PROCESO CD477), CON PLAZO HASTA 30/07/2026, VIGENTE A LA FECHA DE "
     "PRESTACIÓN DE LOS SERVICIOS FACTURADOS, QUE EN SU CLÁUSULA SEGUNDA "
-    "– PARÁGRAFO 1 INCORPORA EL ANEXO No. 1 CON 7.141 ÍTEMS TARIFADOS, ENTRE "
-    "LOS CUALES SE ENCUENTRA LOS SERVICIOS FACTURADOS. LA AFIRMACIÓN DE "
+    "– PARÁGRAFO 1 INCORPORA EL ANEXO No. 1 CON 7.141 ÍTEMS TARIFADOS. "
+    "LA AFIRMACIÓN DE "
     "INEXISTENCIA DE CONTRATO ES INEXACTA. EL ARGUMENTO DE AGOTAMIENTO "
     "PRESUPUESTAL NO CONSTITUYE CAUSAL CONTRACTUAL NI LEGAL PARA SUSTITUIR "
     "UNILATERALMENTE LAS TARIFAS PACTADAS POR SOAT, EN VIRTUD DE LOS "
@@ -5374,6 +5401,95 @@ TEXTO_DMBUG_TARIFAS = (
     "RECONOCIMIENTO DEL VALOR PACTADO EN EL ANEXO No. 1 DEL CONTRATO "
     "440-DIGSA/DMBUG-2025."
 )
+
+
+def _cups_desde_dgh(numero_factura: str | None) -> tuple[str, str]:
+    """El CUPS real de la factura, leído de lo que DGH ya cargó.
+
+    26-08-2026, de las propuestas al motor. El archivo de recepción no trae
+    columna de CUPS: por eso el motor se lo inventaba, y por eso ahora —bien—
+    no escribe ninguno. Pero así la respuesta pierde el argumento del código:
+    no puede nombrar el servicio que defiende ni cruzarlo contra el catálogo
+    del contrato.
+
+    La tabla de conceptos SÍ tiene el CUPS y su descripción cuando la glosa
+    entró alguna vez por el importador de DGH. Si la factura está ahí, se toma
+    de ahí. Esto NO inventa nada: es el código que el propio DGH registró para
+    esa factura.
+
+    Devuelve (codigo, descripcion) o ("", "").
+    """
+    if not numero_factura:
+        return "", ""
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ConceptoRecord
+
+        db = SessionLocal()
+        try:
+            fila = (
+                db.query(ConceptoRecord)
+                .filter(ConceptoRecord.factura == str(numero_factura).strip())
+                .filter(ConceptoRecord.cups_codigo.isnot(None))
+                .filter(ConceptoRecord.cups_codigo != "")
+                .order_by(ConceptoRecord.valor_objetado.desc())
+                .first()
+            )
+            if not fila:
+                return "", ""
+            return (
+                str(fila.cups_codigo or "").strip(),
+                str(fila.cups_descripcion or "").strip(),
+            )
+        finally:
+            db.close()
+    except Exception as e:  # noqa: BLE001 — sin base no se inventa un código
+        logger.debug(f"[CUPS-DGH] no se pudo consultar: {e}")
+        return "", ""
+
+
+def _item_del_anexo_dmbug(cups: str | None) -> str:
+    """Devuelve la frase que nombra el ítem del Anexo 1, si se puede probar.
+
+    26-08-2026, decisión del área. La tercera auditoría señaló que el texto
+    canónico del Dispensario afirmaba que el servicio facturado «se encuentra»
+    entre los 7.141 ítems del Anexo 1 — sin decir cuál y sin verificarlo caso
+    por caso. Puede ser cierta en general y falsa en un caso puntual, y nadie
+    se entera hasta que la entidad lo revisa.
+
+    Yesid pidió que se cambiara y que «trae los servicios». Así queda: la
+    afirmación en bloque sale del texto fijo, y en su lugar el motor BUSCA el
+    código en el catálogo del contrato que el coordinador cargó. Si lo
+    encuentra, lo nombra con su descripción y su valor pactado — que es una
+    prueba, no una generalización. Si no lo encuentra, no se afirma nada.
+    """
+    if not cups:
+        return ""
+    try:
+        from app.database import SessionLocal
+        from app.services.tarifa_lookup_service import _buscar
+
+        db = SessionLocal()
+        try:
+            fila = _buscar(db, "DISPENSARIO MEDICO", str(cups))
+            if not fila:
+                return ""
+            desc = str(getattr(fila, "descripcion", "") or "").strip()
+            codigo = str(
+                getattr(fila, "codigo_cups", "") or getattr(fila, "codigo_ips", "") or cups
+            ).strip()
+            valor = getattr(fila, "valor", None) or getattr(fila, "valor_pactado", None)
+            frase = f" EL SERVICIO OBJETADO CORRESPONDE AL ÍTEM {codigo}"
+            if desc:
+                frase += f" ({desc.upper()})"
+            frase += " DEL ANEXO No. 1"
+            if valor:
+                frase += f", TARIFADO EN ${int(float(valor)):,}".replace(",", ".")
+            return frase + "."
+        finally:
+            db.close()
+    except Exception:  # sin base o sin catálogo no se afirma nada
+        return ""
 
 
 def _dmbug_cubierto_por_el_contrato(fecha_hecho) -> bool:
@@ -5859,18 +5975,34 @@ def limpiar_palabra_injustificado(texto: str, codigo_respuesta: str = "") -> str
     return out
 
 
-def generar_texto_extemporanea(dias: int) -> str:
+def generar_texto_extemporanea(dias: int, fecha_radicacion: str = "", fecha_glosa: str = "") -> str:
     """Texto FIJO canónico HUS para glosas extemporáneas (RE9502).
 
     Es IMPORTANTE que sea 100% fijo — no pasa por IA ni por suavizador —
     para (1) garantizar tono firme consistente y (2) no gastar tokens de
     IA en un caso cuyo argumento es mecánico. El suavizador también se
     salta cuando el `arg_limpio` coincide con esta plantilla.
+
+    26-08-2026 — AHORA MUESTRA EL CÓMPUTO. La tercera auditoría señaló que el
+    dictamen GL-130 afirmaba «han transcurrido 77 días hábiles» y que «ha
+    operado de pleno derecho la aceptación tácita» **sin mostrar una sola
+    fecha**. Si el conteo falla, la causal original nunca quedó respondida y
+    nadie tiene cómo notarlo: ni el gestor antes de radicar, ni la entidad
+    después.
+
+    Un plazo se prueba con sus dos extremos. Cuando el motor los tiene, los
+    escribe; el argumento no pierde fuerza — la gana, porque queda verificable.
     """
+    _computo = ""
+    if fecha_radicacion and fecha_glosa:
+        _computo = (
+            f", CONTADOS ENTRE LA RADICACIÓN DE LA FACTURA ({fecha_radicacion}) "
+            f"Y LA NOTIFICACIÓN DE LA GLOSA ({fecha_glosa})"
+        )
     return (
         "ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA. AL HABERSE SUPERADO EL PLAZO LEGAL DE "
         f"20 DÍAS HÁBILES ESTABLECIDO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 "
-        f"(HAN TRANSCURRIDO {dias} DÍAS HÁBILES) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA "
+        f"(HAN TRANSCURRIDO {dias} DÍAS HÁBILES{_computo}) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA "
         f"NOTIFICACIÓN FORMAL DE LAS OBJECIONES, HA OPERADO DE PLENO DERECHO EL FENÓMENO "
         f"JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO "
         f"DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER "
@@ -6464,7 +6596,11 @@ class GlosaService:
                 "usar la plantilla fija (decisión del área, 25-08-2026)."
             )
         elif es_extemporanea:
-            argumento_fijo = generar_texto_extemporanea(dias)
+            argumento_fijo = generar_texto_extemporanea(
+                dias,
+                str(getattr(data, "fecha_radicacion", "") or ""),
+                str(getattr(data, "fecha_recepcion", "") or ""),
+            )
             tipo_glosa = "EXTEMPORANEA"
         elif (
             es_tarifa
@@ -6492,6 +6628,26 @@ class GlosaService:
             # texto sobre agotamiento presupuestal — y encima por este
             # camino no pasa el Quality Gate, así que nadie lo detectó.
             argumento_fijo = TEXTO_DMBUG_TARIFAS
+            # 26-08-2026: si el catálogo del contrato tiene el código, se nombra
+            # el ítem con su descripción y su valor. Eso es una prueba; decir
+            # «está entre los 7.141» sin más era una generalización.
+            try:
+                _cups_dmbug = ""
+                try:
+                    from app.main import _extraer_cups_servicio as _extcups_dm
+
+                    _cups_dmbug = (_extcups_dm(texto_base, "") or ("", ""))[0] or ""
+                except Exception:
+                    _cups_dmbug = ""
+                _item = _item_del_anexo_dmbug(_cups_dmbug or None)
+                if _item:
+                    argumento_fijo = argumento_fijo.replace(
+                        "7.141 ÍTEMS TARIFADOS.",
+                        "7.141 ÍTEMS TARIFADOS." + _item,
+                    )
+                    logger.info(f"[DMBUG-ITEM] anexo probado con el ítem: {_item.strip()[:90]}")
+            except Exception as _e_it:
+                logger.debug(f"[DMBUG-ITEM] no se pudo nombrar el ítem: {_e_it}")
             tipo_glosa = "TA_DMBUG_FIJO"
         elif (
             es_tarifa
@@ -6904,6 +7060,20 @@ class GlosaService:
                         if not _cups_desc(_m2.group(1), texto_base):
                             cups_verificado = _m2.group(1)
                             break
+
+            # 26-08-2026 — RESPALDO: el CUPS que DGH ya registró para esta
+            # factura. El archivo de recepción no trae la columna, así que sin
+            # esto el dictamen se queda sin poder nombrar el servicio. No se
+            # inventa nada: es el código que el propio DGH tiene guardado.
+            if not cups_verificado:
+                _c_dgh, _d_dgh = _cups_desde_dgh(str(getattr(data, "numero_factura", "") or ""))
+                if _c_dgh:
+                    cups_verificado = _c_dgh
+                    logger.info(
+                        f"[CUPS-DGH] factura {data.numero_factura}: el texto no traía CUPS; "
+                        f"se tomó {_c_dgh} de lo que DGH registró"
+                        + (f" ({_d_dgh[:60]})" if _d_dgh else "")
+                    )
 
             # Extraer valor facturado/pactado de info_tarifa cuando esté
             # disponible. Es la única forma fiable de distinguir el
@@ -8890,6 +9060,70 @@ class GlosaService:
             except Exception as _e_psi:
                 logger.debug(f"[PAGADOR-SIN-IDENTIFICAR] aviso no aplicado: {_e_psi}")
 
+            # 26-08-2026 — NO RADICAR SIN EL SOPORTE DE LA CAUSAL.
+            # Nueve de cada diez dictámenes del lote del 25 afirmaban cosas de
+            # la historia clínica sin un solo soporte anexo. El aviso existía
+            # pero era genérico; ahora dice QUÉ falta y por qué importa en este
+            # caso concreto, que es lo que hace que no se ignore.
+            try:
+                _faltan = self._falta_el_soporte_de_la_causal(
+                    str(getattr(data, "numero_factura", "") or ""), str(codigo_det or "")
+                )
+                if _faltan:
+                    _lista = _faltan[0] if len(_faltan) == 1 else " o ".join(_faltan)
+                    logger.warning(
+                        f"[FALTA-SOPORTE] {codigo_det}: no está {_lista} en el expediente "
+                        "— el dictamen se marcó como NO listo para radicar."
+                    )
+                    dictamen = dictamen.rstrip() + (
+                        f"\n\n⛔ NO RADICAR TODAVÍA: para responder una glosa {codigo_det} "
+                        f"hace falta {_lista}, y no aparece en el expediente de la factura. "
+                        "Este documento argumenta, pero no prueba: anexe el soporte antes "
+                        "de radicarlo o la entidad ratifica la glosa."
+                    )
+            except Exception as _e_fs:
+                logger.debug(f"[FALTA-SOPORTE] aviso no aplicado: {_e_fs}")
+
+            # 26-08-2026 — EL AUDITOR DE LA EPS, ANTES DE RADICAR.
+            # Se enchufa donde de verdad hace falta: cuando el revisor de citas
+            # NO encontró nada. Ese es justo el caso que quemó esta semana —
+            # tres auditorías destaparon defectos graves en dictámenes que
+            # habían salido con el sello «citas verificadas · 0 hallazgos».
+            # Cuando el revisor SÍ marca algo, el gestor ya tiene qué mirar y
+            # este recordatorio sobraría.
+            try:
+                # El sello que va a ver el auditor ya está calculado más
+                # arriba (`verif_citas`), y se calculó CON la evidencia leída.
+                # Se lee ese mismo resultado en vez de volver a revisar: si se
+                # revisara otra vez aquí, sería sin evidencia — y un folio
+                # inventado no se vería. Si el revisor no pudo correr,
+                # `verif_citas` es None y no se promete nada.
+                _hallazgos_previos = (
+                    len(verif_citas.get("issues") or []) if isinstance(verif_citas, dict) else -1
+                )
+                if _hallazgos_previos == 0:
+                    from app.services.multi_agente import agente_auditor_eps
+
+                    _adv = agente_auditor_eps(dictamen, str(codigo_det or ""), str(data.eps or ""))
+                    _fl = _adv.get("flancos") or []
+                    if _fl:
+                        _lineas = "\n".join(
+                            f"   · {x['flanco']}: {x['como_lo_tumbaria']}" for x in _fl[:6]
+                        )
+                        dictamen = dictamen.rstrip() + (
+                            "\n\n⚠ ANTES DE RADICAR, LÉALO COMO EL AUDITOR DE LA ENTIDAD. "
+                            "La revisión automática de citas no encontró nada, y eso no basta: "
+                            "los defectos graves de agosto salieron en dictámenes con ese mismo "
+                            "sello. Estos son los flancos por los que la entidad lo tumbaría:\n"
+                            + _lineas
+                        )
+                        logger.info(
+                            f"[AUDITOR-EPS] {codigo_det}: {len(_fl)} flanco(s) señalados "
+                            "(el revisor de citas no había encontrado nada)."
+                        )
+            except Exception as _e_ae:
+                logger.debug(f"[AUDITOR-EPS] no se aplicó: {_e_ae}")
+
             try:
                 _dictamen_con_de = _reponer_preposicion_comida(dictamen)
                 if _dictamen_con_de != dictamen:
@@ -10153,6 +10387,53 @@ class GlosaService:
         ),
     }
 
+    def _falta_el_soporte_de_la_causal(
+        self, numero_factura: Optional[str], codigo_glosa: str
+    ) -> list[str]:
+        """Los soportes que esa causal necesita y que NO están en el expediente.
+
+        26-08-2026. El aviso de soportes era genérico —«no se encontró el
+        expediente»— y por eso se ignoraba: no decía qué faltaba ni por qué
+        importaba en ESE caso. Nueve de cada diez dictámenes del lote del 25
+        salieron así.
+
+        Ahora se compara lo que pide la causal (catalogo_glosas) contra lo que
+        el indexador encontró de verdad, y se nombra lo que falta. Un dictamen
+        de SO0101 sin epicrisis no es un dictamen: la glosa dice justamente que
+        la epicrisis no soporta la estancia.
+        """
+        if not numero_factura or not codigo_glosa:
+            return []
+        try:
+            from app.services.catalogo_glosas import soportes_que_pide
+
+            pedidos = soportes_que_pide(codigo_glosa)
+            if not pedidos:
+                return []
+            from app.services.soportes_autodiscovery_service import get_indexer
+
+            hallados = {
+                str((s or {}).get("tipo") or "").strip().lower()
+                for s in (get_indexer().lookup(numero_factura) or [])
+            }
+            # Basta con UNO de los soportes que sirven para la causal: la
+            # epicrisis y la hoja de urgencias prueban lo mismo según el caso.
+            if hallados & set(pedidos):
+                return []
+            nombres = {
+                "historia_clinica": "la historia clínica",
+                "epicrisis": "la epicrisis",
+                "hoja_atencion_urgencias": "la hoja de atención de urgencias",
+                "hoja_administracion_medicamentos": "la hoja de administración de medicamentos",
+                "factura_electronica": "la factura electrónica",
+                "rips": "los RIPS",
+                "cuv": "el CUV",
+            }
+            return [nombres.get(p, p) for p in pedidos]
+        except Exception as e:  # noqa: BLE001 — sin índice no se acusa
+            logger.debug(f"[SOPORTE-DE-LA-CAUSAL] no se pudo revisar: {e}")
+            return []
+
     def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:
         """La relación de soportes de la factura, leída del expediente real.
 
@@ -10248,6 +10529,12 @@ class GlosaService:
         # refinado. Antes dependía de que el modelo obedeciera y salía
         # mezclado (05-08-2026, pedido de Yesid).
         argumento = a_mayusculas_html(argumento)
+        # 26-08-2026: los avisos que el motor le agrega al dictamen viajan como
+        # texto plano para que las mallas puedan seguir leyéndolos. Acá, en el
+        # último paso, se envuelven para que SE VEAN — y sobre todo para que se
+        # vean al imprimir. El dictamen se radica en papel o PDF, y un aviso de
+        # «no radicar» que sale como un renglón más de texto no lo detiene nadie.
+        argumento = _resaltar_avisos(argumento)
         servicio = a_mayusculas_html(servicio) if servicio else servicio
         contrato = a_mayusculas_html(contrato) if contrato else contrato
         tarifa = a_mayusculas_html(tarifa) if tarifa else tarifa
