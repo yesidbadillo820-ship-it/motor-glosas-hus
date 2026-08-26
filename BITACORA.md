@@ -213,6 +213,75 @@ el share se caía un momento, la corrida entera se tumbaba y las otras 323
 facturas quedaban sin folio. Ahora esa factura se salta, queda marcada con el
 motivo en el reporte, y las demás siguen.
 
+### 25-08-2026 (cierre 4) — La malla que se desactivaba a sí misma
+
+Llegó una **tercera** auditoría independiente, sobre 10 dictámenes nuevos. Trae
+buenas noticias y una lección incómoda.
+
+**Lo que el auditor confirma que ya quedó bien:** el artículo 23 del Decreto
+4747 se cita correctamente, y el artículo 11 se usa para lo que de verdad dice
+(verificación de derechos) en vez de con la cita fabricada de urgencias.
+
+**El hallazgo de fondo.** El auditor señaló que un dictamen decía «la Ley
+1438/2011 Art. 57 impone que la carga de la prueba recae en la EPS». Se
+verificó contra **dos fuentes oficiales** —el normograma de la SuperSalud y el
+Senado de la República—: el artículo 57 trata de plazos y no menciona la carga
+de la prueba.
+
+Lo grave no fue la cita. **El motor ya tenía la defensa para esto** y la dejó
+pasar por tres agujeros encadenados:
+
+1. El verbo «IMPONE» no estaba en la lista de verbos que la malla reconoce, así
+   que ni siquiera enganchaba la frase.
+2. Ninguno de los tres patrones aceptaba la abreviatura «ART.» — exigían la
+   palabra «ARTÍCULO» completa, y «ART.» es como lo escriben los dictámenes.
+3. Y el peor: la función que trae «el texto real del artículo» devolvía también
+   **nuestro propio comentario** sobre cómo usarlo. Al artículo 57 se le había
+   puesto una nota que dice «NO le atribuya la carga de la prueba: el artículo
+   no la menciona» — y esa nota hacía que la malla encontrara la frase en lo que
+   creía ser el texto legal y diera por buena justo la atribución que la nota
+   prohibía. **La advertencia se desactivaba a sí misma.**
+
+Es la misma autocertificación de toda la jornada, en su versión más incómoda.
+Los tres agujeros quedaron cerrados y el motor ya caza ese caso solo.
+
+**Cuatro cosas más en un solo dictamen**, todas verificadas contra el PDF
+oficial de MinSalud:
+
+| Lo que decía | Lo cierto |
+|---|---|
+| «el Art. 57 fija diez (10) días para responder» | son **quince (15)**; los diez son para que la entidad decida |
+| «Res. 2284 art. 4, que otorga autorización por silencio administrativo» | el art. 4 es «Manual Único» y la resolución no menciona esa figura |
+| «la cláusula antirebatimiento del contrato» | y la ficha del mismo dictamen decía «SIN CONTRATO PACTADO» |
+| «la tarifa SOAT pleno exime de autorización previa» | la tarifa dice cuánto se paga, no si hacía falta autorizar |
+
+El primero es el más peligroso: **decirle a la entidad que nuestro plazo es más
+corto de lo que es le regala el argumento de extemporaneidad contra el propio
+hospital**. Salía de que el corpus tenía los plazos en una lista aparte,
+desconectados del texto del artículo. Ya lleva el literal con sus números.
+
+**Un error propio, del mismo día.** En la mañana se reescribió la alerta de
+vencimientos y se puso, entre comillas y atribuida al artículo 57, la frase «si
+los prestadores no contestan en el plazo señalado, se entenderá aceptada la
+glosa». Esa frase **no está** en el artículo. La consecuencia sí es real, pero
+viene del código **RE2202** del Manual Único (Res. 2284 de 2023). La alerta ya
+cita cada cosa con su norma.
+
+**Y un defecto viejo que salió de rebote:** buscar «Ley 1438» en Consulta
+Normativa nunca funcionó — el patrón exigía un espacio después del número, así
+que caía al camino de palabras clave y la ley podía no aparecer entre las
+primeras. Corregido para las cinco formas (ley, resolución, decreto, circular,
+sentencia).
+
+**Lo que se agregó por lo que señaló el auditor:** cuando el dictamen sale sin
+saber quién es la entidad pagadora («OTRA / SIN DEFINIR»), ahora baja marcado
+— sin saber quién es no se puede afirmar qué contrato rige ni qué tarifa se
+pactó.
+
+**Queda una decisión suya:** la plantilla del Dispensario afirma que el servicio
+«se encuentra» entre los 7.141 ítems del Anexo 1 sin decir cuál. Puede ser
+cierta en general y falsa en un caso puntual. No se tocó, porque es texto
+institucional del área.
 
 ### 25-08-2026 (cierre 3) — El repaso normativo: otros cuatro artículos mal, y un argumento que estábamos regalando
 

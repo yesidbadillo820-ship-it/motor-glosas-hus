@@ -1130,6 +1130,41 @@ _PATRONES_FRASES_ABSURDAS: tuple[re.Pattern[str], ...] = (
         r"CL[ÁA]USULA\s+\d{1,3}\s*[-—–]\s*ANTI[-‐\s]?REBATIMIENTO[^\.\n]{0,160}[\.\s]*",
         re.IGNORECASE,
     ),
+    # 25-08-2026 (3.ª auditoría, GL-131). El patrón de arriba exigía número y
+    # guion («CLÁUSULA 7 — ANTI-REBATIMIENTO»). El dictamen escribió «LA
+    # CLÁUSULA ANTIREBATIMIENTO DEL CONTRATO ESTABLECE QUE CUALQUIER
+    # IMPUGNACIÓN SIN FUNDAMENTO SERÁ IMPROCEDENTE» — sin número, sin guion y
+    # todo junto. Y en el mismo dictamen la ficha decía «SIN CONTRATO
+    # PACTADO»: se invocaba una cláusula de un contrato que no existe.
+    re.compile(
+        r"(?:LA\s+|SEG[ÚU]N\s+LA\s+|CONFORME\s+A\s+LA\s+)?"
+        r"CL[ÁA]USULA\s+ANTI[-‐\s]?REBATIMIENTO[^\.\n]{0,180}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    # 25-08-2026 (GL-131): «LA RESOLUCIÓN 2284 DE 2023, ARTÍCULO 4, QUE OTORGA
+    # AUTORIZACIÓN POR SILENCIO ADMINISTRATIVO». Verificado contra el PDF
+    # oficial de MinSalud: el artículo 4 es «Manual Único de Devoluciones,
+    # Glosas y Respuestas» y la resolución NO menciona el silencio
+    # administrativo ni una sola vez. La figura no existe para autorizaciones
+    # en el SGSSS — la regla 8.undecies del prompt ya lo prohibía, pero era
+    # solo una instrucción.
+    re.compile(
+        r"[^\.\n]{0,90}(?:AUTORIZACI[ÓO]N|APROBACI[ÓO]N)\s+POR\s+SILENCIO"
+        r"(?:\s+ADMINISTRATIVO|\s+POSITIVO)?[^\.\n]{0,140}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"[^\.\n]{0,90}OTORGA\s+(?:LA\s+)?AUTORIZACI[ÓO]N\s+POR\s+SILENCIO[^\.\n]{0,140}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    # 25-08-2026 (GL-131): «LA TARIFA SOAT PLENO EXIME DE AUTORIZACIÓN PREVIA».
+    # No existe tal regla: la tarifa dice cuánto se paga, no si hacía falta
+    # autorizar. Lo que sí exime de autorización previa es la URGENCIA
+    # (Art. 168 Ley 100), y eso es otra cosa.
+    re.compile(
+        r"[^\.\n]{0,70}(?:LA\s+)?TARIFA\s+SOAT[^\.\n]{0,40}EXIME[^\.\n]{0,120}[\.\s]*",
+        re.IGNORECASE,
+    ),
     # ── 25-08-2026: AMENAZAS AL PAGADOR ──────────────────────────────
     # La regla 8.decies del prompt ya las prohíbe, pero era solo una
     # instrucción: en los dictámenes GL-118 y GL-119 la IA amenazó igual.
@@ -8831,6 +8866,29 @@ class GlosaService:
                     dictamen = _dictamen_avisado
             except Exception as _e_cf2:
                 logger.debug(f"[CONTESTA-LA-FORMA] aviso no aplicado: {_e_cf2}")
+
+            # 25-08-2026 (3.ª auditoría, GL-129) — AVISO: no sabemos a quién le
+            # estamos respondiendo. El dictamen salió con la entidad pagadora
+            # en «OTRA / SIN DEFINIR» y aun así construyó una defensa normativa
+            # específica. Sin saber el pagador no se puede afirmar qué contrato
+            # rige, qué tarifa se pactó ni qué régimen aplica — y el gestor no
+            # tiene cómo notarlo si el dictamen se lee bien redactado.
+            try:
+                _eps_final = str(getattr(data, "eps", "") or "").upper().strip()
+                if _eps_final in ("", "OTRA", "SIN DEFINIR", "OTRA / SIN DEFINIR"):
+                    if "NO SE IDENTIFICÓ LA ENTIDAD PAGADORA" not in dictamen:
+                        logger.warning(
+                            "[PAGADOR-SIN-IDENTIFICAR] el dictamen se generó sin saber la "
+                            "entidad pagadora — se marcó para revisión del gestor."
+                        )
+                        dictamen = dictamen.rstrip() + (
+                            "\n\n⚠ REVISAR ANTES DE RADICAR: NO SE IDENTIFICÓ LA ENTIDAD "
+                            "PAGADORA (quedó como «OTRA / SIN DEFINIR»). Sin saber quién "
+                            "es, no se puede afirmar qué contrato rige ni qué tarifa se "
+                            "pactó: confirme la entidad antes de radicar."
+                        )
+            except Exception as _e_psi:
+                logger.debug(f"[PAGADOR-SIN-IDENTIFICAR] aviso no aplicado: {_e_psi}")
 
             try:
                 _dictamen_con_de = _reponer_preposicion_comida(dictamen)

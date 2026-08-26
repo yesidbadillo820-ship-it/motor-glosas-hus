@@ -100,3 +100,47 @@ class TestNoSeLlevaLoLegitimo:
             "LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LO FACTURADO."
         )
         assert _neutralizar_frases_absurdas(texto) == texto
+
+
+class TestReglasInventadasDelGL131:
+    """Tercera auditoria, 25-08-2026. El dictamen GL-131 invoco tres cosas que
+    no existen — y la ficha del mismo dictamen decia «SIN CONTRATO PACTADO».
+
+    Las tres se verificaron contra el PDF oficial de MinSalud de la Resolucion
+    2284 de 2023: su articulo 4 es «Manual Unico de Devoluciones, Glosas y
+    Respuestas» y la resolucion no menciona el silencio administrativo ni una
+    sola vez.
+    """
+
+    def test_la_clausula_antirebatimiento_sin_numero(self):
+        """El patrón anterior exigía «CLÁUSULA 7 — ANTI-REBATIMIENTO», con
+        número y guion. El dictamen la escribió sin número y todo junto."""
+        texto = (
+            "ADEMÁS, LA CLÁUSULA ANTIREBATIMIENTO DEL CONTRATO ESTABLECE QUE CUALQUIER "
+            "IMPUGNACIÓN SIN FUNDAMENTO SERÁ IMPROCEDENTE. SE SOLICITA EL LEVANTAMIENTO."
+        )
+        salida = _neutralizar_frases_absurdas(texto)
+        assert "ANTIREBATIMIENTO" not in salida.upper()
+        assert "SE SOLICITA EL LEVANTAMIENTO" in salida
+
+    def test_la_autorizacion_por_silencio_administrativo(self):
+        texto = (
+            "LA RESOLUCIÓN 2284 DE 2023, ARTÍCULO 4, QUE OTORGA AUTORIZACIÓN POR "
+            "SILENCIO ADMINISTRATIVO. SE SOLICITA EL LEVANTAMIENTO."
+        )
+        salida = _neutralizar_frases_absurdas(texto)
+        assert "SILENCIO ADMINISTRATIVO" not in salida.upper()
+
+    def test_la_tarifa_soat_no_exime_de_autorizacion(self):
+        """La tarifa dice CUÁNTO se paga, no si hacía falta autorizar. Lo que
+        exime de autorización previa es la urgencia (Art. 168 Ley 100)."""
+        texto = "LA TARIFA SOAT PLENO EXIME DE AUTORIZACIÓN PREVIA, CONFORME A LA NORMATIVA."
+        salida = _neutralizar_frases_absurdas(texto)
+        assert "EXIME" not in salida.upper()
+
+    def test_no_toca_la_urgencia_que_si_exime(self):
+        texto = (
+            "LA ATENCIÓN INICIAL DE URGENCIAS NO REQUIERE AUTORIZACIÓN PREVIA "
+            "(ART. 168 LEY 100 DE 1993)."
+        )
+        assert _neutralizar_frases_absurdas(texto) == texto
