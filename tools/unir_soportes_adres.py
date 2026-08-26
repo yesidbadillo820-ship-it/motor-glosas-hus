@@ -1,47 +1,73 @@
-"""unir_soportes_adres.py — un solo PDF de soportes por factura, en el orden del ADRES.
+"""unir_soportes_adres.py — los dos folios de cada factura del ADRES.
 
-En la carpeta de cada factura los soportes están sueltos: la respuesta a la
-glosa, la epicrisis, la historia clínica, las ayudas diagnósticas, los
-medicamentos… Este bot los **une en un solo PDF**, y los pone en el **orden
-exacto** que pide el área:
+En la carpeta de cada factura los soportes están sueltos y con el nombre con
+que salieron del sistema. Este bot los **numera** y los **une en los dos folios**
+que pide el ADRES, con el nombre con que hay que subirlos:
+
+    📁 HUS352904
+        1 RESPUESTA A GLOSA.pdf   (era RTA_ADRES_HUS352904.pdf)
+        2 EPICRISIS.pdf           (era 680010079201_HUS352904_EPICRIS.pdf)
+        3 HISTORIA CLINICA.pdf    (era HC.pdf)
+        4 AYUDAS DIAGNOSTICAS.pdf (era DX.pdf)
+        5 OTROS.pdf
+        ────────────────────────► 680010079201_HUS352904_EPICRIS.pdf
+
+        1 FACTURA.pdf             (era 680010079201_HUS352904_FACTURA.pdf)
+        2 DETALLADO.pdf           (el detallado en Excel, pasado a PDF)
+        3 REPRESENTACION GRAFICA DIAN.pdf
+        4 NOTAS CREDITO.pdf       (PENDIENTE: todavía no las han sacado)
+        ────────────────────────► 680010079201_HUS352904_FACTURA.pdf
+
+Numerar primero no es adorno: es lo que **deja libre el nombre del folio**,
+porque ese nombre es justo el que traían la epicrisis y la factura antes de
+renombrarlas.
+
+EL ORDEN DEL FOLIO CLÍNICO es el de la hoja del área:
 
     1. RESPUESTA A GLOSA          6. NOTAS DE ENFERMERÍA
     2. EPICRISIS                  7. INSUMOS
     3. HISTORIA CLÍNICA           8. OTROS
-       (consulta de urgencias,    9. DETALLADO (queda en Excel, aparte:
-        terapias, curaciones,        NO entra al PDF unido)
+       (consulta de urgencias,
+        terapias, curaciones,
         evoluciones, procedimientos)
     4. AYUDAS DIAGNÓSTICAS
     5. MEDICAMENTOS
 
-Dentro de la HISTORIA CLÍNICA se respeta el orden de las cinco subcarpetas de
-la lista; dentro de cada grupo, los archivos van en orden natural de nombre
-(2 antes que 10).
+LAS NOTAS CRÉDITO quedan pendientes a propósito: son las de los valores
+aceptados y todavía no existen. El bot avisa cuántas faltan; cuando lleguen se
+vuelve a correr y entran solas de cuartas, sin rehacer nada.
 
 CÓMO SABE DE QUÉ ES CADA PDF. Por el **nombre del archivo**: busca las palabras
 con que el equipo los nombra (EPICRISIS, URGENCIAS, TERAPIA, CURACION,
-EVOLUCION, MEDICAMENTOS, ENFERMERIA, INSUMOS…) y las abreviaturas que usa el
-auditor (EPI, HC, DX, MED, NTE, INS). Lo que no reconoce **no se pierde**: va al
-grupo OTROS y sale listado en el reporte para que el auditor lo revise.
+EVOLUCION, MEDICAMENTOS, ENFERMERIA, INSUMOS, FACTURA, DETALLADO…) y las
+abreviaturas que usa el auditor (EPI, HC, DX, MED, NTE, INS). Lo que no reconoce
+**no se pierde**: va al grupo OTROS y sale listado en el reporte para que el
+auditor lo revise. Las palabras se pueden cambiar sin tocar el código, con
+`--mapa-nombres`.
 
-Las palabras se pueden cambiar sin tocar el código, con `--mapa-nombres`.
-
-SIMULA POR DEFECTO. Unir soportes no se deshace de un clic, así que el bot
-primero **muestra qué haría** —qué archivo va en qué grupo y en qué orden— y no
-escribe nada mientras no se le pase `--aplicar`. El PDF unido queda como
-`<FACTURA>_SOPORTES.pdf` dentro de la carpeta de la factura, y nunca se toma a
-sí mismo como entrada, así que se puede correr las veces que haga falta.
+SIMULA POR DEFECTO. Armar folios no se deshace de un clic, así que el bot
+primero **muestra qué haría** y no escribe nada mientras no se le pase
+`--aplicar`. Nunca se toma a sí mismo como entrada, así que se puede correr las
+veces que haga falta.
 
 USO (Windows):
 
-    REM 1) PRIMERO en simulación: muestra el orden y no toca nada.
-    py tools\\unir_soportes_adres.py --carpeta "Z:\\...\\TECNICOS\\CAROLINA"
+    REM 1) PRIMERO en simulación: muestra los dos folios y no toca nada.
+    py tools\\unir_soportes_adres.py --folio ^
+        --carpeta "Z:\\...\\TECNICOS\\CAROLINA" ^
+        --carpeta-facturas "Z:\\...\\4.FACTURAS CON XML\\XML"
 
-    REM 2) Si el listado se ve bien, con --aplicar sí une.
-    py tools\\unir_soportes_adres.py --carpeta "Z:\\...\\TECNICOS\\CAROLINA" --aplicar
+    REM 2) Si el listado se ve bien, con --aplicar sí arma los folios.
+    py tools\\unir_soportes_adres.py --folio ^
+        --carpeta "Z:\\...\\TECNICOS\\CAROLINA" ^
+        --carpeta-facturas "Z:\\...\\4.FACTURAS CON XML\\XML" ^
+        --convertir-detallado --aplicar --reporte-csv "C:\\temp-rtas\\folios.csv"
 
-    REM Con la lista de facturas a trabajar (columna con HUS...):
-    py tools\\unir_soportes_adres.py --carpeta "Z:\\..." --facturas "facturas.xlsx" --aplicar
+    REM Solo numerar los soportes, sin unir nada:
+    py tools\\unir_soportes_adres.py --carpeta "Z:\\..." --renombrar --aplicar
+
+    REM El consolidado viejo de un solo PDF (<FACTURA>_SOPORTES.pdf):
+    py tools\\unir_soportes_adres.py --carpeta "Z:\\..." --aplicar
 
 INSTALACIÓN (una vez):
 
@@ -55,6 +81,7 @@ import csv
 import json
 import logging
 import re
+import shutil
 import sys
 import unicodedata
 from dataclasses import dataclass, field
@@ -69,8 +96,17 @@ logger = logging.getLogger("unir_soportes_adres")
 
 SUFIJO_UNIDO = "_SOPORTES"
 
+# Los DOS folios de cada factura, con el nombre que les pone el ADRES:
+#   <NIT>_<FACTURA>_EPICRIS.pdf → la respuesta a glosa y la historia clínica
+#   <NIT>_<FACTURA>_FACTURA.pdf → la factura y su soporte contable
+SUFIJO_EPICRIS = "_EPICRIS"
+SUFIJO_FACTURA = "_FACTURA"
 
-# ─── Los nueve grupos, en el orden que pide el área ──────────────────────────
+FOLIO_EPICRIS = "EPICRIS"
+FOLIO_FACTURA = "FACTURA"
+
+
+# ─── Los grupos del folio clínico, en el orden que pide el área ──────────────
 
 
 @dataclass(frozen=True)
@@ -81,6 +117,7 @@ class Grupo:
     clave: str
     titulo: str
     palabras: tuple[str, ...]
+    folio: str = FOLIO_EPICRIS
 
 
 # El orden de esta tupla ES el orden del PDF. Las palabras se comparan sin
@@ -193,7 +230,52 @@ GRUPOS: tuple[Grupo, ...] = (
 )
 GRUPO_OTROS = next(g for g in GRUPOS if g.clave == "OTROS")
 
-# El detallado NO entra al PDF: la lista lo pide en Excel, aparte.
+
+# ─── El folio de la FACTURA, con su propio orden adentro ─────────────────────
+
+# El segundo folio de cada factura. El área lo pidió en este orden:
+#   1. la FACTURA (la que viene con el XML: 680010079201_HUS######_FACTURA.pdf)
+#   2. el DETALLADO (sale en Excel y se pasa a PDF)
+#   3. la REPRESENTACIÓN GRÁFICA que sale de la DIAN
+#   4. las NOTAS CRÉDITO de los valores aceptados
+# Las notas crédito TODAVÍA NO EXISTEN: el bot deja ese renglón como PENDIENTE
+# y lo avisa. Cuando lleguen se vuelve a correr y entran solas, sin rehacer nada.
+GRUPOS_FACTURA: tuple[Grupo, ...] = (
+    Grupo(1, "FACTURA", "FACTURA", ("FACTURA", "FACTURA DE VENTA"), FOLIO_FACTURA),
+    Grupo(
+        2,
+        "DETALLADO",
+        "DETALLADO",
+        ("DETALLADO DE FACTURA", "DETALLE DE FACTURA", "DETALLADO", "DETALLE"),
+        FOLIO_FACTURA,
+    ),
+    Grupo(
+        3,
+        "DIAN",
+        "REPRESENTACION GRAFICA DIAN",
+        ("REPRESENTACION GRAFICA DIAN", "REPRESENTACION GRAFICA", "DIAN"),
+        FOLIO_FACTURA,
+    ),
+    Grupo(
+        4,
+        "NOTAS",
+        "NOTAS CREDITO",
+        ("NOTAS CREDITO", "NOTA CREDITO", "NOTA DE CREDITO", "NOTAS DE CREDITO"),
+        FOLIO_FACTURA,
+    ),
+)
+GRUPO_FACTURA = next(g for g in GRUPOS_FACTURA if g.clave == "FACTURA")
+GRUPO_DETALLADO = next(g for g in GRUPOS_FACTURA if g.clave == "DETALLADO")
+
+# Los renglones del folio de la factura que SÍ tienen que estar hoy. El 4
+# (notas crédito) no se cuenta como falta: todavía no las han sacado.
+CLAVES_FACTURA_OBLIGATORIAS = ("FACTURA", "DETALLADO", "DIAN")
+CLAVE_NOTAS = "NOTAS"
+
+# Todos los grupos, los del folio clínico y los del de la factura.
+TODOS_LOS_GRUPOS: tuple[Grupo, ...] = GRUPOS + GRUPOS_FACTURA
+
+# El detallado NO entra al folio clínico: va de segundo en el de la factura.
 PALABRAS_DETALLADO = ("DETALLADO", "DETALLE DE FACTURA")
 
 
@@ -222,11 +304,13 @@ def clasificar(nombre: str, mapa: dict[str, str] | None = None) -> Grupo:
     if mapa:
         for palabra, clave in mapa.items():
             if _norm(palabra) and _norm(palabra) in limpio:
-                grupo = next((g for g in GRUPOS if g.clave == clave.strip().upper()), None)
+                grupo = next(
+                    (g for g in TODOS_LOS_GRUPOS if g.clave == clave.strip().upper()), None
+                )
                 if grupo is not None:
                     return grupo
     mejor: tuple[int, Grupo] = (0, GRUPO_OTROS)
-    for grupo in GRUPOS:
+    for grupo in TODOS_LOS_GRUPOS:
         for palabra in grupo.palabras:
             clave = _norm(palabra)
             if clave and _es_palabra(clave, limpio) and len(clave) > mejor[0]:
@@ -281,7 +365,12 @@ class Soporte:
 
 @dataclass
 class Factura:
-    """Una carpeta de factura y sus soportes en orden."""
+    """Una carpeta de factura y sus soportes en orden.
+
+    Los campos `soportes` / `destino` / `estado` / `paginas` son los del folio
+    clínico (el `_EPICRIS.pdf`); los que terminan en `_factura` son los del
+    folio de la factura (el `_FACTURA.pdf`).
+    """
 
     factura: str
     carpeta: Path
@@ -291,11 +380,39 @@ class Factura:
     paginas: int = 0
     omitidos: list[str] = field(default_factory=list)
     estado: str = ""
+    # El folio de la factura.
+    soportes_factura: list[Soporte] = field(default_factory=list)
+    destino_epicris: Path | None = None
+    destino_factura: Path | None = None
+    paginas_factura: int = 0
+    estado_factura: str = ""
+    # El NIT con que el ADRES nombra los archivos (680010079201). Sale de los
+    # propios archivos de la carpeta: no se inventa.
+    prefijo: str = ""
+    # Detallados que todavía están en Excel y hay que pasar a PDF.
+    detallados_sin_pdf: list[Path] = field(default_factory=list)
+    # Folios de una corrida anterior, que no se vuelven a meter adentro.
+    folios_previos: list[Path] = field(default_factory=list)
+    # Los que además hay que mirar: podrían ser un soporte recién agregado.
+    folios_dudosos: list[Path] = field(default_factory=list)
 
     def faltantes(self) -> list[str]:
         """Los grupos obligatorios que no aparecieron."""
         presentes = {s.grupo.clave for s in self.soportes}
         return [g.titulo for g in (GRUPOS[0], GRUPOS[1]) if g.clave not in presentes]
+
+    def faltantes_factura(self) -> list[str]:
+        """Los renglones del folio de la factura que hoy deberían estar y no están."""
+        presentes = {s.grupo.clave for s in self.soportes_factura}
+        return [
+            g.titulo
+            for g in GRUPOS_FACTURA
+            if g.clave in CLAVES_FACTURA_OBLIGATORIAS and g.clave not in presentes
+        ]
+
+    def notas_pendientes(self) -> bool:
+        """¿Falta el renglón 4 (notas crédito)? No es un error: aún no existen."""
+        return CLAVE_NOTAS not in {s.grupo.clave for s in self.soportes_factura}
 
 
 ESTADO_UNIDO = "UNIDO"
@@ -320,8 +437,78 @@ def nombre_numerado(orden: int, grupo: Grupo, extension: str = ".pdf") -> str:
     return f"{orden} {limpio}{extension}"
 
 
-def renombrar_en_orden(fac: Factura, aplicar: bool = False) -> list[tuple[Path, str]]:
-    """Renombra los soportes de la factura a `<n> <GRUPO>.pdf`, en su orden.
+def nombre_folio(prefijo: str, factura: str, sufijo: str) -> str:
+    """`680010079201_HUS352904_EPICRIS.pdf`.
+
+    Es el nombre que ya traían la epicrisis y la factura antes de renombrarlas:
+    el mismo con que el ADRES espera el folio armado.
+    """
+    tallo = f"{prefijo}_{factura}" if prefijo else factura
+    return f"{tallo}{sufijo}.pdf"
+
+
+def prefijo_del_nombre(nombre: str, factura: str) -> str:
+    """El NIT con que vienen nombrados los archivos, o «» si el nombre no lo trae.
+
+    `680010079201_HUS352904_EPICRIS` → `680010079201`. Solo lo toma si lo que
+    sigue es de verdad esta factura: así no se cuela cualquier número suelto.
+    """
+    partes = _norm(Path(nombre).stem).split()
+    if len(partes) < 2 or not partes[0].isdigit() or len(partes[0]) < 6:
+        return ""
+    if factura_del_nombre(" ".join(partes[1:])) != factura:
+        return ""
+    return partes[0]
+
+
+# Un soporte ya numerado dentro del folio: «1 RESPUESTA A GLOSA.pdf».
+_RE_NUMERADO = re.compile(r"^\s*\d+\s+\S")
+
+
+def _grupos_ya_numerados(archivos: list[Path], mapa: dict[str, str] | None = None) -> set[str]:
+    """Qué grupos ya tienen su archivo numerado en la carpeta."""
+    return {
+        clasificar(r.name, mapa).clave
+        for r in archivos
+        if r.suffix.lower() == ".pdf" and _RE_NUMERADO.match(r.stem)
+    }
+
+
+def es_folio_previo(tallo: str, factura: str, numerados: set[str]) -> bool:
+    """¿Este PDF es el folio que dejó una corrida anterior?
+
+    El folio se llama igual que el archivo del que salió (`..._EPICRIS.pdf`,
+    `..._FACTURA.pdf`), así que por el nombre solo no se distinguen. Lo que sí
+    los distingue es la carpeta: después de armar los folios, TODOS los soportes
+    quedaron numerados («1 …», «2 …»), y con el nombre original ya no queda
+    ninguno. Entonces, si en la carpeta hay archivos numerados, el
+    `..._EPICRIS.pdf` que quede es el folio, y no se vuelve a meter dentro de
+    sí mismo.
+    """
+    if not numerados:
+        return False  # primera corrida: todavía son los archivos de origen
+    limpio = _norm(tallo)
+    return any(
+        limpio.endswith(f"{factura} {s.strip('_')}") for s in (SUFIJO_EPICRIS, SUFIJO_FACTURA)
+    )
+
+
+def _folio_dudoso(tallo: str, factura: str, numerados: set[str]) -> bool:
+    """¿Se tomó por folio algo que podría ser un soporte recién agregado?
+
+    Pasa cuando la carpeta ya está armada pero al renglón le falta su archivo
+    numerado: por ejemplo un `..._EPICRIS.pdf` sin «2 EPICRISIS.pdf» al lado.
+    No se adivina: se toma como folio y se avisa para que el auditor lo mire.
+    """
+    limpio = _norm(tallo)
+    for sufijo, clave in ((SUFIJO_EPICRIS, "EPICRISIS"), (SUFIJO_FACTURA, "FACTURA")):
+        if limpio.endswith(f"{factura} {sufijo.strip('_')}") and clave not in numerados:
+            return True
+    return False
+
+
+def renombrar_lista(soportes: list[Soporte], aplicar: bool = False) -> list[tuple[Path, str]]:
+    """Renombra una lista de soportes a `<n> <GRUPO>.pdf`, en su orden.
 
     Devuelve [(ruta actual, nombre nuevo)]. Se hace en dos vueltas —primero a un
     nombre temporal— porque el nombre que le toca a un archivo puede ser el que
@@ -329,21 +516,29 @@ def renombrar_en_orden(fac: Factura, aplicar: bool = False) -> list[tuple[Path, 
     """
     plan = [
         (s.ruta, nombre_numerado(n, s.grupo, s.ruta.suffix))
-        for n, s in enumerate(fac.soportes, start=1)
+        for n, s in enumerate(soportes, start=1)
     ]
     if not aplicar:
         return plan
-    temporales: list[tuple[Path, str]] = []
-    for ruta, nuevo in plan:
-        if ruta.name == nuevo:
+    temporales: list[tuple[Soporte, Path, str]] = []
+    for soporte, (ruta, nuevo) in zip(soportes, plan):
+        if ruta.name == nuevo or not ruta.exists():
+            # Si el archivo ya no está (se lo llevaron del share a mitad de la
+            # corrida), no se cae el lote: se sigue con los demás.
             continue
         temporal = ruta.with_name(f"~renombrando~{ruta.name}")
         ruta.rename(temporal)
-        temporales.append((temporal, nuevo))
-    for temporal, nuevo in temporales:
+        temporales.append((soporte, temporal, nuevo))
+    for soporte, temporal, nuevo in temporales:
         destino, _ = nombre_libre(temporal.parent, nuevo)
         temporal.rename(destino)
+        soporte.ruta = destino
     return plan
+
+
+def renombrar_en_orden(fac: Factura, aplicar: bool = False) -> list[tuple[Path, str]]:
+    """Los soportes del folio clínico, numerados en su orden."""
+    return renombrar_lista(fac.soportes, aplicar)
 
 
 def nombre_libre(carpeta: Path, nombre: str) -> tuple[Path, bool]:
@@ -379,34 +574,60 @@ def planificar(
         numero = _factura_de_carpeta(sub)
         if facturas is not None and _norm(numero) not in facturas:
             continue
-        fac = Factura(factura=numero, carpeta=sub)
-        pdfs: list[Path] = []
-        for ruta in sub.rglob("*"):
-            if not ruta.is_file() or ruta.name.startswith(("~$", ".")):
-                continue
-            if ruta.suffix.lower() in (".xlsx", ".xls") and es_detallado(ruta.name):
-                fac.detallados.append(ruta)
-                continue
-            if ruta.suffix.lower() != ".pdf":
-                continue
-            if ruta.stem.upper().endswith(SUFIJO_UNIDO):
-                continue  # el consolidado de una corrida anterior
-            if es_detallado(ruta.name):
-                fac.detallados.append(ruta)
-                continue
-            pdfs.append(ruta)
-        # Dentro de cada grupo, orden natural por el nombre del archivo.
-        soportes = [
-            Soporte(ruta=p, grupo=g, reconocido=ok)
-            for p in pdfs
-            for g, ok in [clasificar_con_marca(p.name, mapa)]
-        ]
-        soportes.sort(key=lambda s: (s.grupo.orden, clave_natural(s.ruta.name)))
-        fac.soportes = soportes
-        fac.destino = sub / f"{numero}{SUFIJO_UNIDO}.pdf"
-        fac.estado = ESTADO_SIMULADO if soportes else ESTADO_SIN_PDF
-        salida.append(fac)
+        salida.append(_planificar_carpeta(sub, numero, mapa))
     return salida
+
+
+def _planificar_carpeta(sub: Path, numero: str, mapa: dict[str, str] | None) -> Factura:
+    """Lo que hay en la carpeta de UNA factura, repartido en sus dos folios."""
+    fac = Factura(factura=numero, carpeta=sub)
+    archivos = sorted(
+        r for r in sub.rglob("*") if r.is_file() and not r.name.startswith(("~$", "."))
+    )
+    # El NIT sale del nombre de los propios archivos (la epicrisis y la factura
+    # vienen como 680010079201_HUS######_...). Si no lo traen, queda vacío.
+    for r in archivos:
+        if r.suffix.lower() == ".pdf" and (encontrado := prefijo_del_nombre(r.stem, numero)):
+            fac.prefijo = encontrado
+            break
+    numerados = _grupos_ya_numerados(archivos, mapa)
+
+    pdfs: list[Path] = []
+    for r in archivos:
+        if r.suffix.lower() in (".xlsx", ".xls") and es_detallado(r.name):
+            fac.detallados.append(r)
+            continue
+        if r.suffix.lower() != ".pdf":
+            continue
+        if r.stem.upper().endswith(SUFIJO_UNIDO):
+            continue  # el consolidado de una corrida anterior
+        if es_folio_previo(r.stem, numero, numerados):
+            fac.folios_previos.append(r)
+            if _folio_dudoso(r.stem, numero, numerados):
+                fac.folios_dudosos.append(r)
+            continue
+        if es_detallado(r.name):
+            fac.detallados.append(r)
+        pdfs.append(r)
+
+    # Dentro de cada grupo, orden natural por el nombre del archivo.
+    soportes = [
+        Soporte(ruta=p, grupo=g, reconocido=ok)
+        for p in pdfs
+        for g, ok in [clasificar_con_marca(p.name, mapa)]
+    ]
+    soportes.sort(key=lambda s: (s.grupo.orden, clave_natural(s.ruta.name)))
+    fac.soportes = [s for s in soportes if s.grupo.folio == FOLIO_EPICRIS]
+    fac.soportes_factura = [s for s in soportes if s.grupo.folio == FOLIO_FACTURA]
+    # El detallado que solo está en Excel: al folio únicamente entran PDF.
+    if not any(s.grupo.clave == "DETALLADO" for s in fac.soportes_factura):
+        fac.detallados_sin_pdf = [d for d in fac.detallados if d.suffix.lower() != ".pdf"]
+    fac.destino = sub / f"{numero}{SUFIJO_UNIDO}.pdf"
+    fac.destino_epicris = sub / nombre_folio(fac.prefijo, numero, SUFIJO_EPICRIS)
+    fac.destino_factura = sub / nombre_folio(fac.prefijo, numero, SUFIJO_FACTURA)
+    fac.estado = ESTADO_SIMULADO if fac.soportes else ESTADO_SIN_PDF
+    fac.estado_factura = ESTADO_SIMULADO if fac.soportes_factura else ESTADO_SIN_PDF
+    return fac
 
 
 def unir(
@@ -438,6 +659,194 @@ def unir(
     return plan
 
 
+# ─── Los dos folios de cada factura ──────────────────────────────────────────
+
+
+def aplicar_folios(plan: list[Factura], aplicar: bool = False, prefijo: str = "") -> list[Factura]:
+    """Deja cada factura con sus DOS folios, como los pide el ADRES.
+
+    En la carpeta de la factura:
+      1. numera los soportes clínicos («1 RESPUESTA A GLOSA.pdf»,
+         «2 EPICRISIS.pdf», «3 HISTORIA CLINICA.pdf»…) y los une en
+         `<NIT>_<FACTURA>_EPICRIS.pdf`;
+      2. numera la factura y su soporte contable («1 FACTURA.pdf»,
+         «2 DETALLADO.pdf», «3 REPRESENTACION GRAFICA DIAN.pdf»,
+         «4 NOTAS CREDITO.pdf») y los une en `<NIT>_<FACTURA>_FACTURA.pdf`.
+
+    Numerar primero no es adorno: es lo que **deja libre el nombre del folio**,
+    porque ese nombre es justo el que traían la epicrisis (`..._EPICRIS.pdf`) y
+    la factura (`..._FACTURA.pdf`) antes de renombrarlas.
+    """
+    for fac in plan:
+        if prefijo and not fac.prefijo:
+            fac.prefijo = prefijo
+            fac.destino_epicris = fac.carpeta / nombre_folio(prefijo, fac.factura, SUFIJO_EPICRIS)
+            fac.destino_factura = fac.carpeta / nombre_folio(prefijo, fac.factura, SUFIJO_FACTURA)
+    if not aplicar:
+        return plan
+    PdfReader, PdfWriter = _cargar_lector_escritor()
+    for fac in plan:
+        renombrar_lista(fac.soportes, aplicar=True)
+        renombrar_lista(fac.soportes_factura, aplicar=True)
+        _unir_folio(fac, FOLIO_EPICRIS, PdfReader, PdfWriter)
+        _unir_folio(fac, FOLIO_FACTURA, PdfReader, PdfWriter)
+    return plan
+
+
+def _unir_folio(fac: Factura, cual: str, PdfReader, PdfWriter) -> None:
+    """Une uno de los dos folios. Una factura mala no tumba el lote."""
+    clinico = cual == FOLIO_EPICRIS
+    soportes = fac.soportes if clinico else fac.soportes_factura
+    destino = fac.destino_epicris if clinico else fac.destino_factura
+    if not soportes or destino is None:
+        return
+    try:
+        paginas, omitidos = unir_pdfs([s.ruta for s in soportes], destino, PdfReader, PdfWriter)
+        estado = ESTADO_UNIDO if paginas else ESTADO_ERROR
+        if not paginas:
+            omitidos.append("ningún PDF tenía páginas legibles")
+    except Exception as e:  # noqa: BLE001 - una factura mala no tumba el lote
+        logger.warning("  %s: %s", fac.factura, e)
+        paginas, omitidos, estado = 0, [str(e)], ESTADO_ERROR
+    if clinico:
+        fac.paginas, fac.estado = paginas, estado
+    else:
+        fac.paginas_factura, fac.estado_factura = paginas, estado
+    fac.omitidos.extend(omitidos)
+
+
+def armar_folios(
+    carpeta: Path,
+    facturas: set[str] | None = None,
+    mapa: dict[str, str] | None = None,
+    aplicar: bool = False,
+    prefijo: str = "",
+) -> list[Factura]:
+    """Planifica y arma los dos folios. Sin `aplicar`, solo dice qué haría."""
+    return aplicar_folios(planificar(carpeta, facturas, mapa), aplicar, prefijo)
+
+
+# ─── La factura, que vive en otra carpeta (la del XML) ───────────────────────
+
+
+def indice_facturas(carpeta: Path) -> dict[str, Path]:
+    """Número de factura → su PDF dentro de «4.FACTURAS CON XML\\XML».
+
+    Ahí los archivos vienen como `680010079201_HUS311736_FACTURA.pdf`.
+    """
+    indice: dict[str, Path] = {}
+    for r in sorted(carpeta.rglob("*.pdf")):
+        numero = factura_del_nombre(r.name)
+        if numero:
+            indice.setdefault(numero, r)
+    return indice
+
+
+ESTADO_COPIADA = "COPIADA"
+ESTADO_SE_COPIARIA = "SE COPIARIA"
+ESTADO_YA_ESTABA = "YA ESTABA"
+ESTADO_SIN_FACTURA = "NO ESTA LA FACTURA"
+
+
+@dataclass
+class Copia:
+    """La factura que se trae de la carpeta del XML a la carpeta de la factura."""
+
+    factura: str
+    origen: Path | None
+    destino: Path | None
+    estado: str
+
+
+def copiar_facturas(
+    plan: list[Factura], indice: dict[str, Path], aplicar: bool = False
+) -> list[Copia]:
+    """Trae a cada carpeta el PDF de su factura. No pisa lo que ya esté.
+
+    Sin `aplicar` no copia nada, pero **sí deja la factura anotada en el plan**:
+    así la simulación muestra el folio como va a quedar de verdad, y no uno
+    incompleto que asustaría al auditor.
+    """
+    copias: list[Copia] = []
+    for fac in plan:
+        if any(s.grupo.clave == "FACTURA" for s in fac.soportes_factura):
+            copias.append(Copia(fac.factura, None, None, ESTADO_YA_ESTABA))
+            continue
+        origen = indice.get(fac.factura)
+        if origen is None:
+            copias.append(Copia(fac.factura, None, None, ESTADO_SIN_FACTURA))
+            continue
+        destino = fac.carpeta / origen.name
+        if aplicar:
+            shutil.copy2(origen, destino)
+        _sumar_al_folio(fac, destino, GRUPO_FACTURA)
+        # La factura viene nombrada con el NIT: si la carpeta no lo traía, el
+        # folio ya puede llevarlo.
+        if not fac.prefijo and (nit := prefijo_del_nombre(origen.stem, fac.factura)):
+            fac.prefijo = nit
+            fac.destino_epicris = fac.carpeta / nombre_folio(nit, fac.factura, SUFIJO_EPICRIS)
+            fac.destino_factura = fac.carpeta / nombre_folio(nit, fac.factura, SUFIJO_FACTURA)
+        copias.append(
+            Copia(fac.factura, origen, destino, ESTADO_COPIADA if aplicar else ESTADO_SE_COPIARIA)
+        )
+    return copias
+
+
+def _sumar_al_folio(fac: Factura, ruta: Path, grupo: Grupo) -> None:
+    """Mete un archivo en el folio de la factura, en el renglón que le toca."""
+    fac.soportes_factura.append(Soporte(ruta=ruta, grupo=grupo))
+    fac.soportes_factura.sort(key=lambda s: (s.grupo.orden, clave_natural(s.ruta.name)))
+    fac.estado_factura = ESTADO_SIMULADO
+
+
+# ─── El detallado, que sale en Excel y al folio solo entran PDF ──────────────
+
+
+ESTADO_SE_PASARIA = "SE PASARIA A PDF"
+
+
+def convertir_detallados(plan: list[Factura], aplicar: bool = False) -> list[tuple[str, Path, str]]:
+    """Pasa a PDF el detallado que todavía está en Excel (renglón 2 del folio).
+
+    Usa el mismo motor del bot de conversión masiva: el Excel del equipo si
+    está, y si no LibreOffice. Si no hay ninguno de los dos, no revienta: lo
+    deja anotado para que el auditor lo convierta y vuelva a correr.
+    """
+    pendientes = [(fac, d) for fac in plan for d in fac.detallados_sin_pdf]
+    if not pendientes:
+        return []
+    if not aplicar:
+        # Igual que con la factura: la simulación muestra el folio como va a
+        # quedar, con el detallado ya adentro.
+        for fac, d in pendientes:
+            _sumar_al_folio(fac, d.with_suffix(".pdf"), GRUPO_DETALLADO)
+        return [(fac.factura, d, ESTADO_SE_PASARIA) for fac, d in pendientes]
+
+    import excel_a_pdf
+
+    try:
+        motor, binario = excel_a_pdf.elegir_motor("auto", None)
+    except SystemExit as e:  # sin Excel ni LibreOffice en el equipo
+        return [(fac.factura, d, f"{ESTADO_ERROR}: {e}") for fac, d in pendientes]
+
+    convs = [excel_a_pdf.Conversion(origen=d, destino=d.with_suffix(".pdf")) for _, d in pendientes]
+    if motor == "excel":
+        excel_a_pdf.convertir_con_excel(convs)
+    else:
+        excel_a_pdf.convertir_con_libreoffice(convs, str(binario))
+
+    hechos: list[tuple[str, Path, str]] = []
+    for (fac, origen), conv in zip(pendientes, convs):
+        if conv.estado == "OK":
+            _sumar_al_folio(fac, conv.destino, GRUPO_DETALLADO)
+            fac.detallados.append(conv.destino)
+            fac.detallados_sin_pdf = [d for d in fac.detallados_sin_pdf if d != origen]
+            hechos.append((fac.factura, origen, "PASADO A PDF"))
+        else:
+            hechos.append((fac.factura, origen, f"{ESTADO_ERROR}: {conv.detalle}"))
+    return hechos
+
+
 # ─── Reporte ─────────────────────────────────────────────────────────────────
 
 COLUMNAS_REPORTE = (
@@ -449,11 +858,12 @@ COLUMNAS_REPORTE = (
     "CARPETA",
     "ESTADO",
     "OBSERVACION",
+    "FOLIO",
 )
 
 
 def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
-    """Un renglón por soporte: en qué grupo quedó y en qué orden va."""
+    """Un renglón por soporte: en qué folio y en qué orden va."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
     with open(ruta, "w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh, delimiter=";")
@@ -470,19 +880,35 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         str(s.ruta.parent),
                         fac.estado,
                         "",
+                        FOLIO_EPICRIS,
                     ]
                 )
-            for det in fac.detallados:
+            for n, s in enumerate(fac.soportes_factura, start=1):
+                w.writerow(
+                    [
+                        fac.factura,
+                        n,
+                        s.grupo.titulo,
+                        s.ruta.name,
+                        "SI" if s.reconocido else "NO - revisar",
+                        str(s.ruta.parent),
+                        fac.estado_factura,
+                        "",
+                        FOLIO_FACTURA,
+                    ]
+                )
+            for det in fac.detallados_sin_pdf:
                 w.writerow(
                     [
                         fac.factura,
                         "",
-                        "DETALLADO (no entra al PDF)",
+                        "DETALLADO",
                         det.name,
                         "SI",
                         str(det.parent),
-                        fac.estado,
-                        "",
+                        fac.estado_factura,
+                        "está en Excel: hay que pasarlo a PDF para que entre al folio",
+                        FOLIO_FACTURA,
                     ]
                 )
             if not fac.soportes:
@@ -496,6 +922,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         str(fac.carpeta),
                         fac.estado,
                         "no hay PDF que unir",
+                        FOLIO_EPICRIS,
                     ]
                 )
             for falta in fac.faltantes():
@@ -509,10 +936,60 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         str(fac.carpeta),
                         fac.estado,
                         "FALTA este soporte",
+                        FOLIO_EPICRIS,
+                    ]
+                )
+            for falta in fac.faltantes_factura():
+                w.writerow(
+                    [
+                        fac.factura,
+                        "",
+                        falta,
+                        "",
+                        "NO",
+                        str(fac.carpeta),
+                        fac.estado_factura,
+                        "FALTA este soporte",
+                        FOLIO_FACTURA,
+                    ]
+                )
+            if fac.notas_pendientes():
+                w.writerow(
+                    [
+                        fac.factura,
+                        "",
+                        "NOTAS CREDITO",
+                        "",
+                        "",
+                        str(fac.carpeta),
+                        fac.estado_factura,
+                        "PENDIENTE: las notas crédito de los valores aceptados aún no existen",
+                        FOLIO_FACTURA,
+                    ]
+                )
+            for previo in fac.folios_previos:
+                dudoso = previo in fac.folios_dudosos
+                w.writerow(
+                    [
+                        fac.factura,
+                        "",
+                        "",
+                        previo.name,
+                        "NO - revisar" if dudoso else "SI",
+                        str(previo.parent),
+                        "",
+                        (
+                            "REVISAR: se tomó como el folio de la corrida anterior, pero al "
+                            "renglón le falta su archivo numerado. Si es un soporte nuevo, "
+                            "renómbrelo con su número y vuelva a correr el bot."
+                            if dudoso
+                            else "es el folio de una corrida anterior: se vuelve a armar"
+                        ),
+                        "",
                     ]
                 )
             for om in fac.omitidos:
-                w.writerow([fac.factura, "", "", "", "", str(fac.carpeta), ESTADO_ERROR, om])
+                w.writerow([fac.factura, "", "", "", "", str(fac.carpeta), ESTADO_ERROR, om, ""])
 
 
 # ─── Lista de facturas a trabajar ────────────────────────────────────────────
@@ -575,8 +1052,30 @@ def construir_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--renombrar",
         action="store_true",
-        help="En vez de unir, dejar cada soporte con su nombre numerado dentro del folio: "
+        help="Solo dejar cada soporte con su nombre numerado dentro del folio: "
         "«1 RESPUESTA A GLOSA.pdf», «2 HISTORIA CLINICA.pdf»…",
+    )
+    p.add_argument(
+        "--folio",
+        action="store_true",
+        help="El trabajo completo: numera los soportes y arma los DOS folios de cada "
+        "factura, «<NIT>_<FACTURA>_EPICRIS.pdf» y «<NIT>_<FACTURA>_FACTURA.pdf».",
+    )
+    p.add_argument(
+        "--carpeta-facturas",
+        type=Path,
+        help="Carpeta «4.FACTURAS CON XML\\XML», de donde se trae el PDF de cada factura.",
+    )
+    p.add_argument(
+        "--prefijo",
+        default="",
+        help="NIT con que se nombran los folios (680010079201), por si los archivos "
+        "de una carpeta no lo traen. Sin esto se usa el que traigan los archivos.",
+    )
+    p.add_argument(
+        "--convertir-detallado",
+        action="store_true",
+        help="Pasar a PDF el detallado que esté en Excel, para que entre al folio de la factura.",
     )
     p.add_argument(
         "--aplicar", action="store_true", help="Hacerlo de verdad. Sin esto solo muestra qué haría."
@@ -584,6 +1083,111 @@ def construir_parser() -> argparse.ArgumentParser:
     p.add_argument("--reporte-csv", type=Path, help="Listado de qué archivo quedó en qué grupo.")
     p.add_argument("--log", type=Path, help="Guarda además el log en un archivo.")
     return p
+
+
+def _mostrar_folio(titulo: str, destino: Path | None, soportes: list[Soporte]) -> None:
+    """Un folio en pantalla: el nombre que queda y qué entra adentro, en orden."""
+    if not soportes:
+        logger.info("     %s: no hay nada todavía", titulo)
+        return
+    logger.info("     %s → %s", titulo, (destino or Path()).name)
+    for n, s in enumerate(soportes, start=1):
+        marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
+        logger.info(
+            "        %-34s (era %s)%s",
+            nombre_numerado(n, s.grupo, s.ruta.suffix),
+            s.ruta.name,
+            marca,
+        )
+
+
+def _resumen_folios(
+    plan: list[Factura],
+    copias: list[Copia],
+    conversiones: list[tuple[str, Path, str]],
+    aplicar: bool,
+) -> None:
+    """Lo que quedó (o quedaría) en cada carpeta: los dos folios de la factura."""
+    verbo = "Se armaron" if aplicar else "Se armarían"
+    con_algo = [f for f in plan if f.soportes or f.soportes_factura]
+    logger.info("\n%s los folios de %d factura(s).", verbo, len(con_algo))
+    if aplicar:
+        logger.info(
+            "Páginas escritas: %d en los EPICRIS y %d en las FACTURAS.",
+            sum(f.paginas for f in plan),
+            sum(f.paginas_factura for f in plan),
+        )
+
+    for fac in con_algo[:3]:
+        logger.info("\n  %s\\", fac.carpeta.name)
+        _mostrar_folio("FOLIO CLINICO", fac.destino_epicris, fac.soportes)
+        _mostrar_folio("FOLIO FACTURA", fac.destino_factura, fac.soportes_factura)
+    if len(con_algo) > 3:
+        logger.info(
+            "\n  … y %d factura(s) más (el detalle completo va en el reporte CSV).",
+            len(con_algo) - 3,
+        )
+
+    if copias:
+        cuenta: dict[str, int] = {}
+        for c in copias:
+            cuenta[c.estado] = cuenta.get(c.estado, 0) + 1
+        logger.info(
+            "\nFactura traída de la carpeta del XML: %s",
+            ", ".join(f"{n} {estado}" for estado, n in sorted(cuenta.items())),
+        )
+        sin_factura = [c.factura for c in copias if c.estado == ESTADO_SIN_FACTURA]
+        if sin_factura:
+            logger.info(
+                "   Sin PDF de factura (%d): %s", len(sin_factura), ", ".join(sin_factura[:12])
+            )
+
+    if conversiones:
+        logger.info("\nDetallados que estaban en Excel (%d):", len(conversiones))
+        for factura, origen, estado in conversiones[:10]:
+            logger.info("   %s: %s — %s", factura, origen.name, estado)
+        if len(conversiones) > 10:
+            logger.info("   … y %d más, en el reporte CSV.", len(conversiones) - 10)
+
+    faltan_factura = [(f, f.faltantes_factura()) for f in plan if f.faltantes_factura()]
+    if faltan_factura:
+        logger.info(
+            "\nAl folio de la FACTURA le falta un renglón en %d factura(s):", len(faltan_factura)
+        )
+        for fac, cuales in faltan_factura[:10]:
+            logger.info("   %s: falta %s", fac.factura, ", ".join(cuales))
+        if len(faltan_factura) > 10:
+            logger.info("   … y %d más, en el reporte CSV.", len(faltan_factura) - 10)
+
+    pendientes = [f for f in plan if f.notas_pendientes()]
+    if pendientes:
+        logger.info(
+            "\nNOTAS CRÉDITO: pendientes en %d factura(s). No es un error — todavía no las "
+            "han sacado. Cuando lleguen, se vuelve a correr el bot y entran solas de cuartas.",
+            len(pendientes),
+        )
+
+    dudosos = [(f, p) for f in plan for p in f.folios_dudosos]
+    if dudosos:
+        logger.info(
+            "\nOJO, revise estos archivos (%d): se tomaron como el folio de la corrida "
+            "anterior, pero al renglón le falta su archivo numerado. Si alguno es un "
+            "soporte nuevo, renómbrelo con su número y vuelva a correr el bot:",
+            len(dudosos),
+        )
+        for fac, p in dudosos[:10]:
+            logger.info("   %s: %s", fac.factura, p.name)
+        if len(dudosos) > 10:
+            logger.info("   … y %d más, en el reporte CSV.", len(dudosos) - 10)
+
+    sin_nit = [f.factura for f in plan if not f.prefijo and (f.soportes or f.soportes_factura)]
+    if sin_nit:
+        logger.info(
+            "\nSin el NIT en el nombre (%d): el folio queda como «HUS######_EPICRIS.pdf». "
+            "Si hace falta el NIT, agregue --prefijo 680010079201. Facturas: %s",
+            len(sin_nit),
+            ", ".join(sin_nit[:12]),
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -607,9 +1211,22 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Lista de trabajo: %d facturas", len(facturas))
 
     mapa = _cargar_mapa(args.mapa_nombres)
-    if args.renombrar:
-        # Modo de la hoja del área: cada soporte queda numerado dentro del folio
-        # («1 RESPUESTA A GLOSA.pdf»), no se pega todo en un solo PDF.
+    copias: list[Copia] = []
+    conversiones: list[tuple[str, Path, str]] = []
+    if args.folio:
+        # El trabajo completo: los dos folios de cada factura.
+        plan = planificar(args.carpeta, facturas, mapa)
+        if args.carpeta_facturas:
+            if not args.carpeta_facturas.is_dir():
+                logger.error("No existe la carpeta de facturas: %s", args.carpeta_facturas)
+                return 1
+            copias = copiar_facturas(plan, indice_facturas(args.carpeta_facturas), args.aplicar)
+        if args.convertir_detallado:
+            conversiones = convertir_detallados(plan, args.aplicar)
+        aplicar_folios(plan, args.aplicar, args.prefijo)
+    elif args.renombrar:
+        # Solo numerar: cada soporte queda como «1 RESPUESTA A GLOSA.pdf», sin
+        # pegar nada en un solo PDF.
         plan = planificar(args.carpeta, facturas, mapa)
         for fac in plan:
             if not fac.soportes:
@@ -628,43 +1245,46 @@ def main(argv: list[str] | None = None) -> int:
 
     con_pdf = [f for f in plan if f.soportes]
     sin_pdf = [f for f in plan if not f.soportes]
-    errores = [f for f in plan if f.estado == ESTADO_ERROR]
+    errores = [f for f in plan if ESTADO_ERROR in (f.estado, f.estado_factura)]
     sin_reconocer = [(f, s) for f in plan for s in f.soportes if not s.reconocido]
 
-    if args.renombrar:
-        verbo = "Se renombraron" if args.aplicar else "Se renombrarían"
+    if args.folio:
+        _resumen_folios(plan, copias, conversiones, args.aplicar)
     else:
-        verbo = "Se unieron" if args.aplicar else "Se unirían"
-    logger.info(
-        "\n%s los soportes de %d factura(s): %d archivo(s).",
-        verbo,
-        len(con_pdf),
-        sum(len(f.soportes) for f in con_pdf),
-    )
-    if args.aplicar and not args.renombrar:
-        logger.info("Páginas escritas: %d", sum(f.paginas for f in plan))
-
-    for fac in con_pdf[:3]:
         if args.renombrar:
-            logger.info("\n  %s\\", fac.carpeta.name)
+            verbo = "Se renombraron" if args.aplicar else "Se renombrarían"
         else:
-            logger.info("\n  %s → %s", fac.factura, (fac.destino or Path()).name)
-        for n, s in enumerate(fac.soportes, start=1):
-            marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
-            if args.renombrar:
-                logger.info(
-                    "     %-36s (era %s)%s",
-                    nombre_numerado(n, s.grupo, s.ruta.suffix),
-                    s.ruta.name,
-                    marca,
-                )
-            else:
-                logger.info("     %2d. [%s] %s%s", n, s.grupo.titulo, s.ruta.name, marca)
-    if len(con_pdf) > 3:
+            verbo = "Se unieron" if args.aplicar else "Se unirían"
         logger.info(
-            "\n  … y %d factura(s) más (el detalle completo va en el reporte CSV).",
-            len(con_pdf) - 3,
+            "\n%s los soportes de %d factura(s): %d archivo(s).",
+            verbo,
+            len(con_pdf),
+            sum(len(f.soportes) for f in con_pdf),
         )
+        if args.aplicar and not args.renombrar:
+            logger.info("Páginas escritas: %d", sum(f.paginas for f in plan))
+
+        for fac in con_pdf[:3]:
+            if args.renombrar:
+                logger.info("\n  %s\\", fac.carpeta.name)
+            else:
+                logger.info("\n  %s → %s", fac.factura, (fac.destino or Path()).name)
+            for n, s in enumerate(fac.soportes, start=1):
+                marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
+                if args.renombrar:
+                    logger.info(
+                        "     %-36s (era %s)%s",
+                        nombre_numerado(n, s.grupo, s.ruta.suffix),
+                        s.ruta.name,
+                        marca,
+                    )
+                else:
+                    logger.info("     %2d. [%s] %s%s", n, s.grupo.titulo, s.ruta.name, marca)
+        if len(con_pdf) > 3:
+            logger.info(
+                "\n  … y %d factura(s) más (el detalle completo va en el reporte CSV).",
+                len(con_pdf) - 3,
+            )
 
     if sin_reconocer:
         logger.info(

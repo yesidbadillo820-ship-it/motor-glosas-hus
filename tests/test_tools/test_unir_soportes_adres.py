@@ -387,3 +387,461 @@ def test_main_renombrar(tmp_path):
     assert (fac / "1 RESPUESTA A GLOSA.pdf").exists()
     # En modo renombrar NO se arma el PDF unido.
     assert not (fac / "HUS1_SOPORTES.pdf").exists()
+
+
+# ─── Los dos folios de cada factura ──────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("nombre", "clave"),
+    [
+        ("680010079201_HUS311736_FACTURA.pdf", "FACTURA"),
+        ("1 FACTURA.pdf", "FACTURA"),
+        ("HUS1 DETALLADO DE FACTURA.pdf", "DETALLADO"),
+        ("2 DETALLADO.pdf", "DETALLADO"),
+        ("3 REPRESENTACION GRAFICA DIAN.pdf", "DIAN"),
+        ("HUS1 representacion grafica.pdf", "DIAN"),
+        ("4 NOTAS CREDITO.pdf", "NOTAS"),
+        ("HUS1 NOTA CREDITO 123.pdf", "NOTAS"),
+    ],
+)
+def test_clasificar_el_folio_de_la_factura(nombre, clave):
+    grupo = org.clasificar(nombre)
+    assert grupo.clave == clave
+    assert grupo.folio == org.FOLIO_FACTURA
+
+
+def test_los_soportes_clinicos_siguen_en_su_folio():
+    """Agregar los grupos de la factura no puede mover a los de siempre."""
+    for nombre in ("HC.pdf", "DX.pdf", "RTA_ADRES_HUS1.pdf", "680010079201_HUS1_EPICRIS.pdf"):
+        assert org.clasificar(nombre).folio == org.FOLIO_EPICRIS, nombre
+
+
+def _carpeta_con_los_dos_folios(tmp_path: Path) -> Path:
+    raiz = tmp_path / "CAROLINA"
+    fac = raiz / "HUS352904"
+    for nombre in (
+        "RTA_ADRES_HUS352904.pdf",
+        "680010079201_HUS352904_EPICRIS.pdf",
+        "HC.pdf",
+        "DX.pdf",
+        "OTROS.pdf",
+        "680010079201_HUS352904_FACTURA.pdf",
+        "HUS352904 DETALLADO.pdf",
+    ):
+        _pdf(fac / nombre)
+    return raiz
+
+
+def test_planificar_reparte_los_dos_folios(tmp_path):
+    plan = org.planificar(_carpeta_con_los_dos_folios(tmp_path))[0]
+    assert [s.grupo.clave for s in plan.soportes] == [
+        "RESPUESTA",
+        "EPICRISIS",
+        "HISTORIA",
+        "AYUDAS",
+        "OTROS",
+    ]
+    assert [s.grupo.clave for s in plan.soportes_factura] == ["FACTURA", "DETALLADO"]
+
+
+@pytest.mark.parametrize(
+    ("nombre", "factura", "esperado"),
+    [
+        ("680010079201_HUS352904_EPICRIS", "HUS352904", "680010079201"),
+        ("680010079201_HUS352904_FACTURA.pdf", "HUS352904", "680010079201"),
+        # El número que sigue es de OTRA factura: no es el NIT de esta.
+        ("680010079201_HUS999999_EPICRIS", "HUS352904", ""),
+        ("HC", "HUS352904", ""),
+        ("2 EPICRISIS", "HUS352904", ""),
+    ],
+)
+def test_prefijo_del_nombre(nombre, factura, esperado):
+    assert org.prefijo_del_nombre(nombre, factura) == esperado
+
+
+def test_nombre_folio():
+    assert (
+        org.nombre_folio("680010079201", "HUS352904", org.SUFIJO_EPICRIS)
+        == "680010079201_HUS352904_EPICRIS.pdf"
+    )
+    # Sin NIT no se inventa ninguno: queda el número de factura solo.
+    assert org.nombre_folio("", "HUS352904", org.SUFIJO_FACTURA) == "HUS352904_FACTURA.pdf"
+
+
+def test_armar_folios_deja_los_dos_pdf_con_su_nombre(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    fac = raiz / "HUS352904"
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 FACTURA.pdf",
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 DETALLADO.pdf",
+        "2 EPICRISIS.pdf",
+        "3 HISTORIA CLINICA.pdf",
+        "4 AYUDAS DIAGNOSTICAS.pdf",
+        "5 OTROS.pdf",
+        "680010079201_HUS352904_EPICRIS.pdf",
+        "680010079201_HUS352904_FACTURA.pdf",
+    ]
+    assert plan.paginas == 5 and plan.paginas_factura == 2
+    assert plan.estado == org.ESTADO_UNIDO and plan.estado_factura == org.ESTADO_UNIDO
+
+
+def test_el_folio_lleva_los_soportes_en_orden(tmp_path):
+    """El nombre del folio es el que traía la epicrisis: numerar primero es lo
+    que lo deja libre."""
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert [s.ruta.name for s in plan.soportes] == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 EPICRISIS.pdf",
+        "3 HISTORIA CLINICA.pdf",
+        "4 AYUDAS DIAGNOSTICAS.pdf",
+        "5 OTROS.pdf",
+    ]
+    assert [s.ruta.name for s in plan.soportes_factura] == ["1 FACTURA.pdf", "2 DETALLADO.pdf"]
+
+
+def test_armar_folios_dos_veces_deja_lo_mismo(tmp_path):
+    """El folio no puede volver a meterse dentro de sí mismo."""
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    fac = raiz / "HUS352904"
+    org.armar_folios(raiz, aplicar=True)
+    antes = sorted(p.name for p in fac.iterdir())
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert sorted(p.name for p in fac.iterdir()) == antes
+    assert plan.paginas == 5 and plan.paginas_factura == 2
+    assert len(pypdf.PdfReader(str(fac / "680010079201_HUS352904_EPICRIS.pdf")).pages) == 5
+    assert [p.name for p in plan.folios_previos] == [
+        "680010079201_HUS352904_EPICRIS.pdf",
+        "680010079201_HUS352904_FACTURA.pdf",
+    ]
+
+
+def test_sin_aplicar_no_arma_ningun_folio(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    fac = raiz / "HUS352904"
+    antes = sorted(p.name for p in fac.iterdir())
+    plan = org.armar_folios(raiz, aplicar=False)[0]
+    assert sorted(p.name for p in fac.iterdir()) == antes
+    assert plan.estado == org.ESTADO_SIMULADO and plan.estado_factura == org.ESTADO_SIMULADO
+
+
+def test_sin_nit_el_folio_queda_con_el_numero_de_factura(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.prefijo == ""
+    assert (fac / "HUS1_EPICRIS.pdf").exists()
+
+
+def test_el_prefijo_por_argumento_solo_llena_lo_que_falta(tmp_path):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS1" / "HC.pdf")
+    _pdf(raiz / "HUS2" / "680010079201_HUS2_EPICRIS.pdf")
+    plan = org.armar_folios(raiz, aplicar=True, prefijo="900123456")
+    assert (raiz / "HUS1" / "900123456_HUS1_EPICRIS.pdf").exists()
+    # La HUS2 ya traía su NIT en los archivos: ese manda.
+    assert (raiz / "HUS2" / "680010079201_HUS2_EPICRIS.pdf").exists()
+    assert [f.prefijo for f in plan] == ["900123456", "680010079201"]
+
+
+# ─── Las notas crédito, que todavía no existen ───────────────────────────────
+
+
+def test_las_notas_credito_quedan_pendientes_y_no_son_una_falta(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    plan = org.planificar(raiz)[0]
+    assert plan.notas_pendientes() is True
+    assert "NOTAS CREDITO" not in plan.faltantes_factura()
+
+
+def test_cuando_lleguen_las_notas_entran_de_cuartas(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    fac = raiz / "HUS352904"
+    org.armar_folios(raiz, aplicar=True)
+    _pdf(fac / "HUS352904 NOTA CREDITO 88.pdf")
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.notas_pendientes() is False
+    assert [s.ruta.name for s in plan.soportes_factura] == [
+        "1 FACTURA.pdf",
+        "2 DETALLADO.pdf",
+        "3 NOTAS CREDITO.pdf",
+    ]
+    assert plan.paginas_factura == 3
+
+
+def test_avisa_los_renglones_que_le_faltan_al_folio_de_la_factura(tmp_path):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS1" / "680010079201_HUS1_FACTURA.pdf")
+    plan = org.planificar(raiz)[0]
+    assert plan.faltantes_factura() == ["DETALLADO", "REPRESENTACION GRAFICA DIAN"]
+
+
+# ─── La factura, que vive en la carpeta del XML ──────────────────────────────
+
+
+def test_indice_facturas(tmp_path):
+    xml = tmp_path / "XML"
+    _pdf(xml / "680010079201_HUS311736_FACTURA.pdf")
+    _pdf(xml / "680010079201_HUS352904_FACTURA.pdf")
+    (xml / "680010079201_HUS311736_FACTURA.xml").write_text("<x/>", encoding="utf-8")
+    assert sorted(org.indice_facturas(xml)) == ["HUS311736", "HUS352904"]
+
+
+def test_copiar_facturas_trae_la_factura_a_su_carpeta(tmp_path):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS311736" / "HC.pdf")
+    _pdf(raiz / "HUS999" / "HC.pdf")
+    xml = tmp_path / "XML"
+    _pdf(xml / "680010079201_HUS311736_FACTURA.pdf")
+
+    plan = org.planificar(raiz)
+    copias = org.copiar_facturas(plan, org.indice_facturas(xml), aplicar=True)
+    assert [(c.factura, c.estado) for c in copias] == [
+        ("HUS311736", org.ESTADO_COPIADA),
+        ("HUS999", org.ESTADO_SIN_FACTURA),
+    ]
+    assert (raiz / "HUS311736" / "680010079201_HUS311736_FACTURA.pdf").exists()
+    # Y el NIT de la factura copiada ya sirve para nombrar los dos folios.
+    assert plan[0].prefijo == "680010079201"
+    org.aplicar_folios(plan, aplicar=True)
+    assert (raiz / "HUS311736" / "680010079201_HUS311736_EPICRIS.pdf").exists()
+    assert (raiz / "HUS311736" / "1 FACTURA.pdf").exists()
+
+
+def test_copiar_facturas_no_pisa_la_que_ya_esta(tmp_path):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS311736" / "680010079201_HUS311736_FACTURA.pdf", paginas=7)
+    xml = tmp_path / "XML"
+    _pdf(xml / "680010079201_HUS311736_FACTURA.pdf", paginas=1)
+    plan = org.planificar(raiz)
+    copias = org.copiar_facturas(plan, org.indice_facturas(xml), aplicar=True)
+    assert copias[0].estado == org.ESTADO_YA_ESTABA
+    ruta = raiz / "HUS311736" / "680010079201_HUS311736_FACTURA.pdf"
+    assert len(pypdf.PdfReader(str(ruta)).pages) == 7
+
+
+def test_copiar_facturas_sin_aplicar_no_copia(tmp_path):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS311736" / "HC.pdf")
+    xml = tmp_path / "XML"
+    _pdf(xml / "680010079201_HUS311736_FACTURA.pdf")
+    copias = org.copiar_facturas(org.planificar(raiz), org.indice_facturas(xml), aplicar=False)
+    assert copias[0].estado == org.ESTADO_SE_COPIARIA
+    assert not (raiz / "HUS311736" / "680010079201_HUS311736_FACTURA.pdf").exists()
+
+
+# ─── El detallado, que sale en Excel ─────────────────────────────────────────
+
+
+def test_avisa_el_detallado_que_todavia_esta_en_excel(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    (fac / "DETALLADO HUS1.xlsx").write_bytes(b"x")
+    plan = org.planificar(raiz)[0]
+    assert [d.name for d in plan.detallados_sin_pdf] == ["DETALLADO HUS1.xlsx"]
+    assert "DETALLADO" in plan.faltantes_factura()
+
+
+def test_si_el_detallado_ya_esta_en_pdf_no_hay_nada_que_convertir(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HUS1 DETALLADO.pdf")
+    (fac / "DETALLADO HUS1.xlsx").write_bytes(b"x")
+    plan = org.planificar(raiz)[0]
+    assert plan.detallados_sin_pdf == []
+    assert org.convertir_detallados([plan], aplicar=False) == []
+
+
+def test_convertir_detallados_simulando(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    (fac / "DETALLADO HUS1.xlsx").write_bytes(b"x")
+    hechos = org.convertir_detallados(org.planificar(raiz), aplicar=False)
+    assert [(f, r.name, e) for f, r, e in hechos] == [
+        ("HUS1", "DETALLADO HUS1.xlsx", org.ESTADO_SE_PASARIA)
+    ]
+    assert not (fac / "DETALLADO HUS1.pdf").exists()
+
+
+def test_sin_excel_ni_libreoffice_no_revienta(tmp_path, monkeypatch):
+    """En un equipo sin Excel ni LibreOffice el bot avisa, no se cae."""
+    import excel_a_pdf
+
+    def _sin_motor(pedido, ruta):
+        raise SystemExit("No hay con qué convertir")
+
+    monkeypatch.setattr(excel_a_pdf, "elegir_motor", _sin_motor)
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    (fac / "DETALLADO HUS1.xlsx").write_bytes(b"x")
+    hechos = org.convertir_detallados(org.planificar(raiz), aplicar=True)
+    assert hechos and hechos[0][2].startswith(org.ESTADO_ERROR)
+
+
+# ─── Reporte y CLI del modo folio ────────────────────────────────────────────
+
+
+def test_reporte_csv_de_los_dos_folios(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    plan = org.armar_folios(raiz, aplicar=False)
+    ruta = tmp_path / "folios.csv"
+    org.escribir_reporte(ruta, plan)
+    texto = ruta.read_text(encoding="utf-8-sig")
+    assert "OBSERVACION;FOLIO" in texto
+    assert f"REPRESENTACION GRAFICA DIAN;;NO;{raiz / 'HUS352904'}" in texto
+    assert "PENDIENTE: las notas crédito" in texto
+    assert org.FOLIO_FACTURA in texto
+
+
+def test_main_folio_de_punta_a_punta(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    xml = tmp_path / "XML"
+    _pdf(xml / "680010079201_HUS352904_FACTURA.pdf")
+    reporte = tmp_path / "r.csv"
+    assert (
+        org.main(
+            [
+                "--carpeta",
+                str(raiz),
+                "--folio",
+                "--carpeta-facturas",
+                str(xml),
+                "--aplicar",
+                "--reporte-csv",
+                str(reporte),
+            ]
+        )
+        == 0
+    )
+    fac = raiz / "HUS352904"
+    assert (fac / "680010079201_HUS352904_EPICRIS.pdf").exists()
+    assert (fac / "680010079201_HUS352904_FACTURA.pdf").exists()
+    assert reporte.exists()
+    # El consolidado viejo NO se arma en modo folio.
+    assert not (fac / "HUS352904_SOPORTES.pdf").exists()
+
+
+def test_main_folio_avisa_si_la_carpeta_de_facturas_no_existe(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    assert (
+        org.main(
+            ["--carpeta", str(raiz), "--folio", "--carpeta-facturas", str(tmp_path / "no-existe")]
+        )
+        == 1
+    )
+
+
+def test_main_folio_sin_aplicar_no_escribe(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    fac = raiz / "HUS352904"
+    antes = sorted(p.name for p in fac.iterdir())
+    assert org.main(["--carpeta", str(raiz), "--folio"]) == 0
+    assert sorted(p.name for p in fac.iterdir()) == antes
+
+
+def test_una_carpeta_vacia_no_revienta_en_modo_folio(tmp_path):
+    raiz = tmp_path / "G"
+    (raiz / "HUS1").mkdir(parents=True)
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.estado == org.ESTADO_SIN_PDF and plan.estado_factura == org.ESTADO_SIN_PDF
+
+
+def test_un_pdf_dañado_no_tumba_el_folio_de_la_factura(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "680010079201_HUS1_FACTURA.pdf")
+    (fac / "HUS1 DETALLADO.pdf").write_bytes(b"esto no es un PDF")
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.estado_factura == org.ESTADO_UNIDO
+    assert plan.paginas_factura == 1
+    assert plan.omitidos
+
+
+def test_renombrar_lista_deja_la_ruta_nueva_en_el_soporte(tmp_path):
+    """El folio se arma con los nombres YA numerados: si la ruta no se
+    actualiza, se uniría un archivo que ya no existe."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    plan = org.planificar(raiz)[0]
+    org.renombrar_lista(plan.soportes, aplicar=True)
+    assert plan.soportes[0].ruta == fac / "1 HISTORIA CLINICA.pdf"
+    assert plan.soportes[0].ruta.exists()
+
+
+def test_la_simulacion_muestra_el_folio_como_va_a_quedar(tmp_path):
+    """La simulación no copia ni convierte, pero sí tiene que mostrar el folio
+    completo: si no, el auditor ve «falta la FACTURA» donde no falta."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "HC.pdf")
+    (fac / "DETALLADO HUS311736.xlsx").write_bytes(b"x")
+    xml = tmp_path / "XML"
+    _pdf(xml / "680010079201_HUS311736_FACTURA.pdf")
+
+    plan = org.planificar(raiz)
+    org.copiar_facturas(plan, org.indice_facturas(xml), aplicar=False)
+    org.convertir_detallados(plan, aplicar=False)
+    assert [s.grupo.clave for s in plan[0].soportes_factura] == ["FACTURA", "DETALLADO"]
+    assert plan[0].faltantes_factura() == ["REPRESENTACION GRAFICA DIAN"]
+    # …pero en el disco no se tocó nada.
+    assert sorted(p.name for p in fac.iterdir()) == ["DETALLADO HUS311736.xlsx", "HC.pdf"]
+    assert plan[0].destino_epicris.name == "680010079201_HUS311736_EPICRIS.pdf"
+
+
+def test_renombrar_no_se_cae_si_el_archivo_ya_no_esta(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf")
+    plan = org.planificar(raiz)[0]
+    plan.soportes.append(org.Soporte(ruta=fac / "se lo llevaron.pdf", grupo=org.GRUPO_OTROS))
+    org.renombrar_lista(plan.soportes, aplicar=True)
+    assert (fac / "1 HISTORIA CLINICA.pdf").exists()
+
+
+def test_el_folio_no_se_anida_aunque_falte_ese_soporte(tmp_path):
+    """El caso que se escapó en la prueba real: la HUS311736 no tiene epicrisis.
+
+    El folio `..._EPICRIS.pdf` de la primera corrida se colaba como si fuera una
+    epicrisis y en la segunda corrida el folio crecía metido dentro de sí mismo.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "RTA_ADRES_HUS311736.pdf")
+    _pdf(fac / "HC.pdf")
+    _pdf(fac / "680010079201_HUS311736_FACTURA.pdf")
+    org.armar_folios(raiz, aplicar=True)
+    antes = sorted(p.name for p in fac.iterdir())
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert sorted(p.name for p in fac.iterdir()) == antes
+    assert plan.paginas == 2  # la respuesta y la historia clínica, nada más
+    assert len(pypdf.PdfReader(str(fac / "680010079201_HUS311736_EPICRIS.pdf")).pages) == 2
+
+
+def test_avisa_cuando_no_puede_saber_si_es_folio_o_soporte_nuevo(tmp_path):
+    """Carpeta ya armada + un `..._EPICRIS.pdf` sin su «2 EPICRISIS.pdf» al lado:
+    se toma como el folio anterior, pero tiene que quedar avisado."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "1 RESPUESTA A GLOSA.pdf")
+    _pdf(fac / "680010079201_HUS311736_EPICRIS.pdf")
+    plan = org.planificar(raiz)[0]
+    assert [p.name for p in plan.folios_dudosos] == ["680010079201_HUS311736_EPICRIS.pdf"]
+    ruta = tmp_path / "r.csv"
+    org.escribir_reporte(ruta, [plan])
+    assert "REVISAR: se tomó como el folio" in ruta.read_text(encoding="utf-8-sig")
+
+
+def test_el_folio_de_la_primera_corrida_no_es_dudoso(tmp_path):
+    raiz = _carpeta_con_los_dos_folios(tmp_path)
+    org.armar_folios(raiz, aplicar=True)
+    plan = org.planificar(raiz)[0]
+    assert len(plan.folios_previos) == 2 and plan.folios_dudosos == []
