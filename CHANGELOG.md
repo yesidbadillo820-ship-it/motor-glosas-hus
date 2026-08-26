@@ -43,6 +43,25 @@ carpeta ya armada) no se adivina: se avisa para que el auditor lo mire.
 
 45 pruebas nuevas (104 en el archivo).
 
+### Revisión posterior: dos defectos más, encontrados antes del cargue real
+
+**1. Una factura bloqueada dejaba sin folio a las otras 323.** `aplicar_folios`
+llamaba a `renombrar_lista` sin candado, al contrario de `unir()`. Un PDF
+abierto en Acrobat —o el share cayéndose un momento— tumbaba la corrida entera.
+Ahora esa factura se salta con `ERROR` y su motivo, y las demás siguen.
+
+**2. El folio de la factura habría llevado el detallado dos veces.** Al abrir el
+`680010079201_HUS311736_FACTURA.pdf` que viene con el XML, resultó **no ser solo
+la factura**: son 19 páginas con los cuatro renglones ya pegados —factura con
+CUFE (1–7), detallado (8–9), representación gráfica DIAN (10–18) y nota crédito
+(19)—. El bot le habría agregado encima el detallado del Excel. Ahora
+`renglones_que_trae()` mira dentro del PDF antes de tocarlo: lo que ya viene
+pegado no se duplica ni se cuenta como faltante, y se avisa en pantalla.
+Comprobado sobre una sola factura; en las que vengan solo con la factura, el bot
+arma el folio con las partes sin configurar nada.
+
+Con esto: 111 pruebas en el archivo.
+
 
 ## Sesión 25-ago-2026 (noche, 2) — `--renombrar`: el folio como lo nombra el área
 

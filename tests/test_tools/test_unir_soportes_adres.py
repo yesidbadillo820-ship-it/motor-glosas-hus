@@ -869,3 +869,97 @@ def test_una_factura_bloqueada_no_tumba_las_demas(tmp_path, monkeypatch):
     malas = [f for f in plan if f.estado == org.ESTADO_ERROR]
     assert [f.factura for f in malas] == ["HUS2"]
     assert malas[0].omitidos and "no pude renombrar" in malas[0].omitidos[0]
+
+
+# ─── La factura que ya viene con el folio armado adentro ─────────────────────
+
+
+def _pdf_con_texto(ruta: Path, paginas: list[str]) -> Path:
+    """Un PDF con texto de verdad, para probar lo que el bot lee adentro."""
+    reportlab = pytest.importorskip("reportlab")
+    from reportlab.pdfgen import canvas  # noqa: PLC0415
+
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(ruta))
+    for texto in paginas:
+        c.drawString(40, 700, texto)
+        c.showPage()
+    c.save()
+    assert reportlab
+    return ruta
+
+
+# Así viene de verdad el 680010079201_HUS311736_FACTURA.pdf del paquete 31068:
+# 19 páginas con los cuatro renglones del folio ya pegados.
+PAGINAS_FACTURA_REAL = (
+    ["FACTURA ELECTRONICA DE VENTA HUS311736 CUFE 67811444d5d4"] * 7
+    + ["DETALLADO FACTURA ELECTRONICA HUS311736"] * 2
+    + ["Representacion Grafica Codigo Unico de Factura - CUFE :"]
+    + ["Datos Totales Total Bruto Factura"] * 8
+    + ["NOTA Credito N 253292 GLOSA VIG ANTERIOR"]
+)
+
+
+def test_ve_los_renglones_que_la_factura_ya_trae_pegados(tmp_path):
+    ruta = _pdf_con_texto(tmp_path / "680010079201_HUS311736_FACTURA.pdf", PAGINAS_FACTURA_REAL)
+    assert org.renglones_que_trae(ruta) == {"DETALLADO", "DIAN", "NOTAS"}
+
+
+def test_una_factura_sola_no_trae_nada_pegado(tmp_path):
+    ruta = _pdf_con_texto(
+        tmp_path / "680010079201_HUS1_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA HUS1"] * 3,
+    )
+    assert org.renglones_que_trae(ruta) == set()
+
+
+def test_un_pdf_ilegible_no_afirma_nada(tmp_path):
+    ruta = tmp_path / "roto.pdf"
+    ruta.write_bytes(b"esto no es un PDF")
+    assert org.renglones_que_trae(ruta) == set()
+
+
+def test_no_le_pega_otro_detallado_a_la_factura_que_ya_lo_trae(tmp_path):
+    """El defecto que se evitó: el folio subiría al ADRES con el detallado DOS
+    veces, porque el ..._FACTURA.pdf del XML ya lo trae adentro."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "HC.pdf")
+    _pdf_con_texto(fac / "680010079201_HUS311736_FACTURA.pdf", PAGINAS_FACTURA_REAL)
+    (fac / "DETALLADO HUS311736.xlsx").write_bytes(b"x")
+
+    plan = org.planificar(raiz)
+    assert [d.name for d in plan[0].detallados_sin_pdf] == ["DETALLADO HUS311736.xlsx"]
+
+    org.revisar_facturas(plan)
+    assert plan[0].trae_la_factura == {"DETALLADO", "DIAN", "NOTAS"}
+    # Ya no se convierte ni se agrega: el detallado está dentro de la factura.
+    assert org.convertir_detallados(plan, aplicar=False) == []
+    assert [s.grupo.clave for s in plan[0].soportes_factura] == ["FACTURA"]
+
+
+def test_lo_que_la_factura_ya_trae_no_sale_como_faltante(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf_con_texto(fac / "680010079201_HUS311736_FACTURA.pdf", PAGINAS_FACTURA_REAL)
+    plan = org.planificar(raiz)
+    # Sin mirar adentro, el bot creería que faltan dos renglones.
+    assert plan[0].faltantes_factura() == ["DETALLADO", "REPRESENTACION GRAFICA DIAN"]
+    assert plan[0].notas_pendientes() is True
+    org.revisar_facturas(plan)
+    assert plan[0].faltantes_factura() == []
+    assert plan[0].notas_pendientes() is False
+
+
+def test_revisar_facturas_mira_la_carpeta_del_xml_en_simulacion(tmp_path):
+    """En simulación la factura todavía no se copió: hay que mirarla en su carpeta."""
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS311736" / "HC.pdf")
+    xml = tmp_path / "XML"
+    _pdf_con_texto(xml / "680010079201_HUS311736_FACTURA.pdf", PAGINAS_FACTURA_REAL)
+
+    plan = org.planificar(raiz)
+    indice = org.indice_facturas(xml)
+    org.copiar_facturas(plan, indice, aplicar=False)
+    org.revisar_facturas(plan, indice)
+    assert plan[0].trae_la_factura == {"DETALLADO", "DIAN", "NOTAS"}
