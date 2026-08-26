@@ -67,6 +67,28 @@ y entran solas de cuartas, sin rehacer nada.
 **El DETALLADO ya no queda por fuera**: antes se dejaba en Excel aparte; ahora
 es el renglón 2 de este folio, en PDF.
 
+### Ojo: la factura del XML a veces YA es el folio completo
+
+En el paquete 31068, el `680010079201_HUS311736_FACTURA.pdf` que viene con el
+XML **no es solo la factura**. Son 19 páginas con los cuatro renglones ya
+pegados:
+
+| Páginas | Qué es | Renglón |
+|---|---|---|
+| 1–7 | FACTURA ELECTRÓNICA DE VENTA, con su CUFE | 1. FACTURA |
+| 8–9 | DETALLADO FACTURA ELECTRONICA | 2. DETALLADO |
+| 10–18 | «Representación Gráfica» + Código Único de Factura (CUFE), Datos Totales | 3. REPRESENTACIÓN GRÁFICA DIAN |
+| 19 | NOTA CRÉDITO, con el trámite de objeción que la originó | 4. NOTAS CRÉDITO |
+
+Por eso el bot **mira dentro** del PDF de la factura antes de agregarle nada
+(`renglones_que_trae()`): si el renglón ya viene pegado, no le pone otro encima
+—el folio subiría al ADRES con el detallado dos veces— y tampoco lo cuenta como
+faltante. Lo dice en pantalla y en el reporte.
+
+Esto se comprobó sobre **una sola factura** (la HUS311736). Si en otras el
+`..._FACTURA.pdf` viene solo con la factura, el bot lo detecta igual y arma el
+folio con las partes: no hace falta configurar nada.
+
 ---
 
 ## 2) Cómo decide de qué es cada PDF

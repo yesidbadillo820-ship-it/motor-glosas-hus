@@ -395,6 +395,9 @@ class Factura:
     folios_previos: list[Path] = field(default_factory=list)
     # Los que además hay que mirar: podrían ser un soporte recién agregado.
     folios_dudosos: list[Path] = field(default_factory=list)
+    # Renglones que la propia factura ya trae pegados adentro (DETALLADO, DIAN,
+    # NOTAS): no se le vuelven a agregar encima.
+    trae_la_factura: set[str] = field(default_factory=set)
 
     def faltantes(self) -> list[str]:
         """Los grupos obligatorios que no aparecieron."""
@@ -402,8 +405,12 @@ class Factura:
         return [g.titulo for g in (GRUPOS[0], GRUPOS[1]) if g.clave not in presentes]
 
     def faltantes_factura(self) -> list[str]:
-        """Los renglones del folio de la factura que hoy deberían estar y no están."""
-        presentes = {s.grupo.clave for s in self.soportes_factura}
+        """Los renglones del folio de la factura que hoy deberían estar y no están.
+
+        Lo que la propia factura ya trae pegado adentro (`trae_la_factura`) NO
+        falta: está, solo que dentro del mismo PDF.
+        """
+        presentes = {s.grupo.clave for s in self.soportes_factura} | self.trae_la_factura
         return [
             g.titulo
             for g in GRUPOS_FACTURA
@@ -412,7 +419,8 @@ class Factura:
 
     def notas_pendientes(self) -> bool:
         """¿Falta el renglón 4 (notas crédito)? No es un error: aún no existen."""
-        return CLAVE_NOTAS not in {s.grupo.clave for s in self.soportes_factura}
+        presentes = {s.grupo.clave for s in self.soportes_factura} | self.trae_la_factura
+        return CLAVE_NOTAS not in presentes
 
 
 ESTADO_UNIDO = "UNIDO"
@@ -750,6 +758,47 @@ def indice_facturas(carpeta: Path) -> dict[str, Path]:
     return indice
 
 
+# La factura que viene con el XML no siempre es solo la factura. En el paquete
+# 31068 el `680010079201_HUS######_FACTURA.pdf` trae los cuatro renglones ya
+# pegados: la factura con CUFE, el detallado, la representación gráfica de la
+# DIAN y la nota crédito. Si el bot le agregara encima el detallado del Excel,
+# el folio subiría al ADRES con el detallado DOS VECES. Por eso se mira qué trae
+# adentro antes de tocarlo.
+MARCAS_RENGLON: tuple[tuple[str, str], ...] = (
+    ("DETALLADO", "DETALLADO FACTURA"),
+    ("DIAN", "REPRESENTACION GRAFICA"),
+    ("NOTAS", "NOTA CREDITO"),
+)
+
+# Cuántas páginas se leen buscando esas marcas. Las traen al principio; leer el
+# PDF entero de 324 facturas sobre el share sería lento sin ganar nada.
+PAGINAS_A_MIRAR = 25
+
+
+def renglones_que_trae(pdf: Path, PdfReader=None) -> set[str]:
+    """Qué renglones del folio ya vienen pegados dentro de este PDF.
+
+    Devuelve las claves (`DETALLADO`, `DIAN`, `NOTAS`) que encontró. Si el PDF
+    no se puede leer, devuelve vacío: se prefiere no afirmar nada a adivinar.
+    """
+    if PdfReader is None:
+        PdfReader, _ = _cargar_lector_escritor()
+    faltan = {clave: _norm(marca) for clave, marca in MARCAS_RENGLON}
+    trae: set[str] = set()
+    try:
+        lector = PdfReader(str(pdf))
+        for pagina in list(lector.pages)[:PAGINAS_A_MIRAR]:
+            if not faltan:
+                break
+            limpio = _norm(pagina.extract_text() or "")
+            for clave in [c for c, marca in faltan.items() if marca in limpio]:
+                trae.add(clave)
+                faltan.pop(clave)
+    except Exception as e:  # noqa: BLE001 - un PDF ilegible no tumba el lote
+        logger.debug("No pude mirar dentro de %s: %s", pdf.name, e)
+    return trae
+
+
 ESTADO_COPIADA = "COPIADA"
 ESTADO_SE_COPIARIA = "SE COPIARIA"
 ESTADO_YA_ESTABA = "YA ESTABA"
@@ -800,6 +849,26 @@ def copiar_facturas(
     return copias
 
 
+def revisar_facturas(plan: list[Factura], indice: dict[str, Path] | None = None) -> None:
+    """Mira dentro del PDF de cada factura qué renglones ya trae pegados.
+
+    Hace falta porque en el paquete 31068 el `..._FACTURA.pdf` que viene con el
+    XML **ya es el folio completo**: factura + detallado + representación
+    gráfica DIAN + nota crédito. Sin esta revisión el bot le pegaría encima el
+    detallado del Excel y el folio subiría con el detallado dos veces.
+    """
+    PdfReader, _ = _cargar_lector_escritor()
+    for fac in plan:
+        soporte = next((s for s in fac.soportes_factura if s.grupo.clave == "FACTURA"), None)
+        origen: Path | None = None
+        if soporte is not None and soporte.ruta.exists():
+            origen = soporte.ruta
+        elif indice is not None:
+            origen = indice.get(fac.factura)
+        if origen is not None and origen.exists():
+            fac.trae_la_factura = renglones_que_trae(origen, PdfReader)
+
+
 def _sumar_al_folio(fac: Factura, ruta: Path, grupo: Grupo) -> None:
     """Mete un archivo en el folio de la factura, en el renglón que le toca."""
     fac.soportes_factura.append(Soporte(ruta=ruta, grupo=grupo))
@@ -820,7 +889,14 @@ def convertir_detallados(plan: list[Factura], aplicar: bool = False) -> list[tup
     está, y si no LibreOffice. Si no hay ninguno de los dos, no revienta: lo
     deja anotado para que el auditor lo convierta y vuelva a correr.
     """
-    pendientes = [(fac, d) for fac in plan for d in fac.detallados_sin_pdf]
+    # Si la propia factura ya trae el detallado pegado adentro, no se le agrega
+    # otro encima: el folio quedaría con el detallado dos veces.
+    pendientes = [
+        (fac, d)
+        for fac in plan
+        for d in fac.detallados_sin_pdf
+        if "DETALLADO" not in fac.trae_la_factura
+    ]
     if not pendientes:
         return []
     if not aplicar:
@@ -1175,6 +1251,19 @@ def _resumen_folios(
             len(pendientes),
         )
 
+    completas = [f for f in plan if f.trae_la_factura]
+    if completas:
+        cuenta: dict[str, int] = {}
+        for f in completas:
+            for clave in f.trae_la_factura:
+                cuenta[clave] = cuenta.get(clave, 0) + 1
+        logger.info(
+            "\nLa factura ya trae renglones pegados adentro en %d factura(s): %s.",
+            len(completas),
+            ", ".join(f"{n} con {clave}" for clave, n in sorted(cuenta.items())),
+        )
+        logger.info("   No se les agrega otro encima: el folio quedaría con el renglón dos veces.")
+
     dudosos = [(f, p) for f in plan for p in f.folios_dudosos]
     if dudosos:
         logger.info(
@@ -1224,11 +1313,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.folio:
         # El trabajo completo: los dos folios de cada factura.
         plan = planificar(args.carpeta, facturas, mapa)
+        indice: dict[str, Path] | None = None
         if args.carpeta_facturas:
             if not args.carpeta_facturas.is_dir():
                 logger.error("No existe la carpeta de facturas: %s", args.carpeta_facturas)
                 return 1
-            copias = copiar_facturas(plan, indice_facturas(args.carpeta_facturas), args.aplicar)
+            indice = indice_facturas(args.carpeta_facturas)
+            copias = copiar_facturas(plan, indice, args.aplicar)
+        # Antes de agregarle nada, mirar qué trae la factura pegado adentro.
+        revisar_facturas(plan, indice)
         if args.convertir_detallado:
             conversiones = convertir_detallados(plan, args.aplicar)
         aplicar_folios(plan, args.aplicar, args.prefijo)

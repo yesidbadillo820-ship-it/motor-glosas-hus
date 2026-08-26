@@ -114,13 +114,42 @@ completa, no un solo renglón. Y el caso que de verdad no se puede distinguir
 —un `..._EPICRIS.pdf` suelto en una carpeta que ya estaba armada— no se
 adivina: sale avisado en pantalla y en el reporte para que usted lo mire.
 
-**Lo que hace falta confirmar:** qué archivo es exactamente la
-**REPRESENTACIÓN GRÁFICA DE LA DIAN** (renglón 3). Si es el mismo
-`680010079201_HUS######_FACTURA.pdf` que está en la carpeta del XML, se quita
-ese renglón y listo. Mientras no se confirme, el bot lo reporta como faltante en
-todas las facturas — no se inventó ningún archivo.
+**LA RESPUESTA A SU PREGUNTA, mirando el archivo que usted mandó.** Abrimos el
+`680010079201_HUS311736_FACTURA.pdf` de la carpeta del XML y **no es solo la
+factura**: son 19 páginas que ya traen los cuatro renglones del folio, en el
+mismo orden que usted describió:
 
-Pruebas: 104 en `tests/test_tools/test_unir_soportes_adres.py`.
+| Páginas | Qué es |
+|---|---|
+| 1 a 7 | FACTURA ELECTRÓNICA DE VENTA HUS311736, con su CUFE |
+| 8 y 9 | DETALLADO FACTURA ELECTRONICA HUS311736 |
+| 10 a 18 | «Representación Gráfica» con el Código Único de Factura (CUFE) y los Datos Totales ($28.741.141) |
+| 19 | NOTA CRÉDITO N° 253292 del 30/06/2026 por $518.900, del trámite de objeción 179143 |
+
+O sea: **ese archivo ya ES el folio de la factura**. La representación gráfica
+de la DIAN no es un archivo aparte: son las páginas 10 a 18 de ese mismo PDF.
+
+**Lo que eso evitó.** El bot, tal como estaba, le habría pegado encima el
+detallado del Excel: el folio habría subido al ADRES con el **detallado dos
+veces**. Ya está corregido: ahora el bot mira adentro del PDF de la factura
+antes de agregarle nada, y lo que ya viene pegado no lo duplica ni lo cuenta
+como faltante. Lo avisa en pantalla.
+
+**Cuidado, esto se vio en UNA sola factura** (la HUS311736), que es la que usted
+mandó. Si en otras el `..._FACTURA.pdf` viene solo con la factura, el bot lo
+detecta solo y arma el folio con las partes: no hay nada que configurar.
+
+**Lo que sí hace falta que usted decida:** las notas crédito. La de la página 19
+es de un trámite de junio (objeción 179143). Las de los valores aceptados de
+ESTE paquete son otras. ¿El folio se deja con la nota que ya trae, o cuando
+salgan las nuevas se rehace? Díganos y se ajusta.
+
+Pruebas: 111 en `tests/test_tools/test_unir_soportes_adres.py`.
+
+**Otro defecto corregido el mismo día:** si un PDF estaba abierto en Acrobat, o
+el share se caía un momento, la corrida entera se tumbaba y las otras 323
+facturas quedaban sin folio. Ahora esa factura se salta, queda marcada con el
+motivo en el reporte, y las demás siguen.
 
 
 ### 25-08-2026 (cierre 3) — El repaso normativo: otros cuatro artículos mal, y un argumento que estábamos regalando
@@ -7736,12 +7765,14 @@ vuelve a pasar.
 ## 3) PENDIENTE
 
 ### Folio ADRES del paquete 31068 (26-08)
-- **Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN.** Es el renglón 3 del
-  folio de la factura. Si resulta ser el mismo PDF que viene con el XML, se
-  quita el renglón; si es otro archivo, hay que decir de qué carpeta sale.
-- **Las NOTAS CRÉDITO de los valores aceptados.** Es el renglón 4 y todavía no
-  existen. Cuando salgan, se dejan en la carpeta de cada factura y se vuelve a
-  apretar el botón: entran solas, sin rehacer lo demás.
+- **~~Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN~~ — RESUELTO.** Son
+  las páginas 10 a 18 del mismo `..._FACTURA.pdf` que viene con el XML. Ese
+  archivo ya es el folio de la factura completo.
+- **DECISIÓN SUYA: las notas crédito.** El `..._FACTURA.pdf` de la HUS311736 ya
+  trae una nota crédito (la N° 253292, del trámite de objeción 179143 de junio).
+  Las de los valores aceptados de ESTE paquete son otras. ¿Se deja la que ya
+  trae, o cuando salgan las nuevas se rehace el folio? Mientras no diga, el bot
+  respeta lo que el archivo ya trae y no le agrega nada encima.
 - **Las 101 facturas sin carpeta** en ningún gestor (CAROLINA, CLAUDIA, OSCAR)
   y **las 47 carpetas vacías de CLAUDIA** siguen igual: sin carpeta no hay
   folio que armar.
@@ -8215,8 +8246,9 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 **Folio ADRES (26-08), lo primero:** correr el botón
 `tools/UNIR_SOPORTES_ADRES.cmd` en **una sola carpeta de prueba** (una factura),
 mirar que los dos PDF queden como se espera, y solo entonces pasarlo a los tres
-gestores completos. Antes de eso, decirnos qué archivo es la representación
-gráfica de la DIAN.
+gestores completos. Lo de la representación gráfica de la DIAN ya quedó
+resuelto: son las páginas 10 a 18 del mismo `..._FACTURA.pdf`. Lo que falta es
+que usted decida qué hacer con las notas crédito (ver PENDIENTE).
 
 **Frente COOSALUD (25-08):** (a) subir a DGH los 6 archivos de OBJECIONES del
 lote de 1.573; (b) armar los trámites de ese lote cuando las objeciones estén
