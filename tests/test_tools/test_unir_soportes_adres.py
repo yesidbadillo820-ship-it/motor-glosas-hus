@@ -1418,3 +1418,22 @@ def test_la_caratula_no_deja_archivos_temporales(tmp_path):
     _pdf(fac / "HC.pdf", paginas=3)
     org.armar_folios(raiz, aplicar=True)
     assert not [p.name for p in fac.iterdir() if ".tmp" in p.name]
+
+
+@pytest.mark.parametrize(
+    ("origen", "esperado"),
+    [
+        # Así los deja `dividir_detallado_por_factura.py`: el número y nada más.
+        ("HUS352904.xlsx", "HUS352904 DETALLADO.pdf"),
+        # Si el nombre ya dice qué es, no se le agrega nada.
+        ("DETALLADO HUS1.xlsx", "DETALLADO HUS1.pdf"),
+        ("HUS352904 DETALLADO.xlsx", "HUS352904 DETALLADO.pdf"),
+    ],
+)
+def test_el_detallado_convertido_conserva_un_nombre_reconocible(origen, esperado):
+    """`HUS352904.xlsx` pasado a `HUS352904.pdf` a secas ya no se sabe qué es:
+    en la corrida siguiente se iba a OTROS del folio CLÍNICO."""
+    destino = org.nombre_detallado_pdf(Path(origen))
+    assert destino.name == esperado
+    assert org.es_detallado(destino.name)
+    assert org.clasificar(destino.name).clave == "DETALLADO"
