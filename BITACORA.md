@@ -8279,17 +8279,40 @@ casos de prueba resultó ser idéntico —byte por byte— al de la auditoría
 anterior. No trae los dictámenes nuevos: son los mismos, generados antes de las
 correcciones. Falta volver a enviarlo.
 
-### 26-08 — La única idea que falta, y es decisión suya
+### 26-08 — La idea que yo no recomendaba, y que resultó tapando un defecto real
 
-De las doce ideas para el motor quedaron once hechas. La que falta es la **#12,
-unificar los dos vocabularios de color** de la página.
+Queda escrito porque el equivocado fui yo.
 
-Se lo dejo escrito tal como se lo dije: **no la recomiendo.** Conviven dos
-sistemas de color —el propio de la página (90 nombres, 2.072 usos) y el de
-`sinac-ds.css`, que se carga y casi nadie usa—. Unificarlos son **2.072 cambios
-sobre algo que funciona y sin ningún defecto visible que lo justifique**. Queda
-escrita para que exista la constancia, no porque valga la pena. Si usted me
-dice que sí, se hace.
+De las doce ideas para el motor, la #12 era **unificar los dos vocabularios de
+color**. Yo se la desaconsejé por escrito: dije que eran «2.072 cambios sobre
+algo que funciona y **sin ningún defecto visible** que lo justifique». Usted
+dijo que se hiciera igual. Al medirlo, resultó que **las dos afirmaciones mías
+eran falsas**.
+
+**Uno: sí había defecto visible, y en la pantalla que más se usa.** El archivo
+del sistema de diseño no estaba muerto: dieciséis de sus reglas de color pintan
+hoy la pantalla de Analizar — el cuerpo del dictamen, las fichas de cita, los
+campos y el botón principal. Y las dos paletas no eran dos nombres para el
+mismo color: **eran colores distintos**. La ficha de cita **VERIFICADA** salía
+de un verde en el dictamen y de otro verde en el resto del motor. Lo mismo el
+ámbar del «sin verificar» y el rojo del error.
+
+**Dos: no eran 2.072 cambios, eran 13.** No hacía falta reescribir los usos.
+Bastó con que los trece colores del sistema de diseño dejaran de tener color
+propio y tomaran el de la paleta corporativa. Los nombres siguen siendo los
+mismos que se escriben; lo que cambia es el color que devuelven. Ni uno solo de
+los 2.072 usos se tocó.
+
+Y al medirlo salió algo más: de las seis páginas que cargan ese archivo,
+**cuatro no traen la paleta corporativa**. Sin un color de respaldo, esas
+cuatro se habrían quedado con los colores vacíos —el elemento se pinta
+transparente, que es como quedó invisible en su día el botón del lote ADRES—.
+Cada color lleva el suyo, y es el corporativo, así que esas cuatro páginas
+también quedaron unificadas.
+
+**La lección, para la próxima vez que yo diga que algo no vale la pena:**
+«no hay defecto visible» no es una conclusión si no se ha mirado. Medir costó
+diez minutos y cambió la respuesta entera.
 
 ### ⭐ Lo primero, al cierre del 25-08
 
@@ -8811,22 +8834,39 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
-**Lo primero del motor (26-08, cierre de la noche):** volver a **desplegar y
-reiniciar** el motor en la PC de cartera. Lo que entra con este despliegue son
-las once ideas: el aviso de «falta el soporte», el auditor de la EPS antes de
-radicar, el sello honesto, el CUPS traído de DGH, la plantilla que más plata ha
-recuperado, la pregunta de «¿cuál argumento la levantó?», y las dos pantallas
-nuevas —**«Mi día»** y **«Plata recuperada»**—. Mientras no se reinicie, nada
-de eso se ve.
+**~~Desplegar las once ideas~~ — HECHO y COMPROBADO el 26-08 en la tarde.** El
+motor de la PC de cartera quedó en el mismo punto que el del hospital y las
+tres pantallas nuevas respondieron. Se vieron funcionando «Mi día» (24 glosas
+del Dispensario, $56.169.241 en riesgo) y «Plata recuperada» ($376.145.240
+glosados en agosto, con su aviso de lo que no puede afirmar).
 
-**Lo primero de usted, después del reinicio:** entrar a **«Mi día»** (está en
-el menú, arriba, con el solcito). Es la pantalla con la que debería empezar el
-día el gestor. Si le sirve como está, se queda; si le falta algo, dígamelo y se
+**Lo primero del motor (26-08, cierre de la noche):** volver a **desplegar y
+reiniciar** una vez más. Lo que falta por bajar es la **idea #12** —el color
+unificado— más los tres arreglos de la noche. En la pantalla de Analizar se va
+a notar: la ficha de cita **VERIFICADA** pasa a tener el mismo verde que el
+resto del motor, y el «sin verificar» el mismo ámbar.
+
+**Lo primero de usted:** decirme si **«Mi día»** le sirve como está. Es la
+pantalla con la que debería empezar el día el gestor; si le falta algo, se
 ajusta.
 
-**Y decidir la idea #12** (unificar los dos vocabularios de color). Está
-explicada en PENDIENTE. Repito lo que le dije: son 2.072 cambios sobre algo que
-funciona y no la recomiendo. Solo se hace si usted lo pide.
+**~~Decidir la idea #12~~ — DECIDIDA POR USTED Y HECHA.** Ver la entrada de
+PENDIENTE: yo la había desaconsejado y estaba equivocado.
+
+**Una cosa que hay que decidir, y no es urgente pero sí importante.** Hoy
+entraron tres defectos a la rama del hospital y **ninguno lo detuve yo**: los
+cazó la revisión automática. El problema es que **el autodespliegue no espera a
+esa revisión** — se baja el código apenas se fusiona, así que los tres llegaron
+a la PC de cartera antes de que nadie supiera que estaban mal. El hueco se
+tapa de dos formas, y hay que escoger una:
+
+  1. **Que GitHub no deje fusionar** hasta que la revisión esté en verde. Es un
+     cambio de configuración; se hace en la página del repositorio.
+  2. **Que el `.cmd` del despliegue pregunte** antes de bajarse el código, y no
+     se baje nada si la revisión está en rojo. Esto lo escribo yo.
+
+La primera es más segura (nada malo llega ni siquiera a la rama). La segunda no
+depende de nadie más y protege el PC aunque algo se cuele.
 
 **Sigue faltando (de ayer):** volver a exportar los 10 casos de prueba. El
 documento que subió resultó idéntico —byte por byte— al de la auditoría

@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 7) — un solo vocabulario de color
+
+Idea #12, decidida por el área. **Corrige lo que la propuesta afirmaba:** que
+`sinac-ds.css` «se carga y nadie usa» y que no había defecto visible. Al medir,
+las dos afirmaciones resultaron falsas.
+
+- **16 reglas de color de ese archivo aplican hoy**, todas sobre `#p-analizar`:
+  `.res-dictamen-body`, `.pa-cite.verified`, `.pa-cite.unverified`,
+  `.sidebar input/select/textarea`, `.sidebar .btn-primary`, `.res-actions button`.
+- Las paletas eran **colores distintos**, no alias: `--sds-success` `#16a34a`
+  contra `--c-green` `#2E7D32` (distancia RGB 51); `--sds-amber` `#d97706`
+  contra `--c-amber` `#E65100` (41); `--sds-rose` `#e11d48` contra `--c-red`
+  `#C62828` (43).
+
+**Arreglo: 13 líneas, no 2.072.** Los trece tokens de color de `--sds-*` pasan
+a `var(--sinac-*, #hex)`. El nombre que se escribe sigue siendo `--sds-*` —como
+pide CLAUDE.md— y el valor que devuelve es el corporativo. Ningún uso se tocó.
+
+**El fallback es obligatorio:** de las 6 páginas que cargan el archivo, 4 no
+definen `--sinac-*` (preauditoria, importar-masiva, presentacion-ia,
+terapia-fisica). Un alias sin fallback las dejaría con `var()` vacío → elemento
+transparente. El fallback es el hex corporativo, no el viejo, para unificarlas
+también.
+
+**Pruebas:** `test_un_solo_vocabulario_de_color.py`, 8 casos — ningún token de
+color se declara solo, ninguno queda sin fallback, ningún fallback conserva el
+hex viejo, y un guardia de ≥10 tokens para que no pase por vacía. 262 en
+`tests/test_frontend`.
+
+
+
 ## Sesión 26-ago-2026 (cierre 6) — la ruta de «Mi día» pisaba una que ya existía
 
 Defecto que entró con el PR #506 y lo cazó el CI.
