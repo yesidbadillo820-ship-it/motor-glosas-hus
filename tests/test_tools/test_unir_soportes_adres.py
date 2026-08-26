@@ -8,6 +8,7 @@ cuele en el PDF y que sin `--aplicar` no se escriba nada.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -1002,3 +1003,93 @@ def test_revisar_facturas_mira_la_carpeta_del_xml_en_simulacion(tmp_path):
     org.copiar_facturas(plan, indice, aplicar=False)
     org.revisar_facturas(plan, indice)
     assert plan[0].trae_la_factura == {"DETALLADO", "DIAN", "NOTAS"}
+
+
+# ─── Lo que encontró la revisión adversarial ─────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "nombre",
+    ["NC_263272_HUS352904.pdf", "NC 253292.pdf", "NC_311561_HUS311736.pdf"],
+)
+def test_las_notas_credito_con_el_nombre_del_hospital(nombre):
+    """El hospital las nombra `NC_<numero>_HUS<factura>.pdf`.
+
+    Antes caían en OTROS del folio CLÍNICO y el reporte seguía diciendo que las
+    notas crédito faltaban.
+    """
+    grupo = org.clasificar(nombre)
+    assert grupo.clave == "NOTAS" and grupo.folio == org.FOLIO_FACTURA
+
+
+@pytest.mark.parametrize(
+    "nombre", ["HC.pdf", "RESONANCIA.pdf", "INCAPACIDAD.pdf", "NTE-C.pdf", "CONSENTIMIENTO.pdf"]
+)
+def test_la_abreviatura_NC_no_dispara_falsos_positivos(nombre):
+    assert org.clasificar(nombre).clave != "NOTAS"
+
+
+@pytest.mark.parametrize(
+    "clave", ["URGENCIAS", "TERAPIAS", "CURACIONES", "EVOLUCIONES", "PROCEDIMIENTOS", "HISTORIA"]
+)
+def test_el_nombre_que_escribe_el_bot_se_relee_en_el_mismo_grupo(clave):
+    """`3 HISTORIA CLINICA - TERAPIAS.pdf` se releía como HISTORIA a secas.
+
+    En la segunda corrida el soporte cambiaba de grupo, se renumeraba, y el
+    folio salía con las páginas en otro orden. HISTORIA CLINICA es genérico:
+    cualquier grupo más preciso le gana.
+    """
+    grupo = next(g for g in org.GRUPOS if g.clave == clave)
+    assert org.clasificar(org.nombre_numerado(3, grupo)).clave == clave
+
+
+def test_el_orden_del_folio_no_cambia_entre_corridas(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    for nombre in ("RTA_ADRES_HUS1.pdf", "EPI.pdf", "TERAPIAS.pdf", "CURACIONES.pdf", "HC.pdf"):
+        _pdf(fac / nombre)
+    primera = [s.grupo.clave for s in org.armar_folios(raiz, aplicar=True)[0].soportes]
+    segunda = [s.grupo.clave for s in org.armar_folios(raiz, aplicar=True)[0].soportes]
+    assert (
+        primera
+        == segunda
+        == [
+            "RESPUESTA",
+            "EPICRISIS",
+            "TERAPIAS",
+            "CURACIONES",
+            "HISTORIA",
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("nombre", "esperado"),
+    [
+        # Así lo deja `dividir_detallado_por_factura.py`: el número y nada más.
+        ("HUS352904.xlsx", True),
+        ("HUS0000352890.xlsx", True),
+        ("DETALLADO HUS1.xlsx", True),
+        # Un PDF con ese nombre no es el detallado.
+        ("HUS352904.pdf", False),
+        ("HUS352904 EPICRISIS.pdf", False),
+    ],
+)
+def test_reconoce_el_detallado_que_deja_el_bot_hermano(nombre, esperado):
+    assert org.es_detallado(nombre) is esperado
+
+
+def test_avisa_el_soporte_que_no_entro_al_folio(tmp_path, caplog):
+    """Un PDF dañado se omite y el folio SÍ se arma. No puede pasar en silencio:
+    al ADRES subiría un folio al que le falta una hoja."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    (fac / "HUS1 EPICRISIS.pdf").write_bytes(b"esto no es un PDF")
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        assert org.main(["--carpeta", str(raiz), "--folio", "--aplicar"]) == 0
+    salida = caplog.text
+    assert "NO entraron al folio" in salida
+    # Con el nombre que TIENE ahora en la carpeta, que es el que el auditor va
+    # a buscar: para entonces ya quedó numerado.
+    assert "2 EPICRISIS.pdf" in salida

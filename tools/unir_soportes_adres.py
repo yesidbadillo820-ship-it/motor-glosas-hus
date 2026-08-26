@@ -118,6 +118,13 @@ class Grupo:
     titulo: str
     palabras: tuple[str, ...]
     folio: str = FOLIO_EPICRIS
+    # Un grupo «genérico» pierde contra cualquier otro que también aparezca en
+    # el nombre, aunque su palabra sea más larga. HISTORIA CLINICA lo es: es el
+    # cajón de la historia, y sus subgrupos (terapias, curaciones, evoluciones,
+    # procedimientos) son más precisos. Sin esto, «3 HISTORIA CLINICA -
+    # TERAPIAS.pdf» —el nombre que escribe el propio bot— se releía como
+    # HISTORIA en la corrida siguiente y el soporte cambiaba de sitio.
+    generico: bool = False
 
 
 # El orden de esta tupla ES el orden del PDF. Las palabras se comparan sin
@@ -163,7 +170,13 @@ GRUPOS: tuple[Grupo, ...] = (
         "HISTORIA CLINICA - PROCEDIMIENTOS",
         ("PROCEDIMIENTOS", "PROCEDIMIENTO", "DESCRIPCION QUIRURGICA", "QUIRURGICA"),
     ),
-    Grupo(8, "HISTORIA", "HISTORIA CLINICA", ("HISTORIA CLINICA", "HISTORIA", "HC")),
+    Grupo(
+        8,
+        "HISTORIA",
+        "HISTORIA CLINICA",
+        ("HISTORIA CLINICA", "HISTORIA", "HC"),
+        generico=True,
+    ),
     Grupo(
         9,
         "AYUDAS",
@@ -260,7 +273,17 @@ GRUPOS_FACTURA: tuple[Grupo, ...] = (
         4,
         "NOTAS",
         "NOTAS CREDITO",
-        ("NOTAS CREDITO", "NOTA CREDITO", "NOTA DE CREDITO", "NOTAS DE CREDITO"),
+        (
+            "NOTAS CREDITO",
+            "NOTA CREDITO",
+            "NOTA DE CREDITO",
+            "NOTAS DE CREDITO",
+            "NOTA ELECTRONICA",
+            # Así las nombra el hospital de verdad: NC_263272_HUS352904.pdf.
+            # Sin esto se iban a OTROS del folio CLÍNICO y el reporte seguía
+            # diciendo que las notas crédito faltaban.
+            "NC",
+        ),
         FOLIO_FACTURA,
     ),
 )
@@ -309,12 +332,22 @@ def clasificar(nombre: str, mapa: dict[str, str] | None = None) -> Grupo:
                 )
                 if grupo is not None:
                     return grupo
+    # Se lleva la cuenta aparte de los grupos genéricos: solo ganan si ningún
+    # grupo preciso apareció en el nombre.
     mejor: tuple[int, Grupo] = (0, GRUPO_OTROS)
+    mejor_generico: tuple[int, Grupo | None] = (0, None)
     for grupo in TODOS_LOS_GRUPOS:
         for palabra in grupo.palabras:
             clave = _norm(palabra)
-            if clave and _es_palabra(clave, limpio) and len(clave) > mejor[0]:
+            if not clave or not _es_palabra(clave, limpio):
+                continue
+            if grupo.generico:
+                if len(clave) > mejor_generico[0]:
+                    mejor_generico = (len(clave), grupo)
+            elif len(clave) > mejor[0]:
                 mejor = (len(clave), grupo)
+    if mejor[1] is GRUPO_OTROS and mejor_generico[1] is not None:
+        return mejor_generico[1]
     return mejor[1]
 
 
@@ -345,9 +378,21 @@ def _es_palabra(aguja: str, pajar: str) -> bool:
     return re.search(rf"(?<![A-Z0-9]){re.escape(aguja)}(?![A-Z0-9])", pajar) is not None
 
 
+# `dividir_detallado_por_factura.py` deja cada detallado con el número de la
+# factura por todo nombre (`HUS352904.xlsx`). Es el archivo que el auditor pasa
+# a PDF para el renglón 2 del folio, así que hay que reconocerlo.
+_RE_SOLO_FACTURA = re.compile(r"^HUS\s*0*\d+$")
+
+
 def es_detallado(nombre: str) -> bool:
-    limpio = _norm(nombre)
-    return any(_norm(p) in limpio for p in PALABRAS_DETALLADO)
+    limpio = _norm(Path(nombre).stem)
+    if any(_norm(p) in limpio for p in PALABRAS_DETALLADO):
+        return True
+    return bool(_RE_SOLO_FACTURA.fullmatch(limpio)) and Path(nombre).suffix.lower() in (
+        ".xlsx",
+        ".xlsm",
+        ".xls",
+    )
 
 
 # ─── Lo que se encontró en cada carpeta ──────────────────────────────────────
@@ -1294,6 +1339,21 @@ def _resumen_folios(
             ", ".join(f"{n} con {clave}" for clave, n in sorted(cuenta.items())),
         )
         logger.info("   No se les agrega otro encima: el folio quedaría con el renglón dos veces.")
+
+    # Un soporte que no se pudo leer se omite y el folio SÍ se arma. Eso no
+    # puede pasar en silencio: al ADRES subiría un folio al que le falta una
+    # hoja y en pantalla decía «armado» sin más.
+    caidos = [(f, om) for f in plan for om in f.omitidos]
+    if caidos:
+        logger.info(
+            "\nOJO, %d soporte(s) NO entraron al folio de su factura. El folio se armó "
+            "SIN ellos: revíselos antes de subir nada.",
+            len(caidos),
+        )
+        for fac, om in caidos[:10]:
+            logger.info("   %s: %s", fac.factura, om)
+        if len(caidos) > 10:
+            logger.info("   … y %d más, en el reporte CSV.", len(caidos) - 10)
 
     no_pisados = [f for f in plan if ESTADO_NO_PISA in (f.estado, f.estado_factura)]
     if no_pisados:

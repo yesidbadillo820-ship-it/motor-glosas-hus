@@ -57,7 +57,7 @@ Dentro de un mismo grupo los archivos van en **orden natural** de nombre
 | 1 | FACTURA | `FACTURA`, `FACTURA DE VENTA` | De la carpeta `4.FACTURAS CON XML\XML`, como `680010079201_HUS######_FACTURA.pdf`. El bot la trae solo con `--carpeta-facturas` |
 | 2 | DETALLADO | `DETALLADO`, `DETALLE DE FACTURA` | Del detallado en Excel. Con `--convertir-detallado` el bot lo pasa a PDF |
 | 3 | REPRESENTACIÓN GRÁFICA DIAN | `REPRESENTACION GRAFICA`, `DIAN` | La que sale de la DIAN |
-| 4 | NOTAS CRÉDITO | `NOTAS CREDITO`, `NOTA DE CREDITO` | Las de los valores aceptados |
+| 4 | NOTAS CRÉDITO | `NOTAS CREDITO`, `NOTA DE CREDITO`, `NOTA ELECTRONICA` y `NC` —así las nombra el hospital: `NC_263272_HUS352904.pdf` | Las de los valores aceptados |
 
 **Las NOTAS CRÉDITO quedan pendientes a propósito.** Todavía no las han sacado,
 así que el bot **no las cuenta como falta**: avisa cuántas faltan y sigue. El
@@ -181,7 +181,7 @@ El resultado queda en la carpeta de cada factura como
 
 ---
 
-## 4) Los cinco candados
+## 4) Los seis candados
 
 Armar folios no se deshace de un clic, así que:
 
@@ -193,11 +193,18 @@ Armar folios no se deshace de un clic, así que:
    puede correr las veces que haga falta sin que el folio se anide dentro de sí
    mismo. Lo distingue porque, después de una corrida, todos los soportes
    quedaron numerados y con el nombre original ya no queda ninguno.
-3. **No pisa la factura que ya estaba.** Si la carpeta ya tiene su factura, no
+3. **Nunca pisa un archivo que no escribió él.** El folio se llama igual que el
+   archivo del que sale, así que el bot **firma por dentro** los PDF que
+   escribe (`/Producer`) y en la corrida siguiente reconoce los suyos por esa
+   firma, no por el nombre. Lo que no lleva la firma es un soporte de verdad.
+   Si en la ruta del folio hay algo sin firmar, no arma ese folio y avisa:
+   perder un soporte no se deshace, no armar un folio sí.
+4. **No pisa la factura que ya estaba.** Si la carpeta ya tiene su factura, no
    la reemplaza con la del XML.
-4. **Un PDF dañado no tumba el lote.** Se omite, se sigue con los demás y queda
-   anotado en el reporte.
-5. **Sin Excel ni LibreOffice no revienta.** Si no hay con qué pasar el
+5. **Un PDF dañado no tumba el lote.** Se omite, se sigue con los demás, y sale
+   avisado en pantalla («NO entraron al folio») además del reporte: un folio al
+   que le falta una hoja no se sube sin que el auditor lo sepa.
+6. **Sin Excel ni LibreOffice no revienta.** Si no hay con qué pasar el
    detallado a PDF, lo deja anotado y sigue con lo demás.
 
 ---

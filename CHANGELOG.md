@@ -1,5 +1,53 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (tarde) — la revisión adversarial: pérdida de datos y cuatro defectos más
+
+Se pasó el bot de folios por una revisión con cinco lentes distintas —colisiones
+de nombres, idempotencia, pérdida de archivos, Windows/SMB, contratos—, y cada
+hallazgo se puso a dos escépticos que tenían que reproducirlo contra el código
+real. Salieron 31; estos son los que se confirmaron y se arreglaron.
+
+**1. PÉRDIDA DE DATOS: el folio pisaba la epicrisis de verdad.** El folio se
+llama igual que el archivo del que sale (`..._EPICRIS.pdf`). Para distinguirlos
+el bot miraba si la carpeta traía archivos numerados; en una carpeta donde el
+auditor ya había numerado algo a mano —que es lo que pide la hoja del área— la
+epicrisis DE VERDAD se tomaba por folio viejo, se dejaba fuera del folio y se
+pisaba. Comprobado: epicrisis de 5 páginas → tras UNA corrida, esa ruta tenía un
+folio de 4 páginas sin la epicrisis y la epicrisis no existía. Sin respaldo.
+
+La heurística se reemplaza por un hecho: el bot **firma** los PDF que escribe
+(`/Producer`) y reconoce los suyos por esa firma. Lo que no la lleva es un
+soporte y se trata como tal — que era lo correcto: la epicrisis entra al folio y
+se renombra, y con eso queda libre el nombre. Se quitan `_RE_NUMERADO`,
+`_grupos_ya_numerados` y `folios_dudosos`. Candado extra: si en la ruta del
+folio hay algo sin firma, no se arma ese folio y se avisa.
+
+**2. Las notas crédito no se reconocían con el nombre del hospital.** Vienen
+como `NC_263272_HUS352904.pdf`; caían en OTROS del folio CLÍNICO y el reporte
+seguía diciendo que faltaban. Se agregan `NC` y `NOTA ELECTRONICA`, comprobando
+que no disparan falsos positivos (`HC`, `RESONANCIA`, `INCAPACIDAD`, `NTE-C`).
+
+**3. El folio cambiaba de orden entre corridas.** El nombre que escribe el
+propio bot, `3 HISTORIA CLINICA - TERAPIAS.pdf`, se releía como HISTORIA a
+secas, porque «HISTORIA CLINICA» es más larga que «TERAPIAS» y ganaba. El
+soporte cambiaba de grupo y se renumeraba. Ahora HISTORIA CLINICA es un grupo
+**genérico**: cualquier grupo más preciso le gana. Igual para curaciones,
+evoluciones y procedimientos.
+
+**4. El detallado del bot hermano no se reconocía.**
+`dividir_detallado_por_factura.py` lo deja como `HUS352904.xlsx`, el número y
+nada más: nunca se pasaba a PDF y no entraba al folio.
+
+**5. Un soporte dañado desaparecía del folio en silencio.** Se omitía, el folio
+se armaba sin él y en pantalla decía «armado». Ahora sale avisado: «OJO, N
+soporte(s) NO entraron al folio».
+
+Y dos candados más de robustez: una copia fallida de la factura, o un archivo
+bloqueado al renombrar con `--renombrar`, ya no tumban las otras 323 facturas.
+
+133 pruebas en el archivo.
+
+
 ## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)
 
 El área aclaró cómo es el folio completo, y son **dos PDF por factura**, no uno:
