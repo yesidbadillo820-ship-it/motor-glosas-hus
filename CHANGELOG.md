@@ -1,5 +1,49 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)
+
+El área aclaró cómo es el folio completo, y son **dos PDF por factura**, no uno:
+
+- **`<NIT>_<FACTURA>_EPICRIS.pdf`** — el nombre que queda **después** de unir
+  los soportes numerados (`1 RESPUESTA A GLOSA`, `2 EPICRISIS`,
+  `3 HISTORIA CLINICA`, `4 AYUDAS DIAGNOSTICAS`, `5 OTROS`).
+- **`<NIT>_<FACTURA>_FACTURA.pdf`** — la factura sí entra al folio, con su
+  propio orden adentro: **1 FACTURA · 2 DETALLADO (el Excel pasado a PDF) ·
+  3 REPRESENTACIÓN GRÁFICA DIAN · 4 NOTAS CRÉDITO**.
+
+Lo que se agregó a `unir_soportes_adres.py`:
+
+- **`--folio`**: numera los soportes y arma los dos PDF. Numerar primero no es
+  adorno — es lo que **deja libre el nombre del folio**, porque ese nombre es
+  justo el que traían la epicrisis y la factura antes de renombrarlas.
+- **Cuatro renglones nuevos** (`GRUPOS_FACTURA`) con sus palabras: FACTURA,
+  DETALLADO, REPRESENTACIÓN GRÁFICA DIAN y NOTAS CRÉDITO. Los trece grupos
+  clínicos quedaron igual.
+- **`--carpeta-facturas`**: trae a cada carpeta su
+  `680010079201_HUS######_FACTURA.pdf` desde `4.FACTURAS CON XML\XML`. No pisa
+  la que ya estuviera.
+- **`--convertir-detallado`**: pasa a PDF el detallado que esté en Excel,
+  reusando el motor de `excel_a_pdf.py`. Si el equipo no tiene ni Excel ni
+  LibreOffice, lo deja anotado y sigue.
+- **`--prefijo`**: el NIT del nombre. **No se inventa**: sale del nombre de los
+  propios archivos; esta opción solo llena las carpetas donde ninguno lo trae.
+- **Las notas crédito quedan PENDIENTES a propósito** — todavía no las han
+  sacado, así que no se cuentan como falta. Cuando lleguen, se dejan en la
+  carpeta y se vuelve a correr: entran solas de cuartas.
+- **La simulación muestra el folio como va a quedar de verdad**, con la factura
+  y el detallado ya adentro, aunque todavía no los haya copiado ni convertido.
+
+Un defecto que apareció en la prueba de tres corridas seguidas y quedó cerrado:
+en una factura **sin epicrisis**, el `..._EPICRIS.pdf` de la primera corrida se
+colaba como si fuera una epicrisis y en la segunda el folio crecía metido dentro
+de sí mismo (10 → 13 páginas). Ahora el bot mira la carpeta, no el renglón: si
+ya hay archivos numerados, lo que quede con el nombre original es el folio
+viejo. El caso que no se puede distinguir (un `..._EPICRIS.pdf` suelto en una
+carpeta ya armada) no se adivina: se avisa para que el auditor lo mire.
+
+45 pruebas nuevas (104 en el archivo).
+
+
 ## Sesión 25-ago-2026 (noche, 2) — `--renombrar`: el folio como lo nombra el área
 
 El PDF unido de la HUS352904 no se parecía a lo que pide la hoja del área. Al

@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 25-08-2026
+**Última actualización:** 26-08-2026
 
 ---
 
@@ -62,6 +62,66 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 26-08-2026 — El folio de cada factura del ADRES: ahora son DOS PDF, no uno
+
+Usted aclaró cómo es el folio completo del paquete 31068 y no era como lo
+estábamos armando. Son **dos archivos por factura**, cada uno con su orden:
+
+**1) El folio clínico — `680010079201_HUS######_EPICRIS.pdf`**
+
+Es el nombre que queda **después** de unir los soportes numerados:
+
+```
+1 RESPUESTA A GLOSA.pdf   (era RTA_ADRES_HUS352904.pdf)
+2 EPICRISIS.pdf           (era 680010079201_HUS352904_EPICRIS.pdf)
+3 HISTORIA CLINICA.pdf    (era HC.pdf)
+4 AYUDAS DIAGNOSTICAS.pdf (era DX.pdf)
+5 OTROS.pdf
+```
+
+**2) El folio de la factura — `680010079201_HUS######_FACTURA.pdf`**
+
+La factura sí entra al folio, y adentro va en este orden:
+
+```
+1 FACTURA.pdf                       (la que viene con el XML)
+2 DETALLADO.pdf                     (el detallado en Excel, pasado a PDF)
+3 REPRESENTACION GRAFICA DIAN.pdf
+4 NOTAS CREDITO.pdf                 (PENDIENTE: todavía no las han sacado)
+```
+
+**Las notas crédito quedan pendientes a propósito.** El bot no las cuenta como
+falta: avisa cuántas faltan y sigue. El día que salgan, se dejan en la carpeta
+de la factura, se vuelve a apretar el botón y entran solas de cuartas, sin
+rehacer nada de lo que ya está.
+
+**Lo que hay que apretar:** el mismo botón de siempre,
+`tools/UNIR_SOPORTES_ADRES.cmd`. Ahora pide dos rutas: la carpeta del gestor
+(CAROLINA, CLAUDIA, OSCAR) y la carpeta de las facturas con XML. Primero
+**simula** —muestra los dos folios completos, tal como van a quedar— y solo
+arma de verdad cuando usted escribe «SI».
+
+**Por qué se numeran los archivos antes de unirlos.** No es adorno: el folio se
+llama igual que el archivo del que sale (`..._EPICRIS.pdf`). Si no se renombra
+primero, no habría dónde guardar el folio sin pisar la epicrisis.
+
+**Un defecto que se encontró y se cerró antes de entregar.** Probando tres
+corridas seguidas apareció esto: en una factura **sin epicrisis**, el folio de
+la primera corrida se colaba en la segunda como si fuera una epicrisis, y el
+PDF crecía metido dentro de sí mismo. Ya está resuelto: el bot mira la carpeta
+completa, no un solo renglón. Y el caso que de verdad no se puede distinguir
+—un `..._EPICRIS.pdf` suelto en una carpeta que ya estaba armada— no se
+adivina: sale avisado en pantalla y en el reporte para que usted lo mire.
+
+**Lo que hace falta confirmar:** qué archivo es exactamente la
+**REPRESENTACIÓN GRÁFICA DE LA DIAN** (renglón 3). Si es el mismo
+`680010079201_HUS######_FACTURA.pdf` que está en la carpeta del XML, se quita
+ese renglón y listo. Mientras no se confirme, el bot lo reporta como faltante en
+todas las facturas — no se inventó ningún archivo.
+
+Pruebas: 104 en `tests/test_tools/test_unir_soportes_adres.py`.
+
 
 ### 25-08-2026 (cierre 3) — El repaso normativo: otros cuatro artículos mal, y un argumento que estábamos regalando
 
@@ -7675,6 +7735,19 @@ vuelve a pasar.
 
 ## 3) PENDIENTE
 
+### Folio ADRES del paquete 31068 (26-08)
+- **Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN.** Es el renglón 3 del
+  folio de la factura. Si resulta ser el mismo PDF que viene con el XML, se
+  quita el renglón; si es otro archivo, hay que decir de qué carpeta sale.
+- **Las NOTAS CRÉDITO de los valores aceptados.** Es el renglón 4 y todavía no
+  existen. Cuando salgan, se dejan en la carpeta de cada factura y se vuelve a
+  apretar el botón: entran solas, sin rehacer lo demás.
+- **Las 101 facturas sin carpeta** en ningún gestor (CAROLINA, CLAUDIA, OSCAR)
+  y **las 47 carpetas vacías de CLAUDIA** siguen igual: sin carpeta no hay
+  folio que armar.
+- **Los 12 archivos `FACOSTE`** que el bot no reconoce y manda a OTROS: falta
+  decir a qué grupo pertenecen.
+
 ### Del motor de glosas, al 25-08 (cierre)
 - **~~Reiniciar el motor~~ — HECHO** (confirmado por el área el 25-08).
 - **~~Reenviar el archivo de recepción~~ — HECHO.**
@@ -8138,6 +8211,12 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Folio ADRES (26-08), lo primero:** correr el botón
+`tools/UNIR_SOPORTES_ADRES.cmd` en **una sola carpeta de prueba** (una factura),
+mirar que los dos PDF queden como se espera, y solo entonces pasarlo a los tres
+gestores completos. Antes de eso, decirnos qué archivo es la representación
+gráfica de la DIAN.
 
 **Frente COOSALUD (25-08):** (a) subir a DGH los 6 archivos de OBJECIONES del
 lote de 1.573; (b) armar los trámites de ese lote cuando las objeciones estén
