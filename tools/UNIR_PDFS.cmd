@@ -280,8 +280,19 @@ def listar_pdfs(carpeta: Path, prefijo: str) -> list[Path]:
     return sorted(pdfs, key=lambda p: clave_natural(p.name))
 
 
-def unir_pdfs(pdfs: list[Path], destino: Path, PdfReader, PdfWriter) -> tuple[int, list[str]]:
-    """Une `pdfs` en `destino`. Devuelve (n_paginas, [archivos_omitidos])."""
+def unir_pdfs(
+    pdfs: list[Path],
+    destino: Path,
+    PdfReader,
+    PdfWriter,
+    metadatos: dict[str, str] | None = None,
+) -> tuple[int, list[str]]:
+    """Une `pdfs` en `destino`. Devuelve (n_paginas, [archivos_omitidos]).
+
+    `metadatos` deja una firma dentro del PDF resultante. Sirve para que el bot
+    que lo escribió pueda reconocerlo después como suyo y no confundirlo con un
+    soporte de verdad.
+    """
     escritor = PdfWriter()
     paginas = 0
     omitidos: list[str] = []
@@ -304,6 +315,8 @@ def unir_pdfs(pdfs: list[Path], destino: Path, PdfReader, PdfWriter) -> tuple[in
             omitidos.append(f"{pdf.name} ({type(exc).__name__})")
     if paginas == 0:
         return 0, omitidos
+    if metadatos:
+        escritor.add_metadata(metadatos)
     tmp = destino.with_suffix(destino.suffix + ".tmp")
     with open(tmp, "wb") as fh:
         escritor.write(fh)

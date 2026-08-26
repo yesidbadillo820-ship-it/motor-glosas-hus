@@ -8,6 +8,7 @@ cuele en el PDF y que sin `--aplicar` no se escriba nada.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -826,25 +827,64 @@ def test_el_folio_no_se_anida_aunque_falte_ese_soporte(tmp_path):
     assert len(pypdf.PdfReader(str(fac / "680010079201_HUS311736_EPICRIS.pdf")).pages) == 2
 
 
-def test_avisa_cuando_no_puede_saber_si_es_folio_o_soporte_nuevo(tmp_path):
-    """Carpeta ya armada + un `..._EPICRIS.pdf` sin su «2 EPICRISIS.pdf» al lado:
-    se toma como el folio anterior, pero tiene que quedar avisado."""
+def test_una_epicrisis_sin_firma_es_un_soporte_no_un_folio(tmp_path):
+    """LA REGRESIÓN QUE MÁS IMPORTA.
+
+    La epicrisis del ADRES viene llamada `680010079201_HUS######_EPICRIS.pdf`,
+    que es exactamente como se llamará el folio. Antes el bot decidía por el
+    nombre y por si la carpeta traía archivos numerados: en una carpeta donde el
+    auditor ya había numerado algo a mano, tomaba la epicrisis DE VERDAD por un
+    folio viejo, la dejaba fuera del folio y acto seguido la pisaba. La epicrisis
+    se perdía para siempre y el folio subía al ADRES sin ella.
+    """
     raiz = tmp_path / "G"
-    fac = raiz / "HUS311736"
-    _pdf(fac / "1 RESPUESTA A GLOSA.pdf")
-    _pdf(fac / "680010079201_HUS311736_EPICRIS.pdf")
-    plan = org.planificar(raiz)[0]
-    assert [p.name for p in plan.folios_dudosos] == ["680010079201_HUS311736_EPICRIS.pdf"]
-    ruta = tmp_path / "r.csv"
-    org.escribir_reporte(ruta, [plan])
-    assert "REVISAR: se tomó como el folio" in ruta.read_text(encoding="utf-8-sig")
+    fac = raiz / "HUS352904"
+    _pdf(fac / "1 RESPUESTA A GLOSA.pdf", paginas=1)  # numerado a mano
+    epicrisis = _pdf(fac / "680010079201_HUS352904_EPICRIS.pdf", paginas=5)
+    _pdf(fac / "HC.pdf", paginas=3)
+
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+
+    # La epicrisis entró al folio, no se perdió.
+    assert plan.folios_previos == []
+    assert [s.grupo.clave for s in plan.soportes] == ["RESPUESTA", "EPICRISIS", "HISTORIA"]
+    assert plan.paginas == 9  # 1 + 5 + 3: las cinco páginas de la epicrisis están
+    # La epicrisis se renombró (no se borró): sus 5 páginas siguen ahí.
+    assert len(pypdf.PdfReader(str(fac / "2 EPICRISIS.pdf")).pages) == 5
+    # Y esa ruta ahora la ocupa el folio, con las 9 páginas.
+    assert len(pypdf.PdfReader(str(epicrisis)).pages) == 9
+    assert org.es_folio_nuestro(epicrisis)
 
 
-def test_el_folio_de_la_primera_corrida_no_es_dudoso(tmp_path):
+def test_el_folio_queda_firmado_y_se_reconoce_en_la_corrida_siguiente(tmp_path):
     raiz = _carpeta_con_los_dos_folios(tmp_path)
     org.armar_folios(raiz, aplicar=True)
+    fac = raiz / "HUS352904"
+    assert org.es_folio_nuestro(fac / "680010079201_HUS352904_EPICRIS.pdf")
+    assert org.es_folio_nuestro(fac / "680010079201_HUS352904_FACTURA.pdf")
+    # Un soporte cualquiera NO lleva la firma.
+    assert not org.es_folio_nuestro(fac / "1 RESPUESTA A GLOSA.pdf")
     plan = org.planificar(raiz)[0]
-    assert len(plan.folios_previos) == 2 and plan.folios_dudosos == []
+    assert sorted(p.name for p in plan.folios_previos) == [
+        "680010079201_HUS352904_EPICRIS.pdf",
+        "680010079201_HUS352904_FACTURA.pdf",
+    ]
+
+
+def test_no_pisa_un_archivo_que_no_escribio_el_bot(tmp_path):
+    """Si en la ruta del folio hay algo sin firma, no se arma nada: no se pisa."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "1 RESPUESTA A GLOSA.pdf")
+    # Un archivo ajeno, justo donde iría el folio, que el renombrado no libera.
+    ajeno = _pdf(fac / "HUS1_EPICRIS.pdf", paginas=7)
+    ajeno.chmod(0o444)
+    plan = org.planificar(raiz)[0]
+    plan.soportes = [s for s in plan.soportes if s.ruta != ajeno]  # se quedó fuera
+    org.aplicar_folios([plan], aplicar=True)
+    assert plan.estado == org.ESTADO_NO_PISA
+    assert len(pypdf.PdfReader(str(ajeno)).pages) == 7  # intacto
+    assert plan.omitidos and "no lo escribió este bot" in plan.omitidos[0]
 
 
 def test_una_factura_bloqueada_no_tumba_las_demas(tmp_path, monkeypatch):
@@ -963,3 +1003,335 @@ def test_revisar_facturas_mira_la_carpeta_del_xml_en_simulacion(tmp_path):
     org.copiar_facturas(plan, indice, aplicar=False)
     org.revisar_facturas(plan, indice)
     assert plan[0].trae_la_factura == {"DETALLADO", "DIAN", "NOTAS"}
+
+
+# ─── Lo que encontró la revisión adversarial ─────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "nombre",
+    ["NC_263272_HUS352904.pdf", "NC 253292.pdf", "NC_311561_HUS311736.pdf"],
+)
+def test_las_notas_credito_con_el_nombre_del_hospital(nombre):
+    """El hospital las nombra `NC_<numero>_HUS<factura>.pdf`.
+
+    Antes caían en OTROS del folio CLÍNICO y el reporte seguía diciendo que las
+    notas crédito faltaban.
+    """
+    grupo = org.clasificar(nombre)
+    assert grupo.clave == "NOTAS" and grupo.folio == org.FOLIO_FACTURA
+
+
+@pytest.mark.parametrize(
+    "nombre", ["HC.pdf", "RESONANCIA.pdf", "INCAPACIDAD.pdf", "NTE-C.pdf", "CONSENTIMIENTO.pdf"]
+)
+def test_la_abreviatura_NC_no_dispara_falsos_positivos(nombre):
+    assert org.clasificar(nombre).clave != "NOTAS"
+
+
+@pytest.mark.parametrize(
+    "clave", ["URGENCIAS", "TERAPIAS", "CURACIONES", "EVOLUCIONES", "PROCEDIMIENTOS", "HISTORIA"]
+)
+def test_el_nombre_que_escribe_el_bot_se_relee_en_el_mismo_grupo(clave):
+    """`3 HISTORIA CLINICA - TERAPIAS.pdf` se releía como HISTORIA a secas.
+
+    En la segunda corrida el soporte cambiaba de grupo, se renumeraba, y el
+    folio salía con las páginas en otro orden. HISTORIA CLINICA es genérico:
+    cualquier grupo más preciso le gana.
+    """
+    grupo = next(g for g in org.GRUPOS if g.clave == clave)
+    assert org.clasificar(org.nombre_numerado(3, grupo)).clave == clave
+
+
+def test_el_orden_del_folio_no_cambia_entre_corridas(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    for nombre in ("RTA_ADRES_HUS1.pdf", "EPI.pdf", "TERAPIAS.pdf", "CURACIONES.pdf", "HC.pdf"):
+        _pdf(fac / nombre)
+    primera = [s.grupo.clave for s in org.armar_folios(raiz, aplicar=True)[0].soportes]
+    segunda = [s.grupo.clave for s in org.armar_folios(raiz, aplicar=True)[0].soportes]
+    assert (
+        primera
+        == segunda
+        == [
+            "RESPUESTA",
+            "EPICRISIS",
+            "TERAPIAS",
+            "CURACIONES",
+            "HISTORIA",
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("nombre", "esperado"),
+    [
+        # Así lo deja `dividir_detallado_por_factura.py`: el número y nada más.
+        ("HUS352904.xlsx", True),
+        ("HUS0000352890.xlsx", True),
+        ("DETALLADO HUS1.xlsx", True),
+        # Un PDF con ese nombre no es el detallado.
+        ("HUS352904.pdf", False),
+        ("HUS352904 EPICRISIS.pdf", False),
+    ],
+)
+def test_reconoce_el_detallado_que_deja_el_bot_hermano(nombre, esperado):
+    assert org.es_detallado(nombre) is esperado
+
+
+def test_avisa_el_soporte_que_no_entro_al_folio(tmp_path, caplog):
+    """Un PDF dañado se omite y el folio SÍ se arma. No puede pasar en silencio:
+    al ADRES subiría un folio al que le falta una hoja."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    (fac / "HUS1 EPICRISIS.pdf").write_bytes(b"esto no es un PDF")
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        assert org.main(["--carpeta", str(raiz), "--folio", "--aplicar"]) == 0
+    salida = caplog.text
+    assert "NO entraron al folio" in salida
+    # Con el nombre que TIENE ahora en la carpeta, que es el que el auditor va
+    # a buscar: para entonces ya quedó numerado.
+    assert "2 EPICRISIS.pdf" in salida
+
+
+@pytest.mark.parametrize(
+    ("nombre", "esperado"),
+    [
+        ("680010079201_HUS352904_EPICRIS", "680010079201"),
+        ("680010079201_HUS352904_FACTURA", "680010079201"),
+        # Una FECHA o un número de ingreso NO son el NIT.
+        ("20240913_HUS352904 EVOLUCION", ""),
+        ("13092024 HUS352904 HC", ""),
+        ("190029_HUS352904_ingreso", ""),
+        # Ni el NIT de otra factura.
+        ("680010079201_HUS999999_EPICRIS", ""),
+    ],
+)
+def test_una_fecha_no_puede_pasar_por_NIT(nombre, esperado):
+    """Con «números al principio y esta factura después» bastaba, y el folio
+    salía llamándose `20240913_HUS352904_EPICRIS.pdf`."""
+    assert org.prefijo_del_nombre(nombre, "HUS352904") == esperado
+
+
+def test_en_el_mapa_de_nombres_tambien_gana_la_palabra_mas_larga():
+    """El resultado no puede depender del orden en que estén las líneas del JSON."""
+    for mapa in (
+        {"TAC": "AYUDAS", "TAC DE TORAX": "OTROS"},
+        {"TAC DE TORAX": "OTROS", "TAC": "AYUDAS"},
+    ):
+        assert org.clasificar("HUS1 TAC DE TORAX.pdf", mapa).clave == "OTROS"
+
+
+def test_el_reporte_abierto_en_excel_no_tumba_la_corrida(tmp_path, monkeypatch, caplog):
+    """En Windows un CSV abierto en Excel no se deja escribir. El trabajo ya
+    está hecho: no se pierde por no poder dejar el listado."""
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS1" / "RTA_ADRES_HUS1.pdf")
+
+    def _bloqueado(ruta, plan):
+        raise PermissionError(13, "El archivo está abierto en otro programa")
+
+    monkeypatch.setattr(org, "escribir_reporte", _bloqueado)
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        codigo = org.main(
+            [
+                "--carpeta",
+                str(raiz),
+                "--folio",
+                "--aplicar",
+                "--reporte-csv",
+                str(tmp_path / "r.csv"),
+            ]
+        )
+    assert codigo == 0
+    assert (raiz / "HUS1" / "HUS1_EPICRIS.pdf").exists()  # el folio sí se armó
+    assert "abierto en Excel" in caplog.text
+
+
+def test_renombrar_tambien_numera_el_folio_de_la_factura(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    _pdf(fac / "680010079201_HUS1_FACTURA.pdf")
+    assert org.main(["--carpeta", str(raiz), "--renombrar", "--aplicar"]) == 0
+    assert sorted(p.name for p in fac.iterdir()) == ["1 FACTURA.pdf", "1 RESPUESTA A GLOSA.pdf"]
+
+
+def test_avisa_las_banderas_que_no_hacen_nada_sin_folio(tmp_path, caplog):
+    raiz = tmp_path / "G"
+    _pdf(raiz / "HUS1" / "HC.pdf")
+    with caplog.at_level(logging.WARNING, logger="unir_soportes_adres"):
+        org.main(["--carpeta", str(raiz), "--prefijo", "900123456", "--convertir-detallado"])
+    assert "--prefijo" in caplog.text and "--convertir-detallado" in caplog.text
+    assert "solo funciona" in caplog.text
+
+
+def test_avisa_los_archivos_que_no_son_pdf(tmp_path, caplog):
+    """Una epicrisis en Word o una radiografía en JPG no entran al folio.
+    No pueden desaparecer sin que el auditor se entere."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    (fac / "EPICRISIS.docx").write_bytes(b"x")
+    (fac / "RADIOGRAFIA.jpg").write_bytes(b"x")
+    (fac / "Thumbs.db").write_bytes(b"x")  # basura de Windows: esta no se avisa
+    plan = org.planificar(raiz)[0]
+    assert sorted(p.name for p in plan.no_son_pdf) == ["EPICRISIS.docx", "RADIOGRAFIA.jpg"]
+    with caplog.at_level(logging.INFO, logger="unir_soportes_adres"):
+        org.main(["--carpeta", str(raiz), "--folio"])
+    assert "NO son PDF" in caplog.text and "EPICRISIS.docx" in caplog.text
+
+
+# ─── Lo que deja una corrida que se cayó a mitad ─────────────────────────────
+
+
+def test_un_huerfano_a_medio_renombrar_no_se_pierde(tmp_path):
+    """Un `~renombrando~HC.pdf` colgado no es basura: es la historia clínica con
+    el nombre a medio cambiar. Antes, la corrida siguiente lo PISABA."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "HC.pdf", paginas=3)
+    _pdf(fac / f"{org.PREFIJO_TEMPORAL}HC.pdf", paginas=7)
+    org.armar_folios(raiz, aplicar=True)
+    paginas = sorted(len(pypdf.PdfReader(str(p)).pages) for p in fac.glob("? HISTORIA*.pdf"))
+    assert paginas == [3, 7]  # los dos siguen ahí
+    assert len(pypdf.PdfReader(str(fac / "HUS1_EPICRIS.pdf")).pages) == 10
+
+
+def test_si_el_renombrado_revienta_a_mitad_se_deshace(tmp_path, monkeypatch):
+    """Antes quedaban archivos «~renombrando~…» para siempre y la factura sin folio."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS2"
+    for nombre in ("RTA_ADRES_HUS2.pdf", "HC.pdf", "DX.pdf"):
+        _pdf(fac / nombre)
+
+    original = Path.rename
+    veces = {"n": 0}
+
+    def _revienta(self, destino):
+        if org.PREFIJO_TEMPORAL in str(self):
+            veces["n"] += 1
+            if veces["n"] == 2:
+                raise PermissionError(13, "se cayó el share")
+        return original(self, destino)
+
+    monkeypatch.setattr(Path, "rename", _revienta)
+    org.armar_folios(raiz, aplicar=True)
+    monkeypatch.undo()
+
+    # Todo volvió a su nombre: ni un «~renombrando~» colgado.
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "DX.pdf",
+        "HC.pdf",
+    ]
+    # Y la corrida siguiente lo arma sin ayuda.
+    plan = org.armar_folios(raiz, aplicar=True)[0]
+    assert plan.estado == org.ESTADO_UNIDO and plan.paginas == 3
+
+
+def test_los_huerfanos_se_avisan_en_simulacion(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / f"{org.PREFIJO_TEMPORAL}HC.pdf")
+    plan = org.planificar(raiz)[0]
+    assert [p.name for p in plan.temporales_colgados] == [f"{org.PREFIJO_TEMPORAL}HC.pdf"]
+    assert plan.soportes == []  # con ese nombre no entra al folio
+    ruta = tmp_path / "r.csv"
+    org.escribir_reporte(ruta, [plan])
+    assert "a medio renombrar" in ruta.read_text(encoding="utf-8-sig")
+
+
+def test_renombrar_avisa_que_se_pierde_el_NIT(tmp_path, caplog):
+    """Al numerar, el nombre que traía el NIT desaparece: después no hay de
+    dónde sacarlo para nombrar los folios."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311736"
+    _pdf(fac / "680010079201_HUS311736_EPICRIS.pdf")
+    _pdf(fac / "HC.pdf")
+    with caplog.at_level(logging.WARNING, logger="unir_soportes_adres"):
+        assert org.main(["--carpeta", str(raiz), "--renombrar", "--aplicar"]) == 0
+    assert "se pierde el NIT" in caplog.text
+    assert "--prefijo 680010079201" in caplog.text
+
+
+def test_el_folio_es_estable_con_carpetas_de_nombre_raro(tmp_path):
+    """`HUS379477_PEND. CARTA CORONEL` tiene punto y espacios."""
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS379477_PEND. CARTA CORONEL"
+    _pdf(fac / "RTA_ADRES_HUS379477.pdf", paginas=1)
+    _pdf(fac / "EPI.pdf", paginas=4)
+    _pdf(fac / "HC.pdf", paginas=2)
+    paginas = {org.armar_folios(raiz, aplicar=True)[0].paginas for _ in range(3)}
+    assert paginas == {7}  # las tres corridas dejan lo mismo
+
+
+def test_las_copias_de_windows_van_en_su_orden():
+    """`HC.pdf`, `HC (2).pdf`, `HC (3).pdf` es como Windows nombra los repetidos.
+
+    Con el orden natural a secas el ORIGINAL quedaba de último —«HC (2)» va
+    antes que «HC.» porque el espacio pesa menos que el punto— y la historia
+    clínica salía al revés dentro del folio. Caso real de la HUS311371.
+    """
+    nombres = ["HC (10).pdf", "HC.pdf", "HC (3).pdf", "HC (2).pdf"]
+    assert sorted(nombres, key=org.clave_orden) == [
+        "HC.pdf",
+        "HC (2).pdf",
+        "HC (3).pdf",
+        "HC (10).pdf",
+    ]
+    # Y el orden natural de siempre sigue igual.
+    assert sorted(["EVOLUCIONES 10.pdf", "EVOLUCIONES 2.pdf"], key=org.clave_orden) == [
+        "EVOLUCIONES 2.pdf",
+        "EVOLUCIONES 10.pdf",
+    ]
+
+
+def test_el_folio_pone_la_historia_clinica_en_orden(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311371"
+    _pdf(fac / "RTA_ADRES_HUS311371.pdf", paginas=1)
+    _pdf(fac / "HC.pdf", paginas=2)
+    _pdf(fac / "HC (2).pdf", paginas=3)
+    plan = org.planificar(raiz)[0]
+    assert [s.ruta.name for s in plan.soportes] == [
+        "RTA_ADRES_HUS311371.pdf",
+        "HC.pdf",
+        "HC (2).pdf",
+    ]
+
+
+def test_el_numero_es_del_renglon_no_del_archivo(tmp_path):
+    """Caso real de la HUS311371, tal como lo pidió el área: dos historias
+    clínicas son las dos el renglón 2. En la carátula del folio hay un solo
+    «2. HISTORIA CLINICA», no un 2 y un 3.
+    """
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS311371"
+    _pdf(fac / "RTA_ADRES_HUS311371.pdf", paginas=1)
+    _pdf(fac / "HC.pdf", paginas=2)
+    _pdf(fac / "HC (2).pdf", paginas=3)
+    org.armar_folios(raiz, aplicar=True)
+    assert sorted(p.name for p in fac.iterdir()) == [
+        "1 RESPUESTA A GLOSA.pdf",
+        "2 HISTORIA CLINICA (2).pdf",
+        "2 HISTORIA CLINICA.pdf",
+        "HUS311371_EPICRIS.pdf",
+    ]
+    # Y las tres van adentro, en su orden: 1 + 2 + 3.
+    assert len(pypdf.PdfReader(str(fac / "HUS311371_EPICRIS.pdf")).pages) == 6
+
+
+def test_los_renglones_repetidos_son_estables_entre_corridas(tmp_path):
+    raiz = tmp_path / "G"
+    fac = raiz / "HUS1"
+    _pdf(fac / "RTA_ADRES_HUS1.pdf")
+    _pdf(fac / "HC.pdf")
+    _pdf(fac / "HC (2).pdf")
+    _pdf(fac / "HC (3).pdf")
+    org.armar_folios(raiz, aplicar=True)
+    antes = sorted(p.name for p in fac.iterdir())
+    org.armar_folios(raiz, aplicar=True)
+    assert sorted(p.name for p in fac.iterdir()) == antes
+    assert "2 HISTORIA CLINICA (3).pdf" in antes

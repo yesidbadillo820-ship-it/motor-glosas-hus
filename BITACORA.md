@@ -63,6 +63,68 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 26-08-2026 (tarde) — La revisión que encontró que el bot borraba la epicrisis
+
+Antes de dejarlo correr sobre el servidor, se le pasó al bot de folios una
+revisión a fondo: cinco revisores mirando cosas distintas y, encima, dos
+escépticos por cada cosa encontrada, obligados a reproducirla de verdad. Salieron
+31 avisos. Estos son los que resultaron ciertos y ya quedaron arreglados.
+
+**1. El grave: el bot borraba la epicrisis.**
+
+El folio se llama IGUAL que el archivo del que sale: la epicrisis llega del
+ADRES como `680010079201_HUS######_EPICRIS.pdf`, que es justo el nombre que va a
+tener el folio. Para saber cuál era cuál, el bot miraba si en la carpeta ya
+había archivos numerados. En una carpeta donde usted ya hubiera numerado algo a
+mano —que es lo que pide su hoja— el bot tomaba **la epicrisis de verdad** por
+un folio viejo: la dejaba por fuera del folio y encima la pisaba.
+
+Se comprobó con una epicrisis de 5 páginas: después de UNA sola corrida, en esa
+ruta había un folio de 4 páginas sin la epicrisis, y la epicrisis no existía en
+ningún lado. No hay respaldo. Al ADRES se habría subido un folio clínico sin
+epicrisis.
+
+Ya está arreglado, y de raíz: el bot ahora **firma por dentro** los PDF que él
+escribe, y en la corrida siguiente reconoce los suyos por esa firma, no por el
+nombre. Lo que no lleva la firma es un soporte de verdad y se respeta. Y por si
+acaso: si en la ruta del folio hay algo sin firmar, no arma ese folio y avisa.
+Perder un soporte no se deshace; no armar un folio, sí.
+
+**2. Las notas crédito no se reconocían con el nombre de ustedes.** Las nombran
+`NC_263272_HUS352904.pdf`, y así caían en OTROS del folio clínico mientras el
+reporte seguía diciendo que las notas crédito faltaban. Ya se reconocen.
+
+**3. El folio cambiaba de orden entre una corrida y otra.** Los soportes de
+terapias, curaciones, evoluciones y procedimientos se movían de sitio en la
+segunda corrida, así que las páginas del folio salían en otro orden. Arreglado.
+
+**4. El detallado que saca el otro bot no se reconocía.** Sale como
+`HUS352904.xlsx`, con el número y nada más: nunca se pasaba a PDF ni entraba al
+folio de la factura.
+
+**5. Un soporte dañado se caía del folio en silencio.** El folio se armaba sin
+él y en pantalla decía «armado». Ahora avisa: «OJO, N soporte(s) NO entraron al
+folio».
+
+Y dos más de robustez: si un PDF está abierto en Acrobat o el servidor se cae un
+momento, esa factura se salta con su motivo y las otras 323 siguen.
+
+**Lo que esto significa para usted:** no corra el bot sobre el servidor hasta
+que esté fusionado el PR #492. Y cuando lo corra, hágalo primero sobre UNA sola
+carpeta de prueba.
+
+**6 a 14 (los demás).** Una fecha en el nombre de un archivo se tomaba como si
+fuera el NIT del hospital y el folio salía mal nombrado; el reporte abierto en
+Excel tumbaba la corrida entera después de haber armado todos los folios; los
+archivos que no son PDF (una epicrisis en Word, una radiografía en JPG)
+desaparecían sin avisar; y si la corrida se caía a mitad de renombrar, un
+archivo quedaba a medio cambiar de nombre y en la corrida siguiente **se
+perdía**. Todo eso quedó cerrado, y ahora la corrida que se cae se deshace sola
+y la siguiente recupera lo que quedó colgado.
+
+Pruebas: 149 en `tests/test_tools/test_unir_soportes_adres.py`.
+
+
 ### 26-08-2026 — El folio de cada factura del ADRES: ahora son DOS PDF, no uno
 
 Usted aclaró cómo es el folio completo del paquete 31068 y no era como lo
@@ -7831,6 +7893,41 @@ vuelve a pasar.
 
 ---
 
+### 26-08 — «Dice que no tiene facturación electrónica y sí la tiene»
+
+Tres facturas —**HUS544942, HUS542599 y HUS544936**— salían en la página con
+«Correo F.E.: **NO**» teniéndola. Y eso no es un detalle: **sin correo el
+sistema no deja radicar**, así que el auditor queda obligado a devolver una
+factura que estaba bien.
+
+**Por qué pasaba.** Ese dato no lo escribe nadie a mano: sale de **cruzar** la
+factura con el Formato de Facturación Electrónica del DGH. El cruce se hacía
+comparando el número **letra por letra**, y los dos archivos no siempre lo
+escriben igual: unas veces «544942», otras «HUS544942», otras
+«HUS0000544942». Cuando no coincidía exacto, el sistema daba por hecho que la
+factura no tenía correo — sin decir nada.
+
+**Cómo quedó.** Al subir cualquiera de las dos fuentes, el número se guarda
+siempre en la forma larga (**HUS + 10 dígitos**), venga como venga. Así las dos
+hablan el mismo idioma y el cruce no vuelve a fallar. Lo que no tiene forma de
+número de factura del HUS se deja tal cual: no se inventa nada.
+
+**Para revisarlo sin cambiar nada:**
+
+    venv\Scripts\python.exe tools\preauditoria_revisar_fe.py HUS544942 HUS542599 HUS544936
+
+Dice, factura por factura, si está en el Formato F.E., si está pero **escrita
+distinto**, o si sencillamente no está —y qué hacer en cada caso—. Se pueden
+escribir cortas o largas.
+
+**Lo que hay que hacer con estas tres:** después de actualizar, **volver a
+subir el Formato F.E.** en «Fuentes». Ahí el número se guarda ya normalizado y
+las tres quedan con su correo.
+
+16 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### ⭐ Lo primero, al cierre del 25-08
@@ -8336,7 +8433,9 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
-**Folio ADRES (26-08), lo primero:** correr el botón
+**Folio ADRES (26-08), lo PRIMERO de lo primero:** NO correr el bot sobre el
+servidor hasta que esté fusionado el PR #492 (el que arregla que el bot borraba
+la epicrisis). Después de eso, correr el botón
 `tools/UNIR_SOPORTES_ADRES.cmd` en **una sola carpeta de prueba** (una factura),
 mirar que los dos PDF queden como se espera, y solo entonces pasarlo a los tres
 gestores completos. Lo de la representación gráfica de la DIAN ya quedó
