@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre) — la carátula del folio
+
+El área mandó la carátula que necesita: un índice de una página que abre el
+folio, con el renglón y la página donde empieza.
+
+```
+1.RESPUESTA A GLOSA ______________________________________  2
+2.HISTORIA CLINICA _______________________________________ 70
+3.AYUDAS DIAGNOSTICAS ___________________________________ 237
+```
+
+Una línea por **renglón**, no por archivo — que era lo que quería decir con
+«en la carátula solo quedaría 1. RESPUESTA — 2. HISTORIA CLINICA». Las dos
+historias clínicas son una sola línea y apunta a donde empieza la primera.
+
+Lo que se cuidó, porque un índice que miente es peor que no tener índice:
+
+- El número es la página **exacta** del folio ya armado, contando la carátula.
+- Un soporte que NO entró (un PDF dañado) no figura: si figurara, todas las
+  páginas de abajo quedarían corridas. Por eso la carátula se arma con las
+  páginas que de verdad escribió `unir_pdfs`, no con las que se esperaban.
+- Sin `reportlab` el folio se arma igual, sin índice, y se avisa.
+- No quedan archivos temporales en la carpeta.
+
+`unir_pdfs` acepta un parámetro `detalle` opcional que devuelve cuántas páginas
+puso cada archivo; los demás bots que lo usan no cambian. `UNIR_PDFS.cmd`
+regenerado (su prueba del motor embebido volvió a detectar el desfase).
+
+`--sin-caratula` la desactiva. 158 pruebas en el archivo, 1772 en `tests/test_tools`.
+
+
 ## Sesión 26-ago-2026 (piloto) — el número es del renglón, y las copias de Windows en su sitio
 
 Dos cosas que salieron al correr el piloto sobre la HUS311371 de CAROLINA, que
