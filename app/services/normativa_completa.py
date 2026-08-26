@@ -460,12 +460,36 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "65": {
-                "titulo": "Atención en salud a PPL",
-                "texto": "El sistema de salud al interior de los establecimientos penitenciarios y carcelarios será diseñado e implementado por el Gobierno Nacional a través de los Ministerios competentes, con el fin de garantizar el derecho fundamental a la salud de los internos, así como de promover la salud, prevenir y controlar los principales riesgos.",
-                "aplicacion": "Cobertura integral en salud para PPL",
-                "keywords": ["PPL", "reclusos", "cárcel", "penitenciario"],
+                "titulo": "Modifícase el artículo 104 de la Ley 65 de 1993 — «Artículo 104. Acceso a la salud»",
+                "texto": (
+                    "Acceso a la salud. Las personas privadas de la libertad tendrán acceso a "
+                    "todos los servicios del sistema general de salud de conformidad con lo "
+                    "establecido en la ley sin discriminación por su condición jurídica. Se "
+                    "garantizarán la prevención, diagnóstico temprano y tratamiento adecuado de "
+                    "todas las patologías físicos o mentales. Cualquier tratamiento médico, "
+                    "quirúrgico o psiquiátrico que se determine como necesario para el "
+                    "cumplimiento de este fin será aplicado sin necesidad de resolución judicial "
+                    "que lo ordene. En todo caso el tratamiento médico o la intervención "
+                    "quirúrgica deberán realizarse garantizando el respeto a la dignidad humana "
+                    "de las personas privadas de la libertad. En todos los centros de reclusión "
+                    "se garantizará la existencia de una Unidad de Atención Primaria y de "
+                    "Atención Inicial de Urgencias en Salud Penitenciaria y Carcelaria. Se "
+                    "garantizará el tratamiento médico a la población en condición de "
+                    "discapacidad que observe el derecho a la rehabilitación requerida, "
+                    "atendiendo un enfoque diferencial de acuerdo a la necesidad específica.» "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: el otro revisor tiene razón en las "
+                    "dos cosas. (a) El artículo 65 SÍ existe. (b) El epígrafe guardado, "
+                    "«Atención en salud a PPL», es inventado: el artículo 65 de la Ley 1709 no "
+                    "tiene epígrafe propio, es una norma modificatoria que empieza «Modifícase "
+                    "el artículo 104 de la Ley 65 de 1993, el cual quedará así:» y el título del "
+                    "artículo que introduce es «Acceso a "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["PPL", "penitenciario", "reclusos"],
     },
     "LEY 1562 DE 2012": {
@@ -476,11 +500,44 @@ LEYES = {
         "articulos": {
             "1": {
                 "titulo": "Definiciones",
-                "texto": "El Sistema General de Riesgos Laborales es el conjunto de entidades públicas y privadas, normas y procedimientos, destinados a prevenir, proteger y atender a los trabajadores de los efectos de las enfermedades y los accidentes que puedan ocurrirles con ocasión o como consecuencia del trabajo que desarrollan.",
-                "aplicacion": "Marco general ARL",
-                "keywords": ["ARL", "riesgos laborales", "accidente trabajo", "enfermedad laboral"],
+                "texto": (
+                    "Sistema General de Riesgos Laborales: Es el conjunto de entidades públicas "
+                    "y privadas, normas y procedimientos, destinados a prevenir, proteger y "
+                    "atender a los trabajadores de los efectos de las enfermedades y los "
+                    "accidentes que puedan ocurrirles con ocasión o como consecuencia del "
+                    "trabajo que desarrollan. Las disposiciones vigentes de salud ocupacional "
+                    "relacionadas con la prevención de los accidentes de trabajo y enfermedades "
+                    "laborales y el mejoramiento de las condiciones de trabajo, hacen parte "
+                    "integrante del Sistema General de Riesgos Laborales. Salud Ocupacional: Se "
+                    "entenderá en adelante como Seguridad y Salud en el Trabajo, definida como "
+                    "aquella disciplina que trata de la prevención de las lesiones y "
+                    "enfermedades causadas por las condiciones de trabajo, y de la protección y "
+                    "promoción de la salud de los trabajadores. Tiene por objeto mejorar las "
+                    "condiciones y el medio ambiente de trabajo, así como la salud en el "
+                    "trabajo, que conlleva la promoción y el mantenimiento del bienestar físico, "
+                    "mental y social de los trabajadores en todas las ocupaciones. Programa de "
+                    "Salud Ocupacional: en lo sucesivo se entenderá como el Sistema de Gestión "
+                    "de la Seguridad y Salud en el Trabajo SG-SST. Este Sistema consiste en el "
+                    "desarrollo de un proceso lógico y por etapas, basado en la mejora continua "
+                    "y que incluye la política, la organización, la planificación, la "
+                    "aplicación, la evaluación, la auditoría y las acciones de mejora con el "
+                    "objetivo de anticipar, reconocer, evaluar y controlar los riesgos que "
+                    "puedan afectar la seguridad y salud en el trabajo. PARÁGRAFO. El uso de las "
+                    "anteriores definiciones no obsta para que no se mantengan los derechos ya "
+                    "existentes con las definiciones anteriores. "
+                ),
+                "aplicacion": (
+                    "Fui yo mismo a la fuente oficial y no pude refutar el hallazgo: el otro "
+                    "revisor tiene razón. En el Normograma de la Supersalud y en la Secretaría "
+                    "del Senado el artículo 1 de la Ley 1562 de 2012 aparece rotulado «ARTÍCULO "
+                    "1o. Definiciones», de modo que el epígrafe guardado («Definiciones») es "
+                    "correcto y no hay invención en el título. El problema está en el texto, por "
+                    "dos razones. (1) Está retocado "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["ARL", "riesgos laborales", "Positiva", "Aurora"],
     },
     "LEY 352 DE 1997": {
@@ -490,12 +547,43 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "7": {
-                "titulo": "Subsistema de Salud",
-                "texto": "El Subsistema de Salud de las Fuerzas Militares y de la Policía Nacional está integrado por los servicios de sanidad militar, los servicios de sanidad de la Policía Nacional y el sistema de seguridad social en salud para los miembros de las Fuerzas Militares y de la Policía Nacional, de sus beneficiarios y del personal civil del Ministerio de Defensa Nacional.",
-                "aplicacion": "Marco normativo FF.MM./Policía",
-                "keywords": ["FF.MM.", "policía", "sanidad militar", "subsistema"],
+                "titulo": "FUNCIONES",
+                "texto": (
+                    "Son funciones del CSSMP: a) Adoptar las políticas, planes, programas y "
+                    "prioridades generales del SSMP; b) Señalar los lineamientos generales de "
+                    "organización, orientación y funcionamiento de los subsistemas; c) Aprobar "
+                    "el anteproyecto de presupuesto general de los subsistemas de salud de las "
+                    "Fuerzas Militares y de la Policía Nacional, presentado por los respectivos "
+                    "directores; d) Aprobar el Plan de Servicios de Sanidad Militar y Policial y "
+                    "los planes complementarios de salud, con sujeción a los recursos "
+                    "disponibles para la prestación del servicio de salud en cada uno de los "
+                    "subsistemas; e) Determinar y reglamentar el funcionamiento de los fondos "
+                    "cuenta que se crean por la presente Ley; f) Aprobar los parámetros de "
+                    "administración, transferencia interna y aplicación de recursos para cada "
+                    "uno de los subsistemas con base en los presupuestos disponibles; g) "
+                    "<Literal INEXEQUIBLE>; h) Aprobar el monto de los pagos compartidos y "
+                    "cuotas moderadoras para cada uno de los subsistemas a fin de racionalizar "
+                    "el servicio de salud; i) Autorizar a las entidades y a las unidades que "
+                    "conforman el SSMP la prestación de servicios de salud a terceros o a "
+                    "entidades promotoras de salud y determinar los parámetros que aseguren la "
+                    "atención preferencial de las necesidades de los afiliados y beneficiarios "
+                    "del sistema; j) Adoptar los regímenes de referencia y contrarreferencia "
+                    "para cada uno de los subsistemas; k) <Literal INEXEQUIBLE>; l) Dictar su "
+                    "propio reglamento; m) Expedir los actos administrativos para el "
+                    "cumplimiento de sus funciones; n) Las demás que le señale la ley. "
+                ),
+                "aplicacion": (
+                    "El hallazgo del otro revisor es correcto y no pude refutarlo. (a) El "
+                    "artículo 7o. SÍ existe en la Ley 352 de 1997. (b) El epígrafe guardado "
+                    "«Subsistema de Salud» es falso: el epígrafe real es «FUNCIONES», y el "
+                    "artículo enumera las funciones del Consejo Superior de Salud de las Fuerzas "
+                    "Militares y de la Policía Nacional (CSSMP) en literales a) a n). (c) El "
+                    "texto guardado no es literal ni siquiera u "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["FF.MM.", "fuerzas militares", "policía", "sanidad"],
     },
     "LEY 91 DE 1989": {
@@ -584,29 +672,55 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "23": {
-                "titulo": "Principios de las actuaciones contractuales",
-                "texto": "Las actuaciones de quienes intervengan en la contratación estatal se desarrollarán con arreglo a los principios de transparencia, economía y responsabilidad y de conformidad con los postulados que rigen la función administrativa. Igualmente, se aplicarán en las mismas las normas que regulan la conducta de los servidores públicos, las reglas de interpretación de la contratación, los principios generales del derecho y los particulares del derecho administrativo.",
-                "aplicacion": "Principios rectores de los contratos estatales",
-                "keywords": [
-                    "transparencia",
-                    "economía",
-                    "responsabilidad",
-                    "principios contratación estatal",
-                    "Art. 23",
-                ],
+                "titulo": "DE LOS PRINCIPIOS EN LAS ACTUACIONES CONTRACTUALES DE LAS ENTIDADES ESTATALES",
+                "texto": (
+                    "Las actuaciones de quienes intervengan en la contratación estatal se "
+                    "desarrollarán con arreglo a los principios de transparencia, economía y "
+                    "responsabilidad y de conformidad con los postulados que rigen la función "
+                    "administrativa. Igualmente, se aplicarán en las mismas las normas que "
+                    "regulan la conducta de los servidores públicos, las reglas de "
+                    "interpretación de la contratación, los principios generales del derecho y "
+                    "los particulares del derecho administrativo. "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: el otro revisor tiene razón. (a) El "
+                    "artículo 23 SÍ existe en la Ley 80 de 1993 y abre el Capítulo II «DE LOS "
+                    "PRINCIPIOS DE LA CONTRATACIÓN ESTATAL». (b) El epígrafe guardado está MAL: "
+                    "el real, idéntico en las dos fuentes oficiales consultadas, es «DE LOS "
+                    "PRINCIPIOS EN LAS ACTUACIONES CONTRACTUALES DE LAS ENTIDADES ESTATALES», "
+                    "mientras el corpus guarda «Princi "
+                ),
+                "keywords": [],
             },
             "27": {
-                "titulo": "Ecuación contractual y equilibrio económico",
-                "texto": "En los contratos estatales se mantendrá la igualdad o equivalencia entre derechos y obligaciones surgidos al momento de proponer o de contratar, según el caso. Si dicha igualdad o equivalencia se rompe por causas no imputables a quien resulte afectado, las partes adoptarán en el menor tiempo posible las medidas necesarias para su restablecimiento.",
-                "aplicacion": "Defensa en glosas que rompen equilibrio económico del contrato (tarifas, descuentos unilaterales)",
-                "keywords": [
-                    "equilibrio económico",
-                    "ecuación contractual",
-                    "remuneración pactada",
-                    "Art. 27",
-                ],
+                "titulo": "DE LA ECUACIÓN CONTRACTUAL",
+                "texto": (
+                    "En los contratos estatales se mantendrá la igualdad o equivalencia entre "
+                    "derechos y obligaciones surgidos al momento de proponer o de contratar, "
+                    "según el caso. Si dicha igualdad o equivalencia se rompe por causas no "
+                    "imputables a quien resulte afectado, las partes adoptarán en el menor "
+                    "tiempo posible las medidas necesarias para su restablecimiento. // Para "
+                    "tales efectos, las partes suscribirán los acuerdos y pactos necesarios "
+                    "sobre cuantía, condiciones y forma de pago de gastos adicionales, "
+                    "reconocimiento de costos financieros e intereses, si a ello hubiere lugar, "
+                    "ajustando la cancelación a las disponibilidades de la apropiación de que "
+                    "trata el numeral 14 del artículo 25. En todo caso, las entidades deberán "
+                    "adoptar las medidas necesarias que aseguren la efectividad de estos pagos y "
+                    "reconocimientos al contratista en la misma o en la siguiente vigencia de "
+                    "que se trate. "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: el revisor tiene razón en los dos "
+                    "puntos. (a) El artículo 27 SÍ existe y está vigente, sin notas de "
+                    "derogatoria ni de modificación (solo aparecen anotaciones de "
+                    "«Jurisprudencia Vigencia» y «Concordancias»). (b) El EPÍGRAFE guardado está "
+                    "mal: en el texto oficial dice exactamente «ARTÍCULO 27. DE LA ECUACIÓN "
+                    "CONTRACTUAL.», sin el añadido «y equilibrio económico "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": [
             "contratación estatal",
             "Ley 80",
@@ -628,17 +742,29 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "2.2.1.2.1.4.4": {
-                "titulo": "Contratación de prestadores de servicios de salud",
-                "texto": "Las entidades estatales que requieran contratar servicios de salud deberán seguir las reglas establecidas en este decreto, garantizando la libre concurrencia, la igualdad de los oferentes, la selección objetiva y el respeto a los principios de la función administrativa.",
-                "aplicacion": "Reglamenta contratación de servicios de salud por ESE públicas",
-                "keywords": [
-                    "contratación servicios salud",
-                    "ESE",
-                    "Subsección IV",
-                    "Art. 2.2.1.2.1.4.4",
-                ],
+                "titulo": "Convenios o contratos interadministrativos",
+                "texto": (
+                    "La modalidad de selección para la contratación entre Entidades Estatales es "
+                    "la contratación directa; y en consecuencia, le es aplicable lo establecido "
+                    "en el artículo 2.2.1.2.1.4.1 del presente decreto. Cuando la totalidad del "
+                    "presupuesto de una Entidad Estatal hace parte del presupuesto de otra con "
+                    "ocasión de un convenio o contrato interadministrativo, el monto del "
+                    "presupuesto de la primera deberá deducirse del presupuesto de la segunda "
+                    "para determinar la capacidad contractual de las Entidades Estatales. "
+                    "(Decreto 1510 de 2013, artículo 76) "
+                ),
+                "aplicacion": (
+                    "Verifiqué yo mismo el texto oficial del Decreto 1082 de 2015 y el hallazgo "
+                    "del otro revisor se confirma en los tres puntos. (a) El artículo "
+                    "2.2.1.2.1.4.4 SÍ existe: está en el Libro 2, Parte 2, Título 1, Capítulo 2, "
+                    "Sección 1, Subsección 4 «CONTRATACIÓN DIRECTA». (b) El epígrafe guardado "
+                    "(«Contratación de prestadores de servicios de salud») es FALSO; el epígrafe "
+                    "real es «CONVENIOS O CONTRATOS INTE "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["contratación estatal", "DUR", "servicios de salud", "Decreto 1082"],
     },
     "LEY 599 DE 2000": {
@@ -648,14 +774,44 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "286": {
-                "titulo": "Falsedad ideológica en documento público",
-                "texto": "El servidor público que en ejercicio de sus funciones, al extender documento público que pueda servir de prueba, consigne una falsedad o calle total o parcialmente la verdad, incurrirá en prisión de cuatro (4) a ocho (8) años e inhabilitación para el ejercicio de derechos y funciones públicas de cinco (5) a diez (10) años.",
+                "titulo": "FALSEDAD IDEOLOGICA EN DOCUMENTO PÚBLICO",
+                "texto": (
+                    "El servidor público que en ejercicio de sus funciones, al extender "
+                    "documento público que pueda servir de prueba, consigne una falsedad o calle "
+                    "total o parcialmente la verdad, incurrirá en prisión de sesenta y cuatro "
+                    "(64) a ciento cuarenta y cuatro (144) meses e inhabilitación para el "
+                    "ejercicio de derechos y funciones públicas de ochenta (80) a ciento ochenta "
+                    "(180) meses. (Penas aumentadas por el artículo 14 de la Ley 890 de 2004, a "
+                    "partir del 1o. de enero de 2005.) "
+                ),
+                "aplicacion": (
+                    "Fui a la fuente oficial y el hallazgo del otro revisor queda confirmado. El "
+                    "artículo 286 SÍ existe en la Ley 599 de 2000 y el epígrafe guardado es "
+                    "correcto en sustancia (la norma lo imprime en mayúsculas y sin tilde: "
+                    "«FALSEDAD IDEOLOGICA EN DOCUMENTO PÚBLICO»), así que el título no está "
+                    "inventado, solo con otra ortografía. El problema es el TEXTO: el corpus "
+                    "guarda la redacción ORIGINAL de 2000, de "
+                ),
+                "keywords": [],
             },
             "289": {
                 "titulo": "Falsedad en documento privado",
-                "texto": "El que falsifique documento privado que pueda servir de prueba, incurrirá, si lo usa, en prisión de uno (1) a seis (6) años.",
+                "texto": (
+                    "El que falsifique documento privado que pueda servir de prueba, incurrirá, "
+                    "si lo usa, en prisión de dieciséis (16) a ciento ocho (108) meses. "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: la fuente oficial le da la razón. "
+                    "(a) EXISTENCIA — El artículo 289 SÍ existe en la Ley 599 de 2000 (Código "
+                    "Penal), Título IX «De los delitos contra la fe pública», Capítulo III «De "
+                    "la falsedad en documentos». (b) EPÍGRAFE — El epígrafe guardado, «Falsedad "
+                    "en documento privado», es el REAL. En el texto de la Secretaría del Senado "
+                    "aparece como «ARTÍCULO 289. "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["código penal", "falsedad documental", "fraude", "peculado"],
     },
     "LEY 1474 DE 2011": {
@@ -679,10 +835,40 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "14": {
-                "titulo": "Términos para resolver",
-                "texto": "Salvo norma legal especial y so pena de sanción disciplinaria, toda petición deberá resolverse dentro de los quince (15) días siguientes a su recepción. Para las peticiones de documentos y de información el término es de diez (10) días, y para consultas de las autoridades, treinta (30) días.",
+                "titulo": "Términos para resolver las distintas modalidades de peticiones",
+                "texto": (
+                    "Artículo 14. Términos para resolver las distintas modalidades de "
+                    "peticiones. Salvo norma legal especial y so pena de sanción disciplinaria, "
+                    "toda petición deberá resolverse dentro de los quince (15) días siguientes a "
+                    "su recepción. Estará sometida a término especial la resolución de las "
+                    "siguientes peticiones: 1. Las peticiones de documentos y de información "
+                    "deberán resolverse dentro de los diez (10) días siguientes a su recepción. "
+                    "Si en ese lapso no se ha dado respuesta al peticionario, se entenderá, para "
+                    "todos los efectos legales, que la respectiva solicitud ha sido aceptada y, "
+                    "por consiguiente, la administración ya no podrá negar la entrega de dichos "
+                    "documentos al peticionario, y como consecuencia las copias se entregarán "
+                    "dentro de los tres (3) días siguientes. 2. Las peticiones mediante las "
+                    "cuales se eleva una consulta a las autoridades en relación con las materias "
+                    "a su cargo deberán resolverse dentro de los treinta (30) días siguientes a "
+                    "su recepción. PARÁGRAFO. Cuando excepcionalmente no fuere posible resolver "
+                    "la petición en los plazos aquí señalados, la autoridad debe informar esta "
+                    "circunstancia al interesado, antes del vencimiento del término señalado en "
+                    "la ley expresando los motivos de la demora y señalando a la vez el plazo "
+                    "razonable en que se resolverá o dará respuesta, que no podrá exceder del "
+                    "doble del inicialmente previsto. "
+                ),
+                "aplicacion": (
+                    "INTENTÉ REFUTARLO Y NO PUDE: el otro revisor tiene razón en los tres "
+                    "puntos. Descargué la norma yo mismo de dos fuentes oficiales y el texto "
+                    "coincide palabra por palabra entre ellas. 1) EPÍGRAFE: el guardado dice "
+                    "«Términos para resolver». El real, idéntico en Senado y en Normograma "
+                    "SuperSalud, es «Términos para resolver las distintas modalidades de "
+                    "peticiones». Confirmado: el epígrafe guardado es "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["derecho de petición", "términos", "respuesta", "Ley 1755"],
     },
     "LEY 1437 DE 2011 (CPACA)": {
@@ -692,14 +878,108 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "14": {
-                "titulo": "Términos para resolver peticiones",
-                "texto": "Las peticiones de documentos y de información deberán resolverse dentro de los diez (10) días siguientes a su recepción. Las demás peticiones, dentro de los quince (15) días.",
+                "titulo": "Términos para resolver las distintas modalidades de peticiones",
+                "texto": (
+                    "Salvo norma legal especial y so pena de sanción disciplinaria, toda "
+                    "petición deberá resolverse dentro de los quince (15) días siguientes a su "
+                    "recepción. Estará sometida a término especial la resolución de las "
+                    "siguientes peticiones: 1. Las peticiones de documentos y de información "
+                    "deberán resolverse dentro de los diez (10) días siguientes a su recepción. "
+                    "Si en ese lapso no se ha dado respuesta al peticionario, se entenderá, para "
+                    "todos los efectos legales, que la respectiva solicitud ha sido aceptada y, "
+                    "por consiguiente, la administración ya no podrá negar la entrega de dichos "
+                    "documentos al peticionario, y como consecuencia las copias se entregarán "
+                    "dentro de los tres (3) días siguientes. 2. Las peticiones mediante las "
+                    "cuales se eleva una consulta a las autoridades en relación con las materias "
+                    "a su cargo deberán resolverse dentro de los treinta (30) días siguientes a "
+                    "su recepción. PARÁGRAFO. Cuando excepcionalmente no fuere posible resolver "
+                    "la petición en los plazos aquí señalados, la autoridad debe informar esta "
+                    "circunstancia al interesado, antes del vencimiento del término señalado en "
+                    "la ley expresando los motivos de la demora y señalando a la vez el plazo "
+                    "razonable en que se resolverá o dará respuesta, que no podrá exceder del "
+                    "doble del inicialmente previsto. [Nota de vigencia obligatoria en la cita: "
+                    "artículo modificado por el artículo 1 de la Ley 1755 de 2015.] "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: el otro revisor tiene razón en los "
+                    "dos puntos. (a) El artículo 14 SÍ existe. (b) El epígrafe real es «TÉRMINOS "
+                    "PARA RESOLVER LAS DISTINTAS MODALIDADES DE PETICIONES»; el corpus lo tenía "
+                    "truncado como «Términos para resolver peticiones». (c) El texto guardado NO "
+                    "es literal: es un resumen. Le falta el encabezado, que es la regla general "
+                    "y va PRIMERO («Salvo nor "
+                ),
+                "keywords": [],
             },
             "164": {
-                "titulo": "Caducidad — pretensión por reparación directa",
-                "texto": "La caducidad de la pretensión de reparación directa será de dos (2) años contados desde el día siguiente a la ocurrencia del hecho, omisión, operación administrativa o de la ejecutoria del acto.",
+                "titulo": "OPORTUNIDAD PARA PRESENTAR LA DEMANDA",
+                "texto": (
+                    "La demanda deberá ser presentada: 1. En cualquier tiempo, cuando: a) Se "
+                    "pretenda la nulidad en los términos del artículo 137 de este Código; (…) f) "
+                    "En los demás casos expresamente establecidos en la ley. 2. En los "
+                    "siguientes términos, so pena de que opere la caducidad: (…) d) Cuando se "
+                    "pretenda la nulidad y restablecimiento del derecho, la demanda deberá "
+                    "presentarse dentro del término de cuatro (4) meses contados a partir del "
+                    "día siguiente al de la comunicación, notificación, ejecución o publicación "
+                    "del acto administrativo, según el caso, salvo las excepciones establecidas "
+                    "en otras disposiciones legales; (…) i) Cuando se pretenda la reparación "
+                    "directa, la demanda deberá presentarse dentro del término de dos (2) años, "
+                    "contados a partir del día siguiente al de la ocurrencia de la acción u "
+                    "omisión causante del daño, o de cuando el demandante tuvo o debió tener "
+                    "conocimiento del mismo si fue en fecha posterior y siempre que pruebe la "
+                    "imposibilidad de haberlo conocido en la fecha de su ocurrencia. Sin "
+                    "embargo, el término para formular la pretensión de reparación directa "
+                    "derivada del delito de desaparición forzada, se contará a partir de la "
+                    "fecha en que aparezca la víctima o en su defecto desde la ejecutoria del "
+                    "fallo definitivo adoptado en el proceso penal, sin perjuicio de que la "
+                    "demanda con tal pretensión pueda intentarse desde el momento en que "
+                    "ocurrieron los hechos que dieron lugar a la desaparición; j) En las "
+                    "relativas a contratos el término para demandar será de dos (2) años que se "
+                    "contarán a partir del día siguiente a la ocurrencia de los motivos de hecho "
+                    "o de derecho que les sirvan de fundamento. Cuando se pretenda la nulidad "
+                    "absoluta o relativa del contrato, el término para demandar será de dos (2) "
+                    "años que se empezarán a contar desde el día siguiente al de su "
+                    "perfeccionamiento. En todo caso, podrá demandarse la nulidad absoluta del "
+                    "contrato mientras este se encuentre vigente. En los siguientes contratos, "
+                    "el término de dos (2) años se contará así: i) En los de ejecución "
+                    "instantánea desde el día siguiente a cuando se cumplió o debió cumplirse el "
+                    "objeto del contrato; ii) En los que no requieran de liquidación, desde el "
+                    "día siguiente al de la terminación del contrato por cualquier causa; iii) "
+                    "En los que requieran de liquidación y esta sea efectuada de común acuerdo "
+                    "por las partes, desde el día siguiente al de la firma del acta; iv) En los "
+                    "que requieran de liquidación y esta sea efectuada unilateralmente por la "
+                    "administración, desde el día siguiente al de la ejecutoria del acto "
+                    "administrativo que la apruebe; v) En los que requieran de liquidación y "
+                    "esta no se logre por mutuo acuerdo o no se practique por la administración "
+                    "unilateralmente, una vez cumplido el término de dos (2) meses contados a "
+                    "partir del vencimiento del plazo convenido para hacerlo bilateralmente o, "
+                    "en su defecto, del término de los cuatro (4) meses siguientes a la "
+                    "terminación del contrato o la expedición del acto que lo ordene o del "
+                    "acuerdo que la disponga; k) Cuando se pretenda la ejecución con títulos "
+                    "derivados del contrato, de decisiones judiciales proferidas por la "
+                    "Jurisdicción de lo Contencioso Administrativo en cualquier materia y de "
+                    "laudos arbitrales contractuales estatales, el término para solicitar su "
+                    "ejecución será de cinco (5) años contados a partir de la exigibilidad de la "
+                    "obligación en ellos contenida; l) <Literal modificado por el artículo 43 de "
+                    "la Ley 2195 de 2022, corregido por el artículo 1 del Decreto 1463 de 2022. "
+                    "El nuevo texto es el siguiente:> Cuando se pretenda repetir para recuperar "
+                    "lo pagado como consecuencia de una condena, conciliación u otra forma de "
+                    "terminación de un conflicto, el termino será de cinco (5) años, contados a "
+                    "partir del día siguiente de la fecha del pago, o, a más tardar desde el "
+                    "vencimiento del plazo con que cuenta la administración para el pago de "
+                    "condenas de conformidad con lo previsto en este Código. "
+                ),
+                "aplicacion": (
+                    "NO logré refutar al otro revisor: tiene razón en los dos puntos, y lo "
+                    "comprobé yo mismo bajando la Ley 1437 de 2011 del normograma oficial de la "
+                    "Superintendencia Nacional de Salud (HTTP 200, 720 KB, descarga propia, no "
+                    "reutilicé archivos de otra sesión). (a) EXISTENCIA: el artículo 164 SÍ "
+                    "existe en la Ley 1437 de 2011, y está vigente. (b) EPÍGRAFE: el guardado "
+                    "(«Caducidad — pretensión por repara "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["CPACA", "procedimiento administrativo", "actuación", "caducidad"],
     },
     "LEY 1798 DE 2016": {
@@ -746,12 +1026,62 @@ LEYES = {
         "vigente": True,
         "articulos": {
             "art_11": {
-                "titulo": "Consentimiento informado en salud mental",
-                "texto": "El consentimiento informado en salud mental se otorga por la propia persona; en su ausencia por incapacidad transitoria de juicio (psicosis aguda, riesgo suicida inminente), se acepta consentimiento sustitutivo del cónyuge o familiar de primer grado documentado en historia clínica.",
-                "aplicacion": "Defensa de ECT/internación involuntaria sin firma del paciente",
-                "keywords": ["consentimiento informado", "capacidad de juicio", "sustitutivo"],
+                "titulo": "ACCIONES COMPLEMENTARIAS PARA LA ATENCIÓN INTEGRAL",
+                "texto": (
+                    "TEXTO VIGENTE (modificado por el artículo 12 de la Ley 2460 de 2025): "
+                    "«ARTÍCULO 11. ACCIONES COMPLEMENTARIAS PARA LA ATENCIÓN INTEGRAL. <Artículo "
+                    "modificado por el artículo 12 de la Ley 2460 de 2025. El nuevo texto es el "
+                    "siguiente:> La atención integral en salud mental no se reducirá a un "
+                    "tratamiento médico, psicológico o psiquiátrico, y se llevará a cabo con un "
+                    "enfoque biopsicosocial y comunitario e incluirá acciones complementarias al "
+                    "tratamiento tales como la integración familiar, social, laboral, educativa "
+                    "y en actividades culturales, físicas, deportivas y/o recreativas. Para tal "
+                    "efecto, el Ministerio de Salud y Protección en coordinación con el "
+                    "Ministerio de Educación garantizará la incorporación del enfoque "
+                    "promocional de la Calidad de Vida y la acción transectorial e "
+                    "intersectorial necesaria como elementos fundamentales en el diseño, "
+                    "implementación y evaluación de las acciones complementarias para la "
+                    "atención integral en salud mental, y deberá incluir la educación emocional, "
+                    "sensibilización y prevención de todo tipo de violencia. Para promover los "
+                    "entornos protectores pana [sic] la salud mental, los entes territoriales y "
+                    "las autoridades en temas de salud y educación de los niveles nacional, "
+                    "departamental, distrital y municipal, armonizarán y articularán sus "
+                    "campañas de prevención, sensibilización, orientación y capacitación, y "
+                    "convocarán a participar a organizaciones sociales, étnicas y comunitarias, "
+                    "a familias, a cuidadores y a otros actores interesados. Estas "
+                    "capacitaciones deberán considerar las rutas de atención en salud mental, "
+                    "educación emocional, sensibilización y prevención de todo tipo de violencia "
+                    "y promover elementos básicos de autocuidado, incluyendo la promoción de "
+                    "factores protectores, la atención en situaciones de crisis y los primeros "
+                    "auxilios psicológicos, sin perjuicio de los demás ternos [sic] que se "
+                    "definan en el marco de su autonomía.» TEXTO ORIGINAL DE LA LEY 1616 DE 2013 "
+                    "(aplicable a servicios anteriores a la reforma de 2025): «ARTÍCULO 11. "
+                    "ACCIONES COMPLEMENTARIAS PARA LA ATENCIÓN INTEGRAL. La atención integral en "
+                    "salud mental incluirá acciones complementarias al tratamiento tales como la "
+                    "integración familiar, social, laboral y educativa. Para tal efecto, el "
+                    "Ministerio de Salud y Protección Social, garantizará la incorporación del "
+                    "enfoque promocional de la Calidad de Vida y la acción transectorial e "
+                    "intersectorial necesaria como elementos fundamentales en el diseño, "
+                    "implementación y evaluación de las acciones complementarias para la "
+                    "atención integral en salud mental.» CITA CORRECTA SI SE NECESITA "
+                    "CONSENTIMIENTO INFORMADO EN SALUD MENTAL (artículo 6, Derechos de las "
+                    "personas): «13. Derecho a exigir que sea tenido en cuenta el consentimiento "
+                    "informado para recibir el tratamiento. 14. Derecho a no ser sometido a "
+                    "ensayos clínicos ni tratamientos experimentales sin su consentimiento "
+                    "informado.» "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: es correcto en todo. Descargué y "
+                    "verifiqué yo mismo DOS fuentes oficiales independientes: 1) Ley 1616 de "
+                    "2013 original firmada, publicada por el Ministerio de Salud (PDF de 17 "
+                    "páginas, ley-1616-del-21-de-enero-2013.pdf). 2) Compilación vigente de la "
+                    "Secretaría del Senado (ley_1616_2013.html, última actualización 15 de "
+                    "agosto de 2026), que ya incorpora la Ley "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": [
             "Ley 1616",
             "salud mental",
@@ -1068,12 +1398,80 @@ DECRETOS = {
         "vigente": True,
         "articulos": {
             "6": {
-                "titulo": "Cobertura",
-                "texto": "El Sistema de Salud de las Fuerzas Militares y de la Policía Nacional garantizará la atención integral en salud a sus afiliados y beneficiarios, incluyendo servicios de baja, mediana y alta complejidad.",
-                "aplicacion": "Cobertura integral FF.MM./Policía",
-                "keywords": ["FF.MM.", "cobertura", "sanidad"],
+                "titulo": "PRINCIPIOS Y CARACTERISTICAS",
+                "texto": (
+                    "Serán principios orientadores para la prestación del servicio de salud del "
+                    "SSMP los siguientes: a) CALIDAD. Los servicios que presta el Sistema se "
+                    "fundamentan en valores orientados a satisfacer las necesidades y "
+                    "expectativas razonables de los usuarios de tal forma que los servicios se "
+                    "presten de manera integral. b) ETICA. Es el conjunto de reglas encaminadas "
+                    "a brindar servicios de salud integrales en un marco de respeto por la vida "
+                    "y la dignidad humana sin ningún distingo. c) EFICIENCIA. Es la mejor "
+                    "utilización social y económica de los recursos administrativos y "
+                    "financieros disponibles para que los beneficios a que da derecho el Sistema "
+                    "sean prestados en forma adecuada, oportuna y suficiente. d) UNIVERSALIDAD. "
+                    "Es la garantía de la protección para todas las personas, sin ninguna "
+                    "discriminación, en todas las etapas de la vida. e) SOLIDARIDAD. Es la "
+                    "práctica de la mutua ayuda entre los Establecimientos de Sanidad de las "
+                    "Fuerzas Militares y Policía Nacional bajo el principio del más fuerte hacia "
+                    "el más débil. f) PROTECCION INTEGRAL. El SSMP brindará atención en salud "
+                    "integral a sus afiliados y beneficiarios en sus fases de educación, "
+                    "información y fomento de la salud, así como en los aspectos de prevención, "
+                    "protección, diagnóstico, recuperación, rehabilitación, en los términos y "
+                    "condiciones que se establezcan en el plan de Servicios de Sanidad Militar y "
+                    "Policial, y atenderá todas las actividades que en materia de salud "
+                    "operacional requieran las Fuerzas Militares y la Policía Nacional para el "
+                    "cumplimiento de su misión. En el SSMP no existirán restricciones a los "
+                    "servicios prestados a los afiliados y beneficiarios por concepto de "
+                    "preexistencias. g) <Literal INEXEQUIBLE> h) EQUIDAD. El SSMP garantizará "
+                    "servicios de salud de igual calidad a todos sus afiliados y beneficiarios, "
+                    "independientemente de su ubicación geográfica, grado o condición de "
+                    "uniformado o no uniformado, activo, retirado o pensionado. Serán "
+                    "características propias del Sistema: a) AUTONOMIA. <Aparte tachado "
+                    "INEXEQUIBLE> El SSMP es autónomo y se regirá de conformidad con lo "
+                    "establecido en el presente Decreto. b) DESCENTRALIZACION Y "
+                    "DESCONCENTRACION. El SSMP se administrará en forma descentralizada y "
+                    "desconcentrada, con el fin de optimizar la utilización de los recursos, "
+                    "obtener economías de escala y facilitar el acceso y la oportunidad de los "
+                    "servicios de salud en las Fuerzas Militares y en la Policía Nacional. Esto "
+                    "con sujeción a las políticas, reglas, directrices y orientaciones trazadas "
+                    "por el Consejo Superior de Salud de las Fuerzas Militares y de la Policía "
+                    "Nacional. c) INTEGRACION FUNCIONAL. La Dirección General de Sanidad "
+                    "Militar, la Dirección de Sanidad de la Policía Nacional, las Direcciones de "
+                    "Sanidad de las Fuerzas, los Establecimientos de Sanidad Militar y Policial, "
+                    "y el Hospital Militar Central, concurrirán armónicamente a la prestación de "
+                    "los servicios de salud, mediante la integración en sus funciones, acciones "
+                    "y recursos, de acuerdo con la regulación que para el efecto adopte el "
+                    "Consejo Superior de Salud de las Fuerzas Militares y de la Policía "
+                    "Nacional. d) INDEPENDENCIA DE LOS RECURSOS. Los recursos que reciban las "
+                    "Fuerzas Militares y la Policía Nacional para la salud, deberán manejarse en "
+                    "fondos cuenta separados e independientes del resto de su presupuesto y sólo "
+                    "podrán destinarse a la ejecución de dichas funciones. e) ATENCION "
+                    "EQUITATIVA Y PREFERENCIAL. <Aparte tachado INEXEQUIBLE> En todos los "
+                    "niveles del SSMP se deberán atender equitativa y prioritariamente a los "
+                    "afiliados y beneficiarios del mismo. Por consiguiente, solamente podrán "
+                    "ofrecer servicios a terceros o a entidades promotoras de salud, una vez "
+                    "hayan sido satisfechas debidamente las necesidades de tales usuarios. f) "
+                    "RACIONALIDAD. El SSMP utilizará los recursos de manera racional a fin de "
+                    "que los servicios sean eficaces, eficientes y equitativos. g) UNIDAD. El "
+                    "SSMP tendrá unidad de gestión, de tal forma que aunque la prestación de "
+                    "servicios se realice en forma desconcentrada o contratada, siempre que "
+                    "exista unidad de dirección y políticas así como la debida coordinación "
+                    "entre los Subsistemas y entre las entidades y Establecimientos de Sanidad "
+                    "de cada uno de ellos. "
+                ),
+                "aplicacion": (
+                    "Verifiqué yo mismo el Decreto 1795 de 2000 en el normograma de la "
+                    "Supersalud (HTTP 200, 148 KB; encabezado «DECRETO 1795 DE 2000 (septiembre "
+                    "14) — Diario Oficial 44.161 — MINISTERIO DE DEFENSA NACIONAL») y NO pude "
+                    "refutar al otro revisor: tiene razón en todo. (a) El artículo 6 sí existe. "
+                    "(b) Su epígrafe real es «PRINCIPIOS Y CARACTERISTICAS»; el título guardado "
+                    "«Cobertura» no corresponde — la pala "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["FF.MM.", "policía", "sanidad militar"],
     },
     "DECRETO 2423 DE 1996": {
@@ -1205,14 +1603,8 @@ DECRETOS = {
         "titulo": "Régimen general de obtención, donación, preservación y trasplante de componentes anatómicos",
         "ambito": "Trasplantes — atención del donante y receptor",
         "vigente": True,
-        "articulos": {
-            "general": {
-                "titulo": "Cobertura integral del proceso de trasplante",
-                "texto": "La atención del donante cadavérico (extracción, preservación, transporte del órgano) y la del receptor (pre, intra y postoperatoria, inmunosupresión incluida) son responsabilidad ÍNTEGRA de la entidad pagadora del receptor, independientemente del estatus de afiliación del donante.",
-                "aplicacion": "Defensa de glosas de trasplante por 'donante no afiliado'",
-                "keywords": ["donante", "trasplante", "extracción", "receptor"],
-            },
-        },
+        "articulos": {},
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["Decreto 2493", "trasplante", "donante", "componente anatómico", "INS"],
     },
     "DECRETO 600 DE 2017": {
@@ -1230,17 +1622,77 @@ DECRETOS = {
         "vigente": True,
         "articulos": {
             "art_35": {
-                "titulo": "Vigencia y renovación del registro sanitario",
-                "texto": "El registro sanitario tiene vigencia de 10 años renovable. Si se radica la solicitud de renovación antes del vencimiento, el registro se entiende vigente hasta el pronunciamiento del INVIMA (extensión automática).",
-                "aplicacion": "Defensa de glosas por uso de dispositivo con registro 'vencido' pero en proceso de renovación",
-                "keywords": [
-                    "registro sanitario",
-                    "vencimiento",
-                    "renovación",
-                    "extensión automática",
-                ],
+                "titulo": "REQUERIMIENTOS GENERALES PARA LOS EQUIPOS BIOMÉDICOS DE TECNOLOGÍA CONTROLADA",
+                "texto": (
+                    "Sin perjuicio de lo dispuesto en los artículos precedentes, cuando se trate "
+                    "de equipos biomédicos de tecnología controlada, se deberán tener en cuenta "
+                    "los siguientes requisitos: a) Las personas naturales o jurídicas que "
+                    "adquieran equipos biomédicos deberán contar en todo momento, con los "
+                    "manuales de operación, funcionamiento y mantenimiento, los cuales serán "
+                    "provistos en forma obligatoria por el distribuidor en el momento de la "
+                    "entrega del equipo; b) El titular o importador del equipo biomédico deberá "
+                    "garantizar, la capacidad de ofrecer servicio de soporte técnico permanente "
+                    "durante la vida útil del mismo, así como los repuestos y herramientas "
+                    "necesarias para el mantenimiento y calibración que permita conservar los "
+                    "equipos en los rangos de seguridad establecidos inicialmente por el "
+                    "fabricante; c) Las empresas productoras de equipos biomédicos, sus "
+                    "representantes en el país y titulares de permiso de comercialización, "
+                    "deberán contar con responsables técnicos, con título universitario y/o "
+                    "especialización en el área específica para los procesos de adquisición, "
+                    "instalación y mantenimiento de este tipo de tecnología; d) Los productos "
+                    "deberán diseñarse, fabricarse y acondicionarse de forma tal, que sus "
+                    "características y funciones según la utilización prevista, no se vean "
+                    "alteradas durante el almacenamiento y transporte, teniendo en cuenta las "
+                    "instrucciones y datos facilitados por el fabricante. --- Artículos que el "
+                    "corpus confundió con el 35 (texto literal, para guardarlos aparte) --- "
+                    "ARTÍCULO 31. VIGENCIA DE LOS REGISTROS SANITARIOS Y PERMISOS DE "
+                    "COMERCIALIZACIÓN. Los registros sanitarios y permisos de comercialización, "
+                    "tendrán una vigencia de diez (10) años contados a partir de la expedición "
+                    "del acto administrativo correspondiente. El titular de dichos registros o "
+                    "permisos podrá solicitar su cancelación en cualquier momento. ARTÍCULO 32. "
+                    "DE LAS RENOVACIONES DE LOS REGISTROS SANITARIOS Y PERMISOS DE "
+                    "COMERCIALIZACIÓN. Las renovaciones de los registros sanitarios y permisos "
+                    "de comercialización se realizarán siguiendo el mismo procedimiento de su "
+                    "expedición en lo que hace referencia a las evaluaciones técnica y legal. "
+                    "Para las mismas, se podrá realizar análisis de control de calidad y "
+                    "evaluación del proceso de elaboración, cuando sea del caso y del "
+                    "cumplimiento de Buenas Prácticas de Manufactura para Dispositivos Médicos, "
+                    "BPM, vigentes. Los registros sanitarios y permisos de comercialización de "
+                    "que trata el presente decreto se renovarán bajo el mismo número que tenía "
+                    "inicialmente pero seguida de la letra R, adicionada con el número 1, 2 y "
+                    "así sucesivamente. La solicitud de renovación deberá radicarse ante el "
+                    "Instituto Nacional de Vigilancia de Medicamentos y Alimentos, Invima, con "
+                    "tres (3) meses de anterioridad al vencimiento del respectivo registro "
+                    "sanitario o permiso de comercialización. Toda solicitud de renovación de un "
+                    "registro sanitario o permiso de comercialización que no sea presentada en "
+                    "el término previsto, se tramitará como nueva solicitud. PARÁGRAFO 1o. Si se "
+                    "hubiere vencido el respectivo registro sanitario o permiso de "
+                    "comercialización sin que se presente la solicitud de renovación, se "
+                    "abandone la solicitud o se desista de ella o no se hubiere presentado la "
+                    "solicitud en el término aquí previsto, el correspondiente producto no podrá "
+                    "importarse al país, ni fabricarse, según el caso. Si hay existencias en el "
+                    "mercado, el Instituto Nacional de Vigilancia de Medicamentos y Alimentos, "
+                    "Invima, dará a los interesados un plazo para disponer de ellas, el cual no "
+                    "podrá ser superior a seis (6) meses. Si transcurrido este plazo, existen "
+                    "productos en el mercado, el Instituto Nacional de Vigilancia de "
+                    "Medicamentos y Alimentos, Invima, ordenará su decomiso conforme a lo "
+                    "dispuesto en el presente decreto. PARÁGRAFO 2o. Si la información "
+                    "científica que reposa en el expediente no ha cambiado y continúa vigente en "
+                    "el momento de solicitar la renovación, no se deberá anexar nuevamente, y en "
+                    "su lugar, el titular allegará una declaración en tal sentido. "
+                ),
+                "aplicacion": (
+                    "Descargué y verifiqué el texto oficial compilado del Decreto 4725 de 2005 "
+                    "en el Normograma de la Superintendencia Nacional de Salud (fuente de primer "
+                    "orden). El otro revisor tiene razón; no pude refutarlo: (a) EXISTE el "
+                    "artículo 35, dentro del CAPÍTULO VII «DISPOSICIONES COMUNES A LOS CAPÍTULOS "
+                    "ANTERIORES». (b) El EPÍGRAFE guardado («Vigencia y renovación del registro "
+                    "sanitario») es FALSO. El epí "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": [
             "Decreto 4725",
             "dispositivos médicos",
@@ -1367,18 +1819,94 @@ RESOLUCIONES = {
         "vigente": True,
         "articulos": {
             "art_14": {
-                "titulo": "Vigencia de la prescripción MIPRES",
-                "texto": "La prescripción tiene vigencia equivalente a la duración del tratamiento prescrito por el médico tratante. La continuidad del tratamiento en hospitalización por descompensación clínica no requiere nueva prescripción si el evento clínico es el mismo.",
-                "aplicacion": "Defensa de glosas por 'MIPRES vencido' cuando la atención hospitalaria continúa el tratamiento crónico",
-                "keywords": ["vigencia MIPRES", "continuidad", "tratamiento crónico"],
+                "titulo": "DE LAS PRESCRIPCIONES EN EL ÁMBITO DE ATENCIÓN HOSPITALARIA",
+                "texto": (
+                    "Cuando el profesional de la salud se encuentre prescribiendo tecnologías en "
+                    "salud no financiadas con recursos de la UPC o servicios complementarios, en "
+                    "el ámbito hospitalario de atención, ya sea internación, domiciliario o "
+                    "urgencias deberá tener en cuenta lo siguiente: 1. En casos de urgencia "
+                    "vital, la prescripción de tecnologías no financiadas con recursos de la UPC "
+                    "o servicios complementarios podrá efectuarse en la herramienta tecnológica "
+                    "dispuesta por este Ministerio de forma posterior a la prestación de los "
+                    "servicios durante las doce (12) horas siguientes a la atención y hasta el "
+                    "momento del egreso del paciente. 2. En caso de servicios hospitalarios con "
+                    "internación en institución o domiciliaria, la prescripción se podrá "
+                    "registrar en la herramienta tecnológica, durante la internación y hasta la "
+                    "fecha del egreso. En caso de que se presenten excedentes en cuanto a las "
+                    "cantidades prescritas por el profesional de la salud, la evidencia de "
+                    "entrega para efectos del recobro/cobro ante la ADRES, se realizará contra "
+                    "lo efectivamente suministrado y facturado. 3. Sin perjuicio de lo "
+                    "establecido en el numeral anterior del presente artículo, el profesional de "
+                    "la salud deberá conforme a la normatividad vigente registrar en la historia "
+                    "clínica, el plan de tratamiento de forma habitual, y prescribirá en el "
+                    "ordenamiento médico diario el manejo que se requiera realizar. 4. Cuando se "
+                    "trate de prescripciones para el egreso hospitalario, se debe tener en "
+                    "cuenta lo siguiente: i) si corresponde a prescripciones necesarias para "
+                    "garantizar la continuidad del tratamiento posterior al egreso hospitalario, "
+                    "el profesional de la salud deberá seleccionar el ámbito ambulatorio "
+                    "priorizado en la herramienta tecnológica de que trata la presente "
+                    "Resolución, y podrá generar la solicitud hasta por un mes de tratamiento; "
+                    "ii) si un usuario requiere continuar tratamiento en hospitalización "
+                    "domiciliaria, el profesional de la salud tratante de la IPS que efectúa el "
+                    "egreso deberá seleccionar el ámbito de atención hospitalario - domiciliario "
+                    "para generar el plan de manejo de las tecnologías no financiadas con "
+                    "recursos de la UPC o servicios complementarios, en la herramienta "
+                    "tecnológica dispuesta para tal fin; iii) Cuando se requiera ajustar o "
+                    "cambiar el plan de manejo en el ámbito de atención domiciliaria, "
+                    "corresponderá a los profesionales de la salud de la IPS domiciliaria, la "
+                    "prescripción en la herramienta tecnológica. 5. Cuando la IPS no haga parte "
+                    "de la red de prestadores de la EPS o EOC y se requiera atención de "
+                    "urgencias e incluso posterior a ello, se defina la hospitalización del "
+                    "usuario, se podrá utilizar el ámbito de atención de urgencias desde el "
+                    "ingreso hasta el egreso hospitalario, siempre y cuando se informe y sea "
+                    "autorizado por la EPS o EOC tal condición, en los términos estipulados para "
+                    "dicho reporte, so pena de incurrir en omisión a la obligación de reportar "
+                    "la información. [NOTA DE VIGENCIA: Resolución derogada por el artículo 53 "
+                    "de la Resolución 740 de 2024] "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: el otro revisor tiene razón "
+                    "(AMBOS_MAL). Descargué el texto oficial completo de la Resolución 1885 de "
+                    "2018 del Normograma de la SuperSalud y lo verifiqué línea por línea. (a) "
+                    "EXISTE: el artículo 14 sí existe en la Resolución 1885 de 2018. (b) "
+                    "EPÍGRAFE GUARDADO: FALSO. El corpus dice «Vigencia de la prescripción "
+                    "MIPRES». El epígrafe real, literal, es «DE LAS "
+                ),
+                "keywords": [],
             },
             "art_22": {
-                "titulo": "MIPRES en eventos especiales — junta médica",
-                "texto": "En urgencia vital o tratamiento iniciado prequirúrgicamente (inducción inmunológica en trasplantes), la prescripción MIPRES puede radicarse antes o durante el evento; el rigor administrativo NO impide la cobertura del tratamiento.",
-                "aplicacion": "Defensa de inmunosupresión PRE-trasplante prescrita antes de la cirugía",
-                "keywords": ["MIPRES contingencia", "trasplante", "urgencia vital"],
+                "titulo": "RESPONSABILIDAD DE LA IPS",
+                "texto": (
+                    "<Resolución derogada por el artículo 53 de la Resolución 740 de 2024> Las "
+                    "IPS deben conformar la Junta de Profesionales de la Salud de acuerdo con la "
+                    "obligatoriedad establecida en la presente Resolución, les corresponderá: 1. "
+                    "Disponer de los mecanismos necesarios para garantizar el funcionamiento de "
+                    "la Junta de Profesiones de la Salud, de conformidad con los integrantes "
+                    "establecidos en la presente Resolución, para dar la respuesta, en cada "
+                    "caso, en los tiempos previstos en la garantía del suministro establecida en "
+                    "esta resolución. 2. Reportar oportunamente la decisión adoptada por la "
+                    "Junta de Profesionales de la Salud en la herramienta tecnológica que el "
+                    "Ministerio de Salud y Protección dispone para ello, en los tiempos "
+                    "previstos en el presente acto administrativo so pena de las sanciones a que "
+                    "haya lugar por no realizarlo. 3. Garantizar que bajo ninguna circunstancia "
+                    "el personal administrativo de las Instituciones Prestadoras de Salud (IPS), "
+                    "hagan parte de Juntas, así sean profesionales de la salud. 4. Instaurar "
+                    "mecanismos para evitar que los miembros de las Juntas de Profesionales de "
+                    "la Salud reciban reconocimientos en especie o económicos de compañías "
+                    "productoras y distribuidoras de tecnologías en salud. "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y NO pude: la fuente oficial le da la razón al "
+                    "otro revisor. Descargué la compilación oficial de la Resolución 1885 de "
+                    "2018 MSPS del Normograma de la Superintendencia Nacional de Salud (281 KB "
+                    "de HTML, texto completo con notas de vigencia) y busqué el artículo 22. (a) "
+                    "El artículo 22 EXISTE. (b) Su epígrafe real es «RESPONSABILIDAD DE LA IPS», "
+                    "no «MIPRES en eventos espec "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["Resolución 1885", "MIPRES", "no PBS", "prescripción"],
     },
     "RESOLUCION 1885 DE 2024": {
@@ -1388,12 +1916,55 @@ RESOLUCIONES = {
         "vigente": True,
         "articulos": {
             "cronograma": {
-                "titulo": "Cronograma 2025",
-                "texto": "Alta complejidad: desde 1-feb-2025. Mediana complejidad: desde 1-abr-2025. Baja complejidad: desde 1-jun-2025.",
-                "aplicacion": "Plazos de implementación Manual Único",
-                "keywords": ["cronograma", "alta complejidad", "implementación"],
+                "titulo": "(modifica el artículo 12 «Transitoriedad» de la Resolución 2284 de 2023)",
+                "texto": (
+                    "ARTÍCULO 1o. Modifíquese el artículo 12 de la Resolución número 2284 de "
+                    "2023, modificado por el artículo 1o de la Resolución número 627 de 2024, el "
+                    "cual quedará así: 'Artículo 12. Transitoriedad. Las entidades responsables "
+                    "de pago, los prestadores de servicios de salud y los proveedores de "
+                    "tecnologías en salud, deberán implementar las disposiciones establecidas en "
+                    "la presente resolución, de acuerdo con el siguiente cronograma y "
+                    "clasificación de las entidades, así: Tipo de entidad / Fecha de inicio "
+                    "Grupo 1: Prestadores de Servicios de Salud con servicios de alta "
+                    "complejidad habilitados y activos en REPS al 2 de septiembre de 2024 según "
+                    "el listado dispuesto por el Ministerio en el micrositio de FEV-RIPS en el "
+                    "siguiente enlace "
+                    "https://www.minsalud.gov.co/sites/rid/Lists/BibliotecaDigital/RIDE/DE/OT/listado-pss-reps-2024.zip "
+                    "y las Entidades Responsables de Pago — 1o de febrero de 2025 Grupo 2: "
+                    "Prestadores de Servicios de Salud con servicios de mediana complejidad "
+                    "habilitados y activos en REPS al 2 de septiembre de 2024 según el listado "
+                    "dispuesto por el Ministerio en el micrositio de FEV-RIPS en el siguiente "
+                    "enlace "
+                    "https://www.minsalud.gov.co/sites/rid/Lists/BibliotecaDigital/RIDE/DE/OT/listado-pss-reps-2024.zip "
+                    "— 1o de abril de 2025 Grupo 3: Prestadores de Servicios de Salud con "
+                    "servicios de baja complejidad, profesionales independientes no obligados a "
+                    "FEV en salud y entidades con objeto social diferente habilitados y activos "
+                    "en REPS al 2 de septiembre de 2024 según el listado dispuesto por el "
+                    "Ministerio en el micrositio de FEV-RIPS en el siguiente enlace "
+                    "https://www.minsalud.gov.co/sites/rid/Lists/BibliotecaDigital/RIDE/DE/OT/listado-pss-reps-2024.zip "
+                    "y los Proveedores de Tecnologías en Salud en el marco del Decreto número "
+                    "441 de 2022 incorporado en el Decreto número 780 de 2016 — 1o de junio de "
+                    "2025 Los servicios y tecnologías en salud, prestados o suministrados antes "
+                    "de la fecha de inicio establecida para cada uno de los grupos definidos en "
+                    "el presente artículo, dispondrán hasta el 31 de diciembre de 2025 para "
+                    "atender las disposiciones contenidas en la Resolución 3047 de 2008 y sus "
+                    "modificatorias, la Resolución 416 de 2009 y la Resolución 4331 de 2012, así "
+                    "como la Resolución 3253 de 2009, y para los procesos de auditoría deberán "
+                    "aplacarse [sic, en el texto publicado] los términos del artículo 57 de la "
+                    "Ley 1438 de 2011.' "
+                ),
+                "aplicacion": (
+                    "Fui yo mismo a la fuente oficial y NO pude refutar el hallazgo: el corpus "
+                    "está mal en los tres puntos señalados. (1) «cronograma» no es un artículo. "
+                    "La Resolución 00001885 de 2024 (30 de septiembre de 2024, Diario Oficial "
+                    "No. 52.896 del 1 de octubre de 2024) tiene únicamente tres artículos: 1o, "
+                    "2o y 3o. El cronograma está dentro del ARTÍCULO 1o, que sustituye el "
+                    "artículo 12 de la Resolución 2284 "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["cronograma", "implementación", "2025"],
     },
     "RESOLUCION 2275 DE 2023": {
@@ -1916,19 +2487,8 @@ RESOLUCIONES = {
         "titulo": "Política Nacional de Salud Mental — internación involuntaria y junta médica",
         "ambito": "Salud mental — internación involuntaria, criterios de prolongación",
         "vigente": True,
-        "articulos": {
-            "art_25": {
-                "titulo": "Junta médica para internación involuntaria prolongada",
-                "texto": "La internación involuntaria que supere 14 días requiere pronunciamiento documentado de junta médica interdisciplinaria cada 7 días con criterios clínicos de mantenimiento (riesgo suicida activo, agitación severa, respuesta parcial al tratamiento).",
-                "aplicacion": "Defensa de internación prolongada con junta médica documentada",
-                "keywords": [
-                    "internación involuntaria",
-                    "junta médica",
-                    "prolongación",
-                    "salud mental",
-                ],
-            },
-        },
+        "articulos": {},
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": ["Resolución 4886", "salud mental", "internación involuntaria", "junta médica"],
     },
     # ── Ronda 16 (26-jun-2026 — Bug P v3): normas pre-existentes que la EPS
@@ -2084,25 +2644,82 @@ CIRCULARES = {
         "notas": "Consolida y operacionaliza los plazos del Art. 57 Ley 1438/2011 y la Res. 2284/2023 (Manual Único). Plazos vigentes: 20 días EPS formular | 15 días IPS responder | 7 días subsanar | 10 días EPS decidir | 5 días pago post-levantamiento.",
         "articulos": {
             "plazos": {
-                "titulo": "Cronograma completo del trámite de glosas",
-                "texto": "1. FORMULACIÓN: La Entidad Responsable del Pago (EPS/ERP) dispone de 20 días hábiles desde la radicación de la factura para formular glosas. Vencido este plazo, se configura aceptación tácita. 2. RESPUESTA: La IPS dispone de 15 días hábiles desde la recepción de la glosa para presentar respuesta técnica. 3. SUBSANACIÓN: Si la glosa es subsanable, la IPS cuenta con 7 días hábiles adicionales para corregir y reenviar. 4. DECISIÓN FINAL: La EPS dispone de 10 días hábiles tras la respuesta de la IPS para levantar (parcial o total) o ratificar la glosa. 5. PAGO: Una vez levantada o aceptada la glosa, el pago debe efectuarse dentro de los 5 días hábiles siguientes. Nota: Una vez formulada la glosa inicial, no se pueden presentar nuevas glosas sobre la misma factura, salvo hechos nuevos detectados en la respuesta.",
-                "aplicacion": "Cronograma operativo completo vigente 2026",
-                "keywords": [
-                    "plazos",
-                    "cronograma",
-                    "20 días",
-                    "15 días",
-                    "7 días",
-                    "10 días",
-                    "5 días",
-                    "formulación",
-                    "respuesta",
-                    "subsanación",
-                    "decisión",
-                    "pago",
-                ],
+                "titulo": "Manual Funcional de Seguimiento a Facturas – SIIFA, Ministerio de Salud y Protección Social, versión 1.0.0 …",
+                "texto": (
+                    "6.3 Registro de Glosa — «Se recuerda que en virtud del artículo 57 de la "
+                    "Ley 1438 de 2011, todas las glosas deben formularse y comunicarse en un "
+                    "mismo momento y sólo es posible formular nuevas glosas que resulten de la "
+                    "respuesta inicial dada por el prestador. El sistema registrará "
+                    "automáticamente la fecha del registro.» «Tiempos del registro en SIIFA de "
+                    "la glosa. Los tiempos para el registro de las glosa y la respuestas en el "
+                    "SIIFA, están determinados en la Resolución 1962 de 2025, y debe ser "
+                    "preferiblemente por interoperabilidad o a mas tardar durante las siguientes "
+                    "48 horas hábiles posteriores a la formulación y comunicación de las "
+                    "mismas.» «Tiempos del trámite de la glosa. Los tiempos para la formulación "
+                    "y comunicación de las glosas están establecidos en el artículo 57 de la Ley "
+                    "1438 de 2011. (…) Una vez registrada la glosa que previamente ha sido "
+                    "formulada y comunicada por el pagador; esta queda disponible para que el "
+                    "prestador/proveedor consulte y registre la respuesta dentro de los tiempos "
+                    "definidos por la normativa vigente.» Tabla «Tiempos para la formulación y "
+                    "comunicación de glosa» (Etapa | Responsable | Tiempo máximo | Descripción): "
+                    "1) «Formulación y comunicación de todas las glosas asociadas a la factura» "
+                    "| ERP | «20 días hábiles desde la radicación» | «La entidad pagadora revisa "
+                    "la factura radicada, si encuentra alguna inconformidad que sea causal de "
+                    "glosa, debe comunicarla al prestador/proveedor durante los primeros 20 dias "
+                    "hábiles posteriores a la radicación de la factura. Preferiblemente por "
+                    "interoperabilidad o máximo durante las siguientes 48 horas hábiles, deberá "
+                    "registrar dicha información en SIIFA.» 2) «Respuesta a glosa» | "
+                    "Prestador/Proveedor | «15 días hábiles después de la formulación y "
+                    "comunicación» | «(…) El prestador/proveedor debe corregir las "
+                    "inconsistencias señaladas y responder a la ERP, justificando o sustentando "
+                    "su respuesta, dentro del plazo estipulado.» 3) «ERP levanta total o, "
+                    "parcialmente la glosa o, la reitera» | ERP | «10 días hábiles posteriores a "
+                    "la respuesta del PSS o PTS» | «La entidad pagadora analiza la respuesta "
+                    "presentada y decide levantar o reiterar total o parcialmente la glosa, con "
+                    "el debido argumento que justifique la decisión. Preferiblemente por "
+                    "interoperabilidad o máximo durante las siguientes 48 horas hábiles, deberá "
+                    "registrar dicha información en SIIFA. Si la glosa es reiterada, y el "
+                    "prestador/proveedor considera que es correcta la aplicación deberá realizar "
+                    "una nota crédito afectando la factura por el valor de la glosa, y validar "
+                    "dicha nota crétido por el mecanismo único de validación de FEV-RIPS.» 4) "
+                    "«Subsanación de glosa no levantada» | Prestador/Proveedor | «7 días hábiles "
+                    "después de la respuesta inicial de la ERP» | «Sobre las glosas no "
+                    "levantadas, si el prestador/provedor considera que es subsanable, debe "
+                    "corregir la inconsistencia señalada y responder a la ERP, justificando o "
+                    "sustentando su subsanación, dentro del plazo estipulado. Preferiblemente "
+                    "por interoperabilidad o máximo durante las siguientes 48 horas hábiles, "
+                    "deberá registrar dicha información en SIIFA.» 5) «Respuesta final y Pago de "
+                    "valores aceptados» | ERP | «5 días hábiles» | «La entidad responsable de "
+                    "pago debe responder durante los 5 dias hábiles posteriores a la subsanación "
+                    "recibida del prestador/proveedor, sobre las glosas no levantadas, con el "
+                    "debido argumento que justifique la decisión. Preferiblemente por "
+                    "interoperabilidad o máximo durante las siguientes 48 horas hábiles, el "
+                    "pagador deberá registrar la decisión final en SIIFA. Si la glosa es "
+                    "reiterada, y el prestador/proveedor considera que es correcta la aplicación "
+                    "deberá realizar una nota crédito parcial afectando la factura por el valor "
+                    "de la glosa, y validarla ante la DIAN y por el mecanismo único de "
+                    "validación de FEV-RIPS. De modo contrario, si considera que la glosa no "
+                    "levantada es injustificada, podrá acudir ante la Superintendencia Nacional "
+                    "de Salud, para que en el ejercicio de sus funciones conciliatorias o "
+                    "jurisdiccionales resuelva la controversia.» «Normativa: Artículo 57, Ley "
+                    "1438 de 2011.» Numeral 6.3.5 «Decisión Final»: «Posterior a la subsananción "
+                    "de glosas no levantadas realizada por el prestador/proveedor, la ERP deberá "
+                    "revisar y tomar una decisión final, la cual posterior a la comunicación al "
+                    "prestador/proveedor deberá ser registrada en el SIIFA dentro de los 48 "
+                    "horas hábiles posteriores.» "
+                ),
+                "aplicacion": (
+                    "Intenté refutar el hallazgo y no pude: los tres defectos son ciertos y se "
+                    "comprueban en la fuente oficial. (0) EPÍGRAFE INEXISTENTE: el «Manual SIIFA "
+                    "2026» no es una norma con artículos; el documento real es el «Manual "
+                    "Funcional de Seguimiento a Facturas – SIIFA» v1.0.0 de febrero de 2026, y "
+                    "en sus 61 páginas no existe ningún título «Cronograma completo del trámite "
+                    "de glosas». Los plazos están en "
+                ),
+                "keywords": [],
             },
         },
+        "verificada": "26-08-2026 contra fuente oficial (normograma SuperSalud / Senado) — se corrigió",
         "keywords": [
             "SIIFA",
             "manual SIIFA",

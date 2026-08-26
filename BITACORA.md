@@ -7930,6 +7930,48 @@ las tres quedan con su correo.
 
 ## 3) PENDIENTE
 
+### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
+
+Usted pidió verificar, corregir y completar las 16 normas que faltaban. Se
+hizo, con dieciséis revisores trabajando en paralelo y un segundo par de ojos
+que intentaba tumbar cada hallazgo antes de darlo por bueno.
+
+**El resultado, sin adornos: de los 20 artículos, los 20 estaban mal.** Y
+ninguno se cayó al intentar refutarlo.
+
+| Qué tenían | Cuántos |
+|---|---|
+| Título **y** texto inventados | 13 |
+| El texto cambiado | 3 |
+| El título cambiado | 2 |
+| El artículo **no existe** en esa norma | 2 |
+
+Tres ejemplos de lo que decía el motor:
+
+- **Decreto 1082**, artículo 2.2.1.2.1.4.4 — el motor lo daba como
+  «Contratación de prestadores de servicios de salud». Es «Convenios o
+  contratos interadministrativos», y el texto que le habían puesto sale de otro
+  decreto, el 1510 de 2013.
+- **Decreto 1795** (el del sistema de salud de las Fuerzas Militares), artículo
+  6 — figuraba como «Cobertura». Es «Principios y características».
+- **Resolución 4886 de 2018**, artículo 25 — esa resolución adopta la Política
+  Nacional de Salud Mental y **no tiene ese artículo**.
+
+Los 20 quedaron corregidos con el texto literal de la norma, los 2 que no
+existen se retiraron, y las 16 normas quedaron marcadas con la fuente contra la
+que se verificaron.
+
+**El corpus completo, al cierre: 26 normas, 47 artículos, cero pendientes.**
+
+Y quedó una prueba que impide que vuelva a pasar: si alguien agrega un artículo
+con su texto y no deja escrito contra qué fuente lo verificó, la prueba se pone
+roja y el cambio no entra.
+
+**El balance de la semana.** Sumando las tres auditorías: de las 26 normas del
+corpus, **veintiuna tenían al menos un artículo con el nombre o el texto
+inventado**. El motor llevaba meses citando derecho que no existe, con un sello
+que decía «citas verificadas» porque se contrastaba contra esa misma lista.
+
 ### 26-08-2026 — Seis decisiones del área, aplicadas
 
 **El texto del Dispensario ya no generaliza: prueba el ítem.** Afirmaba que el
@@ -8021,7 +8063,8 @@ Tres cosas, en este orden:
 - **La cuenta repetida de Edgar Silva** — pendiente de pantalla, no de código:
   entrar a Administración → Usuarios, borrar `devoluciones1@sinacsc.com` y
   dejar `carterahus02@sinacsc.com`.
-- **Terminar de repasar la base normativa** — **las de uso diario ya están.**
+- ~~**Terminar de repasar la base normativa**~~ — **HECHO, completo.** 26
+  normas, 47 artículos, cero pendientes. (Antes decía:)
   12 normas verificadas contra fuente oficial (29 artículos): Decreto 4747,
   Decreto 780, Decreto 111, Decreto 2423, Ley 23, Ley 100, Ley 1122, Ley 1164,
   Ley 1438, Ley 1751, Resolución 1995 y Resolución 2284. **Quedan 16 normas con
