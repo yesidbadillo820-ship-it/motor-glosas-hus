@@ -1,5 +1,24 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 (cierre 3) — el aviso decía un nombre que no existe
+
+Armando el paquete completo (223 folios), CLAUDIA avisó de 11 archivos «que no
+se reconocieron», listándolos como «3 OTROS.pdf», «4 OTROS.pdf»… Pero
+`3 OTROS.pdf` SÍ se reconoce: ese es el nombre que el bot les acababa de poner.
+El nombre de verdad —el único que le diría al auditor qué archivo es— ya no
+estaba en el disco.
+
+O sea: los 11 archivos que hay que revisar salían avisados con un nombre
+inservible. Ahora el `Soporte` guarda con qué nombre llegó, y el aviso dice
+«3 OTROS.pdf (llegó como «FACOSTE.pdf»)». El reporte CSV lleva además una
+columna **LLEGO COMO**.
+
+Es el mismo defecto de la pantalla que mostraba dos veces «2 HISTORIA
+CLINICA.pdf»: el bot contaba lo que iba a hacer, no lo que hizo.
+
+1778 pruebas en `tests/test_tools`.
+
+
 ## Sesión 26-ago-2026 (cierre 2) — el detallado convertido no se pierde de vista
 
 Al ir a repartir los 317 detallados del paquete —que salen del bot hermano con

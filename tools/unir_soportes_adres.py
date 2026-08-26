@@ -439,6 +439,18 @@ class Soporte:
     grupo: Grupo
     reconocido: bool = True
     paginas: int = 0
+    # Con qué nombre llegó, antes de numerarlo. Sin esto, un archivo que no se
+    # reconoció salía avisado con su nombre NUEVO («3 OTROS.pdf»), que no le
+    # dice nada al auditor — y el de verdad ya no está en el disco.
+    nombre_original: str = ""
+
+    def __post_init__(self) -> None:
+        self.nombre_original = self.nombre_original or self.ruta.name
+
+    @property
+    def como_llego(self) -> str:
+        """El nombre original si cambió; si no, el que tiene."""
+        return self.nombre_original
 
 
 @dataclass
@@ -1286,6 +1298,7 @@ COLUMNAS_REPORTE = (
     "ESTADO",
     "OBSERVACION",
     "FOLIO",
+    "LLEGO COMO",
 )
 
 
@@ -1308,6 +1321,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         fac.estado,
                         "",
                         FOLIO_EPICRIS,
+                        s.como_llego,
                     ]
                 )
             for n, s in zip(numeros_de_renglon(fac.soportes_factura), fac.soportes_factura):
@@ -1322,6 +1336,7 @@ def escribir_reporte(ruta: Path, plan: list[Factura]) -> None:
                         fac.estado_factura,
                         "",
                         FOLIO_FACTURA,
+                        s.como_llego,
                     ]
                 )
             for colgado in fac.temporales_colgados:
@@ -1836,7 +1851,10 @@ def main(argv: list[str] | None = None) -> int:
             "\nArchivos que NO se reconocieron (%d) — quedaron en OTROS:", len(sin_reconocer)
         )
         for fac, s in sin_reconocer[:10]:
-            logger.info("   %s: %s", fac.factura, s.ruta.name)
+            if s.como_llego != s.ruta.name:
+                logger.info("   %s: %s (llegó como «%s»)", fac.factura, s.ruta.name, s.como_llego)
+            else:
+                logger.info("   %s: %s", fac.factura, s.ruta.name)
         if len(sin_reconocer) > 10:
             logger.info("   … y %d más, en el reporte CSV.", len(sin_reconocer) - 10)
 
