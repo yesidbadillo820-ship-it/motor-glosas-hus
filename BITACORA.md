@@ -7893,6 +7893,41 @@ vuelve a pasar.
 
 ---
 
+### 26-08 — «Dice que no tiene facturación electrónica y sí la tiene»
+
+Tres facturas —**HUS544942, HUS542599 y HUS544936**— salían en la página con
+«Correo F.E.: **NO**» teniéndola. Y eso no es un detalle: **sin correo el
+sistema no deja radicar**, así que el auditor queda obligado a devolver una
+factura que estaba bien.
+
+**Por qué pasaba.** Ese dato no lo escribe nadie a mano: sale de **cruzar** la
+factura con el Formato de Facturación Electrónica del DGH. El cruce se hacía
+comparando el número **letra por letra**, y los dos archivos no siempre lo
+escriben igual: unas veces «544942», otras «HUS544942», otras
+«HUS0000544942». Cuando no coincidía exacto, el sistema daba por hecho que la
+factura no tenía correo — sin decir nada.
+
+**Cómo quedó.** Al subir cualquiera de las dos fuentes, el número se guarda
+siempre en la forma larga (**HUS + 10 dígitos**), venga como venga. Así las dos
+hablan el mismo idioma y el cruce no vuelve a fallar. Lo que no tiene forma de
+número de factura del HUS se deja tal cual: no se inventa nada.
+
+**Para revisarlo sin cambiar nada:**
+
+    venv\Scripts\python.exe tools\preauditoria_revisar_fe.py HUS544942 HUS542599 HUS544936
+
+Dice, factura por factura, si está en el Formato F.E., si está pero **escrita
+distinto**, o si sencillamente no está —y qué hacer en cada caso—. Se pueden
+escribir cortas o largas.
+
+**Lo que hay que hacer con estas tres:** después de actualizar, **volver a
+subir el Formato F.E.** en «Fuentes». Ahí el número se guarda ya normalizado y
+las tres quedan con su correo.
+
+16 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Folio ADRES del paquete 31068 (26-08)

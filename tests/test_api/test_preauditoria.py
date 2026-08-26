@@ -2718,3 +2718,54 @@ class TestObservacionLarga:
             json={"resultado": "DEVUELTA", "motivo_devolucion": "x" * 4100},
         )
         assert r.status_code == 422
+
+
+class TestElNumeroDeFacturaSeCruzaAunqueVengaCorto:
+    """26-08-2026: tres facturas salían con «Correo F.E.: NO» teniéndola. El
+    Formato F.E. traía el número corto («544942») y la Radicación el largo
+    («HUS0000544942»): el cruce fallaba en silencio y, sin correo, el sistema
+    no deja radicar — el auditor tenía que devolver una factura buena."""
+
+    def test_el_formato_fe_con_el_numero_corto_igual_cruza(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, "HUS0000544942", 250700)])
+        # El DGH exportó el número sin el HUS ni los ceros.
+        r = client.post(
+            "/preauditoria/fuentes/dgreport",
+            files={
+                "archivo": (
+                    "dgreport.xlsx",
+                    _excel(DG_HEADERS, [["2026-08-26 09:00", "544942", "CUFE1"]]),
+                    "application/xlsx",
+                )
+            },
+        )
+        assert r.status_code == 200, r.text
+        o = _crear_oficio(client, radicado="FHUS-AS-I01500-26")
+        _escribir(client, o["id"], ENV)
+        ficha = client.get(f"/preauditoria/oficios/{o['id']}").json()
+        assert ficha["facturas"][0]["correo_fe"] == "SI", (
+            "la factura sigue saliendo sin facturación electrónica: no se puede radicar"
+        )
+
+    def test_y_por_eso_ya_se_puede_radicar(self, client):
+        _subir_radicacion(client, [_rad_fila(ENV, "HUS0000542599", 120000)])
+        client.post(
+            "/preauditoria/fuentes/dgreport",
+            files={
+                "archivo": (
+                    "dgreport.xlsx",
+                    _excel(DG_HEADERS, [["2026-08-26 09:00", "HUS542599", "CUFE2"]]),
+                    "application/xlsx",
+                )
+            },
+        )
+        o = _crear_oficio(client, radicado="FHUS-AS-I01501-26")
+        _escribir(client, o["id"], ENV)
+        fid = _factura_id(client, "HUS0000542599")
+        assert _radicar(client, fid).status_code == 200
+
+    def test_la_radicacion_con_numero_corto_tambien_se_guarda_larga(self, client):
+        """Así las dos fuentes hablan el mismo idioma."""
+        _subir_radicacion(client, [_rad_fila(ENV, "544936", 99900)])
+        d = client.get("/preauditoria/fuentes/radicacion").json()
+        assert any(f["factura"] == "HUS0000544936" for f in d["items"])
