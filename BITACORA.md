@@ -7833,6 +7833,29 @@ vuelve a pasar.
 
 ## 3) PENDIENTE
 
+### ⭐ Lo primero, al cierre del 25-08
+
+Tres cosas, en este orden:
+
+1. **Correr los 10 casos de prueba en la pantalla del motor.** Están armados
+   para que cada uno pruebe algo concreto que se arregló ese día. Si el motor
+   pasa los diez, lo del 25 quedó funcionando de verdad en el hospital. Es lo
+   único que falta para dar el día por cerrado.
+2. **Dos decisiones del área**, las dos sobre textos institucionales que no se
+   tocan sin permiso:
+   - **La plantilla del Dispensario** afirma que el servicio «se encuentra»
+     entre los 7.141 ítems del Anexo 1, sin decir cuál ni verificarlo caso por
+     caso. Puede ser cierta en general y falsa en un caso puntual. ¿Se cambia
+     por una frase que no afirme lo que no se verificó?
+   - **El criterio de «aseguradora»** para las ratificaciones: hoy van al
+     análisis las compañías de seguros y las ARL, y conservan la plantilla las
+     EPS, el Dispensario, Sanidad Militar, la Policía y el Magisterio. Falta que
+     el área lo confirme o lo corrija.
+3. **Verificar el cómputo de días hábiles** antes de radicar una glosa como
+   extemporánea. El dictamen GL-130 afirma «77 días hábiles» y «ha operado de
+   pleno derecho la aceptación tácita» como hecho consumado. Si el conteo
+   falla, la causal original nunca quedó respondida.
+
 ### Folio ADRES del paquete 31068 (26-08)
 - **~~Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN~~ — RESUELTO.** Son
   las páginas 10 a 18 del mismo `..._FACTURA.pdf` que viene con el XML. Ese
@@ -7866,7 +7889,10 @@ vuelve a pasar.
   Resolución 1885, entre otras). Se pueden hacer cuando haya un rato.
 
 ### Lo que quedó de la noche del 25-08
-- **Decisión suya: la plantilla de las ratificaciones.** El segundo auditor
+- ~~**Decisión suya: la plantilla de las ratificaciones**~~ — **RESUELTO** el
+  mismo día: el área decidió que las de aseguradora van al análisis y las demás
+  conservan la plantilla. Ya está implementado. (Se deja el texto de abajo
+  porque explica de dónde salió.) El segundo auditor
   señala que las 21 respuestas a glosas ratificadas usan el mismo texto y
   ninguna entra en el motivo concreto por el que la entidad ratificó. El texto
   lo pidió el área en abril y jurídicamente se sostiene, así que no se cambió
@@ -7880,14 +7906,11 @@ vuelve a pasar.
   2016 es el primero de la lista.
 
 ### Del motor de glosas, al 25-08 (tarde)
-- **Reenviar el archivo de hoy con las columnas de IA.** Las 117 respuestas
-  salieron correctas, pero el Excel que llegó a los gestores salió **sin** las
-  columnas RESPUESTA IA / ESTADO IA. Vale la pena reenviarlo ya corregido.
-- **La cuenta repetida de Edgar Silva.** Los correos a `devoluciones1@sinacsc.com`
-  rebotan; el bueno es `carterahus02@sinacsc.com`. Hay que dejar una sola cuenta
-  en el motor.
-- **Que a las médicas les llegue lo suyo.** Ya quedó el nombre de la profesional
-  amarrado a la glosa; falta reenviar el lote de hoy para que les llegue.
+- ~~Reenviar el archivo con las columnas de IA~~ · ~~que a las médicas les
+  llegue lo suyo~~ — **HECHO**, confirmado por el área el 25-08 (noche).
+- ~~La cuenta repetida de Edgar Silva~~ — el área decidió: queda
+  `carterahus02@sinacsc.com`. Falta hacerlo en la pantalla de Usuarios; no es
+  tarea de código.
 - **Los CSV de «valores distintos»** de la carga de tarifas: 256 del
   Dispensario, 737 de Compensar y 737 de Positiva. Cada uno es un código con
   dos precios: hay que decidir cuál queda.
@@ -7897,7 +7920,8 @@ vuelve a pasar.
   agregar la columna al archivo.
 
 ### Del frente COOSALUD (glosas y trámites), al 25-08
-- **Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573** (uno por uno,
+- ~~**Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573**~~ — HECHO,
+  confirmado por el área el 25-08. (Detalle original: uno por uno,
   por el tope de 300 facturas). Si alguno devuelve error, corregirlo con el bot
   CORREGIR ERRORES DGH y reintentar el archivo completo. Después van los
   trámites de ese lote.
