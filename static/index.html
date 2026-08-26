@@ -2274,6 +2274,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
         </button>
+        <button class="sn-item" data-tip="Mi día" onclick="sidebarTab(this,'mi-dia')" id="sn-mi-dia">
+          <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+          <span class="sn-item-label">Mi día</span>
+        </button>
         <button class="sn-item" data-tip="Mi desempeño" onclick="sidebarTab(this,'mi-desempeno')">
           <svg class="i i-md" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           <span class="sn-item-label">Mi desempeño</span>
@@ -3336,6 +3340,43 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <div style="margin-top:1rem;font-size:.7rem;color:var(--text3);text-align:center">
           Datos en tiempo real · Endpoint: <code>/dashboard-ejecutivo/vivo</code> ·
           Solo COORDINADOR / SUPER_ADMIN
+        </div>
+      </div>
+    </div>
+
+    <!-- 26-08-2026 · «Mi dia».
+         Treinta y dos pantallas para un gestor que en el dia a dia hace tres
+         cosas: responder lo que llego, revisar lo que el motor marco y
+         radicar lo que esta listo. Las otras siguen ahi para quien las
+         necesite, pero dejan de ser el punto de partida. -->
+    <div class="panel" id="p-mi-dia">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">☀️ Mi día</div>
+            <div style="font-size:.78rem;color:var(--text3)" id="midia-sub">Lo que le toca hoy, ordenado por lo que más urge</div>
+          </div>
+          <button class="btn btn-ghost" onclick="cargarMiDia()" style="font-size:.8rem">Actualizar</button>
+        </div>
+
+        <div id="midia-cols" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">📝 Responder lo que llegó <span id="midia-n-responder" style="float:right;font-weight:700"></span></div>
+            <div id="midia-responder" style="padding:.5rem"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">🔎 Revisar lo que el motor marcó <span id="midia-n-revisar" style="float:right;font-weight:700"></span></div>
+            <div id="midia-revisar" style="padding:.5rem"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">📤 Radicar lo que está listo <span id="midia-n-radicar" style="float:right;font-weight:700"></span></div>
+            <div id="midia-radicar" style="padding:.5rem"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.72rem;color:var(--text3);text-align:center">
+          Primero lo que vence antes; a igualdad de días, lo de más plata.
+          Lo que no tiene plazo conocido va al final — no se le inventa uno.
         </div>
       </div>
     </div>
@@ -8372,6 +8413,7 @@ function tab(btn,id){
   if(id==='glosas-adres') loadGlosasAdres();
   if(id==='resumen-mes') loadResumenMes();
   if(id==='mando'){ loadMando(); loadOperacion(); }
+  if(id==='mi-dia') cargarMiDia();
   if(id==='plata') cargarPlata();
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
@@ -21406,6 +21448,97 @@ function mkChart(id,type,labels,datasets,opts){
   var c=document.getElementById(id);
   if(charts[id]){charts[id].destroy();}
   charts[id]=new Chart(c,{type:type,data:{labels:labels,datasets:datasets},options:Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#374151',font:{size:12}}}}},opts||{})});
+}
+
+// ─── «MI DÍA» (26-08-2026) ────────────────────────────────────────────────
+// Tres columnas y nada más: responder lo que llegó, revisar lo que el motor
+// marcó y radicar lo que está listo. El reparto y el orden los hace el
+// servidor (/mi-dia); aquí solo se pinta.
+function _midiaPlazo(g){
+  if(g.dias_que_faltan === null || g.dias_que_faltan === undefined){
+    return '<span style="color:var(--text3)">sin plazo conocido</span>';
+  }
+  if(g.vencida){
+    return '<span style="color:var(--c-red);font-weight:700">vencida hace '
+      + Math.abs(g.dias_que_faltan) + ' d</span>';
+  }
+  var color = g.dias_que_faltan <= 3 ? 'var(--c-amber)' : 'var(--text2)';
+  var texto = 'faltan ' + g.dias_que_faltan + ' d';
+  if(g.plazo_sin_fecha) texto += ' (sin fecha, del contador)';
+  return '<span style="color:' + color + ';font-weight:600">' + texto + '</span>';
+}
+
+function _midiaPintarColumna(idCaja, idContador, col, vacio){
+  var caja = document.getElementById(idCaja);
+  var cont = document.getElementById(idContador);
+  if(!caja) return;
+  if(cont){
+    cont.textContent = (col && col.cantidad) ? col.cantidad : '';
+    cont.style.color = (col && col.vencidas > 0) ? 'var(--c-red)' : 'var(--text3)';
+  }
+  if(!col || !col.glosas || !col.glosas.length){
+    caja.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">'
+      + escHtml(vacio) + '</div>';
+    return;
+  }
+  var html = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">'
+    + col.cantidad + ' glosa(s) · ' + fmtCOP(col.valor)
+    + (col.vencidas > 0
+        ? ' · <span style="color:var(--c-red);font-weight:700">' + col.vencidas + ' vencida(s)</span>'
+        : '')
+    + '</div>';
+  col.glosas.forEach(function(g){
+    html += '<div style="padding:.5rem .6rem;border:1px solid var(--border);border-radius:8px;margin-bottom:.45rem;cursor:pointer;background:var(--bg-card)"'
+      + ' onclick="verGlosa(' + Number(g.id) + ')" title="Abrir la glosa">'
+      + '<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:baseline">'
+      +   '<strong style="font-size:.82rem">' + escHtml(g.factura || '(sin factura)') + '</strong>'
+      +   '<span style="font-size:.82rem;font-weight:700">' + fmtCOP(g.valor_objetado) + '</span>'
+      + '</div>'
+      + '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">'
+      +   escHtml(g.eps || '') + (g.codigo_glosa ? ' · ' + escHtml(g.codigo_glosa) : '')
+      + '</div>'
+      + '<div style="font-size:.72rem;margin-top:.25rem;display:flex;justify-content:space-between;gap:.5rem">'
+      +   '<span style="color:var(--text2)">' + escHtml(g.motivo || '') + '</span>'
+      +   _midiaPlazo(g)
+      + '</div>'
+      + '</div>';
+  });
+  if(col.hay_mas > 0){
+    html += '<div style="font-size:.72rem;color:var(--text3);text-align:center;padding:.3rem">'
+      + 'y ' + col.hay_mas + ' más — están en «Mis glosas»</div>';
+  }
+  caja.innerHTML = html;
+}
+
+async function cargarMiDia(){
+  ['midia-responder','midia-revisar','midia-radicar'].forEach(function(id){
+    var e = document.getElementById(id);
+    if(e) e.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">Cargando…</div>';
+  });
+  try{
+    var r = await fetch('/mi-dia', {headers: authH()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    _midiaPintarColumna('midia-responder','midia-n-responder', d.responder,
+                        'Nada por responder. Todo lo que llegó ya tiene respuesta escrita.');
+    _midiaPintarColumna('midia-revisar','midia-n-revisar', d.revisar,
+                        'El motor no marcó nada pendiente de revisar.');
+    _midiaPintarColumna('midia-radicar','midia-n-radicar', d.radicar,
+                        'Nada aprobado esperando el portal.');
+    var sub = document.getElementById('midia-sub');
+    if(sub){
+      sub.textContent = d.total_abiertas
+        ? (d.total_abiertas + ' glosa(s) abiertas · ' + fmtCOP(d.valor_en_riesgo) + ' en riesgo'
+           + (d.vencidas ? ' · ' + d.vencidas + ' vencida(s)' : ''))
+        : 'Sin glosas abiertas asignadas.';
+    }
+  }catch(e){
+    ['midia-responder','midia-revisar','midia-radicar'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.innerHTML = '<div style="padding:1rem;color:var(--c-red);font-size:.8rem;text-align:center">No se pudo cargar.</div>';
+    });
+    avisarNoCargo('«Mi día»', e);
+  }
 }
 
 // ─── TABLERO DE PLATA RECUPERADA (26-08-2026) ─────────────────────────────
