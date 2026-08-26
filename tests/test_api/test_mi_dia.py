@@ -1,4 +1,4 @@
-"""«Mi día» — GET /mi-dia y el reparto en tres columnas.
+"""«Mi día» — GET /mi-dia/tablero y el reparto en tres columnas.
 
 Idea del 26-08-2026: 32 pantallas para un gestor que hace tres cosas.
 Lo que se prueba aquí es que cada glosa caiga donde le toca, que el orden
@@ -78,7 +78,7 @@ def _glosa(db, **kw):
 
 
 def _pedir(client):
-    r = client.get("/mi-dia")
+    r = client.get("/mi-dia/tablero")
     assert r.status_code == 200, r.text
     return r.json()
 

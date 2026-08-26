@@ -21453,7 +21453,7 @@ function mkChart(id,type,labels,datasets,opts){
 // ─── «MI DÍA» (26-08-2026) ────────────────────────────────────────────────
 // Tres columnas y nada más: responder lo que llegó, revisar lo que el motor
 // marcó y radicar lo que está listo. El reparto y el orden los hace el
-// servidor (/mi-dia); aquí solo se pinta.
+// servidor (/mi-dia/tablero); aquí solo se pinta.
 function _midiaPlazo(g){
   if(g.dias_que_faltan === null || g.dias_que_faltan === undefined){
     return '<span style="color:var(--text3)">sin plazo conocido</span>';
@@ -21516,7 +21516,7 @@ async function cargarMiDia(){
     if(e) e.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">Cargando…</div>';
   });
   try{
-    var r = await fetch('/mi-dia', {headers: authH()});
+    var r = await fetch('/mi-dia/tablero', {headers: authH()});
     if(!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     _midiaPintarColumna('midia-responder','midia-n-responder', d.responder,
