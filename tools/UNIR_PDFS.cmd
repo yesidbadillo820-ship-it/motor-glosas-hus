@@ -325,9 +325,17 @@ def unir_pdfs(
     if metadatos:
         escritor.add_metadata(metadatos)
     tmp = destino.with_suffix(destino.suffix + ".tmp")
-    with open(tmp, "wb") as fh:
-        escritor.write(fh)
-    os.replace(tmp, destino)  # escritura atómica: no deja PDFs a medias
+    try:
+        with open(tmp, "wb") as fh:
+            escritor.write(fh)
+        os.replace(tmp, destino)  # escritura atómica: no deja PDFs a medias
+    except Exception:
+        # No dejar el .tmp huérfano (mismo cuidado que `copiar_como`): en
+        # Windows el destino puede estar ABIERTO en un visor de PDF, o
+        # bloqueado por el antivirus, y entonces `os.replace` no pasa.
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
     return paginas, omitidos
 
 

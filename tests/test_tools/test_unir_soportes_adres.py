@@ -1587,3 +1587,50 @@ def test_sanar_temporales_barre_la_basura_de_una_corrida_caida(tmp_path):
     org.sanar_temporales(raiz)
     assert not [p.name for p in fac.iterdir() if ".tmp" in p.name]
     assert (fac / "HC.pdf").exists()  # lo del auditor no se toca
+
+
+def test_sanar_temporales_barre_tambien_el_pdf_tmp(tmp_path):
+    """El `..._FACTURA.pdf.tmp` que deja un destino bloqueado también es basura.
+
+    Del paquete 31068: `sanar_temporales` barría `*.tmp.pdf*` (los pedazos del
+    armado) pero NO el `*.pdf.tmp` de la escritura atómica, así que el archivo
+    regado se quedaba ahí corrida tras corrida.
+    """
+    carpeta = tmp_path / "HUS311371"
+    carpeta.mkdir()
+    basura = carpeta / "680010079201_HUS311371_FACTURA.pdf.tmp"
+    basura.write_bytes(b"%PDF-1.4 a medias")
+    pedazo = carpeta / "680010079201_HUS311371_FACTURA.1FACTURA.tmp.pdf"
+    pedazo.write_bytes(b"%PDF-1.4 pedazo")
+    bueno = carpeta / "1 FACTURA.pdf"
+    bueno.write_bytes(b"%PDF-1.4 de verdad")
+
+    org.sanar_temporales(tmp_path)
+
+    assert not basura.exists(), "no barrió el .pdf.tmp"
+    assert not pedazo.exists(), "no barrió el .tmp.pdf"
+    assert bueno.exists(), "se llevó por delante un soporte de verdad"
+
+
+def test_el_acceso_denegado_se_explica_en_cristiano():
+    """«[WinError 5] Acceso denegado: <ruta larga> -> <ruta larga>» no le sirve al auditor.
+
+    Tiene que decirle QUÉ archivo y QUÉ hacer: casi siempre está abierto en un
+    visor de PDF.
+    """
+    e = PermissionError(
+        5,
+        "Acceso denegado",
+        r"\\Prime\...\680010079201_HUS311371_FACTURA.pdf.tmp",
+        5,
+        r"\\Prime\...\680010079201_HUS311371_FACTURA.pdf",
+    )
+    dicho = org.explicar_error(e)
+
+    assert "680010079201_HUS311371_FACTURA.pdf" in dicho, "no dice cuál archivo"
+    assert "abierto" in dicho.lower(), "no dice qué hacer"
+    assert "WinError" not in dicho
+
+
+def test_explicar_error_deja_pasar_los_demas_errores():
+    assert org.explicar_error(ValueError("el PDF no abre")) == "el PDF no abre"
