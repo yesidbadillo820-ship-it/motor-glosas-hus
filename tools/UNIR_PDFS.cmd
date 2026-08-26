@@ -234,6 +234,7 @@ import argparse
 import contextlib
 import os
 import re
+import logging
 import shutil
 import time
 import sys
@@ -340,7 +341,12 @@ def unir_pdfs(
     return paginas, omitidos
 
 
-ESPERAS_REEMPLAZO = (0.2, 0.5, 1.0, 2.0)
+# Sobre el share del hospital 3,7 s no alcanzaban: seguía cayendo una factura
+# por corrida. Con esto se aguanta medio minuto antes de darse por vencido.
+# El bot del folio configura el logging; suelto por el .cmd no estorba.
+logger = logging.getLogger(__name__)
+
+ESPERAS_REEMPLAZO = (0.2, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0)
 
 
 def reemplazar_con_reintento(origen: Path, destino: Path) -> None:
@@ -353,12 +359,20 @@ def reemplazar_con_reintento(origen: Path, destino: Path) -> None:
     un momento y se vuelve a intentar; si de verdad está bloqueado (alguien con
     el PDF abierto), después de los intentos el error sube igual.
     """
+    esperado = 0.0
     for espera in ESPERAS_REEMPLAZO:
         try:
             os.replace(origen, destino)
+            if esperado:
+                # Sin esto solo se ven las que fallan, nunca las que se
+                # salvaron, y no hay cómo saber si la espera alcanza.
+                logger.info(
+                    "  %s estaba ocupado; cedió tras esperar %.1f s.", destino.name, esperado
+                )
             return
         except PermissionError:
             time.sleep(espera)
+            esperado += espera
     os.replace(origen, destino)
 
 
