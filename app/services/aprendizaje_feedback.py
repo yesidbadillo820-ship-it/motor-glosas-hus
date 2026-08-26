@@ -118,7 +118,10 @@ def _notas_de_la_promocion(glosa: GlosaRecord) -> str:
         f"tras decisión EPS=LEVANTADA. Valor recuperado: "
         f"${int(glosa.valor_recuperado or 0):,}."
     )
-    dijo_el_gestor = (glosa.observacion_eps or "").strip()
+    # `getattr` y no `glosa.observacion_eps`: aquí llega lo que tenga el
+    # que llama, y una glosa vieja —o un objeto de prueba— puede no traer
+    # ese campo. Que falte no es un error: es que el gestor no anotó nada.
+    dijo_el_gestor = (getattr(glosa, "observacion_eps", None) or "").strip()
     if dijo_el_gestor:
         notas += f"\nSegún el gestor, lo que la levantó fue: {dijo_el_gestor[:600]}"
     return notas
