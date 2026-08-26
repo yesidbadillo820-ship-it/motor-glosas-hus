@@ -1634,3 +1634,43 @@ def test_el_acceso_denegado_se_explica_en_cristiano():
 
 def test_explicar_error_deja_pasar_los_demas_errores():
     assert org.explicar_error(ValueError("el PDF no abre")) == "el PDF no abre"
+
+
+def _abiertos(ruta: Path) -> int:
+    """Cuántos descriptores del proceso apuntan a este archivo (solo Linux)."""
+    fds = Path("/proc/self/fd")
+    if not fds.is_dir():
+        pytest.skip("sin /proc: no se puede contar descriptores abiertos")
+    n = 0
+    for fd in fds.iterdir():
+        try:
+            if fd.resolve() == ruta.resolve():
+                n += 1
+        except OSError:
+            continue
+    return n
+
+
+def test_leerle_la_firma_a_un_folio_no_lo_deja_abierto(tmp_path):
+    """Leer la firma no puede dejar el archivo abierto.
+
+    Guarda de Windows: allá un archivo abierto no se deja reemplazar y
+    `os.replace` responde «Acceso denegado». Hoy pypdf cierra solo, pero en
+    Linux —donde corren las pruebas— sí se puede pisar un archivo abierto, así
+    que sin esta guarda una fuga de este tipo pasaría de largo hasta que
+    reventara en el servidor de cartera.
+    """
+    pdf = tmp_path / "680010079201_HUS311371_EPICRIS.pdf"
+    _pdf(pdf, 2)
+
+    assert org.es_folio_nuestro(pdf) is False
+    assert _abiertos(pdf) == 0, "quedó abierto tras leerle la firma"
+
+
+def test_mirar_las_partes_de_la_factura_no_la_deja_abierta(tmp_path):
+    pdf = tmp_path / "1 FACTURA.pdf"
+    _pdf(pdf, 3)
+
+    org.partes_de_la_factura(pdf)
+
+    assert _abiertos(pdf) == 0, "quedó abierta tras mirarle las partes"
