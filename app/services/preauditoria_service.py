@@ -416,6 +416,25 @@ def _hallar_encabezado(ws, alias: dict, requeridos: set, max_filas: int = 15):
     return None, None
 
 
+def canonizar_factura(texto) -> str:
+    """El número de factura escrito siempre igual: HUS + 10 dígitos.
+
+    POR QUÉ EXISTE (caso real 26-08-2026). Tres facturas salían con «Correo
+    F.E.: NO» teniendo facturación electrónica. La causa: el Formato F.E. y la
+    Radicación no siempre traen el número escrito igual —a veces «544942»,
+    a veces «HUS544942», a veces «HUS0000544942»— y el sistema cruza las dos
+    fuentes por ese texto exacto. Si no coincide letra por letra, la factura
+    queda como si no tuviera correo, y sin correo NO SE PUEDE RADICAR: el
+    auditor se ve obligado a devolver una factura que estaba bien.
+
+    Aquí se lleva todo a la forma larga. Lo que no tenga forma de número de
+    factura del HUS se deja tal cual: no se inventa nada.
+    """
+    t = re.sub(r"\s+", "", str(texto or "")).upper()
+    m = re.fullmatch(r"(?:HUS)?0*(\d{1,10})", t)
+    return "HUS" + m.group(1).zfill(10) if m else t
+
+
 def parsear_excel_radicacion(contenido: bytes) -> dict:
     """Lee el Excel de RADICACIÓN DE CUENTAS.
 
@@ -455,7 +474,7 @@ def parsear_excel_radicacion(contenido: bytes) -> dict:
                     return None
                 return fila[idx]
 
-            factura = (str(_celda("factura") or "").strip() or "").upper()
+            factura = canonizar_factura(_celda("factura"))
             if not factura or _es_fila_de_encabezado(factura):
                 continue
             leidas += 1
@@ -526,7 +545,7 @@ def parsear_excel_dgreport(contenido: bytes) -> dict:
                     return None
                 return fila[idx]
 
-            factura = (str(_celda("factura") or "").strip() or "").upper()
+            factura = canonizar_factura(_celda("factura"))
             if not factura or _normalizar_encabezado(factura) in {"FACTURA", "TOTAL"}:
                 continue
             leidas += 1
