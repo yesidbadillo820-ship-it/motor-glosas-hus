@@ -367,6 +367,7 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
         "fuentes_rad_nuevas": {},  # factura -> última pasada (datos descriptivos)
         "fuentes_dg_nuevas": {},  # factura -> última pasada con correo SI
         "ledger_nuevo": set(),  # (envio, radicado)
+        "conteo_ledger": defaultdict(int),  # (envio, radicado) -> cuántas facturas trae
         "envios_con_mas_de_3_oficios": [],
         "resumen_estados": defaultdict(int),
     }
@@ -388,6 +389,7 @@ def planear(pasadas: list[Pasada], con: sqlite3.Connection) -> dict:
                     plan["oficios_nuevos"][rad] = p.f_recibido
             if p.envio:
                 envio_oficios[p.envio].add(rad)
+                plan["conteo_ledger"][(p.envio, rad)] += 1
                 clave = (p.envio, rad)
                 if rad in oficios_db and (p.envio, oficios_db[rad]) in ledger:
                     continue
@@ -628,11 +630,17 @@ def aplicar(plan: dict, con: sqlite3.Connection) -> dict:
             hechos["oficios"] += 1
 
         for envio, rad in sorted(plan["ledger_nuevo"]):
+            # CUÁNTAS FACTURAS TRAÍA (25-08-2026). Antes se escribía 0 en las tres
+            # cuentas, y la página lo mostraba como «226945(1/0)» o «226943(0)» en
+            # oficios que sí tenían facturas: el chip decía que el envío no había
+            # traído nada. El dato existe en el propio Excel: es cuántas facturas
+            # de esa pasada llevan ese envío y ese oficio.
+            cuantas = plan["conteo_ledger"].get((envio, rad), 0)
             cur.execute(
                 "INSERT OR IGNORE INTO preaud_envios_cargados "
                 "(envio, oficio_id, total_facturas, nuevas, reingresos, cargado_por, cargado_en) "
-                "VALUES (?, ?, 0, 0, 0, ?, ?)",
-                (envio, oficios_db[rad], MARCA_IMPORT, _iso(datetime.now())),
+                "VALUES (?, ?, ?, 0, 0, ?, ?)",
+                (envio, oficios_db[rad], cuantas, MARCA_IMPORT, _iso(datetime.now())),
             )
             hechos["ledger"] += cur.rowcount if cur.rowcount > 0 else 0
 

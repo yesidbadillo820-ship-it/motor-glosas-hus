@@ -1,5 +1,149 @@
 # Registro de cambios
 
+## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)
+
+El área aclaró cómo es el folio completo, y son **dos PDF por factura**, no uno:
+
+- **`<NIT>_<FACTURA>_EPICRIS.pdf`** — el nombre que queda **después** de unir
+  los soportes numerados (`1 RESPUESTA A GLOSA`, `2 EPICRISIS`,
+  `3 HISTORIA CLINICA`, `4 AYUDAS DIAGNOSTICAS`, `5 OTROS`).
+- **`<NIT>_<FACTURA>_FACTURA.pdf`** — la factura sí entra al folio, con su
+  propio orden adentro: **1 FACTURA · 2 DETALLADO (el Excel pasado a PDF) ·
+  3 REPRESENTACIÓN GRÁFICA DIAN · 4 NOTAS CRÉDITO**.
+
+Lo que se agregó a `unir_soportes_adres.py`:
+
+- **`--folio`**: numera los soportes y arma los dos PDF. Numerar primero no es
+  adorno — es lo que **deja libre el nombre del folio**, porque ese nombre es
+  justo el que traían la epicrisis y la factura antes de renombrarlas.
+- **Cuatro renglones nuevos** (`GRUPOS_FACTURA`) con sus palabras: FACTURA,
+  DETALLADO, REPRESENTACIÓN GRÁFICA DIAN y NOTAS CRÉDITO. Los trece grupos
+  clínicos quedaron igual.
+- **`--carpeta-facturas`**: trae a cada carpeta su
+  `680010079201_HUS######_FACTURA.pdf` desde `4.FACTURAS CON XML\XML`. No pisa
+  la que ya estuviera.
+- **`--convertir-detallado`**: pasa a PDF el detallado que esté en Excel,
+  reusando el motor de `excel_a_pdf.py`. Si el equipo no tiene ni Excel ni
+  LibreOffice, lo deja anotado y sigue.
+- **`--prefijo`**: el NIT del nombre. **No se inventa**: sale del nombre de los
+  propios archivos; esta opción solo llena las carpetas donde ninguno lo trae.
+- **Las notas crédito quedan PENDIENTES a propósito** — todavía no las han
+  sacado, así que no se cuentan como falta. Cuando lleguen, se dejan en la
+  carpeta y se vuelve a correr: entran solas de cuartas.
+- **La simulación muestra el folio como va a quedar de verdad**, con la factura
+  y el detallado ya adentro, aunque todavía no los haya copiado ni convertido.
+
+Un defecto que apareció en la prueba de tres corridas seguidas y quedó cerrado:
+en una factura **sin epicrisis**, el `..._EPICRIS.pdf` de la primera corrida se
+colaba como si fuera una epicrisis y en la segunda el folio crecía metido dentro
+de sí mismo (10 → 13 páginas). Ahora el bot mira la carpeta, no el renglón: si
+ya hay archivos numerados, lo que quede con el nombre original es el folio
+viejo. El caso que no se puede distinguir (un `..._EPICRIS.pdf` suelto en una
+carpeta ya armada) no se adivina: se avisa para que el auditor lo mire.
+
+45 pruebas nuevas (104 en el archivo).
+
+### Revisión posterior: dos defectos más, encontrados antes del cargue real
+
+**1. Una factura bloqueada dejaba sin folio a las otras 323.** `aplicar_folios`
+llamaba a `renombrar_lista` sin candado, al contrario de `unir()`. Un PDF
+abierto en Acrobat —o el share cayéndose un momento— tumbaba la corrida entera.
+Ahora esa factura se salta con `ERROR` y su motivo, y las demás siguen.
+
+**2. El folio de la factura habría llevado el detallado dos veces.** Al abrir el
+`680010079201_HUS311736_FACTURA.pdf` que viene con el XML, resultó **no ser solo
+la factura**: son 19 páginas con los cuatro renglones ya pegados —factura con
+CUFE (1–7), detallado (8–9), representación gráfica DIAN (10–18) y nota crédito
+(19)—. El bot le habría agregado encima el detallado del Excel. Ahora
+`renglones_que_trae()` mira dentro del PDF antes de tocarlo: lo que ya viene
+pegado no se duplica ni se cuenta como faltante, y se avisa en pantalla.
+Comprobado sobre una sola factura; en las que vengan solo con la factura, el bot
+arma el folio con las partes sin configurar nada.
+
+Con esto: 111 pruebas en el archivo.
+
+
+## Sesión 25-ago-2026 (noche, 2) — `--renombrar`: el folio como lo nombra el área
+
+El PDF unido de la HUS352904 no se parecía a lo que pide la hoja del área. Al
+mirarlo con el auditor salieron dos cosas distintas:
+
+- **La hoja no pide un PDF pegado, pide los soportes numerados dentro del
+  folio**: `1 RESPUESTA A GLOSA.pdf`, `2 HISTORIA CLINICA.pdf`, `3 OTRO.pdf`.
+  Eso es `--renombrar`, nuevo. `nombre_numerado()` arma el nombre y
+  `renombrar_en_orden()` lo aplica **en dos vueltas** —primero a un nombre
+  temporal—: el nombre que le toca a un archivo puede ser el que todavía tiene
+  otro, y renombrando de una uno pisaría al otro. Idempotente.
+- **El contenido era corto porque la carpeta solo tenía dos soportes.** No es
+  defecto del bot: faltan la epicrisis y los demás.
+
+La unión en un solo PDF sigue como estaba, por defecto. Se pueden usar las dos.
+
+7 pruebas nuevas (59 en el archivo), incluida la del renombrado que se pisaría a
+sí mismo y la de correrlo dos veces.
+
+
+## Sesión 25-ago-2026 (noche) — repartir la respuesta a glosa por carpeta de factura
+
+`organizar_soportes_por_factura.py`:
+
+- **`carpetas_por_factura()`**: mapea el número de factura a la carpeta que ya
+  existe, aunque traiga una nota detrás (`HUS379477_PEND. CARTA CORONEL`,
+  `HUS367368 ACEPTADO`, `HUS378523_MAOS`). Antes se buscaba `carpeta / factura`
+  literal, así que a esas no las encontraba y **creaba una carpeta gemela
+  vacía**. Con dos carpetas para la misma factura gana la primera alfabética,
+  para que el resultado no dependa del orden del sistema de archivos.
+- **`--solo-carpetas-existentes`**: mueve solo lo que ya tiene carpeta, sin
+  crear ninguna. Hace falta al repartir un lote que abarca varios gestores: las
+  324 respuestas se sueltan en cada carpeta y solo caen las que corresponden;
+  las demás quedan listadas con el estado `SIN CARPETA PARA ESA FACTURA`.
+
+`unir_soportes_adres.py`: `_factura_de_carpeta` pasa a delegar en
+`factura_del_nombre` — la regla de cómo se saca el número de un nombre queda en
+un solo sitio.
+
+8 pruebas nuevas (54 en el archivo), y ensayo de punta a punta con el ZIP real.
+
+
+## Sesión 25-ago-2026 — `unir_soportes_adres.py` + arreglo del desglose huérfano
+
+### `unir_soportes_adres.py` (nuevo)
+Une los soportes de cada carpeta de factura en un solo `<FACTURA>_SOPORTES.pdf`,
+en el orden de la lista del área (13 grupos, de RESPUESTA A GLOSA a OTROS). El
+detallado queda fuera del PDF: la lista lo pide en Excel.
+
+Clasifica por nombre de archivo con dos reglas que evitan los falsos positivos:
+gana la **palabra más larga** («NOTAS DE ENFERMERIA» sobre «NOTAS»), y las
+abreviaturas cortas se buscan como **palabra completa** (`INS` no casa dentro de
+`INSTITUCIONAL`). Lo no reconocido va a OTROS y sale marcado en el reporte.
+`--mapa-nombres` agrega palabras sin tocar el código.
+
+Reusa `unir_pdfs` / `clave_natural` de `unir_pdfs_carpetas.py` — la unión y el
+orden natural ya estaban resueltos; aquí solo se agrega la capa de orden.
+
+Simula por defecto (`--aplicar` para escribir), se excluye a sí mismo de la
+entrada (idempotente) y un PDF ilegible se omite sin tumbar el lote. Avisa las
+facturas sin RESPUESTA A GLOSA o sin EPICRISIS.
+
+Incluye `UNIR_SOPORTES_ADRES.cmd` (CRLF), guía en español y 42 pruebas.
+
+### `ajustar_detallado_glosas.py` — desglose huérfano
+**Defecto:** cada ítem se decidía por separado. Cuando la entidad aprobaba el
+procedimiento (CUPS, que no aparece en el reporte del ADRES porque este glosa
+con códigos SOAT) pero seguía glosando sus componentes, el principal se quitaba
+y los componentes quedaban huérfanos: el detallado mostraba honorarios y
+derechos de sala sin decir de qué cirugía eran. El auditor tuvo que rehacer a
+mano la HUS383283.
+
+**Arreglo:** una pasada previa marca los principales cuyo desglose sobrevive y
+los conserva con la acción nueva `ACCION_ENCABEZADO` — se ven, pero no suman al
+subtotal, porque su valor ya está en los renglones de desglose. La condición de
+"no suma" de los hijos se corrigió en consecuencia (`id(padre) not in
+rescatados`), para que el valor no se pierda ni se cuente dos veces.
+
+2 pruebas nuevas: el principal se queda como encabezado y no suma; y si su
+desglose también se fue, se va como siempre.
+
 ## Sesión 25-ago-2026 (noche) — 2.ª auditoría del lote: el Decreto 4747 tenía tres artículos inventados
 
 Un segundo auditor revisó las mismas 117 respuestas con otro método: contrastó

@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 25-08-2026
+**Última actualización:** 26-08-2026
 
 ---
 
@@ -62,6 +62,94 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 26-08-2026 — El folio de cada factura del ADRES: ahora son DOS PDF, no uno
+
+Usted aclaró cómo es el folio completo del paquete 31068 y no era como lo
+estábamos armando. Son **dos archivos por factura**, cada uno con su orden:
+
+**1) El folio clínico — `680010079201_HUS######_EPICRIS.pdf`**
+
+Es el nombre que queda **después** de unir los soportes numerados:
+
+```
+1 RESPUESTA A GLOSA.pdf   (era RTA_ADRES_HUS352904.pdf)
+2 EPICRISIS.pdf           (era 680010079201_HUS352904_EPICRIS.pdf)
+3 HISTORIA CLINICA.pdf    (era HC.pdf)
+4 AYUDAS DIAGNOSTICAS.pdf (era DX.pdf)
+5 OTROS.pdf
+```
+
+**2) El folio de la factura — `680010079201_HUS######_FACTURA.pdf`**
+
+La factura sí entra al folio, y adentro va en este orden:
+
+```
+1 FACTURA.pdf                       (la que viene con el XML)
+2 DETALLADO.pdf                     (el detallado en Excel, pasado a PDF)
+3 REPRESENTACION GRAFICA DIAN.pdf
+4 NOTAS CREDITO.pdf                 (PENDIENTE: todavía no las han sacado)
+```
+
+**Las notas crédito quedan pendientes a propósito.** El bot no las cuenta como
+falta: avisa cuántas faltan y sigue. El día que salgan, se dejan en la carpeta
+de la factura, se vuelve a apretar el botón y entran solas de cuartas, sin
+rehacer nada de lo que ya está.
+
+**Lo que hay que apretar:** el mismo botón de siempre,
+`tools/UNIR_SOPORTES_ADRES.cmd`. Ahora pide dos rutas: la carpeta del gestor
+(CAROLINA, CLAUDIA, OSCAR) y la carpeta de las facturas con XML. Primero
+**simula** —muestra los dos folios completos, tal como van a quedar— y solo
+arma de verdad cuando usted escribe «SI».
+
+**Por qué se numeran los archivos antes de unirlos.** No es adorno: el folio se
+llama igual que el archivo del que sale (`..._EPICRIS.pdf`). Si no se renombra
+primero, no habría dónde guardar el folio sin pisar la epicrisis.
+
+**Un defecto que se encontró y se cerró antes de entregar.** Probando tres
+corridas seguidas apareció esto: en una factura **sin epicrisis**, el folio de
+la primera corrida se colaba en la segunda como si fuera una epicrisis, y el
+PDF crecía metido dentro de sí mismo. Ya está resuelto: el bot mira la carpeta
+completa, no un solo renglón. Y el caso que de verdad no se puede distinguir
+—un `..._EPICRIS.pdf` suelto en una carpeta que ya estaba armada— no se
+adivina: sale avisado en pantalla y en el reporte para que usted lo mire.
+
+**LA RESPUESTA A SU PREGUNTA, mirando el archivo que usted mandó.** Abrimos el
+`680010079201_HUS311736_FACTURA.pdf` de la carpeta del XML y **no es solo la
+factura**: son 19 páginas que ya traen los cuatro renglones del folio, en el
+mismo orden que usted describió:
+
+| Páginas | Qué es |
+|---|---|
+| 1 a 7 | FACTURA ELECTRÓNICA DE VENTA HUS311736, con su CUFE |
+| 8 y 9 | DETALLADO FACTURA ELECTRONICA HUS311736 |
+| 10 a 18 | «Representación Gráfica» con el Código Único de Factura (CUFE) y los Datos Totales ($28.741.141) |
+| 19 | NOTA CRÉDITO N° 253292 del 30/06/2026 por $518.900, del trámite de objeción 179143 |
+
+O sea: **ese archivo ya ES el folio de la factura**. La representación gráfica
+de la DIAN no es un archivo aparte: son las páginas 10 a 18 de ese mismo PDF.
+
+**Lo que eso evitó.** El bot, tal como estaba, le habría pegado encima el
+detallado del Excel: el folio habría subido al ADRES con el **detallado dos
+veces**. Ya está corregido: ahora el bot mira adentro del PDF de la factura
+antes de agregarle nada, y lo que ya viene pegado no lo duplica ni lo cuenta
+como faltante. Lo avisa en pantalla.
+
+**Cuidado, esto se vio en UNA sola factura** (la HUS311736), que es la que usted
+mandó. Si en otras el `..._FACTURA.pdf` viene solo con la factura, el bot lo
+detecta solo y arma el folio con las partes: no hay nada que configurar.
+
+**Lo que sí hace falta que usted decida:** las notas crédito. La de la página 19
+es de un trámite de junio (objeción 179143). Las de los valores aceptados de
+ESTE paquete son otras. ¿El folio se deja con la nota que ya trae, o cuando
+salgan las nuevas se rehace? Díganos y se ajusta.
+
+Pruebas: 111 en `tests/test_tools/test_unir_soportes_adres.py`.
+
+**Otro defecto corregido el mismo día:** si un PDF estaba abierto en Acrobat, o
+el share se caía un momento, la corrida entera se tumbaba y las otras 323
+facturas quedaban sin folio. Ahora esa factura se salta, queda marcada con el
+motivo en el reporte, y las demás siguen.
 
 ### 25-08-2026 (cierre 4) — La malla que se desactivaba a sí misma
 
@@ -3614,6 +3702,100 @@ centavo entre las hojas ACTA, GLOSA y TRAMITE del archivo.
   facturas que no cuadran ($247.617.689, el 83 % del paquete).
   De paso se corrigió un defecto de redacción: los avisos convertían la coma de
   la frase en punto («glosado $34.942.962. pero el detalle...»).
+
+### 25-08-2026 (noche) — La respuesta a glosa, repartida en la carpeta de cada factura
+
+**De dónde sale.** La simulación sobre las tres carpetas del paquete (CAROLINA,
+CLAUDIA y OSCAR) mostró que **a las 174 carpetas les falta la respuesta a glosa
+y la epicrisis** — el 100 %. Sin eso, el PDF unido saldría sin los dos renglones
+que encabezan la lista del área.
+
+Las respuestas ya existen: son los 324 `RTA_ADRES_<FACTURA>.pdf` que se armaron
+el 21-08. Solo faltaba llevarlas a su carpeta.
+
+**Dos cosas que lo impedían, ya arregladas:**
+
+1. **Las carpetas traen notas detrás del número.** `HUS379477_PEND. CARTA
+   CORONEL`, `HUS367368 ACEPTADO`, `HUS378523_MAOS`. El bot que archiva
+   soportes buscaba una carpeta llamada exactamente como la factura, así que a
+   esas no las encontraba: **habría creado una segunda carpeta vacía al lado de
+   la buena**, y el soporte habría quedado separado del resto.
+2. **El lote es de las tres carpetas juntas.** Al soltar las 324 respuestas en
+   la carpeta de un gestor, el bot le habría creado las carpetas de los otros
+   dos. Con la opción nueva **«solo carpetas existentes»** deja quietas las que
+   no son de ese gestor, y las lista al final para que no pasen calladas.
+
+Probado de punta a punta con el ZIP de verdad: las respuestas cayeron en su
+carpeta —incluidas las de nombre con nota— y el PDF unido ya sale con la
+RESPUESTA A GLOSA de primera.
+
+**Queda pendiente la EPICRISIS**, que no está en ninguna carpeta.
+
+---
+
+### 25-08-2026 — Un solo PDF de soportes por factura, en el orden que pide el área
+
+**Lo que pidió el auditor:** que los soportes de cada factura se unan en un solo
+PDF, y que queden en el **orden exacto** de la lista del área: respuesta a
+glosa, epicrisis, historia clínica (urgencias, terapias, curaciones,
+evoluciones, procedimientos), ayudas diagnósticas, medicamentos, notas de
+enfermería, insumos y otros. Cada factura en su carpeta, con su número.
+
+**Lo que quedó hecho:** un bot nuevo, `tools/unir_soportes_adres.py`, con su
+botón de doble clic `UNIR_SOPORTES_ADRES.cmd` y su guía. Reconoce de qué es cada
+PDF **por el nombre del archivo** —las palabras con que las nombra el equipo y
+las abreviaturas del auditor (EPI, HC, DX, MED, NTE, INS)— y los une en el orden
+de la lista. El **detallado no entra al PDF**: la lista lo pide en Excel, así
+que se queda aparte en la carpeta.
+
+**Dos cuidados con los nombres**, que son los errores que se cometen solos:
+«NOTAS DE ENFERMERÍA» no se lo puede llevar la palabra «NOTAS» (gana siempre la
+palabra más larga), y «INS» no puede casar dentro de «INSTITUCIONAL» (las
+abreviaturas cortas tienen que ir sueltas).
+
+**Lo que no reconoce, no se pierde:** va al grupo OTROS y sale listado en el
+reporte para que el auditor lo revise. Si al equipo le falta una palabra, se
+agrega sin tocar el código con `--mapa-nombres`.
+
+**Tres candados, porque unir no se deshace de un clic:** simula por defecto y
+muestra el orden completo antes de escribir nada; nunca se come su propio
+consolidado (se puede correr las veces que haga falta); y un PDF dañado se omite
+y queda anotado, sin tumbar el lote.
+
+**El reporte avisa además** qué facturas no tienen respuesta a glosa o no tienen
+epicrisis, que son los dos soportes obligatorios.
+
+---
+
+### 25-08-2026 — El detallado ya no deja servicios huérfanos
+
+**Lo que reportó el auditor:** «tuve que modificar un detallado que me había
+salido porque me había quitado los servicios y me tocó hacer el detallado
+manual».
+
+**Qué estaba pasando.** Cuando el ADRES **aprueba la cirugía** pero **sigue
+glosando sus componentes** —honorarios del cirujano, del anestesiólogo, de
+ayudantía, derechos de sala, materiales—, el bot quitaba el renglón de la
+cirugía por aprobado y dejaba los componentes solos. El detallado quedaba
+mostrando «servicios profesionales del cirujano» y «derechos de sala» **sin
+decir de qué cirugía son**. Así no se puede defender, y toca rehacerlo a mano,
+que fue justo lo que le tocó hacer en la HUS383283.
+
+Pasa porque los dos sistemas hablan distinto: el ADRES glosa con **códigos
+SOAT** (39010, 39110, 39214…) y la factura del hospital trae la cirugía con su
+**código CUPS** (13723, 14171…). El CUPS no aparece en el reporte del ADRES, así
+que el bot lo leía como «aprobado» y lo borraba.
+
+**Cómo quedó.** El renglón principal ahora **se conserva como ENCABEZADO**: se
+ve, para que se sepa a qué cirugía pertenecen los servicios, pero **no suma al
+total** —su valor ya está en los renglones que quedaron—. Es exactamente lo que
+usted hizo a mano. Si no queda ningún componente vivo, el principal se va como
+siempre.
+
+En la bitácora CSV esos renglones salen con la acción `ENCABEZADO` y la nota de
+por qué se quedaron.
+
+---
 
 ### 24-08-2026 — Las objeciones del ADRES, cuadradas con lo que el ADRES reporta
 
@@ -7617,7 +7799,54 @@ de trabajar.
 
 ---
 
+### 25-08 (cierre) — De dónde salieron esos nombres, y el chip que decía «(1/0)»
+
+Yesid comparó el Excel del informe contra la pantalla y aparecieron dos cosas.
+
+**1) «Salen gestores escribiendo envíos y ellos solo recepcionan».** El
+movimiento **ESCRITA no es auditar**: es el registro de quién **cargó el envío**
+en la página (el paso 4 de la pantalla). Y el nombre no lo pone el sistema según
+el cargo de cada quien: lo pone según la **sesión abierta en el navegador**. Si
+un gestor deja su sesión abierta y otro trabaja en ese computador, todo queda
+firmado por el primero.
+
+Se le entregó a la Dirección el informe **INFORME_AUTORIA_PREAUDITORIA_SINAC**
+(Excel con fórmulas y gráficos) con los números: 3.889 movimientos, **92 sin
+gestor identificado** (los trajo el cargue del consolidado histórico, sobre 55
+facturas, y **164 de los 183 oficios** quedaron registrados así), la lista
+completa de esos 92 con casilla para asignar responsable, y el hallazgo de que
+**VANESSA OSPINA** está partida en dos por un nombre mal escrito («VANESA
+OSPINA», 29 movimientos entre el 18 y el 25 de agosto), más un movimiento a
+nombre de «Auditor Principal», que no es una persona.
+
+**2) El chip decía «226945(1/0)» y «226943(0)».** Los envíos que entraron por la
+importación quedaron con «traía 0 facturas» —el Excel no lo decía— y el chip
+comparaba contra ese cero: mostraba que el envío no había traído nada en oficios
+que sí tienen facturas. Ahora, cuando el registro no sabe cuántas traía, la
+pantalla muestra lo único cierto: **las que están ahí**. Y el importador ya
+guarda el número real de facturas por envío, así que a los cargues nuevos no les
+vuelve a pasar.
+
+4 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
+
+### Folio ADRES del paquete 31068 (26-08)
+- **~~Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN~~ — RESUELTO.** Son
+  las páginas 10 a 18 del mismo `..._FACTURA.pdf` que viene con el XML. Ese
+  archivo ya es el folio de la factura completo.
+- **DECISIÓN SUYA: las notas crédito.** El `..._FACTURA.pdf` de la HUS311736 ya
+  trae una nota crédito (la N° 253292, del trámite de objeción 179143 de junio).
+  Las de los valores aceptados de ESTE paquete son otras. ¿Se deja la que ya
+  trae, o cuando salgan las nuevas se rehace el folio? Mientras no diga, el bot
+  respeta lo que el archivo ya trae y no le agrega nada encima.
+- **Las 101 facturas sin carpeta** en ningún gestor (CAROLINA, CLAUDIA, OSCAR)
+  y **las 47 carpetas vacías de CLAUDIA** siguen igual: sin carpeta no hay
+  folio que armar.
+- **Los 12 archivos `FACOSTE`** que el bot no reconoce y manda a OTROS: falta
+  decir a qué grupo pertenecen.
 
 ### Del motor de glosas, al 25-08 (cierre)
 - **~~Reiniciar el motor~~ — HECHO** (confirmado por el área el 25-08).
@@ -8082,6 +8311,13 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Folio ADRES (26-08), lo primero:** correr el botón
+`tools/UNIR_SOPORTES_ADRES.cmd` en **una sola carpeta de prueba** (una factura),
+mirar que los dos PDF queden como se espera, y solo entonces pasarlo a los tres
+gestores completos. Lo de la representación gráfica de la DIAN ya quedó
+resuelto: son las páginas 10 a 18 del mismo `..._FACTURA.pdf`. Lo que falta es
+que usted decida qué hacer con las notas crédito (ver PENDIENTE).
 
 **Frente COOSALUD (25-08):** (a) subir a DGH los 6 archivos de OBJECIONES del
 lote de 1.573; (b) armar los trámites de ese lote cuando las objeciones estén
