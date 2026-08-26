@@ -8025,7 +8025,6 @@ las tres quedan con su correo.
 
 ## 3) PENDIENTE
 
-<<<<<<< HEAD
 ### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
 
 Usted pidió verificar, corregir y completar las 16 normas que faltaban. Se
@@ -8133,7 +8132,7 @@ Tres cosas, en este orden:
    extemporánea. El dictamen GL-130 afirma «77 días hábiles» y «ha operado de
    pleno derecho la aceptación tácita» como hecho consumado. Si el conteo
    falla, la causal original nunca quedó respondida.
-=======
+
 ### Folio ADRES del paquete 31068 (26-08, cierre)
 - **DECISIÓN SUYA: las cinco respuestas del Word «PARA_CORREGIR».** Se enviaron
   dos versiones. La **A** incluye 310 glosas «SE SUBSANA» que hoy se omiten
@@ -8148,7 +8147,6 @@ Tres cosas, en este orden:
 - **La EPICRISIS de las 223 facturas.** Falta en todas. Hay que decidir si se
   consigue o si el paquete va sin ella.
 - **La HUS381290** necesita que le busquen su factura en la carpeta del XML.
->>>>>>> origin/motor-glosas
 
 ### Folio ADRES del paquete 31068 (26-08)
 - **~~Confirmar qué es la REPRESENTACIÓN GRÁFICA DE LA DIAN~~ — RESUELTO.** Son
