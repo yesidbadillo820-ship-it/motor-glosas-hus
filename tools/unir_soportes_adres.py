@@ -300,8 +300,63 @@ class Factura:
 
 ESTADO_UNIDO = "UNIDO"
 ESTADO_SIMULADO = "SE UNIRIA"
+ESTADO_RENOMBRADO = "RENOMBRADO"
 ESTADO_SIN_PDF = "SIN PDF QUE UNIR"
 ESTADO_ERROR = "ERROR"
+
+
+# Caracteres que Windows no admite en un nombre de archivo.
+_RE_PROHIBIDOS = re.compile(r'[<>:"/\\|?*]')
+
+
+def nombre_numerado(orden: int, grupo: Grupo, extension: str = ".pdf") -> str:
+    """`1 RESPUESTA A GLOSA.pdf`, `2 HISTORIA CLINICA.pdf`…
+
+    Es como el área nombra los soportes dentro del folio de la factura: el
+    número dice en qué orden van y el nombre dice de qué es cada uno, sin tener
+    que abrirlos.
+    """
+    limpio = _RE_PROHIBIDOS.sub(" ", grupo.titulo).strip()
+    return f"{orden} {limpio}{extension}"
+
+
+def renombrar_en_orden(fac: Factura, aplicar: bool = False) -> list[tuple[Path, str]]:
+    """Renombra los soportes de la factura a `<n> <GRUPO>.pdf`, en su orden.
+
+    Devuelve [(ruta actual, nombre nuevo)]. Se hace en dos vueltas —primero a un
+    nombre temporal— porque el nombre que le toca a un archivo puede ser el que
+    todavía tiene otro: renombrando de una, uno pisaría al otro.
+    """
+    plan = [
+        (s.ruta, nombre_numerado(n, s.grupo, s.ruta.suffix))
+        for n, s in enumerate(fac.soportes, start=1)
+    ]
+    if not aplicar:
+        return plan
+    temporales: list[tuple[Path, str]] = []
+    for ruta, nuevo in plan:
+        if ruta.name == nuevo:
+            continue
+        temporal = ruta.with_name(f"~renombrando~{ruta.name}")
+        ruta.rename(temporal)
+        temporales.append((temporal, nuevo))
+    for temporal, nuevo in temporales:
+        destino, _ = nombre_libre(temporal.parent, nuevo)
+        temporal.rename(destino)
+    return plan
+
+
+def nombre_libre(carpeta: Path, nombre: str) -> tuple[Path, bool]:
+    """(ruta libre en la carpeta, ¿hubo que renombrar?). No se pisa nada."""
+    destino = carpeta / nombre
+    if not destino.exists():
+        return destino, False
+    tallo, sufijo = Path(nombre).stem, Path(nombre).suffix
+    for n in range(2, 1000):
+        candidato = carpeta / f"{tallo} ({n}){sufijo}"
+        if not candidato.exists():
+            return candidato, True
+    raise ValueError(f"No hay un nombre libre para {nombre!r} en {carpeta}")
 
 
 def _factura_de_carpeta(carpeta: Path) -> str:
@@ -518,7 +573,13 @@ def construir_parser() -> argparse.ArgumentParser:
         "--mapa-nombres", type=Path, help='JSON para agregar palabras: {"ANGIOTAC": "AYUDAS"}.'
     )
     p.add_argument(
-        "--aplicar", action="store_true", help="Unir de verdad. Sin esto solo muestra qué haría."
+        "--renombrar",
+        action="store_true",
+        help="En vez de unir, dejar cada soporte con su nombre numerado dentro del folio: "
+        "«1 RESPUESTA A GLOSA.pdf», «2 HISTORIA CLINICA.pdf»…",
+    )
+    p.add_argument(
+        "--aplicar", action="store_true", help="Hacerlo de verdad. Sin esto solo muestra qué haría."
     )
     p.add_argument("--reporte-csv", type=Path, help="Listado de qué archivo quedó en qué grupo.")
     p.add_argument("--log", type=Path, help="Guarda además el log en un archivo.")
@@ -545,7 +606,19 @@ def main(argv: list[str] | None = None) -> int:
         facturas = leer_facturas(args.facturas)
         logger.info("Lista de trabajo: %d facturas", len(facturas))
 
-    plan = unir(args.carpeta, facturas, _cargar_mapa(args.mapa_nombres), args.aplicar)
+    mapa = _cargar_mapa(args.mapa_nombres)
+    if args.renombrar:
+        # Modo de la hoja del área: cada soporte queda numerado dentro del folio
+        # («1 RESPUESTA A GLOSA.pdf»), no se pega todo en un solo PDF.
+        plan = planificar(args.carpeta, facturas, mapa)
+        for fac in plan:
+            if not fac.soportes:
+                continue
+            renombrar_en_orden(fac, args.aplicar)
+            if args.aplicar:
+                fac.estado = ESTADO_RENOMBRADO
+    else:
+        plan = unir(args.carpeta, facturas, mapa, args.aplicar)
     if args.reporte_csv:
         escribir_reporte(args.reporte_csv, plan)
 
@@ -558,21 +631,35 @@ def main(argv: list[str] | None = None) -> int:
     errores = [f for f in plan if f.estado == ESTADO_ERROR]
     sin_reconocer = [(f, s) for f in plan for s in f.soportes if not s.reconocido]
 
-    verbo = "Se unieron" if args.aplicar else "Se unirían"
+    if args.renombrar:
+        verbo = "Se renombraron" if args.aplicar else "Se renombrarían"
+    else:
+        verbo = "Se unieron" if args.aplicar else "Se unirían"
     logger.info(
-        "\n%s %d factura(s), %d soporte(s).",
+        "\n%s los soportes de %d factura(s): %d archivo(s).",
         verbo,
         len(con_pdf),
         sum(len(f.soportes) for f in con_pdf),
     )
-    if args.aplicar:
+    if args.aplicar and not args.renombrar:
         logger.info("Páginas escritas: %d", sum(f.paginas for f in plan))
 
     for fac in con_pdf[:3]:
-        logger.info("\n  %s → %s", fac.factura, (fac.destino or Path()).name)
+        if args.renombrar:
+            logger.info("\n  %s\\", fac.carpeta.name)
+        else:
+            logger.info("\n  %s → %s", fac.factura, (fac.destino or Path()).name)
         for n, s in enumerate(fac.soportes, start=1):
             marca = "" if s.reconocido else "   <-- no reconocido, va en OTROS"
-            logger.info("     %2d. [%s] %s%s", n, s.grupo.titulo, s.ruta.name, marca)
+            if args.renombrar:
+                logger.info(
+                    "     %-36s (era %s)%s",
+                    nombre_numerado(n, s.grupo, s.ruta.suffix),
+                    s.ruta.name,
+                    marca,
+                )
+            else:
+                logger.info("     %2d. [%s] %s%s", n, s.grupo.titulo, s.ruta.name, marca)
     if len(con_pdf) > 3:
         logger.info(
             "\n  … y %d factura(s) más (el detalle completo va en el reporte CSV).",

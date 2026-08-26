@@ -1,5 +1,25 @@
 # Registro de cambios
 
+## Sesión 25-ago-2026 (noche, 2) — `--renombrar`: el folio como lo nombra el área
+
+El PDF unido de la HUS352904 no se parecía a lo que pide la hoja del área. Al
+mirarlo con el auditor salieron dos cosas distintas:
+
+- **La hoja no pide un PDF pegado, pide los soportes numerados dentro del
+  folio**: `1 RESPUESTA A GLOSA.pdf`, `2 HISTORIA CLINICA.pdf`, `3 OTRO.pdf`.
+  Eso es `--renombrar`, nuevo. `nombre_numerado()` arma el nombre y
+  `renombrar_en_orden()` lo aplica **en dos vueltas** —primero a un nombre
+  temporal—: el nombre que le toca a un archivo puede ser el que todavía tiene
+  otro, y renombrando de una uno pisaría al otro. Idempotente.
+- **El contenido era corto porque la carpeta solo tenía dos soportes.** No es
+  defecto del bot: faltan la epicrisis y los demás.
+
+La unión en un solo PDF sigue como estaba, por defecto. Se pueden usar las dos.
+
+7 pruebas nuevas (59 en el archivo), incluida la del renombrado que se pisaría a
+sí mismo y la de correrlo dos veces.
+
+
 ## Sesión 25-ago-2026 (noche) — repartir la respuesta a glosa por carpeta de factura
 
 `organizar_soportes_por_factura.py`:

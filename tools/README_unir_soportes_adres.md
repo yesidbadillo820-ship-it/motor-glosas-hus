@@ -60,6 +60,33 @@ código con `--mapa-nombres`:
 
 ---
 
+## 2bis) Dos formas de dejar el folio
+
+**a) Renombrado numerado (`--renombrar`)** — es como el área nombra los soportes
+dentro del folio de la factura:
+
+```
+📁 HUS352904
+    1 RESPUESTA A GLOSA.pdf
+    2 EPICRISIS.pdf
+    3 HISTORIA CLINICA.pdf
+    4 AYUDAS DIAGNOSTICAS.pdf
+    5 OTROS.pdf
+```
+
+El número dice en qué orden van y el nombre dice de qué es cada uno, sin tener
+que abrirlos. Si hay dos del mismo grupo, siguen la numeración (`3 HISTORIA
+CLINICA.pdf`, `4 HISTORIA CLINICA.pdf`).
+
+Se puede correr las veces que haga falta: la segunda corrida deja lo mismo.
+
+**b) Un solo PDF pegado (por defecto)** — deja `<FACTURA>_SOPORTES.pdf` con todo
+adentro, en el mismo orden, y no toca los originales.
+
+Las dos se pueden usar: primero `--renombrar` y después la unión, o solo una.
+
+---
+
 ## 3) Uso
 
 ```
@@ -76,7 +103,8 @@ py tools\unir_soportes_adres.py --carpeta "Z:\...\TECNICOS\CAROLINA" --aplicar ^
 |---|---|
 | `--carpeta` | La carpeta del gestor (CAROLINA, CLAUDIA, OSCAR…) |
 | `--facturas archivo.xlsx` | Solo las facturas de esa lista. Sin esto, todas las carpetas |
-| `--aplicar` | Unir de verdad (sin esto solo simula) |
+| `--renombrar` | Numerar y renombrar los soportes en el folio en vez de unirlos |
+| `--aplicar` | Hacerlo de verdad (sin esto solo simula) |
 | `--reporte-csv` | Listado de qué archivo quedó en qué grupo y en qué orden |
 | `--mapa-nombres` | JSON para agregar palabras propias |
 
