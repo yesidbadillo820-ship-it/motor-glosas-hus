@@ -5354,8 +5354,8 @@ TEXTO_DMBUG_TARIFAS = (
     "CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025 "
     "(PROCESO CD477), CON PLAZO HASTA 30/07/2026, VIGENTE A LA FECHA DE "
     "PRESTACIÓN DE LOS SERVICIOS FACTURADOS, QUE EN SU CLÁUSULA SEGUNDA "
-    "– PARÁGRAFO 1 INCORPORA EL ANEXO No. 1 CON 7.141 ÍTEMS TARIFADOS, ENTRE "
-    "LOS CUALES SE ENCUENTRA LOS SERVICIOS FACTURADOS. LA AFIRMACIÓN DE "
+    "– PARÁGRAFO 1 INCORPORA EL ANEXO No. 1 CON 7.141 ÍTEMS TARIFADOS. "
+    "LA AFIRMACIÓN DE "
     "INEXISTENCIA DE CONTRATO ES INEXACTA. EL ARGUMENTO DE AGOTAMIENTO "
     "PRESUPUESTAL NO CONSTITUYE CAUSAL CONTRACTUAL NI LEGAL PARA SUSTITUIR "
     "UNILATERALMENTE LAS TARIFAS PACTADAS POR SOAT, EN VIRTUD DE LOS "
@@ -5374,6 +5374,50 @@ TEXTO_DMBUG_TARIFAS = (
     "RECONOCIMIENTO DEL VALOR PACTADO EN EL ANEXO No. 1 DEL CONTRATO "
     "440-DIGSA/DMBUG-2025."
 )
+
+
+def _item_del_anexo_dmbug(cups: str | None) -> str:
+    """Devuelve la frase que nombra el ítem del Anexo 1, si se puede probar.
+
+    26-08-2026, decisión del área. La tercera auditoría señaló que el texto
+    canónico del Dispensario afirmaba que el servicio facturado «se encuentra»
+    entre los 7.141 ítems del Anexo 1 — sin decir cuál y sin verificarlo caso
+    por caso. Puede ser cierta en general y falsa en un caso puntual, y nadie
+    se entera hasta que la entidad lo revisa.
+
+    Yesid pidió que se cambiara y que «trae los servicios». Así queda: la
+    afirmación en bloque sale del texto fijo, y en su lugar el motor BUSCA el
+    código en el catálogo del contrato que el coordinador cargó. Si lo
+    encuentra, lo nombra con su descripción y su valor pactado — que es una
+    prueba, no una generalización. Si no lo encuentra, no se afirma nada.
+    """
+    if not cups:
+        return ""
+    try:
+        from app.database import SessionLocal
+        from app.services.tarifa_lookup_service import _buscar
+
+        db = SessionLocal()
+        try:
+            fila = _buscar(db, "DISPENSARIO MEDICO", str(cups))
+            if not fila:
+                return ""
+            desc = str(getattr(fila, "descripcion", "") or "").strip()
+            codigo = str(
+                getattr(fila, "codigo_cups", "") or getattr(fila, "codigo_ips", "") or cups
+            ).strip()
+            valor = getattr(fila, "valor", None) or getattr(fila, "valor_pactado", None)
+            frase = f" EL SERVICIO OBJETADO CORRESPONDE AL ÍTEM {codigo}"
+            if desc:
+                frase += f" ({desc.upper()})"
+            frase += " DEL ANEXO No. 1"
+            if valor:
+                frase += f", TARIFADO EN ${int(float(valor)):,}".replace(",", ".")
+            return frase + "."
+        finally:
+            db.close()
+    except Exception:  # sin base o sin catálogo no se afirma nada
+        return ""
 
 
 def _dmbug_cubierto_por_el_contrato(fecha_hecho) -> bool:
@@ -5859,18 +5903,34 @@ def limpiar_palabra_injustificado(texto: str, codigo_respuesta: str = "") -> str
     return out
 
 
-def generar_texto_extemporanea(dias: int) -> str:
+def generar_texto_extemporanea(dias: int, fecha_radicacion: str = "", fecha_glosa: str = "") -> str:
     """Texto FIJO canónico HUS para glosas extemporáneas (RE9502).
 
     Es IMPORTANTE que sea 100% fijo — no pasa por IA ni por suavizador —
     para (1) garantizar tono firme consistente y (2) no gastar tokens de
     IA en un caso cuyo argumento es mecánico. El suavizador también se
     salta cuando el `arg_limpio` coincide con esta plantilla.
+
+    26-08-2026 — AHORA MUESTRA EL CÓMPUTO. La tercera auditoría señaló que el
+    dictamen GL-130 afirmaba «han transcurrido 77 días hábiles» y que «ha
+    operado de pleno derecho la aceptación tácita» **sin mostrar una sola
+    fecha**. Si el conteo falla, la causal original nunca quedó respondida y
+    nadie tiene cómo notarlo: ni el gestor antes de radicar, ni la entidad
+    después.
+
+    Un plazo se prueba con sus dos extremos. Cuando el motor los tiene, los
+    escribe; el argumento no pierde fuerza — la gana, porque queda verificable.
     """
+    _computo = ""
+    if fecha_radicacion and fecha_glosa:
+        _computo = (
+            f", CONTADOS ENTRE LA RADICACIÓN DE LA FACTURA ({fecha_radicacion}) "
+            f"Y LA NOTIFICACIÓN DE LA GLOSA ({fecha_glosa})"
+        )
     return (
         "ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA. AL HABERSE SUPERADO EL PLAZO LEGAL DE "
         f"20 DÍAS HÁBILES ESTABLECIDO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 "
-        f"(HAN TRANSCURRIDO {dias} DÍAS HÁBILES) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA "
+        f"(HAN TRANSCURRIDO {dias} DÍAS HÁBILES{_computo}) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA "
         f"NOTIFICACIÓN FORMAL DE LAS OBJECIONES, HA OPERADO DE PLENO DERECHO EL FENÓMENO "
         f"JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO "
         f"DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER "
@@ -6464,7 +6524,11 @@ class GlosaService:
                 "usar la plantilla fija (decisión del área, 25-08-2026)."
             )
         elif es_extemporanea:
-            argumento_fijo = generar_texto_extemporanea(dias)
+            argumento_fijo = generar_texto_extemporanea(
+                dias,
+                str(getattr(data, "fecha_radicacion", "") or ""),
+                str(getattr(data, "fecha_recepcion", "") or ""),
+            )
             tipo_glosa = "EXTEMPORANEA"
         elif (
             es_tarifa
@@ -6492,6 +6556,26 @@ class GlosaService:
             # texto sobre agotamiento presupuestal — y encima por este
             # camino no pasa el Quality Gate, así que nadie lo detectó.
             argumento_fijo = TEXTO_DMBUG_TARIFAS
+            # 26-08-2026: si el catálogo del contrato tiene el código, se nombra
+            # el ítem con su descripción y su valor. Eso es una prueba; decir
+            # «está entre los 7.141» sin más era una generalización.
+            try:
+                _cups_dmbug = ""
+                try:
+                    from app.main import _extraer_cups_servicio as _extcups_dm
+
+                    _cups_dmbug = (_extcups_dm(texto_base, "") or ("", ""))[0] or ""
+                except Exception:
+                    _cups_dmbug = ""
+                _item = _item_del_anexo_dmbug(_cups_dmbug or None)
+                if _item:
+                    argumento_fijo = argumento_fijo.replace(
+                        "7.141 ÍTEMS TARIFADOS.",
+                        "7.141 ÍTEMS TARIFADOS." + _item,
+                    )
+                    logger.info(f"[DMBUG-ITEM] anexo probado con el ítem: {_item.strip()[:90]}")
+            except Exception as _e_it:
+                logger.debug(f"[DMBUG-ITEM] no se pudo nombrar el ítem: {_e_it}")
             tipo_glosa = "TA_DMBUG_FIJO"
         elif (
             es_tarifa

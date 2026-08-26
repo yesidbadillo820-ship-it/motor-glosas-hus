@@ -7930,6 +7930,49 @@ las tres quedan con su correo.
 
 ## 3) PENDIENTE
 
+### 26-08-2026 — Seis decisiones del área, aplicadas
+
+**El texto del Dispensario ya no generaliza: prueba el ítem.** Afirmaba que el
+servicio «se encuentra» entre los 7.141 ítems del Anexo 1 sin decir cuál. Ahora
+esa afirmación sale del texto fijo, y en su lugar el motor **busca el código en
+el catálogo del contrato** que usted cargó: si lo encuentra, lo nombra con su
+descripción y su valor pactado — eso es una prueba, no una generalización. Si
+no lo encuentra, no afirma nada.
+
+**El cómputo de días hábiles ya se ve.** El texto de glosa extemporánea decía
+«han transcurrido 77 días hábiles» sin mostrar una sola fecha. Ahora escribe
+entre qué dos fechas contó: la radicación de la factura y la notificación de la
+glosa. Si el conteo falla, se nota antes de radicar — y la entidad puede
+rehacerlo, que es lo que le da fuerza al argumento.
+
+**La cuenta de Edgar Silva se volvía a crear sola.** Los correos a
+`devoluciones1@` rebotaban y la cuenta buena es `carterahus02@`. Borrarla en la
+pantalla no servía de nada: **estaba sembrada en el código de arranque**, así
+que reaparecía en cada reinicio del motor. Ahí quedó corregida.
+
+**Los códigos con dos valores ahora se resuelven con la fórmula del contrato.**
+Eran 256 del Dispensario, 737 de Compensar y 737 de Positiva que no se cargaban
+porque el archivo traía el mismo código con precios distintos. Usted decidió:
+«el que mejor se ajuste a las tarifas pactadas». Ahora el motor toma el valor
+SOAT oficial del código, le aplica el descuento del contrato de esa entidad y
+escoge el que caiga sobre ese número. **No es «el más parecido»:** se exige que
+quede a menos del 2 % del esperado y que ningún otro quede igual de cerca. Si
+nada cuadra, el código se sigue omitiendo, como antes.
+
+**Y apareció una segunda lista de normas que nadie había mirado.** Aparte del
+corpus que alimenta a la IA, la pantalla de Consulta Normativa tiene su propia
+lista de 132 entradas. Al auditar los dictámenes salió que una estaba
+inventada: decía que el artículo 10 del Decreto 2423 de 1996 son «tarifas
+mínimas SOAT para urgencias», y verificado contra el PDF oficial de MinSalud
+ese artículo es **la nomenclatura de las intervenciones quirúrgicas de
+proctología**. Se reemplazó por el artículo 87, que sí es el de tarifas. **Las
+otras 131 siguen sin contrastar**, y quedó escrito en el archivo.
+
+**Nota sobre el archivo que subió.** El documento con los resultados de los 10
+casos de prueba resultó ser idéntico —byte por byte— al de la auditoría
+anterior. No trae los dictámenes nuevos: son los mismos, generados antes de las
+correcciones. Falta volver a enviarlo.
+
 ### ⭐ Lo primero, al cierre del 25-08
 
 Tres cosas, en este orden:

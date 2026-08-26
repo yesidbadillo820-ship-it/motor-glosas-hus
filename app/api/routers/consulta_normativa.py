@@ -64,6 +64,18 @@ _STOPWORDS = {
 }
 
 
+# ⚠ 26-08-2026 — ESTA LISTA NO ESTÁ VERIFICADA CONTRA FUENTE OFICIAL.
+#
+# Son 132 entradas que alimentan la pantalla «Consulta Normativa» (no los
+# dictámenes: la IA usa el corpus de app/services/normativa_completa.py, que sí
+# se repasó el 25-08). Al auditar los dictámenes salió que una de ellas estaba
+# inventada: decía que el Art. 10 del Decreto 2423 de 1996 son «tarifas mínimas
+# SOAT para urgencias», y verificado contra el PDF oficial de MinSalud ese
+# artículo es la nomenclatura de las intervenciones quirúrgicas de PROCTOLOGÍA.
+# Se reemplazó por el Art. 87, que es el que de verdad sirve para tarifas.
+#
+# Las otras 131 no se han contrastado una por una. Mientras eso no se haga, lo
+# que se lea acá se verifica antes de usarlo en un documento que se radique.
 def _norm_txt(s: str) -> str:
     """Lowercase + sin tildes + solo alfanumérico/espacios."""
     if not s:
@@ -1063,11 +1075,11 @@ CATALOGO_NORMAS = [
         "keywords": ["glosas", "objeciones", "cuentas médicas"],
     },
     {
-        "clave": "DECRETO 2423 DE 1996 ART 10",
-        "nombre": "Decreto 2423 de 1996 — Art. 10",
-        "titulo": "Tarifas mínimas SOAT para urgencias",
+        "clave": "DECRETO 2423 DE 1996 ART 87",
+        "nombre": "Decreto 2423 de 1996 — Art. 87",
+        "titulo": "Procedimiento sin tarifa asignada: se reconoce por la tarifa de la institución",
         "vigente": True,
-        "keywords": ["SOAT", "urgencias", "tarifas mínimas"],
+        "keywords": ["SOAT", "sin tarifa", "tarifa institucional", "manual tarifario"],
     },
     {
         "clave": "RESOLUCION 1604 DE 2006",

@@ -1014,7 +1014,7 @@ async def lifespan(app: FastAPI):
             ("auditorhus02@sinacsc.com", "AUDITOR", "LEIDY JHOANA SANGUINO"),
             ("auditorhus03@sinacsc.com", "AUDITOR", "LEYDI ZULAY GONZALEZ"),
             ("devoluciones03@sinacsc.com", "AUDITOR", "JOHANNA MORENO"),
-            ("devoluciones1@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
+            ("carterahus02@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
             ("glosashus03@sinacsc.com", "AUDITOR", "OSCAR VILLAMIZAR"),
             # Pedido 03-08-2026: ELIAS con todos los permisos de admin.
             ("glosashus15@sinacsc.com", "SUPER_ADMIN", "ELIAS CARVAJAL"),
