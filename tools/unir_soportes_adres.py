@@ -81,7 +81,6 @@ import csv
 import json
 import logging
 import contextlib
-import os
 import re
 import shutil
 import sys
@@ -92,7 +91,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # El motor de unión ya existe y está probado: aquí solo se le da el ORDEN.
 from organizar_soportes_por_factura import factura_del_nombre  # noqa: E402
-from unir_pdfs_carpetas import _cargar_lector_escritor, clave_natural, unir_pdfs  # noqa: E402
+from unir_pdfs_carpetas import (  # noqa: E402
+    _cargar_lector_escritor,
+    clave_natural,
+    reemplazar_con_reintento,
+    unir_pdfs,
+)
 
 logger = logging.getLogger("unir_soportes_adres")
 
@@ -1141,7 +1145,7 @@ def _poner_caratula(
         entradas = entradas_de_caratula(soportes, dict(detalle))
         if not escribir_caratula(entradas, caratula):
             # Sin reportlab no hay carátula, pero el folio no se pierde.
-            os.replace(cuerpo, destino)
+            reemplazar_con_reintento(cuerpo, destino)
             omitidos.append("sin carátula: falta reportlab (py -m pip install reportlab)")
             return len(PdfReader(str(destino)).pages), omitidos
         paginas, mas = unir_pdfs([caratula, cuerpo], destino, PdfReader, PdfWriter, METADATOS_FOLIO)

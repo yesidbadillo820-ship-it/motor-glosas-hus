@@ -320,3 +320,53 @@ def test_si_no_puede_escribir_el_destino_no_deja_el_tmp_tirado(tmp_path, monkeyp
         mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
 
     assert list(tmp_path.glob("*.tmp")) == [], "quedó un .tmp huérfano en la carpeta"
+
+
+def test_reintenta_cuando_el_antivirus_tiene_el_archivo_un_instante(tmp_path, monkeypatch):
+    """El bloqueo del antivirus dura un instante: hay que reintentar, no rendirse.
+
+    Del paquete 31068: cada corrida sobre el share tumbaba UNA factura distinta.
+    En una corrida falló HUS376521 y pasó HUS377385; en la siguiente, al revés.
+    Un bloqueo que se mueve así no es un PDF abierto por alguien: es el
+    antivirus mirando el archivo recién escrito.
+    """
+    mod = _cargar_modulo()
+    origen = tmp_path / "1 FACTURA.pdf"
+    _hacer_pdf(origen, 2)
+    destino = tmp_path / "FOLIO.pdf"
+
+    real = mod.os.replace
+    fallos = {"n": 0}
+
+    def replace_ocupado(src, dst):
+        if fallos["n"] < 2:
+            fallos["n"] += 1
+            raise PermissionError(5, "Acceso denegado", str(src), 5, str(dst))
+        return real(src, dst)
+
+    monkeypatch.setattr(mod.os, "replace", replace_ocupado)
+    monkeypatch.setattr(mod.time, "sleep", lambda _s: None)
+    paginas, _ = mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
+
+    assert fallos["n"] == 2, "no reintentó"
+    assert paginas == 2
+    assert destino.exists()
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_si_el_bloqueo_no_se_suelta_avisa_y_no_deja_basura(tmp_path, monkeypatch):
+    """Reintentar no es insistir para siempre: si no se suelta, se avisa."""
+    mod = _cargar_modulo()
+    origen = tmp_path / "1 FACTURA.pdf"
+    _hacer_pdf(origen, 2)
+    destino = tmp_path / "FOLIO.pdf"
+
+    def replace_denegado(src, dst):
+        raise PermissionError(5, "Acceso denegado", str(src), 5, str(dst))
+
+    monkeypatch.setattr(mod.os, "replace", replace_denegado)
+    monkeypatch.setattr(mod.time, "sleep", lambda _s: None)
+    with pytest.raises(PermissionError):
+        mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
+
+    assert list(tmp_path.glob("*.tmp")) == []
