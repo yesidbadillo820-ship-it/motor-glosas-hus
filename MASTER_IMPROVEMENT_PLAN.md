@@ -46,7 +46,16 @@ con prueba.
 - [x] `presentacion-ia.html` íd.
 - [x] `terapia-fisica-paciente-encamado.html` íd.
 - [x] Prueba que falla si una página del portal deja de cargar el sistema de diseño (12 casos, uno por página y por archivo).
-- [ ] Que además **usen** los tokens `--sds-*`. **Medido el 25-08 y replanteado:** `index.html` no está sin disciplina — tiene **su propio** sistema, con 90 tokens y 2.072 usos (`--text3`, `--bg-card`, `--border`…). Lo que pasa es que `sinac-ds.css` carga un **segundo** vocabulario que nadie usa. Migrar los 2.072 usos es el cambio gigante que la regla 1 del proyecto prohíbe sin defecto visible que lo justifique. **DECISIÓN DEL DUEÑO.**
+- [x] Que además **usen** los tokens `--sds-*`. **HECHO el 26-08, y al revés de como estaba planteado.**
+  Lo que decía esta casilla era falso en sus dos mitades, y solo se supo al medirlo:
+  (a) `sinac-ds.css` **no** era «un segundo vocabulario que nadie usa» — 16 de sus reglas
+  de color pintan hoy la pantalla de Analizar (dictamen, fichas de cita, campos, botón
+  principal); y (b) **sí** había defecto visible: las dos paletas eran colores distintos,
+  así que la ficha de cita VERIFICADA salía verde `#16a34a` en el dictamen y verde
+  `#2E7D32` en el resto del motor. Tampoco eran 2.072 cambios: bastaron **13** — los
+  tokens de color de `--sds-*` pasaron a apuntar a la paleta corporativa, así que el
+  nombre que se escribe sigue siendo `--sds-*` y el color que devuelve es el de la casa.
+  Ningún uso se tocó. 8 pruebas en `tests/test_frontend/test_un_solo_vocabulario_de_color.py`.
 
 ### 1.2 La moneda se formatea de 74 maneras
 
