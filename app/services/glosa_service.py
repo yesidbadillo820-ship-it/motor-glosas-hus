@@ -5448,6 +5448,103 @@ def _cups_desde_dgh(numero_factura: str | None) -> tuple[str, str]:
         return "", ""
 
 
+# ── 27-08-2026: la glosa de soportes se contesta con el folio ─────────────
+#
+# Pedido textual del auditor, mirando un dictamen real (GL-134, SO0102):
+# «están reclamando un soporte y la IA no responde que realmente, según el
+#  folio tal de la hoja tal del archivo tal, ahí se encuentra ese
+#  procedimiento, que lo hizo el Dr. X el día X a X paciente».
+#
+# Tiene razón, y es la diferencia entre un documento que argumenta y uno que
+# prueba. Lo que salió en su lugar fue una declaración categórica —«LA
+# FACTURACIÓN INCORPORA: (I)... (IX)...»— sin un solo folio detrás. La entidad
+# no discute lo que está probado, pero tumba de entrada lo que se afirma sin
+# respaldo: le basta pedir el folio.
+#
+# La regla 8.septdecies del prompt ya lo ordena. Esta red comprueba que llegó,
+# que es la lección que dejó agosto: escribir la regla nunca fue el trabajo.
+
+# Las fórmulas que afirman el envío de soportes sin probarlo.
+_PAT_AFIRMA_SOPORTES_EN_BLOQUE = re.compile(
+    r"(?:RADICAD[AO]\s+ACOMPA[ÑN]AD[AO]\s+DE\s+LA\s+TOTALIDAD"
+    r"|LA\s+FACTURACI[ÓO]N\s+INCORPORA"
+    r"|SE\s+APORT[ÓO]\s+LA\s+TOTALIDAD\s+DE\s+LOS\s+SOPORTES"
+    r"|CON\s+LA\s+TOTALIDAD\s+DE\s+LOS\s+SOPORTES\s+M[ÍI]NIMOS)",
+    re.IGNORECASE,
+)
+
+# Lo que sí es una prueba: un folio, una página o una fecha con el documento.
+_PAT_CITA_UN_FOLIO = re.compile(
+    r"(?:\bFOLIOS?\s*(?:N[°ºo\.]{0,2}\s*)?\d"
+    r"|\bP[ÁA]GINAS?\s*(?:N[°ºo\.]{0,2}\s*)?\d"
+    r"|\bHOJA\s*(?:N[°ºo\.]{0,2}\s*)?\d)",
+    re.IGNORECASE,
+)
+
+
+def _glosa_es_de_soportes(codigo: str, texto_glosa: str) -> bool:
+    """¿La entidad está echando de menos un documento?"""
+    if (codigo or "").strip().upper().startswith("SO"):
+        return True
+    t = (texto_glosa or "").upper()
+    return bool(
+        re.search(
+            r"FALTA\s+DE\s+SOPORTE|SIN\s+SOPORTE|NO\s+EXISTENTE\s+EN\s+LO\s+RADICADO"
+            r"|SOPORTE\s+NO\s+APORTAD|AUSENCIA\s+DE\s+SOPORTE",
+            t,
+        )
+    )
+
+
+def _avisar_si_afirma_soportes_sin_probarlos(
+    dictamen: str, codigo: str, texto_glosa: str, evidencia: str
+) -> str:
+    """Avisa cuando la respuesta a una glosa de soportes no señala el folio.
+
+    Dos casos distintos, y el aviso los distingue porque lo que hay que hacer
+    es distinto:
+
+      · HAY evidencia forense a la vista y el dictamen no la usó → el folio
+        estaba ahí y no se citó. Es el caso que más duele.
+      · NO hay evidencia y el dictamen igual afirma que se envió todo → eso
+        es afirmar lo que no se probó.
+    """
+    if not dictamen or not _glosa_es_de_soportes(codigo, texto_glosa):
+        return dictamen
+    if _PAT_CITA_UN_FOLIO.search(dictamen):
+        return dictamen  # ya señala dónde está: nada que avisar
+
+    hay_evidencia = bool(evidencia) and "EVIDENCIA FORENSE" in (evidencia or "").upper()
+    afirma_en_bloque = bool(_PAT_AFIRMA_SOPORTES_EN_BLOQUE.search(dictamen))
+
+    if hay_evidencia:
+        logger.warning(
+            f"[SOPORTE-SIN-FOLIO] {codigo}: había evidencia forense del expediente y el "
+            "dictamen no citó ni un folio."
+        )
+        return dictamen.rstrip() + (
+            "\n\n⚠ ESTA RESPUESTA NO SEÑALA DÓNDE ESTÁ EL SOPORTE. La entidad echa de "
+            "menos un documento y el motor SÍ leyó el expediente, pero el escrito no dice "
+            "en qué documento, en qué folio o de qué fecha está lo que ella busca, ni qué "
+            "profesional lo firmó. Use el Auditor Forense de esta misma pantalla para "
+            "ubicarlo y agréguelo: la entidad no discute lo que está probado."
+        )
+
+    if afirma_en_bloque:
+        logger.warning(
+            f"[SOPORTE-SIN-FOLIO] {codigo}: el dictamen afirma que se enviaron todos los "
+            "soportes sin señalar ninguno."
+        )
+        return dictamen.rstrip() + (
+            "\n\n⚠ AFIRMA SIN PROBAR. El escrito dice que la factura se radicó con todos "
+            "los soportes, pero no señala ni uno: ni documento, ni folio, ni fecha. A la "
+            "entidad le basta pedir el folio para ratificar la glosa. Ubique el documento "
+            "con el Auditor Forense y nómbrelo, o cambie la afirmación por lo que sí se "
+            "puede probar y exíjale a la entidad que precise qué folio echa de menos."
+        )
+    return dictamen
+
+
 def _item_del_anexo_dmbug(cups: str | None) -> str:
     """Devuelve la frase que nombra el ítem del Anexo 1, si se puede probar.
 
@@ -9083,6 +9180,20 @@ class GlosaService:
                     )
             except Exception as _e_fs:
                 logger.debug(f"[FALTA-SOPORTE] aviso no aplicado: {_e_fs}")
+
+            # 27-08-2026 — LA GLOSA DE SOPORTES SE CONTESTA CON EL FOLIO.
+            # Va después del aviso de arriba a propósito: aquel dice que el
+            # soporte NO está en el expediente; este dice que SÍ está (o que
+            # se afirmó que estaba) y aun así el escrito no señala dónde.
+            try:
+                dictamen = _avisar_si_afirma_soportes_sin_probarlos(
+                    dictamen,
+                    str(codigo_det or ""),
+                    str(getattr(data, "tabla_excel", "") or ""),
+                    _evidencia_leida or "",
+                )
+            except Exception as _e_sf:
+                logger.debug(f"[SOPORTE-SIN-FOLIO] aviso no aplicado: {_e_sf}")
 
             # 26-08-2026 — EL AUDITOR DE LA EPS, ANTES DE RADICAR.
             # Se enchufa donde de verdad hace falta: cuando el revisor de citas
