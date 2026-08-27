@@ -1674,3 +1674,132 @@ def test_mirar_las_partes_de_la_factura_no_la_deja_abierta(tmp_path):
     org.partes_de_la_factura(pdf)
 
     assert _abiertos(pdf) == 0, "quedó abierta tras mirarle las partes"
+
+
+# ─── El folio de las facturas que solo tienen la respuesta ───────────────────
+
+
+def test_la_respuesta_sola_queda_como_folio_con_indice(tmp_path):
+    """Hay facturas sin carpeta de soportes: su folio es solo la respuesta.
+
+    Del paquete 31068: el área pidió que a esas se les ponga el índice, se
+    nombren como el folio clínico y queden SUELTAS en la carpeta destino, sin
+    crearles carpeta.
+    """
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "RTA_ADRES_HUS403233.pdf", 3)
+    destino = tmp_path / "GI-XX-XXXXX-2026"
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=True)
+
+    folio = destino / "680010079201_HUS403233_EPICRIS.pdf"
+    assert folio.exists(), "no salió el folio con el nombre del EPICRIS"
+    assert [f.name for f in destino.iterdir()] == [folio.name], "creó algo más que el PDF"
+    assert len(hechos) == 1 and hechos[0].factura == "HUS403233"
+    assert hechos[0].paginas == 4, "debería ser la carátula más las 3 de la respuesta"
+    assert org.es_folio_nuestro(folio), "el folio quedó sin la firma del bot"
+
+
+def test_solo_arma_las_facturas_de_la_lista(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    for factura in ("HUS403233", "HUS404072", "HUS999999"):
+        _pdf(rtas / f"RTA_ADRES_{factura}.pdf", 1)
+    destino = tmp_path / "GI"
+
+    org.folios_de_respuestas(
+        rtas, destino, prefijo="680010079201", facturas={"HUS403233", "HUS404072"}, aplicar=True
+    )
+
+    assert sorted(f.name for f in destino.iterdir()) == [
+        "680010079201_HUS403233_EPICRIS.pdf",
+        "680010079201_HUS404072_EPICRIS.pdf",
+    ]
+
+
+def test_folio_suelto_sin_aplicar_no_escribe_nada(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "RTA_ADRES_HUS403233.pdf", 2)
+    destino = tmp_path / "GI"
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=False)
+
+    assert len(hechos) == 1
+    assert not destino.exists(), "en simulación no puede crear la carpeta destino"
+
+
+def test_no_pisa_un_pdf_que_no_armó_el_bot(tmp_path):
+    """La misma guarda del folio: si el destino ya existe y es ajeno, no se toca."""
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "RTA_ADRES_HUS403233.pdf", 2)
+    destino = tmp_path / "GI"
+    destino.mkdir()
+    ajeno = destino / "680010079201_HUS403233_EPICRIS.pdf"
+    _pdf(ajeno, 7)
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    assert len(Lector(str(ajeno)).pages) == 7, "pisó un archivo que no era del bot"
+    assert "no lo escribió este bot" in hechos[0].aviso
+
+
+def test_avisa_la_respuesta_cuyo_nombre_no_dice_la_factura(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "no se sabe de quien.pdf", 1)
+    destino = tmp_path / "GI"
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=True)
+
+    assert len(hechos) == 1 and not hechos[0].factura
+    assert "no dice de qué factura" in hechos[0].aviso
+
+
+def test_lista_de_facturas_en_txt(tmp_path):
+    """El área manda la lista pegada de un Excel: con ceros, espacios y vacíos."""
+    lista = tmp_path / "lista.txt"
+    lista.write_text(
+        "HUS403233\n  hus0000404072 \n\nHUS 404165\n# un comentario\nHUS404676\n",
+        encoding="utf-8",
+    )
+
+    assert org.leer_lista_facturas(lista) == {
+        "HUS403233",
+        "HUS404072",
+        "HUS404165",
+        "HUS404676",
+    }
+
+
+def test_el_comando_arma_los_folios_sueltos(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    for factura in ("HUS403233", "HUS404072"):
+        _pdf(rtas / f"RTA_ADRES_{factura}.pdf", 2)
+    lista = tmp_path / "lista.txt"
+    lista.write_text("HUS403233\n", encoding="utf-8")
+    destino = tmp_path / "GI-XX-XXXXX-2026"
+
+    assert (
+        org.main(
+            [
+                "--solo-respuestas",
+                "--carpeta",
+                str(rtas),
+                "--salida",
+                str(destino),
+                "--lista",
+                str(lista),
+                "--prefijo",
+                "680010079201",
+                "--aplicar",
+            ]
+        )
+        == 0
+    )
+
+    assert [f.name for f in destino.iterdir()] == ["680010079201_HUS403233_EPICRIS.pdf"]
