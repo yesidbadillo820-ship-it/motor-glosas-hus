@@ -10377,10 +10377,37 @@ class GlosaService:
         ),
         "comprobante_recibido_cobro": ("Comprobante de recibido de cobro", "Res. 2284/2023"),
         "furips": ("FURIPS", "Circular 022/2023"),
-        "resultados_msps": ("Resultados de apoyo diagnóstico", "Res. 3047/2008 Anexo 5"),
-        "otros_procedimientos": ("Soporte de procedimientos", "Res. 3047/2008 Anexo 5"),
-        "pde": ("Soporte de estancia", "Res. 3047/2008 Anexo 5"),
-        "pdx": ("Soporte de diagnóstico", "Res. 3047/2008 Anexo 5"),
+        # 27-08-2026 — ESTOS CUATRO CITABAN UNA NORMA DEROGADA.
+        # Decían «Res. 3047/2008 Anexo 5», y esa resolución está derogada
+        # desde el 1 de abril de 2026 por el artículo 20 de la Res. 2335 de
+        # 2023 (modificado por el art. 2 de la Res. 1886 de 2024). Salía
+        # impreso en la tabla de soportes de cada dictamen: cuatro filas
+        # regalándole a la entidad la forma de tumbar el escrito.
+        # El listado de soportes que rige hoy es el Anexo Técnico 1 de la
+        # Res. 2284 de 2023, sustituido por el Anexo 1 de la Res. 1885 de
+        # 2024. Se nombran los dos con la regla de la fecha, igual que se
+        # hizo con los RIPS, para que el dictamen sea correcto cualquiera
+        # que sea la fecha de la atención.
+        "resultados_msps": (
+            "Resultados de apoyo diagnóstico",
+            "Res. 2284/2023 Anexo 1 (sust. Res. 1885/2024); Res. 3047/2008 Anexo 5 "
+            "si el servicio es anterior al 01-04-2026",
+        ),
+        "otros_procedimientos": (
+            "Soporte de procedimientos",
+            "Res. 2284/2023 Anexo 1 (sust. Res. 1885/2024); Res. 3047/2008 Anexo 5 "
+            "si el servicio es anterior al 01-04-2026",
+        ),
+        "pde": (
+            "Soporte de estancia",
+            "Res. 2284/2023 Anexo 1 (sust. Res. 1885/2024); Res. 3047/2008 Anexo 5 "
+            "si el servicio es anterior al 01-04-2026",
+        ),
+        "pdx": (
+            "Soporte de diagnóstico",
+            "Res. 2284/2023 Anexo 1 (sust. Res. 1885/2024); Res. 3047/2008 Anexo 5 "
+            "si el servicio es anterior al 01-04-2026",
+        ),
         "xml_cufe": (
             "XML CUFE de la factura",
             "Res. 948/2026 (Res. 2275/2023 antes del 14-05-2026)",
@@ -10480,8 +10507,15 @@ class GlosaService:
         for sop in soportes:
             tipo = sop.get("tipo") or "otro"
             nombre_archivo = sop.get("nombre_archivo") or ""
+            # 27-08-2026: el respaldo decia «Res. 3047/2008 Anexo 5», derogada
+            # desde el 01-04-2026. Cualquier soporte que no estuviera en la
+            # tabla salia impreso con la norma muerta. Ahora cae en la vigente.
             documento, norma = self._MARCO_LEGAL_SOPORTE.get(
-                tipo, (nombre_archivo or "Soporte anexo", "Res. 3047/2008 Anexo 5")
+                tipo,
+                (
+                    nombre_archivo or "Soporte anexo",
+                    "Res. 2284/2023 Anexo 1 (sust. Res. 1885/2024)",
+                ),
             )
             if documento in vistos:
                 continue

@@ -974,11 +974,11 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 8.octies (RONDA 21). EPS EN LIQUIDACIÓN / INTERVENIDA: si la glosa menciona liquidación, intervención, agente liquidadora o "verificación de saldos por SuperSalud", PROHIBIDO responder con relleno ("conforme al régimen legal aplicable"). La defensa correcta ancla: (a) la liquidación NO extingue el crédito por servicios efectivamente prestados; (b) las acreencias por servicios de salud tienen PRELACIÓN en el proceso liquidatorio; (c) la agente liquidadora designada por SuperSalud debe reconocer la obligación conforme a la prelación de pagos, y procede el giro directo de ADRES cuando aplique. El proceso de liquidación NO es excusa para no reconocer el servicio.
 
-8.nonies (RONDA 22). SANCIÓN/MULTA DE LA EPS — ATACAR LA LEGALIDAD, NUNCA "PACTA SUNT SERVANDA": cuando la EPS aplique una sanción o multa (aunque la funde en una cláusula del contrato, p. ej. "cláusula 18"), está PROHIBIDO invocar "Pacta Sunt Servanda" o llamarla "modificación unilateral" — eso CONCEDE que la cláusula es válida y aplica (tiro por la culata). La defensa correcta ATACA LA LEGALIDAD de la potestad sancionatoria: (a) las EPS NO tienen facultad sancionatoria sobre las IPS; la potestad sancionatoria es exclusiva de la Superintendencia Nacional de Salud (Art. 126 Ley 1438/2011) y del juez competente; (b) una cláusula contractual que pretenda imponer multas unilaterales a la IPS es INEFICAZ / ABUSIVA de pleno derecho, porque pacta una potestad reservada por la ley a otra autoridad; (c) la glosa es objeción técnica sujeta a respuesta y conciliación (Arts. 56–57 Ley 1438/2011; Res. 3047/2008), no título sancionatorio. Conclusión: se RECHAZA la sanción por VICIO DE COMPETENCIA.
+8.nonies (RONDA 22). SANCIÓN/MULTA DE LA EPS — ATACAR LA LEGALIDAD, NUNCA "PACTA SUNT SERVANDA": cuando la EPS aplique una sanción o multa (aunque la funde en una cláusula del contrato, p. ej. "cláusula 18"), está PROHIBIDO invocar "Pacta Sunt Servanda" o llamarla "modificación unilateral" — eso CONCEDE que la cláusula es válida y aplica (tiro por la culata). La defensa correcta ATACA LA LEGALIDAD de la potestad sancionatoria: (a) las EPS NO tienen facultad sancionatoria sobre las IPS; la potestad sancionatoria es exclusiva de la Superintendencia Nacional de Salud (Art. 126 Ley 1438/2011) y del juez competente; (b) una cláusula contractual que pretenda imponer multas unilaterales a la IPS es INEFICAZ / ABUSIVA de pleno derecho, porque pacta una potestad reservada por la ley a otra autoridad; (c) la glosa es objeción técnica sujeta a respuesta y conciliación (Arts. 56–57 Ley 1438/2011; Res. 2284/2023), no título sancionatorio. Conclusión: se RECHAZA la sanción por VICIO DE COMPETENCIA.
 
 8.decies (RONDA 22). TONO — PROHIBIDO AMENAZAR: las glosas se ganan con argumentos normativos fríos y precisos, no con amenazas. Está PROHIBIDO el lenguaje beligerante o intimidatorio del tipo "se advierte que cualquier intento de rebatir este dictamen constituirá violación...", "generará responsabilidad institucional/penal", "se tomarán acciones legales". Ese tono hace que el auditor de la EPS se ponga a la defensiva y escale el caso. Cierre profesional y conciliador (o firme en ratificación), nunca amenazante.
 
-8.undecies (RONDA 22). PROHIBIDO EL FALSO "SILENCIO POSITIVO": NUNCA afirmar que "el silencio de la EPS se entiende como aceptación tácita" ni "silencio positivo". En el SGSSS el no pago no opera automáticamente por silencio (Decreto 4747/2007; Res. 3047/2008): si la EPS no responde, el trámite se ESCALA a conciliación obligatoria o a la SuperSalud. Pedir el levantamiento dentro del plazo (Art. 57 Ley 1438/2011) SÍ; afirmar aceptación automática por silencio NO.
+8.undecies (RONDA 22). PROHIBIDO EL FALSO "SILENCIO POSITIVO": NUNCA afirmar que "el silencio de la EPS se entiende como aceptación tácita" ni "silencio positivo". En el SGSSS el no pago no opera automáticamente por silencio (Decreto 4747/2007; Res. 2284/2023): si la EPS no responde, el trámite se ESCALA a conciliación obligatoria o a la SuperSalud. Pedir el levantamiento dentro del plazo (Art. 57 Ley 1438/2011) SÍ; afirmar aceptación automática por silencio NO.
 
 8.duodecies (RONDA 22). PROHIBIDO INVENTAR EL TEXTO DE CLÁUSULAS O NORMAS: NUNCA escribir "se cita textualmente la cláusula N que establece: ..." ni transcribir el contenido de una cláusula contractual o de un artículo que NO esté en los datos aportados. Si no tienes el texto literal, refiérete a la cláusula/norma por su número y da la respuesta sustantiva, sin inventar su redacción. Inventar una cita textual destruye la buena fe procesal (riesgo de falsedad documental).
 
@@ -1016,7 +1016,7 @@ NIVEL REGLAMENTARIO SECTORIAL:
   2026, Res. 5159/2015 para lo anterior.
 
 NIVEL TÉCNICO-OPERATIVO:
-- Resolución 3047/2008 + 416/2009 (Anexo Técnico No. 5 soportes, Anexo Técnico No. 6 catálogo único de glosas).
+- Resolución 2284/2023: Anexo Técnico 1 (soportes de cobro, sustituido por el Anexo 1 de la Res. 1885/2024) y Anexo Técnico 3 (Manual Único de Devoluciones, Glosas y Respuestas). ES LA FUENTE VIGENTE. La Res. 3047/2008 y la 416/2009 quedaron DEROGADAS el 01-04-2026 (Res. 2335/2023 art. 20, modificado por el art. 2 de la Res. 1886/2024): solo se citan para servicios prestados ANTES de esa fecha.
 - RIPS y factura electrónica: Resolución 948/2026, vigente desde el 14-05-2026
   (derogó la Res. 2275/2023). Para servicios prestados ANTES de esa fecha la
   norma aplicable sigue siendo la Res. 2275/2023: mira la fecha del servicio
@@ -1053,7 +1053,7 @@ E) PREVALENCIA DEL CRITERIO MÉDICO (Ley 23/1981 Art. 11, Ley 1751/2015 Art. 17)
 F) AUTONOMÍA DEL ACTO MÉDICO + LEX ARTIS AD HOC (Ley 23/1981, Ley 1751/2015 Art. 17).
 G) CARGA DINÁMICA DE LA PRUEBA (Ley 1438/2011 Art. 57).
 H) DEBIDO PROCESO Y MOTIVACIÓN DE ACTOS (C.P. Art. 29, CPACA Art. 42).
-I) TIPICIDAD DE LAS CAUSALES DE GLOSA (Res. 3047/2008 Anexo Técnico No. 6).
+I) TIPICIDAD DE LAS CAUSALES DE GLOSA (Res. 2284/2023 Anexo Técnico 3 — Manual Único). Solo si el servicio es anterior al 01-04-2026 aplica el Anexo Técnico No. 6 de la Res. 3047/2008, hoy derogada.
 J) PROHIBICIÓN DE INTROMISIÓN EN EL ACTO MÉDICO (Ley 1438/2011 Art. 105).
 
 CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SERVANDA…") + su norma de respaldo. Esto eleva el registro frente a la mesa de conciliación.
@@ -1117,10 +1117,10 @@ Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO 
 
 • INMOTIVACIÓN — la EPS no expone hecho concreto, norma vulnerada ni cuadro comparativo. Cita: Decreto 4747/2007 Art. 22 + CPACA Art. 42 + Ley 1438/2011 Art. 57.
 • CONTRADICCIÓN INTERNA — el motivo escrito por el auditor se contradice con el código tipificado o con las observaciones. Cita la contradicción literal entre comillas.
-• APLICACIÓN INDEBIDA DE CAUSAL — la causal invocada (TA0201, FA0205, etc.) no corresponde al hecho real. Cita Res. 3047/2008 Anexo Técnico No. 6 (tipicidad).
+• APLICACIÓN INDEBIDA DE CAUSAL — la causal invocada (TA0201, FA0205, etc.) no corresponde al hecho real. Cita Res. 2284/2023 Anexo Técnico 3 (tipicidad); la Res. 3047/2008 Anexo 6 solo para servicios anteriores al 01-04-2026.
 • INVERSIÓN DE LA CARGA PROBATORIA — la EPS exige a la IPS soportes adicionales no tipificados en el catálogo legal. Cita Ley 1438/2011 Art. 57 (carga dinámica) + Art. 29 C.P. + CPACA Art. 42.
 • MODIFICACIÓN UNILATERAL DEL CONTRATO — la EPS aplica tarifa, descuento o exclusión no pactada en vía de glosa. Cita Pacta Sunt Servanda (Art. 1602 C.C.) + Art. 871 C.Co. + cláusula contractual específica.
-• GLOSA ATÍPICA — el porcentaje o concepto NO existe en el Catálogo Único de Glosas (Res. 3047/2008 Anexo Técnico No. 6).
+• GLOSA ATÍPICA — el porcentaje o concepto NO existe en el Manual Único de Devoluciones, Glosas y Respuestas (Res. 2284/2023 Anexo Técnico 3).
 • AUSENCIA DE CONCEPTO TÉCNICO ESPECIALIZADO — en glosas de PERTINENCIA, la EPS debe acreditar concepto de par académico o auditor médico de la misma especialidad. Sin ese soporte, la glosa es inválida.
 
 ═══════════════ DECISIÓN AUTÓNOMA — MATRIZ DE ACCIÓN ═══════════════
@@ -1272,7 +1272,7 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 
 ═══════════════ MANEJO DE CASOS LÍMITE ═══════════════
 ERROR PARCIAL: acepta expresamente el valor procedente y defiende el remanente con argumentos reforzados.
-GLOSA INFUNDADA: expone la FALTA DE TIPICIDAD + AUSENCIA DE SOPORTE PROBATORIO + cita el catálogo de causales (Res. 3047/2008 Anexo Técnico No. 6).
+GLOSA INFUNDADA: expone la FALTA DE TIPICIDAD + AUSENCIA DE SOPORTE PROBATORIO + cita el catálogo de causales (Res. 2284/2023 Anexo Técnico 3 — Manual Único vigente).
 GLOSA CONTRADICTORIA: TRANSCRIBE LITERALMENTE la contradicción interna entre comillas y solicita DESESTIMACIÓN POR VICIO DE MOTIVACIÓN.
 GLOSA INMOTIVADA: argumenta defecto formal y solicita levantamiento por incumplimiento del Decreto 4747/2007 Art. 22.
 
@@ -2222,7 +2222,8 @@ FALLBACK_SIN_SOPORTES = (
     "2. Si no hay evidencia clínica a la vista, NO inventes folios ni "
     "hallazgos: fundamenta en las cláusulas del contrato, la normativa y la "
     "carga de la EPS de especificar y probar su objeción "
-    "(Res. 3047/2008 anexo técnico 5; Ley 1438/2011 art. 57).\n"
+    "(Res. 2284/2023 Anexo Técnico 1, sustituido por el Anexo 1 de la Res. 1885/2024; "
+    "Ley 1438/2011 art. 57).\n"
     "3. La historia clínica (Res. 1995/1999) y los RIPS "
     "reposan en el archivo institucional a disposición de la entidad."
 )
@@ -2598,7 +2599,7 @@ def build_user_prompt(
         vicios_detectados.append(
             {
                 "nombre": "INVERSION INDEBIDA DE LA CARGA PROBATORIA",
-                "ataque": "La EPS exige soportes NO tipificados en Res. 3047/2008 Anexo Tecnico No. 5 ni Res. 2284/2023 "
+                "ataque": "La EPS exige soportes NO tipificados en el Anexo Tecnico 1 de la Res. 2284/2023 "
                 "Anexo Tecnico No. 1. Cita Ley 1438/2011 Art. 57 (carga dinamica) + Art. 29 C.P. (debido proceso).",
             }
         )
@@ -2608,7 +2609,7 @@ def build_user_prompt(
             {
                 "nombre": "GLOSA ATIPICA",
                 "ataque": "El porcentaje de objecion NO existe en el Catalogo Unico de Glosas "
-                "(Res. 3047/2008 Anexo Tecnico No. 6). La causal carece de TIPICIDAD.",
+                "(Res. 2284/2023 Anexo Tecnico 3). La causal carece de TIPICIDAD.",
             }
         )
     # Modificacion unilateral de tarifa
@@ -2626,7 +2627,7 @@ def build_user_prompt(
             {
                 "nombre": "APLICACION INDEBIDA DE CAUSAL",
                 "ataque": "FA0202 aplica a consulta DOMICILIARIA. Aqui el servicio es INTRAHOSPITALARIO, "
-                "lo cual configura tipificacion indebida (Res. 3047/2008 Anexo Tecnico No. 6).",
+                "lo cual configura tipificacion indebida (Res. 2284/2023 Anexo Tecnico 3).",
             }
         )
     # Glosa de pertinencia sin concepto de par academico
@@ -2638,7 +2639,7 @@ def build_user_prompt(
                 "nombre": "AUSENCIA DE CONCEPTO TECNICO ESPECIALIZADO",
                 "ataque": "La glosa de pertinencia clinica REQUIERE concepto tecnico de par academico "
                 "o auditor medico de la MISMA ESPECIALIDAD que emitio la indicacion "
-                "(Res. 3047/2008 Anexo Tecnico No. 6). Sin ese soporte la glosa es invalida.",
+                "(Res. 2284/2023 Anexo Tecnico 3). Sin ese soporte la glosa es invalida.",
             }
         )
 
@@ -3184,7 +3185,7 @@ def build_user_prompt(
                     "     NO inventes evidencia clínica que no puedas verificar.\n"
                     "  2. Si no hay evidencia clínica a la vista, fundamenta en las cláusulas\n"
                     "     del contrato, la normativa y la carga de la EPS de especificar y\n"
-                    "     probar su objeción (Res. 3047/2008 anexo técnico 5; Ley 1438 art. 57).\n"
+                    "     probar su objeción (Res. 2284/2023 Anexo Técnico 1; Ley 1438 art. 57).\n"
                     "  3. La historia clínica (Res. 1995/1999) reposa en el archivo\n"
                     "     institucional a disposición de la entidad.\n"
                     "  4. Exige a la EPS precisar el folio/documento echado de menos, sin\n"
