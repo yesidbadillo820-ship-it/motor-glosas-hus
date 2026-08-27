@@ -103,8 +103,26 @@ def check_citas_verificadas(
         )
 
     reporte = verificar_citas(texto or "", eps=eps)
-    issues_graves = [i for i in reporte.get("issues", []) if i.get("severidad") == "ALTA"]
-    issues_medias = [i for i in reporte.get("issues", []) if i.get("severidad") == "MEDIA"]
+    # 27-08-2026 — UNA NORMA QUE NO SE PUDO COMPROBAR NO SE APRUEBA SOLA.
+    # Ese día se bajó de ALTA a MEDIA el aviso de «no está en el corpus»,
+    # porque decirle al auditor que la Resolución 839 de 2017 «no existe»
+    # —cuando existe y es pertinente— le quita credibilidad al sello. Pero el
+    # mensaje es una cosa y la puerta es otra: el prompt le dice al modelo qué
+    # normas usar, y todas están en el corpus. Citar una de fuera es salirse
+    # del guion, y eso merece ojos humanos antes de radicar. Si se dejara pasar
+    # como simple aviso, un dictamen con derecho que nadie pudo comprobar
+    # saldría aprobado solo — que es exactamente lo que pasó en agosto.
+    _sin_comprobar = {"NORMA_SIN_VERIFICAR"}
+    issues_graves = [
+        i
+        for i in reporte.get("issues", [])
+        if i.get("severidad") == "ALTA" or i.get("tipo") in _sin_comprobar
+    ]
+    issues_medias = [
+        i
+        for i in reporte.get("issues", [])
+        if i.get("severidad") == "MEDIA" and i.get("tipo") not in _sin_comprobar
+    ]
 
     total_problematicas = issues_graves + issues_medias
 

@@ -2062,6 +2062,69 @@ RESOLUCIONES = {
         "verificada": "27-08-2026 fuente oficial (normograma Supersalud, Res. 2335/2023 art. 20)",
         "keywords": ["3047", "anexo técnico 5", "anexo técnico 6", "glosa", "derogada"],
     },
+    # 27-08-2026 — CARGADA PORQUE EL MOTOR LA DABA POR INVENTADA.
+    # El dictamen GL-135 la citó y el revisor la marcó NORMA_INEXISTENTE en
+    # severidad ALTA. Existe: se descargó del normograma oficial de la
+    # Supersalud y es conjunta de MinSalud y MinCultura. Y es pertinente —
+    # modifica justamente la Res. 1995 de 1999, que es la que el motor usa
+    # para la historia clínica. Los textos de abajo son literales de esa
+    # descarga.
+    # FUENTE VERIFICADA: normograma.supersalud.gov.co, resolucion_minsaludps_0839_2017
+    "RESOLUCION 839 DE 2017": {
+        "nombre": "Resolución 839 de 2017 (MinSalud y MinCultura)",
+        "titulo": "Manejo, custodia y conservación de la historia clínica",
+        "ambito": (
+            "Modifica la Resolución 1995 de 1999. Fija cuánto tiempo debe "
+            "guardarse la historia clínica y qué pasa con ella si la entidad se "
+            "liquida."
+        ),
+        "vigente": True,
+        "verificada": (
+            "normograma.supersalud.gov.co — resolucion_minsaludps_0839_2017 "
+            "(descargado y transcrito el 27-08-2026)"
+        ),
+        "articulos": {
+            "1": {
+                "titulo": "Objeto",
+                "texto": (
+                    "La presente resolución tiene por objeto establecer el manejo, "
+                    "custodia, tiempo de retención, conservación y disposición final "
+                    "de los expedientes de las historias clínicas, así como "
+                    "reglamentar el procedimiento que deben adelantar las entidades "
+                    "del SGSSS, para el manejo de estas en caso de liquidación."
+                ),
+            },
+            "3": {
+                "titulo": (
+                    "Retención y tiempos de conservación documental del expediente "
+                    "de la historia clínica"
+                ),
+                "texto": (
+                    "La historia clínica debe retenerse y conservarse por el "
+                    "responsable de su custodia, por un periodo mínimo de quince (15) "
+                    "años, contados a partir de la fecha de la última atención. Los "
+                    "cinco (5) primeros años dicha retención y conservación se hará en "
+                    "el archivo de gestión y los diez (10) años siguientes en el "
+                    "archivo central."
+                ),
+                "aplicacion": (
+                    "Sirve para responder a la entidad que pide un soporte de una "
+                    "atención antigua: si está dentro de los 15 años, el hospital debe "
+                    "tenerlo y puede aportarlo; si la entidad exige uno de antes, esa "
+                    "exigencia no tiene respaldo normativo."
+                ),
+            },
+        },
+        "keywords": [
+            "839",
+            "historia clínica",
+            "custodia",
+            "retención",
+            "conservación",
+            "liquidación",
+            "archivo",
+        ],
+    },
     "RESOLUCION 5269 DE 2017": {
         "nombre": "Resolución 5269 de 2017 (MinSalud)",
         "titulo": "Plan de Beneficios en Salud (PBS)",
