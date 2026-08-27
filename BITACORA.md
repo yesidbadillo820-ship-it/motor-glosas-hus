@@ -8194,6 +8194,51 @@ está a un clic.
 
 ## 3) PENDIENTE
 
+> **Cómo leer esta lista (27-08-2026).** Es larga porque cubre todos los
+> frentes y varios meses. Lo tachado ya está hecho y se deja para que se vea
+> de dónde salió. Lo que de verdad está abierto, ordenado por lo que le cuesta
+> plata al hospital, es esto:
+>
+> **1. Lo que espera una decisión suya**
+> - Folio ADRES: la versión A o B de las cinco respuestas, el texto dañado de
+>   la HUS396996 y si esa factura entra, y qué se hace con las notas crédito.
+> - La **epicrisis de las 223 facturas**: no está en ninguna carpeta. Si el
+>   ADRES la exige, es el hueco más grande del paquete.
+> - Las **131 entradas sin contrastar** de Consulta Normativa.
+> - Si se agrega a la plantilla de ratificaciones el argumento del Art. 23 del
+>   Decreto 4747 (no se pueden formular glosas nuevas salvo por hechos nuevos).
+> - El criterio de quién cuenta como **aseguradora** para las ratificaciones.
+> - Si se pone en GitHub la regla de **no fusionar sin revisión en verde**
+>   (el autodespliegue ya no baja código en rojo, pero esa regla lo cierra por
+>   el otro lado).
+>
+> **2. Lo que hay que hacer en el PC de cartera**
+> - Volver a correr el bot de folios en CAROLINA, CLAUDIA y OSCAR, para que
+>   los 223 se rehagan con el orden bueno.
+> - Volver a subir el **Formato F.E.** en «Fuentes» (las tres facturas que
+>   decían no tener facturación electrónica).
+> - Borrar en Administración → Usuarios la cuenta `devoluciones1@sinacsc.com`
+>   de Edgar Silva. Ya no se vuelve a crear sola, pero la fila vieja sigue ahí.
+> - Volver a cargar el **Excel de tarifas de POSITIVA** marcando «Reemplazar
+>   tarifas existentes». Mientras tanto, no confiar en dictámenes de tarifas de
+>   esa entidad: citarían valores 15 % más altos que el contrato.
+> - **Comprobar que la tarea de arranque existe** y con qué cuenta quedó. La
+>   última noticia clara es del 24-08; si no está, el portal no vuelve solo
+>   cuando el PC se reinicie.
+> - Mirar `data\autodeploy.log` la primera vez, para confirmar que la puerta
+>   nueva sí puede preguntar por la revisión automática.
+>
+> **3. Lo que falta de datos, y no lo puede resolver el sistema**
+> - COOSALUD: las **44 del lote de 1.573** que no quedaron OK, las 8 facturas
+>   de auditoría médica de agosto (más las 37 del masivo del 14/07), y las que
+>   hay que registrar a mano en DGH.
+> - ADRES: las **101 facturas sin carpeta**, las 47 carpetas vacías de CLAUDIA,
+>   los 12 archivos `FACOSTE`, la HUS381290 sin factura y las seis sin
+>   detallado.
+> - **Volver a exportar los 10 casos de prueba** del motor: el archivo que se
+>   subió eran los dictámenes viejos, así que esa validación sigue sin hacerse.
+
+
 ### 26-08-2026 (tarde) — Se repasó TODA la base normativa, y no quedaba un artículo bueno
 
 Usted pidió verificar, corregir y completar las 16 normas que faltaban. Se
@@ -8409,13 +8454,16 @@ Tres cosas, en este orden:
 - ~~La cuenta repetida de Edgar Silva~~ — el área decidió: queda
   `carterahus02@sinacsc.com`. Falta hacerlo en la pantalla de Usuarios; no es
   tarea de código.
-- **Los CSV de «valores distintos»** de la carga de tarifas: 256 del
-  Dispensario, 737 de Compensar y 737 de Positiva. Cada uno es un código con
-  dos precios: hay que decidir cuál queda.
-- **Revisar de dónde saldrá el CUPS.** El archivo de recepción no lo trae, así
-  que el motor ya no lo escribe (bien: antes se lo inventaba). Si se quiere que
-  la respuesta nombre el procedimiento con su código, hay que traerlo de DGH o
-  agregar la columna al archivo.
+- ~~**Los CSV de «valores distintos»**~~ — **RESUELTO el 26-08.** Eran 256 del
+  Dispensario, 737 de Compensar y 737 de Positiva, cada uno un código con dos
+  precios. El área decidió: «el que mejor se ajuste a las tarifas pactadas».
+  Ya está implementado — el motor toma el valor SOAT del código, le aplica el
+  descuento del contrato de esa entidad y escoge el que caiga sobre ese número,
+  exigiendo que quede a menos del 2 % y que ningún otro quede igual de cerca.
+- ~~**Revisar de dónde saldrá el CUPS**~~ — **RESUELTO el 26-08.** El archivo
+  de recepción no lo trae, y se decidió traerlo de DGH: cuando el texto no lo
+  dice, el motor busca el que el propio DGH tiene guardado para esa factura.
+  No inventa, lee. Si no está ahí tampoco, la respuesta sale sin código.
 
 ### Del frente COOSALUD (glosas y trámites), al 25-08
 - ~~**Subir a DGH los 6 archivos de OBJECIONES del lote de 1.573**~~ — HECHO,
@@ -8440,10 +8488,11 @@ Tres cosas, en este orden:
 
 
 ### Del motor de glosas, después de la revisión del 25-08
-- **Reiniciar el motor del hospital.** Sigue corriendo código viejo: se
-  confirmó mirando los dictámenes de la ronda 2 (sale una frase en el
-  «Fundamento normativo» que ya se había quitado). Mientras no se reinicie,
-  ninguna de estas correcciones está funcionando en la PC de cartera.
+- ~~**Reiniciar el motor del hospital**~~ — **HECHO y COMPROBADO el 26-08.**
+  Se verificó en el PC de cartera: el commit local coincide con el de la rama
+  del hospital y las tres pantallas nuevas responden. (Antes decía: seguía
+  corriendo código viejo, y mientras no se reiniciara ninguna corrección
+  estaba funcionando.)
 - **Los correos de Usuarios hay que depurarlos.** Edgar Silva tiene dos
   cuentas y una apunta a `devoluciones1@sinacsc.com`, que rebota con «Address
   not found»; la buena es `carterahus02@sinacsc.com`. Mientras no se corrija,
