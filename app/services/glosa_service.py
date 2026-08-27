@@ -10595,10 +10595,20 @@ class GlosaService:
                 return []
             from app.services.soportes_autodiscovery_service import get_indexer
 
-            hallados = {
-                str((s or {}).get("tipo") or "").strip().lower()
-                for s in (get_indexer().lookup(numero_factura) or [])
-            }
+            _idx = get_indexer()
+            _encontrados = _idx.lookup(numero_factura) or []
+            # 27-08-2026 — no se acusa de faltar un soporte mientras el índice
+            # se está armando. Un índice a medio construir no ha visto nada
+            # todavía, y con eso este aviso bloqueaba la radicación de facturas
+            # que sí tienen su expediente completo. «Todavía no sé» no es
+            # «no está».
+            if not _encontrados:
+                try:
+                    if _idx.stats().get("construyendo"):
+                        return []
+                except Exception:  # noqa: BLE001 — sin estado, se sigue como antes
+                    pass
+            hallados = {str((s or {}).get("tipo") or "").strip().lower() for s in _encontrados}
             # Basta con UNO de los soportes que sirven para la causal: la
             # epicrisis y la hoja de urgencias prueban lo mismo según el caso.
             if hallados & set(pedidos):
@@ -10634,13 +10644,51 @@ class GlosaService:
         vacio_sin_factura = ([], 0, "")
         if not numero_factura:
             return vacio_sin_factura
+        # 27-08-2026 — «NO HAY» Y «TODAVÍA NO SÉ» NO SON LO MISMO.
+        # El índice devuelve una lista vacía en dos casos que no se parecen en
+        # nada: que la factura de verdad no tenga soportes en el servidor, o
+        # que el índice se esté reconstruyendo y aún no haya llegado a ella.
+        # Con las dos cosas iguales, un dictamen sacado en mitad de una
+        # reindexación afirmaba «no se encontró el expediente» de una factura
+        # que sí lo tiene, y encima bloqueaba la radicación.
+        # Lo vio el auditor: el índice terminó, volvió a empezar (el motor se
+        # había reiniciado por el despliegue) y en esa ventana salió así.
+        # Es el mismo defecto del contador de días que valía cero por defecto.
+        indice_a_medio_construir = False
         try:
             from app.services.soportes_autodiscovery_service import get_indexer
 
-            soportes = get_indexer().lookup(numero_factura) or []
+            _idx = get_indexer()
+            soportes = _idx.lookup(numero_factura) or []
+            if not soportes:
+                try:
+                    indice_a_medio_construir = bool(_idx.stats().get("construyendo"))
+                except Exception:  # noqa: BLE001 — sin estado se trata como «no hay»
+                    indice_a_medio_construir = False
         except Exception as e:  # noqa: BLE001 - sin índice se avisa, no se inventa
             logger.warning(f"[SOPORTES-DICTAMEN] no se pudo consultar el índice: {e}")
             soportes = []
+
+        if not soportes and indice_a_medio_construir:
+            logger.info(
+                f"[SOPORTES-DICTAMEN] factura {numero_factura}: el índice se está "
+                "reconstruyendo; no se afirma que no haya expediente."
+            )
+            return (
+                [],
+                0,
+                '<div style="background:#eff6ff;border:2px solid #1565C0;border-radius:8px;'
+                'padding:12px;margin-top:10px;">'
+                '<div style="font-weight:bold;color:#0B3D91;margin-bottom:6px;">'
+                "⏳ RELACIÓN DE SOPORTES — EL ÍNDICE SE ESTÁ RECONSTRUYENDO</div>"
+                '<div style="color:#14304f;font-size:11px;line-height:1.6;">'
+                "El buscador de soportes del servidor está a medio armar en este "
+                f"momento, así que <b>todavía no se sabe</b> qué hay para la factura "
+                f"{numero_factura}. Esto <b>no</b> quiere decir que no tenga "
+                "expediente. Espere a que la pantalla de <b>Soportes</b> diga que "
+                "terminó y vuelva a analizar la glosa; ahí sí se puede relacionar lo "
+                "aportado.</div></div>",
+            )
 
         if not soportes:
             return (
