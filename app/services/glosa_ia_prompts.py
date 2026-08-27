@@ -1021,7 +1021,7 @@ NIVEL REGLAMENTARIO SECTORIAL:
   2026, Res. 5159/2015 para lo anterior.
 
 NIVEL TÉCNICO-OPERATIVO:
-- Resolución 2284/2023: Anexo Técnico 1 (soportes de cobro, sustituido por el Anexo 1 de la Res. 1885/2024) y Anexo Técnico 3 (Manual Único de Devoluciones, Glosas y Respuestas). ES LA FUENTE VIGENTE. La Res. 3047/2008 y la 416/2009 quedaron DEROGADAS el 01-04-2026 (Res. 2335/2023 art. 20, modificado por el art. 2 de la Res. 1886/2024): solo se citan para servicios prestados ANTES de esa fecha.
+- Resolución 2284/2023: Anexo Técnico 1 (soportes de cobro, sustituido por el Anexo 1 de la Res. 1885/2024) y Anexo Técnico 3 (Manual Único de Devoluciones, Glosas y Respuestas). ES LA FUENTE VIGENTE. La Res. 3047/2008 y la 416/2009 quedaron DEROGADAS el 01-04-2026 (Res. 2335/2023 art. 20, modificado por el art. 2 de la Res. 1886/2024): solo se citan para servicios prestados ANTES de esa fecha. SI NO CONOCES LA FECHA DEL SERVICIO, NO LAS CITES: cita únicamente la Res. 2284/2023. Sin fecha no puedes saber cuál regía, y citar una derogada le entrega a la entidad la forma de tumbar el escrito. Lo mismo vale para cualquier otra norma con fecha de derogatoria.
 - RIPS y factura electrónica: Resolución 948/2026, vigente desde el 14-05-2026
   (derogó la Res. 2275/2023). Para servicios prestados ANTES de esa fecha la
   norma aplicable sigue siendo la Res. 2275/2023: mira la fecha del servicio

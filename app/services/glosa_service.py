@@ -4283,6 +4283,24 @@ def _cups_esta_en_catalogo(codigo: str) -> bool:
         return True
 
 
+def _es_codigo_de_glosa(codigo: str) -> bool:
+    """True si el código es una CAUSAL de glosa (SO0102, TA0201, FA0301…).
+
+    27-08-2026. Una causal jamás es el código del servicio. Cuando el dictamen
+    la presenta como tal, la entidad ve de una que el hospital confundió su
+    propia objeción con el procedimiento.
+    """
+    if not codigo:
+        return False
+    limpio = codigo.upper().strip().replace("-", "")
+    try:
+        from app.services.catalogo_glosas import CATALOGO_COMPLETO
+
+        return limpio in CATALOGO_COMPLETO
+    except Exception:  # noqa: BLE001 — sin catálogo no se acusa
+        return False
+
+
 def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
     """Quita del dictamen los CUPS que no están ni en el expediente ni en el catálogo.
 
@@ -4300,6 +4318,18 @@ def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
         codigo = m.group(1)
         if _cups_esta_en_catalogo(codigo):
             return m.group(0)  # es un CUPS de verdad: no se toca
+        # 27-08-2026 — EL CÓDIGO DE LA GLOSA NUNCA ES EL DEL SERVICIO.
+        # Lo destapó el dictamen GL-135: la IA escribió «EL PROCEDIMIENTO
+        # FACTURADO CON CUPS SO0102», y SO0102 es la CAUSAL de la glosa, no el
+        # procedimiento. Peor: el arreglo de esta misma mañana lo dejaba como
+        # «código SO0102» —porque SO0102 sí aparece en la evidencia, que es el
+        # texto de la glosa— y así un disparate que saltaba a la vista quedaba
+        # convertido en algo creíble. Se lavó el error en vez de mostrarlo.
+        # Una causal se borra entera: no es un código que la entidad reconozca
+        # como servicio, y presentarla así deja al hospital en evidencia.
+        if _es_codigo_de_glosa(codigo):
+            borrados.append(codigo)
+            return ""
         # 27-08-2026 — ESTAR EN LA EVIDENCIA NO LO VUELVE UN CUPS.
         # La red perdonaba el código si aparecía en lo que la IA tuvo a la
         # vista, y así se coló el 380125 en el dictamen GL-134: venía del
@@ -4321,6 +4351,9 @@ def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
         return ""
 
     resultado, n = _PAT_MENCION_CUPS.subn(_sub, texto)
+    # Sin repetir: el aviso del GL-135 salió «348240, 348240».
+    despojados = list(dict.fromkeys(despojados))
+    borrados = list(dict.fromkeys(borrados))
     if despojados:
         logger.warning(
             f"[CUPS-SIN-RESPALDO] {len(despojados)} código(s) del expediente que NO están "
