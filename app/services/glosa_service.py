@@ -4294,19 +4294,49 @@ def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
         return texto
 
     borrados: list[str] = []
+    despojados: list[str] = []
 
     def _sub(m: "re.Match[str]") -> str:
         codigo = m.group(1)
-        if _cups_en_evidencia(codigo, evidencia or ""):
-            return m.group(0)
         if _cups_esta_en_catalogo(codigo):
-            return m.group(0)
+            return m.group(0)  # es un CUPS de verdad: no se toca
+        # 27-08-2026 — ESTAR EN LA EVIDENCIA NO LO VUELVE UN CUPS.
+        # La red perdonaba el código si aparecía en lo que la IA tuvo a la
+        # vista, y así se coló el 380125 en el dictamen GL-134: venía del
+        # registro de DGH, o sea que SÍ estaba en la evidencia, pero no existe
+        # en el catálogo. Y lo que la entidad cruza contra su sistema es el
+        # CUPS: uno que no encuentra tumba la defensa completa.
+        # Un código que está en el expediente no se borra —puede ser el que
+        # usa la entidad y el auditor lo reconoce— pero se le quita el rótulo
+        # de CUPS, que es lo que hace el daño.
+        if _cups_en_evidencia(codigo, evidencia or ""):
+            despojados.append(codigo)
+            return re.sub(
+                r"(?:C[ÓO]DIGO\s+)?CUPS\s*[:\-#]?\s*(?:N[°ºO\.]{0,2}\s*)?",
+                "código ",
+                m.group(0),
+                flags=re.IGNORECASE,
+            )
         borrados.append(codigo)
         return ""
 
     resultado, n = _PAT_MENCION_CUPS.subn(_sub, texto)
+    if despojados:
+        logger.warning(
+            f"[CUPS-SIN-RESPALDO] {len(despojados)} código(s) del expediente que NO están "
+            f"en el catálogo CUPS: {', '.join(despojados)} — se dejan como «código», sin "
+            "llamarlos CUPS (27-08-2026, caso GL-134)."
+        )
+        resultado = resultado.rstrip() + (
+            "\n\n⚠ REVISE EL CÓDIGO ANTES DE RADICAR: "
+            + ", ".join(despojados)
+            + " está en el expediente pero NO figura en el catálogo CUPS oficial. En el "
+            "escrito quedó como «código», no como CUPS, a propósito: la entidad cruza los "
+            "CUPS contra su sistema y uno que no encuentre le sirve para ratificar la "
+            "glosa. Busque el CUPS real del servicio en «Consulta Normativa» y cámbielo."
+        )
     if not borrados:
-        return texto
+        return resultado if despojados else texto
     # Limpieza de lo que deja el hueco: paréntesis vacíos, comas sueltas,
     # conectores duplicados y espacios de más.
     resultado = re.sub(r"[\(\[]\s*[\)\]]", "", resultado)
@@ -5437,10 +5467,25 @@ def _cups_desde_dgh(numero_factura: str | None) -> tuple[str, str]:
             )
             if not fila:
                 return "", ""
-            return (
-                str(fila.cups_codigo or "").strip(),
-                str(fila.cups_descripcion or "").strip(),
-            )
+            codigo = str(fila.cups_codigo or "").strip()
+            descripcion = str(fila.cups_descripcion or "").strip()
+            # 27-08-2026 — QUE DGH LO TENGA NO LO VUELVE UN CUPS.
+            # Defecto propio, del 26-08. Esta función se conectó ayer para que
+            # el dictamen volviera a nombrar el servicio con su código, y
+            # devolvía tal cual lo que estuviera en la columna. Pero en DGH
+            # caben códigos que NO son CUPS: ya había precedente el 21-08
+            # («CUPS FMQ0952» no es un CUPS). En el dictamen GL-134 salió así
+            # el 380125, que no existe en el catálogo — y la entidad cruza los
+            # CUPS contra su sistema: uno que no encuentra le tumba la defensa
+            # entera, por buena que esté.
+            # Se prefiere quedarse sin código a poner uno que no lo es.
+            if codigo and not _cups_esta_en_catalogo(codigo):
+                logger.warning(
+                    f"[CUPS-DGH] factura {numero_factura}: DGH tiene «{codigo}» pero no "
+                    "figura en el catálogo CUPS — no se usa como CUPS en el dictamen."
+                )
+                return "", descripcion
+            return codigo, descripcion
         finally:
             db.close()
     except Exception as e:  # noqa: BLE001 — sin base no se inventa un código
