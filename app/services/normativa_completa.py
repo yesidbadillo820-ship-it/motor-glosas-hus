@@ -2014,12 +2014,53 @@ RESOLUCIONES = {
         ],
     },
     "RESOLUCION 3047 DE 2008": {
+        # DEROGADA — corregido el 27-08-2026 contra el texto oficial.
+        #
+        # El corpus la daba como «vigente: True» con la nota «sigue vigente
+        # como referente histórico y para casos en transición». Eso hacía que
+        # el revisor de citas la aprobara, y un dictamen real del 27-08 fundó
+        # TODA su defensa de soportes en su Anexo Técnico 5, citándola seis
+        # veces. Ese dictamen es tumbable de entrada.
+        #
+        # La derogatoria es expresa y está fechada. Texto literal del Art. 20
+        # de la Resolución 2335 de 2023, tal como quedó tras su modificación:
+        #
+        #   «ARTÍCULO 20. DEROGATORIAS. <Artículo modificado por el artículo 2
+        #    de la Resolución 1886 de 2024. El nuevo texto es el siguiente:>
+        #    El presente acto administrativo deroga la Resolución número 3047
+        #    de 2008 y sus modificatorias, la Resolución número 416 de 2009 y
+        #    la Resolución número 4331 de 2012, así como la Resolución número
+        #    3253 de 2009; a partir del 1 de abril de 2026.»
+        #
+        # Se descargó del normograma de la Superintendencia Nacional de Salud
+        # (resolucion_minsaludps_2335_2023.htm) el 27-08-2026.
+        #
+        # OJO CON LAS FECHAS, que aquí es donde se decide: para un servicio
+        # prestado ANTES del 1 de abril de 2026 la 3047 sí era la norma
+        # aplicable y citarla es correcto. Para uno posterior, no. Por eso no
+        # se borra del corpus: se marca, con la fecha desde la que dejó de
+        # regir, y el motor escoge según la fecha de la atención.
         "nombre": "Resolución 3047 de 2008",
-        "titulo": "Procedimiento glosas (antecedente)",
-        "ambito": "Antecedente procedimental — desplazada por Res. 2284/2023",
-        "vigente": True,
-        "notas": "Sigue vigente como referente histórico y para casos en transición. El anexo técnico 5 fue reemplazado por Res. 2284/2023 Anexo 3.",
-        "keywords": ["3047", "anexo técnico 5", "glosa", "antecedente"],
+        "titulo": "Formatos y procedimientos entre prestadores y pagadores (DEROGADA)",
+        "ambito": "Aplicable solo a servicios prestados antes del 1 de abril de 2026",
+        "vigente": False,
+        "derogada_por": (
+            "Resolución 2335 de 2023, artículo 20 (modificado por el artículo 2 de la "
+            "Resolución 1886 de 2024), que la deroga expresamente A PARTIR DEL 1 DE "
+            "ABRIL DE 2026 junto con la Res. 416 de 2009, la Res. 4331 de 2012 y la "
+            "Res. 3253 de 2009. Para los soportes de cobro rige hoy el Anexo Técnico 1 "
+            "de la Res. 2284 de 2023, sustituido por el Anexo 1 de la Res. 1885 de 2024; "
+            "para las causales de glosa, el Anexo Técnico 3 de la Res. 2284 de 2023"
+        ),
+        "notas": (
+            "Definía los formatos, mecanismos de envío, procedimientos y términos entre "
+            "prestadores y entidades responsables de pago. NO citarla para servicios "
+            "prestados desde el 1 de abril de 2026: la entidad tumba el escrito sin "
+            "discutir el fondo. Su Anexo Técnico 5 (soportes) y su Anexo Técnico 6 "
+            "(catálogo de glosas) ya no son la fuente aplicable."
+        ),
+        "verificada": "27-08-2026 fuente oficial (normograma Supersalud, Res. 2335/2023 art. 20)",
+        "keywords": ["3047", "anexo técnico 5", "anexo técnico 6", "glosa", "derogada"],
     },
     "RESOLUCION 5269 DE 2017": {
         "nombre": "Resolución 5269 de 2017 (MinSalud)",
@@ -2461,7 +2502,32 @@ RESOLUCIONES = {
             "voluntades entre la IPS y la entidad pagadora. Sirve para discutir la "
             "ejecucion del contrato, no para cancer infantil ni para RIPS."
         ),
-        "verificada": "25-08-2026 PDF oficial MinSalud",
+        # 27-08-2026: se carga el articulo 20 con su texto literal. Es el que
+        # deroga la Resolucion 3047 de 2008, y el corpus no lo tenia — por eso
+        # el revisor de citas aprobaba dictamenes fundados en una norma muerta.
+        # Descargado del normograma de la Superintendencia Nacional de Salud
+        # (resolucion_minsaludps_2335_2023.htm).
+        "articulos": {
+            "20": {
+                "titulo": "Derogatorias",
+                "texto": (
+                    "El presente acto administrativo deroga la Resolucion numero 3047 de "
+                    "2008 y sus modificatorias, la Resolucion numero 416 de 2009 y la "
+                    "Resolucion numero 4331 de 2012, asi como la Resolucion numero 3253 "
+                    "de 2009; a partir del 1 de abril de 2026."
+                ),
+                "aplicacion": (
+                    "Texto vigente tras la modificacion del articulo 2 de la Resolucion "
+                    "1886 de 2024. Es la prueba de que la Res. 3047 de 2008 ya no rige "
+                    "para servicios prestados desde el 1 de abril de 2026. Para los "
+                    "anteriores a esa fecha la 3047 SI era aplicable."
+                ),
+            },
+        },
+        "verificada": (
+            "25-08-2026 PDF oficial MinSalud (objeto de la resolución) · "
+            "27-08-2026 normograma Supersalud (artículo 20, derogatorias)"
+        ),
         "keywords": [
             "acuerdos de voluntades",
             "ejecucion del contrato",
