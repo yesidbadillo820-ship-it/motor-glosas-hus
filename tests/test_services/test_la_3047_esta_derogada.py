@@ -31,6 +31,7 @@ trabajo era comprobar que llegara».
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 
@@ -77,6 +78,12 @@ def _archivos_que_escriben_dictamen() -> list[pathlib.Path]:
         RAIZ / "app" / "services" / "banco_respuestas_hus.py",
         RAIZ / "app" / "services" / "excel_radicable.py",
         RAIZ / "app" / "services" / "contexto_contractual_enriquecido.py",
+        # 28-08-2026: faltaba, y ahí estaba el peor caso. Las plantillas fijas
+        # de Salud Total citaban la Res. 3047/2008 como ÚNICA fuente de los
+        # soportes, sin nombrar ninguna norma vigente — la cita que la entidad
+        # tumba sin discutir el fondo. Este archivo escribe texto que sale
+        # directo al portal de la EPS; tiene que estar bajo el mismo guardián.
+        RAIZ / "app" / "services" / "salud_total_service.py",
     ]
 
 
@@ -97,6 +104,14 @@ class TestNadieLaPresentaComoLaFuenteVigente:
                 continue
             if linea.lstrip().startswith("#"):
                 continue  # los comentarios explican, no salen en el dictamen
+            # 28-08-2026: una EXPRESIÓN DE BÚSQUEDA no es una mención. La red
+            # que le pone a la 3047 su fecha de derogatoria necesita, para
+            # encontrarla, un patrón que contenga «3047» — y ese patrón hacía
+            # fallar esta prueba, que es justo la que pide esa red. Un patrón
+            # nunca sale impreso en el dictamen: busca, no escribe. El resto
+            # del guardián queda intacto para la prosa, que es la que sí sale.
+            if re.search(r"re\.compile\(|\\b|\\s", linea):
+                continue
             ventana = " ".join(lineas[n - 1 : n + 2]).lower()
             acompanada = DESDE in ventana or "derogad" in ventana or "1 de abril de 2026" in ventana
             if not acompanada:
