@@ -4603,16 +4603,97 @@ def _corregir_articulo_mal_citado(dictamen: str) -> str:
 # misma que llevan las etiquetas de soportes. Así la cita es correcta
 # cualquiera que sea la fecha del servicio, y la entidad no puede rebatirla
 # diciendo «esa resolución está derogada».
+#
+# 28-08-2026 — LA TABLA TENÍA UNA SOLA NORMA Y FALTABA LA QUE MÁS DUELE.
+# La Resolución 3047 de 2008 está derogada desde el 1 de abril de 2026 y el
+# motor la seguía escribiendo en el cuerpo del dictamen: en el export real de
+# 135 glosas del hospital, NUEVE la citan. Se le cambió el prompt a la IA para
+# que no la use sin fecha del servicio y la escribió igual — la instrucción no
+# basta, por eso existen estas redes. La máquina ya estaba hecha desde el 25
+# de agosto; lo único que faltaba era cargarle la norma.
+#
+# Y la forma abreviada tampoco se reconocía: el patrón exigía «RESOLUCIÓN 2275
+# DE 2023» completo, así que «Res. 2275/2023» —que es como la escribe el
+# propio motor en varios textos fijos— pasaba de largo.
+#
+# Las tres resoluciones que deroga el art. 20 de la Res. 2335 de 2023 —la
+# 3047 de 2008, la 416 de 2009 y la 4331 de 2012— comparten fecha y norma
+# sucesora, así que comparten esta señal. Consecuencia buscada: si el dictamen
+# cita dos de ellas, la aclaración sale UNA vez; repetir el mismo paréntesis de
+# veinticinco palabras en la misma frase no se puede leer, y la regla que
+# explica es exactamente la misma para las tres.
+#
+# SE BUSCA LA NORMA, NO LA FECHA. El primer borrador aceptaba también «1 de
+# abril de 2026» suelto como prueba de que el dictamen ya lo había explicado.
+# Mala idea: esa fecha puede estar ahí por otra razón —la fecha del servicio,
+# sin ir más lejos— y entonces la aclaración no salía y la resolución muerta se
+# iba al escrito pelada, que es exactamente lo que esta red existe para evitar.
+# De los dos errores posibles, ese es el caro; el otro es un paréntesis
+# repetido. Se busca solo el número de la norma que derogó.
+_RE_DEROGATORIA_2335_YA_DICHA = re.compile(
+    r"\b2335\s*(?:DE\s*|/)\s*2023\b",
+    re.IGNORECASE,
+)
+
+
 _NORMAS_DEROGADAS_SIN_REGLA: tuple[tuple[re.Pattern[str], re.Pattern[str], str], ...] = (
     (
         re.compile(
-            r"\bRESOLUCI[ÓO]N\s+2275\s*(?:DE\s*|/)\s*2023\b",
+            r"\bRES(?:OLUCI[ÓO]N)?\.?\s+2275\s*(?:DE\s*|/)\s*2023\b",
             re.IGNORECASE,
         ),
         # Si el dictamen YA nombra la 948, no hay nada que completar.
         re.compile(r"\b948\s*(?:DE\s*|/)\s*2026\b", re.IGNORECASE),
         " (VIGENTE PARA SERVICIOS ANTERIORES AL 14 DE MAYO DE 2026; "
         "DESDE ESA FECHA RIGE LA RESOLUCIÓN 948 DE 2026)",
+    ),
+    (
+        # Res. 3047 de 2008 — derogada a partir del 1 de abril de 2026 por el
+        # art. 20 de la Res. 2335 de 2023 (modificado por el art. 2 de la Res.
+        # 1886 de 2024). Texto oficial transcrito en normativa_completa.py.
+        re.compile(
+            r"\bRES(?:OLUCI[ÓO]N)?\.?\s+3047\s*(?:DE\s*|/)\s*2008\b",
+            re.IGNORECASE,
+        ),
+        # LA SEÑAL TIENE QUE SER LA DEROGATORIA, NO LA NORMA NUEVA.
+        # Primer intento de este mismo cambio: se usó «que el dictamen ya
+        # nombre la Res. 2284 de 2023». Pero la 2284 es el Manual Único —se
+        # cita en casi todos los dictámenes—, así que la aclaración no habría
+        # salido casi nunca y el cambio quedaba en nada. Se exige que el texto
+        # ya diga QUIÉN derogó (Res. 2335 de 2023) o DESDE CUÁNDO, que es la
+        # información que la coletilla aporta.
+        _RE_DEROGATORIA_2335_YA_DICHA,
+        # Nombrar A LA 2335 no es adorno: es lo que convierte el aviso del
+        # revisor de citas en redundante —su regla es «si el dictamen ya dice
+        # cuál norma la reemplazó, el aviso sobra»— y, sobre todo, es lo que
+        # le quita a la entidad la respuesta fácil de «esa resolución está
+        # derogada»: el escrito ya lo dijo primero, con fecha y con norma.
+        " (VIGENTE PARA SERVICIOS ANTERIORES AL 1 DE ABRIL DE 2026, FECHA EN QUE "
+        "LA DEROGÓ LA RESOLUCIÓN 2335 DE 2023; DESDE ENTONCES RIGE LA RESOLUCIÓN "
+        "2284 DE 2023, CUYO ANEXO TÉCNICO 1 FUE SUSTITUIDO POR EL ANEXO 1 DE LA "
+        "RESOLUCIÓN 1885 DE 2024)",
+    ),
+    (
+        # Res. 416 de 2009 y Res. 4331 de 2012 — mismas derogatoria y fecha:
+        # las nombra el mismo art. 20 de la Res. 2335 de 2023.
+        re.compile(
+            r"\bRES(?:OLUCI[ÓO]N)?\.?\s+416\s*(?:DE\s*|/)\s*2009\b",
+            re.IGNORECASE,
+        ),
+        _RE_DEROGATORIA_2335_YA_DICHA,
+        " (VIGENTE PARA SERVICIOS ANTERIORES AL 1 DE ABRIL DE 2026, FECHA EN QUE "
+        "LA DEROGÓ LA RESOLUCIÓN 2335 DE 2023; DESDE ENTONCES RIGE LA "
+        "RESOLUCIÓN 2284 DE 2023)",
+    ),
+    (
+        re.compile(
+            r"\bRES(?:OLUCI[ÓO]N)?\.?\s+4331\s*(?:DE\s*|/)\s*2012\b",
+            re.IGNORECASE,
+        ),
+        _RE_DEROGATORIA_2335_YA_DICHA,
+        " (VIGENTE PARA SERVICIOS ANTERIORES AL 1 DE ABRIL DE 2026, FECHA EN QUE "
+        "LA DEROGÓ LA RESOLUCIÓN 2335 DE 2023; DESDE ENTONCES RIGE LA "
+        "RESOLUCIÓN 2284 DE 2023)",
     ),
 )
 
@@ -9220,6 +9301,10 @@ class GlosaService:
             except Exception as _e_nm:
                 logger.debug(f"[NORMA-TEMA-EQUIVOCADO] red final no aplicada: {_e_nm}")
 
+            # Foto del texto antes de las tres redes de normas, para saber
+            # después si hay que volver a revisar las citas.
+            _dictamen_antes_de_las_redes_de_normas = dictamen
+
             # 25-08-2026 — RED FINAL: norma real citada con el año cambiado
             # ("Resolución 3100 de 2020" cuando es de 2019). La entidad no
             # la encuentra y la trata como inventada.
@@ -9252,6 +9337,25 @@ class GlosaService:
                     dictamen = _dictamen_art_ok
             except Exception as _e_am:
                 logger.debug(f"[ARTICULO-MAL-CITADO] red final no aplicada: {_e_am}")
+
+            # 28-08-2026 — EL SELLO TIENE QUE HABLAR DEL TEXTO FINAL (2.ª vez).
+            # Ayer se arregló para la red de CUPS y quedó el mismo defecto en
+            # las tres redes de normas —año equivocado, norma derogada,
+            # artículo mal citado—: corren DESPUÉS de que se revisaron las
+            # citas, así que el sello describe una versión del dictamen que ya
+            # no existe. Caso concreto: la red le acaba de poner a la Res. 3047
+            # de 2008 su fecha de derogatoria y quién la derogó, y el sello
+            # seguiría avisando «NORMA_DEROGADA» de algo que el escrito ya
+            # explica. Una sola revisión al final cubre las tres.
+            try:
+                if dictamen != _dictamen_antes_de_las_redes_de_normas:
+                    verif_citas = _vc(
+                        dictamen,
+                        eps=str(data.eps or ""),
+                        evidencia=_evidencia_leida,
+                    )
+            except Exception as _e_rn:
+                logger.debug(f"[REDES-DE-NORMAS] no se pudo re-revisar: {_e_rn}")
 
             # 25-08-2026 — AVISO: la respuesta habla de la factura y la glosa
             # era de fondo (FA1606 = quién paga; FA0703 = si ya estaba en el

@@ -2459,11 +2459,68 @@ RESOLUCIONES = {
         "keywords": ["Res. 1604", "glosas históricas", "manual glosas 2013"],
     },
     "RESOLUCION 4331 DE 2012": {
+        # DEROGADA — corregido el 28-08-2026, misma causa que la Res. 3047 de
+        # 2008: el corpus la daba por vigente, así que el revisor de citas
+        # aprobaba un dictamen fundado en una norma que ya no rige.
+        #
+        # La deroga el mismo artículo 20 de la Resolución 2335 de 2023 (en su
+        # texto modificado por el art. 2 de la Res. 1886 de 2024), que se
+        # transcribió literal en la ficha de la Res. 3047 de 2008: «...deroga
+        # la Resolución número 3047 de 2008 y sus modificatorias, la
+        # Resolución número 416 de 2009 y la Resolución número 4331 de 2012,
+        # así como la Resolución número 3253 de 2009; a partir del 1 de abril
+        # de 2026».
+        #
+        # OJO CON EL TÍTULO: esta ficha dice «urgencias a no afiliados», pero
+        # el grafo normativo del propio motor (normativa_grafo.py) la tiene
+        # como modificatoria de la Res. 3047 de 2008. No se toca el título
+        # porque no se ha contrastado con el texto oficial — lo único que aquí
+        # se afirma es la derogatoria, que sí está verificada.
         "nombre": "Resolución 4331 de 2012 (MinSalud)",
         "titulo": "Pago de servicios prestados por urgencias a no afiliados",
-        "ambito": "Urgencias — flujo de recursos para pacientes no asegurados",
-        "vigente": True,
-        "keywords": ["urgencias", "no afiliados", "ADRES", "FOSYGA"],
+        "ambito": "Aplicable solo a servicios prestados antes del 1 de abril de 2026",
+        "vigente": False,
+        "derogada_por": (
+            "Resolución 2335 de 2023, artículo 20 (modificado por el artículo 2 de la "
+            "Resolución 1886 de 2024), que la deroga expresamente A PARTIR DEL 1 DE "
+            "ABRIL DE 2026 junto con la Res. 3047 de 2008, la Res. 416 de 2009 y la "
+            "Res. 3253 de 2009"
+        ),
+        "verificada": "27-08-2026 fuente oficial (normograma Supersalud, Res. 2335/2023 art. 20)",
+        "keywords": ["urgencias", "no afiliados", "ADRES", "FOSYGA", "derogada"],
+    },
+    "RESOLUCION 416 DE 2009": {
+        # CARGADA EL 28-08-2026 SOLO POR LA DEROGATORIA.
+        #
+        # El prompt del motor la nombra por su nombre («La Res. 3047/2008 y la
+        # 416/2009 quedaron DEROGADAS»), así que la IA puede escribirla. Sin
+        # ficha, el revisor la marcaba «NORMA_SIN_VERIFICAR» y la red de la
+        # fecha no tenía con qué completarla.
+        #
+        # De esta resolución NO se ha contrastado el articulado, así que aquí
+        # no se afirma qué dice: se registra únicamente lo que sí está
+        # verificado contra el texto oficial —que quedó derogada a partir del
+        # 1 de abril de 2026 por el art. 20 de la Res. 2335 de 2023, en su
+        # texto modificado por el art. 2 de la Res. 1886 de 2024—. Sin
+        # evidencia no se inventa contenido.
+        "nombre": "Resolución 416 de 2009 (MinSalud)",
+        "titulo": "Modifica la Resolución 3047 de 2008 (DEROGADA)",
+        "ambito": "Aplicable solo a servicios prestados antes del 1 de abril de 2026",
+        "vigente": False,
+        "derogada_por": (
+            "Resolución 2335 de 2023, artículo 20 (modificado por el artículo 2 de la "
+            "Resolución 1886 de 2024), que la deroga expresamente A PARTIR DEL 1 DE "
+            "ABRIL DE 2026 junto con la Res. 3047 de 2008, la Res. 4331 de 2012 y la "
+            "Res. 3253 de 2009. Para los soportes de cobro rige hoy el Anexo Técnico 1 "
+            "de la Res. 2284 de 2023, sustituido por el Anexo 1 de la Res. 1885 de 2024"
+        ),
+        "notas": (
+            "Del contenido de esta resolución no hay transcripción verificada en el "
+            "corpus: solo consta la derogatoria. NO citarla para servicios prestados "
+            "desde el 1 de abril de 2026."
+        ),
+        "verificada": "27-08-2026 fuente oficial (normograma Supersalud, Res. 2335/2023 art. 20)",
+        "keywords": ["416", "3047", "glosa", "derogada"],
     },
     "RESOLUCION 2003 DE 2014": {
         "nombre": "Resolución 2003 de 2014 (MinSalud)",

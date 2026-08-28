@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 26-08-2026
+**Última actualización:** 28-08-2026
 
 ---
 
@@ -62,6 +62,70 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 28-08-2026 — Se auditaron las 135 glosas reales de la base, y la norma derogada que el motor seguía escribiendo
+
+**Lo que se revisó.** Usted exportó desde la PC de cartera las **135 glosas
+reales** que el motor ha respondido y las mandó completas. Se revisaron una por
+una. Esto no es una prueba de laboratorio: son los dictámenes que salieron de
+verdad.
+
+**Lo que salió mal, en orden de gravedad:**
+
+| Qué | Cuántas |
+|---|---|
+| Sin código de causal (el archivo de recepción no trae esa columna) | 59 |
+| Citan una resolución que ya no rige | 34 |
+| Citan un CUPS que no existe en el catálogo | 19 |
+| Sin fechas: no se puede calcular si la glosa llegó tarde | 16 |
+| Presentan como vigente un contrato ya vencido | 14 |
+| Dicen que un código de glosa es el código del servicio | 11 |
+| Afirman cosas de la historia clínica sin un soporte anexo | 9 |
+| Valor objetado en cero | 7 |
+| Comillas de una cita que la norma no dice así | 5 |
+| Le atribuyen a un artículo algo que no dice | 3 |
+| Citan un folio que no está en el expediente | 1 |
+
+**Lo que se arregló hoy en el motor:**
+
+1. **La Resolución 3047 de 2008 ya no puede salir sola.** Está derogada desde
+   el 1 de abril de 2026, y **nueve de las 135** la citan. Se le había cambiado
+   la instrucción a la IA para que no la usara y la escribió igual — la
+   instrucción no basta. Ahora hay una **red** que revisa el texto ya escrito:
+   donde aparezca la 3047 le agrega, ahí mismo, **quién la derogó y desde
+   cuándo**, y cuál rige hoy. La cita NO se borra: para un servicio prestado
+   antes del 1 de abril de 2026 esa ERA la norma aplicable, y cambiarla sería
+   meterle al escrito una norma que ese día no existía. Así la EPS ya no puede
+   responder «esa resolución está derogada»: el escrito lo dice primero.
+
+   La máquina que hace esto existía desde el 25 de agosto, con **una sola**
+   resolución cargada. Nadie le había puesto la 3047. Es otra vez la lección de
+   esta semana: escribir la regla no era el trabajo, el trabajo era comprobar
+   que llegara.
+
+2. **Otras dos resoluciones muertas que el motor daba por vivas.** El mismo
+   artículo que derogó la 3047 derogó también la **Res. 416 de 2009** y la
+   **Res. 4331 de 2012**. La 4331 estaba en el corpus marcada como vigente, así
+   que el revisor aprobaba un dictamen fundado en ella. Quedaron las dos
+   corregidas y cargadas en la red.
+
+3. **La forma corta no se reconocía.** El motor escribe a veces «Res.
+   3047/2008» en vez de «Resolución 3047 de 2008». La red solo veía la forma
+   larga, así que la corta pasaba de largo. Ya ve las dos.
+
+4. **El sello volvía a hablar de un texto que ya no existía.** Ayer se corrigió
+   para los CUPS y había quedado el mismo defecto en las tres redes de normas:
+   corrían DESPUÉS de que se revisaban las citas, así que el sello avisaba de
+   problemas que el escrito ya había arreglado. Ahora se vuelve a revisar al
+   final. El gestor deja de leer avisos graves de cosas que ya no están —que es
+   lo que hace que uno deje de creerle al sello.
+
+**Lo del día anterior (27-08), que tampoco estaba en esta bitácora:** se
+descubrió que el motor llamaba «CUPS» a códigos que no lo son (el código de la
+glosa, por ejemplo), y que un código sacado de DGH no queda validado por venir
+de ahí. También que el revisor marcaba como inventada la **Res. 839 de 2017**,
+que existe y es pertinente (es la de la custodia de la historia clínica): quedó
+cargada con su texto oficial.
 
 ### 28-08-2026 — La carpeta de radicación del 31068 quedó armada y limpia
 
@@ -9059,6 +9123,43 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+### Lo primero (28-08, cierre)
+
+**1. Fusionar y desplegar.** La entrega de la causal en el recuadro y el sello
+que hablaba de un texto viejo **ya la fusionó usted** (PR #529). Falta la de
+hoy: la Res. 3047 de 2008 y sus dos hermanas derogadas.
+
+Después del despliegue, corra **la misma glosa de siempre** (SO0102 de la
+factura HUS0000498954) y mire dos cosas: que en el recuadro ya **no** diga
+«código SO0102», y que si el escrito nombra la Res. 3047 de 2008 le salga al
+lado, entre paréntesis, desde cuándo está derogada.
+
+**2. Lo que NO arregla el programa y necesita su decisión:**
+
+- **59 de las 135 glosas salieron sin código de causal.** Eso no lo puede
+  arreglar ningún cambio de código: el archivo de recepción **no trae esa
+  columna**. Sin causal, el motor no sabe contra qué está defendiendo. Hay que
+  pedir que el archivo la traiga.
+- **La tarifa del contrato 440-DIGSA.** El motor lo está tomando como **SOAT
+  pleno** y el contrato en pantalla dice **SOAT −20 %**. Es plata: hay que
+  confirmar cuál es la buena antes de que salgan más dictámenes con la
+  equivocada.
+- **Las glosas sin fecha de servicio.** Cuando no hay fecha, el motor supone
+  hoy, concluye «sin contrato» y aplica SOAT pleno — cuando lo más probable es
+  que el servicio sí estuviera cubierto. Hay que decidir qué debe hacer el
+  motor en ese caso.
+- **El texto de TARIFAS de Salud Total se está cortando.** Salud Total no
+  acepta la fila si la Observación IPS pasa de **500 caracteres**, y esa
+  plantilla mide **543**. El programa la corta sola por el último punto que
+  quepa, así que se pierde el final — «Se solicita el reconocimiento íntegro»
+  y el correo de Cartera. La EPS está recibiendo un párrafo sin petición.
+  Esto **ya venía así**, no lo causó ningún cambio de esta semana; se descubrió
+  midiendo. **No lo toqué a propósito:** ese texto lleva las cifras del manual
+  tarifario (UVB 2026 $12.110, Circular 047/2025, Decreto 780/2016) y decidir
+  qué se recorta es suyo, no mío. Dígame qué se puede quitar y lo dejo dentro
+  del límite. Mientras tanto quedó una prueba que impide que crezca más.
+
 
 **Radicación 31068 (28-08) — lo primero.** La carpeta `GI-XX-XXXXX-2026` ya
 está armada y limpia: 222 carpetas, cada una con su EPICRIS y su FACTURA, y
