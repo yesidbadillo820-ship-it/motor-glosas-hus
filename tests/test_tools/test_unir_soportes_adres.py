@@ -1937,3 +1937,37 @@ def test_el_comando_arma_los_folios_de_factura(tmp_path):
     )
 
     assert [f.name for f in salida.iterdir()] == ["680010079201_HUS403233_FACTURA.pdf"]
+
+
+def test_solo_facturas_no_pide_la_carpeta_del_gestor(tmp_path):
+    """--solo-facturas trabaja con --carpeta-facturas: exigir --carpeta sobra.
+
+    Del paquete 31068: el comando reventó con «the following arguments are
+    required: --carpeta» cuando el auditor lo corrió tal como se le indicó.
+    """
+    xml = tmp_path / "XML"
+    _pdf_marcado(xml / "680010079201_HUS403233_FACTURA.pdf", ["FACTURA ELECTRONICA DE VENTA"])
+    salida = tmp_path / "GI"
+
+    assert (
+        org.main(
+            [
+                "--solo-facturas",
+                "--carpeta-facturas",
+                str(xml),
+                "--salida",
+                str(salida),
+                "--prefijo",
+                "680010079201",
+                "--aplicar",
+            ]
+        )
+        == 0
+    )
+
+    assert (salida / "680010079201_HUS403233_FACTURA.pdf").exists()
+
+
+def test_sin_carpeta_y_sin_modo_suelto_lo_dice_claro(tmp_path):
+    """Quitarle el `required` no puede dejar pasar una corrida sin carpeta."""
+    assert org.main(["--folio"]) == 1
