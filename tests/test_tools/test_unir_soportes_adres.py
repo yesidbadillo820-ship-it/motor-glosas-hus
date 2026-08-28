@@ -1803,3 +1803,137 @@ def test_el_comando_arma_los_folios_sueltos(tmp_path):
     )
 
     assert [f.name for f in destino.iterdir()] == ["680010079201_HUS403233_EPICRIS.pdf"]
+
+
+# ─── El folio de la factura, suelto y sin carpetas ───────────────────────────
+
+
+def _pdf_marcado(ruta: Path, paginas: list[str]) -> Path:
+    """Un PDF donde cada página lleva el texto que la marca como su renglón."""
+    from reportlab.pdfgen import canvas
+
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(ruta))
+    for texto in paginas:
+        c.drawString(72, 720, texto)
+        c.showPage()
+    c.save()
+    return ruta
+
+
+def test_el_folio_de_la_factura_queda_suelto_y_en_orden(tmp_path):
+    """La factura del XML trae la gráfica pegada; el detallado llega aparte.
+
+    El área lo quiere 1 FACTURA · 2 DETALLADO · 3 REPRESENTACION GRAFICA, y el
+    archivo suelto en la carpeta de radicación, sin carpeta propia.
+    """
+    xml = tmp_path / "XML"
+    _pdf_marcado(
+        xml / "680010079201_HUS403233_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA", "sigue la factura", "REPRESENTACION GRAFICA", "y sigue"],
+    )
+    dets = tmp_path / "sin_aceptado"
+    _pdf(dets / "HUS403233 DETALLADO.pdf", 2)
+    salida = tmp_path / "GI"
+
+    hechos = org.folios_de_facturas(xml, salida, dets, prefijo="680010079201", aplicar=True)
+
+    folio = salida / "680010079201_HUS403233_FACTURA.pdf"
+    assert folio.exists()
+    assert [f.name for f in salida.iterdir()] == [folio.name], "creó algo más que el PDF"
+    Lector, _ = org._cargar_lector_escritor()
+    paginas = [p.extract_text() for p in Lector(str(folio)).pages]
+    assert len(paginas) == 6, "2 de factura + 2 de detallado + 2 de gráfica"
+    assert "FACTURA ELECTRONICA" in paginas[0]
+    assert "REPRESENTACION GRAFICA" in paginas[4], "la gráfica quedó antes del detallado"
+    assert hechos[0].paginas == 6
+    assert org.es_folio_nuestro(folio)
+
+
+def test_si_la_factura_ya_trae_el_detallado_no_se_le_agrega_otro(tmp_path):
+    """Si no, el folio subiría al ADRES con el detallado DOS veces."""
+    xml = tmp_path / "XML"
+    _pdf_marcado(
+        xml / "680010079201_HUS403233_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA", "DETALLADO FACTURA", "REPRESENTACION GRAFICA"],
+    )
+    dets = tmp_path / "sin_aceptado"
+    _pdf(dets / "HUS403233 DETALLADO.pdf", 5)
+    salida = tmp_path / "GI"
+
+    hechos = org.folios_de_facturas(xml, salida, dets, prefijo="680010079201", aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    folio = salida / "680010079201_HUS403233_FACTURA.pdf"
+    assert len(Lector(str(folio)).pages) == 3, "le pegó el detallado de más"
+    assert "ya trae el detallado" in hechos[0].aviso
+
+
+def test_avisa_la_factura_que_no_tiene_pdf(tmp_path):
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    dets = tmp_path / "sin_aceptado"
+    dets.mkdir()
+    salida = tmp_path / "GI"
+
+    hechos = org.folios_de_facturas(
+        xml, salida, dets, prefijo="680010079201", facturas={"HUS403233"}, aplicar=True
+    )
+
+    assert len(hechos) == 1 and hechos[0].paginas == 0
+    assert "no está el PDF de la factura" in hechos[0].aviso
+
+
+def test_folio_de_factura_no_pisa_un_pdf_ajeno(tmp_path):
+    xml = tmp_path / "XML"
+    _pdf_marcado(xml / "680010079201_HUS403233_FACTURA.pdf", ["FACTURA ELECTRONICA DE VENTA"])
+    dets = tmp_path / "sin_aceptado"
+    dets.mkdir()
+    salida = tmp_path / "GI"
+    salida.mkdir()
+    ajeno = salida / "680010079201_HUS403233_FACTURA.pdf"
+    _pdf(ajeno, 9)
+
+    hechos = org.folios_de_facturas(xml, salida, dets, prefijo="680010079201", aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    assert len(Lector(str(ajeno)).pages) == 9, "pisó un archivo que no era del bot"
+    assert "no lo escribió este bot" in hechos[0].aviso
+
+
+def test_el_comando_arma_los_folios_de_factura(tmp_path):
+    xml = tmp_path / "XML"
+    _pdf_marcado(
+        xml / "680010079201_HUS403233_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA", "REPRESENTACION GRAFICA"],
+    )
+    _pdf_marcado(xml / "680010079201_HUS404072_FACTURA.pdf", ["FACTURA ELECTRONICA DE VENTA"])
+    dets = tmp_path / "sin_aceptado"
+    _pdf(dets / "HUS403233 DETALLADO.pdf", 1)
+    lista = tmp_path / "lista.txt"
+    lista.write_text("HUS403233\n", encoding="utf-8")
+    salida = tmp_path / "GI-XX-XXXXX-2026"
+
+    assert (
+        org.main(
+            [
+                "--solo-facturas",
+                "--carpeta",
+                str(xml),
+                "--carpeta-facturas",
+                str(xml),
+                "--detallados",
+                str(dets),
+                "--salida",
+                str(salida),
+                "--lista",
+                str(lista),
+                "--prefijo",
+                "680010079201",
+                "--aplicar",
+            ]
+        )
+        == 0
+    )
+
+    assert [f.name for f in salida.iterdir()] == ["680010079201_HUS403233_FACTURA.pdf"]
