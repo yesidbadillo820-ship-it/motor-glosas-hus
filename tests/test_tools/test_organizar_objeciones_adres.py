@@ -887,3 +887,64 @@ def test_reporte_que_no_es_el_del_adres_avisa_claro(tmp_path):
     otro = _libro(tmp_path, "OTRO.xlsx", {"Hoja1": [["A", "B"], [1, 2]]})
     with pytest.raises(ValueError, match="no parece el reporte de reclamaciones"):
         org.leer_reporte_reclamaciones(otro)
+
+
+class TestQueCodigoVaEnSlnserpro:
+    """La columna SLNSERPRO: el código de DGH o el de la factura del ADRES.
+
+    La pantalla de Recepción de Objeción muestra dos columnas de código:
+    «Codigo» (21705, el del ADRES) y «Codigo Cups» (879122). El auditor busca
+    por la primera, así que con el CUPS el renglón no le sirve. Para COOSALUD
+    en cambio sigue yendo el código interno de DGH.
+    """
+
+    def _armar(self, codigo_servicio):
+        fila = org.FilaAdres(
+            factura="HUS0000356290",
+            cod_elemento="21705",
+            codigo_glosa="TA0801",
+            valor_glosado=799900.0,
+            descripcion="SILLA TURCA U OIDO",
+        )
+        linea = org.LineaDgh(
+            slnserpro="879122",
+            cups="879122",
+            desc_cups="TOMOGRAFIA DE SILLA TURCA",
+            centro_costo="734103",
+            valor=799900.0,
+            saldo=3221600.0,
+        )
+        conversion = org.construir_registros(
+            [fila],
+            {"HUS0000356290": [linea]},
+            {"21705": {"879122"}},
+            _dt.datetime(2026, 8, 28),
+            codigo_servicio=codigo_servicio,
+        )
+        return conversion.registros[0]
+
+    def test_por_defecto_sigue_yendo_el_codigo_de_dgh(self):
+        assert self._armar(org.CODIGO_DGH)["SLNSERPRO"] == "879122"
+
+    def test_en_modo_adres_va_el_codigo_de_la_factura(self):
+        assert self._armar(org.CODIGO_ADRES)["SLNSERPRO"] == "21705"
+
+    def test_el_centro_de_costo_sigue_saliendo_de_dgh(self):
+        for modo in (org.CODIGO_DGH, org.CODIGO_ADRES):
+            assert self._armar(modo)["CTNCENCOS"] == "734103"
+
+    def test_sin_codigo_del_adres_no_deja_el_renglon_vacio(self):
+        """DGH rechaza la fila sin servicio: mejor el código de DGH que nada."""
+        fila = org.FilaAdres(
+            factura="HUS0000356290", cod_elemento="", codigo_glosa="TA0801", valor_glosado=100.0
+        )
+        linea = org.LineaDgh(slnserpro="879122", centro_costo="734103", valor=100.0, saldo=100.0)
+        conversion = org.construir_registros(
+            [fila],
+            {"HUS0000356290": [linea]},
+            {},
+            _dt.datetime(2026, 8, 28),
+            completar_servicios=True,
+            codigo_servicio=org.CODIGO_ADRES,
+        )
+        assert conversion.registros[0]["SLNSERPRO"] == "879122"
