@@ -94,6 +94,7 @@ from organizar_soportes_por_factura import factura_del_nombre  # noqa: E402
 from unir_pdfs_carpetas import (  # noqa: E402
     _cargar_lector_escritor,
     clave_natural,
+    copiar_como,
     reemplazar_con_reintento,
     unir_pdfs,
 )
@@ -1393,6 +1394,74 @@ def sacar_los_folios(carpeta: Path, aplicar: bool = False) -> list[Salida]:
     return hechas
 
 
+@dataclass
+class Traido:
+    """El XML que se trajo (o no) para una factura."""
+
+    factura: str
+    traidos: int = 0
+    aviso: str = ""
+
+
+def facturas_con_folio(carpeta: Path) -> list[str]:
+    """Las facturas que ya tienen algún folio suelto en la carpeta de radicación."""
+    numeros: set[str] = set()
+    for pdf in carpeta.glob("*.pdf"):
+        numero = factura_del_nombre(pdf.name)
+        if numero and es_folio_armado(pdf.name, numero)[0]:
+            numeros.add(numero)
+    return sorted(numeros)
+
+
+def traer_los_xml(
+    carpeta: Path,
+    carpeta_facturas: Path,
+    prefijo: str = "",
+    facturas: set[str] | None = None,
+    aplicar: bool = False,
+) -> list[Traido]:
+    """Copia el XML de cada factura junto a sus folios, suelto y sin carpetas.
+
+    Se COPIA, no se mueve: la carpeta del XML es la fuente del paquete y no
+    puede quedar vacía. Y no se pisa un XML que ya estuviera en el destino.
+    """
+    indice: dict[str, Path] = {}
+    for x in sorted(carpeta_facturas.rglob("*.xml")):
+        numero = factura_del_nombre(x.name)
+        if numero:
+            indice.setdefault(numero, x)
+
+    numeros = [f for f in facturas_con_folio(carpeta) if facturas is None or f in facturas]
+    hechos: list[Traido] = []
+    for numero in numeros:
+        traido = Traido(numero)
+        hechos.append(traido)
+        origen = indice.get(numero)
+        if origen is None:
+            traido.aviso = "no está el XML en la carpeta del paquete"
+            logger.warning("  %s: %s", numero, traido.aviso)
+            continue
+        destino = carpeta / (
+            nombre_folio(prefijo, numero, SUFIJO_FACTURA).replace(".pdf", ".xml")
+            if prefijo
+            else origen.name
+        )
+        if destino.exists():
+            traido.aviso = f"ya estaba «{destino.name}» en la carpeta; no se pisó"
+            logger.warning("  %s: %s", numero, traido.aviso)
+            continue
+        traido.traidos = 1
+        if not aplicar:
+            continue
+        try:
+            copiar_como(origen, destino)
+        except OSError as e:
+            traido.traidos = 0
+            traido.aviso = explicar_error(e)
+            logger.warning("  %s: %s", numero, traido.aviso)
+    return hechos
+
+
 def leer_lista_facturas(ruta: Path) -> set[str]:
     """Las facturas de un .txt, una por línea, como las pega el área del Excel.
 
@@ -1997,6 +2066,12 @@ def construir_parser() -> argparse.ArgumentParser:
         "«<NIT>_<FACTURA>_EPICRIS.pdf», suelta, sin crear carpetas.",
     )
     p.add_argument(
+        "--traer-xml",
+        action="store_true",
+        help="Copia a «--carpeta» el XML de cada factura que ya tiene folio ahí. "
+        "El XML se toma de «--carpeta-facturas» y se COPIA, no se mueve.",
+    )
+    p.add_argument(
         "--sacar-folios",
         action="store_true",
         help="Saca los dos folios de cada subcarpeta de «--carpeta» y los deja "
@@ -2288,6 +2363,27 @@ def _informe_salida(hechas: list[Salida], aplicar: bool) -> int:
     return 0
 
 
+def _informe_xml(hechos: list[Traido], aplicar: bool) -> int:
+    """Lo que el auditor lee al terminar de traer los XML."""
+    con_aviso = [h for h in hechos if h.aviso]
+    verbo = "Se trajeron" if aplicar else "Se traerían"
+    logger.info(
+        "\n%s %d XML, de %d factura(s) con folio en la carpeta.",
+        verbo,
+        sum(h.traidos for h in hechos),
+        len(hechos),
+    )
+    if con_aviso:
+        logger.info("\nCon novedad (%d):", len(con_aviso))
+        for h in con_aviso[:10]:
+            logger.info("   %s: %s", h.factura, h.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if not aplicar:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = construir_parser().parse_args(argv)
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
@@ -2305,6 +2401,21 @@ def main(argv: list[str] | None = None) -> int:
         if not args.carpeta.is_dir():
             logger.error("No existe la carpeta: %s", args.carpeta)
             return 1
+
+    if args.traer_xml:
+        if args.carpeta_facturas is None:
+            logger.error("Con --traer-xml hay que decir --carpeta-facturas (la del XML).")
+            return 1
+        if not args.carpeta_facturas.is_dir():
+            logger.error("No existe la carpeta del XML: %s", args.carpeta_facturas)
+            return 1
+        lista = _leer_lista(args)
+        if lista is False:
+            return 1
+        return _informe_xml(
+            traer_los_xml(args.carpeta, args.carpeta_facturas, args.prefijo, lista, args.aplicar),
+            args.aplicar,
+        )
 
     if args.sacar_folios:
         return _informe_salida(sacar_los_folios(args.carpeta, args.aplicar), args.aplicar)
