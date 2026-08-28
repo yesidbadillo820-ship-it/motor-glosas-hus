@@ -63,6 +63,78 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 28-08-2026 (tarde) — Las objeciones del ADRES en DGH: tres errores míos que el auditor encontró
+
+Todo el día fue armar el archivo de **recepción de objeciones** para subirlo a
+Dinámica Gerencial, sobre 73 facturas del ADRES. Quedó, pero costó tres vueltas
+y las tres fueron por fallas mías. Las dejo escritas para que no se repitan.
+
+**Lo que había que hacer.** El área mandó tres archivos: las glosas
+(`BASE_PARA_GLOSAS`), lo que el ADRES dice que glosó por factura
+(`SALDOS_ADRES`) y los servicios que DGH tiene registrados. Después mandó los
+**lotes con las facturas electrónicas pasadas a Excel**, que es donde está el
+código de cada servicio. Con eso hay que decirle a DGH, renglón por renglón,
+contra qué servicio va cada glosa y por cuánto.
+
+**Fallo 1: mi lector partía el nombre del servicio.** De
+«SE GLOSA-EQUIPO DE BOMBA (FOTOPROTECTOR) REF 14007» yo me quedaba con
+«FOTOPROTECTOR», porque miraba primero el paréntesis. Eran 171 renglones. Al
+corregirlo, el cruce subió del 63 % al 76 %.
+
+**Fallo 2, el grande: yo estaba botando renglones de la factura.** Los
+**honorarios de cirujano, de anestesiólogo y de ayudantía**, los materiales de
+sutura y los derechos de sala vienen en la factura **sin número de orden**, y mi
+lector exigía ese número para reconocer un servicio. Se perdían **756 renglones
+y $269.467.041**, en 47 de las 72 facturas.
+
+Lo peor no fue el error sino que **mi propia comprobación lo tapaba**: yo
+verificaba que la suma de lo extraído diera igual al subtotal que declara la
+factura, y ese subtotal **tampoco cuenta esos renglones**. Cuadraba «72 de 72»
+*porque* los estaba botando. Una prueba que se aprobaba a sí misma. El auditor
+lo destapó mandando el pantallazo de una factura donde esos servicios estaban a
+la vista.
+
+**Fallo 3: el centro de costo salía vacío en las 2.079 filas.** La pantalla de
+Recepción de Objeción de DGH tiene su columna Centro Costo y el archivo la
+traía en blanco, aunque el bot sí sabía el dato. Estaba puesto en vacío a la
+fuerza dentro del programa. Corregido y con prueba (PR #534).
+
+**La otra cosa que aprendí, y esta la dijo el área:** cuando el ADRES glosa la
+factura **entera**, no hay que adivinar de qué servicios se trata — son todos
+los de la factura. Y DGH no guarda «3 radiografías por $220.500»: guarda **tres
+renglones de $73.500**, cada uno con su código. Por eso ahora la objeción se
+arma tomando renglones de DGH hasta completar lo que la factura cobra por ese
+servicio. Son 15 facturas así, todas con el mismo código de glosa (SO6101).
+
+**Cómo quedó el archivo.**
+
+| | |
+|---|---|
+| Facturas | 64 de 73 |
+| Renglones | 2.079 |
+| Valor objetado | $304.328.954 |
+| Servicios vacíos | **0** |
+| Centros de costo vacíos | **0** |
+| Facturas objetando de más | **0** |
+
+La regla de corte quedó en lo que de verdad importa: **nunca objetar más de lo
+que el ADRES glosó**. Pasarse es reclamar plata que nadie glosó; quedarse corto
+solo significa que unos servicios no se ubicaron, y eso se reporta.
+
+**Lo que ya se cargó.** El área subió **24 facturas** (87 renglones,
+$10.528.795) y entraron bien. Quedan **40** en un archivo aparte (1.992
+renglones, $293.800.159).
+
+**Las 9 que quedaron fuera.** HUS356201, HUS356263, HUS378506, HUS378538,
+HUS379199, HUS383283, HUS388347, HUS397138 y HUS402461. No son glosa total y la
+base pide entre 8 % y 30 % más de lo que el ADRES glosó; no hay forma de saber
+qué renglón sobra sin adivinar.
+
+**Aparte, el trámite de objeciones del export de DGH.** Se llenaron las columnas
+FECHA DE CARGUE, CODIGO RESPUESTA, VALOR ACEPTADO y OBSERVACION con la respuesta
+del paquete 31068: **1.299 de 1.586 filas (81 %)**, $41.968.198 aceptados. Las
+287 restantes quedaron en blanco a propósito y con su motivo en el informe.
+
 ### 28-08-2026 — Se auditaron las 135 glosas reales de la base, y la norma derogada que el motor seguía escribiendo
 
 **Lo que se revisó.** Usted exportó desde la PC de cartera las **135 glosas
@@ -8403,6 +8475,19 @@ está a un clic.
 ---
 
 ## 3) PENDIENTE
+
+### Objeciones del ADRES en DGH (28-08)
+- **Cargar las 40 facturas que faltan** (`OBJECIONES_ADRES_40_PENDIENTES.xlsx`,
+  1.992 renglones, $293.800.159). Antes, subir **una sola de las grandes** de
+  piloto: traen renglones a los que el bot les asignó el servicio más parecido,
+  y hay que ver si DGH los acepta.
+- **Revisar la hoja REVISAR** antes del cargue: ahí están los renglones que no
+  cruzaron y a los que se les puso un servicio por defecto para que DGH no
+  rechazara la fila. No es homologación.
+- **Las 9 facturas que quedaron fuera**: HUS356201, HUS356263, HUS378506,
+  HUS378538, HUS379199, HUS383283, HUS388347, HUS397138, HUS402461.
+- **Las 287 filas en blanco** del trámite de objeciones: filtrar CODIGO
+  RESPUESTA vacío en el mismo libro y escoger.
 
 ### Radicación del paquete 31068 (28-08)
 - **~~Contar las páginas de los folios clínicos~~ — HECHO.** Ningún folio salió
