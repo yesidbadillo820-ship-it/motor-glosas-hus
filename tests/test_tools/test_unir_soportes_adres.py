@@ -2076,3 +2076,90 @@ def test_el_comando_deja_solo_los_folios(tmp_path):
         "680010079201_HUS404986_FACTURA.pdf",
     ]
     assert (gi / org.CARPETA_APARTADOS / "HUS404986" / "1 RESPUESTA A GLOSA.pdf").exists()
+
+
+# ─── Sacar los folios de las carpetas y dejarlos sueltos ─────────────────────
+
+
+def test_saca_los_folios_y_deja_la_carpeta_vacia(tmp_path):
+    """El área quiere todos los folios sueltos en la carpeta de radicación."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    assert (gi / "680010079201_HUS404986_EPICRIS.pdf").exists()
+    assert (gi / "680010079201_HUS404986_FACTURA.pdf").exists()
+    assert not carpeta.exists(), "la carpeta quedó vacía y debía irse"
+    assert hechos[0].sacados == 2
+
+
+def test_no_borra_la_carpeta_si_adentro_queda_algo(tmp_path):
+    """Si sobró un archivo, la carpeta se queda: no se pierde nada sin avisar."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    (carpeta / "una nota.txt").write_text("x", encoding="utf-8")
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    assert carpeta.exists() and (carpeta / "una nota.txt").exists()
+    assert "quedó con 1 archivo" in hechos[0].aviso
+
+
+def test_no_pisa_un_folio_que_ya_estaba_suelto(tmp_path):
+    """Los 101 ya están sueltos: si uno se repite, no se pisa, se avisa."""
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS404986_EPICRIS.pdf", 9)
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    assert len(Lector(str(gi / "680010079201_HUS404986_EPICRIS.pdf")).pages) == 9
+    assert (carpeta / "680010079201_HUS404986_EPICRIS.pdf").exists(), "lo movió encima del otro"
+    assert "ya hay uno suelto" in hechos[0].aviso
+    assert hechos[0].sacados == 1, "el de la factura sí debía salir"
+
+
+def test_sacar_sin_aplicar_no_mueve_nada(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=False)
+
+    assert carpeta.exists() and not (gi / "680010079201_HUS404986_EPICRIS.pdf").exists()
+    assert hechos[0].sacados == 2
+
+
+def test_sacar_no_toca_la_carpeta_de_apartados(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / org.CARPETA_APARTADOS / "HUS1" / "680010079201_HUS1_EPICRIS.pdf", 1)
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    assert (gi / org.CARPETA_APARTADOS / "HUS1" / "680010079201_HUS1_EPICRIS.pdf").exists()
+    assert [h.factura for h in hechos] == ["HUS404986"]
+
+
+def test_el_comando_saca_los_folios(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    assert org.main(["--sacar-folios", "--carpeta", str(gi), "--aplicar"]) == 0
+
+    assert sorted(f.name for f in gi.iterdir()) == [
+        "680010079201_HUS404986_EPICRIS.pdf",
+        "680010079201_HUS404986_FACTURA.pdf",
+    ]
