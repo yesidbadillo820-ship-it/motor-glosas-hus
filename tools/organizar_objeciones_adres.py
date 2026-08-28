@@ -208,6 +208,11 @@ class Resolucion:
     candidato_desc: str = ""
     tope_servicio: float = 0.0
     saldo: float = 0.0
+    # El centro de costo de la línea de DGH con la que se emparejó. La pantalla
+    # de Recepción de Objeción lo muestra en su propia columna, así que el
+    # archivo tiene que traerlo: antes salía siempre vacío aunque el cruce sí
+    # hubiera acertado el servicio.
+    centro_costo: str = ""
 
 
 @dataclass
@@ -691,6 +696,7 @@ def resolver_slnserpro(
             candidato_desc=linea.rotulo(),
             tope_servicio=round(sum(x.valor for x in mismos), 2),
             saldo=linea.saldo,
+            centro_costo=linea.centro_costo,
         )
 
     # 1) el código del ADRES ya existe tal cual en DGH.
@@ -1117,9 +1123,14 @@ def construir_registros(
                     f"por parecido con {resolucion.candidato} {resolucion.candidato_desc}".strip()
                 )
                 resolucion.slnserpro = resolucion.candidato
+                resolucion.centro_costo = next(
+                    (x.centro_costo for x in lineas if x.slnserpro == resolucion.candidato),
+                    resolucion.centro_costo,
+                )
             elif principal is not None:
                 asignado = f"servicio de más peso de la factura: {principal.slnserpro} {principal.rotulo()}"
                 resolucion.slnserpro = principal.slnserpro
+                resolucion.centro_costo = principal.centro_costo
             if asignado:
                 salida.asignados += 1
 
@@ -1141,7 +1152,7 @@ def construir_registros(
                 "CRNCONOBJ": codigo or None,
                 "SLNSERPRO": resolucion.slnserpro or None,
                 "IDRIPS": None,
-                "CTNCENCOS": None,
+                "CTNCENCOS": resolucion.centro_costo or None,
                 "CROVALOBJ": valor,
                 "CRDOBSERV": construir_crdobserv(codigo, fila, valor),
                 "CROTIPOBJ": crotipobj_factura(clasificaciones[crncxc]),
