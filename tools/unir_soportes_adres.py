@@ -1258,6 +1258,81 @@ def _armar_folio_factura_suelto(
     return paginas
 
 
+# ─── Dejar en cada carpeta solo los dos folios ───────────────────────────────
+
+# Los soportes NO se borran: se mueven aquí. Son los documentos clínicos del
+# paciente y son la única fuente para rehacer un folio. El auditor los revisa
+# y los borra él, cuando esté seguro.
+CARPETA_APARTADOS = "_APARTADOS_REVISAR_Y_BORRAR"
+
+
+@dataclass
+class Limpieza:
+    """Qué se le hizo a una carpeta de factura."""
+
+    factura: str
+    carpeta: Path
+    apartados: int = 0
+    aviso: str = ""
+
+
+def es_folio_armado(nombre: str, factura: str) -> tuple[bool, str]:
+    """¿Este archivo es uno de los dos folios de esta factura? Y cuál."""
+    tallo = Path(nombre).stem
+    if Path(nombre).suffix.lower() != ".pdf" or factura_del_nombre(nombre) != factura:
+        return False, ""
+    for sufijo in (SUFIJO_EPICRIS, SUFIJO_FACTURA):
+        if _norm(tallo).endswith(_norm(sufijo.strip("_"))):
+            return True, sufijo
+    return False, ""
+
+
+def dejar_solo_los_folios(carpeta: Path, aplicar: bool = False) -> list[Limpieza]:
+    """En cada carpeta de factura deja solo «..._EPICRIS.pdf» y «..._FACTURA.pdf».
+
+    Lo demás se APARTA a «_APARTADOS_REVISAR_Y_BORRAR», no se borra: son los
+    soportes clínicos y son la única fuente para rehacer un folio. Y si a una
+    carpeta le falta alguno de los dos folios, no se le toca nada — apartarle
+    los soportes la dejaría sin nada que radicar.
+    """
+    apartados_raiz = carpeta / CARPETA_APARTADOS
+    hechas: list[Limpieza] = []
+    for sub in sorted(p for p in carpeta.iterdir() if p.is_dir()):
+        if sub.name == CARPETA_APARTADOS:
+            continue
+        numero = factura_del_nombre(sub.name)
+        limpieza = Limpieza(numero, sub)
+        hechas.append(limpieza)
+        if not numero:
+            limpieza.aviso = "el nombre de la carpeta no dice de qué factura es"
+            logger.warning("  %s: %s", sub.name, limpieza.aviso)
+            continue
+
+        archivos = [p for p in sorted(sub.rglob("*")) if p.is_file()]
+        folios = {s for p in archivos for hay, s in [es_folio_armado(p.name, numero)] if hay}
+        faltan = [s.strip("_") for s in (SUFIJO_EPICRIS, SUFIJO_FACTURA) if s not in folios]
+        if faltan:
+            limpieza.aviso = f"NO se tocó: falta el folio de la {' y de la '.join(faltan)}"
+            logger.warning("  %s: %s", numero, limpieza.aviso)
+            continue
+
+        sobran = [p for p in archivos if not es_folio_armado(p.name, numero)[0]]
+        limpieza.apartados = len(sobran)
+        if not aplicar or not sobran:
+            continue
+        destino = apartados_raiz / sub.name
+        destino.mkdir(parents=True, exist_ok=True)
+        for suelto in sobran:
+            try:
+                libre, _ = nombre_libre(destino, suelto.name)
+                shutil.move(str(suelto), str(libre))
+            except OSError as e:
+                limpieza.apartados -= 1
+                limpieza.aviso = explicar_error(e)
+                logger.warning("  %s: %s", numero, limpieza.aviso)
+    return hechas
+
+
 def leer_lista_facturas(ruta: Path) -> set[str]:
     """Las facturas de un .txt, una por línea, como las pega el área del Excel.
 
@@ -1862,6 +1937,13 @@ def construir_parser() -> argparse.ArgumentParser:
         "«<NIT>_<FACTURA>_EPICRIS.pdf», suelta, sin crear carpetas.",
     )
     p.add_argument(
+        "--dejar-solo-folios",
+        action="store_true",
+        help="En cada carpeta de «--carpeta» deja solo «..._EPICRIS.pdf» y "
+        "«..._FACTURA.pdf». Lo demás NO se borra: se aparta a una carpeta "
+        "«_APARTADOS_REVISAR_Y_BORRAR» para que usted la revise.",
+    )
+    p.add_argument(
         "--solo-facturas",
         action="store_true",
         help="Como --solo-respuestas pero para el folio de la FACTURA: toma el PDF "
@@ -2086,6 +2168,38 @@ def _leer_lista(args) -> set[str] | None | bool:
     return lista
 
 
+def _informe_limpieza(hechas: list[Limpieza], aplicar: bool) -> int:
+    """Lo que el auditor lee al terminar la limpieza."""
+    tocadas = [h for h in hechas if h.apartados]
+    con_aviso = [h for h in hechas if h.aviso]
+    verbo = "Se apartaron" if aplicar else "Se apartarían"
+    logger.info(
+        "\n%s %d archivo(s) de %d carpeta(s), de %d revisadas.",
+        verbo,
+        sum(h.apartados for h in hechas),
+        len(tocadas),
+        len(hechas),
+    )
+    for h in tocadas[:5]:
+        logger.info("   %s: %d archivo(s)", h.factura or h.carpeta.name, h.apartados)
+    if len(tocadas) > 5:
+        logger.info("   … y %d carpeta(s) más.", len(tocadas) - 5)
+    if con_aviso:
+        logger.info("\nSin tocar (%d):", len(con_aviso))
+        for h in con_aviso[:10]:
+            logger.info("   %s: %s", h.factura or h.carpeta.name, h.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if aplicar:
+        logger.info(
+            "\nNada se borró: lo apartado quedó en «%s». Revíselo y bórrelo usted.",
+            CARPETA_APARTADOS,
+        )
+    else:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = construir_parser().parse_args(argv)
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
@@ -2103,6 +2217,9 @@ def main(argv: list[str] | None = None) -> int:
         if not args.carpeta.is_dir():
             logger.error("No existe la carpeta: %s", args.carpeta)
             return 1
+
+    if args.dejar_solo_folios:
+        return _informe_limpieza(dejar_solo_los_folios(args.carpeta, args.aplicar), args.aplicar)
 
     if args.solo_facturas:
         if args.salida is None or args.carpeta_facturas is None:

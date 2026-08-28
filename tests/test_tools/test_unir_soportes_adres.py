@@ -1971,3 +1971,108 @@ def test_solo_facturas_no_pide_la_carpeta_del_gestor(tmp_path):
 def test_sin_carpeta_y_sin_modo_suelto_lo_dice_claro(tmp_path):
     """Quitarle el `required` no puede dejar pasar una corrida sin carpeta."""
     assert org.main(["--folio"]) == 1
+
+
+# ─── Dejar en cada carpeta solo los dos folios ───────────────────────────────
+
+
+def test_aparta_lo_que_no_es_folio_y_no_borra_nada(tmp_path):
+    """El área pidió dejar solo EPICRIS y FACTURA. Lo demás se APARTA, no se borra.
+
+    Son los soportes clínicos del paciente: si se borran y hay que rehacer un
+    folio, no hay de dónde. Por eso se mueven a una carpeta aparte, que el
+    auditor revisa y borra cuando esté seguro.
+    """
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+    _pdf(carpeta / "2 HISTORIA CLINICA.pdf", 1)
+    (carpeta / "detallado.xlsx").write_text("x", encoding="utf-8")
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    quedan = sorted(f.name for f in carpeta.iterdir())
+    assert quedan == [
+        "680010079201_HUS404986_EPICRIS.pdf",
+        "680010079201_HUS404986_FACTURA.pdf",
+    ]
+    apartados = sorted(f.name for f in (gi / org.CARPETA_APARTADOS / "HUS404986").iterdir())
+    assert apartados == ["1 RESPUESTA A GLOSA.pdf", "2 HISTORIA CLINICA.pdf", "detallado.xlsx"]
+    assert hechos[0].apartados == 3
+
+
+def test_no_toca_la_carpeta_a_la_que_le_falte_un_folio(tmp_path):
+    """Sin los dos folios armados, apartar los soportes deja la factura sin nada."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS405001"
+    _pdf(carpeta / "680010079201_HUS405001_EPICRIS.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    assert (carpeta / "1 RESPUESTA A GLOSA.pdf").exists(), "apartó soportes sin el folio hecho"
+    assert "falta el folio de la FACTURA" in hechos[0].aviso
+    assert hechos[0].apartados == 0
+
+
+def test_sin_aplicar_no_mueve_nada(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=False)
+
+    assert (carpeta / "1 RESPUESTA A GLOSA.pdf").exists()
+    assert not (gi / org.CARPETA_APARTADOS).exists()
+    assert hechos[0].apartados == 1, "la simulación debe decir cuántos apartaría"
+
+
+def test_aguanta_carpetas_con_nota_en_el_nombre(tmp_path):
+    """En el servidor vienen como «HUS354080_ACEPTADA TOTAL»."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS354080_ACEPTADA TOTAL"
+    _pdf(carpeta / "680010079201_HUS354080_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS354080_FACTURA.pdf", 1)
+    _pdf(carpeta / "3 OTROS.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    assert hechos[0].factura == "HUS354080"
+    assert sorted(f.name for f in carpeta.iterdir()) == [
+        "680010079201_HUS354080_EPICRIS.pdf",
+        "680010079201_HUS354080_FACTURA.pdf",
+    ]
+
+
+def test_no_se_aparta_a_si_misma(tmp_path):
+    """La carpeta de apartados no puede entrar en la barrida de la corrida siguiente."""
+    gi = tmp_path / "GI"
+    _pdf(gi / org.CARPETA_APARTADOS / "HUS1" / "algo.pdf", 1)
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    assert [h.factura for h in hechos] == ["HUS404986"]
+    assert (gi / org.CARPETA_APARTADOS / "HUS1" / "algo.pdf").exists()
+
+
+def test_el_comando_deja_solo_los_folios(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+
+    assert org.main(["--dejar-solo-folios", "--carpeta", str(gi), "--aplicar"]) == 0
+
+    assert sorted(f.name for f in carpeta.iterdir()) == [
+        "680010079201_HUS404986_EPICRIS.pdf",
+        "680010079201_HUS404986_FACTURA.pdf",
+    ]
+    assert (gi / org.CARPETA_APARTADOS / "HUS404986" / "1 RESPUESTA A GLOSA.pdf").exists()
