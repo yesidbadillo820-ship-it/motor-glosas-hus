@@ -122,6 +122,16 @@ FORMATOS_OBJECIONES: dict[str, str] = {
     "CROTIPOBJ": "0",
 }
 
+# Qué código va en la columna SLNSERPRO del archivo.
+#   "dgh"   — el código interno de DGH (873122, FMQ0041). Es lo que se viene
+#             cargando para COOSALUD y sigue siendo lo de siempre.
+#   "adres" — el código del ADRES tal como viene en la factura (21705, 39145).
+#             La pantalla de Recepción de Objeción lo muestra en su columna
+#             «Codigo», al lado de «Codigo Cups»; el auditor busca por ese, y
+#             con el CUPS el renglón no le sirve.
+CODIGO_DGH = "dgh"
+CODIGO_ADRES = "adres"
+
 CROCLAOBJ_CONST = 0
 GENUSUARIO4_CONST = "999"
 MAX_FACTURAS_POR_LOTE = 300  # tope de DGH (el mismo del cruce de la Suite)
@@ -969,6 +979,19 @@ def conciliar_factura(filas: list[FilaAdres], glosado_reportado: float) -> Conci
 # ─── Código de servicio para los renglones que no cruzaron ───────────────────
 
 
+def _codigo_servicio(modo: str, fila: FilaAdres, resolucion: Resolucion) -> str | None:
+    """El código que se escribe en SLNSERPRO, según lo que pida el portal.
+
+    En modo «adres» manda el código de la factura (`COD ELEMENTO`), que es el
+    que la pantalla de DGH muestra en su columna «Codigo». Si esa glosa no trae
+    código, se cae al de DGH antes que dejar el renglón vacío: una fila sin
+    servicio DGH la rechaza.
+    """
+    if modo == CODIGO_ADRES and fila.cod_elemento:
+        return _texto(fila.cod_elemento) or None
+    return resolucion.slnserpro or None
+
+
 def servicio_principal(lineas: list[LineaDgh]) -> LineaDgh | None:
     """El servicio de más peso de la factura en DGH: el que más plata suma.
 
@@ -1063,6 +1086,7 @@ def construir_registros(
     incluir_glosa_total: bool = True,
     reclamaciones: dict[str, Reclamacion] | None = None,
     completar_servicios: bool = False,
+    codigo_servicio: str = CODIGO_DGH,
 ) -> Conversion:
     """Convierte las glosas del ADRES en filas del formato OBJECIONES.
 
@@ -1150,7 +1174,7 @@ def construir_registros(
                 "CRNCLAOBJ": None,
                 "GENUSUARIO4": GENUSUARIO4_CONST,
                 "CRNCONOBJ": codigo or None,
-                "SLNSERPRO": resolucion.slnserpro or None,
+                "SLNSERPRO": _codigo_servicio(codigo_servicio, fila, resolucion),
                 "IDRIPS": None,
                 "CTNCENCOS": resolucion.centro_costo or None,
                 "CROVALOBJ": valor,
@@ -1529,6 +1553,14 @@ def construir_parser() -> argparse.ArgumentParser:
         "cuadrado contra el Valor Glosado que reporta el ADRES.",
     )
     p.add_argument(
+        "--codigo-servicio",
+        choices=(CODIGO_DGH, CODIGO_ADRES),
+        default=CODIGO_DGH,
+        help="Qué código va en SLNSERPRO: «dgh» el interno de DGH (lo de "
+        "siempre, COOSALUD) o «adres» el de la factura (21705, 39145), que es "
+        "el que la pantalla de Recepción de Objeción muestra en «Codigo».",
+    )
+    p.add_argument(
         "--completar-servicios",
         action="store_true",
         help="Que ningún renglón quede sin código de servicio: el que no cruce se lleva "
@@ -1634,6 +1666,7 @@ def main(argv: list[str] | None = None) -> int:
         incluir_glosa_total=not args.excluir_glosa_total,
         reclamaciones=reclamaciones,
         completar_servicios=args.completar_servicios,
+        codigo_servicio=args.codigo_servicio,
     )
 
     grupos = lotes(conversion.registros, args.max_facturas)
