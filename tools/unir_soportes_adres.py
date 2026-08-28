@@ -1820,8 +1820,8 @@ def construir_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--carpeta",
         type=Path,
-        required=True,
-        help="Carpeta del gestor (CAROLINA, CLAUDIA, OSCAR…).",
+        help="Carpeta del gestor (CAROLINA, CLAUDIA, OSCAR…). No hace falta con "
+        "--solo-facturas, que trabaja con --carpeta-facturas.",
     )
     p.add_argument(
         "--facturas",
@@ -2094,13 +2094,22 @@ def main(argv: list[str] | None = None) -> int:
         handlers.append(logging.FileHandler(args.log, encoding="utf-8"))
     logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=handlers)
 
-    if not args.carpeta.is_dir():
-        logger.error("No existe la carpeta: %s", args.carpeta)
-        return 1
+    # --solo-facturas trabaja con --carpeta-facturas; las demás corridas sí
+    # necesitan la carpeta del gestor.
+    if not args.solo_facturas:
+        if args.carpeta is None:
+            logger.error("Falta --carpeta (la del gestor: CAROLINA, CLAUDIA, OSCAR…).")
+            return 1
+        if not args.carpeta.is_dir():
+            logger.error("No existe la carpeta: %s", args.carpeta)
+            return 1
 
     if args.solo_facturas:
         if args.salida is None or args.carpeta_facturas is None:
             logger.error("Con --solo-facturas hay que decir --carpeta-facturas y --salida.")
+            return 1
+        if not args.carpeta_facturas.is_dir():
+            logger.error("No existe la carpeta del XML: %s", args.carpeta_facturas)
             return 1
         lista = _leer_lista(args)
         if lista is False:
