@@ -63,6 +63,65 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 28-08-2026 — La carpeta de radicación del 31068 quedó armada y limpia
+
+Todo el día fue sobre la carpeta `GI-XX-XXXXX-2026`, la que se radica al ADRES.
+
+**1. Las facturas que no tenían carpeta de soportes.** Son 101 y lo único que
+existía de ellas era su respuesta a glosa, suelta en `RESPUESTAS_31068\salida`.
+El bot aprendió a tomar cada respuesta, ponerle el índice y dejarla como
+`680010079201_HUS######_EPICRIS.pdf`, **suelta en la carpeta, sin crear
+carpetas**. La única que no salió fue la HUS380112, porque no estaba su
+archivo; después apareció.
+
+**2. El folio de la factura de esas mismas.** Igual, pero con la factura del
+XML y el detallado intercalado en su puesto:
+
+```
+1 FACTURA  ->  2 DETALLADO  ->  3 REPRESENTACION GRAFICA  ->  4 NOTA CREDITO
+```
+
+Como el archivo del XML trae la factura y la representación gráfica pegadas,
+el bot lo parte para meter el detallado en la mitad. Si una factura ya trae el
+detallado adentro, **no se le agrega otro**: subiría al ADRES con el detallado
+dos veces.
+
+**3. La limpieza de las carpetas.** El área pidió dejar en cada carpeta solo el
+EPICRIS y la FACTURA. Se hizo, pero **sin borrar nada**: lo demás se movió a
+una carpeta `_APARTADOS_REVISAR_Y_BORRAR` dentro de la misma. Son las historias
+clínicas y los detallados del paciente, y son la única fuente para rehacer un
+folio; borrarlos no tiene vuelta atrás y esa decisión es del auditor.
+
+| | |
+|---|---|
+| Carpetas revisadas | 222 |
+| Archivos apartados | 1.340 |
+| Carpetas sin tocar por faltarles un folio | ninguna |
+
+Comprobado en el servidor: los 1.340 archivos están en la carpeta de apartados
+y en las carpetas de factura no quedó ni un archivo que no sea uno de los dos
+folios.
+
+**4. Un error del comando, que era mío.** La primera vez que el auditor corrió
+el bot le salió «the following arguments are required: --carpeta», aunque ese
+modo no usa la carpeta del gestor. Estaba mal pedido y ya se corrigió. La
+prueba no lo había detectado porque probaba el comando con una opción que el
+auditor no tenía por qué escribir.
+
+**5. El FURIPS2 y las respuestas del DGH.** Aparte del folio, salieron dos
+archivos de escritorio:
+
+- El **FURIPS2 con solo la glosa**, ya descontado lo aceptado: pasó de
+  $2.460.635.897 a $519.367.482, y el FURIPS1 quedó con los mismos valores en
+  VALOR FOSYGA y VALOR FACTURA. Quedó anotado que **$361.758.330 de glosa no se
+  pudieron ubicar**, casi todo porque 1.308 renglones del reporte del ADRES no
+  traen código de elemento.
+- Las **respuestas del export de DGH**: 760 de 947 filas llenas con su código
+  (RE9901 / RE9702 / RE9801) y su valor aceptado. Las otras 187 se dejaron en
+  blanco a propósito, con un archivo aparte que trae las opciones para que el
+  auditor escoja: cuando dos renglones de la misma factura tienen el mismo
+  valor pero respuesta distinta, adivinar invierte la plata.
+
 ### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
 
 El área revisó los folios ya armados y mandó tres correcciones. Las tres
@@ -8194,6 +8253,21 @@ está a un clic.
 
 ## 3) PENDIENTE
 
+### Radicación del paquete 31068 (28-08)
+- **DECISIÓN SUYA: borrar la carpeta `_APARTADOS_REVISAR_Y_BORRAR`.** Ahí
+  quedaron los 1.340 archivos que se sacaron de las carpetas de factura
+  (historias clínicas, respuestas, detallados). El bot no los borra a propósito:
+  son la única fuente para rehacer un folio. Revíselos y bórrelos usted.
+- **La HUS380112.** Ya apareció su archivo en la carpeta del XML; falta volver a
+  correr `--solo-facturas` para que le arme el folio.
+- **$361.758.330 de glosa que no entraron al FURIPS2.** No se pudieron ubicar
+  en un renglón porque 1.308 renglones del reporte del ADRES no traen código de
+  elemento. Hay que decidir si se reclama de otra forma o se deja así.
+- **187 filas del export de DGH en blanco.** Están en
+  `REVISAR_RESPUESTAS.xlsx` con las opciones servidas; falta que el auditor
+  escoja cuál va en cada una.
+
+
 > **Cómo leer esta lista (27-08-2026).** Es larga porque cubre todos los
 > frentes y varios meses. Lo tachado ya está hecho y se deja para que se vea
 > de dónde salió. Lo que de verdad está abierto, ordenado por lo que le cuesta
@@ -8882,6 +8956,19 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**Radicación 31068 (28-08) — lo primero.** La carpeta `GI-XX-XXXXX-2026` ya
+está armada y limpia: 222 carpetas, cada una con su EPICRIS y su FACTURA, y
+nada más. Lo que falta antes de radicar:
+
+1. Correr `--solo-facturas` otra vez para armar el folio de la **HUS380112**,
+   que ya tiene su archivo en el XML.
+2. Revisar la carpeta `_APARTADOS_REVISAR_Y_BORRAR` y borrarla cuando esté
+   seguro.
+3. Decidir qué se hace con los **$361.758.330** de glosa que no entraron al
+   FURIPS2.
+4. Escoger las **187 respuestas** que quedaron en blanco en el export de DGH.
+
 
 **~~Desplegar las once ideas~~ — HECHO y COMPROBADO el 26-08 en la tarde.** El
 motor de la PC de cartera quedó en el mismo punto que el del hospital y las
