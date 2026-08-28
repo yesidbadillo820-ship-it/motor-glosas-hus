@@ -122,6 +122,36 @@ archivos de escritorio:
   auditor escoja: cuando dos renglones de la misma factura tienen el mismo
   valor pero respuesta distinta, adivinar invierte la plata.
 
+**6. Sacar los folios de las carpetas.** El área pidió que los PDF no queden
+metidos en 222 carpetitas, sino sueltos en la carpeta de radicación, que es
+como se sube al ADRES. El bot ahora los saca, y **solo borra la carpeta si
+quedó vacía**: si adentro sobró algo, la deja y lo avisa por nombre. La
+simulación dio 444 folios en 222 carpetas, sin choques de nombre; sumados a
+los 201 que ya estaban sueltos, la carpeta debe quedar con **645 PDF**.
+
+**7. Los XML de las facturas.** Al final el área pidió que a la carpeta de
+radicación también entrara el XML de cada factura. El bot mira **qué facturas
+ya tienen su folio suelto ahí** y trae el XML solo de esas, así no arrastra
+facturas de otro paquete. Tres cuidados que quedaron por escrito en el
+programa:
+
+- **Copia, no mueve.** La carpeta `4.FACTURAS CON XML\XML` es la fuente del
+  paquete y tiene que quedar completa.
+- **No pisa lo que ya estaba.** Si el XML ya estaba en la carpeta de
+  radicación, lo deja quieto y lo reporta.
+- **Si falta un XML, lo dice con el número de la factura**, en vez de fallar
+  callado.
+
+Importante para el orden: primero se sacan los folios de las carpetas (punto 6)
+y **después** se traen los XML. Al revés no daña nada, pero tocaría correrlo
+dos veces, porque el bot solo trae el XML de las facturas cuyo folio ya está
+suelto.
+
+**8. Una prueba que estaba en rojo y ya está en verde.** La del bot de
+objeciones del ADRES (`test_organizar_objeciones_adres`) llevaba días fallando
+por un cambio de otro chat. Ya se arregló en la rama principal y las 65 pruebas
+de ese bot pasan.
+
 ### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
 
 El área revisó los folios ya armados y mandó tres correcciones. Las tres
@@ -8258,6 +8288,12 @@ está a un clic.
   quedaron los 1.340 archivos que se sacaron de las carpetas de factura
   (historias clínicas, respuestas, detallados). El bot no los borra a propósito:
   son la única fuente para rehacer un folio. Revíselos y bórrelos usted.
+- **Sacar los folios de las carpetas.** La simulación quedó limpia (444 folios
+  de 222 carpetas); falta correrlo con `--aplicar`. Deben quedar 645 PDF
+  sueltos.
+- **Traer los XML.** El bot ya sabe hacerlo; se corre **después** de sacar los
+  folios, para que los traiga todos y no solo los de los 201 que ya estaban
+  sueltos.
 - **La HUS380112.** Ya apareció su archivo en la carpeta del XML; falta volver a
   correr `--solo-facturas` para que le arme el folio.
 - **$361.758.330 de glosa que no entraron al FURIPS2.** No se pudieron ubicar
@@ -8961,13 +8997,20 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 está armada y limpia: 222 carpetas, cada una con su EPICRIS y su FACTURA, y
 nada más. Lo que falta antes de radicar:
 
-1. Correr `--solo-facturas` otra vez para armar el folio de la **HUS380112**,
+1. **Sacar los folios de las carpetas** (`--sacar-folios --aplicar`). La
+   simulación ya salió limpia: 444 folios de 222 carpetas, sin choques de
+   nombre. Al terminar deben quedar **645 PDF sueltos** y, de carpetas, solo
+   `_APARTADOS_REVISAR_Y_BORRAR`.
+2. **Traer los XML** (`--traer-xml`, primero sin `--aplicar` para ver el
+   informe). Va en este orden y no antes: el bot trae el XML de las facturas
+   cuyo folio ya está suelto en la carpeta.
+3. Correr `--solo-facturas` otra vez para armar el folio de la **HUS380112**,
    que ya tiene su archivo en el XML.
-2. Revisar la carpeta `_APARTADOS_REVISAR_Y_BORRAR` y borrarla cuando esté
+4. Revisar la carpeta `_APARTADOS_REVISAR_Y_BORRAR` y borrarla cuando esté
    seguro.
-3. Decidir qué se hace con los **$361.758.330** de glosa que no entraron al
+5. Decidir qué se hace con los **$361.758.330** de glosa que no entraron al
    FURIPS2.
-4. Escoger las **187 respuestas** que quedaron en blanco en el export de DGH.
+6. Escoger las **187 respuestas** que quedaron en blanco en el export de DGH.
 
 
 **~~Desplegar las once ideas~~ — HECHO y COMPROBADO el 26-08 en la tarde.** El
