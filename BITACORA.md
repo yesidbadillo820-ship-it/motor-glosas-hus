@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 28-08-2026
+**Última actualización:** 28-08-2026 (cierre)
 
 ---
 
@@ -62,6 +62,86 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 28-08-2026 (cierre) — Las objeciones del ADRES quedaron cargadas: 58 facturas y $103,9 millones
+
+Se cerró el cargue de las objeciones del ADRES en Dinámica Gerencial. Lo que
+faltaba de la mañana entró, y lo que fue rechazado se corrigió con la regla que
+DGH mismo nos enseñó a punta de mensajes de error.
+
+**Lo que DGH exige, ya en limpio (cinco reglas).**
+
+1. El código del servicio tiene que ser **el de la factura (SOAT)**, no el CUPS
+   ni el código interno de DGH. Se comprobó con los cargues buenos: los **422
+   códigos** que DGH aceptó salen todos de la factura, y solo la mitad aparece
+   en el reporte de servicios de DGH — o sea, que un código no esté en ese
+   reporte no significa nada.
+2. Ningún renglón puede valer más que el servicio.
+3. La suma de todo lo objetado a un servicio tampoco puede pasarse de su precio.
+4. El valor objetado tiene que ser mayor que cero.
+5. Y nunca objetar más de lo que el ADRES glosó.
+
+**El tope de un servicio es lo que cobra la factura, no lo que suma el reporte
+de DGH.** Esto lo destapó el auditor con un pantallazo: el servicio `901221H` de
+la HUS0000397138 aparece dos veces en el reporte de DGH (234.400 y 234.448),
+pero la factura lo cobra **una sola vez por $234.400**, y el mensaje de error de
+DGH decía justamente $234.400. Yo estaba sumando los dos renglones y por eso se
+pasaba. Al recalcularlo aparecieron 9 renglones y 33 servicios por encima del
+tope verdadero, $2.619.623.
+
+**Y sí se puede objetar un pedazo de un servicio.** DGH solo pide que el valor
+objetado sea **menor o igual** al del servicio, no exactamente igual. Antes yo
+solo tomaba un renglón si cabía completo, y por eso se perdía plata: al
+permitir el pedazo, lo que quedaba sin reclamar bajó de $3.176.782 a $464.850, y
+la HUS379267 pasó de faltarle $1.999.439 a cuadrar exacta.
+
+**Lo que se cargó hoy.**
+
+| Cargue | Facturas | Renglones | Valor |
+|---|---|---|---|
+| Primero (mañana) | 24 | 87 | $10.528.795 |
+| Segundo (tarde) | 33 | 752 | $90.221.717 |
+| La última (HUS0000356290) | 1 | 27 | $3.221.600 |
+| **Total cargado** | **58** | **866** | **$103.972.112** |
+
+**El cruce final del archivo de 33 contra el saldo del ADRES.** De las 33
+facturas, **21 cuadran exacto**, **9 tienen diferencias de centavos** (entre 1 y
+35 centavos: el ADRES maneja centavos y DGH solo recibe pesos enteros — no son
+error) y **3 quedaron por menor valor**, sumando $318.248: HUS0000397138
+($234.448), HUS0000384132 ($82.000) y HUS0000388347 ($1.800). Las tres tienen
+cupo de sobra en sus propios servicios, así que se pueden completar cuando el
+área lo pida. Quedó el archivo `CRUCE_OBJECIONES_VS_SALDOS.xlsx` con el detalle.
+
+**La última factura, HUS0000356290.** El área la mandó pensando que estaba
+descuadrada. En plata ya estaba bien: el ADRES glosó $3.221.600 y el archivo
+objetaba $3.221.600. Lo que confundía es que la base de glosas suma $3.777.300
+para esa factura, $555.700 de más, porque **el ADRES glosó dos veces la misma
+plata** de los honorarios del código 1240 (una vez como «honorarios no
+justificados» y otra como «mayor valor en honorarios»). Solo se le cambió la
+forma para dejarla igual a la de los cargues que sí entraron (RADICADO 31068 en
+la observación, fecha de objeción 09-07-2026 y centro de costo vacío). Entró.
+
+**Una que sí está corta y quedó lista pero sin cargar: la HUS0000378444.** El
+ADRES la glosó **completa, por $16.256.163**, y en el archivo solo quedaron
+objetados $190.171 — 27 códigos de material y medicamentos, ni un solo servicio.
+Se armaron los **95 renglones** que faltan ($16.065.992), uno por cada unidad de
+servicio de la factura, con su código SOAT, su centro de costo y sin pasarse de
+ningún precio. Con eso la factura cierra exacta en $16.256.163. **Falta que el
+área lo suba.**
+
+**Tres errores míos de esta jornada, para que no se repitan.**
+
+- **Dije «16 filas, todas de una sola factura» después de mirar solo las
+  primeras 12.** Eran **tres** facturas. De ahí salió la regla del área: leer,
+  contar, cruzar y validar **antes** de responder, nunca sobre una primera
+  lectura ni sobre lo que dije antes.
+- **Saqué 9 facturas del archivo para que me cuadraran los totales.** El área lo
+  paró en seco: «no me quite facturas con tal de que le cuadre a usted los
+  valores... ya de 40 vamos en 37 y así vamos bajando». Se devolvieron todas.
+  Sacar una factura nunca fue una decisión mía.
+- **Inflé el renglón más grande para llegar al total del ADRES**, y con eso los
+  servicios quedaban por encima de su precio. El área lo corrigió en una frase:
+  «no es sacarlo es ajustarlo al precio que es».
 
 ### 28-08-2026 (tarde) — Las objeciones del ADRES en DGH: tres errores míos que el auditor encontró
 
@@ -8476,18 +8556,27 @@ está a un clic.
 
 ## 3) PENDIENTE
 
-### Objeciones del ADRES en DGH (28-08)
-- **Cargar las 40 facturas que faltan** (`OBJECIONES_ADRES_40_PENDIENTES.xlsx`,
-  1.992 renglones, $293.800.159). Antes, subir **una sola de las grandes** de
-  piloto: traen renglones a los que el bot les asignó el servicio más parecido,
-  y hay que ver si DGH los acepta.
-- **Revisar la hoja REVISAR** antes del cargue: ahí están los renglones que no
-  cruzaron y a los que se les puso un servicio por defecto para que DGH no
-  rechazara la fila. No es homologación.
-- **Las 9 facturas que quedaron fuera**: HUS356201, HUS356263, HUS378506,
-  HUS378538, HUS379199, HUS383283, HUS388347, HUS397138, HUS402461.
+### Objeciones del ADRES en DGH (28-08, al cierre)
+- **~~Cargar las 40 facturas que faltan~~ — HECHO en su mayor parte.** Al cierre
+  quedaron cargadas **58 facturas, 866 renglones, $103.972.112**.
+- **Subir la HUS0000378444.** Es la única que quedó lista y sin cargar: el ADRES
+  la glosó completa por $16.256.163 y en DGH solo hay $190.171. El archivo con
+  los **95 renglones** que faltan ($16.065.992) ya está armado y validado.
+- **Las 3 facturas que quedaron por menor valor** en el cruce contra el saldo
+  del ADRES, $318.248 en total: HUS0000397138 ($234.448), HUS0000384132
+  ($82.000) y HUS0000388347 ($1.800). Las tres tienen cupo libre en sus propios
+  servicios; se completan cuando el área lo pida.
+- **Las 9 diferencias de centavos NO son error**: el ADRES maneja centavos y DGH
+  solo recibe pesos enteros. No hay que tocarlas.
+- **Las 6 facturas con error de estado en DGH** («La FACTURA se encuentra
+  Glosa_Total / Objetada y por lo tanto no puede ser OBJETADA»). Eso no se ve en
+  ningún archivo: hay que mirarlo dentro de DGH.
+- **HUS0000385933 y HUS0000393556**: no están en el paquete de 73 facturas — no
+  aparecen ni en la base de glosas, ni en el saldo del ADRES, ni en los lotes,
+  ni en el reporte de DGH. Si son de otro paquete, hay que pedir sus glosas.
 - **Las 287 filas en blanco** del trámite de objeciones: filtrar CODIGO
   RESPUESTA vacío en el mismo libro y escoger.
+- **Las 10 filas en blanco** del trámite de Carolina, lo mismo.
 
 ### Radicación del paquete 31068 (28-08)
 - **~~Contar las páginas de los folios clínicos~~ — HECHO.** Ningún folio salió
@@ -9208,6 +9297,28 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+### Objeciones del ADRES en DGH — lo primero del día siguiente
+
+**1. Subir la HUS0000378444.** Es lo único del cargue que quedó armado y sin
+subir. El ADRES glosó esa factura **completa por $16.256.163** y en DGH solo
+están objetados $190.171. El archivo con los **95 renglones que faltan**
+($16.065.992) ya está hecho y revisado: los códigos son todos de la factura,
+ningún renglón se pasa del precio de su servicio y con esos renglones la factura
+cierra exacta. Si DGH saca error, mandar el mensaje tal cual: los archivos que
+tenemos ya no dicen más.
+
+**2. Decidir si se completan las tres facturas cortas.** HUS0000397138,
+HUS0000384132 y HUS0000388347 quedaron por menor valor, $318.248 entre las tres.
+Se pueden completar al peso usando el cupo que queda en sus propios servicios,
+sin sacar ni agregar facturas. Es decisión del área.
+
+**3. Mirar en DGH las 6 facturas con error de estado.** El mensaje es «La
+FACTURA se encuentra Glosa_Total / Objetada y por lo tanto no puede ser
+OBJETADA». Ese estado solo se ve dentro de DGH, no está en ningún Excel.
+
+**4. Buscar HUS0000385933 y HUS0000393556.** No están en el paquete de 73. Si
+pertenecen a otro paquete, hay que conseguir sus glosas para poder armarlas.
 
 ### Lo primero (28-08, cierre)
 
