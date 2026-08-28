@@ -152,6 +152,36 @@ objeciones del ADRES (`test_organizar_objeciones_adres`) llevaba días fallando
 por un cambio de otro chat. Ya se arregló en la rama principal y las 65 pruebas
 de ese bot pasan.
 
+**9. La carpeta quedó comprobada, con dos cosas anotadas.** Al final del día se
+corrió todo en el servidor y se contó lo que quedó:
+
+| | |
+|---|---|
+| Folios en PDF sueltos | **645** |
+| XML sueltos | **322** |
+| Carpetas que sobraban | 1, y era una copia repetida |
+
+Los 645 salen de 322 facturas con sus dos folios (644) más la HUS380112, que
+solo tiene el clínico. Los 322 XML son uno por factura, menos esa misma.
+
+- **La carpeta HUS354214.** Tenía adentro un folio con el mismo nombre de uno
+  que ya estaba suelto. El bot no lo pisó, y por eso no borró la carpeta. Se
+  comprobó por huella digital (MD5) que **los dos archivos son idénticos**: la
+  copia de adentro sobra y la carpeta se puede borrar.
+- **A la HUS380112 le falta el XML.** En la carpeta del paquete solo está el
+  PDF de la factura; el archivo `.xml` no está. Hay que conseguirlo.
+
+**10. Una alarma mía que resultó falsa, y queda anotada para no repetirla.** Al
+ver que muchos folios pesan 3 KB avisé que podían estar vacíos. **Estaba
+equivocado.** Se midió: un folio de índice más tres páginas llenas de texto
+pesa 3.629 bytes, o sea los mismos 3 KB. Las respuestas son texto, no fotos, y
+el PDF no guarda la letra adentro; una hoja escaneada pesa 100 KB porque es una
+imagen, una hoja de texto pesa unos cientos de bytes.
+
+**El tamaño no sirve para saber si un folio está vacío. Lo que sirve es contar
+las páginas**: un folio de una sola página es el índice y nada más. Esa cuenta
+quedó pendiente de correr en el servidor.
+
 ### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
 
 El área revisó los folios ya armados y mandó tres correcciones. Las tres
@@ -8284,6 +8314,13 @@ está a un clic.
 ## 3) PENDIENTE
 
 ### Radicación del paquete 31068 (28-08)
+- **Contar las páginas de los folios clínicos.** Es la única comprobación que
+  falta antes de radicar: si alguno tiene una sola página, es el índice sin
+  nada detrás y hay que rehacerlo. El tamaño del archivo NO sirve para esto.
+- **Borrar la carpeta `HUS354214`.** Adentro quedó una copia idéntica (misma
+  huella MD5) de un folio que ya está suelto. Es lo único que sobra.
+- **A la HUS380112 le falta el archivo `.xml`.** En la carpeta del paquete solo
+  está el PDF de la factura. Es la única de las 323 a la que le falta.
 - **DECISIÓN SUYA: borrar la carpeta `_APARTADOS_REVISAR_Y_BORRAR`.** Ahí
   quedaron los 1.340 archivos que se sacaron de las carpetas de factura
   (historias clínicas, respuestas, detallados). El bot no los borra a propósito:
@@ -8997,15 +9034,18 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 está armada y limpia: 222 carpetas, cada una con su EPICRIS y su FACTURA, y
 nada más. Lo que falta antes de radicar:
 
-1. **Sacar los folios de las carpetas** (`--sacar-folios --aplicar`). La
-   simulación ya salió limpia: 444 folios de 222 carpetas, sin choques de
-   nombre. Al terminar deben quedar **645 PDF sueltos** y, de carpetas, solo
-   `_APARTADOS_REVISAR_Y_BORRAR`.
-2. **Traer los XML** (`--traer-xml`, primero sin `--aplicar` para ver el
-   informe). Va en este orden y no antes: el bot trae el XML de las facturas
-   cuyo folio ya está suelto en la carpeta.
-3. Correr `--solo-facturas` otra vez para armar el folio de la **HUS380112**,
-   que ya tiene su archivo en el XML.
+**~~Sacar los folios~~ y ~~traer los XML~~ — HECHO Y CONTADO el 28-08.** La
+carpeta quedó con **645 folios en PDF y 322 XML**, sueltos, como se radica.
+
+Lo que falta:
+
+1. **Contar las páginas de los folios clínicos** (el comando quedó en el chat).
+   Es la última comprobación antes de radicar: un folio de una sola página es
+   el índice sin nada detrás.
+2. Borrar la carpeta **`HUS354214`**: adentro quedó una copia idéntica de un
+   folio que ya está suelto.
+3. Conseguir el **`.xml` de la HUS380112**. En la carpeta del paquete solo está
+   el PDF de la factura.
 4. Revisar la carpeta `_APARTADOS_REVISAR_Y_BORRAR` y borrarla cuando esté
    seguro.
 5. Decidir qué se hace con los **$361.758.330** de glosa que no entraron al
