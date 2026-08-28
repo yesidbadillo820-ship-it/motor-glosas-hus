@@ -9322,9 +9322,11 @@ pertenecen a otro paquete, hay que conseguir sus glosas para poder armarlas.
 
 ### Lo primero (28-08, cierre)
 
-**1. Fusionar y desplegar.** La entrega de la causal en el recuadro y el sello
-que hablaba de un texto viejo **ya la fusionó usted** (PR #529). Falta la de
-hoy: la Res. 3047 de 2008 y sus dos hermanas derogadas.
+**1. Comprobar en pantalla lo que ya se fusionó.** Las dos entregas del motor
+están fusionadas: la causal que salía en el recuadro y el sello que hablaba de
+un texto viejo (PR #529), y la Res. 3047 de 2008 con sus dos hermanas derogadas
+(PR #533). Falta la comprobación en la PC de cartera — hasta que se vea
+corriendo, esto no está verificado.
 
 Después del despliegue, corra **la misma glosa de siempre** (SO0102 de la
 factura HUS0000498954) y mire dos cosas: que en el recuadro ya **no** diga
