@@ -4283,6 +4283,29 @@ def _cups_esta_en_catalogo(codigo: str) -> bool:
         return True
 
 
+def _quitar_causal_del_servicio(servicio: str) -> str:
+    """Saca del nombre del servicio el código de la glosa, si se coló.
+
+    28-08-2026. «CONSULTA DE PRIMERA VEZ POR OTRAS ESPECIALIDADES MÉDICAS,
+    código SO0102» → se queda solo el nombre. La causal identifica la objeción
+    de la entidad, no lo que el hospital prestó, y ponerla ahí deja ver que el
+    escrito confundió las dos cosas.
+    """
+    if not servicio:
+        return servicio
+    limpio = re.sub(
+        r"[,;]?\s*(?:c[óo]digo|cups)\s*[:\-]?\s*"
+        r"((?:TA|SO|FA|CL|CO|AU|SA|DE)\s*-?\s*\d{2,4})\b",
+        lambda m: (
+            "" if _es_codigo_de_glosa(m.group(1).replace(" ", "").replace("-", "")) else m.group(0)
+        ),
+        servicio,
+        flags=re.IGNORECASE,
+    )
+    limpio = re.sub(r"\s{2,}", " ", limpio).strip(" ,;.")
+    return limpio or servicio
+
+
 def _es_codigo_de_glosa(codigo: str) -> bool:
     """True si el código es una CAUSAL de glosa (SO0102, TA0201, FA0301…).
 
@@ -8304,6 +8327,17 @@ class GlosaService:
                 _campos_saltar.add("servicio")
             else:
                 servicio_ia = _limpiar_placeholder_servicio(servicio_ia)
+            # 28-08-2026 — LA CAUSAL NO ES EL NOMBRE DEL SERVICIO.
+            # Dictamen GL-134 corrido en el hospital: el recuadro salió con
+            # «Servicio objetado: CONSULTA DE PRIMERA VEZ POR OTRAS
+            # ESPECIALIDADES MÉDICAS, código SO0102». SO0102 es la causal de
+            # la glosa, no el procedimiento.
+            # Ayer se puso la red que borra las causales del CUERPO del
+            # dictamen, pero este campo NO pasa por ella: la IA lo entrega
+            # aparte, en su etiqueta <servicio>, y el recuadro se arma después.
+            # Escribir la regla no era el trabajo; el trabajo era comprobar que
+            # llegara a los dos sitios.
+            servicio_ia = _quitar_causal_del_servicio(servicio_ia)
             # OT-016 (06-08-2026) — el servicio inventado. Glosa FA0101 de
             # AURORA: el texto no nombraba ningún servicio, no había CUPS ni
             # PDF, y el dictamen salió con "ESTANCIA U OBSERVACIÓN DE
@@ -9155,6 +9189,24 @@ class GlosaService:
                 )
                 if _dictamen_cups_respaldado != dictamen:
                     dictamen = _dictamen_cups_respaldado
+                    # 28-08-2026 — EL SELLO TIENE QUE HABLAR DEL TEXTO FINAL.
+                    # Dictamen GL-134 corrido en el hospital: la red ya había
+                    # quitado el rótulo de CUPS al 380125 —en el escrito quedó
+                    # como «código»— y aun así el sello seguía diciendo
+                    # «CUPS_INEXISTENTE · CUPS 380125» en severidad ALTA.
+                    # El motivo: el revisor de citas corre ANTES que las redes,
+                    # así que describía una versión del documento que ya no
+                    # existe. El gestor lee un hallazgo grave sobre algo que ya
+                    # no está — y de ahí a no creerle al sello hay un paso.
+                    # Se vuelve a revisar, como ya se hacía tras descomillar.
+                    try:
+                        verif_citas = _vc(
+                            dictamen,
+                            eps=str(data.eps or ""),
+                            evidencia=_evidencia_leida,
+                        )
+                    except Exception as _e_rev:
+                        logger.debug(f"[CUPS-SIN-RESPALDO] no se pudo re-revisar: {_e_rev}")
             except Exception as _e_csr:
                 logger.debug(f"[CUPS-SIN-RESPALDO] red final no aplicada: {_e_csr}")
 
