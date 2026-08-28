@@ -1333,6 +1333,66 @@ def dejar_solo_los_folios(carpeta: Path, aplicar: bool = False) -> list[Limpieza
     return hechas
 
 
+@dataclass
+class Salida:
+    """Qué folios se sacaron de una carpeta de factura."""
+
+    factura: str
+    carpeta: Path
+    sacados: int = 0
+    aviso: str = ""
+
+
+def sacar_los_folios(carpeta: Path, aplicar: bool = False) -> list[Salida]:
+    """Saca los dos folios de cada subcarpeta y los deja sueltos en `carpeta`.
+
+    Así queda todo igual: los de las facturas que tenían carpeta de soportes
+    junto a los que ya estaban sueltos. La carpeta vacía se va; si adentro
+    sobró algo, se queda y se avisa — nada desaparece sin que el auditor lo sepa.
+    """
+    hechas: list[Salida] = []
+    for sub in sorted(p for p in carpeta.iterdir() if p.is_dir()):
+        if sub.name == CARPETA_APARTADOS:
+            continue
+        numero = factura_del_nombre(sub.name)
+        salida = Salida(numero, sub)
+        hechas.append(salida)
+        folios = [
+            p for p in sorted(sub.iterdir()) if p.is_file() and es_folio_armado(p.name, numero)[0]
+        ]
+        if not folios:
+            salida.aviso = "no tiene ningún folio armado adentro"
+            logger.warning("  %s: %s", numero or sub.name, salida.aviso)
+            continue
+        for folio in folios:
+            destino = carpeta / folio.name
+            if destino.exists():
+                salida.aviso = f"ya hay uno suelto con el nombre «{folio.name}»; no se pisó"
+                logger.warning("  %s: %s", numero, salida.aviso)
+                continue
+            salida.sacados += 1
+            if not aplicar:
+                continue
+            try:
+                shutil.move(str(folio), str(destino))
+            except OSError as e:
+                salida.sacados -= 1
+                salida.aviso = explicar_error(e)
+                logger.warning("  %s: %s", numero, salida.aviso)
+        if not aplicar:
+            continue
+        quedan = [p for p in sub.rglob("*") if p.is_file()]
+        if quedan:
+            # Se suma al aviso que ya hubiera: el de la colisión importa más y
+            # no puede perderse por este.
+            cola = f"la carpeta quedó con {len(quedan)} archivo(s) adentro; no se borró"
+            salida.aviso = f"{salida.aviso} | {cola}" if salida.aviso else cola
+            continue
+        with contextlib.suppress(OSError):
+            shutil.rmtree(sub)
+    return hechas
+
+
 def leer_lista_facturas(ruta: Path) -> set[str]:
     """Las facturas de un .txt, una por línea, como las pega el área del Excel.
 
@@ -1937,6 +1997,13 @@ def construir_parser() -> argparse.ArgumentParser:
         "«<NIT>_<FACTURA>_EPICRIS.pdf», suelta, sin crear carpetas.",
     )
     p.add_argument(
+        "--sacar-folios",
+        action="store_true",
+        help="Saca los dos folios de cada subcarpeta de «--carpeta» y los deja "
+        "SUELTOS ahí mismo. La carpeta que queda vacía se borra; si adentro "
+        "sobró algo, se conserva y se avisa.",
+    )
+    p.add_argument(
         "--dejar-solo-folios",
         action="store_true",
         help="En cada carpeta de «--carpeta» deja solo «..._EPICRIS.pdf» y "
@@ -2200,6 +2267,27 @@ def _informe_limpieza(hechas: list[Limpieza], aplicar: bool) -> int:
     return 0
 
 
+def _informe_salida(hechas: list[Salida], aplicar: bool) -> int:
+    """Lo que el auditor lee al terminar de sacar los folios."""
+    con_aviso = [h for h in hechas if h.aviso]
+    verbo = "Se sacaron" if aplicar else "Se sacarían"
+    logger.info(
+        "\n%s %d folio(s) de %d carpeta(s).", verbo, sum(h.sacados for h in hechas), len(hechas)
+    )
+    if aplicar:
+        vacias = sum(1 for h in hechas if not h.carpeta.exists())
+        logger.info("Carpetas que quedaron vacías y se borraron: %d", vacias)
+    if con_aviso:
+        logger.info("\nCon novedad (%d):", len(con_aviso))
+        for h in con_aviso[:10]:
+            logger.info("   %s: %s", h.factura or h.carpeta.name, h.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if not aplicar:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = construir_parser().parse_args(argv)
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
@@ -2217,6 +2305,9 @@ def main(argv: list[str] | None = None) -> int:
         if not args.carpeta.is_dir():
             logger.error("No existe la carpeta: %s", args.carpeta)
             return 1
+
+    if args.sacar_folios:
+        return _informe_salida(sacar_los_folios(args.carpeta, args.aplicar), args.aplicar)
 
     if args.dejar_solo_folios:
         return _informe_limpieza(dejar_solo_los_folios(args.carpeta, args.aplicar), args.aplicar)
