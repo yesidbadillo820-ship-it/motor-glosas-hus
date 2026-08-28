@@ -253,6 +253,25 @@ def test_resolver_codigo_directo():
     assert (r.slnserpro, r.metodo) == ("873420", org.METODO_CODIGO)
 
 
+def test_resolver_trae_el_centro_de_costo_de_la_linea():
+    """La pantalla de Recepción de Objeción tiene su columna Centro Costo.
+
+    Salía siempre vacía —las 2.079 filas del paquete 31068— aunque el cruce sí
+    hubiera acertado el servicio, porque el centro de costo se perdía al armar
+    el renglón.
+    """
+    lineas = [
+        org.LineaDgh(
+            slnserpro="FMQ0365",
+            nombre_medicamento="EQUIPO DE BOMBA (FOTOPROTECTOR)",
+            centro_costo="732109",
+            valor=40300,
+        )
+    ]
+    r = org.resolver_slnserpro(_fila("FMQ0365"), lineas, {})
+    assert (r.slnserpro, r.centro_costo) == ("FMQ0365", "732109")
+
+
 def test_resolver_codigo_directo_ignora_ceros_de_relleno():
     """DGH escribe 19935303-04 y el ADRES 19935303-4: es el mismo medicamento."""
     lineas = [org.LineaDgh(slnserpro="19935303-04", nombre_medicamento="ACETAMINOFEN", valor=800)]
