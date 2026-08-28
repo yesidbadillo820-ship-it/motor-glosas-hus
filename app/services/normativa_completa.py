@@ -592,6 +592,7 @@ LEYES = {
         "ambito": "FOMAG — Docentes oficiales",
         "vigente": True,
         "keywords": ["FOMAG", "magisterio", "docentes"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     # ─── R52 B: ampliación catálogo legal ──────────────────────────────────
     # 25-08-2026: el lote de recepcion cito 3 veces la Ley 1164 de 2007 para
@@ -664,6 +665,7 @@ LEYES = {
         "ambito": "Distribución competencias y recursos del SGP en salud",
         "vigente": True,
         "keywords": ["SGP", "participaciones", "recursos", "competencias territoriales"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "LEY 80 DE 1993": {
         "nombre": "Ley 80 de 1993 (Estatuto General de Contratación)",
@@ -995,6 +997,7 @@ LEYES = {
         "ambito": "PND — política pública de salud y giro directo a IPS",
         "vigente": True,
         "keywords": ["PND", "Plan Nacional de Desarrollo", "giro directo", "salud preventiva"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     # Ronda 15 (25-jun-2026, Bug P v2): leyes reales que el verifier
     # marcaba como inexistentes en producción.
@@ -1010,6 +1013,7 @@ LEYES = {
             "pediatría oncológica",
             "atención integral menor",
         ],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "LEY 1392 DE 2010": {
         "nombre": "Ley 1392 de 2010 (Enfermedades huérfanas)",
@@ -1390,6 +1394,7 @@ DECRETOS = {
         "ambito": "Contratación — auditoría concurrente y administrativa",
         "vigente": True,
         "keywords": ["acuerdos voluntades", "auditoría concurrente", "contratación"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "DECRETO 1795 DE 2000": {
         "nombre": "Decreto 1795 de 2000",
@@ -1528,6 +1533,7 @@ DECRETOS = {
         "ambito": "ARL",
         "vigente": True,
         "keywords": ["ARL", "riesgos profesionales"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "DECRETO 1072 DE 2015": {
         "nombre": "Decreto 1072 de 2015",
@@ -1543,6 +1549,7 @@ DECRETOS = {
         "ambito": "Habilitación, auditoría y acreditación de servicios",
         "vigente": True,
         "keywords": ["SOGCS", "habilitación", "calidad", "auditoría servicios salud"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "DECRETO 1683 DE 2013": {
         "nombre": "Decreto 1683 de 2013",
@@ -1562,6 +1569,7 @@ DECRETOS = {
             "movilidad régimen",
             "régimen contributivo subsidiado",
         ],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "DECRETO 866 DE 2017": {
         "nombre": "Decreto 866 de 2017",
@@ -2508,6 +2516,7 @@ RESOLUCIONES = {
         "ambito": "SOGCS — reporte obligatorio de indicadores trazadores",
         "vigente": True,
         "keywords": ["calidad", "indicadores trazadores", "SOGCS", "monitoría"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "RESOLUCION 3100 DE 2019": {
         "nombre": "Resolución 3100 de 2019 (MinSalud)",
@@ -2522,6 +2531,7 @@ RESOLUCIONES = {
             "Sirve para acreditar que el servicio facturado estaba habilitado."
         ),
         "keywords": ["habilitación", "REPS", "registro especial prestadores", "estándares"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "RESOLUCION 202 DE 2021": {
         "nombre": "Resolución 202 de 2021 (MinSalud)",
@@ -2609,13 +2619,23 @@ RESOLUCIONES = {
         "verificada": "27-08-2026 fuente oficial (normograma Supersalud, Res. 2335/2023 art. 20)",
         "keywords": ["416", "3047", "glosa", "derogada"],
     },
+    # 28-08-2026: estaba bien marcada como no vigente, pero SIN el campo que
+    # dice quién la derogó. Ese campo no es decorativo: el revisor de citas lo
+    # lee para redactar el aviso y para callarse cuando el dictamen ya nombra a
+    # la sucesora. Vacío, el aviso salía sin decir por cuál hay que cambiarla,
+    # que es justo lo que el gestor necesita saber.
     "RESOLUCION 2003 DE 2014": {
         "nombre": "Resolución 2003 de 2014 (MinSalud)",
-        "titulo": "Sistema Único de Habilitación — manual de inscripción",
-        "ambito": "Habilitación — manual de criterios",
+        "titulo": "Procedimientos y condiciones de inscripción de prestadores y habilitación",
+        "ambito": "Aplicable solo a hechos anteriores a la Res. 3100 de 2019",
         "vigente": False,
-        "notas": "Antecesora de Res. 3100/2019.",
-        "keywords": ["Res. 2003", "habilitación 2014", "manual inscripción"],
+        "derogada_por": (
+            "el artículo 27 de la Resolución 3100 de 2019, que adoptó el Manual de "
+            "Inscripción de Prestadores y Habilitación de Servicios de Salud"
+        ),
+        "notas": "Antecesora de la Res. 3100 de 2019.",
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, nota de vigencia literal)",
+        "keywords": ["Res. 2003", "habilitación 2014", "manual inscripción", "derogada"],
     },
     "RESOLUCION 1604 DE 2024": {
         # Corregida el 25-08-2026. El sistema la daba como "modificaciones al
