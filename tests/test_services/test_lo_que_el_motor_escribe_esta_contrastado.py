@@ -15,6 +15,14 @@ comparó» de «alguien lo escribió de memoria». Esta prueba fija la lista de 
 que ya están contrastadas para que nadie le quite la nota, y deja anotadas las
 que faltan, con su razón.
 
+UNA TRAMPA QUE CONVIENE CONOCER: dos normas pueden llevar el mismo número y
+el mismo año y ser documentos distintos. La Circular 19 de 2024 del corpus es
+la de la Comisión Nacional de Precios de Medicamentos; en el normograma de
+salud, con ese mismo número, está una circular conjunta de MinSalud y
+MinTrabajo sobre mpox. Al revisar el corpus esa coincidencia hizo parecer por
+un momento que la ficha estaba mal descrita, y no lo estaba. Antes de corregir
+una ficha hay que mirar también el emisor y la fecha, no solo el número.
+
 NO exige que TODAS lo estén: eso volvería roja la suite por trabajo pendiente,
 que es la forma más rápida de que alguien apague la prueba. Exige que las ya
 hechas no retrocedan y que la lista de pendientes no crezca.
@@ -30,10 +38,13 @@ from app.services.normativa_completa import _TODAS_LAS_NORMAS
 # 27 y el 28-08-2026. Quitarle la nota a cualquiera de estas rompe la prueba.
 CONTRASTADAS = [
     "DECRETO 1011 DE 2006",
+    "DECRETO 1072 DE 2015",
     "DECRETO 1295 DE 1994",
     "DECRETO 2353 DE 2015",
     "DECRETO 441 DE 2022",
+    "LEY 1150 DE 2007",
     "LEY 1388 DE 2010",
+    "LEY 1581 DE 2012",
     "LEY 2294 DE 2023",
     "LEY 715 DE 2001",
     "LEY 91 DE 1989",
@@ -55,11 +66,13 @@ CONTRASTADAS = [
 # varias hay que buscarlas en otra fuente; y la Res. 124 de 2026 es del propio
 # hospital, no de un ministerio.
 FALTAN_CON_MOTIVO = {
-    "CIRCULAR 19 DE 2024": "no se ubicó en el normograma; buscarla en la fuente del emisor",
-    "DECRETO 1072 DE 2015": "es del sector Trabajo, no está en el normograma de salud",
+    "CIRCULAR 19 DE 2024": (
+        "es de la Comisión Nacional de Precios (CNPMDM), que numera aparte: en el "
+        "normograma de salud, con ese mismo número y año, está una circular conjunta "
+        "MinSalud–MinTrabajo sobre mpox, que es OTRO documento. Buscarla donde la "
+        "publica la CNPMDM"
+    ),
     "DECRETO 3752 DE 2003": "no se ubicó en el normograma (404)",
-    "LEY 1150 DE 2007": "contratación estatal; no está en el normograma de salud",
-    "LEY 1581 DE 2012": "habeas data; no está en el normograma de salud",
     "RESOLUCION 124 DE 2026": "es del propio HUS, no de un ministerio",
     "RESOLUCION 1652 DE 2021": "no se ubicó en el normograma (404)",
     "RESOLUCION 2358 DE 1998": "no se ubicó en el normograma (404)",

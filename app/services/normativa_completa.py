@@ -736,6 +736,7 @@ LEYES = {
         "ambito": "Contratación estatal — modalidades de selección y régimen aplicable",
         "vigente": True,
         "keywords": ["contratación estatal", "selección abreviada", "régimen ESE", "Ley 1150"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "DECRETO 1082 DE 2015": {
         "nombre": "Decreto 1082 de 2015 (DUR Planeación)",
@@ -829,6 +830,7 @@ LEYES = {
         "ambito": "Datos sensibles del paciente — historia clínica digital",
         "vigente": True,
         "keywords": ["habeas data", "datos personales", "datos sensibles", "tratamiento"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "LEY 1755 DE 2015": {
         "nombre": "Ley 1755 de 2015",
@@ -1541,6 +1543,7 @@ DECRETOS = {
         "ambito": "ARL — Libro 2 Parte 2 Título 4",
         "vigente": True,
         "keywords": ["ARL", "riesgos laborales", "decreto único trabajo"],
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     # ─── R52 B: ampliación catálogo ────────────────────────────────────────
     "DECRETO 1011 DE 2006": {
@@ -2837,6 +2840,17 @@ CIRCULARES = {
     # salía marcado con «NORMA_INEXISTENTE» en rojo. Son las dos normas con
     # que se responde una glosa de «precio superior al regulado».
     "CIRCULAR 19 DE 2024": {
+        # OJO — HAY DOS «CIRCULAR 19 DE 2024» Y NO SON LA MISMA (28-08-2026).
+        # Esta es la de la Comisión Nacional de Precios de Medicamentos y
+        # Dispositivos Médicos (CNPMDM), del 30 de julio de 2024, sobre precios.
+        # En el normograma de la Supersalud, con ese mismo número y año, está la
+        # CIRCULAR CONJUNTA EXTERNA 00000019 de 2024 de MinSalud y MinTrabajo, del
+        # 28 de noviembre, que es de mpox (viruela símica). Son documentos
+        # distintos: la Comisión de Precios numera sus circulares aparte.
+        # Se deja escrito porque al revisar el corpus esa coincidencia hizo
+        # parecer que esta ficha estaba mal descrita, y no lo está. Por eso esta
+        # norma NO se puede contrastar en el normograma de salud: hay que buscarla
+        # donde la publica la CNPMDM.
         "nombre": "Circular 19 de 2024 (CNPMDM — MinSalud/MinCIT)",
         "titulo": "Precio máximo de venta de medicamentos en control directo",
         "ambito": "Medicamentos con control directo de precios — por mercado relevante",
