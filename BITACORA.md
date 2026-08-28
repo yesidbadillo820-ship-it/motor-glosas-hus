@@ -162,14 +162,16 @@ corrió todo en el servidor y se contó lo que quedó:
 | Carpetas que sobraban | 1, y era una copia repetida |
 
 Los 645 salen de 322 facturas con sus dos folios (644) más la HUS380112, que
-solo tiene el clínico. Los 322 XML son uno por factura, menos esa misma.
+**solo tiene el de la factura**. Los 322 XML son uno por factura, menos esa
+misma.
 
 - **La carpeta HUS354214.** Tenía adentro un folio con el mismo nombre de uno
   que ya estaba suelto. El bot no lo pisó, y por eso no borró la carpeta. Se
   comprobó por huella digital (MD5) que **los dos archivos son idénticos**: la
   copia de adentro sobra y la carpeta se puede borrar.
-- **A la HUS380112 le falta el XML.** En la carpeta del paquete solo está el
-  PDF de la factura; el archivo `.xml` no está. Hay que conseguirlo.
+- **La HUS380112 tiene tres huecos.** Le falta el folio clínico (EPICRIS),
+  le falta el `.xml`, y su respuesta a glosa nunca apareció — que es la razón
+  de las otras dos. Es la única de las 323 en esa situación.
 
 **10. Una alarma mía que resultó falsa, y queda anotada para no repetirla.** Al
 ver que muchos folios pesan 3 KB avisé que podían estar vacíos. **Estaba
@@ -181,6 +183,31 @@ imagen, una hoja de texto pesa unos cientos de bytes.
 **El tamaño no sirve para saber si un folio está vacío. Lo que sirve es contar
 las páginas**: un folio de una sola página es el índice y nada más. Esa cuenta
 quedó pendiente de correr en el servidor.
+
+**11. La cuenta de páginas: ningún folio salió vacío.** Se contaron las páginas
+de los 322 folios clínicos, que es la comprobación que de verdad sirve:
+
+| | |
+|---|---|
+| Folios de **una** página (vacíos) | **0** |
+| El más corto | 2 páginas |
+| El más largo | 465 páginas |
+| Páginas en total | 4.294 |
+| Promedio | 13 páginas por folio |
+
+De paso salió el hueco de la HUS380112: hay 322 folios clínicos y 323 de
+factura, y el que falta es el suyo.
+
+**12. Los 107 folios de dos páginas, cruzados contra la lista.** Un folio de
+dos páginas es índice + una sola hoja. Se cruzaron contra las 101 facturas que
+no tenían carpeta de soportes:
+
+- **67** son de esas 101 — está bien: su folio es el índice y la respuesta.
+- **34** de las 101 salieron con más de dos páginas, porque su respuesta es
+  más larga. También está bien.
+- **40 no son de las 101.** Esas facturas **sí tenían carpeta de soportes** y
+  aun así su folio quedó con una sola hoja de contenido. Puede ser legítimo,
+  pero queda anotado para revisarlo antes de radicar.
 
 ### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
 
@@ -8314,13 +8341,16 @@ está a un clic.
 ## 3) PENDIENTE
 
 ### Radicación del paquete 31068 (28-08)
-- **Contar las páginas de los folios clínicos.** Es la única comprobación que
-  falta antes de radicar: si alguno tiene una sola página, es el índice sin
-  nada detrás y hay que rehacerlo. El tamaño del archivo NO sirve para esto.
+- **~~Contar las páginas de los folios clínicos~~ — HECHO.** Ningún folio salió
+  vacío: el más corto tiene dos páginas. Son 4.294 páginas en total.
+- **Los 40 folios de dos páginas que SÍ tenían carpeta de soportes.** Su folio
+  clínico quedó con una sola hoja de contenido. Falta mirar qué trae esa hoja
+  para saber si se les quedó algo por fuera.
+- **La HUS380112: le falta el EPICRIS y le falta el `.xml`.** Las dos cosas
+  vienen de lo mismo — su respuesta a glosa nunca apareció. Es la única de las
+  323 así.
 - **Borrar la carpeta `HUS354214`.** Adentro quedó una copia idéntica (misma
   huella MD5) de un folio que ya está suelto. Es lo único que sobra.
-- **A la HUS380112 le falta el archivo `.xml`.** En la carpeta del paquete solo
-  está el PDF de la factura. Es la única de las 323 a la que le falta.
 - **DECISIÓN SUYA: borrar la carpeta `_APARTADOS_REVISAR_Y_BORRAR`.** Ahí
   quedaron los 1.340 archivos que se sacaron de las carpetas de factura
   (historias clínicas, respuestas, detallados). El bot no los borra a propósito:
@@ -9039,13 +9069,12 @@ carpeta quedó con **645 folios en PDF y 322 XML**, sueltos, como se radica.
 
 Lo que falta:
 
-1. **Contar las páginas de los folios clínicos** (el comando quedó en el chat).
-   Es la última comprobación antes de radicar: un folio de una sola página es
-   el índice sin nada detrás.
-2. Borrar la carpeta **`HUS354214`**: adentro quedó una copia idéntica de un
+1. **Los 40 folios de dos páginas** que sí tenían carpeta de soportes: mirar
+   qué trae esa única hoja. Es lo último que puede parar la radicación.
+2. **La HUS380112**: conseguir su respuesta a glosa y su `.xml`. Le falta el
+   folio clínico y el XML; las dos cosas salen de ahí.
+3. Borrar la carpeta **`HUS354214`**: adentro quedó una copia idéntica de un
    folio que ya está suelto.
-3. Conseguir el **`.xml` de la HUS380112**. En la carpeta del paquete solo está
-   el PDF de la factura.
 4. Revisar la carpeta `_APARTADOS_REVISAR_Y_BORRAR` y borrarla cuando esté
    seguro.
 5. Decidir qué se hace con los **$361.758.330** de glosa que no entraron al
