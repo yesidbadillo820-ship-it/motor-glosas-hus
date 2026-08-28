@@ -105,11 +105,36 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # CORREGIDA EL 28-08-2026 CONTRA EL TEXTO OFICIAL.
+    #
+    # Este catálogo decía «Procedimiento de conciliación de glosas médicas», y
+    # con eso el acta de conciliación —el documento que FIRMAN el HUS y la
+    # EPS— se suscribía «en cumplimiento de la Resolución 2175 de 2015».
+    #
+    # No es eso. Del normograma de la Supersalud, encabezado literal:
+    #
+    #   «RESOLUCIÓN 2175 DE 2015 (junio 18) — Por la cual se establece el
+    #    anexo técnico para el reporte de las atenciones en salud a menores de
+    #    18 años, gestantes y atenciones de parto y se adopta el mecanismo de
+    #    transferencia de los archivos.»
+    #
+    # Es del programa Familias en Acción. Nada que ver con glosas. Es el mismo
+    # error de la Ley 1388 de 2010 —citada para discapacidad auditiva cuando es
+    # de cáncer infantil— pero dentro de nuestro propio tema y en un documento
+    # firmado: a la EPS le basta abrirla para restarle seriedad al acta.
+    #
+    # No se borra del catálogo: existe y el motor puede toparse con ella. Se
+    # deja con lo que de verdad dice.
     "RESOLUCION 2175/2015": {
-        "nombre": "Resolución 2175 de 2015",
-        "resumen": "Procedimiento de conciliación de glosas médicas.",
+        "nombre": "Resolución 2175 de 2015 (MinSalud)",
+        "resumen": (
+            "Anexo técnico para el reporte de atenciones en salud a menores de 18 años, "
+            "gestantes y atenciones de parto (Familias en Acción). NO regula glosas ni "
+            "conciliación: para eso rige la Res. 2284 de 2023, Anexo Técnico 3."
+        ),
         "tipo": "RESOLUCION",
         "vigente": True,
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "CIRCULAR 047/2025": {
         "nombre": "Circular Externa 047 de 2025 (MinSalud)",

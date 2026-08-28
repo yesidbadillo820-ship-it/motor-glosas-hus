@@ -2255,12 +2255,34 @@ RESOLUCIONES = {
             "quirurgicos",
         ],
     },
+    # CORREGIDA EL 28-08-2026 CONTRA EL TEXTO OFICIAL — ver el comentario largo
+    # en normativa.py. El corpus la daba como «procedimiento de conciliación de
+    # glosas médicas» y con eso el acta que firman el HUS y la EPS se suscribía
+    # invocándola. Encabezado literal del normograma de la Supersalud:
+    #
+    #   «RESOLUCIÓN 2175 DE 2015 (junio 18) — Por la cual se establece el anexo
+    #    técnico para el reporte de las atenciones en salud a menores de 18
+    #    años, gestantes y atenciones de parto y se adopta el mecanismo de
+    #    transferencia de los archivos.»
+    #
+    # Se le cambian también las palabras clave: con «conciliación» y «auditoría
+    # médica» el buscador del corpus se la ofrecía a la IA justo para el tema
+    # en el que no sirve, que es como llegó al acta.
     "RESOLUCION 2175 DE 2015": {
-        "nombre": "Resolución 2175 de 2015",
-        "titulo": "Procedimiento de conciliación de glosas médicas",
-        "ambito": "Conciliación de auditoría médica",
+        "nombre": "Resolución 2175 de 2015 (MinSalud)",
+        "titulo": (
+            "Anexo técnico para el reporte de atenciones a menores de 18 años, gestantes "
+            "y partos (Familias en Acción)"
+        ),
+        "ambito": "Reporte de atenciones — NO regula glosas ni conciliación",
         "vigente": True,
-        "keywords": ["conciliación", "auditoría médica", "2175"],
+        "notas": (
+            "Para el trámite de glosas y su conciliación rige el Anexo Técnico 3 de la "
+            "Res. 2284 de 2023 (Manual Único de Devoluciones, Glosas y Respuestas), junto "
+            "con el art. 57 de la Ley 1438 de 2011 y el art. 23 del Decreto 4747 de 2007."
+        ),
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
+        "keywords": ["2175", "menores de 18 años", "gestantes", "parto", "reporte"],
     },
     "RESOLUCION 5159 DE 2015": {
         # DEROGADA (verificado el 25-08-2026 en el PDF oficial del Ministerio).
