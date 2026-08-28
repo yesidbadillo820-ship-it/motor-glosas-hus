@@ -2163,3 +2163,90 @@ def test_el_comando_saca_los_folios(tmp_path):
         "680010079201_HUS404986_EPICRIS.pdf",
         "680010079201_HUS404986_FACTURA.pdf",
     ]
+
+
+# ─── Traer el XML de cada factura a la carpeta de radicación ─────────────────
+
+
+def test_trae_el_xml_de_cada_factura_que_tiene_folio(tmp_path):
+    """El XML va junto a los dos folios, suelto y sin crear carpetas."""
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    _pdf(gi / "680010079201_HUS403233_FACTURA.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<f/>", encoding="utf-8")
+    (xml / "680010079201_HUS999999_FACTURA.xml").write_text("<otra/>", encoding="utf-8")
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert (gi / "680010079201_HUS403233_FACTURA.xml").read_text(encoding="utf-8") == "<f/>"
+    assert not (gi / "680010079201_HUS999999_FACTURA.xml").exists(), "trajo una que no estaba"
+    assert [h.factura for h in hechos] == ["HUS403233"] and hechos[0].traidos == 1
+
+
+def test_el_xml_original_no_se_mueve(tmp_path):
+    """Se COPIA: la carpeta del XML es la fuente y no puede quedar vacía."""
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    origen = xml / "680010079201_HUS403233_FACTURA.xml"
+    origen.write_text("<f/>", encoding="utf-8")
+
+    org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert origen.exists(), "movió el XML en vez de copiarlo"
+
+
+def test_avisa_la_factura_sin_xml(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert hechos[0].traidos == 0 and "no está el XML" in hechos[0].aviso
+
+
+def test_no_pisa_un_xml_que_ya_estaba(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    (gi / "680010079201_HUS403233_FACTURA.xml").write_text("<el bueno/>", encoding="utf-8")
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<otro/>", encoding="utf-8")
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert (gi / "680010079201_HUS403233_FACTURA.xml").read_text(encoding="utf-8") == "<el bueno/>"
+    assert "ya estaba" in hechos[0].aviso
+
+
+def test_traer_xml_sin_aplicar_no_copia(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<f/>", encoding="utf-8")
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=False)
+
+    assert not (gi / "680010079201_HUS403233_FACTURA.xml").exists()
+    assert hechos[0].traidos == 1
+
+
+def test_el_comando_trae_los_xml(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<f/>", encoding="utf-8")
+
+    assert (
+        org.main(["--traer-xml", "--carpeta", str(gi), "--carpeta-facturas", str(xml), "--aplicar"])
+        == 0
+    )
+
+    assert (gi / "680010079201_HUS403233_FACTURA.xml").exists()
