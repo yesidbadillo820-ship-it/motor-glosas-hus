@@ -99,11 +99,26 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,  # aún citable como antecedente
     },
-    "RESOLUCION 5269/2017": {
-        "nombre": "Resolución 5269 de 2017",
-        "resumen": "Plan de Beneficios en Salud (PBS). Listado de servicios cubiertos.",
+    # 28-08-2026 — EL LISTADO DEL PBS SE REEXPIDE CADA AÑO.
+    # Este catálogo tenía la Res. 5269 de 2017 como vigente. La derogó el art.
+    # 132 de la Res. 5857 de 2018, y desde entonces la cadena siguió: 2481/2020
+    # → 2292/2021 → 2808/2022 → 2366/2023 → 2718/2024. Con la ficha vieja el
+    # motor podía afirmar que un servicio está cubierto invocando un listado de
+    # hace ocho años; a la entidad le basta mostrar la derogatoria.
+    # La cadena completa, con la nota de vigencia literal de cada eslabón, está
+    # en normativa_completa.py.
+    "RESOLUCION 2718/2024": {
+        "nombre": "Resolución 2718 de 2024 (MinSalud)",
+        "resumen": (
+            "Servicios y tecnologías de salud financiados con recursos de la UPC. Rige a "
+            "partir del 1 de enero de 2025. Es el último eslabón sin derogatoria anotada "
+            "en el normograma al 28-08-2026; el listado se reexpide cada diciembre, así "
+            "que conviene verificar si salió uno posterior. Para un servicio anterior "
+            "aplica el listado que regía ese día."
+        ),
         "tipo": "RESOLUCION",
         "vigente": True,
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud)",
     },
     # CORREGIDA EL 28-08-2026 CONTRA EL TEXTO OFICIAL.
     #

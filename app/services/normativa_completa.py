@@ -2125,12 +2125,42 @@ RESOLUCIONES = {
             "archivo",
         ],
     },
+    # ── LA CADENA DEL PBS: CADA AÑO SALE UNA NUEVA (28-08-2026) ──────────
+    #
+    # El corpus tenía CUATRO resoluciones del listado de servicios financiados
+    # con UPC marcadas como vigentes a la vez. Solo puede regir una: el
+    # Ministerio la reexpide cada diciembre para el año siguiente. Con eso, el
+    # motor podía decirle al auditor que un servicio está cubierto invocando un
+    # listado que dejó de aplicar hace años — y a la entidad le basta mostrar la
+    # derogatoria para ratificar la glosa.
+    #
+    # Cadena completa, bajada del normograma de la Supersalud el 28-08-2026,
+    # cada eslabón con la nota de vigencia literal de su propia página:
+    #
+    #   Res. 5269 de 2017 → derogada por el art. 132 de la Res. 5857 de 2018
+    #   Res. 5857 de 2018 → (el corpus ya la tenía como no vigente)
+    #   Res. 2481 de 2020 → derogada por el art. 116 de la Res. 2292 de 2021
+    #   Res. 2292 de 2021 → derogada por el art. 116 de la Res. 2808 de 2022
+    #   Res. 2808 de 2022 → derogada por el art. 114 de la Res. 2366 de 2023
+    #   Res. 2366 de 2023 → derogada con la expedición de la Res. 2718 de 2024
+    #   Res. 2718 de 2024 → el normograma NO le registra derogatoria
+    #
+    # OJO CON LA FECHA DEL SERVICIO: no se borra ninguna. Para un servicio
+    # prestado en 2022 el listado aplicable ES el de la Res. 2808 de 2022, y
+    # citar el de 2024 sería el error contrario.
     "RESOLUCION 5269 DE 2017": {
         "nombre": "Resolución 5269 de 2017 (MinSalud)",
-        "titulo": "Plan de Beneficios en Salud (PBS)",
-        "ambito": "Listado de servicios cubiertos por UPC",
-        "vigente": True,
-        "keywords": ["PBS", "plan beneficios", "UPC", "cobertura"],
+        "titulo": "Plan de Beneficios en Salud con cargo a la UPC (DEROGADA)",
+        "ambito": "Aplicable solo a servicios prestados mientras rigió (año 2018)",
+        "vigente": False,
+        "derogada_por": (
+            "el artículo 132 de la Resolución 5857 de 2018. El listado se reexpide cada "
+            "año: la cadena sigue con la Res. 2481 de 2020, la Res. 2292 de 2021, la "
+            "Res. 2808 de 2022, la Res. 2366 de 2023 y la Res. 2718 de 2024, que es la "
+            "última a la que el normograma no le registra derogatoria"
+        ),
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, nota de vigencia literal)",
+        "keywords": ["PBS", "plan beneficios", "UPC", "cobertura", "derogada"],
     },
     "RESOLUCION 1995 DE 1999": {
         "nombre": "Resolución 1995 de 1999 (MinSalud)",
@@ -2423,12 +2453,47 @@ RESOLUCIONES = {
         "notas": "Reemplazada por Res. 2481/2020.",
         "keywords": ["PBS", "UPC", "plan beneficios", "cobertura UPC"],
     },
+    # CARGADA EL 28-08-2026 — ES LA QUE HAY QUE CITAR HOY.
+    # De nada sirve marcar como derogadas las cuatro anteriores si el motor no
+    # tiene ninguna vigente que ofrecer: se quedaría sin poder decir que un
+    # servicio está cubierto. Encabezado literal del normograma:
+    #
+    #   «RESOLUCIÓN 2718 DE 2024 (diciembre 30) — Diario Oficial No. 53.030 de
+    #    14 de febrero de 2025 — <Rige a partir del 1 de enero de 2025> — Por
+    #    la cual se actualizan los servicios y tecnologías de salud financiados
+    #    con recursos de la Unidad de Pago por Capitación (UPC)»
+    #
+    # LO QUE AQUI NO SE AFIRMA: que sea la del año 2026. El listado se reexpide
+    # cada diciembre y el normograma puede ir atrasado; lo único comprobado es
+    # que a esta NO le registra derogatoria al 28-08-2026. Antes de fundar un
+    # dictamen en ella conviene mirar si salió una nueva. Sin evidencia no se
+    # inventa una resolución que no se ha visto.
+    "RESOLUCION 2718 DE 2024": {
+        "nombre": "Resolución 2718 de 2024 (MinSalud)",
+        "titulo": "Servicios y tecnologías de salud financiados con recursos de la UPC",
+        "ambito": "PBS — rige a partir del 1 de enero de 2025",
+        "vigente": True,
+        "notas": (
+            "Es el último eslabón de la cadena del PBS que registra el normograma de la "
+            "Supersalud, sin derogatoria anotada al 28-08-2026. El listado se reexpide "
+            "cada diciembre: verifique si salió uno posterior antes de citarla. Para un "
+            "servicio anterior al 1 de enero de 2025 aplica el listado que regía ese día, "
+            "no este."
+        ),
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
+        "keywords": ["PBS", "UPC", "2718", "cobertura", "plan de beneficios"],
+    },
     "RESOLUCION 2481 DE 2020": {
         "nombre": "Resolución 2481 de 2020 (MinSalud)",
-        "titulo": "Listado de tecnologías de salud financiadas con UPC",
-        "ambito": "Cobertura PBS vigente",
-        "vigente": True,
-        "keywords": ["PBS", "UPC", "Res. 2481", "listado financiado"],
+        "titulo": "Servicios y tecnologías financiados con UPC (DEROGADA)",
+        "ambito": "Aplicable solo a servicios prestados en 2021, mientras rigió",
+        "vigente": False,
+        "derogada_por": (
+            "el artículo 116 de la Resolución 2292 de 2021, que a su vez fue derogada. "
+            "Para servicios prestados desde el 1 de enero de 2025 rige la Res. 2718 de 2024"
+        ),
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, nota de vigencia literal)",
+        "keywords": ["PBS", "UPC", "Res. 2481", "listado financiado", "derogada"],
     },
     "RESOLUCION 4505 DE 2012": {
         "nombre": "Resolución 4505 de 2012 (MinSalud)",
@@ -2623,9 +2688,14 @@ RESOLUCIONES = {
     },
     "RESOLUCION 2292 DE 2021": {
         "nombre": "Resolución 2292 de 2021 (MinSalud)",
-        "titulo": "Actualización del Plan de Beneficios en Salud (PBS) con cargo a la UPC",
-        "ambito": "PBS — listado de tecnologías financiadas con UPC",
-        "vigente": True,
+        "titulo": "Servicios y tecnologías financiados con UPC (DEROGADA)",
+        "ambito": "Aplicable solo a servicios prestados en 2022, mientras rigió",
+        "vigente": False,
+        "derogada_por": (
+            "el artículo 116 de la Resolución 2808 de 2022. Para servicios prestados "
+            "desde el 1 de enero de 2025 rige la Res. 2718 de 2024"
+        ),
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, nota de vigencia literal)",
         "notas": "Reemplazó parcialmente la Res. 5267/2017. Incluye tecnologías de alto costo (Factor VIII recombinante, Emicizumab para profilaxis en hemofilia con inhibidores) con financiación UPC.",
         "keywords": ["Resolución 2292", "PBS", "UPC", "hemofilia", "Emicizumab"],
     },
