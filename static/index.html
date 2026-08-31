@@ -22883,6 +22883,13 @@ var AUDITOR_TABS_PERMITIDAS = {
   // El validador ADRES y el buscador de autorizaciones son trabajo diario
   // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
   'validador-adres': true,
+  // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
+  // Faltaban en esta lista, así que el botón del menú se le escondía a todo
+  // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía
+  // siquiera entrar a la pantalla, y desde afuera parecía «falta de permiso»
+  // cuando en realidad el permiso del servidor ya lo tenían: las rutas de
+  // responder, cambiar estado y contestar en lote piden AUDITOR o superior.
+  'glosas-adres': true,
 };
 function aplicarRestriccionesRol(){
   if(USER_ROL !== 'AUDITOR') return;
