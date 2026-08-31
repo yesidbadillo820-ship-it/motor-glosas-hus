@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 28-08-2026 (cierre)
+**Última actualización:** 31-08-2026 (cierre)
 
 ---
 
@@ -88,6 +88,75 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 31-08-2026 — Los gestores no podían entrar al ADRES, y la pantalla no lo decía
+
+**El problema.** Los gestores no podían trabajar las glosas del ADRES y nadie
+sabía por qué. Se revisó y aparecieron **dos cosas distintas** que desde afuera
+se veían igual —«no tengo permiso»— y ninguna era lo que parecía.
+
+**1. El botón del menú se les escondía.** La pantalla tiene una lista de lo que
+puede ver cada rol, y «Glosas ADRES» **no estaba en ella**. Como los 28 usuarios
+del hospital tienen rol de auditor, **ninguno veía la pantalla**. El permiso del
+servidor sí lo tenían desde siempre. **Ya quedó y el área confirmó que entran.**
+
+**2. Repartir el área era solo del administrador.** Las glosas de causal
+compartida (la 4506) las trabajan facturación y las médicas, y solo un
+administrador podía decir cuál la toma — así que se quedaban quietas esperando
+a una sola persona. Se abrió a los gestores, a pedido del área.
+
+Lo que se cuidó al abrirlo: solo se puede repartir en las causales que de
+verdad trabajan dos áreas, queda grabado **quién lo hizo y cuándo**, y se puede
+volver a cambiar. **No se abrió importar el paquete**, porque reimportar
+reemplaza el trabajo de todos.
+
+**3. La pantalla mentía sobre por qué fallaba.** Cuando el servidor le negaba
+algo a alguien, el aviso decía «no se pudo cargar — **revise la conexión**». Le
+echaba la culpa al internet cuando era otra cosa. Por eso el gestor reintentaba,
+culpaba a la red, y el problema nunca llegaba con nombre propio. Ahora dice qué
+le está negando, con su rol y a quién pedírselo.
+
+---
+
+### 31-08-2026 (tarde) — Cinco mejoras de diseño del motor
+
+Salieron de un repaso completo de la pantalla. Cada una arregla algo real.
+
+**El color ahora significa algo.** Los colores se llamaban por su tono
+(«ámbar», «rosa»), lo que obliga a acordarse de si el ámbar era «revisar» o
+«error». Ahora se llaman por lo que quieren decir. Además:
+
+- El ámbar del motor estaba **demasiado pegado al rojo** de error: en un
+  monitor de facturación, y para quien no distingue bien el rojo —uno de cada
+  doce hombres—, eran el mismo aviso. Se separó al doble de distancia.
+- **La plata tiene color propio.** Antes un valor en riesgo se pintaba con el
+  rojo de error, y una glosa de $16 millones bien defendida no es un error: es
+  lo que está en juego.
+- **El color nunca va solo:** ahora cada estado lleva color, icono y palabra.
+  El dictamen se imprime, y en blanco y negro el color no existe.
+
+**El motor muestra lo que corrigió.** Ya arreglaba solo lo que la IA escribe
+mal —quita códigos que no existen, le pone la fecha a una norma derogada,
+corrige artículos— pero lo hacía **en silencio**. Ahora, arriba del dictamen,
+sale la lista de lo que arregló y por qué. No sale impreso: es una nota para el
+gestor, no para la EPS.
+
+**El «0 próximas a vencer» ya no puede mentir.** Si la consulta fallaba, la
+pantalla escribía **0** igual y pintaba el pill verde de «sin glosas próximas a
+vencer». Eso no era cierto: no es que no hubiera, es que **no se pudo
+preguntar**. Y eso cuesta plata — una glosa no contestada a tiempo se da por
+aceptada. Ahora, cuando no sabe, dice que no sabe.
+
+**Cada hoja impresa dice de qué factura es.** El número aparecía una sola vez,
+en la primera hoja. Un dictamen de seis páginas que se separa en la mesa de
+radicación dejaba hojas sueltas sin identificar.
+
+**Las glosas sin causal ya no entran calladas.** En el lote real, **59 de 135
+(el 44 %) entraron sin código de causal**. Sin causal el motor no sabe contra
+qué defiende: puede contestar la forma cuando la glosa era de fondo. Eso **no lo
+arregla el programa** —la columna no viene en el archivo— pero ahora la pantalla
+dice cuántas son, cuáles, y que hay que pedirle esa columna a quien manda el
+archivo. Con la cifra en la mano, el reclamo tiene evidencia.
 
 ### 28-08-2026 (cierre) — Las objeciones del ADRES quedaron cargadas: 58 facturas y $103,9 millones
 
