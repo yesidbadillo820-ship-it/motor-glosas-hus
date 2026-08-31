@@ -1,5 +1,24 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 3) — La casilla de la voz en Windows no se llama así
+
+Corrección de una instrucción equivocada que se entregó al usuario.
+
+- **El nombre estaba mal.** La app decía «marcando **Voz** entre las funciones
+  opcionales». En esa pantalla de Windows la casilla se llama **«Texto a voz»**
+  — «Voz» a secas no existe ahí, y «Reconocimiento de voz» es otra cosa
+  (dictado).
+- **Y ese camino es peligroso.** En la misma pantalla de *Idioma y región →
+  Agregar idioma* está **«Establecer como mi idioma de presentación de
+  Windows»**: marcarla por error deja **todo el PC del hospital en noruego**.
+- **Se cambió al camino corto:** *Configuración → Hora e idioma → **Voz** →
+  Administrar voces → Agregar voces → «Noruego (Bokmål)»*. Instala solo la voz
+  y no toca el idioma del sistema.
+- La guía documenta los dos caminos y advierte del riesgo del primero.
+
+Comprobado en Chromium con user-agent de Windows: el aviso muestra el camino
+nuevo y ya no nombra el de «Idioma y región».
+
 ## Sesión 31-ago-2026 (noche 2) — La voz noruega: aviso sin salida y voces tardías
 
 En la prueba real la app dijo «este dispositivo no tiene voz noruega» y ahí

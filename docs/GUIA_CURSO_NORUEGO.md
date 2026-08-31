@@ -138,11 +138,23 @@ Tres advertencias que la aplicación repite en pantalla:
    «jei» porque es lo más cercano a un oído español, pero la *h* noruega es un
    soplido suave, no la jota española. Sirven para arrancar; el oído se afina
    escuchando.
-2. **El audio usa la voz del propio celular.** Si el aparato no tiene voz
-   noruega instalada, la aplicación lo dice y muestra el texto en vez de leerlo
-   con acento español, que enseñaría mal. En Android se agrega en
-   *Ajustes → Idiomas → Texto a voz*; en iPhone, en *Ajustes → Accesibilidad →
-   Contenido hablado → Voces*.
+2. **El audio usa la voz del propio aparato.** Si no tiene voz noruega
+   instalada, la aplicación lo dice y muestra el texto en vez de leerlo con
+   acento español, que enseñaría mal. **La propia aplicación indica dónde se
+   instala**, según el aparato:
+
+   | Aparato | Dónde |
+   |---|---|
+   | **Windows** | Configuración → Hora e idioma → **Voz** → Administrar voces → **Agregar voces** → «Noruego (Bokmål)». Luego **cerrar el navegador por completo**. |
+   | **Android** | Ajustes → Idiomas → Salida de texto a voz → instalar «norsk bokmål» |
+   | **iPhone** | Ajustes → Accesibilidad → Contenido hablado → Voces → «Norsk (bokmål)» |
+   | **macOS** | Ajustes del sistema → Accesibilidad → Contenido hablado → Gestionar voces → «Noruego» |
+
+   > En Windows **no** conviene el camino de *Idioma y región → Agregar
+   > idioma*: ahí la casilla se llama **«Texto a voz»** (no «Voz») y en esa
+   > misma pantalla está *«Establecer como mi idioma de presentación de
+   > Windows»*, que deja **todo el sistema en noruego**. El camino por
+   > *Voz → Agregar voces* instala solo la voz.
 3. **Enseña bokmål**, no nynorsk. Es la forma escrita que usa la gran mayoría
    de los noruegos y la única que se evalúa en la prueba oficial para
    extranjeros.

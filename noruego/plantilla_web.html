@@ -551,10 +551,13 @@ function comoInstalarVoz(){
     instalando el idioma <b>norsk bokmål</b>`;
   if(/iPhone|iPad|iPod/i.test(ua)) return `en <b>Ajustes → Accesibilidad →
     Contenido hablado → Voces</b>, agregando <b>Norsk (bokmål)</b>`;
-  if(/Windows/i.test(ua)) return `en <b>Configuración → Hora e idioma → Idioma y
-    región → Agregar idioma → Norsk bokmål</b>, marcando <b>Voz</b> entre las
-    funciones opcionales. Después hay que <b>cerrar el navegador por completo</b>
-    y volverlo a abrir`;
+  // OJO con el camino: por «Agregar idioma» la casilla se llama «Texto a voz»
+  // (no «Voz»), y en esa misma pantalla está «Establecer como mi idioma de
+  // presentación de Windows», que deja TODO el sistema en noruego. Por eso se
+  // manda por Voz → Agregar voces, que instala solo la voz.
+  if(/Windows/i.test(ua)) return `en <b>Configuración → Hora e idioma → Voz →
+    Administrar voces → Agregar voces</b>, buscando <b>Noruego (Bokmål)</b>.
+    Después hay que <b>cerrar el navegador por completo</b> y volverlo a abrir`;
   if(/Mac/i.test(ua)) return `en <b>Ajustes del sistema → Accesibilidad → Contenido
     hablado → Voz del sistema → Gestionar voces</b>, agregando <b>Noruego</b>`;
   return `en los ajustes de <b>texto a voz</b> del aparato, agregando el idioma
