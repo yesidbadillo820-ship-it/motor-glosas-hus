@@ -8711,6 +8711,40 @@ está a un clic.
 
 ---
 
+### 24 al 31-08-2026 — SIIFA: el balance de las cuatro IPS y el segundo cargue de Socorro
+
+**El balance cerró redondo (24-08):** con la opción [B] se cruzaron las
+cuatro IPS — **nada del corte quedó sin responder en ninguna**. Total al
+corte: 65.088 seguimientos por $3.321 millones, todos respondidos. Salieron
+los informes Word (consolidado y el de solo-pendientes).
+
+**SANITAS no para (24 al 31-08):** en una semana le cargó a Socorro
+**3.345 glosas nuevas por $148,6 millones** (más 847 devoluciones por
+$7,9 millones que siguen pendientes de código). El flujo con `--sin-respuesta`
+(bajar de SIIFA solo lo pendiente) demostró ser el camino rápido para los
+cortes semanales.
+
+**Segundo cargue de Socorro (31-08): 3.355 respuestas por $158.713.879 en
+7 minutos 20 segundos, cero errores.** El archivo llegó de la clínica con
+las columnas `respuesta`/`codigo` diligenciadas; la revisión previa recortó
+32 textos de la factura DHMB1164677 que pasaban de 1.500 caracteres.
+
+**Hallazgo del catálogo — RE9702 es el código de GLOSA ACEPTADA.** Una línea
+del archivo venía aceptando (DHMB1165885, $42.800) con RE9702 y SIIFA la
+tomó. Confirma el patrón: terminación 01 = devolución, 02 = glosa
+(RE9701↔RE9702 aceptada; RE9601↔RE9602 injustificada). Los grupos de glosa
+del catálogo de la API vuelven vacíos: quedó documentado en
+`docs/CONTEXTO_SIIFA.md`.
+
+**También esta semana:** semáforo del HUS al 24-08 (2.657 respondidas con la
+EPS en mora por $458 millones —SANITAS $394M—; las 4 devoluciones ratificadas
+seguían sin subsanar y la glosa SOAT HUS538952 vencida sin responder);
+desgloses por EPS de lo respondido (51.381 por $2.284 millones, 99% SANITAS)
+y de lo pendiente; y la **landing page del servicio** (borrador «Glosa Cero»,
+artefacto privado con los números anonimizados) con su análisis de precios.
+
+---
+
 ## 3) PENDIENTE
 
 ### Objeciones del ADRES en DGH (28-08, al cierre)
@@ -9714,11 +9748,15 @@ solo renglón, dígalo y se hace.
   sale al final del dictamen, con la factura ya puesta. Si lo echa de menos,
   dígalo y se devuelve.
 
-**SIIFA (lo primero, 19-08):** (a) tramitar a mano en el portal las 4
-devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);
-(b) cerrar Guane (salida del cargue + informe); (c) correr el **balance**
-de las cuatro IPS con la opción [B] del bot — de ahí sale qué quedó sin
-responder y qué nuevo hay que trabajar.
+**SIIFA (actualizado 31-08):** (a) las **4 devoluciones ratificadas de
+SANITAS del HUS ($14.049.088)** siguen pendientes de trámite MANUAL en el
+portal — vencidas, es lo más urgente; (b) definir el código de las **847
+devoluciones de SANITAS en Socorro ($7,9 millones)** (RE9601 injustificada /
+RE9501 fuera de términos / RE9701 aceptar) y cargarlas; (c) responder lo
+del HUS al corte 24-08 (la glosa SOAT HUS538952 vencida y las ~9 nuevas) y
+las 12 de Girón + 20 de Guane; (d) verificación final del cargue 2 de
+Socorro (`--sin-respuesta`: deben quedar solo las devoluciones); (e) revisión
+de novedades semanal en las cuatro — SANITAS carga a diario.
 
 **Glosas ADRES (mismo día, otro frente):**
 
