@@ -1,5 +1,26 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 2) — La voz noruega: aviso sin salida y voces tardías
+
+En la prueba real la app dijo «este dispositivo no tiene voz noruega» y ahí
+quedó: el usuario no tenía cómo saber que eso se instala.
+
+- **Fallo real: las voces llegan tarde y la pantalla no se redibujaba.** Chrome
+  entrega `speechSynthesis.getVoices()` de forma asíncrona; la primera llamada
+  casi siempre devuelve una lista vacía. Como el aviso se cocina al dibujar,
+  un aparato **que sí tiene** la voz veía «no hay voz» hasta cambiar de
+  pantalla. Ahora `onvoiceschanged` vuelve a dibujar cuando el resultado
+  cambia, y se abstiene si el usuario está escribiendo en un campo.
+- **`comoInstalarVoz()`: instrucciones según el aparato.** Los avisos nombraban
+  solo Android e iPhone. Se agregaron **Windows** (Configuración → Hora e
+  idioma → Agregar idioma → Norsk bokmål, marcando «Voz», y cerrar el navegador
+  por completo) y **macOS**, más un texto genérico. Los tres avisos de audio
+  apagado —inicio, ejercicio de escucha y perfil— dicen ahora cómo arreglarlo.
+- **4 pruebas nuevas** (200): que la búsqueda acepte las tres etiquetas del
+  noruego (`nb`, `no`, `nn`), que la pantalla se redibuje al llegar las voces
+  sin borrar lo escrito, que estén los cuatro sistemas y que ningún aviso quede
+  sin salida.
+
 ## Sesión 31-ago-2026 (noche) — La guía hacía copiar una dirección que no era
 
 Segunda vuelta del mismo problema, en la prueba real.
