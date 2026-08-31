@@ -90,6 +90,61 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 31-08-2026 — Pruebas de estrés: la prueba 2 destapó dos fallas caras
+
+**Prueba 1 (TA0301, La Previsora) — CERRADA.** Las cuatro correcciones del día
+quedaron funcionando en el servidor: la IA identifica sola a
+«LA PREVISORA S.A. — SOAT» (ya no hay que escogerla en el desplegable), toma
+el valor **glosado** de $1.254.000 y no el facturado de $4.180.000, escribe
+«POR VALOR OBJETADO DE» en vez de «FACTURADA POR», y aplica tarifa SOAT plena
+sin robarle el contrato del magisterio.
+
+**Prueba 2 (CL4506, NUEVA EPS) — dos fallas nuevas.**
+
+*La primera.* El recuadro verde del dictamen decía, una línea encima de la
+otra: «Contrato: 02-01-06-00077-2017» y «Tarifa pactada: SOAT PLENO». Las dos
+cosas son falsas. Ese contrato de NUEVA EPS **pactaba SOAT −20 %** y su
+**vigencia terminó el 31 de marzo de 2026**. Decirle a NUEVA EPS que lo
+*pactado* es SOAT pleno, justo en una glosa donde ella objeta la tarifa, es
+firmarle por escrito que el hospital cobró de más.
+
+Lo llamativo es que el arreglo de la mañana ya ponía «TARIFA NO DETERMINADA»
+en la ficha que se le entrega a la IA. La IA la limpió: se quedó con el número
+bonito del contrato vencido y escogió «SOAT PLENO» porque el formato de
+respuesta se lo ofrecía como una de dos opciones válidas. Ahora **la ficha
+manda**: si la vigencia venció, el motor reemplaza esas dos casillas por el
+texto verdadero, aunque la IA haya escrito otra cosa, y se lo avisa al gestor
+en el panel de correcciones.
+
+*La segunda, y es la de fondo.* La glosa objetaba **dos cosas**: la pertinencia
+del material de osteosíntesis y, con la palabra «adicionalmente», que el valor
+unitario del clavo supera el tope contractual. El dictamen contestó la primera
+con tres párrafos y de la segunda **no dijo una sola palabra**. Lo que no se
+contesta se ratifica: esa parte de los $7.310.000 se perdía sin haberla
+discutido.
+
+La causa es de diseño: el motor arma la respuesta con **un solo módulo**,
+escogido por el código de la glosa (CL → pertinencia). Pero el código dice cuál
+es el motivo *principal*, no el único. Se hicieron dos cosas: se le ordenó a la
+IA contestar **todas** las objeciones del texto, cada una en su propio párrafo;
+y se agregó una revisión que detecta la objeción que quedó muda y **se la
+nombra al gestor** («OJO: la glosa también objeta el tope tarifario y el
+dictamen no lo responde»). La revisión **no escribe el argumento que falta** —
+inventarlo sería peor que callarlo.
+
+**Un detalle del oficio.** Una prueba propia atrapó un error mío: la revisión
+nueva confundía «NO SE EVIDENCIA JUSTIFICACIÓN» (que es pertinencia) con una
+glosa de soportes, y reclamaba unos documentos que nadie había pedido. Se
+corrigió la revisión, no la prueba.
+
+**Y una duda resuelta:** La Previsora **no es ARL**, es aseguradora **SOAT**.
+No confundirla con FIDUPREVISORA (la fiduciaria), que sí es FOMAG/magisterio.
+Son nombres parecidos y entidades distintas; el motor ya las separa.
+
+**Falta:** correr las pruebas 3, 4 y 5 (AU0201, SO0102, FA0205) y repetir la
+prueba 2 **adjuntando los PDF de soportes**, porque sin ellos no se pudo
+comprobar si el dictamen cita la nota operatoria.
+
 ### 31-08-2026 (noche) — Curso de noruego para el celular (carpeta `noruego/`)
 
 **Qué se pidió.** Una aplicación web para aprender noruego desde cero hasta
