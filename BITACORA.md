@@ -8897,9 +8897,12 @@ artefacto privado con los números anonimizados) con su análisis de precios.
 - **Instalar la voz noruega donde no la haya.** El computador del hospital no
   la trae, y por eso el audio salió apagado en la primera prueba. **Ahora la
   propia aplicación dice dónde se instala**, distinto en cada aparato: en
-  Windows es Configuración → Hora e idioma → Idioma y región → Agregar idioma →
-  «Norsk bokmål», marcando **Voz** entre las funciones opcionales, y después
-  cerrar el navegador por completo. En Android, Ajustes → Idiomas → Salida de
+  Windows es Configuración → Hora e idioma → **Voz** → Administrar voces →
+  Agregar voces → «Noruego (Bokmål)», y después cerrar el navegador por
+  completo. **Por ahí y no por «Agregar idioma»:** en esa otra pantalla la
+  casilla se llama «Texto a voz» (no «Voz») y al lado está «Establecer como mi
+  idioma de presentación de Windows», que si se marca por error deja todo el
+  computador del hospital en noruego. En Android, Ajustes → Idiomas → Salida de
   texto a voz. Sin la voz, los ejercicios de escuchar muestran el texto en vez
   de sonar: la aplicación lo avisa y no se traba.
 - **Más material para los niveles altos.** Los módulos B2 y C2 funcionan, pero
