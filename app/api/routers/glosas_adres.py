@@ -28,7 +28,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_admin,
     get_auditor_o_superior,
     get_coordinador_o_admin,
     get_usuario_actual,
@@ -343,13 +342,28 @@ def asignar_area(
     glosa_id: int,
     cuerpo: AreaIn,
     db: Session = Depends(get_db),
-    usuario: UsuarioRecord = Depends(get_admin),
+    usuario: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Reparte una glosa de causal compartida entre gestores y médicas.
 
-    Solo **SUPER ADMIN**: la causal 4506 la trabajan las dos áreas y quién la
-    toma depende del procedimiento y de lo que se glosó (el material de
-    osteosíntesis y el de alto costo lo revisa el médico auditor).
+    ABIERTA A LOS GESTORES EL 31-08-2026, a pedido del área. Antes era solo de
+    SUPER ADMIN y con eso las glosas de causal compartida se quedaban quietas
+    esperando a una sola persona.
+
+    Lo que NO cambia, y es lo que hacía prudente la restricción: quién toma la
+    causal 4506 depende del procedimiento — el material de osteosíntesis y el
+    de alto costo los revisa el médico auditor, no facturación. Por eso el
+    reparto sigue siendo:
+
+    - acotado: solo se puede asignar en las causales que de verdad trabajan dos
+      áreas (hoy la 4506); en cualquier otra el motor responde con un error;
+    - con testigo: queda grabado quién la asignó y cuándo
+      (`area_asignada_por`, `area_asignada_en`);
+    - reversible: se puede volver a asignar, no borra el trabajo de nadie.
+
+    El motor además ya trae su propia sugerencia de área con el motivo
+    (`area_sugerida`, `motivo_area`), que es lo que el gestor debe mirar antes
+    de mandar a facturación algo que le corresponde al médico.
     """
     try:
         glosa = svc.asignar_area(

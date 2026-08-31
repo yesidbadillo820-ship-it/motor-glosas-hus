@@ -756,7 +756,16 @@ class TestEvidenciaPDF:
 class TestRepartoDeAreas:
     """La causal 4506 la trabajan gestores (FACTURACION) y médicas (PERTINENCIA).
 
-    Quién la toma depende de qué se glosó, así que la reparte un SUPER ADMIN.
+    Quién la toma depende de qué se glosó. Hasta el 31-08-2026 solo un SUPER
+    ADMIN podía repartirla, y con eso las glosas compartidas se quedaban
+    quietas esperando a una sola persona. **El área pidió abrirlo a los
+    gestores** y así quedó.
+
+    Lo que sostiene que sea aceptable abrirlo: el reparto es acotado (solo
+    causales de dos áreas), deja testigo de quién y cuándo, y es reversible.
+    Y el motor sigue calculando su propia sugerencia con el motivo — que es lo
+    que hay que mirar antes de mandar a facturación algo que le toca al médico
+    auditor (osteosíntesis, material de alto costo).
     """
 
     def test_la_4506_llega_marcada_para_repartir(self, client, paquete):
@@ -780,8 +789,15 @@ class TestRepartoDeAreas:
         assert r.status_code == 200
         assert {g["codigo"] for g in r.json()} == {"INS-100", "OST-200"}
 
-    def test_un_gestor_no_puede_repartir(self, db_session, coordinador, gestor):
-        from app.api.deps import get_admin, get_coordinador_o_admin, get_usuario_actual
+    def test_el_gestor_si_puede_repartir(self, db_session, coordinador, gestor):
+        """Cambió el 31-08-2026 a pedido del área.
+
+        Antes esta prueba exigía un 403 para el gestor. La regla cambió por
+        decisión de quien usa el motor, no porque la prueba estorbara: las
+        glosas compartidas se quedaban esperando a la única persona que podía
+        repartirlas. Queda el testigo de quién lo hizo.
+        """
+        from app.api.deps import get_coordinador_o_admin, get_usuario_actual
         from app.main import app
 
         app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
@@ -795,11 +811,39 @@ class TestRepartoDeAreas:
                 for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
                 if g["causal_codigo"] == "4506"
             )
-            # El gestor (AUDITOR) no pasa el filtro de SUPER_ADMIN.
             app.dependency_overrides[get_usuario_actual] = lambda: gestor
-            app.dependency_overrides.pop(get_admin, None)
             r = c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"})
-            assert r.status_code == 403
+            assert r.status_code == 200, r.text
+            cuerpo = r.json()
+            assert cuerpo["clasificacion"] == "PERTINENCIA"
+            assert cuerpo["requiere_asignacion"] is False
+            # El testigo es lo que hace aceptable haber abierto el permiso.
+            assert cuerpo["area_asignada_por"] == gestor.email
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_el_gestor_no_puede_repartir_una_causal_que_no_se_comparte(
+        self, db_session, coordinador, gestor
+    ):
+        """Abrir el permiso no es dejar repartir lo que sea: fuera de las
+        causales de dos áreas el motor sigue respondiendo con error."""
+        from app.api.deps import get_coordinador_o_admin, get_usuario_actual
+        from app.main import app
+
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
+        app.dependency_overrides[get_usuario_actual] = lambda: coordinador
+        app.dependency_overrides[get_coordinador_o_admin] = lambda: coordinador
+        try:
+            c = TestClient(app)
+            c.post("/glosas-adres/importar", files={"archivo": ("r.xlsx", _reporte_bytes())})
+            gid = next(
+                g["id"]
+                for g in c.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+                if g["causal_codigo"] != "4506"
+            )
+            app.dependency_overrides[get_usuario_actual] = lambda: gestor
+            r = c.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"})
+            assert r.status_code == 400, r.text
         finally:
             app.dependency_overrides.clear()
 
