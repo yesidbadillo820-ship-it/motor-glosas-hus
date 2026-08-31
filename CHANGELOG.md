@@ -1,5 +1,27 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 4) — Windows no deja instalar la voz en el PC del hospital
+
+El usuario llegó al sitio correcto (Hora e idioma → Voz → Agregar voces) y
+Windows respondió **«No se pudo instalar el paquete de voz»**. Los dos paquetes
+listados —el noruego y el español— aparecían con **0 MB**: ese equipo no está
+descargando contenido de idioma en absoluto.
+
+- **La causa no es la aplicación ni el usuario.** Es un equipo de dominio
+  (`esehus.loc`): las actualizaciones pasan por el servidor de Sistemas, que
+  normalmente bloquea las *características a petición* (paquetes de voz e
+  idioma). Se habilita con la directiva «Especificar la configuración para la
+  instalación y la reparación de componentes opcionales», permitiendo bajar de
+  Windows Update en vez de WSUS. Eso lo hace Sistemas, no el usuario.
+- **El aviso de la app lo dice ahora.** En Windows, después de los pasos,
+  advierte del error exacto y ofrece la salida que sí funciona: el celular,
+  donde Android e iPhone traen la voz noruega.
+- **1 prueba nueva** (201): que el tramo de Windows nombre el error literal y
+  ofrezca el celular.
+
+La aplicación sigue siendo usable sin voz: los ejercicios de escuchar muestran
+la palabra escrita y la pronunciación aproximada sigue debajo de cada palabra.
+
 ## Sesión 31-ago-2026 (noche 3) — La casilla de la voz en Windows no se llama así
 
 Corrección de una instrucción equivocada que se entregó al usuario.

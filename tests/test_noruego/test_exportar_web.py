@@ -250,3 +250,18 @@ def test_los_tres_avisos_de_audio_apagado_dicen_como_arreglarlo():
     assert plantilla.count("comoInstalarVoz()") >= 4, (
         "algún aviso de «no hay voz» no dice cómo instalarla"
     )
+
+
+def test_windows_avisa_del_bloqueo_del_servidor_del_hospital():
+    """El PC de cartera falló con «No se pudo instalar el paquete de voz».
+
+    Es un equipo de dominio: las actualizaciones pasan por el servidor de
+    Sistemas, que bloquea los paquetes opcionales. Sin este aviso, el usuario
+    cree que hizo algo mal y sigue intentando.
+    """
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    tramo = plantilla.split("/Windows/i.test(ua)", 1)[1][:700]
+    assert "No se pudo instalar el paquete de voz" in tramo, (
+        "no se nombra el error exacto que muestra Windows"
+    )
+    assert "celular" in tramo, "no se ofrece la salida que sí funciona"
