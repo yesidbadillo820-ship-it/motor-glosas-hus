@@ -17438,6 +17438,16 @@ function renderResult(d){
   var qgOk = !!(_vc && _seRevisó && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
 
   var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+
+  // La factura para el pie de página impreso. Misma cascada que el recuadro
+  // del servicio: lo que mande el motor y, si no, lo que el auditor escribió
+  // en el formulario. «N/A» es falta de dato, no un número.
+  var _facturaImpresa = '';
+  [d && d.factura, d && d.numero_factura,
+   (document.getElementById('f-factura') || {}).value].forEach(function(v){
+    v = String(v == null ? '' : v).trim();
+    if(!_facturaImpresa && v && v.toUpperCase() !== 'N/A') _facturaImpresa = v;
+  });
   var consecDoc = d.glosa_id ? ('GL-'+d.glosa_id) : (d.codigo_glosa || '—');
 
   var html='<div class="res-header">'
@@ -17492,6 +17502,16 @@ function renderResult(d){
     +'</div>'
     +'</div>'
     +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
+    // 31-08-2026 — EL PAPEL ES LO QUE LLEGA A LA EPS.
+    // Un dictamen de seis hojas que se separa en la mesa de radicación queda
+    // sin forma de saber qué hoja es de qué factura: el número solo aparecía
+    // una vez, en el membrete de la primera. Este pie se repite en TODAS las
+    // hojas impresas (position:fixed en @media print) y no se ve en pantalla.
+    +'<div class="doc-pie-corrido">'
+    +  'ESE HUS · Respuesta a glosa'
+    +  (_facturaImpresa ? ' · Factura <b>'+escHtml(_facturaImpresa)+'</b>' : '')
+    +  ' · ' + fechaLarga
+    +'</div>'
     +'<div class="doc-footer">'
     +'<div class="doc-firma">'
     +'<div class="doc-firma-linea"></div>'
