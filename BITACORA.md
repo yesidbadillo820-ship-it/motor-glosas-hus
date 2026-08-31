@@ -8930,6 +8930,18 @@ responde, y se pierde por tiempo.
   compartir), que se oiga la voz noruega y que el avance siga ahí al día
   siguiente. **Si esa opción no aparece, es que la página no cargó** — revise
   el wifi y el enlace, no el celular.
+- **El computador del hospital NO deja instalar la voz.** Se intentó por el
+  camino correcto (Configuración → Hora e idioma → Voz → Agregar voces) y
+  Windows contestó «No se pudo instalar el paquete de voz». Los dos paquetes
+  salían en 0 MB, hasta el de español: ese equipo no baja contenido de idioma.
+  **No es la aplicación ni un error suyo**, es que en los equipos del dominio
+  las actualizaciones pasan por el servidor de Sistemas y ese servidor bloquea
+  estos paquetes. Para arreglarlo hay que **pedírselo a Sistemas** (la directiva
+  de «componentes opcionales», que se bajen de Windows Update y no de WSUS).
+  **Mientras tanto, la voz sí funciona en el celular**, que es donde la
+  aplicación está pensada para usarse. Sin voz, la aplicación se sigue pudiendo
+  usar: muestra la palabra escrita en vez de dejar el ejercicio sin respuesta.
+
 - **Instalar la voz noruega donde no la haya.** El computador del hospital no
   la trae, y por eso el audio salió apagado en la primera prueba. **Ahora la
   propia aplicación dice dónde se instala**, distinto en cada aparato: en

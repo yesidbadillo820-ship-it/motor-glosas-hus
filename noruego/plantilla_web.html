@@ -557,7 +557,11 @@ function comoInstalarVoz(){
   // manda por Voz → Agregar voces, que instala solo la voz.
   if(/Windows/i.test(ua)) return `en <b>Configuración → Hora e idioma → Voz →
     Administrar voces → Agregar voces</b>, buscando <b>Noruego (Bokmål)</b>.
-    Después hay que <b>cerrar el navegador por completo</b> y volverlo a abrir`;
+    Después hay que <b>cerrar el navegador por completo</b> y volverlo a abrir.
+    <br><b>Si sale «No se pudo instalar el paquete de voz»</b>, no es su
+    computador: en los equipos del hospital las actualizaciones pasan por el
+    servidor de Sistemas, que suele bloquear estos paquetes. Eso lo tiene que
+    habilitar Sistemas — o use el celular, que sí trae la voz`;
   if(/Mac/i.test(ua)) return `en <b>Ajustes del sistema → Accesibilidad → Contenido
     hablado → Voz del sistema → Gestionar voces</b>, agregando <b>Noruego</b>`;
   return `en los ajustes de <b>texto a voz</b> del aparato, agregando el idioma
