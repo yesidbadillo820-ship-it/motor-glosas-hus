@@ -1,5 +1,26 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche) — La guía hacía copiar una dirección que no era
+
+Segunda vuelta del mismo problema, en la prueba real.
+
+- **Se quitó toda dirección de ejemplo** de la guía y del bot. La guía traía
+  `http://192.168.1.15:8000/...` como muestra, con la advertencia de no
+  copiarla; se copió igual (la máquina real era `172.17.80.25`). Antes había
+  pasado lo mismo con `LA-IP-DE-ARRIBA` y con `ESE-NUMERO`. La conclusión: una
+  dirección impresa como ejemplo termina escrita en el navegador, así que no
+  puede haber ninguna — la instrucción ahora es «copie **la línea que muestra
+  su ventana**».
+- **El bot explica el `ERR_CONNECTION_TIMED_OUT`.** Ese error no es del enlace
+  sino de la red: firewall de Windows (con el `New-NetFirewallRule` listo para
+  pegar), celular en otra red, o wifi y cable separados en el hospital.
+- **Salida por el túnel.** Como `app/` monta `/static` desde el disco, el
+  servidor que ya se ve desde fuera del hospital sirve también la aplicación:
+  la dirección de siempre con `/static/noruego/index.html` al final. Sin
+  firewall, sin wifi y sin reiniciar nada.
+- **3 pruebas nuevas** (196): un `re` rechaza cualquier `http://n.n.n.n:puerto/`
+  en la guía y en el bot, y se exige que el bot traiga la regla de firewall.
+
 ## Sesión 31-ago-2026 (tarde) — El bot de noruego no mostraba la dirección
 
 Arreglo de la primera prueba real en el PC de cartera.

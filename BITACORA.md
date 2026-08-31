@@ -9649,14 +9649,22 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ### Curso de noruego — lo primero
 1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en
-   **`tools\NORUEGO.cmd`**. El bot escribe en pantalla el **enlace completo**
-   (algo como `http://192.168.1.15:8000/static/noruego/index.html`). Ese es el
-   que se copia **letra por letra** en el navegador del celular, con el mismo
-   wifi. No escriba el del ejemplo: el número cambia en cada computador.
-2. **Instalarla en el celular** con «Agregar a la pantalla de inicio» y hacer
+   **`tools\NORUEGO.cmd`**. El bot escribe en pantalla **una sola línea** que
+   empieza por `http://` y termina en `index.html`: **esa** es la que se copia
+   en el navegador del celular. Aquí no se pone ningún ejemplo a propósito —
+   dos veces se copió el ejemplo en vez del número propio.
+
+2. **Si el celular dice «tardó demasiado en responder»**, el enlace está bien
+   y lo que falla es la red. Por orden: abrir el puerto en el firewall de
+   Windows (el bot muestra el comando, se corre como administrador), revisar
+   que el celular no esté en el wifi de invitados, y si nada de eso sirve,
+   entrar por la **misma dirección con la que se usa el Motor de Glosas desde
+   fuera del hospital**, cambiándole el final por `/static/noruego/index.html`.
+   Esa última funciona hasta con datos del celular.
+3. **Instalarla en el celular** con «Agregar a la pantalla de inicio» y hacer
    **la primera lección completa**. Si algo se ve mal o un ejercicio no se
    puede responder, mande la foto de la pantalla.
-3. **Comprobar el sonido.** Si en los ejercicios de escuchar sale el aviso de
+4. **Comprobar el sonido.** Si en los ejercicios de escuchar sale el aviso de
    que no hay voz noruega, instale la voz (ver PENDIENTE) y vuelva a entrar.
 
 
