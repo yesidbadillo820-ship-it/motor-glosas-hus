@@ -168,6 +168,7 @@
         <input id="of-fecha" type="datetime-local"></label>
       <button class="btn btn-azul" onclick="crearOficio()">Registrar oficio</button>
     </div>
+    <div id="of-firma"></div>
     <div id="of-msg"></div>
     <p class="leyenda">El plazo para auditar es de <b>3 días hábiles</b> desde el día siguiente al recibo.
       Semáforo: <span class="sem sem-VERDE">VERDE</span> <span class="sem sem-AMARILLO">AMARILLO</span>
@@ -337,11 +338,27 @@ var ICO_BASURA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 // se vea habilitado para algo que va a rebotar.
 var MI_NOMBRE = (localStorage.getItem('hus_user') || '').trim().toUpperCase();
 function esMia(f){ return !!f.auditor && String(f.auditor).trim().toUpperCase() === MI_NOMBRE; }
+// ── Aviso de firma (31-08-2026) ─────────────────────────────────────────
+// Caso real: una devolución quedó firmada por LAURA DIAZ y la hizo otro
+// gestor, porque en ese computador quedó abierta la sesión de Laura. El
+// sistema firma con la SESIÓN, no con quién está sentado: por eso, antes de
+// decidir, la ventana dice grande con qué nombre va a quedar el movimiento y
+// da la salida de una: «No soy yo → cambiar de usuario».
+function avisoFirma(){
+  var quien = (localStorage.getItem('hus_user') || '').trim();
+  return '<div class="aviso aviso-info" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+    '<span>✍️ Quedará firmado por: <b>'+esc(quien || '(sin sesión)')+'</b></span>'+
+    '<a href="javascript:salir()" style="font-weight:700;text-decoration:underline">No soy yo — cambiar de usuario</a>'+
+    '</div>';
+}
 function puedeRevertir(f){
   if(ES_ADMIN || f.resultado === 'PENDIENTE') return true;
   return esMia(f) && !f.oficio_devolucion_id;
 }
 // La autorización real la impone el servidor; esto solo muestra/oculta botones.
+document.addEventListener('DOMContentLoaded', function(){
+  var f=document.getElementById('of-firma'); if(f) f.innerHTML=avisoFirma();
+});
 if (ES_ADMIN) {
   document.addEventListener('DOMContentLoaded', function(){
     var b=document.getElementById('admin-del-bar'); if(b) b.style.display='block';
@@ -628,6 +645,7 @@ async function abrirOficio(id){
         '<input id="env-num" placeholder="229304" style="padding:7px;border:1px solid var(--borde);border-radius:6px;margin:6px 6px 6px 0;"> '+
         '<button class="btn btn-borde btn-chico" onclick="previewEnvio('+o.id+')">Ver antes</button> '+
         '<button class="btn btn-azul btn-chico" onclick="commitEnvio('+o.id+')">Cargar envío</button>'+
+        avisoFirma()+
         '<div id="env-msg"></div></div>'+
       (o.total_facturas?
         '<p><b>'+o.total_facturas+'</b> factura(s) · Pend '+o.pendientes+' · OK '+o.radicar+' · Dev '+o.devueltas+
@@ -808,6 +826,7 @@ async function abrirAuditar(id){
       // texto que sale en el oficio de devolución.
       '<label class="campo" style="margin:10px 0">Observación — se guarda siempre; si devuelve, este texto sale en el oficio de devolución'+
         '<textarea id="au-obs" rows="4" maxlength="4000" style="width:100%">'+esc(f.motivo_devolucion||f.observaciones||'')+'</textarea></label>'+
+      avisoFirma()+
       '<div id="au-msg"></div>'+
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
