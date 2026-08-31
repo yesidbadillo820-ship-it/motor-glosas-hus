@@ -4283,21 +4283,39 @@ def _cups_esta_en_catalogo(codigo: str) -> bool:
         return True
 
 
-def _quitar_causal_del_servicio(servicio: str) -> str:
+def _quitar_causal_del_servicio(servicio: str, codigo_glosa: str = "") -> str:
     """Saca del nombre del servicio el código de la glosa, si se coló.
 
     28-08-2026. «CONSULTA DE PRIMERA VEZ POR OTRAS ESPECIALIDADES MÉDICAS,
     código SO0102» → se queda solo el nombre. La causal identifica la objeción
     de la entidad, no lo que el hospital prestó, y ponerla ahí deja ver que el
     escrito confundió las dos cosas.
+
+    31-08-2026 (PRUEBA 2 DE ESTRÉS). Salió «Servicio objetado: OSTEOSÍNTESIS DE
+    FÉMUR código CL4506» y la red no lo tocó. La red estaba bien; el filtro era
+    muy estrecho: solo borraba el código si figuraba EXACTO en el catálogo de
+    200 causales, y CL4506 no está entre ellas.
+
+    Ahora, además del catálogo, se borra el código de LA GLOSA QUE SE ESTÁ
+    CONTESTANDO. Ese no necesita catálogo que lo respalde: por definición es la
+    causal de la entidad, no el procedimiento del hospital. Es el caso seguro y
+    el que de verdad aparece — la IA copia el código del encabezado de la
+    glosa. Para los demás sigue mandando el catálogo, que es lo que evita
+    acusar de causal a un código que no lo sea.
     """
     if not servicio:
         return servicio
+    _propio = (codigo_glosa or "").upper().strip().replace("-", "").replace(" ", "")
     limpio = re.sub(
         r"[,;]?\s*(?:c[óo]digo|cups)\s*[:\-]?\s*"
         r"((?:TA|SO|FA|CL|CO|AU|SA|DE)\s*-?\s*\d{2,4})\b",
         lambda m: (
-            "" if _es_codigo_de_glosa(m.group(1).replace(" ", "").replace("-", "")) else m.group(0)
+            ""
+            if (
+                _es_codigo_de_glosa(m.group(1).replace(" ", "").replace("-", ""))
+                or (_propio and m.group(1).replace(" ", "").replace("-", "").upper() == _propio)
+            )
+            else m.group(0)
         ),
         servicio,
         flags=re.IGNORECASE,
@@ -8667,7 +8685,9 @@ class GlosaService:
             # Escribir la regla no era el trabajo; el trabajo era comprobar que
             # llegara a los dos sitios.
             _servicio_antes_de_la_causal = servicio_ia
-            servicio_ia = _quitar_causal_del_servicio(servicio_ia)
+            servicio_ia = _quitar_causal_del_servicio(
+                servicio_ia, str(locals().get("codigo_det") or "")
+            )
             # Esta red corre mucho antes que las del cuerpo, así que se guarda
             # la marca y se suma abajo, donde se arma la lista de correcciones.
             _quito_la_causal_del_servicio = servicio_ia != _servicio_antes_de_la_causal
