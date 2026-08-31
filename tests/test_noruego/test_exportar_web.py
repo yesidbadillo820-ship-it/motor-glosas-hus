@@ -265,3 +265,44 @@ def test_windows_avisa_del_bloqueo_del_servidor_del_hospital():
         "no se nombra el error exacto que muestra Windows"
     )
     assert "celular" in tramo, "no se ofrece la salida que sí funciona"
+
+
+# --- El audio automático ---------------------------------------------------
+# Fallo real del 31-08: en «escucha y elige» la palabra NO sonaba al aparecer,
+# solo al pulsar «Comprobar». El mecanismo existía —`tras()` buscaba un
+# atributo `data-autoaudio`— pero NINGÚN ejercicio lo ponía: era código muerto.
+
+
+def test_el_ejercicio_de_escucha_suena_solo_al_aparecer():
+    """Sin esto, «escucha y elige» se convierte en «lee y elige»."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    cuerpo = plantilla.split("function audioGrande(", 1)[1].split("\n}", 1)[0]
+    assert "data-autoaudio=" in cuerpo, (
+        "audioGrande no marca el audio para que suene solo: `tras()` no encontrará nada"
+    )
+
+
+def test_el_audio_no_se_repite_al_tocar_cada_opcion():
+    """Tocar una opción vuelve a pintar la pantalla entera."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    assert "data-audio-clave=" in plantilla, "falta la marca que evita repetir la palabra"
+    tras = plantilla.split("function tras()", 1)[1].split("\n}", 1)[0]
+    assert "ULTIMO_AUDIO" in tras, "tras() no recuerda qué dijo: repetiría en cada toque"
+    assert "clave === ULTIMO_AUDIO" in tras, "tras() no compara antes de volver a hablar"
+
+
+def test_no_habla_dos_veces_al_revelar_la_respuesta():
+    """`comprobar()` ya dice la palabra al acertar: repetirla sonaría encima."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    cuerpo = plantilla.split("function audioGrande(", 1)[1].split("\n}", 1)[0]
+    assert "!s.mostrando" in cuerpo, (
+        "el audio automático sigue activo con la respuesta revelada: sonaría doble"
+    )
+
+
+def test_los_tres_ejercicios_de_oido_usan_el_mismo_camino():
+    """escuchar_opcion, escuchar_escribir y pronunciar: todos por audioGrande."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    assert plantilla.count("audioGrande(") >= 4, (
+        "algún ejercicio de oído arma su botón por su cuenta y se queda sin audio automático"
+    )

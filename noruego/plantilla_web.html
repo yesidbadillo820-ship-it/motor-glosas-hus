@@ -631,12 +631,21 @@ function pintar(){
   app.innerHTML = render();
   tras();
 }
+//: Qué se dijo por última vez sin que nadie lo pidiera. Tocar una opción
+//: vuelve a pintar la pantalla ENTERA, así que sin esta marca la palabra se
+//: repetiría en cada toque.
+let ULTIMO_AUDIO = null;
+
 function tras(){
   // Enganches que necesitan el DOM ya pintado.
   const auto = document.querySelector("[data-autofoco]");
   if(auto) setTimeout(() => auto.focus(), 60);
   const audio = document.querySelector("[data-autoaudio]");
-  if(audio) setTimeout(() => decir(audio.getAttribute("data-autoaudio")), 260);
+  if(!audio) return;
+  const clave = audio.getAttribute("data-audio-clave") || "";
+  if(clave === ULTIMO_AUDIO) return;
+  ULTIMO_AUDIO = clave;
+  setTimeout(() => decir(audio.getAttribute("data-autoaudio")), 260);
 }
 
 function cabecera(titulo, sub){
@@ -887,7 +896,18 @@ function botonListo(e){
 
 /* ------------------------------------------------------------- los cuerpos */
 function audioGrande(texto, etiqueta){
-  let h = `<button class="audio-btn" onclick="decir(${JSON.stringify(texto)})"
+  // En un ejercicio de ESCUCHA la palabra tiene que sonar sola al aparecer:
+  // obligar a buscar el botón convierte «escucha y elige» en «lee y elige».
+  // Hasta el 31-08 esto no pasaba: `tras()` buscaba «data-autoaudio» y ningún
+  // ejercicio lo ponía, así que el audio solo salía al comprobar la respuesta.
+  //
+  // Solo mientras la respuesta está sin revelar: al revelarla ya habla
+  // `comprobar()`, y repetirlo sonaría dos veces encima.
+  const s = sesion;
+  const solo = (s && !s.mostrando && hayVoz())
+    ? ` data-autoaudio="${esc(texto)}" data-audio-clave="${s.inicio}#${s.i}"`
+    : "";
+  let h = `<button class="audio-btn"${solo} onclick="decir(${JSON.stringify(texto)})"
     aria-label="Escuchar">🔊<span class="mini" style="margin-left:8px">${etiqueta||"Escuchar"}</span></button>`;
   if(!hayVoz()){
     // Sin voz noruega instalada, un ejercicio de escucha sería imposible de

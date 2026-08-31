@@ -8930,6 +8930,12 @@ responde, y se pierde por tiempo.
   compartir), que se oiga la voz noruega y que el avance siga ahí al día
   siguiente. **Si esa opción no aparece, es que la página no cargó** — revise
   el wifi y el enlace, no el celular.
+- **~~En «escucha y elige» la palabra no sonaba al aparecer~~ — ARREGLADO.**
+  Solo se oía al pulsar «Comprobar», así que el ejercicio se resolvía leyendo en
+  vez de escuchando. La orden de reproducir estaba escrita en el programa pero
+  no la disparaba nadie. Ya suena sola al aparecer el ejercicio —también en los
+  de pronunciación— y no se repite cada vez que uno toca una opción.
+
 - **El computador del hospital NO deja instalar la voz.** Se intentó por el
   camino correcto (Configuración → Hora e idioma → Voz → Agregar voces) y
   Windows contestó «No se pudo instalar el paquete de voz». Los dos paquetes
