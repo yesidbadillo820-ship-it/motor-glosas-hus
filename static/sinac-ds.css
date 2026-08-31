@@ -458,6 +458,46 @@ body.sds-focus-mode .sds-focus-indicator {
   .no-print { display: none !important; }
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   El papel es lo que llega a la EPS (31-08-2026)
+
+   En pantalla el dictamen se lee de corrido y el número de factura
+   se ve una vez, en el membrete. Impreso es otra cosa: son varias
+   hojas que en la mesa de radicación se separan, se traspapelan y se
+   vuelven a juntar. Sin nada que las identifique, una hoja suelta no
+   se sabe de qué factura es.
+
+   Este pie se repite en TODAS las hojas impresas —position:fixed
+   dentro de @media print es lo que los navegadores sí respetan— y
+   no existe en pantalla.
+   ────────────────────────────────────────────────────────────────── */
+.doc-pie-corrido { display: none; }
+
+@media print {
+  .doc-pie-corrido {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 3mm 0 1mm;
+    border-top: 0.5pt solid #666;
+    font-size: 7.5pt;
+    color: #333;
+    text-align: center;
+    background: #fff;
+  }
+
+  /* Que ningún párrafo del dictamen quede partido dejando una línea
+     sola al final o al principio de la hoja: en un escrito jurídico
+     eso se lee como si faltara texto. */
+  .res-dictamen-body p,
+  .res-dictamen-body li {
+    orphans: 3;
+    widows: 3;
+  }
+}
+
 .sds-kbd {
   display: inline-flex;
   align-items: center;
