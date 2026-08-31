@@ -11,6 +11,7 @@ Rutas:
     POST /glosas-adres/importar            carga el reporte (coordinador/admin)
     POST /glosas-adres/importar-bitacora   agrega el detallado cruzado
     GET  /glosas-adres/paquetes            qué paquetes hay cargados
+    GET  /glosas-adres/informe.xlsx        el paquete completo, como informe
     GET  /glosas-adres/facturas            la lista de facturas a auditar
     GET  /glosas-adres/buscar              autocompletado de facturas
     GET  /glosas-adres/factura/{numero}    TODO lo de esa factura
@@ -37,6 +38,7 @@ from app.database import get_db
 from app.models.db import GlosaAdresRecord, PaqueteAdresRecord, UsuarioRecord
 from app.services import preauditoria_adres as svc
 from app.services.evidencia_adres_pdf import generar_pdf_evidencia, nombre_archivo_evidencia
+from app.services.glosas_adres_excel import construir_informe_paquete, nombre_informe
 
 router = APIRouter(prefix="/glosas-adres", tags=["Glosas ADRES"])
 
@@ -143,6 +145,40 @@ def paquetes(
         }
         for p in filas
     ]
+
+
+@router.get("/informe.xlsx")
+def informe_xlsx(
+    paquete_id: int | None = Query(None, description="Por defecto, el último paquete cargado"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El paquete completo en un Excel que se puede leer, no un volcado.
+
+    Lo pidió el área el 31-08-2026: el mismo tipo de informe que ya sale en
+    Pre-auditoría. Trae las glosas agrupadas por causal, el reparto por área y
+    centro de costos, el avance de cada gestor y el estado de cada factura, con
+    fórmulas vivas sobre la hoja de datos. El armado vive en el servicio.
+    """
+    paquete = (
+        db.get(PaqueteAdresRecord, paquete_id)
+        if paquete_id
+        else db.query(PaqueteAdresRecord).order_by(PaqueteAdresRecord.id.desc()).first()
+    )
+    if paquete is None:
+        raise HTTPException(404, "No hay ningún paquete del ADRES cargado todavía.")
+    contenido = construir_informe_paquete(
+        db, paquete.id, generado_por=current_user.nombre or current_user.email
+    )
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{nombre_informe(paquete.numero_paquete)}"'
+            )
+        },
+    )
 
 
 # ─── Consulta ────────────────────────────────────────────────────────────────

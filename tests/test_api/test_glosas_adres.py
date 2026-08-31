@@ -986,6 +986,236 @@ class TestPermisos:
             app.dependency_overrides.clear()
 
 
+class TestInformeExcel:
+    """El paquete completo, bajado como archivo (pedido del 31-08-2026).
+
+    Yesid pidió dos cosas, y las dos se prueban acá:
+
+    1. «Un informe así como el que tenemos en el apartado de preauditoría» — el
+       resumen, las causales, el reparto y el avance, con fórmulas vivas.
+    2. «Los archivos descargados deben ser así como estos», mandando dos
+       `RTA_GLOSA_ADRES_PAQ_31068_*` — o sea que la hoja de datos tiene que
+       seguir siendo la de siempre: las 26 columnas de la macro, en su orden,
+       con el encabezado en la fila 1, para que sirvan la tabla dinámica y los
+       bots que la leen.
+
+    Y lo que más duele si falla: que los números del archivo sean los mismos de
+    la pantalla — la plata del ítem glosado con dos causales y lo aceptado, que
+    no se le puede declarar dos veces al ADRES.
+    """
+
+    HOJAS = [
+        "CÓMO LEER",
+        "RESUMEN",
+        "POR QUÉ NOS GLOSAN",
+        "POR ÁREA Y CENTRO",
+        "POR GESTOR",
+        "FACTURAS",
+        "Hoja1",
+    ]
+    DECISION = "OBSERVACION (SE ACEPTA - SE OBJETA -  SE SUBSANA )"
+
+    def _libro(self, client, **params):
+        r = client.get("/glosas-adres/informe.xlsx", params=params)
+        assert r.status_code == 200, r.text
+        return openpyxl.load_workbook(io.BytesIO(r.content)), r
+
+    def _filas(self, hoja, encabezado: int = 4) -> list[dict]:
+        cols = {
+            (hoja.cell(encabezado, i).value or "").strip(): i
+            for i in range(1, hoja.max_column + 1)
+            if hoja.cell(encabezado, i).value
+        }
+        salida = []
+        for f in range(encabezado + 1, hoja.max_row + 1):
+            if not hoja.cell(f, 1).value:
+                continue
+            salida.append({nombre: hoja.cell(f, i).value for nombre, i in cols.items()})
+        return salida
+
+    def _datos(self, wb) -> list[dict]:
+        """Las filas de la hoja de siempre, cuyo encabezado va en la fila 1."""
+        return self._filas(wb["Hoja1"], encabezado=1)
+
+    def test_trae_las_hojas_del_informe(self, client, paquete):
+        wb, _ = self._libro(client)
+        assert wb.sheetnames == self.HOJAS
+
+    def test_la_hoja_de_datos_conserva_el_formato_de_la_macro(self, client, paquete):
+        """Las 26 columnas, en su orden, con el encabezado en la fila 1."""
+        from app.services.preauditoria_adres import COLUMNAS_MACRO
+
+        wb, _ = self._libro(client)
+        hd = wb["Hoja1"]
+        encabezado = [hd.cell(1, i).value for i in range(1, len(COLUMNAS_MACRO) + 1)]
+        assert encabezado == COLUMNAS_MACRO
+        # Y los datos arrancan en la 2, sin fila de título en medio.
+        assert hd.cell(2, 3).value in {"HUS311371", "HUS352890"}
+
+    def test_el_bot_de_objeciones_puede_leer_el_archivo_bajado(self, client, paquete, tmp_path):
+        """La prueba de fuego: que el archivo sirva para lo de siempre.
+
+        `organizar_objeciones_adres.py` busca la hoja de glosas por sus
+        encabezados **en la primera fila**. Si el informe le pusiera un título
+        arriba, el bot no encontraría nada y el auditor se quedaría sin las
+        objeciones para el DGH.
+        """
+        organizar = pytest.importorskip("organizar_objeciones_adres")
+        r = client.get("/glosas-adres/informe.xlsx")
+        ruta = tmp_path / "RTA_GLOSA_ADRES.xlsx"
+        ruta.write_bytes(r.content)
+        filas = organizar.leer_adres(ruta)
+        assert filas, "el bot de objeciones no encontró la hoja de glosas"
+        assert {f.factura for f in filas} >= {"HUS311371", "HUS352890"}
+
+    def test_el_archivo_se_baja_con_el_nombre_del_area(self, client, paquete):
+        _, r = self._libro(client)
+        assert "spreadsheetml" in r.headers["content-type"]
+        nombre = r.headers["content-disposition"]
+        assert "RTA_GLOSA_ADRES_PAQ_31068_" in nombre
+        assert nombre.endswith('.xlsx"')
+
+    def test_una_fila_por_glosa_con_lo_que_escribio_el_gestor(self, client, paquete):
+        gid = client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"][0]["id"]
+        client.post(
+            f"/glosas-adres/glosa/{gid}",
+            json={
+                "decision": "SE OBJETA",
+                "observacion_tecnico": "SE ANEXA HOJA DE GASTO Y REGISTRO DE ENTREGA.",
+            },
+        )
+        wb, _ = self._libro(client)
+        filas = self._datos(wb)
+        assert len(filas) == len(FILAS)  # todas las filas del reporte, ninguna se pierde
+        objetada = [f for f in filas if f[self.DECISION] == "SE OBJETA"]
+        assert len(objetada) == 1
+        assert objetada[0]["OBSERVACION TECNICO / PROFESIONAL"] == (
+            "SE ANEXA HOJA DE GASTO Y REGISTRO DE ENTREGA."
+        )
+        assert objetada[0]["QUIÉN DECIDIÓ"] == "coordinador@hus.gov.co"
+        # La respuesta consolidada sale armada, como la de la macro.
+        assert "SE OBJETA" in (objetada[0]["RTA GLOSA COMPLETA"] or "")
+
+    def test_lo_que_no_se_ha_decidido_queda_en_blanco(self, client, paquete):
+        """La columna de la macro solo lleva las tres decisiones, o nada."""
+        wb, _ = self._libro(client)
+        valores = {f[self.DECISION] for f in self._datos(wb)}
+        assert valores <= {None, "SE ACEPTA", "SE OBJETA", "SE SUBSANA"}
+
+    def test_la_plata_del_mismo_item_no_se_cuenta_dos_veces(self, client, paquete):
+        """Las dos causales del TAC salen las dos, pero solo una suma."""
+        wb, _ = self._libro(client)
+        filas = self._datos(wb)
+        tac = [f for f in filas if f["Cod Elemento"] == "DOS-1"]
+        assert len(tac) == 2
+        assert sorted(f["CUENTA PARA LA PLATA"] for f in tac) == ["NO", "SÍ"]
+        glosado = sum(
+            f["Valor Glosado"]
+            for f in filas
+            if f["Número Factura"] == "HUS311371" and f["CUENTA PARA LA PLATA"] == "SÍ"
+        )
+        # Lo mismo que muestra la pantalla: 31.800 + 700.000 + 3.400.
+        assert glosado == pytest.approx(735200)
+
+    def test_lo_aceptado_no_se_le_declara_dos_veces_al_adres(self, client, paquete):
+        """Aceptar en las dos causales del mismo servicio no duplica la plata."""
+        tac = [
+            g
+            for g in client.get("/glosas-adres/factura/HUS0000311371").json()["glosas"]
+            if g["codigo"] == "DOS-1"
+        ]
+        for g in tac:
+            client.post(
+                f"/glosas-adres/glosa/{g['id']}",
+                json={"decision": "SE ACEPTA", "valor_aceptado": 700000},
+            )
+        wb, _ = self._libro(client)
+        filas = [f for f in self._datos(wb) if f["Número Factura"] == "HUS311371"]
+        # Lo escrito por el gestor son 1.400.000 (dos renglones de 700.000)…
+        assert sum(f["VALOR ACEPTADO"] for f in filas) == pytest.approx(1400000)
+        # …pero lo que se declara es 700.000, que es lo que el ítem tiene glosado.
+        assert sum(f["VALOR ACEPTADO QUE SE DECLARA"] for f in filas) == pytest.approx(700000)
+        fila_factura = next(f for f in self._filas(wb["FACTURAS"]) if f["Factura"] == "HUS311371")
+        assert fila_factura["Aceptado"] == pytest.approx(700000)
+        assert fila_factura["Sigue glosado"] == pytest.approx(35200)
+
+    def test_las_glosas_totales_se_marcan_y_no_cuentan_como_trabajo(self, client, paquete):
+        wb, _ = self._libro(client)
+        filas = self._datos(wb)
+        totales = [f for f in filas if f["TIPO DE RENGLÓN"] == "GLOSA TOTAL"]
+        assert {f["Cod Elemento"] for f in totales} == {"TOT-1", "TOT-2"}
+        fila = next(f for f in self._filas(wb["FACTURAS"]) if f["Factura"] == "HUS311371")
+        assert fila["Glosas a responder"] == 3  # las que se responden una por una
+        assert fila["Glosa total (renglones)"] == 1
+
+    def test_los_numeros_del_resumen_son_formulas_vivas(self, client, paquete):
+        """Si el auditor corrige una fila, los resúmenes se recalculan solos."""
+        wb, _ = self._libro(client)
+        rs = wb["RESUMEN"]
+        formulas = [
+            rs.cell(f, c).value
+            for f in range(5, 20)
+            for c in (3, 4)
+            if isinstance(rs.cell(f, c).value, str)
+        ]
+        assert formulas, "el resumen no trajo ninguna fórmula"
+        assert all(v.startswith("=") for v in formulas)
+        assert all("Hoja1!" in v for v in formulas if "COUNTIF" in v or "SUMIF" in v)
+        assert any("COUNTIF" in v for v in formulas)
+        assert any("SUMIFS" in v for v in formulas)
+
+    def test_las_causales_salen_agrupadas_con_su_valor(self, client, paquete):
+        wb, _ = self._libro(client)
+        filas = self._filas(wb["POR QUÉ NOS GLOSAN"])
+        causales = {str(f["Causal"]) for f in filas if f["Causal"] != "TOTAL"}
+        assert {"3106", "3202", "3209", "4506"} <= causales
+        soporte = next(f for f in filas if f["Causal"] == "3106")
+        assert "Soporte" in (soporte["Descripción de la causal"] or "")
+        assert soporte["Facturas"] == 2  # la 352890 y la 311371
+        assert str(soporte["Valor glosado"]).startswith("=")  # es fórmula, no número pegado
+        assert "soporte" in (soporte["Qué hace falta para responderla"] or "").lower()
+
+    def test_el_trabajo_sin_dueno_queda_a_la_vista(self, client, paquete):
+        """El reporte no trae gestor: eso tiene que verse, no desaparecer."""
+        wb, _ = self._libro(client)
+        gestores = {f["Gestor"] for f in self._filas(wb["POR GESTOR"]) if f["Gestor"] != "TOTAL"}
+        assert "(sin gestor asignado)" in gestores
+
+    def test_trae_sus_graficos(self, client, paquete):
+        wb, _ = self._libro(client)
+        assert len(wb["RESUMEN"]._charts) == 1
+        assert len(wb["POR QUÉ NOS GLOSAN"]._charts) == 1
+        assert len(wb["POR GESTOR"]._charts) == 1
+
+    def test_la_factura_avisa_cuando_no_cuadra_con_el_adres(self, client):
+        oficial = _archivo_facturas({"HUS352890": 590400, "HUS311371": 400000})
+        r = client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": ("reporte.xlsx", _reporte_bytes()),
+                "facturas": ("f.xlsx", oficial),
+            },
+        )
+        wb, _ = self._libro(client, paquete_id=r.json()["paquete_id"])
+        por_factura = {f["Factura"]: f for f in self._filas(wb["FACTURAS"])}
+        assert por_factura["HUS352890"]["¿Cuadra?"] == "SÍ"
+        assert por_factura["HUS311371"]["¿Cuadra?"] == "NO CUADRA"
+        assert por_factura["HUS311371"]["Valor glosado (ADRES)"] == pytest.approx(400000)
+
+    def test_sin_ningun_paquete_cargado_lo_dice_y_no_se_cae(self, client):
+        r = client.get("/glosas-adres/informe.xlsx")
+        assert r.status_code == 404
+        assert "paquete" in r.json()["detail"].lower()
+
+    def test_se_puede_pedir_un_paquete_por_su_id(self, client, paquete):
+        _, r = self._libro(client, paquete_id=paquete)
+        assert "31068" in r.headers["content-disposition"]
+
+    def test_un_paquete_que_no_existe_da_404(self, client, paquete):
+        r = client.get("/glosas-adres/informe.xlsx", params={"paquete_id": 999999})
+        assert r.status_code == 404
+
+
 def test_el_router_esta_montado_en_la_app():
     from app.main import app
 
