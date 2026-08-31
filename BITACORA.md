@@ -8580,6 +8580,57 @@ hallazgo.
 
 ---
 
+### 31-08 — Glosas ADRES: el paquete completo se baja en un solo archivo
+
+Yesid: «me gustaría que en esta opción también esté poder descargar un excel
+con un informe así como el que tenemos en el apartado de preauditoría». Y
+después, mandando dos archivos del paquete 31068: «los archivos descargados
+deben ser así como estos».
+
+La pantalla de **Glosas ADRES** ya no tenía por dónde sacar el paquete: se veía
+factura por factura, pero para revisarlo por fuera, repartir el trabajo o
+llevarlo a una reunión tocaba volver al Excel de la macro. Ahora, al lado de
+«Cargar paquete», hay un botón **⬇ Exportar Excel**.
+
+**El archivo respeta lo de siempre.** La `Hoja1` sale con **las 26 columnas de
+la macro**, en el mismo orden y con los mismos títulos, con el encabezado en la
+fila 1 y los datos desde la 2 — igual que los `RTA_GLOSA_ADRES_PAQ_*` con los
+que trabaja el área. Eso no es un detalle de forma: los bots que leen ese
+archivo (el de **objeciones para el DGH** y el de **respuestas por factura**)
+buscan la hoja por sus encabezados en la primera fila. Si el informe le hubiera
+puesto un título arriba, el bot no habría encontrado nada. Queda una prueba que
+baja el archivo y se lo pasa al bot de objeciones para comprobarlo.
+
+**Y encima trae el informe.** Cinco hojas más, todas con fórmulas vivas sobre
+la `Hoja1`:
+
+- **RESUMEN** — facturas, glosas a responder, cuántas van decididas, el avance,
+  cuánto se objeta, cuánto se acepta, cuánto sigue glosado, y dos alertas: las
+  glosas **sin gestor asignado** y las que **falta repartir de área** (la 4506).
+- **POR QUÉ NOS GLOSAN** — las glosas agrupadas por causal del ADRES, con
+  cuántos renglones, cuántas facturas toca, cuánta plata pesa y **qué hace falta
+  para responderla**. Con gráfico.
+- **POR ÁREA Y CENTRO** — quién tiene que responder: el área y el centro de
+  costos del hospital. Sirve para repartir y para pedirle el sustento al
+  servicio.
+- **POR GESTOR** — cuántas tiene cada uno, cuántas lleva y cuánto le falta.
+- **FACTURAS** — una fila por factura, con **¿cuadra?**: compara lo que suma el
+  sistema con la cifra oficial del ADRES y marca en rojo la que no cuadra.
+
+**Lo que se cuidó con lupa: la plata.** El reporte del ADRES abre una fila por
+cada causal del mismo servicio. Todas se conservan —el gestor decide causal por
+causal— pero **solo una cuenta**; si no, la glosa sale al doble. Y lo aceptado
+se junta por servicio y se topa en lo glosado, porque aceptar en las dos
+causales le declararía al ADRES el doble de lo que ese servicio tiene glosado.
+Los números del archivo dan exactamente los mismos de la pantalla, y hay
+pruebas que lo verifican con el caso real del TAC de la HUS311371.
+
+El archivo se baja como `RTA_GLOSA_ADRES_PAQ_31068_31-08-2026.xlsx`.
+
+17 pruebas nuevas.
+
+---
+
 ### 26-08 (cierre) — Las doce ideas para el motor, implementadas
 
 Usted dijo «vamos a implementar todas las ideas». Quedaron **once de doce**. La

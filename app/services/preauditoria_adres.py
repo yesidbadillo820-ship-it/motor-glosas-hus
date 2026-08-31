@@ -46,6 +46,8 @@ from glosas_adres_por_factura import (  # noqa: E402
 from preauditar_glosas_adres import (  # noqa: E402
     CATALOGO_CENTROS_COSTOS,
     CAUSALES_DE_DOS_AREAS,
+    COLUMNAS_APOYO,  # noqa: F401 — se reexportan para el Excel de Glosas ADRES
+    COLUMNAS_MACRO,  # noqa: F401
     DECISIONES,
     TEXTO_EXTEMPORANEA,
     FilaMacro,

@@ -3156,6 +3156,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
             <select id="ga-paquete" onchange="gaCambiarPaquete()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem"></select>
+            <button class="btn btn-ghost" onclick="gaExportarExcel(this)" style="font-size:.8rem" title="Baja el paquete completo: la Hoja1 de siempre (las 26 columnas de la macro) y encima el informe por causal, por área, por gestor y factura por factura">⬇ Exportar Excel</button>
             <button class="btn btn-ghost" onclick="gaAbrirCargue()" style="font-size:.8rem">Cargar paquete</button>
           </div>
         </div>
@@ -20763,6 +20764,34 @@ async function gaCambiarEstado(estado){
     gaBuscar();
     gaCargarLista();
   }catch(e){ toast('No se pudo cambiar el estado', e.message, 'error'); }
+}
+
+// El paquete completo como informe en Excel: lo mismo que ya sale en
+// Pre-auditoría, pedido por el área el 31-08-2026. Se baja como archivo, así
+// que no sirve un enlace suelto: la petición lleva el token.
+async function gaExportarExcel(btn){
+  if(btn) btn.disabled = true;
+  try{
+    toast('Armando el informe', 'Puede tardar unos segundos con paquetes grandes', 'info');
+    var url = '/glosas-adres/informe.xlsx' + (GA_PAQUETE ? '?paquete_id='+GA_PAQUETE : '');
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || ('HTTP '+r.status));
+    }
+    var blob = await r.blob();
+    var nombre = 'RTA_GLOSA_ADRES.xlsx';
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    toast('Informe listo', 'Se descargó '+escHtml(nombre), 'success');
+  }catch(e){ toast('No se pudo generar el informe', e.message, 'error'); }
+  finally{ if(btn) btn.disabled = false; }
 }
 
 // El PDF de evidencia de la factura, con el mismo formato del reporte que
