@@ -412,6 +412,52 @@ body.sds-focus-mode .sds-focus-indicator {
   }
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   «Qué corregí antes de entregarte esto» (31-08-2026)
+
+   Va ARRIBA del dictamen, no debajo: el gestor tiene que verlo antes
+   de leer el texto, no después de haberlo radicado. Y lleva
+   .no-print porque es una nota interna — no forma parte del escrito
+   que va a la EPS.
+   ────────────────────────────────────────────────────────────────── */
+.res-correcciones {
+  background: var(--sds-probado-bg);
+  border: 1px solid var(--sds-probado);
+  border-radius: var(--sds-radius-md, 8px);
+  padding: 0.75rem 0.95rem 0.85rem;
+  margin-bottom: 0.7rem;
+}
+.res-correcciones-hdr {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  color: var(--sds-gray-900);
+  margin-bottom: 0.5rem;
+}
+.res-correcciones-lista {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--sds-gray-900);
+}
+.res-correcciones-pie {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--sds-probado);
+  font-size: 0.76rem;
+  color: var(--sds-gray-600);
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
+
 .sds-kbd {
   display: inline-flex;
   align-items: center;

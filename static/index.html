@@ -11654,18 +11654,37 @@ async function poblarLandingKPIs(){
   // escondía con `dias_restantes > 0`). Se cuentan aparte porque no es lo
   // mismo "vence pronto" que "ya se venció": decirle al gestor que algo
   // vence pronto cuando el plazo ya pasó es tranquilizarlo al revés.
+  //
+  // 31-08-2026 — NINGÚN ESTADO QUE MIENTA. El caso que más cuesta.
+  //
+  // La consulta de alertas se pide con `.catch(()=>null)`, así que si falla
+  // llega `null`. Y este bloque igual escribía **0** en la tarjeta y pintaba
+  // el pill verde de «sin glosas próximas a vencer».
+  //
+  // Eso no es cierto: no es que no haya ninguna, es que NO SE PUDO
+  // PREGUNTAR. Y aquí la diferencia cuesta plata — una glosa que no se
+  // contesta a tiempo se da por aceptada (Art. 57 Ley 1438 de 2011). El
+  // auditor abre el motor, ve un cero tranquilizador y se dedica a otra cosa.
+  //
+  // Cuando no se sabe, se dice que no se sabe.
+  var _hayAlertas = !!(alertas && Array.isArray(alertas.alertas));
   var nVencen = 0, nVencidas = 0;
-  if(alertas && Array.isArray(alertas.alertas)){
+  if(_hayAlertas){
     nVencen = alertas.alertas.length;
     nVencidas = alertas.alertas.filter(function(a){ return (a.dias_restantes||0) <= 0; }).length;
   }
-  if($('land-alertas')) $('land-alertas').textContent = nVencen;
+  if($('land-alertas')) $('land-alertas').textContent = _hayAlertas ? nVencen : '—';
   var deltaA = $('land-alertas-delta');
   if(deltaA){
-    deltaA.textContent = nVencidas > 0
-      ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
-      : 'en 5 días';
-    deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+    if(!_hayAlertas){
+      deltaA.textContent = 'no se pudo consultar';
+      deltaA.className = 'stat-card-delta down';
+    } else {
+      deltaA.textContent = nVencidas > 0
+        ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
+        : 'en 5 días';
+      deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+    }
   }
 
   // ─── Saludo: pills de contexto ───
@@ -11678,15 +11697,26 @@ async function poblarLandingKPIs(){
     } else if(nVencen > 0){
       pillV.innerHTML = '⏰ <b>' + nVencen + '</b> glosa' + (nVencen===1?'':'s') + ' vence' + (nVencen===1?'':'n') + ' pronto';
       pillV.className = 'pill warn';
-    } else {
+    } else if(_hayAlertas){
       pillV.innerHTML = '✓ sin glosas próximas a vencer';
       pillV.className = 'pill good';
+    } else {
+      // El verde de «todo en orden» es justo lo que no se puede decir cuando
+      // no se pudo preguntar.
+      pillV.innerHTML = '⚠ no se pudo revisar si hay glosas próximas a vencer';
+      pillV.className = 'pill warn';
     }
   }
   var pillC = $('land-saludo-pill-contratos');
   if(pillC){
-    pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
-    pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+    // Mismo caso: sin respuesta, «0 contratos cargados» es falso.
+    if(!contratos){
+      pillC.innerHTML = '⚠ no se pudo consultar cuántos contratos hay cargados';
+      pillC.className = 'pill warn';
+    } else {
+      pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
+      pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+    }
   }
 
   // ─── Top entidades + Top causales ───
@@ -17384,6 +17414,16 @@ function renderResult(d){
   // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
   window._paVerificacionCitas = d.verificacion_citas || null;
 
+  // 31-08-2026 — LO QUE LA MÁQUINA CORRIGIÓ, A LA VISTA.
+  // El motor ya arreglaba solo lo que la IA escribe mal —quitaba códigos
+  // citados como CUPS que no existen, le ponía la fecha a una norma derogada,
+  // corregía el artículo— y todo eso pasaba EN SILENCIO: el dictamen salía
+  // limpio y nadie sabía que se le habían quitado tres cosas.
+  // Mostrarlo no cuesta trabajo nuevo (ya está hecho por dentro) y sirve para
+  // dos cosas: el gestor le cree al motor porque ve que revisa, y aprende qué
+  // mirar cuando revise a mano.
+  window._paCorrecciones = (d.correcciones && d.correcciones.length) ? d.correcciones : null;
+
   // Quality Gate OK = trae verificación de citas y ninguna con severidad ALTA.
   // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
   // el JS puede togglearla después si la verificación cambia.
@@ -17416,6 +17456,24 @@ function renderResult(d){
     +(_vc && _vc.verificado === false
        ? '<div style="background:#fffbeb;border:2px solid #d97706;border-radius:8px;padding:.7rem .9rem;margin-bottom:.6rem;font-size:.82rem;color:#7c2d12"><b>⚠ Las citas de este dictamen NO se revisaron.</b> '
          + escHtml(_vc.motivo_no_verificado || 'El verificador no pudo correr.')
+         + '</div>'
+       : '')
+    // Lo que las redes arreglaron solas, ANTES del dictamen: el gestor tiene
+    // que verlo antes de leer el texto, no después de haberlo radicado.
+    // No sale impreso — es una nota interna, no parte del escrito a la EPS.
+    +(window._paCorrecciones
+       ? '<div class="res-correcciones no-print">'
+         + '<div class="res-correcciones-hdr">'
+         + '<span class="sds-estado es-probado">Revisado</span>'
+         + '<b>' + window._paCorrecciones.length + ' '
+         + (window._paCorrecciones.length === 1 ? 'corrección' : 'correcciones')
+         + ' antes de entregarle el dictamen</b></div>'
+         + '<ul class="res-correcciones-lista">'
+         + window._paCorrecciones.map(function(c){ return '<li>'+escHtml(c)+'</li>'; }).join('')
+         + '</ul>'
+         + '<div class="res-correcciones-pie">Esto lo arregló el motor solo. Se lo '
+         + 'mostramos para que sepa qué revisar cuando lea a mano — no hace falta '
+         + 'que haga nada.</div>'
          + '</div>'
        : '')
     +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
