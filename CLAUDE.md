@@ -16,6 +16,22 @@ todas las sesiones y todos los chats de Claude Code.
 - Escribe la bitácora en **español claro, sin tecnicismos**, pensando en el
   área de Cartera / Auditoría de Cuentas Médicas del HUS (no en programadores).
 
+## ⭐ PROTOCOLO DE ARRANQUE (la primera respuesta de cada chat)
+
+Después de leer `BITACORA.md`, la PRIMERA respuesta de un chat nuevo debe:
+
+1. Saludar y preguntar: **«¿Sobre qué proyecto vamos a trabajar hoy?»**,
+   mostrando el menú numerado de la sección **«0) MAPA DE PROYECTOS»** de la
+   bitácora (número + nombre + una línea de qué es, nada más).
+2. Cuando el usuario elija (por número o nombre), responder con un resumen de
+   3–5 líneas: qué es el proyecto, cómo se trabaja en él y qué quedó pendiente
+   la última vez (sacándolo de las secciones PENDIENTE y de fechas de la
+   bitácora), y de una vez preguntar por cuál pendiente empezar.
+3. **Excepción:** si el primer mensaje del usuario ya trae la tarea (un
+   archivo, una pantalla, una orden concreta), no estorbe con el menú:
+   identifique a qué proyecto pertenece, dígalo en una línea («esto es del
+   frente ADRES/FURIPS») y póngase a trabajar.
+
 ## Contexto del proyecto
 
 - Dueño: auditoría de facturación de la E.S.E. Hospital Universitario de

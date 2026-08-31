@@ -10,6 +10,32 @@
 
 ---
 
+## 0) MAPA DE PROYECTOS — el menú para empezar cualquier chat
+
+> Cuando arranque un chat nuevo, Claude debe PREGUNTAR: **«¿Sobre qué proyecto
+> vamos a trabajar hoy?»** mostrando este menú. Usted responde con el número o
+> el nombre, y Claude le recuerda en 3 líneas qué es, cómo se trabaja y qué
+> quedó pendiente (buscándolo en las secciones PENDIENTE y de fechas de abajo).
+
+| # | Proyecto | Qué es y qué hace | Cómo trabajamos |
+|---|----------|-------------------|-----------------|
+| 1 | **Motor de Glosas (app web)** | La aplicación de `app/` que redacta con IA las respuestas técnico-jurídicas a las glosas (contrato, tarifas, norma). Corre en el PC del hospital (Docker, `/opt/motor-glosas`, se actualiza sola ~5 min tras cada cambio). | Todo cambio con su prueba de pytest, PR y CI en verde; la producción se actualiza sola. |
+| 2 | **Pre-auditoría SINAC** | Módulo del motor (página `/preauditoria`): radicación del paquete ADRES, devoluciones con oficio PDF y consecutivo, observaciones, informes de gestión. | Igual que el motor: es parte de la app. Los arreglos salen de lo que los 4 auditores ven en pantalla. |
+| 3 | **Proyecto ADRES / FURIPS** | Reclamaciones ADRES (victimas/eventos): validador FURIPS (Circular 022/2023), generador FUR, armado de carpetas de radicación (ej. paquete 31068), objeciones del ADRES en DGH, respuestas de glosa y descuento de valores aceptados en FURIPS2. | Los archivos viven en `Z:\...\00.00PROYECTO ADRES`; Claude no ve ese disco: usted sube los archivos al chat o Claude entrega comandos/bots listos. |
+| 4 | **COOSALUD** | Organizar el ZIP del portal en lotes → consolidar → OBJECIONES para DGH → responder en el portal VCO (vco.ctamedicas.com). | SIEMPRE piloto de 1 factura antes del masivo. Guía: `docs/CONTEXTO_COOSALUD.md`. |
+| 5 | **Dispensario Médico / SIMED** | Glosas y notas crédito del Dispensario (Sanidad Ejército) + la conciliación (expediente por factura, actas, las 147 facturas). | Validar el CUV antes de cargar notas (`tools/verificar_cuv_notas.py`). Guías: `docs/CONTEXTO_DISPENSARIO_*.md`. |
+| 6 | **SIIFA (MinSalud)** | Informe masivo de seguimientos y respuesta de glosas por la API oficial (no es portal de EPS). | Piloto con `--solo-id` antes de cualquier masivo. Guía: `docs/CONTEXTO_SIIFA.md`. |
+| 7 | **Suite Cartera HUS** | Programa de escritorio del analista (`tools/suite_cartera_hus/`): organizar portales → consolidar → cruzar DGH → OBJECIONES; más la caja de Herramientas PDF 🧰, correos de pagos 📧 y unir Exceles 📊. | Ventana (`suite_cartera_hus.py`) o consola (`suite_cli.py`). Claves de portales en archivo local NO versionado. |
+| 8 | **Objeciones de otras EPS** | Bots que arman el Excel de OBJECIONES para DGH desde el archivo de cada entidad: FAMISANAR, SAVIA, EMSSANAR, Mutual Ser, FOMAG (Horus). | Cada uno con su `tools/organizar_objeciones_*.py` y su README. Si DGH devuelve errores, está `corregir_errores_dgh.py` y Claude los analiza. |
+| 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
+| 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
+
+**Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
+esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
+Cuando nazca un proyecto o bot nuevo, se agrega a esta tabla en el mismo commit.
+
+---
+
 ## 1) Las patas del proyecto
 
 1. **Motor de Glosas (aplicación web con IA):** recibe las glosas y redacta el
