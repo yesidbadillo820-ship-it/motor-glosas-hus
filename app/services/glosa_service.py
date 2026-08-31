@@ -4283,21 +4283,39 @@ def _cups_esta_en_catalogo(codigo: str) -> bool:
         return True
 
 
-def _quitar_causal_del_servicio(servicio: str) -> str:
+def _quitar_causal_del_servicio(servicio: str, codigo_glosa: str = "") -> str:
     """Saca del nombre del servicio el código de la glosa, si se coló.
 
     28-08-2026. «CONSULTA DE PRIMERA VEZ POR OTRAS ESPECIALIDADES MÉDICAS,
     código SO0102» → se queda solo el nombre. La causal identifica la objeción
     de la entidad, no lo que el hospital prestó, y ponerla ahí deja ver que el
     escrito confundió las dos cosas.
+
+    31-08-2026 (PRUEBA 2 DE ESTRÉS). Salió «Servicio objetado: OSTEOSÍNTESIS DE
+    FÉMUR código CL4506» y la red no lo tocó. La red estaba bien; el filtro era
+    muy estrecho: solo borraba el código si figuraba EXACTO en el catálogo de
+    200 causales, y CL4506 no está entre ellas.
+
+    Ahora, además del catálogo, se borra el código de LA GLOSA QUE SE ESTÁ
+    CONTESTANDO. Ese no necesita catálogo que lo respalde: por definición es la
+    causal de la entidad, no el procedimiento del hospital. Es el caso seguro y
+    el que de verdad aparece — la IA copia el código del encabezado de la
+    glosa. Para los demás sigue mandando el catálogo, que es lo que evita
+    acusar de causal a un código que no lo sea.
     """
     if not servicio:
         return servicio
+    _propio = (codigo_glosa or "").upper().strip().replace("-", "").replace(" ", "")
     limpio = re.sub(
         r"[,;]?\s*(?:c[óo]digo|cups)\s*[:\-]?\s*"
         r"((?:TA|SO|FA|CL|CO|AU|SA|DE)\s*-?\s*\d{2,4})\b",
         lambda m: (
-            "" if _es_codigo_de_glosa(m.group(1).replace(" ", "").replace("-", "")) else m.group(0)
+            ""
+            if (
+                _es_codigo_de_glosa(m.group(1).replace(" ", "").replace("-", ""))
+                or (_propio and m.group(1).replace(" ", "").replace("-", "").upper() == _propio)
+            )
+            else m.group(0)
         ),
         servicio,
         flags=re.IGNORECASE,
@@ -8667,7 +8685,8 @@ class GlosaService:
             # Escribir la regla no era el trabajo; el trabajo era comprobar que
             # llegara a los dos sitios.
             _servicio_antes_de_la_causal = servicio_ia
-            servicio_ia = _quitar_causal_del_servicio(servicio_ia)
+            _cod_de_esta_glosa = str(locals().get("codigo_det") or "")
+            servicio_ia = _quitar_causal_del_servicio(servicio_ia, _cod_de_esta_glosa)
             # Esta red corre mucho antes que las del cuerpo, así que se guarda
             # la marca y se suma abajo, donde se arma la lista de correcciones.
             _quito_la_causal_del_servicio = servicio_ia != _servicio_antes_de_la_causal
@@ -9293,6 +9312,7 @@ class GlosaService:
                 servicio=servicio_ia if servicio_ia else None,
                 contrato=contrato_ia if contrato_ia else None,
                 tarifa=tarifa_ia if tarifa_ia else None,
+                adjuntos=self._documentos_adjuntos(contexto_pdf),
             )
 
         # ── Ronda 19 (Bug BB) + Ronda 20 (Bug EE): el banner de alerta de
@@ -11254,6 +11274,30 @@ class GlosaService:
             logger.debug(f"[SOPORTE-DE-LA-CAUSAL] no se pudo revisar: {e}")
             return []
 
+    @staticmethod
+    def _documentos_adjuntos(contexto_pdf: Optional[str]) -> list[str]:
+        """Nombres de los PDF que el gestor adjuntó en ESTA respuesta.
+
+        31-08-2026 (PRUEBA 2 DE ESTRÉS, segunda corrida). El auditor adjuntó
+        dos PDF, la confianza subió «por tener soportes»… y el dictamen no
+        relacionó ninguno. La relación de soportes solo sabía leer el índice
+        del servidor de radicación, por número de factura: lo que se acaba de
+        adjuntar no lo miraba nadie.
+
+        El router deja el nombre de cada archivo dentro del contexto, en la
+        marca «═══ DOCUMENTO: x.pdf ═══». De ahí salen, que es lo único que se
+        puede afirmar sin inventar: estos archivos SÍ llegaron con la
+        respuesta.
+        """
+        if not contexto_pdf:
+            return []
+        vistos: list[str] = []
+        for m in re.finditer(r"═+\s*DOCUMENTO:\s*(.+?)\s*═+", contexto_pdf):
+            nombre = m.group(1).strip()
+            if nombre and nombre not in vistos:
+                vistos.append(nombre)
+        return vistos[:10]
+
     def _soportes_reales(self, numero_factura: Optional[str]) -> tuple[list[str], int, str]:
         """La relación de soportes de la factura, leída del expediente real.
 
@@ -11376,6 +11420,7 @@ class GlosaService:
         servicio: Optional[str] = None,
         contrato: Optional[str] = None,
         tarifa: Optional[str] = None,
+        adjuntos: Optional[list[str]] = None,
     ) -> str:
         # Incidente 04-08-2026 (segunda parte): con la IA caída el motor
         # armaba la carátula completa —tabla, sello, cierre— con la
@@ -11508,8 +11553,42 @@ class GlosaService:
         bloque_adjuntos = ""
         filas_adj, soportes_reales, aviso_adj = self._soportes_reales(numero_factura)
         if not soportes_reales:
-            # Sin expediente que respalde, no se firma una relación de soportes.
-            bloque_adjuntos = aviso_adj
+            # 31-08-2026 — LO ADJUNTADO TAMBIÉN ES UN SOPORTE APORTADO.
+            # Hasta hoy, sin expediente indexado el dictamen no relacionaba
+            # nada, ni siquiera los PDF que el gestor acababa de subir. Salían
+            # dos archivos adjuntos, la confianza subía «por tener soportes» y
+            # el escrito que se radica no los nombraba.
+            #
+            # Se relacionan aparte y con su propio título: NO se dice que
+            # obren en el expediente institucional —eso es lo que verifica el
+            # índice y aquí no se verificó—, se dice lo único cierto: que van
+            # anexos a esta respuesta. Sin folios: el motor conoce el nombre
+            # del archivo, no su foliación.
+            if adjuntos:
+                _filas_anx = "".join(
+                    f'<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;'
+                    f'width:40px;">{i}</td>'
+                    f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">'
+                    f"{nombre}</td></tr>"
+                    for i, nombre in enumerate(adjuntos, 1)
+                )
+                bloque_adjuntos = (
+                    '<div style="background:#f0fdf4;border:2px solid #16a34a;'
+                    'border-radius:8px;padding:12px;margin-top:10px;">'
+                    '<div style="font-weight:bold;color:#15803d;margin-bottom:8px;">'
+                    "📎 DOCUMENTOS ANEXOS A ESTA RESPUESTA</div>"
+                    '<table style="width:100%;font-size:11px;border-collapse:collapse;">'
+                    "<tbody>" + _filas_anx + "</tbody></table>"
+                    '<div style="color:#14532d;font-size:10px;margin-top:8px;">'
+                    "Relación de lo que se anexa con este escrito. La verificación "
+                    "contra el expediente institucional de la factura queda "
+                    "pendiente del índice del servidor de radicación."
+                    "</div></div>"
+                ) + (aviso_adj or "")
+            else:
+                # Sin expediente que respalde y sin nada adjunto, no se firma
+                # una relación de soportes.
+                bloque_adjuntos = aviso_adj
         elif filas_adj:
             bloque_adjuntos = f"""
             <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-top:10px;">
