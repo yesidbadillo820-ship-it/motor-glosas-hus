@@ -8418,7 +8418,11 @@ class GlosaService:
             # aparte, en su etiqueta <servicio>, y el recuadro se arma después.
             # Escribir la regla no era el trabajo; el trabajo era comprobar que
             # llegara a los dos sitios.
+            _servicio_antes_de_la_causal = servicio_ia
             servicio_ia = _quitar_causal_del_servicio(servicio_ia)
+            # Esta red corre mucho antes que las del cuerpo, así que se guarda
+            # la marca y se suma abajo, donde se arma la lista de correcciones.
+            _quito_la_causal_del_servicio = servicio_ia != _servicio_antes_de_la_causal
             # OT-016 (06-08-2026) — el servicio inventado. Glosa FA0101 de
             # AURORA: el texto no nombraba ningún servicio, no había CUPS ni
             # PDF, y el dictamen salió con "ESTANCIA U OBSERVACIÓN DE
@@ -9255,6 +9259,20 @@ class GlosaService:
             except Exception as _e_cfx:
                 logger.debug(f"[CUPS-FACTURA] red final no aplicada: {_e_cfx}")
 
+            # 31-08-2026 — LO QUE LA MÁQUINA CORRIGIÓ, A LA VISTA.
+            # Las redes de abajo ya arreglan solas lo que la IA escribe mal, y
+            # lo hacían EN SILENCIO: el dictamen salía limpio y nadie sabía
+            # que se le habían quitado tres cosas. Se anota cada arreglo
+            # comparando el texto antes y después — sin tocar ninguna red, que
+            # siguen siendo funciones puras de texto a texto.
+            _correcciones: list[str] = []
+            if locals().get("_quito_la_causal_del_servicio"):
+                _correcciones.append(
+                    "Quité del recuadro del servicio el código de la causal de la "
+                    "glosa. Una causal no es el código del procedimiento, y "
+                    "presentarla así deja al hospital en evidencia."
+                )
+
             # ═══════════════════════════════════════════════════════════
             #  Ronda 35 (25-08-2026) — RED FINAL CUPS sin respaldo.
             #  Lote de 117 dictámenes de recepción: 19 citaron un CUPS
@@ -9270,6 +9288,11 @@ class GlosaService:
                 )
                 if _dictamen_cups_respaldado != dictamen:
                     dictamen = _dictamen_cups_respaldado
+                    _correcciones.append(
+                        "Retiré códigos que el escrito llamaba CUPS y no están en el "
+                        "catálogo oficial. La entidad cruza los CUPS contra su sistema: "
+                        "uno que no encuentre le sirve para ratificar la glosa."
+                    )
                     # 28-08-2026 — EL SELLO TIENE QUE HABLAR DEL TEXTO FINAL.
                     # Dictamen GL-134 corrido en el hospital: la red ya había
                     # quitado el rótulo de CUPS al 380125 —en el escrito quedó
@@ -9312,6 +9335,11 @@ class GlosaService:
                 _dictamen_anio_ok = _corregir_anio_de_norma(dictamen)
                 if _dictamen_anio_ok != dictamen:
                     dictamen = _dictamen_anio_ok
+                    _correcciones.append(
+                        "Corregí el año de una norma real que estaba citada con el año "
+                        "cambiado. Es el primer dato que la entidad verifica; si no la "
+                        "encuentra, la trata como inventada."
+                    )
             except Exception as _e_na:
                 logger.debug(f"[NORMA-ANIO-EQUIVOCADO] red final no aplicada: {_e_na}")
 
@@ -9325,6 +9353,12 @@ class GlosaService:
                 _dictamen_derogada_ok = _completar_norma_derogada(dictamen)
                 if _dictamen_derogada_ok != dictamen:
                     dictamen = _dictamen_derogada_ok
+                    _correcciones.append(
+                        "Le puse a una norma derogada su fecha de derogatoria y cuál "
+                        "rige hoy. No la quité: para un servicio anterior esa ERA la "
+                        "norma aplicable. Así la entidad no puede responder «esa "
+                        "resolución está derogada»."
+                    )
             except Exception as _e_nd:
                 logger.debug(f"[NORMA-DEROGADA] red final no aplicada: {_e_nd}")
 
@@ -9335,6 +9369,11 @@ class GlosaService:
                 _dictamen_art_ok = _corregir_articulo_mal_citado(dictamen)
                 if _dictamen_art_ok != dictamen:
                     dictamen = _dictamen_art_ok
+                    _correcciones.append(
+                        "Corregí el artículo de una norma real: estaba citado el de al "
+                        "lado. El art. 20 del Decreto 4747 es el del RIPS; el del "
+                        "trámite de glosas es el 23."
+                    )
             except Exception as _e_am:
                 logger.debug(f"[ARTICULO-MAL-CITADO] red final no aplicada: {_e_am}")
 
@@ -10177,6 +10216,10 @@ class GlosaService:
             valor_aceptar_ia=(valor_aceptar_ia if valor_aceptar_ia > 0 else None),
             valor_defender_ia=(valor_defender_ia if valor_defender_ia > 0 else None),
             verificacion_citas=verif_citas,
+            # Lo que las redes arreglaron solas. locals().get porque hay
+            # caminos de salida temprana que no pasan por el bloque de redes:
+            # en esos el campo va vacío, que es la verdad, no una lista falsa.
+            correcciones=(locals().get("_correcciones") or None),
             confianza=confianza,
             auto_pilot=auto_pilot,
             # Mejora #3: campos estructurados confirmados (None si flag OFF o

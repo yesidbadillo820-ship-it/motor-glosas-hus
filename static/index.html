@@ -17384,6 +17384,16 @@ function renderResult(d){
   // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
   window._paVerificacionCitas = d.verificacion_citas || null;
 
+  // 31-08-2026 — LO QUE LA MÁQUINA CORRIGIÓ, A LA VISTA.
+  // El motor ya arreglaba solo lo que la IA escribe mal —quitaba códigos
+  // citados como CUPS que no existen, le ponía la fecha a una norma derogada,
+  // corregía el artículo— y todo eso pasaba EN SILENCIO: el dictamen salía
+  // limpio y nadie sabía que se le habían quitado tres cosas.
+  // Mostrarlo no cuesta trabajo nuevo (ya está hecho por dentro) y sirve para
+  // dos cosas: el gestor le cree al motor porque ve que revisa, y aprende qué
+  // mirar cuando revise a mano.
+  window._paCorrecciones = (d.correcciones && d.correcciones.length) ? d.correcciones : null;
+
   // Quality Gate OK = trae verificación de citas y ninguna con severidad ALTA.
   // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
   // el JS puede togglearla después si la verificación cambia.
@@ -17416,6 +17426,24 @@ function renderResult(d){
     +(_vc && _vc.verificado === false
        ? '<div style="background:#fffbeb;border:2px solid #d97706;border-radius:8px;padding:.7rem .9rem;margin-bottom:.6rem;font-size:.82rem;color:#7c2d12"><b>⚠ Las citas de este dictamen NO se revisaron.</b> '
          + escHtml(_vc.motivo_no_verificado || 'El verificador no pudo correr.')
+         + '</div>'
+       : '')
+    // Lo que las redes arreglaron solas, ANTES del dictamen: el gestor tiene
+    // que verlo antes de leer el texto, no después de haberlo radicado.
+    // No sale impreso — es una nota interna, no parte del escrito a la EPS.
+    +(window._paCorrecciones
+       ? '<div class="res-correcciones no-print">'
+         + '<div class="res-correcciones-hdr">'
+         + '<span class="sds-estado es-probado">Revisado</span>'
+         + '<b>' + window._paCorrecciones.length + ' '
+         + (window._paCorrecciones.length === 1 ? 'corrección' : 'correcciones')
+         + ' antes de entregarle el dictamen</b></div>'
+         + '<ul class="res-correcciones-lista">'
+         + window._paCorrecciones.map(function(c){ return '<li>'+escHtml(c)+'</li>'; }).join('')
+         + '</ul>'
+         + '<div class="res-correcciones-pie">Esto lo arregló el motor solo. Se lo '
+         + 'mostramos para que sepa qué revisar cuando lea a mano — no hace falta '
+         + 'que haga nada.</div>'
          + '</div>'
        : '')
     +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
