@@ -369,3 +369,86 @@ class TestNoLlamarFacturadoAlValorObjetado:
             "ARTÍCULO 871",
         ):
             assert pieza in t, pieza
+
+
+class TestLasAseguradorasSoatSeDetectanSolas:
+    """El auditor confirmó el nombre oficial: «LA PREVISORA S.A.».
+
+    LA PARTE DELICADA, y por eso queda escrita: La Previsora S.A. es LA MISMA
+    EMPRESA que administra el Fondo del Magisterio, y por eso la malla la tiene
+    como alias de FOMAG. El nombre solo NO distingue si la glosa es del
+    magisterio o de SOAT — eso lo dice el «SOAT» o el «UVB» del propio texto.
+
+    Por eso el nombre canónico CONSERVA el marcador SOAT. Si devolviera «LA
+    PREVISORA S.A.» a secas, la malla le daría el contrato de FOMAG (factor
+    0.85) y volveríamos al defecto corregido esta misma tarde.
+    """
+
+    @pytest.mark.parametrize(
+        "escrito,esperado",
+        [
+            ("LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB", "LA PREVISORA S.A. — SOAT"),
+            ("LA PREVISORA S.A. SOAT UVB", "LA PREVISORA S.A. — SOAT"),
+            ("ASEGURADORA SOLIDARIA SOAT UVB", "ASEGURADORA SOLIDARIA — SOAT"),
+            ("SEGUROS DEL ESTADO SOAT", "SEGUROS DEL ESTADO — SOAT"),
+            ("COMPAÑIA MUNDIAL DE SEGUROS S.A. SOAT UVB", "COMPAÑIA MUNDIAL DE SEGUROS — SOAT"),
+        ],
+    )
+    def test_las_reconoce_en_el_texto(self, escrito, esperado):
+        texto = f"TA0301 | HUS0000601447 | {escrito}\nMAYOR VALOR COBRADO."
+        assert resolver_eps_efectiva("OTRA / SIN DEFINIR", texto)[0] == esperado
+
+    @pytest.mark.parametrize(
+        "escrito",
+        [
+            "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB",
+            "LA PREVISORA S.A. SOAT UVB",
+            "ASEGURADORA SOLIDARIA SOAT UVB",
+        ],
+    )
+    def test_y_liquidan_a_soat_pleno_no_al_0_85_de_fomag(self, escrito):
+        """La cadena completa: detección → contrato → factor. Es donde estaba
+        el defecto y donde tiene que quedar comprobado."""
+        det = resolver_eps_efectiva("OTRA / SIN DEFINIR", f"TA0301 | HUS1 | {escrito}")[0]
+        assert get_contrato(det)["factor"] == 1.00
+
+    def test_el_canonico_conserva_el_marcador_soat(self):
+        """Sin el marcador, la malla le devolvería el contrato de FOMAG."""
+        det = resolver_eps_efectiva(
+            "OTRA / SIN DEFINIR", "TA0301 | HUS1 | LA PREVISORA S.A. SOAT UVB"
+        )[0]
+        assert "SOAT" in det
+
+    @pytest.mark.parametrize("texto", ["FIDUCIARIA PREVISORA FOMAG", "MAGISTERIO"])
+    def test_el_magisterio_manda_sobre_el_nombre_de_la_compania(self, texto):
+        """La Previsora S.A. es la MISMA empresa que administra el FOMAG.
+
+        Primer intento de este arreglo: se metió «PREVISORA» como token suelto
+        y se tragó «FIDUCIARIA PREVISORA FOMAG», que es magisterio puro. Lo
+        atajó una prueba de la ronda 13 que existe desde junio.
+
+        La regla pide LAS DOS COSAS —nombre de compañía Y marcador SOAT— y
+        cede ante el magisterio, que es más específico sobre el pagador que la
+        palabra «SOAT», que puede estar ahí solo por la tarifa.
+        """
+        from app.services.glosa_ia_prompts import _detectar_pagador_en_texto
+
+        assert _detectar_pagador_en_texto(texto) == "FOMAG"
+
+    def test_el_nombre_de_la_compania_solo_no_basta(self):
+        """Sin marcador SOAT no se puede afirmar de qué negocio viene."""
+        from app.services.glosa_ia_prompts import _detectar_pagador_en_texto
+
+        assert _detectar_pagador_en_texto("LA PREVISORA") == ""
+
+    def test_fomag_a_secas_no_se_movio(self):
+        """Regresión: el magisterio conserva su contrato y su factor."""
+        assert get_contrato("FOMAG")["factor"] == 0.85
+
+    def test_las_eps_normales_no_se_vieron_afectadas(self):
+        for escrito, esperado in (
+            ("NUEVA E.P.S. S.A. - SUBSIDIADO", "NUEVA EPS"),
+            ("FAMISANAR EPS", "FAMISANAR"),
+        ):
+            det = resolver_eps_efectiva("OTRA / SIN DEFINIR", f"AU0201 | HUS1 | {escrito}")[0]
+            assert det == esperado

@@ -1835,6 +1835,50 @@ _RE_EPS_SOLA = (
 )
 
 
+# ── Aseguradoras SOAT (31-08-2026) ──────────────────────────────────────
+# El auditor confirmó el nombre oficial: «LA PREVISORA S.A.».
+#
+# LA PARTE DELICADA: La Previsora S.A. es LA MISMA EMPRESA que administra el
+# Fondo del Magisterio, y por eso la malla la tiene como alias de FOMAG. El
+# nombre de la compañía NO basta para saber de qué negocio viene la glosa.
+#
+# Primer intento de este mismo arreglo: se metió «PREVISORA» como token suelto
+# y se tragó «FIDUCIARIA PREVISORA FOMAG», que es magisterio puro. Lo atajó una
+# prueba de la ronda 13 que existe desde junio.
+#
+# La regla correcta pide LAS DOS COSAS: el nombre de la compañía Y un marcador
+# de SOAT en el texto. Y si el texto nombra el magisterio, manda el magisterio
+# —es más específico sobre el pagador que la palabra «SOAT», que puede estar
+# ahí solo por la tarifa—.
+_ASEGURADORAS_SOAT: tuple[tuple[str, str], ...] = (
+    ("PREVISORA", "LA PREVISORA S.A. — SOAT"),
+    ("SEGUROS DEL ESTADO", "SEGUROS DEL ESTADO — SOAT"),
+    ("SOLIDARIA", "ASEGURADORA SOLIDARIA — SOAT"),
+    ("MUNDIAL DE SEGUROS", "COMPAÑIA MUNDIAL DE SEGUROS — SOAT"),
+    ("AXA COLPATRIA", "AXA COLPATRIA — SOAT"),
+)
+_RE_MARCADOR_SOAT = re.compile(r"(?<![A-Z])(SOAT|UVB)(?![A-Z])")
+_RE_MAGISTERIO = re.compile(r"(?<![A-Z])(FOMAG|MAGISTERIO)(?![A-Z])")
+
+
+def _aseguradora_soat_en_texto(txt_up: str) -> str:
+    """Nombre canónico de la aseguradora SOAT nombrada en el texto, o "".
+
+    El canónico CONSERVA el marcador «— SOAT» a propósito: si devolviera
+    «LA PREVISORA S.A.» a secas, la malla contractual le daría el contrato de
+    FOMAG (factor 0.85) y volveríamos al defecto que se corrigió esta tarde.
+    Con el marcador, la guardia de régimen lo manda a SOAT pleno.
+    """
+    if _RE_MAGISTERIO.search(txt_up):
+        return ""
+    if not _RE_MARCADOR_SOAT.search(txt_up):
+        return ""
+    for nombre, canonico in _ASEGURADORAS_SOAT:
+        if nombre in txt_up:
+            return canonico
+    return ""
+
+
 def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     """Bug I (ronda 13): detecta el nombre canónico de la EPS / ARL que
     aparece literalmente en el texto de la glosa. Útil cuando el usuario
@@ -1853,6 +1897,11 @@ def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     # entidad en «OTRA / SIN DEFINIR», sin contrato y sin tarifa.
     # Se quita el punto DENTRO de la sigla (E.P.S. → EPS). Nada más cambia.
     txt_up = re.sub(r"(?<=\b[A-Z])\.(?=[A-Z]\b|[A-Z]\.)", "", txt_up)
+    # 0) Aseguradora SOAT: exige nombre de compañía Y marcador SOAT, y cede
+    #    ante el magisterio. Va primero porque es la regla más estricta.
+    _soat = _aseguradora_soat_en_texto(txt_up)
+    if _soat:
+        return _soat
     # 1) Tokens explícitos ("EPS SURA", "ARL SURA", etc.) — más específicos.
     for token, canonico in _TOKENS_PAGADOR_EN_TEXTO:
         if token in txt_up:
