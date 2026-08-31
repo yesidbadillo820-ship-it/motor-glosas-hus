@@ -6160,98 +6160,52 @@ def _afirma_hechos_clinicos_sin_soporte(dictamen: str, tiene_soportes: bool) -> 
 # Esta red NO escribe el argumento que falta — inventarlo sería peor. Detecta
 # que la objeción quedó sin tocar y se lo dice al gestor por su nombre, para
 # que lo complete antes de radicar.
-_FAMILIAS_DE_OBJECION: tuple[tuple[str, str, re.Pattern[str], tuple[str, ...]], ...] = (
-    (
-        "tarifa",
-        "el mayor valor o el tope tarifario",
-        re.compile(
-            r"TOPE\s+CONTRACTUAL|SUPERA\s+EL\s+TOPE|MAYOR\s+VALOR|"
-            r"VALOR\s+UNITARIO|TARIFA\s+PACTADA|EXCEDE\s+LA\s+TARIFA|SOBRECOSTO"
-        ),
-        ("TARIFA", "TOPE", "VALOR UNITARIO", "PACTA SUNT SERVANDA", "SOAT", "MAYOR VALOR"),
-    ),
-    (
-        "autorización",
-        "la falta de autorización previa",
-        re.compile(
-            r"(?:SIN|NO|CARECE\s+DE|FALTA\s+DE)\s+AUTORIZAC|AUTORIZACI[ÓO]N\s+PREVIA|"
-            r"NO\s+AUTORIZAD[OA]"
-        ),
-        ("AUTORIZAC", "URGENCIA", "ART. 67", "ARTICULO 67", "ARTÍCULO 67"),
-    ),
-    (
-        # 31-08-2026: «NO SE EVIDENCIA» a secas NO es una objeción de
-        # soportes. En la CL4506 la frase completa era «NO SE EVIDENCIA
-        # JUSTIFICACION DE AMBOS SISTEMAS DE FIJACION», que es pertinencia
-        # pura, y la red reclamaba unos soportes que nadie había pedido.
-        # Lo que distingue una glosa de soportes es QUÉ falta: un DOCUMENTO
-        # con nombre propio, no una justificación clínica.
-        "soportes",
-        "los soportes que la entidad echa de menos",
-        re.compile(
-            r"(?:NO\s+SE\s+(?:EVIDENCIA|ANEXA|APORTA|ADJUNTA)|NO\s+(?:ANEXA|APORTA|"
-            r"ADJUNTA)|SIN|FALTA(?:N)?(?:\s+DE)?|AUSENCIA\s+DE|CARECE\s+DE)"
-            r"[^.\n]{0,40}?"
-            r"(?:HISTORIA\s+CL[IÍ]NICA|EPICRISIS|RIPS|ORDEN\s+M[EÉ]DICA|"
-            r"DESCRIPCI[ÓO]N\s+QUIR[UÚ]RGICA|NOTA\s+(?:OPERATORIA|DE\s+ENFERMER[ÍI]A)|"
-            r"SOPORTE|ANEXO|INFORME|RESULTADO\s+DE|HOJA\s+DE|COMPROBANTE)"
-        ),
-        ("SOPORTE", "HISTORIA CLINICA", "HISTORIA CLÍNICA", "FOLIO", "EPICRISIS", "ANEXA"),
-    ),
-    (
-        "cantidad",
-        "la cantidad o el número de unidades cobradas",
-        re.compile(
-            r"CANTIDAD\s+COBRADA|MAYOR\s+CANTIDAD|UNIDADES\s+DE\s+M[ÁA]S|"
-            r"DOBLE\s+COBRO|COBRO\s+DUPLICADO"
-        ),
-        ("CANTIDAD", "UNIDAD", "DUPLICAD", "DOBLE COBRO"),
-    ),
-    (
-        "pertinencia",
-        "la pertinencia clínica del servicio",
-        re.compile(
-            r"PERTINENCIA|NO\s+PERTINENTE|NO\s+ACORDE\s+A\s+GPC|"
-            r"(?:SIN|NO\s+SE\s+EVIDENCIA)\s+JUSTIFICACI[ÓO]N|"
-            r"SIN\s+JUSTIFICACI[ÓO]N\s+CL[IÍ]NICA|NO\s+SE\s+JUSTIFICA"
-        ),
-        ("PERTINEN", "AUTONOMIA", "AUTONOMÍA", "MEDICO TRATANTE", "MÉDICO TRATANTE"),
-    ),
-)
-
-# Palabras con las que una entidad encadena la segunda objeción. Sin alguna de
-# ellas no se afirma que haya dos: una glosa puede nombrar la tarifa de paso.
-_RE_HAY_SEGUNDA_OBJECION = re.compile(
-    r"\b(?:ADICIONALMENTE|AS[ÍI]\s+MISMO|ASIMISMO|IGUALMENTE|ADEM[ÁA]S|"
-    r"POR\s+OTRA\s+PARTE|AUNADO\s+A|DE\s+IGUAL\s+(?:FORMA|MANERA)|"
-    r"AS[ÍI]\s+COMO\s+TAMBI[ÉE]N)\b",
-    re.IGNORECASE,
-)
-
-
 def _objeciones_sin_contestar(texto_glosa: str, dictamen: str) -> list[str]:
     """Objeciones que la glosa plantea y el dictamen no menciona.
 
-    Devuelve la descripción en español de cada una. Lista vacía = o hay una
-    sola objeción, o el dictamen las tocó todas.
-
-    Prudente a propósito: solo mira glosas que encadenan («adicionalmente»,
-    «además»…) y solo reporta cuando encuentra DOS O MÁS familias en el texto.
-    Una glosa de tarifas que nombra la historia clínica al pasar no dispara
-    nada, porque sin conector no se cuenta como segunda objeción.
+    La tabla vive en `glosa_ia_prompts` porque el prompt la usa ANTES de
+    redactar —para exigir el párrafo— y esta red la usa DESPUÉS, para avisar
+    si aun así faltó. Una sola fuente: si mañana se agrega una familia, las
+    dos puntas la ven.
     """
     if not texto_glosa or not dictamen:
         return []
-    glosa_up = texto_glosa.upper()
-    if not _RE_HAY_SEGUNDA_OBJECION.search(glosa_up):
-        return []
+    from app.services.glosa_ia_prompts import objeciones_no_respondidas
 
-    presentes = [fam for fam in _FAMILIAS_DE_OBJECION if fam[2].search(glosa_up)]
-    if len(presentes) < 2:
-        return []
+    return objeciones_no_respondidas(texto_glosa, dictamen)
 
+
+def _nota_operatoria_sin_citar(
+    codigo: str, texto_glosa: str, contexto_pdf: str, dictamen: str
+) -> bool:
+    """True si había nota operatoria y el dictamen no la usó.
+
+    31-08-2026, prueba 2 (CL4506). El auditor lo dijo sin rodeos: escudarse en
+    la autonomía médica sin justificar por qué el cirujano usó clavo Y placa
+    garantiza que la EPS ratifique. Contra una glosa quirúrgica el argumento
+    es lo que dice la nota; la Ley 1751 es el cierre.
+
+    Solo avisa cuando la nota ESTÁ entre lo aportado: reclamar que se cite un
+    documento que nadie entregó sería pedir que se invente.
+    """
+    from app.services.glosa_ia_prompts import exige_nota_operatoria
+
+    if not dictamen or not exige_nota_operatoria(codigo, texto_glosa or "", contexto_pdf or ""):
+        return False
     dict_up = dictamen.upper()
-    return [fam[1] for fam in presentes if not any(p in dict_up for p in fam[3])]
+    la_nombra = any(
+        p in dict_up
+        for p in (
+            "NOTA OPERATORIA",
+            "NOTA QUIRÚRGICA",
+            "NOTA QUIRURGICA",
+            "DESCRIPCIÓN QUIRÚRGICA",
+            "DESCRIPCION QUIRURGICA",
+            "PROTOCOLO OPERATORIO",
+            "REPORTE OPERATORIO",
+        )
+    )
+    return not la_nombra
 
 
 # ── Glosaron antes de que existiera la factura (OT-010) ──
@@ -9718,6 +9672,23 @@ class GlosaService:
                     )
             except Exception as _e_os:
                 logger.debug(f"[OBJECION-SIN-CONTESTAR] red no aplicada: {_e_os}")
+
+            # 31-08-2026 — PERTINENCIA QUIRÚRGICA SIN LA NOTA OPERATORIA.
+            # No se escribe la justificación clínica que falta: eso sería
+            # inventar historia clínica. Se avisa, que es lo que el gestor
+            # necesita para ir a buscarla antes de radicar.
+            try:
+                if _nota_operatoria_sin_citar(codigo_det, texto_base, contexto_pdf or "", dictamen):
+                    _correcciones.append(
+                        "OJO: es una glosa de pertinencia quirúrgica, la nota "
+                        "operatoria está entre los soportes y el dictamen no la "
+                        "cita. La autonomía médica sola no sostiene esta defensa: "
+                        "traiga del expediente lo que escribió el cirujano, con "
+                        "folio y fecha, antes de radicar."
+                    )
+                    logger.info("[NOTA-OPERATORIA] pertinencia quirúrgica sin citar la nota")
+            except Exception as _e_no:
+                logger.debug(f"[NOTA-OPERATORIA] red no aplicada: {_e_no}")
 
             # 28-08-2026 — EL SELLO TIENE QUE HABLAR DEL TEXTO FINAL (2.ª vez).
             # Ayer se arregló para la red de CUPS y quedó el mismo defecto en
