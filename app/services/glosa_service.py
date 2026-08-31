@@ -6125,6 +6125,117 @@ def _afirma_hechos_clinicos_sin_soporte(dictamen: str, tiene_soportes: bool) -> 
     return bool(_PAT_AFIRMACION_CLINICA.search(dictamen))
 
 
+# ── La segunda objeción que nadie contestó (PRUEBA 2 DE ESTRÉS, 31-08-2026) ──
+# Glosa CL4506, factura HUS0000601892, NUEVA EPS. El texto objetaba DOS cosas:
+#
+#   (1) la pertinencia del doble sistema de fijación, y
+#   (2) «ADICIONALMENTE EL VALOR UNITARIO DEL CLAVO SUPERA EL TOPE CONTRACTUAL».
+#
+# El dictamen contestó la primera con tres páginas de autonomía médica y de la
+# segunda no dijo una sola palabra. Lo que no se contesta se ratifica: esa
+# parte de los $7.310.000 se pierde sin haberla discutido.
+#
+# La causa es de diseño: el motor arma el prompt con UN módulo, elegido por el
+# código de la glosa (CL → pertinencia), y el módulo describe una sola línea
+# de defensa. El código dice cuál es el motivo principal, no el único.
+#
+# Esta red NO escribe el argumento que falta — inventarlo sería peor. Detecta
+# que la objeción quedó sin tocar y se lo dice al gestor por su nombre, para
+# que lo complete antes de radicar.
+_FAMILIAS_DE_OBJECION: tuple[tuple[str, str, re.Pattern[str], tuple[str, ...]], ...] = (
+    (
+        "tarifa",
+        "el mayor valor o el tope tarifario",
+        re.compile(
+            r"TOPE\s+CONTRACTUAL|SUPERA\s+EL\s+TOPE|MAYOR\s+VALOR|"
+            r"VALOR\s+UNITARIO|TARIFA\s+PACTADA|EXCEDE\s+LA\s+TARIFA|SOBRECOSTO"
+        ),
+        ("TARIFA", "TOPE", "VALOR UNITARIO", "PACTA SUNT SERVANDA", "SOAT", "MAYOR VALOR"),
+    ),
+    (
+        "autorización",
+        "la falta de autorización previa",
+        re.compile(
+            r"(?:SIN|NO|CARECE\s+DE|FALTA\s+DE)\s+AUTORIZAC|AUTORIZACI[ÓO]N\s+PREVIA|"
+            r"NO\s+AUTORIZAD[OA]"
+        ),
+        ("AUTORIZAC", "URGENCIA", "ART. 67", "ARTICULO 67", "ARTÍCULO 67"),
+    ),
+    (
+        # 31-08-2026: «NO SE EVIDENCIA» a secas NO es una objeción de
+        # soportes. En la CL4506 la frase completa era «NO SE EVIDENCIA
+        # JUSTIFICACION DE AMBOS SISTEMAS DE FIJACION», que es pertinencia
+        # pura, y la red reclamaba unos soportes que nadie había pedido.
+        # Lo que distingue una glosa de soportes es QUÉ falta: un DOCUMENTO
+        # con nombre propio, no una justificación clínica.
+        "soportes",
+        "los soportes que la entidad echa de menos",
+        re.compile(
+            r"(?:NO\s+SE\s+(?:EVIDENCIA|ANEXA|APORTA|ADJUNTA)|NO\s+(?:ANEXA|APORTA|"
+            r"ADJUNTA)|SIN|FALTA(?:N)?(?:\s+DE)?|AUSENCIA\s+DE|CARECE\s+DE)"
+            r"[^.\n]{0,40}?"
+            r"(?:HISTORIA\s+CL[IÍ]NICA|EPICRISIS|RIPS|ORDEN\s+M[EÉ]DICA|"
+            r"DESCRIPCI[ÓO]N\s+QUIR[UÚ]RGICA|NOTA\s+(?:OPERATORIA|DE\s+ENFERMER[ÍI]A)|"
+            r"SOPORTE|ANEXO|INFORME|RESULTADO\s+DE|HOJA\s+DE|COMPROBANTE)"
+        ),
+        ("SOPORTE", "HISTORIA CLINICA", "HISTORIA CLÍNICA", "FOLIO", "EPICRISIS", "ANEXA"),
+    ),
+    (
+        "cantidad",
+        "la cantidad o el número de unidades cobradas",
+        re.compile(
+            r"CANTIDAD\s+COBRADA|MAYOR\s+CANTIDAD|UNIDADES\s+DE\s+M[ÁA]S|"
+            r"DOBLE\s+COBRO|COBRO\s+DUPLICADO"
+        ),
+        ("CANTIDAD", "UNIDAD", "DUPLICAD", "DOBLE COBRO"),
+    ),
+    (
+        "pertinencia",
+        "la pertinencia clínica del servicio",
+        re.compile(
+            r"PERTINENCIA|NO\s+PERTINENTE|NO\s+ACORDE\s+A\s+GPC|"
+            r"(?:SIN|NO\s+SE\s+EVIDENCIA)\s+JUSTIFICACI[ÓO]N|"
+            r"SIN\s+JUSTIFICACI[ÓO]N\s+CL[IÍ]NICA|NO\s+SE\s+JUSTIFICA"
+        ),
+        ("PERTINEN", "AUTONOMIA", "AUTONOMÍA", "MEDICO TRATANTE", "MÉDICO TRATANTE"),
+    ),
+)
+
+# Palabras con las que una entidad encadena la segunda objeción. Sin alguna de
+# ellas no se afirma que haya dos: una glosa puede nombrar la tarifa de paso.
+_RE_HAY_SEGUNDA_OBJECION = re.compile(
+    r"\b(?:ADICIONALMENTE|AS[ÍI]\s+MISMO|ASIMISMO|IGUALMENTE|ADEM[ÁA]S|"
+    r"POR\s+OTRA\s+PARTE|AUNADO\s+A|DE\s+IGUAL\s+(?:FORMA|MANERA)|"
+    r"AS[ÍI]\s+COMO\s+TAMBI[ÉE]N)\b",
+    re.IGNORECASE,
+)
+
+
+def _objeciones_sin_contestar(texto_glosa: str, dictamen: str) -> list[str]:
+    """Objeciones que la glosa plantea y el dictamen no menciona.
+
+    Devuelve la descripción en español de cada una. Lista vacía = o hay una
+    sola objeción, o el dictamen las tocó todas.
+
+    Prudente a propósito: solo mira glosas que encadenan («adicionalmente»,
+    «además»…) y solo reporta cuando encuentra DOS O MÁS familias en el texto.
+    Una glosa de tarifas que nombra la historia clínica al pasar no dispara
+    nada, porque sin conector no se cuenta como segunda objeción.
+    """
+    if not texto_glosa or not dictamen:
+        return []
+    glosa_up = texto_glosa.upper()
+    if not _RE_HAY_SEGUNDA_OBJECION.search(glosa_up):
+        return []
+
+    presentes = [fam for fam in _FAMILIAS_DE_OBJECION if fam[2].search(glosa_up)]
+    if len(presentes) < 2:
+        return []
+
+    dict_up = dictamen.upper()
+    return [fam[1] for fam in presentes if not any(p in dict_up for p in fam[3])]
+
+
 # ── Glosaron antes de que existiera la factura (OT-010) ──
 # Prueba real del 06-08-2026, glosa FA0201 de NUEVA EPS: "Factura radicada el
 # 15/09/2026. Glosa notificada el 03/08/2026". Es imposible objetar una
@@ -8589,6 +8700,56 @@ class GlosaService:
                 )
             except Exception as _e_ti:
                 logger.debug(f"[TARIFA-INVENTADA] guarda no aplicada: {_e_ti}")
+            # 31-08-2026 (PRUEBA 2 DE ESTRÉS — CL4506, NUEVA EPS). LA FICHA
+            # DECÍA «TARIFA NO DETERMINADA» Y EL DICTAMEN SALIÓ CON
+            # «Contrato: 02-01-06-00077-2017 · Tarifa pactada: SOAT PLENO».
+            #
+            # El arreglo anterior (e23a886) corrigió el DATO que entra al
+            # prompt, y estaba bien. Lo que no se vio es que estas dos
+            # casillas del recuadro NO las escribe el motor: las escribe el
+            # modelo en su XML (<contrato> y <tarifa>). Y el modelo «limpió»
+            # la advertencia: se quedó con el número bonito del contrato
+            # vencido y eligió «SOAT PLENO», que el propio esquema le ofrece
+            # como uno de los dos valores válidos.
+            #
+            # El daño es de los caros: el hospital afirma por escrito que con
+            # NUEVA EPS lo PACTADO es SOAT pleno, cuando ese contrato pactaba
+            # SOAT −20 % y venció el 31/03/2026. En una glosa de TARIFA eso
+            # es concederle a la entidad justo lo que objetó.
+            #
+            # La ficha contractual es la fuente de verdad y no se negocia con
+            # el modelo: si dice que la vigencia está vencida, esas dos
+            # casillas se reemplazan por el texto de la ficha. Únicamente en
+            # ese caso — cuando el contrato sí rige, el XML del modelo sigue
+            # mandando como hasta hoy.
+            _correcciones_previas: list[str] = list(locals().get("_correcciones_previas") or [])
+            try:
+                from app.services.glosa_ia_prompts import get_contrato as _get_ctr_v
+
+                _ficha_vig = _get_ctr_v(
+                    str(getattr(data, "eps", "") or ""),
+                    getattr(data, "fecha_radicacion", None)
+                    or getattr(data, "fecha_recepcion", None),
+                )
+                if _ficha_vig and _ficha_vig.get("_vigencia_vencida"):
+                    _num_ficha = str(_ficha_vig.get("numero") or "").strip()
+                    _tar_ficha = str(_ficha_vig.get("tarifa") or "").strip()
+                    if _num_ficha and _num_ficha != contrato_ia:
+                        contrato_ia = _num_ficha
+                        _correcciones_previas.append(
+                            "El dictamen citaba el contrato como si estuviera "
+                            "vigente. Su vigencia ya terminó: se reemplazó por "
+                            "la advertencia y la fecha de vencimiento."
+                        )
+                    if _tar_ficha and _tar_ficha != tarifa_ia:
+                        tarifa_ia = _tar_ficha
+                        _correcciones_previas.append(
+                            "El dictamen afirmaba una tarifa pactada que nadie "
+                            "puede sostener sin la fecha del servicio: se "
+                            "reemplazó por «TARIFA NO DETERMINADA»."
+                        )
+            except Exception as _e_vv:
+                logger.debug(f"[VIGENCIA-VENCIDA] guarda no aplicada: {_e_vv}")
             arg_ia = self._xml("argumento", res_ia, "")
             normas_clave = self._xml("normas_clave", res_ia, "")
 
@@ -9403,6 +9564,10 @@ class GlosaService:
             # comparando el texto antes y después — sin tocar ninguna red, que
             # siguen siendo funciones puras de texto a texto.
             _correcciones: list[str] = []
+            # Lo que se corrigió ANTES de llegar aquí (la ficha contractual
+            # pisando el XML del modelo) también es una corrección que el
+            # gestor tiene que ver.
+            _correcciones += list(locals().get("_correcciones_previas") or [])
             if locals().get("_quito_la_causal_del_servicio"):
                 _correcciones.append(
                     "Quité del recuadro del servicio el código de la causal de la "
@@ -9513,6 +9678,26 @@ class GlosaService:
                     )
             except Exception as _e_am:
                 logger.debug(f"[ARTICULO-MAL-CITADO] red final no aplicada: {_e_am}")
+
+            # 31-08-2026 — LA SEGUNDA OBJECIÓN QUE NADIE CONTESTÓ (CL4506).
+            # No se escribe el argumento que falta: se avisa. El gestor sabe
+            # defender un tope contractual; lo que no puede es adivinar que el
+            # dictamen se saltó media glosa.
+            try:
+                _sin_contestar = _objeciones_sin_contestar(texto_base, dictamen)
+                for _obj in _sin_contestar:
+                    _correcciones.append(
+                        f"OJO: la glosa también objeta {_obj} y el dictamen no lo "
+                        "responde. Lo que no se contesta se ratifica: complételo "
+                        "antes de radicar."
+                    )
+                if _sin_contestar:
+                    logger.info(
+                        f"[OBJECION-SIN-CONTESTAR] {len(_sin_contestar)} objecion(es) "
+                        f"sin respuesta: {_sin_contestar}"
+                    )
+            except Exception as _e_os:
+                logger.debug(f"[OBJECION-SIN-CONTESTAR] red no aplicada: {_e_os}")
 
             # 28-08-2026 — EL SELLO TIENE QUE HABLAR DEL TEXTO FINAL (2.ª vez).
             # Ayer se arregló para la red de CUPS y quedó el mismo defecto en
@@ -11279,7 +11464,16 @@ class GlosaService:
             # PLENO». Si no hay contrato no hay nada pactado — la contradicción
             # está en la etiqueta, no en el dato: el SOAT pleno es justamente lo
             # que se aplica A FALTA de pacto. Se cambia la palabra.
-            _sin_pacto = "SIN CONTRATO" in str(contrato or "").upper()
+            # 31-08-2026: la etiqueta también miente cuando el contrato
+            # existió pero su vigencia terminó — «Tarifa pactada: TARIFA
+            # NO DETERMINADA» es una contradicción en la misma línea.
+            _c_up = str(contrato or "").upper()
+            _t_up = str(tarifa or "").upper()
+            _sin_pacto = (
+                "SIN CONTRATO" in _c_up
+                or "VIGENCIA TERMINADA" in _c_up
+                or "NO DETERMINADA" in _t_up
+            )
             _etiqueta_tarifa = "Tarifa aplicada" if _sin_pacto else "Tarifa pactada"
             tarifa_html = f"<div><b>{_etiqueta_tarifa}:</b> {tarifa}</div>" if tarifa else ""
             bloque_servicio = f"""
