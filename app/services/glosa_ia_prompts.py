@@ -611,6 +611,46 @@ def get_contrato(eps: str, fecha_hecho=None) -> dict:
                 f"CONTRATO CON VIGENCIA TERMINADA: {_vencidos}. "
                 "VERIFICAR LA FECHA DEL SERVICIO ANTES DE RADICAR."
             )
+            # 31-08-2026 — «TARIFA PACTADA: SOAT PLENO» ERA UNA AFIRMACIÓN QUE
+            # NADIE PODÍA HACER.
+            #
+            # Este bloque ya arreglaba el número del contrato («no teníamos
+            # contrato» pasó a «el contrato venció el X»), pero la TARIFA se
+            # quedaba con el texto del fallback: «SOAT PLENO — Manual Tarifario
+            # SOAT 2026». El dictamen salía entonces con la línea
+            #
+            #     Tarifa pactada: SOAT PLENO
+            #
+            # que es una afirmación positiva sobre algo que en este camino
+            # justamente NO se sabe: la glosa no trajo fecha del servicio y el
+            # contrato ya venció, así que no hay forma de decir cuál rige.
+            #
+            # Lo destapó la tanda de pruebas de estrés: salió en NUEVA EPS
+            # (contrato hasta 2026-03-31, pactaba SOAT −20 %) y en DISPENSARIO
+            # MEDICO (440-DIGSA hasta 2026-07-30, también −20 %). En una glosa
+            # de TARIFA eso es concederle a la entidad justo lo que objetó.
+            #
+            # EL FACTOR NO SE TOCA: sigue en 1.00 a propósito —aplicar un
+            # descuento pactado sin saber la fecha también sería inventar, y de
+            # los dos errores ese es el que le cuesta plata al hospital—. Lo que
+            # se corrige es la AFIRMACIÓN: se nombra el factor que pactaba cada
+            # contrato vencido para que el gestor vea qué está en juego, y se
+            # dice expresamente que no está determinada.
+            _pactados = " · ".join(
+                f"{c.numero or 'sin número'}: factor {c.factor:.2f}"
+                for c in otros
+                if getattr(c, "factor", None)
+            )
+            ficha["tarifa"] = (
+                "TARIFA NO DETERMINADA — sin la fecha del servicio no se puede "
+                "afirmar cuál rige. "
+                + (f"El contrato vencido pactaba {_pactados}. " if _pactados else "")
+                + "Mientras no se conozca la fecha se liquida a SOAT pleno "
+                "(Circular Externa 047 de 2025 MinSalud, Manual SOAT 2026 "
+                "indexado a UVB), que es lo único sostenible sin ese dato. "
+                "CONFIRME LA FECHA DE PRESTACIÓN ANTES DE RADICAR."
+            )
+            ficha["_tarifa_indeterminada"] = True
             ficha["_vigencia_vencida"] = True
             ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
             return ficha
