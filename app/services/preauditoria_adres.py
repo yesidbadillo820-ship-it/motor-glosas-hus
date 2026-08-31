@@ -495,6 +495,56 @@ def importar_bitacora(db: Session, contenido: bytes, *, paquete_id: int) -> int:
 # ─── Consultar ───────────────────────────────────────────────────────────────
 
 
+def paquetes_de_factura(db: Session, numero: str) -> list[dict]:
+    """En qué paquete(s) está esa factura, con sus glosas y su plata.
+
+    POR QUÉ EXISTE (31-08-2026). El ADRES puede glosar la misma factura en más
+    de un paquete. La pantalla trabaja sobre el paquete que el auditor tiene
+    escogido arriba, así que al buscar una factura de otro paquete respondía
+    «no está en ningún paquete cargado» — y era mentira: sí estaba, en otro.
+    Con esto la pantalla puede decir dónde está y llevarlo allá, y la ficha
+    puede avisar cuando la misma factura está glosada en dos paquetes.
+    """
+    clave = normalizar_factura(numero)
+    filas = (
+        db.query(
+            GlosaAdresRecord.paquete_id,
+            GlosaAdresRecord.factura,
+            GlosaAdresRecord.glosa_total,
+            GlosaAdresRecord.cuenta_valor,
+            GlosaAdresRecord.valor_glosado,
+            GlosaAdresRecord.decision,
+            PaqueteAdresRecord.numero_paquete,
+        )
+        .join(PaqueteAdresRecord, PaqueteAdresRecord.id == GlosaAdresRecord.paquete_id)
+        .filter(GlosaAdresRecord.factura_clave == clave)
+        .all()
+    )
+    resumen: dict[int, dict] = {}
+    for paquete_id, factura, total, cuenta, glosado, decision, numero_paquete in filas:
+        d = resumen.setdefault(
+            paquete_id,
+            {
+                "paquete_id": paquete_id,
+                "paquete": numero_paquete or "",
+                "factura": factura,
+                "glosas": 0,
+                "pendientes": 0,
+                "valor_glosado": 0.0,
+                "glosas_totales_ocultas": 0,
+            },
+        )
+        if cuenta:  # el mismo ítem con varias causales cuenta una sola vez
+            d["valor_glosado"] += glosado or 0
+        if total:
+            d["glosas_totales_ocultas"] += 1
+            continue
+        d["glosas"] += 1
+        if not (decision or "").strip():
+            d["pendientes"] += 1
+    return sorted(resumen.values(), key=lambda d: -d["paquete_id"])
+
+
 def consultar_factura(
     db: Session,
     numero: str,
@@ -526,6 +576,9 @@ def consultar_factura(
 
     primera = todas[0]
     paquete = db.get(PaqueteAdresRecord, primera.paquete_id)
+    # El ADRES puede glosar la misma factura en más de un paquete: si pasa, hay
+    # que decirlo, porque el trabajo del otro paquete no se ve desde acá.
+    otros = [p for p in paquetes_de_factura(db, clave) if p["paquete_id"] != primera.paquete_id]
     ficha = (
         db.query(FacturaAdresRecord)
         .filter(FacturaAdresRecord.paquete_id == primera.paquete_id)
@@ -598,6 +651,20 @@ def consultar_factura(
                 "lotes que se importaron, o que aún no se haya subido la bitácora del "
                 "ajustador de detallados. Abajo está todo lo que sí trae el reporte del ADRES."
             )
+        ),
+        "otros_paquetes": otros,
+        "aviso_otros_paquetes": (
+            (
+                "Ojo: esta factura también tiene glosas en "
+                + ", ".join(
+                    f"el paquete {p['paquete'] or p['paquete_id']} "
+                    f"({p['glosas']} glosa(s), {_pesos(p['valor_glosado'])})"
+                    for p in otros
+                )
+                + ". Lo que se responda acá no cubre esas: hay que trabajarlas en su paquete."
+            )
+            if otros
+            else ""
         ),
         "catalogo_centros": catalogo_centros(db, primera.paquete_id),
         "glosas": [glosa_dict(g) for g in glosas],

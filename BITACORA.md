@@ -8885,6 +8885,42 @@ artefacto privado con los números anonimizados) con su análisis de precios.
 
 ---
 
+### 31-08 (tarde) — «La glosan dos veces y acá me aparece una sola vez»
+
+Yesid buscó la **HUS406687** teniendo escogido arriba el paquete **31073** y la
+pantalla le contestó: *«La factura HUS406687 no está en ningún paquete
+cargado»*. **Era mentira.** La factura sí estaba cargada, pero en el paquete
+**31078**, con sus dos glosas por $174.200.
+
+**Por qué importa.** El ADRES glosa la misma factura en más de un paquete. La
+pantalla de Glosas ADRES trabaja sobre el paquete que uno escoge arriba, y con
+ese mensaje el auditor se queda creyendo que esa glosa nunca llegó: no se
+responde, y se pierde por tiempo.
+
+**Lo que quedó:**
+
+1. **La pantalla dice la verdad.** Si la factura no está en el paquete escogido
+   pero sí en otro, sale: *«no está en el paquete que tiene escogido arriba,
+   pero sí está en este»* con un botón **«Ver en el paquete 31078 · 2 glosas ·
+   $174.200»** que cambia el paquete y la trae. Si de verdad no está en ninguno,
+   el mensaje de siempre.
+2. **La ficha avisa cuando la factura está en dos paquetes.** Un recuadro
+   morado: *«Esta factura también tiene glosas en el paquete X (N glosas, $…).
+   Lo que se responda acá no cubre esas: hay que trabajarlas en su paquete»*,
+   con botón para saltar.
+3. **Un comando para revisarlo desde el PC**, que no cambia nada:
+
+       venv\Scripts\python.exe tools\glosas_adres_donde_esta.py HUS406687
+
+   Dice en qué paquetes está y muestra **renglón por renglón** lo que el ADRES
+   glosó en cada uno, marcando con «·» los renglones que no suman (el mismo
+   servicio glosado con otra causal). Es lo que responde de una la pregunta de
+   si una factura viene glosada dos veces o una sola.
+
+18 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Curso de noruego (31-08, noche)

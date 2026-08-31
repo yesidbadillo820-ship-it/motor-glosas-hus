@@ -163,25 +163,31 @@ class TestColapsadoYAccesibilidad:
         assert ".sn-item:focus-visible" in CSS
 
 
+def _markup_del_menu(texto: str) -> str:
+    """El `<aside class="sidebar-nav">` completo, sin el CSS ni el resto de la página."""
+    m = re.search(r'<aside class="sidebar-nav".*?</aside>', texto, re.S)
+    assert m, "no se encontró el menú lateral en index.html"
+    return m.group(0)
+
+
 class TestSoloCambioLaApariencia:
-    def test_el_diff_contra_git_no_toca_html_ni_javascript(self):
+    def test_el_markup_del_menu_es_el_mismo_que_esta_en_git(self):
         """La comprobación que de verdad importa: que esto haya sido
-        exclusivamente estética."""
-        salida = subprocess.run(
-            ["git", "diff", "-U0", "HEAD", "--", "static/index.html"],
+        exclusivamente estética.
+
+        Se compara **el markup del menú** contra el que hay en git, no el
+        archivo entero: `index.html` es toda la aplicación y cualquier otra
+        pantalla puede cambiar su JavaScript sin que eso tenga nada que ver
+        con el pulido del menú (31-08-2026).
+        """
+        en_git = subprocess.run(
+            ["git", "show", "HEAD:static/index.html"],
             cwd=RAIZ,
             capture_output=True,
             text=True,
-        ).stdout
-        if not salida.strip():
-            pytest.skip("ya está confirmado en git; nada que comparar")
-        sospechosas = []
-        for linea in salida.splitlines():
-            if not linea.startswith(("+", "-")) or linea.startswith(("+++", "---")):
-                continue
-            cuerpo = linea[1:].strip()
-            if cuerpo.startswith(("/*", "*", "·")) or not cuerpo:
-                continue
-            if re.search(r"onclick=|sidebarTab\(|href=|fetch\(|function |<button|<input", cuerpo):
-                sospechosas.append(cuerpo[:90])
-        assert not sospechosas, "el diff tocó markup o JavaScript:\n" + "\n".join(sospechosas)
+        )
+        if en_git.returncode != 0 or not en_git.stdout.strip():
+            pytest.skip("no se pudo leer index.html de git")
+        assert _markup_del_menu(HTML) == _markup_del_menu(en_git.stdout), (
+            "el menú lateral cambió de markup: este trabajo era solo de apariencia (CSS)"
+        )

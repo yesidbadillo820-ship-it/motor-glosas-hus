@@ -15,6 +15,7 @@ Rutas:
     GET  /glosas-adres/facturas            la lista de facturas a auditar
     GET  /glosas-adres/buscar              autocompletado de facturas
     GET  /glosas-adres/factura/{numero}    TODO lo de esa factura
+    GET  /glosas-adres/factura/{n}/paquetes  en qué paquete(s) está esa factura
     GET  /glosas-adres/factura/{n}/respuesta  el texto consolidado
     POST /glosas-adres/factura/{n}/estado  cierra la factura o la reabre
     GET  /glosas-adres/factura/{n}/evidencia.pdf   el PDF de evidencia
@@ -237,8 +238,34 @@ def factura(
         db, numero, paquete_id=paquete_id, incluir_totales=incluir_totales
     )
     if not datos["encontrada"]:
+        # No basta con decir «no está»: el ADRES glosa la misma factura en
+        # varios paquetes y la pantalla trabaja sobre el que está escogido
+        # arriba. Si está en otro, se dice en cuál (31-08-2026).
+        donde = svc.paquetes_de_factura(db, numero)
+        if donde:
+            lugares = ", ".join(f"el paquete {p['paquete'] or p['paquete_id']}" for p in donde)
+            raise HTTPException(
+                404,
+                f"La factura {numero} no está en el paquete que tiene escogido, "
+                f"pero sí está en {lugares}.",
+            )
         raise HTTPException(404, f"La factura {numero} no está en ningún paquete cargado.")
     return datos
+
+
+@router.get("/factura/{numero}/paquetes")
+def paquetes_de_la_factura(
+    numero: str,
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """En qué paquete(s) está esa factura, con sus glosas y su plata.
+
+    Sirve para dos cosas de la pantalla: cuando el auditor busca una factura
+    que no está en el paquete escogido, poder llevarlo al paquete donde sí
+    está; y avisar cuando la misma factura viene glosada en dos paquetes.
+    """
+    return svc.paquetes_de_factura(db, numero)
 
 
 class EstadoIn(BaseModel):
