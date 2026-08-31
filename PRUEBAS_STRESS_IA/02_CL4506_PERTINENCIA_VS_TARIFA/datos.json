@@ -9,7 +9,9 @@
   "fecha_radicacion": "2026-05-22",
   "fecha_recepcion": "2026-06-05",
   "diagnostico": "S72.0 — Fractura del cuello de fémur",
-  "cups": ["215601 (osteosíntesis de fémur)"],
+  "cups": [
+    "215601 (osteosíntesis de fémur)"
+  ],
   "informacion_deliberadamente_ausente": [
     "La descripción quirúrgica NO dice si hubo una segunda fractura. La nota operatoria aportada menciona «trazo intertrocantérico y fractura diafisaria ipsilateral» de pasada, en una sola línea.",
     "El tope contractual: la glosa lo invoca pero el contrato aportado NO tiene tope por material"
@@ -33,6 +35,13 @@
     "Que el diagnóstico y la nota operatoria coinciden plenamente"
   ],
   "resultado_esperado": "OBJETAR. Debe defender la pertinencia CITANDO la línea de la nota operatoria que describe las dos fracturas, y debe rebatir el tope contractual señalando que esa cláusula no existe en el contrato aportado. Debe advertir la discrepancia entre el diagnóstico RIPS y la nota.",
-  "soportes_entregados": ["nota_operatoria.pdf", "contrato_440_DIGSA.pdf", "rips_procedimientos.csv"],
-  "soportes_deliberadamente_ausentes": ["evolución médica posterior", "imágenes diagnósticas"]
+  "soportes_entregados": [
+    "nota_operatoria.pdf",
+    "contrato_440_DIGSA.pdf",
+    "rips_procedimientos.pdf"
+  ],
+  "soportes_deliberadamente_ausentes": [
+    "evolución médica posterior",
+    "imágenes diagnósticas"
+  ]
 }

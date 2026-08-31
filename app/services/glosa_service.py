@@ -5990,8 +5990,136 @@ _PAT_AFIRMACION_CLINICA = re.compile(
 )
 
 
+# 31-08-2026 — EL GUARDIÁN ERA TODO O NADA, Y ASÍ SE COLABA LO PEOR.
+#
+# Hasta hoy este control solo miraba si había CERO soportes. Bastaba adjuntar
+# un kardex para que el dictamen pudiera afirmar, sin que nadie lo detuviera,
+# que leyó una epicrisis, unos RIPS o un informe de radiología que nunca se
+# subieron.
+#
+# Salió en la prueba ST-04: se adjuntaron kardex y factura, y el dictamen
+# escribió «LA HISTORIA CLÍNICA INTEGRAL, EL KARDEX Y LOS RIPS RADICADOS SE
+# ENCUENTRAN ADJUNTOS» y «EL HISTORIAL CLÍNICO CONFIRMA DICHA SUSPENSIÓN».
+# Solo el kardex era cierto. Le basta a la entidad pedir la historia clínica
+# para tumbar el escrito entero.
+#
+# Ahora se compara POR TIPO DE DOCUMENTO: si el dictamen afirma contenido de
+# una historia clínica, tiene que haber una historia clínica entre lo que el
+# motor de verdad leyó. Cada familia trae las palabras con que ese documento
+# se anuncia a sí mismo en su primera página.
+_FAMILIAS_DOCUMENTALES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "historia clínica",
+        r"HISTORIA\s+CL[ÍI]NICA|HISTORIAL\s+M[ÉE]DICO",
+        (
+            "HISTORIA CLINICA",
+            "HISTORIA CLÍNICA",
+            "HISTORIAL MEDICO",
+            "HISTORIAL MÉDICO",
+            "ANAMNESIS",
+            "MOTIVO DE CONSULTA",
+            "EXAMEN FISICO",
+            "EXAMEN FÍSICO",
+        ),
+    ),
+    (
+        "epicrisis",
+        r"EPICRISIS|RESUMEN\s+DE\s+EGRESO",
+        ("EPICRISIS", "RESUMEN DE EGRESO", "RESUMEN DE ATENCION", "RESUMEN DE ATENCIÓN"),
+    ),
+    (
+        "informe de imágenes",
+        r"INFORME\s+DE\s+(?:RADIOLOG[ÍI]A|IMAGENOLOG[ÍI]A)|REPORTE\s+DE\s+IM[ÁA]GENES",
+        ("RADIOLOG", "IMAGENOLOG", "TOMOGRAF", "ECOGRAF", "RESONANCIA", "RADIOGRAF"),
+    ),
+    (
+        "laboratorio",
+        r"REPORTE\s+DE\s+LABORATORIO|RESULTADO\s+DE\s+LABORATORIO",
+        ("LABORATORIO", "HEMOGRAMA", "UROANALISIS", "UROANÁLISIS", "CULTIVO"),
+    ),
+    (
+        "patología",
+        r"(?:INFORME|REPORTE)\s+DE\s+PATOLOG[ÍI]A",
+        ("PATOLOG", "BIOPSIA", "ESTUDIO HISTOPATOL"),
+    ),
+    (
+        "nota operatoria",
+        r"NOTA\s+OPERATORIA|DESCRIPCI[ÓO]N\s+QUIR[ÚU]RGICA",
+        (
+            "NOTA OPERATORIA",
+            "DESCRIPCION QUIRURGICA",
+            "DESCRIPCIÓN QUIRÚRGICA",
+            "HALLAZGOS INTRAOPERATORIOS",
+            "PROCEDIMIENTO REALIZADO",
+        ),
+    ),
+    (
+        "nota de enfermería",
+        r"NOTA\s+DE\s+ENFERMER[ÍI]A|KARDEX",
+        (
+            "NOTA DE ENFERMERIA",
+            "NOTA DE ENFERMERÍA",
+            "KARDEX",
+            "ADMINISTRACION DE MEDICAMENTOS",
+            "ADMINISTRACIÓN DE MEDICAMENTOS",
+        ),
+    ),
+    (
+        "RIPS",
+        r"\bRIPS\b",
+        ("RIPS", "NUMFACTURA", "CODPROCEDIMIENTO", "CODDIAGNOSTICO"),
+    ),
+    (
+        "orden médica",
+        r"ORDEN\s+M[ÉE]DICA|F[ÓO]RMULA\s+M[ÉE]DICA",
+        ("ORDEN MEDICA", "ORDEN MÉDICA", "FORMULA MEDICA", "FÓRMULA MÉDICA", "PRESCRIPCION"),
+    ),
+)
+
+_VERBOS_DE_LECTURA = (
+    r"\b(?:DETALLA|DETALLAN|DESCRIBE|DESCRIBEN|REGISTRA|REGISTRAN|CONSIGNA|"
+    r"CONSIGNAN|REPORTA|REPORTAN|INDICA|INDICAN|EVIDENCIA|EVIDENCIAN|"
+    r"DEMUESTRA|DEMUESTRAN|CONFIRMA|CONFIRMAN|ACREDITA|ACREDITAN|"
+    r"SE\s+ENCUENTRAN?\s+ADJUNT[OA]S?|OBRA\s+EN\s+EL\s+EXPEDIENTE)\b"
+)
+
+
+def _familias_afirmadas_sin_respaldo(dictamen: str, texto_soportes: str) -> list[str]:
+    """Documentos cuyo CONTENIDO afirma el dictamen sin que estén adjuntos.
+
+    Devuelve los nombres de las familias afirmadas y no respaldadas. Lista
+    vacía = todo lo que el dictamen dice haber leído está entre lo aportado.
+
+    No se juzga si el hecho clínico es cierto: se juzga si el documento del
+    que se dice sacarlo llegó al motor. Es la diferencia entre «la historia
+    clínica es prueba» —afirmación jurídica, legítima sin documento— y «la
+    historia clínica registra dolor abdominal», que exige haberla leído.
+    """
+    if not dictamen:
+        return []
+    soportes_up = (texto_soportes or "").upper()
+    faltan: list[str] = []
+    for nombre, patron_doc, huellas in _FAMILIAS_DOCUMENTALES:
+        afirma = re.search(
+            rf"(?:{patron_doc})[^.<]{{0,90}}?{_VERBOS_DE_LECTURA}",
+            dictamen,
+            re.IGNORECASE,
+        )
+        if not afirma:
+            continue
+        if not any(h in soportes_up for h in huellas):
+            faltan.append(nombre)
+    return faltan
+
+
 def _afirma_hechos_clinicos_sin_soporte(dictamen: str, tiene_soportes: bool) -> bool:
-    """¿El dictamen dice qué contiene un documento que nadie adjuntó?"""
+    """¿El dictamen dice qué contiene un documento que nadie adjuntó?
+
+    Se conserva para el caso de CERO soportes, que es el más grave y el que
+    ya tenía su aviso. La revisión por tipo de documento la hace
+    `_familias_afirmadas_sin_respaldo`, que también cubre el caso de soportes
+    incompletos.
+    """
     if tiene_soportes or not dictamen:
         return False
     return bool(_PAT_AFIRMACION_CLINICA.search(dictamen))
@@ -10122,6 +10250,40 @@ class GlosaService:
         except Exception as _e_cs:
             logger.debug(f"[CLINICA-SIN-SOPORTE] aviso no agregado: {_e_cs}")
 
+        # ── Soportes INCOMPLETOS: se afirma un documento que no llegó ──────
+        # 31-08-2026, prueba ST-04. El control de arriba solo miraba si había
+        # CERO soportes: bastaba adjuntar un kardex para que el dictamen
+        # pudiera decir que leyó una epicrisis o unos RIPS que nadie subió.
+        # Este mira POR TIPO: si afirma contenido de una historia clínica,
+        # tiene que haber una historia clínica entre lo que se leyó.
+        try:
+            _faltantes = _familias_afirmadas_sin_respaldo(dictamen, contexto_pdf or "")
+            if _faltantes:
+                _lista = (
+                    _faltantes[0]
+                    if len(_faltantes) == 1
+                    else (", ".join(_faltantes[:-1]) + " y " + _faltantes[-1])
+                )
+                dictamen = dictamen + (
+                    '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                    'padding:16px;margin:15px 0;border-radius:8px;">'
+                    '<h4 style="color:#991b1b;margin:0 0 8px 0;">EL DICTAMEN DICE QUÉ '
+                    f"CONTIENE UN DOCUMENTO QUE NO SE APORTÓ: {_lista.upper()}</h4>"
+                    '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                    "Sí se adjuntaron soportes, pero <b>ninguno de ese tipo</b>. El "
+                    "escrito afirma lo que ese documento registra sin haberlo tenido "
+                    "a la vista. <b>A la entidad le basta pedirlo para tumbar la "
+                    "respuesta completa</b>: adjúntelo, o borre esa afirmación antes "
+                    "de radicar."
+                    "</p></div>"
+                )
+                logger.warning(
+                    "[SOPORTE-NO-APORTADO] el dictamen afirma contenido de "
+                    f"{_lista} y no está entre lo adjuntado — aviso agregado."
+                )
+        except Exception as _e_sna:
+            logger.debug(f"[SOPORTE-NO-APORTADO] aviso no agregado: {_e_sna}")
+
         # ── Glosaron antes de radicar la factura (06-08-2026, OT-010) ────
         try:
             _fechas_imp = _glosa_anterior_a_la_factura(texto_base or "")
@@ -10595,14 +10757,53 @@ class GlosaService:
         # el TOTAL etiquetado y, en su defecto, el MAYOR valor objetado.
         from app.utils.moneda import parse_valor_cop as _pvc_lab
 
+        # 31-08-2026 — EL MOTOR DEFENDÍA EL VALOR FACTURADO, NO EL GLOSADO.
+        #
+        # Lo destapó la tanda de pruebas de estrés: en las CINCO el dictamen
+        # salió defendiendo el valor facturado. En ST-04, con esta glosa:
+        #
+        #     VALOR FACTURADO: $3.870.000  VALOR GLOSADO: $1.980.000
+        #
+        # el dictamen decía «VALOR OBJETADO $3.870.000». La EPS solo objetó
+        # 1.980.000: el hospital estaba discutiendo casi el doble de lo que le
+        # glosaron, y esa desproporción se la tumba cualquier auditor.
+        #
+        # La causa: esta lista solo conocía la palabra «objetado». «GLOSADO»
+        # —que es la que usan de verdad las EPS y la que trae la columna
+        # VALOR_GLOSADO de los archivos del ADRES— no estaba, así que el valor
+        # caía a los patrones genéricos de abajo, que toman EL PRIMER número
+        # con «$» del texto. Y en el formato normal de una glosa el primero es
+        # el facturado.
+        #
+        # Se agregan las formas reales: glosado, no conciliado, no aceptado,
+        # rechazado, y las abreviaturas «VR» y «VLR» que aparecen en los
+        # archivos de las entidades.
         for _p_lab in (
             r"\btotal\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
-            r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\btotal\s+glosad[oa][:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\b(?:valor|vr|vlr)\.?\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\b(?:valor|vr|vlr)\.?\s+glosad[oa][:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\b(?:valor|vr|vlr)\.?\s+no\s+(?:conciliado|aceptado)[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
+            r"\b(?:valor|vr|vlr)\.?\s+rechazado[:\s]*\$?\s*([\d][\d\.,]{2,})(?![\d\.,]*\s*%)",
         ):
             _hits = re.findall(_p_lab, t, re.IGNORECASE)
             if _hits:
                 _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
                 return _en_pesos_colombianos(_mejor)
+
+        # EL FACTURADO NUNCA ES EL OBJETADO. Si el texto rotula un valor como
+        # facturado (o cobrado, o total de la factura) y ningún rótulo de los
+        # de arriba enganchó, ese número se saca del camino antes de que los
+        # patrones genéricos lo agarren por ser el primero que aparece.
+        # Se opera sobre una copia: el texto original no se toca.
+        _t_sin_facturado = re.sub(
+            r"\b(?:valor|vr|vlr)\.?\s+(?:facturado|cobrado|total\s+factura)[:\s]*\$?\s*[\d][\d\.,]{2,}",
+            " ",
+            t,
+            flags=re.IGNORECASE,
+        )
+        if _t_sin_facturado != t and re.search(r"[\d]", _t_sin_facturado):
+            t = _t_sin_facturado
 
         patrones = [
             r"\$\s*([\d][\d\.,]{2,})",
