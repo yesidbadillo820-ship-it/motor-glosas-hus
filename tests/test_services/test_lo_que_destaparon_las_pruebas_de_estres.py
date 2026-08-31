@@ -48,7 +48,7 @@ import datetime as dt
 
 import pytest
 
-from app.services.glosa_ia_prompts import get_contrato
+from app.services.glosa_ia_prompts import get_contrato, resolver_eps_efectiva
 from app.services.glosa_service import GlosaService, _familias_afirmadas_sin_respaldo
 
 
@@ -232,3 +232,90 @@ class TestElNombreDelPagadorConPuntos:
 
     def test_una_entidad_desconocida_sigue_sin_contrato(self):
         assert self._m.contratos_de("IPS QUE NO EXISTE S.A.S.") == []
+
+
+class TestLaAseguradoraSoatNoEsElMagisterio:
+    """Defecto encontrado corriendo la prueba 1 con el auditor.
+
+    «LA PREVISORA» es alias de FOMAG en la malla, y con razón: La Previsora
+    administra el Fondo del Magisterio. Pero LA MISMA COMPAÑÍA es también una
+    aseguradora SOAT, y ahí es otro pagador y otro régimen.
+
+    Resultado: «LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB» recibía el
+    contrato de FOMAG (factor 0.85, SOAT −15 %) cuando una reclamación SOAT se
+    liquida a tarifa plena. Es darle a una glosa el contrato de otra entidad, y
+    pega donde más duele: en el export real de la base ese pagador es **el que
+    más glosas tiene** — 32 de 135.
+
+    La regla es de RÉGIMEN, no de nombre propio: si el pagador se identifica a
+    sí mismo como SOAT, ningún alias puede llevarlo a un contrato que no lo sea.
+    """
+
+    from app.services import malla_contractual as _m
+
+    @pytest.mark.parametrize(
+        "pagador",
+        [
+            "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB",
+            "ASEGURADORA SOLIDARIA SOAT UVB",
+            "SEGUROS DEL ESTADO SOAT",
+        ],
+    )
+    def test_un_pagador_soat_no_hereda_un_contrato_que_no_lo_es(self, pagador):
+        assert self._m.contratos_de(pagador) == []
+
+    @pytest.mark.parametrize(
+        "pagador",
+        ["LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB", "ASEGURADORA SOLIDARIA SOAT UVB"],
+    )
+    def test_y_se_liquida_a_soat_pleno(self, pagador):
+        assert get_contrato(pagador)["factor"] == 1.00
+
+    def test_la_previsora_a_secas_sigue_siendo_fomag(self):
+        """Regresión: el alias legítimo no se puede perder."""
+        assert [c.pagador for c in self._m.contratos_de("LA PREVISORA")] == ["FOMAG"]
+        assert get_contrato("LA PREVISORA")["factor"] == 0.85
+
+    def test_fomag_sigue_igual(self):
+        assert get_contrato("FOMAG")["factor"] == 0.85
+
+    @pytest.mark.parametrize("pagador,factor", [("FAMISANAR EPS", 0.95), ("NUEVA EPS", 1.00)])
+    def test_los_demas_pagadores_no_se_movieron(self, pagador, factor):
+        assert get_contrato(pagador)["factor"] == factor
+
+
+class TestLaEpsSeSacaDelTextoDeLaGlosa:
+    """El auditor lo pidió corriendo la prueba 1: «la IA debe identificar la
+    EPS automáticamente», y tiene razón — el nombre está escrito en la primera
+    línea de la glosa.
+
+    Ya existía la función que lo hace, pero el token del catálogo es «NUEVA
+    EPS» y las glosas reales escriben «NUEVA E.P.S. S.A. - SUBSIDIADO». Con los
+    puntos no enganchaba, así que el pagador MÁS FRECUENTE de la base quedaba
+    en «OTRA / SIN DEFINIR»: sin contrato, sin tarifa y con el aviso de entidad
+    sin identificar.
+    """
+
+    @pytest.mark.parametrize(
+        "escrito,canonico",
+        [
+            ("NUEVA E.P.S. S.A. - SUBSIDIADO", "NUEVA EPS"),
+            ("NUEVA E.P.S. S.A. - SUBSIDIADO SERVICIOS AMBULATORIOS", "NUEVA EPS"),
+            ("NUEVA EPS", "NUEVA EPS"),
+            ("FAMISANAR EPS", "FAMISANAR"),
+            ("COOSALUD", "COOSALUD"),
+        ],
+    )
+    def test_la_reconoce_en_el_encabezado_de_la_glosa(self, escrito, canonico):
+        texto = f"AU0201 | HUS0000601447 | {escrito}\nSERVICIO SIN AUTORIZACION."
+        assert resolver_eps_efectiva("OTRA / SIN DEFINIR", texto)[0] == canonico
+
+    def test_si_no_reconoce_ninguna_deja_lo_que_habia(self):
+        """No inventar: mejor «sin definir» con su aviso que una EPS adivinada."""
+        texto = "AU0201 | HUS1 | ENTIDAD QUE NO ESTA EN NINGUN CATALOGO S.A.S."
+        assert resolver_eps_efectiva("OTRA / SIN DEFINIR", texto)[0] == "OTRA / SIN DEFINIR"
+
+    def test_no_pisa_una_eps_ya_escogida_si_coincide(self):
+        texto = "AU0201 | HUS1 | FAMISANAR EPS"
+        eps, hubo, _ = resolver_eps_efectiva("FAMISANAR EPS", texto)
+        assert eps == "FAMISANAR EPS" and hubo is False
