@@ -6615,8 +6615,17 @@ def generar_texto_injustificada(
 
     return (
         f"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
-        f"INTERPUESTA POR {entidad} BAJO EL CÓDIGO {codigo_str}, FACTURADA POR "
-        f"{valor_str}. "
+        # 31-08-2026 — DECÍA «FACTURADA POR» Y EL NÚMERO ES EL OBJETADO.
+        # Mientras el motor confundía facturado con glosado, la etiqueta
+        # coincidía por accidente. Al corregir el valor —hoy mismo— el número
+        # pasó a ser el correcto y la palabra quedó mintiendo: el dictamen
+        # decía «FACTURADA POR $1.254.000» cuando la factura era de
+        # $4.180.000 y $1.254.000 es lo objetado. Lo vio el auditor en la
+        # tercera corrida de la prueba de estrés TA0301.
+        # Un dictamen que le dice a la entidad un valor facturado que no es el
+        # de la factura se cae solo: ella tiene la factura.
+        f"INTERPUESTA POR {entidad} BAJO EL CÓDIGO {codigo_str}, POR VALOR "
+        f"OBJETADO DE {valor_str}. "
         f"LA OBJECIÓN NO SE AJUSTA AL MARCO CONTRACTUAL NI NORMATIVO POR LAS "
         f"SIGUIENTES RAZONES: EN PRIMER LUGAR, NO EXISTE CONTRATO PACTADO ENTRE "
         f"LAS PARTES QUE CONTEMPLE UNA TARIFA CONVENIDA DISTINTA A LA DEL MANUAL "
