@@ -457,8 +457,29 @@ MALLA: tuple[Contrato, ...] = (
 
 
 def _normalizar(texto: str) -> str:
+    """Deja el nombre del pagador comparable con el de la malla.
+
+    31-08-2026 — LOS PUNTOS ROMPÍAN EL MATCH, Y CON EL PAGADOR MÁS FRECUENTE.
+    En la base del hospital NUEVA EPS aparece escrita «NUEVA E.P.S. S.A. -
+    SUBSIDIADO». Como la comparación es por PALABRA COMPLETA, «E.P.S.» nunca
+    era «EPS» y esa entidad se quedaba sin ningún contrato: el motor la trataba
+    como si nunca hubiera existido relación contractual y liquidaba a SOAT
+    pleno, sin avisar siquiera que había un contrato.
+
+    Es el mismo daño que el contrato vencido pero peor, porque ni se nota.
+
+    Se quitan los puntos DENTRO de las siglas (E.P.S. → EPS, S.A. → SA) y se
+    normaliza la puntuación de separación a espacios. No se toca nada más: los
+    nombres siguen comparándose por palabra completa, que es lo que impide
+    darle a una glosa el contrato de otra entidad.
+    """
     t = (texto or "").strip().upper()
-    return t.translate(str.maketrans("ÁÉÍÓÚÜÑ", "AEIOUUN"))
+    t = t.translate(str.maketrans("ÁÉÍÓÚÜÑ", "AEIOUUN"))
+    # E.P.S. → EPS  ·  S.A.S → SAS  (punto entre dos letras sueltas)
+    t = re.sub(r"(?<=\b[A-Z])\.(?=[A-Z]\b|[A-Z]\.)", "", t)
+    # Lo que queda de puntuación separa palabras, no las pega.
+    t = re.sub(r"[.,;:/\\|]+", " ", t)
+    return re.sub(r"\s{2,}", " ", t).strip()
 
 
 def contratos_de(pagador: str) -> list[Contrato]:
