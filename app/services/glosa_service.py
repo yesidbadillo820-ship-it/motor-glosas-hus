@@ -9563,7 +9563,11 @@ class GlosaService:
             # que se le habían quitado tres cosas. Se anota cada arreglo
             # comparando el texto antes y después — sin tocar ninguna red, que
             # siguen siendo funciones puras de texto a texto.
-            _correcciones: list[str] = list(locals().get("_correcciones_previas") or [])
+            _correcciones: list[str] = []
+            # Lo que se corrigió ANTES de llegar aquí (la ficha contractual
+            # pisando el XML del modelo) también es una corrección que el
+            # gestor tiene que ver.
+            _correcciones += list(locals().get("_correcciones_previas") or [])
             if locals().get("_quito_la_causal_del_servicio"):
                 _correcciones.append(
                     "Quité del recuadro del servicio el código de la causal de la "
