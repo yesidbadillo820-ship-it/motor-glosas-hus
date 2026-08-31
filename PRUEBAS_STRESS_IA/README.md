@@ -85,6 +85,13 @@ factor 0.8 del contrato 440-DIGSA).
 
 ## Sobre los soportes
 
+**Todos los soportes son PDF, y tiene que ser así.** El campo de «Soportes PDF»
+del motor lleva `accept=".pdf"`: no admite CSV, Excel ni ningún otro formato.
+El RIPS de las pruebas 01 y 02 iba en CSV en la primera versión de este paquete
+y **no se podía adjuntar** — lo detectó el auditor al correr la prueba 1 el
+31-08. Ahora va como PDF.
+
+
 Los PDF se generan con `_generadores/generar_soportes.py`. Ese script **no
 importa nada del motor**, no toca la base de datos ni la configuración: solo
 escribe archivos dentro de esta carpeta.

@@ -31,6 +31,13 @@
     "Que la tarifa facturada es correcta o incorrecta: con lo aportado no se puede concluir"
   ],
   "resultado_esperado": "OBJETAR PARCIALMENTE o NO CONCLUYENTE. El dictamen debe exigirle al pagador que identifique el manual y el valor de referencia, y debe decir expresamente que sin la fecha de prestación no puede determinarse el manual aplicable.",
-  "soportes_entregados": ["factura.pdf", "rips_procedimientos.csv"],
-  "soportes_deliberadamente_ausentes": ["contrato", "historia clínica", "manual tarifario"]
+  "soportes_entregados": [
+    "factura.pdf",
+    "rips_procedimientos.pdf"
+  ],
+  "soportes_deliberadamente_ausentes": [
+    "contrato",
+    "historia clínica",
+    "manual tarifario"
+  ]
 }
