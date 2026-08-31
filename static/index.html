@@ -7017,8 +7017,72 @@ function _toastSonido(type){
 // Se avisa UNA vez por pantalla y no más de una cada 15 segundos: con la red
 // caída fallan seis cosas a la vez y seis avisos seguidos no los lee nadie.
 var _avisosDeCarga = {};
+
+// ─── «NO TIENE PERMISO» NO ES «REVISE LA CONEXIÓN» (31-08-2026) ──────────
+//
+// Los gestores no podían trabajar el ADRES y nadie sabía por qué. La causa
+// no era el permiso en sí: era que la pantalla NO LO DECÍA. Cuando el
+// servidor contesta 403, el aviso que veía el gestor era el genérico de
+// abajo — «no se pudo cargar, revise la conexión»— así que reintentaba,
+// culpaba al internet, y el problema nunca llegaba con nombre propio hasta
+// quien podía arreglarlo.
+//
+// De las 317 llamadas que hace esta pantalla al motor, solo 21 miraban el
+// 403. Arreglarlas una por una es imposible de sostener: en cuanto alguien
+// escriba la 318 vuelve el problema. Se envuelve `fetch` UNA vez, y con eso
+// queda cubierta toda llamada presente y futura.
+//
+// El servidor ya manda el motivo exacto («Se requiere rol COORDINADOR o
+// superior»): lo único que faltaba era mostrárselo a quien está sentado
+// enfrente, junto con el rol que tiene.
+var _ultimo403 = 0;
+(function envolverFetchPara403(){
+  if (!window.fetch || window.__fetch403) return;
+  window.__fetch403 = true;
+  var original = window.fetch.bind(window);
+  window.fetch = function(entrada, opciones){
+    return original(entrada, opciones).then(function(res){
+      try{
+        if (res && res.status === 403) {
+          _ultimo403 = Date.now();
+          var ruta = '';
+          try { ruta = (typeof entrada === 'string' ? entrada : (entrada && entrada.url) || ''); } catch(_){}
+          // Se lee sobre una COPIA: el original tiene que llegar intacto a
+          // quien hizo la llamada.
+          res.clone().json().then(function(cuerpo){
+            _avisar403(ruta, (cuerpo && cuerpo.detail) ? String(cuerpo.detail) : '');
+          }).catch(function(){ _avisar403(ruta, ''); });
+        }
+      }catch(_){}
+      return res;
+    });
+  };
+})();
+
+function _avisar403(ruta, motivo){
+  try{
+    if (_avisosDeCarga['__403'] && (Date.now() - _avisosDeCarga['__403']) < 8000) return;
+    _avisosDeCarga['__403'] = Date.now();
+    var rol = (window.USER_ROL || localStorage.getItem('hus_rol') || '').toUpperCase() || 'sin rol';
+    var donde = '';
+    try { donde = String(ruta).split('?')[0].replace(location.origin, ''); } catch(_){}
+    var base = motivo || 'Esta acción está restringida a otro rol.';
+    if (!/[.!?]$/.test(base)) base += '.';   // el servidor no manda punto final
+    var texto = base
+              + ' Su usuario tiene rol ' + rol + '.'
+              + (donde ? ' (' + donde + ')' : '')
+              + ' No es un problema de conexión: pida el permiso a quien administra los usuarios.';
+    if (typeof toast === 'function') toast('No tiene permiso para esto', texto, 'error', {duracion: 12000});
+    console.error('[403]', donde, motivo, 'rol=' + rol);
+  }catch(_){}
+}
+
 function avisarNoCargo(queCosa, e){
   try{
+    // Si el motivo real fue un 403, ya se avisó arriba con el detalle exacto.
+    // Repetirlo como «revise la conexión» sería justo la mentira que este
+    // cambio vino a quitar.
+    if (Date.now() - _ultimo403 < 3000) return;
     var ahora = Date.now();
     if(_avisosDeCarga[queCosa] && (ahora - _avisosDeCarga[queCosa]) < 15000) return;
     _avisosDeCarga[queCosa] = ahora;
