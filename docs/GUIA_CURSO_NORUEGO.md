@@ -10,22 +10,50 @@ ni de `tools/` y solo usa la librería estándar de Python 3.11.
 
 ## 1. Cómo abrirla en el celular
 
-**En Windows: doble clic en `tools\NORUEGO.cmd`.** Genera la aplicación, te
-muestra la dirección de tu computador en la red y levanta el servidor.
+**En Windows: doble clic en `tools\NORUEGO.cmd`.** Genera la aplicación,
+**escribe en pantalla el enlace completo** de tu computador y levanta el
+servidor. Deja esa ventana abierta.
+
+El enlace se ve así, con el número de tu computador:
+
+```
+http://192.168.1.15:8000/static/noruego/index.html
+```
+
+> Ese número **cambia en cada computador y en cada wifi**. Copie el que
+> muestre su ventana; no escriba el del ejemplo.
 
 Después, en el celular conectado al **mismo wifi**:
 
-1. Abre el navegador y escribe `http://LA-IP:8000/static/noruego/index.html`
-2. En el menú del navegador, toca **«Agregar a la pantalla de inicio»**.
+1. Abre el navegador y escribe el enlace **tal cual**, en la barra de
+   direcciones de arriba. No lo busques en Google.
+2. Cuando cargue la aplicación, instálala (ver abajo).
 3. Ábrela desde el ícono. A partir de ahí funciona **sin internet**.
 
-Desde la consola es lo mismo en dos pasos:
+### Dónde sale «Agregar a la pantalla de inicio»
+
+Es una opción **del celular**. En el navegador del computador no aparece con
+ese nombre.
+
+| Dónde | Qué tocar |
+|---|---|
+| **Android (Chrome)** | Los **tres puntos** de arriba a la derecha → **«Agregar a la pantalla principal»** o **«Instalar aplicación»**. |
+| **iPhone (Safari)** | El botón de **compartir** (el cuadrito con la flecha hacia arriba, abajo en el centro) → **«Añadir a pantalla de inicio»**. |
+| **En el computador** | No hace falta: abra `static\noruego\index.html` con doble clic. (En Chrome de escritorio la opción existe, pero se llama **«Instalar página como aplicación…»**, dentro de *Enviar, guardar y compartir*.) |
+
+Si la opción no aparece, es porque **la página no cargó**. Revise que el
+celular esté en el mismo wifi y que el enlace esté escrito completo.
+
+### Desde la consola
 
 ```bash
-cd C:\temp-notas
-python -m noruego exportar
+python -m noruego exportar      # arma la aplicación
+python -m noruego direccion     # imprime el enlace para el celular
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+`direccion` averigua la IP con la que este equipo sale a la red y arma el
+enlace completo. Si no hay red, no imprime nada y devuelve código 1.
 
 > El archivo también se puede abrir con doble clic (`static/noruego/index.html`).
 > Así funciona todo menos la instalación y el guardado sin conexión: los
@@ -144,14 +172,15 @@ crece, las lecciones crecen solas.
 | `noruego/ejercicios.py` | Genera los ejercicios a partir de los datos. |
 | `noruego/exportar_web.py` | Arma la PWA: HTML + manifest + service worker + iconos. |
 | `noruego/plantilla_web.html` | La aplicación: HTML, CSS y JavaScript. |
-| `noruego/cli.py` | `python -m noruego revisar\|curso\|leccion\|exportar` |
+| `noruego/red.py` | Averigua el enlace con el que el celular alcanza este computador. |
+| `noruego/cli.py` | `python -m noruego revisar\|curso\|leccion\|exportar\|direccion` |
 
 **La idea de fondo del motor:** no se escriben ejercicios a mano. Se escribe una
 sola vez que «bil» es masculino y que su definido es «bilen», y de ahí salen
 solos el ejercicio de género, el de forma, el de traducción, el de escucha y el
 de parejas. Agregar una palabra agrega ejercicios a todo el curso.
 
-Pruebas: `python -m pytest tests/test_noruego -q`.
+Pruebas: `python -m pytest tests/test_noruego -q` (193).
 
 ---
 

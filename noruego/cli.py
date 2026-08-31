@@ -7,6 +7,7 @@ curso y generar la aplicación web.
     python -m noruego curso           # muestra módulos y lecciones
     python -m noruego leccion s1      # muestra los ejercicios de una lección
     python -m noruego exportar        # genera la aplicación web
+    python -m noruego direccion       # el enlace para abrirla en el celular
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from .curso import MODULOS, buscar_leccion, todas_las_lecciones
 from .ejercicios import generar, material
 from .exportar_web import exportar
 from .lexico import cargar, revisar
+from .red import PUERTO_POR_DEFECTO, enlace_de_esta_maquina
 
 Salida = Callable[[str], None]
 
@@ -107,10 +109,24 @@ def cmd_exportar(args, salida: Salida) -> int:
     salida("Para abrirla en el celular:")
     salida("  1. Levanta el servidor:  uvicorn app.main:app --host 0.0.0.0 --port 8000")
     salida("  2. En el celular, en la misma red wifi, abre:")
-    salida("       http://<IP-DEL-COMPUTADOR>:8000/static/noruego/index.html")
-    salida("  3. En el menú del navegador, «Agregar a la pantalla de inicio».")
+    url = enlace_de_esta_maquina()
+    if url:
+        salida(f"       {url}")
+    else:
+        salida("       http://LA-IP-DE-ESTE-PC:8000/static/noruego/index.html")
+        salida("       (no se pudo leer la IP; mírala con «python -m noruego direccion»)")
+    salida("  3. En el menú del navegador del CELULAR, «Agregar a la pantalla de inicio».")
     salida("")
     salida(f"También funciona con doble clic en {indice} (sin instalación ni caché).")
+    return 0
+
+
+def cmd_direccion(args, salida: Salida) -> int:
+    """Imprime SOLO el enlace, para que el bot de Windows lo capture tal cual."""
+    url = enlace_de_esta_maquina(args.puerto)
+    if url is None:
+        return 1
+    salida(url)
     return 0
 
 
@@ -131,6 +147,9 @@ def construir_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("exportar", help="Generar la aplicación web.")
     p.add_argument("--salida", default=str(DESTINO_POR_DEFECTO), help="Carpeta de destino.")
+
+    p = sub.add_parser("direccion", help="El enlace para abrir la app en el celular.")
+    p.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="Puerto del servidor.")
     return parser
 
 
@@ -141,4 +160,5 @@ def main(argv: Sequence[str] | None = None, salida: Salida = print) -> int:
         "curso": cmd_curso,
         "leccion": cmd_leccion,
         "exportar": cmd_exportar,
+        "direccion": cmd_direccion,
     }[args.comando](args, salida)
