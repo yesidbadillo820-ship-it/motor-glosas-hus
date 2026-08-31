@@ -530,7 +530,35 @@ function buscarVoz(){
 }
 if("speechSynthesis" in window){
   buscarVoz();
-  window.speechSynthesis.onvoiceschanged = () => { buscarVoz(); };
+  // Chrome entrega las voces DESPUÉS de cargar la página: la primera llamada a
+  // getVoices() casi siempre devuelve una lista vacía. Si la pantalla ya se
+  // dibujó diciendo «no hay voz noruega» y la voz aparece un segundo después,
+  // el aviso se queda mintiendo hasta que el usuario cambie de pantalla. Por
+  // eso, cuando cambia el resultado, se vuelve a dibujar.
+  window.speechSynthesis.onvoiceschanged = () => {
+    const antes = !!VOZ;
+    buscarVoz();
+    const escribiendo = document.activeElement
+      && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if(antes !== !!VOZ && !escribiendo && document.getElementById("app")) pintar();
+  };
+}
+
+/** Dónde se instala la voz noruega, según el aparato que se esté usando. */
+function comoInstalarVoz(){
+  const ua = navigator.userAgent || "";
+  if(/Android/i.test(ua)) return `en <b>Ajustes → Idiomas → Salida de texto a voz</b>,
+    instalando el idioma <b>norsk bokmål</b>`;
+  if(/iPhone|iPad|iPod/i.test(ua)) return `en <b>Ajustes → Accesibilidad →
+    Contenido hablado → Voces</b>, agregando <b>Norsk (bokmål)</b>`;
+  if(/Windows/i.test(ua)) return `en <b>Configuración → Hora e idioma → Idioma y
+    región → Agregar idioma → Norsk bokmål</b>, marcando <b>Voz</b> entre las
+    funciones opcionales. Después hay que <b>cerrar el navegador por completo</b>
+    y volverlo a abrir`;
+  if(/Mac/i.test(ua)) return `en <b>Ajustes del sistema → Accesibilidad → Contenido
+    hablado → Voz del sistema → Gestionar voces</b>, agregando <b>Noruego</b>`;
+  return `en los ajustes de <b>texto a voz</b> del aparato, agregando el idioma
+    <b>noruego (bokmål)</b>`;
 }
 function hayVoz(){ if(!VOZ_BUSCADA) buscarVoz(); return !!VOZ; }
 function decir(texto, velocidad){
@@ -681,10 +709,9 @@ function vInicio(){
   }
   if(!hayVoz()){
     h += `<div class="aviso vio"><span>🔈</span><span>Tu dispositivo no tiene voz noruega
-      instalada, así que el audio está apagado. En Android se agrega en
-      <b>Ajustes → Idiomas → Texto a voz</b>; en iPhone, en
-      <b>Ajustes → Accesibilidad → Contenido hablado → Voces</b>. Mientras tanto usa la
-      pronunciación aproximada que aparece debajo de cada palabra.</span></div>`;
+      instalada, así que el audio está apagado. Se agrega ${comoInstalarVoz()}.
+      Mientras tanto usa la pronunciación aproximada que aparece debajo de cada
+      palabra.</span></div>`;
   }
   return h + `</div>`;
 }
@@ -861,7 +888,8 @@ function audioGrande(texto, etiqueta){
     // se dice por qué: enseñar mal es peor que no tener audio.
     h += `<div class="aviso vio" style="margin-top:calc(var(--s3)*-1)">
       <span>🔇</span><span>Este dispositivo no tiene voz noruega, así que en vez de
-      oírlo lo vas a leer: <b>${esc(texto)}</b></span></div>`;
+      oírlo lo vas a leer: <b>${esc(texto)}</b><br><span class="mini tenue">Para oírlo
+      de verdad, instala la voz ${comoInstalarVoz()}.</span></span></div>`;
   }
   return h;
 }
@@ -1430,7 +1458,9 @@ function vPerfil(){
     <div class="tarjeta"><div class="rot">Audio</div>
       <p class="tenue mini">${hayVoz()
         ? "Tu dispositivo tiene voz noruega instalada: el audio funciona."
-        : "No se encontró voz noruega en este dispositivo. El audio está apagado y solo verás la pronunciación aproximada."}</p>
+        : `No se encontró voz noruega en este dispositivo, así que el audio está
+           apagado y solo verás la pronunciación aproximada. Se instala
+           ${comoInstalarVoz()}.`}</p>
       <button class="blq" onclick="decir('Hei! Jeg snakker norsk.')">🔊 Probar el audio</button></div>
     <div class="tarjeta"><div class="rot">Tu avance</div>
       <p class="tenue mini">Todo vive solo en este navegador. Si cambias de teléfono o borras

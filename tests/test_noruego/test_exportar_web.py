@@ -213,3 +213,40 @@ def test_exportar_dos_veces_da_lo_mismo(tmp_path):
 def test_la_plantilla_del_repositorio_existe():
     assert PLANTILLA.is_file()
     assert MANIFEST["lang"] == "es"
+
+
+# --- La voz noruega --------------------------------------------------------
+# En la prueba real, la app dijo «este dispositivo no tiene voz noruega» y no
+# ofrecía ninguna salida: el usuario no sabía que eso se instala en Windows.
+
+
+def test_la_busqueda_de_voz_acepta_las_tres_etiquetas_del_noruego():
+    """Los sistemas la etiquetan «nb», «no» o «nn» según el fabricante."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    for etiqueta in ("nb", "no", "nn"):
+        assert f'startsWith("{etiqueta}")' in plantilla, f"no se busca la voz «{etiqueta}»"
+
+
+def test_la_pantalla_se_redibuja_cuando_las_voces_llegan_tarde():
+    """Chrome entrega las voces después de cargar: sin esto el aviso miente."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    bloque = plantilla.split("onvoiceschanged", 1)[1][:600]
+    assert "pintar()" in bloque, "al llegar las voces no se vuelve a dibujar la pantalla"
+    assert "antes !== !!VOZ" in bloque, "se redibuja siempre, no solo cuando cambia"
+    assert "escribiendo" in bloque, "un redibujado podría borrar lo que el usuario escribe"
+
+
+def test_se_dice_como_instalar_la_voz_en_cada_sistema():
+    """Windows faltaba: el aviso solo hablaba de Android y de iPhone."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    assert "function comoInstalarVoz()" in plantilla
+    for sistema in ("Android", "iPhone", "Windows", "Mac"):
+        assert sistema in plantilla, f"no se explica cómo instalar la voz en {sistema}"
+
+
+def test_los_tres_avisos_de_audio_apagado_dicen_como_arreglarlo():
+    """Un aviso sin salida deja al usuario atascado, que fue lo que pasó."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    assert plantilla.count("comoInstalarVoz()") >= 4, (
+        "algún aviso de «no hay voz» no dice cómo instalarla"
+    )

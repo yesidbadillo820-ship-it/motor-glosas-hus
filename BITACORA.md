@@ -8894,10 +8894,14 @@ artefacto privado con los números anonimizados) con su análisis de precios.
   compartir), que se oiga la voz noruega y que el avance siga ahí al día
   siguiente. **Si esa opción no aparece, es que la página no cargó** — revise
   el wifi y el enlace, no el celular.
-- **Instalar la voz noruega si el celular no la trae.** En Android se busca en
-  Ajustes → Idiomas → Salida de texto a voz → instalar «norsk bokmål». Sin
-  ella, los ejercicios de escuchar muestran el texto en vez de sonar (la
-  aplicación lo avisa, no se traba).
+- **Instalar la voz noruega donde no la haya.** El computador del hospital no
+  la trae, y por eso el audio salió apagado en la primera prueba. **Ahora la
+  propia aplicación dice dónde se instala**, distinto en cada aparato: en
+  Windows es Configuración → Hora e idioma → Idioma y región → Agregar idioma →
+  «Norsk bokmål», marcando **Voz** entre las funciones opcionales, y después
+  cerrar el navegador por completo. En Android, Ajustes → Idiomas → Salida de
+  texto a voz. Sin la voz, los ejercicios de escuchar muestran el texto en vez
+  de sonar: la aplicación lo avisa y no se traba.
 - **Más material para los niveles altos.** Los módulos B2 y C2 funcionan, pero
   con el vocabulario que hay hoy. Se agregan palabras desde el propio panel de
   la aplicación, sin tocar programación.
