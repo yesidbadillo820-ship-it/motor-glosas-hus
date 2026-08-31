@@ -49,7 +49,11 @@ import datetime as dt
 import pytest
 
 from app.services.glosa_ia_prompts import get_contrato, resolver_eps_efectiva
-from app.services.glosa_service import GlosaService, _familias_afirmadas_sin_respaldo
+from app.services.glosa_service import (
+    GlosaService,
+    _familias_afirmadas_sin_respaldo,
+    generar_texto_injustificada,
+)
 
 
 @pytest.fixture(scope="module")
@@ -319,3 +323,49 @@ class TestLaEpsSeSacaDelTextoDeLaGlosa:
         texto = "AU0201 | HUS1 | FAMISANAR EPS"
         eps, hubo, _ = resolver_eps_efectiva("FAMISANAR EPS", texto)
         assert eps == "FAMISANAR EPS" and hubo is False
+
+
+class TestNoLlamarFacturadoAlValorObjetado:
+    """Defecto que salió al corregir el anterior — y solo por eso.
+
+    Mientras el motor confundía facturado con glosado, la plantilla de tarifas
+    decía «FACTURADA POR {valor}» y la etiqueta coincidía por accidente. Al
+    corregir el valor, el número pasó a ser el objetado y la palabra quedó
+    mintiendo: el dictamen decía «FACTURADA POR $1.254.000» cuando la factura
+    era de $4.180.000.
+
+    Lo vio el auditor en la tercera corrida de la prueba TA0301, en producción.
+
+    Un dictamen que le dice a la entidad un valor facturado que no es el de la
+    factura se cae solo: ella tiene la factura.
+    """
+
+    def test_el_valor_va_rotulado_como_objetado(self):
+        t = generar_texto_injustificada(
+            eps="OTRA / SIN DEFINIR", codigo="TA0301", valor="$ 1.254.000"
+        )
+        assert "POR VALOR OBJETADO DE $ 1.254.000" in t
+
+    def test_ya_no_lo_llama_facturado(self):
+        t = generar_texto_injustificada(
+            eps="OTRA / SIN DEFINIR", codigo="TA0301", valor="$ 1.254.000"
+        )
+        assert "FACTURADA POR" not in t
+
+    def test_sin_valor_no_inventa_una_cifra(self):
+        """Regresión: el texto de respaldo cuando la glosa no trae valor."""
+        t = generar_texto_injustificada(eps="OTRA / SIN DEFINIR", codigo="TA0301", valor="")
+        assert "EL VALOR INDICADO EN EL EXPEDIENTE" in t
+
+    def test_el_resto_del_argumento_sigue_intacto(self):
+        """No se puede perder el fundamento por arreglar una etiqueta."""
+        t = generar_texto_injustificada(
+            eps="OTRA / SIN DEFINIR", codigo="TA0301", valor="$ 1.254.000"
+        )
+        for pieza in (
+            "NO EXISTE CONTRATO PACTADO",
+            "CIRCULAR EXTERNA 047 DE 2025",
+            "DECRETO 780 DE 2016",
+            "ARTÍCULO 871",
+        ):
+            assert pieza in t, pieza
