@@ -68,6 +68,41 @@
   --sds-amber-bg:   var(--c-amber-light, #FFF3E0);
   --sds-rose:       var(--c-red,         #C62828);
 
+  /* ═══ Los mismos colores, llamados por lo que SIGNIFICAN (31-08-2026) ═══
+
+     Los nombres de arriba dicen el tono («amber», «rose»). Eso obliga a
+     acordarse de si el ámbar era «revisar» o era «error», y el día que haya
+     que cambiar un tono hay que buscarlo en cada archivo. Estos nombres dicen
+     el papel, que es lo que no cambia.
+
+     NO se toca ninguno de los de arriba: siguen funcionando igual y todo lo
+     que ya los usa queda intacto. Estos se apoyan en ellos.
+
+     DOS COSAS QUE SÍ CAMBIAN, y por qué:
+
+     1. «revisar» no hereda el #E65100 de --sds-amber. Ese ámbar es un rojo
+        anaranjado: está a 21 grados del rojo de error en la rueda de color.
+        En un monitor de sala de facturación, y para quien no distingue bien
+        el rojo —alrededor de uno de cada doce hombres—, «revisar» y «error»
+        son el mismo aviso. El #A67500 está a 42 grados: el doble.
+
+     2. La PLATA tiene color propio. Hasta hoy un valor en riesgo se pintaba
+        con el rojo de error, y una glosa de $16 millones bien defendida no es
+        un error: es lo que está en juego. Sacar el dinero del semáforo deja
+        el semáforo para lo que sí es estado.
+
+     EL COLOR NUNCA VA SOLO: estos tokens acompañan a un icono y a una
+     palabra, siempre las tres cosas. El dictamen se imprime, y en blanco y
+     negro el color no existe. */
+  --sds-probado:         var(--sds-success);
+  --sds-probado-bg:      var(--sds-success-bg);
+  --sds-revisar:         #A67500;
+  --sds-revisar-bg:      var(--sds-amber-bg);
+  --sds-contradicho:     var(--sds-rose);
+  --sds-contradicho-bg:  #FBE9E9;
+  --sds-plata:           #00695C;
+  --sds-plata-bg:        #E0F0EE;
+
   /* Sombras (3 niveles) */
   --sds-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
   --sds-shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
@@ -327,6 +362,142 @@ body.sds-focus-mode .sds-focus-indicator {
 /* ──────────────────────────────────────────────────────────────────
    4. ATAJOS DE TECLADO — Hint visual
    ────────────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────────────
+   ESTADO: color + icono + palabra, siempre las tres (31-08-2026)
+
+   El color solo no alcanza y en este motor menos que en otros: el
+   dictamen SE IMPRIME, y en blanco y negro el color no existe. Se
+   pierde también en un monitor viejo de facturación y para quien no
+   distingue bien el rojo del verde.
+
+   El icono va como carácter dentro del propio elemento (::before), no
+   como imagen: así viaja con el texto cuando alguien copia y pega el
+   estado a un correo o a un Excel, que es lo que de verdad hace el
+   gestor.
+
+   Uso:  <span class="sds-estado es-probado">Probado</span>
+   ────────────────────────────────────────────────────────────────── */
+.sds-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  border: 1px solid currentColor;
+}
+.sds-estado::before {
+  font-weight: 700;
+  font-size: 0.85em;
+  line-height: 1;
+}
+.sds-estado.es-probado      { color: var(--sds-probado);     background: var(--sds-probado-bg); }
+.sds-estado.es-probado::before      { content: "\2713"; }        /* ✓ */
+.sds-estado.es-revisar      { color: var(--sds-revisar);     background: var(--sds-revisar-bg); }
+.sds-estado.es-revisar::before      { content: "\0021"; }        /* ! */
+.sds-estado.es-contradicho  { color: var(--sds-contradicho); background: var(--sds-contradicho-bg); }
+.sds-estado.es-contradicho::before  { content: "\2715"; }        /* ✕ */
+.sds-estado.es-plata        { color: var(--sds-plata);       background: var(--sds-plata-bg); }
+.sds-estado.es-plata::before        { content: "\0024"; }        /* $ */
+
+/* Impreso: el fondo de color no sale, así que el borde y el icono son
+   lo único que separa un estado de otro. */
+@media print {
+  .sds-estado {
+    background: transparent !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   «Qué corregí antes de entregarte esto» (31-08-2026)
+
+   Va ARRIBA del dictamen, no debajo: el gestor tiene que verlo antes
+   de leer el texto, no después de haberlo radicado. Y lleva
+   .no-print porque es una nota interna — no forma parte del escrito
+   que va a la EPS.
+   ────────────────────────────────────────────────────────────────── */
+.res-correcciones {
+  background: var(--sds-probado-bg);
+  border: 1px solid var(--sds-probado);
+  border-radius: var(--sds-radius-md, 8px);
+  padding: 0.75rem 0.95rem 0.85rem;
+  margin-bottom: 0.7rem;
+}
+.res-correcciones-hdr {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  color: var(--sds-gray-900);
+  margin-bottom: 0.5rem;
+}
+.res-correcciones-lista {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--sds-gray-900);
+}
+.res-correcciones-pie {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--sds-probado);
+  font-size: 0.76rem;
+  color: var(--sds-gray-600);
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   El papel es lo que llega a la EPS (31-08-2026)
+
+   En pantalla el dictamen se lee de corrido y el número de factura
+   se ve una vez, en el membrete. Impreso es otra cosa: son varias
+   hojas que en la mesa de radicación se separan, se traspapelan y se
+   vuelven a juntar. Sin nada que las identifique, una hoja suelta no
+   se sabe de qué factura es.
+
+   Este pie se repite en TODAS las hojas impresas —position:fixed
+   dentro de @media print es lo que los navegadores sí respetan— y
+   no existe en pantalla.
+   ────────────────────────────────────────────────────────────────── */
+.doc-pie-corrido { display: none; }
+
+@media print {
+  .doc-pie-corrido {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 3mm 0 1mm;
+    border-top: 0.5pt solid #666;
+    font-size: 7.5pt;
+    color: #333;
+    text-align: center;
+    background: #fff;
+  }
+
+  /* Que ningún párrafo del dictamen quede partido dejando una línea
+     sola al final o al principio de la hoja: en un escrito jurídico
+     eso se lee como si faltara texto. */
+  .res-dictamen-body p,
+  .res-dictamen-body li {
+    orphans: 3;
+    widows: 3;
+  }
+}
+
 .sds-kbd {
   display: inline-flex;
   align-items: center;

@@ -172,6 +172,15 @@ class GlosaResult(BaseModel):
     # la UI pueda mostrar warnings y badge de calidad. Opcionales para
     # no romper consumidores que no los esperan.
     verificacion_citas: Optional[dict] = None
+    # 31-08-2026 — LO QUE LA MÁQUINA CORRIGIÓ, A LA VISTA.
+    # El motor ya arregla solo lo que la IA escribe mal: quita códigos citados
+    # como CUPS que no existen, le pone la fecha de derogatoria a una norma
+    # muerta, corrige el artículo. Todo eso pasaba EN SILENCIO: el dictamen
+    # salía limpio y nadie sabía que se le habían quitado tres cosas.
+    # Enseñarlo no cuesta trabajo nuevo —ya está hecho por dentro— y sirve
+    # para dos cosas: el gestor le cree al motor porque ve que revisa, y
+    # aprende qué mirar cuando revise a mano.
+    correcciones: Optional[list[str]] = None
     confianza: Optional[dict] = None
     # Decisión auto-pilot v2 (Yesid mayo 2026): si confianza >= 0.90 y
     # no es "caso difícil" (>= 5M COP + multi-conceptos), el sistema

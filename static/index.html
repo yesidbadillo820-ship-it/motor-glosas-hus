@@ -690,42 +690,97 @@ header::after{
 
 /* ─── SIDEBAR NAV (lateral, estilo Linear/Epic) ────────────── */
 .main-layout{flex:1;display:flex;overflow:hidden;min-height:0}
-.sidebar-nav{width:240px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;transition:width .2s var(--ease)}
-.sidebar-nav.collapsed{width:64px}
-.sn-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;border-bottom:1px solid var(--border);color:var(--text3);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
-.sidebar-nav.collapsed .sn-toggle-label{display:none}
-.sn-toggle button{background:transparent;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center}
-.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
-.sn-group{padding:.75rem 0;border-bottom:1px solid var(--border)}
-.sn-group:last-child{border-bottom:none}
-.sn-label{padding:.35rem 1.1rem;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:.25rem}
-.sidebar-nav.collapsed .sn-label{display:none}
-.sn-item{
-  width:100%;display:flex;align-items:center;gap:.75rem;padding:.6rem 1.15rem;
-  background:transparent;border:none;cursor:pointer;font-family:var(--font);
-  font-size:.82rem;font-weight:500;color:var(--text2);text-align:left;
-  transition:background .2s var(--ease-out),color .2s var(--ease-out),transform .15s var(--ease-out);
-  position:relative;border-radius:0;
+/* ═══════════════════════════════════════════════════════════════════
+   MENÚ LATERAL — pulido visual (31-08-2026)
+
+   Solo estética: ni una ruta, ni un permiso, ni un onclick cambian.
+   Se conservan todas las clases y todos los nombres que el JS usa
+   (.sn-item, .sn-group, .sn-label, .sn-badge, .collapsed, .active…).
+
+   Qué se corrigió y por qué:
+   · El grupo se separaba con una LÍNEA a todo el ancho; eso corta el
+     menú en bloques y compite con el item activo. Se cambia por aire
+     y un rótulo mejor jerarquizado — pesa menos y ordena más.
+   · Los items iban pegados al borde. Ahora viven en una «pista» con
+     margen lateral, así el estado activo se lee como una pieza y no
+     como una banda que cruza la pantalla.
+   · El hover movía el item 3px a la derecha. En un menú de 30 entradas
+     eso es ruido: se reemplaza por un cambio de fondo, que es lo que
+     hace un producto serio.
+   ══════════════════════════════════════════════════════════════════ */
+.sidebar-nav{
+  width:248px;flex-shrink:0;background:var(--bg-card);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+  transition:width .2s var(--ease);
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent;
 }
-.sn-item:hover{background:var(--sinac-gray-50);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(11,61,145,.06)}
-.sn-item:hover svg{color:var(--sinac-blue-700)}
-/* 13-08-2026. La pestaña activa pasa de azul a NARANJA, como la pidió el
-   auditor. Se usa el token que ya existe (--c-amber / --c-amber-light), no
-   un color suelto: si mañana se ajusta la paleta, esto va con ella. */
+.sidebar-nav::-webkit-scrollbar{width:8px}
+.sidebar-nav::-webkit-scrollbar-track{background:transparent}
+.sidebar-nav::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.sidebar-nav:hover::-webkit-scrollbar-thumb{background:var(--border2);background-clip:content-box}
+.sidebar-nav.collapsed{width:68px}
+
+.sn-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 1rem .8rem 1.15rem;
+  color:var(--text4);font-size:.63rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.9px;
+}
+.sidebar-nav.collapsed .sn-toggle{justify-content:center;padding-left:1rem;padding-right:1rem}
+.sidebar-nav.collapsed .sn-toggle-label{display:none}
+.sn-toggle button{
+  background:transparent;border:none;cursor:pointer;color:var(--text3);
+  padding:5px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out);
+}
+.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
+
+/* Los grupos se separan con AIRE, no con una línea a todo el ancho:
+   la línea partía el menú en bloques y competía con el item activo. */
+.sn-group{padding:.15rem .5rem .55rem}
+.sn-group + .sn-group{margin-top:.1rem}
+.sn-group:last-child{padding-bottom:.75rem}
+.sn-label{
+  padding:.55rem .65rem .3rem;
+  font-size:.62rem;font-weight:700;color:var(--text4);
+  text-transform:uppercase;letter-spacing:.9px;
+}
+.sidebar-nav.collapsed .sn-label{
+  /* Colapsado no cabe el rótulo, pero el grupo sí tiene que notarse:
+     queda una rayita corta y centrada en su lugar. */
+  padding:0;height:1px;overflow:hidden;color:transparent;
+  margin:.5rem auto .45rem;width:20px;background:var(--border2);
+}
+.sn-item{
+  width:100%;display:flex;align-items:center;gap:.7rem;
+  padding:.5rem .65rem;border-radius:7px;
+  background:transparent;border:none;cursor:pointer;font-family:var(--font);
+  font-size:.815rem;font-weight:500;color:var(--text2);text-align:left;
+  letter-spacing:.005em;line-height:1.35;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out);
+  position:relative;
+}
+.sn-item + .sn-item{margin-top:1px}
+/* El hover ya no desplaza el item: en un menú de treinta entradas ese
+   salto de 3px es ruido. Cambia el fondo, que es lo que se espera. */
+.sn-item:hover{background:var(--bg-subtle);color:var(--text)}
+.sn-item:hover svg{color:var(--text2)}
+
+/* 13-08-2026. La pestaña activa es NARANJA, como la pidió el auditor.
+   31-08-2026: se conserva el color, se cambia la forma. Antes era una
+   banda a todo el ancho con una barra que latía; ahora es una pieza
+   con esquinas suaves y una marca fija a la izquierda — se distingue
+   igual de rápido y no compite con el contenido de la pantalla. */
 .sn-item.active{
   background:var(--c-amber-light);
   color:var(--c-amber);font-weight:600;
 }
 .sn-item.active::before{
-  content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:16px;width:3px;
   background:var(--c-amber);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 8px rgba(230,81,0,.35);
-  animation:snActivePulse 2.4s ease-in-out infinite;
-}
-@keyframes snActivePulse{
-  0%,100%{box-shadow:0 0 8px rgba(230,81,0,.30)}
-  50%{box-shadow:0 0 13px rgba(230,81,0,.55)}
 }
 /* Cascade slide-in al cargar el sidebar */
 .sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
@@ -742,26 +797,55 @@ header::after{
 }
 @media (prefers-reduced-motion: reduce){
   .sn-group .sn-item{opacity:1;animation:none}
-  .sn-item.active::before{animation:none}
 }
-body.dark .sn-item.active{background:rgba(230,81,0,.18);color:#fdba74}
-body.dark .sn-item:hover{background:rgba(255,255,255,.05)}
-.sn-item svg{flex-shrink:0;color:var(--text3)}
+body.dark .sn-item.active{background:rgba(230,81,0,.16);color:#fdba74}
+body.dark .sn-item:hover{background:rgba(255,255,255,.045)}
+
+/* Iconos: mismo tamaño para todos y alineados en una columna, para que
+   las etiquetas arranquen a la misma altura en todo el menú. */
+.sn-item svg{flex-shrink:0;width:17px;height:17px;color:var(--text4);transition:color .15s var(--ease-out)}
 .sn-item.active svg{color:var(--c-amber)}
 body.dark .sn-item.active svg{color:#fdba74}
 .sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-nav.collapsed .sn-item-label{display:none}
-.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
-.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:4px 10px;border-radius:6px;font-size:.72rem;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
-.sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;box-shadow:0 0 0 0 rgba(239,68,68,.65);animation:snBadgePulse 2s ease-out infinite}
-@keyframes snBadgePulse{
-  0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}
-  70%{box-shadow:0 0 0 6px rgba(239,68,68,0)}
-  100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.55rem;position:relative}
+.sidebar-nav.collapsed .sn-item.active::before{display:none}
+.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:500;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
+
+/* Badges: eran un círculo rojo que latía sin parar. Un número que
+   parpadea todo el día se deja de ver, y son tres a la vez. Ahora es
+   una pastilla discreta que se lee de un vistazo; el rojo se reserva
+   para «Alertas» y «Vencimientos», que es donde corre un plazo. */
+.sn-badge{
+  background:var(--bg-subtle);color:var(--text2);
+  font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  min-width:19px;height:18px;border-radius:9px;padding:0 6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-left:auto;flex-shrink:0;line-height:1;
+  border:1px solid var(--border2);
 }
+.sn-item.active .sn-badge{background:#fff;border-color:rgba(230,81,0,.35);color:var(--c-amber)}
+body.dark .sn-badge{background:rgba(255,255,255,.07);border-color:transparent;color:var(--text2)}
+body.dark .sn-item.active .sn-badge{background:rgba(255,255,255,.12);color:#fdba74}
+
+/* El rojo se reserva para donde CORRE UN PLAZO: vencimientos y alertas.
+   Una glosa que no se contesta a tiempo se da por aceptada (Art. 57 Ley
+   1438), así que ese número sí tiene que saltar. Si todos los badges van
+   en rojo, ninguno destaca — que es lo que pasaba.
+   Se selecciona por el id que ya existe en el HTML: no se toca el markup
+   ni el JavaScript que los muestra y los llena. */
+#venc-badge-side, #alert-badge-side, #sn-sug-badge{
+  background:var(--c-red);border-color:transparent;color:#fff;
+}
+.sn-item.active #venc-badge-side,
+.sn-item.active #alert-badge-side{background:var(--c-red);color:#fff;border-color:transparent}
+body.dark #venc-badge-side, body.dark #alert-badge-side, body.dark #sn-sug-badge{
+  background:var(--c-red);color:#fff;
+}
+
 @media (prefers-reduced-motion: reduce){.sn-badge{animation:none}}
 .sidebar-nav.collapsed .sn-badge{position:absolute;top:4px;right:4px;margin-left:0;min-width:14px;height:14px;font-size:9px}
-.sn-brand-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
+.sn-brand-footer{margin-top:auto;padding:.85rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
 .sidebar-nav.collapsed .sn-brand-footer{padding:.6rem .3rem}
 .sidebar-nav.collapsed .sn-brand-footer img{max-height:24px}
 .sidebar-nav.collapsed .sn-brand-footer div{display:none}
@@ -3156,6 +3240,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
             <select id="ga-paquete" onchange="gaCambiarPaquete()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem"></select>
+            <button class="btn btn-ghost" onclick="gaExportarExcel(this)" style="font-size:.8rem" title="Baja el paquete completo: la Hoja1 de siempre (las 26 columnas de la macro) y encima el informe por causal, por área, por gestor y factura por factura">⬇ Exportar Excel</button>
             <button class="btn btn-ghost" onclick="gaAbrirCargue()" style="font-size:.8rem">Cargar paquete</button>
           </div>
         </div>
@@ -5842,23 +5927,26 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
   /* 3. SIDEBAR PREMIUM: search input + favoritos + recientes */
   .sn-search{
-    margin:.5rem .75rem .65rem; position:sticky; top:0; z-index:5;
-    background:var(--bg-card);
+    margin:0 .75rem .5rem; position:sticky; top:0; z-index:5;
+    background:var(--bg-card); padding-bottom:.35rem;
   }
+  .sidebar-nav.collapsed .sn-search{display:none}
   .sn-search input{
-    width:100%; padding:.45rem .6rem .45rem 2rem;
-    font-size:.78rem;
-    background:var(--bg-subtle); border:1px solid var(--border);
+    width:100%; padding:.48rem .65rem .48rem 2.05rem;
+    font-size:.78rem; font-family:var(--font);
+    background:var(--bg-subtle); border:1px solid var(--border2);
     border-radius:8px; color:var(--text);
-    transition:all .15s ease;
+    transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
   }
+  /* 31-08-2026: el foco se pinta con el azul del sistema, no con el teal —
+     era el único punto del menú donde aparecía ese color. */
   .sn-search input:focus{
-    outline:none; border-color:var(--c-teal2);
+    outline:none; border-color:var(--sinac-blue-700);
     background:var(--bg-card);
-    box-shadow:0 0 0 3px rgba(2,132,199,.1);
+    box-shadow:0 0 0 3px rgba(21,101,192,.12);
   }
   .sn-search::before{
-    content:""; position:absolute; left:.55rem; top:50%;
+    content:""; position:absolute; left:.62rem; top:calc(50% - .17rem);
     transform:translateY(-50%); width:12px; height:12px;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
     background-size:contain; background-repeat:no-repeat; opacity:.6;
@@ -7017,8 +7105,72 @@ function _toastSonido(type){
 // Se avisa UNA vez por pantalla y no más de una cada 15 segundos: con la red
 // caída fallan seis cosas a la vez y seis avisos seguidos no los lee nadie.
 var _avisosDeCarga = {};
+
+// ─── «NO TIENE PERMISO» NO ES «REVISE LA CONEXIÓN» (31-08-2026) ──────────
+//
+// Los gestores no podían trabajar el ADRES y nadie sabía por qué. La causa
+// no era el permiso en sí: era que la pantalla NO LO DECÍA. Cuando el
+// servidor contesta 403, el aviso que veía el gestor era el genérico de
+// abajo — «no se pudo cargar, revise la conexión»— así que reintentaba,
+// culpaba al internet, y el problema nunca llegaba con nombre propio hasta
+// quien podía arreglarlo.
+//
+// De las 317 llamadas que hace esta pantalla al motor, solo 21 miraban el
+// 403. Arreglarlas una por una es imposible de sostener: en cuanto alguien
+// escriba la 318 vuelve el problema. Se envuelve `fetch` UNA vez, y con eso
+// queda cubierta toda llamada presente y futura.
+//
+// El servidor ya manda el motivo exacto («Se requiere rol COORDINADOR o
+// superior»): lo único que faltaba era mostrárselo a quien está sentado
+// enfrente, junto con el rol que tiene.
+var _ultimo403 = 0;
+(function envolverFetchPara403(){
+  if (!window.fetch || window.__fetch403) return;
+  window.__fetch403 = true;
+  var original = window.fetch.bind(window);
+  window.fetch = function(entrada, opciones){
+    return original(entrada, opciones).then(function(res){
+      try{
+        if (res && res.status === 403) {
+          _ultimo403 = Date.now();
+          var ruta = '';
+          try { ruta = (typeof entrada === 'string' ? entrada : (entrada && entrada.url) || ''); } catch(_){}
+          // Se lee sobre una COPIA: el original tiene que llegar intacto a
+          // quien hizo la llamada.
+          res.clone().json().then(function(cuerpo){
+            _avisar403(ruta, (cuerpo && cuerpo.detail) ? String(cuerpo.detail) : '');
+          }).catch(function(){ _avisar403(ruta, ''); });
+        }
+      }catch(_){}
+      return res;
+    });
+  };
+})();
+
+function _avisar403(ruta, motivo){
+  try{
+    if (_avisosDeCarga['__403'] && (Date.now() - _avisosDeCarga['__403']) < 8000) return;
+    _avisosDeCarga['__403'] = Date.now();
+    var rol = (window.USER_ROL || localStorage.getItem('hus_rol') || '').toUpperCase() || 'sin rol';
+    var donde = '';
+    try { donde = String(ruta).split('?')[0].replace(location.origin, ''); } catch(_){}
+    var base = motivo || 'Esta acción está restringida a otro rol.';
+    if (!/[.!?]$/.test(base)) base += '.';   // el servidor no manda punto final
+    var texto = base
+              + ' Su usuario tiene rol ' + rol + '.'
+              + (donde ? ' (' + donde + ')' : '')
+              + ' No es un problema de conexión: pida el permiso a quien administra los usuarios.';
+    if (typeof toast === 'function') toast('No tiene permiso para esto', texto, 'error', {duracion: 12000});
+    console.error('[403]', donde, motivo, 'rol=' + rol);
+  }catch(_){}
+}
+
 function avisarNoCargo(queCosa, e){
   try{
+    // Si el motivo real fue un 403, ya se avisó arriba con el detalle exacto.
+    // Repetirlo como «revise la conexión» sería justo la mentira que este
+    // cambio vino a quitar.
+    if (Date.now() - _ultimo403 < 3000) return;
     var ahora = Date.now();
     if(_avisosDeCarga[queCosa] && (ahora - _avisosDeCarga[queCosa]) < 15000) return;
     _avisosDeCarga[queCosa] = ahora;
@@ -11590,18 +11742,37 @@ async function poblarLandingKPIs(){
   // escondía con `dias_restantes > 0`). Se cuentan aparte porque no es lo
   // mismo "vence pronto" que "ya se venció": decirle al gestor que algo
   // vence pronto cuando el plazo ya pasó es tranquilizarlo al revés.
+  //
+  // 31-08-2026 — NINGÚN ESTADO QUE MIENTA. El caso que más cuesta.
+  //
+  // La consulta de alertas se pide con `.catch(()=>null)`, así que si falla
+  // llega `null`. Y este bloque igual escribía **0** en la tarjeta y pintaba
+  // el pill verde de «sin glosas próximas a vencer».
+  //
+  // Eso no es cierto: no es que no haya ninguna, es que NO SE PUDO
+  // PREGUNTAR. Y aquí la diferencia cuesta plata — una glosa que no se
+  // contesta a tiempo se da por aceptada (Art. 57 Ley 1438 de 2011). El
+  // auditor abre el motor, ve un cero tranquilizador y se dedica a otra cosa.
+  //
+  // Cuando no se sabe, se dice que no se sabe.
+  var _hayAlertas = !!(alertas && Array.isArray(alertas.alertas));
   var nVencen = 0, nVencidas = 0;
-  if(alertas && Array.isArray(alertas.alertas)){
+  if(_hayAlertas){
     nVencen = alertas.alertas.length;
     nVencidas = alertas.alertas.filter(function(a){ return (a.dias_restantes||0) <= 0; }).length;
   }
-  if($('land-alertas')) $('land-alertas').textContent = nVencen;
+  if($('land-alertas')) $('land-alertas').textContent = _hayAlertas ? nVencen : '—';
   var deltaA = $('land-alertas-delta');
   if(deltaA){
-    deltaA.textContent = nVencidas > 0
-      ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
-      : 'en 5 días';
-    deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+    if(!_hayAlertas){
+      deltaA.textContent = 'no se pudo consultar';
+      deltaA.className = 'stat-card-delta down';
+    } else {
+      deltaA.textContent = nVencidas > 0
+        ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
+        : 'en 5 días';
+      deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+    }
   }
 
   // ─── Saludo: pills de contexto ───
@@ -11614,15 +11785,26 @@ async function poblarLandingKPIs(){
     } else if(nVencen > 0){
       pillV.innerHTML = '⏰ <b>' + nVencen + '</b> glosa' + (nVencen===1?'':'s') + ' vence' + (nVencen===1?'':'n') + ' pronto';
       pillV.className = 'pill warn';
-    } else {
+    } else if(_hayAlertas){
       pillV.innerHTML = '✓ sin glosas próximas a vencer';
       pillV.className = 'pill good';
+    } else {
+      // El verde de «todo en orden» es justo lo que no se puede decir cuando
+      // no se pudo preguntar.
+      pillV.innerHTML = '⚠ no se pudo revisar si hay glosas próximas a vencer';
+      pillV.className = 'pill warn';
     }
   }
   var pillC = $('land-saludo-pill-contratos');
   if(pillC){
-    pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
-    pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+    // Mismo caso: sin respuesta, «0 contratos cargados» es falso.
+    if(!contratos){
+      pillC.innerHTML = '⚠ no se pudo consultar cuántos contratos hay cargados';
+      pillC.className = 'pill warn';
+    } else {
+      pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
+      pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+    }
   }
 
   // ─── Top entidades + Top causales ───
@@ -17320,6 +17502,16 @@ function renderResult(d){
   // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
   window._paVerificacionCitas = d.verificacion_citas || null;
 
+  // 31-08-2026 — LO QUE LA MÁQUINA CORRIGIÓ, A LA VISTA.
+  // El motor ya arreglaba solo lo que la IA escribe mal —quitaba códigos
+  // citados como CUPS que no existen, le ponía la fecha a una norma derogada,
+  // corregía el artículo— y todo eso pasaba EN SILENCIO: el dictamen salía
+  // limpio y nadie sabía que se le habían quitado tres cosas.
+  // Mostrarlo no cuesta trabajo nuevo (ya está hecho por dentro) y sirve para
+  // dos cosas: el gestor le cree al motor porque ve que revisa, y aprende qué
+  // mirar cuando revise a mano.
+  window._paCorrecciones = (d.correcciones && d.correcciones.length) ? d.correcciones : null;
+
   // Quality Gate OK = trae verificación de citas y ninguna con severidad ALTA.
   // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
   // el JS puede togglearla después si la verificación cambia.
@@ -17334,6 +17526,16 @@ function renderResult(d){
   var qgOk = !!(_vc && _seRevisó && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
 
   var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+
+  // La factura para el pie de página impreso. Misma cascada que el recuadro
+  // del servicio: lo que mande el motor y, si no, lo que el auditor escribió
+  // en el formulario. «N/A» es falta de dato, no un número.
+  var _facturaImpresa = '';
+  [d && d.factura, d && d.numero_factura,
+   (document.getElementById('f-factura') || {}).value].forEach(function(v){
+    v = String(v == null ? '' : v).trim();
+    if(!_facturaImpresa && v && v.toUpperCase() !== 'N/A') _facturaImpresa = v;
+  });
   var consecDoc = d.glosa_id ? ('GL-'+d.glosa_id) : (d.codigo_glosa || '—');
 
   var html='<div class="res-header">'
@@ -17354,6 +17556,24 @@ function renderResult(d){
          + escHtml(_vc.motivo_no_verificado || 'El verificador no pudo correr.')
          + '</div>'
        : '')
+    // Lo que las redes arreglaron solas, ANTES del dictamen: el gestor tiene
+    // que verlo antes de leer el texto, no después de haberlo radicado.
+    // No sale impreso — es una nota interna, no parte del escrito a la EPS.
+    +(window._paCorrecciones
+       ? '<div class="res-correcciones no-print">'
+         + '<div class="res-correcciones-hdr">'
+         + '<span class="sds-estado es-probado">Revisado</span>'
+         + '<b>' + window._paCorrecciones.length + ' '
+         + (window._paCorrecciones.length === 1 ? 'corrección' : 'correcciones')
+         + ' antes de entregarle el dictamen</b></div>'
+         + '<ul class="res-correcciones-lista">'
+         + window._paCorrecciones.map(function(c){ return '<li>'+escHtml(c)+'</li>'; }).join('')
+         + '</ul>'
+         + '<div class="res-correcciones-pie">Esto lo arregló el motor solo. Se lo '
+         + 'mostramos para que sepa qué revisar cuando lea a mano — no hace falta '
+         + 'que haga nada.</div>'
+         + '</div>'
+       : '')
     +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
     +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
@@ -17370,6 +17590,16 @@ function renderResult(d){
     +'</div>'
     +'</div>'
     +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
+    // 31-08-2026 — EL PAPEL ES LO QUE LLEGA A LA EPS.
+    // Un dictamen de seis hojas que se separa en la mesa de radicación queda
+    // sin forma de saber qué hoja es de qué factura: el número solo aparecía
+    // una vez, en el membrete de la primera. Este pie se repite en TODAS las
+    // hojas impresas (position:fixed en @media print) y no se ve en pantalla.
+    +'<div class="doc-pie-corrido">'
+    +  'ESE HUS · Respuesta a glosa'
+    +  (_facturaImpresa ? ' · Factura <b>'+escHtml(_facturaImpresa)+'</b>' : '')
+    +  ' · ' + fechaLarga
+    +'</div>'
     +'<div class="doc-footer">'
     +'<div class="doc-firma">'
     +'<div class="doc-firma-linea"></div>'
@@ -19978,6 +20208,43 @@ async function gaAutocompletar(texto){
   }catch(e){ /* el autocompletado es de cortesía: si falla, se sigue escribiendo */ }
 }
 
+// Cuando la factura no está en el paquete escogido, no se dice «no existe»:
+// se mira en cuáles SÍ está y se ofrece llevar al auditor allá (31-08-2026).
+async function gaAvisarDondeEsta(numero, caja){
+  var donde = [];
+  try{
+    var r = await fetch('/glosas-adres/factura/'+encodeURIComponent(numero)+'/paquetes', {headers: authH()});
+    if(r.ok) donde = await r.json();
+  }catch(_){ /* si falla, queda el mensaje simple */ }
+  if(!donde.length){
+    caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
+      'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+    return;
+  }
+  var botones = donde.map(function(p){
+    return '<button class="btn btn-primary" style="font-size:.8rem" onclick="gaIrAPaquete('+p.paquete_id+',\''+
+           String(p.factura||numero).replace(/'/g,"") + '\')">'+
+           'Ver en el paquete '+escHtml(p.paquete||p.paquete_id)+
+           ' · '+p.glosas+' glosa(s) · '+fmtCOP(p.valor_glosado)+'</button>';
+  }).join(' ');
+  caja.innerHTML = '<div class="chart-card" style="padding:1.2rem">'+
+    '<div style="font-size:.9rem;margin-bottom:.6rem">La factura <b>'+escHtml(numero)+
+    '</b> no está en el paquete que tiene escogido arriba, pero sí está en '+
+    (donde.length>1 ? 'estos paquetes' : 'este')+':</div>'+
+    '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'+botones+'</div></div>';
+}
+
+// Cambia el paquete de arriba y trae la factura allá.
+async function gaIrAPaquete(paqueteId, factura){
+  var sel = document.getElementById('ga-paquete');
+  if(sel){ sel.value = String(paqueteId); }
+  GA_PAQUETE = paqueteId;
+  var input = document.getElementById('ga-factura');
+  if(input && factura) input.value = factura;
+  gaCargarLista();
+  gaBuscar();
+}
+
 async function gaBuscar(){
   var numero = (document.getElementById('ga-factura').value||'').trim();
   var caja = document.getElementById('ga-resultado');
@@ -19987,8 +20254,7 @@ async function gaBuscar(){
     var url = '/glosas-adres/factura/'+encodeURIComponent(numero)+(GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
     var r = await fetch(url, {headers: authH()});
     if(r.status === 404){
-      caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
-        'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+      await gaAvisarDondeEsta(numero, caja);
       return;
     }
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -20299,6 +20565,17 @@ function gaPintar(d){
   if(d.aviso_detallado){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.10);font-size:.8rem">'+
          '<b>Sin detallado.</b> '+escHtml(d.aviso_detallado)+'</div>';
+  }
+  // La misma factura glosada en dos paquetes: acá solo se ve la de este.
+  if(d.aviso_otros_paquetes){
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
+         '<b>Esta factura está glosada en más de un paquete.</b> '+escHtml(d.aviso_otros_paquetes)+
+         '<div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">'+
+         (d.otros_paquetes||[]).map(function(p){
+           return '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaIrAPaquete('+p.paquete_id+',\''+
+                  String(d.factura||'').replace(/'/g,"") + '\')">Ver en el paquete '+escHtml(p.paquete||p.paquete_id)+'</button>';
+         }).join('')+
+         '</div></div>';
   }
   if(r.por_asignar){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
@@ -20638,6 +20915,34 @@ async function gaCambiarEstado(estado){
     gaBuscar();
     gaCargarLista();
   }catch(e){ toast('No se pudo cambiar el estado', e.message, 'error'); }
+}
+
+// El paquete completo como informe en Excel: lo mismo que ya sale en
+// Pre-auditoría, pedido por el área el 31-08-2026. Se baja como archivo, así
+// que no sirve un enlace suelto: la petición lleva el token.
+async function gaExportarExcel(btn){
+  if(btn) btn.disabled = true;
+  try{
+    toast('Armando el informe', 'Puede tardar unos segundos con paquetes grandes', 'info');
+    var url = '/glosas-adres/informe.xlsx' + (GA_PAQUETE ? '?paquete_id='+GA_PAQUETE : '');
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || ('HTTP '+r.status));
+    }
+    var blob = await r.blob();
+    var nombre = 'RTA_GLOSA_ADRES.xlsx';
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    toast('Informe listo', 'Se descargó '+escHtml(nombre), 'success');
+  }catch(e){ toast('No se pudo generar el informe', e.message, 'error'); }
+  finally{ if(btn) btn.disabled = false; }
 }
 
 // El PDF de evidencia de la factura, con el mismo formato del reporte que
@@ -22836,6 +23141,13 @@ var AUDITOR_TABS_PERMITIDAS = {
   // El validador ADRES y el buscador de autorizaciones son trabajo diario
   // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
   'validador-adres': true,
+  // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
+  // Faltaban en esta lista, así que el botón del menú se le escondía a todo
+  // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía
+  // siquiera entrar a la pantalla, y desde afuera parecía «falta de permiso»
+  // cuando en realidad el permiso del servidor ya lo tenían: las rutas de
+  // responder, cambiar estado y contestar en lote piden AUDITOR o superior.
+  'glosas-adres': true,
 };
 function aplicarRestriccionesRol(){
   if(USER_ROL !== 'AUDITOR') return;

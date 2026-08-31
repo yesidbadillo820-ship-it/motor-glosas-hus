@@ -11,9 +11,11 @@ Rutas:
     POST /glosas-adres/importar            carga el reporte (coordinador/admin)
     POST /glosas-adres/importar-bitacora   agrega el detallado cruzado
     GET  /glosas-adres/paquetes            qué paquetes hay cargados
+    GET  /glosas-adres/informe.xlsx        el paquete completo, como informe
     GET  /glosas-adres/facturas            la lista de facturas a auditar
     GET  /glosas-adres/buscar              autocompletado de facturas
     GET  /glosas-adres/factura/{numero}    TODO lo de esa factura
+    GET  /glosas-adres/factura/{n}/paquetes  en qué paquete(s) está esa factura
     GET  /glosas-adres/factura/{n}/respuesta  el texto consolidado
     POST /glosas-adres/factura/{n}/estado  cierra la factura o la reabre
     GET  /glosas-adres/factura/{n}/evidencia.pdf   el PDF de evidencia
@@ -28,7 +30,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_admin,
     get_auditor_o_superior,
     get_coordinador_o_admin,
     get_usuario_actual,
@@ -38,6 +39,7 @@ from app.database import get_db
 from app.models.db import GlosaAdresRecord, PaqueteAdresRecord, UsuarioRecord
 from app.services import preauditoria_adres as svc
 from app.services.evidencia_adres_pdf import generar_pdf_evidencia, nombre_archivo_evidencia
+from app.services.glosas_adres_excel import construir_informe_paquete, nombre_informe
 
 router = APIRouter(prefix="/glosas-adres", tags=["Glosas ADRES"])
 
@@ -146,6 +148,40 @@ def paquetes(
     ]
 
 
+@router.get("/informe.xlsx")
+def informe_xlsx(
+    paquete_id: int | None = Query(None, description="Por defecto, el último paquete cargado"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """El paquete completo en un Excel que se puede leer, no un volcado.
+
+    Lo pidió el área el 31-08-2026: el mismo tipo de informe que ya sale en
+    Pre-auditoría. Trae las glosas agrupadas por causal, el reparto por área y
+    centro de costos, el avance de cada gestor y el estado de cada factura, con
+    fórmulas vivas sobre la hoja de datos. El armado vive en el servicio.
+    """
+    paquete = (
+        db.get(PaqueteAdresRecord, paquete_id)
+        if paquete_id
+        else db.query(PaqueteAdresRecord).order_by(PaqueteAdresRecord.id.desc()).first()
+    )
+    if paquete is None:
+        raise HTTPException(404, "No hay ningún paquete del ADRES cargado todavía.")
+    contenido = construir_informe_paquete(
+        db, paquete.id, generado_por=current_user.nombre or current_user.email
+    )
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{nombre_informe(paquete.numero_paquete)}"'
+            )
+        },
+    )
+
+
 # ─── Consulta ────────────────────────────────────────────────────────────────
 
 
@@ -202,8 +238,34 @@ def factura(
         db, numero, paquete_id=paquete_id, incluir_totales=incluir_totales
     )
     if not datos["encontrada"]:
+        # No basta con decir «no está»: el ADRES glosa la misma factura en
+        # varios paquetes y la pantalla trabaja sobre el que está escogido
+        # arriba. Si está en otro, se dice en cuál (31-08-2026).
+        donde = svc.paquetes_de_factura(db, numero)
+        if donde:
+            lugares = ", ".join(f"el paquete {p['paquete'] or p['paquete_id']}" for p in donde)
+            raise HTTPException(
+                404,
+                f"La factura {numero} no está en el paquete que tiene escogido, "
+                f"pero sí está en {lugares}.",
+            )
         raise HTTPException(404, f"La factura {numero} no está en ningún paquete cargado.")
     return datos
+
+
+@router.get("/factura/{numero}/paquetes")
+def paquetes_de_la_factura(
+    numero: str,
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """En qué paquete(s) está esa factura, con sus glosas y su plata.
+
+    Sirve para dos cosas de la pantalla: cuando el auditor busca una factura
+    que no está en el paquete escogido, poder llevarlo al paquete donde sí
+    está; y avisar cuando la misma factura viene glosada en dos paquetes.
+    """
+    return svc.paquetes_de_factura(db, numero)
 
 
 class EstadoIn(BaseModel):
@@ -343,13 +405,28 @@ def asignar_area(
     glosa_id: int,
     cuerpo: AreaIn,
     db: Session = Depends(get_db),
-    usuario: UsuarioRecord = Depends(get_admin),
+    usuario: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Reparte una glosa de causal compartida entre gestores y médicas.
 
-    Solo **SUPER ADMIN**: la causal 4506 la trabajan las dos áreas y quién la
-    toma depende del procedimiento y de lo que se glosó (el material de
-    osteosíntesis y el de alto costo lo revisa el médico auditor).
+    ABIERTA A LOS GESTORES EL 31-08-2026, a pedido del área. Antes era solo de
+    SUPER ADMIN y con eso las glosas de causal compartida se quedaban quietas
+    esperando a una sola persona.
+
+    Lo que NO cambia, y es lo que hacía prudente la restricción: quién toma la
+    causal 4506 depende del procedimiento — el material de osteosíntesis y el
+    de alto costo los revisa el médico auditor, no facturación. Por eso el
+    reparto sigue siendo:
+
+    - acotado: solo se puede asignar en las causales que de verdad trabajan dos
+      áreas (hoy la 4506); en cualquier otra el motor responde con un error;
+    - con testigo: queda grabado quién la asignó y cuándo
+      (`area_asignada_por`, `area_asignada_en`);
+    - reversible: se puede volver a asignar, no borra el trabajo de nadie.
+
+    El motor además ya trae su propia sugerencia de área con el motivo
+    (`area_sugerida`, `motivo_area`), que es lo que el gestor debe mirar antes
+    de mandar a facturación algo que le corresponde al médico.
     """
     try:
         glosa = svc.asignar_area(

@@ -611,6 +611,46 @@ def get_contrato(eps: str, fecha_hecho=None) -> dict:
                 f"CONTRATO CON VIGENCIA TERMINADA: {_vencidos}. "
                 "VERIFICAR LA FECHA DEL SERVICIO ANTES DE RADICAR."
             )
+            # 31-08-2026 — «TARIFA PACTADA: SOAT PLENO» ERA UNA AFIRMACIÓN QUE
+            # NADIE PODÍA HACER.
+            #
+            # Este bloque ya arreglaba el número del contrato («no teníamos
+            # contrato» pasó a «el contrato venció el X»), pero la TARIFA se
+            # quedaba con el texto del fallback: «SOAT PLENO — Manual Tarifario
+            # SOAT 2026». El dictamen salía entonces con la línea
+            #
+            #     Tarifa pactada: SOAT PLENO
+            #
+            # que es una afirmación positiva sobre algo que en este camino
+            # justamente NO se sabe: la glosa no trajo fecha del servicio y el
+            # contrato ya venció, así que no hay forma de decir cuál rige.
+            #
+            # Lo destapó la tanda de pruebas de estrés: salió en NUEVA EPS
+            # (contrato hasta 2026-03-31, pactaba SOAT −20 %) y en DISPENSARIO
+            # MEDICO (440-DIGSA hasta 2026-07-30, también −20 %). En una glosa
+            # de TARIFA eso es concederle a la entidad justo lo que objetó.
+            #
+            # EL FACTOR NO SE TOCA: sigue en 1.00 a propósito —aplicar un
+            # descuento pactado sin saber la fecha también sería inventar, y de
+            # los dos errores ese es el que le cuesta plata al hospital—. Lo que
+            # se corrige es la AFIRMACIÓN: se nombra el factor que pactaba cada
+            # contrato vencido para que el gestor vea qué está en juego, y se
+            # dice expresamente que no está determinada.
+            _pactados = " · ".join(
+                f"{c.numero or 'sin número'}: factor {c.factor:.2f}"
+                for c in otros
+                if getattr(c, "factor", None)
+            )
+            ficha["tarifa"] = (
+                "TARIFA NO DETERMINADA — sin la fecha del servicio no se puede "
+                "afirmar cuál rige. "
+                + (f"El contrato vencido pactaba {_pactados}. " if _pactados else "")
+                + "Mientras no se conozca la fecha se liquida a SOAT pleno "
+                "(Circular Externa 047 de 2025 MinSalud, Manual SOAT 2026 "
+                "indexado a UVB), que es lo único sostenible sin ese dato. "
+                "CONFIRME LA FECHA DE PRESTACIÓN ANTES DE RADICAR."
+            )
+            ficha["_tarifa_indeterminada"] = True
             ficha["_vigencia_vencida"] = True
             ficha["_fuente"] = f"malla contractual al {_malla.FECHA_MALLA.isoformat()}"
             return ficha
@@ -995,6 +1035,8 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 8.sexdecies (RONDA 34). «AYUDA DIAGNÓSTICA NO INTERPRETADA» EN SERVICIOS CUYA ESENCIA ES LA LECTURA: cuando la objeción diga "ayuda diagnóstica no interpretada" (o "sin lectura", "sin informe") sobre un CUPS cuya naturaleza ES la interpretación por el especialista — estudios anatomopatológicos y citologías (grupo 898xxx, p. ej. 898015H citología cervicovaginal), biopsias, y en general lecturas de patología — la defensa señala que la interpretación es INHERENTE al servicio: no existe la versión "sin interpretar" del estudio, el producto facturado ES el informe del patólogo. Se anexa el informe como soporte y se cita la descripción del CUPS según la norma vigente al momento de la prestación: Res. 2706/2025 para servicios de 2026 en adelante, Res. 2641/2024 para los de 2025. PRECAUCIÓN: no confundir con procedimientos que sí separan toma y lectura en códigos distintos (ciertas imágenes diagnósticas) — ahí primero verificar cuál de los dos códigos se facturó antes de responder.
 
+8.octodecies (31-08-2026, PRUEBA 2 DE ESTRÉS — CL4506). UNA GLOSA PUEDE TRAER DOS OBJECIONES: CONTÉSTALAS TODAS. El código de la glosa dice cuál es el motivo PRINCIPAL, no el único. Cuando el texto objeta más de una cosa —por ejemplo pertinencia clínica Y a la vez tarifa, o soportes Y cantidad—, está PROHIBIDO responder solo la que corresponde al código y dejar la otra en silencio: lo que no se contesta se ratifica, y el hospital pierde esa plata sin haber discutido. Señales de que hay una SEGUNDA objeción en el mismo texto: «adicionalmente», «así mismo», «igualmente», «además», «por otra parte», o un segundo hecho objetado con su propio verbo (supera el tope, excede la tarifa, no está autorizado, no se evidencia, no está soportado). Cómo se responde: UN PÁRRAFO PROPIO PARA CADA OBJECIÓN, nombrándola («en cuanto al mayor valor unitario alegado…»), con su propio fundamento —el módulo de este prompt manda para la principal, pero la objeción tarifaria se contesta con las reglas de TARIFAS y la de autorización con las de AUTORIZACIÓN—. Si la segunda objeción no se puede contestar con lo que hay en el expediente, se dice expresamente qué falta; lo que NO se vale es no mencionarla.
+
 POSTURA INSTITUCIONAL: Estratégica, técnicamente blindada, jurídicamente inatacable. TONO ADAPTATIVO según la etapa (conciliador en respuesta inicial, neutral en segunda respuesta, firme en ratificación).
 
 MISIÓN: Redactar respuestas técnico-jurídicas a glosas de EPS y entidades pagadoras para lograr LEVANTAMIENTO en etapa inicial (evitar ratificación), MAXIMIZANDO el monto recuperado y BLINDANDO al HUS frente a eventual escalada a SuperSalud.
@@ -1151,7 +1193,7 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <paciente>Nombre si aparece, sino "PACIENTE IDENTIFICADO EN EXPEDIENTE"</paciente>
 <servicio>Descripción del servicio + CUPS si hay</servicio>
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
-<tarifa>Tarifa pactada (ej: "SOAT -20%") o "SOAT PLENO"</tarifa>
+<tarifa>Tarifa pactada (ej: "SOAT -20%"), "SOAT PLENO", o el texto de la ficha COPIADO TAL CUAL si empieza por "TARIFA NO DETERMINADA" — en ese caso está PROHIBIDO reemplazarlo por "SOAT PLENO"</tarifa>
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
 <accion>DEFENDER_TOTAL</accion>
 <valor_aceptar>$0</valor_aceptar>
@@ -1795,6 +1837,50 @@ _RE_EPS_SOLA = (
 )
 
 
+# ── Aseguradoras SOAT (31-08-2026) ──────────────────────────────────────
+# El auditor confirmó el nombre oficial: «LA PREVISORA S.A.».
+#
+# LA PARTE DELICADA: La Previsora S.A. es LA MISMA EMPRESA que administra el
+# Fondo del Magisterio, y por eso la malla la tiene como alias de FOMAG. El
+# nombre de la compañía NO basta para saber de qué negocio viene la glosa.
+#
+# Primer intento de este mismo arreglo: se metió «PREVISORA» como token suelto
+# y se tragó «FIDUCIARIA PREVISORA FOMAG», que es magisterio puro. Lo atajó una
+# prueba de la ronda 13 que existe desde junio.
+#
+# La regla correcta pide LAS DOS COSAS: el nombre de la compañía Y un marcador
+# de SOAT en el texto. Y si el texto nombra el magisterio, manda el magisterio
+# —es más específico sobre el pagador que la palabra «SOAT», que puede estar
+# ahí solo por la tarifa—.
+_ASEGURADORAS_SOAT: tuple[tuple[str, str], ...] = (
+    ("PREVISORA", "LA PREVISORA S.A. — SOAT"),
+    ("SEGUROS DEL ESTADO", "SEGUROS DEL ESTADO — SOAT"),
+    ("SOLIDARIA", "ASEGURADORA SOLIDARIA — SOAT"),
+    ("MUNDIAL DE SEGUROS", "COMPAÑIA MUNDIAL DE SEGUROS — SOAT"),
+    ("AXA COLPATRIA", "AXA COLPATRIA — SOAT"),
+)
+_RE_MARCADOR_SOAT = re.compile(r"(?<![A-Z])(SOAT|UVB)(?![A-Z])")
+_RE_MAGISTERIO = re.compile(r"(?<![A-Z])(FOMAG|MAGISTERIO)(?![A-Z])")
+
+
+def _aseguradora_soat_en_texto(txt_up: str) -> str:
+    """Nombre canónico de la aseguradora SOAT nombrada en el texto, o "".
+
+    El canónico CONSERVA el marcador «— SOAT» a propósito: si devolviera
+    «LA PREVISORA S.A.» a secas, la malla contractual le daría el contrato de
+    FOMAG (factor 0.85) y volveríamos al defecto que se corrigió esta tarde.
+    Con el marcador, la guardia de régimen lo manda a SOAT pleno.
+    """
+    if _RE_MAGISTERIO.search(txt_up):
+        return ""
+    if not _RE_MARCADOR_SOAT.search(txt_up):
+        return ""
+    for nombre, canonico in _ASEGURADORAS_SOAT:
+        if nombre in txt_up:
+            return canonico
+    return ""
+
+
 def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     """Bug I (ronda 13): detecta el nombre canónico de la EPS / ARL que
     aparece literalmente en el texto de la glosa. Útil cuando el usuario
@@ -1805,6 +1891,19 @@ def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     if not texto_glosa:
         return ""
     txt_up = re.sub(r"\s+", " ", str(texto_glosa).upper())
+    # 31-08-2026 — LOS PUNTOS DE LAS SIGLAS ROMPÍAN LA DETECCIÓN.
+    # El token del catálogo es «NUEVA EPS», pero las glosas reales escriben
+    # «NUEVA E.P.S. S.A. - SUBSIDIADO» — que es como aparece en la base del
+    # hospital y es el pagador más frecuente. Con los puntos, el nombre estaba
+    # escrito en la primera línea de la glosa y el motor igual dejaba la
+    # entidad en «OTRA / SIN DEFINIR», sin contrato y sin tarifa.
+    # Se quita el punto DENTRO de la sigla (E.P.S. → EPS). Nada más cambia.
+    txt_up = re.sub(r"(?<=\b[A-Z])\.(?=[A-Z]\b|[A-Z]\.)", "", txt_up)
+    # 0) Aseguradora SOAT: exige nombre de compañía Y marcador SOAT, y cede
+    #    ante el magisterio. Va primero porque es la regla más estricta.
+    _soat = _aseguradora_soat_en_texto(txt_up)
+    if _soat:
+        return _soat
     # 1) Tokens explícitos ("EPS SURA", "ARL SURA", etc.) — más específicos.
     for token, canonico in _TOKENS_PAGADOR_EN_TEXTO:
         if token in txt_up:

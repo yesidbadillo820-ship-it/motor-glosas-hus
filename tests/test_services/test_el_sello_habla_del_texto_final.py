@@ -57,9 +57,14 @@ class TestLaCausalNoEsElNombreDelServicio:
 
     def test_esta_cableado_donde_se_arma_el_recuadro(self):
         fuente = pathlib.Path("app/services/glosa_service.py").read_text(encoding="utf-8")
-        assert "servicio_ia = _quitar_causal_del_servicio(servicio_ia)" in fuente, (
+        assert "servicio_ia = _quitar_causal_del_servicio(servicio_ia" in fuente, (
             "el campo <servicio> de la IA tiene que pasar por la limpieza: es el "
             "que alimenta el recuadro, y no pasa por la red del cuerpo"
+        )
+        # 31-08-2026: la limpieza recibe además el código de ESTA glosa, para
+        # poder borrarlo aunque no figure en el catálogo de causales (CL4506).
+        assert "_cod_de_esta_glosa" in fuente, (
+            "la limpieza dejó de recibir el código de la glosa que se contesta"
         )
 
 

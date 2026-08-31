@@ -6,7 +6,34 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 31-08-2026
+**Última actualización:** 31-08-2026 (noche)
+
+---
+
+## 0) MAPA DE PROYECTOS — el menú para empezar cualquier chat
+
+> Cuando arranque un chat nuevo, Claude debe PREGUNTAR: **«¿Sobre qué proyecto
+> vamos a trabajar hoy?»** mostrando este menú. Usted responde con el número o
+> el nombre, y Claude le recuerda en 3 líneas qué es, cómo se trabaja y qué
+> quedó pendiente (buscándolo en las secciones PENDIENTE y de fechas de abajo).
+
+| # | Proyecto | Qué es y qué hace | Cómo trabajamos |
+|---|----------|-------------------|-----------------|
+| 1 | **Motor de Glosas (app web)** | La aplicación de `app/` que redacta con IA las respuestas técnico-jurídicas a las glosas (contrato, tarifas, norma). Corre en el PC del hospital (Docker, `/opt/motor-glosas`, se actualiza sola ~5 min tras cada cambio). | Todo cambio con su prueba de pytest, PR y CI en verde; la producción se actualiza sola. |
+| 2 | **Pre-auditoría SINAC** | Módulo del motor (página `/preauditoria`): radicación del paquete ADRES, devoluciones con oficio PDF y consecutivo, observaciones, informes de gestión. | Igual que el motor: es parte de la app. Los arreglos salen de lo que los 4 auditores ven en pantalla. |
+| 3 | **Proyecto ADRES / FURIPS** | Reclamaciones ADRES (victimas/eventos): validador FURIPS (Circular 022/2023), generador FUR, armado de carpetas de radicación (ej. paquete 31068), objeciones del ADRES en DGH, respuestas de glosa y descuento de valores aceptados en FURIPS2. | Los archivos viven en `Z:\...\00.00PROYECTO ADRES`; Claude no ve ese disco: usted sube los archivos al chat o Claude entrega comandos/bots listos. |
+| 4 | **COOSALUD** | Organizar el ZIP del portal en lotes → consolidar → OBJECIONES para DGH → responder en el portal VCO (vco.ctamedicas.com). | SIEMPRE piloto de 1 factura antes del masivo. Guía: `docs/CONTEXTO_COOSALUD.md`. |
+| 5 | **Dispensario Médico / SIMED** | Glosas y notas crédito del Dispensario (Sanidad Ejército) + la conciliación (expediente por factura, actas, las 147 facturas). | Validar el CUV antes de cargar notas (`tools/verificar_cuv_notas.py`). Guías: `docs/CONTEXTO_DISPENSARIO_*.md`. |
+| 6 | **SIIFA (MinSalud)** | Informe masivo de seguimientos y respuesta de glosas por la API oficial (no es portal de EPS). | Piloto con `--solo-id` antes de cualquier masivo. Guía: `docs/CONTEXTO_SIIFA.md`. |
+| 7 | **Suite Cartera HUS** | Programa de escritorio del analista (`tools/suite_cartera_hus/`): organizar portales → consolidar → cruzar DGH → OBJECIONES; más la caja de Herramientas PDF 🧰, correos de pagos 📧 y unir Exceles 📊. | Ventana (`suite_cartera_hus.py`) o consola (`suite_cli.py`). Claves de portales en archivo local NO versionado. |
+| 8 | **Objeciones de otras EPS** | Bots que arman el Excel de OBJECIONES para DGH desde el archivo de cada entidad: FAMISANAR, SAVIA, EMSSANAR, Mutual Ser, FOMAG (Horus). | Cada uno con su `tools/organizar_objeciones_*.py` y su README. Si DGH devuelve errores, está `corregir_errores_dgh.py` y Claude los analiza. |
+| 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
+| 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
+| 11 | **Módulos personales de estudio** | Dos programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11) y **noruego** (`noruego/`, curso de idioma para el celular). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`. Guías: `docs/GUIA_SISTEMA_ICFES.md` y `docs/GUIA_CURSO_NORUEGO.md`. |
+
+**Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
+esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
+Cuando nazca un proyecto o bot nuevo, se agrega a esta tabla en el mismo commit.
 
 ---
 
@@ -63,7 +90,219 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
-### 31-08-2026 — La glosa que no aparecía en pantalla (y los 73 detallados del 31078)
+### 31-08-2026 — Pruebas de estrés: la prueba 2 destapó dos fallas caras
+
+**Prueba 1 (TA0301, La Previsora) — CERRADA.** Las cuatro correcciones del día
+quedaron funcionando en el servidor: la IA identifica sola a
+«LA PREVISORA S.A. — SOAT» (ya no hay que escogerla en el desplegable), toma
+el valor **glosado** de $1.254.000 y no el facturado de $4.180.000, escribe
+«POR VALOR OBJETADO DE» en vez de «FACTURADA POR», y aplica tarifa SOAT plena
+sin robarle el contrato del magisterio.
+
+**Prueba 2 (CL4506, NUEVA EPS) — dos fallas nuevas.**
+
+*La primera.* El recuadro verde del dictamen decía, una línea encima de la
+otra: «Contrato: 02-01-06-00077-2017» y «Tarifa pactada: SOAT PLENO». Las dos
+cosas son falsas. Ese contrato de NUEVA EPS **pactaba SOAT −20 %** y su
+**vigencia terminó el 31 de marzo de 2026**. Decirle a NUEVA EPS que lo
+*pactado* es SOAT pleno, justo en una glosa donde ella objeta la tarifa, es
+firmarle por escrito que el hospital cobró de más.
+
+Lo llamativo es que el arreglo de la mañana ya ponía «TARIFA NO DETERMINADA»
+en la ficha que se le entrega a la IA. La IA la limpió: se quedó con el número
+bonito del contrato vencido y escogió «SOAT PLENO» porque el formato de
+respuesta se lo ofrecía como una de dos opciones válidas. Ahora **la ficha
+manda**: si la vigencia venció, el motor reemplaza esas dos casillas por el
+texto verdadero, aunque la IA haya escrito otra cosa, y se lo avisa al gestor
+en el panel de correcciones.
+
+*La segunda, y es la de fondo.* La glosa objetaba **dos cosas**: la pertinencia
+del material de osteosíntesis y, con la palabra «adicionalmente», que el valor
+unitario del clavo supera el tope contractual. El dictamen contestó la primera
+con tres párrafos y de la segunda **no dijo una sola palabra**. Lo que no se
+contesta se ratifica: esa parte de los $7.310.000 se perdía sin haberla
+discutido.
+
+La causa es de diseño: el motor arma la respuesta con **un solo módulo**,
+escogido por el código de la glosa (CL → pertinencia). Pero el código dice cuál
+es el motivo *principal*, no el único. Se hicieron dos cosas: se le ordenó a la
+IA contestar **todas** las objeciones del texto, cada una en su propio párrafo;
+y se agregó una revisión que detecta la objeción que quedó muda y **se la
+nombra al gestor** («OJO: la glosa también objeta el tope tarifario y el
+dictamen no lo responde»). La revisión **no escribe el argumento que falta** —
+inventarlo sería peor que callarlo.
+
+**Un detalle del oficio.** Una prueba propia atrapó un error mío: la revisión
+nueva confundía «NO SE EVIDENCIA JUSTIFICACIÓN» (que es pertinencia) con una
+glosa de soportes, y reclamaba unos documentos que nadie había pedido. Se
+corrigió la revisión, no la prueba.
+
+**Y una duda resuelta:** La Previsora **no es ARL**, es aseguradora **SOAT**.
+No confundirla con FIDUPREVISORA (la fiduciaria), que sí es FOMAG/magisterio.
+Son nombres parecidos y entidades distintas; el motor ya las separa.
+
+**Falta:** correr las pruebas 3, 4 y 5 (AU0201, SO0102, FA0205) y repetir la
+prueba 2 **adjuntando los PDF de soportes**, porque sin ellos no se pudo
+comprobar si el dictamen cita la nota operatoria.
+
+### 31-08-2026 (noche) — Curso de noruego para el celular (carpeta `noruego/`)
+
+**Qué se pidió.** Una aplicación web para aprender noruego desde cero hasta
+nivel profesional, para usarla **desde el celular**, al estilo de esas apps de
+idiomas pero dedicada solo al noruego. No es del hospital: es un módulo
+personal, igual que el del ICFES.
+
+**Dónde vive.** En la carpeta `noruego/`, **aparte**. No toca ni depende del
+Motor de Glosas: si mañana se borra la carpeta, la aplicación del hospital
+sigue funcionando exactamente igual.
+
+**Lo que quedó hecho:**
+
+1. **El curso completo: 18 módulos y 73 lecciones**, ordenadas de menos a más,
+   desde «no sé nada» (el alfabeto y los saludos) hasta noruego profesional.
+   Cada lección se abre solo cuando se terminó la anterior, para que no se
+   salte pasos.
+
+2. **El material de estudio: 423 elementos** guardados en archivos de texto
+   (`noruego/lexico/`): 133 sustantivos, 69 verbos, 40 adjetivos, 85 frases,
+   42 números, 13 sonidos difíciles del noruego, 29 reglas de gramática
+   explicadas y 12 conversaciones completas. Todo con su traducción, su
+   pronunciación aproximada y su ejemplo.
+
+3. **875 ejercicios** que el programa arma solo, en **15 formas distintas**
+   (escoger la traducción, escribir, ordenar la frase, oír y escribir,
+   emparejar, conjugar el verbo, escoger el artículo, completar el diálogo,
+   etc.). Ninguna lección quedó a medias: se revisó una por una.
+
+4. **La aplicación en el celular.** Es un solo archivo que se abre en el
+   navegador; desde el menú se le da «Agregar a la pantalla de inicio» y queda
+   como una aplicación más, con su ícono. **Funciona sin internet** una vez
+   abierta la primera vez. Todo está pensado para el dedo: botones grandes,
+   menú abajo, y no se sale de la pantalla ni en los celulares angostos.
+
+5. **Cómo mantiene el ritmo:** vidas por lección (cinco fallas y se repite),
+   puntos, racha de días seguidos, 10 logros y **repaso espaciado** — el
+   programa se acuerda de las palabras que le costaron y se las vuelve a
+   poner justo antes de que se le olviden.
+
+6. **Además del curso hay:** diccionario buscable con las 423 entradas,
+   las 29 reglas de gramática, las 12 conversaciones para practicar, la
+   pantalla de progreso, y un **panel para agregar palabras nuevas** sin
+   tocar una sola línea de programación.
+
+**Tres cosas que la aplicación dice de frente, en vez de disimular:**
+
+- La pronunciación que muestra es **aproximada, escrita a la colombiana**.
+  Sirve para arrancar, no reemplaza oír a un noruego.
+- Si el celular **no tiene voz noruega instalada**, los ejercicios de escuchar
+  **muestran el texto escrito** y lo avisan. Antes de arreglarlo, esos
+  ejercicios eran imposibles de responder en un celular sin esa voz.
+- El curso enseña **bokmål**, que es el noruego escrito de la mayoría. No
+  enseña nynorsk ni los dialectos.
+
+**Se cuidó no inventar nada.** Ninguna palabra, regla ni traducción salió de
+una suposición. Hay un revisor (`python -m noruego revisar`) que avisa si a
+alguna entrada le falta traducción, género o ejemplo — hoy sale limpio.
+
+**Lo que se probó:** 167 pruebas automáticas, y la aplicación se recorrió
+completa en un navegador de celular: se hicieron tres lecciones enteras, se
+buscó en el diccionario, se abrieron la gramática y las conversaciones, se
+agregó contenido desde el panel y se recargó la página para comprobar que el
+avance **no se pierde**. Sin errores y sin barras de desplazamiento de lado.
+
+**Cómo se usa:** doble clic en **`tools\NORUEGO.cmd`**. El bot arma la
+aplicación, **escribe el enlace completo** para copiarlo en el celular y
+levanta el servidor. Guía completa: `docs/GUIA_CURSO_NORUEGO.md`.
+
+**Arreglo del mismo día, en la primera prueba real.** El bot no mostró la
+dirección: sacaba la ayuda de `ipconfig` en vez del número. Era un error de
+una sola letra en el archivo del bot (la barra `|` iba «escapada» donde no
+debía, así que `ipconfig` la recibió como si fuera una orden). Como no salió
+la dirección, el usuario escribió en el navegador el texto de relleno que
+decía el bot —«LA-IP-DE-ARRIBA»— y el navegador respondió que la página no
+existe. **Ya no hay texto de relleno:** ahora el propio programa averigua con
+qué número se ve este computador en la red y **escribe el enlace completo,
+listo para copiar** (`http://192.168.x.x:8000/...`). También se agregó el
+comando `python -m noruego direccion` y **26 pruebas nuevas** que vigilan ese
+archivo, para que ese error no pueda volver.
+
+Y se aclaró dónde sale **«Agregar a la pantalla de inicio»**: es del
+**celular**, no del computador. En Android es el menú de los tres puntos; en
+iPhone, el botón de compartir. En el PC no hace falta: se abre el archivo con
+doble clic. El bot y la guía ahora lo dicen.
+
+---
+
+### 31-08-2026 — Los gestores no podían entrar al ADRES, y la pantalla no lo decía
+
+**El problema.** Los gestores no podían trabajar las glosas del ADRES y nadie
+sabía por qué. Se revisó y aparecieron **dos cosas distintas** que desde afuera
+se veían igual —«no tengo permiso»— y ninguna era lo que parecía.
+
+**1. El botón del menú se les escondía.** La pantalla tiene una lista de lo que
+puede ver cada rol, y «Glosas ADRES» **no estaba en ella**. Como los 28 usuarios
+del hospital tienen rol de auditor, **ninguno veía la pantalla**. El permiso del
+servidor sí lo tenían desde siempre. **Ya quedó y el área confirmó que entran.**
+
+**2. Repartir el área era solo del administrador.** Las glosas de causal
+compartida (la 4506) las trabajan facturación y las médicas, y solo un
+administrador podía decir cuál la toma — así que se quedaban quietas esperando
+a una sola persona. Se abrió a los gestores, a pedido del área.
+
+Lo que se cuidó al abrirlo: solo se puede repartir en las causales que de
+verdad trabajan dos áreas, queda grabado **quién lo hizo y cuándo**, y se puede
+volver a cambiar. **No se abrió importar el paquete**, porque reimportar
+reemplaza el trabajo de todos.
+
+**3. La pantalla mentía sobre por qué fallaba.** Cuando el servidor le negaba
+algo a alguien, el aviso decía «no se pudo cargar — **revise la conexión**». Le
+echaba la culpa al internet cuando era otra cosa. Por eso el gestor reintentaba,
+culpaba a la red, y el problema nunca llegaba con nombre propio. Ahora dice qué
+le está negando, con su rol y a quién pedírselo.
+
+---
+
+### 31-08-2026 (tarde) — Cinco mejoras de diseño del motor
+
+Salieron de un repaso completo de la pantalla. Cada una arregla algo real.
+
+**El color ahora significa algo.** Los colores se llamaban por su tono
+(«ámbar», «rosa»), lo que obliga a acordarse de si el ámbar era «revisar» o
+«error». Ahora se llaman por lo que quieren decir. Además:
+
+- El ámbar del motor estaba **demasiado pegado al rojo** de error: en un
+  monitor de facturación, y para quien no distingue bien el rojo —uno de cada
+  doce hombres—, eran el mismo aviso. Se separó al doble de distancia.
+- **La plata tiene color propio.** Antes un valor en riesgo se pintaba con el
+  rojo de error, y una glosa de $16 millones bien defendida no es un error: es
+  lo que está en juego.
+- **El color nunca va solo:** ahora cada estado lleva color, icono y palabra.
+  El dictamen se imprime, y en blanco y negro el color no existe.
+
+**El motor muestra lo que corrigió.** Ya arreglaba solo lo que la IA escribe
+mal —quita códigos que no existen, le pone la fecha a una norma derogada,
+corrige artículos— pero lo hacía **en silencio**. Ahora, arriba del dictamen,
+sale la lista de lo que arregló y por qué. No sale impreso: es una nota para el
+gestor, no para la EPS.
+
+**El «0 próximas a vencer» ya no puede mentir.** Si la consulta fallaba, la
+pantalla escribía **0** igual y pintaba el pill verde de «sin glosas próximas a
+vencer». Eso no era cierto: no es que no hubiera, es que **no se pudo
+preguntar**. Y eso cuesta plata — una glosa no contestada a tiempo se da por
+aceptada. Ahora, cuando no sabe, dice que no sabe.
+
+**Cada hoja impresa dice de qué factura es.** El número aparecía una sola vez,
+en la primera hoja. Un dictamen de seis páginas que se separa en la mesa de
+radicación dejaba hojas sueltas sin identificar.
+
+**Las glosas sin causal ya no entran calladas.** En el lote real, **59 de 135
+(el 44 %) entraron sin código de causal**. Sin causal el motor no sabe contra
+qué defiende: puede contestar la forma cuando la glosa era de fondo. Eso **no lo
+arregla el programa** —la columna no viene en el archivo— pero ahora la pantalla
+dice cuántas son, cuáles, y que hay que pedirle esa columna a quien manda el
+archivo. Con la cifra en la mano, el reclamo tiene evidencia.
+
+### 31-08-2026 (tarde) — La glosa que no aparecía en pantalla (y los 73 detallados del 31078)
 
 **Lo que reportó Jhon.** Abrió una factura del paquete 31078 y arriba le decía
 **4 glosas, 1 sin decidir**, pero en la tabla solo salían **3**. Preguntó dónde
@@ -8517,6 +8756,57 @@ hallazgo.
 
 ---
 
+### 31-08 — Glosas ADRES: el paquete completo se baja en un solo archivo
+
+Yesid: «me gustaría que en esta opción también esté poder descargar un excel
+con un informe así como el que tenemos en el apartado de preauditoría». Y
+después, mandando dos archivos del paquete 31068: «los archivos descargados
+deben ser así como estos».
+
+La pantalla de **Glosas ADRES** ya no tenía por dónde sacar el paquete: se veía
+factura por factura, pero para revisarlo por fuera, repartir el trabajo o
+llevarlo a una reunión tocaba volver al Excel de la macro. Ahora, al lado de
+«Cargar paquete», hay un botón **⬇ Exportar Excel**.
+
+**El archivo respeta lo de siempre.** La `Hoja1` sale con **las 26 columnas de
+la macro**, en el mismo orden y con los mismos títulos, con el encabezado en la
+fila 1 y los datos desde la 2 — igual que los `RTA_GLOSA_ADRES_PAQ_*` con los
+que trabaja el área. Eso no es un detalle de forma: los bots que leen ese
+archivo (el de **objeciones para el DGH** y el de **respuestas por factura**)
+buscan la hoja por sus encabezados en la primera fila. Si el informe le hubiera
+puesto un título arriba, el bot no habría encontrado nada. Queda una prueba que
+baja el archivo y se lo pasa al bot de objeciones para comprobarlo.
+
+**Y encima trae el informe.** Cinco hojas más, todas con fórmulas vivas sobre
+la `Hoja1`:
+
+- **RESUMEN** — facturas, glosas a responder, cuántas van decididas, el avance,
+  cuánto se objeta, cuánto se acepta, cuánto sigue glosado, y dos alertas: las
+  glosas **sin gestor asignado** y las que **falta repartir de área** (la 4506).
+- **POR QUÉ NOS GLOSAN** — las glosas agrupadas por causal del ADRES, con
+  cuántos renglones, cuántas facturas toca, cuánta plata pesa y **qué hace falta
+  para responderla**. Con gráfico.
+- **POR ÁREA Y CENTRO** — quién tiene que responder: el área y el centro de
+  costos del hospital. Sirve para repartir y para pedirle el sustento al
+  servicio.
+- **POR GESTOR** — cuántas tiene cada uno, cuántas lleva y cuánto le falta.
+- **FACTURAS** — una fila por factura, con **¿cuadra?**: compara lo que suma el
+  sistema con la cifra oficial del ADRES y marca en rojo la que no cuadra.
+
+**Lo que se cuidó con lupa: la plata.** El reporte del ADRES abre una fila por
+cada causal del mismo servicio. Todas se conservan —el gestor decide causal por
+causal— pero **solo una cuenta**; si no, la glosa sale al doble. Y lo aceptado
+se junta por servicio y se topa en lo glosado, porque aceptar en las dos
+causales le declararía al ADRES el doble de lo que ese servicio tiene glosado.
+Los números del archivo dan exactamente los mismos de la pantalla, y hay
+pruebas que lo verifican con el caso real del TAC de la HUS311371.
+
+El archivo se baja como `RTA_GLOSA_ADRES_PAQ_31068_31-08-2026.xlsx`.
+
+17 pruebas nuevas.
+
+---
+
 ### 26-08 (cierre) — Las doce ideas para el motor, implementadas
 
 Usted dijo «vamos a implementar todas las ideas». Quedaron **once de doce**. La
@@ -8648,7 +8938,162 @@ está a un clic.
 
 ---
 
+### 24 al 31-08-2026 — SIIFA: el balance de las cuatro IPS y el segundo cargue de Socorro
+
+**El balance cerró redondo (24-08):** con la opción [B] se cruzaron las
+cuatro IPS — **nada del corte quedó sin responder en ninguna**. Total al
+corte: 65.088 seguimientos por $3.321 millones, todos respondidos. Salieron
+los informes Word (consolidado y el de solo-pendientes).
+
+**SANITAS no para (24 al 31-08):** en una semana le cargó a Socorro
+**3.345 glosas nuevas por $148,6 millones** (más 847 devoluciones por
+$7,9 millones que siguen pendientes de código). El flujo con `--sin-respuesta`
+(bajar de SIIFA solo lo pendiente) demostró ser el camino rápido para los
+cortes semanales.
+
+**Segundo cargue de Socorro (31-08): 3.355 respuestas por $158.713.879 en
+7 minutos 20 segundos, cero errores.** El archivo llegó de la clínica con
+las columnas `respuesta`/`codigo` diligenciadas; la revisión previa recortó
+32 textos de la factura DHMB1164677 que pasaban de 1.500 caracteres.
+
+**Hallazgo del catálogo — RE9702 es el código de GLOSA ACEPTADA.** Una línea
+del archivo venía aceptando (DHMB1165885, $42.800) con RE9702 y SIIFA la
+tomó. Confirma el patrón: terminación 01 = devolución, 02 = glosa
+(RE9701↔RE9702 aceptada; RE9601↔RE9602 injustificada). Los grupos de glosa
+del catálogo de la API vuelven vacíos: quedó documentado en
+`docs/CONTEXTO_SIIFA.md`.
+
+**También esta semana:** semáforo del HUS al 24-08 (2.657 respondidas con la
+EPS en mora por $458 millones —SANITAS $394M—; las 4 devoluciones ratificadas
+seguían sin subsanar y la glosa SOAT HUS538952 vencida sin responder);
+desgloses por EPS de lo respondido (51.381 por $2.284 millones, 99% SANITAS)
+y de lo pendiente; y la **landing page del servicio** (borrador «Glosa Cero»,
+artefacto privado con los números anonimizados) con su análisis de precios.
+
+---
+
+### 31-08 (tarde) — «La glosan dos veces y acá me aparece una sola vez»
+
+Yesid buscó la **HUS406687** teniendo escogido arriba el paquete **31073** y la
+pantalla le contestó: *«La factura HUS406687 no está en ningún paquete
+cargado»*. **Era mentira.** La factura sí estaba cargada, pero en el paquete
+**31078**, con sus dos glosas por $174.200.
+
+**Por qué importa.** El ADRES glosa la misma factura en más de un paquete. La
+pantalla de Glosas ADRES trabaja sobre el paquete que uno escoge arriba, y con
+ese mensaje el auditor se queda creyendo que esa glosa nunca llegó: no se
+responde, y se pierde por tiempo.
+
+**Lo que quedó:**
+
+1. **La pantalla dice la verdad.** Si la factura no está en el paquete escogido
+   pero sí en otro, sale: *«no está en el paquete que tiene escogido arriba,
+   pero sí está en este»* con un botón **«Ver en el paquete 31078 · 2 glosas ·
+   $174.200»** que cambia el paquete y la trae. Si de verdad no está en ninguno,
+   el mensaje de siempre.
+2. **La ficha avisa cuando la factura está en dos paquetes.** Un recuadro
+   morado: *«Esta factura también tiene glosas en el paquete X (N glosas, $…).
+   Lo que se responda acá no cubre esas: hay que trabajarlas en su paquete»*,
+   con botón para saltar.
+3. **Un comando para revisarlo desde el PC**, que no cambia nada:
+
+       venv\Scripts\python.exe tools\glosas_adres_donde_esta.py HUS406687
+
+   Dice en qué paquetes está y muestra **renglón por renglón** lo que el ADRES
+   glosó en cada uno, marcando con «·» los renglones que no suman (el mismo
+   servicio glosado con otra causal). Es lo que responde de una la pregunta de
+   si una factura viene glosada dos veces o una sola.
+
+18 pruebas nuevas.
+
+---
+
+### 31-08 (noche) — «¿Por qué me salen otros auditores?»: el aviso de firma
+
+Yesid mostró el historial de la HUS0000554177: la devolución quedó firmada por
+**LAURA DIAZ** y la hizo otro gestor. Es el mismo mal del 25-08 (Vanesa y
+Óscar): el sistema firma cada movimiento con la **sesión abierta en el
+navegador**, no con quién está sentado al computador — y la sesión dura 8
+horas, así que una sesión olvidada firma por otros el resto del día. La regla
+de oficina («cada uno con su usuario y cerrar sesión») ya demostró que sola no
+alcanza.
+
+**El control que escogió Yesid:** antes de firmar, la pantalla lo dice grande.
+En los tres puntos de la pre-auditoría donde se firma —la ventana de auditar
+(radicar / devolver / dejar pendiente), el paso 4 «Cargar envío» y el paso 3
+«Registrar oficio»— ahora sale un recuadro azul:
+
+> ✍️ **Quedará firmado por: LAURA DIAZ** · No soy yo — cambiar de usuario
+
+El enlace cierra la sesión equivocada y lleva al login, de una. Quien sí es,
+no hace ningún clic de más.
+
+**Para averiguar quién tenía la sesión** en un caso ya ocurrido sigue
+sirviendo el comando de solo lectura:
+
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py FHUS-AS-I01261-26
+
+**Lo que quedó pendiente de decidir** (se le propusieron y no los escogió por
+ahora): cierre de sesión por inactividad, y que coordinación pueda corregir
+una firma ya guardada dejando rastro.
+
+8 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
+
+### Curso de noruego (31-08, noche)
+- **Probarlo en SU celular.** Aquí se probó en un navegador de celular
+  simulado; falta verlo en el teléfono real: que se instale con «Agregar a la
+  pantalla de inicio» (Android: los tres puntos; iPhone: el botón de
+  compartir), que se oiga la voz noruega y que el avance siga ahí al día
+  siguiente. **Si esa opción no aparece, es que la página no cargó** — revise
+  el wifi y el enlace, no el celular.
+- **~~Ningún botón de altavoz funcionaba~~ — ARREGLADO (esta era la de fondo).**
+  Los doce botones 🔊 de la aplicación estaban mudos: «Toca para oír», los de
+  «más despacio», los del recuadro de respuesta y los del diccionario, la
+  gramática y las conversaciones. Un error de escritura del programa hacía que
+  el navegador cortara la orden por la mitad y el botón no hiciera nada. Lo
+  único que sí sonaba era lo que no pasaba por un botón. Ya quedó, y ahora
+  todos los botones que hablan salen de un mismo sitio para que no vuelva a
+  pasar de a uno.
+
+- **~~En «escucha y elige» la palabra no sonaba al aparecer~~ — ARREGLADO.**
+  Solo se oía al pulsar «Comprobar», así que el ejercicio se resolvía leyendo en
+  vez de escuchando. La orden de reproducir estaba escrita en el programa pero
+  no la disparaba nadie. Ya suena sola al aparecer el ejercicio —también en los
+  de pronunciación— y no se repite cada vez que uno toca una opción.
+
+- **El computador del hospital NO deja instalar la voz.** Se intentó por el
+  camino correcto (Configuración → Hora e idioma → Voz → Agregar voces) y
+  Windows contestó «No se pudo instalar el paquete de voz». Los dos paquetes
+  salían en 0 MB, hasta el de español: ese equipo no baja contenido de idioma.
+  **No es la aplicación ni un error suyo**, es que en los equipos del dominio
+  las actualizaciones pasan por el servidor de Sistemas y ese servidor bloquea
+  estos paquetes. Para arreglarlo hay que **pedírselo a Sistemas** (la directiva
+  de «componentes opcionales», que se bajen de Windows Update y no de WSUS).
+  **Mientras tanto, la voz sí funciona en el celular**, que es donde la
+  aplicación está pensada para usarse. Sin voz, la aplicación se sigue pudiendo
+  usar: muestra la palabra escrita en vez de dejar el ejercicio sin respuesta.
+
+- **Instalar la voz noruega donde no la haya.** El computador del hospital no
+  la trae, y por eso el audio salió apagado en la primera prueba. **Ahora la
+  propia aplicación dice dónde se instala**, distinto en cada aparato: en
+  Windows es Configuración → Hora e idioma → **Voz** → Administrar voces →
+  Agregar voces → «Noruego (Bokmål)», y después cerrar el navegador por
+  completo. **Por ahí y no por «Agregar idioma»:** en esa otra pantalla la
+  casilla se llama «Texto a voz» (no «Voz») y al lado está «Establecer como mi
+  idioma de presentación de Windows», que si se marca por error deja todo el
+  computador del hospital en noruego. En Android, Ajustes → Idiomas → Salida de
+  texto a voz. Sin la voz, los ejercicios de escuchar muestran el texto en vez
+  de sonar: la aplicación lo avisa y no se traba.
+- **Más material para los niveles altos.** Los módulos B2 y C2 funcionan, pero
+  con el vocabulario que hay hoy. Se agregan palabras desde el propio panel de
+  la aplicación, sin tocar programación.
+- **La pronunciación escrita es aproximada.** Cuando haya con quién
+  confirmarla (un hablante o un curso formal), conviene repasarla.
+
 
 ### Objeciones del ADRES en DGH (28-08, al cierre)
 - **~~Cargar las 40 facturas que faltan~~ — HECHO en su mayor parte.** Al cierre
@@ -9392,6 +9837,27 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
+### Curso de noruego — lo primero
+1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en
+   **`tools\NORUEGO.cmd`**. El bot escribe en pantalla **una sola línea** que
+   empieza por `http://` y termina en `index.html`: **esa** es la que se copia
+   en el navegador del celular. Aquí no se pone ningún ejemplo a propósito —
+   dos veces se copió el ejemplo en vez del número propio.
+
+2. **Si el celular dice «tardó demasiado en responder»**, el enlace está bien
+   y lo que falla es la red. Por orden: abrir el puerto en el firewall de
+   Windows (el bot muestra el comando, se corre como administrador), revisar
+   que el celular no esté en el wifi de invitados, y si nada de eso sirve,
+   entrar por la **misma dirección con la que se usa el Motor de Glosas desde
+   fuera del hospital**, cambiándole el final por `/static/noruego/index.html`.
+   Esa última funciona hasta con datos del celular.
+3. **Instalarla en el celular** con «Agregar a la pantalla de inicio» y hacer
+   **la primera lección completa**. Si algo se ve mal o un ejercicio no se
+   puede responder, mande la foto de la pantalla.
+4. **Comprobar el sonido.** Si en los ejercicios de escuchar sale el aviso de
+   que no hay voz noruega, instale la voz (ver PENDIENTE) y vuelva a entrar.
+
+
 ### Objeciones del ADRES en DGH — lo primero del día siguiente
 
 **1. Subir la HUS0000378444.** Es lo único del cargue que quedó armado y sin
@@ -9651,11 +10117,15 @@ solo renglón, dígalo y se hace.
   sale al final del dictamen, con la factura ya puesta. Si lo echa de menos,
   dígalo y se devuelve.
 
-**SIIFA (lo primero, 19-08):** (a) tramitar a mano en el portal las 4
-devoluciones ratificadas de SANITAS del HUS ($14.049.088, pendiente #11);
-(b) cerrar Guane (salida del cargue + informe); (c) correr el **balance**
-de las cuatro IPS con la opción [B] del bot — de ahí sale qué quedó sin
-responder y qué nuevo hay que trabajar.
+**SIIFA (actualizado 31-08):** (a) las **4 devoluciones ratificadas de
+SANITAS del HUS ($14.049.088)** siguen pendientes de trámite MANUAL en el
+portal — vencidas, es lo más urgente; (b) definir el código de las **847
+devoluciones de SANITAS en Socorro ($7,9 millones)** (RE9601 injustificada /
+RE9501 fuera de términos / RE9701 aceptar) y cargarlas; (c) responder lo
+del HUS al corte 24-08 (la glosa SOAT HUS538952 vencida y las ~9 nuevas) y
+las 12 de Girón + 20 de Guane; (d) verificación final del cargue 2 de
+Socorro (`--sin-respuesta`: deben quedar solo las devoluciones); (e) revisión
+de novedades semanal en las cuatro — SANITAS carga a diario.
 
 **Glosas ADRES (mismo día, otro frente):**
 

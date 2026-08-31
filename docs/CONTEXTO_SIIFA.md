@@ -283,6 +283,24 @@ Cuál usar, según lo que diga el texto de la respuesta:
 motor para no aceptar una glosa— hace que SIIFA rechace la respuesta con
 «no pertenece al grupo RESPUESTA_DEV_PTS_PSS».
 
+### Los códigos de respuesta a una GLOSA (confirmados en la práctica)
+
+**El catálogo de la API no los entrega**: los grupos `RESPUESTA_GLOSA`,
+`RESPUESTA` y similares vuelven **vacíos** (comprobado el 31-08-2026 con
+`--listar-catalogo`). Los códigos se confirmaron por la otra vía: la lista
+desplegable del portal y las escrituras que SIIFA aceptó.
+
+| Código | Qué dice | Comprobado |
+|---|---|---|
+| `RE9901` | El hospital **no acepta** la glosa y se mantiene en su respuesta. | Decenas de miles de cargues del HUS y las tres clínicas. |
+| `RE9602` | El hospital **no acepta**: aporta la evidencia de que la glosa es injustificada. | Cargues de HUS y Guane. |
+| `RE9702` | El hospital **ACEPTA la glosa** (el espejo de RE9701, que acepta la devolución). | Piloto manual del 03-08 (HUS497119, elegido en el desplegable del portal) y cargue del 31-08 en Socorro (DHMB1165885, la API lo aceptó). |
+
+La regla nemotécnica del catálogo: **terminación 01 = devolución,
+terminación 02 = glosa** (RE9601↔RE9602 injustificada, RE9701↔RE9702
+aceptada). Ojo: una glosa respondida con RE9702 queda **aceptada** — esa
+plata no se pelea más; SIIFA no deja modificar una respuesta enviada.
+
 ## 5.ter) Cómo se responde A MANO en el portal (guía del auditor, 03-08-2026)
 
 Es el procedimiento que el bot replica por API. Sirve para el piloto, para

@@ -442,6 +442,33 @@ function mostrarResultado(d){
     om.innerHTML = html;
   }
 
+  // 31-08-2026 — PEDIR EL DATO QUE FALTA, DONDE FALTA.
+  // En el export real del hospital, 59 de 135 glosas entraron SIN CÓDIGO DE
+  // CAUSAL — el 44 %. Sin causal el motor redacta a ciegas: contesta la forma
+  // cuando la glosa era de fondo, o alega soportes cuando lo que objetaron
+  // fue la tarifa. Y entraban en silencio.
+  // Esto NO lo arregla ningún cambio de código: el dato no viene en el
+  // archivo. Lo que hace este aviso es darle al auditor la cifra y los
+  // ejemplos para que el reclamo salga con evidencia y no con una impresión.
+  const nSc = d.sin_causal || 0;
+  if(nSc > 0){
+    const total = d.total || 0;
+    const pct = total ? Math.round(nSc * 100 / total) : 0;
+    const muestra = (d.sin_causal_detalle || []).slice(0, 6)
+      .map(x => x.factura + (x.entidad ? ' (' + x.entidad + ')' : '')).join(' · ');
+    const extra = nSc > 6 ? ' … y ' + (nSc - 6) + ' más' : '';
+    om.innerHTML += '<div style="background:#fbf1dc;border:1px solid #A67500;border-radius:8px;'
+      + 'padding:12px;color:#5c4200;font-size:13px;line-height:1.6;margin-top:10px">'
+      + '<b>! ' + nSc + ' de ' + total + ' glosas (' + pct + '%) entraron SIN código de causal.</b>'
+      + '<br>Sin la causal el motor no sabe contra qué está defendiendo: puede contestar la '
+      + 'forma cuando la glosa era de fondo, o alegar soportes cuando lo que objetaron fue '
+      + 'la tarifa.'
+      + '<br><br><b>Esto no se arregla desde el programa</b> — la columna de causal no viene '
+      + 'en el archivo. Pídale a quien lo envía que la incluya, y muéstrele esta cifra.'
+      + (muestra ? '<br><span style="font-size:12px;opacity:.85">Ejemplos: ' + muestra + extra + '</span>' : '')
+      + '</div>';
+  }
+
   const errs = document.getElementById('errores');
   errs.innerHTML = '';
   if(d.errores && d.errores.length){

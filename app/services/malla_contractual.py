@@ -457,8 +457,29 @@ MALLA: tuple[Contrato, ...] = (
 
 
 def _normalizar(texto: str) -> str:
+    """Deja el nombre del pagador comparable con el de la malla.
+
+    31-08-2026 — LOS PUNTOS ROMPÍAN EL MATCH, Y CON EL PAGADOR MÁS FRECUENTE.
+    En la base del hospital NUEVA EPS aparece escrita «NUEVA E.P.S. S.A. -
+    SUBSIDIADO». Como la comparación es por PALABRA COMPLETA, «E.P.S.» nunca
+    era «EPS» y esa entidad se quedaba sin ningún contrato: el motor la trataba
+    como si nunca hubiera existido relación contractual y liquidaba a SOAT
+    pleno, sin avisar siquiera que había un contrato.
+
+    Es el mismo daño que el contrato vencido pero peor, porque ni se nota.
+
+    Se quitan los puntos DENTRO de las siglas (E.P.S. → EPS, S.A. → SA) y se
+    normaliza la puntuación de separación a espacios. No se toca nada más: los
+    nombres siguen comparándose por palabra completa, que es lo que impide
+    darle a una glosa el contrato de otra entidad.
+    """
     t = (texto or "").strip().upper()
-    return t.translate(str.maketrans("ÁÉÍÓÚÜÑ", "AEIOUUN"))
+    t = t.translate(str.maketrans("ÁÉÍÓÚÜÑ", "AEIOUUN"))
+    # E.P.S. → EPS  ·  S.A.S → SAS  (punto entre dos letras sueltas)
+    t = re.sub(r"(?<=\b[A-Z])\.(?=[A-Z]\b|[A-Z]\.)", "", t)
+    # Lo que queda de puntuación separa palabras, no las pega.
+    t = re.sub(r"[.,;:/\\|]+", " ", t)
+    return re.sub(r"\s{2,}", " ", t).strip()
 
 
 def contratos_de(pagador: str) -> list[Contrato]:
@@ -471,6 +492,24 @@ def contratos_de(pagador: str) -> list[Contrato]:
     if not p:
         return []
     palabras = set(p.split())
+
+    # 31-08-2026 — LA ASEGURADORA SOAT NO ES EL MAGISTERIO.
+    #
+    # «LA PREVISORA» es alias de FOMAG en esta malla, y con razón: La Previsora
+    # administra el Fondo del Magisterio. Pero LA MISMA COMPAÑÍA es también una
+    # aseguradora SOAT, y ahí es otro pagador y otro régimen.
+    #
+    # Resultado: «LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB» recibía el
+    # contrato de FOMAG (factor 0.85, SOAT −15 %) cuando una reclamación SOAT
+    # se liquida a tarifa plena. Es darle a una glosa el contrato de otra
+    # entidad — justo lo que los guardianes de abajo existen para impedir— y
+    # pega donde más duele: en el export real de la base, ese pagador es el que
+    # más glosas tiene.
+    #
+    # La regla es de régimen, no de nombre propio: si el pagador se identifica
+    # a sí mismo como SOAT, ningún alias puede llevarlo a un contrato que no
+    # sea de SOAT. Vale para cualquier aseguradora, no solo para esta.
+    _es_soat = bool(re.search(r"(?<![A-Z0-9])SOAT(?![A-Z0-9])", p))
 
     def _como_palabra(aguja: str, pajar: str) -> bool:
         """`aguja` dentro de `pajar`, pero como palabra completa.
@@ -485,6 +524,11 @@ def contratos_de(pagador: str) -> list[Contrato]:
     def _encaja(nombre: str) -> bool:
         n = _normalizar(nombre)
         if not n:
+            return False
+        # Un pagador SOAT no puede caer en un contrato que no lo sea. El
+        # nombre canónico exacto sí manda: si alguien se llama literalmente
+        # así, es ese.
+        if _es_soat and n != p and not re.search(r"(?<![A-Z0-9])SOAT(?![A-Z0-9])", n):
             return False
         if n == p:
             return True

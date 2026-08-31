@@ -1,5 +1,219 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 6) — Todos los botones 🔊 estaban mudos
+
+La causa de fondo de todo el enredo de la voz.
+
+- **El navegador cortaba el manejador a la mitad.** Los botones se armaban con
+  `onclick="decir(${JSON.stringify(texto)})"`. `JSON.stringify` devuelve el
+  texto entre comillas **dobles**, y el atributo HTML también va entre comillas
+  dobles: el navegador leía `onclick="decir("gå")"`, lo cortaba en la primera
+  comilla, y el atributo quedaba en `decir(` — con su «Unexpected end of input»
+  en la consola. **Los 12 botones de audio de la aplicación no hacían nada**:
+  «Toca para oír», «🐢 Más despacio», «🔊 Oír» y «🐢 Despacio» del veredicto, y
+  los 🔊 del diccionario, la gramática y las conversaciones.
+- **Por qué costó tanto verlo.** Lo único que sí hablaba era lo que no pasa por
+  un atributo: el audio al acertar (se llama desde JavaScript) y, desde el
+  arreglo anterior, el automático al aparecer (va por un atributo de datos).
+- **Una sola puerta: `alPulsarDecir()`.** Escapa el JavaScript para HTML (`esc`
+  convierte la comilla en `&quot;`) y todos los botones que hablan salen de
+  ahí. De paso, el 🔊 de los errores recientes dejó de borrar los apóstrofos
+  del texto, que era lo que hacía para esquivar el problema.
+- **3 pruebas nuevas** (208): que ningún `onclick` lleve un `JSON.stringify` sin
+  escapar, que todos los botones salgan del ayudante y que el ayudante escape.
+
+Comprobado en Chromium con voz simulada: hablan los cinco sitios probados
+—automático, «Toca para oír», «Más despacio», «Oír» del veredicto y el 🔊 del
+diccionario— y el `onclick` ya llega entero (`decir("øl")`), sin errores.
+
+## Sesión 31-ago-2026 (noche 5) — «Escucha y elige» no sonaba al aparecer
+
+Fallo real reportado desde el uso: en los ejercicios de escucha la palabra
+**no se oía al aparecer el ejercicio**, solo al pulsar «Comprobar».
+
+- **Era código muerto.** `tras()` buscaba un elemento con `data-autoaudio` para
+  decirlo al pintar la pantalla… y **ningún ejercicio ponía ese atributo**. Lo
+  único que hablaba solo era `comprobar()`, que dice la palabra al acertar.
+  Resultado: «escucha y elige» funcionaba como «lee y elige».
+- **`audioGrande()` ahora sí lo marca**, y con ello quedan cubiertos los tres
+  ejercicios de oído que lo usan: `escuchar_opcion`, `escuchar_escribir` y
+  `pronunciar` (este último dice «escúchalo y repítelo», así que también debe
+  sonar solo).
+- **Dos condiciones para no molestar:**
+  - `data-audio-clave` (sesión + número de ejercicio) impide que la palabra se
+    repita **en cada toque de opción** — tocar una opción vuelve a pintar la
+    pantalla entera.
+  - No suena con la respuesta ya revelada: ahí ya habla `comprobar()`, y sonaría
+    dos veces encima.
+- **4 pruebas nuevas** (205) y comprobación en Chromium con una voz noruega
+  simulada: al aparecer el ejercicio dice `['øl']`, tras tocar dos opciones
+  sigue en `['øl']`, y al pasar al siguiente ejercicio de oído vuelve a hablar.
+
+## Sesión 31-ago-2026 (noche 4) — Windows no deja instalar la voz en el PC del hospital
+
+El usuario llegó al sitio correcto (Hora e idioma → Voz → Agregar voces) y
+Windows respondió **«No se pudo instalar el paquete de voz»**. Los dos paquetes
+listados —el noruego y el español— aparecían con **0 MB**: ese equipo no está
+descargando contenido de idioma en absoluto.
+
+- **La causa no es la aplicación ni el usuario.** Es un equipo de dominio
+  (`esehus.loc`): las actualizaciones pasan por el servidor de Sistemas, que
+  normalmente bloquea las *características a petición* (paquetes de voz e
+  idioma). Se habilita con la directiva «Especificar la configuración para la
+  instalación y la reparación de componentes opcionales», permitiendo bajar de
+  Windows Update en vez de WSUS. Eso lo hace Sistemas, no el usuario.
+- **El aviso de la app lo dice ahora.** En Windows, después de los pasos,
+  advierte del error exacto y ofrece la salida que sí funciona: el celular,
+  donde Android e iPhone traen la voz noruega.
+- **1 prueba nueva** (201): que el tramo de Windows nombre el error literal y
+  ofrezca el celular.
+
+La aplicación sigue siendo usable sin voz: los ejercicios de escuchar muestran
+la palabra escrita y la pronunciación aproximada sigue debajo de cada palabra.
+
+## Sesión 31-ago-2026 (noche 3) — La casilla de la voz en Windows no se llama así
+
+Corrección de una instrucción equivocada que se entregó al usuario.
+
+- **El nombre estaba mal.** La app decía «marcando **Voz** entre las funciones
+  opcionales». En esa pantalla de Windows la casilla se llama **«Texto a voz»**
+  — «Voz» a secas no existe ahí, y «Reconocimiento de voz» es otra cosa
+  (dictado).
+- **Y ese camino es peligroso.** En la misma pantalla de *Idioma y región →
+  Agregar idioma* está **«Establecer como mi idioma de presentación de
+  Windows»**: marcarla por error deja **todo el PC del hospital en noruego**.
+- **Se cambió al camino corto:** *Configuración → Hora e idioma → **Voz** →
+  Administrar voces → Agregar voces → «Noruego (Bokmål)»*. Instala solo la voz
+  y no toca el idioma del sistema.
+- La guía documenta los dos caminos y advierte del riesgo del primero.
+
+Comprobado en Chromium con user-agent de Windows: el aviso muestra el camino
+nuevo y ya no nombra el de «Idioma y región».
+
+## Sesión 31-ago-2026 (noche 2) — La voz noruega: aviso sin salida y voces tardías
+
+En la prueba real la app dijo «este dispositivo no tiene voz noruega» y ahí
+quedó: el usuario no tenía cómo saber que eso se instala.
+
+- **Fallo real: las voces llegan tarde y la pantalla no se redibujaba.** Chrome
+  entrega `speechSynthesis.getVoices()` de forma asíncrona; la primera llamada
+  casi siempre devuelve una lista vacía. Como el aviso se cocina al dibujar,
+  un aparato **que sí tiene** la voz veía «no hay voz» hasta cambiar de
+  pantalla. Ahora `onvoiceschanged` vuelve a dibujar cuando el resultado
+  cambia, y se abstiene si el usuario está escribiendo en un campo.
+- **`comoInstalarVoz()`: instrucciones según el aparato.** Los avisos nombraban
+  solo Android e iPhone. Se agregaron **Windows** (Configuración → Hora e
+  idioma → Agregar idioma → Norsk bokmål, marcando «Voz», y cerrar el navegador
+  por completo) y **macOS**, más un texto genérico. Los tres avisos de audio
+  apagado —inicio, ejercicio de escucha y perfil— dicen ahora cómo arreglarlo.
+- **4 pruebas nuevas** (200): que la búsqueda acepte las tres etiquetas del
+  noruego (`nb`, `no`, `nn`), que la pantalla se redibuje al llegar las voces
+  sin borrar lo escrito, que estén los cuatro sistemas y que ningún aviso quede
+  sin salida.
+
+## Sesión 31-ago-2026 (noche) — La guía hacía copiar una dirección que no era
+
+Segunda vuelta del mismo problema, en la prueba real.
+
+- **Se quitó toda dirección de ejemplo** de la guía y del bot. La guía traía
+  `http://192.168.1.15:8000/...` como muestra, con la advertencia de no
+  copiarla; se copió igual (la máquina real era `172.17.80.25`). Antes había
+  pasado lo mismo con `LA-IP-DE-ARRIBA` y con `ESE-NUMERO`. La conclusión: una
+  dirección impresa como ejemplo termina escrita en el navegador, así que no
+  puede haber ninguna — la instrucción ahora es «copie **la línea que muestra
+  su ventana**».
+- **El bot explica el `ERR_CONNECTION_TIMED_OUT`.** Ese error no es del enlace
+  sino de la red: firewall de Windows (con el `New-NetFirewallRule` listo para
+  pegar), celular en otra red, o wifi y cable separados en el hospital.
+- **Salida por el túnel.** Como `app/` monta `/static` desde el disco, el
+  servidor que ya se ve desde fuera del hospital sirve también la aplicación:
+  la dirección de siempre con `/static/noruego/index.html` al final. Sin
+  firewall, sin wifi y sin reiniciar nada.
+- **3 pruebas nuevas** (196): un `re` rechaza cualquier `http://n.n.n.n:puerto/`
+  en la guía y en el bot, y se exige que el bot traiga la regla de firewall.
+
+## Sesión 31-ago-2026 (tarde) — El bot de noruego no mostraba la dirección
+
+Arreglo de la primera prueba real en el PC de cartera.
+
+- **`tools/NORUEGO.cmd` imprimía la ayuda de `ipconfig` en vez de la IP.** La
+  línea era `ipconfig ^| findstr /C:"IPv4"`: el `^|` solo va escapado dentro de
+  un `for /f`; suelto, el `|` le llega a `ipconfig` como argumento. Como no
+  salía la dirección, el bot igual mostraba el texto de relleno
+  `http://LA-IP-DE-ARRIBA:8000/...` — y eso fue literalmente lo que se escribió
+  en Chrome (`DNS_PROBE_FINISHED_NXDOMAIN`).
+- **Nuevo `noruego/red.py` + `python -m noruego direccion`.** La IP se averigua
+  abriendo un socket UDP hacia `8.8.8.8` sin enviar ningún byte (en UDP,
+  `connect()` solo fija la ruta local): funciona sin internet, no genera tráfico
+  y no depende del idioma de Windows ni de cuántos adaptadores tenga el equipo.
+  El comando imprime el **enlace completo**, listo para copiar; sin red no
+  imprime nada y devuelve 1.
+- **El bot y `exportar` ya no muestran texto de relleno** cuando pueden mostrar
+  el enlace real. El relleno que queda (`ESE-NUMERO`) solo aparece si de verdad
+  no hubo IP, y va acompañado de cómo conseguirla.
+- **Se explica dónde está «Agregar a la pantalla de inicio»:** Android (Chrome)
+  en los tres puntos, iPhone (Safari) en el botón de compartir. En el computador
+  no aplica — se abre `static\noruego\index.html` con doble clic. Se buscó esa
+  opción en el Chrome de escritorio, donde no existe con ese nombre.
+- **26 pruebas nuevas** (193 en `tests/test_noruego`): `test_red.py` comprueba
+  que no salga tráfico, que sin red no reviente y que nunca se ofrezca una IP de
+  loopback; `test_bots_windows.py` rechaza el `^|` fuera de un `for /f`, el
+  texto de relleno viejo, los finales de línea LF y los subcomandos inexistentes.
+
+## Sesión 31-ago-2026 — Curso de noruego (`noruego/`)
+
+Aplicación web para aprender noruego bokmål desde cero, para hispanohablantes,
+instalable en el celular (PWA) y funcional sin internet. Módulo independiente:
+no importa nada de `app/` ni de `tools/` y solo usa la librería estándar.
+
+### Contenido
+- **423 elementos de léxico** en JSON: 133 sustantivos con género y las cuatro
+  formas, 69 verbos con sus cuatro tiempos y su grupo, 40 adjetivos con las tres
+  formas, 85 frases de uso real, 42 números, 13 guías de pronunciación, 29
+  reglas de gramática (con ejemplo, error típico y comparación con el español) y
+  12 conversaciones de situaciones reales.
+- **18 módulos y 73 lecciones**, de nivel cero a B2, con la estructura definida
+  hasta C2.
+
+### Motor
+- Los ejercicios **se generan a partir de los datos**, no se escriben a mano:
+  de «bil es masculino y su definido es bilen» salen solos el ejercicio de
+  género, el de forma, el de traducción, el de escucha y el de parejas. 875
+  ejercicios por variante, 3 variantes por lección (2.625 en total).
+- 15 tipos de ejercicio: opción, completar, ordenar, traducir en las dos
+  direcciones, escuchar y elegir, escuchar y escribir, parejas, conjugar,
+  género, forma nominal, encontrar el error, diálogo, lectura y pronunciación.
+
+### Aplicación
+- Mobile first: barra inferior, botones de 52 px, zona segura del iPhone,
+  vibración, atajos de teclado.
+- Repetición espaciada que decide sola qué repasar, con detección de palabras
+  difíciles.
+- XP, niveles de jugador, racha, objetivo diario, corazones, estrellas, 10
+  logros y desbloqueo progresivo.
+- Audio con la voz del propio dispositivo (`nb-NO`). **Si no hay voz noruega,
+  muestra el texto y lo dice**, en vez de leer con acento español.
+- Diccionario buscable, gramática explicada, conversaciones, estadísticas con
+  calendario de constancia, copia de seguridad y panel para agregar contenido
+  sin tocar código.
+- PWA: manifest, service worker con caché e iconos generados.
+
+### Correcciones encontradas durante el desarrollo
+- `fuentes=("frases")` era una cadena, no una tupla: al recorrerla daba letras
+  sueltas y dejaba lecciones sin material.
+- El tipo de ejercicio rotaba con los ejercicios ya generados, así que un tipo
+  imposible de construir con ese material **bloqueaba el ciclo entero**: 27
+  lecciones quedaban casi vacías. Ahora rota con los intentos.
+- Sin voz noruega instalada, los ejercicios de escucha eran imposibles de
+  responder. Ahora muestran el texto como respaldo.
+
+### Pruebas
+167 pruebas en `tests/test_noruego/`; `ruff` limpio. Recorrido completo
+verificado en Chromium emulando un celular: alta de usuario, tres lecciones
+completas, XP, logros, diccionario, gramática, conversaciones, perfil, panel de
+contenido y **persistencia tras recargar**, sin errores de JavaScript y sin
+desbordamiento horizontal.
+
 ## Sesión 26-ago-2026 (cierre 7) — un solo vocabulario de color
 
 Idea #12, decidida por el área. **Corrige lo que la propuesta afirmaba:** que
