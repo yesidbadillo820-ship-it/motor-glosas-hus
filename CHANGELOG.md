@@ -1,5 +1,28 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 5) — «Escucha y elige» no sonaba al aparecer
+
+Fallo real reportado desde el uso: en los ejercicios de escucha la palabra
+**no se oía al aparecer el ejercicio**, solo al pulsar «Comprobar».
+
+- **Era código muerto.** `tras()` buscaba un elemento con `data-autoaudio` para
+  decirlo al pintar la pantalla… y **ningún ejercicio ponía ese atributo**. Lo
+  único que hablaba solo era `comprobar()`, que dice la palabra al acertar.
+  Resultado: «escucha y elige» funcionaba como «lee y elige».
+- **`audioGrande()` ahora sí lo marca**, y con ello quedan cubiertos los tres
+  ejercicios de oído que lo usan: `escuchar_opcion`, `escuchar_escribir` y
+  `pronunciar` (este último dice «escúchalo y repítelo», así que también debe
+  sonar solo).
+- **Dos condiciones para no molestar:**
+  - `data-audio-clave` (sesión + número de ejercicio) impide que la palabra se
+    repita **en cada toque de opción** — tocar una opción vuelve a pintar la
+    pantalla entera.
+  - No suena con la respuesta ya revelada: ahí ya habla `comprobar()`, y sonaría
+    dos veces encima.
+- **4 pruebas nuevas** (205) y comprobación en Chromium con una voz noruega
+  simulada: al aparecer el ejercicio dice `['øl']`, tras tocar dos opciones
+  sigue en `['øl']`, y al pasar al siguiente ejercicio de oído vuelve a hablar.
+
 ## Sesión 31-ago-2026 (noche 4) — Windows no deja instalar la voz en el PC del hospital
 
 El usuario llegó al sitio correcto (Hora e idioma → Voz → Agregar voces) y
