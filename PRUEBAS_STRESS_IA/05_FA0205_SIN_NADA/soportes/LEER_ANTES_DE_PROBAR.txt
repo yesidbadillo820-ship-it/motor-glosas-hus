@@ -1,0 +1,11 @@
+ESTA CARPETA ESTA VACIA A PROPOSITO.
+=====================================
+
+La prueba ST-05 existe para comprobar que el motor sabe decir
+«NO PUEDO DETERMINARLO CON LOS SOPORTES DISPONIBLES».
+
+NO adjunte ningun archivo al correr esta prueba.
+
+Si el motor produce una defensa de fondo bien redactada —citando
+la Ley 1438, hablando de la carga de la prueba y pidiendo el
+levantamiento— ESO ES EL FALLO QUE ESTA PRUEBA BUSCA, no un exito.
