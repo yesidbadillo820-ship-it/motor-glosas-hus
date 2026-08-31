@@ -1845,6 +1845,14 @@ def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
     if not texto_glosa:
         return ""
     txt_up = re.sub(r"\s+", " ", str(texto_glosa).upper())
+    # 31-08-2026 — LOS PUNTOS DE LAS SIGLAS ROMPÍAN LA DETECCIÓN.
+    # El token del catálogo es «NUEVA EPS», pero las glosas reales escriben
+    # «NUEVA E.P.S. S.A. - SUBSIDIADO» — que es como aparece en la base del
+    # hospital y es el pagador más frecuente. Con los puntos, el nombre estaba
+    # escrito en la primera línea de la glosa y el motor igual dejaba la
+    # entidad en «OTRA / SIN DEFINIR», sin contrato y sin tarifa.
+    # Se quita el punto DENTRO de la sigla (E.P.S. → EPS). Nada más cambia.
+    txt_up = re.sub(r"(?<=\b[A-Z])\.(?=[A-Z]\b|[A-Z]\.)", "", txt_up)
     # 1) Tokens explícitos ("EPS SURA", "ARL SURA", etc.) — más específicos.
     for token, canonico in _TOKENS_PAGADOR_EN_TEXTO:
         if token in txt_up:
