@@ -581,6 +581,25 @@ function decir(texto, velocidad){
     return true;
   }catch(e){ return false; }
 }
+/** El atributo onclick para pronunciar un texto.
+ *
+ *  ESTO TUVO MUDOS TODOS LOS BOTONES 🔊 DE LA APLICACIÓN. `JSON.stringify`
+ *  devuelve el texto entre comillas DOBLES, y el atributo HTML también va
+ *  entre comillas dobles: el navegador lee `onclick="decir("gå")"` y lo corta
+ *  en la primera comilla, así que el atributo queda en «decir(» y el botón no
+ *  hace absolutamente nada (además de un «Unexpected end of input» en la
+ *  consola). Sonaba el audio automático, que va por un atributo de datos, y
+ *  el de acertar, que se llama desde JavaScript — por eso costó verlo.
+ *
+ *  La solución es escapar el JavaScript para HTML: `esc` convierte la comilla
+ *  en `&quot;` y el navegador se lo devuelve entero al motor de JavaScript.
+ *  Todo botón que hable tiene que salir de aquí.
+ */
+function alPulsarDecir(texto, velocidad){
+  const js = "decir(" + JSON.stringify(String(texto == null ? "" : texto))
+    + (velocidad ? ", " + velocidad : "") + ")";
+  return `onclick="${esc(js)}"`;
+}
 function vibrar(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
 
 /* ------------------------------------------------------------ utilidades - */
@@ -720,7 +739,7 @@ function vInicio(){
       <h2 style="margin-bottom:var(--s3)">Lo que se te atravesó</h2>` +
       errores.map(er => `<div class="ejemplo"><div class="tx">
         <div class="no">${esc(er.no)}</div><div class="es">${esc(er.es)}</div></div>
-        <button class="audio-btn chico" onclick="decir('${esc(er.no).replace(/'/g,"")}')">🔊</button>
+        <button class="audio-btn chico" ${alPulsarDecir(er.no)}>🔊</button>
       </div>`).join("") + `</div>`;
   }
   if(!hayVoz()){
@@ -907,7 +926,7 @@ function audioGrande(texto, etiqueta){
   const solo = (s && !s.mostrando && hayVoz())
     ? ` data-autoaudio="${esc(texto)}" data-audio-clave="${s.inicio}#${s.i}"`
     : "";
-  let h = `<button class="audio-btn"${solo} onclick="decir(${JSON.stringify(texto)})"
+  let h = `<button class="audio-btn"${solo} ${alPulsarDecir(texto)}
     aria-label="Escuchar">🔊<span class="mini" style="margin-left:8px">${etiqueta||"Escuchar"}</span></button>`;
   if(!hayVoz()){
     // Sin voz noruega instalada, un ejercicio de escucha sería imposible de
@@ -926,7 +945,7 @@ function cuerpoOpciones(e){
   if(e.tipo === "escuchar_opcion"){
     h += audioGrande(e.audio, "Toca para oír");
     h += `<p class="tenue mini centro" style="margin-top:calc(var(--s3)*-1)">
-      <button class="fantasma mini" onclick="decir(${JSON.stringify(e.audio)}, 0.55)">🐢 Más despacio</button></p>`;
+      <button class="fantasma mini" ${alPulsarDecir(e.audio, 0.55)}>🐢 Más despacio</button></p>`;
   } else if(e.contexto){
     h += `<div class="material${e.tipo==="completar"||e.tipo==="dialogo"?"":" grande"}">${esc(e.contexto)}</div>`;
   }
@@ -950,7 +969,7 @@ function cuerpoEscrita(e){
   if(e.tipo === "escuchar_escribir"){
     h += audioGrande(e.audio, "Toca para oír");
     h += `<p class="centro" style="margin-top:calc(var(--s3)*-1)">
-      <button class="fantasma mini" onclick="decir(${JSON.stringify(e.audio)}, 0.55)">🐢 Más despacio</button></p>`;
+      <button class="fantasma mini" ${alPulsarDecir(e.audio, 0.55)}>🐢 Más despacio</button></p>`;
   } else if(e.contexto){
     h += `<div class="material grande">${esc(e.contexto)}</div>`;
   }
@@ -1027,7 +1046,7 @@ function tocarPareja(lado, i){
 function cuerpoPronunciar(e){
   let h = `<div class="material grande">${esc(e.contexto || e.audio)}</div>`;
   h += audioGrande(e.audio, "Escúchalo");
-  h += `<p class="centro"><button class="fantasma" onclick="decir(${JSON.stringify(e.audio)}, 0.5)">
+  h += `<p class="centro"><button class="fantasma" ${alPulsarDecir(e.audio, 0.5)}>
     🐢 Más despacio</button></p>`;
   if(e.pista) h += `<div class="tarjeta plana centro"><div class="rot">Aproximación</div>
     <div style="font-family:var(--mono);font-size:1.2rem;font-weight:700">${esc(e.pista)}</div>
@@ -1089,8 +1108,8 @@ function panelVeredicto(e){
     h += `<div class="dato">Respuesta correcta: <b>${esc(correcto)}</b></div>`;
   if(e.explicacion) h += `<div class="dato">${esc(e.explicacion)}</div>`;
   if(e.audio) h += `<div class="fila-btn" style="margin-bottom:var(--s3)">
-    <button class="fantasma" onclick="decir(${JSON.stringify(e.audio)})">🔊 Oír</button>
-    <button class="fantasma" onclick="decir(${JSON.stringify(e.audio)},0.55)">🐢 Despacio</button></div>`;
+    <button class="fantasma" ${alPulsarDecir(e.audio)}>🔊 Oír</button>
+    <button class="fantasma" ${alPulsarDecir(e.audio, 0.55)}>🐢 Despacio</button></div>`;
   h += `<button class="pri blq" onclick="siguiente()" data-autofoco>Continuar</button>
     </div></div>`;
   return h;
@@ -1166,7 +1185,7 @@ function vResultado(){
       dif.map(id => { const w = LEXICO_POR_ID[id]; if(!w) return "";
         return `<div class="ejemplo"><div class="tx"><div class="no">${esc(textoNoruego(w))}</div>
           <div class="es">${esc(w.es||"")}</div></div>
-          <button class="audio-btn chico" onclick="decir(${JSON.stringify(textoNoruego(w))})">🔊</button></div>`;
+          <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>🔊</button></div>`;
       }).join("") + `</div>`;
   }
 
@@ -1205,7 +1224,7 @@ function vRepaso(){
           <b>${esc(textoNoruego(w))}</b><div class="es">${esc(w.es||"")}</div>
           <div class="pr">${esc(w.pron||"")}</div></div>
           <span class="ficha rojo">${t.fallos} ${plural(t.fallos,"fallo","fallos")}</span>
-          <button class="audio-btn chico" onclick="decir(${JSON.stringify(textoNoruego(w))})">🔊</button>
+          <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>🔊</button>
         </div>`; }).join("") + `</div>`;
   }
 
@@ -1272,7 +1291,7 @@ function filasDiccionario(lista){
       : w._tipo === "verbos" ? `å ${w.inf} · ${w.pres} · ${w.pas} · ${w.perf}`
       : w._tipo === "adjetivos" ? `${w.base} · ${w.neutro} · ${w.plural}` : "";
     return `<div class="palabra-fila">
-      <button class="audio-btn chico" onclick="decir(${JSON.stringify(textoNoruego(w))})">🔊</button>
+      <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>🔊</button>
       <div class="tx"><b>${esc(textoNoruego(w))}</b>
         <div class="es">${esc(w.es||"")}</div>
         ${w.pron ? `<div class="pr">≈ ${esc(w.pron)}</div>` : ""}
@@ -1326,7 +1345,7 @@ function vGramatica(){
         ${r.regla ? `<div class="caja"><span class="rot">La regla</span><br>
           <b style="font-family:var(--mono)">${esc(r.regla)}</b></div>` : ""}
         ${r.ejemplos.map(e => `<div class="ejemplo">
-          <button class="audio-btn chico" onclick="decir(${JSON.stringify(e.no)})">🔊</button>
+          <button class="audio-btn chico" ${alPulsarDecir(e.no)}>🔊</button>
           <div class="tx"><div class="no">${esc(e.no)}</div>
           <div class="es">${esc(e.es)}</div>
           ${e.pron ? `<div class="pr">≈ ${esc(e.pron)}</div>` : ""}</div></div>`).join("")}
@@ -1344,7 +1363,7 @@ function vGramatica(){
       h += `<div class="tarjeta"><h3>${esc(s.letra)} — ${esc(s.nombre)}</h3>
         <p class="tenue mini" style="margin:var(--s2) 0">${esc(s.como)}</p>` +
         s.ejemplos.map(e => `<div class="ejemplo">
-          <button class="audio-btn chico" onclick="decir(${JSON.stringify(e.no)})">🔊</button>
+          <button class="audio-btn chico" ${alPulsarDecir(e.no)}>🔊</button>
           <div class="tx"><div class="no">${esc(e.no)}</div><div class="es">${esc(e.es)}</div>
           <div class="pr">≈ ${esc(e.pron)}</div></div></div>`).join("") +
         `<div class="caja" style="background:var(--sup2);border-radius:var(--r2);
@@ -1387,7 +1406,7 @@ function vDialogo(id){
     h += `<div class="tarjeta ${mio?"acento":"plana"}" style="margin-bottom:var(--s2)">
       <div class="rot">${esc(l.quien)}</div>
       <div style="display:flex;gap:var(--s3);align-items:flex-start;margin-top:4px">
-        <button class="audio-btn chico" onclick="decir(${JSON.stringify(l.no)})">🔊</button>
+        <button class="audio-btn chico" ${alPulsarDecir(l.no)}>🔊</button>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:1.05rem">${esc(l.no)}</div>
           <div class="tenue mini">${esc(l.es)}</div>
@@ -1488,7 +1507,7 @@ function vPerfil(){
         : `No se encontró voz noruega en este dispositivo, así que el audio está
            apagado y solo verás la pronunciación aproximada. Se instala
            ${comoInstalarVoz()}.`}</p>
-      <button class="blq" onclick="decir('Hei! Jeg snakker norsk.')">🔊 Probar el audio</button></div>
+      <button class="blq" ${alPulsarDecir('Hei! Jeg snakker norsk.')}>🔊 Probar el audio</button></div>
     <div class="tarjeta"><div class="rot">Tu avance</div>
       <p class="tenue mini">Todo vive solo en este navegador. Si cambias de teléfono o borras
       los datos de navegación, se pierde. Sácale copia de vez en cuando.</p>

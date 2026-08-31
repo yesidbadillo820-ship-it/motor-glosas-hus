@@ -306,3 +306,39 @@ def test_los_tres_ejercicios_de_oido_usan_el_mismo_camino():
     assert plantilla.count("audioGrande(") >= 4, (
         "algún ejercicio de oído arma su botón por su cuenta y se queda sin audio automático"
     )
+
+
+# --- Los botones que hablan ------------------------------------------------
+# Fallo real del 31-08, y el peor de todos: TODOS los botones 🔊 estaban mudos.
+# `JSON.stringify` devuelve el texto entre comillas dobles y el atributo HTML
+# también va entre comillas dobles, así que el navegador leía
+#     onclick="decir("gå")"
+# y lo cortaba en la primera comilla: el atributo quedaba en «decir(» y el
+# botón no hacía nada. Solo hablaban el audio automático (va por un atributo
+# de datos) y el de acertar (se llama desde JavaScript) — por eso costó verlo.
+
+MANEJADOR_ROTO = re.compile(r'onclick="[^"]*\$\{JSON\.stringify')
+
+
+def test_ningun_manejador_mete_comillas_dobles_en_un_atributo():
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    rotos = MANEJADOR_ROTO.findall(plantilla)
+    assert not rotos, (
+        "un onclick con JSON.stringify sin escapar: el navegador corta el "
+        f"atributo en la primera comilla y el botón queda mudo ({len(rotos)})"
+    )
+
+
+def test_todos_los_botones_que_hablan_salen_del_mismo_ayudante():
+    """Una sola puerta: si alguien arma el onclick a mano, vuelve el fallo."""
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    assert "function alPulsarDecir(" in plantilla
+    assert plantilla.count("alPulsarDecir(") >= 14, (
+        "algún botón de audio arma su propio onclick en vez de usar el ayudante"
+    )
+
+
+def test_el_ayudante_escapa_para_html():
+    plantilla = PLANTILLA.read_text(encoding="utf-8")
+    cuerpo = plantilla.split("function alPulsarDecir(", 1)[1].split("\n}", 1)[0]
+    assert "esc(js)" in cuerpo, "el ayudante no escapa el JavaScript para el atributo"
